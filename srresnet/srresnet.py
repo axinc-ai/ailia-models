@@ -18,9 +18,10 @@ net = ailia.Net(model_path,weight_path,env_id=env_id)
 ailia_input_width = net.get_input_shape()[3]
 ailia_input_height = net.get_input_shape()[2]
 
-file_name = '../images/pizza.jpg'
+file_name = './lenna.png'
 
 img = cv2.imread(file_name)
+
 img = cv2.resize(img,(ailia_input_width,ailia_input_height),interpolation=cv2.INTER_AREA)
 img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
@@ -47,4 +48,4 @@ output_img[output_img<0] = 0
 output_img[output_img>255.] = 255.            
 output_img = output_img.astype(np.int8)
 img2 = Image.fromarray(output_img, 'RGB')
-img2.save('result.jpg')
+img2.save('output.jpg')
