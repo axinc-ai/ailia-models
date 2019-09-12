@@ -12,7 +12,7 @@ import resnet50_labels
 # settings
 model_path = "./resnet50.onnx.prototxt"
 weight_path = "./resnet50.onnx"
-img_path = '../images/pizza.jpg'
+img_path = './pizza.jpg'
 
 # classifier initialize
 env_id = ailia.get_gpu_environment_id()
