@@ -12,6 +12,9 @@ import ailia
 model_path = "noise2noise_gaussian.onnx.prototxt"
 weight_path = "noise2noise_gaussian.onnx"
 
+#model_path = "noise2noise_text.onnx.prototxt"
+#weight_path = "noise2noise_text.onnx"
+
 print("downloading ...");
 
 if not os.path.exists(model_path):
