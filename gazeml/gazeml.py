@@ -5,13 +5,33 @@ import numpy as np
 import os
 import matplotlib.pyplot as plt
 import pandas as pd
+import urllib.request
 
 import ailia
 
+#model_path = "gazeml_elg_i180x108_n64.onnx.prototxt"
+#weight_path = "gazeml_elg_i180x108_n64.onnx"
+
+model_path = "gazeml_elg_i60x36_n32.onnx.prototxt"
+weight_path = "gazeml_elg_i60x36_n32.onnx"
+
+print("downloading ...");
+
+if not os.path.exists(model_path):
+    urllib.request.urlretrieve("https://storage.googleapis.com/ailia-models/gazeml/"+model_path,model_path)
+if not os.path.exists(weight_path):
+    urllib.request.urlretrieve("https://storage.googleapis.com/ailia-models/gazeml/"+weight_path,weight_path)
+
+print("loading ...");
+
+env_id=0
+#env_id=ailia.get_gpu_environment_id()
+net = ailia.Net(model_path,weight_path,env_id=env_id)
+
 IMAGE_PATH="eye.png"
 
-IMAGE_WIDTH=180
-IMAGE_HEIGHT=108
+IMAGE_WIDTH=net.get_input_shape()[2]
+IMAGE_HEIGHT=net.get_input_shape()[1]
 
 input_img = cv2.imread(IMAGE_PATH)
 
@@ -28,16 +48,19 @@ data = np.array(img, dtype=np.float32)
 data.shape = (1,1,) + data.shape
 data = data / 255.0 *2 -1.0
 
-env_id=0
-env_id=ailia.get_gpu_environment_id()
-net = ailia.Net("gazeml_elg_i180x108_n64.onnx.prototxt","gazeml_elg_i180x108_n64.onnx",env_id=env_id)
+print("inferencing ...");
 
 eyeI = np.concatenate((data, data), axis=0)
 eyeI = eyeI.reshape(2,IMAGE_HEIGHT,IMAGE_WIDTH,1)
 pred_onnx = net.predict(eyeI)
 out = pred_onnx
 
-out = net.predict(eyeI)
+cnt = 3
+for i in range(cnt):
+	start=int(round(time.time() * 1000))
+	out = net.predict(eyeI)
+	end=int(round(time.time() * 1000))
+	print("## ailia processing time , "+str(i)+" , "+str(end-start)+" ms")
 
 points = []
 threshold = 0.1
@@ -63,7 +86,7 @@ for i in range(out.shape[3]):
 		points.append(None)
 	
 cv2.imshow("Keypoints",input_img)
-cv2.imwrite('output.jpg', input_img)
+cv2.imwrite('output.png', input_img)
 
 def plot_images(title, images, tile_shape):
 	from mpl_toolkits.axes_grid1 import ImageGrid
