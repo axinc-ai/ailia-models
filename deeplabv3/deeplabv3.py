@@ -2,16 +2,12 @@ import numpy as np
 import time
 import os
 import cv2
+import urllib.request
+import sys
 
 from PIL import Image
 
-from matplotlib import gridspec
-from matplotlib import pyplot as plt
-
 import ailia
-
-import urllib.request
-import sys
 
 model_path = "deeplabv3.onnx.prototxt"
 weight_path = "deeplabv3.onnx"
