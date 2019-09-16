@@ -14,10 +14,6 @@ Range : [-1.0, 1.0]
 Shape : (21,129,129)
 Range : [0, 21.0]
 
-## Model Format
-
-ONNX opset = 10
-
 ## Category
 
 VOC
@@ -25,6 +21,10 @@ VOC
 ## Reference
 
 [Xception65 for backbone network of DeepLab v3+](https://github.com/tensorflow/models/tree/master/research/deeplab)
+
+## Model Format
+
+ONNX opset = 10
 
 ## Framework
 

@@ -14,10 +14,6 @@ Range : [0.0, 1.0]
 Shape : (1,3,256,256)
 Range : [0, 1.0]
 
-## Model Format
-
-ONNX opset = 10
-
 ## Reference
 
 [Photo-Realistic Single Image Super-Resolution Using a Generative Adversarial Network](https://github.com/twtygqyy/pytorch-SRResNet)
@@ -25,3 +21,7 @@ ONNX opset = 10
 ## Framework
 
 Pytorch 1.2.0
+
+## Model Format
+
+ONNX opset = 10
