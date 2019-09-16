@@ -2,6 +2,8 @@ import numpy as np
 import time
 import os
 import cv2
+import urllib.request
+import sys
 
 from PIL import Image
 
@@ -10,10 +12,21 @@ import ailia
 model_path = "srresnet.onnx.prototxt"
 weight_path = "srresnet.onnx"
 
+print("downloading ...");
+
+if not os.path.exists(model_path):
+    urllib.request.urlretrieve("https://storage.googleapis.com/ailia-models/srresnet/"+model_path,model_path)
+if not os.path.exists(weight_path):
+    urllib.request.urlretrieve("https://storage.googleapis.com/ailia-models/srresnet/"+weight_path,weight_path)
+
+print("loading ...");
+
 env_id=ailia.ENVIRONMENT_AUTO
 
 env_id=ailia.get_gpu_environment_id()
 net = ailia.Net(model_path,weight_path,env_id=env_id)
+
+print("inferencing ...");
 
 ailia_input_width = net.get_input_shape()[3]
 ailia_input_height = net.get_input_shape()[2]
@@ -48,4 +61,4 @@ output_img[output_img<0] = 0
 output_img[output_img>255.] = 255.            
 output_img = output_img.astype(np.int8)
 img2 = Image.fromarray(output_img, 'RGB')
-img2.save('output.jpg')
+img2.save('output.png')
