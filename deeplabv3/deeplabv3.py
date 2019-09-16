@@ -35,6 +35,9 @@ print("inferencing ...");
 file_name = './couple.jpg'
 img = cv2.imread(file_name)
 
+img_width = img.shape[0]
+img_height = img.shape[1]
+
 ailia_input_width = net.get_input_shape()[3]
 ailia_input_height = net.get_input_shape()[2]
 
@@ -45,7 +48,7 @@ img.shape = (1,) + img.shape
 img = img.transpose((0, 3, 1, 2))
 img = np.array(img)
 img = img.astype(np.float32)
-img = img / 127.0 - 0.5
+img = img / 127.0 - 1.0
 
 output_img = None
 
@@ -71,7 +74,7 @@ output_img = output_img*255. / 21
 output_img = output_img.astype(np.int8)
 
 img2 = Image.fromarray(output_img, 'RGB')
-img2 = img2.resize((ailia_input_width, ailia_input_height), Image.BICUBIC)
+img2 = img2.resize((img_width, img_height), Image.BICUBIC)
 
 numpyArray = np.array(img2)
 numpyArray[numpyArray<128] = 0

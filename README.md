@@ -19,7 +19,7 @@ The collection of pre-trained, state-of-the-art models.
 
 | Name | Detail | Exported From | Supported Version |
 |:-----------|------------:|:------------:|:------------:|
-| deeplabv3 | [Xception65 for backbone network of DeepLab v3+](https://github.com/tensorflow/models/tree/master/research/deeplab) | Chainer | 1.2.0 b2 |
+| [deeplabv3](/deeplabv3/) | [Xception65 for backbone network of DeepLab v3+](https://github.com/tensorflow/models/tree/master/research/deeplab) | Chainer | 1.2.0 b2 |
 
 ## DMS
 
