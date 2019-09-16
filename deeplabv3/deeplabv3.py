@@ -10,20 +10,33 @@ from matplotlib import pyplot as plt
 
 import ailia
 
+import urllib.request
+import sys
+
 model_path = "deeplabv3.onnx.prototxt"
 weight_path = "deeplabv3.onnx"
 
+print("downloading ...");
+
+if not os.path.exists(model_path):
+    urllib.request.urlretrieve("https://storage.googleapis.com/ailia-models/deeplabv3/"+model_path,model_path)
+if not os.path.exists(weight_path):
+    urllib.request.urlretrieve("https://storage.googleapis.com/ailia-models/deeplabv3/"+weight_path,weight_path)
+
+print("loading ...");
+
 env_id=ailia.ENVIRONMENT_AUTO
 
-env_id=ailia.get_gpu_environment_id()
+#env_id=ailia.get_gpu_environment_id()
 net = ailia.Net(model_path,weight_path,env_id=env_id)
+
+print("inferencing ...");
+
+file_name = './couple.jpg'
+img = cv2.imread(file_name)
 
 ailia_input_width = net.get_input_shape()[3]
 ailia_input_height = net.get_input_shape()[2]
-
-file_name = './couple.jpg'
-
-img = cv2.imread(file_name)
 
 img = cv2.resize(img,(ailia_input_width,ailia_input_height),interpolation=cv2.INTER_AREA)
 img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
@@ -32,7 +45,7 @@ img.shape = (1,) + img.shape
 img = img.transpose((0, 3, 1, 2))
 img = np.array(img)
 img = img.astype(np.float32)
-img = img / 255.0
+img = img / 127.0 - 0.5
 
 output_img = None
 
@@ -42,7 +55,7 @@ LABEL_NAMES = np.asarray([
     'person', 'pottedplant', 'sheep', 'sofa', 'train', 'tv'
 ])
 
-cnt = 3
+cnt = 1
 for i in range(cnt):
 	start=int(round(time.time() * 1000))
 	output_img = net.predict(img)
@@ -55,10 +68,14 @@ output_img = output_img.transpose((0,2,3,1))
 shape = output_img.shape
 output_img = output_img.reshape((shape[1],shape[2],shape[3]))
 output_img = output_img*255. / 21
-output_img[output_img<128] = 0
-output_img[output_img>128] = 255.      
 output_img = output_img.astype(np.int8)
 
 img2 = Image.fromarray(output_img, 'RGB')
 img2 = img2.resize((ailia_input_width, ailia_input_height), Image.BICUBIC)
-img2.save('output.jpg')
+
+numpyArray = np.array(img2)
+numpyArray[numpyArray<128] = 0
+numpyArray[numpyArray>128] = 255.      
+img2 = Image.fromarray(numpyArray, 'RGB')
+
+img2.save('output.png')
