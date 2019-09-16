@@ -23,7 +23,7 @@ Range : [-127.0, 127.0]
 
 ## Reference
 
-[Photo-Realistic Single Image Super-Resolution Using a Generative Adversarial Network](https://github.com/twtygqyy/pytorch-SRResNet)
+[Deep Residual Learning for Image Recognition]( https://github.com/KaimingHe/deep-residual-networks)
 
 ## Model Format
 
