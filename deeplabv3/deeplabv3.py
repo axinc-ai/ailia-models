@@ -31,8 +31,8 @@ print("inferencing ...");
 file_name = './couple.jpg'
 img = cv2.imread(file_name)
 
-img_width = img.shape[0]
-img_height = img.shape[1]
+img_width = img.shape[1]
+img_height = img.shape[0]
 
 ailia_input_width = net.get_input_shape()[3]
 ailia_input_height = net.get_input_shape()[2]
