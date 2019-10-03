@@ -21,9 +21,8 @@ if not os.path.exists(weight_path):
 
 print("loading ...");
 
-env_id=ailia.ENVIRONMENT_AUTO
-
-#env_id=ailia.get_gpu_environment_id()
+#env_id=ailia.ENVIRONMENT_AUTO
+env_id=ailia.get_gpu_environment_id()
 net = ailia.Net(model_path,weight_path,env_id=env_id)
 
 print("inferencing ...");
@@ -73,8 +72,11 @@ img2 = Image.fromarray(output_img, 'RGB')
 img2 = img2.resize((img_width, img_height), Image.BICUBIC)
 
 numpyArray = np.array(img2)
-numpyArray[numpyArray<128] = 0
-numpyArray[numpyArray>128] = 255.      
+th = 160
+numpyArray[numpyArray<th] = 0
+numpyArray[numpyArray>th] = 255.      
 img2 = Image.fromarray(numpyArray, 'RGB')
 
 img2.save('output.png')
+
+#print(net.get_summary())
