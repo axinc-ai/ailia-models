@@ -33,7 +33,7 @@ for i in range(10):
     end = int(round(time.time() * 1000))
     print("ailia processing time {} ms".format(end-start))
 
-fig = plt.figure(figsize=(6, 6))
+fig = plt.figure(figsize=(3, 3))
 plt.show()
 ax = fig.add_axes([0, 0, 1, 1])
 ax.imshow(img.reshape(96, 96))
