@@ -9,11 +9,11 @@ import ailia
 
 
 model_names = ['resnet50', 'vgg16_bn', 'pdresnet50', 'pdresnet101', 'pdresnet152']
-img_name = "test_5652.JPEG"
+img_name = "test_5735.JPEG"
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--arch', '-a', metavar='ARCH', default='pdresnet50', choices=model_names,
-                    help='model architecture: ' + ' | '.join(model_names) + ' (default: pdresnet50)')
+parser.add_argument('--arch', '-a', metavar='ARCH', default='pdresnet152', choices=model_names,
+                    help='model architecture: ' + ' | '.join(model_names) + ' (default: pdresnet152)')
 args = parser.parse_args()
 model_name = args.arch
 
