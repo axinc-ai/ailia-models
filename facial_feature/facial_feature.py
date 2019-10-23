@@ -23,6 +23,7 @@ img = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE).reshape(1, 1, 96, 96) / 255
 
 # net initialize
 env_id = ailia.get_gpu_environment_id()
+print(env_id)
 net = ailia.Net(model_path, weight_path, env_id=env_id)
 
 # compute time
