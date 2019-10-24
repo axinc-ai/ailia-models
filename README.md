@@ -7,6 +7,7 @@ The collection of pre-trained, state-of-the-art models.
 | Name | Detail | Exported From | Supported Version |
 |:-----------|------------:|:------------:|:------------:|
 | [resnet50](/resnet50/) | [Deep Residual Learning for Image Recognition]( https://github.com/KaimingHe/deep-residual-networks) | Chainer | 1.2.0 b1 |
+| [mobilenetv2](/mobilenetv2/)|[PyTorch Implemention of MobileNet V2](https://github.com/d-li14/mobilenetv2.pytorch)|Pytorch| 1.2.0 b1 |
 
 ## Image manipulation
 
