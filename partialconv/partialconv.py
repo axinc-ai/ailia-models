@@ -24,7 +24,7 @@ with open("label.txt") as f:
         (key, val) = line.split(':')
         LABEL[int(key)] = val
 
-weight_path = model_name + "/" + model_name + ".onnx"
+weight_path = model_name + ".onnx"
 model_path = weight_path + ".prototxt"
 
 if not os.path.exists(model_path):

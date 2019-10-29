@@ -1,5 +1,13 @@
 # Partial Convolution
 
+### Execution
+```shell script
+python3 partialconv.py -a pdresnet152
+```
+5 models are currently available.  
+['resnet50', 'vgg16_bn', 'pdresnet50', 'pdresnet101', 'pdresnet152']
+
+
 ### input
 ![input_image](https://github.com/sngyo/ailia-models/blob/master/partialconv/test_5735.JPEG)
 
@@ -22,4 +30,4 @@ The predicted label is dumbbell
 PyTorch 1.2.0
 
 ### Model Format
-ONNX opset = 10
+ONNX opset = 10 
