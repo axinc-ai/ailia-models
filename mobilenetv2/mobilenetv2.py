@@ -11,8 +11,13 @@ import ailia
 import mobilenetv2_labels
 
 # settings
-model_path = "mobilenetv2_1.0.onnx.prototxt"
-weight_path = "mobilenetv2_1.0.onnx"
+OPT_MODEL=True
+if OPT_MODEL:
+    model_path = "mobilenetv2_1.0.opt.onnx.prototxt"
+    weight_path = "mobilenetv2_1.0.opt.onnx"
+else:
+    model_path = "mobilenetv2_1.0.onnx.prototxt"
+    weight_path = "mobilenetv2_1.0.onnx"
 img_path = './clock.jpg'
 
 # model download
