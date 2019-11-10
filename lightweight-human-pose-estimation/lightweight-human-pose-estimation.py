@@ -8,8 +8,13 @@ import urllib.request
 
 import ailia
 
-model_path = "lightweight-human-pose-estimation.onnx.prototxt"
-weight_path = "lightweight-human-pose-estimation.onnx"
+OPT_MODEL=True
+if OPT_MODEL:
+	model_path = "lightweight-human-pose-estimation.opt.onnx.prototxt"
+	weight_path = "lightweight-human-pose-estimation.opt.onnx"
+else:
+	model_path = "lightweight-human-pose-estimation.onnx.prototxt"
+	weight_path = "lightweight-human-pose-estimation.onnx"
 
 print("downloading ...");
 
