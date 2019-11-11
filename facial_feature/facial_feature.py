@@ -39,4 +39,4 @@ ax = fig.add_axes([0, 0, 1, 1])
 ax.imshow(img.reshape(96, 96))
 points = np.vstack(np.split(preds_ailia, 15)).T * 48 + 48
 ax.plot(points[0], points[1], 'o', color='red')
-fig.savefig('result.png')
+fig.savefig('output.png')
