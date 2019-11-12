@@ -9,8 +9,13 @@ from PIL import Image
 
 import ailia
 
-model_path = "deeplabv3.onnx.prototxt"
-weight_path = "deeplabv3.onnx"
+OPT_MODEL=True
+if OPT_MODEL:
+    model_path = "deeplabv3.opt.onnx.prototxt"
+    weight_path = "deeplabv3.opt.onnx"
+else:
+    model_path = "deeplabv3.onnx.prototxt"
+    weight_path = "deeplabv3.onnx"
 
 print("downloading ...");
 

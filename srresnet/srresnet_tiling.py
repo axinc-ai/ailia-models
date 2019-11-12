@@ -16,8 +16,13 @@ else:
   print("usage: python srresnet_tiling.py input.png output.png")
   sys.exit(1)
 
-model_path = "srresnet.onnx.prototxt"
-weight_path = "srresnet.onnx"
+OPT_MODEL=True
+if OPT_MODEL:
+  model_path = "srresnet.opt.onnx.prototxt"
+  weight_path = "srresnet.opt.onnx"
+else:
+  model_path = "srresnet.onnx.prototxt"
+  weight_path = "srresnet.onnx"
 
 if not os.path.exists(model_path):
     urllib.request.urlretrieve("https://storage.googleapis.com/ailia-models/srresnet/"+model_path,model_path)

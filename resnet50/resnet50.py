@@ -11,8 +11,13 @@ import ailia
 import resnet50_labels
 
 # settings
-model_path = "resnet50.onnx.prototxt"
-weight_path = "resnet50.onnx"
+OPT_MODEL=True
+if OPT_MODEL:
+    model_path = "resnet50.opt.onnx.prototxt"
+    weight_path = "resnet50.opt.onnx"
+else:
+    model_path = "resnet50.onnx.prototxt"
+    weight_path = "resnet50.onnx"
 img_path = './pizza.jpg'
 
 # model download

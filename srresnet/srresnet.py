@@ -9,8 +9,13 @@ from PIL import Image
 
 import ailia
 
-model_path = "srresnet.onnx.prototxt"
-weight_path = "srresnet.onnx"
+OPT_MODEL=True
+if OPT_MODEL:
+	model_path = "srresnet.opt.onnx.prototxt"
+	weight_path = "srresnet.opt.onnx"
+else:
+	model_path = "srresnet.onnx.prototxt"
+	weight_path = "srresnet.onnx"
 
 print("downloading ...");
 
