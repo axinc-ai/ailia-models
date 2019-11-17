@@ -39,7 +39,7 @@ gender_model_path = "gender_miniXception.prototxt"
 if not os.path.exists(gender_model_path):
     urllib.request.urlretrieve("https://storage.googleapis.com/ailia-models/face_classification/" + gender_model_path, gender_model_path)
 if not os.path.exists(gender_weight_path):
-    urllib.request.urlretrieve("https://storage.googleapis.com/ailia-models/face_classification/" + gender_weight_path, egender_weight_path)
+    urllib.request.urlretrieve("https://storage.googleapis.com/ailia-models/face_classification/" + gender_weight_path, gender_weight_path)
 
 print("loading ...");
 
