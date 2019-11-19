@@ -31,4 +31,4 @@ ONNX opset = 10
 
 ## Framework
 
-Pytorch 1.2.0
+Chainer 6.3.0
