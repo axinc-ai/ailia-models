@@ -32,30 +32,39 @@ if not os.path.exists(weight_path):
 print("loading ...");
 
 env_id = ailia.get_gpu_environment_id()
-classifier = ailia.Classifier(model_path, weight_path, env_id=env_id, format=ailia.NETWORK_IMAGE_FORMAT_RGB, range=ailia.NETWORK_IMAGE_RANGE_U_FP32)
+net = ailia.Net(model_path, weight_path, env_id=env_id)
 
 # load input image and convert to BGRA
 print("inferencing ...");
 
 img = cv2.imread( img_path, cv2.IMREAD_UNCHANGED )
-if img.shape[2] == 3 :
-    img = cv2.cvtColor( img, cv2.COLOR_BGR2BGRA )
-elif img.shape[2] == 1 : 
-    img = cv2.cvtColor( img, cv2.COLOR_GRAY2BGRA )
+
+# preprocessing
+mean = [0.485, 0.456, 0.406]  # mean of ImageNet dataset
+std = [0.229, 0.224, 0.225]  # std of ImageNet dataset
+img = cv2.resize(img, (256, 256))  # resize image
+# center clop & normalize between 0 and 1
+img = np.array(img[16:240, 16:240], dtype='float64') / 255  
+for i in range(3):  # normalize image
+    img[:, :, i] = (img[:, :, i] - mean[i]) / std[i]
+
+# [x, y, channel] --> [1, channel, x, y]
+img = np.expand_dims(np.rollaxis(img, 2, 0), axis=0) 
+
 
 # compute
 max_class_count = 3
-classifier.compute(img, max_class_count)
+preds_ailia = net.predict(img)[0]
 
 # get result
-count = classifier.get_class_count()
+top = preds_ailia.argsort()[-1 * max_class_count:][::-1]
 
-print("class_count=" + str(count))
+print("class_count={}".format(max_class_count))
 
-for idx  in range(count) :
+for idx  in range(max_class_count) :
     # print result
     print("+ idx=" + str(idx))
-    info = classifier.get_class(idx)
-    print("  category=" + str(info.category) + "[ " + mobilenetv2_labels.imagenet_category[info.category] + " ]" )
-    print("  prob=" + str(info.prob) )
+    print("  category={}".format(top[idx]) + "[ " +
+          mobilenetv2_labels.imagenet_category[top[idx]] + " ]" )
+    print("  prob={}".format(preds_ailia[top[idx]]))
 
