@@ -1,4 +1,4 @@
-# yolov1-tiny
+# yolov3-tiny
 
 ## Input
 
