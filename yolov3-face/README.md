@@ -17,7 +17,7 @@ Range : [0.0, 1.0]
 
 ## Reference
 
-- TBD
+- [Face detection using keras-yolov3](https://github.com/axinc-ai/yolov3-face)
 
 ## Framework
 

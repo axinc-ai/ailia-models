@@ -10,7 +10,7 @@ import urllib.request
 
 model_path = "yolov3-tiny.opt.onnx.prototxt"
 weight_path = "yolov3-tiny.opt.onnx"
-img_path = "couple.jpg"
+img_path = "sheep.jpg"
 
 print("downloading ...");
 
@@ -25,6 +25,7 @@ print("loading ...");
 env_id = ailia.get_gpu_environment_id()
 categories = 80
 detector = ailia.Detector(model_path, weight_path, categories, format=ailia.NETWORK_IMAGE_FORMAT_RGB, channel=ailia.NETWORK_IMAGE_CHANNEL_FIRST, range=ailia.NETWORK_IMAGE_RANGE_U_FP32, algorithm=ailia.DETECTOR_ALGORITHM_YOLOV3, env_id=env_id)
+detector.set_input_shape(128,128)
 
 # load input image and convert to BGRA
 img = cv2.imread( img_path, cv2.IMREAD_UNCHANGED )
@@ -67,9 +68,6 @@ coco_category=[
 count = detector.get_object_count()
 
 print("object_count=" + str(count))
-
-detector.set_input_shape(416,416)
-
 
 for idx  in range(count) :
     # print result
