@@ -42,7 +42,7 @@ img = img[...,::-1]  #BGR 2 RGB
 
 data = np.array(img, dtype=np.float32)
 data.shape = (1,) + data.shape
-data = data / 255.0
+data = (data - 128) / 255.0
 data = data.transpose((0, 3, 1, 2))
 
 print("inferencing ...");

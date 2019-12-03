@@ -5,7 +5,7 @@
 ![Input](balloon.png)
 
 Shape : (1, 3, 240, 320)
-Range : [0.0, 1.0]
+Range : [-0.5, 0.5]
 
 ## Output
 
