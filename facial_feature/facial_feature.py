@@ -8,14 +8,21 @@ import numpy as np
 import ailia
 
 
-img_path = "test.png"
+img_path = "face.jpeg"
+# img_path = "test.png"
 weight_path = "resnet_facial_feature.onnx"
 model_path = "resnet_facial_feature.onnx.prototxt"
 
 if not os.path.exists(model_path):
-    urllib.request.urlretrieve("https://storage.googleapis.com/ailia-models/resnet_facial_feature/" + model_path, model_path)
+    urllib.request.urlretrieve(
+        "https://storage.googleapis.com/ailia-models/resnet_facial_feature/"
+        + model_path, model_path
+    )
 if not os.path.exists(weight_path):
-    urllib.request.urlretrieve("https://storage.googleapis.com/ailia-models/resnet_facial_feature/" + weight_path, weight_path)
+    urllib.request.urlretrieve(
+        "https://storage.googleapis.com/ailia-models/resnet_facial_feature/"
+        + weight_path, weight_path
+    )
 
 
 # load dataset
