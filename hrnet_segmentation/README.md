@@ -18,8 +18,12 @@ We have three pretrained-model
 python3 hrnet_segmentation.py -a HRNetV2-W48
 ```
 
+### Reference
+[High-resolution networks (HRNets) for Semantic Segmentation](https://github.com/HRNet/HRNet-Semantic-Segmentation)
+
 ### Framework
 PyTorch 0.4.1
 
 ### Model Format
-ONNX opset = 10
+ONNX opset = 1
+

@@ -84,6 +84,7 @@ def save_pred(preds, sv_path, name):
         pred = convert_label(preds[i], inverse=True)
         save_img = Image.fromarray(pred)
         save_img.putpalette(palette)
+        save_img = save_img.resize((1024, 2048))
         save_img.save(os.path.join(sv_path, name[i]+'.png'))
 
 
