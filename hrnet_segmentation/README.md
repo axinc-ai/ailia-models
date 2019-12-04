@@ -9,12 +9,12 @@ Shape: (1, 3, 512, 1024) Range:[0, 1]
 ![Result_image](https://github.com/sngyo/ailia-models/blob/master/hrnet_segmentation/result.png)
 
 ### Usage
-We have three pretrained-model
+We have three pretrained-model.
 - HRNetV2-W48
 - HRNetV2-W18-Small-v1
-- HRNetV2-W18-Small-v2
+- HRNetV2-W18-Small-v2 (default)
 
-```python3
+```bash
 python3 hrnet_segmentation.py -a HRNetV2-W48
 ```
 
