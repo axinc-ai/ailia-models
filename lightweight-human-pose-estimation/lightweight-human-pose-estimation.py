@@ -25,7 +25,6 @@ if not os.path.exists(weight_path):
 
 print("loading ...");
 
-env_id=0
 env_id=ailia.get_gpu_environment_id()
 net = ailia.Net(model_path,weight_path,env_id=env_id)
 
