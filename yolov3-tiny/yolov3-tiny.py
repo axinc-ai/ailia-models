@@ -10,7 +10,7 @@ import urllib.request
 
 model_path = "yolov3-tiny.opt.onnx.prototxt"
 weight_path = "yolov3-tiny.opt.onnx"
-img_path = "sheep.jpg"
+img_path = "couple.jpg"
 
 print("downloading ...");
 
