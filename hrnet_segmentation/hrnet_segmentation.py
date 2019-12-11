@@ -26,11 +26,12 @@ model_name = args.arch
 weight_path = "checkpoints/" + model_name + ".onnx"
 model_path = weight_path + ".prototxt"
 
+rmt_ckpt = "https://storage.googleapis.com/ailia-models/hrnet_segmentation/"
 
 if not os.path.exists(model_path):
-   urllib.request.urlretrieve("https://storage.googleapis.com/ailia-models/hrnet_segmentation/" + model_path, model_path)
+    urllib.request.urlretrieve(rmt_ckpt + model_path, model_path)
 if not os.path.exists(weight_path):
-   urllib.request.urlretrieve("https://storage.googleapis.com/ailia-models/hrnet_segmentation/" + weight_path, weight_path)
+    urllib.request.urlretrieve(rmt_ckpt + weight_path, weight_path)
 
 print("Weight path: " + weight_path)
 
@@ -89,7 +90,6 @@ def save_pred(preds, sv_path, name):
 
 
 # load dataset
-# TODO resize should be removed here
 img = cv2.resize(cv2.imread(img_path), (1024, 512))
 img = np.array([img.transpose(2, 0, 1) / 255])
 
