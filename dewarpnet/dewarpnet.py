@@ -9,25 +9,27 @@ import ailia
 
 img_path = "test.png"
 
-bm_weight_path = "checkpoints/bm_model.onnx"
-wc_weight_path = "checkpoints/wc_model.onnx"
+bm_weight_path = "bm_model.onnx"
+wc_weight_path = "wc_model.onnx"
 bm_model_path = bm_weight_path + ".prototxt"
 wc_model_path = wc_weight_path + ".prototxt"
 
 
-rmt_chkpt = "https://storage.googleapis.com/ailia-models/dewarpnet/"
+rmt_ckpt = "https://storage.googleapis.com/ailia-models/dewarpnet/"
+
+print("loading model...")
 
 # BM
 if not os.path.exists(bm_model_path):
-    urllib.request.urlretrieve(rmt_chkpt + bm_model_path, bm_model_path)
+    urllib.request.urlretrieve(rmt_ckpt + bm_model_path, bm_model_path)
 if not os.path.exists(bm_weight_path):
-    urllib.request.urlretrieve(rmt_chkpt + bm_weight_path, bm_weight_path)
+    urllib.request.urlretrieve(rmt_ckpt + bm_weight_path, bm_weight_path)
 
 # WC
 if not os.path.exists(wc_model_path):
-    urllib.request.urlretrieve(rmt_chkpt + wc_model_path, wc_model_path)
+    urllib.request.urlretrieve(rmt_ckpt + wc_model_path, wc_model_path)
 if not os.path.exists(wc_weight_path):
-    urllib.request.urlretrieve(rmt_chkpt + wc_weight_path, wc_weight_path)
+    urllib.request.urlretrieve(rmt_ckpt + wc_weight_path, wc_weight_path)
 
 
 def grid_sample(img, grid):

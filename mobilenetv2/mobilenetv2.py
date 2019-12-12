@@ -23,10 +23,12 @@ img_path = './clock.jpg'
 # model download
 print("downloading ...");
 
+rmt_ckpt = "https://storage.googleapis.com/ailia-models/mobilenetv2/"
+
 if not os.path.exists(model_path):
-    urllib.request.urlretrieve("https://storage.googleapis.com/ailia-models/mobilenetv2/"+model_path,model_path)
+    urllib.request.urlretrieve(rmt_ckpt + model_path, model_path)
 if not os.path.exists(weight_path):
-    urllib.request.urlretrieve("https://storage.googleapis.com/ailia-models/mobilenetv2/"+weight_path,weight_path)
+    urllib.request.urlretrieve(rmt_ckpt + weight_path,weight_path)
 
 # classifier initialize
 print("loading ...");

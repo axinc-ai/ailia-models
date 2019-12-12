@@ -23,10 +23,10 @@ args = parser.parse_args()
 model_name = args.arch
 
 
-weight_path = "checkpoints/" + model_name + ".onnx"
+weight_path = model_name + ".onnx"
 model_path = weight_path + ".prototxt"
 
-rmt_ckpt = "https://storage.googleapis.com/ailia-models/hrnet_segmentation/"
+rmt_ckpt = "https://storage.googleapis.com/ailia-models/hrnet/"
 
 if not os.path.exists(model_path):
     urllib.request.urlretrieve(rmt_ckpt + model_path, model_path)
