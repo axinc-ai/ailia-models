@@ -7,19 +7,24 @@ import numpy as np
 
 import ailia
 
+# TODO adapting 96 and 226
 
-img_path = "test.png"
+img_path = "face.jpeg"
+# img_path = "test.png"
 weight_path = "resnet_facial_feature.onnx"
 model_path = "resnet_facial_feature.onnx.prototxt"
 
+rmt_ckpt = "https://storage.googleapis.com/ailia-models/resnet_facial_feature/"
+
 if not os.path.exists(model_path):
-    urllib.request.urlretrieve("https://storage.googleapis.com/ailia-models/resnet_facial_feature/" + model_path, model_path)
+    urllib.request.urlretrieve(rmt_ckpt + model_path, model_path)
 if not os.path.exists(weight_path):
-    urllib.request.urlretrieve("https://storage.googleapis.com/ailia-models/resnet_facial_feature/" + weight_path, weight_path)
+    urllib.request.urlretrieve(rmt_ckpt + weight_path, weight_path)
 
 
 # load dataset
-img = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE).reshape(1, 1, 96, 96) / 255
+img = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE)
+img = cv2.resize(img, (226, 226)).reshape(1, 1, 226, 226) / 255
 
 # net initialize
 env_id = ailia.get_gpu_environment_id()
@@ -36,7 +41,7 @@ for i in range(10):
 fig = plt.figure(figsize=(3, 3))
 plt.show()
 ax = fig.add_axes([0, 0, 1, 1])
-ax.imshow(img.reshape(96, 96))
-points = np.vstack(np.split(preds_ailia, 15)).T * 48 + 48
+ax.imshow(img.reshape(226, 226))
+points = np.vstack(np.split(preds_ailia, 15)).T * 113 + 113
 ax.plot(points[0], points[1], 'o', color='red')
 fig.savefig('output.png')

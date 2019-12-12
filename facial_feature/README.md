@@ -3,7 +3,7 @@
 ### input
 ![input_image](test.png)
 
-Shape: (1, 1, 96, 96) Range:[0, 1]
+Shape: (1, 1, 226, 226) Range:[0, 1]
 
 ### output
 ![Result_image](output.png)
