@@ -1,10 +1,10 @@
 # DewarpNet
 
 ### input
-![input_image](https://github.com/sngyo/ailia-models/blob/master/dewarpnet/test.png)
+![input_image](test.png)
 
 ### output
-![Result_image](https://github.com/sngyo/ailia-models/blob/master/dewarpnet/output.png)  
+![Result_image](output.png)  
 Shape: same with input image
 
 ### Usage
@@ -13,7 +13,7 @@ python3 dewarpnet.py
 ```
 
 ### Reference
-[DewarpNet](https://github.com/cvlab-stonybrook/DewarpNet)
+[DewarpNet: Single-Image Document Unwarping With Stacked 3D and 2D Regression Networks](https://github.com/cvlab-stonybrook/DewarpNet)
 
 ### Framework
 PyTorch 1.3.1
