@@ -26,5 +26,5 @@ python3 hrnet_segmentation.py -a HRNetV2-W48
 PyTorch 0.4.1
 
 ### Model Format
-ONNX opset = 1
+ONNX opset = 10
 
