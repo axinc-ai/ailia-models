@@ -23,7 +23,7 @@ def transfer(image, mask):
     return dst
 
 
-img_path = input("image name: ")
+img_path = input("image name (00041.jpg, 00053.jpg): ")
 
 weight_path = "hair_segmentation.onnx"
 model_path = weight_path + ".prototxt"
