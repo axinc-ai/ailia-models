@@ -38,10 +38,13 @@ if not os.path.exists(model_path):
 if not os.path.exists(weight_path):
     urllib.request.urlretrieve(rmt_ckpt + weight_path, weight_path)
 
+# preprocessing
 img = cv2.imread(img_path)
 img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 img = cv2.resize((img / 255), (224, 224))
 img = img.reshape((1,) + img.shape)
+# print(img.shape) -> (1, 224, 224, 3)
+
 
 # net initialize
 env_id = ailia.get_gpu_environment_id()
@@ -49,17 +52,15 @@ print("Environment mode: {} (-1: CPU, 1: GPU)".format(env_id))
 
 net = ailia.Net(model_path, weight_path, env_id=env_id)
 
-
 # compute time
 for i in range(1):
     start = int(round(time.time() * 1000))
-    
-    predict = net(img).reshape((224, 224))
-    
+    pred = net.predict(img)
     end = int(round(time.time() * 1000))
     print("ailia processing time {} ms".format(end-start))
 
-dst = transfer(img, predict)
+pred = pred.reshape((224, 224))
+dst = transfer(img, pred)
 cv2.imwrite("output.png", dst)
 
 print('Successfully finished !')
