@@ -3,6 +3,7 @@ import numpy as np
 import time
 import os
 import cv2
+import urllib.request
 
 import ailia
 import ailia_pose_estimator
