@@ -11,7 +11,7 @@ Range : [-0.5, 0.5]
 
 ![Output](output.png)
 
-- category : [0,19]
+- category : [0,79]
 - probablity : [0.0,1.0]
 - position : x, y, w, h [0,1]
 
