@@ -24,10 +24,11 @@ print("loading ...");
 
 # detector initialize
 env_id = ailia.get_gpu_environment_id()
-categories = 20
+categories = 80
 detector = ailia.Detector(model_path, weight_path, categories, format=ailia.NETWORK_IMAGE_FORMAT_RGB, channel=ailia.NETWORK_IMAGE_CHANNEL_FIRST, range=ailia.NETWORK_IMAGE_RANGE_S_FP32, algorithm=ailia.DETECTOR_ALGORITHM_YOLOV2, env_id=env_id)
 
-anchors=numpy.array([1.08, 1.19, 3.42, 4.41, 6.63, 11.38, 9.42, 5.11, 16.62, 10.52])    #voc anchors
+anchors=numpy.array([0.57273, 0.677385, 1.87446, 2.06253, 3.33843, 5.47434, 7.88282, 3.52778, 9.77052, 9.16828])    #coco anchors
+
 detector.set_anchors(anchors)
 
 # load input image and convert to BGRA
@@ -51,27 +52,20 @@ iou = 0.45
 detector.compute(img, threshold, iou)
 
 # category
-voc_category=[
-    "aeroplane",
-    "bicycle",
-    "bird",
-    "boat",
-    "bottle",
-    "bus",
-    "car",
-    "cat",
-    "chair",
-    "cow",
-    "diningtable",
-    "dog",
-    "horse",
-    "motorbike",
-    "person",
-    "pottedplant",
-    "sheep",
-    "sofa",
-    "train",
-    "tvmonitor"
+coco_category=[
+	"person", "bicycle", "car", "motorcycle", "airplane", "bus", "train",
+	"truck", "boat", "traffic light", "fire hydrant", "stop sign",
+	"parking meter", "bench", "bird", "cat", "dog", "horse", "sheep", "cow",
+	"elephant", "bear", "zebra", "giraffe", "backpack", "umbrella",
+	"handbag", "tie", "suitcase", "frisbee", "skis", "snowboard",
+	"sports ball", "kite", "baseball bat", "baseball glove", "skateboard",
+	"surfboard", "tennis racket", "bottle", "wine glass", "cup", "fork",
+	"knife", "spoon", "bowl", "banana", "apple", "sandwich", "orange",
+	"broccoli", "carrot", "hot dog", "pizza", "donut", "cake", "chair",
+	"couch", "potted plant", "bed", "dining table", "toilet", "tv",
+	"laptop", "mouse", "remote", "keyboard", "cell phone", "microwave",
+	"oven", "toaster", "sink", "refrigerator", "book", "clock", "vase",
+	"scissors", "teddy bear", "hair drier", "toothbrush"
 ]
 
 # get result
@@ -83,7 +77,7 @@ for idx  in range(count) :
     # print result
     print("+ idx=" + str(idx))
     obj = detector.get_object(idx)
-    print("  category=" + str(obj.category) + "[ " + voc_category[obj.category] + " ]" )
+    print("  category=" + str(obj.category) + "[ " + coco_category[obj.category] + " ]" )
     print("  prob=" + str(obj.prob) )
     print("  x=" + str(obj.x) )
     print("  y=" + str(obj.y) )
@@ -95,7 +89,7 @@ for idx  in range(count) :
 
     # update image
     cv2.rectangle( work, top_left, bottom_right, (0, 0, 255, 255), 4)
-    cv2.putText( work, voc_category[obj.category], text_position, cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255, 255), 1)
+    cv2.putText( work, coco_category[obj.category], text_position, cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255, 255), 1)
 
 # save image
 cv2.imwrite( "output.png", work)
