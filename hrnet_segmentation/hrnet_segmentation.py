@@ -1,4 +1,4 @@
-import cv2
+# import cv2
 import time
 import os
 import urllib.request
@@ -90,7 +90,9 @@ def save_pred(preds, sv_path, name):
 
 
 # load dataset
-img = cv2.resize(cv2.imread(img_path), (1024, 512))
+# img = cv2.resize(cv2.imread(img_path), (1024, 512))
+img = Image.open(img_path).resize((1024, 512))
+img = np.array(img)
 img = np.array([img.transpose(2, 0, 1) / 255])
 
 # net initialize
