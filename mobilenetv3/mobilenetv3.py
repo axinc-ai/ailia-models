@@ -22,12 +22,12 @@ model_path = weight_path + '.prototxt'
 img_path = './clock.jpg'
 
 # model download
-print("downloading ...")
 rmt_ckpt = "https://storage.googleapis.com/ailia-models/mobilenetv3/"
 if not os.path.exists(model_path):
+    print("downloading ...")
     urllib.request.urlretrieve(rmt_ckpt + model_path, model_path)
 if not os.path.exists(weight_path):
-    urllib.request.urlretrieve(rmt_ckpt + weight_path,weight_path)
+    urllib.request.urlretrieve(rmt_ckpt + weight_path, weight_path)
 
 # classifier initialize
 env_id = ailia.get_gpu_environment_id()
