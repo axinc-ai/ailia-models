@@ -9,8 +9,8 @@ import ailia
 
 # TODO adapting 96 and 226
 
-img_path = "face.jpeg"
-# img_path = "test.png"
+# img_path = input("input image name: ")
+img_path = "test.png"
 weight_path = "resnet_facial_feature.onnx"
 model_path = "resnet_facial_feature.onnx.prototxt"
 

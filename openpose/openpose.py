@@ -8,26 +8,21 @@ import urllib.request
 import ailia
 import ailia_pose_estimator
 
-#require ailia SDK 1.2.1
+#OPENPOSE: MULTIPERSON KEYPOINT DETECTION
+#SOFTWARE LICENSE AGREEMENT
+#ACADEMIC OR NON-PROFIT ORGANIZATION NONCOMMERCIAL RESEARCH USE ONLY
 
-OPT_MODEL=True
-if OPT_MODEL:
-	model_path = "lightweight-human-pose-estimation.opt.onnx.prototxt"
-	weight_path = "lightweight-human-pose-estimation.opt.onnx"
-else:
-	model_path = "lightweight-human-pose-estimation.onnx.prototxt"
-	weight_path = "lightweight-human-pose-estimation.onnx"
+model_path = "pose_deploy.prototxt"
+weight_path = "pose_iter_440000.caffemodel"
 
 print("downloading ...");
 
-if not os.path.exists(model_path):
-    urllib.request.urlretrieve("https://storage.googleapis.com/ailia-models/lightweight-human-pose-estimation/"+model_path,model_path)
 if not os.path.exists(weight_path):
-    urllib.request.urlretrieve("https://storage.googleapis.com/ailia-models/lightweight-human-pose-estimation/"+weight_path,weight_path)
+    urllib.request.urlretrieve("http://posefs1.perception.cs.cmu.edu/OpenPose/models/pose/coco/"+weight_path,weight_path)
 
 print("loading ...");
 
-algorithm = ailia_pose_estimator.ALGORITHM_LW_HUMAN_POSE
+algorithm = ailia_pose_estimator.ALGORITHM_OPEN_POSE
 
 ailia_input_width = 320
 ailia_input_height = 240
