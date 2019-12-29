@@ -23,7 +23,8 @@ def transfer(image, mask):
     return dst
 
 
-img_path = input("image name (00041.jpg, 00053.jpg): ")
+# img_path = input("image name (00041.jpg, 00053.jpg): ")
+img_path = "input.jpg"
 
 weight_path = "hair_segmentation.onnx"
 model_path = weight_path + ".prototxt"
@@ -40,10 +41,11 @@ if not os.path.exists(weight_path):
 
 # preprocessing
 img = cv2.imread(img_path)
-img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-img = cv2.resize((img / 255), (224, 224))
-img = img.reshape((1,) + img.shape)
-# print(img.shape) -> (1, 224, 224, 3)
+input_img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+input_img = cv2.resize(input_img, (224, 224))
+input_img = input_img / 255
+input_img = input_img.reshape((1,) + input_img.shape)
+# print(input_img.shape) -> (1, 224, 224, 3)
 
 
 # net initialize
@@ -51,11 +53,12 @@ env_id = ailia.get_gpu_environment_id()
 print("Environment mode: {} (-1: CPU, 1: GPU)".format(env_id))
 
 net = ailia.Net(model_path, weight_path, env_id=env_id)
+net.set_input_shape(input_img.shape)
 
 # compute time
-for i in range(1):
+for i in range(10):
     start = int(round(time.time() * 1000))
-    pred = net.predict(img)
+    pred = net.predict(input_img)
     end = int(round(time.time() * 1000))
     print("ailia processing time {} ms".format(end-start))
 
