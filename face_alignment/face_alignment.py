@@ -23,7 +23,7 @@ print("loading ...");
 env_id=ailia.get_gpu_environment_id()
 net = ailia.Net(model_path,weight_path,env_id=env_id)
 
-IMAGE_PATH="lenna.png"
+IMAGE_PATH="aflw-test.jpg"
 
 IMAGE_WIDTH=net.get_input_shape()[3]
 IMAGE_HEIGHT=net.get_input_shape()[2]
@@ -36,7 +36,7 @@ img = img[...,::-1]  #BGR 2 RGB
 
 data = np.array(img, dtype=np.float32)
 data.shape = (1,) + data.shape
-data = (data - 128) / 255.0
+data = data / 255.0
 data = data.transpose((0, 3, 1, 2))
 
 print("inferencing ...");
@@ -53,10 +53,8 @@ for i in range(cnt):
 	end=int(round(time.time() * 1000))
 	print("## ailia processing time , "+str(i)+" , "+str(end-start)+" ms")
 
-confidence = net.get_blob_data(net.find_blob_index_by_name("397"))
-paf = net.get_blob_data(net.find_blob_index_by_name("400"))
+confidence = out
 
-print("PAF SHAPE : "+str(paf.shape))
 print("CONFIDENCE SHAPE : "+str(confidence.shape))
 
 points = []
@@ -72,8 +70,6 @@ for i in range(confidence.shape[1]):
 	if prob > threshold : 
 		circle_size = 4
 		cv2.circle(input_img, (int(x), int(y)), circle_size, (0, 255, 255), thickness=-1, lineType=cv2.FILLED)
-		#cv2.putText(input_img, "{}".format(i), (int(x), int(y)), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 0, 255), 1, lineType=cv2.LINE_AA)
-		#cv2.putText(input_img, ""+str(prob), (int(x), int(y+circle_size)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1, lineType=cv2.LINE_AA)
 
 		points.append((int(x), int(y)))
 	else :
@@ -92,10 +88,9 @@ def plot_images(title, images, tile_shape):
 		grd = grid[i]
 		grd.imshow(images[0,i])
 
-channels=max(confidence.shape[1],paf.shape[1])
+channels=confidence.shape[1]
 cols=8
 
-plot_images("paf",paf,tile_shape=((int)((channels+cols-1)/cols),cols))
 plot_images("confidence",confidence,tile_shape=((int)((channels+cols-1)/cols),cols))
 
 plt.show()

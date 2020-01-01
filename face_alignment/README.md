@@ -2,7 +2,7 @@
 
 ## Input
 
-![Input](lenna.png)
+![Input](aflw-test.jpg)
 
 Shape : (1, 3, 256, 256)
 Range : [0.0, 1.0]
