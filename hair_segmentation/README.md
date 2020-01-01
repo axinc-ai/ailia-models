@@ -4,6 +4,8 @@
 
 ![input image](input.jpg)
 
+(from https://github.com/thangtran480/hair-segmentation/tree/master/assets)
+
 Shape(1, 3, 224, 224) Range:[0, 1]
 
 ### output

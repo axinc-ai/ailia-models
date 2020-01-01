@@ -4,6 +4,8 @@
 
 ![Input](aflw-test.jpg)
 
+(from https://github.com/1adrianb/face-alignment/tree/master/test/assets)
+
 Shape : (1, 3, 256, 256)
 Range : [0.0, 1.0]
 
