@@ -24,13 +24,13 @@ model_dict = {
 # argument
 parser = argparse.ArgumentParser()
 parser.add_argument(
-    '--arch', '-a', metavar='ARCH', default='gsv2', choices=model_names,
-    help='model architecture: ' + ' | '.join(model_names) + ' (default gsv2)'
+    '--model', '-m', metavar='MODEL', default='gsv2', choices=model_names,
+    help='choose model : ' + ' | '.join(model_names) + ' (default gsv2)'
 )
 args = parser.parse_args()
 
 
-model_name = model_dict[args.arch]
+model_name = model_dict[args.model]
 weight_path = model_name + '.onnx'
 model_path = weight_path + '.prototxt'
 
