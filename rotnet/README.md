@@ -1,7 +1,7 @@
 # RotNet
 
 ### input
-![input_image](input.jpg)
+![input_image](test.jpg)
 
 (from https://github.com/d4nst/RotNet/tree/master/data/test_examples)
 
