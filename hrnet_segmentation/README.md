@@ -6,7 +6,12 @@
 Shape: (1, 3, 512, 1024) Range:[0, 1]
 
 ### output
+- Normal output
 ![Result_image](result.png)
+  
+- Smoothed output
+![Smoothed_result_image](result_smooth.png)
+
 
 ### Usage
 We have three pretrained-model.
@@ -17,6 +22,14 @@ We have three pretrained-model.
 ```bash
 python3 hrnet_segmentation.py -a HRNetV2-W48
 ```
+
+If you want the segmentated image to be smooth, use `--smooth` / `-s` option.  
+By applying resize method `interpolaation=cv2.INTER_LINEAR`, the visualisation will be more smooth.
+```bash
+python3 hrnet_segmentation.py -a HRNetV2-W48 --smooth
+```
+
+
 
 ### Reference
 
