@@ -165,7 +165,7 @@ def post_processing(scores, boxes, top_k=10):
             picked_box_probs[:, 4])
     
 
-def save_result(org_image, scores, boxes):
+def save_result(org_image, scores, boxes, save_path):
     class_names = [name.strip() for name in open(LABEL_PATH).readlines()]
     boxes, labels, probs = post_processing(scores, boxes, top_k=10)
     for i in range(boxes.shape[0]):
@@ -186,4 +186,4 @@ def save_result(org_image, scores, boxes):
             cv2.LINE_AA # Line type
         )
         
-    cv2.imwrite('annotated.png', org_image)
+    cv2.imwrite(save_path, org_image)

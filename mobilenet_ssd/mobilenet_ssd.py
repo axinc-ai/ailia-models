@@ -11,17 +11,18 @@ from  utils import save_result
 
 
 img_path = "couple.jpg"
+save_path = "annotated.jpg"
 
 
 # model loading part
 net_type = sys.argv[1]
-model_lists = ['vgg16-ssd', 'mb1-ssd', 'mb2-ssd-lite']
+model_lists = ['mb1-ssd', 'mb2-ssd-lite']
 if net_type in model_lists:
     model_path = net_type + '.onnx.prototxt'
     weight_path = net_type + '.onnx'
 else:
     print("The net type is wrong.")
-    print("It should be one of vgg16-ssd, mb1-ssd and mb2-ssd-lite.")
+    print("It should be mb1-ssd or mb2-ssd-lite.")
     sys.exit(1)
 
 # model download
@@ -55,5 +56,5 @@ for i in range(1):
     end = int(round(time.time() * 1000))
     print("ailia processing time {} ms".format(end-start))
 
-save_result(org_img, scores, boxes)
+save_result(org_img, scores, boxes, save_path)
 print('Successfully finished !')
