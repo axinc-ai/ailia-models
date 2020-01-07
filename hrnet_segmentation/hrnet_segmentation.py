@@ -13,6 +13,7 @@ import ailia
 
 model_names = ['HRNetV2-W48', 'HRNetV2-W18-Small-v1', 'HRNetV2-W18-Small-v2']
 img_path = "test.png"
+save_img_name = "result"
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
@@ -53,7 +54,7 @@ print("Environment mode: {} (-1: CPU, 1: GPU)".format(env_id))
 net = ailia.Net(model_path, weight_path, env_id=env_id)
 
 # compute time
-for i in range(10):
+for i in range(1):
     start = int(round(time.time() * 1000))
     input_blobs = net.get_input_blob_list()
     net.set_input_blob_data(img, input_blobs[0])
@@ -76,5 +77,5 @@ for i in range(10):
     print("ailia processing time {} ms".format(end-start))
 
 # prediction saving
-save_pred(result, ".", ["result"])
+save_pred(result, ".", [save_img_name])
 print('Successfully finished !')
