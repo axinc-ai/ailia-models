@@ -1,0 +1,24 @@
+# Mobilenet_SSD
+
+### input
+
+![input_iamge](couple.jpg)
+
+Shape(1, 3, 300, 300) Range:[0, 1]
+
+### output
+
+![output_image](annotated.png)
+
+
+### Reference
+
+[pytorch-ssd](https://github.com/qfgaohao/pytorch-ssd)
+
+
+### Framework
+PyTorch 1.0 / 0.4
+
+
+### Model Format
+ONNX opset = 10
