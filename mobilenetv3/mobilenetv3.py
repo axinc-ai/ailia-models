@@ -49,7 +49,7 @@ for i in range(3):  # normalize image
 
 # [x, y, channel] --> [1, channel, x, y]
 img = np.expand_dims(np.rollaxis(img, 2, 0), axis=0) 
-print(img.shape)
+# print(img.shape)
 
 # compute
 max_class_count = 3
@@ -60,7 +60,7 @@ top = preds_ailia.argsort()[-1 * max_class_count:][::-1]
 
 print("class_count={}".format(max_class_count))
 
-for idx  in range(max_class_count) :
+for idx in range(max_class_count) :
     # print result
     print("+ idx=" + str(idx))
     print("  category={}".format(top[idx]) + "[ " +
