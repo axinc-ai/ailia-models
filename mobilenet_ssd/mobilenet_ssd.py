@@ -15,7 +15,11 @@ save_path = "annotated.jpg"
 
 
 # model loading part
-net_type = sys.argv[1]
+if len(sys.argv)<2:
+    net_type="mb2-ssd-lite"
+else:
+    net_type = sys.argv[1]
+
 model_lists = ['mb1-ssd', 'mb2-ssd-lite']
 if net_type in model_lists:
     model_path = net_type + '.onnx.prototxt'
