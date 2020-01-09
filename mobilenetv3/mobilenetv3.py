@@ -8,7 +8,7 @@ import argparse
 import ailia
 import mobilenetv3_labels
 
-model_names = ['small']  # TODO add large model
+model_names = ['small', 'large']
 parser = argparse.ArgumentParser()
 parser.add_argument(
     '-m', '--model', default='small', choices=model_names,
