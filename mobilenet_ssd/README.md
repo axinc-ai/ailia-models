@@ -25,7 +25,7 @@ you can change input image path and save image path in `mobilenet_ssd.py`
 
 ### Reference
 
-[pytorch-ssd](https://github.com/qfgaohao/pytorch-ssd)
+[MobileNetV1, MobileNetV2, VGG based SSD/SSD-lite implementation in Pytorch](https://github.com/qfgaohao/pytorch-ssd)
 
 
 ### Framework
