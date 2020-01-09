@@ -8,6 +8,7 @@ The collection of pre-trained, state-of-the-art models.
 |:-----------|------------:|:------------:|:------------:|
 | [resnet50](/resnet50/) | [Deep Residual Learning for Image Recognition]( https://github.com/KaimingHe/deep-residual-networks) | Chainer | 1.2.0 |
 | [mobilenetv2](/mobilenetv2/)|[PyTorch Implemention of MobileNet V2](https://github.com/d-li14/mobilenetv2.pytorch)|Pytorch| 1.2.0 |
+| [mobilenetv3](/mobilenetv3/)|[PyTorch Implemention of MobileNet V3](https://github.com/d-li14/mobilenetv3.pytorch)|Pytorch| 1.2.1 beta |
 | [inceptionv3](/inceptionv3/)|[Rethinking the Inception Architecture for Computer Vision](http://arxiv.org/abs/1512.00567)|Pytorch| 1.2.0 |
 | [partialconv](/partialconv/)|[Partial Convolution Layer for Padding and Image Inpainting](https://github.com/NVIDIA/partialconv)|Pytorch| 1.2.0 |
 | [googlenet](/googlenet/) |[Going Deeper with Convolutions]( https://arxiv.org/abs/1409.4842 )|Pytorch| 1.2.0|
@@ -39,6 +40,9 @@ The collection of pre-trained, state-of-the-art models.
 | [yolov3](/yolov3/) | [YOLO: Real-Time Object Detection](https://pjreddie.com/darknet/yolo/) | ONNX Runtime | 1.2.1 beta  |
 | [yolov3-tiny](/yolov3-tiny/) | [YOLO: Real-Time Object Detection](https://pjreddie.com/darknet/yolo/) | Keras | 1.2.1 beta  |
 | [yolov3-face](/yolov3-face/) | [Face detection using keras-yolov3](https://github.com/axinc-ai/yolov3-face) | Keras | 1.2.1 beta  |
+| [mobilenet-ssd](/mobilenet-ssd/) | [pytorch-ssd](https://github.com/qfgaohao/pytorch-ssd) | Pytorch | 1.2.1 beta  |
+
+
 
 ## Human recognization
 
