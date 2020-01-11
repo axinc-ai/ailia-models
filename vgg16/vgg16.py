@@ -11,9 +11,15 @@ import ailia
 import vgg16_labels
 
 # settings
-model_path = "VGG16.prototxt"
-weight_path = "VGG16.caffemodel"
-img_path = './pizza.jpg'
+pytorch_model=False
+if(pytorch_model):
+    model_path = "vgg16_pytorch.onnx.prototxt"
+    weight_path = "vgg16_pytorch.onnx"
+    img_path = './clock.jpg'
+else:
+    model_path = "VGG16.prototxt"
+    weight_path = "VGG16.caffemodel"
+    img_path = './pizza.jpg'
 
 # model download
 print("downloading ...");
