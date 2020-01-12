@@ -24,7 +24,7 @@ python3 rotnet.py --model gsv2
 ```
 
 ### Reference
-[RotNet](https://github.com/d4nst/RotNet)
+[CNNs for predicting the rotation angle of an image to correct its orientation](https://github.com/d4nst/RotNet)
 
 ### Framework
 Keras

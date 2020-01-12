@@ -63,3 +63,10 @@ The collection of pre-trained, state-of-the-art models.
 |[vggface2](/vggface2) | [VGGFace2 Dataset for Face Recognition](https://github.com/ox-vgg/vgg_face2) | Caffe | 1.1.0 |
 |[facial_feature](/facial_feature/)|[kaggle-facial-keypoints](https://github.com/axinc-ai/kaggle-facial-keypoints)|Pytorch| 1.2.0 |
 |[face_alignment](/face_alignment/)| [2D and 3D Face alignment library build using pytorch](https://github.com/1adrianb/face-alignment) | Pytorch | 1.2.1 beta |
+
+## Rotation estimation
+
+| Name | Detail | Exported From | Supported Version |
+|:-----------|------------:|:------------:|:------------:|
+|[rotnet](/rotnet) | [CNNs for predicting the rotation angle of an image to correct its orientation](https://github.com/d4nst/RotNet) | Keras | 1.2.1 beta |
+
