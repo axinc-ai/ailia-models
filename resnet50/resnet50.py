@@ -12,12 +12,21 @@ import resnet50_labels
 
 # settings
 OPT_MODEL=True
-if OPT_MODEL:
-    model_path = "resnet50.opt.onnx.prototxt"
-    weight_path = "resnet50.opt.onnx"
+PYTORCH_MODEL=False
+
+if(PYTORCH_MODEL):
+    model_path = "resnet50_pytorch.onnx.prototxt"
+    weight_path = "resnet50_pytorch.onnx"
+    image_range = ailia.NETWORK_IMAGE_RANGE_S_FP32
 else:
-    model_path = "resnet50.onnx.prototxt"
-    weight_path = "resnet50.onnx"
+    if OPT_MODEL:
+        model_path = "resnet50.opt.onnx.prototxt"
+        weight_path = "resnet50.opt.onnx"
+    else:
+        model_path = "resnet50.onnx.prototxt"
+        weight_path = "resnet50.onnx"
+    image_range = ailia.NETWORK_IMAGE_RANGE_S_INT8
+
 img_path = './pizza.jpg'
 
 # model download
@@ -32,7 +41,7 @@ if not os.path.exists(weight_path):
 print("loading ...");
 
 env_id = ailia.get_gpu_environment_id()
-classifier = ailia.Classifier(model_path, weight_path, env_id=env_id, format=ailia.NETWORK_IMAGE_FORMAT_RGB, range=ailia.NETWORK_IMAGE_RANGE_S_INT8)
+classifier = ailia.Classifier(model_path, weight_path, env_id=env_id, format=ailia.NETWORK_IMAGE_FORMAT_RGB, range=image_range)
 
 # load input image and convert to BGRA
 print("inferencing ...");
@@ -45,7 +54,13 @@ elif img.shape[2] == 1 :
 
 # compute
 max_class_count = 3
-classifier.compute(img, max_class_count)
+
+cnt = 3
+for i in range(cnt):
+	start=int(round(time.time() * 1000))
+	classifier.compute(img, max_class_count)
+	end=int(round(time.time() * 1000))
+	print("## ailia processing time , "+str(i)+" , "+str(end-start)+" ms")
 
 # get result
 count = classifier.get_class_count()
