@@ -26,7 +26,11 @@ def transfer(image, mask):
 # img_path = input("image name (00041.jpg, 00053.jpg): ")
 img_path = "input.jpg"
 
-weight_path = "hair_segmentation.onnx"
+OPT_MODEL=True
+if OPT_MODEL:
+    weight_path = "hair_segmentation.opt.onnx"
+else:
+    weight_path = "hair_segmentation.onnx"
 model_path = weight_path + ".prototxt"
 
 rmt_ckpt = "https://storage.googleapis.com/ailia-models/hair_segmentation/"
