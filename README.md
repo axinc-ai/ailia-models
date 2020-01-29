@@ -2,6 +2,12 @@
 
 The collection of pre-trained, state-of-the-art models.
 
+## About ailia SDK
+
+ailia SDK is a cross-platform high speed inference SDK. The ailia SDK provides a consistent C++ API on Windows, Mac, Linux, iOS and Android. It supports Unity, Python and JNI for efficient AI implementation. The ailia SDK makes great use of the GPU to serve accelerated computing.
+
+https://ailia.jp/en/
+
 ## Image classification
 
 | Name | Detail | Exported From | Supported Version |
