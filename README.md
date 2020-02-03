@@ -76,3 +76,14 @@ https://ailia.jp/en/
 |:-----------|------------:|:------------:|:------------:|
 |[rotnet](/rotnet) | [CNNs for predicting the rotation angle of an image to correct its orientation](https://github.com/d4nst/RotNet) | Keras | 1.2.1 beta |
 
+## Crowd counting
+
+| Name | Detail | Exported From | Supported Version |
+|:-----------|------------:|:------------:|:------------:|
+|[crowdcount-cascaded-mtl](/crowdcount-cascaded-mtl) | [CNN-based Cascaded Multi-task Learning of High-level Prior and Density Estimation for Crowd Counting (Single Image Crowd Counting)](https://github.com/svishwa/crowdcount-cascaded-mtl) | Pytorch | 1.2.1 beta |
+
+## Text recognization
+
+| Name | Detail | Exported From | Supported Version |
+|:-----------|------------:|:------------:|:------------:|
+|[etl](/etl) | Japanese Character Recognization | Keras | 1.1.0 |
