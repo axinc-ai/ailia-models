@@ -28,3 +28,7 @@ Darknet
 ## Model Format
 
 CaffeModel
+
+## Netron
+
+[yolov1-tiny.prototxt](https://lutzroeder.github.io/netron/?url=https://storage.googleapis.com/ailia-models/yolov1-tiny/yolov1-tiny.prototxt)

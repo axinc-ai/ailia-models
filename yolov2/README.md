@@ -27,3 +27,7 @@ Pytorch 1.3.1
 ## Model Format
 
 ONNX opset=10
+
+## Netron
+
+[yolov2.onnx.prototxt](https://lutzroeder.github.io/netron/?url=https://storage.googleapis.com/ailia-models/yolov2/yolov2.onnx.prototxt)
