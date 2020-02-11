@@ -42,3 +42,7 @@ Keras
 ### Model Format
 
 CaffeModel
+
+### Netron
+
+[etl_BINARY_squeezenet128_20.prototxt](https://lutzroeder.github.io/netron/?url=https://storage.googleapis.com/ailia-models/etl/etl_BINARY_squeezenet128_20.prototxt)

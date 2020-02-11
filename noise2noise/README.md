@@ -25,3 +25,8 @@ Pytorch 1.2.0
 ## Model Format
 
 ONNX opset = 10
+
+## Netron
+
+[noise2noise_gaussian.onnx.prototxt](https://lutzroeder.github.io/netron/?url=https://storage.googleapis.com/ailia-models/noise2noise/noise2noise_gaussian.onnx.prototxt)
+

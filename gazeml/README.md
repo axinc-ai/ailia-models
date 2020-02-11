@@ -25,3 +25,9 @@ TensorFlow 1.13.1
 ## Model Format
 
 ONNX opset = 10
+
+## Netron
+
+[gazeml_elg_i60x36_n32.onnx.prototxt](https://lutzroeder.github.io/netron/?url=https://storage.googleapis.com/ailia-models/gazeml/gazeml_elg_i60x36_n32.onnx.prototxt)
+
+[gazeml_elg_i180x108_n64.onnx.prototxt](https://lutzroeder.github.io/netron/?url=https://storage.googleapis.com/ailia-models/gazeml/gazeml_elg_i180x108_n64.onnx.prototxt)

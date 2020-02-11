@@ -25,3 +25,10 @@ Pytorch 1.2.0
 ## Model Format
 
 ONNX opset = 10
+
+## Netron
+
+[srresnet.onnx.prototxt](https://lutzroeder.github.io/netron/?url=https://storage.googleapis.com/ailia-models/srresnet/srresnetn.onnx.prototxt)
+
+[srresnet.opt.onnx.prototxt](https://lutzroeder.github.io/netron/?url=https://storage.googleapis.com/ailia-models/srresnet/srresnet.opt.onnx.prototxt)
+
