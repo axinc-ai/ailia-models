@@ -40,6 +40,17 @@ img = cv2.imread(file_name)
 img = cv2.resize(img,(ailia_input_width,ailia_input_height),interpolation=cv2.INTER_AREA)
 img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
+add_noise=False
+if add_noise:
+	noise_param = 50
+	std = np.random.uniform(0, noise_param)
+	noise = np.random.normal(0, std, (ailia_input_height, ailia_input_width, 3))
+	noise_img = np.array(img) + noise
+	noise_img = np.clip(noise_img, 0, 255).astype(np.uint8)
+	img = noise_img
+	img2 = Image.fromarray(noise_img, 'RGB')
+	img2.save('noise_image.png')
+
 img.shape = (1,) + img.shape
 img = img.transpose((0, 3, 1, 2))
 img = np.array(img)
