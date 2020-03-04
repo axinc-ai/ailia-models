@@ -8,7 +8,7 @@ Shape(1, 3, 128, 128) Range:[-1, 1]
 
 ### output
 
-<img src="output.png" width="320px">
+<img src="result.png" width="320px">
 
 
 ### usage
