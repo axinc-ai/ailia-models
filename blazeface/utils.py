@@ -84,15 +84,15 @@ def decode_boxes(raw_boxes, anchors):
 
 
 def intersect(box_a, box_b):
-    """ We resize both tensors to [A,B,2] without new malloc:
+    """ We resize both arrays to [A,B,2] without new malloc:
     [A,2] -> [A,1,2] -> [A,B,2]
     [B,2] -> [1,B,2] -> [A,B,2]
     Then we compute the area of intersect between box_a and box_b.
     Args:
-      box_a: (tensor) bounding boxes, Shape: [A,4].
-      box_b: (tensor) bounding boxes, Shape: [B,4].
+      box_a: (array) bounding boxes, Shape: [A,4].
+      box_b: (array) bounding boxes, Shape: [B,4].
     Return:
-      (tensor) intersection area, Shape: [A,B].
+      (array) intersection area, Shape: [A,B].
     """
     A = box_a.shape[0]
     B = box_b.shape[0]
@@ -123,10 +123,10 @@ def jaccard(box_a, box_b):
     E.g.:
         A ∩ B / A ∪ B = A ∩ B / (area(A) + area(B) - A ∩ B)
     Args:
-        box_a: (tensor) Ground truth bounding boxes, Shape: [num_objects,4]
-        box_b: (tensor) Prior boxes from priorbox layers, Shape: [num_priors,4]
+        box_a: (array) Ground truth bounding boxes, Shape: [num_objects,4]
+        box_b: (array) Prior boxes from priorbox layers, Shape: [num_priors,4]
     Return:
-        jaccard overlap: (tensor) Shape: [box_a.size(0), box_b.size(0)]
+        jaccard overlap: (array) Shape: [box_a.size(0), box_b.size(0)]
     """
     inter = intersect(box_a, box_b)
     area_a = np.repeat(
