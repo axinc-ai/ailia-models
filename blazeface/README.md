@@ -2,13 +2,13 @@
 
 ### input
 
-![input_iamge](input.png)
+<img src="input.png" width="320px">
 
 Shape(1, 3, 128, 128) Range:[-1, 1]
 
 ### output
 
-![output_image](result.png)
+<img src="output.png" width="320px">
 
 
 ### usage
