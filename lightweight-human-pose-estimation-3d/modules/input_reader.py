@@ -14,8 +14,6 @@ class ImageReader:
         if self.idx == self.max_idx:
             raise StopIteration
         img = cv2.imread(self.file_names[self.idx], cv2.IMREAD_COLOR)
-        # fixed when the model was exported
-        img = cv2.resize(img, dsize=(448, 256))
         if img.size == 0:
             raise IOError(
                 'Image {} cannot be read'.format(self.file_names[self.idx])
@@ -35,7 +33,9 @@ class VideoReader:
     def __iter__(self):
         self.cap = cv2.VideoCapture(self.file_name)
         self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
+        # self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 448)
         self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
+        # self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 256)
         if not self.cap.isOpened():
             raise IOError('Video {} cannot be opened'.format(self.file_name))
         return self

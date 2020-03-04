@@ -27,23 +27,29 @@ def rotate_poses(poses_3d, R, t):
 def main():
     parser = ArgumentParser(
         description='Lightweight 3D human pose estimation demo. '
-        # 'Press esc to exit, "p" to (un)pause video or process next image.'
+        'Press esc to exit, "p" to (un)pause video or process next image.'
     )
-    # parser.add_argument(
-    #     '--video',
-    #     help='Optional. Path to video file or camera id.',
-    #     type=str,
-    #     default=''
-    # )
+    parser.add_argument(
+        '--video',
+        help='Optional. Path to video file or camera id.',
+        type=str,
+        default=''
+    )
     parser.add_argument(
         '--images',
         help='Optional. Path to input image(s).',
         nargs='+',
         default=''
     )
+    parser.add_argument(
+        '--rotate3d',
+        help='allowing 3D canvas rotation while on pause',
+        action='store_true',
+        default=False
+    )
     args = parser.parse_args()
 
-    if args.images == '':  # and arigs.video == ''
+    if args.images == '' and args.video == '':
         raise ValueError('Either --images has to be provided')
     
     weight_path = 'human-pose-estimation-3d.onnx'
@@ -79,16 +85,16 @@ def main():
 
     frame_provider = ImageReader(args.images)
     is_video = False
-    # if args.video != '':
-    #     frame_provider = VideoReader(args.video)
-    #     is_video = True
+    if args.video != '':
+        frame_provider = VideoReader(args.video)
+        is_video = True
     base_height = 256
     fx = -1
 
-    # delay = 1
-    # esc_code = 27
-    # p_code = 112
-    # space_code = 32
+    delay = 1
+    esc_code = 27
+    p_code = 112
+    space_code = 32
     mean_time = 0
     img_mean = np.array([128, 128, 128], dtype=np.float32)
     
@@ -97,12 +103,10 @@ def main():
         if frame is None:
             break
         input_scale = base_height / frame.shape[0]
-        # scaled_img = cv2.resize(
-        #     frame, dsize=None, fx=input_scale, fy=input_scale
-        # )
-        # scaled_img = scaled_img[
-        #     :, 0:scaled_img.shape[1] - (scaled_img.shape[1] % stride)
-        # ]  # better to pad, but cut out for demo
+
+        # fixed when the model was exported
+        frame = cv2.resize(frame, dsize=(448, 256))
+        
         if fx < 0:  # Focal length is unknown
             fx = np.float32(0.8 * frame.shape[1])
         
@@ -111,15 +115,20 @@ def main():
             np.rollaxis(normalized_img, 2, 0),
             axis=0
         )
-        print(f'[DEBUG] {normalized_img.shape}')
-        for i in range(5):
-            start = int(round(time.time() * 1000))
+        if is_video:
             input_blobs = net.get_input_blob_list()
             net.set_input_blob_data(normalized_img, input_blobs[0])
             net.update()
             features, heatmaps, pafs = net.get_results()
-            end = int(round(time.time() * 1000))
-            print("ailia processing time {} ms".format(end - start))
+        else:
+            for i in range(5):
+                start = int(round(time.time() * 1000))
+                input_blobs = net.get_input_blob_list()
+                net.set_input_blob_data(normalized_img, input_blobs[0])
+                net.update()
+                features, heatmaps, pafs = net.get_results()
+                end = int(round(time.time() * 1000))
+                print("ailia processing time {} ms".format(end - start))
 
         inference_result = (
             features[-1].squeeze(),
@@ -149,8 +158,10 @@ def main():
                 19 * np.arange(poses_3d.shape[0]).reshape((-1, 1, 1))
             ).reshape((-1, 2))
         plotter.plot(canvas_3d, poses_3d, edges)
-        # cv2.imshow(canvas_3d_window_name, canvas_3d)
-        cv2.imwrite(canvas_3d_window_name + f'_{frame_id}.png', canvas_3d)
+        if is_video:
+            cv2.imshow(canvas_3d_window_name, canvas_3d)
+        else:
+            cv2.imwrite(canvas_3d_window_name + f'_{frame_id}.png', canvas_3d)
 
         draw_poses(frame, poses_2d)
         current_time = (cv2.getTickCount()-current_time)/cv2.getTickFrequency()
@@ -160,30 +171,33 @@ def main():
             mean_time = mean_time * 0.95 + current_time * 0.05
         cv2.putText(frame, 'FPS: {}'.format(int(1 / mean_time * 10) / 10),
                     (40, 80), cv2.FONT_HERSHEY_COMPLEX, 1, (0, 0, 255))
-        # cv2.imshow('ICV 3D Human Pose Estimation', frame)
-        cv2.imwrite(f'ICV_3D_Human_Pose_Estimation_{frame_id}.png', frame)
+        if is_video:
+            cv2.imshow('ICV 3D Human Pose Estimation', frame)
+        else:
+            cv2.imwrite(f'ICV_3D_Human_Pose_Estimation_{frame_id}.png', frame)
 
-        # key = cv2.waitKey(delay)
-        # if key == esc_code:
-        #     break
-        # if key == p_code:
-        #     if delay == 1:
-        #         delay = 0
-        #     else:
-        #         delay = 1
-        # # allow to rotate 3D canvas while on pause
-        # if delay == 0 or not is_video:  
-        #     key = 0
-        #     while (key != p_code
-        #            and key != esc_code
-        #            and key != space_code):
-        #         plotter.plot(canvas_3d, poses_3d, edges)
-        #         cv2.imshow(canvas_3d_window_name, canvas_3d)
-        #         key = cv2.waitKey(33)
-        #     if key == esc_code:
-        #         break
-        #     else:
-        #         delay = 1
+        key = cv2.waitKey(delay)
+        if key == esc_code:
+            break
+        if key == p_code:
+            if delay == 1:
+                delay = 0
+            else:
+                delay = 1
+        # allow to rotate 3D canvas while on pause
+        # TODO make argument to activate \this
+        if delay == 0 and args.rotate3d:
+            key = 0
+            while (key != p_code
+                   and key != esc_code
+                   and key != space_code):
+                plotter.plot(canvas_3d, poses_3d, edges)
+                cv2.imshow(canvas_3d_window_name, canvas_3d)
+                key = cv2.waitKey(33)
+            if key == esc_code:
+                break
+            else:
+                delay = 1
     
 
 if __name__ == "__main__":
