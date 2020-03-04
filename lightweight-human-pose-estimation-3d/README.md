@@ -1,4 +1,4 @@
-# BlazeFace
+# Light Weight Human Pose Estimation 3D Demo
 
 ### input
 
@@ -35,7 +35,7 @@ python3 lightweight-human-pose-estimation-3d.py --video 0
 
 
 ### Framework
-PyTorch 1.1
+PyTorch 1.0
 
 
 ### Model Format
