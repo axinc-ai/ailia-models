@@ -17,13 +17,13 @@ For images:
 ``` bash
 python3 lightweight-human-pose-estimation-3d.py --images input.png
 ```
-argument `ratate3d` to activate 3d-canvas-rotation-mode
+argument `--rotate3d` to activate 3d-canvas-rotation-mode
 
 In order to use web-camera,
 ```bash
 python3 lightweight-human-pose-estimation-3d.py --video 0
 ```
-(try -1 or 1 if 0 does not work, it may depends on your system)
+(try -1 or 1 if 0 does not work, it may depend on your system)
 
 
 
@@ -31,7 +31,7 @@ python3 lightweight-human-pose-estimation-3d.py --video 0
 
 ### Reference
 
-[BlazeFace-PyTorch](https://github.com/hollance/BlazeFace-PyTorch)
+[lightweight-human-pose-estimation-3d-demo.pytorch](https://github.com/Daniil-Osokin/lightweight-human-pose-estimation-3d-demo.pytorch)
 
 
 ### Framework
