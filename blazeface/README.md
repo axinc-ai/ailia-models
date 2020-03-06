@@ -4,12 +4,13 @@
 
 <img src="input.png" width="320px">
 
+(Image from https://github.com/hollance/BlazeFace-PyTorch/blob/master/3faces.png)
+
 Shape(1, 3, 128, 128) Range:[-1, 1]
 
 ### output
 
 ![output_image](result.png)
-
 
 ### usage
 
@@ -18,6 +19,10 @@ python3 blazeface.py
 ```
 you can change input image path in `blazeface.py`
 
+``` bash
+python3 blazeface.py video
+```
+you can use webcamera input
 
 ### Reference
 

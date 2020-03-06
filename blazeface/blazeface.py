@@ -122,8 +122,8 @@ def recognize_from_video():
 		detections = postprocess(preds_ailia)
 		show_result(input_img,detections)
 
-
 		cv2.imshow('frame',input_img)
+
 	capture.release()
 	cv2.destroyAllWindows()
 
