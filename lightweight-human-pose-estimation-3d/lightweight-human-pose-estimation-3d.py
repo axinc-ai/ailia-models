@@ -14,6 +14,11 @@ from modules.parse_poses import parse_poses
 import ailia
 
 
+# Fixed when exporting ONNX model
+base_height = 360
+base_width = 640
+
+
 def rotate_poses(poses_3d, R, t):
     R_inv = np.linalg.inv(R)
     for pose_id in range(len(poses_3d)):
@@ -50,7 +55,7 @@ def main():
     args = parser.parse_args()
 
     if args.images == '' and args.video == '':
-        raise ValueError('Either --images has to be provided')
+        raise ValueError('Either --images or --video has to be provided')
     
     weight_path = 'human-pose-estimation-3d.onnx'
     model_path = 'human-pose-estimation-3d.onnx.prototxt'
@@ -88,7 +93,6 @@ def main():
     if args.video != '':
         frame_provider = VideoReader(args.video)
         is_video = True
-    base_height = 256
     fx = -1
 
     delay = 1
@@ -102,17 +106,20 @@ def main():
         current_time = cv2.getTickCount()
         if frame is None:
             break
-        input_scale = base_height / frame.shape[0]
-
+        
         # fixed when the model was exported
-        frame = cv2.resize(frame, dsize=(448, 256))
+        frame = cv2.resize(frame, dsize=(base_width, base_height))
+
+        input_scale = base_height / frame.shape[0]
         
         if fx < 0:  # Focal length is unknown
             fx = np.float32(0.8 * frame.shape[1])
-        
+
+        # normalize image between -0.5 and 0.5
         normalized_img = (frame.astype(np.float32) - img_mean) / 255.0
         normalized_img = np.expand_dims(
-            np.rollaxis(normalized_img, 2, 0),
+            # np.rollaxis(normalized_img, 2, 0),
+            normalized_img.transpose(2, 0, 1),
             axis=0
         )
         if is_video:

@@ -4,7 +4,7 @@
 
 ![input_image](input.png)
 
-Shape(1, 3,	256, 448) Range:[-1, 1]
+Shape(1, 3,	360, 640) Range:[-1, 1]
 
 ### output
 
@@ -19,12 +19,16 @@ python3 lightweight-human-pose-estimation-3d.py --images input.png
 ```
 argument `--rotate3d` to activate 3d-canvas-rotation-mode
 
+For video:
+```bash
+python3 lightweight-human-pose-estimation-3d.py --video <VIDEO FILE>
+```
+
 In order to use web-camera,
 ```bash
 python3 lightweight-human-pose-estimation-3d.py --video 0
 ```
 (try -1 or 1 if 0 does not work, it may depend on your system)
-
 
 
 
