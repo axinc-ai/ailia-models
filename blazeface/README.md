@@ -30,3 +30,8 @@ PyTorch 1.1
 
 ### Model Format
 ONNX opset = 10
+
+
+### Netron
+
+[blazeface.onnx.prototxt](https://lutzroeder.github.io/netron/?url=https://storage.googleapis.com/ailia-models/blazeface/blazeface.onnx.prototxt)

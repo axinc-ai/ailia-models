@@ -11,9 +11,11 @@ import ailia
 
 #model_path = "gazeml_elg_i180x108_n64.onnx.prototxt"
 #weight_path = "gazeml_elg_i180x108_n64.onnx"
+#output_blob_name = "import/hourglass/hg_3/after/hmap/conv/BiasAdd:0"
 
 model_path = "gazeml_elg_i60x36_n32.onnx.prototxt"
 weight_path = "gazeml_elg_i60x36_n32.onnx"
+output_blob_name = "import/hourglass/hg_2/after/hmap/conv/BiasAdd:0"
 
 print("downloading ...");
 
@@ -51,13 +53,12 @@ print("inferencing ...");
 
 eyeI = np.concatenate((data, data), axis=0)
 eyeI = eyeI.reshape(2,IMAGE_HEIGHT,IMAGE_WIDTH,1)
-pred_onnx = net.predict(eyeI)
-out = pred_onnx
 
 cnt = 3
 for i in range(cnt):
 	start=int(round(time.time() * 1000))
 	out = net.predict(eyeI)
+	out = net.get_blob_data(net.find_blob_index_by_name(output_blob_name))
 	end=int(round(time.time() * 1000))
 	print("## ailia processing time , "+str(i)+" , "+str(end-start)+" ms")
 
