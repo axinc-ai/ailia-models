@@ -35,7 +35,7 @@ python3 lightweight-human-pose-estimation-3d.py --video 0
 
 ### Reference
 
-[lightweight-human-pose-estimation-3d-demo.pytorch](https://github.com/Daniil-Osokin/lightweight-human-pose-estimation-3d-demo.pytorch)
+[Real-time 3D multi-person pose estimation demo in PyTorch. OpenVINO backend can be used for fast inference on CPU.](https://github.com/Daniil-Osokin/lightweight-human-pose-estimation-3d-demo.pytorch)
 
 
 ### Framework
