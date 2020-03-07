@@ -101,22 +101,29 @@ def main():
     space_code = 32
     mean_time = 0
     img_mean = np.array([128, 128, 128], dtype=np.float32)
-    
+    base_width_calculated = False
+
     for frame_id, frame in enumerate(frame_provider):
         current_time = cv2.getTickCount()
         if frame is None:
             break
         
-        # fixed when the model was exported
-        frame = cv2.resize(frame, dsize=(base_width, base_height))
+        if not base_width_calculated:
+            base_width=frame.shape[1]*(base_height/frame.shape[0])
+            base_width=int(base_width/stride)*stride
+            net.set_input_shape((1,3,base_height,base_width))
+            base_width_calculated=True
 
         input_scale = base_height / frame.shape[0]
         
+        scaled_img = cv2.resize(frame, dsize=None, fx=input_scale, fy=input_scale)
+        scaled_img = scaled_img[:, 0:scaled_img.shape[1] - (scaled_img.shape[1] % stride)]  # better to pad, but cut out for demo
+
         if fx < 0:  # Focal length is unknown
             fx = np.float32(0.8 * frame.shape[1])
 
         # normalize image between -0.5 and 0.5
-        normalized_img = (frame.astype(np.float32) - img_mean) / 255.0
+        normalized_img = (scaled_img.astype(np.float32) - img_mean) / 255.0
         normalized_img = np.expand_dims(
             # np.rollaxis(normalized_img, 2, 0),
             normalized_img.transpose(2, 0, 1),
