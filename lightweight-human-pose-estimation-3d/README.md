@@ -35,7 +35,7 @@ python3 lightweight-human-pose-estimation-3d.py --video 0
 
 ### Reference
 
-[lightweight-human-pose-estimation-3d-demo.pytorch](https://github.com/Daniil-Osokin/lightweight-human-pose-estimation-3d-demo.pytorch)
+[Real-time 3D multi-person pose estimation demo in PyTorch. OpenVINO backend can be used for fast inference on CPU.](https://github.com/Daniil-Osokin/lightweight-human-pose-estimation-3d-demo.pytorch)
 
 
 ### Framework
@@ -44,3 +44,8 @@ PyTorch 1.0
 
 ### Model Format
 ONNX opset = 10
+
+
+### Netron
+
+[lightweight-human-pose-estimation-3d.onnx.prototxt](https://lutzroeder.github.io/netron/?url=https://storage.googleapis.com/ailia-models/lightweight-human-pose-estimation-3d/human-pose-estimation-3d.onnx.prototxt)
