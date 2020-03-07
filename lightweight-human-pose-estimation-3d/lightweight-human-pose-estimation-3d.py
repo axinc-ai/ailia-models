@@ -101,12 +101,19 @@ def main():
     space_code = 32
     mean_time = 0
     img_mean = np.array([128, 128, 128], dtype=np.float32)
-    
+    base_width_calculated = False
+
     for frame_id, frame in enumerate(frame_provider):
         current_time = cv2.getTickCount()
         if frame is None:
             break
         
+        if not base_width_calculated:
+            base_width=frame.shape[1]*(base_height/frame.shape[0])
+            base_width=int(base_width/stride)*stride
+            net.set_input_shape((1,3,base_height,base_width))
+            base_width_calculated=True
+
         # fixed when the model was exported
         frame = cv2.resize(frame, dsize=(base_width, base_height))
 
