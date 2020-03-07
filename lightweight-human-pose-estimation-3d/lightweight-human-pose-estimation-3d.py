@@ -15,8 +15,8 @@ import ailia
 
 
 # Fixed when exporting ONNX model
-base_height = 360
-base_width = 640
+base_height = 256
+base_width = 448
 
 
 def rotate_poses(poses_3d, R, t):

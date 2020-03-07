@@ -4,7 +4,7 @@
 
 ![input_image](input.png)
 
-Shape(1, 3,	360, 640) Range:[-1, 1]
+Shape(1, 3,	256, 448) Range:[-1, 1]
 
 ### output
 
