@@ -10,6 +10,7 @@ Shape(1, 3,	256, 448) Range:[-1, 1]
 
 ![output_image](ICV_3D_Human_Pose_Estimation_0.png)
 
+![output_3d](Canvas3D_0.png)
 
 ### usage
 
