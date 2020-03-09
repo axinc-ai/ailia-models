@@ -20,6 +20,8 @@ if not os.path.exists(weight_path):
 
 # load dataset
 dummy_input = np.ones((1, 128))
+dummy_inputs = np.array([dummy_input, dummy_input, dummy_input])
+# dummy_inputs = (dummy_input, dummy_input, dummy_input)
 
 # net initialize
 env_id = ailia.get_gpu_environment_id()
@@ -27,9 +29,14 @@ print(env_id)
 net = ailia.Net(model_path, weight_path, env_id=env_id)
 
 # compute time
-for i in range(10):
+for i in range(5):
     start = int(round(time.time() * 1000))
-    preds_ailia = net.predict((dummy_input, dummy_input, dummy_input))[0]
+    input_blobs = net.get_input_blob_list()
+    net.set_input_blob_data(dummy_inputs, input_blobs[0])
+    net.update()
+    preds_ailia = net.get_results()
+    
+    # preds_ailia = net.predict(dummy_input)[0]
     end = int(round(time.time() * 1000))
     print("ailia processing time {} ms".format(end-start))
 
