@@ -29,10 +29,11 @@ print(env_id)
 net = ailia.Net(model_path, weight_path, env_id=env_id)
 
 # compute time
-for i in range(5):
+for i in range(1):
     start = int(round(time.time() * 1000))
     input_blobs = net.get_input_blob_list()
-    net.set_input_blob_data(dummy_inputs, input_blobs[0])
+    for idx in input_blobs:
+        net.set_input_blob_data(dummy_input, idx)
     net.update()
     preds_ailia = net.get_results()
     
@@ -40,5 +41,6 @@ for i in range(5):
     end = int(round(time.time() * 1000))
     print("ailia processing time {} ms".format(end-start))
 
-print(f'[DEBUG] output shape: {preds_ailia.shape}')
+print(f'[DEBUG] output shape: {preds_ailia[0].shape}')
+print(f'[DEBUG] output shape: {preds_ailia[1].shape}')
 print('Successfully finished!')
