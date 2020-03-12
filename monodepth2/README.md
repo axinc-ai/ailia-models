@@ -1,36 +1,32 @@
-# BlazeFace
+# MonoDepth2
 
 ### input
 
-<img src="input.png" width="320px">
+![input_image](input.jpg)
 
-(Image from https://github.com/hollance/BlazeFace-PyTorch/blob/master/3faces.png)
+(Image from https://github.com/nianticlabs/monodepth2/tree/master/assets/test_image.jpg)
 
-Shape(1, 3, 128, 128) Range:[-1, 1]
+Shape(1, 3, 192, 640) Range:[0, 1]
 
 ### output
 
-![output_image](result.png)
+![output_image](output.png)
 
 ### usage
 
 ``` bash
-python3 blazeface.py 
+python3 monodepth2.py
 ```
-you can change input image path in `blazeface.py`
+you can change input image path in `monodepth2.py`
 
-``` bash
-python3 blazeface.py video
-```
-you can use webcamera input
 
 ### Reference
 
-[BlazeFace-PyTorch](https://github.com/hollance/BlazeFace-PyTorch)
+[Monodepth2](https://github.com/nianticlabs/monodepth2)
 
 
 ### Framework
-PyTorch 1.1
+PyTorch 0.4.1
 
 
 ### Model Format
@@ -38,5 +34,4 @@ ONNX opset = 10
 
 
 ### Netron
-
-[blazeface.onnx.prototxt](https://lutzroeder.github.io/netron/?url=https://storage.googleapis.com/ailia-models/blazeface/blazeface.onnx.prototxt)
+[]()
