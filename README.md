@@ -84,16 +84,14 @@ https://ailia.jp/en/
 |:-----------|------------:|:------------:|:------------:|
 |[crowdcount-cascaded-mtl](/crowdcount-cascaded-mtl) | [CNN-based Cascaded Multi-task Learning of High-level Prior and Density Estimation for Crowd Counting (Single Image Crowd Counting)](https://github.com/svishwa/crowdcount-cascaded-mtl) | Pytorch | 1.2.1 and later |
 
+## Depth estimation
+
+| Name | Detail | Exported From | Supported Ailia Version |
+|:-----------|------------:|:------------:|:------------:|
+|[monodepth2](monodepth2)| [Monocular depth estimation from a single image](https://github.com/nianticlabs/monodepth2) | Pytorch | 1.2.1 and later |
+
 ## Text recognization
 
 | Name | Detail | Exported From | Supported Ailia Version |
 |:-----------|------------:|:------------:|:------------:|
 |[etl](/etl) | Japanese Character Recognization | Keras | 1.1.0 and later |
-
-## Depth estimation
-
-| Name | Detail | Exported From | Supported Ailia Version |
-|:-----------|------------:|:------------:|:------------:|
-|[monodepth2](https://github.com/nianticlabs/monodepth2)| Monocular depth estimation from a single image | Pytorch | 1.2.1 and later |
-
-
