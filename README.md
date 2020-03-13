@@ -89,3 +89,11 @@ https://ailia.jp/en/
 | Name | Detail | Exported From | Supported Ailia Version |
 |:-----------|------------:|:------------:|:------------:|
 |[etl](/etl) | Japanese Character Recognization | Keras | 1.1.0 and later |
+
+## Depth estimation
+
+| Name | Detail | Exported From | Supported Ailia Version |
+|:-----------|------------:|:------------:|:------------:|
+|[monodepth2](https://github.com/nianticlabs/monodepth2)| Monocular depth estimation from a single image | Pytorch | 1.2.1 and later |
+
+
