@@ -8,6 +8,15 @@ Masked Word should be represented by one `_`.
 Top `k` predicted words suitable for filling the Masked Word.  
 `k` is defined as `NUM_PREDICT` in `bert.py`
 
+### Usage
+ex. SENTENCE = 'I want to _ the car because it is cheap.'
+
+```bash
+$ python3 bert.py
+...
+predicted top 3 words: ['buy', 'drive', 'rent']
+```
+
 ### Reference
 [pytorch-pretrained-bert](https://pypi.org/project/pytorch-pretrained-bert/)
 
