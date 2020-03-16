@@ -1,22 +1,18 @@
-# ResNet Facial Feature Detection
+# Predicting Missing Word Using Bert Masked LM
 
 ### input
-![input_image](test.png)
-
-Shape: (1, 1, 226, 226) Range:[0, 1]
+A sentence with a masked word, which is defined as `SENTENCE` in `bert.py`.  
+Masked Word should be represented by one `_`.
 
 ### output
-![Result_image](output.png)
- 
-The raw output of our model is a list of 15 coordinates of feature points.  
-In the `facial_feature.py`, we place these points on the input image and resize it to 300pixels * 300pixels for easier understanding.
+Top `k` predicted words suitable for filling the Masked Word.  
+`k` is defined as `NUM_PREDICT` in `bert.py`
 
 ### Reference
-
-[kaggle-facial-keypoints](https://github.com/axinc-ai/kaggle-facial-keypoints)
+[pytorch-pretrained-bert](https://pypi.org/project/pytorch-pretrained-bert/)
 
 ### Framework
-PyTorch 1.2.0
+PyTorch 1.3.0
 
 ### Model Format
 ONNX opset = 10

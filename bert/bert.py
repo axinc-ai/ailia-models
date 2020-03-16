@@ -10,6 +10,7 @@ import ailia
 
 
 NUM_PREDICT = 3
+SENTENCE = 'I want to _ the car because it is cheap.'
 
 WEIGHT_PATH = "bert-base-uncased.onnx"
 MODEL_PATH = "bert-base-uncased.onnx.prototxt"
@@ -53,9 +54,8 @@ def text2token(text, tokenizer):
 def main():
     tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
     # Prepare data
-    dummy_input = np.ones((1, 128))
-    test_sentence = 'I want to _ the car because it is cheap.'
-    tokens_ts, segments_ts, masked_index = text2token(test_sentence, tokenizer)
+    dummy_input = np.ones((1, 128))    
+    tokens_ts, segments_ts, masked_index = text2token(SENTENCE, tokenizer)
     input_data = np.array([tokens_ts, segments_ts])
     
     # net initialize
