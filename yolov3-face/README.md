@@ -26,3 +26,7 @@ Keras 2.2.4
 ## Model Format
 
 ONNX opset=10
+
+## Netron
+
+[yolov3-face.opt.onnx.prototxt](https://lutzroeder.github.io/netron/?url=https://storage.googleapis.com/ailia-models/yolov3-face/yolov3-face.opt.onnx.prototxt)

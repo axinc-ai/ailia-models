@@ -15,6 +15,20 @@ Range : [0.0, 1.0]
 - probablity : [0.0,1.0]
 - position : x, y, w, h [0,1]
 
+## Usage
+
+Predict from image
+
+```
+python3 yolov3-tiny.py
+```
+
+Predict from web camera
+
+```
+python3 yolov3-tiny.py video
+```
+
 ## Reference
 
 - [YOLO: Real-Time Object Detection](https://pjreddie.com/darknet/yolo/)
@@ -28,3 +42,7 @@ Keras 2.2.4
 ## Model Format
 
 ONNX opset=10
+
+## Netron
+
+[yolov3-tiny.opt.onnx.prototxt](https://lutzroeder.github.io/netron/?url=https://storage.googleapis.com/ailia-models/yolov3-tiny/yolov3-tiny.opt.onnx.prototxt)

@@ -1,12 +1,23 @@
-import cv2
-import sys
-import time
+#ailia pose estimator api sample
+
+import requests
 import numpy as np
+import time
 import os
-import matplotlib.pyplot as plt
-import urllib.request
+import cv2
+import urllib
+import sys
 
 import ailia
+
+#require ailia SDK 1.2.1
+
+MODE="image"
+if len(sys.argv)>=2:
+	MODE = sys.argv[1]
+	if MODE!="image" and MODE!="video":
+		print("please set mdoe to image or video")
+		sys.exit()
 
 OPT_MODEL=True
 if OPT_MODEL:
@@ -23,86 +34,118 @@ if not os.path.exists(model_path):
 if not os.path.exists(weight_path):
     urllib.request.urlretrieve("https://storage.googleapis.com/ailia-models/lightweight-human-pose-estimation/"+weight_path,weight_path)
 
-print("loading ...");
+algorithm = ailia.POSE_ALGORITHM_LW_HUMAN_POSE
 
+file_name = 'balloon.png'
+
+# estimator initialize
 env_id=ailia.get_gpu_environment_id()
-net = ailia.Net(model_path,weight_path,env_id=env_id)
+pose = ailia.PoseEstimator(model_path,weight_path, env_id=env_id, algorithm=algorithm)
 
-IMAGE_PATH="balloon.png"
+shape = pose.get_input_shape()
+ailia_input_width = shape[3]
+ailia_input_height = shape[2]
 
-IMAGE_WIDTH=net.get_input_shape()[3]
-IMAGE_HEIGHT=net.get_input_shape()[2]
+# print result
+def hsv_to_rgb(h, s, v):
+	bgr = cv2.cvtColor(np.array([[[h, s, v]]], dtype=np.uint8), cv2.COLOR_HSV2BGR)[0][0]
+	return (int(bgr[2]), int(bgr[1]), int(bgr[0]))
 
-input_img = cv2.imread(IMAGE_PATH)
+def line(input_img,person,point1,point2):
+	threshold = 0.2
+	if person.points[point1].score>threshold and person.points[point2].score>threshold:
+		color = hsv_to_rgb(255*point1/ailia.POSE_KEYPOINT_CNT,255,255)
 
-img = cv2.resize(input_img, (IMAGE_WIDTH, IMAGE_HEIGHT))
+		x1 = int(input_img.shape[1] * person.points[point1].x)
+		y1 = int(input_img.shape[0] * person.points[point1].y)
 
-img = img[...,::-1]  #BGR 2 RGB
+		x2 = int(input_img.shape[1] * person.points[point2].x)
+		y2 = int(input_img.shape[0] * person.points[point2].y)
 
-data = np.array(img, dtype=np.float32)
-data.shape = (1,) + data.shape
-data = (data - 128) / 255.0
-data = data.transpose((0, 3, 1, 2))
+		cv2.line(input_img,(x1,y1),(x2,y2),color,5)
 
-print("inferencing ...");
+def display_result(input_img,pose):
+	count = pose.get_object_count()
+	for idx  in range(count) :
+		person = pose.get_object_pose(idx)
+		for i in range(ailia.POSE_KEYPOINT_CNT):
+			score = person.points[i].score
+			x = (input_img.shape[1] * person.points[i].x)
+			y = (input_img.shape[0] * person.points[i].y)
 
-pred_onnx = net.predict(data)
-out = pred_onnx
+			line(input_img,person,ailia.POSE_KEYPOINT_NOSE,ailia.POSE_KEYPOINT_SHOULDER_CENTER)
+			line(input_img,person,ailia.POSE_KEYPOINT_SHOULDER_LEFT,ailia.POSE_KEYPOINT_SHOULDER_CENTER)
+			line(input_img,person,ailia.POSE_KEYPOINT_SHOULDER_RIGHT,ailia.POSE_KEYPOINT_SHOULDER_CENTER)
 
-cnt = 3
-for i in range(cnt):
-	if(i==1):
-		net.set_profile_mode()
-	start=int(round(time.time() * 1000))
-	out = net.predict(data)
-	end=int(round(time.time() * 1000))
-	print("## ailia processing time , "+str(i)+" , "+str(end-start)+" ms")
+			line(input_img,person,ailia.POSE_KEYPOINT_EYE_LEFT,ailia.POSE_KEYPOINT_NOSE)
+			line(input_img,person,ailia.POSE_KEYPOINT_EYE_RIGHT,ailia.POSE_KEYPOINT_NOSE)
+			line(input_img,person,ailia.POSE_KEYPOINT_EAR_LEFT,ailia.POSE_KEYPOINT_EYE_LEFT)
+			line(input_img,person,ailia.POSE_KEYPOINT_EAR_RIGHT,ailia.POSE_KEYPOINT_EYE_RIGHT)
 
-confidence = net.get_blob_data(net.find_blob_index_by_name("397"))
-paf = net.get_blob_data(net.find_blob_index_by_name("400"))
+			line(input_img,person,ailia.POSE_KEYPOINT_ELBOW_LEFT,ailia.POSE_KEYPOINT_SHOULDER_LEFT)
+			line(input_img,person,ailia.POSE_KEYPOINT_ELBOW_RIGHT,ailia.POSE_KEYPOINT_SHOULDER_RIGHT)
+			line(input_img,person,ailia.POSE_KEYPOINT_WRIST_LEFT,ailia.POSE_KEYPOINT_ELBOW_LEFT)
+			line(input_img,person,ailia.POSE_KEYPOINT_WRIST_RIGHT,ailia.POSE_KEYPOINT_ELBOW_RIGHT)
 
-print("PAF SHAPE : "+str(paf.shape))
-print("CONFIDENCE SHAPE : "+str(confidence.shape))
+			line(input_img,person,ailia.POSE_KEYPOINT_BODY_CENTER,ailia.POSE_KEYPOINT_SHOULDER_CENTER)
+			line(input_img,person,ailia.POSE_KEYPOINT_HIP_LEFT,ailia.POSE_KEYPOINT_BODY_CENTER)
+			line(input_img,person,ailia.POSE_KEYPOINT_HIP_RIGHT,ailia.POSE_KEYPOINT_BODY_CENTER)
 
-points = []
-threshold = 0.1
+			line(input_img,person,ailia.POSE_KEYPOINT_KNEE_LEFT,ailia.POSE_KEYPOINT_HIP_LEFT)
+			line(input_img,person,ailia.POSE_KEYPOINT_ANKLE_LEFT,ailia.POSE_KEYPOINT_KNEE_LEFT)
+			line(input_img,person,ailia.POSE_KEYPOINT_KNEE_RIGHT,ailia.POSE_KEYPOINT_HIP_RIGHT)
+			line(input_img,person,ailia.POSE_KEYPOINT_ANKLE_RIGHT,ailia.POSE_KEYPOINT_KNEE_RIGHT)
 
-for i in range(confidence.shape[1]):
-	probMap = confidence[0, i, :, :]
-	minVal, prob, minLoc, point = cv2.minMaxLoc(probMap)
+def recognize_from_image():
+	# load input image and convert to BGRA
+	img = cv2.imread(file_name)
+	input_img = np.array(img)
+	img = cv2.resize(img,(ailia_input_width,ailia_input_height))
+	if img.shape[2] == 3 :
+		img = cv2.cvtColor( img, cv2.COLOR_BGR2BGRA )
+	elif img.shape[2] == 1 : 
+		img = cv2.cvtColor( img, cv2.COLOR_GRAY2BGRA )
 
-	x = (input_img.shape[1] * point[0]) / confidence.shape[3]
-	y = (input_img.shape[0] * point[1]) / confidence.shape[2]
- 
-	if prob > threshold : 
-		circle_size = 4
-		cv2.circle(input_img, (int(x), int(y)), circle_size, (0, 255, 255), thickness=-1, lineType=cv2.FILLED)
-		#cv2.putText(input_img, "{}".format(i), (int(x), int(y)), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 0, 255), 1, lineType=cv2.LINE_AA)
-		#cv2.putText(input_img, ""+str(prob), (int(x), int(y+circle_size)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1, lineType=cv2.LINE_AA)
+	# compute
+	cnt = 3
+	for i in range(cnt):
+		start=int(round(time.time() * 1000))
+		persons = pose.compute(img)
+		end=int(round(time.time() * 1000))
+		print("## ailia processing time , "+str(i)+" , "+str(end-start)+" ms")
+	
+	count = pose.get_object_count()
+	print("person_count=" + str(count))
 
-		points.append((int(x), int(y)))
-	else :
-		points.append(None)
- 
-cv2.imshow("Keypoints",input_img)
-cv2.imwrite('output.png', input_img)
+	count = pose.get_object_count()
+	display_result(input_img,pose)
+	cv2.imwrite( "output.png", input_img)
 
-def plot_images(title, images, tile_shape):
-	assert images.shape[0] <= (tile_shape[0]* tile_shape[1])
-	from mpl_toolkits.axes_grid1 import ImageGrid
-	fig = plt.figure()
-	plt.title(title)
-	grid = ImageGrid(fig, 111,  nrows_ncols = tile_shape )
-	for i in range(images.shape[1]):
-		grd = grid[i]
-		grd.imshow(images[0,i])
+def recognize_from_video():
+	capture = cv2.VideoCapture(0)
+	if not capture.isOpened():
+		print("webcamera not found")
+		sys.exit()
+	while(True):
+		ret, frame = capture.read()
+		if cv2.waitKey(1) & 0xFF == ord('q'):
+			break
+		if not ret:
+			continue
 
-channels=max(confidence.shape[1],paf.shape[1])
-cols=8
+		input_img = np.array(frame)
+		img = cv2.resize(frame,(ailia_input_width,ailia_input_height))
+		img = cv2.cvtColor( img, cv2.COLOR_BGR2BGRA )
+		persons = pose.compute(img)
+		display_result(input_img,pose)
 
-plot_images("paf",paf,tile_shape=((int)((channels+cols-1)/cols),cols))
-plot_images("confidence",confidence,tile_shape=((int)((channels+cols-1)/cols),cols))
+		cv2.imshow('frame',input_img)
+	capture.release()
+	cv2.destroyAllWindows()
 
-plt.show()
+if MODE=="image":
+	recognize_from_image()
 
-cv2.destroyAllWindows()
+if MODE=="video":
+	recognize_from_video()
+	

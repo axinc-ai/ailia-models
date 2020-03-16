@@ -26,3 +26,7 @@ ONNX Runtime
 ## Model Format
 
 ONNX opset=10
+
+## Netron
+
+[yolov3.opt.onnx.prototxt](https://lutzroeder.github.io/netron/?url=https://storage.googleapis.com/ailia-models/yolov3/yolov3.opt.onnx.prototxt)

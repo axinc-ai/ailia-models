@@ -31,3 +31,8 @@ Caffe
 ## Model Format
 
 CaffeModel
+
+## Netron
+
+[pose_deploy.prototxt](https://lutzroeder.github.io/netron/?url=https://storage.googleapis.com/ailia-models/openpose/pose_deploy.prototxt)
+

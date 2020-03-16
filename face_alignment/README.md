@@ -26,3 +26,7 @@ Pytorch 1.2.0
 ## Model Format
 
 ONNX opset = 10
+
+## Netron
+
+[face_alignment.onnx.prototxt](https://lutzroeder.github.io/netron/?url=https://storage.googleapis.com/ailia-models/face_alignment/face_alignment.onnx.prototxt)

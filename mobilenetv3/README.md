@@ -33,3 +33,7 @@ ONNX opset = 10
 ## Framework
 
 Pytorch
+
+## Netron
+
+[mobilenetv3_small.onnx.prototxt](https://lutzroeder.github.io/netron/?url=https://storage.googleapis.com/ailia-models/mobilenetv3/mobilenetv3_small.onnx.prototxt)

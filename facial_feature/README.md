@@ -20,3 +20,7 @@ PyTorch 1.2.0
 
 ### Model Format
 ONNX opset = 10
+
+### Netron
+
+[resnet_facial_feature.onnx.prototxt](https://lutzroeder.github.io/netron/?url=https://storage.googleapis.com/ailia-models/resnet_facial_feature/resnet_facial_feature.onnx.prototxt)

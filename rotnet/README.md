@@ -31,3 +31,7 @@ Keras
 
 ### Model Format
 ONNX opset = 10
+
+### Netron
+
+[rotnet_gsv_2.onnx.prototxt](https://lutzroeder.github.io/netron/?url=https://storage.googleapis.com/ailia-models/rotnet/rotnet_gsv_2.onnx.prototxt)

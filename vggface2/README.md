@@ -32,3 +32,7 @@ Caffe
 ## Model Format
 
 CaffeModel
+
+## Netron
+
+[resnet50_scratch.prototxt](https://lutzroeder.github.io/netron/?url=https://storage.googleapis.com/ailia-models/vggface2/resnet50_scratch.prototxt)

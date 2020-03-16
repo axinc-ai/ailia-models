@@ -41,3 +41,9 @@ PyTorch 0.4.1
 ### Model Format
 ONNX opset = 10
 
+### Netron
+
+[HRNetV2-W18-Small-v1.onnx.prototxt](https://lutzroeder.github.io/netron/?url=https://storage.googleapis.com/ailia-models/hrnet/HRNetV2-W18-Small-v1.onnx.prototxt)
+
+[HRNetV2-W18-Small-v2.onnx.prototxt](https://lutzroeder.github.io/netron/?url=https://storage.googleapis.com/ailia-models/hrnet/HRNetV2-W18-Small-v2.onnx.prototxt)
+

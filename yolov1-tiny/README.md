@@ -5,7 +5,7 @@
 ![Input](couple.jpg)
 
 Shape : (1, 3, 448, 448)
-Range : [-0.5, 0.5]
+Range : [-1.0, 1.0]
 
 ## Output
 
@@ -28,3 +28,7 @@ Darknet
 ## Model Format
 
 CaffeModel
+
+## Netron
+
+[yolov1-tiny.prototxt](https://lutzroeder.github.io/netron/?url=https://storage.googleapis.com/ailia-models/yolov1-tiny/yolov1-tiny.prototxt)
