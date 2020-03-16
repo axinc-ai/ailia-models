@@ -96,3 +96,9 @@ https://ailia.jp/en/
 | Name | Detail | Exported From | Supported Ailia Version |
 |:-----------|------------:|:------------:|:------------:|
 |[etl](/etl) | Japanese Character Recognization | Keras | 1.1.0 and later |
+
+## Natural language processing
+
+| Name | Detail | Exported From | Supported Ailia Version |
+|:-----------|------------:|:------------:|:------------:|
+|[bert](/bert) | [pytorch-pretrained-bert](https://pypi.org/project/pytorch-pretrained-bert/) | Pytorch | 1.2.2 beta and later |
