@@ -105,7 +105,7 @@ def main():
         )
 
     # Prepare data
-    dummy_input = np.ones((1, MAX_SEQ_LEN))
+    dummy_input = np.ones((1, MAX_SEQ_LEN), dtype=np.int64)
     tokens_ts, segments_ts, masked_index = text2token(
         SENTENCE, tokenizer, lang=LANG
     )
@@ -113,24 +113,39 @@ def main():
     
     # net initialize
     env_id = ailia.get_gpu_environment_id()
-    print(f'env_id: {env_id}')
-    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
-    
-    # compute time
-    for i in range(1):
-        start = int(round(time.time() * 1000))
-        input_blobs = net.get_input_blob_list()
-        for i, idx in enumerate(input_blobs):
-            if i < len(input_data):
-                net.set_input_blob_data(input_data[i], idx)
-            else:
-                net.set_input_blob_data(dummy_input, idx)
-        net.update()
-        preds_ailia = net.get_results()
 
-        # preds_ailia = net.predict(dummy_input)[0]
-        end = int(round(time.time() * 1000))
-        print("ailia processing time {} ms".format(end-start))
+    # onnx debug
+    import onnxruntime
+    ss = onnxruntime.InferenceSession(WEIGHT_PATH)
+
+    input_name_0 = ss.get_inputs()[0].name
+    input_name_1 = ss.get_inputs()[1].name
+    input_name_2 = ss.get_inputs()[2].name
+    out = ss.get_outputs()[0].name
+    preds_ailia = ss.run([out], {
+        input_name_0: tokens_ts.astype(np.int64),
+        input_name_1: segments_ts.astype(np.int64),
+        input_name_2: dummy_input
+    })
+    
+    # print(f'env_id: {env_id}')
+    # net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+    
+    # # compute time
+    # for i in range(1):
+    #     start = int(round(time.time() * 1000))
+    #     input_blobs = net.get_input_blob_list()
+    #     for i, idx in enumerate(input_blobs):
+    #         if i < len(input_data):
+    #             net.set_input_blob_data(input_data[i], idx)
+    #         else:
+    #             net.set_input_blob_data(dummy_input, idx)
+    #     net.update()
+    #     preds_ailia = net.get_results()
+
+    #     # preds_ailia = net.predict(dummy_input)[0]
+    #     end = int(round(time.time() * 1000))
+    #     print("ailia processing time {} ms".format(end-start))
 
     # Masked Word Prediction
     predicted_indices = np.argsort(
