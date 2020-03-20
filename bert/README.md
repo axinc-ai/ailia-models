@@ -39,3 +39,7 @@ PyTorch 1.3.0
 
 ### Model Format
 ONNX opset = 10
+
+### Netron
+
+[bert-base-uncased.onnx.prototxt](https://lutzroeder.github.io/netron/?url=https://storage.googleapis.com/ailia-models/bert_en/bert-base-uncased.onnx.prototxt)
