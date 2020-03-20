@@ -4,8 +4,11 @@ import urllib.request
 import argparse
 
 import numpy as np
-from pyknp import Juman
 from transformers import BertTokenizer
+try:
+    from pyknp import Juman
+except:
+    print('[WARNING] pyknp module is not installed. (for japanese mode)')
 
 import ailia
 

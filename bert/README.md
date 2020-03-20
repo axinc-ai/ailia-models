@@ -31,7 +31,7 @@ predicted top 3 words: ['結婚', '[UNK]', '旅']
 
 
 ### Reference
-[pytorch-pretrained-bert](https://pypi.org/project/pytorch-pretrained-bert/)
+[pytorch-pretrained-bert](https://pypi.org/project/pytorch-pretrained-bert/)  
 [BERT日本語Pretrainedモデル](http://nlp.ist.i.kyoto-u.ac.jp/index.php?BERT%E6%97%A5%E6%9C%AC%E8%AA%9EPretrained%E3%83%A2%E3%83%87%E3%83%AB)
 
 ### Framework
