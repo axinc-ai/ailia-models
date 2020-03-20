@@ -5,10 +5,15 @@ import argparse
 
 import numpy as np
 from pyknp import Juman
+import sentencepiece as sp
 # from pytorch_pretrained_bert import BertTokenizer
 from transformers import BertTokenizer
 
 import ailia
+
+
+# TODO NICT model
+# SentencePiece Model
 
 
 # argument config
@@ -39,9 +44,17 @@ elif LANG == 'jp':
     # masked word should be represented by '＿' (zen-kaku)
     # SENTENCE = '私は車が安いので＿したい．'
     SENTENCE = '私はクリスマスプレゼントには＿が欲しい！'
+    
+    # NICT
+    # WEIGHT_PATH = 'nict-bert-jp.onnx'
+    # MODEL_PATH = 'nict-bert-jp.onnx.prototxt'
 
-    WEIGHT_PATH = 'nict-bert-jp.onnx'
-    MODEL_PATH = 'nict-bert-jp.onnx.prototxt'
+    # SentencePiece
+    WEIGHT_PATH = 'spp-bert-jp.onnx'
+    MODEL_PATH = 'spp-bert-jp.onnx.prototxt'
+    BASE_SPM = 'wiki-ja.model'
+    BASE_VOCAB = 'wiki-ja.vocab'
+    
     RMT_CKPT = "https://storage.googleapis.com/ailia-models/bert_jp/"
 
     MAX_SEQ_LEN = 512
@@ -61,15 +74,34 @@ def text2token(text, tokenizer, lang='en'):
         indexed_tokens = tokenizer.convert_tokens_to_ids(tokenized_text)
         
     elif lang == 'jp':
-        jumanapp = Juman()
-        juman_res = jumanapp.analysis(text)
-        tokenized_text = [mrph.midasi for mrph in juman_res.mrph_list()]
+        # NICT model 
+        # jumanapp = Juman()
+        # juman_res = jumanapp.analysis(text)
+        # tokenized_text = [mrph.midasi for mrph in juman_res.mrph_list()]
+
+        # sentence piece model
+        spp = sp.SentencePieceProcessor()
+        spp.Load(BASE_SPM)
+
+        # sentencepiece replace a space to "_", which we use for mask work
+        tokenized_text = [
+            w for w in spp.encode_as_pieces(text.replace(" ", ""))
+        ]
         tokenized_text.insert(0, '[CLS]')
         tokenized_text.append('[SEP]')
         tokenized_text = [
-            '[MASK]' if token == '＿' else token for token in tokenized_text
+            '[MASK]' if token == '_' else token for token in tokenized_text
         ]
-        indexed_tokens = tokenizer.convert_tokens_to_ids(tokenized_text)
+        
+        # indexed_tokens = tokenizer.convert_tokens_to_ids(tokenized_text)
+
+        indexed_tokens = []
+        for t, token in enumerate(tokenized_text):
+            try:
+                indexed_tokens.append(spp.piece_to_id(token))
+            except:
+                print('[WARNING] ' + token + ' is unknown.')
+                indexed_tokens.append(spp.piece_to_id('<unk>'))
                 
     masked_index = tokenized_text.index('[MASK]')
     segments_ids = [0] * len(tokenized_text)
@@ -98,12 +130,13 @@ def main():
     if LANG == 'en':
         tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
     elif LANG == 'jp':
+        # NICT model
         tokenizer = BertTokenizer(
             'vocab.txt',
             do_lower_case=False,
             do_basic_tokenize=False
         )
-
+        
     # Prepare data
     dummy_input = np.ones((1, MAX_SEQ_LEN), dtype=np.int64)
     tokens_ts, segments_ts, masked_index = text2token(
@@ -151,7 +184,16 @@ def main():
     predicted_indices = np.argsort(
         preds_ailia[0][0][masked_index]
     )[-NUM_PREDICT:][::-1]
-    predicted_tokens = tokenizer.convert_ids_to_tokens(predicted_indices)
+
+    if LANG == 'en':
+        predicted_tokens = tokenizer.convert_ids_to_tokens(predicted_indices)
+    elif LANG == 'jp':
+        spp = sp.SentencePieceProcessor()
+        spp.Load(BASE_SPM)
+        predicted_tokens = []
+        for index in predicted_indices:
+            predicted_tokens.append(spp.id_to_piece(int(index)))
+        # predicted_tokens = [spp.id_to_piece(index) for index in predicted_indices]
     print('Input sentence: ' + SENTENCE)
     print(f'predicted top {NUM_PREDICT} words: {predicted_tokens}')
 
