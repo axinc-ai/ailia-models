@@ -115,20 +115,6 @@ def main():
     # net initialize
     env_id = ailia.get_gpu_environment_id()
 
-    # onnx debug
-    # import onnxruntime
-    # ss = onnxruntime.InferenceSession(WEIGHT_PATH)
-
-    # input_name_0 = ss.get_inputs()[0].name
-    # input_name_1 = ss.get_inputs()[1].name
-    # input_name_2 = ss.get_inputs()[2].name
-    # out = ss.get_outputs()[0].name
-    # preds_ailia = ss.run([out], {
-    #     input_name_0: tokens_ts.astype(np.int64),
-    #     input_name_1: segments_ts.astype(np.int64),
-    #     input_name_2: dummy_input
-    # })
-
     print(f'env_id: {env_id}')
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
 
