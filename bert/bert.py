@@ -5,15 +5,9 @@ import argparse
 
 import numpy as np
 from pyknp import Juman
-import sentencepiece as sp
-# from pytorch_pretrained_bert import BertTokenizer
 from transformers import BertTokenizer
 
 import ailia
-
-
-# TODO NICT model
-# SentencePiece Model
 
 
 # argument config
@@ -29,7 +23,7 @@ print('[INFO] language is set to ' + LANG)
 
 
 # Params
-NUM_PREDICT = 3
+NUM_PREDICT = 10
 if LANG == 'en':
     # masked word should be represented by '_'
     SENTENCE = 'I want to _ the car because it is cheap.'
@@ -42,19 +36,13 @@ if LANG == 'en':
 
 elif LANG == 'jp':
     # masked word should be represented by '＿' (zen-kaku)
-    # SENTENCE = '私は車が安いので＿したい．'
-    SENTENCE = '私はクリスマスプレゼントには＿が欲しい！'
-    
-    # NICT
-    # WEIGHT_PATH = 'nict-bert-jp.onnx'
-    # MODEL_PATH = 'nict-bert-jp.onnx.prototxt'
+    SENTENCE = '私は車が安いので＿したい．'
+    # SENTENCE = '私はクリスマスプレゼントには＿が欲しい！'
 
-    # SentencePiece
-    WEIGHT_PATH = 'spp-bert-jp.onnx'
-    MODEL_PATH = 'spp-bert-jp.onnx.prototxt'
-    BASE_SPM = 'wiki-ja.model'
-    BASE_VOCAB = 'wiki-ja.vocab'
-    
+    # kyoto univ
+    WEIGHT_PATH = 'kyoto-bert-jp.onnx'
+    MODEL_PATH = 'kyoto-bert-jp.onnx.prototxt'
+
     RMT_CKPT = "https://storage.googleapis.com/ailia-models/bert_jp/"
 
     MAX_SEQ_LEN = 512
@@ -72,37 +60,18 @@ def text2token(text, tokenizer, lang='en'):
         masked_text = "[CLS] " + text + " [SEP]"
         tokenized_text = tokenizer.tokenize(masked_text)
         indexed_tokens = tokenizer.convert_tokens_to_ids(tokenized_text)
-        
+
     elif lang == 'jp':
-        # NICT model 
-        # jumanapp = Juman()
-        # juman_res = jumanapp.analysis(text)
-        # tokenized_text = [mrph.midasi for mrph in juman_res.mrph_list()]
-
-        # sentence piece model
-        spp = sp.SentencePieceProcessor()
-        spp.Load(BASE_SPM)
-
-        # sentencepiece replace a space to "_", which we use for mask work
-        tokenized_text = [
-            w for w in spp.encode_as_pieces(text.replace(" ", ""))
-        ]
+        jumanapp = Juman()
+        juman_res = jumanapp.analysis(text)
+        tokenized_text = [mrph.midasi for mrph in juman_res.mrph_list()]
         tokenized_text.insert(0, '[CLS]')
         tokenized_text.append('[SEP]')
         tokenized_text = [
-            '[MASK]' if token == '_' else token for token in tokenized_text
+            '[MASK]' if token == '＿' else token for token in tokenized_text
         ]
-        
-        # indexed_tokens = tokenizer.convert_tokens_to_ids(tokenized_text)
+        indexed_tokens = tokenizer.convert_tokens_to_ids(tokenized_text)
 
-        indexed_tokens = []
-        for t, token in enumerate(tokenized_text):
-            try:
-                indexed_tokens.append(spp.piece_to_id(token))
-            except:
-                print('[WARNING] ' + token + ' is unknown.')
-                indexed_tokens.append(spp.piece_to_id('<unk>'))
-                
     masked_index = tokenized_text.index('[MASK]')
     segments_ids = [0] * len(tokenized_text)
     tokens_ts = np.array([indexed_tokens])
@@ -130,73 +99,65 @@ def main():
     if LANG == 'en':
         tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
     elif LANG == 'jp':
-        # NICT model
         tokenizer = BertTokenizer(
             'vocab.txt',
             do_lower_case=False,
             do_basic_tokenize=False
         )
-        
+
     # Prepare data
     dummy_input = np.ones((1, MAX_SEQ_LEN), dtype=np.int64)
     tokens_ts, segments_ts, masked_index = text2token(
         SENTENCE, tokenizer, lang=LANG
     )
     input_data = np.array([tokens_ts, segments_ts])
-    
+
     # net initialize
     env_id = ailia.get_gpu_environment_id()
 
     # onnx debug
-    import onnxruntime
-    ss = onnxruntime.InferenceSession(WEIGHT_PATH)
+    # import onnxruntime
+    # ss = onnxruntime.InferenceSession(WEIGHT_PATH)
 
-    input_name_0 = ss.get_inputs()[0].name
-    input_name_1 = ss.get_inputs()[1].name
-    input_name_2 = ss.get_inputs()[2].name
-    out = ss.get_outputs()[0].name
-    preds_ailia = ss.run([out], {
-        input_name_0: tokens_ts.astype(np.int64),
-        input_name_1: segments_ts.astype(np.int64),
-        input_name_2: dummy_input
-    })
-    
-    # print(f'env_id: {env_id}')
-    # net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
-    
-    # # compute time
-    # for i in range(1):
-    #     start = int(round(time.time() * 1000))
-    #     input_blobs = net.get_input_blob_list()
-    #     for i, idx in enumerate(input_blobs):
-    #         if i < len(input_data):
-    #             net.set_input_blob_data(input_data[i], idx)
-    #         else:
-    #             net.set_input_blob_data(dummy_input, idx)
-    #     net.update()
-    #     preds_ailia = net.get_results()
+    # input_name_0 = ss.get_inputs()[0].name
+    # input_name_1 = ss.get_inputs()[1].name
+    # input_name_2 = ss.get_inputs()[2].name
+    # out = ss.get_outputs()[0].name
+    # preds_ailia = ss.run([out], {
+    #     input_name_0: tokens_ts.astype(np.int64),
+    #     input_name_1: segments_ts.astype(np.int64),
+    #     input_name_2: dummy_input
+    # })
 
-    #     # preds_ailia = net.predict(dummy_input)[0]
-    #     end = int(round(time.time() * 1000))
-    #     print("ailia processing time {} ms".format(end-start))
+    print(f'env_id: {env_id}')
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+
+    # compute time
+    for i in range(1):
+        start = int(round(time.time() * 1000))
+        input_blobs = net.get_input_blob_list()
+        for i, idx in enumerate(input_blobs):
+            if i < len(input_data):
+                net.set_input_blob_data(input_data[i], idx)
+            else:
+                net.set_input_blob_data(dummy_input, idx)
+        net.update()
+        preds_ailia = net.get_results()
+
+        # preds_ailia = net.predict(dummy_input)[0]
+        end = int(round(time.time() * 1000))
+        print("ailia processing time {} ms".format(end-start))
 
     # Masked Word Prediction
     predicted_indices = np.argsort(
         preds_ailia[0][0][masked_index]
     )[-NUM_PREDICT:][::-1]
 
-    if LANG == 'en':
-        predicted_tokens = tokenizer.convert_ids_to_tokens(predicted_indices)
-    elif LANG == 'jp':
-        spp = sp.SentencePieceProcessor()
-        spp.Load(BASE_SPM)
-        predicted_tokens = []
-        for index in predicted_indices:
-            predicted_tokens.append(spp.id_to_piece(int(index)))
-        # predicted_tokens = [spp.id_to_piece(index) for index in predicted_indices]
+    print(predicted_indices)
+    predicted_tokens = tokenizer.convert_ids_to_tokens(predicted_indices)
+
     print('Input sentence: ' + SENTENCE)
     print(f'predicted top {NUM_PREDICT} words: {predicted_tokens}')
-
     print('Successfully finished!')
 
 
