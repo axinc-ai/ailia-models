@@ -23,7 +23,7 @@ print('[INFO] language is set to ' + LANG)
 
 
 # Params
-NUM_PREDICT = 10
+NUM_PREDICT = 3
 if LANG == 'en':
     # masked word should be represented by '_'
     SENTENCE = 'I want to _ the car because it is cheap.'
