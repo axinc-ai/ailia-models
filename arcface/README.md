@@ -8,18 +8,21 @@
 
 (Image from https://github.com/ronghuaiyang/arcface-pytorch/issues/63)
 
-Shape(1, 1, 128, 128) Range:[-1, 1]
+Shape(4, 1, 128, 128) Range:[-1, 1]  (original image & flipped iamge for a pair image)
 
 ### output
 A similarity of a pair of images.
 
 
 ### usage
-
+- `correct_pair_1.jpg` & `correct_pair_2.jpg`
 ``` bash
 $ python3 arcface.py
 Similarity of (correct_pair_1.jpg, correct_pair_2.jpg) : 0.5981666445732117
+```
 
+- `correct_pair_1.jpg` & `incorrect.jpg`
+``` bash
 $ python3 arcface.py
 Similarity of (correct_pair_1.jpg, incorrect.jpg) : -0.010565089993178844
 ```
