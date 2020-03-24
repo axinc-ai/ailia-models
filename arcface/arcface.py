@@ -13,6 +13,10 @@ IMG_PATH_1 = 'correct_pair_1.jpg'
 IMG_PATH_2 = 'correct_pair_2.jpg'
 # IMG_PATH_2 = 'incorrect.jpg'
 
+# the threshold was calculated by the `test_performance` function in `test.py`
+# of the original repository
+THRESHOLD = 0.25572845  
+
 
 WEIGHT_PATH = 'arcface.onnx'
 MODEL_PATH = 'arcface.onnx.prototxt'
@@ -64,6 +68,10 @@ def main():
     sim = cosin_metric(fe_1, fe_2)
 
     print('Similarity of (' + IMG_PATH_1 + ', ' + IMG_PATH_2 + f') : {sim}')
+    if THRESHOLD > sim:
+        print('They are not the same face!')
+    else:
+        print('They are the same face!')
     
 
 if __name__ == "__main__":
