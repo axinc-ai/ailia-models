@@ -103,7 +103,7 @@ def compare_images():
         start = int(round(time.time() * 1000))
         preds_ailia = net.predict(imgs)
         end = int(round(time.time() * 1000))
-        print("ailia processing time {} ms".format(end - start))
+        print(f'ailia processing time {end - start} ms')
 
     # postprocessing
     fe_1 = np.concatenate([preds_ailia[0], preds_ailia[1]], axis=0)
@@ -133,11 +133,12 @@ def compare_image_and_webcamvideo():
         sys.exit(1)
 
     _, frame = capture.read()
+    # TODO need test when capture size is smaller than the rectangle
     frame_h, frame_w = frame.shape[0], frame.shape[1]
-    rect_top = frame_h//2 - int(IMAGE_HEIGHT * 1.5)
-    rect_bottom = frame_h//2 + int(IMAGE_HEIGHT * 1.5)
-    rect_left = frame_w//2 - int(IMAGE_WIDTH * 1.5)
-    rect_right = frame_w//2 + int(IMAGE_WIDTH * 1.5)
+    rect_top = np.max((frame_h//2 - int(IMAGE_HEIGHT * 1.5), 0))
+    rect_bottom = np.min((frame_h//2 + int(IMAGE_HEIGHT * 1.5), frame_h))
+    rect_left = np.max((frame_w//2 - int(IMAGE_WIDTH * 1.5), 0))
+    rect_right = np.min((frame_w//2 + int(IMAGE_WIDTH * 1.5), frame_w))
     
     # inference loop
     while(True):

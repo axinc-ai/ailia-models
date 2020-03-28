@@ -4,15 +4,21 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 
 
-def plot_detections(img, detections, with_keypoints=True):
+def sigmoid(x):
+    return 1.0 / (1.0 + np.exp(-x))
+
+
+def plot_detections(
+        img, detections, with_keypoints=True, save_image_path='result.png'
+):
     fig, ax = plt.subplots(1, figsize=(10, 10))
     ax.grid(False)
     ax.imshow(img)
 
     # if detections.ndim == 1:
     # detections = np.expand_dims(detections, axis=0)
-    
-    print("Found %d faces" % detections.shape[0])
+
+    print(f'Found {detections.shape[0]} faces')
         
     for i in range(detections.shape[0]):
         ymin = detections[i, 0] * img.shape[0]
@@ -44,8 +50,7 @@ def plot_detections(img, detections, with_keypoints=True):
                     alpha=detections[i, 16]
                 )
                 ax.add_patch(circle)
-    # save image as 'result.png'
-    plt.savefig('result.png')
+    plt.savefig(save_image_path)
 
 
 def decode_boxes(raw_boxes, anchors):
@@ -197,10 +202,6 @@ def weighted_non_max_suppression(detections):
     return output_detections    
 
 
-def sigmoid(x):
-    return 1 / (1 + np.exp(-x))
-
-
 def postprocess(preds_ailia, anchor_path='anchors.npy'):
     raw_box = preds_ailia[0]  # (1, 896, 16)
     raw_score = preds_ailia[1]  # (1, 896, 1)
@@ -233,16 +234,40 @@ def postprocess(preds_ailia, anchor_path='anchors.npy'):
         faces = np.stack(faces) if len(faces) > 0 else np.zeros((0, 17))
         filtered_detections.append(faces)
     return filtered_detections
-    
 
-# load image and apply preprocess (shape change, normalization)
-def load_image(fname):
-    img = cv2.imread(fname)
-    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-    # [x, y, channel] --> [1, channel, x, y]
-    imgs = np.expand_dims(np.rollaxis(img, 2, 0), axis=0).astype(np.float32)
-    assert imgs.shape[1] == 3
-    assert imgs.shape[2] == 128
-    assert imgs.shape[3] == 128
-    imgs = imgs / 127.5 - 1.0
-    return imgs
+
+def preprocess_frame(frame, input_height, input_width):
+    height, width = frame.shape[0], frame.shape[1]
+    size = np.max((height, width))
+    limit = np.min((height, width))
+    start = int((size - limit) / 2)
+    fin = int((size + limit) / 2)
+    img = cv2.resize(np.zeros((1, 1, 3), np.uint8), (size, size))
+    if size == height:
+        img[:, start:fin] = frame    
+    else:
+        img[start:fin, :] = frame
+    
+    data = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    data = cv2.resize(data, (input_height, input_width))
+    data = np.expand_dims(np.rollaxis(data, 2, 0), axis=0).astype(np.float32)
+    data = data / 127.5 - 1.0
+    return img, data
+
+
+def show_result(input_img, detections):
+    for detection in detections:
+        for d in detection:
+            w = input_img.shape[1]
+            h = input_img.shape[0]
+            top_left = (int(d[1]*w), int(d[0]*h))
+            bottom_right = (int(d[3]*w), int(d[2]*h))
+            color = (255, 255, 255)
+            cv2.rectangle(input_img, top_left, bottom_right, color, 4)
+
+            for k in range(6):
+                kp_x = d[4 + k*2] * input_img.shape[1]
+                kp_y = d[4 + k*2 + 1] * input_img.shape[0]
+                r = int(input_img.shape[1]/100)
+                cv2.circle(input_img, (int(kp_x), int(kp_y)),
+                           r, (255, 255, 255), -1)
