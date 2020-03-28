@@ -35,7 +35,7 @@ parser = argparse.ArgumentParser(
     description='Determine if the person is the same from two facial images.'
 )
 parser.add_argument(
-    '-i', '--input', metavar='INPUT',
+    '-i', '--input', metavar='IMAGEFILE_PATH',
     nargs=2,
     default=[IMG_PATH_1, IMG_PATH_2],
     help='Two iamge paths for calculating the face match'
