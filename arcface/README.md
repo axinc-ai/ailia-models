@@ -15,20 +15,29 @@ A similarity of a pair of images.
 
 
 ### usage
-- `correct_pair_1.jpg` & `correct_pair_2.jpg`
+Automatically downloads the onnx and prototxt files on the first run.  
+It is necessary to be connected to the Internet while downloading.
+
+By default, the following two images are loaded: `correct_pair_1.jpg`, `correct_pair_2.jpg`
 ``` bash
 $ python3 arcface.py
 Similarity of (correct_pair_1.jpg, correct_pair_2.jpg) : 0.5981666445732117
 ```
 
-- `correct_pair_1.jpg` & `incorrect.jpg`
+If you want to specify images, specify the paths of the two images after the --input option.
 ``` bash
-$ python3 arcface.py
-Similarity of (correct_pair_1.jpg, incorrect.jpg) : -0.010565089993178844
+$ python3 arcface.py --input IMAGE_PATH1 IMAGE_PATH2
 ```
 
-Change `IMG_PATH_1` and `IMG_PATH_2` in `arcface.py`.
-We give two images at once as a batch, then calculate the similarity of these two images based on the model output.
+If you want to compare a webcam captured image with a certain image, specify the base image to be compared after the --camera option.
+
+If a webcam is detected, a window will open automatically.  
+The area enclosed by the green square is the part that will actually be loaded into the model.  
+So, adjust the camera so that the face fits in the green square.
+```bash
+$ python3 arcface.py --camera BASE_IMAGE_PATH
+```
+
 
 
 ### Reference
