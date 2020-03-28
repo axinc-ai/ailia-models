@@ -51,6 +51,7 @@ def check_and_download_models(weight_path, model_path, remote_path):
             weight_path,
             progress_print
         )
+        print('\n')
     if not os.path.exists(model_path):
         print(f'Downloading prototxt file... (save path: {model_path})')
         urllib.request.urlretrieve(
@@ -58,4 +59,5 @@ def check_and_download_models(weight_path, model_path, remote_path):
             model_path,
             progress_print
         )
+        print('\n')
     print('ONNX file and Prototxt file are prepared!')
