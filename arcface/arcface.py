@@ -18,6 +18,8 @@ from image_utils import load_image
 IMG_PATH_1 = 'correct_pair_1.jpg'  # Base image
 IMG_PATH_2 = 'correct_pair_2.jpg'  # Correct Pair image
 IMG_PATH_3 = 'incorrect.jpg'     # Incorrect Pair image
+IMAGE_HEIGHT = 128
+IMAGE_WIDTH = 128
 
 # the threshold was calculated by the `test_performance` function in `test.py`
 # of the original repository
@@ -50,12 +52,17 @@ def prepare_input_data(image_path):
     # (ref: https://github.com/ronghuaiyang/arcface-pytorch/issues/14)
     # use origin image and fliped image to infer,
     # and concat the feature as the final feature of the origin image.
-    image = load_image(image_path, rgb=False, normalize_type='None')
+    image = load_image(
+        image_path,
+        image_shape=(IMAGE_HEIGHT, IMAGE_WIDTH),
+        rgb=False,
+        normalize_type='None'
+    )
     image = np.dstack((image, np.fliplr(image)))
     image = image.transpose((2, 0, 1))
     image = image[:, np.newaxis, :, :]
     image = image.astype(np.float32, copy=False)
-    image = image / 127.5 - 1.0
+    image = image / 127.5 - 1.0  # normalize
     return image
 
 
