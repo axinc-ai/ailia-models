@@ -37,7 +37,7 @@ parser = argparse.ArgumentParser(
     description='Determine if the person is the same from two facial images.'
 )
 parser.add_argument(
-    '-i', '--input', metavar='INPUT',
+    '-i', '--input', metavar='IMAGEFILE_PATH',
     nargs=2,
     default=[IMG_PATH_1, IMG_PATH_2],
     help='Two iamge paths for calculating the face match'
@@ -100,7 +100,9 @@ def main():
     fe_2 = np.concatenate([preds_ailia[2], preds_ailia[3]], axis=0)
     sim = cosin_metric(fe_1, fe_2)
 
-    print('Similarity of (' + IMG_PATH_1 + ', ' + IMG_PATH_2 + f') : {sim}')
+    print(
+        'Similarity of (' + args.input[0] + ', ' + args.input[1] + f') : {sim}'
+    )
     if THRESHOLD > sim:
         print('They are not the same face!')
     else:
