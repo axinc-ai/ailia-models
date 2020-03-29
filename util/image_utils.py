@@ -50,7 +50,7 @@ def load_image(
     ----------
     image_path: string
         The path of image which you want to load.
-    image_shape: (int, int)
+    image_shape: (int, int)  (height, width)
         Resizes the loaded image to the size required by the model.
     rgb: bool, default=True
         Load as rgb image when True, as gray scale image when False.
@@ -77,7 +77,7 @@ def load_image(
     if rgb:
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
     image = normalize_image(image, normalize_type)
-    image = cv2.resize(image, image_shape)
+    image = cv2.resize(image, (image_shape[1], image_shape[0]))
 
     if gen_input_ailia:
         if rgb:
