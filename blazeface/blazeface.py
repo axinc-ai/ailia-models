@@ -125,6 +125,7 @@ def recognize_from_video():
 
     capture.release()
     cv2.destroyAllWindows()
+    print('Script finished successfully.')
 
 
 def main():
