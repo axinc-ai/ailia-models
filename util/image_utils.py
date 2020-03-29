@@ -1,4 +1,5 @@
 import sys
+import os
 
 import cv2
 import numpy as np
@@ -68,14 +69,20 @@ def load_image(
     """
     # rgb == True --> cv2.IMREAD_COLOR
     # rbg == False --> cv2.IMREAD_GRAYSCALE
-    image = cv2.imread(image_path, int(rgb))
+    if os.path.isfile(image_path):
+        image = cv2.imread(image_path, int(rgb))
+    else:
+        print(f'[ERROR] {image_path} not found.')
+        sys.exit()
     if rgb:
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
     image = normalize_image(image, normalize_type)
     image = cv2.resize(image, image_shape)
 
     if gen_input_ailia:
-        image = image.transpose((2, 0, 1))  # channel first
-        image = image[np.newaxis, :, :, :]  # (batch_size, channel, h, w)
-    
+        if rgb:
+            image = image.transpose((2, 0, 1))  # channel first
+            image = image[np.newaxis, :, :, :]  # (batch_size, channel, h, w)
+        else:
+            image = image[np.newaxis, np.newaxis, :, :]
     return image
