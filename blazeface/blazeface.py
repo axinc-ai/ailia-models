@@ -55,12 +55,12 @@ args = parser.parse_args()
 def recognize_from_image():
     # prepare input data
     org_img = load_image(
-        IMAGE_PATH,
+        args.input,
         (IMAGE_HEIGHT, IMAGE_WIDTH),
     )
 
     input_data = load_image(
-        IMAGE_PATH,
+        args.input,
         (IMAGE_HEIGHT, IMAGE_WIDTH),
         normalize_type='127.5',
         gen_input_ailia=True
@@ -87,7 +87,7 @@ def recognize_from_image():
 
     # generate detections
     for detection in detections:
-        plot_detections(org_img, detection, save_image_path=SAVE_IMAGE_PATH)
+        plot_detections(org_img, detection, save_image_path=args.savepath)
 
 
 def recognize_from_video():
