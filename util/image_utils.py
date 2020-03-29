@@ -86,3 +86,9 @@ def load_image(
         else:
             image = image[np.newaxis, np.newaxis, :, :]
     return image
+
+
+def get_image_shape(image_path):
+    tmp = cv2.imread(image_path)
+    height, width = tmp.shape[0], tmp.shape[1]
+    return height, width
