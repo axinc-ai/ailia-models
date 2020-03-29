@@ -10,6 +10,7 @@ from utils import *
 sys.path.append('../util')
 from model_utils import check_and_download_models
 from image_utils import load_image
+from webcamera_utils import preprocess_frame
 
 
 # ======================
@@ -109,7 +110,7 @@ def recognize_from_video():
             continue
 
         input_image, input_data = preprocess_frame(
-            frame, IMAGE_WIDTH, IMAGE_HEIGHT
+            frame, IMAGE_WIDTH, IMAGE_HEIGHT, normalize_type='127.5'
         )
         
         # infrence

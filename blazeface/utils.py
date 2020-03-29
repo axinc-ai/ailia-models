@@ -236,25 +236,6 @@ def postprocess(preds_ailia, anchor_path='anchors.npy'):
     return filtered_detections
 
 
-def preprocess_frame(frame, input_height, input_width):
-    height, width = frame.shape[0], frame.shape[1]
-    size = np.max((height, width))
-    limit = np.min((height, width))
-    start = int((size - limit) / 2)
-    fin = int((size + limit) / 2)
-    img = cv2.resize(np.zeros((1, 1, 3), np.uint8), (size, size))
-    if size == height:
-        img[:, start:fin] = frame    
-    else:
-        img[start:fin, :] = frame
-    
-    data = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-    data = cv2.resize(data, (input_height, input_width))
-    data = np.expand_dims(np.rollaxis(data, 2, 0), axis=0).astype(np.float32)
-    data = data / 127.5 - 1.0
-    return img, data
-
-
 def show_result(input_img, detections):
     for detection in detections:
         for d in detection:
