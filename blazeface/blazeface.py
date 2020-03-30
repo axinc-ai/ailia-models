@@ -89,6 +89,7 @@ def recognize_from_image():
     # generate detections
     for detection in detections:
         plot_detections(org_img, detection, save_image_path=args.savepath)
+    print('Script finished successfully.')
 
 
 def recognize_from_video():
@@ -113,7 +114,7 @@ def recognize_from_video():
             frame, IMAGE_HEIGHT, IMAGE_WIDTH, normalize_type='127.5'
         )
         
-        # infrence
+        # inference
         input_blobs = net.get_input_blob_list()
         net.set_input_blob_data(input_data, input_blobs[0])
         net.update()

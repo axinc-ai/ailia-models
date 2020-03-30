@@ -120,7 +120,7 @@ def estimate_from_video():
             frame, HEIGHT, WIDTH, data_rgb=False, normalize_type='None'
         )
 
-        # infrence
+        # inference
         preds_ailia = net.predict(input_data)
     
         # estimated crowd count

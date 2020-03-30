@@ -171,7 +171,7 @@ def segment_from_video():
             frame, ailia_input_h, ailia_input_w, normalize_type='127.5'
         )
         
-        # infrence
+        # inference
         input_blobs = net.get_input_blob_list()
         net.set_input_blob_data(input_data, input_blobs[0])
         net.update()
