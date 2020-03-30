@@ -4,6 +4,43 @@ import cv2
 from image_utils import normalize_image
 
 
+def adjust_frame_size(frame, height, width):
+    """
+    Adjust the size of the frame from the webcam to the ailia input shape.
+
+    Parameters
+    ----------
+    frame: numpy array
+    height: int
+        ailia model input height
+    width: int
+        ailia model input width
+
+    Returns
+    -------
+    img: numpy array
+        Image with the propotions of height and width
+        adjusted by padding for ailia model input.
+    resized_img: numpy array
+        Resized `img` as well as adapt the scale
+    """
+    f_height, f_width = frame.shape[0], frame.shape[1]
+    scale = np.max((f_height / height, f_width / width))
+
+    # padding base
+    img = np.zeros(
+        (int(scale * height), int(scale * width), 3),
+        np.uint8
+    )
+    start = (np.array(img.shape) - np.array(frame.shape)) // 2
+    img[
+        start[0]: start[0] + f_height,
+        start[1]: start[1] + f_width
+    ] = frame
+    resized_img = cv2.resize(img, (width, height))
+    return img, resized_img
+    
+
 def preprocess_frame(
         frame, input_height, input_width, data_rgb=True, normalize_type='255'
 ):
@@ -35,26 +72,12 @@ def preprocess_frame(
     data: numpy array
         Input data for ailia
     """
-    f_height, f_width = frame.shape[0], frame.shape[1]
-    scale = np.max((f_height / input_height, f_width / input_width))
-
-    # padding base
-    img = np.zeros(
-        (int(scale * input_height), int(scale * input_width), 3),
-        np.uint8
-    )
-    start = (np.array(img.shape) - np.array(frame.shape)) // 2
-    img[
-        start[0]: start[0] + f_height,
-        start[1]: start[1] + f_width
-    ] = frame
+    img, resized_img = adjust_frame_size(frame, input_height, input_width)
     
     if data_rgb:
-        data = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        data = cv2.resize(data, (input_width, input_height))
-    else:
-        data = cv2.resize(img, (input_width, input_height))
-    data = normalize_image(data, normalize_type)
+        resized_img = cv2.cvtColor(resized_img, cv2.COLOR_BGR2RGB)
+        
+    data = normalize_image(resized_img, normalize_type)
 
     if data_rgb:
         data = np.rollaxis(data, 2, 0)

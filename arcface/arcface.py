@@ -11,6 +11,7 @@ import ailia
 sys.path.append('../util')
 from model_utils import check_and_download_models
 from image_utils import load_image
+from webcamera_utils import adjust_frame_size
 
 
 # ======================
@@ -58,10 +59,12 @@ args = parser.parse_args()
 # ======================
 # Utils
 # ======================
-def preprocess_image(image):
+def preprocess_image(image, input_is_bgr=False):
     # (ref: https://github.com/ronghuaiyang/arcface-pytorch/issues/14)
     # use origin image and fliped image to infer,
     # and concat the feature as the final feature of the origin image.
+    if input_is_bgr:
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     image = np.dstack((image, np.fliplr(image)))
     image = image.transpose((2, 0, 1))
     image = image[:, np.newaxis, :, :]
@@ -132,31 +135,19 @@ def compare_image_and_webcamvideo():
         print("[Error] webcamera not found")
         sys.exit(1)
 
-    _, frame = capture.read()
-    # TODO need test when capture size is smaller than the rectangle
-    frame_h, frame_w = frame.shape[0], frame.shape[1]
-    rect_top = np.max((frame_h//2 - int(IMAGE_HEIGHT * 1.5), 0))
-    rect_bottom = np.min((frame_h//2 + int(IMAGE_HEIGHT * 1.5), frame_h))
-    rect_left = np.max((frame_w//2 - int(IMAGE_WIDTH * 1.5), 0))
-    rect_right = np.min((frame_w//2 + int(IMAGE_WIDTH * 1.5), frame_w))
-    
     # inference loop
     while(True):
-        ret, original_frame = capture.read()                
+        ret, frame = capture.read()                
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
         if not ret:
             continue
-
-        # preprocessing
-        frame = original_frame[
-            rect_top:rect_bottom + 1,
-            rect_left:rect_right + 1,
-        ]
-        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        frame = cv2.resize(frame, (IMAGE_HEIGHT, IMAGE_WIDTH))
-        frame = preprocess_image(frame)
-        input_data = np.concatenate([base_imgs, frame], axis=0)
+        
+        frame, resized_frame = adjust_frame_size(
+            frame, IMAGE_HEIGHT, IMAGE_WIDTH
+        )
+        input_frame = preprocess_image(resized_frame, input_is_bgr=True)
+        input_data = np.concatenate([base_imgs, input_frame], axis=0)
 
         # inference
         preds_ailia = net.predict(input_data)
@@ -168,7 +159,7 @@ def compare_image_and_webcamvideo():
         bool_sim = False if THRESHOLD > sim else True
         
         cv2.putText(
-            original_frame,
+            frame,
             f'Similarity: {sim:06.3f}  SAME PERSON: {bool_sim}',
             (50, 100),  # put text position
             cv2.FONT_HERSHEY_COMPLEX,  # font type
@@ -177,15 +168,7 @@ def compare_image_and_webcamvideo():
             thickness=2,
             lineType=cv2.LINE_AA
         )        
-        # Draw a rectangle of the range to be inputted into the model
-        cv2.rectangle(
-            original_frame,
-            (rect_left, rect_top),  # top left corner
-            (rect_right, rect_bottom),  # bottom right corner
-            (0, 255, 0),  # color
-            3  # thickness
-        )
-        cv2.imshow('frame', original_frame)
+        cv2.imshow('frame', frame)
         
     capture.release()
     cv2.destroyAllWindows()
