@@ -1,98 +1,178 @@
-import cv2
 import sys
 import time
+import argparse
+
+from mpl_toolkits.axes_grid1 import ImageGrid
 import numpy as np
-import os
+import cv2
+
 import matplotlib.pyplot as plt
-import urllib.request
 
 import ailia
+# import original modules
+sys.path.append('../util')
+from model_utils import check_and_download_models
+from image_utils import load_image
+from webcamera_utils import preprocess_frame
 
-model_path = "face_alignment.onnx.prototxt"
-weight_path = "face_alignment.onnx"
 
-print("downloading ...");
+# ======================
+# PARAMETERS
+# ======================
+MODEL_PATH = 'face_alignment.onnx.prototxt'
+WEIGHT_PATH = 'face_alignment.onnx'
+REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/face_alignment/'
 
-if not os.path.exists(model_path):
-    urllib.request.urlretrieve("https://storage.googleapis.com/ailia-models/face_alignment/"+model_path,model_path)
-if not os.path.exists(weight_path):
-    urllib.request.urlretrieve("https://storage.googleapis.com/ailia-models/face_alignment/"+weight_path,weight_path)
+IMAGE_PATH = 'aflw-test.jpg'
+SAVE_IMAGE_PATH = 'output.png'
 
-print("loading ...");
+IMAGE_HEIGHT = 256
+IMAGE_WIDTH = 256
+THRESHOLD = 0.1
 
-env_id=ailia.get_gpu_environment_id()
-net = ailia.Net(model_path,weight_path,env_id=env_id)
 
-IMAGE_PATH="aflw-test.jpg"
+# ======================
+# Arguemnt Parser Config
+# ======================
+parser = argparse.ArgumentParser(
+    description='Face alignment model'
+)
+parser.add_argument(
+    '-i', '--input', metavar='IMAGEFILE_PATH',
+    default=IMAGE_PATH, 
+    help='The input image path.'
+)
+parser.add_argument(
+    '-c', '--camera',
+    action='store_true',
+    help='Running the model with the webcam image as input.'
+)
+parser.add_argument(
+    '-s', '--savepath', metavar='SAVE_IMAGE_PATH',
+    default=SAVE_IMAGE_PATH,
+    help='Save path for the output image.'
+)
+args = parser.parse_args()
 
-IMAGE_WIDTH=net.get_input_shape()[3]
-IMAGE_HEIGHT=net.get_input_shape()[2]
 
-input_img = cv2.imread(IMAGE_PATH)
-
-img = cv2.resize(input_img, (IMAGE_WIDTH, IMAGE_HEIGHT))
-
-img = img[...,::-1]  #BGR 2 RGB
-
-data = np.array(img, dtype=np.float32)
-data.shape = (1,) + data.shape
-data = data / 255.0
-data = data.transpose((0, 3, 1, 2))
-
-print("inferencing ...");
-
-pred_onnx = net.predict(data)
-out = pred_onnx
-
-cnt = 3
-for i in range(cnt):
-	if(i==1):
-		net.set_profile_mode()
-	start=int(round(time.time() * 1000))
-	out = net.predict(data)
-	end=int(round(time.time() * 1000))
-	print("## ailia processing time , "+str(i)+" , "+str(end-start)+" ms")
-
-confidence = out
-
-print("CONFIDENCE SHAPE : "+str(confidence.shape))
-
-points = []
-threshold = 0.1
-
-for i in range(confidence.shape[1]):
-	probMap = confidence[0, i, :, :]
-	minVal, prob, minLoc, point = cv2.minMaxLoc(probMap)
-
-	x = (input_img.shape[1] * point[0]) / confidence.shape[3]
-	y = (input_img.shape[0] * point[1]) / confidence.shape[2]
- 
-	if prob > threshold : 
-		circle_size = 4
-		cv2.circle(input_img, (int(x), int(y)), circle_size, (0, 255, 255), thickness=-1, lineType=cv2.FILLED)
-
-		points.append((int(x), int(y)))
-	else :
-		points.append(None)
- 
-cv2.imshow("Keypoints",input_img)
-cv2.imwrite('output.png', input_img)
-
+# ======================
+# Utils
+# ======================
 def plot_images(title, images, tile_shape):
-	assert images.shape[0] <= (tile_shape[0]* tile_shape[1])
-	from mpl_toolkits.axes_grid1 import ImageGrid
-	fig = plt.figure()
-	plt.title(title)
-	grid = ImageGrid(fig, 111,  nrows_ncols = tile_shape )
-	for i in range(images.shape[1]):
-		grd = grid[i]
-		grd.imshow(images[0,i])
+    fig = plt.figure()
+    plt.title(title)
+    grid = ImageGrid(fig, 111,  nrows_ncols = tile_shape)
+    for i in range(images.shape[0]):
+        grd = grid[i]
+        grd.imshow(images[i])
 
-channels=confidence.shape[1]
-cols=8
 
-plot_images("confidence",confidence,tile_shape=((int)((channels+cols-1)/cols),cols))
+def visualize_plots(image, preds_ailia):
+    for i in range(preds_ailia.shape[0]):
+        probMap = preds_ailia[i, :, :]
+        minVal, prob, minLoc, point = cv2.minMaxLoc(probMap)
 
-plt.show()
+        x = (image.shape[1] * point[0]) / preds_ailia.shape[2]
+        y = (image.shape[0] * point[1]) / preds_ailia.shape[1]
+ 
+        if prob > THRESHOLD:
+            circle_size = 4
+            cv2.circle(
+                image,
+                (int(x), int(y)),
+                circle_size,
+                (0, 255, 255),
+                thickness=-1,
+                lineType=cv2.FILLED
+            )
+    return image
 
-cv2.destroyAllWindows()
+
+# ======================
+# Main functions
+# ======================
+def recognize_from_image():
+    # prepare input data
+    input_img = cv2.imread(args.input)
+    data = load_image(
+        args.input,
+        (IMAGE_HEIGHT, IMAGE_WIDTH),
+        normalize_type='255',
+        gen_input_ailia=True
+    )
+    
+    # net initalize
+    env_id = ailia.get_gpu_environment_id()
+    print(f'env_id: {env_id}')
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+
+    # compute execution time
+    for i in range(5):
+        start = int(round(time.time() * 1000))
+        preds_ailia = net.predict(data)[0]
+        end = int(round(time.time() * 1000))
+        print(f'ailia processing time {end - start} ms')
+
+    visualize_plots(input_img, preds_ailia)
+    cv2.imwrite(args.savepath, input_img)
+    print('Script finished successfully.')
+
+    # Confidence Map?
+    # channels = preds_ailia.shape[0]
+    # cols = 8
+    # plot_images(
+    #     'confidence',
+    #     preds_ailia,
+    #     tile_shape=((int)((channels+cols-1)/cols), cols))
+    # plt.show()
+    # cv2.destroyAllWindows()
+
+
+def recognize_from_video():
+    # net initialize
+    env_id = ailia.get_gpu_environment_id()
+    print(f'env_id: {env_id}')
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+
+    capture = cv2.VideoCapture(0)
+    if not capture.isOpened():
+        print("[ERROR] webcamera not found")
+        sys.exit(1)
+    
+    while(True):
+        ret, frame = capture.read()
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
+        if not ret:
+            continue
+
+        input_image, input_data = preprocess_frame(
+            frame, IMAGE_HEIGHT, IMAGE_WIDTH, normalize_type='255'
+        )
+        
+        # inference
+        preds_ailia = net.predict(input_data)[0]
+        
+        # postprocessing
+        visualize_plots(input_image, preds_ailia)
+        cv2.imshow('frame', input_image)
+
+    capture.release()
+    cv2.destroyAllWindows()
+    print('Script finished successfully.')
+
+
+def main():
+    # model files check and download
+    check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
+
+    if args.camera:
+        # video mode
+        recognize_from_video()
+    else:
+        # image mode
+        recognize_from_image()
+
+
+if __name__ == '__main__':
+    main()
