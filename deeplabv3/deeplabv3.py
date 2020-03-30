@@ -1,5 +1,4 @@
 import time
-import os
 import sys
 import argparse
 
@@ -15,6 +14,7 @@ from utils import *
 sys.path.append('../util')
 from model_utils import check_and_download_models
 from image_utils import load_image, get_image_shape
+from webcamera_utils import preprocess_frame
 
 
 # ======================
@@ -22,7 +22,7 @@ from image_utils import load_image, get_image_shape
 # ======================
 IMAGE_PATH = 'couple.jpg'
 SAVE_IMAGE_PATH = 'output.png'
-THRESHOLD = 160
+
 LABEL_NAMES = np.asarray([
     'background', 'aeroplane', 'bicycle', 'bird', 'boat', 'bottle', 'bus',
     'car', 'cat', 'chair', 'cow', 'diningtable', 'dog', 'horse', 'motorbike',
@@ -86,9 +86,9 @@ def segment_from_image():
     print(f'env_id: {env_id}')
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
 
-    ailia_input_width = net.get_input_shape()[3]
-    ailia_input_height = net.get_input_shape()[2]
-    input_shape = [ailia_input_height, ailia_input_width]
+    ailia_input_w = net.get_input_shape()[3]
+    ailia_input_h = net.get_input_shape()[2]
+    input_shape = [ailia_input_h, ailia_input_w]
 
     # prepare input data
     img = load_image(
@@ -103,7 +103,6 @@ def segment_from_image():
         print(f'ailia processing time {end - start} ms')        
 
     # postprocessing
-    # original size
     seg_map = np.argmax(preds_ailia.transpose(1, 2, 0), axis=2)
     seg_image = label_to_color_image(seg_map).astype(np.uint8)
 
@@ -144,7 +143,55 @@ def segment_from_image():
     plt.xticks([], [])
     ax.tick_params(width=0.0)
     plt.grid('off')
-    plt.savefig('test.png')
+    plt.savefig(args.savepath)
+
+
+def segment_from_video():
+    # net initialize
+    env_id = ailia.get_gpu_environment_id()
+    print(f'env_id: {env_id}')
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+
+    ailia_input_w = net.get_input_shape()[3]
+    ailia_input_h = net.get_input_shape()[2]
+
+    capture = cv2.VideoCapture(0)
+    if not capture.isOpened():
+        print("[ERROR] webcamera not found")
+        sys.exit(1)
+    
+    while(True):
+        ret, frame = capture.read()
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
+        if not ret:
+            continue
+
+        input_image, input_data = preprocess_frame(
+            frame, ailia_input_h, ailia_input_w, normalize_type='127.5'
+        )
+        
+        # infrence
+        input_blobs = net.get_input_blob_list()
+        net.set_input_blob_data(input_data, input_blobs[0])
+        net.update()
+        preds_ailia = np.array(net.get_results())[0, 0]  # TODO why?
+        
+        # postprocessing
+        seg_map = np.argmax(preds_ailia.transpose(1, 2, 0), axis=2)
+        seg_image = label_to_color_image(seg_map).astype(np.uint8)
+
+        # showing the segmented image (simple)
+        seg_image = cv2.cvtColor(seg_image, cv2.COLOR_RGB2BGR)
+        seg_image = cv2.resize(
+            seg_image, (input_image.shape[1], input_image.shape[0])
+        )
+
+        cv2.imshow('frame', seg_image)
+
+    capture.release()
+    cv2.destroyAllWindows()
+    print('Script finished successfully.')
 
 
 def main():
