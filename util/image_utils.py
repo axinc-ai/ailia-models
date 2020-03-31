@@ -92,3 +92,34 @@ def get_image_shape(image_path):
     tmp = cv2.imread(image_path)
     height, width = tmp.shape[0], tmp.shape[1]
     return height, width
+
+
+# (ref: https://qiita.com/yasudadesu/items/dd3e74dcc7e8f72bc680)
+def draw_texts(img, texts, font_scale=0.7, thickness=2):
+    h, w, c = img.shape
+    offset_x = 10
+    initial_y = 0
+    dy = int(img.shape[1] / 15)
+    color = (0, 0, 0)  # black
+
+    texts = [texts] if type(texts) == str else texts
+
+    for i, text in enumerate(texts):
+        offset_y = initial_y + (i+1)*dy
+        cv2.putText(img, text, (offset_x, offset_y), cv2.FONT_HERSHEY_SIMPLEX,
+                    font_scale, color, thickness, cv2.LINE_AA)
+
+
+def draw_result_on_img(img, texts, w_ratio=0.35, h_ratio=0.2, alpha=0.4):
+    overlay = img.copy()
+    pt1 = (0, 0)
+    pt2 = (int(img.shape[1] * w_ratio), int(img.shape[0] * h_ratio))
+
+    mat_color = (200, 200, 200)
+    fill = -1
+    cv2.rectangle(overlay, pt1, pt2, mat_color, fill)
+
+    mat_img = cv2.addWeighted(overlay, alpha, img, 1 - alpha, 0)
+
+    draw_texts(mat_img, texts)
+    return mat_img

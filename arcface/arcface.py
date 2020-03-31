@@ -9,8 +9,9 @@ import ailia
 
 # import original modules
 sys.path.append('../util')
+from utils import check_file_existance
 from model_utils import check_and_download_models
-from image_utils import load_image
+from image_utils import load_image, draw_result_on_img
 from webcamera_utils import adjust_frame_size
 
 
@@ -42,19 +43,21 @@ parser = argparse.ArgumentParser(
     description='Determine if the person is the same from two facial images.'
 )
 parser.add_argument(
-    '-i', '--inputs', metavar='IMAGEFILE_PATH',
+    '-i', '--inputs', metavar='IMAGE',
     nargs=2,
     default=[IMG_PATH_1, IMG_PATH_2],
     help='Two image paths for calculating the face match.'
 )
 parser.add_argument(
-    '-c', '--camera', metavar='IMAGEFILE_PATH',
+    '-v', '--video', metavar=('VIDEO', 'IMAGE'),
+    nargs=2,
     default=None,
-    help='Compare the image loaded by web-camera with the specified ' +\
-         'face image to determine if it is the same person or not.'
+    help='Determines whether the face in the video file specified by VIDEO ' +\
+         'and the face in the image file specified by IMAGE are the same. ' +\
+         'If the VIDEO argument is set to 0, the webcam input will be used.' 
 )
 args = parser.parse_args()
-            
+
 
 # ======================
 # Utils
@@ -120,9 +123,9 @@ def compare_images():
         print('They are the same face!')
 
 
-def compare_image_and_webcamvideo():
+def compare_image_and_video():
     # prepare base image
-    base_imgs = prepare_input_data(args.camera)
+    base_imgs = prepare_input_data(args.video[1])
 
     # net itinialize
     env_id = ailia.get_gpu_environment_id()
@@ -130,14 +133,19 @@ def compare_image_and_webcamvideo():
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
 
     # web camera
-    capture = cv2.VideoCapture(0)
-    if not capture.isOpened():
-        print("[Error] webcamera not found")
-        sys.exit(1)
+    if args.video[0] == '0':
+        print('[INFO] Webcam mode is activated')
+        capture = cv2.VideoCapture(0)
+        if not capture.isOpened():
+            print("[Error] webcamera not found")
+            sys.exit(1)
+    else:
+        if check_file_existance(args.video[0]):
+            capture = cv2.VideoCapture(args.video[0])
 
     # inference loop
     while(True):
-        ret, frame = capture.read()                
+        ret, frame = capture.read()
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
         if not ret:
@@ -157,17 +165,11 @@ def compare_image_and_webcamvideo():
         fe_2 = np.concatenate([preds_ailia[2], preds_ailia[3]], axis=0)
         sim = cosin_metric(fe_1, fe_2)
         bool_sim = False if THRESHOLD > sim else True
-        
-        cv2.putText(
+
+        frame = draw_result_on_img(
             frame,
-            f'Similarity: {sim:06.3f}  SAME PERSON: {bool_sim}',
-            (50, 100),  # put text position
-            cv2.FONT_HERSHEY_COMPLEX,  # font type
-            1.2,  # font scale
-            (255, 255, 255),  # font color
-            thickness=2,
-            lineType=cv2.LINE_AA
-        )        
+            texts=[f"Similarity: {sim:06.3f}", f"SAME FACE: {bool_sim}"]
+        )
         cv2.imshow('frame', frame)
         
     capture.release()
@@ -179,14 +181,14 @@ def main():
     # model files check and download
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
     
-    if args.camera is None:
+    if args.video is None:
         # still image mode
         # comparing two images specified args.inputs
         compare_images()
     else:
         # video mode
-        # comparing specified image and the image captured by web-camera
-        compare_image_and_webcamvideo()
+        # comparing the specified image and the video
+        compare_image_and_video()
 
 
 if __name__ == "__main__":
