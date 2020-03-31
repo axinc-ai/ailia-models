@@ -1,14 +1,21 @@
 # ArcFace
 
 ### input
-
+- correct pair  
 ![correct_pair_1_image](correct_pair_1.jpg)
 ![correct_pair_2_image](correct_pair_2.jpg)
+
+- incorrect pair  
+![correct_pair_1_image](correct_pair_1.jpg)
 ![incorrect_iamge](incorrect.jpg)
 
 (Image from https://github.com/ronghuaiyang/arcface-pytorch/issues/63)
 
-Ailia input Shape(4, 1, 128, 128) Range:[-1, 1]  (original image & flipped iamge for a pair image)
+Input the original image1 and its inversion, and the original image2 and its inversion.  
+Invered images are generated automatically.  
+(All images are treated as grayscale images)
+- Ailia input Shape: (4, 1, 128, 128)  
+- Range: [-1, 1]  
 
 
 ### output
@@ -22,7 +29,9 @@ It is necessary to be connected to the Internet while downloading.
 By default, the following two images are loaded: `correct_pair_1.jpg`, `correct_pair_2.jpg`
 ``` bash
 $ python3 arcface.py
+...
 Similarity of (correct_pair_1.jpg, correct_pair_2.jpg) : 0.5981666445732117
+They are the same face!
 ```
 
 If you want to specify images, specify the paths of the two images after the --input option.
