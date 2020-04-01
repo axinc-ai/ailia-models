@@ -162,7 +162,7 @@ def main():
     # model files check and download
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
 
-    if args.video:
+    if args.video is not None:
         # video mode
         estimate_from_video()
     else:
