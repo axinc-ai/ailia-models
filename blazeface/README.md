@@ -28,7 +28,10 @@ $ python3 blazeface.py --input IMAGE_PATH --savepath SAVE_IMAGE_PATH
 ```
 
 By adding the `--video` option, you can input the video.   
-If you pass 0 as an argument to VIDEO_PATH, you can use the webcam input instead of the video file.
+If you pass `0` as an argument to VIDEO_PATH, you can use the webcam input instead of the video file.
+```bash
+$ python3 blazeface.py --video VIDEO_PATH
+```
 
 ### Reference
 
