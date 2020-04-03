@@ -39,9 +39,8 @@ $ python3 blazeface.py
 ```
 
 If you want to specify the input image, put the image path after the `--input` option.  
-You can use `--savepath` option to change the name of the output file to save.
 ```bash
-$ python3 etl.py --input IMAGE_PATH --savepath SAVE_IMAGE_PATH
+$ python3 etl.py --input IMAGE_PATH
 ```
 
 By adding the `--video` option, you can input the video.   
