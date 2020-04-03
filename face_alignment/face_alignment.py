@@ -67,6 +67,9 @@ def plot_images(title, images, tile_shape):
     for i in range(images.shape[0]):
         grd = grid[i]
         grd.imshow(images[i])
+    split_fname = args.savepath.split('.')
+    save_name = split_fname[0] + '_confidence.' + split_fname[1]
+    fig.savefig(save_name)
 
 
 def visualize_plots(image, preds_ailia):
@@ -117,17 +120,15 @@ def recognize_from_image():
 
     visualize_plots(input_img, preds_ailia)
     cv2.imwrite(args.savepath, input_img)
-    print('Script finished successfully.')
 
-    # Confidence Map?
-    # channels = preds_ailia.shape[0]
-    # cols = 8
-    # plot_images(
-    #     'confidence',
-    #     preds_ailia,
-    #     tile_shape=((int)((channels+cols-1)/cols), cols))
-    # plt.show()
-    # cv2.destroyAllWindows()
+    # Confidence Map
+    channels = preds_ailia.shape[0]
+    cols = 8
+    plot_images(
+        'confidence',
+        preds_ailia,
+        tile_shape=((int)((channels+cols-1)/cols), cols))
+    print('Script finished successfully.')
 
 
 def recognize_from_video():
