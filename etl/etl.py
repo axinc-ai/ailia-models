@@ -9,6 +9,7 @@ import codecs
 import ailia
 # import original modules
 sys.path.append('../util')
+from utils import check_file_existance
 from model_utils import check_and_download_models
 from image_utils import load_image
 from webcamera_utils import adjust_frame_size
@@ -41,9 +42,10 @@ parser.add_argument(
     help='The input image path.'
 )
 parser.add_argument(
-    '-c', '--camera',
-    action='store_true',
-    help='Running the model with the webcam image as input.'
+    '-v', '--video', metavar='VIDEO',
+    default=None,
+    help='The input video path. ' +\
+         'If the VIDEO argument is set to 0, the webcam input will be used.'
 )
 args = parser.parse_args()
 
@@ -114,11 +116,16 @@ def recognize_from_video():
         range=ailia.NETWORK_IMAGE_RANGE_U_FP32
     )
 
-    capture = cv2.VideoCapture(0)
-    if not capture.isOpened():
-        print("[ERROR] webcamera not found")
-        sys.exit(1)
-    
+    if args.video == '0':
+        print('[INFO] Webcam mode is activated')
+        capture = cv2.VideoCapture(0)
+        if not capture.isOpened():
+            print("[ERROR] webcamera not found")
+            sys.exit(1)
+    else:
+        if check_file_existance(args.video):
+            capture = cv2.VideoCapture(args.video)        
+
     while(True):
         ret, frame = capture.read()
         if cv2.waitKey(1) & 0xFF == ord('q'):
@@ -157,7 +164,7 @@ def main():
     # model files check and download
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
 
-    if args.camera:
+    if args.video is not None:
         # video mode
         recognize_from_video()
     else:
