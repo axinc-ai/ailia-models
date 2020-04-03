@@ -1,6 +1,5 @@
 import time
-import os
-import urllib.request
+import sys
 import argparse
 
 import numpy as np
@@ -11,51 +10,74 @@ except:
     print('[WARNING] pyknp module is not installed. (for japanese mode)')
 
 import ailia
+# import original modules
+sys.path.append('../util')
+from model_utils import check_and_download_models
 
 
-# argument config
+# ======================
+# Arguemnt Parser Config
+# ======================
 LANGS = ['en', 'jp']
-parser = argparse.ArgumentParser()
+
+parser = argparse.ArgumentParser(
+    description='BERT is a state of the art language model.' +\
+    'In our model, we solve the task of predicting the masked word.'
+)
 parser.add_argument(
-    '--lang', '-l', metavar='LANG', default='en', choices=LANGS,
+    '--lang', '-l', metavar='LANG',
+    default='en', choices=LANGS,
     help='choose language: ' + ' | '.join(LANGS) + ' (default: en)'
 )
+# TODO
+# input masked sentence ? how treats Japanese?
 args = parser.parse_args()
+
+
+# ======================
+# PARAMETERS
+# ======================
+NUM_PREDICT = 3  # Top NUM_PREDICT predictions will be displayed. (default=3)
 LANG = args.lang
 print('[INFO] language is set to ' + LANG)
 
-
-# Params
-NUM_PREDICT = 3
 if LANG == 'en':
-    # masked word should be represented by '_'
-    SENTENCE = 'I want to _ the car because it is cheap.'
-
     WEIGHT_PATH = "bert-base-uncased.onnx"
     MODEL_PATH = "bert-base-uncased.onnx.prototxt"
-    RMT_CKPT = "https://storage.googleapis.com/ailia-models/bert_en/"
-
+    REMOTE_PATH = "https://storage.googleapis.com/ailia-models/bert_en/"
+    
     MAX_SEQ_LEN = 128
 
-elif LANG == 'jp':
-    # masked word should be represented by '＿' (zen-kaku)
-    SENTENCE = '私は車が安いので＿したい．'
-    # SENTENCE = '私はクリスマスプレゼントには＿が欲しい！'
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    # ~~~ CHANGE HERE ~~~ CHANGE HERE ~~~ CHANGE HERE ~~~ CHANGE HERE ~~~
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    # masked word should be represented by '_'
+    SENTENCE = 'I want to _ the car because it is cheap.'
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    # ~~~ CHANGE HERE ~~~ CHANGE HERE ~~~ CHANGE HERE ~~~ CHANGE HERE ~~~
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    # kyoto univ
+elif LANG == 'jp':
+    # kyoto univ.
     WEIGHT_PATH = 'kyoto-bert-jp.onnx'
     MODEL_PATH = 'kyoto-bert-jp.onnx.prototxt'
-
-    RMT_CKPT = "https://storage.googleapis.com/ailia-models/bert_jp/"
+    REMOTE_PATH = "https://storage.googleapis.com/ailia-models/bert_jp/"
 
     MAX_SEQ_LEN = 512
 
-if not os.path.exists(MODEL_PATH):
-    urllib.request.urlretrieve(RMT_CKPT + MODEL_PATH, MODEL_PATH)
-if not os.path.exists(WEIGHT_PATH):
-    urllib.request.urlretrieve(RMT_CKPT + WEIGHT_PATH, WEIGHT_PATH)
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    # ~~~ CHANGE HERE ~~~ CHANGE HERE ~~~ CHANGE HERE ~~~ CHANGE HERE ~~~
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    # masked word should be represented by '＿' (zen-kaku)
+    SENTENCE = '私は車が安いので＿したい．'
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    # ~~~ CHANGE HERE ~~~ CHANGE HERE ~~~ CHANGE HERE ~~~ CHANGE HERE ~~~
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
+# ======================
+# Utils
+# ======================
 def text2token(text, tokenizer, lang='en'):
     # convert a text to tokens which can be interpreted in BERT model
     if lang == 'en':
@@ -97,7 +119,13 @@ def text2token(text, tokenizer, lang='en'):
     return tokens_ts, segments_ts, masked_index
 
 
+# ======================
+# Main function
+# ======================
 def main():
+    # model files check and download
+    check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
+    
     # bert tokenizer
     if LANG == 'en':
         tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
@@ -108,7 +136,7 @@ def main():
             do_basic_tokenize=False
         )
 
-    # Prepare data
+    # prepare data
     dummy_input = np.ones((1, MAX_SEQ_LEN), dtype=np.int64)
     tokens_ts, segments_ts, masked_index = text2token(
         SENTENCE, tokenizer, lang=LANG
@@ -117,12 +145,11 @@ def main():
 
     # net initialize
     env_id = ailia.get_gpu_environment_id()
-
     print(f'env_id: {env_id}')
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
 
-    # compute time
-    for i in range(1):
+    # compute execution time
+    for i in range(5):
         start = int(round(time.time() * 1000))
         input_blobs = net.get_input_blob_list()
         for i, idx in enumerate(input_blobs):
@@ -132,22 +159,20 @@ def main():
                 net.set_input_blob_data(dummy_input, idx)
         net.update()
         preds_ailia = net.get_results()
-
         # preds_ailia = net.predict(dummy_input)[0]
         end = int(round(time.time() * 1000))
         print("ailia processing time {} ms".format(end-start))
 
-    # Masked Word Prediction
+    # masked word prediction
     predicted_indices = np.argsort(
         preds_ailia[0][0][masked_index]
     )[-NUM_PREDICT:][::-1]
 
-    print(predicted_indices)
     predicted_tokens = tokenizer.convert_ids_to_tokens(predicted_indices)
 
     print('Input sentence: ' + SENTENCE)
     print(f'predicted top {NUM_PREDICT} words: {predicted_tokens}')
-    print('Successfully finished!')
+    print('Script finished successfully.')
 
 
 if __name__ == "__main__":
