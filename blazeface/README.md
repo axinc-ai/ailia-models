@@ -18,7 +18,7 @@ It is necessary to be connected to the Internet while downloading.
 
 For the sample image,
 ``` bash
-python3 blazeface.py 
+$ python3 blazeface.py 
 ```
 
 If you want to specify the input image, put the image path after the `--input` option.  
