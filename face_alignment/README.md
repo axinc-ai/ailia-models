@@ -10,8 +10,10 @@ Ailia input shape : (1, 3, 256, 256)
 Range : [0.0, 1.0]
 
 ## Output
+- output image  
 ![Output](output.png)  
 
+- confidence map  
 ![confidence_map](output_confidence.png)
 
 ## Usage
