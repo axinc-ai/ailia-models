@@ -83,6 +83,6 @@ def preprocess_frame(
         data = np.rollaxis(data, 2, 0)
         data = np.expand_dims(data, axis=0).astype(np.float32)
     else:
-        data = cv2.cvtColor(data, cv2.COLOR_BGR2GRAY)
+        data = cv2.cvtColor(data.astype(np.float32), cv2.COLOR_BGR2GRAY)
         data = data[np.newaxis, np.newaxis, :, :]
     return img, data
