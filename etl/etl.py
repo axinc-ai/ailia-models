@@ -96,8 +96,6 @@ def recognize_from_image():
     for idx in range(count) :
         print(f"+ idx={idx}")
         info = classifier.get_class(idx)
-        print(info.category)
-        print(len(etl_word))
         print(f"  category={info.category} [ {etl_word[info.category]} ]" )
         print(f"  prob={info.prob}")
 
@@ -148,8 +146,6 @@ def recognize_from_video():
         for idx in range(count) :
             print(f"+ idx={idx}")
             info = classifier.get_class(idx)
-            print(info.category)
-            print(len(etl_word))
             print(f"  category={info.category} [ {etl_word[info.category]} ]" )
             print(f"  prob={info.prob}")
         cv2.imshow('frame', in_frame)
