@@ -4,8 +4,8 @@
 
 ![Input](pizza.jpg)
 
-Shape : (1,3,224,224)
-Range : [0.0, 1.0]
+Ailia input shape: (224, 224, 4)  
+Range : [0.0, 255.0]  (np.uint8)
 
 ## Output
 
@@ -20,6 +20,25 @@ Range : [0.0, 1.0]
   category=567[ frying pan, frypan, skillet ]
   prob=6.665373802185059
 ```
+
+## Usage
+Automatically downloads the onnx and prototxt files on the first run. It is necessary to be connected to the Internet while downloading.
+
+For the sample image,
+```
+$ python3 googlenet.py
+```
+
+If you want to specify the input image, put the image path after the --input option.
+```
+$ python3 googlenet.py --input IMAGE_PATH
+```
+By adding the --video option, you can input the video.
+If you pass 0 as an argument to VIDEO_PATH, you can use the webcam input instead of the video file.
+```
+$ python3 googlenet.py --video VIDEO_PATH
+```
+
 
 ## Reference
 
