@@ -29,12 +29,12 @@ For the sample image,
 $ python3 googlenet.py
 ```
 
-If you want to specify the input image, put the image path after the --input option.
+If you want to specify the input image, put the image path after the `--input` option.
 ```
 $ python3 googlenet.py --input IMAGE_PATH
 ```
-By adding the --video option, you can input the video.
-If you pass 0 as an argument to VIDEO_PATH, you can use the webcam input instead of the video file.
+By adding the `--video` option, you can input the video.
+If you pass `0` as an argument to VIDEO_PATH, you can use the webcam input instead of the video file.
 ```
 $ python3 googlenet.py --video VIDEO_PATH
 ```
