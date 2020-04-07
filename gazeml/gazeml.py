@@ -1,5 +1,6 @@
 import sys
 import time
+import platform
 import argparse
 
 import numpy as np
@@ -106,7 +107,10 @@ def recognize_from_image():
         normalize_type='None'
     )
     img = cv2.equalizeHist(img)
-    data = img[np.newaxis, np.newaxis, :, :] / 127.5 - 1.0
+    if platform.system() == 'Darwin':  # For Mac OS (FP16)
+        data = img[np.newaxis, np.newaxis, :, :] / 255.0 - 0.5
+    else:
+        data = img[np.newaxis, np.newaxis, :, :] / 127.5 - 1.0
     eyeI = np.concatenate((data, data), axis=0)
     eyeI = eyeI.reshape(2, IMAGE_HEIGHT, IMAGE_WIDTH, 1)
 
@@ -158,7 +162,10 @@ def recognize_from_video():
         img, resized_img = adjust_frame_size(frame, IMAGE_HEIGHT, IMAGE_WIDTH)
         data = cv2.cvtColor(resized_img, cv2.COLOR_BGR2GRAY)
         data = cv2.equalizeHist(data)
-        data = data[np.newaxis, np.newaxis, :, :] / 127.5 - 1.0
+        if platform.sys() == 'Darwin':
+            data = data[np.newaxis, np.newaxis, :, :] / 255.0 - 0.5
+        else:
+            data = data[np.newaxis, np.newaxis, :, :] / 127.5 - 1.0
         eyeI = np.concatenate((data, data), axis=0)
         eyeI = eyeI.reshape(2, IMAGE_HEIGHT, IMAGE_WIDTH, 1)
 
