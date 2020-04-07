@@ -32,6 +32,8 @@ If you pass `0` as an argument to VIDEO_PATH, you can use the webcam input inste
 $ python3 hair_segmentation.py --video VIDEO_PATH
 ```
 
+The default setting is to use the optimized model and weights, but you can also switch to the normal model by using the `--normal` option.
+
 ### Reference
 
 [hair segmentation in mobile device](https://github.com/thangtran480/hair-segmentation)
