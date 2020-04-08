@@ -13,11 +13,12 @@ from image_utils import load_image  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from utils import check_file_existance  # noqa: E402
 
+
 # ======================
 # Parameters 1
 # ======================
 IMAGE_PATH = 'balloon.png'
-SAVE_IMAGE_PATH = '???'
+SAVE_IMAGE_PATH = 'output.png'
 IMAGE_HEIGHT = 240
 IMAGE_WIDTH = 320
 
@@ -154,7 +155,7 @@ def recognize_from_image():
         (IMAGE_HEIGHT, IMAGE_WIDTH),
         normalize_type='None'
     )
-    input_data = cv2.cvtColor(input_image, cv2.COLOR_BGR2BGRA)
+    input_data = cv2.cvtColor(input_image, cv2.COLOR_RGB2BGRA)
 
     # net initialize
     env_id = ailia.get_gpu_environment_id()
