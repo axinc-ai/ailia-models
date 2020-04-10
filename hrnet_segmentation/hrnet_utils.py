@@ -1,8 +1,7 @@
 import os
 
-import cv2
 import numpy as np
-from matplotlib import pyplot as plt
+import cv2
 from PIL import Image
 
 
@@ -46,15 +45,29 @@ def convert_label(label, inverse=False):
         for k, v in label_mapping.items():
             label[temp == k] = v
     return label
-    
 
-def save_pred(preds, sv_path, name):
+
+def smooth_output(preds, height, width):
+    result = np.zeros((1, 19, height, width))
+    for i in range(19):
+        result[0, i] = cv2.resize(
+            preds[0, i],
+            (height, width),
+            interpolation=cv2.INTER_LINEAR
+        )
+    return result
+
+
+def gen_preds_img(preds, height, width):
     palette = get_palette(256)
     preds = np.asarray(np.argmax(preds, axis=1), dtype=np.uint8)
-    for i in range(preds.shape[0]):
-        pred = convert_label(preds[i], inverse=True)
-        save_img = Image.fromarray(pred)
-        save_img.putpalette(palette)
-        save_img = save_img.resize((1024, 512))
+    # for now, we only expects one image per batch
+    pred = convert_label(preds[0], inverse=True)
+    gen_img = Image.fromarray(pred)
+    gen_img.putpalette(palette)
+    return gen_img.resize((width, height))
 
-        save_img.save(os.path.join(sv_path, name[i]+'.png'))
+
+def save_pred(preds, sv_fname, height, width):
+    save_img = gen_preds_img(preds, height, width)
+    save_img.save(sv_fname)
