@@ -162,7 +162,7 @@ def recognize_from_video():
         img, resized_img = adjust_frame_size(frame, IMAGE_HEIGHT, IMAGE_WIDTH)
         data = cv2.cvtColor(resized_img, cv2.COLOR_BGR2GRAY)
         data = cv2.equalizeHist(data)
-        if platform.sys() == 'Darwin':
+        if platform.system() == 'Darwin':
             data = data[np.newaxis, np.newaxis, :, :] / 255.0 - 0.5
         else:
             data = data[np.newaxis, np.newaxis, :, :] / 127.5 - 1.0
