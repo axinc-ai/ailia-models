@@ -31,8 +31,12 @@ def normalize_image(image, normalize_type='255'):
     elif normalize_type == '127.5':
         return image / 127.5 - 1.0
     elif normalize_type == 'ImageNet':
-        print('[FIXME] Not Implemented Error')
-        sys.exit(1)
+        mean = np.array([0.485, 0.456, 0.406])
+        std = np.array([0.229, 0.224, 0.225])
+        image = image / 255.0
+        for i in range(3):
+            image[:, :, i] = (image[:, :, i] - mean[i]) / std[i]
+        return image
 
 
 def load_image(
