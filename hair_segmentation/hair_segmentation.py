@@ -42,7 +42,7 @@ parser.add_argument(
 )
 parser.add_argument(
     '-n', '--normal',
-    action='store_false',
+    action='store_true',
     help='By default, the optimized model is used, but with this option, ' +\
     'you can switch to the normal (not optimized) model'
 )
