@@ -2,7 +2,6 @@ import sys
 import time
 import argparse
 
-import numpy as np
 import cv2
 
 import ailia
@@ -19,10 +18,6 @@ from webcamera_utils import preprocess_frame  # noqa: E402C
 # ======================
 # Parameters 1
 # ======================
-WEIGHT_PATH = '.onnx'
-MODEL_PATH = '.onnx.prototxt'
-REMOTE_PATH = 'https://storage.googleapis.com/ailia-models//'
-
 IMAGE_PATH = 'clock.jpg'
 IMAGE_HEIGHT = 224
 IMAGE_WIDTH = 224
