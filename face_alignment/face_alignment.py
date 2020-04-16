@@ -63,7 +63,11 @@ args = parser.parse_args()
 def plot_images(title, images, tile_shape):
     fig = plt.figure()
     plt.title(title)
-    grid = ImageGrid(fig, 111,  nrows_ncols = tile_shape)
+    grid = ImageGrid(fig, 111,  nrows_ncols=tile_shape, share_all=True)
+
+    grid[0].get_yaxis().set_ticks([])
+    grid[0].get_xaxis().set_ticks([])
+    
     for i in range(images.shape[0]):
         grd = grid[i]
         grd.imshow(images[i])
