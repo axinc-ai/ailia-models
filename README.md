@@ -4,7 +4,7 @@ The collection of pre-trained, state-of-the-art models.
 
 ## About ailia SDK
 
-ailia SDK is a cross-platform high speed inference SDK. The ailia SDK provides a consistent C++ API on Windows, Mac, Linux, iOS, Android and Jetson. It supports Unity, Python and JNI for efficient AI implementation. The ailia SDK makes great use of the GPU from Vulkan and Metal to serve accelerated computing.
+ailia SDK is a cross-platform high speed inference SDK. The ailia SDK provides a consistent C++ API on Windows, Mac, Linux, iOS, Android and Jetson. It supports Unity, Python and JNI for efficient AI implementation. The ailia SDK makes great use of the GPU via Vulkan and Metal to serve accelerated computing.
 
 You can download a free evaluation version that allows you to evaluate the ailia SDK for 30 days. Please download from the trial link below.
 
