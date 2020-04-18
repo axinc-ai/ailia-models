@@ -48,9 +48,9 @@ parser.add_argument(
 )
 parser.add_argument(
     '--arch', '-a', metavar='ARCH',
-    default='pdresnet152', choices=MODEL_NAMES,
+    default='pdresnet101', choices=MODEL_NAMES,
     help=('model architecture: ' + ' | '.join(MODEL_NAMES) +
-          ' (default: pdresnet152)')
+          ' (default: pdresnet101)')
 )
 args = parser.parse_args()
 
