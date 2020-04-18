@@ -3,7 +3,6 @@ import time
 import argparse
 
 import cv2
-import numpy as np
 
 import ailia
 import partialconv_label
