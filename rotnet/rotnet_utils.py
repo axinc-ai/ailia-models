@@ -32,9 +32,9 @@ def rotate(image, angle):
     # Obtain the rotated coordinates of the image corners
     rotated_coords = [
         (np.array([-image_w2,  image_h2]) * rot_mat_notranslate).A[0],
-        (np.array([ image_w2,  image_h2]) * rot_mat_notranslate).A[0],
+        (np.array([image_w2,  image_h2]) * rot_mat_notranslate).A[0],
         (np.array([-image_w2, -image_h2]) * rot_mat_notranslate).A[0],
-        (np.array([ image_w2, -image_h2]) * rot_mat_notranslate).A[0]
+        (np.array([image_w2, -image_h2]) * rot_mat_notranslate).A[0]
     ]
 
     # Find the size of the new image
@@ -180,13 +180,14 @@ def generate_rotated_image(image, angle, size=None, crop_center=False,
     return image
 
 
-def visualize(rotated_image, rotation_angle, predicted_angle, height, width):
+def visualize(rotated_image, rotation_angle, predicted_angle):
     plt.figure(figsize=(10.0, 2))
     title_fontdict = {
         'fontsize': 14,
         'fontweight': 'bold'
     }
 
+    height, width, _ = rotated_image.shape
     original_image = rotate(rotated_image, -rotation_angle)
     original_image = crop_largest_rectangle(
         original_image, -rotation_angle, height, width
@@ -195,7 +196,7 @@ def visualize(rotated_image, rotation_angle, predicted_angle, height, width):
     corrected_image = crop_largest_rectangle(
         corrected_image, -predicted_angle, height, width
     )
-    
+
     ax = plt.subplot(1, 3, 1)
     plt.title('Original\n', fontdict=title_fontdict)
     plt.imshow(np.squeeze(original_image).astype('uint8'))
@@ -211,7 +212,7 @@ def visualize(rotated_image, rotation_angle, predicted_angle, height, width):
     )
     plt.imshow(np.squeeze(rotated_image).astype('uint8'))
     plt.axis('off')
-    
+
     ax = plt.subplot(1, 3, 3)
     plt.title('Corrected\n', fontdict=title_fontdict)
     ax.text(
@@ -223,4 +224,5 @@ def visualize(rotated_image, rotation_angle, predicted_angle, height, width):
     plt.imshow(np.squeeze(corrected_image).astype('uint8'))
     plt.axis('off')
     plt.tight_layout(pad=0.4, w_pad=0.5, h_pad=1.0)
-    plt.savefig('output.png')
+    # plt.savefig(savename)
+    return plt
