@@ -2,6 +2,7 @@ import sys
 import time
 import argparse
 
+import numpy as np
 import cv2
 
 import ailia
@@ -19,8 +20,10 @@ from webcamera_utils import preprocess_frame  # noqa: E402C
 # ======================
 IMAGE_PATH = 'lenna.png'
 SAVE_IMAGE_PATH = 'output.png'
-IMAGE_HEIGHT = 64
-IMAGE_WIDTH = 64
+IMAGE_HEIGHT = 64    # net.get_input_shape()[3]
+IMAGE_WIDTH = 64     # net.get_input_shape()[2]
+OUTPUT_HEIGHT = 256  # net.get_output_shape()[3]
+OUTPUT_WIDTH = 256   # net.get_output.shape()[2]
 
 
 # ======================
@@ -49,6 +52,11 @@ parser.add_argument(
     '-n', '--normal', action='store_true',
     help=('By default, the optimized model is used, but with this option, ' +
           'you can switch to the normal (not optimized) model')
+)
+parser.add_argument(
+    '-p', '--padding', action='store_true',
+    help=('Instead of resizing input image when loading it, ' +
+          ' padding input and output image')
 )
 args = parser.parse_args()
 
@@ -95,6 +103,64 @@ def recognize_from_image():
     cv2.imwrite(args.savepath, output_img * 255)
     print('Script finished successfully.')
 
+
+def recognize_from_image_tiling():
+    # net initialize
+    env_id = ailia.get_gpu_environment_id()
+    print(f'env_id: {env_id}')
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+    
+    # padding input image
+    img = cv2.imread(args.input)
+    h, w = img.shape[0], img.shape[1]
+    padding_w = int((w + IMAGE_WIDTH - 1) / IMAGE_WIDTH) * IMAGE_WIDTH
+    padding_h = int((h+IMAGE_HEIGHT-1) / IMAGE_HEIGHT) * IMAGE_HEIGHT
+    scale = int(OUTPUT_HEIGHT / IMAGE_HEIGHT)
+    output_padding_w = padding_w * scale
+    output_padding_h = padding_h * scale
+    output_w = w * scale
+    output_h = h * scale
+
+    print(f'input image : {h}x{w}')
+    print(f'output image : {output_w}x{output_h}')
+
+    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    img = img / 255.0
+    img = img.transpose(2, 0, 1)
+    img = img[np.newaxis, :, :, :]
+
+    pad_img = np.zeros((1, 3, padding_h, padding_w))
+    pad_img[:, :, 0:h, 0:w] = img
+
+    output_pad_img = np.zeros((1, 3, output_padding_h, output_padding_w))
+    tile_x = int(padding_w / IMAGE_WIDTH)
+    tile_y = int(padding_h / IMAGE_HEIGHT)
+
+    # Inference
+    start = int(round(time.time() * 1000))
+    for y in range(tile_y):
+        for x in range(tile_x):
+            output_pad_img[
+                :,
+                :,
+                y*OUTPUT_HEIGHT:(y+1)*OUTPUT_HEIGHT,
+                x*OUTPUT_WIDTH:(x+1)*OUTPUT_WIDTH
+            ] = net.predict(pad_img[
+                :,
+                :,
+                y*IMAGE_HEIGHT:(y+1)*IMAGE_HEIGHT,
+                x*IMAGE_WIDTH:(x+1)*IMAGE_WIDTH
+            ])
+    end = int(round(time.time() * 1000))
+    print(f'ailia processing time {end - start} ms')
+
+    # Postprocessing
+    output_img = output_pad_img[0, :, :output_h, :output_w]
+    output_img = output_img.transpose(1, 2, 0).astype(np.float32)
+    output_img = cv2.cvtColor(output_img, cv2.COLOR_RGB2BGR)
+    cv2.imwrite(args.savepath, output_img * 255)
+    print('Script finished successfully.')
+    
 
 def recognize_from_video():
     # net initialize
@@ -145,7 +211,10 @@ def main():
         recognize_from_video()
     else:
         # image mode
-        recognize_from_image()
+        if args.padding:
+            recognize_from_image_tiling()
+        else:
+            recognize_from_image()
 
 
 if __name__ == '__main__':
