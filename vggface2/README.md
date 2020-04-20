@@ -6,18 +6,32 @@
 - image_b : ![Input](couple_b.jpg)
 - image_c : ![Input](couple_c.jpg)
 
-Shape : (1, 3, 224, 224)
-Range : [-128.0, 127.0]
+Ailia input shape : (1, 3, 224, 224)
 
-## Output
 
-Feature Shape : (1,1,1,2048)
+## Usage
+Automatically downloads the onnx and prototxt files on the first run.
+It is necessary to be connected to the Internet while downloading.
 
+By default, the following two images are loaded: `couple_a.jpg`, `couple_c.jpg` (Same person example)
+
+```bash
+$ python3 vggface2.py
+...
+couple_a.jpg vs couple_c.jpg = 0.6718782782554626
+Same person
 ```
-image_a vs image_b =  1.143173
-not same person
-image_a vs image_c =  0.7116655
-same person
+
+If you want to specify images, speficy the paths of the two images after the `--inputs` option.
+```bash
+$ python3 vggface2.py --inputs IMAGE_PATH1 IMAGE_PATH2
+```
+
+By adding `--video` option, you can compare the face from video frame and the still image, and calculate the distance.
+If you pass `0` as an argument to `VIDEO_PATH`, you can use the webcam input instead of the video file.
+```bash
+$ python3 vggface2.py --video VIDEO_PATH IMAGE_PATH
+$ python3 vggface2.py --video 0 IMAGE_PATH
 ```
 
 ## Reference
