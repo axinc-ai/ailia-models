@@ -103,7 +103,7 @@ def hard_nms(box_scores, iou_threshold, top_k=-1, candidate_size=200):
 #         box_scores[max_score_index, :] = box_scores[-1, :]
 #         box_scores = box_scores[:-1, :]
 #         ious = iou_of(cur_box.unsqueeze(0), box_scores[:, :-1])
-#         box_scores[:, -1] = box_scores[:, -1] * torch.exp(-(ious * ious) / sigma)
+#         box_scores[:, -1] = box_scores[:, -1] * torch.exp(-(ious*ious)/sigma)
 #         box_scores = box_scores[box_scores[:, -1] > score_threshold, :]
 #     if len(picked_box_scores) > 0:
 #         return torch.stack(picked_box_scores)
@@ -132,7 +132,7 @@ def post_processing(scores, boxes, top_k=10):
     picked_labels = []
 
     # print(f"[DEBUG] {scores.shape[1]}")
-    
+
     for class_index in range(1, scores.shape[1]):
         probs = scores[:, class_index]
         mask = probs > prob_threshold
@@ -163,27 +163,28 @@ def post_processing(scores, boxes, top_k=10):
     return (picked_box_probs[:, :4],
             np.array(picked_labels),
             picked_box_probs[:, 4])
-    
 
-def save_result(org_image, scores, boxes, save_path):
+
+def plot_result(base_image, scores, boxes):
     class_names = [name.strip() for name in open(LABEL_PATH).readlines()]
     boxes, labels, probs = post_processing(scores, boxes, top_k=10)
     for i in range(boxes.shape[0]):
         box = boxes[i, :]
         label = f"{class_names[labels[i]]}: {probs[i]:.2f}"
+
         cv2.rectangle(
-            org_image, (box[0], box[1]), (box[2], box[3]), (255, 255, 0), 2
+            base_image, (box[0], box[1]), (box[2], box[3]), (255, 255, 0), 2
         )
-        
+
         cv2.putText(
-            org_image,
+            base_image,
             label,
             (int(box[0])+20, int(box[1])+40),
             cv2.FONT_HERSHEY_SIMPLEX,
             0.5,  # font scale
-            (255, 0, 255), # font color
-            1, # thickness
-            cv2.LINE_AA # Line type
+            (255, 0, 255),  # font color
+            1,  # thickness
+            cv2.LINE_AA  # Line type
         )
-        
-    cv2.imwrite(save_path, org_image)
+
+    return base_image

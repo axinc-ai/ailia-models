@@ -1,69 +1,159 @@
-import numpy as np
+import sys
 import time
-import os
+
 import cv2
-import urllib.request
 import argparse
 
 import ailia
 import mobilenetv3_labels
 
-model_names = ['small', 'large']
-parser = argparse.ArgumentParser()
+# import original modules
+sys.path.append('../util')
+from utils import check_file_existance  # noqa: E402
+from model_utils import check_and_download_models  # noqa: E402
+from image_utils import load_image  # noqa: E402
+from webcamera_utils import preprocess_frame  # noqa: E402C
+
+
+# ======================
+# Parameters 1
+# ======================
+IMAGE_PATH = 'clock.jpg'
+IMAGE_HEIGHT = 224
+IMAGE_WIDTH = 224
+MODEL_LISTS = ['small', 'large']
+
+MAX_CLASS_COUNT = 3
+SLEEP_TIME = 3
+
+
+# ======================
+# Arguemnt Parser Config
+# ======================
+parser = argparse.ArgumentParser(
+    description='ImageNet classification Model'
+)
 parser.add_argument(
-    '-m', '--model', default='small', choices=model_names,
-    help='model architecture (default: small)'
+    '-i', '--input', metavar='IMAGE',
+    default=IMAGE_PATH,
+    help='The input image path.'
+)
+parser.add_argument(
+    '-v', '--video', metavar='VIDEO',
+    default=None,
+    help='The input video path. ' +
+         'If the VIDEO argument is set to 0, the webcam input will be used.'
+)
+parser.add_argument(
+    '-a', '--arch', metavar='ARCH',
+    default='small', choices=MODEL_LISTS,
+    help='model lists: ' + ' | '.join(MODEL_LISTS) + ' (default: small)'
 )
 args = parser.parse_args()
 
-weight_path = 'mobilenetv3_' + args.model + '.onnx'
-model_path = weight_path + '.prototxt'
 
-img_path = './clock.jpg'
+# ======================
+# Parameters 2
+# ======================
+WEIGHT_PATH = f'mobilenetv3_{args.arch}.onnx'
+MODEL_PATH = WEIGHT_PATH + '.prototxt'
+REMOTE_PATH = f'https://storage.googleapis.com/ailia-models/mobilenetv3/'
 
-# model download
-rmt_ckpt = "https://storage.googleapis.com/ailia-models/mobilenetv3/"
-if not os.path.exists(model_path):
-    print("downloading ...")
-    urllib.request.urlretrieve(rmt_ckpt + model_path, model_path)
-if not os.path.exists(weight_path):
-    urllib.request.urlretrieve(rmt_ckpt + weight_path, weight_path)
 
-# classifier initialize
-env_id = ailia.get_gpu_environment_id()
-net = ailia.Net(model_path, weight_path, env_id=env_id)
+# ======================
+# Utils
+# ======================
+def print_results(preds_ailia):
+    preds_ailia = preds_ailia[0]
+    top_scores = preds_ailia.argsort()[-1 * MAX_CLASS_COUNT:][::-1]
 
-# load input image and convert to BGRA
-print("inferencing ...")
+    print('==============================================================')
+    print(f'class_count={MAX_CLASS_COUNT}')
+    for idx in range(MAX_CLASS_COUNT):
+        print(f'+ idx={idx}')
+        print(f'  category={top_scores[idx]}['
+              f'{mobilenetv3_labels.imagenet_category[top_scores[idx]]} ]')
+        print(f'  prob={preds_ailia[top_scores[idx]]}')
 
-img = cv2.imread(img_path, cv2.IMREAD_UNCHANGED)
 
-# preprocessing
-mean = [0.485, 0.456, 0.406]  # mean of ImageNet dataset
-std = [0.229, 0.224, 0.225]  # std of ImageNet dataset
-img = cv2.resize(img, (256, 256))  # resize image
-# center clop & normalize between 0 and 1
-img = np.array(img[16:240, 16:240], dtype='float64') / 255  
-for i in range(3):  # normalize image
-    img[:, :, i] = (img[:, :, i] - mean[i]) / std[i]
+# ======================
+# Main functions
+# ======================
+def recognize_from_image():
+    # prepare input data
+    input_data = load_image(
+        args.input,
+        (IMAGE_HEIGHT, IMAGE_WIDTH),
+        normalize_type='ImageNet',
+        gen_input_ailia=True
+    )
 
-# [x, y, channel] --> [1, channel, x, y]
-img = np.expand_dims(np.rollaxis(img, 2, 0), axis=0) 
-# print(img.shape)
+    # net initialize
+    env_id = ailia.get_gpu_environment_id()
+    print(f'env_id: {env_id}')
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
 
-# compute
-max_class_count = 3
-preds_ailia = net.predict(img)[0]
+    # compute execution time
+    for i in range(5):
+        start = int(round(time.time() * 1000))
+        preds_ailia = net.predict(input_data)
+        end = int(round(time.time() * 1000))
+        print(f'ailia processing time {end - start} ms')
 
-# get result
-top = preds_ailia.argsort()[-1 * max_class_count:][::-1]
+    print_results(preds_ailia)
+    print('Script finished successfully.')
 
-print("class_count={}".format(max_class_count))
 
-for idx in range(max_class_count) :
-    # print result
-    print("+ idx=" + str(idx))
-    print("  category={}".format(top[idx]) + "[ " +
-          mobilenetv3_labels.imagenet_category[top[idx]] + " ]" )
-    print("  prob={}".format(preds_ailia[top[idx]]))
+def recognize_from_video():
+    # net initialize
+    env_id = ailia.get_gpu_environment_id()
+    print(f'env_id: {env_id}')
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
 
+    if args.video == '0':
+        print('[INFO] Webcam mode is activated')
+        capture = cv2.VideoCapture(0)
+        if not capture.isOpened():
+            print("[ERROR] webcamera not found")
+            sys.exit(1)
+    else:
+        if check_file_existance(args.video):
+            capture = cv2.VideoCapture(args.video)
+
+    while(True):
+        ret, frame = capture.read()
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
+        if not ret:
+            continue
+
+        input_image, input_data = preprocess_frame(
+            frame, IMAGE_HEIGHT, IMAGE_WIDTH, normalize_type='ImageNet'
+        )
+
+        # Inference
+        preds_ailia = net.predict(input_data)
+
+        print_results(preds_ailia)
+        cv2.imshow('frame', input_image)
+        time.sleep(SLEEP_TIME)
+
+    capture.release()
+    cv2.destroyAllWindows()
+    print('Script finished successfully.')
+
+
+def main():
+    # model files check and download
+    check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
+
+    if args.video is not None:
+        # video mode
+        recognize_from_video()
+    else:
+        # image mode
+        recognize_from_image()
+
+
+if __name__ == '__main__':
+    main()

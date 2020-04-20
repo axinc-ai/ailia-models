@@ -4,7 +4,8 @@
 
 ![input_iamge](couple.jpg)
 
-Shape(1, 3, 300, 300) Range:[0, 1]
+Ailia input shape(1, 3, 300, 300)  
+Range:[0, 1]
 
 ### output
 
@@ -13,14 +14,27 @@ Shape(1, 3, 300, 300) Range:[0, 1]
 
 ### usage
 
+Automatically downloads the onnx and prototxt files on the first run.
+It is necessary to be connected to the Internet while downloading.
+
+For the sample image,
 ``` bash
-python3 mobilenet_ssd.py mb1-ssd
+$ python3 mobilenet_ssd.py
 ```
-or
+
+If you want to specify the input image, put the image path after the `--input` option.  
+You can use `--savepath` option to change the name of the output file to save.
 ```bash
-python3 mobilenet_ssd.py mb2-ssd-lite
+$ python3 mobilenet_ssd.py --input IMAGE_PATH --savepath SAVE_IMAGE_PATH
 ```
-you can change input image path and save image path in `mobilenet_ssd.py`
+
+By adding the `--video` option, you can input the video.   
+If you pass `0` as an argument to VIDEO_PATH, you can use the webcam input instead of the video file.
+```bash
+$ python3 mobilenet_ssd.py --video VIDEO_PATH
+```
+
+You can select a pretrained model by specifying `-a mb1-ssd` or `-a mb2-ssd-lite`(default).
 
 
 ### Reference

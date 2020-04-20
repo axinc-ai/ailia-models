@@ -32,10 +32,6 @@ class VideoReader:
 
     def __iter__(self):
         self.cap = cv2.VideoCapture(self.file_name)
-        # self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 448)
-        # self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 360)
-        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 256)
         if not self.cap.isOpened():
             raise IOError('Video {} cannot be opened'.format(self.file_name))
         return self
