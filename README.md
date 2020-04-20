@@ -4,7 +4,9 @@ The collection of pre-trained, state-of-the-art models.
 
 ## About ailia SDK
 
-ailia SDK is a cross-platform high speed inference SDK. The ailia SDK provides a consistent C++ API on Windows, Mac, Linux, iOS and Android. It supports Unity, Python and JNI for efficient AI implementation. The ailia SDK makes great use of the GPU to serve accelerated computing.
+ailia SDK is a cross-platform high speed inference SDK. The ailia SDK provides a consistent C++ API on Windows, Mac, Linux, iOS, Android and Jetson. It supports Unity, Python and JNI for efficient AI implementation. The ailia SDK makes great use of the GPU via Vulkan and Metal to serve accelerated computing.
+
+You can download a free evaluation version that allows you to evaluate the ailia SDK for 30 days. Please download from the trial link below.
 
 https://ailia.jp/en/
 
@@ -91,7 +93,7 @@ https://ailia.jp/en/
 
 | Name | Detail | Exported From | Supported Ailia Version |
 |:-----------|------------:|:------------:|:------------:|
-|[monodepth2](monodepth2)| [Monocular depth estimation from a single image](https://github.com/nianticlabs/monodepth2) | Pytorch | 1.2.2 beta and later |
+|[monodepth2](monodepth2)| [Monocular depth estimation from a single image](https://github.com/nianticlabs/monodepth2) | Pytorch | 1.2.2 and later |
 
 ## Text recognization
 
@@ -103,4 +105,4 @@ https://ailia.jp/en/
 
 | Name | Detail | Exported From | Supported Ailia Version |
 |:-----------|------------:|:------------:|:------------:|
-|[bert](/bert) | [pytorch-pretrained-bert](https://pypi.org/project/pytorch-pretrained-bert/) | Pytorch | 1.2.2 beta and later |
+|[bert](/bert) | [pytorch-pretrained-bert](https://pypi.org/project/pytorch-pretrained-bert/) | Pytorch | 1.2.2 and later |
