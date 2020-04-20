@@ -41,7 +41,7 @@ $ python3 arcface.py --inputs IMAGE_PATH1 IMAGE_PATH2
 
 By adding the `--video` option, you can compare the face of the video and the still image
 and calculate the similarity.
-If you pass 0 as an argument to VIDEO_PATH, you can use the webcam input instead of the video.
+If you pass `0` as an argument to `VIDEO_PATH`, you can use the webcam input instead of the video.
 ```bash
 $ python3 arcface.py --video VIDEO_PATH IMAGE_PATH
 
