@@ -62,11 +62,7 @@ WEIGHT_PATH = args.arch + '.onnx'
 MODEL_PATH = args.arch + '.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/mobilenet_ssd/'
 
-
-# ======================
-# Display result
-# ======================
-voc_category=[
+VOC_CATEGORY = [
     "aeroplane",
     "bicycle",
     "bird",
@@ -89,40 +85,55 @@ voc_category=[
     "tvmonitor"
 ]
 
+
+# ======================
+# Utils
+# ======================
 def hsv_to_rgb(h, s, v):
-	bgr = cv2.cvtColor(np.array([[[h, s, v]]], dtype=np.uint8), cv2.COLOR_HSV2BGR)[0][0]
-	return (int(bgr[0]), int(bgr[1]), int(bgr[2]), 255)
+    bgr = cv2.cvtColor(
+        np.array([[[h, s, v]]], dtype=np.uint8), cv2.COLOR_HSV2BGR)[0][0]
+    return (int(bgr[0]), int(bgr[1]), int(bgr[2]), 255)
 
-def display_result(work,detector,logging):
-	# get result
-	count = detector.get_object_count()
 
-	if logging:
-		print("object_count=" + str(count))
+def display_result(work, detector, logging):
+    # get result
+    count = detector.get_object_count()
 
-	w = work.shape[1]
-	h = work.shape[0]
+    if logging:
+        print("object_count=" + str(count))
 
-	for idx  in range(count) :
-		# print result
-		obj = detector.get_object(idx)
-		if logging:
-			print("+ idx=" + str(idx))
-			print("  category=" + str(obj.category) + "[ " + voc_category[obj.category] + " ]" )
-			print("  prob=" + str(obj.prob) )
-			print("  x=" + str(obj.x) )
-			print("  y=" + str(obj.y) )
-			print("  w=" + str(obj.w) )
-			print("  h=" + str(obj.h) )
-		top_left = ( int(w*obj.x), int(h*obj.y) )
-		bottom_right = ( int(w*(obj.x+obj.w)), int(h*(obj.y+obj.h)) )
-		text_position = ( int(w*obj.x)+4, int(h*(obj.y+obj.h)-8) )
+    w = work.shape[1]
+    h = work.shape[0]
 
-		# update image
-		color = hsv_to_rgb(255*obj.category/80,255,255)
-		cv2.rectangle( work, top_left, bottom_right, color, 4)
-		fontScale=w/512.0
-		cv2.putText( work, voc_category[obj.category], text_position, cv2.FONT_HERSHEY_SIMPLEX, fontScale, color, 1)
+    for idx in range(count):
+        # print result
+        obj = detector.get_object(idx)
+        if logging:
+            print("+ idx=" + str(idx))
+            print("  category=" + str(obj.category) +
+                  "[ " + VOC_CATEGORY[obj.category] + " ]")
+            print("  prob=" + str(obj.prob))
+            print("  x=" + str(obj.x))
+            print("  y=" + str(obj.y))
+            print("  w=" + str(obj.w))
+            print("  h=" + str(obj.h))
+        top_left = (int(w*obj.x), int(h*obj.y))
+        bottom_right = (int(w*(obj.x+obj.w)), int(h*(obj.y+obj.h)))
+        text_position = (int(w*obj.x)+4, int(h*(obj.y+obj.h)-8))
+
+        # update image
+        color = hsv_to_rgb(255 * obj.category / 80, 255, 255)
+        cv2.rectangle(work, top_left, bottom_right, color, 4)
+        fontScale = w / 512.0
+        cv2.putText(
+            work,
+            VOC_CATEGORY[obj.category],
+            text_position,
+            cv2.FONT_HERSHEY_SIMPLEX,
+            fontScale,
+            color,
+            1
+        )
 
 
 # ======================
@@ -135,8 +146,8 @@ def recognize_from_image():
         (IMAGE_HEIGHT, IMAGE_WIDTH),
         normalize_type='None',
     )
-    if org_img.shape[2] == 3 :
-        org_img = cv2.cvtColor( org_img, cv2.COLOR_RGB2BGRA )
+    if org_img.shape[2] == 3:
+        org_img = cv2.cvtColor(org_img, cv2.COLOR_RGB2BGRA)
 
     # net initialize
     env_id = ailia.get_gpu_environment_id()
@@ -144,7 +155,15 @@ def recognize_from_image():
     categories = 80
     threshold = 0.4
     iou = 0.45
-    detector = ailia.Detector(MODEL_PATH, WEIGHT_PATH, categories, format=ailia.NETWORK_IMAGE_FORMAT_RGB, channel=ailia.NETWORK_IMAGE_CHANNEL_FIRST, range=ailia.NETWORK_IMAGE_RANGE_U_FP32, algorithm=ailia.DETECTOR_ALGORITHM_SSD, env_id=env_id)
+    detector = ailia.Detector(
+        MODEL_PATH,
+        WEIGHT_PATH,
+        categories,
+        format=ailia.NETWORK_IMAGE_FORMAT_RGB,
+        channel=ailia.NETWORK_IMAGE_CHANNEL_FIRST,
+        range=ailia.NETWORK_IMAGE_RANGE_U_FP32,
+        algorithm=ailia.DETECTOR_ALGORITHM_SSD, env_id=env_id
+    )
 
     # compute execution time
     for i in range(5):
@@ -154,8 +173,8 @@ def recognize_from_image():
         print(f'ailia processing time {end - start} ms')
 
     # postprocessing
-    display_result(org_img,detector,True)
-    cv2.imwrite(args.savepath,org_img)
+    display_result(org_img, detector, True)
+    cv2.imwrite(args.savepath, org_img)
     print('Script finished successfully.')
 
 
@@ -166,7 +185,15 @@ def recognize_from_video():
     categories = 80
     threshold = 0.4
     iou = 0.45
-    detector = ailia.Detector(MODEL_PATH, WEIGHT_PATH, categories, format=ailia.NETWORK_IMAGE_FORMAT_RGB, channel=ailia.NETWORK_IMAGE_CHANNEL_FIRST, range=ailia.NETWORK_IMAGE_RANGE_U_FP32, algorithm=ailia.DETECTOR_ALGORITHM_SSD, env_id=env_id)
+    detector = ailia.Detector(
+        MODEL_PATH,
+        WEIGHT_PATH,
+        categories,
+        format=ailia.NETWORK_IMAGE_FORMAT_RGB,
+        channel=ailia.NETWORK_IMAGE_CHANNEL_FIRST,
+        range=ailia.NETWORK_IMAGE_RANGE_U_FP32,
+        algorithm=ailia.DETECTOR_ALGORITHM_SSD, env_id=env_id
+    )
 
     if args.video == '0':
         print('[INFO] Webcam mode is activated')
@@ -187,9 +214,9 @@ def recognize_from_video():
 
         _, resized_img = adjust_frame_size(frame, IMAGE_HEIGHT, IMAGE_WIDTH)
 
-        img = cv2.cvtColor( resized_img, cv2.COLOR_RGB2BGRA )
+        img = cv2.cvtColor(resized_img, cv2.COLOR_RGB2BGRA)
         detector.compute(img, threshold, iou)
-        display_result(resized_img,detector,False)
+        display_result(resized_img, detector, False)
 
         cv2.imshow('frame', resized_img)
 

@@ -34,14 +34,14 @@ Similarity of (correct_pair_1.jpg, correct_pair_2.jpg) : 0.5981666445732117
 They are the same face!
 ```
 
-If you want to specify images, specify the paths of the two images after the `--input` option.
+If you want to specify images, specify the paths of the two images after the `--inputs` option.
 ``` bash
-$ python3 arcface.py --input IMAGE_PATH1 IMAGE_PATH2
+$ python3 arcface.py --inputs IMAGE_PATH1 IMAGE_PATH2
 ```
 
 By adding the `--video` option, you can compare the face of the video and the still image
 and calculate the similarity.
-If you pass 0 as an argument to VIDEO_PATH, you can use the webcam input instead of the video.
+If you pass `0` as an argument to `VIDEO_PATH`, you can use the webcam input instead of the video.
 ```bash
 $ python3 arcface.py --video VIDEO_PATH IMAGE_PATH
 
