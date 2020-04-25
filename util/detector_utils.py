@@ -30,7 +30,8 @@ def hsv_to_rgb(h, s, v):
 def plot_results(detector, img, category, logging=True):
     h, w = img.shape[0], img.shape[1]
     count = detector.get_object_count()
-    print(f'object_count={count}')
+    if logging:
+        print(f'object_count={count}')
     
     for idx in range(count):
         obj = detector.get_object(idx)
