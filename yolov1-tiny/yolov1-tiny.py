@@ -1,54 +1,33 @@
-#ailia detector api sample
+import sys
+import os
+import time
+import argparse
+
+import cv2
 
 import ailia
 
-import numpy
-import tempfile
-import cv2
-import os
-import urllib.request
+# import original modules
+sys.path.append('../util')
+from utils import check_file_existance  # noqa: E402
+from model_utils import check_and_download_models  # noqa: E402
+from webcamera_utils import adjust_frame_size  # noqa: E402C
+from detector_utils import plot_results, load_image # noqa: E402C
 
-# settings
-model_path = "yolov1-tiny.prototxt"
-weight_path = "yolov1-tiny.caffemodel"
-img_path = "./couple.jpg"
 
-print("downloading ...");
+# ======================
+# Parameters
+# ======================
+WEIGHT_PATH = 'yolov1-tiny.caffemodel'
+MODEL_PATH = 'yolov1-tiny.prototxt'
+REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/yolov1-tiny/'
 
-if not os.path.exists(model_path):
-    urllib.request.urlretrieve("https://storage.googleapis.com/ailia-models/yolov1-tiny/"+model_path,model_path)
-if not os.path.exists(weight_path):
-    urllib.request.urlretrieve("https://storage.googleapis.com/ailia-models/yolov1-tiny/"+weight_path,weight_path)
+IMAGE_PATH = 'couple.jpg'
+SAVE_IMAGE_PATH = 'output.png'
+IMAGE_HEIGHT = 448  # for video mode
+IMAGE_WIDTH = 448  # for video mode
 
-print("loading ...");
-
-# detector initialize
-env_id = ailia.get_gpu_environment_id()
-categories = 20
-detector = ailia.Detector(model_path, weight_path, categories, format=ailia.NETWORK_IMAGE_FORMAT_RGB, channel=ailia.NETWORK_IMAGE_CHANNEL_FIRST, range=ailia.NETWORK_IMAGE_RANGE_S_FP32, algorithm=ailia.DETECTOR_ALGORITHM_YOLOV1, env_id=env_id)
-
-# load input image and convert to BGRA
-img = cv2.imread( img_path, cv2.IMREAD_UNCHANGED )
-if img.shape[2] == 3 :
-    img = cv2.cvtColor( img, cv2.COLOR_BGR2BGRA )
-elif img.shape[2] == 1 : 
-    img = cv2.cvtColor( img, cv2.COLOR_GRAY2BGRA )
-
-print( "img.shape=" + str(img.shape) )
-
-work = img
-w = img.shape[1]
-h = img.shape[0]
-
-print("inferencing ...");
-
-# compute
-threshold = 0.2
-iou = 0.45
-detector.compute(img, threshold, iou)
-
-# category
-voc_category=[
+VOC_CATEGORY = [
     "aeroplane",
     "bicycle",
     "bird",
@@ -70,29 +49,125 @@ voc_category=[
     "train",
     "tvmonitor"
 ]
+THRESHOLD = 0.2
+IOU = 0.45
 
-# get result
-count = detector.get_object_count()
 
-print("object_count=" + str(count))
+# ======================
+# Arguemnt Parser Config
+# ======================
+parser = argparse.ArgumentParser(
+    description='Yolov1 tiny model'
+)
+parser.add_argument(
+    '-i', '--input', metavar='IMAGE',
+    default=IMAGE_PATH,
+    help='The input image path.'
+)
+parser.add_argument(
+    '-v', '--video', metavar='VIDEO',
+    default=None,
+    help='The input video path. ' +
+         'If the VIDEO argument is set to 0, the webcam input will be used.'
+)
+parser.add_argument(
+    '-s', '--savepath', metavar='SAVE_IMAGE_PATH',
+    default=SAVE_IMAGE_PATH,
+    help='Save path for the output image.'
+)
+args = parser.parse_args()
 
-for idx  in range(count) :
-    # print result
-    print("+ idx=" + str(idx))
-    obj = detector.get_object(idx)
-    print("  category=" + str(obj.category) + "[ " + voc_category[obj.category] + " ]" )
-    print("  prob=" + str(obj.prob) )
-    print("  x=" + str(obj.x) )
-    print("  y=" + str(obj.y) )
-    print("  w=" + str(obj.w) )
-    print("  h=" + str(obj.h) )
-    top_left = ( int(w*obj.x), int(h*obj.y) )
-    bottom_right = ( int(w*(obj.x+obj.w)), int(h*(obj.y+obj.h)) )
-    text_position = ( int(w*obj.x)+4, int(h*(obj.y+obj.h)-8) )
 
-    # update image
-    cv2.rectangle( work, top_left, bottom_right, (0, 0, 255, 255), 4)
-    cv2.putText( work, voc_category[obj.category], text_position, cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255, 255), 1)
+# ======================
+# Main functions
+# ======================
+def recognize_from_image():
+    # prepare input data
+    img = load_image(args.input)
+    print(f'input image shape: {img.shape}')
 
-# save image
-cv2.imwrite( "output.png", work)
+    # net initialize
+    env_id = ailia.get_gpu_environment_id()
+    print(f'env_id: {env_id}')
+    detector = ailia.Detector(
+        MODEL_PATH,
+        WEIGHT_PATH,
+        len(VOC_CATEGORY),
+        format=ailia.NETWORK_IMAGE_FORMAT_RGB,
+        channel=ailia.NETWORK_IMAGE_CHANNEL_FIRST,
+        range=ailia.NETWORK_IMAGE_RANGE_S_FP32,
+        algorithm=ailia.DETECTOR_ALGORITHM_YOLOV1,
+        env_id=env_id
+    )
+
+    # compute execution time
+    for i in range(5):
+        start = int(round(time.time() * 1000))
+        detector.compute(img, THRESHOLD, IOU)
+        end = int(round(time.time() * 1000))
+        print(f'ailia processing time {end - start} ms')
+
+    # plot result
+    res_img = plot_results(detector, img, VOC_CATEGORY)
+    cv2.imwrite(args.savepath, res_img)
+    print('Script finished successfully.')
+
+
+def recognize_from_video():
+    # net initialize
+    env_id = ailia.get_gpu_environment_id()
+    print(f'env_id: {env_id}')
+    detector = ailia.Detector(
+        MODEL_PATH,
+        WEIGHT_PATH,
+        len(VOC_CATEGORY),
+        format=ailia.NETWORK_IMAGE_FORMAT_RGB,
+        channel=ailia.NETWORK_IMAGE_CHANNEL_FIRST,
+        range=ailia.NETWORK_IMAGE_RANGE_S_FP32,
+        algorithm=ailia.DETECTOR_ALGORITHM_YOLOV1,
+        env_id=env_id
+    )
+
+    if args.video == '0':
+        print('[INFO] Webcam mode is activated')
+        capture = cv2.VideoCapture(0)
+        if not capture.isOpened():
+            print("[ERROR] webcamera not found")
+            sys.exit(1)
+    else:
+        if check_file_existance(args.video):
+            capture = cv2.VideoCapture(args.video)
+
+    while(True):
+        ret, frame = capture.read()
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
+        if not ret:
+            continue
+
+        _, resized_img = adjust_frame_size(frame, IMAGE_HEIGHT, IMAGE_WIDTH)
+
+        img = cv2.cvtColor(resized_img, cv2.COLOR_RGB2BGRA)
+        detector.compute(img, THRESHOLD, IOU)
+        res_img = plot_results(detector, resized_img, VOC_CATEGORY, False)
+        cv2.imshow('frame', res_img)
+
+    capture.release()
+    cv2.destroyAllWindows()
+    print('Script finished successfully.')
+
+
+def main():
+    # model files check and download
+    check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
+
+    if args.video is not None:
+        # video mode
+        recognize_from_video()
+    else:
+        # image mode
+        recognize_from_image()
+
+
+if __name__ == '__main__':
+    main()
