@@ -24,8 +24,8 @@ REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/yolov2/'
 
 IMAGE_PATH = 'couple.jpg'
 SAVE_IMAGE_PATH = 'output.png'
-IMAGE_HEIGHT = 448  # for video mode
-IMAGE_WIDTH = 448  # for video mode
+IMAGE_HEIGHT = 416  # for video mode
+IMAGE_WIDTH = 416  # for video mode
 
 COCO_CATEGORY = [
     "person", "bicycle", "car", "motorcycle", "airplane", "bus", "train",
