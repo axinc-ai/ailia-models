@@ -1,5 +1,24 @@
+import os
+import sys
 import numpy as np
 import cv2
+
+
+def preprocessing_img(img):
+    if img.shape[2] == 3:
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2BGRA)
+    elif img.shape[2] == 1:
+        img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGRA)
+    return img
+
+
+def load_image(image_path):
+    if os.path.isfile(image_path):
+        img = cv2.imread(image_path, cv2.IMREAD_UNCHANGED)
+    else:
+        print(f'[ERROR] {image_path} not found.')
+        sys.exit()
+    return preprocessing_img(img)
 
 
 def hsv_to_rgb(h, s, v):

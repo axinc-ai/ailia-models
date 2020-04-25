@@ -1,5 +1,4 @@
 import sys
-import os
 import time
 import argparse
 
@@ -12,7 +11,7 @@ sys.path.append('../util')
 from utils import check_file_existance  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from webcamera_utils import adjust_frame_size  # noqa: E402C
-from detector_utils import plot_results  # noqa: E402C
+from detector_utils import plot_results, load_image  # noqa: E402C
 
 
 # ======================
@@ -55,23 +54,6 @@ parser.add_argument(
     help='Save path for the output image.'
 )
 args = parser.parse_args()
-
-
-# ======================
-# Utils
-# ======================
-def preprocessing(img):
-    if img.shape[2] == 3:
-        img = cv2.cvtColor(img, cv2.COLOR_BGR2BGRA)
-    elif img.shape[2] == 1:
-        img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGRA)
-    return img
-
-
-def load_image(image_path):
-    if os.path.isfile(image_path):
-        img = cv2.imread(image_path, cv2.IMREAD_UNCHANGED)
-    return preprocessing(img)
 
 
 # ======================
