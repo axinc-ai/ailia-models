@@ -2,7 +2,6 @@ import sys
 import time
 import argparse
 
-import numpy as np
 import cv2
 
 import ailia
@@ -13,6 +12,7 @@ from utils import check_file_existance  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from image_utils import load_image  # noqa: E402
 from webcamera_utils import adjust_frame_size  # noqa: E402C
+from detector_utils import plot_results  # noqa: E402C
 
 
 # ======================
@@ -87,56 +87,6 @@ VOC_CATEGORY = [
 
 
 # ======================
-# Utils
-# ======================
-def hsv_to_rgb(h, s, v):
-    bgr = cv2.cvtColor(
-        np.array([[[h, s, v]]], dtype=np.uint8), cv2.COLOR_HSV2BGR)[0][0]
-    return (int(bgr[0]), int(bgr[1]), int(bgr[2]), 255)
-
-
-def display_result(work, detector, logging):
-    # get result
-    count = detector.get_object_count()
-
-    if logging:
-        print("object_count=" + str(count))
-
-    w = work.shape[1]
-    h = work.shape[0]
-
-    for idx in range(count):
-        # print result
-        obj = detector.get_object(idx)
-        if logging:
-            print("+ idx=" + str(idx))
-            print("  category=" + str(obj.category) +
-                  "[ " + VOC_CATEGORY[obj.category] + " ]")
-            print("  prob=" + str(obj.prob))
-            print("  x=" + str(obj.x))
-            print("  y=" + str(obj.y))
-            print("  w=" + str(obj.w))
-            print("  h=" + str(obj.h))
-        top_left = (int(w*obj.x), int(h*obj.y))
-        bottom_right = (int(w*(obj.x+obj.w)), int(h*(obj.y+obj.h)))
-        text_position = (int(w*obj.x)+4, int(h*(obj.y+obj.h)-8))
-
-        # update image
-        color = hsv_to_rgb(255 * obj.category / 80, 255, 255)
-        cv2.rectangle(work, top_left, bottom_right, color, 4)
-        fontScale = w / 512.0
-        cv2.putText(
-            work,
-            VOC_CATEGORY[obj.category],
-            text_position,
-            cv2.FONT_HERSHEY_SIMPLEX,
-            fontScale,
-            color,
-            1
-        )
-
-
-# ======================
 # Main functions
 # ======================
 def recognize_from_image():
@@ -173,8 +123,8 @@ def recognize_from_image():
         print(f'ailia processing time {end - start} ms')
 
     # postprocessing
-    display_result(org_img, detector, True)
-    cv2.imwrite(args.savepath, org_img)
+    res_img = plot_results(detector, org_img, VOC_CATEGORY)
+    cv2.imwrite(args.savepath, res_img)
     print('Script finished successfully.')
 
 
@@ -213,12 +163,10 @@ def recognize_from_video():
             continue
 
         _, resized_img = adjust_frame_size(frame, IMAGE_HEIGHT, IMAGE_WIDTH)
-
         img = cv2.cvtColor(resized_img, cv2.COLOR_RGB2BGRA)
         detector.compute(img, threshold, iou)
-        display_result(resized_img, detector, False)
-
-        cv2.imshow('frame', resized_img)
+        res_img = plot_results(detector, resized_img, VOC_CATEGORY, False)
+        cv2.imshow('frame', res_img)
 
     capture.release()
     cv2.destroyAllWindows()
