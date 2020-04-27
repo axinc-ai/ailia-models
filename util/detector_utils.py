@@ -51,11 +51,9 @@ def plot_results(detector, img, category, logging=True):
         text_position = (int(w*obj.x)+4, int(h*(obj.y+obj.h)-8))
 
         # update image
-        cv2.rectangle(img, top_left, bottom_right, (0, 0, 255, 255), 4)
-
-        color = hsv_to_rgb(255 * obj.category / 80, 255, 255)
+        color = hsv_to_rgb(256 * obj.category / len(category), 255, 255)
         fontScale = w / 512.0
-        cv2.rectangle(img, top_left, bottom_right, color, int(fontScale))
+        cv2.rectangle(img, top_left, bottom_right, color, 4)
 
         cv2.putText(
             img,
