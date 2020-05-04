@@ -2,7 +2,7 @@
 
 ## Input
 
-![Input](teddy_bear.jpg)
+![Input](teddy_bear_resize.jpg)
 
 Ailia input shape : (1,3,224,224)  
 Range : [-1.0, 1.0]
