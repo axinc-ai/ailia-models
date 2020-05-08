@@ -7,17 +7,32 @@
 Ailia input shape : (1,3,224,224)
 
 ## Output
+- large model
 ```bash
 class_count=3
 + idx=0
   category=409[analog clock ]
-  prob=16.309402465820312
+  prob=10.01405143737793
 + idx=1
   category=892[wall clock ]
-  prob=10.951416015625
+  prob=7.830683708190918
 + idx=2
-  category=816[spindle ]
-  prob=8.520172119140625
+  category=530[digital clock ]
+  prob=3.3934028148651123
+```
+
+- small model
+```bash
+class_count=3
++ idx=0
+  category=409[analog clock ]
+  prob=19.85206413269043
++ idx=1
+  category=892[wall clock ]
+  prob=19.0461368560791
++ idx=2
+  category=826[stopwatch, stop watch ]
+  prob=12.139641761779785
 ```
 
 ## usage
