@@ -29,9 +29,9 @@ print("loading ...");
 #env_id=ailia.ENVIRONMENT_AUTO
 env_id=ailia.get_gpu_environment_id()
 net = ailia.Net(model_path,weight_path,env_id=env_id)
+ar = cv2.imread('ar.png',cv2.IMREAD_UNCHANGED)
 
 print("inferencing ...");
-
 
 ailia_input_width = net.get_input_shape()[3]
 ailia_input_height = net.get_input_shape()[2]
@@ -90,6 +90,12 @@ while True:
         output_img[output_img<0] = 0
         output_img[output_img>255] = 255.      
 
+        ar_width = 512
+        ar_height = 256
+        ar_logo = cv2.resize(ar,(ar_width,ar_height),interpolation=cv2.INTER_AREA)
+        ar_resize = cv2.resize(np.zeros((1, 1, 4), np.uint8), (img_width, img_height))
+        ar_resize[int((img_height-ar_height)/2):int((img_height-ar_height)/2+ar_height),int((img_width-ar_width)/2):int((img_width-ar_width)/2+ar_width),:] = ar_logo
+
         img_in = cv2.resize(frame,(img_width,img_height),interpolation=cv2.INTER_AREA)
         img_in = cv2.cvtColor(img_in, cv2.COLOR_BGR2RGB)
         print("img in : ")
@@ -101,10 +107,21 @@ while True:
         print(img2.shape)
 
         th = 96
-        img2[img2<th] = 0
+        img2[img2<=th] = 0
         img2[img2>th] = 255.      
 
-        img2 = img2 + img_in * 0.5
+        print("ar : ")
+        print(ar_resize.shape)
+
+        for y in range(img_height):
+            for x in range(img_width):
+                if img2[y,x,0]>th or img2[y,x,1]>th or img2[y,x,2]>th:
+                    ar_resize[y,x,3]=0
+                alpha = ar_resize[y,x,3]/255.0
+                img2[y,x,:] = img_in[y,x,:] * (1.0 - alpha) + ar_resize[y,x,0:3] * alpha
+
+        #img2 = img2 + img_in * 0.5 + ar_resize * 0.5
+        #img2 = img_in + ar_resize * 1.0
 
         img2[img2<0] = 0
         img2[img2>255] = 255.      
