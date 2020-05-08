@@ -1,83 +1,188 @@
-import os
-import argparse
-import urllib
+import sys
 import time
+import argparse
 
 import cv2
 import numpy as np
 
-
 import ailia
-from utils import generate_rotated_image, visualize
+from rotnet_utils import generate_rotated_image, visualize
+
+# import original modules
+sys.path.append('../util')
+from utils import check_file_existance  # noqa: E402
+from model_utils import check_and_download_models  # noqa: E402
+from webcamera_utils import adjust_frame_size  # noqa: E402C
 
 
-img_path = 'test.jpg'
-width, height = 224, 224
-
-model_names = ['mnist', 'gsv2']
-model_dict = {
+# ======================
+# Parameters 1
+# ======================
+MODEL_NAMES = ['mnist', 'gsv2']
+MODEL_DICT = {
     'mnist': "rotnet_mnist",
     'gsv2': "rotnet_gsv_2"
 }
+IMAGE_PATH = 'test.jpg'
+SAVE_IMAGE_PATH = 'output.png'
+IMAGE_HEIGHT = 224
+IMAGE_WIDTH = 224
 
 
-# argument
-parser = argparse.ArgumentParser()
+# ======================
+# Arguemnt Parser Config
+# ======================
+parser = argparse.ArgumentParser(
+    description='Image Rotation Correction Model'
+)
 parser.add_argument(
-    '--model', '-m', metavar='MODEL', default='gsv2', choices=model_names,
-    help='choose model : ' + ' | '.join(model_names) + ' (default gsv2)'
+    '-i', '--input', metavar='IMAGE',
+    default=IMAGE_PATH,
+    help='The input image path.'
+)
+parser.add_argument(
+    '-v', '--video', metavar='VIDEO',
+    default=None,
+    help='The input video path. ' +
+         'If the VIDEO argument is set to 0, the webcam input will be used.'
+)
+parser.add_argument(
+    '-s', '--savepath', metavar='SAVE_IMAGE_PATH',
+    default=SAVE_IMAGE_PATH,
+    help='Save path for the output image.'
+)
+parser.add_argument(
+    '--model', '-m', metavar='model',
+    default='gsv2', choices=MODEL_NAMES,
+    help=('model architecture: ' + ' | '.join(MODEL_NAMES) +
+          ' (default: gsv2)')
+)
+parser.add_argument(
+    '--apply_rotate', action='store_true',
+    help='If add this argument, apply random rotation to input image'
 )
 args = parser.parse_args()
 
 
-model_name = model_dict[args.model]
-weight_path = model_name + '.onnx'
-model_path = weight_path + '.prototxt'
+# ======================
+# Parameters 2
+# ======================
+WEIGHT_PATH = MODEL_DICT[args.model] + '.onnx'
+MODEL_PATH = MODEL_DICT[args.model] + '.onnx.prototxt'
+REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/rotnet/'
 
-# downloading
-rmt_ckpt = 'https://storage.googleapis.com/ailia-models/rotnet/'
-if not os.path.exists(model_path):
-    urllib.request.urlretrieve(rmt_ckpt + model_path, model_path)
-if not os.path.exists(weight_path):
-    urllib.request.urlretrieve(rmt_ckpt + weight_path, weight_path)
 
-    
-def main():
-    # create model
+# ======================
+# Main functions
+# ======================
+def recognize_from_image():
+    # prepare input data
+    org_img = cv2.cvtColor(cv2.imread(args.input), cv2.COLOR_BGR2RGB)
+
+    if args.apply_rotate:
+        rotation_angle = np.random.randint(360)
+        rotated_img = generate_rotated_image(
+            org_img,
+            rotation_angle,
+            size=(IMAGE_HEIGHT, IMAGE_WIDTH),
+            crop_center=True,
+            crop_largest_rect=True
+        )
+        input_data = rotated_img.reshape((1, IMAGE_HEIGHT, IMAGE_WIDTH, 3))
+    else:
+        rotation_angle = 0
+        rotated_img = org_img.resize((IMAGE_HEIGHT, IMAGE_WIDTH))
+        input_data = rotated_img.reshape((1, IMAGE_HEIGHT, IMAGE_WIDTH, 3))
+
+    # net initialize
     env_id = ailia.get_gpu_environment_id()
-    print("Environment mode: {} (-1: CPU, 1: GPU)".format(env_id))
-    net = ailia.Net(model_path, weight_path, env_id=env_id)
-
-    # image processing
-    org_img = cv2.imread(img_path)
-    org_img = cv2.cvtColor(org_img, cv2.COLOR_BGR2RGB)
-    
-    # generating input image (rotated image)
-    rotation_angle = np.random.randint(360)
-    rotated_image = generate_rotated_image(
-        org_img,
-        rotation_angle,
-        size=(height, width),
-        crop_center=True,
-        crop_largest_rect=True
-    )
-
-    input_data = rotated_image.reshape((1, 224, 224, 3))
+    print(f'env_id: {env_id}')
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
     net.set_input_shape(input_data.shape)
-    
-    # compute time
-    for i in range(10):
+
+    # compute execution time
+    for i in range(5):
         start = int(round(time.time() * 1000))
-        pred = net.predict(input_data)
+        preds_ailia = net.predict(input_data)
         end = int(round(time.time() * 1000))
-        print(f"ailia processing time {end-start} ms")
-    predicted_angle = np.argmax(pred, axis=1)[0]
-    print(f"predicted angle is {predicted_angle}")
+        print(f'ailia processing time {end - start} ms')
 
-    # visualize result
-    visualize(rotated_image, rotation_angle, predicted_angle, height, width)
-    print('Successfully finished!')
+    # visualize
+    predicted_angle = np.argmax(preds_ailia, axis=1)[0]
+    plt = visualize(rotated_img, rotation_angle, predicted_angle)
+    plt.savefig(args.savepath)
+    
+    print('Script finished successfully.')
 
 
-if __name__ == "__main__":
+def recognize_from_video():
+    # net initialize
+    env_id = ailia.get_gpu_environment_id()
+    print(f'env_id: {env_id}')
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+    net.set_input_shape((1, IMAGE_HEIGHT, IMAGE_WIDTH, 3))
+
+    if args.video == '0':
+        print('[INFO] Webcam mode is activated')
+        capture = cv2.VideoCapture(0)
+        if not capture.isOpened():
+            print("[ERROR] webcamera not found")
+            sys.exit(1)
+    else:
+        if check_file_existance(args.video):
+            capture = cv2.VideoCapture(args.video)
+
+    while(True):
+        ret, frame = capture.read()
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
+        if not ret:
+            continue
+
+        input_image, resized_img = adjust_frame_size(
+            frame, IMAGE_HEIGHT, IMAGE_WIDTH
+        )
+        resized_img = cv2.cvtColor(resized_img, cv2.COLOR_BGR2RGB)
+
+        if args.apply_rotate:
+            rotation_angle = np.random.randint(360)
+            rotated_img = generate_rotated_image(
+                resized_img,
+                rotation_angle,
+                size=(IMAGE_HEIGHT, IMAGE_WIDTH),
+                crop_center=True,
+                crop_largest_rect=True
+            )
+            input_data = rotated_img.reshape((1, IMAGE_HEIGHT, IMAGE_WIDTH, 3))
+        else:
+            rotation_angle = 0
+            rotated_img = resized_img
+            input_data = rotated_img.reshape((1, IMAGE_HEIGHT, IMAGE_WIDTH, 3))
+
+        # inference
+        preds_ailia = net.predict(input_data)
+
+        # visualize
+        predicted_angle = np.argmax(preds_ailia, axis=1)[0]
+        plt = visualize(rotated_img, rotation_angle, predicted_angle)
+        plt.pause(.01)
+
+    capture.release()
+    cv2.destroyAllWindows()
+    print('Script finished successfully.')
+
+
+def main():
+    # model files check and download
+    check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
+
+    if args.video is not None:
+        # video mode
+        recognize_from_video()
+    else:
+        # image mode
+        recognize_from_image()
+
+
+if __name__ == '__main__':
     main()

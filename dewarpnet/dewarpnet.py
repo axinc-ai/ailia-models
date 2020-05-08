@@ -1,37 +1,66 @@
-import cv2
+import sys
 import time
-import urllib.request
-import os
+import argparse
+
+import cv2
 import numpy as np
 
 import ailia
+# import original modules
+sys.path.append('../util')
+from utils import check_file_existance
+from model_utils import check_and_download_models
+from image_utils import load_image
+from webcamera_utils import preprocess_frame
 
 
-img_path = "test.png"
+# ======================
+# PARAMETERS
+# ======================
+BM_WEIGHT_PATH = "bm_model.onnx"
+WC_WEIGHT_PATH = "wc_model.onnx"
+BM_MODEL_PATH = "bm_model.onnx.prototxt"
+WC_MODEL_PATH = "wc_model.onnx.prototxt"
+REMOTE_PATH = "https://storage.googleapis.com/ailia-models/dewarpnet/"
 
-bm_weight_path = "bm_model.onnx"
-wc_weight_path = "wc_model.onnx"
-bm_model_path = bm_weight_path + ".prototxt"
-wc_model_path = wc_weight_path + ".prototxt"
+IMAGE_PATH = 'test.png'
+SAVE_IMAGE_PATH = 'result.png'
 
-
-rmt_ckpt = "https://storage.googleapis.com/ailia-models/dewarpnet/"
-
-print("loading model...")
-
-# BM
-if not os.path.exists(bm_model_path):
-    urllib.request.urlretrieve(rmt_ckpt + bm_model_path, bm_model_path)
-if not os.path.exists(bm_weight_path):
-    urllib.request.urlretrieve(rmt_ckpt + bm_weight_path, bm_weight_path)
-
-# WC
-if not os.path.exists(wc_model_path):
-    urllib.request.urlretrieve(rmt_ckpt + wc_model_path, wc_model_path)
-if not os.path.exists(wc_weight_path):
-    urllib.request.urlretrieve(rmt_ckpt + wc_weight_path, wc_weight_path)
+WC_IMG_HEIGHT = 256
+WC_IMG_WIDTH = 256
+BM_IMG_HEIGHT = 128
+BM_IMG_WIDTH = 128
 
 
+# ======================
+# Arguemnt Parser Config
+# ======================
+parser = argparse.ArgumentParser(
+    description='DewarpNet is a model for document image unwarping.'
+)
+parser.add_argument(
+    '-i', '--input', metavar='IMAGEFILE_PATH',
+    default=IMAGE_PATH, 
+    help='The input image path.'
+)
+parser.add_argument(
+    '-v', '--video', metavar='VIDEO',
+    default=None,
+    help='The input video path. ' +\
+         'If the VIDEO argument is set to 0, the webcam input will be used.'
+
+)
+parser.add_argument(
+    '-s', '--savepath', metavar='SAVE_IMAGE_PATH',
+    default=SAVE_IMAGE_PATH,
+    help='Save path for the output image.'
+)
+args = parser.parse_args()
+
+
+# ======================
+# Utils
+# ======================
 def grid_sample(img, grid):
     height, width, c = img.shape
     output = np.zeros_like(img)
@@ -47,49 +76,114 @@ def grid_sample(img, grid):
 
 
 def unwarp(img, bm):
-    w,h=img.shape[0],img.shape[1]
+    w, h = img.shape[0], img.shape[1]
     bm = bm.transpose(1, 2, 0)
-    bm0=cv2.blur(bm[:,:,0],(3,3))
-    bm1=cv2.blur(bm[:,:,1],(3,3))
-    bm0=cv2.resize(bm0,(h,w))
-    bm1=cv2.resize(bm1,(h,w))
-    bm=np.stack([bm0,bm1],axis=-1)
+    bm0 = cv2.blur(bm[:, :, 0], (3, 3))
+    bm1 = cv2.blur(bm[:, :, 1], (3, 3))
+    bm0 = cv2.resize(bm0, (h, w))
+    bm1 = cv2.resize(bm1, (h, w))
+    bm = np.stack([bm0, bm1], axis=-1)
     img = img.astype(float) / 255.0
     res = grid_sample(img, bm)
     return res
 
 
-wc_img_size = (256, 256)
-bm_img_size = (128, 128)
+# ======================
+# Main functions
+# ======================
+def unwarp_from_image():
+    org_img = cv2.imread(args.input)
+    img = load_image(
+        args.input,
+        (WC_IMG_HEIGHT, WC_IMG_WIDTH),
+        normalize_type='255',
+        gen_input_ailia=True
+    )
 
-img_org = cv2.imread(img_path)
-img = cv2.resize(img_org, wc_img_size)
-img = img[:, :, ::-1] / 255.0
-img = img.transpose(2, 0, 1)
-img = np.expand_dims(img, 0)
+    # net initialize
+    env_id = ailia.get_gpu_environment_id()
+    print(f'env_id: {env_id}')
+    bm_net = ailia.Net(BM_MODEL_PATH, BM_WEIGHT_PATH, env_id=env_id)
+    wc_net = ailia.Net(WC_MODEL_PATH, WC_WEIGHT_PATH, env_id=env_id)
 
-
-# net initialize
-env_id = ailia.get_gpu_environment_id()
-print("Environment mode: {} (-1: CPU, 1: GPU)".format(env_id))
-
-bm_net = ailia.Net(bm_model_path, bm_weight_path, env_id=env_id)
-wc_net = ailia.Net(wc_model_path, wc_weight_path, env_id=env_id)
-
-# compute time
-for i in range(1):
-    start = int(round(time.time() * 1000))
+    # compute exectuion time
+    for i in range(5):
+        start = int(round(time.time() * 1000))
     
-    wc_output = wc_net.predict(img)[0]
-    pred_wc = np.clip(wc_output, 0, 1.0).transpose(1, 2, 0)
-    bm_input = cv2.resize(pred_wc, bm_img_size).transpose(2, 0, 1)
-    bm_input = np.expand_dims(bm_input, 0)
-    outputs_bm = bm_net.predict(bm_input)[0]
-    uwpred = unwarp(img_org, outputs_bm)  # This is not on GPU!
+        wc_output = wc_net.predict(img)[0]
+        pred_wc = np.clip(wc_output, 0, 1.0).transpose(1, 2, 0)
+        bm_input = cv2.resize(
+            pred_wc, (BM_IMG_WIDTH, BM_IMG_HEIGHT)
+        ).transpose(2, 0, 1)
+        bm_input = np.expand_dims(bm_input, 0)
+        outputs_bm = bm_net.predict(bm_input)[0]
+        uwpred = unwarp(org_img, outputs_bm)  # This is not on GPU!
     
-    end = int(round(time.time() * 1000))
-    print("ailia processing time {} ms".format(end-start))
+        end = int(round(time.time() * 1000))
+        print("ailia processing time {} ms".format(end-start))
 
-cv2.imwrite('output.png', uwpred * 255)
+    cv2.imwrite(args.savepath, uwpred * 255)
+    print('Script finished successfully.')
+
+
+def unwarp_from_video():
+    # net initialize
+    env_id = ailia.get_gpu_environment_id()
+    print(f'env_id: {env_id}')
+    bm_net = ailia.Net(BM_MODEL_PATH, BM_WEIGHT_PATH, env_id=env_id)
+    wc_net = ailia.Net(WC_MODEL_PATH, WC_WEIGHT_PATH, env_id=env_id)
+
+    if args.video == '0':
+        print('[INFO] Webcam mode is activated')
+        capture = cv2.VideoCapture(0)
+        if not capture.isOpened():
+            print("[ERROR] webcamera not found")
+            sys.exit(1)
+    else:
+        if check_file_existance(args.video):
+            capture = cv2.VideoCapture(args.video)        
     
-print('Successfully finished !')
+    while(True):
+        ret, frame = capture.read()
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
+        if not ret:
+            continue
+
+        org_image, input_data = preprocess_frame(
+            frame, WC_IMG_HEIGHT, WC_IMG_WIDTH, normalize_type='255'
+        )
+        
+        # inference
+        wc_output = wc_net.predict(input_data)[0]
+        pred_wc = np.clip(wc_output, 0, 1.0).transpose(1, 2, 0)
+        bm_input = cv2.resize(
+            pred_wc, (BM_IMG_WIDTH, BM_IMG_HEIGHT)
+        ).transpose(2, 0, 1)
+        bm_input = np.expand_dims(bm_input, 0)
+        outputs_bm = bm_net.predict(bm_input)[0]
+        uwpred = unwarp(org_image, outputs_bm)  # This is not on GPU!
+
+        cv2.imshow('frame', uwpred)
+
+    capture.release()
+    cv2.destroyAllWindows()
+    print('Script finished successfully.')
+
+
+def main():
+    # model files check and download
+    check_and_download_models(BM_WEIGHT_PATH, BM_MODEL_PATH, REMOTE_PATH)
+    check_and_download_models(WC_WEIGHT_PATH, WC_MODEL_PATH, REMOTE_PATH)
+
+    if args.video is not None:
+        # video mode
+        unwarp_from_video()
+    else:
+        # image mode
+        unwarp_from_image()
+
+
+if __name__ == '__main__':
+    main()
+    

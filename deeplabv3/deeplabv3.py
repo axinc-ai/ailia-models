@@ -1,87 +1,217 @@
-import numpy as np
 import time
-import os
-import cv2
-import urllib.request
 import sys
+import argparse
 
-from PIL import Image
+import cv2
+import numpy as np
+from matplotlib import pyplot as plt
+from matplotlib import gridspec
 
 import ailia
+from deeplab_utils import *
 
-OPT_MODEL=True
-if OPT_MODEL:
-    model_path = "deeplabv3.opt.onnx.prototxt"
-    weight_path = "deeplabv3.opt.onnx"
-else:
-    model_path = "deeplabv3.onnx.prototxt"
-    weight_path = "deeplabv3.onnx"
+# import original modules
+sys.path.append('../util')
+from utils import check_file_existance
+from model_utils import check_and_download_models
+from image_utils import load_image, get_image_shape
+from webcamera_utils import preprocess_frame
 
-print("downloading ...");
 
-if not os.path.exists(model_path):
-    urllib.request.urlretrieve("https://storage.googleapis.com/ailia-models/deeplabv3/"+model_path,model_path)
-if not os.path.exists(weight_path):
-    urllib.request.urlretrieve("https://storage.googleapis.com/ailia-models/deeplabv3/"+weight_path,weight_path)
-
-print("loading ...");
-
-#env_id=ailia.ENVIRONMENT_AUTO
-env_id=ailia.get_gpu_environment_id()
-net = ailia.Net(model_path,weight_path,env_id=env_id)
-
-print("inferencing ...");
-
-file_name = './couple.jpg'
-img = cv2.imread(file_name)
-
-img_width = img.shape[1]
-img_height = img.shape[0]
-
-ailia_input_width = net.get_input_shape()[3]
-ailia_input_height = net.get_input_shape()[2]
-
-img = cv2.resize(img,(ailia_input_width,ailia_input_height),interpolation=cv2.INTER_AREA)
-img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-
-img.shape = (1,) + img.shape
-img = img.transpose((0, 3, 1, 2))
-img = np.array(img)
-img = img.astype(np.float32)
-img = img / 127.0 - 1.0
-
-output_img = None
+# ======================
+# PARAMETERS
+# ======================
+IMAGE_PATH = 'couple.jpg'
+SAVE_IMAGE_PATH = 'output.png'
 
 LABEL_NAMES = np.asarray([
     'background', 'aeroplane', 'bicycle', 'bird', 'boat', 'bottle', 'bus',
     'car', 'cat', 'chair', 'cow', 'diningtable', 'dog', 'horse', 'motorbike',
     'person', 'pottedplant', 'sheep', 'sofa', 'train', 'tv'
 ])
+CLASS_NUM = 21
+FULL_LABEL_MAP = np.arange(len(LABEL_NAMES)).reshape(len(LABEL_NAMES), 1)
+FULL_COLOR_MAP = label_to_color_image(FULL_LABEL_MAP)
+assert CLASS_NUM == len(LABEL_NAMES), 'The number of labels is incorrect.'
 
-cnt = 1
-for i in range(cnt):
-	start=int(round(time.time() * 1000))
-	output_img = net.predict(img)
-	end=int(round(time.time() * 1000))
-	print("## ailia processing time , "+str(i)+" , "+str(end-start)+" ms")
 
-output_img = output_img[:,15:18,:,:]
-output_img = output_img.transpose((0,2,3,1))
+# ======================
+# Arguemnt Parser Config
+# ======================
+parser = argparse.ArgumentParser(
+    description='DeepLab is a state-of-art deep learning model ' +\
+    'for semantic image segmentation.'
+)
+parser.add_argument(
+    '-i', '--input', metavar='IMAGEFILE_PATH',
+    default=IMAGE_PATH,
+    help='The input image path.'
+)
+parser.add_argument(
+    '-v', '--video', metavar='VIDEO',
+    default=None,
+    help='The input video path. ' +\
+         'If the VIDEO argument is set to 0, the webcam input will be used.'
+)
+parser.add_argument(
+    '-n', '--normal',
+    action='store_true',
+    help='By default, the optimized model is used, but with this option, ' +\
+    'you can switch to the normal (not optimized) model'
+)
+parser.add_argument(
+    '-s', '--savepath', metavar='SAVE_IMAGE_PATH',
+    default=SAVE_IMAGE_PATH,
+    help='Save path for the output image.'
+)
+args = parser.parse_args()
 
-shape = output_img.shape
-output_img = output_img.reshape((shape[1],shape[2],shape[3]))
-output_img = output_img*255. / 21
-output_img = output_img.astype(np.int8)
 
-img2 = Image.fromarray(output_img, 'RGB')
-img2 = img2.resize((img_width, img_height), Image.BICUBIC)
+# ======================
+# MODEL PARAMETERS
+# ======================
+if args.normal:
+    MODEL_PATH = 'deeplabv3.opt.onnx.prototxt'
+    WEIGHT_PATH = 'deeplabv3.opt.onnx'
+else:
+    MODEL_PATH = 'deeplabv3.onnx.prototxt'
+    WEIGHT_PATH = 'deeplabv3.onnx'
+REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/deeplabv3/'
 
-numpyArray = np.array(img2)
-th = 160
-numpyArray[numpyArray<th] = 0
-numpyArray[numpyArray>th] = 255.      
-img2 = Image.fromarray(numpyArray, 'RGB')
 
-img2.save('output.png')
+# ======================
+# Main functions
+# ======================
+def segment_from_image():
+    # net initialize
+    env_id = ailia.get_gpu_environment_id()
+    print(f'env_id: {env_id}')
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
 
-#print(net.get_summary())
+    ailia_input_w = net.get_input_shape()[3]
+    ailia_input_h = net.get_input_shape()[2]
+    input_shape = [ailia_input_h, ailia_input_w]
+
+    # prepare input data
+    img = load_image(
+        args.input, input_shape, normalize_type='127.5', gen_input_ailia=True
+    )
+
+    # compute execution time
+    for i in range(5):
+        start = int(round(time.time() * 1000))
+        preds_ailia = net.predict(img)[0]
+        end = int(round(time.time() * 1000))
+        print(f'ailia processing time {end - start} ms')        
+
+    # postprocessing
+    seg_map = np.argmax(preds_ailia.transpose(1, 2, 0), axis=2)
+    seg_image = label_to_color_image(seg_map).astype(np.uint8)
+
+    # save just segmented image (simple)
+    # seg_image = cv2.cvtColor(seg_image, cv2.COLOR_RGB2BGR)
+    # cv2.imwrite('seg_test.png', seg_image)  
+
+    # save org_img, segmentation-map, segmentation-overlay
+    org_img = cv2.cvtColor(cv2.imread(args.input), cv2.COLOR_BGR2RGB)
+    org_img = cv2.resize(org_img, (seg_image.shape[1], seg_image.shape[0]))
+
+    plt.figure(figsize=(15, 5))
+    grid_spec = gridspec.GridSpec(1, 4, width_ratios=[6, 6, 6, 1])
+
+    plt.subplot(grid_spec[0])
+    plt.imshow(org_img)
+    plt.axis('off')
+    plt.title('input image')
+
+    plt.subplot(grid_spec[1])
+    plt.imshow(seg_image)
+    plt.axis('off')
+    plt.title('segmentation map')
+
+    plt.subplot(grid_spec[2])
+    plt.imshow(org_img)
+    plt.imshow(seg_image, alpha=0.7)
+    plt.axis('off')
+    plt.title('segmentation overlay')
+
+    unique_labels = np.unique(seg_map)
+    ax = plt.subplot(grid_spec[3])
+    plt.imshow(
+        FULL_COLOR_MAP[unique_labels].astype(np.uint8), interpolation='nearest'
+    )
+    ax.yaxis.tick_right()
+    plt.yticks(range(len(unique_labels)), LABEL_NAMES[unique_labels])
+    plt.xticks([], [])
+    ax.tick_params(width=0.0)
+    plt.grid('off')
+    plt.savefig(args.savepath)
+
+
+def segment_from_video():
+    # net initialize
+    env_id = ailia.get_gpu_environment_id()
+    print(f'env_id: {env_id}')
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+
+    ailia_input_w = net.get_input_shape()[3]
+    ailia_input_h = net.get_input_shape()[2]
+
+    if args.video == '0':
+        print('[INFO] Webcam mode is activated')
+        capture = cv2.VideoCapture(0)
+        if not capture.isOpened():
+            print("[ERROR] webcamera not found")
+            sys.exit(1)
+    else:
+        if check_file_existance(args.video):
+            capture = cv2.VideoCapture(args.video)
+    
+    while(True):
+        ret, frame = capture.read()
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
+        if not ret:
+            continue
+
+        input_image, input_data = preprocess_frame(
+            frame, ailia_input_h, ailia_input_w, normalize_type='127.5'
+        )
+        
+        # inference
+        input_blobs = net.get_input_blob_list()
+        net.set_input_blob_data(input_data, input_blobs[0])
+        net.update()
+        preds_ailia = np.array(net.get_results())[0, 0]  # TODO why?
+        
+        # postprocessing
+        seg_map = np.argmax(preds_ailia.transpose(1, 2, 0), axis=2)
+        seg_image = label_to_color_image(seg_map).astype(np.uint8)
+
+        # showing the segmented image (simple)
+        seg_image = cv2.cvtColor(seg_image, cv2.COLOR_RGB2BGR)
+        seg_image = cv2.resize(
+            seg_image, (input_image.shape[1], input_image.shape[0])
+        )
+
+        cv2.imshow('frame', seg_image)
+
+    capture.release()
+    cv2.destroyAllWindows()
+    print('Script finished successfully.')
+
+
+def main():
+    # model files check and download
+    check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
+
+    if args.video is not None:
+        # video mode
+        segment_from_video()
+    else:
+        # image mode
+        segment_from_image()
+
+
+if __name__ == '__main__':
+    main()

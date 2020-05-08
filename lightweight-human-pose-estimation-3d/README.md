@@ -4,7 +4,8 @@
 
 ![input_image](input.png)
 
-Shape(1, 3,	256, 448) Range:[-1, 1]
+Ailia input shape(1, 3,	256, 448)  
+Range:[-1, 1]
 
 ### output
 
@@ -13,25 +14,27 @@ Shape(1, 3,	256, 448) Range:[-1, 1]
 ![output_3d](Canvas3D_0.png)
 
 ### usage
+Automatically downloads the onnx and prototxt files on the first run.
+It is necessary to be connected to the Internet while downloading.
 
-For images:
+For the sample image,
 ``` bash
-python3 lightweight-human-pose-estimation-3d.py --images input.png
+$ python3 lightweight-human-pose-estimation-3d.py
 ```
-argument `--rotate3d` to activate 3d-canvas-rotation-mode
 
-For video:
+Argument `--rotate3d` to activate 3d-canvas-rotation-mode.  
+
+If you want to specify the input image, put the image path after the `--input` option.  
+You can use `--savepath` option to change the name of the output file to save.
 ```bash
-python3 lightweight-human-pose-estimation-3d.py --video <VIDEO FILE>
+$ python3 lightweight-human-pose-estimation-3d.py --input IMAGE_PATH --savepath SAVE_IMAGE_PATH
 ```
 
-In order to use web-camera,
+By adding the `--video` option, you can input the video.   
+If you pass `0` as an argument to VIDEO_PATH, you can use the webcam input instead of the video file.
 ```bash
-python3 lightweight-human-pose-estimation-3d.py --video 0
+$ python3 lightweight-human-pose-estimation-3d.py --video VIDEO_PATH
 ```
-(try -1 or 1 if 0 does not work, it may depend on your system)
-
-
 
 
 ### Reference

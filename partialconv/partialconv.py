@@ -1,72 +1,162 @@
+import sys
 import time
-import cv2
-import os
-import urllib.request
-import numpy as np
 import argparse
 
+import cv2
+
 import ailia
+import partialconv_label
+
+# import original modules
+sys.path.append('../util')
+from utils import check_file_existance  # noqa: E402
+from model_utils import check_and_download_models  # noqa: E402
+from image_utils import load_image  # noqa: E402
+from webcamera_utils import preprocess_frame  # noqa: E402C
 
 
-model_names = ['resnet50', 'vgg16_bn', 'pdresnet50', 'pdresnet101', 'pdresnet152']
-img_name = "test_5735.JPEG"
+# ======================
+# Parameters 1
+# ======================
+MODEL_NAMES = [
+    'resnet50', 'vgg16_bn', 'pdresnet50', 'pdresnet101', 'pdresnet152'
+]
+IMAGE_PATH = 'test_5735.JPEG'
+IMAGE_HEIGHT = 224
+IMAGE_WIDTH = 224
 
-parser = argparse.ArgumentParser()
-parser.add_argument('--arch', '-a', metavar='ARCH', default='pdresnet152', choices=model_names,
-                    help='model architecture: ' + ' | '.join(model_names) + ' (default: pdresnet152)')
+MAX_CLASS_COUNT = 5
+SLEEP_TIME = 3
+
+# ======================
+# Arguemnt Parser Config
+# ======================
+parser = argparse.ArgumentParser(
+    description='ImageNet Classification Model Using Partial CNN '
+)
+parser.add_argument(
+    '-i', '--input', metavar='IMAGE',
+    default=IMAGE_PATH,
+    help='The input image path.'
+)
+parser.add_argument(
+    '-v', '--video', metavar='VIDEO',
+    default=None,
+    help='The input video path. ' +
+         'If the VIDEO argument is set to 0, the webcam input will be used.'
+)
+parser.add_argument(
+    '--arch', '-a', metavar='ARCH',
+    default='pdresnet101', choices=MODEL_NAMES,
+    help=('model architecture: ' + ' | '.join(MODEL_NAMES) +
+          ' (default: pdresnet101)')
+)
 args = parser.parse_args()
-model_name = args.arch
 
-# label of 1000 classes
-LABEL = {}
-with open("label.txt") as f:
-    for line in f:
-        (key, val) = line.split(':')
-        LABEL[int(key)] = val
 
-weight_path = model_name + ".onnx"
-model_path = weight_path + ".prototxt"
+# ======================
+# Parameters 2
+# ======================
+WEIGHT_PATH = args.arch + '.onnx'
+MODEL_PATH = args.arch + '.onnx.prototxt'
+REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/partialconv/'
 
-if not os.path.exists(model_path):
-    urllib.request.urlretrieve("https://storage.googleapis.com/ailia-models/partialconv/" + model_path, model_path)
-if not os.path.exists(weight_path):
-    urllib.request.urlretrieve("https://storage.googleapis.com/ailia-models/partialconv/" + weight_path, weight_path)
 
-print(weight_path)
+# ======================
+# Utils
+# ======================
+def print_results(preds_ailia):
+    preds_ailia = preds_ailia[0]
+    top_scores = preds_ailia.argsort()[-1 * MAX_CLASS_COUNT:][::-1]
 
-mean = [0.485, 0.456, 0.406]  # mean of ImageNet dataset
-std = [0.229, 0.224, 0.225]  # std of ImageNet dataset
+    print('==============================================================')
+    print(f'class_count={MAX_CLASS_COUNT}')
+    for idx in range(MAX_CLASS_COUNT):
+        print(f'+ idx={idx}')
+        print(f'  category={top_scores[idx]}['
+              f'{partialconv_label.imagenet_category[top_scores[idx]]} ]')
+        print(f'  prob={preds_ailia[top_scores[idx]]}')
 
-img = cv2.imread(img_name)
 
-"""
-======================================================================
- Here is a special image preprocessing for imagenet dataset 
-======================================================================
- """
-img = cv2.resize(img, (256, 256))  # resize image
-img = np.array(img[16:240, 16:240], dtype='float64') / 255  # center clop & normalize between 0 and 1
-for i in range(3):  # normalize image
-    img[:, :, i] = (img[:, :, i] - mean[i]) / std[i]
-"""
-======================================================================
- Until Here
-======================================================================
-"""
+# ======================
+# Main functions
+# ======================
+def recognize_from_image():
+    # prepare input data
+    input_data = load_image(
+        args.input,
+        (IMAGE_HEIGHT, IMAGE_WIDTH),
+        normalize_type='ImageNet',
+        gen_input_ailia=True
+    )
 
-img = np.expand_dims(np.rollaxis(img, 2, 0), axis=0)  # [x, y, channel] --> [1, channel, x, y]
+    # net initialize
+    env_id = ailia.get_gpu_environment_id()
+    print(f'env_id: {env_id}')
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
 
-# net initialize
-env_id = ailia.get_gpu_environment_id()
-net = ailia.Net(model_path, weight_path, env_id=env_id)
-# net.set_input_shape((1, 3, 224, 224))
-print(net.get_summary())
+    # compute execution time
+    for i in range(5):
+        start = int(round(time.time() * 1000))
+        preds_ailia = net.predict(input_data)
+        end = int(round(time.time() * 1000))
+        print(f'ailia processing time {end - start} ms')
 
-# compute time
-for i in range(10):
-    start = int(round(time.time() * 1000))
-    preds_ailia = net.predict(img)[0]
-    end = int(round(time.time() * 1000))
-    print("ailia processing time {} ms".format(end-start))
+    # postprocessing
+    print_results(preds_ailia)
+    print('Script finished successfully.')
 
-print("The predicted label is " + LABEL[preds_ailia.argmax()])
+
+def recognize_from_video():
+    # net initialize
+    env_id = ailia.get_gpu_environment_id()
+    print(f'env_id: {env_id}')
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+
+    if args.video == '0':
+        print('[INFO] Webcam mode is activated')
+        capture = cv2.VideoCapture(0)
+        if not capture.isOpened():
+            print("[ERROR] webcamera not found")
+            sys.exit(1)
+    else:
+        if check_file_existance(args.video):
+            capture = cv2.VideoCapture(args.video)
+
+    while(True):
+        ret, frame = capture.read()
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
+        if not ret:
+            continue
+
+        input_image, input_data = preprocess_frame(
+            frame, IMAGE_HEIGHT, IMAGE_WIDTH, normalize_type='ImageNet'
+        )
+
+        # Inference
+        preds_ailia = net.predict(input_data)
+
+        print_results(preds_ailia)
+        cv2.imshow('frame', input_image)
+        time.sleep(SLEEP_TIME)
+
+    capture.release()
+    cv2.destroyAllWindows()
+    print('Script finished successfully.')
+
+
+def main():
+    # model files check and download
+    check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
+
+    if args.video is not None:
+        # video mode
+        recognize_from_video()
+    else:
+        # image mode
+        recognize_from_image()
+
+
+if __name__ == '__main__':
+    main()
