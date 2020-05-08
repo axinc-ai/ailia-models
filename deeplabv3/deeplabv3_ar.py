@@ -51,7 +51,37 @@ cap = cv2.VideoCapture(file_path)
 if not cap.isOpened():
     sys.exit()
 
+def shear_X(image, shear):
+    h, w = image.shape[:2]
+    src = np.array([[0.0, 0.0],[0.0, 1.0],[1.0, 0.0]], np.float32)
+    dest = src.copy()
+    dest[:,0] += (shear / h * (h - src[:,1])).astype(np.float32)
+    #affine = cv2.getAffineTransform(src, dest)
+
+    a = 0.3
+    pts1 = np.float32([[0,0],[w,0],[w,h],[0,h]])
+    pts2 = np.float32([[w*(a),0],[w*(1.0-a),0],[w,h],[0,h]])
+    affine = cv2.getPerspectiveTransform(pts1,pts2)
+
+    #affine = cv2.getRotationMatrix2D((w / 2, h / 2), 0, 1.0)
+    #affine = affine * share
+    
+    return cv2.warpPerspective(image,affine,(w,h))
+    #return cv2.warpAffine(image, affine, (w, h))
+
+print(ar.shape)
+ar = shear_X(ar, -20)
+print(ar.shape)
+
+frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+fps = int(cap.get(cv2.CAP_PROP_FPS))
+idx = 0#fps*32*60
+
 while True:
+    cap.set(cv2.CAP_PROP_POS_FRAMES, idx)
+    current_pos = str(int(cap.get(cv2.CAP_PROP_POS_FRAMES)))
+    print(idx,current_pos)
+    idx = idx + fps
     ret, frame = cap.read()
     if ret:
         print("input frame : ")
@@ -63,7 +93,7 @@ while True:
         img_height=frame.shape[0]
 
         img = cv2.resize(frame,(ailia_input_width,ailia_input_height),interpolation=cv2.INTER_AREA)
-        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        #img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
         img.shape = (1,) + img.shape
         img = img.transpose((0, 3, 1, 2))
@@ -73,6 +103,7 @@ while True:
 
         start=int(round(time.time() * 1000))
         output_img = net.predict(img)
+        #output_img=np.zeros((1,21,64,64),dtype=np.float32)
         end=int(round(time.time() * 1000))
         print("## ailia processing time , "+str(end-start)+" ms")
 
@@ -90,14 +121,16 @@ while True:
         output_img[output_img<0] = 0
         output_img[output_img>255] = 255.      
 
-        ar_width = 512
-        ar_height = 256
+        ar_width = 700
+        ar_height = int(ar_width/2)
+        px = 50
+        py = 100
         ar_logo = cv2.resize(ar,(ar_width,ar_height),interpolation=cv2.INTER_AREA)
         ar_resize = cv2.resize(np.zeros((1, 1, 4), np.uint8), (img_width, img_height))
-        ar_resize[int((img_height-ar_height)/2):int((img_height-ar_height)/2+ar_height),int((img_width-ar_width)/2):int((img_width-ar_width)/2+ar_width),:] = ar_logo
+        ar_resize[int((img_height-ar_height)/2)+py:int((img_height-ar_height)/2+ar_height)+py,int((img_width-ar_width)/2)+px:int((img_width-ar_width)/2+ar_width)+px,:] = ar_logo
 
         img_in = cv2.resize(frame,(img_width,img_height),interpolation=cv2.INTER_AREA)
-        img_in = cv2.cvtColor(img_in, cv2.COLOR_BGR2RGB)
+        #img_in = cv2.cvtColor(img_in, cv2.COLOR_BGR2RGB)
         print("img in : ")
         print(img_in.shape)
 
@@ -113,15 +146,21 @@ while True:
         print("ar : ")
         print(ar_resize.shape)
 
-        for y in range(img_height):
-            for x in range(img_width):
-                if img2[y,x,0]>th or img2[y,x,1]>th or img2[y,x,2]>th:
-                    ar_resize[y,x,3]=0
-                alpha = ar_resize[y,x,3]/255.0
-                img2[y,x,:] = img_in[y,x,:] * (1.0 - alpha) + ar_resize[y,x,0:3] * alpha
-
-        #img2 = img2 + img_in * 0.5 + ar_resize * 0.5
-        #img2 = img_in + ar_resize * 1.0
+        AR_MODE = False
+        if AR_MODE:
+            ar_resize[img2[:,:,0]>th]=0
+            ar_resize[img2[:,:,1]>th]=0
+            ar_resize[img2[:,:,2]>th]=0
+            mask=ar_resize[:,:,3]/512.0
+            mask=mask.reshape((img_width,img_height,1))
+            a=ar_resize[:,:,0:3] * mask
+            b=img_in * (1.0 - mask)
+            img2=a+b
+        else:
+            img2 = img2 + img_in * 0.5# + ar_resize * 0.5
+            #img2 = img_in + ar_resize * 1.0
+        
+        #img2 = img_in
 
         img2[img2<0] = 0
         img2[img2>255] = 255.      
