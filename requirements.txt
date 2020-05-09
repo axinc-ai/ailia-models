@@ -1,0 +1,24 @@
+-i https://pypi.org/simple
+certifi==2020.4.5.1
+chardet==3.0.4
+click==7.1.2
+cycler==0.10.0
+filelock==3.0.12
+idna==2.9
+joblib==0.14.1
+kiwisolver==1.2.0
+matplotlib==3.2.1
+numpy==1.18.4
+opencv-python==4.2.0.34
+pillow==7.1.2
+pyparsing==2.4.7
+python-dateutil==2.8.1
+regex==2020.5.7
+requests==2.23.0
+sacremoses==0.0.43
+sentencepiece==0.1.86
+six==1.14.0
+tokenizers==0.7.0
+tqdm==4.46.0
+transformers==2.9.0
+urllib3==1.25.9
