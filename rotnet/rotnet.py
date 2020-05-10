@@ -91,7 +91,7 @@ def recognize_from_image():
         input_data = rotated_img.reshape((1, IMAGE_HEIGHT, IMAGE_WIDTH, 3))
     else:
         rotation_angle = 0
-        rotated_img = org_img.resize((IMAGE_HEIGHT, IMAGE_WIDTH))
+        rotated_img = cv2.resize(org_img, (IMAGE_HEIGHT, IMAGE_WIDTH))
         input_data = rotated_img.reshape((1, IMAGE_HEIGHT, IMAGE_WIDTH, 3))
 
     # net initialize
