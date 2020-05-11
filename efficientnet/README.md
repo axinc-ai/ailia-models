@@ -59,3 +59,9 @@ ONNX opset = 10
 ## Framework
 
 Pytorch 1.1.0
+
+## Netron
+
+[efficientnet-b0.onnx.prototxt](https://lutzroeder.github.io/netron/?url=https://storage.googleapis.com/ailia-models/efficientnet/efficientnet-b0.onnx.prototxt)
+
+[efficientnet-b7.onnx.prototxt](https://lutzroeder.github.io/netron/?url=https://storage.googleapis.com/ailia-models/efficientnet/efficientnet-b7.onnx.prototxt)
