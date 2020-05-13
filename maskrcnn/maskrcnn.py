@@ -87,13 +87,21 @@ def preprocess(image):
 
 
 def display_objdetect_image(
-        image, boxes, labels, scores, masks, score_threshold=0.7
+        image, boxes, labels, scores, masks, score_threshold=0.7, savepath=None
 ):
+    """
+    Display or Save result
+    
+    Parameters
+    ----------
+    savepath: str
+        When savepath is not None, save output image instead of displaying
+    """
     # Resize boxes
     ratio = 800.0 / min(image.size[0], image.size[1])
     boxes /= ratio
 
-    _, ax = plt.subplots(1, figsize=(12, 9))
+    fig, ax = plt.subplots(1, figsize=(12, 9), tight_layout=True)
     image = np.array(image)
 
     for mask, box, label, score in zip(masks, boxes, labels, scores):
@@ -137,15 +145,18 @@ def display_objdetect_image(
             facecolor='none'
         )
         ax.annotate(
-            CLASSES[label] + ':' + str(np.round(score, 2)),
+            CLASSES[int(label)] + ':' + str(np.round(score, 2)),
             (box[0], box[1]),
             color='w',
             fontsize=12
         )
         ax.add_patch(rect)
 
-    ax.imshow(image)
-    plt.show()
+    if savepath is not None:
+        ax.imshow(image)
+        fig.savefig(savepath, dpi=150)
+    else:
+        plt.imshow(image)
 
 
 # ======================
@@ -163,13 +174,9 @@ def recognize_from_image():
     net.set_input_shape(input_data.shape)
 
     # compute execution time
-    for i in range(5):
+    for i in range(1):
         start = int(round(time.time() * 1000))
 
-        # 1. preditct
-        # preds_ailia = net.predict(input_data)
-
-        # 2. blob
         input_blobs = net.get_input_blob_list()
         net.set_input_blob_data(input_data, input_blobs[0])
         net.update()
@@ -179,7 +186,9 @@ def recognize_from_image():
         print(f'ailia processing time {end - start} ms')
 
     # postprocessing
-    display_objdetect_image(image, boxes, labels, scores, masks)
+    display_objdetect_image(
+        image, boxes, labels, scores, masks, savepath=args.savepath
+    )
     print('Script finished successfully.')
 
 
@@ -206,24 +215,17 @@ def recognize_from_video():
         if not ret:
             continue
 
-        # input_image, input_data = preprocess_frame(
-        #     frame, IMAGE_HEIGHT, IMAGE_WIDTH, normalize_type='127.5'
-        # )
-        # # ???
+        frame = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+        input_data = preprocess(frame)
+        net.set_input_shape(input_data.shape)
 
-        # # inference
-        # # 1.
-        # preds_ailia = net.predict(input_data)
+        input_blobs = net.get_input_blob_list()
+        net.set_input_blob_data(input_data, input_blobs[0])
+        net.update()
+        boxes, labels, scores, masks = net.get_results()
 
-        # # 2.
-        # input_blobs = net.get_input_blob_list()
-        # net.set_input_blob_data(input_data, input_blobs[0])
-        # net.update()
-        # preds_ailia = net.get_results()
-
-        # # postprocessing
-        # # ???
-        # cv2.imshow('frame', input_image)
+        display_objdetect_image(frame, boxes, labels, scores, masks)
+        plt.pause(.01)
 
     capture.release()
     cv2.destroyAllWindows()
