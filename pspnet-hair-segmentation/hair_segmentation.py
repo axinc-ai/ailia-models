@@ -20,7 +20,7 @@ from utils import check_file_existance  # noqa: E402
 WEIGHT_PATH = 'pspnet-hair-segmentation.onnx'
 MODEL_PATH = WEIGHT_PATH + '.prototxt'
 REMOTE_PATH =\
-    'https://storage.googleapis.com/ailia-models/pspnet-hair_segmentation/'
+    'https://storage.googleapis.com/ailia-models/pspnet-hair-segmentation/'
 
 IMAGE_PATH = 'test.jpg'
 SAVE_IMAGE_PATH = 'output.png'
