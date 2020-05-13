@@ -4,48 +4,39 @@
 
 ![Input](balloon.png)
 
-Shape : (1, 3, 240, 320)
-Range : [-0.5, 0.5]
+Ailia input shape: (1, 3, 240, 320)  
+Range: [-0.5, 0.5]
 
 ## Output
 
 ![Output](output.png)
 
-- Confidence : (1, 19, 30, 40)
-- Range : [0, 1.0]
+- Confidence: (1, 19, 30, 40)
+- Range: [0, 1.0]
 
-![Confidence](confidence.png)
+## Usage
 
-- Paf : (1, 38,  30, 40)
-- Range : [0, 1.0]
+Automatically downloads the onnx and prototxt files on the first run.
+It is necessary to be connected to the Internet while downloading.
 
-![Paf](paf.png)
-
-## Keypoint Order
-
-[Pose Output Format (COCO)](https://github.com/CMU-Perceptual-Computing-Lab/openpose/blob/master/doc/output.md)
-
+For the sample image,
+``` bash
+$ python3 lightweight-human-pose-estimation.py
 ```
-COCO_KEYPOINT_NOSE = (0)
-COCO_KEYPOINT_NECK = (1)
-COCO_KEYPOINT_SHOULDER_RIGHT = (2)
-COCO_KEYPOINT_ELBOW_RIGHT = (3)
-COCO_KEYPOINT_WRIST_RIGHT = (4)
-COCO_KEYPOINT_SHOULDER_LEFT = (5)
-COCO_KEYPOINT_ELBOW_LEFT = (6)
-COCO_KEYPOINT_WRIST_LEFT = (7)
-COCO_KEYPOINT_HIP_RIGHT = (8)
-COCO_KEYPOINT_KNEE_RIGHT = (9)
-COCO_KEYPOINT_ANKLE_RIGHT = (10)
-COCO_KEYPOINT_HIP_LEFT = (11)
-COCO_KEYPOINT_KNEE_LEFT = (12)
-COCO_KEYPOINT_ANKLE_LEFT = (13)
-COCO_KEYPOINT_EYE_RIGHT = (14)
-COCO_KEYPOINT_EYE_LEFT = (15)
-COCO_KEYPOINT_EAR_RIGHT = (16)
-COCO_KEYPOINT_EAR_LEFT = (17)
-COCO_KEYPOINT_BACKGROUND = (18)
+
+If you want to specify the input image, put the image path after the `--input` option.  
+You can use `--savepath` option to change the name of the output file to save.
+```bash
+$ python3 lightweight-human-pose-estimation.py --input IMAGE_PATH --savepath SAVE_IMAGE_PATH
 ```
+
+By adding the `--video` option, you can input the video.   
+If you pass `0` as an argument to VIDEO_PATH, you can use the webcam input instead of the video file.
+```bash
+$ python3 lightweight-human-pose-estimation.py --video VIDEO_PATH
+```
+
+The default setting is to use the optimized model and weights, but you can also switch to the normal model by using the --normal option.
 
 ## Reference
 
@@ -58,3 +49,10 @@ Pytorch 1.2.0
 ## Model Format
 
 ONNX opset = 10
+
+## Netron
+
+[lightweight-human-pose-estimation.onnx.prototxt](https://lutzroeder.github.io/netron/?url=https://storage.googleapis.com/ailia-models/lightweight-human-pose-estimation/lightweight-human-pose-estimation.onnx.prototxt)
+
+[lightweight-human-pose-estimation.opt.onnx.prototxt](https://lutzroeder.github.io/netron/?url=https://storage.googleapis.com/ailia-models/lightweight-human-pose-estimation/lightweight-human-pose-estimation.opt.onnx.prototxt)
+

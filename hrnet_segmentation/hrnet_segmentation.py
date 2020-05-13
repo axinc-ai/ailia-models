@@ -1,81 +1,161 @@
+import sys
 import time
-import os
 import argparse
-import urllib.request
 
-from PIL import Image
-import numpy as np
+import matplotlib.pyplot as plt
 import cv2
 
-from utils import save_pred
 import ailia
+from hrnet_utils import save_pred, gen_preds_img, smooth_output
+
+# import original modules
+sys.path.append('../util')
+from utils import check_file_existance
+from model_utils import check_and_download_models
+from image_utils import load_image
+from webcamera_utils import preprocess_frame
 
 
-model_names = ['HRNetV2-W48', 'HRNetV2-W18-Small-v1', 'HRNetV2-W18-Small-v2']
-img_path = "test.png"
-save_img_name = "result"
+# ======================
+# Parameters 1
+# ======================
+MODEL_NAMES = ['HRNetV2-W48', 'HRNetV2-W18-Small-v1', 'HRNetV2-W18-Small-v2']
+IMAGE_PATH = 'test.png'
+SAVE_IMAGE_PATH = 'result.png'
+IMAGE_HEIGHT = 512
+IMAGE_WIDTH = 1024
 
-parser = argparse.ArgumentParser()
-parser.add_argument(
-    '--arch', '-a', metavar="ARCH", default='HRNetV2-W18-Small-v2',
-    choices=model_names,
-    help='model architecture:  ' + ' | '.join(model_names) + ' (default: HRNetV2-W18-Small-v2)'
+
+# ======================
+# Arguemnt Parser Config
+# ======================
+parser = argparse.ArgumentParser(
+    description='High-Resolution networks for semantic segmentations.'
 )
 parser.add_argument(
-    '--smooth', '-s', action='store_true',
+    '-i', '--input', metavar='IMAGE',
+    default=IMAGE_PATH, 
+    help='The input image path.'
+)
+parser.add_argument(
+    '-v', '--video', metavar='VIDEO',
+    default=None,
+    help='The input video path. ' +\
+         'If the VIDEO argument is set to 0, the webcam input will be used.'
+)
+parser.add_argument(
+    '-s', '--savepath', metavar='SAVE_IMAGE_PATH',
+    default=SAVE_IMAGE_PATH,
+    help='Save path for the output image.'
+)
+parser.add_argument(
+    '-a', '--arch', metavar="ARCH",
+    default='HRNetV2-W18-Small-v2',
+    choices=MODEL_NAMES,
+    help='model architecture:  ' + ' | '.join(MODEL_NAMES) +\
+         ' (default: HRNetV2-W18-Small-v2)'
+)
+parser.add_argument(
+    '--smooth',  # '-s' has already been reserved for '--savepath'
+    action='store_true',
     help='result image will be smoother by applying bilinear upsampling'
 )
 args = parser.parse_args()
-model_name = args.arch
 
 
-weight_path = model_name + ".onnx"
-model_path = weight_path + ".prototxt"
-
-rmt_ckpt = "https://storage.googleapis.com/ailia-models/hrnet/"
-
-if not os.path.exists(model_path):
-    urllib.request.urlretrieve(rmt_ckpt + model_path, model_path)
-if not os.path.exists(weight_path):
-    urllib.request.urlretrieve(rmt_ckpt + weight_path, weight_path)
-
-print("Weight path: " + weight_path)
+# ======================
+# Parameters 2
+# ======================
+MODEL_NAME = args.arch
+WEIGHT_PATH = MODEL_NAME + ".onnx"
+MODEL_PATH = WEIGHT_PATH + ".prototxt"
+REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/hrnet/'
 
 
-# load dataset
-img = Image.open(img_path).resize((1024, 512))
-img = np.array(img)
-img = np.array([img.transpose(2, 0, 1) / 255])
+# ======================
+# Main functions
+# ======================
+def recognize_from_image():
+    # prepare input data
+    input_data = load_image(
+        args.input,
+        (IMAGE_HEIGHT, IMAGE_WIDTH),
+        gen_input_ailia=True
+    )
 
-# net initialize
-env_id = ailia.get_gpu_environment_id()
-print("Environment mode: {} (-1: CPU, 1: GPU)".format(env_id))
+    # net initialize
+    env_id = ailia.get_gpu_environment_id()
+    print(f'env_id: {env_id}')
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
 
-net = ailia.Net(model_path, weight_path, env_id=env_id)
+    # compute execution time
+    for i in range(5):
+        start = int(round(time.time() * 1000))
+        preds_ailia = net.predict(input_data)
+        end = int(round(time.time() * 1000))
+        print(f'ailia processing time {end - start} ms')
 
-# compute time
-for i in range(1):
-    start = int(round(time.time() * 1000))
-    input_blobs = net.get_input_blob_list()
-    net.set_input_blob_data(img, input_blobs[0])
-    net.update()
-    result = net.get_results()
-    result = np.asarray(result).reshape(1, 19, 128, 256)
-
-    # if you want to get upsampled image
+    # postprocessing
     if args.smooth:
-        result_ = np.zeros((1, 19, 512, 1024))
-        for i in range(19):
-            result_[0, i] = cv2.resize(
-                result[0, i],
-                (1024, 512),
-                interpolation=cv2.INTER_LINEAR
-            )
-        result = result_
-    
-    end = int(round(time.time() * 1000))
-    print("ailia processing time {} ms".format(end-start))
+        preds_ailia = smooth_output(preds_ailia)
 
-# prediction saving
-save_pred(result, ".", [save_img_name])
-print('Successfully finished !')
+    save_pred(preds_ailia, args.savepath, IMAGE_HEIGHT, IMAGE_WIDTH)
+    print('Script finished successfully.')
+    
+
+def recognize_from_video():
+    # net initialize
+    env_id = ailia.get_gpu_environment_id()
+    print(f'env_id: {env_id}')
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+
+    if args.video == '0':
+        print('[INFO] Webcam mode is activated')
+        capture = cv2.VideoCapture(0)
+        if not capture.isOpened():
+            print("[ERROR] webcamera not found")
+            sys.exit(1)
+    else:
+        if check_file_existance(args.video):
+            capture = cv2.VideoCapture(args.video)        
+    
+    while(True):
+        ret, frame = capture.read()
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
+        if not ret:
+            continue
+
+        input_image, input_data = preprocess_frame(
+            frame, IMAGE_HEIGHT, IMAGE_WIDTH,
+        )
+        
+        # inference
+        preds_ailia = net.predict(input_data)
+
+        # postprocessing
+        if args.smooth:
+            preds_ailia = smooth_output(preds_ailia)
+        gen_img = gen_preds_img(preds_ailia, IMAGE_HEIGHT, IMAGE_WIDTH)
+        plt.imshow(gen_img)
+        plt.pause(.01)
+
+    capture.release()
+    cv2.destroyAllWindows()
+    print('Script finished successfully.')
+
+
+def main():
+    # model files check and download
+    check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
+
+    if args.video is not None:
+        # video mode
+        recognize_from_video()
+    else:
+        # image mode
+        recognize_from_image()
+
+
+if __name__ == '__main__':
+    main()

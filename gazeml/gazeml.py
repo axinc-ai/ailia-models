@@ -1,105 +1,200 @@
-import cv2
 import sys
 import time
+import platform
+import argparse
+
 import numpy as np
-import os
+import cv2
+
 import matplotlib.pyplot as plt
-import pandas as pd
-import urllib.request
 
 import ailia
 
-#model_path = "gazeml_elg_i180x108_n64.onnx.prototxt"
-#weight_path = "gazeml_elg_i180x108_n64.onnx"
+# import original modules
+sys.path.append('../util')
+from utils import check_file_existance
+from model_utils import check_and_download_models
+from image_utils import load_image
+from webcamera_utils import adjust_frame_size
 
-model_path = "gazeml_elg_i60x36_n32.onnx.prototxt"
-weight_path = "gazeml_elg_i60x36_n32.onnx"
 
-print("downloading ...");
+# ======================
+# PARAMETERS
+# ======================
+# MODEL_PATH = "gazeml_elg_i180x108_n64.onnx.prototxt"
+# WEIGHT_PATH = "gazeml_elg_i180x108_n64.onnx"
+# OUTPUT_BLOB_NAME = "import/hourglass/hg_3/after/hmap/conv/BiasAdd:0"
 
-if not os.path.exists(model_path):
-    urllib.request.urlretrieve("https://storage.googleapis.com/ailia-models/gazeml/"+model_path,model_path)
-if not os.path.exists(weight_path):
-    urllib.request.urlretrieve("https://storage.googleapis.com/ailia-models/gazeml/"+weight_path,weight_path)
+WEIGHT_PATH = 'gazeml_elg_i60x36_n32.onnx'
+MODEL_PATH = 'gazeml_elg_i60x36_n32.onnx.prototxt'
+OUTPUT_BLOB_NAME = "import/hourglass/hg_2/after/hmap/conv/BiasAdd:0"
 
-print("loading ...");
+REMOTE_PATH = "https://storage.googleapis.com/ailia-models/gazeml/"
 
-env_id=ailia.get_gpu_environment_id()
-net = ailia.Net(model_path,weight_path,env_id=env_id)
+IMAGE_PATH = 'eye.png'
+SAVE_IMAGE_PATH = 'output.png'
+IMAGE_HEIGHT = 36  # 108
+IMAGE_WIDTH = 60  # 180
 
-IMAGE_PATH="eye.png"
+THRESHOLD = 0.1
+SCALE = 1.2
 
-IMAGE_WIDTH=net.get_input_shape()[2]
-IMAGE_HEIGHT=net.get_input_shape()[1]
 
-input_img = cv2.imread(IMAGE_PATH)
+# ======================
+# Arguemnt Parser Config
+# ======================
+parser = argparse.ArgumentParser(
+    description='gaze estimation model'
+)
+parser.add_argument(
+    '-i', '--input', metavar='IMAGE',
+    default=IMAGE_PATH, 
+    help='The input image path.'
+)
+parser.add_argument(
+    '-v', '--video', metavar='VIDEO',
+    default=None,
+    help='The input video path. ' +\
+         'If the VIDEO argument is set to 0, the webcam input will be used.'
+)
+parser.add_argument(
+    '-s', '--savepath', metavar='SAVE_IMAGE_PATH',
+    default=SAVE_IMAGE_PATH,
+    help='Save path for the output image.'
+)
+args = parser.parse_args()
 
-img = cv2.resize(input_img, (IMAGE_WIDTH, IMAGE_HEIGHT))
 
-img = img[...,::-1]  #BGR 2 RGB
+# ======================
+# Utils
+# ======================
+def plot_on_image(img, preds_ailia):
+    print(img.shape)
+    for i in range(preds_ailia.shape[3]):
+        probMap = preds_ailia[0, :, :, i]
+        minVal, prob, minLoc, point = cv2.minMaxLoc(probMap)
 
-img = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
+        x = (img.shape[1] * point[0]) / preds_ailia.shape[2] * SCALE
+        y = (img.shape[0] * point[1]) / preds_ailia.shape[1] * SCALE
+        color = (0, 255, 255)
+        if i>=8:
+            color = (255, 0, 0)
+        if i>=16:
+            color = (0, 0, 255)
+        if prob > THRESHOLD:
+            cv2.circle(
+                img,
+                (int(x), int(y)),
+                3,
+                color,
+                thickness=-1,
+                lineType=cv2.FILLED
+            )
+        # print(f'[DEBUG]  x: {int(x):3d}\ty: {int(y):3d}\tprob:{prob}')
+    return img
 
-img = cv2.equalizeHist(img)
-cv2.imshow("equalize",img)
 
-data = np.array(img, dtype=np.float32)
-data.shape = (1,1,) + data.shape
-data = data / 255.0 *2 -1.0
+# ======================
+# Main functions
+# ======================
+def recognize_from_image():
+    # prepare input data
+    org_img = cv2.imread(args.input)
+    img = load_image(
+        args.input,
+        (IMAGE_HEIGHT, IMAGE_WIDTH),
+        rgb=False,
+        normalize_type='None'
+    )
+    img = cv2.equalizeHist(img)
+    if platform.system() == 'Darwin':  # For Mac OS (FP16)
+        data = img[np.newaxis, np.newaxis, :, :] / 255.0 - 0.5
+    else:
+        data = img[np.newaxis, np.newaxis, :, :] / 127.5 - 1.0
+    eyeI = np.concatenate((data, data), axis=0)
+    eyeI = eyeI.reshape(2, IMAGE_HEIGHT, IMAGE_WIDTH, 1)
 
-print("inferencing ...");
+    # net initialize
+    env_id = ailia.get_gpu_environment_id()
+    print(f'env_id: {env_id}')
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
 
-eyeI = np.concatenate((data, data), axis=0)
-eyeI = eyeI.reshape(2,IMAGE_HEIGHT,IMAGE_WIDTH,1)
-pred_onnx = net.predict(eyeI)
-out = pred_onnx
+    # compute execution time
+    for i in range(5):
+        start = int(round(time.time() * 1000))
+        preds_ailia = net.predict(eyeI)
+        preds_ailia = net.get_blob_data(
+            net.find_blob_index_by_name(OUTPUT_BLOB_NAME)
+        )
+        end = int(round(time.time() * 1000))
+        print(f'ailia processing time {end - start} ms')
 
-cnt = 3
-for i in range(cnt):
-	start=int(round(time.time() * 1000))
-	out = net.predict(eyeI)
-	end=int(round(time.time() * 1000))
-	print("## ailia processing time , "+str(i)+" , "+str(end-start)+" ms")
+    # postprocessing
+    img = plot_on_image(org_img, preds_ailia)
+    cv2.imwrite(args.savepath, img)
+    print('Script finished successfully.')
 
-points = []
-threshold = 0.1
-scale = 1.2
 
-for i in range(out.shape[3]):
-	probMap = out[0, :, :, i]
-	minVal, prob, minLoc, point = cv2.minMaxLoc(probMap)
+def recognize_from_video():
+    # net initialize
+    env_id = ailia.get_gpu_environment_id()
+    print(f'env_id: {env_id}')
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
 
-	x = (input_img.shape[1] * point[0]) / out.shape[2] * scale
-	y = (input_img.shape[0] * point[1]) / out.shape[1] * scale
+    if args.video == '0':
+        print('[INFO] Webcam mode is activated')
+        capture = cv2.VideoCapture(0)
+        if not capture.isOpened():
+            print("[ERROR] webcamera not found")
+            sys.exit(1)
+    else:
+        if check_file_existance(args.video):
+            capture = cv2.VideoCapture(args.video)        
+    
+    while(True):
+        ret, frame = capture.read()
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
+        if not ret:
+            continue
 
-	color = (0, 255, 255)
-	if i>=8:
-		color = (255, 0, 0)
-	if i>=16:
-		color = (0, 0, 255)
+        # prepare frame
+        img, resized_img = adjust_frame_size(frame, IMAGE_HEIGHT, IMAGE_WIDTH)
+        data = cv2.cvtColor(resized_img, cv2.COLOR_BGR2GRAY)
+        data = cv2.equalizeHist(data)
+        if platform.system() == 'Darwin':
+            data = data[np.newaxis, np.newaxis, :, :] / 255.0 - 0.5
+        else:
+            data = data[np.newaxis, np.newaxis, :, :] / 127.5 - 1.0
+        eyeI = np.concatenate((data, data), axis=0)
+        eyeI = eyeI.reshape(2, IMAGE_HEIGHT, IMAGE_WIDTH, 1)
 
-	if prob > threshold : 
-		cv2.circle(input_img, (int(x), int(y)), 3, color, thickness=-1, lineType=cv2.FILLED)
-		points.append((int(x), int(y)))
-	else :
-		points.append(None)
-	
-cv2.imshow("Keypoints",input_img)
-cv2.imwrite('output.png', input_img)
+        # inference
+        preds_ailia = net.predict(eyeI)
+        preds_ailia = net.get_blob_data(
+            net.find_blob_index_by_name(OUTPUT_BLOB_NAME)
+        )
 
-def plot_images(title, images, tile_shape):
-	from mpl_toolkits.axes_grid1 import ImageGrid
-	fig = plt.figure()
-	plt.title(title)
-	grid = ImageGrid(fig, 111,  nrows_ncols = tile_shape )
-	for i in range(images.shape[3]):
-		grd = grid[i]
-		grd.imshow(images[0,:,:,i])
+        # postprocessing
+        img = plot_on_image(img, preds_ailia)
+        cv2.imshow('frame', img)
 
-channels=out.shape[3]
-cols=8
+    capture.release()
+    cv2.destroyAllWindows()
+    print('Script finished successfully.')
 
-plot_images("result",out,tile_shape=((int)((channels+cols-1)/cols),cols))
-plt.show()
 
-cv2.destroyAllWindows()
+def main():
+    # model files check and download
+    check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
+
+    if args.video is not None:
+        # video mode
+        recognize_from_video()
+    else:
+        # image mode
+        recognize_from_image()
+
+
+if __name__ == '__main__':
+    main()

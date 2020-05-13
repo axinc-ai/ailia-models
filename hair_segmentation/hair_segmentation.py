@@ -1,12 +1,75 @@
-import cv2
+import sys
 import time
-import urllib.request
-import os
+import argparse
+
 import numpy as np
+import cv2
 
 import ailia
+# import original modules
+sys.path.append('../util')
+from utils import check_file_existance
+from model_utils import check_and_download_models
+from image_utils import load_image
+from webcamera_utils import adjust_frame_size
 
 
+# ======================
+# Parameters 1
+# ======================
+IMAGE_PATH = 'input.jpg'
+SAVE_IMAGE_PATH = 'output.png'
+IMAGE_HEIGHT = 224
+IMAGE_WIDTH = 224
+
+
+# ======================
+# Arguemnt Parser Config
+# ======================
+parser = argparse.ArgumentParser(
+    description='Real-time hair segmentation model'
+)
+parser.add_argument(
+    '-i', '--input', metavar='IMAGE',
+    default=IMAGE_PATH, 
+    help='The input image path.'
+)
+parser.add_argument(
+    '-v', '--video', metavar='VIDEO',
+    default=None,
+    help='The input video path. ' +\
+         'If the VIDEO argument is set to 0, the webcam input will be used.'
+)
+parser.add_argument(
+    '-n', '--normal',
+    action='store_true',
+    help='By default, the optimized model is used, but with this option, ' +\
+    'you can switch to the normal (not optimized) model'
+)
+parser.add_argument(
+    '-s', '--savepath', metavar='SAVE_IMAGE_PATH',
+    default=SAVE_IMAGE_PATH,
+    help='Save path for the output image.'
+)
+
+args = parser.parse_args()
+
+
+# ======================
+# Parameters 2
+# ======================
+NOT_OPT_MODEL = args.normal
+if NOT_OPT_MODEL:
+    WEIGHT_PATH = 'hair_segmentation.onnx'
+else:
+    WEIGHT_PATH = "hair_segmentation.opt.onnx"
+MODEL_PATH = WEIGHT_PATH + '.prototxt'
+REMOTE_PATH = "https://storage.googleapis.com/ailia-models/hair_segmentation/"
+
+
+# ======================
+# Utils
+# ======================
 def transfer(image, mask):
     mask[mask > 0.5] = 255
     mask[mask <= 0.5] = 0
@@ -19,55 +82,95 @@ def transfer(image, mask):
     alpha = 0.8
     beta = (1.0 - alpha)
     dst = cv2.addWeighted(image, alpha, mask_n, beta, 0.0)
-
     return dst
 
 
-# img_path = input("image name (00041.jpg, 00053.jpg): ")
-img_path = "input.jpg"
+# ======================
+# Main functions
+# ======================
+def recognize_from_image():
+    # prepare input data
+    src_img = cv2.imread(args.input)
+    input_data = load_image(
+        args.input,
+        (IMAGE_HEIGHT, IMAGE_WIDTH),
+    )
+    input_data = input_data[np.newaxis, :, :, :]
 
-OPT_MODEL=True
-if OPT_MODEL:
-    weight_path = "hair_segmentation.opt.onnx"
-else:
-    weight_path = "hair_segmentation.onnx"
-model_path = weight_path + ".prototxt"
+    # net initialize
+    env_id = ailia.get_gpu_environment_id()
+    print(f'env_id: {env_id}')
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+    net.set_input_shape(input_data.shape)
+    
+    # compute execution time
+    for i in range(5):
+        start = int(round(time.time() * 1000))
+        preds_ailia = net.predict(input_data)
+        end = int(round(time.time() * 1000))
+        print(f'ailia processing time {end - start} ms')
 
-rmt_ckpt = "https://storage.googleapis.com/ailia-models/hair_segmentation/"
-
-print("loading model...")
-
-
-if not os.path.exists(model_path):
-    urllib.request.urlretrieve(rmt_ckpt + model_path, model_path)
-if not os.path.exists(weight_path):
-    urllib.request.urlretrieve(rmt_ckpt + weight_path, weight_path)
-
-# preprocessing
-img = cv2.imread(img_path)
-input_img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-input_img = cv2.resize(input_img, (224, 224))
-input_img = input_img / 255
-input_img = input_img.reshape((1,) + input_img.shape)
-# print(input_img.shape) -> (1, 224, 224, 3)
+    # postprocessing
+    pred = preds_ailia.reshape((IMAGE_HEIGHT, IMAGE_WIDTH))
+    dst = transfer(src_img, pred)
+    cv2.imwrite(args.savepath, dst)
 
 
-# net initialize
-env_id = ailia.get_gpu_environment_id()
-print("Environment mode: {} (-1: CPU, 1: GPU)".format(env_id))
+def recognize_from_video():
+    # net initialize
+    env_id = ailia.get_gpu_environment_id()
+    print(f'env_id: {env_id}')
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+    flag_set_shape = False
 
-net = ailia.Net(model_path, weight_path, env_id=env_id)
-net.set_input_shape(input_img.shape)
+    if args.video == '0':
+        print('[INFO] Webcam mode is activated')
+        capture = cv2.VideoCapture(0)
+        if not capture.isOpened():
+            print("[ERROR] webcamera not found")
+            sys.exit(1)
+    else:
+        if check_file_existance(args.video):
+            capture = cv2.VideoCapture(args.video)        
+    
+    while(True):
+        ret, frame = capture.read()
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
+        if not ret:
+            continue
 
-# compute time
-for i in range(10):
-    start = int(round(time.time() * 1000))
-    pred = net.predict(input_img)
-    end = int(round(time.time() * 1000))
-    print("ailia processing time {} ms".format(end-start))
+        input_image, input_data = adjust_frame_size(
+            frame, IMAGE_HEIGHT, IMAGE_WIDTH
+        )
+        input_data = cv2.cvtColor(input_data, cv2.COLOR_BGR2RGB) / 255.0
+        input_data = input_data[np.newaxis, :, :, :]
 
-pred = pred.reshape((224, 224))
-dst = transfer(img, pred)
-cv2.imwrite("output.png", dst)
+        if not flag_set_shape:
+            net.set_input_shape(input_data.shape)
+            flag_set_shape = True
+        
+        preds_ailia = net.predict(input_data)
+        pred = preds_ailia.reshape((IMAGE_HEIGHT, IMAGE_WIDTH))
+        dst = transfer(input_image, pred)
+        cv2.imshow('frame', dst)
 
-print('Successfully finished !')
+    capture.release()
+    cv2.destroyAllWindows()
+    print('Script finished successfully.')
+
+
+def main():
+    # model files check and download
+    check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
+
+    if args.video is not None:
+        # video mode
+        recognize_from_video()
+    else:
+        # image mode
+        recognize_from_image()
+
+
+if __name__ == '__main__':
+    main()
