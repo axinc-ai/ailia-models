@@ -30,11 +30,11 @@ $ python3 maskrcnn.py --video VIDEO_PATH
 
 ### Reference
 
-[Mask R-CNN](https://github.com/onnx/models/tree/master/vision/object_detection_segmentation/mask-rcnn)
+[Mask R-CNN : real-time neural network for object instance segmentation](https://github.com/onnx/models/tree/master/vision/object_detection_segmentation/mask-rcnn)
 
 
 ### Framework
-
+ONNX Runtime
 
 ### Model Format
 ONNX opset = 10
