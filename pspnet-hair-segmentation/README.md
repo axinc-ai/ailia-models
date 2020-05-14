@@ -3,6 +3,8 @@
 ### input
 ![input_image](test.jpg)
 
+(from http://projects.i-ctm.eu/it/progetto/figaro-1k)
+
 Ailia input shape: (1, 3, 512, 512)  
 
 ### output
