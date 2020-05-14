@@ -76,7 +76,7 @@ def recognize_from_image():
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
 
     # compute execution time
-    for i in range(5):
+    for c in range(5):
         start = int(round(time.time() * 1000))
 
         for j in range(ynum):
