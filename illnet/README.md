@@ -2,7 +2,7 @@
 
 
 ### input
-![input_image](input.png)
+<img src='input.png' width='240px'>
 - The output image of [ailia-models/dewarpnet](https://github.com/sngyo/ailia-models/tree/master/dewarpnet) is used as the sample input image.
 (original image from https://github.com/cvlab-stonybrook/DewarpNet/tree/master/eval/inp)
 
@@ -10,7 +10,7 @@ Ailia input shape: (1, 3, 128, 128)
 Range: [-1, 1]
 
 ### output
-![output_image](output.png)
+<img src='output.png' width='240px'>
 
 ### usage
 Automatically downloads the onnx and prototxt files on the first run.
