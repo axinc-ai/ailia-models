@@ -3,6 +3,8 @@
 ### input
 ![input_image](test.png)
 
+(from https://www.cityscapes-dataset.com/)
+
 Ailia input shape: (1, 3, 512, 1024)  
 Range:[0, 1]
 
