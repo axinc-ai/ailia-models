@@ -130,7 +130,7 @@ def recognize_from_image():
             start = int(round(time.time() * 1000))
             preds_ailia = net.predict(eyeI)
             end = int(round(time.time() * 1000))
-            print(f'ailia processing time {end - start} ms')
+            print(f'\tailia processing time {end - start} ms')
     else:
         preds_ailia = net.predict(eyeI)
         
