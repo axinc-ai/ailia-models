@@ -132,7 +132,7 @@ def unwarp_from_image():
             start = int(round(time.time() * 1000))
             uwpred = run_inference(wc_net, bm_net, img, org_img)
             end = int(round(time.time() * 1000))
-            print("ailia processing time {} ms".format(end-start))
+            print("\tailia processing time {} ms".format(end-start))
     else:
         uwpred = run_inference(wc_net, bm_net, img, org_img)
         
