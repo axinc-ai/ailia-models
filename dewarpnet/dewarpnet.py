@@ -24,7 +24,7 @@ WC_MODEL_PATH = "wc_model.onnx.prototxt"
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/dewarpnet/"
 
 IMAGE_PATH = 'test.png'
-SAVE_IMAGE_PATH = 'result.png'
+SAVE_IMAGE_PATH = 'output.png'
 
 WC_IMG_HEIGHT = 256
 WC_IMG_WIDTH = 256
