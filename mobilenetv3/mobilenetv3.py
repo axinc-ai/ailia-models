@@ -49,6 +49,12 @@ parser.add_argument(
     default='small', choices=MODEL_LISTS,
     help='model lists: ' + ' | '.join(MODEL_LISTS) + ' (default: small)'
 )
+parser.add_argument(
+    '-b', '--benchmark',
+    action='store_true',
+    help='Running the inference on the same input 5 times ' +
+         'to measure execution performance. (Cannot be used in video mode)'
+)
 args = parser.parse_args()
 
 
@@ -93,12 +99,17 @@ def recognize_from_image():
     print(f'env_id: {env_id}')
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
 
-    # compute execution time
-    for i in range(5):
-        start = int(round(time.time() * 1000))
+    # inference
+    print('Start inference...')
+    if args.benchmark:
+        print('BENCHMARK mode')
+        for i in range(5):
+            start = int(round(time.time() * 1000))
+            preds_ailia = net.predict(input_data)
+            end = int(round(time.time() * 1000))
+            print(f'\tailia processing time {end - start} ms')
+    else:
         preds_ailia = net.predict(input_data)
-        end = int(round(time.time() * 1000))
-        print(f'ailia processing time {end - start} ms')
 
     print_results(preds_ailia)
     print('Script finished successfully.')

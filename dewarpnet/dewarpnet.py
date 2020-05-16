@@ -8,10 +8,10 @@ import numpy as np
 import ailia
 # import original modules
 sys.path.append('../util')
-from utils import check_file_existance
-from model_utils import check_and_download_models
-from image_utils import load_image
-from webcamera_utils import preprocess_frame
+from utils import check_file_existance  # noqa: E402
+from model_utils import check_and_download_models  # noqa: E402
+from image_utils import load_image  # noqa: E402
+from webcamera_utils import preprocess_frame  # noqa: E402
 
 
 # ======================
@@ -24,7 +24,7 @@ WC_MODEL_PATH = "wc_model.onnx.prototxt"
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/dewarpnet/"
 
 IMAGE_PATH = 'test.png'
-SAVE_IMAGE_PATH = 'result.png'
+SAVE_IMAGE_PATH = 'output.png'
 
 WC_IMG_HEIGHT = 256
 WC_IMG_WIDTH = 256
@@ -40,13 +40,13 @@ parser = argparse.ArgumentParser(
 )
 parser.add_argument(
     '-i', '--input', metavar='IMAGEFILE_PATH',
-    default=IMAGE_PATH, 
+    default=IMAGE_PATH,
     help='The input image path.'
 )
 parser.add_argument(
     '-v', '--video', metavar='VIDEO',
     default=None,
-    help='The input video path. ' +\
+    help='The input video path. ' +
          'If the VIDEO argument is set to 0, the webcam input will be used.'
 
 )
@@ -54,6 +54,12 @@ parser.add_argument(
     '-s', '--savepath', metavar='SAVE_IMAGE_PATH',
     default=SAVE_IMAGE_PATH,
     help='Save path for the output image.'
+)
+parser.add_argument(
+    '-b', '--benchmark',
+    action='store_true',
+    help='Running the inference on the same input 5 times ' +
+         'to measure execution performance. (Cannot be used in video mode)'
 )
 args = parser.parse_args()
 
@@ -91,6 +97,18 @@ def unwarp(img, bm):
 # ======================
 # Main functions
 # ======================
+def run_inference(wc_net, bm_net, img, org_img):
+    wc_output = wc_net.predict(img)[0]
+    pred_wc = np.clip(wc_output, 0, 1.0).transpose(1, 2, 0)
+    bm_input = cv2.resize(
+        pred_wc, (BM_IMG_WIDTH, BM_IMG_HEIGHT)
+    ).transpose(2, 0, 1)
+    bm_input = np.expand_dims(bm_input, 0)
+    outputs_bm = bm_net.predict(bm_input)[0]
+    uwpred = unwarp(org_img, outputs_bm)  # This is not on GPU!
+    return uwpred
+
+
 def unwarp_from_image():
     org_img = cv2.imread(args.input)
     img = load_image(
@@ -106,22 +124,18 @@ def unwarp_from_image():
     bm_net = ailia.Net(BM_MODEL_PATH, BM_WEIGHT_PATH, env_id=env_id)
     wc_net = ailia.Net(WC_MODEL_PATH, WC_WEIGHT_PATH, env_id=env_id)
 
-    # compute exectuion time
-    for i in range(5):
-        start = int(round(time.time() * 1000))
-    
-        wc_output = wc_net.predict(img)[0]
-        pred_wc = np.clip(wc_output, 0, 1.0).transpose(1, 2, 0)
-        bm_input = cv2.resize(
-            pred_wc, (BM_IMG_WIDTH, BM_IMG_HEIGHT)
-        ).transpose(2, 0, 1)
-        bm_input = np.expand_dims(bm_input, 0)
-        outputs_bm = bm_net.predict(bm_input)[0]
-        uwpred = unwarp(org_img, outputs_bm)  # This is not on GPU!
-    
-        end = int(round(time.time() * 1000))
-        print("ailia processing time {} ms".format(end-start))
-
+    # inference
+    print('Start inference...')
+    if args.benchmark:
+        print('BENCHMARK mode')
+        for i in range(5):
+            start = int(round(time.time() * 1000))
+            uwpred = run_inference(wc_net, bm_net, img, org_img)
+            end = int(round(time.time() * 1000))
+            print("\tailia processing time {} ms".format(end-start))
+    else:
+        uwpred = run_inference(wc_net, bm_net, img, org_img)
+        
     cv2.imwrite(args.savepath, uwpred * 255)
     print('Script finished successfully.')
 
@@ -141,8 +155,8 @@ def unwarp_from_video():
             sys.exit(1)
     else:
         if check_file_existance(args.video):
-            capture = cv2.VideoCapture(args.video)        
-    
+            capture = cv2.VideoCapture(args.video)
+
     while(True):
         ret, frame = capture.read()
         if cv2.waitKey(1) & 0xFF == ord('q'):
@@ -153,16 +167,8 @@ def unwarp_from_video():
         org_image, input_data = preprocess_frame(
             frame, WC_IMG_HEIGHT, WC_IMG_WIDTH, normalize_type='255'
         )
-        
-        # inference
-        wc_output = wc_net.predict(input_data)[0]
-        pred_wc = np.clip(wc_output, 0, 1.0).transpose(1, 2, 0)
-        bm_input = cv2.resize(
-            pred_wc, (BM_IMG_WIDTH, BM_IMG_HEIGHT)
-        ).transpose(2, 0, 1)
-        bm_input = np.expand_dims(bm_input, 0)
-        outputs_bm = bm_net.predict(bm_input)[0]
-        uwpred = unwarp(org_image, outputs_bm)  # This is not on GPU!
+
+        uwpred = run_inference(wc_net, bm_net, input_data, org_image)
 
         cv2.imshow('frame', uwpred)
 
@@ -186,4 +192,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-    

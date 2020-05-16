@@ -12,10 +12,10 @@ from deeplab_utils import *
 
 # import original modules
 sys.path.append('../util')
-from utils import check_file_existance
-from model_utils import check_and_download_models
-from image_utils import load_image, get_image_shape
-from webcamera_utils import preprocess_frame
+from utils import check_file_existance  # noqa: E402
+from model_utils import check_and_download_models  # noqa: E402
+from image_utils import load_image  # noqa: E402
+from webcamera_utils import preprocess_frame  # noqa: E402
 
 
 # ======================
@@ -64,6 +64,12 @@ parser.add_argument(
     default=SAVE_IMAGE_PATH,
     help='Save path for the output image.'
 )
+parser.add_argument(
+    '-b', '--benchmark',
+    action='store_true',
+    help='Running the inference on the same input 5 times ' +
+         'to measure execution performance. (Cannot be used in video mode)'
+)
 args = parser.parse_args()
 
 
@@ -97,12 +103,17 @@ def segment_from_image():
         args.input, input_shape, normalize_type='127.5', gen_input_ailia=True
     )
 
-    # compute execution time
-    for i in range(5):
-        start = int(round(time.time() * 1000))
+    # inference
+    print('Start inference...')
+    if args.benchmark:
+        print('BENCHMARK mode')
+        for i in range(5):
+            start = int(round(time.time() * 1000))
+            preds_ailia = net.predict(img)[0]
+            end = int(round(time.time() * 1000))
+            print(f'ailia processing time {end - start} ms')
+    else:
         preds_ailia = net.predict(img)[0]
-        end = int(round(time.time() * 1000))
-        print(f'ailia processing time {end - start} ms')        
 
     # postprocessing
     seg_map = np.argmax(preds_ailia.transpose(1, 2, 0), axis=2)
@@ -146,6 +157,8 @@ def segment_from_image():
     ax.tick_params(width=0.0)
     plt.grid('off')
     plt.savefig(args.savepath)
+    
+    print('Script finished successfully.')
 
 
 def segment_from_video():
