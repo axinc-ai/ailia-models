@@ -127,7 +127,7 @@ def main():
     print(f'env_id: {env_id}')
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
 
-    # compute execution time
+    # inference
     for frame_id, frame in enumerate(frame_provider):
         current_time = cv2.getTickCount()
         if frame is None:

@@ -179,7 +179,7 @@ def recognize_from_image():
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
     net.set_input_shape(input_data.shape)
 
-    # compute execution time
+    # inference
     print('Start inference...')
     if args.benchmark:
         print('BENCHMARK mode')

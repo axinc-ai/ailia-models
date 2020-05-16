@@ -95,7 +95,7 @@ def recognize_from_image():
         channel=ailia.NETWORK_IMAGE_CHANNEL_FIRST
     )
 
-    # compute emotion exectution time
+    # inference emotion
     print('Start inference...')
     if args.benchmark:
         print('BENCHMARK mode')
@@ -119,7 +119,7 @@ def recognize_from_image():
         print(f'  prob={info.prob}')
     print('')
 
-    # compute gender exectution time
+    # inference gender
     if args.benchmark:
         print('BENCHMARK mode')
         for i in range(5):

@@ -97,7 +97,7 @@ def recognize_from_image():
         range=IMAGE_RANGE
     )
 
-    # compute execution time
+    # inference
     print('Start inference...')
     if args.benchmark:
         print('BENCHMARK mode')

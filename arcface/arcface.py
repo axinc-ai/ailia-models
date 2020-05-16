@@ -109,7 +109,7 @@ def compare_images():
     print(f'env_id: {env_id}')
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
 
-    # compute execution time
+    # inference
     print('Start inference...')
     if args.benchmark:
         print('BENCHMARK mode')

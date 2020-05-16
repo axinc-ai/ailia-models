@@ -124,7 +124,7 @@ def unwarp_from_image():
     bm_net = ailia.Net(BM_MODEL_PATH, BM_WEIGHT_PATH, env_id=env_id)
     wc_net = ailia.Net(WC_MODEL_PATH, WC_WEIGHT_PATH, env_id=env_id)
 
-    # compute exectuion time
+    # inference
     print('Start inference...')
     if args.benchmark:
         print('BENCHMARK mode')

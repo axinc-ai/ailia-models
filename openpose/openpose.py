@@ -164,7 +164,7 @@ def recognize_from_image():
         MODEL_PATH, WEIGHT_PATH, env_id=env_id, algorithm=ALGORITHM
     )
 
-    # compute execution time
+    # inference
     print('Start inference...')
     if args.benchmark:
         print('BENCHMARK mode')

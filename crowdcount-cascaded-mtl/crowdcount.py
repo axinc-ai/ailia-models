@@ -77,7 +77,7 @@ def estimate_from_image():
     print(env_id)
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
 
-    # compute execution time
+    # inference
     if args.benchmark:
         print('BENCHMARK mode')
         for i in range(5):

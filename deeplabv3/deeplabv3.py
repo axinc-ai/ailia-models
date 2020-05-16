@@ -103,7 +103,7 @@ def segment_from_image():
         args.input, input_shape, normalize_type='127.5', gen_input_ailia=True
     )
 
-    # compute execution time
+    # inference
     print('Start inference...')
     if args.benchmark:
         print('BENCHMARK mode')

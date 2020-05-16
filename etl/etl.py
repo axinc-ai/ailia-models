@@ -86,7 +86,7 @@ def recognize_from_image():
         range=ailia.NETWORK_IMAGE_RANGE_U_FP32
     )
 
-    # compute execution time
+    # inference
     print('Start inference...')
     if args.benchmark:
         print('BENCHMARK mode')

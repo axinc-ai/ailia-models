@@ -121,7 +121,7 @@ def recognize_from_image():
         algorithm=ailia.DETECTOR_ALGORITHM_SSD, env_id=env_id
     )
 
-    # compute execution time
+    # inference
     print('Start inference...')
     if args.benchmark:
         print('BENCHMARK mode')
