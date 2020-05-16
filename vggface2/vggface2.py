@@ -49,9 +49,15 @@ parser.add_argument(
     '-v', '--video', metavar=('VIDEO', 'IMAGE'),
     nargs=2,
     default=None,
-    help='Determines whether the face in the video file specified by VIDEO ' +\
-         'and the face in the image file specified by IMAGE are the same. ' +\
-         'If the VIDEO argument is set to 0, the webcam input will be used.' 
+    help='Determines whether the face in the video file specified by VIDEO ' +
+         'and the face in the image file specified by IMAGE are the same. ' +
+         'If the VIDEO argument is set to 0, the webcam input will be used.'
+)
+parser.add_argument(
+    '-b', '--benchmark',
+    action='store_true',
+    help='Running the inference on the same input 5 times ' +
+         'to measure execution performance. (Cannot be used in video mode)'
 )
 args = parser.parse_args()
 
@@ -75,12 +81,12 @@ def load_and_preprocess(img_path):
         gen_input_ailia=False
     )
     return preprocess(img)
-    
+
 
 def preprocess(img, input_is_bgr=False):
     if input_is_bgr:
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-    
+
     # normalize image
     input_data = (img.astype(np.float) - MEAN)
     input_data = input_data.transpose((2, 0, 1))
@@ -100,15 +106,21 @@ def compare_images():
     features = []
 
     # prepare input data
-    for img_path in args.inputs:
+    for j, img_path in enumerate(args.inputs):
         input_data = load_and_preprocess(img_path)
 
-        # compute execution time
-        for i in range(1):
-            start = int(round(time.time() * 1000))
+        # inference
+        print('Start inference...')
+        if args.benchmark and j == 0:
+            # Bench mark mode is only for the first image
+            print('BENCHMARK mode')
+            for i in range(5):
+                start = int(round(time.time() * 1000))
+                _ = net.predict(input_data)
+                end = int(round(time.time() * 1000))
+                print(f'\tailia processing time {end - start} ms')
+        else:
             _ = net.predict(input_data)
-            end = int(round(time.time() * 1000))
-            print(f'ailia processing time {end - start} ms')
 
         blob = net.get_blob_data(net.find_blob_index_by_name('conv5_3'))
         features.append(blob)
@@ -156,7 +168,7 @@ def compare_videoframe_image():
             break
         if not ret:
             continue
-        
+
         _, resized_frame = adjust_frame_size(
             frame, IMAGE_HEIGHT, IMAGE_WIDTH
         )
