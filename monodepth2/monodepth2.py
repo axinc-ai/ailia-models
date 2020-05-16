@@ -2,7 +2,6 @@ import sys
 import time
 import argparse
 
-import PIL.Image as pil
 import cv2
 import matplotlib.pyplot as plt
 import numpy as np
@@ -55,6 +54,12 @@ parser.add_argument(
     default=SAVE_IMAGE_PATH,
     help='Save path for the output image.'
 )
+parser.add_argument(
+    '-b', '--benchmark',
+    action='store_true',
+    help='Running the inference on the same input 5 times ' +
+         'to measure execution performance. (Cannot be used in video mode)'
+)
 args = parser.parse_args()
 
 
@@ -75,7 +80,7 @@ def result_plot(disp, original_width, original_height):
 # ======================
 # Main functions
 # ======================
-def recognize_from_image():
+def estimate_from_image():
     # prepare input data
     org_height, org_width, _ = cv2.imread(args.input).shape
     input_data = load_image(
@@ -91,26 +96,18 @@ def recognize_from_image():
     dec_net = ailia.Net(DEC_MODEL_PATH, DEC_WEIGHT_PATH, env_id=env_id)
 
     # compute execution time
-    for i in range(5):
-        start = int(round(time.time() * 1000))
-
-        # encoder
-        enc_input_blobs = enc_net.get_input_blob_list()
-        enc_net.set_input_blob_data(input_data, enc_input_blobs[0])
-        enc_net.update()
-        features = enc_net.get_results()
-
-        # decoder
-        dec_inputs_blobs = dec_net.get_input_blob_list()
-        for f_idx in range(len(features)):
-            dec_net.set_input_blob_data(
-                features[f_idx], dec_inputs_blobs[f_idx]
-            )
-        dec_net.update()
-        preds_ailia = dec_net.get_results()
-
-        end = int(round(time.time() * 1000))
-        print(f'ailia processing time {end - start} ms')
+    print('Start inference...')
+    if args.benchmark:
+        print('BENCHMARK mode')
+        for i in range(5):
+            start = int(round(time.time() * 1000))
+            features = enc_net.predict([input_data])
+            preds_ailia = dec_net.predict(features)
+            end = int(round(time.time() * 1000))
+            print(f'\tailia processing time {end - start} ms')
+    else:
+        features = enc_net.predict([input_data])
+        preds_ailia = dec_net.predict(features)
 
     # postprocessing
     disp = preds_ailia[-1]
@@ -119,7 +116,7 @@ def recognize_from_image():
     print('Script finished successfully.')
 
 
-def recognize_from_video():
+def estimate_from_video():
     # net initialize
     env_id = ailia.get_gpu_environment_id()
     print(f'env_id: {env_id}')
@@ -138,7 +135,7 @@ def recognize_from_video():
 
     ret, frame = capture.read()
     org_height, org_width, _ = frame.shape
-    
+
     while(True):
         ret, frame = capture.read()
         if cv2.waitKey(1) & 0xFF == ord('q'):
@@ -167,7 +164,7 @@ def recognize_from_video():
 
         # postprocessing
         disp = preds_ailia[-1]
-        disp_resized, vmax =  result_plot(disp, org_width, org_height)
+        disp_resized, vmax = result_plot(disp, org_width, org_height)
         plt.imshow(disp_resized, cmap='magma', vmax=vmax)
         plt.pause(.01)
 
@@ -183,10 +180,10 @@ def main():
 
     if args.video is not None:
         # video mode
-        recognize_from_video()
+        estimate_from_video()
     else:
         # image mode
-        recognize_from_image()
+        estimate_from_image()
 
 
 if __name__ == '__main__':
