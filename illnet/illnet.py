@@ -8,13 +8,12 @@ from skimage import img_as_ubyte
 from skimage import io
 
 import ailia
+from illnet_utils import *
 
 # import original modules
 sys.path.append('../util')
 from utils import check_file_existance  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
-from webcamera_utils import preprocess_frame  # noqa: E402C
-from illnet_utils import *
 
 
 # ======================
@@ -52,6 +51,12 @@ parser.add_argument(
     default=SAVE_IMAGE_PATH,
     help='Save path for the output image.'
 )
+parser.add_argument(
+    '-b', '--benchmark',
+    action='store_true',
+    help='Running the inference on the same input 5 times ' +
+         'to measure execution performance. (Cannot be used in video mode)'
+)
 args = parser.parse_args()
 
 
@@ -75,8 +80,27 @@ def recognize_from_image():
     print(f'env_id: {env_id}')
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
 
-    # compute execution time
-    for c in range(5):
+    # inference
+    print('Start inference...')
+    if args.benchmark:
+        print('BENCHMARK mode')
+        for c in range(5):
+            start = int(round(time.time() * 1000))
+
+            for j in range(ynum):
+                for i in range(xnum):
+                    patchImg = input_data[j, i]
+                    patchImg = (patchImg - 0.5) / 0.5
+                    patchImg = patchImg.transpose((2, 0, 1))
+                    patchImg = patchImg[np.newaxis, :, :, :]
+                    out = net.predict(patchImg)
+                    out = out.transpose((0, 2, 3, 1))[0]
+                    out = (np.clip(out, 0, 1) * 255).astype(np.uint8)
+                    preds_ailia[j, i] = out
+
+            end = int(round(time.time() * 1000))
+            print(f'\tailia processing time {end - start} ms')
+    else:
         start = int(round(time.time() * 1000))
 
         for j in range(ynum):
@@ -91,7 +115,6 @@ def recognize_from_image():
                 preds_ailia[j, i] = out
 
         end = int(round(time.time() * 1000))
-        print(f'ailia processing time {end - start} ms')
 
     # postprocessing
     resImg = composePatch(preds_ailia)
@@ -154,7 +177,7 @@ def recognize_from_video():
     cv2.destroyAllWindows()
     print('Script finished successfully.')
 
-    
+
 def main():
     # model files check and download
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
