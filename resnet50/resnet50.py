@@ -50,6 +50,12 @@ parser.add_argument(
     help=('model architecture: ' + ' | '.join(MODEL_NAMES) +
           ' (default: resnet50.opt)')
 )
+parser.add_argument(
+    '-b', '--benchmark',
+    action='store_true',
+    help='Running the inference on the same input 5 times ' +
+         'to measure execution performance. (Cannot be used in video mode)'
+)
 args = parser.parse_args()
 
 
@@ -65,9 +71,9 @@ REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/resnet50/'
 # Utils
 # ======================
 def preprocess_image(img):
-    if img.shape[2] == 3 :
+    if img.shape[2] == 3:
         img = cv2.cvtColor(img, cv2.COLOR_BGR2BGRA)
-    elif img.shape[2] == 1 : 
+    elif img.shape[2] == 1:
         img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGRA)
     return img
 
@@ -90,23 +96,28 @@ def recognize_from_image():
         format=ailia.NETWORK_IMAGE_FORMAT_RGB,
         range=IMAGE_RANGE
     )
-    
+
     # compute execution time
-    for i in range(5):
-        start = int(round(time.time() * 1000))
+    print('Start inference...')
+    if args.benchmark:
+        print('BENCHMARK mode')
+        for i in range(5):
+            start = int(round(time.time() * 1000))
+            classifier.compute(img, MAX_CLASS_COUNT)
+            end = int(round(time.time() * 1000))
+            print(f'\tailia processing time {end - start} ms')
+    else:
         classifier.compute(img, MAX_CLASS_COUNT)
-        end = int(round(time.time() * 1000))
-        print(f'ailia processing time {end - start} ms')
 
     # get result
     count = classifier.get_class_count()
     print(f'class_count: {count}')
 
-    for idx in range(count) :
+    for idx in range(count):
         print(f"+ idx={idx}")
         info = classifier.get_class(idx)
         print(f"  category={info.category} " +
-              f"[ {resnet50_labels.imagenet_category[info.category]} ]" )
+              f"[ {resnet50_labels.imagenet_category[info.category]} ]")
         print(f"  prob={info.prob}")
     print('Script finished successfully.')
 
@@ -151,11 +162,11 @@ def recognize_from_video():
 
         print('==============================================================')
         print(f'class_count: {count}')
-        for idx in range(count) :
+        for idx in range(count):
             print(f"+ idx={idx}")
             info = classifier.get_class(idx)
             print(f"  category={info.category} " +
-                  f"[ {resnet50_labels.imagenet_category[info.category]} ]" )
+                  f"[ {resnet50_labels.imagenet_category[info.category]} ]")
             print(f"  prob={info.prob}")
         cv2.imshow('frame', in_frame)
         time.sleep(SLEEP_TIME)

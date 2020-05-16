@@ -61,6 +61,12 @@ parser.add_argument(
     '--apply_rotate', action='store_true',
     help='If add this argument, apply random rotation to input image'
 )
+parser.add_argument(
+    '-b', '--benchmark',
+    action='store_true',
+    help='Running the inference on the same input 5 times ' +
+         'to measure execution performance. (Cannot be used in video mode)'
+)
 args = parser.parse_args()
 
 
@@ -101,17 +107,22 @@ def recognize_from_image():
     net.set_input_shape(input_data.shape)
 
     # compute execution time
-    for i in range(5):
-        start = int(round(time.time() * 1000))
+    print('Start inference...')
+    if args.benchmark:
+        print('BENCHMARK mode')
+        for i in range(5):
+            start = int(round(time.time() * 1000))
+            preds_ailia = net.predict(input_data)
+            end = int(round(time.time() * 1000))
+            print(f'\tailia processing time {end - start} ms')
+    else:
         preds_ailia = net.predict(input_data)
-        end = int(round(time.time() * 1000))
-        print(f'ailia processing time {end - start} ms')
 
     # visualize
     predicted_angle = np.argmax(preds_ailia, axis=1)[0]
     plt = visualize(rotated_img, rotation_angle, predicted_angle)
     plt.savefig(args.savepath)
-    
+
     print('Script finished successfully.')
 
 
