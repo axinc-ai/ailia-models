@@ -49,7 +49,12 @@ parser.add_argument(
     help='By default, the optimized model is used, but with this option, ' +
     'you can switch to the normal (not optimized) model'
 )
-
+parser.add_argument(
+    '-b', '--benchmark',
+    action='store_true',
+    help='Running the inference on the same input 5 times ' +
+         'to measure execution performance. (Cannot be used in video mode)'
+)
 args = parser.parse_args()
 
 
@@ -100,11 +105,16 @@ def recognize_from_image():
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
 
     # compute execution time
-    for i in range(5):
-        start = int(round(time.time() * 1000))
+    print('Start inference...')
+    if args.benchmark:
+        print('BENCHMARK mode')
+        for i in range(5):
+            start = int(round(time.time() * 1000))
+            preds_ailia = net.predict(input_data)
+            end = int(round(time.time() * 1000))
+            print(f'\tailia processing time {end - start} ms')
+    else:
         preds_ailia = net.predict(input_data)
-        end = int(round(time.time() * 1000))
-        print(f'ailia processing time {end - start} ms')
 
     print_results(preds_ailia)
     print('Script finished successfully.')
