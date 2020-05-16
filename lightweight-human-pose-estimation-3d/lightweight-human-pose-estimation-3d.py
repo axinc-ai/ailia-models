@@ -63,6 +63,12 @@ parser.add_argument(
     default=SAVE_IMAGE_PATH,
     help='Save path for the output image.'
 )
+parser.add_argument(
+    '-b', '--benchmark',
+    action='store_true',
+    help='Running the inference on the same input 5 times ' +
+         'to measure execution performance. (Cannot be used in video mode)'
+)
 args = parser.parse_args()
 
 
@@ -149,7 +155,7 @@ def main():
             normalized_img.transpose(2, 0, 1), axis=0
         )
 
-        # exectution 
+        # exectution
         if is_video:
             input_blobs = net.get_input_blob_list()
             net.set_input_blob_data(normalized_img, input_blobs[0])
@@ -157,14 +163,16 @@ def main():
             features, heatmaps, pafs = net.get_results()
 
         else:
-            for i in range(5):
-                start = int(round(time.time() * 1000))
-                input_blobs = net.get_input_blob_list()
-                net.set_input_blob_data(normalized_img, input_blobs[0])
-                net.update()
-                features, heatmaps, pafs = net.get_results()
-                end = int(round(time.time() * 1000))
-                print(f'ailia processing time {end - start} ms')
+            print('Start inference...')
+            if args.benchmark:
+                print('BENCHMARK mode')
+                for i in range(5):
+                    start = int(round(time.time() * 1000))
+                    features, heatmaps, pafs = net.predict([normalized_img])
+                    end = int(round(time.time() * 1000))
+                    print(f'ailia processing time {end - start} ms')
+            else:
+                features, heatmaps, pafs = net.predict([normalized_img])
 
         inference_result = (
             features[-1].squeeze(),
@@ -235,7 +243,7 @@ def main():
                 break
             else:
                 delay = 1
-    
+
     print('Script finished successfully.')
 
 
