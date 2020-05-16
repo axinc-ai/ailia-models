@@ -54,6 +54,12 @@ parser.add_argument(
     default=SAVE_IMAGE_PATH,
     help='Save path for the output image.'
 )
+parser.add_argument(
+    '-b', '--benchmark',
+    action='store_true',
+    help='Running the inference on the same input 5 times ' +
+         'to measure execution performance. (Cannot be used in video mode)'
+)
 args = parser.parse_args()
 
 
@@ -91,7 +97,7 @@ def display_objdetect_image(
 ):
     """
     Display or Save result
-    
+
     Parameters
     ----------
     savepath: str
@@ -174,16 +180,16 @@ def recognize_from_image():
     net.set_input_shape(input_data.shape)
 
     # compute execution time
-    for i in range(1):
-        start = int(round(time.time() * 1000))
-
-        input_blobs = net.get_input_blob_list()
-        net.set_input_blob_data(input_data, input_blobs[0])
-        net.update()
-        boxes, labels, scores, masks = net.get_results()
-        
-        end = int(round(time.time() * 1000))
-        print(f'ailia processing time {end - start} ms')
+    print('Start inference...')
+    if args.benchmark:
+        print('BENCHMARK mode')
+        for i in range(5):
+            start = int(round(time.time() * 1000))
+            boxes, labels, scores, masks = net.predict([input_data])
+            end = int(round(time.time() * 1000))
+            print(f'\tailia processing time {end - start} ms')
+    else:
+        boxes, labels, scores, masks = net.predict([input_data])
 
     # postprocessing
     display_objdetect_image(
@@ -219,10 +225,7 @@ def recognize_from_video():
         input_data = preprocess(frame)
         net.set_input_shape(input_data.shape)
 
-        input_blobs = net.get_input_blob_list()
-        net.set_input_blob_data(input_data, input_blobs[0])
-        net.update()
-        boxes, labels, scores, masks = net.get_results()
+        boxes, labels, scores, masks = net.predict([input_data])
 
         display_objdetect_image(frame, boxes, labels, scores, masks)
         plt.pause(.01)

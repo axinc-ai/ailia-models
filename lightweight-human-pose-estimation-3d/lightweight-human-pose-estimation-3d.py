@@ -170,7 +170,7 @@ def main():
                     start = int(round(time.time() * 1000))
                     features, heatmaps, pafs = net.predict([normalized_img])
                     end = int(round(time.time() * 1000))
-                    print(f'ailia processing time {end - start} ms')
+                    print(f'\tailia processing time {end - start} ms')
             else:
                 features, heatmaps, pafs = net.predict([normalized_img])
 
