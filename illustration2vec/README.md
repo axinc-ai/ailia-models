@@ -1,7 +1,7 @@
 # Illustration2Vec
 
 ### input
-![input_image](input.jpg)
+![input_image](input.jpg)  
 Hatsune Miku (初音ミク), © Crypton Future Media, INC., http://piapro.net/en_for_creators.html. This image is licensed under the Creative Commons - Attribution-NonCommercial, 3.0 Unported (CC BY-NC).  
 - Ailia input shape: (1, 3, 224, 224)  
 
