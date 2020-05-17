@@ -50,7 +50,12 @@ parser.add_argument(
     default=SAVE_IMAGE_PATH,
     help='Save path for the output image.'
 )
-
+parser.add_argument(
+    '-b', '--benchmark',
+    action='store_true',
+    help='Running the inference on the same input 5 times ' +
+         'to measure execution performance. (Cannot be used in video mode)'
+)
 args = parser.parse_args()
 
 
@@ -108,12 +113,17 @@ def recognize_from_image():
     print(f'env_id: {env_id}')
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
 
-    # compute execution time
-    for i in range(5):
-        start = int(round(time.time() * 1000))
+    # inference
+    print('Start inference...')
+    if args.benchmark:
+        print('BENCHMARK mode')    
+        for i in range(5):
+            start = int(round(time.time() * 1000))
+            preds_ailia = net.predict(input_data)
+            end = int(round(time.time() * 1000))
+            print(f'\tailia processing time {end - start} ms')
+    else:
         preds_ailia = net.predict(input_data)
-        end = int(round(time.time() * 1000))
-        print(f'ailia processing time {end - start} ms')
 
     # postprocessing
     res_img = postprocess(src_img, preds_ailia)
@@ -126,7 +136,7 @@ def recognize_from_video():
     env_id = ailia.get_gpu_environment_id()
     print(f'env_id: {env_id}')
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
-    
+
     if args.video == '0':
         print('[INFO] Webcam mode is activated')
         capture = cv2.VideoCapture(0)
@@ -153,12 +163,12 @@ def recognize_from_video():
 
         src_img = cv2.resize(src_img, (IMAGE_WIDTH, IMAGE_HEIGHT))
         src_img = cv2.cvtColor(src_img, cv2.COLOR_BGR2RGB)
-        
+
         preds_ailia = net.predict(input_data)
-        
+
         res_img = postprocess(src_img, preds_ailia)
         cv2.imshow('frame', res_img / 255.0)
-        
+
     capture.release()
     cv2.destroyAllWindows()
     print('Script finished successfully.')

@@ -52,6 +52,12 @@ parser.add_argument(
     default='mb2-ssd-lite', choices=MODEL_LISTS,
     help='model lists: ' + ' | '.join(MODEL_LISTS) + ' (default: mb2-ssd-lite)'
 )
+parser.add_argument(
+    '-b', '--benchmark',
+    action='store_true',
+    help='Running the inference on the same input 5 times ' +
+         'to measure execution performance. (Cannot be used in video mode)'
+)
 args = parser.parse_args()
 
 
@@ -115,12 +121,17 @@ def recognize_from_image():
         algorithm=ailia.DETECTOR_ALGORITHM_SSD, env_id=env_id
     )
 
-    # compute execution time
-    for i in range(5):
-        start = int(round(time.time() * 1000))
+    # inference
+    print('Start inference...')
+    if args.benchmark:
+        print('BENCHMARK mode')
+        for i in range(5):
+            start = int(round(time.time() * 1000))
+            detector.compute(org_img, threshold, iou)
+            end = int(round(time.time() * 1000))
+            print(f'\tailia processing time {end - start} ms')
+    else:
         detector.compute(org_img, threshold, iou)
-        end = int(round(time.time() * 1000))
-        print(f'ailia processing time {end - start} ms')
 
     # postprocessing
     res_img = plot_results(detector, org_img, VOC_CATEGORY)

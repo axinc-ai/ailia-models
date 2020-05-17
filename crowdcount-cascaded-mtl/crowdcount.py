@@ -8,10 +8,10 @@ import numpy as np
 import ailia
 # import original modules
 sys.path.append('../util')
-from utils import check_file_existance
-from model_utils import check_and_download_models
-from image_utils import load_image
-from webcamera_utils import preprocess_frame
+from utils import check_file_existance  # noqa: E402
+from model_utils import check_and_download_models  # noqa: E402
+from image_utils import load_image  # noqa: E402
+from webcamera_utils import preprocess_frame  # noqa: E402
 
 
 # ======================
@@ -35,13 +35,13 @@ parser = argparse.ArgumentParser(
 )
 parser.add_argument(
     '-i', '--input', metavar='IMAGEFILE_PATH',
-    default=IMAGE_PATH, 
+    default=IMAGE_PATH,
     help='The input image path.'
 )
 parser.add_argument(
     '-v', '--video', metavar='VIDEO',
     default=None,
-    help='The input video path. ' +\
+    help='The input video path. ' +
          'If the VIDEO argument is set to 0, the webcam input will be used.'
 )
 parser.add_argument(
@@ -49,16 +49,22 @@ parser.add_argument(
     default=SAVE_IMAGE_PATH,
     help='Save path for the output image.'
 )
+parser.add_argument(
+    '-b', '--benchmark',
+    action='store_true',
+    help='Running the inference on the same input 5 times ' +
+         'to measure execution performance. (Cannot be used in video mode)'
+)
 args = parser.parse_args()
 
 
-# ======================p
+# ======================
 # Main functions
 # ======================
 def estimate_from_image():
     # prepare input data
     org_img = load_image(args.input, (HEIGHT, WIDTH), normalize_type='None')
-    img = load_image(
+    input_data = load_image(
         args.input,
         (HEIGHT, WIDTH),
         rgb=False,
@@ -71,12 +77,16 @@ def estimate_from_image():
     print(env_id)
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
 
-    # compute execution time
-    for i in range(5):
-        start = int(round(time.time() * 1000))
-        preds_ailia = net.predict(img)
-        end = int(round(time.time() * 1000))
-        print("ailia processing time {} ms".format(end - start))
+    # inference
+    if args.benchmark:
+        print('BENCHMARK mode')
+        for i in range(5):
+            start = int(round(time.time() * 1000))
+            preds_ailia = net.predict(input_data)
+            end = int(round(time.time() * 1000))
+            print("\tailia processing time {} ms".format(end - start))
+    else:
+        preds_ailia = net.predict(input_data)
 
     # estimated crowd count
     et_count = int(np.sum(preds_ailia))
@@ -129,7 +139,7 @@ def estimate_from_video():
 
         # inference
         preds_ailia = net.predict(input_data)
-    
+
         # estimated crowd count
         et_count = int(np.sum(preds_ailia))
 
