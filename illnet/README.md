@@ -3,6 +3,7 @@
 
 ### input
 <img src='input.png' width='240px'>
+
 - The output image of [ailia-models/dewarpnet](https://github.com/sngyo/ailia-models/tree/master/dewarpnet) is used as the sample input image.
 (original image from https://github.com/cvlab-stonybrook/DewarpNet/tree/master/eval/inp)
 
@@ -34,7 +35,7 @@ $ python3 illnet.py --video VIDEO_PATH
 ```
 
 ### Reference
-[DocProj](https://github.com/xiaoyu258/DocProj)
+[Document Rectification and Illumination Correction using a Patch-based CNN](https://github.com/xiaoyu258/DocProj)
 
 
 ### Framework
