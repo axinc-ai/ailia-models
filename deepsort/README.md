@@ -1,6 +1,13 @@
 # DeepSort
 
-### usage
+### Input
+The sample input video is `TownCentreXVID.avi` from http://www.robots.ox.ac.uk/~lav/Research/Projects/2009bbenfold_headpose/project.html
+
+### Output Example
+![ex_result](https://user-images.githubusercontent.com/45060776/82342446-978c1500-9a2c-11ea-976b-a0d3358f89a3.gif)
+
+
+### Usage
 Automatically downloads the onnx and prototxt files on the first run.
 It is necessary to be connected to the Internet while downloading.
 
