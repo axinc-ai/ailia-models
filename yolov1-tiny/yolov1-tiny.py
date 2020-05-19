@@ -11,7 +11,7 @@ sys.path.append('../util')
 from utils import check_file_existance  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from webcamera_utils import adjust_frame_size  # noqa: E402C
-from detector_utils import plot_results, load_image # noqa: E402C
+from detector_utils import plot_results, load_image  # noqa: E402C
 
 
 # ======================
@@ -74,6 +74,12 @@ parser.add_argument(
     default=SAVE_IMAGE_PATH,
     help='Save path for the output image.'
 )
+parser.add_argument(
+    '-b', '--benchmark',
+    action='store_true',
+    help='Running the inference on the same input 5 times ' +
+         'to measure execution performance. (Cannot be used in video mode)'
+)
 args = parser.parse_args()
 
 
@@ -99,12 +105,17 @@ def recognize_from_image():
         env_id=env_id
     )
 
-    # compute execution time
-    for i in range(5):
-        start = int(round(time.time() * 1000))
+    # inference
+    print('Start inference...')
+    if args.benchmark:
+        print('BENCHMARK mode')
+        for i in range(5):
+            start = int(round(time.time() * 1000))
+            detector.compute(img, THRESHOLD, IOU)
+            end = int(round(time.time() * 1000))
+            print(f'\tailia processing time {end - start} ms')
+    else:
         detector.compute(img, THRESHOLD, IOU)
-        end = int(round(time.time() * 1000))
-        print(f'ailia processing time {end - start} ms')
 
     # plot result
     res_img = plot_results(detector, img, VOC_CATEGORY)

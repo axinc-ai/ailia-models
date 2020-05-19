@@ -7,10 +7,8 @@ import cv2
 import ailia
 # import original modules
 sys.path.append('../util')
-from utils import check_file_existance
-from model_utils import check_and_download_models
-from image_utils import load_image
-from webcamera_utils import preprocess_frame
+from utils import check_file_existance  # noqa: E402
+from model_utils import check_and_download_models  # noqa: E402
 
 
 # ======================
@@ -47,14 +45,20 @@ parser = argparse.ArgumentParser(
 )
 parser.add_argument(
     '-i', '--input', metavar='IMAGEFILE_PATH',
-    default=IMAGE_PATH, 
+    default=IMAGE_PATH,
     help='The input image path.'
 )
 parser.add_argument(
     '-v', '--video', metavar='VIDEO',
     default=None,
-    help='The input video path. ' +\
+    help='The input video path. ' +
          'If the VIDEO argument is set to 0, the webcam input will be used.'
+)
+parser.add_argument(
+    '-b', '--benchmark',
+    action='store_true',
+    help='Running the inference on the same input 5 times ' +
+         'to measure execution performance. (Cannot be used in video mode)'
 )
 args = parser.parse_args()
 
@@ -66,14 +70,14 @@ def recognize_from_image():
     # prepare input
     # load input image and convert to BGRA
     img = cv2.imread(args.input, cv2.IMREAD_UNCHANGED)
-    if img.shape[2] == 3 :
+    if img.shape[2] == 3:
         img = cv2.cvtColor(img, cv2.COLOR_BGR2BGRA)
-    elif img.shape[2] == 1 : 
+    elif img.shape[2] == 1:
         img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGRA)
 
     # net initialize
     env_id = ailia.get_gpu_environment_id()
-    print(f'env_id: {env_id}')    
+    print(f'env_id: {env_id}')
     emotion_classifier = ailia.Classifier(
         EMOTION_MODEL_PATH,
         EMOTION_WEIGHT_PATH,
@@ -91,13 +95,17 @@ def recognize_from_image():
         channel=ailia.NETWORK_IMAGE_CHANNEL_FIRST
     )
 
-    # compute emotion exectution time
-    for i in range(5):
-        start = int(round(time.time() * 1000))
+    # inference emotion
+    print('Start inference...')
+    if args.benchmark:
+        print('BENCHMARK mode')
+        for i in range(5):
+            start = int(round(time.time() * 1000))
+            emotion_classifier.compute(img, EMOTION_MAX_CLASS_COUNT)
+            end = int(round(time.time() * 1000))
+            print(f'\t[EMOTION MODEL] ailia processing time {end - start} ms')
+    else:
         emotion_classifier.compute(img, EMOTION_MAX_CLASS_COUNT)
-        end = int(round(time.time() * 1000))
-        print(f'[EMOTION MODEL] ailia processing time {end - start} ms')
-
     count = emotion_classifier.get_class_count()
     print(f'emotion_class_count={count}')
 
@@ -111,13 +119,16 @@ def recognize_from_image():
         print(f'  prob={info.prob}')
     print('')
 
-    # compute gender exectution time
-    for i in range(5):
-        start = int(round(time.time() * 1000))
+    # inference gender
+    if args.benchmark:
+        print('BENCHMARK mode')
+        for i in range(5):
+            start = int(round(time.time() * 1000))
+            gender_classifier.compute(img, GENDER_MAX_CLASS_COUNT)
+            end = int(round(time.time() * 1000))
+            print(f'\t[EMOTION MODEL] ailia processing time {end - start} ms')
+    else:
         gender_classifier.compute(img, GENDER_MAX_CLASS_COUNT)
-        end = int(round(time.time() * 1000))
-        print(f'[EMOTION MODEL] ailia processing time {end - start} ms')
-
     count = gender_classifier.get_class_count()
     print(f'gender_class_count={count}')
 
@@ -152,7 +163,7 @@ def recognize_from_video():
         range=ailia.NETWORK_IMAGE_RANGE_S_FP32,
         channel=ailia.NETWORK_IMAGE_CHANNEL_FIRST
     )
-    
+
     if args.video == '0':
         print('[INFO] Webcam mode is activated')
         capture = cv2.VideoCapture(0)
@@ -161,17 +172,17 @@ def recognize_from_video():
             sys.exit(1)
     else:
         if check_file_existance(args.video):
-            capture = cv2.VideoCapture(args.video)        
-    
+            capture = cv2.VideoCapture(args.video)
+
     while(True):
         ret, frame = capture.read()
         frame = cv2.cvtColor(frame, cv2.COLOR_BGR2BGRA)
-        
+
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
         if not ret:
             continue
-        
+
         # emotion inference
         emotion_classifier.compute(frame, EMOTION_MAX_CLASS_COUNT)
         count = emotion_classifier.get_class_count()
@@ -183,7 +194,7 @@ def recognize_from_video():
             print(f'+ idx={idx}')
             info = emotion_classifier.get_class(idx)
             print(
-                f'  category={info.category} ' +\
+                f'  category={info.category} ' +
                 f'[ {EMOTION_CATEGORY[info.category]} ]'
             )
             print(f'  prob={info.prob}')
@@ -197,14 +208,14 @@ def recognize_from_video():
             print(f'+ idx={idx}')
             info = gender_classifier.get_class(idx)
             print(
-                f'  category={info.category} ' +\
+                f'  category={info.category} ' +
                 f'[ {GENDER_CATEGORY[info.category]} ]'
             )
             print(f'  prob={info.prob}')
         print('')
         cv2.imshow('frame', frame)
         time.sleep(SLEEP_TIME)
-        
+
     capture.release()
     cv2.destroyAllWindows()
     print('Script finished successfully.')

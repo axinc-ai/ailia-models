@@ -9,42 +9,51 @@ import efficientnet_labels
 
 # import original modules
 sys.path.append("../util")
-from utils import check_file_existance
-from model_utils import check_and_download_models
-from image_utils import load_image
-from webcamera_utils import adjust_frame_size
+from utils import check_file_existance  # noqa: E402
+from model_utils import check_and_download_models  # noqa: E402
+from image_utils import load_image  # noqa: E402
+from webcamera_utils import adjust_frame_size  # noqa: E402
 
-# ================
-# IMAGE PARAMETERS
-# ================
+
+# ======================
+# PARAMETERS 1
+# ======================
 IMAGE_PATH = "clock.jpg"
 IMAGE_HEIGHT = 224
 IMAGE_WIDTH = 224
+
 
 # ======================
 # Argument Parser Config
 # ======================
 parser = argparse.ArgumentParser(
-    description = "EfficientNet is "
+    description="EfficientNet is "
 )
 parser.add_argument(
-    '-m', '--model', metavar = 'MODEL',
-    default = "b7",
-    help = "The input model path." +\
-           "you can set b0 or b7 to select efficientnet-b0 or efficientnet-b7"
+    '-m', '--model', metavar='MODEL',
+    default="b7", choices=['b0', 'b7'], 
+    help="The input model path." +
+         "you can set b0 or b7 to select efficientnet-b0 or efficientnet-b7"
 )
 parser.add_argument(
-    '-i', '--input', metavar = 'IMAGE',
-    default = IMAGE_PATH,
-    help = "The input image path."
+    '-i', '--input', metavar='IMAGE',
+    default=IMAGE_PATH,
+    help="The input image path."
 )
 parser.add_argument(
-    '-v', '--video', metavar = 'VIDEO',
-    default = None,
-    help = "The input video path." +\
-           "If the VIDEO argument is set to 0, the webcam input will be used."
+    '-v', '--video', metavar='VIDEO',
+    default=None,
+    help="The input video path." +
+         "If the VIDEO argument is set to 0, the webcam input will be used."
+)
+parser.add_argument(
+    '-b', '--benchmark',
+    action='store_true',
+    help='Running the inference on the same input 5 times ' +
+         'to measure execution performance. (Cannot be used in video mode)'
 )
 args = parser.parse_args()
+
 
 # ==========================
 # MODEL AND OTHER PARAMETERS
@@ -54,13 +63,13 @@ WEIGHT_PATH = "efficientnet-" + args.model + ".onnx"
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/efficientnet/"
 
 MAX_CLASS_COUNT = 3
-SLEEP_TIME = 3 # for web cam mode
+SLEEP_TIME = 3  # for web cam mode
+
 
 # ======================
 # Main functions
 # ======================
 def recognize_from_image():
-
     # prepare input data
     input_data = load_image(
         args.input,
@@ -84,20 +93,26 @@ def recognize_from_image():
         range=ailia.NETWORK_IMAGE_RANGE_S_FP32
     )
 
-    # compute execution time
-    for i in range(5):
-        start = int(round(time.time() * 1000))
+    # inference
+    print('Start inference...')
+    if args.benchmark:
+        print('BENCHMARK mode')
+        for i in range(5):
+            start = int(round(time.time() * 1000))
+            classifier.compute(input_data, MAX_CLASS_COUNT)
+            count = classifier.get_class_count()
+            end = int(round(time.time() * 1000))
+            print(f'\tailia processing time {end - start} ms')
+    else:
         classifier.compute(input_data, MAX_CLASS_COUNT)
         count = classifier.get_class_count()
-        end = int(round(time.time() * 1000))
-        print(f'ailia processing time {end - start} ms')
 
     # show results
     print(f'class_count: {count}')
     for idx in range(count):
         print(f'+ idx={idx}')
         info = classifier.get_class(idx)
-        print(f'  category={info.category} [ ' +\
+        print(f'  category={info.category} [ ' +
               f'{efficientnet_labels.imagenet_category[info.category]} ]')
         print(f'  prob={info.prob}')
 
@@ -148,7 +163,7 @@ def recognize_from_video():
         for idx in range(count):
             print(f'+ idx={idx}')
             info = classifier.get_class(idx)
-            print(f'  category={info.category} [ ' +\
+            print(f'  category={info.category} [ ' +
                   f'{efficientnet_labels.imagenet_category[info.category]} ]')
             print(f'  prob={info.prob}')
 

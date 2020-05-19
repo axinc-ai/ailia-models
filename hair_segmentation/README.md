@@ -3,6 +3,7 @@
 ### Input
 
 ![input image](input.jpg)
+
 (from https://github.com/thangtran480/hair-segmentation/tree/master/assets)
 
 Ailia input shape(1, 224, 224, 3)  
