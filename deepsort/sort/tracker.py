@@ -1,8 +1,8 @@
 import numpy as np
-import kalman_filter
-import linear_assignment
-import iou_matching
-from track import Track
+from . import kalman_filter
+from . import linear_assignment
+from . import iou_matching
+from .track import Track
 
 
 class Tracker:

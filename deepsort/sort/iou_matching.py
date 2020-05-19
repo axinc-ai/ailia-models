@@ -1,5 +1,5 @@
 import numpy as np
-import linear_assignment
+from . import linear_assignment
 
 
 def iou(bbox, candidates):

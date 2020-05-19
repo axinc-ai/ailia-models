@@ -5,8 +5,8 @@ import numpy as np
 import cv2
 
 import ailia
-from tracker import Tracker
-from nn_matching import NearestNeighborDistanceMetric
+from sort.tracker import Tracker
+from sort.nn_matching import NearestNeighborDistanceMetric
 from deepsort_utils import *
 
 # import original modules
