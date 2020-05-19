@@ -1,6 +1,3 @@
-from tracker import Tracker
-from nn_matching import NearestNeighborDistanceMetric
-from deepsort_utils import *
 import sys
 import argparse
 
@@ -8,6 +5,9 @@ import numpy as np
 import cv2
 
 import ailia
+from tracker import Tracker
+from nn_matching import NearestNeighborDistanceMetric
+from deepsort_utils import *
 
 # import original modules
 sys.path.append('../util')
@@ -25,8 +25,8 @@ EX_WEIGHT_PATH = 'deep_sort.onnx'
 EX_MODEL_PATH = 'deep_sort.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/deep_sort/'
 
-VIDEO_PATH = 'input.mp4'
-SAVE_VIDEO_PATH = 'output.mp4'
+VIDEO_PATH = 'sample.mp4'
+SAVE_VIDEO_PATH = 'output.avi'
 
 # Deep sort model input
 INPUT_HEIGHT = 128
@@ -74,12 +74,19 @@ args = parser.parse_args()
 
 
 # ======================
+# Utils
+# ======================
+def resize(img, size=(INPUT_WIDTH, INPUT_HEIGHT)):
+    return cv2.resize(img.astype(np.float32), size)
+
+
+# ======================
 # Main functions
 # ======================
 def recognize_from_video():
     results = []
     idx_frame = 0
-    
+
     # net initialize
     env_id = ailia.get_gpu_environment_id()
     print(f'env_id: {env_id}')
@@ -96,10 +103,10 @@ def recognize_from_video():
         env_id=env_id
     )
 
-    # SORT
+    # SORT Model
     extractor = ailia.Net(EX_MODEL_PATH, EX_WEIGHT_PATH, env_id=env_id)
 
-    # tracker
+    # tracker class instance
     max_cosine_distance = 0.2
     nn_budget = 100
     metric = NearestNeighborDistanceMetric(
@@ -111,7 +118,7 @@ def recognize_from_video():
         max_age=70,
         n_init=3
     )
-    
+
     if args.input == '0':
         print('[INFO] Webcam mode is activated')
         capture = cv2.VideoCapture(0)
@@ -125,7 +132,9 @@ def recognize_from_video():
     # create video writer
     writer = cv2.VideoWriter(
         args.savepath,
-        cv2.VideoWriter_fourcc(*'MJPG'),
+        # cv2.VideoWriter_fourcc(*'mpeg'),
+        cv2.VideoWriter_fourcc(*'MJPG'),  # mp4
+        # cv2.VideoWriter_fourcc(*'XVID'),  # avi
         20,
         (
             int(capture.get(cv2.CAP_PROP_FRAME_WIDTH)),
@@ -133,21 +142,22 @@ def recognize_from_video():
         )
     )
 
+    print('Start Inference...')
     while(True):
         idx_frame += 1
         ret, frame = capture.read()
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
         if not ret:
-            continue
+            break
 
-        img = cv2.cvtColor(frame, cv2.COLOR_RGB2BGRA)
+        input_img = cv2.cvtColor(frame, cv2.COLOR_RGB2BGRA)
         h, w = frame.shape[0], frame.shape[1]
 
         # do detection
-        detector.compute(img, THRESHOLD, IOU)
+        detector.compute(input_img, THRESHOLD, IOU)
         bbox_xywh, cls_conf, cls_ids = get_detector_result(detector, h, w)
-
+        
         # select person class
         mask = cls_ids == 0
         bbox_xywh = bbox_xywh[mask]
@@ -164,12 +174,17 @@ def recognize_from_video():
 
         if img_crops:
             # preprocess
-            def _resize(img, size=(INPUT_WIDTH, INPUT_HEIGHT)):
-                return cv2.resize(img.astype(np.float32) / 255.0, size)
-            img_crops = [_resize(img) for img in img_crops]
-            img_crops = [normalize_image(img, 'ImageNet') for img in img_crops]
-            img_batch = np.concatenate(img_crops, axis=0).transpose((2, 0, 1))
-            features = extractor.predict(img_batch)
+            img_batch = np.concatenate([
+                normalize_image(resize(img), 'ImageNet')[np.newaxis, :, :, :]
+                for img in img_crops
+            ], axis=0).transpose(0, 3, 1, 2)
+            
+            # TODO better to pass a batch at once
+            # features = extractor.predict(img_batch)
+            features = []
+            for img in img_batch:
+                features.append(extractor.predict(img[np.newaxis, :, :, :])[0])
+            features = np.array(features)
         else:
             features = np.array([])
 
@@ -214,16 +229,16 @@ def recognize_from_video():
 
             results.append((idx_frame - 1, bbox_tlwh, identities))
 
-        if args.display:
-            cv2.imshow('frame', frame)
-        
+        cv2.imshow('frame', frame)
+
         if args.savepath:
             writer.write(frame)
 
-        write_results(args.savepath, results, 'mot')
+        write_results(args.savepath.split('.')[0] + '.txt', results, 'mot')
 
     capture.release()
     cv2.destroyAllWindows()
+    print(f'Save results to {args.savepath}')
     print('Script finished successfully.')
 
 
@@ -233,7 +248,7 @@ def main():
     check_and_download_models(DT_WEIGHT_PATH, DT_MODEL_PATH, REMOTE_PATH)
     print('Check Extractor...')
     check_and_download_models(EX_WEIGHT_PATH, EX_MODEL_PATH, REMOTE_PATH)
-    
+
     recognize_from_video()
 
 
