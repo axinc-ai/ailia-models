@@ -267,3 +267,7 @@ def write_results(filename, results, data_type):
                     h=h
                 )
                 f.write(line)
+
+
+def cosin_metric(x1, x2):
+    return np.dot(x1, x2) / (np.linalg.norm(x1) * np.linalg.norm(x2))
