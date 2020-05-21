@@ -20,8 +20,6 @@ which allows for non-commercial use only. For any other use of the software not
 covered by the terms of this license, please contact partnerships@nianticlabs.com
 
 ### usage
-
-### usage
 Automatically downloads the onnx and prototxt files on the first run.
 It is necessary to be connected to the Internet while downloading.
 

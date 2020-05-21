@@ -65,7 +65,7 @@ parser = argparse.ArgumentParser(
     description='Deep SORT'
 )
 parser.add_argument(
-    '-i', '--input', metavar='VIDEO',
+    '-v', '--video', metavar='VIDEO',
     default=VIDEO_PATH,
     help=('The input video path.'
           'If the VIDEO argument is set to 0, the webcam input will be used.')
