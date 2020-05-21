@@ -2,13 +2,29 @@
 
 The collection of pre-trained, state-of-the-art models.
 
+# Setup
+
 ## About ailia SDK
 
-ailia SDK is a cross-platform high speed inference SDK. The ailia SDK provides a consistent C++ API on Windows, Mac, Linux, iOS, Android and Jetson. It supports Unity, Python and JNI for efficient AI implementation. The ailia SDK makes great use of the GPU via Vulkan and Metal to serve accelerated computing.
+[ailia SDK](/https://ailia.jp/en/) is a cross-platform high speed inference SDK. The ailia SDK provides a consistent C++ API on Windows, Mac, Linux, iOS, Android and Jetson. It supports Unity, Python and JNI for efficient AI implementation. The ailia SDK makes great use of the GPU via Vulkan and Metal to serve accelerated computing.
 
-You can download a free evaluation version that allows you to evaluate the ailia SDK for 30 days. Please download from the trial link below.
+## Install ailia SDK
 
-https://ailia.jp/en/
+- [Download a free avaluation version of ailia SDK](https://ailia.jp/en/trial)
+- Unzip ailia SDK
+- Find the location of Python site-packages directory
+```
+python -c "import site; print (site.getsitepackages())"
+```
+
+- Copy the ​ailia ​folder located in the ​python f​older to site-packages
+- Copy library files (dll or dylib or so) from the folder library to site-packages/ailia
+- Install required libraries
+```
+pip install -r requirements.txt
+```
+
+# Supported models
 
 ## Image classification
 
