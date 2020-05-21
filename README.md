@@ -10,7 +10,7 @@ The collection of pre-trained, state-of-the-art models.
 
 ## Install ailia SDK
 
-- [Download a free avaluation version of ailia SDK](https://ailia.jp/en/trial)
+- [Download a free evaluation version of ailia SDK](https://ailia.jp/en/trial)
 - Unzip ailia SDK
 - Find the location of Python site-packages directory
 ```
