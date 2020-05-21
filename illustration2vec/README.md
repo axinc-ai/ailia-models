@@ -64,6 +64,7 @@ $ python3 illustration2vec --featurevec
 
 
 ### Framework
+Caffe
 
 
 ### Model Format

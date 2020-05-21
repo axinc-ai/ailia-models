@@ -61,6 +61,12 @@ https://ailia.jp/en/
 | [mobilenet_ssd](/mobilenet_ssd/) | [MobileNetV1, MobileNetV2, VGG based SSD/SSD-lite implementation in Pytorch](https://github.com/qfgaohao/pytorch-ssd) | Pytorch | 1.2.1 and later |
 | [maskrcnn](/maskrcnn/) | [Mask R-CNN: real-time neural network for object instance segmentation](https://github.com/onnx/models/tree/master/vision/object_detection_segmentation/mask-rcnn) | Pytorch | 1.2.3 beta and later |
 
+## Object tracking
+
+| Name | Detail | Exported From | Supported Ailia Version |
+|:-----------|------------:|:------------:|:------------:|
+| [deepsort](/deepsort/) | [Deep Sort with PyTorch](https://github.com/ZQPei/deep_sort_pytorch) | Pytorch | 1.2.3 beta and later |
+
 ## Pose estimation
 
 | Name | Detail | Exported From | Supported Ailia Version |
