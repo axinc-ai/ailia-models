@@ -3,16 +3,21 @@ import sys
 import argparse
 
 import numpy as np
-from transformers import BertTokenizer
+
+# to remove "deprecated error"
+import warnings
+warnings.filterwarnings('ignore', category=FutureWarning)
+
+from transformers import BertTokenizer  # noqa: E402
 try:
-    from pyknp import Juman
+    from pyknp import Juman  # noqa: E402
 except:
     print('[WARNING] pyknp module is not installed. (for japanese mode)')
 
-import ailia
+import ailia  # noqa: E402
 # import original modules
 sys.path.append('../util')
-from model_utils import check_and_download_models
+from model_utils import check_and_download_models  # noqa: E402
 
 
 # ======================
@@ -21,13 +26,19 @@ from model_utils import check_and_download_models
 LANGS = ['en', 'jp']
 
 parser = argparse.ArgumentParser(
-    description='BERT is a state of the art language model.' +\
+    description='BERT is a state of the art language model.' +
     'In our model, we solve the task of predicting the masked word.'
 )
 parser.add_argument(
     '--lang', '-l', metavar='LANG',
     default='en', choices=LANGS,
     help='choose language: ' + ' | '.join(LANGS) + ' (default: en)'
+)
+parser.add_argument(
+    '-b', '--benchmark',
+    action='store_true',
+    help='Running the inference on the same input 5 times ' +
+         'to measure execution performance. (Cannot be used in video mode)'
 )
 # TODO
 # input masked sentence ? how treats Japanese?
@@ -45,7 +56,7 @@ if LANG == 'en':
     WEIGHT_PATH = "bert-base-uncased.onnx"
     MODEL_PATH = "bert-base-uncased.onnx.prototxt"
     REMOTE_PATH = "https://storage.googleapis.com/ailia-models/bert_en/"
-    
+
     MAX_SEQ_LEN = 128
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -125,7 +136,7 @@ def text2token(text, tokenizer, lang='en'):
 def main():
     # model files check and download
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
-    
+
     # bert tokenizer
     if LANG == 'en':
         tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
@@ -137,31 +148,28 @@ def main():
         )
 
     # prepare data
-    dummy_input = np.ones((1, MAX_SEQ_LEN), dtype=np.int64)
+    sentence_id = np.ones((1, MAX_SEQ_LEN), dtype=np.int64)
     tokens_ts, segments_ts, masked_index = text2token(
         SENTENCE, tokenizer, lang=LANG
     )
-    input_data = np.array([tokens_ts, segments_ts])
+    input_data = [tokens_ts, segments_ts, sentence_id]
 
     # net initialize
     env_id = ailia.get_gpu_environment_id()
     print(f'env_id: {env_id}')
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
 
-    # compute execution time
-    for i in range(5):
-        start = int(round(time.time() * 1000))
-        input_blobs = net.get_input_blob_list()
-        for i, idx in enumerate(input_blobs):
-            if i < len(input_data):
-                net.set_input_blob_data(input_data[i], idx)
-            else:
-                net.set_input_blob_data(dummy_input, idx)
-        net.update()
-        preds_ailia = net.get_results()
-        # preds_ailia = net.predict(dummy_input)[0]
-        end = int(round(time.time() * 1000))
-        print("ailia processing time {} ms".format(end-start))
+    # inference
+    print('Start inference...')
+    if args.benchmark:
+        print('BENCHMARK mode')
+        for c in range(5):
+            start = int(round(time.time() * 1000))
+            preds_ailia = net.predict(input_data)
+            end = int(round(time.time() * 1000))
+            print("\tailia processing time {} ms".format(end-start))
+    else:
+        preds_ailia = net.predict(input_data)
 
     # masked word prediction
     predicted_indices = np.argsort(
