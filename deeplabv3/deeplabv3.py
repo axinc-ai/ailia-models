@@ -15,7 +15,7 @@ sys.path.append('../util')
 from utils import check_file_existance  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from image_utils import load_image  # noqa: E402
-from webcamera_utils import preprocess_frame  # noqa: E402
+import webcamera_utils  # noqa: E402
 
 
 # ======================
@@ -39,7 +39,7 @@ assert CLASS_NUM == len(LABEL_NAMES), 'The number of labels is incorrect.'
 # Arguemnt Parser Config
 # ======================
 parser = argparse.ArgumentParser(
-    description='DeepLab is a state-of-art deep learning model ' +\
+    description='DeepLab is a state-of-art deep learning model ' +
     'for semantic image segmentation.'
 )
 parser.add_argument(
@@ -50,19 +50,19 @@ parser.add_argument(
 parser.add_argument(
     '-v', '--video', metavar='VIDEO',
     default=None,
-    help='The input video path. ' +\
+    help='The input video path. ' +
          'If the VIDEO argument is set to 0, the webcam input will be used.'
 )
 parser.add_argument(
     '-n', '--normal',
     action='store_true',
-    help='By default, the optimized model is used, but with this option, ' +\
+    help='By default, the optimized model is used, but with this option, ' +
     'you can switch to the normal (not optimized) model'
 )
 parser.add_argument(
-    '-s', '--savepath', metavar='SAVE_IMAGE_PATH',
+    '-s', '--savepath', metavar='SAVE_PATH',
     default=SAVE_IMAGE_PATH,
-    help='Save path for the output image.'
+    help='Save path for the result of the model.'
 )
 parser.add_argument(
     '-b', '--benchmark',
@@ -121,7 +121,7 @@ def segment_from_image():
 
     # save just segmented image (simple)
     # seg_image = cv2.cvtColor(seg_image, cv2.COLOR_RGB2BGR)
-    # cv2.imwrite('seg_test.png', seg_image)  
+    # cv2.imwrite('seg_test.png', seg_image)
 
     # save org_img, segmentation-map, segmentation-overlay
     org_img = cv2.cvtColor(cv2.imread(args.input), cv2.COLOR_BGR2RGB)
@@ -157,7 +157,7 @@ def segment_from_image():
     ax.tick_params(width=0.0)
     plt.grid('off')
     plt.savefig(args.savepath)
-    
+
     print('Script finished successfully.')
 
 
@@ -179,24 +179,33 @@ def segment_from_video():
     else:
         if check_file_existance(args.video):
             capture = cv2.VideoCapture(args.video)
-    
+
+    # create video writer if savepath is specified as video format
+    if args.savepath != SAVE_IMAGE_PATH:
+        f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
+        save_h, save_w = webcamera_utils.calc_adjust_fsize(
+            f_h, f_w, ailia_input_h, ailia_input_w
+        )
+        writer = webcamera_utils.get_writer(args.savepath, save_h, save_w)
+    else:
+        writer = None
+
     while(True):
         ret, frame = capture.read()
-        if cv2.waitKey(1) & 0xFF == ord('q'):
+        if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
-        if not ret:
-            continue
 
-        input_image, input_data = preprocess_frame(
+        input_image, input_data = webcamera_utils.preprocess_frame(
             frame, ailia_input_h, ailia_input_w, normalize_type='127.5'
         )
-        
+
         # inference
         input_blobs = net.get_input_blob_list()
         net.set_input_blob_data(input_data, input_blobs[0])
         net.update()
         preds_ailia = np.array(net.get_results())[0, 0]  # TODO why?
-        
+
         # postprocessing
         seg_map = np.argmax(preds_ailia.transpose(1, 2, 0), axis=2)
         seg_image = label_to_color_image(seg_map).astype(np.uint8)
@@ -208,6 +217,10 @@ def segment_from_video():
         )
 
         cv2.imshow('frame', seg_image)
+
+        # save results
+        if writer is not None:
+            writer.write(seg_image)
 
     capture.release()
     cv2.destroyAllWindows()
