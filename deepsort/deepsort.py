@@ -28,7 +28,6 @@ EX_MODEL_PATH = 'deep_sort.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/deep_sort/'
 
 VIDEO_PATH = 'sample.mp4'
-SAVE_VIDEO_PATH = 'output.avi'
 
 # Deep sort model input
 INPUT_HEIGHT = 128
@@ -80,7 +79,7 @@ parser.add_argument(
 )
 parser.add_argument(
     '-s', '--savepath', metavar='SAVE_VIDEO_PATH',
-    default=SAVE_VIDEO_PATH,
+    default=None,
     help='Save path for the output video.'
 )
 args = parser.parse_args()
@@ -142,11 +141,14 @@ def recognize_from_video():
             capture = cv2.VideoCapture(args.video)
 
     # create video writer
-    writer = get_writer(
-        args.savepath,
-        int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT)),
-        int(capture.get(cv2.CAP_PROP_FRAME_WIDTH)),
-    )
+    if args.savepath is not None:
+        writer = get_writer(
+            args.savepath,
+            int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT)),
+            int(capture.get(cv2.CAP_PROP_FRAME_WIDTH)),
+        )
+    else:
+        writer = None
 
     print('Start Inference...')
     while(True):
@@ -237,10 +239,13 @@ def recognize_from_video():
 
         cv2.imshow('frame', frame)
 
-        if args.savepath:
+        if writer is not None:
             writer.write(frame)
 
-        write_results(args.savepath.split('.')[0] + '.txt', results, 'mot')
+        if args.savepath is not None:
+            write_results(args.savepath.split('.')[0] + '.txt', results, 'mot')
+        else:
+            write_results('result.txt', results, 'mot')
 
     capture.release()
     cv2.destroyAllWindows()
