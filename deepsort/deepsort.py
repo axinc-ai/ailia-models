@@ -15,6 +15,7 @@ from utils import check_file_existance  # noqa: E402
 from image_utils import normalize_image  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from detector_utils import plot_results, load_image  # noqa: E402C
+from webcamera_utils import get_writer  # noqa: E402C
 
 
 # ======================
@@ -130,25 +131,21 @@ def recognize_from_video():
         n_init=3
     )
 
-    if args.input == '0':
+    if args.video == '0':
         print('[INFO] Webcam mode is activated')
         capture = cv2.VideoCapture(0)
         if not capture.isOpened():
             print("[ERROR] webcamera not found")
             sys.exit(1)
     else:
-        if check_file_existance(args.input):
-            capture = cv2.VideoCapture(args.input)
+        if check_file_existance(args.video):
+            capture = cv2.VideoCapture(args.video)
 
     # create video writer
-    writer = cv2.VideoWriter(
+    writer = get_writer(
         args.savepath,
-        cv2.VideoWriter_fourcc(*'MJPG'),
-        20,
-        (
-            int(capture.get(cv2.CAP_PROP_FRAME_WIDTH)),
-            int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        )
+        int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT)),
+        int(capture.get(cv2.CAP_PROP_FRAME_WIDTH)),
     )
 
     print('Start Inference...')
