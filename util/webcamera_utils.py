@@ -93,3 +93,13 @@ def preprocess_frame(
         data = cv2.cvtColor(data.astype(np.float32), cv2.COLOR_BGR2GRAY)
         data = data[np.newaxis, np.newaxis, :, :]
     return img, data
+
+
+def get_writer(savepath, height, width):
+    writer = cv2.VideoWriter(
+        savepath,
+        cv2.VideoWriter_fourcc(*'MJPG'),
+        20,
+        (width, height)
+    )
+    return writer

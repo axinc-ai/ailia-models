@@ -12,7 +12,7 @@ sys.path.append('../util')
 from utils import check_file_existance  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from image_utils import load_image  # noqa: E402
-from webcamera_utils import preprocess_frame, calc_adjust_fsize  # noqa: E402
+import webcamera_utils  # noqa: E402
 
 
 # ======================
@@ -119,16 +119,13 @@ def recognize_from_video():
             capture = cv2.VideoCapture(args.video)
 
     # create video writer if savepath is specified as video format
-    f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
-    save_h, save_w = calc_adjust_fsize(f_h, f_w, IMAGE_HEIGHT, IMAGE_WIDTH)
     if args.savepath != SAVE_IMAGE_PATH:
-        writer = cv2.VideoWriter(
-            args.savepath,
-            cv2.VideoWriter_fourcc(*'MJPG'),
-            20,
-            (save_w, save_h)
+        f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
+        save_h, save_w = webcamera_utils.calc_adjust_fsize(
+            f_h, f_w, IMAGE_HEIGHT, IMAGE_WIDTH
         )
+        writer = webcamera_utils.get_writer(args.savepath, save_h, save_w)
     else:
         writer = None
 
@@ -137,7 +134,7 @@ def recognize_from_video():
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
 
-        input_image, input_data = preprocess_frame(
+        input_image, input_data = webcamera_utils.preprocess_frame(
             frame, IMAGE_HEIGHT, IMAGE_WIDTH, normalize_type='127.5'
         )
 
