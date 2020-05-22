@@ -29,7 +29,7 @@ $ python3 deeplabv3.py --input IMAGE_PATH --savepath SAVE_IMAGE_PATH
 By adding the `--video` option, you can input the video.
 If you pass `0` as an argument to VIDEO_PATH, you can use the webcam input instead of the video file.
 ```bash
-$ python3 deeplabv3.py --video VIDEO_PATH
+$ python3 deeplabv3.py --video VIDEO_PATH --savepath SAVE_VIDEO_PATH
 ```
 
 The default setting is to use the optimized model and weights, but you can also switch to the normal model by using the `--normal` option.

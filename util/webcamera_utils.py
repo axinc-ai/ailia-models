@@ -4,6 +4,13 @@ import cv2
 from image_utils import normalize_image
 
 
+def calc_adjust_fsize(f_height, f_width, height, width):
+    # calculate the image size of the output('img') of adjust_frame_size
+    # This function is supposed to be used to declare 'cv2.writer'
+    scale = np.max((f_height / height, f_width / width))
+    return int(scale * height), int(scale * width)
+
+
 def adjust_frame_size(frame, height, width):
     """
     Adjust the size of the frame from the webcam to the ailia input shape.
@@ -86,3 +93,13 @@ def preprocess_frame(
         data = cv2.cvtColor(data.astype(np.float32), cv2.COLOR_BGR2GRAY)
         data = data[np.newaxis, np.newaxis, :, :]
     return img, data
+
+
+def get_writer(savepath, height, width):
+    writer = cv2.VideoWriter(
+        savepath,
+        cv2.VideoWriter_fourcc(*'MJPG'),
+        20,
+        (width, height)
+    )
+    return writer

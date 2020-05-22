@@ -12,7 +12,7 @@ sys.path.append('../util')
 from utils import check_file_existance  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from image_utils import load_image  # noqa: E402
-from webcamera_utils import preprocess_frame  # noqa: E402
+import webcamera_utils  # noqa: E402
 
 
 # ======================
@@ -36,19 +36,19 @@ parser = argparse.ArgumentParser(
 )
 parser.add_argument(
     '-i', '--input', metavar='IMAGE',
-    default=IMAGE_PATH, 
+    default=IMAGE_PATH,
     help='The input image path.'
 )
 parser.add_argument(
     '-v', '--video', metavar='VIDEO',
     default=None,
-    help='The input video path. ' +\
+    help='The input video path. ' +
          'If the VIDEO argument is set to 0, the webcam input will be used.'
 )
 parser.add_argument(
-    '-s', '--savepath', metavar='SAVE_IMAGE_PATH',
+    '-s', '--savepath', metavar='SAVE_PATH',
     default=SAVE_IMAGE_PATH,
-    help='Save path for the output image.'
+    help='Save path for the result of the model.'
 )
 parser.add_argument(
     '-b', '--benchmark',
@@ -116,19 +116,28 @@ def recognize_from_video():
             sys.exit(1)
     else:
         if check_file_existance(args.video):
-            capture = cv2.VideoCapture(args.video)        
-    
+            capture = cv2.VideoCapture(args.video)
+
+    # create video writer if savepath is specified as video format
+    if args.savepath != SAVE_IMAGE_PATH:
+        f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
+        save_h, save_w = webcamera_utils.calc_adjust_fsize(
+            f_h, f_w, IMAGE_HEIGHT, IMAGE_WIDTH
+        )
+        writer = webcamera_utils.get_writer(args.savepath, save_h, save_w)
+    else:
+        writer = None
+
     while(True):
         ret, frame = capture.read()
-        if cv2.waitKey(1) & 0xFF == ord('q'):
+        if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
-        if not ret:
-            continue
 
-        input_image, input_data = preprocess_frame(
+        input_image, input_data = webcamera_utils.preprocess_frame(
             frame, IMAGE_HEIGHT, IMAGE_WIDTH, normalize_type='127.5'
         )
-        
+
         # inference
         input_blobs = net.get_input_blob_list()
         net.set_input_blob_data(input_data, input_blobs[0])
@@ -139,6 +148,10 @@ def recognize_from_video():
         detections = postprocess(preds_ailia)
         show_result(input_image, detections)
         cv2.imshow('frame', input_image)
+
+        # save results
+        if writer is not None:
+            writer.write(input_image)
 
     capture.release()
     cv2.destroyAllWindows()
