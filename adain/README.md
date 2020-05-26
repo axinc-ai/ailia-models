@@ -1,19 +1,19 @@
 # Arbitrary Style Transfer in Real-time with Adaptive Instance Normalization
 
 ### input
-- input image
-![input_image](cornell.jpg)
+- input image  
+<img src="cornell.jpg" width="480px">
 
-- style image
-![style_image](woman_with_hat_matisse.jpg)
+- style image  
+<img src="woman_with_hat_matisse.jpg" width="480px">
 
-(These images from https://github.com/naoto0804/pytorch-AdaIN/tree/master/input  )
+(These images from https://github.com/naoto0804/pytorch-AdaIN/tree/master/input)
 Ailia input shape: (1, 3, 512, 512)  
 Range: [0, 1]
 
 
 ### output
-![output_image](result.png)
+![output_image](output.png)
 
 ### usage
 Automatically downloads the onnx and prototxt files on the first run.
