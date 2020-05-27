@@ -37,7 +37,7 @@ if POSE_ESTIMATION:
 print("estimate 2d pose ...");
 
 if POSE_ESTIMATION:
-	IMAGE_PATH = "images/running.jpg"
+	IMAGE_PATH = "input.png"
 
 	if not os.path.exists(IMAGE_PATH):
 		print(IMAGE_PATH+" not found")
