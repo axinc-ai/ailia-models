@@ -178,15 +178,10 @@ def draw_connect(from_id,to_id,color,X,Y,Z,IS_3D):
 def plot(outputs,inputs):
     plt.cla()
 
-    cnt=0
-
     ax.set_xlabel('X axis')
     ax.set_ylabel('Z axis')
     ax.set_zlabel('Y axis')
     ax.set_zlim([600, -600])
-
-    #global cnt,X,Y,Z,IS_3D
-    #k=cnt
 
     for mode in range(2):
         X=[]
@@ -262,10 +257,8 @@ def display_3d_pose(points,baseline):
 
     for i in range(16):
         j=h36m_2d_mean[i]
-        target_width=1
-        target_height=1
-        inputs[i*2+0]=(inputs[i*2+0]*target_width-data_mean_2d[j*2+0])/data_std_2d[j*2+0]
-        inputs[i*2+1]=(inputs[i*2+1]*target_height-data_mean_2d[j*2+1])/data_std_2d[j*2+1]
+        inputs[i*2+0]=(inputs[i*2+0]-data_mean_2d[j*2+0])/data_std_2d[j*2+0]
+        inputs[i*2+1]=(inputs[i*2+1]-data_mean_2d[j*2+1])/data_std_2d[j*2+1]
 
     reshape_input = np.reshape(np.array(inputs),(1,32))
 
@@ -282,12 +275,10 @@ def display_3d_pose(points,baseline):
         dy = outputs[i*3+1] - data_mean_3d[0*3+1]
         dz = outputs[i*3+2] - data_mean_3d[0*3+2]
 
-        theta = math.radians(13)
-
-        if True:
-            outputs[i*3+0] = dx
-            outputs[i*3+1] =  dy*math.cos(theta) + dz*math.sin(theta)
-            outputs[i*3+2] = -dy*math.sin(theta) + dz*math.cos(theta)
+        theta = math.radians(13)    # Camera tilt of teacher data (average 13 degrees downward)
+        outputs[i*3+0] = dx
+        outputs[i*3+1] =  dy*math.cos(theta) + dz*math.sin(theta)
+        outputs[i*3+2] = -dy*math.sin(theta) + dz*math.cos(theta)
 
     plot(outputs,inputs)
 
@@ -403,10 +394,16 @@ def display_result(input_img, pose, baseline):
         points.append(person.points[ailia.POSE_KEYPOINT_BODY_CENTER].x)    #OPENPOSE_Background
         points.append(person.points[ailia.POSE_KEYPOINT_BODY_CENTER].y)
 
-        print(input_img.shape[0])
-        print(input_img.shape[1])
+        neck_x=person.points[ailia.POSE_KEYPOINT_SHOULDER_CENTER].x
+        neck_y=person.points[ailia.POSE_KEYPOINT_SHOULDER_CENTER].y
+
+        hip_x=(person.points[ailia.POSE_KEYPOINT_HIP_RIGHT].x+person.points[ailia.POSE_KEYPOINT_HIP_LEFT].x)/2
+        hip_y=(person.points[ailia.POSE_KEYPOINT_HIP_RIGHT].y+person.points[ailia.POSE_KEYPOINT_HIP_LEFT].y)/2
+
+        d=math.sqrt((neck_x-hip_x)*(neck_x-hip_x)+(neck_y-hip_y)*(neck_y-hip_y))
+
         for i in range(int(len(points)/2)):
-            target_width=600
+            target_width=110 / d    #From neck to Hip should be about 110 pixels
             points[i*2+0]=points[i*2+0]*input_img.shape[1]*(target_width/input_img.shape[1])
             points[i*2+1]=points[i*2+1]*input_img.shape[0]*(target_width/input_img.shape[1])
 
