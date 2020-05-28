@@ -26,7 +26,7 @@ from utils import check_file_existance  # noqa: E402
 # ======================
 # Parameters 1
 # ======================
-IMAGE_PATH = 'running.jpg'
+IMAGE_PATH = 'input.png'
 SAVE_IMAGE_PATH = 'output.png'
 IMAGE_HEIGHT = 240
 IMAGE_WIDTH = 320
@@ -241,7 +241,9 @@ def plot(outputs,inputs):
             draw_connect('LHip','LKnee',"#ff0000",X,Y,Z,IS_3D)
             draw_connect('LKnee','LFoot',"#ff0000",X,Y,Z,IS_3D)
 
-def display_3d_pose(points):
+def display_3d_pose(points,baseline):
+    points_queue=points
+
     inputs = np.zeros(32)
 
     for i in range(16):
@@ -267,15 +269,7 @@ def display_3d_pose(points):
 
     reshape_input = np.reshape(np.array(inputs),(1,32))
 
-    env_id=ailia.ENVIRONMENT_AUTO
-    env_id=ailia.get_gpu_environment_id()
-    net2 = ailia.Net(BASELINE_MODEL_PATH,BASELINE_WEIGHT_PATH,env_id=env_id)
-    net2.set_input_shape((1,32))
-    print(reshape_input.shape)
-    outputs = net2.predict(reshape_input)[0]
-    print(outputs.shape)
-
-    #return
+    outputs = baseline.predict(reshape_input)[0]
 
     for i in range(16):
         j=h36m_3d_mean[i]
@@ -295,15 +289,7 @@ def display_3d_pose(points):
             outputs[i*3+1] =  dy*math.cos(theta) + dz*math.sin(theta)
             outputs[i*3+2] = -dy*math.sin(theta) + dz*math.cos(theta)
 
-
-
-
     plot(outputs,inputs)
-    plt.show()
-
-    #ani = animation.FuncAnimation(fig, plot, interval=1000)
-    #plt.show()
-
 
 # ======================
 # 2d-pose Utils
@@ -328,8 +314,11 @@ def line(input_img, person, point1, point2):
         cv2.line(input_img, (x1, y1), (x2, y2), color, 5)
 
 
-def display_result(input_img, pose):
+def display_result(input_img, pose, baseline):
     count = pose.get_object_count()
+    if count >= 1:
+        count = 1
+
     for idx in range(count):
         person = pose.get_object_pose(idx)
 
@@ -414,7 +403,7 @@ def display_result(input_img, pose):
         points.append(person.points[ailia.POSE_KEYPOINT_BODY_CENTER].x)    #OPENPOSE_Background
         points.append(person.points[ailia.POSE_KEYPOINT_BODY_CENTER].y)
 
-        display_3d_pose(points)
+        display_3d_pose(points,baseline)
 
 
 # ======================
@@ -436,6 +425,10 @@ def recognize_from_image():
     pose = ailia.PoseEstimator(
         MODEL_PATH, WEIGHT_PATH, env_id=env_id, algorithm=ALGORITHM
     )
+    baseline = ailia.Net(
+        BASELINE_MODEL_PATH,BASELINE_WEIGHT_PATH,env_id=env_id
+    )
+    baseline.set_input_shape((1,32))
 
     # inference
     print('Start inference...')
@@ -452,10 +445,14 @@ def recognize_from_image():
     # postprocessing
     count = pose.get_object_count()
     print(f'person_count={count}')
-    display_result(src_img, pose)
+    display_result(src_img, pose, baseline)
     cv2.imwrite(args.savepath, src_img)
     print('Script finished successfully.')
 
+    # display 3d pose
+    plt.show()
+    #fig = plt.figure()
+    #fig.savefig("output_3dpose.png")
 
 def recognize_from_video():
     # net initialize
@@ -464,6 +461,10 @@ def recognize_from_video():
     pose = ailia.PoseEstimator(
         MODEL_PATH, WEIGHT_PATH, env_id=env_id, algorithm=ALGORITHM
     )
+    baseline = ailia.Net(
+        BASELINE_MODEL_PATH,BASELINE_WEIGHT_PATH,env_id=env_id
+    )
+    baseline.set_input_shape((1,32))
 
     if args.video == '0':
         print('[INFO] Webcam mode is activated')
@@ -491,8 +492,11 @@ def recognize_from_video():
         _ = pose.compute(input_data)
 
         # postprocessing
-        display_result(input_image, pose)
+        display_result(input_image, pose, baseline)
         cv2.imshow('frame', input_image)
+
+        # display 3d pose
+        plt.pause(0.01)
 
     capture.release()
     cv2.destroyAllWindows()
