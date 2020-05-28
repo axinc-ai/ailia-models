@@ -26,7 +26,7 @@ from utils import check_file_existance  # noqa: E402
 # ======================
 # Parameters 1
 # ======================
-IMAGE_PATH = 'input.png'
+IMAGE_PATH = 'girl-5204299_640.jpg'
 SAVE_IMAGE_PATH = 'output.png'
 IMAGE_HEIGHT = 240
 IMAGE_WIDTH = 320
@@ -262,8 +262,8 @@ def display_3d_pose(points,baseline):
 
     for i in range(16):
         j=h36m_2d_mean[i]
-        target_width=600
-        target_height=600
+        target_width=1
+        target_height=1
         inputs[i*2+0]=(inputs[i*2+0]*target_width-data_mean_2d[j*2+0])/data_std_2d[j*2+0]
         inputs[i*2+1]=(inputs[i*2+1]*target_height-data_mean_2d[j*2+1])/data_std_2d[j*2+1]
 
@@ -402,6 +402,13 @@ def display_result(input_img, pose, baseline):
         points.append(person.points[ailia.POSE_KEYPOINT_EYE_LEFT].y)
         points.append(person.points[ailia.POSE_KEYPOINT_BODY_CENTER].x)    #OPENPOSE_Background
         points.append(person.points[ailia.POSE_KEYPOINT_BODY_CENTER].y)
+
+        print(input_img.shape[0])
+        print(input_img.shape[1])
+        for i in range(int(len(points)/2)):
+            target_width=600
+            points[i*2+0]=points[i*2+0]*input_img.shape[1]*(target_width/input_img.shape[1])
+            points[i*2+1]=points[i*2+1]*input_img.shape[0]*(target_width/input_img.shape[1])
 
         display_3d_pose(points,baseline)
 
