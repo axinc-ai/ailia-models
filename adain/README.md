@@ -40,7 +40,7 @@ $ python3 adain.py --video VIDEO_PATH --style STYLE_IMAGE_PATH
 ```
 
 ### Reference
-[pytorch-AdaIN](https://github.com/naoto0804/pytorch-AdaIN)
+[Arbitrary Style Transfer in Real-time with Adaptive Instance Normalization](https://github.com/naoto0804/pytorch-AdaIN)
 
 
 ### Framework
