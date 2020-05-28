@@ -13,7 +13,7 @@ import math
 
 from mpl_toolkits.mplot3d import Axes3D
 
-ONNX_RUNTIME=True
+ONNX_RUNTIME=False
 KERAS=False
 model_path = "3d-pose-baseline.onnx.prototxt"
 weight_path = "3d-pose-baseline.onnx"
@@ -37,7 +37,7 @@ if POSE_ESTIMATION:
 print("estimate 2d pose ...");
 
 if POSE_ESTIMATION:
-	IMAGE_PATH = "input.png"
+	IMAGE_PATH = "running.jpg"
 
 	if not os.path.exists(IMAGE_PATH):
 		print(IMAGE_PATH+" not found")
@@ -107,14 +107,15 @@ with h5py.File('3d-pose-baseline-mean.h5', 'r') as f:
   data_mean_3d = np.array(f['data_mean_3d'])
   data_std_3d = np.array(f['data_std_3d'])
 
-with h5py.File('3d-pose-baseline-test.hdf5', 'r') as f:
-  enc_in = np.array(f['enc_in'])
-  dec_out = np.array(f['dec_out'])
-  poses3d = np.array(f['poses3d'])
-  data_mean_2d_onnx = np.array(f['data_mean_2d'])
-  data_std_2d_onnx = np.array(f['data_std_2d'])
-  data_mean_3d_onnx = np.array(f['data_mean_3d'])
-  data_std_3d_onnx = np.array(f['data_std_3d'])
+if not POSE_ESTIMATION:
+	with h5py.File('3d-pose-baseline-test.hdf5', 'r') as f:
+		enc_in = np.array(f['enc_in'])
+		dec_out = np.array(f['dec_out'])
+		poses3d = np.array(f['poses3d'])
+		data_mean_2d_onnx = np.array(f['data_mean_2d'])
+		data_std_2d_onnx = np.array(f['data_std_2d'])
+		data_mean_3d_onnx = np.array(f['data_mean_3d'])
+		data_std_3d_onnx = np.array(f['data_std_3d'])
 
 H36M_NAMES = ['']*32
 H36M_NAMES[0]  = 'Hip' #ignore when 3d
@@ -218,7 +219,10 @@ else:
 		env_id=ailia.ENVIRONMENT_AUTO
 		env_id=ailia.get_gpu_environment_id()
 		net = ailia.Net(model_path,weight_path,env_id=env_id)
-		outputs = net.predict(reshape_input)
+		net.set_input_shape((1,32))
+		print(reshape_input.shape)
+		outputs = net.predict(reshape_input)[0]
+		print(outputs.shape)
 
 print("display 3d pose ...");
 
