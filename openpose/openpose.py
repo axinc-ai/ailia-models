@@ -97,51 +97,47 @@ def display_result(input_img, pose):
     count = pose.get_object_count()
     for idx in range(count):
         person = pose.get_object_pose(idx)
-        for i in range(ailia.POSE_KEYPOINT_CNT):
-            # score = person.points[i].score
-            # x = (input_img.shape[1] * person.points[i].x)
-            # y = (input_img.shape[0] * person.points[i].y)
 
-            line(input_img, person, ailia.POSE_KEYPOINT_NOSE,
-                 ailia.POSE_KEYPOINT_SHOULDER_CENTER)
-            line(input_img, person, ailia.POSE_KEYPOINT_SHOULDER_LEFT,
-                 ailia.POSE_KEYPOINT_SHOULDER_CENTER)
-            line(input_img, person, ailia.POSE_KEYPOINT_SHOULDER_RIGHT,
-                 ailia.POSE_KEYPOINT_SHOULDER_CENTER)
+        line(input_img, person, ailia.POSE_KEYPOINT_NOSE,
+                ailia.POSE_KEYPOINT_SHOULDER_CENTER)
+        line(input_img, person, ailia.POSE_KEYPOINT_SHOULDER_LEFT,
+                ailia.POSE_KEYPOINT_SHOULDER_CENTER)
+        line(input_img, person, ailia.POSE_KEYPOINT_SHOULDER_RIGHT,
+                ailia.POSE_KEYPOINT_SHOULDER_CENTER)
 
-            line(input_img, person, ailia.POSE_KEYPOINT_EYE_LEFT,
-                 ailia.POSE_KEYPOINT_NOSE)
-            line(input_img, person, ailia.POSE_KEYPOINT_EYE_RIGHT,
-                 ailia.POSE_KEYPOINT_NOSE)
-            line(input_img, person, ailia.POSE_KEYPOINT_EAR_LEFT,
-                 ailia.POSE_KEYPOINT_EYE_LEFT)
-            line(input_img, person, ailia.POSE_KEYPOINT_EAR_RIGHT,
-                 ailia.POSE_KEYPOINT_EYE_RIGHT)
+        line(input_img, person, ailia.POSE_KEYPOINT_EYE_LEFT,
+                ailia.POSE_KEYPOINT_NOSE)
+        line(input_img, person, ailia.POSE_KEYPOINT_EYE_RIGHT,
+                ailia.POSE_KEYPOINT_NOSE)
+        line(input_img, person, ailia.POSE_KEYPOINT_EAR_LEFT,
+                ailia.POSE_KEYPOINT_EYE_LEFT)
+        line(input_img, person, ailia.POSE_KEYPOINT_EAR_RIGHT,
+                ailia.POSE_KEYPOINT_EYE_RIGHT)
 
-            line(input_img, person, ailia.POSE_KEYPOINT_ELBOW_LEFT,
-                 ailia.POSE_KEYPOINT_SHOULDER_LEFT)
-            line(input_img, person, ailia.POSE_KEYPOINT_ELBOW_RIGHT,
-                 ailia.POSE_KEYPOINT_SHOULDER_RIGHT)
-            line(input_img, person, ailia.POSE_KEYPOINT_WRIST_LEFT,
-                 ailia.POSE_KEYPOINT_ELBOW_LEFT)
-            line(input_img, person, ailia.POSE_KEYPOINT_WRIST_RIGHT,
-                 ailia.POSE_KEYPOINT_ELBOW_RIGHT)
+        line(input_img, person, ailia.POSE_KEYPOINT_ELBOW_LEFT,
+                ailia.POSE_KEYPOINT_SHOULDER_LEFT)
+        line(input_img, person, ailia.POSE_KEYPOINT_ELBOW_RIGHT,
+                ailia.POSE_KEYPOINT_SHOULDER_RIGHT)
+        line(input_img, person, ailia.POSE_KEYPOINT_WRIST_LEFT,
+                ailia.POSE_KEYPOINT_ELBOW_LEFT)
+        line(input_img, person, ailia.POSE_KEYPOINT_WRIST_RIGHT,
+                ailia.POSE_KEYPOINT_ELBOW_RIGHT)
 
-            line(input_img, person, ailia.POSE_KEYPOINT_BODY_CENTER,
-                 ailia.POSE_KEYPOINT_SHOULDER_CENTER)
-            line(input_img, person, ailia.POSE_KEYPOINT_HIP_LEFT,
-                 ailia.POSE_KEYPOINT_BODY_CENTER)
-            line(input_img, person, ailia.POSE_KEYPOINT_HIP_RIGHT,
-                 ailia.POSE_KEYPOINT_BODY_CENTER)
+        line(input_img, person, ailia.POSE_KEYPOINT_BODY_CENTER,
+                ailia.POSE_KEYPOINT_SHOULDER_CENTER)
+        line(input_img, person, ailia.POSE_KEYPOINT_HIP_LEFT,
+                ailia.POSE_KEYPOINT_BODY_CENTER)
+        line(input_img, person, ailia.POSE_KEYPOINT_HIP_RIGHT,
+                ailia.POSE_KEYPOINT_BODY_CENTER)
 
-            line(input_img, person, ailia.POSE_KEYPOINT_KNEE_LEFT,
-                 ailia.POSE_KEYPOINT_HIP_LEFT)
-            line(input_img, person, ailia.POSE_KEYPOINT_ANKLE_LEFT,
-                 ailia.POSE_KEYPOINT_KNEE_LEFT)
-            line(input_img, person, ailia.POSE_KEYPOINT_KNEE_RIGHT,
-                 ailia.POSE_KEYPOINT_HIP_RIGHT)
-            line(input_img, person, ailia.POSE_KEYPOINT_ANKLE_RIGHT,
-                 ailia.POSE_KEYPOINT_KNEE_RIGHT)
+        line(input_img, person, ailia.POSE_KEYPOINT_KNEE_LEFT,
+                ailia.POSE_KEYPOINT_HIP_LEFT)
+        line(input_img, person, ailia.POSE_KEYPOINT_ANKLE_LEFT,
+                ailia.POSE_KEYPOINT_KNEE_LEFT)
+        line(input_img, person, ailia.POSE_KEYPOINT_KNEE_RIGHT,
+                ailia.POSE_KEYPOINT_HIP_RIGHT)
+        line(input_img, person, ailia.POSE_KEYPOINT_ANKLE_RIGHT,
+                ailia.POSE_KEYPOINT_KNEE_RIGHT)
 
 
 # ======================
