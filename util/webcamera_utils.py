@@ -36,7 +36,7 @@ def adjust_frame_size(frame, height, width):
 
     # padding base
     img = np.zeros(
-        (int(scale * height), int(scale * width), 3),
+        (int(round(scale * height)), int(round(scale * width)), 3),
         np.uint8
     )
     start = (np.array(img.shape) - np.array(frame.shape)) // 2
