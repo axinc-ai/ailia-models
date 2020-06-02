@@ -95,11 +95,12 @@ def preprocess_frame(
     return img, data
 
 
-def get_writer(savepath, height, width):
+def get_writer(savepath, height, width, rgb=True):
     writer = cv2.VideoWriter(
         savepath,
         cv2.VideoWriter_fourcc(*'MJPG'),
         20,
-        (width, height)
+        (width, height),
+        isColor=rgb
     )
     return writer
