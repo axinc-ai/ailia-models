@@ -33,7 +33,7 @@ You can select a pretrained model by specifying `-a large`(default) or `-a small
 
 ### Reference
 
-[U-2-Net](https://github.com/NathanUA/U-2-Net)
+[U^2-Net: Going Deeper with Nested U-Structure for Salient Object Detection](https://github.com/NathanUA/U-2-Net)
 
 
 ### Framework
