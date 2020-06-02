@@ -1,7 +1,7 @@
 # U^2-Net
 
 ### input
-![input_image](input.png)
+![input_image](input.png)  
 (Image from https://github.com/NathanUA/U-2-Net/blob/master/test_data/test_images/girl.png)
 - Ailia input shape: (1, 3, 320, 320)  
 
