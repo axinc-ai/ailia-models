@@ -2,20 +2,23 @@
 
 ### input
 - original image  
-![input_image](alfw-test.jpg)  
+![input_image](aflw-test.jpg)  
 (from https://github.com/1adrianb/face-alignment/tree/master/test/assets)
 
 - Before feeding the image into the model, the face dectection model (e.g., [yolov3-face](https://github.com/axinc-ai/ailia-models/tree/master/yolov3-face))
  must be applied to extract appropriately sized (256 * 256) face images.  
- ![input_cropped_image](alfw-cropped.png)
+ ![input_cropped_image](aflw-cropped.png)
  
 - Ailia input shape: (1, 256, 256, 3)  
 - Range: [0, 1]
 
 ### output
+1. face alignment mode  
 ![pose](results/pose.png)
 ![sparse_alignment](results/sparse_alignment.png)
 ![dense_alignment](results/dense_alignment.png)
+
+2. texture editing mode  
 ![texture_edited](results/texture_edited.png)
 
 ### usage
