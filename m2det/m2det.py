@@ -1,20 +1,20 @@
+import time
+import math
+import sys
+import argparse
+import pathlib
+
 import torch
 import numpy as np
 import cv2
-import time
 
-from configs.CC import Config
-# from layers.functions import Detect, PriorBox
-import torch.backends.cudnn as cudnn
-import sys
-sys.path.insert(0, '/media/prolley/M2/Projects_2/Ailia-SDK/ailia_1_22_0/tools/onnx/')
-import onnx_optimizer
-import onnx2prototxt
-import math
-import os.path
-import argparse
-import m2det
-import pathlib
+import ailia
+
+# import original modules
+sys.path.append('../util')
+from model_utils import check_and_download_models 
+from webcamera_utils import adjust_frame_size  
+from detector_utils import plot_results, load_image 
 
 # ======================
 # Parameters
@@ -22,7 +22,7 @@ import pathlib
 
 WEIGHT_PATH = './m2det.onnx'
 MODEL_PATH = './m2det.onnx.prototxt'
-# REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/yolov3/'
+REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/m2det/'
 
 IMAGE_PATH = 'couple.jpg'
 SAVE_IMAGE_PATH = 'output.png'
@@ -82,15 +82,6 @@ args = parser.parse_args()
 # Secondaty Functions
 # ======================
 
-def load_image(image_path):
-    if pathlib.Path(image_path).exists():
-        image = cv2.imread(image_path)
-    else:
-        print(f'[ERROR] {image_path} not found.')
-        sys.exit()
-    return image
-
-# from /utils/nms
 def nms(dets, thresh):
     """Pure Python NMS baseline."""
     x1 = dets[:, 0]
@@ -120,16 +111,17 @@ def nms(dets, thresh):
         order = order[inds + 1]
     return keep
 
-def _preprocess(img, resize=512, rgb_means=(104,117,123), swap=(2, 0, 1)):
+def preprocess(img, resize=512, rgb_means=(104,117,123), swap=(2, 0, 1)):
     interp_method = cv2.INTER_LINEAR
     img = cv2.resize(np.array(img), 
                      (resize, resize),
                      interpolation = interp_method).astype(np.float32)
     img -= rgb_means
+    # make channel first
     img = img.transpose(swap)
-    return torch.from_numpy(img)
+    return img[None, ...]
 
-def _to_color(indx, base):
+def to_color(indx, base):
     """ return (b, r, g) tuple"""
     base2 = base * base
     b = 2 - indx / base2
@@ -138,15 +130,12 @@ def _to_color(indx, base):
     return b * 127, r * 127, g * 127
 
 base = int(np.ceil(pow(len(COCO_CATEGORY), 1. / 3)))
-COLORS = [_to_color(x, base) for x in range(len(COCO_CATEGORY))]
+COLORS = [to_color(x, base) for x in range(len(COCO_CATEGORY))]
 
-# from m2det.py
-def draw_detection(im, bboxes, scores, cls_inds, fps, thr=0.2):
+def draw_detection(im, bboxes, scores, cls_inds):
     imgcv = np.copy(im)
     h, w, _ = imgcv.shape
     for i, box in enumerate(bboxes):
-        if scores[i] < thr:
-            continue
         cls_indx = int(cls_inds[i])
         box = [int(_) for _ in box]
         thick = int((h + w) / 300)
@@ -156,41 +145,24 @@ def draw_detection(im, bboxes, scores, cls_inds, fps, thr=0.2):
         mess = '%s: %.3f' % (COCO_CATEGORY[cls_indx], scores[i])
         cv2.putText(imgcv, mess, (box[0], box[1] - 7),
                     0, 1e-3 * h, COLORS[cls_indx], thick // 3)
-        if fps >= 0:
-            cv2.putText(imgcv, '%.2f' % fps + ' fps', (w - 160, h - 15), 0, 2e-3 * h, (255, 255, 255), thick // 2)
-
     return imgcv
 
 # ======================
 # Main functions
 # ======================
-
-def recognize_objects(filename):
-    import onnxruntime as ort
-    
-    # load model
-    ort_session = ort.InferenceSession(WEIGHT_PATH)
+def detect_objects(img, detector):
+    # get sizes for posterior rescaling
+    w, h, _ = img.shape
+    scale = np.asarray([w,h,w,h])
     
     # initial preprocesses
+    img = preprocess(img)
     
-    labels = tuple(['__background__'] + COCO_CATEGORY)
-    image = load_image(filename)
-    w, h, c = image.shape
-    img = _preprocess(image).unsqueeze(0)
-
-    # move img to gpu
-    cuda=True
-    if cuda:
-        img = img.cuda()
-        
     # feedforward
-    out = ort_session.run(None, {'input.1': img.cpu().numpy()})
-    boxes, scores =  (torch.Tensor(out[0]), torch.Tensor(out[1]))
-    
-   
-    scale = torch.Tensor([w,h,w,h])
-    boxes = (boxes[0]*scale).cpu().numpy()
-    scores = scores[0].cpu().numpy()
+    boxes, scores = detector.run(None, {'input.1': img})
+
+    boxes = boxes[0]
+    scores = scores[0]
     allboxes = []
     
     # filter boxes for every class
@@ -206,24 +178,98 @@ def recognize_objects(filename):
         keep = keep[:KEEP_PER_CLASS]
         c_dets = c_dets[keep, :]
         allboxes.extend([_.tolist()+[j] for _ in c_dets])
-    allboxes = np.array(allboxes)
     
-#     split boxes and scores
-    boxes = allboxes[:,:4]
-    scores = allboxes[:,4]
-    cls_inds = allboxes[:,5]
     
-    print('\n'.join(['pos:{}, ids:{}, score:{:.3f}'.format('(%.1f,%.1f,%.1f,%.1f)' % (o[0],o[1],o[2],o[3]) \
-            ,labels[int(oo)],ooo) for o,oo,ooo in zip(boxes,cls_inds,scores)]))
+    if len(allboxes)>0:
+        allboxes = np.array(allboxes)    
+        # split boxes and scores
+        boxes = allboxes[:,:4] * scale
+        scores = allboxes[:,4]
+        cls_inds = allboxes[:,5]
+        return boxes, scores, cls_inds
+    else:
+        return [], [], []
     
-    # fps = 1.0 / float(loop_time) if cam >= 0 or video else -1
-    fps = -1
+def recognize_from_image(filename, detector):
+    # load input image
+    img = load_image(filename, False)
     
-    # show image
-    im2show = draw_detection(image, boxes, scores, cls_inds, fps)
+    boxes, scores, cls_inds = detect_objects(img, detector)
+    
+    try:
+        print('\n'.join(['pos:{}, ids:{}, score:{:.3f}'.format('(%.1f,%.1f,%.1f,%.1f)' % (box[0],box[1],box[2],box[3]) \
+                ,COCO_CATEGORY[int(obj_cls)], score) for box, obj_cls, score in zip(boxes,cls_inds,scores)]))
+    except:
+        pass
+    
+    # show image 
+    im2show = draw_detection(img, boxes, scores, cls_inds)
     cv2.imshow('demo', im2show)
     cv2.waitKey(5000)
     cv2.destroyAllWindows()
+    
+def recognize_from_video(video, detector):
+ 
+    if video == '0':
+        print('[INFO] Webcam mode is activated')
+        capture = cv2.VideoCapture(0)
+        if not capture.isOpened():
+            print("[ERROR] webcamera not found")
+            sys.exit(1)
+    else:
+        if pathlib.Path(video).exists():
+            capture = cv2.VideoCapture(video)
+
+    while(True):
+        ret, img = capture.read()
+       
+        boxes, scores, cls_inds = detect_objects(img, detector)
+
+#         detector.compute(img, THRESHOLD, IOU)
+        boxes, scores, cls_inds = detect_objects(img, detector)
+        img = draw_detection(img, boxes, scores, cls_inds)
+        cv2.imshow('frame', img)
+        
+        # press q to end video capture
+        if cv2.waitKey(1)&0xFF == ord('q'):
+            break
+        if not ret:
+            continue
+
+    capture.release()
+    cv2.destroyAllWindows()
+    print('Script finished successfully.')
+    
+def main():
+    # model files check and download
+    check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
+
+    # load model
+    env_id = ailia.get_gpu_environment_id()
+    print(f'env_id: {env_id}')
+    
+    import onnxruntime as ort
+    detector = ort.InferenceSession(WEIGHT_PATH)
+    
+    """
+    detector = ailia.Detector(
+        MODEL_PATH,
+        WEIGHT_PATH,
+        len(COCO_CATEGORY),
+        format=ailia.NETWORK_IMAGE_FORMAT_RGB,
+        channel=ailia.NETWORK_IMAGE_CHANNEL_FIRST,
+        range=ailia.NETWORK_IMAGE_RANGE_U_FP32,
+        algorithm=ailia.DETECTOR_ALGORITHM_YOLOV3,
+        env_id=env_id
+    )"""
+    
+    if args.video is not None:
+        # video mode
+        recognize_from_video(args.video, detector)
+    else:
+        # image mode
+        recognize_from_image(args.input, detector)
+
 
 if __name__=='__main__':
-    recognize_objects(args.input)
+    main()
