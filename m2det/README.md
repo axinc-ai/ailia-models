@@ -39,7 +39,7 @@ $ python3 m2det.py --video VIDEO_PATH
 
 ## Reference
 
-- [M2Det](https://github.com/qijiezhao/M2Det)
+- [M2Det: A Single-Shot Object Detector based on Multi-Level Feature Pyramid Network](https://github.com/qijiezhao/M2Det)
 
 ## Framework
 
