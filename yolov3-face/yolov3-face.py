@@ -83,7 +83,6 @@ def recognize_from_image():
         algorithm=ailia.DETECTOR_ALGORITHM_YOLOV3,
         env_id=env_id
     )
-    detector.set_input_shape(IMAGE_HEIGHT, IMAGE_WIDTH)
 
     # inference
     print('Start inference...')
@@ -117,7 +116,6 @@ def recognize_from_video():
         algorithm=ailia.DETECTOR_ALGORITHM_YOLOV3,
         env_id=env_id
     )
-    detector.set_input_shape(IMAGE_HEIGHT, IMAGE_WIDTH)
 
     if args.video == '0':
         print('[INFO] Webcam mode is activated')
@@ -138,7 +136,7 @@ def recognize_from_video():
 
         _, resized_img = adjust_frame_size(frame, IMAGE_HEIGHT, IMAGE_WIDTH)
 
-        img = cv2.cvtColor(resized_img, cv2.COLOR_RGB2BGRA)
+        img = cv2.cvtColor(resized_img, cv2.COLOR_BGR2BGRA)
         detector.compute(img, THRESHOLD, IOU)
         res_img = plot_results(detector, resized_img, FACE_CATEGORY, False)
         cv2.imshow('frame', res_img)

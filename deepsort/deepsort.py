@@ -158,7 +158,7 @@ def recognize_from_video():
             break
 
         # In order to use ailia.Detector, the input should have 4 channels.
-        input_img = cv2.cvtColor(frame, cv2.COLOR_RGB2BGRA)
+        input_img = cv2.cvtColor(frame, cv2.COLOR_BGR2BGRA)
         h, w = frame.shape[0], frame.shape[1]
 
         # do detection

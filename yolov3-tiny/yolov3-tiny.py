@@ -150,7 +150,7 @@ def recognize_from_video():
 
         _, resized_img = adjust_frame_size(frame, IMAGE_HEIGHT, IMAGE_WIDTH)
 
-        img = cv2.cvtColor(resized_img, cv2.COLOR_RGB2BGRA)
+        img = cv2.cvtColor(resized_img, cv2.COLOR_BGR2BGRA)
         detector.compute(img, THRESHOLD, IOU)
         res_img = plot_results(detector, resized_img, COCO_CATEGORY, False)
         cv2.imshow('frame', res_img)
