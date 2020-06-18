@@ -193,7 +193,7 @@ def compare_image_and_video():
         for idx in range(count):
             # get detected face
             obj = detector.get_object(idx)
-            margin = 0.0
+            margin = 0.2
             fx = obj.x - obj.w*margin
             fy = obj.y - obj.w*margin
             fw = obj.w + obj.w*margin*2
