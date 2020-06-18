@@ -22,6 +22,12 @@ WEIGHT_PATH = 'arcface.onnx'
 MODEL_PATH = 'arcface.onnx.prototxt'
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/arcface/"
 
+YOLOV3_FACE_WEIGHT_PATH = 'yolov3-face.opt.onnx'
+YOLOV3_FACE_MODEL_PATH = 'yolov3-face.opt.onnx.prototxt'
+YOLOV3_FACE_REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/yolov3-face/'
+YOLOV3_FACE_THRESHOLD = 0.2
+YOLOV3_FACE_IOU = 0.45
+
 IMG_PATH_1 = 'correct_pair_1.jpg'
 IMG_PATH_2 = 'correct_pair_2.jpg'
 IMAGE_HEIGHT = 128
@@ -50,7 +56,7 @@ parser.add_argument(
 )
 parser.add_argument(
     '-v', '--video', metavar=('VIDEO', 'IMAGE'),
-    nargs=2,
+    nargs='*',
     default=None,
     help='Determines whether the face in the video file specified by VIDEO ' +
          'and the face in the image file specified by IMAGE are the same. ' +
@@ -135,12 +141,29 @@ def compare_images():
 
 def compare_image_and_video():
     # prepare base image
-    base_imgs = prepare_input_data(args.video[1])
+    if len(args.video) == 1:
+        base_imgs = None
+        base_imgs_exists = False
+    else:
+        base_imgs = prepare_input_data(args.video[1])
+        base_imgs_exists = True
 
-    # net itinialize
+    # net initialize
     env_id = ailia.get_gpu_environment_id()
     print(f'env_id: {env_id}')
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+
+    # detector initialize
+    detector = ailia.Detector(
+        YOLOV3_FACE_MODEL_PATH,
+        YOLOV3_FACE_WEIGHT_PATH,
+        1,
+        format=ailia.NETWORK_IMAGE_FORMAT_RGB,
+        channel=ailia.NETWORK_IMAGE_CHANNEL_FIRST,
+        range=ailia.NETWORK_IMAGE_RANGE_U_FP32,
+        algorithm=ailia.DETECTOR_ALGORITHM_YOLOV3,
+        env_id=env_id
+    )
 
     # web camera
     if args.video[0] == '0':
@@ -159,25 +182,53 @@ def compare_image_and_video():
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
 
-        frame, resized_frame = adjust_frame_size(
-            frame, IMAGE_HEIGHT, IMAGE_WIDTH
-        )
-        input_frame = preprocess_image(resized_frame, input_is_bgr=True)
-        input_data = np.concatenate([base_imgs, input_frame], axis=0)
+        # detect face
+        img = cv2.cvtColor(frame, cv2.COLOR_BGR2BGRA)
+        detector.compute(img, YOLOV3_FACE_THRESHOLD, YOLOV3_FACE_IOU)
+        h, w = img.shape[0], img.shape[1]
+        count = detector.get_object_count()
+        for idx in range(count):
+            # get detected face
+            obj = detector.get_object(idx)
+            fx=max(obj.x,0)
+            fy=max(obj.y,0)
+            fw=min(obj.w,w-fx)
+            fh=min(obj.h,h-fy)
+            top_left = (int(w*fx), int(h*fy))
+            bottom_right = (int(w*(fx+fw)), int(h*(fy+fh)))
+            text_position = (int(w*fx)+4, int(h*(fy+fh)-8))
+            color = (255,255,255)
+            fontScale = w / 512.0
+            cv2.rectangle(frame, top_left, bottom_right, color, 4)
 
-        # inference
-        preds_ailia = net.predict(input_data)
+            # get detected face
+            img = img[top_left[1]:bottom_right[1],top_left[0]:bottom_right[0],0:3]
 
-        # postprocessing
-        fe_1 = np.concatenate([preds_ailia[0], preds_ailia[1]], axis=0)
-        fe_2 = np.concatenate([preds_ailia[2], preds_ailia[3]], axis=0)
-        sim = cosin_metric(fe_1, fe_2)
-        bool_sim = False if THRESHOLD > sim else True
+            img, resized_frame = adjust_frame_size(
+                img, IMAGE_HEIGHT, IMAGE_WIDTH
+            )
 
-        frame = draw_result_on_img(
-            frame,
-            texts=[f"Similarity: {sim:06.3f}", f"SAME FACE: {bool_sim}"]
-        )
+            # prepare target face and input face
+            input_frame = preprocess_image(resized_frame, input_is_bgr=True)
+            if not base_imgs_exists:
+                base_imgs = np.copy(input_frame)
+                base_imgs_exists = True
+            input_data = np.concatenate([base_imgs, input_frame], axis=0)
+
+            # inference
+            preds_ailia = net.predict(input_data)
+
+            # postprocessing
+            fe_1 = np.concatenate([preds_ailia[0], preds_ailia[1]], axis=0)
+            fe_2 = np.concatenate([preds_ailia[2], preds_ailia[3]], axis=0)
+            sim = cosin_metric(fe_1, fe_2)
+            bool_sim = False if THRESHOLD > sim else True
+
+            frame = draw_result_on_img(
+                frame,
+                texts=[f"Similarity: {sim:06.3f}", f"SAME FACE: {bool_sim}"]
+            )
+
         cv2.imshow('frame', frame)
 
     capture.release()
@@ -196,6 +247,7 @@ def main():
     else:
         # video mode
         # comparing the specified image and the video
+        check_and_download_models(YOLOV3_FACE_WEIGHT_PATH, YOLOV3_FACE_MODEL_PATH, YOLOV3_FACE_REMOTE_PATH)
         compare_image_and_video()
 
 
