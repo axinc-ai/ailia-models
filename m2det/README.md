@@ -1,4 +1,4 @@
-# yolov3
+# m2det
 
 ## Input
 
