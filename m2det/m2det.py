@@ -10,8 +10,6 @@ import cv2
 
 import ailia
 
-AILIA_ENABLE=True
-
 # import original modules
 sys.path.append('../util')
 from model_utils import check_and_download_models 
@@ -161,10 +159,7 @@ def detect_objects(img, detector):
     img = preprocess(img)
     
     # feedforward
-    if AILIA_ENABLE:
-        boxes, scores = detector.predict({'input.1': img})
-    else:
-        boxes, scores = detector.run(None, {'input.1': img})
+    boxes, scores = detector.predict({'input.1': img})
 
     boxes = boxes[0]
     scores = scores[0]
@@ -258,11 +253,7 @@ def main():
     env_id = ailia.get_gpu_environment_id()
     print(f'env_id: {env_id}')
     
-    if AILIA_ENABLE:
-        detector = ailia.Net(MODEL_PATH,WEIGHT_PATH,env_id=env_id)
-    else:
-        import onnxruntime as ort
-        detector = ort.InferenceSession(WEIGHT_PATH)
+    detector = ailia.Net(MODEL_PATH,WEIGHT_PATH,env_id=env_id)
     
     if args.video is not None:
         # video mode
