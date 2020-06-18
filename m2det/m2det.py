@@ -152,14 +152,17 @@ def draw_detection(im, bboxes, scores, cls_inds):
 # ======================
 def detect_objects(img, detector):
     # get sizes for posterior rescaling
-    w, h, _ = img.shape
+    h, w, _ = img.shape
     scale = np.asarray([w,h,w,h])
     
     # initial preprocesses
     img = preprocess(img)
     
     # feedforward
-    boxes, scores = detector.run(None, {'input.1': img})
+    if AILIA_ENABLE:
+        boxes, scores = detector.predict({'input.1': img})
+    else:
+        boxes, scores = detector.run(None, {'input.1': img})
 
     boxes = boxes[0]
     scores = scores[0]
@@ -222,7 +225,11 @@ def recognize_from_video(video, detector):
 
     while(True):
         ret, img = capture.read()
-       
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
+        if not ret:
+            continue
+
         boxes, scores, cls_inds = detect_objects(img, detector)
 
 #         detector.compute(img, THRESHOLD, IOU)
