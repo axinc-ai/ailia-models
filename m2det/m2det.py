@@ -10,6 +10,8 @@ import cv2
 
 import ailia
 
+AILIA_ENABLE=True
+
 # import original modules
 sys.path.append('../util')
 from model_utils import check_and_download_models 
@@ -195,7 +197,8 @@ def detect_objects(img, detector):
     
 def recognize_from_image(filename, detector):
     # load input image
-    img = load_image(filename, False)
+    img = load_image(filename)
+    img = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
     
     boxes, scores, cls_inds = detect_objects(img, detector)
     
@@ -255,20 +258,11 @@ def main():
     env_id = ailia.get_gpu_environment_id()
     print(f'env_id: {env_id}')
     
-    import onnxruntime as ort
-    detector = ort.InferenceSession(WEIGHT_PATH)
-    
-    """
-    detector = ailia.Detector(
-        MODEL_PATH,
-        WEIGHT_PATH,
-        len(COCO_CATEGORY),
-        format=ailia.NETWORK_IMAGE_FORMAT_RGB,
-        channel=ailia.NETWORK_IMAGE_CHANNEL_FIRST,
-        range=ailia.NETWORK_IMAGE_RANGE_U_FP32,
-        algorithm=ailia.DETECTOR_ALGORITHM_YOLOV3,
-        env_id=env_id
-    )"""
+    if AILIA_ENABLE:
+        detector = ailia.Net(MODEL_PATH,WEIGHT_PATH,env_id=env_id)
+    else:
+        import onnxruntime as ort
+        detector = ort.InferenceSession(WEIGHT_PATH)
     
     if args.video is not None:
         # video mode
