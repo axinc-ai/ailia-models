@@ -13,6 +13,7 @@ from webcamera_utils import adjust_frame_size  # noqa: E402
 from image_utils import load_image, draw_result_on_img  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from utils import check_file_existance  # noqa: E402
+from detector_utils import hsv_to_rgb # noqa: E402C
 
 
 # ======================
@@ -147,6 +148,7 @@ def compare_image_and_video():
     else:
         base_imgs = prepare_input_data(args.video[1])
         base_imgs_exists = True
+    fe_list = []
 
     # net initialize
     env_id = ailia.get_gpu_environment_id()
@@ -187,25 +189,28 @@ def compare_image_and_video():
         detector.compute(img, YOLOV3_FACE_THRESHOLD, YOLOV3_FACE_IOU)
         h, w = img.shape[0], img.shape[1]
         count = detector.get_object_count()
+        texts = []
         for idx in range(count):
             # get detected face
             obj = detector.get_object(idx)
-            fx=max(obj.x,0)
-            fy=max(obj.y,0)
-            fw=min(obj.w,w-fx)
-            fh=min(obj.h,h-fy)
+            margin = 0.0
+            fx = obj.x - obj.w*margin
+            fy = obj.y - obj.w*margin
+            fw = obj.w + obj.w*margin*2
+            fh = obj.h + obj.w*margin*2
+            fx=max(fx,0)
+            fy=max(fy,0)
+            fw=min(fw,w-fx)
+            fh=min(fh,h-fy)
             top_left = (int(w*fx), int(h*fy))
             bottom_right = (int(w*(fx+fw)), int(h*(fy+fh)))
-            text_position = (int(w*fx)+4, int(h*(fy+fh)-8))
-            color = (255,255,255)
-            fontScale = w / 512.0
-            cv2.rectangle(frame, top_left, bottom_right, color, 4)
 
             # get detected face
-            img = img[top_left[1]:bottom_right[1],top_left[0]:bottom_right[0],0:3]
-
-            img, resized_frame = adjust_frame_size(
-                img, IMAGE_HEIGHT, IMAGE_WIDTH
+            crop_img = img[top_left[1]:bottom_right[1],top_left[0]:bottom_right[0],0:3]
+            if crop_img.shape[0]<=0 or crop_img.shape[1]<=0:
+                continue
+            crop_img, resized_frame = adjust_frame_size(
+                crop_img, IMAGE_HEIGHT, IMAGE_WIDTH
             )
 
             # prepare target face and input face
@@ -221,13 +226,46 @@ def compare_image_and_video():
             # postprocessing
             fe_1 = np.concatenate([preds_ailia[0], preds_ailia[1]], axis=0)
             fe_2 = np.concatenate([preds_ailia[2], preds_ailia[3]], axis=0)
-            sim = cosin_metric(fe_1, fe_2)
-            bool_sim = False if THRESHOLD > sim else True
 
-            frame = draw_result_on_img(
+            bool_sim = False
+            id_sim = 0
+            score_sim = 0
+            for i in range(len(fe_list)):
+                fe=fe_list[i]
+                sim = cosin_metric(fe, fe_2)
+                if score_sim < sim:
+                    bool_sim = True
+                    id_sim = i
+                    score_sim = sim
+            if score_sim < THRESHOLD:
+                id_sim = len(fe_list)
+                fe_list.append(fe_2)
+                score_sim = 0
+
+            texts.append(f"Face Id: {id_sim}")
+            texts.append(f"Similarity: {score_sim:06.3f}")
+
+            fontScale = w / 512.0
+            thickness = 2
+            color = hsv_to_rgb(256 * id_sim / 16, 255, 255)
+            cv2.rectangle(frame, top_left, bottom_right, color, 4)
+
+            text_position = (int(w*fx)+4, int(h*(fy+fh)-8))
+
+            cv2.putText(
                 frame,
-                texts=[f"Similarity: {sim:06.3f}", f"SAME FACE: {bool_sim}"]
+                f"{id_sim}",
+                text_position,
+                cv2.FONT_HERSHEY_SIMPLEX,
+                fontScale,
+                color,
+                thickness
             )
+
+        frame = draw_result_on_img(
+            frame,
+            texts=texts
+        )
 
         cv2.imshow('frame', frame)
 
