@@ -40,8 +40,10 @@ WEBCAM_SCALE = 1.5
 
 # the threshold was calculated by the `test_performance` function in `test.py`
 # of the original repository
-THRESHOLD = 0.25572845
+#THRESHOLD = 0.25572845
 
+# change threshold for demo
+THRESHOLD = 0.4
 
 # ======================
 # Arguemnt Parser Config
