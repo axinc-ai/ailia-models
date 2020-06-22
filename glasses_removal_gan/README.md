@@ -1,13 +1,13 @@
 # Glasses Removal GAN
 
 ### Input
-<img src='test.png' width='320px'>
+<img src='test.jpg' width='320px'>
 
 Ailia input shape: (1, 128, 128, 1)  
 Range: [0, 1]
 
 ### Output
-![Result_image](output.png)
+<img src='output.png' width='320px'>
 
 
 
