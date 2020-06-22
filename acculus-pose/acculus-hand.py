@@ -147,6 +147,7 @@ def recognize_from_video():
     hand = ailia.PoseEstimator(
         HAND_MODEL_PATH, HAND_WEIGHT_PATH, env_id=env_id, algorithm=HAND_ALGORITHM
     )
+    hand.set_threshold(0.1)
 
     if args.video == '0':
         print('[INFO] Webcam mode is activated')
