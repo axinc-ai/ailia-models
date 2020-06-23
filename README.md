@@ -144,3 +144,9 @@ pip install -r requirements.txt
 | Name | Detail | Exported From | Supported Ailia Version |
 |:-----------|------------:|:------------:|:------------:|
 |[bert](/bert) | [pytorch-pretrained-bert](https://pypi.org/project/pytorch-pretrained-bert/) | Pytorch | 1.2.2 and later |
+
+## Commercial Model
+
+| Name | Detail | Exported From | Supported Ailia Version |
+|:-----------|------------:|:------------:|:------------:|
+|[acculus-pose](/acculus-pose) | [Acculus, Inc.](https://acculus.jp/) | Caffe | 1.2.3 beta and later |

@@ -8,7 +8,8 @@ This model is a commercial model. Please contact contact@axinc.jp to get the mod
 
 For the sample image,
 ``` bash
-$ python3 lightweight-human-pose-estimation.py
+$ python3 acculus-pose.py
+$ python3 acculus-up-pose.py
 ```
 
 If you want to specify the input image, put the image path after the `--input` option.  
