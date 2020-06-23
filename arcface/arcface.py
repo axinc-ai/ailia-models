@@ -55,11 +55,9 @@ parser.add_argument(
     help='Two image paths for calculating the face match.'
 )
 parser.add_argument(
-    '-v', '--video', metavar=('VIDEO', 'IMAGE'),
-    nargs='*',
+    '-v', '--video', metavar='VIDEO',
     default=None,
-    help='Determines whether the face in the video file specified by VIDEO ' +
-         'and the face in the image file specified by IMAGE are the same. ' +
+    help='The input video path. ' +
          'If the VIDEO argument is set to 0, the webcam input will be used.'
 )
 parser.add_argument(
@@ -192,19 +190,19 @@ def compare_image_and_video():
         for idx in range(count):
             # get detected face
             obj = detector.get_object(idx)
-            cx = (obj.x + obj.w/2)*w
-            cy = (obj.y + obj.h/2)*h
+            cx = (obj.x + obj.w/2) * w
+            cy = (obj.y + obj.h/2) * h
             margin = 1.1
             cw = max(obj.w * w * margin,obj.h * h * margin)
-            fx=max(cx - cw/2,0)
-            fy=max(cy - cw/2,0)
-            fw=min(cw,w-fx)
-            fh=min(cw,h-fy)
+            fx = max(cx - cw/2, 0)
+            fy = max(cy - cw/2, 0)
+            fw = min(cw, w-fx)
+            fh = min(cw, h-fy)
             top_left = (int(fx), int(fy))
             bottom_right = (int((fx+fw)), int(fy+fh))
 
             # get detected face
-            crop_img = img[top_left[1]:bottom_right[1],top_left[0]:bottom_right[0],0:3]
+            crop_img = img[top_left[1]:bottom_right[1], top_left[0]:bottom_right[0], 0:3]
             if crop_img.shape[0]<=0 or crop_img.shape[1]<=0:
                 continue
             crop_img, resized_frame = adjust_frame_size(
@@ -226,14 +224,12 @@ def compare_image_and_video():
             fe_2 = np.concatenate([preds_ailia[2], preds_ailia[3]], axis=0)
 
             # get matched face
-            bool_sim = False
             id_sim = 0
             score_sim = 0
             for i in range(len(fe_list)):
                 fe=fe_list[i]
                 sim = cosin_metric(fe, fe_2)
                 if score_sim < sim:
-                    bool_sim = True
                     id_sim = i
                     score_sim = sim
             if score_sim < THRESHOLD:
@@ -269,6 +265,8 @@ def compare_image_and_video():
 def main():
     # model files check and download
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
+    if args.video:
+        check_and_download_models(YOLOV3_FACE_WEIGHT_PATH, YOLOV3_FACE_MODEL_PATH, YOLOV3_FACE_REMOTE_PATH)
 
     if args.video is None:
         # still image mode
@@ -277,7 +275,6 @@ def main():
     else:
         # video mode
         # comparing the specified image and the video
-        check_and_download_models(YOLOV3_FACE_WEIGHT_PATH, YOLOV3_FACE_MODEL_PATH, YOLOV3_FACE_REMOTE_PATH)
         compare_image_and_video()
 
 
