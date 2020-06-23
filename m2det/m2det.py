@@ -195,7 +195,16 @@ def recognize_from_image(filename, detector):
     img = load_image(filename)
     img = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
     
-    boxes, scores, cls_inds = detect_objects(img, detector)
+    print('Start inference...')
+    if args.benchmark:
+        print('BENCHMARK mode')
+        for i in range(5):
+            start = int(round(time.time() * 1000))
+            boxes, scores, cls_inds = detect_objects(img, detector)
+            end = int(round(time.time() * 1000))
+            print(f'\tailia processing time {end - start} ms')
+    else:
+        boxes, scores, cls_inds = detect_objects(img, detector)
     
     try:
         print('\n'.join(['pos:{}, ids:{}, score:{:.3f}'.format('(%.1f,%.1f,%.1f,%.1f)' % (box[0],box[1],box[2],box[3]) \
@@ -205,9 +214,13 @@ def recognize_from_image(filename, detector):
     
     # show image 
     im2show = draw_detection(img, boxes, scores, cls_inds)
+    
+    print('Script finished successfully.')
+    
     cv2.imshow('demo', im2show)
     cv2.waitKey(5000)
     cv2.destroyAllWindows()
+    
     
 def recognize_from_video(video, detector):
  
