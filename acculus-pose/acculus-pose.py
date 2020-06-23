@@ -29,7 +29,7 @@ ALGORITHM = ailia.POSE_ALGORITHM_ACCULUS_POSE
 # Arguemnt Parser Config
 # ======================
 parser = argparse.ArgumentParser(
-    description='Fast and accurate human pose 2D-estimation.'
+    description='Acculus human pose estimation.'
 )
 parser.add_argument(
     '-i', '--input', metavar='IMAGE',

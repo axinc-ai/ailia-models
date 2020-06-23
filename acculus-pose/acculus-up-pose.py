@@ -22,14 +22,12 @@ SAVE_IMAGE_PATH = 'output.png'
 IMAGE_HEIGHT = 240
 IMAGE_WIDTH = 320
 
-ALGORITHM = ailia.POSE_ALGORITHM_ACCULUS_UP_POSE_FPGA
-
 
 # ======================
 # Arguemnt Parser Config
 # ======================
 parser = argparse.ArgumentParser(
-    description='Fast and accurate human pose 2D-estimation.'
+    description='Acculus human up pose estimation.'
 )
 parser.add_argument(
     '-i', '--input', metavar='IMAGE',
@@ -43,10 +41,10 @@ parser.add_argument(
          'If the VIDEO argument is set to 0, the webcam input will be used.'
 )
 parser.add_argument(
-    '-n', '--normal',
+    '-f', '--fpga',
     action='store_true',
-    help='By default, the optimized model is used, but with this option, ' +
-    'you can switch to the normal (not optimized) model'
+    help='By default, the gpu model is used, but with this option, ' +
+    'you can switch to the fpga model'
 )
 parser.add_argument(
     '-s', '--savepath', metavar='SAVE_IMAGE_PATH',
@@ -66,11 +64,16 @@ args = parser.parse_args()
 # Parameters 2
 # ======================
 MODEL_NAME = 'acculus-pose'
-#WEIGHT_PATH = f'uppose_fpga_1_obf.caffemodel'
-#MODEL_PATH = f'uppose_fpga_obf.prototxt'
-WEIGHT_PATH = f'uppose_obf.caffemodel'
-MODEL_PATH = f'uppose_obf.prototxt'
 REMOTE_PATH = f''
+
+if args.fpga:
+    WEIGHT_PATH = f'uppose_fpga_1_obf.caffemodel'
+    MODEL_PATH = f'uppose_fpga_obf.prototxt'
+    ALGORITHM = ailia.POSE_ALGORITHM_ACCULUS_UPPOSE_FPGA
+else:
+    WEIGHT_PATH = f'uppose_obf.caffemodel'
+    MODEL_PATH = f'uppose_obf.prototxt'
+    ALGORITHM = ailia.POSE_ALGORITHM_ACCULUS_UPPOSE
 
 
 # ======================

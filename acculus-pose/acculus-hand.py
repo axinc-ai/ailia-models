@@ -28,12 +28,7 @@ HAND_MODEL_PATH = 'hand_obf.prototxt'
 HAND_REMOTE_PATH = ''
 HAND_ALGORITHM = ailia.POSE_ALGORITHM_ACCULUS_HAND
 
-IMAGE_PATH = 'couple.jpg'
-SAVE_IMAGE_PATH = 'output.png'
-IMAGE_HEIGHT = 448
-IMAGE_WIDTH = 448
-
-FACE_CATEGORY = ['hand']
+HAND_CATEGORY = ['hand']
 THRESHOLD = 0.2
 IOU = 0.45
 
@@ -42,29 +37,13 @@ IOU = 0.45
 # Arguemnt Parser Config
 # ======================
 parser = argparse.ArgumentParser(
-    description='Yolov3 face detection model'
-)
-parser.add_argument(
-    '-i', '--input', metavar='IMAGE',
-    default=IMAGE_PATH,
-    help='The input image path.'
+    description='Acculus hand detection model'
 )
 parser.add_argument(
     '-v', '--video', metavar='VIDEO',
     default=None,
     help='The input video path. ' +
          'If the VIDEO argument is set to 0, the webcam input will be used.'
-)
-parser.add_argument(
-    '-s', '--savepath', metavar='SAVE_IMAGE_PATH',
-    default=SAVE_IMAGE_PATH,
-    help='Save path for the output image.'
-)
-parser.add_argument(
-    '-b', '--benchmark',
-    action='store_true',
-    help='Running the inference on the same input 5 times ' +
-         'to measure execution performance. (Cannot be used in video mode)'
 )
 args = parser.parse_args()
 
@@ -83,13 +62,15 @@ def line(input_img, hand_keypoint, point1, point2, offset, scale):
     threshold = 0.3
     if hand_keypoint.points[point1].score > threshold and\
        hand_keypoint.points[point2].score > threshold:
-        color = hsv_to_rgb(255*point1/ailia.POSE_KEYPOINT_CNT, 255, 255)
+        color = hsv_to_rgb(255*point2/ailia.POSE_KEYPOINT_CNT, 255, 255)
 
         x1 = int(hand_keypoint.points[point1].x * scale[0] + offset[0])
         y1 = int(hand_keypoint.points[point1].y * scale[1] + offset[1])
         x2 = int(hand_keypoint.points[point2].x * scale[0] + offset[0])
         y2 = int(hand_keypoint.points[point2].y * scale[1] + offset[1])
-        cv2.line(input_img, (x1, y1), (x2, y2), color, 2)
+
+        w = int(input_img.shape[0] / 100)
+        cv2.line(input_img, (x1, y1), (x2, y2), color, w)
 
 
 def display_result(input_img, hand, top_left, bottom_right):
@@ -136,7 +117,7 @@ def recognize_from_video():
     detector = ailia.Detector(
         MODEL_PATH,
         WEIGHT_PATH,
-        len(FACE_CATEGORY),
+        len(HAND_CATEGORY),
         format=ailia.NETWORK_IMAGE_FORMAT_RGB,
         channel=ailia.NETWORK_IMAGE_CHANNEL_FIRST,
         range=ailia.NETWORK_IMAGE_RANGE_U_FP32,
@@ -166,51 +147,41 @@ def recognize_from_video():
         if not ret:
             continue
 
-        _, resized_img = adjust_frame_size(frame, IMAGE_HEIGHT, IMAGE_WIDTH)
-
-        img = cv2.cvtColor(resized_img, cv2.COLOR_BGR2BGRA)
+        img = cv2.cvtColor(frame, cv2.COLOR_BGR2BGRA)
         detector.compute(img, THRESHOLD, IOU)
-        res_img = plot_results(detector, resized_img, FACE_CATEGORY, False)
 
         h, w = img.shape[0], img.shape[1]
         count = detector.get_object_count()
-        texts = []
         for idx in range(count):
             # get detected hand
             obj = detector.get_object(idx)
             margin = 1.0
-            cx = obj.x + obj.w/2
-            cy = obj.y + obj.h/2
-            cw = max(obj.w,obj.h) * margin
-            fx = cx - cw/2
-            fy = cy - cw/2
-            fw = cw
-            fh = cw
-            fx=max(fx,0)
-            fy=max(fy,0)
-            fw=min(fw,w-fx)
-            fh=min(fh,h-fy)
-            top_left = (int(w*fx), int(h*fy))
-            bottom_right = (int(w*(fx+fw)), int(h*(fy+fh)))
+            cx = (obj.x + obj.w/2) * w
+            cy = (obj.y + obj.h/2) * h
+            cw = max(obj.w * w,obj.h * h) * margin
+            fx=max(cx - cw/2,0)
+            fy=max(cy - cw/2,0)
+            fw=min(cw, w-fx)
+            fh=min(cw, h-fy)
+            top_left = (int(fx), int(fy))
+            bottom_right = (int(fx+fw), int(fy+fh))
 
+            # display detected hand
             color = hsv_to_rgb(0, 255, 255)
-            cv2.rectangle(res_img, top_left, bottom_right, color, 4)
+            cv2.rectangle(frame, top_left, bottom_right, color, 4)
 
             # get detected face
-            crop_img = img[top_left[1]:bottom_right[1],top_left[0]:bottom_right[0],0:4]
+            crop_img = img[top_left[1]:bottom_right[1], top_left[0]:bottom_right[0], 0:4]
             if crop_img.shape[0]<=0 or crop_img.shape[1]<=0:
                 continue
-            #crop_img, resized_frame = adjust_frame_size(
-            #    crop_img, HAND_IMAGE_HEIGHT, HAND_IMAGE_WIDTH
-            #)
 
             # inferece
             _ = hand.compute(crop_img.astype(np.uint8, order='C'))
 
             # postprocessing
-            display_result(res_img, hand, top_left, bottom_right)
+            display_result(frame, hand, top_left, bottom_right)
 
-        cv2.imshow('frame', res_img)
+        cv2.imshow('frame', frame)
 
     capture.release()
     cv2.destroyAllWindows()
@@ -219,7 +190,12 @@ def recognize_from_video():
 
 def main():
     # model files check and download
+    check_and_download_models(HAND_WEIGHT_PATH, HAND_MODEL_PATH, HAND_REMOTE_PATH)
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
+
+    if args.video is None:
+        print("Video file required.")
+        return
 
     # video mode
     recognize_from_video()
