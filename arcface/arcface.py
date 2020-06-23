@@ -40,10 +40,7 @@ WEBCAM_SCALE = 1.5
 
 # the threshold was calculated by the `test_performance` function in `test.py`
 # of the original repository
-#THRESHOLD = 0.25572845
-
-# change threshold for demo
-THRESHOLD = 0.4
+THRESHOLD = 0.25572845
 
 # ======================
 # Arguemnt Parser Config
@@ -195,17 +192,16 @@ def compare_image_and_video():
         for idx in range(count):
             # get detected face
             obj = detector.get_object(idx)
-            margin = 0.2
-            fx = obj.x - obj.w*margin
-            fy = obj.y - obj.w*margin
-            fw = obj.w + obj.w*margin*2
-            fh = obj.h + obj.w*margin*2
-            fx=max(fx,0)
-            fy=max(fy,0)
-            fw=min(fw,w-fx)
-            fh=min(fh,h-fy)
-            top_left = (int(w*fx), int(h*fy))
-            bottom_right = (int(w*(fx+fw)), int(h*(fy+fh)))
+            cx = (obj.x + obj.w/2)*w
+            cy = (obj.y + obj.h/2)*h
+            margin = 1.1
+            cw = max(obj.w * w * margin,obj.h * h * margin)
+            fx=max(cx - cw/2,0)
+            fy=max(cy - cw/2,0)
+            fw=min(cw,w-fx)
+            fh=min(cw,h-fy)
+            top_left = (int(fx), int(fy))
+            bottom_right = (int((fx+fw)), int(fy+fh))
 
             # get detected face
             crop_img = img[top_left[1]:bottom_right[1],top_left[0]:bottom_right[0],0:3]
@@ -229,6 +225,7 @@ def compare_image_and_video():
             fe_1 = np.concatenate([preds_ailia[0], preds_ailia[1]], axis=0)
             fe_2 = np.concatenate([preds_ailia[2], preds_ailia[3]], axis=0)
 
+            # get matched face
             bool_sim = False
             id_sim = 0
             score_sim = 0
@@ -244,30 +241,23 @@ def compare_image_and_video():
                 fe_list.append(fe_2)
                 score_sim = 0
 
-            texts.append(f"Face Id: {id_sim}")
-            texts.append(f"Similarity: {score_sim:06.3f}")
-
+            # display result
             fontScale = w / 512.0
             thickness = 2
             color = hsv_to_rgb(256 * id_sim / 16, 255, 255)
-            cv2.rectangle(frame, top_left, bottom_right, color, 4)
+            cv2.rectangle(frame, top_left, bottom_right, color, 2)
 
-            text_position = (int(w*fx)+4, int(h*(fy+fh)-8))
+            text_position = (int(fx)+4, int((fy+fh)-8))
 
             cv2.putText(
                 frame,
-                f"{id_sim}",
+                f"{id_sim} : {score_sim:5.3f}",
                 text_position,
                 cv2.FONT_HERSHEY_SIMPLEX,
                 fontScale,
                 color,
                 thickness
             )
-
-        frame = draw_result_on_img(
-            frame,
-            texts=texts
-        )
 
         cv2.imshow('frame', frame)
 
