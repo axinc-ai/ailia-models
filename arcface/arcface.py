@@ -139,12 +139,6 @@ def compare_images():
 
 def compare_image_and_video():
     # prepare base image
-    if len(args.video) == 1:
-        base_imgs = None
-        base_imgs_exists = False
-    else:
-        base_imgs = prepare_input_data(args.video[1])
-        base_imgs_exists = True
     fe_list = []
 
     # net initialize
@@ -165,15 +159,15 @@ def compare_image_and_video():
     )
 
     # web camera
-    if args.video[0] == '0':
+    if args.video == '0':
         print('[INFO] Webcam mode is activated')
         capture = cv2.VideoCapture(0)
         if not capture.isOpened():
             print("[Error] webcamera not found")
             sys.exit(1)
     else:
-        if check_file_existance(args.video[0]):
-            capture = cv2.VideoCapture(args.video[0])
+        if check_file_existance(args.video):
+            capture = cv2.VideoCapture(args.video)
 
     # inference loop
     while(True):
@@ -192,7 +186,7 @@ def compare_image_and_video():
             obj = detector.get_object(idx)
             cx = (obj.x + obj.w/2) * w
             cy = (obj.y + obj.h/2) * h
-            margin = 1.1
+            margin = 1.0
             cw = max(obj.w * w * margin,obj.h * h * margin)
             fx = max(cx - cw/2, 0)
             fy = max(cy - cw/2, 0)
@@ -211,10 +205,7 @@ def compare_image_and_video():
 
             # prepare target face and input face
             input_frame = preprocess_image(resized_frame, input_is_bgr=True)
-            if not base_imgs_exists:
-                base_imgs = np.copy(input_frame)
-                base_imgs_exists = True
-            input_data = np.concatenate([base_imgs, input_frame], axis=0)
+            input_data = np.concatenate([input_frame, input_frame], axis=0)
 
             # inference
             preds_ailia = net.predict(input_data)
