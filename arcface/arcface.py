@@ -227,6 +227,8 @@ def compare_image_and_video():
                 id_sim = len(fe_list)
                 fe_list.append(fe_2)
                 score_sim = 0
+            else:
+                fe_list[id_sim]=(fe_list[id_sim] + fe_2)/2  #update feature value
 
             # display result
             fontScale = w / 512.0
