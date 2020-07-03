@@ -13,6 +13,7 @@ from webcamera_utils import adjust_frame_size  # noqa: E402
 from image_utils import load_image, draw_result_on_img  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from utils import check_file_existance  # noqa: E402
+from detector_utils import hsv_to_rgb # noqa: E402C
 
 
 # ======================
@@ -21,6 +22,12 @@ from utils import check_file_existance  # noqa: E402
 WEIGHT_PATH = 'arcface.onnx'
 MODEL_PATH = 'arcface.onnx.prototxt'
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/arcface/"
+
+YOLOV3_FACE_WEIGHT_PATH = 'yolov3-face.opt.onnx'
+YOLOV3_FACE_MODEL_PATH = 'yolov3-face.opt.onnx.prototxt'
+YOLOV3_FACE_REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/yolov3-face/'
+YOLOV3_FACE_THRESHOLD = 0.2
+YOLOV3_FACE_IOU = 0.45
 
 IMG_PATH_1 = 'correct_pair_1.jpg'
 IMG_PATH_2 = 'correct_pair_2.jpg'
@@ -35,7 +42,6 @@ WEBCAM_SCALE = 1.5
 # of the original repository
 THRESHOLD = 0.25572845
 
-
 # ======================
 # Arguemnt Parser Config
 # ======================
@@ -49,11 +55,9 @@ parser.add_argument(
     help='Two image paths for calculating the face match.'
 )
 parser.add_argument(
-    '-v', '--video', metavar=('VIDEO', 'IMAGE'),
-    nargs=2,
+    '-v', '--video', metavar='VIDEO',
     default=None,
-    help='Determines whether the face in the video file specified by VIDEO ' +
-         'and the face in the image file specified by IMAGE are the same. ' +
+    help='The input video path. ' +
          'If the VIDEO argument is set to 0, the webcam input will be used.'
 )
 parser.add_argument(
@@ -135,23 +139,35 @@ def compare_images():
 
 def compare_image_and_video():
     # prepare base image
-    base_imgs = prepare_input_data(args.video[1])
+    fe_list = []
 
-    # net itinialize
+    # net initialize
     env_id = ailia.get_gpu_environment_id()
     print(f'env_id: {env_id}')
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
 
+    # detector initialize
+    detector = ailia.Detector(
+        YOLOV3_FACE_MODEL_PATH,
+        YOLOV3_FACE_WEIGHT_PATH,
+        1,
+        format=ailia.NETWORK_IMAGE_FORMAT_RGB,
+        channel=ailia.NETWORK_IMAGE_CHANNEL_FIRST,
+        range=ailia.NETWORK_IMAGE_RANGE_U_FP32,
+        algorithm=ailia.DETECTOR_ALGORITHM_YOLOV3,
+        env_id=env_id
+    )
+
     # web camera
-    if args.video[0] == '0':
+    if args.video == '0':
         print('[INFO] Webcam mode is activated')
         capture = cv2.VideoCapture(0)
         if not capture.isOpened():
             print("[Error] webcamera not found")
             sys.exit(1)
     else:
-        if check_file_existance(args.video[0]):
-            capture = cv2.VideoCapture(args.video[0])
+        if check_file_existance(args.video):
+            capture = cv2.VideoCapture(args.video)
 
     # inference loop
     while(True):
@@ -159,25 +175,79 @@ def compare_image_and_video():
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
 
-        frame, resized_frame = adjust_frame_size(
-            frame, IMAGE_HEIGHT, IMAGE_WIDTH
-        )
-        input_frame = preprocess_image(resized_frame, input_is_bgr=True)
-        input_data = np.concatenate([base_imgs, input_frame], axis=0)
+        # detect face
+        img = cv2.cvtColor(frame, cv2.COLOR_BGR2BGRA)
+        detector.compute(img, YOLOV3_FACE_THRESHOLD, YOLOV3_FACE_IOU)
+        h, w = img.shape[0], img.shape[1]
+        count = detector.get_object_count()
+        texts = []
+        for idx in range(count):
+            # get detected face
+            obj = detector.get_object(idx)
+            cx = (obj.x + obj.w/2) * w
+            cy = (obj.y + obj.h/2) * h
+            margin = 1.0
+            cw = max(obj.w * w * margin,obj.h * h * margin)
+            fx = max(cx - cw/2, 0)
+            fy = max(cy - cw/2, 0)
+            fw = min(cw, w-fx)
+            fh = min(cw, h-fy)
+            top_left = (int(fx), int(fy))
+            bottom_right = (int((fx+fw)), int(fy+fh))
 
-        # inference
-        preds_ailia = net.predict(input_data)
+            # get detected face
+            crop_img = img[top_left[1]:bottom_right[1], top_left[0]:bottom_right[0], 0:3]
+            if crop_img.shape[0]<=0 or crop_img.shape[1]<=0:
+                continue
+            crop_img, resized_frame = adjust_frame_size(
+                crop_img, IMAGE_HEIGHT, IMAGE_WIDTH
+            )
 
-        # postprocessing
-        fe_1 = np.concatenate([preds_ailia[0], preds_ailia[1]], axis=0)
-        fe_2 = np.concatenate([preds_ailia[2], preds_ailia[3]], axis=0)
-        sim = cosin_metric(fe_1, fe_2)
-        bool_sim = False if THRESHOLD > sim else True
+            # prepare target face and input face
+            input_frame = preprocess_image(resized_frame, input_is_bgr=True)
+            input_data = np.concatenate([input_frame, input_frame], axis=0)
 
-        frame = draw_result_on_img(
-            frame,
-            texts=[f"Similarity: {sim:06.3f}", f"SAME FACE: {bool_sim}"]
-        )
+            # inference
+            preds_ailia = net.predict(input_data)
+
+            # postprocessing
+            fe_1 = np.concatenate([preds_ailia[0], preds_ailia[1]], axis=0)
+            fe_2 = np.concatenate([preds_ailia[2], preds_ailia[3]], axis=0)
+
+            # get matched face
+            id_sim = 0
+            score_sim = 0
+            for i in range(len(fe_list)):
+                fe=fe_list[i]
+                sim = cosin_metric(fe, fe_2)
+                if score_sim < sim:
+                    id_sim = i
+                    score_sim = sim
+            if score_sim < THRESHOLD:
+                id_sim = len(fe_list)
+                fe_list.append(fe_2)
+                score_sim = 0
+            else:
+                fe_list[id_sim]=(fe_list[id_sim] + fe_2)/2  #update feature value
+
+            # display result
+            fontScale = w / 512.0
+            thickness = 2
+            color = hsv_to_rgb(256 * id_sim / 16, 255, 255)
+            cv2.rectangle(frame, top_left, bottom_right, color, 2)
+
+            text_position = (int(fx)+4, int((fy+fh)-8))
+
+            cv2.putText(
+                frame,
+                f"{id_sim} : {score_sim:5.3f}",
+                text_position,
+                cv2.FONT_HERSHEY_SIMPLEX,
+                fontScale,
+                color,
+                thickness
+            )
+
         cv2.imshow('frame', frame)
 
     capture.release()
@@ -188,6 +258,8 @@ def compare_image_and_video():
 def main():
     # model files check and download
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
+    if args.video:
+        check_and_download_models(YOLOV3_FACE_WEIGHT_PATH, YOLOV3_FACE_MODEL_PATH, YOLOV3_FACE_REMOTE_PATH)
 
     if args.video is None:
         # still image mode
