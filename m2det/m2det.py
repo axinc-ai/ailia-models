@@ -243,9 +243,6 @@ def recognize_from_video(video, detector):
             continue
 
         boxes, scores, cls_inds = detect_objects(img, detector)
-
-#         detector.compute(img, THRESHOLD, IOU)
-        boxes, scores, cls_inds = detect_objects(img, detector)
         img = draw_detection(img, boxes, scores, cls_inds)
         cv2.imshow('frame', img)
         
