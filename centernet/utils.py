@@ -111,4 +111,6 @@ def postprocess(raw_output, image_size, k=40, threshold=0.3):
         filtered_detections = detections[mask]
 
         # scale bounding boxes to original image size
+        if len(filtered_detections)==0:
+            return []
         return np.apply_along_axis(scale_bboxes, 1, filtered_detections, (height, width), image_size)
