@@ -52,7 +52,7 @@ KEEP_PER_CLASS = 10
 # Arguemnt Parser Config
 # ======================
 parser = argparse.ArgumentParser(
-    description='Yolov3 model'
+    description='m2det model'
 )
 parser.add_argument(
     '-i', '--input', metavar='IMAGE',
