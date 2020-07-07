@@ -214,12 +214,13 @@ def recognize_from_image(filename, detector):
     
     # show image 
     im2show = draw_detection(img, boxes, scores, cls_inds)
+    cv2.imwrite(args.savepath, im2show)
     
     print('Script finished successfully.')
     
-    cv2.imshow('demo', im2show)
-    cv2.waitKey(5000)
-    cv2.destroyAllWindows()
+    #cv2.imshow('demo', im2show)
+    #cv2.waitKey(5000)
+    #cv2.destroyAllWindows()
     
     
 def recognize_from_video(video, detector):
