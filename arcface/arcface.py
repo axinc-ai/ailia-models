@@ -19,8 +19,9 @@ from detector_utils import hsv_to_rgb # noqa: E402C
 # ======================
 # PARAMETERS
 # ======================
-WEIGHT_PATH = 'arcface.onnx'
-MODEL_PATH = 'arcface.onnx.prototxt'
+
+MODEL_LISTS = ['normal', 'masked']
+
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/arcface/"
 
 YOLOV3_FACE_WEIGHT_PATH = 'yolov3-face.opt.onnx'
@@ -66,8 +67,21 @@ parser.add_argument(
     help='Running the inference on the same input 5 times ' +
          'to measure execution performance. (Cannot be used in video mode)'
 )
+parser.add_argument(
+    '-a', '--arch', metavar='ARCH',
+    default='normal', choices=MODEL_LISTS,
+    help='model lists: ' + ' | '.join(MODEL_LISTS)
+)
 args = parser.parse_args()
 
+if args.arch == 'masked':
+    WEIGHT_PATH = 'arcface_masked190.onnx'
+    MODEL_PATH = 'arcface_masked190.onnx.prototxt'
+    BATCH_SIZE = 2
+else:
+    WEIGHT_PATH = 'arcface.onnx'
+    MODEL_PATH = 'arcface.onnx.prototxt'
+    BATCH_SIZE = 4
 
 # ======================
 # Utils
@@ -136,6 +150,40 @@ def compare_images():
     else:
         print('They are the same face!')
 
+def compare_images_batch_size_2():
+    # prepare input data
+    imgs_1 = prepare_input_data(args.inputs[0])
+    imgs_2 = prepare_input_data(args.inputs[1])
+
+    # net initialize
+    env_id = ailia.get_gpu_environment_id()
+    print(f'env_id: {env_id}')
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+
+    # inference
+    print('Start inference...')
+    if args.benchmark:
+        print('BENCHMARK mode')
+        for i in range(5):
+            start = int(round(time.time() * 1000))
+            preds_ailia1 = net.predict(imgs_1)
+            preds_ailia2 = net.predict(imgs_2)
+            end = int(round(time.time() * 1000))
+            print(f'\tailia processing time {end - start} ms')
+    else:
+        preds_ailia1 = net.predict(imgs_1)
+        preds_ailia2 = net.predict(imgs_2)
+
+    # postprocessing
+    fe_1 = np.concatenate([preds_ailia1[0], preds_ailia1[1]], axis=0)
+    fe_2 = np.concatenate([preds_ailia2[0], preds_ailia2[1]], axis=0)
+    sim = cosin_metric(fe_1, fe_2)
+
+    print(f'Similarity of ({args.inputs[0]}, {args.inputs[1]}) : {sim:.3f}')
+    if THRESHOLD > sim:
+        print('They are not the same face!')
+    else:
+        print('They are the same face!')
 
 def compare_image_and_video():
     # prepare base image
@@ -205,14 +253,21 @@ def compare_image_and_video():
 
             # prepare target face and input face
             input_frame = preprocess_image(resized_frame, input_is_bgr=True)
-            input_data = np.concatenate([input_frame, input_frame], axis=0)
+            if BATCH_SIZE == 4:
+                input_data = np.concatenate([input_frame, input_frame], axis=0)
+            else:
+                input_data = input_frame
 
             # inference
             preds_ailia = net.predict(input_data)
 
             # postprocessing
-            fe_1 = np.concatenate([preds_ailia[0], preds_ailia[1]], axis=0)
-            fe_2 = np.concatenate([preds_ailia[2], preds_ailia[3]], axis=0)
+            if BATCH_SIZE == 4:
+                fe_1 = np.concatenate([preds_ailia[0], preds_ailia[1]], axis=0)
+                fe_2 = np.concatenate([preds_ailia[2], preds_ailia[3]], axis=0)
+            else:
+                fe_1 = np.concatenate([preds_ailia[0], preds_ailia[1]], axis=0)
+                fe_2 = fe_1
 
             # get matched face
             id_sim = 0
@@ -264,7 +319,10 @@ def main():
     if args.video is None:
         # still image mode
         # comparing two images specified args.inputs
-        compare_images()
+        if BATCH_SIZE==2:
+            compare_images_batch_size_2()
+        else:
+            compare_images()
     else:
         # video mode
         # comparing the specified image and the video
