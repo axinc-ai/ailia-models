@@ -21,13 +21,18 @@ WEIGHT_PATH = 'deep-image-matting.onnx'
 MODEL_PATH = WEIGHT_PATH + '.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/deep-image-matting/'
 
-SEGMENTATION_WEIGHT_PATH = 'u2netp.onnx'
+SEGMENTATION_WEIGHT_PATH = 'u2net.onnx'
 SEGMENTATION_MODEL_PATH = SEGMENTATION_WEIGHT_PATH + '.prototxt'
 SEGMENTATION_REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/u2net/'
 
 IMAGE_PATH = 'input.png'
 TRIMAP_PATH = 'trimap.png'
-#TRIMAP_PATH = ''
+
+IMAGE_PATH = 'couple.jpg'
+TRIMAP_PATH = ''
+
+IMAGE_PATH = 'u2net.png'
+TRIMAP_PATH = ''
 
 SAVE_IMAGE_PATH = 'output.png'
 IMAGE_HEIGHT = 320
@@ -73,8 +78,8 @@ args = parser.parse_args()
 # ======================
 # Utils
 # ======================
-img_rows = 320
-img_cols = 320
+img_rows = IMAGE_HEIGHT
+img_cols = IMAGE_WIDTH
 
 def safe_crop(mat, x, y, crop_size=(img_rows, img_cols)):
     crop_height, crop_width = crop_size
@@ -95,20 +100,11 @@ def get_final_output(out, trimap):
     return (1 - mask) * trimap + mask * out
 
 def postprocess(src_img, trimap, preds_ailia, use_trimap_directly=False):
-    print(trimap.shape)
-    print(preds_ailia.shape)
-    #trimap=trimap.transpose(0,2,3,1)
-    
-    trimap = trimap[:,:,0].reshape((320,320))
-    preds_ailia = preds_ailia.reshape((320,320))
+    trimap = trimap[:,:,0].reshape((IMAGE_HEIGHT,IMAGE_WIDTH))
+    preds_ailia = preds_ailia.reshape((IMAGE_HEIGHT,IMAGE_WIDTH))
 
-    #trimap=trimap.transpose(0,2,3,1)
     preds_ailia = preds_ailia * 255.0
     preds_ailia = get_final_output(preds_ailia,trimap)
-    print(preds_ailia.shape)
-
-    print(src_img.shape)
-    print(preds_ailia)
 
     output_data = np.zeros((IMAGE_HEIGHT,IMAGE_WIDTH,4))
     output_data[:,:,0]=src_img[:,:,0]
@@ -195,8 +191,8 @@ def gen_trimap(mask,k_size=(5,5),ite=1):
     eroded = cv2.erode(mask,kernel,iterations = ite)
     dilated = cv2.dilate(mask,kernel,iterations = ite)
     trimap = np.full(mask.shape,128)
-    trimap[eroded == 255] = 255
-    trimap[dilated == 0] = 0
+    trimap[eroded >= 254] = 255
+    trimap[dilated <= 1] = 0
     return trimap
 
 # ======================
@@ -238,11 +234,13 @@ def recognize_from_image():
         trimap_data = np.asarray(img).copy()
         trimap_data_original = trimap_data.copy()
 
-        trimap_data[trimap_data_original<192] = 128
-        trimap_data[trimap_data_original<64] = 0
-        trimap_data[trimap_data_original>=192] = 255
+        #thre1=64
+        #thre2=192+32
+        #trimap_data[trimap_data_original<thre2] = 128
+        #trimap_data[trimap_data_original<thre1] = 0
+        #trimap_data[trimap_data_original>=thre2] = 255
 
-        #trimap_data = gen_trimap(trimap_data,k_size=(10,10),ite=5)
+        trimap_data = gen_trimap(trimap_data,k_size=(3,3),ite=1)
 
         im = Image.fromarray(trimap_data.astype('uint8'))
         im.save("trimap2_dump.png")
@@ -250,38 +248,33 @@ def recognize_from_image():
     else:
         trimap_data = cv2.imread(args.trimap)
 
-    x = 320
-    y = 0
-    crop_size=(IMAGE_HEIGHT*2,IMAGE_WIDTH*2)
+    if IMAGE_PATH=="input.png":
+        x = 320
+        y = 0
+        crop_size=(IMAGE_HEIGHT*2,IMAGE_WIDTH*2)
+    else:
+        x = 0
+        y = 0
+        crop_size=(IMAGE_HEIGHT,IMAGE_WIDTH)
 
     rgb_data=safe_crop(rgb_data, x, y, crop_size)
     trimap_data=safe_crop(trimap_data, x, y, crop_size)
     src_img=safe_crop(src_img, x, y, crop_size)
 
-    print(rgb_data.shape)
-    print(trimap_data.shape)
-    #trimap_data = trimap_data[:,0,:,:].reshape((1,320,320,1))
     input_data = np.zeros((1,IMAGE_HEIGHT,IMAGE_WIDTH,4))
-    print(input_data.shape)
-    input_data[:,:,:,0:3] = rgb_data[:,:,0:3]# / 255.0
-    input_data[:,:,:,3] = trimap_data[:,:,0]# / 255.0
-    #print(input_data)
-    #image_n = cv2.cvtColor(input_data, cv2.COLOR_RGBA2RGBA)
-    #input_data = input_data.transpose(0,2,3,1)
-    #from PIL import Image
-    im = Image.fromarray(input_data.reshape((320,320,4)).astype('uint8'))
+    input_data[:,:,:,0:3] = rgb_data[:,:,0:3]
+    input_data[:,:,:,3] = trimap_data[:,:,0]
+    im = Image.fromarray(input_data.reshape((IMAGE_HEIGHT,IMAGE_WIDTH,4)).astype('uint8'))
     im.save("input_dump.png")
     input_data = input_data / 255.0
     print(input_data.shape)
-    #print(input_data)
-    #print(trimap_data[0,1,160,160])
-
+    
     # net initialize
-    env_id = 0#ailia.get_gpu_environment_id()
-    # overflow fp16 range
+    env_id = 0  # use cpu because overflow fp16 range
+    #env_id = ailia.get_gpu_environment_id()   
     print(f'env_id: {env_id}')
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
-    net.set_input_shape((1,320,320,4))
+    net.set_input_shape((1,IMAGE_HEIGHT,IMAGE_WIDTH,4))
 
     # inference
     print('Start inference...')
