@@ -19,11 +19,15 @@ from utils import check_file_existance  # noqa: E402
 # ======================
 WEIGHT_PATH = 'deep-image-matting.onnx'
 MODEL_PATH = WEIGHT_PATH + '.prototxt'
-REMOTE_PATH =\
-    'https://storage.googleapis.com/ailia-models/deep-image-matting/'
+REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/deep-image-matting/'
+
+SEGMENTATION_WEIGHT_PATH = 'u2netp.onnx'
+SEGMENTATION_MODEL_PATH = SEGMENTATION_WEIGHT_PATH + '.prototxt'
+SEGMENTATION_REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/u2net/'
 
 IMAGE_PATH = 'input.png'
 TRIMAP_PATH = 'trimap.png'
+#TRIMAP_PATH = ''
 
 SAVE_IMAGE_PATH = 'output.png'
 IMAGE_HEIGHT = 320
@@ -90,7 +94,7 @@ def get_final_output(out, trimap):
     mask = np.equal(trimap, unknown_code).astype(np.float32)
     return (1 - mask) * trimap + mask * out
 
-def postprocess(src_img, trimap, preds_ailia):
+def postprocess(src_img, trimap, preds_ailia, use_trimap_directly=False):
     print(trimap.shape)
     print(preds_ailia.shape)
     #trimap=trimap.transpose(0,2,3,1)
@@ -110,38 +114,90 @@ def postprocess(src_img, trimap, preds_ailia):
     output_data[:,:,0]=src_img[:,:,0]
     output_data[:,:,1]=src_img[:,:,1]
     output_data[:,:,2]=src_img[:,:,2]
-    output_data[:,:,3]=preds_ailia
+    if use_trimap_directly:
+        output_data[:,:,3]=trimap
+    else:
+        output_data[:,:,3]=preds_ailia
 
     output_data[output_data>255]=255
     output_data[output_data<0]=0
 
     return output_data
-    #preds_ailia.reshape()
-    #return preds_ailia * 255
 
-    pred = sigmoid(preds_ailia)[0][0]
-    mask = pred >= 0.5
+# ======================
+# Segmentation util
+# ======================
 
-    mask_n = np.zeros((IMAGE_HEIGHT, IMAGE_WIDTH, 3))
-    mask_n[:, :, 0] = 255
-    mask_n[:, :, 0] *= mask
+import cv2
+import numpy as np
+from skimage import io
+from PIL import Image
 
-    image_n = cv2.cvtColor(src_img, cv2.COLOR_RGB2BGR)
 
-    # discard padded area
-    h, w, _ = image_n.shape
-    delta_h = h - IMAGE_HEIGHT
-    delta_w = w - IMAGE_WIDTH
+def transform(image, scaled_size):
+    # RescaleT part in original repo
+    h, w = image.shape[:2]
+    if h > w:
+        new_h, new_w = scaled_size*h/w, scaled_size
+    else:
+        new_h, new_w = scaled_size, scaled_size*w/h
+    new_h, new_w = int(new_h), int(new_w)
+    
+    image = cv2.resize(image, (scaled_size, scaled_size))
 
-    top = delta_h // 2
-    bottom = IMAGE_HEIGHT - (delta_h - top)
-    left = delta_w // 2
-    right = IMAGE_WIDTH - (delta_w - left)
+    # ToTensorLab part in original repo
+    tmpImg = np.zeros((image.shape[0], image.shape[1], 3))
+    image = image/np.max(image)
+    if image.shape[2] == 1:
+        tmpImg[:, :, 0] = (image[:, :, 0]-0.485)/0.229
+        tmpImg[:, :, 1] = (image[:, :, 0]-0.485)/0.229
+        tmpImg[:, :, 2] = (image[:, :, 0]-0.485)/0.229
+    else:
+        tmpImg[:, :, 0] = (image[:, :, 0]-0.485)/0.229
+        tmpImg[:, :, 1] = (image[:, :, 1]-0.456)/0.224
+        tmpImg[:, :, 2] = (image[:, :, 2]-0.406)/0.225
+    return tmpImg.transpose((2, 0, 1))[np.newaxis, :, :, :]
 
-    mask_n = mask_n[top:bottom, left:right, :]
-    image_n = image_n * 0.5 + mask_n * 0.5
-    return image_n
 
+def load_image(image_path, scaled_size):
+    image = io.imread(image_path)
+    h, w = image.shape[0], image.shape[1]
+    if 2 == len(image.shape):
+        image = image[:, :, np.newaxis]
+    return transform(image, scaled_size), h, w
+
+
+def norm(pred):
+    ma = np.max(pred)
+    mi = np.min(pred)
+    return (pred - mi) / (ma - mi)
+
+
+def save_result(pred, savepath, srcimg_shape):
+    """
+    Parameters
+    ----------
+    srcimg_shape: (h, w)
+    """
+    # normalization
+    pred = norm(pred)
+
+    img = Image.fromarray(pred * 255).convert('RGB')
+    img = img.resize(
+        (srcimg_shape[1], srcimg_shape[0]),
+        resample=Image.BILINEAR
+    )
+    img.save(savepath)
+    
+
+def gen_trimap(mask,k_size=(5,5),ite=1):
+    kernel = np.ones(k_size,np.uint8)
+    eroded = cv2.erode(mask,kernel,iterations = ite)
+    dilated = cv2.dilate(mask,kernel,iterations = ite)
+    trimap = np.full(mask.shape,128)
+    trimap[eroded == 255] = 255
+    trimap[dilated == 0] = 0
+    return trimap
 
 # ======================
 # Main functions
@@ -149,8 +205,50 @@ def postprocess(src_img, trimap, preds_ailia):
 def recognize_from_image():
     # prepare input data
     rgb_data = cv2.imread(args.input)
-    trimap_data = cv2.imread(args.trimap)
     src_img = cv2.imread(args.input)
+
+    if args.trimap=="":
+        input_data, h, w = load_image(
+            args.input,
+            scaled_size=IMAGE_WIDTH,
+        )
+
+        env_id = ailia.get_gpu_environment_id()
+        print(f'env_id: {env_id}')
+        net = ailia.Net(SEGMENTATION_MODEL_PATH, SEGMENTATION_WEIGHT_PATH, env_id=env_id)
+        print(net.get_input_shape())
+
+        preds_ailia = net.predict([input_data])
+
+        pred = preds_ailia[0][0, 0, :, :]
+
+        print("pred : "+str(pred.shape))
+        save_result(pred, "segmentation.png", [h, w])
+
+        pred = norm(pred)
+
+        img = Image.fromarray(pred * 255).convert('RGB')
+        img = img.resize(
+            (w, h),
+            resample=Image.BILINEAR
+        )
+
+        img.save("trimap_dump.png")
+
+        trimap_data = np.asarray(img).copy()
+        trimap_data_original = trimap_data.copy()
+
+        trimap_data[trimap_data_original<192] = 128
+        trimap_data[trimap_data_original<64] = 0
+        trimap_data[trimap_data_original>=192] = 255
+
+        #trimap_data = gen_trimap(trimap_data,k_size=(10,10),ite=5)
+
+        im = Image.fromarray(trimap_data.astype('uint8'))
+        im.save("trimap2_dump.png")
+
+    else:
+        trimap_data = cv2.imread(args.trimap)
 
     x = 320
     y = 0
@@ -170,7 +268,7 @@ def recognize_from_image():
     #print(input_data)
     #image_n = cv2.cvtColor(input_data, cv2.COLOR_RGBA2RGBA)
     #input_data = input_data.transpose(0,2,3,1)
-    from PIL import Image
+    #from PIL import Image
     im = Image.fromarray(input_data.reshape((320,320,4)).astype('uint8'))
     im.save("input_dump.png")
     input_data = input_data / 255.0
@@ -251,6 +349,8 @@ def recognize_from_video():
 def main():
     # model files check and download
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
+    if args.trimap == '':
+        check_and_download_models(SEGMENTATION_WEIGHT_PATH, SEGMENTATION_MODEL_PATH, SEGMENTATION_REMOTE_PATH)
 
     if args.video is not None:
         # video mode
