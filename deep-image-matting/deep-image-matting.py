@@ -21,16 +21,6 @@ WEIGHT_PATH = 'deep-image-matting.onnx'
 MODEL_PATH = WEIGHT_PATH + '.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/deep-image-matting/'
 
-SEGMENTATION_WEIGHT_PATH = 'u2net.onnx'
-SEGMENTATION_MODEL_PATH = SEGMENTATION_WEIGHT_PATH + '.prototxt'
-SEGMENTATION_REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/u2net/'
-
-SEGMENTATION_WEIGHT_PATH = 'deeplabv3.opt.onnx'
-SEGMENTATION_MODEL_PATH = SEGMENTATION_WEIGHT_PATH + '.prototxt'
-SEGMENTATION_REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/deeplabv3/'
-
-DEEPLABV3=True
-
 IMAGE_PATH = 'input.png'
 TRIMAP_PATH = 'trimap.png'
 
@@ -44,6 +34,7 @@ SAVE_IMAGE_PATH = 'output.png'
 IMAGE_HEIGHT = 320
 IMAGE_WIDTH = 320
 
+MODEL_LISTS = ['deeplabv3', 'u2net']
 
 # ======================
 # Arguemnt Parser Config
@@ -68,6 +59,11 @@ parser.add_argument(
          'If the VIDEO argument is set to 0, the webcam input will be used.'
 )
 parser.add_argument(
+    '-a', '--arch', metavar='ARCH',
+    default='deeplabv3', choices=MODEL_LISTS,
+    help='model lists: ' + ' | '.join(MODEL_LISTS)
+)
+parser.add_argument(
     '-s', '--savepath', metavar='SAVE_IMAGE_PATH',
     default=SAVE_IMAGE_PATH,
     help='Save path for the output image.'
@@ -80,6 +76,18 @@ parser.add_argument(
 )
 args = parser.parse_args()
 
+DEEPLABV3=False
+if args.arch == 'deeplabv3':
+    DEEPLABV3=True
+
+if not DEEPLABV3:
+    SEGMENTATION_WEIGHT_PATH = 'u2net.onnx'
+    SEGMENTATION_MODEL_PATH = SEGMENTATION_WEIGHT_PATH + '.prototxt'
+    SEGMENTATION_REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/u2net/'
+else:
+    SEGMENTATION_WEIGHT_PATH = 'deeplabv3.opt.onnx'
+    SEGMENTATION_MODEL_PATH = SEGMENTATION_WEIGHT_PATH + '.prototxt'
+    SEGMENTATION_REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/deeplabv3/'
 
 # ======================
 # Utils
@@ -136,40 +144,6 @@ import numpy as np
 from skimage import io
 from PIL import Image
 
-
-def transform(image, scaled_size):
-    # RescaleT part in original repo
-    h, w = image.shape[:2]
-    if h > w:
-        new_h, new_w = scaled_size*h/w, scaled_size
-    else:
-        new_h, new_w = scaled_size, scaled_size*w/h
-    new_h, new_w = int(new_h), int(new_w)
-    
-    image = cv2.resize(image, (scaled_size, scaled_size))
-
-    # ToTensorLab part in original repo
-    tmpImg = np.zeros((image.shape[0], image.shape[1], 3))
-    image = image/np.max(image)
-    if image.shape[2] == 1:
-        tmpImg[:, :, 0] = (image[:, :, 0]-0.485)/0.229
-        tmpImg[:, :, 1] = (image[:, :, 0]-0.485)/0.229
-        tmpImg[:, :, 2] = (image[:, :, 0]-0.485)/0.229
-    else:
-        tmpImg[:, :, 0] = (image[:, :, 0]-0.485)/0.229
-        tmpImg[:, :, 1] = (image[:, :, 1]-0.456)/0.224
-        tmpImg[:, :, 2] = (image[:, :, 2]-0.406)/0.225
-    return tmpImg.transpose((2, 0, 1))[np.newaxis, :, :, :]
-
-
-def load_image(image_path, scaled_size):
-    image = io.imread(image_path)
-    h, w = image.shape[0], image.shape[1]
-    if 2 == len(image.shape):
-        image = image[:, :, np.newaxis]
-    return transform(image, scaled_size), h, w
-
-
 def norm(pred):
     ma = np.max(pred)
     mi = np.min(pred)
@@ -208,6 +182,12 @@ def generate_trimap(net,input_data,w,h):
         input_data = cv2.resize(input_data, (513, 513))
         input_data = input_data / 127.5 - 1.0
         input_data = input_data.transpose((2,0,1))[np.newaxis, :, :, :]
+    else:
+        input_data = input_data / 255.0
+        input_data[:, :, 0] = (input_data[:, :, 0]-0.485)/0.229
+        input_data[:, :, 1] = (input_data[:, :, 1]-0.456)/0.224
+        input_data[:, :, 2] = (input_data[:, :, 2]-0.406)/0.225
+        input_data=input_data.transpose((2, 0, 1))[np.newaxis, :, :, :]
 
     preds_ailia = net.predict([input_data])
 
@@ -289,16 +269,12 @@ def matting_preprocess(x,y,crop_size,src_img,trimap_data,seg_data,dump=False):
 def recognize_from_image():
     # prepare input data
     src_img = cv2.imread(args.input)
-    if args.trimap!="":
-        trimap_data = cv2.imread(args.trimap)
 
     x = 0
     y = 0
     crop_size = (max(src_img.shape[0],src_img.shape[1]),max(src_img.shape[0],src_img.shape[1]))
 
     src_img=safe_crop(src_img, x, y, crop_size)
-    if args.trimap!="":
-        trimap_data=safe_crop(trimap_data, x, y, crop_size)
 
     # net initialize
     env_id = 0  # use cpu because overflow fp16 range
@@ -308,16 +284,10 @@ def recognize_from_image():
     net.set_input_shape((1,IMAGE_HEIGHT,IMAGE_WIDTH,4))
 
     if args.trimap=="":
-        if DEEPLABV3:
-            input_data = src_img
-            w = src_img.shape[1]
-            h = src_img.shape[0]
-        else:
-            input_data, h, w = load_image(
-                args.input,
-                scaled_size=IMAGE_WIDTH,
-            )
-            input_data=safe_crop(input_data, x, y, crop_size)
+        input_data = src_img
+
+        w = src_img.shape[1]
+        h = src_img.shape[0]
 
         env_id = ailia.get_gpu_environment_id()
         seg_net = ailia.Net(SEGMENTATION_MODEL_PATH, SEGMENTATION_WEIGHT_PATH, env_id=env_id)
@@ -325,8 +295,8 @@ def recognize_from_image():
         trimap_data,seg_data = generate_trimap(seg_net,input_data,w,h)
     else:
         trimap_data = cv2.imread(args.trimap)
+        trimap_data=safe_crop(trimap_data, x, y, crop_size)
         seg_data = trimap_data.copy()
-
 
     input_data, src_img, trimap_data = matting_preprocess(x,y,crop_size,src_img,trimap_data,seg_data,dump=True)
 
