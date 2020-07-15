@@ -25,13 +25,19 @@ SEGMENTATION_WEIGHT_PATH = 'u2net.onnx'
 SEGMENTATION_MODEL_PATH = SEGMENTATION_WEIGHT_PATH + '.prototxt'
 SEGMENTATION_REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/u2net/'
 
-IMAGE_PATH = 'input.png'
-TRIMAP_PATH = 'trimap.png'
+SEGMENTATION_WEIGHT_PATH = 'deeplabv3.opt.onnx'
+SEGMENTATION_MODEL_PATH = SEGMENTATION_WEIGHT_PATH + '.prototxt'
+SEGMENTATION_REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/deeplabv3/'
 
-IMAGE_PATH = 'couple.jpg'
-TRIMAP_PATH = ''
+DEEPLABV3=True
 
-IMAGE_PATH = 'u2net.png'
+#IMAGE_PATH = 'input.png'
+#TRIMAP_PATH = 'trimap.png'
+
+#IMAGE_PATH = 'couple.jpg'
+#TRIMAP_PATH = ''
+
+IMAGE_PATH = 'pixaboy.jpg'
 TRIMAP_PATH = ''
 
 SAVE_IMAGE_PATH = 'output.png'
@@ -195,6 +201,75 @@ def gen_trimap(mask,k_size=(5,5),ite=1):
     trimap[dilated <= 1] = 0
     return trimap
 
+
+def generate_trimap(args):
+    if DEEPLABV3:
+        input_data = cv2.imread(args.input)
+        w = input_data.shape[1]
+        h = input_data.shape[0]
+        input_data = cv2.resize(input_data, (513, 513))
+        input_data = input_data / 127.5 - 1.0
+        input_data = input_data.transpose((2,0,1))[np.newaxis, :, :, :]
+    else:
+        input_data, h, w = load_image(
+            args.input,
+            scaled_size=IMAGE_WIDTH,
+        )
+
+    env_id = ailia.get_gpu_environment_id()
+    print(f'env_id: {env_id}')
+    net = ailia.Net(SEGMENTATION_MODEL_PATH, SEGMENTATION_WEIGHT_PATH, env_id=env_id)
+    print(net.get_input_shape())
+
+    preds_ailia = net.predict([input_data])
+
+    if DEEPLABV3:
+        pred = preds_ailia[0]
+        print(pred.shape)
+        #print(pred)
+        pred = pred[0,15,:,:] / 21.0
+        thre = 0.6
+        pred [pred<thre] = 0
+        pred [pred>=thre] = 1
+        print(pred.shape)
+    else:
+        pred = preds_ailia[0][0, 0, :, :]
+
+    print("pred : "+str(pred.shape))
+    save_result(pred, "debug_segmentation.png", [h, w])
+
+    if not DEEPLABV3:
+        pred = norm(pred)
+
+    img = Image.fromarray(pred * 255).convert('RGB')
+    img = img.resize(
+        (w, h),
+        resample=Image.NEAREST#BILINEAR
+    )
+
+    #img.save("trimap_dump.png")
+
+    trimap_data = np.asarray(img).copy()
+    u2net_data = trimap_data.copy()
+
+    trimap_data_original = trimap_data.copy()
+
+    thre1=128
+    thre2=128#192+32
+    trimap_data[trimap_data_original<thre2] = 0
+    trimap_data[trimap_data_original<thre1] = 0
+    trimap_data[trimap_data_original>=thre2] = 255
+
+    trimap_data = trimap_data.astype("uint8")
+
+    trimap_data = gen_trimap(trimap_data,k_size=(7,7),ite=3)
+
+    im = Image.fromarray(trimap_data.astype('uint8'))
+    im.save("debug_trimap.png")
+
+    return trimap_data,u2net_data
+
+
 # ======================
 # Main functions
 # ======================
@@ -204,49 +279,10 @@ def recognize_from_image():
     src_img = cv2.imread(args.input)
 
     if args.trimap=="":
-        input_data, h, w = load_image(
-            args.input,
-            scaled_size=IMAGE_WIDTH,
-        )
-
-        env_id = ailia.get_gpu_environment_id()
-        print(f'env_id: {env_id}')
-        net = ailia.Net(SEGMENTATION_MODEL_PATH, SEGMENTATION_WEIGHT_PATH, env_id=env_id)
-        print(net.get_input_shape())
-
-        preds_ailia = net.predict([input_data])
-
-        pred = preds_ailia[0][0, 0, :, :]
-
-        print("pred : "+str(pred.shape))
-        save_result(pred, "segmentation.png", [h, w])
-
-        pred = norm(pred)
-
-        img = Image.fromarray(pred * 255).convert('RGB')
-        img = img.resize(
-            (w, h),
-            resample=Image.BILINEAR
-        )
-
-        img.save("trimap_dump.png")
-
-        trimap_data = np.asarray(img).copy()
-        trimap_data_original = trimap_data.copy()
-
-        #thre1=64
-        #thre2=192+32
-        #trimap_data[trimap_data_original<thre2] = 128
-        #trimap_data[trimap_data_original<thre1] = 0
-        #trimap_data[trimap_data_original>=thre2] = 255
-
-        trimap_data = gen_trimap(trimap_data,k_size=(3,3),ite=1)
-
-        im = Image.fromarray(trimap_data.astype('uint8'))
-        im.save("trimap2_dump.png")
-
+        trimap_data,u2net_data = generate_trimap(args)
     else:
         trimap_data = cv2.imread(args.trimap)
+        u2net_data = trimap_data.copy()
 
     if IMAGE_PATH=="input.png":
         x = 320
@@ -259,13 +295,15 @@ def recognize_from_image():
 
     rgb_data=safe_crop(rgb_data, x, y, crop_size)
     trimap_data=safe_crop(trimap_data, x, y, crop_size)
+    u2net_data=safe_crop(u2net_data, x, y, crop_size)
     src_img=safe_crop(src_img, x, y, crop_size)
 
     input_data = np.zeros((1,IMAGE_HEIGHT,IMAGE_WIDTH,4))
     input_data[:,:,:,0:3] = rgb_data[:,:,0:3]
+
     input_data[:,:,:,3] = trimap_data[:,:,0]
     im = Image.fromarray(input_data.reshape((IMAGE_HEIGHT,IMAGE_WIDTH,4)).astype('uint8'))
-    im.save("input_dump.png")
+    im.save("debug_input.png")
     input_data = input_data / 255.0
     print(input_data.shape)
     
@@ -293,6 +331,13 @@ def recognize_from_image():
     # postprocessing
     res_img = postprocess(src_img, trimap_data, preds_ailia)
     cv2.imwrite(args.savepath, res_img)
+
+    res_img = postprocess(src_img, u2net_data, preds_ailia, True)
+    cv2.imwrite("debug_segmentation_alpha.png", res_img)
+
+    res_img = postprocess(src_img, trimap_data, preds_ailia, True)
+    cv2.imwrite("debug_trimap_alpha.png", res_img)
+
     print('Script finished successfully.')
 
 
