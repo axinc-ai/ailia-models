@@ -248,7 +248,12 @@ def generate_trimap(net,input_data,w,h):
 
     trimap_data = trimap_data.astype("uint8")
 
-    trimap_data = gen_trimap(trimap_data,k_size=(7,7),ite=3)
+    kernel_size=round(max(w,h)/48)    #256 -> 4, 1280 -> 20
+    #print(kernel_size)
+    trimap_data = gen_trimap(trimap_data,k_size=(kernel_size,kernel_size),ite=3)   #pixaboy
+
+    #trimap_data = gen_trimap(trimap_data,k_size=(7,7),ite=3)   #pixaboy
+    #trimap_data = gen_trimap(trimap_data,k_size=(5,5),ite=1)   #couple
 
     im = Image.fromarray(trimap_data.astype('uint8'))
     im.save("debug_trimap_full.png")
@@ -308,9 +313,9 @@ def recognize_from_image():
             )
 
         env_id = ailia.get_gpu_environment_id()
-        net = ailia.Net(SEGMENTATION_MODEL_PATH, SEGMENTATION_WEIGHT_PATH, env_id=env_id)
+        seg_net = ailia.Net(SEGMENTATION_MODEL_PATH, SEGMENTATION_WEIGHT_PATH, env_id=env_id)
 
-        trimap_data,seg_data = generate_trimap(net,input_data,w,h)
+        trimap_data,seg_data = generate_trimap(seg_net,input_data,w,h)
     else:
         trimap_data = cv2.imread(args.trimap)
         seg_data = trimap_data.copy()
@@ -382,7 +387,6 @@ def recognize_from_video():
         w = src_img.shape[1]
         h = src_img.shape[0]
 
-        print(input_data.shape)
         trimap_data,seg_data = generate_trimap(seg_net,src_img,w,h)
 
         input_data, src_img, trimap_data = matting_preprocess(x,y,crop_size,src_img,trimap_data,seg_data,dump=False)
@@ -391,12 +395,22 @@ def recognize_from_video():
 
         # postprocessing
         res_img = postprocess(src_img, trimap_data, preds_ailia)
+        seg_img = res_img.copy()
+
+        seg_data=safe_crop(seg_data, x, y, crop_size)
+        seg_img [:,:,3] = seg_data[:,:,0]
+        seg_img[:,:,0]=seg_img[:,:,0] * seg_img[:,:,3] / 255.0
+        seg_img[:,:,1]=seg_img[:,:,1] * seg_img[:,:,3] / 255.0 + 255.0 * (1.0 - seg_img[:,:,3] / 255.0)
+        seg_img[:,:,2]=seg_img[:,:,2] * seg_img[:,:,3] / 255.0
+
         res_img[:,:,0]=res_img[:,:,0] * res_img[:,:,3] / 255.0
         res_img[:,:,1]=res_img[:,:,1] * res_img[:,:,3] / 255.0 + 255.0 * (1.0 - res_img[:,:,3] / 255.0)
         res_img[:,:,2]=res_img[:,:,2] * res_img[:,:,3] / 255.0
 
-        cv2.imshow('frame', res_img / 255.0)
-        cv2.imshow('trimap_data', trimap_data / 255.0)
+        cv2.imshow('matting', res_img / 255.0)
+        cv2.imshow('masked', seg_img / 255.0)
+        cv2.imshow('trimap', trimap_data / 255.0)
+        cv2.imshow('segmentation', seg_data / 255.0)
 
     capture.release()
     cv2.destroyAllWindows()
