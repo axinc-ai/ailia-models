@@ -248,12 +248,8 @@ def generate_trimap(net,input_data,w,h):
 
     trimap_data = trimap_data.astype("uint8")
 
-    kernel_size=round(max(w,h)/48)    #256 -> 4, 1280 -> 20
-    #print(kernel_size)
-    trimap_data = gen_trimap(trimap_data,k_size=(kernel_size,kernel_size),ite=3)   #pixaboy
-
-    #trimap_data = gen_trimap(trimap_data,k_size=(7,7),ite=3)   #pixaboy
-    #trimap_data = gen_trimap(trimap_data,k_size=(5,5),ite=1)   #couple
+    trimap_data = gen_trimap(trimap_data,k_size=(7,7),ite=3)   #pixaboy
+    #trimap_data = gen_trimap(trimap_data,k_size=(7,7),ite=1)   #couple
 
     im = Image.fromarray(trimap_data.astype('uint8'))
     im.save("debug_trimap_full.png")
@@ -261,8 +257,8 @@ def generate_trimap(net,input_data,w,h):
     return trimap_data,u2net_data
 
 def matting_preprocess(x,y,crop_size,src_img,trimap_data,seg_data,dump=False):
-    src_img=safe_crop(src_img, x, y, crop_size)
-    trimap_data=safe_crop(trimap_data, x, y, crop_size)
+    #src_img=safe_crop(src_img, x, y, crop_size)
+    #trimap_data=safe_crop(trimap_data, x, y, crop_size)
 
     input_data = np.zeros((1,IMAGE_HEIGHT,IMAGE_WIDTH,4))
     input_data[:,:,:,0:3] = src_img[:,:,0:3]
@@ -277,7 +273,7 @@ def matting_preprocess(x,y,crop_size,src_img,trimap_data,seg_data,dump=False):
         cv2.imwrite("debug_rgb.png", src_img)
         cv2.imwrite("debug_trimap.png", trimap_data)
 
-        seg_data=safe_crop(seg_data, x, y, crop_size)
+        #seg_data=safe_crop(seg_data, x, y, crop_size)
         res_img = postprocess(src_img, seg_data, None, True)
         cv2.imwrite("debug_segmentation_alpha.png", res_img)
 
@@ -293,6 +289,16 @@ def matting_preprocess(x,y,crop_size,src_img,trimap_data,seg_data,dump=False):
 def recognize_from_image():
     # prepare input data
     src_img = cv2.imread(args.input)
+    if args.trimap!="":
+        trimap_data = cv2.imread(args.trimap)
+
+    x = 0
+    y = 0
+    crop_size = (max(src_img.shape[0],src_img.shape[1]),max(src_img.shape[0],src_img.shape[1]))
+
+    src_img=safe_crop(src_img, x, y, crop_size)
+    if args.trimap!="":
+        trimap_data=safe_crop(trimap_data, x, y, crop_size)
 
     # net initialize
     env_id = 0  # use cpu because overflow fp16 range
@@ -303,14 +309,15 @@ def recognize_from_image():
 
     if args.trimap=="":
         if DEEPLABV3:
-            input_data = cv2.imread(args.input)
-            w = input_data.shape[1]
-            h = input_data.shape[0]
+            input_data = src_img
+            w = src_img.shape[1]
+            h = src_img.shape[0]
         else:
             input_data, h, w = load_image(
                 args.input,
                 scaled_size=IMAGE_WIDTH,
             )
+            input_data=safe_crop(input_data, x, y, crop_size)
 
         env_id = ailia.get_gpu_environment_id()
         seg_net = ailia.Net(SEGMENTATION_MODEL_PATH, SEGMENTATION_WEIGHT_PATH, env_id=env_id)
@@ -320,9 +327,6 @@ def recognize_from_image():
         trimap_data = cv2.imread(args.trimap)
         seg_data = trimap_data.copy()
 
-    x = 0
-    y = 0
-    crop_size = (max(src_img.shape[0],src_img.shape[1]),max(src_img.shape[0],src_img.shape[1]))
 
     input_data, src_img, trimap_data = matting_preprocess(x,y,crop_size,src_img,trimap_data,seg_data,dump=True)
 
@@ -384,6 +388,8 @@ def recognize_from_video():
         y = 0
         crop_size = (max(src_img.shape[0],src_img.shape[1]),max(src_img.shape[0],src_img.shape[1]))
 
+        src_img=safe_crop(src_img, x, y, crop_size)
+
         w = src_img.shape[1]
         h = src_img.shape[0]
 
@@ -397,7 +403,7 @@ def recognize_from_video():
         res_img = postprocess(src_img, trimap_data, preds_ailia)
         seg_img = res_img.copy()
 
-        seg_data=safe_crop(seg_data, x, y, crop_size)
+        # seg_data=safe_crop(seg_data, x, y, crop_size)
         seg_img [:,:,3] = seg_data[:,:,0]
         seg_img[:,:,0]=seg_img[:,:,0] * seg_img[:,:,3] / 255.0
         seg_img[:,:,1]=seg_img[:,:,1] * seg_img[:,:,3] / 255.0 + 255.0 * (1.0 - seg_img[:,:,3] / 255.0)
