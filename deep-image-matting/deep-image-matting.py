@@ -219,24 +219,23 @@ def generate_trimap(args):
     env_id = ailia.get_gpu_environment_id()
     print(f'env_id: {env_id}')
     net = ailia.Net(SEGMENTATION_MODEL_PATH, SEGMENTATION_WEIGHT_PATH, env_id=env_id)
-    print(net.get_input_shape())
 
     preds_ailia = net.predict([input_data])
 
     if DEEPLABV3:
         pred = preds_ailia[0]
-        print(pred.shape)
-        #print(pred)
         pred = pred[0,15,:,:] / 21.0
-        thre = 0.6
-        pred [pred<thre] = 0
-        pred [pred>=thre] = 1
-        print(pred.shape)
     else:
         pred = preds_ailia[0][0, 0, :, :]
 
-    print("pred : "+str(pred.shape))
     save_result(pred, "debug_segmentation.png", [h, w])
+
+    if DEEPLABV3:
+        thre = 0.6
+        pred [pred<thre] = 0
+        pred [pred>=thre] = 1
+
+    save_result(pred, "debug_segmentation_threshold.png", [h, w])
 
     if not DEEPLABV3:
         pred = norm(pred)
@@ -247,15 +246,13 @@ def generate_trimap(args):
         resample=Image.NEAREST#BILINEAR
     )
 
-    #img.save("trimap_dump.png")
-
     trimap_data = np.asarray(img).copy()
     u2net_data = trimap_data.copy()
 
     trimap_data_original = trimap_data.copy()
 
     thre1=128
-    thre2=128#192+32
+    thre2=128
     trimap_data[trimap_data_original<thre2] = 0
     trimap_data[trimap_data_original<thre1] = 0
     trimap_data[trimap_data_original>=thre2] = 255
@@ -305,7 +302,6 @@ def recognize_from_image():
     im = Image.fromarray(input_data.reshape((IMAGE_HEIGHT,IMAGE_WIDTH,4)).astype('uint8'))
     im.save("debug_input.png")
     input_data = input_data / 255.0
-    print(input_data.shape)
     
     # net initialize
     env_id = 0  # use cpu because overflow fp16 range
@@ -326,8 +322,6 @@ def recognize_from_image():
     else:
         preds_ailia = net.predict(input_data)
 
-    print(preds_ailia.shape)
-    
     # postprocessing
     res_img = postprocess(src_img, trimap_data, preds_ailia)
     cv2.imwrite(args.savepath, res_img)
