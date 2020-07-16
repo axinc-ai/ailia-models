@@ -2,7 +2,7 @@ import numpy as np
 
 
 def frontalize(vertices):
-    canonical_vertices = np.load('../uv-data/canonical_vertices.npy')
+    canonical_vertices = np.load('./uv-data/canonical_vertices.npy')
     
     # n x 4
     vertices_homo = np.hstack((vertices, np.ones([vertices.shape[0], 1])))  
