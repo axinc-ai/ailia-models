@@ -28,7 +28,7 @@ SAVE_IMAGE_PATH = 'output.png'
 IMAGE_HEIGHT = 320
 IMAGE_WIDTH = 320
 
-MODEL_LISTS = ['deeplabv3', 'u2net']
+MODEL_LISTS = ['deeplabv3', 'u2net', 'pspnet']
 
 # ======================
 # Arguemnt Parser Config
@@ -83,6 +83,10 @@ if args.arch == 'deeplabv3':
     SEGMENTATION_WEIGHT_PATH = 'deeplabv3.opt.onnx'
     SEGMENTATION_MODEL_PATH = SEGMENTATION_WEIGHT_PATH + '.prototxt'
     SEGMENTATION_REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/deeplabv3/'
+if args.arch == 'pspnet':
+    SEGMENTATION_WEIGHT_PATH = 'pspnet-hair-segmentation.onnx'
+    SEGMENTATION_MODEL_PATH = SEGMENTATION_WEIGHT_PATH + '.prototxt'
+    SEGMENTATION_REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/pspnet-hair-segmentation/'
 
 # ======================
 # Utils
@@ -132,15 +136,13 @@ def postprocess(src_img, trimap, preds_ailia):
 # Segmentation util
 # ======================
 
-import cv2
-import numpy as np
-from skimage import io
-from PIL import Image
-
 def norm(pred):
     ma = np.max(pred)
     mi = np.min(pred)
     return (pred - mi) / (ma - mi)
+
+def sigmoid(x):
+    return 1.0 / (1.0 + np.exp(-x))
 
 def erode_and_dilate(mask,k_size,ite):
     kernel = np.ones(k_size,np.uint8)
@@ -152,12 +154,11 @@ def erode_and_dilate(mask,k_size,ite):
     return trimap
 
 def deeplabv3_preprocess(input_data):
-    input_data = cv2.resize(input_data, (513, 513))
     input_data = input_data / 127.5 - 1.0
     input_data = input_data.transpose((2,0,1))[np.newaxis, :, :, :]
     return input_data
 
-def u2net_preprocess(input_data):
+def imagenet_preprocess(input_data):
     input_data = input_data / 255.0
     input_data[:, :, 0] = (input_data[:, :, 0]-0.485)/0.229
     input_data[:, :, 1] = (input_data[:, :, 1]-0.456)/0.224
@@ -169,52 +170,53 @@ def generate_trimap(net,input_data):
     w = input_data.shape[1]
     h = input_data.shape[0]
 
+    input_shape = net.get_input_shape()
+    input_data = cv2.resize(input_data, (input_shape[2], input_shape[3]))
+
     if args.arch=="deeplabv3":
         input_data = deeplabv3_preprocess(input_data)
-    if args.arch=="u2net":
-        input_data = u2net_preprocess(input_data)
+    if args.arch=="u2net" or args.arch=="pspnet":
+        input_data = imagenet_preprocess(input_data)
 
     preds_ailia = net.predict([input_data])
 
     if args.arch=="deeplabv3":
         pred = preds_ailia[0]
         pred = pred[0,15,:,:] / 21.0
-    if args.arch=="u2net":
+    if args.arch=="u2net" or args.arch=="pspnet":
         pred = preds_ailia[0][0, 0, :, :]
 
     if args.debug:
         cv2.imwrite("debug_segmentation.png", pred*255)
 
-    if args.arch=="deeplabv3":
-        thre = 0.6
-        pred [pred<thre] = 0
-        pred [pred>=thre] = 1
-
     if args.arch=="u2net":
         pred = norm(pred)
-
-    if args.debug:
-        cv2.imwrite("debug_segmentation_threshold.png", pred*255)
-   
+    if args.arch=="pspnet":
+        pred = sigmoid(pred)
+  
     trimap_data = cv2.resize(pred * 255, (w, h))
     trimap_data = trimap_data.reshape((w,h,1))
 
-    u2net_data = trimap_data.copy()
+    seg_data = trimap_data.copy()
 
-    trimap_data_original = trimap_data.copy()
+    thre=255 * 0.6
+    trimap_data[trimap_data<thre] = 0
+    trimap_data[trimap_data>=thre] = 255
 
-    thre=128
-    trimap_data[trimap_data_original<thre] = 0
-    trimap_data[trimap_data_original>=thre] = 255
+    if args.arch=="deeplabv3":
+        seg_data = trimap_data.copy()
 
     trimap_data = trimap_data.astype("uint8")
+
+    if args.debug:
+        cv2.imwrite("debug_segmentation_threshold.png", trimap_data)
 
     trimap_data = erode_and_dilate(trimap_data,k_size=(7,7),ite=3)
 
     if args.debug:
         cv2.imwrite("debug_trimap_full.png", trimap_data)
 
-    return trimap_data,u2net_data
+    return trimap_data,seg_data
 
 def matting_preprocess(src_img,trimap_data,seg_data):
     input_data = np.zeros((1,IMAGE_HEIGHT,IMAGE_WIDTH,4))
