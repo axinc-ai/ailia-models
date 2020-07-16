@@ -24,12 +24,6 @@ REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/deep-image-matting/'
 IMAGE_PATH = 'input.png'
 TRIMAP_PATH = 'trimap.png'
 
-#IMAGE_PATH = 'couple.jpg'
-#TRIMAP_PATH = ''
-
-#IMAGE_PATH = 'pixaboy.jpg'
-#TRIMAP_PATH = ''
-
 SAVE_IMAGE_PATH = 'output.png'
 IMAGE_HEIGHT = 320
 IMAGE_WIDTH = 320
@@ -74,17 +68,18 @@ parser.add_argument(
     help='Running the inference on the same input 5 times ' +
          'to measure execution performance. (Cannot be used in video mode)'
 )
+parser.add_argument(
+    '-d', '--debug',
+    action='store_true',
+    help='Dump debug images'
+)
 args = parser.parse_args()
 
-DEEPLABV3=False
-if args.arch == 'deeplabv3':
-    DEEPLABV3=True
-
-if not DEEPLABV3:
+if args.arch == 'u2net':
     SEGMENTATION_WEIGHT_PATH = 'u2net.onnx'
     SEGMENTATION_MODEL_PATH = SEGMENTATION_WEIGHT_PATH + '.prototxt'
     SEGMENTATION_REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/u2net/'
-else:
+if args.arch == 'deeplabv3':
     SEGMENTATION_WEIGHT_PATH = 'deeplabv3.opt.onnx'
     SEGMENTATION_MODEL_PATH = SEGMENTATION_WEIGHT_PATH + '.prototxt'
     SEGMENTATION_REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/deeplabv3/'
@@ -95,12 +90,14 @@ else:
 img_rows = IMAGE_HEIGHT
 img_cols = IMAGE_WIDTH
 
-def safe_crop(mat, x, y, crop_size=(img_rows, img_cols)):
+def safe_crop(mat, crop_size=(img_rows, img_cols)):
     crop_height, crop_width = crop_size
     if len(mat.shape) == 2:
         ret = np.zeros((crop_height, crop_width), np.float32)
     else:
         ret = np.zeros((crop_height, crop_width, 3), np.float32)
+    x = 0
+    y = 0
     crop = mat[y:y + crop_height, x:x + crop_width]
     h, w = crop.shape[:2]
     ret[0:h, 0:w] = crop
@@ -113,22 +110,18 @@ def get_final_output(out, trimap):
     mask = np.equal(trimap, unknown_code).astype(np.float32)
     return (1 - mask) * trimap + mask * out
 
-def postprocess(src_img, trimap, preds_ailia, use_trimap_directly=False):
+def postprocess(src_img, trimap, preds_ailia):
     trimap = trimap[:,:,0].reshape((IMAGE_HEIGHT,IMAGE_WIDTH))
 
-    if not use_trimap_directly:
-        preds_ailia = preds_ailia.reshape((IMAGE_HEIGHT,IMAGE_WIDTH))
-        preds_ailia = preds_ailia * 255.0
-        preds_ailia = get_final_output(preds_ailia,trimap)
+    preds_ailia = preds_ailia.reshape((IMAGE_HEIGHT,IMAGE_WIDTH))
+    preds_ailia = preds_ailia * 255.0
+    preds_ailia = get_final_output(preds_ailia,trimap)
 
     output_data = np.zeros((IMAGE_HEIGHT,IMAGE_WIDTH,4))
     output_data[:,:,0]=src_img[:,:,0]
     output_data[:,:,1]=src_img[:,:,1]
     output_data[:,:,2]=src_img[:,:,2]
-    if use_trimap_directly:
-        output_data[:,:,3]=trimap
-    else:
-        output_data[:,:,3]=preds_ailia
+    output_data[:,:,3]=preds_ailia
 
     output_data[output_data>255]=255
     output_data[output_data<0]=0
@@ -149,25 +142,7 @@ def norm(pred):
     mi = np.min(pred)
     return (pred - mi) / (ma - mi)
 
-
-def save_result(pred, savepath, srcimg_shape):
-    """
-    Parameters
-    ----------
-    srcimg_shape: (h, w)
-    """
-    # normalization
-    pred = norm(pred)
-
-    img = Image.fromarray(pred * 255).convert('RGB')
-    img = img.resize(
-        (srcimg_shape[1], srcimg_shape[0]),
-        resample=Image.BILINEAR
-    )
-    img.save(savepath)
-    
-
-def gen_trimap(mask,k_size=(5,5),ite=1):
+def erode_and_dilate(mask,k_size,ite):
     kernel = np.ones(k_size,np.uint8)
     eroded = cv2.erode(mask,kernel,iterations = ite)
     dilated = cv2.dilate(mask,kernel,iterations = ite)
@@ -176,92 +151,92 @@ def gen_trimap(mask,k_size=(5,5),ite=1):
     trimap[dilated <= 1] = 0
     return trimap
 
+def deeplabv3_preprocess(input_data):
+    input_data = cv2.resize(input_data, (513, 513))
+    input_data = input_data / 127.5 - 1.0
+    input_data = input_data.transpose((2,0,1))[np.newaxis, :, :, :]
+    return input_data
 
-def generate_trimap(net,input_data,w,h):
-    if DEEPLABV3:
-        input_data = cv2.resize(input_data, (513, 513))
-        input_data = input_data / 127.5 - 1.0
-        input_data = input_data.transpose((2,0,1))[np.newaxis, :, :, :]
-    else:
-        input_data = input_data / 255.0
-        input_data[:, :, 0] = (input_data[:, :, 0]-0.485)/0.229
-        input_data[:, :, 1] = (input_data[:, :, 1]-0.456)/0.224
-        input_data[:, :, 2] = (input_data[:, :, 2]-0.406)/0.225
-        input_data=input_data.transpose((2, 0, 1))[np.newaxis, :, :, :]
+def u2net_preprocess(input_data):
+    input_data = input_data / 255.0
+    input_data[:, :, 0] = (input_data[:, :, 0]-0.485)/0.229
+    input_data[:, :, 1] = (input_data[:, :, 1]-0.456)/0.224
+    input_data[:, :, 2] = (input_data[:, :, 2]-0.406)/0.225
+    input_data=input_data.transpose((2, 0, 1))[np.newaxis, :, :, :]
+    return input_data
+
+def generate_trimap(net,input_data):
+    w = input_data.shape[1]
+    h = input_data.shape[0]
+
+    if args.arch=="deeplabv3":
+        input_data = deeplabv3_preprocess(input_data)
+    if args.arch=="u2net":
+        input_data = u2net_preprocess(input_data)
 
     preds_ailia = net.predict([input_data])
 
-    if DEEPLABV3:
+    if args.arch=="deeplabv3":
         pred = preds_ailia[0]
         pred = pred[0,15,:,:] / 21.0
-    else:
+    if args.arch=="u2net":
         pred = preds_ailia[0][0, 0, :, :]
 
-    save_result(pred, "debug_segmentation.png", [h, w])
+    if args.debug:
+        cv2.imwrite("debug_segmentation.png", pred*255)
 
-    if DEEPLABV3:
+    if args.arch=="deeplabv3":
         thre = 0.6
         pred [pred<thre] = 0
         pred [pred>=thre] = 1
 
-    save_result(pred, "debug_segmentation_threshold.png", [h, w])
-
-    if not DEEPLABV3:
+    if args.arch=="u2net":
         pred = norm(pred)
 
-    img = Image.fromarray(pred * 255).convert('RGB')
-    img = img.resize(
-        (w, h),
-        resample=Image.NEAREST#BILINEAR
-    )
+    if args.debug:
+        cv2.imwrite("debug_segmentation_threshold.png", pred*255)
+   
+    trimap_data = cv2.resize(pred * 255, (w, h))
+    trimap_data = trimap_data.reshape((w,h,1))
 
-    trimap_data = np.asarray(img).copy()
     u2net_data = trimap_data.copy()
 
     trimap_data_original = trimap_data.copy()
 
-    thre1=128
-    thre2=128
-    trimap_data[trimap_data_original<thre2] = 0
-    trimap_data[trimap_data_original<thre1] = 0
-    trimap_data[trimap_data_original>=thre2] = 255
+    thre=128
+    trimap_data[trimap_data_original<thre] = 0
+    trimap_data[trimap_data_original>=thre] = 255
 
     trimap_data = trimap_data.astype("uint8")
 
-    trimap_data = gen_trimap(trimap_data,k_size=(7,7),ite=3)   #pixaboy
-    #trimap_data = gen_trimap(trimap_data,k_size=(7,7),ite=1)   #couple
+    trimap_data = erode_and_dilate(trimap_data,k_size=(7,7),ite=3)
 
-    im = Image.fromarray(trimap_data.astype('uint8'))
-    im.save("debug_trimap_full.png")
+    if args.debug:
+        cv2.imwrite("debug_trimap_full.png", trimap_data)
 
     return trimap_data,u2net_data
 
-def matting_preprocess(x,y,crop_size,src_img,trimap_data,seg_data,dump=False):
-    #src_img=safe_crop(src_img, x, y, crop_size)
-    #trimap_data=safe_crop(trimap_data, x, y, crop_size)
-
+def matting_preprocess(src_img,trimap_data,seg_data):
     input_data = np.zeros((1,IMAGE_HEIGHT,IMAGE_WIDTH,4))
     input_data[:,:,:,0:3] = src_img[:,:,0:3]
 
     input_data[:,:,:,3] = trimap_data[:,:,0]
-    if dump:
-        im = Image.fromarray(input_data.reshape((IMAGE_HEIGHT,IMAGE_WIDTH,4)).astype('uint8'))
-        im.save("debug_input.png")
+    if args.debug:
+        cv2.imwrite("debug_input.png", input_data.reshape((IMAGE_HEIGHT,IMAGE_WIDTH,4)))
+
     input_data = input_data / 255.0
 
-    if dump:
+    if args.debug:
         cv2.imwrite("debug_rgb.png", src_img)
         cv2.imwrite("debug_trimap.png", trimap_data)
 
-        #seg_data=safe_crop(seg_data, x, y, crop_size)
-        res_img = postprocess(src_img, seg_data, None, True)
-        cv2.imwrite("debug_segmentation_alpha.png", res_img)
-
-        res_img = postprocess(src_img, trimap_data, None, True)
-        cv2.imwrite("debug_trimap_alpha.png", res_img)
-
     return input_data, src_img, trimap_data
 
+def composite(img):
+    img[:,:,0]=img[:,:,0] * img[:,:,3] / 255.0
+    img[:,:,1]=img[:,:,1] * img[:,:,3] / 255.0 + 255.0 * (1.0 - img[:,:,3] / 255.0)
+    img[:,:,2]=img[:,:,2] * img[:,:,3] / 255.0
+    return img
 
 # ======================
 # Main functions
@@ -270,11 +245,9 @@ def recognize_from_image():
     # prepare input data
     src_img = cv2.imread(args.input)
 
-    x = 0
-    y = 0
     crop_size = (max(src_img.shape[0],src_img.shape[1]),max(src_img.shape[0],src_img.shape[1]))
 
-    src_img=safe_crop(src_img, x, y, crop_size)
+    src_img=safe_crop(src_img, crop_size)
 
     # net initialize
     env_id = 0  # use cpu because overflow fp16 range
@@ -286,19 +259,16 @@ def recognize_from_image():
     if args.trimap=="":
         input_data = src_img
 
-        w = src_img.shape[1]
-        h = src_img.shape[0]
-
         env_id = ailia.get_gpu_environment_id()
         seg_net = ailia.Net(SEGMENTATION_MODEL_PATH, SEGMENTATION_WEIGHT_PATH, env_id=env_id)
 
-        trimap_data,seg_data = generate_trimap(seg_net,input_data,w,h)
+        trimap_data,seg_data = generate_trimap(seg_net,input_data)
     else:
         trimap_data = cv2.imread(args.trimap)
-        trimap_data=safe_crop(trimap_data, x, y, crop_size)
+        trimap_data=safe_crop(trimap_data, crop_size)
         seg_data = trimap_data.copy()
 
-    input_data, src_img, trimap_data = matting_preprocess(x,y,crop_size,src_img,trimap_data,seg_data,dump=True)
+    input_data, src_img, trimap_data = matting_preprocess(src_img,trimap_data,seg_data)
 
     # inference
     print('Start inference...')
@@ -347,25 +317,19 @@ def recognize_from_video():
         if not ret:
             continue
 
+        # grab src image
         src_img, input_data = preprocess_frame(
             frame,
             IMAGE_HEIGHT,
             IMAGE_WIDTH,
             normalize_type='None'
         )
-
-        x = 0
-        y = 0
         crop_size = (max(src_img.shape[0],src_img.shape[1]),max(src_img.shape[0],src_img.shape[1]))
+        src_img=safe_crop(src_img, crop_size)
 
-        src_img=safe_crop(src_img, x, y, crop_size)
+        trimap_data,seg_data = generate_trimap(seg_net,src_img)
 
-        w = src_img.shape[1]
-        h = src_img.shape[0]
-
-        trimap_data,seg_data = generate_trimap(seg_net,src_img,w,h)
-
-        input_data, src_img, trimap_data = matting_preprocess(x,y,crop_size,src_img,trimap_data,seg_data,dump=False)
+        input_data, src_img, trimap_data = matting_preprocess(src_img,trimap_data,seg_data)
 
         preds_ailia = net.predict(input_data)
 
@@ -375,13 +339,8 @@ def recognize_from_video():
 
         # seg_data=safe_crop(seg_data, x, y, crop_size)
         seg_img [:,:,3] = seg_data[:,:,0]
-        seg_img[:,:,0]=seg_img[:,:,0] * seg_img[:,:,3] / 255.0
-        seg_img[:,:,1]=seg_img[:,:,1] * seg_img[:,:,3] / 255.0 + 255.0 * (1.0 - seg_img[:,:,3] / 255.0)
-        seg_img[:,:,2]=seg_img[:,:,2] * seg_img[:,:,3] / 255.0
-
-        res_img[:,:,0]=res_img[:,:,0] * res_img[:,:,3] / 255.0
-        res_img[:,:,1]=res_img[:,:,1] * res_img[:,:,3] / 255.0 + 255.0 * (1.0 - res_img[:,:,3] / 255.0)
-        res_img[:,:,2]=res_img[:,:,2] * res_img[:,:,3] / 255.0
+        seg_img = composite(seg_img)
+        res_img = composite(res_img)
 
         cv2.imshow('matting', res_img / 255.0)
         cv2.imshow('masked', seg_img / 255.0)
