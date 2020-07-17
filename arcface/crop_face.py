@@ -88,7 +88,7 @@ def recognize_from_image_blazeface(detector,dst_path,src_dir,file_):
 
         cx = (obj_x + obj_w/2) * w
         cy = (obj_y + obj_h/2) * h
-        margin = 1.0
+        margin = 1.4
         cw = max(obj_w * w * margin,obj_h * h * margin)
         fx = max(cx - cw/2, 0)
         fy = max(cy - cw/2, 0)
@@ -176,6 +176,7 @@ def main():
         )
 
     for src_dir, dirs, files in os.walk(root_src_dir):
+        files = sorted(files)
         for file_ in files:
             root, ext = os.path.splitext(file_)
 

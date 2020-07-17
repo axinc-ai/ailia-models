@@ -100,6 +100,7 @@ def preprocess_image(image, input_is_bgr=False):
     # and concat the feature as the final feature of the origin image.
     if input_is_bgr:
         image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    #image = cv2.equalizeHist(image)
     image = np.dstack((image, np.fliplr(image)))
     image = image.transpose((2, 0, 1))
     image = image[:, np.newaxis, :, :]
@@ -328,6 +329,7 @@ def compare_folder():
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
 
     for src_dir, dirs, files in os.walk(args.folder):
+        files = sorted(files)
         for file_ in files:
             root, ext = os.path.splitext(file_)
 
