@@ -75,8 +75,8 @@ parser.add_argument(
 args = parser.parse_args()
 
 if args.arch == 'masked':
-    WEIGHT_PATH = 'arcface_masked190.onnx'
-    MODEL_PATH = 'arcface_masked190.onnx.prototxt'
+    WEIGHT_PATH = 'arcface_mixed10.onnx'
+    MODEL_PATH = 'arcface_mixed10.onnx.prototxt'
     BATCH_SIZE = 2
 else:
     WEIGHT_PATH = 'arcface.onnx'
