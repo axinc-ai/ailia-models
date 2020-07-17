@@ -2,6 +2,7 @@ import sys
 import time
 import argparse
 import os
+import re
 
 import numpy as np
 import cv2
@@ -329,7 +330,8 @@ def compare_folder():
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
 
     for src_dir, dirs, files in os.walk(args.folder):
-        files = sorted(files)
+        #files = sorted(files)
+        files = sorted(files,key=lambda var:[int(x) if x.isdigit() else x for x in re.findall(r'[^0-9]|[0-9]+', var)])
         for file_ in files:
             root, ext = os.path.splitext(file_)
 
@@ -405,9 +407,6 @@ def compare_folder():
             if f0==f1:
                 ex=1
             
-            print(f0)
-            print(f1)
-
             #sim = ex
 
             print(f'Similarity of ({inputs0}, {inputs1}) : {sim:.3f}')
