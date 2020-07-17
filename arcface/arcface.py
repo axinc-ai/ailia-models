@@ -348,9 +348,9 @@ def compare_folder():
             file_dict[folder].append(src_dir+"/"+file_)
             file_list.append(src_dir+"/"+file_)
 
-    fig = plt.figure()
-    ax1 = fig.add_axes((0.1, 0.6, 0.8, 0.3))
-    ax2 = fig.add_axes((0.1, 0.1, 0.8, 0.3))
+    fig = plt.figure(figsize=(6.0, 12.0))
+    ax1 = fig.add_subplot(2, 1, 1)
+    ax2 = fig.add_subplot(2, 1, 2)
     ax1.tick_params(labelbottom="on")
     ax2.tick_params(labelleft="on")
 
@@ -444,7 +444,7 @@ def compare_folder():
     ax2.set_ylabel('(face1')
     ax2.legend(loc='upper right')
     
-    fig.savefig("confusion.png")
+    fig.savefig("confusion.png",dpi=300)
 
 def main():
     # model files check and download
