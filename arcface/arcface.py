@@ -1,6 +1,7 @@
 import sys
 import time
 import argparse
+import os
 
 import numpy as np
 import cv2
@@ -15,6 +16,7 @@ from model_utils import check_and_download_models  # noqa: E402
 from utils import check_file_existance  # noqa: E402
 from detector_utils import hsv_to_rgb # noqa: E402C
 
+import matplotlib.pyplot as plt
 
 # ======================
 # PARAMETERS
@@ -66,6 +68,12 @@ parser.add_argument(
     action='store_true',
     help='Running the inference on the same input 5 times ' +
          'to measure execution performance. (Cannot be used in video mode)'
+)
+parser.add_argument(
+    '-f', '--folder', metavar='FOLDER',
+    default=None,
+    help='The input folder path. ' +
+         'Create confusion matrix.'
 )
 parser.add_argument(
     '-a', '--arch', metavar='ARCH',
@@ -309,14 +317,134 @@ def compare_image_and_video():
     cv2.destroyAllWindows()
     print('Script finished successfully.')
 
+def compare_folder():
+    file_dict={}
+    file_list=[]
+    before_folder=""
+
+    # net initialize
+    env_id = ailia.get_gpu_environment_id()
+    print(f'env_id: {env_id}')
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+
+    for src_dir, dirs, files in os.walk(args.folder):
+        for file_ in files:
+            root, ext = os.path.splitext(file_)
+
+            if file_==".DS_Store":
+                continue
+            if file_=="Thumbs.db":
+                continue
+            if not(ext == ".jpg" or ext == ".png" or ext == ".bmp"):
+                continue
+
+            folders=src_dir.split("/")
+            folder=folders[len(folders)-1]
+            before_folder=folder
+            if not(folder in file_dict):
+                file_dict[folder]=[]
+            file_dict[folder].append(src_dir+"/"+file_)
+            file_list.append(src_dir+"/"+file_)
+
+    fig = plt.figure()
+    ax1 = fig.add_axes((0.1, 0.6, 0.8, 0.3))
+    ax2 = fig.add_axes((0.1, 0.1, 0.8, 0.3))
+    ax1.tick_params(labelbottom="on")
+    ax2.tick_params(labelleft="on")
+
+    max_cnt=len(file_list)
+
+    x=np.zeros((max_cnt))
+    y=np.zeros((max_cnt))
+    t=np.zeros((max_cnt))
+
+    heatmap=np.zeros((len(file_list),len(file_list)))
+    expect=np.zeros((len(file_list),len(file_list)))
+
+    for i0 in range(0,len(file_list)):
+        for i1 in range(0,len(file_list)):
+            inputs0=file_list[i0]
+            inputs1=file_list[i1]
+
+            print(inputs0)
+            print(inputs1)
+
+            # prepare input data
+            imgs_1 = prepare_input_data(inputs0)
+            imgs_2 = prepare_input_data(inputs1)
+
+            # inference
+            preds_ailia1 = net.predict(imgs_1)
+            preds_ailia2 = net.predict(imgs_2)
+
+            # postprocessing
+            fe_1 = np.concatenate([preds_ailia1[0], preds_ailia1[1]], axis=0)
+            fe_2 = np.concatenate([preds_ailia2[0], preds_ailia2[1]], axis=0)
+            sim = cosin_metric(fe_1, fe_2)
+
+            ex=0
+            f0=inputs0.split("/")
+            f1=inputs1.split("/")
+
+            f0=f0[len(f0)-2]
+            f1=f1[len(f1)-2]
+
+            if f0==f1:
+                ex=1
+            
+            print(f0)
+            print(f1)
+
+            #sim = ex
+
+            print(f'Similarity of ({inputs0}, {inputs1}) : {sim:.3f}')
+            if THRESHOLD > sim:
+                print('They are not the same face!')
+            else:
+                print('They are the same face!')
+
+            heatmap[int(i0),int(i1)]=sim
+            expect[int(i0),int(i1)]=ex
+
+
+    ax1.pcolor(expect, cmap=plt.cm.Blues)
+    #ax2.hist(t, bins=len(file_list))
+    ax2.pcolor(heatmap, cmap=plt.cm.Blues)
+
+    for y in range(heatmap.shape[0]):
+        for x in range(heatmap.shape[1]):
+            continue
+            if heatmap[y, x]!=0:
+                ax1.text(x + 0.5, y + 0.5, ""+str(expect[y,x]) +":"+ str(heatmap[y, x]),
+                    horizontalalignment='center',
+                    verticalalignment='center',
+                    fontsize=8
+                )
+
+    ax1.set_title('expected result ')
+    ax1.set_xlabel('(face2)')
+    ax1.set_ylabel('(face1)')
+    ax1.legend(loc='upper right')
+
+    ax2.set_title('arcface result ')
+    ax2.set_xlabel('(face2)')
+    ax2.set_ylabel('(face1')
+    ax2.legend(loc='upper right')
+    
+    fig.savefig("confusion.png")
 
 def main():
     # model files check and download
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
     if args.video:
         check_and_download_models(YOLOV3_FACE_WEIGHT_PATH, YOLOV3_FACE_MODEL_PATH, YOLOV3_FACE_REMOTE_PATH)
-
-    if args.video is None:
+    
+    if args.folder:
+        if BATCH_SIZE==2:
+            compare_folder()
+        else:
+            print("must be masked model")
+    elif args.video is None:
         # still image mode
         # comparing two images specified args.inputs
         if BATCH_SIZE==2:
