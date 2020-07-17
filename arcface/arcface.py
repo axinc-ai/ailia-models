@@ -366,6 +366,8 @@ def compare_folder():
         inputs0=file_list[i]
         print(inputs0)
         imgs_1 = prepare_input_data(inputs0)
+        if BATCH_SIZE==4:
+           imgs_1 = np.concatenate([imgs_1, imgs_1], axis=0)
         preds_ailia1 = net.predict(imgs_1)
         fe_1 = np.concatenate([preds_ailia1[0], preds_ailia1[1]], axis=0)
         fe_list.append(fe_1)
@@ -449,10 +451,7 @@ def main():
         check_and_download_models(YOLOV3_FACE_WEIGHT_PATH, YOLOV3_FACE_MODEL_PATH, YOLOV3_FACE_REMOTE_PATH)
     
     if args.folder:
-        if BATCH_SIZE==2:
-            compare_folder()
-        else:
-            print("must be masked model")
+        compare_folder()
     elif args.video is None:
         # still image mode
         # comparing two images specified args.inputs
