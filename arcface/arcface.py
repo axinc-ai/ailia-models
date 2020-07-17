@@ -361,25 +361,34 @@ def compare_folder():
     heatmap=np.zeros((len(file_list),len(file_list)))
     expect=np.zeros((len(file_list),len(file_list)))
 
+    fe_list=[]
+    for i in range(0,len(file_list)):
+        inputs0=file_list[i]
+        print(inputs0)
+        imgs_1 = prepare_input_data(inputs0)
+        preds_ailia1 = net.predict(imgs_1)
+        fe_1 = np.concatenate([preds_ailia1[0], preds_ailia1[1]], axis=0)
+        fe_list.append(fe_1)
+
     for i0 in range(0,len(file_list)):
         for i1 in range(0,len(file_list)):
             inputs0=file_list[i0]
             inputs1=file_list[i1]
 
-            print(inputs0)
-            print(inputs1)
+            #print(inputs0)
+            #print(inputs1)
 
             # prepare input data
-            imgs_1 = prepare_input_data(inputs0)
-            imgs_2 = prepare_input_data(inputs1)
+            #imgs_1 = prepare_input_data(inputs0)
+            #imgs_2 = prepare_input_data(inputs1)
 
             # inference
-            preds_ailia1 = net.predict(imgs_1)
-            preds_ailia2 = net.predict(imgs_2)
+            #preds_ailia1 = net.predict(imgs_1)
+            #preds_ailia2 = net.predict(imgs_2)
 
             # postprocessing
-            fe_1 = np.concatenate([preds_ailia1[0], preds_ailia1[1]], axis=0)
-            fe_2 = np.concatenate([preds_ailia2[0], preds_ailia2[1]], axis=0)
+            fe_1 = fe_list[i0]#np.concatenate([preds_ailia1[0], preds_ailia1[1]], axis=0)
+            fe_2 = fe_list[i1]#np.concatenate([preds_ailia2[0], preds_ailia2[1]], axis=0)
             sim = cosin_metric(fe_1, fe_2)
 
             ex=0
