@@ -1,6 +1,35 @@
 import numpy as np
 import cv2
 
+def bbox_based_nms(dets, thresh):
+    x1 = dets[:, 0]
+    y1 = dets[:, 1]
+    x2 = dets[:, 2]
+    y2 = dets[:, 3]
+    scores = dets[:, 4]
+
+    areas = (x2 - x1 + 1) * (y2 - y1 + 1)
+    order = scores.argsort()[::-1]
+
+    keep = []
+    while order.size > 0:
+        i = order[0]
+        keep.append(i)
+        xx1 = np.maximum(x1[i], x1[order[1:]])
+        yy1 = np.maximum(y1[i], y1[order[1:]])
+        xx2 = np.minimum(x2[i], x2[order[1:]])
+        yy2 = np.minimum(y2[i], y2[order[1:]])
+
+        w = np.maximum(0.0, xx2 - xx1 + 1)
+        h = np.maximum(0.0, yy2 - yy1 + 1)
+        inter = w * h
+        ovr = inter / (areas[i] + areas[order[1:]] - inter)
+
+        inds = np.where(ovr <= thresh)[0]
+        order = order[inds + 1]
+
+    return [dets[x] for x in keep]
+
 def preprocess(image, target_shape):
     image = image / 255.0
     image = cv2.resize(image, (target_shape[1], target_shape[0]))
@@ -75,7 +104,7 @@ def postprocess(raw_output, image_size, k=40, threshold=0.3):
         height, width = hm.shape[1:3]
 
         # apply nms to eliminate clusters
-        hm = non_maximum_suppresion(hm)
+        #hm = non_maximum_suppresion(hm)
 
         # extract topk
         scores, inds, classes, ys, xs = topk(hm, k=k)
@@ -106,9 +135,11 @@ def postprocess(raw_output, image_size, k=40, threshold=0.3):
         # concatenate classes, scores and bounding boxes in a single array
         detections = np.concatenate((bboxes, scores, classes), axis=1)
 
+        filtered_detections = bbox_based_nms(detections, threshold)
+
         # filter out detections below threshold
-        mask = detections[..., 4] >= threshold
-        filtered_detections = detections[mask]
+        #mask = detections[..., 4] >= threshold
+        #filtered_detections = detections[mask]
 
         # scale bounding boxes to original image size
         if len(filtered_detections)==0:

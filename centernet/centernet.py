@@ -22,10 +22,6 @@ from detector_utils import plot_results, load_image
 # Parameters
 # ======================
 
-WEIGHT_PATH = './ctdet_coco_dlav0_1x.onnx'
-MODEL_PATH = './ctdet_coco_dlav0_1x.onnx.prototxt'
-REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/centernet/'
-
 IMAGE_PATH = 'couple.jpg'
 SAVE_IMAGE_PATH = 'output.png'
 
@@ -46,6 +42,7 @@ COCO_CATEGORY = [
 ]
 THRESHOLD = 0.3 #Threshold for filteing for filtering (from 0.0 to 1.0)
 K_VALUE = 40    #K value for topK function
+OPSET_LISTS = ['10', '11']
 
 # ======================
 # Arguemnt Parser Config
@@ -75,7 +72,20 @@ parser.add_argument(
     help='Running the inference on the same input 5 times ' +
          'to measure execution performance. (Cannot be used in video mode)'
 )
+parser.add_argument(
+    '-o', '--opset', metavar='OPSET',
+    default='10', choices=OPSET_LISTS,
+    help='opset lists: ' + ' | '.join(OPSET_LISTS)
+)
 args = parser.parse_args()
+
+if args.opset=="10":
+    WEIGHT_PATH = './ctdet_coco_dlav0_1x.onnx'
+    MODEL_PATH = './ctdet_coco_dlav0_1x.onnx.prototxt'
+else:
+    WEIGHT_PATH = './ctdet_coco_dlav0_1x_opset11.onnx'
+    MODEL_PATH = './ctdet_coco_dlav0_1x_opset11.onnx.prototxt'
+REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/centernet/'
 
 # ======================
 # Secondaty Functions
