@@ -8,13 +8,9 @@ import cv2
 import ailia
 
 sys.path.append('../util')
-from webcamera_utils import adjust_frame_size  # noqa: E402
-from image_utils import load_image  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
-from utils import check_file_existance  # noqa: E402
 
-
-# OPENPOSE: MULTIPERSON KEYPOINT DETECTION
+# PYTORCHGAN-ZOO
 # SOFTWARE LICENSE AGREEMENT
 # ACADEMIC OR NON-PROFIT ORGANIZATION NONCOMMERCIAL RESEARCH USE ONLY
 
@@ -28,9 +24,9 @@ MODEL_PATH = 'pytorch-gnet-animeface.onnx.prototxt'
 WEIGHT_PATH = 'pytorch-gnet-animeface.onnx'
 REMOTE_PATH = 'TODO'
 
-# ======================
-# Arguemnt Parser Config
-# ======================
+# =======================
+# Arguments Parser Config
+# =======================
 parser = argparse.ArgumentParser(
     description='Generation of anime character faces using a GNet trained from the PytorchZoo GAN.'
 )
@@ -43,7 +39,7 @@ parser.add_argument(
     '-b', '--benchmark',
     action='store_true',
     help='Running the inference on the same input 5 times ' +
-         'to measure execution performance. (Cannot be used in video mode)'
+         'to measure execution performance.'
 )
 args = parser.parse_args()
 
@@ -77,12 +73,12 @@ def generate_image():
 
     outp = np.clip((0.5 + 255*output_data.transpose((2,3,1,0)).reshape((64,64,3))).astype(np.float32),0,255)
 
-    from PIL import Image
-    img = Image.fromarray(outp.astype(np.uint8),'RGB')
-    #img.show()
-    img.save(args.savepath)
+    ## If using PIL instead of OpenCV:
+    #from PIL import Image
+    #img = Image.fromarray(outp.astype(np.uint8),'RGB')
+    #img.save(args.savepath)
 
-    #cv2.imwrite(args.savepath, img)
+    cv2.imwrite(args.savepath, cv2.cvtColor(outp.astype(np.uint8), cv2.COLOR_RGB2BGR))
     print('Script finished successfully.')
 
 
