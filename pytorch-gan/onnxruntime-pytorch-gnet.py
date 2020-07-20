@@ -8,7 +8,7 @@ from PIL import Image
 import onnxruntime as rt
 import onnx
 
-modelpath = "./netg_exported.onnx"
+modelpath = "./pytorch-gnet-animeface.onnx"
 
 onnx_sess = rt.InferenceSession(modelpath)
 

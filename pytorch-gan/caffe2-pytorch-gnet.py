@@ -6,7 +6,7 @@ import numpy
 import onnxruntime as rt
 
 # Load the ONNX ModelProto object. model is a standard Python protobuf object
-modelpath = "./netg_exported_mod.onnx"
+modelpath = "./pytorch-gnet-animeface.onnx"
 model = onnx.load(modelpath)
 
 # check the model
