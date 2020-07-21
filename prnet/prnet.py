@@ -33,7 +33,7 @@ WEIGHT_PATH = 'prnet.onnx'
 MODEL_PATH = 'prnet.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/prnet/'
 
-IMAGE_PATH = 'aflw-cropped.png'
+IMAGE_PATH = 'image00430-cropped.jpg'
 SAVE_FOLDER = 'results'
 
 # INFO used only for texture editing mode
