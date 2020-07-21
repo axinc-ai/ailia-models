@@ -22,7 +22,7 @@ SAVE_IMAGE_PATH = 'output.png'
 
 MODEL_PATH = 'pytorch-gnet-animeface.onnx.prototxt'
 WEIGHT_PATH = 'pytorch-gnet-animeface.onnx'
-REMOTE_PATH = 'TODO'
+REMOTE_PATH = f'https://storage.googleapis.com/ailia-models/pytorch-gan/'
 
 # =======================
 # Arguments Parser Config
