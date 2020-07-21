@@ -20,7 +20,7 @@ from model_utils import check_and_download_models  # noqa: E402
 # ======================
 
 WEIGHT_PATH = 'councilGAN-glasses.onnx'
-MODEL_PATH = 'councilGAN-glasses.onnx.prototxt'
+MODEL_PATH = 'councilGAN-glasses.opt.onnx.prototxt'
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/councilGAN-glasses/"
 
 IMAGE_PATH = 'sample.jpg'
@@ -113,15 +113,18 @@ def process_image():
         if args.benchmark:
             print('BENCHMARK mode')
             for i in range(5):
+                data = [img[None,...]] 
                 start = int(round(time.time() * 1000))
-                preds_ailia = (net.predict(img)[0]*255).astype(np.uint8)
+                preds_ailia = net.predict(data)[0][0]
                 end = int(round(time.time() * 1000))
                 print(f'\tailia processing time {end - start} ms')
         else:
-            preds_ailia = postprocess_image(net.predict(img)[0][0])
+            data = [img[None,...]] 
+            preds_ailia = net.predict(data)
+            preds_ailia = postprocess_image(preds_ailia[0][0])
     else:
         # teporary onnxruntime mode
-        sess = onnxruntime.InferenceSession('councilGAN-glasses.onnx')
+        sess = onnxruntime.InferenceSession(WEIGHT_PATH)
         # inference
         print('Start inference in onnxruntime mode...')
         if args.benchmark:
@@ -199,7 +202,7 @@ def process_video():
 
 def main():
     # model files check and download
-#     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
 
     if args.video is not None:
         # video mode
