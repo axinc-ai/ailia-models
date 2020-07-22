@@ -7,8 +7,8 @@ def bbox_based_nms(dets, thresh):
     x2 = dets[:, 2]
     y2 = dets[:, 3]
     scores = dets[:, 4]
-
-    areas = (x2 - x1 + 1) * (y2 - y1 + 1)
+    
+    areas = (x2 - x1 + 1) * (y2 - y1 + 1) 
     order = scores.argsort()[::-1]
 
     keep = []
@@ -98,13 +98,13 @@ def scale_bboxes(coords, original_size, image_size):
     ymax = coords[3] / original_height * height
     return [xmin, ymin, xmax, ymax, coords[4], coords[5]]
 
-def postprocess(raw_output, image_size, k=40, threshold=0.3):
+def postprocess(raw_output, image_size, k=40, threshold=0.3, iou=0.45):
         hm, reg, wh = raw_output
         hm = hm = np.exp(hm)/(1 + np.exp(hm))
         height, width = hm.shape[1:3]
 
         # apply nms to eliminate clusters
-        #hm = non_maximum_suppresion(hm)
+        hm = non_maximum_suppresion(hm)
 
         # extract topk
         scores, inds, classes, ys, xs = topk(hm, k=k)
@@ -135,11 +135,11 @@ def postprocess(raw_output, image_size, k=40, threshold=0.3):
         # concatenate classes, scores and bounding boxes in a single array
         detections = np.concatenate((bboxes, scores, classes), axis=1)
 
-        filtered_detections = bbox_based_nms(detections, threshold)
-
         # filter out detections below threshold
-        #mask = detections[..., 4] >= threshold
-        #filtered_detections = detections[mask]
+        mask = detections[..., 4] >= threshold
+        filtered_detections = detections[mask]
+
+        filtered_detections = bbox_based_nms(filtered_detections, iou)
 
         # scale bounding boxes to original image size
         if len(filtered_detections)==0:
