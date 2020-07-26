@@ -135,13 +135,11 @@ def postprocess(raw_output, image_size, k=40, threshold=0.3, iou=0.45):
         # concatenate classes, scores and bounding boxes in a single array
         detections = np.concatenate((bboxes, scores, classes), axis=1)
 
-        # filter out detections below threshold
-        mask = detections[..., 4] >= threshold
-        filtered_detections = detections[mask]
+        filtered_detections = []
+        for j in range(0, len(classes)):
+            current_class = detections[np.logical_and(detections[..., 5] == j, detections[..., 4] >= threshold)]
+            filtered_detections.extend(bbox_based_nms(current_class, iou))
 
-        filtered_detections = bbox_based_nms(filtered_detections, iou)
-
-        # scale bounding boxes to original image size
         if len(filtered_detections)==0:
             return []
         return np.apply_along_axis(scale_bboxes, 1, filtered_detections, (height, width), image_size)
