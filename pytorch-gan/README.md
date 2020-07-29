@@ -8,8 +8,8 @@
 
 ## Note
 
-The generative network presented and used here have been trained to generate anime faces
-by the company AX Inc (in 2020).
+The generative networks presented and used here have been trained to generate anime faces
+and celebrity faces by the company AX Inc (in 2020).
 
 The training was performed using the framework Pytorch-ZOO GAN.
 Software license agreement of Pytorch-Zoo GAN: see LICENSE file

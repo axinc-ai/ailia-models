@@ -31,10 +31,9 @@ from model_utils import check_and_download_models  # noqa: E402
 # ======================
 # Parameters
 # ======================
-SAVE_IMAGE_PATH = 'output.png'
+SAVE_IMAGE_PATH = 'output.png' # default value
+MODEL_NAME = 'anime' # default value
 
-MODEL_PATH = 'pytorch-gnet-animeface.onnx.prototxt'
-WEIGHT_PATH = 'pytorch-gnet-animeface.onnx'
 REMOTE_PATH = f'https://storage.googleapis.com/ailia-models/pytorch-gan/'
 
 # =======================
@@ -42,6 +41,11 @@ REMOTE_PATH = f'https://storage.googleapis.com/ailia-models/pytorch-gan/'
 # =======================
 parser = argparse.ArgumentParser(
     description='Generation of anime character faces using a GNet trained from the PytorchZoo GAN.'
+)
+parser.add_argument(
+    '-m', '--model', metavar='MODEL_NAME',
+    default=MODEL_NAME,
+    help='Model to use ("anime" or "celeb". Default is "anime").'
 )
 parser.add_argument(
     '-s', '--savepath', metavar='SAVE_IMAGE_PATH',
@@ -55,6 +59,17 @@ parser.add_argument(
          'to measure execution performance.'
 )
 args = parser.parse_args()
+if args.model == 'anime':
+    print('Generation using model "Celeba"')
+    MODEL_INFIX = 'animeface'
+elif args.model == 'celeb':
+    print('Generation using model "AnimeFace"')
+    MODEL_INFIX = 'celeba'
+else:
+    print('Error: unknown model name "'+args.model+'" (must be "anime" or "celeb")')
+    exit(-1)
+MODEL_PATH = 'pytorch-gnet-'+MODEL_INFIX+'.onnx.prototxt'
+WEIGHT_PATH = 'pytorch-gnet-'+MODEL_INFIX+'.onnx'
 
 def generate_image():
     # prepare input data
