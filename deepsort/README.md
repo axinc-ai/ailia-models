@@ -53,6 +53,12 @@ It is necessary to be connected to the Internet while downloading.
   $ python3 deepsort.py --pairimage IMAGE_PATH1 IMAGE_PATH2
   ```
 
+### Requirements
+
+DeepSort uses scipy for the Kalman filter. For Jetson, you need to install it with the following command.
+
+```sudo apt-get install python3-scipy```
+
 ### Reference
 
 [Deep Sort with PyTorch](https://github.com/ZQPei/deep_sort_pytorch)
