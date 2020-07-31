@@ -250,7 +250,7 @@ def process_array(net, img):
     """Apply network to a correctly scaled and centered image """
     if not args.onnx:
         print('Start inference...')
-        preds_ailia = postprocess_image(net.predict(img)[0][0])
+        preds_ailia = postprocess_image(net.predict(img[None,...])[0])
     else:
         # teporary onnxruntime mode
         print('Start inference in onnxruntime mode...')
