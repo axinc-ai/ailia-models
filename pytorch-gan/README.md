@@ -46,3 +46,5 @@ ONNX opset=10
 
 [pytorch-gnet-animeface.onnx.prototxt](https://lutzroeder.github.io/netron/?url=https://storage.googleapis.com/ailia-models/pytorch-gan/pytorch-gnet-animeface.onnx.prototxt)
 
+[pytorch-gnet-celeba.onnx.prototxt](https://lutzroeder.github.io/netron/?url=https://storage.googleapis.com/ailia-models/pytorch-gan/pytorch-gnet-celeba.onnx.prototxt)
+

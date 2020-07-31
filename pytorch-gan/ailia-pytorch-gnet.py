@@ -60,10 +60,10 @@ parser.add_argument(
 )
 args = parser.parse_args()
 if args.model == 'anime':
-    print('Generation using model "Celeba"')
+    print('Generation using model "AnimeFace"')
     MODEL_INFIX = 'animeface'
 elif args.model == 'celeb':
-    print('Generation using model "AnimeFace"')
+    print('Generation using model "CelebA"')
     MODEL_INFIX = 'celeba'
 else:
     print('Error: unknown model name "'+args.model+'" (must be "anime" or "celeb")')
