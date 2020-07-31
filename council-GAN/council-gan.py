@@ -19,8 +19,18 @@ from yolo_face import FaceLocator
 # PARAMETERS
 # ======================
 
-WEIGHT_PATH = 'councilGAN-glasses.onnx'
-MODEL_PATH = 'councilGAN-glasses.onnx.prototxt'
+WEIGHT_PATH = [
+    'councilGAN-glasses.onnx',
+    'councilGAN-m2f.onnx',
+    'councilGAN-anime.onnx'
+]
+MODEL_PATH = [
+    'councilGAN-glasses.onnx.prototxt',
+    'councilGAN-m2f.onnx.prototxt',
+    'councilGAN-anime.onnx.prototxt'
+]
+MODEL = 0
+
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/council-gan/"
 
 IMAGE_PATH = 'sample.jpg'
@@ -32,7 +42,7 @@ SAVE_IMAGE_PATH = 'output.png'
 # ======================
 
 parser = argparse.ArgumentParser(
-    description='Glasses removal GAN based on SimGAN'
+    description='Glasses removal, m2f and anime transformation GAN based on SimGAN'
 )
 parser.add_argument(
     '-i', '--input', metavar='IMAGE',
@@ -59,7 +69,7 @@ parser.add_argument(
 parser.add_argument(
     '-f', '--face_recognition',
     action='store_true',
-    help='Run face recognition with yolo v3'
+    help='Run face recognition with yolo v3 (only for glasses removal mode)'
 )
 parser.add_argument(
     '-d', '--dilation', metavar='DILATION',
@@ -71,14 +81,32 @@ parser.add_argument(
     action='store_true',
     help='Run on ONNXruntime instead of Ailia'
 )
+parser.add_argument(
+    '-g', '--glasses',
+    action='store_true',
+    help='Run glasses-removal mode'
+)
+parser.add_argument(
+    '-m', '--m2f',
+    action='store_true',
+    help='Run male-to-female mode'
+)
+parser.add_argument(
+    '-a', '--anime',
+    action='store_true',
+    help='Run anime mode'
+)
 args = parser.parse_args()
 
 # ======================
 # Preprocessing functions
 # ======================
 def preprocess(image):
+    """Convert channel-first BGR image as numpy /n
+    array to normalized channel-last RGB."""
     image = center_crop(image)
-    image = cv2.resize(image, (128, 128))
+    size = [128, 128, 256][MODEL]
+    image = cv2.resize(image, (size, size))
     # BGR to RGB
     image = image[...,::-1]
     # scale to [0,1]
@@ -91,13 +119,15 @@ def preprocess(image):
     return image.astype(np.float32)   
 
 def center_crop(image):
-#     Crop the image around the center to make square
+    """Crop the image around the center to make square"""
     shape = image.shape[0:2]
     size = min(shape)
     return image[(shape[0]-size)//2:(shape[0]+size)//2, (shape[1]-size)//2:(shape[1]+size)//2, ...]
 
 def square_coords(coords, dilation=1.0):
-#     Make coordinates square for the network with dimension equal to the longer side * dilation, same center
+    """Make coordinates square for the network with /n
+    dimension equal to the longer side * dilation, same /n
+    center"""
     top, left, bottom, right = coords
     w = right-left
     h = bottom-top
@@ -117,6 +147,10 @@ def square_coords(coords, dilation=1.0):
     return out
 
 def get_slice(image, coords):
+    """Get a subarray of the image using coordinates /n
+    that may be outside the bounds of the image. If so, /n
+    return a slice as if the image were padded in all /n
+    sides with zeros."""
     padded_slice = np.zeros((coords[2]-coords[0], coords[3]-coords[1], 3))
     new_coords = np.zeros((4), dtype=np.int16)
     padded_coords = np.zeros((4), dtype=np.int16)
@@ -134,13 +168,14 @@ def get_slice(image, coords):
     return padded_slice, new_coords, padded_coords
 
 def sliceify(coords):
-#     Turn a list of (top, left, bottom right) into slices for indexing
+    """Turn a list of (top, left, bottom right) into slices for indexing."""
     return slice(coords[0], coords[2]), slice(coords[1], coords[3])
 
 # ======================
 # Postprocessing functions
 # ======================
 def postprocess_image(image):
+    """Convert network output to channel-last 8bit unsigned integet array"""
     max_v = np.max(image)
     min_v = np.min(image)
     final_image = np.transpose((image-min_v)/(max_v-min_v)*255+0.5, (1,2,0)).round()
@@ -148,6 +183,7 @@ def postprocess_image(image):
     return out
 
 def replace_face(img, replacement, coords):
+    """Replace a face in the input image with a transformed one."""
     img = img.copy()
     img[sliceify(coords)] = cv2.resize(replacement, (coords[3]-coords[1], coords[2]-coords[0]))
     return img
@@ -156,7 +192,7 @@ def replace_face(img, replacement, coords):
 # Main functions
 # ======================
 def transform_image():
-#     Full transormation on single image from filepath
+    """Full transormation on a single image loaded from filepath in arguments."""
     image = cv2.imread(args.input)
     env_id = ailia.get_gpu_environment_id()
     print(f'env_id: {env_id}')
@@ -164,7 +200,7 @@ def transform_image():
     if not args.onnx:
         net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
     else:
-        net = onnxruntime.InferenceSession('councilGAN-glasses.onnx')
+        net = onnxruntime.InferenceSession(WEIGHT_PATH)
     
     if args.face_recognition:
         locator = FaceLocator()
@@ -189,8 +225,8 @@ def transform_image():
 
 
 def process_frame(net, locator, image):
-#     Process a single frame with preloaded network and locator
-    if args.face_recognition:
+    """Process a single frame with preloaded network and locator"""
+    if args.face_recognition and MODEL==0:
 #         Run with face recognition using yolo
         out_image = image.copy()[...,::-1]
 #         Get face coordinates with yolo
@@ -211,7 +247,7 @@ def process_frame(net, locator, image):
     return out_image
  
 def process_array(net, img):
-#    Apply network to a correctly scaled and centered image 
+    """Apply network to a correctly scaled and centered image """
     if not args.onnx:
         print('Start inference...')
         preds_ailia = postprocess_image(net.predict(img)[0][0])
@@ -233,7 +269,7 @@ def process_video():
     env_id = ailia.get_gpu_environment_id()
     print(f'env_id: {env_id}')
     if args.onnx:
-        net = onnxruntime.InferenceSession('councilGAN-glasses.onnx')
+        net = onnxruntime.InferenceSession(WEIGHT_PATH)
     else:
         net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
 
@@ -267,10 +303,30 @@ def process_video():
     cv2.destroyAllWindows()
     print('Script finished successfully.')
 
-
 def main():
+    # check model choice, defaults to glasses-removal
+    global WEIGHT_PATH
+    global MODEL_PATH
+    global MODEL
+    
+    model_choice = [args.glasses, args.m2f, args.anime]
+    if sum(model_choice)>1:
+        raise ValueError('Please select only one model (-g, -m, or -a)')
+    elif sum(model_choice)==0:
+        pass
+    else:
+        MODEL = np.argmax(model_choice)
+    
+    global WEIGHT_PATH
+    global MODEL_PATH
+    
+    WEIGHT_PATH = WEIGHT_PATH[MODEL]
+    MODEL_PATH = MODEL_PATH[MODEL]
+#     print(WEIGHT_PATH, MODEL_PATH)
+        
     # model files check and download
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
+    
 
     if args.video is not None:
         # video mode
