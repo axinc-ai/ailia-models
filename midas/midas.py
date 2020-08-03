@@ -166,6 +166,7 @@ def recognize_from_video():
         if check_file_existance(args.video):
             capture = cv2.VideoCapture(args.video)
 
+    input_shape_set = False
     while(True):
         ret, frame = capture.read()
         if cv2.waitKey(1) & 0xFF == ord('q'):
@@ -177,6 +178,8 @@ def recognize_from_video():
         resized_img = resized_img.transpose((2, 0, 1))  # channel first
         resized_img = resized_img[np.newaxis, :, :, :]
 
+        # if(not input_shape_set)
+        #     net.set_input_shape(resized_img.shape)
         # result = net.compute(img)
         result = session.run([output_name], {input_name: resized_img.astype(np.float32)})[0]
 

@@ -4,13 +4,13 @@
 
 ![Input](input.jpg)
 
-Shape : (1, 3, 384, 384)  
+Shape : (1, 3, 128, 384)  
 
 ## Output
 
 ![Output](input_depth.png)
 
-Shape : (1, 384, 384)  
+Shape : (1, 128, 384)  
 
 ### usage
 Automatically downloads the onnx and prototxt files on the first run.
