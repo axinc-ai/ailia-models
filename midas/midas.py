@@ -180,6 +180,7 @@ def recognize_from_video():
 
         # if(not input_shape_set)
         #     net.set_input_shape(resized_img.shape)
+        #     input_shape_set = True
         # result = net.compute(img)
         result = session.run([output_name], {input_name: resized_img.astype(np.float32)})[0]
 
