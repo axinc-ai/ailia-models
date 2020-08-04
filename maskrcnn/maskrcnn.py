@@ -91,7 +91,7 @@ def preprocess(image):
     image = padded_image[np.newaxis, :, :, :]
     return image
 
-def create_plot():
+def create_figure():
     fig, ax = plt.subplots(1, figsize=(12, 9), tight_layout=True)
     return fig, ax
 
@@ -195,7 +195,7 @@ def recognize_from_image():
         boxes, labels, scores, masks = net.predict([input_data])
 
     # postprocessing
-    fig, ax = create_plot()
+    fig, ax = create_figure()
     display_objdetect_image(
         fig, ax, image, boxes, labels, scores, masks, savepath=args.savepath
     )
@@ -220,7 +220,7 @@ def recognize_from_video():
         if check_file_existance(args.video):
             capture = cv2.VideoCapture(args.video)
 
-    fig, ax = create_plot()
+    fig, ax = create_figure()
 
     while(True):
         ret, frame = capture.read()
