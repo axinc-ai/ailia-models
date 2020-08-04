@@ -235,7 +235,7 @@ def recognize_from_video():
 
         boxes, labels, scores, masks = net.predict([input_data])
 
-        fig.clear()
+        ax.clear()
         display_objdetect_image(fig, ax, frame, boxes, labels, scores, masks)
         plt.pause(.01)
 
