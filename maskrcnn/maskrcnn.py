@@ -123,9 +123,9 @@ def display_objdetect_image(
         mask = mask > 0.5
         im_mask = np.zeros((image.shape[0], image.shape[1]), dtype=np.uint8)
         x_0 = max(int_box[0], 0)
-        x_1 = min(int_box[2] + 1, image.shape[1])
+        x_1 = min(int_box[2] + 1, int(image.shape[1]))
         y_0 = max(int_box[1], 0)
-        y_1 = min(int_box[3] + 1, image.shape[0])
+        y_1 = min(int_box[3] + 1, int(image.shape[0]))
         mask_y_0 = max(y_0 - box[1], 0)
         mask_y_1 = mask_y_0 + y_1 - y_0
         mask_x_0 = max(x_0 - box[0], 0)
