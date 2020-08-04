@@ -91,9 +91,12 @@ def preprocess(image):
     image = padded_image[np.newaxis, :, :, :]
     return image
 
+def create_plot():
+    fig, ax = plt.subplots(1, figsize=(12, 9), tight_layout=True)
+    return fig, ax
 
 def display_objdetect_image(
-        image, boxes, labels, scores, masks, score_threshold=0.7, savepath=None
+        fig, ax, image, boxes, labels, scores, masks, score_threshold=0.7, savepath=None
 ):
     """
     Display or Save result
@@ -107,7 +110,6 @@ def display_objdetect_image(
     ratio = 800.0 / min(image.size[0], image.size[1])
     boxes /= ratio
 
-    fig, ax = plt.subplots(1, figsize=(12, 9), tight_layout=True)
     image = np.array(image)
 
     for mask, box, label, score in zip(masks, boxes, labels, scores):
@@ -194,8 +196,9 @@ def recognize_from_image():
         boxes, labels, scores, masks = net.predict([input_data])
 
     # postprocessing
+    fig, ax = create_plot()
     display_objdetect_image(
-        image, boxes, labels, scores, masks, savepath=args.savepath
+        fig, ax, image, boxes, labels, scores, masks, savepath=args.savepath
     )
     print('Script finished successfully.')
 
@@ -219,6 +222,8 @@ def recognize_from_video():
         if check_file_existance(args.video):
             capture = cv2.VideoCapture(args.video)
 
+    fig, ax = create_plot()
+
     while(True):
         ret, frame = capture.read()
         if cv2.waitKey(1) & 0xFF == ord('q'):
@@ -232,7 +237,8 @@ def recognize_from_video():
 
         boxes, labels, scores, masks = net.predict([input_data])
 
-        display_objdetect_image(frame, boxes, labels, scores, masks)
+        fig.clear()
+        display_objdetect_image(fig, ax, frame, boxes, labels, scores, masks)
         plt.pause(.01)
 
     capture.release()
