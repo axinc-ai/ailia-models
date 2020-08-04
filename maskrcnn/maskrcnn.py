@@ -176,7 +176,10 @@ def recognize_from_image():
     # net initialize
     env_id = ailia.get_gpu_environment_id()
     print(f'env_id: {env_id}')
-    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+    memory_mode = None
+    if env_id != -1 and ailia.get_environment(env_id).props=="LOWPOWER":
+        memory_mode = ailia.get_memory_mode(reduce_constant=True, reduce_interstage=True)
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id, memory_mode=memory_mode)
     net.set_input_shape(input_data.shape)
 
     # inference
@@ -202,7 +205,10 @@ def recognize_from_video():
     # net initialize
     env_id = ailia.get_gpu_environment_id()
     print(f'env_id: {env_id}')
-    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+    memory_mode = None
+    if env_id != -1 and ailia.get_environment(env_id).props=="LOWPOWER":
+        memory_mode = ailia.get_memory_mode(reduce_constant=True, reduce_interstage=True)
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id, memory_mode=memory_mode)
 
     if args.video == '0':
         print('[INFO] Webcam mode is activated')
