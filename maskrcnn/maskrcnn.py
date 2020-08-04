@@ -135,10 +135,9 @@ def display_objdetect_image(
         ]
         im_mask = im_mask[:, :, None]
 
-        # OpenCV version 4.x
         contours, hierarchy = cv2.findContours(
             im_mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE
-        )
+        )[-2:]  #cv2.findContours has changed since OpenCV 3.x, but in OpenCV 4.0 it changes back
 
         image = cv2.drawContours(image, contours, -1, 25, 3)
 
