@@ -179,9 +179,11 @@ def generate_rotated_image(image, angle, size=None, crop_center=False,
 
     return image
 
+def create_figure():
+    fig = plt.figure(figsize=(10.0, 2))
+    return fig
 
-def visualize(rotated_image, rotation_angle, predicted_angle):
-    plt.figure(figsize=(10.0, 2))
+def visualize(fig, rotated_image, rotation_angle, predicted_angle, tight_layout=True):
     title_fontdict = {
         'fontsize': 14,
         'fontweight': 'bold'
@@ -198,11 +200,13 @@ def visualize(rotated_image, rotation_angle, predicted_angle):
     )
 
     ax = plt.subplot(1, 3, 1)
+    ax.clear()
     plt.title('Original\n', fontdict=title_fontdict)
     plt.imshow(np.squeeze(original_image).astype('uint8'))
     plt.axis('off')
 
     ax = plt.subplot(1, 3, 2)
+    ax.clear()
     plt.title('Rotated\n', fontdict=title_fontdict)
     ax.text(
         0.5, 1.03, 'Angle: {0}'.format(rotation_angle),
@@ -214,6 +218,7 @@ def visualize(rotated_image, rotation_angle, predicted_angle):
     plt.axis('off')
 
     ax = plt.subplot(1, 3, 3)
+    ax.clear()
     plt.title('Corrected\n', fontdict=title_fontdict)
     ax.text(
         0.5, 1.03, 'Predicted angle: {0}'.format(predicted_angle),
@@ -223,6 +228,6 @@ def visualize(rotated_image, rotation_angle, predicted_angle):
     )
     plt.imshow(np.squeeze(corrected_image).astype('uint8'))
     plt.axis('off')
-    plt.tight_layout(pad=0.4, w_pad=0.5, h_pad=1.0)
-    # plt.savefig(savename)
+    if tight_layout:
+        plt.tight_layout(pad=0.4, w_pad=0.5, h_pad=1.0)
     return plt
