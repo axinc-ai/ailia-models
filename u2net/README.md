@@ -47,3 +47,9 @@ ONNX opset = 10
 ### Netron
 
 [u2net.onnx.prototxt](https://lutzroeder.github.io/netron/?url=https://storage.googleapis.com/ailia-models/u2net/u2net.onnx.prototxt)
+
+[u2netp.onnx.prototxt](https://lutzroeder.github.io/netron/?url=https://storage.googleapis.com/ailia-models/u2net/u2netp.onnx.prototxt)
+
+[u2net_opset11.onnx.prototxt](https://lutzroeder.github.io/netron/?url=https://storage.googleapis.com/ailia-models/u2net/u2net_opset11.onnx.prototxt)
+
+[u2netp_opset11.onnx.prototxt](https://lutzroeder.github.io/netron/?url=https://storage.googleapis.com/ailia-models/u2net/u2netp_opset11.onnx.prototxt)

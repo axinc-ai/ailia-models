@@ -21,7 +21,7 @@
 
 ### Output Example
 - DeepSORT original mode:
-  ![ex_result](https://user-images.githubusercontent.com/45060776/82342446-978c1500-9a2c-11ea-976b-a0d3358f89a3.gif)
+  ![ex_result](demo.gif)
 
 - compare image mode:
   ```bash
@@ -52,6 +52,12 @@ It is necessary to be connected to the Internet while downloading.
   ```bash
   $ python3 deepsort.py --pairimage IMAGE_PATH1 IMAGE_PATH2
   ```
+
+### Requirements
+
+DeepSort uses scipy for the Kalman filter. For Jetson, you need to install it with the following command.
+
+```sudo apt-get install python3-scipy```
 
 ### Reference
 

@@ -1,6 +1,5 @@
 import cv2
 import numpy as np
-from skimage import io
 from PIL import Image
 
 
@@ -30,7 +29,7 @@ def transform(image, scaled_size):
 
 
 def load_image(image_path, scaled_size):
-    image = io.imread(image_path)
+    image = cv2.imread(image_path)
     h, w = image.shape[0], image.shape[1]
     if 2 == len(image.shape):
         image = image[:, :, np.newaxis]

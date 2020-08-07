@@ -19,9 +19,25 @@ python -c "import site; print (site.getsitepackages())"
 
 - Copy the ​ailia ​folder located in the ​python f​older to site-packages
 - Copy library files (dll or dylib or so) from the folder library to site-packages/ailia
-- Install required libraries
+
+## Install required libraries for Python
+
+### For Windows, Mac, Linux
+
 ```
 pip install -r requirements.txt
+```
+
+### For Jetson
+
+```
+sudo apt-get install python3-matplotlib
+```
+
+[OpenCV for python3 is pre-installed on Jetson.](https://forums.developer.nvidia.com/t/install-opencv-for-python3-in-jetson-nano/74042/3) You only need to run this command if you get a cv2 import error.
+
+```
+sudo apt-get install python3-opencv
 ```
 
 # Supported models
@@ -58,6 +74,7 @@ pip install -r requirements.txt
 | [dewarpnet](/dewarpnet) | [DewarpNet: Single-Image Document Unwarping With Stacked 3D and 2D Regression Networks](https://github.com/cvlab-stonybrook/DewarpNet) | Pytorch | 1.2.1 and later |
 | [illnet](/illnet/) | [Document Rectification and Illumination Correction using a Patch-based CNN](https://github.com/xiaoyu258/DocProj) | Pytorch | 1.2.2 and later |
 | [adain](/adain/) | [Arbitrary Style Transfer in Real-time with Adaptive Instance Normalization](https://github.com/naoto0804/pytorch-AdaIN)| Pytorch | 1.2.1 and later |
+| [deep-image-matting](/deep-image-matting/) | [Deep Image Matting](https://github.com/foamliu/Deep-Image-Matting)| Keras | 1.2.3 and later |
 
 ## Image to vector
 
@@ -79,6 +96,7 @@ pip install -r requirements.txt
 | [mobilenet_ssd](/mobilenet_ssd/) | [MobileNetV1, MobileNetV2, VGG based SSD/SSD-lite implementation in Pytorch](https://github.com/qfgaohao/pytorch-ssd) | Pytorch | 1.2.1 and later |
 | [maskrcnn](/maskrcnn/) | [Mask R-CNN: real-time neural network for object instance segmentation](https://github.com/onnx/models/tree/master/vision/object_detection_segmentation/mask-rcnn) | Pytorch | 1.2.3 and later |
 | [m2det](/m2det/) | [M2Det: A Single-Shot Object Detector based on Multi-Level Feature Pyramid Network](https://github.com/qijiezhao/M2Det) | Pytorch | 1.2.3 and later |
+| [centernet](/centernet/) | [CenterNet : Objects as Points](https://github.com/xingyizhou/CenterNet) | Pytorch | 1.2.1 and later |
 
 ## Object tracking
 
