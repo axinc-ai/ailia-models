@@ -163,6 +163,12 @@ sudo apt-get install python3-opencv
 |:-----------|------------:|:------------:|:------------:|
 |[bert](/bert) | [pytorch-pretrained-bert](https://pypi.org/project/pytorch-pretrained-bert/) | Pytorch | 1.2.2 and later |
 
+## Genera tive Adversarial Networks
+
+| Name | Detail | Exported From | Supported Ailia Version |
+|:-----------|------------:|:------------:|:------------:|
+|[pytorch-gan](/pytorch-gan) | [Code repo for the Pytorch GAN Zoo project (used to train this model)](https://github.com/facebookresearch/pytorch_GAN_zoo)| Pytorch | 1.2.4 beta and later |
+
 ## Commercial Model
 
 | Name | Detail | Exported From | Supported Ailia Version |
