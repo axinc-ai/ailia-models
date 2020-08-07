@@ -58,13 +58,16 @@ parser.add_argument(
     help='Running the inference on the same input 5 times ' +
          'to measure execution performance.'
 )
+OUTPUT_SIZE = 0 # uninitialized
 args = parser.parse_args()
 if args.model == 'anime':
     print('Generation using model "AnimeFace"')
     MODEL_INFIX = 'animeface'
+    OUTPUT_SIZE = 64
 elif args.model == 'celeb':
     print('Generation using model "CelebA"')
     MODEL_INFIX = 'celeba'
+    OUTPUT_SIZE = 32
 else:
     print('Error: unknown model name "'+args.model+'" (must be "anime" or "celeb")')
     exit(-1)
@@ -99,7 +102,7 @@ def generate_image():
     [output_blob_idx] = gnet.get_output_blob_list()
     output_data = gnet.get_blob_data(output_blob_idx)
 
-    outp = np.clip((0.5 + 255*output_data.transpose((2,3,1,0)).reshape((64,64,3))).astype(np.float32),0,255)
+    outp = np.clip((0.5 + 255*output_data.transpose((2,3,1,0)).reshape((OUTPUT_SIZE,OUTPUT_SIZE,3))).astype(np.float32),0,255)
 
     ## If using PIL instead of OpenCV:
     #from PIL import Image
