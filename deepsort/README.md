@@ -21,7 +21,7 @@
 
 ### Output Example
 - DeepSORT original mode:
-  ![ex_result](https://user-images.githubusercontent.com/45060776/82342446-978c1500-9a2c-11ea-976b-a0d3358f89a3.gif)
+  ![ex_result](demo.gif)
 
 - compare image mode:
   ```bash
