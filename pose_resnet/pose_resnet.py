@@ -22,8 +22,8 @@ from inference import get_final_preds, get_affine_transform
 # ======================
 IMAGE_PATH = 'balloon.png'
 SAVE_IMAGE_PATH = 'output.png'
-IMAGE_WIDTH = 256
-IMAGE_HEIGHT = 192
+IMAGE_WIDTH = 192
+IMAGE_HEIGHT = 256
 
 # ======================
 # Arguemnt Parser Config
@@ -68,24 +68,6 @@ def plot_images(title, images, tile_shape):
         grd.imshow(images[0, i])
 
 
-def center_scale(x,y,w,h):
-    aspect_ratio = 0.75 # input_img_width to Input_img_height ratio
-    pixel_std = 200 # Standard bb size
-    center = np.zeros((2), dtype=np.float32)
-    center[0] = x + w * 0.5
-    center[1] = y + h * 0.5
-
-    if w > aspect_ratio * h:
-        h = w / aspect_ratio
-    elif w < aspect_ratio * h:
-        w = h * aspect_ratio
-    scale = np.array([w / pixel_std, h / pixel_std], dtype=np.float32)
-    if center[0] != -1:
-        scale = scale * 1.25
-
-    return center, scale
-
-
 # ======================
 # Main functions
 # ======================
@@ -100,51 +82,23 @@ def main():
 
     # prepare input data
     src_img = cv2.imread(args.input)
-    src_img = cv2.resize(src_img,(IMAGE_HEIGHT,IMAGE_WIDTH))
-
-    #src_img = load_image(
-    #    args.input,
-    #    (IMAGE_WIDTH, IMAGE_HEIGHT),
-    #    normalize_type='None',
-    #)
-
+    src_img = cv2.resize(src_img,(IMAGE_WIDTH,IMAGE_HEIGHT))
 
     w=src_img.shape[1]
     h=src_img.shape[0]
     print(w,h)
-    center,scale = center_scale(0,0,w,h)
 
-    image_size = [IMAGE_HEIGHT, IMAGE_WIDTH]
+    image_size = [IMAGE_WIDTH, IMAGE_HEIGHT]
 
     print(image_size)
 
-
     input_data = src_img
-    #r = 0
-    #trans = get_affine_transform(center, scale, r, image_size)
-    #input_data = cv2.warpAffine(
-    #    src_img,
-    #    trans,
-    #    (int(image_size[0]), int(image_size[1])),
-    #    flags=cv2.INTER_LINEAR)
-
     cv2.imwrite("affine.png", input_data)
-
-    #net_input = to_tensor(net_input)
-    #input_data = normalize(net_input, mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-    #net_input = net_input.unsqueeze(0)
-
-
-
-    print(input_data.shape)
-    #print(input_data)
 
     center=np.array([w/2, h/2], dtype=np.float32)
     scale = np.array([1, 1], dtype=np.float32)
 
-    print(center)
-
-
+    #BGR format
     mean=[0.485, 0.456, 0.406]
     std=[0.229, 0.224, 0.225]
     input_data = (input_data/255.0 - mean) / std
@@ -153,7 +107,7 @@ def main():
     #print(input_data)
     print(input_data.shape)
 
-    for i in range(1):
+    for i in range(2):
         if(i == 1):
             net.set_profile_mode()
         start = int(round(time.time() * 1000))
@@ -161,20 +115,8 @@ def main():
         end = int(round(time.time() * 1000))
         print(f'ailia processing time {end - start} ms')
     
-    #center = np.array([w/2, h/2], dtype=np.float32)
-    #scale = np.array([1, 1], dtype=np.float32)
-    #print(output)
-    #print(center)
-    #print(scale)
     preds, maxvals = get_final_preds(output, [center], [scale])
-    #print(preds)
-    #print(maxvals)
-    #print(preds.shape)
-    #print(maxvals.shape)
-    #return
 
-    #confidence = net.get_blob_data(net.find_blob_index_by_name("397"))
-    #paf = net.get_blob_data(net.find_blob_index_by_name("400"))
     points = []
     threshold = 0.1
 
@@ -205,13 +147,12 @@ def main():
     cv2.imshow("Keypoints", src_img)
     cv2.imwrite(args.savepath, src_img)
 
-    #channels = confidence.shape[1]#, paf.shape[1])
-    cols = 8
+    print(output.shape)
 
-    #plot_images("paf", paf, tile_shape=((int)((channels+cols-1)/cols), cols))
-    #plot_images("confidence", confidence, tile_shape=(
+    #channels = output.shape[1]#, paf.shape[1])
+    #cols = 8
+    #plot_images("output", output, tile_shape=(
     #    (int)((channels+cols-1)/cols), cols))
-
     #plt.show()
 
     cv2.destroyAllWindows()
