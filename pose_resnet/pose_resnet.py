@@ -25,9 +25,6 @@ SAVE_IMAGE_PATH = 'output.png'
 IMAGE_WIDTH = 256
 IMAGE_HEIGHT = 192
 
-ALGORITHM = ailia.POSE_ALGORITHM_LW_HUMAN_POSE
-
-
 # ======================
 # Arguemnt Parser Config
 # ======================
@@ -103,9 +100,11 @@ def main():
 
     # prepare input data
     src_img = cv2.imread(args.input)
-    #input_image = load_image(
+    src_img = cv2.resize(src_img,(IMAGE_HEIGHT,IMAGE_WIDTH))
+
+    #src_img = load_image(
     #    args.input,
-    #    (IMAGE_HEIGHT, IMAGE_WIDTH),
+    #    (IMAGE_WIDTH, IMAGE_HEIGHT),
     #    normalize_type='None',
     #)
 
@@ -120,14 +119,14 @@ def main():
     print(image_size)
 
 
-
-    r = 0
-    trans = get_affine_transform(center, scale, r, image_size)
-    input_data = cv2.warpAffine(
-        src_img,
-        trans,
-        (int(image_size[0]), int(image_size[1])),
-        flags=cv2.INTER_LINEAR)
+    input_data = src_img
+    #r = 0
+    #trans = get_affine_transform(center, scale, r, image_size)
+    #input_data = cv2.warpAffine(
+    #    src_img,
+    #    trans,
+    #    (int(image_size[0]), int(image_size[1])),
+    #    flags=cv2.INTER_LINEAR)
 
     cv2.imwrite("affine.png", input_data)
 
@@ -140,8 +139,10 @@ def main():
     print(input_data.shape)
     #print(input_data)
 
-    #center=np.array([w/2, h/2], dtype=np.float32)
-    #scale = np.array([1, 1], dtype=np.float32)
+    center=np.array([w/2, h/2], dtype=np.float32)
+    scale = np.array([1, 1], dtype=np.float32)
+
+    print(center)
 
 
     mean=[0.485, 0.456, 0.406]
@@ -165,7 +166,7 @@ def main():
     #print(output)
     #print(center)
     #print(scale)
-    preds, maxvals = get_final_preds(output, center, scale)
+    preds, maxvals = get_final_preds(output, [center], [scale])
     #print(preds)
     #print(maxvals)
     #print(preds.shape)
