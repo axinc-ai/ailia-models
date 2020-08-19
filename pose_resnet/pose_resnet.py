@@ -81,8 +81,8 @@ def main():
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
 
     # prepare input data
-    src_img = cv2.imread(args.input)
-    src_img = cv2.resize(src_img,(IMAGE_WIDTH,IMAGE_HEIGHT))
+    original_img = cv2.imread(args.input)
+    src_img = cv2.resize(original_img,(IMAGE_WIDTH,IMAGE_HEIGHT))
 
     w=src_img.shape[1]
     h=src_img.shape[0]
@@ -118,19 +118,19 @@ def main():
     preds, maxvals = get_final_preds(output, [center], [scale])
 
     points = []
-    threshold = 0.1
+    threshold = 0.3
 
     for i in range(preds.shape[1]):
-        x=preds[0,i,0]
-        y=preds[0,i,1]
+        x=preds[0,i,0] * original_img.shape[1] / src_img.shape[1]
+        y=preds[0,i,1] * original_img.shape[0] / src_img.shape[0]
         prob=maxvals[0,i,0]
 
         if prob > threshold:
             circle_size = 2
-            cv2.circle(src_img, (int(x), int(y)), circle_size,
+            cv2.circle(original_img, (int(x), int(y)), circle_size,
                        (0, 255, 255), thickness=-1, lineType=cv2.FILLED)
             cv2.putText(
-                src_img,
+                original_img,
                 "{}".format(i),
                 (int(x), int(y)),
                 cv2.FONT_HERSHEY_SIMPLEX,
@@ -144,8 +144,8 @@ def main():
         else:
             points.append(None)
 
-    cv2.imshow("Keypoints", src_img)
-    cv2.imwrite(args.savepath, src_img)
+    cv2.imshow("Keypoints", original_img)
+    cv2.imwrite(args.savepath, original_img)
 
     print(output.shape)
 
