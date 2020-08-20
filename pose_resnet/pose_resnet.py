@@ -31,8 +31,6 @@ REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/yolov3/'
 
 IMAGE_PATH = 'balloon.png'
 SAVE_IMAGE_PATH = 'output.png'
-IMAGE_HEIGHT = 448  # for video mode
-IMAGE_WIDTH = 448  # for video mode
 
 COCO_CATEGORY = [
     "person", "bicycle", "car", "motorcycle", "airplane", "bus", "train",
@@ -51,6 +49,7 @@ COCO_CATEGORY = [
 ]
 THRESHOLD = 0.4
 IOU = 0.45
+POSE_THRESHOLD = 0.1
 
 
 # ======================
@@ -92,8 +91,34 @@ def hsv_to_rgb(h, s, v):
         np.array([[[h, s, v]]], dtype=np.uint8), cv2.COLOR_HSV2BGR)[0][0]
     return (int(bgr[0]), int(bgr[1]), int(bgr[2]), 255)
 
+
+def keep_aspect(top_left,bottom_right,pose_img,pose):
+    py1 = max(0,top_left[1])
+    py2 = min(pose_img.shape[0],bottom_right[1])
+    px1 = max(0,top_left[0])
+    px2 = min(pose_img.shape[1],bottom_right[0])
+
+    shape = pose.get_input_shape()
+    aspect = shape[2]/shape[3]
+    ow = (px2-px1)
+    w = (py2-py1)/aspect
+    px1 = px1 - (w-ow)/2
+    px2 = px1 + w
+
+    px1 = int(px1)
+    px2 = int(px2)
+    py1 = int(py1)
+    py2 = int(py2)
+
+    py1 = max(0,py1)
+    py2 = min(pose_img.shape[0],py2)
+    px1 = max(0,px1)
+    px2 = min(pose_img.shape[1],px2)
+    return px1,py1,px2,py2
+
+
 def line(input_img, person, point1, point2):
-    threshold = 0.3
+    threshold = POSE_THRESHOLD
     if person.points[point1].score > threshold and\
        person.points[point2].score > threshold:
         color = hsv_to_rgb(255*point1/ailia.POSE_KEYPOINT_CNT, 255, 255)
@@ -192,10 +217,16 @@ def plot_results(detector, pose, img, category, logging=True):
             continue
 
         # pose detection
-        crop_img = pose_img[max(0,top_left[1]):min(pose_img.shape[0],bottom_right[1]),max(0,top_left[0]):min(pose_img.shape[1],bottom_right[0]),:]
-        cv2.imwrite("crop.png",crop_img)
-        detections = compute(pose,crop_img,max(0,obj.x),max(obj.y,0),crop_img.shape[1]/img.shape[1],crop_img.shape[0]/img.shape[0])
-        threshold = 0.3
+        px1,py1,px2,py2 = keep_aspect(top_left,bottom_right,pose_img,pose)
+
+        crop_img = pose_img[py1:py2,px1:px2,:]
+        offset_x = px1/img.shape[1]
+        offset_y = py1/img.shape[0]
+        scale_x = crop_img.shape[1]/img.shape[1]
+        scale_y = crop_img.shape[0]/img.shape[0]
+        detections = compute(pose,crop_img,offset_x,offset_y,scale_x,scale_y)
+
+        cv2.rectangle(img, (px1,py1), (px2,py2), color, 1)
 
         display_result(img, detections)
 
