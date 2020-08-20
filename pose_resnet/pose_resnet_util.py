@@ -1,15 +1,6 @@
-# ------------------------------------------------------------------------------
-# Copyright (c) Microsoft
-# Licensed under the MIT License.
-# Written by Bin Xiao (Bin.Xiao@microsoft.com)
-# ------------------------------------------------------------------------------
-
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import math
 import cv2
+import ailia
 
 import numpy as np
 
@@ -136,3 +127,86 @@ def get_final_preds(batch_heatmaps, center, scale):
                                    [heatmap_width, heatmap_height])
 
     return preds, maxvals
+
+
+def compute(net,original_img):
+    shape=net.get_input_shape()
+
+    IMAGE_WIDTH = shape[3]
+    IMAGE_HEIGHT = shape[2]
+
+    src_img = cv2.resize(original_img,(IMAGE_WIDTH,IMAGE_HEIGHT))
+
+    w=src_img.shape[1]
+    h=src_img.shape[0]
+
+    image_size = [IMAGE_WIDTH, IMAGE_HEIGHT]
+
+    input_data = src_img
+
+    center=np.array([w/2, h/2], dtype=np.float32)
+    scale = np.array([1, 1], dtype=np.float32)
+
+    #BGR format
+    mean=[0.485, 0.456, 0.406]
+    std=[0.229, 0.224, 0.225]
+    input_data = (input_data/255.0 - mean) / std
+    input_data = input_data[np.newaxis, :, :, :].transpose((0, 3, 1, 2))
+
+    output = net.predict(input_data)
+    
+    preds, maxvals = get_final_preds(output, [center], [scale])
+
+    k_list = []
+    ailia_to_mpi=[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,-1,-1]
+    ailia_to_coco=[0,14,15,16,17,2,5,3,6,4,8,11,7,9,12,10,13,1,-1]
+    total_score = 0
+    num_valid_points = 0
+    id = 0
+    angle_x = 0
+    angle_y = 0
+    angle_z = 0
+    for j in range(ailia.POSE_KEYPOINT_CNT):
+        i = ailia_to_mpi[j]
+        z=0
+        interpolated=0
+        if j==ailia.POSE_KEYPOINT_BODY_CENTER:
+            x=(k_list[ailia.POSE_KEYPOINT_SHOULDER_CENTER].x+k_list[ailia.POSE_KEYPOINT_HIP_LEFT].x+k_list[ailia.POSE_KEYPOINT_HIP_RIGHT].x)/3
+            y=(k_list[ailia.POSE_KEYPOINT_SHOULDER_CENTER].y+k_list[ailia.POSE_KEYPOINT_HIP_LEFT].y+k_list[ailia.POSE_KEYPOINT_HIP_RIGHT].y)/3
+            score=min(min(k_list[ailia.POSE_KEYPOINT_SHOULDER_CENTER].score,k_list[ailia.POSE_KEYPOINT_HIP_LEFT].score),k_list[ailia.POSE_KEYPOINT_HIP_RIGHT].score)
+            interpolated=1
+        elif j==ailia.POSE_KEYPOINT_SHOULDER_CENTER:
+            x=(k_list[ailia.POSE_KEYPOINT_SHOULDER_LEFT].x+k_list[ailia.POSE_KEYPOINT_SHOULDER_RIGHT].x)/2
+            y=(k_list[ailia.POSE_KEYPOINT_SHOULDER_LEFT].y+k_list[ailia.POSE_KEYPOINT_SHOULDER_RIGHT].y)/2
+            score=min(k_list[ailia.POSE_KEYPOINT_SHOULDER_LEFT].score,k_list[ailia.POSE_KEYPOINT_SHOULDER_RIGHT].score)
+            interpolated=1
+        else:
+            x=preds[0,i,0] * original_img.shape[1] / src_img.shape[1]
+            y=preds[0,i,1] * original_img.shape[0] / src_img.shape[0]
+            score=maxvals[0,i,0]
+
+        num_valid_points=num_valid_points+1
+        total_score=total_score+score
+
+        k = ailia.PoseEstimatorKeypoint(
+            x = x,
+            y = y,
+            z_local = z,
+            score = score,
+            interpolated = interpolated,
+        )
+        k_list.append(k)
+    
+    total_score=total_score/num_valid_points
+
+    r = ailia.PoseEstimatorObjectPose(
+        points = k_list,
+        total_score = total_score,
+        num_valid_points = num_valid_points,
+        id = id,
+        angle_x = angle_x,
+        angle_y = angle_y,
+        angle_z = angle_z
+    )
+
+    return r

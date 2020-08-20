@@ -14,7 +14,7 @@ from image_utils import load_image  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from utils import check_file_existance  # noqa: E402
 
-from pose_resnet_util import get_final_preds, get_affine_transform
+from pose_resnet_util import get_final_preds, get_affine_transform, compute
 
 
 # ======================
@@ -71,6 +71,7 @@ def plot_images(title, images, tile_shape):
 # ======================
 # Main functions
 # ======================
+
 def main():
     # model files check and download
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
@@ -82,47 +83,14 @@ def main():
 
     # prepare input data
     original_img = cv2.imread(args.input)
-    src_img = cv2.resize(original_img,(IMAGE_WIDTH,IMAGE_HEIGHT))
 
-    w=src_img.shape[1]
-    h=src_img.shape[0]
-    print(w,h)
-
-    image_size = [IMAGE_WIDTH, IMAGE_HEIGHT]
-
-    print(image_size)
-
-    input_data = src_img
-
-    center=np.array([w/2, h/2], dtype=np.float32)
-    scale = np.array([1, 1], dtype=np.float32)
-
-    #BGR format
-    mean=[0.485, 0.456, 0.406]
-    std=[0.229, 0.224, 0.225]
-    input_data = (input_data/255.0 - mean) / std
-    input_data = input_data[np.newaxis, :, :, :].transpose((0, 3, 1, 2))
-
-    #print(input_data)
-    print(input_data.shape)
-
-    for i in range(2):
-        if(i == 1):
-            net.set_profile_mode()
-        start = int(round(time.time() * 1000))
-        output = net.predict(input_data)
-        end = int(round(time.time() * 1000))
-        print(f'ailia processing time {end - start} ms')
-    
-    preds, maxvals = get_final_preds(output, [center], [scale])
-
-    points = []
+    detections = compute(net,original_img)
     threshold = 0.3
 
-    for i in range(preds.shape[1]):
-        x=preds[0,i,0] * original_img.shape[1] / src_img.shape[1]
-        y=preds[0,i,1] * original_img.shape[0] / src_img.shape[0]
-        prob=maxvals[0,i,0]
+    for i in range(ailia.POSE_KEYPOINT_CNT):
+        x = detections.points[i].x
+        y = detections.points[i].y
+        prob = detections.points[i].score
 
         if prob > threshold:
             circle_size = 2
@@ -139,14 +107,8 @@ def main():
                 lineType=cv2.LINE_AA
             )
 
-            points.append((int(x), int(y)))
-        else:
-            points.append(None)
-
     cv2.imshow("Keypoints", original_img)
     cv2.imwrite(args.savepath, original_img)
-
-    print(output.shape)
 
     #channels = output.shape[1]#, paf.shape[1])
     #cols = 8
