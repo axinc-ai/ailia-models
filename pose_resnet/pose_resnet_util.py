@@ -181,8 +181,8 @@ def compute(net,original_img):
             score=min(k_list[ailia.POSE_KEYPOINT_SHOULDER_LEFT].score,k_list[ailia.POSE_KEYPOINT_SHOULDER_RIGHT].score)
             interpolated=1
         else:
-            x=preds[0,i,0] * original_img.shape[1] / src_img.shape[1]
-            y=preds[0,i,1] * original_img.shape[0] / src_img.shape[0]
+            x=preds[0,i,0] / src_img.shape[1]
+            y=preds[0,i,1] / src_img.shape[0]
             score=maxvals[0,i,0]
 
         num_valid_points=num_valid_points+1
