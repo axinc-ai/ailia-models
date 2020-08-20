@@ -129,7 +129,7 @@ def get_final_preds(batch_heatmaps, center, scale):
     return preds, maxvals
 
 
-def compute(net,original_img):
+def compute(net,original_img,offset_x,offset_y,scale_x,scale_y):
     shape=net.get_input_shape()
 
     IMAGE_WIDTH = shape[3]
@@ -189,8 +189,8 @@ def compute(net,original_img):
         total_score=total_score+score
 
         k = ailia.PoseEstimatorKeypoint(
-            x = x,
-            y = y,
+            x = x * scale_x + offset_x,
+            y = y * scale_y + offset_y,
             z_local = z,
             score = score,
             interpolated = interpolated,

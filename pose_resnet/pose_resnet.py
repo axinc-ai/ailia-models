@@ -57,7 +57,7 @@ IOU = 0.45
 # Arguemnt Parser Config
 # ======================
 parser = argparse.ArgumentParser(
-    description='Yolov3 model'
+    description='Simple Baseline for Pose Estimation'
 )
 parser.add_argument(
     '-i', '--input', metavar='IMAGE',
@@ -149,6 +149,7 @@ def display_result(input_img, person):
 
 
 def plot_results(detector, pose, img, category, logging=True):
+    pose_img = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
     h, w = img.shape[0], img.shape[1]
     count = detector.get_object_count()
     if logging:
@@ -186,33 +187,17 @@ def plot_results(detector, pose, img, category, logging=True):
             1
         )
 
+        CATEGORY_PERSON = 0
+        if obj.category!=CATEGORY_PERSON:
+            continue
+
         # pose detection
-        original_img = img
-        original_img = cv2.cvtColor(original_img, cv2.COLOR_BGRA2BGR)
-        detections = compute(pose,original_img)
+        crop_img = pose_img[max(0,top_left[1]):min(pose_img.shape[0],bottom_right[1]),max(0,top_left[0]):min(pose_img.shape[1],bottom_right[0]),:]
+        cv2.imwrite("crop.png",crop_img)
+        detections = compute(pose,crop_img,max(0,obj.x),max(obj.y,0),crop_img.shape[1]/img.shape[1],crop_img.shape[0]/img.shape[0])
         threshold = 0.3
 
         display_result(img, detections)
-
-        for i in range(ailia.POSE_KEYPOINT_CNT):
-            x = detections.points[i].x
-            y = detections.points[i].y
-            prob = detections.points[i].score
-
-            if prob > threshold:
-                circle_size = 2
-                cv2.circle(img, (int(x), int(y)), circle_size,
-                        (0, 255, 255), thickness=-1, lineType=cv2.FILLED)
-                cv2.putText(
-                    img,
-                    "{}".format(i),
-                    (int(x), int(y)),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.5,
-                    (0, 0, 255),
-                    1,
-                    lineType=cv2.LINE_AA
-                )
 
     return img
 
@@ -273,6 +258,8 @@ def recognize_from_video():
         env_id=env_id
     )
 
+    pose = ailia.Net(POSE_MODEL_PATH, POSE_WEIGHT_PATH, env_id=env_id)
+
     if args.video == '0':
         print('[INFO] Webcam mode is activated')
         capture = cv2.VideoCapture(0)
@@ -290,11 +277,9 @@ def recognize_from_video():
         if not ret:
             continue
 
-        _, resized_img = adjust_frame_size(frame, IMAGE_HEIGHT, IMAGE_WIDTH)
-
-        img = cv2.cvtColor(resized_img, cv2.COLOR_BGR2BGRA)
+        img = cv2.cvtColor(frame, cv2.COLOR_BGR2BGRA)
         detector.compute(img, THRESHOLD, IOU)
-        res_img = plot_results(detector, resized_img, COCO_CATEGORY, False)
+        res_img = plot_results(detector, pose, frame, COCO_CATEGORY, False)
         cv2.imshow('frame', res_img)
 
     capture.release()
