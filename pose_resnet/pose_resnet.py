@@ -14,7 +14,7 @@ from model_utils import check_and_download_models  # noqa: E402
 from webcamera_utils import adjust_frame_size  # noqa: E402C
 from detector_utils import load_image  # noqa: E402C
 
-from pose_resnet_util import get_final_preds, get_affine_transform, compute
+from pose_resnet_util import get_final_preds, get_affine_transform, compute, keep_aspect
 
 # ======================
 # Parameters
@@ -90,31 +90,6 @@ def hsv_to_rgb(h, s, v):
     bgr = cv2.cvtColor(
         np.array([[[h, s, v]]], dtype=np.uint8), cv2.COLOR_HSV2BGR)[0][0]
     return (int(bgr[0]), int(bgr[1]), int(bgr[2]), 255)
-
-
-def keep_aspect(top_left,bottom_right,pose_img,pose):
-    py1 = max(0,top_left[1])
-    py2 = min(pose_img.shape[0],bottom_right[1])
-    px1 = max(0,top_left[0])
-    px2 = min(pose_img.shape[1],bottom_right[0])
-
-    shape = pose.get_input_shape()
-    aspect = shape[2]/shape[3]
-    ow = (px2-px1)
-    w = (py2-py1)/aspect
-    px1 = px1 - (w-ow)/2
-    px2 = px1 + w
-
-    px1 = int(px1)
-    px2 = int(px2)
-    py1 = int(py1)
-    py2 = int(py2)
-
-    py1 = max(0,py1)
-    py2 = min(pose_img.shape[0],py2)
-    px1 = max(0,px1)
-    px2 = min(pose_img.shape[1],px2)
-    return px1,py1,px2,py2
 
 
 def line(input_img, person, point1, point2):
