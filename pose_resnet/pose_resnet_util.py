@@ -171,26 +171,39 @@ def compute(net,original_img,offset_x,offset_y,scale_x,scale_y):
         z=0
         interpolated=0
         if j==ailia.POSE_KEYPOINT_BODY_CENTER:
-            x=(k_list[ailia.POSE_KEYPOINT_SHOULDER_CENTER].x+k_list[ailia.POSE_KEYPOINT_HIP_LEFT].x+k_list[ailia.POSE_KEYPOINT_HIP_RIGHT].x)/3
-            y=(k_list[ailia.POSE_KEYPOINT_SHOULDER_CENTER].y+k_list[ailia.POSE_KEYPOINT_HIP_LEFT].y+k_list[ailia.POSE_KEYPOINT_HIP_RIGHT].y)/3
-            score=min(min(k_list[ailia.POSE_KEYPOINT_SHOULDER_CENTER].score,k_list[ailia.POSE_KEYPOINT_HIP_LEFT].score),k_list[ailia.POSE_KEYPOINT_HIP_RIGHT].score)
+            x=(preds[0,ailia_to_mpi[ailia.POSE_KEYPOINT_SHOULDER_LEFT],0]+
+               preds[0,ailia_to_mpi[ailia.POSE_KEYPOINT_SHOULDER_RIGHT],0]+
+               preds[0,ailia_to_mpi[ailia.POSE_KEYPOINT_HIP_LEFT],0]+
+               preds[0,ailia_to_mpi[ailia.POSE_KEYPOINT_HIP_RIGHT],0])/4
+            y=(preds[0,ailia_to_mpi[ailia.POSE_KEYPOINT_SHOULDER_LEFT],1]+
+               preds[0,ailia_to_mpi[ailia.POSE_KEYPOINT_SHOULDER_RIGHT],1]+
+               preds[0,ailia_to_mpi[ailia.POSE_KEYPOINT_HIP_LEFT],1]+
+               preds[0,ailia_to_mpi[ailia.POSE_KEYPOINT_HIP_RIGHT],1])/4
+            score=min(min(min(
+                    maxvals[0,ailia_to_mpi[ailia.POSE_KEYPOINT_SHOULDER_LEFT],0],
+                    maxvals[0,ailia_to_mpi[ailia.POSE_KEYPOINT_SHOULDER_RIGHT],0]),
+                    maxvals[0,ailia_to_mpi[ailia.POSE_KEYPOINT_HIP_LEFT],0]),
+                    maxvals[0,ailia_to_mpi[ailia.POSE_KEYPOINT_HIP_RIGHT],0])
             interpolated=1
         elif j==ailia.POSE_KEYPOINT_SHOULDER_CENTER:
-            x=(k_list[ailia.POSE_KEYPOINT_SHOULDER_LEFT].x+k_list[ailia.POSE_KEYPOINT_SHOULDER_RIGHT].x)/2
-            y=(k_list[ailia.POSE_KEYPOINT_SHOULDER_LEFT].y+k_list[ailia.POSE_KEYPOINT_SHOULDER_RIGHT].y)/2
-            score=min(k_list[ailia.POSE_KEYPOINT_SHOULDER_LEFT].score,k_list[ailia.POSE_KEYPOINT_SHOULDER_RIGHT].score)
+            x=(preds[0,ailia_to_mpi[ailia.POSE_KEYPOINT_SHOULDER_LEFT],0]+
+               preds[0,ailia_to_mpi[ailia.POSE_KEYPOINT_SHOULDER_RIGHT],0])/2
+            y=(preds[0,ailia_to_mpi[ailia.POSE_KEYPOINT_SHOULDER_LEFT],1]+
+               preds[0,ailia_to_mpi[ailia.POSE_KEYPOINT_SHOULDER_RIGHT],1])/2
+            score=min(maxvals[0,ailia_to_mpi[ailia.POSE_KEYPOINT_SHOULDER_LEFT]],
+               maxvals[0,ailia_to_mpi[ailia.POSE_KEYPOINT_SHOULDER_RIGHT]])
             interpolated=1
         else:
-            x=preds[0,i,0] / src_img.shape[1]
-            y=preds[0,i,1] / src_img.shape[0]
+            x=preds[0,i,0]
+            y=preds[0,i,1]
             score=maxvals[0,i,0]
 
         num_valid_points=num_valid_points+1
         total_score=total_score+score
 
         k = ailia.PoseEstimatorKeypoint(
-            x = x * scale_x + offset_x,
-            y = y * scale_y + offset_y,
+            x = x / src_img.shape[1] * scale_x + offset_x,
+            y = y / src_img.shape[0] * scale_y + offset_y,
             z_local = z,
             score = score,
             interpolated = interpolated,
