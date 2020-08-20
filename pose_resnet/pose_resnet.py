@@ -14,7 +14,7 @@ from image_utils import load_image  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from utils import check_file_existance  # noqa: E402
 
-from inference import get_final_preds, get_affine_transform
+from pose_resnet_util import get_final_preds, get_affine_transform
 
 
 # ======================
@@ -93,7 +93,6 @@ def main():
     print(image_size)
 
     input_data = src_img
-    cv2.imwrite("affine.png", input_data)
 
     center=np.array([w/2, h/2], dtype=np.float32)
     scale = np.array([1, 1], dtype=np.float32)
