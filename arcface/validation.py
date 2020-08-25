@@ -55,6 +55,11 @@ parser.add_argument(
     default='arcface', choices=MODEL_LISTS,
     help='model lists: ' + ' | '.join(MODEL_LISTS)
 )
+parser.add_argument(
+    '-s', '--skip',
+    action='store_true',
+    help='RCalculate using only some images'
+)
 args = parser.parse_args()
 
 WEIGHT_PATH = args.arch+'.onnx'
@@ -94,6 +99,7 @@ def cosin_metric(x1, x2):
 
 def get_evaluation_files(input):
     before_folder=""
+    folder_cnt=0
 
     file_dict={}
     file_list=[]
@@ -116,6 +122,14 @@ def get_evaluation_files(input):
             before_folder=folder
             if not(folder in file_dict):
                 file_dict[folder]=[]
+                folder_cnt=folder_cnt+1
+            if args.skip:
+                NUM_SKIP_PER_PERSON = 4
+                if(len(file_dict[folder])>=NUM_SKIP_PER_PERSON):
+                    continue
+                NUM_SKIP_PERSON = 16
+                if folder_cnt >= NUM_SKIP_PERSON:
+                    continue
             file_dict[folder].append(src_dir+"/"+file_)
             file_list.append(src_dir+"/"+file_)
     
@@ -138,11 +152,15 @@ def get_feature_values(net,file_list):
 
 
 def display_result(file_list,fe_list):
-    fig = plt.figure(figsize=(6.0, 12.0))
-    ax1 = fig.add_subplot(2, 1, 1)
-    ax2 = fig.add_subplot(2, 1, 2)
+    fig = plt.figure(figsize=(12.0, 12.0))
+
+    ax1 = fig.add_subplot(2, 2, 1)
+    ax2 = fig.add_subplot(2, 2, 2)
+    ax3 = fig.add_subplot(2, 2, 4)
+
     ax1.tick_params(labelbottom="on")
     ax2.tick_params(labelleft="on")
+    ax3.tick_params(labelleft="on")
 
     max_cnt=len(file_list)
 
@@ -152,6 +170,10 @@ def display_result(file_list,fe_list):
 
     heatmap=np.zeros((len(file_list),len(file_list)))
     expect=np.zeros((len(file_list),len(file_list)))
+    detected=np.zeros((len(file_list),len(file_list)))
+
+    success = 0
+    failed = 0
 
     for i0 in range(0,len(file_list)):
         for i1 in range(0,len(file_list)):
@@ -178,34 +200,51 @@ def display_result(file_list,fe_list):
                 print('They are not the same face!')
             else:
                 print('They are the same face!')
+            
+            if (f0==f1 and THRESHOLD <= sim) or (f0!=f1 and THRESHOLD > sim):
+                success = success + 1
+            else:
+                failed = failed + 1
 
             heatmap[int(i0),int(i1)]=sim
             expect[int(i0),int(i1)]=ex
+            if THRESHOLD <= sim:
+                detected[int(i0),int(i1)]=1
+            else:
+                detected[int(i0),int(i1)]=0
+    
+    accuracy = int(success * 10000 / (success + failed))/100
 
     ax1.pcolor(expect, cmap=plt.cm.Blues)
-    ax2.pcolor(heatmap, cmap=plt.cm.Blues)
+    ax2.pcolor(detected, cmap=plt.cm.Blues)
+    ax3.pcolor(heatmap, cmap=plt.cm.Blues)
 
-    for y in range(heatmap.shape[0]):
-        for x in range(heatmap.shape[1]):
-            continue
-            if heatmap[y, x]!=0:
-                ax1.text(x + 0.5, y + 0.5, ""+str(expect[y,x]) +":"+ str(heatmap[y, x]),
-                    horizontalalignment='center',
-                    verticalalignment='center',
-                    fontsize=8
-                )
+    if False:   # Plot values
+        for y in range(heatmap.shape[0]):
+            for x in range(heatmap.shape[1]):
+                if heatmap[y, x]!=0:
+                    ax2.text(x + 0.5, y + 0.5, str(heatmap[y, x]),
+                        horizontalalignment='center',
+                        verticalalignment='center',
+                        fontsize=8
+                    )
 
-    ax1.set_title('expected result ')
+    ax1.set_title('expected ')
     ax1.set_xlabel('(face2)')
     ax1.set_ylabel('(face1)')
     ax1.legend(loc='upper right')
 
-    ax2.set_title('arcface result ')
+    ax2.set_title('detected (accuracy '+str(accuracy)+' %)')
     ax2.set_xlabel('(face2)')
     ax2.set_ylabel('(face1')
     ax2.legend(loc='upper right')
-    
-    fig.savefig("confusion_"+args.arch+".png",dpi=300)
+
+    ax3.set_title('similality')
+    ax3.set_xlabel('(face2)')
+    ax3.set_ylabel('(face1')
+    ax3.legend(loc='upper right')
+
+    fig.savefig("confusion_"+args.arch+".png",dpi=100)
 
 
 # ======================
