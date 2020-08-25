@@ -6,7 +6,7 @@ import cv2
 import numpy as np
 
 import ailia
-from rotnet_utils import generate_rotated_image, visualize
+from rotnet_utils import generate_rotated_image, create_figure, visualize
 
 # import original modules
 sys.path.append('../util')
@@ -120,7 +120,8 @@ def recognize_from_image():
 
     # visualize
     predicted_angle = np.argmax(preds_ailia, axis=1)[0]
-    plt = visualize(rotated_img, rotation_angle, predicted_angle)
+    fig = create_figure()
+    plt = visualize(fig, rotated_img, rotation_angle, predicted_angle)
     plt.savefig(args.savepath)
 
     print('Script finished successfully.')
@@ -142,6 +143,9 @@ def recognize_from_video():
     else:
         if check_file_existance(args.video):
             capture = cv2.VideoCapture(args.video)
+
+    fig = create_figure()
+    tight_layout = True
 
     while(True):
         ret, frame = capture.read()
@@ -175,8 +179,9 @@ def recognize_from_video():
 
         # visualize
         predicted_angle = np.argmax(preds_ailia, axis=1)[0]
-        plt = visualize(rotated_img, rotation_angle, predicted_angle)
+        plt = visualize(fig, rotated_img, rotation_angle, predicted_angle, tight_layout)
         plt.pause(.01)
+        tight_layout = False
 
     capture.release()
     cv2.destroyAllWindows()
