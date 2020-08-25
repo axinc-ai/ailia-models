@@ -234,7 +234,7 @@ def display_result(file_list,fe_list):
     ax1.set_ylabel('(face1)')
     ax1.legend(loc='upper right')
 
-    ax2.set_title('detected (accuracy '+str(accuracy)+' %)')
+    ax2.set_title('detected (threshold '+str(THRESHOLD)+' accuracy '+str(accuracy)+' %)')
     ax2.set_xlabel('(face2)')
     ax2.set_ylabel('(face1')
     ax2.legend(loc='upper right')
