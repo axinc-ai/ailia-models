@@ -49,6 +49,24 @@ $ python3 arcface.py --video 0
 ```
 
 
+### validation
+
+Compute a confusion matrix from a set of face images.
+
+```bash
+$ python3 validation.py -i ./CASIA-WebFace
+```
+
+The dataset folder must be divided into folders for each person.
+
+An example of the folder structure is shown below.
+
+```
+./CASIA-WebFace/0000045/001.jpg
+./CASIA-WebFace/0000045/002.jpg
+./CASIA-WebFace/0000099/001.jpg
+```
+
 ### Reference
 [arcface-pytorch](https://github.com/ronghuaiyang/arcface-pytorch)
 
