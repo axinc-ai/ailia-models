@@ -23,7 +23,7 @@ import matplotlib.pyplot as plt
 # PARAMETERS
 # ======================
 
-MODEL_LISTS = ['normal', 'masked']
+MODEL_LISTS = ['arcface', 'arcface_mixed10', 'arcface_mixed150', 'arcface_mixed_90_82', 'arcface_mixed_90_99', 'arcface_mixed_eq_90_89']
 
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/arcface/"
 
@@ -71,26 +71,14 @@ parser.add_argument(
          'to measure execution performance. (Cannot be used in video mode)'
 )
 parser.add_argument(
-    '-f', '--folder', metavar='FOLDER',
-    default=None,
-    help='The input folder path. ' +
-         'Create confusion matrix.'
-)
-parser.add_argument(
     '-a', '--arch', metavar='ARCH',
-    default='normal', choices=MODEL_LISTS,
+    default='arcface', choices=MODEL_LISTS,
     help='model lists: ' + ' | '.join(MODEL_LISTS)
 )
 args = parser.parse_args()
 
-if args.arch == 'masked':
-    WEIGHT_PATH = 'arcface_mixed10.onnx'
-    MODEL_PATH = 'arcface_mixed10.onnx.prototxt'
-    BATCH_SIZE = 2
-else:
-    WEIGHT_PATH = 'arcface.onnx'
-    MODEL_PATH = 'arcface.onnx.prototxt'
-    BATCH_SIZE = 4
+WEIGHT_PATH = args.arch+'.onnx'
+MODEL_PATH = args.arch+'.onnx.prototxt'
 
 # ======================
 # Utils
@@ -101,7 +89,8 @@ def preprocess_image(image, input_is_bgr=False):
     # and concat the feature as the final feature of the origin image.
     if input_is_bgr:
         image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    #image = cv2.equalizeHist(image)
+    if "eq_" in args.arch:
+        image = cv2.equalizeHist(image)
     image = np.dstack((image, np.fliplr(image)))
     image = image.transpose((2, 0, 1))
     image = image[:, np.newaxis, :, :]
@@ -136,18 +125,31 @@ def compare_images():
     env_id = ailia.get_gpu_environment_id()
     print(f'env_id: {env_id}')
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+    BATCH_SIZE = net.get_input_shape()[0]
 
     # inference
     print('Start inference...')
+    if BATCH_SIZE==2:
+        shape = net.get_output_shape()
+        shape = (4,shape[1])
+        preds_ailia = np.zeros(shape)
     if args.benchmark:
         print('BENCHMARK mode')
         for i in range(5):
             start = int(round(time.time() * 1000))
-            preds_ailia = net.predict(imgs)
+            if BATCH_SIZE==4:
+                preds_ailia = net.predict(imgs)
+            else:
+                preds_ailia[0:2] = net.predict(imgs[0:2])
+                preds_ailia[2:4] = net.predict(imgs[2:4])
             end = int(round(time.time() * 1000))
             print(f'\tailia processing time {end - start} ms')
     else:
-        preds_ailia = net.predict(imgs)
+        if BATCH_SIZE==4:
+            preds_ailia = net.predict(imgs)
+        else:
+            preds_ailia[0:2] = net.predict(imgs[0:2])
+            preds_ailia[2:4] = net.predict(imgs[2:4])
 
     # postprocessing
     fe_1 = np.concatenate([preds_ailia[0], preds_ailia[1]], axis=0)
@@ -160,40 +162,6 @@ def compare_images():
     else:
         print('They are the same face!')
 
-def compare_images_batch_size_2():
-    # prepare input data
-    imgs_1 = prepare_input_data(args.inputs[0])
-    imgs_2 = prepare_input_data(args.inputs[1])
-
-    # net initialize
-    env_id = ailia.get_gpu_environment_id()
-    print(f'env_id: {env_id}')
-    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
-
-    # inference
-    print('Start inference...')
-    if args.benchmark:
-        print('BENCHMARK mode')
-        for i in range(5):
-            start = int(round(time.time() * 1000))
-            preds_ailia1 = net.predict(imgs_1)
-            preds_ailia2 = net.predict(imgs_2)
-            end = int(round(time.time() * 1000))
-            print(f'\tailia processing time {end - start} ms')
-    else:
-        preds_ailia1 = net.predict(imgs_1)
-        preds_ailia2 = net.predict(imgs_2)
-
-    # postprocessing
-    fe_1 = np.concatenate([preds_ailia1[0], preds_ailia1[1]], axis=0)
-    fe_2 = np.concatenate([preds_ailia2[0], preds_ailia2[1]], axis=0)
-    sim = cosin_metric(fe_1, fe_2)
-
-    print(f'Similarity of ({args.inputs[0]}, {args.inputs[1]}) : {sim:.3f}')
-    if THRESHOLD > sim:
-        print('They are not the same face!')
-    else:
-        print('They are the same face!')
 
 def compare_image_and_video():
     # prepare base image
@@ -203,6 +171,7 @@ def compare_image_and_video():
     env_id = ailia.get_gpu_environment_id()
     print(f'env_id: {env_id}')
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+    BATCH_SIZE = net.get_input_shape()[0]
 
     # detector initialize
     detector = ailia.Detector(
@@ -319,131 +288,6 @@ def compare_image_and_video():
     cv2.destroyAllWindows()
     print('Script finished successfully.')
 
-def compare_folder():
-    file_dict={}
-    file_list=[]
-    before_folder=""
-
-    # net initialize
-    env_id = ailia.get_gpu_environment_id()
-    print(f'env_id: {env_id}')
-    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
-
-    for src_dir, dirs, files in os.walk(args.folder):
-        #files = sorted(files)
-        files = sorted(files,key=lambda var:[int(x) if x.isdigit() else x for x in re.findall(r'[^0-9]|[0-9]+', var)])
-        for file_ in files:
-            root, ext = os.path.splitext(file_)
-
-            if file_==".DS_Store":
-                continue
-            if file_=="Thumbs.db":
-                continue
-            if not(ext == ".jpg" or ext == ".png" or ext == ".bmp"):
-                continue
-
-            folders=src_dir.split("/")
-            folder=folders[len(folders)-1]
-            before_folder=folder
-            if not(folder in file_dict):
-                file_dict[folder]=[]
-            file_dict[folder].append(src_dir+"/"+file_)
-            file_list.append(src_dir+"/"+file_)
-
-    fig = plt.figure(figsize=(6.0, 12.0))
-    ax1 = fig.add_subplot(2, 1, 1)
-    ax2 = fig.add_subplot(2, 1, 2)
-    ax1.tick_params(labelbottom="on")
-    ax2.tick_params(labelleft="on")
-
-    max_cnt=len(file_list)
-
-    x=np.zeros((max_cnt))
-    y=np.zeros((max_cnt))
-    t=np.zeros((max_cnt))
-
-    heatmap=np.zeros((len(file_list),len(file_list)))
-    expect=np.zeros((len(file_list),len(file_list)))
-
-    fe_list=[]
-    for i in range(0,len(file_list)):
-        inputs0=file_list[i]
-        print(inputs0)
-        imgs_1 = prepare_input_data(inputs0)
-        if BATCH_SIZE==4:
-           imgs_1 = np.concatenate([imgs_1, imgs_1], axis=0)
-        preds_ailia1 = net.predict(imgs_1)
-        fe_1 = np.concatenate([preds_ailia1[0], preds_ailia1[1]], axis=0)
-        fe_list.append(fe_1)
-
-    for i0 in range(0,len(file_list)):
-        for i1 in range(0,len(file_list)):
-            inputs0=file_list[i0]
-            inputs1=file_list[i1]
-
-            #print(inputs0)
-            #print(inputs1)
-
-            # prepare input data
-            #imgs_1 = prepare_input_data(inputs0)
-            #imgs_2 = prepare_input_data(inputs1)
-
-            # inference
-            #preds_ailia1 = net.predict(imgs_1)
-            #preds_ailia2 = net.predict(imgs_2)
-
-            # postprocessing
-            fe_1 = fe_list[i0]#np.concatenate([preds_ailia1[0], preds_ailia1[1]], axis=0)
-            fe_2 = fe_list[i1]#np.concatenate([preds_ailia2[0], preds_ailia2[1]], axis=0)
-            sim = cosin_metric(fe_1, fe_2)
-
-            ex=0
-            f0=inputs0.split("/")
-            f1=inputs1.split("/")
-
-            f0=f0[len(f0)-2]
-            f1=f1[len(f1)-2]
-
-            if f0==f1:
-                ex=1
-            
-            #sim = ex
-
-            print(f'Similarity of ({inputs0}, {inputs1}) : {sim:.3f}')
-            if THRESHOLD > sim:
-                print('They are not the same face!')
-            else:
-                print('They are the same face!')
-
-            heatmap[int(i0),int(i1)]=sim
-            expect[int(i0),int(i1)]=ex
-
-
-    ax1.pcolor(expect, cmap=plt.cm.Blues)
-    #ax2.hist(t, bins=len(file_list))
-    ax2.pcolor(heatmap, cmap=plt.cm.Blues)
-
-    for y in range(heatmap.shape[0]):
-        for x in range(heatmap.shape[1]):
-            continue
-            if heatmap[y, x]!=0:
-                ax1.text(x + 0.5, y + 0.5, ""+str(expect[y,x]) +":"+ str(heatmap[y, x]),
-                    horizontalalignment='center',
-                    verticalalignment='center',
-                    fontsize=8
-                )
-
-    ax1.set_title('expected result ')
-    ax1.set_xlabel('(face2)')
-    ax1.set_ylabel('(face1)')
-    ax1.legend(loc='upper right')
-
-    ax2.set_title('arcface result ')
-    ax2.set_xlabel('(face2)')
-    ax2.set_ylabel('(face1')
-    ax2.legend(loc='upper right')
-    
-    fig.savefig("confusion.png",dpi=300)
 
 def main():
     # model files check and download
@@ -451,15 +295,10 @@ def main():
     if args.video:
         check_and_download_models(YOLOV3_FACE_WEIGHT_PATH, YOLOV3_FACE_MODEL_PATH, YOLOV3_FACE_REMOTE_PATH)
     
-    if args.folder:
-        compare_folder()
-    elif args.video is None:
+    if args.video is None:
         # still image mode
         # comparing two images specified args.inputs
-        if BATCH_SIZE==2:
-            compare_images_batch_size_2()
-        else:
-            compare_images()
+        compare_images()
     else:
         # video mode
         # comparing the specified image and the video
