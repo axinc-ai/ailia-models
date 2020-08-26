@@ -4,7 +4,7 @@
 
 ![Input](couple.jpg)
 
-- Shape : (1, 3, 448, 448)  
+- Shape : (1, 3, 416, 416)  
 - Range : [0.0, 1.0]
 
 ## Output
