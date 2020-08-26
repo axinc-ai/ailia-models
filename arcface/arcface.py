@@ -132,6 +132,45 @@ def cosin_metric(x1, x2):
     return np.dot(x1, x2) / (np.linalg.norm(x1) * np.linalg.norm(x2))
 
 
+def face_identification(fe_list,net,resized_frame):
+    BATCH_SIZE = net.get_input_shape()[0]
+
+    # prepare target face and input face
+    input_frame = preprocess_image(resized_frame, input_is_bgr=True)
+    if BATCH_SIZE == 4:
+        input_data = np.concatenate([input_frame, input_frame], axis=0)
+    else:
+        input_data = input_frame
+
+    # inference
+    preds_ailia = net.predict(input_data)
+
+    # postprocessing
+    if BATCH_SIZE == 4:
+        fe_1 = np.concatenate([preds_ailia[0], preds_ailia[1]], axis=0)
+        fe_2 = np.concatenate([preds_ailia[2], preds_ailia[3]], axis=0)
+    else:
+        fe_1 = np.concatenate([preds_ailia[0], preds_ailia[1]], axis=0)
+        fe_2 = fe_1
+
+    # identification
+    id_sim = 0
+    score_sim = 0
+    for i in range(len(fe_list)):
+        fe=fe_list[i]
+        sim = cosin_metric(fe, fe_2)
+        if score_sim < sim:
+            id_sim = i
+            score_sim = sim
+    if score_sim < args.threshold:
+        id_sim = len(fe_list)
+        fe_list.append(fe_2)
+        score_sim = 0
+    #else:
+    #    fe_list[id_sim]=(fe_list[id_sim] + fe_2)/2  #update feature value
+    return id_sim, score_sim
+
+
 # ======================
 # Main functions
 # ======================
@@ -177,13 +216,13 @@ def compare_images():
     sim = cosin_metric(fe_1, fe_2)
 
     print(f'Similarity of ({args.inputs[0]}, {args.inputs[1]}) : {sim:.3f}')
-    if THRESHOLD > sim:
+    if args.threshold > sim:
         print('They are not the same face!')
     else:
         print('They are the same face!')
 
 
-def compare_image_and_video():
+def compare_video():
     # prepare base image
     fe_list = []
 
@@ -191,7 +230,6 @@ def compare_image_and_video():
     env_id = ailia.get_gpu_environment_id()
     print(f'env_id: {env_id}')
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
-    BATCH_SIZE = net.get_input_shape()[0]
 
     # detector initialize
     if args.face=="yolov3":
@@ -283,39 +321,8 @@ def compare_image_and_video():
                 crop_img, IMAGE_HEIGHT, IMAGE_WIDTH
             )
 
-            # prepare target face and input face
-            input_frame = preprocess_image(resized_frame, input_is_bgr=True)
-            if BATCH_SIZE == 4:
-                input_data = np.concatenate([input_frame, input_frame], axis=0)
-            else:
-                input_data = input_frame
-
-            # inference
-            preds_ailia = net.predict(input_data)
-
-            # postprocessing
-            if BATCH_SIZE == 4:
-                fe_1 = np.concatenate([preds_ailia[0], preds_ailia[1]], axis=0)
-                fe_2 = np.concatenate([preds_ailia[2], preds_ailia[3]], axis=0)
-            else:
-                fe_1 = np.concatenate([preds_ailia[0], preds_ailia[1]], axis=0)
-                fe_2 = fe_1
-
             # get matched face
-            id_sim = 0
-            score_sim = 0
-            for i in range(len(fe_list)):
-                fe=fe_list[i]
-                sim = cosin_metric(fe, fe_2)
-                if score_sim < sim:
-                    id_sim = i
-                    score_sim = sim
-            if score_sim < THRESHOLD:
-                id_sim = len(fe_list)
-                fe_list.append(fe_2)
-                score_sim = 0
-            else:
-                fe_list[id_sim]=(fe_list[id_sim] + fe_2)/2  #update feature value
+            id_sim, score_sim = face_identification(fe_list,net,resized_frame)
 
             # display result
             fontScale = w / 512.0
@@ -355,7 +362,7 @@ def main():
     else:
         # video mode
         # comparing the specified image and the video
-        compare_image_and_video()
+        compare_video()
 
 
 if __name__ == "__main__":
