@@ -24,8 +24,6 @@ REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/yolov3/'
 
 IMAGE_PATH = 'couple.jpg'
 SAVE_IMAGE_PATH = 'output.png'
-IMAGE_HEIGHT = 448  # for video mode
-IMAGE_WIDTH = 448  # for video mode
 
 COCO_CATEGORY = [
     "person", "bicycle", "car", "motorcycle", "airplane", "bus", "train",
@@ -44,6 +42,7 @@ COCO_CATEGORY = [
 ]
 THRESHOLD = 0.4
 IOU = 0.45
+DETECTION_WIDTH = 416
 
 
 # ======================
@@ -74,6 +73,11 @@ parser.add_argument(
     help='Running the inference on the same input 5 times ' +
          'to measure execution performance. (Cannot be used in video mode)'
 )
+parser.add_argument(
+    '-dw', '--detection_width',
+    default=DETECTION_WIDTH,
+    help='The detection width and height for yolo. (default: 416)'
+)
 args = parser.parse_args()
 
 
@@ -98,6 +102,8 @@ def recognize_from_image():
         algorithm=ailia.DETECTOR_ALGORITHM_YOLOV3,
         env_id=env_id
     )
+    if int(args.detection_width)!=416:
+        detector.set_input_shape(int(args.detection_width),int(args.detection_width))
 
     # inferece
     print('Start inference...')
@@ -131,6 +137,8 @@ def recognize_from_video():
         algorithm=ailia.DETECTOR_ALGORITHM_YOLOV3,
         env_id=env_id
     )
+    if int(args.detection_width)!=DETECTION_WIDTH:
+        detector.set_input_shape(int(args.detection_width),int(args.detection_width))
 
     if args.video == '0':
         print('[INFO] Webcam mode is activated')
@@ -149,11 +157,9 @@ def recognize_from_video():
         if not ret:
             continue
 
-        _, resized_img = adjust_frame_size(frame, IMAGE_HEIGHT, IMAGE_WIDTH)
-
-        img = cv2.cvtColor(resized_img, cv2.COLOR_BGR2BGRA)
+        img = cv2.cvtColor(frame, cv2.COLOR_BGR2BGRA)
         detector.compute(img, THRESHOLD, IOU)
-        res_img = plot_results(detector, resized_img, COCO_CATEGORY, False)
+        res_img = plot_results(detector, frame, COCO_CATEGORY, False)
         cv2.imshow('frame', res_img)
 
     capture.release()
