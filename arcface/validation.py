@@ -37,6 +37,7 @@ WEBCAM_SCALE = 1.5
 # the threshold was calculated by the `test_performance` function in `test.py`
 # of the original repository
 THRESHOLD = 0.25572845
+THRESHOLDS = [i / 100 for i in range(0, 50, 1)]
 
 # ======================
 # Arguemnt Parser Config
@@ -141,7 +142,7 @@ def get_feature_values(net,file_list):
     fe_list=[]
     for i in range(0,len(file_list)):
         inputs0=file_list[i]
-        print(inputs0)
+        print("feature extracting "+inputs0)
         imgs_1 = prepare_input_data(inputs0)
         if BATCH_SIZE==4:
            imgs_1 = np.concatenate([imgs_1, imgs_1], axis=0)
@@ -149,6 +150,76 @@ def get_feature_values(net,file_list):
         fe_1 = np.concatenate([preds_ailia1[0], preds_ailia1[1]], axis=0)
         fe_list.append(fe_1)
     return fe_list
+
+
+def compute_similality(heatmap,expect,file_list,fe_list,face_count):
+    for i0 in range(0,face_count):
+        for i1 in range(0,face_count):
+            inputs0=file_list[i0]
+            inputs1=file_list[i1]
+
+            # postprocessing
+            fe_1 = fe_list[i0]
+            fe_2 = fe_list[i1]
+            sim = cosin_metric(fe_1, fe_2)
+
+            ex=0
+            f0=inputs0.split("/")
+            f1=inputs1.split("/")
+
+            f0=f0[len(f0)-2]
+            f1=f1[len(f1)-2]
+
+            if f0==f1:
+                ex=1
+            
+            print(f'Similarity of ({inputs0}, {inputs1}) : {sim:.3f}')
+            #if THRESHOLD > sim:
+            #    print('They are not the same face!')
+            #else:
+            #    print('They are the same face!')
+
+            heatmap[i0,i1]=sim
+            expect[i0,i1]=ex
+    return heatmap,expect
+
+
+def decide_threshold(heatmap,expect,face_count):
+    best_threshold=0.0
+    best_accuracy=0.0
+    for threshold in THRESHOLDS:
+        success = 0
+        failed = 0
+
+        for i0 in range(0,face_count):
+            for i1 in range(0,face_count):
+                sim = heatmap[i0,i1]
+                ex = expect[i0,i1]
+
+                if (ex==1 and threshold <= sim) or (ex==0 and threshold > sim):
+                    success = success + 1
+                else:
+                    failed = failed + 1
+
+        accuracy = int(success * 10000 / (success + failed))/100
+        print("threshold "+str(threshold)+" accuracy "+str(accuracy))
+        if best_accuracy < accuracy:
+            best_accuracy = accuracy
+            best_threshold = threshold
+    
+    return best_threshold,best_accuracy
+
+
+def compute_final_result(detected,heatmap,expect,face_count,best_threshold):
+    for i0 in range(0,face_count):
+        for i1 in range(0,face_count):
+            sim = heatmap[i0,i1]
+            ex = expect[i0,i1]
+
+            if best_threshold <= sim:
+                detected[int(i0),int(i1)]=1
+            else:
+                detected[int(i0),int(i1)]=0
 
 
 def display_result(file_list,fe_list):
@@ -172,48 +243,13 @@ def display_result(file_list,fe_list):
     expect=np.zeros((len(file_list),len(file_list)))
     detected=np.zeros((len(file_list),len(file_list)))
 
-    success = 0
-    failed = 0
-
-    for i0 in range(0,len(file_list)):
-        for i1 in range(0,len(file_list)):
-            inputs0=file_list[i0]
-            inputs1=file_list[i1]
-
-            # postprocessing
-            fe_1 = fe_list[i0]
-            fe_2 = fe_list[i1]
-            sim = cosin_metric(fe_1, fe_2)
-
-            ex=0
-            f0=inputs0.split("/")
-            f1=inputs1.split("/")
-
-            f0=f0[len(f0)-2]
-            f1=f1[len(f1)-2]
-
-            if f0==f1:
-                ex=1
-            
-            print(f'Similarity of ({inputs0}, {inputs1}) : {sim:.3f}')
-            if THRESHOLD > sim:
-                print('They are not the same face!')
-            else:
-                print('They are the same face!')
-            
-            if (f0==f1 and THRESHOLD <= sim) or (f0!=f1 and THRESHOLD > sim):
-                success = success + 1
-            else:
-                failed = failed + 1
-
-            heatmap[int(i0),int(i1)]=sim
-            expect[int(i0),int(i1)]=ex
-            if THRESHOLD <= sim:
-                detected[int(i0),int(i1)]=1
-            else:
-                detected[int(i0),int(i1)]=0
+    face_count = len(file_list)
     
-    accuracy = int(success * 10000 / (success + failed))/100
+    compute_similality(heatmap,expect,file_list,fe_list,face_count)
+    best_threshold,best_accuracy=decide_threshold(heatmap,expect,face_count)
+    compute_final_result(detected,heatmap,expect,face_count,best_threshold)  
+
+    print("best threshold "+str(best_threshold)+" best accuracy "+str(best_accuracy))
 
     ax1.pcolor(expect, cmap=plt.cm.Blues)
     ax2.pcolor(detected, cmap=plt.cm.Blues)
@@ -234,7 +270,7 @@ def display_result(file_list,fe_list):
     ax1.set_ylabel('(face1)')
     ax1.legend(loc='upper right')
 
-    ax2.set_title('detected (threshold '+str(THRESHOLD)+' accuracy '+str(accuracy)+' %)')
+    ax2.set_title('detected (threshold '+str(best_threshold)+' accuracy '+str(best_accuracy)+' %)')
     ax2.set_xlabel('(face2)')
     ax2.set_ylabel('(face1')
     ax2.legend(loc='upper right')
@@ -246,6 +282,7 @@ def display_result(file_list,fe_list):
 
     fig.savefig("confusion_"+args.arch+".png",dpi=100)
 
+    print('Script finished successfully.')
 
 # ======================
 # Main functions
