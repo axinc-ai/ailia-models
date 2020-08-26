@@ -91,9 +91,12 @@ def preprocess(image):
     image = padded_image[np.newaxis, :, :, :]
     return image
 
+def create_figure():
+    fig, ax = plt.subplots(1, figsize=(12, 9), tight_layout=True)
+    return fig, ax
 
 def display_objdetect_image(
-        image, boxes, labels, scores, masks, score_threshold=0.7, savepath=None
+        fig, ax, image, boxes, labels, scores, masks, score_threshold=0.7, savepath=None
 ):
     """
     Display or Save result
@@ -107,7 +110,6 @@ def display_objdetect_image(
     ratio = 800.0 / min(image.size[0], image.size[1])
     boxes /= ratio
 
-    fig, ax = plt.subplots(1, figsize=(12, 9), tight_layout=True)
     image = np.array(image)
 
     for mask, box, label, score in zip(masks, boxes, labels, scores):
@@ -126,19 +128,18 @@ def display_objdetect_image(
         x_1 = min(int_box[2] + 1, image.shape[1])
         y_0 = max(int_box[1], 0)
         y_1 = min(int_box[3] + 1, image.shape[0])
-        mask_y_0 = max(y_0 - box[1], 0)
+        mask_y_0 = max(y_0 - int_box[1], 0)
         mask_y_1 = mask_y_0 + y_1 - y_0
-        mask_x_0 = max(x_0 - box[0], 0)
+        mask_x_0 = max(x_0 - int_box[0], 0)
         mask_x_1 = mask_x_0 + x_1 - x_0
         im_mask[y_0:y_1, x_0:x_1] = mask[
             mask_y_0: mask_y_1, mask_x_0: mask_x_1
         ]
         im_mask = im_mask[:, :, None]
 
-        # OpenCV version 4.x
         contours, hierarchy = cv2.findContours(
             im_mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE
-        )
+        )[-2:]  #cv2.findContours has changed since OpenCV 3.x, but in OpenCV 4.0 it changes back
 
         image = cv2.drawContours(image, contours, -1, 25, 3)
 
@@ -176,6 +177,8 @@ def recognize_from_image():
     # net initialize
     env_id = ailia.get_gpu_environment_id()
     print(f'env_id: {env_id}')
+    if env_id != -1 and ailia.get_environment(env_id).props=="LOWPOWER":
+        env_id = -1 # This model requires fuge gpu memory so fallback to cpu mode
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
     net.set_input_shape(input_data.shape)
 
@@ -192,8 +195,9 @@ def recognize_from_image():
         boxes, labels, scores, masks = net.predict([input_data])
 
     # postprocessing
+    fig, ax = create_figure()
     display_objdetect_image(
-        image, boxes, labels, scores, masks, savepath=args.savepath
+        fig, ax, image, boxes, labels, scores, masks, savepath=args.savepath
     )
     print('Script finished successfully.')
 
@@ -202,6 +206,8 @@ def recognize_from_video():
     # net initialize
     env_id = ailia.get_gpu_environment_id()
     print(f'env_id: {env_id}')
+    if env_id != -1 and ailia.get_environment(env_id).props=="LOWPOWER":
+        env_id = -1 # This model requires fuge gpu memory so fallback to cpu mode
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
 
     if args.video == '0':
@@ -213,6 +219,8 @@ def recognize_from_video():
     else:
         if check_file_existance(args.video):
             capture = cv2.VideoCapture(args.video)
+
+    fig, ax = create_figure()
 
     while(True):
         ret, frame = capture.read()
@@ -227,7 +235,8 @@ def recognize_from_video():
 
         boxes, labels, scores, masks = net.predict([input_data])
 
-        display_objdetect_image(frame, boxes, labels, scores, masks)
+        ax.clear()
+        display_objdetect_image(fig, ax, frame, boxes, labels, scores, masks)
         plt.pause(.01)
 
     capture.release()

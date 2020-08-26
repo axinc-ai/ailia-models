@@ -22,6 +22,7 @@ IMAGE_PATH = 'input.png'
 SAVE_IMAGE_PATH = 'output.png'
 IMAGE_SIZE = 320
 MODEL_LISTS = ['small', 'large']
+OPSET_LISTS = ['10', '11']
 
 
 # ======================
@@ -58,13 +59,21 @@ parser.add_argument(
     help='Running the inference on the same input 5 times ' +
          'to measure execution performance. (Cannot be used in video mode)'
 )
+parser.add_argument(
+    '-o', '--opset', metavar='OPSET',
+    default='10', choices=OPSET_LISTS,
+    help='opset lists: ' + ' | '.join(OPSET_LISTS)
+)
 args = parser.parse_args()
 
 
 # ======================
 # Parameters 2
 # ======================
-WEIGHT_PATH = 'u2net.onnx' if args.arch == 'large' else 'u2netp.onnx'
+if args.opset=="10":
+    WEIGHT_PATH = 'u2net.onnx' if args.arch == 'large' else 'u2netp.onnx'
+else:
+    WEIGHT_PATH = 'u2net_opset11.onnx' if args.arch == 'large' else 'u2netp_opset11.onnx'
 MODEL_PATH = WEIGHT_PATH + '.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/u2net/'
 

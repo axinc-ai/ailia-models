@@ -4,7 +4,6 @@ import sys
 import argparse
 import pathlib
 
-import torch
 import numpy as np
 import cv2
 

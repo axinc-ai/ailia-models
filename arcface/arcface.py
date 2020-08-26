@@ -1,6 +1,8 @@
 import sys
 import time
 import argparse
+import os
+import re
 
 import numpy as np
 import cv2
@@ -15,32 +17,34 @@ from model_utils import check_and_download_models  # noqa: E402
 from utils import check_file_existance  # noqa: E402
 from detector_utils import hsv_to_rgb # noqa: E402C
 
+import matplotlib.pyplot as plt
 
 # ======================
 # PARAMETERS
 # ======================
-WEIGHT_PATH = 'arcface.onnx'
-MODEL_PATH = 'arcface.onnx.prototxt'
-REMOTE_PATH = "https://storage.googleapis.com/ailia-models/arcface/"
 
-YOLOV3_FACE_WEIGHT_PATH = 'yolov3-face.opt.onnx'
-YOLOV3_FACE_MODEL_PATH = 'yolov3-face.opt.onnx.prototxt'
-YOLOV3_FACE_REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/yolov3-face/'
-YOLOV3_FACE_THRESHOLD = 0.2
-YOLOV3_FACE_IOU = 0.45
+MODEL_LISTS = ['arcface', 'arcface_mixed_90_82', 'arcface_mixed_90_99', 'arcface_mixed_eq_90_89']
+
+REMOTE_PATH = "https://storage.googleapis.com/ailia-models/arcface/"
 
 IMG_PATH_1 = 'correct_pair_1.jpg'
 IMG_PATH_2 = 'correct_pair_2.jpg'
 IMAGE_HEIGHT = 128
 IMAGE_WIDTH = 128
 
-# (IMAGE_HEIGHT * 2 * WEBCAM_SCALE, IMAGE_WIDTH * 2 * WEBCAM_SCALE)
-# Scale to determine the input size of the webcam
-WEBCAM_SCALE = 1.5
-
 # the threshold was calculated by the `test_performance` function in `test.py`
 # of the original repository
 THRESHOLD = 0.25572845
+# THRESHOLD = 0.45 # for mixed model
+
+# face detection
+FACE_MODEL_LISTS = ['yolov3', 'blazeface']
+
+YOLOV3_FACE_THRESHOLD = 0.2
+YOLOV3_FACE_IOU = 0.45
+
+BLAZEFACE_INPUT_IMAGE_HEIGHT = 128
+BLAZEFACE_INPUT_IMAGE_WIDTH = 128
 
 # ======================
 # Arguemnt Parser Config
@@ -66,8 +70,35 @@ parser.add_argument(
     help='Running the inference on the same input 5 times ' +
          'to measure execution performance. (Cannot be used in video mode)'
 )
+parser.add_argument(
+    '-a', '--arch', metavar='ARCH',
+    default='arcface', choices=MODEL_LISTS,
+    help='model lists: ' + ' | '.join(MODEL_LISTS)
+)
+parser.add_argument(
+    '-f', '--face', metavar='FACE_ARCH',
+    default='yolov3', choices=FACE_MODEL_LISTS,
+    help='dace detection model lists: ' + ' | '.join(FACE_MODEL_LISTS)
+)
+parser.add_argument(
+    '-t', '--threshold', type=float, default=THRESHOLD,
+    help='Similality threshold for identification'
+) 
 args = parser.parse_args()
 
+WEIGHT_PATH = args.arch+'.onnx'
+MODEL_PATH = args.arch+'.onnx.prototxt'
+
+if args.face=="yolov3":
+    FACE_WEIGHT_PATH = 'yolov3-face.opt.onnx'
+    FACE_MODEL_PATH = 'yolov3-face.opt.onnx.prototxt'
+    FACE_REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/yolov3-face/'
+else:
+    FACE_WEIGHT_PATH = 'blazeface.onnx'
+    FACE_MODEL_PATH = 'blazeface.onnx.prototxt'
+    FACE_REMOTE_PATH = "https://storage.googleapis.com/ailia-models/blazeface/"
+    sys.path.append('../blazeface')
+    from blazeface_utils import *
 
 # ======================
 # Utils
@@ -78,6 +109,8 @@ def preprocess_image(image, input_is_bgr=False):
     # and concat the feature as the final feature of the origin image.
     if input_is_bgr:
         image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    if "eq_" in args.arch:
+        image = cv2.equalizeHist(image)
     image = np.dstack((image, np.fliplr(image)))
     image = image.transpose((2, 0, 1))
     image = image[:, np.newaxis, :, :]
@@ -99,6 +132,45 @@ def cosin_metric(x1, x2):
     return np.dot(x1, x2) / (np.linalg.norm(x1) * np.linalg.norm(x2))
 
 
+def face_identification(fe_list,net,resized_frame):
+    BATCH_SIZE = net.get_input_shape()[0]
+
+    # prepare target face and input face
+    input_frame = preprocess_image(resized_frame, input_is_bgr=True)
+    if BATCH_SIZE == 4:
+        input_data = np.concatenate([input_frame, input_frame], axis=0)
+    else:
+        input_data = input_frame
+
+    # inference
+    preds_ailia = net.predict(input_data)
+
+    # postprocessing
+    if BATCH_SIZE == 4:
+        fe_1 = np.concatenate([preds_ailia[0], preds_ailia[1]], axis=0)
+        fe_2 = np.concatenate([preds_ailia[2], preds_ailia[3]], axis=0)
+    else:
+        fe_1 = np.concatenate([preds_ailia[0], preds_ailia[1]], axis=0)
+        fe_2 = fe_1
+
+    # identification
+    id_sim = 0
+    score_sim = 0
+    for i in range(len(fe_list)):
+        fe=fe_list[i]
+        sim = cosin_metric(fe, fe_2)
+        if score_sim < sim:
+            id_sim = i
+            score_sim = sim
+    if score_sim < args.threshold:
+        id_sim = len(fe_list)
+        fe_list.append(fe_2)
+        score_sim = 0
+    #else:
+    #    fe_list[id_sim]=(fe_list[id_sim] + fe_2)/2  #update feature value
+    return id_sim, score_sim
+
+
 # ======================
 # Main functions
 # ======================
@@ -112,18 +184,31 @@ def compare_images():
     env_id = ailia.get_gpu_environment_id()
     print(f'env_id: {env_id}')
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+    BATCH_SIZE = net.get_input_shape()[0]
 
     # inference
     print('Start inference...')
+    if BATCH_SIZE==2:
+        shape = net.get_output_shape()
+        shape = (4,shape[1])
+        preds_ailia = np.zeros(shape)
     if args.benchmark:
         print('BENCHMARK mode')
         for i in range(5):
             start = int(round(time.time() * 1000))
-            preds_ailia = net.predict(imgs)
+            if BATCH_SIZE==4:
+                preds_ailia = net.predict(imgs)
+            else:
+                preds_ailia[0:2] = net.predict(imgs[0:2])
+                preds_ailia[2:4] = net.predict(imgs[2:4])
             end = int(round(time.time() * 1000))
             print(f'\tailia processing time {end - start} ms')
     else:
-        preds_ailia = net.predict(imgs)
+        if BATCH_SIZE==4:
+            preds_ailia = net.predict(imgs)
+        else:
+            preds_ailia[0:2] = net.predict(imgs[0:2])
+            preds_ailia[2:4] = net.predict(imgs[2:4])
 
     # postprocessing
     fe_1 = np.concatenate([preds_ailia[0], preds_ailia[1]], axis=0)
@@ -131,13 +216,13 @@ def compare_images():
     sim = cosin_metric(fe_1, fe_2)
 
     print(f'Similarity of ({args.inputs[0]}, {args.inputs[1]}) : {sim:.3f}')
-    if THRESHOLD > sim:
+    if args.threshold > sim:
         print('They are not the same face!')
     else:
         print('They are the same face!')
 
 
-def compare_image_and_video():
+def compare_video():
     # prepare base image
     fe_list = []
 
@@ -147,16 +232,19 @@ def compare_image_and_video():
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
 
     # detector initialize
-    detector = ailia.Detector(
-        YOLOV3_FACE_MODEL_PATH,
-        YOLOV3_FACE_WEIGHT_PATH,
-        1,
-        format=ailia.NETWORK_IMAGE_FORMAT_RGB,
-        channel=ailia.NETWORK_IMAGE_CHANNEL_FIRST,
-        range=ailia.NETWORK_IMAGE_RANGE_U_FP32,
-        algorithm=ailia.DETECTOR_ALGORITHM_YOLOV3,
-        env_id=env_id
-    )
+    if args.face=="yolov3":
+        detector = ailia.Detector(
+            FACE_MODEL_PATH,
+            FACE_WEIGHT_PATH,
+            1,
+            format=ailia.NETWORK_IMAGE_FORMAT_RGB,
+            channel=ailia.NETWORK_IMAGE_CHANNEL_FIRST,
+            range=ailia.NETWORK_IMAGE_RANGE_U_FP32,
+            algorithm=ailia.DETECTOR_ALGORITHM_YOLOV3,
+            env_id=env_id
+        )
+    else:
+        detector = ailia.Net(FACE_MODEL_PATH, FACE_WEIGHT_PATH, env_id=env_id)
 
     # web camera
     if args.video == '0':
@@ -174,19 +262,49 @@ def compare_image_and_video():
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
+        h, w = frame.shape[0], frame.shape[1]
 
         # detect face
-        img = cv2.cvtColor(frame, cv2.COLOR_BGR2BGRA)
-        detector.compute(img, YOLOV3_FACE_THRESHOLD, YOLOV3_FACE_IOU)
-        h, w = img.shape[0], img.shape[1]
-        count = detector.get_object_count()
+        if args.face=="yolov3":
+            img = cv2.cvtColor(frame, cv2.COLOR_BGR2BGRA)
+            detector.compute(img, YOLOV3_FACE_THRESHOLD, YOLOV3_FACE_IOU)
+            count = detector.get_object_count()
+        else:
+            img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            image = cv2.resize(img, (BLAZEFACE_INPUT_IMAGE_WIDTH, BLAZEFACE_INPUT_IMAGE_HEIGHT))
+            image = image.transpose((2, 0, 1))  # channel first
+            image = image[np.newaxis, :, :, :]  # (batch_size, channel, h, w)
+            input_data = image / 127.5 - 1.0
+
+            # inference
+            preds_ailia = detector.predict([input_data])
+
+            # postprocessing
+            detections = postprocess(preds_ailia)
+            count = len(detections)
+
         texts = []
         for idx in range(count):
             # get detected face
-            obj = detector.get_object(idx)
+            if args.face=="yolov3":
+                obj = detector.get_object(idx)
+                margin = 1.0
+            else:
+                obj = detections[idx]
+                if len(obj)==0:
+                    continue
+                d = obj[0]
+                obj = ailia.DetectorObject(
+                    category = 0,
+                    prob = 1.0,
+                    x = d[1],
+                    y = d[0],
+                    w = d[3]-d[1],
+                    h = d[2]-d[0] )
+                margin = 1.4
+
             cx = (obj.x + obj.w/2) * w
             cy = (obj.y + obj.h/2) * h
-            margin = 1.0
             cw = max(obj.w * w * margin,obj.h * h * margin)
             fx = max(cx - cw/2, 0)
             fy = max(cy - cw/2, 0)
@@ -203,32 +321,8 @@ def compare_image_and_video():
                 crop_img, IMAGE_HEIGHT, IMAGE_WIDTH
             )
 
-            # prepare target face and input face
-            input_frame = preprocess_image(resized_frame, input_is_bgr=True)
-            input_data = np.concatenate([input_frame, input_frame], axis=0)
-
-            # inference
-            preds_ailia = net.predict(input_data)
-
-            # postprocessing
-            fe_1 = np.concatenate([preds_ailia[0], preds_ailia[1]], axis=0)
-            fe_2 = np.concatenate([preds_ailia[2], preds_ailia[3]], axis=0)
-
             # get matched face
-            id_sim = 0
-            score_sim = 0
-            for i in range(len(fe_list)):
-                fe=fe_list[i]
-                sim = cosin_metric(fe, fe_2)
-                if score_sim < sim:
-                    id_sim = i
-                    score_sim = sim
-            if score_sim < THRESHOLD:
-                id_sim = len(fe_list)
-                fe_list.append(fe_2)
-                score_sim = 0
-            else:
-                fe_list[id_sim]=(fe_list[id_sim] + fe_2)/2  #update feature value
+            id_sim, score_sim = face_identification(fe_list,net,resized_frame)
 
             # display result
             fontScale = w / 512.0
@@ -259,8 +353,8 @@ def main():
     # model files check and download
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
     if args.video:
-        check_and_download_models(YOLOV3_FACE_WEIGHT_PATH, YOLOV3_FACE_MODEL_PATH, YOLOV3_FACE_REMOTE_PATH)
-
+        check_and_download_models(FACE_WEIGHT_PATH, FACE_MODEL_PATH, FACE_REMOTE_PATH)
+    
     if args.video is None:
         # still image mode
         # comparing two images specified args.inputs
@@ -268,7 +362,7 @@ def main():
     else:
         # video mode
         # comparing the specified image and the video
-        compare_image_and_video()
+        compare_video()
 
 
 if __name__ == "__main__":
