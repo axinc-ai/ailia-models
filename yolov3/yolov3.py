@@ -102,7 +102,7 @@ def recognize_from_image():
         algorithm=ailia.DETECTOR_ALGORITHM_YOLOV3,
         env_id=env_id
     )
-    if int(args.detection_width)!=416:
+    if int(args.detection_width)!=DETECTION_WIDTH:
         detector.set_input_shape(int(args.detection_width),int(args.detection_width))
 
     # inferece
