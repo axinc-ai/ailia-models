@@ -23,7 +23,7 @@ import matplotlib.pyplot as plt
 # PARAMETERS
 # ======================
 
-MODEL_LISTS = ['arcface', 'arcface_mixed10', 'arcface_mixed150', 'arcface_mixed_90_82', 'arcface_mixed_90_99', 'arcface_mixed_eq_90_89']
+MODEL_LISTS = ['arcface', 'arcface_mixed_90_82', 'arcface_mixed_90_99', 'arcface_mixed_eq_90_89']
 
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/arcface/"
 
@@ -38,13 +38,10 @@ IMG_PATH_2 = 'correct_pair_2.jpg'
 IMAGE_HEIGHT = 128
 IMAGE_WIDTH = 128
 
-# (IMAGE_HEIGHT * 2 * WEBCAM_SCALE, IMAGE_WIDTH * 2 * WEBCAM_SCALE)
-# Scale to determine the input size of the webcam
-WEBCAM_SCALE = 1.5
-
 # the threshold was calculated by the `test_performance` function in `test.py`
 # of the original repository
 THRESHOLD = 0.25572845
+# THRESHOLD = 0.45 # for mixed model
 
 # ======================
 # Arguemnt Parser Config
@@ -75,6 +72,10 @@ parser.add_argument(
     default='arcface', choices=MODEL_LISTS,
     help='model lists: ' + ' | '.join(MODEL_LISTS)
 )
+parser.add_argument(
+    '-t', '--threshold', type=float, default=THRESHOLD,
+    help='Similality threshold for identification'
+) 
 args = parser.parse_args()
 
 WEIGHT_PATH = args.arch+'.onnx'

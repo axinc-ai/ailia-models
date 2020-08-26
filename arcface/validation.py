@@ -23,16 +23,12 @@ import matplotlib.pyplot as plt
 # PARAMETERS
 # ======================
 
-MODEL_LISTS = ['arcface', 'arcface_mixed10', 'arcface_mixed150', 'arcface_mixed_90_82', 'arcface_mixed_90_99', 'arcface_mixed_eq_90_89']
+MODEL_LISTS = ['arcface', ''arcface_mixed_90_82', 'arcface_mixed_90_99', 'arcface_mixed_eq_90_89']
 
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/arcface/"
 
 IMAGE_HEIGHT = 128
 IMAGE_WIDTH = 128
-
-# (IMAGE_HEIGHT * 2 * WEBCAM_SCALE, IMAGE_WIDTH * 2 * WEBCAM_SCALE)
-# Scale to determine the input size of the webcam
-WEBCAM_SCALE = 1.5
 
 # the threshold was calculated by the `test_performance` function in `test.py`
 # of the original repository
