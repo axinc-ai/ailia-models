@@ -27,12 +27,6 @@ MODEL_LISTS = ['arcface', 'arcface_mixed_90_82', 'arcface_mixed_90_99', 'arcface
 
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/arcface/"
 
-YOLOV3_FACE_WEIGHT_PATH = 'yolov3-face.opt.onnx'
-YOLOV3_FACE_MODEL_PATH = 'yolov3-face.opt.onnx.prototxt'
-YOLOV3_FACE_REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/yolov3-face/'
-YOLOV3_FACE_THRESHOLD = 0.2
-YOLOV3_FACE_IOU = 0.45
-
 IMG_PATH_1 = 'correct_pair_1.jpg'
 IMG_PATH_2 = 'correct_pair_2.jpg'
 IMAGE_HEIGHT = 128
@@ -42,6 +36,15 @@ IMAGE_WIDTH = 128
 # of the original repository
 THRESHOLD = 0.25572845
 # THRESHOLD = 0.45 # for mixed model
+
+# face detection
+FACE_MODEL_LISTS = ['yolov3', 'blazeface']
+
+YOLOV3_FACE_THRESHOLD = 0.2
+YOLOV3_FACE_IOU = 0.45
+
+BLAZEFACE_INPUT_IMAGE_HEIGHT = 128
+BLAZEFACE_INPUT_IMAGE_WIDTH = 128
 
 # ======================
 # Arguemnt Parser Config
@@ -73,6 +76,11 @@ parser.add_argument(
     help='model lists: ' + ' | '.join(MODEL_LISTS)
 )
 parser.add_argument(
+    '-f', '--face', metavar='FACE_ARCH',
+    default='yolov3', choices=FACE_MODEL_LISTS,
+    help='dace detection model lists: ' + ' | '.join(FACE_MODEL_LISTS)
+)
+parser.add_argument(
     '-t', '--threshold', type=float, default=THRESHOLD,
     help='Similality threshold for identification'
 ) 
@@ -80,6 +88,17 @@ args = parser.parse_args()
 
 WEIGHT_PATH = args.arch+'.onnx'
 MODEL_PATH = args.arch+'.onnx.prototxt'
+
+if args.face=="yolov3":
+    FACE_WEIGHT_PATH = 'yolov3-face.opt.onnx'
+    FACE_MODEL_PATH = 'yolov3-face.opt.onnx.prototxt'
+    FACE_REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/yolov3-face/'
+else:
+    FACE_WEIGHT_PATH = 'blazeface.onnx'
+    FACE_MODEL_PATH = 'blazeface.onnx.prototxt'
+    FACE_REMOTE_PATH = "https://storage.googleapis.com/ailia-models/blazeface/"
+    sys.path.append('../blazeface')
+    from blazeface_utils import *
 
 # ======================
 # Utils
@@ -175,16 +194,19 @@ def compare_image_and_video():
     BATCH_SIZE = net.get_input_shape()[0]
 
     # detector initialize
-    detector = ailia.Detector(
-        YOLOV3_FACE_MODEL_PATH,
-        YOLOV3_FACE_WEIGHT_PATH,
-        1,
-        format=ailia.NETWORK_IMAGE_FORMAT_RGB,
-        channel=ailia.NETWORK_IMAGE_CHANNEL_FIRST,
-        range=ailia.NETWORK_IMAGE_RANGE_U_FP32,
-        algorithm=ailia.DETECTOR_ALGORITHM_YOLOV3,
-        env_id=env_id
-    )
+    if args.face=="yolov3":
+        detector = ailia.Detector(
+            FACE_MODEL_PATH,
+            FACE_WEIGHT_PATH,
+            1,
+            format=ailia.NETWORK_IMAGE_FORMAT_RGB,
+            channel=ailia.NETWORK_IMAGE_CHANNEL_FIRST,
+            range=ailia.NETWORK_IMAGE_RANGE_U_FP32,
+            algorithm=ailia.DETECTOR_ALGORITHM_YOLOV3,
+            env_id=env_id
+        )
+    else:
+        detector = ailia.Net(FACE_MODEL_PATH, FACE_WEIGHT_PATH, env_id=env_id)
 
     # web camera
     if args.video == '0':
@@ -202,19 +224,49 @@ def compare_image_and_video():
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
+        h, w = frame.shape[0], frame.shape[1]
 
         # detect face
-        img = cv2.cvtColor(frame, cv2.COLOR_BGR2BGRA)
-        detector.compute(img, YOLOV3_FACE_THRESHOLD, YOLOV3_FACE_IOU)
-        h, w = img.shape[0], img.shape[1]
-        count = detector.get_object_count()
+        if args.face=="yolov3":
+            img = cv2.cvtColor(frame, cv2.COLOR_BGR2BGRA)
+            detector.compute(img, YOLOV3_FACE_THRESHOLD, YOLOV3_FACE_IOU)
+            count = detector.get_object_count()
+        else:
+            img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            image = cv2.resize(img, (BLAZEFACE_INPUT_IMAGE_WIDTH, BLAZEFACE_INPUT_IMAGE_HEIGHT))
+            image = image.transpose((2, 0, 1))  # channel first
+            image = image[np.newaxis, :, :, :]  # (batch_size, channel, h, w)
+            input_data = image / 127.5 - 1.0
+
+            # inference
+            preds_ailia = detector.predict([input_data])
+
+            # postprocessing
+            detections = postprocess(preds_ailia)
+            count = len(detections)
+
         texts = []
         for idx in range(count):
             # get detected face
-            obj = detector.get_object(idx)
+            if args.face=="yolov3":
+                obj = detector.get_object(idx)
+                margin = 1.0
+            else:
+                obj = detections[idx]
+                if len(obj)==0:
+                    continue
+                d = obj[0]
+                obj = ailia.DetectorObject(
+                    category = 0,
+                    prob = 1.0,
+                    x = d[1],
+                    y = d[0],
+                    w = d[3]-d[1],
+                    h = d[2]-d[0] )
+                margin = 1.4
+
             cx = (obj.x + obj.w/2) * w
             cy = (obj.y + obj.h/2) * h
-            margin = 1.0
             cw = max(obj.w * w * margin,obj.h * h * margin)
             fx = max(cx - cw/2, 0)
             fy = max(cy - cw/2, 0)
@@ -294,7 +346,7 @@ def main():
     # model files check and download
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
     if args.video:
-        check_and_download_models(YOLOV3_FACE_WEIGHT_PATH, YOLOV3_FACE_MODEL_PATH, YOLOV3_FACE_REMOTE_PATH)
+        check_and_download_models(FACE_WEIGHT_PATH, FACE_MODEL_PATH, FACE_REMOTE_PATH)
     
     if args.video is None:
         # still image mode
