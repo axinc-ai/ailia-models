@@ -67,6 +67,12 @@ An example of the folder structure is shown below.
 ./CASIA-WebFace/0000099/001.jpg
 ```
 
+Cut out a facial region from the dataset.
+
+```bash
+$ python3 validation_dataset_gen.py -i ./dataset/no_crop -o ./dataset/crop
+```
+
 ### Reference
 [arcface-pytorch](https://github.com/ronghuaiyang/arcface-pytorch)
 
