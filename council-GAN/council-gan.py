@@ -21,12 +21,12 @@ from yolo_face import FaceLocator
 
 WEIGHT_PATH = [
     'councilGAN-glasses.onnx',
-    'councilGAN-m2f.onnx',
+    'councilGAN-m2f_256.onnx',
     'councilGAN-anime.onnx'
 ]
 MODEL_PATH = [
     'councilGAN-glasses.onnx.prototxt',
-    'councilGAN-m2f.onnx.prototxt',
+    'councilGAN-m2f_256.onnx.prototxt',
     'councilGAN-anime.onnx.prototxt'
 ]
 MODEL = 0
@@ -105,7 +105,7 @@ def preprocess(image):
     """Convert channel-first BGR image as numpy /n
     array to normalized channel-last RGB."""
     image = center_crop(image)
-    size = [128, 128, 256][MODEL]
+    size = [128, 256, 256][MODEL]
     image = cv2.resize(image, (size, size))
     # BGR to RGB
     image = image[...,::-1]
