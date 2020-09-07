@@ -13,8 +13,7 @@ sys.path.append('../util')
 from utils import check_file_existance  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from webcamera_utils import adjust_frame_size  # noqa: E402C
-from detector_utils import plot_results#, load_image  # noqa: E402C
-from image_utils import load_image
+from detector_utils import plot_results, load_image  # noqa: E402C
 
 import yolov4_utils
 
@@ -95,16 +94,14 @@ args = parser.parse_args()
 # ======================
 def recognize_from_image():
     # prepare input data
-    # img = load_image(args.input)
-    img = load_image(
-        args.input,
-        (IMAGE_HEIGHT, IMAGE_WIDTH),
-        normalize_type='None',
-    )
+    org_img = load_image(args.input)
+    print(f'input image shape: {org_img.shape}')
+
+    img = cv2.cvtColor(org_img, cv2.COLOR_BGRA2RGB)
+    img = cv2.resize(img, (IMAGE_WIDTH, IMAGE_HEIGHT))
     img = np.transpose(img, [2, 0, 1])
     img = img.astype(np.float32) / 255
     img = np.expand_dims(img, 0)
-    print(f'input image shape: {img.shape}')
 
     # net initialize
     if args.ailia:
@@ -148,12 +145,10 @@ def recognize_from_image():
         output = session.run([output_box_array, output_confs],
                              {input_name: img})
 
-        boxes = yolov4_utils.post_processing(img, THRESHOLD, IOU, output)
+        detect_object = yolov4_utils.post_processing(img, THRESHOLD, IOU, output)
 
         # plot result
-        img = cv2.imread(args.input)
-        res_img = yolov4_utils.plot_results(img, boxes[0], COCO_CATEGORY)
-        # res_img = yolov4_utils.plot_boxes_cv2(img, boxes[0], class_names=COCO_CATEGORY)
+        res_img = plot_results(detect_object[0], org_img, COCO_CATEGORY)
 
     # plot result
     cv2.imwrite(args.savepath, res_img)
@@ -162,23 +157,27 @@ def recognize_from_image():
 
 def recognize_from_video():
     # net initialize
-    """
-    env_id = ailia.get_gpu_environment_id()
-    print(f'env_id: {env_id}')
-    detector = ailia.Detector(
-        MODEL_PATH,
-        WEIGHT_PATH,
-        len(COCO_CATEGORY),
-        format=ailia.NETWORK_IMAGE_FORMAT_RGB,
-        channel=ailia.NETWORK_IMAGE_CHANNEL_FIRST,
-        range=ailia.NETWORK_IMAGE_RANGE_U_FP32,
-        algorithm=ailia.DETECTOR_ALGORITHM_YOLOV3,
-        env_id=env_id
-    )
-    if int(args.detection_width)!=DETECTION_WIDTH:
-        detector.set_input_shape(int(args.detection_width),int(args.detection_width))
-    """
-    session = onnxruntime.InferenceSession(WEIGHT_PATH)
+    detector = session = None
+    if args.ailia:
+        env_id = ailia.get_gpu_environment_id()
+        print(f'env_id: {env_id}')
+        detector = ailia.Detector(
+            MODEL_PATH,
+            WEIGHT_PATH,
+            len(COCO_CATEGORY),
+            format=ailia.NETWORK_IMAGE_FORMAT_RGB,
+            channel=ailia.NETWORK_IMAGE_CHANNEL_FIRST,
+            range=ailia.NETWORK_IMAGE_RANGE_U_FP32,
+            algorithm=ailia.DETECTOR_ALGORITHM_YOLOV3,
+            env_id=env_id
+        )
+        if int(args.detection_width) != DETECTION_WIDTH:
+            detector.set_input_shape(int(args.detection_width), int(args.detection_width))
+    else:
+        session = onnxruntime.InferenceSession(WEIGHT_PATH)
+        input_name = session.get_inputs()[0].name
+        output_box_array = session.get_outputs()[0].name
+        output_confs = session.get_outputs()[1].name
 
     if args.video == '0':
         print('[INFO] Webcam mode is activated')
@@ -190,9 +189,6 @@ def recognize_from_video():
         if check_file_existance(args.video):
             capture = cv2.VideoCapture(args.video)
 
-    input_name = session.get_inputs()[0].name
-    output_box_array = session.get_outputs()[0].name
-    output_confs = session.get_outputs()[1].name
     while (True):
         ret, frame = capture.read()
         if cv2.waitKey(1) & 0xFF == ord('q'):
@@ -200,21 +196,20 @@ def recognize_from_video():
         if not ret:
             continue
 
-        img = cv2.cvtColor(frame, cv2.COLOR_BGR2BGRA)
+        img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         img = cv2.resize(img, (IMAGE_WIDTH, IMAGE_HEIGHT))
         img = np.transpose(img, [2, 0, 1])
         img = img.astype(np.float32) / 255
         img = np.expand_dims(img, 0)
 
-        output = session.run([output_box_array, output_confs],
-                             {input_name: img})
-
-        boxes = yolov4_utils.post_processing(img, THRESHOLD, IOU, output)
-        """
-        detector.compute(img, THRESHOLD, IOU)
-        res_img = plot_results(detector, frame, COCO_CATEGORY, False)
-        """
-        res_img = yolov4_utils.plot_results(frame, boxes[0], COCO_CATEGORY)
+        if args.ailia:
+            detector.compute(img, THRESHOLD, IOU)
+            res_img = plot_results(detector, frame, COCO_CATEGORY, False)
+        else:
+            output = session.run([output_box_array, output_confs],
+                                 {input_name: img})
+            detect_object = yolov4_utils.post_processing(img, THRESHOLD, IOU, output)
+            res_img = plot_results(detect_object[0], frame, COCO_CATEGORY)
         cv2.imshow('frame', res_img)
 
     capture.release()
