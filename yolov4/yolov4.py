@@ -22,7 +22,7 @@ import yolov4_utils
 # ======================
 WEIGHT_PATH = 'yolov4.onnx'
 MODEL_PATH = 'yolov4.onnx.prototxt'
-REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/yolov3/'
+REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/yolov4/'
 
 IMAGE_PATH = 'couple.jpg'
 SAVE_IMAGE_PATH = 'output.png'
@@ -219,7 +219,7 @@ def recognize_from_video():
 
 def main():
     # model files check and download
-    # check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
 
     if not args.ailia:
         print(onnxruntime.get_device())
