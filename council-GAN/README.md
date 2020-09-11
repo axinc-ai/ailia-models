@@ -5,11 +5,11 @@
 
 
 ### Output
-<img src='output-glasses.png' width='320px'>
+<img src='output_glasses.png' width='320px'>
 
-<img src='output-m2f.png' width='320px'>
+<img src='output_m2f.png' width='320px'>
 
-<img src='output-anime.png' width='320px'>
+<img src='output_anime.png' width='320px'>
 
 
 ### usage
