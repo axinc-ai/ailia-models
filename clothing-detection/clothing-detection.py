@@ -5,6 +5,7 @@ from collections import OrderedDict
 
 import numpy as np
 import cv2
+from PIL import Image
 
 import ailia
 
@@ -18,15 +19,11 @@ from detector_utils import plot_results, load_image  # noqa: E402C
 # Parameters
 # ======================
 
-WEIGHT_YOLOV3_MODANET_PATH = 'yolov3-modanet.onnx'
-MODEL_YOLOV3_MODANET_PATH = 'yolov3-modanet.onnx.prototxt'
-WEIGHT_YOLOV3_DF2_PATH = 'yolov3-df2.onnx'
-MODEL_YOLOV3_DF2_PATH = 'yolov3-df2.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/yolov3/'
 
 DATASETS_MODEL_PATH = OrderedDict([
-    ('modanet', [WEIGHT_YOLOV3_MODANET_PATH, MODEL_YOLOV3_MODANET_PATH]),
-    ('df2', [WEIGHT_YOLOV3_DF2_PATH, MODEL_YOLOV3_DF2_PATH])
+    ('modanet', ['yolov3-modanet.onnx', 'yolov3-modanet.onnx.prototxt']),
+    ('df2', ['yolov3-df2.onnx', 'yolov3-df2.onnx.prototxt'])
 ])
 
 IMAGE_PATH = '0000003.jpg'
@@ -42,7 +39,7 @@ DF2_CATEGORY = [
     "long sleeve dress", "vest dress", "sling dress"
 ]
 THRESHOLD = 0.5
-IOU = 0.4
+# IOU = 0.4
 DETECTION_WIDTH = 416
 
 # ======================
@@ -89,49 +86,78 @@ weight_path, model_path = DATASETS_MODEL_PATH[args.dataset]
 
 
 # ======================
+# Secondaty Functions
+# ======================
+
+def letterbox_image(image, size):
+    '''resize image with unchanged aspect ratio using padding'''
+    iw, ih = image.size
+    w, h = size
+    scale = min(w / iw, h / ih)
+    nw = int(iw * scale)
+    nh = int(ih * scale)
+
+    image = image.resize((nw, nh), Image.BICUBIC)
+    new_image = Image.new('RGB', size, (128, 128, 128))
+    new_image.paste(image, ((w - nw) // 2, (h - nh) // 2))
+    return new_image
+
+
+def preprocess(img, resize):
+    image = Image.fromarray(img)
+    boxed_image = letterbox_image(image, (resize, resize))
+    image_data = np.array(boxed_image, dtype='float32')
+    image_data /= 255.
+    image_data = np.expand_dims(image_data, 0)  # Add batch dimension.
+    image_data = np.transpose(image_data, [0, 3, 1, 2])
+    return image_data
+
+
+def post_processing(img_shape, all_boxes, all_scores, indices):
+    indices = indices.astype(np.int)
+
+    bboxes = []
+    for idx_ in indices[0]:
+        cls_ind = idx_[1]
+        score = all_scores[tuple(idx_)]
+        if score < THRESHOLD:
+            continue
+
+        idx_1 = (idx_[0], idx_[2])
+        box = all_boxes[idx_1]
+        y, x, y2, x2 = box
+        w = (x2 - x) / img_shape[1]
+        h = (y2 - y) / img_shape[0]
+        x /= img_shape[1]
+        y /= img_shape[0]
+
+        r = ailia.DetectorObject(
+            category=cls_ind, prob=score,
+            x=x, y=y, w=w, h=h,
+        )
+        bboxes.append(r)
+
+    return bboxes
+
+
+# ======================
 # Main functions
 # ======================
-def recognize_from_image():
+
+def recognize_from_image(filename, detector):
     # prepare input data
-    img = load_image(args.input)
-    # img = cv2.imread(args.input)  # BGR
-    # img = cv2.resize(img, (416, 416))
-    # img = cv2.cvtColor(img, cv2.COLOR_BGR2BGRA)
-    # x = img
+    img = org_img = load_image(filename)
+    img_shape = org_img.shape[:2]
     print(f'input image shape: {img.shape}')
 
-    img = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
-    h, w, _ = img.shape
-    dim_diff = np.abs(h - w)
-    pad1, pad2 = int(dim_diff // 2), int(dim_diff - dim_diff // 2)
-    x = np.zeros([h, w + pad1 + pad2, 3], dtype=np.uint8) \
-        if w <= h else np.zeros([h + pad1 + pad2, w, 3], dtype=np.uint8)
-    x[:, :, :] = 127.5
-    if w <= h:
-        x[:, pad1:pad1 + w, :] = img
-    else:
-        x[pad1:pad1 + h, :, :] = img
-    x = cv2.resize(x, (416, 416))
-    x = cv2.cvtColor(x, cv2.COLOR_BGR2BGRA)
-
-    dataset_category = MODANET_CATEGORY if args.dataset == 'modanet' else DF2_CATEGORY
+    img = cv2.cvtColor(img, cv2.COLOR_BGRA2RGB)
+    img = preprocess(img, resize=args.detection_width)
 
     # net initialize
-    env_id = ailia.get_gpu_environment_id()
-    print(f'env_id: {env_id}')
-    detector = ailia.Detector(
-        model_path,
-        weight_path,
-        len(dataset_category),
-        format=ailia.NETWORK_IMAGE_FORMAT_RGB,
-        channel=ailia.NETWORK_IMAGE_CHANNEL_FIRST,
-        range=ailia.NETWORK_IMAGE_RANGE_U_FP32,
-        algorithm=ailia.DETECTOR_ALGORITHM_YOLOV3,
-        env_id=env_id
-    )
-    # if int(args.detection_width) != DETECTION_WIDTH:
-    #     detector.set_input_shape(int(args.detection_width), int(args.detection_width))
-    detector.set_input_shape(416, 416)
+    idx_list = detector.get_input_blob_list()
+    _, shape_idx = idx_list
+    detector.set_input_shape((1, 3, args.detection_width, args.detection_width))
+    detector.set_input_blob_shape((1, 2), shape_idx)
 
     # inferece
     print('Start inference...')
@@ -139,45 +165,26 @@ def recognize_from_image():
         print('BENCHMARK mode')
         for i in range(5):
             start = int(round(time.time() * 1000))
+            # TODO
             detector.compute(img, THRESHOLD, IOU)
             end = int(round(time.time() * 1000))
             print(f'\tailia processing time {end - start} ms')
     else:
-        detector.compute(x, THRESHOLD, IOU)
+        all_boxes, all_scores, indices = detector.predict(
+            {'input_1': img, 'image_shape': np.array([img_shape], np.float32)}
+        )
+        bboxes = post_processing(img_shape, all_boxes, all_scores, indices)
 
-    print("----")
-    count = detector.get_object_count()
-    print(count)
-    for idx in range(count):
-        obj = detector.get_object(idx)
-        print("obj---", obj)
+    category = MODANET_CATEGORY if args.dataset == 'modanet' else DF2_CATEGORY
 
     # plot result
-    res_img = plot_results(detector, img, dataset_category)
+    res_img = plot_results(bboxes, org_img, category)
     cv2.imwrite(args.savepath, res_img)
     print('Script finished successfully.')
 
 
-def recognize_from_video():
-    dataset_category = MODANET_CATEGORY if args.dataset == 'modanet' else DF2_CATEGORY
-
-    # net initialize
-    env_id = ailia.get_gpu_environment_id()
-    print(f'env_id: {env_id}')
-    detector = ailia.Detector(
-        model_path,
-        weight_path,
-        len(dataset_category),
-        format=ailia.NETWORK_IMAGE_FORMAT_RGB,
-        channel=ailia.NETWORK_IMAGE_CHANNEL_FIRST,
-        range=ailia.NETWORK_IMAGE_RANGE_U_FP32,
-        algorithm=ailia.DETECTOR_ALGORITHM_YOLOV3,
-        env_id=env_id
-    )
-    if int(args.detection_width) != DETECTION_WIDTH:
-        detector.set_input_shape(int(args.detection_width), int(args.detection_width))
-
-    if args.video == '0':
+def recognize_from_video(video, detector):
+    if video == '0':
         print('[INFO] Webcam mode is activated')
         capture = cv2.VideoCapture(0)
         if not capture.isOpened():
@@ -194,10 +201,11 @@ def recognize_from_video():
         if not ret:
             continue
 
-        img = cv2.cvtColor(frame, cv2.COLOR_BGR2BGRA)
-        detector.compute(img, THRESHOLD, IOU)
-        res_img = plot_results(detector, frame, dataset_category, False)
-        cv2.imshow('frame', res_img)
+        # TODO
+        # img = cv2.cvtColor(frame, cv2.COLOR_BGR2BGRA)
+        # detector.compute(img, THRESHOLD, IOU)
+        # res_img = plot_results(detector, frame, dataset_category, False)
+        # cv2.imshow('frame', res_img)
 
     capture.release()
     cv2.destroyAllWindows()
@@ -208,12 +216,18 @@ def main():
     # model files check and download
     # check_and_download_models(weight_path, model_path, REMOTE_PATH)
 
+    # load model
+    env_id = ailia.get_gpu_environment_id()
+    print(f'env_id: {env_id}')
+
+    detector = ailia.Net(model_path, weight_path, env_id=env_id)
+
     if args.video is not None:
         # video mode
-        recognize_from_video()
+        recognize_from_video(args.video, detector)
     else:
         # image mode
-        recognize_from_image()
+        recognize_from_image(args.input, detector)
 
 
 if __name__ == '__main__':
