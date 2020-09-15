@@ -29,15 +29,17 @@ DATASETS_MODEL_PATH = OrderedDict([
 IMAGE_PATH = '0000003.jpg'
 SAVE_IMAGE_PATH = 'output.png'
 
-MODANET_CATEGORY = [
-    "bag", "belt", "boots", "footwear", "outer", "dress", "sunglasses",
-    "pants", "top", "shorts", "skirt", "headwear", "scarf/tie"
-]
-DF2_CATEGORY = [
-    "short sleeve top", "long sleeve top", "short sleeve outwear", "long sleeve outwear",
-    "vest", "sling", "shorts", "trousers", "skirt", "short sleeve dress",
-    "long sleeve dress", "vest dress", "sling dress"
-]
+DATASETS_CATEGORY = {
+    'modanet': [
+        "bag", "belt", "boots", "footwear", "outer", "dress", "sunglasses",
+        "pants", "top", "shorts", "skirt", "headwear", "scarf/tie"
+    ],
+    'df2': [
+        "short sleeve top", "long sleeve top", "short sleeve outwear", "long sleeve outwear",
+        "vest", "sling", "shorts", "trousers", "skirt", "short sleeve dress",
+        "long sleeve dress", "vest dress", "sling dress"
+    ]
+}
 THRESHOLD = 0.5
 # IOU = 0.4
 DETECTION_WIDTH = 416
@@ -83,6 +85,7 @@ parser.add_argument(
 args = parser.parse_args()
 
 weight_path, model_path = DATASETS_MODEL_PATH[args.dataset]
+category = DATASETS_CATEGORY[args.dataset]
 
 
 # ======================
@@ -144,20 +147,30 @@ def post_processing(img_shape, all_boxes, all_scores, indices):
 # Main functions
 # ======================
 
-def recognize_from_image(filename, detector):
-    # prepare input data
-    img = org_img = load_image(filename)
-    img_shape = org_img.shape[:2]
-    print(f'input image shape: {img.shape}')
 
-    img = cv2.cvtColor(img, cv2.COLOR_BGRA2RGB)
+def detect_objects(img, detector):
+    img_shape = img.shape[:2]
+
+    # initial preprocesses
     img = preprocess(img, resize=args.detection_width)
 
-    # net initialize
-    idx_list = detector.get_input_blob_list()
-    _, shape_idx = idx_list
-    detector.set_input_shape((1, 3, args.detection_width, args.detection_width))
-    detector.set_input_blob_shape((1, 2), shape_idx)
+    # feedforward
+    all_boxes, all_scores, indices = detector.predict(
+        {'input_1': img, 'image_shape': np.array([img_shape], np.float32)}
+    )
+
+    # post processes
+    detect_object = post_processing(img_shape, all_boxes, all_scores, indices)
+
+    return detect_object
+
+
+def recognize_from_image(filename, detector):
+    # prepare input data
+    img = load_image(filename)
+    print(f'input image shape: {img.shape}')
+
+    x = cv2.cvtColor(img, cv2.COLOR_BGRA2RGB)
 
     # inferece
     print('Start inference...')
@@ -165,20 +178,14 @@ def recognize_from_image(filename, detector):
         print('BENCHMARK mode')
         for i in range(5):
             start = int(round(time.time() * 1000))
-            # TODO
-            detector.compute(img, THRESHOLD, IOU)
+            detect_object = detect_objects(x, detector)
             end = int(round(time.time() * 1000))
             print(f'\tailia processing time {end - start} ms')
     else:
-        all_boxes, all_scores, indices = detector.predict(
-            {'input_1': img, 'image_shape': np.array([img_shape], np.float32)}
-        )
-        bboxes = post_processing(img_shape, all_boxes, all_scores, indices)
-
-    category = MODANET_CATEGORY if args.dataset == 'modanet' else DF2_CATEGORY
+        detect_object = detect_objects(x, detector)
 
     # plot result
-    res_img = plot_results(bboxes, org_img, category)
+    res_img = plot_results(detect_object, img, category)
     cv2.imwrite(args.savepath, res_img)
     print('Script finished successfully.')
 
@@ -194,18 +201,17 @@ def recognize_from_video(video, detector):
         if check_file_existance(args.video):
             capture = cv2.VideoCapture(args.video)
 
-    while (True):
+    while True:
         ret, frame = capture.read()
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
         if not ret:
             continue
 
-        # TODO
-        # img = cv2.cvtColor(frame, cv2.COLOR_BGR2BGRA)
-        # detector.compute(img, THRESHOLD, IOU)
-        # res_img = plot_results(detector, frame, dataset_category, False)
-        # cv2.imshow('frame', res_img)
+        x = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        detect_object = detect_objects(x, detector)
+        res_img = plot_results(detect_object, frame, category)
+        cv2.imshow('frame', res_img)
 
     capture.release()
     cv2.destroyAllWindows()
@@ -214,13 +220,18 @@ def recognize_from_video(video, detector):
 
 def main():
     # model files check and download
-    # check_and_download_models(weight_path, model_path, REMOTE_PATH)
+    check_and_download_models(weight_path, model_path, REMOTE_PATH)
 
     # load model
     env_id = ailia.get_gpu_environment_id()
     print(f'env_id: {env_id}')
 
+    # initialize
     detector = ailia.Net(model_path, weight_path, env_id=env_id)
+    idx_list = detector.get_input_blob_list()
+    _, shape_idx = idx_list
+    detector.set_input_shape((1, 3, args.detection_width, args.detection_width))
+    detector.set_input_blob_shape((1, 2), shape_idx)
 
     if args.video is not None:
         # video mode
