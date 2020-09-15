@@ -19,6 +19,7 @@ python -c "import site; print (site.getsitepackages())"
 
 - Copy the ​ailia ​folder located in the ​python f​older to site-packages
 - Copy library files (dll or dylib or so) from the folder library to site-packages/ailia
+- In the evaluation version, place the license file in the same folder as libailia.dll on Windows and in ~/Library/SHALO/ on Mac.
 
 ## Install required libraries for Python
 
@@ -31,13 +32,17 @@ pip install -r requirements.txt
 ### For Jetson
 
 ```
-sudo apt-get install python3-matplotlib
+sudo apt install python3-pip
+sudo apt install python3-matplotlib
+sudo apt install python3-scipy
+pip3 install cython
+pip3 install numpy
 ```
 
 [OpenCV for python3 is pre-installed on Jetson.](https://forums.developer.nvidia.com/t/install-opencv-for-python3-in-jetson-nano/74042/3) You only need to run this command if you get a cv2 import error.
 
 ```
-sudo apt-get install python3-opencv
+sudo apt install python3-opencv
 ```
 
 # Supported models
