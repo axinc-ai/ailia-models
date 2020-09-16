@@ -22,8 +22,8 @@ from detector_utils import plot_results, load_image  # noqa: E402C
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/yolov3/'
 
 DATASETS_MODEL_PATH = OrderedDict([
-    ('modanet', ['yolov3-modanet.onnx', 'yolov3-modanet.onnx.prototxt']),
-    ('df2', ['yolov3-df2.onnx', 'yolov3-df2.onnx.prototxt'])
+    ('modanet', ['yolov3-modanet.opt.onnx', 'yolov3-modanet.opt.onnx.prototxt']),
+    ('df2', ['yolov3-df2.opt.onnx', 'yolov3-df2.opt.onnx.prototxt'])
 ])
 
 IMAGE_PATH = '0000003.jpg'
@@ -40,8 +40,8 @@ DATASETS_CATEGORY = {
         "long sleeve dress", "vest dress", "sling dress"
     ]
 }
-THRESHOLD = 0.5
-# IOU = 0.4
+THRESHOLD = 0.39
+IOU = 0.4
 DETECTION_WIDTH = 416
 
 # ======================
@@ -123,8 +123,6 @@ def post_processing(img_shape, all_boxes, all_scores, indices):
     for idx_ in indices[0]:
         cls_ind = idx_[1]
         score = all_scores[tuple(idx_)]
-        if score < THRESHOLD:
-            continue
 
         idx_1 = (idx_[0], idx_[2])
         box = all_boxes[idx_1]
@@ -155,9 +153,12 @@ def detect_objects(img, detector):
     img = preprocess(img, resize=args.detection_width)
 
     # feedforward
-    all_boxes, all_scores, indices = detector.predict(
-        {'input_1': img, 'image_shape': np.array([img_shape], np.float32)}
-    )
+    all_boxes, all_scores, indices = detector.predict({
+        'input_1': img,
+        'image_shape': np.array([img_shape], np.float32),
+        'layer.score_threshold': np.array([THRESHOLD], np.float32),
+        'iou_threshold': np.array([IOU], np.float32),
+    })
 
     # post processes
     detect_object = post_processing(img_shape, all_boxes, all_scores, indices)
@@ -228,10 +229,9 @@ def main():
 
     # initialize
     detector = ailia.Net(model_path, weight_path, env_id=env_id)
-    idx_list = detector.get_input_blob_list()
-    _, shape_idx = idx_list
+    id_image_shape = detector.find_blob_index_by_name("image_shape")
     detector.set_input_shape((1, 3, args.detection_width, args.detection_width))
-    detector.set_input_blob_shape((1, 2), shape_idx)
+    detector.set_input_blob_shape((1, 2), id_image_shape)
 
     if args.video is not None:
         # video mode
