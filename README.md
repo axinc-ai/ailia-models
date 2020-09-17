@@ -163,6 +163,14 @@ sudo apt install python3-opencv
 |:-----------|------------:|:------------:|:------------:|
 |[monodepth2](monodepth2)| [Monocular depth estimation from a single image](https://github.com/nianticlabs/monodepth2) | Pytorch | 1.2.2 and later |
 
+
+## GAN
+
+| Name | Detail | Exported From | Supported Ailia Version |
+|:-----------|------------:|:------------:|:------------:|
+|[council-GAN](council-GAN)| [Council-GAN](https://github.com/Onr/Council-GAN)| Pytorch | 1.2.4 beta and later |
+
+
 ## Text recognization
 
 | Name | Detail | Exported From | Supported Ailia Version |

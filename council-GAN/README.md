@@ -3,14 +3,10 @@
 ### Input
 <img src='sample.jpg' width='320px'>
 
+(Image from CelebA dataset http://mmlab.ie.cuhk.edu.hk/projects/CelebA.html)
 
 ### Output
 <img src='output_glasses.png' width='320px'>
-
-<img src='output_m2f.png' width='320px'>
-
-<img src='output_anime.png' width='320px'>
-
 
 ### usage
 Automatically downloads the onnx and prototxt files on the first run.
@@ -32,6 +28,17 @@ If you pass `0` as an argument to VIDEO_PATH, you can use the webcam input inste
 ```bash
 $ python3 council-gan.py --glasses --video VIDEO_PATH
 ```
+
+### Other mode
+
+--m2f
+
+<img src='output_m2f.png' width='320px'>
+
+--anime
+
+<img src='output_anime.png' width='320px'>
+
 
 ### Reference
 [Council-GAN](https://github.com/Onr/Council-GAN)
