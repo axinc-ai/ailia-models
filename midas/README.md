@@ -4,6 +4,8 @@
 
 ![Input](input.jpg)
 
+(Image from kitti dataset http://www.cvlibs.net/datasets/kitti/raw_data.php)
+
 Shape : (1, 3, 128, 384)  
 
 ## Output
@@ -35,9 +37,11 @@ $ python3 midas.py --video VIDEO_PATH
 
 ## Reference
 
+[Towards Robust Monocular Depth Estimation: Mixing Datasets for Zero-shot Cross-dataset Transfer](https://github.com/intel-isl/MiDaS)
+
 ## Framework
 
-ONNX Runtime
+Pytorch
 
 ## Model Format
 
