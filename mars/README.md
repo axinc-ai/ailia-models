@@ -4,6 +4,8 @@
 
 ![Input](inputs/input0.jpg)
 
+(Video from HMDB51 : https://serre-lab.clps.brown.edu/resource/hmdb-a-large-human-motion-database/)
+
 Shape : (1, 3, duration, 112, 112))
 
 ## Output

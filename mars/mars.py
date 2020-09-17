@@ -120,6 +120,11 @@ parser.add_argument(
     help='Number of outputs for category.',
     type=int
 )
+parser.add_argument(
+    '-a', '--ailia',
+    action='store_true',
+    help='Use ailia SDK'
+)
 args = parser.parse_args()
 
 # ======================
@@ -152,15 +157,16 @@ def recognize_from_image():
     input_frame_size = len(sorted_inputs_path)
 
     # # net initialize
-    # env_id = ailia.get_gpu_environment_id()
-    # print(f'env_id: {env_id}')
-    # net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
-    # net.set_input_shape((1, 3, args.duration, IMAGE_HEIGHT, IMAGE_WIDTH))
-    
-    # net initialize(onnxruntime)
-    session = onnxruntime.InferenceSession(WEIGHT_PATH)
-    input_name = session.get_inputs()[0].name 
-    output_name = session.get_outputs()[0].name
+    if args.ailia:
+        env_id = ailia.get_gpu_environment_id()
+        print(f'env_id: {env_id}')
+        net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+        net.set_input_shape((1, 3, args.duration, IMAGE_HEIGHT, IMAGE_WIDTH))
+    else:
+        # # net initialize(onnxruntime)
+        session = onnxruntime.InferenceSession(WEIGHT_PATH)
+        input_name = session.get_inputs()[0].name 
+        output_name = session.get_outputs()[0].name
 
     # inferece
     print('Start inference...')
@@ -168,16 +174,20 @@ def recognize_from_image():
         print('BENCHMARK mode')
         for i in range(5):
             start = int(round(time.time() * 1000))
-            # result = net.predict(input_blob)
-            result = session.run([output_name], {input_name: input_blob.astype(np.float32)})[0]
+            if args.ailia:
+                result = net.predict(input_blob)
+            else:
+                result = session.run([output_name], {input_name: input_blob.astype(np.float32)})[0]
             end = int(round(time.time() * 1000))
             print(f'\tailia processing time {end - start} ms')
     else:
         while(next_input_index < input_frame_size):
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
-            # result = net.predict(input_blob)
-            result = session.run([output_name], {input_name: input_blob.astype(np.float32)})[0]
+            if args.ailia:
+                result = net.predict(input_blob)
+            else:
+                result = session.run([output_name], {input_name: input_blob.astype(np.float32)})[0]
 
             print_mars_result(result)
             
@@ -219,15 +229,16 @@ def recognize_from_video():
             capture = cv2.VideoCapture(args.video)
 
     # # net initialize
-    # env_id = ailia.get_gpu_environment_id()
-    # print(f'env_id: {env_id}')
-    # net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
-    # net.set_input_shape((1, 3, args.duration, IMAGE_HEIGHT, IMAGE_WIDTH))
-    
-    # net initialize(onnxruntime)
-    session = onnxruntime.InferenceSession(WEIGHT_PATH)
-    input_name = session.get_inputs()[0].name 
-    output_name = session.get_outputs()[0].name
+    if args.ailia:
+        env_id = ailia.get_gpu_environment_id()
+        print(f'env_id: {env_id}')
+        net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+        net.set_input_shape((1, 3, args.duration, IMAGE_HEIGHT, IMAGE_WIDTH))
+    else:
+        # net initialize(onnxruntime)
+        session = onnxruntime.InferenceSession(WEIGHT_PATH)
+        input_name = session.get_inputs()[0].name 
+        output_name = session.get_outputs()[0].name
 
     # prepare input data
     original_queue = deque([])
@@ -249,8 +260,10 @@ def recognize_from_video():
         original_queue.append(frame)
         input_blob[0, :, args.duration - 1, :, :] = convert_input_frame(frame)
         
-        # result = net.predict(input_blob)
-        result = session.run([output_name], {input_name: input_blob.astype(np.float32)})[0]
+        if args.ailia:
+            result = net.predict(input_blob)
+        else:
+            result = session.run([output_name], {input_name: input_blob.astype(np.float32)})[0]
         print_mars_result(result)
         
         preview_img = original_queue.popleft()
