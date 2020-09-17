@@ -19,6 +19,7 @@ python -c "import site; print (site.getsitepackages())"
 
 - Copy the ​ailia ​folder located in the ​python f​older to site-packages
 - Copy library files (dll or dylib or so) from the folder library to site-packages/ailia
+- In the evaluation version, place the license file in the same folder as libailia.dll on Windows and in ~/Library/SHALO/ on Mac.
 
 ## Install required libraries for Python
 
@@ -31,13 +32,17 @@ pip install -r requirements.txt
 ### For Jetson
 
 ```
-sudo apt-get install python3-matplotlib
+sudo apt install python3-pip
+sudo apt install python3-matplotlib
+sudo apt install python3-scipy
+pip3 install cython
+pip3 install numpy
 ```
 
 [OpenCV for python3 is pre-installed on Jetson.](https://forums.developer.nvidia.com/t/install-opencv-for-python3-in-jetson-nano/74042/3) You only need to run this command if you get a cv2 import error.
 
 ```
-sudo apt-get install python3-opencv
+sudo apt install python3-opencv
 ```
 
 # Supported models
@@ -97,6 +102,12 @@ sudo apt-get install python3-opencv
 | [maskrcnn](/maskrcnn/) | [Mask R-CNN: real-time neural network for object instance segmentation](https://github.com/onnx/models/tree/master/vision/object_detection_segmentation/mask-rcnn) | Pytorch | 1.2.3 and later |
 | [m2det](/m2det/) | [M2Det: A Single-Shot Object Detector based on Multi-Level Feature Pyramid Network](https://github.com/qijiezhao/M2Det) | Pytorch | 1.2.3 and later |
 | [centernet](/centernet/) | [CenterNet : Objects as Points](https://github.com/xingyizhou/CenterNet) | Pytorch | 1.2.1 and later |
+
+## Deep Fashion
+
+| Name | Detail | Exported From | Supported Ailia Version |
+|:-----------|------------:|:------------:|:------------:|
+| [clothing-detection](/clothing-detection/) | [Clothing-Detection](https://github.com/simaiden/Clothing-Detection) | Pytorch | 1.2.1 and later |
 
 ## Object tracking
 
