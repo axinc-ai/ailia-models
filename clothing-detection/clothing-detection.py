@@ -19,14 +19,14 @@ from detector_utils import plot_results, load_image  # noqa: E402C
 # Parameters
 # ======================
 
-REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/yolov3/'
+REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/clothing-detection/'
 
 DATASETS_MODEL_PATH = OrderedDict([
     ('modanet', ['yolov3-modanet.opt.onnx', 'yolov3-modanet.opt.onnx.prototxt']),
     ('df2', ['yolov3-df2.opt.onnx', 'yolov3-df2.opt.onnx.prototxt'])
 ])
 
-IMAGE_PATH = '0000003.jpg'
+IMAGE_PATH = 'input.jpg'
 SAVE_IMAGE_PATH = 'output.png'
 
 DATASETS_CATEGORY = {
