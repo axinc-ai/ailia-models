@@ -37,7 +37,7 @@ $ python3 mars.py --video VIDEO_PATH
 
 ## Framework
 
-ONNX Runtime
+Pytorch
 
 ## Model Format
 

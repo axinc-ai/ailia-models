@@ -115,6 +115,13 @@ sudo apt install python3-opencv
 |:-----------|------------:|:------------:|:------------:|
 | [deepsort](/deepsort/) | [Deep Sort with PyTorch](https://github.com/ZQPei/deep_sort_pytorch) | Pytorch | 1.2.3 and later |
 
+
+## Action Recognition
+
+| Name | Detail | Exported From | Supported Ailia Version |
+|:-----------|------------:|:------------:|:------------:|
+| [mars](/mars/) | [MARS: Motion-Augmented RGB Stream for Action Recognition](https://github.com/craston/MARS) | Pytorch | 1.2.4 beta and later |
+
 ## Pose estimation
 
 | Name | Detail | Exported From | Supported Ailia Version |
