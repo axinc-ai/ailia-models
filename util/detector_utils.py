@@ -28,13 +28,21 @@ def hsv_to_rgb(h, s, v):
 
 
 def plot_results(detector, img, category, logging=True):
+    """
+
+    :param detector: ailia.Detector, or list of ailia.DetectorObject
+    :param img: ndarray data of image
+    :param category: list of category_name
+    :param logging: output log flg
+    :return:
+    """
     h, w = img.shape[0], img.shape[1]
-    count = detector.get_object_count()
+    count = detector.get_object_count() if hasattr(detector, 'get_object_count') else len(detector)
     if logging:
         print(f'object_count={count}')
     
     for idx in range(count):
-        obj = detector.get_object(idx)
+        obj = detector.get_object(idx) if hasattr(detector, 'get_object') else detector[idx]
         # print result
         if logging:
             print(f'+ idx={idx}')        
