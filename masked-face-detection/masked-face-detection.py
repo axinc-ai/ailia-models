@@ -17,30 +17,26 @@ from detector_utils import plot_results, load_image  # noqa: E402C
 # ======================
 # Parameters
 # ======================
-WEIGHT_PATH = 'yolov3-face.opt.onnx'
-MODEL_PATH = 'yolov3-face.opt.onnx.prototxt'
-REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/yolov3-face/'
 
-IMAGE_PATH = 'student.jpg'
+WEIGHT_PATH = 'masked-face-detection.opt.onnx'
+MODEL_PATH = 'masked-face-detection.opt.onnx.prototxt'
+REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/masked-face-detection/'
+
+IMAGE_PATH = 'ferry.jpg'
 SAVE_IMAGE_PATH = 'output.png'
 IMAGE_HEIGHT = 416  
 IMAGE_WIDTH = 416
 
-FACE_CATEGORY = ['face']
-THRESHOLD = 0.2
-IOU = 0.2
-
-
-WEIGHT_PATH = 'ax_masked_face.opt.onnx'
-MODEL_PATH = 'ax_masked_face.opt.onnx.prototxt'
 FACE_CATEGORY = ['masked','half','unmasked']
 
+THRESHOLD = 0.2
+IOU = 0.2
 
 # ======================
 # Arguemnt Parser Config
 # ======================
 parser = argparse.ArgumentParser(
-    description='Yolov3 face detection model'
+    description='masked face detection model'
 )
 parser.add_argument(
     '-i', '--input', metavar='IMAGE',
@@ -88,7 +84,6 @@ def recognize_from_image():
         algorithm=ailia.DETECTOR_ALGORITHM_YOLOV3,
         env_id=env_id
     )
-    #detector.set_input_shape(416*2,416*2)
 
     # inference
     print('Start inference...')
