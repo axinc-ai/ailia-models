@@ -38,6 +38,10 @@ If you pass `0` as an argument to VIDEO_PATH, you can use the webcam input inste
 $ python3 masked-face-detection.py --video VIDEO_PATH
 ```
 
+## Reference
+
+- [Face detection using keras-yolov3](https://github.com/axinc-ai/yolov3-face)
+
 ## Framework
 
 Keras 2.2.4
