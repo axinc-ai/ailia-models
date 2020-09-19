@@ -1,4 +1,4 @@
-# masked-face-detection using YOLOv3
+# face-mask-detection
 
 ## Input
 
@@ -48,4 +48,4 @@ ONNX opset=10 (Obfuscated by ailia SDK)
 
 ## Netron
 
-[masked-face-detection.opt.onnx.prototxt](https://lutzroeder.github.io/netron/?url=https://storage.googleapis.com/ailia-models/masked-face-detection/masked-face-detection.opt.onnx.prototxt)
+[face-mask-detection-yolov3-tiny.opt.onnx.prototxt](https://lutzroeder.github.io/netron/?url=https://storage.googleapis.com/ailia-models/face-mask-detection/face-mask-detection-yolov3-tiny.opt.onnx.prototxt)

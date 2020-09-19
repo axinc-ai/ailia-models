@@ -18,19 +18,19 @@ from detector_utils import plot_results, load_image  # noqa: E402C
 # Parameters
 # ======================
 
-WEIGHT_PATH = 'masked-face-detection.opt.onnx'
-MODEL_PATH = 'masked-face-detection.opt.onnx.prototxt'
-REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/masked-face-detection/'
+WEIGHT_PATH = 'face-mask-detection-yolov3-tiny.opt.obf.onnx'
+MODEL_PATH = 'face-mask-detection-yolov3-tiny.opt.onnx.prototxt'
+REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/face-mask-detection/'
 
 IMAGE_PATH = 'ferry.jpg'
 SAVE_IMAGE_PATH = 'output.png'
 IMAGE_HEIGHT = 416  
 IMAGE_WIDTH = 416
 
-FACE_CATEGORY = ['masked','half','unmasked']
+FACE_CATEGORY = ['unmasked','masked']
 
-THRESHOLD = 0.2
-IOU = 0.2
+THRESHOLD = 0.4
+IOU = 0.45
 
 # ======================
 # Arguemnt Parser Config
