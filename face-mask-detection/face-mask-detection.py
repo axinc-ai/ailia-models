@@ -18,9 +18,7 @@ from detector_utils import plot_results, load_image  # noqa: E402C
 # Parameters
 # ======================
 
-WEIGHT_PATH = 'face-mask-detection-yolov3-tiny.opt.obf.onnx'
-MODEL_PATH = 'face-mask-detection-yolov3-tiny.opt.onnx.prototxt'
-REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/face-mask-detection/'
+MODEL_LISTS = ['yolov3-tiny', 'mb2-ssd']
 
 IMAGE_PATH = 'ferry.jpg'
 SAVE_IMAGE_PATH = 'output.png'
@@ -60,8 +58,22 @@ parser.add_argument(
     help='Running the inference on the same input 5 times ' +
          'to measure execution performance. (Cannot be used in video mode)'
 )
+parser.add_argument(
+    '-a', '--arch', metavar='ARCH',
+    default='yolov3-tiny', choices=MODEL_LISTS,
+    help='model lists: ' + ' | '.join(MODEL_LISTS)
+)
 args = parser.parse_args()
 
+if args.arch=="yolov3-tiny":
+    WEIGHT_PATH = 'face-mask-detection-yolov3-tiny.opt.obf.onnx'
+    MODEL_PATH = 'face-mask-detection-yolov3-tiny.opt.onnx.prototxt'
+    ALGORITHM = ailia.DETECTOR_ALGORITHM_YOLOV3
+else:
+    WEIGHT_PATH = 'mb2-ssd-lite.onnx'
+    MODEL_PATH = 'mb2-ssd-lite.onnx.prototxt'
+    ALGORITHM = ailia.DETECTOR_ALGORITHM_SSD
+REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/face-mask-detection/'
 
 # ======================
 # Main functions
@@ -81,7 +93,7 @@ def recognize_from_image():
         format=ailia.NETWORK_IMAGE_FORMAT_RGB,
         channel=ailia.NETWORK_IMAGE_CHANNEL_FIRST,
         range=ailia.NETWORK_IMAGE_RANGE_U_FP32,
-        algorithm=ailia.DETECTOR_ALGORITHM_YOLOV3,
+        algorithm=ALGORITHM,
         env_id=env_id
     )
 
