@@ -245,13 +245,15 @@ def recognize_from_video():
     input_blob = np.empty((1, 3, args.duration, IMAGE_HEIGHT, IMAGE_WIDTH))
     for i in range(args.duration - 1):
         ret, frame = capture.read()
+        if not ret:
+            continue
         original_queue.append(frame)
         input_blob[0, :, i, :, :] = convert_input_frame(frame)
     
     next_input_index = args.duration - 1
     input_frame_size = capture.get(cv2.CAP_PROP_FRAME_COUNT)
 
-    while(next_input_index <= input_frame_size):        
+    while(next_input_index <= input_frame_size or input_frame_size==0):        
         ret, frame = capture.read()
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
