@@ -40,4 +40,4 @@ ONNX opset = 10
 
 ## Netron
 
-[dbface_pytorch.onnx.prototxt](https://storage.googleapis.com/ailia-models/dbface/dbface_pytorch.onnx.prototxt)
+[dbface_pytorch.onnx.prototxt](https://lutzroeder.github.io/netron/?url=https://storage.googleapis.com/ailia-models/dbface/dbface_pytorch.onnx.prototxt)
