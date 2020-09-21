@@ -19,10 +19,9 @@ from detector_utils import load_image
 # ======================
 # Parameters
 # ======================
-WEIGHT_PATH = 'dbface.onnx'
-MODEL_PATH = 'dbface.onnx.prototxt'
-# REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/dbface/'
-REMOTE_PATH = ''
+WEIGHT_PATH = 'dbface_pytorch.onnx'
+MODEL_PATH = 'dbface_pytorch.onnx.prototxt'
+REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/dbface/'
 
 IMAGE_PATH = 'selfie.png'
 SAVE_IMAGE_PATH = 'selfie_output.png'

@@ -3,6 +3,8 @@
 ## Input
 <img src='selfie.png' width='240px'>
 
+(Image from https://github.com/dlunion/DBFace/blob/master/datas/selfie.jpg)
+
 ## Output
 <img src='selfie_output.png' width='240px'>
 
@@ -28,7 +30,7 @@ $ python3 dbface.py --video VIDEO_PATH
 ```
 
 ## Reference
-[DBFace](https://github.com/dlunion/DBFace)
+[DBFace : real-time, single-stage detector for face detection, with faster speed and higher accuracy](https://github.com/dlunion/DBFace)
 
 ## Framework
 PyTorch
@@ -38,4 +40,4 @@ ONNX opset = 10
 
 ## Netron
 
-[dbface.onnx.prototxt]()
+[dbface_pytorch.onnx.prototxt](https://storage.googleapis.com/ailia-models/dbface/dbface_pytorch.onnx.prototxt)
