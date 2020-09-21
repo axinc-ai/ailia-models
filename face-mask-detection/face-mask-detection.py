@@ -129,7 +129,7 @@ def recognize_from_video():
         format=ailia.NETWORK_IMAGE_FORMAT_RGB,
         channel=ailia.NETWORK_IMAGE_CHANNEL_FIRST,
         range=RANGE,
-        algorithm=ailia.DETECTOR_ALGORITHM_YOLOV3,
+        algorithm=ALGORITHM,
         env_id=env_id
     )
 
