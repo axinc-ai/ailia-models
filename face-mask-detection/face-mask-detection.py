@@ -27,7 +27,6 @@ IMAGE_WIDTH = 416
 
 FACE_CATEGORY = ['unmasked','masked']
 
-THRESHOLD = 0.4
 IOU = 0.45
 
 # ======================
@@ -68,11 +67,15 @@ args = parser.parse_args()
 if args.arch=="yolov3-tiny":
     WEIGHT_PATH = 'face-mask-detection-yolov3-tiny.opt.obf.onnx'
     MODEL_PATH = 'face-mask-detection-yolov3-tiny.opt.onnx.prototxt'
+    RANGE = ailia.NETWORK_IMAGE_RANGE_U_FP32
     ALGORITHM = ailia.DETECTOR_ALGORITHM_YOLOV3
+    THRESHOLD = 0.4
 else:
-    WEIGHT_PATH = 'mb2-ssd-lite.onnx'
-    MODEL_PATH = 'mb2-ssd-lite.onnx.prototxt'
+    WEIGHT_PATH = 'face-mask-detection-mb2-ssd-lite.obf.onnx'
+    MODEL_PATH = 'face-mask-detection-mb2-ssd-lite.onnx.prototxt'
+    RANGE = ailia.NETWORK_IMAGE_RANGE_S_FP32
     ALGORITHM = ailia.DETECTOR_ALGORITHM_SSD
+    THRESHOLD = 0.2
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/face-mask-detection/'
 
 # ======================
@@ -92,7 +95,7 @@ def recognize_from_image():
         len(FACE_CATEGORY),
         format=ailia.NETWORK_IMAGE_FORMAT_RGB,
         channel=ailia.NETWORK_IMAGE_CHANNEL_FIRST,
-        range=ailia.NETWORK_IMAGE_RANGE_U_FP32,
+        range=RANGE,
         algorithm=ALGORITHM,
         env_id=env_id
     )
@@ -125,7 +128,7 @@ def recognize_from_video():
         len(FACE_CATEGORY),
         format=ailia.NETWORK_IMAGE_FORMAT_RGB,
         channel=ailia.NETWORK_IMAGE_CHANNEL_FIRST,
-        range=ailia.NETWORK_IMAGE_RANGE_U_FP32,
+        range=RANGE,
         algorithm=ailia.DETECTOR_ALGORITHM_YOLOV3,
         env_id=env_id
     )
