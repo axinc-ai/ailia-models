@@ -27,9 +27,6 @@ REMOTE_PATH = ''
 IMAGE_PATH = 'selfie.png'
 SAVE_IMAGE_PATH = 'selfie_output.png'
 
-IMAGE_HEIGHT = 448  # for video mode
-IMAGE_WIDTH = 448  # for video mode
-
 THRESHOLD = 0.4
 IOU = 0.45
 
@@ -55,11 +52,6 @@ parser.add_argument(
     default=SAVE_IMAGE_PATH,
     help='Save path for the output image.'
 )
-# parser.add_argument(
-#     '-dw', '--detection_width',
-#     default=DETECTION_WIDTH,
-#     help='The detection width and height for dbface. (default: 416)'
-# )
 parser.add_argument(
     '-b', '--benchmark',
     action='store_true',
@@ -98,7 +90,6 @@ def preprocess(img):
     std = [0.289, 0.274, 0.278]
     img = ((img / 255.0 - mean) / std).astype(np.float32)
     img = np.transpose(img, [2, 0, 1])
-
     img = np.expand_dims(img, 0)
     return img
 
@@ -107,7 +98,6 @@ def detect_objects(img):
     img = preprocess(img)
     
     env_id = ailia.get_gpu_environment_id()
-    print(f'env_id: {env_id}')
     detector = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
     detector.set_input_shape((1, 3, img.shape[2], img.shape[3]))
     hm, box, landmark = detector.predict({'input.1': img})
@@ -167,40 +157,33 @@ def recognize_from_image(filename):
     print('Script finished successfully.')
 
 
-# wip
-def recognize_from_video(video):
-    pass
- 
-    # if video == '0':
-    #     print('[INFO] Webcam mode is activated')
-    #     capture = cv2.VideoCapture(0)
-    #     if not capture.isOpened():
-    #         print("[ERROR] webcamera not found")
-    #         sys.exit(1)
-    # else:
-    #     if pathlib.Path(video).exists():
-    #         capture = cv2.VideoCapture(video)
+def recognize_from_video(video): 
+    if video == '0':
+        print('[INFO] Webcam mode is activated')
+        capture = cv2.VideoCapture(0)
+        if not capture.isOpened():
+            print("[ERROR] webcamera not found")
+            sys.exit(1)
+    else:
+        if pathlib.Path(video).exists():
+            capture = cv2.VideoCapture(video)
 
-    # while(True):
-    #     ret, img = capture.read()
-    #     if cv2.waitKey(1) & 0xFF == ord('q'):
-    #         break
-    #     if not ret:
-    #         continue
+    while(True):
+        ret, img = capture.read()
+        objs = detect_objects(img)
+        for obj in objs:
+            dbface_utils.drawbbox(img, obj)
+        cv2.imshow('frame', img)
 
-    #     boxes, scores, cls_inds = detect_objects(img, detector)
-    #     img = draw_detection(img, boxes, scores, cls_inds)
-    #     cv2.imshow('frame', img)
-        
-    #     # press q to end video capture
-    #     if cv2.waitKey(1)&0xFF == ord('q'):
-    #         break
-    #     if not ret:
-    #         continue
+        # press q to end video capture
+        if cv2.waitKey(1)&0xFF == ord('q'):
+            break
+        if not ret:
+            continue
 
-    # capture.release()
-    # cv2.destroyAllWindows()
-    # print('Script finished successfully.')
+    capture.release()
+    cv2.destroyAllWindows()
+    print('Script finished successfully.')
 
 
 def main():
