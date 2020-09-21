@@ -173,13 +173,6 @@ sudo apt install python3-opencv
 |[midas](midas)| [Towards Robust Monocular Depth Estimation: Mixing Datasets for Zero-shot Cross-dataset Transfer](https://github.com/intel-isl/MiDaS) | Pytorch | 1.2.4 beta and later |
 
 
-## GAN
-
-| Name | Detail | Exported From | Supported Ailia Version |
-|:-----------|------------:|:------------:|:------------:|
-|[council-GAN](council-GAN)| [Council-GAN](https://github.com/Onr/Council-GAN)| Pytorch | 1.2.4 beta and later |
-
-
 ## Text recognization
 
 | Name | Detail | Exported From | Supported Ailia Version |
@@ -192,11 +185,13 @@ sudo apt install python3-opencv
 |:-----------|------------:|:------------:|:------------:|
 |[bert](/bert) | [pytorch-pretrained-bert](https://pypi.org/project/pytorch-pretrained-bert/) | Pytorch | 1.2.2 and later |
 
-## Genera tive Adversarial Networks
+## Generative Adversarial Networks
 
 | Name | Detail | Exported From | Supported Ailia Version |
 |:-----------|------------:|:------------:|:------------:|
 |[pytorch-gan](/pytorch-gan) | [Code repo for the Pytorch GAN Zoo project (used to train this model)](https://github.com/facebookresearch/pytorch_GAN_zoo)| Pytorch | 1.2.4 beta and later |
+|[council-GAN](council-GAN)| [Council-GAN](https://github.com/Onr/Council-GAN)| Pytorch | 1.2.4 beta and later |
+
 
 ## Commercial Model
 
