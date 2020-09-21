@@ -15,7 +15,7 @@ from model_utils import check_and_download_models  # noqa: E402
 # Parameters
 # ======================
 SAVE_IMAGE_PATH = 'output.png' # default value
-MODEL_NAME = 'anime' # default value
+MODEL_NAME = 'celeb' # default value
 
 REMOTE_PATH = f'https://storage.googleapis.com/ailia-models/pytorch-gan/'
 
@@ -50,7 +50,7 @@ if args.model == 'anime':
 elif args.model == 'celeb':
     print('Generation using model "CelebA"')
     MODEL_INFIX = 'celeba'
-    OUTPUT_SIZE = 32
+    OUTPUT_SIZE = 128
 else:
     print('Error: unknown model name "'+args.model+'" (must be "anime" or "celeb")')
     exit(-1)

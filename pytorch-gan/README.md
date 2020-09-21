@@ -4,9 +4,15 @@
 
 ## Output
 
-![Output](output.png)
+### Celeb model
 
-## Note
+![Output](output_celeba.png)
+
+Celeb model is converted from pre-trained model of Pytorch-ZOO GAN.
+
+### AnimeFace model
+
+![Output](output_anime.png)
 
 The generative networks presented and used here have been trained to generate anime faces
 and celebrity faces by the company ax Inc. (in 2020).
@@ -21,18 +27,18 @@ It is necessary to be connected to the Internet while downloading.
 
 To generate `output.png`,
 ``` bash
-$ python3 ailia-pytorch-gnet.py
+$ python3 pytorch-gnet.py
 ```
 
 You can use `--savepath` option to change the name of the output file to save.
 ```bash
-$ python3 ailia-pytorch-gnet.py --savepath SAVE_IMAGE_PATH
+$ python3 pytorch-gnet.py --savepath SAVE_IMAGE_PATH
 ```
 
-You can also generate using celeb model.
+You can also generate using anime model.
 
 ``` bash
-$ python3 ailia-pytorch-gnet.py -m celeb
+$ python3 pytorch-gnet.py -m anime
 ```
 
 
