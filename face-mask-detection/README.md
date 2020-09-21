@@ -38,6 +38,12 @@ If you pass `0` as an argument to VIDEO_PATH, you can use the webcam input inste
 $ python3 face-mask-detection.py --video VIDEO_PATH
 ```
 
+By adding the `-a mb2-ssd` option, you can use mobilenet-ssd version.
+
+```bash
+$ python3 face-mask-detection.py -a mb2-ssd
+```
+
 ## Reference
 
 - [Face detection using keras-yolov3](https://github.com/axinc-ai/yolov3-face)
@@ -53,3 +59,5 @@ ONNX opset=10 (Obfuscated by ailia SDK)
 ## Netron
 
 [face-mask-detection-yolov3-tiny.opt.onnx.prototxt](https://lutzroeder.github.io/netron/?url=https://storage.googleapis.com/ailia-models/face-mask-detection/face-mask-detection-yolov3-tiny.opt.onnx.prototxt)
+
+[face-mask-detection-mb2-ssd-lite.onnx.prototxt](https://lutzroeder.github.io/netron/?url=https://storage.googleapis.com/ailia-models/face-mask-detection/face-mask-detection-mb2-ssd-lite.onnx.prototxt)

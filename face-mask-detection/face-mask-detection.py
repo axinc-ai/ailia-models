@@ -18,9 +18,7 @@ from detector_utils import plot_results, load_image  # noqa: E402C
 # Parameters
 # ======================
 
-WEIGHT_PATH = 'face-mask-detection-yolov3-tiny.opt.obf.onnx'
-MODEL_PATH = 'face-mask-detection-yolov3-tiny.opt.onnx.prototxt'
-REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/face-mask-detection/'
+MODEL_LISTS = ['yolov3-tiny', 'mb2-ssd']
 
 IMAGE_PATH = 'ferry.jpg'
 SAVE_IMAGE_PATH = 'output.png'
@@ -29,7 +27,6 @@ IMAGE_WIDTH = 416
 
 FACE_CATEGORY = ['unmasked','masked']
 
-THRESHOLD = 0.4
 IOU = 0.45
 
 # ======================
@@ -60,8 +57,26 @@ parser.add_argument(
     help='Running the inference on the same input 5 times ' +
          'to measure execution performance. (Cannot be used in video mode)'
 )
+parser.add_argument(
+    '-a', '--arch', metavar='ARCH',
+    default='yolov3-tiny', choices=MODEL_LISTS,
+    help='model lists: ' + ' | '.join(MODEL_LISTS)
+)
 args = parser.parse_args()
 
+if args.arch=="yolov3-tiny":
+    WEIGHT_PATH = 'face-mask-detection-yolov3-tiny.opt.obf.onnx'
+    MODEL_PATH = 'face-mask-detection-yolov3-tiny.opt.onnx.prototxt'
+    RANGE = ailia.NETWORK_IMAGE_RANGE_U_FP32
+    ALGORITHM = ailia.DETECTOR_ALGORITHM_YOLOV3
+    THRESHOLD = 0.4
+else:
+    WEIGHT_PATH = 'face-mask-detection-mb2-ssd-lite.obf.onnx'
+    MODEL_PATH = 'face-mask-detection-mb2-ssd-lite.onnx.prototxt'
+    RANGE = ailia.NETWORK_IMAGE_RANGE_S_FP32
+    ALGORITHM = ailia.DETECTOR_ALGORITHM_SSD
+    THRESHOLD = 0.2
+REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/face-mask-detection/'
 
 # ======================
 # Main functions
@@ -80,8 +95,8 @@ def recognize_from_image():
         len(FACE_CATEGORY),
         format=ailia.NETWORK_IMAGE_FORMAT_RGB,
         channel=ailia.NETWORK_IMAGE_CHANNEL_FIRST,
-        range=ailia.NETWORK_IMAGE_RANGE_U_FP32,
-        algorithm=ailia.DETECTOR_ALGORITHM_YOLOV3,
+        range=RANGE,
+        algorithm=ALGORITHM,
         env_id=env_id
     )
 
@@ -113,7 +128,7 @@ def recognize_from_video():
         len(FACE_CATEGORY),
         format=ailia.NETWORK_IMAGE_FORMAT_RGB,
         channel=ailia.NETWORK_IMAGE_CHANNEL_FIRST,
-        range=ailia.NETWORK_IMAGE_RANGE_U_FP32,
+        range=RANGE,
         algorithm=ailia.DETECTOR_ALGORITHM_YOLOV3,
         env_id=env_id
     )
