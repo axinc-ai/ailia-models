@@ -58,11 +58,6 @@ parser.add_argument(
     help='Running the inference on the same input 5 times ' +
          'to measure execution performance. (Cannot be used in video mode)'
 )
-parser.add_argument(
-    '-a', '--ailia',
-    action='store_true',
-    help='Use ailia SDK'
-)
 args = parser.parse_args()
 
 # ======================
@@ -113,16 +108,10 @@ def recognize_from_image():
     print(f'input image shape: {img.shape}')
     
     # # net initialize
-    if args.ailia:
-        env_id = ailia.get_gpu_environment_id()
-        print(f'env_id: {env_id}')
-        net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
-        net.set_input_shape(img.shape)
-    else:
-        # net initialize(onnxruntime)
-        session = onnxruntime.InferenceSession('midas.onnx')
-        input_name = session.get_inputs()[0].name 
-        output_name = session.get_outputs()[0].name
+    env_id = ailia.get_gpu_environment_id()
+    print(f'env_id: {env_id}')
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+    net.set_input_shape(img.shape)
 
     # inferece
     print('Start inference...')
@@ -130,17 +119,11 @@ def recognize_from_image():
         print('BENCHMARK mode')
         for i in range(5):
             start = int(round(time.time() * 1000))
-            if args.ailia:
-                result = net.predict(img)
-            else:
-                result = session.run([output_name], {input_name: img.astype(np.float32)})[0]
+            result = net.predict(img)
             end = int(round(time.time() * 1000))
             print(f'\tailia processing time {end - start} ms')
     else:
-        if args.ailia:
-            result = net.predict(img)
-        else:
-            result = session.run([output_name], {input_name: img.astype(np.float32)})[0]
+        result = net.predict(img)
     
     depth_min = result.min()
     depth_max = result.max()
@@ -157,15 +140,9 @@ def recognize_from_image():
 
 def recognize_from_video():
     # # net initialize
-    if args.ailia:
-        env_id = ailia.get_gpu_environment_id()
-        print(f'env_id: {env_id}')
-        net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
-    else:
-        # net initialize(onnxruntime)
-        session = onnxruntime.InferenceSession('midas.onnx')
-        input_name = session.get_inputs()[0].name 
-        output_name = session.get_outputs()[0].name
+    env_id = ailia.get_gpu_environment_id()
+    print(f'env_id: {env_id}')
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
 
     if args.video == '0':
         print('[INFO] Webcam mode is activated')
@@ -189,13 +166,10 @@ def recognize_from_video():
         resized_img = resized_img.transpose((2, 0, 1))  # channel first
         resized_img = resized_img[np.newaxis, :, :, :]
 
-        if args.ailia:
-            if(not input_shape_set):
-                net.set_input_shape(resized_img.shape)
-                input_shape_set = True
-            result = net.compute(img)
-        else:
-            result = session.run([output_name], {input_name: resized_img.astype(np.float32)})[0]
+        if(not input_shape_set):
+            net.set_input_shape(resized_img.shape)
+            input_shape_set = True
+        result = net.predict(resized_img)
 
         depth_min = result.min()
         depth_max = result.max()
