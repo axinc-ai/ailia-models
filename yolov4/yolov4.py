@@ -24,7 +24,7 @@ WEIGHT_PATH = 'yolov4.onnx'
 MODEL_PATH = 'yolov4.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/yolov4/'
 
-IMAGE_PATH = 'couple.jpg'
+IMAGE_PATH = 'dog.jpg'
 SAVE_IMAGE_PATH = 'output.png'
 
 COCO_CATEGORY = [
