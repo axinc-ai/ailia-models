@@ -93,11 +93,9 @@ def preprocess(img):
     return img
 
 
-def detect_objects(img):
+def detect_objects(img, detector):
     img = preprocess(img)
     
-    env_id = ailia.get_gpu_environment_id()
-    detector = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
     detector.set_input_shape((1, 3, img.shape[2], img.shape[3]))
     hm, box, landmark = detector.predict({'input.1': img})
     
@@ -136,17 +134,21 @@ def recognize_from_image(filename):
     img = load_image(filename)
     print(f'input image shape: {img.shape}')
     img = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
+
+    env_id = ailia.get_gpu_environment_id()
+    print(f'env_id: {env_id}')
+    detector = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
     
     print('Start inference...')
     if args.benchmark:
         print('BENCHMARK mode')
         for i in range(5):
             start = int(round(time.time() * 1000))
-            objs = detect_objects(img)
+            objs = detect_objects(img, detector)
             end = int(round(time.time() * 1000))
             print(f'\tailia processing time {end - start} ms')
     else:
-        objs = detect_objects(img)
+        objs = detect_objects(img, detector)
         
     # show image 
     for obj in objs:
@@ -157,6 +159,10 @@ def recognize_from_image(filename):
 
 
 def recognize_from_video(video): 
+    env_id = ailia.get_gpu_environment_id()
+    print(f'env_id: {env_id}')
+    detector = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+    
     if video == '0':
         print('[INFO] Webcam mode is activated')
         capture = cv2.VideoCapture(0)
@@ -169,7 +175,7 @@ def recognize_from_video(video):
 
     while(True):
         ret, img = capture.read()
-        objs = detect_objects(img)
+        objs = detect_objects(img, detector)
         for obj in objs:
             dbface_utils.drawbbox(img, obj)
         cv2.imshow('frame', img)
