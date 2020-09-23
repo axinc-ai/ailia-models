@@ -1,4 +1,3 @@
-
 import cv2
 import random
 import numpy as np
@@ -327,3 +326,29 @@ def file_name(path):
     path = path.replace("\\", "/")
     p0 = path.rfind("/") + 1
     return path[p0:]
+
+
+def max_pool2d(A, kernel_size, stride, padding):
+    '''2D Max Pooling
+
+    Parameters:
+        A: input 2D array
+        kernel_size: int, the size of the window
+        stride: int, the stride of the window
+        padding: int, implicit zero paddings on both sides of the input
+    '''
+    A = np.pad(A, padding, mode='constant')
+    output_shape = ((A.shape[0] - kernel_size)//stride + 1, (A.shape[1] - kernel_size)//stride + 1)
+    kernel_size = (kernel_size, kernel_size)
+    A_w = np.lib.stride_tricks.as_strided(A, 
+        shape = output_shape + kernel_size, 
+        strides = (stride*A.strides[0], stride*A.strides[1]) + A.strides)
+    A_w = A_w.reshape(-1, *kernel_size)
+    return A_w.max(axis=(1,2)).reshape(output_shape)
+
+
+def get_topk_score_indices(hm_pool, hm, k):
+    ary = ((hm_pool == hm).astype(np.bool) * hm).reshape(-1)
+    indices = ary.argsort()[::-1][:k]
+    scores = ary[indices]
+    return scores, indices

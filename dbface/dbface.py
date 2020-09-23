@@ -5,8 +5,6 @@ import pathlib
 
 import numpy as np
 import cv2
-import torch
-import torch.nn.functional as F
 
 import ailia
 import dbface_utils
@@ -99,16 +97,18 @@ def detect_objects(img, detector):
     detector.set_input_shape((1, 3, img.shape[2], img.shape[3]))
     hm, box, landmark = detector.predict({'input.1': img})
     
-    hm_pool = F.max_pool2d(torch.from_numpy(hm), 3, 1, 1)
-    scores, indices = ((torch.from_numpy(hm) == hm_pool).float() * hm).view(1, -1).cpu().topk(1000)
+    hm_pool = dbface_utils.max_pool2d(A=hm[0][0], kernel_size=3, stride=1, padding=1)
+    hm_pool = np.expand_dims(np.expand_dims(hm_pool, 0), 0)
+
+    scores, indices = dbface_utils.get_topk_score_indices(hm_pool, hm, k=1000)
     hm_height, hm_width = hm.shape[2:]
     scores = scores.squeeze()
     indices = indices.squeeze()
-    ys = list((indices // hm_width).int().data.numpy())
-    xs = list((indices % hm_width).int().data.numpy())
-    scores = list(scores.data.numpy())
-    box = torch.from_numpy(box).cpu().squeeze().data.numpy()
-    landmark = torch.from_numpy(landmark).cpu().squeeze().data.numpy()
+    ys = list((indices // hm_width))
+    xs = list((indices % hm_width))
+    scores = list(scores)
+    box = box.squeeze()
+    landmark = landmark.squeeze()
 
     stride = 4
     objs = []
