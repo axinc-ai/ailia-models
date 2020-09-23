@@ -54,14 +54,10 @@ The collection of pre-trained, state-of-the-art models.
 | Name | Detail | Exported From | Supported Ailia Version | Demo |
 |:-----------|------------:|:------------:|:------------:|:------------:|
 |[face_classification](/face_recognition/face_classification) | [Real-time face detection and emotion/gender classification](https://github.com/oarriaga/face_classification) | Keras | 1.1.0 and later | [<img src="face_recognition/face_classification/lenna.png">](face_recognition/face_classification/) |
-|[facial_feature](/face_recognition/facial_feature/)|[kaggle-facial-keypoints](https://github.com/axinc-ai/kaggle-facial-keypoints)|Pytorch| 1.2.0 and later | [<img src="face_recognition/facial_feature/output.png" width=64px>](face_recognition/facial_feature/)
- |
-|[face_alignment](/face_recognition/face_alignment/)| [2D and 3D Face alignment library build using pytorch](https://github.com/1adrianb/face-alignment) | Pytorch | 1.2.1 and later | [<img src="face_recognition/face_alignment/output.png" width=64px>](face_recognition/face_alignment/)
- |
-|[prnet](/face_recognition/prnet)| [Joint 3D Face Reconstruction and Dense Alignment with Position Map Regression Network](https://github.com/YadiraF/PRNet) | TensorFlow | 1.2.2 and later | [<img src="face_recognition/prnet/results/dense_alignment.png" width=64px>](face_recognition/prnet/)
- |
-| [gazeml](/face_recognition/gazeml/) | [A deep learning framework based on Tensorflow for the training of high performance gaze estimation](https://github.com/swook/GazeML) | TensorFlow | 1.2.0 and later | [<img src="face_recognition/gazeml/output.png" width=64px>](face_recognition/gazeml/)
- |
+|[facial_feature](/face_recognition/facial_feature/)|[kaggle-facial-keypoints](https://github.com/axinc-ai/kaggle-facial-keypoints)|Pytorch| 1.2.0 and later | [<img src="face_recognition/facial_feature/output.png" width=64px>](face_recognition/facial_feature/) |
+|[face_alignment](/face_recognition/face_alignment/)| [2D and 3D Face alignment library build using pytorch](https://github.com/1adrianb/face-alignment) | Pytorch | 1.2.1 and later | [<img src="face_recognition/face_alignment/output.png" width=64px>](face_recognition/face_alignment/) |
+|[prnet](/face_recognition/prnet)| [Joint 3D Face Reconstruction and Dense Alignment with Position Map Regression Network](https://github.com/YadiraF/PRNet) | TensorFlow | 1.2.2 and later | [<img src="face_recognition/prnet/results/dense_alignment.png" width=64px>](face_recognition/prnet/) |
+| [gazeml](/face_recognition/gazeml/) | [A deep learning framework based on Tensorflow for the training of high performance gaze estimation](https://github.com/swook/GazeML) | TensorFlow | 1.2.0 and later | [<img src="face_recognition/gazeml/output.png" width=64px>](face_recognition/gazeml/) |
 
 ## Generative adversarial networks
 
@@ -146,7 +142,7 @@ The collection of pre-trained, state-of-the-art models.
 |:-----------|------------:|:------------:|:------------:|:------------:|
 |[openpose](/pose_estimation/openpose/) | [Code repo for realtime multi-person pose estimation in CVPR'17 (Oral)](https://github.com/ZheC/Realtime_Multi-Person_Pose_Estimation) | Caffe | 1.2.1 and later | [<img src="pose_estimation/openpose/output.png" width=64px>](pose_estimation/openpose/) |
 |[lightweight-human-pose-estimation](/pose_estimation/lightweight-human-pose-estimation/) | [Fast and accurate human pose estimation in PyTorch. Contains implementation of "Real-time 2D Multi-Person Pose Estimation on CPU: Lightweight OpenPose" paper.](https://github.com/Daniil-Osokin/lightweight-human-pose-estimation.pytorch) | Pytorch | 1.2.1 and later | [<img src="pose_estimation/lightweight-human-pose-estimation/output.png" width=64px>](pose_estimation/lightweight-human-pose-estimation/) |
-|[lightweight-human-pose-estimation-3d](/pose_estimation/lightweight-human-pose-estimation-3d/) | [Real-time 3D multi-person pose estimation demo in PyTorch. OpenVINO backend can be used for fast inference on CPU.](https://github.com/Daniil-Osokin/lightweight-human-pose-estimation-3d-demo.pytorch) | Pytorch | 1.2.1 and later | [<img src="pose_estimation/lightweight-human-pose-estimation-3d/output.png" width=64px>](pose_estimation/lightweight-human-pose-estimation-3d/) |
+|[lightweight-human-pose-estimation-3d](/pose_estimation/lightweight-human-pose-estimation-3d/) | [Real-time 3D multi-person pose estimation demo in PyTorch. OpenVINO backend can be used for fast inference on CPU.](https://github.com/Daniil-Osokin/lightweight-human-pose-estimation-3d-demo.pytorch) | Pytorch | 1.2.1 and later | [<img src="pose_estimation/lightweight-human-pose-estimation-3d/ICV_3D_Human_Pose_Estimation_0.png" width=64px>](pose_estimation/lightweight-human-pose-estimation-3d/) |
 |[3d-pose-baseline](/pose_estimation/3d-pose-baseline/) | [A simple baseline for 3d human pose estimation in tensorflow. Presented at ICCV 17.](https://github.com/una-dinosauria/3d-pose-baseline) | Tensorflow | 1.2.3 and later | [<img src="pose_estimation/3d-pose-baseline/output.png" width=64px>](pose_estimation/3d-pose-baseline/) |
 |[pose_resnet](/pose_estimation/pose_resnet/) | [Simple Baselines for Human Pose Estimation and Tracking](https://github.com/microsoft/human-pose-estimation.pytorch) | Pytorch | 1.2.1 and later | [<img src="pose_estimation/pose_resnet/output.png" width=64px>](pose_estimation/pose_resnet/) |
 
