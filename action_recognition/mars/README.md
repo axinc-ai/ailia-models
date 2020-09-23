@@ -10,6 +10,19 @@ Shape : (1, 3, duration, 112, 112))
 
 ## Output
 
+```
+class_count=3
++ idx=0
+  category=15[golf ]
+  prob=6.96644401550293
++ idx=1
+  category=43[swing_baseball ]
+  prob=3.26068377494812
++ idx=2
+  category=2[catch ]
+  prob=2.2060546875
+```
+
 The accuracy of each category. (HMDB51)
 
 Shape : (1, 51)  
