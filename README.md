@@ -2,48 +2,9 @@
 
 The collection of pre-trained, state-of-the-art models.
 
-# Setup
-
-## About ailia SDK
+# About ailia SDK
 
 [ailia SDK](https://ailia.jp/en/) is a cross-platform high speed inference SDK. The ailia SDK provides a consistent C++ API on Windows, Mac, Linux, iOS, Android and Jetson. It supports Unity, Python and JNI for efficient AI implementation. The ailia SDK makes great use of the GPU via Vulkan and Metal to serve accelerated computing.
-
-## Install ailia SDK
-
-- [Download a free evaluation version of ailia SDK](https://ailia.jp/en/trial)
-- Unzip ailia SDK
-- Find the location of Python site-packages directory
-```
-python -c "import site; print (site.getsitepackages())"
-```
-
-- Copy the ​ailia ​folder located in the ​python f​older to site-packages
-- Copy library files (dll or dylib or so) from the folder library to site-packages/ailia
-- In the evaluation version, place the license file in the same folder as libailia.dll on Windows and in ~/Library/SHALO/ on Mac.
-
-## Install required libraries for Python
-
-### For Windows, Mac, Linux
-
-```
-pip install -r requirements.txt
-```
-
-### For Jetson
-
-```
-sudo apt install python3-pip
-sudo apt install python3-matplotlib
-sudo apt install python3-scipy
-pip3 install cython
-pip3 install numpy
-```
-
-[OpenCV for python3 is pre-installed on Jetson.](https://forums.developer.nvidia.com/t/install-opencv-for-python3-in-jetson-nano/74042/3) You only need to run this command if you get a cv2 import error.
-
-```
-sudo apt install python3-opencv
-```
 
 # Supported models
 
@@ -214,3 +175,42 @@ sudo apt install python3-opencv
 | Name | Detail | Exported From | Supported Ailia Version |
 |:-----------|------------:|:------------:|:------------:|
 |[acculus-pose](/commercial_model/acculus-pose) | [Acculus, Inc.](https://acculus.jp/) | Caffe | 1.2.3 and later |
+
+# Setup
+
+## Install ailia SDK
+
+- [Download a free evaluation version of ailia SDK](https://ailia.jp/en/trial)
+- Unzip ailia SDK
+- Find the location of Python site-packages directory
+```
+python -c "import site; print (site.getsitepackages())"
+```
+
+- Copy the ​ailia ​folder located in the ​python f​older to site-packages
+- Copy library files (dll or dylib or so) from the folder library to site-packages/ailia
+- In the evaluation version, place the license file in the same folder as libailia.dll on Windows and in ~/Library/SHALO/ on Mac.
+
+## Install required libraries for Python
+
+### For Windows, Mac, Linux
+
+```
+pip install -r requirements.txt
+```
+
+### For Jetson
+
+```
+sudo apt install python3-pip
+sudo apt install python3-matplotlib
+sudo apt install python3-scipy
+pip3 install cython
+pip3 install numpy
+```
+
+[OpenCV for python3 is pre-installed on Jetson.](https://forums.developer.nvidia.com/t/install-opencv-for-python3-in-jetson-nano/74042/3) You only need to run this command if you get a cv2 import error.
+
+```
+sudo apt install python3-opencv
+```
