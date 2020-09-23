@@ -10,44 +10,44 @@ The collection of pre-trained, state-of-the-art models.
 
 ## Action recognition
 
-| Name | Detail | Exported From | Supported Ailia Version | Demo |
+| | Name | Detail | Exported From | Supported Ailia Version |
 |:-----------|------------:|:------------:|:------------:|:------------:|
-| [mars](/action_recognition/mars/) | [MARS: Motion-Augmented RGB Stream for Action Recognition](https://github.com/craston/MARS) | Pytorch | 1.2.4 beta and later | [<img src="action_recognition/mars/inputs/input0.jpg" width=64px>](action_recognition/mars/) |
+| [<img src="action_recognition/mars/inputs/input0.jpg" width=64px>](action_recognition/mars/) | [mars](/action_recognition/mars/) | [MARS: Motion-Augmented RGB Stream for Action Recognition](https://github.com/craston/MARS) | Pytorch | 1.2.4 beta and later |
 
 ## Crowd counting
 
-| Name | Detail | Exported From | Supported Ailia Version | Demo |
+| | Name | Detail | Exported From | Supported Ailia Version |
 |:-----------|------------:|:------------:|:------------:|:------------:|
-|[crowdcount-cascaded-mtl](/crowd_counting/crowdcount-cascaded-mtl) | [CNN-based Cascaded Multi-task Learning of High-level Prior and Density Estimation for Crowd Counting (Single Image Crowd Counting)](https://github.com/svishwa/crowdcount-cascaded-mtl) | Pytorch | 1.2.1 and later | [<img src="crowd_counting/crowdcount-cascaded-mtl/result.png" height=64px>](crowd_counting/crowdcount-cascaded-mtl/) |
+|[<img src="crowd_counting/crowdcount-cascaded-mtl/result.png" height=64px>](crowd_counting/crowdcount-cascaded-mtl/) | [crowdcount-cascaded-mtl](/crowd_counting/crowdcount-cascaded-mtl) | [CNN-based Cascaded Multi-task Learning of High-level Prior and Density Estimation for Crowd Counting (Single Image Crowd Counting)](https://github.com/svishwa/crowdcount-cascaded-mtl) | Pytorch | 1.2.1 and later | 
 
 ## Deep fashion
 
-| Name | Detail | Exported From | Supported Ailia Version | Demo |
+| | Name | Detail | Exported From | Supported Ailia Version |
 |:-----------|------------:|:------------:|:------------:|:------------:|
-| [clothing-detection](/deep_fashion/clothing-detection/) | [Clothing-Detection](https://github.com/simaiden/Clothing-Detection) | Pytorch | 1.2.1 and later | [<img src="deep_fashion/clothing-detection/output_modanet.png" width=64px>](deep_fashion/clothing-detection/) |
+[<img src="deep_fashion/clothing-detection/output_modanet.png" width=64px>](deep_fashion/clothing-detection/) | [clothing-detection](/deep_fashion/clothing-detection/) | [Clothing-Detection](https://github.com/simaiden/Clothing-Detection) | Pytorch | 1.2.1 and later |
 
 ## Depth estimation
 
-| Name | Detail | Exported From | Supported Ailia Version | Demo |
+| | Name | Detail | Exported From | Supported Ailia Version |
 |:-----------|------------:|:------------:|:------------:|:------------:|
-|[monodepth2](depth_estimation/monodepth2)| [Monocular depth estimation from a single image](https://github.com/nianticlabs/monodepth2) | Pytorch | 1.2.2 and later | [<img src="depth_estimation/monodepth2/output.png" width=128px>](depth_estimation/monodepth2/) |
-|[midas](depth_estimation/midas)| [Towards Robust Monocular Depth Estimation: Mixing Datasets for Zero-shot Cross-dataset Transfer](https://github.com/intel-isl/MiDaS) | Pytorch | 1.2.4 beta and later | [<img src="depth_estimation/midas/input_depth.png" width=128px>](depth_estimation/midas/) |
+| [<img src="depth_estimation/monodepth2/output.png" width=128px>](depth_estimation/monodepth2/) | [monodepth2](depth_estimation/monodepth2)| [Monocular depth estimation from a single image](https://github.com/nianticlabs/monodepth2) | Pytorch | 1.2.2 and later |
+| [<img src="depth_estimation/midas/input_depth.png" width=128px>](depth_estimation/midas/) |[midas](depth_estimation/midas)| [Towards Robust Monocular Depth Estimation: Mixing Datasets for Zero-shot Cross-dataset Transfer](https://github.com/intel-isl/MiDaS) | Pytorch | 1.2.4 beta and later |
 
 ## Face detection
 
-| Name | Detail | Exported From | Supported Ailia Version | Demo |
+| | Name | Detail | Exported From | Supported Ailia Version |
 |:-----------|------------:|:------------:|:------------:|:------------:|
-| [yolov1-face](/face_detection/yolov1-face/) | [YOLO-Face-detection](https://github.com/dannyblueliu/YOLO-Face-detection/) | Darknet | 1.1.0 and later | [<img src="face_detection/yolov1-face/output.png" width=64px>](face_detection/yolov1-face/) |
-| [yolov3-face](/face_detection/yolov3-face/) | [Face detection using keras-yolov3](https://github.com/axinc-ai/yolov3-face) | Keras | 1.2.1 and later | [<img src="face_detection/yolov3-face/output.png" width=64px>](face_detection/yolov3-face/) |
-|[blazeface](/face_detection/blazeface/)| [BlazeFace-PyTorch](https://github.com/hollance/BlazeFace-PyTorch) | Pytorch | 1.2.1 and later | [<img src="face_detection/blazeface/result.png" width=64px>](face_detection/blazeface/) |
-| [face-mask-detection](/face_detection/face-mask-detection/) | [Face detection using keras-yolov3](https://github.com/axinc-ai/yolov3-face) | Keras | 1.2.1 and later | [<img src="face_detection/face-mask-detection/output.png" width=64px>](face_detection/face-mask-detection/) |
+| [<img src="face_detection/yolov1-face/output.png" width=64px>](face_detection/yolov1-face/) | [yolov1-face](/face_detection/yolov1-face/) | [YOLO-Face-detection](https://github.com/dannyblueliu/YOLO-Face-detection/) | Darknet | 1.1.0 and later |
+| [<img src="face_detection/yolov3-face/output.png" width=64px>](face_detection/yolov3-face/) | [yolov3-face](/face_detection/yolov3-face/) | [Face detection using keras-yolov3](https://github.com/axinc-ai/yolov3-face) | Keras | 1.2.1 and later |
+| [<img src="face_detection/blazeface/result.png" width=64px>](face_detection/blazeface/) |[blazeface](/face_detection/blazeface/)| [BlazeFace-PyTorch](https://github.com/hollance/BlazeFace-PyTorch) | Pytorch | 1.2.1 and later |
+| [<img src="face_detection/face-mask-detection/output.png" width=64px>](face_detection/face-mask-detection/)| [face-mask-detection](/face_detection/face-mask-detection/) | [Face detection using keras-yolov3](https://github.com/axinc-ai/yolov3-face) | Keras | 1.2.1 and later | 
 
 ## Face identification
 
-| Name | Detail | Exported From | Supported Ailia Version | Demo |
+| | Name | Detail | Exported From | Supported Ailia Version |
 |:-----------|------------:|:------------:|:------------:|:------------:|
-|[vggface2](/face_identification/vggface2) | [VGGFace2 Dataset for Face Recognition](https://github.com/ox-vgg/vgg_face2) | Caffe | 1.1.0 and later | [<img src="face_identification/vggface2/couple_a.jpg" width=64px>](face_identification/vggface2/) |
-|[arcface](/face_identification/arcface) | [pytorch implement of arcface](https://github.com/ronghuaiyang/arcface-pytorch) | Pytorch | 1.2.1 and later | [<img src="face_identification/arcface/correct_pair_1.jpg" width=64px>](face_identification/arcface/) |
+| [<img src="face_identification/vggface2/couple_a.jpg" width=64px>](face_identification/vggface2/) |[vggface2](/face_identification/vggface2) | [VGGFace2 Dataset for Face Recognition](https://github.com/ox-vgg/vgg_face2) | Caffe | 1.1.0 and later |
+| [<img src="face_identification/arcface/correct_pair_1.jpg" width=64px>](face_identification/arcface/)|[arcface](/face_identification/arcface) | [pytorch implement of arcface](https://github.com/ronghuaiyang/arcface-pytorch) | Pytorch | 1.2.1 and later |
 
 ## Face recognition
 
