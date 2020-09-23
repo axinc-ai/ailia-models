@@ -107,18 +107,13 @@ def recognize_from_image():
     if args.ailia:
         env_id = ailia.get_gpu_environment_id()
         print(f'env_id: {env_id}')
-        detector = ailia.Detector(
+        detector = ailia.Net(
             MODEL_PATH,
             WEIGHT_PATH,
-            len(COCO_CATEGORY),
-            format=ailia.NETWORK_IMAGE_FORMAT_RGB,
-            channel=ailia.NETWORK_IMAGE_CHANNEL_FIRST,
-            range=ailia.NETWORK_IMAGE_RANGE_U_FP32,
-            algorithm=ailia.DETECTOR_ALGORITHM_YOLOV3,
             env_id=env_id
         )
         if int(args.detection_width) != DETECTION_WIDTH:
-            detector.set_input_shape(int(args.detection_width), int(args.detection_width))
+            detector.set_input_shape((1,3,int(args.detection_width), int(args.detection_width)))
     else:
         session = onnxruntime.InferenceSession(WEIGHT_PATH)
         print(session.get_providers())
@@ -130,14 +125,15 @@ def recognize_from_image():
             print('BENCHMARK mode')
             for i in range(5):
                 start = int(round(time.time() * 1000))
-                detector.compute(img, THRESHOLD, IOU)
+                output = detector.predict([img])
                 end = int(round(time.time() * 1000))
                 print(f'\tailia processing time {end - start} ms')
         else:
-            detector.compute(img, THRESHOLD, IOU)
+            output = detector.predict([img])
+        detect_object = yolov4_utils.post_processing(img, THRESHOLD, IOU, output)
 
         # plot result
-        res_img = plot_results(detector, img, COCO_CATEGORY)
+        res_img = plot_results(detect_object[0], org_img, COCO_CATEGORY)
     else:
         input_name = session.get_inputs()[0].name
         output_box_array = session.get_outputs()[0].name
@@ -161,18 +157,13 @@ def recognize_from_video():
     if args.ailia:
         env_id = ailia.get_gpu_environment_id()
         print(f'env_id: {env_id}')
-        detector = ailia.Detector(
+        detector = ailia.Net(
             MODEL_PATH,
             WEIGHT_PATH,
-            len(COCO_CATEGORY),
-            format=ailia.NETWORK_IMAGE_FORMAT_RGB,
-            channel=ailia.NETWORK_IMAGE_CHANNEL_FIRST,
-            range=ailia.NETWORK_IMAGE_RANGE_U_FP32,
-            algorithm=ailia.DETECTOR_ALGORITHM_YOLOV3,
             env_id=env_id
         )
         if int(args.detection_width) != DETECTION_WIDTH:
-            detector.set_input_shape(int(args.detection_width), int(args.detection_width))
+            detector.set_input_shape((1,3,int(args.detection_width), int(args.detection_width)))
     else:
         session = onnxruntime.InferenceSession(WEIGHT_PATH)
         input_name = session.get_inputs()[0].name
@@ -203,8 +194,9 @@ def recognize_from_video():
         img = np.expand_dims(img, 0)
 
         if args.ailia:
-            detector.compute(img, THRESHOLD, IOU)
-            res_img = plot_results(detector, frame, COCO_CATEGORY, False)
+            output = detector.predict([img])
+            detect_object = yolov4_utils.post_processing(img, THRESHOLD, IOU, output)
+            res_img = plot_results(detect_object[0], frame, COCO_CATEGORY)
         else:
             output = session.run([output_box_array, output_confs],
                                  {input_name: img})
