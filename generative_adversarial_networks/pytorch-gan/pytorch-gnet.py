@@ -7,7 +7,7 @@ import cv2
 
 import ailia
 
-sys.path.append('../util')
+sys.path.append('../../util')
 from model_utils import check_and_download_models  # noqa: E402
 
 

@@ -8,7 +8,7 @@ import ailia
 import mobilenetv3_labels
 
 # import original modules
-sys.path.append('../util')
+sys.path.append('../../util')
 from utils import check_file_existance  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from image_utils import load_image  # noqa: E402

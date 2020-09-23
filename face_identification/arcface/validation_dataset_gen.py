@@ -8,11 +8,11 @@ import cv2
 import ailia
 
 # import original modules
-sys.path.append('../util')
+sys.path.append('../../util')
 from utils import check_file_existance  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 
-sys.path.append('../blazeface')
+sys.path.append('../../object_detection/blazeface')
 from blazeface_utils import *
 
 # ======================

@@ -10,7 +10,7 @@ import ailia
 import onnxruntime
 
 # import original modules
-sys.path.append('../util')
+sys.path.append('../../util')
 from utils import check_file_existance  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from yolo_face import FaceLocator

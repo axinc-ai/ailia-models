@@ -16,7 +16,7 @@ except:
 
 import ailia  # noqa: E402
 # import original modules
-sys.path.append('../util')
+sys.path.append('../../util')
 from model_utils import check_and_download_models  # noqa: E402
 
 

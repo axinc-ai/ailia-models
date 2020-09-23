@@ -9,7 +9,7 @@ import ailia
 from rotnet_utils import generate_rotated_image, create_figure, visualize
 
 # import original modules
-sys.path.append('../util')
+sys.path.append('../../util')
 from utils import check_file_existance  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from webcamera_utils import adjust_frame_size  # noqa: E402C

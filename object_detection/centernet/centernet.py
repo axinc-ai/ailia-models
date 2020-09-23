@@ -13,7 +13,7 @@ import ailia
 from utils import preprocess, postprocess
 
 # import original modules
-sys.path.append('../util')
+sys.path.append('../../util')
 from model_utils import check_and_download_models 
 from webcamera_utils import adjust_frame_size  
 from detector_utils import plot_results, load_image 
