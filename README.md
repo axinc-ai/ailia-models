@@ -63,6 +63,9 @@ The collection of pre-trained, state-of-the-art models.
 |[vggface2](/face_identification/vggface2) | [VGGFace2 Dataset for Face Recognition](https://github.com/ox-vgg/vgg_face2) | Caffe | 1.1.0 and later |
 |[arcface](/face_identification/arcface) | [pytorch implement of arcface](https://github.com/ronghuaiyang/arcface-pytorch) | Pytorch | 1.2.1 and later |
 
+[<img src="face_identification/vggface2/couple_a.jpg" height="128">](face_identification/vggface2/)
+[<img src="face_identification/arcface/correct_pair_1.jpg" height="128">](face_identification/arcface/)
+
 ## Face recognition
 
 | Name | Detail | Exported From | Supported Ailia Version |
@@ -73,6 +76,12 @@ The collection of pre-trained, state-of-the-art models.
 |[prnet](/face_recognition/prnet)| [Joint 3D Face Reconstruction and Dense Alignment with Position Map Regression Network](https://github.com/YadiraF/PRNet) | TensorFlow | 1.2.2 and later |
 | [gazeml](/face_recognition/gazeml/) | [A deep learning framework based on Tensorflow for the training of high performance gaze estimation](https://github.com/swook/GazeML) | TensorFlow | 1.2.0 and later |
 
+[<img src="face_recognition/face_classification/lenna.png" height="128">](face_recognition/face_classification/)
+[<img src="face_recognition/facial_feature/output.png" height="128">](face_recognition/facial_feature/)
+[<img src="face_recognition/face_alignment/output.png" height="128">](face_recognition/face_alignment/)
+[<img src="face_recognition/prnet/results/dense_alignment.png" height="128">](face_recognition/prnet/)
+[<img src="face_recognition/gazeml/output.png" height="128">](face_recognition/gazeml/)
+
 ## Generative adversarial networks
 
 | Name | Detail | Exported From | Supported Ailia Version |
@@ -81,6 +90,7 @@ The collection of pre-trained, state-of-the-art models.
 |[council-GAN](/generative_adversarial_networks/council-GAN)| [Council-GAN](https://github.com/Onr/Council-GAN)| Pytorch | 1.2.4 beta and later |
 
 [<img src="generative_adversarial_networks/pytorch-gan/output_anime.png" height="128">](generative_adversarial_networks/pytorch-gan/)
+[<img src="generative_adversarial_networks/council-GAN/output_glasses.png" height="128">](generative_adversarial_networks/council-GAN/)
 
 ## Hand detection
 
@@ -88,11 +98,15 @@ The collection of pre-trained, state-of-the-art models.
 |:-----------|------------:|:------------:|:------------:|
 | [yolov3-hand](/hand_detection/yolov3-hand/) | [Hand detection branch of Face detection using keras-yolov3](https://github.com/axinc-ai/yolov3-face/tree/hand_detection) | Keras | 1.2.1 and later |
 
+[<img src="hand_detection/yolov3-hand/output.png" height="128">](hand_detection/yolov3-hand/)
+
 ## Image captioning
 
 | Name | Detail | Exported From | Supported Ailia Version |
 |:-----------|------------:|:------------:|:------------:|
 | [illustration2vec](/image_captioning/illustration2vec/)|[Illustration2Vec](https://github.com/rezoo/illustration2vec) | Caffe | 1.2.2 and later |
+
+[<img src="image_captioning/illustration2vec/input.jpg" height="128">](image_captioning/illustration2vec/)
 
 ## Image classification
 
@@ -107,6 +121,8 @@ The collection of pre-trained, state-of-the-art models.
 | [partialconv](/image_classification/partialconv/)|[Partial Convolution Layer for Padding and Image Inpainting](https://github.com/NVIDIA/partialconv)|Pytorch| 1.2.0 and later |
 | [efficientnet](/image_classification/efficientnet/)|[A PyTorch implementation of EfficientNet]( https://github.com/lukemelas/EfficientNet-PyTorch)|Pytorch| 1.2.3 and later |
 
+[<img src="image_classification/vgg16/clock.jpg" height="128">](image_classification/vgg16/)
+
 ## Image manipulation
 
 | Name | Detail | Exported From | Supported Ailia Version |
@@ -114,6 +130,10 @@ The collection of pre-trained, state-of-the-art models.
 | [noise2noise](/image_maniplulation/noise2noise/) | [Learning Image Restoration without Clean Data](https://github.com/joeylitalien/noise2noise-pytorch) | Pytorch | 1.2.0 and later |
 | [dewarpnet](/image_maniplulation/dewarpnet) | [DewarpNet: Single-Image Document Unwarping With Stacked 3D and 2D Regression Networks](https://github.com/cvlab-stonybrook/DewarpNet) | Pytorch | 1.2.1 and later |
 | [illnet](/image_maniplulation/illnet/) | [Document Rectification and Illumination Correction using a Patch-based CNN](https://github.com/xiaoyu258/DocProj) | Pytorch | 1.2.2 and later |
+
+[<img src="image_manipulation/noise2noise/output.png" height="128">](image_manipulation/noise2noise/)
+[<img src="image_manipulation/dewarpnet/output.png" height="128">](image_manipulation/dewarpnet/)
+[<img src="image_manipulation/illnet/output.png" height="128">](image_manipulation/illnet/)
 
 ## Image segmentation
 
@@ -126,7 +146,12 @@ The collection of pre-trained, state-of-the-art models.
 | [U-2-Net](/image_segmentation/u2net/) | [U^2-Net: Going Deeper with Nested U-Structure for Salient Object Detection](https://github.com/NathanUA/U-2-Net) | Pytorch | 1.2.2 and later |
 | [deep-image-matting](/image_segmentation/deep-image-matting/) | [Deep Image Matting](https://github.com/foamliu/Deep-Image-Matting)| Keras | 1.2.3 and later |
 
+[<img src="image_segmentation/deeplabv3/output.png" height="128">](image_segmentation/deeplabv3/)
+[<img src="image_segmentation/hrnet_segmentation/output.png" height="128">](image_segmentation/hrnet_segmentation/)
+[<img src="image_segmentation/hair_segmentation/output.png" height="128">](image_segmentation/hair_segmentation/)
+[<img src="image_segmentation/pspnet-hair-segmentation/output.png" height="128">](image_segmentation/pspnet-hair-segmentation/)
 [<img src="image_segmentation/u2net/output.png" height="128">](image_segmentation/u2net/)
+[<img src="image_segmentation/deep-image-matting/output.png" height="128">](image_segmentation/deep-image-matting/)
 
 ## Natural language processing
 
@@ -148,8 +173,15 @@ The collection of pre-trained, state-of-the-art models.
 | [m2det](/object_detection/m2det/) | [M2Det: A Single-Shot Object Detector based on Multi-Level Feature Pyramid Network](https://github.com/qijiezhao/M2Det) | Pytorch | 1.2.3 and later |
 | [centernet](/object_detection/centernet/) | [CenterNet : Objects as Points](https://github.com/xingyizhou/CenterNet) | Pytorch | 1.2.1 and later |
 
+[<img src="object_detection/yolov1-tiny/output.png" height="128">](object_detection/yolov1-tiny/)
+[<img src="object_detection/yolov2/output.png" height="128">](object_detection/yolov2/)
+[<img src="object_detection/yolov3/output.png" height="128">](object_detection/yolov3/)
+[<img src="object_detection/yolov3-tiny/output.png" height="128">](object_detection/yolov3-tiny/)
 [<img src="object_detection/yolov4/output.png" height="128">](object_detection/yolov4/)
+[<img src="object_detection/mobilenet_ssd/output.png" height="128">](object_detection/mobilenet_ssd/)
 [<img src="object_detection/maskrcnn/output.png" height="128">](object_detection/maskrcnn/)
+[<img src="object_detection/m2det/output.png" height="128">](object_detection/m2det/)
+[<img src="object_detection/centernet/output.png" height="128">](object_detection/centernet/)
 
 ## Object tracking
 
@@ -166,16 +198,22 @@ The collection of pre-trained, state-of-the-art models.
 |[openpose](/pose_estimation/openpose/) | [Code repo for realtime multi-person pose estimation in CVPR'17 (Oral)](https://github.com/ZheC/Realtime_Multi-Person_Pose_Estimation) | Caffe | 1.2.1 and later |
 |[lightweight-human-pose-estimation](/pose_estimation/lightweight-human-pose-estimation/) | [Fast and accurate human pose estimation in PyTorch. Contains implementation of "Real-time 2D Multi-Person Pose Estimation on CPU: Lightweight OpenPose" paper.](https://github.com/Daniil-Osokin/lightweight-human-pose-estimation.pytorch) | Pytorch | 1.2.1 and later |
 |[lightweight-human-pose-estimation-3d](/pose_estimation/lightweight-human-pose-estimation-3d/) | [Real-time 3D multi-person pose estimation demo in PyTorch. OpenVINO backend can be used for fast inference on CPU.](https://github.com/Daniil-Osokin/lightweight-human-pose-estimation-3d-demo.pytorch) | Pytorch | 1.2.1 and later |
-|[3d-pose-basline](/pose_estimation/3d-pose-baseline/) | [A simple baseline for 3d human pose estimation in tensorflow. Presented at ICCV 17.](https://github.com/una-dinosauria/3d-pose-baseline) | Tensorflow | 1.2.3 and later |
+|[3d-pose-baseline](/pose_estimation/3d-pose-baseline/) | [A simple baseline for 3d human pose estimation in tensorflow. Presented at ICCV 17.](https://github.com/una-dinosauria/3d-pose-baseline) | Tensorflow | 1.2.3 and later |
 |[pose_resnet](/pose_estimation/pose_resnet/) | [Simple Baselines for Human Pose Estimation and Tracking](https://github.com/microsoft/human-pose-estimation.pytorch) | Pytorch | 1.2.1 and later |
 
+[<img src="pose_estimation/openpose/output.png" height="128">](pose_estimation/openpose/)
+[<img src="pose_estimation/lightweight-human-pose-estimation/output.png" height="128">](pose_estimation/lightweight-human-pose-estimation/)
 [<img src="pose_estimation/lightweight-human-pose-estimation-3d/Canvas3D_0.png" height="128">](pose_estimation/lightweight-human-pose-estimation-3d/)
+[<img src="pose_estimation/3d-pose-baseline/output.png" height="128">](pose_estimation/3d-pose-baseline/)
+[<img src="pose_estimation/pose_resnet/output.png" height="128">](pose_estimation/pose_resnet/)
 
 ## Rotation prediction
 
 | Name | Detail | Exported From | Supported Ailia Version |
 |:-----------|------------:|:------------:|:------------:|
 |[rotnet](/rotation_prediction/rotnet) | [CNNs for predicting the rotation angle of an image to correct its orientation](https://github.com/d4nst/RotNet) | Keras | 1.2.1 and later |
+
+[<img src="rotation_prediction/rotnet/output.png" height="128">](rotation_prediction/rotnet/)
 
 ## Style transfer
 
@@ -191,11 +229,15 @@ The collection of pre-trained, state-of-the-art models.
 |:-----------|------------:|:------------:|:------------:|
 | [srresnet](/super_resolution/srresnet/) | [Photo-Realistic Single Image Super-Resolution Using a Generative Adversarial Network](https://github.com/twtygqyy/pytorch-SRResNet) | Pytorch | 1.2.0 and later |
 
+[<img src="super_resolution/srresnet/output.png" height="128">](super_resolution/srresnet/)
+
 ## Text recognition
 
 | Name | Detail | Exported From | Supported Ailia Version |
 |:-----------|------------:|:------------:|:------------:|
 |[etl](/text_recognition/etl) | Japanese Character Recognization | Keras | 1.1.0 and later |
+
+[<img src="text_recognition/etl/font.png" height="128">](text_recognition/etl/)
 
 ## Commercial model
 
