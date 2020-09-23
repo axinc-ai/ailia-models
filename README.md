@@ -19,6 +19,7 @@ python -c "import site; print (site.getsitepackages())"
 
 - Copy the ​ailia ​folder located in the ​python f​older to site-packages
 - Copy library files (dll or dylib or so) from the folder library to site-packages/ailia
+- In the evaluation version, place the license file in the same folder as libailia.dll on Windows and in ~/Library/SHALO/ on Mac.
 
 ## Install required libraries for Python
 
@@ -31,13 +32,17 @@ pip install -r requirements.txt
 ### For Jetson
 
 ```
-sudo apt-get install python3-matplotlib
+sudo apt install python3-pip
+sudo apt install python3-matplotlib
+sudo apt install python3-scipy
+pip3 install cython
+pip3 install numpy
 ```
 
 [OpenCV for python3 is pre-installed on Jetson.](https://forums.developer.nvidia.com/t/install-opencv-for-python3-in-jetson-nano/74042/3) You only need to run this command if you get a cv2 import error.
 
 ```
-sudo apt-get install python3-opencv
+sudo apt install python3-opencv
 ```
 
 # Supported models
@@ -97,12 +102,26 @@ sudo apt-get install python3-opencv
 | [maskrcnn](/maskrcnn/) | [Mask R-CNN: real-time neural network for object instance segmentation](https://github.com/onnx/models/tree/master/vision/object_detection_segmentation/mask-rcnn) | Pytorch | 1.2.3 and later |
 | [m2det](/m2det/) | [M2Det: A Single-Shot Object Detector based on Multi-Level Feature Pyramid Network](https://github.com/qijiezhao/M2Det) | Pytorch | 1.2.3 and later |
 | [centernet](/centernet/) | [CenterNet : Objects as Points](https://github.com/xingyizhou/CenterNet) | Pytorch | 1.2.1 and later |
+| [face-mask-detection](/face-mask-detection/) | [Face detection using keras-yolov3](https://github.com/axinc-ai/yolov3-face) | Keras | 1.2.1 and later |
+
+## Deep Fashion
+
+| Name | Detail | Exported From | Supported Ailia Version |
+|:-----------|------------:|:------------:|:------------:|
+| [clothing-detection](/clothing-detection/) | [Clothing-Detection](https://github.com/simaiden/Clothing-Detection) | Pytorch | 1.2.1 and later |
 
 ## Object tracking
 
 | Name | Detail | Exported From | Supported Ailia Version |
 |:-----------|------------:|:------------:|:------------:|
 | [deepsort](/deepsort/) | [Deep Sort with PyTorch](https://github.com/ZQPei/deep_sort_pytorch) | Pytorch | 1.2.3 and later |
+
+
+## Action Recognition
+
+| Name | Detail | Exported From | Supported Ailia Version |
+|:-----------|------------:|:------------:|:------------:|
+| [mars](/mars/) | [MARS: Motion-Augmented RGB Stream for Action Recognition](https://github.com/craston/MARS) | Pytorch | 1.2.4 beta and later |
 
 ## Pose estimation
 
@@ -151,6 +170,8 @@ sudo apt-get install python3-opencv
 | Name | Detail | Exported From | Supported Ailia Version |
 |:-----------|------------:|:------------:|:------------:|
 |[monodepth2](monodepth2)| [Monocular depth estimation from a single image](https://github.com/nianticlabs/monodepth2) | Pytorch | 1.2.2 and later |
+|[midas](midas)| [Towards Robust Monocular Depth Estimation: Mixing Datasets for Zero-shot Cross-dataset Transfer](https://github.com/intel-isl/MiDaS) | Pytorch | 1.2.4 beta and later |
+
 
 ## Text recognization
 
@@ -163,6 +184,14 @@ sudo apt-get install python3-opencv
 | Name | Detail | Exported From | Supported Ailia Version |
 |:-----------|------------:|:------------:|:------------:|
 |[bert](/bert) | [pytorch-pretrained-bert](https://pypi.org/project/pytorch-pretrained-bert/) | Pytorch | 1.2.2 and later |
+
+## Generative Adversarial Networks
+
+| Name | Detail | Exported From | Supported Ailia Version |
+|:-----------|------------:|:------------:|:------------:|
+|[pytorch-gan](/pytorch-gan) | [Code repo for the Pytorch GAN Zoo project (used to train this model)](https://github.com/facebookresearch/pytorch_GAN_zoo)| Pytorch | 1.2.4 beta and later |
+|[council-GAN](council-GAN)| [Council-GAN](https://github.com/Onr/Council-GAN)| Pytorch | 1.2.4 beta and later |
+
 
 ## Commercial Model
 

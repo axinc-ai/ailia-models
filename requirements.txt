@@ -13,7 +13,7 @@ kiwisolver==1.2.0
 matplotlib==3.2.1
 networkx==2.4
 numpy==1.18.4
-opencv-python==4.2.0.34
+opencv-python==4.4.0.42
 pillow==7.1.2
 pyparsing==2.4.7
 python-dateutil==2.8.1
