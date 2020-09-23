@@ -47,7 +47,7 @@ sudo apt install python3-opencv
 
 # Supported models
 
-## Action Recognition
+## Action recognition
 
 | Name | Detail | Exported From | Supported Ailia Version |
 |:-----------|------------:|:------------:|:------------:|
@@ -59,7 +59,7 @@ sudo apt install python3-opencv
 |:-----------|------------:|:------------:|:------------:|
 |[crowdcount-cascaded-mtl](/crowd_counting/crowdcount-cascaded-mtl) | [CNN-based Cascaded Multi-task Learning of High-level Prior and Density Estimation for Crowd Counting (Single Image Crowd Counting)](https://github.com/svishwa/crowdcount-cascaded-mtl) | Pytorch | 1.2.1 and later |
 
-## Deep Fashion
+## Deep fashion
 
 | Name | Detail | Exported From | Supported Ailia Version |
 |:-----------|------------:|:------------:|:------------:|
@@ -98,7 +98,7 @@ sudo apt install python3-opencv
 |[prnet](/face_recognition/prnet)| [Joint 3D Face Reconstruction and Dense Alignment with Position Map Regression Network](https://github.com/YadiraF/PRNet) | TensorFlow | 1.2.2 and later |
 | [gazeml](/face_recognition/gazeml/) | [A deep learning framework based on Tensorflow for the training of high performance gaze estimation](https://github.com/swook/GazeML) | TensorFlow | 1.2.0 and later |
 
-## Generative Adversarial Networks
+## Generative adversarial networks
 
 | Name | Detail | Exported From | Supported Ailia Version |
 |:-----------|------------:|:------------:|:------------:|
@@ -209,7 +209,7 @@ sudo apt install python3-opencv
 |:-----------|------------:|:------------:|:------------:|
 |[etl](/text_recognition/etl) | Japanese Character Recognization | Keras | 1.1.0 and later |
 
-## Commercial Model
+## Commercial model
 
 | Name | Detail | Exported From | Supported Ailia Version |
 |:-----------|------------:|:------------:|:------------:|
