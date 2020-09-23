@@ -6,7 +6,6 @@ import numpy as np
 import cv2
 
 import ailia
-import onnxruntime
 
 # import original modules
 sys.path.append('../util')
@@ -81,11 +80,6 @@ parser.add_argument(
     default=DETECTION_WIDTH,
     help='The detection width and height for yolo. (default: 416)'
 )
-parser.add_argument(
-    '--ailia',
-    action='store_true',
-    help='execute ailia version.'
-)
 args = parser.parse_args()
 
 
@@ -104,47 +98,31 @@ def recognize_from_image():
     img = np.expand_dims(img, 0)
 
     # net initialize
-    if args.ailia:
-        env_id = ailia.get_gpu_environment_id()
-        print(f'env_id: {env_id}')
-        detector = ailia.Net(
-            MODEL_PATH,
-            WEIGHT_PATH,
-            env_id=env_id
-        )
-        if int(args.detection_width) != DETECTION_WIDTH:
-            detector.set_input_shape((1,3,int(args.detection_width), int(args.detection_width)))
-    else:
-        session = onnxruntime.InferenceSession(WEIGHT_PATH)
-        print(session.get_providers())
+    env_id = ailia.get_gpu_environment_id()
+    print(f'env_id: {env_id}')
+    detector = ailia.Net(
+        MODEL_PATH,
+        WEIGHT_PATH,
+        env_id=env_id
+    )
+    if int(args.detection_width) != DETECTION_WIDTH:
+        detector.set_input_shape((1,3,int(args.detection_width), int(args.detection_width)))
 
     # inferece
     print('Start inference...')
-    if args.ailia:
-        if args.benchmark:
-            print('BENCHMARK mode')
-            for i in range(5):
-                start = int(round(time.time() * 1000))
-                output = detector.predict([img])
-                end = int(round(time.time() * 1000))
-                print(f'\tailia processing time {end - start} ms')
-        else:
+    if args.benchmark:
+        print('BENCHMARK mode')
+        for i in range(5):
+            start = int(round(time.time() * 1000))
             output = detector.predict([img])
-        detect_object = yolov4_utils.post_processing(img, THRESHOLD, IOU, output)
-
-        # plot result
-        res_img = plot_results(detect_object[0], org_img, COCO_CATEGORY)
+            end = int(round(time.time() * 1000))
+            print(f'\tailia processing time {end - start} ms')
     else:
-        input_name = session.get_inputs()[0].name
-        output_box_array = session.get_outputs()[0].name
-        output_confs = session.get_outputs()[1].name
-        output = session.run([output_box_array, output_confs],
-                             {input_name: img})
+        output = detector.predict([img])
+    detect_object = yolov4_utils.post_processing(img, THRESHOLD, IOU, output)
 
-        detect_object = yolov4_utils.post_processing(img, THRESHOLD, IOU, output)
-
-        # plot result
-        res_img = plot_results(detect_object[0], org_img, COCO_CATEGORY)
+    # plot result
+    res_img = plot_results(detect_object[0], org_img, COCO_CATEGORY)
 
     # plot result
     cv2.imwrite(args.savepath, res_img)
@@ -153,22 +131,16 @@ def recognize_from_image():
 
 def recognize_from_video():
     # net initialize
-    detector = session = None
-    if args.ailia:
-        env_id = ailia.get_gpu_environment_id()
-        print(f'env_id: {env_id}')
-        detector = ailia.Net(
-            MODEL_PATH,
-            WEIGHT_PATH,
-            env_id=env_id
-        )
-        if int(args.detection_width) != DETECTION_WIDTH:
-            detector.set_input_shape((1,3,int(args.detection_width), int(args.detection_width)))
-    else:
-        session = onnxruntime.InferenceSession(WEIGHT_PATH)
-        input_name = session.get_inputs()[0].name
-        output_box_array = session.get_outputs()[0].name
-        output_confs = session.get_outputs()[1].name
+    detector = None
+    env_id = ailia.get_gpu_environment_id()
+    print(f'env_id: {env_id}')
+    detector = ailia.Net(
+        MODEL_PATH,
+        WEIGHT_PATH,
+        env_id=env_id
+    )
+    if int(args.detection_width) != DETECTION_WIDTH:
+        detector.set_input_shape((1,3,int(args.detection_width), int(args.detection_width)))
 
     if args.video == '0':
         print('[INFO] Webcam mode is activated')
@@ -193,15 +165,10 @@ def recognize_from_video():
         img = img.astype(np.float32) / 255
         img = np.expand_dims(img, 0)
 
-        if args.ailia:
-            output = detector.predict([img])
-            detect_object = yolov4_utils.post_processing(img, THRESHOLD, IOU, output)
-            res_img = plot_results(detect_object[0], frame, COCO_CATEGORY)
-        else:
-            output = session.run([output_box_array, output_confs],
-                                 {input_name: img})
-            detect_object = yolov4_utils.post_processing(img, THRESHOLD, IOU, output)
-            res_img = plot_results(detect_object[0], frame, COCO_CATEGORY)
+        output = detector.predict([img])
+        detect_object = yolov4_utils.post_processing(img, THRESHOLD, IOU, output)
+        res_img = plot_results(detect_object[0], frame, COCO_CATEGORY)
+
         cv2.imshow('frame', res_img)
 
     capture.release()
@@ -212,9 +179,6 @@ def recognize_from_video():
 def main():
     # model files check and download
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
-
-    if not args.ailia:
-        print(onnxruntime.get_device())
 
     if args.video is not None:
         # video mode
