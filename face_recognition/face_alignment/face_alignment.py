@@ -31,7 +31,7 @@ THRESHOLD = 0.1
 
 
 # ======================
-# Arguemnt Parser Config
+# Argument Parser Config
 # ======================
 parser = argparse.ArgumentParser(
     description='Face alignment model'

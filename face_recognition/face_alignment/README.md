@@ -27,7 +27,7 @@ $ python3 face_alignment.py
 
 If you want to specify the input image, put the image path after the `--input` option.  
 You can use `--savepath` option to change the name of the output file to save.  
-Confidence map is saved with the output image file name prefixed with `_confidence`. 
+Confidence map is saved with the output image file name prefixed with `_confidence`.
 - ex. output.png --> output_confidence.png
 ```bash
 $ python3 face_alignment.py --input IMAGE_PATH --savepath SAVE_IMAGE_PATH
