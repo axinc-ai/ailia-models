@@ -14,11 +14,15 @@ The collection of pre-trained, state-of-the-art models.
 |:-----------|------------:|:------------:|:------------:|
 | [mars](/action_recognition/mars/) | [MARS: Motion-Augmented RGB Stream for Action Recognition](https://github.com/craston/MARS) | Pytorch | 1.2.4 beta and later |
 
+[<img src="action_recognition/mars/inputs/input0.jpg" height="128">](action_recognition/mars/)
+
 ## Crowd counting
 
 | Name | Detail | Exported From | Supported Ailia Version |
 |:-----------|------------:|:------------:|:------------:|
 |[crowdcount-cascaded-mtl](/crowd_counting/crowdcount-cascaded-mtl) | [CNN-based Cascaded Multi-task Learning of High-level Prior and Density Estimation for Crowd Counting (Single Image Crowd Counting)](https://github.com/svishwa/crowdcount-cascaded-mtl) | Pytorch | 1.2.1 and later |
+
+[<img src="crowd_counting/crowdcount-cascaded-mtl/result.png" height="128">](crowd_counting/crowdcount-cascaded-mtl/)
 
 ## Deep fashion
 
@@ -26,12 +30,17 @@ The collection of pre-trained, state-of-the-art models.
 |:-----------|------------:|:------------:|:------------:|
 | [clothing-detection](/deep_fashion/clothing-detection/) | [Clothing-Detection](https://github.com/simaiden/Clothing-Detection) | Pytorch | 1.2.1 and later |
 
+[<img src="deep_fashion/clothing-detection/output_modanet.png" height="128">](deep_fashion/clothing-detection/)
+
 ## Depth estimation
 
 | Name | Detail | Exported From | Supported Ailia Version |
 |:-----------|------------:|:------------:|:------------:|
 |[monodepth2](depth_estimation/monodepth2)| [Monocular depth estimation from a single image](https://github.com/nianticlabs/monodepth2) | Pytorch | 1.2.2 and later |
 |[midas](depth_estimation/midas)| [Towards Robust Monocular Depth Estimation: Mixing Datasets for Zero-shot Cross-dataset Transfer](https://github.com/intel-isl/MiDaS) | Pytorch | 1.2.4 beta and later |
+
+[<img src="depth_estimation/monodepth2/output.png" height="128">](depth_estimation/monodepth2/)
+[<img src="depth_estimation/midas/input_depth.png" height="128">](depth_estimation/midas/)
 
 ## Face detection
 
@@ -41,6 +50,11 @@ The collection of pre-trained, state-of-the-art models.
 | [yolov3-face](/face_detection/yolov3-face/) | [Face detection using keras-yolov3](https://github.com/axinc-ai/yolov3-face) | Keras | 1.2.1 and later |
 |[blazeface](/face_detection/blazeface/)| [BlazeFace-PyTorch](https://github.com/hollance/BlazeFace-PyTorch) | Pytorch | 1.2.1 and later |
 | [face-mask-detection](/face_detection/face-mask-detection/) | [Face detection using keras-yolov3](https://github.com/axinc-ai/yolov3-face) | Keras | 1.2.1 and later |
+
+[<img src="face_detection/yolov1-face/output.png" height="128">](face_detection/yolov1-face/)
+[<img src="face_detection/yolov3-face/output.png" height="128">](face_detection/yolov3-face/)
+[<img src="face_detection/blazeface/result.png" height="128">](face_detection/blazeface/)
+[<img src="face_detection/face-mask-detection/output.png" height="128">](face_detection/face-mask-detection/)
 
 ## Face identification
 
@@ -65,6 +79,8 @@ The collection of pre-trained, state-of-the-art models.
 |:-----------|------------:|:------------:|:------------:|
 |[pytorch-gan](/generative_adversarial_networks/pytorch-gan) | [Code repo for the Pytorch GAN Zoo project (used to train this model)](https://github.com/facebookresearch/pytorch_GAN_zoo)| Pytorch | 1.2.4 beta and later |
 |[council-GAN](/generative_adversarial_networks/council-GAN)| [Council-GAN](https://github.com/Onr/Council-GAN)| Pytorch | 1.2.4 beta and later |
+
+[<img src="generative_adversarial_networks/pytorch-gan/output_anime.png" height="128">](generative_adversarial_networks/pytorch-gan/)
 
 ## Hand detection
 
@@ -110,6 +126,8 @@ The collection of pre-trained, state-of-the-art models.
 | [U-2-Net](/image_segmentation/u2net/) | [U^2-Net: Going Deeper with Nested U-Structure for Salient Object Detection](https://github.com/NathanUA/U-2-Net) | Pytorch | 1.2.2 and later |
 | [deep-image-matting](/image_segmentation/deep-image-matting/) | [Deep Image Matting](https://github.com/foamliu/Deep-Image-Matting)| Keras | 1.2.3 and later |
 
+[<img src="image_segmentation/u2net/output.png" height="128">](image_segmentation/u2net/)
+
 ## Natural language processing
 
 | Name | Detail | Exported From | Supported Ailia Version |
@@ -130,11 +148,16 @@ The collection of pre-trained, state-of-the-art models.
 | [m2det](/object_detection/m2det/) | [M2Det: A Single-Shot Object Detector based on Multi-Level Feature Pyramid Network](https://github.com/qijiezhao/M2Det) | Pytorch | 1.2.3 and later |
 | [centernet](/object_detection/centernet/) | [CenterNet : Objects as Points](https://github.com/xingyizhou/CenterNet) | Pytorch | 1.2.1 and later |
 
+[<img src="object_detection/yolov4/output.png" height="128">](object_detection/yolov4/)
+[<img src="object_detection/maskrcnn/output.png" height="128">](object_detection/maskrcnn/)
+
 ## Object tracking
 
 | Name | Detail | Exported From | Supported Ailia Version |
 |:-----------|------------:|:------------:|:------------:|
 | [deepsort](/object_tracking/deepsort/) | [Deep Sort with PyTorch](https://github.com/ZQPei/deep_sort_pytorch) | Pytorch | 1.2.3 and later |
+
+[<img src="object_tracking/deepsort/demo.gif" height="128">](object_tracking/deepsort/)
 
 ## Pose estimation
 
@@ -145,6 +168,8 @@ The collection of pre-trained, state-of-the-art models.
 |[lightweight-human-pose-estimation-3d](/pose_estimation/lightweight-human-pose-estimation-3d/) | [Real-time 3D multi-person pose estimation demo in PyTorch. OpenVINO backend can be used for fast inference on CPU.](https://github.com/Daniil-Osokin/lightweight-human-pose-estimation-3d-demo.pytorch) | Pytorch | 1.2.1 and later |
 |[3d-pose-basline](/pose_estimation/3d-pose-baseline/) | [A simple baseline for 3d human pose estimation in tensorflow. Presented at ICCV 17.](https://github.com/una-dinosauria/3d-pose-baseline) | Tensorflow | 1.2.3 and later |
 |[pose_resnet](/pose_estimation/pose_resnet/) | [Simple Baselines for Human Pose Estimation and Tracking](https://github.com/microsoft/human-pose-estimation.pytorch) | Pytorch | 1.2.1 and later |
+
+[<img src="pose_estimation/lightweight-human-pose-estimation-3d/Canvas3D_0.png" height="128">](pose_estimation/lightweight-human-pose-estimation-3d/)
 
 ## Rotation prediction
 
@@ -157,6 +182,8 @@ The collection of pre-trained, state-of-the-art models.
 | Name | Detail | Exported From | Supported Ailia Version |
 |:-----------|------------:|:------------:|:------------:|
 | [adain](/style_transfer/adain/) | [Arbitrary Style Transfer in Real-time with Adaptive Instance Normalization](https://github.com/naoto0804/pytorch-AdaIN)| Pytorch | 1.2.1 and later |
+
+[<img src="style_transfer/adain/output.png" height="128">](style_transfer/adain/)
 
 ## Super resolution
 
