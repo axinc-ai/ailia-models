@@ -31,6 +31,16 @@ $ python3 u2net.py --video VIDEO_PATH
 
 You can select a pretrained model by specifying `-a large`(default) or `-a small`.
 
+```bash
+$ python3 u2net.py --input IMAGE_PATH --savepath SAVE_IMAGE_PATH -a small
+```
+
+You can use more accurate model by specifying `--opset 11` from ailia SDK 1.2.4.
+
+```bash
+$ python3 u2net.py --input IMAGE_PATH --savepath SAVE_IMAGE_PATH --opset 11
+```
+
 ### Reference
 
 [U^2-Net: Going Deeper with Nested U-Structure for Salient Object Detection](https://github.com/NathanUA/U-2-Net)
