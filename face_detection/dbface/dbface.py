@@ -10,7 +10,7 @@ import ailia
 import dbface_utils
 
 # import original modules
-sys.path.append('../util')
+sys.path.append('../../util')
 from model_utils import check_and_download_models 
 from detector_utils import load_image 
 
