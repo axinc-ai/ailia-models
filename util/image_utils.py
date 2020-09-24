@@ -12,7 +12,7 @@ def normalize_image(image, normalize_type='255'):
     Parameters
     ----------
     image: numpy array
-        The image you want to normalize 
+        The image you want to normalize
     normalize_type: string
         Normalize type should be chosen from the type below.
         - '255': simply dividing by 255.0

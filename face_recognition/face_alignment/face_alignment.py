@@ -1,9 +1,11 @@
 import sys
 import time
 import argparse
+import math
 
 from mpl_toolkits.axes_grid1 import ImageGrid
 import cv2
+import numpy as np
 import matplotlib.pyplot as plt
 
 import ailia
@@ -15,11 +17,14 @@ from image_utils import load_image  # noqa: E402
 from webcamera_utils import preprocess_frame  # noqa: E402
 
 
+# TODO: deprecates visualize_plots()
+# TODO: 3d point plotting how ?
+# TODO: confidence plot ?
+
+
 # ======================
-# PARAMETERS
+# PARAMETERS 1
 # ======================
-MODEL_PATH = 'face_alignment.onnx.prototxt'
-WEIGHT_PATH = 'face_alignment.onnx'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/face_alignment/'
 
 IMAGE_PATH = 'aflw-test.jpg'
@@ -37,28 +42,37 @@ parser = argparse.ArgumentParser(
     description='Face alignment model'
 )
 parser.add_argument(
-    '-i', '--input', metavar='IMAGEFILE_PATH',
-    default=IMAGE_PATH,
+    '-i', '--input', metavar='IMAGEFILE_PATH', default=IMAGE_PATH,
     help='The input image path.'
 )
 parser.add_argument(
-    '-v', '--video', metavar='VIDEO',
-    default=None,
-    help='The input video path. ' +
-         'If the VIDEO argument is set to 0, the webcam input will be used.'
+    '-v', '--video', metavar='VIDEO', default=None,
+    help=('The input video path. '
+          'If the VIDEO argument is set to 0, the webcam input will be used.')
 )
 parser.add_argument(
-    '-s', '--savepath', metavar='SAVE_IMAGE_PATH',
-    default=SAVE_IMAGE_PATH,
+    '-s', '--savepath', metavar='SAVE_IMAGE_PATH', default=SAVE_IMAGE_PATH,
     help='Save path for the output image.'
 )
 parser.add_argument(
-    '-b', '--benchmark',
-    action='store_true',
-    help='Running the inference on the same input 5 times ' +
-         'to measure execution performance. (Cannot be used in video mode)'
+    '-b', '--benchmark', action='store_true',
+    help=('Running the inference on the same input 5 times '
+          'to measure execution performance. (Cannot be used in video mode)')
+)
+parser.add_argument(
+    '-3', '--active_3d', action='store_true',
+    help='Activate 3D face alignment mode'
 )
 args = parser.parse_args()
+
+
+# ======================
+# PARAMETERS 2
+# ======================
+WEIGHT_PATH = '3DFAN-4.onnx' if args.active_3d else '2DFAN-4.onnx'
+MODEL_PATH = WEIGHT_PATH + '.prototxt'
+DEPTH_WEIGHT_PATH = 'depth_estimation.onnx'
+DEPTH_MODEL_PATH = DEPTH_WEIGHT_PATH + '.prototxt'
 
 
 # ======================
@@ -101,6 +115,156 @@ def visualize_plots(image, preds_ailia):
     return image
 
 
+def transform(point, center, scale, resolution, invert=False):
+    """Generate and affine transformation matrix.
+
+    Given a set of points, a center, a scale and a targer resolution, the
+    function generates and affine transformation matrix. If invert is ``True``
+    it will produce the inverse transformation.
+
+    Arguments:
+        point {torch.tensor} -- the input 2D point
+        center {torch.tensor or numpy.array} -- the center around which to
+            perform the transformations
+        scale {float} -- the scale of the face/object
+        resolution {float} -- the output resolution
+
+    Keyword Arguments:
+        invert {bool} -- define wherever the function should produce the direct
+            or the inverse transformation matrix (default: {False})
+    """
+    _pt = np.ones(3)
+    _pt[0] = point[0]
+    _pt[1] = point[1]
+
+    h = scale  # NOTE: originally, scale * 200
+    t = np.eye(3)
+    t[0, 0] = resolution / h
+    t[1, 1] = resolution / h
+    t[0, 2] = resolution * (-center[0] / h + 0.5)
+    t[1, 2] = resolution * (-center[1] / h + 0.5)
+
+    if invert:
+        t = np.linalg.inv(t)
+    new_point = (np.dot(t, _pt))[0:2]
+    return new_point.astype(np.int)
+
+
+def get_preds_from_hm(hm):
+    """
+    Obtain (x,y) coordinates given a set of N heatmaps.
+    ref: 1adrianb/face-alignment/blob/master/face_alignment/utils.py
+
+    TODO: docstring
+
+    Parameters
+    ----------
+    hm : np.array
+
+    Returns
+    -------
+    preds:
+    preds_orig:
+
+    """
+    idx = np.argmax(
+        hm.reshape(hm.shape[0], hm.shape[1], hm.shape[2] * hm.shape[3]), axis=2
+    )
+    idx += 1
+    preds = idx.reshape(idx.shape[0], idx.shape[1], 1)
+    preds = np.tile(preds, (1, 1, 2)).astype(np.float)
+    preds[..., 0] = (preds[..., 0] - 1) % hm.shape[3] + 1
+    preds[..., 1] = np.floor((preds[..., 1] - 1) / (hm.shape[2])) + 1
+
+    for i in range(preds.shape[0]):
+        for j in range(preds.shape[1]):
+            hm_ = hm[i, j, :]
+            pX, pY = int(preds[i, j, 0]) - 1, int(preds[i, j, 1]) - 1
+            if pX > 0 and pX < 63 and pY > 0 and pY < 63:
+                diff = np.array(
+                    [hm_[pY, pX + 1] - hm_[pY, pX - 1],
+                     hm_[pY + 1, pX] - hm_[pY - 1, pX]]).astype(np.float)
+                preds[i, j] = preds[i, j] + (np.sign(diff) * 0.25)
+
+    preds += -0.5
+    preds_orig = np.zeros_like(preds)
+
+    for i in range(hm.shape[0]):
+        for j in range(hm.shape[1]):
+            preds_orig[i, j] = transform(
+                preds[i, j], np.array([IMAGE_HEIGHT // 2, IMAGE_WIDTH // 2]),
+                (IMAGE_HEIGHT + IMAGE_WIDTH) // 2, # FIXME not sure...
+                hm.shape[2],
+                True,
+            )
+    return preds, preds_orig
+
+
+def _gaussian(
+        size=3,
+        sigma=0.25,
+        amplitude=1,
+        normalize=False,
+        width=None,
+        height=None,
+        sigma_horz=None,
+        sigma_vert=None,
+        mean_horz=0.5,
+        mean_vert=0.5
+):
+    # handle some defaults
+    if width is None:
+        width = size
+    if height is None:
+        height = size
+    if sigma_horz is None:
+        sigma_horz = sigma
+    if sigma_vert is None:
+        sigma_vert = sigma
+    center_x = mean_horz * width + 0.5
+    center_y = mean_vert * height + 0.5
+    gauss = np.empty((height, width), dtype=np.float32)
+    # generate kernel
+    for i in range(height):
+        for j in range(width):
+            gauss[i][j] = amplitude * math.exp(-(math.pow(
+                (j + 1 - center_x) / (sigma_horz * width), 2
+            ) / 2.0 + math.pow(
+                (i + 1 - center_y) / (sigma_vert * height), 2
+            ) / 2.0))
+    if normalize:
+        gauss = gauss / np.sum(gauss)
+    return gauss
+
+
+def draw_gaussian(img, point, sigma):
+    # Check if the gaussian is inside
+    ul = [math.floor(point[0] - 3 * sigma), math.floor(point[1] - 3 * sigma)]
+    br = [math.floor(point[0] + 3 * sigma), math.floor(point[1] + 3 * sigma)]
+    if ul[0] > img.shape[1] or ul[1] > img.shape[0] or br[0] < 1 or br[1] < 1:
+        return img
+    size = 6 * sigma + 1
+    g = _gaussian(size)
+    g_x = [
+        int(max(1, -ul[0])),
+        int(min(br[0], img.shape[1])) - int(max(1, ul[0])) +
+        int(max(1, -ul[0]))
+    ]
+    g_y = [
+        int(max(1, -ul[1])),
+        int(min(br[1], img.shape[0])) - int(max(1, ul[1])) +
+        int(max(1, -ul[1]))
+    ]
+    img_x = [int(max(1, ul[0])), int(min(br[0], img.shape[1]))]
+    img_y = [int(max(1, ul[1])), int(min(br[1], img.shape[0]))]
+    assert (g_x[0] > 0 and g_y[1] > 0)
+    img[img_y[0] - 1:img_y[1], img_x[0] - 1:img_x[1]] = img[
+        img_y[0] - 1:img_y[1], img_x[0] - 1:img_x[1]
+    ] + g[g_y[0] - 1:g_y[1], g_x[0] - 1:g_x[1]]
+    img[img > 1] = 1
+    return img
+
+
 # ======================
 # Main functions
 # ======================
@@ -114,10 +278,15 @@ def recognize_from_image():
         gen_input_ailia=True
     )
 
-    # net initalize
+    # net initialize
     env_id = ailia.get_gpu_environment_id()
     print(f'env_id: {env_id}')
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+    if args.active_3d:
+        print('>>> 3D mode is activated!')
+        depth_net = ailia.Net(
+            DEPTH_MODEL_PATH, DEPTH_WEIGHT_PATH, env_id=env_id
+        )
 
     # inference
     print('Start inference...')
@@ -125,22 +294,48 @@ def recognize_from_image():
         print('BENCHMARK mode')
         for i in range(5):
             start = int(round(time.time() * 1000))
-            preds_ailia = net.predict(data)[0]
+            preds_ailia = net.predict(data)
             end = int(round(time.time() * 1000))
             print(f'\tailia processing time {end - start} ms')
     else:
-        preds_ailia = net.predict(data)[0]
+        preds_ailia = net.predict(data)
 
-    visualize_plots(input_img, preds_ailia)
-    cv2.imwrite(args.savepath, input_img)
+    pts, pts_img = get_preds_from_hm(preds_ailia)
+    pts, pts_img = pts.reshape(68, 2) * 4, pts_img.reshape(68, 2)
 
-    # Confidence Map
-    channels = preds_ailia.shape[0]
-    cols = 8
-    plot_images(
-        'confidence',
-        preds_ailia,
-        tile_shape=((int)((channels+cols-1)/cols), cols))
+    if args.active_3d:
+        heatmaps = np.zeros((68, IMAGE_HEIGHT, IMAGE_WIDTH), dtype=np.float32)
+        for i in range(68):
+            if pts[i, 0] > 0:
+                heatmaps[i] = draw_gaussian(heatmaps[i], pts[i], 2)
+        heatmaps = heatmaps[np.newaxis, :, :, :]
+        depth_pred = depth_net.predict(np.concatenate((data, heatmaps), 1))
+        depth_pred = depth_pred.reshape(68, 1)
+        # TODO: depth_pred requires post_processing
+        pts_img = np.concatenate((pts_img, depth_pred), 1)
+
+    input_img = cv2.resize(
+        cv2.cvtColor(input_img, cv2.COLOR_BGR2RGB),
+        (IMAGE_WIDTH, IMAGE_HEIGHT)
+    )
+    plt.imshow(input_img)
+    plt.scatter(pts_img[:, 0], pts_img[:, 1], 2)
+    plt.axis('off')
+    plt.savefig(args.savepath)
+
+    # # previous version
+    # else:
+    #     visualize_plots(input_img, preds_ailia[0])
+    #     cv2.imwrite(args.savepath, input_img)
+
+    #     # Confidence Map
+    #     channels = preds_ailia[0].shape[0]
+    #     cols = 8
+    #     plot_images(
+    #         'confidence',
+    #         preds_ailia[0],
+    #         tile_shape=((int)((channels+cols-1)/cols), cols)
+    #     )
     print('Script finished successfully.')
 
 
@@ -172,7 +367,7 @@ def recognize_from_video():
         )
 
         # inference
-        preds_ailia = net.predict(input_data)[0]
+        preds_ailia = net.predict(input_data)[-1]
 
         # postprocessing
         visualize_plots(input_image, preds_ailia)
