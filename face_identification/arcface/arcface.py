@@ -146,7 +146,7 @@ class FaceTrack():
         self.fe = [fe]
         self.image = [image]
         self.frame_no = [frame_no]
-        self.TRACK_T = 8
+        self.TRACK_T = 16
         self.REMOVE_T = 80
         self.score = 0
     
@@ -199,11 +199,16 @@ def face_identification(tracks,net,detections,frame_no):
     for i in range(len(detections)):
         for j in range(len(tracks)):
             max_sim = 0
+            avg_sim = 0
             for k in range(len(tracks[j].fe)):
                 sim = cosin_metric(detections[i]["fe"], tracks[j].fe[k])
+                avg_sim = avg_sim + sim
                 if max_sim < sim:
                     max_sim = sim
             score_matrix[i,j] = max_sim
+            if len(tracks[j].fe)>=1:
+                avg_sim = avg_sim / len(tracks[j].fe)
+            score_matrix[i,j] = avg_sim
 
     for i in range(len(detections)):
         score_sim = 0
