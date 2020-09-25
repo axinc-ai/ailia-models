@@ -2,6 +2,7 @@ import sys
 import time
 import argparse
 import math
+import collections
 
 from mpl_toolkits.axes_grid1 import ImageGrid
 import cv2
@@ -74,6 +75,19 @@ MODEL_PATH = WEIGHT_PATH + '.prototxt'
 DEPTH_WEIGHT_PATH = 'depth_estimation.onnx'
 DEPTH_MODEL_PATH = DEPTH_WEIGHT_PATH + '.prototxt'
 
+PRED_TYPE = collections.namedtuple('prediction_type', ['slice', 'color'])
+PRED_TYPES = {
+    'face': PRED_TYPE(slice(0, 17), (0.682, 0.780, 0.909, 0.5)),
+    'eyebrow1': PRED_TYPE(slice(17, 22), (1.0, 0.498, 0.055, 0.4)),
+    'eyebrow2': PRED_TYPE(slice(22, 27), (1.0, 0.498, 0.055, 0.4)),
+    'nose': PRED_TYPE(slice(27, 31), (0.345, 0.239, 0.443, 0.4)),
+    'nostril': PRED_TYPE(slice(31, 36), (0.345, 0.239, 0.443, 0.4)),
+    'eye1': PRED_TYPE(slice(36, 42), (0.596, 0.875, 0.541, 0.3)),
+    'eye2': PRED_TYPE(slice(42, 48), (0.596, 0.875, 0.541, 0.3)),
+    'lips': PRED_TYPE(slice(48, 60), (0.596, 0.875, 0.541, 0.3)),
+    'teeth': PRED_TYPE(slice(60, 68), (0.596, 0.875, 0.541, 0.4))
+}
+
 
 # ======================
 # Utils
@@ -113,6 +127,66 @@ def visualize_plots(image, preds_ailia):
                 lineType=cv2.FILLED
             )
     return image
+
+
+def visualize_results(image, pts_img, savepath, active_3d=False):
+    fig = plt.figure(figsize=plt.figaspect(0.5))
+
+    if active_3d:
+        # 2D-plot
+        ax = fig.add_subplot(1, 2, 1)
+        ax.imshow(image)
+        for pred_type in PRED_TYPES.values():
+            ax.plot(
+                pts_img[pred_type.slice, 0],
+                pts_img[pred_type.slice, 1],
+                color=pred_type.color,
+                marker='o',
+                markersize=4,
+                linestyle='-',
+                lw=2,
+            )
+
+        ax.axis('off')
+
+        # 3D-plot
+        ax = fig.add_subplot(1, 2, 2, projection='3d')
+        surf = ax.scatter(
+            pts_img[:, 0],
+            pts_img[:, 1],
+            pts_img[:, 2],
+            c='cyan',
+            alpha=1.0,
+            edgecolor='b',
+        )
+
+        for pred_type in PRED_TYPES.values():
+            ax.plot3D(
+                pts_img[pred_type.slice, 0],
+                pts_img[pred_type.slice, 1],
+                pts_img[pred_type.slice, 2],
+                color='blue'
+            )
+
+        ax.view_init(elev=90, azim=90.)
+        ax.set_xlim(ax.get_xlim()[::-1])
+
+    else:
+        # 2D
+        plt.imshow(image)
+        for pred_type in PRED_TYPES.values():
+            plt.plot(
+                pts_img[pred_type.slice, 0],
+                pts_img[pred_type.slice, 1],
+                color=pred_type.color,
+                marker='o',
+                markersize=4,
+                linestyle='-',
+                lw=2,
+            )
+        plt.axis('off')
+
+    plt.savefig(savepath)
 
 
 def transform(point, center, scale, resolution, invert=False):
@@ -192,9 +266,10 @@ def get_preds_from_hm(hm):
     for i in range(hm.shape[0]):
         for j in range(hm.shape[1]):
             preds_orig[i, j] = transform(
-                preds[i, j], np.array([IMAGE_HEIGHT // 2, IMAGE_WIDTH // 2]),
-                (IMAGE_HEIGHT + IMAGE_WIDTH) // 2, # FIXME not sure...
-                hm.shape[2],
+                preds[i, j],  # point
+                np.array([IMAGE_HEIGHT // 2, IMAGE_WIDTH // 2]),  # center
+                (IMAGE_HEIGHT + IMAGE_WIDTH) // 2,  # FIXME not sure... # scale
+                hm.shape[2],  # resolution
                 True,
             )
     return preds, preds_orig
@@ -303,7 +378,13 @@ def recognize_from_image():
     pts, pts_img = get_preds_from_hm(preds_ailia)
     pts, pts_img = pts.reshape(68, 2) * 4, pts_img.reshape(68, 2)
 
+    input_img = cv2.resize(
+        cv2.cvtColor(input_img, cv2.COLOR_BGR2RGB),
+        (IMAGE_WIDTH, IMAGE_HEIGHT)
+    )
+
     if args.active_3d:
+        # 3D mode
         heatmaps = np.zeros((68, IMAGE_HEIGHT, IMAGE_WIDTH), dtype=np.float32)
         for i in range(68):
             if pts[i, 0] > 0:
@@ -311,31 +392,20 @@ def recognize_from_image():
         heatmaps = heatmaps[np.newaxis, :, :, :]
         depth_pred = depth_net.predict(np.concatenate((data, heatmaps), 1))
         depth_pred = depth_pred.reshape(68, 1)
-        # TODO: depth_pred requires post_processing
-        pts_img = np.concatenate((pts_img, depth_pred), 1)
+        pts_img = np.concatenate((pts_img, depth_pred * 2), 1)
 
-    input_img = cv2.resize(
-        cv2.cvtColor(input_img, cv2.COLOR_BGR2RGB),
-        (IMAGE_WIDTH, IMAGE_HEIGHT)
+    visualize_results(
+        input_img, pts_img, args.savepath, active_3d=args.active_3d
     )
-    plt.imshow(input_img)
-    plt.scatter(pts_img[:, 0], pts_img[:, 1], 2)
-    plt.axis('off')
-    plt.savefig(args.savepath)
 
-    # # previous version
-    # else:
-    #     visualize_plots(input_img, preds_ailia[0])
-    #     cv2.imwrite(args.savepath, input_img)
-
-    #     # Confidence Map
-    #     channels = preds_ailia[0].shape[0]
-    #     cols = 8
-    #     plot_images(
-    #         'confidence',
-    #         preds_ailia[0],
-    #         tile_shape=((int)((channels+cols-1)/cols), cols)
-    #     )
+    # Confidence Map
+    channels = preds_ailia[0].shape[0]
+    cols = 8
+    plot_images(
+        'confidence',
+        preds_ailia[0],
+        tile_shape=((int)((channels+cols-1)/cols), cols)
+    )
     print('Script finished successfully.')
 
 
