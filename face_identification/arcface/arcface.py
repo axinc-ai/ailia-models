@@ -38,7 +38,7 @@ THRESHOLD = 0.25572845
 # THRESHOLD = 0.45 # for mixed model
 
 # face detection
-FACE_MODEL_LISTS = ['yolov3', 'blazeface', 'mobilenet']
+FACE_MODEL_LISTS = ['yolov3', 'blazeface', 'yolov3-mask', 'mobilenet-mask']
 
 YOLOV3_FACE_THRESHOLD = 0.2
 YOLOV3_FACE_IOU = 0.45
@@ -93,7 +93,11 @@ if args.face=="yolov3":
     FACE_WEIGHT_PATH = 'yolov3-face.opt.onnx'
     FACE_MODEL_PATH = 'yolov3-face.opt.onnx.prototxt'
     FACE_REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/yolov3-face/'
-elif args.face=="mobilenet":
+elif args.face=="yolov3-mask":
+    FACE_WEIGHT_PATH = 'face-mask-detection-yolov3-tiny.opt.obf.onnx'
+    FACE_MODEL_PATH = 'face-mask-detection-yolov3-tiny.opt.onnx.prototxt'
+    FACE_REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/face-mask-detection/'
+elif args.face=="mobilenet-mask":
     FACE_WEIGHT_PATH = 'face-mask-detection-mb2-ssd-lite.obf.onnx'
     FACE_MODEL_PATH = 'face-mask-detection-mb2-ssd-lite.onnx.prototxt'
     FACE_REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/face-mask-detection/'
@@ -308,7 +312,18 @@ def compare_video():
             algorithm=ailia.DETECTOR_ALGORITHM_YOLOV3,
             env_id=env_id
         )
-    elif args.face=="mobilenet":
+    elif args.face=="yolov3-mask":
+        detector = ailia.Detector(
+            FACE_MODEL_PATH,
+            FACE_WEIGHT_PATH,
+            2,
+            format=ailia.NETWORK_IMAGE_FORMAT_RGB,
+            channel=ailia.NETWORK_IMAGE_CHANNEL_FIRST,
+            range=ailia.NETWORK_IMAGE_RANGE_U_FP32,
+            algorithm=ailia.DETECTOR_ALGORITHM_YOLOV3,
+            env_id=env_id
+        )
+    elif args.face=="mobilenet-mask":
         detector = ailia.Detector(
             FACE_MODEL_PATH,
             FACE_WEIGHT_PATH,
@@ -347,7 +362,7 @@ def compare_video():
             ui = np.zeros((h,int(w * 1.5),3), np.uint8)
 
         # detect face
-        if args.face=="yolov3" or args.face=="mobilenet":
+        if args.face=="yolov3" or args.face=="yolov3-mask" or args.face=="mobilenet-mask":
             img = cv2.cvtColor(frame, cv2.COLOR_BGR2BGRA)
             detector.compute(img, YOLOV3_FACE_THRESHOLD, YOLOV3_FACE_IOU)
             count = detector.get_object_count()
@@ -369,7 +384,7 @@ def compare_video():
         detections = []
         for idx in range(count):
             # get detected face
-            if args.face=="yolov3" or args.face=="mobilenet":
+            if args.face=="yolov3" or args.face=="yolov3-mask" or args.face=="mobilenet-mask":
                 obj = detector.get_object(idx)
                 margin = 1.0
             else:
