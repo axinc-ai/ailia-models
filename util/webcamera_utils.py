@@ -46,7 +46,7 @@ def adjust_frame_size(frame, height, width):
     ] = frame
     resized_img = cv2.resize(img, (width, height))
     return img, resized_img
-    
+
 
 def preprocess_frame(
         frame, input_height, input_width, data_rgb=True, normalize_type='255'
@@ -80,10 +80,10 @@ def preprocess_frame(
         Input data for ailia
     """
     img, resized_img = adjust_frame_size(frame, input_height, input_width)
-    
+
     if data_rgb:
         resized_img = cv2.cvtColor(resized_img, cv2.COLOR_BGR2RGB)
-        
+
     data = normalize_image(resized_img, normalize_type)
 
     if data_rgb:

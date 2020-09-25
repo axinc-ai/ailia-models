@@ -18,10 +18,8 @@ from image_utils import load_image  # noqa: E402
 from webcamera_utils import preprocess_frame  # noqa: E402
 
 
-# TODO: deprecates visualize_plots()
-# TODO: 3d point plotting how ?
-# TODO: confidence plot ?
-
+# TODO: Old plot window doesn't disappear when in video mode
+#       plt.clf() did not work
 
 # ======================
 # PARAMETERS 1
@@ -108,28 +106,7 @@ def plot_images(title, images, tile_shape):
     fig.savefig(save_name)
 
 
-def visualize_plots(image, preds_ailia):
-    for i in range(preds_ailia.shape[0]):
-        probMap = preds_ailia[i, :, :]
-        minVal, prob, minLoc, point = cv2.minMaxLoc(probMap)
-
-        x = (image.shape[1] * point[0]) / preds_ailia.shape[2]
-        y = (image.shape[0] * point[1]) / preds_ailia.shape[1]
-
-        if prob > THRESHOLD:
-            circle_size = 4
-            cv2.circle(
-                image,
-                (int(x), int(y)),
-                circle_size,
-                (0, 255, 255),
-                thickness=-1,
-                lineType=cv2.FILLED
-            )
-    return image
-
-
-def visualize_results(image, pts_img, savepath, active_3d=False):
+def visualize_results(image, pts_img, active_3d=False):
     fig = plt.figure(figsize=plt.figaspect(0.5))
 
     if active_3d:
@@ -151,7 +128,7 @@ def visualize_results(image, pts_img, savepath, active_3d=False):
 
         # 3D-plot
         ax = fig.add_subplot(1, 2, 2, projection='3d')
-        surf = ax.scatter(
+        ax.scatter(
             pts_img[:, 0],
             pts_img[:, 1],
             pts_img[:, 2],
@@ -186,7 +163,7 @@ def visualize_results(image, pts_img, savepath, active_3d=False):
             )
         plt.axis('off')
 
-    plt.savefig(savepath)
+    return fig
 
 
 def transform(point, center, scale, resolution, invert=False):
@@ -394,9 +371,8 @@ def recognize_from_image():
         depth_pred = depth_pred.reshape(68, 1)
         pts_img = np.concatenate((pts_img, depth_pred * 2), 1)
 
-    visualize_results(
-        input_img, pts_img, args.savepath, active_3d=args.active_3d
-    )
+    fig = visualize_results(input_img, pts_img, active_3d=args.active_3d)
+    fig.savefig(args.savepath)
 
     # Confidence Map
     channels = preds_ailia[0].shape[0]
@@ -414,6 +390,11 @@ def recognize_from_video():
     env_id = ailia.get_gpu_environment_id()
     print(f'env_id: {env_id}')
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+    if args.active_3d:
+        print('>>> 3D mode is activated!')
+        depth_net = ailia.Net(
+            DEPTH_MODEL_PATH, DEPTH_WEIGHT_PATH, env_id=env_id
+        )
 
     if args.video == '0':
         print('[INFO] Webcam mode is activated')
@@ -437,11 +418,29 @@ def recognize_from_video():
         )
 
         # inference
-        preds_ailia = net.predict(input_data)[-1]
+        preds_ailia = net.predict(input_data)
 
-        # postprocessing
-        visualize_plots(input_image, preds_ailia)
-        cv2.imshow('frame', input_image)
+        pts, pts_img = get_preds_from_hm(preds_ailia)
+        pts, pts_img = pts.reshape(68, 2) * 4, pts_img.reshape(68, 2)
+
+        if args.active_3d:
+            # 3D mode
+            heatmaps = np.zeros(
+                (68, IMAGE_HEIGHT, IMAGE_WIDTH), dtype=np.float32
+            )
+            for i in range(68):
+                if pts[i, 0] > 0:
+                    heatmaps[i] = draw_gaussian(heatmaps[i], pts[i], 2)
+            heatmaps = heatmaps[np.newaxis, :, :, :]
+            depth_pred = depth_net.predict(
+                np.concatenate((input_data, heatmaps), 1)
+            )
+            depth_pred = depth_pred.reshape(68, 1)
+            pts_img = np.concatenate((pts_img, depth_pred * 2), 1)
+
+        resized_img = cv2.resize(input_image, (IMAGE_WIDTH, IMAGE_HEIGHT))
+        fig = visualize_results(resized_img, pts_img, active_3d=args.active_3d)
+        plt.pause(0.01)
 
     capture.release()
     cv2.destroyAllWindows()
@@ -451,6 +450,11 @@ def recognize_from_video():
 def main():
     # model files check and download
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
+
+    if args.active_3d:
+        check_and_download_models(
+            DEPTH_WEIGHT_PATH, DEPTH_MODEL_PATH, REMOTE_PATH
+        )
 
     if args.video is not None:
         # video mode
