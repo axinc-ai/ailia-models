@@ -40,7 +40,7 @@ THRESHOLD = 0.25572845
 # face detection
 FACE_MODEL_LISTS = ['yolov3', 'blazeface', 'yolov3-mask', 'mobilenet-mask']
 
-YOLOV3_FACE_THRESHOLD = 0.2
+YOLOV3_FACE_THRESHOLD = 0.4
 YOLOV3_FACE_IOU = 0.45
 
 BLAZEFACE_INPUT_IMAGE_HEIGHT = 128
@@ -240,6 +240,25 @@ def face_identification(tracks,net,detections,frame_no):
         tracks[i].pop(frame_no)
 
 
+def bb_intersection_over_union(boxA, boxB):
+    # determine the (x, y)-coordinates of the intersection rectangle
+    xA = max(boxA[0], boxB[0])
+    yA = max(boxA[1], boxB[1])
+    xB = min(boxA[2], boxB[2])
+    yB = min(boxA[3], boxB[3])
+    # compute the area of intersection rectangle
+    interArea = max(0, xB - xA + 1) * max(0, yB - yA + 1)
+    # compute the area of both the prediction and ground-truth
+    # rectangles
+    boxAArea = (boxA[2] - boxA[0] + 1) * (boxA[3] - boxA[1] + 1)
+    boxBArea = (boxB[2] - boxB[0] + 1) * (boxB[3] - boxB[1] + 1)
+    # compute the intersection over union by taking the intersection
+    # area and dividing it by the sum of prediction + ground-truth
+    # areas - the interesection area
+    iou = interArea / float(boxAArea + boxBArea - interArea)
+    # return the intersection over union value
+    return iou
+
 # ======================
 # Main functions
 # ======================
@@ -362,10 +381,14 @@ def compare_video():
             ui = np.zeros((h,int(w * 1.5),3), np.uint8)
 
         # detect face
+        org_detections = []
         if args.face=="yolov3" or args.face=="yolov3-mask" or args.face=="mobilenet-mask":
             img = cv2.cvtColor(frame, cv2.COLOR_BGR2BGRA)
             detector.compute(img, YOLOV3_FACE_THRESHOLD, YOLOV3_FACE_IOU)
             count = detector.get_object_count()
+            for idx in range(count):
+                obj = detector.get_object(idx)
+                org_detections.append(obj)
         else:
             img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             image = cv2.resize(img, (BLAZEFACE_INPUT_IMAGE_WIDTH, BLAZEFACE_INPUT_IMAGE_HEIGHT))
@@ -377,18 +400,10 @@ def compare_video():
             preds_ailia = detector.predict([input_data])
 
             # postprocessing
-            detections = postprocess(preds_ailia)
-            count = len(detections)
-
-        texts = []
-        detections = []
-        for idx in range(count):
-            # get detected face
-            if args.face=="yolov3" or args.face=="yolov3-mask" or args.face=="mobilenet-mask":
-                obj = detector.get_object(idx)
-                margin = 1.0
-            else:
-                obj = detections[idx]
+            org_detections = []
+            blaze_face_detections = postprocess(preds_ailia)
+            for idx in range(blaze_face_detections):
+                obj = blaze_face_detections[idx]
                 if len(obj)==0:
                     continue
                 d = obj[0]
@@ -399,6 +414,46 @@ def compare_video():
                     y = d[0],
                     w = d[3]-d[1],
                     h = d[2]-d[0] )
+                
+                org_detections.append(obj)
+
+            count = len(org_detections)
+
+        # remove overwrapped detection
+        det = []
+        keep = []
+        iou_threshold = 0.25
+        for idx in range(len(org_detections)):
+            obj = org_detections[idx]
+            is_keep=True
+            for idx2 in range(len(det)):
+                if not keep[idx2]:
+                    continue
+                box_a = [w*det[idx2].x,h*det[idx2].y,w*(det[idx2].x+det[idx2].w),h*(det[idx2].y+det[idx2].h)]
+                box_b = [w*obj.x,h*obj.y,w*(obj.x+obj.w),h*(obj.y+obj.h)]
+                iou = bb_intersection_over_union(box_a,box_b)
+                if iou >= iou_threshold:
+                    if det[idx2].prob<=obj.prob:
+                        keep[idx2]=False
+                    else:
+                        is_keep=False
+            det.append(obj)
+            keep.append(is_keep)
+
+        texts = []
+        detections = []
+        for idx in range(count):
+            if not keep[idx]:
+                continue
+
+            # get detected face
+            if args.face=="yolov3" or args.face=="yolov3-mask" or args.face=="mobilenet-mask":
+                obj = org_detections[idx]
+                margin = 1.0
+                if args.face=="yolov3-mask" or args.face=="mobilenet-mask":
+                    margin = 1.4
+            else:
+                obj = org_detections[idx]
                 margin = 1.4
 
             cx = (obj.x + obj.w/2) * w
