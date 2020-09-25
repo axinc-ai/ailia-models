@@ -10,8 +10,11 @@ Ailia input shape : (1, 3, 256, 256)
 Range : [0.0, 1.0]
 
 ## Output
-- output image  
-![Output](output.png)  
+- 2D mode output image  
+![2D_Output](output_2d.png)  
+
+- 3D mode output image  
+![3D_Output](output_3d.png)  
 
 - confidence map  
 ![confidence_map](output_confidence.png)
@@ -59,4 +62,6 @@ ONNX opset = 10
 
 ## Netron
 
-[face_alignment.onnx.prototxt](https://lutzroeder.github.io/netron/?url=https://storage.googleapis.com/ailia-models/face_alignment/face_alignment.onnx.prototxt)
+- [2DFAN-4.onnx.prototxt](https://lutzroeder.github.io/netron/?url=https://storage.googleapis.com/ailia-models/face_alignment/2DFAN-4.onnx.prototxt)
+- [3DFAN-4.onnx.prototxt](https://lutzroeder.github.io/netron/?url=https://storage.googleapis.com/ailia-models/face_alignment/3DFAN-4.onnx.prototxt)
+- [depth_estimation.onnx.prototxt](https://lutzroeder.github.io/netron/?url=https://storage.googleapis.com/ailia-models/face_alignment/depth_estimation.onnx.prototxt)
