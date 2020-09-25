@@ -132,44 +132,85 @@ def cosin_metric(x1, x2):
     return np.dot(x1, x2) / (np.linalg.norm(x1) * np.linalg.norm(x2))
 
 
-def face_identification(fe_list,net,resized_frame):
+class FaceTrack():
+    def __init__(self, id, fe, image):
+        self.id = id
+        self.fe = [fe]
+        self.image = [image]
+        self.TRACK_T = 8
+    
+    def update(self,fe,image):
+        self.fe.append(fe)
+        self.image.append(image)
+        if len(self.fe)>=self.TRACK_T:
+            self.fe.pop(0)
+        if len(self.image)>=self.TRACK_T:
+            self.image.pop(0)
+
+
+def face_identification(tracks,net,detections):
     BATCH_SIZE = net.get_input_shape()[0]
 
-    # prepare target face and input face
-    input_frame = preprocess_image(resized_frame, input_is_bgr=True)
-    if BATCH_SIZE == 4:
-        input_data = np.concatenate([input_frame, input_frame], axis=0)
-    else:
-        input_data = input_frame
+    for i in range(len(detections)):
+        resized_frame = detections[i]["resized_frame"]
 
-    # inference
-    preds_ailia = net.predict(input_data)
+        # prepare target face and input face
+        input_frame = preprocess_image(resized_frame, input_is_bgr=True)
+        if BATCH_SIZE == 4:
+            input_data = np.concatenate([input_frame, input_frame], axis=0)
+        else:
+            input_data = input_frame
 
-    # postprocessing
-    if BATCH_SIZE == 4:
-        fe_1 = np.concatenate([preds_ailia[0], preds_ailia[1]], axis=0)
-        fe_2 = np.concatenate([preds_ailia[2], preds_ailia[3]], axis=0)
-    else:
-        fe_1 = np.concatenate([preds_ailia[0], preds_ailia[1]], axis=0)
-        fe_2 = fe_1
+        # inference
+        preds_ailia = net.predict(input_data)
 
-    # identification
-    id_sim = 0
-    score_sim = 0
-    for i in range(len(fe_list)):
-        fe=fe_list[i]
-        sim = cosin_metric(fe, fe_2)
-        if score_sim < sim:
-            id_sim = i
-            score_sim = sim
-    if score_sim < args.threshold:
-        id_sim = len(fe_list)
-        fe_list.append(fe_2)
+        # postprocessing
+        if BATCH_SIZE == 4:
+            fe_1 = np.concatenate([preds_ailia[0], preds_ailia[1]], axis=0)
+            fe_2 = np.concatenate([preds_ailia[2], preds_ailia[3]], axis=0)
+        else:
+            fe_1 = np.concatenate([preds_ailia[0], preds_ailia[1]], axis=0)
+            fe_2 = fe_1
+        
+        detections[i]["fe"] = fe_2
+    
+    score_matrix = np.zeros((len(detections),len(tracks)))
+    for i in range(len(detections)):
+        for j in range(len(tracks)):
+            max_sim = 0
+            for k in range(len(tracks[j].fe)):
+                sim = cosin_metric(detections[i]["fe"], tracks[j].fe[k])
+                if max_sim < sim:
+                    max_sim = sim
+            score_matrix[i,j] = max_sim
+
+    for i in range(len(detections)):
         score_sim = 0
-    #else:
-    #    fe_list[id_sim]=(fe_list[id_sim] + fe_2)/2  #update feature value
-    return id_sim, score_sim
+        id_sim = 0
+        det_sim = 0
+        for j in range(len(detections)):
+            for k in range(len(tracks)):
+                if score_sim < score_matrix[j,k]:
+                    score_sim = score_matrix[j,k]
+                    det_sim = j
+                    id_sim = k
+        detections[det_sim]["id_sim"] = id_sim
+        detections[det_sim]["score_sim"] = score_sim
+        for j in range(len(detections)):
+            for k in range(len(tracks)):
+                if j==det_sim or k==id_sim:
+                    score_matrix[j,k]=0
 
+    for i in range(len(detections)):
+        # identification
+        if detections[i]["score_sim"] < args.threshold:
+            id_sim = len(tracks)
+            fe_obj=FaceTrack(id_sim,detections[i]["fe"],detections[i]["resized_frame"])
+            tracks.append(fe_obj)
+            detections[i]["score_sim"] = 0
+            detections[i]["id_sim"] = id_sim
+        else:
+            tracks[detections[i]["id_sim"]].update(detections[i]["fe"],detections[i]["resized_frame"])
 
 # ======================
 # Main functions
@@ -224,7 +265,7 @@ def compare_images():
 
 def compare_video():
     # prepare base image
-    fe_list = []
+    tracks = []
 
     # net initialize
     env_id = ailia.get_gpu_environment_id()
@@ -257,12 +298,17 @@ def compare_video():
         if check_file_existance(args.video):
             capture = cv2.VideoCapture(args.video)
 
+    # ui buffer
+    ui = np.zeros((1,1,3), np.uint8)
+
     # inference loop
     while(True):
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
         h, w = frame.shape[0], frame.shape[1]
+        if ui.shape[0]==1:
+            ui = np.zeros((h,int(w * 1.5),3), np.uint8)
 
         # detect face
         if args.face=="yolov3":
@@ -284,6 +330,7 @@ def compare_video():
             count = len(detections)
 
         texts = []
+        detections = []
         for idx in range(count):
             # get detected face
             if args.face=="yolov3":
@@ -320,21 +367,22 @@ def compare_video():
             crop_img, resized_frame = adjust_frame_size(
                 crop_img, IMAGE_HEIGHT, IMAGE_WIDTH
             )
+            detections.append({"resized_frame":resized_frame,"top_left":top_left,"bottom_right":bottom_right,"id_sim":0,"score_sim":0,"fe":None})
+        
+        face_identification(tracks,net,detections)
 
-            # get matched face
-            id_sim, score_sim = face_identification(fe_list,net,resized_frame)
-
+        for detection in detections:
             # display result
             fontScale = w / 512.0
             thickness = 2
-            color = hsv_to_rgb(256 * id_sim / 16, 255, 255)
-            cv2.rectangle(frame, top_left, bottom_right, color, 2)
+            color = hsv_to_rgb(256 * detection["id_sim"] / 16, 255, 255)
+            cv2.rectangle(frame, detection["top_left"], detection["bottom_right"], color, 2)
 
-            text_position = (int(fx)+4, int((fy+fh)-8))
+            text_position = (int(detection["top_left"][0])+4, int((detection["bottom_right"][1])-8))
 
             cv2.putText(
                 frame,
-                f"{id_sim} : {score_sim:5.3f}",
+                f"{detection['id_sim']} : {detection['score_sim']:5.3f}",
                 text_position,
                 cv2.FONT_HERSHEY_SIMPLEX,
                 fontScale,
@@ -342,7 +390,22 @@ def compare_video():
                 thickness
             )
 
-        cv2.imshow('frame', frame)
+        # display ui
+        ui[:,0:w,:]=frame[:,:,:]
+        for i in range(len(tracks)):
+            for j in range(len(tracks[i].image)):
+                y1=int(IMAGE_HEIGHT/4)*i
+                y2=int(IMAGE_HEIGHT/4)*(i+1)
+                x1=w+int(IMAGE_WIDTH/4)*j
+                x2=w+int(IMAGE_WIDTH/4)*(j+1)
+                if x2>=int(w*1.5) or y2>=h:
+                    continue
+                face=tracks[i].image[j]
+                face=cv2.resize(face,((int)(IMAGE_WIDTH/4),(int)(IMAGE_HEIGHT/4)))
+                ui[y1:y2,x1:x2,:]=face
+
+        #cv2.imshow('frame', frame)
+        cv2.imshow('arcface', ui)
 
     capture.release()
     cv2.destroyAllWindows()
