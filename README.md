@@ -171,7 +171,7 @@ The collection of pre-trained, state-of-the-art models.
 
 | | Model | Reference | Exported From | Supported Ailia Version |
 |:-----------|------------:|:------------:|:------------:|:------------:|
-| [<img src="text_recognition/etl/font.png" width=64px>](text_recognition/etl/) |[etl](/text_recognition/etl) | Japanese Character Recognization | Keras | 1.1.0 and later |
+| [<img src="text_recognition/etl/font.png" width=64px>](text_recognition/etl/) |[etl](/text_recognition/etl) | Japanese Character Classification | Keras | 1.1.0 and later |
 
 ## Commercial model
 
