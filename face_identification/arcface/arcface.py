@@ -38,7 +38,7 @@ THRESHOLD = 0.25572845
 # THRESHOLD = 0.45 # for mixed model
 
 # face detection
-FACE_MODEL_LISTS = ['yolov3', 'blazeface']
+FACE_MODEL_LISTS = ['yolov3', 'blazeface', 'mobilenet']
 
 YOLOV3_FACE_THRESHOLD = 0.2
 YOLOV3_FACE_IOU = 0.45
@@ -93,6 +93,10 @@ if args.face=="yolov3":
     FACE_WEIGHT_PATH = 'yolov3-face.opt.onnx'
     FACE_MODEL_PATH = 'yolov3-face.opt.onnx.prototxt'
     FACE_REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/yolov3-face/'
+elif args.face=="mobilenet":
+    FACE_WEIGHT_PATH = 'face-mask-detection-mb2-ssd-lite.obf.onnx'
+    FACE_MODEL_PATH = 'face-mask-detection-mb2-ssd-lite.onnx.prototxt'
+    FACE_REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/face-mask-detection/'
 else:
     FACE_WEIGHT_PATH = 'blazeface.onnx'
     FACE_MODEL_PATH = 'blazeface.onnx.prototxt'
@@ -133,22 +137,35 @@ def cosin_metric(x1, x2):
 
 
 class FaceTrack():
-    def __init__(self, id, fe, image):
+    def __init__(self, id, fe, image, frame_no):
         self.id = id
         self.fe = [fe]
         self.image = [image]
+        self.frame_no = [frame_no]
         self.TRACK_T = 8
+        self.REMOVE_T = 80
+        self.score = 0
     
-    def update(self,fe,image):
+    def update(self,fe,image,score,frame_no):
         self.fe.append(fe)
         self.image.append(image)
-        if len(self.fe)>=self.TRACK_T:
+        self.frame_no.append(frame_no)
+        self.score=score
+    
+    def pop(self,frame_no):
+        if len(self.frame_no)>=self.TRACK_T:
             self.fe.pop(0)
-        if len(self.image)>=self.TRACK_T:
             self.image.pop(0)
+            self.frame_no.pop(0)
+
+        if len(self.frame_no)>=1:
+            if frame_no - self.frame_no[0] >= self.REMOVE_T:
+                self.fe.pop(0)
+                self.image.pop(0)
+                self.frame_no.pop(0)
 
 
-def face_identification(tracks,net,detections):
+def face_identification(tracks,net,detections,frame_no):
     BATCH_SIZE = net.get_input_shape()[0]
 
     for i in range(len(detections)):
@@ -201,16 +218,23 @@ def face_identification(tracks,net,detections):
                 if j==det_sim or k==id_sim:
                     score_matrix[j,k]=0
 
+    for i in range(len(tracks)):
+        tracks[i].score=0
+
     for i in range(len(detections)):
         # identification
         if detections[i]["score_sim"] < args.threshold:
             id_sim = len(tracks)
-            fe_obj=FaceTrack(id_sim,detections[i]["fe"],detections[i]["resized_frame"])
+            fe_obj=FaceTrack(id_sim,detections[i]["fe"],detections[i]["resized_frame"],frame_no)
             tracks.append(fe_obj)
             detections[i]["score_sim"] = 0
             detections[i]["id_sim"] = id_sim
         else:
-            tracks[detections[i]["id_sim"]].update(detections[i]["fe"],detections[i]["resized_frame"])
+            tracks[detections[i]["id_sim"]].update(detections[i]["fe"],detections[i]["resized_frame"],detections[i]["score_sim"],frame_no)
+
+    for i in range(len(tracks)):
+        tracks[i].pop(frame_no)
+
 
 # ======================
 # Main functions
@@ -284,6 +308,17 @@ def compare_video():
             algorithm=ailia.DETECTOR_ALGORITHM_YOLOV3,
             env_id=env_id
         )
+    elif args.face=="mobilenet":
+        detector = ailia.Detector(
+            FACE_MODEL_PATH,
+            FACE_WEIGHT_PATH,
+            2,
+            format=ailia.NETWORK_IMAGE_FORMAT_RGB,
+            channel=ailia.NETWORK_IMAGE_CHANNEL_FIRST,
+            range=ailia.NETWORK_IMAGE_RANGE_S_FP32,
+            algorithm=ailia.DETECTOR_ALGORITHM_SSD,
+            env_id=env_id
+        )
     else:
         detector = ailia.Net(FACE_MODEL_PATH, FACE_WEIGHT_PATH, env_id=env_id)
 
@@ -300,6 +335,7 @@ def compare_video():
 
     # ui buffer
     ui = np.zeros((1,1,3), np.uint8)
+    frame_no = 0
 
     # inference loop
     while(True):
@@ -311,7 +347,7 @@ def compare_video():
             ui = np.zeros((h,int(w * 1.5),3), np.uint8)
 
         # detect face
-        if args.face=="yolov3":
+        if args.face=="yolov3" or args.face=="mobilenet":
             img = cv2.cvtColor(frame, cv2.COLOR_BGR2BGRA)
             detector.compute(img, YOLOV3_FACE_THRESHOLD, YOLOV3_FACE_IOU)
             count = detector.get_object_count()
@@ -333,7 +369,7 @@ def compare_video():
         detections = []
         for idx in range(count):
             # get detected face
-            if args.face=="yolov3":
+            if args.face=="yolov3" or args.face=="mobilenet":
                 obj = detector.get_object(idx)
                 margin = 1.0
             else:
@@ -369,7 +405,8 @@ def compare_video():
             )
             detections.append({"resized_frame":resized_frame,"top_left":top_left,"bottom_right":bottom_right,"id_sim":0,"score_sim":0,"fe":None})
         
-        face_identification(tracks,net,detections)
+        face_identification(tracks,net,detections,frame_no)
+        frame_no=frame_no+1
 
         for detection in detections:
             # display result
@@ -382,7 +419,7 @@ def compare_video():
 
             cv2.putText(
                 frame,
-                f"{detection['id_sim']} : {detection['score_sim']:5.3f}",
+                f"{detection['id_sim']}",
                 text_position,
                 cv2.FONT_HERSHEY_SIMPLEX,
                 fontScale,
@@ -392,10 +429,18 @@ def compare_video():
 
         # display ui
         ui[:,0:w,:]=frame[:,:,:]
+        ui[:,w:int(w*1.5),:]=0
+
+        cnt = 0
         for i in range(len(tracks)):
+            if len(tracks[i].image)<=0:
+                continue
+
+            y0=int(IMAGE_HEIGHT/4)*(cnt*2+0)
+            y1=int(IMAGE_HEIGHT/4)*(cnt*2+1)
+            y2=int(IMAGE_HEIGHT/4)*(cnt*2+2)
+
             for j in range(len(tracks[i].image)):
-                y1=int(IMAGE_HEIGHT/4)*i
-                y2=int(IMAGE_HEIGHT/4)*(i+1)
                 x1=w+int(IMAGE_WIDTH/4)*j
                 x2=w+int(IMAGE_WIDTH/4)*(j+1)
                 if x2>=int(w*1.5) or y2>=h:
@@ -403,6 +448,26 @@ def compare_video():
                 face=tracks[i].image[j]
                 face=cv2.resize(face,((int)(IMAGE_WIDTH/4),(int)(IMAGE_HEIGHT/4)))
                 ui[y1:y2,x1:x2,:]=face
+
+            fontScale = 0.5
+            thickness = 2
+            color = hsv_to_rgb(256 * i / 16, 255, 255)
+            cv2.rectangle(ui, (w,y0), (int(w*1.5),y2), color, 2)
+
+            text_position = (w,y0 + 16)
+
+            cv2.putText(
+                ui,
+                f"ID {i} : {tracks[i].score:5.3f}",
+                text_position,
+                cv2.FONT_HERSHEY_SIMPLEX,
+                fontScale,
+                color,
+                thickness
+            )
+
+            cnt = cnt + 1
+
 
         #cv2.imshow('frame', frame)
         cv2.imshow('arcface', ui)
