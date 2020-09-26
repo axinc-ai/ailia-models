@@ -376,7 +376,7 @@ def compare_video():
             org_detections=compute_blazeface(detector,frame)
 
         # remove overwrapped detection
-        org_detections=nms_between_class(org_detections,w,h,iou_threshold=0.25)
+        org_detections=nms_between_class(org_detections,w,h,classes=[0,1],iou_threshold=0.25)
 
         texts = []
         detections = []

@@ -22,7 +22,7 @@ def bb_intersection_over_union(boxA, boxB):
     # return the intersection over union value
     return iou
 
-def nms_between_class(detections,w,h,iou_threshold = 0.25):
+def nms_between_class(detections,w,h,classes = None,iou_threshold = 0.25):
     #Normally darknet use per class nms
     #But some cases need between class nms
     #https://github.com/opencv/opencv/issues/17111
@@ -39,7 +39,7 @@ def nms_between_class(detections,w,h,iou_threshold = 0.25):
             box_a = [w*det[idx2].x,h*det[idx2].y,w*(det[idx2].x+det[idx2].w),h*(det[idx2].y+det[idx2].h)]
             box_b = [w*obj.x,h*obj.y,w*(obj.x+obj.w),h*(obj.y+obj.h)]
             iou = bb_intersection_over_union(box_a,box_b)
-            if iou >= iou_threshold:
+            if iou >= iou_threshold and (classes==None or ((det[idx2].category in classes) and (obj.category in classes))):
                 if det[idx2].prob<=obj.prob:
                     keep[idx2]=False
                 else:
