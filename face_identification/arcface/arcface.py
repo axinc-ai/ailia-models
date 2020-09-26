@@ -41,8 +41,6 @@ THRESHOLD = 0.25572845
 # face detection
 FACE_MODEL_LISTS = ['yolov3', 'blazeface', 'yolov3-mask', 'mobilenet-mask']
 
-UI_WIDTH = 1.5
-
 # ======================
 # Arguemnt Parser Config
 # ======================
@@ -101,7 +99,7 @@ if args.face=="yolov3":
     FACE_CATEGORY = ["face"]
     FACE_ALGORITHM = ailia.DETECTOR_ALGORITHM_YOLOV3
     FACE_RANGE = ailia.NETWORK_IMAGE_RANGE_U_FP32
-    FACE_MARGIN = 1.0
+    FACE_MARGIN = 1.2
 elif args.face=="yolov3-mask":
     FACE_WEIGHT_PATH = 'face-mask-detection-yolov3-tiny.opt.obf.onnx'
     FACE_MODEL_PATH = 'face-mask-detection-yolov3-tiny.opt.onnx.prototxt'
@@ -167,14 +165,15 @@ def cosin_metric(x1, x2):
 # Face Tracking
 # ======================
 
+FACE_TRACK_T = 15   # Face buffer size
+FACE_REMOVE_T = 80  # Remove track after this frames
+
 class FaceTrack():
     def __init__(self, id, fe, image, frame_no):
         self.id = id
         self.fe = [fe]
         self.image = [image]
         self.frame_no = [frame_no]
-        self.TRACK_T = 16
-        self.REMOVE_T = 80
         self.score = 0
     
     def update(self,fe,image,score,frame_no):
@@ -184,13 +183,13 @@ class FaceTrack():
         self.score=score
     
     def pop(self,frame_no):
-        if len(self.frame_no)>=self.TRACK_T:
+        if len(self.frame_no) > FACE_TRACK_T:
             self.fe.pop(0)
             self.image.pop(0)
             self.frame_no.pop(0)
 
         if len(self.frame_no)>=1:
-            if frame_no - self.frame_no[0] >= self.REMOVE_T:
+            if frame_no - self.frame_no[0] >= FACE_REMOVE_T:
                 self.fe.pop(0)
                 self.image.pop(0)
                 self.frame_no.pop(0)
@@ -350,7 +349,7 @@ def display_tracks(ui,w,h,tracks):
         for j in range(len(tracks[i].image)):
             x1=w+int(IMAGE_WIDTH/4)*j
             x2=w+int(IMAGE_WIDTH/4)*(j+1)
-            if x2>=int(w*UI_WIDTH) or y2>=h:
+            if x2>ui.shape[1] or y2>h:
                 continue
             face=tracks[i].image[j]
             face=cv2.resize(face,((int)(IMAGE_WIDTH/4),(int)(IMAGE_HEIGHT/4)))
@@ -359,7 +358,7 @@ def display_tracks(ui,w,h,tracks):
         fontScale = 0.5
         thickness = 2
         color = hsv_to_rgb(256 * i / 16, 255, 255)
-        cv2.rectangle(ui, (w,y0), (int(w*UI_WIDTH),y2), color, 2)
+        cv2.rectangle(ui, (w,y0), (ui.shape[1]-2,y2-2), color, 2)
 
         text_position = (w,y0 + 16)
 
@@ -461,18 +460,18 @@ def compare_video():
         if check_file_existance(args.video):
             capture = cv2.VideoCapture(args.video)
 
+    # ui buffer
+    ui = np.zeros((int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT)),int(capture.get(cv2.CAP_PROP_FRAME_WIDTH)+IMAGE_WIDTH/4*FACE_TRACK_T),3), np.uint8)
+    frame_no = 0
+
     # writer
     writer = None
     if args.savepath is not None:
         frame_rate = capture.get(cv2.CAP_PROP_FPS)
-        size = (int(capture.get(cv2.CAP_PROP_FRAME_WIDTH)*UI_WIDTH),
-                int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT)))
+        size = (ui.shape[1],
+                ui.shape[0])
         fmt = cv2.VideoWriter_fourcc('m', 'p', '4', 'v')
         writer = cv2.VideoWriter(args.savepath, fmt, frame_rate, size)
-
-    # ui buffer
-    ui = np.zeros((1,1,3), np.uint8)
-    frame_no = 0
 
     # inference loop
     while(True):
@@ -482,8 +481,6 @@ def compare_video():
     
         # get frame size
         h, w = frame.shape[0], frame.shape[1]
-        if frame_no == 0:
-            ui = np.zeros((h,int(w * UI_WIDTH),3), np.uint8)
      
         # get faces from image
         detections = get_faces(detector,frame,w,h)
@@ -494,7 +491,7 @@ def compare_video():
 
         # display result
         ui[:,0:w,:]=frame[:,:,:]
-        ui[:,w:int(w*UI_WIDTH),:]=0
+        ui[:,w:-1,:]=0
         display_detections(ui,w,h,detections)
         display_tracks(ui,w,h,tracks)
 
