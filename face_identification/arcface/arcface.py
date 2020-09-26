@@ -40,6 +40,8 @@ THRESHOLD = 0.25572845
 
 # face detection
 FACE_MODEL_LISTS = ['yolov3', 'blazeface', 'yolov3-mask']
+FACE_THRESHOLD = 0.4
+FACE_IOU = 0.45
 
 # ======================
 # Arguemnt Parser Config
@@ -60,6 +62,11 @@ parser.add_argument(
          'If the VIDEO argument is set to 0, the webcam input will be used.'
 )
 parser.add_argument(
+    '-s', '--savepath', metavar='SAVE_FILE_PATH',
+    default=None,
+    help='Save path for the output image or video(mp4).'
+)
+parser.add_argument(
     '-b', '--benchmark',
     action='store_true',
     help='Running the inference on the same input 5 times ' +
@@ -71,19 +78,18 @@ parser.add_argument(
     help='model lists: ' + ' | '.join(MODEL_LISTS)
 )
 parser.add_argument(
-    '-f', '--face', metavar='FACE_ARCH',
-    default='yolov3', choices=FACE_MODEL_LISTS,
-    help='dace detection model lists: ' + ' | '.join(FACE_MODEL_LISTS)
-)
-parser.add_argument(
     '-t', '--threshold', type=float, default=THRESHOLD,
     help='Similality threshold for identification'
 ) 
 parser.add_argument(
-    '-s', '--savepath', metavar='SAVE_FILE_PATH',
-    default=None,
-    help='Save path for the output image or video(mp4).'
+    '-f', '--face', metavar='FACE_ARCH',
+    default='yolov3', choices=FACE_MODEL_LISTS,
+    help='Face detection model lists: ' + ' | '.join(FACE_MODEL_LISTS)
 )
+parser.add_argument(
+    '-ft', '--face_threshold', type=float, default=FACE_THRESHOLD,
+    help='Threshold for face detection'
+) 
 args = parser.parse_args()
 
 WEIGHT_PATH = args.arch+'.onnx'
@@ -118,9 +124,6 @@ else:
     FACE_MARGIN = 1.4
     sys.path.append('../../face_detection/blazeface')
     from blazeface_utils import *
-
-FACE_THRESHOLD = 0.4
-FACE_IOU = 0.45
 
 # ======================
 # Utils
@@ -270,7 +273,7 @@ def get_faces(detector,frame,w,h):
         org_detections=compute_blazeface(detector,frame)
     else:
         img = cv2.cvtColor(frame, cv2.COLOR_BGR2BGRA)
-        detector.compute(img, FACE_THRESHOLD, FACE_IOU)
+        detector.compute(img, args.face_threshold, FACE_IOU)
         count = detector.get_object_count()
         for idx in range(count):
             obj = detector.get_object(idx)
@@ -341,7 +344,7 @@ def display_tracks(ui,w,h,tracks):
         for j in range(len(tracks[i].image)):
             x1=w+int(IMAGE_WIDTH/4)*j
             x2=w+int(IMAGE_WIDTH/4)*(j+1)
-            if x2>ui.shape[1] or y2>h:
+            if x2>ui.shape[1] or y2>ui.shape[0]:
                 continue
             face=tracks[i].image[j]
             face=cv2.resize(face,((int)(IMAGE_WIDTH/4),(int)(IMAGE_HEIGHT/4)))
@@ -453,7 +456,9 @@ def compare_video():
             capture = cv2.VideoCapture(args.video)
 
     # ui buffer
-    ui = np.zeros((int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT)),int(capture.get(cv2.CAP_PROP_FRAME_WIDTH)+IMAGE_WIDTH/4*FACE_TRACK_T),3), np.uint8)
+    ui_width = capture.get(cv2.CAP_PROP_FRAME_WIDTH)+IMAGE_WIDTH/4*FACE_TRACK_T
+    ui_height = max(capture.get(cv2.CAP_PROP_FRAME_HEIGHT) , IMAGE_HEIGHT/4*2*8)
+    ui = np.zeros((int(ui_height),int(ui_width),3), np.uint8)
     frame_no = 0
 
     # writer
@@ -482,8 +487,8 @@ def compare_video():
         frame_no=frame_no+1
 
         # display result
-        ui[:,0:w,:]=frame[:,:,:]
-        ui[:,w:-1,:]=0
+        ui[:,:,:]=0
+        ui[0:h,0:w,:]=frame[:,:,:]
         display_detections(ui,w,h,detections)
         display_tracks(ui,w,h,tracks)
 
