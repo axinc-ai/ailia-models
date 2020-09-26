@@ -39,7 +39,7 @@ THRESHOLD = 0.25572845
 # THRESHOLD = 0.45 # for mixed model
 
 # face detection
-FACE_MODEL_LISTS = ['yolov3', 'blazeface', 'yolov3-mask', 'mobilenet-mask']
+FACE_MODEL_LISTS = ['yolov3', 'blazeface', 'yolov3-mask']
 
 # ======================
 # Arguemnt Parser Config
@@ -107,14 +107,6 @@ elif args.face=="yolov3-mask":
     FACE_CATEGORY = ["no_mask","mask"]
     FACE_ALGORITHM = ailia.DETECTOR_ALGORITHM_YOLOV3
     FACE_RANGE = ailia.NETWORK_IMAGE_RANGE_U_FP32
-    FACE_MARGIN = 1.4
-elif args.face=="mobilenet-mask":
-    FACE_WEIGHT_PATH = 'face-mask-detection-mb2-ssd-lite.obf.onnx'
-    FACE_MODEL_PATH = 'face-mask-detection-mb2-ssd-lite.onnx.prototxt'
-    FACE_REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/face-mask-detection/'
-    FACE_CATEGORY = ["no_mask","mask"]
-    FACE_ALGORITHM = ailia.DETECTOR_ALGORITHM_SSD
-    FACE_RANGE = ailia.NETWORK_IMAGE_RANGE_S_FP32
     FACE_MARGIN = 1.4
 else:
     FACE_WEIGHT_PATH = 'blazeface.onnx'
