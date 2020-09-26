@@ -41,9 +41,6 @@ THRESHOLD = 0.25572845
 # face detection
 FACE_MODEL_LISTS = ['yolov3', 'blazeface', 'yolov3-mask', 'mobilenet-mask']
 
-YOLOV3_FACE_THRESHOLD = 0.4
-YOLOV3_FACE_IOU = 0.45
-
 # ======================
 # Arguemnt Parser Config
 # ======================
@@ -87,24 +84,46 @@ args = parser.parse_args()
 WEIGHT_PATH = args.arch+'.onnx'
 MODEL_PATH = args.arch+'.onnx.prototxt'
 
+# ======================
+# Face detection models
+# ======================
 if args.face=="yolov3":
     FACE_WEIGHT_PATH = 'yolov3-face.opt.onnx'
     FACE_MODEL_PATH = 'yolov3-face.opt.onnx.prototxt'
     FACE_REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/yolov3-face/'
+    FACE_CATEGORY = ["face"]
+    FACE_ALGORITHM = ailia.DETECTOR_ALGORITHM_YOLOV3
+    FACE_RANGE = ailia.NETWORK_IMAGE_RANGE_U_FP32
+    FACE_MARGIN = 1.0
 elif args.face=="yolov3-mask":
     FACE_WEIGHT_PATH = 'face-mask-detection-yolov3-tiny.opt.obf.onnx'
     FACE_MODEL_PATH = 'face-mask-detection-yolov3-tiny.opt.onnx.prototxt'
     FACE_REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/face-mask-detection/'
+    FACE_CATEGORY = ["no_mask","mask"]
+    FACE_ALGORITHM = ailia.DETECTOR_ALGORITHM_YOLOV3
+    FACE_RANGE = ailia.NETWORK_IMAGE_RANGE_U_FP32
+    FACE_MARGIN = 1.4
 elif args.face=="mobilenet-mask":
     FACE_WEIGHT_PATH = 'face-mask-detection-mb2-ssd-lite.obf.onnx'
     FACE_MODEL_PATH = 'face-mask-detection-mb2-ssd-lite.onnx.prototxt'
     FACE_REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/face-mask-detection/'
+    FACE_CATEGORY = ["no_mask","mask"]
+    FACE_ALGORITHM = ailia.DETECTOR_ALGORITHM_SSD
+    FACE_RANGE = ailia.NETWORK_IMAGE_RANGE_S_FP32
+    FACE_MARGIN = 1.4
 else:
     FACE_WEIGHT_PATH = 'blazeface.onnx'
     FACE_MODEL_PATH = 'blazeface.onnx.prototxt'
     FACE_REMOTE_PATH = "https://storage.googleapis.com/ailia-models/blazeface/"
+    FACE_CATEGORY = ["face"]
+    FACE_ALGORITHM = None
+    FACE_RANGE = None
+    FACE_MARGIN = 1.4
     sys.path.append('../../face_detection/blazeface')
     from blazeface_utils import *
+
+FACE_THRESHOLD = 0.4
+FACE_IOU = 0.45
 
 # ======================
 # Utils
@@ -303,41 +322,19 @@ def compare_video():
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
 
     # detector initialize
-    if args.face=="yolov3":
-        detector = ailia.Detector(
-            FACE_MODEL_PATH,
-            FACE_WEIGHT_PATH,
-            1,
-            format=ailia.NETWORK_IMAGE_FORMAT_RGB,
-            channel=ailia.NETWORK_IMAGE_CHANNEL_FIRST,
-            range=ailia.NETWORK_IMAGE_RANGE_U_FP32,
-            algorithm=ailia.DETECTOR_ALGORITHM_YOLOV3,
-            env_id=env_id
-        )
-    elif args.face=="yolov3-mask":
-        detector = ailia.Detector(
-            FACE_MODEL_PATH,
-            FACE_WEIGHT_PATH,
-            2,
-            format=ailia.NETWORK_IMAGE_FORMAT_RGB,
-            channel=ailia.NETWORK_IMAGE_CHANNEL_FIRST,
-            range=ailia.NETWORK_IMAGE_RANGE_U_FP32,
-            algorithm=ailia.DETECTOR_ALGORITHM_YOLOV3,
-            env_id=env_id
-        )
-    elif args.face=="mobilenet-mask":
-        detector = ailia.Detector(
-            FACE_MODEL_PATH,
-            FACE_WEIGHT_PATH,
-            2,
-            format=ailia.NETWORK_IMAGE_FORMAT_RGB,
-            channel=ailia.NETWORK_IMAGE_CHANNEL_FIRST,
-            range=ailia.NETWORK_IMAGE_RANGE_S_FP32,
-            algorithm=ailia.DETECTOR_ALGORITHM_SSD,
-            env_id=env_id
-        )
-    else:
+    if args.face=="blazeface":
         detector = ailia.Net(FACE_MODEL_PATH, FACE_WEIGHT_PATH, env_id=env_id)
+    else:
+        detector = ailia.Detector(
+            FACE_MODEL_PATH,
+            FACE_WEIGHT_PATH,
+            len(FACE_CATEGORY),
+            format=ailia.NETWORK_IMAGE_FORMAT_RGB,
+            channel=ailia.NETWORK_IMAGE_CHANNEL_FIRST,
+            range=FACE_RANGE,
+            algorithm=FACE_ALGORITHM,
+            env_id=env_id
+        )
 
     # web camera
     if args.video == '0':
@@ -365,15 +362,15 @@ def compare_video():
 
         # detect face
         org_detections = []
-        if args.face=="yolov3" or args.face=="yolov3-mask" or args.face=="mobilenet-mask":
+        if args.face=="blazeface":
+            org_detections=compute_blazeface(detector,frame)
+        else:
             img = cv2.cvtColor(frame, cv2.COLOR_BGR2BGRA)
-            detector.compute(img, YOLOV3_FACE_THRESHOLD, YOLOV3_FACE_IOU)
+            detector.compute(img, FACE_THRESHOLD, FACE_IOU)
             count = detector.get_object_count()
             for idx in range(count):
                 obj = detector.get_object(idx)
                 org_detections.append(obj)
-        else:
-            org_detections=compute_blazeface(detector,frame)
 
         # remove overwrapped detection
         org_detections=nms_between_class(org_detections,w,h,classes=[0,1],iou_threshold=0.25)
@@ -382,14 +379,8 @@ def compare_video():
         detections = []
         for idx in range(len(org_detections)):
             # get detected face
-            if args.face=="yolov3" or args.face=="yolov3-mask" or args.face=="mobilenet-mask":
-                obj = org_detections[idx]
-                margin = 1.0
-                if args.face=="yolov3-mask" or args.face=="mobilenet-mask":
-                    margin = 1.4
-            else:
-                obj = org_detections[idx]
-                margin = 1.4
+            obj = org_detections[idx]
+            margin = FACE_MARGIN
 
             cx = (obj.x + obj.w/2) * w
             cy = (obj.y + obj.h/2) * h
