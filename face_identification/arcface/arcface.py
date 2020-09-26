@@ -41,6 +41,8 @@ THRESHOLD = 0.25572845
 # face detection
 FACE_MODEL_LISTS = ['yolov3', 'blazeface', 'yolov3-mask', 'mobilenet-mask']
 
+UI_WIDTH = 1.5
+
 # ======================
 # Arguemnt Parser Config
 # ======================
@@ -79,6 +81,11 @@ parser.add_argument(
     '-t', '--threshold', type=float, default=THRESHOLD,
     help='Similality threshold for identification'
 ) 
+parser.add_argument(
+    '-s', '--savepath', metavar='SAVE_FILE_PATH',
+    default=None,
+    help='Save path for the output image or video(mp4).'
+)
 args = parser.parse_args()
 
 WEIGHT_PATH = args.arch+'.onnx'
@@ -343,7 +350,7 @@ def display_tracks(ui,w,h,tracks):
         for j in range(len(tracks[i].image)):
             x1=w+int(IMAGE_WIDTH/4)*j
             x2=w+int(IMAGE_WIDTH/4)*(j+1)
-            if x2>=int(w*1.5) or y2>=h:
+            if x2>=int(w*UI_WIDTH) or y2>=h:
                 continue
             face=tracks[i].image[j]
             face=cv2.resize(face,((int)(IMAGE_WIDTH/4),(int)(IMAGE_HEIGHT/4)))
@@ -352,7 +359,7 @@ def display_tracks(ui,w,h,tracks):
         fontScale = 0.5
         thickness = 2
         color = hsv_to_rgb(256 * i / 16, 255, 255)
-        cv2.rectangle(ui, (w,y0), (int(w*1.5),y2), color, 2)
+        cv2.rectangle(ui, (w,y0), (int(w*UI_WIDTH),y2), color, 2)
 
         text_position = (w,y0 + 16)
 
@@ -454,6 +461,15 @@ def compare_video():
         if check_file_existance(args.video):
             capture = cv2.VideoCapture(args.video)
 
+    # writer
+    writer = None
+    if args.savepath is not None:
+        frame_rate = capture.get(cv2.CAP_PROP_FPS)
+        size = (int(capture.get(cv2.CAP_PROP_FRAME_WIDTH)*UI_WIDTH),
+                int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT)))
+        fmt = cv2.VideoWriter_fourcc('m', 'p', '4', 'v')
+        writer = cv2.VideoWriter(args.savepath, fmt, frame_rate, size)
+
     # ui buffer
     ui = np.zeros((1,1,3), np.uint8)
     frame_no = 0
@@ -467,7 +483,7 @@ def compare_video():
         # get frame size
         h, w = frame.shape[0], frame.shape[1]
         if frame_no == 0:
-            ui = np.zeros((h,int(w * 1.5),3), np.uint8)
+            ui = np.zeros((h,int(w * UI_WIDTH),3), np.uint8)
      
         # get faces from image
         detections = get_faces(detector,frame,w,h)
@@ -478,12 +494,18 @@ def compare_video():
 
         # display result
         ui[:,0:w,:]=frame[:,:,:]
-        ui[:,w:int(w*1.5),:]=0
+        ui[:,w:int(w*UI_WIDTH),:]=0
         display_detections(ui,w,h,detections)
         display_tracks(ui,w,h,tracks)
 
         # show
         cv2.imshow('arcface', ui)
+
+        if writer is not None:
+            writer.write(ui)
+
+    if writer is not None:
+        writer.release()
 
     capture.release()
     cv2.destroyAllWindows()
