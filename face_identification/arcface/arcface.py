@@ -231,21 +231,21 @@ def face_identification(tracks,net,detections,frame_no):
             score_matrix[i,j] = avg_sim
 
     for i in range(len(detections)):
-        score_sim = 0
-        id_sim = 0
-        det_sim = 0
-        for j in range(len(detections)):
-            for k in range(len(tracks)):
-                if score_sim < score_matrix[j,k]:
-                    score_sim = score_matrix[j,k]
-                    det_sim = j
-                    id_sim = k
+        if len(tracks)==0:
+            continue
+
+        # search max score between detections and tracks
+        max_score=np.unravel_index(np.argmax(score_matrix), score_matrix.shape)
+
+        det_sim=max_score[0]
+        id_sim=max_score[1]
+        score_sim=score_matrix[det_sim,id_sim]
+
         detections[det_sim]["id_sim"] = id_sim
         detections[det_sim]["score_sim"] = score_sim
-        for j in range(len(detections)):
-            for k in range(len(tracks)):
-                if j==det_sim or k==id_sim:
-                    score_matrix[j,k]=0
+
+        score_matrix[det_sim,:]=0
+        score_matrix[:,id_sim]=0
 
     for i in range(len(tracks)):
         tracks[i].score=0
