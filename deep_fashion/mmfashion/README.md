@@ -10,6 +10,8 @@ Shape : (1, 3, height, width)
 
 ## Output
 
+![Output](output.png)
+
 - bboxes shape : (objects, bbox)
 - labels shape : (objects)
 - masks shape : (objects, 28, 28)
