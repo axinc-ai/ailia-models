@@ -156,6 +156,9 @@ def prepare_input_data(image_path):
 def cosin_metric(x1, x2):
     return np.dot(x1, x2) / (np.linalg.norm(x1) * np.linalg.norm(x2))
 
+# ======================
+# Face Tracking
+# ======================
 
 class FaceTrack():
     def __init__(self, id, fe, image, frame_no):
@@ -261,6 +264,110 @@ def face_identification(tracks,net,detections,frame_no):
     for i in range(len(tracks)):
         tracks[i].pop(frame_no)
 
+
+def get_faces(detector,frame,w,h):
+    # detect face
+    org_detections = []
+    if args.face=="blazeface":
+        org_detections=compute_blazeface(detector,frame)
+    else:
+        img = cv2.cvtColor(frame, cv2.COLOR_BGR2BGRA)
+        detector.compute(img, FACE_THRESHOLD, FACE_IOU)
+        count = detector.get_object_count()
+        for idx in range(count):
+            obj = detector.get_object(idx)
+            org_detections.append(obj)
+
+    # remove overwrapped detection
+    org_detections=nms_between_class(org_detections,w,h,classes=[0,1],iou_threshold=0.25)
+
+    detections = []
+    for idx in range(len(org_detections)):
+        # get detected face
+        obj = org_detections[idx]
+        margin = FACE_MARGIN
+
+        cx = (obj.x + obj.w/2) * w
+        cy = (obj.y + obj.h/2) * h
+        cw = max(obj.w * w * margin,obj.h * h * margin)
+        fx = max(cx - cw/2, 0)
+        fy = max(cy - cw/2, 0)
+        fw = min(cw, w-fx)
+        fh = min(cw, h-fy)
+        top_left = (int(fx), int(fy))
+        bottom_right = (int((fx+fw)), int(fy+fh))
+
+        # get detected face
+        crop_img = frame[top_left[1]:bottom_right[1], top_left[0]:bottom_right[0], 0:3]
+        if crop_img.shape[0]<=0 or crop_img.shape[1]<=0:
+            continue
+        crop_img, resized_frame = adjust_frame_size(
+            crop_img, IMAGE_HEIGHT, IMAGE_WIDTH
+        )
+        detections.append({"resized_frame":resized_frame,"top_left":top_left,"bottom_right":bottom_right,"id_sim":0,"score_sim":0,"fe":None})
+    
+    return detections
+
+
+def display_detections(ui,w,h,detections):
+    for detection in detections:
+        # display result
+        fontScale = w / 512.0
+        thickness = 2
+        color = hsv_to_rgb(256 * detection["id_sim"] / 16, 255, 255)
+        cv2.rectangle(ui, detection["top_left"], detection["bottom_right"], color, 2)
+
+        text_position = (int(detection["top_left"][0])+4, int((detection["bottom_right"][1])-8))
+
+        cv2.putText(
+            ui,
+            f"{detection['id_sim']}",
+            text_position,
+            cv2.FONT_HERSHEY_SIMPLEX,
+            fontScale,
+            color,
+            thickness
+        )
+
+
+def display_tracks(ui,w,h,tracks):
+    cnt = 0
+    for i in range(len(tracks)):
+        if len(tracks[i].image)<=0:
+            continue
+
+        y0=int(IMAGE_HEIGHT/4)*(cnt*2+0)
+        y1=int(IMAGE_HEIGHT/4)*(cnt*2+1)
+        y2=int(IMAGE_HEIGHT/4)*(cnt*2+2)
+
+        for j in range(len(tracks[i].image)):
+            x1=w+int(IMAGE_WIDTH/4)*j
+            x2=w+int(IMAGE_WIDTH/4)*(j+1)
+            if x2>=int(w*1.5) or y2>=h:
+                continue
+            face=tracks[i].image[j]
+            face=cv2.resize(face,((int)(IMAGE_WIDTH/4),(int)(IMAGE_HEIGHT/4)))
+            ui[y1:y2,x1:x2,:]=face
+
+        fontScale = 0.5
+        thickness = 2
+        color = hsv_to_rgb(256 * i / 16, 255, 255)
+        cv2.rectangle(ui, (w,y0), (int(w*1.5),y2), color, 2)
+
+        text_position = (w,y0 + 16)
+
+        cv2.putText(
+            ui,
+            f"ID {i} : {tracks[i].score:5.3f}",
+            text_position,
+            cv2.FONT_HERSHEY_SIMPLEX,
+            fontScale,
+            color,
+            thickness
+        )
+
+        cnt = cnt + 1
+
 # ======================
 # Main functions
 # ======================
@@ -356,116 +463,26 @@ def compare_video():
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
+    
+        # get frame size
         h, w = frame.shape[0], frame.shape[1]
-        if ui.shape[0]==1:
+        if frame_no == 0:
             ui = np.zeros((h,int(w * 1.5),3), np.uint8)
+     
+        # get faces from image
+        detections = get_faces(detector,frame,w,h)
 
-        # detect face
-        org_detections = []
-        if args.face=="blazeface":
-            org_detections=compute_blazeface(detector,frame)
-        else:
-            img = cv2.cvtColor(frame, cv2.COLOR_BGR2BGRA)
-            detector.compute(img, FACE_THRESHOLD, FACE_IOU)
-            count = detector.get_object_count()
-            for idx in range(count):
-                obj = detector.get_object(idx)
-                org_detections.append(obj)
-
-        # remove overwrapped detection
-        org_detections=nms_between_class(org_detections,w,h,classes=[0,1],iou_threshold=0.25)
-
-        texts = []
-        detections = []
-        for idx in range(len(org_detections)):
-            # get detected face
-            obj = org_detections[idx]
-            margin = FACE_MARGIN
-
-            cx = (obj.x + obj.w/2) * w
-            cy = (obj.y + obj.h/2) * h
-            cw = max(obj.w * w * margin,obj.h * h * margin)
-            fx = max(cx - cw/2, 0)
-            fy = max(cy - cw/2, 0)
-            fw = min(cw, w-fx)
-            fh = min(cw, h-fy)
-            top_left = (int(fx), int(fy))
-            bottom_right = (int((fx+fw)), int(fy+fh))
-
-            # get detected face
-            crop_img = frame[top_left[1]:bottom_right[1], top_left[0]:bottom_right[0], 0:3]
-            if crop_img.shape[0]<=0 or crop_img.shape[1]<=0:
-                continue
-            crop_img, resized_frame = adjust_frame_size(
-                crop_img, IMAGE_HEIGHT, IMAGE_WIDTH
-            )
-            detections.append({"resized_frame":resized_frame,"top_left":top_left,"bottom_right":bottom_right,"id_sim":0,"score_sim":0,"fe":None})
-        
+        # track face
         face_identification(tracks,net,detections,frame_no)
         frame_no=frame_no+1
 
-        for detection in detections:
-            # display result
-            fontScale = w / 512.0
-            thickness = 2
-            color = hsv_to_rgb(256 * detection["id_sim"] / 16, 255, 255)
-            cv2.rectangle(frame, detection["top_left"], detection["bottom_right"], color, 2)
-
-            text_position = (int(detection["top_left"][0])+4, int((detection["bottom_right"][1])-8))
-
-            cv2.putText(
-                frame,
-                f"{detection['id_sim']}",
-                text_position,
-                cv2.FONT_HERSHEY_SIMPLEX,
-                fontScale,
-                color,
-                thickness
-            )
-
-        # display ui
+        # display result
         ui[:,0:w,:]=frame[:,:,:]
         ui[:,w:int(w*1.5),:]=0
+        display_detections(ui,w,h,detections)
+        display_tracks(ui,w,h,tracks)
 
-        cnt = 0
-        for i in range(len(tracks)):
-            if len(tracks[i].image)<=0:
-                continue
-
-            y0=int(IMAGE_HEIGHT/4)*(cnt*2+0)
-            y1=int(IMAGE_HEIGHT/4)*(cnt*2+1)
-            y2=int(IMAGE_HEIGHT/4)*(cnt*2+2)
-
-            for j in range(len(tracks[i].image)):
-                x1=w+int(IMAGE_WIDTH/4)*j
-                x2=w+int(IMAGE_WIDTH/4)*(j+1)
-                if x2>=int(w*1.5) or y2>=h:
-                    continue
-                face=tracks[i].image[j]
-                face=cv2.resize(face,((int)(IMAGE_WIDTH/4),(int)(IMAGE_HEIGHT/4)))
-                ui[y1:y2,x1:x2,:]=face
-
-            fontScale = 0.5
-            thickness = 2
-            color = hsv_to_rgb(256 * i / 16, 255, 255)
-            cv2.rectangle(ui, (w,y0), (int(w*1.5),y2), color, 2)
-
-            text_position = (w,y0 + 16)
-
-            cv2.putText(
-                ui,
-                f"ID {i} : {tracks[i].score:5.3f}",
-                text_position,
-                cv2.FONT_HERSHEY_SIMPLEX,
-                fontScale,
-                color,
-                thickness
-            )
-
-            cnt = cnt + 1
-
-
-        #cv2.imshow('frame', frame)
+        # show
         cv2.imshow('arcface', ui)
 
     capture.release()
