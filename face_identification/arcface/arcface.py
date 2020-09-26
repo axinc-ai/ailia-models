@@ -43,9 +43,6 @@ FACE_MODEL_LISTS = ['yolov3', 'blazeface', 'yolov3-mask', 'mobilenet-mask']
 YOLOV3_FACE_THRESHOLD = 0.4
 YOLOV3_FACE_IOU = 0.45
 
-BLAZEFACE_INPUT_IMAGE_HEIGHT = 128
-BLAZEFACE_INPUT_IMAGE_WIDTH = 128
-
 # ======================
 # Arguemnt Parser Config
 # ======================
@@ -105,7 +102,7 @@ else:
     FACE_WEIGHT_PATH = 'blazeface.onnx'
     FACE_MODEL_PATH = 'blazeface.onnx.prototxt'
     FACE_REMOTE_PATH = "https://storage.googleapis.com/ailia-models/blazeface/"
-    sys.path.append('../../object-detection/blazeface')
+    sys.path.append('../../face_detection/blazeface')
     from blazeface_utils import *
 
 # ======================
@@ -395,33 +392,7 @@ def compare_video():
                 obj = detector.get_object(idx)
                 org_detections.append(obj)
         else:
-            img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            image = cv2.resize(img, (BLAZEFACE_INPUT_IMAGE_WIDTH, BLAZEFACE_INPUT_IMAGE_HEIGHT))
-            image = image.transpose((2, 0, 1))  # channel first
-            image = image[np.newaxis, :, :, :]  # (batch_size, channel, h, w)
-            input_data = image / 127.5 - 1.0
-
-            # inference
-            preds_ailia = detector.predict([input_data])
-
-            # postprocessing
-            org_detections = []
-            blaze_face_detections = postprocess(preds_ailia)
-            for idx in range(blaze_face_detections):
-                obj = blaze_face_detections[idx]
-                if len(obj)==0:
-                    continue
-                d = obj[0]
-                obj = ailia.DetectorObject(
-                    category = 0,
-                    prob = 1.0,
-                    x = d[1],
-                    y = d[0],
-                    w = d[3]-d[1],
-                    h = d[2]-d[0] )
-                
-                org_detections.append(obj)
-
+            org_detections=compute_blazeface(detector,frame)
             count = len(org_detections)
 
         # remove overwrapped detection
@@ -472,7 +443,7 @@ def compare_video():
             bottom_right = (int((fx+fw)), int(fy+fh))
 
             # get detected face
-            crop_img = img[top_left[1]:bottom_right[1], top_left[0]:bottom_right[0], 0:3]
+            crop_img = frame[top_left[1]:bottom_right[1], top_left[0]:bottom_right[0], 0:3]
             if crop_img.shape[0]<=0 or crop_img.shape[1]<=0:
                 continue
             crop_img, resized_frame = adjust_frame_size(
