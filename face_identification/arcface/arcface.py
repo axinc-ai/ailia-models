@@ -16,6 +16,7 @@ from image_utils import load_image, draw_result_on_img  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from utils import check_file_existance  # noqa: E402
 from detector_utils import hsv_to_rgb # noqa: E402C
+from nms_utils import nms_between_class
 
 import matplotlib.pyplot as plt
 
@@ -241,26 +242,6 @@ def face_identification(tracks,net,detections,frame_no):
     for i in range(len(tracks)):
         tracks[i].pop(frame_no)
 
-
-def bb_intersection_over_union(boxA, boxB):
-    # determine the (x, y)-coordinates of the intersection rectangle
-    xA = max(boxA[0], boxB[0])
-    yA = max(boxA[1], boxB[1])
-    xB = min(boxA[2], boxB[2])
-    yB = min(boxA[3], boxB[3])
-    # compute the area of intersection rectangle
-    interArea = max(0, xB - xA + 1) * max(0, yB - yA + 1)
-    # compute the area of both the prediction and ground-truth
-    # rectangles
-    boxAArea = (boxA[2] - boxA[0] + 1) * (boxA[3] - boxA[1] + 1)
-    boxBArea = (boxB[2] - boxB[0] + 1) * (boxB[3] - boxB[1] + 1)
-    # compute the intersection over union by taking the intersection
-    # area and dividing it by the sum of prediction + ground-truth
-    # areas - the interesection area
-    iou = interArea / float(boxAArea + boxBArea - interArea)
-    # return the intersection over union value
-    return iou
-
 # ======================
 # Main functions
 # ======================
@@ -393,35 +374,13 @@ def compare_video():
                 org_detections.append(obj)
         else:
             org_detections=compute_blazeface(detector,frame)
-            count = len(org_detections)
 
         # remove overwrapped detection
-        det = []
-        keep = []
-        iou_threshold = 0.25
-        for idx in range(len(org_detections)):
-            obj = org_detections[idx]
-            is_keep=True
-            for idx2 in range(len(det)):
-                if not keep[idx2]:
-                    continue
-                box_a = [w*det[idx2].x,h*det[idx2].y,w*(det[idx2].x+det[idx2].w),h*(det[idx2].y+det[idx2].h)]
-                box_b = [w*obj.x,h*obj.y,w*(obj.x+obj.w),h*(obj.y+obj.h)]
-                iou = bb_intersection_over_union(box_a,box_b)
-                if iou >= iou_threshold:
-                    if det[idx2].prob<=obj.prob:
-                        keep[idx2]=False
-                    else:
-                        is_keep=False
-            det.append(obj)
-            keep.append(is_keep)
+        org_detections=nms_between_class(org_detections,w,h,iou_threshold=0.25)
 
         texts = []
         detections = []
-        for idx in range(count):
-            if not keep[idx]:
-                continue
-
+        for idx in range(len(org_detections)):
             # get detected face
             if args.face=="yolov3" or args.face=="yolov3-mask" or args.face=="mobilenet-mask":
                 obj = org_detections[idx]
