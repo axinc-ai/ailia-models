@@ -27,12 +27,12 @@ def hsv_to_rgb(h, s, v):
     return (int(bgr[0]), int(bgr[1]), int(bgr[2]), 255)
 
 
-def plot_results(detector, img, category, logging=True):
+def plot_results(detector, img, category, segm_masks=None, logging=True):
     """
-
     :param detector: ailia.Detector, or list of ailia.DetectorObject
     :param img: ndarray data of image
     :param category: list of category_name
+    :param segm_masks:
     :param logging: output log flg
     :return:
     """
@@ -40,12 +40,15 @@ def plot_results(detector, img, category, logging=True):
     count = detector.get_object_count() if hasattr(detector, 'get_object_count') else len(detector)
     if logging:
         print(f'object_count={count}')
-    
+
+    # prepare color data
+    colors = []
     for idx in range(count):
         obj = detector.get_object(idx) if hasattr(detector, 'get_object') else detector[idx]
+
         # print result
         if logging:
-            print(f'+ idx={idx}')        
+            print(f'+ idx={idx}')
             print(
                 f'  category={obj.category}[ {category[obj.category]} ]'
             )
@@ -54,15 +57,34 @@ def plot_results(detector, img, category, logging=True):
             print(f'  y={obj.y}')
             print(f'  w={obj.w}')
             print(f'  h={obj.h}')
-        top_left = (int(w*obj.x), int(h*obj.y))
-        bottom_right = (int(w*(obj.x+obj.w)), int(h*(obj.y+obj.h)))
-        text_position = (int(w*obj.x)+4, int(h*(obj.y+obj.h)-8))
 
-        # update image
-        color = hsv_to_rgb(256 * obj.category / (len(category)+1), 255, 255)
-        fontScale = w / 512.0
+        color = hsv_to_rgb(256 * obj.category / (len(category) + 1), 255, 255)
+        colors.append(color)
+
+    # draw segmentation area
+    if segm_masks:
+        for idx in range(count):
+            mask = np.repeat(np.expand_dims(segm_masks[idx], 2), 3, 2).astype(np.bool)
+            color = colors[idx][:3]
+            fill = np.repeat(np.repeat([[color]], img.shape[0], 0), img.shape[1], 1)
+            img[:, :, :3][mask] = img[:, :, :3][mask] * 0.7 + fill[mask] * 0.3
+
+    # draw bounding box
+    for idx in range(count):
+        obj = detector.get_object(idx) if hasattr(detector, 'get_object') else detector[idx]
+        top_left = (int(w * obj.x), int(h * obj.y))
+        bottom_right = (int(w * (obj.x + obj.w)), int(h * (obj.y + obj.h)))
+
+        color = colors[idx]
         cv2.rectangle(img, top_left, bottom_right, color, 4)
 
+    # draw label
+    for idx in range(count):
+        obj = detector.get_object(idx) if hasattr(detector, 'get_object') else detector[idx]
+        text_position = (int(w * obj.x) + 4, int(h * (obj.y + obj.h) - 8))
+        fontScale = w / 512.0
+
+        color = colors[idx]
         cv2.putText(
             img,
             category[obj.category],
@@ -73,5 +95,3 @@ def plot_results(detector, img, category, logging=True):
             1
         )
     return img
-
-
