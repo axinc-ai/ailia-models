@@ -23,7 +23,7 @@ import matplotlib.pyplot as plt
 # PARAMETERS
 # ======================
 
-MODEL_LISTS = ['arcface', ''arcface_mixed_90_82', 'arcface_mixed_90_99', 'arcface_mixed_eq_90_89']
+MODEL_LISTS = ['arcface', 'arcface_mixed_90_82', 'arcface_mixed_90_99', 'arcface_mixed_eq_90_89']
 
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/arcface/"
 
