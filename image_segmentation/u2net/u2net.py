@@ -119,11 +119,10 @@ def recognize_from_image():
 
     # composite
     if args.composite:
-        pred = cv2.resize(pred,(w,h)) * 255
         image = cv2.imread(args.input)
         image = cv2.cvtColor(image, cv2.COLOR_BGR2BGRA)
-        image[:,:,3]=pred
-        cv2.imwrite(args.savepath,image)
+        image[:,:,3] = cv2.resize(pred,(w,h)) * 255
+        cv2.imwrite(args.savepath, image)
 
     print('Script finished successfully.')
 
