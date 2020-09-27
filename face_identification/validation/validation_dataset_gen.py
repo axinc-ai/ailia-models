@@ -12,7 +12,7 @@ sys.path.append('../../util')
 from utils import check_file_existance  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 
-sys.path.append('../../object_detection/blazeface')
+sys.path.append('../../face_detection/blazeface')
 from blazeface_utils import *
 
 # ======================
