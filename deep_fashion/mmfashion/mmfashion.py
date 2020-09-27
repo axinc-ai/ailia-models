@@ -263,8 +263,8 @@ def recognize_from_video(video, detector):
             continue
 
         x = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        detect_object, _ = detect_objects(x, detector)
-        res_img = plot_results(detect_object, frame, CATEGORY)
+        detect_object, seg_masks = detect_objects(x, detector)
+        res_img = plot_results(detect_object, frame, CATEGORY, segm_masks=seg_masks)
         cv2.imshow('frame', res_img)
 
     capture.release()
