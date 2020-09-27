@@ -16,7 +16,7 @@ from image_utils import load_image, draw_result_on_img  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from utils import check_file_existance  # noqa: E402
 from detector_utils import hsv_to_rgb # noqa: E402C
-from nms_utils import nms_between_class
+from nms_utils import nms_between_categories
 
 import matplotlib.pyplot as plt
 
@@ -280,7 +280,7 @@ def get_faces(detector,frame,w,h):
             org_detections.append(obj)
 
     # remove overwrapped detection
-    org_detections=nms_between_class(org_detections,w,h,classes=[0,1],iou_threshold=0.25)
+    org_detections=nms_between_categories(org_detections,w,h,categories=[0,1],iou_threshold=FACE_IOU)
 
     detections = []
     for idx in range(len(org_detections)):

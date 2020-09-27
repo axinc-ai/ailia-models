@@ -12,7 +12,7 @@ from utils import check_file_existance  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from webcamera_utils import adjust_frame_size  # noqa: E402C
 from detector_utils import plot_results, load_image  # noqa: E402C
-
+from nms_utils import nms_between_categories
 
 # ======================
 # Parameters
@@ -112,8 +112,15 @@ def recognize_from_image():
     else:
         detector.compute(img, THRESHOLD, IOU)
 
+    # nms
+    detections = []
+    for idx in range(detector.get_object_count()):
+        obj = detector.get_object(idx)
+        detections.append(obj)
+    detections=nms_between_categories(detections,img.shape[1],img.shape[0],categories=[0,1],iou_threshold=IOU)
+
     # plot result
-    res_img = plot_results(detector, img, FACE_CATEGORY)
+    res_img = plot_results(detections, img, FACE_CATEGORY)
     cv2.imwrite(args.savepath, res_img)
     print('Script finished successfully.')
 
@@ -154,7 +161,14 @@ def recognize_from_video():
 
         img = cv2.cvtColor(resized_img, cv2.COLOR_BGR2BGRA)
         detector.compute(img, THRESHOLD, IOU)
-        res_img = plot_results(detector, resized_img, FACE_CATEGORY, False)
+
+        detections = []
+        for idx in range(detector.get_object_count()):
+            obj = detector.get_object(idx)
+            detections.append(obj)
+        detections=nms_between_categories(detections,frame.shape[1],frame.shape[0],categories=[0,1],iou_threshold=IOU)
+
+        res_img = plot_results(detections, resized_img, FACE_CATEGORY, False)
         cv2.imshow('frame', res_img)
 
     capture.release()
