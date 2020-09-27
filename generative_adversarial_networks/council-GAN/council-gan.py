@@ -19,16 +19,13 @@ from yolo_face import FaceLocator
 # PARAMETERS
 # ======================
 
-WEIGHT_PATH = [
-    'councilGAN-glasses.onnx',
-    'councilGAN-m2f_256.onnx',
-    'councilGAN-anime.onnx'
+
+PATH_SUFFIX = [
+    'councilGAN-glasses',
+    'councilGAN-m2f_256',
+    'councilGAN-anime'
 ]
-MODEL_PATH = [
-    'councilGAN-glasses.onnx.prototxt',
-    'councilGAN-m2f_256.onnx.prototxt',
-    'councilGAN-anime.onnx.prototxt'
-]
+
 MODEL = 0
 
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/council-gan/"
@@ -96,7 +93,13 @@ parser.add_argument(
     action='store_true',
     help='Run anime mode'
 )
+parser.add_argument(
+    '-r', '--resolution', metavar='RESOLUTION',
+    default=128,
+    help='Input file resolution for glasses mode'
+)
 args = parser.parse_args()
+
 
 # ======================
 # Preprocessing functions
@@ -105,8 +108,8 @@ def preprocess(image):
     """Convert channel-first BGR image as numpy /n
     array to normalized channel-last RGB."""
     image = center_crop(image)
-    size = [128, 256, 256][MODEL]
-    image = cv2.resize(image, (size, size))
+#     size = [128, 256, 256][MODEL]
+    image = cv2.resize(image, (args.resolution, args.resolution))
     # BGR to RGB
     image = image[...,::-1]
     # scale to [0,1]
@@ -305,8 +308,7 @@ def process_video():
 
 def main():
     # check model choice, defaults to glasses-removal
-    global WEIGHT_PATH
-    global MODEL_PATH
+    global PATH_SUFFIX
     global MODEL
     
     model_choice = [args.glasses, args.m2f, args.anime]
@@ -316,14 +318,24 @@ def main():
         pass
     else:
         MODEL = np.argmax(model_choice)
+        
+    PATH_SUFFIX = PATH_SUFFIX[MODEL]
+        
+    # 128 is only available for glasses-mode
+    if MODEL!=0:
+        args.resolution = 256
+    elif args.resolution != 128:
+        PATH_SUFFIX += '_' + str(args.resolution)
+        args.resolution = int(args.resolution)
+    
     
     global WEIGHT_PATH
     global MODEL_PATH
     
-    WEIGHT_PATH = WEIGHT_PATH[MODEL]
-    MODEL_PATH = MODEL_PATH[MODEL]
-#     print(WEIGHT_PATH, MODEL_PATH)
-        
+    WEIGHT_PATH = PATH_SUFFIX + '.onnx'
+    MODEL_PATH = PATH_SUFFIX + '.onnx.prototxt'
+    print(WEIGHT_PATH, MODEL_PATH)
+       
     # model files check and download
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
     
