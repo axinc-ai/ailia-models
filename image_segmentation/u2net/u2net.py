@@ -60,6 +60,11 @@ parser.add_argument(
          'to measure execution performance. (Cannot be used in video mode)'
 )
 parser.add_argument(
+    '-c', '--composite',
+    action='store_true',
+    help='Composite input image and predicted alpha value'
+)
+parser.add_argument(
     '-o', '--opset', metavar='OPSET',
     default='10', choices=OPSET_LISTS,
     help='opset lists: ' + ' | '.join(OPSET_LISTS)
@@ -109,7 +114,17 @@ def recognize_from_image():
     # postprocessing
     # we only use `d1` (the first output, check the original repository)
     pred = preds_ailia[0][0, 0, :, :]
+
     save_result(pred, args.savepath, [h, w])
+
+    # composite
+    if args.composite:
+        pred = cv2.resize(pred,(w,h)) * 255
+        image = cv2.imread(args.input)
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2BGRA)
+        image[:,:,3]=pred
+        cv2.imwrite(args.savepath,image)
+
     print('Script finished successfully.')
 
 
