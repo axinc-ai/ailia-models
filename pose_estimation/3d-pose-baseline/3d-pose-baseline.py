@@ -1,15 +1,12 @@
-import cv2
 import sys
-import numpy as np
-import pandas as pd
-import os
 import time
-import h5py
-import matplotlib.pyplot as plt
-import matplotlib.animation as animation
-import urllib.request
 import math
 import argparse
+
+import cv2
+import numpy as np
+import h5py
+import matplotlib.pyplot as plt
 
 from mpl_toolkits.mplot3d import Axes3D
 
@@ -20,7 +17,6 @@ from webcamera_utils import adjust_frame_size  # noqa: E402
 from image_utils import load_image  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from utils import check_file_existance  # noqa: E402
-
 
 
 # ======================
@@ -89,28 +85,27 @@ BASELINE_MODEL_PATH = f'{BASELINE_MODEL_NAME}.onnx.prototxt'
 BASELINE_REMOTE_PATH = f'https://storage.googleapis.com/ailia-models/{BASELINE_MODEL_NAME}/'
 
 
-
 # ======================
 # 3d-pose Utils
 # ======================
 
 with h5py.File('3d-pose-baseline-mean.h5', 'r') as f:
-  data_mean_2d = np.array(f['data_mean_2d'])
-  data_std_2d = np.array(f['data_std_2d'])
-  data_mean_3d = np.array(f['data_mean_3d'])
-  data_std_3d = np.array(f['data_std_3d'])
+    data_mean_2d = np.array(f['data_mean_2d'])
+    data_std_2d = np.array(f['data_std_2d'])
+    data_mean_3d = np.array(f['data_mean_3d'])
+    data_std_3d = np.array(f['data_std_3d'])
 
 H36M_NAMES = ['']*32
-H36M_NAMES[0]  = 'Hip' #ignore when 3d
-H36M_NAMES[1]  = 'RHip'
-H36M_NAMES[2]  = 'RKnee'
-H36M_NAMES[3]  = 'RFoot'
-H36M_NAMES[6]  = 'LHip'
-H36M_NAMES[7]  = 'LKnee'
-H36M_NAMES[8]  = 'LFoot'
+H36M_NAMES[0] = 'Hip'  # ignore when 3d
+H36M_NAMES[1] = 'RHip'
+H36M_NAMES[2] = 'RKnee'
+H36M_NAMES[3] = 'RFoot'
+H36M_NAMES[6] = 'LHip'
+H36M_NAMES[7] = 'LKnee'
+H36M_NAMES[8] = 'LFoot'
 H36M_NAMES[12] = 'Spine'
 H36M_NAMES[13] = 'Thorax'
-H36M_NAMES[14] = 'Neck/Nose' #ignore when 2d
+H36M_NAMES[14] = 'Neck/Nose'  # ignore when 2d
 H36M_NAMES[15] = 'Head'
 H36M_NAMES[17] = 'LShoulder'
 H36M_NAMES[18] = 'LElbow'
@@ -119,8 +114,8 @@ H36M_NAMES[25] = 'RShoulder'
 H36M_NAMES[26] = 'RElbow'
 H36M_NAMES[27] = 'RWrist'
 
-h36m_2d_mean = [0,1,2,3,6,7,8,12,13,15,17,18,19,25,26,27]
-h36m_3d_mean = [1,2,3,6,7,8,12,13,14,15,17,18,19,25,26,27]
+h36m_2d_mean = [0, 1, 2, 3, 6, 7, 8, 12, 13, 15, 17, 18, 19, 25, 26, 27]
+h36m_3d_mean = [1, 2, 3, 6, 7, 8, 12, 13, 14, 15, 17, 18, 19, 25, 26, 27]
 
 OPENPOSE_Nose = 0
 OPENPOSE_Neck = 1
@@ -142,32 +137,36 @@ OPENPOSE_RightEar = 16
 OPENPOSE_LeftEar = 17
 OPENPOSE_Background = 18
 
-openpose_to_3dposebaseline=[-1,8,9,10,11,12,13,-1,1,0,5,6,7,2,3,4]
+openpose_to_3dposebaseline = [
+    -1, 8, 9, 10, 11, 12, 13, -1, 1, 0, 5, 6, 7, 2, 3, 4
+]
 
 fig = plt.figure()
 ax = Axes3D(fig)
-ax.view_init(18, -70)  
+ax.view_init(18, -70)
 
-def search_name(name,IS_3D):
-    j=0
+
+def search_name(name, IS_3D):
+    j = 0
     for i in range(32):
         if(IS_3D):
-            if(H36M_NAMES[i]=="Hip"):
+            if(H36M_NAMES[i] == "Hip"):
                 continue
         else:
-            if(H36M_NAMES[i]=="Neck/Nose"):
+            if(H36M_NAMES[i] == "Neck/Nose"):
                 continue
-        if(H36M_NAMES[i]==""):
+        if(H36M_NAMES[i] == ""):
             continue
-        if(H36M_NAMES[i]==name):
+        if(H36M_NAMES[i] == name):
             return j
-        j=j+1
+        j = j+1
     return -1
 
-def draw_connect(from_id,to_id,color,X,Y,Z,IS_3D):
-    from_id=search_name(from_id,IS_3D)
-    to_id=search_name(to_id,IS_3D)
-    if(from_id==-1 or to_id==-1):
+
+def draw_connect(from_id, to_id, color, X, Y, Z, IS_3D):
+    from_id = search_name(from_id, IS_3D)
+    to_id = search_name(to_id, IS_3D)
+    if(from_id == -1 or to_id == -1):
         return
     x = [X[from_id], X[to_id]]
     y = [Y[from_id], Y[to_id]]
@@ -175,7 +174,8 @@ def draw_connect(from_id,to_id,color,X,Y,Z,IS_3D):
 
     ax.plot(x, z, y, "o-", color=color, ms=4, mew=0.5)
 
-def plot(outputs,inputs):
+
+def plot(outputs, inputs):
     plt.cla()
 
     ax.set_xlabel('X axis')
@@ -184,14 +184,14 @@ def plot(outputs,inputs):
     ax.set_zlim([600, -600])
 
     for mode in range(2):
-        X=[]
-        Y=[]
-        Z=[]
+        X = []
+        Y = []
+        Z = []
 
-        if(mode==0):
-            IS_3D=True
+        if mode == 0:
+            IS_3D = True
         else:
-            IS_3D=False
+            IS_3D = False
 
         for i in range(16):
             if IS_3D:
@@ -199,7 +199,7 @@ def plot(outputs,inputs):
                 Y.append(outputs[i*3+1])
                 Z.append(outputs[i*3+2])
             else:
-                j=h36m_2d_mean[i]
+                j = h36m_2d_mean[i]
                 X.append(inputs[i*2+0]*data_std_2d[j*2+0]+data_mean_2d[j*2+0])
                 Y.append(inputs[i*2+1]*data_std_2d[j*2+1]+data_mean_2d[j*2+1])
                 Z.append(0)
@@ -236,51 +236,52 @@ def plot(outputs,inputs):
             draw_connect('LHip','LKnee',"#ff0000",X,Y,Z,IS_3D)
             draw_connect('LKnee','LFoot',"#ff0000",X,Y,Z,IS_3D)
 
-def display_3d_pose(points,baseline):
-    points_queue=points
 
+def display_3d_pose(points, baseline):
     inputs = np.zeros(32)
 
     for i in range(16):
-        if openpose_to_3dposebaseline[i]==-1:
+        if openpose_to_3dposebaseline[i] == -1:
             continue
-        inputs[i*2+0]=points[openpose_to_3dposebaseline[i]*2+0]
-        inputs[i*2+1]=points[openpose_to_3dposebaseline[i]*2+1]
+        inputs[i*2+0] = points[openpose_to_3dposebaseline[i]*2+0]
+        inputs[i*2+1] = points[openpose_to_3dposebaseline[i]*2+1]
 
     inputs[0*2+0] = (points[11*2+0]+points[8*2+0])/2
     inputs[0*2+1] = (points[11*2+1]+points[8*2+1])/2
     inputs[7*2+0] = (points[5*2+0]+points[2*2+0])/2
     inputs[7*2+1] = (points[5*2+1]+points[2*2+1])/2
 
-    spine_x = inputs[24]
-    spine_y = inputs[25]
+    # spine_x = inputs[24]
+    # spine_y = inputs[25]
 
     for i in range(16):
-        j=h36m_2d_mean[i]
-        inputs[i*2+0]=(inputs[i*2+0]-data_mean_2d[j*2+0])/data_std_2d[j*2+0]
-        inputs[i*2+1]=(inputs[i*2+1]-data_mean_2d[j*2+1])/data_std_2d[j*2+1]
+        j = h36m_2d_mean[i]
+        inputs[i*2+0] = (inputs[i*2+0]-data_mean_2d[j*2+0])/data_std_2d[j*2+0]
+        inputs[i*2+1] = (inputs[i*2+1]-data_mean_2d[j*2+1])/data_std_2d[j*2+1]
 
-    reshape_input = np.reshape(np.array(inputs),(1,32))
+    reshape_input = np.reshape(np.array(inputs), (1, 32))
 
     outputs = baseline.predict(reshape_input)[0]
 
     for i in range(16):
-        j=h36m_3d_mean[i]
-        outputs[i*3+0]=outputs[i*3+0]*data_std_3d[j*3+0]+data_mean_3d[j*3+0]
-        outputs[i*3+1]=outputs[i*3+1]*data_std_3d[j*3+1]+data_mean_3d[j*3+1]
-        outputs[i*3+2]=outputs[i*3+2]*data_std_3d[j*3+2]+data_mean_3d[j*3+2]
+        j = h36m_3d_mean[i]
+        outputs[i*3+0] = outputs[i*3+0]*data_std_3d[j*3+0]+data_mean_3d[j*3+0]
+        outputs[i*3+1] = outputs[i*3+1]*data_std_3d[j*3+1]+data_mean_3d[j*3+1]
+        outputs[i*3+2] = outputs[i*3+2]*data_std_3d[j*3+2]+data_mean_3d[j*3+2]
 
     for i in range(16):
         dx = outputs[i*3+0] - data_mean_3d[0*3+0]
         dy = outputs[i*3+1] - data_mean_3d[0*3+1]
         dz = outputs[i*3+2] - data_mean_3d[0*3+2]
 
-        theta = math.radians(13)    # Camera tilt of teacher data (average 13 degrees downward)
+        # Camera tilt of teacher data (average 13 degrees downward)
+        theta = math.radians(13)
         outputs[i*3+0] = dx
-        outputs[i*3+1] =  dy*math.cos(theta) + dz*math.sin(theta)
+        outputs[i*3+1] = dy*math.cos(theta) + dz*math.sin(theta)
         outputs[i*3+2] = -dy*math.sin(theta) + dz*math.cos(theta)
 
-    plot(outputs,inputs)
+    plot(outputs, inputs)
+
 
 # ======================
 # 2d-pose Utils
@@ -314,47 +315,47 @@ def display_result(input_img, pose, baseline):
         person = pose.get_object_pose(idx)
 
         line(input_img, person, ailia.POSE_KEYPOINT_NOSE,
-                ailia.POSE_KEYPOINT_SHOULDER_CENTER)
+             ailia.POSE_KEYPOINT_SHOULDER_CENTER)
         line(input_img, person, ailia.POSE_KEYPOINT_SHOULDER_LEFT,
-                ailia.POSE_KEYPOINT_SHOULDER_CENTER)
+             ailia.POSE_KEYPOINT_SHOULDER_CENTER)
         line(input_img, person, ailia.POSE_KEYPOINT_SHOULDER_RIGHT,
-                ailia.POSE_KEYPOINT_SHOULDER_CENTER)
+             ailia.POSE_KEYPOINT_SHOULDER_CENTER)
 
         line(input_img, person, ailia.POSE_KEYPOINT_EYE_LEFT,
-                ailia.POSE_KEYPOINT_NOSE)
+             ailia.POSE_KEYPOINT_NOSE)
         line(input_img, person, ailia.POSE_KEYPOINT_EYE_RIGHT,
-                ailia.POSE_KEYPOINT_NOSE)
+             ailia.POSE_KEYPOINT_NOSE)
         line(input_img, person, ailia.POSE_KEYPOINT_EAR_LEFT,
-                ailia.POSE_KEYPOINT_EYE_LEFT)
+             ailia.POSE_KEYPOINT_EYE_LEFT)
         line(input_img, person, ailia.POSE_KEYPOINT_EAR_RIGHT,
-                ailia.POSE_KEYPOINT_EYE_RIGHT)
+             ailia.POSE_KEYPOINT_EYE_RIGHT)
 
         line(input_img, person, ailia.POSE_KEYPOINT_ELBOW_LEFT,
-                ailia.POSE_KEYPOINT_SHOULDER_LEFT)
+             ailia.POSE_KEYPOINT_SHOULDER_LEFT)
         line(input_img, person, ailia.POSE_KEYPOINT_ELBOW_RIGHT,
-                ailia.POSE_KEYPOINT_SHOULDER_RIGHT)
+             ailia.POSE_KEYPOINT_SHOULDER_RIGHT)
         line(input_img, person, ailia.POSE_KEYPOINT_WRIST_LEFT,
-                ailia.POSE_KEYPOINT_ELBOW_LEFT)
+             ailia.POSE_KEYPOINT_ELBOW_LEFT)
         line(input_img, person, ailia.POSE_KEYPOINT_WRIST_RIGHT,
-                ailia.POSE_KEYPOINT_ELBOW_RIGHT)
+             ailia.POSE_KEYPOINT_ELBOW_RIGHT)
 
         line(input_img, person, ailia.POSE_KEYPOINT_BODY_CENTER,
-                ailia.POSE_KEYPOINT_SHOULDER_CENTER)
+             ailia.POSE_KEYPOINT_SHOULDER_CENTER)
         line(input_img, person, ailia.POSE_KEYPOINT_HIP_LEFT,
-                ailia.POSE_KEYPOINT_BODY_CENTER)
+             ailia.POSE_KEYPOINT_BODY_CENTER)
         line(input_img, person, ailia.POSE_KEYPOINT_HIP_RIGHT,
-                ailia.POSE_KEYPOINT_BODY_CENTER)
+             ailia.POSE_KEYPOINT_BODY_CENTER)
 
         line(input_img, person, ailia.POSE_KEYPOINT_KNEE_LEFT,
-                ailia.POSE_KEYPOINT_HIP_LEFT)
+             ailia.POSE_KEYPOINT_HIP_LEFT)
         line(input_img, person, ailia.POSE_KEYPOINT_ANKLE_LEFT,
-                ailia.POSE_KEYPOINT_KNEE_LEFT)
+             ailia.POSE_KEYPOINT_KNEE_LEFT)
         line(input_img, person, ailia.POSE_KEYPOINT_KNEE_RIGHT,
-                ailia.POSE_KEYPOINT_HIP_RIGHT)
+             ailia.POSE_KEYPOINT_HIP_RIGHT)
         line(input_img, person, ailia.POSE_KEYPOINT_ANKLE_RIGHT,
-                ailia.POSE_KEYPOINT_KNEE_RIGHT)
-        
-        points=[]
+             ailia.POSE_KEYPOINT_KNEE_RIGHT)
+
+        points = []
         points.append(person.points[ailia.POSE_KEYPOINT_NOSE].x)    #OPENPOSE_Nose
         points.append(person.points[ailia.POSE_KEYPOINT_NOSE].y)
         points.append(person.points[ailia.POSE_KEYPOINT_SHOULDER_CENTER].x)    #OPENPOSE_Neck
@@ -394,20 +395,29 @@ def display_result(input_img, pose, baseline):
         points.append(person.points[ailia.POSE_KEYPOINT_BODY_CENTER].x)    #OPENPOSE_Background
         points.append(person.points[ailia.POSE_KEYPOINT_BODY_CENTER].y)
 
-        neck_x=person.points[ailia.POSE_KEYPOINT_SHOULDER_CENTER].x
-        neck_y=person.points[ailia.POSE_KEYPOINT_SHOULDER_CENTER].y
+        neck_x = person.points[ailia.POSE_KEYPOINT_SHOULDER_CENTER].x
+        neck_y = person.points[ailia.POSE_KEYPOINT_SHOULDER_CENTER].y
 
-        hip_x=(person.points[ailia.POSE_KEYPOINT_HIP_RIGHT].x+person.points[ailia.POSE_KEYPOINT_HIP_LEFT].x)/2
-        hip_y=(person.points[ailia.POSE_KEYPOINT_HIP_RIGHT].y+person.points[ailia.POSE_KEYPOINT_HIP_LEFT].y)/2
+        hip_x = (person.points[ailia.POSE_KEYPOINT_HIP_RIGHT].x +
+                 person.points[ailia.POSE_KEYPOINT_HIP_LEFT].x) / 2
+        hip_y = (person.points[ailia.POSE_KEYPOINT_HIP_RIGHT].y +
+                 person.points[ailia.POSE_KEYPOINT_HIP_LEFT].y) / 2
 
-        d=math.sqrt((neck_x-hip_x)*(neck_x-hip_x)+(neck_y-hip_y)*(neck_y-hip_y))
+        d = math.sqrt(
+            (neck_x-hip_x)*(neck_x-hip_x)+(neck_y-hip_y)*(neck_y-hip_y)
+        )
 
         for i in range(int(len(points)/2)):
-            target_width=110 / d    #From neck to Hip should be about 110 pixels
-            points[i*2+0]=points[i*2+0]*input_img.shape[1]*(target_width/input_img.shape[1])
-            points[i*2+1]=points[i*2+1]*input_img.shape[0]*(target_width/input_img.shape[1])
+            # From neck to Hip should be about 110 pixels
+            target_width = 110 / d
+            points[i*2+0] = points[i*2+0]*input_img.shape[1]*(
+                target_width/input_img.shape[1]
+            )
+            points[i*2+1] = points[i*2+1]*input_img.shape[0]*(
+                target_width/input_img.shape[1]
+            )
 
-        display_3d_pose(points,baseline)
+        display_3d_pose(points, baseline)
 
 
 # ======================
@@ -430,9 +440,9 @@ def recognize_from_image():
         MODEL_PATH, WEIGHT_PATH, env_id=env_id, algorithm=ALGORITHM
     )
     baseline = ailia.Net(
-        BASELINE_MODEL_PATH,BASELINE_WEIGHT_PATH,env_id=env_id
+        BASELINE_MODEL_PATH, BASELINE_WEIGHT_PATH, env_id=env_id
     )
-    baseline.set_input_shape((1,32))
+    baseline.set_input_shape((1, 32))
 
     # inference
     print('Start inference...')
@@ -455,8 +465,9 @@ def recognize_from_image():
 
     # display 3d pose
     plt.show()
-    #fig = plt.figure()
-    #fig.savefig("output_3dpose.png")
+    # fig = plt.figure()
+    # fig.savefig("output_3dpose.png")
+
 
 def recognize_from_video():
     # net initialize
@@ -466,9 +477,9 @@ def recognize_from_video():
         MODEL_PATH, WEIGHT_PATH, env_id=env_id, algorithm=ALGORITHM
     )
     baseline = ailia.Net(
-        BASELINE_MODEL_PATH,BASELINE_WEIGHT_PATH,env_id=env_id
+        BASELINE_MODEL_PATH, BASELINE_WEIGHT_PATH, env_id=env_id
     )
-    baseline.set_input_shape((1,32))
+    baseline.set_input_shape((1, 32))
 
     if args.video == '0':
         print('[INFO] Webcam mode is activated')
@@ -510,7 +521,9 @@ def recognize_from_video():
 def main():
     # model files check and download
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
-    check_and_download_models(BASELINE_WEIGHT_PATH, BASELINE_MODEL_PATH, BASELINE_REMOTE_PATH)
+    check_and_download_models(
+        BASELINE_WEIGHT_PATH, BASELINE_MODEL_PATH, BASELINE_REMOTE_PATH
+    )
 
     if args.video is not None:
         # video mode
