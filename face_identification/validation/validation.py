@@ -23,12 +23,7 @@ import matplotlib.pyplot as plt
 # PARAMETERS
 # ======================
 
-MODEL_LISTS = ['arcface', 'arcface_mixed_90_82', 'arcface_mixed_90_99', 'arcface_mixed_eq_90_89']
-
-REMOTE_PATH = "https://storage.googleapis.com/ailia-models/arcface/"
-
-IMAGE_HEIGHT = 128
-IMAGE_WIDTH = 128
+MODEL_LISTS = ['arcface', 'vggface2', 'arcface_mixed_90_82', 'arcface_mixed_90_99', 'arcface_mixed_eq_90_89']
 
 # the threshold was calculated by the `test_performance` function in `test.py`
 # of the original repository
@@ -59,13 +54,23 @@ parser.add_argument(
 )
 args = parser.parse_args()
 
-WEIGHT_PATH = args.arch+'.onnx'
-MODEL_PATH = args.arch+'.onnx.prototxt'
+if args.arch=="vggface2":
+    WEIGHT_PATH = 'resnet50_scratch.caffemodel'
+    MODEL_PATH = 'resnet50_scratch.prototxt'
+    REMOTE_PATH = "https://storage.googleapis.com/ailia-models/vggface2/"
+    IMAGE_HEIGHT = 224
+    IMAGE_WIDTH = 224
+else:
+    WEIGHT_PATH = args.arch+'.onnx'
+    MODEL_PATH = args.arch+'.onnx.prototxt'
+    REMOTE_PATH = "https://storage.googleapis.com/ailia-models/arcface/"
+    IMAGE_HEIGHT = 128
+    IMAGE_WIDTH = 128
 
 # ======================
 # Utils
 # ======================
-def preprocess_image(image, input_is_bgr=False):
+def preprocess_image_arcface(image, input_is_bgr=False):
     # (ref: https://github.com/ronghuaiyang/arcface-pytorch/issues/14)
     # use origin image and fliped image to infer,
     # and concat the feature as the final feature of the origin image.
@@ -80,18 +85,48 @@ def preprocess_image(image, input_is_bgr=False):
     return image / 127.5 - 1.0  # normalize
 
 
+def preprocess_image_vggface2(img, input_is_bgr=False):
+    if input_is_bgr:
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+
+    # normalize image
+    MEAN = np.array([131.0912, 103.8827, 91.4953])  # to normalize input image
+    input_data = (img.astype(np.float) - MEAN)
+    input_data = input_data.transpose((2, 0, 1))
+    input_data = input_data[np.newaxis, :, :, :]
+    return input_data
+
+
 def prepare_input_data(image_path):
-    image = load_image(
-        image_path,
-        image_shape=(IMAGE_HEIGHT, IMAGE_WIDTH),
-        rgb=False,
-        normalize_type='None'
-    )
-    return preprocess_image(image)
+    if args.arch=="vggface2":
+        image = load_image(
+            image_path,
+            (IMAGE_HEIGHT, IMAGE_WIDTH),
+            normalize_type='None',
+            gen_input_ailia=False
+        )
+        return preprocess_image_vggface2(image)
+    else:
+        #arcface
+        image = load_image(
+            image_path,
+            image_shape=(IMAGE_HEIGHT, IMAGE_WIDTH),
+            rgb=False,
+            normalize_type='None'
+        )
+        return preprocess_image_arcface(image)
 
 
 def cosin_metric(x1, x2):
     return np.dot(x1, x2) / (np.linalg.norm(x1) * np.linalg.norm(x2))
+
+
+def l2_metric(feature1, feature2):
+    norm1 = np.sqrt(np.sum(np.abs(feature1**2)))
+    norm2 = np.sqrt(np.sum(np.abs(feature2**2)))
+    dist = feature1/norm1-feature2/norm2
+    l2_norm = np.sqrt(np.sum(np.abs(dist**2)))
+    return l2_norm
 
 
 def get_evaluation_files(input):
@@ -143,7 +178,10 @@ def get_feature_values(net,file_list):
         if BATCH_SIZE==4:
            imgs_1 = np.concatenate([imgs_1, imgs_1], axis=0)
         preds_ailia1 = net.predict(imgs_1)
-        fe_1 = np.concatenate([preds_ailia1[0], preds_ailia1[1]], axis=0)
+        if args.arch=="vggface2":
+            fe_1 = preds_ailia1[0]
+        else:
+            fe_1 = np.concatenate([preds_ailia1[0], preds_ailia1[1]], axis=0)
         fe_list.append(fe_1)
     return fe_list
 
@@ -157,7 +195,10 @@ def compute_similality(heatmap,expect,file_list,fe_list,face_count):
             # postprocessing
             fe_1 = fe_list[i0]
             fe_2 = fe_list[i1]
-            sim = cosin_metric(fe_1, fe_2)
+            if args.arch=="vggface2":
+                sim = 1.0 - l2_metric(fe_1, fe_2)
+            else:
+                sim = cosin_metric(fe_1, fe_2)
 
             ex=0
             f0=inputs0.split("/")

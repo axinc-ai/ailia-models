@@ -1,4 +1,4 @@
-# Validate ArcFace
+# Validate ArcFace and VGGFace2
 
 ### usage
 
