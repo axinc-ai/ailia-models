@@ -2,6 +2,7 @@ import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
+import ailia
 
 
 def sigmoid(x):
@@ -234,6 +235,41 @@ def postprocess(preds_ailia, anchor_path='anchors.npy'):
         faces = np.stack(faces) if len(faces) > 0 else np.zeros((0, 17))
         filtered_detections.append(faces)
     return filtered_detections
+
+
+def compute_blazeface(detector, frame):
+    BLAZEFACE_INPUT_IMAGE_HEIGHT = 128
+    BLAZEFACE_INPUT_IMAGE_WIDTH = 128
+
+    # preprocessing
+    img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+    image = cv2.resize(img, (BLAZEFACE_INPUT_IMAGE_WIDTH, BLAZEFACE_INPUT_IMAGE_HEIGHT))
+    image = image.transpose((2, 0, 1))  # channel first
+    image = image[np.newaxis, :, :, :]  # (batch_size, channel, h, w)
+    input_data = image / 127.5 - 1.0
+
+    # inference
+    preds_ailia = detector.predict([input_data])
+
+    # postprocessing
+    org_detections = []
+    blaze_face_detections = postprocess(preds_ailia)
+    for idx in range(len(blaze_face_detections)):
+        obj = blaze_face_detections[idx]
+        if len(obj)==0:
+            continue
+        d = obj[0]
+        obj = ailia.DetectorObject(
+            category = 0,
+            prob = 1.0,
+            x = d[1],
+            y = d[0],
+            w = d[3]-d[1],
+            h = d[2]-d[0] )
+        
+        org_detections.append(obj)
+
+    return org_detections
 
 
 def show_result(input_img, detections):

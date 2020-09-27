@@ -16,7 +16,6 @@ import ailia
 sys.path.append('../../util')
 from utils import check_file_existance  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
-from webcamera_utils import preprocess_frame  # noqa: E402C
 
 
 # ======================
@@ -91,12 +90,15 @@ def preprocess(image):
     image = padded_image[np.newaxis, :, :, :]
     return image
 
+
 def create_figure():
     fig, ax = plt.subplots(1, figsize=(12, 9), tight_layout=True)
     return fig, ax
 
+
 def display_objdetect_image(
-        fig, ax, image, boxes, labels, scores, masks, score_threshold=0.7, savepath=None
+        fig, ax, image, boxes, labels, scores, masks,
+        score_threshold=0.7, savepath=None
 ):
     """
     Display or Save result
@@ -137,9 +139,11 @@ def display_objdetect_image(
         ]
         im_mask = im_mask[:, :, None]
 
+        # cv2.findContours has changed since OpenCV 3.x,
+        # but in OpenCV 4.0 it changes back
         contours, hierarchy = cv2.findContours(
             im_mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE
-        )[-2:]  #cv2.findContours has changed since OpenCV 3.x, but in OpenCV 4.0 it changes back
+        )[-2:]
 
         image = cv2.drawContours(image, contours, -1, 25, 3)
 
@@ -177,8 +181,9 @@ def recognize_from_image():
     # net initialize
     env_id = ailia.get_gpu_environment_id()
     print(f'env_id: {env_id}')
-    if env_id != -1 and ailia.get_environment(env_id).props=="LOWPOWER":
-        env_id = -1 # This model requires fuge gpu memory so fallback to cpu mode
+    # This model requires fuge gpu memory so fallback to cpu mode
+    if env_id != -1 and ailia.get_environment(env_id).props == "LOWPOWER":
+        env_id = -1
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
     net.set_input_shape(input_data.shape)
 
@@ -206,8 +211,10 @@ def recognize_from_video():
     # net initialize
     env_id = ailia.get_gpu_environment_id()
     print(f'env_id: {env_id}')
-    if env_id != -1 and ailia.get_environment(env_id).props=="LOWPOWER":
-        env_id = -1 # This model requires fuge gpu memory so fallback to cpu mode
+
+    # This model requires fuge gpu memory so fallback to cpu mode
+    if env_id != -1 and ailia.get_environment(env_id).props == "LOWPOWER":
+        env_id = -1
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
 
     if args.video == '0':
