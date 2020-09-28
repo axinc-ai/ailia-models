@@ -8,24 +8,6 @@ The collection of pre-trained, state-of-the-art models.
 
 # Supported models
 
-<style>
-table th:first-of-type {
-    width: 10%;
-}
-table th:nth-of-type(2) {
-    width: 20%;
-}
-table th:nth-of-type(3) {
-    width: 40%;
-}
-table th:nth-of-type(4) {
-    width: 10%;
-}
-table th:nth-of-type(5) {
-    width: 10%;
-}
-</style>
-
 ## Action recognition
 
 | | Model | Reference | Exported From | Supported Ailia Version |
