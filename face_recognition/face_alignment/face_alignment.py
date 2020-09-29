@@ -90,11 +90,14 @@ PRED_TYPES = {
 # ======================
 # Utils
 # ======================
-def create_figure():
+def create_figure(active_3d):
     fig = plt.figure(figsize=plt.figaspect(0.5), tight_layout=True)
-    ax1 = fig.add_subplot(1, 2, 1)
-    ax2 = fig.add_subplot(1, 2, 2, projection='3d')
-    axs = [ax1, ax2]
+    axs = None  # for 2D mode
+    if active_3d:
+        # 3D mode configuration
+        ax1 = fig.add_subplot(1, 2, 1)
+        ax2 = fig.add_subplot(1, 2, 2, projection='3d')
+        axs = [ax1, ax2]
     return fig, axs
 
 
@@ -118,23 +121,23 @@ def visualize_results(axs, image, pts_img, active_3d=False):
     """Visualize results & clear previous output
     """
     # 2D-plot
-    ax = axs[0]
-    ax.clear()
-    ax.imshow(image)
-    for pred_type in PRED_TYPES.values():
-        ax.plot(
-            pts_img[pred_type.slice, 0],
-            pts_img[pred_type.slice, 1],
-            color=pred_type.color,
-            marker='o',
-            markersize=4,
-            linestyle='-',
-            lw=2,
-        )
-
-    ax.axis('off')
-
     if active_3d:
+        ax = axs[0]
+        ax.clear()
+        ax.imshow(image)
+        for pred_type in PRED_TYPES.values():
+            ax.plot(
+                pts_img[pred_type.slice, 0],
+                pts_img[pred_type.slice, 1],
+                color=pred_type.color,
+                marker='o',
+                markersize=4,
+                linestyle='-',
+                lw=2,
+            )
+
+        ax.axis('off')
+
         # 3D-plot
         ax = axs[1]
         ax.clear()
@@ -158,6 +161,20 @@ def visualize_results(axs, image, pts_img, active_3d=False):
         ax.view_init(elev=90, azim=90.)
         ax.set_xlim(ax.get_xlim()[::-1])
 
+    else:
+        # 2D
+        plt.imshow(image)
+        for pred_type in PRED_TYPES.values():
+            plt.plot(
+                pts_img[pred_type.slice, 0],
+                pts_img[pred_type.slice, 1],
+                color=pred_type.color,
+                marker='o',
+                markersize=4,
+                linestyle='-',
+                lw=2,
+            )
+        plt.axis('off')
     return axs
 
 
@@ -366,7 +383,7 @@ def recognize_from_image():
         depth_pred = depth_pred.reshape(68, 1)
         pts_img = np.concatenate((pts_img, depth_pred * 2), 1)
 
-    fig, axs = create_figure()
+    fig, axs = create_figure(active_3d=args.active_3d)
     axs = visualize_results(axs, input_img, pts_img, active_3d=args.active_3d)
     fig.savefig(args.savepath)
 
@@ -402,7 +419,7 @@ def recognize_from_video():
         if check_file_existance(args.video):
             capture = cv2.VideoCapture(args.video)
 
-    fig, axs = create_figure()
+    fig, axs = create_figure(active_3d=True)
 
     while(True):
         ret, frame = capture.read()
