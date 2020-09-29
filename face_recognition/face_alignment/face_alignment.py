@@ -163,6 +163,7 @@ def visualize_results(axs, image, pts_img, active_3d=False):
 
     else:
         # 2D
+        plt.clf()
         plt.imshow(image)
         for pred_type in PRED_TYPES.values():
             plt.plot(
@@ -419,7 +420,7 @@ def recognize_from_video():
         if check_file_existance(args.video):
             capture = cv2.VideoCapture(args.video)
 
-    fig, axs = create_figure(active_3d=True)
+    fig, axs = create_figure(active_3d=args.active_3d)
 
     while(True):
         ret, frame = capture.read()
