@@ -90,6 +90,17 @@ PRED_TYPES = {
 # ======================
 # Utils
 # ======================
+def create_figure(active_3d):
+    fig = plt.figure(figsize=plt.figaspect(0.5), tight_layout=True)
+    axs = None  # for 2D mode
+    if active_3d:
+        # 3D mode configuration
+        ax1 = fig.add_subplot(1, 2, 1)
+        ax2 = fig.add_subplot(1, 2, 2, projection='3d')
+        axs = [ax1, ax2]
+    return fig, axs
+
+
 def plot_images(title, images, tile_shape):
     fig = plt.figure()
     plt.title(title)
@@ -106,12 +117,13 @@ def plot_images(title, images, tile_shape):
     fig.savefig(save_name)
 
 
-def visualize_results(image, pts_img, active_3d=False):
-    fig = plt.figure(figsize=plt.figaspect(0.5))
-
+def visualize_results(axs, image, pts_img, active_3d=False):
+    """Visualize results & clear previous output
+    """
+    # 2D-plot
     if active_3d:
-        # 2D-plot
-        ax = fig.add_subplot(1, 2, 1)
+        ax = axs[0]
+        ax.clear()
         ax.imshow(image)
         for pred_type in PRED_TYPES.values():
             ax.plot(
@@ -127,7 +139,8 @@ def visualize_results(image, pts_img, active_3d=False):
         ax.axis('off')
 
         # 3D-plot
-        ax = fig.add_subplot(1, 2, 2, projection='3d')
+        ax = axs[1]
+        ax.clear()
         ax.scatter(
             pts_img[:, 0],
             pts_img[:, 1],
@@ -162,8 +175,7 @@ def visualize_results(image, pts_img, active_3d=False):
                 lw=2,
             )
         plt.axis('off')
-
-    return fig
+    return axs
 
 
 def transform(point, center, scale, resolution, invert=False):
@@ -371,7 +383,8 @@ def recognize_from_image():
         depth_pred = depth_pred.reshape(68, 1)
         pts_img = np.concatenate((pts_img, depth_pred * 2), 1)
 
-    fig = visualize_results(input_img, pts_img, active_3d=args.active_3d)
+    fig, axs = create_figure(active_3d=args.active_3d)
+    axs = visualize_results(axs, input_img, pts_img, active_3d=args.active_3d)
     fig.savefig(args.savepath)
 
     # Confidence Map
@@ -406,6 +419,8 @@ def recognize_from_video():
         if check_file_existance(args.video):
             capture = cv2.VideoCapture(args.video)
 
+    fig, axs = create_figure(active_3d=True)
+
     while(True):
         ret, frame = capture.read()
         if cv2.waitKey(1) & 0xFF == ord('q'):
@@ -439,7 +454,11 @@ def recognize_from_video():
             pts_img = np.concatenate((pts_img, depth_pred * 2), 1)
 
         resized_img = cv2.resize(input_image, (IMAGE_WIDTH, IMAGE_HEIGHT))
-        fig = visualize_results(resized_img, pts_img, active_3d=args.active_3d)
+
+        # visualize results (clear axs at first)
+        axs = visualize_results(
+            axs, resized_img, pts_img, active_3d=args.active_3d
+        )
         plt.pause(0.01)
 
     capture.release()
