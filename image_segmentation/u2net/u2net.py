@@ -163,6 +163,14 @@ def recognize_from_video():
 
         # postprocessing
         pred = cv2.resize(norm(preds_ailia[0][0, 0, :, :]), (f_w, f_h))
+
+        # composite
+        if args.composite:
+            frame[:,:,0] = frame[:,:,0] * pred
+            frame[:,:,1] = frame[:,:,1] * pred
+            frame[:,:,2] = frame[:,:,2] * pred
+            pred = frame / 255.0
+
         cv2.imshow('frame', pred)
         
         # save results
