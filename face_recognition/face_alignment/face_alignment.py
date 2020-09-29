@@ -18,9 +18,6 @@ from image_utils import load_image  # noqa: E402
 from webcamera_utils import preprocess_frame  # noqa: E402
 
 
-# TODO: Old plot window doesn't disappear when in video mode
-#       plt.clf() did not work
-
 # ======================
 # PARAMETERS 1
 # ======================
@@ -454,7 +451,7 @@ def recognize_from_video():
             depth_pred = depth_pred.reshape(68, 1)
             pts_img = np.concatenate((pts_img, depth_pred * 2), 1)
 
-        resized_img = cv2.resize(input_image, (IMAGE_WIDTH, IMAGE_HEIGHT))
+        resized_img = cv2.resize(cv2.cvtColor(input_image, cv2.COLOR_BGR2RGB), (IMAGE_WIDTH, IMAGE_HEIGHT))
 
         # visualize results (clear axs at first)
         axs = visualize_results(
