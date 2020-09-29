@@ -1,5 +1,6 @@
 import sys
 import argparse
+import time
 
 import numpy as np
 import cv2
@@ -81,6 +82,12 @@ parser.add_argument(
     '-s', '--savepath', metavar='SAVE_VIDEO_PATH',
     default=None,
     help='Save path for the output video.'
+)
+parser.add_argument(
+    '-b', '--benchmark',
+    action='store_true',
+    help='Running the inference on the same input 5 times ' +
+         'to measure execution performance. (Cannot be used in video mode)'
 )
 args = parser.parse_args()
 
@@ -312,7 +319,18 @@ def compare_images():
         img_crop = normalize_image(
             resize(img_crop), 'ImageNet'
         )[np.newaxis, :, :, :].transpose(0, 3, 1, 2)
-        features.append(extractor.predict(img_crop)[0])
+
+        if args.benchmark:
+            print('BENCHMARK mode')
+            for i in range(5):
+                start = int(round(time.time() * 1000))
+                feature = extractor.predict(img_crop)
+                end = int(round(time.time() * 1000))
+                print(f'\tailia processing time {end - start} ms')
+        else:
+            feature = extractor.predict(img_crop)
+
+        features.append(feature[0])
 
     sim = cosin_metric(features[0], features[1])
     if sim >= (1 - MAX_COSINE_DISTANCE):
@@ -327,6 +345,10 @@ def main():
     check_and_download_models(DT_WEIGHT_PATH, DT_MODEL_PATH, REMOTE_PATH)
     print('Check Extractor...')
     check_and_download_models(EX_WEIGHT_PATH, EX_MODEL_PATH, REMOTE_PATH)
+
+    if args.benchmark:
+        args.pairimage[0]="correct_32_1.jpg"
+        args.pairimage[1]="correct_32_2.jpg"
 
     if args.pairimage[0] != None and args.pairimage[1] != None:
         print('Cheking if the person in two images is the same person or not.')
