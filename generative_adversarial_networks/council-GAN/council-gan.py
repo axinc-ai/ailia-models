@@ -7,7 +7,6 @@ import cv2
 import numpy as np
 
 import ailia
-import onnxruntime
 
 # import original modules
 sys.path.append('../../util')
@@ -72,11 +71,6 @@ parser.add_argument(
     '-d', '--dilation', metavar='DILATION',
     default=1,
     help='Dilation value for face recognition image size'
-)
-parser.add_argument(
-    '-o', '--onnx',
-    action='store_true',
-    help='Run on ONNXruntime instead of Ailia'
 )
 parser.add_argument(
     '-g', '--glasses',
@@ -200,10 +194,7 @@ def transform_image():
     env_id = ailia.get_gpu_environment_id()
     print(f'env_id: {env_id}')
     
-    if not args.onnx:
-        net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
-    else:
-        net = onnxruntime.InferenceSession(WEIGHT_PATH)
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
     
     if args.face_recognition:
         locator = FaceLocator()
@@ -251,30 +242,15 @@ def process_frame(net, locator, image):
  
 def process_array(net, img):
     """Apply network to a correctly scaled and centered image """
-    if not args.onnx:
-        print('Start inference...')
-        preds_ailia = postprocess_image(net.predict(img[None,...])[0])
-    else:
-        # teporary onnxruntime mode
-        print('Start inference in onnxruntime mode...')
-        inputs = [i.name for i in net.get_inputs()]
-        outputs = [o.name for o in net.get_outputs()]
-
-        data = [img[None,...]] 
-        out = net.run(outputs, {i: data for i, data in zip(inputs, data)})
-
-        preds_ailia = postprocess_image(out[0][0])
-            
+    print('Start inference...')
+    preds_ailia = postprocess_image(net.predict(img[None,...])[0])
     return preds_ailia
           
 def process_video():
     # net initialize
     env_id = ailia.get_gpu_environment_id()
     print(f'env_id: {env_id}')
-    if args.onnx:
-        net = onnxruntime.InferenceSession(WEIGHT_PATH)
-    else:
-        net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
 
     if args.face_recognition:
         locator = FaceLocator()

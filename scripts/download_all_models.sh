@@ -14,7 +14,7 @@ cd ../../face_detection/yolov3-face; python3 yolov3-face.py ${OPTION}
 cd ../../face_identification/arcface; python3 arcface.py ${OPTION}
 cd ../../face_identification/vggface2; python3 vggface2.py ${OPTION}
 cd ../../face_recognition/face_alignment; python3 face_alignment.py ${OPTION}
-cd ../../face_recognition/face_alignment; python3 face_alignment.py --active3d ${OPTION}
+cd ../../face_recognition/face_alignment; python3 face_alignment.py --active_3d ${OPTION}
 cd ../../face_recognition/face_classification; python3 face_classification.py ${OPTION}
 cd ../../face_recognition/facial_feature; python3 facial_feature.py ${OPTION}
 cd ../../face_recognition/gazeml; python3 gazeml.py ${OPTION}

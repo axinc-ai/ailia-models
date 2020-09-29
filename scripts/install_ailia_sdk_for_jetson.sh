@@ -1,7 +1,7 @@
-python -c "import site; print (site.getsitepackages())"
+python3 -c "import site; print (site.getsitepackages())"
 
 export SITEPACKAGES=/usr/local/lib/python3.6/dist-packages
-export AILIA_SDK=./ailia_sdk_1_24
+export AILIA_SDK=./ailia_1_24_0
 
 sudo cp -r ${AILIA_SDK}/python/ailia ${SITEPACKAGES}
 sudo cp ${AILIA_SDK}/library/jetson/libailia.so ${SITEPACKAGES}/ailia
