@@ -1,6 +1,9 @@
+import sys
+
 import numpy as np
 import cv2
 
+from utils import check_file_existance
 from image_utils import normalize_image
 
 
@@ -104,3 +107,33 @@ def get_writer(savepath, height, width, rgb=True):
         isColor=rgb
     )
     return writer
+
+
+def get_capture(video):
+    """
+    Get cv2.VideoCapture
+
+    Parameters
+    ----------
+    video : str
+        webcamera-id or video path
+
+    Returns
+    -------
+    capture : cv2.VideoCapture
+    """
+    try:
+        video_id = int(video)
+
+        # webcamera-mode
+        capture = cv2.VideoCapture(video_id)
+        if not capture.isOpened():
+            print(f"[ERROR] webcamera (ID - {video_id}) not found")
+            sys.exit(0)
+
+    except ValueError:
+        # if file path is given, open video file
+        if check_file_existance(video):
+            capture = cv2.VideoCapture(video)
+
+    return capture
