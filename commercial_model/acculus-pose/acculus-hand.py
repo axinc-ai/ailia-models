@@ -1,5 +1,4 @@
 import sys
-import time
 import argparse
 
 import cv2
@@ -12,8 +11,7 @@ import numpy as np
 sys.path.append('../../util')
 from utils import check_file_existance  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
-from webcamera_utils import adjust_frame_size  # noqa: E402C
-from detector_utils import plot_results, load_image  # noqa: E402C
+from webcamera_utils import get_capture  # noqa: E402C
 
 
 # ======================
@@ -92,19 +90,20 @@ def display_result(input_img, hand, top_left, bottom_right):
         line(input_img, hand_keypoint, 7, 8, offset, scale)
 
         line(input_img, hand_keypoint, 0, 9, offset, scale)
-        line(input_img, hand_keypoint, 9,10, offset, scale)
-        line(input_img, hand_keypoint,10,11, offset, scale)
-        line(input_img, hand_keypoint,11,12, offset, scale)
+        line(input_img, hand_keypoint, 9, 10, offset, scale)
+        line(input_img, hand_keypoint, 10, 11, offset, scale)
+        line(input_img, hand_keypoint, 11, 12, offset, scale)
 
-        line(input_img, hand_keypoint, 0,13, offset, scale)
-        line(input_img, hand_keypoint,13,14, offset, scale)
-        line(input_img, hand_keypoint,14,15, offset, scale)
-        line(input_img, hand_keypoint,15,16, offset, scale)
+        line(input_img, hand_keypoint, 0, 13, offset, scale)
+        line(input_img, hand_keypoint, 13, 14, offset, scale)
+        line(input_img, hand_keypoint, 14, 15, offset, scale)
+        line(input_img, hand_keypoint, 15, 16, offset, scale)
 
-        line(input_img, hand_keypoint, 0,17, offset, scale)
-        line(input_img, hand_keypoint,17,18, offset, scale)
-        line(input_img, hand_keypoint,18,19, offset, scale)
-        line(input_img, hand_keypoint,19,20, offset, scale)
+        line(input_img, hand_keypoint, 0, 17, offset, scale)
+        line(input_img, hand_keypoint, 17, 18, offset, scale)
+        line(input_img, hand_keypoint, 18, 19, offset, scale)
+        line(input_img, hand_keypoint, 19, 20, offset, scale)
+
 
 # ======================
 # Main functions
@@ -126,19 +125,14 @@ def recognize_from_video():
     )
 
     hand = ailia.PoseEstimator(
-        HAND_MODEL_PATH, HAND_WEIGHT_PATH, env_id=env_id, algorithm=HAND_ALGORITHM
+        HAND_MODEL_PATH,
+        HAND_WEIGHT_PATH,
+        env_id=env_id,
+        algorithm=HAND_ALGORITHM
     )
     hand.set_threshold(0.1)
 
-    if args.video == '0':
-        print('[INFO] Webcam mode is activated')
-        capture = cv2.VideoCapture(0)
-        if not capture.isOpened():
-            print("[ERROR] webcamera not found")
-            sys.exit(1)
-    else:
-        if check_file_existance(args.video):
-            capture = cv2.VideoCapture(args.video)
+    capture = get_capture(args.video)
 
     while(True):
         ret, frame = capture.read()
@@ -158,11 +152,11 @@ def recognize_from_video():
             margin = 1.0
             cx = (obj.x + obj.w/2) * w
             cy = (obj.y + obj.h/2) * h
-            cw = max(obj.w * w,obj.h * h) * margin
-            fx=max(cx - cw/2,0)
-            fy=max(cy - cw/2,0)
-            fw=min(cw, w-fx)
-            fh=min(cw, h-fy)
+            cw = max(obj.w * w, obj.h * h) * margin
+            fx = max(cx - cw/2, 0)
+            fy = max(cy - cw/2, 0)
+            fw = min(cw, w-fx)
+            fh = min(cw, h-fy)
             top_left = (int(fx), int(fy))
             bottom_right = (int(fx+fw), int(fy+fh))
 
@@ -171,8 +165,10 @@ def recognize_from_video():
             cv2.rectangle(frame, top_left, bottom_right, color, 4)
 
             # get detected face
-            crop_img = img[top_left[1]:bottom_right[1], top_left[0]:bottom_right[0], 0:4]
-            if crop_img.shape[0]<=0 or crop_img.shape[1]<=0:
+            crop_img = img[
+                top_left[1]:bottom_right[1], top_left[0]:bottom_right[0], 0:4
+            ]
+            if crop_img.shape[0] <= 0 or crop_img.shape[1] <= 0:
                 continue
 
             # inferece
@@ -190,7 +186,9 @@ def recognize_from_video():
 
 def main():
     # model files check and download
-    check_and_download_models(HAND_WEIGHT_PATH, HAND_MODEL_PATH, HAND_REMOTE_PATH)
+    check_and_download_models(
+        HAND_WEIGHT_PATH, HAND_MODEL_PATH, HAND_REMOTE_PATH
+    )
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
 
     if args.video is None:

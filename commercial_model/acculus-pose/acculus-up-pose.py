@@ -8,10 +8,9 @@ import numpy as np
 import ailia
 
 sys.path.append('../../util')
-from webcamera_utils import adjust_frame_size  # noqa: E402
+from webcamera_utils import adjust_frame_size, get_capture  # noqa: E402
 from image_utils import load_image  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
-from utils import check_file_existance  # noqa: E402
 
 
 # ======================
@@ -64,15 +63,15 @@ args = parser.parse_args()
 # Parameters 2
 # ======================
 MODEL_NAME = 'acculus-pose'
-REMOTE_PATH = f''
+REMOTE_PATH = ''
 
 if args.fpga:
-    WEIGHT_PATH = f'uppose_fpga_1_obf.caffemodel'
-    MODEL_PATH = f'uppose_fpga_obf.prototxt'
+    WEIGHT_PATH = 'uppose_fpga_1_obf.caffemodel'
+    MODEL_PATH = 'uppose_fpga_obf.prototxt'
     ALGORITHM = ailia.POSE_ALGORITHM_ACCULUS_UPPOSE_FPGA
 else:
-    WEIGHT_PATH = f'uppose_obf.caffemodel'
-    MODEL_PATH = f'uppose_obf.prototxt'
+    WEIGHT_PATH = 'uppose_obf.caffemodel'
+    MODEL_PATH = 'uppose_obf.prototxt'
     ALGORITHM = ailia.POSE_ALGORITHM_ACCULUS_UPPOSE
 
 
@@ -105,36 +104,36 @@ def display_result(input_img, pose):
         person = pose.get_object_up_pose(idx)
 
         line(input_img, person, ailia.POSE_UPPOSE_KEYPOINT_NOSE,
-                ailia.POSE_UPPOSE_KEYPOINT_SHOULDER_CENTER)
+             ailia.POSE_UPPOSE_KEYPOINT_SHOULDER_CENTER)
         line(input_img, person, ailia.POSE_UPPOSE_KEYPOINT_SHOULDER_LEFT,
-                ailia.POSE_UPPOSE_KEYPOINT_SHOULDER_CENTER)
+             ailia.POSE_UPPOSE_KEYPOINT_SHOULDER_CENTER)
         line(input_img, person, ailia.POSE_UPPOSE_KEYPOINT_SHOULDER_RIGHT,
-                ailia.POSE_UPPOSE_KEYPOINT_SHOULDER_CENTER)
+             ailia.POSE_UPPOSE_KEYPOINT_SHOULDER_CENTER)
 
         line(input_img, person, ailia.POSE_UPPOSE_KEYPOINT_EYE_LEFT,
-                ailia.POSE_UPPOSE_KEYPOINT_NOSE)
+             ailia.POSE_UPPOSE_KEYPOINT_NOSE)
         line(input_img, person, ailia.POSE_UPPOSE_KEYPOINT_EYE_RIGHT,
-                ailia.POSE_UPPOSE_KEYPOINT_NOSE)
+             ailia.POSE_UPPOSE_KEYPOINT_NOSE)
         line(input_img, person, ailia.POSE_UPPOSE_KEYPOINT_EAR_LEFT,
-                ailia.POSE_UPPOSE_KEYPOINT_EYE_LEFT)
+             ailia.POSE_UPPOSE_KEYPOINT_EYE_LEFT)
         line(input_img, person, ailia.POSE_UPPOSE_KEYPOINT_EAR_RIGHT,
-                ailia.POSE_UPPOSE_KEYPOINT_EYE_RIGHT)
+             ailia.POSE_UPPOSE_KEYPOINT_EYE_RIGHT)
 
         line(input_img, person, ailia.POSE_UPPOSE_KEYPOINT_ELBOW_LEFT,
-                ailia.POSE_UPPOSE_KEYPOINT_SHOULDER_LEFT)
+             ailia.POSE_UPPOSE_KEYPOINT_SHOULDER_LEFT)
         line(input_img, person, ailia.POSE_UPPOSE_KEYPOINT_ELBOW_RIGHT,
-                ailia.POSE_UPPOSE_KEYPOINT_SHOULDER_RIGHT)
+             ailia.POSE_UPPOSE_KEYPOINT_SHOULDER_RIGHT)
         line(input_img, person, ailia.POSE_UPPOSE_KEYPOINT_WRIST_LEFT,
-                ailia.POSE_UPPOSE_KEYPOINT_ELBOW_LEFT)
+             ailia.POSE_UPPOSE_KEYPOINT_ELBOW_LEFT)
         line(input_img, person, ailia.POSE_UPPOSE_KEYPOINT_WRIST_RIGHT,
-                ailia.POSE_UPPOSE_KEYPOINT_ELBOW_RIGHT)
+             ailia.POSE_UPPOSE_KEYPOINT_ELBOW_RIGHT)
 
         line(input_img, person, ailia.POSE_UPPOSE_KEYPOINT_BODY_CENTER,
-                ailia.POSE_UPPOSE_KEYPOINT_SHOULDER_CENTER)
+             ailia.POSE_UPPOSE_KEYPOINT_SHOULDER_CENTER)
         line(input_img, person, ailia.POSE_UPPOSE_KEYPOINT_HIP_LEFT,
-                ailia.POSE_UPPOSE_KEYPOINT_BODY_CENTER)
+             ailia.POSE_UPPOSE_KEYPOINT_BODY_CENTER)
         line(input_img, person, ailia.POSE_UPPOSE_KEYPOINT_HIP_RIGHT,
-                ailia.POSE_UPPOSE_KEYPOINT_BODY_CENTER)
+             ailia.POSE_UPPOSE_KEYPOINT_BODY_CENTER)
 
 
 # ======================
@@ -184,20 +183,12 @@ def recognize_from_video():
     pose = ailia.PoseEstimator(
         MODEL_PATH, WEIGHT_PATH, env_id=env_id, algorithm=ALGORITHM
     )
-    shape=pose.get_input_shape()
+    shape = pose.get_input_shape()
     print(shape)
-    IMAGE_WIDTH=shape[3]
-    IMAGE_HEIGHT=shape[2]
+    IMAGE_WIDTH = shape[3]
+    IMAGE_HEIGHT = shape[2]
 
-    if args.video == '0':
-        print('[INFO] Webcam mode is activated')
-        capture = cv2.VideoCapture(0)
-        if not capture.isOpened():
-            print("[ERROR] webcamera not found")
-            sys.exit(1)
-    else:
-        if check_file_existance(args.video):
-            capture = cv2.VideoCapture(args.video)
+    capture = get_capture(args.video)
 
     while(True):
         ret, frame = capture.read()
