@@ -12,8 +12,8 @@ import ailia
 sys.path.append('../../util')
 from utils import check_file_existance  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
-from webcamera_utils import adjust_frame_size  # noqa: E402C
-from image_utils import load_image, normalize_image  # noqa: E402C
+from webcamera_utils import get_capture  # noqa: E402C
+from image_utils import normalize_image  # noqa: E402C
 
 # ======================
 # Parameters
@@ -59,10 +59,11 @@ parser.add_argument(
 )
 args = parser.parse_args()
 
+
 # ======================
 # Main functions
 # ======================
-def constrain_to_multiple_of(x, min_val = 0, max_val = None):
+def constrain_to_multiple_of(x, min_val=0, max_val=None):
     y = (np.round(x / IMAGE_MULTIPLE_OF) * IMAGE_MULTIPLE_OF).astype(int)
     if max_val is not None and y > max_val:
         y = (np.floor(x / IMAGE_MULTIPLE_OF) * IMAGE_MULTIPLE_OF).astype(int)
@@ -80,10 +81,16 @@ def midas_resize(image, target_height, target_width):
         scale_height = scale_width
     else:
         scale_width = scale_height
-    new_height = constrain_to_multiple_of(scale_height * h, max_val = target_height)
-    new_width = constrain_to_multiple_of(scale_width * w, max_val = target_width)
+    new_height = constrain_to_multiple_of(
+        scale_height * h, max_val=target_height
+    )
+    new_width = constrain_to_multiple_of(
+        scale_width * w, max_val=target_width
+    )
 
-    return cv2.resize(image, (new_width, new_height), interpolation = cv2.INTER_CUBIC)
+    return cv2.resize(
+        image, (new_width, new_height), interpolation=cv2.INTER_CUBIC
+    )
 
 
 def midas_imread(image_path):
@@ -105,7 +112,7 @@ def recognize_from_image():
     img = img.transpose((2, 0, 1))  # channel first
     img = img[np.newaxis, :, :, :]
     print(f'input image shape: {img.shape}')
-    
+
     # # net initialize
     env_id = ailia.get_gpu_environment_id()
     print(f'env_id: {env_id}')
@@ -123,7 +130,7 @@ def recognize_from_image():
             print(f'\tailia processing time {end - start} ms')
     else:
         result = net.predict(img)
-    
+
     depth_min = result.min()
     depth_max = result.max()
     max_val = (2 ** 16) - 1
@@ -132,8 +139,8 @@ def recognize_from_image():
         out = max_val * (result - depth_min) / (depth_max - depth_min)
     else:
         out = 0
-    
-    cv2.imwrite(args.savepath, out.transpose(1, 2, 0).astype("uint16"))    
+
+    cv2.imwrite(args.savepath, out.transpose(1, 2, 0).astype("uint16"))
     print('Script finished successfully.')
 
 
@@ -143,15 +150,7 @@ def recognize_from_video():
     print(f'env_id: {env_id}')
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
 
-    if args.video == '0':
-        print('[INFO] Webcam mode is activated')
-        capture = cv2.VideoCapture(0)
-        if not capture.isOpened():
-            print("[ERROR] webcamera not found")
-            sys.exit(1)
-    else:
-        if check_file_existance(args.video):
-            capture = cv2.VideoCapture(args.video)
+    capture = get_capture(args.video)
 
     input_shape_set = False
     while(True):

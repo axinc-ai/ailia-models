@@ -11,9 +11,10 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import check_file_existance  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from detector_utils import plot_results, load_image  # noqa: E402C
+from webcamera_utils import get_capture  # noqa: E402C
+
 
 # ======================
 # Parameters
@@ -22,7 +23,10 @@ from detector_utils import plot_results, load_image  # noqa: E402C
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/clothing-detection/'
 
 DATASETS_MODEL_PATH = OrderedDict([
-    ('modanet', ['yolov3-modanet.opt.onnx', 'yolov3-modanet.opt.onnx.prototxt']),
+    (
+        'modanet',
+        ['yolov3-modanet.opt.onnx', 'yolov3-modanet.opt.onnx.prototxt']
+    ),
     ('df2', ['yolov3-df2.opt.onnx', 'yolov3-df2.opt.onnx.prototxt'])
 ])
 
@@ -35,9 +39,9 @@ DATASETS_CATEGORY = {
         "pants", "top", "shorts", "skirt", "headwear", "scarf/tie"
     ],
     'df2': [
-        "short sleeve top", "long sleeve top", "short sleeve outwear", "long sleeve outwear",
-        "vest", "sling", "shorts", "trousers", "skirt", "short sleeve dress",
-        "long sleeve dress", "vest dress", "sling dress"
+        "short sleeve top", "long sleeve top", "short sleeve outwear",
+        "long sleeve outwear", "vest", "sling", "shorts", "trousers", "skirt",
+        "short sleeve dress", "long sleeve dress", "vest dress", "sling dress"
     ]
 }
 THRESHOLD = 0.39
@@ -58,7 +62,8 @@ parser.add_argument(
 parser.add_argument(
     '-d', '--dataset', metavar='TYPE', choices=DATASETS_MODEL_PATH,
     default=list(DATASETS_MODEL_PATH.keys())[0],
-    help='Type of dataset to train the model. Allowed values are {}.'.format(', '.join(DATASETS_MODEL_PATH))
+    help=('Type of dataset to train the model. '
+          'Allowed values are {}.'.format(', '.join(DATASETS_MODEL_PATH)))
 )
 parser.add_argument(
     '-v', '--video', metavar='VIDEO',
@@ -192,15 +197,7 @@ def recognize_from_image(filename, detector):
 
 
 def recognize_from_video(video, detector):
-    if video == '0':
-        print('[INFO] Webcam mode is activated')
-        capture = cv2.VideoCapture(0)
-        if not capture.isOpened():
-            print("[ERROR] webcamera not found")
-            sys.exit(1)
-    else:
-        if check_file_existance(args.video):
-            capture = cv2.VideoCapture(args.video)
+    capture = get_capture(args.video)
 
     while True:
         ret, frame = capture.read()
@@ -230,7 +227,9 @@ def main():
     # initialize
     detector = ailia.Net(model_path, weight_path, env_id=env_id)
     id_image_shape = detector.find_blob_index_by_name("image_shape")
-    detector.set_input_shape((1, 3, args.detection_width, args.detection_width))
+    detector.set_input_shape(
+        (1, 3, args.detection_width, args.detection_width)
+    )
     detector.set_input_blob_shape((1, 2), id_image_shape)
 
     if args.video is not None:
