@@ -4,7 +4,7 @@ import time
 import argparse
 import re
 from collections import deque
- 
+
 import numpy as np
 import cv2
 
@@ -12,10 +12,10 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import check_file_existance  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
-from webcamera_utils import adjust_frame_size  # noqa: E402C
-from image_utils import load_image, normalize_image, draw_result_on_img  # noqa: E402C
+from webcamera_utils import get_capture  # noqa: E402C
+from image_utils import load_image  # noqa: E402C
+
 
 # ======================
 # Parameters
@@ -30,57 +30,57 @@ IMAGE_WIDTH = 112
 DURATION = 16
 
 HMDB51_LABEL = [
-'brush_hair',
-'cartwheel',
-'catch',
-'chew',
-'clap',
-'climb',
-'climb_stairs',
-'dive',
-'draw_sword',
-'dribble',
-'drink',
-'eat',
-'fall_floor',
-'fencing',
-'flic_flac',
-'golf',
-'handstand',
-'hit',
-'hug',
-'jump',
-'kick',
-'kick_ball',
-'kiss',
-'laugh',
-'pick',
-'pour',
-'pullup',
-'punch',
-'push',
-'pushup',
-'ride_bike',
-'ride_horse',
-'run',
-'shake_hands',
-'shoot_ball',
-'shoot_bow',
-'shoot_gun',
-'sit',
-'situp',
-'smile',
-'smoke',
-'somersault',
-'stand',
-'swing_baseball',
-'sword',
-'sword_exercise',
-'talk',
-'throw',
-'turn',
-'walk',
-'wave',
+    'brush_hair',
+    'cartwheel',
+    'catch',
+    'chew',
+    'clap',
+    'climb',
+    'climb_stairs',
+    'dive',
+    'draw_sword',
+    'dribble',
+    'drink',
+    'eat',
+    'fall_floor',
+    'fencing',
+    'flic_flac',
+    'golf',
+    'handstand',
+    'hit',
+    'hug',
+    'jump',
+    'kick',
+    'kick_ball',
+    'kiss',
+    'laugh',
+    'pick',
+    'pour',
+    'pullup',
+    'punch',
+    'push',
+    'pushup',
+    'ride_bike',
+    'ride_horse',
+    'run',
+    'shake_hands',
+    'shoot_ball',
+    'shoot_bow',
+    'shoot_gun',
+    'sit',
+    'situp',
+    'smile',
+    'smoke',
+    'somersault',
+    'stand',
+    'swing_baseball',
+    'sword',
+    'sword_exercise',
+    'talk',
+    'throw',
+    'turn',
+    'walk',
+    'wave',
 ]
 
 
@@ -121,22 +121,23 @@ parser.add_argument(
 )
 args = parser.parse_args()
 
+
 # ======================
 # Main functions
 # ======================
 def print_mars_result(result):
-    indexes = result[0,:].argsort()[::-1]
+    indexes = result[0, :].argsort()[::-1]
     print('==============================================================')
     print(f'class_count={args.top}')
     for i, idx in enumerate(indexes[0:args.top]):
         print(f'+ idx={i}')
-        print(f'  category={idx}['
-            f'{HMDB51_LABEL[idx]} ]')
+        print(f'  category={idx}[ {HMDB51_LABEL[idx]} ]')
         print(f'  prob={result[0, idx]}')
+
 
 def recognize_from_image():
     # prepare input data
-    num = lambda val : int(re.sub("\\D", "", val))
+    num = lambda val: int(re.sub("\\D", "", val))
     sorted_inputs_path = sorted(os.listdir(args.input), key=num)
     input_blob = np.empty((1, 3, args.duration, IMAGE_HEIGHT, IMAGE_WIDTH))
     for i, input_path in enumerate(sorted_inputs_path[0:args.duration]):
@@ -172,13 +173,15 @@ def recognize_from_image():
             result = net.predict(input_blob)
 
             print_mars_result(result)
-            
-            preview_img = cv2.imread(args.input + '/' + sorted_inputs_path[next_input_index - args.duration])
+
+            preview_img = cv2.imread(args.input + '/' + sorted_inputs_path[
+                    next_input_index - args.duration
+            ])
             cv2.imshow('preview', preview_img)
 
             for i in range(args.duration - 1):
                 input_blob[0, :, i, :, :] = input_blob[0, :, i + 1, :, :]
-            
+
             img = load_image(
                 args.input + '/' + sorted_inputs_path[next_input_index],
                 (IMAGE_HEIGHT, IMAGE_WIDTH),
@@ -187,7 +190,7 @@ def recognize_from_image():
             )
             input_blob[0, :, args.duration - 1, :, :] = img
             next_input_index += 1
-        
+
     print('Script finished successfully.')
 
 
@@ -200,15 +203,7 @@ def convert_input_frame(frame):
 
 
 def recognize_from_video():
-    if args.video == '0':
-        print('[INFO] Webcam mode is activated')
-        capture = cv2.VideoCapture(0)
-        if not capture.isOpened():
-            print("[ERROR] webcamera not found")
-            sys.exit(1)
-    else:
-        if check_file_existance(args.video):
-            capture = cv2.VideoCapture(args.video)
+    capture = get_capture(args.video)
 
     # # net initialize
     env_id = ailia.get_gpu_environment_id()
@@ -225,11 +220,11 @@ def recognize_from_video():
             continue
         original_queue.append(frame)
         input_blob[0, :, i, :, :] = convert_input_frame(frame)
-    
+
     next_input_index = args.duration - 1
     input_frame_size = capture.get(cv2.CAP_PROP_FRAME_COUNT)
 
-    while(next_input_index <= input_frame_size or input_frame_size==0):        
+    while(next_input_index <= input_frame_size or input_frame_size == 0):
         ret, frame = capture.read()
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
@@ -237,20 +232,16 @@ def recognize_from_video():
             continue
         original_queue.append(frame)
         input_blob[0, :, args.duration - 1, :, :] = convert_input_frame(frame)
-        
-        if args.ailia:
-            result = net.predict(input_blob)
-        else:
-            result = session.run([output_name], {input_name: input_blob.astype(np.float32)})[0]
+
+        result = net.predict(input_blob)
         print_mars_result(result)
-        
         preview_img = original_queue.popleft()
         cv2.imshow('preview', preview_img)
 
         for i in range(args.duration - 1):
             input_blob[0, :, i, :, :] = input_blob[0, :, i + 1, :, :]
-        
-        next_input_index+=1 
+
+        next_input_index += 1
 
     capture.release()
     print('Script finished successfully.')
