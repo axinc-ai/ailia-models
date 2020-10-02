@@ -8,11 +8,11 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import check_file_existance  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
-from webcamera_utils import adjust_frame_size  # noqa: E402C
+from webcamera_utils import adjust_frame_size, get_capture  # noqa: E402C
 from detector_utils import plot_results, load_image  # noqa: E402C
-from nms_utils import nms_between_categories
+from nms_utils import nms_between_categories  # noqa: E402C
+
 
 # ======================
 # Parameters
@@ -22,12 +22,13 @@ MODEL_LISTS = ['yolov3-tiny', 'mb2-ssd']
 
 IMAGE_PATH = 'ferry.jpg'
 SAVE_IMAGE_PATH = 'output.png'
-IMAGE_HEIGHT = 416  
+IMAGE_HEIGHT = 416
 IMAGE_WIDTH = 416
 
-FACE_CATEGORY = ['unmasked','masked']
+FACE_CATEGORY = ['unmasked', 'masked']
 
 IOU = 0.45
+
 
 # ======================
 # Arguemnt Parser Config
@@ -64,7 +65,7 @@ parser.add_argument(
 )
 args = parser.parse_args()
 
-if args.arch=="yolov3-tiny":
+if args.arch == "yolov3-tiny":
     WEIGHT_PATH = 'face-mask-detection-yolov3-tiny.opt.obf.onnx'
     MODEL_PATH = 'face-mask-detection-yolov3-tiny.opt.onnx.prototxt'
     RANGE = ailia.NETWORK_IMAGE_RANGE_U_FP32
@@ -77,6 +78,7 @@ else:
     ALGORITHM = ailia.DETECTOR_ALGORITHM_SSD
     THRESHOLD = 0.2
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/face-mask-detection/'
+
 
 # ======================
 # Main functions
@@ -117,7 +119,13 @@ def recognize_from_image():
     for idx in range(detector.get_object_count()):
         obj = detector.get_object(idx)
         detections.append(obj)
-    detections=nms_between_categories(detections,img.shape[1],img.shape[0],categories=[0,1],iou_threshold=IOU)
+    detections = nms_between_categories(
+        detections,
+        img.shape[1],
+        img.shape[0],
+        categories=[0, 1],
+        iou_threshold=IOU
+    )
 
     # plot result
     res_img = plot_results(detections, img, FACE_CATEGORY)
@@ -140,15 +148,7 @@ def recognize_from_video():
         env_id=env_id
     )
 
-    if args.video == '0':
-        print('[INFO] Webcam mode is activated')
-        capture = cv2.VideoCapture(0)
-        if not capture.isOpened():
-            print("[ERROR] webcamera not found")
-            sys.exit(1)
-    else:
-        if check_file_existance(args.video):
-            capture = cv2.VideoCapture(args.video)
+    capture = get_capture(args.video)
 
     while(True):
         ret, frame = capture.read()
@@ -166,7 +166,13 @@ def recognize_from_video():
         for idx in range(detector.get_object_count()):
             obj = detector.get_object(idx)
             detections.append(obj)
-        detections=nms_between_categories(detections,frame.shape[1],frame.shape[0],categories=[0,1],iou_threshold=IOU)
+        detections = nms_between_categories(
+            detections,
+            frame.shape[1],
+            frame.shape[0],
+            categories=[0, 1],
+            iou_threshold=IOU
+        )
 
         res_img = plot_results(detections, resized_img, FACE_CATEGORY, False)
         cv2.imshow('frame', res_img)
