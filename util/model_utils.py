@@ -43,7 +43,7 @@ def check_and_download_models(weight_path, model_path, remote_path):
         The url where the onnx file and prototxt file are saved.
         ex. "https://storage.googleapis.com/ailia-models/mobilenetv2/"
     """
-    
+
     if not os.path.exists(weight_path):
         print(f'Downloading onnx file... (save path: {weight_path})')
         urllib.request.urlretrieve(
