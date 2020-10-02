@@ -7,16 +7,15 @@ import numpy as np
 import cv2
 import scipy.io as sio
 from skimage.io import imread, imsave
-from skimage.transform import rescale, resize
+from skimage.transform import resize
 
 import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import check_file_existance  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from image_utils import load_image  # noqa: E402
-import webcamera_utils  # noqa: E402C
+from webcamera_utils import get_capture  # noqa: E402C
 
 from prnet_utils.net_utils import *  # noqa: E402C
 from prnet_utils.estimate_pose import estimate_pose  # noqa: E402C
@@ -49,7 +48,7 @@ IMAGE_SIZE = 256
 # ntri x 3
 TRIANGLES = np.loadtxt('uv-data/triangles.txt').astype(np.int32)
 
-UV_COORDS = generate_uv_coords(IMAGE_SIZE)
+UV_COORDS = generate_uv_coords(IMAGE_SIZE)  # unused
 
 
 # ======================
@@ -115,7 +114,8 @@ parser.add_argument(
 )
 parser.add_argument(
     '--isShow', action='store_true',
-    help='whether to show the results with opencv(need opencv) instead of saving'
+    help=('whether to show the results with opencv(need opencv) instead of '
+          'saving them')
 )
 parser.add_argument(
     '--isFront', action='store_true',
@@ -131,7 +131,8 @@ parser.add_argument(
 )
 parser.add_argument(
     '--isMask', action='store_true',
-    help='whether to set invisible pixels(due to self-occlusion) in texture as 0'
+    help=('whether to set invisible pixels(due to self-occlusion) in texture '
+          'as 0')
 )
 parser.add_argument(
     '--texture_size', default=256, type=int,
@@ -420,15 +421,8 @@ def recognize_from_video():
     env_id = ailia.get_gpu_environment_id()
     print(f'env_id: {env_id}')
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
-    if args.video == '0':
-        print('[INFO] Webcam mode is activated')
-        capture = cv2.VideoCapture(0)
-        if not capture.isOpened():
-            print("[ERROR] webcamera not found")
-            sys.exit(1)
-    else:
-        if check_file_existance(args.video):
-            capture = cv2.VideoCapture(args.video)
+
+    capture = get_capture(args.video)
 
     # create video writer if savepath is specified as video format
     if args.savepath != SAVE_IMAGE_PATH:
@@ -468,7 +462,7 @@ def recognize_from_video():
         # save results
         if writer is not None:
             writer.write(seg_image)
-        
+
     capture.release()
     cv2.destroyAllWindows()
     print('Script finished successfully.')

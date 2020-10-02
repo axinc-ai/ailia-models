@@ -12,10 +12,9 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import check_file_existance  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from image_utils import load_image  # noqa: E402
-from webcamera_utils import preprocess_frame  # noqa: E402
+from webcamera_utils import preprocess_frame, get_capture  # noqa: E402
 
 
 # TODO Upgrade Model
@@ -108,7 +107,7 @@ def recognize_from_image():
     fig = gen_img_from_predsailia(img, preds_ailia)
     fig.savefig(args.savepath)
     print('Script finished successfully.')
-    
+
 
 def recognize_from_video():
     # net initialize
@@ -116,15 +115,7 @@ def recognize_from_video():
     print(f'env_id: {env_id}')
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
 
-    if args.video == '0':
-        print('[INFO] Webcam mode is activated')
-        capture = cv2.VideoCapture(0)
-        if not capture.isOpened():
-            print("[ERROR] webcamera not found")
-            sys.exit(1)
-    else:
-        if check_file_existance(args.video):
-            capture = cv2.VideoCapture(args.video)
+    capture = get_capture(args.video)
 
     while(True):
         ret, frame = capture.read()
