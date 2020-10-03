@@ -8,9 +8,8 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import check_file_existance  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
-from webcamera_utils import adjust_frame_size  # noqa: E402C
+from webcamera_utils import get_capture  # noqa: E402C
 from detector_utils import plot_results, load_image  # noqa: E402C
 
 
@@ -100,13 +99,15 @@ def recognize_from_image():
         algorithm=ailia.DETECTOR_ALGORITHM_YOLOV3,
         env_id=env_id
     )
-    if int(args.detection_width)!=416:
-        detector.set_input_shape(int(args.detection_width),int(args.detection_width))
+    if int(args.detection_width) != 416:
+        detector.set_input_shape(
+            int(args.detection_width), int(args.detection_width)
+        )
 
     # inferece
     print('Start inference...')
     if args.benchmark:
-        print('BENCHMARK mode')    
+        print('BENCHMARK mode')
         for i in range(5):
             start = int(round(time.time() * 1000))
             detector.compute(img, THRESHOLD, IOU)
@@ -135,18 +136,12 @@ def recognize_from_video():
         algorithm=ailia.DETECTOR_ALGORITHM_YOLOV3,
         env_id=env_id
     )
-    if int(args.detection_width)!=DETECTION_WIDTH:
-        detector.set_input_shape(int(args.detection_width),int(args.detection_width))
+    if int(args.detection_width) != DETECTION_WIDTH:
+        detector.set_input_shape(
+            int(args.detection_width), int(args.detection_width)
+        )
 
-    if args.video == '0':
-        print('[INFO] Webcam mode is activated')
-        capture = cv2.VideoCapture(0)
-        if not capture.isOpened():
-            print("[ERROR] webcamera not found")
-            sys.exit(1)
-    else:
-        if check_file_existance(args.video):
-            capture = cv2.VideoCapture(args.video)
+    capture = get_capture(args.video)
 
     while(True):
         ret, frame = capture.read()
