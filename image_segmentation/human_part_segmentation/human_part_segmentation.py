@@ -67,11 +67,6 @@ parser.add_argument(
     help='Running the inference on the same input 5 times ' +
          'to measure execution performance. (Cannot be used in video mode)'
 )
-parser.add_argument(
-    '--onnx',
-    action='store_true',
-    help='execute onnxruntime version.'
-)
 args = parser.parse_args()
 
 
@@ -159,19 +154,10 @@ def detect_objects(img, detector):
     data = preprocess(img)
 
     # feedforward
-    if not args.onnx:
-        output = detector.predict({
-            'img': data['img']
-        })
-        _, fusion, _ = output
-    else:
-        input_name = detector.get_inputs()[0].name
-        output_parsing = detector.get_outputs()[0].name
-        output_fusion = detector.get_outputs()[1].name
-        output_edge = detector.get_outputs()[2].name
-        output = detector.run([output_parsing, output_fusion, output_edge],
-                              {input_name: data['img']})
-        _, fusion, _ = output
+    output = detector.predict({
+        'img': data['img']
+    })
+    _, fusion, _ = output
 
     # post processes
     pixel_labels = post_processing(data, fusion)
@@ -250,11 +236,7 @@ def main():
     print(f'env_id: {env_id}')
 
     # initialize
-    if not args.onnx:
-        detector = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
-    else:
-        import onnxruntime
-        detector = onnxruntime.InferenceSession(WEIGHT_PATH)
+    detector = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
 
     if args.video is not None:
         # video mode
