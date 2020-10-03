@@ -18,7 +18,8 @@ EMOTION_WEIGHT_PATH = 'emotion_miniXception.caffemodel'
 EMOTION_MODEL_PATH = 'emotion_miniXception.prototxt'
 GENDER_WEIGHT_PATH = "gender_miniXception.caffemodel"
 GENDER_MODEL_PATH = "gender_miniXception.prototxt"
-REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/face_classification/'
+REMOTE_PATH = \
+    'https://storage.googleapis.com/ailia-models/face_classification/'
 
 IMAGE_PATH = 'lenna.png'
 EMOTION_MAX_CLASS_COUNT = 3
@@ -170,10 +171,8 @@ def recognize_from_video():
         ret, frame = capture.read()
         frame = cv2.cvtColor(frame, cv2.COLOR_BGR2BGRA)
 
-        if cv2.waitKey(1) & 0xFF == ord('q'):
+        if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
-        if not ret:
-            continue
 
         # emotion inference
         emotion_classifier.compute(frame, EMOTION_MAX_CLASS_COUNT)

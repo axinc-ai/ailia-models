@@ -136,10 +136,8 @@ def recognize_from_video():
 
     while(True):
         ret, frame = capture.read()
-        if cv2.waitKey(1) & 0xFF == ord('q'):
+        if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
-        if not ret:
-            continue
 
         img = preProcess(frame)
         input_data = padCropImg(img)

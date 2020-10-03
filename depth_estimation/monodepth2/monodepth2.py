@@ -129,10 +129,8 @@ def estimate_from_video():
 
     while(True):
         ret, frame = capture.read()
-        if cv2.waitKey(1) & 0xFF == ord('q'):
+        if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
-        if not ret:
-            continue
 
         _, input_data = preprocess_frame(
             frame, IMAGE_HEIGHT, IMAGE_WIDTH

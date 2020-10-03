@@ -179,10 +179,8 @@ def recognize_from_video(video):
         cv2.imshow('frame', img)
 
         # press q to end video capture
-        if cv2.waitKey(1) & 0xFF == ord('q'):
+        if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
-        if not ret:
-            continue
 
     capture.release()
     cv2.destroyAllWindows()

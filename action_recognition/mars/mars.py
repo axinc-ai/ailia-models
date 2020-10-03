@@ -226,10 +226,8 @@ def recognize_from_video():
 
     while(next_input_index <= input_frame_size or input_frame_size == 0):
         ret, frame = capture.read()
-        if cv2.waitKey(1) & 0xFF == ord('q'):
+        if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
-        if not ret:
-            continue
         original_queue.append(frame)
         input_blob[0, :, args.duration - 1, :, :] = convert_input_frame(frame)
 

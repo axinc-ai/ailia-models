@@ -77,7 +77,8 @@ else:
     RANGE = ailia.NETWORK_IMAGE_RANGE_S_FP32
     ALGORITHM = ailia.DETECTOR_ALGORITHM_SSD
     THRESHOLD = 0.2
-REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/face-mask-detection/'
+REMOTE_PATH = \
+    'https://storage.googleapis.com/ailia-models/face-mask-detection/'
 
 
 # ======================
@@ -152,10 +153,8 @@ def recognize_from_video():
 
     while(True):
         ret, frame = capture.read()
-        if cv2.waitKey(1) & 0xFF == ord('q'):
+        if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
-        if not ret:
-            continue
 
         _, resized_img = adjust_frame_size(frame, IMAGE_HEIGHT, IMAGE_WIDTH)
 

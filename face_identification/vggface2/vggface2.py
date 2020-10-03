@@ -155,10 +155,8 @@ def compare_videoframe_image():
 
     while(True):
         ret, frame = capture.read()
-        if cv2.waitKey(1) & 0xFF == ord('q'):
+        if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
-        if not ret:
-            continue
 
         _, resized_frame = adjust_frame_size(
             frame, IMAGE_HEIGHT, IMAGE_WIDTH

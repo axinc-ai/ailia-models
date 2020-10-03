@@ -76,15 +76,18 @@ args = parser.parse_args()
 if args.arch == 'u2net':
     SEGMENTATION_WEIGHT_PATH = 'u2net.onnx'
     SEGMENTATION_MODEL_PATH = SEGMENTATION_WEIGHT_PATH + '.prototxt'
-    SEGMENTATION_REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/u2net/'
+    SEGMENTATION_REMOTE_PATH = \
+        'https://storage.googleapis.com/ailia-models/u2net/'
 if args.arch == 'deeplabv3':
     SEGMENTATION_WEIGHT_PATH = 'deeplabv3.opt.onnx'
     SEGMENTATION_MODEL_PATH = SEGMENTATION_WEIGHT_PATH + '.prototxt'
-    SEGMENTATION_REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/deeplabv3/'
+    SEGMENTATION_REMOTE_PATH = \
+        'https://storage.googleapis.com/ailia-models/deeplabv3/'
 if args.arch == 'pspnet':
     SEGMENTATION_WEIGHT_PATH = 'pspnet-hair-segmentation.onnx'
     SEGMENTATION_MODEL_PATH = SEGMENTATION_WEIGHT_PATH + '.prototxt'
-    SEGMENTATION_REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/pspnet-hair-segmentation/'
+    SEGMENTATION_REMOTE_PATH = \
+        'https://storage.googleapis.com/ailia-models/pspnet-hair-segmentation/'
 
 # ======================
 # Utils
@@ -329,10 +332,8 @@ def recognize_from_video():
 
     while(True):
         ret, frame = capture.read()
-        if cv2.waitKey(1) & 0xFF == ord('q'):
+        if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
-        if not ret:
-            continue
 
         # grab src image
         src_img, input_data = preprocess_frame(

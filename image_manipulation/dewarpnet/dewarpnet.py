@@ -150,10 +150,8 @@ def unwarp_from_video():
 
     while(True):
         ret, frame = capture.read()
-        if cv2.waitKey(1) & 0xFF == ord('q'):
+        if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
-        if not ret:
-            continue
 
         org_image, input_data = preprocess_frame(
             frame, WC_IMG_HEIGHT, WC_IMG_WIDTH, normalize_type='255'

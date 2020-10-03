@@ -230,10 +230,8 @@ def recognize_tag_from_video():
         ret, frame = capture.read()
         _, frame = adjust_frame_size(frame, IMAGE_HEIGHT, IMAGE_WIDTH)
 
-        if cv2.waitKey(1) & 0xFF == ord('q'):
+        if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
-        if not ret:
-            continue
 
         input_data = prepare_input_data(frame, bgr=True)
         input_dict = {'data': input_data}
@@ -266,10 +264,8 @@ def extract_feature_vec_from_video():
         ret, frame = capture.read()
         _, frame = adjust_frame_size(frame, IMAGE_HEIGHT, IMAGE_WIDTH)
 
-        if cv2.waitKey(1) & 0xFF == ord('q'):
+        if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
-        if not ret:
-            continue
 
         input_data = prepare_input_data(frame, bgr=True)
         input_dict = {'data': input_data}

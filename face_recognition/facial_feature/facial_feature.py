@@ -23,7 +23,8 @@ from webcamera_utils import preprocess_frame, get_capture  # noqa: E402
 # ======================
 WEIGHT_PATH = 'resnet_facial_feature.onnx'
 MODEL_PATH = 'resnet_facial_feature.onnx.prototxt'
-REMOTE_PATH = "https://storage.googleapis.com/ailia-models/resnet_facial_feature/"
+REMOTE_PATH = \
+    "https://storage.googleapis.com/ailia-models/resnet_facial_feature/"
 
 IMAGE_PATH = 'test.png'
 SAVE_IMAGE_PATH = 'output.png'
@@ -119,10 +120,8 @@ def recognize_from_video():
 
     while(True):
         ret, frame = capture.read()
-        if cv2.waitKey(1) & 0xFF == ord('q'):
+        if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
-        if not ret:
-            continue
 
         input_image, input_data = preprocess_frame(
             frame, IMAGE_HEIGHT, IMAGE_WIDTH, data_rgb=False

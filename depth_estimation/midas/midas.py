@@ -10,7 +10,6 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import check_file_existance  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from webcamera_utils import get_capture  # noqa: E402C
 from image_utils import normalize_image  # noqa: E402C
@@ -155,10 +154,8 @@ def recognize_from_video():
     input_shape_set = False
     while(True):
         ret, frame = capture.read()
-        if cv2.waitKey(1) & 0xFF == ord('q'):
+        if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
-        if not ret:
-            continue
 
         resized_img = midas_resize(frame, IMAGE_HEIGHT, IMAGE_WIDTH)
         resized_img = resized_img.transpose((2, 0, 1))  # channel first

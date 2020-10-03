@@ -242,20 +242,16 @@ def recognize_from_video(video, detector):
 
     while(True):
         ret, img = capture.read()
-        if cv2.waitKey(1) & 0xFF == ord('q'):
+        if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
-        if not ret:
-            continue
 
         boxes, scores, cls_inds = detect_objects(img, detector)
         img = draw_detection(img, boxes, scores, cls_inds)
         cv2.imshow('frame', img)
 
         # press q to end video capture
-        if cv2.waitKey(1) & 0xFF == ord('q'):
+        if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
-        if not ret:
-            continue
 
     capture.release()
     cv2.destroyAllWindows()
