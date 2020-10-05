@@ -235,6 +235,8 @@ def recognize_from_video():
         ax.clear()
         display_objdetect_image(fig, ax, frame, boxes, labels, scores, masks)
         plt.pause(.01)
+        if not plt.get_fignums():
+            break
 
     capture.release()
     cv2.destroyAllWindows()
