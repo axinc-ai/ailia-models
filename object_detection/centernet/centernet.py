@@ -7,7 +7,7 @@ import cv2
 
 import ailia
 
-from utils import preprocess, postprocess
+from centernet_utils import preprocess, postprocess
 
 # import original modules
 sys.path.append('../../util')
