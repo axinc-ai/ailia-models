@@ -9,10 +9,9 @@ import inceptionv3_labels
 
 # import original modules
 sys.path.append('../../util')
-from utils import check_file_existance  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from image_utils import load_image  # noqa: E402
-from webcamera_utils import adjust_frame_size  # noqa: E402
+from webcamera_utils import adjust_frame_size, get_capture  # noqa: E402
 
 
 # ======================
@@ -91,7 +90,7 @@ def recognize_from_image():
         classifier.compute(input_data, MAX_CLASS_COUNT)
 
     count = classifier.get_class_count()
-    
+
     # postprocessing
     for idx in range(count):
         # print result
@@ -115,22 +114,12 @@ def recognize_from_video():
         range=ailia.NETWORK_IMAGE_RANGE_U_FP32
     )
 
-    if args.video == '0':
-        print('[INFO] Webcam mode is activated')
-        capture = cv2.VideoCapture(0)
-        if not capture.isOpened():
-            print("[ERROR] webcamera not found")
-            sys.exit(1)
-    else:
-        if check_file_existance(args.video):
-            capture = cv2.VideoCapture(args.video)
+    capture = get_capture(args.video)
 
     while(True):
         ret, frame = capture.read()
-        if cv2.waitKey(1) & 0xFF == ord('q'):
+        if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
-        if not ret:
-            continue
 
         # prepare input data
         input_image, input_data = adjust_frame_size(

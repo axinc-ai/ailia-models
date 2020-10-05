@@ -1,7 +1,6 @@
 import time
 import sys
 import argparse
-import pathlib
 
 import numpy as np
 import cv2
@@ -11,8 +10,10 @@ import dbface_utils
 
 # import original modules
 sys.path.append('../../util')
-from model_utils import check_and_download_models 
-from detector_utils import load_image 
+from model_utils import check_and_download_models  # noqa: E402
+from detector_utils import load_image  # noqa: E402
+from webcamera_utils import get_capture  # noqa: E402
+
 
 # ======================
 # Parameters
@@ -57,6 +58,7 @@ parser.add_argument(
 )
 args = parser.parse_args()
 
+
 # ======================
 # Secondaty Functions
 # ======================
@@ -93,11 +95,13 @@ def preprocess(img):
 
 def detect_objects(img, detector):
     img = preprocess(img)
-    
+
     detector.set_input_shape((1, 3, img.shape[2], img.shape[3]))
     hm, box, landmark = detector.predict({'input.1': img})
-    
-    hm_pool = dbface_utils.max_pool2d(A=hm[0][0], kernel_size=3, stride=1, padding=1)
+
+    hm_pool = dbface_utils.max_pool2d(
+        A=hm[0][0], kernel_size=3, stride=1, padding=1
+    )
     hm_pool = np.expand_dims(np.expand_dims(hm_pool, 0), 0)
 
     scores, indices = dbface_utils.get_topk_score_indices(hm_pool, hm, k=1000)
@@ -121,8 +125,10 @@ def detect_objects(img, detector):
         x5y5 = landmark[:, cy, cx]
         x5y5 = (dbface_utils.exp(x5y5 * 4) + ([cx]*5 + [cy]*5)) * stride
         box_landmark = list(zip(x5y5[:5], x5y5[5:]))
-        objs.append(dbface_utils.BBox(0, xyrb=xyrb, score=score, landmark=box_landmark))
-    
+        objs.append(
+            dbface_utils.BBox(0, xyrb=xyrb, score=score, landmark=box_landmark)
+        )
+
     return nms(objs, iou=IOU)
 
 
@@ -138,7 +144,7 @@ def recognize_from_image(filename):
     env_id = ailia.get_gpu_environment_id()
     print(f'env_id: {env_id}')
     detector = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
-    
+
     print('Start inference...')
     if args.benchmark:
         print('BENCHMARK mode')
@@ -149,8 +155,8 @@ def recognize_from_image(filename):
             print(f'\tailia processing time {end - start} ms')
     else:
         objs = detect_objects(img, detector)
-        
-    # show image 
+
+    # show image
     for obj in objs:
         dbface_utils.drawbbox(img, obj)
     cv2.imwrite(args.savepath, img)
@@ -158,20 +164,12 @@ def recognize_from_image(filename):
     print('Script finished successfully.')
 
 
-def recognize_from_video(video): 
+def recognize_from_video(video):
     env_id = ailia.get_gpu_environment_id()
     print(f'env_id: {env_id}')
     detector = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
-    
-    if video == '0':
-        print('[INFO] Webcam mode is activated')
-        capture = cv2.VideoCapture(0)
-        if not capture.isOpened():
-            print("[ERROR] webcamera not found")
-            sys.exit(1)
-    else:
-        if pathlib.Path(video).exists():
-            capture = cv2.VideoCapture(video)
+
+    capture = get_capture(video)
 
     while(True):
         ret, img = capture.read()
@@ -181,10 +179,8 @@ def recognize_from_video(video):
         cv2.imshow('frame', img)
 
         # press q to end video capture
-        if cv2.waitKey(1)&0xFF == ord('q'):
+        if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
-        if not ret:
-            continue
 
     capture.release()
     cv2.destroyAllWindows()
@@ -203,5 +199,5 @@ def main():
         recognize_from_image(args.input)
 
 
-if __name__=='__main__':
+if __name__ == '__main__':
     main()

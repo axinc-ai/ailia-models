@@ -9,7 +9,6 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import check_file_existance  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 import webcamera_utils  # noqa: E402C
 from u2net_utils import load_image, transform, save_result, norm  # noqa: E402C
@@ -75,10 +74,11 @@ args = parser.parse_args()
 # ======================
 # Parameters 2
 # ======================
-if args.opset=="10":
+if args.opset == "10":
     WEIGHT_PATH = 'u2net.onnx' if args.arch == 'large' else 'u2netp.onnx'
 else:
-    WEIGHT_PATH = 'u2net_opset11.onnx' if args.arch == 'large' else 'u2netp_opset11.onnx'
+    WEIGHT_PATH = 'u2net_opset11.onnx' \
+        if args.arch == 'large' else 'u2netp_opset11.onnx'
 MODEL_PATH = WEIGHT_PATH + '.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/u2net/'
 
@@ -121,7 +121,7 @@ def recognize_from_image():
     if args.composite:
         image = cv2.imread(args.input)
         image = cv2.cvtColor(image, cv2.COLOR_BGR2BGRA)
-        image[:,:,3] = cv2.resize(pred,(w,h)) * 255
+        image[:, :, 3] = cv2.resize(pred, (w, h)) * 255
         cv2.imwrite(args.savepath, image)
 
     print('Script finished successfully.')
@@ -133,20 +133,12 @@ def recognize_from_video():
     print(f'env_id: {env_id}')
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
 
-    if args.video == '0':
-        print('[INFO] Webcam mode is activated')
-        capture = cv2.VideoCapture(0)
-        if not capture.isOpened():
-            print("[ERROR] webcamera not found")
-            sys.exit(1)
-    else:
-        if check_file_existance(args.video):
-            capture = cv2.VideoCapture(args.video)
+    capture = webcamera_utils.get_capture(args.video)
 
     # create video writer if savepath is specified as video format
     f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))    
-    if args.savepath != SAVE_IMAGE_PATH:    
+    f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
+    if args.savepath != SAVE_IMAGE_PATH:
         writer = webcamera_utils.get_writer(args.savepath, f_h, f_w, rgb=False)
     else:
         writer = None
@@ -166,17 +158,17 @@ def recognize_from_video():
 
         # composite
         if args.composite:
-            frame[:,:,0] = frame[:,:,0] * pred
-            frame[:,:,1] = frame[:,:,1] * pred
-            frame[:,:,2] = frame[:,:,2] * pred
+            frame[:, :, 0] = frame[:, :, 0] * pred
+            frame[:, :, 1] = frame[:, :, 1] * pred
+            frame[:, :, 2] = frame[:, :, 2] * pred
             pred = frame / 255.0
 
         cv2.imshow('frame', pred)
-        
+
         # save results
         if writer is not None:
             writer.write((pred * 255).astype(np.uint8))
-        
+
     capture.release()
     cv2.destroyAllWindows()
     print('Script finished successfully.')

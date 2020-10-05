@@ -43,7 +43,7 @@ cd ../../image_segmentation/hair_segmentation; python3 hair_segmentation.py ${OP
 cd ../../image_segmentation/hrnet_segmentation; python3 hrnet_segmentation.py ${OPTION}
 cd ../../image_segmentation/pspnet-hair-segmentation; python3 pspnet-hair-segmentation.py ${OPTION}
 cd ../../image_segmentation/u2net; python3 u2net.py ${OPTION}
-cd ../../image_segmentation/u2net; python3 u2net.py -a small${OPTION}
+cd ../../image_segmentation/u2net; python3 u2net.py -a small ${OPTION}
 cd ../../neural_language_processing/bert; python3 bert.py ${OPTION}
 cd ../../object_detection/centernet; python3 centernet.py ${OPTION}
 cd ../../object_detection/m2det; python3 m2det.py ${OPTION}

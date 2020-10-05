@@ -8,9 +8,8 @@ import cv2
 import ailia
 # import original modules
 sys.path.append('../../util')
-from utils import check_file_existance   # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
-from webcamera_utils import adjust_frame_size  # noqa: E402
+from webcamera_utils import adjust_frame_size, get_capture  # noqa: E402
 
 
 # ======================
@@ -123,22 +122,12 @@ def recognize_from_video():
         range=ailia.NETWORK_IMAGE_RANGE_U_FP32
     )
 
-    if args.video == '0':
-        print('[INFO] Webcam mode is activated')
-        capture = cv2.VideoCapture(0)
-        if not capture.isOpened():
-            print("[ERROR] webcamera not found")
-            sys.exit(1)
-    else:
-        if check_file_existance(args.video):
-            capture = cv2.VideoCapture(args.video)
+    capture = get_capture(args.video)
 
     while(True):
         ret, frame = capture.read()
-        if cv2.waitKey(1) & 0xFF == ord('q'):
+        if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
-        if not ret:
-            continue
 
         in_frame, frame = adjust_frame_size(frame, IMAGE_HEIGHT, IMAGE_WIDTH)
         frame = preprocess_image(frame)

@@ -9,10 +9,9 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import check_file_existance  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from image_utils import load_image  # noqa: E402
-from webcamera_utils import adjust_frame_size  # noqa: E402C
+from webcamera_utils import adjust_frame_size, get_capture  # noqa: E402C
 
 
 # ======================
@@ -75,7 +74,7 @@ def add_noise(img, noise_param=50):
     img = noise_img
     cv2.imwrite('noise_image.png', img)  # TODO make argument for savepath ?
     return img
-    
+
 
 # ======================
 # Main functions
@@ -94,7 +93,7 @@ def recognize_from_image():
     img = img / 255.0
     input_data = img.transpose(2, 0, 1)
     input_data.shape = (1, ) + input_data.shape
-    
+
     # net initialize
     env_id = ailia.get_gpu_environment_id()
     print(f'env_id: {env_id}')
@@ -126,31 +125,21 @@ def recognize_from_video():
     print(f'env_id: {env_id}')
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
 
-    if args.video == '0':
-        print('[INFO] Webcam mode is activated')
-        capture = cv2.VideoCapture(0)
-        if not capture.isOpened():
-            print("[ERROR] webcamera not found")
-            sys.exit(1)
-    else:
-        if check_file_existance(args.video):
-            capture = cv2.VideoCapture(args.video)
+    capture = get_capture(args.video)
 
     while(True):
         ret, frame = capture.read()
-        if cv2.waitKey(1) & 0xFF == ord('q'):
+        if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
-        if not ret:
-            continue
 
         _, resized_image = adjust_frame_size(frame, IMAGE_HEIGHT, IMAGE_WIDTH)
 
         if args.add_noise:
             resized_image = add_noise(resized_image)
-            
+
         resized_image = resized_image / 255.0
         input_data = resized_image.transpose(2, 0, 1)
-        input_data.shape = (1, ) + input_data.shape       
+        input_data.shape = (1, ) + input_data.shape
 
         # inference
         preds_ailia = net.predict(input_data)

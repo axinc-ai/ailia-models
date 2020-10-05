@@ -5,11 +5,10 @@ import argparse
 import cv2
 
 import ailia
-from blazeface_utils import *
+import blazeface_utils as but
 
 # import original modules
 sys.path.append('../../util')
-from utils import check_file_existance  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from image_utils import load_image  # noqa: E402
 import webcamera_utils  # noqa: E402
@@ -94,11 +93,11 @@ def recognize_from_image():
         preds_ailia = net.predict([input_data])
 
     # postprocessing
-    detections = postprocess(preds_ailia)
+    detections = but.postprocess(preds_ailia)
 
     # generate detections
     for detection in detections:
-        plot_detections(org_img, detection, save_image_path=args.savepath)
+        but.plot_detections(org_img, detection, save_image_path=args.savepath)
     print('Script finished successfully.')
 
 
@@ -108,15 +107,7 @@ def recognize_from_video():
     print(f'env_id: {env_id}')
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
 
-    if args.video == '0':
-        print('[INFO] Webcam mode is activated')
-        capture = cv2.VideoCapture(0)
-        if not capture.isOpened():
-            print("[ERROR] webcamera not found")
-            sys.exit(1)
-    else:
-        if check_file_existance(args.video):
-            capture = cv2.VideoCapture(args.video)
+    capture = webcamera_utils.get_capture(args.video)
 
     # create video writer if savepath is specified as video format
     if args.savepath != SAVE_IMAGE_PATH:
@@ -145,8 +136,8 @@ def recognize_from_video():
         preds_ailia = net.get_results()
 
         # postprocessing
-        detections = postprocess(preds_ailia)
-        show_result(input_image, detections)
+        detections = but.postprocess(preds_ailia)
+        but.show_result(input_image, detections)
         cv2.imshow('frame', input_image)
 
         # save results
