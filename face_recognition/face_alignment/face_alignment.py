@@ -450,6 +450,8 @@ def recognize_from_video():
             axs, resized_img, pts_img, active_3d=args.active_3d
         )
         plt.pause(0.01)
+        if not plt.get_fignums():
+            break
 
     capture.release()
     cv2.destroyAllWindows()

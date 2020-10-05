@@ -172,6 +172,8 @@ def recognize_from_video():
             fig, rotated_img, rotation_angle, predicted_angle, tight_layout
         )
         plt.pause(.01)
+        if not plt.get_fignums():
+            break
         tight_layout = False
 
     capture.release()

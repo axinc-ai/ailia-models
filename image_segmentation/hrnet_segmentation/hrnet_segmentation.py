@@ -139,6 +139,8 @@ def recognize_from_video():
         gen_img = gen_preds_img(preds_ailia, IMAGE_HEIGHT, IMAGE_WIDTH)
         plt.imshow(gen_img)
         plt.pause(.01)
+        if not plt.get_fignums():
+            break
 
     capture.release()
     cv2.destroyAllWindows()

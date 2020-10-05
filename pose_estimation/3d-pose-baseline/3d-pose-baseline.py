@@ -520,6 +520,8 @@ def recognize_from_video():
 
         # display 3d pose
         plt.pause(0.01)
+        if not plt.get_fignums():
+            break
 
     capture.release()
     cv2.destroyAllWindows()
