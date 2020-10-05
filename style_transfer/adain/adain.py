@@ -37,7 +37,7 @@ IMAGE_WIDTH = 512
 # ======================
 parser = argparse.ArgumentParser(
     formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-    description='Arbitrary Style Transfer Model',    
+    description='Arbitrary Style Transfer Model',
 )
 parser.add_argument(
     '-i', '--input', metavar='IMAGE',
@@ -93,7 +93,7 @@ def image_style_transfer():
         normalize_type='255',
         gen_input_ailia=True
     )
-    
+
     src_h, src_w, _ = cv2.imread(args.input).shape
     style_img = load_image(
         args.style,
@@ -119,7 +119,7 @@ def image_style_transfer():
             print(f'\tailia processing time {end - start} ms')
     else:
         preds_ailia = style_transfer(vgg, decoder, input_img, style_img)
-        
+
     res_img = cv2.cvtColor(
         preds_ailia[0].transpose(1, 2, 0),
         cv2.COLOR_RGB2BGR
@@ -136,15 +136,7 @@ def video_style_transfer():
     vgg = ailia.Net(VGG_MODEL_PATH, VGG_WEIGHT_PATH, env_id=env_id)
     decoder = ailia.Net(DEC_MODEL_PATH, DEC_WEIGHT_PATH, env_id=env_id)
 
-    if args.video == '0':
-        print('[INFO] Webcam mode is activated')
-        capture = cv2.VideoCapture(0)
-        if not capture.isOpened():
-            print("[ERROR] webcamera not found")
-            sys.exit(1)
-    else:
-        if check_file_existance(args.video):
-            capture = cv2.VideoCapture(args.video)
+    capture = webcamera_utils.get_capture(args.video)
 
     # Style image
     style_img = load_image(
@@ -171,7 +163,7 @@ def video_style_transfer():
         _, input_data = webcamera_utils.preprocess_frame(
             frame, IMAGE_HEIGHT, IMAGE_WIDTH, normalize_type='255'
         )
-        
+
         # # The image will be distorted by normal resize
         # input_data = (cv2.cvtColor(
         #     cv2.resize(frame, (IMAGE_WIDTH, IMAGE_HEIGHT)), cv2.COLOR_BGR2RGB
@@ -179,8 +171,8 @@ def video_style_transfer():
 
         # inference
         preds_ailia = style_transfer(vgg, decoder, input_data, style_img)
-        
-        # postprocessing
+
+        # post-processing
         res_img = cv2.cvtColor(
             preds_ailia[0].transpose(1, 2, 0), cv2.COLOR_RGB2BGR
         )

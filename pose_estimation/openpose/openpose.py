@@ -8,10 +8,9 @@ import cv2
 import ailia
 
 sys.path.append('../../util')
-from webcamera_utils import adjust_frame_size  # noqa: E402
+from webcamera_utils import adjust_frame_size, get_capture  # noqa: E402
 from image_utils import load_image  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
-from utils import check_file_existance  # noqa: E402
 
 
 # OPENPOSE: MULTIPERSON KEYPOINT DETECTION
@@ -99,45 +98,45 @@ def display_result(input_img, pose):
         person = pose.get_object_pose(idx)
 
         line(input_img, person, ailia.POSE_KEYPOINT_NOSE,
-                ailia.POSE_KEYPOINT_SHOULDER_CENTER)
+             ailia.POSE_KEYPOINT_SHOULDER_CENTER)
         line(input_img, person, ailia.POSE_KEYPOINT_SHOULDER_LEFT,
-                ailia.POSE_KEYPOINT_SHOULDER_CENTER)
+             ailia.POSE_KEYPOINT_SHOULDER_CENTER)
         line(input_img, person, ailia.POSE_KEYPOINT_SHOULDER_RIGHT,
-                ailia.POSE_KEYPOINT_SHOULDER_CENTER)
+             ailia.POSE_KEYPOINT_SHOULDER_CENTER)
 
         line(input_img, person, ailia.POSE_KEYPOINT_EYE_LEFT,
-                ailia.POSE_KEYPOINT_NOSE)
+             ailia.POSE_KEYPOINT_NOSE)
         line(input_img, person, ailia.POSE_KEYPOINT_EYE_RIGHT,
-                ailia.POSE_KEYPOINT_NOSE)
+             ailia.POSE_KEYPOINT_NOSE)
         line(input_img, person, ailia.POSE_KEYPOINT_EAR_LEFT,
-                ailia.POSE_KEYPOINT_EYE_LEFT)
+             ailia.POSE_KEYPOINT_EYE_LEFT)
         line(input_img, person, ailia.POSE_KEYPOINT_EAR_RIGHT,
-                ailia.POSE_KEYPOINT_EYE_RIGHT)
+             ailia.POSE_KEYPOINT_EYE_RIGHT)
 
         line(input_img, person, ailia.POSE_KEYPOINT_ELBOW_LEFT,
-                ailia.POSE_KEYPOINT_SHOULDER_LEFT)
+             ailia.POSE_KEYPOINT_SHOULDER_LEFT)
         line(input_img, person, ailia.POSE_KEYPOINT_ELBOW_RIGHT,
-                ailia.POSE_KEYPOINT_SHOULDER_RIGHT)
+             ailia.POSE_KEYPOINT_SHOULDER_RIGHT)
         line(input_img, person, ailia.POSE_KEYPOINT_WRIST_LEFT,
-                ailia.POSE_KEYPOINT_ELBOW_LEFT)
+             ailia.POSE_KEYPOINT_ELBOW_LEFT)
         line(input_img, person, ailia.POSE_KEYPOINT_WRIST_RIGHT,
-                ailia.POSE_KEYPOINT_ELBOW_RIGHT)
+             ailia.POSE_KEYPOINT_ELBOW_RIGHT)
 
         line(input_img, person, ailia.POSE_KEYPOINT_BODY_CENTER,
-                ailia.POSE_KEYPOINT_SHOULDER_CENTER)
+             ailia.POSE_KEYPOINT_SHOULDER_CENTER)
         line(input_img, person, ailia.POSE_KEYPOINT_HIP_LEFT,
-                ailia.POSE_KEYPOINT_BODY_CENTER)
+             ailia.POSE_KEYPOINT_BODY_CENTER)
         line(input_img, person, ailia.POSE_KEYPOINT_HIP_RIGHT,
-                ailia.POSE_KEYPOINT_BODY_CENTER)
+             ailia.POSE_KEYPOINT_BODY_CENTER)
 
         line(input_img, person, ailia.POSE_KEYPOINT_KNEE_LEFT,
-                ailia.POSE_KEYPOINT_HIP_LEFT)
+             ailia.POSE_KEYPOINT_HIP_LEFT)
         line(input_img, person, ailia.POSE_KEYPOINT_ANKLE_LEFT,
-                ailia.POSE_KEYPOINT_KNEE_LEFT)
+             ailia.POSE_KEYPOINT_KNEE_LEFT)
         line(input_img, person, ailia.POSE_KEYPOINT_KNEE_RIGHT,
-                ailia.POSE_KEYPOINT_HIP_RIGHT)
+             ailia.POSE_KEYPOINT_HIP_RIGHT)
         line(input_img, person, ailia.POSE_KEYPOINT_ANKLE_RIGHT,
-                ailia.POSE_KEYPOINT_KNEE_RIGHT)
+             ailia.POSE_KEYPOINT_KNEE_RIGHT)
 
 
 # ======================
@@ -171,7 +170,7 @@ def recognize_from_image():
             print(f'\tailia processing time {end - start} ms')
     else:
         _ = pose.compute(input_data)
-        
+
     # postprocessing
     count = pose.get_object_count()
     print(f'person_count={count}')
@@ -188,22 +187,12 @@ def recognize_from_video():
         MODEL_PATH, WEIGHT_PATH, env_id=env_id, algorithm=ALGORITHM
     )
 
-    if args.video == '0':
-        print('[INFO] Webcam mode is activated')
-        capture = cv2.VideoCapture(0)
-        if not capture.isOpened():
-            print("[ERROR] webcamera not found")
-            sys.exit(1)
-    else:
-        if check_file_existance(args.video):
-            capture = cv2.VideoCapture(args.video)
+    capture = get_capture(args.video)
 
     while(True):
         ret, frame = capture.read()
-        if cv2.waitKey(1) & 0xFF == ord('q'):
+        if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
-        if not ret:
-            continue
 
         input_image, input_data = adjust_frame_size(
             frame, IMAGE_HEIGHT, IMAGE_WIDTH,

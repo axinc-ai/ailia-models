@@ -12,10 +12,9 @@ import matplotlib.pyplot as plt
 import ailia
 # import original modules
 sys.path.append('../../util')
-from utils import check_file_existance  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from image_utils import load_image  # noqa: E402
-from webcamera_utils import preprocess_frame  # noqa: E402
+from webcamera_utils import preprocess_frame, get_capture  # noqa: E402
 
 
 # ======================
@@ -407,24 +406,14 @@ def recognize_from_video():
             DEPTH_MODEL_PATH, DEPTH_WEIGHT_PATH, env_id=env_id
         )
 
-    if args.video == '0':
-        print('[INFO] Webcam mode is activated')
-        capture = cv2.VideoCapture(0)
-        if not capture.isOpened():
-            print("[ERROR] webcamera not found")
-            sys.exit(1)
-    else:
-        if check_file_existance(args.video):
-            capture = cv2.VideoCapture(args.video)
+    capture = get_capture(args.video)
 
     fig, axs = create_figure(active_3d=args.active_3d)
 
     while(True):
         ret, frame = capture.read()
-        if cv2.waitKey(1) & 0xFF == ord('q'):
+        if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
-        if not ret:
-            continue
 
         input_image, input_data = preprocess_frame(
             frame, IMAGE_HEIGHT, IMAGE_WIDTH, normalize_type='255'
@@ -451,7 +440,10 @@ def recognize_from_video():
             depth_pred = depth_pred.reshape(68, 1)
             pts_img = np.concatenate((pts_img, depth_pred * 2), 1)
 
-        resized_img = cv2.resize(cv2.cvtColor(input_image, cv2.COLOR_BGR2RGB), (IMAGE_WIDTH, IMAGE_HEIGHT))
+        resized_img = cv2.resize(
+            cv2.cvtColor(input_image, cv2.COLOR_BGR2RGB),
+            (IMAGE_WIDTH, IMAGE_HEIGHT)
+        )
 
         # visualize results (clear axs at first)
         axs = visualize_results(

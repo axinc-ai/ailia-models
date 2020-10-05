@@ -13,10 +13,9 @@ from mpl_toolkits.mplot3d import Axes3D
 import ailia
 
 sys.path.append('../../util')
-from webcamera_utils import adjust_frame_size  # noqa: E402
+from webcamera_utils import adjust_frame_size, get_capture  # noqa: E402
 from image_utils import load_image  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
-from utils import check_file_existance  # noqa: E402
 
 
 # ======================
@@ -205,36 +204,36 @@ def plot(outputs, inputs):
                 Z.append(0)
 
         if(IS_3D):
-            draw_connect("Head","Thorax","#0000aa",X,Y,Z,IS_3D)
-            draw_connect("Thorax",'RShoulder',"#00ff00",X,Y,Z,IS_3D)
-            draw_connect('RShoulder','RElbow',"#00ff00",X,Y,Z,IS_3D)
-            draw_connect('RElbow','RWrist',"#00ff00",X,Y,Z,IS_3D)
-            draw_connect("Thorax",'LShoulder',"#00ff00",X,Y,Z,IS_3D)
-            draw_connect('LShoulder','LElbow',"#00ff00",X,Y,Z,IS_3D)
-            draw_connect('LElbow','LWrist',"#00ff00",X,Y,Z,IS_3D)
-            draw_connect('Thorax','Spine',"#00ff00",X,Y,Z,IS_3D)
-            draw_connect('Spine','LHip',"#00ff00",X,Y,Z,IS_3D)
-            draw_connect('Spine','RHip',"#00ff00",X,Y,Z,IS_3D)
-            draw_connect('RHip','RKnee',"#ff0000",X,Y,Z,IS_3D)
-            draw_connect('RKnee','RFoot',"#ff0000",X,Y,Z,IS_3D)
-            draw_connect('LHip','LKnee',"#ff0000",X,Y,Z,IS_3D)
-            draw_connect('LKnee','LFoot',"#ff0000",X,Y,Z,IS_3D)
+            draw_connect("Head", "Thorax", "#0000aa", X, Y, Z, IS_3D)
+            draw_connect("Thorax", 'RShoulder', "#00ff00", X, Y, Z, IS_3D)
+            draw_connect('RShoulder', 'RElbow', "#00ff00", X, Y, Z, IS_3D)
+            draw_connect('RElbow', 'RWrist', "#00ff00", X, Y, Z, IS_3D)
+            draw_connect("Thorax", 'LShoulder', "#00ff00", X, Y, Z, IS_3D)
+            draw_connect('LShoulder', 'LElbow', "#00ff00", X, Y, Z, IS_3D)
+            draw_connect('LElbow', 'LWrist', "#00ff00", X, Y, Z, IS_3D)
+            draw_connect('Thorax', 'Spine', "#00ff00", X, Y, Z, IS_3D)
+            draw_connect('Spine', 'LHip', "#00ff00", X, Y, Z, IS_3D)
+            draw_connect('Spine', 'RHip', "#00ff00", X, Y, Z, IS_3D)
+            draw_connect('RHip', 'RKnee', "#ff0000", X, Y, Z, IS_3D)
+            draw_connect('RKnee', 'RFoot', "#ff0000", X, Y, Z, IS_3D)
+            draw_connect('LHip', 'LKnee', "#ff0000", X, Y, Z, IS_3D)
+            draw_connect('LKnee', 'LFoot', "#ff0000", X, Y, Z, IS_3D)
         else:
-            draw_connect("Head","Thorax","#0000ff",X,Y,Z,IS_3D)
-            draw_connect("Thorax",'RShoulder',"#00ff00",X,Y,Z,IS_3D)
-            draw_connect('RShoulder','RElbow',"#00ff00",X,Y,Z,IS_3D)
-            draw_connect('RElbow','RWrist',"#00ff00",X,Y,Z,IS_3D)
-            draw_connect("Thorax",'LShoulder',"#00ff00",X,Y,Z,IS_3D)
-            draw_connect('LShoulder','LElbow',"#00ff00",X,Y,Z,IS_3D)
-            draw_connect('LElbow','LWrist',"#00ff00",X,Y,Z,IS_3D)
-            draw_connect('Thorax','Spine',"#00ff00",X,Y,Z,IS_3D)
-            draw_connect('Spine','Hip',"#00ff00",X,Y,Z,IS_3D)
-            draw_connect('Hip','LHip',"#ff0000",X,Y,Z,IS_3D)
-            draw_connect('Hip','RHip',"#ff0000",X,Y,Z,IS_3D)
-            draw_connect('RHip','RKnee',"#ff0000",X,Y,Z,IS_3D)
-            draw_connect('RKnee','RFoot',"#ff0000",X,Y,Z,IS_3D)
-            draw_connect('LHip','LKnee',"#ff0000",X,Y,Z,IS_3D)
-            draw_connect('LKnee','LFoot',"#ff0000",X,Y,Z,IS_3D)
+            draw_connect("Head", "Thorax", "#0000ff", X, Y, Z, IS_3D)
+            draw_connect("Thorax", 'RShoulder', "#00ff00", X, Y, Z, IS_3D)
+            draw_connect('RShoulder', 'RElbow', "#00ff00", X, Y, Z, IS_3D)
+            draw_connect('RElbow', 'RWrist', "#00ff00", X, Y, Z, IS_3D)
+            draw_connect("Thorax", 'LShoulder', "#00ff00", X, Y, Z, IS_3D)
+            draw_connect('LShoulder', 'LElbow', "#00ff00", X, Y, Z, IS_3D)
+            draw_connect('LElbow', 'LWrist', "#00ff00", X, Y, Z, IS_3D)
+            draw_connect('Thorax', 'Spine', "#00ff00", X, Y, Z, IS_3D)
+            draw_connect('Spine', 'Hip', "#00ff00", X, Y, Z, IS_3D)
+            draw_connect('Hip', 'LHip', "#ff0000", X, Y, Z, IS_3D)
+            draw_connect('Hip', 'RHip', "#ff0000", X, Y, Z, IS_3D)
+            draw_connect('RHip', 'RKnee', "#ff0000", X, Y, Z, IS_3D)
+            draw_connect('RKnee', 'RFoot', "#ff0000", X, Y, Z, IS_3D)
+            draw_connect('LHip', 'LKnee', "#ff0000", X, Y, Z, IS_3D)
+            draw_connect('LKnee', 'LFoot', "#ff0000", X, Y, Z, IS_3D)
 
 
 def display_3d_pose(points, baseline):
@@ -356,43 +355,62 @@ def display_result(input_img, pose, baseline):
              ailia.POSE_KEYPOINT_KNEE_RIGHT)
 
         points = []
-        points.append(person.points[ailia.POSE_KEYPOINT_NOSE].x)    #OPENPOSE_Nose
+        # OPENPOSE_Nose
+        points.append(person.points[ailia.POSE_KEYPOINT_NOSE].x)
         points.append(person.points[ailia.POSE_KEYPOINT_NOSE].y)
-        points.append(person.points[ailia.POSE_KEYPOINT_SHOULDER_CENTER].x)    #OPENPOSE_Neck
+        # OPENPOSE_Neck
+        points.append(person.points[ailia.POSE_KEYPOINT_SHOULDER_CENTER].x)
         points.append(person.points[ailia.POSE_KEYPOINT_SHOULDER_CENTER].y)
-        points.append(person.points[ailia.POSE_KEYPOINT_SHOULDER_RIGHT].x)    #OPENPOSE_RightShoulder
+        # OPENPOSE_RightShoulder
+        points.append(person.points[ailia.POSE_KEYPOINT_SHOULDER_RIGHT].x)
         points.append(person.points[ailia.POSE_KEYPOINT_SHOULDER_RIGHT].y)
-        points.append(person.points[ailia.POSE_KEYPOINT_ELBOW_RIGHT].x)    #OPENPOSE_RightElbow
+        # OPENPOSE_RightElbow
+        points.append(person.points[ailia.POSE_KEYPOINT_ELBOW_RIGHT].x)
         points.append(person.points[ailia.POSE_KEYPOINT_ELBOW_RIGHT].y)
-        points.append(person.points[ailia.POSE_KEYPOINT_WRIST_RIGHT].x)    #OPENPOSE_RightWrist
+        # OPENPOSE_RightWrist
+        points.append(person.points[ailia.POSE_KEYPOINT_WRIST_RIGHT].x)
         points.append(person.points[ailia.POSE_KEYPOINT_WRIST_RIGHT].y)
-        points.append(person.points[ailia.POSE_KEYPOINT_SHOULDER_LEFT].x)    #OPENPOSE_LeftShoulder
+        # OPENPOSE_LeftShoulder
+        points.append(person.points[ailia.POSE_KEYPOINT_SHOULDER_LEFT].x)
         points.append(person.points[ailia.POSE_KEYPOINT_SHOULDER_LEFT].y)
-        points.append(person.points[ailia.POSE_KEYPOINT_ELBOW_LEFT].x)    #OPENPOSE_LeftElbow
+        # OPENPOSE_LeftElbow
+        points.append(person.points[ailia.POSE_KEYPOINT_ELBOW_LEFT].x)
         points.append(person.points[ailia.POSE_KEYPOINT_ELBOW_LEFT].y)
-        points.append(person.points[ailia.POSE_KEYPOINT_WRIST_LEFT].x)    #OPENPOSE_LeftWrist
+        # OPENPOSE_LeftWrist
+        points.append(person.points[ailia.POSE_KEYPOINT_WRIST_LEFT].x)
         points.append(person.points[ailia.POSE_KEYPOINT_WRIST_LEFT].y)
-        points.append(person.points[ailia.POSE_KEYPOINT_HIP_RIGHT].x)    #OPENPOSE_RightHip
+        # OPENPOSE_RightHip
+        points.append(person.points[ailia.POSE_KEYPOINT_HIP_RIGHT].x)
         points.append(person.points[ailia.POSE_KEYPOINT_HIP_RIGHT].y)
-        points.append(person.points[ailia.POSE_KEYPOINT_KNEE_RIGHT].x)    #OPENPOSE_RightKnee
+        # OPENPOSE_RightKnee
+        points.append(person.points[ailia.POSE_KEYPOINT_KNEE_RIGHT].x)
         points.append(person.points[ailia.POSE_KEYPOINT_KNEE_RIGHT].y)
-        points.append(person.points[ailia.POSE_KEYPOINT_ANKLE_RIGHT].x)    #OPENPOSE_RightAnkle
+        # OPENPOSE_RightAnkle
+        points.append(person.points[ailia.POSE_KEYPOINT_ANKLE_RIGHT].x)
         points.append(person.points[ailia.POSE_KEYPOINT_ANKLE_RIGHT].y)
-        points.append(person.points[ailia.POSE_KEYPOINT_HIP_LEFT].x)    #OPENPOSE_LeftHip
+        # OPENPOSE_LeftHip
+        points.append(person.points[ailia.POSE_KEYPOINT_HIP_LEFT].x)
         points.append(person.points[ailia.POSE_KEYPOINT_HIP_LEFT].y)
-        points.append(person.points[ailia.POSE_KEYPOINT_KNEE_LEFT].x)    #OPENPOSE_LeftKnee
+        # OPENPOSE_LeftKnee
+        points.append(person.points[ailia.POSE_KEYPOINT_KNEE_LEFT].x)
         points.append(person.points[ailia.POSE_KEYPOINT_KNEE_LEFT].y)
-        points.append(person.points[ailia.POSE_KEYPOINT_ANKLE_LEFT].x)    #OPENPOSE_LAnkle
+        # OPENPOSE_LAnkle
+        points.append(person.points[ailia.POSE_KEYPOINT_ANKLE_LEFT].x)
         points.append(person.points[ailia.POSE_KEYPOINT_ANKLE_LEFT].y)
-        points.append(person.points[ailia.POSE_KEYPOINT_EYE_RIGHT].x)    #OPENPOSE_RightEye
+        # OPENPOSE_RightEye
+        points.append(person.points[ailia.POSE_KEYPOINT_EYE_RIGHT].x)
         points.append(person.points[ailia.POSE_KEYPOINT_EYE_RIGHT].y)
-        points.append(person.points[ailia.POSE_KEYPOINT_EYE_LEFT].x)    #OPENPOSE_LeftEye
+        # OPENPOSE_LeftEye
+        points.append(person.points[ailia.POSE_KEYPOINT_EYE_LEFT].x)
         points.append(person.points[ailia.POSE_KEYPOINT_EYE_LEFT].y)
-        points.append(person.points[ailia.POSE_KEYPOINT_EAR_RIGHT].x)    #OPENPOSE_RightEar
+        # OPENPOSE_RightEar
+        points.append(person.points[ailia.POSE_KEYPOINT_EAR_RIGHT].x)
         points.append(person.points[ailia.POSE_KEYPOINT_EAR_RIGHT].y)
-        points.append(person.points[ailia.POSE_KEYPOINT_EYE_LEFT].x)    #OPENPOSE_LeftEar
+        # OPENPOSE_LeftEar
+        points.append(person.points[ailia.POSE_KEYPOINT_EYE_LEFT].x)
         points.append(person.points[ailia.POSE_KEYPOINT_EYE_LEFT].y)
-        points.append(person.points[ailia.POSE_KEYPOINT_BODY_CENTER].x)    #OPENPOSE_Background
+        # OPENPOSE_Background
+        points.append(person.points[ailia.POSE_KEYPOINT_BODY_CENTER].x)
         points.append(person.points[ailia.POSE_KEYPOINT_BODY_CENTER].y)
 
         neck_x = person.points[ailia.POSE_KEYPOINT_SHOULDER_CENTER].x
@@ -481,22 +499,12 @@ def recognize_from_video():
     )
     baseline.set_input_shape((1, 32))
 
-    if args.video == '0':
-        print('[INFO] Webcam mode is activated')
-        capture = cv2.VideoCapture(0)
-        if not capture.isOpened():
-            print("[ERROR] webcamera not found")
-            sys.exit(1)
-    else:
-        if check_file_existance(args.video):
-            capture = cv2.VideoCapture(args.video)
+    capture = get_capture(args.video)
 
     while(True):
         ret, frame = capture.read()
-        if cv2.waitKey(1) & 0xFF == ord('q'):
+        if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
-        if not ret:
-            continue
 
         input_image, input_data = adjust_frame_size(
             frame, IMAGE_HEIGHT, IMAGE_WIDTH,

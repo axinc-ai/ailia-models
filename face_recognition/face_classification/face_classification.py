@@ -7,8 +7,8 @@ import cv2
 import ailia
 # import original modules
 sys.path.append('../../util')
-from utils import check_file_existance  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
+from webcamera_utils import get_capture  # noqa: E402
 
 
 # ======================
@@ -18,7 +18,8 @@ EMOTION_WEIGHT_PATH = 'emotion_miniXception.caffemodel'
 EMOTION_MODEL_PATH = 'emotion_miniXception.prototxt'
 GENDER_WEIGHT_PATH = "gender_miniXception.caffemodel"
 GENDER_MODEL_PATH = "gender_miniXception.prototxt"
-REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/face_classification/'
+REMOTE_PATH = \
+    'https://storage.googleapis.com/ailia-models/face_classification/'
 
 IMAGE_PATH = 'lenna.png'
 EMOTION_MAX_CLASS_COUNT = 3
@@ -164,24 +165,14 @@ def recognize_from_video():
         channel=ailia.NETWORK_IMAGE_CHANNEL_FIRST
     )
 
-    if args.video == '0':
-        print('[INFO] Webcam mode is activated')
-        capture = cv2.VideoCapture(0)
-        if not capture.isOpened():
-            print("[ERROR] webcamera not found")
-            sys.exit(1)
-    else:
-        if check_file_existance(args.video):
-            capture = cv2.VideoCapture(args.video)
+    capture = get_capture(args.video)
 
     while(True):
         ret, frame = capture.read()
         frame = cv2.cvtColor(frame, cv2.COLOR_BGR2BGRA)
 
-        if cv2.waitKey(1) & 0xFF == ord('q'):
+        if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
-        if not ret:
-            continue
 
         # emotion inference
         emotion_classifier.compute(frame, EMOTION_MAX_CLASS_COUNT)

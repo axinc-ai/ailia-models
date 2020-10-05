@@ -9,12 +9,12 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import check_file_existance  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
-from webcamera_utils import adjust_frame_size  # noqa: E402C
+from webcamera_utils import get_capture  # noqa: E402C
 from detector_utils import plot_results, load_image  # noqa: E402C
 
-import yolov4_utils
+import yolov4_utils  # noqa: E402C
+
 
 # ======================
 # Parameters
@@ -106,7 +106,9 @@ def recognize_from_image():
         env_id=env_id
     )
     if int(args.detection_width) != DETECTION_WIDTH:
-        detector.set_input_shape((1,3,int(args.detection_width), int(args.detection_width)))
+        detector.set_input_shape(
+            (1, 3, int(args.detection_width), int(args.detection_width))
+        )
 
     # inferece
     print('Start inference...')
@@ -140,24 +142,16 @@ def recognize_from_video():
         env_id=env_id
     )
     if int(args.detection_width) != DETECTION_WIDTH:
-        detector.set_input_shape((1,3,int(args.detection_width), int(args.detection_width)))
+        detector.set_input_shape(
+            (1, 3, int(args.detection_width), int(args.detection_width))
+        )
 
-    if args.video == '0':
-        print('[INFO] Webcam mode is activated')
-        capture = cv2.VideoCapture(0)
-        if not capture.isOpened():
-            print("[ERROR] webcamera not found")
-            sys.exit(1)
-    else:
-        if check_file_existance(args.video):
-            capture = cv2.VideoCapture(args.video)
+    capture = get_capture(args.video)
 
     while (True):
         ret, frame = capture.read()
-        if cv2.waitKey(1) & 0xFF == ord('q'):
+        if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
-        if not ret:
-            continue
 
         img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         img = cv2.resize(img, (IMAGE_WIDTH, IMAGE_HEIGHT))
@@ -166,7 +160,9 @@ def recognize_from_video():
         img = np.expand_dims(img, 0)
 
         output = detector.predict([img])
-        detect_object = yolov4_utils.post_processing(img, THRESHOLD, IOU, output)
+        detect_object = yolov4_utils.post_processing(
+            img, THRESHOLD, IOU, output
+        )
         res_img = plot_results(detect_object[0], frame, COCO_CATEGORY)
 
         cv2.imshow('frame', res_img)
