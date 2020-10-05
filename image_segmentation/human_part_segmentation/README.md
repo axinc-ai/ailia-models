@@ -62,4 +62,4 @@ ONNX opset=11
 
 ## Netron
 
-[resnet.onnx.prototxt](https://lutzroeder.github.io/netron/?url=https://storage.googleapis.com/ailia-models/human_part_segmentation/resnet-lip.onnx.prototxt)
+[resnet-lip.onnx.prototxt](https://lutzroeder.github.io/netron/?url=https://storage.googleapis.com/ailia-models/human_part_segmentation/resnet-lip.onnx.prototxt)

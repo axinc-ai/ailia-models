@@ -10,6 +10,7 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
+import webcamera_utils  # noqa: E402C
 from utils import check_file_existance  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from detector_utils import plot_results, load_image  # noqa: E402C
@@ -192,15 +193,7 @@ def recognize_from_image(filename, detector):
 
 
 def recognize_from_video(video, detector):
-    if video == '0':
-        print('[INFO] Webcam mode is activated')
-        capture = cv2.VideoCapture(0)
-        if not capture.isOpened():
-            print("[ERROR] webcamera not found")
-            sys.exit(1)
-    else:
-        if check_file_existance(args.video):
-            capture = cv2.VideoCapture(args.video)
+    capture = webcamera_utils.get_capture(args.video)
 
     palette = get_palette(len(CATEGORY))
     while True:
