@@ -11,11 +11,11 @@ import ailia
 # import original modules
 sys.path.append('../../util')
 import webcamera_utils  # noqa: E402C
-from utils import check_file_existance  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
-from detector_utils import plot_results, load_image  # noqa: E402C
+from detector_utils import load_image  # noqa: E402
 
-from hps_utils import xywh2cs, transform_logits, get_affine_transform
+from hps_utils import xywh2cs, transform_logits, \
+    get_affine_transform  # noqa: E402
 
 # ======================
 # Parameters
@@ -23,15 +23,16 @@ from hps_utils import xywh2cs, transform_logits, get_affine_transform
 
 WEIGHT_PATH = './resnet-lip.onnx'
 MODEL_PATH = './resnet-lip.onnx.prototxt'
-REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/human_part_segmentation/'
+REMOTE_PATH = \
+    'https://storage.googleapis.com/ailia-models/human_part_segmentation/'
 
 IMAGE_PATH = 'demo.jpg'
 SAVE_IMAGE_PATH = 'output.png'
 
 CATEGORY = (
-    'Background', 'Hat', 'Hair', 'Glove', 'Sunglasses', 'Upper-clothes', 'Dress', 'Coat',
-    'Socks', 'Pants', 'Jumpsuits', 'Scarf', 'Skirt', 'Face', 'Left-arm', 'Right-arm',
-    'Left-leg', 'Right-leg', 'Left-shoe', 'Right-shoe'
+    'Background', 'Hat', 'Hair', 'Glove', 'Sunglasses', 'Upper-clothes',
+    'Dress', 'Coat', 'Socks', 'Pants', 'Jumpsuits', 'Scarf', 'Skirt', 'Face',
+    'Left-arm', 'Right-arm', 'Left-leg', 'Right-leg', 'Left-shoe', 'Right-shoe'
 )
 IMAGE_HEIGHT = 473
 IMAGE_WIDTH = 473
@@ -82,7 +83,9 @@ def preprocess(img):
     # Get person center and scale
     person_center, s = xywh2cs(0, 0, w - 1, h - 1)
     r = 0
-    trans = get_affine_transform(person_center, s, r, [IMAGE_HEIGHT, IMAGE_WIDTH])
+    trans = get_affine_transform(
+        person_center, s, r, [IMAGE_HEIGHT, IMAGE_WIDTH]
+    )
     img = cv2.warpAffine(
         img,
         trans,
@@ -109,7 +112,9 @@ def preprocess(img):
 
 def post_processing(data, fusion):
     fusion = fusion[0].transpose(1, 2, 0)
-    upsample_output = cv2.resize(fusion, (IMAGE_WIDTH, IMAGE_HEIGHT), interpolation = cv2.INTER_LINEAR)
+    upsample_output = cv2.resize(
+        fusion, (IMAGE_WIDTH, IMAGE_HEIGHT), interpolation=cv2.INTER_LINEAR
+    )
     logits_result = transform_logits(
         upsample_output,
         data['center'], data['scale'], data['width'], data['height'],
@@ -179,7 +184,7 @@ def recognize_from_image(filename, detector):
         print('BENCHMARK mode')
         for i in range(5):
             start = int(round(time.time() * 1000))
-            pixel_labels = detect_objects(img, detector)
+            parsing_result = detect_objects(img, detector)
             end = int(round(time.time() * 1000))
             print(f'\tailia processing time {end - start} ms')
     else:
@@ -198,10 +203,8 @@ def recognize_from_video(video, detector):
     palette = get_palette(len(CATEGORY))
     while True:
         ret, frame = capture.read()
-        if cv2.waitKey(1) & 0xFF == ord('q'):
+        if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
-        if not ret:
-            continue
 
         pixel_labels = detect_objects(frame, detector)
 
@@ -226,8 +229,9 @@ def main():
 
     # load model
     env_id = ailia.get_gpu_environment_id()
-    if sys.platform == "darwin" :
-        env_id = 0 # Workaround for accuracy issue on ailia SDK 1.2.4 + opset11 + gpu
+    if sys.platform == "darwin":
+        # Workaround for accuracy issue on ailia SDK 1.2.4 + opset11 + gpu
+        env_id = 0
     print(f'env_id: {env_id}')
 
     # initialize
