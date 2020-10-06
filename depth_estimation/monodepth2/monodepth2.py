@@ -156,6 +156,8 @@ def estimate_from_video():
         disp_resized, vmax = result_plot(disp, org_width, org_height)
         plt.imshow(disp_resized, cmap='magma', vmax=vmax)
         plt.pause(.01)
+        if not plt.get_fignums():
+            break
 
     capture.release()
     cv2.destroyAllWindows()

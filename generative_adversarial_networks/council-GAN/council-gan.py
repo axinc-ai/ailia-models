@@ -219,6 +219,8 @@ def transform_image():
     else:
         locator = None
 
+    print('Start inference...')
+
     if args.benchmark:
         print('BENCHMARK mode')
         for i in range(5):
@@ -261,7 +263,6 @@ def process_frame(net, locator, image):
 
 def process_array(net, img):
     """Apply network to a correctly scaled and centered image """
-    print('Start inference...')
     preds_ailia = postprocess_image(net.predict(img[None, ...])[0])
     return preds_ailia
 

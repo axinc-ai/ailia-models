@@ -87,8 +87,7 @@ def preprocess(image):
 
     padded_image = np.zeros((3, padded_h, padded_w), dtype=np.float32)
     padded_image[:, :image.shape[1], :image.shape[2]] = image
-    image = padded_image[np.newaxis, :, :, :]
-    return image
+    return padded_image
 
 
 def create_figure():
@@ -235,6 +234,8 @@ def recognize_from_video():
         ax.clear()
         display_objdetect_image(fig, ax, frame, boxes, labels, scores, masks)
         plt.pause(.01)
+        if not plt.get_fignums():
+            break
 
     capture.release()
     cv2.destroyAllWindows()

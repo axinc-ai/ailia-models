@@ -151,6 +151,12 @@ def recognize_from_video():
 
     capture = get_capture(args.video)
 
+    if args.savepath != SAVE_IMAGE_PATH:
+        fmt = cv2.VideoWriter_fourcc('m', 'p', '4', 'v')
+        writer = cv2.VideoWriter(args.savepath, fmt, capture.get(cv2.CAP_PROP_FPS), (IMAGE_WIDTH, IMAGE_HEIGHT))
+    else:
+        writer = None
+
     while(True):
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
@@ -176,8 +182,14 @@ def recognize_from_video():
         res_img = plot_results(detections, resized_img, FACE_CATEGORY, False)
         cv2.imshow('frame', res_img)
 
+        # save results
+        if writer is not None:
+            writer.write(res_img)
+
     capture.release()
     cv2.destroyAllWindows()
+    if writer is not None:
+        writer.release()
     print('Script finished successfully.')
 
 
