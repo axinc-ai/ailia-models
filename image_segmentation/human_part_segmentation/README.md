@@ -54,7 +54,7 @@ $ python3 human_part_segmentation.py --video VIDEO_PATH
 
 ## Framework
 
-ONNX Runtime
+Pytorch
 
 ## Model Format
 
