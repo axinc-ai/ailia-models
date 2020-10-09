@@ -71,7 +71,7 @@ def display_ui(img,model_list,category_cnt):
         color = hsv_to_rgb(256 * model["category_id"] / (category_cnt+1), 128, 255)
 
         if mx >= x and mx <= x+w and my >= y and my <= y+h:
-           color = (192,192,192)
+           color = (255,255,255)
            if click_trig:
                 print(model["script"])
                 dir="./"+model["category"]+"/"+model["model"]+"/"
