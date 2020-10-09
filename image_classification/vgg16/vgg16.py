@@ -12,6 +12,7 @@ sys.path.append('../../util')
 from model_utils import check_and_download_models  # noqa: E402
 from image_utils import load_image  # noqa: E402
 from webcamera_utils import preprocess_frame, get_capture  # noqa: E402C
+from classifier_utils import plot_results, print_results  # noqa: E402
 
 
 # ======================
@@ -25,7 +26,6 @@ IMAGE_PATH = 'pizza.jpg'
 IMAGE_HEIGHT = 224
 IMAGE_WIDTH = 224
 
-MAX_CLASS_COUNT = 5
 SLEEP_TIME = 3
 
 # TODO
@@ -61,21 +61,6 @@ args = parser.parse_args()
 
 
 # ======================
-# Utils
-# ======================
-def print_results(preds_ailia):
-    top_scores = preds_ailia[0].argsort()[-1 * MAX_CLASS_COUNT:][::-1]
-
-    print('==============================================================')
-    print(f'class_count={MAX_CLASS_COUNT}')
-    for idx in range(MAX_CLASS_COUNT):
-        print(f'+ idx={idx}')
-        print(f'  category={top_scores[idx]}['
-              f'{vgg16_labels.imagenet_category[top_scores[idx]]} ]')
-        print(f'  prob={preds_ailia[0][top_scores[idx]]}')
-
-
-# ======================
 # Main functions
 # ======================
 def recognize_from_image():
@@ -105,7 +90,7 @@ def recognize_from_image():
         preds_ailia = net.predict(input_data)
 
     # postprocessing
-    print_results(preds_ailia)
+    print_results(preds_ailia, vgg16_labels.imagenet_category)
     print('Script finished successfully.')
 
 
@@ -130,7 +115,7 @@ def recognize_from_video():
         preds_ailia = net.predict(input_data)
 
         # postprocessing
-        print_results(preds_ailia)
+        plot_results(input_image, preds_ailia, vgg16_labels.imagenet_category)
         cv2.imshow('frame', input_image)
         time.sleep(SLEEP_TIME)
 
