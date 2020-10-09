@@ -72,7 +72,6 @@ def display_ui(img,model_list,category_cnt):
         if mx >= x and mx <= x+w and my >= y and my <= y+h:
            color = (255,255,255)
            if click_trig:
-                print(model["script"])
                 dir="./"+model["category"]+"/"+model["model"]+"/"
                 cmd="python"
                 if shutil.which("python3"):
