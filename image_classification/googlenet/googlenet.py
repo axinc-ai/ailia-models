@@ -13,6 +13,7 @@ sys.path.append('../../util')
 from model_utils import check_and_download_models  # noqa: E402
 from image_utils import load_image  # noqa: E402
 from webcamera_utils import adjust_frame_size, get_capture  # noqa: E402
+from classifier_utils import plot_results, print_results  # noqa: E402
 
 
 # ======================
@@ -99,13 +100,7 @@ def recognize_from_image():
     count = classifier.get_class_count()
 
     # show results
-    print(f'class_count: {count}')
-    for idx in range(count):
-        print(f'+ idx={idx}')
-        info = classifier.get_class(idx)
-        print(f'  category={info.category} [ ' +
-              f'{googlenet_labels.imagenet_category[info.category]} ]')
-        print(f'  prob={info.prob}')
+    print_results(classifier, googlenet_labels.imagenet_category)
 
     print('Script finished successfully.')
 
@@ -139,14 +134,7 @@ def recognize_from_video():
         count = classifier.get_class_count()
 
         # show results
-        print('==============================================================')
-        print(f'class_count: {count}')
-        for idx in range(count):
-            print(f'+ idx={idx}')
-            info = classifier.get_class(idx)
-            print(f'  category={info.category} [ ' +
-                  f'{googlenet_labels.imagenet_category[info.category]} ]')
-            print(f'  prob={info.prob}')
+        plot_results(frame, classifier, googlenet_labels.imagenet_category)
 
         cv2.imshow('frame', frame)
         time.sleep(SLEEP_TIME)
