@@ -237,7 +237,7 @@ def postprocess(preds_ailia, anchor_path='anchors.npy'):
     return filtered_detections
 
 
-def compute_blazeface(detector, frame):
+def compute_blazeface(detector, frame, anchor_path='anchors.npy'):
     BLAZEFACE_INPUT_IMAGE_HEIGHT = 128
     BLAZEFACE_INPUT_IMAGE_WIDTH = 128
 
@@ -253,7 +253,7 @@ def compute_blazeface(detector, frame):
 
     # postprocessing
     org_detections = []
-    blaze_face_detections = postprocess(preds_ailia)
+    blaze_face_detections = postprocess(preds_ailia, anchor_path)
     for idx in range(len(blaze_face_detections)):
         obj = blaze_face_detections[idx]
         if len(obj)==0:
@@ -270,6 +270,24 @@ def compute_blazeface(detector, frame):
         org_detections.append(obj)
 
     return org_detections
+
+
+def crop_blazeface(obj, margin, frame):
+    w = frame.shape[1]
+    h = frame.shape[0]
+    cx = (obj.x + obj.w/2) * w
+    cy = (obj.y + obj.h/2) * h
+    cw = max(obj.w * w * margin, obj.h * h * margin)
+    fx = max(cx - cw/2, 0)
+    fy = max(cy - cw/2, 0)
+    fw = min(cw, w-fx)
+    fh = min(cw, h-fy)
+    top_left = (int(fx), int(fy))
+    bottom_right = (int((fx+fw)), int(fy+fh))
+    crop_img = frame[
+        top_left[1]:bottom_right[1], top_left[0]:bottom_right[0], 0:3
+    ]
+    return crop_img, top_left, bottom_right
 
 
 def show_result(input_img, detections):

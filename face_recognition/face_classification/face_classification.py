@@ -37,6 +37,15 @@ EMOTION_CATEGORY = [
 ]
 GENDER_CATEGORY = ["female", "male"]
 
+FACE_WEIGHT_PATH = 'blazeface.onnx'
+FACE_MODEL_PATH = 'blazeface.onnx.prototxt'
+FACE_REMOTE_PATH = "https://storage.googleapis.com/ailia-models/blazeface/"
+FACE_CATEGORY = ["face"]
+FACE_ALGORITHM = None
+FACE_RANGE = None
+FACE_MARGIN = 1.0
+sys.path.append('../../face_detection/blazeface')
+from blazeface_utils import compute_blazeface, crop_blazeface
 
 # ======================
 # Arguemnt Parser Config
@@ -164,48 +173,86 @@ def recognize_from_video():
         range=ailia.NETWORK_IMAGE_RANGE_S_FP32,
         channel=ailia.NETWORK_IMAGE_CHANNEL_FIRST
     )
+    detector = ailia.Net(FACE_MODEL_PATH, FACE_WEIGHT_PATH, env_id=env_id)
 
     capture = get_capture(args.video)
 
     while(True):
         ret, frame = capture.read()
-        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2BGRA)
 
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
 
-        # emotion inference
-        emotion_classifier.compute(frame, EMOTION_MAX_CLASS_COUNT)
-        count = emotion_classifier.get_class_count()
-        print('===========================================================')
-        print(f'emotion_class_count={count}')
+        # detect face
+        detections = compute_blazeface(detector, frame, anchor_path='../../face_detection/blazeface/anchors.npy')
 
-        # print result
-        for idx in range(count):
-            print(f'+ idx={idx}')
-            info = emotion_classifier.get_class(idx)
-            print(
-                f'  category={info.category} ' +
-                f'[ {EMOTION_CATEGORY[info.category]} ]'
-            )
-            print(f'  prob={info.prob}')
-        print('')
+        for obj in detections:
+            # get detected face
+            crop_img, top_left, bottom_right = crop_blazeface(obj, FACE_MARGIN, frame)
+            if crop_img.shape[0] <= 0 or crop_img.shape[1] <= 0:
+                continue
+            crop_img = cv2.cvtColor(crop_img, cv2.COLOR_BGR2BGRA)
+                
+            # emotion inference
+            emotion_classifier.compute(crop_img, EMOTION_MAX_CLASS_COUNT)
+            count = emotion_classifier.get_class_count()
+            print('===========================================================')
+            print(f'emotion_class_count={count}')
 
-        # gender inference
-        gender_classifier.compute(frame, GENDER_MAX_CLASS_COUNT)
-        count = gender_classifier.get_class_count()
-        # print reuslt
-        for idx in range(count):
-            print(f'+ idx={idx}')
-            info = gender_classifier.get_class(idx)
-            print(
-                f'  category={info.category} ' +
-                f'[ {GENDER_CATEGORY[info.category]} ]'
+            # print result
+            emotion_text = ""
+            for idx in range(count):
+                print(f'+ idx={idx}')
+                info = emotion_classifier.get_class(idx)
+                print(
+                    f'  category={info.category} ' +
+                    f'[ {EMOTION_CATEGORY[info.category]} ]'
+                )
+                print(f'  prob={info.prob}')
+                if idx == 0:
+                    emotion_text = f'[ {EMOTION_CATEGORY[info.category]} ] prob={info.prob:.3f}'
+            print('')
+
+            # gender inference
+            gender_text = ""
+            gender_classifier.compute(crop_img, GENDER_MAX_CLASS_COUNT)
+            count = gender_classifier.get_class_count()
+            # print reuslt
+            for idx in range(count):
+                print(f'+ idx={idx}')
+                info = gender_classifier.get_class(idx)
+                print(
+                    f'  category={info.category} ' +
+                    f'[ {GENDER_CATEGORY[info.category]} ]'
+                )
+                print(f'  prob={info.prob}')
+                if idx == 0:
+                    gender_text = f'[ {GENDER_CATEGORY[info.category]} ] prob={info.prob:.3f}'
+            print('')
+
+            # display label
+            LABEL_WIDTH = 400
+            LABEL_HEIGHT = 20
+            color = (255,255,255)
+            cv2.rectangle(frame, top_left, bottom_right, color, thickness=2)
+            cv2.rectangle(frame, top_left, (top_left[0]+LABEL_WIDTH,top_left[1]+LABEL_HEIGHT), color, thickness=-1)
+
+            text_position = (top_left[0], top_left[1]+LABEL_HEIGHT//2)
+            color = (0,0,0)
+            fontScale = 0.5
+            cv2.putText(
+                frame,
+                emotion_text + " " + gender_text,
+                text_position,
+                cv2.FONT_HERSHEY_SIMPLEX,
+                fontScale,
+                color,
+                1
             )
-            print(f'  prob={info.prob}')
-        print('')
-        cv2.imshow('frame', frame)
-        time.sleep(SLEEP_TIME)
+
+            # show result
+            cv2.imshow('frame', frame)
+            time.sleep(SLEEP_TIME)
 
     capture.release()
     cv2.destroyAllWindows()
@@ -220,6 +267,10 @@ def main():
     check_and_download_models(
         GENDER_WEIGHT_PATH, GENDER_MODEL_PATH, REMOTE_PATH
     )
+    if args.video:
+        check_and_download_models(
+            FACE_WEIGHT_PATH, FACE_MODEL_PATH, FACE_REMOTE_PATH
+        )
 
     if args.video is not None:
         # video mode
