@@ -141,7 +141,7 @@ def recognize_from_video():
         # get result
         count = classifier.get_class_count()
 
-        plot_results(frame, classifier, resnet50_labels.imagenet_category)
+        plot_results(in_frame, classifier, resnet50_labels.imagenet_category)
 
         cv2.imshow('frame', in_frame)
         time.sleep(SLEEP_TIME)
