@@ -26,7 +26,7 @@ IMAGE_PATH = 'pizza.jpg'
 IMAGE_HEIGHT = 224
 IMAGE_WIDTH = 224
 
-SLEEP_TIME = 3
+SLEEP_TIME = 0
 
 # TODO
 # model_path = "VGG16.prototxt"

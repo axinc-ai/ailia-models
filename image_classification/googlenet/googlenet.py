@@ -28,7 +28,7 @@ IMAGE_HEIGHT = 224
 IMAGE_WIDTH = 224
 
 MAX_CLASS_COUNT = 3
-SLEEP_TIME = 3  # for webcam mode
+SLEEP_TIME = 0  # for webcam mode
 
 
 # ======================

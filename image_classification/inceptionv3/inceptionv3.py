@@ -25,7 +25,7 @@ IMAGE_PATH = 'clock.jpg'
 IMAGE_HEIGHT = 299
 IMAGE_WIDTH = 299
 MAX_CLASS_COUNT = 3
-SLEEP_TIME = 3  # for video mode
+SLEEP_TIME = 0  # for video mode
 
 
 # ======================

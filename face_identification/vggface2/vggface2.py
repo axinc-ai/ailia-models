@@ -29,7 +29,7 @@ IMAGE_WIDTH = 224
 
 MEAN = np.array([131.0912, 103.8827, 91.4953])  # to normalize input image
 THRESHOLD = 1.00  # VGGFace2 predefined value 1~1.24
-SLEEP_TIME = 3  # for video input mode
+SLEEP_TIME = 0  # for video input mode
 
 
 # ======================

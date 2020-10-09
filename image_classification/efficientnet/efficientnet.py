@@ -63,7 +63,7 @@ WEIGHT_PATH = "efficientnet-" + args.model + ".onnx"
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/efficientnet/"
 
 MAX_CLASS_COUNT = 3
-SLEEP_TIME = 3  # for web cam mode
+SLEEP_TIME = 0  # for web cam mode
 
 
 # ======================

@@ -24,7 +24,7 @@ IMAGE_HEIGHT = 28
 IMAGE_WIDTH = 28
 ETL_PATH = 'etl_BINARY_squeezenet128_20.txt'
 MAX_CLASS_COUNT = 3
-SLEEP_TIME = 3  # for webcam mode
+SLEEP_TIME = 0  # for webcam mode
 
 
 # ======================

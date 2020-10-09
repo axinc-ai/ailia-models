@@ -23,7 +23,7 @@ IMAGE_HEIGHT = 224
 IMAGE_WIDTH = 224
 MODEL_LISTS = ['small', 'large']
 
-SLEEP_TIME = 3
+SLEEP_TIME = 0
 
 
 # ======================
