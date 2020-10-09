@@ -219,6 +219,14 @@ pip3 install numpy
 sudo apt install python3-opencv
 ```
 
+# Launcher
+
+You can display a list of models and select them with the mouse by using the command below.
+
+```
+python3 launcher.py
+```
+
 # Resources
 
 ## Blog
