@@ -1,6 +1,15 @@
+# ailia MODELS launcher
+
 import os
 import cv2
 import numpy
+
+mx = 0
+my = 0
+click_trig = False
+
+WINDOW_WIDTH = 640
+WINDOW_HEIGHT = 480
 
 def search_model():
     model_list=[]
@@ -20,42 +29,33 @@ def hsv_to_rgb(h, s, v):
     )[0][0]
     return (int(bgr[2]), int(bgr[1]), int(bgr[0]))
 
-#マウスの操作があるとき呼ばれる関数
 def callback(event, x, y, flags, param):
-    global pt, m, n, p
-    print(x,y)
-
-    #マウスの左ボタンがクリックされたとき
+    global mx,my,click_trig
     if event == cv2.EVENT_LBUTTONDOWN:
-        m = n
-        pt[n] = (x, y)
-        #print(n)
-        #print(pt)
-        n = n + 1
-        p = p + 1
-
-    #マウスの右ボタンがクリックされたとき
-    if event == cv2.EVENT_RBUTTONDOWN and n > 0:
-        #print(m, n)
-        #print(pt[m])
-        pt.pop(m)
-        m = m - 1
-        n = n - 1
-        p = p + 1
+        click_trig = True
+    mx = x
+    my = y
 
 def display_ui(img,model_list):
+    global mx,my,click_trig
+
     x = 2
     y = 2
-    w = 400
+    w = 200
     h = 20
     margin = 2
 
     for model in model_list:
-        print(model)
+        color = (128,128,128)
 
-        cv2.rectangle(img, (x, y), (x + w, y + h), (128,128,128), thickness=-1)
+        if mx >= x and mx <= x+w and my >= y and my <= y+h:
+            color = (192,192,192)
+            if click_trig:
+                print(model["script"])
 
-        text_position = (x+4, y-8)
+        cv2.rectangle(img, (x, y), (x + w, y + h), color, thickness=-1)
+
+        text_position = (x+4, y+12)
 
         color = (0,0,0)
         #hsv_to_rgb(256 * obj.category / len(category), 255, 255)
@@ -63,7 +63,7 @@ def display_ui(img,model_list):
 
         cv2.putText(
             img,
-            model["script"],
+            model["model"],
             text_position,
             cv2.FONT_HERSHEY_SIMPLEX,
             fontScale,
@@ -73,10 +73,15 @@ def display_ui(img,model_list):
 
         y=y+h+margin
 
+        if y>=WINDOW_HEIGHT:
+            y = 2
+            x = x + w + 2
+    
+    click_trig = False
+
 # ui
 model_list = search_model()
-img = numpy.zeros((480,640,3)).astype(numpy.uint8)
-display_ui(img,model_list)
+img = numpy.zeros((WINDOW_HEIGHT,WINDOW_WIDTH,3)).astype(numpy.uint8)
 
 cv2.imshow('frame', img)
 cv2.setMouseCallback("frame", callback)
@@ -84,5 +89,6 @@ cv2.setMouseCallback("frame", callback)
 while(True):
     if cv2.waitKey(1) & 0xFF == ord('q'):
         break
+    display_ui(img,model_list)
     cv2.imshow('frame', img)
 
