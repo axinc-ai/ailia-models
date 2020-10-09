@@ -10,16 +10,25 @@ mx = 0
 my = 0
 click_trig = False
 
-WINDOW_WIDTH = 640
+WINDOW_WIDTH = 1280
 WINDOW_HEIGHT = 480
+
+BUTTON_WIDTH = 400
+BUTTON_HEIGHT = 20
 
 IGNORE_LIST=["commercial_model","validation",".git","log"]
 
 def search_model():
+    file_list=[]
+    for current, subfolders, subfiles in os.walk("./"):
+        file_list.append(current)
+
+    file_list.sort()
+
     model_list=[]
     category_list={}
     model_exist={}
-    for current, subfolders, subfiles in os.walk("./"):
+    for current in file_list:
         files = current.split("/")
         if len(files)==3:
             if (files[1] in IGNORE_LIST) or (files[2] in IGNORE_LIST):
@@ -54,8 +63,8 @@ def display_ui(img,model_list,category_cnt):
 
     x = 2
     y = 2
-    w = 200
-    h = 20
+    w = BUTTON_WIDTH
+    h = BUTTON_HEIGHT
     margin = 2
 
     for model in model_list:
@@ -80,7 +89,7 @@ def display_ui(img,model_list,category_cnt):
 
         cv2.putText(
             img,
-            model["model"],
+            model["category"]+" : "+model["model"],
             text_position,
             cv2.FONT_HERSHEY_SIMPLEX,
             fontScale,
