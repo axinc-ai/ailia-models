@@ -1,7 +1,6 @@
 import os
 import sys
 import time
-import argparse
 import re
 from collections import deque
 
@@ -12,9 +11,10 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
+from utils import get_base_parser  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
-from webcamera_utils import get_capture  # noqa: E402C
-from image_utils import load_image  # noqa: E402C
+from webcamera_utils import get_capture  # noqa: E402
+from image_utils import load_image  # noqa: E402
 
 
 # ======================
@@ -87,37 +87,15 @@ HMDB51_LABEL = [
 # ======================
 # Arguemnt Parser Config
 # ======================
-parser = argparse.ArgumentParser(
-    description='MARS model'
-)
+parser = get_base_parser('MARS model', IMAGE_PATH, None)
+
 parser.add_argument(
-    '-i', '--input', metavar='IMAGE',
-    default=IMAGE_PATH,
-    help='The input image path.'
-)
-parser.add_argument(
-    '-v', '--video', metavar='VIDEO',
-    default=None,
-    help='The input video path. ' +
-         'If the VIDEO argument is set to 0, the webcam input will be used.'
-)
-parser.add_argument(
-    '-b', '--benchmark',
-    action='store_true',
-    help='Running the inference on the same input 5 times ' +
-         'to measure execution performance. (Cannot be used in video mode)'
-)
-parser.add_argument(
-    '-d', '--duration', metavar='DURATION',
-    default=DURATION,
+    '-d', '--duration', metavar='DURATION', default=DURATION, type=int,
     help='Sampling duration.',
-    type=int
 )
 parser.add_argument(
-    '-t', '--top', metavar='TOP',
-    default=3,
+    '-t', '--top', metavar='TOP', default=3, type=int,
     help='Number of outputs for category.',
-    type=int
 )
 args = parser.parse_args()
 
