@@ -13,7 +13,7 @@ BUTTON_WIDTH = 400
 BUTTON_HEIGHT = 20
 BUTTON_MARGIN = 2
 
-IGNORE_LIST=["commercial_model","validation",".git","log"]
+IGNORE_LIST=["commercial_model", "validation", ".git", "log", "prnet", "bert", "illustration2vec"]
 
 def search_model():
     file_list=[]
@@ -77,6 +77,7 @@ def display_ui(img,model_list,category_cnt):
                 if shutil.which("python3"):
                     cmd="python3"
                 subprocess.run([cmd,model["model"]+".py","-v 0"],cwd=dir)
+                click_trig = False
 
         cv2.rectangle(img, (x, y), (x + w, y + h), color, thickness=-1)
 

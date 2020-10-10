@@ -29,6 +29,12 @@ IMAGE_HEIGHT = 256
 IMAGE_WIDTH = 256
 THRESHOLD = 0.1
 
+FACE_WEIGHT_PATH = 'blazeface.onnx'
+FACE_MODEL_PATH = 'blazeface.onnx.prototxt'
+FACE_REMOTE_PATH = "https://storage.googleapis.com/ailia-models/blazeface/"
+FACE_MARGIN = 1.2
+sys.path.append('../../face_detection/blazeface')
+from blazeface_utils import compute_blazeface, crop_blazeface  # noqa: E402
 
 # ======================
 # Argument Parser Config
@@ -405,6 +411,7 @@ def recognize_from_video():
         depth_net = ailia.Net(
             DEPTH_MODEL_PATH, DEPTH_WEIGHT_PATH, env_id=env_id
         )
+    detector = ailia.Net(FACE_MODEL_PATH, FACE_WEIGHT_PATH, env_id=env_id)
 
     capture = get_capture(args.video)
 
@@ -415,8 +422,20 @@ def recognize_from_video():
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
 
+        # detect face
+        detections = compute_blazeface(detector, frame, anchor_path='../../face_detection/blazeface/anchors.npy')
+        
+        # get detected face
+        if len(detections) == 0:
+            crop_img = frame
+        else:
+            crop_img, top_left, bottom_right = crop_blazeface(detections[0], FACE_MARGIN, frame)
+            if crop_img.shape[0] <= 0 or crop_img.shape[1] <= 0:
+                crop_img = frame
+
+        # preprocess
         input_image, input_data = preprocess_frame(
-            frame, IMAGE_HEIGHT, IMAGE_WIDTH, normalize_type='255'
+            crop_img, IMAGE_HEIGHT, IMAGE_WIDTH, normalize_type='255'
         )
 
         # inference
@@ -465,6 +484,11 @@ def main():
     if args.active_3d:
         check_and_download_models(
             DEPTH_WEIGHT_PATH, DEPTH_MODEL_PATH, REMOTE_PATH
+        )
+
+    if args.video:
+        check_and_download_models(
+            FACE_WEIGHT_PATH, FACE_MODEL_PATH, FACE_REMOTE_PATH
         )
 
     if args.video is not None:

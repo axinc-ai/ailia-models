@@ -31,6 +31,13 @@ SAVE_IMAGE_PATH = 'output.png'
 IMAGE_HEIGHT = 226
 IMAGE_WIDTH = 226
 
+FACE_WEIGHT_PATH = 'blazeface.onnx'
+FACE_MODEL_PATH = 'blazeface.onnx.prototxt'
+FACE_REMOTE_PATH = "https://storage.googleapis.com/ailia-models/blazeface/"
+FACE_MARGIN = 1.0
+sys.path.append('../../face_detection/blazeface')
+from blazeface_utils import compute_blazeface, crop_blazeface  # noqa: E402
+
 
 # ======================
 # Arguemnt Parser Config
@@ -115,6 +122,7 @@ def recognize_from_video():
     env_id = ailia.get_gpu_environment_id()
     print(f'env_id: {env_id}')
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+    detector = ailia.Net(FACE_MODEL_PATH, FACE_WEIGHT_PATH, env_id=env_id)
 
     capture = get_capture(args.video)
 
@@ -123,8 +131,20 @@ def recognize_from_video():
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
 
+        # detect face
+        detections = compute_blazeface(detector, frame, anchor_path='../../face_detection/blazeface/anchors.npy')
+
+        # get detected face
+        if len(detections) == 0:
+            crop_img = frame
+        else:
+            crop_img, top_left, bottom_right = crop_blazeface(detections[0], FACE_MARGIN, frame)
+            if crop_img.shape[0] <= 0 or crop_img.shape[1] <= 0:
+                crop_img = frame
+
+        # preprocess
         input_image, input_data = preprocess_frame(
-            frame, IMAGE_HEIGHT, IMAGE_WIDTH, data_rgb=False
+            crop_img, IMAGE_HEIGHT, IMAGE_WIDTH, data_rgb=False
         )
 
         # inference
@@ -145,6 +165,11 @@ def recognize_from_video():
 def main():
     # model files check and download
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
+
+    if args.video:
+        check_and_download_models(
+            FACE_WEIGHT_PATH, FACE_MODEL_PATH, FACE_REMOTE_PATH
+        )
 
     if args.video is not None:
         # video mode
