@@ -40,12 +40,9 @@ GENDER_CATEGORY = ["female", "male"]
 FACE_WEIGHT_PATH = 'blazeface.onnx'
 FACE_MODEL_PATH = 'blazeface.onnx.prototxt'
 FACE_REMOTE_PATH = "https://storage.googleapis.com/ailia-models/blazeface/"
-FACE_CATEGORY = ["face"]
-FACE_ALGORITHM = None
-FACE_RANGE = None
 FACE_MARGIN = 1.0
 sys.path.append('../../face_detection/blazeface')
-from blazeface_utils import compute_blazeface, crop_blazeface
+from blazeface_utils import compute_blazeface, crop_blazeface  # noqa: E402
 
 # ======================
 # Arguemnt Parser Config
