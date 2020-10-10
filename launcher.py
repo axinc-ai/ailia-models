@@ -13,7 +13,7 @@ BUTTON_WIDTH = 400
 BUTTON_HEIGHT = 20
 BUTTON_MARGIN = 2
 
-IGNORE_LIST=["commercial_model", "validation", ".git", "log", "prnet", "bert", "illustration2vec", "etl"]
+IGNORE_LIST=["commercial_model", "validation", ".git", "log", "prnet", "bert", "illustration2vec", "etl", "vggface2"]
 
 def search_model():
     file_list=[]
