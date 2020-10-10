@@ -237,7 +237,7 @@ def postprocess(preds_ailia, anchor_path='anchors.npy'):
     return filtered_detections
 
 
-def compute_blazeface(detector, frame, anchor_path='anchors.npy'):
+def compute_blazeface_with_keypoint(detector, frame, anchor_path='anchors.npy'):
     BLAZEFACE_INPUT_IMAGE_HEIGHT = 128
     BLAZEFACE_INPUT_IMAGE_WIDTH = 128
 
@@ -252,13 +252,16 @@ def compute_blazeface(detector, frame, anchor_path='anchors.npy'):
     preds_ailia = detector.predict([input_data])
 
     # postprocessing
-    org_detections = []
+    detections = []
+    keypoints = []
     blaze_face_detections = postprocess(preds_ailia, anchor_path)
     for idx in range(len(blaze_face_detections)):
         obj = blaze_face_detections[idx]
         if len(obj)==0:
             continue
         d = obj[0]
+
+        # face position
         obj = ailia.DetectorObject(
             category = 0,
             prob = 1.0,
@@ -266,10 +269,21 @@ def compute_blazeface(detector, frame, anchor_path='anchors.npy'):
             y = d[0],
             w = d[3]-d[1],
             h = d[2]-d[0] )
-        
-        org_detections.append(obj)
+        detections.append(obj)
 
-    return org_detections
+        # keypoint potision
+        keypoint = {
+            "eye_left_x":blaze_face_detections[idx][0][4],"eye_left_y":blaze_face_detections[idx][0][5],
+            "eye_right_x":blaze_face_detections[idx][0][6],"eye_right_y":blaze_face_detections[idx][0][7]
+        }
+        keypoints.append(keypoint)
+
+    return detections, keypoints
+
+
+def compute_blazeface(detector, frame, anchor_path='anchors.npy'):
+    detections, keypoints = compute_blazeface_with_keypoint(detector, frame, anchor_path)
+    return detections
 
 
 def crop_blazeface(obj, margin, frame):
