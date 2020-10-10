@@ -14,8 +14,8 @@ from deepsort_utils import *
 sys.path.append('../../util')
 from image_utils import normalize_image  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
-from detector_utils import load_image  # noqa: E402C
-from webcamera_utils import get_writer, get_capture  # noqa: E402C
+from detector_utils import load_image  # noqa: E402
+from webcamera_utils import get_writer, get_capture  # noqa: E402
 
 
 # ======================

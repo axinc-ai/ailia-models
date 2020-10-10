@@ -10,10 +10,10 @@ import ailia
 # import original modules
 sys.path.append('../../util')
 from model_utils import check_and_download_models  # noqa: E402
-from webcamera_utils import get_capture  # noqa: E402C
-from detector_utils import load_image  # noqa: E402C
+from webcamera_utils import get_capture  # noqa: E402
+from detector_utils import load_image  # noqa: E402
 
-from pose_resnet_util import compute, keep_aspect  # noqa: E402C
+from pose_resnet_util import compute, keep_aspect  # noqa: E402
 
 # ======================
 # Parameters

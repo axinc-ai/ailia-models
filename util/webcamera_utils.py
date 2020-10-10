@@ -113,6 +113,9 @@ def get_capture(video):
     """
     Get cv2.VideoCapture
 
+    * TODO: maybe get capture & writer at the same time?
+    *       then, you can use capture frame size directory
+
     Parameters
     ----------
     video : str

@@ -11,8 +11,8 @@ import ailia
 # import original modules
 sys.path.append('../../util')
 from model_utils import check_and_download_models  # noqa: E402
-from image_utils import load_image  # noqa: E402C
-from webcamera_utils import preprocess_frame, get_capture  # noqa: E402C
+from image_utils import load_image  # noqa: E402
+from webcamera_utils import preprocess_frame, get_capture  # noqa: E402
 
 
 # ======================

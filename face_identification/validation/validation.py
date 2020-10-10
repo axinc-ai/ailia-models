@@ -15,7 +15,7 @@ from webcamera_utils import adjust_frame_size  # noqa: E402
 from image_utils import load_image, draw_result_on_img  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from utils import check_file_existance  # noqa: E402
-from detector_utils import hsv_to_rgb # noqa: E402C
+from detector_utils import hsv_to_rgb # noqa: E402
 
 import matplotlib.pyplot as plt
 

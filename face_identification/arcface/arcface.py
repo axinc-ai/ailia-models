@@ -12,8 +12,8 @@ sys.path.append('../../util')
 from webcamera_utils import adjust_frame_size, get_capture  # noqa: E402
 from image_utils import load_image  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
-from detector_utils import hsv_to_rgb  # noqa: E402C
-from nms_utils import nms_between_categories  # noqa: E402C
+from detector_utils import hsv_to_rgb  # noqa: E402
+from nms_utils import nms_between_categories  # noqa: E402
 
 
 # ======================

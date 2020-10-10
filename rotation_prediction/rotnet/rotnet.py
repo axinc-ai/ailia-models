@@ -11,7 +11,7 @@ from rotnet_utils import generate_rotated_image, create_figure, visualize
 # import original modules
 sys.path.append('../../util')
 from model_utils import check_and_download_models  # noqa: E402
-from webcamera_utils import adjust_frame_size, get_capture  # noqa: E402C
+from webcamera_utils import adjust_frame_size, get_capture  # noqa: E402
 
 
 # ======================

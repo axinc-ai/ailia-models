@@ -15,15 +15,15 @@ import ailia
 sys.path.append('../../util')
 from model_utils import check_and_download_models  # noqa: E402
 from image_utils import load_image  # noqa: E402
-from webcamera_utils import get_capture  # noqa: E402C
+from webcamera_utils import get_capture  # noqa: E402
 
-from prnet_utils.net_utils import *  # noqa: E402C
-from prnet_utils.estimate_pose import estimate_pose  # noqa: E402C
-from prnet_utils.rotate_vertices import frontalize  # noqa: E402C
-from prnet_utils.render_app import get_visibility, get_uv_mask, get_depth_image  # noqa: E402C
-from prnet_utils.write import write_obj_with_colors, write_obj_with_texture  # noqa: E402C
-from prnet_utils.cv_plot import plot_kpt, plot_vertices, plot_pose_box  # noqa: E402C
-from prnet_utils.render import render_texture  # noqa: E402C
+from prnet_utils.net_utils import *  # noqa: E402
+from prnet_utils.estimate_pose import estimate_pose  # noqa: E402
+from prnet_utils.rotate_vertices import frontalize  # noqa: E402
+from prnet_utils.render_app import get_visibility, get_uv_mask, get_depth_image  # noqa: E402
+from prnet_utils.write import write_obj_with_colors, write_obj_with_texture  # noqa: E402
+from prnet_utils.cv_plot import plot_kpt, plot_vertices, plot_pose_box  # noqa: E402
+from prnet_utils.render import render_texture  # noqa: E402
 
 # ======================
 # Parameters

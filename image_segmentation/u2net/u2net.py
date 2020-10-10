@@ -10,8 +10,8 @@ import ailia
 # import original modules
 sys.path.append('../../util')
 from model_utils import check_and_download_models  # noqa: E402
-import webcamera_utils  # noqa: E402C
-from u2net_utils import load_image, transform, save_result, norm  # noqa: E402C
+import webcamera_utils  # noqa: E402
+from u2net_utils import load_image, transform, save_result, norm  # noqa: E402
 
 
 # ======================

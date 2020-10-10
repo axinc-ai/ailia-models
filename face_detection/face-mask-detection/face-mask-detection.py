@@ -9,9 +9,9 @@ import ailia
 # import original modules
 sys.path.append('../../util')
 from model_utils import check_and_download_models  # noqa: E402
-from webcamera_utils import adjust_frame_size, get_capture  # noqa: E402C
-from detector_utils import plot_results, load_image  # noqa: E402C
-from nms_utils import nms_between_categories  # noqa: E402C
+from webcamera_utils import adjust_frame_size, get_capture  # noqa: E402
+from detector_utils import plot_results, load_image  # noqa: E402
+from nms_utils import nms_between_categories  # noqa: E402
 
 
 # ======================

@@ -11,7 +11,7 @@ import partialconv_label
 sys.path.append('../../util')
 from model_utils import check_and_download_models  # noqa: E402
 from image_utils import load_image  # noqa: E402
-from webcamera_utils import preprocess_frame, get_capture  # noqa: E402C
+from webcamera_utils import preprocess_frame, get_capture  # noqa: E402
 from classifier_utils import plot_results, print_results  # noqa: E402
 
 
