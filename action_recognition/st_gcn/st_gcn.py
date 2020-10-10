@@ -32,8 +32,8 @@ WEIGHT_POSE_PATH = 'pose_iter_440000.caffemodel'
 REMOTE_POSE_PATH = 'http://posefs1.perception.cs.cmu.edu/OpenPose/models/pose/coco/'
 
 POSE_ALGORITHM_OPEN_POSE_SINGLE_SCALE = (12)
-# POSE_ALGORITHM = ailia.POSE_ALGORITHM_OPEN_POSE
-POSE_ALGORITHM = POSE_ALGORITHM_OPEN_POSE_SINGLE_SCALE
+POSE_ALGORITHM = ailia.POSE_ALGORITHM_OPEN_POSE
+# POSE_ALGORITHM = POSE_ALGORITHM_OPEN_POSE_SINGLE_SCALE
 
 IMAGE_PATH = 'skateboarding.mp4'
 # IMAGE_HEIGHT = 112
@@ -633,12 +633,12 @@ def recognize_offline(input, pose, net):
             pose.compute(img)
             count = pose.get_object_count()
             # display_result(img, pose)
-            # cv2.imwrite("output/ST-GCN-%08d.jpg" % frame_index, img)
+            # cv2.imwrite("output/POSE-%08d.jpg" % frame_index, img)
             if count == 0:
                 continue
             print(f'[{frame_index}] person_count={count}')
 
-            pose_key = {
+            pose_key = [
                 ailia.POSE_KEYPOINT_NOSE,
                 ailia.POSE_KEYPOINT_SHOULDER_CENTER,
                 ailia.POSE_KEYPOINT_SHOULDER_RIGHT,
@@ -657,7 +657,7 @@ def recognize_offline(input, pose, net):
                 ailia.POSE_KEYPOINT_EYE_LEFT,
                 ailia.POSE_KEYPOINT_EAR_RIGHT,
                 ailia.POSE_KEYPOINT_EAR_LEFT,
-            }
+            ]
             pose_keypoints = np.zeros((count, 18, 3))  # (num_person, num_joint, 3)
             for idx in range(count):
                 person = pose.get_object_pose(idx)
