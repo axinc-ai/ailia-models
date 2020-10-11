@@ -663,7 +663,7 @@ def recognize_offline(input, pose, net):
                 person = pose.get_object_pose(idx)
                 for i, key in enumerate(pose_key):
                     p = person.points[key]
-                    pose_keypoints[idx, key, :] = [p.x, p.y, p.score]
+                    pose_keypoints[idx, i, :] = [p.x, p.y, p.score]
 
         # for idx in range(len(pose_keypoints)):
         #     for i in range(18):
