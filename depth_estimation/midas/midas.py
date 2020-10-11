@@ -1,7 +1,6 @@
 import os
 import sys
 import time
-import argparse
 
 import numpy as np
 import cv2
@@ -10,9 +9,12 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
+from utils import get_base_parser  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
-from webcamera_utils import get_capture  # noqa: E402
+from webcamera_utils import get_capture, get_writer, \
+    calc_adjust_fsize  # noqa: E402
 from image_utils import normalize_image  # noqa: E402
+
 
 # ======================
 # Parameters
@@ -31,31 +33,7 @@ IMAGE_MULTIPLE_OF = 32
 # ======================
 # Arguemnt Parser Config
 # ======================
-parser = argparse.ArgumentParser(
-    description='MiDaS model'
-)
-parser.add_argument(
-    '-i', '--input', metavar='IMAGE',
-    default=IMAGE_PATH,
-    help='The input image path.'
-)
-parser.add_argument(
-    '-v', '--video', metavar='VIDEO',
-    default=None,
-    help='The input video path. ' +
-         'If the VIDEO argument is set to 0, the webcam input will be used.'
-)
-parser.add_argument(
-    '-s', '--savepath', metavar='SAVE_IMAGE_PATH',
-    default=SAVE_IMAGE_PATH,
-    help='Save path for the output image.'
-)
-parser.add_argument(
-    '-b', '--benchmark',
-    action='store_true',
-    help='Running the inference on the same input 5 times ' +
-         'to measure execution performance. (Cannot be used in video mode)'
-)
+parser = get_base_parser('MiDaS model', IMAGE_PATH, SAVE_IMAGE_PATH)
 args = parser.parse_args()
 
 
@@ -151,6 +129,16 @@ def recognize_from_video():
 
     capture = get_capture(args.video)
 
+    # create video writer if savepath is specified as video format
+    if args.savepath != SAVE_IMAGE_PATH:
+        f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
+        save_h, save_w = calc_adjust_fsize(f_h, f_w, IMAGE_HEIGHT, IMAGE_WIDTH)
+        # save_w * 2: we stack source frame and estimated heatmap
+        writer = get_writer(args.savepath, save_h, save_w * 2)
+    else:
+        writer = None
+
     input_shape_set = False
     while(True):
         ret, frame = capture.read()
@@ -174,7 +162,12 @@ def recognize_from_video():
         else:
             out = 0
 
-        cv2.imshow('depth', out.transpose(1, 2, 0).astype("uint16"))
+        res_img = out.transpose(1, 2, 0).astype("uint16")
+        cv2.imshow('depth', res_img)
+
+        # save results
+        if writer is not None:
+            writer.write(res_img)
 
     capture.release()
     cv2.destroyAllWindows()

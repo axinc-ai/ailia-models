@@ -1,6 +1,5 @@
 import sys
 import time
-import argparse
 from collections import OrderedDict
 
 import numpy as np
@@ -11,9 +10,11 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
+from utils import get_base_parser  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from detector_utils import plot_results, load_image  # noqa: E402
-from webcamera_utils import get_capture  # noqa: E402
+from webcamera_utils import get_capture, get_writer,\
+    calc_adjust_fsize  # noqa: E402
 
 
 # ======================
@@ -51,36 +52,14 @@ DETECTION_WIDTH = 416
 # ======================
 # Arguemnt Parser Config
 # ======================
-parser = argparse.ArgumentParser(
-    description='Clothing detection model'
-)
-parser.add_argument(
-    '-i', '--input', metavar='IMAGE',
-    default=IMAGE_PATH,
-    help='The input image path.'
+parser = get_base_parser(
+    'Clothing detection model', IMAGE_PATH, SAVE_IMAGE_PATH
 )
 parser.add_argument(
     '-d', '--dataset', metavar='TYPE', choices=DATASETS_MODEL_PATH,
     default=list(DATASETS_MODEL_PATH.keys())[0],
     help=('Type of dataset to train the model. '
           'Allowed values are {}.'.format(', '.join(DATASETS_MODEL_PATH)))
-)
-parser.add_argument(
-    '-v', '--video', metavar='VIDEO',
-    default=None,
-    help='The input video path. ' +
-         'If the VIDEO argument is set to 0, the webcam input will be used.'
-)
-parser.add_argument(
-    '-s', '--savepath', metavar='SAVE_IMAGE_PATH',
-    default=SAVE_IMAGE_PATH,
-    help='Save path for the output image.'
-)
-parser.add_argument(
-    '-b', '--benchmark',
-    action='store_true',
-    help='Running the inference on the same input 5 times ' +
-         'to measure execution performance. (Cannot be used in video mode)'
 )
 parser.add_argument(
     '-dw', '--detection_width',
@@ -150,7 +129,6 @@ def post_processing(img_shape, all_boxes, all_scores, indices):
 # Main functions
 # ======================
 
-
 def detect_objects(img, detector):
     img_shape = img.shape[:2]
 
@@ -199,6 +177,21 @@ def recognize_from_image(filename, detector):
 def recognize_from_video(video, detector):
     capture = get_capture(args.video)
 
+    # create video writer if savepath is specified as video format
+    if args.savepath != SAVE_IMAGE_PATH:
+        ailia_input_w = detector.get_input_shape()[3]
+        ailia_input_h = detector.get_input_shape()[2]
+
+        f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
+        save_h, save_w = calc_adjust_fsize(
+            f_h, f_w, ailia_input_h, ailia_input_w
+        )
+        # save_w * 2: we stack source frame and estimated heatmap
+        writer = get_writer(args.savepath, save_h, save_w * 2)
+    else:
+        writer = None
+
     while True:
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
@@ -208,6 +201,10 @@ def recognize_from_video(video, detector):
         detect_object = detect_objects(x, detector)
         res_img = plot_results(detect_object, frame, category)
         cv2.imshow('frame', res_img)
+
+        # save results
+        if writer is not None:
+            writer.write(res_img)
 
     capture.release()
     cv2.destroyAllWindows()

@@ -1,6 +1,5 @@
 import sys
 import time
-import argparse
 
 import cv2
 import numpy as np
@@ -30,30 +29,8 @@ IMAGE_HEIGHT = 480
 # ======================
 # Arguemnt Parser Config
 # ======================
-parser = argparse.ArgumentParser(
-    description='Single image crowd counting.'
-)
-parser.add_argument(
-    '-i', '--input', metavar='IMAGEFILE_PATH',
-    default=IMAGE_PATH,
-    help='The input image path.'
-)
-parser.add_argument(
-    '-v', '--video', metavar='VIDEO',
-    default=None,
-    help='The input video path. ' +
-         'If the VIDEO argument is set to 0, the webcam input will be used.'
-)
-parser.add_argument(
-    '-s', '--savepath', metavar='SAVE_PATH',
-    default=SAVE_IMAGE_PATH,
-    help='Save path for the result of the model.'
-)
-parser.add_argument(
-    '-b', '--benchmark',
-    action='store_true',
-    help='Running the inference on the same input 5 times ' +
-         'to measure execution performance. (Cannot be used in video mode)'
+parser = get_base_parser(
+    'Single image crowd counting.', IMAGE_PATH, SAVE_IMAGE_PATH,
 )
 args = parser.parse_args()
 
