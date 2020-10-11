@@ -10,10 +10,9 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import check_file_existance  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from image_utils import load_image  # noqa: E402C
-from webcamera_utils import preprocess_frame  # noqa: E402C
+from webcamera_utils import preprocess_frame, get_capture  # noqa: E402C
 
 
 # ======================
@@ -123,25 +122,15 @@ def estimate_from_video():
     enc_net = ailia.Net(ENC_MODEL_PATH, ENC_WEIGHT_PATH, env_id=env_id)
     dec_net = ailia.Net(DEC_MODEL_PATH, DEC_WEIGHT_PATH, env_id=env_id)
 
-    if args.video == '0':
-        print('[INFO] Webcam mode is activated')
-        capture = cv2.VideoCapture(0)
-        if not capture.isOpened():
-            print("[ERROR] webcamera not found")
-            sys.exit(1)
-    else:
-        if check_file_existance(args.video):
-            capture = cv2.VideoCapture(args.video)
+    capture = get_capture(args.video)
 
     ret, frame = capture.read()
     org_height, org_width, _ = frame.shape
 
     while(True):
         ret, frame = capture.read()
-        if cv2.waitKey(1) & 0xFF == ord('q'):
+        if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
-        if not ret:
-            continue
 
         _, input_data = preprocess_frame(
             frame, IMAGE_HEIGHT, IMAGE_WIDTH
@@ -167,6 +156,8 @@ def estimate_from_video():
         disp_resized, vmax = result_plot(disp, org_width, org_height)
         plt.imshow(disp_resized, cmap='magma', vmax=vmax)
         plt.pause(.01)
+        if not plt.get_fignums():
+            break
 
     capture.release()
     cv2.destroyAllWindows()

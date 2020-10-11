@@ -9,10 +9,10 @@ import partialconv_label
 
 # import original modules
 sys.path.append('../../util')
-from utils import check_file_existance  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from image_utils import load_image  # noqa: E402
-from webcamera_utils import preprocess_frame  # noqa: E402C
+from webcamera_utils import preprocess_frame, get_capture  # noqa: E402C
+from classifier_utils import plot_results, print_results  # noqa: E402
 
 
 # ======================
@@ -26,7 +26,7 @@ IMAGE_HEIGHT = 224
 IMAGE_WIDTH = 224
 
 MAX_CLASS_COUNT = 5
-SLEEP_TIME = 3
+SLEEP_TIME = 0
 
 # ======================
 # Arguemnt Parser Config
@@ -69,22 +69,6 @@ REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/partialconv/'
 
 
 # ======================
-# Utils
-# ======================
-def print_results(preds_ailia):
-    preds_ailia = preds_ailia[0]
-    top_scores = preds_ailia.argsort()[-1 * MAX_CLASS_COUNT:][::-1]
-
-    print('==============================================================')
-    print(f'class_count={MAX_CLASS_COUNT}')
-    for idx in range(MAX_CLASS_COUNT):
-        print(f'+ idx={idx}')
-        print(f'  category={top_scores[idx]}['
-              f'{partialconv_label.imagenet_category[top_scores[idx]]} ]')
-        print(f'  prob={preds_ailia[top_scores[idx]]}')
-
-
-# ======================
 # Main functions
 # ======================
 def recognize_from_image():
@@ -114,7 +98,7 @@ def recognize_from_image():
         preds_ailia = net.predict(input_data)
 
     # postprocessing
-    print_results(preds_ailia)
+    print_results(preds_ailia, partialconv_label.imagenet_category)
     print('Script finished successfully.')
 
 
@@ -124,22 +108,12 @@ def recognize_from_video():
     print(f'env_id: {env_id}')
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
 
-    if args.video == '0':
-        print('[INFO] Webcam mode is activated')
-        capture = cv2.VideoCapture(0)
-        if not capture.isOpened():
-            print("[ERROR] webcamera not found")
-            sys.exit(1)
-    else:
-        if check_file_existance(args.video):
-            capture = cv2.VideoCapture(args.video)
+    capture = get_capture(args.video)
 
     while(True):
         ret, frame = capture.read()
-        if cv2.waitKey(1) & 0xFF == ord('q'):
+        if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
-        if not ret:
-            continue
 
         input_image, input_data = preprocess_frame(
             frame, IMAGE_HEIGHT, IMAGE_WIDTH, normalize_type='ImageNet'
@@ -148,7 +122,7 @@ def recognize_from_video():
         # Inference
         preds_ailia = net.predict(input_data)
 
-        print_results(preds_ailia)
+        plot_results(input_image, preds_ailia, partialconv_label.imagenet_category)
         cv2.imshow('frame', input_image)
         time.sleep(SLEEP_TIME)
 

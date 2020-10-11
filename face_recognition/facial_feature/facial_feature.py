@@ -12,10 +12,9 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import check_file_existance  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from image_utils import load_image  # noqa: E402
-from webcamera_utils import preprocess_frame  # noqa: E402
+from webcamera_utils import preprocess_frame, get_capture  # noqa: E402
 
 
 # TODO Upgrade Model
@@ -24,12 +23,20 @@ from webcamera_utils import preprocess_frame  # noqa: E402
 # ======================
 WEIGHT_PATH = 'resnet_facial_feature.onnx'
 MODEL_PATH = 'resnet_facial_feature.onnx.prototxt'
-REMOTE_PATH = "https://storage.googleapis.com/ailia-models/resnet_facial_feature/"
+REMOTE_PATH = \
+    "https://storage.googleapis.com/ailia-models/resnet_facial_feature/"
 
 IMAGE_PATH = 'test.png'
 SAVE_IMAGE_PATH = 'output.png'
 IMAGE_HEIGHT = 226
 IMAGE_WIDTH = 226
+
+FACE_WEIGHT_PATH = 'blazeface.onnx'
+FACE_MODEL_PATH = 'blazeface.onnx.prototxt'
+FACE_REMOTE_PATH = "https://storage.googleapis.com/ailia-models/blazeface/"
+FACE_MARGIN = 1.0
+sys.path.append('../../face_detection/blazeface')
+from blazeface_utils import compute_blazeface, crop_blazeface  # noqa: E402
 
 
 # ======================
@@ -108,33 +115,36 @@ def recognize_from_image():
     fig = gen_img_from_predsailia(img, preds_ailia)
     fig.savefig(args.savepath)
     print('Script finished successfully.')
-    
+
 
 def recognize_from_video():
     # net initialize
     env_id = ailia.get_gpu_environment_id()
     print(f'env_id: {env_id}')
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+    detector = ailia.Net(FACE_MODEL_PATH, FACE_WEIGHT_PATH, env_id=env_id)
 
-    if args.video == '0':
-        print('[INFO] Webcam mode is activated')
-        capture = cv2.VideoCapture(0)
-        if not capture.isOpened():
-            print("[ERROR] webcamera not found")
-            sys.exit(1)
-    else:
-        if check_file_existance(args.video):
-            capture = cv2.VideoCapture(args.video)
+    capture = get_capture(args.video)
 
     while(True):
         ret, frame = capture.read()
-        if cv2.waitKey(1) & 0xFF == ord('q'):
+        if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
-        if not ret:
-            continue
 
+        # detect face
+        detections = compute_blazeface(detector, frame, anchor_path='../../face_detection/blazeface/anchors.npy')
+
+        # get detected face
+        if len(detections) == 0:
+            crop_img = frame
+        else:
+            crop_img, top_left, bottom_right = crop_blazeface(detections[0], FACE_MARGIN, frame)
+            if crop_img.shape[0] <= 0 or crop_img.shape[1] <= 0:
+                crop_img = frame
+
+        # preprocess
         input_image, input_data = preprocess_frame(
-            frame, IMAGE_HEIGHT, IMAGE_WIDTH, data_rgb=False
+            crop_img, IMAGE_HEIGHT, IMAGE_WIDTH, data_rgb=False
         )
 
         # inference
@@ -155,6 +165,11 @@ def recognize_from_video():
 def main():
     # model files check and download
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
+
+    if args.video:
+        check_and_download_models(
+            FACE_WEIGHT_PATH, FACE_MODEL_PATH, FACE_REMOTE_PATH
+        )
 
     if args.video is not None:
         # video mode

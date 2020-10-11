@@ -9,10 +9,9 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import check_file_existance  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from image_utils import load_image  # noqa: E402
-from webcamera_utils import preprocess_frame  # noqa: E402C
+from webcamera_utils import preprocess_frame, get_capture  # noqa: E402C
 
 
 # ======================
@@ -115,15 +114,9 @@ def recognize_from_image():
     print('Script finished successfully.')
 
 
-def recognize_from_image_tiling():
-    # net initialize
-    env_id = ailia.get_gpu_environment_id()
-    print(f'env_id: {env_id}')
-    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
-    
-    # padding input image
-    img = cv2.imread(args.input)
+def tiling(net, img):
     h, w = img.shape[0], img.shape[1]
+
     padding_w = int((w + IMAGE_WIDTH - 1) / IMAGE_WIDTH) * IMAGE_WIDTH
     padding_h = int((h+IMAGE_HEIGHT-1) / IMAGE_HEIGHT) * IMAGE_HEIGHT
     scale = int(OUTPUT_HEIGHT / IMAGE_HEIGHT)
@@ -169,9 +162,23 @@ def recognize_from_image_tiling():
     output_img = output_pad_img[0, :, :output_h, :output_w]
     output_img = output_img.transpose(1, 2, 0).astype(np.float32)
     output_img = cv2.cvtColor(output_img, cv2.COLOR_RGB2BGR)
+
+    return output_img
+
+
+def recognize_from_image_tiling():
+    # net initialize
+    env_id = ailia.get_gpu_environment_id()
+    print(f'env_id: {env_id}')
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+
+    # processing
+    img = cv2.imread(args.input)
+    output_img = tiling(net, img)
+
     cv2.imwrite(args.savepath, output_img * 255)
     print('Script finished successfully.')
-    
+
 
 def recognize_from_video():
     # net initialize
@@ -179,33 +186,18 @@ def recognize_from_video():
     print(f'env_id: {env_id}')
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
 
-    if args.video == '0':
-        print('[INFO] Webcam mode is activated')
-        capture = cv2.VideoCapture(0)
-        if not capture.isOpened():
-            print("[ERROR] webcamera not found")
-            sys.exit(1)
-    else:
-        if check_file_existance(args.video):
-            capture = cv2.VideoCapture(args.video)
+    capture = get_capture(args.video)
 
     while(True):
         ret, frame = capture.read()
-        if cv2.waitKey(1) & 0xFF == ord('q'):
+        if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
-        if not ret:
-            continue
+        
+        h, w = frame.shape[0], frame.shape[1]
+        frame = frame[h//2:h//2+h//4,w//2:w//2+w//4,:]
 
-        input_image, input_data = preprocess_frame(
-            frame, IMAGE_HEIGHT, IMAGE_WIDTH, normalize_type='255'
-        )
+        output_img = tiling(net, frame)
 
-        # inference
-        preds_ailia = net.predict(input_data)
-
-        # postprocessing
-        output_img = preds_ailia[0].transpose((1, 2, 0))
-        output_img = cv2.cvtColor(output_img, cv2.COLOR_RGB2BGR)
         cv2.imshow('frame', output_img)
 
     capture.release()

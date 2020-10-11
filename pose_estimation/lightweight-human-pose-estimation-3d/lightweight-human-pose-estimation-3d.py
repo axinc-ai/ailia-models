@@ -117,6 +117,7 @@ def main():
     delay = 1
     esc_code = 27
     p_code = 112
+    q_code = 113
     space_code = 32
     mean_time = 0
     img_mean = np.array([128, 128, 128], dtype=np.float32)
@@ -223,7 +224,7 @@ def main():
             cv2.imwrite(args.savepath, frame)
 
         key = cv2.waitKey(delay)
-        if key == esc_code:
+        if key == esc_code or key == q_code:
             break
         if key == p_code:
             if delay == 1:
@@ -235,11 +236,12 @@ def main():
             key = 0
             while (key != p_code
                    and key != esc_code
+                   and key != q_code
                    and key != space_code):
                 plotter.plot(canvas_3d, poses_3d, edges)
                 cv2.imshow(canvas_3d_window_name, canvas_3d)
                 key = cv2.waitKey(33)
-            if key == esc_code:
+            if key == esc_code or key == q_code:
                 break
             else:
                 delay = 1

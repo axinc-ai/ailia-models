@@ -237,7 +237,7 @@ def postprocess(preds_ailia, anchor_path='anchors.npy'):
     return filtered_detections
 
 
-def compute_blazeface(detector, frame):
+def compute_blazeface_with_keypoint(detector, frame, anchor_path='anchors.npy'):
     BLAZEFACE_INPUT_IMAGE_HEIGHT = 128
     BLAZEFACE_INPUT_IMAGE_WIDTH = 128
 
@@ -252,13 +252,16 @@ def compute_blazeface(detector, frame):
     preds_ailia = detector.predict([input_data])
 
     # postprocessing
-    org_detections = []
-    blaze_face_detections = postprocess(preds_ailia)
+    detections = []
+    keypoints = []
+    blaze_face_detections = postprocess(preds_ailia, anchor_path)
     for idx in range(len(blaze_face_detections)):
         obj = blaze_face_detections[idx]
         if len(obj)==0:
             continue
         d = obj[0]
+
+        # face position
         obj = ailia.DetectorObject(
             category = 0,
             prob = 1.0,
@@ -266,10 +269,39 @@ def compute_blazeface(detector, frame):
             y = d[0],
             w = d[3]-d[1],
             h = d[2]-d[0] )
-        
-        org_detections.append(obj)
+        detections.append(obj)
 
-    return org_detections
+        # keypoint potision
+        keypoint = {
+            "eye_left_x":blaze_face_detections[idx][0][4],"eye_left_y":blaze_face_detections[idx][0][5],
+            "eye_right_x":blaze_face_detections[idx][0][6],"eye_right_y":blaze_face_detections[idx][0][7]
+        }
+        keypoints.append(keypoint)
+
+    return detections, keypoints
+
+
+def compute_blazeface(detector, frame, anchor_path='anchors.npy'):
+    detections, keypoints = compute_blazeface_with_keypoint(detector, frame, anchor_path)
+    return detections
+
+
+def crop_blazeface(obj, margin, frame):
+    w = frame.shape[1]
+    h = frame.shape[0]
+    cx = (obj.x + obj.w/2) * w
+    cy = (obj.y + obj.h/2) * h
+    cw = max(obj.w * w * margin, obj.h * h * margin)
+    fx = max(cx - cw/2, 0)
+    fy = max(cy - cw/2, 0)
+    fw = min(cw, w-fx)
+    fh = min(cw, h-fy)
+    top_left = (int(fx), int(fy))
+    bottom_right = (int((fx+fw)), int(fy+fh))
+    crop_img = frame[
+        top_left[1]:bottom_right[1], top_left[0]:bottom_right[0], 0:3
+    ]
+    return crop_img, top_left, bottom_right
 
 
 def show_result(input_img, detections):

@@ -1,5 +1,6 @@
 import sys
 import argparse
+import time
 
 import numpy as np
 import cv2
@@ -11,11 +12,10 @@ from deepsort_utils import *
 
 # import original modules
 sys.path.append('../../util')
-from utils import check_file_existance  # noqa: E402
 from image_utils import normalize_image  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
-from detector_utils import plot_results, load_image  # noqa: E402C
-from webcamera_utils import get_writer  # noqa: E402C
+from detector_utils import load_image  # noqa: E402C
+from webcamera_utils import get_writer, get_capture  # noqa: E402C
 
 
 # ======================
@@ -82,6 +82,12 @@ parser.add_argument(
     default=None,
     help='Save path for the output video.'
 )
+parser.add_argument(
+    '-b', '--benchmark',
+    action='store_true',
+    help='Running the inference on the same input 5 times ' +
+         'to measure execution performance. (Cannot be used in video mode)'
+)
 args = parser.parse_args()
 
 
@@ -130,15 +136,7 @@ def recognize_from_video():
         n_init=3
     )
 
-    if args.video == '0':
-        print('[INFO] Webcam mode is activated')
-        capture = cv2.VideoCapture(0)
-        if not capture.isOpened():
-            print("[ERROR] webcamera not found")
-            sys.exit(1)
-    else:
-        if check_file_existance(args.video):
-            capture = cv2.VideoCapture(args.video)
+    capture = get_capture(args.video)
 
     # create video writer
     if args.savepath is not None:
@@ -281,7 +279,7 @@ def compare_images():
         detector.compute(input_data[i], THRESHOLD, IOU)
         h, w = input_data[i].shape[0], input_data[i].shape[1]
         bbox_xywh, cls_conf, cls_ids = get_detector_result(detector, h, w)
-        
+
         # select person class
         mask = cls_ids == 0
         if mask.sum() == 0:
@@ -289,7 +287,7 @@ def compare_images():
                   f'in the input image: {args.pairimage[i]}')
             print('Program finished.')
             sys.exit(0)
-        
+
         bbox_xywh = bbox_xywh[mask]
 
         # bbox dilation just in case bbox too small,
@@ -307,12 +305,23 @@ def compare_images():
         x1, y1, x2, y2 = xywh_to_xyxy(bbox_xywh[np.argmax(cls_conf)], h, w)
         src_img = cv2.cvtColor(input_data[i], cv2.COLOR_BGRA2RGB)
         img_crop = src_img[y1:y2, x1:x2]
-            
+
         # preprocess
         img_crop = normalize_image(
             resize(img_crop), 'ImageNet'
         )[np.newaxis, :, :, :].transpose(0, 3, 1, 2)
-        features.append(extractor.predict(img_crop)[0])
+
+        if args.benchmark:
+            print('BENCHMARK mode')
+            for i in range(5):
+                start = int(round(time.time() * 1000))
+                feature = extractor.predict(img_crop)
+                end = int(round(time.time() * 1000))
+                print(f'\tailia processing time {end - start} ms')
+        else:
+            feature = extractor.predict(img_crop)
+
+        features.append(feature[0])
 
     sim = cosin_metric(features[0], features[1])
     if sim >= (1 - MAX_COSINE_DISTANCE):
@@ -327,6 +336,10 @@ def main():
     check_and_download_models(DT_WEIGHT_PATH, DT_MODEL_PATH, REMOTE_PATH)
     print('Check Extractor...')
     check_and_download_models(EX_WEIGHT_PATH, EX_MODEL_PATH, REMOTE_PATH)
+
+    if args.benchmark:
+        args.pairimage[0]="correct_32_1.jpg"
+        args.pairimage[1]="correct_32_2.jpg"
 
     if args.pairimage[0] != None and args.pairimage[1] != None:
         print('Cheking if the person in two images is the same person or not.')

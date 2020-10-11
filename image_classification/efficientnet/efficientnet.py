@@ -8,11 +8,11 @@ import ailia
 import efficientnet_labels
 
 # import original modules
-sys.path.append("../util")
-from utils import check_file_existance  # noqa: E402
+sys.path.append('../../util')
 from model_utils import check_and_download_models  # noqa: E402
 from image_utils import load_image  # noqa: E402
-from webcamera_utils import adjust_frame_size  # noqa: E402
+from webcamera_utils import adjust_frame_size, get_capture  # noqa: E402
+from classifier_utils import plot_results, print_results  # noqa: E402
 
 
 # ======================
@@ -31,7 +31,7 @@ parser = argparse.ArgumentParser(
 )
 parser.add_argument(
     '-m', '--model', metavar='MODEL',
-    default="b7", choices=['b0', 'b7'], 
+    default="b7", choices=['b0', 'b7'],
     help="The input model path." +
          "you can set b0 or b7 to select efficientnet-b0 or efficientnet-b7"
 )
@@ -63,7 +63,7 @@ WEIGHT_PATH = "efficientnet-" + args.model + ".onnx"
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/efficientnet/"
 
 MAX_CLASS_COUNT = 3
-SLEEP_TIME = 3  # for web cam mode
+SLEEP_TIME = 0  # for web cam mode
 
 
 # ======================
@@ -108,13 +108,7 @@ def recognize_from_image():
         count = classifier.get_class_count()
 
     # show results
-    print(f'class_count: {count}')
-    for idx in range(count):
-        print(f'+ idx={idx}')
-        info = classifier.get_class(idx)
-        print(f'  category={info.category} [ ' +
-              f'{efficientnet_labels.imagenet_category[info.category]} ]')
-        print(f'  prob={info.prob}')
+    print_results(classifier, efficientnet_labels.imagenet_category)
 
     print('Script finished successfully.')
 
@@ -131,22 +125,12 @@ def recognize_from_video():
         range=ailia.NETWORK_IMAGE_RANGE_S_FP32
     )
 
-    if args.video == '0':
-        print('[INFO] Webcam mode is activated')
-        capture = cv2.VideoCapture(0)
-        if not capture.isOpened():
-            print("[ERROR] webcamera not found")
-            sys.exit(1)
-    else:
-        if check_file_existance(args.video):
-            capture = cv2.VideoCapture(args.video)
+    capture = get_capture(args.video)
 
     while(True):
         ret, frame = capture.read()
-        if cv2.waitKey(1) & 0xFF == ord('q'):
+        if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
-        if not ret:
-            continue
 
         _, resized_frame = adjust_frame_size(frame, IMAGE_HEIGHT, IMAGE_WIDTH)
         input_data = cv2.cvtColor(
@@ -158,14 +142,7 @@ def recognize_from_video():
         count = classifier.get_class_count()
 
         # show results
-        print('==============================================================')
-        print(f'class_count: {count}')
-        for idx in range(count):
-            print(f'+ idx={idx}')
-            info = classifier.get_class(idx)
-            print(f'  category={info.category} [ ' +
-                  f'{efficientnet_labels.imagenet_category[info.category]} ]')
-            print(f'  prob={info.prob}')
+        plot_results(frame, classifier, efficientnet_labels.imagenet_category)
 
         cv2.imshow('frame', frame)
         time.sleep(SLEEP_TIME)

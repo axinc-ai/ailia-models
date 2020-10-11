@@ -9,21 +9,21 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import check_file_existance  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
-from webcamera_utils import adjust_frame_size  # noqa: E402C
+from webcamera_utils import get_capture  # noqa: E402C
 from detector_utils import load_image  # noqa: E402C
 
-from pose_resnet_util import get_final_preds, get_affine_transform, compute, keep_aspect
+from pose_resnet_util import compute, keep_aspect  # noqa: E402C
 
 # ======================
 # Parameters
 # ======================
 
+
 POSE_MODEL_NAME = 'pose_resnet_50_256x192'
 POSE_WEIGHT_PATH = f'{POSE_MODEL_NAME}.onnx'
 POSE_MODEL_PATH = f'{POSE_MODEL_NAME}.onnx.prototxt'
-POSE_REMOTE_PATH = f'https://storage.googleapis.com/ailia-models/pose_resnet/'
+POSE_REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/pose_resnet/'
 
 WEIGHT_PATH = 'yolov3.opt.onnx'
 MODEL_PATH = 'yolov3.opt.onnx.prototxt'
@@ -82,10 +82,10 @@ parser.add_argument(
 )
 args = parser.parse_args()
 
+
 # ======================
 # Display result
 # ======================
-
 def hsv_to_rgb(h, s, v):
     bgr = cv2.cvtColor(
         np.array([[[h, s, v]]], dtype=np.uint8), cv2.COLOR_HSV2BGR)[0][0]
@@ -107,45 +107,45 @@ def line(input_img, person, point1, point2):
 
 def display_result(input_img, person):
     line(input_img, person, ailia.POSE_KEYPOINT_NOSE,
-            ailia.POSE_KEYPOINT_SHOULDER_CENTER)
+         ailia.POSE_KEYPOINT_SHOULDER_CENTER)
     line(input_img, person, ailia.POSE_KEYPOINT_SHOULDER_LEFT,
-            ailia.POSE_KEYPOINT_SHOULDER_CENTER)
+         ailia.POSE_KEYPOINT_SHOULDER_CENTER)
     line(input_img, person, ailia.POSE_KEYPOINT_SHOULDER_RIGHT,
-            ailia.POSE_KEYPOINT_SHOULDER_CENTER)
+         ailia.POSE_KEYPOINT_SHOULDER_CENTER)
 
     line(input_img, person, ailia.POSE_KEYPOINT_EYE_LEFT,
-            ailia.POSE_KEYPOINT_NOSE)
+         ailia.POSE_KEYPOINT_NOSE)
     line(input_img, person, ailia.POSE_KEYPOINT_EYE_RIGHT,
-            ailia.POSE_KEYPOINT_NOSE)
+         ailia.POSE_KEYPOINT_NOSE)
     line(input_img, person, ailia.POSE_KEYPOINT_EAR_LEFT,
-            ailia.POSE_KEYPOINT_EYE_LEFT)
+         ailia.POSE_KEYPOINT_EYE_LEFT)
     line(input_img, person, ailia.POSE_KEYPOINT_EAR_RIGHT,
-            ailia.POSE_KEYPOINT_EYE_RIGHT)
+         ailia.POSE_KEYPOINT_EYE_RIGHT)
 
     line(input_img, person, ailia.POSE_KEYPOINT_ELBOW_LEFT,
-            ailia.POSE_KEYPOINT_SHOULDER_LEFT)
+         ailia.POSE_KEYPOINT_SHOULDER_LEFT)
     line(input_img, person, ailia.POSE_KEYPOINT_ELBOW_RIGHT,
-            ailia.POSE_KEYPOINT_SHOULDER_RIGHT)
+         ailia.POSE_KEYPOINT_SHOULDER_RIGHT)
     line(input_img, person, ailia.POSE_KEYPOINT_WRIST_LEFT,
-            ailia.POSE_KEYPOINT_ELBOW_LEFT)
+         ailia.POSE_KEYPOINT_ELBOW_LEFT)
     line(input_img, person, ailia.POSE_KEYPOINT_WRIST_RIGHT,
-            ailia.POSE_KEYPOINT_ELBOW_RIGHT)
+         ailia.POSE_KEYPOINT_ELBOW_RIGHT)
 
     line(input_img, person, ailia.POSE_KEYPOINT_BODY_CENTER,
-            ailia.POSE_KEYPOINT_SHOULDER_CENTER)
+         ailia.POSE_KEYPOINT_SHOULDER_CENTER)
     line(input_img, person, ailia.POSE_KEYPOINT_HIP_LEFT,
-            ailia.POSE_KEYPOINT_BODY_CENTER)
+         ailia.POSE_KEYPOINT_BODY_CENTER)
     line(input_img, person, ailia.POSE_KEYPOINT_HIP_RIGHT,
-            ailia.POSE_KEYPOINT_BODY_CENTER)
+         ailia.POSE_KEYPOINT_BODY_CENTER)
 
     line(input_img, person, ailia.POSE_KEYPOINT_KNEE_LEFT,
-            ailia.POSE_KEYPOINT_HIP_LEFT)
+         ailia.POSE_KEYPOINT_HIP_LEFT)
     line(input_img, person, ailia.POSE_KEYPOINT_ANKLE_LEFT,
-            ailia.POSE_KEYPOINT_KNEE_LEFT)
+         ailia.POSE_KEYPOINT_KNEE_LEFT)
     line(input_img, person, ailia.POSE_KEYPOINT_KNEE_RIGHT,
-            ailia.POSE_KEYPOINT_HIP_RIGHT)
+         ailia.POSE_KEYPOINT_HIP_RIGHT)
     line(input_img, person, ailia.POSE_KEYPOINT_ANKLE_RIGHT,
-            ailia.POSE_KEYPOINT_KNEE_RIGHT)
+         ailia.POSE_KEYPOINT_KNEE_RIGHT)
 
 
 def plot_results(detector, pose, img, category, logging=True):
@@ -154,15 +154,13 @@ def plot_results(detector, pose, img, category, logging=True):
     count = detector.get_object_count()
     if logging:
         print(f'object_count={count}')
-    
+
     for idx in range(count):
         obj = detector.get_object(idx)
         # print result
         if logging:
-            print(f'+ idx={idx}')        
-            print(
-                f'  category={obj.category}[ {category[obj.category]} ]'
-            )
+            print(f'+ idx={idx}')
+            print(f'  category={obj.category}[ {category[obj.category]} ]')
             print(f'  prob={obj.prob}')
             print(f'  x={obj.x}')
             print(f'  y={obj.y}')
@@ -188,24 +186,29 @@ def plot_results(detector, pose, img, category, logging=True):
         )
 
         CATEGORY_PERSON = 0
-        if obj.category!=CATEGORY_PERSON:
+        if obj.category != CATEGORY_PERSON:
             continue
 
         # pose detection
-        px1,py1,px2,py2 = keep_aspect(top_left,bottom_right,pose_img,pose)
+        px1, py1, px2, py2 = keep_aspect(
+            top_left, bottom_right, pose_img, pose
+        )
 
-        crop_img = pose_img[py1:py2,px1:px2,:]
+        crop_img = pose_img[py1:py2, px1:px2, :]
         offset_x = px1/img.shape[1]
         offset_y = py1/img.shape[0]
         scale_x = crop_img.shape[1]/img.shape[1]
         scale_y = crop_img.shape[0]/img.shape[0]
-        detections = compute(pose,crop_img,offset_x,offset_y,scale_x,scale_y)
+        detections = compute(
+            pose, crop_img, offset_x, offset_y, scale_x, scale_y
+        )
 
-        cv2.rectangle(img, (px1,py1), (px2,py2), color, 1)
+        cv2.rectangle(img, (px1, py1), (px2, py2), color, 1)
 
         display_result(img, detections)
 
     return img
+
 
 # ======================
 # Main functions
@@ -242,7 +245,7 @@ def recognize_from_image():
             print(f'\tailia processing time {end - start} ms')
     else:
         detector.compute(img, THRESHOLD, IOU)
-            
+
     # plot result
     res_img = plot_results(detector, pose, img, COCO_CATEGORY)
     cv2.imwrite(args.savepath, res_img)
@@ -266,22 +269,12 @@ def recognize_from_video():
 
     pose = ailia.Net(POSE_MODEL_PATH, POSE_WEIGHT_PATH, env_id=env_id)
 
-    if args.video == '0':
-        print('[INFO] Webcam mode is activated')
-        capture = cv2.VideoCapture(0)
-        if not capture.isOpened():
-            print("[ERROR] webcamera not found")
-            sys.exit(1)
-    else:
-        if check_file_existance(args.video):
-            capture = cv2.VideoCapture(args.video)
+    capture = get_capture(args.video)
 
     while(True):
         ret, frame = capture.read()
-        if cv2.waitKey(1) & 0xFF == ord('q'):
+        if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
-        if not ret:
-            continue
 
         img = cv2.cvtColor(frame, cv2.COLOR_BGR2BGRA)
         detector.compute(img, THRESHOLD, IOU)
@@ -296,7 +289,9 @@ def recognize_from_video():
 def main():
     # model files check and download
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
-    check_and_download_models(POSE_WEIGHT_PATH, POSE_MODEL_PATH, POSE_REMOTE_PATH)
+    check_and_download_models(
+        POSE_WEIGHT_PATH, POSE_MODEL_PATH, POSE_REMOTE_PATH
+    )
 
     if args.video is not None:
         # video mode

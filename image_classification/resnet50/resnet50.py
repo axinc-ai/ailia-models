@@ -9,9 +9,9 @@ import resnet50_labels
 
 # import original modules
 sys.path.append('../../util')
-from utils import check_file_existance  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
-from webcamera_utils import adjust_frame_size  # noqa: E402C
+from webcamera_utils import adjust_frame_size, get_capture  # noqa: E402C
+from classifier_utils import plot_results, print_results  # noqa: E402
 
 
 # ======================
@@ -23,8 +23,8 @@ IMAGE_HEIGHT = 224
 IMAGE_WIDTH = 224
 IMAGE_RANGE = ailia.NETWORK_IMAGE_RANGE_S_INT8
 
-MAX_CLASS_COUNT = 5
-SLEEP_TIME = 3
+MAX_CLASS_COUNT = 3
+SLEEP_TIME = 0
 
 
 # ======================
@@ -109,17 +109,8 @@ def recognize_from_image():
     else:
         classifier.compute(img, MAX_CLASS_COUNT)
 
-    # get result
-    count = classifier.get_class_count()
-    print(f'class_count: {count}')
-
-    for idx in range(count):
-        print(f"+ idx={idx}")
-        info = classifier.get_class(idx)
-        print(f"  category={info.category} " +
-              f"[ {resnet50_labels.imagenet_category[info.category]} ]")
-        print(f"  prob={info.prob}")
-    print('Script finished successfully.')
+    # show results
+    print_results(classifier, resnet50_labels.imagenet_category)
 
 
 def recognize_from_video():
@@ -134,22 +125,12 @@ def recognize_from_video():
         range=IMAGE_RANGE
     )
 
-    if args.video == '0':
-        print('[INFO] Webcam mode is activated')
-        capture = cv2.VideoCapture(0)
-        if not capture.isOpened():
-            print("[ERROR] webcamera not found")
-            sys.exit(1)
-    else:
-        if check_file_existance(args.video):
-            capture = cv2.VideoCapture(args.video)
+    capture = get_capture(args.video)
 
     while(True):
         ret, frame = capture.read()
-        if cv2.waitKey(1) & 0xFF == ord('q'):
+        if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
-        if not ret:
-            continue
 
         in_frame, frame = adjust_frame_size(frame, IMAGE_HEIGHT, IMAGE_WIDTH)
         frame = preprocess_image(frame)
@@ -160,14 +141,8 @@ def recognize_from_video():
         # get result
         count = classifier.get_class_count()
 
-        print('==============================================================')
-        print(f'class_count: {count}')
-        for idx in range(count):
-            print(f"+ idx={idx}")
-            info = classifier.get_class(idx)
-            print(f"  category={info.category} " +
-                  f"[ {resnet50_labels.imagenet_category[info.category]} ]")
-            print(f"  prob={info.prob}")
+        plot_results(in_frame, classifier, resnet50_labels.imagenet_category)
+
         cv2.imshow('frame', in_frame)
         time.sleep(SLEEP_TIME)
 

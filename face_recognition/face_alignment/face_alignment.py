@@ -12,14 +12,10 @@ import matplotlib.pyplot as plt
 import ailia
 # import original modules
 sys.path.append('../../util')
-from utils import check_file_existance  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from image_utils import load_image  # noqa: E402
-from webcamera_utils import preprocess_frame  # noqa: E402
+from webcamera_utils import preprocess_frame, get_capture  # noqa: E402
 
-
-# TODO: Old plot window doesn't disappear when in video mode
-#       plt.clf() did not work
 
 # ======================
 # PARAMETERS 1
@@ -33,6 +29,12 @@ IMAGE_HEIGHT = 256
 IMAGE_WIDTH = 256
 THRESHOLD = 0.1
 
+FACE_WEIGHT_PATH = 'blazeface.onnx'
+FACE_MODEL_PATH = 'blazeface.onnx.prototxt'
+FACE_REMOTE_PATH = "https://storage.googleapis.com/ailia-models/blazeface/"
+FACE_MARGIN = 1.2
+sys.path.append('../../face_detection/blazeface')
+from blazeface_utils import compute_blazeface, crop_blazeface  # noqa: E402
 
 # ======================
 # Argument Parser Config
@@ -90,6 +92,17 @@ PRED_TYPES = {
 # ======================
 # Utils
 # ======================
+def create_figure(active_3d):
+    fig = plt.figure(figsize=plt.figaspect(0.5), tight_layout=True)
+    axs = None  # for 2D mode
+    if active_3d:
+        # 3D mode configuration
+        ax1 = fig.add_subplot(1, 2, 1)
+        ax2 = fig.add_subplot(1, 2, 2, projection='3d')
+        axs = [ax1, ax2]
+    return fig, axs
+
+
 def plot_images(title, images, tile_shape):
     fig = plt.figure()
     plt.title(title)
@@ -106,12 +119,13 @@ def plot_images(title, images, tile_shape):
     fig.savefig(save_name)
 
 
-def visualize_results(image, pts_img, active_3d=False):
-    fig = plt.figure(figsize=plt.figaspect(0.5))
-
+def visualize_results(axs, image, pts_img, active_3d=False):
+    """Visualize results & clear previous output
+    """
+    # 2D-plot
     if active_3d:
-        # 2D-plot
-        ax = fig.add_subplot(1, 2, 1)
+        ax = axs[0]
+        ax.clear()
         ax.imshow(image)
         for pred_type in PRED_TYPES.values():
             ax.plot(
@@ -127,7 +141,8 @@ def visualize_results(image, pts_img, active_3d=False):
         ax.axis('off')
 
         # 3D-plot
-        ax = fig.add_subplot(1, 2, 2, projection='3d')
+        ax = axs[1]
+        ax.clear()
         ax.scatter(
             pts_img[:, 0],
             pts_img[:, 1],
@@ -150,6 +165,7 @@ def visualize_results(image, pts_img, active_3d=False):
 
     else:
         # 2D
+        plt.clf()
         plt.imshow(image)
         for pred_type in PRED_TYPES.values():
             plt.plot(
@@ -162,8 +178,7 @@ def visualize_results(image, pts_img, active_3d=False):
                 lw=2,
             )
         plt.axis('off')
-
-    return fig
+    return axs
 
 
 def transform(point, center, scale, resolution, invert=False):
@@ -371,7 +386,8 @@ def recognize_from_image():
         depth_pred = depth_pred.reshape(68, 1)
         pts_img = np.concatenate((pts_img, depth_pred * 2), 1)
 
-    fig = visualize_results(input_img, pts_img, active_3d=args.active_3d)
+    fig, axs = create_figure(active_3d=args.active_3d)
+    axs = visualize_results(axs, input_img, pts_img, active_3d=args.active_3d)
     fig.savefig(args.savepath)
 
     # Confidence Map
@@ -395,26 +411,31 @@ def recognize_from_video():
         depth_net = ailia.Net(
             DEPTH_MODEL_PATH, DEPTH_WEIGHT_PATH, env_id=env_id
         )
+    detector = ailia.Net(FACE_MODEL_PATH, FACE_WEIGHT_PATH, env_id=env_id)
 
-    if args.video == '0':
-        print('[INFO] Webcam mode is activated')
-        capture = cv2.VideoCapture(0)
-        if not capture.isOpened():
-            print("[ERROR] webcamera not found")
-            sys.exit(1)
-    else:
-        if check_file_existance(args.video):
-            capture = cv2.VideoCapture(args.video)
+    capture = get_capture(args.video)
+
+    fig, axs = create_figure(active_3d=args.active_3d)
 
     while(True):
         ret, frame = capture.read()
-        if cv2.waitKey(1) & 0xFF == ord('q'):
+        if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
-        if not ret:
-            continue
 
+        # detect face
+        detections = compute_blazeface(detector, frame, anchor_path='../../face_detection/blazeface/anchors.npy')
+        
+        # get detected face
+        if len(detections) == 0:
+            crop_img = frame
+        else:
+            crop_img, top_left, bottom_right = crop_blazeface(detections[0], FACE_MARGIN, frame)
+            if crop_img.shape[0] <= 0 or crop_img.shape[1] <= 0:
+                crop_img = frame
+
+        # preprocess
         input_image, input_data = preprocess_frame(
-            frame, IMAGE_HEIGHT, IMAGE_WIDTH, normalize_type='255'
+            crop_img, IMAGE_HEIGHT, IMAGE_WIDTH, normalize_type='255'
         )
 
         # inference
@@ -438,9 +459,18 @@ def recognize_from_video():
             depth_pred = depth_pred.reshape(68, 1)
             pts_img = np.concatenate((pts_img, depth_pred * 2), 1)
 
-        resized_img = cv2.resize(input_image, (IMAGE_WIDTH, IMAGE_HEIGHT))
-        fig = visualize_results(resized_img, pts_img, active_3d=args.active_3d)
+        resized_img = cv2.resize(
+            cv2.cvtColor(input_image, cv2.COLOR_BGR2RGB),
+            (IMAGE_WIDTH, IMAGE_HEIGHT)
+        )
+
+        # visualize results (clear axs at first)
+        axs = visualize_results(
+            axs, resized_img, pts_img, active_3d=args.active_3d
+        )
         plt.pause(0.01)
+        if not plt.get_fignums():
+            break
 
     capture.release()
     cv2.destroyAllWindows()
@@ -454,6 +484,11 @@ def main():
     if args.active_3d:
         check_and_download_models(
             DEPTH_WEIGHT_PATH, DEPTH_MODEL_PATH, REMOTE_PATH
+        )
+
+    if args.video:
+        check_and_download_models(
+            FACE_WEIGHT_PATH, FACE_MODEL_PATH, FACE_REMOTE_PATH
         )
 
     if args.video is not None:

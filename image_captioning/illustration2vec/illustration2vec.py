@@ -14,7 +14,7 @@ sys.path.append('../../util')
 from utils import check_file_existance  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from image_utils import load_image  # noqa: E402
-from webcamera_utils import adjust_frame_size  # noqa: E402
+from webcamera_utils import adjust_frame_size, get_capture  # noqa: E402
 
 
 # ======================
@@ -33,7 +33,7 @@ IMAGE_HEIGHT = 224
 IMAGE_WIDTH = 224
 
 THRESHOLD = 0.5  # TODO argument ?
-SLEEP_TIME = 3
+SLEEP_TIME = 0
 
 
 # ======================
@@ -220,15 +220,7 @@ def recognize_tag_from_video():
     print(f'env_id: {env_id}')
     tag_net = ailia.Net(TAG_MODEL_PATH, TAG_WEIGHT_PATH, env_id=env_id)
 
-    if args.video == '0':
-        print('[INFO] Webcam mode is activated')
-        capture = cv2.VideoCapture(0)
-        if not capture.isOpened():
-            print("[ERROR] webcamera not found")
-            sys.exit(1)
-    else:
-        if check_file_existance(args.video):
-            capture = cv2.VideoCapture(args.video)
+    capture = get_capture(args.video)
 
     if check_file_existance(TAG_PATH):
         tags = np.array(json.loads(open(TAG_PATH, 'r').read()))
@@ -238,10 +230,8 @@ def recognize_tag_from_video():
         ret, frame = capture.read()
         _, frame = adjust_frame_size(frame, IMAGE_HEIGHT, IMAGE_WIDTH)
 
-        if cv2.waitKey(1) & 0xFF == ord('q'):
+        if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
-        if not ret:
-            continue
 
         input_data = prepare_input_data(frame, bgr=True)
         input_dict = {'data': input_data}
@@ -268,24 +258,14 @@ def extract_feature_vec_from_video():
     print(f'env_id: {env_id}')
     fe_net = ailia.Net(FE_MODEL_PATH, FE_WEIGHT_PATH, env_id=env_id)
 
-    if args.video == '0':
-        print('[INFO] Webcam mode is activated')
-        capture = cv2.VideoCapture(0)
-        if not capture.isOpened():
-            print("[ERROR] webcamera not found")
-            sys.exit(1)
-    else:
-        if check_file_existance(args.video):
-            capture = cv2.VideoCapture(args.video)
+    capture = get_capture(args.video)
 
     while(True):
         ret, frame = capture.read()
         _, frame = adjust_frame_size(frame, IMAGE_HEIGHT, IMAGE_WIDTH)
 
-        if cv2.waitKey(1) & 0xFF == ord('q'):
+        if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
-        if not ret:
-            continue
 
         input_data = prepare_input_data(frame, bgr=True)
         input_dict = {'data': input_data}
