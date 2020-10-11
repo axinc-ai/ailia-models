@@ -199,7 +199,7 @@ def detect_objects(img, detector):
 
     # feedforward
     if args.ailia:
-        detector.set_input_shape((1, 3, data['ori_shape'][0], data['ori_shape'][1]))
+        detector.set_input_shape((1, 3, data['img'].shape[2], data['img'].shape[3]))
         output = detector.predict({
             'image': data['img']
         })
