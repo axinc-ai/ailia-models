@@ -27,18 +27,18 @@ It is necessary to be connected to the Internet while downloading.
 
 To generate `output.png`,
 ``` bash
-$ python3 pytorch-gnet.py
+$ python3 pytorch-gan.py
 ```
 
 You can use `--savepath` option to change the name of the output file to save.
 ```bash
-$ python3 pytorch-gnet.py --savepath SAVE_IMAGE_PATH
+$ python3 pytorch-gan.py --savepath SAVE_IMAGE_PATH
 ```
 
 You can also generate using anime model.
 
 ``` bash
-$ python3 pytorch-gnet.py -m anime
+$ python3 pytorch-gan.py -m anime
 ```
 
 
