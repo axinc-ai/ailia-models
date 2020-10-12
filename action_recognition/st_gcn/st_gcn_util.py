@@ -1,6 +1,12 @@
 import numpy as np
 import cv2
 
+graph_edge = [
+    (0, 0), (1, 1), (2, 2), (3, 3), (4, 4), (5, 5), (6, 6), (7, 7), (8, 8), (9, 9), (10, 10), (11, 11), (12, 12),
+    (13, 13), (14, 14), (15, 15), (16, 16), (17, 17), (4, 3), (3, 2), (7, 6), (6, 5), (13, 12), (12, 11), (10, 9),
+    (9, 8), (11, 5), (8, 2), (5, 1), (2, 1), (0, 1), (15, 0), (14, 0), (17, 15), (16, 14)
+]
+
 
 class naive_pose_tracker():
     """ A simple tracker for recording person poses and generating skeleton sequences.
@@ -264,17 +270,24 @@ def stgcn_visualize(
         yield img
 
 
-def render_video(data_numpy, voting_label_name, video_label_name, intensity, video):
-    edge = [(0, 0), (1, 1), (2, 2), (3, 3), (4, 4), (5, 5), (6, 6), (7, 7), (8, 8), (9, 9), (10, 10), (11, 11), (12, 12),
-     (13, 13), (14, 14), (15, 15), (16, 16), (17, 17), (4, 3), (3, 2), (7, 6), (6, 5), (13, 12), (12, 11), (10, 9),
-     (9, 8), (11, 5), (8, 2), (5, 1), (2, 1), (0, 1), (15, 0), (14, 0), (17, 15), (16, 14)]
-    height = 1080
+def render_video(data, voting_label_name, video_label_name, intensity, frames):
     images = stgcn_visualize(
-        data_numpy,
-        # self.model.graph.edge,
-        edge,
-        intensity, video,
+        data,
+        graph_edge,
+        intensity, frames,
         voting_label_name,
-        video_label_name,
-        height)
+        video_label_name)
     return images
+
+
+def render_image(data, voting_label_name, video_label_name, intensity, image, fps=0):
+    images = stgcn_visualize(
+        data[:, [-1]],
+        graph_edge,
+        intensity[[-1]], [image],
+        voting_label_name,
+        [video_label_name[-1]],
+        fps=fps)
+    image = next(images)
+    image = image.astype(np.uint8)
+    return image

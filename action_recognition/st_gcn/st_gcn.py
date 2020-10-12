@@ -15,9 +15,8 @@ sys.path.append('../../util')
 sys.path.append('util')
 from utils import check_file_existance  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
-from webcamera_utils import get_capture  # noqa: E402C
 
-from st_gcn_util import naive_pose_tracker, render_video
+from st_gcn_util import naive_pose_tracker, render_video, render_image
 
 # ======================
 # Parameters
@@ -27,18 +26,37 @@ MODEL_PATH = 'st_gcn.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/st_gcn/'
 
 MODEL_POSE_PATH = 'pose_deploy.prototxt'
-# MODEL_POSE_PATH = 'pose_deploy_linevec.prototxt'
 WEIGHT_POSE_PATH = 'pose_iter_440000.caffemodel'
 REMOTE_POSE_PATH = 'http://posefs1.perception.cs.cmu.edu/OpenPose/models/pose/coco/'
 
 POSE_ALGORITHM_OPEN_POSE_SINGLE_SCALE = (12)
-POSE_ALGORITHM = ailia.POSE_ALGORITHM_OPEN_POSE
-# POSE_ALGORITHM = POSE_ALGORITHM_OPEN_POSE_SINGLE_SCALE
+# POSE_ALGORITHM = ailia.POSE_ALGORITHM_OPEN_POSE
+POSE_ALGORITHM = POSE_ALGORITHM_OPEN_POSE_SINGLE_SCALE
 
-IMAGE_PATH = 'skateboarding.mp4'
-# IMAGE_HEIGHT = 112
-# IMAGE_WIDTH = 112
-# DURATION = 16
+VIDEO_PATH = 'skateboarding.mp4'
+
+POSE_KEY = [
+    ailia.POSE_KEYPOINT_NOSE,
+    ailia.POSE_KEYPOINT_SHOULDER_CENTER,
+    ailia.POSE_KEYPOINT_SHOULDER_RIGHT,
+    ailia.POSE_KEYPOINT_ELBOW_RIGHT,
+    ailia.POSE_KEYPOINT_WRIST_RIGHT,
+    ailia.POSE_KEYPOINT_SHOULDER_LEFT,
+    ailia.POSE_KEYPOINT_ELBOW_LEFT,
+    ailia.POSE_KEYPOINT_WRIST_LEFT,
+    ailia.POSE_KEYPOINT_HIP_RIGHT,
+    ailia.POSE_KEYPOINT_KNEE_RIGHT,
+    ailia.POSE_KEYPOINT_ANKLE_RIGHT,
+    ailia.POSE_KEYPOINT_HIP_LEFT,
+    ailia.POSE_KEYPOINT_KNEE_LEFT,
+    ailia.POSE_KEYPOINT_ANKLE_LEFT,
+    ailia.POSE_KEYPOINT_EYE_RIGHT,
+    ailia.POSE_KEYPOINT_EYE_LEFT,
+    ailia.POSE_KEYPOINT_EAR_RIGHT,
+    ailia.POSE_KEYPOINT_EAR_LEFT,
+]
+
+PYOPENPOSE_PATH = '/usr/local/python'
 
 KINETICS_LABEL = [
     'abseiling',
@@ -448,14 +466,14 @@ parser = argparse.ArgumentParser(
     description='ST-GCN model'
 )
 parser.add_argument(
-    '-i', '--input', metavar='IMAGE',
-    default=IMAGE_PATH,
-    help='The input image path.'
+    '-i', '--input', metavar='VIDEO',
+    default=VIDEO_PATH,
+    help='The input video path.'
 )
 parser.add_argument(
     '-v', '--video', metavar='VIDEO',
     default=None,
-    help='The input video path. ' +
+    help='The input video path for realtime operation. ' +
          'If the VIDEO argument is set to 0, the webcam input will be used.'
 )
 parser.add_argument(
@@ -464,13 +482,31 @@ parser.add_argument(
     help='Running the inference on the same input 5 times ' +
          'to measure execution performance. (Cannot be used in video mode)'
 )
-# parser.add_argument(
-#     '-d', '--duration', metavar='DURATION',
-#     default=DURATION,
-#     help='Sampling duration.',
-#     type=int
-# )
+parser.add_argument(
+    '--fps',
+    default=30,
+    type=int,
+    help='fps of video.'
+)
+parser.add_argument(
+    '--op',
+    action='store_true',
+    help='Use pyopenpose library.',
+)
+parser.add_argument(
+    '--img-save',
+    action='store_true',
+    help='Instead of show video, save image file.'
+)
 args = parser.parse_args()
+
+if args.op:
+    sys.path.insert(0, PYOPENPOSE_PATH)
+    try:
+        from openpose import pyopenpose as op
+    except:
+        print('Can not find Openpose Python API.')
+        sys.exit(-1)
 
 
 # ======================
@@ -511,90 +547,13 @@ def postprocess(output, feature, num_person):
     return voting_label_name, video_label_name, output, intensity
 
 
-def hsv_to_rgb(h, s, v):
-    bgr = cv2.cvtColor(
-        np.array([[[h, s, v]]], dtype=np.uint8), cv2.COLOR_HSV2BGR
-    )[0][0]
-    return (int(bgr[2]), int(bgr[1]), int(bgr[0]))
-
-
-def line(input_img, person, point1, point2):
-    threshold = 0.2
-    if person.points[point1].score > threshold and \
-            person.points[point2].score > threshold:
-        color = hsv_to_rgb(255 * point1 / ailia.POSE_KEYPOINT_CNT, 255, 255)
-
-        x1 = int(input_img.shape[1] * person.points[point1].x)
-        y1 = int(input_img.shape[0] * person.points[point1].y)
-        x2 = int(input_img.shape[1] * person.points[point2].x)
-        y2 = int(input_img.shape[0] * person.points[point2].y)
-        cv2.line(input_img, (x1, y1), (x2, y2), color, 5)
-
-
-def display_result(input_img, pose):
-    count = pose.get_object_count()
-    for idx in range(count):
-        person = pose.get_object_pose(idx)
-
-        line(input_img, person, ailia.POSE_KEYPOINT_NOSE,
-             ailia.POSE_KEYPOINT_SHOULDER_CENTER)
-        line(input_img, person, ailia.POSE_KEYPOINT_SHOULDER_LEFT,
-             ailia.POSE_KEYPOINT_SHOULDER_CENTER)
-        line(input_img, person, ailia.POSE_KEYPOINT_SHOULDER_RIGHT,
-             ailia.POSE_KEYPOINT_SHOULDER_CENTER)
-
-        line(input_img, person, ailia.POSE_KEYPOINT_EYE_LEFT,
-             ailia.POSE_KEYPOINT_NOSE)
-        line(input_img, person, ailia.POSE_KEYPOINT_EYE_RIGHT,
-             ailia.POSE_KEYPOINT_NOSE)
-        line(input_img, person, ailia.POSE_KEYPOINT_EAR_LEFT,
-             ailia.POSE_KEYPOINT_EYE_LEFT)
-        line(input_img, person, ailia.POSE_KEYPOINT_EAR_RIGHT,
-             ailia.POSE_KEYPOINT_EYE_RIGHT)
-
-        line(input_img, person, ailia.POSE_KEYPOINT_ELBOW_LEFT,
-             ailia.POSE_KEYPOINT_SHOULDER_LEFT)
-        line(input_img, person, ailia.POSE_KEYPOINT_ELBOW_RIGHT,
-             ailia.POSE_KEYPOINT_SHOULDER_RIGHT)
-        line(input_img, person, ailia.POSE_KEYPOINT_WRIST_LEFT,
-             ailia.POSE_KEYPOINT_ELBOW_LEFT)
-        line(input_img, person, ailia.POSE_KEYPOINT_WRIST_RIGHT,
-             ailia.POSE_KEYPOINT_ELBOW_RIGHT)
-
-        line(input_img, person, ailia.POSE_KEYPOINT_BODY_CENTER,
-             ailia.POSE_KEYPOINT_SHOULDER_CENTER)
-        line(input_img, person, ailia.POSE_KEYPOINT_HIP_LEFT,
-             ailia.POSE_KEYPOINT_BODY_CENTER)
-        line(input_img, person, ailia.POSE_KEYPOINT_HIP_RIGHT,
-             ailia.POSE_KEYPOINT_BODY_CENTER)
-
-        line(input_img, person, ailia.POSE_KEYPOINT_KNEE_LEFT,
-             ailia.POSE_KEYPOINT_HIP_LEFT)
-        line(input_img, person, ailia.POSE_KEYPOINT_ANKLE_LEFT,
-             ailia.POSE_KEYPOINT_KNEE_LEFT)
-        line(input_img, person, ailia.POSE_KEYPOINT_KNEE_RIGHT,
-             ailia.POSE_KEYPOINT_HIP_RIGHT)
-        line(input_img, person, ailia.POSE_KEYPOINT_ANKLE_RIGHT,
-             ailia.POSE_KEYPOINT_KNEE_RIGHT)
-
-
 # ======================
 # Main functions
 # ======================
 def recognize_offline(input, pose, net):
     capture = cv2.VideoCapture(input)
-
     video_length = int(capture.get(cv2.CAP_PROP_FRAME_COUNT))
     pose_tracker = naive_pose_tracker(data_frame=video_length)
-
-    # # initiate pyopenpose
-    # sys.path.insert(0, '/usr/local/python')
-    # sys.path.insert(0, '/usr/local/build/python')
-    # from openpose import pyopenpose as op
-    # opWrapper = op.WrapperPython()
-    # params = dict(model_folder='./st-gcn/models', model_pose='COCO')
-    # opWrapper.configure(params)
-    # opWrapper.start()
 
     # pose estimation
     frame_index = 0
@@ -611,90 +570,50 @@ def recognize_offline(input, pose, net):
         H, W, _ = img.shape
 
         # pose estimate
-        if 0:
+        if args.op:
             datum = op.Datum()
             datum.cvInputData = img
-            opWrapper.emplaceAndPop([datum])
+            pose.emplaceAndPop([datum])
             pose_keypoints = datum.poseKeypoints  # (num_person, num_joint, 3)
             if len(pose_keypoints.shape) != 3:
                 continue
-            print(f'[{frame_index}] person_count={len(pose_keypoints)}')
 
             # normalization
             pose_keypoints[:, :, 0] = pose_keypoints[:, :, 0] / W
             pose_keypoints[:, :, 1] = pose_keypoints[:, :, 1] / H
         else:
-            IMAGE_HEIGHT = 240
-            IMAGE_WIDTH = 320
-            # IMAGE_HEIGHT = 368
-            # IMAGE_WIDTH = 368
-            img = cv2.resize(img, (IMAGE_WIDTH, IMAGE_HEIGHT))
             img = cv2.cvtColor(img, cv2.COLOR_BGR2BGRA)
             pose.compute(img)
             count = pose.get_object_count()
-            # display_result(img, pose)
-            # cv2.imwrite("output/POSE-%08d.jpg" % frame_index, img)
             if count == 0:
                 continue
-            print(f'[{frame_index}] person_count={count}')
 
-            pose_key = [
-                ailia.POSE_KEYPOINT_NOSE,
-                ailia.POSE_KEYPOINT_SHOULDER_CENTER,
-                ailia.POSE_KEYPOINT_SHOULDER_RIGHT,
-                ailia.POSE_KEYPOINT_ELBOW_RIGHT,
-                ailia.POSE_KEYPOINT_WRIST_RIGHT,
-                ailia.POSE_KEYPOINT_SHOULDER_LEFT,
-                ailia.POSE_KEYPOINT_ELBOW_LEFT,
-                ailia.POSE_KEYPOINT_WRIST_LEFT,
-                ailia.POSE_KEYPOINT_HIP_RIGHT,
-                ailia.POSE_KEYPOINT_KNEE_RIGHT,
-                ailia.POSE_KEYPOINT_ANKLE_RIGHT,
-                ailia.POSE_KEYPOINT_HIP_LEFT,
-                ailia.POSE_KEYPOINT_KNEE_LEFT,
-                ailia.POSE_KEYPOINT_ANKLE_LEFT,
-                ailia.POSE_KEYPOINT_EYE_RIGHT,
-                ailia.POSE_KEYPOINT_EYE_LEFT,
-                ailia.POSE_KEYPOINT_EAR_RIGHT,
-                ailia.POSE_KEYPOINT_EAR_LEFT,
-            ]
             pose_keypoints = np.zeros((count, 18, 3))  # (num_person, num_joint, 3)
             for idx in range(count):
                 person = pose.get_object_pose(idx)
-                for i, key in enumerate(pose_key):
+                for i, key in enumerate(POSE_KEY):
                     p = person.points[key]
                     pose_keypoints[idx, i, :] = [p.x, p.y, p.score]
 
-        # for idx in range(len(pose_keypoints)):
-        #     for i in range(18):
-        #         print("{}: {}, {}, {}".format(i, pose_keypoints[idx,i,0], pose_keypoints[idx,i,1], pose_keypoints[idx,i,2]))
-
         pose_keypoints = pose_postprocess(pose_keypoints)
-
         pose_tracker.update(pose_keypoints, frame_index)
         frame_index += 1
         print('Pose estimation ({}/{}).'.format(frame_index, video_length))
 
-    # frames = np.load('video.npy')
-    # data = np.load('data.npy')
-    data = pose_tracker.get_skeleton_sequence()
-
     # action recognition
+    data = pose_tracker.get_skeleton_sequence()
     input_data = np.expand_dims(data, 0)
-    print("data-------", input_data.shape)
     net.set_input_shape(input_data.shape)
     outputs = net.predict({
         'data': input_data
     })
     output, feature = outputs
-
     output = output[0]
     feature = feature[0]
+
     # classification result for each person of the latest frame
     _, _, _, num_person = data.shape
     voting_label_name, video_label_name, output, intensity = postprocess(output, feature, num_person)
-    print("voting_label_name-------", voting_label_name)
-    print("video_label_name-------", video_label_name)
     return data, voting_label_name, video_label_name, output, intensity, frames
 
 
@@ -722,13 +641,15 @@ def recognize_from_file(input, pose, net):
     # visualize
     for i, image in enumerate(images):
         image = image.astype(np.uint8)
-        cv2.imshow("ST-GCN", image)
-        if cv2.waitKey(1) & 0xFF == ord('q'):
-            break
-        # cv2.imwrite("output/ST-GCN-%08d.jpg" % i, image)
+        if args.img_save:
+            cv2.imwrite("output/ST-GCN-%08d.jpg" % i, image)
+        else:
+            cv2.imshow("ST-GCN", image)
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                break
 
 
-def recognize_realtime(video, net):
+def recognize_realtime(video, pose, net):
     if video == '0':
         print('[INFO] Webcam mode is activated')
         capture = cv2.VideoCapture(0)
@@ -739,15 +660,89 @@ def recognize_realtime(video, net):
         if check_file_existance(video):
             capture = cv2.VideoCapture(video)
 
+    pose_tracker = naive_pose_tracker()
+
+    # start recognition
+    start_time = time.time()
+    frame_index = 0
     while True:
+        tic = time.time()
+
         ret, frame = capture.read()
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
         if not ret:
-            continue
+            if video == '0':
+                continue
+            else:
+                break
+
+        source_H, source_W, _ = frame.shape
+        img = cv2.resize(
+            frame, (256 * source_W // source_H, 256))
+        H, W, _ = img.shape
+
+        # pose estimate
+        if args.op:
+            datum = op.Datum()
+            datum.cvInputData = img
+            pose.emplaceAndPop([datum])
+            pose_keypoints = datum.poseKeypoints  # (num_person, num_joint, 3)
+            if len(pose_keypoints.shape) != 3:
+                continue
+
+            # normalization
+            pose_keypoints[:, :, 0] = pose_keypoints[:, :, 0] / W
+            pose_keypoints[:, :, 1] = pose_keypoints[:, :, 1] / H
+        else:
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2BGRA)
+            pose.compute(img)
+            count = pose.get_object_count()
+            if count == 0:
+                continue
+
+            pose_keypoints = np.zeros((count, 18, 3))  # (num_person, num_joint, 3)
+            for idx in range(count):
+                person = pose.get_object_pose(idx)
+                for i, key in enumerate(POSE_KEY):
+                    p = person.points[key]
+                    pose_keypoints[idx, i, :] = [p.x, p.y, p.score]
+
+        # pose tracking
+        if video == '0':
+            fps = 30
+            frame_index = int((time.time() - start_time) * fps)
+        else:
+            frame_index += 1
+        pose_keypoints = pose_postprocess(pose_keypoints)
+        pose_tracker.update(pose_keypoints, frame_index)
+
+        # action recognition
+        data = pose_tracker.get_skeleton_sequence()
+        input_data = np.expand_dims(data, 0)
+        net.set_input_shape(input_data.shape)
+        outputs = net.predict({
+            'data': input_data
+        })
+        output, feature = outputs
+        output = output[0]
+        feature = feature[0]
+
+        # classification result for each person of the latest frame
+        _, _, _, num_person = data.shape
+        voting_label_name, video_label_name, output, intensity = postprocess(output, feature, num_person)
+
+        # visualization
+        app_fps = 1 / (time.time() - tic)
+        image = render_image(
+            data, voting_label_name,
+            video_label_name, intensity, frame, app_fps)
 
         # show
-        cv2.imshow('ST-GCN', frame)
+        if args.img_save:
+            cv2.imwrite("output/ST-GCN-%08d.jpg" % frame_index, image)
+        else:
+            cv2.imshow('ST-GCN', image)
 
     capture.release()
     cv2.destroyAllWindows()
@@ -756,22 +751,32 @@ def recognize_realtime(video, net):
 
 def main():
     # model files check and download
+    print("=== ST-GCN model ===")
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
-    check_and_download_models(WEIGHT_POSE_PATH, MODEL_POSE_PATH, REMOTE_POSE_PATH)
+    if not args.op:
+        print("=== OpenPose model ===")
+        check_and_download_models(WEIGHT_POSE_PATH, MODEL_POSE_PATH, REMOTE_POSE_PATH)
 
     # net initialize
     env_id = ailia.get_gpu_environment_id()
     print(f'env_id: {env_id}')
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
 
-    pose = ailia.PoseEstimator(
-        MODEL_POSE_PATH, WEIGHT_POSE_PATH, env_id=env_id, algorithm=POSE_ALGORITHM
-    )
-    pose.set_threshold(0.1)
+    if args.op:
+        opWrapper = op.WrapperPython()
+        params = dict(model_folder='.', model_pose='COCO')
+        opWrapper.configure(params)
+        opWrapper.start()
+        pose = opWrapper
+    else:
+        pose = ailia.PoseEstimator(
+            MODEL_POSE_PATH, WEIGHT_POSE_PATH, env_id=env_id, algorithm=POSE_ALGORITHM
+        )
+        pose.set_threshold(0.1)
 
     if args.video is not None:
         # video mode
-        recognize_realtime(args.video, net)
+        recognize_realtime(args.video, pose, net)
     else:
         # image mode
         recognize_from_file(args.input, pose, net)
