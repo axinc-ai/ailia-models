@@ -12,7 +12,6 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
-sys.path.append('util')
 from utils import check_file_existance  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 
@@ -26,7 +25,7 @@ MODEL_PATH = 'st_gcn.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/st_gcn/'
 
 MODEL_POSE_PATH = 'pose_deploy.prototxt'
-WEIGHT_POSE_PATH = 'pose_iter_440000.caffemodel'
+WEIGHT_POSE_PATH = 'pose/coco/pose_iter_440000.caffemodel'
 REMOTE_POSE_PATH = 'http://posefs1.perception.cs.cmu.edu/OpenPose/models/pose/coco/'
 
 POSE_ALGORITHM_OPEN_POSE_SINGLE_SCALE = (12)
@@ -486,12 +485,12 @@ parser.add_argument(
     '--fps',
     default=30,
     type=int,
-    help='fps of video.'
+    help='FPS of video.'
 )
 parser.add_argument(
     '--op',
     action='store_true',
-    help='Use pyopenpose library.',
+    help='Use Openpose Python API.',
 )
 parser.add_argument(
     '--img-save',
@@ -642,7 +641,7 @@ def recognize_from_file(input, pose, net):
     for i, image in enumerate(images):
         image = image.astype(np.uint8)
         if args.img_save:
-            cv2.imwrite("output/ST-GCN-%08d.jpg" % i, image)
+            cv2.imwrite("output/ST-GCN-%08d.png" % i, image)
         else:
             cv2.imshow("ST-GCN", image)
             if cv2.waitKey(1) & 0xFF == ord('q'):
@@ -669,13 +668,8 @@ def recognize_realtime(video, pose, net):
         tic = time.time()
 
         ret, frame = capture.read()
-        if cv2.waitKey(1) & 0xFF == ord('q'):
+        if cv2.waitKey(1) & 0xFF == ord('q') or not ret:
             break
-        if not ret:
-            if video == '0':
-                continue
-            else:
-                break
 
         source_H, source_W, _ = frame.shape
         img = cv2.resize(
@@ -710,8 +704,7 @@ def recognize_realtime(video, pose, net):
 
         # pose tracking
         if video == '0':
-            fps = 30
-            frame_index = int((time.time() - start_time) * fps)
+            frame_index = int((time.time() - start_time) * args.fps)
         else:
             frame_index += 1
         pose_keypoints = pose_postprocess(pose_keypoints)
@@ -740,7 +733,7 @@ def recognize_realtime(video, pose, net):
 
         # show
         if args.img_save:
-            cv2.imwrite("output/ST-GCN-%08d.jpg" % frame_index, image)
+            cv2.imwrite("output/ST-GCN-%08d.png" % frame_index, image)
         else:
             cv2.imshow('ST-GCN', image)
 
@@ -763,11 +756,10 @@ def main():
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
 
     if args.op:
-        opWrapper = op.WrapperPython()
+        pose = op.WrapperPython()
         params = dict(model_folder='.', model_pose='COCO')
-        opWrapper.configure(params)
-        opWrapper.start()
-        pose = opWrapper
+        pose.configure(params)
+        pose.start()
     else:
         pose = ailia.PoseEstimator(
             MODEL_POSE_PATH, WEIGHT_POSE_PATH, env_id=env_id, algorithm=POSE_ALGORITHM
@@ -775,10 +767,10 @@ def main():
         pose.set_threshold(0.1)
 
     if args.video is not None:
-        # video mode
+        # realtime mode
         recognize_realtime(args.video, pose, net)
     else:
-        # image mode
+        # offline mode
         recognize_from_file(args.input, pose, net)
 
 
