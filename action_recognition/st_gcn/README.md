@@ -99,7 +99,7 @@ This is an offline mode in which all frames are examined first and then inferred
 By adding the `--video` option, It can be run as a real-time mode that infers frame by frame of the video.
 If you pass `0` as an argument to VIDEO_PATH, you can use the webcam input instead of the video file.
 ```bash
-$ python3 mmfashion.py --video VIDEO_PATH
+$ python3 st_gcn.py --video VIDEO_PATH
 ```
 
 ## Reference
