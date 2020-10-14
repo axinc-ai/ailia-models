@@ -41,7 +41,7 @@ RCNN_MASK_THRE = 0.5
 # Arguemnt Parser Config
 # ======================
 parser = argparse.ArgumentParser(
-    description='Clothing detection model'
+    description='MMFashion model'
 )
 parser.add_argument(
     '-i', '--input', metavar='IMAGE',
