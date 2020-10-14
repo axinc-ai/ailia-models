@@ -104,11 +104,13 @@ if args.arch == "pyopenpose":
     except:
         print('Can not find Openpose Python API.')
         sys.exit(-1)
-
-if args.arch == "lw_human_pose":
+    MODEL_POSE_PATH = 'pose/coco/pose_deploy_linevec.prototxt'
+    WEIGHT_POSE_PATH = 'pose/coco/pose_iter_440000.caffemodel'
+    REMOTE_POSE_PATH = 'http://posefs1.perception.cs.cmu.edu/OpenPose/models/pose/coco/'
+elif args.arch == "lw_human_pose":
     POSE_ALGORITHM = ailia.POSE_ALGORITHM_LW_HUMAN_POSE
-    WEIGHT_POSE_PATH = 'lightweight-human-pose-estimation.opt.onnx'
     MODEL_POSE_PATH = 'lightweight-human-pose-estimation.opt.onnx.prototxt'
+    WEIGHT_POSE_PATH = 'lightweight-human-pose-estimation.opt.onnx'
     REMOTE_POSE_PATH = f'https://storage.googleapis.com/ailia-models/lightweight-human-pose-estimation/'
 else:
     POSE_ALGORITHM_OPEN_POSE_SINGLE_SCALE = (12)
@@ -117,6 +119,7 @@ else:
     MODEL_POSE_PATH = 'pose_deploy.prototxt'
     WEIGHT_POSE_PATH = 'pose/coco/pose_iter_440000.caffemodel'
     REMOTE_POSE_PATH = 'http://posefs1.perception.cs.cmu.edu/OpenPose/models/pose/coco/'
+
 
 # ======================
 # Secondaty Functions
@@ -356,9 +359,8 @@ def main():
     # model files check and download
     print("=== ST-GCN model ===")
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
-    if args.arch == "pyopenpose":
-        print("=== OpenPose model ===")
-        check_and_download_models(WEIGHT_POSE_PATH, MODEL_POSE_PATH, REMOTE_POSE_PATH)
+    print("=== OpenPose model ===")
+    check_and_download_models(WEIGHT_POSE_PATH, MODEL_POSE_PATH, REMOTE_POSE_PATH)
 
     # net initialize
     env_id = ailia.get_gpu_environment_id()
