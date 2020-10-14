@@ -45,7 +45,7 @@ NORM_STD = [0.225, 0.224, 0.229]
 # ======================
 
 parser = argparse.ArgumentParser(
-    description='Clothing detection model'
+    description='Human-Part-Segmentation model'
 )
 parser.add_argument(
     '-i', '--input', metavar='IMAGE',
