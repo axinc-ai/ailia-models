@@ -22,7 +22,7 @@ from detector_utils import load_image  # noqa: E402
 WEIGHT_PATH = './sem_seg.onnx'
 MODEL_PATH = './sem_seg.onnx.prototxt'
 REMOTE_PATH = \
-    'https://storage.googleapis.com/ailia-models/semantic-segmentation-with-mobilenet-v3/'
+    'https://storage.googleapis.com/ailia-models/semantic-segmentation-mobilenet-v3/'
 
 IMAGE_PATH = 'demo.png'
 SAVE_IMAGE_PATH = 'output.png'
