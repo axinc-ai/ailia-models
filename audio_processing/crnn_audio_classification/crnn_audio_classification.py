@@ -20,8 +20,16 @@ from crnn_audio_classification_util import MelspectrogramStretch, SpecNormalizat
 # Arguemnt Parser Config
 # ======================
 
+WAVE_PATH="24965__www-bonson-ca__bigdogbarking-02.wav" #https://freesound.org/people/www.bonson.ca/sounds/24965/
+#WAVE_PATH="dog.wav" #dog_bark 0.5050086379051208
+
 parser = argparse.ArgumentParser(
     description='CRNN Audio Classification.'
+)
+parser.add_argument(
+    '-i', '--input', metavar='IMAGE',
+    default=WAVE_PATH,
+    help='The input image path.'
 )
 parser.add_argument(
     '-b', '--benchmark',
@@ -34,6 +42,7 @@ parser.add_argument(
     action='store_true',
     help='Running on onnx runtime'
 )
+
 args = parser.parse_args()
 
 
@@ -123,7 +132,7 @@ def main():
     # model files check and download
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
 
-    path = "dog.wav" #dog_bark 0.5050086379051208
+    path = args.input
     if args.onnx:
         session = onnxruntime.InferenceSession(WEIGHT_PATH)
     else:

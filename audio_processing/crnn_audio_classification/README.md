@@ -1,10 +1,23 @@
 # crnn-audio-classification
 
 ### input
-wave file path
+
+audio file
+
+```
+24965__www-bonson-ca__bigdogbarking-02.wav
+Attribution 3.0 Unported (CC BY 3.0)
+https://freesound.org/people/www.bonson.ca/sounds/24965/
+```
 
 ### output
-labels
+
+```
+dog_bark
+0.8683825731277466
+```
+
+### labels
 
 ```
 'air_conditioner',
