@@ -41,9 +41,9 @@ args = parser.parse_args()
 # PARAMETERS
 # ======================
 
-WEIGHT_PATH = "crnn.onnx"
-MODEL_PATH = "crnn.onnx.prototxt"
-REMOTE_PATH = "https://storage.googleapis.com/ailia-models/crnn/"
+WEIGHT_PATH = "crnn_audio_classification.onnx"
+MODEL_PATH = "crnn_audio_classification.onnx.prototxt"
+REMOTE_PATH = "https://storage.googleapis.com/ailia-models/crnn_audio_classification/"
 
 # ======================
 # Preprocess
@@ -125,7 +125,7 @@ def main():
 
     path = "dog.wav" #dog_bark 0.5050086379051208
     if args.onnx:
-        session = onnxruntime.InferenceSession("crnn.onnx")
+        session = onnxruntime.InferenceSession(WEIGHT_PATH)
     else:
         env_id = ailia.get_gpu_environment_id()
         print(f'env_id: {env_id}')
