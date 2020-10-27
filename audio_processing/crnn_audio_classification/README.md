@@ -1,4 +1,4 @@
-# crnn-audio-classification
+# crnn_audio_classification
 
 ### input
 
@@ -11,6 +11,8 @@ https://freesound.org/people/www.bonson.ca/sounds/24965/
 ```
 
 ### output
+
+audio label
 
 ```
 dog_bark
