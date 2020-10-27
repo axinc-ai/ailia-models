@@ -16,9 +16,9 @@ from webcamera_utils import adjust_frame_size, get_capture  # noqa: E402C
 # ======================
 # Parameters
 # ======================
-WEIGHT_PATH = 'hand_detection.onnx'
-MODEL_PATH = 'hand_detection.onnx.prototxt'
-REMOTE_PATH = ''
+WEIGHT_PATH = 'hand_detection_pytorch.onnx'
+MODEL_PATH = 'hand_detection_pytorch.onnx.prototxt'
+REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/hand_detection_pytorch/'
 
 IMAGE_PATH = 'CARDS_OFFICE.jpg'
 SAVE_IMAGE_PATH = 'CARDS_OFFICE_output.jpg'
