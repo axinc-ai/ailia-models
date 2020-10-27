@@ -14,7 +14,7 @@ import onnxruntime
 # import original modules
 sys.path.append('../../util')
 from model_utils import check_and_download_models  # noqa: E402
-from crnn_audio_classification_util import MelspectrogramStretch, SpecNormalization, AudioTransforms, ProcessChannels, ToTensorAudio  # noqa: E402
+from crnn_audio_classification_util import MelspectrogramStretch, AudioTransforms  # noqa: E402
 
 # ======================
 # Arguemnt Parser Config
@@ -65,24 +65,15 @@ def load_audio(path):
     return sf.read(path)
 
 def preprocess(batch):
-    spec = MelspectrogramStretch(hop_length=None, 
-                            num_mels=128, 
-                            fft_length=2048, 
-                            norm='whiten', 
-                            stretch_param=[0.4, 0.4])
+    spec = MelspectrogramStretch()
                             
     # x-> (batch, time, channel)
     x, lengths, _ = batch # unpacking seqs, lengths and srs
     # x-> (batch, channel, time)
     xt = x.float().transpose(1,2)
     # xt -> (batch, channel, freq, time)
-    print(xt.shape)
     xt, lengths = spec(xt, lengths)                
-    print(xt.shape)
 
-    #for key in self.net:
-    #    print(key)
-    
     return xt, lengths
 
 
