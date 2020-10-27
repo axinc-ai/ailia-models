@@ -5,16 +5,14 @@ import argparse
 import numpy as np
 
 import ailia  # noqa: E402
-
-import torch
-from torchvision import transforms
-
 import onnxruntime
+
+import soundfile as sf
 
 # import original modules
 sys.path.append('../../util')
 from model_utils import check_and_download_models  # noqa: E402
-from crnn_audio_classification_util import MelspectrogramStretch, AudioTransforms  # noqa: E402
+from crnn_audio_classification_util import MelspectrogramStretch  # noqa: E402
 
 # ======================
 # Arguemnt Parser Config
@@ -55,67 +53,34 @@ MODEL_PATH = "crnn_audio_classification.onnx.prototxt"
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/crnn_audio_classification/"
 
 # ======================
-# Preprocess
+# Postprocess
 # ======================
 
 
-import soundfile as sf
-
-def load_audio(path):
-    return sf.read(path)
-
-def preprocess(batch):
-    spec = MelspectrogramStretch()
-                            
-    # x-> (batch, time, channel)
-    x, lengths, _ = batch # unpacking seqs, lengths and srs
-    # x-> (batch, channel, time)
-    xt = x.float().transpose(1,2)
-    # xt -> (batch, channel, freq, time)
-    xt, lengths = spec(xt, lengths)                
-
-    return xt, lengths
-
-
-def postprocess(out_raw):
+def postprocess(x):
     classes = ['air_conditioner', 'car_horn', 'children_playing', 'dog_bark', 'drilling',
  'engine_idling', 'gun_shot', 'jackhammer', 'siren', 'street_music']
-    out = torch.exp(out_raw)
+    out = np.exp(x)
     max_ind = out.argmax().item()      
-    print(max_ind)  
-    print(out.shape)
-    print(len(classes))
     return classes[max_ind], out[:,max_ind].item()
+
 
 # ======================
 # Main function
 # ======================
 
-def crnn(path, session):
+def crnn(data, session):
     # normal inference
-    data = load_audio(path)
-    tsf = AudioTransforms()
-    sig_t, sr, _ = tsf.apply(data, None)
-
-    length = torch.tensor(sig_t.size(0))
-    sr = torch.tensor(sr)
-    data = [d.unsqueeze(0).to("cpu") for d in [sig_t, length, sr]]
-    
-    #label, conf = self.model.predict( data )
-
-    xt, lengths = preprocess(data) 
+    spec = MelspectrogramStretch()
+    xt, lengths = spec(data)
 
     # inference
-    xt = xt.to('cpu').detach().numpy().copy()
-    lengths = lengths.to('cpu').detach().numpy().copy()
     if args.onnx:
         results = session.run(["conf"],{ "data": xt, "lengths": lengths})
     else:
         results = net.predict({ "data": xt, "lengths": lengths})
 
-    x = torch.from_numpy(results[0].astype(np.float32)).clone()
-
-    label, conf = postprocess(x)
+    label, conf = postprocess(results[0])
 
     return label, conf
 
@@ -123,7 +88,10 @@ def main():
     # model files check and download
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
 
-    path = args.input
+    # load audio
+    data = sf.read(args.input)
+
+    # create instance
     if args.onnx:
         session = onnxruntime.InferenceSession(WEIGHT_PATH)
     else:
@@ -137,11 +105,11 @@ def main():
         print('BENCHMARK mode')
         for c in range(5):
             start = int(round(time.time() * 1000))
-            label, conf = crnn(path, session)
+            label, conf = crnn(data, session)
             end = int(round(time.time() * 1000))
             print("\tailia processing time {} ms".format(end-start))
     else:
-        label, conf = crnn(path, session)
+        label, conf = crnn(data, session)
 
     print(label)
     print(conf)
