@@ -57,7 +57,7 @@ def pre_process(to_show):
 def get_detection_dimension(out):
     detection_dimension = []
     for i in range(2, len(out)):
-        detection_dimension.append(int(out[i][0][0][0][0]))
+        detection_dimension.append(int(out[i]))
     detection_dimension = np.array(detection_dimension).reshape(3, 2).tolist()
     return detection_dimension
 
