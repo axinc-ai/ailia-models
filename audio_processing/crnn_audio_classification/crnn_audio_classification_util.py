@@ -12,10 +12,10 @@ class MelspectrogramStretch(object):
 
     def __init__(self):
 
-        hop_length=None # default : fft_length//2
         sample_rate=44100
         num_mels=128
         fft_length=2048
+        hop_length=fft_length//2
 
         self.stft = Spectrogram(n_fft=fft_length, win_length=fft_length,
                                        hop_length=None, pad=0, 
@@ -29,8 +29,6 @@ class MelspectrogramStretch(object):
         # Normalization (pot spec processing)
         self.complex_norm = ComplexNorm(power=2.)
 
-    def _num_stft_bins(self, lengths, fft_length, hop_length, pad):
-        return (lengths + 2 * pad - fft_length + hop_length) // hop_length
 
     def forward(self, data):
         tsf = AudioTransforms()
@@ -48,13 +46,6 @@ class MelspectrogramStretch(object):
         x = self.stft(xt)
         # x -> (fft_length//2+1,bins,channel)
 
-        if lengths is not None:
-            n_fft=2048
-            hop_length=n_fft//2
-
-            lengths = self._num_stft_bins(lengths, n_fft, hop_length, n_fft//2)
-            lengths = lengths.long()
-        
         #print(x.shape)  #torch.Size([1, 1, 1025, 173, 2])
         x = self.complex_norm(x)
         #print(x.shape)  #torch.Size([1, 1, 1025, 173])
@@ -69,11 +60,9 @@ class MelspectrogramStretch(object):
         x = (x - mean)/std 
 
         x = x.to('cpu').detach().numpy().copy()
-        lengths = lengths.to('cpu').detach().numpy().copy()
 
-        if lengths is not None:
-            return x, lengths
-        return x
+        lengths = [x.shape[3]]
+        return x, lengths
 
 class AudioTransforms(object):
 
