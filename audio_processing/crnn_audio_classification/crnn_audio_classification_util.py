@@ -30,12 +30,8 @@ class MelspectrogramStretch(MelSpectrogram):
                                        hop_length=self.hop_length, pad=self.pad, 
                                        power=None, normalized=False)
         
-        # Augmentation
-        self.prob = stretch_param[0]
-
         # Normalization (pot spec processing)
         self.complex_norm = ComplexNorm(power=2.)
-        self.norm = SpecNormalization()
 
     def forward(self, x, lengths=None):
         x = self.stft(x)
@@ -48,32 +44,15 @@ class MelspectrogramStretch(MelSpectrogram):
         x = self.mel_scale(x)
 
         # Normalize melspectrogram
-        x = self.norm(x)
-
-        if lengths is not None:
-            return x, lengths
-        return x
-
-    def __repr__(self):
-        return self.__class__.__name__ + '()'
-
-class SpecNormalization(nn.Module):
-
-    def __init__(self):
-        super(SpecNormalization, self).__init__()
-        self._norm = lambda x: self.z_transform(x)
-        
-    
-    def z_transform(self, x):
         # Independent mean, std per batch
         non_batch_inds = [1, 2, 3]
         mean = x.mean(non_batch_inds, keepdim=True)
         std = x.std(non_batch_inds, keepdim=True)
         x = (x - mean)/std 
-        return x
 
-    def forward(self, x):
-        return self._norm(x)
+        if lengths is not None:
+            return x, lengths
+        return x
 
 class AudioTransforms(object):
 
