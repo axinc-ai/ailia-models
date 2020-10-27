@@ -72,7 +72,7 @@ def postprocess(x):
 def crnn(data, session):
     # normal inference
     spec = MelspectrogramStretch()
-    xt, lengths = spec(data)
+    xt, lengths = spec.forward(data)
 
     # inference
     if args.onnx:

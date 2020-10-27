@@ -8,29 +8,29 @@ from torch.distributions import Uniform
 
 from torchvision import transforms
 
-def _num_stft_bins(lengths, fft_length, hop_length, pad):
-    return (lengths + 2 * pad - fft_length + hop_length) // hop_length
+class MelspectrogramStretch(object):
 
-class MelspectrogramStretch(MelSpectrogram):
+    def __init__(self):
 
-    def __init__(self,):
-
-        hop_length=None
+        hop_length=None # default : fft_length//2
         sample_rate=44100
         num_mels=128
         fft_length=2048
 
-        super(MelspectrogramStretch, self).__init__(sample_rate=sample_rate, 
+        self.stft = Spectrogram(n_fft=fft_length, win_length=fft_length,
+                                       hop_length=None, pad=0, 
+                                       power=None, normalized=False)
+
+        self.mst = MelSpectrogram(sample_rate=sample_rate, 
                                                     n_fft=fft_length, 
                                                     hop_length=hop_length, 
                                                     n_mels=num_mels)
 
-        self.stft = Spectrogram(n_fft=self.n_fft, win_length=self.win_length,
-                                       hop_length=self.hop_length, pad=self.pad, 
-                                       power=None, normalized=False)
-        
         # Normalization (pot spec processing)
         self.complex_norm = ComplexNorm(power=2.)
+
+    def _num_stft_bins(self, lengths, fft_length, hop_length, pad):
+        return (lengths + 2 * pad - fft_length + hop_length) // hop_length
 
     def forward(self, data):
         tsf = AudioTransforms()
@@ -45,18 +45,21 @@ class MelspectrogramStretch(MelSpectrogram):
         # x-> (batch, channel, time)
         xt = x.float().transpose(1,2)
         # xt -> (batch, channel, freq, time)
-
-        x = xt
-        lengths = lengths
-
-        x = self.stft(x)
+        x = self.stft(xt)
+        # x -> (fft_length//2+1,bins,channel)
 
         if lengths is not None:
-            lengths = _num_stft_bins(lengths, self.n_fft, self.hop_length, self.n_fft//2)
+            n_fft=2048
+            hop_length=n_fft//2
+
+            lengths = self._num_stft_bins(lengths, n_fft, hop_length, n_fft//2)
             lengths = lengths.long()
         
+        #print(x.shape)  #torch.Size([1, 1, 1025, 173, 2])
         x = self.complex_norm(x)
-        x = self.mel_scale(x)
+        #print(x.shape)  #torch.Size([1, 1, 1025, 173])
+        x = self.mst.mel_scale(x)
+        #print(x.shape)  #torch.Size([1, 1, 128, 173])
 
         # Normalize melspectrogram
         # Independent mean, std per batch
