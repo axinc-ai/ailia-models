@@ -78,7 +78,9 @@ def crnn(data, session):
     if args.onnx:
         results = session.run(["conf"],{ "data": xt, "lengths": lengths})
     else:
-        results = net.predict({ "data": xt, "lengths": lengths})
+        lengths_np = np.zeros((1))
+        lengths_np[0]=lengths[0]
+        results = session.predict({ "data": xt, "lengths": lengths_np})
 
     label, conf = postprocess(results[0])
 
@@ -97,7 +99,7 @@ def main():
     else:
         env_id = ailia.get_gpu_environment_id()
         print(f'env_id: {env_id}')
-        net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+        session = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
 
     # inference
     print('Start inference...')
