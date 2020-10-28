@@ -217,6 +217,12 @@ def main():
 
     # load model
     env_id = ailia.get_gpu_environment_id()
+    if args.env_id is not None:
+        count = ailia.get_environment_count()
+        if count > args.env_id:
+            env_id = args.env_id
+        else:
+            print(f'specified env_id: {args.env_id} cannot found error')
     print(f'env_id: {env_id}')
 
     # initialize

@@ -55,7 +55,14 @@ def estimate_from_image():
 
     # net initialize
     env_id = ailia.get_gpu_environment_id()
+    if args.env_id is not None:
+        count = ailia.get_environment_count()
+        if count > args.env_id:
+            env_id = args.env_id
+        else:
+            print(f'specified env_id: {args.env_id} cannot found error')
     print(env_id)
+
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
 
     # inference
@@ -94,7 +101,14 @@ def estimate_from_image():
 def estimate_from_video():
     # net initialize
     env_id = ailia.get_gpu_environment_id()
+    if args.env_id is not None:
+        count = ailia.get_environment_count()
+        if count > args.env_id:
+            env_id = args.env_id
+        else:
+            print(f'specified env_id: {args.env_id} cannot found error')
     print(env_id)
+
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
 
     capture = webcamera_utils.get_capture(args.video)

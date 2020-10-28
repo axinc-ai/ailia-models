@@ -130,8 +130,15 @@ def recognize_from_image():
     input_frame_size = len(sorted_inputs_path)
 
     # # net initialize
-    env_id = ailia.get_gpu_environment_id()
+    env_id = ailia.get_gpu_environment_id()  # initialize
+    if args.env_id is not None:
+        count = ailia.get_environment_count()
+        if count > args.env_id:
+            env_id = args.env_id
+        else:
+            print(f'specified env_id: {args.env_id} cannot found error')
     print(f'env_id: {env_id}')
+
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
     net.set_input_shape((1, 3, args.duration, IMAGE_HEIGHT, IMAGE_WIDTH))
 
@@ -185,7 +192,14 @@ def recognize_from_video():
 
     # # net initialize
     env_id = ailia.get_gpu_environment_id()
+    if args.env_id is not None:
+        count = ailia.get_environment_count()
+        if count > args.env_id:
+            env_id = args.env_id
+        else:
+            print(f'specified env_id: {args.env_id} cannot found error')
     print(f'env_id: {env_id}')
+
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
     net.set_input_shape((1, 3, args.duration, IMAGE_HEIGHT, IMAGE_WIDTH))
 
