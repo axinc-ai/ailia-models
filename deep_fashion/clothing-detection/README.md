@@ -72,6 +72,6 @@ ONNX opset=10
 
 ## Netron
 
-[yolov3-modanet.opt.onnx.prototxt](https://lutzroeder.github.io/netron/?url=https://storage.googleapis.com/ailia-models/clothing-detection/yolov3-modanet.opt.onnx.prototxt)
+[yolov3-modanet.opt.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/clothing-detection/yolov3-modanet.opt.onnx.prototxt)
 
-[yolov3-df2.opt.onnx.prototxt](https://lutzroeder.github.io/netron/?url=https://storage.googleapis.com/ailia-models/clothing-detection/yolov3-df2.opt.onnx.prototxt)
+[yolov3-df2.opt.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/clothing-detection/yolov3-df2.opt.onnx.prototxt)

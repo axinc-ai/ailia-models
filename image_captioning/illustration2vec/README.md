@@ -73,5 +73,5 @@ ONNX opset = 10
 
 ### Netron
 
-- [illust2vec_ver200.onnx.prototxt](https://lutzroeder.github.io/netron/?url=https://storage.googleapis.com/ailia-models/ill2vec/illust2vec_ver200.onnx.prototxt)
-- [illust2vec_tag_ver200.onnx.prototxt](https://lutzroeder.github.io/netron/?url=https://storage.googleapis.com/ailia-models/ill2vec/illust2vec_tag_ver200.onnx.prototxt)
+- [illust2vec_ver200.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/ill2vec/illust2vec_ver200.onnx.prototxt)
+- [illust2vec_tag_ver200.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/ill2vec/illust2vec_tag_ver200.onnx.prototxt)

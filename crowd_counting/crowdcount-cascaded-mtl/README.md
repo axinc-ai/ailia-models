@@ -43,4 +43,4 @@ ONNX opset = 10
 
 ### Netron
 
-[crowdcount.onnx.prototxt](https://lutzroeder.github.io/netron/?url=https://storage.googleapis.com/ailia-models/crowd_count/crowdcount.onnx.prototxt)
+[crowdcount.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/crowd_count/crowdcount.onnx.prototxt)

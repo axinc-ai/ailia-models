@@ -57,6 +57,6 @@ ONNX opset = 10
 
 ### Netron
 
-[monodepth2_mono+stereo_640x192_enc.onnx.prototxt](https://lutzroeder.github.io/netron/?url=https://storage.googleapis.com/ailia-models/monodepth2/monodepth2_mono%2Bstereo_640x192_enc.onnx.prototxt)
+[monodepth2_mono+stereo_640x192_enc.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/monodepth2/monodepth2_mono%2Bstereo_640x192_enc.onnx.prototxt)
 
-[monodepth2_mono+stereo_640x192_dec.onnx.prototxt](https://lutzroeder.github.io/netron/?url=https://storage.googleapis.com/ailia-models/monodepth2/monodepth2_mono%2Bstereo_640x192_dec.onnx.prototxt)
+[monodepth2_mono+stereo_640x192_dec.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/monodepth2/monodepth2_mono%2Bstereo_640x192_dec.onnx.prototxt)

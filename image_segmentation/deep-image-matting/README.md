@@ -50,4 +50,4 @@ ONNX opset = 10
 
 
 ### Netron
-[deep-image-matting.onnx.prototxt](https://lutzroeder.github.io/netron/?url=https://storage.googleapis.com/ailia-models/deep-image-matting/deep-image-matting.onnx.prototxt)
+[deep-image-matting.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/deep-image-matting/deep-image-matting.onnx.prototxt)

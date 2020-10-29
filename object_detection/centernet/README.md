@@ -51,4 +51,4 @@ ONNX opset=10
 
 ## Netron
 
-[ctdet_coco_dlav0_1x.onnx.prototxt](https://lutzroeder.github.io/netron/?url=https://storage.googleapis.com/ailia-models/centernet/ctdet_coco_dlav0_1x.onnx.prototxt)
+[ctdet_coco_dlav0_1x.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/centernet/ctdet_coco_dlav0_1x.onnx.prototxt)

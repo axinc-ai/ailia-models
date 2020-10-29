@@ -49,4 +49,4 @@ ONNX opset = 10
 
 ## Netron
 
-[pose_resnet_50_256x192.onnx.prototxt](https://lutzroeder.github.io/netron/?url=https://storage.googleapis.com/ailia-models/pose_resnet/pose_resnet_50_256x192.onnx.prototxt)
+[pose_resnet_50_256x192.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/pose_resnet/pose_resnet_50_256x192.onnx.prototxt)

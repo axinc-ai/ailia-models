@@ -53,5 +53,5 @@ ONNX opset = 10
 
 ### Netron
 
-- [adain-vgg.onnx.prototxt](https://lutzroeder.github.io/netron/?url=https://storage.googleapis.com/ailia-models/adain/adain-vgg.onnx.prototxt)
-- [adain-decoder.onnx.prototxt](https://lutzroeder.github.io/netron/?url=https://storage.googleapis.com/ailia-models/adain/adain-decoder.onnx.prototxt)
+- [adain-vgg.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/adain/adain-vgg.onnx.prototxt)
+- [adain-decoder.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/adain/adain-decoder.onnx.prototxt)

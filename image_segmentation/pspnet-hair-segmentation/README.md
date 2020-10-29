@@ -45,4 +45,4 @@ ONNX opset = 10
 
 
 ### Netron
-[pspnet-hair-segmentation.onnx.prototxt](https://lutzroeder.github.io/netron/?url=https://storage.googleapis.com/ailia-models/pspnet-hair-segmentation/pspnet-hair-segmentation.onnx.prototxt)
+[pspnet-hair-segmentation.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/pspnet-hair-segmentation/pspnet-hair-segmentation.onnx.prototxt)
