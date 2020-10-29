@@ -57,8 +57,8 @@ Chainer 6.3.0
 
 ## Netron
 
-[resnet50.onnx.prototxt](https://lutzroeder.github.io/netron/?url=https://storage.googleapis.com/ailia-models/resnet50/resnet50.onnx.prototxt)
+[resnet50.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/resnet50/resnet50.onnx.prototxt)
 
-[resnet50.opt.onnx.prototxt](https://lutzroeder.github.io/netron/?url=https://storage.googleapis.com/ailia-models/resnet50/resnet50.opt.onnx.prototxt)
+[resnet50.opt.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/resnet50/resnet50.opt.onnx.prototxt)
 
-[resnet50_pytorch.onnx.prototxt](https://lutzroeder.github.io/netron/?url=https://storage.googleapis.com/ailia-models/resnet50/resnet50_pytorch.onnx.prototxt)
+[resnet50_pytorch.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/resnet50/resnet50_pytorch.onnx.prototxt)

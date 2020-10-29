@@ -47,6 +47,6 @@ ONNX opset = 10
 
 ### Netron
 
-[hair_segmentation.onnx.prototxt](https://lutzroeder.github.io/netron/?url=https://storage.googleapis.com/ailia-models/hair_segmentation/hair_segmentation.onnx.prototxt)
+[hair_segmentation.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/hair_segmentation/hair_segmentation.onnx.prototxt)
 
-[hair_segmentation.opt.onnx.prototxt](https://lutzroeder.github.io/netron/?url=https://storage.googleapis.com/ailia-models/hair_segmentation/hair_segmentation.opt.onnx.prototxt)
+[hair_segmentation.opt.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/hair_segmentation/hair_segmentation.opt.onnx.prototxt)

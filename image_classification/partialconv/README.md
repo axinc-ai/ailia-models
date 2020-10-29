@@ -61,8 +61,8 @@ ONNX opset = 10
 
 ### Netron
 
-[resnet50.onnx.prototxt](https://lutzroeder.github.io/netron/?url=https://storage.googleapis.com/ailia-models/partialconv/resnet50.onnx.prototxt)
+[resnet50.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/partialconv/resnet50.onnx.prototxt)
 
-[vgg16_bn.onnx.prototxt](https://lutzroeder.github.io/netron/?url=https://storage.googleapis.com/ailia-models/partialconv/vgg16_bn.onnx.prototxt)
+[vgg16_bn.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/partialconv/vgg16_bn.onnx.prototxt)
 
-[pdresnet50.onnx.prototxt](https://lutzroeder.github.io/netron/?url=https://storage.googleapis.com/ailia-models/partialconv/pdresnet50.onnx.prototxt)
+[pdresnet50.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/partialconv/pdresnet50.onnx.prototxt)

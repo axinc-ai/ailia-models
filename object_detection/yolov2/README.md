@@ -52,4 +52,4 @@ ONNX opset=10
 
 ## Netron
 
-[yolov2.onnx.prototxt](https://lutzroeder.github.io/netron/?url=https://storage.googleapis.com/ailia-models/yolov2/yolov2.onnx.prototxt)
+[yolov2.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/yolov2/yolov2.onnx.prototxt)

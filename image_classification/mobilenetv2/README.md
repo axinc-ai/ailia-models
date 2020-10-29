@@ -56,6 +56,6 @@ Pytorch 1.2.0
 
 ## Netron
 
-[mobilenetv2_1.0.onnx.prototxt](https://lutzroeder.github.io/netron/?url=https://storage.googleapis.com/ailia-models/mobilenetv2/mobilenetv2_1.0.onnx.prototxt)
+[mobilenetv2_1.0.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/mobilenetv2/mobilenetv2_1.0.onnx.prototxt)
 
-[mobilenetv2_1.0.opt.onnx.prototxt](https://lutzroeder.github.io/netron/?url=https://storage.googleapis.com/ailia-models/mobilenetv2/mobilenetv2_1.0.opt.onnx.prototxt)
+[mobilenetv2_1.0.opt.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/mobilenetv2/mobilenetv2_1.0.opt.onnx.prototxt)
