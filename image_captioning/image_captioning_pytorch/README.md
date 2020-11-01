@@ -52,4 +52,6 @@ ONNX opset = 11
 ### Netron
 
 - [model_feat.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/image_captioning_pytorch/model_feat.onnx.prototxt)
-- [model_caption.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/image_captioning_pytorch/model_caption.onnx.prototxt)
+- [model_fc.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/image_captioning_pytorch/model_fc.onnx.prototxt)
+- [model_fc_rl.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/image_captioning_pytorch/model_fc_rl.onnx.prototxt)
+- [model_fc_nsc.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/image_captioning_pytorch/model_fc_nsc.onnx.prototxt)
