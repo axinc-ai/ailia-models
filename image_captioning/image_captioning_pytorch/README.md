@@ -33,13 +33,17 @@ If you pass `0` as an argument to VIDEO_PATH, you can use the webcam input inste
 $ python3 image_captioning.py --video VIDEO_PATH
 ```
 
+The default captioning model is fc.   
+By adding the `--model fc_rl` option, you can use fc_rl model for captioning.
+Or by adding the `--model fc_nsc` option, you can use fc_nsc.
+
 ### Reference
 
 - [Image Captioning pytorch](https://github.com/ruotianluo/ImageCaptioning.pytorch)
 
 ### Framework
 
-Caffe
+ONNX Runtime
 
 ### Model Format
 

@@ -21,8 +21,12 @@ from my_utils import decode_sequence
 # Parameters
 # ======================
 
-WEIGHT_CAPTIONING_PATH = './model_caption.onnx'
-MODEL_CAPTIONING_PATH = './model_caption.onnx.prototxt'
+WEIGHT_CAPTIONING_FC_PATH = './model_fc.onnx'
+MODEL_CAPTIONING_FC_PATH = './model_fc.onnx.prototxt'
+WEIGHT_CAPTIONING_FC_RL_PATH = './model_fc_rl.onnx'
+MODEL_CAPTIONING_FC_RL_PATH = './model_fc_rl.onnx.prototxt'
+WEIGHT_CAPTIONING_FC_NSC_PATH = './model_fc_nsc.onnx'
+MODEL_CAPTIONING_FC_NSC_PATH = './model_fc_nsc.onnx.prototxt'
 WEIGHT_FEAT_PATH = './model_feat.onnx'
 MODEL_FEAT_PATH = './model_feat.onnx.prototxt'
 REMOTE_PATH = \
@@ -57,20 +61,15 @@ parser.add_argument(
          'If the VIDEO argument is set to 0, the webcam input will be used.'
 )
 parser.add_argument(
-    '-s', '--savepath', metavar='SAVE_IMAGE_PATH',
-    default=SAVE_IMAGE_PATH,
-    help='Save path for the output image.'
-)
-parser.add_argument(
     '-b', '--benchmark',
     action='store_true',
     help='Running the inference on the same input 5 times ' +
          'to measure execution performance. (Cannot be used in video mode)'
 )
 parser.add_argument(
-    '--orig-size',
-    action='store_true',
-    help='output in original image size.'
+    '--model', type=str, default='fc',
+    choices=('fc', 'fc_rl', 'fc_nsc'),
+    help='captioning model (fc | fc_rl | fc_nsc)'
 )
 parser.add_argument(
     '--onnx',
@@ -189,9 +188,16 @@ def recognize_from_video(video, net, my_resnet):
 
 
 def main():
+    dic_model = {
+        'fc': (WEIGHT_CAPTIONING_FC_PATH, MODEL_CAPTIONING_FC_PATH),
+        'fc_rl': (WEIGHT_CAPTIONING_FC_RL_PATH, MODEL_CAPTIONING_FC_RL_PATH),
+        'fc_nsc': (WEIGHT_CAPTIONING_FC_NSC_PATH, MODEL_CAPTIONING_FC_NSC_PATH),
+    }
+    weight_path, model_path = dic_model[args.model]
+
     # model files check and download
     print("=== Captioning model ===")
-    check_and_download_models(WEIGHT_CAPTIONING_PATH, MODEL_CAPTIONING_PATH, REMOTE_PATH)
+    check_and_download_models(weight_path, model_path, REMOTE_PATH)
     print("=== Feature model ===")
     check_and_download_models(WEIGHT_FEAT_PATH, MODEL_FEAT_PATH, REMOTE_PATH)
 
@@ -201,12 +207,12 @@ def main():
 
     # initialize
     if not args.onnx:
-        net = ailia.Net(MODEL_CAPTIONING_PATH, WEIGHT_CAPTIONING_PATH, env_id=env_id)
+        net = ailia.Net(model_path, weight_path, env_id=env_id)
         net.set_input_shape((1, 2048))
         my_resnet = ailia.Net(MODEL_FEAT_PATH, WEIGHT_FEAT_PATH, env_id=env_id)
     else:
         import onnxruntime
-        net = onnxruntime.InferenceSession(WEIGHT_CAPTIONING_PATH)
+        net = onnxruntime.InferenceSession(weight_path)
         my_resnet = onnxruntime.InferenceSession(WEIGHT_FEAT_PATH)
 
     if args.video is not None:
