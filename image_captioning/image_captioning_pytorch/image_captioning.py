@@ -179,6 +179,9 @@ def recognize_from_video(video, net, my_resnet):
 
         print('Caption --->', sents[0])
 
+        cv2.rectangle(frame, (0, 0), (frame.shape[1], 48), (255,255,255), thickness=-1)
+        cv2.putText(frame, sents[0], (32,32), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0,0,0), 2)
+
         cv2.imshow('frame', frame)
         time.sleep(SLEEP_TIME)
 
