@@ -233,3 +233,9 @@ python3 launcher.py
 ## Blog
 
 [ailia SDK tutorial (Python API)](https://medium.com/axinc/ailia-sdk-%E3%83%81%E3%83%A5%E3%83%BC%E3%83%88%E3%83%AA%E3%82%A2%E3%83%AB-python-28379dbc9649)
+
+## Other languages
+
+[unity version](https://github.com/axinc-ai/ailia-models-unity)
+
+[c++ version](https://github.com/axinc-ai/ailia-models-cpp)
