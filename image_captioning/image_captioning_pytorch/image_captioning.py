@@ -47,7 +47,7 @@ SLEEP_TIME = 0
 # ======================
 
 parser = argparse.ArgumentParser(
-    description='Semantic segmentation with MobileNetV3 model'
+    description='ImageCaptioning.pytorch model'
 )
 parser.add_argument(
     '-i', '--input', metavar='IMAGE',
