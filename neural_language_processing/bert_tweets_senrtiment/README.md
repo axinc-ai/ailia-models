@@ -1,44 +1,28 @@
-# Predicting Missing Word Using Bert Masked LM
+# BERT tweets sentiment
 
 ### input
-A sentence with a masked word, which is defined as `SENTENCE` in `bert.py`.  
-Masked Word should be represented by one `_`.
+A twitter sentence
 
 ### output
-Top `k` predicted words suitable for filling the Masked Word.  
-`k` is defined as `NUM_PREDICT` in `bert.py`
+Determine if the tweet related to the entered home appliance is positive or negative
 
 ### Usage
-`SENTENCE` is defined in the `bert.py`.
-ex. SENTENCE = 'I want to _ the car because it is cheap.'
-
-- English Bert
-```bash
-$ python3 bert.py
-...
-predicted top 3 words: ['buy', 'drive', 'rent']
-```
-
-- Japanese Bert (test implementation)
-  - [WARNING] For now, Japanese model does not work correctly.
-  - requirements
-	- juman++, boost (ref: https://blog.imind.jp/entry/2019/01/12/192936)
 
 ```bash
-$ python3 bert.py -l jp
-predicted top 3 words: ['結婚', '[UNK]', '旅']
+$ python3 bert_tweets_sentiment.py -i "iPhone 12 mini が欲しい"
+Label :  positive
+$ python3 bert_tweets_sentiment.py -i "iPhone 12 mini は高い"
+Label :  negative
 ```
-
 
 ### Reference
-[pytorch-pretrained-bert](https://pypi.org/project/pytorch-pretrained-bert/)  
-[BERT日本語Pretrainedモデル](http://nlp.ist.i.kyoto-u.ac.jp/index.php?BERT%E6%97%A5%E6%9C%AC%E8%AA%9EPretrained%E3%83%A2%E3%83%87%E3%83%AB)
+[Twitter日本語評判分析データセット](http://www.db.info.gifu-u.ac.jp/data/Data_5d832973308d57446583ed9f)
 
 ### Framework
-PyTorch 1.3.0
+PyTorch 1.6.0
 
 ### Model Format
-ONNX opset = 10
+ONNX opset = 11
 
 ### Netron
 
