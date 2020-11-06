@@ -26,4 +26,4 @@ ONNX opset = 11
 
 ### Netron
 
-[bert-base-uncased.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/bert_en/bert-base-uncased.onnx.prototxt)
+[bert_tweets_sentiment.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/bert_tweets_sentiment/bert_tweets_sentiment.onnx.prototxt)
