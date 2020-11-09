@@ -82,9 +82,10 @@ parser.add_argument(
          'to measure execution performance. (Cannot be used in video mode)'
 )
 parser.add_argument(
-    '--left-hand',
+    '--right-hand',
+    dest='flip',
     action='store_true',
-    help='left hand flag.'
+    help='right hand flag.'
 )
 parser.add_argument(
     '--onnx',
@@ -112,7 +113,7 @@ def preprocess(img, img_size):
         margin = int((img.shape[1] - img.shape[0]) / 2)
         img = img[:, margin:-margin]
 
-    if args.left_hand:
+    if args.flip:
         img = np.flip(img, axis=1).copy()
 
     img = cv2.resize(img, img_size, cv2.INTER_LINEAR)
