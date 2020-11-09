@@ -92,11 +92,6 @@ parser.add_argument(
     action='store_true',
     help='execute onnxruntime version.'
 )
-parser.add_argument(
-    '--tensorflow',
-    action='store_true',
-    help='execute tensorflow version.'
-)
 args = parser.parse_args()
 
 
@@ -168,79 +163,12 @@ def visualize_results(axs, img, keypts):
 # ======================
 
 
-class ModelDet:
-    """
-    DetNet: estimating 3D keypoint positions from input color image.
-    """
-    def __init__(self, model_path):
-        """
-        Parameters
-        ----------
-        model_path : str
-          Path to the trained model.
-        """
-        import tensorflow as tf
-        from network import detnet, tf_hmap_to_uv
-
-        self.graph = tf.Graph()
-        with self.graph.as_default():
-            with tf.variable_scope('prior_based_hand'):
-                config = tf.ConfigProto()
-                config.gpu_options.allow_growth = True
-                self.sess = tf.Session(config=config)
-                self.input_ph = tf.placeholder(tf.uint8, [128, 128, 3])
-                self.feed_img = \
-                    tf.cast(tf.expand_dims(self.input_ph, 0), tf.float32) / 255
-                self.hmaps, self.dmaps, self.lmaps = \
-                    detnet(self.feed_img, 1, False)
-
-                self.hmap = self.hmaps[-1]
-                self.dmap = self.dmaps[-1]
-                self.lmap = self.lmaps[-1]
-
-                self.uv = tf_hmap_to_uv(self.hmap)
-                self.delta = tf.gather_nd(
-                    tf.transpose(self.dmap, [0, 3, 1, 2, 4]), self.uv, batch_dims=2
-                )[0]
-                self.xyz = tf.gather_nd(
-                    tf.transpose(self.lmap, [0, 3, 1, 2, 4]), self.uv, batch_dims=2
-                )[0]
-
-                self.uv = self.uv[0]
-            tf.train.Saver().restore(self.sess, model_path)
-
-    def process(self, img):
-        """
-        Process a color image.
-
-        Parameters
-        ----------
-        img : np.ndarray
-          A 128x128 RGB image of **left hand** with dtype uint8.
-
-        Returns
-        -------
-        np.ndarray, shape [21, 3]
-          Normalized keypoint locations. The coordinates are relative to the M0
-          joint and normalized by the length of the bone from wrist to M0. The
-          order of keypoints is as `kinematics.MPIIHandJoints`.
-        np.ndarray, shape [21, 2]
-          The uv coordinates of the keypoints on the heat map, whose resolution is
-          32x32.
-        """
-        results = self.sess.run([self.xyz, self.uv], {self.input_ph: img})
-
-        return results
-
-
 def predict(img, det_model):
     # initial preprocesses
     img = preprocess(img, (128, 128))
 
     # feedforward
-    if args.tensorflow:
-        xyz, _ = det_model.process(img)
-    elif not args.onnx:
+    if not args.onnx:
         output = det_model.predict({
             'import/prior_based_hand/Placeholder:0': img
         })
@@ -328,9 +256,7 @@ def main():
     print(f'env_id: {env_id}')
 
     # initialize
-    if args.tensorflow:
-        det_model = ModelDet('./model/detnet/detnet.ckpt')
-    elif not args.onnx:
+    if not args.onnx:
         det_model = ailia.Net(MODEL_DET_PATH, WEIGHT_DET_PATH, env_id=env_id)
         # ik_model = ailia.Net(MODEL_IK_PATH, WEIGHT_IK_PATH, env_id=env_id)
     else:
