@@ -1,0 +1,3 @@
+DATA:
+    BATCH_SIZE: 1
+    IMG_SIZE: 256
