@@ -50,4 +50,4 @@ ONNX opset=10
 
 ## Netron
 
-[sem_seg.onnx.prototxt](https://lutzroeder.github.io/netron/?url=https://storage.googleapis.com/ailia-models/semantic-segmentation-mobilenet-v3/sem_seg.onnx.prototxt)
+[sem_seg.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/semantic-segmentation-mobilenet-v3/sem_seg.onnx.prototxt)
