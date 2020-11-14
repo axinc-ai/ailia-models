@@ -80,18 +80,15 @@ args = parser.parse_args()
 # ======================
 
 
-def preprocess(img):
-    img_h, img_w, _ = img.shape
-    scale = IMAGE_SIZE / max(img_w, img_h)
-    img_h2 = int(img_h * scale)
-    img_w2 = int(img_w * scale)
-    img = cv2.resize(img, (img_w2, img_h2), interpolation=cv2.INTER_CUBIC)
+def preprocess(img, img_size):
+    (img_w, img_h) = img_size
+    img = cv2.resize(img, (img_w, img_h), interpolation=cv2.INTER_CUBIC)
     img = np.transpose(img, (2, 0, 1)).astype(np.float32)  # channel, height, width
     img[[0, 2]] = img[[2, 0]]  # BGR -> RGB
     img = img / 255.0
     img = (img - MU) / SIGMA
     pad_imgs = np.zeros([1, 3, IMAGE_SIZE, IMAGE_SIZE], dtype=np.float32)
-    pad_imgs[0, :, :img_h2, :img_w2] = img
+    pad_imgs[0, :, :img_h, :img_w] = img
 
     return pad_imgs
 
@@ -144,11 +141,12 @@ def predict(img, net):
 
     img_h, img_w, _ = img.shape
     scale = IMAGE_SIZE / max(img_w, img_h)
+    img_h2 = int(img_h * scale)
+    img_w2 = int(img_w * scale)
 
     # initial preprocesses
-    img = preprocess(img)
-    img_flip = preprocess(img_flip)
-    img_h2, img_w2 = img_flip.shape[2:]
+    img = preprocess(img, (img_w2, img_h2))
+    img_flip = preprocess(img_flip, (img_w2, img_h2))
 
     # feedforward
     if not args.onnx:
