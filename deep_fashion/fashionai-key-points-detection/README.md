@@ -2,13 +2,23 @@
 
 ## Input
 
-![fashionAI_keypoints_train1.tar/Images/dress/303e65590dc524f8eb67936bea48d489.jpg](dress.jpg)
+### blouse
+![blouse/5ac2a09a11b0488bf1e39713f36e88d4.jpg](blouse.jpg)
+### dress
+![dress/303e65590dc524f8eb67936bea48d489.jpg](dress.jpg)
+### outwear
+![outwear/513816cb9c691bef7e0edb40468717b1.jpg](outwear.jpg)
 
 (Image from https://tianchi.aliyun.com/museum7/?spm=5176.14046517.J_9711814210.23.2bd17c0aFQzXFg#/newprodetail?productId=7)
 
 ## Output
 
+### blouse
+![Output](output_blouse.png)
+### dress
 ![Output](output_dress.png)
+### outwear
+![Output](output_outwear.png)
 
 ## Usage
 Automatically downloads the onnx and prototxt files on the first run.
@@ -17,6 +27,12 @@ It is necessary to be connected to the Internet while downloading.
 For the sample image,
 ``` bash
 $ python3 fashionai.py
+```
+
+You can specify the clothing type by specifying after the `--clothing-type` option.
+The clothing type is selected from blouse, dress, outwear.  
+```bash
+$ python3 fashionai.py --clothing-type blouse
 ```
 
 If you want to specify the input image, put the image path after the `--input` option.  

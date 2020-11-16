@@ -20,12 +20,18 @@ from my_utils import decode_np, draw_keypoints
 # Parameters
 # ======================
 
+WEIGHT_BLOUSE_PATH = './blouse_100.onnx'
+MODEL_BLOUSE_PATH = './blouse_100.onnx.prototxt'
 WEIGHT_DRESS_PATH = './dress_100.onnx'
 MODEL_DRESS_PATH = './dress_100.onnx.prototxt'
+WEIGHT_OUTWEAR_PATH = './outwear_100.onnx'
+MODEL_OUTWEAR_PATH = './outwear_100.onnx.prototxt'
 REMOTE_PATH = \
     'https://storage.googleapis.com/ailia-models/fashionai/'
 
+IMAGE_BLOUSE_PATH = 'blouse.jpg'
 IMAGE_DRESS_PATH = 'dress.jpg'
+IMAGE_OUTWEAR_PATH = 'outwear.jpg'
 SAVE_IMAGE_PATH = 'output.png'
 
 IMAGE_SIZE = 512
@@ -63,8 +69,8 @@ parser.add_argument(
          'to measure execution performance. (Cannot be used in video mode)'
 )
 parser.add_argument(
-    '-t', '--clothing_type', type=str, default='dress',
-    choices=('dress',),
+    '-c', '--clothing-type', type=str, default='blouse',
+    choices=('blouse', 'dress', 'outwear'),
     help='clothing type'
 )
 parser.add_argument(
@@ -236,7 +242,9 @@ def recognize_from_video(video, net):
 
 def main():
     dic_model = {
+        'blouse': (WEIGHT_BLOUSE_PATH, MODEL_BLOUSE_PATH, IMAGE_BLOUSE_PATH),
         'dress': (WEIGHT_DRESS_PATH, MODEL_DRESS_PATH, IMAGE_DRESS_PATH),
+        'outwear': (WEIGHT_OUTWEAR_PATH, MODEL_OUTWEAR_PATH, IMAGE_OUTWEAR_PATH),
     }
     weight_path, model_path, img_path = dic_model[args.clothing_type]
 
