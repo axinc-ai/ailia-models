@@ -183,6 +183,10 @@ The collection of pre-trained, state-of-the-art models.
 
 # Setup
 
+## Requirements
+
+- Python 3.6 and later
+
 ## Install ailia SDK
 
 - [Download a free evaluation version of ailia SDK](https://ailia.jp/en/trial)
@@ -217,7 +221,7 @@ pip3 install numpy
 [OpenCV for python3 is pre-installed on Jetson.](https://forums.developer.nvidia.com/t/install-opencv-for-python3-in-jetson-nano/74042/3) You only need to run this command if you get a cv2 import error.
 
 ```
-sudo apt install python3-opencv
+sudo apt install nvidia-jetpack
 ```
 
 # Launcher
