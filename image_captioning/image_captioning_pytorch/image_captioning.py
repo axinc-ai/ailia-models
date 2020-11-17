@@ -115,7 +115,7 @@ def predict(img, net, my_resnet):
     if not args.onnx:
         fc = my_resnet.predict({
             'img': img
-        })
+        })[0]
         fc = np.expand_dims(fc, axis=0)
         output = net.predict({
             'fc_feats': fc
@@ -211,7 +211,6 @@ def main():
     # initialize
     if not args.onnx:
         net = ailia.Net(model_path, weight_path, env_id=env_id)
-        net.set_input_shape((1, 2048))
         my_resnet = ailia.Net(MODEL_FEAT_PATH, WEIGHT_FEAT_PATH, env_id=env_id)
     else:
         import onnxruntime
