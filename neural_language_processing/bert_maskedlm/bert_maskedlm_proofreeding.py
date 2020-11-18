@@ -38,6 +38,11 @@ parser.add_argument(
     default='bert-base-japanese-whole-word-masking', choices=MODEL_LISTS,
     help='model lists: ' + ' | '.join(MODEL_LISTS)
 )
+parser.add_argument(
+    '-o', '--onnx',
+    action='store_true',
+    help='Use onnx runtime'
+)
 args = parser.parse_args()
 
 
@@ -66,8 +71,7 @@ def main():
     else:
         tokenizer = BertJapaneseTokenizer.from_pretrained("cl-tohoku/"+args.arch)
 
-    ailia_mode = False
-    if ailia_mode:
+    if not args.onnx:
         import ailia
         cpu_model = ailia.Net(MODEL_PATH,WEIGHT_PATH)
     else:
@@ -97,7 +101,7 @@ def main():
             indexed_tokens = tokenizer.convert_tokens_to_ids(tokenized_text)
             #print("Indexed tokens : ",indexed_tokens)
 
-            if ailia_mode:
+            if not args.onnx:
                 indexed_tokens = numpy.expand_dims(numpy.array(indexed_tokens), axis=0)
                 token_type_ids = numpy.zeros((1,len(tokenized_text)))
                 attention_mask = numpy.zeros((1,len(tokenized_text)))
@@ -111,7 +115,7 @@ def main():
             #print("Input : ",inputs_onnx)
 
             #print("Predicting...")
-            if ailia_mode:
+            if not args.onnx:
                 cpu_model.set_input_blob_shape(indexed_tokens.shape,cpu_model.find_blob_index_by_name("token_type_ids"))
                 cpu_model.set_input_blob_shape(indexed_tokens.shape,cpu_model.find_blob_index_by_name("input_ids"))
                 cpu_model.set_input_blob_shape(attention_mask.shape,cpu_model.find_blob_index_by_name("attention_mask"))
