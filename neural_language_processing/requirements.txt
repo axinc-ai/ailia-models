@@ -1,0 +1,6 @@
+transformers==3.4.0
+mecab-python3
+unidic-lite
+fugashi
+ipadic
+datasets
