@@ -7,24 +7,14 @@ import argparse
 
 import ailia
 
-#sys.path.append('../../util')
-#from model_utils import check_and_download_models  # noqa: E402
-
-#O : 固有表現外
-#B-MIS : 別のその他の直後のその他の始まり
-#I-MIS : その他
-#B-PER : 別の人物名の直後の人物名の始まり
-#I-PER : 人物名
-#B-ORG : 別の組織の直後の組織の始まり
-#I-ORG : 組織
-#B-LOC : 別の場所の直後の場所の始まり
-#I-LOC : 場所
+sys.path.append('../../util')
+from model_utils import check_and_download_models  # noqa: E402
 
 # ======================
 # Arguemnt Parser Config
 # ======================
 
-DEFAULT_TEXT = 'My name is bert'
+SENTENCE = 'My name is bert'
 
 parser = argparse.ArgumentParser(
     description='bert ner.'
@@ -32,7 +22,7 @@ parser = argparse.ArgumentParser(
 
 parser.add_argument(
     '--input', '-i', metavar='TEXT',
-    default=DEFAULT_TEXT, 
+    default=SENTENCE, 
     help='input text'
 )
 parser.add_argument(
@@ -48,9 +38,9 @@ args = parser.parse_args()
 # PARAMETERS
 # ======================
 
-WEIGHT_PATH = "../onnx_transformers/.onnx/dbmdz/bert-large-cased-finetuned-conll03-english/bert-large-cased-finetuned-conll03-english.onnx"
-MODEL_PATH = "../onnx_transformers/.onnx/dbmdz/bert-large-cased-finetuned-conll03-english/bert-large-cased-finetuned-conll03-english.onnx.prototxt"
-REMOTE_PATH = "https://storage.googleapis.com/ailia-models/bert_tweets_sentiment/"
+WEIGHT_PATH = "bert-large-cased-finetuned-conll03-english.onnx"
+MODEL_PATH = "bert-large-cased-finetuned-conll03-english.onnx.prototxt"
+REMOTE_PATH = "https://storage.googleapis.com/ailia-models/bert_ner/"
 
 
 # ======================
@@ -58,7 +48,7 @@ REMOTE_PATH = "https://storage.googleapis.com/ailia-models/bert_tweets_sentiment
 # ======================
 def main():
     # model files check and download
-    #check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
 
     ailia_model = ailia.Net(MODEL_PATH,WEIGHT_PATH)
     tokenizer = AutoTokenizer.from_pretrained('dbmdz/bert-large-cased-finetuned-conll03-english')

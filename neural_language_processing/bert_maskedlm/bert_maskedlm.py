@@ -24,7 +24,7 @@ MODEL_LISTS = [
 
 NUM_PREDICT = 5
 
-DEFAULT_TEXT = '私は[MASK]で動く。'
+SENTENCE = '私は[MASK]で動く。'
 
 parser = argparse.ArgumentParser(
     description='bert masklm sample.'
@@ -32,7 +32,7 @@ parser = argparse.ArgumentParser(
 
 parser.add_argument(
     '--input', '-i', metavar='TEXT',
-    default=DEFAULT_TEXT, 
+    default=SENTENCE, 
     help='input text'
 )
 parser.add_argument(
