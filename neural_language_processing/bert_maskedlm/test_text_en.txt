@@ -1,0 +1,2 @@
+Sentence proofreading test
+This program analyzes sentences to dsa detect typographical errors. The location of the typographical error is displayed in red.
