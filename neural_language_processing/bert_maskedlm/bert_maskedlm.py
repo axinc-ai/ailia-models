@@ -2,6 +2,7 @@ import sys
 import torch
 import numpy
 import argparse
+import time
 
 from transformers import BertTokenizer, BertJapaneseTokenizer, BertForMaskedLM
 
@@ -21,7 +22,9 @@ MODEL_LISTS = [
     'bert-base-japanese-whole-word-masking'
 ]
 
-DEFAULT_TEXT = '私はお金で動く。'
+NUM_PREDICT = 5
+
+DEFAULT_TEXT = '私は[MASK]で動く。'
 
 parser = argparse.ArgumentParser(
     description='bert masklm sample.'
@@ -72,9 +75,14 @@ def main():
     tokenized_text = tokenizer.tokenize(text)
     print("Tokenized text : ",tokenized_text)
 
-    masked_index = 2
-    tokenized_text[masked_index] = '[MASK]'
-    print("Masked text : ",tokenized_text)
+    masked_index = -1
+    for i in range(0,len(tokenized_text)):
+        if tokenized_text[i]=='[MASK]':
+            masked_index = i
+            break
+    if masked_index == -1:
+        print("[MASK] not found")
+        sys.exit(1)
 
     indexed_tokens = tokenizer.convert_tokens_to_ids(tokenized_text)
     print("Indexed tokens : ",indexed_tokens)
@@ -84,6 +92,7 @@ def main():
     indexed_tokens = numpy.array(indexed_tokens)
     token_type_ids = numpy.zeros((1,len(tokenized_text)))
     attention_mask = numpy.zeros((1,len(tokenized_text)))
+    attention_mask[:,0:len(tokenized_text)]=1
 
     inputs_onnx = {"token_type_ids":token_type_ids,"input_ids":indexed_tokens,"attention_mask":attention_mask}
 
@@ -98,9 +107,7 @@ def main():
     else:
         outputs = ailia_model.predict(inputs_onnx)
 
-    print("Output : ",outputs)
-
-    predictions = torch.from_numpy(outputs[0][0, masked_index]).topk(5)
+    predictions = torch.from_numpy(outputs[0][0, masked_index]).topk(NUM_PREDICT)
 
     print("Predictions : ")
     for i, index_t in enumerate(predictions.indices):
