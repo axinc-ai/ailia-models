@@ -87,10 +87,16 @@ def main():
 
     inputs_onnx = {"token_type_ids":token_type_ids,"input_ids":indexed_tokens,"attention_mask":attention_mask}
 
-    print("Input : ",inputs_onnx)
-
     print("Predicting...")
-    outputs = ailia_model.predict(inputs_onnx)
+    if args.benchmark:
+        print('BENCHMARK mode')
+        for i in range(5):
+            start = int(round(time.time() * 1000))
+            outputs = ailia_model.predict(inputs_onnx)
+            end = int(round(time.time() * 1000))
+            print("\tailia processing time {} ms".format(end - start))
+    else:
+        outputs = ailia_model.predict(inputs_onnx)
 
     print("Output : ",outputs)
 
@@ -101,6 +107,8 @@ def main():
         index = index_t.item()
         token = tokenizer.convert_ids_to_tokens([index])[0]
         print(i, token)
+
+    print('Script finished successfully.')
 
 if __name__ == "__main__":
     main()
