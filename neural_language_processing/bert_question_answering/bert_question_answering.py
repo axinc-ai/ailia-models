@@ -1,6 +1,3 @@
-import sys
-sys.path.append('../onnx_transformers')
-
 from transformers import DistilBertTokenizer
 from transformers.tokenization_utils import PreTrainedTokenizer
 from transformers.tokenization_auto import AutoTokenizer
@@ -12,8 +9,8 @@ import argparse
 
 import ailia
 
-#sys.path.append('../../util')
-#from model_utils import check_and_download_models  # noqa: E402
+sys.path.append('../../util')
+from model_utils import check_and_download_models  # noqa: E402
 
 # ======================
 # Arguemnt Parser Config
@@ -49,9 +46,9 @@ args = parser.parse_args()
 # PARAMETERS
 # ======================
 
-WEIGHT_PATH = "../onnx_transformers/.onnx/deepset/roberta-base-squad2/roberta-base-squad2.onnx"
-MODEL_PATH = "../onnx_transformers/.onnx/deepset/roberta-base-squad2/roberta-base-squad2.onnx.prototxt"
-REMOTE_PATH = "https://storage.googleapis.com/ailia-models/bert_tweets_sentiment/"
+WEIGHT_PATH = "roberta-base-squad2.onnx"
+MODEL_PATH = "roberta-base-squad2.onnx.prototxt"
+REMOTE_PATH = "https://storage.googleapis.com/ailia-models/bert_question_answering/"
 
 
 # ======================
@@ -59,6 +56,7 @@ REMOTE_PATH = "https://storage.googleapis.com/ailia-models/bert_tweets_sentiment
 # ======================
 
 # code from https://github.com/patil-suraj/onnx_transformers
+# Apache license
 from transformers.data import SquadExample, squad_convert_examples_to_features
 from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Optional, Sequence, Tuple, Union
 from transformers.tokenization_utils_base import BatchEncoding, PaddingStrategy
@@ -178,10 +176,7 @@ def span_to_answer(tokenizer, text: str, start: int, end: int) -> Dict[str, Unio
 # ======================
 def main():
     # model files check and download
-    #check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
-
-    # onnx transformers
-    from onnx_transformers import pipeline
+    check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
 
     inputs = {
       "question": args.question, 

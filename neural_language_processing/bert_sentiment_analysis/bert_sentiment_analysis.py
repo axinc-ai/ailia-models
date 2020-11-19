@@ -7,8 +7,8 @@ import argparse
 
 import ailia
 
-#sys.path.append('../../util')
-#from model_utils import check_and_download_models  # noqa: E402
+sys.path.append('../../util')
+from model_utils import check_and_download_models  # noqa: E402
 
 # ======================
 # Arguemnt Parser Config
@@ -39,9 +39,9 @@ args = parser.parse_args()
 # PARAMETERS
 # ======================
 
-WEIGHT_PATH = "../onnx_transformers/.onnx/distilbert-base-uncased-finetuned-sst-2-english/distilbert-base-uncased-finetuned-sst-2-english.onnx"
-MODEL_PATH = "../onnx_transformers/.onnx/distilbert-base-uncased-finetuned-sst-2-english/distilbert-base-uncased-finetuned-sst-2-english.onnx.prototxt"
-REMOTE_PATH = "https://storage.googleapis.com/ailia-models/bert_tweets_sentiment/"
+WEIGHT_PATH = "distilbert-base-uncased-finetuned-sst-2-english.onnx"
+MODEL_PATH = "distilbert-base-uncased-finetuned-sst-2-english.onnx.prototxt"
+REMOTE_PATH = "https://storage.googleapis.com/ailia-models/bert_sentiment_analysis/"
 
 
 # ======================
@@ -49,7 +49,7 @@ REMOTE_PATH = "https://storage.googleapis.com/ailia-models/bert_tweets_sentiment
 # ======================
 def main():
     # model files check and download
-    #check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
 
     ailia_model = ailia.Net(MODEL_PATH,WEIGHT_PATH)
     tokenizer = DistilBertTokenizer.from_pretrained('distilbert-base-uncased-finetuned-sst-2-english')

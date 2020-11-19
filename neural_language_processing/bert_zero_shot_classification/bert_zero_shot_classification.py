@@ -7,23 +7,28 @@ import argparse
 
 import ailia
 
-#sys.path.append('../../util')
-#from model_utils import check_and_download_models  # noqa: E402
+sys.path.append('../../util')
+from model_utils import check_and_download_models  # noqa: E402
 
 # ======================
 # Arguemnt Parser Config
 # ======================
 
-DEFAULT_TEXT = "Who are you voting for in 2020?"
-candidate_labels = ["economics", "politics", "public health"]
+SENTENCE = "Who are you voting for in 2020?"
+CANDIDATE_LABELS = "economics, politics, public health"
 
 parser = argparse.ArgumentParser(
     description='bert zero-shot-classification.'
 )
 
 parser.add_argument(
-    '--input', '-i', metavar='TEXT',
-    default=DEFAULT_TEXT, 
+    '--sentence', '-s', metavar='TEXT',
+    default=SENTENCE, 
+    help='input text'
+)
+parser.add_argument(
+    '--candidate_labels', '-c', metavar='TEXT',
+    default=CANDIDATE_LABELS, 
     help='input text'
 )
 parser.add_argument(
@@ -39,9 +44,9 @@ args = parser.parse_args()
 # PARAMETERS
 # ======================
 
-WEIGHT_PATH = "../onnx_transformers/.onnx/roberta-large-mnli/roberta-large-mnli.onnx"
-MODEL_PATH = "../onnx_transformers/.onnx/roberta-large-mnli/roberta-large-mnli.onnx.prototxt"
-REMOTE_PATH = "https://storage.googleapis.com/ailia-models/bert_tweets_sentiment/"
+WEIGHT_PATH = "roberta-large-mnli.onnx"
+MODEL_PATH = "roberta-large-mnli.onnx.prototxt"
+REMOTE_PATH = "https://storage.googleapis.com/ailia-models/bert_zero_shot_classification/"
 
 
 # ======================
@@ -49,7 +54,9 @@ REMOTE_PATH = "https://storage.googleapis.com/ailia-models/bert_tweets_sentiment
 # ======================
 def main():
     # model files check and download
-    #check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
+
+    candidate_labels = CANDIDATE_LABELS.split(", ")
 
     ailia_model = ailia.Net(MODEL_PATH,WEIGHT_PATH)
     tokenizer = AutoTokenizer.from_pretrained('roberta-large-mnli"')

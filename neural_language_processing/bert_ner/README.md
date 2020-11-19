@@ -26,7 +26,6 @@ $ python3 bert_ner.py -i "My name is bert"
 ...
 Input :  My name is bert
 Output :  [{'word': 'be', 'score': 0.9467903971672058, 'entity': 'I-PER', 'index': 4}, {'word': '##rt', 'score': 0.8386904001235962, 'entity': 'I-PER', 'index': 5}]
-Script finished successfully.
 ```
 
 ### Reference
