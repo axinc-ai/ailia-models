@@ -219,7 +219,6 @@ def recognize_from_video(video, net):
         if not ret:
             continue
 
-        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         keypoints = predict(frame, net)
         res_img = draw_keypoints(frame, keypoints)
 
