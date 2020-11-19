@@ -4,7 +4,6 @@ import argparse
 
 import numpy as np
 import cv2
-import matplotlib.pyplot as plt
 
 import ailia
 
@@ -78,11 +77,6 @@ parser.add_argument(
     '-c', '--clothing-type', type=str, default='blouse',
     choices=('blouse', 'dress', 'outwear', 'skirt', 'trousers'),
     help='clothing type'
-)
-parser.add_argument(
-    '--onnx',
-    action='store_true',
-    help='execute onnxruntime version.'
 )
 args = parser.parse_args()
 
@@ -161,21 +155,12 @@ def predict(img, net):
     img_flip = preprocess(img_flip, (img_w2, img_h2))
 
     # feedforward
-    if not args.onnx:
-        output = net.predict({
-            'img': img
-        })
-        output_flip = net.predict({
-            'img': img_flip
-        })
-    else:
-        img_name = net.get_inputs()[0].name
-        p2_name = net.get_outputs()[0].name
-        hm_pred_name = net.get_outputs()[1].name
-        output = net.run([p2_name, hm_pred_name],
-                         {img_name: img})
-        output_flip = net.run([p2_name, hm_pred_name],
-                              {img_name: img_flip})
+    output = net.predict({
+        'img': img
+    })
+    output_flip = net.predict({
+        'img': img_flip
+    })
 
     _, hm_pred = output
     _, hm_pred2 = output_flip
@@ -264,11 +249,7 @@ def main():
     print(f'env_id: {env_id}')
 
     # initialize
-    if not args.onnx:
-        net = ailia.Net(model_path, weight_path, env_id=env_id)
-    else:
-        import onnxruntime
-        net = onnxruntime.InferenceSession(weight_path)
+    net = ailia.Net(model_path, weight_path, env_id=env_id)
 
     if args.video is not None:
         recognize_from_video(args.video, net)
