@@ -3,3 +3,4 @@
 *.caffemodel
 *.pyc
 *.pb
+face_identification/validation/dataset/*
