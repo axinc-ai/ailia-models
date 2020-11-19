@@ -26,12 +26,18 @@ WEIGHT_DRESS_PATH = './dress_100.onnx'
 MODEL_DRESS_PATH = './dress_100.onnx.prototxt'
 WEIGHT_OUTWEAR_PATH = './outwear_100.onnx'
 MODEL_OUTWEAR_PATH = './outwear_100.onnx.prototxt'
+WEIGHT_SKIRT_PATH = './skirt_100.onnx'
+MODEL_SKIRT_PATH = './skirt_100.onnx.prototxt'
+WEIGHT_TROUSERS_PATH = './trousers_100.onnx'
+MODEL_TROUSERS_PATH = './trousers_100.onnx.prototxt'
 REMOTE_PATH = \
     'https://storage.googleapis.com/ailia-models/fashionai/'
 
 IMAGE_BLOUSE_PATH = 'blouse.jpg'
 IMAGE_DRESS_PATH = 'dress.jpg'
 IMAGE_OUTWEAR_PATH = 'outwear.jpg'
+IMAGE_SKIRT_PATH = 'skirt.jpg'
+IMAGE_TROUSERS_PATH = 'trousers.jpg'
 SAVE_IMAGE_PATH = 'output.png'
 
 IMAGE_SIZE = 512
@@ -70,7 +76,7 @@ parser.add_argument(
 )
 parser.add_argument(
     '-c', '--clothing-type', type=str, default='blouse',
-    choices=('blouse', 'dress', 'outwear'),
+    choices=('blouse', 'dress', 'outwear', 'skirt', 'trousers'),
     help='clothing type'
 )
 parser.add_argument(
@@ -245,6 +251,8 @@ def main():
         'blouse': (WEIGHT_BLOUSE_PATH, MODEL_BLOUSE_PATH, IMAGE_BLOUSE_PATH),
         'dress': (WEIGHT_DRESS_PATH, MODEL_DRESS_PATH, IMAGE_DRESS_PATH),
         'outwear': (WEIGHT_OUTWEAR_PATH, MODEL_OUTWEAR_PATH, IMAGE_OUTWEAR_PATH),
+        'skirt': (WEIGHT_SKIRT_PATH, MODEL_SKIRT_PATH, IMAGE_SKIRT_PATH),
+        'trousers': (WEIGHT_TROUSERS_PATH, MODEL_TROUSERS_PATH, IMAGE_TROUSERS_PATH),
     }
     weight_path, model_path, img_path = dic_model[args.clothing_type]
 
