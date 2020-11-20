@@ -3,6 +3,7 @@
 ## Input
 
 ![Input](imgs/ansel_adams3.jpg)
+
 (Image above is from [https://github.com/richzhang/colorization/tree/master/imgs](https://github.com/richzhang/colorization/tree/master/imgs))
 
 ## Output
