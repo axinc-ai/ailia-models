@@ -2,15 +2,12 @@
 
 ## Input
 
-{: align="center"}
-<img src='imgs/ansel_adams3.jpg', width=512>
-
+![Input](imgs/ansel_adams3.jpg)
 (Image above is from [https://github.com/richzhang/colorization/tree/master/imgs](https://github.com/richzhang/colorization/tree/master/imgs))
 
 ## Output
 
-{: align="center"}
-<img src='imgs_out/ansel_adams3_output.jpg', width=512>
+![Output](imgs_out/ansel_adams3_output.jpg)
 
 ## Usage
 Automatically downloads the onnx and prototxt files on the first run.
