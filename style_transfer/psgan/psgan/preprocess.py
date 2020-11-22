@@ -64,7 +64,7 @@ class PreProcess:
     eye_margin = 16
     diff_size = (64, 64)
 
-    def __init__(self, config, device="cpu", need_parser=True):
+    def __init__(self, config, device="cpu", args=None, face_parser_path=None, need_parser=True):
         self.device = device
         self.img_size    = config.DATA.IMG_SIZE
 
@@ -83,7 +83,7 @@ class PreProcess:
         fix = np.concatenate([ys, xs], axis=0)
         self.fix = torch.Tensor(fix).to(self.device)
         if need_parser:
-            self.face_parse = futils.mask.FaceParser(device=device)
+            self.face_parse = futils.mask.FaceParser(device=device, args=args, face_parser_path=face_parser_path)
         self.up_ratio    = config.PREPROCESS.UP_RATIO
         self.down_ratio  = config.PREPROCESS.DOWN_RATIO
         self.width_ratio = config.PREPROCESS.WIDTH_RATIO

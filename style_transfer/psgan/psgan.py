@@ -22,7 +22,10 @@ from webcamera_utils import adjust_frame_size, get_capture  # NOQA: E402
 # ======================
 WEIGHT_PATH = "psgan.onnx"
 MODEL_PATH = "psgan.onnx.prototxt"
+FACE_PARSER_WEIGHT_PATH = "face_parser.onnx"
+FACE_PARSER_MODEL_PATH = "face_parser.onnx.prototxt"
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/psgan/"
+face_parser_path = [FACE_PARSER_MODEL_PATH, FACE_PARSER_WEIGHT_PATH]
 
 SOURCE_IMAGE_PATH = "images/non-makeup/xfsy_0106.png"
 REFERENCE_IMAGE_PATH = "images/makeup"
@@ -177,7 +180,7 @@ def _postprocessing(out, source, crop_face, postprocess):
 def transfer_to_image():
     # Prepare input data
     device = args.device
-    preprocess = PreProcess(config, device)
+    preprocess = PreProcess(config, device, args, face_parser_path)
     source, real_A, mask_A, diff_A, crop_face = _prepare_data(
         args, device, preprocess, "source"
     )
@@ -245,7 +248,12 @@ def transfer_to_video():
 
 def main():
     # Check model files and download
-    check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
+    check_and_download_models(
+        WEIGHT_PATH, MODEL_PATH, REMOTE_PATH,
+    )
+    check_and_download_models(
+        FACE_PARSER_WEIGHT_PATH, FACE_PARSER_MODEL_PATH, REMOTE_PATH,
+    )
 
     if args.video is not None:
         # Video mode
