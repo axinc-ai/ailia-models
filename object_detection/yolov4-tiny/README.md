@@ -2,9 +2,9 @@
 
 ## Input
 
-![Input](street.jpg)
+![Input](dog.jpg)
 
-(Image from https://github.com/bubbliiiing/yolov4-tiny-pytorch/blob/master/img/street.jpg)
+(Image from https://github.com/Tianxiaomo/pytorch-YOLOv4/blob/master/data/dog.jpg)
 
 Shape : (batch_size, 3, 416, 416)  
 Range : [0.0, 1.0]
@@ -55,4 +55,4 @@ ONNX opset=11
 
 ## Netron
 
-[yolov4.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/yolov4-tiny/yolov4-tiny.onnx.prototxt)
+[yolov4-tiny.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/yolov4-tiny/yolov4-tiny.onnx.prototxt)

@@ -13,16 +13,16 @@ from model_utils import check_and_download_models  # noqa: E402
 from webcamera_utils import get_capture  # noqa: E402C
 from detector_utils import plot_results, load_image  # noqa: E402C
 
-from my_utils import post_processing
+from yolov4_tiny_utils import post_processing
 
 # ======================
 # Parameters
 # ======================
 WEIGHT_PATH = 'yolov4-tiny.onnx'
 MODEL_PATH = 'yolov4-tiny.onnx.prototxt'
-REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/yolov4/'
+REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/yolov4-tiny/'
 
-IMAGE_PATH = 'street.jpg'
+IMAGE_PATH = 'dog.jpg'
 SAVE_IMAGE_PATH = 'output.png'
 
 COCO_CATEGORY = [
