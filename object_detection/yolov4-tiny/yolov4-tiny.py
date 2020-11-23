@@ -41,7 +41,7 @@ COCO_CATEGORY = [
     "scissors", "teddy bear", "hair drier", "toothbrush"
 ]
 THRESHOLD = 0.4
-IOU = 0.6
+IOU = 0.45
 IMAGE_HEIGHT = 416
 IMAGE_WIDTH = 416
 
