@@ -2,6 +2,7 @@ import sys, os
 import time
 import argparse
 import glob
+from collections import namedtuple
 
 import numpy as np
 from numpy.linalg import norm
@@ -15,7 +16,7 @@ from model_utils import check_and_download_models  # noqa: E402
 from detector_utils import plot_results, load_image  # noqa: E402C
 from webcamera_utils import get_capture  # noqa: E402
 
-from my_utils import PriorBox, decode, decode_landm, nms, face_align_norm_crop
+from my_utils import PriorBox, decode, decode_landm, nms, face_align_norm_crop, draw_detection
 
 # ======================
 # Parameters
@@ -25,6 +26,8 @@ WEIGHT_DET_PATH = './retinaface_resnet.onnx'
 MODEL_DET_PATH = './retinaface_resnet.onnx.prototxt'
 WEIGHT_REC_PATH = './arcface_r100_v1.onnx'
 MODEL_REC_PATH = './arcface_r100_v1.onnx.prototxt'
+WEIGHT_GA_PATH = './genderage_v1.onnx'
+MODEL_GA_PATH = './genderage_v1.onnx.prototxt'
 REMOTE_PATH = \
     'https://storage.googleapis.com/ailia-models/insightface'
 
@@ -32,6 +35,12 @@ IMAGE_PATH = 'demo.jpg'
 SAVE_IMAGE_PATH = 'output.png'
 
 IMAGE_SIZE = 512
+
+Face = namedtuple('Face', [
+    'category', 'prob', 'cosin_metric',
+    'landmark', 'x', 'y', 'w', 'h',
+    'embedding', 'gender', 'age'
+])
 
 # ======================
 # Arguemnt Parser Config
@@ -70,6 +79,10 @@ parser.add_argument(
     help='nms_thresh'
 )
 parser.add_argument(
+    '--ident_thresh', type=float, default=0.25572845,
+    help='ident_thresh'
+)
+parser.add_argument(
     '--top_k', type=int, default=5000,
     help='top_k'
 )
@@ -94,7 +107,7 @@ def preprocess(img):
     return img
 
 
-def det_post_processing(im_height, im_width, loc, conf, landms):
+def post_processing(im_height, im_width, loc, conf, landms):
     cfg_re50 = {
         'min_sizes': [[16, 32], [64, 128], [256, 512]],
         'steps': [8, 16, 32],
@@ -137,26 +150,20 @@ def det_post_processing(im_height, im_width, loc, conf, landms):
     return dets, landms
 
 
-def post_processing(bboxes, embs, ident_feats, img_width, img_height):
-    detect_object = []
-    for i in range(bboxes.shape[0]):
-        bbox = bboxes[i, 0:4]
-        probs = bboxes[i, 4]
-        emb = embs[i]
+def face_identification(faces, ident_feats):
+    ident_faces = []
+    for i in range(len(faces)):
+        face = faces[i]
+        emb = face.embedding
         metrics = ident_feats.dot(emb)
-        cat = np.argmax(metrics)
+        category = np.argmax(metrics)
+        face = face._replace(cosin_metric=metrics[category])
+        if args.ident_thresh <= face.cosin_metric:
+            face = face._replace(category=category)
 
-        r = ailia.DetectorObject(
-            category=cat,
-            prob=probs,
-            x=bbox[0] / img_width,
-            y=bbox[1] / img_height,
-            w=(bbox[2] - bbox[0]) / img_width,
-            h=(bbox[3] - bbox[1]) / img_height,
-        )
-        detect_object.append(r)
+        ident_faces.append(face)
 
-    return detect_object
+    return ident_faces
 
 
 def load_identities(rec_model):
@@ -197,7 +204,7 @@ def load_identities(rec_model):
 # ======================
 
 
-def predict(img, det_model, rec_model):
+def predict(img, det_model, rec_model, ga_model):
     # initial preprocesses
     im_height, im_width, _ = img.shape
     _img = preprocess(img)
@@ -217,13 +224,13 @@ def predict(img, det_model, rec_model):
 
     loc, conf, landms = output
 
-    bboxes, landmarks = det_post_processing(im_height, im_width, loc, conf, landms)
+    bboxes, landmarks = post_processing(im_height, im_width, loc, conf, landms)
 
-    landms = []
-    embs = []
+    faces = []
     for i in range(bboxes.shape[0]):
+        bbox = bboxes[i, 0:4]
+        prob = bboxes[i, 4]
         landmark = landmarks[i].reshape((5, 2))
-        landms.append(landmark)
 
         _img = face_align_norm_crop(img, landmark=landmark)
         _img = cv2.cvtColor(_img, cv2.COLOR_BGR2RGB)
@@ -242,14 +249,42 @@ def predict(img, det_model, rec_model):
         embedding = output[0]
         embedding_norm = norm(embedding)
         normed_embedding = embedding / embedding_norm
-        embs.append(normed_embedding)
 
-    embs = np.vstack(embs)
+        if not args.onnx:
+            output = ga_model.predict({
+                'data': _img
+            })[0]
+        else:
+            img_name = rec_model.get_inputs()[0].name
+            fc1_name = rec_model.get_outputs()[0].name
+            output = ga_model.run([fc1_name],
+                                  {img_name: _img})[0]
 
-    return bboxes, embs
+        g = output[0, 0:2]
+        gender = np.argmax(g)
+        a = output[0, 2:202].reshape((100, 2))
+        a = np.argmax(a, axis=1)
+        age = int(sum(a))
+
+        face = Face(
+            category=None,
+            prob=prob,
+            cosin_metric=1,
+            landmark=landmark,
+            x=bbox[0] / im_width,
+            y=bbox[1] / im_height,
+            w=(bbox[2] - bbox[0]) / im_width,
+            h=(bbox[3] - bbox[1]) / im_height,
+            embedding=normed_embedding,
+            gender=gender,
+            age=age
+        )
+        faces.append(face)
+
+    return faces
 
 
-def recognize_from_image(filename, det_model, rec_model):
+def recognize_from_image(filename, det_model, rec_model, ga_model):
     # prepare input data
     img = load_image(filename)
     print(f'input image shape: {img.shape}')
@@ -265,24 +300,23 @@ def recognize_from_image(filename, det_model, rec_model):
         print('BENCHMARK mode')
         for i in range(5):
             start = int(round(time.time() * 1000))
-            bboxes, embs = predict(img, det_model, rec_model)
+            faces = predict(img, det_model, rec_model, ga_model)
             end = int(round(time.time() * 1000))
             print(f'\tailia processing time {end - start} ms')
     else:
-        bboxes, embs = predict(img, det_model, rec_model)
+        faces = predict(img, det_model, rec_model, ga_model)
 
-    img_height, img_width, _ = img.shape
-    detect_object = post_processing(bboxes, embs, ident_feats, img_width, img_height)
+    faces = face_identification(faces, ident_feats)
 
     # plot result
-    res_img = plot_results(detect_object, img, ident_names)
+    res_img = draw_detection(img, faces, ident_names)
 
     # plot result
     cv2.imwrite(args.savepath, res_img)
     print('Script finished successfully.')
 
 
-def recognize_from_video(video, det_model, rec_model):
+def recognize_from_video(video, det_model, rec_model, ga_model):
     capture = get_capture(video)
 
     # load identities
@@ -295,12 +329,11 @@ def recognize_from_video(video, det_model, rec_model):
         if not ret:
             continue
 
-        bboxes, embs = predict(frame, det_model, rec_model)
-        img_height, img_width, _ = frame.shape
-        detect_object = post_processing(bboxes, embs, ident_feats, img_width, img_height)
+        faces = predict(frame, det_model, rec_model, ga_model)
+        faces = face_identification(faces, ident_feats)
 
         # plot result
-        res_img = plot_results(detect_object, frame, ident_names)
+        res_img = draw_detection(frame, faces, ident_names)
 
         # show
         cv2.imshow('frame', res_img)
@@ -316,6 +349,8 @@ def main():
     check_and_download_models(WEIGHT_DET_PATH, MODEL_DET_PATH, REMOTE_PATH)
     print("=== REC model ===")
     check_and_download_models(WEIGHT_REC_PATH, MODEL_REC_PATH, REMOTE_PATH)
+    print("=== GA model ===")
+    check_and_download_models(WEIGHT_GA_PATH, MODEL_GA_PATH, REMOTE_PATH)
 
     # load model
     env_id = ailia.get_gpu_environment_id()
@@ -325,15 +360,17 @@ def main():
     if not args.onnx:
         det_model = ailia.Net(MODEL_DET_PATH, WEIGHT_DET_PATH, env_id=env_id)
         rec_model = ailia.Net(MODEL_REC_PATH, WEIGHT_REC_PATH, env_id=env_id)
+        ga_model = ailia.Net(MODEL_GA_PATH, WEIGHT_GA_PATH, env_id=env_id)
     else:
         import onnxruntime
         det_model = onnxruntime.InferenceSession(WEIGHT_DET_PATH)
         rec_model = onnxruntime.InferenceSession(WEIGHT_REC_PATH)
+        ga_model = onnxruntime.InferenceSession(WEIGHT_GA_PATH)
 
     if args.video is not None:
-        recognize_from_video(args.video, det_model)
+        recognize_from_video(args.video, det_model, rec_model, ga_model)
     else:
-        recognize_from_image(args.input, det_model, rec_model)
+        recognize_from_image(args.input, det_model, rec_model, ga_model)
 
 
 if __name__ == '__main__':

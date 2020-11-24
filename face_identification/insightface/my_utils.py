@@ -1,3 +1,4 @@
+import random
 from math import ceil
 from itertools import product as product
 
@@ -178,3 +179,35 @@ def face_align_norm_crop(img, landmark, image_size=112, mode='arcface'):
     M, pose_index = estimate_norm(landmark, image_size, mode)
     warped = cv2.warpAffine(img, M, (image_size, image_size), borderValue=0.0)
     return warped
+
+
+def draw_detection(img, detections, names):
+    h, w = img.shape[0], img.shape[1]
+
+    for i, face in enumerate(detections):
+        color = (random.randint(0, 256), random.randint(0, 128),
+                 random.randint(0, 256))  # generate a random color
+
+        xy = (int(w * face.x), int(h * face.y))
+        xy2 = (int(w * (face.x + face.w)), int(h * (face.y + face.h)))
+
+        cv2.rectangle(img, xy, xy2, color=color, thickness=2)
+        cv2.putText(
+            img,
+            '%s %.3f' % (
+                names[face.category] if face.category is not None else '?',
+                face.cosin_metric),
+            (xy[0], xy[1] + 22),
+            color=color,
+            thickness=2,
+            fontFace=cv2.FONT_HERSHEY_COMPLEX,
+            fontScale=0.8)
+        cv2.putText(
+            img,
+            '%s: %d' % ('M' if face.gender else 'F', face.age),
+            (xy[0], xy[1] + 44),
+            color=color,
+            thickness=2,
+            fontFace=cv2.FONT_HERSHEY_COMPLEX,
+            fontScale=0.8)
+    return img
