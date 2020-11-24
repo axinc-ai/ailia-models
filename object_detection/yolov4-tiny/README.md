@@ -42,12 +42,15 @@ $ python3 yolov4-tiny.py --video VIDEO_PATH
 
 ## Reference
 
-- [YOLO: Real-Time Object Detection](https://pjreddie.com/darknet/yolov2/)
 - [Pytorch-YOLOv4](https://github.com/Tianxiaomo/pytorch-YOLOv4)
+
+- [YOLOv4-tiny released](https://github.com/Tianxiaomo/pytorch-YOLOv4/issues/125)
+
+- [Yolo v4, v3 and v2 for Windows and Linux](https://github.com/AlexeyAB/darknet)
 
 ## Framework
 
-ONNX Runtime
+Pytorch
 
 ## Model Format
 
