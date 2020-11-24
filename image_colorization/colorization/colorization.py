@@ -21,7 +21,7 @@ from webcamera_utils import adjust_frame_size, get_capture  # noqa: E402C
 # ======================
 WEIGHT_PATH = 'colorizer.onnx'
 MODEL_PATH = 'colorizer.onnx.prototxt'
-REMOTE_PATH = ''
+REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/colorization/'
 
 IMAGE_PATH = 'imgs/ansel_adams1.jpg'
 SAVE_IMAGE_PATH = 'imgs_out/ansel_adams1_output.jpg'
