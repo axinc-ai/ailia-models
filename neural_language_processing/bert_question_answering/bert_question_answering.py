@@ -225,29 +225,21 @@ def main():
         model_input_names = tokenizer.model_input_names + ["input_ids"]
         fw_args = {k: [feature.__dict__[k] for feature in features] for k in model_input_names}
         fw_args = {k: np.array(v) for (k, v) in fw_args.items()}
+
         #print("Input",fw_args)
         #print("Shape",fw_args["input_ids"].shape)
-        if False:
-          net = ailia.Net(MODEL_PATH,WEIGHT_PATH)
-          net.set_input_shape(fw_args["input_ids"].shape)
-          if args.benchmark:
-              print('BENCHMARK mode')
-              for i in range(5):
-                  start = int(round(time.time() * 1000))
-                  outputs = net.predict(fw_args)
-                  end = int(round(time.time() * 1000))
-                  print("\tailia processing time {} ms".format(end - start))
-          else:
-            outputs = net.predict(fw_args)
+
+        net = ailia.Net(MODEL_PATH,WEIGHT_PATH)
+        net.set_input_shape(fw_args["input_ids"].shape)
+        if args.benchmark:
+            print('BENCHMARK mode')
+            for i in range(5):
+                start = int(round(time.time() * 1000))
+                outputs = net.predict(fw_args)
+                end = int(round(time.time() * 1000))
+                print("\tailia processing time {} ms".format(end - start))
         else:
-          from onnxruntime import InferenceSession, SessionOptions, get_all_providers
-          from onnxruntime import GraphOptimizationLevel, InferenceSession, SessionOptions, get_all_providers
-          options = SessionOptions()
-          options.intra_op_num_threads = 1
-          options.graph_optimization_level = GraphOptimizationLevel.ORT_ENABLE_ALL
-          cpu_model = InferenceSession(WEIGHT_PATH, options, providers=["CPUExecutionProvider"])
-          cpu_model.disable_fallback()
-          outputs = cpu_model.run(None, fw_args)
+            outputs = net.predict(fw_args)
 
         #print("Output",outputs)
         start,end =outputs[0:2]
