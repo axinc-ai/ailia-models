@@ -138,9 +138,12 @@ def recognize_from_video():
     capture = get_capture(args.video)
     while(True):
         ret, img = capture.read()
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         (img_lab_orig, img_lab_rs) = preprocess(img)
         out = net.predict({'input.1':img_lab_rs})[0]
         out_img = post_process(out, img_lab_orig)
+        out_img = np.array(out_img * 255, dtype=np.uint8)
+        out_img = cv2.cvtColor(out_img, cv2.COLOR_RGB2BGR)
         cv2.imshow('frame', out_img)
 
         # press q to end video capture
