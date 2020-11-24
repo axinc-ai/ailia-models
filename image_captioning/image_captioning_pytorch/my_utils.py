@@ -12,7 +12,7 @@ def decode_sequence(ix_to_word, seq):
         for j in range(D):
             ix = seq[i, j]
             if ix > 0:
-                words.append(ix_to_word[str(ix)])
+                words.append(ix_to_word[str(int(ix))])
             else:
                 break
         if int(os.getenv('REMOVE_BAD_ENDINGS', '0')):
