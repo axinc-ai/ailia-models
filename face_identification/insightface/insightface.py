@@ -97,11 +97,6 @@ parser.add_argument(
     choices=('resnet100', 'resnet50', 'resnet34', 'mobileface'),
     help='recognition model'
 )
-parser.add_argument(
-    '--onnx',
-    action='store_true',
-    help='execute onnxruntime version.'
-)
 args = parser.parse_args()
 
 
@@ -190,15 +185,7 @@ def load_identities(rec_model):
         img = np.expand_dims(img, axis=0)
         img = img.astype(np.float32)
 
-        if not args.onnx:
-            output = rec_model.predict({
-                'data': img
-            })[0]
-        else:
-            img_name = rec_model.get_inputs()[0].name
-            fc1_name = rec_model.get_outputs()[0].name
-            output = rec_model.run([fc1_name],
-                                   {img_name: img})[0]
+        output = rec_model.predict({'data': img})[0]
 
         embedding = output[0]
         embedding_norm = norm(embedding)
@@ -221,17 +208,7 @@ def predict(img, det_model, rec_model, ga_model):
     _img = preprocess(img)
 
     # feedforward
-    if not args.onnx:
-        output = det_model.predict({
-            'img': _img
-        })
-    else:
-        img_name = det_model.get_inputs()[0].name
-        loc_name = det_model.get_outputs()[0].name
-        conf_name = det_model.get_outputs()[1].name
-        landms_name = det_model.get_outputs()[2].name
-        output = det_model.run([loc_name, conf_name, landms_name],
-                               {img_name: _img})
+    output = det_model.predict({'img': _img})
 
     loc, conf, landms = output
 
@@ -248,28 +225,13 @@ def predict(img, det_model, rec_model, ga_model):
         _img = np.transpose(_img, (2, 0, 1))
         _img = np.expand_dims(_img, axis=0)
         _img = _img.astype(np.float32)
-        if not args.onnx:
-            output = rec_model.predict({
-                'data': _img
-            })[0]
-        else:
-            img_name = rec_model.get_inputs()[0].name
-            fc1_name = rec_model.get_outputs()[0].name
-            output = rec_model.run([fc1_name],
-                                   {img_name: _img})[0]
+        output = rec_model.predict({'data': _img})[0]
+
         embedding = output[0]
         embedding_norm = norm(embedding)
         normed_embedding = embedding / embedding_norm
 
-        if not args.onnx:
-            output = ga_model.predict({
-                'data': _img
-            })[0]
-        else:
-            img_name = rec_model.get_inputs()[0].name
-            fc1_name = rec_model.get_outputs()[0].name
-            output = ga_model.run([fc1_name],
-                                  {img_name: _img})[0]
+        output = ga_model.predict({'data': _img})[0]
 
         g = output[0, 0:2]
         gender = np.argmax(g)
@@ -376,15 +338,9 @@ def main():
     print(f'env_id: {env_id}')
 
     # initialize
-    if not args.onnx:
-        det_model = ailia.Net(MODEL_DET_PATH, WEIGHT_DET_PATH, env_id=env_id)
-        rec_model = ailia.Net(MODEL_REC_PATH, WEIGHT_REC_PATH, env_id=env_id)
-        ga_model = ailia.Net(MODEL_GA_PATH, WEIGHT_GA_PATH, env_id=env_id)
-    else:
-        import onnxruntime
-        det_model = onnxruntime.InferenceSession(WEIGHT_DET_PATH)
-        rec_model = onnxruntime.InferenceSession(WEIGHT_REC_PATH)
-        ga_model = onnxruntime.InferenceSession(WEIGHT_GA_PATH)
+    det_model = ailia.Net(MODEL_DET_PATH, WEIGHT_DET_PATH, env_id=env_id)
+    rec_model = ailia.Net(MODEL_REC_PATH, WEIGHT_REC_PATH, env_id=env_id)
+    ga_model = ailia.Net(MODEL_GA_PATH, WEIGHT_GA_PATH, env_id=env_id)
 
     if args.video is not None:
         recognize_from_video(args.video, det_model, rec_model, ga_model)
