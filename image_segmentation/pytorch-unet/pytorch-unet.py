@@ -19,8 +19,7 @@ from webcamera_utils import get_capture  # noqa: E402C
 # ======================
 WEIGHT_PATH = 'pytorch-unet.onnx'
 MODEL_PATH = 'pytorch-unet.onnx.prototxt'
-# REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/pytorch-unet/'
-REMOTE_PATH = ''
+REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/pytorch-unet/'
 
 IMAGE_PATH = 'data/imgs/0cdf5b5d0ce1_14.jpg'
 SAVE_IMAGE_PATH = 'data/masks/0cdf5b5d0ce1_14.jpg'

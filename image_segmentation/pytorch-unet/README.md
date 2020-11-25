@@ -45,5 +45,5 @@ ONNX opset=11
 
 ## Netron
 
-[pytorch-unet.onnx.prototxt]()
+[pytorch-unet.onnx.prototxt](https://storage.googleapis.com/ailia-models/pytorch-unet/pytorch-unet.onnx.prototxt)
 
