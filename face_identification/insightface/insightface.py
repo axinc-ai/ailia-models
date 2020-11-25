@@ -24,8 +24,14 @@ from my_utils import PriorBox, decode, decode_landm, nms, face_align_norm_crop, 
 
 WEIGHT_DET_PATH = './retinaface_resnet.onnx'
 MODEL_DET_PATH = './retinaface_resnet.onnx.prototxt'
-WEIGHT_REC_PATH = './arcface_r100_v1.onnx'
-MODEL_REC_PATH = './arcface_r100_v1.onnx.prototxt'
+WEIGHT_REC_R100_PATH = './arcface_r100_v1.onnx'
+MODEL_REC_R100_PATH = './arcface_r100_v1.onnx.prototxt'
+WEIGHT_REC_R50_PATH = './arcface_r50_v1.onnx'
+MODEL_REC_R50_PATH = './arcface_r50_v1.onnx.prototxt'
+WEIGHT_REC_R34_PATH = './arcface_r34_v1.onnx'
+MODEL_REC_R34_PATH = './arcface_r34_v1.onnx.prototxt'
+WEIGHT_REC_MF_PATH = './arcface_mobilefacenet.onnx'
+MODEL_REC_MF_PATH = './arcface_mobilefacenet.onnx.prototxt'
 WEIGHT_GA_PATH = './genderage_v1.onnx'
 MODEL_GA_PATH = './genderage_v1.onnx.prototxt'
 REMOTE_PATH = \
@@ -85,6 +91,11 @@ parser.add_argument(
 parser.add_argument(
     '--top_k', type=int, default=5000,
     help='top_k'
+)
+parser.add_argument(
+    '-r', '--rec_model', type=str, default='resnet100',
+    choices=('resnet100', 'resnet50', 'resnet34', 'mobileface'),
+    help='recognition model'
 )
 parser.add_argument(
     '--onnx',
@@ -344,6 +355,14 @@ def recognize_from_video(video, det_model, rec_model, ga_model):
 
 
 def main():
+    rec_model = {
+        'resnet100': (WEIGHT_REC_R100_PATH, MODEL_REC_R100_PATH),
+        'resnet50': (WEIGHT_REC_R50_PATH, MODEL_REC_R50_PATH),
+        'resnet34': (WEIGHT_REC_R34_PATH, MODEL_REC_R34_PATH),
+        'mobileface': (WEIGHT_REC_MF_PATH, MODEL_REC_MF_PATH),
+    }
+    WEIGHT_REC_PATH, MODEL_REC_PATH = rec_model[args.rec_model]
+
     # model files check and download
     print("=== DET model ===")
     check_and_download_models(WEIGHT_DET_PATH, MODEL_DET_PATH, REMOTE_PATH)
