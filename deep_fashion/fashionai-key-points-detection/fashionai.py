@@ -19,18 +19,18 @@ from my_utils import decode_np, draw_keypoints
 # Parameters
 # ======================
 
-WEIGHT_BLOUSE_PATH = './blouse_100.onnx'
-MODEL_BLOUSE_PATH = './blouse_100.onnx.prototxt'
-WEIGHT_DRESS_PATH = './dress_100.onnx'
-MODEL_DRESS_PATH = './dress_100.onnx.prototxt'
-WEIGHT_OUTWEAR_PATH = './outwear_100.onnx'
-MODEL_OUTWEAR_PATH = './outwear_100.onnx.prototxt'
-WEIGHT_SKIRT_PATH = './skirt_100.onnx'
-MODEL_SKIRT_PATH = './skirt_100.onnx.prototxt'
-WEIGHT_TROUSERS_PATH = './trousers_100.onnx'
-MODEL_TROUSERS_PATH = './trousers_100.onnx.prototxt'
+WEIGHT_BLOUSE_PATH = 'blouse_100.onnx'
+MODEL_BLOUSE_PATH = 'blouse_100.onnx.prototxt'
+WEIGHT_DRESS_PATH = 'dress_100.onnx'
+MODEL_DRESS_PATH = 'dress_100.onnx.prototxt'
+WEIGHT_OUTWEAR_PATH = 'outwear_100.onnx'
+MODEL_OUTWEAR_PATH = 'outwear_100.onnx.prototxt'
+WEIGHT_SKIRT_PATH = 'skirt_100.onnx'
+MODEL_SKIRT_PATH = 'skirt_100.onnx.prototxt'
+WEIGHT_TROUSERS_PATH = 'trousers_100.onnx'
+MODEL_TROUSERS_PATH = 'trousers_100.onnx.prototxt'
 REMOTE_PATH = \
-    'https://storage.googleapis.com/ailia-models/fashionai/'
+    'https://storage.googleapis.com/ailia-models/fashionai-key-points-detection/'
 
 IMAGE_BLOUSE_PATH = 'blouse.jpg'
 IMAGE_DRESS_PATH = 'dress.jpg'
