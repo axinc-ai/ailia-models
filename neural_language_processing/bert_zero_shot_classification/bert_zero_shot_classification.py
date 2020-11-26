@@ -16,6 +16,7 @@ from model_utils import check_and_download_models  # noqa: E402
 
 SENTENCE = "Who are you voting for in 2020?"
 CANDIDATE_LABELS = "economics, politics, public health"
+HYPOTHESIS_TEMPLATE="This example is {}."
 
 parser = argparse.ArgumentParser(
     description='bert zero-shot-classification.'
@@ -24,12 +25,17 @@ parser = argparse.ArgumentParser(
 parser.add_argument(
     '--sentence', '-s', metavar='TEXT',
     default=SENTENCE, 
-    help='input text'
+    help='input sentence'
 )
 parser.add_argument(
     '--candidate_labels', '-c', metavar='TEXT',
     default=CANDIDATE_LABELS, 
-    help='input text'
+    help='input labels separated by , '
+)
+parser.add_argument(
+    '--hypothesis_template', '-t', metavar='TEXT',
+    default=HYPOTHESIS_TEMPLATE, 
+    help='input hypothesis template'
 )
 parser.add_argument(
     '-b', '--benchmark',
@@ -54,19 +60,7 @@ REMOTE_PATH = "https://storage.googleapis.com/ailia-models/bert_zero_shot_classi
 # ======================
 
 def preprocess(sequences, labels, hypothesis_template):
-    if len(labels) == 0 or len(sequences) == 0:
-        raise ValueError("You must include at least one label and at least one sequence.")
-    if hypothesis_template.format(labels[0]) == hypothesis_template:
-        raise ValueError(
-            (
-                'The provided hypothesis_template "{}" was not able to be formatted with the target labels. '
-                "Make sure the passed template includes formatting syntax such as {{}} where the label should go."
-            ).format(hypothesis_template)
-        )
-
-    if isinstance(sequences, str):
-        sequences = [sequences]
-
+    sequences = [sequences]
     sequence_pairs = []
     for sequence in sequences:
         sequence_pairs.extend([[sequence, hypothesis_template.format(label)] for label in labels])
@@ -82,12 +76,7 @@ def main():
     ailia_model = ailia.Net(MODEL_PATH,WEIGHT_PATH)
     tokenizer = AutoTokenizer.from_pretrained('roberta-large-mnli')
 
-    hypothesis_template="This example is {}."
-
-    #https://github.com/patil-suraj/onnx_transformers/blob/master/onnx_transformers/pipelines.py
-    model_inputs = preprocess(args.sentence,candidate_labels,hypothesis_template)
-
-    #model_inputs = tokenizer.encode_plus(model_inputs, return_tensors="pt")
+    model_inputs = preprocess(args.sentence,candidate_labels,args.hypothesis_template)
 
     model_inputs = tokenizer(
         model_inputs,
@@ -101,34 +90,18 @@ def main():
 
     print("Sentence : ", args.sentence)
     print("Candidate Labels : ", args.candidate_labels)
-    print("Hypothesis Template : ", hypothesis_template)
-
-    print("Inputs : ",inputs_onnx)
+    print("Hypothesis Template : ", args.hypothesis_template)
 
     # inference
-    if True:
-        ailia_model.set_input_blob_shape(inputs_onnx["input_ids"].shape,ailia_model.find_blob_index_by_name("input_ids"))
-        ailia_model.set_input_blob_shape(inputs_onnx["attention_mask"].shape,ailia_model.find_blob_index_by_name("attention_mask"))
-
-        if args.benchmark:
-            print('BENCHMARK mode')
-            for i in range(5):
-                start = int(round(time.time() * 1000))
-                score = ailia_model.predict(inputs_onnx)
-                end = int(round(time.time() * 1000))
-                print("\tailia processing time {} ms".format(end - start))
-        else:
+    if args.benchmark:
+        print('BENCHMARK mode')
+        for i in range(5):
+            start = int(round(time.time() * 1000))
             score = ailia_model.predict(inputs_onnx)
+            end = int(round(time.time() * 1000))
+            print("\tailia processing time {} ms".format(end - start))
     else:
-        from onnxruntime import InferenceSession, SessionOptions, get_all_providers
-        from onnxruntime import GraphOptimizationLevel, InferenceSession, SessionOptions, get_all_providers
-        options = SessionOptions()
-        options.intra_op_num_threads = 1
-        options.graph_optimization_level = GraphOptimizationLevel.ORT_ENABLE_ALL
-        cpu_model = InferenceSession(WEIGHT_PATH, options, providers=["CPUExecutionProvider"])
-        cpu_model.disable_fallback()
-        score = cpu_model.run(None, inputs_onnx)
-        print(score)
+        score = ailia_model.predict(inputs_onnx)
 
     score = score[0]
     num_sequences = 1
@@ -136,8 +109,6 @@ def main():
 
     entail_logits = reshaped_outputs[..., -1]
     score = numpy.exp(entail_logits) / numpy.exp(entail_logits).sum(-1, keepdims=True)
-
-    #score = numpy.exp(score) / numpy.exp(score).sum(-1, keepdims=True)
 
     label_id=numpy.argmax(numpy.array(score))
     print("Label Id :",label_id)

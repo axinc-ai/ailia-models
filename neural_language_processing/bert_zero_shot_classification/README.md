@@ -1,17 +1,23 @@
 # Zero Shot Classification Using Bert
 
 ### input
-A `SENTENCE` and `CANDIDATE_LABELS`.
+A `SENTENCE`, `CANDIDATE_LABELS` and `HYPOTHESIS_TEMPLATE`.
 
 ### output
 Positive or Negative
 
 ### Usage
-Set the `SENTENCE` and `CANDIDATE_LABELS` as an argument.
+Set the `SENTENCE`, `CANDIDATE_LABELS` and `HYPOTHESIS_TEMPLATE` as an argument.
 
 ```bash
-$ python3 bert_zero_shot_classification.py -s "Who are you voting for in 2020?" -c "economics, politics, public health"
+$ python3 bert_zero_shot_classification.py -s "Who are you voting for in 2020?" -c "economics, politics, public health" -t "This example is {}."
 ...
+Sentence :  Who are you voting for in 2020?
+Candidate Labels :  economics, politics, public health
+Hypothesis Template :  This example is {}.
+Label Id : 1
+Label :  politics
+Score :  0.96848875
 ```
 
 ### Reference
