@@ -22,20 +22,20 @@ from my_utils import PriorBox, decode, decode_landm, nms, face_align_norm_crop, 
 # Parameters
 # ======================
 
-WEIGHT_DET_PATH = './retinaface_resnet.onnx'
-MODEL_DET_PATH = './retinaface_resnet.onnx.prototxt'
-WEIGHT_REC_R100_PATH = './arcface_r100_v1.onnx'
-MODEL_REC_R100_PATH = './arcface_r100_v1.onnx.prototxt'
-WEIGHT_REC_R50_PATH = './arcface_r50_v1.onnx'
-MODEL_REC_R50_PATH = './arcface_r50_v1.onnx.prototxt'
-WEIGHT_REC_R34_PATH = './arcface_r34_v1.onnx'
-MODEL_REC_R34_PATH = './arcface_r34_v1.onnx.prototxt'
-WEIGHT_REC_MF_PATH = './arcface_mobilefacenet.onnx'
-MODEL_REC_MF_PATH = './arcface_mobilefacenet.onnx.prototxt'
-WEIGHT_GA_PATH = './genderage_v1.onnx'
-MODEL_GA_PATH = './genderage_v1.onnx.prototxt'
+WEIGHT_DET_PATH = 'retinaface_resnet.onnx'
+MODEL_DET_PATH = 'retinaface_resnet.onnx.prototxt'
+WEIGHT_REC_R100_PATH = 'arcface_r100_v1.onnx'
+MODEL_REC_R100_PATH = 'arcface_r100_v1.onnx.prototxt'
+WEIGHT_REC_R50_PATH = 'arcface_r50_v1.onnx'
+MODEL_REC_R50_PATH = 'arcface_r50_v1.onnx.prototxt'
+WEIGHT_REC_R34_PATH = 'arcface_r34_v1.onnx'
+MODEL_REC_R34_PATH = 'arcface_r34_v1.onnx.prototxt'
+WEIGHT_REC_MF_PATH = 'arcface_mobilefacenet.onnx'
+MODEL_REC_MF_PATH = 'arcface_mobilefacenet.onnx.prototxt'
+WEIGHT_GA_PATH = 'genderage_v1.onnx'
+MODEL_GA_PATH = 'genderage_v1.onnx.prototxt'
 REMOTE_PATH = \
-    'https://storage.googleapis.com/ailia-models/insightface'
+    'https://storage.googleapis.com/ailia-models/insightface/'
 
 IMAGE_PATH = 'demo.jpg'
 SAVE_IMAGE_PATH = 'output.png'

@@ -10,6 +10,12 @@
 
 ![Output](output.png)
 
+## Note
+
+The code of InsightFace is released under the MIT License. There is no limitation for both acadmic and commercial usage.
+
+The training data containing the annotation (and the models trained with these data) are available for non-commercial research purposes only.
+
 ## Usage
 Automatically downloads the onnx and prototxt files on the first run.
 It is necessary to be connected to the Internet while downloading.
@@ -40,7 +46,7 @@ $ python3 insightface.py --video VIDEO_PATH
 
 ## Framework
 
-ONNX Runtime
+Pytorch
 
 ## Model Format
 
