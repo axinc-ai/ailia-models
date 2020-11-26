@@ -42,4 +42,4 @@ ONNX opset = 10
 
 ### Netron
 
-[bert-base-uncased.onnx.prototxt](https://lutzroeder.github.io/netron/?url=https://storage.googleapis.com/ailia-models/bert_en/bert-base-uncased.onnx.prototxt)
+[bert-base-uncased.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/bert_en/bert-base-uncased.onnx.prototxt)

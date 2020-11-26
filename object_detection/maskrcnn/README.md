@@ -43,4 +43,4 @@ ONNX opset = 10
 
 ### Netron
 
-[mask_rcnn_R_50_FPN_1x.onnx.prototxt](https://lutzroeder.github.io/netron/?url=https://storage.googleapis.com/ailia-models/mask_rcnn/mask_rcnn_R_50_FPN_1x.onnx.prototxt)
+[mask_rcnn_R_50_FPN_1x.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/mask_rcnn/mask_rcnn_R_50_FPN_1x.onnx.prototxt)

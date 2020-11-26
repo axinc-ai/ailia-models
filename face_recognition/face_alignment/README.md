@@ -62,6 +62,6 @@ ONNX opset = 10
 
 ## Netron
 
-- [2DFAN-4.onnx.prototxt](https://lutzroeder.github.io/netron/?url=https://storage.googleapis.com/ailia-models/face_alignment/2DFAN-4.onnx.prototxt)
-- [3DFAN-4.onnx.prototxt](https://lutzroeder.github.io/netron/?url=https://storage.googleapis.com/ailia-models/face_alignment/3DFAN-4.onnx.prototxt)
-- [depth_estimation.onnx.prototxt](https://lutzroeder.github.io/netron/?url=https://storage.googleapis.com/ailia-models/face_alignment/depth_estimation.onnx.prototxt)
+- [2DFAN-4.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/face_alignment/2DFAN-4.onnx.prototxt)
+- [3DFAN-4.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/face_alignment/3DFAN-4.onnx.prototxt)
+- [depth_estimation.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/face_alignment/depth_estimation.onnx.prototxt)

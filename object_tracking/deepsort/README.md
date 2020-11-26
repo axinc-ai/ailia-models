@@ -73,4 +73,4 @@ ONNX opset = 10
 
 
 ### Netron
-[deep_sort.onnx.prototxt](https://lutzroeder.github.io/netron/?url=https://storage.googleapis.com/ailia-models/deep_sort/deep_sort.onnx.prototxt)
+[deep_sort.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/deep_sort/deep_sort.onnx.prototxt)

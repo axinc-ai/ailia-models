@@ -50,5 +50,5 @@ ONNX opset=10
 
 ## Netron
 
-[yolov3-hand.opt.onnx.prototxt](https://lutzroeder.github.io/netron/?url=https://storage.googleapis.com/ailia-models/yolov3-hand/yolov3-hand.opt.onnx.prototxt)
+[yolov3-hand.opt.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/yolov3-hand/yolov3-hand.opt.onnx.prototxt)
 
