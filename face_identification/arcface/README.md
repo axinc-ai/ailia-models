@@ -62,4 +62,4 @@ ONNX opset = 10
 
 
 ### Netron
-[arcface.onnx.prototxt](https://lutzroeder.github.io/netron/?url=https://storage.googleapis.com/ailia-models/arcface/arcface.onnx.prototxt)
+[arcface.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/arcface/arcface.onnx.prototxt)

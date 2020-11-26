@@ -229,9 +229,8 @@ def main():
 
     # load model
     env_id = ailia.get_gpu_environment_id()
-    if sys.platform == "darwin":
-        # Workaround for accuracy issue on ailia SDK 1.2.4 + opset11 + gpu
-        env_id = 0
+    # Workaround for accuracy issue on ailia SDK 1.2.4 + opset11 + gpu (metal/vulkan)
+    env_id = 0
     print(f'env_id: {env_id}')
 
     # initialize

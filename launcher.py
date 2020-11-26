@@ -26,6 +26,7 @@ def search_model():
     category_list={}
     model_exist={}
     for current in file_list:
+        current = current.replace("\\","/")
         files = current.split("/")
         if len(files)==3:
             if (files[1] in IGNORE_LIST) or (files[2] in IGNORE_LIST):

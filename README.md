@@ -18,13 +18,13 @@ The collection of pre-trained, state-of-the-art models.
 
 | | Model | Reference | Exported From | Supported Ailia Version |
 |:-----------|------------:|:------------:|:------------:|:------------:|
-|[<img src="crowd_counting/crowdcount-cascaded-mtl/result.png" width=256px>](crowd_counting/crowdcount-cascaded-mtl/) | [crowdcount-cascaded-mtl](/crowd_counting/crowdcount-cascaded-mtl) | [CNN-based Cascaded Multi-task Learning of <br/>High-level Prior and Density Estimation for Crowd Counting <br/>(Single Image Crowd Counting)](https://github.com/svishwa/crowdcount-cascaded-mtl) | Pytorch | 1.2.1 and later | 
+| [<img src="crowd_counting/crowdcount-cascaded-mtl/result.png" width=256px>](crowd_counting/crowdcount-cascaded-mtl/) | [crowdcount-cascaded-mtl](/crowd_counting/crowdcount-cascaded-mtl) | [CNN-based Cascaded Multi-task Learning of <br/>High-level Prior and Density Estimation for Crowd Counting <br/>(Single Image Crowd Counting)](https://github.com/svishwa/crowdcount-cascaded-mtl) | Pytorch | 1.2.1 and later | 
 
 ## Deep fashion
 
 | | Model | Reference | Exported From | Supported Ailia Version |
 |:-----------|------------:|:------------:|:------------:|:------------:|
-[<img src="deep_fashion/clothing-detection/output_modanet.png" width=128px>](deep_fashion/clothing-detection/) | [clothing-detection](/deep_fashion/clothing-detection/) | [Clothing-Detection](https://github.com/simaiden/Clothing-Detection) | Pytorch | 1.2.1 and later |
+| [<img src="deep_fashion/clothing-detection/output_modanet.png" width=128px>](deep_fashion/clothing-detection/) | [clothing-detection](/deep_fashion/clothing-detection/) | [Clothing-Detection](https://github.com/simaiden/Clothing-Detection) | Pytorch | 1.2.1 and later |
 
 ## Depth estimation
 
@@ -72,6 +72,7 @@ The collection of pre-trained, state-of-the-art models.
 | | Model | Reference | Exported From | Supported Ailia Version |
 |:-----------|------------:|:------------:|:------------:|:------------:|
 | [<img src="hand_detection/yolov3-hand/output.png" width=128px>](hand_detection/yolov3-hand/) | [yolov3-hand](/hand_detection/yolov3-hand/) | [Hand detection branch of Face detection using keras-yolov3](https://github.com/axinc-ai/yolov3-face/tree/hand_detection) | Keras | 1.2.1 and later |
+| [<img src="hand_detection/hand_detection_pytorch/CARDS_OFFICE_output.jpg" width=128px>](hand_detection/hand_detection_pytorch/) | [hand_detection_pytorch](/hand_detection/hand_detection_pytorch/) | [hand-detection.PyTorch](https://github.com/zllrunning/hand-detection.PyTorch) | Pytorch | 1.2.2 and later |
 
 ## Image captioning
 
@@ -99,6 +100,7 @@ The collection of pre-trained, state-of-the-art models.
 | [<img src="image_manipulation/noise2noise/output.png" width=128px>](image_manipulation/noise2noise/) | [noise2noise](/image_maniplulation/noise2noise/) | [Learning Image Restoration without Clean Data](https://github.com/joeylitalien/noise2noise-pytorch) | Pytorch | 1.2.0 and later |
 | [<img src="image_manipulation/dewarpnet/output.png" width=128px>](image_manipulation/dewarpnet/) | [dewarpnet](/image_maniplulation/dewarpnet) | [DewarpNet: Single-Image Document Unwarping With Stacked 3D and 2D Regression Networks](https://github.com/cvlab-stonybrook/DewarpNet) | Pytorch | 1.2.1 and later |
 | [<img src="image_manipulation/illnet/output.png" width=128px>](image_manipulation/illnet/) | [illnet](/image_maniplulation/illnet/) | [Document Rectification and Illumination Correction using a Patch-based CNN](https://github.com/xiaoyu258/DocProj) | Pytorch | 1.2.2 and later |
+| [<img src="image_manipulation/colorization/imgs_out/ansel_adams3_output.jpg" width=128px>](image_manipulation/colorization/) | [colorization](/image_maniplulation/colorization/) | [Colorful Image Colorization](https://github.com/richzhang/colorization) | Pytorch | 1.2.2 and later |
 
 ## Image segmentation
 
@@ -182,6 +184,10 @@ The collection of pre-trained, state-of-the-art models.
 
 # Setup
 
+## Requirements
+
+- Python 3.6 and later
+
 ## Install ailia SDK
 
 - [Download a free evaluation version of ailia SDK](https://ailia.jp/en/trial)
@@ -216,7 +222,7 @@ pip3 install numpy
 [OpenCV for python3 is pre-installed on Jetson.](https://forums.developer.nvidia.com/t/install-opencv-for-python3-in-jetson-nano/74042/3) You only need to run this command if you get a cv2 import error.
 
 ```
-sudo apt install python3-opencv
+sudo apt install nvidia-jetpack
 ```
 
 # Launcher
@@ -232,3 +238,9 @@ python3 launcher.py
 ## Blog
 
 [ailia SDK tutorial (Python API)](https://medium.com/axinc/ailia-sdk-%E3%83%81%E3%83%A5%E3%83%BC%E3%83%88%E3%83%AA%E3%82%A2%E3%83%AB-python-28379dbc9649)
+
+## Other languages
+
+[unity version](https://github.com/axinc-ai/ailia-models-unity)
+
+[c++ version](https://github.com/axinc-ai/ailia-models-cpp)

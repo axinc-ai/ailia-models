@@ -65,4 +65,4 @@ CaffeModel
 
 ## Netron
 
-[emotion_miniXception.prototxt](https://lutzroeder.github.io/netron/?url=https://storage.googleapis.com/ailia-models/face_classification/emotion_miniXception.prototxt)
+[emotion_miniXception.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/face_classification/emotion_miniXception.prototxt)

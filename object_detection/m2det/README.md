@@ -51,4 +51,4 @@ ONNX opset=10
 
 ## Netron
 
-[m2det.onnx.prototxt](https://lutzroeder.github.io/netron/?url=https://storage.googleapis.com/ailia-models/m2det/m2det.onnx.prototxt)
+[m2det.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/m2det/m2det.onnx.prototxt)

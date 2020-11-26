@@ -52,7 +52,7 @@ ONNX opset = 10
 
 ## Netron
 
-[lightweight-human-pose-estimation.onnx.prototxt](https://lutzroeder.github.io/netron/?url=https://storage.googleapis.com/ailia-models/lightweight-human-pose-estimation/lightweight-human-pose-estimation.onnx.prototxt)
+[lightweight-human-pose-estimation.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/lightweight-human-pose-estimation/lightweight-human-pose-estimation.onnx.prototxt)
 
-[lightweight-human-pose-estimation.opt.onnx.prototxt](https://lutzroeder.github.io/netron/?url=https://storage.googleapis.com/ailia-models/lightweight-human-pose-estimation/lightweight-human-pose-estimation.opt.onnx.prototxt)
+[lightweight-human-pose-estimation.opt.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/lightweight-human-pose-estimation/lightweight-human-pose-estimation.opt.onnx.prototxt)
 
