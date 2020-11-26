@@ -117,8 +117,8 @@ else:
     # POSE_ALGORITHM = ailia.POSE_ALGORITHM_OPEN_POSE
     POSE_ALGORITHM = POSE_ALGORITHM_OPEN_POSE_SINGLE_SCALE
     MODEL_POSE_PATH = 'pose_deploy.prototxt'
-    WEIGHT_POSE_PATH = 'pose/coco/pose_iter_440000.caffemodel'
-    REMOTE_POSE_PATH = 'http://posefs1.perception.cs.cmu.edu/OpenPose/models/pose/coco/'
+    WEIGHT_POSE_PATH = 'pose_iter_440000.caffemodel'
+    REMOTE_POSE_PATH = 'https://storage.googleapis.com/ailia-models/openpose/'
 
 
 # ======================

@@ -28,7 +28,8 @@ IMAGE_WIDTH = 320
 
 MODEL_PATH = 'pose_deploy.prototxt'
 WEIGHT_PATH = 'pose_iter_440000.caffemodel'
-REMOTE_PATH = 'http://posefs1.perception.cs.cmu.edu/OpenPose/models/pose/coco/'
+#REMOTE_PATH = 'http://posefs1.perception.cs.cmu.edu/OpenPose/models/pose/coco/'
+REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/openpose/'
 
 ALGORITHM = ailia.POSE_ALGORITHM_OPEN_POSE
 #ALGORITHM = ailia.POSE_ALGORITHM_OPEN_POSE_SINGLE_SCALE    # require ailia SDK 1.2.5 and later
