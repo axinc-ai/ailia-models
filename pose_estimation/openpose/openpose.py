@@ -31,6 +31,8 @@ WEIGHT_PATH = 'pose_iter_440000.caffemodel'
 REMOTE_PATH = 'http://posefs1.perception.cs.cmu.edu/OpenPose/models/pose/coco/'
 
 ALGORITHM = ailia.POSE_ALGORITHM_OPEN_POSE
+#ALGORITHM = ailia.POSE_ALGORITHM_OPEN_POSE_SINGLE_SCALE    # require ailia SDK 1.2.5 and later
+THRESHOLD_DEFAULT = 0.4
 
 # ======================
 # Arguemnt Parser Config
@@ -66,6 +68,12 @@ parser.add_argument(
     help='Running the inference on the same input 5 times ' +
          'to measure execution performance. (Cannot be used in video mode)'
 )
+parser.add_argument(
+    '-t', '--threshold',
+    type=float,
+    default=THRESHOLD_DEFAULT,
+    help='The detection threshold. (require ailia SDK 1.2.5 and later) (default: 0.4)'
+)
 args = parser.parse_args()
 
 
@@ -80,7 +88,7 @@ def hsv_to_rgb(h, s, v):
 
 
 def line(input_img, person, point1, point2):
-    threshold = 0.2
+    threshold = args.threshold
     if person.points[point1].score > threshold and\
        person.points[point2].score > threshold:
         color = hsv_to_rgb(255*point1/ailia.POSE_KEYPOINT_CNT, 255, 255)
@@ -158,6 +166,8 @@ def recognize_from_image():
     pose = ailia.PoseEstimator(
         MODEL_PATH, WEIGHT_PATH, env_id=env_id, algorithm=ALGORITHM
     )
+    if args.threshold != THRESHOLD_DEFAULT:
+        pose.set_threshold(args.threshold)
 
     # inference
     print('Start inference...')
@@ -186,6 +196,8 @@ def recognize_from_video():
     pose = ailia.PoseEstimator(
         MODEL_PATH, WEIGHT_PATH, env_id=env_id, algorithm=ALGORITHM
     )
+    if args.threshold != THRESHOLD_DEFAULT:
+        pose.set_threshold(args.threshold)
 
     capture = get_capture(args.video)
 
