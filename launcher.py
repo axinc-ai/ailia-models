@@ -6,14 +6,14 @@ import numpy
 import subprocess
 import shutil
 
-WINDOW_WIDTH = 1280
-WINDOW_HEIGHT = 480
+WINDOW_WIDTH = 1608
+WINDOW_HEIGHT = 484
 
 BUTTON_WIDTH = 400
 BUTTON_HEIGHT = 20
 BUTTON_MARGIN = 2
 
-IGNORE_LIST=["commercial_model", "validation", ".git", "log", "prnet", "bert", "illustration2vec", "etl", "vggface2"]
+IGNORE_LIST=["commercial_model", "validation", ".git", "log", "prnet", "bert", "illustration2vec", "etl", "vggface2", "audio_processing"]
 
 def search_model():
     file_list=[]
