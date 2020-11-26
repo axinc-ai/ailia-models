@@ -6,14 +6,13 @@ import numpy
 import subprocess
 import shutil
 
-WINDOW_WIDTH = 1608
-WINDOW_HEIGHT = 484
-
 BUTTON_WIDTH = 400
 BUTTON_HEIGHT = 20
 BUTTON_MARGIN = 2
 
-IGNORE_LIST=["commercial_model", "validation", ".git", "log", "prnet", "bert", "illustration2vec", "etl", "vggface2", "audio_processing"]
+WINDOW_ROW = 22
+
+IGNORE_LIST=["commercial_model", "validation", ".git", "log", "prnet", "neural_language_processing", "illustration2vec", "etl", "vggface2", "audio_processing"]
 
 def search_model():
     file_list=[]
@@ -59,7 +58,7 @@ def hsv_to_rgb(h, s, v):
     )[0][0]
     return (int(bgr[2]), int(bgr[1]), int(bgr[0]))
 
-def display_ui(img,model_list,category_cnt):
+def display_ui(img,model_list,category_cnt,window_width,window_height):
     global mx,my,click_trig
 
     x = BUTTON_MARGIN
@@ -99,7 +98,7 @@ def display_ui(img,model_list,category_cnt):
 
         y=y + h + BUTTON_MARGIN
 
-        if y>=WINDOW_HEIGHT:
+        if y>=window_height:
             y = BUTTON_MARGIN
             x = x + w + BUTTON_MARGIN
     
@@ -107,7 +106,13 @@ def display_ui(img,model_list,category_cnt):
 
 def main():
     model_list,category_cnt = search_model()
-    img = numpy.zeros((WINDOW_HEIGHT,WINDOW_WIDTH,3)).astype(numpy.uint8)
+
+    WINDOW_COL = int((len(model_list)+WINDOW_ROW-1)/WINDOW_ROW)
+
+    window_width = (BUTTON_WIDTH + BUTTON_MARGIN) * WINDOW_COL
+    window_height = (BUTTON_HEIGHT + BUTTON_MARGIN) * WINDOW_ROW
+
+    img = numpy.zeros((window_height,window_width,3)).astype(numpy.uint8)
 
     cv2.imshow('ailia MODELS', img)
     cv2.setMouseCallback("ailia MODELS", mouse_callback)
@@ -115,7 +120,7 @@ def main():
     while(True):
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
-        display_ui(img,model_list,category_cnt)
+        display_ui(img,model_list,category_cnt,window_width,window_height)
         cv2.imshow('ailia MODELS', img)
 
     cv2.destroyAllWindows()
