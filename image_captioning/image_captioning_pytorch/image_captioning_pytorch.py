@@ -42,6 +42,8 @@ NORM_STD = [0.229, 0.224, 0.225]
 
 SLEEP_TIME = 0
 
+INPUT_WIDTH = 640
+
 # ======================
 # Arguemnt Parser Config
 # ======================
@@ -85,6 +87,9 @@ args = parser.parse_args()
 
 
 def preprocess(img):
+    h, w, _ = img.shape
+    if w>=INPUT_WIDTH:
+        img = cv2.resize(img,(INPUT_WIDTH,int(h*INPUT_WIDTH/w)))
     img = ((img / 255.0 - NORM_MEAN) / NORM_STD).astype(np.float32)
     img = img.transpose([2, 0, 1])
     return img
