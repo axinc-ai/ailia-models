@@ -25,6 +25,7 @@ cd ../../generative_adversarial_networks/council-GAN; python3 council-gan.py --a
 cd ../../generative_adversarial_networks/pytorch-gan; python3 pytorch-gnet.py -m celeb ${OPTION}
 cd ../../generative_adversarial_networks/pytorch-gan; python3 pytorch-gnet.py -m anime ${OPTION}
 cd ../../hand_detection/yolov3-hand; python3 yolov3-hand.py ${OPTION}
+cd ../../hand_detection/hand_detection_pytorch python3 hand_detection_pytorch.py ${OPTION}
 cd ../../image_captioning/illustration2vec; python3 illustration2vec.py ${OPTION}
 cd ../../image_classification/efficientnet; python3 efficientnet.py ${OPTION}
 cd ../../image_classification/googlenet; python3 googlenet.py ${OPTION}
@@ -37,6 +38,7 @@ cd ../../image_classification/vgg16; python3 vgg16.py ${OPTION}
 cd ../../image_manipulation/dewarpnet; python3 dewarpnet.py ${OPTION}
 cd ../../image_manipulation/illnet; python3 illnet.py ${OPTION}
 cd ../../image_manipulation/noise2noise; python3 noise2noise.py ${OPTION}
+cd ../../image_manipulation/colorization; python3 colorization.py ${OPTION}
 cd ../../image_segmentation/deep-image-matting; python3 deep-image-matting.py ${OPTION}
 cd ../../image_segmentation/deeplabv3; python3 deeplabv3.py ${OPTION}
 cd ../../image_segmentation/hair_segmentation; python3 hair_segmentation.py ${OPTION}
