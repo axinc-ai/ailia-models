@@ -68,7 +68,7 @@ $ python3 fashionai.py --video VIDEO_PATH
 
 ## Framework
 
-ONNX Runtime
+Pytorch
 
 ## Model Format
 
