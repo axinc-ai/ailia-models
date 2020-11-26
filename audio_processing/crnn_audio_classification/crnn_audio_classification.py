@@ -5,7 +5,6 @@ import argparse
 import numpy as np
 
 import ailia  # noqa: E402
-import onnxruntime
 
 import soundfile as sf
 
@@ -95,6 +94,7 @@ def main():
 
     # create instance
     if args.onnx:
+        import onnxruntime
         session = onnxruntime.InferenceSession(WEIGHT_PATH)
     else:
         env_id = ailia.get_gpu_environment_id()
