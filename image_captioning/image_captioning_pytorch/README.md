@@ -19,18 +19,18 @@ It is necessary to be connected to the Internet while downloading.
 
 For the sample image,
 ``` bash
-$ python3 image_captioning.py
+$ python3 image_captioning_pytorch.py
 ```
 
 If you want to specify the input image, put the image path after the `--input` option.  
 ```bash
-$ python3 image_captioning.py --input IMAGE_PATH
+$ python3 image_captioning_pytorch.py --input IMAGE_PATH
 ```
 
 By adding the `--video` option, you can input the video.   
 If you pass `0` as an argument to VIDEO_PATH, you can use the webcam input instead of the video file.
 ```bash
-$ python3 image_captioning.py --video VIDEO_PATH
+$ python3 image_captioning_pytorch.py --video VIDEO_PATH
 ```
 
 The default captioning model is fc.   

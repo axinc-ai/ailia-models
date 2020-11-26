@@ -48,7 +48,16 @@ cd ../../image_segmentation/pspnet-hair-segmentation; python3 pspnet-hair-segmen
 cd ../../image_segmentation/u2net; python3 u2net.py ${OPTION}
 cd ../../image_segmentation/u2net; python3 u2net.py -a small ${OPTION}
 cd ../../image_segmentation/human_part_segmentation; python3 human_part_segmentation.py ${OPTION}
+cd ../../image_segmentation/pytorch-unet; python3 pytorch-unet.py ${OPTION}
+cd ../../image_segmentation/semantic-segmentation-mobilenet-v3; python3 semantic-segmentation-mobilenet-v3.py ${OPTION}
 cd ../../neural_language_processing/bert; python3 bert.py ${OPTION}
+cd ../../neural_language_processing/bert_tweets_sentiment; python3 bert_tweets_sentiment.py ${OPTION}
+cd ../../neural_language_processing/bert_maskedlm; python3 bert_maskedlm.py ${OPTION}
+cd ../../neural_language_processing/bert_ner; python3 bert_ner.py ${OPTION}
+cd ../../neural_language_processing/bert_question_answering; python3 bert_question_answering.py ${OPTION}
+cd ../../neural_language_processing/bert_sentiment_analysis; python3 bert_sentiment_analysis.py ${OPTION}
+cd ../../neural_language_processing/bert_tweets_sentiment; python3 bert_tweets_sentiment.py ${OPTION}
+cd ../../neural_language_processing/bert_zero_shot_classification; python3 bert_zero_shot_classification.py ${OPTION}
 cd ../../object_detection/centernet; python3 centernet.py ${OPTION}
 cd ../../object_detection/m2det; python3 m2det.py ${OPTION}
 cd ../../object_detection/maskrcnn; python3 maskrcnn.py ${OPTION}
