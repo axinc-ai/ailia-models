@@ -1,0 +1,10 @@
+-i https://pypi.org/simple
+transformers>=3.4.0
+tokenizers>=0.7.0
+sentencepiece>=0.1.90
+sacremoses>=0.0.43
+mecab-python3
+unidic-lite
+fugashi
+ipadic
+datasets
