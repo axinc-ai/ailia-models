@@ -13,7 +13,7 @@ from model_utils import check_and_download_models  # noqa: E402
 from detector_utils import load_image  # noqa: E402
 from webcamera_utils import get_capture  # noqa: E402
 
-from my_utils import decode_np, draw_keypoints
+from fashionai_key_points_detection_utils import decode_np, draw_keypoints
 
 # ======================
 # Parameters

@@ -42,24 +42,24 @@ It is necessary to be connected to the Internet while downloading.
 
 For the sample image,
 ``` bash
-$ python3 fashionai.py
+$ python3 fashionai-key-points-detection.py
 ```
 
 You can specify the "clothing type" by specifying after the `--clothing-type` option.
 The clothing type is selected from blouse, dress, outwear.  
 ```bash
-$ python3 fashionai.py --clothing-type blouse
+$ python3 fashionai-key-points-detection.py --clothing-type blouse
 ```
 
 If you want to specify the input image, put the image path after the `--input` option.  
 ```bash
-$ python3 fashionai.py --input IMAGE_PATH
+$ python3 fashionai-key-points-detection.py --input IMAGE_PATH
 ```
 
 By adding the `--video` option, you can input the video.   
 If you pass `0` as an argument to VIDEO_PATH, you can use the webcam input instead of the video file.
 ```bash
-$ python3 fashionai.py --video VIDEO_PATH
+$ python3 fashionai-key-points-detection.py --video VIDEO_PATH
 ```
 
 ## Reference

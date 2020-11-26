@@ -3,6 +3,12 @@ cd ../
 cd action_recognition/mars; python3 mars.py ${OPTION}
 cd ../../crowd_counting/crowdcount-cascaded-mtl; python3 crowdcount.py ${OPTION}
 cd ../../deep_fashion/clothing-detection; python3 clothing-detection.py ${OPTION}
+cd ../../deep_fashion/fashionai-key-points-detection; python3 fashionai-key-points-detection.py -c blouse ${OPTION}
+cd ../../deep_fashion/fashionai-key-points-detection; python3 fashionai-key-points-detection.py -c dress ${OPTION}
+cd ../../deep_fashion/fashionai-key-points-detection; python3 fashionai-key-points-detection.py -c outwear ${OPTION}
+cd ../../deep_fashion/fashionai-key-points-detection; python3 fashionai-key-points-detection.py -c skirt ${OPTION}
+cd ../../deep_fashion/fashionai-key-points-detection; python3 fashionai-key-points-detection.py -c trousers ${OPTION}
+cd ../../deep_fashion/mmfashion; python3 mmfashion.py ${OPTION}
 cd ../../depth_estimation/midas; python3 midas.py ${OPTION}
 cd ../../depth_estimation/monodepth2; python3 monodepth2.py ${OPTION}
 cd ../../face_detection/blazeface; python3 blazeface.py ${OPTION}
@@ -12,6 +18,7 @@ cd ../../face_detection/face-mask-detection; python3 face-mask-detection.py -a m
 cd ../../face_detection/yolov1-face; python3 yolov1-face.py ${OPTION}
 cd ../../face_detection/yolov3-face; python3 yolov3-face.py ${OPTION}
 cd ../../face_identification/arcface; python3 arcface.py ${OPTION}
+cd ../../face_identification/insightface; python3 insightface.py ${OPTION}
 cd ../../face_identification/vggface2; python3 vggface2.py ${OPTION}
 cd ../../face_recognition/face_alignment; python3 face_alignment.py ${OPTION}
 cd ../../face_recognition/face_alignment; python3 face_alignment.py --active_3d ${OPTION}
@@ -67,6 +74,7 @@ cd ../../object_detection/yolov2; python3 yolov2.py ${OPTION}
 cd ../../object_detection/yolov3; python3 yolov3.py ${OPTION}
 cd ../../object_detection/yolov3-tiny; python3 yolov3-tiny.py ${OPTION}
 cd ../../object_detection/yolov4; python3 yolov4.py ${OPTION}
+cd ../../object_detection/yolov4-tiny; python3 yolov4-tiny.py ${OPTION}
 cd ../../object_tracking/deepsort; python3 deepsort.py ${OPTION}
 cd ../../pose_estimation/3d-pose-baseline; python3 3d-pose-baseline.py ${OPTION}
 cd ../../pose_estimation/lightweight-human-pose-estimation; python3 lightweight-human-pose-estimation.py ${OPTION}

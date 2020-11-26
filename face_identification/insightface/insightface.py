@@ -16,7 +16,7 @@ from model_utils import check_and_download_models  # noqa: E402
 from detector_utils import plot_results, load_image  # noqa: E402C
 from webcamera_utils import get_capture  # noqa: E402
 
-from my_utils import PriorBox, decode, decode_landm, nms, face_align_norm_crop, draw_detection
+from insightface_utils import PriorBox, decode, decode_landm, nms, face_align_norm_crop, draw_detection
 
 # ======================
 # Parameters
