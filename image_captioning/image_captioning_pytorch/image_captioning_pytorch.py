@@ -15,20 +15,20 @@ from model_utils import check_and_download_models  # noqa: E402
 from detector_utils import load_image  # noqa: E402
 from webcamera_utils import get_capture  # noqa: E402
 
-from my_utils import decode_sequence
+from image_captioning_pytorch_utils import decode_sequence
 
 # ======================
 # Parameters
 # ======================
 
-WEIGHT_CAPTIONING_FC_PATH = './model_fc.onnx'
-MODEL_CAPTIONING_FC_PATH = './model_fc.onnx.prototxt'
-WEIGHT_CAPTIONING_FC_RL_PATH = './model_fc_rl.onnx'
-MODEL_CAPTIONING_FC_RL_PATH = './model_fc_rl.onnx.prototxt'
-WEIGHT_CAPTIONING_FC_NSC_PATH = './model_fc_nsc.onnx'
-MODEL_CAPTIONING_FC_NSC_PATH = './model_fc_nsc.onnx.prototxt'
-WEIGHT_FEAT_PATH = './model_feat.onnx'
-MODEL_FEAT_PATH = './model_feat.onnx.prototxt'
+WEIGHT_CAPTIONING_FC_PATH = 'model_fc.onnx'
+MODEL_CAPTIONING_FC_PATH = 'model_fc.onnx.prototxt'
+WEIGHT_CAPTIONING_FC_RL_PATH = 'model_fc_rl.onnx'
+MODEL_CAPTIONING_FC_RL_PATH = 'model_fc_rl.onnx.prototxt'
+WEIGHT_CAPTIONING_FC_NSC_PATH = 'model_fc_nsc.onnx'
+MODEL_CAPTIONING_FC_NSC_PATH = 'model_fc_nsc.onnx.prototxt'
+WEIGHT_FEAT_PATH = 'model_feat.onnx'
+MODEL_FEAT_PATH = 'model_feat.onnx.prototxt'
 REMOTE_PATH = \
     'https://storage.googleapis.com/ailia-models/image_captioning_pytorch/'
 

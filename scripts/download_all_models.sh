@@ -27,6 +27,7 @@ cd ../../generative_adversarial_networks/pytorch-gan; python3 pytorch-gnet.py -m
 cd ../../hand_detection/yolov3-hand; python3 yolov3-hand.py ${OPTION}
 cd ../../hand_detection/hand_detection_pytorch python3 hand_detection_pytorch.py ${OPTION}
 cd ../../image_captioning/illustration2vec; python3 illustration2vec.py ${OPTION}
+cd ../../image_captioning/image_captioning_pytorch; python3 image_captioning_pytorch.py ${OPTION}
 cd ../../image_classification/efficientnet; python3 efficientnet.py ${OPTION}
 cd ../../image_classification/googlenet; python3 googlenet.py ${OPTION}
 cd ../../image_classification/inceptionv3; python3 inceptionv3.py ${OPTION}
