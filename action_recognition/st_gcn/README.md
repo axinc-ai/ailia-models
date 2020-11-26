@@ -108,7 +108,7 @@ $ python3 st_gcn.py --video VIDEO_PATH
 
 ## Framework
 
-ONNX Runtime
+Pytorch
 
 ## Model Format
 
