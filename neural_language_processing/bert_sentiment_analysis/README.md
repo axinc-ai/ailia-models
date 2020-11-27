@@ -30,4 +30,4 @@ ONNX opset = 11
 
 ### Netron
 
-- [distilbert-base-uncased-finetuned-sst-2-english.onnx.prototxt(https://netron.app/?url=https://storage.googleapis.com/ailia-models/bert_sentiment_analysis/distilbert-base-uncased-finetuned-sst-2-english.onnx.prototxt)
+- [distilbert-base-uncased-finetuned-sst-2-english.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/bert_sentiment_analysis/distilbert-base-uncased-finetuned-sst-2-english.onnx.prototxt)
