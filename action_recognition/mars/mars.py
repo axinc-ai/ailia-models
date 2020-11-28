@@ -15,6 +15,7 @@ sys.path.append('../../util')
 from model_utils import check_and_download_models  # noqa: E402
 from webcamera_utils import get_capture  # noqa: E402C
 from image_utils import load_image  # noqa: E402C
+from classifier_utils import plot_results, print_results  # noqa: E402
 
 
 # ======================
@@ -234,6 +235,9 @@ def recognize_from_video():
         result = net.predict(input_blob)
         print_mars_result(result)
         preview_img = original_queue.popleft()
+
+        plot_results(preview_img, result, HMDB51_LABEL)
+
         cv2.imshow('preview', preview_img)
 
         for i in range(args.duration - 1):
