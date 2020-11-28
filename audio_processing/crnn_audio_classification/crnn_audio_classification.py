@@ -34,11 +34,6 @@ parser.add_argument(
     help='Running the inference on the same input 5 times ' +
          'to measure execution performance. (Cannot be used in video mode)'
 )
-parser.add_argument(
-    '-o', '--onnx',
-    action='store_true',
-    help='Running on onnx runtime'
-)
 
 args = parser.parse_args()
 
@@ -74,12 +69,9 @@ def crnn(data, session):
     xt, lengths = spec.forward(data)
 
     # inference
-    if args.onnx:
-        results = session.run(["conf"],{ "data": xt, "lengths": lengths})
-    else:
-        lengths_np = np.zeros((1))
-        lengths_np[0]=lengths[0]
-        results = session.predict({ "data": xt, "lengths": lengths_np})
+    lengths_np = np.zeros((1))
+    lengths_np[0]=lengths[0]
+    results = session.predict({ "data": xt, "lengths": lengths_np})
 
     label, conf = postprocess(results[0])
 
@@ -93,13 +85,9 @@ def main():
     data = sf.read(args.input)
 
     # create instance
-    if args.onnx:
-        import onnxruntime
-        session = onnxruntime.InferenceSession(WEIGHT_PATH)
-    else:
-        env_id = ailia.get_gpu_environment_id()
-        print(f'env_id: {env_id}')
-        session = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+    env_id = ailia.get_gpu_environment_id()
+    print(f'env_id: {env_id}')
+    session = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
 
     # inference
     print('Start inference...')

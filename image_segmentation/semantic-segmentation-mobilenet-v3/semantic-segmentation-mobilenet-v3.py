@@ -69,11 +69,6 @@ parser.add_argument(
     action='store_true',
     help='output in original image size.'
 )
-parser.add_argument(
-    '--onnx',
-    action='store_true',
-    help='execute onnxruntime version.'
-)
 args = parser.parse_args()
 
 
@@ -114,15 +109,9 @@ def predict(img, net):
     img = preprocess(img)
 
     # feedforward
-    if not args.onnx:
-        output = net.predict({
-            'input_1': img
-        })
-    else:
-        input_name = net.get_inputs()[0].name
-        output_name = net.get_outputs()[0].name
-        output = net.run([output_name],
-                         {input_name: img})[0]
+    output = net.predict({
+        'input_1': img
+    })
 
     # post processes
     out_mask = post_processing(output, orig_shape=(h, w))
@@ -192,12 +181,8 @@ def main():
     print(f'env_id: {env_id}')
 
     # initialize
-    if not args.onnx:
-        net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
-        net.set_input_shape((1, IMAGE_HEIGHT, IMAGE_WIDTH, 3))
-    else:
-        import onnxruntime
-        net = onnxruntime.InferenceSession(WEIGHT_PATH)
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+    net.set_input_shape((1, IMAGE_HEIGHT, IMAGE_WIDTH, 3))
 
     if args.video is not None:
         # video mode

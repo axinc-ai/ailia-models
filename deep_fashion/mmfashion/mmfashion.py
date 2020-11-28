@@ -66,11 +66,6 @@ parser.add_argument(
     help='Running the inference on the same input 5 times ' +
          'to measure execution performance. (Cannot be used in video mode)'
 )
-parser.add_argument(
-    '--ailia',
-    action='store_true',
-    help='execute ailia version.'
-)
 args = parser.parse_args()
 
 
@@ -199,20 +194,11 @@ def detect_objects(img, detector):
     data = preprocess(img)
 
     # feedforward
-    if args.ailia:
-        detector.set_input_shape((1, 3, data['img'].shape[2], data['img'].shape[3]))
-        output = detector.predict({
-            'image': data['img']
-        })
-        boxes, labels, masks = output
-    else:
-        input_name = detector.get_inputs()[0].name
-        output_boxes = detector.get_outputs()[0].name
-        output_labels = detector.get_outputs()[1].name
-        output_masks = detector.get_outputs()[2].name
-        output = detector.run([output_boxes, output_labels, output_masks],
-                              {input_name: data['img']})
-        boxes, labels, masks = output
+    detector.set_input_shape((1, 3, data['img'].shape[2], data['img'].shape[3]))
+    output = detector.predict({
+        'image': data['img']
+    })
+    boxes, labels, masks = output
 
     # post processes
     detect_object, seg_masks = post_processing(data, boxes, labels, masks)
@@ -274,11 +260,7 @@ def main():
     print(f'env_id: {env_id}')
 
     # initialize
-    if args.ailia:
-        detector = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
-    else:
-        import onnxruntime
-        detector = onnxruntime.InferenceSession(WEIGHT_PATH)
+    detector = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
 
     if args.video is not None:
         # video mode

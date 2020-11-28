@@ -58,12 +58,6 @@ parser.add_argument(
     help='Running the inference on the same input 5 times ' +
          'to measure execution performance. (Cannot be used in video mode)'
 )
-parser.add_argument(
-    '--onnx',
-    default=True,
-    action='store_true',
-    help='execute onnxruntime version.'
-)
 args = parser.parse_args()
 
 
@@ -104,12 +98,7 @@ def segment_image(img, net):
     img = preprocess(img)
 
     # feedforward
-    if not args.onnx:
-        out = net.predict({'input.1': img})
-    else:
-        first_input_name = net.get_inputs()[0].name
-        first_output_name = net.get_outputs()[0].name
-        output = net.run([first_output_name], {first_input_name: img})[0]
+    output = net.predict({'input.1': img})[0]
 
     out = post_process(output)
     return out
@@ -163,11 +152,7 @@ def main():
     print(f'env_id: {env_id}')
 
     # model initialize
-    if not args.onnx:
-        net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
-    else:
-        import onnxruntime
-        net = onnxruntime.InferenceSession(WEIGHT_PATH)
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
 
     if args.video is not None:
         # video mode

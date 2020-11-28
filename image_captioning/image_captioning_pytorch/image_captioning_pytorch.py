@@ -73,11 +73,6 @@ parser.add_argument(
     choices=('fc', 'fc_rl', 'fc_nsc'),
     help='captioning model (fc | fc_rl | fc_nsc)'
 )
-parser.add_argument(
-    '--onnx',
-    action='store_true',
-    help='execute onnxruntime version.'
-)
 args = parser.parse_args()
 
 
@@ -117,25 +112,13 @@ def predict(img, net, my_resnet):
     img = preprocess(img)
 
     # feedforward
-    if not args.onnx:
-        fc = my_resnet.predict({
-            'img': img
-        })[0]
-        fc = np.expand_dims(fc, axis=0)
-        output = net.predict({
-            'fc_feats': fc
-        })
-    else:
-        input_name = my_resnet.get_inputs()[0].name
-        output_name = my_resnet.get_outputs()[0].name
-        fc = my_resnet.run([output_name],
-                           {input_name: img})[0]
-        fc = np.expand_dims(fc, axis=0)
-        input_name = net.get_inputs()[0].name
-        output_seq = net.get_outputs()[0].name
-        output_logprobes = net.get_outputs()[1].name
-        output = net.run([output_seq, output_logprobes],
-                         {input_name: fc})
+    fc = my_resnet.predict({
+        'img': img
+    })[0]
+    fc = np.expand_dims(fc, axis=0)
+    output = net.predict({
+        'fc_feats': fc
+    })
 
     # post processes
     sents = post_processing(output)
@@ -214,13 +197,8 @@ def main():
     print(f'env_id: {env_id}')
 
     # initialize
-    if not args.onnx:
-        net = ailia.Net(model_path, weight_path, env_id=env_id)
-        my_resnet = ailia.Net(MODEL_FEAT_PATH, WEIGHT_FEAT_PATH, env_id=env_id)
-    else:
-        import onnxruntime
-        net = onnxruntime.InferenceSession(weight_path)
-        my_resnet = onnxruntime.InferenceSession(WEIGHT_FEAT_PATH)
+    net = ailia.Net(model_path, weight_path, env_id=env_id)
+    my_resnet = ailia.Net(MODEL_FEAT_PATH, WEIGHT_FEAT_PATH, env_id=env_id)
 
     if args.video is not None:
         recognize_from_video(args.video, net, my_resnet)
