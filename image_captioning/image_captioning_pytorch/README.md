@@ -43,7 +43,7 @@ Or by adding the `--model fc_nsc` option, you can use fc_nsc.
 
 ### Framework
 
-ONNX Runtime
+Pytorch
 
 ### Model Format
 
