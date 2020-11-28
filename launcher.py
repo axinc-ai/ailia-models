@@ -12,7 +12,19 @@ BUTTON_MARGIN = 2
 
 WINDOW_ROW = 22
 
-IGNORE_LIST=["commercial_model", "validation", ".git", "log", "prnet", "bert", "illustration2vec", "etl", "vggface2", "audio_processing"]
+IGNORE_LIST=["commercial_model", "validation", ".git", "log", "prnet", "bert", "illustration2vec", "etl", "vggface2", ""]
+
+try:
+    import transformers
+except ModuleNotFoundError:
+    IGNORE_LIST.append("neural_language_processing")
+    pass
+
+try:
+    import torchaudio
+except ModuleNotFoundError:
+    IGNORE_LIST.append("audio_processing")
+    pass
 
 def search_model():
     file_list=[]
@@ -76,7 +88,7 @@ def display_ui(img,model_list,category_cnt,window_width,window_height):
                 cmd="python"
                 if shutil.which("python3"):
                     cmd="python3"
-                if ("neural_language_processing" in model["category"]):
+                if "neural_language_processing" == model["category"] or "audio_processing" == model["category"]:
                     subprocess.run([cmd,model["model"]+".py"],cwd=dir)
                 else:
                     subprocess.run([cmd,model["model"]+".py","-v 0"],cwd=dir)
