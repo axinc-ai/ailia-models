@@ -12,7 +12,7 @@ BUTTON_MARGIN = 2
 
 WINDOW_ROW = 22
 
-IGNORE_LIST=["commercial_model", "validation", ".git", "log", "prnet", "neural_language_processing", "illustration2vec", "etl", "vggface2", "audio_processing"]
+IGNORE_LIST=["commercial_model", "validation", ".git", "log", "prnet", "bert", "illustration2vec", "etl", "vggface2", "audio_processing"]
 
 def search_model():
     file_list=[]
@@ -76,7 +76,10 @@ def display_ui(img,model_list,category_cnt,window_width,window_height):
                 cmd="python"
                 if shutil.which("python3"):
                     cmd="python3"
-                subprocess.run([cmd,model["model"]+".py","-v 0"],cwd=dir)
+                if ("neural_language_processing" in model["category"]):
+                    subprocess.run([cmd,model["model"]+".py"],cwd=dir)
+                else:
+                    subprocess.run([cmd,model["model"]+".py","-v 0"],cwd=dir)
                 click_trig = False
 
         cv2.rectangle(img, (x, y), (x + w, y + h), color, thickness=-1)
