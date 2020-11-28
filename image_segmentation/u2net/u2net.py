@@ -65,7 +65,7 @@ parser.add_argument(
 )
 parser.add_argument(
     '-o', '--opset', metavar='OPSET',
-    default='10', choices=OPSET_LISTS,
+    default='11', choices=OPSET_LISTS,
     help='opset lists: ' + ' | '.join(OPSET_LISTS)
 )
 args = parser.parse_args()
@@ -156,12 +156,11 @@ def recognize_from_video():
         # postprocessing
         pred = cv2.resize(norm(preds_ailia[0][0, 0, :, :]), (f_w, f_h))
 
-        # composite
-        if args.composite:
-            frame[:, :, 0] = frame[:, :, 0] * pred
-            frame[:, :, 1] = frame[:, :, 1] * pred
-            frame[:, :, 2] = frame[:, :, 2] * pred
-            pred = frame / 255.0
+        # force composite
+        frame[:, :, 0] = frame[:, :, 0] * pred
+        frame[:, :, 1] = frame[:, :, 1] * pred
+        frame[:, :, 2] = frame[:, :, 2] * pred
+        pred = frame / 255.0
 
         cv2.imshow('frame', pred)
 
