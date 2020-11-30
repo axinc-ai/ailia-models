@@ -46,7 +46,7 @@ TensorFlow
 
 ## Model Format
 
-ONNX opset=10
+ONNX opset=11
 
 ## Netron
 
