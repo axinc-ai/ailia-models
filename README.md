@@ -205,6 +205,14 @@ The collection of pre-trained, state-of-the-art models.
 |:-----------|------------:|:------------:|:------------:|:------------:|
 | |[acculus-pose](/commercial_model/acculus-pose) | [Acculus, Inc.](https://acculus.jp/) | Caffe | 1.2.3 and later |
 
+# Launcher
+
+You can display a list of models and select them with the mouse by using the command below.
+
+```
+python3 launcher.py
+```
+
 # Setup
 
 ## Tutorial
@@ -232,7 +240,7 @@ pip3 install ./
 
 - In the evaluation version, place the license file in the same folder as libailia.dll ([python_path]/site_packages/ailia) on Windows and in ~/Library/SHALO/ on Mac.
 
-- You can find the location of Python site-packages directory
+- You can find the location of Python site-packages directory using the following command.
 
 ```
 python -c "import site; print (site.getsitepackages())"
@@ -260,14 +268,6 @@ pip3 install numpy
 
 ```
 sudo apt install nvidia-jetpack
-```
-
-# Launcher
-
-You can display a list of models and select them with the mouse by using the command below.
-
-```
-python3 launcher.py
 ```
 
 # Other languages
