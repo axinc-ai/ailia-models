@@ -248,13 +248,13 @@ python -c "import site; print (site.getsitepackages())"
 
 ## Install required libraries for Python
 
-### For Windows, Mac, Linux
+### For Windows, Mac and Linux
 
 ```
 pip install -r requirements.txt
 ```
 
-### For Jetson or Raspberry Pi
+### For Jetson
 
 ```
 sudo apt install python3-pip
@@ -268,6 +268,15 @@ pip3 install numpy
 
 ```
 sudo apt install nvidia-jetpack
+```
+
+### For Raspberry Pi
+
+```
+pip3 install numpy
+pip3 install opencv-python
+pip3 install matplotlib
+sudo apt-get install libatlas-base-dev
 ```
 
 # Other languages
