@@ -207,6 +207,13 @@ The collection of pre-trained, state-of-the-art models.
 
 # Setup
 
+## Tutorial
+
+[ailia SDK tutorial (Python API) (EN)](https://medium.com/axinc-ai/ailia-sdk-tutorial-python-ea29ae990cf6)
+
+[ailia SDK tutorial (Python API) (JP)](https://medium.com/axinc/ailia-sdk-%E3%83%81%E3%83%A5%E3%83%BC%E3%83%88%E3%83%AA%E3%82%A2%E3%83%AB-python-28379dbc9649)
+
+
 ## Requirements
 
 - Python 3.6 and later
@@ -215,14 +222,21 @@ The collection of pre-trained, state-of-the-art models.
 
 - [Download a free evaluation version of ailia SDK](https://ailia.jp/en/trial)
 - Unzip ailia SDK
-- Find the location of Python site-packages directory
+- Run the following command
+
+```
+cd ailia_sdk/python
+python3 bootstrap.py
+pip3 install ./
+```
+
+- In the evaluation version, place the license file in the same folder as libailia.dll ([python_path]/site_packages/ailia) on Windows and in ~/Library/SHALO/ on Mac.
+
+- You can find the location of Python site-packages directory
+
 ```
 python -c "import site; print (site.getsitepackages())"
 ```
-
-- Copy the ​ailia ​folder located in the ​python f​older to site-packages
-- Copy library files (dll or dylib or so) from the folder library to site-packages/ailia
-- In the evaluation version, place the license file in the same folder as libailia.dll on Windows and in ~/Library/SHALO/ on Mac.
 
 ## Install required libraries for Python
 
@@ -232,7 +246,7 @@ python -c "import site; print (site.getsitepackages())"
 pip install -r requirements.txt
 ```
 
-### For Jetson
+### For Jetson or Raspberry Pi
 
 ```
 sudo apt install python3-pip
@@ -256,13 +270,7 @@ You can display a list of models and select them with the mouse by using the com
 python3 launcher.py
 ```
 
-# Resources
-
-## Blog
-
-[ailia SDK tutorial (Python API)](https://medium.com/axinc/ailia-sdk-%E3%83%81%E3%83%A5%E3%83%BC%E3%83%88%E3%83%AA%E3%82%A2%E3%83%AB-python-28379dbc9649)
-
-## Other languages
+# Other languages
 
 [unity version](https://github.com/axinc-ai/ailia-models-unity)
 
