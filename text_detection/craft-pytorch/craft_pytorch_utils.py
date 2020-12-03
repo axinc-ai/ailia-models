@@ -16,7 +16,7 @@ def load_image(img_file):
 
 def pre_process(image):
     img_resized, target_ratio, _ = resize_aspect_ratio(
-        image, 150, cv2.INTER_LINEAR, 1.5
+        image, 1280, 1.5, cv2.INTER_LINEAR
     )
     ratio_h = ratio_w = 1 / target_ratio
     x = normalize_mean_variance(img_resized)
@@ -44,7 +44,7 @@ def post_process(y, image, ratio_w, ratio_h):
 # Utils
 # ======================
 
-def resize_aspect_ratio(img, square_size, interpolation, mag_ratio):
+def resize_aspect_ratio(img, square_size, mag_ratio, interpolation):
     height, width, channel = img.shape
 
     # magnify image size

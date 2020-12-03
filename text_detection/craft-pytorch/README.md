@@ -5,11 +5,11 @@
 
 ![Input](imgs/00_00.jpg)
 
+(Image above is from [http://www.iapr-tc11.org/mediawiki/index.php/The_Street_View_Text_Dataset](http://www.iapr-tc11.org/mediawiki/index.php/The_Street_View_Text_Dataset).)
+
 ## Output
 
 ![Output](imgs_results/res_00_00.jpg)
-
-(Images above are from [http://www.iapr-tc11.org/mediawiki/index.php/The_Street_View_Text_Dataset](http://www.iapr-tc11.org/mediawiki/index.php/The_Street_View_Text_Dataset))
 
 ## Usage
 Automatically downloads the onnx and prototxt files on the first run.

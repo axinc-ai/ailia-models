@@ -103,6 +103,7 @@ def recognize_from_video():
         net.set_input_shape((1, 3, x.shape[2], x.shape[3]))
         y, _ = net.predict({'input.1': x})
         img = craft_pytorch_utils.post_process(y, image, ratio_w, ratio_h)
+        img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
         cv2.imshow('frame', img)
 
         # press q to end video capture
