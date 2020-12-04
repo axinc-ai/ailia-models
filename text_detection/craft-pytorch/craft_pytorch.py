@@ -18,7 +18,7 @@ from webcamera_utils import adjust_frame_size, get_capture  # noqa: E402C
 # ======================
 WEIGHT_PATH = 'craft.onnx'
 MODEL_PATH = 'craft.onnx.prototxt'
-REMOTE_PATH = ''
+REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/craft-pytorch/'
 
 IMAGE_PATH = 'imgs/00_00.jpg'
 SAVE_IMAGE_PATH = 'imgs_results/res_00_00.jpg'
