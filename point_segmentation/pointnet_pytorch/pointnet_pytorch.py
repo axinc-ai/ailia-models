@@ -15,38 +15,38 @@ from model_utils import check_and_download_models  # noqa: E402
 # Parameters
 # ======================
 
-WEIGHT_PATH_AIRPLANE = 'airplane.onnx'
-MODEL_PATH_AIRPLANE = 'airplane.onnx.prototxt'
-WEIGHT_PATH_BAG = 'bag.onnx'
-MODEL_PATH_BAG = 'bag.onnx.prototxt'
-WEIGHT_PATH_CAP = 'cap.onnx'
-MODEL_PATH_CAP = 'cap.onnx.prototxt'
-WEIGHT_PATH_CAR = 'car.onnx'
-MODEL_PATH_CAR = 'car.onnx.prototxt'
-WEIGHT_PATH_CHAIR = 'chair.onnx'
-MODEL_PATH_CHAIR = 'chair.onnx.prototxt'
-WEIGHT_PATH_EARPHONE = 'earphone.onnx'
-MODEL_PATH_EARPHONE = 'earphone.onnx.prototxt'
-WEIGHT_PATH_GUITAR = 'guitar.onnx'
-MODEL_PATH_GUITAR = 'guitar.onnx.prototxt'
-WEIGHT_PATH_KNIFE = 'knife.onnx'
-MODEL_PATH_KNIFE = 'knife.onnx.prototxt'
-WEIGHT_PATH_LAMP = 'lamp.onnx'
-MODEL_PATH_LAMP = 'lamp.onnx.prototxt'
-WEIGHT_PATH_LAPTOP = 'laptop.onnx'
-MODEL_PATH_LAPTOP = 'laptop.onnx.prototxt'
-WEIGHT_PATH_MOTORBIKE = 'motorbike.onnx'
-MODEL_PATH_MOTORBIKE = 'motorbike.onnx.prototxt'
-WEIGHT_PATH_MUG = 'mug.onnx'
-MODEL_PATH_MUG = 'mug.onnx.prototxt'
-WEIGHT_PATH_PISTOL = 'pistol.onnx'
-MODEL_PATH_PISTOL = 'pistol.onnx.prototxt'
-WEIGHT_PATH_ROCKET = 'rocket.onnx'
-MODEL_PATH_ROCKET = 'rocket.onnx.prototxt'
-WEIGHT_PATH_SKATEBOARD = 'skateboard.onnx'
-MODEL_PATH_SKATEBOARD = 'skateboard.onnx.prototxt'
-WEIGHT_PATH_TABLE = 'table.onnx'
-MODEL_PATH_TABLE = 'table.onnx.prototxt'
+WEIGHT_PATH_AIRPLANE = 'airplane_100.onnx'
+MODEL_PATH_AIRPLANE = 'airplane_100.onnx.prototxt'
+WEIGHT_PATH_BAG = 'bag_100.onnx'
+MODEL_PATH_BAG = 'bag_100.onnx.prototxt'
+WEIGHT_PATH_CAP = 'cap_100.onnx'
+MODEL_PATH_CAP = 'cap_100.onnx.prototxt'
+WEIGHT_PATH_CAR = 'car_100.onnx'
+MODEL_PATH_CAR = 'car_100.onnx.prototxt'
+WEIGHT_PATH_CHAIR = 'chair_100.onnx'
+MODEL_PATH_CHAIR = 'chair_100.onnx.prototxt'
+WEIGHT_PATH_EARPHONE = 'earphone_100.onnx'
+MODEL_PATH_EARPHONE = 'earphone_100.onnx.prototxt'
+WEIGHT_PATH_GUITAR = 'guitar_100.onnx'
+MODEL_PATH_GUITAR = 'guitar_100.onnx.prototxt'
+WEIGHT_PATH_KNIFE = 'knife_100.onnx'
+MODEL_PATH_KNIFE = 'knife_100.onnx.prototxt'
+WEIGHT_PATH_LAMP = 'lamp_100.onnx'
+MODEL_PATH_LAMP = 'lamp_100.onnx.prototxt'
+WEIGHT_PATH_LAPTOP = 'laptop_100.onnx'
+MODEL_PATH_LAPTOP = 'laptop_100.onnx.prototxt'
+WEIGHT_PATH_MOTORBIKE = 'motorbike_100.onnx'
+MODEL_PATH_MOTORBIKE = 'motorbike_100.onnx.prototxt'
+WEIGHT_PATH_MUG = 'mug_100.onnx'
+MODEL_PATH_MUG = 'mug_100.onnx.prototxt'
+WEIGHT_PATH_PISTOL = 'pistol_100.onnx'
+MODEL_PATH_PISTOL = 'pistol_100.onnx.prototxt'
+WEIGHT_PATH_ROCKET = 'rocket_100.onnx'
+MODEL_PATH_ROCKET = 'rocket_100.onnx.prototxt'
+WEIGHT_PATH_SKATEBOARD = 'skateboard_100.onnx'
+MODEL_PATH_SKATEBOARD = 'skateboard_100.onnx.prototxt'
+WEIGHT_PATH_TABLE = 'table_100.onnx'
+MODEL_PATH_TABLE = 'table_100.onnx.prototxt'
 REMOTE_PATH = \
     'https://storage.googleapis.com/ailia-models/pointnet/'
 
@@ -152,7 +152,7 @@ def predict(points, net):
 
 def recognize_from_points(filename, net):
     # prepare input data
-    points = load_data(filename)
+    point = load_data(filename)
 
     # inference
     print('Start inference...')
@@ -160,27 +160,27 @@ def recognize_from_points(filename, net):
         print('BENCHMARK mode')
         for i in range(5):
             start = int(round(time.time() * 1000))
-            pred = predict(points, net)
+            pred = predict(point, net)
             end = int(round(time.time() * 1000))
             print(f'\tailia processing time {end - start} ms')
     else:
-        pred = predict(points, net)
+        pred = predict(point, net)
 
     cmap = plt.cm.get_cmap("hsv", 10)
     cmap = np.array([cmap(i) for i in range(10)])[:, :3]
     pred_color = cmap[pred, :]
 
     showsz = 800
-    points = points - points.mean(axis=0)
-    radius = ((points ** 2).sum(axis=-1) ** 0.5).max()
-    points /= (radius * 2.2) / showsz
+    point = point - point.mean(axis=0)
+    radius = ((point ** 2).sum(axis=-1) ** 0.5).max()
+    point /= (radius * 2.2) / showsz
 
     # plot result
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
-    X = points[:, 0]
-    Y = points[:, 1]
-    Z = points[:, 2]
+    X = point[:, 0]
+    Y = point[:, 1]
+    Z = point[:, 2]
     ax.scatter(X, Y, Z, color=pred_color)
 
     # adjust plot scale
