@@ -50,24 +50,24 @@ MODEL_PATH_TABLE = 'table_100.onnx.prototxt'
 WEIGHT_PATH_CLASSIFIER = 'cls_model_100.onnx'
 MODEL_PATH_CLASSIFIER = 'cls_model_100.onnx.prototxt'
 REMOTE_PATH = \
-    'https://storage.googleapis.com/ailia-models/pointnet/'
+    'https://storage.googleapis.com/ailia-models/pointnet_pytorch/'
 
-POINT_PATH_AIRPLANE = 'shapenetcore_dataset/Airplane/a1708ad923f3b51abbf3143b1cb6076a.pts'
-POINT_PATH_BAG = 'shapenetcore_dataset/Bag/4e4fcfffec161ecaed13f430b2941481.pts'
-POINT_PATH_CAP = 'shapenetcore_dataset/Cap/c7122c44495a5ac6aceb0fa31f18f016.pts'
-POINT_PATH_CAR = 'shapenetcore_dataset/Car/1f1b5c7c01557c484354740e038a7994.pts'
-POINT_PATH_CHAIR = 'shapenetcore_dataset/Chair/355fa0f35b61fdd7aa74a6b5ee13e775.pts'
-POINT_PATH_EARPHONE = 'shapenetcore_dataset/Earphone/e33d6e8e39a75268957b6a4f3924d982.pts'
-POINT_PATH_GUITAR = 'shapenetcore_dataset/Guitar/d546e034a6c659a425cd348738a8052a.pts'
-POINT_PATH_KNIFE = 'shapenetcore_dataset/Knife/9d424831d05d363d870906b5178d97bd.pts'
-POINT_PATH_LAMP = 'shapenetcore_dataset/Lamp/b8c87ad9d4930983a8d82fc8a3e54728.pts'
-POINT_PATH_LAPTOP = 'shapenetcore_dataset/Laptop/4d3dde22f529195bc887d5d9a11f3155.pts'
-POINT_PATH_MOTORBIKE = 'shapenetcore_dataset/Motorbike/9d3b07f4475d501e8249f134aca4c817.pts'
-POINT_PATH_MUG = 'shapenetcore_dataset/Mug/10f6e09036350e92b3f21f1137c3c347.pts'
-POINT_PATH_PISTOL = 'shapenetcore_dataset/Pistol/b1bbe535a833635d91f9af3df5b0c8fc.pts'
-POINT_PATH_ROCKET = 'shapenetcore_dataset/Rocket/15474cf9caa757a528eba1f0b7744e9.pts'
-POINT_PATH_SKATEBOARD = 'shapenetcore_dataset/Skateboard/f5d7698b5a57d61226e0640b67de606.pts'
-POINT_PATH_TABLE = 'shapenetcore_dataset/Table/408c3db9b4ee6be2e9f3e9c758fef992.pts'
+POINT_PATH_AIRPLANE = 'shapenet_dataset/Airplane/a1708ad923f3b51abbf3143b1cb6076a.pts'
+POINT_PATH_BAG = 'shapenet_dataset/Bag/4e4fcfffec161ecaed13f430b2941481.pts'
+POINT_PATH_CAP = 'shapenet_dataset/Cap/c7122c44495a5ac6aceb0fa31f18f016.pts'
+POINT_PATH_CAR = 'shapenet_dataset/Car/1f1b5c7c01557c484354740e038a7994.pts'
+POINT_PATH_CHAIR = 'shapenet_dataset/Chair/355fa0f35b61fdd7aa74a6b5ee13e775.pts'
+POINT_PATH_EARPHONE = 'shapenet_dataset/Earphone/e33d6e8e39a75268957b6a4f3924d982.pts'
+POINT_PATH_GUITAR = 'shapenet_dataset/Guitar/d546e034a6c659a425cd348738a8052a.pts'
+POINT_PATH_KNIFE = 'shapenet_dataset/Knife/9d424831d05d363d870906b5178d97bd.pts'
+POINT_PATH_LAMP = 'shapenet_dataset/Lamp/b8c87ad9d4930983a8d82fc8a3e54728.pts'
+POINT_PATH_LAPTOP = 'shapenet_dataset/Laptop/4d3dde22f529195bc887d5d9a11f3155.pts'
+POINT_PATH_MOTORBIKE = 'shapenet_dataset/Motorbike/9d3b07f4475d501e8249f134aca4c817.pts'
+POINT_PATH_MUG = 'shapenet_dataset/Mug/10f6e09036350e92b3f21f1137c3c347.pts'
+POINT_PATH_PISTOL = 'shapenet_dataset/Pistol/b1bbe535a833635d91f9af3df5b0c8fc.pts'
+POINT_PATH_ROCKET = 'shapenet_dataset/Rocket/15474cf9caa757a528eba1f0b7744e9.pts'
+POINT_PATH_SKATEBOARD = 'shapenet_dataset/Skateboard/f5d7698b5a57d61226e0640b67de606.pts'
+POINT_PATH_TABLE = 'shapenet_dataset/Table/408c3db9b4ee6be2e9f3e9c758fef992.pts'
 SAVE_IMAGE_PATH = 'output.png'
 
 # ======================
@@ -75,7 +75,7 @@ SAVE_IMAGE_PATH = 'output.png'
 # ======================
 
 parser = argparse.ArgumentParser(
-    description='Pixel-Link model'
+    description='PointNet.pytorch model'
 )
 parser.add_argument(
     '-i', '--input', metavar='POINT',
