@@ -47,6 +47,8 @@ WEIGHT_PATH_SKATEBOARD = 'skateboard_100.onnx'
 MODEL_PATH_SKATEBOARD = 'skateboard_100.onnx.prototxt'
 WEIGHT_PATH_TABLE = 'table_100.onnx'
 MODEL_PATH_TABLE = 'table_100.onnx.prototxt'
+WEIGHT_PATH_CLASSIFIER = 'cls_model_100.onnx'
+MODEL_PATH_CLASSIFIER = 'cls_model_100.onnx.prototxt'
 REMOTE_PATH = \
     'https://storage.googleapis.com/ailia-models/pointnet/'
 
@@ -129,7 +131,7 @@ def load_data(point_file, npoints=2500):
     return point_set
 
 
-def predict(points, net):
+def predict_seg(points, net):
     points = points.transpose(1, 0)
     points = np.expand_dims(points, axis=0)
 
@@ -150,7 +152,32 @@ def predict(points, net):
     return pred_choice
 
 
-def recognize_from_points(filename, net):
+def predict_cls(points, net):
+    points = points.transpose(1, 0)
+    points = np.expand_dims(points, axis=0)
+
+    # feedforward
+    if not args.onnx:
+        net.set_input_shape(points.shape)
+        output = net.predict({'point': points})
+    else:
+        point_name = net.get_inputs()[0].name
+        pred_name = net.get_outputs()[0].name
+        trans_name = net.get_outputs()[1].name
+        output = net.run([pred_name, trans_name],
+                         {point_name: points})
+
+    pred, _ = output
+    pred_choice = np.argmax(pred[0], axis=0)
+    pred_choice = [
+        'airplane', 'bag', 'cap', 'car', 'chair', 'earphone', 'guitar', 'knife',
+        'lamp', 'laptop', 'motorbike', 'mug', 'pistol', 'rocket', 'skateboard', 'table',
+    ][pred_choice]
+
+    return pred_choice
+
+
+def recognize_from_points(filename, net_seg, net_cls):
     # prepare input data
     point = load_data(filename)
 
@@ -160,15 +187,17 @@ def recognize_from_points(filename, net):
         print('BENCHMARK mode')
         for i in range(5):
             start = int(round(time.time() * 1000))
-            pred = predict(point, net)
+            pred_seg = predict_seg(point, net_seg)
+            pred_cls = predict_cls(point, net_cls)
             end = int(round(time.time() * 1000))
             print(f'\tailia processing time {end - start} ms')
     else:
-        pred = predict(point, net)
+        pred_seg = predict_seg(point, net_seg)
+        pred_cls = predict_cls(point, net_cls)
 
     cmap = plt.cm.get_cmap("hsv", 10)
     cmap = np.array([cmap(i) for i in range(10)])[:, :3]
-    pred_color = cmap[pred, :]
+    pred_color = cmap[pred_seg, :]
 
     showsz = 800
     point = point - point.mean(axis=0)
@@ -191,6 +220,8 @@ def recognize_from_points(filename, net):
     ax.set_xlim(mid_x - max_range, mid_x + max_range)
     ax.set_ylim(mid_y - max_range, mid_y + max_range)
     ax.set_zlim(mid_z - max_range, mid_z + max_range)
+
+    print('class --', pred_cls)
 
     plt.savefig(args.savepath, dpi=120)
     plt.show()
@@ -219,7 +250,10 @@ def main():
     WEIGHT_PATH, MODEL_PATH, POINT_PATH = rec_model[args.choice_class]
 
     # model files check and download
+    print("=== Segmentation model ===")
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
+    print("=== Classifier model ===")
+    check_and_download_models(WEIGHT_PATH_CLASSIFIER, MODEL_PATH_CLASSIFIER, REMOTE_PATH)
 
     # load model
     env_id = ailia.get_gpu_environment_id()
@@ -227,12 +261,14 @@ def main():
 
     # initialize
     if not args.onnx:
-        net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+        net_seg = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+        net_cls = ailia.Net(MODEL_PATH_CLASSIFIER, WEIGHT_PATH_CLASSIFIER, env_id=env_id)
     else:
         import onnxruntime
-        net = onnxruntime.InferenceSession(WEIGHT_PATH)
+        net_seg = onnxruntime.InferenceSession(WEIGHT_PATH)
+        net_cls = onnxruntime.InferenceSession(WEIGHT_PATH_CLASSIFIER)
 
-    recognize_from_points(args.input if args.input else POINT_PATH, net)
+    recognize_from_points(args.input if args.input else POINT_PATH, net_seg, net_cls)
 
 
 if __name__ == '__main__':
