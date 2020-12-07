@@ -8,26 +8,19 @@ import pyaudio
 
 import ailia
 """import original modules"""
-#sys.path.append('./ailia-models/util') 
-#from model_utils import check_and_download_models
-
-#librispeech_pretrained_v2
-#how strange it seemed to the sad woman as she watched the growth and the beauty that became every day more brilliant and the intelligence that through its quivering sunshine over the tiny features of this child
-
-#an4_pretrained_v2
-# sthiee sixtysx s one cs one stwp teoh ten teny kwenth three t four eineaieteen twonr two seven te ine  thine shirn i np twe tseiox sven sie
-
-#ted_pretrained_v2
-#howstrange at seemed to the sad woman she wachd the grolt han the beauty that became every day more brilliant and the intelligence that through its equivering sunching over the tiny peacturs of this child
-
-#
+sys.path.append('../../util') 
+from model_utils import check_and_download_models
 
 # ======================
 # Parameters
 # ======================
-WEIGHT_PATH = 'ted_pretrained_v2.onnx' #'deepspeech2_dynamic.onnx'
-MODEL_PATH = 'ted_pretrained_v2.onnx.prototxt' #'deepspeech2_dynamic.onnx.prototxt'
-REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/deepspeech2/'
+MODEL_LISTS = ['an4_pretrained_v2', 'librispeech_pretrained_v2', 'ted_pretrained_v2']
+
+DEFAULT_MODEL = 'librispeech_pretrained_v2'
+
+WEIGHT_PATH = 'librispeech_pretrained_v2.onnx'
+MODEL_PATH = 'librispeech_pretrained_v2.onnx.prototxt'
+REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/deepspeach2/'
 
 WAV_PATH = './1221-135766-0000.wav'
 SAVE_TEXT_PATH = 'output.txt'
@@ -89,11 +82,10 @@ parser.add_argument(
     help='use beam decoder'
 )
 parser.add_argument(
-    '-a', metavar='WEIGHT',
-    default=WEIGHT_PATH,
-    help='The .onnx path.'
+    '-a', '--arch', metavar='WEIGHT',
+    default=DEFAULT_MODEL, choices=MODEL_LISTS,
+    help='model lists: ' + ' | '.join(MODEL_LISTS)
 )
-
 args = parser.parse_args()
 
 # ======================
@@ -278,10 +270,13 @@ def microphone_input_recognition():
 
 def main():
     global WEIGHT_PATH, MODEL_PATH
-    if args.a != WEIGHT_PATH:
-        WEIGHT_PATH = args.a
+    if args.arch != WEIGHT_PATH:
+        WEIGHT_PATH = args.arch + '.onnx'
         MODEL_PATH = WEIGHT_PATH + '.prototxt'
-    #check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
+    
+    check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
+    check_and_download_models(LM_PATH, LM_PATH, REMOTE_PATH)
+    
     #マイク入力モード
     if args.V:
         try:
