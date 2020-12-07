@@ -2,7 +2,7 @@
 
 ### input
 
-audio file
+audio file（16kHz)
 
 ```
 LibriSpeech ASR corpus
@@ -27,8 +27,51 @@ howstrange at seemed to the sad woman she wachd the grolt han the beauty that be
 
 ### Usage
 
+#### Basic
+
+File input
+
 ```bash
-$ python3 deepspeech2.py -i 1221-135766-0000.wav
+$ python3 deepspeech_dynamic.py -i 1221-135766-0000.wav -s output.txt
+```
+
+Mic input
+
+```bash
+$ python3 deepspeech_dynamic.py -V
+```
+
+1. speak into the microphone when "Please speak something."
+2. end the recording after about 1 second of silence and do voice recognition
+3. return to 1 again after displaying the forecast results
+4. type ``Ctrl+c`` if you want to exit
+
+#### Options
+
+With the `-d` option, decode the recognition results in BeamDecoder using the language model. With the `-a` option, you can use other trained models.
+
+### Setup
+
+#### Install pyaudio
+
+Mac OS:
+```
+brew install portaudio
+pip install pyaudio
+```
+
+Linux:
+```
+sudo apt-get install portaudio19-dev
+pip install pyaudio
+```
+
+#### Install ctcdecode (for -d option)
+This module is required to perform Beam Decode using the language model.
+
+```
+git clone --recursive https://github.com/parlance/ctcdecode.git
+cd ctcdecode && pip install .
 ```
 
 ### Reference
@@ -43,5 +86,7 @@ ONNX opset = 10
 ### Netron
 
 [an4_pretrained_v2.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/deepspeach2/an4_pretrained_v2.onnx.prototxt)
-[librispeech_pretrained_v2.onnx.prototxt(https://netron.app/?url=https://storage.googleapis.com/ailia-models/deepspeach2/librispeech_pretrained_v2.onnx.prototxt)
+
+[librispeech_pretrained_v2.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/deepspeach2/librispeech_pretrained_v2.onnx.prototxt)
+
 [ted_pretrained_v2.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/deepspeach2/ted_pretrained_v2.onnx.prototxt)
