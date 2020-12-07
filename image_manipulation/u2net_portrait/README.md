@@ -46,5 +46,5 @@ ONNX opset=10
 
 ## Netron
 
-[u2net_portrait.onnx.prototxt]()
+[u2net_portrait.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/u2net_portrait/u2net_portrait.onnx.prototxt)
 

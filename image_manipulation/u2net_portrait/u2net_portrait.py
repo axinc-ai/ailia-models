@@ -218,15 +218,16 @@ def recognize_from_video():
     capture = get_capture(args.video)
     while(True):
         ret, img = capture.read()
+        
+        # press q to end video capture
+        if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+
         input_img = preprocess(img)
         print(input_img.shape)
         d1,d2,d3,d4,d5,d6,d7 = net.predict({'input.1': input_img})
         out_img = post_process(d1)
         cv2.imshow('frame', out_img)
-
-        # press q to end video capture
-        if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
-            break
 
     capture.release()
     cv2.destroyAllWindows()

@@ -47,6 +47,7 @@ cd ../../image_manipulation/dewarpnet; python3 dewarpnet.py ${OPTION}
 cd ../../image_manipulation/illnet; python3 illnet.py ${OPTION}
 cd ../../image_manipulation/noise2noise; python3 noise2noise.py ${OPTION}
 cd ../../image_manipulation/colorization; python3 colorization.py ${OPTION}
+cd ../../image_manipulation/u2net_portrait; python3 u2net_portrait.py ${OPTION}
 cd ../../image_segmentation/deep-image-matting; python3 deep-image-matting.py ${OPTION}
 cd ../../image_segmentation/deeplabv3; python3 deeplabv3.py ${OPTION}
 cd ../../image_segmentation/hair_segmentation; python3 hair_segmentation.py ${OPTION}
