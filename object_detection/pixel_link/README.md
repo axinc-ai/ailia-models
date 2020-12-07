@@ -50,4 +50,4 @@ ONNX opset=11
 
 ## Netron
 
-[pixellink-vgg16-4s.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/pixel-link/pixellink-vgg16-4s.onnx.prototxt)
+[pixellink-vgg16-4s.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/pixel_link/pixellink-vgg16-4s.onnx.prototxt)
