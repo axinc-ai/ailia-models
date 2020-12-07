@@ -116,6 +116,8 @@ The collection of pre-trained, state-of-the-art models.
 | [<img src="image_manipulation/dewarpnet/output.png" width=128px>](image_manipulation/dewarpnet/) | [dewarpnet](/image_maniplulation/dewarpnet) | [DewarpNet: Single-Image Document Unwarping With Stacked 3D and 2D Regression Networks](https://github.com/cvlab-stonybrook/DewarpNet) | Pytorch | 1.2.1 and later |
 | [<img src="image_manipulation/illnet/output.png" width=128px>](image_manipulation/illnet/) | [illnet](/image_maniplulation/illnet/) | [Document Rectification and Illumination Correction using a Patch-based CNN](https://github.com/xiaoyu258/DocProj) | Pytorch | 1.2.2 and later |
 | [<img src="image_manipulation/colorization/imgs_out/ansel_adams3_output.jpg" width=128px>](image_manipulation/colorization/) | [colorization](/image_maniplulation/colorization/) | [Colorful Image Colorization](https://github.com/richzhang/colorization) | Pytorch | 1.2.2 and later |
+| [<img src="image_manipulation/u2net_portrait/your_portrait_results/GalGadot.jpg" width=128px>](image_manipulation/u2net_portrait/) | [u2net_portrait](/image_maniplulation/u2net_portrait/) | [U^2-Net: Going Deeper with Nested U-Structure for Salient Object Detection](https://github.com/NathanUA/U-2-Net) | Pytorch | 1.2.2 and later |
+
 
 ## Image segmentation
 
@@ -194,6 +196,12 @@ The collection of pre-trained, state-of-the-art models.
 |:-----------|------------:|:------------:|:------------:|:------------:|
 | [<img src="super_resolution/srresnet/output.png" width=128px>](super_resolution/srresnet/) | [srresnet](/super_resolution/srresnet/) | [Photo-Realistic Single Image Super-Resolution Using a Generative Adversarial Network](https://github.com/twtygqyy/pytorch-SRResNet) | Pytorch | 1.2.0 and later |
 
+## Text detection
+
+| | Model | Reference | Exported From | Supported Ailia Version |
+|:-----------|------------:|:------------:|:------------:|:------------:|
+| [<img src="text_detection/craft_pytorch/imgs_results/res_00_00.jpg" width=64px>](text_detection/craft_pytorch/) |[craft_pytorch](/text_detection/craft_pytorch) | [CRAFT: Character-Region Awareness For Text detection](https://github.com/clovaai/CRAFT-pytorch) | Pytorch | 1.2.2 and later |
+
 ## Text recognition
 
 | | Model | Reference | Exported From | Supported Ailia Version |
@@ -206,7 +214,22 @@ The collection of pre-trained, state-of-the-art models.
 |:-----------|------------:|:------------:|:------------:|:------------:|
 | |[acculus-pose](/commercial_model/acculus-pose) | [Acculus, Inc.](https://acculus.jp/) | Caffe | 1.2.3 and later |
 
+# Launcher
+
+You can display a list of models and select them with the mouse by using the command below.
+
+```
+python3 launcher.py
+```
+
 # Setup
+
+## Tutorial
+
+[ailia SDK tutorial (Python API) (EN)](https://medium.com/axinc-ai/ailia-sdk-tutorial-python-ea29ae990cf6)
+
+[ailia SDK tutorial (Python API) (JP)](https://medium.com/axinc/ailia-sdk-%E3%83%81%E3%83%A5%E3%83%BC%E3%83%88%E3%83%AA%E3%82%A2%E3%83%AB-python-28379dbc9649)
+
 
 ## Requirements
 
@@ -216,18 +239,25 @@ The collection of pre-trained, state-of-the-art models.
 
 - [Download a free evaluation version of ailia SDK](https://ailia.jp/en/trial)
 - Unzip ailia SDK
-- Find the location of Python site-packages directory
+- Run the following command
+
+```
+cd ailia_sdk/python
+python3 bootstrap.py
+pip3 install ./
+```
+
+- In the evaluation version, place the license file in the same folder as libailia.dll ([python_path]/site_packages/ailia) on Windows and in ~/Library/SHALO/ on Mac.
+
+- You can find the location of Python site-packages directory using the following command.
+
 ```
 python -c "import site; print (site.getsitepackages())"
 ```
 
-- Copy the ​ailia ​folder located in the ​python f​older to site-packages
-- Copy library files (dll or dylib or so) from the folder library to site-packages/ailia
-- In the evaluation version, place the license file in the same folder as libailia.dll on Windows and in ~/Library/SHALO/ on Mac.
-
 ## Install required libraries for Python
 
-### For Windows, Mac, Linux
+### For Windows, Mac and Linux
 
 ```
 pip install -r requirements.txt
@@ -249,21 +279,16 @@ pip3 install numpy
 sudo apt install nvidia-jetpack
 ```
 
-# Launcher
-
-You can display a list of models and select them with the mouse by using the command below.
+### For Raspberry Pi
 
 ```
-python3 launcher.py
+pip3 install numpy
+pip3 install opencv-python
+pip3 install matplotlib
+sudo apt-get install libatlas-base-dev
 ```
 
-# Resources
-
-## Blog
-
-[ailia SDK tutorial (Python API)](https://medium.com/axinc/ailia-sdk-%E3%83%81%E3%83%A5%E3%83%BC%E3%83%88%E3%83%AA%E3%82%A2%E3%83%AB-python-28379dbc9649)
-
-## Other languages
+# Other languages
 
 [unity version](https://github.com/axinc-ai/ailia-models-unity)
 
