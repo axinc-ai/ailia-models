@@ -20,7 +20,7 @@ from webcamera_utils import adjust_frame_size, get_capture  # noqa: E402C
 # ======================
 WEIGHT_PATH = 'u2net_portrait.onnx'
 MODEL_PATH = 'u2net_portrait.onnx.prototxt'
-REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/'
+REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/u2net_portrait/'
 
 IMAGE_PATH = 'your_portrait_im/kid1.jpg'
 SAVE_IMAGE_PATH = 'your_portrait_results/kid1.jpg'
