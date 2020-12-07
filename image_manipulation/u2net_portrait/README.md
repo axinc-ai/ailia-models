@@ -1,4 +1,4 @@
-# Colorful Image Colorization
+# U^2-Net for human portrait drawing
 
 ## Input
 
