@@ -51,4 +51,4 @@ ONNX opset = 10
 
 ### Netron
 
-[crnn.onnx.prototxt](https://lutzroeder.github.io/netron/?url=https://storage.googleapis.com/ailia-models/crnn/crnn.onnx.prototxt)
+[crnn.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/crnn/crnn.onnx.prototxt)

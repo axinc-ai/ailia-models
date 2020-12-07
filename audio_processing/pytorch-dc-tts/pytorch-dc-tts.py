@@ -21,11 +21,11 @@ SAVE_WAV_PATH = 'output.wav'
 
 WEIGHT_PATH_T2M = 'text2mel.onnx'
 MODEL_PATH_T2M = 'text2mel.onnx.prototxt'
-REMOTE_PATH_T2M = ''
+REMOTE_PATH_T2M = 'https://storage.googleapis.com/ailia-models/pytorch-dc-tts/'
 
 WEIGHT_PATH_SSRM = 'ssrn.onnx'
 MODEL_PATH_SSRM = 'ssrn.onnx.prototxt'
-REMOTE_PATH_SSRM = ''
+REMOTE_PATH_SSRM = 'https://storage.googleapis.com/ailia-models/pytorch-dc-tts/'
 
 MAX_T = 210
 

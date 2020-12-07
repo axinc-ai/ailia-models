@@ -37,5 +37,5 @@ ONNX opset = 10
 
 ### Netron
 
-- [text2mel.onnx.prototxt]()
-- [ssrn.onnx.prototxt]()
+- [text2mel.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/pytorch-dc-tts/text2mel.onnx.prototxt)
+- [ssrn.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/pytorch-dc-tts/ssrn.onnx.prototxt)
