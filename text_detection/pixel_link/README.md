@@ -42,7 +42,7 @@ $ python3 pixel_link.py --video VIDEO_PATH
 
 ## Framework
 
-Tesorflow
+TensorFlow
 
 ## Model Format
 
