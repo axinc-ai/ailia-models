@@ -32,13 +32,13 @@ howstrange at seemed to the sad woman she wachd the grolt han the beauty that be
 File input
 
 ```bash
-$ python3 deepspeech_dynamic.py -i 1221-135766-0000.wav -s output.txt
+$ python3 deepspeech2.py -i 1221-135766-0000.wav -s output.txt
 ```
 
 Mic input
 
 ```bash
-$ python3 deepspeech_dynamic.py -V
+$ python3 deepspeech2.py -V
 ```
 
 1. speak into the microphone when "Please speak something."
