@@ -20,7 +20,7 @@ DEFAULT_MODEL = 'librispeech_pretrained_v2'
 
 WEIGHT_PATH = 'librispeech_pretrained_v2.onnx'
 MODEL_PATH = 'librispeech_pretrained_v2.onnx.prototxt'
-REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/deepspeach2/'
+REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/deepspeech2/'
 
 WAV_PATH = './1221-135766-0000.wav'
 SAVE_TEXT_PATH = 'output.txt'

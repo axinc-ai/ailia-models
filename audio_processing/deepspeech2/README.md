@@ -1,4 +1,4 @@
-# deepspeach2
+# deepspeech2
 
 ### input
 
@@ -85,8 +85,8 @@ ONNX opset = 10
 
 ### Netron
 
-[an4_pretrained_v2.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/deepspeach2/an4_pretrained_v2.onnx.prototxt)
+[an4_pretrained_v2.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/deepspeech2/an4_pretrained_v2.onnx.prototxt)
 
-[librispeech_pretrained_v2.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/deepspeach2/librispeech_pretrained_v2.onnx.prototxt)
+[librispeech_pretrained_v2.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/deepspeech2/librispeech_pretrained_v2.onnx.prototxt)
 
-[ted_pretrained_v2.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/deepspeach2/ted_pretrained_v2.onnx.prototxt)
+[ted_pretrained_v2.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/deepspeech2/ted_pretrained_v2.onnx.prototxt)
