@@ -1,0 +1,48 @@
+# --------------------
+# Repository
+# --------------------
+ailia/
+
+*.caffemodel
+*.onnx
+*.prototxt
+
+__pycache__/
+.ipynb_checkpoints/
+.venv
+.vscode
+.python-version
+Pipfile.lock
+
+
+# --------------------
+# Packages
+# --------------------
+*.7z
+*.dmg
+*.gz
+*.iso
+*.jar
+*.rar
+*.tar
+*.zip
+
+
+# --------------------
+# OS files
+# --------------------
+.DS_Store
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+
+# --------------------
+# Special files
+# --------------------
+sample_script/
+tmp.avi
+
+image_segmentation/pspnet-hair-segmentation/images
+object_tracking/deepsort/images/
+style_transfer/adain/images/
