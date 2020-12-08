@@ -18,7 +18,7 @@ from nms_utils import nms_between_categories  # noqa: E402
 # Parameters
 # ======================
 
-MODEL_LISTS = ['yolov3-tiny', 'mb2-ssd']
+MODEL_LISTS = ['yolov3-tiny', 'yolov3', 'mb2-ssd']
 
 IMAGE_PATH = 'ferry.jpg'
 SAVE_IMAGE_PATH = 'output.png'
@@ -68,6 +68,12 @@ args = parser.parse_args()
 if args.arch == "yolov3-tiny":
     WEIGHT_PATH = 'face-mask-detection-yolov3-tiny.opt.obf.onnx'
     MODEL_PATH = 'face-mask-detection-yolov3-tiny.opt.onnx.prototxt'
+    RANGE = ailia.NETWORK_IMAGE_RANGE_U_FP32
+    ALGORITHM = ailia.DETECTOR_ALGORITHM_YOLOV3
+    THRESHOLD = 0.4
+elif args.arch == "yolov3":
+    WEIGHT_PATH = 'face-mask-detection-yolov3.opt.obf.onnx'
+    MODEL_PATH = 'face-mask-detection-yolov3.opt.onnx.prototxt'
     RANGE = ailia.NETWORK_IMAGE_RANGE_U_FP32
     ALGORITHM = ailia.DETECTOR_ALGORITHM_YOLOV3
     THRESHOLD = 0.4

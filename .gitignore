@@ -43,6 +43,7 @@ Thumbs.db
 sample_script/
 tmp.avi
 
+face_identification/validation/dataset/
 image_segmentation/pspnet-hair-segmentation/images
 object_tracking/deepsort/images/
 style_transfer/adain/images/

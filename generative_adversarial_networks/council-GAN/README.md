@@ -79,9 +79,9 @@ ONNX opset = 10
 
 ### Netron
 
-[councilGAN-glasses.onnx.prototxt](https://lutzroeder.github.io/netron/?url=https://storage.googleapis.com/ailia-models/council-gan/councilGAN-glasses.onnx.prototxt)
+[councilGAN-glasses.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/council-gan/councilGAN-glasses.onnx.prototxt)
 
-[councilGAN-m2f_256.onnx.prototxt](https://lutzroeder.github.io/netron/?url=https://storage.googleapis.com/ailia-models/council-gan/councilGAN-m2f_256.onnx.prototxt)
+[councilGAN-m2f_256.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/council-gan/councilGAN-m2f_256.onnx.prototxt)
 
-[councilGAN-anime.onnx.prototxt](https://lutzroeder.github.io/netron/?url=https://storage.googleapis.com/ailia-models/council-gan/councilGAN-anime.onnx.prototxt)
+[councilGAN-anime.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/council-gan/councilGAN-anime.onnx.prototxt)
 

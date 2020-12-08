@@ -134,8 +134,8 @@ def recognize_from_video():
 
         _, resized_image = adjust_frame_size(frame, IMAGE_HEIGHT, IMAGE_WIDTH)
 
-        if args.add_noise:
-            resized_image = add_noise(resized_image)
+        # add noise
+        resized_image = add_noise(resized_image)
 
         resized_image = resized_image / 255.0
         input_data = resized_image.transpose(2, 0, 1)
@@ -143,6 +143,9 @@ def recognize_from_video():
 
         # inference
         preds_ailia = net.predict(input_data)
+
+        # side by side
+        preds_ailia[:,:,:,0:input_data.shape[3]//2] = input_data[:,:,:,0:input_data.shape[3]//2]
 
         # postprocessing
         output_img = preds_ailia[0].transpose(1, 2, 0)

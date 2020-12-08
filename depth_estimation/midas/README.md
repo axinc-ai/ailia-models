@@ -49,4 +49,4 @@ ONNX opset=11
 
 ## Netron
 
-[midas.onnx.prototxt](https://lutzroeder.github.io/netron/?url=https://storage.googleapis.com/ailia-models/mdias/midas.onnx.prototxt)
+[midas.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/midas/midas.onnx.prototxt)

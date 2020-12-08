@@ -52,5 +52,5 @@ ONNX opset = 10
 
 ### Netron
 
-[mb2-ssd-lite.onnx.onnx.prototxt](https://lutzroeder.github.io/netron/?url=https://storage.googleapis.com/ailia-models/mobilenet_ssd/mb2-ssd-lite.onnx.prototxt)
+[mb2-ssd-lite.onnx.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/mobilenet_ssd/mb2-ssd-lite.onnx.prototxt)
 

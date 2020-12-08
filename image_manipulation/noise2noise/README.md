@@ -50,5 +50,5 @@ ONNX opset = 10
 
 ## Netron
 
-[noise2noise_gaussian.onnx.prototxt](https://lutzroeder.github.io/netron/?url=https://storage.googleapis.com/ailia-models/noise2noise/noise2noise_gaussian.onnx.prototxt)
+[noise2noise_gaussian.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/noise2noise/noise2noise_gaussian.onnx.prototxt)
 

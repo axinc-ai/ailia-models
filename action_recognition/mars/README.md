@@ -58,4 +58,4 @@ ONNX opset=10
 
 ## Netron
 
-[mars.onnx.prototxt](https://lutzroeder.github.io/netron/?url=https://storage.googleapis.com/ailia-models/mars/mars.onnx.prototxt)
+[mars.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/mars/mars.onnx.prototxt)

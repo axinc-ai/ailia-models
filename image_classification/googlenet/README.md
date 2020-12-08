@@ -56,4 +56,4 @@ Pytorch 1.3.0
 
 ## Netron
 
-[googlenet.onnx.prototxt](https://lutzroeder.github.io/netron/?url=https://storage.googleapis.com/ailia-models/googlenet/googlenet.onnx.prototxt)
+[googlenet.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/googlenet/googlenet.onnx.prototxt)

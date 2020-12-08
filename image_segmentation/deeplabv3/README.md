@@ -52,7 +52,7 @@ Chainer 6.3.0
 
 ## Netron
 
-[deeplabv3.onnx.prototxt](https://lutzroeder.github.io/netron/?url=https://storage.googleapis.com/ailia-models/deeplabv3/deeplabv3.onnx.prototxt)
+[deeplabv3.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/deeplabv3/deeplabv3.onnx.prototxt)
 
-[deeplabv3.opt.onnx.prototxt](https://lutzroeder.github.io/netron/?url=https://storage.googleapis.com/ailia-models/deeplabv3/deeplabv3.opt.onnx.prototxt)
+[deeplabv3.opt.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/deeplabv3/deeplabv3.opt.onnx.prototxt)
 

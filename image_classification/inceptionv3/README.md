@@ -57,4 +57,4 @@ Pytorch 1.2.0
 
 ## Netron
 
-[inceptionv3.onnx.prototxt](https://lutzroeder.github.io/netron/?url=https://storage.googleapis.com/ailia-models/inceptionv3/inceptionv3.onnx.prototxt)
+[inceptionv3.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/inceptionv3/inceptionv3.onnx.prototxt)

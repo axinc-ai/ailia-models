@@ -45,7 +45,7 @@ ONNX opset = 10
 
 ## Netron
 
-[bm_model.onnx.prototxt](https://lutzroeder.github.io/netron/?url=https://storage.googleapis.com/ailia-models/dewarpnet/bm_model.onnx.prototxt)
+[bm_model.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/dewarpnet/bm_model.onnx.prototxt)
 
-[wc_model.opt.onnx.prototxt](https://lutzroeder.github.io/netron/?url=https://storage.googleapis.com/ailia-models/dewarpnet/wc_model.onnx.prototxt)
+[wc_model.opt.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/dewarpnet/wc_model.onnx.prototxt)
 
