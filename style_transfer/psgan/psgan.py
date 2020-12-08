@@ -213,7 +213,7 @@ def transfer_to_video():
     net = _initialize_net(args)
 
     device = args.device
-    preprocess = PreProcess(config, device)
+    preprocess = PreProcess(config, device, args, face_parser_path)
     _, real_B, mask_B, diff_B, _ = _prepare_data(args, device, preprocess, "reference")
     postprocess = PostProcess(config)
 
