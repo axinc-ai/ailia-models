@@ -30,6 +30,7 @@ def get_base_parser(description, default_img, default_save, parse=False):
     description : str
     parse : bool, default is False
         if True, return parsed arguments
+        TODO: deprecates
 
     Returns
     -------
@@ -70,3 +71,29 @@ def get_base_parser(description, default_img, default_save, parse=False):
         parser = parser.parse_args()
 
     return parser
+
+
+def update_parser(parser):
+    """Default check or update configurations should be placed here
+
+    Parameters
+    ----------
+    parser : ArgumentParser()
+
+    Returns
+    -------
+    args : ArgumentParser()
+        (parse_args() will be done here)
+    """
+    args = parser.parse_args()
+
+    # 1. check env_id count
+    if AILIA_EXIST:
+        count = ailia.get_environment_count()
+        if count <= args.env_id:
+            print(f'[ERROR] specified env_id: {args.env_id} cannot found. ')
+            print('env_id updated to 0')
+
+    print(f'env_id: {args.env_id}')
+
+    return args
