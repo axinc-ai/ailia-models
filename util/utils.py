@@ -21,13 +21,17 @@ def check_file_existance(filename):
         sys.exit()
 
 
-def get_base_parser(description, default_img, default_save, parse=False):
+def get_base_parser(description, default_input, default_save, parse=False):
     """
     Get ailia default argument parser
 
     Parameters
     ----------
     description : str
+    default_input : str
+        default input data (image / video) path
+    default_save : str
+        default save path
     parse : bool, default is False
         if True, return parsed arguments
         TODO: deprecates
@@ -42,8 +46,8 @@ def get_base_parser(description, default_img, default_save, parse=False):
         description=description,
     )
     parser.add_argument(
-        '-i', '--input', metavar='IMAGE', default=default_img,
-        help='The input image path.'
+        '-i', '--input', metavar='IMAGE/VIDEO', default=default_input,
+        help='The default (model-dependent) input data (image / video) path.'
     )
     parser.add_argument(
         '-v', '--video', metavar='VIDEO', default=None,
