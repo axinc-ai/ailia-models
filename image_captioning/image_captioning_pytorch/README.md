@@ -10,7 +10,9 @@
 - Estimating Caption
 ```bash
 ### Caption ###
- a giraffe and a zebra standing in a field
+a giraffe and a zebra standing in a field (fc model)
+a group of zebras and a giraffe in a field (fc_rl model)
+a group of zebras and a giraffe standing on a dirt road (fc_nsc model)
 ```
 
 ### usage
@@ -33,9 +35,9 @@ If you pass `0` as an argument to VIDEO_PATH, you can use the webcam input inste
 $ python3 image_captioning_pytorch.py --video VIDEO_PATH
 ```
 
-The default captioning model is fc.   
+The default captioning model is fc_nsc.   
 By adding the `--model fc_rl` option, you can use fc_rl model for captioning.
-Or by adding the `--model fc_nsc` option, you can use fc_nsc.
+Or by adding the `--model fc` option, you can use fc.
 
 ### Reference
 
