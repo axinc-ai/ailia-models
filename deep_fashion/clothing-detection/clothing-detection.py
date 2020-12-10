@@ -10,7 +10,7 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser  # noqa: E402
+from utils import get_base_parser, update_parser  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from detector_utils import plot_results, load_image  # noqa: E402
 from webcamera_utils import get_capture, get_writer,\
@@ -66,7 +66,7 @@ parser.add_argument(
     default=DETECTION_WIDTH,
     help='The detection width and height for yolo. (default: 416)'
 )
-args = parser.parse_args()
+args = update_parser(parser)
 
 weight_path, model_path = DATASETS_MODEL_PATH[args.dataset]
 category = DATASETS_CATEGORY[args.dataset]
@@ -208,6 +208,8 @@ def recognize_from_video(video, detector):
 
     capture.release()
     cv2.destroyAllWindows()
+    if writer is not None:
+        writer.release()
     print('Script finished successfully.')
 
 
@@ -215,18 +217,8 @@ def main():
     # model files check and download
     check_and_download_models(weight_path, model_path, REMOTE_PATH)
 
-    # load model
-    env_id = ailia.get_gpu_environment_id()
-    if args.env_id is not None:
-        count = ailia.get_environment_count()
-        if count > args.env_id:
-            env_id = args.env_id
-        else:
-            print(f'specified env_id: {args.env_id} cannot found error')
-    print(f'env_id: {env_id}')
-
     # initialize
-    detector = ailia.Net(model_path, weight_path, env_id=env_id)
+    detector = ailia.Net(model_path, weight_path, env_id=args.env_id)
     id_image_shape = detector.find_blob_index_by_name("image_shape")
     detector.set_input_shape(
         (1, 3, args.detection_width, args.detection_width)

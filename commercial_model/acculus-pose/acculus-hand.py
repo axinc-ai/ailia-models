@@ -209,6 +209,8 @@ def recognize_from_video():
 
     capture.release()
     cv2.destroyAllWindows()
+    if writer is not None:
+        writer.release()
     print('Script finished successfully.')
 
 

@@ -7,7 +7,7 @@ import numpy as np
 import ailia
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser  # noqa: E402
+from utils import get_base_parser, update_parser  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from image_utils import load_image  # noqa: E402
 import webcamera_utils  # noqa: E402
@@ -32,7 +32,7 @@ IMAGE_HEIGHT = 480
 parser = get_base_parser(
     'Single image crowd counting.', IMAGE_PATH, SAVE_IMAGE_PATH,
 )
-args = parser.parse_args()
+args = update_parser(parser)
 
 
 # ======================
@@ -54,16 +54,7 @@ def estimate_from_image():
     )
 
     # net initialize
-    env_id = ailia.get_gpu_environment_id()
-    if args.env_id is not None:
-        count = ailia.get_environment_count()
-        if count > args.env_id:
-            env_id = args.env_id
-        else:
-            print(f'specified env_id: {args.env_id} cannot found error')
-    print(env_id)
-
-    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
 
     # inference
     if args.benchmark:
@@ -100,16 +91,7 @@ def estimate_from_image():
 
 def estimate_from_video():
     # net initialize
-    env_id = ailia.get_gpu_environment_id()
-    if args.env_id is not None:
-        count = ailia.get_environment_count()
-        if count > args.env_id:
-            env_id = args.env_id
-        else:
-            print(f'specified env_id: {args.env_id} cannot found error')
-    print(env_id)
-
-    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
 
     capture = webcamera_utils.get_capture(args.video)
 
@@ -171,6 +153,8 @@ def estimate_from_video():
 
     capture.release()
     cv2.destroyAllWindows()
+    if writer is not None:
+        writer.release()
     print('Script finished successfully.')
 
 

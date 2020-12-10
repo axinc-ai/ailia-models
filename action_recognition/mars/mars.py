@@ -11,7 +11,7 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser  # noqa: E402
+from utils import get_base_parser, update_parser  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from webcamera_utils import get_capture  # noqa: E402
 from image_utils import load_image  # noqa: E402
@@ -98,7 +98,7 @@ parser.add_argument(
     '-t', '--top', metavar='TOP', default=3, type=int,
     help='Number of outputs for category.',
 )
-args = parser.parse_args()
+args = update_parser(parser)
 
 
 # ======================
@@ -130,20 +130,11 @@ def recognize_from_image():
     next_input_index = args.duration
     input_frame_size = len(sorted_inputs_path)
 
-    # # net initialize
-    env_id = ailia.get_gpu_environment_id()  # initialize
-    if args.env_id is not None:
-        count = ailia.get_environment_count()
-        if count > args.env_id:
-            env_id = args.env_id
-        else:
-            print(f'specified env_id: {args.env_id} cannot found error')
-    print(f'env_id: {env_id}')
-
-    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+    # net initialize
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
     net.set_input_shape((1, 3, args.duration, IMAGE_HEIGHT, IMAGE_WIDTH))
 
-    # inferece
+    # inference
     print('Start inference...')
     if args.benchmark:
         print('BENCHMARK mode')
@@ -191,17 +182,8 @@ def convert_input_frame(frame):
 def recognize_from_video():
     capture = get_capture(args.video)
 
-    # # net initialize
-    env_id = ailia.get_gpu_environment_id()
-    if args.env_id is not None:
-        count = ailia.get_environment_count()
-        if count > args.env_id:
-            env_id = args.env_id
-        else:
-            print(f'specified env_id: {args.env_id} cannot found error')
-    print(f'env_id: {env_id}')
-
-    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+    # net initialize
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
     net.set_input_shape((1, 3, args.duration, IMAGE_HEIGHT, IMAGE_WIDTH))
 
     # prepare input data

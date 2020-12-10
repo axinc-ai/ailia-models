@@ -1,6 +1,5 @@
 import sys
 import time
-import argparse
 
 import cv2
 import numpy as np
@@ -8,6 +7,7 @@ import numpy as np
 import ailia
 
 sys.path.append('../../util')
+from utils import get_base_parser, update_parser  # noqa: E402
 from webcamera_utils import adjust_frame_size, get_capture  # noqa: E402
 from image_utils import load_image  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
@@ -23,51 +23,24 @@ IMAGE_WIDTH = 320
 
 ALGORITHM = ailia.POSE_ALGORITHM_ACCULUS_POSE
 
-
-# ======================
-# Arguemnt Parser Config
-# ======================
-parser = argparse.ArgumentParser(
-    description='Acculus human pose estimation.'
-)
-parser.add_argument(
-    '-i', '--input', metavar='IMAGE',
-    default=IMAGE_PATH,
-    help='The input image path.'
-)
-parser.add_argument(
-    '-v', '--video', metavar='VIDEO',
-    default=None,
-    help='The input video path. ' +
-         'If the VIDEO argument is set to 0, the webcam input will be used.'
-)
-parser.add_argument(
-    '-n', '--normal',
-    action='store_true',
-    help='By default, the optimized model is used, but with this option, ' +
-    'you can switch to the normal (not optimized) model'
-)
-parser.add_argument(
-    '-s', '--savepath', metavar='SAVE_IMAGE_PATH',
-    default=SAVE_IMAGE_PATH,
-    help='Save path for the output image.'
-)
-parser.add_argument(
-    '-b', '--benchmark',
-    action='store_true',
-    help='Running the inference on the same input 5 times ' +
-         'to measure execution performance. (Cannot be used in video mode)'
-)
-args = parser.parse_args()
-
-
-# ======================
-# Parameters 2
-# ======================
 MODEL_NAME = 'acculus_pose'
 WEIGHT_PATH = 'fullbody_obf.caffemodel'
 MODEL_PATH = 'fullbody_obf.prototxt'
 REMOTE_PATH = ''
+
+
+# ======================
+# Arguemnt Parser Config
+# ======================
+parser = get_base_parser(
+    'Acculus human pose estimation.', IMAGE_PATH, SAVE_IMAGE_PATH
+)
+parser.add_argument(
+    '-n', '--normal', action='store_true',
+    help=('By default, the optimized model is used, but with this option, '
+          'you can switch to the normal (not optimized) model')
+)
+args = update_parser(parser)
 
 
 # ======================
@@ -154,17 +127,8 @@ def recognize_from_image():
     input_data = cv2.cvtColor(input_image, cv2.COLOR_RGB2BGRA)
 
     # net initialize
-    env_id = ailia.get_gpu_environment_id()
-    if args.env_id is not None:
-        count = ailia.get_environment_count()
-        if count > args.env_id:
-            env_id = args.env_id
-        else:
-            print(f'specified env_id: {args.env_id} cannot found error')
-    print(f'env_id: {env_id}')
-
     pose = ailia.PoseEstimator(
-        MODEL_PATH, WEIGHT_PATH, env_id=env_id, algorithm=ALGORITHM
+        MODEL_PATH, WEIGHT_PATH, env_id=args.env_id, algorithm=ALGORITHM
     )
 
     # inference
@@ -189,17 +153,8 @@ def recognize_from_image():
 
 def recognize_from_video():
     # net initialize
-    env_id = ailia.get_gpu_environment_id()
-    if args.env_id is not None:
-        count = ailia.get_environment_count()
-        if count > args.env_id:
-            env_id = args.env_id
-        else:
-            print(f'specified env_id: {args.env_id} cannot found error')
-    print(f'env_id: {env_id}')
-
     pose = ailia.PoseEstimator(
-        MODEL_PATH, WEIGHT_PATH, env_id=env_id, algorithm=ALGORITHM
+        MODEL_PATH, WEIGHT_PATH, env_id=args.env_id, algorithm=ALGORITHM
     )
 
     capture = get_capture(args.video)
