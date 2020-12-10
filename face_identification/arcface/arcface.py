@@ -1,6 +1,5 @@
 import sys
 import time
-import argparse
 
 import numpy as np
 import cv2
@@ -9,7 +8,8 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
-from webcamera_utils import adjust_frame_size, get_capture  # noqa: E402
+from utils import get_base_parser, update_parser  # noqa: E402
+import webcamera_utils  # noqa: E402
 from image_utils import load_image  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from detector_utils import hsv_to_rgb  # noqa: E402
@@ -44,34 +44,21 @@ FACE_MODEL_LISTS = ['yolov3', 'blazeface', 'yolov3-mask']
 FACE_THRESHOLD = 0.4
 FACE_IOU = 0.45
 
+
 # ======================
 # Arguemnt Parser Config
 # ======================
-parser = argparse.ArgumentParser(
-    description='Determine if the person is the same from two facial images.'
+parser = get_base_parser(
+    'Determine if the person is the same from two facial images.',
+    None,
+    None,
 )
+# overwrite default config
 parser.add_argument(
     '-i', '--inputs', metavar='IMAGE',
     nargs=2,
-    default=[IMG_PATH_1, IMG_PATH_2],
+    default=,
     help='Two image paths for calculating the face match.'
-)
-parser.add_argument(
-    '-v', '--video', metavar='VIDEO',
-    default=None,
-    help='The input video path. ' +
-         'If the VIDEO argument is set to 0, the webcam input will be used.'
-)
-parser.add_argument(
-    '-s', '--savepath', metavar='SAVE_FILE_PATH',
-    default=None,
-    help='Save path for the output image or video(mp4).'
-)
-parser.add_argument(
-    '-b', '--benchmark',
-    action='store_true',
-    help='Running the inference on the same input 5 times ' +
-         'to measure execution performance. (Cannot be used in video mode)'
 )
 parser.add_argument(
     '-a', '--arch', metavar='ARCH',
@@ -91,10 +78,10 @@ parser.add_argument(
     '-ft', '--face_threshold', type=float, default=FACE_THRESHOLD,
     help='Threshold for face detection'
 )
-args = parser.parse_args()
+args = update_parser(parser)
 
-WEIGHT_PATH = args.arch+'.onnx'
-MODEL_PATH = args.arch+'.onnx.prototxt'
+WEIGHT_PATH = args.arch + '.onnx'
+MODEL_PATH = args.arch + '.onnx.prototxt'
 
 
 # ======================
@@ -322,7 +309,7 @@ def get_faces(detector, frame, w, h):
         ]
         if crop_img.shape[0] <= 0 or crop_img.shape[1] <= 0:
             continue
-        crop_img, resized_frame = adjust_frame_size(
+        crop_img, resized_frame = webcamera_utils.adjust_frame_size(
             crop_img, IMAGE_HEIGHT, IMAGE_WIDTH
         )
         detections.append({
@@ -413,9 +400,7 @@ def compare_images():
     imgs = np.concatenate([imgs_1, imgs_2], axis=0)
 
     # net initialize
-    env_id = ailia.get_gpu_environment_id()
-    print(f'env_id: {env_id}')
-    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
     BATCH_SIZE = net.get_input_shape()[0]
 
     # inference
@@ -459,13 +444,13 @@ def compare_video():
     tracks = []
 
     # net initialize
-    env_id = ailia.get_gpu_environment_id()
-    print(f'env_id: {env_id}')
-    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
 
     # detector initialize
     if args.face == "blazeface":
-        detector = ailia.Net(FACE_MODEL_PATH, FACE_WEIGHT_PATH, env_id=env_id)
+        detector = ailia.Net(
+            FACE_MODEL_PATH, FACE_WEIGHT_PATH, env_id=args.env_id
+        )
     else:
         detector = ailia.Detector(
             FACE_MODEL_PATH,
@@ -475,11 +460,11 @@ def compare_video():
             channel=ailia.NETWORK_IMAGE_CHANNEL_FIRST,
             range=FACE_RANGE,
             algorithm=FACE_ALGORITHM,
-            env_id=env_id
+            env_id=args.env_id
         )
 
     # web camera
-    capture = get_capture(args.video)
+    capture = webcamera_utils.get_capture(args.video)
 
     # ui buffer
     ui_width = capture.get(cv2.CAP_PROP_FRAME_WIDTH)+IMAGE_WIDTH/4*FACE_TRACK_T
@@ -492,11 +477,12 @@ def compare_video():
     # writer
     writer = None
     if args.savepath is not None:
-        frame_rate = capture.get(cv2.CAP_PROP_FPS)
-        size = (ui.shape[1],
-                ui.shape[0])
-        fmt = cv2.VideoWriter_fourcc('m', 'p', '4', 'v')
-        writer = cv2.VideoWriter(args.savepath, fmt, frame_rate, size)
+        writer = webcamera_utils.get_writer(
+            args.savepath,
+            ui.shape[0],
+            ui.shape[1],
+            fps=capture.get(cv2.CAP_PROP_FPS),
+        )
 
     # inference loop
     while(True):

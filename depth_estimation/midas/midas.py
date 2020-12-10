@@ -9,7 +9,7 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser  # noqa: E402
+from utils import get_base_parser, update_parser  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from webcamera_utils import get_capture, get_writer, \
     calc_adjust_fsize  # noqa: E402
@@ -34,7 +34,7 @@ IMAGE_MULTIPLE_OF = 32
 # Arguemnt Parser Config
 # ======================
 parser = get_base_parser('MiDaS model', IMAGE_PATH, SAVE_IMAGE_PATH)
-args = parser.parse_args()
+args = update_parser(parser)
 
 
 # ======================
@@ -90,10 +90,8 @@ def recognize_from_image():
     img = img[np.newaxis, :, :, :]
     print(f'input image shape: {img.shape}')
 
-    # # net initialize
-    env_id = ailia.get_gpu_environment_id()
-    print(f'env_id: {env_id}')
-    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+    # net initialize
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
     net.set_input_shape(img.shape)
 
     # inferece
@@ -122,15 +120,16 @@ def recognize_from_image():
 
 
 def recognize_from_video():
-    # # net initialize
-    env_id = ailia.get_gpu_environment_id()
-    print(f'env_id: {env_id}')
-    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+    # net initialize
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
 
     capture = get_capture(args.video)
 
     # create video writer if savepath is specified as video format
     if args.savepath != SAVE_IMAGE_PATH:
+        print(
+            '[WARNING] currently, video results cannot be output correctly...'
+        )
         f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
         f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
         save_h, save_w = calc_adjust_fsize(f_h, f_w, IMAGE_HEIGHT, IMAGE_WIDTH)
@@ -167,10 +166,14 @@ def recognize_from_video():
 
         # save results
         if writer is not None:
-            writer.write(res_img)
+            # FIXME: cannot save correctly...
+            res_img = cv2.cvtColor(res_img, cv2.COLOR_GRAY2BGR)
+            writer.write(cv2.convertScaleAbs(res_img))
 
     capture.release()
     cv2.destroyAllWindows()
+    if writer is not None:
+        writer.release()
     print('Script finished successfully.')
 
 

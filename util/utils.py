@@ -44,6 +44,7 @@ def get_base_parser(description, default_input, default_save, parse=False):
     parser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
         description=description,
+        conflict_handler='resolve',  # allow to overwrite default argument
     )
     parser.add_argument(
         '-i', '--input', metavar='IMAGE/VIDEO', default=default_input,

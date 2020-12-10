@@ -1,7 +1,6 @@
 import os
 import sys
 import time
-import argparse
 
 import numpy as np
 import cv2
@@ -10,9 +9,10 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
+from utils import get_base_parser, update_parser  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from image_utils import load_image  # noqa: E402
-from webcamera_utils import adjust_frame_size, get_capture  # noqa: E402
+import webcamera_utils  # noqa: E402
 
 
 # ======================
@@ -35,9 +35,12 @@ SLEEP_TIME = 0  # for video input mode
 # ======================
 # Arguemnt Parser Config
 # ======================
-parser = argparse.ArgumentParser(
-    description='Determine if the person is the same based on VGGFace2'
+parser = get_base_parser(
+    'Determine if the person is the same based on VGGFace2',
+    None,
+    None,
 )
+# overwrite default argument
 parser.add_argument(
     '-i', '--inputs', metavar='IMAGE',
     nargs=2,
@@ -52,13 +55,7 @@ parser.add_argument(
          'and the face in the image file specified by IMAGE are the same. ' +
          'If the VIDEO argument is set to 0, the webcam input will be used.'
 )
-parser.add_argument(
-    '-b', '--benchmark',
-    action='store_true',
-    help='Running the inference on the same input 5 times ' +
-         'to measure execution performance. (Cannot be used in video mode)'
-)
-args = parser.parse_args()
+args = update_parser(parser)
 
 
 # ======================
@@ -98,9 +95,7 @@ def preprocess(img, input_is_bgr=False):
 # ======================
 def compare_images():
     # net initialize
-    env_id = ailia.get_gpu_environment_id()
-    print(f'env_id: {env_id}')
-    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
 
     features = []
 
@@ -140,9 +135,7 @@ def compare_images():
 
 def compare_videoframe_image():
     # net initialize
-    env_id = ailia.get_gpu_environment_id()
-    print(f'env_id: {env_id}')
-    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
 
     # img part
     fname = args.video[1]
@@ -151,14 +144,23 @@ def compare_videoframe_image():
     i_feature = net.get_blob_data(net.find_blob_index_by_name('conv5_3'))
 
     # video part
-    capture = get_capture(args.video)
+    capture = webcamera_utils.get_capture(args.video[0])
+
+    # create video writer if savepath is specified as video format
+    if args.savepath is not None:
+        writer = webcamera_utils.get_writer(
+            args.savepath, IMAGE_HEIGHT, IMAGE_WIDTH
+        )
+
+    else:
+        writer = None
 
     while(True):
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
 
-        _, resized_frame = adjust_frame_size(
+        _, resized_frame = webcamera_utils.adjust_frame_size(
             frame, IMAGE_HEIGHT, IMAGE_WIDTH
         )
         input_data = preprocess(resized_frame, input_is_bgr=True)
@@ -179,8 +181,14 @@ def compare_videoframe_image():
         cv2.imshow('frame', resized_frame)
         time.sleep(SLEEP_TIME)
 
+        # save results
+        if writer is not None:
+            writer.write(resized_frame)
+
     capture.release()
     cv2.destroyAllWindows()
+    if writer is not None:
+        writer.release()
     print('Script finished successfully.')
 
 
