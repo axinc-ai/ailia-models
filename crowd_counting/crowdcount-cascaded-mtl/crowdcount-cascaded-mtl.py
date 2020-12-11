@@ -117,7 +117,7 @@ def estimate_from_video():
             IMAGE_HEIGHT,
             IMAGE_WIDTH,
             data_rgb=False,
-            normalize_type='None'
+            normalize_type='None',
         )
 
         # inference
@@ -130,7 +130,7 @@ def estimate_from_video():
         density_map = (255 * preds_ailia / np.max(preds_ailia))[0][0]
         density_map = cv2.resize(
             density_map,
-            (input_image.shape[1], input_image.shape[0])
+            (input_image.shape[1], input_image.shape[0]),
         )
         heatmap = cv2.applyColorMap(
             density_map.astype(np.uint8), cv2.COLORMAP_JET
@@ -142,7 +142,7 @@ def estimate_from_video():
             cv2.FONT_HERSHEY_SIMPLEX,  # font
             0.8,  # fontscale
             (255, 255, 255),  # color
-            2  # thickness
+            2,  # thickness
         )
         res_img = np.hstack((input_image, heatmap))
         cv2.imshow('frame', res_img)
