@@ -42,7 +42,7 @@ def _initialize_net(args, face_parser_path):
 
 def _parse_face(input_image, net, args):
     if not args.onnx:
-        return net.predict(_to_numpy(input_image))
+        return net.predict([_to_numpy(input_image)])
     else:
         inputs = {net.get_inputs()[0].name: _to_numpy(input_image)}
         return net.run(None, inputs)
