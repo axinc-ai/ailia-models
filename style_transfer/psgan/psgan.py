@@ -226,6 +226,7 @@ def transfer_to_video():
             break
 
         # Prepare input data
+        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         in_frame, frame = adjust_frame_size(frame, IMAGE_HEIGHT, IMAGE_WIDTH)
         frame = Image.fromarray(frame)
         source, real_A, mask_A, diff_A, crop_face = _prepare_data(
