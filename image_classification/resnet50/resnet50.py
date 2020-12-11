@@ -1,6 +1,5 @@
 import time
 import sys
-import argparse
 
 import cv2
 
@@ -9,9 +8,10 @@ import resnet50_labels
 
 # import original modules
 sys.path.append('../../util')
+from utils import get_base_parser, update_parser  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
-from webcamera_utils import adjust_frame_size, get_capture  # noqa: E402
 from classifier_utils import plot_results, print_results  # noqa: E402
+import webcamera_utils  # noqa: E402
 
 
 # ======================
@@ -30,19 +30,8 @@ SLEEP_TIME = 0
 # ======================
 # Arguemnt Parser Config
 # ======================
-parser = argparse.ArgumentParser(
-    description='Resnet50 ImageNet classification model'
-)
-parser.add_argument(
-    '-i', '--input', metavar='IMAGE',
-    default=IMAGE_PATH,
-    help='The input image path.'
-)
-parser.add_argument(
-    '-v', '--video', metavar='VIDEO',
-    default=None,
-    help='The input video path. ' +
-         'If the VIDEO argument is set to 0, the webcam input will be used.'
+parser = get_base_parser(
+    'Resnet50 ImageNet classification model', IMAGE_PATH, None
 )
 parser.add_argument(
     '--arch', '-a', metavar='ARCH',
@@ -50,13 +39,7 @@ parser.add_argument(
     help=('model architecture: ' + ' | '.join(MODEL_NAMES) +
           ' (default: resnet50.opt)')
 )
-parser.add_argument(
-    '-b', '--benchmark',
-    action='store_true',
-    help='Running the inference on the same input 5 times ' +
-         'to measure execution performance. (Cannot be used in video mode)'
-)
-args = parser.parse_args()
+args = update_parser(parser)
 
 
 # ======================
@@ -87,12 +70,10 @@ def recognize_from_image():
     img = preprocess_image(img)
 
     # net initialize
-    env_id = ailia.get_gpu_environment_id()
-    print(f'env_id: {env_id}')
     classifier = ailia.Classifier(
         MODEL_PATH,
         WEIGHT_PATH,
-        env_id=env_id,
+        env_id=args.env_id,
         format=ailia.NETWORK_IMAGE_FORMAT_RGB,
         range=IMAGE_RANGE
     )
@@ -115,39 +96,56 @@ def recognize_from_image():
 
 def recognize_from_video():
     # net initialize
-    env_id = ailia.get_gpu_environment_id()
-    print(f'env_id: {env_id}')
     classifier = ailia.Classifier(
         MODEL_PATH,
         WEIGHT_PATH,
-        env_id=env_id,
+        env_id=args.env_id,
         format=ailia.NETWORK_IMAGE_FORMAT_RGB,
         range=IMAGE_RANGE
     )
 
-    capture = get_capture(args.video)
+    capture = webcamera_utils.get_capture(args.video)
+
+    # create video writer if savepath is specified as video format
+    if args.savepath is not None:
+        f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
+        save_h, save_w = webcamera_utils.calc_adjust_fsize(
+            f_h, f_w, IMAGE_HEIGHT, IMAGE_WIDTH
+        )
+        writer = webcamera_utils.get_writer(args.savepath, save_h, save_w)
+    else:
+        writer = None
 
     while(True):
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
 
-        in_frame, frame = adjust_frame_size(frame, IMAGE_HEIGHT, IMAGE_WIDTH)
+        in_frame, frame = webcamera_utils.adjust_frame_size(
+            frame, IMAGE_HEIGHT, IMAGE_WIDTH
+        )
         frame = preprocess_image(frame)
 
         # inference
         classifier.compute(frame, MAX_CLASS_COUNT)
 
         # get result
-        count = classifier.get_class_count()
+        # count = classifier.get_class_count()
 
         plot_results(in_frame, classifier, resnet50_labels.imagenet_category)
 
         cv2.imshow('frame', in_frame)
         time.sleep(SLEEP_TIME)
 
+        # save results
+        if writer is not None:
+            writer.write(in_frame)
+
     capture.release()
     cv2.destroyAllWindows()
+    if writer is not None:
+        writer.release()
     print('Script finished successfully.')
 
 
