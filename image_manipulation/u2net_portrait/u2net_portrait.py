@@ -1,8 +1,5 @@
-import os
 import sys
 import time
-import argparse
-from glob import glob
 
 import cv2
 import numpy as np
@@ -11,8 +8,9 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
+from utils import get_base_parser, update_parser  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
-from webcamera_utils import adjust_frame_size, get_capture  # noqa: E402C
+import webcamera_utils  # noqa: E402
 
 
 # ======================
@@ -33,53 +31,34 @@ IMAGE_HEIGHT = 512
 # ======================
 # Arguemnt Parser Config
 # ======================
-parser = argparse.ArgumentParser(
-    description='U^2-Net: Going Deeper with Nested U-Structure for Salient Object Detection'
+parser = get_base_parser(
+    'U^2-Net: Going Deeper with Nested U-Structure for Salient Object Detection',
+    IMAGE_PATH,
+    SAVE_IMAGE_PATH,
 )
-parser.add_argument(
-    '-i', '--input', metavar='IMAGE',
-    default=IMAGE_PATH,
-    help='The input image path.'
-)
-parser.add_argument(
-    '-v', '--video', metavar='VIDEO',
-    default=None,
-    help='The input video path. ' +
-         'If the VIDEO argument is set to 0, the webcam input will be used.'
-)
-parser.add_argument(
-    '-s', '--savepath', metavar='SAVE_IMAGE_PATH',
-    default=SAVE_IMAGE_PATH,
-    help='Save path for the output image.'
-)
-parser.add_argument(
-    '-b', '--benchmark',
-    action='store_true',
-    help='Running the inference on the same input 5 times ' +
-         'to measure execution performance. (Cannot be used in video mode)'
-)
-args = parser.parse_args()
+args = update_parser(parser)
 
 
 # ======================
 # Utils
 # ======================
-def detect_single_face(face_cascade,img):
+def detect_single_face(face_cascade, img):
     # Convert into grayscale
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
     # Detect faces
     faces = face_cascade.detectMultiScale(gray, 1.1, 4)
-    if(len(faces)==0):
-        print("Warming: no face detection, the portrait u2net will run on the whole image!")
+    if len(faces) == 0:
+        print("[WARNING] no face detection, "
+              "the portrait u2net will run on the whole image!")
         return None
 
     # filter to keep the largest face
     wh = 0
     idx = 0
     for i in range(0, len(faces)):
-        (x,y,w,h) = faces[i]
-        if (wh<w*h):
+        (x, y, w, h) = faces[i]
+        if (wh < w*h):
             idx = i
             wh = w*h
 
@@ -89,59 +68,79 @@ def detect_single_face(face_cascade,img):
 # crop, pad and resize face region to 512x512 resolution
 def crop_face(img, face):
 
-    # no face detected, return the whole image and the inference will run on the whole image
-    if(face is None):
-        return cv2.resize(img, (IMAGE_WIDTH, IMAGE_HEIGHT), interpolation = cv2.INTER_AREA)
+    # no face detected, return the whole image and
+    # the inference will run on the whole image
+    if face is None:
+        return cv2.resize(
+            img, (IMAGE_WIDTH, IMAGE_HEIGHT), interpolation=cv2.INTER_AREA
+        )
     (x, y, w, h) = face
 
     height, width = img.shape[0:2]
 
     # crop the face with a bigger bbox
-    hmw = h - w
-
-    l,r,t,b = 0,0,0,0
+    l, r, t, b = 0, 0, 0, 0
     lpad = int(float(w)*0.4)
     left = x-lpad
-    if(left<0):
+    if(left < 0):
         l = lpad-x
         left = 0
 
     rpad = int(float(w)*0.4)
     right = x+w+rpad
-    if(right>width):
+    if(right > width):
         r = right-width
         right = width
 
     tpad = int(float(h)*0.6)
     top = y - tpad
-    if(top<0):
+    if(top < 0):
         t = tpad-y
         top = 0
 
-    bpad  = int(float(h)*0.2)
+    bpad = int(float(h)*0.2)
     bottom = y+h+bpad
-    if(bottom>height):
+    if(bottom > height):
         b = bottom-height
         bottom = height
 
+    im_face = img[top:bottom, left:right]
+    if(len(im_face.shape) == 2):
+        im_face = np.repeat(im_face[:, :, np.newaxis], (1, 1, 3))
 
-    im_face = img[top:bottom,left:right]
-    if(len(im_face.shape)==2):
-        im_face = np.repeat(im_face[:,:,np.newaxis],(1,1,3))
+    im_face = np.pad(
+        im_face,
+        ((t, b), (l, r), (0, 0)),
+        mode='constant',
+        constant_values=((255, 255), (255, 255), (255, 255))
+    )
 
-    im_face = np.pad(im_face,((t,b),(l,r),(0,0)),mode='constant',constant_values=((255,255),(255,255),(255,255)))
-
-    # pad to achieve image with square shape for avoding face deformation after resizing
-    hf,wf = im_face.shape[0:2]
-    if(hf-2>wf):
+    # pad to achieve image with square shape for avoding face deformation
+    # after resizing
+    hf, wf = im_face.shape[0:2]
+    if(hf-2 > wf):
         wfp = int((hf-wf)/2)
-        im_face = np.pad(im_face,((0,0),(wfp,wfp),(0,0)),mode='constant',constant_values=((255,255),(255,255),(255,255)))
-    elif(wf-2>hf):
+        im_face = np.pad(
+            im_face,
+            ((0, 0), (wfp, wfp), (0, 0)),
+            mode='constant',
+            constant_values=((255, 255), (255, 255), (255, 255))
+        )
+    elif(wf-2 > hf):
         hfp = int((wf-hf)/2)
-        im_face = np.pad(im_face,((hfp,hfp),(0,0),(0,0)),mode='constant',constant_values=((255,255),(255,255),(255,255)))
+        im_face = np.pad(
+            im_face,
+            ((hfp, hfp), (0, 0), (0, 0)),
+            mode='constant',
+            constant_values=((255, 255), (255, 255), (255, 255))
+        )
 
     # resize to have 512x512 resolution
-    im_face = cv2.resize(im_face, (IMAGE_WIDTH, IMAGE_HEIGHT), interpolation = cv2.INTER_AREA)
+    im_face = cv2.resize(
+        im_face,
+        (IMAGE_WIDTH, IMAGE_HEIGHT),
+        interpolation=cv2.INTER_AREA
+    )
 
     return im_face
 
@@ -154,21 +153,21 @@ def preprocess(img):
     im_face = crop_face(img, face)
 
     # normalize the input
-    input_img = np.zeros((im_face.shape[0],im_face.shape[1],3))
+    input_img = np.zeros((im_face.shape[0], im_face.shape[1], 3))
     im_face = im_face/np.max(im_face)
-    input_img[:,:,0] = (im_face[:,:,2]-0.406)/0.225
-    input_img[:,:,1] = (im_face[:,:,1]-0.456)/0.224
-    input_img[:,:,2] = (im_face[:,:,0]-0.485)/0.229
+    input_img[:, :, 0] = (im_face[:, :, 2]-0.406)/0.225
+    input_img[:, :, 1] = (im_face[:, :, 1]-0.456)/0.224
+    input_img[:, :, 2] = (im_face[:, :, 0]-0.485)/0.229
 
     # convert BGR to RGB
     input_img = input_img.transpose((2, 0, 1))
-    input_img = input_img[np.newaxis,:,:,:]
+    input_img = input_img[np.newaxis, :, :, :]
 
     return input_img
 
 
 def post_process(d1):
-    pred = 1.0 - d1[:,0,:,:]
+    pred = 1.0 - d1[:, 0, :, :]
 
     # normalization
     ma = np.max(pred)
@@ -188,9 +187,7 @@ def recognize_from_image():
     input_img = preprocess(img)
 
     # net initialize
-    env_id = ailia.get_gpu_environment_id()
-    print(f'env_id: {env_id}')
-    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
 
     # inference
     print('Start inference...')
@@ -198,11 +195,11 @@ def recognize_from_image():
         print('BENCHMARK mode')
         for i in range(5):
             start = int(round(time.time() * 1000))
-            d1,d2,d3,d4,d5,d6,d7 = net.predict({'input.1': input_img})
+            d1, d2, d3, d4, d5, d6, d7 = net.predict({'input.1': input_img})
             end = int(round(time.time() * 1000))
             print(f'\tailia processing time {end - start} ms')
     else:
-        d1,d2,d3,d4,d5,d6,d7 = net.predict({'input.1': input_img})
+        d1, d2, d3, d4, d5, d6, d7 = net.predict({'input.1': input_img})
 
     out_img = post_process(d1)
     cv2.imwrite(args.savepath, out_img)
@@ -211,26 +208,38 @@ def recognize_from_image():
 
 def recognize_from_video():
     # net initialize
-    env_id = ailia.get_gpu_environment_id()
-    print(f'env_id: {env_id}')
-    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
 
-    capture = get_capture(args.video)
+    capture = webcamera_utils.get_capture(args.video)
+
+    # create video writer if savepath is specified as video format
+    if args.savepath != SAVE_IMAGE_PATH:
+        writer = webcamera_utils.get_writer(
+            args.savepath, IMAGE_HEIGHT, IMAGE_WIDTH, rgb=False
+        )
+    else:
+        writer = None
+
     while(True):
         ret, img = capture.read()
-        
+
         # press q to end video capture
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
 
         input_img = preprocess(img)
         print(input_img.shape)
-        d1,d2,d3,d4,d5,d6,d7 = net.predict({'input.1': input_img})
+        d1, d2, d3, d4, d5, d6, d7 = net.predict({'input.1': input_img})
         out_img = post_process(d1)
         cv2.imshow('frame', out_img)
 
+        if writer is not None:
+            writer.write(out_img)
+
     capture.release()
     cv2.destroyAllWindows()
+    if writer is not None:
+        writer.release()
     print('Script finished successfully.')
 
 
