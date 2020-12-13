@@ -14,7 +14,7 @@ import ailia
 sys.path.append('../../util')
 from utils import get_base_parser, update_parser  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
-from detector_utils import load_image  # noqa: E402C
+from detector_utils import load_image  # noqa: E402
 import webcamera_utils  # noqa: E402
 from insightface_utils import PriorBox, decode, decode_landm, nms, \
     face_align_norm_crop, draw_detection  # noqa: E402
