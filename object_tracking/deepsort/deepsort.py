@@ -1,5 +1,4 @@
 import sys
-import argparse
 import time
 
 import numpy as np
@@ -12,10 +11,11 @@ from deepsort_utils import *
 
 # import original modules
 sys.path.append('../../util')
+from utils import get_base_parser, update_parser  # noqa: E402
 from image_utils import normalize_image  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from detector_utils import load_image  # noqa: E402
-from webcamera_utils import get_writer, get_capture  # noqa: E402
+import webcamera_utils  # noqa: E402
 
 
 # ======================
@@ -61,15 +61,7 @@ NN_BUDGET = 100
 # ======================
 # Arguemnt Parser Config
 # ======================
-parser = argparse.ArgumentParser(
-    description='Deep SORT'
-)
-parser.add_argument(
-    '-v', '--video', metavar='VIDEO',
-    default=VIDEO_PATH,
-    help=('The input video path.'
-          'If the VIDEO argument is set to 0, the webcam input will be used.')
-)
+parser = get_base_parser('Deep SORT', IMAGE_PATH, SAVE_IMAGE_PATH,)
 parser.add_argument(
     '-p', '--pairimage', metavar='IMAGE',
     nargs=2,
@@ -77,18 +69,7 @@ parser.add_argument(
     help=('If this option is specified, the model is set to determine '
           'if the person in two images is the same person or not.')
 )
-parser.add_argument(
-    '-s', '--savepath', metavar='SAVE_VIDEO_PATH',
-    default=None,
-    help='Save path for the output video.'
-)
-parser.add_argument(
-    '-b', '--benchmark',
-    action='store_true',
-    help='Running the inference on the same input 5 times ' +
-         'to measure execution performance. (Cannot be used in video mode)'
-)
-args = parser.parse_args()
+args = update_parser(parser)
 
 
 # ======================
@@ -107,7 +88,7 @@ def init_detector(env_id):
         channel=ailia.NETWORK_IMAGE_CHANNEL_FIRST,
         range=ailia.NETWORK_IMAGE_RANGE_U_FP32,
         algorithm=ailia.DETECTOR_ALGORITHM_YOLOV3,
-        env_id=env_id
+        env_id=env_id,
     )
     return detector
 
@@ -120,10 +101,8 @@ def recognize_from_video():
     idx_frame = 0
 
     # net initialize
-    env_id = ailia.get_gpu_environment_id()
-    print(f'env_id: {env_id}')
-    detector = init_detector(env_id)
-    extractor = ailia.Net(EX_MODEL_PATH, EX_WEIGHT_PATH, env_id=env_id)
+    detector = init_detector(args.env_id)
+    extractor = ailia.Net(EX_MODEL_PATH, EX_WEIGHT_PATH, env_id=args.env_id)
 
     # tracker class instance
     metric = NearestNeighborDistanceMetric(
@@ -136,11 +115,11 @@ def recognize_from_video():
         n_init=3
     )
 
-    capture = get_capture(args.video)
+    capture = webcamera_utils.get_capture(args.video)
 
     # create video writer
     if args.savepath is not None:
-        writer = get_writer(
+        writer = webcamera_utils.get_writer(
             args.savepath,
             int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT)),
             int(capture.get(cv2.CAP_PROP_FRAME_WIDTH)),
@@ -247,6 +226,9 @@ def recognize_from_video():
 
     capture.release()
     cv2.destroyAllWindows()
+    if writer is not None:
+        writer.release()
+
     print(f'Save results to {args.savepath}')
     print('Script finished successfully.')
 
@@ -261,10 +243,8 @@ def compare_images():
     """
 
     # net initialize
-    env_id = ailia.get_gpu_environment_id()
-    print(f'env_id: {env_id}')
-    detector = init_detector(env_id)
-    extractor = ailia.Net(EX_MODEL_PATH, EX_WEIGHT_PATH, env_id=env_id)
+    detector = init_detector(args.env_id)
+    extractor = ailia.Net(EX_MODEL_PATH, EX_WEIGHT_PATH, env_id=args.env_id)
 
     # prepare input data
     input_data = []
