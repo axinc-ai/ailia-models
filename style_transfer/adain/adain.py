@@ -8,7 +8,7 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser  # noqa: E402
+from utils import get_base_parser, update_parser  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from image_utils import load_image  # noqa: E402
 import webcamera_utils  # noqa: E402
@@ -42,7 +42,7 @@ parser.add_argument(
     default=STYLE_PATH,
     help='The style image path.'
 )
-args = parser.parse_args()
+args = update_parser(parser)
 
 
 # ======================
@@ -79,10 +79,8 @@ def image_style_transfer():
     )
 
     # net initialize
-    env_id = ailia.get_gpu_environment_id()
-    print(f'env_id: {env_id}')
-    vgg = ailia.Net(VGG_MODEL_PATH, VGG_WEIGHT_PATH, env_id=env_id)
-    decoder = ailia.Net(DEC_MODEL_PATH, DEC_WEIGHT_PATH, env_id=env_id)
+    vgg = ailia.Net(VGG_MODEL_PATH, VGG_WEIGHT_PATH, env_id=args.env_id)
+    decoder = ailia.Net(DEC_MODEL_PATH, DEC_WEIGHT_PATH, env_id=args.env_id)
 
     # inference
     print('Start inference...')
@@ -107,20 +105,10 @@ def image_style_transfer():
 
 def video_style_transfer():
     # net initialize
-    env_id = ailia.get_gpu_environment_id()
-    print(f'env_id: {env_id}')
-    vgg = ailia.Net(VGG_MODEL_PATH, VGG_WEIGHT_PATH, env_id=env_id)
-    decoder = ailia.Net(DEC_MODEL_PATH, DEC_WEIGHT_PATH, env_id=env_id)
+    vgg = ailia.Net(VGG_MODEL_PATH, VGG_WEIGHT_PATH, env_id=args.env_id)
+    decoder = ailia.Net(DEC_MODEL_PATH, DEC_WEIGHT_PATH, env_id=args.env_id)
 
     capture = webcamera_utils.get_capture(args.video)
-
-    # Style image
-    style_img = load_image(
-        args.style,
-        (IMAGE_HEIGHT, IMAGE_WIDTH),
-        normalize_type='255',
-        gen_input_ailia=True
-    )
 
     # create video writer if savepath is specified as video format
     if args.savepath != SAVE_IMAGE_PATH:
@@ -129,6 +117,14 @@ def video_style_transfer():
         )
     else:
         writer = None
+
+    # Style image
+    style_img = load_image(
+        args.style,
+        (IMAGE_HEIGHT, IMAGE_WIDTH),
+        normalize_type='255',
+        gen_input_ailia=True
+    )
 
     while(True):
         ret, frame = capture.read()
@@ -161,6 +157,8 @@ def video_style_transfer():
 
     capture.release()
     cv2.destroyAllWindows()
+    if writer is not None:
+        writer.release()
 
     print('Script finished successfully.')
 
