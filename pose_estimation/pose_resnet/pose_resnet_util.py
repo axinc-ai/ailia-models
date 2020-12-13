@@ -1,8 +1,10 @@
 import math
+
 import cv2
+import numpy as np
+
 import ailia
 
-import numpy as np
 
 def transform_preds(coords, center, scale, output_size):
     target_coords = np.zeros(coords.shape)
@@ -108,7 +110,7 @@ def get_final_preds(batch_heatmaps, center, scale):
     heatmap_width = batch_heatmaps.shape[3]
 
     # post-processing
-    if True:#config.TEST.POST_PROCESS:
+    if True:  # config.TEST.POST_PROCESS:
         for n in range(coords.shape[0]):
             for p in range(coords.shape[1]):
                 hm = batch_heatmaps[n][p]
@@ -129,37 +131,39 @@ def get_final_preds(batch_heatmaps, center, scale):
     return preds, maxvals
 
 
-def compute(net,original_img,offset_x,offset_y,scale_x,scale_y):
-    shape=net.get_input_shape()
+def compute(net, original_img, offset_x, offset_y, scale_x, scale_y):
+    shape = net.get_input_shape()
 
     IMAGE_WIDTH = shape[3]
     IMAGE_HEIGHT = shape[2]
 
-    src_img = cv2.resize(original_img,(IMAGE_WIDTH,IMAGE_HEIGHT))
+    src_img = cv2.resize(original_img, (IMAGE_WIDTH, IMAGE_HEIGHT))
 
-    w=src_img.shape[1]
-    h=src_img.shape[0]
-
-    image_size = [IMAGE_WIDTH, IMAGE_HEIGHT]
+    w = src_img.shape[1]
+    h = src_img.shape[0]
 
     input_data = src_img
 
-    center=np.array([w/2, h/2], dtype=np.float32)
+    center = np.array([w/2, h/2], dtype=np.float32)
     scale = np.array([1, 1], dtype=np.float32)
 
-    #BGR format
-    mean=[0.485, 0.456, 0.406]
-    std=[0.229, 0.224, 0.225]
+    # BGR format
+    mean = [0.485, 0.456, 0.406]
+    std = [0.229, 0.224, 0.225]
     input_data = (input_data/255.0 - mean) / std
     input_data = input_data[np.newaxis, :, :, :].transpose((0, 3, 1, 2))
 
     output = net.predict(input_data)
-    
+
     preds, maxvals = get_final_preds(output, [center], [scale])
 
     k_list = []
-    ailia_to_mpi=[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,-1,-1]
-    ailia_to_coco=[0,14,15,16,17,2,5,3,6,4,8,11,7,9,12,10,13,1,-1]
+    ailia_to_mpi = [
+        0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, -1, -1
+    ]
+    # ailia_to_coco = [
+    #     0, 14, 15, 16, 17, 2, 5, 3, 6, 4, 8, 11, 7, 9, 12, 10, 13, 1, -1
+    # ]
     total_score = 0
     num_valid_points = 0
     id = 0
@@ -168,68 +172,68 @@ def compute(net,original_img,offset_x,offset_y,scale_x,scale_y):
     angle_z = 0
     for j in range(ailia.POSE_KEYPOINT_CNT):
         i = ailia_to_mpi[j]
-        z=0
-        interpolated=0
-        if j==ailia.POSE_KEYPOINT_BODY_CENTER:
-            x=(preds[0,ailia_to_mpi[ailia.POSE_KEYPOINT_SHOULDER_LEFT],0]+
-               preds[0,ailia_to_mpi[ailia.POSE_KEYPOINT_SHOULDER_RIGHT],0]+
-               preds[0,ailia_to_mpi[ailia.POSE_KEYPOINT_HIP_LEFT],0]+
-               preds[0,ailia_to_mpi[ailia.POSE_KEYPOINT_HIP_RIGHT],0])/4
-            y=(preds[0,ailia_to_mpi[ailia.POSE_KEYPOINT_SHOULDER_LEFT],1]+
-               preds[0,ailia_to_mpi[ailia.POSE_KEYPOINT_SHOULDER_RIGHT],1]+
-               preds[0,ailia_to_mpi[ailia.POSE_KEYPOINT_HIP_LEFT],1]+
-               preds[0,ailia_to_mpi[ailia.POSE_KEYPOINT_HIP_RIGHT],1])/4
-            score=min(min(min(
-                    maxvals[0,ailia_to_mpi[ailia.POSE_KEYPOINT_SHOULDER_LEFT],0],
-                    maxvals[0,ailia_to_mpi[ailia.POSE_KEYPOINT_SHOULDER_RIGHT],0]),
-                    maxvals[0,ailia_to_mpi[ailia.POSE_KEYPOINT_HIP_LEFT],0]),
-                    maxvals[0,ailia_to_mpi[ailia.POSE_KEYPOINT_HIP_RIGHT],0])
-            interpolated=1
-        elif j==ailia.POSE_KEYPOINT_SHOULDER_CENTER:
-            x=(preds[0,ailia_to_mpi[ailia.POSE_KEYPOINT_SHOULDER_LEFT],0]+
-               preds[0,ailia_to_mpi[ailia.POSE_KEYPOINT_SHOULDER_RIGHT],0])/2
-            y=(preds[0,ailia_to_mpi[ailia.POSE_KEYPOINT_SHOULDER_LEFT],1]+
-               preds[0,ailia_to_mpi[ailia.POSE_KEYPOINT_SHOULDER_RIGHT],1])/2
-            score=min(maxvals[0,ailia_to_mpi[ailia.POSE_KEYPOINT_SHOULDER_LEFT]],
-               maxvals[0,ailia_to_mpi[ailia.POSE_KEYPOINT_SHOULDER_RIGHT]])
-            interpolated=1
+        z = 0
+        interpolated = 0
+        if j == ailia.POSE_KEYPOINT_BODY_CENTER:
+            x = (preds[0, ailia_to_mpi[ailia.POSE_KEYPOINT_SHOULDER_LEFT], 0] +
+                 preds[0, ailia_to_mpi[ailia.POSE_KEYPOINT_SHOULDER_RIGHT], 0] +
+                 preds[0, ailia_to_mpi[ailia.POSE_KEYPOINT_HIP_LEFT], 0] +
+                 preds[0, ailia_to_mpi[ailia.POSE_KEYPOINT_HIP_RIGHT], 0])/4
+            y = (preds[0, ailia_to_mpi[ailia.POSE_KEYPOINT_SHOULDER_LEFT], 1] +
+                 preds[0, ailia_to_mpi[ailia.POSE_KEYPOINT_SHOULDER_RIGHT], 1] +
+                 preds[0, ailia_to_mpi[ailia.POSE_KEYPOINT_HIP_LEFT], 1] +
+                 preds[0, ailia_to_mpi[ailia.POSE_KEYPOINT_HIP_RIGHT], 1])/4
+            score = min(min(min(
+                maxvals[0, ailia_to_mpi[ailia.POSE_KEYPOINT_SHOULDER_LEFT], 0],
+                maxvals[0, ailia_to_mpi[ailia.POSE_KEYPOINT_SHOULDER_RIGHT], 0]),
+                maxvals[0, ailia_to_mpi[ailia.POSE_KEYPOINT_HIP_LEFT], 0]),
+                maxvals[0, ailia_to_mpi[ailia.POSE_KEYPOINT_HIP_RIGHT], 0])
+            interpolated = 1
+        elif j == ailia.POSE_KEYPOINT_SHOULDER_CENTER:
+            x = (preds[0, ailia_to_mpi[ailia.POSE_KEYPOINT_SHOULDER_LEFT], 0] +
+                 preds[0, ailia_to_mpi[ailia.POSE_KEYPOINT_SHOULDER_RIGHT], 0])/2
+            y = (preds[0, ailia_to_mpi[ailia.POSE_KEYPOINT_SHOULDER_LEFT], 1] +
+                 preds[0, ailia_to_mpi[ailia.POSE_KEYPOINT_SHOULDER_RIGHT], 1])/2
+            score = min(maxvals[0, ailia_to_mpi[ailia.POSE_KEYPOINT_SHOULDER_LEFT]],
+                        maxvals[0, ailia_to_mpi[ailia.POSE_KEYPOINT_SHOULDER_RIGHT]])
+            interpolated = 1
         else:
-            x=preds[0,i,0]
-            y=preds[0,i,1]
-            score=maxvals[0,i,0]
+            x = preds[0, i, 0]
+            y = preds[0, i, 1]
+            score = maxvals[0, i, 0]
 
-        num_valid_points=num_valid_points+1
-        total_score=total_score+score
+        num_valid_points = num_valid_points+1
+        total_score = total_score+score
 
         k = ailia.PoseEstimatorKeypoint(
-            x = x / src_img.shape[1] * scale_x + offset_x,
-            y = y / src_img.shape[0] * scale_y + offset_y,
-            z_local = z,
-            score = score,
-            interpolated = interpolated,
+            x=x / src_img.shape[1] * scale_x + offset_x,
+            y=y / src_img.shape[0] * scale_y + offset_y,
+            z_local=z,
+            score=score,
+            interpolated=interpolated,
         )
         k_list.append(k)
-    
-    total_score=total_score/num_valid_points
+
+    total_score = total_score/num_valid_points
 
     r = ailia.PoseEstimatorObjectPose(
-        points = k_list,
-        total_score = total_score,
-        num_valid_points = num_valid_points,
-        id = id,
-        angle_x = angle_x,
-        angle_y = angle_y,
-        angle_z = angle_z
+        points=k_list,
+        total_score=total_score,
+        num_valid_points=num_valid_points,
+        id=id,
+        angle_x=angle_x,
+        angle_y=angle_y,
+        angle_z=angle_z
     )
 
     return r
 
 
-def keep_aspect(top_left,bottom_right,pose_img,pose):
-    py1 = max(0,top_left[1])
-    py2 = min(pose_img.shape[0],bottom_right[1])
-    px1 = max(0,top_left[0])
-    px2 = min(pose_img.shape[1],bottom_right[0])
+def keep_aspect(top_left, bottom_right, pose_img, pose):
+    py1 = max(0, top_left[1])
+    py2 = min(pose_img.shape[0], bottom_right[1])
+    px1 = max(0, top_left[0])
+    px2 = min(pose_img.shape[1], bottom_right[0])
 
     shape = pose.get_input_shape()
     aspect = shape[2]/shape[3]
@@ -243,8 +247,8 @@ def keep_aspect(top_left,bottom_right,pose_img,pose):
     py1 = int(py1)
     py2 = int(py2)
 
-    py1 = max(0,py1)
-    py2 = min(pose_img.shape[0],py2)
-    px1 = max(0,px1)
-    px2 = min(pose_img.shape[1],px2)
-    return px1,py1,px2,py2
+    py1 = max(0, py1)
+    py2 = min(pose_img.shape[0], py2)
+    px1 = max(0, px1)
+    px2 = min(pose_img.shape[1], px2)
+    return px1, py1, px2, py2
