@@ -204,7 +204,7 @@ def recognize_from_video():
         )
         input_data = cv2.cvtColor(input_data, cv2.COLOR_BGR2BGRA)
 
-        # inferece
+        # inference
         _ = pose.compute(input_data)
 
         # postprocessing

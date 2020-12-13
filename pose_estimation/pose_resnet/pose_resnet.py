@@ -234,7 +234,7 @@ def recognize_from_image():
 
     pose = ailia.Net(POSE_MODEL_PATH, POSE_WEIGHT_PATH, env_id=env_id)
 
-    # inferece
+    # inference
     print('Start inference...')
     if args.benchmark:
         print('BENCHMARK mode')

@@ -68,7 +68,7 @@ def recognize_from_image(detector):
     img = img.astype(np.float32) / 255
     img = np.expand_dims(img, 0)
 
-    # inferece
+    # inference
     print('Start inference...')
     if args.benchmark:
         print('BENCHMARK mode')

@@ -79,7 +79,7 @@ def recognize_from_image():
             int(args.detection_width), int(args.detection_width)
         )
 
-    # inferece
+    # inference
     print('Start inference...')
     if args.benchmark:
         print('BENCHMARK mode')

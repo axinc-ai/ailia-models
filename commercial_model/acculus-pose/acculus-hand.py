@@ -195,7 +195,7 @@ def recognize_from_video():
             if crop_img.shape[0] <= 0 or crop_img.shape[1] <= 0:
                 continue
 
-            # inferece
+            # inference
             _ = hand.compute(crop_img.astype(np.uint8, order='C'))
 
             # postprocessing

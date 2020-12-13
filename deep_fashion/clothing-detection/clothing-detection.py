@@ -156,7 +156,7 @@ def recognize_from_image(filename, detector):
 
     x = cv2.cvtColor(img, cv2.COLOR_BGRA2RGB)
 
-    # inferece
+    # inference
     print('Start inference...')
     if args.benchmark:
         print('BENCHMARK mode')

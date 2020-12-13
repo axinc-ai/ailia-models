@@ -210,7 +210,7 @@ def recognize_offline(input, pose, net):
 
 
 def recognize_from_file(input, pose, net):
-    # inferece
+    # inference
     print('Start inference...')
     if args.benchmark:
         print('BENCHMARK mode')
