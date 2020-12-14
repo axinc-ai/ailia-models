@@ -49,7 +49,7 @@ parser = get_base_parser(
     'ImageCaptioning.pytorch model', IMAGE_PATH, SAVE_IMAGE_PATH
 )
 parser.add_argument(
-    '--model', type=str, default='fc',
+    '--model', type=str, default='fc_nsc',
     choices=('fc', 'fc_rl', 'fc_nsc'),
     help='captioning model (fc | fc_rl | fc_nsc)'
 )
