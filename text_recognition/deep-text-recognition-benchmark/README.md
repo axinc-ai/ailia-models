@@ -7,6 +7,8 @@
 Ailia input shape: (10, 1, 32, 100)  
 Range: [0, 1]
 
+(10 = batchsize)
+
 ### Output
 
 recognized text
