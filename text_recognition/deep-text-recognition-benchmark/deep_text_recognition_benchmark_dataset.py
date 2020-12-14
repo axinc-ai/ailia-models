@@ -237,18 +237,18 @@ class RawDataset(Dataset):
     def __getitem__(self, index):
 
         try:
-            if self.opt.rgb:
-                img = Image.open(self.image_path_list[index]).convert('RGB')  # for color image
-            else:
-                img = Image.open(self.image_path_list[index]).convert('L')
+            #if self.opt.rgb:
+            #    img = Image.open(self.image_path_list[index]).convert('RGB')  # for color image
+            #else:
+            img = Image.open(self.image_path_list[index]).convert('L')
 
         except IOError:
             print(f'Corrupted image for {index}')
             # make dummy image and dummy label for corrupted image.
-            if self.opt.rgb:
-                img = Image.new('RGB', (self.opt.imgW, self.opt.imgH))
-            else:
-                img = Image.new('L', (self.opt.imgW, self.opt.imgH))
+            #if self.opt.rgb:
+            #    img = Image.new('RGB', (self.opt.imgW, self.opt.imgH))
+            #else:
+            img = Image.new('L', (self.opt.imgW, self.opt.imgH))
 
         return (img, self.image_path_list[index])
 
