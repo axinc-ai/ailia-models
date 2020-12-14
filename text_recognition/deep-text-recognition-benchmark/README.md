@@ -31,4 +31,4 @@ ONNX opset=11
 
 ### Netron
 
-[None-ResNet-None-CTC.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/deep-text-recognition-benchmarj/None-ResNet-None-CTC.onnx.prototxt)
+[None-ResNet-None-CTC.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/deep-text-recognition-benchmark/None-ResNet-None-CTC.onnx.prototxt)
