@@ -1,6 +1,5 @@
 import sys
 import time
-import argparse
 
 import cv2
 import numpy as np
@@ -9,9 +8,10 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
+from utils import get_base_parser, update_parser  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
-from webcamera_utils import get_capture  # noqa: E402
 from yolo_face import FaceLocator  # noqa: E402
+import webcamera_utils  # noqa: E402
 
 
 # ======================
@@ -34,32 +34,10 @@ SAVE_IMAGE_PATH = 'output.png'
 # ======================
 # Arguemnt Parser Config
 # ======================
-
-parser = argparse.ArgumentParser(
-    description=('Glasses removal, m2f and anime transformation GAN based on '
-                 'SimGAN')
-)
-parser.add_argument(
-    '-i', '--input', metavar='IMAGE',
-    default=IMAGE_PATH,
-    help='The input image path.'
-)
-parser.add_argument(
-    '-v', '--video', metavar='VIDEO',
-    default=None,
-    help='The input video path. ' +
-         'If the VIDEO argument is set to 0, the webcam input will be used.'
-)
-parser.add_argument(
-    '-s', '--savepath', metavar='SAVE_IMAGE_PATH',
-    default=SAVE_IMAGE_PATH,
-    help='Save path for the output image.'
-)
-parser.add_argument(
-    '-b', '--benchmark',
-    action='store_true',
-    help='Running the inference on the same input 5 times ' +
-         'to measure execution performance. (Cannot be used in video mode)'
+parser = get_base_parser(
+    'Glasses removal, m2f and anime transformation GAN based on SimGAN',
+    IMAGE_PATH,
+    SAVE_IMAGE_PATH,
 )
 parser.add_argument(
     '-f', '--face_recognition',
@@ -91,7 +69,7 @@ parser.add_argument(
     default=128,
     help='Input file resolution for glasses mode'
 )
-args = parser.parse_args()
+args = update_parser(parser)
 
 
 # ======================
@@ -209,10 +187,8 @@ def transform_image():
     """Full transormation on a single image loaded from filepath in arguments.
     """
     image = cv2.imread(args.input)
-    env_id = ailia.get_gpu_environment_id()
-    print(f'env_id: {env_id}')
 
-    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
 
     if args.face_recognition:
         locator = FaceLocator()
@@ -269,16 +245,20 @@ def process_array(net, img):
 
 def process_video():
     # net initialize
-    env_id = ailia.get_gpu_environment_id()
-    print(f'env_id: {env_id}')
-    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
 
     if args.face_recognition:
         locator = FaceLocator()
     else:
         locator = None
 
-    capture = get_capture(args.video)
+    capture = webcamera_utils.get_capture(args.video)
+    if args.savepath != SAVE_IMAGE_PATH:
+        writer = webcamera_utils.get_writer(
+            args.savepath, args.resolution, args.resolution
+        )
+    else:
+        writer = None
 
     while(True):
         ret, frame = capture.read()
@@ -287,10 +267,16 @@ def process_video():
 
         img = process_frame(net, locator, frame)
 
-        cv2.imshow('frame', img[..., ::-1])
+        img = img[..., ::-1]
+        cv2.imshow('frame', img)
+        # save results
+        if writer is not None:
+            writer.write(img)
 
     capture.release()
     cv2.destroyAllWindows()
+    if writer is not None:
+        writer.release()
     print('Script finished successfully.')
 
 
@@ -336,4 +322,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-    print('Script finished successfully.')

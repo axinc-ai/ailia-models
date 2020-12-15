@@ -1,6 +1,5 @@
 import sys
 import time
-import argparse
 
 import cv2
 import numpy as np
@@ -10,8 +9,9 @@ from rotnet_utils import generate_rotated_image, create_figure, visualize
 
 # import original modules
 sys.path.append('../../util')
+from utils import get_base_parser, update_parser  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
-from webcamera_utils import adjust_frame_size, get_capture  # noqa: E402C
+import webcamera_utils  # noqa: E402
 
 
 # ======================
@@ -31,24 +31,8 @@ IMAGE_WIDTH = 224
 # ======================
 # Arguemnt Parser Config
 # ======================
-parser = argparse.ArgumentParser(
-    description='Image Rotation Correction Model'
-)
-parser.add_argument(
-    '-i', '--input', metavar='IMAGE',
-    default=IMAGE_PATH,
-    help='The input image path.'
-)
-parser.add_argument(
-    '-v', '--video', metavar='VIDEO',
-    default=None,
-    help='The input video path. ' +
-         'If the VIDEO argument is set to 0, the webcam input will be used.'
-)
-parser.add_argument(
-    '-s', '--savepath', metavar='SAVE_IMAGE_PATH',
-    default=SAVE_IMAGE_PATH,
-    help='Save path for the output image.'
+parser = get_base_parser(
+    'Image Rotation Correction Model', IMAGE_PATH, SAVE_IMAGE_PATH,
 )
 parser.add_argument(
     '--model', '-m', metavar='model',
@@ -60,13 +44,7 @@ parser.add_argument(
     '--apply_rotate', action='store_true',
     help='If add this argument, apply random rotation to input image'
 )
-parser.add_argument(
-    '-b', '--benchmark',
-    action='store_true',
-    help='Running the inference on the same input 5 times ' +
-         'to measure execution performance. (Cannot be used in video mode)'
-)
-args = parser.parse_args()
+args = update_parser(parser)
 
 
 # ======================
@@ -100,9 +78,7 @@ def recognize_from_image():
         input_data = rotated_img.reshape((1, IMAGE_HEIGHT, IMAGE_WIDTH, 3))
 
     # net initialize
-    env_id = ailia.get_gpu_environment_id()
-    print(f'env_id: {env_id}')
-    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
     net.set_input_shape(input_data.shape)
 
     # inference
@@ -128,12 +104,22 @@ def recognize_from_image():
 
 def recognize_from_video():
     # net initialize
-    env_id = ailia.get_gpu_environment_id()
-    print(f'env_id: {env_id}')
-    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
     net.set_input_shape((1, IMAGE_HEIGHT, IMAGE_WIDTH, 3))
 
-    capture = get_capture(args.video)
+    capture = webcamera_utils.get_capture(args.video)
+
+    # create video writer if savepath is specified as video format
+    if args.savepath != SAVE_IMAGE_PATH:
+        print(
+            '[WARNING] currently, video results cannot be output correctly...'
+        )
+        # TODO: DEBUG: shape
+        f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
+        writer = webcamera_utils.get_writer(args.savepath, f_h, f_w)
+    else:
+        writer = None
 
     fig = create_figure()
     tight_layout = True
@@ -143,7 +129,7 @@ def recognize_from_video():
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
 
-        input_image, resized_img = adjust_frame_size(
+        input_image, resized_img = webcamera_utils.adjust_frame_size(
             frame, IMAGE_HEIGHT, IMAGE_WIDTH
         )
         resized_img = cv2.cvtColor(resized_img, cv2.COLOR_BGR2RGB)
@@ -176,8 +162,14 @@ def recognize_from_video():
             break
         tight_layout = False
 
+        # # save results
+        # if writer is not None:
+        #     writer.write(res_img)
+
     capture.release()
     cv2.destroyAllWindows()
+    if writer is not None:
+        writer.release()
     print('Script finished successfully.')
 
 
