@@ -36,12 +36,6 @@ parser.add_argument(
     default=IMAGE_PATH,
     help='The input image path.'
 )
-#parser.add_argument(
-#    '-v', '--video', metavar='VIDEO',
-#    default=None,
-#    help='The input video path. ' +
-#         'If the VIDEO argument is set to 0, the webcam input will be used.'
-#)
 parser.add_argument(
     '-b', '--benchmark',
     action='store_true',
@@ -190,6 +184,17 @@ def demo(opt):
         for image_tensors, image_path_list in demo_loader:
             batch_size = image_tensors.size(0)
             image = image_tensors.to(device)
+
+            print(image.shape)
+            sample = cv2.imread("demo_image/demo_2.jpg")
+            sample = cv2.resize(sample,(imgW,imgH),interpolation=cv2.INTER_CUBIC)
+            sample = cv2.cvtColor(sample, cv2.COLOR_BGR2GRAY)
+            sample = sample/127.5 - 1.0
+
+            #print(sample.shape)
+            #print(image)
+            #print(sample)
+
             # For max length prediction
             #length_for_pred = torch.IntTensor([batch_max_length] * batch_size).to(device)
             #text_for_pred = torch.LongTensor(batch_size, opt.batch_max_length + 1).fill_(0).to(device)
@@ -209,6 +214,7 @@ def demo(opt):
             env_id = ailia.get_gpu_environment_id()
             net = ailia.Net("None-ResNet-None-CTC.onnx.prototxt","None-ResNet-None-CTC.onnx",env_id=env_id)
             input_img = image.to('cpu').detach().numpy().copy()
+            input_img[0,:,:,:] = sample
             print(input_img.shape)
             preds = net.predict(input_img)
             print(preds.shape)
