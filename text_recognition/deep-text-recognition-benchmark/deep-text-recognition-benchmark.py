@@ -85,6 +85,10 @@ def preprocess_image(sample):
     sample = sample/127.5 - 1.0
     return sample
 
+def softmax(x):
+    u = numpy.sum(numpy.exp(x))
+    return numpy.exp(x)/u
+
 dashed_line = '-' * 80
 
 def recognize_from_image():
@@ -104,9 +108,9 @@ def recognize_from_image():
         session = ailia.Net(MODEL_PATH,WEIGHT_PATH,env_id=env_id)
 
     for path in image_path_list:
-        recognize_one_image([path],session)
+        recognize_one_image(path,session)
 
-def recognize_one_image(image_path_list,session):
+def recognize_one_image(image_path,session):
     """ model configuration """
     character = '0123456789abcdefghijklmnopqrstuvwxyz'
     imgH = IMAGE_HEIGHT
@@ -120,12 +124,9 @@ def recognize_one_image(image_path_list,session):
     # predict
     input_img = numpy.zeros((batch_size,1,imgH,imgW),dtype=numpy.float32)
     
-    cnt = 0
-    for file_path in image_path_list:
-        sample = cv2.imread(file_path)
-        sample = preprocess_image(sample)
-        input_img[cnt,:,:,:] = sample
-        cnt=cnt+1
+    sample = cv2.imread(image_path)
+    sample = preprocess_image(sample)
+    input_img[0,:,:,:] = sample
 
     if args.onnx:
         session.get_modelmeta()
@@ -140,21 +141,14 @@ def recognize_one_image(image_path_list,session):
     preds_index = numpy.argmax(preds,axis=2)
 
     preds_str = ctc_decode(preds_index, preds_size, character)
-
-
-    preds_cpu = preds
-    preds_prob = numpy.zeros(preds_cpu.shape)
+    preds_prob = numpy.zeros(preds.shape)
     
-    def softmax(x):
-        u = numpy.sum(numpy.exp(x))
-        return numpy.exp(x)/u
-
     for b in range(0,batch_size):
         for t in range(0,time_size):
-            preds_prob[b,t,:]=softmax(preds_cpu[b,t,:])
+            preds_prob[b,t,:]=softmax(preds[b,t,:])
 
     preds_max_prob = numpy.max(preds_prob,axis=2)
-    for img_name, pred, pred_max_prob in zip(image_path_list, preds_str, preds_max_prob):
+    for img_name, pred, pred_max_prob in zip([image_path], preds_str, preds_max_prob):
         confidence_score = pred_max_prob.cumprod(axis=0)[-1]
 
         print(f'{img_name:25s}\t{pred:25s}\t{confidence_score:0.4f}')
