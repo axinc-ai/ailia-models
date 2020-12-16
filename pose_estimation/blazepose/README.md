@@ -37,12 +37,15 @@ $ python3 blazeface.py --video VIDEO_PATH --savepath SAVE_VIDEO_PATH
 
 [MediaPipePyTorch](https://github.com/zmurez/MediaPipePyTorch)
 
+Squeeze function in Pytorch model removed as it produces an IF layer in ONNX unsupported in ailia (segmentation output has thus 1 more dim)
 
 ## Framework
-PyTorch 1.7.2
+
+PyTorch 1.7.1
 
 
 ## Model Format
+
 ONNX opset = 11
 
 
