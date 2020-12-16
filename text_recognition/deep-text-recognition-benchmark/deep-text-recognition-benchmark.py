@@ -18,7 +18,7 @@ import torch
 import torch.utils.data
 import torch.nn.functional as F
 
-from deep_text_recognition_benchmark_utils import CTCLabelConverter, AttnLabelConverter
+from deep_text_recognition_benchmark_utils import CTCLabelConverter
 from deep_text_recognition_benchmark_dataset import RawDataset, AlignCollate
 
 
@@ -29,7 +29,7 @@ MODEL_PATH = 'None-ResNet-None-CTC.onnx.prototxt'
 WEIGHT_PATH = 'None-ResNet-None-CTC.onnx'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/deep-text-recognition-benchmark/'
 
-IMAGE_PATH = 'demo_image/demo_1.png'
+IMAGE_PATH = 'demo_image/demo_2.jpg'
 IMAGE_WIDTH = 100
 IMAGE_HEIGHT = 32
 
@@ -68,7 +68,7 @@ def preprocess_image(sample):
     sample = sample/127.5 - 1.0
     return sample
 
-def recognize_from_image(opt):
+def recognize_from_image():
     """ model configuration """
     character = '0123456789abcdefghijklmnopqrstuvwxyz'
     imgH = IMAGE_HEIGHT
@@ -79,11 +79,12 @@ def recognize_from_image(opt):
     batch_max_length = 25
 
     converter = CTCLabelConverter(character)
-    opt.num_class = len(converter.character)
+    image_folder = "demo_image/"
+    num_class = len(converter.character)
 
     # prepare data. two demo images from https://github.com/bgshih/crnn#run-demo
     AlignCollate_demo = AlignCollate(imgH=imgH, imgW=imgW, keep_ratio_with_pad=PAD)
-    demo_data = RawDataset(root=opt.image_folder, opt=opt)  # use RawDataset
+    demo_data = RawDataset(root=image_folder)  # use RawDataset
     demo_loader = torch.utils.data.DataLoader(
         demo_data, batch_size=batch_size,
         shuffle=False,
@@ -98,12 +99,12 @@ def recognize_from_image(opt):
             image = image_tensors.to(device)
 
             print(image.shape)
-            sample = cv2.imread("demo_image/demo_2.jpg")
+            sample = cv2.imread(IMAGE_PATH)
             sample = preprocess_image(sample)
 
             if args.onnx:
                 import onnxruntime
-                session = onnxruntime.InferenceSession("None-ResNet-None-CTC.onnx")
+                session = onnxruntime.InferenceSession(WEIGHT_PATH)
                 session.get_modelmeta()
                 first_input_name = session.get_inputs()[0].name
                 print(first_input_name)
@@ -113,7 +114,7 @@ def recognize_from_image(opt):
                 preds = torch.from_numpy(preds.astype(numpy.float32)).clone()
             else:
                 env_id = ailia.get_gpu_environment_id()
-                net = ailia.Net("None-ResNet-None-CTC.onnx.prototxt","None-ResNet-None-CTC.onnx",env_id=env_id)
+                net = ailia.Net(MODEL_PATH,WEIGHT_PATH,env_id=env_id)
                 input_img = image.to('cpu').detach().numpy().copy()
                 input_img[0,:,:,:] = sample
                 print(input_img.shape)
@@ -142,12 +143,4 @@ if __name__ == '__main__':
     # model files check and download
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
 
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--image_folder', default="demo_image/", help='path to image_folder which contains text images')
-    opt = parser.parse_args()
-
-    #cudnn.benchmark = True
-    #cudnn.deterministic = True
-    #opt.num_gpu = torch.cuda.device_count()
-
-    recognize_from_image(opt)
+    recognize_from_image()
