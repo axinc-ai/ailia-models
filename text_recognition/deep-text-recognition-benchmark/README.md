@@ -4,10 +4,8 @@
 
 ![input_image](demo_image/demo_1.png)
 
-Ailia input shape: (10, 1, 32, 100)  
-Range: [0, 1]
-
-(10 = batchsize)
+Ailia input shape: (1, 1, 32, 100)  
+Color Range: [-1.0, 1.0]
 
 ### Output
 

@@ -85,19 +85,37 @@ def preprocess_image(sample):
     sample = sample/127.5 - 1.0
     return sample
 
+dashed_line = '-' * 80
+
 def recognize_from_image():
+    import glob
+    image_path_list = sorted(glob.glob(args.input+"/*"))
+    #image_path_list = [image_path_list[0]]
+
+    head = f'{"image_path":25s}\t{"predicted_labels":25s}\tconfidence score'
+    
+    print(f'{dashed_line}\n{head}\n{dashed_line}')
+
+    if args.onnx:
+        import onnxruntime
+        session = onnxruntime.InferenceSession(WEIGHT_PATH)
+    else:
+        env_id = ailia.get_gpu_environment_id()
+        session = ailia.Net(MODEL_PATH,WEIGHT_PATH,env_id=env_id)
+
+    for path in image_path_list:
+        recognize_one_image([path],session)
+
+def recognize_one_image(image_path_list,session):
     """ model configuration """
     character = '0123456789abcdefghijklmnopqrstuvwxyz'
     imgH = IMAGE_HEIGHT
     imgW = IMAGE_WIDTH
     PAD = False
-    batch_size = 10
+    batch_size = 1
     workers = 4
     batch_max_length = 25
     time_size = 26
-
-    import glob
-    image_path_list = sorted(glob.glob(args.input+"/*"))
 
     # predict
     input_img = numpy.zeros((batch_size,1,imgH,imgW),dtype=numpy.float32)
@@ -110,16 +128,12 @@ def recognize_from_image():
         cnt=cnt+1
 
     if args.onnx:
-        import onnxruntime
-        session = onnxruntime.InferenceSession(WEIGHT_PATH)
         session.get_modelmeta()
         first_input_name = session.get_inputs()[0].name
         preds = session.run([], {first_input_name: input_img})
         preds = preds[0]
     else:
-        env_id = ailia.get_gpu_environment_id()
-        net = ailia.Net(MODEL_PATH,WEIGHT_PATH,env_id=env_id)
-        preds = net.predict(input_img)
+        preds = session.predict(input_img)
 
     # Select max probabilty (greedy decoding) then decode index to character
     preds_size = [int(preds.shape[1])] * batch_size
@@ -127,10 +141,6 @@ def recognize_from_image():
 
     preds_str = ctc_decode(preds_index, preds_size, character)
 
-    dashed_line = '-' * 80
-    head = f'{"image_path":25s}\t{"predicted_labels":25s}\tconfidence score'
-    
-    print(f'{dashed_line}\n{head}\n{dashed_line}')
 
     preds_cpu = preds
     preds_prob = numpy.zeros(preds_cpu.shape)
