@@ -1,5 +1,4 @@
 import time
-import argparse
 import sys
 
 import numpy as np
@@ -9,10 +8,9 @@ import matplotlib.pyplot as plt
 import ailia
 
 sys.path.append('../../util')
-from webcamera_utils import adjust_frame_size  # noqa: E402
+from utils import get_base_parser, update_parser  # noqa: E402
 from image_utils import load_image  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
-from utils import check_file_existance  # noqa: E402
 
 
 # ======================
@@ -29,13 +27,8 @@ ALGORITHM = ailia.POSE_ALGORITHM_LW_HUMAN_POSE
 # ======================
 # Arguemnt Parser Config
 # ======================
-parser = argparse.ArgumentParser(
-    description='Fast and accurate human pose 2D-estimation.'
-)
-parser.add_argument(
-    '-i', '--input', metavar='IMAGE',
-    default=IMAGE_PATH,
-    help='The input image path.'
+parser = get_base_parser(
+    'Fast and accurate human pose 2D-estimation.', IMAGE_PATH, SAVE_IMAGE_PATH,
 )
 parser.add_argument(
     '-n', '--normal',
@@ -43,13 +36,7 @@ parser.add_argument(
     help='By default, the optimized model is used, but with this option, ' +
     'you can switch to the normal (not optimized) model'
 )
-parser.add_argument(
-    '-s', '--savepath', metavar='SAVE_IMAGE_PATH',
-    default=SAVE_IMAGE_PATH,
-    help='Save path for the output image.'
-)
-
-args = parser.parse_args()
+args = update_parser(parser)
 
 
 # ======================
@@ -87,9 +74,7 @@ def main():
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
 
     # net initialize
-    env_id = ailia.get_gpu_environment_id()
-    print(f'env_id: {env_id}')
-    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
 
     # prepare input data
     src_img = cv2.imread(args.input)

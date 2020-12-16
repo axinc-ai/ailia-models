@@ -1,6 +1,5 @@
 import sys
 import time
-import argparse
 
 import cv2
 import numpy as np
@@ -10,8 +9,9 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
+from utils import get_base_parser, update_parser  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
-from webcamera_utils import get_capture  # noqa: E402C
+import webcamera_utils  # noqa: E402
 
 
 # ======================
@@ -33,32 +33,10 @@ THRESHOLD = 0.5
 # ======================
 # Arguemnt Parser Config
 # ======================
-parser = argparse.ArgumentParser(
-    description='hand-detection.PyTorch hand detection model'
+parser = get_base_parser(
+    'hand-detection.PyTorch hand detection model', IMAGE_PATH, SAVE_IMAGE_PATH
 )
-parser.add_argument(
-    '-i', '--input', metavar='IMAGE',
-    default=IMAGE_PATH,
-    help='The input image path.'
-)
-parser.add_argument(
-    '-v', '--video', metavar='VIDEO',
-    default=None,
-    help='The input video path. ' +
-         'If the VIDEO argument is set to 0, the webcam input will be used.'
-)
-parser.add_argument(
-    '-s', '--savepath', metavar='SAVE_IMAGE_PATH',
-    default=SAVE_IMAGE_PATH,
-    help='Save path for the output image.'
-)
-parser.add_argument(
-    '-b', '--benchmark',
-    action='store_true',
-    help='Running the inference on the same input 5 times ' +
-         'to measure execution performance. (Cannot be used in video mode)'
-)
-args = parser.parse_args()
+args = update_parser(parser)
 
 
 # ======================
@@ -69,9 +47,11 @@ def load_image(input_path):
 
 
 def preprocess(img):
-    img = cv2.resize(img, (IMAGE_WIDTH, IMAGE_HEIGHT), interpolation = cv2.INTER_AREA)
+    img = cv2.resize(
+        img, (IMAGE_WIDTH, IMAGE_HEIGHT), interpolation=cv2.INTER_AREA
+    )
     img = np.expand_dims(img, 0)
-    img_trans = img.transpose((0, 3, 1, 2)) # NHWC to NCHW
+    img_trans = img.transpose((0, 3, 1, 2))  # NHWC to NCHW
     if img_trans.max() > 1:
         img_trans = img_trans / 255
 
@@ -86,9 +66,9 @@ def post_process(output):
     probs = sigmoid(output)
     probs = probs.squeeze(0)
     full_mask = cv2.resize(
-        probs.transpose(1, 2, 0), 
-        (IMAGE_WIDTH, IMAGE_HEIGHT), 
-        interpolation = cv2.INTER_CUBIC
+        probs.transpose(1, 2, 0),
+        (IMAGE_WIDTH, IMAGE_HEIGHT),
+        interpolation=cv2.INTER_CUBIC,
     )
     mask = full_mask > THRESHOLD
     return mask.astype(np.uint8)*255
@@ -129,7 +109,15 @@ def recognize_from_image(net):
 
 
 def recognize_from_video(net):
-    capture = get_capture(args.video)
+    capture = webcamera_utils.get_capture(args.video)
+    # create video writer if savepath is specified as video format
+    if args.savepath != SAVE_IMAGE_PATH:
+        writer = webcamera_utils.get_writer(
+            args.savepath, IMAGE_HEIGHT, IMAGE_WIDTH, rgb=False
+        )
+    else:
+        writer = None
+
     while(True):
         ret, img = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
@@ -138,8 +126,14 @@ def recognize_from_video(net):
         out = segment_image(img, net)
         cv2.imshow('frame', out)
 
+        # save results
+        if writer is not None:
+            writer.write(out)
+
     capture.release()
     cv2.destroyAllWindows()
+    if writer is not None:
+        writer.release()
     print('Script finished successfully.')
 
 
@@ -147,12 +141,8 @@ def main():
     # model files check and download
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
 
-    # load model
-    env_id = ailia.get_gpu_environment_id()
-    print(f'env_id: {env_id}')
-
     # model initialize
-    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
 
     if args.video is not None:
         # video mode

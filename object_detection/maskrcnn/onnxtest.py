@@ -16,7 +16,7 @@ import onnxruntime
 sys.path.append('../../util')
 from utils import check_file_existance  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
-from webcamera_utils import preprocess_frame  # noqa: E402C
+from webcamera_utils import preprocess_frame  # noqa: E402
 
 
 CLASSES = [line.rstrip('\n') for line in open('coco_classes.txt')]
@@ -114,7 +114,7 @@ def test_maskrcnn():
     ss = onnxruntime.InferenceSession("mask_rcnn_R_50_FPN_1x.onnx")
     image = Image.open(IMAGE_PATH)
     input_data = preprocess(image)
-    
+
     input_name = ss.get_inputs()[0].name
     output_name = ss.get_outputs()[0].name
 

@@ -1,8 +1,6 @@
 import sys
 import time
-import argparse
 
-from PIL import Image
 import numpy as np
 import cv2
 
@@ -10,10 +8,11 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
-sys.path.append('./util')
-import webcamera_utils  # noqa: E402C
+from utils import get_base_parser, update_parser  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from detector_utils import load_image  # noqa: E402
+import webcamera_utils  # noqa: E402
+
 
 # ======================
 # Parameters
@@ -35,48 +34,24 @@ CATEGORY = (
 IMAGE_HEIGHT = 224
 IMAGE_WIDTH = 224
 
+
 # ======================
 # Arguemnt Parser Config
 # ======================
-
-parser = argparse.ArgumentParser(
-    description='Semantic segmentation with MobileNetV3 model'
-)
-parser.add_argument(
-    '-i', '--input', metavar='IMAGE',
-    default=IMAGE_PATH,
-    help='The input image path.'
-)
-parser.add_argument(
-    '-v', '--video', metavar='VIDEO',
-    default=None,
-    help='The input video path. ' +
-         'If the VIDEO argument is set to 0, the webcam input will be used.'
-)
-parser.add_argument(
-    '-s', '--savepath', metavar='SAVE_IMAGE_PATH',
-    default=SAVE_IMAGE_PATH,
-    help='Save path for the output image.'
-)
-parser.add_argument(
-    '-b', '--benchmark',
-    action='store_true',
-    help='Running the inference on the same input 5 times ' +
-         'to measure execution performance. (Cannot be used in video mode)'
+parser = get_base_parser(
+    'Semantic segmentation with MobileNetV3 model', IMAGE_PATH, SAVE_IMAGE_PATH
 )
 parser.add_argument(
     '--orig-size',
     action='store_true',
     help='output in original image size.'
 )
-args = parser.parse_args()
+args = update_parser(parser)
 
 
 # ======================
 # Secondaty Functions
 # ======================
-
-
 def preprocess(img):
     img = img[:, :, ::-1]
     img = cv2.resize(img, (IMAGE_WIDTH, IMAGE_HEIGHT))
@@ -91,7 +66,9 @@ def post_processing(output, orig_shape=(IMAGE_HEIGHT, IMAGE_WIDTH)):
     out_mask = np.squeeze(output)
     if args.orig_size:
         out_mask = cv2.resize(
-            out_mask, (orig_shape[1], orig_shape[0]), interpolation=cv2.INTER_LINEAR
+            out_mask,
+            (orig_shape[1], orig_shape[0]),
+            interpolation=cv2.INTER_LINEAR,
         )
     out_mask = out_mask * 255 > threshold
 
@@ -101,8 +78,6 @@ def post_processing(output, orig_shape=(IMAGE_HEIGHT, IMAGE_WIDTH)):
 # ======================
 # Main functions
 # ======================
-
-
 def predict(img, net):
     # initial preprocesses
     h, w, _ = img.shape
@@ -151,6 +126,14 @@ def recognize_from_image(filename, net):
 def recognize_from_video(video, net):
     capture = webcamera_utils.get_capture(video)
 
+    # create video writer if savepath is specified as video format
+    if args.savepath != SAVE_IMAGE_PATH:
+        writer = webcamera_utils.get_writer(
+            args.savepath, IMAGE_HEIGHT, IMAGE_WIDTH
+        )
+    else:
+        writer = None
+
     while True:
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
@@ -166,9 +149,14 @@ def recognize_from_video(video, net):
 
         # show
         cv2.imshow('frame', res_img)
+        # save results
+        if writer is not None:
+            writer.write(res_img)
 
     capture.release()
     cv2.destroyAllWindows()
+    if writer is not None:
+        writer.release()
     print('Script finished successfully.')
 
 
@@ -176,12 +164,8 @@ def main():
     # model files check and download
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
 
-    # load model
-    env_id = ailia.get_gpu_environment_id()
-    print(f'env_id: {env_id}')
-
     # initialize
-    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
     net.set_input_shape((1, IMAGE_HEIGHT, IMAGE_WIDTH, 3))
 
     if args.video is not None:

@@ -1,6 +1,5 @@
 import sys
 import time
-import argparse
 
 import numpy as np
 import cv2
@@ -8,17 +7,17 @@ import cv2
 import ailia
 
 # import original modules
+from fashionai_key_points_detection_utils import decode_np, draw_keypoints
 sys.path.append('../../util')
+from utils import get_base_parser, update_parser  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from detector_utils import load_image  # noqa: E402
 from webcamera_utils import get_capture  # noqa: E402
 
-from fashionai_key_points_detection_utils import decode_np, draw_keypoints
 
 # ======================
 # Parameters
 # ======================
-
 WEIGHT_BLOUSE_PATH = 'blouse_100.onnx'
 MODEL_BLOUSE_PATH = 'blouse_100.onnx.prototxt'
 WEIGHT_DRESS_PATH = 'dress_100.onnx'
@@ -48,44 +47,18 @@ HM_STRIDE = 4
 # ======================
 # Arguemnt Parser Config
 # ======================
-
-parser = argparse.ArgumentParser(
-    description='FashionAI model'
-)
-parser.add_argument(
-    '-i', '--input', metavar='IMAGE',
-    default='',
-    help='The input image path.'
-)
-parser.add_argument(
-    '-v', '--video', metavar='VIDEO',
-    default=None,
-    help='The input video path. ' +
-         'If the VIDEO argument is set to 0, the webcam input will be used.'
-)
-parser.add_argument(
-    '-s', '--savepath', metavar='SAVE_IMAGE_PATH', default=SAVE_IMAGE_PATH,
-    help='Save path for the output image.'
-)
-parser.add_argument(
-    '-b', '--benchmark',
-    action='store_true',
-    help='Running the inference on the same input 5 times ' +
-         'to measure execution performance. (Cannot be used in video mode)'
-)
+parser = get_base_parser('FashionAI model', None, SAVE_IMAGE_PATH)
 parser.add_argument(
     '-c', '--clothing-type', type=str, default='blouse',
     choices=('blouse', 'dress', 'outwear', 'skirt', 'trousers'),
     help='clothing type'
 )
-args = parser.parse_args()
+args = update_parser(parser)
 
 
 # ======================
 # Secondaty Functions
 # ======================
-
-
 def preprocess(img, img_size):
     (img_w, img_h) = img_size
     img = cv2.resize(img, (img_w, img_h), interpolation=cv2.INTER_CUBIC)
@@ -123,7 +96,9 @@ def post_processing(hm_pred, hm_pred2, info):
 
     a = np.zeros_like(hm_pred2)
     img_w2 = info['img_w2']
-    a[:, :, :img_w2 // HM_STRIDE] = np.flip(hm_pred2[:, :, :img_w2 // HM_STRIDE], 2)
+    a[:, :, :img_w2 // HM_STRIDE] = np.flip(
+        hm_pred2[:, :, :img_w2 // HM_STRIDE], 2
+    )
     for conj in conjug:
         a[conj] = a[conj[::-1]]
     hm_pred2 = a
@@ -131,7 +106,13 @@ def post_processing(hm_pred, hm_pred2, info):
     scale = info['scale']
     img_w = info['img_w']
     img_h = info['img_h']
-    x, y = decode_np(hm_pred + hm_pred2, scale, HM_STRIDE, (img_w / 2, img_h / 2), method='maxoffset')
+    x, y = decode_np(
+        hm_pred + hm_pred2,
+        scale,
+        HM_STRIDE,
+        (img_w / 2, img_h / 2),
+        method='maxoffset',
+    )
     keypoints = np.stack([x, y, np.ones(x.shape)], axis=1).astype(np.int16)
 
     return keypoints
@@ -140,8 +121,6 @@ def post_processing(hm_pred, hm_pred2, info):
 # ======================
 # Main functions
 # ======================
-
-
 def predict(img, net):
     img_flip = cv2.flip(img, 1)
 
@@ -243,12 +222,8 @@ def main():
     # model files check and download
     check_and_download_models(weight_path, model_path, REMOTE_PATH)
 
-    # load model
-    env_id = ailia.get_gpu_environment_id()
-    print(f'env_id: {env_id}')
-
     # initialize
-    net = ailia.Net(model_path, weight_path, env_id=env_id)
+    net = ailia.Net(model_path, weight_path, env_id=args.env_id)
 
     if args.video is not None:
         recognize_from_video(args.video, net)

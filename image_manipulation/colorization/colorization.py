@@ -1,6 +1,5 @@
 import sys
 import time
-import argparse
 
 import cv2
 from PIL import Image
@@ -12,8 +11,9 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
+from utils import get_base_parser, update_parser  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
-from webcamera_utils import adjust_frame_size, get_capture  # noqa: E402C
+import webcamera_utils  # noqa: E402
 
 
 # ======================
@@ -33,32 +33,10 @@ IMAGE_HEIGHT = 256
 # ======================
 # Arguemnt Parser Config
 # ======================
-parser = argparse.ArgumentParser(
-    description='Colorful Image Colorization model'
+parser = get_base_parser(
+    'Colorful Image Colorization model', IMAGE_PATH, SAVE_IMAGE_PATH
 )
-parser.add_argument(
-    '-i', '--input', metavar='IMAGE',
-    default=IMAGE_PATH,
-    help='The input image path.'
-)
-parser.add_argument(
-    '-v', '--video', metavar='VIDEO',
-    default=None,
-    help='The input video path. ' +
-         'If the VIDEO argument is set to 0, the webcam input will be used.'
-)
-parser.add_argument(
-    '-s', '--savepath', metavar='SAVE_IMAGE_PATH',
-    default=SAVE_IMAGE_PATH,
-    help='Save path for the output image.'
-)
-parser.add_argument(
-    '-b', '--benchmark',
-    action='store_true',
-    help='Running the inference on the same input 5 times ' +
-         'to measure execution performance. (Cannot be used in video mode)'
-)
-args = parser.parse_args()
+args = update_parser(parser)
 
 
 # ======================
@@ -66,33 +44,36 @@ args = parser.parse_args()
 # ======================
 def load_img(img_path):
     out_np = np.asarray(Image.open(img_path))
-    if(out_np.ndim==2):
-        out_np = np.tile(out_np[:,:,None],3)
+    if(out_np.ndim == 2):
+        out_np = np.tile(out_np[:, :, None], 3)
     return out_np
 
 
 def preprocess(img_rgb_orig, resample=3):
-    img_rgb_rs = np.asarray(
-        Image.fromarray(img_rgb_orig).resize((IMAGE_WIDTH, IMAGE_HEIGHT), 
-        resample=resample)
+    img_rgb_rs = np.asarray(Image.fromarray(img_rgb_orig).resize(
+        (IMAGE_WIDTH, IMAGE_HEIGHT), resample=resample)
     )
 
     img_lab_orig = color.rgb2lab(img_rgb_orig)
     img_lab_rs = color.rgb2lab(img_rgb_rs)
 
-    img_lab_orig = img_lab_orig[:,:,0][None,None,:,:]
-    img_lab_rs = img_lab_rs[:,:,0][None,None,:,:]
+    img_lab_orig = img_lab_orig[:, :, 0][None, None, :, :]
+    img_lab_rs = img_lab_rs[:, :, 0][None, None, :, :]
 
     return (img_lab_orig, img_lab_rs)
 
 
 def post_process(out, img_lab_orig):
     HW_orig = img_lab_orig.shape[2:]
-    out_ab_orig = cv2.resize(out.transpose(2, 3, 1, 0).squeeze(), (HW_orig[1],  HW_orig[0]), interpolation = cv2.INTER_LINEAR)
+    out_ab_orig = cv2.resize(
+        out.transpose(2, 3, 1, 0).squeeze(),
+        (HW_orig[1],  HW_orig[0]),
+        interpolation=cv2.INTER_LINEAR,
+    )
     out_ab_orig = np.expand_dims(out_ab_orig.transpose(2, 0, 1), 0)
     out_lab_orig = np.concatenate([img_lab_orig, out_ab_orig], 1)
-    
-    out_img = color.lab2rgb(out_lab_orig[0,...].transpose((1, 2, 0)))
+
+    out_img = color.lab2rgb(out_lab_orig[0, ...].transpose((1, 2, 0)))
     return out_img
 
 
@@ -106,9 +87,7 @@ def recognize_from_image():
     (img_lab_orig, img_lab_rs) = preprocess(img)
 
     # net initialize
-    env_id = ailia.get_gpu_environment_id()
-    print(f'env_id: {env_id}')
-    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
     net.set_input_shape((1, 1, IMAGE_HEIGHT, IMAGE_WIDTH))
 
     # inference
@@ -117,11 +96,11 @@ def recognize_from_image():
         print('BENCHMARK mode')
         for i in range(5):
             start = int(round(time.time() * 1000))
-            out = net.predict({'input.1':img_lab_rs})[0]
+            out = net.predict({'input.1': img_lab_rs})[0]
             end = int(round(time.time() * 1000))
             print(f'\tailia processing time {end - start} ms')
     else:
-        out = net.predict({'input.1':img_lab_rs})[0]
+        out = net.predict({'input.1': img_lab_rs})[0]
 
     out_img = post_process(out, img_lab_orig)
     plt.imsave(args.savepath, out_img)
@@ -130,28 +109,41 @@ def recognize_from_image():
 
 def recognize_from_video():
     # net initialize
-    env_id = ailia.get_gpu_environment_id()
-    print(f'env_id: {env_id}')
-    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
     net.set_input_shape((1, 1, IMAGE_HEIGHT, IMAGE_WIDTH))
 
-    capture = get_capture(args.video)
+    capture = webcamera_utils.get_capture(args.video)
+
+    # create video writer if savepath is specified as video format
+    if args.savepath != SAVE_IMAGE_PATH:
+        f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
+        writer = webcamera_utils.get_writer(args.savepath, f_h, f_w)
+    else:
+        writer = None
+
     while(True):
         ret, img = capture.read()
+        # press q to end video capture
+        if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         (img_lab_orig, img_lab_rs) = preprocess(img)
-        out = net.predict({'input.1':img_lab_rs})[0]
+        out = net.predict({'input.1': img_lab_rs})[0]
         out_img = post_process(out, img_lab_orig)
         out_img = np.array(out_img * 255, dtype=np.uint8)
         out_img = cv2.cvtColor(out_img, cv2.COLOR_RGB2BGR)
         cv2.imshow('frame', out_img)
 
-        # press q to end video capture
-        if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
-            break
+        # save results
+        if writer is not None:
+            writer.write(out_img)
 
     capture.release()
     cv2.destroyAllWindows()
+    if writer is not None:
+        writer.release()
     print('Script finished successfully.')
 
 
