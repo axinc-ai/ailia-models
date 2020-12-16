@@ -94,7 +94,6 @@ dashed_line = '-' * 80
 def recognize_from_image():
     import glob
     image_path_list = sorted(glob.glob(args.input+"/*"))
-    #image_path_list = [image_path_list[0]]
 
     head = f'{"image_path":25s}\t{"predicted_labels":25s}\tconfidence score'
     
@@ -115,19 +114,15 @@ def recognize_one_image(image_path,session):
     character = '0123456789abcdefghijklmnopqrstuvwxyz'
     imgH = IMAGE_HEIGHT
     imgW = IMAGE_WIDTH
-    PAD = False
     batch_size = 1
-    workers = 4
-    batch_max_length = 25
-    time_size = 26
+
+    # load image
+    input_img = cv2.imread(image_path)
+    input_img = preprocess_image(input_img)
+    input_img = numpy.expand_dims(input_img, axis=0)
+    input_img = numpy.expand_dims(input_img, axis=0)
 
     # predict
-    input_img = numpy.zeros((batch_size,1,imgH,imgW),dtype=numpy.float32)
-    
-    sample = cv2.imread(image_path)
-    sample = preprocess_image(sample)
-    input_img[0,:,:,:] = sample
-
     if args.onnx:
         session.get_modelmeta()
         first_input_name = session.get_inputs()[0].name
@@ -143,8 +138,8 @@ def recognize_one_image(image_path,session):
     preds_str = ctc_decode(preds_index, preds_size, character)
     preds_prob = numpy.zeros(preds.shape)
     
-    for b in range(0,batch_size):
-        for t in range(0,time_size):
+    for b in range(0,preds.shape[0]):
+        for t in range(0,preds.shape[1]):
             preds_prob[b,t,:]=softmax(preds[b,t,:])
 
     preds_max_prob = numpy.max(preds_prob,axis=2)
