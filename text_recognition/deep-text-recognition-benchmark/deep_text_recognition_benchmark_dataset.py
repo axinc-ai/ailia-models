@@ -5,6 +5,7 @@ import six
 import math
 import lmdb
 import torch
+import cv2
 
 from natsort import natsorted
 from PIL import Image
@@ -34,6 +35,9 @@ class RawDataset(Dataset):
 
         try:
             img = Image.open(self.image_path_list[index]).convert('L')
+    
+            #img = cv2.imread(self.image_path_list[index])
+            #img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
         except IOError:
             print(f'Corrupted image for {index}')
@@ -52,6 +56,12 @@ class ResizeNormalize(object):
         img = img.resize(self.size, self.interpolation)
         img = self.toTensor(img)
         img.sub_(0.5).div_(0.5)
+
+        #img = cv2.resize(img,self.size,interpolation=cv2.INTER_CUBIC)
+        #img = img / 255
+        #img = img - 0.5
+        #img = img / 0.5
+
         return img
 
 

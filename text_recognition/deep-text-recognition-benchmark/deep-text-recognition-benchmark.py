@@ -91,40 +91,40 @@ def recognize_from_image():
         num_workers=int(workers),
         collate_fn=AlignCollate_demo, pin_memory=True)
 
+    import glob
+    file_list = glob.glob(image_folder+"/*")
+
     # predict
     device="cpu"
     with torch.no_grad():
         for image_tensors, image_path_list in demo_loader:
             batch_size = image_tensors.size(0)
             image = image_tensors.to(device)
+            input_img = image.to('cpu').detach().numpy().copy()
 
-            print(image.shape)
-            sample = cv2.imread(IMAGE_PATH)
-            sample = preprocess_image(sample)
+            cnt = 0
+            for file_path in file_list:
+                sample = cv2.imread(file_path)
+                sample = preprocess_image(sample)
+                #input_img[cnt,:,:,:] = sample
+                cnt=cnt+1
 
             if args.onnx:
                 import onnxruntime
                 session = onnxruntime.InferenceSession(WEIGHT_PATH)
                 session.get_modelmeta()
                 first_input_name = session.get_inputs()[0].name
-                print(first_input_name)
-                preds = session.run([], {first_input_name: image.to('cpu').detach().numpy().copy()})
+                preds = session.run([], {first_input_name: input_img})
                 preds = preds[0]
-                print(preds.shape)
-                preds = torch.from_numpy(preds.astype(numpy.float32)).clone()
             else:
                 env_id = ailia.get_gpu_environment_id()
                 net = ailia.Net(MODEL_PATH,WEIGHT_PATH,env_id=env_id)
-                input_img = image.to('cpu').detach().numpy().copy()
-                input_img[0,:,:,:] = sample
-                print(input_img.shape)
                 preds = net.predict(input_img)
-                print(preds.shape)
-                preds = torch.from_numpy(preds.astype(numpy.float32)).clone()
 
             # Select max probabilty (greedy decoding) then decode index to character
-            preds_size = torch.IntTensor([preds.size(1)] * batch_size)
-            _, preds_index = preds.max(2)
+            preds_size = [int(preds.shape[1])] * batch_size
+            preds_index = numpy.argmax(preds,axis=2)
+
             preds_str = converter.decode(preds_index, preds_size)
 
             dashed_line = '-' * 80
@@ -132,12 +132,24 @@ def recognize_from_image():
             
             print(f'{dashed_line}\n{head}\n{dashed_line}')
 
-            preds_prob = F.softmax(preds, dim=2)
-            preds_max_prob, _ = preds_prob.max(dim=2)
+            preds_cpu = preds
+            preds_prob = numpy.zeros(preds_cpu.shape)
+            
+            def softmax(x):
+                u = numpy.sum(numpy.exp(x))
+                return numpy.exp(x)/u
+
+            time_size=26
+            for b in range(0,batch_size):
+                for t in range(0,time_size):
+                    preds_prob[b,t,:]=softmax(preds_cpu[b,t,:])
+
+            preds_max_prob = numpy.max(preds_prob,axis=2)
             for img_name, pred, pred_max_prob in zip(image_path_list, preds_str, preds_max_prob):
-                confidence_score = pred_max_prob.cumprod(dim=0)[-1]
+                confidence_score = pred_max_prob.cumprod(axis=0)[-1]
 
                 print(f'{img_name:25s}\t{pred:25s}\t{confidence_score:0.4f}')
+
 
 if __name__ == '__main__':
     # model files check and download
