@@ -145,11 +145,13 @@ def crop_face(img, face):
     return im_face
 
 
-def preprocess(img):
+def preprocess(img,face_detection):
     # Load the cascade face detection model
-    face_cascade = cv2.CascadeClassifier(FACE_CASCADE_MODEL_PATH)
-
-    face = detect_single_face(face_cascade, img)
+    if face_detection:
+        face_cascade = cv2.CascadeClassifier(FACE_CASCADE_MODEL_PATH)
+        face = detect_single_face(face_cascade, img)
+    else:
+        face = None
     im_face = crop_face(img, face)
 
     # normalize the input
@@ -184,7 +186,7 @@ def recognize_from_image():
     # prepare input data
     img = cv2.imread(IMAGE_PATH)
     print(f'input image shape: {img.shape}')
-    input_img = preprocess(img)
+    input_img = preprocess(img,True)
 
     # net initialize
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
@@ -227,8 +229,7 @@ def recognize_from_video():
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
 
-        input_img = preprocess(img)
-        print(input_img.shape)
+        input_img = preprocess(img,False)
         d1, d2, d3, d4, d5, d6, d7 = net.predict({'input.1': input_img})
         out_img = post_process(d1)
         cv2.imshow('frame', out_img)
