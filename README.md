@@ -283,6 +283,7 @@ sudo apt install nvidia-jetpack
 pip3 install numpy
 pip3 install opencv-python
 pip3 install matplotlib
+pip3 install scikit-image
 sudo apt-get install libatlas-base-dev
 ```
 
