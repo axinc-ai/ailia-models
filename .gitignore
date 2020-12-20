@@ -3,6 +3,8 @@
 # --------------------
 ailia/
 
+*.log
+
 *.caffemodel
 *.onnx
 *.prototxt
