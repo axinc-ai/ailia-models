@@ -3,13 +3,14 @@
 
 ## Input
 
-![Input](imgs/00_00.jpg)
+![Input](demo.png)
 
-(Image above is from [http://www.iapr-tc11.org/mediawiki/index.php/The_Street_View_Text_Dataset](http://www.iapr-tc11.org/mediawiki/index.php/The_Street_View_Text_Dataset).)
+(Image above is from [https://github.com/meijieru/crnn.pytorch](https://github.com/meijieru/crnn.pytorch).)
 
 ## Output
 
-![Output](imgs_results/res_00_00.jpg)
+The output character will be printed.
+
 
 ## Usage
 Automatically downloads the onnx and prototxt files on the first run.
@@ -17,28 +18,28 @@ It is necessary to be connected to the Internet while downloading.
 
 For the sample image,
 ```
-$ python3 craft-pytorch.py
+$ python3 crnn.pytorch.py
 ```
 
 If you want to specify the input image, put the image path after the `--input` option.  
 You can use `--savepath` option to change the name of the output file to save.
 ```
-$ python3 craft-pytorch.py --input IMAGE_PATH --savepath SAVE_IMAGE_PATH
+$ python3 craft-pytorch.py --input IMAGE_PATH
 ```
 
 By adding the `--video` option, you can input the video.   
 If you pass `0` as an argument to VIDEO_PATH, you can use the webcam input instead of the video file.
 ```
-$ python3 craft-pytorch.py --video VIDEO_PATH
+$ python3 crnn.pytorch.py --video VIDEO_PATH
 ```
 
 ## Reference
 
-- [CRAFT: Character-Region Awareness For Text detection](https://github.com/clovaai/CRAFT-pytorch)
+- [Convolutional Recurrent Neural Network](https://github.com/meijieru/crnn.pytorch)
 
 ## Framework
 
-PyTorch 0.4.1 or more
+PyTorch
 
 ## Model Format
 
@@ -46,5 +47,5 @@ ONNX opset=10
 
 ## Netron
 
-[craft.onnx.prototxt](https://storage.googleapis.com/ailia-models/craft-pytorch/craft.onnx.prototxt)
+[crnn_pytorch.onnx.prototxt]()
 
