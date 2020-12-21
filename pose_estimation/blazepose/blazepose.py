@@ -6,6 +6,7 @@ import cv2
 import numpy as np
 
 import ailia
+import blazepose_utils as but
 
 sys.path.append('../../util')
 from webcamera_utils import adjust_frame_size, get_capture  # noqa: E402
@@ -64,8 +65,10 @@ args = parser.parse_args()
 # ======================
 MODEL_NAME = 'blazepose'
 # if args.normal:
-WEIGHT_PATH = f'{MODEL_NAME}.onnx'
-MODEL_PATH = f'{MODEL_NAME}.onnx.prototxt'
+DETECTOR_WEIGHT_PATH = f'{MODEL_NAME}_detector.onnx'
+DETECTOR_MODEL_PATH = f'{MODEL_NAME}_detector.onnx.prototxt'
+ESTIMATOR_WEIGHT_PATH = f'{MODEL_NAME}_estimator.onnx'
+ESTIMATOR_MODEL_PATH = f'{MODEL_NAME}_estimator.onnx.prototxt'
 # else:
     # WEIGHT_PATH = f'{MODEL_NAME}.opt.onnx'
     # MODEL_PATH = f'{MODEL_NAME}.opt.onnx.prototxt'
@@ -152,17 +155,20 @@ REMOTE_PATH = f'https://storage.googleapis.com/ailia-models/{MODEL_NAME}/'
 def recognize_from_image():
     # prepare input data
     src_img = cv2.imread(args.input)
-    input_image = load_image(
-        args.input,
-        (IMAGE_HEIGHT, IMAGE_WIDTH),
-        normalize_type='None'
-    )
-    input_data = cv2.cvtColor(input_image, cv2.COLOR_RGB2BGRA)
+    # input_image = load_image(
+    #     args.input,
+    #     (IMAGE_HEIGHT, IMAGE_WIDTH),
+    #     normalize_type='None'
+    # )
+    img256, img128, scale, pad = but.resize_pad(src_img[:,:,::-1])
+    # input_data = cv2.cvtColor(input_image, cv2.COLOR_RGB2BGRA)
+    input_data = img128.astype(float) / 255.
+    input_data = np.expand_dims(np.moveaxis(input_data, -1, 0), 0)
 
     # net initialize
     env_id = ailia.get_gpu_environment_id()
     print(f'env_id: {env_id}')
-    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+    detector = ailia.Net(DETECTOR_MODEL_PATH, DETECTOR_WEIGHT_PATH, env_id=env_id)
 
     # inference
     print('Start inference...')
@@ -175,7 +181,16 @@ def recognize_from_image():
     #         print(f'\tailia processing time {end - start} ms')
     # else:
     #     _ = pose.compute(input_data)
-    preds_ailia = net.predict([input_data])
+    print(input_data.shape)
+    detector_out = detector.predict([input_data])
+    # print(detector_out)
+    print(detector_out[0].shape, detector_out[1].shape)
+
+    detections = but.detector_postprocess(detector_out, scale, pad)
+    print(detections)
+
+    for detection in detections:
+        but.plot_detections(src_img[:,:,::-1], detection, save_image_path=args.savepath)
 
     # postprocessing
     # count = pose.get_object_count()
@@ -220,7 +235,8 @@ def recognize_from_video():
 
 def main():
     # model files check and download
-    check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
+    check_and_download_models(DETECTOR_WEIGHT_PATH, DETECTOR_MODEL_PATH, REMOTE_PATH)
+    check_and_download_models(ESTIMATOR_WEIGHT_PATH, ESTIMATOR_MODEL_PATH, REMOTE_PATH)
 
     if args.video is not None:
         # video mode

@@ -6,12 +6,31 @@
 
 <!-- (Image from https://github.com/hollance/BlazeFace-PyTorch/blob/master/3faces.png) -->
 
-Ailia input shape: (1, 3, 256, 256)  
-Range:
+### Detector
+
+- ailia input shape: (1, 3, 128, 128)  
+- Range:
+
+### Estimator
+
+- ailia input shape: (1, 3, 256, 256)
 
 ## Output
 
 
+### Detector
+
+- ailia Predict API output:
+
+### Estimator
+- ailia Predict API output:
+  - Segmentation
+    - Shape: (1, 1, 128, 128)
+  - Landmarks
+    - Shape: (1, 31, 4)
+    - 4 face bounding boxes (x, y, z, visibility) + 2 virtual keypoints (x, y, z, visibility) + 25 upper-body keypoints (x, y, z, visibility)
+  - Flag
+    - Shape: (1,)
 ## Usage
 <!-- Automatically downloads the onnx and prototxt files on the first run.
 It is necessary to be connected to the Internet while downloading.
