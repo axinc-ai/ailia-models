@@ -17,7 +17,7 @@ from model_utils import check_and_download_models  # noqa: E402
 # ======================
 # Parameters 1
 # ======================
-IMAGE_PATH = 'balloon.png'
+IMAGE_PATH = 'person.jpg'
 SAVE_IMAGE_PATH = 'output.png'
 IMAGE_HEIGHT = 256
 IMAGE_WIDTH = 256
@@ -156,7 +156,7 @@ def display_result(input_img, count, landmarks, flags):
 def recognize_from_image():
     # prepare input data
     src_img = cv2.imread(args.input)
-    img256, img128, scale, pad = but.resize_pad(src_img[:,:,::-1])
+    _, img128, scale, pad = but.resize_pad(src_img[:,:,::-1])
     input_data = img128.astype('float32') / 255.
     input_data = np.expand_dims(np.moveaxis(input_data, -1, 0), 0)
 
@@ -170,7 +170,7 @@ def recognize_from_image():
     print('Start inference...')
     if args.benchmark:
         print('BENCHMARK mode')
-        for i in range(5):
+        for _ in range(5):
             start = int(round(time.time() * 1000))
             # Person detection
             detector_out = detector.predict([input_data])
@@ -179,9 +179,10 @@ def recognize_from_image():
 
             # Pose estimation
             landmarks = []
+            flags = []
             if count > 0:
-                img, affine, box = but.estimator_preprocess(src_img, detections, scale, pad)
-                flags, normalized_landmarks, mask = estimator.predict([img])
+                img, affine, _ = but.estimator_preprocess(src_img, detections, scale, pad)
+                flags, normalized_landmarks, _ = estimator.predict([img])
                 landmarks = but.denormalize_landmarks(normalized_landmarks, affine)
                 end = int(round(time.time() * 1000))
             print(f'\tailia processing time {end - start} ms')
@@ -193,9 +194,10 @@ def recognize_from_image():
 
         # Pose estimation
         landmarks = []
+        flags = []
         if count > 0:
-            img, affine, box = but.estimator_preprocess(src_img, detections, scale, pad)
-            flags, normalized_landmarks, mask = estimator.predict([img])
+            img, affine, _ = but.estimator_preprocess(src_img, detections, scale, pad)
+            flags, normalized_landmarks, _ = estimator.predict([img])
             landmarks = but.denormalize_landmarks(normalized_landmarks, affine)
 
     # postprocessing
@@ -219,7 +221,7 @@ def recognize_from_video():
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
 
-        img256, img128, scale, pad = but.resize_pad(frame[:,:,::-1])
+        _, img128, scale, pad = but.resize_pad(frame[:,:,::-1])
         input_data = img128.astype('float32') / 255.
         input_data = np.expand_dims(np.moveaxis(input_data, -1, 0), 0)
 
@@ -231,9 +233,10 @@ def recognize_from_video():
 
         # Pose estimation
         landmarks = []
+        flags = []
         if count > 0:
-            img, affine, box = but.estimator_preprocess(frame, detections, scale, pad)
-            flags, normalized_landmarks, mask = estimator.predict([img])
+            img, affine, _ = but.estimator_preprocess(frame, detections, scale, pad)
+            flags, normalized_landmarks, _ = estimator.predict([img])
             landmarks = but.denormalize_landmarks(normalized_landmarks, affine)
 
         # postprocessing
