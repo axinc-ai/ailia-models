@@ -305,6 +305,9 @@ def denormalize_detections(detections, scale, pad):
 
 
 def detector_postprocess(preds_ailia, anchor_path='anchors.npy'):
+    """
+    Process detection predictions from ailia and return filtered detections
+    """
     raw_box = preds_ailia[0]  # (1, 896, 12)
     raw_score = preds_ailia[1]  # (1, 896, 1)
 
@@ -412,7 +415,7 @@ def extract_roi(frame, xc, yc, theta, scale):
 
 def estimator_preprocess(src_img, detections, scale, pad):
     """
-    docstring
+    Extract ROI given detections
     """
     pose_detections = denormalize_detections(detections[0], scale, pad)
     xc, yc, scale, theta = detection2roi(pose_detections)
