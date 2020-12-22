@@ -5,13 +5,20 @@ from logging import getLogger, StreamHandler, FileHandler, Formatter
 from logging import INFO, DEBUG
 
 
-# Log file name
+# ===== User Configuration ====================================================
+
+# Log file name (if disable_file_handler is set to False)
 now = datetime.datetime.now()
 save_filename = now.strftime('%Y%m%d') + '.log'
+
+# level: CRITICAL > ERROR > WARNING > INFO > DEBUG
+log_level = INFO
 
 # params
 disable_stream_handler = False
 disable_file_handler = True  # set False if you want to save text log file
+
+# =============================================================================
 
 # default logging format
 datefmt = '%Y/%m/%d %H:%M:%S'
@@ -21,10 +28,10 @@ default_fmt = Formatter(
     datefmt=datefmt
 )
 
-# level: CRITICAL > ERROR > WARNING > INFO > DEBUG
+
 logger = getLogger()
 # the level of logging passed to the Handler
-logger.setLevel(INFO)
+logger.setLevel(log_level)
 
 # set up stream handler
 if not disable_stream_handler:

@@ -2,6 +2,7 @@ import os
 import sys
 import argparse
 import glob
+from logging import DEBUG
 
 from params import MODALITIES, EXTENSIONS
 import log_init
@@ -14,6 +15,9 @@ logger.info('Start!')
 # TODO: better to use them (first, fix above)
 # from logging import getLogger
 # logger = getLogger(__name__)
+
+
+# TODO: yaml config file and yaml loader
 
 try:
     import ailia
@@ -86,6 +90,10 @@ def get_base_parser(description, default_input, default_save):
         '--ftype', metavar='FILE_TYPE', default='image', choices=MODALITIES,
         help='file type list: ' + ' | '.join(MODALITIES)
     )
+    parser.add_argument(
+        '--debug', action='store_true',
+        help='set default logger level to DEBUG (enable to show DEBUG logs)'
+    )
     return parser
 
 
@@ -102,6 +110,11 @@ def update_parser(parser):
         (parse_args() will be done here)
     """
     args = parser.parse_args()
+
+    # -------------------------------------------------------------------------
+    # 0. logger level update
+    if args.debug:
+        logger.setLevel(DEBUG)
 
     # -------------------------------------------------------------------------
     # 1. check env_id count
@@ -122,9 +135,13 @@ def update_parser(parser):
     elif os.path.isdir(args.input):
         # Directory Path --> generate list of inputs
         files_grapped = []
-        for files in EXTENSIONS[args.ftype]:
-            files_grapped.extend(glob.glob(files))
-        logger.info(f'{len(files)} {args.ftype} files found!')
+        for extension in EXTENSIONS[args.ftype]:
+            files_grapped.extend(
+                glob.glob(os.path.join(args.input, extension))
+            )
+        logger.info(f'{len(files_grapped)} {args.ftype} files found!')
+
+        args.input = files_grapped
 
         # create save directory
         if args.savepath is None:
