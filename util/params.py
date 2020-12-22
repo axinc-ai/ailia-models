@@ -6,7 +6,7 @@ MODALITIES = ['image', 'video', 'audio']
 EXTENSIONS = {
     'image': ['*.png', '*.jpg', '*.jpeg'],
     'video': ['*.mp4'],
-    'audio': ['*.mp3'],
+    'audio': ['*.mp3', '*.wav'],
 }
 
 # =============================================================================

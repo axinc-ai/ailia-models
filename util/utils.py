@@ -37,7 +37,9 @@ def check_file_existance(filename):
         sys.exit()
 
 
-def get_base_parser(description, default_input, default_save):
+def get_base_parser(
+        description, default_input, default_save, input_ftype='image',
+):
     """
     Get ailia default argument parser
 
@@ -48,6 +50,7 @@ def get_base_parser(description, default_input, default_save):
         default input data (image / video) path
     default_save : str
         default save path
+    input_ftype : str
 
     Returns
     -------
@@ -87,7 +90,8 @@ def get_base_parser(description, default_input, default_save):
               'the return value of ailia.get_gpu_environment_id will be used')
     )
     parser.add_argument(
-        '--ftype', metavar='FILE_TYPE', default='image', choices=MODALITIES,
+        '--ftype', metavar='FILE_TYPE', default=input_ftype,
+        choices=MODALITIES,
         help='file type list: ' + ' | '.join(MODALITIES)
     )
     parser.add_argument(
