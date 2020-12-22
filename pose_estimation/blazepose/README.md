@@ -2,9 +2,9 @@
 
 ## Input
 
-<!-- <img src="input.png" width="320px"> -->
+<img src="person.jpg" width="320px">
 
-<!-- (Image from https://github.com/hollance/BlazeFace-PyTorch/blob/master/3faces.png) -->
+(Image from https://www.turbosquid.com/ja/3d-models/3ds-max-realistic-human-pose/897233)
 
 ### Detector
 
@@ -17,6 +17,7 @@
 
 ## Output
 
+<img src="output.png" width="320px">
 
 ### Detector
 
@@ -67,7 +68,3 @@ PyTorch 1.7.1
 
 ONNX opset = 11
 
-
-<!-- ### Netron
-
-[blazeface.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/blazeface/blazeface.onnx.prototxt) -->
