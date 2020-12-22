@@ -51,12 +51,12 @@ parser.add_argument(
     default=SAVE_IMAGE_PATH,
     help='Save path for the output image.'
 )
-# parser.add_argument(
-#     '-b', '--benchmark',
-#     action='store_true',
-#     help='Running the inference on the same input 5 times ' +
-#          'to measure execution performance. (Cannot be used in video mode)'
-# )
+parser.add_argument(
+    '-b', '--benchmark',
+    action='store_true',
+    help='Running the inference on the same input 5 times ' +
+         'to measure execution performance. (Cannot be used in video mode)'
+)
 args = parser.parse_args()
 
 
@@ -78,75 +78,76 @@ REMOTE_PATH = f'https://storage.googleapis.com/ailia-models/{MODEL_NAME}/'
 # ======================
 # Utils
 # ======================
-# def hsv_to_rgb(h, s, v):
-#     bgr = cv2.cvtColor(
-#         np.array([[[h, s, v]]], dtype=np.uint8), cv2.COLOR_HSV2BGR
-#     )[0][0]
-#     return (int(bgr[2]), int(bgr[1]), int(bgr[0]))
+def hsv_to_rgb(h, s, v):
+    bgr = cv2.cvtColor(
+        np.array([[[h, s, v]]], dtype=np.uint8), cv2.COLOR_HSV2BGR
+    )[0][0]
+    return (int(bgr[2]), int(bgr[1]), int(bgr[0]))
 
 
-# def line(input_img, person, point1, point2):
-#     threshold = 0.3
-#     if person.points[point1].score > threshold and\
-#        person.points[point2].score > threshold:
-#         color = hsv_to_rgb(255*point1/ailia.BLAZEPOSE_KEYPOINT_CNT, 255, 255)
+def line(input_img, landmarks, flags, point1, point2):
+    threshold = 0.5
+    for i in range(len(flags)):
+        landmark, flag = landmarks[i], flags[i]
+        if flag > threshold:
+            color = hsv_to_rgb(255*point1/but.BLAZEPOSE_KEYPOINT_CNT, 255, 255)
 
-#         x1 = int(input_img.shape[1] * person.points[point1].x)
-#         y1 = int(input_img.shape[0] * person.points[point1].y)
-#         x2 = int(input_img.shape[1] * person.points[point2].x)
-#         y2 = int(input_img.shape[0] * person.points[point2].y)
-#         cv2.line(input_img, (x1, y1), (x2, y2), color, 5)
+            x1 = int(landmark[point1, 0])
+            y1 = int(landmark[point1, 1])
+            x2 = int(landmark[point2, 0])
+            y2 = int(landmark[point2, 1])
+            cv2.line(input_img, (x1, y1), (x2, y2), color, 5)
 
 
-# def display_result(input_img, pose):
-#     count = pose.get_object_count()
-#     for idx in range(count):
-#         person = pose.get_object_pose(idx)
+def display_result(input_img, count, landmarks, flags):
+    for _ in range(count):
+        line(input_img,landmarks,flags,but.BLAZEPOSE_KEYPOINT_NOSE,but.BLAZEPOSE_KEYPOINT_EYE_LEFT_INNER)
+        line(input_img,landmarks,flags,but.BLAZEPOSE_KEYPOINT_EYE_LEFT_INNER,but.BLAZEPOSE_KEYPOINT_EYE_LEFT)
+        line(input_img,landmarks,flags,but.BLAZEPOSE_KEYPOINT_EYE_LEFT,but.BLAZEPOSE_KEYPOINT_EYE_LEFT_OUTER)
+        line(input_img,landmarks,flags,but.BLAZEPOSE_KEYPOINT_EYE_LEFT_OUTER,but.BLAZEPOSE_KEYPOINT_EAR_LEFT)
 
-#         line(input_img,person,ailia.BLAZEPOSE_KEYPOINT_NOSE,ailia.BLAZEPOSE_KEYPOINT_EYE_LEFT_INNER)
-#         line(input_img,person,ailia.BLAZEPOSE_KEYPOINT_EYE_LEFT_INNER,ailia.BLAZEPOSE_KEYPOINT_EYE_LEFT)
-#         line(input_img,person,ailia.BLAZEPOSE_KEYPOINT_EYE_LEFT,ailia.BLAZEPOSE_KEYPOINT_EYE_LEFT_OUTER)
-#         line(input_img,person,ailia.BLAZEPOSE_KEYPOINT_EYE_LEFT_OUTER,ailia.BLAZEPOSE_KEYPOINT_EAR_LEFT)
+        line(input_img,landmarks,flags,but.BLAZEPOSE_KEYPOINT_NOSE,but.BLAZEPOSE_KEYPOINT_EYE_RIGHT_INNER)
+        line(input_img,landmarks,flags,but.BLAZEPOSE_KEYPOINT_EYE_RIGHT_INNER,but.BLAZEPOSE_KEYPOINT_EYE_RIGHT)
+        line(input_img,landmarks,flags,but.BLAZEPOSE_KEYPOINT_EYE_RIGHT,but.BLAZEPOSE_KEYPOINT_EYE_RIGHT_OUTER)
+        line(input_img,landmarks,flags,but.BLAZEPOSE_KEYPOINT_EYE_RIGHT_OUTER,but.BLAZEPOSE_KEYPOINT_EAR_RIGHT)
 
-#         line(input_img,person,ailia.BLAZEPOSE_KEYPOINT_NOSE,ailia.BLAZEPOSE_KEYPOINT_EYE_RIGHT_INNER)
-#         line(input_img,person,ailia.BLAZEPOSE_KEYPOINT_EYE_RIGHT_INNER,ailia.BLAZEPOSE_KEYPOINT_EYE_RIGHT)
-#         line(input_img,person,ailia.BLAZEPOSE_KEYPOINT_EYE_RIGHT,ailia.BLAZEPOSE_KEYPOINT_EYE_RIGHT_OUTER)
-#         line(input_img,person,ailia.BLAZEPOSE_KEYPOINT_EYE_RIGHT_OUTER,ailia.BLAZEPOSE_KEYPOINT_EAR_RIGHT)
+        line(input_img,landmarks,flags,but.BLAZEPOSE_KEYPOINT_MOUTH_LEFT,but.BLAZEPOSE_KEYPOINT_MOUTH_RIGHT)
 
-#         line(input_img,person,ailia.BLAZEPOSE_KEYPOINT_MOUTH_LEFT,ailia.BLAZEPOSE_KEYPOINT_MOUTH_RIGHT)
+        line(input_img,landmarks,flags,but.BLAZEPOSE_KEYPOINT_SHOULDER_LEFT,but.BLAZEPOSE_KEYPOINT_SHOULDER_RIGHT)
+        line(input_img,landmarks,flags,but.BLAZEPOSE_KEYPOINT_SHOULDER_LEFT,but.BLAZEPOSE_KEYPOINT_ELBOW_LEFT)
+        line(input_img,landmarks,flags,but.BLAZEPOSE_KEYPOINT_ELBOW_LEFT,but.BLAZEPOSE_KEYPOINT_WRIST_LEFT)
+        line(input_img,landmarks,flags,but.BLAZEPOSE_KEYPOINT_SHOULDER_RIGHT,but.BLAZEPOSE_KEYPOINT_ELBOW_RIGHT)
+        line(input_img,landmarks,flags,but.BLAZEPOSE_KEYPOINT_ELBOW_RIGHT,but.BLAZEPOSE_KEYPOINT_WRIST_RIGHT)
 
-#         line(input_img,person,ailia.BLAZEPOSE_KEYPOINT_SHOULDER_LEFT,ailia.BLAZEPOSE_KEYPOINT_SHOULDER_RIGHT)
-#         line(input_img,person,ailia.BLAZEPOSE_KEYPOINT_SHOULDER_LEFT,ailia.BLAZEPOSE_KEYPOINT_ELBOW_LEFT)
-#         line(input_img,person,ailia.BLAZEPOSE_KEYPOINT_ELBOW_LEFT,ailia.BLAZEPOSE_KEYPOINT_WRIST_LEFT)
-#         line(input_img,person,ailia.BLAZEPOSE_KEYPOINT_SHOULDER_RIGHT,ailia.BLAZEPOSE_KEYPOINT_ELBOW_RIGHT)
-#         line(input_img,person,ailia.BLAZEPOSE_KEYPOINT_ELBOW_RIGHT,ailia.BLAZEPOSE_KEYPOINT_WRIST_RIGHT)
-        
-#         line(input_img,person,ailia.BLAZEPOSE_KEYPOINT_WRIST_LEFT,ailia.BLAZEPOSE_KEYPOINT_PINKY_LEFT_KNUCKLE1)
-#         line(input_img,person,ailia.BLAZEPOSE_KEYPOINT_PINKY_LEFT_KNUCKLE1,ailia.BLAZEPOSE_KEYPOINT_INDEX_LEFT_KNUCKLE1)
-#         line(input_img,person,ailia.BLAZEPOSE_KEYPOINT_WRIST_LEFT,ailia.BLAZEPOSE_KEYPOINT_INDEX_LEFT_KNUCKLE1)
-#         line(input_img,person,ailia.BLAZEPOSE_KEYPOINT_WRIST_LEFT,ailia.BLAZEPOSE_KEYPOINT_THUMB_LEFT_KNUCKLE2)
+        line(input_img,landmarks,flags,but.BLAZEPOSE_KEYPOINT_WRIST_LEFT,but.BLAZEPOSE_KEYPOINT_PINKY_LEFT_KNUCKLE1)
+        line(input_img,landmarks,flags,but.BLAZEPOSE_KEYPOINT_PINKY_LEFT_KNUCKLE1,but.BLAZEPOSE_KEYPOINT_INDEX_LEFT_KNUCKLE1)
+        line(input_img,landmarks,flags,but.BLAZEPOSE_KEYPOINT_WRIST_LEFT,but.BLAZEPOSE_KEYPOINT_INDEX_LEFT_KNUCKLE1)
+        line(input_img,landmarks,flags,but.BLAZEPOSE_KEYPOINT_WRIST_LEFT,but.BLAZEPOSE_KEYPOINT_THUMB_LEFT_KNUCKLE2)
 
-#         line(input_img,person,ailia.BLAZEPOSE_KEYPOINT_WRIST_RIGHT,ailia.BLAZEPOSE_KEYPOINT_PINKY_RIGHT_KNUCKLE1)
-#         line(input_img,person,ailia.BLAZEPOSE_KEYPOINT_PINKY_RIGHT_KNUCKLE1,ailia.BLAZEPOSE_KEYPOINT_INDEX_RIGHT_KNUCKLE1)
-#         line(input_img,person,ailia.BLAZEPOSE_KEYPOINT_WRIST_RIGHT,ailia.BLAZEPOSE_KEYPOINT_INDEX_RIGHT_KNUCKLE1)
-#         line(input_img,person,ailia.BLAZEPOSE_KEYPOINT_WRIST_RIGHT,ailia.BLAZEPOSE_KEYPOINT_THUMB_RIGHT_KNUCKLE2)
+        line(input_img,landmarks,flags,but.BLAZEPOSE_KEYPOINT_WRIST_RIGHT,but.BLAZEPOSE_KEYPOINT_PINKY_RIGHT_KNUCKLE1)
+        line(input_img,landmarks,flags,but.BLAZEPOSE_KEYPOINT_PINKY_RIGHT_KNUCKLE1,but.BLAZEPOSE_KEYPOINT_INDEX_RIGHT_KNUCKLE1)
+        line(input_img,landmarks,flags,but.BLAZEPOSE_KEYPOINT_WRIST_RIGHT,but.BLAZEPOSE_KEYPOINT_INDEX_RIGHT_KNUCKLE1)
+        line(input_img,landmarks,flags,but.BLAZEPOSE_KEYPOINT_WRIST_RIGHT,but.BLAZEPOSE_KEYPOINT_THUMB_RIGHT_KNUCKLE2)
 
-#         line(input_img,person,ailia.BLAZEPOSE_KEYPOINT_SHOULDER_LEFT,ailia.BLAZEPOSE_KEYPOINT_HIP_LEFT)
-#         line(input_img,person,ailia.BLAZEPOSE_KEYPOINT_SHOULDER_RIGHT,ailia.BLAZEPOSE_KEYPOINT_HIP_RIGHT)
-#         line(input_img,person,ailia.BLAZEPOSE_KEYPOINT_HIP_LEFT,ailia.BLAZEPOSE_KEYPOINT_HIP_RIGHT)
+        line(input_img,landmarks,flags,but.BLAZEPOSE_KEYPOINT_SHOULDER_LEFT,but.BLAZEPOSE_KEYPOINT_HIP_LEFT)
+        line(input_img,landmarks,flags,but.BLAZEPOSE_KEYPOINT_SHOULDER_RIGHT,but.BLAZEPOSE_KEYPOINT_HIP_RIGHT)
+        line(input_img,landmarks,flags,but.BLAZEPOSE_KEYPOINT_HIP_LEFT,but.BLAZEPOSE_KEYPOINT_HIP_RIGHT)
 
-#         line(input_img,person,ailia.BLAZEPOSE_KEYPOINT_HIP_LEFT,ailia.BLAZEPOSE_KEYPOINT_KNEE_LEFT)
-#         line(input_img,person,ailia.BLAZEPOSE_KEYPOINT_KNEE_LEFT,ailia.BLAZEPOSE_KEYPOINT_ANKLE_LEFT)
-#         line(input_img,person,ailia.BLAZEPOSE_KEYPOINT_HIP_RIGHT,ailia.BLAZEPOSE_KEYPOINT_KNEE_RIGHT)
-#         line(input_img,person,ailia.BLAZEPOSE_KEYPOINT_KNEE_RIGHT,ailia.BLAZEPOSE_KEYPOINT_ANKLE_RIGHT)
+        # Upper body: stop here
 
-#         line(input_img,person,ailia.BLAZEPOSE_KEYPOINT_ANKLE_LEFT,ailia.BLAZEPOSE_KEYPOINT_HEEL_LEFT)
-#         line(input_img,person,ailia.BLAZEPOSE_KEYPOINT_HEEL_LEFT,ailia.BLAZEPOSE_KEYPOINT_FOOT_LEFT_INDEX)
-#         line(input_img,person,ailia.BLAZEPOSE_KEYPOINT_ANKLE_LEFT,ailia.BLAZEPOSE_KEYPOINT_FOOT_LEFT_INDEX)
+        # line(input_img,landmarks,flags,but.BLAZEPOSE_KEYPOINT_HIP_LEFT,but.BLAZEPOSE_KEYPOINT_KNEE_LEFT)
+        # line(input_img,landmarks,flags,but.BLAZEPOSE_KEYPOINT_KNEE_LEFT,but.BLAZEPOSE_KEYPOINT_ANKLE_LEFT)
+        # line(input_img,landmarks,flags,but.BLAZEPOSE_KEYPOINT_HIP_RIGHT,but.BLAZEPOSE_KEYPOINT_KNEE_RIGHT)
+        # line(input_img,landmarks,flags,but.BLAZEPOSE_KEYPOINT_KNEE_RIGHT,but.BLAZEPOSE_KEYPOINT_ANKLE_RIGHT)
 
-#         line(input_img,person,ailia.BLAZEPOSE_KEYPOINT_ANKLE_RIGHT,ailia.BLAZEPOSE_KEYPOINT_HEEL_RIGHT)
-#         line(input_img,person,ailia.BLAZEPOSE_KEYPOINT_HEEL_RIGHT,ailia.BLAZEPOSE_KEYPOINT_FOOT_RIGHT_INDEX)
-#         line(input_img,person,ailia.BLAZEPOSE_KEYPOINT_ANKLE_RIGHT,ailia.BLAZEPOSE_KEYPOINT_FOOT_RIGHT_INDEX)
+        # line(input_img,landmarks,flags,but.BLAZEPOSE_KEYPOINT_ANKLE_LEFT,but.BLAZEPOSE_KEYPOINT_HEEL_LEFT)
+        # line(input_img,landmarks,flags,but.BLAZEPOSE_KEYPOINT_HEEL_LEFT,but.BLAZEPOSE_KEYPOINT_FOOT_LEFT_INDEX)
+        # line(input_img,landmarks,flags,but.BLAZEPOSE_KEYPOINT_ANKLE_LEFT,but.BLAZEPOSE_KEYPOINT_FOOT_LEFT_INDEX)
+
+        # line(input_img,landmarks,flags,but.BLAZEPOSE_KEYPOINT_ANKLE_RIGHT,but.BLAZEPOSE_KEYPOINT_HEEL_RIGHT)
+        # line(input_img,landmarks,flags,but.BLAZEPOSE_KEYPOINT_HEEL_RIGHT,but.BLAZEPOSE_KEYPOINT_FOOT_RIGHT_INDEX)
+        # line(input_img,landmarks,flags,but.BLAZEPOSE_KEYPOINT_ANKLE_RIGHT,but.BLAZEPOSE_KEYPOINT_FOOT_RIGHT_INDEX)
+
 
 
 # ======================
@@ -155,81 +156,93 @@ REMOTE_PATH = f'https://storage.googleapis.com/ailia-models/{MODEL_NAME}/'
 def recognize_from_image():
     # prepare input data
     src_img = cv2.imread(args.input)
-    # input_image = load_image(
-    #     args.input,
-    #     (IMAGE_HEIGHT, IMAGE_WIDTH),
-    #     normalize_type='None'
-    # )
     img256, img128, scale, pad = but.resize_pad(src_img[:,:,::-1])
-    # input_data = cv2.cvtColor(input_image, cv2.COLOR_RGB2BGRA)
-    input_data = img128.astype(float) / 255.
+    input_data = img128.astype('float32') / 255.
     input_data = np.expand_dims(np.moveaxis(input_data, -1, 0), 0)
 
     # net initialize
     env_id = ailia.get_gpu_environment_id()
     print(f'env_id: {env_id}')
     detector = ailia.Net(DETECTOR_MODEL_PATH, DETECTOR_WEIGHT_PATH, env_id=env_id)
+    estimator = ailia.Net(ESTIMATOR_MODEL_PATH, ESTIMATOR_WEIGHT_PATH, env_id=env_id)
 
     # inference
     print('Start inference...')
-    # if args.benchmark:
-    #     print('BENCHMARK mode')
-    #     for i in range(5):
-    #         start = int(round(time.time() * 1000))
-    #         _ = pose.compute(input_data)
-    #         end = int(round(time.time() * 1000))
-    #         print(f'\tailia processing time {end - start} ms')
-    # else:
-    #     _ = pose.compute(input_data)
-    print(input_data.shape)
-    detector_out = detector.predict([input_data])
-    # print(detector_out)
-    print(detector_out[0].shape, detector_out[1].shape)
+    if args.benchmark:
+        print('BENCHMARK mode')
+        for i in range(5):
+            start = int(round(time.time() * 1000))
+            # Person detection
+            detector_out = detector.predict([input_data])
+            detections = but.detector_postprocess(detector_out)
+            count = len(detections) if detections[0].size > 0  else 0
 
-    detections = but.detector_postprocess(detector_out, scale, pad)
-    print(detections)
+            # Pose estimation
+            landmarks = []
+            if count > 0:
+                img, affine, box = but.estimator_preprocess(src_img, detections, scale, pad)
+                flags, normalized_landmarks, mask = estimator.predict([img])
+                landmarks = but.denormalize_landmarks(normalized_landmarks, affine)
+                end = int(round(time.time() * 1000))
+            print(f'\tailia processing time {end - start} ms')
+    else:
+        # Person detection
+        detector_out = detector.predict([input_data])
+        detections = but.detector_postprocess(detector_out)
+        count = len(detections) if detections[0].size != 0 else 0
 
-    for detection in detections:
-        but.plot_detections(src_img[:,:,::-1], detection, save_image_path=args.savepath)
+        # Pose estimation
+        landmarks = []
+        if count > 0:
+            img, affine, box = but.estimator_preprocess(src_img, detections, scale, pad)
+            flags, normalized_landmarks, mask = estimator.predict([img])
+            landmarks = but.denormalize_landmarks(normalized_landmarks, affine)
 
     # postprocessing
-    # count = pose.get_object_count()
-    # print(f'person_count={count}')
-    # display_result(src_img, pose)
-    # cv2.imwrite(args.savepath, src_img)
+    print(f'person_count={count}')
+    display_result(src_img, count, landmarks, flags)
+    cv2.imwrite(args.savepath, src_img)
     print('Script finished successfully.')
 
 
 def recognize_from_video():
     # net initialize
-    # env_id = ailia.get_gpu_environment_id()
-    # print(f'env_id: {env_id}')
-    # pose = ailia.PoseEstimator(
-    #     MODEL_PATH, WEIGHT_PATH, env_id=env_id, algorithm=ALGORITHM
-    # )
+    env_id = ailia.get_gpu_environment_id()
+    print(f'env_id: {env_id}')
+    detector = ailia.Net(DETECTOR_MODEL_PATH, DETECTOR_WEIGHT_PATH, env_id=env_id)
+    estimator = ailia.Net(ESTIMATOR_MODEL_PATH, ESTIMATOR_WEIGHT_PATH, env_id=env_id)
 
-    # capture = get_capture(args.video)
+    capture = get_capture(args.video)
 
-    # while(True):
-    #     ret, frame = capture.read()
-    #     if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
-    #         break
+    while(True):
+        ret, frame = capture.read()
+        if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
 
-    #     input_image, input_data = adjust_frame_size(
-    #         frame, IMAGE_HEIGHT, IMAGE_WIDTH,
-    #     )
-    #     input_data = cv2.cvtColor(input_data, cv2.COLOR_BGR2BGRA)
+        img256, img128, scale, pad = but.resize_pad(frame[:,:,::-1])
+        input_data = img128.astype('float32') / 255.
+        input_data = np.expand_dims(np.moveaxis(input_data, -1, 0), 0)
 
-    #     # inferece
-    #     _ = pose.compute(input_data)
+        # inference
+        # Person detection
+        detector_out = detector.predict([input_data])
+        detections = but.detector_postprocess(detector_out)
+        count = len(detections) if detections[0].size > 0 else 0
 
-    #     # postprocessing
-    #     display_result(input_image, pose)
-    #     cv2.imshow('frame', input_image)
+        # Pose estimation
+        landmarks = []
+        if count > 0:
+            img, affine, box = but.estimator_preprocess(frame, detections, scale, pad)
+            flags, normalized_landmarks, mask = estimator.predict([img])
+            landmarks = but.denormalize_landmarks(normalized_landmarks, affine)
 
-    # capture.release()
-    # cv2.destroyAllWindows()
-    # print('Script finished successfully.')
+        # postprocessing
+        display_result(frame, count, landmarks, flags)
+        cv2.imshow('frame', frame)
+
+    capture.release()
+    cv2.destroyAllWindows()
+    print('Script finished successfully.')
     pass
 
 

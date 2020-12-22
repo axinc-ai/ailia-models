@@ -2,19 +2,48 @@ import cv2
 import matplotlib.patches as patches
 import matplotlib.pyplot as plt
 import numpy as np
-import torch
+from scipy.special import expit
 
-num_classes = 1
-num_anchors = 896
+
+BLAZEPOSE_KEYPOINT_NOSE				    = (0)
+BLAZEPOSE_KEYPOINT_EYE_LEFT_INNER	    = (1)
+BLAZEPOSE_KEYPOINT_EYE_LEFT			    = (2)
+BLAZEPOSE_KEYPOINT_EYE_LEFT_OUTER	    = (3)
+BLAZEPOSE_KEYPOINT_EYE_RIGHT_INNER	    = (4)
+BLAZEPOSE_KEYPOINT_EYE_RIGHT			= (5)
+BLAZEPOSE_KEYPOINT_EYE_RIGHT_OUTER	    = (6)
+BLAZEPOSE_KEYPOINT_EAR_LEFT			    = (7)
+BLAZEPOSE_KEYPOINT_EAR_RIGHT		    = (8)
+BLAZEPOSE_KEYPOINT_MOUTH_LEFT		    = (9)
+BLAZEPOSE_KEYPOINT_MOUTH_RIGHT		    = (10)
+BLAZEPOSE_KEYPOINT_SHOULDER_LEFT		= (11)
+BLAZEPOSE_KEYPOINT_SHOULDER_RIGHT	    = (12)
+BLAZEPOSE_KEYPOINT_ELBOW_LEFT		    = (13)
+BLAZEPOSE_KEYPOINT_ELBOW_RIGHT		    = (14)
+BLAZEPOSE_KEYPOINT_WRIST_LEFT		    = (15)
+BLAZEPOSE_KEYPOINT_WRIST_RIGHT		    = (16)
+BLAZEPOSE_KEYPOINT_PINKY_LEFT_KNUCKLE1  = (17)
+BLAZEPOSE_KEYPOINT_PINKY_RIGHT_KNUCKLE1 = (18)
+BLAZEPOSE_KEYPOINT_INDEX_LEFT_KNUCKLE1  = (19)
+BLAZEPOSE_KEYPOINT_INDEX_RIGHT_KNUCKLE1 = (20)
+BLAZEPOSE_KEYPOINT_THUMB_LEFT_KNUCKLE2  = (21)
+BLAZEPOSE_KEYPOINT_THUMB_RIGHT_KNUCKLE2 = (22)
+BLAZEPOSE_KEYPOINT_HIP_LEFT			    = (23)
+BLAZEPOSE_KEYPOINT_HIP_RIGHT			= (24)
+BLAZEPOSE_KEYPOINT_KNEE_LEFT			= (25)
+BLAZEPOSE_KEYPOINT_KNEE_RIGHT		    = (26)
+BLAZEPOSE_KEYPOINT_ANKLE_LEFT		    = (27)
+BLAZEPOSE_KEYPOINT_ANKLE_RIGHT		    = (28)
+BLAZEPOSE_KEYPOINT_HEEL_LEFT		    = (29)
+BLAZEPOSE_KEYPOINT_HEEL_RIGHT		    = (30)
+BLAZEPOSE_KEYPOINT_FOOT_LEFT_INDEX	    = (31)
+BLAZEPOSE_KEYPOINT_FOOT_RIGHT_INDEX	    = (32)
+
+BLAZEPOSE_KEYPOINT_CNT = 31
+
 num_coords = 12
-score_clipping_thresh = 100.0
-x_scale = 128.0
-y_scale = 128.0
-h_scale = 128.0
-w_scale = 128.0
-min_score_thresh = 0.75
-min_suppression_threshold = 0.3
-num_keypoints = 4
+resolution = 256
+
 
 def resize_pad(img):
     """ resize and pad images to be input to the detectors
@@ -53,11 +82,17 @@ def resize_pad(img):
     img2 = cv2.resize(img1, (128,128))
     return img1, img2, scale, pad
 
+
 def decode_boxes(raw_boxes, anchors):
         """Converts the predictions into actual coordinates using
         the anchor boxes. Processes the entire batch at once.
         """
-        boxes = torch.zeros_like(raw_boxes)
+        boxes = np.zeros_like(raw_boxes)
+
+        x_scale = 128.0
+        y_scale = 128.0
+        h_scale = 128.0
+        w_scale = 128.0
 
         x_center = raw_boxes[..., 0] / x_scale * anchors[:, 2] + anchors[:, 0]
         y_center = raw_boxes[..., 1] / y_scale * anchors[:, 3] + anchors[:, 1]
@@ -70,7 +105,7 @@ def decode_boxes(raw_boxes, anchors):
         boxes[..., 2] = y_center + h / 2.  # ymax
         boxes[..., 3] = x_center + w / 2.  # xmax
 
-        for k in range(num_keypoints):
+        for k in range(4): # 4 keypoints
             offset = 4 + k*2
             keypoint_x = raw_boxes[..., offset    ] / x_scale * anchors[:, 2] + anchors[:, 0]
             keypoint_y = raw_boxes[..., offset + 1] / y_scale * anchors[:, 3] + anchors[:, 1]
@@ -79,39 +114,43 @@ def decode_boxes(raw_boxes, anchors):
 
         return boxes
 
-def tensors_to_detections(raw_box_tensor, raw_score_tensor, anchors):
-        """The output of the neural network is a tensor of shape (b, 896, 16)
-        containing the bounding box regressor predictions, as well as a tensor 
+
+def raw_output_to_detections(raw_box, raw_score, anchors):
+        """The output of the neural network is an array of shape (b, 896, 12)
+        containing the bounding box regressor predictions, as well as an array 
         of shape (b, 896, 1) with the classification confidences.
 
-        This function converts these two "raw" tensors into proper detections.
-        Returns a list of (num_detections, 17) tensors, one for each image in
+        This function converts these two "raw" arrays into proper detections.
+        Returns a list of (num_detections, 13) arrays, one for each image in
         the batch.
 
         This is based on the source code from:
         mediapipe/calculators/tflite/tflite_tensors_to_detections_calculator.cc
         mediapipe/calculators/tflite/tflite_tensors_to_detections_calculator.proto
-        """        
-        detection_boxes = decode_boxes(raw_box_tensor, anchors)
+        """
+        detection_boxes = decode_boxes(raw_box, anchors)
         
-        thresh = score_clipping_thresh
-        raw_score_tensor = raw_score_tensor.clamp(-thresh, thresh)
-        detection_scores = raw_score_tensor.sigmoid().squeeze(dim=-1)
+        thresh = 100.0
+        raw_score = raw_score.clip(-thresh, thresh)
+        # expit = sigmoid (instead of defining our own sigmoid function which yields a warning)
+        detection_scores = expit(raw_score).squeeze(axis=-1)
         
         # Note: we stripped off the last dimension from the scores tensor
         # because there is only has one class. Now we can simply use a mask
         # to filter out the boxes with too low confidence.
+        min_score_thresh = 0.75
         mask = detection_scores >= min_score_thresh
 
         # Because each image from the batch can have a different number of
         # detections, process them one at a time using a loop.
         output_detections = []
-        for i in range(raw_box_tensor.shape[0]):
+        for i in range(raw_box.shape[0]):
             boxes = detection_boxes[i, mask[i]]
-            scores = detection_scores[i, mask[i]].unsqueeze(dim=-1)
-            output_detections.append(torch.cat((boxes, scores), dim=-1))
+            scores = np.expand_dims(detection_scores[i, mask[i]], axis=-1)
+            output_detections.append(np.concatenate((boxes, scores), axis=-1))
 
         return output_detections
+
 
 def intersect(box_a, box_b):
     """ We resize both tensors to [A,B,2] without new malloc:
@@ -124,14 +163,21 @@ def intersect(box_a, box_b):
     Return:
       (tensor) intersection area, Shape: [A,B].
     """
-    A = box_a.size(0)
-    B = box_b.size(0)
-    max_xy = torch.min(box_a[:, 2:].unsqueeze(1).expand(A, B, 2),
-                       box_b[:, 2:].unsqueeze(0).expand(A, B, 2))
-    min_xy = torch.max(box_a[:, :2].unsqueeze(1).expand(A, B, 2),
-                       box_b[:, :2].unsqueeze(0).expand(A, B, 2))
-    inter = torch.clamp((max_xy - min_xy), min=0)
+    A = box_a.shape[0]
+    B = box_b.shape[0]
+    max_xy = np.minimum(
+        np.repeat(np.expand_dims(box_a[:, 2:], axis=1), B, axis=1),
+        np.repeat(np.expand_dims(box_b[:, 2:], axis=0), A, axis=0),
+        
+    )
+    min_xy = np.maximum(
+        np.repeat(np.expand_dims(box_a[:, :2], axis=1), B, axis=1),
+        np.repeat(np.expand_dims(box_b[:, :2], axis=0), A, axis=0),
+        
+    )
+    inter = np.clip((max_xy - min_xy), 0, None)
     return inter[:, :, 0] * inter[:, :, 1]
+
 
 def jaccard(box_a, box_b):
     """Compute the jaccard overlap of two sets of boxes.  The jaccard overlap
@@ -146,16 +192,30 @@ def jaccard(box_a, box_b):
         jaccard overlap: (tensor) Shape: [box_a.size(0), box_b.size(0)]
     """
     inter = intersect(box_a, box_b)
-    area_a = ((box_a[:, 2]-box_a[:, 0]) *
-              (box_a[:, 3]-box_a[:, 1])).unsqueeze(1).expand_as(inter)  # [A,B]
-    area_b = ((box_b[:, 2]-box_b[:, 0]) *
-              (box_b[:, 3]-box_b[:, 1])).unsqueeze(0).expand_as(inter)  # [A,B]
+    area_a = np.repeat(
+        np.expand_dims(
+            (box_a[:, 2]-box_a[:, 0]) * (box_a[:, 3]-box_a[:, 1]),
+            axis=1
+        ),
+        inter.shape[1],
+        axis=1
+    )  # [A,B]
+    area_b = np.repeat(
+        np.expand_dims(
+            (box_b[:, 2]-box_b[:, 0]) * (box_b[:, 3]-box_b[:, 1]),
+            axis=0
+        ),
+        inter.shape[0],
+        axis=0
+    )  # [A,B]
     union = area_a + area_b - inter
     return inter / union  # [A,B]
 
+
 def overlap_similarity(box, other_boxes):
     """Computes the IOU between a bounding box and set of other boxes."""
-    return jaccard(box.unsqueeze(0), other_boxes).squeeze(0)
+    return jaccard(np.expand_dims(box, axis=0), other_boxes).squeeze(0)
+
 
 def weighted_non_max_suppression(detections):
     """The alternative NMS method as mentioned in the BlazeFace paper:
@@ -176,12 +236,14 @@ def weighted_non_max_suppression(detections):
     mediapipe/calculators/util/non_max_suppression_calculator.cc
     mediapipe/calculators/util/non_max_suppression_calculator.proto
     """
+    min_suppression_threshold = 0.3
     if len(detections) == 0: return []
 
     output_detections = []
 
     # Sort the detections from highest to lowest score.
-    remaining = torch.argsort(detections[:, num_coords], descending=True)
+    # argsort() returns ascending order, therefore read the array from end
+    remaining = np.argsort(detections[:, num_coords])[::-1]
 
     while len(remaining) > 0:
         detection = detections[remaining[0]]
@@ -201,18 +263,19 @@ def weighted_non_max_suppression(detections):
 
         # Take an average of the coordinates from the overlapping
         # detections, weighted by their confidence scores.
-        weighted_detection = detection.clone()
+        weighted_detection = detection.copy()
         if len(overlapping) > 1:
             coordinates = detections[overlapping, :num_coords]
             scores = detections[overlapping, num_coords:num_coords+1]
             total_score = scores.sum()
-            weighted = (coordinates * scores).sum(dim=0) / total_score
+            weighted = (coordinates * scores).sum(axis=0) / total_score
             weighted_detection[:num_coords] = weighted
             weighted_detection[num_coords] = total_score / len(overlapping)
 
         output_detections.append(weighted_detection)
 
     return output_detections  
+
 
 def denormalize_detections(detections, scale, pad):
     """ maps detection coordinates from [0,1] to image coordinates
@@ -231,7 +294,6 @@ def denormalize_detections(detections, scale, pad):
         pad: padding in the x and y dimensions
 
     """
-    print(scale, pad)
     detections[:, 0] = detections[:, 0] * scale * 256 - pad[0]
     detections[:, 1] = detections[:, 1] * scale * 256 - pad[1]
     detections[:, 2] = detections[:, 2] * scale * 256 - pad[0]
@@ -241,87 +303,128 @@ def denormalize_detections(detections, scale, pad):
     detections[:, 5::2] = detections[:, 5::2] * scale * 256 - pad[0]
     return detections
 
-def detector_postprocess(preds, scale, pad):
-    """
-    docstring
-    """
-    anchors = torch.tensor(np.load("anchors.npy"))
 
-    # 3. Postprocess the raw predictions:
-    detections = tensors_to_detections(torch.tensor(preds[0]), torch.tensor(preds[1]), anchors)
-    print(detections)
+def detector_postprocess(preds_ailia, anchor_path='anchors.npy'):
+    raw_box = preds_ailia[0]  # (1, 896, 12)
+    raw_score = preds_ailia[1]  # (1, 896, 1)
 
-    # 4. Non-maximum suppression to remove overlapping detections:
+    anchors = np.load(anchor_path).astype("float32")
+
+    # Postprocess the raw predictions:
+    detections = raw_output_to_detections(raw_box, raw_score, anchors)
+
+    # Non-maximum suppression to remove overlapping detections:
     filtered_detections = []
     for i in range(len(detections)):
         faces = weighted_non_max_suppression(detections[i])
-        faces = torch.stack(faces) if len(faces) > 0 else torch.zeros((0, num_coords+1))
+        faces = np.stack(faces) if len(faces) > 0 else np.zeros((0, num_coords+1))
         filtered_detections.append(faces)
 
     return filtered_detections
 
-    # print(filtered_detections)
-    # pose_detections = denormalize_detections(filtered_detections[0], scale, pad)
 
-    return pose_detections
+def detection2roi(detection, detection2roi_method='alignment'):
+        """ Convert detections from detector to an oriented bounding box.
 
-def show_result(input_img, detections):
-    for detection in detections:
-        for d in detection:
-            w = input_img.shape[1]
-            h = input_img.shape[0]
-            top_left = (int(d[1]*w), int(d[0]*h))
-            bottom_right = (int(d[3]*w), int(d[2]*h))
-            color = (255, 255, 255)
-            cv2.rectangle(input_img, top_left, bottom_right, color, 4)
+        Adapted from:
+        # mediapipe/modules/face_landmark/face_detection_front_detection_to_roi.pbtxt
 
-            for k in range(6):
-                kp_x = d[4 + k*2] * input_img.shape[1]
-                kp_y = d[4 + k*2 + 1] * input_img.shape[0]
-                r = int(input_img.shape[1]/100)
-                cv2.circle(input_img, (int(kp_x), int(kp_y)),
-                           r, (255, 255, 255), -1)
+        The center and size of the box is calculated from the center 
+        of the detected box. Rotation is calcualted from the vector
+        between kp1 and kp2 relative to theta0. The box is scaled
+        and shifted by dscale and dy.
 
-def plot_detections(
-        img, detections, with_keypoints=True, save_image_path='result.png'
-):
-    fig, ax = plt.subplots(1, figsize=(10, 10))
-    ax.grid(False)
-    ax.imshow(img)
+        """
+        # mediapipe/modules/pose_landmark/pose_detection_to_roi.pbtxt
+        kp1 = 2
+        kp2 = 3
+        theta0 = 90 * np.pi / 180
+        dscale = 1.5
+        dy = 0.
 
-    # if detections.ndim == 1:
-    # detections = np.expand_dims(detections, axis=0)
+        if detection2roi_method == 'box':
+            # compute box center and scale
+            # use mediapipe/calculators/util/detections_to_rects_calculator.cc
+            xc = (detection[:,1] + detection[:,3]) / 2
+            yc = (detection[:,0] + detection[:,2]) / 2
+            scale = (detection[:,3] - detection[:,1]) # assumes square boxes
 
-    print(f'Found {detections.shape[0]} faces')
-        
-    for i in range(detections.shape[0]):
-        ymin = detections[i, 0] * img.shape[0]
-        xmin = detections[i, 1] * img.shape[1]
-        ymax = detections[i, 2] * img.shape[0]
-        xmax = detections[i, 3] * img.shape[1]
-        print(detections[i, 12].item())
-        rect = patches.Rectangle(
-            (xmin, ymin),
-            xmax - xmin,
-            ymax - ymin,
-            linewidth=1,
-            edgecolor="r",
-            facecolor="none", 
-            alpha=detections[i, 12].item()
-        )
-        ax.add_patch(rect)
+        elif detection2roi_method == 'alignment':
+            # compute box center and scale
+            # use mediapipe/calculators/util/alignment_points_to_rects_calculator.cc
+            xc = detection[:,4+2*kp1]
+            yc = detection[:,4+2*kp1+1]
+            x1 = detection[:,4+2*kp2]
+            y1 = detection[:,4+2*kp2+1]
+            scale = np.sqrt(((xc-x1)**2 + (yc-y1)**2)) * 2
+        else:
+            raise NotImplementedError(
+                "detection2roi_method [%s] not supported"%detection2roi_method)
 
-        if with_keypoints:
-            for k in range(4):
-                kp_x = detections[i, 4 + k*2    ] * img.shape[1]
-                kp_y = detections[i, 4 + k*2 + 1] * img.shape[0]
-                circle = patches.Circle(
-                    (kp_x, kp_y),
-                    radius=0.5,
-                    linewidth=1, 
-                    edgecolor="lightskyblue",
-                    facecolor="none", 
-                    alpha=detections[i, 12].item()
-                )
-                ax.add_patch(circle)
-    plt.savefig(save_image_path)
+        yc += dy * scale
+        scale *= dscale
+
+        # compute box rotation
+        x0 = detection[:,4+2*kp1]
+        y0 = detection[:,4+2*kp1+1]
+        x1 = detection[:,4+2*kp2]
+        y1 = detection[:,4+2*kp2+1]
+        theta = np.arctan2(y0-y1, x0-x1) - theta0
+        return xc, yc, scale, theta
+
+
+def extract_roi(frame, xc, yc, theta, scale):
+    # take points on unit square and transform them according to the roi
+    points = np.array([[-1, -1, 1, 1],
+                       [-1, 1, -1, 1]]).reshape(1,2,4)
+    points = points * scale.reshape(-1,1,1)/2
+    theta = theta.reshape(-1, 1, 1)
+    R = np.concatenate((
+        np.concatenate((np.cos(theta), -np.sin(theta)), 2),
+        np.concatenate((np.sin(theta), np.cos(theta)), 2),
+        ), 1)
+    center = np.concatenate((xc.reshape(-1,1,1), yc.reshape(-1,1,1)), 1)
+    points = R @ points + center
+
+    # use the points to compute the affine transform that maps 
+    # these points back to the output square
+    res = resolution
+    points1 = np.array([[0, 0, res-1],
+                        [0, res-1, 0]], dtype='float32').T
+    affines = []
+    imgs = []
+    for i in range(points.shape[0]):
+        pts = points[i, :, :3].T.astype('float32')
+        M = cv2.getAffineTransform(pts, points1)
+        img = cv2.warpAffine(frame, M, (res,res))#, borderValue=127.5)
+        imgs.append(img)
+        affine = cv2.invertAffineTransform(M).astype('float32')
+        affines.append(affine)
+    if imgs:
+        imgs = np.moveaxis(np.stack(imgs), 3, 1).astype('float32') / 255.#/ 127.5 - 1.0
+        affines = np.stack(affines)
+    else:
+        imgs = np.zeros((0, 3, res, res))
+        affines = np.zeros((0, 2, 3))
+
+    return imgs, affines, points
+
+
+def estimator_preprocess(src_img, detections, scale, pad):
+    """
+    docstring
+    """
+    pose_detections = denormalize_detections(detections[0], scale, pad)
+    xc, yc, scale, theta = detection2roi(pose_detections)
+    img, affine, box = extract_roi(src_img, xc, yc, theta, scale)
+
+    return img, affine, box
+
+
+def denormalize_landmarks(landmarks, affines):
+    landmarks[:,:,:2] *= resolution
+    for i in range(len(landmarks)):
+        landmark, affine = landmarks[i], affines[i]
+        landmark = (affine[:,:2] @ landmark[:,:2].T + affine[:,2:]).T
+        landmarks[i,:,:2] = landmark
+    return landmarks
