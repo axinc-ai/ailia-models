@@ -1,4 +1,4 @@
-# BlazePose
+# BlazePalm
 
 ## Input
 
