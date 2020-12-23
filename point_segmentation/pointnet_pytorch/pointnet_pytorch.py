@@ -159,7 +159,7 @@ def predict_cls(points, net):
     # feedforward
     if not args.onnx:
         net.set_input_shape(points.shape)
-        output = net.predict({'point': points})
+        output = net.predict({'points': points})
     else:
         point_name = net.get_inputs()[0].name
         pred_name = net.get_outputs()[0].name
