@@ -8,12 +8,12 @@
 
 ### Detector
 
-- ailia input shape: (1, 3, 256, 256)
+- ailia input shape: (1, 3, 256, 256) RGB channel order
 - Pixel value range: [0, 1]
 
 ### Landmark
 
-- ailia input shape: (batch_size, 3, 256, 256)
+- ailia input shape: (batch_size, 3, 256, 256) BGR channel order
 - Pixel value range: [0, 1]
 
 ## Output

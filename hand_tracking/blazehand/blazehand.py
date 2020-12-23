@@ -123,11 +123,12 @@ def recognize_from_image():
 
             # Hand landmark estimation
             if detections[0].size != 0:
-                img, affine, _ = but.estimator_preprocess(src_img, detections, scale, pad)
-                estimator.set_input_shape(img.shape)
-                flags, _, normalized_landmarks = estimator.predict([img])
-                landmarks = but.denormalize_landmarks(normalized_landmarks, affine)
+                imgs, affines, _ = but.estimator_preprocess(src_img, detections, scale, pad)
+                estimator.set_input_shape(imgs.shape)
+                flags, _, normalized_landmarks = estimator.predict([imgs])
 
+                # postprocessing
+                landmarks = but.denormalize_landmarks(normalized_landmarks, affines)
                 for i in range(len(flags)):
                     landmark, flag = landmarks[i], flags[i]
                     if flag > 0:
@@ -141,17 +142,17 @@ def recognize_from_image():
 
         # Hand landmark estimation
         if detections[0].size != 0:
-            img, affine, _ = but.estimator_preprocess(src_img, detections, scale, pad)
-            estimator.set_input_shape(img.shape)
-            flags, _, normalized_landmarks = estimator.predict([img])
-            landmarks = but.denormalize_landmarks(normalized_landmarks, affine)
+            imgs, affines, _ = but.estimator_preprocess(src_img, detections, scale, pad)
+            estimator.set_input_shape(imgs.shape)
+            flags, _, normalized_landmarks = estimator.predict([imgs])
 
+            # postprocessing
+            landmarks = but.denormalize_landmarks(normalized_landmarks, affines)
             for i in range(len(flags)):
                 landmark, flag = landmarks[i], flags[i]
                 if flag > 0:
                     draw_landmarks(src_img, landmark[:,:2], but.HAND_CONNECTIONS, size=2)
 
-    # postprocessing
     cv2.imwrite(args.savepath, src_img)
     print('Script finished successfully.')
 
@@ -192,17 +193,17 @@ def recognize_from_video():
 
         # Hand landmark estimation
         if detections[0].size != 0:
-            img, affine, _ = but.estimator_preprocess(frame[:,:,::-1], detections, scale, pad)
+            img, affine, _ = but.estimator_preprocess(frame, detections, scale, pad)
             estimator.set_input_shape(img.shape)
             flags, _, normalized_landmarks = estimator.predict([img])
-            landmarks = but.denormalize_landmarks(normalized_landmarks, affine)
 
+            # postprocessing
+            landmarks = but.denormalize_landmarks(normalized_landmarks, affine)
             for i in range(len(flags)):
                 landmark, flag = landmarks[i], flags[i]
                 if flag > 0.5:
                     draw_landmarks(frame, landmark[:,:2], but.HAND_CONNECTIONS, size=2)
 
-        # postprocessing
         cv2.imshow('frame', frame)
 
         # save results
