@@ -23,10 +23,11 @@
 ### Detector
 
 - ailia Predict API output:
-  - Bounding boxes
+  - Bounding boxes and keypoints
     - Shape: (1, 896, 18)
   - Classification confidences
     - Shape: (1, 896, 1)
+- With helper functions, filtered detections with keypoints can be obtained.
 
 ### Estimator
 
@@ -47,6 +48,7 @@
     respectively. z represents the landmark depth with the depth at the wrist
     being the origin, and the smaller the value the closer the landmark is to
     the camera. The magnitude of z uses roughly the same scale as x.
+- With helper functions, image coordinates of hand landmarks can be obtained.
 
 ## Usage
 

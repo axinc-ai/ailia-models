@@ -82,17 +82,17 @@ LANDMARK_REMOTE_PATH = f'https://storage.googleapis.com/ailia-models/{LANDMARK_M
 # ======================
 # Utils
 # ======================
-def draw_landmarks(img, points, connections=[], color=(0, 255, 0), size=2):
-    for point in points:
-        x, y = point
-        x, y = int(x), int(y)
-        cv2.circle(img, (x, y), size, color, thickness=size)
+def draw_landmarks(img, points, connections=[], color=(0, 0, 255), size=2):
     for connection in connections:
         x0, y0 = points[connection[0]]
         x1, y1 = points[connection[1]]
         x0, y0 = int(x0), int(y0)
         x1, y1 = int(x1), int(y1)
-        cv2.line(img, (x0, y0), (x1, y1), (0,0,0), size)
+        cv2.line(img, (x0, y0), (x1, y1), (0, 255, 0), size)
+    for point in points:
+        x, y = point
+        x, y = int(x), int(y)
+        cv2.circle(img, (x, y), size+1, color, thickness=cv2.FILLED)
 
 
 # ======================
@@ -119,7 +119,7 @@ def recognize_from_image():
             start = int(round(time.time() * 1000))
             # Palm detection
             preds = detector.predict([input_data])
-            detections = but.postprocess(preds)
+            detections = but.detector_postprocess(preds)
 
             # Hand landmark estimation
             if detections[0].size != 0:
@@ -138,7 +138,7 @@ def recognize_from_image():
     else:
         # Palm detection
         preds = detector.predict([input_data])
-        detections = but.postprocess(preds)
+        detections = but.detector_postprocess(preds)
 
         # Hand landmark estimation
         if detections[0].size != 0:
@@ -189,7 +189,7 @@ def recognize_from_video():
         # inference
         # Palm detection
         preds = detector.predict([input_data])
-        detections = but.postprocess(preds)
+        detections = but.detector_postprocess(preds)
 
         # Hand landmark estimation
         if detections[0].size != 0:
