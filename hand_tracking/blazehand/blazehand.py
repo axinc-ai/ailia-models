@@ -124,7 +124,7 @@ def recognize_from_image():
             # Hand landmark estimation
             if detections[0].size != 0:
                 img, affine, _ = but.estimator_preprocess(src_img, detections, scale, pad)
-                img, affine = img[-1:], affine[-1:] # TODO: ailia accept batch > 1
+                estimator.set_input_shape(img.shape)
                 flags, _, normalized_landmarks = estimator.predict([img])
                 landmarks = but.denormalize_landmarks(normalized_landmarks, affine)
 
@@ -142,7 +142,7 @@ def recognize_from_image():
         # Hand landmark estimation
         if detections[0].size != 0:
             img, affine, _ = but.estimator_preprocess(src_img, detections, scale, pad)
-            img, affine = img[-1:], affine[-1:] # TODO: ailia accept batch > 1
+            estimator.set_input_shape(img.shape)
             flags, _, normalized_landmarks = estimator.predict([img])
             landmarks = but.denormalize_landmarks(normalized_landmarks, affine)
 
@@ -193,7 +193,7 @@ def recognize_from_video():
         # Hand landmark estimation
         if detections[0].size != 0:
             img, affine, _ = but.estimator_preprocess(frame[:,:,::-1], detections, scale, pad)
-            img, affine = img[-1:], affine[-1:] # TODO: ailia accept batch > 1
+            estimator.set_input_shape(img.shape)
             flags, _, normalized_landmarks = estimator.predict([img])
             landmarks = but.denormalize_landmarks(normalized_landmarks, affine)
 
