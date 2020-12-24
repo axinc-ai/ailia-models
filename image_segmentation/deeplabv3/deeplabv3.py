@@ -1,6 +1,5 @@
 import time
 import sys
-import argparse
 
 import cv2
 import numpy as np
@@ -12,7 +11,7 @@ from deeplab_utils import *
 
 # import original modules
 sys.path.append('../../util')
-from utils import check_file_existance  # noqa: E402
+from utils import get_base_parser, update_parser  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from image_utils import load_image  # noqa: E402
 import webcamera_utils  # noqa: E402
@@ -38,20 +37,11 @@ assert CLASS_NUM == len(LABEL_NAMES), 'The number of labels is incorrect.'
 # ======================
 # Arguemnt Parser Config
 # ======================
-parser = argparse.ArgumentParser(
-    description='DeepLab is a state-of-art deep learning model ' +
-    'for semantic image segmentation.'
-)
-parser.add_argument(
-    '-i', '--input', metavar='IMAGEFILE_PATH',
-    default=IMAGE_PATH,
-    help='The input image path.'
-)
-parser.add_argument(
-    '-v', '--video', metavar='VIDEO',
-    default=None,
-    help='The input video path. ' +
-         'If the VIDEO argument is set to 0, the webcam input will be used.'
+parser = get_base_parser(
+    ('DeepLab is a state-of-art deep learning model '
+     'for semantic image segmentation.'),
+    IMAGE_PATH,
+    SAVE_IMAGE_PATH,
 )
 parser.add_argument(
     '-n', '--normal',
@@ -59,18 +49,7 @@ parser.add_argument(
     help='By default, the optimized model is used, but with this option, ' +
     'you can switch to the normal (not optimized) model'
 )
-parser.add_argument(
-    '-s', '--savepath', metavar='SAVE_PATH',
-    default=SAVE_IMAGE_PATH,
-    help='Save path for the result of the model.'
-)
-parser.add_argument(
-    '-b', '--benchmark',
-    action='store_true',
-    help='Running the inference on the same input 5 times ' +
-         'to measure execution performance. (Cannot be used in video mode)'
-)
-args = parser.parse_args()
+args = update_parser(parser)
 
 
 # ======================
@@ -90,9 +69,7 @@ REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/deeplabv3/'
 # ======================
 def segment_from_image():
     # net initialize
-    env_id = ailia.get_gpu_environment_id()
-    print(f'env_id: {env_id}')
-    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
 
     ailia_input_w = net.get_input_shape()[3]
     ailia_input_h = net.get_input_shape()[2]
@@ -163,9 +140,7 @@ def segment_from_image():
 
 def segment_from_video():
     # net initialize
-    env_id = ailia.get_gpu_environment_id()
-    print(f'env_id: {env_id}')
-    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
 
     ailia_input_w = net.get_input_shape()[3]
     ailia_input_h = net.get_input_shape()[2]
@@ -216,6 +191,8 @@ def segment_from_video():
 
     capture.release()
     cv2.destroyAllWindows()
+    if writer is not None:
+        writer.release()
     print('Script finished successfully.')
 
 

@@ -1,6 +1,5 @@
 import sys
 import time
-import argparse
 
 import cv2
 import numpy as np
@@ -8,9 +7,10 @@ import numpy as np
 import ailia
 # import original modules
 sys.path.append('../../util')
+from utils import get_base_parser, update_parser  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from image_utils import load_image  # noqa: E402
-from webcamera_utils import preprocess_frame, get_capture  # noqa: E402
+import webcamera_utils  # noqa: E402
 
 
 # ======================
@@ -34,33 +34,12 @@ BM_IMG_WIDTH = 128
 # ======================
 # Arguemnt Parser Config
 # ======================
-parser = argparse.ArgumentParser(
-    description='DewarpNet is a model for document image unwarping.'
+parser = get_base_parser(
+    'DewarpNet is a model for document image unwarping.',
+    IMAGE_PATH,
+    SAVE_IMAGE_PATH,
 )
-parser.add_argument(
-    '-i', '--input', metavar='IMAGEFILE_PATH',
-    default=IMAGE_PATH,
-    help='The input image path.'
-)
-parser.add_argument(
-    '-v', '--video', metavar='VIDEO',
-    default=None,
-    help='The input video path. ' +
-         'If the VIDEO argument is set to 0, the webcam input will be used.'
-
-)
-parser.add_argument(
-    '-s', '--savepath', metavar='SAVE_IMAGE_PATH',
-    default=SAVE_IMAGE_PATH,
-    help='Save path for the output image.'
-)
-parser.add_argument(
-    '-b', '--benchmark',
-    action='store_true',
-    help='Running the inference on the same input 5 times ' +
-         'to measure execution performance. (Cannot be used in video mode)'
-)
-args = parser.parse_args()
+args = update_parser(parser)
 
 
 # ======================
@@ -118,10 +97,8 @@ def unwarp_from_image():
     )
 
     # net initialize
-    env_id = ailia.get_gpu_environment_id()
-    print(f'env_id: {env_id}')
-    bm_net = ailia.Net(BM_MODEL_PATH, BM_WEIGHT_PATH, env_id=env_id)
-    wc_net = ailia.Net(WC_MODEL_PATH, WC_WEIGHT_PATH, env_id=env_id)
+    bm_net = ailia.Net(BM_MODEL_PATH, BM_WEIGHT_PATH, env_id=args.env_id)
+    wc_net = ailia.Net(WC_MODEL_PATH, WC_WEIGHT_PATH, env_id=args.env_id)
 
     # inference
     print('Start inference...')
@@ -141,28 +118,48 @@ def unwarp_from_image():
 
 def unwarp_from_video():
     # net initialize
-    env_id = ailia.get_gpu_environment_id()
-    print(f'env_id: {env_id}')
-    bm_net = ailia.Net(BM_MODEL_PATH, BM_WEIGHT_PATH, env_id=env_id)
-    wc_net = ailia.Net(WC_MODEL_PATH, WC_WEIGHT_PATH, env_id=env_id)
+    bm_net = ailia.Net(BM_MODEL_PATH, BM_WEIGHT_PATH, env_id=args.env_id)
+    wc_net = ailia.Net(WC_MODEL_PATH, WC_WEIGHT_PATH, env_id=args.env_id)
 
-    capture = get_capture(args.video)
+    capture = webcamera_utils.get_capture(args.video)
+
+    # create video writer if savepath is specified as video format
+    if args.savepath != SAVE_IMAGE_PATH:
+        print(
+            '[WARNING] currently, video results cannot be output correctly...'
+        )
+        f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
+        save_h, save_w = webcamera_utils.calc_adjust_fsize(
+            f_h, f_w, WC_IMG_HEIGHT, WC_IMG_WIDTH
+        )
+        writer = webcamera_utils.get_writer(args.savepath, save_h, save_w)
+    else:
+        writer = None
 
     while(True):
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
 
-        org_image, input_data = preprocess_frame(
+        org_image, input_data = webcamera_utils.preprocess_frame(
             frame, WC_IMG_HEIGHT, WC_IMG_WIDTH, normalize_type='255'
         )
 
         uwpred = run_inference(wc_net, bm_net, input_data, org_image)
 
         cv2.imshow('frame', uwpred)
+        # TODO: FIXME:
+        # >>> error: (-215:Assertion failed)
+        # >>> image.depth() == CV_8U in function 'write'
+        # # save results
+        # if writer is not None:
+        #     writer.write(uwpred)
 
     capture.release()
     cv2.destroyAllWindows()
+    if writer is not None:
+        writer.release()
     print('Script finished successfully.')
 
 

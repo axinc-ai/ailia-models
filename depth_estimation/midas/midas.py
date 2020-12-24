@@ -1,7 +1,6 @@
 import os
 import sys
 import time
-import argparse
 
 import numpy as np
 import cv2
@@ -10,9 +9,12 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
+from utils import get_base_parser, update_parser  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
-from webcamera_utils import get_capture  # noqa: E402C
-from image_utils import normalize_image  # noqa: E402C
+from webcamera_utils import get_capture, get_writer, \
+    calc_adjust_fsize  # noqa: E402
+from image_utils import normalize_image  # noqa: E402
+
 
 # ======================
 # Parameters
@@ -31,32 +33,8 @@ IMAGE_MULTIPLE_OF = 32
 # ======================
 # Arguemnt Parser Config
 # ======================
-parser = argparse.ArgumentParser(
-    description='MiDaS model'
-)
-parser.add_argument(
-    '-i', '--input', metavar='IMAGE',
-    default=IMAGE_PATH,
-    help='The input image path.'
-)
-parser.add_argument(
-    '-v', '--video', metavar='VIDEO',
-    default=None,
-    help='The input video path. ' +
-         'If the VIDEO argument is set to 0, the webcam input will be used.'
-)
-parser.add_argument(
-    '-s', '--savepath', metavar='SAVE_IMAGE_PATH',
-    default=SAVE_IMAGE_PATH,
-    help='Save path for the output image.'
-)
-parser.add_argument(
-    '-b', '--benchmark',
-    action='store_true',
-    help='Running the inference on the same input 5 times ' +
-         'to measure execution performance. (Cannot be used in video mode)'
-)
-args = parser.parse_args()
+parser = get_base_parser('MiDaS model', IMAGE_PATH, SAVE_IMAGE_PATH)
+args = update_parser(parser)
 
 
 # ======================
@@ -112,13 +90,11 @@ def recognize_from_image():
     img = img[np.newaxis, :, :, :]
     print(f'input image shape: {img.shape}')
 
-    # # net initialize
-    env_id = ailia.get_gpu_environment_id()
-    print(f'env_id: {env_id}')
-    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+    # net initialize
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
     net.set_input_shape(img.shape)
 
-    # inferece
+    # inference
     print('Start inference...')
     if args.benchmark:
         print('BENCHMARK mode')
@@ -144,12 +120,23 @@ def recognize_from_image():
 
 
 def recognize_from_video():
-    # # net initialize
-    env_id = ailia.get_gpu_environment_id()
-    print(f'env_id: {env_id}')
-    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+    # net initialize
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
 
     capture = get_capture(args.video)
+
+    # create video writer if savepath is specified as video format
+    if args.savepath != SAVE_IMAGE_PATH:
+        print(
+            '[WARNING] currently, video results cannot be output correctly...'
+        )
+        f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
+        save_h, save_w = calc_adjust_fsize(f_h, f_w, IMAGE_HEIGHT, IMAGE_WIDTH)
+        # save_w * 2: we stack source frame and estimated heatmap
+        writer = get_writer(args.savepath, save_h, save_w * 2)
+    else:
+        writer = None
 
     input_shape_set = False
     while(True):
@@ -174,10 +161,19 @@ def recognize_from_video():
         else:
             out = 0
 
-        cv2.imshow('depth', out.transpose(1, 2, 0).astype("uint16"))
+        res_img = out.transpose(1, 2, 0).astype("uint16")
+        cv2.imshow('depth', res_img)
+
+        # save results
+        if writer is not None:
+            # FIXME: cannot save correctly...
+            res_img = cv2.cvtColor(res_img, cv2.COLOR_GRAY2BGR)
+            writer.write(cv2.convertScaleAbs(res_img))
 
     capture.release()
     cv2.destroyAllWindows()
+    if writer is not None:
+        writer.release()
     print('Script finished successfully.')
 
 
