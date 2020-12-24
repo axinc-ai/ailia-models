@@ -4,6 +4,9 @@ import os
 import cv2
 import numpy as np
 
+from logging import getLogger
+logger = getLogger(__name__)
+
 
 def normalize_image(image, normalize_type='255'):
     """
@@ -76,7 +79,7 @@ def load_image(
     if os.path.isfile(image_path):
         image = cv2.imread(image_path, int(rgb))
     else:
-        print(f'[ERROR] {image_path} not found.')
+        logger.error(f'{image_path} not found.')
         sys.exit()
     if rgb:
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
