@@ -272,7 +272,7 @@ def postprocess(preds_ailia, anchor_path='anchors.npy'):
     """
     Process detection predictions from ailia and return filtered detections
     """
-    raw_box = preds_ailia[0]  # (1, 896, 12)
+    raw_box = preds_ailia[0]  # (1, 896, 18)
     raw_score = preds_ailia[1]  # (1, 896, 1)
 
     anchors = np.load(anchor_path).astype("float32")

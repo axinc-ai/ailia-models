@@ -2,11 +2,11 @@
 
 ## Input
 
-<img src="bill_gates.jpg" width="320px">
+<img src="person_with_hands.jpg" width="320px">
 
-(Image from https://www.pinterest.com/pin/472244710905655341/)
+(Image from https://pixabay.com/photos/person-human-woman-young-body-3929040/)
 
-- ailia input shape: (1, 3, 256, 256)
+- ailia input shape: (1, 3, 256, 256) RGB channel order
 - Pixel value range: [0, 1]
 
 ## Output
@@ -14,10 +14,11 @@
 <img src="output.png" width="320px">
 
 - ailia Predict API output:
-  - Bounding boxes
+  - Bounding boxes and keypoints
     - Shape: (1, 896, 18)
   - Classification confidences
     - Shape: (1, 896, 1)
+- With helper functions, filtered detections with keypoints can be obtained.
 
 ## Usage
 
@@ -43,7 +44,8 @@ $ python3 blazepalm.py --video VIDEO_PATH --savepath SAVE_VIDEO_PATH
 
 ## Reference
 
-[MediaPipePyTorch](https://github.com/zmurez/MediaPipePyTorch)
+- [MediaPipePyTorch](https://github.com/zmurez/MediaPipePyTorch)
+- [MediaPipe Hands](https://google.github.io/mediapipe/solutions/hands.html)
 
 ## Framework
 
