@@ -2,9 +2,9 @@
 
 ## Input
 
-<img src="bill_gates.jpg" width="320px">
+<img src="person_hand.jpg" width="320px">
 
-(Image from https://www.pinterest.com/pin/472244710905655341/)
+(Image from https://pixabay.com/photos/stop-no-photo-no-photographing-hand-565609/)
 
 ### Detector
 
