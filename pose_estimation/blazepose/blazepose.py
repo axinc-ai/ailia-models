@@ -18,7 +18,7 @@ from model_utils import check_and_download_models  # noqa: E402
 # ======================
 # Parameters 1
 # ======================
-IMAGE_PATH = 'person.jpg'
+IMAGE_PATH = 'girl-5204299_640.jpg'
 SAVE_IMAGE_PATH = 'output.png'
 IMAGE_HEIGHT = 256
 IMAGE_WIDTH = 256

@@ -2,9 +2,9 @@
 
 ## Input
 
-<img src="person.jpg" width="320px">
+![Input](girl-5204299_640.jpg)
 
-(Image from https://www.turbosquid.com/ja/3d-models/3ds-max-realistic-human-pose/897233)
+(Image from https://pixabay.com/ja/photos/%E5%A5%B3%E3%81%AE%E5%AD%90-%E7%BE%8E%E3%81%97%E3%81%84-%E8%8B%A5%E3%81%84-%E3%83%9B%E3%83%AF%E3%82%A4%E3%83%88-5204299/)
 
 ### Detector
 
