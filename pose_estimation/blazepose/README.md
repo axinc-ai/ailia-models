@@ -68,3 +68,8 @@ PyTorch 1.7.1
 
 ONNX opset = 11
 
+## Netron
+
+[blazepose_detector.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/blazepose/blazepose_detector.onnx.prototxt)
+
+[blazepose_estimator.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/blazepose/blazepose_estimator.onnx.prototxt)
