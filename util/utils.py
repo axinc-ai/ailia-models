@@ -133,7 +133,14 @@ def update_parser(parser):
 
     # -------------------------------------------------------------------------
     # 2. update input
-    if isinstance(args.input, list):
+    if args.video is not None:
+        args.ftype = 'video'
+
+    if args.input is None:
+        # TODO: args.video, args.input is vague...
+        # input is None --> video mode maybe?
+        pass
+    elif isinstance(args.input, list):
         # LIST --> nothing will be changed here.
         pass
     elif os.path.isdir(args.input):
@@ -166,3 +173,33 @@ def update_parser(parser):
 
     # -------------------------------------------------------------------------
     return args
+
+
+def get_savepath(arg_path, src_path, prefix='', post_fix='_res'):
+    """Get savepath
+    NOTE: we may have better option...
+    TODO: args.save_dir & args.save_path ?
+
+    Parameters
+    ----------
+    arg_path : str
+        argument parser's savepath
+    src_path : str
+        the path of source path
+    prefix : str
+    postfix : str
+
+    Returns
+    -------
+    new_path : str
+    """
+    if '.' in arg_path:
+        # 1. args.savepath is actually the image path
+        new_path = arg_path
+    else:
+        # 2. args.savepath is save directory path
+        src_base, src_ext = os.path.splitext(os.path.basename(src_path))
+        new_path = os.path.join(
+            arg_path, prefix + src_base + post_fix + src_ext
+        )
+    return new_path
