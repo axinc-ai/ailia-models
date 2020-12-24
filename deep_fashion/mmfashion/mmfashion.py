@@ -1,6 +1,5 @@
 import sys
 import time
-import argparse
 
 import numpy as np
 import cv2
@@ -9,15 +8,15 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import check_file_existance  # noqa: E402
+from utils import get_base_parser, update_parser  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
-from detector_utils import plot_results, load_image  # noqa: E402C
-from webcamera_utils import get_capture  # noqa: E402C
+from detector_utils import plot_results, load_image  # noqa: E402
+from webcamera_utils import get_capture  # noqa: E402
+
 
 # ======================
 # Parameters
 # ======================
-
 WEIGHT_PATH = './mask_rcnn_r50_fpn_1x.onnx'
 MODEL_PATH = './mask_rcnn_r50_fpn_1x.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/mmfashion/'
@@ -38,42 +37,17 @@ NORM_MEAN = [123.675, 116.28, 103.53]
 NORM_STD = [58.395, 57.12, 57.375]
 RCNN_MASK_THRE = 0.5
 
+
 # ======================
 # Arguemnt Parser Config
 # ======================
-parser = argparse.ArgumentParser(
-    description='MMFashion model'
-)
-parser.add_argument(
-    '-i', '--input', metavar='IMAGE',
-    default=IMAGE_PATH,
-    help='The input image path.'
-)
-parser.add_argument(
-    '-v', '--video', metavar='VIDEO',
-    default=None,
-    help='The input video path. ' +
-         'If the VIDEO argument is set to 0, the webcam input will be used.'
-)
-parser.add_argument(
-    '-s', '--savepath', metavar='SAVE_IMAGE_PATH',
-    default=SAVE_IMAGE_PATH,
-    help='Save path for the output image.'
-)
-parser.add_argument(
-    '-b', '--benchmark',
-    action='store_true',
-    help='Running the inference on the same input 5 times ' +
-         'to measure execution performance. (Cannot be used in video mode)'
-)
-args = parser.parse_args()
+parser = get_base_parser('MMFashion model', IMAGE_PATH, SAVE_IMAGE_PATH)
+args = update_parser(parser)
 
 
 # ======================
 # Secondaty Functions
 # ======================
-
-
 def preprocess(img):
     h, w = img.shape[:2]
 
@@ -81,7 +55,8 @@ def preprocess(img):
     max_long_edge = max(RESIZE_RANGE)
     max_short_edge = min(RESIZE_RANGE)
     scale_factor = min(max_long_edge / max(h, w), max_short_edge / min(h, w))
-    new_w, new_h = int(w * float(scale_factor) + 0.5), int(h * float(scale_factor) + 0.5)
+    new_w = int(w * float(scale_factor) + 0.5)
+    new_h = int(h * float(scale_factor) + 0.5)
     img = cv2.resize(img, (new_w, new_h), interpolation=cv2.INTER_LINEAR)
     scale_w = new_w / w
     scale_h = new_h / h
@@ -164,7 +139,9 @@ def post_processing(data, boxes, labels, masks):
 
         # segment mask
         mask = cv2.resize(mask, (ori_w, ori_h), interpolation=cv2.INTER_LINEAR)
-        segm_mask = np.zeros((max(ori_shape[0], ori_y2), max(ori_shape[1], ori_x2)))
+        segm_mask = np.zeros(
+            (max(ori_shape[0], ori_y2), max(ori_shape[1], ori_x2))
+        )
         segm_mask[ori_y:ori_y + ori_h, ori_x:ori_x + ori_w] = mask
         segm_mask = segm_mask[:ori_shape[0], :ori_shape[1]]
         segm_mask = (segm_mask > RCNN_MASK_THRE).astype(np.uint8)
@@ -194,7 +171,9 @@ def detect_objects(img, detector):
     data = preprocess(img)
 
     # feedforward
-    detector.set_input_shape((1, 3, data['img'].shape[2], data['img'].shape[3]))
+    detector.set_input_shape(
+        (1, 3, data['img'].shape[2], data['img'].shape[3])
+    )
     output = detector.predict({
         'image': data['img']
     })
@@ -226,7 +205,9 @@ def recognize_from_image(filename, detector):
         detect_object, seg_masks = detect_objects(img, detector)
 
     # plot result
-    res_img = plot_results(detect_object, img_0, CATEGORY, segm_masks=seg_masks)
+    res_img = plot_results(
+        detect_object, img_0, CATEGORY, segm_masks=seg_masks
+    )
     cv2.imwrite(args.savepath, res_img)
     print('Script finished successfully.')
 
@@ -243,7 +224,9 @@ def recognize_from_video(video, detector):
 
         x = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         detect_object, seg_masks = detect_objects(x, detector)
-        res_img = plot_results(detect_object, frame, CATEGORY, segm_masks=seg_masks)
+        res_img = plot_results(
+            detect_object, frame, CATEGORY, segm_masks=seg_masks
+        )
         cv2.imshow('frame', res_img)
 
     capture.release()
@@ -255,12 +238,8 @@ def main():
     # model files check and download
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
 
-    # load model
-    env_id = ailia.get_gpu_environment_id()
-    print(f'env_id: {env_id}')
-
     # initialize
-    detector = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+    detector = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
 
     if args.video is not None:
         # video mode

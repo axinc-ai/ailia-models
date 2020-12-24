@@ -1,6 +1,5 @@
 import time
 import sys
-import argparse
 
 import numpy as np
 
@@ -11,12 +10,13 @@ warnings.filterwarnings('ignore', category=FutureWarning)
 from transformers import BertTokenizer  # noqa: E402
 try:
     from pyknp import Juman  # noqa: E402
-except:
+except ModuleNotFoundError:
     print('[WARNING] pyknp module is not installed. (for japanese mode)')
 
 import ailia  # noqa: E402
 # import original modules
 sys.path.append('../../util')
+from utils import get_base_parser, update_parser  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 
 
@@ -25,24 +25,20 @@ from model_utils import check_and_download_models  # noqa: E402
 # ======================
 LANGS = ['en', 'jp']
 
-parser = argparse.ArgumentParser(
-    description='BERT is a state of the art language model.' +
-    'In our model, we solve the task of predicting the masked word.'
+parser = get_base_parser(
+    ('BERT is a state of the art language model. '
+     'In our model, we solve the task of predicting the masked word.'),
+    None,
+    None,
 )
 parser.add_argument(
     '--lang', '-l', metavar='LANG',
     default='en', choices=LANGS,
     help='choose language: ' + ' | '.join(LANGS) + ' (default: en)'
 )
-parser.add_argument(
-    '-b', '--benchmark',
-    action='store_true',
-    help='Running the inference on the same input 5 times ' +
-         'to measure execution performance. (Cannot be used in video mode)'
-)
 # TODO
 # input masked sentence ? how treats Japanese?
-args = parser.parse_args()
+args = update_parser(parser)
 
 
 # ======================
@@ -155,9 +151,7 @@ def main():
     input_data = [tokens_ts, segments_ts, sentence_id]
 
     # net initialize
-    env_id = ailia.get_gpu_environment_id()
-    print(f'env_id: {env_id}')
-    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
 
     # inference
     print('Start inference...')
