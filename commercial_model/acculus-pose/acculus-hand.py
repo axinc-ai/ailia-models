@@ -1,5 +1,4 @@
 import sys
-import argparse
 
 import cv2
 import numpy as np
@@ -8,9 +7,14 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
+from utils import get_base_parser, update_parser  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from webcamera_utils import get_capture, get_writer, \
     calc_adjust_fsize  # noqa: E402
+
+# logger
+from logging import getLogger   # noqa: E402
+logger = getLogger(__name__)
 
 
 # ======================
@@ -22,6 +26,8 @@ REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/yolov3-hand/'
 
 SAVE_PATH = ''
 
+# NOTE: commercial model
+logger.warning('The pre-trained model is not available freely')
 HAND_WEIGHT_PATH = 'hand_obf.caffemodel'
 HAND_MODEL_PATH = 'hand_obf.prototxt'
 HAND_REMOTE_PATH = ''
@@ -35,21 +41,8 @@ IOU = 0.45
 # ======================
 # Arguemnt Parser Config
 # ======================
-# TODO: impl image mode and use get_base_parser()
-parser = argparse.ArgumentParser(
-    description='Acculus hand detection model'
-)
-parser.add_argument(
-    '-v', '--video', metavar='VIDEO', default=None,
-    help='The input video path. ' +
-         'If the VIDEO argument is set to 0, the webcam input will be used.'
-)
-parser.add_argument(
-    '-s', '--savepath', metavar='SAVE_PATH', default=SAVE_PATH,
-    help='Save path for the output (image / video).'
-)
-
-args = parser.parse_args()
+parser = get_base_parser('Acculus hand detection model', None, SAVE_PATH)
+args = update_parser(parser)
 
 
 # ======================
@@ -114,18 +107,8 @@ def display_result(input_img, hand, top_left, bottom_right):
 # ======================
 # Main functions
 # ======================
-
 def recognize_from_video():
     # net initialize
-    env_id = ailia.get_gpu_environment_id()
-    if args.env_id is not None:
-        count = ailia.get_environment_count()
-        if count > args.env_id:
-            env_id = args.env_id
-        else:
-            print(f'specified env_id: {args.env_id} cannot found error')
-    print(f'env_id: {env_id}')
-
     detector = ailia.Detector(
         MODEL_PATH,
         WEIGHT_PATH,
@@ -134,13 +117,13 @@ def recognize_from_video():
         channel=ailia.NETWORK_IMAGE_CHANNEL_FIRST,
         range=ailia.NETWORK_IMAGE_RANGE_U_FP32,
         algorithm=ailia.DETECTOR_ALGORITHM_YOLOV3,
-        env_id=env_id
+        env_id=args.env_id
     )
 
     hand = ailia.PoseEstimator(
         HAND_MODEL_PATH,
         HAND_WEIGHT_PATH,
-        env_id=env_id,
+        env_id=args.env_id,
         algorithm=HAND_ALGORITHM
     )
     hand.set_threshold(0.1)
@@ -211,7 +194,7 @@ def recognize_from_video():
     cv2.destroyAllWindows()
     if writer is not None:
         writer.release()
-    print('Script finished successfully.')
+    logger.info('Script finished successfully.')
 
 
 def main():
@@ -222,7 +205,7 @@ def main():
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
 
     if args.video is None:
-        print("Video file required.")
+        logger.info("Video file required.")
         return
 
     # video mode
