@@ -1,6 +1,9 @@
 export OPTION=-b
 cd ../
 cd action_recognition/mars; python3 mars.py ${OPTION}
+cd ../../action_recognition/st-gcn; python3 st-gcn.py ${OPTION}
+cd ../../audio_processing/crnn_audio_classification; python3 crnn_audio_classification.py ${OPTION}
+cd ../../audio_processing/deepspeech2; python3 deepspeech2.py ${OPTION}
 cd ../../crowd_counting/crowdcount-cascaded-mtl; python3 crowdcount-cascaded-mtl.py ${OPTION}
 cd ../../deep_fashion/clothing-detection; python3 clothing-detection.py ${OPTION}
 cd ../../deep_fashion/fashionai-key-points-detection; python3 fashionai-key-points-detection.py -c blouse ${OPTION}
