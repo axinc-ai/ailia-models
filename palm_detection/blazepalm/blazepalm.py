@@ -28,7 +28,7 @@ IMAGE_WIDTH = 256
 # Argument Parser Config
 # ======================
 parser = get_base_parser(
-    'BlazePose, an on-device real-time body pose tracking.', IMAGE_PATH, SAVE_IMAGE_PATH,
+    'BlazePalm, on-device real-time palm detection.', IMAGE_PATH, SAVE_IMAGE_PATH,
 )
 args = update_parser(parser)
 
