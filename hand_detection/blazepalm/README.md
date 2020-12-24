@@ -56,3 +56,9 @@ PyTorch 1.7.1
 
 ONNX opset = 11
 
+
+## Netron
+
+[blazepalm.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/blazepalm/blazepalm.onnx.prototxt)
+
+
