@@ -9,6 +9,7 @@ import cv2
 import ailia
 # import original modules
 sys.path.append('../../util')
+from utils import get_base_parser, update_parser  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from webcamera_utils import adjust_frame_size, get_capture  # noqa: E402
 
@@ -29,19 +30,9 @@ IMAGE_HEIGHT = 32
 # ======================
 # Arguemnt Parser Config
 # ======================
-parser = argparse.ArgumentParser(
-    description='deep text recognition benchmark.'
-)
-parser.add_argument(
-    '-i', '--input', metavar='IMAGE_FOLDER_PATH',
-    default=IMAGE_FOLDER_PATH,
-    help='The input image folder path.'
-)
-parser.add_argument(
-    '-b', '--benchmark',
-    action='store_true',
-    help='Running the inference on the same input 5 times ' +
-         'to measure execution performance. (Cannot be used in video mode)'
+
+parser = get_base_parser(
+    'deep text recognition benchmark.', IMAGE_FOLDER_PATH, None
 )
 parser.add_argument(
     '-o', '--onnx',
