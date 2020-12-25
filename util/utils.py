@@ -146,10 +146,9 @@ def update_parser(parser):
     elif os.path.isdir(args.input):
         # Directory Path --> generate list of inputs
         files_grapped = []
+        in_dir = args.input
         for extension in EXTENSIONS[args.ftype]:
-            files_grapped.extend(
-                glob.glob(os.path.join(args.input, extension))
-            )
+            files_grapped.extend(glob.glob(os.path.join(in_dir, extension)))
         logger.info(f'{len(files_grapped)} {args.ftype} files found!')
 
         args.input = sorted(files_grapped)
@@ -161,8 +160,10 @@ def update_parser(parser):
             if '.' in args.savepath:
                 logger.warning('Please specify save directory as --savepath '
                                'if you specified a direcotry for --input')
-                logger.info('[./results] directory will be created')
-                args.savepath = 'results'
+                logger.info(f'[{in_dir}_results] directory will be created')
+                if in_dir[-1] == '/':
+                    in_dir = in_dir[:-1]
+                args.savepath = in_dir + '_results'
             os.makedirs(args.savepath, exist_ok=True)
             logger.info(f'output saving directory: {args.savepath}')
 
