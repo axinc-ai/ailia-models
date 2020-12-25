@@ -10,11 +10,15 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser  # noqa: E402
+from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from detector_utils import plot_results, load_image  # noqa: E402
 from webcamera_utils import get_capture, get_writer,\
     calc_adjust_fsize  # noqa: E402
+
+# logger
+from logging import getLogger   # noqa: E402
+logger = getLogger(__name__)
 
 
 # ======================
@@ -48,6 +52,7 @@ DATASETS_CATEGORY = {
 THRESHOLD = 0.39
 IOU = 0.4
 DETECTION_WIDTH = 416
+
 
 # ======================
 # Arguemnt Parser Config
@@ -152,26 +157,28 @@ def detect_objects(img, detector):
 def recognize_from_image(filename, detector):
     # prepare input data
     img = load_image(filename)
-    print(f'input image shape: {img.shape}')
+    logger.debug(f'input image shape: {img.shape}')
 
     x = cv2.cvtColor(img, cv2.COLOR_BGRA2RGB)
 
     # inference
-    print('Start inference...')
+    logger.info('Start inference...')
     if args.benchmark:
-        print('BENCHMARK mode')
+        logger.info('BENCHMARK mode')
         for i in range(5):
             start = int(round(time.time() * 1000))
             detect_object = detect_objects(x, detector)
             end = int(round(time.time() * 1000))
-            print(f'\tailia processing time {end - start} ms')
+            logger.info(f'\tailia processing time {end - start} ms')
     else:
         detect_object = detect_objects(x, detector)
 
     # plot result
     res_img = plot_results(detect_object, img, category)
-    cv2.imwrite(args.savepath, res_img)
-    print('Script finished successfully.')
+    # cv2.imwrite(args.savepath, res_img)
+    savepath = get_savepath(args.savepath, filename)
+    logger.info(f'saved at : {savepath}')
+    cv2.imwrite(savepath, res_img)
 
 
 def recognize_from_video(video, detector):
@@ -210,7 +217,6 @@ def recognize_from_video(video, detector):
     cv2.destroyAllWindows()
     if writer is not None:
         writer.release()
-    print('Script finished successfully.')
 
 
 def main():
@@ -230,7 +236,13 @@ def main():
         recognize_from_video(args.video, detector)
     else:
         # image mode
-        recognize_from_image(args.input, detector)
+        # input image loop
+        for image_path in args.input:
+            # prepare input data
+            logger.info(image_path)
+            recognize_from_image(image_path, detector)
+
+    logger.info('Script finished successfully.')
 
 
 if __name__ == '__main__':

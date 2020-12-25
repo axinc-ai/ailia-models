@@ -152,7 +152,7 @@ def update_parser(parser):
             )
         logger.info(f'{len(files_grapped)} {args.ftype} files found!')
 
-        args.input = files_grapped
+        args.input = sorted(files_grapped)
 
         # create save directory
         if args.savepath is None:
