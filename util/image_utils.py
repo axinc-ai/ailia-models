@@ -40,6 +40,9 @@ def normalize_image(image, normalize_type='255'):
         for i in range(3):
             image[:, :, i] = (image[:, :, i] - mean[i]) / std[i]
         return image
+    else:
+        logger.error(f'Unknown normalize_type is given: {normalize_type}')
+        sys.exit()
 
 
 def load_image(
@@ -47,7 +50,7 @@ def load_image(
         image_shape,
         rgb=True,
         normalize_type='255',
-        gen_input_ailia=False
+        gen_input_ailia=False,
 ):
     """
     Loads the image of the given path, performs the necessary preprocessing,

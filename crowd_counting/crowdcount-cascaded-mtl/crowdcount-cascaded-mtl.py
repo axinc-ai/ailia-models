@@ -53,14 +53,15 @@ def estimate_from_image():
         org_img = load_image(
             image_path,
             (IMAGE_HEIGHT, IMAGE_WIDTH),
-            normalize_type='None'
+            normalize_type='None',
         )
+        org_img = cv2.cvtColor(org_img, cv2.COLOR_BGR2RGB)
         input_data = load_image(
             image_path,
             (IMAGE_HEIGHT, IMAGE_WIDTH),
             rgb=False,
             normalize_type='None',
-            gen_input_ailia=True
+            gen_input_ailia=True,
         )
 
         # inference
@@ -90,7 +91,7 @@ def estimate_from_image():
             cv2.FONT_HERSHEY_SIMPLEX,  # font
             0.8,  # fontscale
             (255, 255, 255),  # color
-            2  # thickness
+            2,  # thickness
         )
 
         res_img = np.hstack((org_img, heatmap))
