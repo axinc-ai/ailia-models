@@ -8,7 +8,7 @@ import cv2
 import torch
 from torch_geometric.nn import fps, radius, knn_interpolate
 
-# import ailia
+import ailia
 
 # import original modules
 sys.path.append('../../util')
