@@ -14,6 +14,10 @@ from model_utils import check_and_download_models  # noqa: E402
 from image_utils import load_image  # noqa: E402
 import webcamera_utils  # noqa: E402
 
+# logger
+from logging import getLogger   # noqa: E402
+logger = getLogger(__name__)
+
 
 # ======================
 # Parameters
@@ -41,6 +45,7 @@ parser = get_base_parser(
     None,
 )
 # overwrite default argument
+# NOTE: vggface2  has different usage for `--input` with other models
 parser.add_argument(
     '-i', '--inputs', metavar='IMAGE',
     nargs=2,
@@ -104,15 +109,15 @@ def compare_images():
         input_data = load_and_preprocess(img_path)
 
         # inference
-        print('Start inference...')
+        logger.info('Start inference...')
         if args.benchmark and j == 0:
             # Bench mark mode is only for the first image
-            print('BENCHMARK mode')
+            logger.info('BENCHMARK mode')
             for i in range(5):
                 start = int(round(time.time() * 1000))
                 _ = net.predict(input_data)
                 end = int(round(time.time() * 1000))
-                print(f'\tailia processing time {end - start} ms')
+                logger.info(f'\tailia processing time {end - start} ms')
         else:
             _ = net.predict(input_data)
 
@@ -123,14 +128,14 @@ def compare_images():
     fname1 = os.path.basename(args.inputs[0])
     fname2 = os.path.basename(args.inputs[1])
     dist = distance(features[0], features[1])
-    print(f'{fname1} vs {fname2} = {dist}')
+    logger.info(f'{fname1} vs {fname2} = {dist}')
 
     if dist < THRESHOLD:
-        print('Same person')
+        logger.info('Same person')
     else:
-        print('Not same person')
+        logger.info('Not same person')
 
-    print('Script finished successfully.')
+    logger.info('Script finished successfully.')
 
 
 def compare_videoframe_image():
@@ -171,13 +176,13 @@ def compare_videoframe_image():
 
         # show result
         dist = distance(i_feature, v_feature)
-        print('=============================================================')
-        print(f'{os.path.basename(fname)} vs video frame = {dist}')
+        logger.info('=' * 80)
+        logger.info(f'{os.path.basename(fname)} vs video frame = {dist}')
 
         if dist < THRESHOLD:
-            print('Same person')
+            logger.info('Same person')
         else:
-            print('Not same person')
+            logger.info('Not same person')
         cv2.imshow('frame', resized_frame)
         time.sleep(SLEEP_TIME)
 
@@ -189,7 +194,7 @@ def compare_videoframe_image():
     cv2.destroyAllWindows()
     if writer is not None:
         writer.release()
-    print('Script finished successfully.')
+    logger.info('Script finished successfully.')
 
 
 def main():
