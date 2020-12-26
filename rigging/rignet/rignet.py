@@ -1,62 +1,68 @@
-import sys, os
+import sys
 import argparse
 import itertools as it
 
 import numpy as np
+from scipy.special import softmax
+import cv2
+import torch
 from torch_geometric.nn import fps, radius, knn_interpolate
 
 # import ailia
 
 # import original modules
-# sys.path.append('../../util')
-# from model_utils import check_and_download_models  # noqa: E402
+sys.path.append('../../util')
+from model_utils import check_and_download_models  # noqa: E402
 
 from rignet_utils import create_single_data, inside_check, sample_on_bone
 from rignet_utils import meanshift_cluster, nms_meanshift, flip
-from vis_utils import draw_shifted_pts
+from rignet_utils import increase_cost_for_outside_bone
+from rignet_utils import RigInfo, TreeNode, primMST_symmetry, loadSkel_recur
+from rignet_utils import get_bones, calc_geodesic_matrix, post_filter, assemble_skel_skin
+from vis_utils import draw_shifted_pts, show_obj_skel
 
 # ======================
 # Parameters
 # ======================
 
-WEIGHT_JOINTNET_PATH = 'model/gcn_meanshift.onnx'
-MODEL_JOINTNET_PATH = 'model/gcn_meanshift.onnx.prototxt'
-WEIGHT_ROOTNET_SE_PATH = 'model/rootnet_shape_enc.onnx'
-MODEL_ROOTNET_SE_PATH = 'model/rootnet_shape_enc.onnx.prototxt'
-WEIGHT_ROOTNET_SA1_PATH = 'model/rootnet_sa1_conv.onnx'
-MODEL_ROOTNET_SA1_PATH = 'model/rootnet_sa1_conv.onnx.prototxt'
-WEIGHT_ROOTNET_SA2_PATH = 'model/rootnet_sa2_conv.onnx'
-MODEL_ROOTNET_SA2_PATH = 'model/rootnet_sa2_conv.onnx.prototxt'
-WEIGHT_ROOTNET_SA3_PATH = 'model/rootnet_sa3.onnx'
-MODEL_ROOTNET_SA3_PATH = 'model/rootnet_sa3.onnx.prototxt'
-WEIGHT_ROOTNET_FP3_PATH = 'model/rootnet_fp3_nn.onnx'
-MODEL_ROOTNET_FP3_PATH = 'model/rootnet_fp3_nn.onnx.prototxt'
-WEIGHT_ROOTNET_FP2_PATH = 'model/rootnet_fp2_nn.onnx'
-MODEL_ROOTNET_FP2_PATH = 'model/rootnet_fp2_nn.onnx.prototxt'
-WEIGHT_ROOTNET_FP1_PATH = 'model/rootnet_fp1_nn.onnx'
-MODEL_ROOTNET_FP1_PATH = 'model/rootnet_fp1_nn.onnx.prototxt'
-WEIGHT_ROOTNET_BL_PATH = 'model/rootnet_back_layers.onnx'
-MODEL_ROOTNET_BL_PATH = 'model/rootnet_back_layers.onnx.prototxt'
-WEIGHT_BONENET_SA1_PATH = 'model/bonenet_sa1_conv.onnx'
-MODEL_BONENET_SA1_PATH = 'model/bonenet_sa1_conv.onnx.prototxt'
-WEIGHT_BONENET_SA2_PATH = 'model/bonenet_sa2_conv.onnx'
-MODEL_BONENET_SA2_PATH = 'model/bonenet_sa2_conv.onnx.prototxt'
-WEIGHT_BONENET_SA3_PATH = 'model/bonenet_sa3.onnx'
-MODEL_BONENET_SA3_PATH = 'model/bonenet_sa3.onnx.prototxt'
-WEIGHT_BONENET_SE_PATH = 'model/bonenet_shape_enc.onnx'
-MODEL_BONENET_SE_PATH = 'model/bonenet_shape_enc.onnx.prototxt'
-WEIGHT_BONENET_EF_PATH = 'model/bonenet_expand_joint_feature.onnx'
-MODEL_BONENET_EF_PATH = 'model/bonenet_expand_joint_feature.onnx.prototxt'
-WEIGHT_BONENET_MT_PATH = 'model/bonenet_mix_transform.onnx'
-MODEL_BONENET_MT_PATH = 'model/bonenet_mix_transform.onnx.prototxt'
-WEIGHT_SKINNET_PATH = 'model/skinnet.onnx'
-MODEL_SKINNET_PATH = 'model/skinnet.onnx.prototxt'
+WEIGHT_JOINTNET_PATH = 'models/gcn_meanshift.onnx'
+MODEL_JOINTNET_PATH = 'models/gcn_meanshift.onnx.prototxt'
+WEIGHT_ROOTNET_SE_PATH = 'models/rootnet_shape_enc.onnx'
+MODEL_ROOTNET_SE_PATH = 'models/rootnet_shape_enc.onnx.prototxt'
+WEIGHT_ROOTNET_SA1_PATH = 'models/rootnet_sa1_conv.onnx'
+MODEL_ROOTNET_SA1_PATH = 'models/rootnet_sa1_conv.onnx.prototxt'
+WEIGHT_ROOTNET_SA2_PATH = 'models/rootnet_sa2_conv.onnx'
+MODEL_ROOTNET_SA2_PATH = 'models/rootnet_sa2_conv.onnx.prototxt'
+WEIGHT_ROOTNET_SA3_PATH = 'models/rootnet_sa3.onnx'
+MODEL_ROOTNET_SA3_PATH = 'models/rootnet_sa3.onnx.prototxt'
+WEIGHT_ROOTNET_FP3_PATH = 'models/rootnet_fp3_nn.onnx'
+MODEL_ROOTNET_FP3_PATH = 'models/rootnet_fp3_nn.onnx.prototxt'
+WEIGHT_ROOTNET_FP2_PATH = 'models/rootnet_fp2_nn.onnx'
+MODEL_ROOTNET_FP2_PATH = 'models/rootnet_fp2_nn.onnx.prototxt'
+WEIGHT_ROOTNET_FP1_PATH = 'models/rootnet_fp1_nn.onnx'
+MODEL_ROOTNET_FP1_PATH = 'models/rootnet_fp1_nn.onnx.prototxt'
+WEIGHT_ROOTNET_BL_PATH = 'models/rootnet_back_layers.onnx'
+MODEL_ROOTNET_BL_PATH = 'models/rootnet_back_layers.onnx.prototxt'
+WEIGHT_BONENET_SA1_PATH = 'models/bonenet_sa1_conv.onnx'
+MODEL_BONENET_SA1_PATH = 'models/bonenet_sa1_conv.onnx.prototxt'
+WEIGHT_BONENET_SA2_PATH = 'models/bonenet_sa2_conv.onnx'
+MODEL_BONENET_SA2_PATH = 'models/bonenet_sa2_conv.onnx.prototxt'
+WEIGHT_BONENET_SA3_PATH = 'models/bonenet_sa3.onnx'
+MODEL_BONENET_SA3_PATH = 'models/bonenet_sa3.onnx.prototxt'
+WEIGHT_BONENET_SE_PATH = 'models/bonenet_shape_enc.onnx'
+MODEL_BONENET_SE_PATH = 'models/bonenet_shape_enc.onnx.prototxt'
+WEIGHT_BONENET_EF_PATH = 'models/bonenet_expand_joint_feature.onnx'
+MODEL_BONENET_EF_PATH = 'models/bonenet_expand_joint_feature.onnx.prototxt'
+WEIGHT_BONENET_MT_PATH = 'models/bonenet_mix_transform.onnx'
+MODEL_BONENET_MT_PATH = 'models/bonenet_mix_transform.onnx.prototxt'
+WEIGHT_SKINNET_PATH = 'models/skinnet.onnx'
+MODEL_SKINNET_PATH = 'models/skinnet.onnx.prototxt'
 
 REMOTE_PATH = \
     'https://storage.googleapis.com/ailia-models/rignet/'
 
 INPUT_PATH = '17872_remesh.obj'
-# SAVE_IMAGE_PATH = 'output.png'
+SAVE_IMAGE_PATH = 'output.png'
 
 # ======================
 # Arguemnt Parser Config
@@ -76,10 +82,10 @@ parser.add_argument(
     help='The input video path. ' +
          'If the VIDEO argument is set to 0, the webcam input will be used.'
 )
-# parser.add_argument(
-#     '-s', '--savepath', metavar='SAVE_IMAGE_PATH', default=SAVE_IMAGE_PATH,
-#     help='Save path for the output image.'
-# )
+parser.add_argument(
+    '-s', '--savepath', metavar='SAVE_IMAGE_PATH', default=SAVE_IMAGE_PATH,
+    help='Save path for the output image.'
+)
 # parser.add_argument(
 #     '-b', '--benchmark',
 #     action='store_true',
@@ -97,6 +103,9 @@ args = parser.parse_args()
 # ======================
 # Secondaty Functions
 # ======================
+
+def sigmoid(a):
+    return 1 / (1 + np.exp(-a))
 
 
 # ======================
@@ -184,9 +193,9 @@ def predict_joints(
     joints_batch = np.zeros(len(pred_joints), dtype=np.int64)
     pairs_batch = np.zeros(len(pairs), dtype=np.int64)
 
-    data['joints'] = pred_joints
-    data['pairs'] = pairs
-    data['pair_attr'] = pair_attr
+    data['joints'] = pred_joints.astype(np.float32)
+    data['pairs'] = pairs.astype(np.float32)
+    data['pair_attr'] = pair_attr.astype(np.float32)
     data['joints_batch'] = joints_batch
     data['pairs_batch'] = pairs_batch
     return data
@@ -202,10 +211,10 @@ def getInitId(data, root_net):
     batch, pos, geo_edge_index, tpl_edge_index = \
         data['batch'], data['pos'], data['geo_edge_index'], data['tpl_edge_index']
     joints, joints_batch = data['joints'], data['joints_batch']
-
     idx = np.random.randn(joints.shape[0]).argsort()
     joints_shuffle = joints[idx]
 
+    # shape_encoder
     shape_encoder = root_net['shape_encoder']
     if not args.onnx:
         x_glb_shape = shape_encoder.predict({
@@ -224,7 +233,7 @@ def getInitId(data, root_net):
                 in_batch: batch, in_pos: pos,
                 in_geo_e: geo_edge_index, in_tpl_e: tpl_edge_index
             })[0]
-    shape_feature = x_glb_shape.repeat(len(joints_batch[joints_batch == 0]), 1)
+    shape_feature = np.repeat(x_glb_shape, len(joints_batch[joints_batch == 0]), axis=0)
 
     x = np.abs(joints_shuffle[:, 0:1])
     pos = joints_shuffle
@@ -233,9 +242,12 @@ def getInitId(data, root_net):
 
     # sa1_joint
     ratio, r = 0.999, 0.4
-    idx = fps(pos, batch, ratio=ratio)
-    row, col = radius(pos, pos[idx], r, batch, batch[idx], max_num_neighbors=64)
-    edge_index = np.stack([col, row], dim=0)
+    idx = fps(torch.from_numpy(pos), torch.from_numpy(batch), ratio=ratio).numpy()
+    row, col = radius(
+        torch.from_numpy(pos), torch.from_numpy(pos[idx]), r,
+        torch.from_numpy(batch), torch.from_numpy(batch[idx]),
+        max_num_neighbors=64)
+    edge_index = np.stack([col, row], axis=0)
     sa1_module = root_net['sa1_module']
     if not args.onnx:
         x = sa1_module.predict({
@@ -245,21 +257,24 @@ def getInitId(data, root_net):
         in_x = sa1_module.get_inputs()[0].name
         in_pos = sa1_module.get_inputs()[1].name
         in_pos_idx = sa1_module.get_inputs()[2].name
-        edge_index = sa1_module.get_inputs()[3].name
+        in_edge_index = sa1_module.get_inputs()[3].name
         out = sa1_module.get_outputs()[0].name
         x = sa1_module.run(
             [out],
             {
-                in_x: x, in_pos: pos, in_pos_idx: pos[idx], edge_index: edge_index
+                in_x: x, in_pos: pos, in_pos_idx: pos[idx], in_edge_index: edge_index
             })[0]
     pos, batch = pos[idx], batch[idx]
     sa1_joint = (x, pos, batch)
 
     # sa2_joint
     ratio, r = 0.33, 0.6
-    idx = fps(pos, batch, ratio=ratio)
-    row, col = radius(pos, pos[idx], r, batch, batch[idx], max_num_neighbors=64)
-    edge_index = np.stack([col, row], dim=0)
+    idx = fps(torch.from_numpy(pos), torch.from_numpy(batch), ratio=ratio).numpy()
+    row, col = radius(
+        torch.from_numpy(pos), torch.from_numpy(pos[idx]), r,
+        torch.from_numpy(batch), torch.from_numpy(batch[idx]),
+        max_num_neighbors=64)
+    edge_index = np.stack([col, row], axis=0)
     sa2_module = root_net['sa2_module']
     if not args.onnx:
         x = sa2_module.predict({
@@ -269,12 +284,12 @@ def getInitId(data, root_net):
         in_x = sa2_module.get_inputs()[0].name
         in_pos = sa2_module.get_inputs()[1].name
         in_pos_idx = sa2_module.get_inputs()[2].name
-        edge_index = sa2_module.get_inputs()[3].name
+        in_edge_index = sa2_module.get_inputs()[3].name
         out = sa2_module.get_outputs()[0].name
         x = sa2_module.run(
             [out],
             {
-                in_x: x, in_pos: pos, in_pos_idx: pos[idx], edge_index: edge_index
+                in_x: x, in_pos: pos, in_pos_idx: pos[idx], in_edge_index: edge_index
             })[0]
     pos, batch = pos[idx], batch[idx]
     sa2_joint = (x, pos, batch)
@@ -296,27 +311,33 @@ def getInitId(data, root_net):
             [out_x, out_pos, out_batch],
             {
                 in_x: x, in_pos: pos, in_batch: batch
-            })[0]
+            })
     sa3_joint = output
 
     # fp3_joint
     x, pos, batch = sa3_joint
     x_skip, pos_skip, batch_skip = sa2_joint
-    x = knn_interpolate(x, pos, pos_skip, batch, batch_skip, k=1)
-    x = np.concatenate([x, x_skip], dim=1)
+    x = knn_interpolate(
+        torch.from_numpy(x), torch.from_numpy(pos),
+        torch.from_numpy(pos_skip), torch.from_numpy(batch),
+        torch.from_numpy(batch_skip), k=1).numpy()
+    x = np.concatenate([x, x_skip], axis=1)
     fp3_module = root_net['fp3_module']
     if not args.onnx:
         x = fp3_module.predict({'x': x})[0]
     else:
-        in_x = sa3_module.get_inputs()[0].name
-        out_x = sa3_module.get_outputs()[0].name
-        x = sa3_module.run([out_x], {in_x: x})[0]
+        in_x = fp3_module.get_inputs()[0].name
+        out_x = fp3_module.get_outputs()[0].name
+        x = fp3_module.run([out_x], {in_x: x})[0]
     pos, batch = pos_skip, batch_skip
 
     # fp2_joint
     x_skip, pos_skip, batch_skip = sa1_joint
-    x = knn_interpolate(x, pos, pos_skip, batch, batch_skip, k=1)
-    x = np.concatenate([x, x_skip], dim=1)
+    x = knn_interpolate(
+        torch.from_numpy(x), torch.from_numpy(pos),
+        torch.from_numpy(pos_skip), torch.from_numpy(batch),
+        torch.from_numpy(batch_skip), k=3).numpy()
+    x = np.concatenate([x, x_skip], axis=1)
     fp2_module = root_net['fp2_module']
     if not args.onnx:
         x = fp2_module.predict({'x': x})[0]
@@ -328,8 +349,11 @@ def getInitId(data, root_net):
 
     # fp1_joint
     x_skip, pos_skip, batch_skip = sa0_joint
-    x = knn_interpolate(x, pos, pos_skip, batch, batch_skip, k=1)
-    x = np.concatenate([x, x_skip], dim=1)
+    x = knn_interpolate(
+        torch.from_numpy(x), torch.from_numpy(pos),
+        torch.from_numpy(pos_skip), torch.from_numpy(batch),
+        torch.from_numpy(batch_skip), k=3).numpy()
+    x = np.concatenate([x, x_skip], axis=1)
     fp1_module = root_net['fp1_module']
     if not args.onnx:
         joint_feature = fp1_module.predict({'x': x})[0]
@@ -338,7 +362,7 @@ def getInitId(data, root_net):
         out_x = fp1_module.get_outputs()[0].name
         joint_feature = fp1_module.run([out_x], {in_x: x})[0]
 
-    x_joint = np.concatenate([shape_feature, joint_feature], dim=1)
+    x_joint = np.concatenate([shape_feature, joint_feature], axis=1)
 
     back_layers = root_net['back_layers']
     if not args.onnx:
@@ -348,9 +372,6 @@ def getInitId(data, root_net):
         out_x = back_layers.get_outputs()[0].name
         x_joint = back_layers.run([out_x], {in_x: x_joint})[0]
 
-    def sigmoid(a):
-        return 1 / (1 + np.exp(-a))
-
     root_prob = x_joint
     root_prob = sigmoid(root_prob)
     root_id = np.argmax(root_prob)
@@ -359,7 +380,7 @@ def getInitId(data, root_net):
 
 
 def predict_skeleton(
-        data, vox, root_net, bone_net, mesh_filename):
+        data, vox, root_net, bone_net):
     """
     Predict skeleton structure based on joints
     :param data: wrapped data
@@ -368,32 +389,150 @@ def predict_skeleton(
     :param mesh_filename: meshfilename for debugging
     :return: predicted skeleton structure
     """
+    root_id = getInitId(data, root_net)
+
+    joints, pairs, pair_attr, joints_batch, pairs_batch = \
+        data['joints'], data['pairs'], data['pair_attr'], data['joints_batch'], data['pairs_batch']
+    sa0_joints = (None, joints, joints_batch)
+    _, pos, batch = sa0_joints
+
+    # sa1_joint
+    ratio, r = 0.999, 0.4
+    idx = fps(torch.from_numpy(pos), torch.from_numpy(batch), ratio=ratio).numpy()
+    row, col = radius(
+        torch.from_numpy(pos), torch.from_numpy(pos[idx]), r,
+        torch.from_numpy(batch), torch.from_numpy(batch[idx]),
+        max_num_neighbors=64)
+    edge_index = np.stack([col, row], axis=0)
+    sa1_module = bone_net['sa1_module']
+    if not args.onnx:
+        x = sa1_module.predict({
+            'pos': pos, 'in_pos_idx': pos[idx], 'edge_index': edge_index
+        })
+    else:
+        in_pos = sa1_module.get_inputs()[0].name
+        in_pos_idx = sa1_module.get_inputs()[1].name
+        in_edge_index = sa1_module.get_inputs()[2].name
+        out = sa1_module.get_outputs()[0].name
+        x = sa1_module.run(
+            [out],
+            {
+                in_pos: pos, in_pos_idx: pos[idx], in_edge_index: edge_index
+            })[0]
+    pos, batch = pos[idx], batch[idx]
+
+    # sa2_joint
+    ratio, r = 0.33, 0.6
+    idx = fps(torch.from_numpy(pos), torch.from_numpy(batch), ratio=ratio).numpy()
+    row, col = radius(
+        torch.from_numpy(pos), torch.from_numpy(pos[idx]), r,
+        torch.from_numpy(batch), torch.from_numpy(batch[idx]),
+        max_num_neighbors=64)
+    edge_index = np.stack([col, row], axis=0)
+    sa2_module = bone_net['sa2_module']
+    if not args.onnx:
+        x = sa2_module.predict({
+            'batch': batch, 'pos': pos, 'in_pos_idx': pos[idx], 'edge_index': edge_index
+        })
+    else:
+        in_x = sa2_module.get_inputs()[0].name
+        in_pos = sa2_module.get_inputs()[1].name
+        in_pos_idx = sa2_module.get_inputs()[2].name
+        in_edge_index = sa2_module.get_inputs()[3].name
+        out = sa2_module.get_outputs()[0].name
+        x = sa2_module.run(
+            [out],
+            {
+                in_x: x, in_pos: pos, in_pos_idx: pos[idx], in_edge_index: edge_index
+            })[0]
+    pos, batch = pos[idx], batch[idx]
+
+    # sa3_joint
+    sa3_module = bone_net['sa3_module']
+    if not args.onnx:
+        output = sa3_module.predict({
+            'batch': batch, 'pos': pos, 'batch': batch
+        })
+    else:
+        in_x = sa3_module.get_inputs()[0].name
+        in_pos = sa3_module.get_inputs()[1].name
+        in_batch = sa3_module.get_inputs()[2].name
+        out_x = sa3_module.get_outputs()[0].name
+        out_pos = sa3_module.get_outputs()[1].name
+        out_batch = sa3_module.get_outputs()[2].name
+        output = sa3_module.run(
+            [out_x, out_pos, out_batch],
+            {
+                in_x: x, in_pos: pos, in_batch: batch
+            })
+    joint_feature, _, _ = output
+    joint_feature = np.repeat(joint_feature, len(pairs_batch[pairs_batch == 0]), axis=0)
 
     batch, pos, geo_edge_index, tpl_edge_index = \
         data['batch'], data['pos'], data['geo_edge_index'], data['tpl_edge_index']
-    joints, pairs, pair_attr, joints_batch, pairs_batch = \
-        data['joints'], data['pairs'], data['pair_attr'], data['joints_batch'], data['pairs_batch']
-    # batch = np.load("data_batch.npy")
-    # pos = np.load("data_pos.npy")
-    # geo_edge_index = np.load("data_geo_edge_index.npy")
-    # tpl_edge_index = np.load("data_tpl_edge_index.npy")
 
-    root_id = getInitId(data, root_net)
+    # shape_encoder
+    shape_encoder = bone_net['shape_encoder']
+    if not args.onnx:
+        shape_feature = shape_encoder.predict({
+            'batch': batch, 'pos': pos,
+            'geo_edge_index': geo_edge_index, 'tpl_edge_index': tpl_edge_index
+        })[0]
+    else:
+        in_batch = shape_encoder.get_inputs()[0].name
+        in_pos = shape_encoder.get_inputs()[1].name
+        in_geo_e = shape_encoder.get_inputs()[2].name
+        in_tpl_e = shape_encoder.get_inputs()[3].name
+        out_shape_feature = shape_encoder.get_outputs()[0].name
+        shape_feature = shape_encoder.run(
+            [out_shape_feature],
+            {
+                in_batch: batch, in_pos: pos,
+                in_geo_e: geo_edge_index, in_tpl_e: tpl_edge_index
+            })[0]
+    shape_feature = np.repeat(shape_feature, len(pairs_batch[pairs_batch == 0]), axis=0)
 
-    1 / 0
+    pairs = pairs.astype(np.int64)
+    joints_pair = np.concatenate(
+        (joints[pairs[:, 0]], joints[pairs[:, 1]], pair_attr[:, :-1]), axis=1)
 
-    with torch.no_grad():
-        connect_prob, _ = bone_pred_net(data, permute_joints=False)
-        connect_prob = torch.sigmoid(connect_prob)
+    # expand_joint_feature
+    expand_joint_feature = bone_net['expand_joint_feature']
+    if not args.onnx:
+        pair_feature = expand_joint_feature.predict({
+            'joints_pair': joints_pair,
+        })[0]
+    else:
+        in_x = expand_joint_feature.get_inputs()[0].name
+        out_x = expand_joint_feature.get_outputs()[0].name
+        pair_feature = expand_joint_feature.run(
+            [out_x], {in_x: joints_pair})[0]
 
-    pair_idx = data.pairs.long().data.cpu().numpy()
-    prob_matrix = np.zeros((len(data.joints), len(data.joints)))
-    prob_matrix[pair_idx[:, 0], pair_idx[:, 1]] = connect_prob.data.cpu().numpy().squeeze()
+    pair_feature = np.concatenate((shape_feature, joint_feature, pair_feature), axis=1)
+
+    # mix_transform
+    mix_transform = bone_net['mix_transform']
+    if not args.onnx:
+        pre_label = mix_transform.predict({
+            'pair_feature': pair_feature,
+        })[0]
+    else:
+        in_x = mix_transform.get_inputs()[0].name
+        out_x = mix_transform.get_outputs()[0].name
+        pre_label = mix_transform.run(
+            [out_x], {in_x: pair_feature})[0]
+
+    connect_prob = pre_label
+    connect_prob = sigmoid(connect_prob)
+
+    pair_idx = pairs
+    prob_matrix = np.zeros((len(joints), len(joints)))
+    prob_matrix[pair_idx[:, 0], pair_idx[:, 1]] = connect_prob.squeeze()
     prob_matrix = prob_matrix + prob_matrix.transpose()
     cost_matrix = -np.log(prob_matrix + 1e-10)
     cost_matrix = increase_cost_for_outside_bone(cost_matrix, joints, vox)
 
-    pred_skel = Info()
+    pred_skel = RigInfo()
     parent, key = primMST_symmetry(cost_matrix, root_id, joints)
     for i in range(len(parent)):
         if parent[i] == -1:
@@ -401,33 +540,30 @@ def predict_skeleton(
             break
     loadSkel_recur(pred_skel.root, i, None, joints, parent)
     pred_skel.joint_pos = pred_skel.get_joint_dict()
-    # show_mesh_vox(mesh_filename, vox, pred_skel.root)
 
-    try:
-        img = show_obj_skel(mesh_filename, pred_skel.root)
-    except:
-        print("Visualization is not supported on headless servers. Please consider other headless rendering methods.")
     return pred_skel
 
 
 def predict_skinning(
-        input_data, pred_skel, skin_pred_net, surface_geodesic, mesh_filename, subsampling=False):
+        data, pred_skel, skin_net, surface_geodesic,
+        subsampling=False, decimation=3000, sampling=1500):
     """
     predict skinning
-    :param input_data: wrapped input data
+    :param data: wrapped input data
     :param pred_skel: predicted skeleton
-    :param skin_pred_net: network to predict skinning weights
+    :param skin_net: network to predict skinning weights
     :param surface_geodesic: geodesic distance matrix of all vertices
     :param mesh_filename: mesh filename
     :return: predicted rig with skinning weights information
     """
-
-    global device, output_folder
     num_nearest_bone = 5
     bones, bone_names, bone_isleaf = get_bones(pred_skel)
-    mesh_v = input_data.pos.data.cpu().numpy()
+    mesh_v = data['pos']
+
     print("     calculating volumetric geodesic distance from vertices to bone. This step takes some time...")
-    geo_dist = calc_geodesic_matrix(bones, mesh_v, surface_geodesic, mesh_filename, subsampling=subsampling)
+    geo_dist = calc_geodesic_matrix(
+        bones, mesh_v, surface_geodesic,
+        use_sampling=subsampling, decimation=decimation, sampling=sampling)
     input_samples = []  # joint_pos (x, y, z), (bone_id, 1/D)*5
     loss_mask = []
     skin_nn = []
@@ -458,14 +594,30 @@ def predict_skinning(
     skin_input = np.concatenate(input_samples, axis=0)
     loss_mask = np.concatenate(loss_mask, axis=0)
     skin_nn = np.concatenate(skin_nn, axis=0)
-    skin_input = torch.from_numpy(skin_input).float()
-    input_data.skin_input = skin_input
-    input_data.to(device)
+    data['skin_input'] = skin_input
 
-    skin_pred = skin_pred_net(data)
+    pos, tpl_edge_index, geo_edge_index, batch = \
+        data['pos'], data['tpl_edge_index'], data['geo_edge_index'], data['batch']
+    if not args.onnx:
+        skin_pred = skin_net.predict({
+            'batch': batch, 'pos': pos, 'geo_edge_index': geo_edge_index, 'tpl_edge_index': tpl_edge_index,
+            'sample': skin_input.astype(np.float32)
+        })[0]
+    else:
+        in_batch = skin_net.get_inputs()[0].name
+        in_pos = skin_net.get_inputs()[1].name
+        in_geo_e = skin_net.get_inputs()[2].name
+        in_tpl_e = skin_net.get_inputs()[3].name
+        in_sample = skin_net.get_inputs()[4].name
+        out = skin_net.get_outputs()[0].name
+        skin_pred = skin_net.run(
+            [out],
+            {
+                in_batch: batch, in_pos: pos, in_geo_e: geo_edge_index, in_tpl_e: tpl_edge_index,
+                in_sample: skin_input.astype(np.float32)
+            })[0]
 
-    skin_pred = torch.softmax(skin_pred, dim=1)
-    skin_pred = skin_pred.data.cpu().numpy()
+    skin_pred = softmax(skin_pred, axis=1)
     skin_pred = skin_pred * loss_mask
 
     skin_nn = skin_nn[:, 0:num_nearest_bone]
@@ -473,22 +625,22 @@ def predict_skinning(
     for v in range(len(skin_pred)):
         for nn_id in range(len(skin_nn[v, :])):
             skin_pred_full[v, skin_nn[v, nn_id]] = skin_pred[v, nn_id]
+
     print("     filtering skinning prediction")
-    tpl_e = input_data.tpl_edge_index.data.cpu().numpy()
+    tpl_e = tpl_edge_index
     skin_pred_full = post_filter(skin_pred_full, tpl_e, num_ring=1)
     skin_pred_full[skin_pred_full < np.max(skin_pred_full, axis=1, keepdims=True) * 0.35] = 0.0
     skin_pred_full = skin_pred_full / (skin_pred_full.sum(axis=1, keepdims=True) + 1e-10)
     skel_res = assemble_skel_skin(pred_skel, skin_pred_full)
+
     return skel_res
 
 
-def recognize_from_image(mesh_filename, net_info):
+def recognize_from_obj(
+        mesh_filename, net_info,
+        downsample_skinning=True, decimation=3000, sampling=1500):
     # prepare input data
     data, vox, surface_geodesic, translation_normalize, scale_normalize = create_single_data(mesh_filename)
-    file_normalized = mesh_filename.replace(".obj", "_normalized.obj")
-
-    # inference
-    print('Start inference...')
 
     # data = {}
     # data["batch"] = np.load('data_batch.npy')
@@ -500,20 +652,25 @@ def recognize_from_image(mesh_filename, net_info):
     threshold = 0.75e-5
     bandwidth = 0.045
     data = predict_joints(
-        data, vox, net_info['jointNet'], threshold,
-        bandwidth=bandwidth, mesh_filename=file_normalized)
+        data, vox, net_info['jointNet'], threshold, bandwidth=bandwidth)
 
     print("predicting connectivity")
-    pred_skeleton = predict_skeleton(
-        data, vox, net_info['rootNet'], net_info['boneNet'], mesh_filename=file_normalized)
+    pred_skel = predict_skeleton(
+        data, vox, net_info['rootNet'], net_info['boneNet'])
 
     print("predicting skinning")
     pred_rig = predict_skinning(
-        data, pred_skeleton, net_info['skinNet'], surface_geodesic,
-        mesh_filename=file_normalized, subsampling=downsample_skinning)
+        data, pred_skel, net_info['skinNet'], surface_geodesic,
+        subsampling=downsample_skinning, decimation=decimation, sampling=sampling)
 
     # here we reverse the normalization to the original scale and position
     pred_rig.normalize(scale_normalize, -translation_normalize)
+
+    try:
+        img = show_obj_skel(mesh_filename, pred_skel.root)
+        cv2.imwrite(args.savepath, img)
+    except:
+        print("Visualization is not supported on headless servers. Please consider other headless rendering methods.")
 
     # here we use remeshed mesh
     print("Saving result")
@@ -576,7 +733,7 @@ def main():
         }
         net_info['skinNet'] = onnxruntime.InferenceSession(WEIGHT_SKINNET_PATH)
 
-    recognize_from_image(args.input, net_info)
+    recognize_from_obj(args.input, net_info)
 
 
 if __name__ == '__main__':
