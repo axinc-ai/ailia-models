@@ -93,29 +93,24 @@ def recognize_from_image():
         print('BENCHMARK mode')
         for _ in range(5):
             start = int(round(time.time() * 1000))
-            # # Palm detection
-            # preds = detector.predict([input_data])
-            # detections = fut.detector_postprocess(preds)
+            # Face detection
+            preds = detector.predict([input_data])
+            detections = fut.detector_postprocess(preds)
 
-            # # Hand landmark estimation
-            # presence = [0, 0] # [left, right]
-            # if detections[0].size != 0:
-            #     imgs, affines, _ = fut.estimator_preprocess(src_img, detections, scale, pad)
-            #     estimator.set_input_shape(imgs.shape)
-            #     detections, confidences = estimator.predict([imgs])
+            # Face landmark estimation
+            if detections[0].size != 0:
+                imgs, affines, box = fut.estimator_preprocess(src_img[:,:,::-1], detections, scale, pad)
+                draw_roi(src_img, box)
+                estimator.set_input_shape(imgs.shape)
+                landmarks, confidences = estimator.predict([imgs])
+                normalized_landmarks = landmarks / 192.0
 
-            #     # postprocessing
-            #     # detections[0:-1:3] *= self.x_scale
-            #     # detections[1:-1:3] *= self.y_scale
-            #     landmarks = fut.denormalize_landmarks(detections, affines)
-            #     for i in range(len(flags)):
-            #         landmark, flag, handed = landmarks[i], flags[i], 1 - handedness[i]
-            #         if flag > 0.75:
-            #             if handed < 0.5: # Right handedness when not flipped camera input
-            #                 presence[0] = 1
-            #             else:
-            #                 presence[1] = 1
-            #             draw_landmarks(src_img, landmark[:,:2], fut.HAND_CONNECTIONS, size=2)
+                # postprocessing
+                landmarks = fut.denormalize_landmarks(normalized_landmarks, affines)
+                for i in range(len(landmarks)):
+                    landmark, confidence = landmarks[i], confidences[i]
+                    # if confidence > 0: # Can be > 1, no idea what it represents
+                    draw_landmarks(src_img, landmark[:,:2], size=1)
             end = int(round(time.time() * 1000))
             print(f'\tailia processing time {end - start} ms')
     else:
@@ -168,42 +163,30 @@ def recognize_from_video():
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
 
-        img256, _, scale, pad = fut.resize_pad(frame[:,:,::-1])
-        input_data = img256.astype('float32') / 255.
+        _, img128, scale, pad = fut.resize_pad(frame[:,:,::-1])
+        input_data = img128.astype('float32') / 127.5 - 1.0
         input_data = np.expand_dims(np.moveaxis(input_data, -1, 0), 0)
 
         # inference
-        # Palm detection
+        # Face detection
         preds = detector.predict([input_data])
         detections = fut.detector_postprocess(preds)
 
-        # Hand landmark estimation
-        presence = [0, 0] # [left, right]
+        # Face landmark estimation
         if detections[0].size != 0:
-            img, affine, _ = fut.estimator_preprocess(frame, detections, scale, pad)
-            estimator.set_input_shape(img.shape)
-            flags, handedness, normalized_landmarks = estimator.predict([img])
+            imgs, affines, box = fut.estimator_preprocess(frame[:,:,::-1], detections, scale, pad)
+            draw_roi(frame, box)
+            estimator.set_input_shape(imgs.shape)
+            landmarks, confidences = estimator.predict([imgs])
+            normalized_landmarks = landmarks / 192.0
 
             # postprocessing
-            landmarks = fut.denormalize_landmarks(normalized_landmarks, affine)
-            for i in range(len(flags)):
-                landmark, flag, handed = landmarks[i], flags[i], handedness[i]
-                if flag > 0.75:
-                    if handed > 0.5:
-                        presence[0] = 1
-                    else:
-                        presence[1] = 1
-                    draw_landmarks(frame, landmark[:,:2], fut.HAND_CONNECTIONS, size=2)
+            landmarks = fut.denormalize_landmarks(normalized_landmarks, affines)
+            for i in range(len(landmarks)):
+                landmark, confidence = landmarks[i], confidences[i]
+                # if confidence > 0: # Can be > 1, no idea what it represents
+                draw_landmarks(frame, landmark[:,:2], size=1)
 
-        if presence[0] and presence[1]:
-            text = 'Left and right'
-        elif presence[0]:
-            text = 'Left'
-        elif presence[1]:
-            text = 'Right'
-        else:
-            text = 'No hand'
-        cv2.putText(frame, text, (8, 24), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 255), 2)
         cv2.imshow('frame', frame)
 
         # save results
