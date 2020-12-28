@@ -271,6 +271,8 @@ def create_single_data(mesh_filaname, vox_file=None):
     :param mesh_filaname: name of the input mesh
     :return: wrapped data, voxelized mesh, and geodesic distance matrix of all vertices
     """
+    print("creating data for model {:s}".format(mesh_filaname))
+
     mesh = o3d.io.read_triangle_mesh(mesh_filaname)
     mesh.compute_triangle_normals()
     mesh_v = np.asarray(mesh.vertices)
