@@ -1,7 +1,9 @@
 import sys, os
 import time
-import subprocess
+import shutil
 import tempfile
+import subprocess
+import traceback
 
 import numpy as np
 from scipy.sparse import lil_matrix
@@ -263,7 +265,7 @@ def calc_surface_geodesic(mesh):
     return surface_geodesic
 
 
-def create_single_data(mesh_filaname):
+def create_single_data(mesh_filaname, vox_file=None):
     """
     create input data for the network. The data is wrapped by Data structure in pytorch-geometric library
     :param mesh_filaname: name of the input mesh
@@ -304,25 +306,39 @@ def create_single_data(mesh_filaname):
 
     # batch
     batch = np.zeros(len(v), dtype=np.int64)
-    # voxel
-    fo_normalized = tempfile.NamedTemporaryFile(suffix='_normalized.obj')
-    fo_normalized.close()
 
-    o3d.io.write_triangle_mesh(fo_normalized.name, mesh_normalized)
+    if vox_file is None:
+        # voxel
+        fo_normalized = tempfile.NamedTemporaryFile(suffix='_normalized.obj')
+        fo_normalized.close()
+        path = fo_normalized.name
+        vox_file = os.path.splitext(path)[0] + '.binvox'
 
-    binvox_exe = os.path.join("binvox")
-    if sys.platform.startswith("win"):
-        binvox_exe += ".exe"
+        o3d.io.write_triangle_mesh(path, mesh_normalized)
+        try:
+            if sys.platform.startswith("win"):
+                binvox_exe = "binvox.exe"
+            else:
+                binvox_exe = "./binvox"
 
-    if not os.path.isfile(binvox_exe):
-        os.unlink(fo_normalized.name)
-        raise FileNotFoundError("binvox executable not found in {0}, please check RigNet path in the addon preferences")
+            if not os.path.isfile(binvox_exe):
+                raise FileNotFoundError(
+                    "binvox executable not found in {0}, please check RigNet path in the addon preferences")
 
-    subprocess.call([binvox_exe, "-d", "88", fo_normalized.name])
-    with open(os.path.splitext(fo_normalized.name)[0] + '.binvox', 'rb') as fvox:
-        vox = binvox_rw.read_as_3d_array(fvox)
-
-    os.unlink(fo_normalized.name)
+            ret = subprocess.call([binvox_exe, "-d", "88", path])
+            if ret == 0:
+                with open(vox_file, 'rb') as fvox:
+                    vox = binvox_rw.read_as_3d_array(fvox)
+            else:
+                no_file = mesh_filaname.replace('.obj', '_normalized.obj')
+                print("Failed to execute binvox, normalized file saved to %s" % no_file)
+                shutil.copyfile(path, no_file)
+                sys.exit(-1)
+        finally:
+            os.unlink(path)
+    else:
+        with open(vox_file, 'rb') as fvox:
+            vox = binvox_rw.read_as_3d_array(fvox)
 
     data = dict(
         batch=batch, pos=v[:, 0:3],

@@ -5,8 +5,11 @@ import itertools as it
 import numpy as np
 from scipy.special import softmax
 import cv2
+
 import torch
-from torch_geometric.nn import fps, radius, knn_interpolate
+from torch_geometric.nn import fps
+from torch_geometric.nn import radius
+from torch_geometric.nn import knn_interpolate
 
 import ailia
 
@@ -72,26 +75,29 @@ parser = argparse.ArgumentParser(
     description='RigNet model'
 )
 parser.add_argument(
-    '-i', '--input', metavar='mesh_file',
+    '-i', '--input', metavar='FILE',
     default=INPUT_PATH,
-    help='The input image path.'
-)
-parser.add_argument(
-    '-v', '--video', metavar='VIDEO',
-    default=None,
-    help='The input video path. ' +
-         'If the VIDEO argument is set to 0, the webcam input will be used.'
+    help='The input .obj path.'
 )
 parser.add_argument(
     '-s', '--savepath', metavar='SAVE_IMAGE_PATH', default=SAVE_IMAGE_PATH,
     help='Save path for the output image.'
 )
-# parser.add_argument(
-#     '-b', '--benchmark',
-#     action='store_true',
-#     help='Running the inference on the same input 5 times ' +
-#          'to measure execution performance. (Cannot be used in video mode)'
-# )
+parser.add_argument(
+    '-t', '--threshold', metavar='VAL',
+    default=0.75e-5,
+    help='default is %.08f.' % 0.75e-5,
+)
+parser.add_argument(
+    '-b', '--bandwidth', metavar='VAL',
+    default=0.045,
+    help='default is %f.' % 0.045,
+)
+parser.add_argument(
+    '--vox_file', metavar='FILE',
+    default=None,
+    help='The input .binvox path'
+)
 parser.add_argument(
     '--onnx',
     action='store_true',
@@ -106,6 +112,32 @@ args = parser.parse_args()
 
 def sigmoid(a):
     return 1 / (1 + np.exp(-a))
+
+
+def geometric_fps(src, batch=None, ratio=None):
+    src = torch.from_numpy(src)
+    batch = torch.from_numpy(batch)
+    res = fps(src, batch=batch, ratio=ratio)
+    return res.numpy()
+
+
+def geometric_radius(x, y, r, batch_x=None, batch_y=None, max_num_neighbors=32):
+    x = torch.from_numpy(x)
+    y = torch.from_numpy(y)
+    batch_x = torch.from_numpy(batch_x) if batch_x is not None else None
+    batch_y = torch.from_numpy(batch_y) if batch_y is not None else None
+    row, col = radius(x, y, r, batch_x, batch_y, max_num_neighbors=max_num_neighbors)
+    return row.numpy(), col.numpy()
+
+
+def geometric_knn_interpolate(x, pos_x, pos_y, batch_x=None, batch_y=None, k=3):
+    x = torch.from_numpy(x)
+    pos_x = torch.from_numpy(pos_x)
+    pos_y = torch.from_numpy(pos_y)
+    batch_x = torch.from_numpy(batch_x)
+    batch_y = torch.from_numpy(batch_y)
+    res = knn_interpolate(x, pos_x, pos_y, batch_x, batch_y, k)
+    return res.numpy()
 
 
 # ======================
@@ -242,11 +274,8 @@ def getInitId(data, root_net):
 
     # sa1_joint
     ratio, r = 0.999, 0.4
-    idx = fps(torch.from_numpy(pos), torch.from_numpy(batch), ratio=ratio).numpy()
-    row, col = radius(
-        torch.from_numpy(pos), torch.from_numpy(pos[idx]), r,
-        torch.from_numpy(batch), torch.from_numpy(batch[idx]),
-        max_num_neighbors=64)
+    idx = geometric_fps(pos, batch, ratio=ratio)
+    row, col = geometric_radius(pos, pos[idx], r, batch, batch[idx], max_num_neighbors=64)
     edge_index = np.stack([col, row], axis=0)
     sa1_module = root_net['sa1_module']
     if not args.onnx:
@@ -269,11 +298,8 @@ def getInitId(data, root_net):
 
     # sa2_joint
     ratio, r = 0.33, 0.6
-    idx = fps(torch.from_numpy(pos), torch.from_numpy(batch), ratio=ratio).numpy()
-    row, col = radius(
-        torch.from_numpy(pos), torch.from_numpy(pos[idx]), r,
-        torch.from_numpy(batch), torch.from_numpy(batch[idx]),
-        max_num_neighbors=64)
+    idx = geometric_fps(pos, batch, ratio=ratio)
+    row, col = geometric_radius(pos, pos[idx], r, batch, batch[idx], max_num_neighbors=64)
     edge_index = np.stack([col, row], axis=0)
     sa2_module = root_net['sa2_module']
     if not args.onnx:
@@ -317,10 +343,7 @@ def getInitId(data, root_net):
     # fp3_joint
     x, pos, batch = sa3_joint
     x_skip, pos_skip, batch_skip = sa2_joint
-    x = knn_interpolate(
-        torch.from_numpy(x), torch.from_numpy(pos),
-        torch.from_numpy(pos_skip), torch.from_numpy(batch),
-        torch.from_numpy(batch_skip), k=1).numpy()
+    x = geometric_knn_interpolate(x, pos, pos_skip, batch, batch_skip, k=1)
     x = np.concatenate([x, x_skip], axis=1)
     fp3_module = root_net['fp3_module']
     if not args.onnx:
@@ -333,10 +356,7 @@ def getInitId(data, root_net):
 
     # fp2_joint
     x_skip, pos_skip, batch_skip = sa1_joint
-    x = knn_interpolate(
-        torch.from_numpy(x), torch.from_numpy(pos),
-        torch.from_numpy(pos_skip), torch.from_numpy(batch),
-        torch.from_numpy(batch_skip), k=3).numpy()
+    x = geometric_knn_interpolate(x, pos, pos_skip, batch, batch_skip, k=3)
     x = np.concatenate([x, x_skip], axis=1)
     fp2_module = root_net['fp2_module']
     if not args.onnx:
@@ -349,10 +369,7 @@ def getInitId(data, root_net):
 
     # fp1_joint
     x_skip, pos_skip, batch_skip = sa0_joint
-    x = knn_interpolate(
-        torch.from_numpy(x), torch.from_numpy(pos),
-        torch.from_numpy(pos_skip), torch.from_numpy(batch),
-        torch.from_numpy(batch_skip), k=3).numpy()
+    x = geometric_knn_interpolate(x, pos, pos_skip, batch, batch_skip, k=3)
     x = np.concatenate([x, x_skip], axis=1)
     fp1_module = root_net['fp1_module']
     if not args.onnx:
@@ -398,11 +415,8 @@ def predict_skeleton(
 
     # sa1_joint
     ratio, r = 0.999, 0.4
-    idx = fps(torch.from_numpy(pos), torch.from_numpy(batch), ratio=ratio).numpy()
-    row, col = radius(
-        torch.from_numpy(pos), torch.from_numpy(pos[idx]), r,
-        torch.from_numpy(batch), torch.from_numpy(batch[idx]),
-        max_num_neighbors=64)
+    idx = geometric_fps(pos, batch, ratio=ratio)
+    row, col = geometric_radius(pos, pos[idx], r, batch, batch[idx], max_num_neighbors=64)
     edge_index = np.stack([col, row], axis=0)
     sa1_module = bone_net['sa1_module']
     if not args.onnx:
@@ -423,11 +437,8 @@ def predict_skeleton(
 
     # sa2_joint
     ratio, r = 0.33, 0.6
-    idx = fps(torch.from_numpy(pos), torch.from_numpy(batch), ratio=ratio).numpy()
-    row, col = radius(
-        torch.from_numpy(pos), torch.from_numpy(pos[idx]), r,
-        torch.from_numpy(batch), torch.from_numpy(batch[idx]),
-        max_num_neighbors=64)
+    idx = geometric_fps(pos, batch, ratio=ratio)
+    row, col = geometric_radius(pos, pos[idx], r, batch, batch[idx], max_num_neighbors=64)
     edge_index = np.stack([col, row], axis=0)
     sa2_module = bone_net['sa2_module']
     if not args.onnx:
@@ -640,19 +651,11 @@ def recognize_from_obj(
         mesh_filename, net_info,
         downsample_skinning=True, decimation=3000, sampling=1500):
     # prepare input data
-    data, vox, surface_geodesic, translation_normalize, scale_normalize = create_single_data(mesh_filename)
-
-    # data = {}
-    # data["batch"] = np.load('data_batch.npy')
-    # data["pos"] = np.load('data_pos.npy')
-    # data["geo_edge_index"] = np.load('data_geo_edge_index.npy')
-    # data["tpl_edge_index"] = np.load('data_tpl_edge_index.npy')
+    data, vox, surface_geodesic, translation_normalize, scale_normalize = create_single_data(mesh_filename, args.vox_file)
 
     print("predicting joints")
-    threshold = 0.75e-5
-    bandwidth = 0.045
     data = predict_joints(
-        data, vox, net_info['jointNet'], threshold, bandwidth=bandwidth)
+        data, vox, net_info['jointNet'], args.threshold, bandwidth=args.bandwidth)
 
     print("predicting connectivity")
     pred_skel = predict_skeleton(
@@ -681,11 +684,42 @@ def recognize_from_obj(
 
 def main():
     # model files check and download
-    # check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
+    print('=== JOINETNET ===')
+    check_and_download_models(WEIGHT_JOINTNET_PATH, MODEL_JOINTNET_PATH, REMOTE_PATH)
+    print('=== ROOTNET (1/8) ===')
+    check_and_download_models(WEIGHT_ROOTNET_SE_PATH, MODEL_ROOTNET_SE_PATH, REMOTE_PATH)
+    print('=== ROOTNET (2/8) ===')
+    check_and_download_models(WEIGHT_ROOTNET_SA1_PATH, MODEL_ROOTNET_SA1_PATH, REMOTE_PATH)
+    print('=== ROOTNET (3/8) ===')
+    check_and_download_models(WEIGHT_ROOTNET_SA2_PATH, MODEL_ROOTNET_SA2_PATH, REMOTE_PATH)
+    print('=== ROOTNET (4/8) ===')
+    check_and_download_models(WEIGHT_ROOTNET_SA3_PATH, MODEL_ROOTNET_SA3_PATH, REMOTE_PATH)
+    print('=== ROOTNET (5/8) ===')
+    check_and_download_models(WEIGHT_ROOTNET_FP3_PATH, MODEL_ROOTNET_FP3_PATH, REMOTE_PATH)
+    print('=== ROOTNET (6/8) ===')
+    check_and_download_models(WEIGHT_ROOTNET_FP2_PATH, MODEL_ROOTNET_FP2_PATH, REMOTE_PATH)
+    print('=== ROOTNET (7/8) ===')
+    check_and_download_models(WEIGHT_ROOTNET_FP1_PATH, MODEL_ROOTNET_FP1_PATH, REMOTE_PATH)
+    print('=== ROOTNET (8/8) ===')
+    check_and_download_models(WEIGHT_ROOTNET_BL_PATH, MODEL_ROOTNET_BL_PATH, REMOTE_PATH)
+    print('=== BONENET (1/6) ===')
+    check_and_download_models(WEIGHT_BONENET_SA1_PATH, MODEL_BONENET_SA1_PATH, REMOTE_PATH)
+    print('=== BONENET (2/6) ===')
+    check_and_download_models(WEIGHT_BONENET_SA2_PATH, MODEL_BONENET_SA2_PATH, REMOTE_PATH)
+    print('=== BONENET (3/6) ===')
+    check_and_download_models(WEIGHT_BONENET_SA3_PATH, MODEL_BONENET_SA3_PATH, REMOTE_PATH)
+    print('=== BONENET (4/6) ===')
+    check_and_download_models(WEIGHT_BONENET_SE_PATH, MODEL_BONENET_SE_PATH, REMOTE_PATH)
+    print('=== BONENET (5/6) ===')
+    check_and_download_models(WEIGHT_BONENET_EF_PATH, MODEL_BONENET_EF_PATH, REMOTE_PATH)
+    print('=== BONENET (6/6) ===')
+    check_and_download_models(WEIGHT_BONENET_MT_PATH, MODEL_BONENET_MT_PATH, REMOTE_PATH)
+    print('=== SKINNET ===')
+    check_and_download_models(WEIGHT_SKINNET_PATH, MODEL_SKINNET_PATH, REMOTE_PATH)
 
     # load model
-    # env_id = ailia.get_gpu_environment_id()
-    # print(f'env_id: {env_id}')
+    env_id = ailia.get_gpu_environment_id()
+    print(f'env_id: {env_id}')
 
     # initialize
     net_info = {}
