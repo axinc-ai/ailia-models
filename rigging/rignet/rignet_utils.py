@@ -331,9 +331,12 @@ def create_single_data(mesh_filaname, vox_file=None):
                     vox = binvox_rw.read_as_3d_array(fvox)
             else:
                 no_file = mesh_filaname.replace('.obj', '_normalized.obj')
-                print("Failed to execute binvox, normalized file saved to %s" % no_file)
                 shutil.copyfile(path, no_file)
-                sys.exit(-1)
+                print("===============")
+                print("The normalized file is saved to '%s'." % no_file)
+                print("The binvox file should be created by run 'binvox -d 88 %s'." % no_file)
+                print("===============")
+                raise RuntimeError("failed to execute binvox")
         finally:
             os.unlink(path)
     else:

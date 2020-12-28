@@ -1,6 +1,7 @@
 import sys
 import argparse
 import itertools as it
+import traceback
 
 import numpy as np
 from scipy.special import softmax
@@ -651,7 +652,8 @@ def recognize_from_obj(
         mesh_filename, net_info,
         downsample_skinning=True, decimation=3000, sampling=1500):
     # prepare input data
-    data, vox, surface_geodesic, translation_normalize, scale_normalize = create_single_data(mesh_filename, args.vox_file)
+    data, vox, surface_geodesic, translation_normalize, scale_normalize = \
+        create_single_data(mesh_filename, args.vox_file)
 
     print("predicting joints")
     data = predict_joints(
@@ -673,6 +675,7 @@ def recognize_from_obj(
         img = show_obj_skel(mesh_filename, pred_skel.root)
         cv2.imwrite(args.savepath, img)
     except:
+        traceback.print_exc()
         print("Visualization is not supported on headless servers. Please consider other headless rendering methods.")
 
     # here we use remeshed mesh
@@ -718,12 +721,11 @@ def main():
     check_and_download_models(WEIGHT_SKINNET_PATH, MODEL_SKINNET_PATH, REMOTE_PATH)
 
     # load model
-    env_id = ailia.get_gpu_environment_id()
-    print(f'env_id: {env_id}')
-
-    # initialize
     net_info = {}
     if not args.onnx:
+        env_id = ailia.get_gpu_environment_id()
+        print(f'env_id: {env_id}')
+
         net_info['jointNet'] = ailia.Net(MODEL_JOINTNET_PATH, WEIGHT_JOINTNET_PATH, env_id=env_id)
         net_info['rootNet'] = {
             'shape_encoder': ailia.Net(MODEL_ROOTNET_SE_PATH, WEIGHT_ROOTNET_SE_PATH, env_id=env_id),
