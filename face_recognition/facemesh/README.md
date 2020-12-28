@@ -81,6 +81,6 @@ ONNX opset = 10
 
 ## Netron
 
-<!-- [blazehand.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/blazehand/blazehand.onnx.prototxt) -->
+[facemesh.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/facemesh/facemesh.onnx.prototxt)
 
 

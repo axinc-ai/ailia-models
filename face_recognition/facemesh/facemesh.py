@@ -165,9 +165,10 @@ def recognize_from_video():
 
     while(True):
         ret, frame = capture.read()
-        frame = np.ascontiguousarray(frame[:,::-1,:])
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
+
+        frame = np.ascontiguousarray(frame[:,::-1,:])
 
         _, img128, scale, pad = fut.resize_pad(frame[:,:,::-1])
         input_data = img128.astype('float32') / 127.5 - 1.0
