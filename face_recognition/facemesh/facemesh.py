@@ -30,6 +30,12 @@ IMAGE_WIDTH = 128
 parser = get_base_parser(
     'Face Mesh, an on-device real-time face recognition.', IMAGE_PATH, SAVE_IMAGE_PATH,
 )
+parser.add_argument(
+    '-n', '--normal',
+    action='store_true',
+    help='By default, the optimized model is used, but with this option, ' +
+    'you can switch to the normal (not optimized) model'
+)
 args = update_parser(parser)
 
 
@@ -38,16 +44,16 @@ args = update_parser(parser)
 # ======================
 DETECTION_MODEL_NAME = 'blazeface'
 LANDMARK_MODEL_NAME = 'facemesh'
-# if args.normal:
-DETECTION_WEIGHT_PATH = f'{DETECTION_MODEL_NAME}.onnx'
-DETECTION_MODEL_PATH = f'{DETECTION_MODEL_NAME}.onnx.prototxt'
-LANDMARK_WEIGHT_PATH = f'{LANDMARK_MODEL_NAME}.onnx'
-LANDMARK_MODEL_PATH = f'{LANDMARK_MODEL_NAME}.onnx.prototxt'
-# else:
-    # DETECTION_WEIGHT_PATH = f'{DETECTION_MODEL_NAME}.opt.onnx'
-    # DETECTION_MODEL_PATH = f'{DETECTION_MODEL_NAME}.opt.onnx.prototxt'
-    # LANDMARK_WEIGHT_PATH = f'{LANDMARK_MODEL_NAME}.opt.onnx'
-    # LANDMARK_MODEL_PATH = f'{LANDMARK_MODEL_NAME}.opt.onnx.prototxt'
+if args.normal:
+    DETECTION_WEIGHT_PATH = f'{DETECTION_MODEL_NAME}.onnx'
+    DETECTION_MODEL_PATH = f'{DETECTION_MODEL_NAME}.onnx.prototxt'
+    LANDMARK_WEIGHT_PATH = f'{LANDMARK_MODEL_NAME}.onnx'
+    LANDMARK_MODEL_PATH = f'{LANDMARK_MODEL_NAME}.onnx.prototxt'
+else:
+    DETECTION_WEIGHT_PATH = f'{DETECTION_MODEL_NAME}.opt.onnx'
+    DETECTION_MODEL_PATH = f'{DETECTION_MODEL_NAME}.opt.onnx.prototxt'
+    LANDMARK_WEIGHT_PATH = f'{LANDMARK_MODEL_NAME}.opt.onnx'
+    LANDMARK_MODEL_PATH = f'{LANDMARK_MODEL_NAME}.opt.onnx.prototxt'
 DETECTION_REMOTE_PATH = f'https://storage.googleapis.com/ailia-models/{DETECTION_MODEL_NAME}/'
 LANDMARK_REMOTE_PATH = f'https://storage.googleapis.com/ailia-models/{LANDMARK_MODEL_NAME}/'
 
