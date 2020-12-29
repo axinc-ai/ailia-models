@@ -309,8 +309,8 @@ def create_single_data(mesh_filaname, vox_file=None):
     # batch
     batch = np.zeros(len(v), dtype=np.int64)
 
+    # voxel
     if vox_file is None:
-        # voxel
         fo_normalized = tempfile.NamedTemporaryFile(suffix='_normalized.obj')
         fo_normalized.close()
         path = fo_normalized.name
