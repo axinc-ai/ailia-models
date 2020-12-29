@@ -86,12 +86,12 @@ parser.add_argument(
 )
 parser.add_argument(
     '-t', '--threshold', metavar='VAL',
-    default=0.75e-5,
+    default=0.75e-5, type=float,
     help='default is %.08f.' % 0.75e-5,
 )
 parser.add_argument(
     '-b', '--bandwidth', metavar='VAL',
-    default=0.045,
+    default=0.045, type=float,
     help='default is %f.' % 0.045,
 )
 parser.add_argument(
