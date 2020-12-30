@@ -700,7 +700,7 @@ def calc_pts2bone_visible_mat(mesh, origins, ends):
 
 def calc_geodesic_matrix(
         bones, mesh_v, surface_geodesic,
-        use_sampling=False, decimation=3000, sampling=1500):
+        use_sampling=False, decimation=3000, sampling=1500, mesh_normalized=None):
     """
     calculate volumetric geodesic distance from vertices to each bones
     :param bones: B*6 numpy array where each row stores the starting and ending joint position of a bone
@@ -711,7 +711,7 @@ def calc_geodesic_matrix(
     """
 
     if use_sampling:
-        mesh0 = MESH_NORMALIZED
+        mesh0 = mesh_normalized if mesh_normalized else MESH_NORMALIZED
         mesh0 = mesh0.simplify_quadric_decimation(decimation)
 
         fo_simplified = tempfile.NamedTemporaryFile(suffix='_simplified.obj')
@@ -726,7 +726,7 @@ def calc_geodesic_matrix(
     else:
         fo = tempfile.NamedTemporaryFile(suffix='.obj')
         fo.close()
-        o3d.io.write_triangle_mesh(fo.name, MESH_NORMALIZED)
+        o3d.io.write_triangle_mesh(fo.name, mesh_normalized if mesh_normalized else MESH_NORMALIZED)
         mesh_trimesh = trimesh.load(fo.name)
         os.unlink(fo.name)
         subsamples = mesh_v
