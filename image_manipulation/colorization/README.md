@@ -45,5 +45,5 @@ ONNX opset=10
 
 ## Netron
 
-[colorizer.onnx.prototxt](https://storage.googleapis.com/ailia-models/colorization/colorizer.onnx.prototxt)
+[colorizer.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/colorization/colorizer.onnx.prototxt)
 

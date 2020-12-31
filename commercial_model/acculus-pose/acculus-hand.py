@@ -2,15 +2,15 @@ import sys
 import argparse
 
 import cv2
+import numpy as np
 
 import ailia
-
-import numpy as np
 
 # import original modules
 sys.path.append('../../util')
 from model_utils import check_and_download_models  # noqa: E402
-from webcamera_utils import get_capture  # noqa: E402C
+from webcamera_utils import get_capture, get_writer, \
+    calc_adjust_fsize  # noqa: E402
 
 
 # ======================
@@ -19,6 +19,8 @@ from webcamera_utils import get_capture  # noqa: E402C
 WEIGHT_PATH = 'yolov3-hand.opt.onnx'
 MODEL_PATH = 'yolov3-hand.opt.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/yolov3-hand/'
+
+SAVE_PATH = ''
 
 HAND_WEIGHT_PATH = 'hand_obf.caffemodel'
 HAND_MODEL_PATH = 'hand_obf.prototxt'
@@ -33,15 +35,20 @@ IOU = 0.45
 # ======================
 # Arguemnt Parser Config
 # ======================
+# TODO: impl image mode and use get_base_parser()
 parser = argparse.ArgumentParser(
     description='Acculus hand detection model'
 )
 parser.add_argument(
-    '-v', '--video', metavar='VIDEO',
-    default=None,
+    '-v', '--video', metavar='VIDEO', default=None,
     help='The input video path. ' +
          'If the VIDEO argument is set to 0, the webcam input will be used.'
 )
+parser.add_argument(
+    '-s', '--savepath', metavar='SAVE_PATH', default=SAVE_PATH,
+    help='Save path for the output (image / video).'
+)
+
 args = parser.parse_args()
 
 
@@ -111,7 +118,14 @@ def display_result(input_img, hand, top_left, bottom_right):
 def recognize_from_video():
     # net initialize
     env_id = ailia.get_gpu_environment_id()
+    if args.env_id is not None:
+        count = ailia.get_environment_count()
+        if count > args.env_id:
+            env_id = args.env_id
+        else:
+            print(f'specified env_id: {args.env_id} cannot found error')
     print(f'env_id: {env_id}')
+
     detector = ailia.Detector(
         MODEL_PATH,
         WEIGHT_PATH,
@@ -131,7 +145,20 @@ def recognize_from_video():
     )
     hand.set_threshold(0.1)
 
+    ailia_input_w = detector.get_input_shape()[3]
+    ailia_input_h = detector.get_input_shape()[2]
+
     capture = get_capture(args.video)
+    # create video writer if savepath is specified as video format
+    if args.savepath != SAVE_PATH:
+        f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
+        save_h, save_w = calc_adjust_fsize(
+            f_h, f_w, ailia_input_h, ailia_input_w
+        )
+        writer = get_writer(args.savepath, save_h, save_w)
+    else:
+        writer = None
 
     while(True):
         ret, frame = capture.read()
@@ -168,7 +195,7 @@ def recognize_from_video():
             if crop_img.shape[0] <= 0 or crop_img.shape[1] <= 0:
                 continue
 
-            # inferece
+            # inference
             _ = hand.compute(crop_img.astype(np.uint8, order='C'))
 
             # postprocessing
@@ -176,8 +203,14 @@ def recognize_from_video():
 
         cv2.imshow('frame', frame)
 
+        # save results
+        if writer is not None:
+            writer.write(frame)
+
     capture.release()
     cv2.destroyAllWindows()
+    if writer is not None:
+        writer.release()
     print('Script finished successfully.')
 
 

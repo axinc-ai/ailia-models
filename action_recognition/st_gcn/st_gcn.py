@@ -1,9 +1,5 @@
-import os
 import sys
 import time
-import argparse
-import re
-from collections import deque
 
 import numpy as np
 import cv2
@@ -11,12 +7,14 @@ import cv2
 import ailia
 
 # import original modules
+from st_gcn_util import naive_pose_tracker, render_video, render_image
+from st_gcn_labels import KINETICS_LABEL
+
 sys.path.append('../../util')
+from utils import get_base_parser, update_parser  # noqa: E402
 from utils import check_file_existance  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 
-from st_gcn_util import naive_pose_tracker, render_video, render_image
-from st_gcn_labels import KINETICS_LABEL
 
 # ======================
 # Parameters
@@ -59,49 +57,27 @@ MODEL_LISTS = [
 # ======================
 # Arguemnt Parser Config
 # ======================
-parser = argparse.ArgumentParser(
-    description='ST-GCN model'
-)
+parser = get_base_parser('ST-GCN model', VIDEO_PATH, None)
+
 parser.add_argument(
-    '-i', '--input', metavar='VIDEO',
-    default=VIDEO_PATH,
-    help='The input video path.'
-)
-parser.add_argument(
-    '-v', '--video', metavar='VIDEO',
-    default=None,
-    help='The input video path for realtime operation. ' +
-         'If the VIDEO argument is set to 0, the webcam input will be used.'
-)
-parser.add_argument(
-    '-b', '--benchmark',
-    action='store_true',
-    help='Running the inference on the same input 5 times ' +
-         'to measure execution performance. (Cannot be used in video mode)'
-)
-parser.add_argument(
-    '--fps',
-    default=30,
-    type=int,
+    '--fps', default=30, type=int,
     help='FPS of video.'
 )
 parser.add_argument(
-    '-a', '--arch', metavar='ARCH',
-    default='openpose', choices=MODEL_LISTS,
+    '-a', '--arch', metavar='ARCH', default='openpose', choices=MODEL_LISTS,
     help='model lists: ' + ' | '.join(MODEL_LISTS)
 )
 parser.add_argument(
-    '--img-save',
-    action='store_true',
+    '--img-save', action='store_true',
     help='Instead of show video, save image file.'
 )
-args = parser.parse_args()
+args = update_parser(parser)
 
 if args.arch == "pyopenpose":
     sys.path.insert(0, PYOPENPOSE_PATH)
     try:
         from openpose import pyopenpose as op
-    except:
+    except ImportError:
         print('Can not find Openpose Python API.')
         sys.exit(-1)
     MODEL_POSE_PATH = 'pose/coco/pose_deploy_linevec.prototxt'
@@ -111,7 +87,7 @@ elif args.arch == "lw_human_pose":
     POSE_ALGORITHM = ailia.POSE_ALGORITHM_LW_HUMAN_POSE
     MODEL_POSE_PATH = 'lightweight-human-pose-estimation.opt.onnx.prototxt'
     WEIGHT_POSE_PATH = 'lightweight-human-pose-estimation.opt.onnx'
-    REMOTE_POSE_PATH = f'https://storage.googleapis.com/ailia-models/lightweight-human-pose-estimation/'
+    REMOTE_POSE_PATH = 'https://storage.googleapis.com/ailia-models/lightweight-human-pose-estimation/'
 else:
     POSE_ALGORITHM_OPEN_POSE_SINGLE_SCALE = (12)
     # POSE_ALGORITHM = ailia.POSE_ALGORITHM_OPEN_POSE
@@ -139,12 +115,14 @@ def postprocess(output, feature, num_person):
     voting_label = output.sum(axis=3). \
         sum(axis=2).sum(axis=1).argmax(axis=0)
     voting_label_name = KINETICS_LABEL[voting_label]
+
+    # FIXME: latest_frame_label_name is never used!
     # classification result for each person of the latest frame
-    latest_frame_label = [
-        output[:, :, :, m].sum(axis=2)[:, -1].argmax(axis=0) for m in range(num_person)
-    ]
-    latest_frame_label_name = [KINETICS_LABEL[l]
-                               for l in latest_frame_label]
+    # latest_frame_label = [
+    #     output[:, :, :, m].sum(axis=2)[:, -1].argmax(axis=0)
+    #     for m in range(num_person)
+    # ]
+    # latest_frame_label_name = [KINETICS_LABEL[l] for l in latest_frame_label]
 
     _, num_frame, _, num_person = output.shape
     video_label_name = list()
@@ -200,7 +178,8 @@ def recognize_offline(input, pose, net):
             if count == 0:
                 continue
 
-            pose_keypoints = np.zeros((count, 18, 3))  # (num_person, num_joint, 3)
+            pose_keypoints = np.zeros((count, 18, 3))
+            # pose_keypoints.shape : (num_person, num_joint, 3)
             for idx in range(count):
                 person = pose.get_object_pose(idx)
                 for i, key in enumerate(POSE_KEY):
@@ -225,12 +204,13 @@ def recognize_offline(input, pose, net):
 
     # classification result for each person of the latest frame
     _, _, _, num_person = data.shape
-    voting_label_name, video_label_name, output, intensity = postprocess(output, feature, num_person)
+    out = postprocess(output, feature, num_person)
+    voting_label_name, video_label_name, output, intensity = out
     return data, voting_label_name, video_label_name, output, intensity, frames
 
 
 def recognize_from_file(input, pose, net):
-    # inferece
+    # inference
     print('Start inference...')
     if args.benchmark:
         print('BENCHMARK mode')
@@ -308,7 +288,8 @@ def recognize_realtime(video, pose, net):
             if count == 0:
                 continue
 
-            pose_keypoints = np.zeros((count, 18, 3))  # (num_person, num_joint, 3)
+            pose_keypoints = np.zeros((count, 18, 3))
+            # pose_keypoints.shape : (num_person, num_joint, 3)
             for idx in range(count):
                 person = pose.get_object_pose(idx)
                 for i, key in enumerate(POSE_KEY):
@@ -336,7 +317,8 @@ def recognize_realtime(video, pose, net):
 
         # classification result for each person of the latest frame
         _, _, _, num_person = data.shape
-        voting_label_name, video_label_name, output, intensity = postprocess(output, feature, num_person)
+        out = postprocess(output, feature, num_person)
+        voting_label_name, video_label_name, output, intensity = out
 
         # visualization
         app_fps = 1 / (time.time() - tic)
@@ -360,12 +342,12 @@ def main():
     print("=== ST-GCN model ===")
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
     print("=== OpenPose model ===")
-    check_and_download_models(WEIGHT_POSE_PATH, MODEL_POSE_PATH, REMOTE_POSE_PATH)
+    check_and_download_models(
+        WEIGHT_POSE_PATH, MODEL_POSE_PATH, REMOTE_POSE_PATH
+    )
 
     # net initialize
-    env_id = ailia.get_gpu_environment_id()
-    print(f'env_id: {env_id}')
-    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
 
     if args.arch == "pyopenpose":
         pose = op.WrapperPython()
@@ -374,7 +356,10 @@ def main():
         pose.start()
     else:
         pose = ailia.PoseEstimator(
-            MODEL_POSE_PATH, WEIGHT_POSE_PATH, env_id=env_id, algorithm=POSE_ALGORITHM
+            MODEL_POSE_PATH,
+            WEIGHT_POSE_PATH,
+            env_id=args.env_id,
+            algorithm=POSE_ALGORITHM
         )
         if args.arch == "openpose":
             pose.set_threshold(0.1)

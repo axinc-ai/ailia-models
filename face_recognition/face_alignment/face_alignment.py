@@ -1,6 +1,5 @@
 import sys
 import time
-import argparse
 import math
 import collections
 
@@ -12,9 +11,10 @@ import matplotlib.pyplot as plt
 import ailia
 # import original modules
 sys.path.append('../../util')
+from utils import get_base_parser, update_parser  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from image_utils import load_image  # noqa: E402
-from webcamera_utils import preprocess_frame, get_capture  # noqa: E402
+import webcamera_utils  # noqa: E402
 
 
 # ======================
@@ -39,32 +39,12 @@ from blazeface_utils import compute_blazeface, crop_blazeface  # noqa: E402
 # ======================
 # Argument Parser Config
 # ======================
-parser = argparse.ArgumentParser(
-    description='Face alignment model'
-)
-parser.add_argument(
-    '-i', '--input', metavar='IMAGEFILE_PATH', default=IMAGE_PATH,
-    help='The input image path.'
-)
-parser.add_argument(
-    '-v', '--video', metavar='VIDEO', default=None,
-    help=('The input video path. '
-          'If the VIDEO argument is set to 0, the webcam input will be used.')
-)
-parser.add_argument(
-    '-s', '--savepath', metavar='SAVE_IMAGE_PATH', default=SAVE_IMAGE_PATH,
-    help='Save path for the output image.'
-)
-parser.add_argument(
-    '-b', '--benchmark', action='store_true',
-    help=('Running the inference on the same input 5 times '
-          'to measure execution performance. (Cannot be used in video mode)')
-)
+parser = get_base_parser('Face alignment model', IMAGE_PATH, SAVE_IMAGE_PATH)
 parser.add_argument(
     '-3', '--active_3d', action='store_true',
     help='Activate 3D face alignment mode'
 )
-args = parser.parse_args()
+args = update_parser(parser)
 
 
 # ======================
@@ -346,13 +326,11 @@ def recognize_from_image():
     )
 
     # net initialize
-    env_id = ailia.get_gpu_environment_id()
-    print(f'env_id: {env_id}')
-    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
     if args.active_3d:
         print('>>> 3D mode is activated!')
         depth_net = ailia.Net(
-            DEPTH_MODEL_PATH, DEPTH_WEIGHT_PATH, env_id=env_id
+            DEPTH_MODEL_PATH, DEPTH_WEIGHT_PATH, env_id=args.env_id
         )
 
     # inference
@@ -403,17 +381,26 @@ def recognize_from_image():
 
 def recognize_from_video():
     # net initialize
-    env_id = ailia.get_gpu_environment_id()
-    print(f'env_id: {env_id}')
-    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
     if args.active_3d:
         print('>>> 3D mode is activated!')
         depth_net = ailia.Net(
-            DEPTH_MODEL_PATH, DEPTH_WEIGHT_PATH, env_id=env_id
+            DEPTH_MODEL_PATH, DEPTH_WEIGHT_PATH, env_id=args.env_id
         )
-    detector = ailia.Net(FACE_MODEL_PATH, FACE_WEIGHT_PATH, env_id=env_id)
+    detector = ailia.Net(FACE_MODEL_PATH, FACE_WEIGHT_PATH, env_id=args.env_id)
 
-    capture = get_capture(args.video)
+    capture = webcamera_utils.get_capture(args.video)
+
+    # create video writer if savepath is specified as video format
+    if args.savepath != SAVE_IMAGE_PATH:
+        print('[WARNING] currently video results output feature '
+              'is not supported in this model!')
+        # TODO: shape should be debugged!
+        f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
+        writer = webcamera_utils.get_writer(args.savepath, f_h, f_w)
+    else:
+        writer = None
 
     fig, axs = create_figure(active_3d=args.active_3d)
 
@@ -423,18 +410,24 @@ def recognize_from_video():
             break
 
         # detect face
-        detections = compute_blazeface(detector, frame, anchor_path='../../face_detection/blazeface/anchors.npy')
-        
+        detections = compute_blazeface(
+            detector,
+            frame,
+            anchor_path='../../face_detection/blazeface/anchors.npy',
+        )
+
         # get detected face
         if len(detections) == 0:
             crop_img = frame
         else:
-            crop_img, top_left, bottom_right = crop_blazeface(detections[0], FACE_MARGIN, frame)
+            crop_img, top_left, bottom_right = crop_blazeface(
+                detections[0], FACE_MARGIN, frame
+            )
             if crop_img.shape[0] <= 0 or crop_img.shape[1] <= 0:
                 crop_img = frame
 
         # preprocess
-        input_image, input_data = preprocess_frame(
+        input_image, input_data = webcamera_utils.preprocess_frame(
             crop_img, IMAGE_HEIGHT, IMAGE_WIDTH, normalize_type='255'
         )
 
@@ -472,8 +465,20 @@ def recognize_from_video():
         if not plt.get_fignums():
             break
 
+        # save results
+        # FIXME: How to save plt --> cv2.VideoWriter()
+        # if writer is not None:
+        #     # put pixel buffer in numpy array
+        #     canvas = FigureCanvas(fig)
+        #     canvas.draw()
+        #     mat = np.array(canvas.renderer._renderer)
+        #     res_img = cv2.cvtColor(mat, cv2.COLOR_RGB2BGR)
+        #     writer.write(res_img)
+
     capture.release()
     cv2.destroyAllWindows()
+    if writer is not None:
+        writer.release()
     print('Script finished successfully.')
 
 

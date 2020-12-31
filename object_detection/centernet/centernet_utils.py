@@ -1,14 +1,15 @@
 import numpy as np
 import cv2
 
+
 def bbox_based_nms(dets, thresh):
     x1 = dets[:, 0]
     y1 = dets[:, 1]
     x2 = dets[:, 2]
     y2 = dets[:, 3]
     scores = dets[:, 4]
-    
-    areas = (x2 - x1 + 1) * (y2 - y1 + 1) 
+
+    areas = (x2 - x1 + 1) * (y2 - y1 + 1)
     order = scores.argsort()[::-1]
 
     keep = []
@@ -30,12 +31,14 @@ def bbox_based_nms(dets, thresh):
 
     return [dets[x] for x in keep]
 
+
 def preprocess(image, target_shape):
     image = image / 255.0
     image = cv2.resize(image, (target_shape[1], target_shape[0]))
     image = image.transpose((2, 0, 1))
     image = image[np.newaxis, :, :, :]  # add one more axis to fit ailia
     return image
+
 
 def pool2d(A, kernel_size, padding=1, stride=1, pool_mode='max'):
     # padding
@@ -45,9 +48,11 @@ def pool2d(A, kernel_size, padding=1, stride=1, pool_mode='max'):
     output_shape = ((A.shape[0] - kernel_size)//stride + 1,
                     (A.shape[1] - kernel_size)//stride + 1)
     kernel_size = (kernel_size, kernel_size)
-    A_w = np.lib.stride_tricks.as_strided(A, shape=output_shape + kernel_size,
-                        strides=(stride*A.strides[0],
-                                stride*A.strides[1]) + A.strides)
+    A_w = np.lib.stride_tricks.as_strided(
+        A,
+        shape=output_shape + kernel_size,
+        strides=(stride*A.strides[0], stride*A.strides[1]) + A.strides,
+    )
     A_w = A_w.reshape(-1, *kernel_size)
     if pool_mode == 'max':
         return A_w.max(axis=(1, 2)).reshape(output_shape)
@@ -76,11 +81,13 @@ def topk(scores, k=40):
 
     return topk_score, topk_inds, topk_classes, topk_ys, topk_xs
 
+
 def non_maximum_suppresion(hm, kernel=3, stride=1):
     pad = (kernel - 1) // 2
     hmax = [pool2d(channel, kernel, pad, stride, 'max') for channel in hm]
     keep = (hmax == hm)
     return hm * keep
+
 
 def gather_feat(feat, ind):
     dim = feat.shape[1]
@@ -88,6 +95,7 @@ def gather_feat(feat, ind):
     ind = np.repeat(ind, dim, axis=1)
     feat = feat[ind, np.arange(feat.shape[1])]
     return feat
+
 
 def scale_bboxes(coords, original_size, image_size):
     original_height, original_width = original_size[0], original_size[1]
@@ -98,48 +106,53 @@ def scale_bboxes(coords, original_size, image_size):
     ymax = coords[3] / original_height * height
     return [xmin, ymin, xmax, ymax, coords[4], coords[5]]
 
+
 def postprocess(raw_output, image_size, k=40, threshold=0.3, iou=0.45):
-        hm, reg, wh = raw_output
-        hm = hm = np.exp(hm)/(1 + np.exp(hm))
-        height, width = hm.shape[1:3]
+    hm, reg, wh = raw_output
+    hm = hm = np.exp(hm)/(1 + np.exp(hm))
+    height, width = hm.shape[1:3]
 
-        # apply nms to eliminate clusters
-        hm = non_maximum_suppresion(hm)
+    # apply nms to eliminate clusters
+    hm = non_maximum_suppresion(hm)
 
-        # extract topk
-        scores, inds, classes, ys, xs = topk(hm, k=k)
+    # extract topk
+    scores, inds, classes, ys, xs = topk(hm, k=k)
 
-        # transpose and gather feat
-        reg = np.transpose(reg, (1, 2, 0))
-        reg = reg.reshape((-1, reg.shape[2]))
-        reg = gather_feat(reg, inds)
+    # transpose and gather feat
+    reg = np.transpose(reg, (1, 2, 0))
+    reg = reg.reshape((-1, reg.shape[2]))
+    reg = gather_feat(reg, inds)
 
-        reg = reg.reshape((k, 2))
-        xs = xs.reshape((k, 1)) + reg[:, 0:1]
-        ys = ys.reshape((k, 1)) + reg[:, 1:2]
+    reg = reg.reshape((k, 2))
+    xs = xs.reshape((k, 1)) + reg[:, 0:1]
+    ys = ys.reshape((k, 1)) + reg[:, 1:2]
 
+    wh = np.transpose(wh, (1, 2, 0))
+    wh = wh.reshape((-1, wh.shape[2]))
+    wh = gather_feat(wh, inds)
 
-        wh = np.transpose(wh, (1, 2, 0))
-        wh = wh.reshape((-1, wh.shape[2]))
-        wh = gather_feat(wh, inds)
+    wh = wh.reshape((k, 2))
 
-        wh = wh.reshape((k, 2))
+    classes = classes.reshape((k, 1))
+    scores = scores.reshape((k, 1))
+    bboxes = np.concatenate((
+        xs - wh[..., 0:1] / 2,
+        ys - wh[..., 1:2] / 2,
+        xs + wh[..., 0:1] / 2,
+        ys + wh[..., 1:2] / 2,
+    ), axis=1)
 
-        classes = classes.reshape((k, 1))
-        scores = scores.reshape((k, 1))
-        bboxes = np.concatenate((xs - wh[..., 0:1] / 2,
-                                 ys - wh[..., 1:2] / 2,
-                                 xs + wh[..., 0:1] / 2,
-                                 ys + wh[..., 1:2] / 2), axis=1)
+    # concatenate classes, scores and bounding boxes in a single array
+    detections = np.concatenate((bboxes, scores, classes), axis=1)
 
-        # concatenate classes, scores and bounding boxes in a single array
-        detections = np.concatenate((bboxes, scores, classes), axis=1)
+    filtered_detections = []
+    for j in range(0, len(classes)):
+        current_class = detections[np.logical_and(
+            detections[..., 5] == j, detections[..., 4] >= threshold)]
+        filtered_detections.extend(bbox_based_nms(current_class, iou))
 
-        filtered_detections = []
-        for j in range(0, len(classes)):
-            current_class = detections[np.logical_and(detections[..., 5] == j, detections[..., 4] >= threshold)]
-            filtered_detections.extend(bbox_based_nms(current_class, iou))
-
-        if len(filtered_detections)==0:
-            return []
-        return np.apply_along_axis(scale_bboxes, 1, filtered_detections, (height, width), image_size)
+    if len(filtered_detections) == 0:
+        return []
+    return np.apply_along_axis(
+        scale_bboxes, 1, filtered_detections, (height, width), image_size
+    )
