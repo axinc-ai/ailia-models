@@ -12,11 +12,15 @@ import ailia
 # import original modules
 sys.path.append('../../util')
 sys.path.append('../../face_detection/blazeface')
-from utils import get_base_parser, update_parser  # noqa: E402
+from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from image_utils import load_image  # noqa: E402
 import webcamera_utils  # noqa: E402
 from blazeface_utils import compute_blazeface, crop_blazeface  # noqa: E402
+
+# logger
+from logging import getLogger   # noqa: E402
+logger = getLogger(__name__)
 
 
 # TODO Upgrade Model
@@ -64,33 +68,39 @@ def gen_img_from_predsailia(input_data, preds_ailia):
 # Main functions
 # ======================
 def recognize_from_image():
-    # prepare input data
-    img = load_image(
-        args.input,
-        (IMAGE_HEIGHT, IMAGE_WIDTH),
-        rgb=False,
-        gen_input_ailia=True
-    )
-
     # net initialize
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
 
-    # inference
-    print('Start inference...')
-    if args.benchmark:
-        print('BENCHMARK mode')
-        for i in range(5):
-            start = int(round(time.time() * 1000))
-            preds_ailia = net.predict(img)[0]
-            end = int(round(time.time() * 1000))
-            print(f'\tailia processing time {end - start} ms')
-    else:
-        preds_ailia = net.predict(img)[0]
+    # input image loop
+    for image_path in args.input:
+        # prepare input data
+        logger.info(image_path)
+        # prepare input data
+        img = load_image(
+            image_path,
+            (IMAGE_HEIGHT, IMAGE_WIDTH),
+            rgb=False,
+            gen_input_ailia=True
+        )
 
-    # postprocess
-    fig = gen_img_from_predsailia(img, preds_ailia)
-    fig.savefig(args.savepath)
-    print('Script finished successfully.')
+        # inference
+        logger.info('Start inference...')
+        if args.benchmark:
+            logger.info('BENCHMARK mode')
+            for i in range(5):
+                start = int(round(time.time() * 1000))
+                preds_ailia = net.predict(img)[0]
+                end = int(round(time.time() * 1000))
+                logger.info(f'\tailia processing time {end - start} ms')
+        else:
+            preds_ailia = net.predict(img)[0]
+
+        # post-process
+        savepath = get_savepath(args.savepath, image_path)
+        fig = gen_img_from_predsailia(img, preds_ailia)
+        logger.info(f'saved at : {savepath}')
+        fig.savefig(savepath)
+    logger.info('Script finished successfully.')
 
 
 def recognize_from_video():
@@ -154,7 +164,7 @@ def recognize_from_video():
     if writer is not None:
         writer.release()
     os.remove('tmp.png')
-    print('Script finished successfully.')
+    logger.info('Script finished successfully.')
 
 
 def main():
