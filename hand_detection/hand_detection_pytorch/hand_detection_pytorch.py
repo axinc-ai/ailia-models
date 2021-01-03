@@ -8,9 +8,13 @@ import hand_detection_pytorch_utils
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser  # noqa: E402
+from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 import webcamera_utils  # noqa: E402
+
+# logger
+from logging import getLogger   # noqa: E402
+logger = getLogger(__name__)
 
 
 # ======================
@@ -42,40 +46,45 @@ args = update_parser(parser)
 # Main functions
 # ======================
 def recognize_from_image():
-    # prepare input data
-    to_show = cv2.imread(args.input, cv2.IMREAD_COLOR)
-    print(f'input image shape: {to_show.shape}')
-    img, scale = hand_detection_pytorch_utils.pre_process(to_show)
-
     # net initialize
     detector = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
-    detector.set_input_shape((1, 3, img.shape[2], img.shape[3]))
 
-    # inference
-    print('Start inference...')
-    if args.benchmark:
-        print('BENCHMARK mode')
-        for i in range(5):
-            start = int(round(time.time() * 1000))
+    for image_path in args.input:
+        # prepare input data
+        logger.info(image_path)
+
+        to_show = cv2.imread(image_path, cv2.IMREAD_COLOR)
+        logger.info(f'input image shape: {to_show.shape}')
+        img, scale = hand_detection_pytorch_utils.pre_process(to_show)
+        detector.set_input_shape((1, 3, img.shape[2], img.shape[3]))
+
+        # inference
+        logger.info('Start inference...')
+        if args.benchmark:
+            logger.info('BENCHMARK mode')
+            for i in range(5):
+                start = int(round(time.time() * 1000))
+                out = detector.predict({'input.1': img})
+                end = int(round(time.time() * 1000))
+                logger.info(f'\tailia processing time {end - start} ms')
+        else:
             out = detector.predict({'input.1': img})
-            end = int(round(time.time() * 1000))
-            print(f'\tailia processing time {end - start} ms')
-    else:
-        out = detector.predict({'input.1': img})
 
-    dets = hand_detection_pytorch_utils.post_process(
-        out, img, scale, THRESHOLD, IOU
-    )
-    for i in range(dets.shape[0]):
-        cv2.rectangle(
-            to_show,
-            (dets[i][0], dets[i][1]),
-            (dets[i][2], dets[i][3]),
-            [0, 0, 255],
-            3
+        dets = hand_detection_pytorch_utils.post_process(
+            out, img, scale, THRESHOLD, IOU
         )
-    cv2.imwrite(args.savepath, to_show)
-    print('Script finished successfully.')
+        for i in range(dets.shape[0]):
+            cv2.rectangle(
+                to_show,
+                (dets[i][0], dets[i][1]),
+                (dets[i][2], dets[i][3]),
+                [0, 0, 255],
+                3,
+            )
+        savepath = get_savepath(args.savepath, image_path)
+        logger.info(f'saved at : {savepath}')
+        cv2.imwrite(savepath, to_show)
+    logger.info('Script finished successfully.')
 
 
 def recognize_from_video():
@@ -120,7 +129,7 @@ def recognize_from_video():
     cv2.destroyAllWindows()
     if writer is not None:
         writer.release()
-    print('Script finished successfully.')
+    logger.info('Script finished successfully.')
 
 
 def main():
