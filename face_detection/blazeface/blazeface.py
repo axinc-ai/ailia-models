@@ -53,8 +53,6 @@ def recognize_from_image():
     for image_path in args.input:
         # prepare input data
         logger.info(image_path)
-
-        # prepare input data
         org_img = load_image(image_path, (IMAGE_HEIGHT, IMAGE_WIDTH))
 
         input_data = load_image(
