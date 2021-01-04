@@ -95,16 +95,21 @@ def recognize_from_image():
             detections = but.detector_postprocess(preds)
 
             # Hand landmark estimation
+            presence = [0, 0] # [left, right]
             if detections[0].size != 0:
                 imgs, affines, _ = but.estimator_preprocess(src_img, detections, scale, pad)
                 estimator.set_input_shape(imgs.shape)
-                flags, _, normalized_landmarks = estimator.predict([imgs])
+                flags, handedness, normalized_landmarks = estimator.predict([imgs])
 
                 # postprocessing
                 landmarks = but.denormalize_landmarks(normalized_landmarks, affines)
                 for i in range(len(flags)):
-                    landmark, flag = landmarks[i], flags[i]
-                    if flag > 0:
+                    landmark, flag, handed = landmarks[i], flags[i], 1 - handedness[i]
+                    if flag > 0.75:
+                        if handed < 0.5: # Right handedness when not flipped camera input
+                            presence[0] = 1
+                        else:
+                            presence[1] = 1
                         draw_landmarks(src_img, landmark[:,:2], but.HAND_CONNECTIONS, size=2)
             end = int(round(time.time() * 1000))
             print(f'\tailia processing time {end - start} ms')
@@ -114,18 +119,32 @@ def recognize_from_image():
         detections = but.detector_postprocess(preds)
 
         # Hand landmark estimation
+        presence = [0, 0] # [left, right]
         if detections[0].size != 0:
             imgs, affines, _ = but.estimator_preprocess(src_img, detections, scale, pad)
             estimator.set_input_shape(imgs.shape)
-            flags, _, normalized_landmarks = estimator.predict([imgs])
+            flags, handedness, normalized_landmarks = estimator.predict([imgs])
 
             # postprocessing
             landmarks = but.denormalize_landmarks(normalized_landmarks, affines)
             for i in range(len(flags)):
-                landmark, flag = landmarks[i], flags[i]
-                if flag > 0:
+                landmark, flag, handed = landmarks[i], flags[i], 1 - handedness[i]
+                if flag > 0.75:
+                    if handed > 0.5: # Right handedness when not flipped camera input
+                        presence[0] = 1
+                    else:
+                        presence[1] = 1
                     draw_landmarks(src_img, landmark[:,:2], but.HAND_CONNECTIONS, size=2)
 
+    if presence[0] and presence[1]:
+        hand_presence = 'Left and right'
+    elif presence[0]:
+        hand_presence = 'Left'
+    elif presence[1]:
+        hand_presence = 'Right'
+    else:
+        hand_presence = 'No hand'
+    print(f'Hand presence: {hand_presence}')
     cv2.imwrite(args.savepath, src_img)
     print('Script finished successfully.')
 
@@ -152,6 +171,7 @@ def recognize_from_video():
 
     while(True):
         ret, frame = capture.read()
+        frame = np.ascontiguousarray(frame[:,::-1,:])
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
 
@@ -165,18 +185,32 @@ def recognize_from_video():
         detections = but.detector_postprocess(preds)
 
         # Hand landmark estimation
+        presence = [0, 0] # [left, right]
         if detections[0].size != 0:
             img, affine, _ = but.estimator_preprocess(frame, detections, scale, pad)
             estimator.set_input_shape(img.shape)
-            flags, _, normalized_landmarks = estimator.predict([img])
+            flags, handedness, normalized_landmarks = estimator.predict([img])
 
             # postprocessing
             landmarks = but.denormalize_landmarks(normalized_landmarks, affine)
             for i in range(len(flags)):
-                landmark, flag = landmarks[i], flags[i]
-                if flag > 0.5:
+                landmark, flag, handed = landmarks[i], flags[i], handedness[i]
+                if flag > 0.75:
+                    if handed > 0.5:
+                        presence[0] = 1
+                    else:
+                        presence[1] = 1
                     draw_landmarks(frame, landmark[:,:2], but.HAND_CONNECTIONS, size=2)
 
+        if presence[0] and presence[1]:
+            text = 'Left and right'
+        elif presence[0]:
+            text = 'Left'
+        elif presence[1]:
+            text = 'Right'
+        else:
+            text = 'No hand'
+        cv2.putText(frame, text, (8, 24), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 255), 2)
         cv2.imshow('frame', frame)
 
         # save results

@@ -5,12 +5,31 @@ import cv2
 import numpy
 import subprocess
 import shutil
+import sys
+
+sys.path.append('./util')
+from utils import get_base_parser, update_parser  # noqa: E402
+
+# ======================
+# Arguemnt Parser Config
+# ======================
+parser = get_base_parser('ailia MODELS launcher', None, None)
+args = update_parser(parser)
+
+
+# ======================
+# Settings
+# ======================
 
 BUTTON_WIDTH = 400
 BUTTON_HEIGHT = 20
 BUTTON_MARGIN = 2
 
 WINDOW_ROW = 22
+
+# ======================
+# Model search
+# ======================
 
 IGNORE_LIST = [
     "commercial_model", "validation", ".git", "log", "prnet", "bert",
@@ -28,7 +47,6 @@ try:
 except ModuleNotFoundError:
     IGNORE_LIST.append("audio_processing")
     pass
-
 
 def search_model():
     file_list = []
@@ -62,17 +80,20 @@ def search_model():
     return model_list, len(category_list)
 
 
+# ======================
+# Model List
+# ======================
+
+mx = 0
+my = 0
+click_trig = False
+
 def mouse_callback(event, x, y, flags, param):
     global mx, my, click_trig
     if event == cv2.EVENT_LBUTTONDOWN:
         click_trig = True
     mx = x
     my = y
-
-
-mx = 0
-my = 0
-click_trig = False
 
 
 def hsv_to_rgb(h, s, v):
@@ -102,12 +123,22 @@ def display_ui(img, model_list, category_cnt, window_width, window_height):
                 cmd = "python"
                 if shutil.which("python3"):
                     cmd = "python3"
+
                 if ("neural_language_processing" == model["category"]) or \
                    ("audio_processing" == model["category"]):
-                    subprocess.run([cmd, model["model"]+".py"], cwd=dir)
+                    options = None
+                else:
+                    video_id = args.video
+                    if not args.video:
+                        video_id = 0
+                    options = "-v "+str(video_id)
+                
+                if options==None:
+                    subprocess.run(
+                        [cmd, model["model"]+".py"], cwd=dir)
                 else:
                     subprocess.run(
-                        [cmd, model["model"]+".py", "-v 0"], cwd=dir)
+                        [cmd, model["model"]+".py", options], cwd=dir)
                 click_trig = False
 
         cv2.rectangle(img, (x, y), (x + w, y + h), color, thickness=-1)
