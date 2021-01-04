@@ -8,12 +8,16 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser  # noqa: E402
+from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from detector_utils import plot_results, load_image  # noqa: E402
 import webcamera_utils  # noqa: E402
 
 from yolov4_tiny_utils import post_processing  # noqa: E402
+
+# logger
+from logging import getLogger   # noqa: E402
+logger = getLogger(__name__)
 
 
 # ======================
@@ -58,35 +62,40 @@ args = update_parser(parser)
 # Main functions
 # ======================
 def recognize_from_image(detector):
-    # prepare input data
-    org_img = load_image(args.input)
-    print(f'input image shape: {org_img.shape}')
+    # input image loop
+    for image_path in args.input:
+        # prepare input data
+        logger.info(image_path)
+        org_img = load_image(image_path)
+        logger.debug(f'input image shape: {org_img.shape}')
 
-    img = cv2.cvtColor(org_img, cv2.COLOR_BGRA2RGB)
-    img = cv2.resize(img, (IMAGE_WIDTH, IMAGE_HEIGHT))
-    img = np.transpose(img, [2, 0, 1])
-    img = img.astype(np.float32) / 255
-    img = np.expand_dims(img, 0)
+        img = cv2.cvtColor(org_img, cv2.COLOR_BGRA2RGB)
+        img = cv2.resize(img, (IMAGE_WIDTH, IMAGE_HEIGHT))
+        img = np.transpose(img, [2, 0, 1])
+        img = img.astype(np.float32) / 255
+        img = np.expand_dims(img, 0)
 
-    # inference
-    print('Start inference...')
-    if args.benchmark:
-        print('BENCHMARK mode')
-        for i in range(5):
-            start = int(round(time.time() * 1000))
+        # inference
+        logger.info('Start inference...')
+        if args.benchmark:
+            logger.info('BENCHMARK mode')
+            for i in range(5):
+                start = int(round(time.time() * 1000))
+                output = detector.predict([img])
+                end = int(round(time.time() * 1000))
+                logger.info(f'\tailia processing time {end - start} ms')
+        else:
             output = detector.predict([img])
-            end = int(round(time.time() * 1000))
-            print(f'\tailia processing time {end - start} ms')
-    else:
-        output = detector.predict([img])
-    detect_object = post_processing(img, THRESHOLD, IOU, output)
+        detect_object = post_processing(img, THRESHOLD, IOU, output)
 
-    # plot result
-    res_img = plot_results(detect_object[0], org_img, COCO_CATEGORY)
+        # plot result
+        res_img = plot_results(detect_object[0], org_img, COCO_CATEGORY)
 
-    # plot result
-    cv2.imwrite(args.savepath, res_img)
-    print('Script finished successfully.')
+        # plot result
+        savepath = get_savepath(args.savepath, image_path)
+        logger.info(f'saved at : {savepath}')
+        cv2.imwrite(savepath, res_img)
+    logger.info('Script finished successfully.')
 
 
 def recognize_from_video(detector):
@@ -126,7 +135,7 @@ def recognize_from_video(detector):
     cv2.destroyAllWindows()
     if writer is not None:
         writer.release()
-    print('Script finished successfully.')
+    logger.info('Script finished successfully.')
 
 
 def main():
