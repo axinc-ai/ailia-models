@@ -1,6 +1,9 @@
 export OPTION=-b
 cd ../
 cd action_recognition/mars; python3 mars.py ${OPTION}
+cd ../../action_recognition/st-gcn; python3 st-gcn.py ${OPTION}
+cd ../../audio_processing/crnn_audio_classification; python3 crnn_audio_classification.py ${OPTION}
+cd ../../audio_processing/deepspeech2; python3 deepspeech2.py ${OPTION}
 cd ../../crowd_counting/crowdcount-cascaded-mtl; python3 crowdcount-cascaded-mtl.py ${OPTION}
 cd ../../deep_fashion/clothing-detection; python3 clothing-detection.py ${OPTION}
 cd ../../deep_fashion/fashionai-key-points-detection; python3 fashionai-key-points-detection.py -c blouse ${OPTION}
@@ -26,6 +29,7 @@ cd ../../face_recognition/face_classification; python3 face_classification.py ${
 cd ../../face_recognition/facial_feature; python3 facial_feature.py ${OPTION}
 cd ../../face_recognition/gazeml; python3 gazeml.py ${OPTION}
 cd ../../face_recognition/prnet; python3 prnet.py ${OPTION}
+cd ../../face_recognition/facemesh; python3 facemesh.py ${OPTION}
 cd ../../generative_adversarial_networks/council-GAN; python3 council-gan.py --glasses ${OPTION}
 cd ../../generative_adversarial_networks/council-GAN; python3 council-gan.py --m2f ${OPTION}
 cd ../../generative_adversarial_networks/council-GAN; python3 council-gan.py --anime ${OPTION}
@@ -33,6 +37,8 @@ cd ../../generative_adversarial_networks/pytorch-gan; python3 pytorch-gnet.py -m
 cd ../../generative_adversarial_networks/pytorch-gan; python3 pytorch-gnet.py -m anime ${OPTION}
 cd ../../hand_detection/yolov3-hand; python3 yolov3-hand.py ${OPTION}
 cd ../../hand_detection/hand_detection_pytorch python3 hand_detection_pytorch.py ${OPTION}
+cd ../../hand_detection/blazepalm; python3 blazepalm.py ${OPTION}
+cd ../../hand_recognition/blazehand; python3 blazehand.py ${OPTION}
 cd ../../image_captioning/illustration2vec; python3 illustration2vec.py ${OPTION}
 cd ../../image_captioning/image_captioning_pytorch; python3 image_captioning_pytorch.py ${OPTION}
 cd ../../image_classification/efficientnet; python3 efficientnet.py ${OPTION}
@@ -82,6 +88,7 @@ cd ../../pose_estimation/lightweight-human-pose-estimation; python3 lightweight-
 cd ../../pose_estimation/lightweight-human-pose-estimation-3d; python3 lightweight-human-pose-estimation-3d.py ${OPTION}
 cd ../../pose_estimation/openpose; python3 openpose.py ${OPTION}
 cd ../../pose_estimation/pose_resnet; python3 pose_resnet.py ${OPTION}
+cd ../../pose_estimation/blazepose; python3 blazepose.py ${OPTION}
 cd ../../rotation_prediction/rotnet; python3 rotnet.py ${OPTION}
 cd ../../style_transfer/adain; python3 adain.py ${OPTION}
 cd ../../super_resolution/srresnet; python3 srresnet.py ${OPTION}
