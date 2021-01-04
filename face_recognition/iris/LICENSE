@@ -1,5 +1,5 @@
-Conversion of MediaPipe from TFLite to PyTorch done by George Grigorev
-in June 2020. Website: https://github.com/thepowerfuldeez/facemesh.pytorch
+Conversion of MediaPipe from TFLite to PyTorch done by Cedric Menard
+in Oct 2020. Website: https://github.com/cedriclmenard/irislandmarks.pytorch
 
 This work is licensed under the same terms as MediaPipe (Apache License 2.0)
 https://github.com/google/mediapipe/blob/master/LICENSE
