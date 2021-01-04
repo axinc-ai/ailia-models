@@ -1,6 +1,5 @@
 import sys
 import time
-import argparse
 
 import numpy as np
 import cv2
@@ -9,11 +8,11 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import check_file_existance  # noqa: E402
+from utils import get_base_parser, update_parser  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from image_utils import load_image  # noqa: E402
-import webcamera_utils  # noqa: E402C
-from adain_utils import *  # noqa: E402C
+import webcamera_utils  # noqa: E402
+import adain_utils  # noqa: E402
 
 
 # ======================
@@ -35,38 +34,15 @@ IMAGE_WIDTH = 512
 # ======================
 # Arguemnt Parser Config
 # ======================
-parser = argparse.ArgumentParser(
-    formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-    description='Arbitrary Style Transfer Model',
-)
-parser.add_argument(
-    '-i', '--input', metavar='IMAGE',
-    default=IMAGE_PATH,
-    help='The input image path.'
+parser = get_base_parser(
+    'Arbitrary Style Transfer Model', IMAGE_PATH, SAVE_IMAGE_PATH,
 )
 parser.add_argument(
     '-t', '--style', metavar='STYLE_IMAGE',
     default=STYLE_PATH,
     help='The style image path.'
 )
-parser.add_argument(
-    '-v', '--video', metavar='VIDEO',
-    default=None,
-    help='You can convert the input video by entering style image.' +
-         'If the VIDEO argument is set to 0, the webcam input will be used.'
-)
-parser.add_argument(
-    '-s', '--savepath', metavar='SAVE_IMAGE_PATH',
-    default=SAVE_IMAGE_PATH,
-    help='Save path for the output image.'
-)
-parser.add_argument(
-    '-b', '--benchmark',
-    action='store_true',
-    help='Running the inference on the same input 5 times ' +
-         'to measure execution performance. (Cannot be used in video mode)'
-)
-args = parser.parse_args()
+args = update_parser(parser)
 
 
 # ======================
@@ -77,7 +53,7 @@ def style_transfer(vgg, decoder, content, style, alpha=1.0):
     assert (0.0 <= alpha <= 1.0)
     content_f = vgg.predict(content.astype(np.float32))
     style_f = vgg.predict(style)
-    feat = adaptive_instance_normalization(content_f, style_f)
+    feat = adain_utils.adaptive_instance_normalization(content_f, style_f)
     feat = feat * alpha + content_f * (1 - alpha)
     return decoder.predict(feat)
 
@@ -103,10 +79,8 @@ def image_style_transfer():
     )
 
     # net initialize
-    env_id = ailia.get_gpu_environment_id()
-    print(f'env_id: {env_id}')
-    vgg = ailia.Net(VGG_MODEL_PATH, VGG_WEIGHT_PATH, env_id=env_id)
-    decoder = ailia.Net(DEC_MODEL_PATH, DEC_WEIGHT_PATH, env_id=env_id)
+    vgg = ailia.Net(VGG_MODEL_PATH, VGG_WEIGHT_PATH, env_id=args.env_id)
+    decoder = ailia.Net(DEC_MODEL_PATH, DEC_WEIGHT_PATH, env_id=args.env_id)
 
     # inference
     print('Start inference...')
@@ -131,20 +105,10 @@ def image_style_transfer():
 
 def video_style_transfer():
     # net initialize
-    env_id = ailia.get_gpu_environment_id()
-    print(f'env_id: {env_id}')
-    vgg = ailia.Net(VGG_MODEL_PATH, VGG_WEIGHT_PATH, env_id=env_id)
-    decoder = ailia.Net(DEC_MODEL_PATH, DEC_WEIGHT_PATH, env_id=env_id)
+    vgg = ailia.Net(VGG_MODEL_PATH, VGG_WEIGHT_PATH, env_id=args.env_id)
+    decoder = ailia.Net(DEC_MODEL_PATH, DEC_WEIGHT_PATH, env_id=args.env_id)
 
     capture = webcamera_utils.get_capture(args.video)
-
-    # Style image
-    style_img = load_image(
-        args.style,
-        (IMAGE_HEIGHT, IMAGE_WIDTH),
-        normalize_type='255',
-        gen_input_ailia=True
-    )
 
     # create video writer if savepath is specified as video format
     if args.savepath != SAVE_IMAGE_PATH:
@@ -153,6 +117,14 @@ def video_style_transfer():
         )
     else:
         writer = None
+
+    # Style image
+    style_img = load_image(
+        args.style,
+        (IMAGE_HEIGHT, IMAGE_WIDTH),
+        normalize_type='255',
+        gen_input_ailia=True
+    )
 
     while(True):
         ret, frame = capture.read()
@@ -185,6 +157,8 @@ def video_style_transfer():
 
     capture.release()
     cv2.destroyAllWindows()
+    if writer is not None:
+        writer.release()
 
     print('Script finished successfully.')
 

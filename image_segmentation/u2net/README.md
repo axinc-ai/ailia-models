@@ -35,10 +35,10 @@ You can select a pretrained model by specifying `-a large`(default) or `-a small
 $ python3 u2net.py --input IMAGE_PATH --savepath SAVE_IMAGE_PATH -a small
 ```
 
-When using ailia SDK 1.2.4 or later, you can use a highly accurate model by specifying `--opset 11`.
+When using ailia SDK 1.2.3 or earlier, you must use a lower accurate model by specifying `--opset 10`.
 
 ```bash
-$ python3 u2net.py --input IMAGE_PATH --savepath SAVE_IMAGE_PATH --opset 11
+$ python3 u2net.py --input IMAGE_PATH --savepath SAVE_IMAGE_PATH --opset 10
 ```
 
 Add the `--composite` option if you want to combine the input image with the calculated alpha value.

@@ -1,19 +1,19 @@
 import time
 import sys
-import argparse
 
 import numpy as np
 import cv2
 
 import ailia
-
 from centernet_utils import preprocess, postprocess
 
 # import original modules
 sys.path.append('../../util')
+from utils import get_base_parser, update_parser  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
-from webcamera_utils import get_capture  # noqa: E402
 from detector_utils import load_image  # noqa: E402
+import webcamera_utils  # noqa: E402
+
 
 # ======================
 # Parameters
@@ -41,40 +41,18 @@ THRESHOLD = 0.3  # Threshold for filteing for filtering (from 0.0 to 1.0)
 K_VALUE = 40  # K value for topK function
 OPSET_LISTS = ['10', '11']
 
+
 # ======================
 # Arguemnt Parser Config
 # ======================
-parser = argparse.ArgumentParser(
-    description='CenterNet model'
-)
-parser.add_argument(
-    '-i', '--input', metavar='IMAGE',
-    default=IMAGE_PATH,
-    help='The input image path.'
-)
-parser.add_argument(
-    '-v', '--video', metavar='VIDEO',
-    default=None,
-    help='The input video path. ' +
-         'If the VIDEO argument is set to 0, the webcam input will be used.'
-)
-parser.add_argument(
-    '-s', '--savepath', metavar='SAVE_IMAGE_PATH',
-    default=SAVE_IMAGE_PATH,
-    help='Save path for the output image.'
-)
-parser.add_argument(
-    '-b', '--benchmark',
-    action='store_true',
-    help='Running the inference on the same input 5 times ' +
-         'to measure execution performance. (Cannot be used in video mode)'
-)
+parser = get_base_parser('CenterNet model', IMAGE_PATH, SAVE_IMAGE_PATH)
 parser.add_argument(
     '-o', '--opset', metavar='OPSET',
     default='10', choices=OPSET_LISTS,
     help='opset lists: ' + ' | '.join(OPSET_LISTS)
 )
-args = parser.parse_args()
+args = update_parser(parser)
+
 
 if args.opset == "10":
     WEIGHT_PATH = './ctdet_coco_dlav0_1x.onnx'
@@ -88,16 +66,6 @@ REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/centernet/'
 # ======================
 # Secondaty Functions
 # ======================
-# def preprocess(img, resize=512, rgb_means=(104, 117, 123), swap=(2, 0, 1)):
-#     interp_method = cv2.INTER_LINEAR
-#     img = cv2.resize(np.array(img),
-#                      (resize, resize),
-#                      interpolation=interp_method).astype(np.float32)
-#     img -= rgb_means
-#     # make channel first
-#     img = img.transpose(swap)
-#     return img[None, ...]
-
 def to_color(indx, base):
     """ return (b, r, g) tuple"""
     base2 = base * base
@@ -208,23 +176,34 @@ def recognize_from_image(filename, detector):
 
 
 def recognize_from_video(video, detector):
-    capture = get_capture(args.video)
+    capture = webcamera_utils.get_capture(args.video)
+
+    # create video writer if savepath is specified as video format
+    if args.savepath != SAVE_IMAGE_PATH:
+        f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
+        writer = webcamera_utils.get_writer(args.savepath, f_h, f_w)
+    else:
+        writer = None
 
     while(True):
         ret, img = capture.read()
+
+        # press q to end video capture
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
 
         boxes, scores, cls_inds = detect_objects(img, detector)
         img = draw_detection(img, boxes, scores, cls_inds)
         cv2.imshow('frame', img)
-
-        # press q to end video capture
-        if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
-            break
+        # save results
+        if writer is not None:
+            writer.write(img)
 
     capture.release()
     cv2.destroyAllWindows()
+    if writer is not None:
+        writer.release()
     print('Script finished successfully.')
 
 
@@ -233,10 +212,7 @@ def main():
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
 
     # load model
-    env_id = ailia.get_gpu_environment_id()
-    print(f'env_id: {env_id}')
-
-    detector = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+    detector = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
 
     if args.video is not None:
         # video mode

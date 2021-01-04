@@ -1,6 +1,5 @@
 import sys
 import time
-import argparse
 
 import numpy as np
 import cv2
@@ -12,8 +11,9 @@ from illnet_utils import *
 
 # import original modules
 sys.path.append('../../util')
+from utils import get_base_parser, update_parser  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
-from webcamera_utils import get_capture  # noqa: E402
+import webcamera_utils  # noqa: E402
 
 
 # ======================
@@ -25,39 +25,17 @@ REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/illnet/'
 
 IMAGE_PATH = 'input.png'
 SAVE_IMAGE_PATH = 'output.png'
-IMAGE_HEIGHT = 128
-IMAGE_WIDTH = 128
+
+PATCH_RES = 128
 
 
 # ======================
 # Arguemnt Parser Config
 # ======================
-parser = argparse.ArgumentParser(
-    description='Illumination Correction Model'
+parser = get_base_parser(
+    'Illumination Correction Model', IMAGE_PATH, SAVE_IMAGE_PATH
 )
-parser.add_argument(
-    '-i', '--input', metavar='IMAGE',
-    default=IMAGE_PATH,
-    help='The input image path.'
-)
-parser.add_argument(
-    '-v', '--video', metavar='VIDEO',
-    default=None,
-    help='The input video path. ' +
-         'If the VIDEO argument is set to 0, the webcam input will be used.'
-)
-parser.add_argument(
-    '-s', '--savepath', metavar='SAVE_IMAGE_PATH',
-    default=SAVE_IMAGE_PATH,
-    help='Save path for the output image.'
-)
-parser.add_argument(
-    '-b', '--benchmark',
-    action='store_true',
-    help='Running the inference on the same input 5 times ' +
-         'to measure execution performance. (Cannot be used in video mode)'
-)
-args = parser.parse_args()
+args = update_parser(parser)
 
 
 # ======================
@@ -73,12 +51,12 @@ def recognize_from_image():
     ynum = input_data.shape[0]
     xnum = input_data.shape[1]
 
-    preds_ailia = np.zeros((ynum, xnum, 128, 128, 3), dtype=np.float32)
+    preds_ailia = np.zeros(
+        (ynum, xnum, PATCH_RES, PATCH_RES, 3), dtype=np.float32
+    )
 
     # net initialize
-    env_id = ailia.get_gpu_environment_id()
-    print(f'env_id: {env_id}')
-    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
 
     # inference
     print('Start inference...')
@@ -128,11 +106,27 @@ def recognize_from_video():
     print('[WARNING] This is test implementation')
     # net initialize
 
-    env_id = ailia.get_gpu_environment_id()
-    print(f'env_id: {env_id}')
-    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
 
-    capture = get_capture(args.video)
+    capture = webcamera_utils.get_capture(args.video)
+
+    # create video writer if savepath is specified as video format
+    if args.savepath != SAVE_IMAGE_PATH:
+        f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
+        dummy_img = np.zeros((f_h, f_w, 3))
+        dummy_img = padCropImg(dummy_img)
+        ynum = dummy_img.shape[0]
+        xnum = dummy_img.shape[1]
+        dummy_img = np.zeros(
+            (ynum, xnum, PATCH_RES, PATCH_RES, 3), dtype=np.float32
+        )
+        dummy_img = composePatch(dummy_img)
+        writer = webcamera_utils.get_writer(
+            args.savepath, dummy_img.shape[0], dummy_img.shape[1]
+        )
+    else:
+        writer = None
 
     while(True):
         ret, frame = capture.read()
@@ -146,7 +140,9 @@ def recognize_from_video():
         ynum = input_data.shape[0]
         xnum = input_data.shape[1]
 
-        preds_ailia = np.zeros((ynum, xnum, 128, 128, 3), dtype=np.float32)
+        preds_ailia = np.zeros(
+            (ynum, xnum, PATCH_RES, PATCH_RES, 3), dtype=np.float32
+        )
 
         for j in range(ynum):
             for i in range(xnum):
@@ -159,12 +155,20 @@ def recognize_from_video():
                 out = (np.clip(out, 0, 1) * 255).astype(np.uint8)
                 preds_ailia[j, i] = out
 
-        resImg = composePatch(preds_ailia)
+                resImg = composePatch(preds_ailia)
         resImg = postProcess(resImg)
-        cv2.imshow('frame', img_as_ubyte(resImg))
+
+        resImg = img_as_ubyte(resImg)
+        cv2.imshow('frame', resImg)
+
+        # save results
+        if writer is not None:
+            writer.write(resImg)
 
     capture.release()
     cv2.destroyAllWindows()
+    if writer is not None:
+        writer.release()
     print('Script finished successfully.')
 
 
