@@ -61,7 +61,7 @@ else:
     LANDMARK2_MODEL_PATH = f'{LANDMARK2_MODEL_NAME}.opt.onnx.prototxt'
 DETECTION_REMOTE_PATH = f'https://storage.googleapis.com/ailia-models/{DETECTION_MODEL_NAME}/'
 LANDMARK_REMOTE_PATH = f'https://storage.googleapis.com/ailia-models/{LANDMARK_MODEL_NAME}/'
-LANDMARK2_REMOTE_PATH = f'https://storage.googleapis.com/ailia-models/{LANDMARK2_MODEL_NAME}/'
+LANDMARK2_REMOTE_PATH = f'https://storage.googleapis.com/ailia-models/mediapipe_{LANDMARK2_MODEL_NAME}/'
 
 
 # ======================
