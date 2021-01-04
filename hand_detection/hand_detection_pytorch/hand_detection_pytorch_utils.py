@@ -25,28 +25,35 @@ class PriorBox(object):
                     s_kx = min_size / self.image_size[1]
                     s_ky = min_size / self.image_size[0]
                     if min_size == 32:
-                        dense_cx = [x*self.steps[k]/self.image_size[1] for x in [j+0, j+0.25, j+0.5, j+0.75]]
-                        dense_cy = [y*self.steps[k]/self.image_size[0] for y in [i+0, i+0.25, i+0.5, i+0.75]]
+                        dense_cx = [x*self.steps[k]/self.image_size[1]
+                                    for x in [j+0, j+0.25, j+0.5, j+0.75]]
+                        dense_cy = [y*self.steps[k]/self.image_size[0]
+                                    for y in [i+0, i+0.25, i+0.5, i+0.75]]
                         for cy, cx in product(dense_cy, dense_cx):
                             mean += [cx, cy, s_kx, s_ky]
                     elif min_size == 64:
-                        dense_cx = [x*self.steps[k]/self.image_size[1] for x in [j+0, j+0.5]]
-                        dense_cy = [y*self.steps[k]/self.image_size[0] for y in [i+0, i+0.5]]
+                        dense_cx = [x*self.steps[k]/self.image_size[1]
+                                    for x in [j+0, j+0.5]]
+                        dense_cy = [y*self.steps[k]/self.image_size[0]
+                                    for y in [i+0, i+0.5]]
                         for cy, cx in product(dense_cy, dense_cx):
                             mean += [cx, cy, s_kx, s_ky]
                     else:
                         cx = (j + 0.5) * self.steps[k] / self.image_size[1]
                         cy = (i + 0.5) * self.steps[k] / self.image_size[0]
                         mean += [cx, cy, s_kx, s_ky]
-        output = np.array(mean).reshape(-1, 4) 
+        output = np.array(mean).reshape(-1, 4)
         return output
 
 
-resize = 1
+RESIZE = 1
+
 
 def pre_process(to_show):
     img = np.float32(to_show)
-    img = cv2.resize(img, None, None, fx=resize, fy=resize, interpolation=cv2.INTER_LINEAR)
+    img = cv2.RESIZE(
+        img, None, None, fx=RESIZE, fy=RESIZE, interpolation=cv2.INTER_LINEAR
+    )
     scale = [img.shape[1], img.shape[0], img.shape[1], img.shape[0]]
     img -= (104, 117, 123)
     img = img.transpose(2, 0, 1)
@@ -63,8 +70,10 @@ def get_detection_dimension(out):
 
 
 def decode(loc, priors, variances):
-    boxes = np.concatenate([priors[:, :2] + loc[:, :2] * variances[0] * priors[:, 2:],
-                            priors[:, 2:] * np.exp(loc[:, 2:] * variances[1])], 1)
+    boxes = np.concatenate([
+        priors[:, :2] + loc[:, :2] * variances[0] * priors[:, 2:],
+        priors[:, 2:] * np.exp(loc[:, 2:] * variances[1])
+    ], 1)
     boxes[:, :2] -= boxes[:, 2:] / 2
     boxes[:, 2:] += boxes[:, :2]
     return boxes
@@ -106,7 +115,7 @@ def post_process(out, img, scale, THRESHOLD, IOU):
     priors = priorbox.forward()
     loc, conf = out[0], out[1]
     boxes = decode(loc.squeeze(0), priors, [0.1, 0.2])
-    boxes = boxes * scale / resize
+    boxes = boxes * scale / RESIZE
     scores = conf[:, 1]
 
     # ignore low scores
@@ -120,11 +129,12 @@ def post_process(out, img, scale, THRESHOLD, IOU):
     scores = scores[order]
 
     # do NMS
-    dets = np.hstack((boxes, scores[:, np.newaxis])).astype(np.float32, copy=False)
+    dets = np.hstack(
+        (boxes, scores[:, np.newaxis])
+    ).astype(np.float32, copy=False)
     keep = nms(dets, IOU)
     dets = dets[keep, :]
 
     # keep top-K faster NMS
     dets = dets[:750, :]
     return dets
-

@@ -1,14 +1,16 @@
 import sys
 import time
-import argparse
 
 import cv2
 
 import ailia
 # import original modules
 sys.path.append('../../util')
+sys.path.append('../../face_detection/blazeface')
+from utils import get_base_parser, update_parser  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
-from webcamera_utils import get_capture  # noqa: E402
+import webcamera_utils  # noqa: E402
+from blazeface_utils import compute_blazeface, crop_blazeface  # noqa: E402
 
 
 # ======================
@@ -41,33 +43,17 @@ FACE_WEIGHT_PATH = 'blazeface.onnx'
 FACE_MODEL_PATH = 'blazeface.onnx.prototxt'
 FACE_REMOTE_PATH = "https://storage.googleapis.com/ailia-models/blazeface/"
 FACE_MARGIN = 1.0
-sys.path.append('../../face_detection/blazeface')
-from blazeface_utils import compute_blazeface, crop_blazeface  # noqa: E402
+
 
 # ======================
 # Arguemnt Parser Config
 # ======================
-parser = argparse.ArgumentParser(
-    description='Face Classificaiton Model (emotion & gender)'
+parser = get_base_parser(
+    'Face Classificaiton Model (emotion & gender)',
+    IMAGE_PATH,
+    None,
 )
-parser.add_argument(
-    '-i', '--input', metavar='IMAGEFILE_PATH',
-    default=IMAGE_PATH,
-    help='The input image path.'
-)
-parser.add_argument(
-    '-v', '--video', metavar='VIDEO',
-    default=None,
-    help='The input video path. ' +
-         'If the VIDEO argument is set to 0, the webcam input will be used.'
-)
-parser.add_argument(
-    '-b', '--benchmark',
-    action='store_true',
-    help='Running the inference on the same input 5 times ' +
-         'to measure execution performance. (Cannot be used in video mode)'
-)
-args = parser.parse_args()
+args = update_parser(parser)
 
 
 # ======================
@@ -83,23 +69,21 @@ def recognize_from_image():
         img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGRA)
 
     # net initialize
-    env_id = ailia.get_gpu_environment_id()
-    print(f'env_id: {env_id}')
     emotion_classifier = ailia.Classifier(
         EMOTION_MODEL_PATH,
         EMOTION_WEIGHT_PATH,
-        env_id=env_id,
+        env_id=args.env_id,
         format=ailia.NETWORK_IMAGE_FORMAT_GRAY,
         range=ailia.NETWORK_IMAGE_RANGE_S_FP32,
-        channel=ailia.NETWORK_IMAGE_CHANNEL_FIRST
+        channel=ailia.NETWORK_IMAGE_CHANNEL_FIRST,
     )
     gender_classifier = ailia.Classifier(
         GENDER_MODEL_PATH,
         GENDER_WEIGHT_PATH,
-        env_id=env_id,
+        env_id=args.env_id,
         format=ailia.NETWORK_IMAGE_FORMAT_GRAY,
         range=ailia.NETWORK_IMAGE_RANGE_S_FP32,
-        channel=ailia.NETWORK_IMAGE_CHANNEL_FIRST
+        channel=ailia.NETWORK_IMAGE_CHANNEL_FIRST,
     )
 
     # inference emotion
@@ -152,27 +136,36 @@ def recognize_from_image():
 
 def recognize_from_video():
     # net initialize
-    env_id = ailia.get_gpu_environment_id()
-    print(f'env_id: {env_id}')
     emotion_classifier = ailia.Classifier(
         EMOTION_MODEL_PATH,
         EMOTION_WEIGHT_PATH,
-        env_id=env_id,
+        env_id=args.env_id,
         format=ailia.NETWORK_IMAGE_FORMAT_GRAY,
         range=ailia.NETWORK_IMAGE_RANGE_S_FP32,
-        channel=ailia.NETWORK_IMAGE_CHANNEL_FIRST
+        channel=ailia.NETWORK_IMAGE_CHANNEL_FIRST,
     )
     gender_classifier = ailia.Classifier(
         GENDER_MODEL_PATH,
         GENDER_WEIGHT_PATH,
-        env_id=env_id,
+        env_id=args.env_id,
         format=ailia.NETWORK_IMAGE_FORMAT_GRAY,
         range=ailia.NETWORK_IMAGE_RANGE_S_FP32,
-        channel=ailia.NETWORK_IMAGE_CHANNEL_FIRST
+        channel=ailia.NETWORK_IMAGE_CHANNEL_FIRST,
     )
-    detector = ailia.Net(FACE_MODEL_PATH, FACE_WEIGHT_PATH, env_id=env_id)
+    detector = ailia.Net(FACE_MODEL_PATH, FACE_WEIGHT_PATH, env_id=args.env_id)
 
-    capture = get_capture(args.video)
+    capture = webcamera_utils.get_capture(args.video)
+
+    # create video writer if savepath is specified as video format
+    if args.savepath is not None:
+        print('[WARNING] currently video results output feature '
+              'is not supported in this model!')
+        # TODO: shape should be debugged!
+        f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
+        writer = webcamera_utils.get_writer(args.savepath, f_h, f_w)
+    else:
+        writer = None
 
     while(True):
         ret, frame = capture.read()
@@ -181,19 +174,26 @@ def recognize_from_video():
             break
 
         # detect face
-        detections = compute_blazeface(detector, frame, anchor_path='../../face_detection/blazeface/anchors.npy')
+        # WIP: FIXME: AiliaInvalidArgumentException error
+        detections = compute_blazeface(
+            detector,
+            frame,
+            anchor_path='../../face_detection/blazeface/anchors.npy',
+        )
 
         for obj in detections:
             # get detected face
-            crop_img, top_left, bottom_right = crop_blazeface(obj, FACE_MARGIN, frame)
+            crop_img, top_left, bottom_right = crop_blazeface(
+                obj, FACE_MARGIN, frame
+            )
             if crop_img.shape[0] <= 0 or crop_img.shape[1] <= 0:
                 continue
             crop_img = cv2.cvtColor(crop_img, cv2.COLOR_BGR2BGRA)
-                
+
             # emotion inference
             emotion_classifier.compute(crop_img, EMOTION_MAX_CLASS_COUNT)
             count = emotion_classifier.get_class_count()
-            print('===========================================================')
+            print('=' * 80)
             print(f'emotion_class_count={count}')
 
             # print result
@@ -207,7 +207,8 @@ def recognize_from_video():
                 )
                 print(f'  prob={info.prob}')
                 if idx == 0:
-                    emotion_text = f'[ {EMOTION_CATEGORY[info.category]} ] prob={info.prob:.3f}'
+                    emotion_text = (f'[ {EMOTION_CATEGORY[info.category]} ] '
+                                    f'prob={info.prob:.3f}')
             print('')
 
             # gender inference
@@ -224,18 +225,25 @@ def recognize_from_video():
                 )
                 print(f'  prob={info.prob}')
                 if idx == 0:
-                    gender_text = f'[ {GENDER_CATEGORY[info.category]} ] prob={info.prob:.3f}'
+                    gender_text = (f'[ {GENDER_CATEGORY[info.category]} ] '
+                                   f'prob={info.prob:.3f}')
             print('')
 
             # display label
             LABEL_WIDTH = 400
             LABEL_HEIGHT = 20
-            color = (255,255,255)
+            color = (255, 255, 255)
             cv2.rectangle(frame, top_left, bottom_right, color, thickness=2)
-            cv2.rectangle(frame, top_left, (top_left[0]+LABEL_WIDTH,top_left[1]+LABEL_HEIGHT), color, thickness=-1)
+            cv2.rectangle(
+                frame,
+                top_left,
+                (top_left[0]+LABEL_WIDTH, top_left[1]+LABEL_HEIGHT),
+                color,
+                thickness=-1,
+            )
 
             text_position = (top_left[0], top_left[1]+LABEL_HEIGHT//2)
-            color = (0,0,0)
+            color = (0, 0, 0)
             fontScale = 0.5
             cv2.putText(
                 frame,
@@ -244,15 +252,21 @@ def recognize_from_video():
                 cv2.FONT_HERSHEY_SIMPLEX,
                 fontScale,
                 color,
-                1
+                1,
             )
 
             # show result
             cv2.imshow('frame', frame)
             time.sleep(SLEEP_TIME)
 
+            # save results
+            if writer is not None:
+                writer.write(frame)
+
     capture.release()
     cv2.destroyAllWindows()
+    if writer is not None:
+        writer.release()
     print('Script finished successfully.')
 
 

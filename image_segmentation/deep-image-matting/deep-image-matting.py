@@ -1,6 +1,5 @@
 import sys
 import time
-import argparse
 
 import numpy as np
 import cv2
@@ -8,8 +7,9 @@ import cv2
 import ailia
 # import original modules
 sys.path.append('../../util')
-from webcamera_utils import preprocess_frame, get_capture  # noqa: E402
+from utils import get_base_parser, update_parser  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
+import webcamera_utils  # noqa: E402
 
 
 # ======================
@@ -31,24 +31,11 @@ MODEL_LISTS = ['deeplabv3', 'u2net', 'pspnet']
 # ======================
 # Arguemnt Parser Config
 # ======================
-parser = argparse.ArgumentParser(
-    description='Deep Image Matting'
-)
-parser.add_argument(
-    '-i', '--input', metavar='IMAGE',
-    default=IMAGE_PATH,
-    help='The input image path.'
-)
+parser = get_base_parser('Deep Image Matting', IMAGE_PATH, SAVE_IMAGE_PATH)
 parser.add_argument(
     '-t', '--trimap', metavar='IMAGE',
     default=TRIMAP_PATH,
     help='The input image path.'
-)
-parser.add_argument(
-    '-v', '--video', metavar='VIDEO',
-    default=None,
-    help='The input video path. ' +
-         'If the VIDEO argument is set to 0, the webcam input will be used.'
 )
 parser.add_argument(
     '-a', '--arch', metavar='ARCH',
@@ -56,38 +43,28 @@ parser.add_argument(
     help='model lists: ' + ' | '.join(MODEL_LISTS)
 )
 parser.add_argument(
-    '-s', '--savepath', metavar='SAVE_IMAGE_PATH',
-    default=SAVE_IMAGE_PATH,
-    help='Save path for the output image.'
-)
-parser.add_argument(
-    '-b', '--benchmark',
-    action='store_true',
-    help='Running the inference on the same input 5 times ' +
-         'to measure execution performance. (Cannot be used in video mode)'
-)
-parser.add_argument(
     '-d', '--debug',
     action='store_true',
     help='Dump debug images'
 )
-args = parser.parse_args()
+args = update_parser(parser)
 
 if args.arch == 'u2net':
     SEGMENTATION_WEIGHT_PATH = 'u2net.onnx'
     SEGMENTATION_MODEL_PATH = SEGMENTATION_WEIGHT_PATH + '.prototxt'
     SEGMENTATION_REMOTE_PATH = \
         'https://storage.googleapis.com/ailia-models/u2net/'
-if args.arch == 'deeplabv3':
+elif args.arch == 'deeplabv3':
     SEGMENTATION_WEIGHT_PATH = 'deeplabv3.opt.onnx'
     SEGMENTATION_MODEL_PATH = SEGMENTATION_WEIGHT_PATH + '.prototxt'
     SEGMENTATION_REMOTE_PATH = \
         'https://storage.googleapis.com/ailia-models/deeplabv3/'
-if args.arch == 'pspnet':
+elif args.arch == 'pspnet':
     SEGMENTATION_WEIGHT_PATH = 'pspnet-hair-segmentation.onnx'
     SEGMENTATION_MODEL_PATH = SEGMENTATION_WEIGHT_PATH + '.prototxt'
     SEGMENTATION_REMOTE_PATH = \
         'https://storage.googleapis.com/ailia-models/pspnet-hair-segmentation/'
+
 
 # ======================
 # Utils
@@ -138,11 +115,10 @@ def postprocess(src_img, trimap, preds_ailia):
 
     return output_data
 
+
 # ======================
 # Segmentation util
 # ======================
-
-
 def norm(pred):
     ma = np.max(pred)
     mi = np.min(pred)
@@ -273,17 +249,16 @@ def recognize_from_image():
 
     # net initialize
     env_id = 0  # use cpu because overflow fp16 range
-    # env_id = ailia.get_gpu_environment_id()
-    print(f'env_id: {env_id}')
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
     net.set_input_shape((1, IMAGE_HEIGHT, IMAGE_WIDTH, 4))
 
     if args.trimap == "":
         input_data = src_img
 
-        env_id = ailia.get_gpu_environment_id()
         seg_net = ailia.Net(
-            SEGMENTATION_MODEL_PATH, SEGMENTATION_WEIGHT_PATH, env_id=env_id
+            SEGMENTATION_MODEL_PATH,
+            SEGMENTATION_WEIGHT_PATH,
+            env_id=args.env_id
         )
 
         trimap_data, seg_data = generate_trimap(seg_net, input_data)
@@ -317,18 +292,28 @@ def recognize_from_image():
 
 def recognize_from_video():
     # net initialize
-    # env_id = ailia.get_gpu_environment_id()
-    env_id = 0
-    print(f'env_id: {env_id}')
+    env_id = 0  # use cpu because overflow fp16 range
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
     net.set_input_shape((1, IMAGE_HEIGHT, IMAGE_WIDTH, 4))
 
-    env_id = ailia.get_gpu_environment_id()
     seg_net = ailia.Net(
-        SEGMENTATION_MODEL_PATH, SEGMENTATION_WEIGHT_PATH, env_id=env_id
+        SEGMENTATION_MODEL_PATH,
+        SEGMENTATION_WEIGHT_PATH,
+        env_id=args.env_id
     )
 
-    capture = get_capture(args.video)
+    capture = webcamera_utils.get_capture(args.video)
+
+    # create video writer if savepath is specified as video format
+    if args.savepath != SAVE_IMAGE_PATH:
+        print(
+            '[WARNING] currently, video results cannot be output correctly...'
+        )
+        writer = webcamera_utils.get_writer(
+            args.savepath, IMAGE_HEIGHT, IMAGE_WIDTH
+        )
+    else:
+        writer = None
 
     while(True):
         ret, frame = capture.read()
@@ -336,7 +321,7 @@ def recognize_from_video():
             break
 
         # grab src image
-        src_img, input_data = preprocess_frame(
+        src_img, input_data = webcamera_utils.preprocess_frame(
             frame,
             IMAGE_HEIGHT,
             IMAGE_WIDTH,
@@ -370,20 +355,25 @@ def recognize_from_video():
         cv2.imshow('trimap', trimap_data / 255.0)
         cv2.imshow('segmentation', seg_data / 255.0)
 
+        # # save results
+        # if writer is not None:
+        #     writer.write(res_img)
+
     capture.release()
     cv2.destroyAllWindows()
+    if writer is not None:
+        writer.release()
     print('Script finished successfully.')
 
 
 def main():
     # model files check and download
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
-    if args.trimap == '':
-        check_and_download_models(
-            SEGMENTATION_WEIGHT_PATH,
-            SEGMENTATION_MODEL_PATH,
-            SEGMENTATION_REMOTE_PATH
-        )
+    check_and_download_models(
+        SEGMENTATION_WEIGHT_PATH,
+        SEGMENTATION_MODEL_PATH,
+        SEGMENTATION_REMOTE_PATH
+    )
 
     if args.video is not None:
         # video mode
