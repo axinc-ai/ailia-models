@@ -1,6 +1,5 @@
 import sys
 import time
-import argparse
 
 import numpy as np
 import cv2
@@ -9,9 +8,10 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
+from utils import get_base_parser, update_parser  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
-from webcamera_utils import adjust_frame_size, get_capture  # noqa: E402C
-from detector_utils import plot_results, load_image  # noqa: E402C
+from detector_utils import plot_results, load_image  # noqa: E402
+import webcamera_utils  # noqa: E402
 
 
 # ======================
@@ -53,32 +53,8 @@ IOU = 0.45
 # ======================
 # Arguemnt Parser Config
 # ======================
-parser = argparse.ArgumentParser(
-    description='Yolov1 tiny model'
-)
-parser.add_argument(
-    '-i', '--input', metavar='IMAGE',
-    default=IMAGE_PATH,
-    help='The input image path.'
-)
-parser.add_argument(
-    '-v', '--video', metavar='VIDEO',
-    default=None,
-    help='The input video path. ' +
-         'If the VIDEO argument is set to 0, the webcam input will be used.'
-)
-parser.add_argument(
-    '-s', '--savepath', metavar='SAVE_IMAGE_PATH',
-    default=SAVE_IMAGE_PATH,
-    help='Save path for the output image.'
-)
-parser.add_argument(
-    '-b', '--benchmark',
-    action='store_true',
-    help='Running the inference on the same input 5 times ' +
-         'to measure execution performance. (Cannot be used in video mode)'
-)
-args = parser.parse_args()
+parser = get_base_parser('Yolov2 model', IMAGE_PATH, SAVE_IMAGE_PATH)
+args = update_parser(parser)
 
 
 # ======================
@@ -90,8 +66,6 @@ def recognize_from_image():
     print(f'input image shape: {img.shape}')
 
     # net initialize
-    env_id = ailia.get_gpu_environment_id()
-    print(f'env_id: {env_id}')
     detector = ailia.Detector(
         MODEL_PATH,
         WEIGHT_PATH,
@@ -100,7 +74,7 @@ def recognize_from_image():
         channel=ailia.NETWORK_IMAGE_CHANNEL_FIRST,
         range=ailia.NETWORK_IMAGE_RANGE_S_FP32,
         algorithm=ailia.DETECTOR_ALGORITHM_YOLOV2,
-        env_id=env_id
+        env_id=args.env_id,
     )
     detector.set_anchors(ANCHORS)
 
@@ -124,8 +98,6 @@ def recognize_from_image():
 
 def recognize_from_video():
     # net initialize
-    env_id = ailia.get_gpu_environment_id()
-    print(f'env_id: {env_id}')
     detector = ailia.Detector(
         MODEL_PATH,
         WEIGHT_PATH,
@@ -134,26 +106,42 @@ def recognize_from_video():
         channel=ailia.NETWORK_IMAGE_CHANNEL_FIRST,
         range=ailia.NETWORK_IMAGE_RANGE_S_FP32,
         algorithm=ailia.DETECTOR_ALGORITHM_YOLOV2,
-        env_id=env_id
+        env_id=args.env_id,
     )
     detector.set_anchors(ANCHORS)
 
-    capture = get_capture(args.video)
+    capture = webcamera_utils.get_capture(args.video)
+
+    # create video writer if savepath is specified as video format
+    if args.savepath != SAVE_IMAGE_PATH:
+        writer = webcamera_utils.get_writer(
+            args.savepath, IMAGE_HEIGHT, IMAGE_WIDTH
+        )
+    else:
+        writer = None
 
     while(True):
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
 
-        _, resized_img = adjust_frame_size(frame, IMAGE_HEIGHT, IMAGE_WIDTH)
+        _, resized_img = webcamera_utils.adjust_frame_size(
+            frame, IMAGE_HEIGHT, IMAGE_WIDTH
+        )
 
         img = cv2.cvtColor(resized_img, cv2.COLOR_RGB2BGRA)
         detector.compute(img, THRESHOLD, IOU)
         res_img = plot_results(detector, resized_img, COCO_CATEGORY, False)
         cv2.imshow('frame', res_img)
 
+        # save results
+        if writer is not None:
+            writer.write(res_img)
+
     capture.release()
     cv2.destroyAllWindows()
+    if writer is not None:
+        writer.release()
     print('Script finished successfully.')
 
 

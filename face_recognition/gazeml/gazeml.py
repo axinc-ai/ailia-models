@@ -1,7 +1,6 @@
 import sys
 import time
 import platform
-import argparse
 
 import numpy as np
 import cv2
@@ -10,10 +9,12 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
+sys.path.append('../../face_detection/blazeface')
+from utils import get_base_parser, update_parser  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from image_utils import load_image  # noqa: E402
-from webcamera_utils import adjust_frame_size, get_capture  # noqa: E402
-
+import webcamera_utils  # noqa: E402
+from blazeface_utils import compute_blazeface_with_keypoint  # noqa: E402
 
 # ======================
 # PARAMETERS
@@ -40,39 +41,13 @@ FACE_WEIGHT_PATH = 'blazeface.onnx'
 FACE_MODEL_PATH = 'blazeface.onnx.prototxt'
 FACE_REMOTE_PATH = "https://storage.googleapis.com/ailia-models/blazeface/"
 FACE_MARGIN = 1.2
-sys.path.append('../../face_detection/blazeface')
-from blazeface_utils import compute_blazeface_with_keypoint, crop_blazeface  # noqa: E402
 
 
 # ======================
 # Arguemnt Parser Config
 # ======================
-parser = argparse.ArgumentParser(
-    description='gaze estimation model'
-)
-parser.add_argument(
-    '-i', '--input', metavar='IMAGE',
-    default=IMAGE_PATH,
-    help='The input image path.'
-)
-parser.add_argument(
-    '-v', '--video', metavar='VIDEO',
-    default=None,
-    help='The input video path. ' +
-         'If the VIDEO argument is set to 0, the webcam input will be used.'
-)
-parser.add_argument(
-    '-s', '--savepath', metavar='SAVE_IMAGE_PATH',
-    default=SAVE_IMAGE_PATH,
-    help='Save path for the output image.'
-)
-parser.add_argument(
-    '-b', '--benchmark',
-    action='store_true',
-    help='Running the inference on the same input 5 times ' +
-         'to measure execution performance. (Cannot be used in video mode)'
-)
-args = parser.parse_args()
+parser = get_base_parser('gaze estimation model', IMAGE_PATH, SAVE_IMAGE_PATH)
+args = update_parser(parser)
 
 
 # ======================
@@ -123,9 +98,7 @@ def recognize_from_image():
     eyeI = eyeI.reshape(2, IMAGE_HEIGHT, IMAGE_WIDTH, 1)
 
     # net initialize
-    env_id = ailia.get_gpu_environment_id()
-    print(f'env_id: {env_id}')
-    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
 
     # inference
     print('Start inference...')
@@ -144,19 +117,27 @@ def recognize_from_image():
     )
 
     # postprocessing
-    plot_on_image(org_img, preds_ailia, 0, 0, org_img.shape[1], org_img.shape[0])
+    plot_on_image(
+        org_img, preds_ailia, 0, 0, org_img.shape[1], org_img.shape[0]
+    )
     cv2.imwrite(args.savepath, org_img)
     print('Script finished successfully.')
 
 
 def recognize_from_video():
     # net initialize
-    env_id = ailia.get_gpu_environment_id()
-    print(f'env_id: {env_id}')
-    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
-    detector = ailia.Net(FACE_MODEL_PATH, FACE_WEIGHT_PATH, env_id=env_id)
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
+    detector = ailia.Net(FACE_MODEL_PATH, FACE_WEIGHT_PATH, env_id=args.env_id)
 
-    capture = get_capture(args.video)
+    capture = webcamera_utils.get_capture(args.video)
+
+    # create video writer if savepath is specified as video format
+    if args.savepath != SAVE_IMAGE_PATH:
+        f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
+        writer = webcamera_utils.get_writer(args.savepath, f_h, f_w)
+    else:
+        writer = None
 
     while(True):
         ret, frame = capture.read()
@@ -164,8 +145,12 @@ def recognize_from_video():
             break
 
         # detect eyes
-        detections, keypoints = compute_blazeface_with_keypoint(detector, frame, anchor_path='../../face_detection/blazeface/anchors.npy')
-        
+        detections, keypoints = compute_blazeface_with_keypoint(
+            detector,
+            frame,
+            anchor_path='../../face_detection/blazeface/anchors.npy',
+        )
+
         eye_list = []
         for keypoint in keypoints:
             lx = int(keypoint["eye_left_x"] * frame.shape[1])
@@ -175,20 +160,27 @@ def recognize_from_video():
 
             eye_w = abs((lx-rx)/2)
             eye_h = eye_w * IMAGE_HEIGHT / IMAGE_WIDTH
-            
-            eye_list.append([int(lx-eye_w/2),int(ly-eye_h/2),int(lx+eye_w/2),int(ly+eye_h/2)])
-            eye_list.append([int(rx-eye_w/2),int(ry-eye_h/2),int(rx+eye_w/2),int(ry+eye_h/2)])
+
+            eye_list.append([int(lx-eye_w/2), int(ly-eye_h/2),
+                             int(lx+eye_w/2), int(ly+eye_h/2)])
+            eye_list.append([int(rx-eye_w/2), int(ry-eye_h/2),
+                             int(rx+eye_w/2), int(ry+eye_h/2)])
 
         # detect eye keypoints
         for eye_position in eye_list:
-            color = (255,255,255)
-            top_left = (eye_position[0],eye_position[1])
-            bottom_right = (eye_position[2],eye_position[3])
+            color = (255, 255, 255)
+            top_left = (eye_position[0], eye_position[1])
+            bottom_right = (eye_position[2], eye_position[3])
             cv2.rectangle(frame, top_left, bottom_right, color, thickness=2)
 
             # prepare frame
-            crop_img = frame[eye_position[1]:eye_position[3],eye_position[0]:eye_position[2],:]
-            img, resized_img = adjust_frame_size(crop_img, IMAGE_HEIGHT, IMAGE_WIDTH)
+            crop_img = frame[
+                eye_position[1]:eye_position[3],
+                eye_position[0]:eye_position[2],
+            ]
+            img, resized_img = webcamera_utils.adjust_frame_size(
+                crop_img, IMAGE_HEIGHT, IMAGE_WIDTH
+            )
             data = cv2.cvtColor(resized_img, cv2.COLOR_BGR2GRAY)
             data = cv2.equalizeHist(data)
             if platform.system() == 'Darwin':
@@ -205,12 +197,24 @@ def recognize_from_video():
             )
 
             # postprocessing
-            plot_on_image(frame, preds_ailia, eye_position[0], eye_position[1], eye_position[2]-eye_position[0], eye_position[3]-eye_position[1])
+            plot_on_image(
+                frame,
+                preds_ailia,
+                eye_position[0],
+                eye_position[1],
+                eye_position[2]-eye_position[0],
+                eye_position[3]-eye_position[1],
+            )
 
         cv2.imshow('frame', frame)
+        # save results
+        if writer is not None:
+            writer.write(frame)
 
     capture.release()
     cv2.destroyAllWindows()
+    if writer is not None:
+        writer.release()
     print('Script finished successfully.')
 
 

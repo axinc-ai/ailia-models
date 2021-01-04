@@ -43,6 +43,12 @@ If you pass `0` as an argument to VIDEO_PATH, you can use the webcam input inste
 $ python3 openpose.py --video VIDEO_PATH
 ```
 
+Also you can set detection threshold by adding the `--threshold` option.
+Default value is 0.4.
+
+```bash
+$ python3 openpose.py --threshold 0.2
+```
 
 ## Reference
 

@@ -98,11 +98,26 @@ def preprocess_frame(
     return img, data
 
 
-def get_writer(savepath, height, width, rgb=True):
+def get_writer(savepath, height, width, fps=20, rgb=True):
+    """get cv2.VideoWriter
+
+    Parameters
+    ----------
+    save_path : str
+    height : int
+    width : int
+    fps : int
+    rgb : bool, default is True
+
+    Returns
+    -------
+    writer : cv2.VideoWriter()
+    """
     writer = cv2.VideoWriter(
         savepath,
-        cv2.VideoWriter_fourcc(*'MJPG'),
-        20,
+        # cv2.VideoWriter_fourcc(*'MJPG'),  # avi mode
+        cv2.VideoWriter_fourcc('m', 'p', '4', 'v'),  # mp4 mode
+        fps,
         (width, height),
         isColor=rgb
     )
@@ -112,6 +127,9 @@ def get_writer(savepath, height, width, rgb=True):
 def get_capture(video):
     """
     Get cv2.VideoCapture
+
+    * TODO: maybe get capture & writer at the same time?
+    *       then, you can use capture frame size directory
 
     Parameters
     ----------
