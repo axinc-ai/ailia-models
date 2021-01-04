@@ -1,7 +1,6 @@
 import sys
 import time
 import math
-import argparse
 
 import cv2
 import numpy as np
@@ -14,8 +13,9 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
+from utils import get_base_parser, update_parser  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
-from webcamera_utils import get_capture  # noqa: E402
+import webcamera_utils  # noqa: E402
 
 
 # ======================
@@ -34,32 +34,12 @@ CLASSES = [line.rstrip('\n') for line in open('coco_classes.txt')]
 # ======================
 # Arguemnt Parser Config
 # ======================
-parser = argparse.ArgumentParser(
-    description='Real-time NN for object instance segmentation by Mask R-CNN'
+parser = get_base_parser(
+    'Real-time NN for object instance segmentation by Mask R-CNN',
+    IMAGE_PATH,
+    SAVE_IMAGE_PATH,
 )
-parser.add_argument(
-    '-i', '--input', metavar='IMAGE',
-    default=IMAGE_PATH,
-    help='The input image path.'
-)
-parser.add_argument(
-    '-v', '--video', metavar='VIDEO',
-    default=None,
-    help='The input video path. ' +
-         'If the VIDEO argument is set to 0, the webcam input will be used.'
-)
-parser.add_argument(
-    '-s', '--savepath', metavar='SAVE_IMAGE_PATH',
-    default=SAVE_IMAGE_PATH,
-    help='Save path for the output image.'
-)
-parser.add_argument(
-    '-b', '--benchmark',
-    action='store_true',
-    help='Running the inference on the same input 5 times ' +
-         'to measure execution performance. (Cannot be used in video mode)'
-)
-args = parser.parse_args()
+args = update_parser(parser)
 
 
 # ======================
@@ -68,8 +48,14 @@ args = parser.parse_args()
 def preprocess(image):
     # Resize
     ratio = 800.0 / min(image.size[0], image.size[1])
+    resize_w = int(ratio * image.size[0])
+    resize_h = int(ratio * image.size[1])
+    if (max(resize_w, resize_h) > 1280.0):
+        ratio = 1280.0 / max(image.size[0], image.size[1])
+        resize_w = int(ratio * image.size[0])
+        resize_h = int(ratio * image.size[1])
     image = image.resize(
-        (int(ratio * image.size[0]), int(ratio * image.size[1])),
+        (resize_w, resize_h),
         Image.BILINEAR
     )
 
@@ -109,6 +95,10 @@ def display_objdetect_image(
     """
     # Resize boxes
     ratio = 800.0 / min(image.size[0], image.size[1])
+    resize_w = int(ratio * image.size[0])
+    resize_h = int(ratio * image.size[1])
+    if (max(resize_w, resize_h) > 1280.0):
+        ratio = 1280.0 / max(image.size[0], image.size[1])
     boxes /= ratio
 
     image = np.array(image)
@@ -178,9 +168,8 @@ def recognize_from_image():
     input_data = preprocess(image)
 
     # net initialize
-    env_id = ailia.get_gpu_environment_id()
-    print(f'env_id: {env_id}')
     # This model requires fuge gpu memory so fallback to cpu mode
+    env_id = args.env_id
     if env_id != -1 and ailia.get_environment(env_id).props == "LOWPOWER":
         env_id = -1
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
@@ -208,15 +197,24 @@ def recognize_from_image():
 
 def recognize_from_video():
     # net initialize
-    env_id = ailia.get_gpu_environment_id()
-    print(f'env_id: {env_id}')
-
     # This model requires fuge gpu memory so fallback to cpu mode
+    env_id = args.env_id
     if env_id != -1 and ailia.get_environment(env_id).props == "LOWPOWER":
         env_id = -1
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
 
-    capture = get_capture(args.video)
+    capture = webcamera_utils.get_capture(args.video)
+
+    # create video writer if savepath is specified as video format
+    if args.savepath != SAVE_IMAGE_PATH:
+        print(
+            '[WARNING] currently, video results cannot be output correctly...'
+        )
+        f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
+        writer = webcamera_utils.get_writer(args.savepath, f_h, f_w)
+    else:
+        writer = None
 
     fig, ax = create_figure()
 
@@ -237,8 +235,14 @@ def recognize_from_video():
         if not plt.get_fignums():
             break
 
+        # save results
+        # if writer is not None:
+        #     writer.write(frame)
+
     capture.release()
     cv2.destroyAllWindows()
+    if writer is not None:
+        writer.release()
     print('Script finished successfully.')
 
 

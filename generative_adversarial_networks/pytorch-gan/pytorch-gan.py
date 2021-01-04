@@ -1,6 +1,5 @@
 import sys
 import time
-import argparse
 
 import numpy as np
 import cv2
@@ -8,47 +7,39 @@ import cv2
 import ailia
 
 sys.path.append('../../util')
+from utils import get_base_parser, update_parser  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
+from webcamera_utils import get_writer  # noqa: E402
 
 
 # ======================
 # Parameters
 # ======================
-SAVE_IMAGE_PATH = 'output.png' # default value
-MODEL_NAME = 'celeb' # default value
+SAVE_IMAGE_PATH = 'output.png'  # default value
+MODEL_NAME = 'celeb'  # default value
 
-REMOTE_PATH = f'https://storage.googleapis.com/ailia-models/pytorch-gan/'
+REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/pytorch-gan/'
+
+OUTPUT_SIZE = 0  # uninitialized
+
 
 # =======================
 # Arguments Parser Config
 # =======================
-parser = argparse.ArgumentParser(
-    description='Generation of anime character faces using a GNet trained from the PytorchZoo GAN.'
+parser = get_base_parser(
+    ('Generation of anime character faces using '
+     'a GNet trained from the PytorchZoo GAN.'),
+    None,
+    SAVE_IMAGE_PATH,
 )
 parser.add_argument(
     '-m', '--model', metavar='MODEL_NAME',
     default=MODEL_NAME,
     help='Model to use ("anime" or "celeb". Default is "anime").'
 )
-parser.add_argument(
-    '-s', '--savepath', metavar='SAVE_IMAGE_PATH',
-    default=SAVE_IMAGE_PATH,
-    help='Save path for the output image.'
-)
-parser.add_argument(
-    '-v', '--video', metavar='VIDEO',
-    default=None,
-    help='The input video path. ' +
-         'If the VIDEO argument is set to 0, the webcam input will be used.'
-)
-parser.add_argument(
-    '-b', '--benchmark',
-    action='store_true',
-    help='Running the inference on the same input 5 times ' +
-         'to measure execution performance.'
-)
-OUTPUT_SIZE = 0 # uninitialized
-args = parser.parse_args()
+args = update_parser(parser)
+
+
 if args.model == 'anime':
     print('Generation using model "AnimeFace"')
     MODEL_INFIX = 'animeface'
@@ -58,21 +49,22 @@ elif args.model == 'celeb':
     MODEL_INFIX = 'celeba'
     OUTPUT_SIZE = 128
 else:
-    print('Error: unknown model name "'+args.model+'" (must be "anime" or "celeb")')
+    print(
+        f'[ERROR] unknown model name "{args.model}" '
+        '(must be "anime" or "celeb")'
+    )
     exit(-1)
+
 MODEL_PATH = 'pytorch-gnet-'+MODEL_INFIX+'.onnx.prototxt'
 WEIGHT_PATH = 'pytorch-gnet-'+MODEL_INFIX+'.onnx'
 
+
 def generate_image():
     # prepare input data
-    rand_input = np.random.rand(1,512).astype(np.float32)
+    rand_input = np.random.rand(1, 512).astype(np.float32)
 
     # net initialize
-    env_id = ailia.get_gpu_environment_id()
-    print(f'env_id: {env_id}')
-    gnet = ailia.Net(
-        MODEL_PATH, WEIGHT_PATH, env_id=env_id
-    )
+    gnet = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
 
     # inference
     print('Start inference...')
@@ -85,24 +77,32 @@ def generate_image():
             print(f'\tailia processing time {end - start} ms')
     else:
         _ = gnet.predict(rand_input)
-        
+
     # postprocessing
 
     [output_blob_idx] = gnet.get_output_blob_list()
     output_data = gnet.get_blob_data(output_blob_idx)
 
-    outp = np.clip((0.5 + 255*output_data.transpose((2,3,1,0)).reshape((OUTPUT_SIZE,OUTPUT_SIZE,3))).astype(np.float32),0,255)
+    outp = np.clip((0.5 + 255*output_data.transpose(
+        (2, 3, 1, 0)
+    ).reshape((OUTPUT_SIZE, OUTPUT_SIZE, 3))).astype(np.float32), 0, 255)
 
-    cv2.imwrite(args.savepath, cv2.cvtColor(outp.astype(np.uint8), cv2.COLOR_RGB2BGR))
+    cv2.imwrite(
+        args.savepath,
+        cv2.cvtColor(outp.astype(np.uint8), cv2.COLOR_RGB2BGR)
+    )
     print('Script finished successfully.')
+
 
 def generate_video():
     # net initialize
-    env_id = ailia.get_gpu_environment_id()
-    print(f'env_id: {env_id}')
-    gnet = ailia.Net(
-        MODEL_PATH, WEIGHT_PATH, env_id=env_id
-    )
+    gnet = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
+
+    # create video writer if savepath is specified as video format
+    if args.savepath != SAVE_IMAGE_PATH:
+        writer = get_writer(args.savepath, OUTPUT_SIZE, OUTPUT_SIZE)
+    else:
+        writer = None
 
     # inference
     while(True):
@@ -112,24 +112,33 @@ def generate_video():
         # prepare input data
         no_1 = int(np.random.rand(1)*511)
         no_2 = int(np.random.rand(1)*511)
-        rand_input = np.zeros((1,512))
-        rand_input[0,no_1] = 1.0
-        rand_input[0,no_2] = 1.0
-        
+        rand_input = np.zeros((1, 512))
+        rand_input[0, no_1] = 1.0
+        rand_input[0, no_2] = 1.0
+
         # inference
         _ = gnet.predict(rand_input)
-        
+
         # postprocessing
         [output_blob_idx] = gnet.get_output_blob_list()
         output_data = gnet.get_blob_data(output_blob_idx)
 
-        outp = np.clip((0.5 + 255*output_data.transpose((2,3,1,0)).reshape((OUTPUT_SIZE,OUTPUT_SIZE,3))).astype(np.float32),0,255)
+        outp = np.clip((0.5 + 255*output_data.transpose(
+            (2, 3, 1, 0)
+        ).reshape((OUTPUT_SIZE, OUTPUT_SIZE, 3))).astype(np.float32), 0, 255)
 
         image = cv2.cvtColor(outp.astype(np.uint8), cv2.COLOR_RGB2BGR)
         cv2.imshow("frame", image)
 
+        # save results
+        if writer is not None:
+            writer.write(image)
+
     cv2.destroyAllWindows()
+    if writer is not None:
+        writer.release()
     print('Script finished successfully.')
+
 
 def main():
     # model files check and download

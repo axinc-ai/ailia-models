@@ -1,45 +1,38 @@
-from transformers import DistilBertTokenizer
-from transformers.tokenization_utils import PreTrainedTokenizer
-from transformers.tokenization_auto import AutoTokenizer
-
-import numpy as np
 import time
 import sys
-import argparse
+
+import numpy as np
+from transformers.tokenization_auto import AutoTokenizer
+from transformers.data import SquadExample, squad_convert_examples_to_features
+from typing import Dict, List, Tuple, Union
+from transformers.tokenization_utils_base import PaddingStrategy
 
 import ailia
 
 sys.path.append('../../util')
+from utils import get_base_parser, update_parser  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
+
 
 # ======================
 # Arguemnt Parser Config
 # ======================
 
 DEFAULT_QUESTION = "What is ailia SDK ?"
-DEFAULT_CONTEXT = "ailia SDK is a highly performant single inference engine for multiple platforms and hardware"
+DEFAULT_CONTEXT = ("ailia SDK is a highly performant single inference engine "
+                   "for multiple platforms and hardware")
 
-parser = argparse.ArgumentParser(
-    description='bert question answering.'
-)
 
+parser = get_base_parser('bert question answering.', None, None)
 parser.add_argument(
-    '--question', '-q', metavar='TEXT',
-    default=DEFAULT_QUESTION, 
+    '--question', '-q', metavar='TEXT', default=DEFAULT_QUESTION,
     help='input question'
 )
 parser.add_argument(
-    '--context', '-c', metavar='TEXT',
-    default=DEFAULT_CONTEXT, 
+    '--context', '-c', metavar='TEXT', default=DEFAULT_CONTEXT,
     help='input context'
 )
-parser.add_argument(
-    '-b', '--benchmark',
-    action='store_true',
-    help='Running the inference on the same input 5 times ' +
-         'to measure execution performance. (Cannot be used in video mode)'
-)
-args = parser.parse_args()
+args = update_parser(parser)
 
 
 # ======================
@@ -48,7 +41,8 @@ args = parser.parse_args()
 
 WEIGHT_PATH = "roberta-base-squad2.onnx"
 MODEL_PATH = "roberta-base-squad2.onnx.prototxt"
-REMOTE_PATH = "https://storage.googleapis.com/ailia-models/bert_question_answering/"
+REMOTE_PATH = \
+    "https://storage.googleapis.com/ailia-models/bert_question_answering/"
 
 
 # ======================
@@ -57,9 +51,6 @@ REMOTE_PATH = "https://storage.googleapis.com/ailia-models/bert_question_answeri
 
 # code from https://github.com/patil-suraj/onnx_transformers
 # Apache license
-from transformers.data import SquadExample, squad_convert_examples_to_features
-from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Optional, Sequence, Tuple, Union
-from transformers.tokenization_utils_base import BatchEncoding, PaddingStrategy
 
 def create_sample(
     question: Union[str, List[str]], context: Union[str, List[str]]
@@ -83,6 +74,7 @@ def create_sample(
         return [SquadExample(None, q, c, None, None, None) for q, c in zip(question, context)]
     else:
         return SquadExample(None, question, context, None, None, None)
+
 
 def decode(start: np.ndarray, end: np.ndarray, topk: int, max_answer_len: int) -> Tuple:
     """
@@ -125,7 +117,8 @@ def decode(start: np.ndarray, end: np.ndarray, topk: int, max_answer_len: int) -
     start, end = np.unravel_index(idx_sort, candidates.shape)[1:]
     return start, end, candidates[0, start, end]
 
-#@staticmethod
+
+# @staticmethod
 def span_to_answer(tokenizer, text: str, start: int, end: int) -> Dict[str, Union[str, int]]:
     """
     When decoding from token probalities, this method maps token indexes to actual word in
@@ -179,12 +172,12 @@ def main():
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
 
     inputs = {
-      "question": args.question, 
-      "context": args.context
+        "question": args.question,
+        "context": args.context,
     }
 
-    print("Question : ",args.question)
-    print("Context : ",args.context)
+    print("Question : ", args.question)
+    print("Context : ", args.context)
 
     # Set defaults values
     handle_impossible_answer = False
@@ -196,9 +189,9 @@ def main():
     # Convert inputs to features
     examples = []
 
-    if True:#for i, item in enumerate(inputs):
+    if True:  # for i, item in enumerate(inputs):
         item = inputs
-        #print(item)
+        # print(item)
         if isinstance(item, dict):
             if any(k not in item for k in ["question", "context"]):
                 raise KeyError("You need to provide a dictionary with keys {question:..., context:...}")
@@ -223,13 +216,14 @@ def main():
     all_answers = []
     for features, example in zip(features_list, examples):
         model_input_names = tokenizer.model_input_names + ["input_ids"]
-        fw_args = {k: [feature.__dict__[k] for feature in features] for k in model_input_names}
+        fw_args = {k: [feature.__dict__[k] for feature in features]
+                   for k in model_input_names}
         fw_args = {k: np.array(v) for (k, v) in fw_args.items()}
 
-        #print("Input",fw_args)
-        #print("Shape",fw_args["input_ids"].shape)
+        # print("Input",fw_args)
+        # print("Shape",fw_args["input_ids"].shape)
 
-        net = ailia.Net(MODEL_PATH,WEIGHT_PATH)
+        net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
         net.set_input_shape(fw_args["input_ids"].shape)
         if args.benchmark:
             print('BENCHMARK mode')
@@ -241,29 +235,37 @@ def main():
         else:
             outputs = net.predict(fw_args)
 
-        #print("Output",outputs)
-        start,end =outputs[0:2]
-
+        # print("Output",outputs)
+        start, end = outputs[0:2]
 
         min_null_score = 1000000  # large and positive
         answers = []
         for (feature, start_, end_) in zip(features, start, end):
-            # Ensure padded tokens & question tokens cannot belong to the set of candidate answers.
-            undesired_tokens = np.abs(np.array(feature.p_mask) - 1) & feature.attention_mask
+            # Ensure padded tokens & question tokens cannot belong
+            # to the set of candidate answers.
+            undesired_tokens = np.abs(np.array(feature.p_mask) - 1) & \
+                feature.attention_mask
 
             # Generate mask
             undesired_tokens_mask = undesired_tokens == 0.0
 
-            # Make sure non-context indexes in the tensor cannot contribute to the softmax
+            # Make sure non-context indexes in the tensor cannot contribute
+            # to the softmax
             start_ = np.where(undesired_tokens_mask, -10000.0, start_)
             end_ = np.where(undesired_tokens_mask, -10000.0, end_)
 
             # Normalize logits and spans to retrieve the answer
-            start_ = np.exp(start_ - np.log(np.sum(np.exp(start_), axis=-1, keepdims=True)))
-            end_ = np.exp(end_ - np.log(np.sum(np.exp(end_), axis=-1, keepdims=True)))
+            start_ = np.exp(
+                start_ - np.log(np.sum(np.exp(start_), axis=-1, keepdims=True))
+            )
+            end_ = np.exp(
+                end_ - np.log(np.sum(np.exp(end_), axis=-1, keepdims=True))
+            )
 
             if handle_impossible_answer:
-                min_null_score = min(min_null_score, (start_[0] * end_[0]).item())
+                min_null_score = min(
+                    min_null_score, (start_[0] * end_[0]).item()
+                )
 
             # Mask CLS
             start_[0] = end_[0] = 0.0
@@ -272,27 +274,32 @@ def main():
             char_to_word = np.array(example.char_to_word_offset)
 
             # Convert the answer (tokens) back to the original text
+            t2org = feature.token_to_orig_map
             answers += [
                 {
                     "score": score.item(),
-                    "start": np.where(char_to_word == feature.token_to_orig_map[s])[0][0].item(),
-                    "end": np.where(char_to_word == feature.token_to_orig_map[e])[0][-1].item(),
+                    "start": np.where(char_to_word == t2org[s])[0][0].item(),
+                    "end": np.where(char_to_word == t2org[e])[0][-1].item(),
                     "answer": " ".join(
-                        example.doc_tokens[feature.token_to_orig_map[s] : feature.token_to_orig_map[e] + 1]
+                        example.doc_tokens[t2org[s]:t2org[e] + 1]
                     ),
                 }
                 for s, e, score in zip(starts, ends, scores)
             ]
 
         if handle_impossible_answer:
-            answers.append({"score": min_null_score, "start": 0, "end": 0, "answer": ""})
+            answers.append(
+                {"score": min_null_score, "start": 0, "end": 0, "answer": ""}
+            )
 
-        answers = sorted(answers, key=lambda x: x["score"], reverse=True)[: topk]
+        answers = sorted(
+            answers, key=lambda x: x["score"], reverse=True
+        )[:topk]
         all_answers += answers
-    
-    print("Answer : ",all_answers)
 
+    print("Answer : ", all_answers)
     print('Script finished successfully.')
+
 
 if __name__ == "__main__":
     main()

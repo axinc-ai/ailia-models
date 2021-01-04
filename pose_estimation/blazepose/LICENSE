@@ -1,0 +1,7 @@
+Conversion of MediaPipe from TFLite to PyTorch done by Zak Murez
+in June 2020. Website: https://zak.murez.com
+
+This work builds upon https://github.com/hollance/BlazeFace-PyTorch
+
+This work is licensed under the same terms as MediaPipe (Apache License 2.0)
+https://github.com/google/mediapipe/blob/master/LICENSE

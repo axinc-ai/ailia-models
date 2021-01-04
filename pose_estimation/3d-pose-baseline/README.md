@@ -31,3 +31,7 @@ Tensorflow 1.13.1
 ## Model Format
 
 ONNX opset = 10
+
+## Netron
+
+[3d-pose-baseline.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/3d-pose-baseline/3d-pose-baseline.onnx.prototxt)

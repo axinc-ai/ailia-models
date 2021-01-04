@@ -1,6 +1,5 @@
 import sys
 import time
-import argparse
 
 import cv2
 import numpy as np
@@ -8,6 +7,7 @@ import numpy as np
 import ailia
 # import original modules
 sys.path.append('../../util')
+from utils import get_base_parser, update_parser  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from image_utils import load_image  # noqa: E402
 import webcamera_utils  # noqa: E402
@@ -29,32 +29,10 @@ IMAGE_HEIGHT = 480
 # ======================
 # Arguemnt Parser Config
 # ======================
-parser = argparse.ArgumentParser(
-    description='Single image crowd counting.'
+parser = get_base_parser(
+    'Single image crowd counting.', IMAGE_PATH, SAVE_IMAGE_PATH,
 )
-parser.add_argument(
-    '-i', '--input', metavar='IMAGEFILE_PATH',
-    default=IMAGE_PATH,
-    help='The input image path.'
-)
-parser.add_argument(
-    '-v', '--video', metavar='VIDEO',
-    default=None,
-    help='The input video path. ' +
-         'If the VIDEO argument is set to 0, the webcam input will be used.'
-)
-parser.add_argument(
-    '-s', '--savepath', metavar='SAVE_PATH',
-    default=SAVE_IMAGE_PATH,
-    help='Save path for the result of the model.'
-)
-parser.add_argument(
-    '-b', '--benchmark',
-    action='store_true',
-    help='Running the inference on the same input 5 times ' +
-         'to measure execution performance. (Cannot be used in video mode)'
-)
-args = parser.parse_args()
+args = update_parser(parser)
 
 
 # ======================
@@ -76,9 +54,7 @@ def estimate_from_image():
     )
 
     # net initialize
-    env_id = ailia.get_gpu_environment_id()
-    print(env_id)
-    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
 
     # inference
     if args.benchmark:
@@ -115,9 +91,7 @@ def estimate_from_image():
 
 def estimate_from_video():
     # net initialize
-    env_id = ailia.get_gpu_environment_id()
-    print(env_id)
-    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
 
     capture = webcamera_utils.get_capture(args.video)
 
@@ -143,7 +117,7 @@ def estimate_from_video():
             IMAGE_HEIGHT,
             IMAGE_WIDTH,
             data_rgb=False,
-            normalize_type='None'
+            normalize_type='None',
         )
 
         # inference
@@ -156,7 +130,7 @@ def estimate_from_video():
         density_map = (255 * preds_ailia / np.max(preds_ailia))[0][0]
         density_map = cv2.resize(
             density_map,
-            (input_image.shape[1], input_image.shape[0])
+            (input_image.shape[1], input_image.shape[0]),
         )
         heatmap = cv2.applyColorMap(
             density_map.astype(np.uint8), cv2.COLORMAP_JET
@@ -168,7 +142,7 @@ def estimate_from_video():
             cv2.FONT_HERSHEY_SIMPLEX,  # font
             0.8,  # fontscale
             (255, 255, 255),  # color
-            2  # thickness
+            2,  # thickness
         )
         res_img = np.hstack((input_image, heatmap))
         cv2.imshow('frame', res_img)
@@ -179,6 +153,8 @@ def estimate_from_video():
 
     capture.release()
     cv2.destroyAllWindows()
+    if writer is not None:
+        writer.release()
     print('Script finished successfully.')
 
 
