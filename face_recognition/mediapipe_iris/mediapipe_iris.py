@@ -6,7 +6,7 @@ import cv2
 import numpy as np
 
 import ailia
-import iris_utils as iut
+import mediapipe_iris_utils as iut
 
 sys.path.append('../../util')
 from utils import get_base_parser, update_parser  # noqa: E402
