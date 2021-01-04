@@ -9,10 +9,14 @@ from hrnet_utils import save_pred, gen_preds_img, smooth_output
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser  # noqa: E402
+from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from image_utils import load_image  # noqa: E402
 import webcamera_utils  # noqa: E402
+
+# logger
+from logging import getLogger   # noqa: E402
+logger = getLogger(__name__)
 
 
 # ======================
@@ -61,34 +65,39 @@ REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/hrnet/'
 # Main functions
 # ======================
 def recognize_from_image():
-    # prepare input data
-    input_data = load_image(
-        args.input,
-        (IMAGE_HEIGHT, IMAGE_WIDTH),
-        gen_input_ailia=True
-    )
-
     # net initialize
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
 
-    # inference
-    print('Start inference...')
-    if args.benchmark:
-        print('BENCHMARK mode')
-        for i in range(5):
-            start = int(round(time.time() * 1000))
+    # input image loop
+    for image_path in args.input:
+        # prepare input data
+        logger.info(image_path)
+        input_data = load_image(
+            image_path,
+            (IMAGE_HEIGHT, IMAGE_WIDTH),
+            gen_input_ailia=True,
+        )
+
+        # inference
+        logger.info('Start inference...')
+        if args.benchmark:
+            logger.info('BENCHMARK mode')
+            for i in range(5):
+                start = int(round(time.time() * 1000))
+                preds_ailia = net.predict(input_data)
+                end = int(round(time.time() * 1000))
+                logger.info(f'\tailia processing time {end - start} ms')
+        else:
             preds_ailia = net.predict(input_data)
-            end = int(round(time.time() * 1000))
-            print(f'\tailia processing time {end - start} ms')
-    else:
-        preds_ailia = net.predict(input_data)
 
-    # postprocessing
-    if args.smooth:
-        preds_ailia = smooth_output(preds_ailia)
+        # postprocessing
+        if args.smooth:
+            preds_ailia = smooth_output(preds_ailia)
 
-    save_pred(preds_ailia, args.savepath, IMAGE_HEIGHT, IMAGE_WIDTH)
-    print('Script finished successfully.')
+        savepath = get_savepath(args.savepath, image_path)
+        logger.info(f'saved at : {savepath}')
+        save_pred(preds_ailia, savepath, IMAGE_HEIGHT, IMAGE_WIDTH)
+    logger.info('Script finished successfully.')
 
 
 def recognize_from_video():
@@ -99,8 +108,8 @@ def recognize_from_video():
 
     # create video writer if savepath is specified as video format
     if args.savepath != SAVE_IMAGE_PATH:
-        print(
-            '[WARNING] currently, video results cannot be output correctly...'
+        logger.warning(
+            'currently, video results cannot be output correctly...'
         )
         f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
         f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
@@ -137,7 +146,7 @@ def recognize_from_video():
     cv2.destroyAllWindows()
     if writer is not None:
         writer.release()
-    print('Script finished successfully.')
+    logger.info('Script finished successfully.')
 
 
 def main():
