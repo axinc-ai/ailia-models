@@ -10,6 +10,10 @@ sys.path.append('../../util')
 from utils import get_base_parser, update_parser  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 
+# logger
+from logging import getLogger   # noqa: E402
+logger = getLogger(__name__)
+
 
 # require ailia SDK 1.2.5 and later
 
@@ -56,27 +60,27 @@ def main():
         k: v.cpu().detach().numpy() for k, v in model_inputs.items()
     }
 
-    print("Text : ", args.input)
-    print("Input : ", inputs_onnx)
+    logger.info("Text : ", args.input)
+    logger.info("Input : ", inputs_onnx)
 
     # inference
     if args.benchmark:
-        print('BENCHMARK mode')
+        logger.info('BENCHMARK mode')
         for i in range(5):
             start = int(round(time.time() * 1000))
             score = ailia_model.predict(inputs_onnx)
             end = int(round(time.time() * 1000))
-            print("\tailia processing time {} ms".format(end - start))
+            logger.info("\tailia processing time {} ms".format(end - start))
     else:
         score = ailia_model.predict(inputs_onnx)
 
-    print("Output : ", score)
+    logger.info("Output : ", score)
 
     label_name = ["positive", "negative"]
 
-    print("Label : ", label_name[numpy.argmax(numpy.array(score))])
+    logger.info("Label : ", label_name[numpy.argmax(numpy.array(score))])
 
-    print('Script finished successfully.')
+    logger.info('Script finished successfully.')
 
 
 if __name__ == "__main__":

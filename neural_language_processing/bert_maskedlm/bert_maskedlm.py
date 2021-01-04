@@ -11,6 +11,10 @@ sys.path.append('../../util')
 from utils import get_base_parser, update_parser  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 
+# logger
+from logging import getLogger   # noqa: E402
+logger = getLogger(__name__)
+
 
 # ======================
 # Arguemnt Parser Config
@@ -65,10 +69,10 @@ def main():
             'cl-tohoku/'+'bert-base-japanese-whole-word-masking'
         )
     text = args.input
-    print("Input text : "+text)
+    logger.info("Input text : "+text)
 
     tokenized_text = tokenizer.tokenize(text)
-    print("Tokenized text : ", tokenized_text)
+    logger.info("Tokenized text : ", tokenized_text)
 
     masked_index = -1
     for i in range(0, len(tokenized_text)):
@@ -76,11 +80,11 @@ def main():
             masked_index = i
             break
     if masked_index == -1:
-        print("[MASK] not found")
+        logger.info("[MASK] not found")
         sys.exit(1)
 
     indexed_tokens = tokenizer.convert_tokens_to_ids(tokenized_text)
-    print("Indexed tokens : ", indexed_tokens)
+    logger.info("Indexed tokens : ", indexed_tokens)
 
     ailia_model = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
 
@@ -95,27 +99,27 @@ def main():
         "attention_mask": attention_mask,
     }
 
-    print("Predicting...")
+    logger.info("Predicting...")
     if args.benchmark:
-        print('BENCHMARK mode')
+        logger.info('BENCHMARK mode')
         for i in range(5):
             start = int(round(time.time() * 1000))
             outputs = ailia_model.predict(inputs_onnx)
             end = int(round(time.time() * 1000))
-            print("\tailia processing time {} ms".format(end - start))
+            logger.info("\tailia processing time {} ms".format(end - start))
     else:
         outputs = ailia_model.predict(inputs_onnx)
 
     predictions = torch.from_numpy(
         outputs[0][0, masked_index]).topk(NUM_PREDICT)
 
-    print("Predictions : ")
+    logger.info("Predictions : ")
     for i, index_t in enumerate(predictions.indices):
         index = index_t.item()
         token = tokenizer.convert_ids_to_tokens([index])[0]
-        print(i, token)
+        logger.info(i, token)
 
-    print('Script finished successfully.')
+    logger.info('Script finished successfully.')
 
 
 if __name__ == "__main__":

@@ -13,6 +13,10 @@ sys.path.append('../../util')
 from utils import get_base_parser, update_parser  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 
+# logger
+from logging import getLogger   # noqa: E402
+logger = getLogger(__name__)
+
 
 # ======================
 # Arguemnt Parser Config
@@ -176,8 +180,8 @@ def main():
         "context": args.context,
     }
 
-    print("Question : ", args.question)
-    print("Context : ", args.context)
+    logger.info("Question : ", args.question)
+    logger.info("Context : ", args.context)
 
     # Set defaults values
     handle_impossible_answer = False
@@ -191,10 +195,11 @@ def main():
 
     if True:  # for i, item in enumerate(inputs):
         item = inputs
-        # print(item)
+        logger.debug(item)
         if isinstance(item, dict):
             if any(k not in item for k in ["question", "context"]):
-                raise KeyError("You need to provide a dictionary with keys {question:..., context:...}")
+                raise KeyError("You need to provide a dictionary with keys "
+                               "{question:..., context:...}")
 
             example = create_sample(**item)
             examples.append(example)
@@ -220,22 +225,24 @@ def main():
                    for k in model_input_names}
         fw_args = {k: np.array(v) for (k, v) in fw_args.items()}
 
-        # print("Input",fw_args)
-        # print("Shape",fw_args["input_ids"].shape)
+        logger.debug("Input", fw_args)
+        logger.debug("Shape", fw_args["input_ids"].shape)
 
         net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
         net.set_input_shape(fw_args["input_ids"].shape)
         if args.benchmark:
-            print('BENCHMARK mode')
+            logger.info('BENCHMARK mode')
             for i in range(5):
                 start = int(round(time.time() * 1000))
                 outputs = net.predict(fw_args)
                 end = int(round(time.time() * 1000))
-                print("\tailia processing time {} ms".format(end - start))
+                logger.info(
+                    "\tailia processing time {} ms".format(end - start)
+                )
         else:
             outputs = net.predict(fw_args)
 
-        # print("Output",outputs)
+        logger.debug("Output", outputs)
         start, end = outputs[0:2]
 
         min_null_score = 1000000  # large and positive
@@ -297,8 +304,8 @@ def main():
         )[:topk]
         all_answers += answers
 
-    print("Answer : ", all_answers)
-    print('Script finished successfully.')
+    logger.info("Answer : ", all_answers)
+    logger.info('Script finished successfully.')
 
 
 if __name__ == "__main__":
