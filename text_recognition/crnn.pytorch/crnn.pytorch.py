@@ -19,7 +19,7 @@ import webcamera_utils  # noqa: E402
 # ======================
 WEIGHT_PATH = 'crnn_pytorch.onnx'
 MODEL_PATH = 'crnn_pytorch.onnx.prototxt'
-REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/'
+REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/crnn_pytorch/'
 
 IMAGE_PATH = 'demo.png'
 
@@ -34,7 +34,7 @@ parser = get_base_parser(
 parser.add_argument(
     '-o', '--onnx',
     action='store_true',
-    default=True,
+    default=False,
     help='Use onnx runtime'
 )
 args = update_parser(parser)
@@ -148,7 +148,7 @@ def main():
 
     # model initialize
     if not args.onnx:
-        net = ailia.Net(MODEL_PATH_T2M, WEIGHT_PATH_T2M, env_id=args.env_id)
+        net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
     else:
         import onnxruntime
         net = onnxruntime.InferenceSession(WEIGHT_PATH)
