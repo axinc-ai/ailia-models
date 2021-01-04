@@ -8,9 +8,13 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser  # noqa: E402
+from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 import webcamera_utils  # noqa: E402
+
+# logger
+from logging import getLogger   # noqa: E402
+logger = getLogger(__name__)
 
 
 # ======================
@@ -49,8 +53,8 @@ def detect_single_face(face_cascade, img):
     # Detect faces
     faces = face_cascade.detectMultiScale(gray, 1.1, 4)
     if len(faces) == 0:
-        print("[WARNING] no face detection, "
-              "the portrait u2net will run on the whole image!")
+        logger.warning("no face detection, "
+                       "the portrait u2net will run on the whole image!")
         return None
 
     # filter to keep the largest face
@@ -145,7 +149,7 @@ def crop_face(img, face):
     return im_face
 
 
-def preprocess(img,face_detection):
+def preprocess(img, face_detection):
     # Load the cascade face detection model
     if face_detection:
         face_cascade = cv2.CascadeClassifier(FACE_CASCADE_MODEL_PATH)
@@ -183,29 +187,36 @@ def post_process(d1):
 # Main functions
 # ======================
 def recognize_from_image():
-    # prepare input data
-    img = cv2.imread(IMAGE_PATH)
-    print(f'input image shape: {img.shape}')
-    input_img = preprocess(img,True)
-
     # net initialize
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
 
-    # inference
-    print('Start inference...')
-    if args.benchmark:
-        print('BENCHMARK mode')
-        for i in range(5):
-            start = int(round(time.time() * 1000))
-            d1, d2, d3, d4, d5, d6, d7 = net.predict({'input.1': input_img})
-            end = int(round(time.time() * 1000))
-            print(f'\tailia processing time {end - start} ms')
-    else:
-        d1, d2, d3, d4, d5, d6, d7 = net.predict({'input.1': input_img})
+    # input image loop
+    for image_path in args.input:
+        # prepare input data
+        logger.info(image_path)
+        img = cv2.imread(image_path)
+        logger.debug(f'input image shape: {img.shape}')
+        input_img = preprocess(img, True)
 
-    out_img = post_process(d1)
-    cv2.imwrite(args.savepath, out_img)
-    print('Script finished successfully.')
+        # inference
+        logger.info('Start inference...')
+        if args.benchmark:
+            logger.info('BENCHMARK mode')
+            for i in range(5):
+                start = int(round(time.time() * 1000))
+                d1, d2, d3, d4, d5, d6, d7 = net.predict(
+                    {'input.1': input_img}
+                )
+                end = int(round(time.time() * 1000))
+                logger.info(f'\tailia processing time {end - start} ms')
+        else:
+            d1, d2, d3, d4, d5, d6, d7 = net.predict({'input.1': input_img})
+
+        out_img = post_process(d1)
+        savepath = get_savepath(args.savepath, image_path)
+        logger.info(f'saved at : {savepath}')
+        cv2.imwrite(savepath, out_img)
+    logger.info('Script finished successfully.')
 
 
 def recognize_from_video():
@@ -229,7 +240,7 @@ def recognize_from_video():
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
 
-        input_img = preprocess(img,False)
+        input_img = preprocess(img, False)
         d1, d2, d3, d4, d5, d6, d7 = net.predict({'input.1': input_img})
         out_img = post_process(d1)
         cv2.imshow('frame', out_img)
@@ -241,7 +252,7 @@ def recognize_from_video():
     cv2.destroyAllWindows()
     if writer is not None:
         writer.release()
-    print('Script finished successfully.')
+    logger.info('Script finished successfully.')
 
 
 def main():
