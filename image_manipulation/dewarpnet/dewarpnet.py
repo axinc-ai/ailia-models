@@ -102,7 +102,7 @@ def unwarp_from_image():
         logger.info(image_path)
         org_img = cv2.imread(image_path)
         img = load_image(
-            args.input,
+            image_path,
             (WC_IMG_HEIGHT, WC_IMG_WIDTH),
             normalize_type='255',
             gen_input_ailia=True,
