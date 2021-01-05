@@ -1,3 +1,4 @@
+import os
 import sys
 import time
 import json
@@ -200,7 +201,9 @@ def main():
             if writer is not None:
                 writer.write(canvas_3d)
         else:
-            cv2.imwrite(f'Canvas3D_{frame_id}.png', canvas_3d)
+            cv2.imwrite(os.path.join(
+                os.path.dirname(args.savepath), f'Canvas3D_{frame_id}.png'
+            ), canvas_3d)
 
         draw_poses(frame, poses_2d)
         current_time = (cv2.getTickCount()-current_time)/cv2.getTickFrequency()
