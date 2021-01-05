@@ -13,10 +13,14 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser  # noqa: E402
+from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from utils import check_file_existance  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 import webcamera_utils  # noqa: E402
+
+# logger
+from logging import getLogger   # noqa: E402
+logger = getLogger(__name__)
 
 
 # ======================
@@ -86,7 +90,7 @@ def main():
     t = np.array(extrinsics['t'], dtype=np.float32)
 
     if args.video is None:
-        frame_provider = ImageReader([args.input])
+        frame_provider = ImageReader(args.input)
         is_video = False
     else:
         frame_provider = VideoReader(args.video)
@@ -113,7 +117,7 @@ def main():
 
         if frame_id == 0:
             # create video writer if savepath is specified as video format
-            if args.savepath != SAVE_IMAGE_PATH:
+            if args.savepath != SAVE_IMAGE_PATH and is_video:
                 f_h = int(frame_provider.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
                 f_w = int(frame_provider.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
                 writer = webcamera_utils.get_writer(args.savepath, f_h, f_w)
@@ -150,14 +154,14 @@ def main():
             features, heatmaps, pafs = net.get_results()
 
         else:
-            print('Start inference...')
+            logger.info('Start inference...')
             if args.benchmark:
-                print('BENCHMARK mode')
+                logger.info('BENCHMARK mode')
                 for i in range(5):
                     start = int(round(time.time() * 1000))
                     features, heatmaps, pafs = net.predict([normalized_img])
                     end = int(round(time.time() * 1000))
-                    print(f'\tailia processing time {end - start} ms')
+                    logger.info(f'\tailia processing time {end - start} ms')
             else:
                 features, heatmaps, pafs = net.predict([normalized_img])
 
@@ -210,7 +214,9 @@ def main():
         if is_video:
             cv2.imshow('ICV 3D Human Pose Estimation', frame)
         else:
-            cv2.imwrite(args.savepath, frame)
+            savepath = get_savepath(args.savepath, args.input[frame_id])
+            logger.info(f'saved at : {savepath}')
+            cv2.imwrite(savepath, frame)
 
         key = cv2.waitKey(delay)
         if key == esc_code or key == q_code:
@@ -237,7 +243,7 @@ def main():
 
     if writer is not None:
         writer.release()
-    print('Script finished successfully.')
+    logger.info('Script finished successfully.')
 
 
 if __name__ == '__main__':
