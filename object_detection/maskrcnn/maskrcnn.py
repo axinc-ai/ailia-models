@@ -52,8 +52,14 @@ args = update_parser(parser)
 def preprocess(image):
     # Resize
     ratio = 800.0 / min(image.size[0], image.size[1])
+    resize_w = int(ratio * image.size[0])
+    resize_h = int(ratio * image.size[1])
+    if (max(resize_w, resize_h) > 1280.0):
+        ratio = 1280.0 / max(image.size[0], image.size[1])
+        resize_w = int(ratio * image.size[0])
+        resize_h = int(ratio * image.size[1])
     image = image.resize(
-        (int(ratio * image.size[0]), int(ratio * image.size[1])),
+        (resize_w, resize_h),
         Image.BILINEAR
     )
 
@@ -93,6 +99,10 @@ def display_objdetect_image(
     """
     # Resize boxes
     ratio = 800.0 / min(image.size[0], image.size[1])
+    resize_w = int(ratio * image.size[0])
+    resize_h = int(ratio * image.size[1])
+    if (max(resize_w, resize_h) > 1280.0):
+        ratio = 1280.0 / max(image.size[0], image.size[1])
     boxes /= ratio
 
     image = np.array(image)
