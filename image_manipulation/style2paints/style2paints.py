@@ -11,12 +11,9 @@ import ailia
 # import original modules
 sys.path.append('../../util')
 from model_utils import check_and_download_models  # noqa: E402
+from detector_utils import load_image  # noqa: E402C
 
-from style2paint_utils import s_enhance, emph_line
-from style2paint_utils import k_resize, sk_resize, d_resize
-from style2paint_utils import min_k_down, mini_norm, hard_norm
-from style2paint_utils import opreate_normal_hint, ini_hint
-from style2paint_utils import de_line, blur_line, clip_15
+from style2paints_utils import *
 
 # ======================
 # Parameters
@@ -72,16 +69,19 @@ args = parser.parse_args()
 # Secondaty Functions
 # ======================
 
-def load_image(img_path):
-    sketch = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE)
-    return sketch
 
-
-def preprocess(img):
+def preprocess(img, de_painting=None):
+    img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     img_1024 = k_resize(img, 64)
 
-    img_256 = mini_norm(k_resize(min_k_down(img_1024, 2), 16))
-    img_128 = hard_norm(sk_resize(min_k_down(img_1024, 4), 32))
+    if de_painting is not None:
+        vice_sketch_1024 = cv2.cvtColor(de_painting, cv2.COLOR_BGR2GRAY)
+        vice_sketch_1024 = k_resize(vice_sketch_1024, 64)
+        img_256 = mini_norm(k_resize(min_k_down(vice_sketch_1024, 2), 16))
+        img_128 = hard_norm(sk_resize(min_k_down(vice_sketch_1024, 4), 32))
+    else:
+        img_256 = mini_norm(k_resize(min_k_down(img_1024, 2), 16))
+        img_128 = hard_norm(sk_resize(min_k_down(img_1024, 4), 32))
     # cv2.imwrite('./sketch.128.jpg', img_128)
     # cv2.imwrite('./sketch.256.jpg', img_256)
 
@@ -248,10 +248,41 @@ def predict(img, dict_net, options):
     reference = options["reference"]
     lineColor = options["lineColor"]
     line = options["line"]
-    for _ in range(len(points)):
-        points[_][1] = 1 - points[_][1]
 
-    img_1024, img_256, img_128 = preprocess(img)
+    img = min_resize(img, 512)
+    img = cv_denoise(img)
+    img = sensitive(img, s=5.0)
+    img = go_tail(dict_net['tail'], img)
+    cv2.imwrite('./sketch.improved.jpg', img)
+    img = cv2.imread('./sketch.improved.jpg')
+
+    std = cal_std(img)
+    print('std = ' + str(std))
+    need_de_painting = (std > 100.0) and method == 'rendering'
+    img2 = None
+    if method == 'recolorization' or need_de_painting:
+        img2 = go_passline(img)
+        img2 = min_k_down_c(img2, 2)
+        img2 = cv_denoise(img2)
+        img2 = go_tail(dict_net['tail'], img2)
+        img2 = sensitive(img2, s=5.0)
+        img2 = min_black(img2)
+
+    de_painting = None
+    if method == 'colorization':
+        img = min_black(img)
+        cv2.imwrite('sketch.colorization.jpg', img)
+    elif method == 'rendering':
+        img = eye_black(img)
+        cv2.imwrite('sketch.rendering.jpg', img)
+        if need_de_painting:
+            de_painting = img2
+            cv2.imwrite('de_painting.jpg', de_painting)
+    elif method == 'recolorization':
+        img = img2
+        cv2.imwrite('sketch.recolorization.jpg', img)
+
+    img_1024, img_256, img_128 = preprocess(img, de_painting)
     print('sketch prepared')
 
     x = np.zeros(shape=(img_128.shape[0], img_128.shape[1], 4), dtype=np.float32)
@@ -304,6 +335,8 @@ def recognize_from_image(filename, dict_net):
     img = load_image(filename)
     print(f'input image shape: {img.shape}')
 
+    img = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
+
     json_file = '.'.join([filename.rsplit('.', 1)[0], 'json'])
     if not os.path.exists(json_file):
         raise FileNotFoundError('%s not exists' % json_file)
@@ -311,6 +344,9 @@ def recognize_from_image(filename, dict_net):
     with open(json_file) as f:
         options = json.load(f)
 
+    points = options["points"]
+    for _ in range(len(points)):
+        points[_][1] = 1 - points[_][1]
     options["method"] = options.get("method", "colorization")
     options["alpha"] = float(options.get("alpha", 0.0))
     if options.get("hasReference", False):

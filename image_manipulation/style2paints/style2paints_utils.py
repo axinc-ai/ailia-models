@@ -6,9 +6,16 @@ __all__ = [
     'k_resize',
     'sk_resize',
     'd_resize',
+    'min_resize',
+    'go_passline',
     'min_k_down',
+    'min_k_down_c',
     'mini_norm',
     'hard_norm',
+    'sensitive',
+    'min_black',
+    'eye_black',
+    'cal_std',
     'opreate_normal_hint',
     's_enhance',
     'emph_line',
@@ -16,6 +23,7 @@ __all__ = [
     'de_line',
     'blur_line',
     'clip_15',
+    'cv_denoise',
 ]
 
 
@@ -81,9 +89,42 @@ def d_resize(x, d, fac=1.0):
     return y
 
 
+def min_resize(x, m):
+    if x.shape[0] < x.shape[1]:
+        s0 = m
+        s1 = int(float(m) / float(x.shape[0]) * float(x.shape[1]))
+    else:
+        s0 = int(float(m) / float(x.shape[1]) * float(x.shape[0]))
+        s1 = m
+    new_max = max(s1, s0)
+    raw_max = max(x.shape[0], x.shape[1])
+    if new_max < raw_max:
+        interpolation = cv2.INTER_AREA
+    else:
+        interpolation = cv2.INTER_LANCZOS4
+    y = cv2.resize(x, (s1, s0), interpolation=interpolation)
+    return y
+
+
+def go_passline(img):
+    o = img.astype(np.float32)
+    b = cv2.GaussianBlur(img, (7, 7), 0).astype(np.float32)
+    r = np.max(b - o, axis=2, keepdims=True)
+    r /= np.max(cv2.resize(r.clip(0, 255).astype(np.uint8), (64, 64), cv2.INTER_AREA))
+    r = (1 - r).clip(0, 1)
+    return np.tile((r * 255.0).clip(0, 255).astype(np.uint8), [1, 1, 3])
+
+
 def min_k_down(x, k):
     y = 255 - x.astype(np.float32)
     y = block_reduce(y, (k, k), np.max)
+    y = 255 - y
+    return y.clip(0, 255).astype(np.uint8)
+
+
+def min_k_down_c(x, k):
+    y = 255 - x.astype(np.float32)
+    y = block_reduce(y, (k, k, 1), np.max)
     y = 255 - y
     return y.clip(0, 255).astype(np.uint8)
 
@@ -106,6 +147,27 @@ def hard_norm(x):
     y[y < np.mean(y)] = 0
     y[y > 0] = 1
     return (255.0 - y * 255.0).astype(np.uint8)
+
+
+def sensitive(x, s=15.0):
+    y = x.astype(np.float32)
+    y -= s
+    y /= 255.0 - s * 2.0
+    y *= 255.0
+    return y.clip(0, 255).astype(np.uint8)
+
+
+def min_black(x):
+    return np.tile(np.min(x, axis=2, keepdims=True), [1, 1, 3])
+
+
+def eye_black(x):
+    return cv2.cvtColor(cv2.cvtColor(x, cv2.COLOR_RGB2GRAY), cv2.COLOR_GRAY2RGB)
+
+
+def cal_std(x):
+    y = (cv2.resize(x, (128, 128), cv2.INTER_AREA)).astype(np.float32)
+    return np.mean(np.var(y, axis=2))
 
 
 def opreate_normal_hint(gird, points, type, length):
@@ -162,3 +224,7 @@ def blur_line(x, y):
 
 def clip_15(x, s=15.0):
     return ((x - s) / (255.0 - s - s)).clip(0, 1) * 255.0
+
+
+def cv_denoise(x):
+    return cv2.fastNlMeansDenoisingColored(x, None, 3, 3, 7, 21)
