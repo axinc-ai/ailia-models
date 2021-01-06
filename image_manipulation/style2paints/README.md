@@ -39,7 +39,7 @@ The option file has the following contents.
 
 The most popular parameter is "points" that indicate the "draft color point" and the "accurate color point".
 This is a list of array has the values of "x y r g b t".  
-The "x" and "y" are shown as a percentage of the width and height of image, with the lower left being the origin.  
+The "x" and "y" are the point shown as a percentage of the width and height of image, with the bottom left of image being the origin.  
 If the "t" is 0 indicates a "draft color point", and the "t" is 2 indicates an "accurate color point".  
 The "method" paramter is selected from "colorization", "rendering", "recolorization".
 
