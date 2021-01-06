@@ -10,6 +10,8 @@ __all__ = [
     'mini_norm',
     'hard_norm',
     'opreate_normal_hint',
+    's_enhance',
+    'emph_line',
     'ini_hint',
     'de_line',
     'blur_line',
@@ -123,6 +125,20 @@ def opreate_normal_hint(gird, points, type, length):
             gird[b_:t_, l_:r_, 0] = b
             gird[b_:t_, l_:r_, 3] = 255.0
     return gird
+
+
+def s_enhance(x, k=2.0):
+    p = cv2.cvtColor(x, cv2.COLOR_RGB2HSV).astype(np.float)
+    p[:, :, 1] *= k
+    p = p.clip(0, 255).astype(np.uint8)
+    return cv2.cvtColor(p, cv2.COLOR_HSV2RGB).clip(0, 255)
+
+
+def emph_line(x, y, c):
+    a = x.astype(np.float32)
+    b = y.astype(np.float32)[:, :, None] / 255.0
+    c = np.tile(c[None, None, ::-1], [a.shape[0], a.shape[1], 1])
+    return (a * b + c * (1 - b)).clip(0, 255).astype(np.uint8)
 
 
 def ini_hint(x):

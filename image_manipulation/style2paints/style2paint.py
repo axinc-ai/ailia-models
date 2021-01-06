@@ -11,9 +11,8 @@ import ailia
 # import original modules
 sys.path.append('../../util')
 from model_utils import check_and_download_models  # noqa: E402
-from detector_utils import plot_results  # noqa: E402C
-from webcamera_utils import get_capture  # noqa: E402
 
+from style2paint_utils import s_enhance, emph_line
 from style2paint_utils import k_resize, sk_resize, d_resize
 from style2paint_utils import min_k_down, mini_norm, hard_norm
 from style2paint_utils import opreate_normal_hint, ini_hint
@@ -24,10 +23,12 @@ from style2paint_utils import de_line, blur_line, clip_15
 # ======================
 
 WEIGHT_HEAD_PATH = 'head.onnx'
+WEIGHT_NECK_PATH = 'neck.onnx'
 WEIGHT_BABY_PATH = 'baby.onnx'
 WEIGHT_TAIL_PATH = 'tail.onnx'
 WEIGHT_GIRD_PATH = 'gird.onnx'
 MODEL_HEAD_PATH = 'head.onnx.prototxt'
+MODEL_NECK_PATH = 'neck.onnx.prototxt'
 MODEL_BABY_PATH = 'baby.onnx.prototxt'
 MODEL_TAIL_PATH = 'tail.onnx.prototxt'
 MODEL_GIRD_PATH = 'gird.onnx.prototxt'
@@ -127,6 +128,46 @@ def go_head(net_head, sketch, global_hint, local_hint, global_hint_x, alpha=1.0)
     return head_op
 
 
+def go_neck(net_neck, sketch, global_hint, local_hint, global_hint_x, alpha=1.0):
+    ip1 = sketch[None, :, :, None]
+    ip3 = global_hint[None, :, :, :]
+    ip4 = local_hint[None, :, :, :]
+    ip3x = global_hint_x[None, :, :, :]
+    ipa = np.array([alpha], dtype=np.float32)[None, :]
+    if not args.onnx:
+        idx_ip1 = net_neck.find_blob_index_by_name('import/Placeholder_1:0')
+        idx_ip3 = net_neck.find_blob_index_by_name('import/Placeholder_2:0')
+        idx_ip4 = net_neck.find_blob_index_by_name('import/Placeholder_3:0')
+        idx_ip3x = net_neck.find_blob_index_by_name('import/Placeholder_4:0')
+        idx_ipa = net_neck.find_blob_index_by_name('import/Placeholder:0')
+        net_neck.set_input_blob_shape(ip1.shape, idx_ip1)
+        net_neck.set_input_blob_shape(ip3.shape, idx_ip3)
+        net_neck.set_input_blob_shape(ip4.shape, idx_ip4)
+        net_neck.set_input_blob_shape(ip3x.shape, idx_ip3x)
+        net_neck.set_input_blob_shape(ipa.shape, idx_ipa)
+        output = net_neck.predict({
+            'import/Placeholder_1:0': ip1,
+            'import/Placeholder_2:0': ip3,
+            'import/Placeholder_3:0': ip4,
+            'import/Placeholder_4:0': ip3x,
+            'import/Placeholder:0': ipa,
+        })[0]
+    else:
+        in_ip3x = net_neck.get_inputs()[0].name
+        in_ip4 = net_neck.get_inputs()[1].name
+        in_ip3 = net_neck.get_inputs()[2].name
+        in_ip1 = net_neck.get_inputs()[3].name
+        in_ipa = net_neck.get_inputs()[4].name
+        out_neck = net_neck.get_outputs()[0].name
+        output = net_neck.run(
+            [out_neck],
+            {in_ip1: ip1, in_ip3: ip3, in_ip4: ip4, in_ip3x: ip3x, in_ipa: ipa}
+        )[0]
+
+    neck_op = output[0].clip(0, 255).astype(np.uint8)
+    return neck_op
+
+
 def go_gird(net_gird, sketch, latent, hint):
     ip1 = sketch[None, :, :, None]
     ip3 = latent[None, :, :, :]
@@ -201,13 +242,17 @@ def go_baby(net_baby, sketch, local_hint):
 
 
 def predict(img, dict_net, options):
-    img_1024, img_256, img_128 = preprocess(img)
-
     points = options["points"]
-    alpha = 0.0
-    reference = None
+    method = options["method"]
+    alpha = options["alpha"]
+    reference = options["reference"]
+    lineColor = options["lineColor"]
+    line = options["line"]
     for _ in range(len(points)):
         points[_][1] = 1 - points[_][1]
+
+    img_1024, img_256, img_128 = preprocess(img)
+    print('sketch prepared')
 
     x = np.zeros(shape=(img_128.shape[0], img_128.shape[1], 4), dtype=np.float32)
     x = opreate_normal_hint(x, points, type=0, length=1)
@@ -218,23 +263,37 @@ def predict(img, dict_net, options):
 
     baby = go_tail(dict_net['tail'], baby)
     baby = clip_15(baby)
+    print('baby born')
 
     latent = d_resize(baby, img_256.shape).astype(np.float32)
     hint = ini_hint(img_256)
     composition = go_gird(dict_net['gird'], img_256, latent, hint)
+    if line:
+        composition = emph_line(
+            composition,
+            d_resize(min_k_down(img_1024, 2), composition.shape),
+            lineColor
+        )
     composition = go_tail(dict_net['tail'], composition)
-
-    # cv2.imwrite('composition.jpg', composition)
-    # print('composition saved')
+    cv2.imwrite('composition.jpg', composition)
+    print('composition saved')
 
     global_hint = k_resize(composition, 14).astype(np.float32)
     local_hint = opreate_normal_hint(ini_hint(img_1024), points, type=2, length=2)
     global_hint_x = (
         k_resize(reference, 14) if reference is not None else k_resize(composition, 14)
     ).astype(np.float32)
-    result = go_head(
-        dict_net['head'], img_1024, global_hint, local_hint, global_hint_x,
-        alpha=(1 - alpha) if reference is not None else 1)
+
+    print('method: ' + method)
+    if method == 'rendering':
+        result = go_neck(
+            dict_net['neck'], img_1024, global_hint, local_hint, global_hint_x,
+            alpha=(1 - alpha) if reference is not None else 1)
+    else:
+        result = go_head(
+            dict_net['head'], img_1024, global_hint, local_hint, global_hint_x,
+            alpha=(1 - alpha) if reference is not None else 1)
+
     result = go_tail(dict_net['tail'], result)
 
     return result
@@ -251,6 +310,21 @@ def recognize_from_image(filename, dict_net):
 
     with open(json_file) as f:
         options = json.load(f)
+
+    options["method"] = options.get("method", "colorization")
+    options["alpha"] = float(options.get("alpha", 0.0))
+    if options.get("hasReference", False):
+        reference = cv2.imread(options.get("reference", "style.jpg"))
+        scale = max(reference.shape[:2]) / 256
+        if scale > 1.0:
+            reference = cv2.resize(
+                reference, (int(reference.shape[1] / scale), int(reference.shape[0] / scale))
+            )
+        options["reference"] = s_enhance(reference)
+    else:
+        options["reference"] = None
+    options["line"] = options.get('line', False)
+    options["lineColor"] = np.array(options.get('lineColor', [0, 0, 0]))
 
     # inference
     print('Start inference...')
@@ -273,6 +347,8 @@ def main():
     # model files check and download
     print('=== head model ===')
     check_and_download_models(WEIGHT_HEAD_PATH, MODEL_HEAD_PATH, REMOTE_PATH)
+    print('=== neck model ===')
+    check_and_download_models(WEIGHT_NECK_PATH, MODEL_NECK_PATH, REMOTE_PATH)
     print('=== baby model ===')
     check_and_download_models(WEIGHT_BABY_PATH, MODEL_BABY_PATH, REMOTE_PATH)
     print('=== tail model ===')
@@ -287,17 +363,20 @@ def main():
     # initialize
     if not args.onnx:
         net_head = ailia.Net(MODEL_HEAD_PATH, WEIGHT_HEAD_PATH, env_id=env_id)
+        net_neck = ailia.Net(MODEL_NECK_PATH, WEIGHT_NECK_PATH, env_id=env_id)
         net_baby = ailia.Net(MODEL_BABY_PATH, WEIGHT_BABY_PATH, env_id=env_id)
         net_tail = ailia.Net(MODEL_TAIL_PATH, WEIGHT_TAIL_PATH, env_id=env_id)
         net_gird = ailia.Net(MODEL_GIRD_PATH, WEIGHT_GIRD_PATH, env_id=env_id)
     else:
         import onnxruntime
         net_head = onnxruntime.InferenceSession(WEIGHT_HEAD_PATH)
+        net_neck = onnxruntime.InferenceSession(WEIGHT_NECK_PATH)
         net_baby = onnxruntime.InferenceSession(WEIGHT_BABY_PATH)
         net_tail = onnxruntime.InferenceSession(WEIGHT_TAIL_PATH)
         net_gird = onnxruntime.InferenceSession(WEIGHT_GIRD_PATH)
     dict_net = {
         "head": net_head,
+        "neck": net_neck,
         "baby": net_baby,
         "tail": net_tail,
         "gird": net_gird,
