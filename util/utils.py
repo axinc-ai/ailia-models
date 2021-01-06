@@ -76,7 +76,7 @@ def get_base_parser(
     )
     parser.add_argument(
         '-s', '--savepath', metavar='SAVE_PATH', default=default_save,
-        help='Save path for the output (image / video).'
+        help='Save path for the output (image / video / text).'
     )
     parser.add_argument(
         '-b', '--benchmark', action='store_true',
