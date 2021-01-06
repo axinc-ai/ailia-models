@@ -350,7 +350,10 @@ def recognize_from_image(filename, dict_net):
     options["method"] = options.get("method", "colorization")
     options["alpha"] = float(options.get("alpha", 0.0))
     if options.get("hasReference", False):
-        reference = cv2.imread(options.get("reference", "style.jpg"))
+        ref_file = options.get("reference", "style.jpg")
+        if not os.path.exists(ref_file):
+            raise FileNotFoundError('%s not exists' % ref_file)
+        reference = cv2.imread(ref_file)
         scale = max(reference.shape[:2]) / 256
         if scale > 1.0:
             reference = cv2.resize(
