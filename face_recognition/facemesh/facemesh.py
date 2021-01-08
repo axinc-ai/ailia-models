@@ -195,11 +195,9 @@ def recognize_from_video():
                 landmarks = np.zeros((imgs.shape[0], 468, 3))
                 confidences = np.zeros((imgs.shape[0], 1))
                 for i in range(imgs.shape[0]):
-                    img = imgs[i:i+1,:,:,:]
-                    landmark, confidence = estimator.predict([img])
+                    landmark, confidences[i,:] = estimator.predict([imgs[i:i+1,:,:,:]])
                     normalized_landmark = landmark / 192.0
                     landmarks[i,:,:] = fut.denormalize_landmarks(normalized_landmark, affines)
-                    confidences[i,:] = confidence
 
             for i in range(len(landmarks)):
                 landmark, confidence = landmarks[i], confidences[i]

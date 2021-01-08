@@ -207,13 +207,29 @@ def recognize_from_video():
         # Face landmark estimation
         if detections[0].size != 0:
             imgs, affines, box = iut.estimator_preprocess(frame[:,:,::-1], detections, scale, pad)
-            estimator.set_input_shape(imgs.shape)
-            landmarks, confidences = estimator.predict([imgs])
+
+            dynamic_shape = False
+
+            if dynamic_shape:
+                estimator.set_input_shape(imgs.shape)
+                landmarks, confidences = estimator.predict([imgs])
+            else:
+                landmarks = np.zeros((imgs.shape[0], 1404))
+                confidences = np.zeros((imgs.shape[0], 1))
+                for i in range(imgs.shape[0]):
+                    landmarks[i,:], confidences[i,:] = estimator.predict([imgs[i:i+1,:,:,:]])
 
             # Iris landmark estimation
             imgs2, origins = iut.iris_preprocess(imgs, landmarks)
-            estimator2.set_input_shape(imgs2.shape)
-            eyes, iris = estimator2.predict([imgs2])
+
+            if dynamic_shape:
+                estimator2.set_input_shape(imgs2.shape)
+                eyes, iris = estimator2.predict([imgs2])
+            else:
+                eyes = np.zeros((imgs2.shape[0], 213))
+                iris = np.zeros((imgs2.shape[0], 15))
+                for i in range(imgs2.shape[0]):
+                    eyes[i,:], iris[i,:] = estimator2.predict([imgs2[i:i+1,:,:,:]])
 
             eyes, iris = iut.iris_postprocess(eyes, iris, origins, affines)
             for i in range(len(eyes)):
