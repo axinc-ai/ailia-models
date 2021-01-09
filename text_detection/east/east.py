@@ -32,7 +32,7 @@ SAVE_IMAGE_PATH = 'output.png'
 # ======================
 
 parser = argparse.ArgumentParser(
-    description='Pixel-Link model'
+    description='EAST: An Efficient and Accurate Scene Text Detector model'
 )
 parser.add_argument(
     '-i', '--input', metavar='IMAGE',
