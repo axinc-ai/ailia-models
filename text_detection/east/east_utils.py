@@ -1,5 +1,5 @@
 import numpy as np
-from shapely.geometry import Polygon
+import Polygon
 
 __all__ = [
     'restore_rectangle',
@@ -84,12 +84,10 @@ def restore_rectangle(origin, geometry):
 
 
 def intersection(g, p):
-    g = Polygon(g[:8].reshape((4, 2)))
-    p = Polygon(p[:8].reshape((4, 2)))
-    if not g.is_valid or not p.is_valid:
-        return 0
-    inter = Polygon(g).intersection(Polygon(p)).area
-    union = g.area + p.area - inter
+    g = Polygon.Polygon(g[:8].reshape((4, 2)))
+    p = Polygon.Polygon(p[:8].reshape((4, 2)))
+    inter = (g & p).area()
+    union = g.area() + p.area() - inter
     if union == 0:
         return 0
     else:
