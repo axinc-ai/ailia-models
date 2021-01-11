@@ -1,6 +1,5 @@
 import sys
 import time
-import argparse
 
 import cv2
 import numpy as np
@@ -9,10 +8,13 @@ import ailia
 import blazehand_utils as but
 
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser  # noqa: E402
-from webcamera_utils import adjust_frame_size, get_capture  # noqa: E402
-from image_utils import load_image  # noqa: E402
+from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
+import webcamera_utils  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
+
+# logger
+from logging import getLogger   # noqa: E402
+logger = getLogger(__name__)
 
 
 # ======================
@@ -28,7 +30,9 @@ IMAGE_WIDTH = 256
 # Argument Parser Config
 # ======================
 parser = get_base_parser(
-    'BlazeHand, an on-device real-time hand tracking.', IMAGE_PATH, SAVE_IMAGE_PATH,
+    'BlazeHand, an on-device real-time hand tracking.',
+    IMAGE_PATH,
+    SAVE_IMAGE_PATH,
 )
 args = update_parser(parser)
 
@@ -44,10 +48,10 @@ DETECTION_MODEL_PATH = f'{DETECTION_MODEL_NAME}.onnx.prototxt'
 LANDMARK_WEIGHT_PATH = f'{LANDMARK_MODEL_NAME}.onnx'
 LANDMARK_MODEL_PATH = f'{LANDMARK_MODEL_NAME}.onnx.prototxt'
 # else:
-    # DETECTION_WEIGHT_PATH = f'{DETECTION_MODEL_NAME}.opt.onnx'
-    # DETECTION_MODEL_PATH = f'{DETECTION_MODEL_NAME}.opt.onnx.prototxt'
-    # LANDMARK_WEIGHT_PATH = f'{LANDMARK_MODEL_NAME}.opt.onnx'
-    # LANDMARK_MODEL_PATH = f'{LANDMARK_MODEL_NAME}.opt.onnx.prototxt'
+#     DETECTION_WEIGHT_PATH = f'{DETECTION_MODEL_NAME}.opt.onnx'
+#     DETECTION_MODEL_PATH = f'{DETECTION_MODEL_NAME}.opt.onnx.prototxt'
+#     LANDMARK_WEIGHT_PATH = f'{LANDMARK_MODEL_NAME}.opt.onnx'
+#     LANDMARK_MODEL_PATH = f'{LANDMARK_MODEL_NAME}.opt.onnx.prototxt'
 DETECTION_REMOTE_PATH = f'https://storage.googleapis.com/ailia-models/{DETECTION_MODEL_NAME}/'
 LANDMARK_REMOTE_PATH = f'https://storage.googleapis.com/ailia-models/{LANDMARK_MODEL_NAME}/'
 
@@ -72,91 +76,126 @@ def draw_landmarks(img, points, connections=[], color=(0, 0, 255), size=2):
 # Main functions
 # ======================
 def recognize_from_image():
-    # prepare input data
-    src_img = cv2.imread(args.input)
-    img256, _, scale, pad = but.resize_pad(src_img[:,:,::-1])
-    input_data = img256.astype('float32') / 255.
-    input_data = np.expand_dims(np.moveaxis(input_data, -1, 0), 0)
-
     # net initialize
-    env_id = ailia.get_gpu_environment_id()
-    print(f'env_id: {env_id}')
-    detector = ailia.Net(DETECTION_MODEL_PATH, DETECTION_WEIGHT_PATH, env_id=env_id)
-    estimator = ailia.Net(LANDMARK_MODEL_PATH, LANDMARK_WEIGHT_PATH, env_id=env_id)
+    detector = ailia.Net(
+        DETECTION_MODEL_PATH, DETECTION_WEIGHT_PATH, env_id=args.env_id
+    )
+    estimator = ailia.Net(
+        LANDMARK_MODEL_PATH, LANDMARK_WEIGHT_PATH, env_id=args.env_id
+    )
 
-    # inference
-    print('Start inference...')
-    if args.benchmark:
-        print('BENCHMARK mode')
-        for _ in range(5):
-            start = int(round(time.time() * 1000))
+    # input image loop
+    for image_path in args.input:
+        # prepare input data
+        logger.info(image_path)
+        src_img = cv2.imread(image_path)
+        img256, _, scale, pad = but.resize_pad(src_img[:, :, ::-1])
+        input_data = img256.astype('float32') / 255.
+        input_data = np.expand_dims(np.moveaxis(input_data, -1, 0), 0)
+
+        # inference
+        logger.info('Start inference...')
+        if args.benchmark:
+            logger.info('BENCHMARK mode')
+            for _ in range(5):
+                start = int(round(time.time() * 1000))
+                # Palm detection
+                preds = detector.predict([input_data])
+                detections = but.detector_postprocess(preds)
+
+                # Hand landmark estimation
+                presence = [0, 0]  # [left, right]
+                if detections[0].size != 0:
+                    imgs, affines, _ = but.estimator_preprocess(
+                        src_img, detections, scale, pad
+                    )
+                    estimator.set_input_shape(imgs.shape)
+                    flags, handedness, normed_landmarks = estimator.predict(
+                        [imgs]
+                    )
+
+                    # postprocessing
+                    landmarks = but.denormalize_landmarks(
+                        normed_landmarks, affines
+                    )
+                    for i in range(len(flags)):
+                        landmark = landmarks[i]
+                        flag = flags[i]
+                        handed = 1 - handedness[i]
+                        if flag > 0.75:
+                            # Right handedness when not flipped camera input
+                            if handed < 0.5:
+                                presence[0] = 1
+                            else:
+                                presence[1] = 1
+                            draw_landmarks(
+                                src_img,
+                                landmark[:, :2],
+                                but.HAND_CONNECTIONS,
+                                size=2,
+                            )
+                end = int(round(time.time() * 1000))
+                logger.info(f'\tailia processing time {end - start} ms')
+        else:
             # Palm detection
             preds = detector.predict([input_data])
             detections = but.detector_postprocess(preds)
 
             # Hand landmark estimation
-            presence = [0, 0] # [left, right]
+            presence = [0, 0]  # [left, right]
             if detections[0].size != 0:
-                imgs, affines, _ = but.estimator_preprocess(src_img, detections, scale, pad)
+                imgs, affines, _ = but.estimator_preprocess(
+                    src_img, detections, scale, pad
+                )
                 estimator.set_input_shape(imgs.shape)
-                flags, handedness, normalized_landmarks = estimator.predict([imgs])
+                flags, handedness, normed_landmarks = estimator.predict([imgs])
 
                 # postprocessing
-                landmarks = but.denormalize_landmarks(normalized_landmarks, affines)
+                landmarks = but.denormalize_landmarks(
+                    normed_landmarks, affines
+                )
                 for i in range(len(flags)):
-                    landmark, flag, handed = landmarks[i], flags[i], 1 - handedness[i]
+                    landmark = landmarks[i]
+                    flag = flags[i]
+                    handed = 1 - handedness[i]
                     if flag > 0.75:
-                        if handed < 0.5: # Right handedness when not flipped camera input
+                        # Right handedness when not flipped camera input
+                        if handed > 0.5:
                             presence[0] = 1
                         else:
                             presence[1] = 1
-                        draw_landmarks(src_img, landmark[:,:2], but.HAND_CONNECTIONS, size=2)
-            end = int(round(time.time() * 1000))
-            print(f'\tailia processing time {end - start} ms')
-    else:
-        # Palm detection
-        preds = detector.predict([input_data])
-        detections = but.detector_postprocess(preds)
+                        draw_landmarks(
+                            src_img,
+                            landmark[:, :2],
+                            but.HAND_CONNECTIONS,
+                            size=2,
+                        )
 
-        # Hand landmark estimation
-        presence = [0, 0] # [left, right]
-        if detections[0].size != 0:
-            imgs, affines, _ = but.estimator_preprocess(src_img, detections, scale, pad)
-            estimator.set_input_shape(imgs.shape)
-            flags, handedness, normalized_landmarks = estimator.predict([imgs])
-
-            # postprocessing
-            landmarks = but.denormalize_landmarks(normalized_landmarks, affines)
-            for i in range(len(flags)):
-                landmark, flag, handed = landmarks[i], flags[i], 1 - handedness[i]
-                if flag > 0.75:
-                    if handed > 0.5: # Right handedness when not flipped camera input
-                        presence[0] = 1
-                    else:
-                        presence[1] = 1
-                    draw_landmarks(src_img, landmark[:,:2], but.HAND_CONNECTIONS, size=2)
-
-    if presence[0] and presence[1]:
-        hand_presence = 'Left and right'
-    elif presence[0]:
-        hand_presence = 'Left'
-    elif presence[1]:
-        hand_presence = 'Right'
-    else:
-        hand_presence = 'No hand'
-    print(f'Hand presence: {hand_presence}')
-    cv2.imwrite(args.savepath, src_img)
-    print('Script finished successfully.')
+        if presence[0] and presence[1]:
+            hand_presence = 'Left and right'
+        elif presence[0]:
+            hand_presence = 'Left'
+        elif presence[1]:
+            hand_presence = 'Right'
+        else:
+            hand_presence = 'No hand'
+        logger.info(f'Hand presence: {hand_presence}')
+        savepath = get_savepath(args.savepath, image_path)
+        logger.info(f'saved at : {savepath}')
+        cv2.imwrite(savepath, src_img)
+    logger.info('Script finished successfully.')
 
 
 def recognize_from_video():
     # net initialize
-    env_id = ailia.get_gpu_environment_id()
-    print(f'env_id: {env_id}')
-    detector = ailia.Net(DETECTION_MODEL_PATH, DETECTION_WEIGHT_PATH, env_id=env_id)
-    estimator = ailia.Net(LANDMARK_MODEL_PATH, LANDMARK_WEIGHT_PATH, env_id=env_id)
+    detector = ailia.Net(
+        DETECTION_MODEL_PATH, DETECTION_WEIGHT_PATH, env_id=args.env_id
+    )
+    estimator = ailia.Net(
+        LANDMARK_MODEL_PATH, LANDMARK_WEIGHT_PATH, env_id=args.env_id
+    )
 
-    capture = get_capture(args.video)
+    capture = webcamera_utils.get_capture(args.video)
 
     # create video writer if savepath is specified as video format
     if args.savepath != SAVE_IMAGE_PATH:
@@ -171,11 +210,11 @@ def recognize_from_video():
 
     while(True):
         ret, frame = capture.read()
-        frame = np.ascontiguousarray(frame[:,::-1,:])
+        frame = np.ascontiguousarray(frame[:, ::-1, :])
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
 
-        img256, _, scale, pad = but.resize_pad(frame[:,:,::-1])
+        img256, _, scale, pad = but.resize_pad(frame[:, :, ::-1])
         input_data = img256.astype('float32') / 255.
         input_data = np.expand_dims(np.moveaxis(input_data, -1, 0), 0)
 
@@ -185,14 +224,16 @@ def recognize_from_video():
         detections = but.detector_postprocess(preds)
 
         # Hand landmark estimation
-        presence = [0, 0] # [left, right]
+        presence = [0, 0]  # [left, right]
         if detections[0].size != 0:
-            img, affine, _ = but.estimator_preprocess(frame, detections, scale, pad)
+            img, affine, _ = but.estimator_preprocess(
+                frame, detections, scale, pad
+            )
             estimator.set_input_shape(img.shape)
-            flags, handedness, normalized_landmarks = estimator.predict([img])
+            flags, handedness, normed_landmarks = estimator.predict([img])
 
             # postprocessing
-            landmarks = but.denormalize_landmarks(normalized_landmarks, affine)
+            landmarks = but.denormalize_landmarks(normed_landmarks, affine)
             for i in range(len(flags)):
                 landmark, flag, handed = landmarks[i], flags[i], handedness[i]
                 if flag > 0.75:
@@ -200,7 +241,9 @@ def recognize_from_video():
                         presence[0] = 1
                     else:
                         presence[1] = 1
-                    draw_landmarks(frame, landmark[:,:2], but.HAND_CONNECTIONS, size=2)
+                    draw_landmarks(
+                        frame, landmark[:, :2], but.HAND_CONNECTIONS, size=2
+                    )
 
         if presence[0] and presence[1]:
             text = 'Left and right'
@@ -210,7 +253,9 @@ def recognize_from_video():
             text = 'Right'
         else:
             text = 'No hand'
-        cv2.putText(frame, text, (8, 24), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 255), 2)
+        cv2.putText(
+            frame, text, (8, 24), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 255), 2
+        )
         cv2.imshow('frame', frame)
 
         # save results
@@ -219,14 +264,19 @@ def recognize_from_video():
 
     capture.release()
     cv2.destroyAllWindows()
-    print('Script finished successfully.')
-    pass
+    if writer is not None:
+        writer.release()
+    logger.info('Script finished successfully.')
 
 
 def main():
     # model files check and download
-    check_and_download_models(DETECTION_WEIGHT_PATH, DETECTION_MODEL_PATH, DETECTION_REMOTE_PATH)
-    check_and_download_models(LANDMARK_WEIGHT_PATH, LANDMARK_MODEL_PATH, LANDMARK_REMOTE_PATH)
+    check_and_download_models(
+        DETECTION_WEIGHT_PATH, DETECTION_MODEL_PATH, DETECTION_REMOTE_PATH
+    )
+    check_and_download_models(
+        LANDMARK_WEIGHT_PATH, LANDMARK_MODEL_PATH, LANDMARK_REMOTE_PATH
+    )
 
     if args.video is not None:
         # video mode
