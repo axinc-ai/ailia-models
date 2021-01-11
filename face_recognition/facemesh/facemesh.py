@@ -209,14 +209,28 @@ def recognize_from_video():
                 frame[:, :, ::-1], detections, scale, pad
             )
             draw_roi(frame, box)
-            estimator.set_input_shape(imgs.shape)
-            landmarks, confidences = estimator.predict([imgs])
-            normalized_landmarks = landmarks / 192.0
 
-            # postprocessing
-            landmarks = fut.denormalize_landmarks(
-                normalized_landmarks, affines
-            )
+            dynamic_input_shape = False
+
+            if dynamic_input_shape:
+                estimator.set_input_shape(imgs.shape)
+                landmarks, confidences = estimator.predict([imgs])
+                normalized_landmarks = landmarks / 192.0
+                landmarks = fut.denormalize_landmarks(
+                    normalized_landmarks, affines
+                )
+            else:
+                landmarks = np.zeros((imgs.shape[0], 468, 3))
+                confidences = np.zeros((imgs.shape[0], 1))
+                for i in range(imgs.shape[0]):
+                    landmark, confidences[i, :] = estimator.predict(
+                        [imgs[i:i+1, :, :, :]]
+                    )
+                    normalized_landmark = landmark / 192.0
+                    landmarks[i, :, :] = fut.denormalize_landmarks(
+                        normalized_landmark, affines
+                    )
+
             for i in range(len(landmarks)):
                 landmark, confidence = landmarks[i], confidences[i]
                 # if confidence > 0:
