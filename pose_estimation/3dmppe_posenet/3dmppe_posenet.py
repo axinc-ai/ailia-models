@@ -38,11 +38,11 @@ REMOTE_MASKRCNN_PATH = 'https://storage.googleapis.com/ailia-models/mask_rcnn/'
 
 WEIGHT_ROOTNET_PATH = 'rootnet_snapshot_18.opt.onnx'
 MODEL_ROOTNET_PATH = 'rootnet_snapshot_18.opt.onnx.prototxt'
-REMOTE_ROOTNET_PATH = 'https://storage.googleapis.com/ailia-models/rootnet/'
+REMOTE_ROOTNET_PATH = 'https://storage.googleapis.com/ailia-models/3dmppose_posenet/'
 
 WEIGHT_POSENET_PATH = 'posenet_snapshot_24.opt.onnx'
 MODEL_POSENET_PATH = 'posenet_snapshot_24.opt.onnx.prototxt'
-REMOTE_POSENET_PATH = 'https://storage.googleapis.com/ailia-models/posenet/'
+REMOTE_POSENET_PATH = 'https://storage.googleapis.com/ailia-models/3dmppose_posenet/'
 
 IMAGE_OR_VIDEO_PATH = 'input.jpg' # input.mp4
 SAVE_IMAGE_OR_VIDEO_PATH = 'output.png' # output.mp4
