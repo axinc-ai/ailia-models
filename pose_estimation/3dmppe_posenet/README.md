@@ -42,5 +42,5 @@ ONNX opset = 10
 
 ### Netron
 
-[rootnet_snapshot_18.opt.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/rootnet/rootnet_snapshot_18.opt.onnx.prototxt)
-[posenet_snapshot_24.opt.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/posenet/posenet_snapshot_24.opt.onnx.prototxt)
+[rootnet_snapshot_18.opt.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/3dmppe_posenet/rootnet_snapshot_18.opt.onnx.prototxt)
+[posenet_snapshot_24.opt.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/3dmppe_posenet/posenet_snapshot_24.opt.onnx.prototxt)
