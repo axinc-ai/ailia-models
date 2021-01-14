@@ -61,7 +61,19 @@ REMOTE_PATH = f'https://storage.googleapis.com/ailia-models/{MODEL_NAME}/'
 # ======================
 # Utils
 # ======================
+def get_seg_img(img, preds):
+    """
+    docstring
+    """
+    scores, _, pred_masks, _ = preds
+    mask = np.full(img.shape[:2], False, dtype=bool)
+    for i in range(scores.shape[0]):
+        if scores[i] > 0.5:
+            mask = mask | pred_masks[i]
+    seg_img = img.copy()
+    seg_img[~mask] = 255
 
+    return seg_img
 
 # ======================
 # Main functions
@@ -93,13 +105,13 @@ def recognize_from_image():
             input_name = sess.get_inputs()[0].name
             preds = sess.run(None, {input_name: input_data.astype(np.float32)})
             preds = yut.postprocess(preds, input_data.shape[2:], src_img)
-            scores, pred_classes, pred_masks, pred_boxes = preds
+            seg_img = get_seg_img(src_img, preds)
         else:
             segmentor.set_input_shape(input_data.shape)
             preds = segmentor.predict([input_data])
             preds = yut.postprocess(preds, input_data.shape[2:], src_img)
 
-    cv2.imwrite(args.savepath, src_img)
+    cv2.imwrite(args.savepath, seg_img)
     print('Script finished successfully.')
 
 

@@ -344,7 +344,6 @@ def postprocess(preds, cur_sizes, img_original):
 
     pred_cate = np.concatenate(pred_cate, axis=0)
     pred_kernel = np.concatenate(pred_kernel, axis=0)
-    print(pred_cate.shape, pred_kernel.shape, pred_mask.shape)
 
     # inference for single image.
     preds = inference_single_image(pred_cate, pred_kernel, pred_mask,
