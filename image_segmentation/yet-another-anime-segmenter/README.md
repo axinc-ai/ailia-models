@@ -4,22 +4,21 @@
 
 <img src="anime_character.jpg" width="320px">
 
-<!-- (Image from https://pixabay.com/photos/person-human-male-face-man-view-829966/) -->
+<!-- (Image from ) -->
 
-- ailia input shape: (1, 3, ?, ?) RGB channel order
-<!-- - Pixel value range: [-1, 1] -->
+- ailia input shape: (1, 3, height, width) RGB channel order
+  - Accepts any raw image height and width but needs to be resized and padded
+  accordingly (see `preprocessing` method)
+- Pixel value range: Normalized values (see `preprocessing` method)
 
 ## Output
 
 <img src="output.jpg" width="320px">
 
 
-<!-- - ailia Predict API output:
-  - Bounding boxes and keypoints
-    - Shape: (1, 896, 16)
-  - Classification confidences
-    - Shape: (1, 896, 1)
-- With helper functions, filtered detections with keypoints can be obtained. -->
+- ailia Predict API output: Raw classification, kernel and mask predictions
+- With helper functions, classification scores, predicted classes, predicted
+masks, predicted bounding boxes can be obtained.
 
 ## Usage
 
@@ -43,9 +42,16 @@ If you pass `0` as an argument to VIDEO_PATH, you can use the webcam input inste
 $ python3 yet-another-anime-segmenter.py --video VIDEO_PATH --savepath SAVE_VIDEO_PATH
 ```
 
+To use the ONNX Runtime instead of ailia.
+```bash
+$ python3 yet-another-anime-segmenter.py --onnx
+```
+
 ## Reference
 
 - [Yet-Another-Anime-Segmenter](https://github.com/zymk9/Yet-Another-Anime-Segmenter)
+- [AdelaiDet](https://github.com/aim-uofa/AdelaiDet)
+- [detectron2](https://github.com/facebookresearch/detectron2)
 
 ## Framework
 
@@ -58,4 +64,4 @@ ONNX opset = 11
 
 ## Netron
 
-<!-- [iris.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/mediapipe_iris/iris.onnx.prototxt) -->
+<!-- []() -->
