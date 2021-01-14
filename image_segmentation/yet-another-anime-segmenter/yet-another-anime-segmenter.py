@@ -31,12 +31,6 @@ parser = get_base_parser(
     'Yet-Another-Anime-Segmenter, anime character segmentation.', IMAGE_PATH, SAVE_IMAGE_PATH,
 )
 parser.add_argument(
-    '-n', '--normal',
-    action='store_true',
-    help='By default, the optimized model is used, but with this option, ' +
-    'you can switch to the normal (not optimized) model'
-)
-parser.add_argument(
     '--onnx',
     action='store_true',
     help='By default, the ailia SDK is used, but with this option, ' +
@@ -49,12 +43,8 @@ args = update_parser(parser)
 # Parameters 2
 # ======================
 MODEL_NAME = 'yaas_solov2'
-# if args.normal:
 WEIGHT_PATH = f'{MODEL_NAME}.onnx'
 MODEL_PATH = f'{MODEL_NAME}.onnx.prototxt'
-# else:
-#     WEIGHT_PATH = f'{MODEL_NAME}.opt.onnx'
-#     MODEL_PATH = f'{MODEL_NAME}.opt.onnx.prototxt'
 REMOTE_PATH = f'https://storage.googleapis.com/ailia-models/{MODEL_NAME}/'
 
 
