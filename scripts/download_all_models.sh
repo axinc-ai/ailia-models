@@ -30,6 +30,7 @@ cd ../../face_recognition/facial_feature; python3 facial_feature.py ${OPTION}
 cd ../../face_recognition/gazeml; python3 gazeml.py ${OPTION}
 cd ../../face_recognition/prnet; python3 prnet.py ${OPTION}
 cd ../../face_recognition/facemesh; python3 facemesh.py ${OPTION}
+cd ../../face_recognition/mediapipe_iris; python3 mediapipe_iris.py ${OPTION}
 cd ../../generative_adversarial_networks/council-GAN; python3 council-gan.py --glasses ${OPTION}
 cd ../../generative_adversarial_networks/council-GAN; python3 council-gan.py --m2f ${OPTION}
 cd ../../generative_adversarial_networks/council-GAN; python3 council-gan.py --anime ${OPTION}
