@@ -5,7 +5,7 @@ from scipy.special import expit
 
 MIN_SIZE = 800
 MAX_SIZE = 1600
-size_divisibility = 32
+SIZE_DIVISIBILITY = 32
 PIXEL_MEAN = [103.53, 116.28, 123.675]
 PIXEL_STD = [1.0, 1.0, 1.0]
 NUM_CLASSES = 1
@@ -22,8 +22,16 @@ UPDATE_THR = 0.05
 MAX_PER_IMG = 100
 
 def resize_pad(img):
-    """ resize and pad image to be fed into model
+    """
+    Resize and pad image to be fed into model.
 
+    Scale the shorter edge to the given size, with a limit of `max_size` on the longer edge.
+    If `max_size` is reached, then downscale so that the longer edge does not exceed max_size.
+
+    Add padding to ensure the common height and width is divisible by `SIZE_DIVISIBILITY`.
+    This depends on the model and many models need a divisibility of 32.
+
+    Ref.: https://github.com/facebookresearch/detectron2
     """
     h, w = img.shape[:2]
 
@@ -42,8 +50,8 @@ def resize_pad(img):
     img_new = cv2.resize(img, (neww, newh))
 
     max_size = max(img_new.shape)
-    if size_divisibility > 1:
-        stride = size_divisibility
+    if SIZE_DIVISIBILITY > 1:
+        stride = SIZE_DIVISIBILITY
         # the last two dims are H,W, both subject to divisibility requirement
         max_size = (max_size + (stride - 1)) // stride * stride
 
@@ -72,7 +80,7 @@ def pool2d(A, kernel_size, stride, padding, pool_mode='max'):
         padding: int, implicit zero paddings on both sides of the input
         pool_mode: string, 'max' or 'avg'
 
-    Source: https://stackoverflow.com/questions/54962004/implement-max-mean-poolingwith-stride-with-numpy
+    Ref.: https://stackoverflow.com/questions/54962004/implement-max-mean-poolingwith-stride-with-numpy
     '''
     # Padding
     A = np.pad(A, padding, mode='constant')
@@ -93,12 +101,18 @@ def pool2d(A, kernel_size, stride, padding, pool_mode='max'):
         return A_w.mean(axis=(1,2)).reshape(output_shape)
 
 def point_nms(heat, kernel=2):
+    """
+    Ref.: https://github.com/aim-uofa/AdelaiDet
+    """
     # kernel must be 2
     hmax = np.expand_dims(pool2d(heat.squeeze(), kernel, 1, 1), (0, 1))
     keep = (hmax[:, :, :-1, :-1] == heat).astype(np.float)
     return heat * keep
 
 def matrix_nms(cate_labels, seg_masks, sum_masks, cate_scores, sigma=2.0, kernel='gaussian'):
+    """
+    Ref.: https://github.com/aim-uofa/AdelaiDet
+    """
     n_samples = len(cate_labels)
     if n_samples == 0:
         return []
@@ -136,6 +150,9 @@ def matrix_nms(cate_labels, seg_masks, sum_masks, cate_scores, sigma=2.0, kernel
     return cate_scores_update
 
 def mask_nms(cate_labels, seg_masks, sum_masks, cate_scores, nms_thr=0.5):
+    """
+    Ref.: https://github.com/aim-uofa/AdelaiDet
+    """
     n_samples = len(cate_scores)
     if n_samples == 0:
         return []
@@ -165,9 +182,10 @@ def mask_nms(cate_labels, seg_masks, sum_masks, cate_scores, nms_thr=0.5):
                 keep[j] = False
     return keep
 
-def inference_single_image(
-    cate_preds, kernel_preds, seg_preds, cur_size, ori_size
-):
+def inference_single_image(cate_preds, kernel_preds, seg_preds, cur_size, ori_size):
+    """
+    Ref.: https://github.com/aim-uofa/AdelaiDet
+    """
     scores = []
     pred_classes = []
     pred_masks = []
@@ -187,12 +205,10 @@ def inference_single_image(
 
     # cate_labels & kernel_preds
     inds = inds.nonzero()
-    # cate_labels = inds[:, 1]
     cate_labels = inds[1]
     kernel_preds = kernel_preds[inds[0]]
 
     # trans vector.
-    # size_trans = cate_labels.new_tensor(NUM_GRIDS).pow(2).cumsum(0)
     size_trans = np.power(np.array(NUM_GRIDS), 2).cumsum(0)
     strides = np.ones(size_trans[-1])
 
@@ -205,17 +221,11 @@ def inference_single_image(
     # mask encoding.
     N, I = kernel_preds.shape
     kernel_preds = kernel_preds.reshape(N, I, 1, 1)
-    # import torch
-    # import torch.nn.functional as F
     B, _, H, W = seg_preds.shape
     tmp = np.empty((B, N, H, W))
     for i in range(N):
         tmp[0, i] = np.sum(seg_preds[0] * kernel_preds[i], axis=0)
     seg_preds = expit(tmp.squeeze(0))
-    # a = torch.tensor(seg_preds)
-    # b = torch.tensor(kernel_preds)
-    # seg_preds = F.conv2d(a, b, stride=1)
-    # seg_preds = seg_preds.squeeze(0).sigmoid()
 
     # mask.
     seg_masks = seg_preds > MASK_THR
@@ -275,21 +285,12 @@ def inference_single_image(
     cate_labels = cate_labels[sort_inds]
 
     # reshape to original size.
-    # import torch
-    # import torch.nn.functional as F
-    # a = torch.tensor(seg_preds).unsqueeze(0)
-    # seg_preds = F.interpolate(a,
-    #                             size=upsampled_size_out,
-    #                             mode='bilinear')[:, :, :h, :w]
     C, _, _ = seg_preds.shape
     H, W = upsampled_size_out
     tmp = np.empty((C, H, W))
     for i in range(C):
         tmp[i] = cv2.resize(seg_preds[i], (W, H))
     seg_preds = tmp
-    # seg_masks = F.interpolate(seg_preds,
-    #                             size=ori_size,
-    #                             mode='bilinear').squeeze(0)
     H, W = ori_size
     tmp = np.empty((C, H, W))
     for i in range(C):
@@ -302,15 +303,16 @@ def inference_single_image(
     pred_masks = seg_masks
 
     # get bbox from mask
-    pred_boxes = np.zeros((seg_masks.shape[0], 4))
-    #for i in range(seg_masks.size(0)):
-    #    mask = seg_masks[i].squeeze()
-    #    ys, xs = torch.where(mask)
-    #    pred_boxes[i] = torch.tensor([xs.min(), ys.min(), xs.max(), ys.max()]).float()       
+    pred_boxes = np.zeros((seg_masks.shape[0], 4))   
 
     return scores, pred_classes, pred_masks, pred_boxes
 
 def preprocess(img):
+    """
+    Preprocess the image to be fed into the model.
+
+    Ref.: https://github.com/aim-uofa/AdelaiDet
+    """
     img_new = resize_pad(img)
     pixel_mean = np.array(PIXEL_MEAN).reshape(1, 1, 3)
     pixel_std = np.array(PIXEL_STD).reshape(1, 1, 3)
@@ -321,7 +323,13 @@ def preprocess(img):
 
 def postprocess(preds, cur_sizes, img_original):
     """
-    docstring
+    Postprocess the raw predictions.
+
+    Return:
+        scores, pred_classes, pred_masks, pred_boxes: Classification scores,
+            predicted classes, predicted masks, predicted bounding boxes
+
+    Ref.: https://github.com/aim-uofa/AdelaiDet
     """
     cate_pred = preds[:5]
     kernel_pred = preds[5:10]
@@ -330,7 +338,6 @@ def postprocess(preds, cur_sizes, img_original):
     cate_pred = [np.moveaxis(point_nms(expit(cate_p), kernel=2), 1, -1)
                  for cate_p in cate_pred]
 
-    results = []
     num_ins_levels = len(cate_pred)
     # image size.
     height, width = img_original.shape[:2]
@@ -346,7 +353,5 @@ def postprocess(preds, cur_sizes, img_original):
     pred_kernel = np.concatenate(pred_kernel, axis=0)
 
     # inference for single image.
-    preds = inference_single_image(pred_cate, pred_kernel, pred_mask,
-                                         cur_sizes, ori_size)
-    # results.append({"instances": result})
+    preds = inference_single_image(pred_cate, pred_kernel, pred_mask, cur_sizes, ori_size)
     return preds
