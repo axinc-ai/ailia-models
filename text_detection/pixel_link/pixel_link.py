@@ -55,11 +55,6 @@ parser.add_argument(
     help='Running the inference on the same input 5 times ' +
          'to measure execution performance. (Cannot be used in video mode)'
 )
-parser.add_argument(
-    '--onnx',
-    action='store_true',
-    help='execute onnxruntime version.'
-)
 args = parser.parse_args()
 
 
@@ -84,15 +79,8 @@ def predict(img, net):
     img = img.astype(np.int32)
 
     # feedforward
-    if not args.onnx:
-        net.set_input_shape(img.shape)
-        output = net.predict({'import/test/Placeholder:0': img})
-    else:
-        img_name = net.get_inputs()[0].name
-        pixel_pos_scores_name = net.get_outputs()[0].name
-        link_pos_scores_name = net.get_outputs()[1].name
-        output = net.run([pixel_pos_scores_name, link_pos_scores_name],
-                         {img_name: img})
+    net.set_input_shape(img.shape)
+    output = net.predict({'import/test/Placeholder:0': img})
 
     pixel_pos_scores, link_pos_scores = output
     bboxes = post_processing(pixel_pos_scores, link_pos_scores, img.shape)
@@ -160,11 +148,7 @@ def main():
     print(f'env_id: {env_id}')
 
     # initialize
-    if not args.onnx:
-        net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id, memory_mode=memory_mode)
-    else:
-        import onnxruntime
-        net = onnxruntime.InferenceSession(WEIGHT_PATH)
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id, memory_mode=memory_mode)
 
     if args.video is not None:
         recognize_from_video(args.video, net)
