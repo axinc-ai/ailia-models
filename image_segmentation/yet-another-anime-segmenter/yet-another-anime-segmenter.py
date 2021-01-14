@@ -88,6 +88,15 @@ def recognize_from_image():
         print('BENCHMARK mode')
         for _ in range(5):
             start = int(round(time.time() * 1000))
+            if args.onnx:
+                input_name = sess.get_inputs()[0].name
+                preds = sess.run(None, {input_name: input_data.astype(np.float32)})
+                preds = yut.postprocess(preds, input_data.shape[2:], src_img)
+                seg_img = get_seg_img(src_img, preds)
+            else:
+                segmentor.set_input_shape(input_data.shape)
+                preds = segmentor.predict([input_data])
+                preds = yut.postprocess(preds, input_data.shape[2:], src_img)
             end = int(round(time.time() * 1000))
             print(f'\tailia processing time {end - start} ms')
     else:
@@ -107,9 +116,13 @@ def recognize_from_image():
 
 def recognize_from_video():
     # net initialize
-    env_id = ailia.get_gpu_environment_id()
-    print(f'env_id: {env_id}')
-    segmentor = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+    if args.onnx:
+        import onnxruntime as rt
+        sess = rt.InferenceSession(WEIGHT_PATH)
+    else:
+        env_id = ailia.get_gpu_environment_id()
+        print(f'env_id: {env_id}')
+        segmentor = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
 
     capture = get_capture(args.video)
 
@@ -134,14 +147,21 @@ def recognize_from_video():
         input_data = yut.preprocess(frame)
 
         # inference
-        preds = segmentor.predict([input_data])
-        preds = yut.postprocess(preds, input_data.shape[2:], frame)
+        if args.onnx:
+            input_name = sess.get_inputs()[0].name
+            preds = sess.run(None, {input_name: input_data.astype(np.float32)})
+            preds = yut.postprocess(preds, input_data.shape[2:], frame)
+            seg_img = get_seg_img(frame, preds)
+        else:
+            segmentor.set_input_shape(input_data.shape)
+            preds = segmentor.predict([input_data])
+            preds = yut.postprocess(preds, input_data.shape[2:], frame)
 
-        cv2.imshow('frame', frame)
+        cv2.imshow('Segmented frame', seg_img)
 
         # save results
         if writer is not None:
-            writer.write(frame)
+            writer.write(seg_img)
 
     capture.release()
     cv2.destroyAllWindows()
