@@ -65,4 +65,4 @@ ONNX opset = 11
 
 ## Netron
 
-[yaas_solov2.onnx.prototxt](https://storage.googleapis.com/ailia-models/yaas_solov2/yaas_solov2.onnx.prototxt)
+[yaas_solov2.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/yaas_solov2/yaas_solov2.onnx.prototxt)
