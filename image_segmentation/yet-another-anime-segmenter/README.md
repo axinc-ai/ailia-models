@@ -2,9 +2,10 @@
 
 ## Input
 
-<img src="anime_character.jpg" width="320px">
+<img src="unity_chan.png" width="320px">
 
-<!-- (Image from ) -->
+(Image from https://unity-chan.com/download/index.php and licensed under
+© Unity Technologies Japan/UCL)
 
 - ailia input shape: (1, 3, height, width) RGB channel order
   - Accepts any raw image height and width but needs to be resized and padded
@@ -13,7 +14,7 @@
 
 ## Output
 
-<img src="output.jpg" width="320px">
+<img src="output.png" width="320px">
 
 
 - ailia Predict API output: Raw classification, kernel and mask predictions
@@ -64,4 +65,4 @@ ONNX opset = 11
 
 ## Netron
 
-<!-- []() -->
+[yaas_solov2.onnx.prototxt](https://storage.googleapis.com/ailia-models/yaas_solov2/yaas_solov2.onnx.prototxt)
