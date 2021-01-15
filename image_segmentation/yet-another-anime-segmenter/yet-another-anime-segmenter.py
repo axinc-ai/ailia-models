@@ -97,6 +97,7 @@ def recognize_from_image():
                 segmentor.set_input_shape(input_data.shape)
                 preds = segmentor.predict([input_data])
                 preds = yut.postprocess(preds, input_data.shape[2:], src_img)
+                seg_img = get_seg_img(src_img, preds)
             end = int(round(time.time() * 1000))
             print(f'\tailia processing time {end - start} ms')
     else:
@@ -109,6 +110,7 @@ def recognize_from_image():
             segmentor.set_input_shape(input_data.shape)
             preds = segmentor.predict([input_data])
             preds = yut.postprocess(preds, input_data.shape[2:], src_img)
+            seg_img = get_seg_img(src_img, preds)
 
     cv2.imwrite(args.savepath, seg_img)
     print('Script finished successfully.')
