@@ -18,8 +18,8 @@ from model_utils import check_and_download_models  # noqa: E402
 # ======================
 # Parameters 1
 # ======================
-IMAGE_PATH = 'anime_character.jpg'
-SAVE_IMAGE_PATH = 'output.jpg'
+IMAGE_PATH = 'unity_chan.png'
+SAVE_IMAGE_PATH = 'output.png'
 IMAGE_HEIGHT = 128
 IMAGE_WIDTH = 128
 
