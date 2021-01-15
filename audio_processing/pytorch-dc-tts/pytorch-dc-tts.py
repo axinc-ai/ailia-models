@@ -55,7 +55,7 @@ parser.add_argument(
 parser.add_argument(
     '-o', '--onnx',
     action='store_true',
-    default=True,
+    default=False,
     help='Use onnx runtime'
 )
 args = parser.parse_args()
@@ -86,6 +86,7 @@ def inference(net_t2m, net_ssrm, L, Y, zeros, A):
 def inference_by_text2mel(net_t2m, L, Y, zeros, A):
     for t in (range(MAX_T)):
         if not args.onnx:
+            net_t2m.set_input_blob_shape(Y.shape, net_t2m.find_blob_index_by_name('input.2'))
             _, Y_t, A = net_t2m.predict({'input.1':L, 'input.2':Y})
         else:
             first_input_name = net_t2m.get_inputs()[0].name
