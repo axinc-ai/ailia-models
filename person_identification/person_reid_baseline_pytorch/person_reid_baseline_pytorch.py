@@ -244,7 +244,7 @@ def recognize_from_image(query_path, net):
         gallery_files = data['gallery_file']
     else:
         data = {'gallery_feature': gallery_feature, 'gallery_file': gallery_files}
-        file_name = "%s_result.npy" % args.model
+        file_name = "result_%s.npy" % args.model
         np.save(file_name, data)
         print("'%s' saved" % file_name)
 
