@@ -36,7 +36,6 @@ SAVE_IMAGE_PATH = 'output.png'
 IMAGE_HEIGHT = 256
 IMAGE_WIDTH = 128
 
-FEATURE_RESULT_FILE = 'result.npy'
 MARKET_1501_DROP_SAME_CAMERA_LABEL = True
 
 # ======================
@@ -137,13 +136,17 @@ def sort_img(query_feature, gallery_feature):
 
 def get_id(img_path):
     filename = os.path.basename(img_path)
-    label = filename[0:4]
-    a = filename.split('c')
-    camera_id = int(a[1][0])
-    if label[:2] == '-1':
-        label = -1
-    else:
-        label = int(label)
+    label = filename[:4]
+    try:
+        a = filename.split('c')
+        camera_id = int(a[1][0])
+        if label[:2] == '-1':
+            label = -1
+        else:
+            label = int(label)
+    except:
+        camera_id = None
+        label = None
 
     return camera_id, label
 
@@ -241,8 +244,9 @@ def recognize_from_image(query_path, net):
         gallery_files = data['gallery_file']
     else:
         data = {'gallery_feature': gallery_feature, 'gallery_file': gallery_files}
-        np.save(FEATURE_RESULT_FILE, data)
-        print("'%s' saved" % FEATURE_RESULT_FILE)
+        file_name = "%s_result.npy" % args.model
+        np.save(file_name, data)
+        print("'%s' saved" % file_name)
 
     index = sort_img(query_feature, gallery_feature)
 
@@ -269,12 +273,12 @@ def recognize_from_image(query_path, net):
 
             ax = plt.subplot(1, 11, count + 2)
             ax.axis('off')
-            label = ""
-            imshow(img_path)
+            _, label = get_id(img_path)
             ax.set_title(
                 '%d' % (count + 1),
                 color='black' if not MARKET_1501_DROP_SAME_CAMERA_LABEL else \
                     'green' if label == query_label else 'red')
+            imshow(img_path)
 
             count += 1
             if count >= 10:
