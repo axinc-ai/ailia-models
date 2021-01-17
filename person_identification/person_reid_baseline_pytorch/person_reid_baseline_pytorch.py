@@ -1,12 +1,12 @@
 import sys, os
 import time
 import argparse
+import math
 import glob
 from itertools import chain
 
 import numpy as np
 import cv2
-import scipy.io
 import matplotlib.pyplot as plt
 
 import ailia
@@ -26,6 +26,8 @@ WEIGHT_FP16_PATH = 'fp16.onnx'
 MODEL_FP16_PATH = 'fp16.onnx.prototxt'
 WEIGHT_DENSE_PATH = 'ft_net_dense.onnx'
 MODEL_DENSE_PATH = 'ft_net_dense.onnx.prototxt'
+WEIGHT_PCB_PATH = 'PCB.onnx'
+MODEL_PCB_PATH = 'PCB.onnx.prototxt'
 REMOTE_PATH = \
     'https://storage.googleapis.com/ailia-models/person_reid_baseline_pytorch/'
 
@@ -35,6 +37,8 @@ SAVE_IMAGE_PATH = 'output.png'
 
 IMAGE_HEIGHT = 256
 IMAGE_WIDTH = 128
+IMAGE_PCB_HEIGHT = 384
+IMAGE_PCB_WIDTH = 192
 
 MARKET_1501_DROP_SAME_CAMERA_LABEL = True
 
@@ -64,8 +68,12 @@ parser.add_argument(
 )
 parser.add_argument(
     '-m', '--model', type=str, default='resnet50',
-    choices=('resnet50', 'fp16', 'dense'),
-    help='the name of the model.'
+    choices=('resnet50', 'fp16', 'dense', 'pcb'),
+    help='Name of the model.'
+)
+parser.add_argument(
+    '--ms', default='1', type=str,
+    help='Multiple scale: e.g. 1 or 1,1.1 or 1,1.1,1.2'
 )
 parser.add_argument(
     '-b', '--batchsize', type=int, default=256,
@@ -108,7 +116,10 @@ class DataLoader(object):
 
 
 def preprocess(img):
-    img = cv2.resize(img, (IMAGE_WIDTH, IMAGE_HEIGHT), interpolation=cv2.INTER_CUBIC)
+    if args.model == 'pcb':
+        img = cv2.resize(img, (IMAGE_PCB_WIDTH, IMAGE_PCB_HEIGHT), interpolation=cv2.INTER_CUBIC)
+    else:
+        img = cv2.resize(img, (IMAGE_WIDTH, IMAGE_HEIGHT), interpolation=cv2.INTER_CUBIC)
     img = img.astype(np.float32) / 255
 
     # normalize
@@ -120,6 +131,21 @@ def preprocess(img):
     cv2.multiply(img, stdinv, img)  # inplace
 
     return img
+
+
+def interpolate(imgs, scale):
+    _, _, h, w = imgs.shape
+    h = int(h * scale)
+    w = int(w * scale)
+    a = []
+    for img in imgs:
+        img = img.transpose(1, 2, 0)
+        img = cv2.resize(img, (w, h), interpolation=cv2.INTER_CUBIC)
+        img = img.transpose(2, 0, 1)
+        a.append(img)
+
+    imgs = np.stack(a)
+    return imgs
 
 
 def sort_img(query_feature, gallery_feature):
@@ -177,25 +203,41 @@ def imshow(path, title=None):
 def extract_feature(imgs, net):
     n, c, h, w = imgs.shape
 
-    ff = np.zeros((n, 512))
+    str_ms = args.ms.split(',')
+    ms = []
+    for s in str_ms:
+        s_f = float(s)
+        ms.append(math.sqrt(s_f))
+
+    ff = np.zeros((n, 2048, 6)) if args.model == 'pcb' else np.zeros((n, 512))
     for i in range(2):
         if i == 1:
             # fliplr
             imgs = imgs[:, :, :, ::-1]
 
-        if not args.onnx:
-            net.set_input_shape(imgs.shape)
-            outputs = net.predict({'img': imgs})[0]
-        else:
-            img_name = net.get_inputs()[0].name
-            out_name = net.get_outputs()[0].name
-            outputs = net.run([out_name],
-                              {img_name: imgs})[0]
-        ff += outputs
+        for scale in ms:
+            if scale != 1:
+                imgs = interpolate(imgs, scale)
+
+            if not args.onnx:
+                net.set_input_shape(imgs.shape)
+                outputs = net.predict({'imgs': imgs})[0]
+            else:
+                img_name = net.get_inputs()[0].name
+                out_name = net.get_outputs()[0].name
+                outputs = net.run([out_name],
+                                  {img_name: imgs})[0]
+            ff += outputs
 
     fnorm = np.linalg.norm(ff, ord=2, axis=1, keepdims=True)
+    if args.model == 'pcb':
+        # feature size (n,2048,6)
+        # 1. To treat every part equally, I calculate the norm for every 2048-dim part feature.
+        # 2. To keep the cosine score==1, sqrt(6) is added to norm the whole feature (2048*6).
+        fnorm *= np.sqrt(6)
     fnorm = np.repeat(fnorm, ff.shape[1], axis=1)
     ff = ff / fnorm
+    ff = ff.reshape(n, -1)
 
     return ff
 
@@ -267,7 +309,8 @@ def recognize_from_image(query_path, net):
         count = 0
         for i in range(len(index)):
             img_path = gallery_files[index[i]]
-            if MARKET_1501_DROP_SAME_CAMERA_LABEL and not good_img(img_path, query_camera, query_label):
+            if MARKET_1501_DROP_SAME_CAMERA_LABEL \
+                    and not good_img(img_path, query_camera, query_label):
                 continue
             print(img_path)
 
@@ -276,8 +319,8 @@ def recognize_from_image(query_path, net):
             _, label = get_id(img_path)
             ax.set_title(
                 '%d' % (count + 1),
-                color='black' if not MARKET_1501_DROP_SAME_CAMERA_LABEL else \
-                    'green' if label == query_label else 'red')
+                color='black' if not MARKET_1501_DROP_SAME_CAMERA_LABEL \
+                    else 'green' if label == query_label else 'red')
             imshow(img_path)
 
             count += 1
@@ -288,7 +331,8 @@ def recognize_from_image(query_path, net):
         count = 0
         for i in range(10):
             img_path = gallery_files[index[i]]
-            if MARKET_1501_DROP_SAME_CAMERA_LABEL and not good_img(img_path, query_camera, query_label):
+            if MARKET_1501_DROP_SAME_CAMERA_LABEL \
+                    and not good_img(img_path, query_camera, query_label):
                 continue
             print(img_path)
             count += 1
@@ -307,6 +351,7 @@ def main():
         'resnet50': (WEIGHT_RESNET50_PATH, MODEL_RESNET50_PATH),
         'fp16': (WEIGHT_FP16_PATH, MODEL_FP16_PATH),
         'dense': (WEIGHT_DENSE_PATH, MODEL_DENSE_PATH),
+        'pcb': (WEIGHT_PCB_PATH, MODEL_PCB_PATH),
     }
     weight_path, model_path = dic_model[args.model]
 
