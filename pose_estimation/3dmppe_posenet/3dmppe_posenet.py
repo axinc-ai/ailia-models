@@ -32,17 +32,17 @@ warnings.simplefilter("ignore", DeprecationWarning)
 # ======================
 # Parameters
 # ======================
-WEIGHT_MASKRCNN_PATH = 'mask_rcnn_R_50_FPN_1x.opt.onnx'
-MODEL_MASKRCNN_PATH = 'mask_rcnn_R_50_FPN_1x.opt.onnx.prototxt'
-REMOTE_MASKRCNN_PATH = 'https://storage.googleapis.com/ailia-models/mask_rcnn/'
+WEIGHT_PATH_MASKRCNN = 'mask_rcnn_R_50_FPN_1x.onnx'
+MODEL_PATH_MASKRCNN = 'mask_rcnn_R_50_FPN_1x.onnx.prototxt'
+REMOTE_PATH_MASKRCNN = 'https://storage.googleapis.com/ailia-models/mask_rcnn/'
 
-WEIGHT_ROOTNET_PATH = 'rootnet_snapshot_18.opt.onnx'
-MODEL_ROOTNET_PATH = 'rootnet_snapshot_18.opt.onnx.prototxt'
-REMOTE_ROOTNET_PATH = 'https://storage.googleapis.com/ailia-models/3dmppose_posenet/'
+WEIGHT_PATH_ROOTNET = 'rootnet_snapshot_18.opt.onnx'
+MODEL_PATH_ROOTNET = 'rootnet_snapshot_18.opt.onnx.prototxt'
+REMOTE_PATH_ROOTNET = 'https://storage.googleapis.com/ailia-models/3dmppe_posenet/'
 
-WEIGHT_POSENET_PATH = 'posenet_snapshot_24.opt.onnx'
-MODEL_POSENET_PATH = 'posenet_snapshot_24.opt.onnx.prototxt'
-REMOTE_POSENET_PATH = 'https://storage.googleapis.com/ailia-models/3dmppose_posenet/'
+WEIGHT_PATH_POSENET = 'posenet_snapshot_24.opt.onnx'
+MODEL_PATH_POSENET = 'posenet_snapshot_24.opt.onnx.prototxt'
+REMOTE_PATH_POSENET = 'https://storage.googleapis.com/ailia-models/3dmppe_posenet/'
 
 IMAGE_OR_VIDEO_PATH = 'input.jpg' # input.mp4
 SAVE_IMAGE_OR_VIDEO_PATH = 'output.png' # output.mp4
@@ -580,9 +580,9 @@ def recognize_from_video(vid_path, net_maskrcnn, net_root, net_pose=None, sess_p
 
 def main():
     # model files check and download
-    check_and_download_models(WEIGHT_MASKRCNN_PATH, MODEL_MASKRCNN_PATH, REMOTE_MASKRCNN_PATH)
-    check_and_download_models(WEIGHT_ROOTNET_PATH, MODEL_ROOTNET_PATH, REMOTE_ROOTNET_PATH)
-    check_and_download_models(WEIGHT_POSENET_PATH, MODEL_POSENET_PATH, REMOTE_POSENET_PATH)
+    check_and_download_models(WEIGHT_PATH_MASKRCNN, MODEL_PATH_MASKRCNN, REMOTE_PATH_MASKRCNN)
+    check_and_download_models(WEIGHT_PATH_ROOTNET, MODEL_PATH_ROOTNET, REMOTE_PATH_ROOTNET)
+    check_and_download_models(WEIGHT_PATH_POSENET, MODEL_PATH_POSENET, REMOTE_PATH_POSENET)
 
     # net initialize
     # This model requires fuge gpu memory so fallback to cpu mode
@@ -590,17 +590,17 @@ def main():
     if env_id != -1 and ailia.get_environment(env_id).props == "LOWPOWER":
         env_id = -1
     # Mask R-CNN
-    net_maskrcnn = ailia.Net(MODEL_MASKRCNN_PATH, WEIGHT_MASKRCNN_PATH, env_id=env_id)
+    net_maskrcnn = ailia.Net(MODEL_PATH_MASKRCNN, WEIGHT_PATH_MASKRCNN, env_id=env_id)
     # RootNet
-    net_root = ailia.Net(MODEL_ROOTNET_PATH, WEIGHT_ROOTNET_PATH, env_id=env_id)
+    net_root = ailia.Net(MODEL_PATH_ROOTNET, WEIGHT_PATH_ROOTNET, env_id=env_id)
     # PoseNet
     if (args.onnx is True):
         # onnxruntime
-        sess_pose = onnxruntime.InferenceSession(WEIGHT_POSENET_PATH)
+        sess_pose = onnxruntime.InferenceSession(WEIGHT_PATH_POSENET)
         net_pose = None
     else:
         # ailia SDK
-        net_pose = ailia.Net(MODEL_POSENET_PATH, WEIGHT_POSENET_PATH, env_id=env_id)
+        net_pose = ailia.Net(MODEL_PATH_POSENET, WEIGHT_PATH_POSENET, env_id=env_id)
         sess_pose = None
 
     if args.video is None:
