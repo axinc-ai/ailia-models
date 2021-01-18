@@ -37,7 +37,6 @@ def tfconvert(x, window_len, hop_len, mult, window='hann') :
     y_mag = zero_pad(y_mag, mult)
     y_phase = zero_pad(y_phase, mult)
 
-
     return y_mag, y_phase
 
 
@@ -54,5 +53,4 @@ def calc_time(sample_len ,sr) :
     rem = (sample_len % sr) / sr
     min = quot // 60
     sec = quot % 60 + rem
-
     print('Time length : {}min {:.02f}sec'.format(min,sec))

@@ -13,10 +13,9 @@ doublenoble_k7rain_part.wav
 
 - Music (audio file)
 ```
-Audio from SigSep Datasets
+DSD100 dataset
 https://sigsep.github.io/datasets/dsd100.html
 049 - Young Griffo - Facade.wav
-(Original file : DSD100subset/Mixtures/Test/049 - Young Griffo - Facade/mixture.wav)
 ```
 
 ### output
@@ -35,14 +34,14 @@ $ python3 source_separation.py
 
 ```
 
-If you want to specify the input image, put the input path after the --input option.
+If you want to specify the input audio file, put the input path after the --input option.
 You can use --savepath option to change the name of the output file to save.
 ```bash
 $ python3 source_separation.py --input WAV_PATH --savepath SAVE_WAV_PATH
 ```
 
 You can select a pretrained model by specifying --arch base (default) or --arch large.
-`base` is model for general voice separation task, and `large` is model for singing voice separation taks.  
+`base` is a model for general voice separation task, and `large` is a model for singing voice separation task.  
 ```bash
 $ python3 source_separation.py --input WAV_PATH --savepath SAVE_WAV_PATH --arch base
 ```
@@ -61,6 +60,7 @@ PyTorch 1.6.0
 ONNX opset = 11
 
 ### Netron
-
+- General voice separation
 [second_voice_bank.best.opt.onnx.prototxt](https://lutzroeder.github.io/netron/?url=https://storage.googleapis.com/ailia-models/source_separation/second_voice_bank.best.opt.onnx.prototxt)
+-Singing voice separation
 [RefineSpectrogramUnet.best.opt.onnx.prototxt](https://lutzroeder.github.io/netron/?url=https://storage.googleapis.com/ailia-models/source_separation/RefineSpectrogramUnet.best.opt.onnx.prototxt)
