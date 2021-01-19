@@ -64,7 +64,7 @@ parser.add_argument(
 )
 parser.add_argument(
     '-d', '--data', type=str, default=None,
-    help='Intermediate mat data file.'
+    help='Intermediate result npy file.'
 )
 parser.add_argument(
     '-m', '--model', type=str, default='resnet50',
@@ -292,10 +292,9 @@ def recognize_from_image(query_path, net):
 
     index = sort_img(query_feature, gallery_feature)
 
+    query_camera = query_label = None
     if MARKET_1501_DROP_SAME_CAMERA_LABEL:
         query_camera, query_label = get_id(query_path)
-    else:
-        query_label = None
 
     print('query_file:', query_path)
     print('Top 10 images are as follow:')
@@ -325,7 +324,7 @@ def recognize_from_image(query_path, net):
 
             count += 1
             if count >= 10:
-                plt.show()
+                # plt.show()
                 break
     except RuntimeError:
         count = 0
