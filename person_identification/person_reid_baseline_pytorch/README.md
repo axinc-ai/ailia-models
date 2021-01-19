@@ -31,6 +31,8 @@ If you want to specify the directory of gallery image, put the directory path af
 ```bash
 $ python3 person_reid_baseline_pytorch.py --gallery_dir gallery
 ```
+Now, files in this gallery directory are very restricted.   
+Many more files can be found in the bounding_box_test directory of [Market-1501-v15.09.15.zip](http://188.138.127.15:81/Datasets/Market-1501-v15.09.15.zip).
 
 Once the program run, a intermediate result file containing the features of the gallery image will be created.  
 By adding the intermediate result file name after the `--data` option, you can use the intermediate result of the previous inference.
