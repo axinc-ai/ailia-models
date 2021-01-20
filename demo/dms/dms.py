@@ -245,7 +245,7 @@ def recognize_hand(frame,detector,estimator,out_frame=None):
 
     # display bbox
     detections2 = bhut.denormalize_detections(detections[0].copy(), scale, pad)
-    display_hand_box(out_frame, detections2)
+    #display_hand_box(out_frame, detections2)
 
     # Hand landmark estimation
     presence = [0, 0] # [left, right]
