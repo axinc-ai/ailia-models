@@ -52,6 +52,11 @@ parser.add_argument(
     help='By default, the optimized model is used, but with this option, ' +
     'you can switch to the normal (not optimized) model'
 )
+parser.add_argument(
+    '-b', '--bbox',
+    action='store_true',
+    help='Display detected bonding box'
+)
 args = update_parser(parser)
 
 
@@ -244,8 +249,9 @@ def recognize_hand(frame,detector,estimator,out_frame=None):
     detections = bhut.detector_postprocess(preds,anchor_path="../../hand_recognition/blazehand/anchors.npy")
 
     # display bbox
-    detections2 = bhut.denormalize_detections(detections[0].copy(), scale, pad)
-    #display_hand_box(out_frame, detections2)
+    if args.bbox:
+        detections2 = bhut.denormalize_detections(detections[0].copy(), scale, pad)
+        display_hand_box(out_frame, detections2)
 
     # Hand landmark estimation
     presence = [0, 0] # [left, right]
@@ -289,8 +295,9 @@ def recognize_pose(frame,detector,estimator,out_frame=None):
     count = len(detections) if detections[0].size > 0 else 0
 
     # display bbox
-    detections2 = bput.denormalize_detections(detections[0].copy(), scale, pad)
-    display_hand_box(out_frame, detections2)
+    if args.bbox:
+        detections2 = bput.denormalize_detections(detections[0].copy(), scale, pad)
+        display_hand_box(out_frame, detections2)
 
     # Pose estimation
     landmarks = []
@@ -327,8 +334,9 @@ def recognize_iris(frame,detector,estimator,estimator2,out_frame=None):
     detections = iut.detector_postprocess(preds,anchor_path="../../face_recognition/facemesh/anchors.npy")
 
     # display bbox
-    detections2 = iut.denormalize_detections(detections[0].copy(), scale, pad)
-    display_hand_box(out_frame, detections2)
+    if args.bbox:
+        detections2 = iut.denormalize_detections(detections[0].copy(), scale, pad)
+        display_hand_box(out_frame, detections2)
 
     # Face landmark estimation
     if detections[0].size != 0:
