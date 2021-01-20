@@ -5,13 +5,12 @@ import argparse
 import numpy as np
 
 import ailia  # noqa: E402
-import onnxruntime
 
 import soundfile as sf
 from scipy import signal
 
 # import original modules
-sys.path.append('../util')
+sys.path.append('../../util')
 from model_utils import check_and_download_models  # noqa: E402
 from unet_source_separation_utils import preemphasis, inv_preemphasis, lowpass, tfconvert, zero_pad, calc_time  # noqa: E402
 
@@ -50,7 +49,7 @@ parser.add_argument(
 parser.add_argument(
     '-n', '--onnx', 
     action='store_true',
-    default=True,
+    default=False,
     help='Use onnxruntime'
 )
 parser.add_argument(
@@ -147,6 +146,7 @@ def main():
         session = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
     else :
         print('Use onnxruntime')
+        import onnxruntime
         session = onnxruntime.InferenceSession(WEIGHT_PATH)
 
     # inference
