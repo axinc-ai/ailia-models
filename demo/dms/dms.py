@@ -19,6 +19,7 @@ import mediapipe_iris_utils as iut
 
 sys.path.append('../../util')
 from utils import get_base_parser, update_parser  # noqa: E402
+from webcamera_utils import adjust_frame_size, get_capture  # noqa: E402
 from image_utils import load_image  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 
@@ -41,8 +42,9 @@ POSE_IMAGE_WIDTH = 256
 # ======================
 # Argument Parser Config
 # ======================
+SAVE_IMAGE_PATH="output.mp4"
 parser = get_base_parser(
-    'Driver monirogin system demo.', None, None,
+    'Driver monirogin system demo.', None, SAVE_IMAGE_PATH,
 )
 parser.add_argument(
     '-n', '--normal',
@@ -207,8 +209,8 @@ def display_result_pose(input_img, count, landmarks, flags):
 # ======================
 
 def recognize_hand(frame,detector,estimator,out_frame=None):
-    if out_frame==None:
-        out_frame = frame
+    #if out_frame==None:
+    #    out_frame = frame
 
     frame = np.ascontiguousarray(frame[:,::-1,:])
 
@@ -219,7 +221,7 @@ def recognize_hand(frame,detector,estimator,out_frame=None):
     # inference
     # Palm detection
     preds = detector.predict([input_data])
-    detections = bhut.detector_postprocess(preds,anchors="../../hand_recognition/blazehand/anchors.npy")
+    detections = bhut.detector_postprocess(preds,anchor_path="../../hand_recognition/blazehand/anchors.npy")
 
     # Hand landmark estimation
     presence = [0, 0] # [left, right]
@@ -252,8 +254,8 @@ def recognize_hand(frame,detector,estimator,out_frame=None):
 
 
 def recognize_pose(frame,detector,estimator,out_frame=None):
-    if out_frame==None:
-        out_frame = frame
+    #if out_frame==None:
+    #    out_frame = frame
 
     _, img128, scale, pad = bput.resize_pad(frame[:,:,::-1])
     input_data = img128.astype('float32') / 255.
@@ -262,7 +264,7 @@ def recognize_pose(frame,detector,estimator,out_frame=None):
     # inference
     # Person detection
     detector_out = detector.predict([input_data])
-    detections = bput.detector_postprocess(detector_out,anchors="../../pose_estimatinon/blazepose/anchors.npy")
+    detections = bput.detector_postprocess(detector_out,anchor_path="../../pose_estimation/blazepose/anchors.npy")
     count = len(detections) if detections[0].size > 0 else 0
 
     # Pose estimation
@@ -279,8 +281,8 @@ def recognize_pose(frame,detector,estimator,out_frame=None):
 
 
 def recognize_face(frame,detector,estimator,out_frame=None):
-    if out_frame==None:
-        out_frame = frame
+    #if out_frame==None:
+    #    out_frame = frame
 
     frame = np.ascontiguousarray(frame[:,::-1,:])
 
@@ -291,7 +293,7 @@ def recognize_face(frame,detector,estimator,out_frame=None):
     # inference
     # Face detection
     preds = detector.predict([input_data])
-    detections = fut.detector_postprocess(preds,anchors="../../face_recognition/facemesh/anchors.npy")
+    detections = fut.detector_postprocess(preds,anchor_path="../../face_recognition/facemesh/anchors.npy")
 
     # Face landmark estimation
     if detections[0].size != 0:
@@ -322,8 +324,8 @@ def recognize_face(frame,detector,estimator,out_frame=None):
 
 
 def recognize_iris(frame,detector,estimator,estimator2,out_frame=None):
-    if out_frame==None:
-        out_frame = frame
+    #if out_frame==None:
+    #    out_frame = frame
 
     frame = np.ascontiguousarray(frame[:,::-1,:])
 
@@ -334,7 +336,7 @@ def recognize_iris(frame,detector,estimator,estimator2,out_frame=None):
     # inference
     # Face detection
     preds = detector.predict([input_data])
-    detections = iut.detector_postprocess(preds,anchors="../../face_recognition/facemesh/anchors.npy")
+    detections = iut.detector_postprocess(preds,anchor_path="../../face_recognition/facemesh/anchors.npy")
 
     # Face landmark estimation
     if detections[0].size != 0:
