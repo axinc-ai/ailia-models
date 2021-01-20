@@ -206,6 +206,158 @@ def display_result_pose(input_img, count, landmarks, flags):
 # Main functions
 # ======================
 
+def recognize_hand(frame,detector,estimator):
+    frame = np.ascontiguousarray(frame[:,::-1,:])
+
+    img256, _, scale, pad = bhut.resize_pad(frame[:,:,::-1])
+    input_data = img256.astype('float32') / 255.
+    input_data = np.expand_dims(np.moveaxis(input_data, -1, 0), 0)
+
+    # inference
+    # Palm detection
+    preds = detector.predict([input_data])
+    detections = bhut.detector_postprocess(preds,anchors="../../hand_recognition/blazehand/anchors.npy")
+
+    # Hand landmark estimation
+    presence = [0, 0] # [left, right]
+    if detections[0].size != 0:
+        img, affine, _ = bhut.estimator_preprocess(frame, detections, scale, pad)
+        estimator.set_input_shape(img.shape)
+        flags, handedness, normalized_landmarks = estimator.predict([img])
+
+        # postprocessing
+        landmarks = bhut.denormalize_landmarks(normalized_landmarks, affine)
+        for i in range(len(flags)):
+            landmark, flag, handed = landmarks[i], flags[i], handedness[i]
+            if flag > 0.75:
+                if handed > 0.5:
+                    presence[0] = 1
+                else:
+                    presence[1] = 1
+                draw_landmarks_hand(frame, landmark[:,:2], bhut.HAND_CONNECTIONS, size=2)
+
+    if presence[0] and presence[1]:
+        text = 'Left and right'
+    elif presence[0]:
+        text = 'Left'
+    elif presence[1]:
+        text = 'Right'
+    else:
+        text = 'No hand'
+    cv2.putText(frame, text, (8, 24), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 255), 2)
+
+
+
+def recognize_pose(frame,detector,estimator):
+    _, img128, scale, pad = bput.resize_pad(frame[:,:,::-1])
+    input_data = img128.astype('float32') / 255.
+    input_data = np.expand_dims(np.moveaxis(input_data, -1, 0), 0)
+
+    # inference
+    # Person detection
+    detector_out = detector.predict([input_data])
+    detections = bput.detector_postprocess(detector_out,anchors="../../pose_estimatinon/blazepose/anchors.npy")
+    count = len(detections) if detections[0].size > 0 else 0
+
+    # Pose estimation
+    landmarks = []
+    flags = []
+    if count > 0:
+        img, affine, _ = bput.estimator_preprocess(frame, detections, scale, pad)
+        flags, normalized_landmarks, _ = estimator.predict([img])
+        landmarks = bput.denormalize_landmarks(normalized_landmarks, affine)
+
+    # postprocessing
+    display_result_pose(frame, count, landmarks, flags)
+
+
+
+def recognize_face(frame,detector,estimator):
+    frame = np.ascontiguousarray(frame[:,::-1,:])
+
+    _, img128, scale, pad = fut.resize_pad(frame[:,:,::-1])
+    input_data = img128.astype('float32') / 127.5 - 1.0
+    input_data = np.expand_dims(np.moveaxis(input_data, -1, 0), 0)
+
+    # inference
+    # Face detection
+    preds = detector.predict([input_data])
+    detections = fut.detector_postprocess(preds,anchors="../../face_recognition/facemesh/anchors.npy")
+
+    # Face landmark estimation
+    if detections[0].size != 0:
+        imgs, affines, box = fut.estimator_preprocess(frame[:,:,::-1], detections, scale, pad)
+        draw_roi(frame, box)
+
+        dynamic_input_shape = False
+
+        if dynamic_input_shape:
+            estimator.set_input_shape(imgs.shape)
+            landmarks, confidences = estimator.predict([imgs])
+            normalized_landmarks = landmarks / 192.0
+            landmarks = fut.denormalize_landmarks(normalized_landmarks, affines)
+        else:
+            landmarks = np.zeros((imgs.shape[0], 468, 3))
+            confidences = np.zeros((imgs.shape[0], 1))
+            for i in range(imgs.shape[0]):
+                landmark, confidences[i,:] = estimator.predict([imgs[i:i+1,:,:,:]])
+                normalized_landmark = landmark / 192.0
+                landmarks[i,:,:] = fut.denormalize_landmarks(normalized_landmark, affines)
+
+        for i in range(len(landmarks)):
+            landmark, confidence = landmarks[i], confidences[i]
+            # if confidence > 0: # Can be > 1, no idea what it represents
+            draw_landmarks_face(frame, landmark[:,:2], size=1)
+
+
+
+
+def recognize_iris(frame,detector,estimator,estimator2):
+    frame = np.ascontiguousarray(frame[:,::-1,:])
+
+    _, img128, scale, pad = iut.resize_pad(frame[:,:,::-1])
+    input_data = img128.astype('float32') / 127.5 - 1.0
+    input_data = np.expand_dims(np.moveaxis(input_data, -1, 0), 0)
+
+    # inference
+    # Face detection
+    preds = detector.predict([input_data])
+    detections = iut.detector_postprocess(preds,anchors="../../face_recognition/facemesh/anchors.npy")
+
+    # Face landmark estimation
+    if detections[0].size != 0:
+        imgs, affines, box = iut.estimator_preprocess(frame[:,:,::-1], detections, scale, pad)
+
+        dynamic_shape = False
+
+        if dynamic_shape:
+            estimator.set_input_shape(imgs.shape)
+            landmarks, confidences = estimator.predict([imgs])
+        else:
+            landmarks = np.zeros((imgs.shape[0], 1404))
+            confidences = np.zeros((imgs.shape[0], 1))
+            for i in range(imgs.shape[0]):
+                landmarks[i,:], confidences[i,:] = estimator.predict([imgs[i:i+1,:,:,:]])
+
+        # Iris landmark estimation
+        imgs2, origins = iut.iris_preprocess(imgs, landmarks)
+
+        if dynamic_shape:
+            estimator2.set_input_shape(imgs2.shape)
+            eyes, iris = estimator2.predict([imgs2])
+        else:
+            eyes = np.zeros((imgs2.shape[0], 213))
+            iris = np.zeros((imgs2.shape[0], 15))
+            for i in range(imgs2.shape[0]):
+                eyes[i,:], iris[i,:] = estimator2.predict([imgs2[i:i+1,:,:,:]])
+
+        eyes, iris = iut.iris_postprocess(eyes, iris, origins, affines)
+        for i in range(len(eyes)):
+            draw_eye_iris(frame, eyes[i, :, :16, :2], iris[i, :, :, :2], size=1)
+
+# ======================
+# Main
+# ======================
 
 def recognize_from_video_hand():
     # net initialize
@@ -229,46 +381,10 @@ def recognize_from_video_hand():
 
     while(True):
         ret, frame = capture.read()
-        frame = np.ascontiguousarray(frame[:,::-1,:])
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
+        recognize_hand(frame,detector,estimator)
 
-        img256, _, scale, pad = bhut.resize_pad(frame[:,:,::-1])
-        input_data = img256.astype('float32') / 255.
-        input_data = np.expand_dims(np.moveaxis(input_data, -1, 0), 0)
-
-        # inference
-        # Palm detection
-        preds = detector.predict([input_data])
-        detections = bhut.detector_postprocess(preds,anchors="../../hand_recognition/blazehand/anchors.npy")
-
-        # Hand landmark estimation
-        presence = [0, 0] # [left, right]
-        if detections[0].size != 0:
-            img, affine, _ = bhut.estimator_preprocess(frame, detections, scale, pad)
-            estimator.set_input_shape(img.shape)
-            flags, handedness, normalized_landmarks = estimator.predict([img])
-
-            # postprocessing
-            landmarks = bhut.denormalize_landmarks(normalized_landmarks, affine)
-            for i in range(len(flags)):
-                landmark, flag, handed = landmarks[i], flags[i], handedness[i]
-                if flag > 0.75:
-                    if handed > 0.5:
-                        presence[0] = 1
-                    else:
-                        presence[1] = 1
-                    draw_landmarks_hand(frame, landmark[:,:2], bhut.HAND_CONNECTIONS, size=2)
-
-        if presence[0] and presence[1]:
-            text = 'Left and right'
-        elif presence[0]:
-            text = 'Left'
-        elif presence[1]:
-            text = 'Right'
-        else:
-            text = 'No hand'
-        cv2.putText(frame, text, (8, 24), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 255), 2)
         cv2.imshow('frame', frame)
 
         # save results
@@ -279,7 +395,6 @@ def recognize_from_video_hand():
     cv2.destroyAllWindows()
     print('Script finished successfully.')
     pass
-
 
 def recognize_from_video_pose():
     # net initialize
@@ -295,26 +410,8 @@ def recognize_from_video_pose():
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
 
-        _, img128, scale, pad = bput.resize_pad(frame[:,:,::-1])
-        input_data = img128.astype('float32') / 255.
-        input_data = np.expand_dims(np.moveaxis(input_data, -1, 0), 0)
+        recognize_pose(frame,detector,estimator)
 
-        # inference
-        # Person detection
-        detector_out = detector.predict([input_data])
-        detections = bput.detector_postprocess(detector_out,anchors="../../pose_estimatinon/blazepose/anchors.npy")
-        count = len(detections) if detections[0].size > 0 else 0
-
-        # Pose estimation
-        landmarks = []
-        flags = []
-        if count > 0:
-            img, affine, _ = bput.estimator_preprocess(frame, detections, scale, pad)
-            flags, normalized_landmarks, _ = estimator.predict([img])
-            landmarks = bput.denormalize_landmarks(normalized_landmarks, affine)
-
-        # postprocessing
-        display_result_pose(frame, count, landmarks, flags)
         cv2.imshow('frame', frame)
 
     capture.release()
@@ -347,42 +444,9 @@ def recognize_from_video_face():
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
+        
+        recognize_face(frame,detector,estimator)
 
-        frame = np.ascontiguousarray(frame[:,::-1,:])
-
-        _, img128, scale, pad = fut.resize_pad(frame[:,:,::-1])
-        input_data = img128.astype('float32') / 127.5 - 1.0
-        input_data = np.expand_dims(np.moveaxis(input_data, -1, 0), 0)
-
-        # inference
-        # Face detection
-        preds = detector.predict([input_data])
-        detections = fut.detector_postprocess(preds,anchors="../../face_recognition/facemesh/anchors.npy")
-
-        # Face landmark estimation
-        if detections[0].size != 0:
-            imgs, affines, box = fut.estimator_preprocess(frame[:,:,::-1], detections, scale, pad)
-            draw_roi(frame, box)
-
-            dynamic_input_shape = False
-
-            if dynamic_input_shape:
-                estimator.set_input_shape(imgs.shape)
-                landmarks, confidences = estimator.predict([imgs])
-                normalized_landmarks = landmarks / 192.0
-                landmarks = fut.denormalize_landmarks(normalized_landmarks, affines)
-            else:
-                landmarks = np.zeros((imgs.shape[0], 468, 3))
-                confidences = np.zeros((imgs.shape[0], 1))
-                for i in range(imgs.shape[0]):
-                    landmark, confidences[i,:] = estimator.predict([imgs[i:i+1,:,:,:]])
-                    normalized_landmark = landmark / 192.0
-                    landmarks[i,:,:] = fut.denormalize_landmarks(normalized_landmark, affines)
-
-            for i in range(len(landmarks)):
-                landmark, confidence = landmarks[i], confidences[i]
-                # if confidence > 0: # Can be > 1, no idea what it represents
-                draw_landmarks_face(frame, landmark[:,:2], size=1)
 
         cv2.imshow('frame', frame)
 
@@ -394,7 +458,6 @@ def recognize_from_video_face():
     cv2.destroyAllWindows()
     print('Script finished successfully.')
     pass
-
 
 def recognize_from_video_iris():
     # net initialize
@@ -421,48 +484,8 @@ def recognize_from_video_iris():
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
-
-        frame = np.ascontiguousarray(frame[:,::-1,:])
-
-        _, img128, scale, pad = iut.resize_pad(frame[:,:,::-1])
-        input_data = img128.astype('float32') / 127.5 - 1.0
-        input_data = np.expand_dims(np.moveaxis(input_data, -1, 0), 0)
-
-        # inference
-        # Face detection
-        preds = detector.predict([input_data])
-        detections = iut.detector_postprocess(preds,anchors="../../face_recognition/facemesh/anchors.npy")
-
-        # Face landmark estimation
-        if detections[0].size != 0:
-            imgs, affines, box = iut.estimator_preprocess(frame[:,:,::-1], detections, scale, pad)
-
-            dynamic_shape = False
-
-            if dynamic_shape:
-                estimator.set_input_shape(imgs.shape)
-                landmarks, confidences = estimator.predict([imgs])
-            else:
-                landmarks = np.zeros((imgs.shape[0], 1404))
-                confidences = np.zeros((imgs.shape[0], 1))
-                for i in range(imgs.shape[0]):
-                    landmarks[i,:], confidences[i,:] = estimator.predict([imgs[i:i+1,:,:,:]])
-
-            # Iris landmark estimation
-            imgs2, origins = iut.iris_preprocess(imgs, landmarks)
-
-            if dynamic_shape:
-                estimator2.set_input_shape(imgs2.shape)
-                eyes, iris = estimator2.predict([imgs2])
-            else:
-                eyes = np.zeros((imgs2.shape[0], 213))
-                iris = np.zeros((imgs2.shape[0], 15))
-                for i in range(imgs2.shape[0]):
-                    eyes[i,:], iris[i,:] = estimator2.predict([imgs2[i:i+1,:,:,:]])
-
-            eyes, iris = iut.iris_postprocess(eyes, iris, origins, affines)
-            for i in range(len(eyes)):
-                draw_eye_iris(frame, eyes[i, :, :16, :2], iris[i, :, :, :2], size=1)
+        
+        recognize_iris(frame,detector,estimator,estimator2)
 
         cv2.imshow('frame', frame)
 
