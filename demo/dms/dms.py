@@ -212,11 +212,6 @@ def display_result_pose(input_img, count, landmarks, flags):
 # ======================
 
 def recognize_hand(frame,detector,estimator,out_frame=None):
-    #if out_frame==None:
-    #    out_frame = frame
-
-    #frame = np.ascontiguousarray(frame[:,::-1,:])
-
     img256, _, scale, pad = bhut.resize_pad(frame[:,:,::-1])
     input_data = img256.astype('float32') / 255.
     input_data = np.expand_dims(np.moveaxis(input_data, -1, 0), 0)
@@ -244,22 +239,19 @@ def recognize_hand(frame,detector,estimator,out_frame=None):
                     presence[1] = 1
                 draw_landmarks_hand(out_frame, landmark[:,:2], bhut.HAND_CONNECTIONS, size=4)
 
-    if presence[0] and presence[1]:
-        text = 'Left and right'
-    elif presence[0]:
-        text = 'Left'
-    elif presence[1]:
-        text = 'Right'
-    else:
-        text = 'No hand'
-    cv2.putText(out_frame, text, (8, 24), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 255), 2)
+    #if presence[0] and presence[1]:
+    #    text = 'Left and right'
+    #elif presence[0]:
+    #    text = 'Left'
+    #elif presence[1]:
+    #    text = 'Right'
+    #else:
+    #    text = 'No hand'
+    #cv2.putText(out_frame, text, (8, 24), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 255), 2)
 
 
 
 def recognize_pose(frame,detector,estimator,out_frame=None):
-    #if out_frame==None:
-    #    out_frame = frame
-
     _, img128, scale, pad = bput.resize_pad(frame[:,:,::-1])
     input_data = img128.astype('float32') / 255.
     input_data = np.expand_dims(np.moveaxis(input_data, -1, 0), 0)
@@ -283,55 +275,7 @@ def recognize_pose(frame,detector,estimator,out_frame=None):
 
 
 
-def recognize_face(frame,detector,estimator,out_frame=None):
-    #if out_frame==None:
-    #    out_frame = frame
-
-    #frame = np.ascontiguousarray(frame[:,::-1,:])
-
-    _, img128, scale, pad = fut.resize_pad(frame[:,:,::-1])
-    input_data = img128.astype('float32') / 127.5 - 1.0
-    input_data = np.expand_dims(np.moveaxis(input_data, -1, 0), 0)
-
-    # inference
-    # Face detection
-    preds = detector.predict([input_data])
-    detections = fut.detector_postprocess(preds,anchor_path="../../face_recognition/facemesh/anchors.npy")
-
-    # Face landmark estimation
-    if detections[0].size != 0:
-        imgs, affines, box = fut.estimator_preprocess(frame[:,:,::-1], detections, scale, pad)
-        draw_roi(frame, box)
-
-        dynamic_input_shape = False
-
-        if dynamic_input_shape:
-            estimator.set_input_shape(imgs.shape)
-            landmarks, confidences = estimator.predict([imgs])
-            normalized_landmarks = landmarks / 192.0
-            landmarks = fut.denormalize_landmarks(normalized_landmarks, affines)
-        else:
-            landmarks = np.zeros((imgs.shape[0], 468, 3))
-            confidences = np.zeros((imgs.shape[0], 1))
-            for i in range(imgs.shape[0]):
-                landmark, confidences[i,:] = estimator.predict([imgs[i:i+1,:,:,:]])
-                normalized_landmark = landmark / 192.0
-                landmarks[i,:,:] = fut.denormalize_landmarks(normalized_landmark, affines)
-
-        for i in range(len(landmarks)):
-            landmark, confidence = landmarks[i], confidences[i]
-            # if confidence > 0: # Can be > 1, no idea what it represents
-            draw_landmarks_face(out_frame, landmark[:,:2], size=1)
-
-
-
-
 def recognize_iris(frame,detector,estimator,estimator2,out_frame=None):
-    #if out_frame==None:
-    #    out_frame = frame
-
-    #frame = np.ascontiguousarray(frame[:,::-1,:])
-
     _, img128, scale, pad = iut.resize_pad(frame[:,:,::-1])
     input_data = img128.astype('float32') / 127.5 - 1.0
     input_data = np.expand_dims(np.moveaxis(input_data, -1, 0), 0)
@@ -345,28 +289,28 @@ def recognize_iris(frame,detector,estimator,estimator2,out_frame=None):
     if detections[0].size != 0:
         imgs, affines, box = iut.estimator_preprocess(frame[:,:,::-1], detections, scale, pad)
 
-        dynamic_shape = False
+        landmarks = np.zeros((imgs.shape[0], 1404))
+        normalized_landmarks = np.zeros((imgs.shape[0], 468, 3))
+        confidences = np.zeros((imgs.shape[0], 1))
+        for i in range(imgs.shape[0]):
+            landmark, confidences[i,:] = estimator.predict([imgs[i:i+1,:,:,:]])
+            normalized_landmark = landmark / 192.0
+            normalized_landmarks[i,:,:] = fut.denormalize_landmarks(normalized_landmark, affines)
 
-        if dynamic_shape:
-            estimator.set_input_shape(imgs.shape)
-            landmarks, confidences = estimator.predict([imgs])
-        else:
-            landmarks = np.zeros((imgs.shape[0], 1404))
-            confidences = np.zeros((imgs.shape[0], 1))
-            for i in range(imgs.shape[0]):
-                landmarks[i,:], confidences[i,:] = estimator.predict([imgs[i:i+1,:,:,:]])
+            landmarks[i,:] = landmark
+
+        #Added
+        for i in range(len(normalized_landmark)):
+            landmark, confidence = normalized_landmarks[i], confidences[i]
+            draw_landmarks_face(out_frame, landmark[:,:2], size=1)
 
         # Iris landmark estimation
         imgs2, origins = iut.iris_preprocess(imgs, landmarks)
 
-        if dynamic_shape:
-            estimator2.set_input_shape(imgs2.shape)
-            eyes, iris = estimator2.predict([imgs2])
-        else:
-            eyes = np.zeros((imgs2.shape[0], 213))
-            iris = np.zeros((imgs2.shape[0], 15))
-            for i in range(imgs2.shape[0]):
-                eyes[i,:], iris[i,:] = estimator2.predict([imgs2[i:i+1,:,:,:]])
+        eyes = np.zeros((imgs2.shape[0], 213))
+        iris = np.zeros((imgs2.shape[0], 15))
+        for i in range(imgs2.shape[0]):
+            eyes[i,:], iris[i,:] = estimator2.predict([imgs2[i:i+1,:,:,:]])
 
         eyes, iris = iut.iris_postprocess(eyes, iris, origins, affines)
         for i in range(len(eyes)):
@@ -384,9 +328,6 @@ def recognize_from_video():
     iris_detector = ailia.Net(FACE_DETECTION_MODEL_PATH, FACE_DETECTION_WEIGHT_PATH, env_id=env_id)
     iris_estimator = ailia.Net(FACE_LANDMARK_MODEL_PATH, FACE_LANDMARK_WEIGHT_PATH, env_id=env_id)
     iris_estimator2 = ailia.Net(FACE_LANDMARK2_MODEL_PATH, FACE_LANDMARK2_WEIGHT_PATH, env_id=env_id)
-
-    face_detector = ailia.Net(FACE_DETECTION_MODEL_PATH, FACE_DETECTION_WEIGHT_PATH, env_id=env_id)
-    face_estimator = ailia.Net(FACE_LANDMARK_MODEL_PATH, FACE_LANDMARK_WEIGHT_PATH, env_id=env_id)
 
     hand_detector = ailia.Net(HAND_DETECTION_MODEL_PATH, HAND_DETECTION_WEIGHT_PATH, env_id=env_id)
     hand_estimator = ailia.Net(HAND_LANDMARK_MODEL_PATH, HAND_LANDMARK_WEIGHT_PATH, env_id=env_id)
@@ -416,7 +357,6 @@ def recognize_from_video():
         out_frame = frame.copy()
         
         recognize_iris(frame,iris_detector,iris_estimator,iris_estimator2,out_frame=out_frame)
-        recognize_face(frame,face_detector,face_estimator,out_frame=out_frame)
         recognize_pose(frame,pose_detector,pose_estimator,out_frame=out_frame)
         recognize_hand(frame,hand_detector,hand_estimator,out_frame=out_frame)
 
@@ -451,11 +391,6 @@ def main():
     if args.video is not None:
         # video mode
         recognize_from_video()
-
-        #recognize_from_video_iris()
-        #recognize_from_video_face()
-        #recognize_from_video_pose()
-        #recognize_from_video_hand()
     else:
         # image mode
         print("image mode is not supported.")
