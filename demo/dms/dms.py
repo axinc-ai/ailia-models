@@ -103,16 +103,19 @@ POSE_REMOTE_PATH = f'https://storage.googleapis.com/ailia-models/{POSE_MODEL_NAM
 # Utils
 # ======================
 def draw_landmarks_hand(img, points, connections=[], color=(0, 0, 255), size=2):
+    id = 0
     for connection in connections:
         x0, y0 = points[connection[0]]
         x1, y1 = points[connection[1]]
         x0, y0 = int(x0), int(y0)
         x1, y1 = int(x1), int(y1)
-        cv2.line(img, (x0, y0), (x1, y1), (0, 255, 0), size)
+        color = hsv_to_rgb(255*id/bput.BLAZEPOSE_KEYPOINT_CNT, 255, 255)
+        cv2.line(img, (x0, y0), (x1, y1), color, size)
+        id = id + 1
     for point in points:
         x, y = point
         x, y = int(x), int(y)
-        cv2.circle(img, (x, y), size+1, color, thickness=cv2.FILLED)
+        #cv2.circle(img, (x, y), size+1, color, thickness=cv2.FILLED)
 
 def draw_roi(img, roi):
     for i in range(roi.shape[0]):
@@ -171,17 +174,17 @@ def line(input_img, landmarks, flags, point1, point2):
 
 def display_result_pose(input_img, count, landmarks, flags):
     for _ in range(count):
-        line(input_img,landmarks,flags,bput.BLAZEPOSE_KEYPOINT_NOSE,bput.BLAZEPOSE_KEYPOINT_EYE_LEFT_INNER)
-        line(input_img,landmarks,flags,bput.BLAZEPOSE_KEYPOINT_EYE_LEFT_INNER,bput.BLAZEPOSE_KEYPOINT_EYE_LEFT)
-        line(input_img,landmarks,flags,bput.BLAZEPOSE_KEYPOINT_EYE_LEFT,bput.BLAZEPOSE_KEYPOINT_EYE_LEFT_OUTER)
-        line(input_img,landmarks,flags,bput.BLAZEPOSE_KEYPOINT_EYE_LEFT_OUTER,bput.BLAZEPOSE_KEYPOINT_EAR_LEFT)
+        #line(input_img,landmarks,flags,bput.BLAZEPOSE_KEYPOINT_NOSE,bput.BLAZEPOSE_KEYPOINT_EYE_LEFT_INNER)
+        #line(input_img,landmarks,flags,bput.BLAZEPOSE_KEYPOINT_EYE_LEFT_INNER,bput.BLAZEPOSE_KEYPOINT_EYE_LEFT)
+        #line(input_img,landmarks,flags,bput.BLAZEPOSE_KEYPOINT_EYE_LEFT,bput.BLAZEPOSE_KEYPOINT_EYE_LEFT_OUTER)
+        #line(input_img,landmarks,flags,bput.BLAZEPOSE_KEYPOINT_EYE_LEFT_OUTER,bput.BLAZEPOSE_KEYPOINT_EAR_LEFT)
 
-        line(input_img,landmarks,flags,bput.BLAZEPOSE_KEYPOINT_NOSE,bput.BLAZEPOSE_KEYPOINT_EYE_RIGHT_INNER)
-        line(input_img,landmarks,flags,bput.BLAZEPOSE_KEYPOINT_EYE_RIGHT_INNER,bput.BLAZEPOSE_KEYPOINT_EYE_RIGHT)
-        line(input_img,landmarks,flags,bput.BLAZEPOSE_KEYPOINT_EYE_RIGHT,bput.BLAZEPOSE_KEYPOINT_EYE_RIGHT_OUTER)
-        line(input_img,landmarks,flags,bput.BLAZEPOSE_KEYPOINT_EYE_RIGHT_OUTER,bput.BLAZEPOSE_KEYPOINT_EAR_RIGHT)
+        #line(input_img,landmarks,flags,bput.BLAZEPOSE_KEYPOINT_NOSE,bput.BLAZEPOSE_KEYPOINT_EYE_RIGHT_INNER)
+        #line(input_img,landmarks,flags,bput.BLAZEPOSE_KEYPOINT_EYE_RIGHT_INNER,bput.BLAZEPOSE_KEYPOINT_EYE_RIGHT)
+        #line(input_img,landmarks,flags,bput.BLAZEPOSE_KEYPOINT_EYE_RIGHT,bput.BLAZEPOSE_KEYPOINT_EYE_RIGHT_OUTER)
+        #line(input_img,landmarks,flags,bput.BLAZEPOSE_KEYPOINT_EYE_RIGHT_OUTER,bput.BLAZEPOSE_KEYPOINT_EAR_RIGHT)
 
-        line(input_img,landmarks,flags,bput.BLAZEPOSE_KEYPOINT_MOUTH_LEFT,bput.BLAZEPOSE_KEYPOINT_MOUTH_RIGHT)
+        #line(input_img,landmarks,flags,bput.BLAZEPOSE_KEYPOINT_MOUTH_LEFT,bput.BLAZEPOSE_KEYPOINT_MOUTH_RIGHT)
 
         line(input_img,landmarks,flags,bput.BLAZEPOSE_KEYPOINT_SHOULDER_LEFT,bput.BLAZEPOSE_KEYPOINT_SHOULDER_RIGHT)
         line(input_img,landmarks,flags,bput.BLAZEPOSE_KEYPOINT_SHOULDER_LEFT,bput.BLAZEPOSE_KEYPOINT_ELBOW_LEFT)
@@ -212,7 +215,7 @@ def recognize_hand(frame,detector,estimator,out_frame=None):
     #if out_frame==None:
     #    out_frame = frame
 
-    frame = np.ascontiguousarray(frame[:,::-1,:])
+    #frame = np.ascontiguousarray(frame[:,::-1,:])
 
     img256, _, scale, pad = bhut.resize_pad(frame[:,:,::-1])
     input_data = img256.astype('float32') / 255.
@@ -239,7 +242,7 @@ def recognize_hand(frame,detector,estimator,out_frame=None):
                     presence[0] = 1
                 else:
                     presence[1] = 1
-                draw_landmarks_hand(out_frame, landmark[:,:2], bhut.HAND_CONNECTIONS, size=2)
+                draw_landmarks_hand(out_frame, landmark[:,:2], bhut.HAND_CONNECTIONS, size=4)
 
     if presence[0] and presence[1]:
         text = 'Left and right'
@@ -284,7 +287,7 @@ def recognize_face(frame,detector,estimator,out_frame=None):
     #if out_frame==None:
     #    out_frame = frame
 
-    frame = np.ascontiguousarray(frame[:,::-1,:])
+    #frame = np.ascontiguousarray(frame[:,::-1,:])
 
     _, img128, scale, pad = fut.resize_pad(frame[:,:,::-1])
     input_data = img128.astype('float32') / 127.5 - 1.0
@@ -327,7 +330,7 @@ def recognize_iris(frame,detector,estimator,estimator2,out_frame=None):
     #if out_frame==None:
     #    out_frame = frame
 
-    frame = np.ascontiguousarray(frame[:,::-1,:])
+    #frame = np.ascontiguousarray(frame[:,::-1,:])
 
     _, img128, scale, pad = iut.resize_pad(frame[:,:,::-1])
     input_data = img128.astype('float32') / 127.5 - 1.0
@@ -367,152 +370,11 @@ def recognize_iris(frame,detector,estimator,estimator2,out_frame=None):
 
         eyes, iris = iut.iris_postprocess(eyes, iris, origins, affines)
         for i in range(len(eyes)):
-            draw_eye_iris(out_frame, eyes[i, :, :16, :2], iris[i, :, :, :2], size=1)
+            draw_eye_iris(out_frame, eyes[i, :, :16, :2], iris[i, :, :, :2], size=2)
 
 # ======================
 # Main
 # ======================
-
-def recognize_from_video_hand():
-    # net initialize
-    env_id = ailia.get_gpu_environment_id()
-    print(f'env_id: {env_id}')
-    hand_detector = ailia.Net(HAND_DETECTION_MODEL_PATH, HAND_DETECTION_WEIGHT_PATH, env_id=env_id)
-    hand_estimator = ailia.Net(HAND_LANDMARK_MODEL_PATH, HAND_LANDMARK_WEIGHT_PATH, env_id=env_id)
-
-    capture = get_capture(args.video)
-
-    # create video writer if savepath is specified as video format
-    if args.savepath != SAVE_IMAGE_PATH:
-        f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
-        save_h, save_w = webcamera_utils.calc_adjust_fsize(
-            f_h, f_w, IMAGE_HEIGHT, IMAGE_WIDTH
-        )
-        writer = webcamera_utils.get_writer(args.savepath, save_h, save_w)
-    else:
-        writer = None
-
-    while(True):
-        ret, frame = capture.read()
-        if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
-            break
-        recognize_hand(frame,hand_detector,hand_estimator)
-
-        cv2.imshow('frame', frame)
-
-        # save results
-        if writer is not None:
-            writer.write(frame)
-
-    capture.release()
-    cv2.destroyAllWindows()
-    print('Script finished successfully.')
-    pass
-
-def recognize_from_video_pose():
-    # net initialize
-    env_id = ailia.get_gpu_environment_id()
-    print(f'env_id: {env_id}')
-    pose_detector = ailia.Net(POSE_DETECTOR_MODEL_PATH, POSE_DETECTOR_WEIGHT_PATH, env_id=env_id)
-    pose_estimator = ailia.Net(POSE_ESTIMATOR_MODEL_PATH, POSE_ESTIMATOR_WEIGHT_PATH, env_id=env_id)
-
-    capture = get_capture(args.video)
-
-    while(True):
-        ret, frame = capture.read()
-        if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
-            break
-
-        recognize_pose(frame,pose_detector,pose_estimator)
-
-        cv2.imshow('frame', frame)
-
-    capture.release()
-    cv2.destroyAllWindows()
-    print('Script finished successfully.')
-    pass
-
-
-def recognize_from_video_face():
-    # net initialize
-    env_id = ailia.get_gpu_environment_id()
-    print(f'env_id: {env_id}')
-    face_detector = ailia.Net(FACE_DETECTION_MODEL_PATH, FACE_DETECTION_WEIGHT_PATH, env_id=env_id)
-    face_estimator = ailia.Net(FACE_LANDMARK_MODEL_PATH, FACE_LANDMARK_WEIGHT_PATH, env_id=env_id)
-
-    capture = get_capture(args.video)
-
-    # create video writer if savepath is specified as video format
-    if args.savepath != SAVE_IMAGE_PATH:
-        f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
-        save_h, save_w = webcamera_utils.calc_adjust_fsize(
-            f_h, f_w, IMAGE_HEIGHT, IMAGE_WIDTH
-        )
-        writer = webcamera_utils.get_writer(args.savepath, save_h, save_w)
-    else:
-        writer = None
-
-    while(True):
-        ret, frame = capture.read()
-        if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
-            break
-        
-        recognize_face(frame,face_detector,face_estimator)
-
-
-        cv2.imshow('frame', frame)
-
-        # save results
-        if writer is not None:
-            writer.write(frame)
-
-    capture.release()
-    cv2.destroyAllWindows()
-    print('Script finished successfully.')
-    pass
-
-def recognize_from_video_iris():
-    # net initialize
-    env_id = ailia.get_gpu_environment_id()
-    print(f'env_id: {env_id}')
-    iris_detector = ailia.Net(FACE_DETECTION_MODEL_PATH, FACE_DETECTION_WEIGHT_PATH, env_id=env_id)
-    iris_estimator = ailia.Net(FACE_LANDMARK_MODEL_PATH, FACE_LANDMARK_WEIGHT_PATH, env_id=env_id)
-    iris_estimator2 = ailia.Net(FACE_LANDMARK2_MODEL_PATH, FACE_LANDMARK2_WEIGHT_PATH, env_id=env_id)
-
-    capture = get_capture(args.video)
-
-    # create video writer if savepath is specified as video format
-    if args.savepath != SAVE_IMAGE_PATH:
-        f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
-        save_h, save_w = webcamera_utils.calc_adjust_fsize(
-            f_h, f_w, IMAGE_HEIGHT, IMAGE_WIDTH
-        )
-        writer = webcamera_utils.get_writer(args.savepath, save_h, save_w)
-    else:
-        writer = None
-
-    while(True):
-        ret, frame = capture.read()
-        if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
-            break
-        
-        recognize_iris(frame,iris_detector,iris_estimator,iris_estimator2)
-
-        cv2.imshow('frame', frame)
-
-        # save results
-        if writer is not None:
-            writer.write(frame)
-
-    capture.release()
-    cv2.destroyAllWindows()
-    print('Script finished successfully.')
-    pass
-
-
 
 
 def recognize_from_video():
@@ -550,6 +412,7 @@ def recognize_from_video():
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
         
+        frame = np.ascontiguousarray(frame[:,::-1,:])
         out_frame = frame.copy()
         
         recognize_iris(frame,iris_detector,iris_estimator,iris_estimator2,out_frame=out_frame)
