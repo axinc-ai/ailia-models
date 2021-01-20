@@ -5,10 +5,11 @@ import argparse
 import numpy as np
 
 import ailia  # noqa: E402
-from utils import get_test_data, save_to_wav
+from pytorch_dc_tts_utils import get_test_data, save_to_wav
 
 # import original modules
 sys.path.append('../../util')
+from utils import get_base_parser, update_parser  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 
 
@@ -32,26 +33,10 @@ MAX_T = 210
 # ======================
 # Arguemnt Parser Config
 # ======================
-parser = argparse.ArgumentParser(
-    description=' Efficiently Trainable Text-to-Speech System Based on' +
-    'Deep Convolutional Networks with Guided Attention'
-)
-parser.add_argument(
-    '-i', '--input', metavar='INPUT_SENTENCE',
-    default=SENTENCE,
-    help='The input sentence.'
-)
-parser.add_argument(
-    '-s', '--savepath', metavar='SAVE_WAV_PATH',
-    default=SAVE_WAV_PATH,
-    help='Save path for the output audio.'
-)
-parser.add_argument(
-    '-b', '--benchmark',
-    action='store_true',
-    help='Running the inference on the same input 5 times ' +
-         'to measure execution performance. (Cannot be used in video mode)'
-)
+
+parser = get_base_parser( 'Efficiently Trainable Text-to-Speech System Based on' +
+    'Deep Convolutional Networks with Guided Attention', SENTENCE, SAVE_WAV_PATH)
+args = update_parser(parser)
 parser.add_argument(
     '-o', '--onnx',
     action='store_true',
@@ -134,11 +119,9 @@ def main():
     L, Y, zeros, A = preprocess(SENTENCE)
 
     # model initialize
-    env_id = ailia.get_gpu_environment_id()
-    print(f'env_id: {env_id}')
     if not args.onnx:
-        net_t2m = ailia.Net(MODEL_PATH_T2M, WEIGHT_PATH_T2M, env_id=env_id)
-        net_ssrm = ailia.Net(MODEL_PATH_SSRM, WEIGHT_PATH_SSRM, env_id=env_id)
+        net_t2m = ailia.Net(MODEL_PATH_T2M, WEIGHT_PATH_T2M, env_id=args.env_id)
+        net_ssrm = ailia.Net(MODEL_PATH_SSRM, WEIGHT_PATH_SSRM, env_id=args.env_id)
     else:
         print('Let us try by onnxruntime')
         import onnxruntime
