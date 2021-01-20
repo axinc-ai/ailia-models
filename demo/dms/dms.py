@@ -206,6 +206,28 @@ def display_result_pose(input_img, count, landmarks, flags):
         line(input_img,landmarks,flags,bput.BLAZEPOSE_KEYPOINT_SHOULDER_RIGHT,bput.BLAZEPOSE_KEYPOINT_HIP_RIGHT)
         line(input_img,landmarks,flags,bput.BLAZEPOSE_KEYPOINT_HIP_LEFT,bput.BLAZEPOSE_KEYPOINT_HIP_RIGHT)
 
+def display_hand_box(img, detections, with_keypoints=False):
+    if detections.ndim == 1:
+        detections = np.expand_dims(detections, axis=0)
+
+    n_keypoints = detections.shape[1] // 2 - 2
+
+    for i in range(detections.shape[0]):
+        ymin = detections[i, 0]
+        xmin = detections[i, 1]
+        ymax = detections[i, 2]
+        xmax = detections[i, 3]
+        
+        start_point = (int(xmin), int(ymin))
+        end_point = (int(xmax), int(ymax))
+        img = cv2.rectangle(img, start_point, end_point, (255, 0, 0), 2) 
+
+        if with_keypoints:
+            for k in range(n_keypoints):
+                kp_x = int(detections[i, 4 + k*2    ])
+                kp_y = int(detections[i, 4 + k*2 + 1])
+                cv2.circle(img, (kp_x, kp_y), 2, (0, 0, 255), thickness=2)
+    return img
 
 # ======================
 # Main functions
@@ -220,6 +242,10 @@ def recognize_hand(frame,detector,estimator,out_frame=None):
     # Palm detection
     preds = detector.predict([input_data])
     detections = bhut.detector_postprocess(preds,anchor_path="../../hand_recognition/blazehand/anchors.npy")
+
+    # display bbox
+    detections2 = bhut.denormalize_detections(detections[0].copy(), scale, pad)
+    display_hand_box(out_frame, detections2)
 
     # Hand landmark estimation
     presence = [0, 0] # [left, right]
@@ -262,6 +288,10 @@ def recognize_pose(frame,detector,estimator,out_frame=None):
     detections = bput.detector_postprocess(detector_out,anchor_path="../../pose_estimation/blazepose/anchors.npy")
     count = len(detections) if detections[0].size > 0 else 0
 
+    # display bbox
+    detections2 = bput.denormalize_detections(detections[0].copy(), scale, pad)
+    display_hand_box(out_frame, detections2)
+
     # Pose estimation
     landmarks = []
     flags = []
@@ -284,6 +314,10 @@ def recognize_iris(frame,detector,estimator,estimator2,out_frame=None):
     # Face detection
     preds = detector.predict([input_data])
     detections = iut.detector_postprocess(preds,anchor_path="../../face_recognition/facemesh/anchors.npy")
+
+    # display bbox
+    detections2 = iut.denormalize_detections(detections[0].copy(), scale, pad)
+    display_hand_box(out_frame, detections2)
 
     # Face landmark estimation
     if detections[0].size != 0:
