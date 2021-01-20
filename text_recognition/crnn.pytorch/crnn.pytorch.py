@@ -68,7 +68,7 @@ def post_process(preds, length, alphabet):
 
 def predict(net, image):
     if not args.onnx:
-        preds = net.predict({'input.1':image})  # Not yet tried
+        preds = net.predict({'input.1':image})[0]
     else:
         first_input_name = net.get_inputs()[0].name
         first_output_name = net.get_outputs()[0].name
