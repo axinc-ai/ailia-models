@@ -193,14 +193,14 @@ def display_result_pose(input_img, count, landmarks, flags):
         line(input_img,landmarks,flags,bput.BLAZEPOSE_KEYPOINT_ELBOW_RIGHT,bput.BLAZEPOSE_KEYPOINT_WRIST_RIGHT)
 
         line(input_img,landmarks,flags,bput.BLAZEPOSE_KEYPOINT_WRIST_LEFT,bput.BLAZEPOSE_KEYPOINT_PINKY_LEFT_KNUCKLE1)
-        line(input_img,landmarks,flags,bput.BLAZEPOSE_KEYPOINT_PINKY_LEFT_KNUCKLE1,bput.BLAZEPOSE_KEYPOINT_INDEX_LEFT_KNUCKLE1)
-        line(input_img,landmarks,flags,bput.BLAZEPOSE_KEYPOINT_WRIST_LEFT,bput.BLAZEPOSE_KEYPOINT_INDEX_LEFT_KNUCKLE1)
-        line(input_img,landmarks,flags,bput.BLAZEPOSE_KEYPOINT_WRIST_LEFT,bput.BLAZEPOSE_KEYPOINT_THUMB_LEFT_KNUCKLE2)
+        #line(input_img,landmarks,flags,bput.BLAZEPOSE_KEYPOINT_PINKY_LEFT_KNUCKLE1,bput.BLAZEPOSE_KEYPOINT_INDEX_LEFT_KNUCKLE1)
+        #line(input_img,landmarks,flags,bput.BLAZEPOSE_KEYPOINT_WRIST_LEFT,bput.BLAZEPOSE_KEYPOINT_INDEX_LEFT_KNUCKLE1)
+        #line(input_img,landmarks,flags,bput.BLAZEPOSE_KEYPOINT_WRIST_LEFT,bput.BLAZEPOSE_KEYPOINT_THUMB_LEFT_KNUCKLE2)
 
         line(input_img,landmarks,flags,bput.BLAZEPOSE_KEYPOINT_WRIST_RIGHT,bput.BLAZEPOSE_KEYPOINT_PINKY_RIGHT_KNUCKLE1)
-        line(input_img,landmarks,flags,bput.BLAZEPOSE_KEYPOINT_PINKY_RIGHT_KNUCKLE1,bput.BLAZEPOSE_KEYPOINT_INDEX_RIGHT_KNUCKLE1)
-        line(input_img,landmarks,flags,bput.BLAZEPOSE_KEYPOINT_WRIST_RIGHT,bput.BLAZEPOSE_KEYPOINT_INDEX_RIGHT_KNUCKLE1)
-        line(input_img,landmarks,flags,bput.BLAZEPOSE_KEYPOINT_WRIST_RIGHT,bput.BLAZEPOSE_KEYPOINT_THUMB_RIGHT_KNUCKLE2)
+        #line(input_img,landmarks,flags,bput.BLAZEPOSE_KEYPOINT_PINKY_RIGHT_KNUCKLE1,bput.BLAZEPOSE_KEYPOINT_INDEX_RIGHT_KNUCKLE1)
+        #line(input_img,landmarks,flags,bput.BLAZEPOSE_KEYPOINT_WRIST_RIGHT,bput.BLAZEPOSE_KEYPOINT_INDEX_RIGHT_KNUCKLE1)
+        #line(input_img,landmarks,flags,bput.BLAZEPOSE_KEYPOINT_WRIST_RIGHT,bput.BLAZEPOSE_KEYPOINT_THUMB_RIGHT_KNUCKLE2)
 
         line(input_img,landmarks,flags,bput.BLAZEPOSE_KEYPOINT_SHOULDER_LEFT,bput.BLAZEPOSE_KEYPOINT_HIP_LEFT)
         line(input_img,landmarks,flags,bput.BLAZEPOSE_KEYPOINT_SHOULDER_RIGHT,bput.BLAZEPOSE_KEYPOINT_HIP_RIGHT)
@@ -285,7 +285,7 @@ def recognize_pose(frame,detector,estimator,out_frame=None):
     # inference
     # Person detection
     detector_out = detector.predict([input_data])
-    detections = bput.detector_postprocess(detector_out,anchor_path="../../pose_estimation/blazepose/anchors.npy")
+    detections = bput.detector_postprocess(detector_out,anchor_path="../../pose_estimation/blazepose/anchors.npy",min_score_thresh = 0.5)
     count = len(detections) if detections[0].size > 0 else 0
 
     # display bbox
@@ -296,8 +296,19 @@ def recognize_pose(frame,detector,estimator,out_frame=None):
     landmarks = []
     flags = []
     if count > 0:
-        img, affine, _ = bput.estimator_preprocess(frame, detections, scale, pad)
-        flags, normalized_landmarks, _ = estimator.predict([img])
+        imgs, affine, _ = bput.estimator_preprocess(frame, detections, scale, pad)
+
+        #flags, normalized_landmarks, _ = estimator.predict([imgs])
+        #print(flags.shape)
+        #print(normalized_landmarks.shape)
+
+        flags = np.zeros((imgs.shape[0]))
+        normalized_landmarks = np.zeros((imgs.shape[0], 31, 4))
+        for i in range(imgs.shape[0]):
+            flag, normalized_landmark, _ = estimator.predict([imgs[i:i+1,:,:,:]])
+            flags[i]=flag
+            normalized_landmarks[i]=normalized_landmark
+
         landmarks = bput.denormalize_landmarks(normalized_landmarks, affine)
 
     # postprocessing
