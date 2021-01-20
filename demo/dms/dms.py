@@ -6,15 +6,21 @@ import cv2
 import numpy as np
 
 import ailia
+
+sys.path.append('../../hand_recognition/blazehand')
+sys.path.append('../../face_recognition/facemesh')
+sys.path.append('../../face_recognition/mediapipe_iris')
+sys.path.append('../../pose_estimation/blazepose')
+
 import blazehand_utils as bhut
 import blazepose_utils as bput
 import facemesh_utils as fut
 import mediapipe_iris_utils as iut
 
 sys.path.append('../../util')
+from utils import get_base_parser, update_parser  # noqa: E402
 from image_utils import load_image  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
-
 
 # ======================
 # Parameters 1
@@ -52,49 +58,49 @@ args = update_parser(parser)
 # ======================
 FACE_LANDMARK2_MODEL_NAME = 'iris'
 if args.normal:
-    FACE_LANDMARK2_WEIGHT_PATH = f'{LANDMARK2_MODEL_NAME}.onnx'
-    FACE_LANDMARK2_MODEL_PATH = f'{LANDMARK2_MODEL_NAME}.onnx.prototxt'
+    FACE_LANDMARK2_WEIGHT_PATH = f'{FACE_LANDMARK2_MODEL_NAME}.onnx'
+    FACE_LANDMARK2_MODEL_PATH = f'{FACE_LANDMARK2_MODEL_NAME}.onnx.prototxt'
 else:
-    FACE_LANDMARK2_WEIGHT_PATH = f'{LANDMARK2_MODEL_NAME}.opt.onnx'
-    FACE_LANDMARK2_MODEL_PATH = f'{LANDMARK2_MODEL_NAME}.opt.onnx.prototxt'
-FACE_LANDMARK2_REMOTE_PATH = f'https://storage.googleapis.com/ailia-models/mediapipe_{LANDMARK2_MODEL_NAME}/'
+    FACE_LANDMARK2_WEIGHT_PATH = f'{FACE_LANDMARK2_MODEL_NAME}.opt.onnx'
+    FACE_LANDMARK2_MODEL_PATH = f'{FACE_LANDMARK2_MODEL_NAME}.opt.onnx.prototxt'
+FACE_LANDMARK2_REMOTE_PATH = f'https://storage.googleapis.com/ailia-models/mediapipe_{FACE_LANDMARK2_MODEL_NAME}/'
 
 FACE_DETECTION_MODEL_NAME = 'blazeface'
 FACE_LANDMARK_MODEL_NAME = 'facemesh'
 if args.normal:
-    FACE_DETECTION_WEIGHT_PATH = f'{DETECTION_MODEL_NAME}.onnx'
-    FACE_DETECTION_MODEL_PATH = f'{DETECTION_MODEL_NAME}.onnx.prototxt'
-    FACE_LANDMARK_WEIGHT_PATH = f'{LANDMARK_MODEL_NAME}.onnx'
-    FACE_LANDMARK_MODEL_PATH = f'{LANDMARK_MODEL_NAME}.onnx.prototxt'
+    FACE_DETECTION_WEIGHT_PATH = f'{FACE_DETECTION_MODEL_NAME}.onnx'
+    FACE_DETECTION_MODEL_PATH = f'{FACE_DETECTION_MODEL_NAME}.onnx.prototxt'
+    FACE_LANDMARK_WEIGHT_PATH = f'{FACE_LANDMARK_MODEL_NAME}.onnx'
+    FACE_LANDMARK_MODEL_PATH = f'{FACE_LANDMARK_MODEL_NAME}.onnx.prototxt'
 else:
-    FACE_DETECTION_WEIGHT_PATH = f'{DETECTION_MODEL_NAME}.opt.onnx'
-    FACE_DETECTION_MODEL_PATH = f'{DETECTION_MODEL_NAME}.opt.onnx.prototxt'
-    FACE_LANDMARK_WEIGHT_PATH = f'{LANDMARK_MODEL_NAME}.opt.onnx'
-    FACE_LANDMARK_MODEL_PATH = f'{LANDMARK_MODEL_NAME}.opt.onnx.prototxt'
-FACE_DETECTION_REMOTE_PATH = f'https://storage.googleapis.com/ailia-models/{DETECTION_MODEL_NAME}/'
-FACE_LANDMARK_REMOTE_PATH = f'https://storage.googleapis.com/ailia-models/{LANDMARK_MODEL_NAME}/'
+    FACE_DETECTION_WEIGHT_PATH = f'{FACE_DETECTION_MODEL_NAME}.opt.onnx'
+    FACE_DETECTION_MODEL_PATH = f'{FACE_DETECTION_MODEL_NAME}.opt.onnx.prototxt'
+    FACE_LANDMARK_WEIGHT_PATH = f'{FACE_LANDMARK_MODEL_NAME}.opt.onnx'
+    FACE_LANDMARK_MODEL_PATH = f'{FACE_LANDMARK_MODEL_NAME}.opt.onnx.prototxt'
+FACE_DETECTION_REMOTE_PATH = f'https://storage.googleapis.com/ailia-models/{FACE_DETECTION_MODEL_NAME}/'
+FACE_LANDMARK_REMOTE_PATH = f'https://storage.googleapis.com/ailia-models/{FACE_LANDMARK_MODEL_NAME}/'
 
-DETECTION_MODEL_NAME = 'blazepalm'
-LANDMARK_MODEL_NAME = 'blazehand'
-HAND_DETECTION_WEIGHT_PATH = f'{DETECTION_MODEL_NAME}.onnx'
-HAND_DETECTION_MODEL_PATH = f'{DETECTION_MODEL_NAME}.onnx.prototxt'
-HAND_LANDMARK_WEIGHT_PATH = f'{LANDMARK_MODEL_NAME}.onnx'
-HAND_LANDMARK_MODEL_PATH = f'{LANDMARK_MODEL_NAME}.onnx.prototxt'
-HAND_DETECTION_REMOTE_PATH = f'https://storage.googleapis.com/ailia-models/{DETECTION_MODEL_NAME}/'
-HAND_LANDMARK_REMOTE_PATH = f'https://storage.googleapis.com/ailia-models/{LANDMARK_MODEL_NAME}/'
+HAND_DETECTION_MODEL_NAME = 'blazepalm'
+HAND_LANDMARK_MODEL_NAME = 'blazehand'
+HAND_DETECTION_WEIGHT_PATH = f'{HAND_DETECTION_MODEL_NAME}.onnx'
+HAND_DETECTION_MODEL_PATH = f'{HAND_DETECTION_MODEL_NAME}.onnx.prototxt'
+HAND_LANDMARK_WEIGHT_PATH = f'{HAND_LANDMARK_MODEL_NAME}.onnx'
+HAND_LANDMARK_MODEL_PATH = f'{HAND_LANDMARK_MODEL_NAME}.onnx.prototxt'
+HAND_DETECTION_REMOTE_PATH = f'https://storage.googleapis.com/ailia-models/{HAND_DETECTION_MODEL_NAME}/'
+HAND_LANDMARK_REMOTE_PATH = f'https://storage.googleapis.com/ailia-models/{HAND_LANDMARK_MODEL_NAME}/'
 
-MODEL_NAME = 'blazepose'
-POSE_DETECTOR_WEIGHT_PATH = f'{MODEL_NAME}_detector.onnx'
-POSE_DETECTOR_MODEL_PATH = f'{MODEL_NAME}_detector.onnx.prototxt'
-POSE_ESTIMATOR_WEIGHT_PATH = f'{MODEL_NAME}_estimator.onnx'
-POSE_ESTIMATOR_MODEL_PATH = f'{MODEL_NAME}_estimator.onnx.prototxt'
-POSE_REMOTE_PATH = f'https://storage.googleapis.com/ailia-models/{MODEL_NAME}/'
+POSE_MODEL_NAME = 'blazepose'
+POSE_DETECTOR_WEIGHT_PATH = f'{POSE_MODEL_NAME}_detector.onnx'
+POSE_DETECTOR_MODEL_PATH = f'{POSE_MODEL_NAME}_detector.onnx.prototxt'
+POSE_ESTIMATOR_WEIGHT_PATH = f'{POSE_MODEL_NAME}_estimator.onnx'
+POSE_ESTIMATOR_MODEL_PATH = f'{POSE_MODEL_NAME}_estimator.onnx.prototxt'
+POSE_REMOTE_PATH = f'https://storage.googleapis.com/ailia-models/{POSE_MODEL_NAME}/'
 
 
 # ======================
 # Utils
 # ======================
-def draw_landmarks(img, points, connections=[], color=(0, 0, 255), size=2):
+def draw_landmarks_hand(img, points, connections=[], color=(0, 0, 255), size=2):
     for connection in connections:
         x0, y0 = points[connection[0]]
         x1, y1 = points[connection[1]]
@@ -105,6 +111,95 @@ def draw_landmarks(img, points, connections=[], color=(0, 0, 255), size=2):
         x, y = point
         x, y = int(x), int(y)
         cv2.circle(img, (x, y), size+1, color, thickness=cv2.FILLED)
+
+def draw_roi(img, roi):
+    for i in range(roi.shape[0]):
+        (x1,x2,x3,x4), (y1,y2,y3,y4) = roi[i]
+        cv2.line(img, (int(x1), int(y1)), (int(x2), int(y2)), (0,0,0), 2)
+        cv2.line(img, (int(x1), int(y1)), (int(x3), int(y3)), (0,255,0), 2)
+        cv2.line(img, (int(x2), int(y2)), (int(x4), int(y4)), (0,0,0), 2)
+        cv2.line(img, (int(x3), int(y3)), (int(x4), int(y4)), (0,0,0), 2)
+
+
+def draw_landmarks_face(img, points, color=(0, 0, 255), size=2):
+    for point in points:
+        x, y = point
+        x, y = int(x), int(y)
+        cv2.circle(img, (x, y), size, color, thickness=cv2.FILLED)
+
+
+def draw_eye_iris(img, eyes, iris, eye_color=(0, 0, 255), iris_color=(255, 0, 0),
+                  iris_pt_color=(0, 255, 0), size=1):
+    """
+    docstring
+    """
+    EYE_CONTOUR_ORDERED = [0, 1, 2, 3, 4, 5, 6, 7, 8, 15, 14, 13, 12, 11, 10, 9]
+
+    for i in range(2):
+        pts = eyes[i, EYE_CONTOUR_ORDERED, :2].round().astype(np.int32)
+        pts = pts.reshape((-1, 1, 2))
+        cv2.polylines(img, [pts], True, eye_color, thickness=size)
+
+        center = tuple(iris[i, 0])
+        radius = int(np.linalg.norm(iris[i, 1] - iris[i, 0]).round())
+        cv2.circle(img, center, radius, iris_color, thickness=size)
+        draw_landmarks_face(img, iris[i], color=iris_pt_color, size=size)
+
+
+def hsv_to_rgb(h, s, v):
+    bgr = cv2.cvtColor(
+        np.array([[[h, s, v]]], dtype=np.uint8), cv2.COLOR_HSV2BGR
+    )[0][0]
+    return (int(bgr[2]), int(bgr[1]), int(bgr[0]))
+
+
+def line(input_img, landmarks, flags, point1, point2):
+    threshold = 0.5
+    for i in range(len(flags)):
+        landmark, flag = landmarks[i], flags[i]
+        if flag > threshold:
+            color = hsv_to_rgb(255*point1/bput.BLAZEPOSE_KEYPOINT_CNT, 255, 255)
+
+            x1 = int(landmark[point1, 0])
+            y1 = int(landmark[point1, 1])
+            x2 = int(landmark[point2, 0])
+            y2 = int(landmark[point2, 1])
+            cv2.line(input_img, (x1, y1), (x2, y2), color, 5)
+
+
+def display_result_pose(input_img, count, landmarks, flags):
+    for _ in range(count):
+        line(input_img,landmarks,flags,bput.BLAZEPOSE_KEYPOINT_NOSE,bput.BLAZEPOSE_KEYPOINT_EYE_LEFT_INNER)
+        line(input_img,landmarks,flags,bput.BLAZEPOSE_KEYPOINT_EYE_LEFT_INNER,bput.BLAZEPOSE_KEYPOINT_EYE_LEFT)
+        line(input_img,landmarks,flags,bput.BLAZEPOSE_KEYPOINT_EYE_LEFT,bput.BLAZEPOSE_KEYPOINT_EYE_LEFT_OUTER)
+        line(input_img,landmarks,flags,bput.BLAZEPOSE_KEYPOINT_EYE_LEFT_OUTER,bput.BLAZEPOSE_KEYPOINT_EAR_LEFT)
+
+        line(input_img,landmarks,flags,bput.BLAZEPOSE_KEYPOINT_NOSE,bput.BLAZEPOSE_KEYPOINT_EYE_RIGHT_INNER)
+        line(input_img,landmarks,flags,bput.BLAZEPOSE_KEYPOINT_EYE_RIGHT_INNER,bput.BLAZEPOSE_KEYPOINT_EYE_RIGHT)
+        line(input_img,landmarks,flags,bput.BLAZEPOSE_KEYPOINT_EYE_RIGHT,bput.BLAZEPOSE_KEYPOINT_EYE_RIGHT_OUTER)
+        line(input_img,landmarks,flags,bput.BLAZEPOSE_KEYPOINT_EYE_RIGHT_OUTER,bput.BLAZEPOSE_KEYPOINT_EAR_RIGHT)
+
+        line(input_img,landmarks,flags,bput.BLAZEPOSE_KEYPOINT_MOUTH_LEFT,bput.BLAZEPOSE_KEYPOINT_MOUTH_RIGHT)
+
+        line(input_img,landmarks,flags,bput.BLAZEPOSE_KEYPOINT_SHOULDER_LEFT,bput.BLAZEPOSE_KEYPOINT_SHOULDER_RIGHT)
+        line(input_img,landmarks,flags,bput.BLAZEPOSE_KEYPOINT_SHOULDER_LEFT,bput.BLAZEPOSE_KEYPOINT_ELBOW_LEFT)
+        line(input_img,landmarks,flags,bput.BLAZEPOSE_KEYPOINT_ELBOW_LEFT,bput.BLAZEPOSE_KEYPOINT_WRIST_LEFT)
+        line(input_img,landmarks,flags,bput.BLAZEPOSE_KEYPOINT_SHOULDER_RIGHT,bput.BLAZEPOSE_KEYPOINT_ELBOW_RIGHT)
+        line(input_img,landmarks,flags,bput.BLAZEPOSE_KEYPOINT_ELBOW_RIGHT,bput.BLAZEPOSE_KEYPOINT_WRIST_RIGHT)
+
+        line(input_img,landmarks,flags,bput.BLAZEPOSE_KEYPOINT_WRIST_LEFT,bput.BLAZEPOSE_KEYPOINT_PINKY_LEFT_KNUCKLE1)
+        line(input_img,landmarks,flags,bput.BLAZEPOSE_KEYPOINT_PINKY_LEFT_KNUCKLE1,bput.BLAZEPOSE_KEYPOINT_INDEX_LEFT_KNUCKLE1)
+        line(input_img,landmarks,flags,bput.BLAZEPOSE_KEYPOINT_WRIST_LEFT,bput.BLAZEPOSE_KEYPOINT_INDEX_LEFT_KNUCKLE1)
+        line(input_img,landmarks,flags,bput.BLAZEPOSE_KEYPOINT_WRIST_LEFT,bput.BLAZEPOSE_KEYPOINT_THUMB_LEFT_KNUCKLE2)
+
+        line(input_img,landmarks,flags,bput.BLAZEPOSE_KEYPOINT_WRIST_RIGHT,bput.BLAZEPOSE_KEYPOINT_PINKY_RIGHT_KNUCKLE1)
+        line(input_img,landmarks,flags,bput.BLAZEPOSE_KEYPOINT_PINKY_RIGHT_KNUCKLE1,bput.BLAZEPOSE_KEYPOINT_INDEX_RIGHT_KNUCKLE1)
+        line(input_img,landmarks,flags,bput.BLAZEPOSE_KEYPOINT_WRIST_RIGHT,bput.BLAZEPOSE_KEYPOINT_INDEX_RIGHT_KNUCKLE1)
+        line(input_img,landmarks,flags,bput.BLAZEPOSE_KEYPOINT_WRIST_RIGHT,bput.BLAZEPOSE_KEYPOINT_THUMB_RIGHT_KNUCKLE2)
+
+        line(input_img,landmarks,flags,bput.BLAZEPOSE_KEYPOINT_SHOULDER_LEFT,bput.BLAZEPOSE_KEYPOINT_HIP_LEFT)
+        line(input_img,landmarks,flags,bput.BLAZEPOSE_KEYPOINT_SHOULDER_RIGHT,bput.BLAZEPOSE_KEYPOINT_HIP_RIGHT)
+        line(input_img,landmarks,flags,bput.BLAZEPOSE_KEYPOINT_HIP_LEFT,bput.BLAZEPOSE_KEYPOINT_HIP_RIGHT)
 
 
 # ======================
@@ -163,7 +258,7 @@ def recognize_from_video_hand():
                         presence[0] = 1
                     else:
                         presence[1] = 1
-                    draw_landmarks(frame, landmark[:,:2], bhut.HAND_CONNECTIONS, size=2)
+                    draw_landmarks_hand(frame, landmark[:,:2], bhut.HAND_CONNECTIONS, size=2)
 
         if presence[0] and presence[1]:
             text = 'Left and right'
@@ -184,75 +279,6 @@ def recognize_from_video_hand():
     cv2.destroyAllWindows()
     print('Script finished successfully.')
     pass
-
-
-
-
-# ======================
-# Utils
-# ======================
-def hsv_to_rgb(h, s, v):
-    bgr = cv2.cvtColor(
-        np.array([[[h, s, v]]], dtype=np.uint8), cv2.COLOR_HSV2BGR
-    )[0][0]
-    return (int(bgr[2]), int(bgr[1]), int(bgr[0]))
-
-
-def line(input_img, landmarks, flags, point1, point2):
-    threshold = 0.5
-    for i in range(len(flags)):
-        landmark, flag = landmarks[i], flags[i]
-        if flag > threshold:
-            color = hsv_to_rgb(255*point1/bput.BLAZEPOSE_KEYPOINT_CNT, 255, 255)
-
-            x1 = int(landmark[point1, 0])
-            y1 = int(landmark[point1, 1])
-            x2 = int(landmark[point2, 0])
-            y2 = int(landmark[point2, 1])
-            cv2.line(input_img, (x1, y1), (x2, y2), color, 5)
-
-
-def display_result(input_img, count, landmarks, flags):
-    for _ in range(count):
-        line(input_img,landmarks,flags,bput.BLAZEPOSE_KEYPOINT_NOSE,bput.BLAZEPOSE_KEYPOINT_EYE_LEFT_INNER)
-        line(input_img,landmarks,flags,bput.BLAZEPOSE_KEYPOINT_EYE_LEFT_INNER,bput.BLAZEPOSE_KEYPOINT_EYE_LEFT)
-        line(input_img,landmarks,flags,bput.BLAZEPOSE_KEYPOINT_EYE_LEFT,bput.BLAZEPOSE_KEYPOINT_EYE_LEFT_OUTER)
-        line(input_img,landmarks,flags,bput.BLAZEPOSE_KEYPOINT_EYE_LEFT_OUTER,bput.BLAZEPOSE_KEYPOINT_EAR_LEFT)
-
-        line(input_img,landmarks,flags,bput.BLAZEPOSE_KEYPOINT_NOSE,bput.BLAZEPOSE_KEYPOINT_EYE_RIGHT_INNER)
-        line(input_img,landmarks,flags,bput.BLAZEPOSE_KEYPOINT_EYE_RIGHT_INNER,bput.BLAZEPOSE_KEYPOINT_EYE_RIGHT)
-        line(input_img,landmarks,flags,bput.BLAZEPOSE_KEYPOINT_EYE_RIGHT,bput.BLAZEPOSE_KEYPOINT_EYE_RIGHT_OUTER)
-        line(input_img,landmarks,flags,bput.BLAZEPOSE_KEYPOINT_EYE_RIGHT_OUTER,bput.BLAZEPOSE_KEYPOINT_EAR_RIGHT)
-
-        line(input_img,landmarks,flags,bput.BLAZEPOSE_KEYPOINT_MOUTH_LEFT,bput.BLAZEPOSE_KEYPOINT_MOUTH_RIGHT)
-
-        line(input_img,landmarks,flags,bput.BLAZEPOSE_KEYPOINT_SHOULDER_LEFT,bput.BLAZEPOSE_KEYPOINT_SHOULDER_RIGHT)
-        line(input_img,landmarks,flags,bput.BLAZEPOSE_KEYPOINT_SHOULDER_LEFT,bput.BLAZEPOSE_KEYPOINT_ELBOW_LEFT)
-        line(input_img,landmarks,flags,bput.BLAZEPOSE_KEYPOINT_ELBOW_LEFT,bput.BLAZEPOSE_KEYPOINT_WRIST_LEFT)
-        line(input_img,landmarks,flags,bput.BLAZEPOSE_KEYPOINT_SHOULDER_RIGHT,bput.BLAZEPOSE_KEYPOINT_ELBOW_RIGHT)
-        line(input_img,landmarks,flags,bput.BLAZEPOSE_KEYPOINT_ELBOW_RIGHT,bput.BLAZEPOSE_KEYPOINT_WRIST_RIGHT)
-
-        line(input_img,landmarks,flags,bput.BLAZEPOSE_KEYPOINT_WRIST_LEFT,bput.BLAZEPOSE_KEYPOINT_PINKY_LEFT_KNUCKLE1)
-        line(input_img,landmarks,flags,bput.BLAZEPOSE_KEYPOINT_PINKY_LEFT_KNUCKLE1,bput.BLAZEPOSE_KEYPOINT_INDEX_LEFT_KNUCKLE1)
-        line(input_img,landmarks,flags,bput.BLAZEPOSE_KEYPOINT_WRIST_LEFT,bput.BLAZEPOSE_KEYPOINT_INDEX_LEFT_KNUCKLE1)
-        line(input_img,landmarks,flags,bput.BLAZEPOSE_KEYPOINT_WRIST_LEFT,bput.BLAZEPOSE_KEYPOINT_THUMB_LEFT_KNUCKLE2)
-
-        line(input_img,landmarks,flags,bput.BLAZEPOSE_KEYPOINT_WRIST_RIGHT,bput.BLAZEPOSE_KEYPOINT_PINKY_RIGHT_KNUCKLE1)
-        line(input_img,landmarks,flags,bput.BLAZEPOSE_KEYPOINT_PINKY_RIGHT_KNUCKLE1,bput.BLAZEPOSE_KEYPOINT_INDEX_RIGHT_KNUCKLE1)
-        line(input_img,landmarks,flags,bput.BLAZEPOSE_KEYPOINT_WRIST_RIGHT,bput.BLAZEPOSE_KEYPOINT_INDEX_RIGHT_KNUCKLE1)
-        line(input_img,landmarks,flags,bput.BLAZEPOSE_KEYPOINT_WRIST_RIGHT,bput.BLAZEPOSE_KEYPOINT_THUMB_RIGHT_KNUCKLE2)
-
-        line(input_img,landmarks,flags,bput.BLAZEPOSE_KEYPOINT_SHOULDER_LEFT,bput.BLAZEPOSE_KEYPOINT_HIP_LEFT)
-        line(input_img,landmarks,flags,bput.BLAZEPOSE_KEYPOINT_SHOULDER_RIGHT,bput.BLAZEPOSE_KEYPOINT_HIP_RIGHT)
-        line(input_img,landmarks,flags,bput.BLAZEPOSE_KEYPOINT_HIP_LEFT,bput.BLAZEPOSE_KEYPOINT_HIP_RIGHT)
-
-
-
-
-# ======================
-# Main functions
-# ======================
-
 
 
 def recognize_from_video_pose():
@@ -288,37 +314,13 @@ def recognize_from_video_pose():
             landmarks = bput.denormalize_landmarks(normalized_landmarks, affine)
 
         # postprocessing
-        display_result(frame, count, landmarks, flags)
+        display_result_pose(frame, count, landmarks, flags)
         cv2.imshow('frame', frame)
 
     capture.release()
     cv2.destroyAllWindows()
     print('Script finished successfully.')
     pass
-
-# ======================
-# Utils
-# ======================
-def draw_roi(img, roi):
-    for i in range(roi.shape[0]):
-        (x1,x2,x3,x4), (y1,y2,y3,y4) = roi[i]
-        cv2.line(img, (int(x1), int(y1)), (int(x2), int(y2)), (0,0,0), 2)
-        cv2.line(img, (int(x1), int(y1)), (int(x3), int(y3)), (0,255,0), 2)
-        cv2.line(img, (int(x2), int(y2)), (int(x4), int(y4)), (0,0,0), 2)
-        cv2.line(img, (int(x3), int(y3)), (int(x4), int(y4)), (0,0,0), 2)
-
-
-def draw_landmarks(img, points, color=(0, 0, 255), size=2):
-    for point in points:
-        x, y = point
-        x, y = int(x), int(y)
-        cv2.circle(img, (x, y), size, color, thickness=cv2.FILLED)
-
-
-# ======================
-# Main functions
-# ======================
-
 
 
 def recognize_from_video_face():
@@ -380,7 +382,7 @@ def recognize_from_video_face():
             for i in range(len(landmarks)):
                 landmark, confidence = landmarks[i], confidences[i]
                 # if confidence > 0: # Can be > 1, no idea what it represents
-                draw_landmarks(frame, landmark[:,:2], size=1)
+                draw_landmarks_face(frame, landmark[:,:2], size=1)
 
         cv2.imshow('frame', frame)
 
@@ -392,50 +394,6 @@ def recognize_from_video_face():
     cv2.destroyAllWindows()
     print('Script finished successfully.')
     pass
-
-
-
-
-# ======================
-# Utils
-# ======================
-def draw_roi(img, roi):
-    for i in range(roi.shape[0]):
-        (x1,x2,x3,x4), (y1,y2,y3,y4) = roi[i]
-        cv2.line(img, (int(x1), int(y1)), (int(x2), int(y2)), (0,0,0), 2)
-        cv2.line(img, (int(x1), int(y1)), (int(x3), int(y3)), (0,255,0), 2)
-        cv2.line(img, (int(x2), int(y2)), (int(x4), int(y4)), (0,0,0), 2)
-        cv2.line(img, (int(x3), int(y3)), (int(x4), int(y4)), (0,0,0), 2)
-
-
-def draw_landmarks(img, points, color=(0, 0, 255), size=2):
-    for point in points:
-        x, y = point
-        x, y = int(x), int(y)
-        cv2.circle(img, (x, y), size, color, thickness=cv2.FILLED)
-
-
-def draw_eye_iris(img, eyes, iris, eye_color=(0, 0, 255), iris_color=(255, 0, 0),
-                  iris_pt_color=(0, 255, 0), size=1):
-    """
-    docstring
-    """
-    EYE_CONTOUR_ORDERED = [0, 1, 2, 3, 4, 5, 6, 7, 8, 15, 14, 13, 12, 11, 10, 9]
-
-    for i in range(2):
-        pts = eyes[i, EYE_CONTOUR_ORDERED, :2].round().astype(np.int32)
-        pts = pts.reshape((-1, 1, 2))
-        cv2.polylines(img, [pts], True, eye_color, thickness=size)
-
-        center = tuple(iris[i, 0])
-        radius = int(np.linalg.norm(iris[i, 1] - iris[i, 0]).round())
-        cv2.circle(img, center, radius, iris_color, thickness=size)
-        draw_landmarks(img, iris[i], color=iris_pt_color, size=size)
-
-# ======================
-# Main functions
-# ======================
-
 
 
 def recognize_from_video_iris():
@@ -535,9 +493,9 @@ def main():
     if args.video is not None:
         # video mode
         recognize_from_video_iris()
-        recognize_from_video_face()
-        recognize_from_video_pose()
-        recognize_from_video_hand()
+        #recognize_from_video_face()
+        #recognize_from_video_pose()
+        #recognize_from_video_hand()
     else:
         # image mode
         print("image mode is not supported.")
