@@ -8,6 +8,7 @@
 
 Shape : (1, 3, 640, 640)  
 Range : [0.0, 1.0]
+Color : RGB
 
 ## Output
 

@@ -29,6 +29,11 @@ IMAGE_WIDTH = 640
 #IMAGE_HEIGHT = 640*2
 #IMAGE_WIDTH = 640*2
 
+#WEIGHT_PATH = 'yolov5s_1280_640.onnx'
+#MODEL_PATH = 'yolov5s_1280_640.onnx.prototxt'
+#IMAGE_HEIGHT = 640
+#IMAGE_WIDTH = 640*2
+
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/yolov5/'
 
 IMAGE_PATH = 'bus.jpg'
@@ -68,10 +73,13 @@ args = update_parser(parser)
 def recognize_from_image():
     # prepare input data
     org_img = load_image(args.input)
+    org_img = cv2.cvtColor(org_img, cv2.COLOR_BGRA2BGR)
     print(f'input image shape: {org_img.shape}')
 
-    img = cv2.cvtColor(org_img, cv2.COLOR_BGRA2RGB)
-    img = cv2.resize(img, (IMAGE_WIDTH, IMAGE_HEIGHT))
+    org_img2, img = webcamera_utils.adjust_frame_size(org_img, IMAGE_HEIGHT, IMAGE_WIDTH)
+
+    #img = cv2.resize(img, (IMAGE_WIDTH, IMAGE_HEIGHT))
+    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
     img = np.transpose(img, [2, 0, 1])
     img = img.astype(np.float32) / 255
     img = np.expand_dims(img, 0)
@@ -93,7 +101,12 @@ def recognize_from_image():
     detect_object = yolov5_utils.post_processing(img, THRESHOLD, IOU, output)
 
     # plot result
-    res_img = plot_results(detect_object[0], org_img, COCO_CATEGORY)
+    res_img = plot_results(detect_object[0], org_img2, COCO_CATEGORY)
+
+    # crop
+    pad_w = (org_img2.shape[1]-org_img.shape[1]) // 2
+    pad_h = (org_img2.shape[0]-org_img.shape[0]) // 2
+    res_img = res_img[pad_h:pad_h+org_img.shape[0],pad_w:pad_w+org_img.shape[1],:]
 
     # plot result
     cv2.imwrite(args.savepath, res_img)
@@ -119,9 +132,10 @@ def recognize_from_video():
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
+        
+        frame2, img = webcamera_utils.adjust_frame_size(frame, IMAGE_HEIGHT, IMAGE_WIDTH)
 
-        img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        img = cv2.resize(img, (IMAGE_WIDTH, IMAGE_HEIGHT))
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         img = np.transpose(img, [2, 0, 1])
         img = img.astype(np.float32) / 255
         img = np.expand_dims(img, 0)
@@ -130,7 +144,11 @@ def recognize_from_video():
         detect_object = yolov5_utils.post_processing(
             img, THRESHOLD, IOU, output
         )
-        res_img = plot_results(detect_object[0], frame, COCO_CATEGORY)
+        res_img = plot_results(detect_object[0], frame2, COCO_CATEGORY)
+
+        pad_w = (frame2.shape[1]-frame.shape[1]) // 2
+        pad_h = (frame2.shape[0]-frame.shape[0]) // 2
+        res_img = res_img[pad_h:pad_h+frame.shape[0],pad_w:pad_w+frame.shape[1],:]
 
         cv2.imshow('frame', res_img)
 
