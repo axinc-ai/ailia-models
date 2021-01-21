@@ -49,8 +49,8 @@ COCO_CATEGORY = [
     "oven", "toaster", "sink", "refrigerator", "book", "clock", "vase",
     "scissors", "teddy bear", "hair drier", "toothbrush"
 ]
-THRESHOLD = 0.4
-IOU = 0.3
+THRESHOLD = 0.25
+IOU = 0.45
 
 
 # ======================
