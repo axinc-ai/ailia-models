@@ -36,11 +36,11 @@ def bbox_iou(box1, box2):
 
 def non_max_suppression(prediction, num_classes, conf_thres=0.5, nms_thres=0.4):
     box_corner = np.zeros(prediction.shape)
-    box_corner[:, :, 0] = prediction[:, :, 0] - prediction[:, :, 2] / 2
-    box_corner[:, :, 1] = prediction[:, :, 1] - prediction[:, :, 3] / 2
-    box_corner[:, :, 2] = prediction[:, :, 0] + prediction[:, :, 2] / 2
-    box_corner[:, :, 3] = prediction[:, :, 1] + prediction[:, :, 3] / 2
-    prediction[:, :, :4] = box_corner[:, :, :4]
+    box_corner[:, :, 0] = prediction[:, :, 0] - prediction[:, :, 2] / 2 # cx - w/2
+    box_corner[:, :, 1] = prediction[:, :, 1] - prediction[:, :, 3] / 2 # cy - h/2
+    box_corner[:, :, 2] = prediction[:, :, 0] + prediction[:, :, 2] / 2 # cx + w/2
+    box_corner[:, :, 3] = prediction[:, :, 1] + prediction[:, :, 3] / 2 # cy + h/2
+    prediction[:, :, :4] = box_corner[:, :, :4] #conf
 
     output = [None for _ in range(len(prediction))]
     for image_i, image_pred in enumerate(prediction):
@@ -98,7 +98,14 @@ def post_processing(img, conf_thres, nms_thres, outputs):
     boxs = []
     a = np.array(anchors).reshape(3, -1, 2)
     anchor_grid = a.copy().reshape(3, 1, -1, 1, 1, 2)
-    
+
+    #onnx output
+    #(1, 3, 80, 80, 85) # anchor 0
+    #(1, 3, 40, 40, 85) # anchor 1
+    #(1, 3, 20, 20, 85) # anchor 2
+
+    #[cx,cy,w,h,conf,pred_cls(80)]
+
     for index, out in enumerate(outputs):
         batch = out.shape[1]
         feature_h = out.shape[2]
