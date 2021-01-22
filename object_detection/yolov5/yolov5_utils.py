@@ -75,23 +75,16 @@ def non_max_suppression(prediction, num_classes, conf_thres=0.5, nms_thres=0.4):
 
             max_detections = []
             while detections_class.shape[0]:
-                print(np.expand_dims(detections_class[0],0))
-                print(torch.from_numpy(detections_class[0]).unsqueeze(0))
-                
-                #max_detections.append(torch.from_numpy(detections_class[0]).unsqueeze(0))
-
                 expand_detections_class = np.expand_dims(detections_class[0],0)
-                max_detections.append(torch.from_numpy(expand_detections_class))
-                
-
+                max_detections.append(expand_detections_class)
                 if len(detections_class) == 1:
                     break
-                ious = bbox_iou(max_detections[-1].numpy(), detections_class[1:])
+                ious = bbox_iou(expand_detections_class, detections_class[1:])
                 detections_class = detections_class[1:][ious < nms_thres]
-            #print(max_detections)
-            max_detections = torch.cat(max_detections).data
-            #print(max_detections)
-            output[image_i] = max_detections if output[image_i] is None else torch.cat(
+
+            max_detections = np.concatenate(max_detections)
+            
+            output[image_i] = max_detections if output[image_i] is None else np.concatenate(
                 (output[image_i], max_detections))
 
     return output
@@ -158,10 +151,10 @@ def post_processing(img, conf_thres, nms_thres, outputs):
     bboxes_batch = []
     for i, box in enumerate(boxs):
         x1, y1, x2, y2 = box
-        c = int(labels[i].numpy())
+        c = int(labels[i])
         r = ailia.DetectorObject(
             category=c,
-            prob=confs[i].numpy(),
+            prob=confs[i],
             x=x1/img_size_w,
             y=y1/img_size_h,
             w=(x2 - x1)/img_size_w,
