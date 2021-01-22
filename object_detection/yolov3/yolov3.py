@@ -40,7 +40,7 @@ COCO_CATEGORY = [
 ]
 THRESHOLD = 0.4
 IOU = 0.45
-DETECTION_WIDTH = 416
+DETECTION_SIZE = 416
 
 
 # ======================
@@ -49,8 +49,13 @@ DETECTION_WIDTH = 416
 parser = get_base_parser('Yolov3 model', IMAGE_PATH, SAVE_IMAGE_PATH)
 parser.add_argument(
     '-dw', '--detection_width',
-    default=DETECTION_WIDTH,
+    default=DETECTION_SIZE,
     help='The detection width and height for yolo. (default: 416)'
+)
+parser.add_argument(
+    '-dh', '--detection_height',
+    default=DETECTION_SIZE,
+    help='The detection height and height for yolo. (default: 416)'
 )
 args = update_parser(parser)
 
@@ -74,9 +79,9 @@ def recognize_from_image():
         algorithm=ailia.DETECTOR_ALGORITHM_YOLOV3,
         env_id=args.env_id,
     )
-    if int(args.detection_width) != DETECTION_WIDTH:
+    if int(args.detection_width) != DETECTION_SIZE or int(args.detection_height) != DETECTION_SIZE:
         detector.set_input_shape(
-            int(args.detection_width), int(args.detection_width)
+            int(args.detection_width), int(args.detection_height)
         )
 
     # inference
@@ -109,9 +114,9 @@ def recognize_from_video():
         algorithm=ailia.DETECTOR_ALGORITHM_YOLOV3,
         env_id=args.env_id,
     )
-    if int(args.detection_width) != DETECTION_WIDTH:
+    if int(args.detection_width) != DETECTION_SIZE or int(args.detection_height) != DETECTION_SIZE:
         detector.set_input_shape(
-            int(args.detection_width), int(args.detection_width)
+            int(args.detection_width), int(args.detection_height)
         )
 
     capture = webcamera_utils.get_capture(args.video)
