@@ -5,7 +5,6 @@ import argparse
 import numpy as np
 import cv2
 
-import torch
 import ailia
 
 
@@ -97,9 +96,9 @@ def post_processing(img, conf_thres, nms_thres, outputs):
     anchors = [[10, 13, 16, 30, 33, 23], [30, 61, 62, 45, 59, 119], [116, 90, 156, 198, 373, 326]]
 
     boxs = []
-    a = torch.tensor(anchors).float().view(3, -1, 2)
-    anchor_grid = a.clone().view(3, 1, -1, 1, 1, 2).numpy()
-
+    a = np.array(anchors).reshape(3, -1, 2)
+    anchor_grid = a.copy().reshape(3, 1, -1, 1, 1, 2)
+    
     for index, out in enumerate(outputs):
         batch = out.shape[1]
         feature_h = out.shape[2]
