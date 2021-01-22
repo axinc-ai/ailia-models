@@ -19,7 +19,7 @@ import yolov4_utils  # noqa: E402
 # ======================
 # Parameters
 # ======================
-DETECTION_SIZE_LISTS = ['416','640','1280']
+DETECTION_SIZE_LISTS = [416, 640, 1280]
 
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/yolov4/'
 
@@ -52,27 +52,37 @@ parser = get_base_parser(
     'Yolov4 model', IMAGE_PATH, SAVE_IMAGE_PATH,
 )
 parser.add_argument(
+    '-th', '--threshold',
+    default=THRESHOLD, type=float,
+    help='The detection threshold for yolo. (default: '+str(THRESHOLD)+')'
+)
+parser.add_argument(
+    '-iou', '--iou',
+    default=IOU, type=float,
+    help='The detection iou for yolo. (default: '+str(IOU)+')'
+)
+parser.add_argument(
     '-dw', '--detection_width', metavar='DETECTION_WIDTH',
-    default='416', choices=DETECTION_SIZE_LISTS,
-    help='detection size lists: ' + ' | '.join(DETECTION_SIZE_LISTS)
+    default=416, choices=DETECTION_SIZE_LISTS, type=int,
+    help='detection size lists: ' + ' | '.join(map(str,DETECTION_SIZE_LISTS))
 )
 parser.add_argument(
     '-dh', '--detection_height', metavar='DETECTION_HEIGHT',
-    default='416', choices=DETECTION_SIZE_LISTS,
-    help='detection size lists: ' + ' | '.join(DETECTION_SIZE_LISTS)
+    default=416, choices=DETECTION_SIZE_LISTS, type=int,
+    help='detection size lists: ' + ' | '.join(map(str,DETECTION_SIZE_LISTS))
 )
 args = update_parser(parser)
 
-if args.detection_width != "416" or args.detection_height!="416":
-    WEIGHT_PATH = 'yolov4_'+args.detection_width+'_'+args.detection_height+'.onnx'
-    MODEL_PATH = 'yolov4_'+args.detection_width+'_'+args.detection_height+'.onnx.prototxt'
-    IMAGE_HEIGHT = int(args.detection_height)
-    IMAGE_WIDTH = int(args.detection_width)
+if args.detection_width != 416 or args.detection_height!=416:
+    WEIGHT_PATH = 'yolov4_'+str(args.detection_width)+'_'+str(args.detection_height)+'.onnx'
+    MODEL_PATH = 'yolov4_'+str(args.detection_width)+'_'+str(args.detection_height)+'.onnx.prototxt'
+    IMAGE_HEIGHT = args.detection_height
+    IMAGE_WIDTH = args.detection_width
 else:
     WEIGHT_PATH = 'yolov4.onnx'
     MODEL_PATH = 'yolov4.onnx.prototxt'
-    IMAGE_HEIGHT = int(args.detection_height)
-    IMAGE_WIDTH = int(args.detection_width)
+    IMAGE_HEIGHT = args.detection_height
+    IMAGE_WIDTH = args.detection_width
 
 # ======================
 # Main functions
@@ -104,7 +114,7 @@ def recognize_from_image():
             print(f'\tailia processing time {end - start} ms')
     else:
         output = detector.predict([img])
-    detect_object = yolov4_utils.post_processing(img, THRESHOLD, IOU, output)
+    detect_object = yolov4_utils.post_processing(img, args.threshold, args.iou, output)
 
     # plot result
     res_img = plot_results(detect_object[0], org_img, COCO_CATEGORY, det_shape=(IMAGE_HEIGHT,IMAGE_WIDTH))
@@ -143,7 +153,7 @@ def recognize_from_video():
 
         output = detector.predict([img])
         detect_object = yolov4_utils.post_processing(
-            img, THRESHOLD, IOU, output
+            img, args.threshold, args.iou, output
         )
         res_img = plot_results(detect_object[0], frame, COCO_CATEGORY, det_shape=(IMAGE_HEIGHT,IMAGE_WIDTH))
 
