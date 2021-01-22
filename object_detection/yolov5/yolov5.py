@@ -92,7 +92,6 @@ def recognize_from_image():
 
     org_img2, img = webcamera_utils.adjust_frame_size(org_img, IMAGE_HEIGHT, IMAGE_WIDTH)
 
-    #img = cv2.resize(img, (IMAGE_WIDTH, IMAGE_HEIGHT))
     img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
     img = np.transpose(img, [2, 0, 1])
     img = img.astype(np.float32) / 255
