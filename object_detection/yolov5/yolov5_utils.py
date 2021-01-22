@@ -9,6 +9,10 @@ import torch
 import ailia
 
 
+def sigmoid(x):
+    return 1 / (1 + np.exp(-x))
+
+
 def bbox_iou(box1, box2):
     b1_x1, b1_y1, b1_x2, b1_y2 = box1[:, 0], box1[:, 1], box1[:, 2], box1[:, 3]
     b2_x1, b2_y1, b2_x2, b2_y2 = box2[:, 0], box2[:, 1], box2[:, 2], box2[:, 3]
@@ -86,10 +90,10 @@ def post_processing(img, conf_thres, nms_thres, outputs):
 
     boxs = []
     a = torch.tensor(anchors).float().view(3, -1, 2)
-    anchor_grid = a.clone().view(3, 1, -1, 1, 1, 2)
+    anchor_grid = a.clone().view(3, 1, -1, 1, 1, 2).numpy()
 
     for index, out in enumerate(outputs):
-        out = torch.from_numpy(out)
+        out = out#torch.from_numpy(out)
         print(out.shape)
         batch = out.shape[1]
         feature_h = out.shape[2]
@@ -102,19 +106,19 @@ def post_processing(img, conf_thres, nms_thres, outputs):
         grid_x, grid_y = np.meshgrid(np.arange(feature_w), np.arange(feature_h))
 
         # cx, cy, w, h
-        pred_boxes = torch.FloatTensor(out[..., :4].shape)
-        pred_boxes[..., 0] = (torch.sigmoid(out[..., 0]) * 2.0 - 0.5 + grid_x) * stride_w  # cx
-        pred_boxes[..., 1] = (torch.sigmoid(out[..., 1]) * 2.0 - 0.5 + grid_y) * stride_h  # cy
-        pred_boxes[..., 2:4] = (torch.sigmoid(out[..., 2:4]) * 2) ** 2 * anchor_grid[index]  # wh
+        pred_boxes = np.zeros(out[..., :4].shape)
+        pred_boxes[..., 0] = (sigmoid(out[..., 0]) * 2.0 - 0.5 + grid_x) * stride_w  # cx
+        pred_boxes[..., 1] = (sigmoid(out[..., 1]) * 2.0 - 0.5 + grid_y) * stride_h  # cy
+        pred_boxes[..., 2:4] = (sigmoid(out[..., 2:4]) * 2) ** 2 * anchor_grid[index]  # wh
 
-        conf = torch.sigmoid(out[..., 4])
-        pred_cls = torch.sigmoid(out[..., 5:])
+        conf = sigmoid(out[..., 4])
+        pred_cls = sigmoid(out[..., 5:])
 
-        output = torch.cat((pred_boxes.view(batch_size, -1, 4),
-                            conf.view(batch_size, -1, 1),
-                            pred_cls.view(batch_size, -1, num_classes)),
+        output = np.concatenate((pred_boxes.reshape(batch_size, -1, 4),
+                            conf.reshape(batch_size, -1, 1),
+                            pred_cls.reshape(batch_size, -1, num_classes)),
                             -1)
-        boxs.append(output)
+        boxs.append(torch.from_numpy(output))
 
     outputx = torch.cat(boxs, 1)
 
