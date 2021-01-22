@@ -19,20 +19,9 @@ import yolov5_utils  # noqa: E402
 # ======================
 # Parameters
 # ======================
-WEIGHT_PATH = 'yolov5s.onnx'
-MODEL_PATH = 'yolov5s.onnx.prototxt'
-IMAGE_HEIGHT = 640
-IMAGE_WIDTH = 640
 
-#WEIGHT_PATH = 'yolov5s_1280_1280.onnx'
-#MODEL_PATH = 'yolov5s_1280_1280.onnx.prototxt'
-#IMAGE_HEIGHT = 640*2
-#IMAGE_WIDTH = 640*2
-
-#WEIGHT_PATH = 'yolov5s_1280_640.onnx'
-#MODEL_PATH = 'yolov5s_1280_640.onnx.prototxt'
-#IMAGE_HEIGHT = 640
-#IMAGE_WIDTH = 640*2
+MODEL_LISTS = ['yolov5s', 'yolov5m', 'yolov5l', 'yolov5x']
+DETECTION_SIZE_LISTS = ['640','1280']
 
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/yolov5/'
 
@@ -64,8 +53,33 @@ IOU = 0.45
 parser = get_base_parser(
     'Yolov5 model', IMAGE_PATH, SAVE_IMAGE_PATH,
 )
+parser.add_argument(
+    '-a', '--arch', metavar='ARCH',
+    default='yolov5s', choices=MODEL_LISTS,
+    help='model lists: ' + ' | '.join(MODEL_LISTS)
+)
+parser.add_argument(
+    '-dw', '--detection_width', metavar='DETECTION_WIDTH',
+    default='640', choices=DETECTION_SIZE_LISTS,
+    help='detection size lists: ' + ' | '.join(DETECTION_SIZE_LISTS)
+)
+parser.add_argument(
+    '-dh', '--detection_height', metavar='DETECTION_HEIGHT',
+    default='640', choices=DETECTION_SIZE_LISTS,
+    help='detection size lists: ' + ' | '.join(DETECTION_SIZE_LISTS)
+)
 args = update_parser(parser)
 
+if args.detection_width != "640" or args.detection_height!="640":
+    WEIGHT_PATH = args.arch+'_'+args.detection_width+'_'+args.detection_height+'.onnx'
+    MODEL_PATH = args.arch+'_'+args.detection_width+'_'+args.detection_height+'.onnx.prototxt'
+    IMAGE_HEIGHT = int(args.detection_height)
+    IMAGE_WIDTH = int(args.detection_width)
+else:
+    WEIGHT_PATH = args.arch+'.onnx'
+    MODEL_PATH = args.arch+'.onnx.prototxt'
+    IMAGE_HEIGHT = int(args.detection_height)
+    IMAGE_WIDTH = int(args.detection_width)
 
 # ======================
 # Main functions
