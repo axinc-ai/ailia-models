@@ -10,7 +10,7 @@ import ailia
 sys.path.append('../../util')
 from utils import get_base_parser, update_parser  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
-from detector_utils import plot_results, load_image  # noqa: E402
+from detector_utils import plot_results, load_image, letterbox_convert  # noqa: E402
 import webcamera_utils  # noqa: E402
 
 import yolov5_utils  # noqa: E402
@@ -90,7 +90,7 @@ def recognize_from_image():
     org_img = cv2.cvtColor(org_img, cv2.COLOR_BGRA2BGR)
     print(f'input image shape: {org_img.shape}')
 
-    org_img2, img = webcamera_utils.adjust_frame_size(org_img, IMAGE_HEIGHT, IMAGE_WIDTH)
+    img = letterbox_convert(org_img, IMAGE_HEIGHT, IMAGE_WIDTH)
 
     img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
     img = np.transpose(img, [2, 0, 1])
@@ -114,12 +114,7 @@ def recognize_from_image():
     detect_object = yolov5_utils.post_processing(img, THRESHOLD, IOU, output)
 
     # plot result
-    res_img = plot_results(detect_object[0], org_img2, COCO_CATEGORY)
-
-    # crop
-    pad_w = (org_img2.shape[1]-org_img.shape[1]) // 2
-    pad_h = (org_img2.shape[0]-org_img.shape[0]) // 2
-    res_img = res_img[pad_h:pad_h+org_img.shape[0],pad_w:pad_w+org_img.shape[1],:]
+    res_img = plot_results(detect_object[0], org_img, COCO_CATEGORY, det_shape=(IMAGE_HEIGHT,IMAGE_WIDTH))
 
     # plot result
     cv2.imwrite(args.savepath, res_img)
@@ -146,7 +141,7 @@ def recognize_from_video():
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
         
-        frame2, img = webcamera_utils.adjust_frame_size(frame, IMAGE_HEIGHT, IMAGE_WIDTH)
+        img = letterbox_convert(frame, IMAGE_HEIGHT, IMAGE_WIDTH)
 
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         img = np.transpose(img, [2, 0, 1])
@@ -157,11 +152,7 @@ def recognize_from_video():
         detect_object = yolov5_utils.post_processing(
             img, THRESHOLD, IOU, output
         )
-        res_img = plot_results(detect_object[0], frame2, COCO_CATEGORY)
-
-        pad_w = (frame2.shape[1]-frame.shape[1]) // 2
-        pad_h = (frame2.shape[0]-frame.shape[0]) // 2
-        res_img = res_img[pad_h:pad_h+frame.shape[0],pad_w:pad_w+frame.shape[1],:]
+        res_img = plot_results(detect_object[0], frame, COCO_CATEGORY, det_shape=(IMAGE_HEIGHT,IMAGE_WIDTH))
 
         cv2.imshow('frame', res_img)
 
