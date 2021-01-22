@@ -14,6 +14,11 @@ def sigmoid(x):
 
 
 def bbox_iou(box1, box2):
+    #box1 = box1.numpy()
+    #box2 = box2.numpy()
+
+    #https://qiita.com/kzkadc/items/8e39ab0559e753b74ab0
+
     b1_x1, b1_y1, b1_x2, b1_y2 = box1[:, 0], box1[:, 1], box1[:, 2], box1[:, 3]
     b2_x1, b2_y1, b2_x2, b2_y2 = box2[:, 0], box2[:, 1], box2[:, 2], box2[:, 3]
 
@@ -34,6 +39,8 @@ def bbox_iou(box1, box2):
 
 
 def non_max_suppression(prediction, num_classes, conf_thres=0.5, nms_thres=0.4):
+    prediction = torch.from_numpy(prediction)
+
     box_corner = torch.FloatTensor(prediction.shape)
     box_corner[:, :, 0] = prediction[:, :, 0] - prediction[:, :, 2] / 2
     box_corner[:, :, 1] = prediction[:, :, 1] - prediction[:, :, 3] / 2
@@ -54,9 +61,6 @@ def non_max_suppression(prediction, num_classes, conf_thres=0.5, nms_thres=0.4):
         detections = torch.cat((image_pred[:, :5], class_conf.float(), class_pred.float()), 1)
 
         unique_labels = detections[:, -1].cpu().unique()
-
-        if prediction.is_cuda:
-            unique_labels = unique_labels.cuda()
 
         for c in unique_labels:
             detections_class = detections[detections[:, -1] == c]
@@ -118,9 +122,9 @@ def post_processing(img, conf_thres, nms_thres, outputs):
                             conf.reshape(batch_size, -1, 1),
                             pred_cls.reshape(batch_size, -1, num_classes)),
                             -1)
-        boxs.append(torch.from_numpy(output))
+        boxs.append(output)
 
-    outputx = torch.cat(boxs, 1)
+    outputx = np.concatenate(boxs, 1)
 
     # NMS
     batch_detections = non_max_suppression(outputx, num_classes, conf_thres=conf_thres, nms_thres=nms_thres)
