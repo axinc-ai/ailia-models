@@ -36,9 +36,7 @@ def bbox_iou(box1, box2):
 
 
 def non_max_suppression(prediction, num_classes, conf_thres=0.5, nms_thres=0.4):
-    prediction = torch.from_numpy(prediction)
-
-    box_corner = torch.FloatTensor(prediction.shape)
+    box_corner = np.zeros(prediction.shape)
     box_corner[:, :, 0] = prediction[:, :, 0] - prediction[:, :, 2] / 2
     box_corner[:, :, 1] = prediction[:, :, 1] - prediction[:, :, 3] / 2
     box_corner[:, :, 2] = prediction[:, :, 0] + prediction[:, :, 2] / 2
@@ -48,7 +46,7 @@ def non_max_suppression(prediction, num_classes, conf_thres=0.5, nms_thres=0.4):
     output = [None for _ in range(len(prediction))]
     for image_i, image_pred in enumerate(prediction):
         conf_mask = (image_pred[:, 4] >= conf_thres).squeeze()
-        image_pred = image_pred[conf_mask].numpy()
+        image_pred = image_pred[conf_mask]
 
         if not image_pred.shape[0]:
             continue
@@ -58,9 +56,6 @@ def non_max_suppression(prediction, num_classes, conf_thres=0.5, nms_thres=0.4):
         class_pred = class_pred.reshape((class_pred.shape[0],1))
         detections = np.concatenate((image_pred[:, :5], class_conf, class_pred), 1)
         unique_labels = np.unique(detections[:, -1])
-
-        class_conf = torch.from_numpy(class_conf)
-        class_pred = torch.from_numpy(class_pred)
 
         for c in unique_labels:
             detections_class = detections[detections[:, -1] == c]
@@ -96,7 +91,6 @@ def post_processing(img, conf_thres, nms_thres, outputs):
     img_size_w = img.shape[3]
     img_size_h = img.shape[2]
 
-    print(img_size_w,img_size_h)
     batch_size = 1
     num_classes = 80
 
@@ -107,8 +101,6 @@ def post_processing(img, conf_thres, nms_thres, outputs):
     anchor_grid = a.clone().view(3, 1, -1, 1, 1, 2).numpy()
 
     for index, out in enumerate(outputs):
-        out = out#torch.from_numpy(out)
-        print(out.shape)
         batch = out.shape[1]
         feature_h = out.shape[2]
         feature_w = out.shape[3]
