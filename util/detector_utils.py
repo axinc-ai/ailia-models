@@ -27,6 +27,43 @@ def hsv_to_rgb(h, s, v):
     return (int(bgr[0]), int(bgr[1]), int(bgr[2]), 255)
 
 
+def letterbox_convert(frame, height, width):
+    """
+    Adjust the size of the frame from the webcam to the ailia input shape.
+
+    Parameters
+    ----------
+    frame: numpy array
+    height: int
+        ailia model input height
+    width: int
+        ailia model input width
+
+    Returns
+    -------
+    img: numpy array
+        Image with the propotions of height and width
+        adjusted by padding for ailia model input.
+    resized_img: numpy array
+        Resized `img` as well as adapt the scale
+    """
+    f_height, f_width = frame.shape[0], frame.shape[1]
+    scale = np.max((f_height / height, f_width / width))
+
+    # padding base
+    img = np.zeros(
+        (int(round(scale * height)), int(round(scale * width)), 3),
+        np.uint8
+    )
+    start = (np.array(img.shape) - np.array(frame.shape)) // 2
+    img[
+        start[0]: start[0] + f_height,
+        start[1]: start[1] + f_width
+    ] = frame
+    resized_img = cv2.resize(img, (width, height))
+    return resized_img
+
+
 def plot_results(detector, img, category, segm_masks=None, logging=True, det_shape = None):
     """
     :param detector: ailia.Detector, or list of ailia.DetectorObject
