@@ -72,18 +72,25 @@ def non_max_suppression(prediction, num_classes, conf_thres=0.5, nms_thres=0.4):
             conf_sort_index = conf_sort_index[::-1]
 
             detections_class = detections_class[conf_sort_index]
-            detections_class = torch.from_numpy(detections_class)
 
             max_detections = []
-            while detections_class.size(0):
-                max_detections.append(detections_class[0].unsqueeze(0))
+            while detections_class.shape[0]:
+                print(np.expand_dims(detections_class[0],0))
+                print(torch.from_numpy(detections_class[0]).unsqueeze(0))
+                
+                #max_detections.append(torch.from_numpy(detections_class[0]).unsqueeze(0))
+
+                expand_detections_class = np.expand_dims(detections_class[0],0)
+                max_detections.append(torch.from_numpy(expand_detections_class))
+                
+
                 if len(detections_class) == 1:
                     break
-                ious = bbox_iou(max_detections[-1].numpy(), detections_class[1:].numpy())
+                ious = bbox_iou(max_detections[-1].numpy(), detections_class[1:])
                 detections_class = detections_class[1:][ious < nms_thres]
-            print(max_detections)
+            #print(max_detections)
             max_detections = torch.cat(max_detections).data
-            print(max_detections)
+            #print(max_detections)
             output[image_i] = max_detections if output[image_i] is None else torch.cat(
                 (output[image_i], max_detections))
 
