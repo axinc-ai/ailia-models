@@ -57,6 +57,23 @@ def non_max_suppression(prediction, num_classes, conf_thres=0.5, nms_thres=0.4):
             continue
 
         class_conf, class_pred = torch.max(image_pred[:, 5:5 + num_classes], 1, keepdim=True)
+        print("torch")
+        print(image_pred[:, 5:5 + num_classes])
+        print(class_conf)
+        print(class_pred)
+
+        class_conf = np.max(image_pred[:, 5:5 + num_classes].numpy(), axis=1, keepdims=True)
+        class_pred = np.argmax(image_pred[:, 5:5 + num_classes].numpy(), axis=1)
+        class_pred = class_pred.reshape((class_pred.shape[0],1))
+
+        class_conf = torch.from_numpy(class_conf)
+        class_pred = torch.from_numpy(class_pred)
+
+        print(class_conf)
+        print(class_pred)
+
+        # torch.max(input, dim, keepdim=False, *, out=None) -> (Tensor, LongTensor)
+        # max and argmax
 
         detections = torch.cat((image_pred[:, :5], class_conf.float(), class_pred.float()), 1)
 
@@ -64,7 +81,19 @@ def non_max_suppression(prediction, num_classes, conf_thres=0.5, nms_thres=0.4):
 
         for c in unique_labels:
             detections_class = detections[detections[:, -1] == c]
+
             _, conf_sort_index = torch.sort(detections_class[:, 4], descending=True)
+            print(conf_sort_index)
+
+            conf_sort_value = np.sort(detections_class[:, 4].numpy())
+            conf_sort_value = conf_sort_value[::-1]
+
+            conf_sort_index = np.argsort(detections_class[:, 4].numpy())
+            conf_sort_index = conf_sort_index[::-1]
+            print(conf_sort_index)
+
+            conf_sort_index=torch.from_numpy(conf_sort_index.copy())
+
             detections_class = detections_class[conf_sort_index]
             max_detections = []
             while detections_class.size(0):
