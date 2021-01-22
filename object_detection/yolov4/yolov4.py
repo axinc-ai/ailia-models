@@ -19,8 +19,8 @@ import yolov4_utils  # noqa: E402
 # ======================
 # Parameters
 # ======================
-WEIGHT_PATH = 'yolov4.onnx'
-MODEL_PATH = 'yolov4.onnx.prototxt'
+DETECTION_SIZE_LISTS = ['416','640','1280']
+
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/yolov4/'
 
 IMAGE_PATH = 'dog.jpg'
@@ -43,9 +43,6 @@ COCO_CATEGORY = [
 ]
 THRESHOLD = 0.4
 IOU = 0.45
-DETECTION_WIDTH = 416
-IMAGE_HEIGHT = 416
-IMAGE_WIDTH = 416
 
 
 # ======================
@@ -55,12 +52,27 @@ parser = get_base_parser(
     'Yolov4 model', IMAGE_PATH, SAVE_IMAGE_PATH,
 )
 parser.add_argument(
-    '-dw', '--detection_width',
-    default=DETECTION_WIDTH,
-    help='The detection width and height for yolo. (default: 416)'
+    '-dw', '--detection_width', metavar='DETECTION_WIDTH',
+    default='416', choices=DETECTION_SIZE_LISTS,
+    help='detection size lists: ' + ' | '.join(DETECTION_SIZE_LISTS)
+)
+parser.add_argument(
+    '-dh', '--detection_height', metavar='DETECTION_HEIGHT',
+    default='416', choices=DETECTION_SIZE_LISTS,
+    help='detection size lists: ' + ' | '.join(DETECTION_SIZE_LISTS)
 )
 args = update_parser(parser)
 
+if args.detection_width != "416" or args.detection_height!="416":
+    WEIGHT_PATH = 'yolov4_'+args.detection_width+'_'+args.detection_height+'.onnx'
+    MODEL_PATH = 'yolov4_'+args.detection_width+'_'+args.detection_height+'.onnx.prototxt'
+    IMAGE_HEIGHT = int(args.detection_height)
+    IMAGE_WIDTH = int(args.detection_width)
+else:
+    WEIGHT_PATH = 'yolov4.onnx'
+    MODEL_PATH = 'yolov4.onnx.prototxt'
+    IMAGE_HEIGHT = int(args.detection_height)
+    IMAGE_WIDTH = int(args.detection_width)
 
 # ======================
 # Main functions
@@ -78,10 +90,6 @@ def recognize_from_image():
 
     # net initialize
     detector = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
-    if int(args.detection_width) != DETECTION_WIDTH:
-        detector.set_input_shape(
-            (1, 3, int(args.detection_width), int(args.detection_width))
-        )
 
     # inference
     print('Start inference...')
@@ -108,10 +116,6 @@ def recognize_from_video():
     # net initialize
     detector = None
     detector = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
-    if int(args.detection_width) != DETECTION_WIDTH:
-        detector.set_input_shape(
-            (1, 3, int(args.detection_width), int(args.detection_width))
-        )
 
     capture = webcamera_utils.get_capture(args.video)
 

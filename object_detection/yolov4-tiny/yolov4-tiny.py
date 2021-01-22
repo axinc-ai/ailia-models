@@ -19,8 +19,8 @@ from yolov4_tiny_utils import post_processing  # noqa: E402
 # ======================
 # Parameters
 # ======================
-WEIGHT_PATH = 'yolov4-tiny.onnx'
-MODEL_PATH = 'yolov4-tiny.onnx.prototxt'
+DETECTION_SIZE_LISTS = ['416','640','1280']
+
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/yolov4-tiny/'
 
 IMAGE_PATH = 'dog.jpg'
@@ -43,16 +43,34 @@ COCO_CATEGORY = [
 ]
 THRESHOLD = 0.25
 IOU = 0.45
-IMAGE_HEIGHT = 416
-IMAGE_WIDTH = 416
 
 
 # ======================
 # Arguemnt Parser Config
 # ======================
 parser = get_base_parser('Yolov4-tiny model', IMAGE_PATH, SAVE_IMAGE_PATH)
+parser.add_argument(
+    '-dw', '--detection_width', metavar='DETECTION_WIDTH',
+    default='416', choices=DETECTION_SIZE_LISTS,
+    help='detection size lists: ' + ' | '.join(DETECTION_SIZE_LISTS)
+)
+parser.add_argument(
+    '-dh', '--detection_height', metavar='DETECTION_HEIGHT',
+    default='416', choices=DETECTION_SIZE_LISTS,
+    help='detection size lists: ' + ' | '.join(DETECTION_SIZE_LISTS)
+)
 args = update_parser(parser)
 
+if args.detection_width != "416" or args.detection_height!="416":
+    WEIGHT_PATH = 'yolov4-tiny_'+args.detection_width+'_'+args.detection_height+'.onnx'
+    MODEL_PATH = 'yolov4-tiny_'+args.detection_width+'_'+args.detection_height+'.onnx.prototxt'
+    IMAGE_HEIGHT = int(args.detection_height)
+    IMAGE_WIDTH = int(args.detection_width)
+else:
+    WEIGHT_PATH = 'yolov4-tiny.onnx'
+    MODEL_PATH = 'yolov4-tiny.onnx.prototxt'
+    IMAGE_HEIGHT = int(args.detection_height)
+    IMAGE_WIDTH = int(args.detection_width)
 
 # ======================
 # Main functions
