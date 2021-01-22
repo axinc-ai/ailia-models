@@ -14,9 +14,6 @@ def sigmoid(x):
 
 
 def bbox_iou(box1, box2):
-    box1 = box1.numpy()
-    box2 = box2.numpy()
-
     b1_x1, b1_y1, b1_x2, b1_y2 = box1[:, 0], box1[:, 1], box1[:, 2], box1[:, 3]
     b2_x1, b2_y1, b2_x2, b2_y2 = box2[:, 0], box2[:, 1], box2[:, 2], box2[:, 3]
 
@@ -51,58 +48,42 @@ def non_max_suppression(prediction, num_classes, conf_thres=0.5, nms_thres=0.4):
     output = [None for _ in range(len(prediction))]
     for image_i, image_pred in enumerate(prediction):
         conf_mask = (image_pred[:, 4] >= conf_thres).squeeze()
-        image_pred = image_pred[conf_mask]
+        image_pred = image_pred[conf_mask].numpy()
 
-        if not image_pred.size(0):
+        if not image_pred.shape[0]:
             continue
 
-        class_conf, class_pred = torch.max(image_pred[:, 5:5 + num_classes], 1, keepdim=True)
-        print("torch")
-        print(image_pred[:, 5:5 + num_classes])
-        print(class_conf)
-        print(class_pred)
-
-        class_conf = np.max(image_pred[:, 5:5 + num_classes].numpy(), axis=1, keepdims=True)
-        class_pred = np.argmax(image_pred[:, 5:5 + num_classes].numpy(), axis=1)
+        class_conf = np.max(image_pred[:, 5:5 + num_classes], axis=1, keepdims=True)
+        class_pred = np.argmax(image_pred[:, 5:5 + num_classes], axis=1)
         class_pred = class_pred.reshape((class_pred.shape[0],1))
+        detections = np.concatenate((image_pred[:, :5], class_conf, class_pred), 1)
+        unique_labels = np.unique(detections[:, -1])
 
         class_conf = torch.from_numpy(class_conf)
         class_pred = torch.from_numpy(class_pred)
 
-        print(class_conf)
-        print(class_pred)
-
-        # torch.max(input, dim, keepdim=False, *, out=None) -> (Tensor, LongTensor)
-        # max and argmax
-
-        detections = torch.cat((image_pred[:, :5], class_conf.float(), class_pred.float()), 1)
-
-        unique_labels = detections[:, -1].cpu().unique()
-
         for c in unique_labels:
             detections_class = detections[detections[:, -1] == c]
 
-            _, conf_sort_index = torch.sort(detections_class[:, 4], descending=True)
-            print(conf_sort_index)
-
-            conf_sort_value = np.sort(detections_class[:, 4].numpy())
+            conf_sort_value = np.sort(detections_class[:, 4])
             conf_sort_value = conf_sort_value[::-1]
 
-            conf_sort_index = np.argsort(detections_class[:, 4].numpy())
+            conf_sort_index = np.argsort(detections_class[:, 4])
             conf_sort_index = conf_sort_index[::-1]
-            print(conf_sort_index)
-
-            conf_sort_index=torch.from_numpy(conf_sort_index.copy())
 
             detections_class = detections_class[conf_sort_index]
+            detections_class = torch.from_numpy(detections_class)
+
             max_detections = []
             while detections_class.size(0):
                 max_detections.append(detections_class[0].unsqueeze(0))
                 if len(detections_class) == 1:
                     break
-                ious = bbox_iou(max_detections[-1], detections_class[1:])
+                ious = bbox_iou(max_detections[-1].numpy(), detections_class[1:].numpy())
                 detections_class = detections_class[1:][ious < nms_thres]
+            print(max_detections)
             max_detections = torch.cat(max_detections).data
+            print(max_detections)
             output[image_i] = max_detections if output[image_i] is None else torch.cat(
                 (output[image_i], max_detections))
 
