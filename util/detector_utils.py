@@ -2,6 +2,7 @@ import os
 import sys
 import numpy as np
 import cv2
+import ailia
 
 
 def preprocessing_img(img):
@@ -27,26 +28,22 @@ def hsv_to_rgb(h, s, v):
     return (int(bgr[0]), int(bgr[1]), int(bgr[2]), 255)
 
 
-def letterbox_convert(frame, height, width):
+def letterbox_convert(frame, det_shape):
     """
     Adjust the size of the frame from the webcam to the ailia input shape.
 
     Parameters
     ----------
     frame: numpy array
-    height: int
-        ailia model input height
-    width: int
-        ailia model input width
+    det_shape: tuple
+        ailia model input (height,width)
 
     Returns
     -------
-    img: numpy array
-        Image with the propotions of height and width
-        adjusted by padding for ailia model input.
     resized_img: numpy array
         Resized `img` as well as adapt the scale
     """
+    height, width = det_shape[0], det_shape[1]
     f_height, f_width = frame.shape[0], frame.shape[1]
     scale = np.max((f_height / height, f_width / width))
 
@@ -64,7 +61,33 @@ def letterbox_convert(frame, height, width):
     return resized_img
 
 
-def plot_results(detector, img, category, segm_masks=None, logging=True, det_shape = None):
+def reverse_letterbox(detections, img, det_shape):
+    h, w = img.shape[0], img.shape[1]
+
+    pad_x = pad_y = 0
+    if det_shape != None:
+        scale = np.max((h / det_shape[0], w / det_shape[1]))
+        start = (det_shape[0:2] - np.array(img.shape[0:2]) / scale) // 2
+        pad_x = start[1]*scale
+        pad_y = start[0]*scale
+    
+    new_detections = []
+    for detection in detections:
+        print(detection)
+        r = ailia.DetectorObject(
+            category=detection.category,
+            prob=detection.prob,
+            x=(detection.x*(w+pad_x*2) - pad_x)/w,
+            y=(detection.y*(h+pad_y*2) - pad_y)/h,
+            w=(detection.w*(w+pad_x*2))/w,
+            h=(detection.h*(h+pad_y*2))/h,
+        )
+        new_detections.append(r)
+    
+    return new_detections
+
+
+def plot_results(detector, img, category, segm_masks=None, logging=True):
     """
     :param detector: ailia.Detector, or list of ailia.DetectorObject
     :param img: ndarray data of image
@@ -74,13 +97,6 @@ def plot_results(detector, img, category, segm_masks=None, logging=True, det_sha
     :return:
     """
     h, w = img.shape[0], img.shape[1]
-
-    pad_x = pad_y = 0
-    if det_shape != None:
-        scale = np.max((h / det_shape[0], w / det_shape[1]))
-        start = (det_shape[0:2] - np.array(img.shape[0:2]) / scale) // 2
-        pad_x = start[1]*scale
-        pad_y = start[0]*scale
 
     count = detector.get_object_count() if hasattr(detector, 'get_object_count') else len(detector)
     if logging:
@@ -117,8 +133,8 @@ def plot_results(detector, img, category, segm_masks=None, logging=True, det_sha
     # draw bounding box
     for idx in range(count):
         obj = detector.get_object(idx) if hasattr(detector, 'get_object') else detector[idx]
-        top_left = (int((w + pad_x*2) * obj.x - pad_x), int((h + pad_y*2) * obj.y - pad_y))
-        bottom_right = (int((w + pad_x*2) * (obj.x + obj.w) - pad_x), int((h + pad_y*2) * (obj.y + obj.h) - pad_y))
+        top_left = (int(w * obj.x), int(h * obj.y))
+        bottom_right = (int(w * (obj.x + obj.w)), int(h * (obj.y + obj.h)))
 
         color = colors[idx]
         cv2.rectangle(img, top_left, bottom_right, color, 4)
@@ -126,7 +142,7 @@ def plot_results(detector, img, category, segm_masks=None, logging=True, det_sha
     # draw label
     for idx in range(count):
         obj = detector.get_object(idx) if hasattr(detector, 'get_object') else detector[idx]
-        text_position = (int((w + pad_x*2) * obj.x - pad_x) + 4, int((h + pad_y*2) * (obj.y + obj.h) - pad_y - 8))
+        text_position = (int(w * obj.x) + 4, int(h * (obj.y + obj.h) - 8))
         fontScale = w / 512.0
 
         color = colors[idx]

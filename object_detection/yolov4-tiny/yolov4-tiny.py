@@ -10,7 +10,7 @@ import ailia
 sys.path.append('../../util')
 from utils import get_base_parser, update_parser  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
-from detector_utils import plot_results, load_image, letterbox_convert  # noqa: E402
+from detector_utils import plot_results, load_image, letterbox_convert, reverse_letterbox  # noqa: E402
 import webcamera_utils  # noqa: E402
 
 from yolov4_tiny_utils import post_processing  # noqa: E402
@@ -61,17 +61,17 @@ parser.add_argument(
 )
 parser.add_argument(
     '-dw', '--detection_width', metavar='DETECTION_WIDTH',
-    default=416, choices=DETECTION_SIZE_LISTS, type=int,
+    default=DETECTION_SIZE_LISTS[0], choices=DETECTION_SIZE_LISTS, type=int,
     help='detection size lists: ' + ' | '.join(map(str,DETECTION_SIZE_LISTS))
 )
 parser.add_argument(
     '-dh', '--detection_height', metavar='DETECTION_HEIGHT',
-    default=416, choices=DETECTION_SIZE_LISTS, type=int,
+    default=DETECTION_SIZE_LISTS[0], choices=DETECTION_SIZE_LISTS, type=int,
     help='detection size lists: ' + ' | '.join(map(str,DETECTION_SIZE_LISTS))
 )
 args = update_parser(parser)
 
-if args.detection_width != 416 or args.detection_height!=416:
+if args.detection_width != DETECTION_SIZE_LISTS[0] or args.detection_height!=DETECTION_SIZE_LISTS[0]:
     WEIGHT_PATH = 'yolov4-tiny_'+str(args.detection_width)+'_'+str(args.detection_height)+'.onnx'
     MODEL_PATH = 'yolov4-tiny_'+str(args.detection_width)+'_'+str(args.detection_height)+'.onnx.prototxt'
     IMAGE_HEIGHT = args.detection_height
@@ -91,7 +91,7 @@ def recognize_from_image(detector):
     print(f'input image shape: {org_img.shape}')
 
     org_img = cv2.cvtColor(org_img, cv2.COLOR_BGRA2BGR)
-    img = letterbox_convert(org_img, IMAGE_HEIGHT, IMAGE_WIDTH)
+    img = letterbox_convert(org_img, (IMAGE_HEIGHT, IMAGE_WIDTH))
 
     img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
     img = np.transpose(img, [2, 0, 1])
@@ -110,9 +110,10 @@ def recognize_from_image(detector):
     else:
         output = detector.predict([img])
     detect_object = post_processing(img, args.threshold, args.iou, output)
+    detect_object = reverse_letterbox(detect_object[0], org_img, (IMAGE_HEIGHT,IMAGE_WIDTH))
 
     # plot result
-    res_img = plot_results(detect_object[0], org_img, COCO_CATEGORY, det_shape=(IMAGE_HEIGHT,IMAGE_WIDTH))
+    res_img = plot_results(detect_object, org_img, COCO_CATEGORY)
 
     # plot result
     cv2.imwrite(args.savepath, res_img)
@@ -135,7 +136,7 @@ def recognize_from_video(detector):
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
 
-        img = letterbox_convert(frame, IMAGE_HEIGHT, IMAGE_WIDTH)
+        img = letterbox_convert(frame, (IMAGE_HEIGHT, IMAGE_WIDTH))
 
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         img = np.transpose(img, [2, 0, 1])
@@ -146,7 +147,8 @@ def recognize_from_video(detector):
         detect_object = post_processing(
             img, args.threshold, args.iou, output
         )
-        res_img = plot_results(detect_object[0], frame, COCO_CATEGORY, det_shape=(IMAGE_HEIGHT,IMAGE_WIDTH))
+        detect_object = reverse_letterbox(detect_object[0], frame, (IMAGE_HEIGHT,IMAGE_WIDTH))
+        res_img = plot_results(detect_object, frame, COCO_CATEGORY)
 
         cv2.imshow('frame', res_img)
         # save results
