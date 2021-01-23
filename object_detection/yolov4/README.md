@@ -49,7 +49,7 @@ $ python3 yolov4.py --video VIDEO_PATH
 
 ## Framework
 
-ONNX Runtime
+Pytorch
 
 ## Model Format
 
