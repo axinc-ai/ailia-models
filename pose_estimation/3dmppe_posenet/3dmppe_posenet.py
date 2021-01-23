@@ -7,9 +7,6 @@ import numpy as np
 import math
 import cv2
 from PIL import Image
-import torch
-import torchvision.transforms as transforms
-from torchvision.ops import nms
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
@@ -171,13 +168,6 @@ def maskrcnn_to_image(image, net_maskrcnn, benchmark=False, det_thresh=0.5, iou_
     boxes /= ratio
 
     return boxes
-
-
-def to_numpy(tensor):
-    if (tensor.requires_grad is True):
-        return tensor.detach().cpu().numpy() 
-    else:
-        return tensor.cpu().numpy()
 
 
 class Config:
@@ -409,6 +399,19 @@ def trans_point2d(pt_2d, trans):
     return dst_pt[0:2]
 
 
+def transform(img):
+    # transform = transforms.Compose([transforms.ToTensor(), 
+    #                                 transforms.Normalize(mean=cfg.pixel_mean, 
+    #                                                      std=cfg.pixel_std)])
+    img = np.array(img).astype(np.float32)
+    img = img.transpose(2, 0, 1)
+    for rgb_i in range(3):
+        img[rgb_i, :, :] = img[rgb_i, :, :] - cfg.pixel_mean[rgb_i]
+    for rgb_i in range(3):
+        img[rgb_i, :, :] = img[rgb_i, :, :] / cfg.pixel_std[rgb_i]
+    return img
+
+
 def posenet_to_image(original_img, bbox_list, net_root, net_pose=None, sess_pose=None, benchmark=False):
     # refer from [https://github.com/mks0601/3DMPPE_ROOTNET_RELEASE/blob/master/demo/demo.py]
     # refer from [https://github.com/mks0601/3DMPPE_POSENET_RELEASE/blob/master/demo/demo.py]
@@ -419,7 +422,6 @@ def posenet_to_image(original_img, bbox_list, net_root, net_pose=None, sess_pose
     skeleton = ( (0, 16), (16, 1), (1, 15), (15, 14), (14, 8), (14, 11), (8, 9), (9, 10), (10, 19), (11, 12), (12, 13), (13, 20), (1, 2), (2, 3), (3, 4), (4, 17), (1, 5), (5, 6), (6, 7), (7, 18) )
 
     # prepare input image
-    transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize(mean=cfg.pixel_mean, std=cfg.pixel_std)])
     original_img_height, original_img_width = original_img.shape[:2]
 
     # prepare bbox
@@ -437,20 +439,19 @@ def posenet_to_image(original_img, bbox_list, net_root, net_pose=None, sess_pose
         img, img2bb_trans = generate_patch_image(original_img, bbox, False, 1.0, 0.0, False) 
         img = transform(img)[None,:,:,:]
         k_value = np.array([math.sqrt(cfg.bbox_real[0]*cfg.bbox_real[1]*focal[0]*focal[1]/(bbox[2]*bbox[3]))]).astype(np.float32)
-        k_value = torch.FloatTensor([k_value])[None,:]
+        k_value = k_value[None,:]
 
         # inference
         if args.benchmark:
             print('BENCHMARK mode')
             for i in range(5):
                 start = int(round(time.time() * 1000))
-                root_3d = net_root.predict([to_numpy(img), to_numpy(k_value)])[0]
+                root_3d = net_root.predict([img, k_value])[0]
                 end = int(round(time.time() * 1000))
                 print(f'\tailia processing time {end - start} ms')
         else:
-            root_3d = net_root.predict([to_numpy(img), to_numpy(k_value)])[0]
+            root_3d = net_root.predict([img, k_value])[0]
         root_3d = root_3d[0]
-        # print('root_3d =\n', root_3d)
 
         # inference
         if (net_pose is not None):
@@ -459,14 +460,14 @@ def posenet_to_image(original_img, bbox_list, net_root, net_pose=None, sess_pose
                 print('BENCHMARK mode')
                 for i in range(5):
                     start = int(round(time.time() * 1000))
-                    pose_3d = net_pose.predict([to_numpy(img)])[0]
+                    pose_3d = net_pose.predict([img])[0]
                     end = int(round(time.time() * 1000))
                     print(f'\tailia processing time {end - start} ms')
             else:
-                pose_3d = net_pose.predict([to_numpy(img)])[0]
+                pose_3d = net_pose.predict([img])[0]
         else:
             # onnxruntime
-            onnx_input = {sess_pose.get_inputs()[0].name: to_numpy(img)}
+            onnx_input = {sess_pose.get_inputs()[0].name: img}
             onnx_out = sess_pose.run(None, onnx_input)
             pose_3d = np.array(onnx_out[0])
 
