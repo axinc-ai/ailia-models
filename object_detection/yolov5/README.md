@@ -35,13 +35,23 @@ If you pass `0` as an argument to VIDEO_PATH, you can use the webcam input inste
 $ python3 yolov5.py --video VIDEO_PATH
 ```
 
+You can use `--arch` option to change the model architecture.
+```bash
+$ python3 yolov5.py --arch yolov5m
+```
+
+You can use `--detection_width` and `--detection_height` options to change the detection resolution
+```bash
+$ python3 yolov5.py --detection_width 1280 --detection_height 640
+```
+
 ## Reference
 
 - [yolov5](https://github.com/ultralytics/yolov5)
 
 ## Framework
 
-ONNX Runtime
+Pytorch
 
 ## Model Format
 
@@ -50,6 +60,9 @@ ONNX opset=11
 ## Netron
 
 [yolov5s.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/yolov5/yolov5s.onnx.prototxt)
+
 [yolov5m.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/yolov5/yolov5m.onnx.prototxt)
+
 [yolov5l.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/yolov5/yolov5l.onnx.prototxt)
+
 [yolov5x.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/yolov5/yolov5x.onnx.prototxt)
