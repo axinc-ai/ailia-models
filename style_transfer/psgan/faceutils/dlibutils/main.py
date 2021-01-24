@@ -6,7 +6,7 @@ import dlib
 from concern.image import resize_by_max
 
 detector = dlib.get_frontal_face_detector()
-predictor = dlib.shape_predictor(osp.split(osp.realpath(__file__))[0] + '/lms.dat')
+predictor = dlib.shape_predictor(osp.split(osp.realpath(__file__))[0] + '/shape_predictor_68_face_landmarks.dat')
 
 
 def detect(image: Image) -> 'faces':
