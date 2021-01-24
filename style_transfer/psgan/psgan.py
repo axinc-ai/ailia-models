@@ -24,8 +24,12 @@ WEIGHT_PATH = "psgan.onnx"
 MODEL_PATH = "psgan.onnx.prototxt"
 FACE_PARSER_WEIGHT_PATH = "face_parser.onnx"
 FACE_PARSER_MODEL_PATH = "face_parser.onnx.prototxt"
+FACE_ALIGNMENT_WEIGHT_PATH = "../../face_recognition/face_alignment/2DFAN-4.onnx"
+FACE_ALIGNMENT_MODEL_PATH = "../../face_recognition/face_alignment/2DFAN-4.onnx.prototxt"
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/psgan/"
+FACE_ALIGNMENT_REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/face_alignment/'
 face_parser_path = [FACE_PARSER_MODEL_PATH, FACE_PARSER_WEIGHT_PATH]
+face_alignment_path = [FACE_ALIGNMENT_MODEL_PATH, FACE_ALIGNMENT_WEIGHT_PATH]
 
 SOURCE_IMAGE_PATH = "images/non-makeup/xfsy_0106.png"
 REFERENCE_IMAGE_PATH = "images/makeup"
@@ -88,6 +92,9 @@ parser.add_argument(
 )
 parser.add_argument(
     "--onnx", action="store_true", help="Execute Onnx Runtime mode.",
+)
+parser.add_argument(
+    "--use_dlib", action="store_true", help="Use dlib models for inference.",
 )
 
 args = parser.parse_args()
@@ -180,7 +187,7 @@ def _postprocessing(out, source, crop_face, postprocess):
 def transfer_to_image():
     # Prepare input data
     device = args.device
-    preprocess = PreProcess(config, device, args, face_parser_path)
+    preprocess = PreProcess(config, device, args, face_parser_path, face_alignment_path)
     source, real_A, mask_A, diff_A, crop_face = _prepare_data(
         args, device, preprocess, "source"
     )
@@ -213,7 +220,7 @@ def transfer_to_video():
     net = _initialize_net(args)
 
     device = args.device
-    preprocess = PreProcess(config, device, args, face_parser_path)
+    preprocess = PreProcess(config, device, args, face_parser_path, face_alignment_path)
     _, real_B, mask_B, diff_B, _ = _prepare_data(args, device, preprocess, "reference")
     postprocess = PostProcess(config)
 
@@ -255,6 +262,10 @@ def main():
     check_and_download_models(
         FACE_PARSER_WEIGHT_PATH, FACE_PARSER_MODEL_PATH, REMOTE_PATH,
     )
+    if not args.use_dlib:
+        check_and_download_models(
+            FACE_ALIGNMENT_WEIGHT_PATH, FACE_ALIGNMENT_MODEL_PATH, FACE_ALIGNMENT_REMOTE_PATH,
+        )
 
     if args.video is not None:
         # Video mode
