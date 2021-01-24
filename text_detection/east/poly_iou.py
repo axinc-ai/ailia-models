@@ -2,6 +2,10 @@ import math
 
 import numpy as np
 
+__all__ = [
+    'poly_iou'
+]
+
 
 def crossing_number(point, polys):
     cn = 0
@@ -155,6 +159,14 @@ def area(points):
     return abs(s) * 0.5
 
 
+def isin(ary, p):
+    for x in ary:
+        if all(p == x):
+            return True
+
+    return False
+
+
 def poly_iou(g, p):
     points = []
 
@@ -174,6 +186,9 @@ def poly_iou(g, p):
         if on_edge(x, p):
             points.append(x)
     for x in p:
+        # Do not select the same vertex
+        if isin(points, x):
+            continue
         if on_edge(x, g):
             points.append(x)
 
