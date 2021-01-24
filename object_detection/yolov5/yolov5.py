@@ -13,17 +13,19 @@ from model_utils import check_and_download_models  # noqa: E402
 from detector_utils import plot_results, load_image, letterbox_convert, reverse_letterbox  # noqa: E402
 import webcamera_utils  # noqa: E402
 
-from yolov4_tiny_utils import post_processing  # noqa: E402
+import yolov5_utils  # noqa: E402
 
 
 # ======================
 # Parameters
 # ======================
-DETECTION_SIZE_LISTS = [416, 640, 1280]
 
-REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/yolov4-tiny/'
+MODEL_LISTS = ['yolov5s', 'yolov5m', 'yolov5l', 'yolov5x']
+DETECTION_SIZE_LISTS = [640, 1280]
 
-IMAGE_PATH = 'dog.jpg'
+REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/yolov5/'
+
+IMAGE_PATH = 'bus.jpg'
 SAVE_IMAGE_PATH = 'output.png'
 
 COCO_CATEGORY = [
@@ -48,7 +50,14 @@ IOU = 0.45
 # ======================
 # Arguemnt Parser Config
 # ======================
-parser = get_base_parser('Yolov4-tiny model', IMAGE_PATH, SAVE_IMAGE_PATH)
+parser = get_base_parser(
+    'Yolov5 model', IMAGE_PATH, SAVE_IMAGE_PATH,
+)
+parser.add_argument(
+    '-a', '--arch', metavar='ARCH',
+    default='yolov5s', choices=MODEL_LISTS,
+    help='model lists: ' + ' | '.join(MODEL_LISTS)
+)
 parser.add_argument(
     '-th', '--threshold',
     default=THRESHOLD, type=float,
@@ -71,32 +80,35 @@ parser.add_argument(
 )
 args = update_parser(parser)
 
-if args.detection_width != DETECTION_SIZE_LISTS[0] or args.detection_height!=DETECTION_SIZE_LISTS[0]:
-    WEIGHT_PATH = 'yolov4-tiny_'+str(args.detection_width)+'_'+str(args.detection_height)+'.onnx'
-    MODEL_PATH = 'yolov4-tiny_'+str(args.detection_width)+'_'+str(args.detection_height)+'.onnx.prototxt'
+if args.detection_width != DETECTION_SIZE_LISTS[0] or args.detection_height != DETECTION_SIZE_LISTS[0]:
+    WEIGHT_PATH = args.arch+'_'+str(args.detection_width)+'_'+str(args.detection_height)+'.onnx'
+    MODEL_PATH = args.arch+'_'+str(args.detection_width)+'_'+str(args.detection_height)+'.onnx.prototxt'
     IMAGE_HEIGHT = args.detection_height
     IMAGE_WIDTH = args.detection_width
 else:
-    WEIGHT_PATH = 'yolov4-tiny.onnx'
-    MODEL_PATH = 'yolov4-tiny.onnx.prototxt'
+    WEIGHT_PATH = args.arch+'.onnx'
+    MODEL_PATH = args.arch+'.onnx.prototxt'
     IMAGE_HEIGHT = args.detection_height
     IMAGE_WIDTH = args.detection_width
 
 # ======================
 # Main functions
 # ======================
-def recognize_from_image(detector):
+def recognize_from_image():
     # prepare input data
     org_img = load_image(args.input)
+    org_img = cv2.cvtColor(org_img, cv2.COLOR_BGRA2BGR)
     print(f'input image shape: {org_img.shape}')
 
-    org_img = cv2.cvtColor(org_img, cv2.COLOR_BGRA2BGR)
     img = letterbox_convert(org_img, (IMAGE_HEIGHT, IMAGE_WIDTH))
 
     img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
     img = np.transpose(img, [2, 0, 1])
     img = img.astype(np.float32) / 255
     img = np.expand_dims(img, 0)
+
+    # net initialize
+    detector = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
 
     # inference
     print('Start inference...')
@@ -109,7 +121,7 @@ def recognize_from_image(detector):
             print(f'\tailia processing time {end - start} ms')
     else:
         output = detector.predict([img])
-    detect_object = post_processing(img, args.threshold, args.iou, output)
+    detect_object = yolov5_utils.post_processing(img, args.threshold, args.iou, output)
     detect_object = reverse_letterbox(detect_object[0], org_img, (IMAGE_HEIGHT,IMAGE_WIDTH))
 
     # plot result
@@ -120,7 +132,11 @@ def recognize_from_image(detector):
     print('Script finished successfully.')
 
 
-def recognize_from_video(detector):
+def recognize_from_video():
+    # net initialize
+    detector = None
+    detector = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
+
     capture = webcamera_utils.get_capture(args.video)
 
     # create video writer if savepath is specified as video format
@@ -135,7 +151,7 @@ def recognize_from_video(detector):
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
-
+        
         img = letterbox_convert(frame, (IMAGE_HEIGHT, IMAGE_WIDTH))
 
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
@@ -144,13 +160,15 @@ def recognize_from_video(detector):
         img = np.expand_dims(img, 0)
 
         output = detector.predict([img])
-        detect_object = post_processing(
+        detect_object = yolov5_utils.post_processing(
             img, args.threshold, args.iou, output
         )
         detect_object = reverse_letterbox(detect_object[0], frame, (IMAGE_HEIGHT,IMAGE_WIDTH))
+
         res_img = plot_results(detect_object, frame, COCO_CATEGORY)
 
         cv2.imshow('frame', res_img)
+
         # save results
         if writer is not None:
             writer.write(res_img)
@@ -166,16 +184,12 @@ def main():
     # model files check and download
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
 
-    # net initialize
-    detector = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
-    detector.set_input_shape((1, 3, IMAGE_HEIGHT, IMAGE_WIDTH))
-
     if args.video is not None:
         # video mode
-        recognize_from_video(detector)
+        recognize_from_video()
     else:
         # image mode
-        recognize_from_image(detector)
+        recognize_from_image()
 
 
 if __name__ == '__main__':

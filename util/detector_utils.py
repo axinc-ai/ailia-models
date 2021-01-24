@@ -2,6 +2,7 @@ import os
 import sys
 import numpy as np
 import cv2
+import ailia
 
 
 def preprocessing_img(img):
@@ -27,6 +28,65 @@ def hsv_to_rgb(h, s, v):
     return (int(bgr[0]), int(bgr[1]), int(bgr[2]), 255)
 
 
+def letterbox_convert(frame, det_shape):
+    """
+    Adjust the size of the frame from the webcam to the ailia input shape.
+
+    Parameters
+    ----------
+    frame: numpy array
+    det_shape: tuple
+        ailia model input (height,width)
+
+    Returns
+    -------
+    resized_img: numpy array
+        Resized `img` as well as adapt the scale
+    """
+    height, width = det_shape[0], det_shape[1]
+    f_height, f_width = frame.shape[0], frame.shape[1]
+    scale = np.max((f_height / height, f_width / width))
+
+    # padding base
+    img = np.zeros(
+        (int(round(scale * height)), int(round(scale * width)), 3),
+        np.uint8
+    )
+    start = (np.array(img.shape) - np.array(frame.shape)) // 2
+    img[
+        start[0]: start[0] + f_height,
+        start[1]: start[1] + f_width
+    ] = frame
+    resized_img = cv2.resize(img, (width, height))
+    return resized_img
+
+
+def reverse_letterbox(detections, img, det_shape):
+    h, w = img.shape[0], img.shape[1]
+
+    pad_x = pad_y = 0
+    if det_shape != None:
+        scale = np.max((h / det_shape[0], w / det_shape[1]))
+        start = (det_shape[0:2] - np.array(img.shape[0:2]) / scale) // 2
+        pad_x = start[1]*scale
+        pad_y = start[0]*scale
+    
+    new_detections = []
+    for detection in detections:
+        print(detection)
+        r = ailia.DetectorObject(
+            category=detection.category,
+            prob=detection.prob,
+            x=(detection.x*(w+pad_x*2) - pad_x)/w,
+            y=(detection.y*(h+pad_y*2) - pad_y)/h,
+            w=(detection.w*(w+pad_x*2))/w,
+            h=(detection.h*(h+pad_y*2))/h,
+        )
+        new_detections.append(r)
+    
+    return new_detections
+
+
 def plot_results(detector, img, category, segm_masks=None, logging=True):
     """
     :param detector: ailia.Detector, or list of ailia.DetectorObject
@@ -37,6 +97,7 @@ def plot_results(detector, img, category, segm_masks=None, logging=True):
     :return:
     """
     h, w = img.shape[0], img.shape[1]
+
     count = detector.get_object_count() if hasattr(detector, 'get_object_count') else len(detector)
     if logging:
         print(f'object_count={count}')

@@ -6,7 +6,7 @@ import cv2
 import numpy as np
 
 import ailia
-import facemesh_utils as fut
+import mediapipe_iris_utils as iut
 
 sys.path.append('../../util')
 from utils import get_base_parser, update_parser  # noqa: E402
@@ -28,7 +28,7 @@ IMAGE_WIDTH = 128
 # Argument Parser Config
 # ======================
 parser = get_base_parser(
-    'Face Mesh, an on-device real-time face recognition.', IMAGE_PATH, SAVE_IMAGE_PATH,
+    'MediaPipe Iris, real-time iris estimation.', IMAGE_PATH, SAVE_IMAGE_PATH,
 )
 parser.add_argument(
     '-n', '--normal',
@@ -44,18 +44,24 @@ args = update_parser(parser)
 # ======================
 DETECTION_MODEL_NAME = 'blazeface'
 LANDMARK_MODEL_NAME = 'facemesh'
+LANDMARK2_MODEL_NAME = 'iris'
 if args.normal:
     DETECTION_WEIGHT_PATH = f'{DETECTION_MODEL_NAME}.onnx'
     DETECTION_MODEL_PATH = f'{DETECTION_MODEL_NAME}.onnx.prototxt'
     LANDMARK_WEIGHT_PATH = f'{LANDMARK_MODEL_NAME}.onnx'
     LANDMARK_MODEL_PATH = f'{LANDMARK_MODEL_NAME}.onnx.prototxt'
+    LANDMARK2_WEIGHT_PATH = f'{LANDMARK2_MODEL_NAME}.onnx'
+    LANDMARK2_MODEL_PATH = f'{LANDMARK2_MODEL_NAME}.onnx.prototxt'
 else:
     DETECTION_WEIGHT_PATH = f'{DETECTION_MODEL_NAME}.opt.onnx'
     DETECTION_MODEL_PATH = f'{DETECTION_MODEL_NAME}.opt.onnx.prototxt'
     LANDMARK_WEIGHT_PATH = f'{LANDMARK_MODEL_NAME}.opt.onnx'
     LANDMARK_MODEL_PATH = f'{LANDMARK_MODEL_NAME}.opt.onnx.prototxt'
+    LANDMARK2_WEIGHT_PATH = f'{LANDMARK2_MODEL_NAME}.opt.onnx'
+    LANDMARK2_MODEL_PATH = f'{LANDMARK2_MODEL_NAME}.opt.onnx.prototxt'
 DETECTION_REMOTE_PATH = f'https://storage.googleapis.com/ailia-models/{DETECTION_MODEL_NAME}/'
 LANDMARK_REMOTE_PATH = f'https://storage.googleapis.com/ailia-models/{LANDMARK_MODEL_NAME}/'
+LANDMARK2_REMOTE_PATH = f'https://storage.googleapis.com/ailia-models/mediapipe_{LANDMARK2_MODEL_NAME}/'
 
 
 # ======================
@@ -77,13 +83,30 @@ def draw_landmarks(img, points, color=(0, 0, 255), size=2):
         cv2.circle(img, (x, y), size, color, thickness=cv2.FILLED)
 
 
+def draw_eye_iris(img, eyes, iris, eye_color=(0, 0, 255), iris_color=(255, 0, 0),
+                  iris_pt_color=(0, 255, 0), size=1):
+    """
+    docstring
+    """
+    EYE_CONTOUR_ORDERED = [0, 1, 2, 3, 4, 5, 6, 7, 8, 15, 14, 13, 12, 11, 10, 9]
+
+    for i in range(2):
+        pts = eyes[i, EYE_CONTOUR_ORDERED, :2].round().astype(np.int32)
+        pts = pts.reshape((-1, 1, 2))
+        cv2.polylines(img, [pts], True, eye_color, thickness=size)
+
+        center = tuple(iris[i, 0])
+        radius = int(np.linalg.norm(iris[i, 1] - iris[i, 0]).round())
+        cv2.circle(img, center, radius, iris_color, thickness=size)
+        draw_landmarks(img, iris[i], color=iris_pt_color, size=size)
+
 # ======================
 # Main functions
 # ======================
 def recognize_from_image():
     # prepare input data
     src_img = cv2.imread(args.input)
-    _, img128, scale, pad = fut.resize_pad(src_img[:,:,::-1])
+    _, img128, scale, pad = iut.resize_pad(src_img[:,:,::-1])
     input_data = img128.astype('float32') / 127.5 - 1.0
     input_data = np.expand_dims(np.moveaxis(input_data, -1, 0), 0)
 
@@ -92,6 +115,7 @@ def recognize_from_image():
     print(f'env_id: {env_id}')
     detector = ailia.Net(DETECTION_MODEL_PATH, DETECTION_WEIGHT_PATH, env_id=env_id)
     estimator = ailia.Net(LANDMARK_MODEL_PATH, LANDMARK_WEIGHT_PATH, env_id=env_id)
+    estimator2 = ailia.Net(LANDMARK2_MODEL_PATH, LANDMARK2_WEIGHT_PATH, env_id=env_id)
 
     # inference
     print('Start inference...')
@@ -101,43 +125,43 @@ def recognize_from_image():
             start = int(round(time.time() * 1000))
             # Face detection
             preds = detector.predict([input_data])
-            detections = fut.detector_postprocess(preds)
+            detections = iut.detector_postprocess(preds)
 
             # Face landmark estimation
             if detections[0].size != 0:
-                imgs, affines, box = fut.estimator_preprocess(src_img[:,:,::-1], detections, scale, pad)
-                draw_roi(src_img, box)
+                imgs, affines, box = iut.estimator_preprocess(src_img[:,:,::-1], detections, scale, pad)
                 estimator.set_input_shape(imgs.shape)
                 landmarks, confidences = estimator.predict([imgs])
-                normalized_landmarks = landmarks / 192.0
 
-                # postprocessing
-                landmarks = fut.denormalize_landmarks(normalized_landmarks, affines)
-                for i in range(len(landmarks)):
-                    landmark, confidence = landmarks[i], confidences[i]
-                    # if confidence > 0: # Can be > 1, no idea what it represents
-                    draw_landmarks(src_img, landmark[:,:2], size=1)
+                # Iris landmark estimation
+                imgs2, origins = iut.iris_preprocess(imgs, landmarks)
+                estimator2.set_input_shape(imgs2.shape)
+                eyes, iris = estimator2.predict([imgs2])
+
+                eyes, iris = iut.iris_postprocess(eyes, iris, origins, affines)
+                for i in range(len(eyes)):
+                    draw_eye_iris(src_img, eyes[i, :, :16, :2], iris[i, :, :, :2], size=1)
             end = int(round(time.time() * 1000))
             print(f'\tailia processing time {end - start} ms')
     else:
         # Face detection
         preds = detector.predict([input_data])
-        detections = fut.detector_postprocess(preds)
+        detections = iut.detector_postprocess(preds)
 
         # Face landmark estimation
         if detections[0].size != 0:
-            imgs, affines, box = fut.estimator_preprocess(src_img[:,:,::-1], detections, scale, pad)
-            draw_roi(src_img, box)
+            imgs, affines, box = iut.estimator_preprocess(src_img[:,:,::-1], detections, scale, pad)
             estimator.set_input_shape(imgs.shape)
             landmarks, confidences = estimator.predict([imgs])
-            normalized_landmarks = landmarks / 192.0
 
-            # postprocessing
-            landmarks = fut.denormalize_landmarks(normalized_landmarks, affines)
-            for i in range(len(landmarks)):
-                landmark, confidence = landmarks[i], confidences[i]
-                # if confidence > 0: # Can be > 1, no idea what it represents
-                draw_landmarks(src_img, landmark[:,:2], size=1)
+            # Iris landmark estimation
+            imgs2, origins = iut.iris_preprocess(imgs, landmarks)
+            estimator2.set_input_shape(imgs2.shape)
+            eyes, iris = estimator2.predict([imgs2])
+
+            eyes, iris = iut.iris_postprocess(eyes, iris, origins, affines)
+            for i in range(len(eyes)):
+                draw_eye_iris(src_img, eyes[i, :, :16, :2], iris[i, :, :, :2], size=1)
 
     cv2.imwrite(args.savepath, src_img)
     print('Script finished successfully.')
@@ -149,6 +173,7 @@ def recognize_from_video():
     print(f'env_id: {env_id}')
     detector = ailia.Net(DETECTION_MODEL_PATH, DETECTION_WEIGHT_PATH, env_id=env_id)
     estimator = ailia.Net(LANDMARK_MODEL_PATH, LANDMARK_WEIGHT_PATH, env_id=env_id)
+    estimator2 = ailia.Net(LANDMARK2_MODEL_PATH, LANDMARK2_WEIGHT_PATH, env_id=env_id)
 
     capture = get_capture(args.video)
 
@@ -170,39 +195,45 @@ def recognize_from_video():
 
         frame = np.ascontiguousarray(frame[:,::-1,:])
 
-        _, img128, scale, pad = fut.resize_pad(frame[:,:,::-1])
+        _, img128, scale, pad = iut.resize_pad(frame[:,:,::-1])
         input_data = img128.astype('float32') / 127.5 - 1.0
         input_data = np.expand_dims(np.moveaxis(input_data, -1, 0), 0)
 
         # inference
         # Face detection
         preds = detector.predict([input_data])
-        detections = fut.detector_postprocess(preds)
+        detections = iut.detector_postprocess(preds)
 
         # Face landmark estimation
         if detections[0].size != 0:
-            imgs, affines, box = fut.estimator_preprocess(frame[:,:,::-1], detections, scale, pad)
-            draw_roi(frame, box)
+            imgs, affines, box = iut.estimator_preprocess(frame[:,:,::-1], detections, scale, pad)
 
-            dynamic_input_shape = False
+            dynamic_shape = False
 
-            if dynamic_input_shape:
+            if dynamic_shape:
                 estimator.set_input_shape(imgs.shape)
                 landmarks, confidences = estimator.predict([imgs])
-                normalized_landmarks = landmarks / 192.0
-                landmarks = fut.denormalize_landmarks(normalized_landmarks, affines)
             else:
-                landmarks = np.zeros((imgs.shape[0], 468, 3))
+                landmarks = np.zeros((imgs.shape[0], 1404))
                 confidences = np.zeros((imgs.shape[0], 1))
                 for i in range(imgs.shape[0]):
-                    landmark, confidences[i,:] = estimator.predict([imgs[i:i+1,:,:,:]])
-                    normalized_landmark = landmark / 192.0
-                    landmarks[i,:,:] = fut.denormalize_landmarks(normalized_landmark, affines)
+                    landmarks[i,:], confidences[i,:] = estimator.predict([imgs[i:i+1,:,:,:]])
 
-            for i in range(len(landmarks)):
-                landmark, confidence = landmarks[i], confidences[i]
-                # if confidence > 0: # Can be > 1, no idea what it represents
-                draw_landmarks(frame, landmark[:,:2], size=1)
+            # Iris landmark estimation
+            imgs2, origins = iut.iris_preprocess(imgs, landmarks)
+
+            if dynamic_shape:
+                estimator2.set_input_shape(imgs2.shape)
+                eyes, iris = estimator2.predict([imgs2])
+            else:
+                eyes = np.zeros((imgs2.shape[0], 213))
+                iris = np.zeros((imgs2.shape[0], 15))
+                for i in range(imgs2.shape[0]):
+                    eyes[i,:], iris[i,:] = estimator2.predict([imgs2[i:i+1,:,:,:]])
+
+            eyes, iris = iut.iris_postprocess(eyes, iris, origins, affines)
+            for i in range(len(eyes)):
+                draw_eye_iris(frame, eyes[i, :, :16, :2], iris[i, :, :, :2], size=1)
 
         cv2.imshow('frame', frame)
 
@@ -220,6 +251,7 @@ def main():
     # model files check and download
     check_and_download_models(DETECTION_WEIGHT_PATH, DETECTION_MODEL_PATH, DETECTION_REMOTE_PATH)
     check_and_download_models(LANDMARK_WEIGHT_PATH, LANDMARK_MODEL_PATH, LANDMARK_REMOTE_PATH)
+    check_and_download_models(LANDMARK2_WEIGHT_PATH, LANDMARK2_MODEL_PATH, LANDMARK2_REMOTE_PATH)
 
     if args.video is not None:
         # video mode
