@@ -36,14 +36,13 @@ MAX_T = 210
 
 parser = get_base_parser( 'Efficiently Trainable Text-to-Speech System Based on' +
     'Deep Convolutional Networks with Guided Attention', SENTENCE, SAVE_WAV_PATH)
-args = update_parser(parser)
 parser.add_argument(
     '-o', '--onnx',
     action='store_true',
     default=False,
     help='Use onnx runtime'
 )
-args = parser.parse_args()
+args = update_parser(parser)
 
 
 # ======================
