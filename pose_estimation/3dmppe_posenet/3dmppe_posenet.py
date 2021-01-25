@@ -20,6 +20,7 @@ import ailia
 sys.path.append('../../util')
 from utils import get_base_parser, update_parser  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
+import webcamera_utils  # noqa: E402
 
 
 import warnings
@@ -541,39 +542,47 @@ def recognize_from_video(vid_path, net_maskrcnn, net_root, net_pose=None, sess_p
     assert (net_pose is not None) | (sess_pose is not None)
 
     # make capture
-    video_capture = cv2.VideoCapture(vid_path)
-    height = int(video_capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    width = int(video_capture.get(cv2.CAP_PROP_FRAME_WIDTH))
-    frame_num = int(video_capture.get(cv2.CAP_PROP_FRAME_COUNT))
-    fps = video_capture.get(cv2.CAP_PROP_FPS)
+    video_capture = webcamera_utils.get_capture(args.video)
 
-    # make writer
-    codecs       = 'mp4v'
-    fourcc       = cv2.VideoWriter_fourcc(*codecs)
-    video_writer = cv2.VideoWriter(args.savepath, fourcc, fps, 
-                                   ((width*2), height), True)
+    # create video writer if savepath is specified as video format
+    if args.savepath != SAVE_IMAGE_OR_VIDEO_PATH:
+        f_h = int(video_capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        f_w = int(video_capture.get(cv2.CAP_PROP_FRAME_WIDTH)) * 2
+        video_writer = webcamera_utils.get_writer(args.savepath, f_h, f_w)
+    else:
+        video_writer = None
 
     # frame read and exec segmentation
-    for frame_i in tqdm(range(frame_num)):
-
+    while(True):
         # frame read
         ret, original_img = video_capture.read()
-        if (ret is True):
-            
-            # cast to pillow for mask r-cnn
-            image = Image.fromarray(original_img.copy()[:, :, ::-1])
 
-            # exec mask r-cnn
-            bbox_list = maskrcnn_to_image(image=image, net_maskrcnn=net_maskrcnn)
-            bbox_list[:, 2] = bbox_list[:, 2] - bbox_list[:, 0]
-            bbox_list[:, 3] = bbox_list[:, 3] - bbox_list[:, 1]
+        if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
 
-            # exec posenet
-            vis_img = posenet_to_image(original_img=original_img, bbox_list=bbox_list, 
-                                       net_root=net_root, net_pose=net_pose, sess_pose=sess_pose)
+        # cast to pillow for mask r-cnn
+        image = Image.fromarray(original_img.copy()[:, :, ::-1])
 
-            # write a frame image to video
+        # exec mask r-cnn
+        bbox_list = maskrcnn_to_image(image=image, net_maskrcnn=net_maskrcnn)
+        bbox_list[:, 2] = bbox_list[:, 2] - bbox_list[:, 0]
+        bbox_list[:, 3] = bbox_list[:, 3] - bbox_list[:, 1]
+
+        # exec posenet
+        vis_img = posenet_to_image(original_img=original_img, bbox_list=bbox_list, 
+                                    net_root=net_root, net_pose=net_pose, sess_pose=sess_pose)
+        
+        # display
+        cv2.imshow("frame", vis_img)
+
+        # write a frame image to video
+        if video_writer is not None:
             video_writer.write(vis_img)
+
+    video_capture.release()
+    cv2.destroyAllWindows()
+    if video_writer is not None:
+        video_writer.release()
 
     print('finished process and write result to %s!' % args.savepath)
 
