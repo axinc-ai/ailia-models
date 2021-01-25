@@ -14,7 +14,6 @@ from tqdm import tqdm
 import time
 
 import ailia
-import onnxruntime
 
 
 # import original modules
@@ -597,6 +596,7 @@ def main():
     # PoseNet
     if (args.onnx is True):
         # onnxruntime
+        import onnxruntime
         sess_pose = onnxruntime.InferenceSession(WEIGHT_PATH_POSENET)
         net_pose = None
     else:
