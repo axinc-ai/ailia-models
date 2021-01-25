@@ -30,20 +30,20 @@ Automatically downloads the onnx and prototxt files on the first run. It is nece
 
 For the sample audio file,
 ```bash
-$ python3 source_separation.py
+$ python3 unet_source_separation.py
 
 ```
 
 If you want to specify the input audio file, put the input path after the --input option.
 You can use --savepath option to change the name of the output file to save.
 ```bash
-$ python3 source_separation.py --input WAV_PATH --savepath SAVE_WAV_PATH
+$ python3 unet_source_separation.py --input WAV_PATH --savepath SAVE_WAV_PATH
 ```
 
 You can select a pretrained model by specifying --arch base (default) or --arch large.
 `base` is a model for general voice separation task, and `large` is a model for singing voice separation task.  
 ```bash
-$ python3 source_separation.py --input WAV_PATH --savepath SAVE_WAV_PATH --arch base
+$ python3 unet_source_separation.py --input WAV_PATH --savepath SAVE_WAV_PATH --arch base
 ```
 
 
