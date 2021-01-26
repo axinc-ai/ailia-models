@@ -4,6 +4,7 @@ cd action_recognition/mars; python3 mars.py ${OPTION}
 cd ../../action_recognition/st-gcn; python3 st-gcn.py ${OPTION}
 cd ../../audio_processing/crnn_audio_classification; python3 crnn_audio_classification.py ${OPTION}
 cd ../../audio_processing/deepspeech2; python3 deepspeech2.py ${OPTION}
+cd ../../audio_processing/pytorch-dc-tts/; python3 pytorch-dc-tts.py ${OPTION}
 cd ../../crowd_counting/crowdcount-cascaded-mtl; python3 crowdcount-cascaded-mtl.py ${OPTION}
 cd ../../deep_fashion/clothing-detection; python3 clothing-detection.py ${OPTION}
 cd ../../deep_fashion/fashionai-key-points-detection; python3 fashionai-key-points-detection.py -c blouse ${OPTION}
@@ -85,17 +86,23 @@ cd ../../object_detection/yolov4; python3 yolov4.py ${OPTION}
 cd ../../object_detection/yolov4-tiny; python3 yolov4-tiny.py ${OPTION}
 cd ../../object_detection/yolov5; python3 yolov5.py ${OPTION}
 cd ../../object_tracking/deepsort; python3 deepsort.py ${OPTION}
+cd ../../object_tracking/person_reid_baseline_pytorch; python3 person_reid_baseline_pytorch.py ${OPTION}
+cd ../../point_segmentation/pointnet_pytorch python3 pointnet_pytorch.py ${OPTION}
 cd ../../pose_estimation/3d-pose-baseline; python3 3d-pose-baseline.py ${OPTION}
 cd ../../pose_estimation/lightweight-human-pose-estimation; python3 lightweight-human-pose-estimation.py ${OPTION}
 cd ../../pose_estimation/lightweight-human-pose-estimation-3d; python3 lightweight-human-pose-estimation-3d.py ${OPTION}
 cd ../../pose_estimation/openpose; python3 openpose.py ${OPTION}
 cd ../../pose_estimation/pose_resnet; python3 pose_resnet.py ${OPTION}
 cd ../../pose_estimation/blazepose; python3 blazepose.py ${OPTION}
+cd ../../pose_estimation/3dmppe_posenet; python3 3dmppe_posenet.py ${OPTION}
 cd ../../rotation_prediction/rotnet; python3 rotnet.py ${OPTION}
 cd ../../style_transfer/adain; python3 adain.py ${OPTION}
 cd ../../super_resolution/srresnet; python3 srresnet.py ${OPTION}
 cd ../../text_detection/craft_pytorch; python3 craft_pytorch.py ${OPTION}
+cd ../../text_detection/pixel_link; python3 pixel_link.py ${OPTION}
 cd ../../text_recognition/etl; python3 etl.py ${OPTION}
+cd ../../text_recognition/deep-text-recognition-benchmark; python3 deep-text-recognition-benchmark.py ${OPTION}
+cd ../../text_recognition/crnn.pytorch; python3 crnn.pytorch.py ${OPTION}
 #cd ../../commercial_model/acculus-pose; python3 acculus-hand.py ${OPTION}
 #cd ../../commercial_model/acculus-pose; python3 acculus-pose.py ${OPTION}
 #cd ../../commercial_model/acculus-pose; python3 acculus-up-pose.py ${OPTION}
