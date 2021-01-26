@@ -1,3 +1,5 @@
+# (c) 2021 ax Inc.
+
 import math
 
 import numpy as np

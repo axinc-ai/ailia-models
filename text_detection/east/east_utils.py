@@ -1,6 +1,10 @@
 import numpy as np
-# import Polygon
-from poly_iou import poly_iou
+
+USE_POLYGON=False
+if USE_POLYGON:
+    import Polygon
+else:
+    from poly_iou import poly_iou
 
 __all__ = [
     'restore_rectangle',
@@ -85,17 +89,19 @@ def restore_rectangle(origin, geometry):
 
 
 def intersection(g, p):
-    # g = Polygon.Polygon(g[:8].reshape((4, 2)))
-    # p = Polygon.Polygon(p[:8].reshape((4, 2)))
-    # inter = (g & p).area()
-    # union = g.area() + p.area() - inter
-    # if union == 0:
-    #     return 0
-    # else:
-    #     return inter / union
-    g = g[:8].reshape((4, 2))
-    p = p[:8].reshape((4, 2))
-    return poly_iou(g, p)
+    if USE_POLYGON:
+        g = Polygon.Polygon(g[:8].reshape((4, 2)))
+        p = Polygon.Polygon(p[:8].reshape((4, 2)))
+        inter = (g & p).area()
+        union = g.area() + p.area() - inter
+        if union == 0:
+            return 0
+        else:
+            return inter / union
+    else:
+        g = g[:8].reshape((4, 2))
+        p = p[:8].reshape((4, 2))
+        return poly_iou(g, p)
 
 
 def weighted_merge(g, p):

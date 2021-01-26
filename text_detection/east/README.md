@@ -12,13 +12,6 @@ Shape : (1, height, width, 3)
 
 ![Output](output.png)
 
-## Requirements
-This model requires Polygon module.
-
-```
-pip3 install Polygon3
-```
-
 ## Usage
 Automatically downloads the onnx and prototxt files on the first run.
 It is necessary to be connected to the Internet while downloading.
