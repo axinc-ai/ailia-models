@@ -82,16 +82,6 @@ def line(input_img, coordinates, point1, point2):
         y2 = int(input_img.shape[0] * coordinates[point2][2])
         cv2.line(input_img, (x1, y1), (x2, y2), color, 5)
 
-    # landmark, flag = coordinates[i], flags[i]
-    # if flag > threshold:
-    #     color = hsv_to_rgb(255*point1/e_utils.EFFICIENT_POSE_KEYPOINT_CNT, 255, 255)
-
-    #     x1 = int(landmark[point1, 0])
-    #     y1 = int(landmark[point1, 1])
-    #     x2 = int(landmark[point2, 0])
-    #     y2 = int(landmark[point2, 1])
-    #     cv2.line(input_img, (x1, y1), (x2, y2), color, 5)
-
 def display_result(input_img, coordinates):
     line(input_img,coordinates,e_utils.EFFICIENT_POSE_KEYPOINT_HEAD_TOP,e_utils.EFFICIENT_POSE_KEYPOINT_UPPER_NECK)
     line(input_img,coordinates,e_utils.EFFICIENT_POSE_KEYPOINT_UPPER_NECK,e_utils.EFFICIENT_POSE_KEYPOINT_THORAX)
@@ -214,18 +204,6 @@ def recognize_from_video():
         
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
-
-        # # Pose estimation
-        # landmarks = []
-        # flags = []
-        # if count > 0:
-        #     img, affine, _ = but.estimator_preprocess(frame, detections, scale, pad)
-        #     flags, normalized_landmarks, _ = estimator.predict([img])
-        #     landmarks = but.denormalize_landmarks(normalized_landmarks, affine)
-
-        # # postprocessing
-        # display_result(frame, count, landmarks, flags)
-        # cv2.imshow('frame', frame)
 
     capture.release()
     cv2.destroyAllWindows()
