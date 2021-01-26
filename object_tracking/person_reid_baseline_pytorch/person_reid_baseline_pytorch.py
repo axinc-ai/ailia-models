@@ -79,11 +79,6 @@ parser.add_argument(
     '-b', '--batchsize', type=int, default=256,
     help='Batchsize.'
 )
-parser.add_argument(
-    '--onnx',
-    action='store_true',
-    help='execute onnxruntime version.'
-)
 args = parser.parse_args()
 
 
@@ -219,14 +214,10 @@ def extract_feature(imgs, net):
             if scale != 1:
                 imgs = interpolate(imgs, scale)
 
-            if not args.onnx:
-                net.set_input_shape(imgs.shape)
-                outputs = net.predict({'imgs': imgs})[0]
-            else:
-                img_name = net.get_inputs()[0].name
-                out_name = net.get_outputs()[0].name
-                outputs = net.run([out_name],
-                                  {img_name: imgs})[0]
+            img_name = net.get_inputs()[0].name
+            out_name = net.get_outputs()[0].name
+            outputs = net.run([out_name],
+                                {img_name: imgs})[0]
             ff += outputs
 
     fnorm = np.linalg.norm(ff, ord=2, axis=1, keepdims=True)
@@ -358,13 +349,9 @@ def main():
     check_and_download_models(weight_path, model_path, REMOTE_PATH)
 
     # initialize
-    if not args.onnx:
-        env_id = ailia.get_gpu_environment_id()
-        print(f'env_id: {env_id}')
-        net = ailia.Net(model_path, weight_path, env_id=env_id)
-    else:
-        import onnxruntime
-        net = onnxruntime.InferenceSession(weight_path)
+    env_id = ailia.get_gpu_environment_id()
+    print(f'env_id: {env_id}')
+    net = ailia.Net(model_path, weight_path, env_id=env_id)
 
     recognize_from_image(args.input, net)
 

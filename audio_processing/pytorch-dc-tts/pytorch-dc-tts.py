@@ -36,19 +36,7 @@ MAX_T = 210
 
 parser = get_base_parser( 'Efficiently Trainable Text-to-Speech System Based on' +
     'Deep Convolutional Networks with Guided Attention', SENTENCE, SAVE_WAV_PATH)
-parser.add_argument(
-    '-o', '--onnx',
-    action='store_true',
-    default=False,
-    help='Use onnx runtime'
-)
 args = update_parser(parser)
-
-
-# ======================
-# Utils
-# ======================
-
 
 # ======================
 # Main function
@@ -69,20 +57,8 @@ def inference(net_t2m, net_ssrm, L, Y, zeros, A):
 
 def inference_by_text2mel(net_t2m, L, Y, zeros, A):
     for t in (range(MAX_T)):
-        if not args.onnx:
-            net_t2m.set_input_blob_shape(Y.shape, net_t2m.find_blob_index_by_name('input.2'))
-            _, Y_t, A = net_t2m.predict({'input.1':L, 'input.2':Y})
-        else:
-            first_input_name = net_t2m.get_inputs()[0].name
-            second_input_name = net_t2m.get_inputs()[1].name
-            first_output_name = net_t2m.get_outputs()[0].name
-            second_output_name = net_t2m.get_outputs()[1].name
-            third_output_name = net_t2m.get_outputs()[2].name
-
-            _, Y_t, A = net_t2m.run(
-                [first_output_name, second_output_name, third_output_name], 
-                {first_input_name: L, second_input_name: Y}
-            )
+        net_t2m.set_input_blob_shape(Y.shape, net_t2m.find_blob_index_by_name('input.2'))
+        _, Y_t, A = net_t2m.predict({'input.1':L, 'input.2':Y})
 
         Y = np.concatenate([zeros, Y_t], 2)
         attention = np.argmax(A[0, :, -1], 0)
@@ -94,18 +70,7 @@ def inference_by_text2mel(net_t2m, L, Y, zeros, A):
 
 
 def inference_by_ssr(net_ssrm, Y):
-    if not args.onnx:
-        _, Z = net_ssrm.predict({'input.1':Y})
-    else:
-        first_input_name = net_ssrm.get_inputs()[0].name
-        first_output_name = net_ssrm.get_outputs()[0].name
-        second_output_name = net_ssrm.get_outputs()[1].name
-
-        _, Z = net_ssrm.run(
-            [first_output_name, second_output_name], 
-            {first_input_name: Y}
-        )
-
+    _, Z = net_ssrm.predict({'input.1':Y})
     return Z
 
 
@@ -118,14 +83,8 @@ def main():
     L, Y, zeros, A = preprocess(SENTENCE)
 
     # model initialize
-    if not args.onnx:
-        net_t2m = ailia.Net(MODEL_PATH_T2M, WEIGHT_PATH_T2M, env_id=args.env_id)
-        net_ssrm = ailia.Net(MODEL_PATH_SSRM, WEIGHT_PATH_SSRM, env_id=args.env_id)
-    else:
-        print('Let us try by onnxruntime')
-        import onnxruntime
-        net_t2m = onnxruntime.InferenceSession(WEIGHT_PATH_T2M)
-        net_ssrm = onnxruntime.InferenceSession(WEIGHT_PATH_SSRM)
+    net_t2m = ailia.Net(MODEL_PATH_T2M, WEIGHT_PATH_T2M, env_id=args.env_id)
+    net_ssrm = ailia.Net(MODEL_PATH_SSRM, WEIGHT_PATH_SSRM, env_id=args.env_id)
 
     # inference
     print('Start inference...')

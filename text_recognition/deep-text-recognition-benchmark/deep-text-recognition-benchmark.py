@@ -34,11 +34,6 @@ IMAGE_HEIGHT = 32
 parser = get_base_parser(
     'deep text recognition benchmark.', IMAGE_FOLDER_PATH, None
 )
-parser.add_argument(
-    '-o', '--onnx',
-    action='store_true',
-    help='Use onnx runtime'
-)
 args = parser.parse_args()
 
 
@@ -90,12 +85,8 @@ def recognize_from_image():
     
     print(f'{dashed_line}\n{head}\n{dashed_line}')
 
-    if args.onnx:
-        import onnxruntime
-        session = onnxruntime.InferenceSession(WEIGHT_PATH)
-    else:
-        env_id = ailia.get_gpu_environment_id()
-        session = ailia.Net(MODEL_PATH,WEIGHT_PATH,env_id=env_id)
+    env_id = ailia.get_gpu_environment_id()
+    session = ailia.Net(MODEL_PATH,WEIGHT_PATH,env_id=env_id)
 
     for path in image_path_list:
         recognize_one_image(path,session)
@@ -114,13 +105,7 @@ def recognize_one_image(image_path,session):
     input_img = numpy.expand_dims(input_img, axis=0)
 
     # predict
-    if args.onnx:
-        session.get_modelmeta()
-        first_input_name = session.get_inputs()[0].name
-        preds = session.run([], {first_input_name: input_img})
-        preds = preds[0]
-    else:
-        preds = session.predict(input_img)
+    preds = session.predict(input_img)
 
     # Select max probabilty (greedy decoding) then decode index to character
     preds_size = [int(preds.shape[1])] * batch_size

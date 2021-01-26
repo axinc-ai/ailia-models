@@ -40,10 +40,6 @@ parser.add_argument(
     default='bert-base-japanese-whole-word-masking', choices=MODEL_LISTS,
     help='model lists: ' + ' | '.join(MODEL_LISTS)
 )
-parser.add_argument(
-    '-o', '--onnx', action='store_true',
-    help='Use onnx runtime'
-)
 args = update_parser(parser)
 
 
@@ -87,10 +83,7 @@ def inference(net, tokenizer, tokenized_text, masked_index, original_text_len):
         "attention_mask": attention_mask,
     }
 
-    if not args.onnx:
-        outputs = net.predict(inputs_onnx)
-    else:
-        outputs = net.run(None, inputs_onnx)
+    outputs = net.predict(inputs_onnx)
 
     outputs[0][0, masked_index] = softmax(outputs[0][0, masked_index])
     return outputs
@@ -140,20 +133,16 @@ def main():
             "cl-tohoku/"+args.arch
         )
 
-    if not args.onnx:
-        net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
-        net.set_input_blob_shape(
-            (1, PADDING_LEN), net.find_blob_index_by_name("token_type_ids")
-        )
-        net.set_input_blob_shape(
-            (1, PADDING_LEN), net.find_blob_index_by_name("input_ids")
-        )
-        net.set_input_blob_shape(
-            (1, PADDING_LEN), net.find_blob_index_by_name("attention_mask")
-        )
-    else:
-        from onnxruntime import InferenceSession  # noqa: E402
-        net = InferenceSession(WEIGHT_PATH)
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
+    net.set_input_blob_shape(
+        (1, PADDING_LEN), net.find_blob_index_by_name("token_type_ids")
+    )
+    net.set_input_blob_shape(
+        (1, PADDING_LEN), net.find_blob_index_by_name("input_ids")
+    )
+    net.set_input_blob_shape(
+        (1, PADDING_LEN), net.find_blob_index_by_name("attention_mask")
+    )
 
     with codecs.open(args.input, 'r', 'utf-8', 'ignore') as f:
         s = f.readlines()

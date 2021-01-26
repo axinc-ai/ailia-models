@@ -85,11 +85,6 @@ parser.add_argument(
     ),
     help='choice class'
 )
-parser.add_argument(
-    '--onnx',
-    action='store_true',
-    help='execute onnxruntime version.'
-)
 args = update_parser(parser)
 
 
@@ -114,15 +109,8 @@ def predict_seg(points, net):
     points = np.expand_dims(points, axis=0)
 
     # feedforward
-    if not args.onnx:
-        net.set_input_shape(points.shape)
-        output = net.predict({'point': points})
-    else:
-        point_name = net.get_inputs()[0].name
-        pred_name = net.get_outputs()[0].name
-        trans_name = net.get_outputs()[1].name
-        output = net.run([pred_name, trans_name],
-                         {point_name: points})
+    net.set_input_shape(points.shape)
+    output = net.predict({'point': points})
 
     pred, _ = output
     pred_choice = np.argmax(pred[0], axis=1)
@@ -238,13 +226,8 @@ def main():
     print(f'env_id: {env_id}')
 
     # initialize
-    if not args.onnx:
-        net_seg = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
-        net_cls = ailia.Net(MODEL_PATH_CLASSIFIER, WEIGHT_PATH_CLASSIFIER, env_id=env_id)
-    else:
-        import onnxruntime
-        net_seg = onnxruntime.InferenceSession(WEIGHT_PATH)
-        net_cls = onnxruntime.InferenceSession(WEIGHT_PATH_CLASSIFIER)
+    net_seg = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+    net_cls = ailia.Net(MODEL_PATH_CLASSIFIER, WEIGHT_PATH_CLASSIFIER, env_id=env_id)
 
     recognize_from_points(args.input if args.input else POINT_PATH, net_seg, net_cls)
 

@@ -74,13 +74,9 @@ def recognize_from_image():
     input_data = yut.preprocess(src_img)
 
     # net initialize
-    if args.onnx:
-        import onnxruntime as rt
-        sess = rt.InferenceSession(WEIGHT_PATH)
-    else:
-        env_id = ailia.get_gpu_environment_id()
-        print(f'env_id: {env_id}')
-        segmentor = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+    env_id = ailia.get_gpu_environment_id()
+    print(f'env_id: {env_id}')
+    segmentor = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
 
     # inference
     print('Start inference...')
@@ -118,13 +114,9 @@ def recognize_from_image():
 
 def recognize_from_video():
     # net initialize
-    if args.onnx:
-        import onnxruntime as rt
-        sess = rt.InferenceSession(WEIGHT_PATH)
-    else:
-        env_id = ailia.get_gpu_environment_id()
-        print(f'env_id: {env_id}')
-        segmentor = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+    env_id = ailia.get_gpu_environment_id()
+    print(f'env_id: {env_id}')
+    segmentor = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
 
     capture = get_capture(args.video)
 

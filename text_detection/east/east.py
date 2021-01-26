@@ -37,11 +37,6 @@ parser = get_base_parser(
     IMAGE_PATH,
     SAVE_IMAGE_PATH,
 )
-parser.add_argument(
-    '--onnx',
-    action='store_true',
-    help='execute onnxruntime version.'
-)
 args = update_parser(parser)
 
 # ======================
@@ -161,15 +156,8 @@ def predict(img, net):
     img, (ratio_h, ratio_w) = preprocess(img)
 
     # feedforward
-    if not args.onnx:
-        net.set_input_shape(img.shape)
-        output = net.predict({'import/input_images:0': img})
-    else:
-        img_name = net.get_inputs()[0].name
-        pixel_pos_scores_name = net.get_outputs()[0].name
-        link_pos_scores_name = net.get_outputs()[1].name
-        output = net.run([pixel_pos_scores_name, link_pos_scores_name],
-                         {img_name: img})
+    net.set_input_shape(img.shape)
+    output = net.predict({'import/input_images:0': img})
 
     score, geometry = output
     boxes = post_processing(score_map=score, geo_map=geometry)
@@ -237,12 +225,8 @@ def main():
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
 
     # initialize
-    if not args.onnx:
-        memory_mode = ailia.get_memory_mode(reduce_constant=True, reduce_interstage=True)
-        net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id, memory_mode=memory_mode)
-    else:
-        import onnxruntime
-        net = onnxruntime.InferenceSession(WEIGHT_PATH)
+    memory_mode = ailia.get_memory_mode(reduce_constant=True, reduce_interstage=True)
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id, memory_mode=memory_mode)
 
     if args.video is not None:
         recognize_from_video(args.video, net)

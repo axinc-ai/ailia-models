@@ -67,15 +67,7 @@ def post_process(preds, length, alphabet):
 
 
 def predict(net, image):
-    if not args.onnx:
-        preds = net.predict({'input.1':image})[0]
-    else:
-        first_input_name = net.get_inputs()[0].name
-        first_output_name = net.get_outputs()[0].name
-        preds = net.run(
-            [first_output_name], 
-            {first_input_name: image}
-        )[0]
+    preds = net.predict({'input.1':image})[0]
     return preds
 
 
@@ -147,12 +139,7 @@ def main():
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
 
     # model initialize
-    if not args.onnx:
-        net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
-    else:
-        import onnxruntime
-        net = onnxruntime.InferenceSession(WEIGHT_PATH)
-
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
 
     if args.video is not None:
         # video mode

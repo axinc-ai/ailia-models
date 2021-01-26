@@ -53,10 +53,6 @@ parser = get_base_parser(
     IMAGE_OR_VIDEO_PATH,
     SAVE_IMAGE_OR_VIDEO_PATH,
 )
-parser.add_argument(
-    '-o', '--onnx', action='store_true', 
-    help='If you set this option, PoseNet will be executed with onnxruntime without ailia SDK.'
-)
 args = update_parser(parser)
 
 
@@ -454,22 +450,15 @@ def posenet_to_image(original_img, bbox_list, net_root, net_pose=None, sess_pose
         root_3d = root_3d[0]
 
         # inference
-        if (net_pose is not None):
-            # ailia SDK
-            if args.benchmark:
-                print('BENCHMARK mode')
-                for i in range(5):
-                    start = int(round(time.time() * 1000))
-                    pose_3d = net_pose.predict([img])[0]
-                    end = int(round(time.time() * 1000))
-                    print(f'\tailia processing time {end - start} ms')
-            else:
+        if args.benchmark:
+            print('BENCHMARK mode')
+            for i in range(5):
+                start = int(round(time.time() * 1000))
                 pose_3d = net_pose.predict([img])[0]
+                end = int(round(time.time() * 1000))
+                print(f'\tailia processing time {end - start} ms')
         else:
-            # onnxruntime
-            onnx_input = {sess_pose.get_inputs()[0].name: img}
-            onnx_out = sess_pose.run(None, onnx_input)
-            pose_3d = np.array(onnx_out[0])
+            pose_3d = net_pose.predict([img])[0]
 
         # inverse affine transform (restore the crop and resize)
         pose_3d = pose_3d[0]
@@ -603,15 +592,8 @@ def main():
     # RootNet
     net_root = ailia.Net(MODEL_PATH_ROOTNET, WEIGHT_PATH_ROOTNET, env_id=env_id)
     # PoseNet
-    if (args.onnx is True):
-        # onnxruntime
-        import onnxruntime
-        sess_pose = onnxruntime.InferenceSession(WEIGHT_PATH_POSENET)
-        net_pose = None
-    else:
-        # ailia SDK
-        net_pose = ailia.Net(MODEL_PATH_POSENET, WEIGHT_PATH_POSENET, env_id=env_id)
-        sess_pose = None
+    net_pose = ailia.Net(MODEL_PATH_POSENET, WEIGHT_PATH_POSENET, env_id=env_id)
+    sess_pose = None
 
     if args.video is None:
         # image mode
