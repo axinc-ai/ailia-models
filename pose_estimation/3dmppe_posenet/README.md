@@ -36,7 +36,7 @@ $ python3 3dmppe_posenet.py --onnx --video VIDEO_PATH --savepath SAVE_VIDEO_PATH
 
 
 ### Framework
-ONNX Runtime
+Pytorch
 
 ### Model Format
 ONNX opset = 10
