@@ -43,11 +43,6 @@ SAVE_IMAGE_PATH = 'output.png'
 parser = get_base_parser(
     'Style2Paints model', IMAGE_PATH, SAVE_IMAGE_PATH
 )
-parser.add_argument(
-    '--onnx',
-    action='store_true',
-    help='execute onnxruntime version.'
-)
 args = update_parser(parser)
 
 
@@ -81,35 +76,23 @@ def go_head(net_head, sketch, global_hint, local_hint, global_hint_x, alpha=1.0)
     ip4 = local_hint[None, :, :, :]
     ip3x = global_hint_x[None, :, :, :]
     ipa = np.array([alpha], dtype=np.float32)[None, :]
-    if not args.onnx:
-        idx_ip1 = net_head.find_blob_index_by_name('import/Placeholder_1:0')
-        idx_ip3 = net_head.find_blob_index_by_name('import/Placeholder_2:0')
-        idx_ip4 = net_head.find_blob_index_by_name('import/Placeholder_3:0')
-        idx_ip3x = net_head.find_blob_index_by_name('import/Placeholder_4:0')
-        idx_ipa = net_head.find_blob_index_by_name('import/Placeholder:0')
-        net_head.set_input_blob_shape(ip1.shape, idx_ip1)
-        net_head.set_input_blob_shape(ip3.shape, idx_ip3)
-        net_head.set_input_blob_shape(ip4.shape, idx_ip4)
-        net_head.set_input_blob_shape(ip3x.shape, idx_ip3x)
-        net_head.set_input_blob_shape(ipa.shape, idx_ipa)
-        output = net_head.predict({
-            'import/Placeholder_1:0': ip1,
-            'import/Placeholder_2:0': ip3,
-            'import/Placeholder_3:0': ip4,
-            'import/Placeholder_4:0': ip3x,
-            'import/Placeholder:0': ipa,
-        })[0]
-    else:
-        in_ip3x = net_head.get_inputs()[0].name
-        in_ip4 = net_head.get_inputs()[1].name
-        in_ip3 = net_head.get_inputs()[2].name
-        in_ip1 = net_head.get_inputs()[3].name
-        in_ipa = net_head.get_inputs()[4].name
-        out_head = net_head.get_outputs()[0].name
-        output = net_head.run(
-            [out_head],
-            {in_ip1: ip1, in_ip3: ip3, in_ip4: ip4, in_ip3x: ip3x, in_ipa: ipa}
-        )[0]
+    idx_ip1 = net_head.find_blob_index_by_name('import/Placeholder_1:0')
+    idx_ip3 = net_head.find_blob_index_by_name('import/Placeholder_2:0')
+    idx_ip4 = net_head.find_blob_index_by_name('import/Placeholder_3:0')
+    idx_ip3x = net_head.find_blob_index_by_name('import/Placeholder_4:0')
+    idx_ipa = net_head.find_blob_index_by_name('import/Placeholder:0')
+    net_head.set_input_blob_shape(ip1.shape, idx_ip1)
+    net_head.set_input_blob_shape(ip3.shape, idx_ip3)
+    net_head.set_input_blob_shape(ip4.shape, idx_ip4)
+    net_head.set_input_blob_shape(ip3x.shape, idx_ip3x)
+    net_head.set_input_blob_shape(ipa.shape, idx_ipa)
+    output = net_head.predict({
+        'import/Placeholder_1:0': ip1,
+        'import/Placeholder_2:0': ip3,
+        'import/Placeholder_3:0': ip4,
+        'import/Placeholder_4:0': ip3x,
+        'import/Placeholder:0': ipa,
+    })[0]
 
     head_op = output[0].clip(0, 255).astype(np.uint8)
     return head_op
@@ -121,35 +104,23 @@ def go_neck(net_neck, sketch, global_hint, local_hint, global_hint_x, alpha=1.0)
     ip4 = local_hint[None, :, :, :]
     ip3x = global_hint_x[None, :, :, :]
     ipa = np.array([alpha], dtype=np.float32)[None, :]
-    if not args.onnx:
-        idx_ip1 = net_neck.find_blob_index_by_name('import/Placeholder_1:0')
-        idx_ip3 = net_neck.find_blob_index_by_name('import/Placeholder_2:0')
-        idx_ip4 = net_neck.find_blob_index_by_name('import/Placeholder_3:0')
-        idx_ip3x = net_neck.find_blob_index_by_name('import/Placeholder_4:0')
-        idx_ipa = net_neck.find_blob_index_by_name('import/Placeholder:0')
-        net_neck.set_input_blob_shape(ip1.shape, idx_ip1)
-        net_neck.set_input_blob_shape(ip3.shape, idx_ip3)
-        net_neck.set_input_blob_shape(ip4.shape, idx_ip4)
-        net_neck.set_input_blob_shape(ip3x.shape, idx_ip3x)
-        net_neck.set_input_blob_shape(ipa.shape, idx_ipa)
-        output = net_neck.predict({
-            'import/Placeholder_1:0': ip1,
-            'import/Placeholder_2:0': ip3,
-            'import/Placeholder_3:0': ip4,
-            'import/Placeholder_4:0': ip3x,
-            'import/Placeholder:0': ipa,
-        })[0]
-    else:
-        in_ip3x = net_neck.get_inputs()[0].name
-        in_ip4 = net_neck.get_inputs()[1].name
-        in_ip3 = net_neck.get_inputs()[2].name
-        in_ip1 = net_neck.get_inputs()[3].name
-        in_ipa = net_neck.get_inputs()[4].name
-        out_neck = net_neck.get_outputs()[0].name
-        output = net_neck.run(
-            [out_neck],
-            {in_ip1: ip1, in_ip3: ip3, in_ip4: ip4, in_ip3x: ip3x, in_ipa: ipa}
-        )[0]
+    idx_ip1 = net_neck.find_blob_index_by_name('import/Placeholder_1:0')
+    idx_ip3 = net_neck.find_blob_index_by_name('import/Placeholder_2:0')
+    idx_ip4 = net_neck.find_blob_index_by_name('import/Placeholder_3:0')
+    idx_ip3x = net_neck.find_blob_index_by_name('import/Placeholder_4:0')
+    idx_ipa = net_neck.find_blob_index_by_name('import/Placeholder:0')
+    net_neck.set_input_blob_shape(ip1.shape, idx_ip1)
+    net_neck.set_input_blob_shape(ip3.shape, idx_ip3)
+    net_neck.set_input_blob_shape(ip4.shape, idx_ip4)
+    net_neck.set_input_blob_shape(ip3x.shape, idx_ip3x)
+    net_neck.set_input_blob_shape(ipa.shape, idx_ipa)
+    output = net_neck.predict({
+        'import/Placeholder_1:0': ip1,
+        'import/Placeholder_2:0': ip3,
+        'import/Placeholder_3:0': ip4,
+        'import/Placeholder_4:0': ip3x,
+        'import/Placeholder:0': ipa,
+    })[0]
 
     neck_op = output[0].clip(0, 255).astype(np.uint8)
     return neck_op
@@ -159,25 +130,17 @@ def go_gird(net_gird, sketch, latent, hint):
     ip1 = sketch[None, :, :, None]
     ip3 = latent[None, :, :, :]
     ip4 = hint[None, :, :, :]
-    if not args.onnx:
-        idx_ip1 = net_gird.find_blob_index_by_name('import/Placeholder_1:0')
-        idx_ip3 = net_gird.find_blob_index_by_name('import/Placeholder_2:0')
-        idx_ip4 = net_gird.find_blob_index_by_name('import/Placeholder_3:0')
-        net_gird.set_input_blob_shape(ip1.shape, idx_ip1)
-        net_gird.set_input_blob_shape(ip3.shape, idx_ip3)
-        net_gird.set_input_blob_shape(ip4.shape, idx_ip4)
-        output = net_gird.predict({
-            'import/Placeholder_1:0': ip1,
-            'import/Placeholder_2:0': ip3,
-            'import/Placeholder_3:0': ip4,
-        })[0]
-    else:
-        in_ip4 = net_gird.get_inputs()[0].name
-        in_ip3 = net_gird.get_inputs()[1].name
-        in_ip1 = net_gird.get_inputs()[2].name
-        out_gird = net_gird.get_outputs()[0].name
-        output = net_gird.run([out_gird],
-                              {in_ip1: ip1, in_ip3: ip3, in_ip4: ip4})[0]
+    idx_ip1 = net_gird.find_blob_index_by_name('import/Placeholder_1:0')
+    idx_ip3 = net_gird.find_blob_index_by_name('import/Placeholder_2:0')
+    idx_ip4 = net_gird.find_blob_index_by_name('import/Placeholder_3:0')
+    net_gird.set_input_blob_shape(ip1.shape, idx_ip1)
+    net_gird.set_input_blob_shape(ip3.shape, idx_ip3)
+    net_gird.set_input_blob_shape(ip4.shape, idx_ip4)
+    output = net_gird.predict({
+        'import/Placeholder_1:0': ip1,
+        'import/Placeholder_2:0': ip3,
+        'import/Placeholder_3:0': ip4,
+    })[0]
 
     gird_op = output[0].clip(0, 255).astype(np.uint8)
     return gird_op
@@ -185,16 +148,10 @@ def go_gird(net_gird, sketch, latent, hint):
 
 def go_tail(net_tail, x):
     x = x[None, :, :, :].astype(np.float32)
-    if not args.onnx:
-        net_tail.set_input_shape(x.shape)
-        output = net_tail.predict({
-            'import/Placeholder_857:0': x,
-        })[0]
-    else:
-        in_ip3B = net_tail.get_inputs()[0].name
-        out_tail = net_tail.get_outputs()[0].name
-        output = net_tail.run([out_tail],
-                              {in_ip3B: x})[0]
+    net_tail.set_input_shape(x.shape)
+    output = net_tail.predict({
+        'import/Placeholder_857:0': x,
+    })[0]
 
     tail_op = output[0].clip(0, 255).astype(np.uint8)
     return tail_op
@@ -203,21 +160,14 @@ def go_tail(net_tail, x):
 def go_baby(net_baby, sketch, local_hint):
     ip1 = sketch[None, :, :, None]
     ip4 = local_hint[None, :, :, :]
-    if not args.onnx:
-        idx_ip1 = net_baby.find_blob_index_by_name('import/Placeholder_1:0')
-        idx_ip4 = net_baby.find_blob_index_by_name('import/Placeholder_3:0')
-        net_baby.set_input_blob_shape(ip1.shape, idx_ip1)
-        net_baby.set_input_blob_shape(ip4.shape, idx_ip4)
-        output = net_baby.predict({
-            'import/Placeholder_1:0': ip1,
-            'import/Placeholder_3:0': ip4,
-        })[0]
-    else:
-        in_ip4 = net_baby.get_inputs()[0].name
-        in_ip1 = net_baby.get_inputs()[1].name
-        out_gird = net_baby.get_outputs()[0].name
-        output = net_baby.run([out_gird],
-                              {in_ip4: ip4, in_ip1: ip1})[0]
+    idx_ip1 = net_baby.find_blob_index_by_name('import/Placeholder_1:0')
+    idx_ip4 = net_baby.find_blob_index_by_name('import/Placeholder_3:0')
+    net_baby.set_input_blob_shape(ip1.shape, idx_ip1)
+    net_baby.set_input_blob_shape(ip4.shape, idx_ip4)
+    output = net_baby.predict({
+        'import/Placeholder_1:0': ip1,
+        'import/Placeholder_3:0': ip4,
+    })[0]
 
     baby_op = output[0].clip(0, 255).astype(np.uint8)
     return baby_op
@@ -382,24 +332,20 @@ def main():
     print('=== gird model ===')
     check_and_download_models(WEIGHT_GIRD_PATH, MODEL_GIRD_PATH, REMOTE_PATH)
 
-    # load model
+    # This model requires fuge gpu memory so fallback to cpu mode
     env_id = args.env_id
+    if env_id != -1 and ailia.get_environment(env_id).props == "LOWPOWER":
+        env_id = -1
+
     print(f'env_id: {env_id}')
 
     # initialize
-    if not args.onnx:
-        net_head = ailia.Net(MODEL_HEAD_PATH, WEIGHT_HEAD_PATH, env_id=env_id)
-        net_neck = ailia.Net(MODEL_NECK_PATH, WEIGHT_NECK_PATH, env_id=env_id)
-        net_baby = ailia.Net(MODEL_BABY_PATH, WEIGHT_BABY_PATH, env_id=env_id)
-        net_tail = ailia.Net(MODEL_TAIL_PATH, WEIGHT_TAIL_PATH, env_id=env_id)
-        net_gird = ailia.Net(MODEL_GIRD_PATH, WEIGHT_GIRD_PATH, env_id=env_id)
-    else:
-        import onnxruntime
-        net_head = onnxruntime.InferenceSession(WEIGHT_HEAD_PATH)
-        net_neck = onnxruntime.InferenceSession(WEIGHT_NECK_PATH)
-        net_baby = onnxruntime.InferenceSession(WEIGHT_BABY_PATH)
-        net_tail = onnxruntime.InferenceSession(WEIGHT_TAIL_PATH)
-        net_gird = onnxruntime.InferenceSession(WEIGHT_GIRD_PATH)
+    net_head = ailia.Net(MODEL_HEAD_PATH, WEIGHT_HEAD_PATH, env_id=env_id)
+    net_neck = ailia.Net(MODEL_NECK_PATH, WEIGHT_NECK_PATH, env_id=env_id)
+    net_baby = ailia.Net(MODEL_BABY_PATH, WEIGHT_BABY_PATH, env_id=env_id)
+    net_tail = ailia.Net(MODEL_TAIL_PATH, WEIGHT_TAIL_PATH, env_id=env_id)
+    net_gird = ailia.Net(MODEL_GIRD_PATH, WEIGHT_GIRD_PATH, env_id=env_id)
+
     dict_net = {
         "head": net_head,
         "neck": net_neck,
