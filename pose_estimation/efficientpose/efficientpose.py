@@ -16,6 +16,7 @@ from webcamera_utils import adjust_frame_size, get_capture  # noqa: E402
 from image_utils import load_image  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 
+#TODO:More refactoring on threshold
 
 # ======================
 # Parameters 1
@@ -23,8 +24,8 @@ from model_utils import check_and_download_models  # noqa: E402
 IMAGE_PATH = 'MPII.jpg'
 SAVE_IMAGE_PATH = 'output.png'
 
-MODEL_VARIANT = 'i'
-RESOLUTION = {'rt': 224, 'i': 256, 'ii': 368, 'iii': 480, 'iv': 600, 'rt_lite': 224, 'i_lite': 256, 'ii_lite': 368}[MODEL_VARIANT]
+MODEL_VARIANTS = ['rt','i','ii','iii','iv']
+MODEL_VARIANT = 'rt'
 
 # ======================
 # Argument Parser Config
@@ -44,21 +45,22 @@ parser.add_argument(
 )
 parser.add_argument(
     '-m', '--model_variant', type=str,
-    help='The model variant for pose estimation.'
+    default=MODEL_VARIANT, choices=MODEL_VARIANTS,
+    help="The model variant for pose estimation, 'rt','i','ii','iii','iv'."
 )
 args = update_parser(parser)
 
+RESOLUTION = {'rt': 224, 'i': 256, 'ii': 368, 'iii': 480, 'iv': 600}[args.model_variant]
 
 # ======================
 # Parameters 2
 # ======================
-MODEL_NAME = 'EfficientPose{}'.format(MODEL_VARIANT.upper())
+MODEL_NAME = 'EfficientPose{}'.format(args.model_variant.upper())
 
 WEIGHT_PATH = f'{MODEL_NAME}.onnx'
 MODEL_PATH = f'{MODEL_NAME}.onnx.prototxt'
 
-REMOTE_PATH = f'https://storage.googleapis.com/ailia-models/{MODEL_NAME}/'
-
+REMOTE_PATH = f'https://storage.googleapis.com/ailia-models/efficientpose/'
 
 # ======================
 # Utils
