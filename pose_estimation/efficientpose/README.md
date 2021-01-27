@@ -2,7 +2,7 @@
 
 ## Input
 
-![Input](MPII.jpg)
+<img src="MPII.jpg" width="320px">
 
 Model variant: RT
 Ailia input shape : (1, 224, 224, 3)  
@@ -10,7 +10,7 @@ Range : [0, 1.0]
 
 ## Output
 
-![Output](MPII_out.png)
+<img src="MPII_out.png" width="320px">
 
 - Confidence : (1, 224, 224, 16)
 - Range : [0, 1.0]
@@ -58,8 +58,12 @@ ONNX opset = 10
 ## Netron
 
 [EfficientPoseRT.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/efficientpose/EfficientPoseRT.prototxt)
+
 [EfficientPoseI.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/efficientpose/EfficientPoseI.prototxt)
+
 [EfficientPoseII.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/efficientpose/EfficientPoseII.prototxt)
+
 [EfficientPoseIII.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/efficientpose/EfficientPoseIII.prototxt)
+
 [EfficientPoseIV.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/efficientpose/EfficientPoseIV.prototxt)
 
