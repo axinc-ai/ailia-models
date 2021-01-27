@@ -209,7 +209,7 @@ def extract_coordinates(frame_output, frame_height, frame_width, real_time=False
         #     peak_y += 0.5
         peak_x += 0.5
         peak_y += 0.5
-        
+
         # Normalize coordinates
         peak_x /= output_width
         peak_y /= output_height
