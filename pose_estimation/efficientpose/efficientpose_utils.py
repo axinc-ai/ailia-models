@@ -201,13 +201,15 @@ def extract_coordinates(frame_output, frame_height, frame_width, real_time=False
         peak_x = max_index % output_width
         conf_xy = conf[int(peak_y),int(peak_x)]
         # Verify confidence
-        if real_time and conf_xy < confidence:
-            peak_x = -0.5
-            peak_y = -0.5
-        else:
-            peak_x += 0.5
-            peak_y += 0.5
-
+        # if real_time and conf_xy < confidence:
+        #     peak_x = -0.5
+        #     peak_y = -0.5
+        # else:
+        #     peak_x += 0.5
+        #     peak_y += 0.5
+        peak_x += 0.5
+        peak_y += 0.5
+        
         # Normalize coordinates
         peak_x /= output_width
         peak_y /= output_height
