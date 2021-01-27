@@ -1,6 +1,5 @@
 import sys
 import time
-import argparse
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -123,15 +122,8 @@ def predict_cls(points, net):
     points = np.expand_dims(points, axis=0)
 
     # feedforward
-    if not args.onnx:
-        net.set_input_shape(points.shape)
-        output = net.predict({'points': points})
-    else:
-        point_name = net.get_inputs()[0].name
-        pred_name = net.get_outputs()[0].name
-        trans_name = net.get_outputs()[1].name
-        output = net.run([pred_name, trans_name],
-                         {point_name: points})
+    net.set_input_shape(points.shape)
+    output = net.predict({'points': points})
 
     pred, _ = output
     pred_choice = np.argmax(pred[0], axis=0)

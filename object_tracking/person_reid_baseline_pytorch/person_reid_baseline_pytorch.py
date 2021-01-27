@@ -214,10 +214,8 @@ def extract_feature(imgs, net):
             if scale != 1:
                 imgs = interpolate(imgs, scale)
 
-            img_name = net.get_inputs()[0].name
-            out_name = net.get_outputs()[0].name
-            outputs = net.run([out_name],
-                                {img_name: imgs})[0]
+            net.set_input_shape(imgs.shape)
+            outputs = net.predict({"imgs": imgs})[0]
             ff += outputs
 
     fnorm = np.linalg.norm(ff, ord=2, axis=1, keepdims=True)
