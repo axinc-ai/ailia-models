@@ -142,7 +142,6 @@ class PreProcess:
                 gen_input_ailia=True
             ).astype(np.float32)
             preds_ailia = self.face_alignment.predict(data)
-            print(preds_ailia.shape)#(4, 1, 68, 64, 64)
             pts, _ = _get_preds_from_hm(preds_ailia)
             lms = pts.reshape(68, 2) * 4
 
