@@ -68,16 +68,26 @@ def copy_area(tar, src, lms):
 
 
 class FaceAlignment:
-    def __init__(self, face_alignment_model, face_alignment_weight):
+    def __init__(self, use_onnx, face_alignment_model, face_alignment_weight):
         self.face_alignment_model = face_alignment_model
         self.face_alignment_weight = face_alignment_weight
+        self.use_onnx = use_onnx
         # initialize net
         env_id = ailia.get_gpu_environment_id()
         print(f"env_id (face alignment): {env_id}")
-        self.net = ailia.Net(self.face_alignment_model, self.face_alignment_weight, env_id=env_id)
+        if not self.use_onnx:
+            self.net = ailia.Net(self.face_alignment_model, self.face_alignment_weight, env_id=env_id)
+        else:
+            import onnxruntime
+            self.net = onnxruntime.InferenceSession(self.face_alignment_weight)
 
     def predict(self, data):
-        return self.net.predict(data)
+        # return self.net.predict(data)
+        if not self.use_onnx:
+            return self.net.predict(data)
+        else:
+            inputs = {self.net.get_inputs()[0].name: data}
+            return np.array(self.net.run(None, inputs))[0]
 
 
 class PreProcess:
@@ -109,10 +119,11 @@ class PreProcess:
         self.width_ratio = config.PREPROCESS.WIDTH_RATIO
         self.lip_class   = config.PREPROCESS.LIP_CLASS
         self.face_class  = config.PREPROCESS.FACE_CLASS
+        self.use_onnx = args.onnx
         self.use_dlib = args.use_dlib
         if not self.use_dlib:
             self.input = args.source_path
-            self.face_alignment = FaceAlignment(face_alignment_path[0], face_alignment_path[1])
+            self.face_alignment = FaceAlignment(self.use_onnx, face_alignment_path[0], face_alignment_path[1])
 
     def relative2absolute(self, lms):
         return lms * self.img_size
@@ -130,8 +141,9 @@ class PreProcess:
                 (FACE_ALIGNMENT_IMAGE_HEIGHT, FACE_ALIGNMENT_IMAGE_WIDTH),
                 normalize_type='255',
                 gen_input_ailia=True
-            )
+            ).astype(np.float32)
             preds_ailia = self.face_alignment.predict(data)
+            print(preds_ailia.shape)#(4, 1, 68, 64, 64)
             pts, _ = _get_preds_from_hm(preds_ailia)
             lms = pts.reshape(68, 2) * 4
 
