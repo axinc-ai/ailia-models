@@ -115,7 +115,7 @@ def decode_boxes(raw_boxes, anchors):
         return boxes
 
 
-def raw_output_to_detections(raw_box, raw_score, anchors):
+def raw_output_to_detections(raw_box, raw_score, anchors, min_score_thresh):
         """The output of the neural network is an array of shape (b, 896, 12)
         containing the bounding box regressor predictions, as well as an array 
         of shape (b, 896, 1) with the classification confidences.
@@ -138,7 +138,6 @@ def raw_output_to_detections(raw_box, raw_score, anchors):
         # Note: we stripped off the last dimension from the scores tensor
         # because there is only has one class. Now we can simply use a mask
         # to filter out the boxes with too low confidence.
-        min_score_thresh = 0.75
         mask = detection_scores >= min_score_thresh
 
         # Because each image from the batch can have a different number of
@@ -304,7 +303,7 @@ def denormalize_detections(detections, scale, pad):
     return detections
 
 
-def detector_postprocess(preds_ailia, anchor_path='anchors.npy'):
+def detector_postprocess(preds_ailia, anchor_path='anchors.npy', min_score_thresh = 0.75):
     """
     Process detection predictions from ailia and return filtered detections
     """
@@ -314,7 +313,7 @@ def detector_postprocess(preds_ailia, anchor_path='anchors.npy'):
     anchors = np.load(anchor_path).astype("float32")
 
     # Postprocess the raw predictions:
-    detections = raw_output_to_detections(raw_box, raw_score, anchors)
+    detections = raw_output_to_detections(raw_box, raw_score, anchors, min_score_thresh)
 
     # Non-maximum suppression to remove overlapping detections:
     filtered_detections = []
