@@ -82,7 +82,6 @@ class FaceAlignment:
             self.net = onnxruntime.InferenceSession(self.face_alignment_weight)
 
     def predict(self, data):
-        # return self.net.predict(data)
         if not self.use_onnx:
             return self.net.predict(data)
         else:
