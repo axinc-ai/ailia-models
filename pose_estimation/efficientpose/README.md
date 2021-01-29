@@ -4,6 +4,8 @@
 
 <img src="MPII.jpg" width="320px">
 
+(Image from https://github.com/daniegr/EfficientPose/blob/master/utils/MPII.jpg)
+
 Model variant: RT
 Ailia input shape : (1, 224, 224, 3)  
 Range : [0, 1.0]

@@ -203,6 +203,7 @@ The collection of pre-trained, state-of-the-art models.
 | [<img src="pose_estimation/pose_resnet/output.png" width=128px>](pose_estimation/pose_resnet/) |[pose_resnet](/pose_estimation/pose_resnet/) | [Simple Baselines for Human Pose Estimation and Tracking](https://github.com/microsoft/human-pose-estimation.pytorch) | Pytorch | 1.2.1 and later |
 | [<img src="pose_estimation/blazepose/output.png" width=128px>](pose_estimation/blazepose/) |[blazepose](/pose_estimation/blazepose/) | [MediaPipePyTorch](https://github.com/zmurez/MediaPipePyTorch) | Pytorch | 1.2.5 and later |
 | [<img src="pose_estimation/3dmppe_posenet/output_pose_2d.jpg" width=128px>](pose_estimation/3dmppe_posenet/) |[3dmppe_posenet](/pose_estimation/3dmppe_posenet/) | [PoseNet of "Camera Distance-aware Top-down Approach for 3D Multi-person Pose Estimation from a Single RGB Image"](https://github.com/mks0601/3DMPPE_POSENET_RELEASE) | Pytorch | 1.2.6 and later |
+| [<img src="pose_estimation/efficientpose/MPII_out.png" width=128px>](pose_estimation/efficientpose/) |[efficientpose](/pose_estimation/efficientpose/) | [Code repo for EfficientPose](https://github.com/daniegr/EfficientPose) | Pytorch | 1.2.6 and later |
 
 ## Rotation prediction
 
