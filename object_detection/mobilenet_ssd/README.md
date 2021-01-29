@@ -11,7 +11,7 @@ Range:[0, 1]
 
 ### output
 
-![output_image](annotated.png)
+![output_image](output.png)
 
 
 ### usage
