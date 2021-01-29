@@ -42,7 +42,7 @@ $ python3 pedestrian_detection.py --video VIDEO_PATH
 
 ## Framework
 
-ONNX Runtime
+Keras
 
 ## Model Format
 
