@@ -19,7 +19,7 @@ The collection of pre-trained, state-of-the-art models.
 | [<img src="action_recognition/mars/inputs/input0.jpg" width=128px>](action_recognition/mars/) | [mars](/action_recognition/mars/) | [MARS: Motion-Augmented RGB Stream for Action Recognition](https://github.com/craston/MARS) | Pytorch | 1.2.4 and later |
 | [<img src="action_recognition/st_gcn/input.png" width=128px>](action_recognition/st_gcn/) | [st-gcn](/action_recognition/st_gcn/) | [ST-GCN](https://github.com/yysijie/st-gcn) | Pytorch | 1.2.5 and later |
 
-## Audio Processing
+## Audio processing
 
 | Model | Reference | Exported From | Supported Ailia Version |
 |------------:|:------------:|:------------:|:------------:|
