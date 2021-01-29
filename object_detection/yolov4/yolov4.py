@@ -23,7 +23,7 @@ DETECTION_SIZE_LISTS = [416, 640, 1280]
 
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/yolov4/'
 
-IMAGE_PATH = 'dog.jpg'
+IMAGE_PATH = 'input.jpg'
 SAVE_IMAGE_PATH = 'output.png'
 
 COCO_CATEGORY = [

@@ -20,7 +20,7 @@ WEIGHT_PATH = 'pedestrian_detection.opt.onnx'
 MODEL_PATH = 'pedestrian_detection.opt.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/pedestrian_detection/'
 
-IMAGE_PATH = 'couple.jpg'
+IMAGE_PATH = 'input.jpg'
 SAVE_IMAGE_PATH = 'output.png'
 
 COCO_CATEGORY = [

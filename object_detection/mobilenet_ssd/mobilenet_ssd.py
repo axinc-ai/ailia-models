@@ -17,8 +17,8 @@ import webcamera_utils  # noqa: E402
 # ======================
 # Parameters 1
 # ======================
-IMAGE_PATH = 'couple.jpg'
-SAVE_IMAGE_PATH = 'annotated.png'
+IMAGE_PATH = 'input.jpg'
+SAVE_IMAGE_PATH = 'output.png'
 IMAGE_HEIGHT = 300
 IMAGE_WIDTH = 300
 MODEL_LISTS = ['mb1-ssd', 'mb2-ssd-lite']

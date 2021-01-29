@@ -2,7 +2,7 @@
 
 ## Input
 
-![Input](couple.jpg)
+![Input](input.jpg)
 
 - Shape : (1, 3, 416, 416)  
 - Range : [0.0, 1.0]
