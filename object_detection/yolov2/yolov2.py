@@ -21,7 +21,7 @@ WEIGHT_PATH = 'yolov2.onnx'
 MODEL_PATH = 'yolov2.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/yolov2/'
 
-IMAGE_PATH = 'couple.jpg'
+IMAGE_PATH = 'input.jpg'
 SAVE_IMAGE_PATH = 'output.png'
 IMAGE_HEIGHT = 416  # for video mode
 IMAGE_WIDTH = 416  # for video mode

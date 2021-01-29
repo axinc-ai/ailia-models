@@ -21,7 +21,7 @@ import webcamera_utils  # noqa: E402
 # ======================
 # Parameters
 # ======================
-IMAGE_PATH = 'balloon.png'
+IMAGE_PATH = 'input.jpg'
 SAVE_IMAGE_PATH = 'output.png'
 IMAGE_HEIGHT = 240
 IMAGE_WIDTH = 320
@@ -31,11 +31,7 @@ WEIGHT_PATH = 'pose_iter_440000.caffemodel'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/openpose/'
 
 ALGORITHM = ailia.POSE_ALGORITHM_OPEN_POSE
-# ---
-# require ailia SDK 1.2.5 and later
-# ALGORITHM = ailia.POSE_ALGORITHM_OPEN_POSE_SINGLE_SCALE
-# ---
-THRESHOLD_DEFAULT = 0.4
+THRESHOLD_DEFAULT = 0.3
 
 
 # ======================
@@ -50,11 +46,19 @@ parser.add_argument(
           'you can switch to the normal (not optimized) model')
 )
 parser.add_argument(
+    '-ss', '--single_scale', action='store_true',
+    help=('By default, multi scale detection is used, but with this option, '
+          'you can switch to the single scale detection for performance')
+)
+parser.add_argument(
     '-t', '--threshold', type=float, default=THRESHOLD_DEFAULT,
     help='The detection threshold. (require ailia SDK 1.2.5 and later)'
 )
 args = update_parser(parser)
 
+if args.single_scale:
+    #require ailia SDK 1.2.5 and later
+    ALGORITHM = ailia.POSE_ALGORITHM_OPEN_POSE_SINGLE_SCALE
 
 # ======================
 # Utils

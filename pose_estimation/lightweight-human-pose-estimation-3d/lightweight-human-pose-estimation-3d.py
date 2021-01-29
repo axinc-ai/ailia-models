@@ -26,7 +26,7 @@ WEIGHT_PATH = 'human-pose-estimation-3d.onnx'
 MODEL_PATH = 'human-pose-estimation-3d.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/lightweight-human-pose-estimation-3d/'
 
-IMAGE_PATH = 'input.png'
+IMAGE_PATH = 'input.jpg'
 SAVE_IMAGE_PATH = 'output.png'
 FILE_PATH = 'extrinsics.json'
 IMAGE_HEIGHT = 256

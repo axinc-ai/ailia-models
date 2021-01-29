@@ -2,14 +2,16 @@
 
 ### input
 
-![input_image](input.png)
+![input_image](input.jpg)
+
+(Image from https://pixabay.com/ja/photos/%E5%A5%B3%E3%81%AE%E5%AD%90-%E7%BE%8E%E3%81%97%E3%81%84-%E8%8B%A5%E3%81%84-%E3%83%9B%E3%83%AF%E3%82%A4%E3%83%88-5204299/)
 
 Ailia input shape(1, 3,	256, 448)  
 Range:[-1, 1]
 
 ### output
 
-![output_image](ICV_3D_Human_Pose_Estimation_0.png)
+![output_image](output.png)
 
 ![output_3d](Canvas3D_0.png)
 

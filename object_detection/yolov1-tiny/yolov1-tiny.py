@@ -20,7 +20,7 @@ WEIGHT_PATH = 'yolov1-tiny.caffemodel'
 MODEL_PATH = 'yolov1-tiny.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/yolov1-tiny/'
 
-IMAGE_PATH = 'couple.jpg'
+IMAGE_PATH = 'input.jpg'
 SAVE_IMAGE_PATH = 'output.png'
 IMAGE_HEIGHT = 448  # for video mode
 IMAGE_WIDTH = 448  # for video mode
