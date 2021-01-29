@@ -19,7 +19,7 @@ import webcamera_utils  # noqa: E402
 # Parameters
 # ======================
 
-IMAGE_PATH = 'couple.jpg'
+IMAGE_PATH = 'input.jpg'
 SAVE_IMAGE_PATH = 'output.png'
 
 COCO_CATEGORY = [
