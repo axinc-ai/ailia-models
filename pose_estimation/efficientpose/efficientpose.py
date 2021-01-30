@@ -16,8 +16,6 @@ from webcamera_utils import adjust_frame_size, get_capture  # noqa: E402
 from image_utils import load_image  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 
-import onnxruntime
-
 #TODO:More refactoring on threshold
 
 # ======================
@@ -148,6 +146,7 @@ def recognize_from_image():
 
     # net initialize
     if args.onnx:
+        import onnxruntime
         model = onnxruntime.InferenceSession(WEIGHT_PATH)
     else:
         env_id = ailia.get_gpu_environment_id()
@@ -160,7 +159,11 @@ def recognize_from_image():
         print('BENCHMARK mode')
         for _ in range(5):
             start = int(round(time.time() * 1000))
-            _ = model.predict([batch])[0]
+            if args.onnx:
+                ort_inputs = {model.get_inputs()[0].name: batch.astype(np.float32)}
+                model_out = model.run(None, ort_inputs)[0]
+            else:
+                model_out = model.predict([batch])[0]
             end = int(round(time.time() * 1000))
             print(f'\tailia processing time {end - start} ms')
     else:
@@ -172,8 +175,9 @@ def recognize_from_image():
         else:
             model_out = model.predict([batch])[0]
         print('model_out.shape',model_out.shape)
-        # Extract coordinates
-        coordinates = [e_utils.extract_coordinates(model_out[0,...], image_height, image_width)]
+
+    # Extract coordinates
+    coordinates = [e_utils.extract_coordinates(model_out[0,...], image_height, image_width)]
 
     display_result(src_img, coordinates[0])
     # image.save(normpath(file_path.split('.')[0] + '_out.png'))
@@ -184,6 +188,7 @@ def recognize_from_image():
 def recognize_from_video():
     # net initialize
     if args.onnx:
+        import onnxruntime
         model = onnxruntime.InferenceSession(WEIGHT_PATH)
     else:
         env_id = ailia.get_gpu_environment_id()
