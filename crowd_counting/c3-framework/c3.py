@@ -33,7 +33,7 @@ MODEL_RESNET101_PATH = 'ResNet101.onnx.prototxt'
 MODEL_CSRNET_PATH = 'CSRNet.onnx.prototxt'
 MODEL_SANET_PATH = 'SANet.onnx.prototxt'
 REMOTE_PATH = \
-    'https://storage.googleapis.com/ailia-models/crowd-counting-code/'
+    'https://storage.googleapis.com/ailia-models/c-3-framework/'
 
 IMAGE_PATH = 'demo.jpg'
 SAVE_IMAGE_PATH = 'output.png'
@@ -43,7 +43,7 @@ SAVE_IMAGE_PATH = 'output.png'
 # ======================
 
 parser = get_base_parser(
-    'Crowd Counting Code model', IMAGE_PATH, SAVE_IMAGE_PATH
+    'C-3-Framework model', IMAGE_PATH, SAVE_IMAGE_PATH
 )
 parser.add_argument(
     '-m', '--model', type=str, default='alexnet',
@@ -136,7 +136,7 @@ def recognize_from_video(video, net):
 
     from threading import Event
     fin = Event()
-    
+
     def handle_close(evt):
         fin.set()
 
