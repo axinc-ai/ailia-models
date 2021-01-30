@@ -59,13 +59,13 @@ ONNX opset = 10
 
 ## Netron
 
-[EfficientPoseRT.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/efficientpose/EfficientPoseRT.prototxt)
+[EfficientPoseRT.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/efficientpose/EfficientPoseRT.onnx.prototxt)
 
-[EfficientPoseI.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/efficientpose/EfficientPoseI.prototxt)
+[EfficientPoseI.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/efficientpose/EfficientPoseI.onnx.prototxt)
 
-[EfficientPoseII.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/efficientpose/EfficientPoseII.prototxt)
+[EfficientPoseII.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/efficientpose/EfficientPoseII.onnx.prototxt)
 
-[EfficientPoseIII.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/efficientpose/EfficientPoseIII.prototxt)
+[EfficientPoseIII.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/efficientpose/EfficientPoseIII.onnx.prototxt)
 
-[EfficientPoseIV.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/efficientpose/EfficientPoseIV.prototxt)
+[EfficientPoseIV.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/efficientpose/EfficientPoseIV.onnx.prototxt)
 
