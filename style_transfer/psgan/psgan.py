@@ -26,10 +26,14 @@ FACE_PARSER_WEIGHT_PATH = "face_parser.onnx"
 FACE_PARSER_MODEL_PATH = "face_parser.onnx.prototxt"
 FACE_ALIGNMENT_WEIGHT_PATH = "../../face_recognition/face_alignment/2DFAN-4.onnx"
 FACE_ALIGNMENT_MODEL_PATH = "../../face_recognition/face_alignment/2DFAN-4.onnx.prototxt"
+FACE_DETECTOR_WEIGHT_PATH = "../../face_detection/blazeface/blazeface.onnx"
+FACE_DETECTOR_MODEL_PATH = "../../face_detection/blazeface/blazeface.onnx.prototxt"
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/psgan/"
 FACE_ALIGNMENT_REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/face_alignment/'
+FACE_DETECTOR_REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/blazeface/'
 face_parser_path = [FACE_PARSER_MODEL_PATH, FACE_PARSER_WEIGHT_PATH]
 face_alignment_path = [FACE_ALIGNMENT_MODEL_PATH, FACE_ALIGNMENT_WEIGHT_PATH]
+face_detector_path = [FACE_DETECTOR_MODEL_PATH, FACE_DETECTOR_WEIGHT_PATH]
 
 SOURCE_IMAGE_PATH = "images/non-makeup/xfsy_0106.png"
 REFERENCE_IMAGE_PATH = "images/makeup"
@@ -187,7 +191,7 @@ def _postprocessing(out, source, crop_face, postprocess):
 def transfer_to_image():
     # Prepare input data
     device = args.device
-    preprocess = PreProcess(config, device, args, face_parser_path, face_alignment_path)
+    preprocess = PreProcess(config, device, args, face_parser_path, face_alignment_path, face_detector_path)
     source, real_A, mask_A, diff_A, crop_face = _prepare_data(
         args, device, preprocess, "source"
     )
@@ -220,7 +224,7 @@ def transfer_to_video():
     net = _initialize_net(args)
 
     device = args.device
-    preprocess = PreProcess(config, device, args, face_parser_path, face_alignment_path)
+    preprocess = PreProcess(config, device, args, face_parser_path, face_alignment_path, face_detector_path)
     _, real_B, mask_B, diff_B, _ = _prepare_data(args, device, preprocess, "reference")
     postprocess = PostProcess(config)
 
@@ -265,6 +269,9 @@ def main():
     if not args.use_dlib:
         check_and_download_models(
             FACE_ALIGNMENT_WEIGHT_PATH, FACE_ALIGNMENT_MODEL_PATH, FACE_ALIGNMENT_REMOTE_PATH,
+        )
+        check_and_download_models(
+            FACE_DETECTOR_WEIGHT_PATH, FACE_DETECTOR_MODEL_PATH, FACE_DETECTOR_REMOTE_PATH,
         )
 
     if args.video is not None:

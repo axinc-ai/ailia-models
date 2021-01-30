@@ -16,9 +16,14 @@ from torchvision import transforms
 import faceutils as futils
 sys.path.append("../../util")
 from image_utils import load_image  # noqa: E402
+sys.path.append("../../face_detection")
+from blazeface import blazeface_utils as but
 
 FACE_ALIGNMENT_IMAGE_HEIGHT = 256
 FACE_ALIGNMENT_IMAGE_WIDTH = 256
+FACE_DETECTOR_IMAGE_HEIGHT = 128
+FACE_DETECTOR_IMAGE_WIDTH = 128
+
 
 transform = transforms.Compose([
     transforms.ToTensor(),
@@ -89,11 +94,48 @@ class FaceAlignment:
             return np.array(self.net.run(None, inputs))[0]
 
 
+class FaceDetector:
+    def __init__(self, use_onnx, face_detector_model, face_detector_weight, input):
+        self.face_detector_model = face_detector_model
+        self.face_detector_weight = face_detector_weight
+        self.use_onnx = use_onnx
+        self.input = input
+        # initialize net
+        env_id = ailia.get_gpu_environment_id()
+        print(f"env_id (face detector): {env_id}")
+        if not self.use_onnx:
+            self.net = ailia.Net(self.face_detector_model, self.face_detector_weight, env_id=env_id)
+        else:
+            import onnxruntime
+            self.net = onnxruntime.InferenceSession(self.face_detector_weight)
+
+    def predict(self, image: Image):
+        data = load_image(
+            self.input,
+            (FACE_DETECTOR_IMAGE_HEIGHT, FACE_DETECTOR_IMAGE_WIDTH),
+            normalize_type='127.5',
+            gen_input_ailia=True
+        ).astype(np.float32)
+
+        if not self.use_onnx:
+            preds_ailia = self.net.predict([data])
+        else:
+            inputs = {self.net.get_inputs()[0].name: data}
+            preds_ailia = self.net.run(None, inputs)
+        # postprocessing
+        detected = but.postprocess(preds_ailia, anchor_path=pwd+"/../../../face_detection/blazeface/anchors.npy")[0][0]
+        ymin = int(detected[0] * image.size[1])
+        xmin = int(detected[1] * image.size[0])
+        ymax = int(detected[2] * image.size[1])
+        xmax = int(detected[3] * image.size[0])
+        return [ymin, xmin, ymax, xmax]
+
+
 class PreProcess:
     eye_margin = 16
     diff_size = (64, 64)
 
-    def __init__(self, config, device="cpu", args=None, face_parser_path=None, face_alignment_path=None, need_parser=True):
+    def __init__(self, config, device="cpu", args=None, face_parser_path=None, face_alignment_path=None, face_detector_path=None, need_parser=True):
         self.device = device
         self.img_size = config.DATA.IMG_SIZE
 
@@ -123,6 +165,7 @@ class PreProcess:
         if not self.use_dlib:
             self.input = args.source_path
             self.face_alignment = FaceAlignment(self.use_onnx, face_alignment_path[0], face_alignment_path[1])
+            self.face_detector = FaceDetector(self.use_onnx, face_detector_path[0], face_detector_path[1], self.input)
 
     def relative2absolute(self, lms):
         return lms * self.img_size
@@ -174,7 +217,12 @@ class PreProcess:
         return mask_aug, diff_re
 
     def __call__(self, image: Image):
-        face = futils.dlib.detect(image)
+        if self.use_dlib:
+            face = futils.dlib.detect(image)
+        else:
+            detected = self.face_detector.predict(image)
+            face = dlib.rectangles()
+            face.append(dlib.rectangle(detected[1], detected[0], detected[3], detected[2]))
 
         if not face:
             return None, None, None
