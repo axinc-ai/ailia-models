@@ -7,6 +7,7 @@ cd ../../audio_processing/deepspeech2; python3 deepspeech2.py ${OPTION}
 cd ../../audio_processing/pytorch-dc-tts/; python3 pytorch-dc-tts.py ${OPTION}
 cd ../../audio_processing/unet_source_separation/; python3 unet_source_separation.py ${OPTION}
 cd ../../crowd_counting/crowdcount-cascaded-mtl; python3 crowdcount-cascaded-mtl.py ${OPTION}
+cd ../../crowd_counting/c-3-framework; python3 c-3-framework.py ${OPTION}
 cd ../../deep_fashion/clothing-detection; python3 clothing-detection.py ${OPTION}
 cd ../../deep_fashion/fashionai-key-points-detection; python3 fashionai-key-points-detection.py -c blouse ${OPTION}
 cd ../../deep_fashion/fashionai-key-points-detection; python3 fashionai-key-points-detection.py -c dress ${OPTION}
