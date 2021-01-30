@@ -149,14 +149,14 @@ def recognize_from_image():
         import onnxruntime
         model = onnxruntime.InferenceSession(WEIGHT_PATH)
     else:
-        env_id = ailia.get_gpu_environment_id()
-        print(f'env_id: {env_id}')
-        model = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+        print(f'env_id: {args.env_id}')
+        model = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
  
     # inference
     print('Start inference...')
     if args.benchmark:
         print('BENCHMARK mode')
+        #model.set_profile_mode(True)
         for _ in range(5):
             start = int(round(time.time() * 1000))
             if args.onnx:
@@ -166,6 +166,7 @@ def recognize_from_image():
                 model_out = model.predict([batch])[0]
             end = int(round(time.time() * 1000))
             print(f'\tailia processing time {end - start} ms')
+        #print(model.get_summary())
     else:
         # Person detection
         print('batch.shape', batch.shape)
@@ -191,9 +192,8 @@ def recognize_from_video():
         import onnxruntime
         model = onnxruntime.InferenceSession(WEIGHT_PATH)
     else:
-        env_id = ailia.get_gpu_environment_id()
-        print(f'env_id: {env_id}')
-        model = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+        print(f'env_id: {args.env_id}')
+        model = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
 
     capture = get_capture(args.video)
 
