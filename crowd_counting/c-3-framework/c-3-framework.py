@@ -46,7 +46,7 @@ parser = get_base_parser(
     'C-3-Framework model', IMAGE_PATH, SAVE_IMAGE_PATH
 )
 parser.add_argument(
-    '-m', '--model', type=str, default='alexnet',
+    '-m', '--model', type=str, default='resnet50',
     choices=(
         'alexnet', 'vgg', 'vgg_decoder', 'resnet50', 'resnet101', 'csrnet', 'sanet',
     ),
