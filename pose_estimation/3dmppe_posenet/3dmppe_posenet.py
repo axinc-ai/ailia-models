@@ -408,7 +408,7 @@ def transform(img):
     return img
 
 
-def posenet_to_image(original_img, bbox_list, net_root, net_pose=None, sess_pose=None, benchmark=False):
+def posenet_to_image(original_img, bbox_list, net_root, net_pose, benchmark=False):
     # refer from [https://github.com/mks0601/3DMPPE_ROOTNET_RELEASE/blob/master/demo/demo.py]
     # refer from [https://github.com/mks0601/3DMPPE_POSENET_RELEASE/blob/master/demo/demo.py]
     # MuCo joint set
@@ -500,10 +500,7 @@ def posenet_to_image(original_img, bbox_list, net_root, net_pose=None, sess_pose
     return vis_img
 
 
-def recognize_from_image(img_path, net_maskrcnn, net_root, net_pose=None, sess_pose=None):
-    # temporary check...
-    assert (net_pose is not None) | (sess_pose is not None)
-
+def recognize_from_image(img_path, net_maskrcnn, net_root, net_pose):
     # load image for pposenet
     original_img = cv2.imread(img_path)
 
@@ -518,7 +515,7 @@ def recognize_from_image(img_path, net_maskrcnn, net_root, net_pose=None, sess_p
 
     # exec posenet
     vis_img = posenet_to_image(original_img=original_img, bbox_list=bbox_list, 
-                               net_root=net_root, net_pose=net_pose, sess_pose=sess_pose)
+                               net_root=net_root, net_pose=net_pose)
 
     # output image
     cv2.imwrite(args.savepath, vis_img)
@@ -526,10 +523,7 @@ def recognize_from_image(img_path, net_maskrcnn, net_root, net_pose=None, sess_p
     print('finished process and write result to %s!' % args.savepath)
 
 
-def recognize_from_video(vid_path, net_maskrcnn, net_root, net_pose=None, sess_pose=None):
-    # temporary check...
-    assert (net_pose is not None) | (sess_pose is not None)
-
+def recognize_from_video(vid_path, net_maskrcnn, net_root, net_pose):
     # make capture
     video_capture = webcamera_utils.get_capture(args.video)
 
@@ -559,7 +553,7 @@ def recognize_from_video(vid_path, net_maskrcnn, net_root, net_pose=None, sess_p
 
         # exec posenet
         vis_img = posenet_to_image(original_img=original_img, bbox_list=bbox_list, 
-                                    net_root=net_root, net_pose=net_pose, sess_pose=sess_pose)
+                                    net_root=net_root, net_pose=net_pose)
         
         # display
         cv2.imshow("frame", vis_img)
@@ -593,16 +587,15 @@ def main():
     net_root = ailia.Net(MODEL_PATH_ROOTNET, WEIGHT_PATH_ROOTNET, env_id=env_id)
     # PoseNet
     net_pose = ailia.Net(MODEL_PATH_POSENET, WEIGHT_PATH_POSENET, env_id=env_id)
-    sess_pose = None
 
     if args.video is None:
         # image mode
         recognize_from_image(img_path=args.input, net_maskrcnn=net_maskrcnn, 
-                             net_root=net_root, net_pose=net_pose, sess_pose=sess_pose)
+                             net_root=net_root, net_pose=net_pose)
     else:
         # video mode
         recognize_from_video(vid_path=args.video, net_maskrcnn=net_maskrcnn, 
-                             net_root=net_root, net_pose=net_pose, sess_pose=sess_pose)
+                             net_root=net_root, net_pose=net_pose)
 
 
 if __name__ == '__main__':
