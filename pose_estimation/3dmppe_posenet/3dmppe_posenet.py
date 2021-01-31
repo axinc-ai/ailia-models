@@ -553,7 +553,7 @@ def recognize_from_video(vid_path, net_maskrcnn, net_root, net_pose):
 
         # exec posenet
         vis_img = posenet_to_image(original_img=original_img, bbox_list=bbox_list, 
-                                    net_root=net_root, net_pose=net_pose)
+                                   net_root=net_root, net_pose=net_pose)
         
         # display
         cv2.imshow("frame", vis_img)
