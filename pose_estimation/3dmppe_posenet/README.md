@@ -14,19 +14,24 @@ It is necessary to be connected to the Internet while downloading.
 
 For the sample image,
 ``` bash
-$ python 3dmppe_posenet.py --onnx
+$ python 3dmppe_posenet.py
+(ex on CPU)  $ python 3dmppe_posenet.py -e 0
+(ex on BLAS) $ python 3dmppe_posenet.py -e 1
+(ex on GPU)  $ python 3dmppe_posenet.py -e 2
 ```
 
 If you want to specify the input image, put the image path after the `--input` option.  
 You can use `--savepath` option to change the name of the output file to save.
 ```bash
-$ python3 3dmppe_posenet.py --onnx --input IMAGE_PATH --savepath SAVE_IMAGE_PATH
+$ python3 3dmppe_posenet.py --input IMAGE_PATH --savepath SAVE_IMAGE_PATH
+$ python3 3dmppe_posenet.py -i IMAGE_PATH -s SAVE_IMAGE_PATH
 ```
 
 By adding the `--video` option, you can input the video.
 ```bash
-$ python3 3dmppe_posenet.py --onnx --video VIDEO_PATH --savepath SAVE_VIDEO_PATH
-[ex. $ python3 3dmppe_posenet.py --onnx --video input.mp4 --savepath output.mp]
+$ python3 3dmppe_posenet.py --video VIDEO_PATH --savepath SAVE_VIDEO_PATH
+$ python3 3dmppe_posenet.py -v VIDEO_PATH -s SAVE_VIDEO_PATH
+(ex) $ python3 3dmppe_posenet.py --video input.mp4 --savepath output.mp4
 ```
 
 ### Reference
