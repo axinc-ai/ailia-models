@@ -10,7 +10,7 @@ import mediapipe_iris_utils as iut
 
 sys.path.append('../../util')
 from utils import get_base_parser, update_parser  # noqa: E402
-from webcamera_utils import adjust_frame_size, get_capture  # noqa: E402
+import webcamera_utils  # noqa: E402
 from image_utils import load_image  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 
@@ -175,16 +175,13 @@ def recognize_from_video():
     estimator = ailia.Net(LANDMARK_MODEL_PATH, LANDMARK_WEIGHT_PATH, env_id=env_id)
     estimator2 = ailia.Net(LANDMARK2_MODEL_PATH, LANDMARK2_WEIGHT_PATH, env_id=env_id)
 
-    capture = get_capture(args.video)
+    capture = webcamera_utils.get_capture(args.video)
 
     # create video writer if savepath is specified as video format
     if args.savepath != SAVE_IMAGE_PATH:
         f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
         f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
-        save_h, save_w = webcamera_utils.calc_adjust_fsize(
-            f_h, f_w, IMAGE_HEIGHT, IMAGE_WIDTH
-        )
-        writer = webcamera_utils.get_writer(args.savepath, save_h, save_w)
+        writer = webcamera_utils.get_writer(args.savepath, f_h, f_w)
     else:
         writer = None
 
@@ -242,6 +239,8 @@ def recognize_from_video():
             writer.write(frame)
 
     capture.release()
+    if writer is not None:
+        writer.release()
     cv2.destroyAllWindows()
     print('Script finished successfully.')
     pass
