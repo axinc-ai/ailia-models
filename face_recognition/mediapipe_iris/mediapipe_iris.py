@@ -190,9 +190,6 @@ def recognize_from_video():
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
 
-        if args.video == '0': # Flip horizontally if camera
-            frame = np.ascontiguousarray(frame[:,::-1,:])
-
         _, img128, scale, pad = iut.resize_pad(frame[:,:,::-1])
         input_data = img128.astype('float32') / 127.5 - 1.0
         input_data = np.expand_dims(np.moveaxis(input_data, -1, 0), 0)
@@ -233,7 +230,11 @@ def recognize_from_video():
             for i in range(len(eyes)):
                 draw_eye_iris(frame, eyes[i, :, :16, :2], iris[i, :, :, :2], size=1)
 
-        cv2.imshow('frame', frame)
+        visual_img = frame
+        if args.video == '0': # Flip horizontally if camera
+            visual_img = np.ascontiguousarray(frame[:,::-1,:])
+
+        cv2.imshow('frame', visual_img)
 
         # save results
         if writer is not None:
