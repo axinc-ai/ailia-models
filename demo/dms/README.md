@@ -16,6 +16,8 @@ If you pass `0` as an argument to VIDEO_PATH, you can use the webcam input inste
 $ python3 dms.py --video VIDEO_PATH --savepath SAVE_VIDEO_PATH
 ```
 
+By adding the `--bbox` option, you can check the detected bonding boxes. 
+
 ## Reference
 
 - [facemesh](https://github.com/axinc-ai/ailia-models/tree/master/face_recognition/facemesh)

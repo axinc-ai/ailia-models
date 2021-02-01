@@ -39,6 +39,9 @@ HAND_IMAGE_WIDTH = 256
 POSE_IMAGE_HEIGHT = 256
 POSE_IMAGE_WIDTH = 256
 
+HAND_LANDMARK_THRESHOLD = 0.5#0.75
+POSE_LANDMARK_THRESHOLD = 0.5
+
 # ======================
 # Argument Parser Config
 # ======================
@@ -164,7 +167,7 @@ def hsv_to_rgb(h, s, v):
 
 
 def line(input_img, landmarks, flags, point1, point2):
-    threshold = 0.5
+    threshold = POSE_LANDMARK_THRESHOLD
     for i in range(len(flags)):
         landmark, flag = landmarks[i], flags[i]
         if flag > threshold:
@@ -264,22 +267,12 @@ def recognize_hand(frame,detector,estimator,out_frame=None):
         landmarks = bhut.denormalize_landmarks(normalized_landmarks, affine)
         for i in range(len(flags)):
             landmark, flag, handed = landmarks[i], flags[i], handedness[i]
-            if flag > 0.75:
+            if flag > HAND_LANDMARK_THRESHOLD:
                 if handed > 0.5:
-                    presence[0] = 1
+                    presence[0] = 1 # Left hand
                 else:
-                    presence[1] = 1
+                    presence[1] = 1 # Right hand
                 draw_landmarks_hand(out_frame, landmark[:,:2], bhut.HAND_CONNECTIONS, size=4)
-
-    #if presence[0] and presence[1]:
-    #    text = 'Left and right'
-    #elif presence[0]:
-    #    text = 'Left'
-    #elif presence[1]:
-    #    text = 'Right'
-    #else:
-    #    text = 'No hand'
-    #cv2.putText(out_frame, text, (8, 24), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 255), 2)
 
 
 
