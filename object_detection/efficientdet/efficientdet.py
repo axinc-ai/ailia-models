@@ -27,7 +27,11 @@ WEIGHT_EFFICIENTDET_D3_PATH = 'efficientdet-d3.onnx'
 WEIGHT_EFFICIENTDET_D4_PATH = 'efficientdet-d4.onnx'
 WEIGHT_EFFICIENTDET_D5_PATH = 'efficientdet-d5.onnx'
 WEIGHT_EFFICIENTDET_D6_PATH = 'efficientdet-d6.onnx'
-WEIGHT_EFFICIENTDET_D7_PATH = 'efficientdet-d7.onnx'
+WEIGHT_EFFICIENTDET_D0HD_PATH = 'efficientdet-d0hd.onnx'
+WEIGHT_EFFICIENTDET_D1HD_PATH = 'efficientdet-d1hd.onnx'
+WEIGHT_EFFICIENTDET_D2HD_PATH = 'efficientdet-d2hd.onnx'
+WEIGHT_EFFICIENTDET_D3HD_PATH = 'efficientdet-d3hd.onnx'
+WEIGHT_EFFICIENTDET_D4HD_PATH = 'efficientdet-d4hd.onnx'
 MODEL_EFFICIENTDET_D0_PATH = 'efficientdet-d0.onnx.prototxt'
 MODEL_EFFICIENTDET_D1_PATH = 'efficientdet-d1.onnx.prototxt'
 MODEL_EFFICIENTDET_D2_PATH = 'efficientdet-d2.onnx.prototxt'
@@ -35,7 +39,11 @@ MODEL_EFFICIENTDET_D3_PATH = 'efficientdet-d3.onnx.prototxt'
 MODEL_EFFICIENTDET_D4_PATH = 'efficientdet-d4.onnx.prototxt'
 MODEL_EFFICIENTDET_D5_PATH = 'efficientdet-d5.onnx.prototxt'
 MODEL_EFFICIENTDET_D6_PATH = 'efficientdet-d6.onnx.prototxt'
-MODEL_EFFICIENTDET_D7_PATH = 'efficientdet-d7.onnx.prototxt'
+MODEL_EFFICIENTDET_D0HD_PATH = 'efficientdet-d0hd.onnx.prototxt'
+MODEL_EFFICIENTDET_D1HD_PATH = 'efficientdet-d1hd.onnx.prototxt'
+MODEL_EFFICIENTDET_D2HD_PATH = 'efficientdet-d2hd.onnx.prototxt'
+MODEL_EFFICIENTDET_D3HD_PATH = 'efficientdet-d3hd.onnx.prototxt'
+MODEL_EFFICIENTDET_D4HD_PATH = 'efficientdet-d4hd.onnx.prototxt'
 REMOTE_PATH = \
     'https://storage.googleapis.com/ailia-models/efficientdet/'
 
@@ -64,7 +72,8 @@ parser = get_base_parser(
 parser.add_argument(
     '-m', '--model', type=str, default='d0',
     choices=(
-        'd0', 'd1', 'd2', 'd3', 'd4', 'd5', 'd6', 'd7',
+        'd0', 'd1', 'd2', 'd3', 'd4', 'd5', 'd6',
+        'd0hd', 'd1hd', 'd2hd', 'd3hd', 'd4hd',
     ),
     help='choice model'
 )
@@ -211,7 +220,11 @@ def predict(img, net):
         'd4': 1024,
         'd5': 1280,
         'd6': 1280,
-        'd7': 1280,
+        'd0hd': 1920,
+        'd1hd': 1920,
+        'd2hd': 1920,
+        'd3hd': 1920,
+        'd4hd': 1920,
     }
     input_size = dic_input_size[args.model]
 
@@ -291,7 +304,11 @@ def main():
         'd4': (WEIGHT_EFFICIENTDET_D4_PATH, MODEL_EFFICIENTDET_D4_PATH),
         'd5': (WEIGHT_EFFICIENTDET_D5_PATH, MODEL_EFFICIENTDET_D5_PATH),
         'd6': (WEIGHT_EFFICIENTDET_D6_PATH, MODEL_EFFICIENTDET_D6_PATH),
-        'd7': (WEIGHT_EFFICIENTDET_D7_PATH, MODEL_EFFICIENTDET_D7_PATH),
+        'd0hd': (WEIGHT_EFFICIENTDET_D0HD_PATH, MODEL_EFFICIENTDET_D0HD_PATH),
+        'd1hd': (WEIGHT_EFFICIENTDET_D1HD_PATH, MODEL_EFFICIENTDET_D1HD_PATH),
+        'd2hd': (WEIGHT_EFFICIENTDET_D2HD_PATH, MODEL_EFFICIENTDET_D2HD_PATH),
+        'd3hd': (WEIGHT_EFFICIENTDET_D3HD_PATH, MODEL_EFFICIENTDET_D3HD_PATH),
+        'd4hd': (WEIGHT_EFFICIENTDET_D4HD_PATH, MODEL_EFFICIENTDET_D4HD_PATH),
     }
     weight_path, model_path = dic_model[args.model]
 
