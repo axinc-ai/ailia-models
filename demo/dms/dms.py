@@ -19,7 +19,7 @@ import mediapipe_iris_utils as iut
 
 sys.path.append('../../util')
 from utils import get_base_parser, update_parser  # noqa: E402
-from webcamera_utils import adjust_frame_size, get_capture  # noqa: E402
+import webcamera_utils  # noqa: E402
 from image_utils import load_image  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 
@@ -38,6 +38,9 @@ HAND_IMAGE_WIDTH = 256
 
 POSE_IMAGE_HEIGHT = 256
 POSE_IMAGE_WIDTH = 256
+
+HAND_LANDMARK_THRESHOLD = 0.5#0.75
+POSE_LANDMARK_THRESHOLD = 0.5
 
 # ======================
 # Argument Parser Config
@@ -164,7 +167,7 @@ def hsv_to_rgb(h, s, v):
 
 
 def line(input_img, landmarks, flags, point1, point2):
-    threshold = 0.5
+    threshold = POSE_LANDMARK_THRESHOLD
     for i in range(len(flags)):
         landmark, flag = landmarks[i], flags[i]
         if flag > threshold:
@@ -264,22 +267,12 @@ def recognize_hand(frame,detector,estimator,out_frame=None):
         landmarks = bhut.denormalize_landmarks(normalized_landmarks, affine)
         for i in range(len(flags)):
             landmark, flag, handed = landmarks[i], flags[i], handedness[i]
-            if flag > 0.75:
+            if flag > HAND_LANDMARK_THRESHOLD:
                 if handed > 0.5:
-                    presence[0] = 1
+                    presence[0] = 1 # Left hand
                 else:
-                    presence[1] = 1
+                    presence[1] = 1 # Right hand
                 draw_landmarks_hand(out_frame, landmark[:,:2], bhut.HAND_CONNECTIONS, size=4)
-
-    #if presence[0] and presence[1]:
-    #    text = 'Left and right'
-    #elif presence[0]:
-    #    text = 'Left'
-    #elif presence[1]:
-    #    text = 'Right'
-    #else:
-    #    text = 'No hand'
-    #cv2.putText(out_frame, text, (8, 24), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 255), 2)
 
 
 
@@ -388,16 +381,13 @@ def recognize_from_video():
     pose_detector = ailia.Net(POSE_DETECTOR_MODEL_PATH, POSE_DETECTOR_WEIGHT_PATH, env_id=env_id)
     pose_estimator = ailia.Net(POSE_ESTIMATOR_MODEL_PATH, POSE_ESTIMATOR_WEIGHT_PATH, env_id=env_id)
 
-    capture = get_capture(args.video)
+    capture = webcamera_utils.get_capture(args.video)
 
     # create video writer if savepath is specified as video format
     if args.savepath != SAVE_IMAGE_PATH:
         f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
         f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
-        save_h, save_w = webcamera_utils.calc_adjust_fsize(
-            f_h, f_w, IMAGE_HEIGHT, IMAGE_WIDTH
-        )
-        writer = webcamera_utils.get_writer(args.savepath, save_h, save_w)
+        writer = webcamera_utils.get_writer(args.savepath, f_h, f_w)
     else:
         writer = None
 
@@ -417,7 +407,7 @@ def recognize_from_video():
 
         # save results
         if writer is not None:
-            writer.write(frame)
+            writer.write(out_frame)
 
     capture.release()
     cv2.destroyAllWindows()

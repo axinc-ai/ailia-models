@@ -22,7 +22,7 @@ WEIGHT_PATH = './m2det.onnx'
 MODEL_PATH = './m2det.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/m2det/'
 
-IMAGE_PATH = 'couple.jpg'
+IMAGE_PATH = 'input.jpg'
 SAVE_IMAGE_PATH = 'output.png'
 IMAGE_HEIGHT = 448  # for video mode
 IMAGE_WIDTH = 448  # for video mode

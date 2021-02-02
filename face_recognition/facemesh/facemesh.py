@@ -10,7 +10,7 @@ import facemesh_utils as fut
 
 sys.path.append('../../util')
 from utils import get_base_parser, update_parser  # noqa: E402
-from webcamera_utils import adjust_frame_size, get_capture  # noqa: E402
+from webcamera_utils import get_capture, get_writer  # noqa: E402
 from image_utils import load_image  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 
@@ -156,10 +156,7 @@ def recognize_from_video():
     if args.savepath != SAVE_IMAGE_PATH:
         f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
         f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
-        save_h, save_w = webcamera_utils.calc_adjust_fsize(
-            f_h, f_w, IMAGE_HEIGHT, IMAGE_WIDTH
-        )
-        writer = webcamera_utils.get_writer(args.savepath, save_h, save_w)
+        writer = get_writer(args.savepath, f_h, f_w)
     else:
         writer = None
 
@@ -167,8 +164,6 @@ def recognize_from_video():
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
-
-        frame = np.ascontiguousarray(frame[:,::-1,:])
 
         _, img128, scale, pad = fut.resize_pad(frame[:,:,::-1])
         input_data = img128.astype('float32') / 127.5 - 1.0
@@ -204,13 +199,19 @@ def recognize_from_video():
                 # if confidence > 0: # Can be > 1, no idea what it represents
                 draw_landmarks(frame, landmark[:,:2], size=1)
 
-        cv2.imshow('frame', frame)
+        visual_img = frame
+        if args.video == '0': # Flip horizontally if camera
+            visual_img = np.ascontiguousarray(frame[:,::-1,:])
+
+        cv2.imshow('frame', visual_img)
 
         # save results
         if writer is not None:
             writer.write(frame)
 
     capture.release()
+    if writer is not None:
+        writer.release()
     cv2.destroyAllWindows()
     print('Script finished successfully.')
     pass
