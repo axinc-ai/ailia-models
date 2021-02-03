@@ -261,12 +261,16 @@ def recognize_from_image(filename, net):
     # inference
     print('Start inference...')
     if args.benchmark:
+        #if not args.onnx:
+        #    net.set_profile_mode(True)
         print('BENCHMARK mode')
         for i in range(5):
             start = int(round(time.time() * 1000))
             pred = predict(img, net)
             end = int(round(time.time() * 1000))
             print(f'\tailia processing time {end - start} ms')
+        #if not args.onnx:
+        #    print(net.get_summary())
     else:
         pred = predict(img, net)
 
@@ -317,7 +321,7 @@ def main():
 
     # initialize
     if not args.onnx:
-        env_id = ailia.get_gpu_environment_id()
+        env_id = args.env_id
         net = ailia.Net(model_path, weight_path, env_id=env_id)
     else:
         import onnxruntime
