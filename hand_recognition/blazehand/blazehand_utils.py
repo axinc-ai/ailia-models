@@ -391,17 +391,109 @@ def estimator_preprocess(src_img, detections, scale, pad):
     """
     Extract ROI given detections
     """
-    pose_detections = denormalize_detections(detections[0], scale, pad)
+    pose_detections = denormalize_detections(detections, scale, pad)
     xc, yc, scale, theta = detection2roi(pose_detections)
     img, affine, box = extract_roi(src_img, xc, yc, theta, scale)
 
     return img, affine, box
 
 
-def denormalize_landmarks(landmarks, affines):
+def denormalize_landmarks(normalized_landmarks, affines):
+    landmarks = normalized_landmarks.copy()
     landmarks[:,:,:2] *= resolution
     for i in range(len(landmarks)):
         landmark, affine = landmarks[i], affines[i]
         landmark = (affine[:,:2] @ landmark[:,:2].T + affine[:,2:]).T
         landmarks[i,:,:2] = landmark
     return landmarks
+
+def normalize_radians(angle):
+  return angle - 2 * np.pi * np.floor((angle - (-np.pi)) / (2 * np.pi))
+
+def compute_rotation(landmarks):
+    kWristJoint = 0
+    kMiddleFingerPIPJoint = 6
+    kIndexFingerPIPJoint = 4
+    kRingFingerPIPJoint = 8
+    kTargetAngle = np.pi * 0.5
+
+    x0 = landmarks[kWristJoint, 0] * resolution
+    y0 = landmarks[kWristJoint, 1] * resolution
+
+    x1 = (landmarks[kIndexFingerPIPJoint, 0] + landmarks[kRingFingerPIPJoint, 0]) / 2
+    y1 = (landmarks[kIndexFingerPIPJoint, 1] + landmarks[kRingFingerPIPJoint, 1]) / 2
+    x1 = (x1 + landmarks[kMiddleFingerPIPJoint, 0]) / 2 * resolution
+    y1 = (y1 + landmarks[kMiddleFingerPIPJoint, 1]) / 2 * resolution
+
+    rotation = normalize_radians(kTargetAngle - np.arctan2(-(y1 - y0), x1 - x0))
+    return rotation
+
+def landmarks2roi(landmarks, affine):
+    """
+    Inputs:
+        landmarks: normalized cropped hand image landmarks
+        affine: Affine transform matrix to get original coordinates from
+            cropped image coordinates
+    
+    Outputs:
+        ROI x center, y center, scale (width = height), theta (rotation)
+        in original image coordinates
+
+    Reference: https://github.com/google/mediapipe/blob/master/mediapipe/modules/hand_landmark/hand_landmark_landmarks_to_roi.pbtxt
+    """
+    partial_landmarks_id = [0, 1, 2, 3, 5, 6, 9, 10, 13, 14, 17, 18]
+    partial_landmarks = landmarks[partial_landmarks_id, :]
+
+    rotation = compute_rotation(partial_landmarks)
+    c, s = np.cos(rotation), np.sin(rotation)
+    rot_mat = np.array([
+        [ c, -s],
+        [ s,  c]
+    ])
+    rev_rot_mat = np.array([
+        [ c,  s],
+        [-s,  c]
+    ])
+
+    # Find boundaries of landmarks.
+    axis_min = np.min(partial_landmarks[:, :2], axis=0)
+    axis_max = np.max(partial_landmarks[:, :2], axis=0)
+    axis_aligned_center = (axis_min + axis_max) / 2
+
+    # Find boundaries of rotated landmarks.
+    translated = (partial_landmarks[:, :2] - axis_aligned_center[None]) * resolution
+    projected = translated @ rev_rot_mat.T
+    projected_min = np.min(projected, axis=0)
+    projected_max = np.max(projected, axis=0)
+
+    scale = [2, 2]
+    shift = [0, -0.1]
+
+    projected_center = (projected_min + projected_max) / 2
+    projected_wh = projected_max - projected_min
+    projected_center += projected_wh * shift
+
+    long_side = np.max(projected_wh)
+    projected_wh[:] = long_side
+    projected_wh *= scale
+
+    projected_min_x, projected_min_y = projected_center - projected_wh / 2
+    projected_max_x, projected_max_y = projected_center + projected_wh / 2
+
+    projected_corners = np.array([
+        [projected_min_x, projected_min_y], # top left
+        [projected_max_x, projected_min_y], # top right
+        [projected_min_x, projected_max_y], # bottom left
+        [projected_max_x, projected_max_y]  # bottom right
+    ])
+
+    # Corners in cropped hand image coordinates
+    cropped_corners = (projected_corners @ rot_mat.T) + axis_aligned_center[None] * resolution
+
+    # Compute ROI in original image coordinates
+    corners = (affine[:,:2] @ cropped_corners.T + affine[:,2:]).T
+    x_center, y_center = corners.mean(axis=0)
+    scale_orig = np.linalg.norm(corners[1] - corners[0])
+    theta = np.arctan2(corners[1, 1] - corners[0, 1], corners[1, 0] - corners[0, 0])
+
+    return x_center, y_center, scale_orig, theta
