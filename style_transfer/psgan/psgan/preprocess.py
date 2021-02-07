@@ -1,21 +1,21 @@
 import os.path as osp
+
 pwd = osp.split(osp.realpath(__file__))[0]
 import sys
-sys.path.append(pwd + '/..')
+
+sys.path.append(pwd + "/..")
 
 import ailia
 import cv2
 import dlib
 import numpy as np
 from PIL import Image
-import torch
-from torch.autograd import Variable
-import torch.nn.functional as F
-from torchvision import transforms
 
 import faceutils as futils
+
 sys.path.append("../../util")
 from image_utils import load_image  # noqa: E402
+
 sys.path.append("../../face_detection")
 from blazeface import blazeface_utils as but
 
@@ -25,51 +25,17 @@ FACE_DETECTOR_IMAGE_HEIGHT = 128
 FACE_DETECTOR_IMAGE_WIDTH = 128
 
 
-transform = transforms.Compose([
-    transforms.ToTensor(),
-    transforms.Normalize([0.5,0.5,0.5],[0.5,0.5,0.5])])
-
-
-def ToTensor(pic):
-    # handle PIL Image
-    if pic.mode == 'I':
-        img = torch.from_numpy(np.array(pic, np.int32, copy=False))
-    elif pic.mode == 'I;16':
-        img = torch.from_numpy(np.array(pic, np.int16, copy=False))
-    else:
-        img = torch.ByteTensor(torch.ByteStorage.from_buffer(pic.tobytes()))
-    # PIL image mode: 1, L, P, I, F, RGB, YCbCr, RGBA, CMYK
-    if pic.mode == 'YCbCr':
-        nchannel = 3
-    elif pic.mode == 'I;16':
-        nchannel = 1
-    else:
-        nchannel = len(pic.mode)
-    img = img.view(pic.size[1], pic.size[0], nchannel)
-    # put it from HWC to CHW format
-    # yikes, this transpose takes 80% of the loading time/CPU
-    img = img.transpose(0, 1).transpose(0, 2).contiguous()
-    if isinstance(img, torch.ByteTensor):
-        return img.float()
-    else:
-        return img
-
-
-def to_var(x, requires_grad=True):
-    if requires_grad:
-        return Variable(x).float()
-    else:
-        return Variable(x, requires_grad=requires_grad).float()
-
-
 def copy_area(tar, src, lms):
-    rect = [int(min(lms[:, 1])) - PreProcess.eye_margin, 
-            int(min(lms[:, 0])) - PreProcess.eye_margin, 
-            int(max(lms[:, 1])) + PreProcess.eye_margin + 1, 
-            int(max(lms[:, 0])) + PreProcess.eye_margin + 1]
-    tar[:, :, rect[1]:rect[3], rect[0]:rect[2]] = \
-        src[:, :, rect[1]:rect[3], rect[0]:rect[2]]
-    src[:, :, rect[1]:rect[3], rect[0]:rect[2]] = 0
+    rect = [
+        int(min(lms[:, 1])) - PreProcess.eye_margin,
+        int(min(lms[:, 0])) - PreProcess.eye_margin,
+        int(max(lms[:, 1])) + PreProcess.eye_margin + 1,
+        int(max(lms[:, 0])) + PreProcess.eye_margin + 1,
+    ]
+    tar[:, :, rect[1] : rect[3], rect[0] : rect[2]] = src[
+        :, :, rect[1] : rect[3], rect[0] : rect[2]
+    ]
+    src[:, :, rect[1] : rect[3], rect[0] : rect[2]] = 0
 
 
 class FaceAlignment:
@@ -81,9 +47,12 @@ class FaceAlignment:
         env_id = ailia.get_gpu_environment_id()
         print(f"env_id (face alignment): {env_id}")
         if not self.use_onnx:
-            self.net = ailia.Net(self.face_alignment_model, self.face_alignment_weight, env_id=env_id)
+            self.net = ailia.Net(
+                self.face_alignment_model, self.face_alignment_weight, env_id=env_id
+            )
         else:
             import onnxruntime
+
             self.net = onnxruntime.InferenceSession(self.face_alignment_weight)
 
     def predict(self, data):
@@ -104,17 +73,20 @@ class FaceDetector:
         env_id = ailia.get_gpu_environment_id()
         print(f"env_id (face detector): {env_id}")
         if not self.use_onnx:
-            self.net = ailia.Net(self.face_detector_model, self.face_detector_weight, env_id=env_id)
+            self.net = ailia.Net(
+                self.face_detector_model, self.face_detector_weight, env_id=env_id
+            )
         else:
             import onnxruntime
+
             self.net = onnxruntime.InferenceSession(self.face_detector_weight)
 
     def predict(self, image: Image):
         data = load_image(
             self.input,
             (FACE_DETECTOR_IMAGE_HEIGHT, FACE_DETECTOR_IMAGE_WIDTH),
-            normalize_type='127.5',
-            gen_input_ailia=True
+            normalize_type="127.5",
+            gen_input_ailia=True,
         ).astype(np.float32)
 
         if not self.use_onnx:
@@ -123,7 +95,10 @@ class FaceDetector:
             inputs = {self.net.get_inputs()[0].name: data}
             preds_ailia = self.net.run(None, inputs)
         # postprocessing
-        detected = but.postprocess(preds_ailia, anchor_path=pwd+"/../../../face_detection/blazeface/anchors.npy")[0][0]
+        detected = but.postprocess(
+            preds_ailia,
+            anchor_path=pwd + "/../../../face_detection/blazeface/anchors.npy",
+        )[0][0]
         ymin = int(detected[0] * image.size[1])
         xmin = int(detected[1] * image.size[0])
         ymax = int(detected[2] * image.size[1])
@@ -135,37 +110,43 @@ class PreProcess:
     eye_margin = 16
     diff_size = (64, 64)
 
-    def __init__(self, config, device="cpu", args=None, face_parser_path=None, face_alignment_path=None, face_detector_path=None, need_parser=True):
-        self.device = device
+    def __init__(
+        self,
+        config,
+        args=None,
+        face_parser_path=None,
+        face_alignment_path=None,
+        face_detector_path=None,
+        need_parser=True,
+    ):
         self.img_size = config.DATA.IMG_SIZE
 
         xs, ys = np.meshgrid(
-            np.linspace(
-                0, self.img_size - 1,
-                self.img_size
-            ),
-            np.linspace(
-                0, self.img_size - 1,
-                self.img_size
-            )
+            np.linspace(0, self.img_size - 1, self.img_size),
+            np.linspace(0, self.img_size - 1, self.img_size),
         )
         xs = xs[None].repeat(config.PREPROCESS.LANDMARK_POINTS, axis=0)
         ys = ys[None].repeat(config.PREPROCESS.LANDMARK_POINTS, axis=0)
-        fix = np.concatenate([ys, xs], axis=0)
-        self.fix = torch.Tensor(fix).to(self.device)
+        self.fix = np.concatenate([ys, xs], axis=0)
         if need_parser:
-            self.face_parse = futils.mask.FaceParser(device=device, args=args, face_parser_path=face_parser_path)
-        self.up_ratio    = config.PREPROCESS.UP_RATIO
-        self.down_ratio  = config.PREPROCESS.DOWN_RATIO
+            self.face_parse = futils.mask.FaceParser(
+                args=args, face_parser_path=face_parser_path
+            )
+        self.up_ratio = config.PREPROCESS.UP_RATIO
+        self.down_ratio = config.PREPROCESS.DOWN_RATIO
         self.width_ratio = config.PREPROCESS.WIDTH_RATIO
-        self.lip_class   = config.PREPROCESS.LIP_CLASS
-        self.face_class  = config.PREPROCESS.FACE_CLASS
+        self.lip_class = config.PREPROCESS.LIP_CLASS
+        self.face_class = config.PREPROCESS.FACE_CLASS
         self.use_onnx = args.onnx
         self.use_dlib = args.use_dlib
         if not self.use_dlib:
             self.input = args.source_path
-            self.face_alignment = FaceAlignment(self.use_onnx, face_alignment_path[0], face_alignment_path[1])
-            self.face_detector = FaceDetector(self.use_onnx, face_detector_path[0], face_detector_path[1], self.input)
+            self.face_alignment = FaceAlignment(
+                self.use_onnx, face_alignment_path[0], face_alignment_path[1]
+            )
+            self.face_detector = FaceDetector(
+                self.use_onnx, face_detector_path[0], face_detector_path[1], self.input
+            )
 
     def relative2absolute(self, lms):
         return lms * self.img_size
@@ -173,16 +154,21 @@ class PreProcess:
     def detect_landmark(self, image, face):
         if self.use_dlib:
             predictor = dlib.shape_predictor(
-                pwd + '/../faceutils/dlibutils/shape_predictor_68_face_landmarks.dat')
-            lms = futils.dlib.landmarks(predictor, image, face) * self.img_size / image.width
+                pwd + "/../faceutils/dlibutils/shape_predictor_68_face_landmarks.dat"
+            )
+            lms = (
+                futils.dlib.landmarks(predictor, image, face)
+                * self.img_size
+                / image.width
+            )
             lms = lms.round()
         else:
             # prepare input data
             data = load_image(
                 self.input,
                 (FACE_ALIGNMENT_IMAGE_HEIGHT, FACE_ALIGNMENT_IMAGE_WIDTH),
-                normalize_type='255',
-                gen_input_ailia=True
+                normalize_type="255",
+                gen_input_ailia=True,
             ).astype(np.float32)
             preds_ailia = self.face_alignment.predict(data)
             pts, _ = _get_preds_from_hm(preds_ailia)
@@ -190,28 +176,41 @@ class PreProcess:
 
         return lms
 
-    def process(self, mask, lms, device="cpu"):
+    def process(self, mask, lms):
         lms_eye_left = lms[42:48]
         lms_eye_right = lms[36:42]
-        lms = lms.transpose((1, 0)).reshape(-1, 1, 1)   # transpose to (y-x)
+        lms = lms.transpose((1, 0)).reshape(-1, 1, 1)  # transpose to (y-x)
         # lms = np.tile(lms, (1, 256, 256))  # (136, h, w)
-        diff = to_var((self.fix.double() - torch.tensor(lms).to(self.device)).unsqueeze(0), requires_grad=False).to(self.device)
+        diff = np.expand_dims(self.fix.astype("float32") - lms, 0)
 
-        mask_lip = (mask == self.lip_class[0]).float() + (mask == self.lip_class[1]).float()
-        mask_face = (mask == self.face_class[0]).float() + (mask == self.face_class[1]).float()
+        mask_lip = (mask == self.lip_class[0]) + (mask == self.lip_class[1])
+        mask_face = (mask == self.face_class[0]) + (mask == self.face_class[1])
 
-        mask_eyes = torch.zeros_like(mask, device=device)
+        mask_eyes = np.zeros_like(mask)
         copy_area(mask_eyes, mask_face, lms_eye_left)
         copy_area(mask_eyes, mask_face, lms_eye_right)
-        mask_eyes = to_var(mask_eyes, requires_grad=False).to(device)
 
         mask_list = [mask_lip, mask_face, mask_eyes]
-        mask_aug = torch.cat(mask_list, 0)      # (3, 1, h, w)
-        mask_re = F.interpolate(mask_aug, size=self.diff_size).repeat(1, diff.shape[1], 1, 1)  # (3, 136, 64, 64)
-        diff_re = F.interpolate(diff, size=self.diff_size).repeat(3, 1, 1, 1)  # (3, 136, 64, 64)
-        diff_re = diff_re * mask_re             # (3, 136, 32, 32)
-        norm = torch.norm(diff_re, dim=1, keepdim=True).repeat(1, diff_re.shape[1], 1, 1)
-        norm = torch.where(norm == 0, torch.tensor(1e10, device=device), norm)
+        mask_aug = np.concatenate(mask_list, 0)  # (3, 1, h, w)
+        mask_re = cv2.resize(
+            mask_aug.squeeze().transpose((1, 2, 0)),
+            dsize=self.diff_size,
+            interpolation=cv2.INTER_NEAREST,
+        ).transpose(2, 0, 1)
+        mask_re = np.tile(
+            np.expand_dims(mask_re, 1), (1, diff.shape[1], 1, 1)
+        )  # (3, 136, 64, 64)
+        diff_re = cv2.resize(
+            diff.squeeze().transpose((1, 2, 0)),
+            dsize=self.diff_size,
+            interpolation=cv2.INTER_NEAREST,
+        ).transpose(2, 0, 1)
+        diff_re = np.tile(np.expand_dims(diff_re, 0), (3, 1, 1, 1))  # (3, 136, 64, 64)
+        diff_re = diff_re * mask_re  # (3, 136, 32, 32)
+        norm = np.tile(
+            np.linalg.norm(diff_re, axis=1, keepdims=True), (1, diff_re.shape[1], 1, 1)
+        )
+        norm = np.where(norm == 0, 1e10, norm)
         diff_re /= norm
 
         return mask_aug, diff_re
@@ -222,7 +221,9 @@ class PreProcess:
         else:
             detected = self.face_detector.predict(image)
             face = dlib.rectangles()
-            face.append(dlib.rectangle(detected[1], detected[0], detected[3], detected[2]))
+            face.append(
+                dlib.rectangle(detected[1], detected[0], detected[3], detected[2])
+            )
 
         if not face:
             return None, None, None
@@ -230,25 +231,33 @@ class PreProcess:
         face_on_image = face[0]
 
         image, face, crop_face = futils.dlib.crop(
-            image, face_on_image, self.up_ratio, self.down_ratio, self.width_ratio)
-        np_image = np.array(image)
+            image, face_on_image, self.up_ratio, self.down_ratio, self.width_ratio
+        )
+        np_image = np.array(image).astype(np.float32)
         mask = self.face_parse.parse(cv2.resize(np_image, (512, 512)))
         # obtain face parsing result
         # image = image.resize((512, 512), Image.ANTIALIAS)
-        mask = F.interpolate(
-            mask.view(1, 1, 512, 512),
-            (self.img_size, self.img_size),
-            mode="nearest")
-        mask = mask.type(torch.uint8)
-        mask = to_var(mask, requires_grad=False).to(self.device)
+        mask = np.array(
+            Image.fromarray(mask).resize(
+                (self.img_size, self.img_size), resample=Image.NEAREST
+            )
+        )
+        mask = np.expand_dims(mask, (0, 1))
 
         lms = self.detect_landmark(image, face)
 
-        mask, diff = self.process(mask, lms, device=self.device)
+        mask, diff = self.process(mask, lms)
         image = image.resize((self.img_size, self.img_size), Image.ANTIALIAS)
-        image = transform(image)
-        real = to_var(image.unsqueeze(0))
-        return [real, mask, diff], face_on_image, crop_face
+        image = np.array(image).transpose((2, 0, 1)) / 255
+        means = np.expand_dims([0.5, 0.5, 0.5], (1, 2))
+        stds = np.expand_dims([0.5, 0.5, 0.5], (1, 2))
+        image = (image - means) / stds
+        real = np.expand_dims(image, 0)
+        return (
+            [real.astype(np.float32), mask.astype(np.float32), diff.astype(np.float32)],
+            face_on_image,
+            crop_face,
+        )
 
 
 # Copied from face_recognition/face_alignment/face_alignment.py
@@ -285,8 +294,11 @@ def _get_preds_from_hm(hm):
             pX, pY = int(preds[i, j, 0]) - 1, int(preds[i, j, 1]) - 1
             if pX > 0 and pX < 63 and pY > 0 and pY < 63:
                 diff = np.array(
-                    [hm_[pY, pX + 1] - hm_[pY, pX - 1],
-                     hm_[pY + 1, pX] - hm_[pY - 1, pX]]).astype(np.float)
+                    [
+                        hm_[pY, pX + 1] - hm_[pY, pX - 1],
+                        hm_[pY + 1, pX] - hm_[pY - 1, pX],
+                    ]
+                ).astype(np.float)
                 preds[i, j] = preds[i, j] + (np.sign(diff) * 0.25)
 
     preds += -0.5

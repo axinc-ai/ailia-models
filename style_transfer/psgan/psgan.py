@@ -25,12 +25,16 @@ MODEL_PATH = "psgan.onnx.prototxt"
 FACE_PARSER_WEIGHT_PATH = "face_parser.onnx"
 FACE_PARSER_MODEL_PATH = "face_parser.onnx.prototxt"
 FACE_ALIGNMENT_WEIGHT_PATH = "../../face_recognition/face_alignment/2DFAN-4.onnx"
-FACE_ALIGNMENT_MODEL_PATH = "../../face_recognition/face_alignment/2DFAN-4.onnx.prototxt"
+FACE_ALIGNMENT_MODEL_PATH = (
+    "../../face_recognition/face_alignment/2DFAN-4.onnx.prototxt"
+)
 FACE_DETECTOR_WEIGHT_PATH = "../../face_detection/blazeface/blazeface.onnx"
 FACE_DETECTOR_MODEL_PATH = "../../face_detection/blazeface/blazeface.onnx.prototxt"
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/psgan/"
-FACE_ALIGNMENT_REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/face_alignment/'
-FACE_DETECTOR_REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/blazeface/'
+FACE_ALIGNMENT_REMOTE_PATH = (
+    "https://storage.googleapis.com/ailia-models/face_alignment/"
+)
+FACE_DETECTOR_REMOTE_PATH = "https://storage.googleapis.com/ailia-models/blazeface/"
 face_parser_path = [FACE_PARSER_MODEL_PATH, FACE_PARSER_WEIGHT_PATH]
 face_alignment_path = [FACE_ALIGNMENT_MODEL_PATH, FACE_ALIGNMENT_WEIGHT_PATH]
 face_detector_path = [FACE_DETECTOR_MODEL_PATH, FACE_DETECTOR_WEIGHT_PATH]
@@ -92,13 +96,14 @@ parser.add_argument(
     "--reference_dir", default=REFERENCE_IMAGE_PATH, help="Path to reference images"
 )
 parser.add_argument(
-    "--device", default="cpu", help="Device used for inference",
+    "--onnx",
+    action="store_true",
+    help="Execute Onnx Runtime mode.",
 )
 parser.add_argument(
-    "--onnx", action="store_true", help="Execute Onnx Runtime mode.",
-)
-parser.add_argument(
-    "--use_dlib", action="store_true", help="Use dlib models for inference.",
+    "--use_dlib",
+    action="store_true",
+    help="Use dlib models for inference.",
 )
 
 args = parser.parse_args()
@@ -109,7 +114,7 @@ config = setup_config(args)
 # ======================
 
 
-def _prepare_data(args, device, preprocess, image_type, frame=None):
+def _prepare_data(args, preprocess, image_type, frame=None):
     real = None
     mask = None
     diff = None
@@ -128,9 +133,6 @@ def _prepare_data(args, device, preprocess, image_type, frame=None):
         raise ValueError
 
     if image_input:
-        for i in range(len(image_input)):
-            image_input[i] = image_input[i].to(device)
-
         real, mask, diff = image_input
 
     return image, real, mask, diff, crop_face
@@ -149,30 +151,24 @@ def _initialize_net(args):
     return net
 
 
-def _to_numpy(tensor):
-    return (
-        tensor.detach().cpu().numpy() if tensor.requires_grad else tensor.cpu().numpy()
-    )
-
-
 def _transfer(real_A, real_B, mask_A, mask_B, diff_A, diff_B, net):
     if not args.onnx:
         return net.predict(
-            _to_numpy(real_A),
-            _to_numpy(real_B),
-            _to_numpy(mask_A),
-            _to_numpy(mask_B),
-            _to_numpy(diff_A),
-            _to_numpy(diff_B),
+            real_A,
+            real_B,
+            mask_A,
+            mask_B,
+            diff_A,
+            diff_B,
         )
     else:
         inputs = {
-            net.get_inputs()[0].name: _to_numpy(real_A),
-            net.get_inputs()[1].name: _to_numpy(real_B),
-            net.get_inputs()[2].name: _to_numpy(mask_A),
-            net.get_inputs()[3].name: _to_numpy(mask_B),
-            net.get_inputs()[4].name: _to_numpy(diff_A),
-            net.get_inputs()[5].name: _to_numpy(diff_B),
+            net.get_inputs()[0].name: real_A,
+            net.get_inputs()[1].name: real_B,
+            net.get_inputs()[2].name: mask_A,
+            net.get_inputs()[3].name: mask_B,
+            net.get_inputs()[4].name: diff_A,
+            net.get_inputs()[5].name: diff_B,
         }
         return net.run(None, inputs)
 
@@ -190,12 +186,13 @@ def _postprocessing(out, source, crop_face, postprocess):
 
 def transfer_to_image():
     # Prepare input data
-    device = args.device
-    preprocess = PreProcess(config, device, args, face_parser_path, face_alignment_path, face_detector_path)
-    source, real_A, mask_A, diff_A, crop_face = _prepare_data(
-        args, device, preprocess, "source"
+    preprocess = PreProcess(
+        config, args, face_parser_path, face_alignment_path, face_detector_path
     )
-    _, real_B, mask_B, diff_B, _ = _prepare_data(args, device, preprocess, "reference")
+    source, real_A, mask_A, diff_A, crop_face = _prepare_data(
+        args, preprocess, "source"
+    )
+    _, real_B, mask_B, diff_B, _ = _prepare_data(args, preprocess, "reference")
 
     # Net initialize
     net = _initialize_net(args)
@@ -223,9 +220,10 @@ def transfer_to_video():
     # Net initialize
     net = _initialize_net(args)
 
-    device = args.device
-    preprocess = PreProcess(config, device, args, face_parser_path, face_alignment_path, face_detector_path)
-    _, real_B, mask_B, diff_B, _ = _prepare_data(args, device, preprocess, "reference")
+    preprocess = PreProcess(
+        config, args, face_parser_path, face_alignment_path, face_detector_path
+    )
+    _, real_B, mask_B, diff_B, _ = _prepare_data(args, preprocess, "reference")
     postprocess = PostProcess(config)
 
     capture = get_capture(args.video)
@@ -241,7 +239,7 @@ def transfer_to_video():
         in_frame, frame = adjust_frame_size(frame, IMAGE_HEIGHT, IMAGE_WIDTH)
         frame = Image.fromarray(frame)
         source, real_A, mask_A, diff_A, crop_face = _prepare_data(
-            args, device, preprocess, "frame", frame
+            args, preprocess, "frame", frame
         )
 
         # Inference
@@ -261,17 +259,25 @@ def transfer_to_video():
 def main():
     # Check model files and download
     check_and_download_models(
-        WEIGHT_PATH, MODEL_PATH, REMOTE_PATH,
+        WEIGHT_PATH,
+        MODEL_PATH,
+        REMOTE_PATH,
     )
     check_and_download_models(
-        FACE_PARSER_WEIGHT_PATH, FACE_PARSER_MODEL_PATH, REMOTE_PATH,
+        FACE_PARSER_WEIGHT_PATH,
+        FACE_PARSER_MODEL_PATH,
+        REMOTE_PATH,
     )
     if not args.use_dlib:
         check_and_download_models(
-            FACE_ALIGNMENT_WEIGHT_PATH, FACE_ALIGNMENT_MODEL_PATH, FACE_ALIGNMENT_REMOTE_PATH,
+            FACE_ALIGNMENT_WEIGHT_PATH,
+            FACE_ALIGNMENT_MODEL_PATH,
+            FACE_ALIGNMENT_REMOTE_PATH,
         )
         check_and_download_models(
-            FACE_DETECTOR_WEIGHT_PATH, FACE_DETECTOR_MODEL_PATH, FACE_DETECTOR_REMOTE_PATH,
+            FACE_DETECTOR_WEIGHT_PATH,
+            FACE_DETECTOR_MODEL_PATH,
+            FACE_DETECTOR_REMOTE_PATH,
         )
 
     if args.video is not None:
