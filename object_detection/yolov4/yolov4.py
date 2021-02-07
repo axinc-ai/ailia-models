@@ -10,7 +10,8 @@ import ailia
 sys.path.append('../../util')
 from utils import get_base_parser, update_parser  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
-from detector_utils import plot_results, load_image, letterbox_convert, reverse_letterbox  # noqa: E402
+from detector_utils import plot_results, write_predictions  # noqa: E402
+from detector_utils import load_image, letterbox_convert, reverse_letterbox  # noqa: E402
 import webcamera_utils  # noqa: E402
 
 import yolov4_utils  # noqa: E402
@@ -62,6 +63,11 @@ parser.add_argument(
     help='The detection iou for yolo. (default: '+str(IOU)+')'
 )
 parser.add_argument(
+    '-w', '--write_prediction',
+    default=None, type=str,
+    help='The predictions file name to be output.'
+)
+parser.add_argument(
     '-dw', '--detection_width', metavar='DETECTION_WIDTH',
     default=DETECTION_SIZE_LISTS[0], choices=DETECTION_SIZE_LISTS, type=int,
     help='detection size lists: ' + ' | '.join(map(str,DETECTION_SIZE_LISTS))
@@ -73,7 +79,7 @@ parser.add_argument(
 )
 args = update_parser(parser)
 
-if args.detection_width != DETECTION_SIZE_LISTS[0] or args.detection_height!=DETECTION_SIZE_LISTS[0]:
+if args.detection_width != DETECTION_SIZE_LISTS[0] or args.detection_height != DETECTION_SIZE_LISTS[0]:
     WEIGHT_PATH = 'yolov4_'+str(args.detection_width)+'_'+str(args.detection_height)+'.onnx'
     MODEL_PATH = 'yolov4_'+str(args.detection_width)+'_'+str(args.detection_height)+'.onnx.prototxt'
     IMAGE_HEIGHT = args.detection_height
@@ -83,6 +89,7 @@ else:
     MODEL_PATH = 'yolov4.onnx.prototxt'
     IMAGE_HEIGHT = args.detection_height
     IMAGE_WIDTH = args.detection_width
+
 
 # ======================
 # Main functions
@@ -115,10 +122,13 @@ def recognize_from_image():
     else:
         output = detector.predict([img])
     detect_object = yolov4_utils.post_processing(img, args.threshold, args.iou, output)
-    detect_object = reverse_letterbox(detect_object[0], org_img, (IMAGE_HEIGHT,IMAGE_WIDTH))
+    detect_object = reverse_letterbox(detect_object[0], org_img, (IMAGE_HEIGHT, IMAGE_WIDTH))
 
     # plot result
     res_img = plot_results(detect_object, org_img, COCO_CATEGORY)
+
+    if args.write_prediction:
+        write_predictions(args.write_prediction, detect_object, org_img, COCO_CATEGORY)
 
     # plot result
     cv2.imwrite(args.savepath, res_img)
@@ -156,7 +166,7 @@ def recognize_from_video():
         detect_object = yolov4_utils.post_processing(
             img, args.threshold, args.iou, output
         )
-        detect_object = reverse_letterbox(detect_object[0], frame, (IMAGE_HEIGHT,IMAGE_WIDTH))
+        detect_object = reverse_letterbox(detect_object[0], frame, (IMAGE_HEIGHT, IMAGE_WIDTH))
         res_img = plot_results(detect_object, frame, COCO_CATEGORY)
 
         cv2.imshow('frame', res_img)
