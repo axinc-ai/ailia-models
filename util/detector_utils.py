@@ -160,3 +160,20 @@ def plot_results(detector, img, category, segm_masks=None, logging=True):
             1
         )
     return img
+
+
+def write_predictions(file_name, detector, img, category):
+    h, w = img.shape[0], img.shape[1]
+
+    count = detector.get_object_count() if hasattr(detector, 'get_object_count') else len(detector)
+
+    with open(file_name, 'w') as f:
+        for idx in range(count):
+            obj = detector.get_object(idx) if hasattr(detector, 'get_object') else detector[idx]
+            label = category[obj.category]
+            f.write('%s %f %d %d %d %d\n' % (
+                label.replace(' ', '_'),
+                obj.prob,
+                int(w * obj.x), int(h * obj.y),
+                int(w * obj.w), int(h * obj.h),
+            ))
