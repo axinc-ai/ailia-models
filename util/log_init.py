@@ -31,7 +31,7 @@ if display_date:
     )
 else:
     default_fmt = Formatter(
-        '%(message)s'
+        '%(levelname)5s %(filename)s (%(lineno)d) : %(message)s'
     )
 
 
