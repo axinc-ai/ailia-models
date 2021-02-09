@@ -92,21 +92,6 @@ else:
 # Main functions
 # ======================
 def recognize_from_image():
-<<<<<<< HEAD
-=======
-    # prepare input data
-    org_img = load_image(args.input)
-    org_img = cv2.cvtColor(org_img, cv2.COLOR_BGRA2BGR)
-    print(f'input image shape: {org_img.shape}')
-
-    img = letterbox_convert(org_img, (IMAGE_HEIGHT, IMAGE_WIDTH))
-
-    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-    img = np.transpose(img, [2, 0, 1])
-    img = img.astype(np.float32) / 255
-    img = np.expand_dims(img, 0)
-
->>>>>>> master
     # net initialize
     detector = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
 
@@ -115,10 +100,12 @@ def recognize_from_image():
         # prepare input data
         logger.info(image_path)
         org_img = load_image(image_path)
+        org_img = cv2.cvtColor(org_img, cv2.COLOR_BGRA2BGR)
         logger.debug(f'input image shape: {org_img.shape}')
 
-        img = cv2.cvtColor(org_img, cv2.COLOR_BGRA2RGB)
-        img = cv2.resize(img, (IMAGE_WIDTH, IMAGE_HEIGHT))
+        img = letterbox_convert(org_img, (IMAGE_HEIGHT, IMAGE_WIDTH))
+
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         img = np.transpose(img, [2, 0, 1])
         img = img.astype(np.float32) / 255
         img = np.expand_dims(img, 0)
@@ -134,24 +121,12 @@ def recognize_from_image():
                 logger.info(f'\tailia processing time {end - start} ms')
         else:
             output = detector.predict([img])
-<<<<<<< HEAD
-        detect_object = yolov4_utils.post_processing(
-            img, THRESHOLD, IOU, output
-        )
+
+        detect_object = yolov4_utils.post_processing(img, args.threshold, args.iou, output)
+        detect_object = reverse_letterbox(detect_object[0], org_img, (IMAGE_HEIGHT,IMAGE_WIDTH))
 
         # plot result
-        res_img = plot_results(detect_object[0], org_img, COCO_CATEGORY)
-=======
-            end = int(round(time.time() * 1000))
-            print(f'\tailia processing time {end - start} ms')
-    else:
-        output = detector.predict([img])
-    detect_object = yolov4_utils.post_processing(img, args.threshold, args.iou, output)
-    detect_object = reverse_letterbox(detect_object[0], org_img, (IMAGE_HEIGHT,IMAGE_WIDTH))
-
-    # plot result
-    res_img = plot_results(detect_object, org_img, COCO_CATEGORY)
->>>>>>> master
+        res_img = plot_results(detect_object, org_img, COCO_CATEGORY)
 
         # plot result
         savepath = get_savepath(args.savepath, image_path)
