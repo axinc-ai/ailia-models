@@ -8,14 +8,9 @@ import ailia
 import facemesh_utils as fut
 
 sys.path.append('../../util')
-<<<<<<< HEAD
 from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
-import webcamera_utils  # noqa: E402
-=======
-from utils import get_base_parser, update_parser  # noqa: E402
 from webcamera_utils import get_capture, get_writer  # noqa: E402
 from image_utils import load_image  # noqa: E402
->>>>>>> master
 from model_utils import check_and_download_models  # noqa: E402
 
 # logger
@@ -195,13 +190,7 @@ def recognize_from_video():
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
 
-<<<<<<< HEAD
-        frame = np.ascontiguousarray(frame[:, ::-1, :])
-
-        _, img128, scale, pad = fut.resize_pad(frame[:, :, ::-1])
-=======
         _, img128, scale, pad = fut.resize_pad(frame[:,:,::-1])
->>>>>>> master
         input_data = img128.astype('float32') / 127.5 - 1.0
         input_data = np.expand_dims(np.moveaxis(input_data, -1, 0), 0)
 

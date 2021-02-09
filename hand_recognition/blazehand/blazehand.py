@@ -156,18 +156,9 @@ def recognize_from_image():
                     normed_landmarks, affines
                 )
                 for i in range(len(flags)):
-<<<<<<< HEAD
-                    landmark = landmarks[i]
-                    flag = flags[i]
-                    handed = 1 - handedness[i]
-                    if flag > 0.75:
-                        # Right handedness when not flipped camera input
-                        if handed > 0.5:
-=======
                     landmark, flag, handed = landmarks[i], flags[i], handedness[i]
                     if flag > 0.75:
                         if handed > 0.5: # Right handedness when not flipped camera input
->>>>>>> master
                             presence[0] = 1
                         else:
                             presence[1] = 1
@@ -178,21 +169,6 @@ def recognize_from_image():
                             size=2,
                         )
 
-<<<<<<< HEAD
-        if presence[0] and presence[1]:
-            hand_presence = 'Left and right'
-        elif presence[0]:
-            hand_presence = 'Left'
-        elif presence[1]:
-            hand_presence = 'Right'
-        else:
-            hand_presence = 'No hand'
-        logger.info(f'Hand presence: {hand_presence}')
-        savepath = get_savepath(args.savepath, image_path)
-        logger.info(f'saved at : {savepath}')
-        cv2.imwrite(savepath, src_img)
-    logger.info('Script finished successfully.')
-=======
             # postprocessing
             landmarks = but.denormalize_landmarks(normalized_landmarks, affines)
             for i in range(len(flags)):
@@ -215,7 +191,6 @@ def recognize_from_image():
     print(f'Hand presence: {hand_presence}')
     cv2.imwrite(args.savepath, src_img)
     print('Script finished successfully.')
->>>>>>> master
 
 
 def recognize_from_video():
@@ -239,10 +214,6 @@ def recognize_from_video():
 
     while(True):
         ret, frame = capture.read()
-<<<<<<< HEAD
-        frame = np.ascontiguousarray(frame[:, ::-1, :])
-=======
->>>>>>> master
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
 
@@ -285,12 +256,6 @@ def recognize_from_video():
             text = 'Left'
         else:
             text = 'No hand'
-<<<<<<< HEAD
-        cv2.putText(
-            frame, text, (8, 24), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 255), 2
-        )
-        cv2.imshow('frame', frame)
-=======
 
         visual_img = frame
         if args.video == '0': # Flip horizontally if camera
@@ -298,7 +263,6 @@ def recognize_from_video():
 
         cv2.putText(visual_img, text, (8, 24), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 255), 2)
         cv2.imshow('frame', visual_img)
->>>>>>> master
 
         # save results
         if writer is not None:

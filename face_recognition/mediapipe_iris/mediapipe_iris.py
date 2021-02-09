@@ -230,13 +230,7 @@ def recognize_from_video():
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
 
-<<<<<<< HEAD
-        frame = np.ascontiguousarray(frame[:, ::-1, :])
-
-        _, img128, scale, pad = iut.resize_pad(frame[:, :, ::-1])
-=======
         _, img128, scale, pad = iut.resize_pad(frame[:,:,::-1])
->>>>>>> master
         input_data = img128.astype('float32') / 127.5 - 1.0
         input_data = np.expand_dims(np.moveaxis(input_data, -1, 0), 0)
 
