@@ -35,6 +35,13 @@ parser = get_base_parser(
     IMAGE_PATH,
     SAVE_IMAGE_PATH,
 )
+parser.add_argument(
+    '--hands',
+    metavar='NUM_HANDS',
+    type=int,
+    default=2,
+    help='The maximum number of hands tracked (=2 by default)'
+)
 args = update_parser(parser)
 
 
@@ -94,83 +101,30 @@ def recognize_from_image():
         input_data = img256.astype('float32') / 255.
         input_data = np.expand_dims(np.moveaxis(input_data, -1, 0), 0)
 
-        # inference
-        logger.info('Start inference...')
-        if args.benchmark:
-            logger.info('BENCHMARK mode')
-            for _ in range(5):
-                start = int(round(time.time() * 1000))
-                # Palm detection
-                preds = detector.predict([input_data])
-                detections = but.detector_postprocess(preds)
+        # Palm detection
+        preds = detector.predict([input_data])
+        detections = but.detector_postprocess(preds)
 
-                # Hand landmark estimation
-                presence = [0, 0]  # [left, right]
-                if detections[0].size != 0:
-                    imgs, affines, _ = but.estimator_preprocess(
-                        src_img, detections, scale, pad
-                    )
-                    estimator.set_input_shape(imgs.shape)
-                    flags, handedness, normed_landmarks = estimator.predict(
-                        [imgs]
-                    )
+        # Hand landmark estimation
+        presence = [0, 0]  # [left, right]
+        if detections[0].size != 0:
+            imgs, affines, _ = but.estimator_preprocess(src_img, detections[0], scale, pad)
+            estimator.set_input_shape(imgs.shape)
 
-                    # postprocessing
-                    landmarks = but.denormalize_landmarks(
-                        normed_landmarks, affines
-                    )
-                    for i in range(len(flags)):
-                        landmark = landmarks[i]
-                        flag = flags[i]
-                        handed = 1 - handedness[i]
-                        if flag > 0.75:
-                            # Right handedness when not flipped camera input
-                            if handed < 0.5:
-                                presence[0] = 1
-                            else:
-                                presence[1] = 1
-                            draw_landmarks(
-                                src_img,
-                                landmark[:, :2],
-                                but.HAND_CONNECTIONS,
-                                size=2,
-                            )
-                end = int(round(time.time() * 1000))
-                logger.info(f'\tailia processing time {end - start} ms')
-        else:
-            # Palm detection
-            preds = detector.predict([input_data])
-            detections = but.detector_postprocess(preds)
-
-            # Hand landmark estimation
-            presence = [0, 0]  # [left, right]
-            if detections[0].size != 0:
-                imgs, affines, _ = but.estimator_preprocess(
-                    src_img, detections, scale, pad
-                )
-                estimator.set_input_shape(imgs.shape)
+            if args.benchmark:
+                logger.info('BENCHMARK mode')
+                for _ in range(5):
+                    start = int(round(time.time() * 1000))
+                    flags, handedness, normed_landmarks = estimator.predict([imgs])
+                    end = int(round(time.time() * 1000))
+                    logger.info(f'\tailia processing time {end - start} ms')
+            else:
                 flags, handedness, normed_landmarks = estimator.predict([imgs])
 
-                # postprocessing
-                landmarks = but.denormalize_landmarks(
-                    normed_landmarks, affines
-                )
-                for i in range(len(flags)):
-                    landmark, flag, handed = landmarks[i], flags[i], handedness[i]
-                    if flag > 0.75:
-                        if handed > 0.5: # Right handedness when not flipped camera input
-                            presence[0] = 1
-                        else:
-                            presence[1] = 1
-                        draw_landmarks(
-                            src_img,
-                            landmark[:, :2],
-                            but.HAND_CONNECTIONS,
-                            size=2,
-                        )
-
             # postprocessing
-            landmarks = but.denormalize_landmarks(normalized_landmarks, affines)
+            landmarks = but.denormalize_landmarks(
+                normed_landmarks, affines
+            )
             for i in range(len(flags)):
                 landmark, flag, handed = landmarks[i], flags[i], handedness[i]
                 if flag > 0.75:
@@ -195,14 +149,15 @@ def recognize_from_image():
 
 def recognize_from_video():
     # net initialize
-    detector = ailia.Net(
-        DETECTION_MODEL_PATH, DETECTION_WEIGHT_PATH, env_id=args.env_id
-    )
-    estimator = ailia.Net(
-        LANDMARK_MODEL_PATH, LANDMARK_WEIGHT_PATH, env_id=args.env_id
-    )
+    detector = ailia.Net(DETECTION_MODEL_PATH, DETECTION_WEIGHT_PATH, env_id=args.env_id)
+    estimator = ailia.Net(LANDMARK_MODEL_PATH, LANDMARK_WEIGHT_PATH, env_id=args.env_id)
+    num_hands = args.hands
+    thresh = 0.5
+    tracking = False
+    tracked_hands = np.array([0.0] * num_hands)
+    rois = [None] * num_hands
 
-    capture = webcamera_utils.get_capture(args.video)
+    capture = get_capture(args.video)
 
     # create video writer if savepath is specified as video format
     if args.savepath != SAVE_IMAGE_PATH:
@@ -222,24 +177,37 @@ def recognize_from_video():
         input_data = np.expand_dims(np.moveaxis(input_data, -1, 0), 0)
 
         # inference
-        # Palm detection
-        preds = detector.predict([input_data])
-        detections = but.detector_postprocess(preds)
+        # Perform palm detection on 1st frame and if at least 1 hand has low
+        # confidence (not detected)
+        if np.any(tracked_hands < thresh):
+            tracking = False
+            # Palm detection
+            preds = detector.predict([input_data])
+            detections = but.detector_postprocess(preds)
+            if detections[0].size > 0:
+                tracking = True
+                roi_imgs, affines, _ = but.estimator_preprocess(frame, detections[0][:num_hands], scale, pad)
+        else:
+            for i, roi in enumerate(rois):
+                xc, yc, scale, theta = roi
+                roi_img, affine, _ = but.extract_roi(frame, xc, yc, theta, scale)
+                roi_imgs[i] = roi_img[0]
+                affines[i] = affine[0]
 
         # Hand landmark estimation
-        presence = [0, 0]  # [left, right]
-        if detections[0].size != 0:
-            img, affine, _ = but.estimator_preprocess(
-                frame, detections, scale, pad
-            )
-            estimator.set_input_shape(img.shape)
-            flags, handedness, normed_landmarks = estimator.predict([img])
+        presence = [0, 0] # [left, right]
+        if tracking:
+            estimator.set_input_shape(roi_imgs.shape)
+            hand_flags, handedness, normalized_landmarks = estimator.predict([roi_imgs])
 
             # postprocessing
-            landmarks = but.denormalize_landmarks(normed_landmarks, affine)
-            for i in range(len(flags)):
-                landmark, flag, handed = landmarks[i], flags[i], handedness[i]
-                if flag > 0.75:
+            landmarks = but.denormalize_landmarks(normalized_landmarks, affines)
+
+            tracked_hands[:] = 0
+            n_imgs = len(hand_flags)
+            for i in range(n_imgs):
+                landmark, hand_flag, handed = landmarks[i], hand_flags[i], handedness[i]
+                if hand_flag > thresh:
                     if handed > 0.5: # Right handedness when not flipped camera input
                         presence[0] = 1
                     else:
@@ -247,6 +215,9 @@ def recognize_from_video():
                     draw_landmarks(
                         frame, landmark[:, :2], but.HAND_CONNECTIONS, size=2
                     )
+
+                    rois[i] = but.landmarks2roi(normalized_landmarks[i], affines[i])
+                tracked_hands[i] = hand_flag
 
         if presence[0] and presence[1]:
             text = 'Left and right'
