@@ -77,7 +77,7 @@ def reverse_letterbox(detections, img, det_shape):
     
     new_detections = []
     for detection in detections:
-        print(detection)
+        logger.debug(detection)
         r = ailia.DetectorObject(
             category=detection.category,
             prob=detection.prob,
