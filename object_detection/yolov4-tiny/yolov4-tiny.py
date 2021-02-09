@@ -10,7 +10,7 @@ import ailia
 sys.path.append('../../util')
 from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
-from detector_utils import plot_results, load_image  # noqa: E402
+from detector_utils import plot_results, load_image, letterbox_convert, reverse_letterbox  # noqa: E402
 import webcamera_utils  # noqa: E402
 
 from yolov4_tiny_utils import post_processing  # noqa: E402
@@ -23,11 +23,11 @@ logger = getLogger(__name__)
 # ======================
 # Parameters
 # ======================
-WEIGHT_PATH = 'yolov4-tiny.onnx'
-MODEL_PATH = 'yolov4-tiny.onnx.prototxt'
+DETECTION_SIZE_LISTS = [416, 640, 1280]
+
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/yolov4-tiny/'
 
-IMAGE_PATH = 'dog.jpg'
+IMAGE_PATH = 'input.jpg'
 SAVE_IMAGE_PATH = 'output.png'
 
 COCO_CATEGORY = [
@@ -47,16 +47,44 @@ COCO_CATEGORY = [
 ]
 THRESHOLD = 0.25
 IOU = 0.45
-IMAGE_HEIGHT = 416
-IMAGE_WIDTH = 416
 
 
 # ======================
 # Arguemnt Parser Config
 # ======================
 parser = get_base_parser('Yolov4-tiny model', IMAGE_PATH, SAVE_IMAGE_PATH)
+parser.add_argument(
+    '-th', '--threshold',
+    default=THRESHOLD, type=float,
+    help='The detection threshold for yolo. (default: '+str(THRESHOLD)+')'
+)
+parser.add_argument(
+    '-iou', '--iou',
+    default=IOU, type=float,
+    help='The detection iou for yolo. (default: '+str(IOU)+')'
+)
+parser.add_argument(
+    '-dw', '--detection_width', metavar='DETECTION_WIDTH',
+    default=DETECTION_SIZE_LISTS[0], choices=DETECTION_SIZE_LISTS, type=int,
+    help='detection size lists: ' + ' | '.join(map(str,DETECTION_SIZE_LISTS))
+)
+parser.add_argument(
+    '-dh', '--detection_height', metavar='DETECTION_HEIGHT',
+    default=DETECTION_SIZE_LISTS[0], choices=DETECTION_SIZE_LISTS, type=int,
+    help='detection size lists: ' + ' | '.join(map(str,DETECTION_SIZE_LISTS))
+)
 args = update_parser(parser)
 
+if args.detection_width != DETECTION_SIZE_LISTS[0] or args.detection_height!=DETECTION_SIZE_LISTS[0]:
+    WEIGHT_PATH = 'yolov4-tiny_'+str(args.detection_width)+'_'+str(args.detection_height)+'.onnx'
+    MODEL_PATH = 'yolov4-tiny_'+str(args.detection_width)+'_'+str(args.detection_height)+'.onnx.prototxt'
+    IMAGE_HEIGHT = args.detection_height
+    IMAGE_WIDTH = args.detection_width
+else:
+    WEIGHT_PATH = 'yolov4-tiny.onnx'
+    MODEL_PATH = 'yolov4-tiny.onnx.prototxt'
+    IMAGE_HEIGHT = args.detection_height
+    IMAGE_WIDTH = args.detection_width
 
 # ======================
 # Main functions
@@ -86,7 +114,7 @@ def recognize_from_image(detector):
                 logger.info(f'\tailia processing time {end - start} ms')
         else:
             output = detector.predict([img])
-        detect_object = post_processing(img, THRESHOLD, IOU, output)
+        detect_object = post_processing(img, args.threshold, args.iou, output)
 
         # plot result
         res_img = plot_results(detect_object[0], org_img, COCO_CATEGORY)
@@ -114,17 +142,19 @@ def recognize_from_video(detector):
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
 
-        img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        img = cv2.resize(img, (IMAGE_WIDTH, IMAGE_HEIGHT))
+        img = letterbox_convert(frame, (IMAGE_HEIGHT, IMAGE_WIDTH))
+
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         img = np.transpose(img, [2, 0, 1])
         img = img.astype(np.float32) / 255
         img = np.expand_dims(img, 0)
 
         output = detector.predict([img])
         detect_object = post_processing(
-            img, THRESHOLD, IOU, output
+            img, args.threshold, args.iou, output
         )
-        res_img = plot_results(detect_object[0], frame, COCO_CATEGORY)
+        detect_object = reverse_letterbox(detect_object[0], frame, (IMAGE_HEIGHT,IMAGE_WIDTH))
+        res_img = plot_results(detect_object, frame, COCO_CATEGORY)
 
         cv2.imshow('frame', res_img)
         # save results

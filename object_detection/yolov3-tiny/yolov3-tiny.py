@@ -24,7 +24,7 @@ WEIGHT_PATH = 'yolov3-tiny.opt.onnx'
 MODEL_PATH = 'yolov3-tiny.opt.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/yolov3-tiny/'
 
-IMAGE_PATH = 'couple.jpg'
+IMAGE_PATH = 'input.jpg'
 SAVE_IMAGE_PATH = 'output.png'
 
 COCO_CATEGORY = [
@@ -44,7 +44,7 @@ COCO_CATEGORY = [
 ]
 THRESHOLD = 0.4
 IOU = 0.45
-DETECTION_WIDTH = 416
+DETECTION_SIZE = 416
 
 
 # ======================
@@ -52,9 +52,24 @@ DETECTION_WIDTH = 416
 # ======================
 parser = get_base_parser('Yolov3 tiny model', IMAGE_PATH, SAVE_IMAGE_PATH)
 parser.add_argument(
+    '-th', '--threshold',
+    default=THRESHOLD, type=float,
+    help='The detection threshold for yolo. (default: '+str(THRESHOLD)+')'
+)
+parser.add_argument(
+    '-iou', '--iou',
+    default=IOU, type=float,
+    help='The detection iou for yolo. (default: '+str(IOU)+')'
+)
+parser.add_argument(
     '-dw', '--detection_width',
-    default=DETECTION_WIDTH,
+    default=DETECTION_SIZE, type=int,
     help='The detection width and height for yolo. (default: 416)'
+)
+parser.add_argument(
+    '-dh', '--detection_height',
+    default=DETECTION_SIZE, type=int,
+    help='The detection height and height for yolo. (default: 416)'
 )
 args = update_parser(parser)
 
@@ -74,9 +89,9 @@ def recognize_from_image():
         algorithm=ailia.DETECTOR_ALGORITHM_YOLOV3,
         env_id=args.env_id,
     )
-    if int(args.detection_width) != 416:
+    if args.detection_width != DETECTION_SIZE or args.detection_height != DETECTION_SIZE:
         detector.set_input_shape(
-            int(args.detection_width), int(args.detection_width)
+            args.detection_width, args.detection_height
         )
 
     # input image loop
@@ -92,11 +107,11 @@ def recognize_from_image():
             logger.info('BENCHMARK mode')
             for i in range(5):
                 start = int(round(time.time() * 1000))
-                detector.compute(img, THRESHOLD, IOU)
+                detector.compute(img, args.threshold, args.iou)
                 end = int(round(time.time() * 1000))
                 logger.info(f'\tailia processing time {end - start} ms')
         else:
-            detector.compute(img, THRESHOLD, IOU)
+            detector.compute(img, args.threshold, args.iou)
 
         # plot result
         res_img = plot_results(detector, img, COCO_CATEGORY)
@@ -118,9 +133,9 @@ def recognize_from_video():
         algorithm=ailia.DETECTOR_ALGORITHM_YOLOV3,
         env_id=args.env_id,
     )
-    if int(args.detection_width) != DETECTION_WIDTH:
+    if args.detection_width != DETECTION_SIZE or args.detection_height != DETECTION_SIZE:
         detector.set_input_shape(
-            int(args.detection_width), int(args.detection_width)
+            args.detection_width, args.detection_height
         )
 
     capture = webcamera_utils.get_capture(args.video)
@@ -139,7 +154,7 @@ def recognize_from_video():
             break
 
         img = cv2.cvtColor(frame, cv2.COLOR_BGR2BGRA)
-        detector.compute(img, THRESHOLD, IOU)
+        detector.compute(img, args.threshold, args.iou)
         res_img = plot_results(detector, frame, COCO_CATEGORY, False)
         cv2.imshow('frame', res_img)
 

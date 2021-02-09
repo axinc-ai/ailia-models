@@ -9,6 +9,8 @@ import blazepalm_utils as but
 
 sys.path.append('../../util')
 from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
+from webcamera_utils import get_capture, get_writer  # noqa: E402
+from image_utils import load_image  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 import webcamera_utils  # noqa: E402
 
@@ -131,10 +133,7 @@ def recognize_from_video():
     if args.savepath != SAVE_IMAGE_PATH:
         f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
         f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
-        save_h, save_w = webcamera_utils.calc_adjust_fsize(
-            f_h, f_w, IMAGE_HEIGHT, IMAGE_WIDTH
-        )
-        writer = webcamera_utils.get_writer(args.savepath, save_h, save_w)
+        writer = get_writer(args.savepath, f_h, f_w)
     else:
         writer = None
 
@@ -156,13 +155,20 @@ def recognize_from_video():
 
         # postprocessing
         display_result(frame, detections)
-        cv2.imshow('frame', frame)
+        
+        visual_img = frame
+        if args.video == '0': # Flip horizontally if camera
+            visual_img = np.ascontiguousarray(frame[:,::-1,:])
+
+        cv2.imshow('frame', visual_img)
 
         # save results
         if writer is not None:
             writer.write(frame)
 
     capture.release()
+    if writer is not None:
+        writer.release()
     cv2.destroyAllWindows()
     if writer is not None:
         writer.release()

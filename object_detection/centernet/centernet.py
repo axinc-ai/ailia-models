@@ -23,7 +23,7 @@ logger = getLogger(__name__)
 # Parameters
 # ======================
 
-IMAGE_PATH = 'couple.jpg'
+IMAGE_PATH = 'input.jpg'
 SAVE_IMAGE_PATH = 'output.png'
 
 COCO_CATEGORY = [

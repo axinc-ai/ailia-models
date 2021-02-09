@@ -8,8 +8,9 @@ import ailia
 import mediapipe_iris_utils as iut
 
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
-import webcamera_utils  # noqa: E402
+from utils import get_base_parser, update_parser,get_savepath  # noqa: E402
+from webcamera_utils import get_capture, get_writer  # noqa: E402
+from image_utils import load_image  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 
 # logger
@@ -220,10 +221,7 @@ def recognize_from_video():
     if args.savepath != SAVE_IMAGE_PATH:
         f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
         f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
-        save_h, save_w = webcamera_utils.calc_adjust_fsize(
-            f_h, f_w, IMAGE_HEIGHT, IMAGE_WIDTH
-        )
-        writer = webcamera_utils.get_writer(args.savepath, save_h, save_w)
+        writer = get_writer(args.savepath, f_h, f_w)
     else:
         writer = None
 
@@ -232,9 +230,13 @@ def recognize_from_video():
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
 
+<<<<<<< HEAD
         frame = np.ascontiguousarray(frame[:, ::-1, :])
 
         _, img128, scale, pad = iut.resize_pad(frame[:, :, ::-1])
+=======
+        _, img128, scale, pad = iut.resize_pad(frame[:,:,::-1])
+>>>>>>> master
         input_data = img128.astype('float32') / 127.5 - 1.0
         input_data = np.expand_dims(np.moveaxis(input_data, -1, 0), 0)
 
@@ -282,13 +284,19 @@ def recognize_from_video():
                     frame, eyes[i, :, :16, :2], iris[i, :, :, :2], size=1
                 )
 
-        cv2.imshow('frame', frame)
+        visual_img = frame
+        if args.video == '0': # Flip horizontally if camera
+            visual_img = np.ascontiguousarray(frame[:,::-1,:])
+
+        cv2.imshow('frame', visual_img)
 
         # save results
         if writer is not None:
             writer.write(frame)
 
     capture.release()
+    if writer is not None:
+        writer.release()
     cv2.destroyAllWindows()
     logger.info('Script finished successfully.')
     pass

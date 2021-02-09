@@ -20,7 +20,7 @@ logger = getLogger(__name__)
 # ======================
 # Parameters 1
 # ======================
-IMAGE_PATH = 'balloon.png'
+IMAGE_PATH = 'input.jpg'
 SAVE_IMAGE_PATH = 'output.png'
 IMAGE_HEIGHT = 240
 IMAGE_WIDTH = 320

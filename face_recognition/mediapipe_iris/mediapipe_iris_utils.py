@@ -417,8 +417,8 @@ def iris_preprocess(imgs, raw_landmarks):
         imgs: 192x192 Face Mesh input images
         raw_landmarks: Face Mesh landmarks with shape (1, 1404) and scale [0, 192]
     Outputs:
-        imgs_cropped: 64x64 cropped (and flipped for right eye) eye region images
-        origins: upper left (upper right for right eye) corner coordinates of
+        imgs_cropped: 64x64 cropped (and flipped for left eye) eye region images
+        origins: upper left (upper right for left eye) corner coordinates of
                  the cropped images in the 192x192 images
     """
     landmarks = raw_landmarks.reshape((-1, 3))
@@ -430,15 +430,13 @@ def iris_preprocess(imgs, raw_landmarks):
         eye_right_center = landmarks[EYE_RIGHT_CONTOUR, :2].mean(axis=0)
 
         x_left, y_left = map(int, np.round(eye_left_center - 32))
-        imgs_cropped.append(imgs[i, :, y_left:y_left+64, x_left:x_left+64])
-        origins.append((x_left, y_left))
+        # Horizontal flip
+        imgs_cropped.append(imgs[i, :, y_left:y_left+64, x_left+63:x_left-1:-1])
+        origins.append((x_left+63, y_left))
 
         x_right, y_right = map(int, np.round(eye_right_center - 32))
-        # Horizontal flip
-        imgs_cropped.append(
-            imgs[i, :, y_right:y_right+64, x_right+63:x_right-1:-1]
-        )
-        origins.append((x_right+63, y_right))
+        imgs_cropped.append(imgs[i, :, y_right:y_right+64, x_right:x_right+64])
+        origins.append((x_right, y_right))
 
     return np.stack(imgs_cropped), np.stack(origins)
 
@@ -450,7 +448,7 @@ def iris_postprocess(eyes, iris, origins, affines):
     Inputs:
         eyes: raw eye landmarks output from MediaPipe Iris
         iris: raw iris landmarks output from MediaPipe Iris
-        origins: upper left (upper right for right eye) corner coordinates of
+        origins: upper left (upper right for left eye) corner coordinates of
                  the cropped images in the 192x192 images
         affines: affine transform that maps points in the 192x192 image back to
                  the original image
@@ -460,9 +458,10 @@ def iris_postprocess(eyes, iris, origins, affines):
     eyes = eyes.copy().reshape((-1, 71, 3))
     iris = iris.copy().reshape((-1, 5, 3))
 
-    # Horizontally flipped right eye processing
-    eyes[1::2, :, 0] = -eyes[1::2, :, 0]
-    iris[1::2, :, 0] = -iris[1::2, :, 0]
+    # Horizontally flipped left eye processing
+    eyes[::2, :, 0] = -eyes[::2, :, 0]
+    iris[::2, :, 0] = -iris[::2, :, 0]
+
     eyes[:, :, :2] += origins[:, None]
     iris[:, :, :2] += origins[:, None]
 

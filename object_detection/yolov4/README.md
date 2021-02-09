@@ -2,9 +2,9 @@
 
 ## Input
 
-![Input](dog.jpg)
+![Input](input.jpg)
 
-(Image from https://github.com/Tianxiaomo/pytorch-YOLOv4/blob/master/data/dog.jpg)
+(Image from https://pixabay.com/ja/photos/%E3%83%AD%E3%83%B3%E3%83%89%E3%83%B3%E5%B8%82-%E9%8A%80%E8%A1%8C-%E3%83%AD%E3%83%B3%E3%83%89%E3%83%B3-4481399/)
 
 Shape : (1, 3, 416, 416)  
 Range : [0.0, 1.0]
@@ -49,7 +49,7 @@ $ python3 yolov4.py --video VIDEO_PATH
 
 ## Framework
 
-ONNX Runtime
+Pytorch
 
 ## Model Format
 

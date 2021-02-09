@@ -9,7 +9,8 @@ import blazehand_utils as but
 
 sys.path.append('../../util')
 from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
-import webcamera_utils  # noqa: E402
+from webcamera_utils import get_capture, get_writer  # noqa: E402
+from image_utils import load_image  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 
 # logger
@@ -155,12 +156,18 @@ def recognize_from_image():
                     normed_landmarks, affines
                 )
                 for i in range(len(flags)):
+<<<<<<< HEAD
                     landmark = landmarks[i]
                     flag = flags[i]
                     handed = 1 - handedness[i]
                     if flag > 0.75:
                         # Right handedness when not flipped camera input
                         if handed > 0.5:
+=======
+                    landmark, flag, handed = landmarks[i], flags[i], handedness[i]
+                    if flag > 0.75:
+                        if handed > 0.5: # Right handedness when not flipped camera input
+>>>>>>> master
                             presence[0] = 1
                         else:
                             presence[1] = 1
@@ -171,6 +178,7 @@ def recognize_from_image():
                             size=2,
                         )
 
+<<<<<<< HEAD
         if presence[0] and presence[1]:
             hand_presence = 'Left and right'
         elif presence[0]:
@@ -184,6 +192,30 @@ def recognize_from_image():
         logger.info(f'saved at : {savepath}')
         cv2.imwrite(savepath, src_img)
     logger.info('Script finished successfully.')
+=======
+            # postprocessing
+            landmarks = but.denormalize_landmarks(normalized_landmarks, affines)
+            for i in range(len(flags)):
+                landmark, flag, handed = landmarks[i], flags[i], handedness[i]
+                if flag > 0.75:
+                    if handed > 0.5: # Right handedness when not flipped camera input
+                        presence[0] = 1
+                    else:
+                        presence[1] = 1
+                    draw_landmarks(src_img, landmark[:,:2], but.HAND_CONNECTIONS, size=2)
+
+    if presence[0] and presence[1]:
+        hand_presence = 'Left and right'
+    elif presence[0]:
+        hand_presence = 'Right'
+    elif presence[1]:
+        hand_presence = 'Left'
+    else:
+        hand_presence = 'No hand'
+    print(f'Hand presence: {hand_presence}')
+    cv2.imwrite(args.savepath, src_img)
+    print('Script finished successfully.')
+>>>>>>> master
 
 
 def recognize_from_video():
@@ -201,16 +233,16 @@ def recognize_from_video():
     if args.savepath != SAVE_IMAGE_PATH:
         f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
         f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
-        save_h, save_w = webcamera_utils.calc_adjust_fsize(
-            f_h, f_w, IMAGE_HEIGHT, IMAGE_WIDTH
-        )
-        writer = webcamera_utils.get_writer(args.savepath, save_h, save_w)
+        writer = get_writer(args.savepath, f_h, f_w)
     else:
         writer = None
 
     while(True):
         ret, frame = capture.read()
+<<<<<<< HEAD
         frame = np.ascontiguousarray(frame[:, ::-1, :])
+=======
+>>>>>>> master
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
 
@@ -237,7 +269,7 @@ def recognize_from_video():
             for i in range(len(flags)):
                 landmark, flag, handed = landmarks[i], flags[i], handedness[i]
                 if flag > 0.75:
-                    if handed > 0.5:
+                    if handed > 0.5: # Right handedness when not flipped camera input
                         presence[0] = 1
                     else:
                         presence[1] = 1
@@ -248,21 +280,34 @@ def recognize_from_video():
         if presence[0] and presence[1]:
             text = 'Left and right'
         elif presence[0]:
-            text = 'Left'
-        elif presence[1]:
             text = 'Right'
+        elif presence[1]:
+            text = 'Left'
         else:
             text = 'No hand'
+<<<<<<< HEAD
         cv2.putText(
             frame, text, (8, 24), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 255), 2
         )
         cv2.imshow('frame', frame)
+=======
+
+        visual_img = frame
+        if args.video == '0': # Flip horizontally if camera
+            visual_img = np.ascontiguousarray(frame[:,::-1,:])
+
+        cv2.putText(visual_img, text, (8, 24), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 255), 2)
+        cv2.imshow('frame', visual_img)
+>>>>>>> master
 
         # save results
         if writer is not None:
+            cv2.putText(frame, text, (8, 24), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 255), 2)
             writer.write(frame)
 
     capture.release()
+    if writer is not None:
+        writer.release()
     cv2.destroyAllWindows()
     if writer is not None:
         writer.release()
