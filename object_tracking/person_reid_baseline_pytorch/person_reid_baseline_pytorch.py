@@ -74,7 +74,7 @@ parser.add_argument(
     help='Multiple scale: e.g. 1 or 1,1.1 or 1,1.1,1.2'
 )
 parser.add_argument(
-    '-b', '--batchsize', type=int, default=256,
+    '-bs', '--batchsize', type=int, default=256,
     help='Batchsize.'
 )
 
@@ -214,7 +214,15 @@ def extract_feature(imgs, net):
                 imgs = interpolate(imgs, scale)
 
             net.set_input_shape(imgs.shape)
-            outputs = net.predict({"imgs": imgs})[0]
+            if args.benchmark:
+                logger.info('BENCHMARK mode')
+                for i in range(5):
+                    start = int(round(time.time() * 1000))
+                    outputs = net.predict({"imgs": imgs})[0]
+                    end = int(round(time.time() * 1000))
+                    logger.info(f'\tailia processing time {end - start} ms')
+            else:
+                outputs = net.predict({"imgs": imgs})[0]
             ff += outputs
 
     fnorm = np.linalg.norm(ff, ord=2, axis=1, keepdims=True)
