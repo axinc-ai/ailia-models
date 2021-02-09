@@ -9,9 +9,12 @@ from pytorch_dc_tts_utils import get_test_data, save_to_wav
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser  # noqa: E402
+from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 
+# logger
+from logging import getLogger   # noqa: E402
+logger = getLogger(__name__)
 
 # ======================
 # PARAMETERS
@@ -36,7 +39,12 @@ MAX_T = 210
 
 parser = get_base_parser( 'Efficiently Trainable Text-to-Speech System Based on' +
     'Deep Convolutional Networks with Guided Attention', SENTENCE, SAVE_WAV_PATH)
-args = update_parser(parser)
+# overwrite
+parser.add_argument(
+    '--input', '-i', metavar='TEXT', default=SENTENCE,
+    help='input text'
+)
+args = update_parser(parser, check_input_type=False)
 
 # ======================
 # Main function
@@ -74,32 +82,39 @@ def inference_by_ssr(net_ssrm, Y):
     return Z
 
 
-def main():
-    # model files check and download
-    check_and_download_models(WEIGHT_PATH_T2M, MODEL_PATH_T2M, REMOTE_PATH_T2M)
-    check_and_download_models(WEIGHT_PATH_SSRM, MODEL_PATH_SSRM, REMOTE_PATH_SSRM)
-
+def generate_sentence(sentence):
     # prepare data
-    L, Y, zeros, A = preprocess(SENTENCE)
+    L, Y, zeros, A = preprocess(sentence)
 
     # model initialize
     net_t2m = ailia.Net(MODEL_PATH_T2M, WEIGHT_PATH_T2M, env_id=args.env_id)
     net_ssrm = ailia.Net(MODEL_PATH_SSRM, WEIGHT_PATH_SSRM, env_id=args.env_id)
 
     # inference
-    print('Start inference...')
+    logger.info('Start inference...')
     if args.benchmark:
-        print('BENCHMARK mode')
+        logger.info('BENCHMARK mode')
         for c in range(5):
             start = int(round(time.time() * 1000))
             out = inference(net_t2m, net_ssrm, L, Y, zeros, A)
             end = int(round(time.time() * 1000))
-            print("\tailia processing time {} ms".format(end-start))
+            logger.info("\tailia processing time {} ms".format(end-start))
     else:
         out = inference(net_t2m, net_ssrm, L, Y, zeros, A)
 
-    save_to_wav(out, SAVE_WAV_PATH)
-    print('Script finished successfully.')
+    savepath = args.savepath
+    logger.info(f'saved at : {savepath}')
+    save_to_wav(out, savepath)
+
+    logger.info('Script finished successfully.')
+
+
+def main():
+    # model files check and download
+    check_and_download_models(WEIGHT_PATH_T2M, MODEL_PATH_T2M, REMOTE_PATH_T2M)
+    check_and_download_models(WEIGHT_PATH_SSRM, MODEL_PATH_SSRM, REMOTE_PATH_SSRM)
+
+    generate_sentence(args.input)
 
 
 if __name__ == "__main__":

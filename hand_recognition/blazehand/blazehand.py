@@ -188,9 +188,9 @@ def recognize_from_image():
         hand_presence = 'Left'
     else:
         hand_presence = 'No hand'
-    print(f'Hand presence: {hand_presence}')
+    logger.info(f'Hand presence: {hand_presence}')
     cv2.imwrite(args.savepath, src_img)
-    print('Script finished successfully.')
+    logger.info('Script finished successfully.')
 
 
 def recognize_from_video():
