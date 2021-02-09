@@ -18,10 +18,13 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser  # noqa: E402
+from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 import webcamera_utils  # noqa: E402
 
+# logger
+from logging import getLogger   # noqa: E402
+logger = getLogger(__name__)
 
 import warnings
 warnings.simplefilter("ignore", DeprecationWarning)
@@ -138,12 +141,12 @@ def maskrcnn_to_image(image, net_maskrcnn, benchmark=False, det_thresh=0.5, iou_
 
     # inference
     if benchmark:
-        print('BENCHMARK mode')
+        logger.info('BENCHMARK mode')
         for i in range(5):
             start = int(round(time.time() * 1000))
             boxes, labels, scores, masks = net_maskrcnn.predict([input_data])
             end = int(round(time.time() * 1000))
-            print(f'\tailia processing time {end - start} ms')
+            logger.info(f'\tailia processing time {end - start} ms')
     else:
         boxes, labels, scores, masks = net_maskrcnn.predict([input_data])
 
@@ -439,24 +442,24 @@ def posenet_to_image(original_img, bbox_list, net_root, net_pose, benchmark=Fals
 
         # inference
         if args.benchmark:
-            print('BENCHMARK mode')
+            logger.info('BENCHMARK mode')
             for i in range(5):
                 start = int(round(time.time() * 1000))
                 root_3d = net_root.predict([img, k_value])[0]
                 end = int(round(time.time() * 1000))
-                print(f'\tailia processing time {end - start} ms')
+                logger.info(f'\tailia processing time {end - start} ms')
         else:
             root_3d = net_root.predict([img, k_value])[0]
         root_3d = root_3d[0]
 
         # inference
         if args.benchmark:
-            print('BENCHMARK mode')
+            logger.info('BENCHMARK mode')
             for i in range(5):
                 start = int(round(time.time() * 1000))
                 pose_3d = net_pose.predict([img])[0]
                 end = int(round(time.time() * 1000))
-                print(f'\tailia processing time {end - start} ms')
+                logger.info(f'\tailia processing time {end - start} ms')
         else:
             pose_3d = net_pose.predict([img])[0]
 
@@ -501,26 +504,34 @@ def posenet_to_image(original_img, bbox_list, net_root, net_pose, benchmark=Fals
 
 
 def recognize_from_image(img_path, net_maskrcnn, net_root, net_pose):
-    # load image for pposenet
-    original_img = cv2.imread(img_path)
+    # input image loop
+    for image_path in img_path:
+        # prepare input data
+        logger.info(image_path)
+        src_img = cv2.imread(image_path)
 
-    # cast to pillow for mask r-cnn
-    image = Image.fromarray(original_img.copy()[:, :, ::-1])
+        # load image for pposenet
+        original_img = cv2.imread(image_path)
 
-    # exec mask r-cnn
-    bbox_list = maskrcnn_to_image(image=image, net_maskrcnn=net_maskrcnn)
-    bbox_list[:, 2] = bbox_list[:, 2] - bbox_list[:, 0]
-    bbox_list[:, 3] = bbox_list[:, 3] - bbox_list[:, 1]
-    # print('bbox_list =\n', (bbox_list).astype(np.int))
+        # cast to pillow for mask r-cnn
+        image = Image.fromarray(original_img.copy()[:, :, ::-1])
 
-    # exec posenet
-    vis_img = posenet_to_image(original_img=original_img, bbox_list=bbox_list, 
-                               net_root=net_root, net_pose=net_pose)
+        # exec mask r-cnn
+        bbox_list = maskrcnn_to_image(image=image, net_maskrcnn=net_maskrcnn)
+        bbox_list[:, 2] = bbox_list[:, 2] - bbox_list[:, 0]
+        bbox_list[:, 3] = bbox_list[:, 3] - bbox_list[:, 1]
+        # print('bbox_list =\n', (bbox_list).astype(np.int))
 
-    # output image
-    cv2.imwrite(args.savepath, vis_img)
+        # exec posenet
+        vis_img = posenet_to_image(original_img=original_img, bbox_list=bbox_list, 
+                                net_root=net_root, net_pose=net_pose)
 
-    print('finished process and write result to %s!' % args.savepath)
+        # output image
+        savepath = get_savepath(args.savepath, image_path)
+        logger.info(f'saved at : {savepath}')
+        cv2.imwrite(args.savepath, vis_img)
+
+    logger.info('finished process and write result to %s!' % args.savepath)
 
 
 def recognize_from_video(vid_path, net_maskrcnn, net_root, net_pose):
@@ -567,7 +578,7 @@ def recognize_from_video(vid_path, net_maskrcnn, net_root, net_pose):
     if video_writer is not None:
         video_writer.release()
 
-    print('finished process and write result to %s!' % args.savepath)
+    logger.info('finished process and write result to %s!' % args.savepath)
 
 
 def main():

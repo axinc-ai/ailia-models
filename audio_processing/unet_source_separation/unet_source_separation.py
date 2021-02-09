@@ -11,8 +11,13 @@ from scipy import signal
 
 # import original modules
 sys.path.append('../../util')
+from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from unet_source_separation_utils import preemphasis, inv_preemphasis, lowpass, tfconvert, zero_pad, calc_time  # noqa: E402
+
+# logger
+from logging import getLogger   # noqa: E402
+logger = getLogger(__name__)
 
 
 # ======================
@@ -27,24 +32,10 @@ MODEL_LISTS = ['base', 'large']
 # ======================
 # Arguemnt Parser Config
 # ======================
-parser = argparse.ArgumentParser(
-    description='Source separation.'
-)
-parser.add_argument(
-    '-i', '--input', metavar='WAVFILE',
-    default=WAV_PATH,
-    help='The input audio path.'
-)
-parser.add_argument(
-    '-o', '--savepath',
-    default=SAVE_WAV_PATH,
-    help='The output audio path.'
-)
-parser.add_argument(
-    '-b', '--benchmark',
-    action='store_true',
-    help='Running the inference on the same input 5 times ' +
-         'to measure execution performance. '
+parser = get_base_parser(
+    'RSource separation.',
+    WAV_PATH,
+    SAVE_WAV_PATH,
 )
 parser.add_argument(
     '-n', '--onnx', 
@@ -57,7 +48,7 @@ parser.add_argument(
     default='base', choices=MODEL_LISTS,
     help='model lists: ' + ' | '.join(MODEL_LISTS)
 )
-args = parser.parse_args()
+args = update_parser(parser)
 
 
 # ======================
@@ -109,13 +100,10 @@ def src_sep(data, session) :
     return sep
 
 
-def main():
-    # model files check and download
-    check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
-
+def recognize_one_audio(input_path):
     # load audio
-    print('Loading wavfile...')
-    wav, sr = sf.read(args.input)
+    logger.info('Loading wavfile...')
+    wav, sr = sf.read(input_path)
     
     if wav.dtype != np.float32:
         wav = wav.astype(np.float32)
@@ -128,41 +116,41 @@ def main():
     calc_time(wav.shape[1], sr)
 
     # convert sample rate
-    print('Converting sample rate...')
+    logger.info('Converting sample rate...')
     if not sr == DESIRED_SR :
         wav = signal.resample_poly(wav, DESIRED_SR, sr, axis=1)
 
     # apply preenphasis filter
-    print('Generating input feature...')
+    logger.info('Generating input feature...')
     wav = preemphasis(wav)
 
     input_feature = tfconvert(wav, WINDOW_LEN, HOP_LEN, MULT)
 
     # create instance
     if not args.onnx :
-        print('Use ailia')
+        logger.info('Use ailia')
         env_id = ailia.get_gpu_environment_id()
-        print(f'env_id: {env_id}')
+        logger.info(f'env_id: {env_id}')
         session = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
     else :
-        print('Use onnxruntime')
+        logger.info('Use onnxruntime')
         import onnxruntime
         session = onnxruntime.InferenceSession(WEIGHT_PATH)
 
     # inference
-    print('Start inference...')
+    logger.info('Start inference...')
     if args.benchmark:
-        print('BENCHMARK mode')
+        logger.info('BENCHMARK mode')
         for c in range(5) :
             start = int(round(time.time() * 1000))
             sep = src_sep(input_feature, session)
             end = int(round(time.time() * 1000))
-            print("\tprocessing time {} ms".format(end-start))
+            logger.info("\tprocessing time {} ms".format(end-start))
     else:
         sep = src_sep(input_feature, session)
 
     # postprocessing
-    print('Start postprocessing...')
+    logger.info('Start postprocessing...')
     if LPF_CUTOFF > 0 :
         sep = lowpass(sep, LPF_CUTOFF, DESIRED_SR)
 
@@ -170,11 +158,21 @@ def main():
     out_wav = out_wav.swapaxes(0,1)
     
     # save sapareted signal
-    sf.write(args.savepath, out_wav, DESIRED_SR)
-    
-    print('Saved separated signal. ')
-    print('Script finished successfully.')
+    savepath = get_savepath(args.savepath, input_path)
+    logger.info(f'saved at : {savepath}')
 
+    sf.write(savepath, out_wav, DESIRED_SR)
+    
+    logger.info('Saved separated signal. ')
+    logger.info('Script finished successfully.')
+
+
+def main():
+    # model files check and download
+    check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
+
+    for input_file in args.input:
+        recognize_one_audio(input_file)
 
 if __name__ == "__main__":
      main()
