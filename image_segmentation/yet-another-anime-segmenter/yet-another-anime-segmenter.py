@@ -130,8 +130,12 @@ def recognize_from_image():
 
 def recognize_from_video():
     # net initialize
+    # This model requires fuge gpu memory so fallback to cpu mode
+    env_id = args.env_id
+    if env_id != -1 and ailia.get_environment(env_id).props == "LOWPOWER":
+        env_id = -1
     logger.info(f'env_id: {args.env_id}')
-    segmentor = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
+    segmentor = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
 
     capture = get_capture(args.video)
 
@@ -165,6 +169,7 @@ def recognize_from_video():
             segmentor.set_input_shape(input_data.shape)
             preds = segmentor.predict([input_data])
             preds = yut.postprocess(preds, input_data.shape[2:], frame)
+            seg_img = get_seg_img(frame, preds)
 
         cv2.imshow('Segmented frame', seg_img)
 
