@@ -104,7 +104,7 @@ def recognize_from_image():
             # Hand landmark estimation
             presence = [0, 0] # [left, right]
             if detections[0].size != 0:
-                imgs, affines, _ = but.estimator_preprocess(src_img, detections, scale, pad)
+                imgs, affines, _ = but.estimator_preprocess(src_img, detections[0], scale, pad)
                 estimator.set_input_shape(imgs.shape)
                 flags, handedness, normalized_landmarks = estimator.predict([imgs])
 
@@ -128,7 +128,7 @@ def recognize_from_image():
         # Hand landmark estimation
         presence = [0, 0] # [left, right]
         if detections[0].size != 0:
-            imgs, affines, _ = but.estimator_preprocess(src_img, detections, scale, pad)
+            imgs, affines, _ = but.estimator_preprocess(src_img, detections[0], scale, pad)
             estimator.set_input_shape(imgs.shape)
             flags, handedness, normalized_landmarks = estimator.predict([imgs])
 
