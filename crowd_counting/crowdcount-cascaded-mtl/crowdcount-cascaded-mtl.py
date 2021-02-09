@@ -95,7 +95,6 @@ def estimate_from_image():
         )
 
         res_img = np.hstack((org_img, heatmap))
-        # cv2.imwrite(args.savepath, res_img)
         savepath = get_savepath(args.savepath, image_path)
         logger.info(f'saved at : {savepath}')
         cv2.imwrite(savepath, res_img)
