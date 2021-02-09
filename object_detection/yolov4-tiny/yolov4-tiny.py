@@ -10,7 +10,8 @@ import ailia
 sys.path.append('../../util')
 from utils import get_base_parser, update_parser  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
-from detector_utils import plot_results, load_image, letterbox_convert, reverse_letterbox  # noqa: E402
+from detector_utils import load_image, letterbox_convert, reverse_letterbox  # noqa: E402
+from detector_utils import plot_results, write_predictions  # noqa: E402
 import webcamera_utils  # noqa: E402
 
 from yolov4_tiny_utils import post_processing  # noqa: E402
@@ -58,6 +59,11 @@ parser.add_argument(
     '-iou', '--iou',
     default=IOU, type=float,
     help='The detection iou for yolo. (default: '+str(IOU)+')'
+)
+parser.add_argument(
+    '-w', '--write_prediction',
+    default=None, type=str,
+    help='The predictions file name to be output.'
 )
 parser.add_argument(
     '-dw', '--detection_width', metavar='DETECTION_WIDTH',
@@ -112,11 +118,14 @@ def recognize_from_image(detector):
     detect_object = post_processing(img, args.threshold, args.iou, output)
     detect_object = reverse_letterbox(detect_object[0], org_img, (IMAGE_HEIGHT,IMAGE_WIDTH))
 
-    # plot result
-    res_img = plot_results(detect_object, org_img, COCO_CATEGORY)
+    # write prediction
+    if args.write_prediction:
+        write_predictions(args.write_prediction, detect_object, org_img, COCO_CATEGORY)
 
     # plot result
+    res_img = plot_results(detect_object, org_img, COCO_CATEGORY)
     cv2.imwrite(args.savepath, res_img)
+
     print('Script finished successfully.')
 
 

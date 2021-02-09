@@ -9,7 +9,7 @@ import ailia
 sys.path.append('../../util')
 from utils import get_base_parser, update_parser  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
-from detector_utils import plot_results, load_image  # noqa: E402
+from detector_utils import load_image, plot_results, write_predictions  # noqa: E402
 import webcamera_utils  # noqa: E402
 
 
@@ -56,6 +56,11 @@ parser.add_argument(
     '-iou', '--iou',
     default=IOU, type=float,
     help='The detection iou for yolo. (default: '+str(IOU)+')'
+)
+parser.add_argument(
+    '-w', '--write_prediction',
+    default=None, type=str,
+    help='The predictions file name to be output.'
 )
 parser.add_argument(
     '-dw', '--detection_width',
@@ -106,9 +111,14 @@ def recognize_from_image():
     else:
         detector.compute(img, args.threshold, args.iou)
 
+    # write prediction
+    if args.write_prediction:
+        write_predictions(args.write_prediction, detector, img, COCO_CATEGORY)
+
     # plot result
     res_img = plot_results(detector, img, COCO_CATEGORY)
     cv2.imwrite(args.savepath, res_img)
+
     print('Script finished successfully.')
 
 
