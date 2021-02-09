@@ -128,18 +128,12 @@ def recognize_from_video():
     )
     hand.set_threshold(0.1)
 
-    ailia_input_w = detector.get_input_shape()[3]
-    ailia_input_h = detector.get_input_shape()[2]
-
     capture = get_capture(args.video)
     # create video writer if savepath is specified as video format
     if args.savepath != SAVE_PATH:
         f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
         f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
-        save_h, save_w = calc_adjust_fsize(
-            f_h, f_w, ailia_input_h, ailia_input_w
-        )
-        writer = get_writer(args.savepath, save_h, save_w)
+        writer = get_writer(args.savepath, f_h, f_w)
     else:
         writer = None
 
