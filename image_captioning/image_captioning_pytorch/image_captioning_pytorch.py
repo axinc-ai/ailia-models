@@ -15,6 +15,10 @@ from detector_utils import load_image  # noqa: E402
 from image_captioning_pytorch_utils import decode_sequence  # noqa: E402
 import webcamera_utils  # noqa: E402
 
+# logger
+from logging import getLogger   # noqa: E402
+logger = getLogger(__name__)
+
 
 # ======================
 # Parameters
@@ -31,7 +35,6 @@ REMOTE_PATH = \
     'https://storage.googleapis.com/ailia-models/image_captioning_pytorch/'
 
 IMAGE_PATH = 'demo.jpg'
-SAVE_IMAGE_PATH = 'output.png'
 
 VOCAB_FILE_PATH = 'vocab.json'
 
@@ -45,9 +48,7 @@ INPUT_WIDTH = 640
 # ======================
 # Arguemnt Parser Config
 # ======================
-parser = get_base_parser(
-    'ImageCaptioning.pytorch model', IMAGE_PATH, SAVE_IMAGE_PATH
-)
+parser = get_base_parser('ImageCaptioning.pytorch model', IMAGE_PATH, None)
 parser.add_argument(
     '--model', type=str, default='fc_nsc',
     choices=('fc', 'fc_rl', 'fc_nsc'),
@@ -101,34 +102,35 @@ def predict(img, net, my_resnet):
 def recognize_from_image(filename, net, my_resnet):
     # prepare input data
     img = load_image(filename)
-    print(f'input image shape: {img.shape}')
+    logger.debug(f'input image shape: {img.shape}')
 
     img = cv2.cvtColor(img, cv2.COLOR_BGRA2RGB)
 
     # inference
-    print('Start inference...')
+    logger.info('Start inference...')
     if args.benchmark:
-        print('BENCHMARK mode')
+        logger.info('BENCHMARK mode')
         for i in range(5):
             start = int(round(time.time() * 1000))
             sents = predict(img, net, my_resnet)
             end = int(round(time.time() * 1000))
-            print(f'\tailia processing time {end - start} ms')
+            logger.info(f'\tailia processing time {end - start} ms')
     else:
         sents = predict(img, net, my_resnet)
 
-    print('### Caption ### \n', sents[0], '\n')
+    logger.info('### Caption ### ')
+    logger.info(sents[0])
 
     # plot result
     # cv2.imwrite(args.savepath, res_img)
-    print('Script finished successfully.')
+    logger.info('Script finished successfully.')
 
 
 def recognize_from_video(video, net, my_resnet):
     capture = webcamera_utils.get_capture(video)
 
     # create video writer if savepath is specified as video format
-    if args.savepath != SAVE_IMAGE_PATH:
+    if args.savepath is not None:
         f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
         f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
         writer = webcamera_utils.get_writer(args.savepath, f_h, f_w)
@@ -143,7 +145,7 @@ def recognize_from_video(video, net, my_resnet):
         img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         sents = predict(img, net, my_resnet)
 
-        print('Caption --->', sents[0])
+        logger.info('Caption --->', sents[0])
 
         cv2.rectangle(
             frame, (0, 0), (frame.shape[1], 48), (255, 255, 255), thickness=-1
@@ -169,7 +171,7 @@ def recognize_from_video(video, net, my_resnet):
     cv2.destroyAllWindows()
     if writer is not None:
         writer.release()
-    print('Script finished successfully.')
+    logger.info('Script finished successfully.')
 
 
 def main():
@@ -181,9 +183,9 @@ def main():
     weight_path, model_path = dic_model[args.model]
 
     # model files check and download
-    print("=== Captioning model ===")
+    logger.info("=== Captioning model ===")
     check_and_download_models(weight_path, model_path, REMOTE_PATH)
-    print("=== Feature model ===")
+    logger.info("=== Feature model ===")
     check_and_download_models(WEIGHT_FEAT_PATH, MODEL_FEAT_PATH, REMOTE_PATH)
 
     # initialize
@@ -195,7 +197,11 @@ def main():
     if args.video is not None:
         recognize_from_video(args.video, net, my_resnet)
     else:
-        recognize_from_image(args.input, net, my_resnet)
+        # input image loop
+        for image_path in args.input:
+            # prepare input data
+            logger.info(image_path)
+            recognize_from_image(image_path, net, my_resnet)
 
 
 if __name__ == '__main__':

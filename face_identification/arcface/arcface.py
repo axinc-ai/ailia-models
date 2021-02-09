@@ -15,6 +15,10 @@ from model_utils import check_and_download_models  # noqa: E402
 from detector_utils import hsv_to_rgb  # noqa: E402
 from nms_utils import nms_between_categories  # noqa: E402
 
+# logger
+from logging import getLogger   # noqa: E402
+logger = getLogger(__name__)
+
 
 # ======================
 # PARAMETERS
@@ -54,10 +58,9 @@ parser = get_base_parser(
     None,
 )
 # overwrite default config
+# NOTE: arcface has different usage for `--input` with other models
 parser.add_argument(
-    '-i', '--inputs', metavar='IMAGE',
-    nargs=2,
-    default=,
+    '-i', '--inputs', metavar='IMAGE', nargs=2, default='',
     help='Two image paths for calculating the face match.'
 )
 parser.add_argument(
@@ -90,7 +93,8 @@ MODEL_PATH = args.arch + '.onnx.prototxt'
 if args.face == "yolov3":
     FACE_WEIGHT_PATH = 'yolov3-face.opt.onnx'
     FACE_MODEL_PATH = 'yolov3-face.opt.onnx.prototxt'
-    FACE_REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/yolov3-face/'
+    FACE_REMOTE_PATH = \
+        'https://storage.googleapis.com/ailia-models/yolov3-face/'
     FACE_CATEGORY = ["face"]
     FACE_ALGORITHM = ailia.DETECTOR_ALGORITHM_YOLOV3
     FACE_RANGE = ailia.NETWORK_IMAGE_RANGE_U_FP32
@@ -98,7 +102,8 @@ if args.face == "yolov3":
 elif args.face == "yolov3-mask":
     FACE_WEIGHT_PATH = 'face-mask-detection-yolov3-tiny.opt.obf.onnx'
     FACE_MODEL_PATH = 'face-mask-detection-yolov3-tiny.opt.onnx.prototxt'
-    FACE_REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/face-mask-detection/'
+    FACE_REMOTE_PATH = \
+        'https://storage.googleapis.com/ailia-models/face-mask-detection/'
     FACE_CATEGORY = ["no_mask", "mask"]
     FACE_ALGORITHM = ailia.DETECTOR_ALGORITHM_YOLOV3
     FACE_RANGE = ailia.NETWORK_IMAGE_RANGE_U_FP32
@@ -112,7 +117,7 @@ else:
     FACE_RANGE = None
     FACE_MARGIN = 1.4
     sys.path.append('../../face_detection/blazeface')
-    from blazeface_utils import *
+    from blazeface_utils import *   # noqa: E402
 
 
 # ======================
@@ -404,13 +409,13 @@ def compare_images():
     BATCH_SIZE = net.get_input_shape()[0]
 
     # inference
-    print('Start inference...')
+    logger.info('Start inference...')
     if BATCH_SIZE == 2:
         shape = net.get_output_shape()
         shape = (4, shape[1])
         preds_ailia = np.zeros(shape)
     if args.benchmark:
-        print('BENCHMARK mode')
+        logger.info('BENCHMARK mode')
         for i in range(5):
             start = int(round(time.time() * 1000))
             if BATCH_SIZE == 4:
@@ -419,7 +424,7 @@ def compare_images():
                 preds_ailia[0:2] = net.predict(imgs[0:2])
                 preds_ailia[2:4] = net.predict(imgs[2:4])
             end = int(round(time.time() * 1000))
-            print(f'\tailia processing time {end - start} ms')
+            logger.info(f'\tailia processing time {end - start} ms')
     else:
         if BATCH_SIZE == 4:
             preds_ailia = net.predict(imgs)
@@ -432,11 +437,13 @@ def compare_images():
     fe_2 = np.concatenate([preds_ailia[2], preds_ailia[3]], axis=0)
     sim = cosin_metric(fe_1, fe_2)
 
-    print(f'Similarity of ({args.inputs[0]}, {args.inputs[1]}) : {sim:.3f}')
+    logger.info(
+        f'Similarity of ({args.inputs[0]}, {args.inputs[1]}) : {sim:.3f}'
+    )
     if args.threshold > sim:
-        print('They are not the same face!')
+        logger.info('They are not the same face!')
     else:
-        print('They are the same face!')
+        logger.info('They are the same face!')
 
 
 def compare_video():
@@ -517,7 +524,7 @@ def compare_video():
 
     capture.release()
     cv2.destroyAllWindows()
-    print('Script finished successfully.')
+    logger.info('Script finished successfully.')
 
 
 def main():

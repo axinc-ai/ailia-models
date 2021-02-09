@@ -9,10 +9,14 @@ import ailia
 # import original modules
 from fashionai_key_points_detection_utils import decode_np, draw_keypoints
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser  # noqa: E402
+from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from detector_utils import load_image  # noqa: E402
 from webcamera_utils import get_capture  # noqa: E402
+
+# logger
+from logging import getLogger   # noqa: E402
+logger = getLogger(__name__)
 
 
 # ======================
@@ -164,19 +168,19 @@ def predict(img, net):
 def recognize_from_image(filename, net):
     # prepare input data
     img = load_image(filename)
-    print(f'input image shape: {img.shape}')
+    logger.debug(f'input image shape: {img.shape}')
 
     img = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
 
     # inference
-    print('Start inference...')
+    logger.info('Start inference...')
     if args.benchmark:
-        print('BENCHMARK mode')
+        logger.info('BENCHMARK mode')
         for i in range(5):
             start = int(round(time.time() * 1000))
             keypoints = predict(img, net)
             end = int(round(time.time() * 1000))
-            print(f'\tailia processing time {end - start} ms')
+            logger.info(f'\tailia processing time {end - start} ms')
     else:
         keypoints = predict(img, net)
 
@@ -184,8 +188,10 @@ def recognize_from_image(filename, net):
     plot result
     """
     res_img = draw_keypoints(img, keypoints)
-    cv2.imwrite(args.savepath, res_img)
-    print('Script finished successfully.')
+    # cv2.imwrite(args.savepath, res_img)
+    savepath = get_savepath(args.savepath, filename)
+    logger.info(f'saved at : {savepath}')
+    cv2.imwrite(savepath, res_img)
 
 
 def recognize_from_video(video, net):
@@ -206,7 +212,6 @@ def recognize_from_video(video, net):
 
     capture.release()
     cv2.destroyAllWindows()
-    print('Script finished successfully.')
 
 
 def main():
@@ -226,9 +231,15 @@ def main():
     net = ailia.Net(model_path, weight_path, env_id=args.env_id)
 
     if args.video is not None:
+        # video mode
         recognize_from_video(args.video, net)
     else:
-        recognize_from_image(args.input if args.input else img_path, net)
+        # image mode
+        # input image loop
+        for image_path in args.input:
+            logger.info(image_path)
+            recognize_from_image(image_path, net)
+    logger.info('Script finished successfully.')
 
 
 if __name__ == '__main__':

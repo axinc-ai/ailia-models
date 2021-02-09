@@ -9,9 +9,13 @@ from rotnet_utils import generate_rotated_image, create_figure, visualize
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser  # noqa: E402
+from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 import webcamera_utils  # noqa: E402
+
+# logger
+from logging import getLogger   # noqa: E402
+logger = getLogger(__name__)
 
 
 # ======================
@@ -59,47 +63,53 @@ REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/rotnet/'
 # Main functions
 # ======================
 def recognize_from_image():
-    # prepare input data
-    org_img = cv2.cvtColor(cv2.imread(args.input), cv2.COLOR_BGR2RGB)
-
-    if args.apply_rotate:
-        rotation_angle = np.random.randint(360)
-        rotated_img = generate_rotated_image(
-            org_img,
-            rotation_angle,
-            size=(IMAGE_HEIGHT, IMAGE_WIDTH),
-            crop_center=True,
-            crop_largest_rect=True
-        )
-        input_data = rotated_img.reshape((1, IMAGE_HEIGHT, IMAGE_WIDTH, 3))
-    else:
-        rotation_angle = 0
-        rotated_img = cv2.resize(org_img, (IMAGE_HEIGHT, IMAGE_WIDTH))
-        input_data = rotated_img.reshape((1, IMAGE_HEIGHT, IMAGE_WIDTH, 3))
-
     # net initialize
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
-    net.set_input_shape(input_data.shape)
 
-    # inference
-    print('Start inference...')
-    if args.benchmark:
-        print('BENCHMARK mode')
-        for i in range(5):
-            start = int(round(time.time() * 1000))
+    # input image loop
+    for image_path in args.input:
+        # prepare input data
+        logger.info(image_path)
+        org_img = cv2.cvtColor(cv2.imread(image_path), cv2.COLOR_BGR2RGB)
+
+        if args.apply_rotate:
+            rotation_angle = np.random.randint(360)
+            rotated_img = generate_rotated_image(
+                org_img,
+                rotation_angle,
+                size=(IMAGE_HEIGHT, IMAGE_WIDTH),
+                crop_center=True,
+                crop_largest_rect=True
+            )
+            input_data = rotated_img.reshape((1, IMAGE_HEIGHT, IMAGE_WIDTH, 3))
+        else:
+            rotation_angle = 0
+            rotated_img = cv2.resize(org_img, (IMAGE_HEIGHT, IMAGE_WIDTH))
+            input_data = rotated_img.reshape((1, IMAGE_HEIGHT, IMAGE_WIDTH, 3))
+
+        net.set_input_shape(input_data.shape)
+
+        # inference
+        logger.info('Start inference...')
+        if args.benchmark:
+            logger.info('BENCHMARK mode')
+            for i in range(5):
+                start = int(round(time.time() * 1000))
+                preds_ailia = net.predict(input_data)
+                end = int(round(time.time() * 1000))
+                logger.info(f'\tailia processing time {end - start} ms')
+        else:
             preds_ailia = net.predict(input_data)
-            end = int(round(time.time() * 1000))
-            print(f'\tailia processing time {end - start} ms')
-    else:
-        preds_ailia = net.predict(input_data)
 
-    # visualize
-    predicted_angle = np.argmax(preds_ailia, axis=1)[0]
-    fig = create_figure()
-    plt = visualize(fig, rotated_img, rotation_angle, predicted_angle)
-    plt.savefig(args.savepath)
+        # visualize
+        predicted_angle = np.argmax(preds_ailia, axis=1)[0]
+        fig = create_figure()
+        plt = visualize(fig, rotated_img, rotation_angle, predicted_angle)
+        savepath = get_savepath(args.savepath, image_path)
+        logger.info(f'saved at : {savepath}')
+        plt.savefig(savepath)
 
-    print('Script finished successfully.')
+    logger.info('Script finished successfully.')
 
 
 def recognize_from_video():
@@ -111,8 +121,8 @@ def recognize_from_video():
 
     # create video writer if savepath is specified as video format
     if args.savepath != SAVE_IMAGE_PATH:
-        print(
-            '[WARNING] currently, video results cannot be output correctly...'
+        logger.warning(
+            'currently, video results cannot be output correctly...'
         )
         # TODO: DEBUG: shape
         f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
@@ -170,7 +180,7 @@ def recognize_from_video():
     cv2.destroyAllWindows()
     if writer is not None:
         writer.release()
-    print('Script finished successfully.')
+    logger.info('Script finished successfully.')
 
 
 def main():

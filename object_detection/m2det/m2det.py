@@ -8,10 +8,14 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser  # noqa: E402
+from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from detector_utils import load_image  # noqa: E402
 import webcamera_utils  # noqa: E402
+
+# logger
+from logging import getLogger   # noqa: E402
+logger = getLogger(__name__)
 
 
 # ======================
@@ -182,19 +186,19 @@ def recognize_from_image(filename, detector):
     img = load_image(filename)
     img = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
 
-    print('Start inference...')
+    logger.info('Start inference...')
     if args.benchmark:
-        print('BENCHMARK mode')
+        logger.info('BENCHMARK mode')
         for i in range(5):
             start = int(round(time.time() * 1000))
             boxes, scores, cls_inds = detect_objects(img, detector)
             end = int(round(time.time() * 1000))
-            print(f'\tailia processing time {end - start} ms')
+            logger.info(f'\tailia processing time {end - start} ms')
     else:
         boxes, scores, cls_inds = detect_objects(img, detector)
 
     try:
-        print('\n'.join(
+        logger.info('\n'.join(
             ['pos:{}, ids:{}, score:{:.3f}'.format(
                 '(%.1f,%.1f,%.1f,%.1f)' % (box[0], box[1], box[2], box[3]),
                 COCO_CATEGORY[int(obj_cls)], score
@@ -206,9 +210,9 @@ def recognize_from_image(filename, detector):
 
     # show image
     im2show = draw_detection(img, boxes, scores, cls_inds)
-    cv2.imwrite(args.savepath, im2show)
-
-    print('Script finished successfully.')
+    savepath = get_savepath(args.savepath, filename)
+    logger.info(f'saved at : {savepath}')
+    cv2.imwrite(savepath, im2show)
 
     # cv2.imshow('demo', im2show)
     # cv2.waitKey(5000)
@@ -244,7 +248,6 @@ def recognize_from_video(video, detector):
     cv2.destroyAllWindows()
     if writer is not None:
         writer.release()
-    print('Script finished successfully.')
 
 
 def main():
@@ -259,7 +262,13 @@ def main():
         recognize_from_video(args.video, detector)
     else:
         # image mode
-        recognize_from_image(args.input, detector)
+        # input image loop
+        for image_path in args.input:
+            # prepare input data
+            logger.info(image_path)
+            recognize_from_image(image_path, detector)
+
+    logger.info('Script finished successfully.')
 
 
 if __name__ == '__main__':

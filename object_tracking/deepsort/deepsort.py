@@ -17,6 +17,10 @@ from model_utils import check_and_download_models  # noqa: E402
 from detector_utils import load_image  # noqa: E402
 import webcamera_utils  # noqa: E402
 
+# logger
+from logging import getLogger   # noqa: E402
+logger = getLogger(__name__)
+
 
 # ======================
 # Parameters
@@ -61,7 +65,7 @@ NN_BUDGET = 100
 # ======================
 # Arguemnt Parser Config
 # ======================
-parser = get_base_parser('Deep SORT', IMAGE_PATH, SAVE_IMAGE_PATH,)
+parser = get_base_parser('Deep SORT', None, None)
 parser.add_argument(
     '-p', '--pairimage', metavar='IMAGE',
     nargs=2,
@@ -127,7 +131,7 @@ def recognize_from_video():
     else:
         writer = None
 
-    print('Start Inference...')
+    logger.info('Start Inference...')
     while(True):
         idx_frame += 1
         ret, frame = capture.read()
@@ -229,8 +233,8 @@ def recognize_from_video():
     if writer is not None:
         writer.release()
 
-    print(f'Save results to {args.savepath}')
-    print('Script finished successfully.')
+    logger.info(f'Save results to {args.savepath}')
+    logger.info('Script finished successfully.')
 
 
 def compare_images():
@@ -252,7 +256,7 @@ def compare_images():
         input_data.append(load_image(args.pairimage[i]))
 
     # inference
-    print('Start inference...')
+    logger.info('Start inference...')
     features = []
     for i in range(len(input_data)):
         # do detection
@@ -263,9 +267,9 @@ def compare_images():
         # select person class
         mask = cls_ids == 0
         if mask.sum() == 0:
-            print('Detector could not detect any person '
-                  f'in the input image: {args.pairimage[i]}')
-            print('Program finished.')
+            logger.info('Detector could not detect any person '
+                        f'in the input image: {args.pairimage[i]}')
+            logger.info('Program finished.')
             sys.exit(0)
 
         bbox_xywh = bbox_xywh[mask]
@@ -292,12 +296,12 @@ def compare_images():
         )[np.newaxis, :, :, :].transpose(0, 3, 1, 2)
 
         if args.benchmark:
-            print('BENCHMARK mode')
+            logger.info('BENCHMARK mode')
             for i in range(5):
                 start = int(round(time.time() * 1000))
                 feature = extractor.predict(img_crop)
                 end = int(round(time.time() * 1000))
-                print(f'\tailia processing time {end - start} ms')
+                logger.info(f'\tailia processing time {end - start} ms')
         else:
             feature = extractor.predict(img_crop)
 
@@ -305,27 +309,29 @@ def compare_images():
 
     sim = cosin_metric(features[0], features[1])
     if sim >= (1 - MAX_COSINE_DISTANCE):
-        print(f'{args.pairimage}: SAME person (confidence: {sim})')
+        logger.info(f'{args.pairimage}: Same person (confidence: {sim})')
     else:
-        print(f'{args.pairimage}: Diefferent person (confidence: {sim})')
+        logger.info(f'{args.pairimage}: Different person (confidence: {sim})')
 
 
 def main():
     # model files check and download
-    print('Check Detector...')
+    logger.info('Check Detector...')
     check_and_download_models(DT_WEIGHT_PATH, DT_MODEL_PATH, REMOTE_PATH)
-    print('Check Extractor...')
+    logger.info('Check Extractor...')
     check_and_download_models(EX_WEIGHT_PATH, EX_MODEL_PATH, REMOTE_PATH)
 
     if args.benchmark:
-        args.pairimage[0]="correct_32_1.jpg"
-        args.pairimage[1]="correct_32_2.jpg"
+        args.pairimage[0] = "correct_32_1.jpg"
+        args.pairimage[1] = "correct_32_2.jpg"
 
-    if args.pairimage[0] != None and args.pairimage[1] != None:
-        print('Cheking if the person in two images is the same person or not.')
+    if args.pairimage[0] is not None and args.pairimage[1] is not None:
+        logger.info(
+            'Checking if the person in two images is the same person or not.'
+        )
         compare_images()
     else:
-        print('Deep SORT started')
+        logger.info('Deep SORT started')
         recognize_from_video()
 
 

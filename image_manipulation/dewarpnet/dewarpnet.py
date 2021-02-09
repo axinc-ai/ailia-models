@@ -7,10 +7,14 @@ import numpy as np
 import ailia
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser  # noqa: E402
+from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from image_utils import load_image  # noqa: E402
 import webcamera_utils  # noqa: E402
+
+# logger
+from logging import getLogger   # noqa: E402
+logger = getLogger(__name__)
 
 
 # ======================
@@ -88,32 +92,38 @@ def run_inference(wc_net, bm_net, img, org_img):
 
 
 def unwarp_from_image():
-    org_img = cv2.imread(args.input)
-    img = load_image(
-        args.input,
-        (WC_IMG_HEIGHT, WC_IMG_WIDTH),
-        normalize_type='255',
-        gen_input_ailia=True
-    )
-
     # net initialize
     bm_net = ailia.Net(BM_MODEL_PATH, BM_WEIGHT_PATH, env_id=args.env_id)
     wc_net = ailia.Net(WC_MODEL_PATH, WC_WEIGHT_PATH, env_id=args.env_id)
 
-    # inference
-    print('Start inference...')
-    if args.benchmark:
-        print('BENCHMARK mode')
-        for i in range(5):
-            start = int(round(time.time() * 1000))
-            uwpred = run_inference(wc_net, bm_net, img, org_img)
-            end = int(round(time.time() * 1000))
-            print("\tailia processing time {} ms".format(end-start))
-    else:
-        uwpred = run_inference(wc_net, bm_net, img, org_img)
+    # input image loop
+    for image_path in args.input:
+        # prepare input data
+        logger.info(image_path)
+        org_img = cv2.imread(image_path)
+        img = load_image(
+            image_path,
+            (WC_IMG_HEIGHT, WC_IMG_WIDTH),
+            normalize_type='255',
+            gen_input_ailia=True,
+        )
 
-    cv2.imwrite(args.savepath, uwpred * 255)
-    print('Script finished successfully.')
+        # inference
+        logger.info('Start inference...')
+        if args.benchmark:
+            logger.info('BENCHMARK mode')
+            for i in range(5):
+                start = int(round(time.time() * 1000))
+                uwpred = run_inference(wc_net, bm_net, img, org_img)
+                end = int(round(time.time() * 1000))
+                logger.info("\tailia processing time {} ms".format(end-start))
+        else:
+            uwpred = run_inference(wc_net, bm_net, img, org_img)
+
+        savepath = get_savepath(args.savepath, image_path)
+        logger.info(f'saved at : {savepath}')
+        cv2.imwrite(savepath, uwpred * 255)
+    logger.info('Script finished successfully.')
 
 
 def unwarp_from_video():
@@ -125,8 +135,8 @@ def unwarp_from_video():
 
     # create video writer if savepath is specified as video format
     if args.savepath != SAVE_IMAGE_PATH:
-        print(
-            '[WARNING] currently, video results cannot be output correctly...'
+        logger.warning(
+            'currently, video results cannot be output correctly...'
         )
         f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
         f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
@@ -160,7 +170,7 @@ def unwarp_from_video():
     cv2.destroyAllWindows()
     if writer is not None:
         writer.release()
-    print('Script finished successfully.')
+    logger.info('Script finished successfully.')
 
 
 def main():

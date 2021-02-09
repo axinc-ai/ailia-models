@@ -8,10 +8,14 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser  # noqa: E402
+from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 import webcamera_utils  # noqa: E402
 from u2net_utils import load_image, transform, save_result, norm  # noqa: E402
+
+# logger
+from logging import getLogger   # noqa: E402
+logger = getLogger(__name__)
 
 
 # ======================
@@ -62,42 +66,49 @@ REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/u2net/'
 # Main functions
 # ======================
 def recognize_from_image():
-    # prepare input data
-    input_data, h, w = load_image(
-        args.input,
-        scaled_size=IMAGE_SIZE,
-    )
-
     # net initialize
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
 
-    # inference
-    print('Start inference...')
-    if args.benchmark:
-        print('BENCHMARK mode')
-        for i in range(5):
-            start = int(round(time.time() * 1000))
+    # input image loop
+    for image_path in args.input:
+        # prepare input data
+        logger.info(image_path)
+
+        # prepare input data
+        input_data, h, w = load_image(
+            image_path,
+            scaled_size=IMAGE_SIZE,
+        )
+
+        # inference
+        logger.info('Start inference...')
+        if args.benchmark:
+            logger.info('BENCHMARK mode')
+            for i in range(5):
+                start = int(round(time.time() * 1000))
+                preds_ailia = net.predict([input_data])
+                end = int(round(time.time() * 1000))
+                logger.info(f'\tailia processing time {end - start} ms')
+        else:
+            # dim = [(1, 1, 320, 320), (1, 1, 320, 320),..., ]  len=7
             preds_ailia = net.predict([input_data])
-            end = int(round(time.time() * 1000))
-            print(f'\tailia processing time {end - start} ms')
-    else:
-        # dim = [(1, 1, 320, 320), (1, 1, 320, 320),..., ]  len=7
-        preds_ailia = net.predict([input_data])
 
-    # postprocessing
-    # we only use `d1` (the first output, check the original repository)
-    pred = preds_ailia[0][0, 0, :, :]
+        # postprocessing
+        # we only use `d1` (the first output, check the original repository)
+        pred = preds_ailia[0][0, 0, :, :]
 
-    save_result(pred, args.savepath, [h, w])
+        savepath = get_savepath(args.savepath, image_path)
+        logger.info(f'saved at : {savepath}')
+        save_result(pred, savepath, [h, w])
 
-    # composite
-    if args.composite:
-        image = cv2.imread(args.input)
-        image = cv2.cvtColor(image, cv2.COLOR_BGR2BGRA)
-        image[:, :, 3] = cv2.resize(pred, (w, h)) * 255
-        cv2.imwrite(args.savepath, image)
+        # composite
+        if args.composite:
+            image = cv2.imread(image_path)
+            image = cv2.cvtColor(image, cv2.COLOR_BGR2BGRA)
+            image[:, :, 3] = cv2.resize(pred, (w, h)) * 255
+            cv2.imwrite(savepath, image)
 
-    print('Script finished successfully.')
+    logger.info('Script finished successfully.')
 
 
 def recognize_from_video():
@@ -110,8 +121,8 @@ def recognize_from_video():
     f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
     f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
     if args.savepath != SAVE_IMAGE_PATH:
-        print(
-            '[WARNING] currently, video results cannot be output correctly...'
+        logger.warning(
+            'currently, video results cannot be output correctly...'
         )
         writer = webcamera_utils.get_writer(args.savepath, f_h, f_w, rgb=False)
     else:
@@ -146,7 +157,7 @@ def recognize_from_video():
     cv2.destroyAllWindows()
     if writer is not None:
         writer.release()
-    print('Script finished successfully.')
+    logger.info('Script finished successfully.')
 
 
 def main():

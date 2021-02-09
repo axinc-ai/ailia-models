@@ -9,10 +9,14 @@ import dbface_utils
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser  # noqa: E402
+from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from detector_utils import load_image  # noqa: E402
 import webcamera_utils  # noqa: E402
+
+# logger
+from logging import getLogger   # noqa: E402
+logger = getLogger(__name__)
 
 
 # ======================
@@ -113,28 +117,30 @@ def detect_objects(img, detector):
 def recognize_from_image(filename):
     # load input image
     img = load_image(filename)
-    print(f'input image shape: {img.shape}')
+    logger.debug(f'input image shape: {img.shape}')
     img = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
 
     detector = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
 
-    print('Start inference...')
+    logger.info('Start inference...')
     if args.benchmark:
-        print('BENCHMARK mode')
+        logger.info('BENCHMARK mode')
         for i in range(5):
             start = int(round(time.time() * 1000))
             objs = detect_objects(img, detector)
             end = int(round(time.time() * 1000))
-            print(f'\tailia processing time {end - start} ms')
+            logger.info(f'\tailia processing time {end - start} ms')
     else:
         objs = detect_objects(img, detector)
 
     # show image
     for obj in objs:
         dbface_utils.drawbbox(img, obj)
-    cv2.imwrite(args.savepath, img)
 
-    print('Script finished successfully.')
+    savepath = get_savepath(args.savepath, filename)
+    logger.info(f'saved at : {savepath}')
+    cv2.imwrite(savepath, img)
+    logger.info('Script finished successfully.')
 
 
 def recognize_from_video(video):
@@ -169,7 +175,7 @@ def recognize_from_video(video):
     cv2.destroyAllWindows()
     if writer is not None:
         writer.release()
-    print('Script finished successfully.')
+    logger.info('Script finished successfully.')
 
 
 def main():
@@ -181,7 +187,11 @@ def main():
         recognize_from_video(args.video)
     else:
         # image mode
-        recognize_from_image(args.input)
+        # input image loop
+        for image_path in args.input:
+            # prepare input data
+            logger.info(image_path)
+            recognize_from_image(image_path)
 
 
 if __name__ == '__main__':

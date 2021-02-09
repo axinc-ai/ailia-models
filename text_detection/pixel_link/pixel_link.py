@@ -9,11 +9,16 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
+from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from detector_utils import plot_results, load_image  # noqa: E402C
 from webcamera_utils import get_capture  # noqa: E402
 
 from pixel_link_utils import decode_batch, mask_to_bboxes, draw_bbox
+
+# logger
+from logging import getLogger   # noqa: E402
+logger = getLogger(__name__)
 
 # ======================
 # Parameters
@@ -31,31 +36,8 @@ SAVE_IMAGE_PATH = 'output.png'
 # Arguemnt Parser Config
 # ======================
 
-parser = argparse.ArgumentParser(
-    description='Pixel-Link model'
-)
-parser.add_argument(
-    '-i', '--input', metavar='IMAGE',
-    default=IMAGE_PATH,
-    help='The input image path.'
-)
-parser.add_argument(
-    '-v', '--video', metavar='VIDEO',
-    default=None,
-    help='The input video path. ' +
-         'If the VIDEO argument is set to 0, the webcam input will be used.'
-)
-parser.add_argument(
-    '-s', '--savepath', metavar='SAVE_IMAGE_PATH', default=SAVE_IMAGE_PATH,
-    help='Save path for the output image.'
-)
-parser.add_argument(
-    '-b', '--benchmark',
-    action='store_true',
-    help='Running the inference on the same input 5 times ' +
-         'to measure execution performance. (Cannot be used in video mode)'
-)
-args = parser.parse_args()
+parser = get_base_parser('Pixel-Link model', IMAGE_PATH, SAVE_IMAGE_PATH)
+args = update_parser(parser)
 
 
 # ======================
@@ -88,31 +70,34 @@ def predict(img, net):
     return bboxes
 
 
-def recognize_from_image(filename, net):
-    # prepare input data
-    img = load_image(filename)
-    print(f'input image shape: {img.shape}')
+def recognize_from_image(filenames, net):
+    for filename in filenames:
+        # prepare input data
+        img = load_image(filename)
+        logger.info(f'input image shape: {img.shape}')
 
-    img = cv2.cvtColor(img, cv2.COLOR_BGRA2RGB)
+        img = cv2.cvtColor(img, cv2.COLOR_BGRA2RGB)
 
-    # inference
-    print('Start inference...')
-    if args.benchmark:
-        print('BENCHMARK mode')
-        for i in range(5):
-            start = int(round(time.time() * 1000))
+        # inference
+        logger.info('Start inference...')
+        if args.benchmark:
+            logger.info('BENCHMARK mode')
+            for i in range(5):
+                start = int(round(time.time() * 1000))
+                bboxes = predict(img, net)
+                end = int(round(time.time() * 1000))
+                logger.info(f'\tailia processing time {end - start} ms')
+        else:
             bboxes = predict(img, net)
-            end = int(round(time.time() * 1000))
-            print(f'\tailia processing time {end - start} ms')
-    else:
-        bboxes = predict(img, net)
 
-    img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
-    res_img = draw_bbox(img, bboxes)
+        img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+        res_img = draw_bbox(img, bboxes)
 
-    # plot result
-    cv2.imwrite(args.savepath, res_img)
-    print('Script finished successfully.')
+        # plot result
+        savepath = get_savepath(args.savepath, filename)
+        logger.info(f'saved at : {savepath}')
+        cv2.imwrite(savepath, res_img)
+    logger.info('Script finished successfully.')
 
 
 def recognize_from_video(video, net):
@@ -135,7 +120,7 @@ def recognize_from_video(video, net):
 
     capture.release()
     cv2.destroyAllWindows()
-    print('Script finished successfully.')
+    logger.info('Script finished successfully.')
 
 
 def main():
@@ -145,7 +130,7 @@ def main():
     # load model
     env_id = ailia.get_gpu_environment_id()
     memory_mode=ailia.get_memory_mode(reduce_constant=True, ignore_input_with_initializer=True, reduce_interstage=False, reuse_interstage=True)
-    print(f'env_id: {env_id}')
+    logger.info(f'env_id: {env_id}')
 
     # initialize
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id, memory_mode=memory_mode)

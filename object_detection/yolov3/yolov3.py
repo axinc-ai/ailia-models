@@ -7,10 +7,14 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser  # noqa: E402
+from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from detector_utils import plot_results, load_image  # noqa: E402
 import webcamera_utils  # noqa: E402
+
+# logger
+from logging import getLogger   # noqa: E402
+logger = getLogger(__name__)
 
 
 # ======================
@@ -74,10 +78,6 @@ args = update_parser(parser)
 # Main functions
 # ======================
 def recognize_from_image():
-    # prepare input data
-    img = load_image(args.input)
-    print(f'input image shape: {img.shape}')
-
     # net initialize
     detector = ailia.Detector(
         MODEL_PATH,
@@ -94,22 +94,31 @@ def recognize_from_image():
             args.detection_width, args.detection_height
         )
 
-    # inference
-    print('Start inference...')
-    if args.benchmark:
-        print('BENCHMARK mode')
-        for i in range(5):
-            start = int(round(time.time() * 1000))
-            detector.compute(img, args.threshold, args.iou)
-            end = int(round(time.time() * 1000))
-            print(f'\tailia processing time {end - start} ms')
-    else:
-        detector.compute(img, args.threshold, args.iou)
+    # input image loop
+    for image_path in args.input:
+        # prepare input data
+        logger.info(image_path)
+        img = load_image(image_path)
+        logger.debug(f'input image shape: {img.shape}')
 
-    # plot result
-    res_img = plot_results(detector, img, COCO_CATEGORY)
-    cv2.imwrite(args.savepath, res_img)
-    print('Script finished successfully.')
+        # inference
+        logger.info('Start inference...')
+        if args.benchmark:
+            logger.info('BENCHMARK mode')
+            for i in range(5):
+                start = int(round(time.time() * 1000))
+                detector.compute(img, args.threshold, args.iou)
+                end = int(round(time.time() * 1000))
+                logger.info(f'\tailia processing time {end - start} ms')
+        else:
+            detector.compute(img, args.threshold, args.iou)
+
+        # plot result
+        res_img = plot_results(detector, img, COCO_CATEGORY)
+        savepath = get_savepath(args.savepath, image_path)
+        logger.info(f'saved at : {savepath}')
+        cv2.imwrite(savepath, res_img)
+    logger.info('Script finished successfully.')
 
 
 def recognize_from_video():
@@ -157,7 +166,7 @@ def recognize_from_video():
     cv2.destroyAllWindows()
     if writer is not None:
         writer.release()
-    print('Script finished successfully.')
+    logger.info('Script finished successfully.')
 
 
 def main():

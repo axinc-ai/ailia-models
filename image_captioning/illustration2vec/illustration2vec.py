@@ -16,6 +16,10 @@ from model_utils import check_and_download_models  # noqa: E402
 from image_utils import load_image  # noqa: E402
 import webcamera_utils  # noqa: E402
 
+# logger
+from logging import getLogger   # noqa: E402
+logger = getLogger(__name__)
+
 
 # ======================
 # Parameters
@@ -28,7 +32,6 @@ REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/ill2vec/'
 TAG_PATH = 'tag_list.json'
 
 IMAGE_PATH = 'input.jpg'
-SAVE_IMAGE_PATH = 'output.png'
 IMAGE_HEIGHT = 224
 IMAGE_WIDTH = 224
 
@@ -39,7 +42,7 @@ SLEEP_TIME = 0
 # ======================
 # Arguemnt Parser Config
 # ======================
-parser = get_base_parser('illustration2vec model', IMAGE_PATH, SAVE_IMAGE_PATH)
+parser = get_base_parser('illustration2vec model', IMAGE_PATH, None)
 parser.add_argument(
     '-f', '--featurevec',
     action='store_true',
@@ -121,74 +124,80 @@ def apply_threshold(preds, threshold=0.25, threshold_rule='constant'):
 # Main functions
 # ======================
 def recognize_tag_from_image():
-    # prepare input data
-    input_img = load_image(
-        args.input,
-        (IMAGE_HEIGHT, IMAGE_WIDTH),
-        normalize_type='None',
-    )
-    input_data = prepare_input_data(input_img)
-
     # net initialize
     tag_net = ailia.Net(TAG_MODEL_PATH, TAG_WEIGHT_PATH, env_id=args.env_id)
-    tag_net.set_input_shape(input_data.shape)
 
-    if check_file_existance(TAG_PATH):
-        tags = np.array(json.loads(open(TAG_PATH, 'r').read()))
-        assert(len(tags) == 1539)
+    # input image loop
+    for image_path in args.input:
+        # prepare input data
+        logger.info(image_path)
+        input_img = load_image(
+            image_path,
+            (IMAGE_HEIGHT, IMAGE_WIDTH),
+            normalize_type='None',
+        )
+        input_data = prepare_input_data(input_img)
+        tag_net.set_input_shape(input_data.shape)
 
-    input_dict = {'data': input_data}
+        if check_file_existance(TAG_PATH):
+            tags = np.array(json.loads(open(TAG_PATH, 'r').read()))
+            assert(len(tags) == 1539)
 
-    # inference
-    print('Start inference...')
-    if args.benchmark:
-        print('BENCHMARK mode')
-        for i in range(5):
-            start = int(round(time.time() * 1000))
+        input_dict = {'data': input_data}
+
+        # inference
+        logger.info('Start inference...')
+        if args.benchmark:
+            logger.info('BENCHMARK mode')
+            for i in range(5):
+                start = int(round(time.time() * 1000))
+                preds_ailia = tag_net.predict(input_dict)[0]
+                end = int(round(time.time() * 1000))
+                logger.info(f'\tailia processing time {end - start} ms')
+        else:
             preds_ailia = tag_net.predict(input_dict)[0]
-            end = int(round(time.time() * 1000))
-            print(f'\tailia processing time {end - start} ms')
-    else:
-        preds_ailia = tag_net.predict(input_dict)[0]
 
-    prob = preds_ailia.reshape(preds_ailia.shape[0], -1)
-    preds = estimate_top_tags(prob, tags, 512)  # TODO how to decide n_tag?
-    pprint(apply_threshold(preds, THRESHOLD))
-    print('Script finished successfully.')
+        prob = preds_ailia.reshape(preds_ailia.shape[0], -1)
+        preds = estimate_top_tags(prob, tags, 512)  # TODO how to decide n_tag?
+        pprint(apply_threshold(preds, THRESHOLD))
+    logger.info('Script finished successfully.')
 
 
 def extract_feature_vec_from_image():
-    # prepare input data
-    input_img = load_image(
-        args.input,
-        (IMAGE_HEIGHT, IMAGE_WIDTH),
-        normalize_type='None',
-    )
-    input_data = prepare_input_data(input_img)
-
     # net initialize
     fe_net = ailia.Net(FE_MODEL_PATH, FE_WEIGHT_PATH, env_id=args.env_id)
-    fe_net.set_input_shape(input_data.shape)
 
-    input_dict = {'data': input_data}
+    # input image loop
+    for image_path in args.input:
+        # prepare input data
+        logger.info(image_path)
+        input_img = load_image(
+            image_path,
+            (IMAGE_HEIGHT, IMAGE_WIDTH),
+            normalize_type='None',
+        )
+        input_data = prepare_input_data(input_img)
+        fe_net.set_input_shape(input_data.shape)
 
-    # inference
-    print('Start inference...')
-    if args.benchmark:
-        print('BENCHMARK mode')
-        for i in range(5):
-            start = int(round(time.time() * 1000))
+        input_dict = {'data': input_data}
+
+        # inference
+        logger.info('Start inference...')
+        if args.benchmark:
+            logger.info('BENCHMARK mode')
+            for i in range(5):
+                start = int(round(time.time() * 1000))
+                _ = fe_net.predict(input_dict)[0]
+                end = int(round(time.time() * 1000))
+                logger.info(f'\tailia processing time {end - start} ms')
+        else:
             _ = fe_net.predict(input_dict)[0]
-            end = int(round(time.time() * 1000))
-            print(f'\tailia processing time {end - start} ms')
-    else:
-        _ = fe_net.predict(input_dict)[0]
 
-    # Extracting the output of a specifc layer
-    idx = fe_net.find_blob_index_by_name('encode1')
-    preds_ailia = fe_net.get_blob_data(idx)
-    print(preds_ailia.reshape(preds_ailia.shape[0], -1))
-    print('Script finished successfully.')
+        # Extracting the output of a specifc layer
+        idx = fe_net.find_blob_index_by_name('encode1')
+        preds_ailia = fe_net.get_blob_data(idx)
+        logger.info(preds_ailia.reshape(preds_ailia.shape[0], -1))
+    logger.info('Script finished successfully.')
 
 
 def recognize_tag_from_video():
@@ -202,7 +211,7 @@ def recognize_tag_from_video():
         assert len(tags) == 1539
 
     # create video writer if savepath is specified as video format
-    if args.savepath != SAVE_IMAGE_PATH:
+    if args.savepath is not None:
         writer = webcamera_utils.get_writer(
             args.savepath, IMAGE_HEIGHT, IMAGE_WIDTH
         )
@@ -227,7 +236,7 @@ def recognize_tag_from_video():
 
         prob = preds_ailia.reshape(preds_ailia.shape[0], -1)
         preds = estimate_top_tags(prob, tags, 512)
-        print('==============================================================')
+        logger.info('=' * 80)
         pprint(apply_threshold(preds, THRESHOLD))
         cv2.imshow('frame', frame)
         time.sleep(SLEEP_TIME)
@@ -240,7 +249,7 @@ def recognize_tag_from_video():
     cv2.destroyAllWindows()
     if writer is not None:
         writer.release()
-    print('Script finished successfully.')
+    logger.info('Script finished successfully.')
 
 
 def extract_feature_vec_from_video():
@@ -250,7 +259,7 @@ def extract_feature_vec_from_video():
     capture = webcamera_utils.get_capture(args.video)
 
     # create video writer if savepath is specified as video format
-    if args.savepath != SAVE_IMAGE_PATH:
+    if args.savepath is not None:
         writer = webcamera_utils.get_writer(
             args.savepath, IMAGE_HEIGHT, IMAGE_WIDTH
         )
@@ -275,8 +284,8 @@ def extract_feature_vec_from_video():
         idx = fe_net.find_blob_index_by_name('encode1')
         preds_ailia = fe_net.get_blob_data(idx)
 
-        print('==============================================================')
-        print(preds_ailia.reshape(preds_ailia.shape[0], -1))
+        logger.info('=' * 80)
+        logger.info(preds_ailia.reshape(preds_ailia.shape[0], -1))
         cv2.imshow('frame', frame)
         time.sleep(SLEEP_TIME)
 
@@ -288,7 +297,7 @@ def extract_feature_vec_from_video():
     cv2.destroyAllWindows()
     if writer is not None:
         writer.release()
-    print('Script finished successfully.')
+    logger.info('Script finished successfully.')
 
 
 def main():

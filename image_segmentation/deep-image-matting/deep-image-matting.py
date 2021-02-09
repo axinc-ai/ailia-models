@@ -1,3 +1,4 @@
+import os
 import sys
 import time
 
@@ -7,9 +8,13 @@ import cv2
 import ailia
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser  # noqa: E402
+from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 import webcamera_utils  # noqa: E402
+
+# logger
+from logging import getLogger   # noqa: E402
+logger = getLogger(__name__)
 
 
 # ======================
@@ -27,6 +32,7 @@ IMAGE_HEIGHT = 320
 IMAGE_WIDTH = 320
 
 MODEL_LISTS = ['deeplabv3', 'u2net', 'pspnet']
+
 
 # ======================
 # Arguemnt Parser Config
@@ -161,6 +167,8 @@ def generate_trimap(net, input_data):
     input_shape = net.get_input_shape()
     input_data = cv2.resize(input_data, (input_shape[2], input_shape[3]))
 
+    savedir = os.path.dirname(args.savepath)
+
     if args.arch == "deeplabv3":
         input_data = deeplabv3_preprocess(input_data)
     if args.arch == "u2net" or args.arch == "pspnet":
@@ -175,7 +183,7 @@ def generate_trimap(net, input_data):
         pred = preds_ailia[0][0, 0, :, :]
 
     if args.debug:
-        cv2.imwrite("debug_segmentation.png", pred*255)
+        cv2.imwrite(os.path.join(savedir, "debug_segmentation.png"), pred*255)
 
     if args.arch == "u2net":
         pred = norm(pred)
@@ -197,12 +205,18 @@ def generate_trimap(net, input_data):
     trimap_data = trimap_data.astype("uint8")
 
     if args.debug:
-        cv2.imwrite("debug_segmentation_threshold.png", trimap_data)
+        cv2.imwrite(
+            os.path.join(savedir, "debug_segmentation_threshold.png"),
+            trimap_data,
+        )
 
     trimap_data = erode_and_dilate(trimap_data, k_size=(7, 7), ite=3)
 
     if args.debug:
-        cv2.imwrite("debug_trimap_full.png", trimap_data)
+        cv2.imwrite(
+            os.path.join(savedir, "debug_trimap_full.png"),
+            trimap_data,
+        )
 
     return trimap_data, seg_data
 
@@ -210,17 +224,20 @@ def generate_trimap(net, input_data):
 def matting_preprocess(src_img, trimap_data, seg_data):
     input_data = np.zeros((1, IMAGE_HEIGHT, IMAGE_WIDTH, 4))
     input_data[:, :, :, 0:3] = src_img[:, :, 0:3]
-
     input_data[:, :, :, 3] = trimap_data[:, :, 0]
+
+    savedir = os.path.dirname(args.savepath)
     if args.debug:
-        cv2.imwrite("debug_input.png", input_data.reshape(
-            (IMAGE_HEIGHT, IMAGE_WIDTH, 4)))
+        cv2.imwrite(
+            os.path.join(savedir, "debug_input.png"),
+            input_data.reshape((IMAGE_HEIGHT, IMAGE_WIDTH, 4)),
+        )
 
     input_data = input_data / 255.0
 
     if args.debug:
-        cv2.imwrite("debug_rgb.png", src_img)
-        cv2.imwrite("debug_trimap.png", trimap_data)
+        cv2.imwrite(os.path.join(savedir, "debug_rgb.png"), src_img)
+        cv2.imwrite(os.path.join(savedir, "debug_trimap.png"), trimap_data)
 
     return input_data, src_img, trimap_data
 
@@ -237,57 +254,61 @@ def composite(img):
 # Main functions
 # ======================
 def recognize_from_image():
-    # prepare input data
-    src_img = cv2.imread(args.input)
-
-    crop_size = (
-        max(src_img.shape[0], src_img.shape[1]),
-        max(src_img.shape[0], src_img.shape[1])
-    )
-
-    src_img = safe_crop(src_img, crop_size)
-
     # net initialize
     env_id = 0  # use cpu because overflow fp16 range
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
     net.set_input_shape((1, IMAGE_HEIGHT, IMAGE_WIDTH, 4))
 
-    if args.trimap == "":
-        input_data = src_img
-
-        seg_net = ailia.Net(
-            SEGMENTATION_MODEL_PATH,
-            SEGMENTATION_WEIGHT_PATH,
-            env_id=args.env_id
-        )
-
-        trimap_data, seg_data = generate_trimap(seg_net, input_data)
-    else:
-        trimap_data = cv2.imread(args.trimap)
-        trimap_data = safe_crop(trimap_data, crop_size)
-        seg_data = trimap_data.copy()
-
-    input_data, src_img, trimap_data = matting_preprocess(
-        src_img, trimap_data, seg_data
+    seg_net = ailia.Net(
+        SEGMENTATION_MODEL_PATH,
+        SEGMENTATION_WEIGHT_PATH,
+        env_id=args.env_id,
     )
 
-    # inference
-    print('Start inference...')
-    if args.benchmark:
-        print('BENCHMARK mode')
-        for i in range(5):
-            start = int(round(time.time() * 1000))
+    # input image loop
+    for image_path in args.input:
+        # prepare input data
+        logger.info(image_path)
+        src_img = cv2.imread(image_path)
+
+        crop_size = (
+            max(src_img.shape[0], src_img.shape[1]),
+            max(src_img.shape[0], src_img.shape[1]),
+        )
+
+        src_img = safe_crop(src_img, crop_size)
+
+        if args.trimap == "":
+            input_data = src_img
+            trimap_data, seg_data = generate_trimap(seg_net, input_data)
+        else:
+            trimap_data = cv2.imread(args.trimap)
+            trimap_data = safe_crop(trimap_data, crop_size)
+            seg_data = trimap_data.copy()
+
+        input_data, src_img, trimap_data = matting_preprocess(
+            src_img, trimap_data, seg_data
+        )
+
+        # inference
+        logger.info('Start inference...')
+        if args.benchmark:
+            logger.info('BENCHMARK mode')
+            for i in range(5):
+                start = int(round(time.time() * 1000))
+                preds_ailia = net.predict(input_data)
+                end = int(round(time.time() * 1000))
+                logger.info(f'\tailia processing time {end - start} ms')
+        else:
             preds_ailia = net.predict(input_data)
-            end = int(round(time.time() * 1000))
-            print(f'\tailia processing time {end - start} ms')
-    else:
-        preds_ailia = net.predict(input_data)
 
-    # post-processing
-    res_img = postprocess(src_img, trimap_data, preds_ailia)
-    cv2.imwrite(args.savepath, res_img)
+        # post-processing
+        res_img = postprocess(src_img, trimap_data, preds_ailia)
+        savepath = get_savepath(args.savepath, image_path)
+        logger.info(f'saved at : {savepath}')
+        cv2.imwrite(savepath, res_img)
 
-    print('Script finished successfully.')
+    logger.info('Script finished successfully.')
 
 
 def recognize_from_video():
@@ -299,15 +320,15 @@ def recognize_from_video():
     seg_net = ailia.Net(
         SEGMENTATION_MODEL_PATH,
         SEGMENTATION_WEIGHT_PATH,
-        env_id=args.env_id
+        env_id=args.env_id,
     )
 
     capture = webcamera_utils.get_capture(args.video)
 
     # create video writer if savepath is specified as video format
     if args.savepath != SAVE_IMAGE_PATH:
-        print(
-            '[WARNING] currently, video results cannot be output correctly...'
+        logger.warning(
+            'currently, video results cannot be output correctly...'
         )
         writer = webcamera_utils.get_writer(
             args.savepath, IMAGE_HEIGHT, IMAGE_WIDTH
@@ -325,7 +346,7 @@ def recognize_from_video():
             frame,
             IMAGE_HEIGHT,
             IMAGE_WIDTH,
-            normalize_type='None'
+            normalize_type='None',
         )
         crop_size = (
             max(src_img.shape[0], src_img.shape[1]),
@@ -363,7 +384,7 @@ def recognize_from_video():
     cv2.destroyAllWindows()
     if writer is not None:
         writer.release()
-    print('Script finished successfully.')
+    logger.info('Script finished successfully.')
 
 
 def main():
@@ -372,7 +393,7 @@ def main():
     check_and_download_models(
         SEGMENTATION_WEIGHT_PATH,
         SEGMENTATION_MODEL_PATH,
-        SEGMENTATION_REMOTE_PATH
+        SEGMENTATION_REMOTE_PATH,
     )
 
     if args.video is not None:

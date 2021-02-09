@@ -12,6 +12,10 @@ from model_utils import check_and_download_models  # noqa: E402
 import webcamera_utils  # noqa: E402
 from blazeface_utils import compute_blazeface, crop_blazeface  # noqa: E402
 
+# logger
+from logging import getLogger   # noqa: E402
+logger = getLogger(__name__)
+
 
 # ======================
 # PARAMETERS
@@ -60,14 +64,6 @@ args = update_parser(parser)
 # Main functions
 # ======================
 def recognize_from_image():
-    # prepare input
-    # load input image and convert to BGRA
-    img = cv2.imread(args.input, cv2.IMREAD_UNCHANGED)
-    if img.shape[2] == 3:
-        img = cv2.cvtColor(img, cv2.COLOR_BGR2BGRA)
-    elif img.shape[2] == 1:
-        img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGRA)
-
     # net initialize
     emotion_classifier = ailia.Classifier(
         EMOTION_MODEL_PATH,
@@ -86,52 +82,65 @@ def recognize_from_image():
         channel=ailia.NETWORK_IMAGE_CHANNEL_FIRST,
     )
 
-    # inference emotion
-    print('Start inference...')
-    if args.benchmark:
-        print('BENCHMARK mode')
-        for i in range(5):
-            start = int(round(time.time() * 1000))
+    # input image loop
+    for image_path in args.input:
+        # prepare input data
+        logger.info(image_path)
+        # load input image and convert to BGRA
+        img = cv2.imread(image_path, cv2.IMREAD_UNCHANGED)
+        if img.shape[2] == 3:
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2BGRA)
+        elif img.shape[2] == 1:
+            img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGRA)
+
+        # inference emotion
+        logger.info('Start inference...')
+        if args.benchmark:
+            logger.info('BENCHMARK mode')
+            for i in range(5):
+                start = int(round(time.time() * 1000))
+                emotion_classifier.compute(img, EMOTION_MAX_CLASS_COUNT)
+                end = int(round(time.time() * 1000))
+                logger.info(
+                    f'\t[EMOTION MODEL] ailia processing time {end - start} ms'
+                )
+        else:
             emotion_classifier.compute(img, EMOTION_MAX_CLASS_COUNT)
-            end = int(round(time.time() * 1000))
-            print(f'\t[EMOTION MODEL] ailia processing time {end - start} ms')
-    else:
-        emotion_classifier.compute(img, EMOTION_MAX_CLASS_COUNT)
-    count = emotion_classifier.get_class_count()
-    print(f'emotion_class_count={count}')
+        count = emotion_classifier.get_class_count()
+        logger.info(f'emotion_class_count={count}')
 
-    # print result
-    for idx in range(count):
-        print(f'+ idx={idx}')
-        info = emotion_classifier.get_class(idx)
-        print(
-            f'  category={info.category} [ {EMOTION_CATEGORY[info.category]} ]'
-        )
-        print(f'  prob={info.prob}')
-    print('')
+        # logger.info result
+        for idx in range(count):
+            logger.info(f'+ idx={idx}')
+            info = emotion_classifier.get_class(idx)
+            logger.info(f'  category={info.category} '
+                        f'[ {EMOTION_CATEGORY[info.category]} ]')
+            logger.info(f'  prob={info.prob}')
+        logger.info('')
 
-    # inference gender
-    if args.benchmark:
-        print('BENCHMARK mode')
-        for i in range(5):
-            start = int(round(time.time() * 1000))
+        # inference gender
+        if args.benchmark:
+            logger.info('BENCHMARK mode')
+            for i in range(5):
+                start = int(round(time.time() * 1000))
+                gender_classifier.compute(img, GENDER_MAX_CLASS_COUNT)
+                end = int(round(time.time() * 1000))
+                logger.info(
+                    f'\t[EMOTION MODEL] ailia processing time {end - start} ms'
+                )
+        else:
             gender_classifier.compute(img, GENDER_MAX_CLASS_COUNT)
-            end = int(round(time.time() * 1000))
-            print(f'\t[EMOTION MODEL] ailia processing time {end - start} ms')
-    else:
-        gender_classifier.compute(img, GENDER_MAX_CLASS_COUNT)
-    count = gender_classifier.get_class_count()
-    print(f'gender_class_count={count}')
+        count = gender_classifier.get_class_count()
+        logger.info(f'gender_class_count={count}')
 
-    # print reuslt
-    for idx in range(count):
-        print(f'+ idx={idx}')
-        info = gender_classifier.get_class(idx)
-        print(
-            f'  category={info.category} [ {GENDER_CATEGORY[info.category]} ]'
-        )
-        print(f'  prob={info.prob}')
-    print('Script finished successfully.')
+        # logger.info reuslt
+        for idx in range(count):
+            logger.info(f'+ idx={idx}')
+            info = gender_classifier.get_class(idx)
+            logger.info(f'  category={info.category} '
+                        f'[ {GENDER_CATEGORY[info.category]} ]')
+            logger.info(f'  prob={info.prob}')
+    logger.info('Script finished successfully.')
 
 
 def recognize_from_video():
@@ -158,8 +167,8 @@ def recognize_from_video():
 
     # create video writer if savepath is specified as video format
     if args.savepath is not None:
-        print('[WARNING] currently video results output feature '
-              'is not supported in this model!')
+        logger.warning('[WARNING] currently video results output feature '
+                       'is not supported in this model!')
         # TODO: shape should be debugged!
         f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
         f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
@@ -193,41 +202,41 @@ def recognize_from_video():
             # emotion inference
             emotion_classifier.compute(crop_img, EMOTION_MAX_CLASS_COUNT)
             count = emotion_classifier.get_class_count()
-            print('=' * 80)
-            print(f'emotion_class_count={count}')
+            logger.info('=' * 80)
+            logger.info(f'emotion_class_count={count}')
 
-            # print result
+            # logger.info result
             emotion_text = ""
             for idx in range(count):
-                print(f'+ idx={idx}')
+                logger.info(f'+ idx={idx}')
                 info = emotion_classifier.get_class(idx)
-                print(
+                logger.info(
                     f'  category={info.category} ' +
                     f'[ {EMOTION_CATEGORY[info.category]} ]'
                 )
-                print(f'  prob={info.prob}')
+                logger.info(f'  prob={info.prob}')
                 if idx == 0:
                     emotion_text = (f'[ {EMOTION_CATEGORY[info.category]} ] '
                                     f'prob={info.prob:.3f}')
-            print('')
+            logger.info('')
 
             # gender inference
             gender_text = ""
             gender_classifier.compute(crop_img, GENDER_MAX_CLASS_COUNT)
             count = gender_classifier.get_class_count()
-            # print reuslt
+            # logger.info reuslt
             for idx in range(count):
-                print(f'+ idx={idx}')
+                logger.info(f'+ idx={idx}')
                 info = gender_classifier.get_class(idx)
-                print(
+                logger.info(
                     f'  category={info.category} ' +
                     f'[ {GENDER_CATEGORY[info.category]} ]'
                 )
-                print(f'  prob={info.prob}')
+                logger.info(f'  prob={info.prob}')
                 if idx == 0:
                     gender_text = (f'[ {GENDER_CATEGORY[info.category]} ] '
                                    f'prob={info.prob:.3f}')
-            print('')
+            logger.info('')
 
             # display label
             LABEL_WIDTH = 400
@@ -267,7 +276,7 @@ def recognize_from_video():
     cv2.destroyAllWindows()
     if writer is not None:
         writer.release()
-    print('Script finished successfully.')
+    logger.info('Script finished successfully.')
 
 
 def main():

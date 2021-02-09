@@ -11,6 +11,10 @@ from utils import get_base_parser, update_parser  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from webcamera_utils import get_writer  # noqa: E402
 
+# logger
+from logging import getLogger   # noqa: E402
+logger = getLogger(__name__)
+
 
 # ======================
 # Parameters
@@ -41,17 +45,16 @@ args = update_parser(parser)
 
 
 if args.model == 'anime':
-    print('Generation using model "AnimeFace"')
+    logger.info('Generation using model "AnimeFace"')
     MODEL_INFIX = 'animeface'
     OUTPUT_SIZE = 64
 elif args.model == 'celeb':
-    print('Generation using model "CelebA"')
+    logger.info('Generation using model "CelebA"')
     MODEL_INFIX = 'celeba'
     OUTPUT_SIZE = 128
 else:
-    print(
-        f'[ERROR] unknown model name "{args.model}" '
-        '(must be "anime" or "celeb")'
+    logger.error(
+        f'unknown model name "{args.model}" (must be "anime" or "celeb")'
     )
     exit(-1)
 
@@ -67,14 +70,14 @@ def generate_image():
     gnet = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
 
     # inference
-    print('Start inference...')
+    logger.info('Start inference...')
     if args.benchmark:
-        print('BENCHMARK mode')
+        logger.info('BENCHMARK mode')
         for i in range(5):
             start = int(round(time.time() * 1000))
             _ = gnet.predict(rand_input)
             end = int(round(time.time() * 1000))
-            print(f'\tailia processing time {end - start} ms')
+            logger.info(f'\tailia processing time {end - start} ms')
     else:
         _ = gnet.predict(rand_input)
 
@@ -91,7 +94,7 @@ def generate_image():
         args.savepath,
         cv2.cvtColor(outp.astype(np.uint8), cv2.COLOR_RGB2BGR)
     )
-    print('Script finished successfully.')
+    logger.info('Script finished successfully.')
 
 
 def generate_video():
@@ -137,7 +140,7 @@ def generate_video():
     cv2.destroyAllWindows()
     if writer is not None:
         writer.release()
-    print('Script finished successfully.')
+    logger.info('Script finished successfully.')
 
 
 def main():

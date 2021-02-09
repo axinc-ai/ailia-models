@@ -9,12 +9,17 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser  # noqa: E402
+from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from detector_utils import load_image  # noqa: E402C
 from webcamera_utils import get_capture  # noqa: E402
 
 from east_utils import *
+
+# logger
+from logging import getLogger   # noqa: E402
+logger = getLogger(__name__)
+
 
 # ======================
 # Parameters
@@ -101,7 +106,7 @@ def post_processing(
     xy_text = xy_text[np.argsort(xy_text[:, 0])]
     # restore
     text_box_restored = restore_rectangle(xy_text[:, ::-1] * 4, geo_map[xy_text[:, 0], xy_text[:, 1], :])  # N*4*2
-    print('{} text boxes before nms'.format(text_box_restored.shape[0]))
+    logger.info('{} text boxes before nms'.format(text_box_restored.shape[0]))
     boxes = np.zeros((text_box_restored.shape[0], 9), dtype=np.float32)
     boxes[:, :8] = text_box_restored.reshape((-1, 8))
     boxes[:, 8] = score_map[xy_text[:, 0], xy_text[:, 1]]
@@ -137,7 +142,7 @@ def draw_box(img, boxes):
             box = sort_poly(box.astype(np.int32))
             if np.linalg.norm(box[0] - box[1]) < 5 or np.linalg.norm(box[3] - box[0]) < 5:
                 continue
-            print('({},{}),({},{}),({},{}),({},{})'.format(
+            logger.info('({},{}),({},{}),({},{}),({},{})'.format(
                 box[0, 0], box[0, 1], box[1, 0], box[1, 1], box[2, 0], box[2, 1], box[3, 0], box[3, 1],
             ))
             cv2.polylines(
@@ -171,30 +176,38 @@ def predict(img, net):
 
 
 def recognize_from_image(filename, net):
-    # prepare input data
-    img = load_image(filename)
-    print(f'input image shape: {img.shape}')
+    # input image loop
+    for image_path in args.input:
+        # prepare input data
+        logger.info(image_path)
 
-    img = cv2.cvtColor(img, cv2.COLOR_BGRA2RGB)
+        # prepare input data
+        img = load_image(image_path)
+        logger.info(f'input image shape: {img.shape}')
 
-    # inference
-    print('Start inference...')
-    if args.benchmark:
-        print('BENCHMARK mode')
-        for i in range(5):
-            start = int(round(time.time() * 1000))
+        img = cv2.cvtColor(img, cv2.COLOR_BGRA2RGB)
+
+        # inference
+        logger.info('Start inference...')
+        if args.benchmark:
+            logger.info('BENCHMARK mode')
+            for i in range(5):
+                start = int(round(time.time() * 1000))
+                boxes = predict(img, net)
+                end = int(round(time.time() * 1000))
+                logger.info(f'\tailia processing time {end - start} ms')
+        else:
             boxes = predict(img, net)
-            end = int(round(time.time() * 1000))
-            print(f'\tailia processing time {end - start} ms')
-    else:
-        boxes = predict(img, net)
 
-    img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
-    res_img = draw_box(img, boxes)
+        img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+        res_img = draw_box(img, boxes)
 
-    # plot result
-    cv2.imwrite(args.savepath, res_img)
-    print('Script finished successfully.')
+        # plot result
+        savepath = get_savepath(args.savepath, image_path)
+        logger.info(f'saved at : {savepath}')
+        cv2.imwrite(savepath, res_img)
+
+    logger.info('Script finished successfully.')
 
 
 def recognize_from_video(video, net):
@@ -217,7 +230,7 @@ def recognize_from_video(video, net):
 
     capture.release()
     cv2.destroyAllWindows()
-    print('Script finished successfully.')
+    logger.info('Script finished successfully.')
 
 
 def main():

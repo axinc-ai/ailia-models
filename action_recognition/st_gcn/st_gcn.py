@@ -14,6 +14,7 @@ sys.path.append('../../util')
 from utils import get_base_parser, update_parser  # noqa: E402
 from utils import check_file_existance  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
+from webcamera_utils import get_capture  # noqa: E402
 
 
 # ======================
@@ -242,15 +243,7 @@ def recognize_from_file(input, pose, net):
 
 
 def recognize_realtime(video, pose, net):
-    if video == '0':
-        print('[INFO] Webcam mode is activated')
-        capture = cv2.VideoCapture(0)
-        if not capture.isOpened():
-            print("[ERROR] webcamera not found")
-            sys.exit(1)
-    else:
-        if check_file_existance(video):
-            capture = cv2.VideoCapture(video)
+    capture = get_capture(args.video)
 
     pose_tracker = naive_pose_tracker()
 

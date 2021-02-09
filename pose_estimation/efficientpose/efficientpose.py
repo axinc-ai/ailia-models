@@ -11,10 +11,14 @@ import ailia
 import efficientpose_utils as e_utils
 
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser  # noqa: E402
+from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from webcamera_utils import adjust_frame_size, get_capture  # noqa: E402
 from image_utils import load_image  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
+
+# logger
+from logging import getLogger   # noqa: E402
+logger = getLogger(__name__)
 
 #TODO:More refactoring on threshold
 
@@ -136,54 +140,63 @@ def annotate_image(file_path, coordinates):
 # Main functions
 # ======================
 def recognize_from_image():
-    # prepare input data
-    src_img = cv2.imread(args.input)
-    image_height, image_width = src_img.shape[:2]
-    batch = np.expand_dims(src_img[...,::-1], axis=0)
-
-    # Preprocess batch
-    batch = e_utils.preprocess(batch, RESOLUTION)
-
     # net initialize
     if args.onnx:
         import onnxruntime
         model = onnxruntime.InferenceSession(WEIGHT_PATH)
     else:
-        print(f'env_id: {args.env_id}')
+        logger.info(f'env_id: {args.env_id}')
         model = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
- 
-    # inference
-    print('Start inference...')
-    if args.benchmark:
-        print('BENCHMARK mode')
-        #model.set_profile_mode(True)
-        for _ in range(5):
-            start = int(round(time.time() * 1000))
+
+    # input image loop
+    for image_path in args.input:
+        # prepare input data
+        logger.info(image_path)
+
+        # prepare input data
+        src_img = cv2.imread(image_path)
+        image_height, image_width = src_img.shape[:2]
+        batch = np.expand_dims(src_img[...,::-1], axis=0)
+
+        # Preprocess batch
+        batch = e_utils.preprocess(batch, RESOLUTION)
+
+        # inference
+        logger.info('Start inference...')
+        if args.benchmark:
+            logger.info('BENCHMARK mode')
+            #model.set_profile_mode(True)
+            for _ in range(5):
+                start = int(round(time.time() * 1000))
+                if args.onnx:
+                    ort_inputs = {model.get_inputs()[0].name: batch.astype(np.float32)}
+                    model_out = model.run(None, ort_inputs)[0]
+                else:
+                    model_out = model.predict([batch])[0]
+                end = int(round(time.time() * 1000))
+                logger.info(f'\tailia processing time {end - start} ms')
+            #print(model.get_summary())
+        else:
+            # Person detection
+            #logger.info('batch.shape', batch.shape)
             if args.onnx:
                 ort_inputs = {model.get_inputs()[0].name: batch.astype(np.float32)}
                 model_out = model.run(None, ort_inputs)[0]
             else:
                 model_out = model.predict([batch])[0]
-            end = int(round(time.time() * 1000))
-            print(f'\tailia processing time {end - start} ms')
-        #print(model.get_summary())
-    else:
-        # Person detection
-        print('batch.shape', batch.shape)
-        if args.onnx:
-            ort_inputs = {model.get_inputs()[0].name: batch.astype(np.float32)}
-            model_out = model.run(None, ort_inputs)[0]
-        else:
-            model_out = model.predict([batch])[0]
-        print('model_out.shape',model_out.shape)
+            #logger.info('model_out.shape',model_out.shape)
 
-    # Extract coordinates
-    coordinates = [e_utils.extract_coordinates(model_out[0,...], image_height, image_width)]
+        # Extract coordinates
+        coordinates = [e_utils.extract_coordinates(model_out[0,...], image_height, image_width)]
 
-    display_result(src_img, coordinates[0])
-    # image.save(normpath(file_path.split('.')[0] + '_out.png'))
-    cv2.imwrite(normpath(args.input.split('.')[0] + '_out.png'), src_img)
-    print('Script finished successfully.')
+        display_result(src_img, coordinates[0])
+
+        savepath = get_savepath(args.savepath, image_path)
+        logger.info(f'saved at : {savepath}')
+
+        cv2.imwrite(savepath, src_img)
+
+    logger.info('Script finished successfully.')
 
 
 def recognize_from_video():
@@ -192,7 +205,7 @@ def recognize_from_video():
         import onnxruntime
         model = onnxruntime.InferenceSession(WEIGHT_PATH)
     else:
-        print(f'env_id: {args.env_id}')
+        logger.info(f'env_id: {args.env_id}')
         model = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
 
     capture = get_capture(args.video)
@@ -231,7 +244,7 @@ def recognize_from_video():
 
     capture.release()
     cv2.destroyAllWindows()
-    print('Script finished successfully.')
+    logger.info('Script finished successfully.')
     pass
 
 

@@ -1,15 +1,31 @@
 import os
 import sys
 import argparse
+import glob
+from logging import DEBUG
+
+from params import MODALITIES, EXTENSIONS
+import log_init
+
+# FIXME: Next two lines should be better to call from the main script
+# once we prepared one. For now, we do the initialization of logger here.
+logger = log_init.logger
+logger.info('Start!')
+
+# TODO: better to use them (first, fix above)
+# from logging import getLogger
+# logger = getLogger(__name__)
+
+
+# TODO: yaml config file and yaml loader
 
 try:
     import ailia
     AILIA_EXIST = True
 except ImportError:
-    # TODO: create logger.py --> @sngyo
-    print('[WARNING]: ailia package cannot be found under `sys.path`')
-    print('[WARNING]: default env_id is set to 0, you can change the id by '
-          '[--env_id N]')
+    logger.warning('ailia package cannot be found under `sys.path`')
+    logger.warning('default env_id is set to 0, you can change the id by '
+                   '[--env_id N]')
     AILIA_EXIST = False
 
 
@@ -17,11 +33,13 @@ def check_file_existance(filename):
     if os.path.isfile(filename):
         return True
     else:
-        print(f'[ERROR] {filename} not found')
+        logger.error(f'{filename} not found')
         sys.exit()
 
 
-def get_base_parser(description, default_input, default_save, parse=False):
+def get_base_parser(
+        description, default_input, default_save, input_ftype='image',
+):
     """
     Get ailia default argument parser
 
@@ -32,9 +50,7 @@ def get_base_parser(description, default_input, default_save, parse=False):
         default input data (image / video) path
     default_save : str
         default save path
-    parse : bool, default is False
-        if True, return parsed arguments
-        TODO: deprecates
+    input_ftype : str
 
     Returns
     -------
@@ -48,7 +64,9 @@ def get_base_parser(description, default_input, default_save, parse=False):
     )
     parser.add_argument(
         '-i', '--input', metavar='IMAGE/VIDEO', default=default_input,
-        help='The default (model-dependent) input data (image / video) path.'
+        help=('The default (model-dependent) input data (image / video) path. '
+              'If a directory name is specified, the model will be run for '
+              'the files inside. File type is specified by --ftype argument')
     )
     parser.add_argument(
         '-v', '--video', metavar='VIDEO', default=None,
@@ -58,7 +76,7 @@ def get_base_parser(description, default_input, default_save, parse=False):
     )
     parser.add_argument(
         '-s', '--savepath', metavar='SAVE_PATH', default=default_save,
-        help='Save path for the output (image / video).'
+        help='Save path for the output (image / video / text).'
     )
     parser.add_argument(
         '-b', '--benchmark', action='store_true',
@@ -71,14 +89,19 @@ def get_base_parser(description, default_input, default_save, parse=False):
         help=('A specific environment id can be specified. By default, '
               'the return value of ailia.get_gpu_environment_id will be used')
     )
-
-    if parse:
-        parser = parser.parse_args()
-
+    parser.add_argument(
+        '--ftype', metavar='FILE_TYPE', default=input_ftype,
+        choices=MODALITIES,
+        help='file type list: ' + ' | '.join(MODALITIES)
+    )
+    parser.add_argument(
+        '--debug', action='store_true',
+        help='set default logger level to DEBUG (enable to show DEBUG logs)'
+    )
     return parser
 
 
-def update_parser(parser):
+def update_parser(parser, check_input_type=True, large_model=False):
     """Default check or update configurations should be placed here
 
     Parameters
@@ -92,13 +115,106 @@ def update_parser(parser):
     """
     args = parser.parse_args()
 
+    # -------------------------------------------------------------------------
+    # 0. logger level update
+    if args.debug:
+        logger.setLevel(DEBUG)
+
+    # -------------------------------------------------------------------------
     # 1. check env_id count
     if AILIA_EXIST:
         count = ailia.get_environment_count()
         if count <= args.env_id:
-            print(f'[ERROR] specified env_id: {args.env_id} cannot found. ')
-            print('env_id updated to 0')
+            logger.error(f'specified env_id: {args.env_id} cannot found. ')
+            logger.info('env_id updated to 0')
+            args.env_id = 0
 
-    print(f'env_id: {args.env_id}')
+        if large_model:
+            if args.env_id == ailia.get_gpu_environment_id() and ailia.get_environment(args.env_id).props == "LOWPOWER":
+                args.env_id = 0 # cpu
+                logger.warning('This model requires fuge gpu memory so fallback to cpu mode')
 
+    logger.info(f'env_id: {args.env_id}')
+
+    # -------------------------------------------------------------------------
+    # 2. update input
+    if args.video is not None:
+        args.ftype = 'video'
+
+    if args.input is None:
+        # TODO: args.video, args.input is vague...
+        # input is None --> video mode maybe?
+        pass
+    elif isinstance(args.input, list):
+        # LIST --> nothing will be changed here.
+        pass
+    elif os.path.isdir(args.input):
+        # Directory Path --> generate list of inputs
+        files_grapped = []
+        in_dir = args.input
+        for extension in EXTENSIONS[args.ftype]:
+            files_grapped.extend(glob.glob(os.path.join(in_dir, extension)))
+        logger.info(f'{len(files_grapped)} {args.ftype} files found!')
+
+        args.input = sorted(files_grapped)
+
+        # create save directory
+        if args.savepath is None:
+            pass
+        else:
+            if '.' in args.savepath:
+                logger.warning('Please specify save directory as --savepath '
+                               'if you specified a direcotry for --input')
+                logger.info(f'[{in_dir}_results] directory will be created')
+                if in_dir[-1] == '/':
+                    in_dir = in_dir[:-1]
+                args.savepath = in_dir + '_results'
+            os.makedirs(args.savepath, exist_ok=True)
+            logger.info(f'output saving directory: {args.savepath}')
+
+    elif os.path.isfile(args.input):
+        args.input = [args.input]
+    else:
+        if check_input_type:
+            logger.error('specified input is not file path nor directory path')
+            sys.exit(0)
+
+    # -------------------------------------------------------------------------
     return args
+
+
+def get_savepath(arg_path, src_path, prefix='', post_fix='_res', ext=None):
+    """Get savepath
+    NOTE: we may have better option...
+    TODO: args.save_dir & args.save_path ?
+
+    Parameters
+    ----------
+    arg_path : str
+        argument parser's savepath
+    src_path : str
+        the path of source path
+    prefix : str, default is ''
+    postfix : str, default is '_res'
+    ext : str, default is None
+        if you need to specify the extension, use this argument
+        the argument has to start with '.' like '.png' or '.jpg'
+
+    Returns
+    -------
+    new_path : str
+    """
+
+    if '.' in arg_path:
+        # 1. args.savepath is actually the image path
+        arg_base, arg_ext = os.path.splitext(arg_path)
+        new_ext = arg_ext if ext is None else ext
+        new_path = arg_base + new_ext
+    else:
+        # 2. args.savepath is save directory path
+        src_base, src_ext = os.path.splitext(os.path.basename(src_path))
+        new_ext = src_ext if ext is None else ext
+        new_path = os.path.join(
+            arg_path, prefix + src_base + post_fix + new_ext
+        )
+    return new_path

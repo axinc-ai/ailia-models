@@ -10,11 +10,16 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser  # noqa: E402
+from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from detector_utils import load_image  # noqa: E402C
 
 from style2paints_utils import *
+
+# logger
+from logging import getLogger   # noqa: E402
+logger = getLogger(__name__)
+
 
 # ======================
 # Parameters
@@ -43,7 +48,7 @@ SAVE_IMAGE_PATH = 'output.png'
 parser = get_base_parser(
     'Style2Paints model', IMAGE_PATH, SAVE_IMAGE_PATH
 )
-args = update_parser(parser)
+args = update_parser(parser, large_model=True)
 
 
 
@@ -194,7 +199,7 @@ def predict(img, dict_net, options):
     img = cv2.imread('./sketch.improved.jpg')
 
     std = cal_std(img)
-    print('std = ' + str(std))
+    logger.info('std = ' + str(std))
     need_de_painting = (std > 100.0) and method == 'rendering'
     img2 = None
     if method == 'recolorization' or need_de_painting:
@@ -220,7 +225,7 @@ def predict(img, dict_net, options):
         cv2.imwrite('sketch.recolorization.jpg', img)
 
     img_1024, img_256, img_128 = preprocess(img, de_painting)
-    print('sketch prepared')
+    logger.info('sketch prepared')
 
     x = np.zeros(shape=(img_128.shape[0], img_128.shape[1], 4), dtype=np.float32)
     x = opreate_normal_hint(x, points, type=0, length=1)
@@ -231,7 +236,7 @@ def predict(img, dict_net, options):
 
     baby = go_tail(dict_net['tail'], baby)
     baby = clip_15(baby)
-    print('baby born')
+    logger.info('baby born')
 
     latent = d_resize(baby, img_256.shape).astype(np.float32)
     hint = ini_hint(img_256)
@@ -244,7 +249,7 @@ def predict(img, dict_net, options):
         )
     composition = go_tail(dict_net['tail'], composition)
     cv2.imwrite('composition.jpg', composition)
-    print('composition saved')
+    logger.info('composition saved')
 
     global_hint = k_resize(composition, 14).astype(np.float32)
     local_hint = opreate_normal_hint(ini_hint(img_1024), points, type=2, length=2)
@@ -252,7 +257,7 @@ def predict(img, dict_net, options):
         k_resize(reference, 14) if reference is not None else k_resize(composition, 14)
     ).astype(np.float32)
 
-    print('method: ' + method)
+    logger.info('method: ' + method)
     if method == 'rendering':
         result = go_neck(
             dict_net['neck'], img_1024, global_hint, local_hint, global_hint_x,
@@ -268,83 +273,82 @@ def predict(img, dict_net, options):
 
 
 def recognize_from_image(filename, dict_net):
-    # prepare input data
-    img = load_image(filename)
-    print(f'input image shape: {img.shape}')
+    # input image loop
+    for image_path in args.input:
+        # prepare input data
+        logger.info(image_path)
 
-    img = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
+        img = load_image(image_path)
+        logger.info(f'input image shape: {img.shape}')
 
-    json_file = '.'.join([filename.rsplit('.', 1)[0], 'json'])
-    if not os.path.exists(json_file):
-        raise FileNotFoundError('%s not exists' % json_file)
+        img = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
 
-    with open(json_file) as f:
-        options = json.load(f)
+        json_file = '.'.join([image_path.rsplit('.', 1)[0], 'json'])
+        if not os.path.exists(json_file):
+            raise FileNotFoundError('%s not exists' % json_file)
 
-    points = options["points"]
-    for _ in range(len(points)):
-        points[_][1] = 1 - points[_][1]
-    options["method"] = options.get("method", "colorization")
-    options["alpha"] = float(options.get("alpha", 0.0))
-    if options.get("hasReference", False):
-        ref_file = options.get("reference", "style.jpg")
-        if not os.path.exists(ref_file):
-            raise FileNotFoundError('%s not exists' % ref_file)
-        reference = cv2.imread(ref_file)
-        scale = max(reference.shape[:2]) / 256
-        if scale > 1.0:
-            reference = cv2.resize(
-                reference, (int(reference.shape[1] / scale), int(reference.shape[0] / scale))
-            )
-        options["reference"] = s_enhance(reference)
-    else:
-        options["reference"] = None
-    options["line"] = options.get('line', False)
-    options["lineColor"] = np.array(options.get('lineColor', [0, 0, 0]))
+        with open(json_file) as f:
+            options = json.load(f)
 
-    # inference
-    print('Start inference...')
-    if args.benchmark:
-        print('BENCHMARK mode')
-        for i in range(5):
-            start = int(round(time.time() * 1000))
+        points = options["points"]
+        for _ in range(len(points)):
+            points[_][1] = 1 - points[_][1]
+        options["method"] = options.get("method", "colorization")
+        options["alpha"] = float(options.get("alpha", 0.0))
+        if options.get("hasReference", False):
+            ref_file = options.get("reference", "style.jpg")
+            if not os.path.exists(ref_file):
+                raise FileNotFoundError('%s not exists' % ref_file)
+            reference = cv2.imread(ref_file)
+            scale = max(reference.shape[:2]) / 256
+            if scale > 1.0:
+                reference = cv2.resize(
+                    reference, (int(reference.shape[1] / scale), int(reference.shape[0] / scale))
+                )
+            options["reference"] = s_enhance(reference)
+        else:
+            options["reference"] = None
+        options["line"] = options.get('line', False)
+        options["lineColor"] = np.array(options.get('lineColor', [0, 0, 0]))
+
+        # inference
+        logger.info('Start inference...')
+        if args.benchmark:
+            logger.info('BENCHMARK mode')
+            for i in range(5):
+                start = int(round(time.time() * 1000))
+                result = predict(img, dict_net, options)
+                end = int(round(time.time() * 1000))
+                logger.info(f'\tailia processing time {end - start} ms')
+        else:
             result = predict(img, dict_net, options)
-            end = int(round(time.time() * 1000))
-            print(f'\tailia processing time {end - start} ms')
-    else:
-        result = predict(img, dict_net, options)
 
-    # plot result
-    cv2.imwrite(args.savepath, result)
-    print('Script finished successfully.')
+        # plot result
+        savepath = get_savepath(args.savepath, image_path)
+        logger.info(f'saved at : {savepath}')
+        cv2.imwrite(savepath, result)
+    logger.info('Script finished successfully.')
 
 
 def main():
     # model files check and download
-    print('=== head model ===')
+    logger.info('=== head model ===')
     check_and_download_models(WEIGHT_HEAD_PATH, MODEL_HEAD_PATH, REMOTE_PATH)
-    print('=== neck model ===')
+    logger.info('=== neck model ===')
     check_and_download_models(WEIGHT_NECK_PATH, MODEL_NECK_PATH, REMOTE_PATH)
-    print('=== baby model ===')
+    logger.info('=== baby model ===')
     check_and_download_models(WEIGHT_BABY_PATH, MODEL_BABY_PATH, REMOTE_PATH)
-    print('=== tail model ===')
+    logger.info('=== tail model ===')
     check_and_download_models(WEIGHT_TAIL_PATH, MODEL_TAIL_PATH, REMOTE_PATH)
-    print('=== gird model ===')
+    logger.info('=== gird model ===')
     check_and_download_models(WEIGHT_GIRD_PATH, MODEL_GIRD_PATH, REMOTE_PATH)
 
-    # This model requires fuge gpu memory so fallback to cpu mode
-    env_id = args.env_id
-    if env_id != -1 and ailia.get_environment(env_id).props == "LOWPOWER":
-        env_id = -1
-
-    print(f'env_id: {env_id}')
-
     # initialize
-    net_head = ailia.Net(MODEL_HEAD_PATH, WEIGHT_HEAD_PATH, env_id=env_id)
-    net_neck = ailia.Net(MODEL_NECK_PATH, WEIGHT_NECK_PATH, env_id=env_id)
-    net_baby = ailia.Net(MODEL_BABY_PATH, WEIGHT_BABY_PATH, env_id=env_id)
-    net_tail = ailia.Net(MODEL_TAIL_PATH, WEIGHT_TAIL_PATH, env_id=env_id)
-    net_gird = ailia.Net(MODEL_GIRD_PATH, WEIGHT_GIRD_PATH, env_id=env_id)
+    net_head = ailia.Net(MODEL_HEAD_PATH, WEIGHT_HEAD_PATH, env_id=args.env_id)
+    net_neck = ailia.Net(MODEL_NECK_PATH, WEIGHT_NECK_PATH, env_id=args.env_id)
+    net_baby = ailia.Net(MODEL_BABY_PATH, WEIGHT_BABY_PATH, env_id=args.env_id)
+    net_tail = ailia.Net(MODEL_TAIL_PATH, WEIGHT_TAIL_PATH, env_id=args.env_id)
+    net_gird = ailia.Net(MODEL_GIRD_PATH, WEIGHT_GIRD_PATH, env_id=args.env_id)
 
     dict_net = {
         "head": net_head,

@@ -13,6 +13,9 @@ from utils import get_base_parser, update_parser  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 import webcamera_utils  # noqa: E402
 
+# logger
+from logging import getLogger   # noqa: E402
+logger = getLogger(__name__)
 
 # ======================
 # Parameters
@@ -75,27 +78,29 @@ def predict(net, image):
 # Main functions
 # ======================
 def recognize_from_image(net):
-    # prepare input data
-    image = Image.open(IMAGE_PATH).convert('L')
-    image = pre_process(image)
+    for image_path in args.input:
+        # prepare input data
+        image = Image.open(image_path).convert('L')
+        image = pre_process(image)
 
-    # inference
-    print('Start inference...')
-    if args.benchmark:
-        print('BENCHMARK mode')
-        for i in range(5):
-            start = int(round(time.time() * 1000))
+        # inference
+        logger.info('Start inference...')
+        if args.benchmark:
+            logger.info('BENCHMARK mode')
+            for i in range(5):
+                start = int(round(time.time() * 1000))
+                preds = predict(net, image)
+                end = int(round(time.time() * 1000))
+                logger.info(f'\tailia processing time {end - start} ms')
+        else:
             preds = predict(net, image)
-            end = int(round(time.time() * 1000))
-            print(f'\tailia processing time {end - start} ms')
-    else:
-        preds = predict(net, image)
 
-    sim_pred = post_process(preds, len(preds), alphabet)
-    print('============================================')
-    print('String recognized from image is:', sim_pred)
-    print('============================================')
-    print('Script finished successfully.')
+        sim_pred = post_process(preds, len(preds), alphabet)
+        logger.info('============================================')
+        logger.info('String recognized from image is:'+str(sim_pred))
+        logger.info('============================================')
+
+    logger.info('Script finished successfully.')
 
 
 def recognize_from_video(net):
@@ -115,13 +120,13 @@ def recognize_from_video(net):
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
 
-        print('==============================================================')
+        logger.info('============================================')
         cv2.imshow('frame', image)
         image = Image.fromarray(np.uint8(image)).convert('L')
         image = pre_process(image)
         preds = predict(net, image)
         sim_pred = post_process(preds, len(preds), alphabet)
-        print('String recognized from image is:', sim_pred)
+        logger.info('String recognized from image is:'+str(sim_pred))
 
         # save results
         # if writer is not None:
@@ -131,7 +136,7 @@ def recognize_from_video(net):
     cv2.destroyAllWindows()
     # if writer is not None:
     #     writer.release()
-    print('Script finished successfully.')
+    logger.info('Script finished successfully.')
 
 
 def main():

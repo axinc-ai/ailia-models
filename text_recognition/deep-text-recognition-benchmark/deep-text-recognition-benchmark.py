@@ -9,11 +9,15 @@ import cv2
 import ailia
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser  # noqa: E402
+from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from webcamera_utils import adjust_frame_size, get_capture  # noqa: E402
 
 import string
+
+# logger
+from logging import getLogger   # noqa: E402
+logger = getLogger(__name__)
 
 # ======================
 # PARAMETERS
@@ -34,7 +38,7 @@ IMAGE_HEIGHT = 32
 parser = get_base_parser(
     'deep text recognition benchmark.', IMAGE_FOLDER_PATH, None
 )
-args = parser.parse_args()
+args = update_parser(parser)
 
 
 # ======================
@@ -78,17 +82,15 @@ def softmax(x):
 dashed_line = '-' * 80
 
 def recognize_from_image():
-    import glob
-    image_path_list = sorted(glob.glob(args.input+"/*"))
-
     head = f'{"image_path":25s}\t{"predicted_labels":25s}\tconfidence score'
     
-    print(f'{dashed_line}\n{head}\n{dashed_line}')
+    logger.info(f'{dashed_line}\n{head}\n{dashed_line}')
 
-    env_id = ailia.get_gpu_environment_id()
-    session = ailia.Net(MODEL_PATH,WEIGHT_PATH,env_id=env_id)
+    session = ailia.Net(MODEL_PATH,WEIGHT_PATH,env_id=args.env_id)
 
-    for path in image_path_list:
+    print(args.input)
+
+    for path in args.input:
         recognize_one_image(path,session)
 
 def recognize_one_image(image_path,session):
@@ -122,7 +124,7 @@ def recognize_one_image(image_path,session):
     for img_name, pred, pred_max_prob in zip([image_path], preds_str, preds_max_prob):
         confidence_score = pred_max_prob.cumprod(axis=0)[-1]
 
-        print(f'{img_name:25s}\t{pred:25s}\t{confidence_score:0.4f}')
+        logger.info(f'{img_name:25s}\t{pred:25s}\t{confidence_score:0.4f}')
 
 
 if __name__ == '__main__':

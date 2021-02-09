@@ -13,8 +13,13 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
+from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from detector_utils import load_image  # noqa: E402C
+
+# logger
+from logging import getLogger   # noqa: E402
+logger = getLogger(__name__)
 
 # ======================
 # Parameters
@@ -45,19 +50,12 @@ MARKET_1501_DROP_SAME_CAMERA_LABEL = True
 # ======================
 # Arguemnt Parser Config
 # ======================
+parser = get_base_parser(
+    'UTS-Person-reID-Practical model',
+    IMAGE_PATH,
+    SAVE_IMAGE_PATH,
+)
 
-parser = argparse.ArgumentParser(
-    description='UTS-Person-reID-Practical model'
-)
-parser.add_argument(
-    '-i', '--input', metavar='IMAGE',
-    default=IMAGE_PATH,
-    help='The query image path.'
-)
-parser.add_argument(
-    '-s', '--savepath', metavar='SAVE_IMAGE_PATH', default=SAVE_IMAGE_PATH,
-    help='Save path for the output image.'
-)
 parser.add_argument(
     '-g', '--gallery_dir', type=str, default=GALLERY_DIR,
     help='Gallery file directory'
@@ -76,10 +74,11 @@ parser.add_argument(
     help='Multiple scale: e.g. 1 or 1,1.1 or 1,1.1,1.2'
 )
 parser.add_argument(
-    '-b', '--batchsize', type=int, default=256,
+    '-bs', '--batchsize', type=int, default=256,
     help='Batchsize.'
 )
-args = parser.parse_args()
+
+args = update_parser(parser)
 
 
 # ======================
@@ -215,7 +214,15 @@ def extract_feature(imgs, net):
                 imgs = interpolate(imgs, scale)
 
             net.set_input_shape(imgs.shape)
-            outputs = net.predict({"imgs": imgs})[0]
+            if args.benchmark:
+                logger.info('BENCHMARK mode')
+                for i in range(5):
+                    start = int(round(time.time() * 1000))
+                    outputs = net.predict({"imgs": imgs})[0]
+                    end = int(round(time.time() * 1000))
+                    logger.info(f'\tailia processing time {end - start} ms')
+            else:
+                outputs = net.predict({"imgs": imgs})[0]
             ff += outputs
 
     fnorm = np.linalg.norm(ff, ord=2, axis=1, keepdims=True)
@@ -241,11 +248,11 @@ def recognize_from_image(query_path, net):
                 glob.glob(os.path.join(args.gallery_dir, "*." + ext)) for ext in ext_list
             ]))
         if len(image_list) == 1:
-            print("GALLARY FILE (%s/*.jpg,*.png) not found." % args.gallery_dir)
+            logger.info("GALLARY FILE (%s/*.jpg,*.png) not found." % args.gallery_dir)
             return
 
     start = int(round(time.time() * 1000))
-    print('Start inference...')
+    logger.info('Start inference...')
     dataloader = DataLoader(image_list)
     features = []
     count = 0
@@ -254,7 +261,7 @@ def recognize_from_image(query_path, net):
 
         n, c, h, w = imgs.shape
         count += n
-        print("%d/%d" % (count, len(dataloader)))
+        logger.info("%d/%d" % (count, len(dataloader)))
 
         outputs = extract_feature(imgs, net)
         features.append(outputs)
@@ -262,7 +269,7 @@ def recognize_from_image(query_path, net):
     features = np.vstack(features)
 
     end = int(round(time.time() * 1000))
-    print(f'processing time {end - start} ms')
+    logger.info(f'processing time {end - start} ms')
 
     query_feature = features[0]
     gallery_feature = features[1:]
@@ -277,7 +284,7 @@ def recognize_from_image(query_path, net):
         data = {'gallery_feature': gallery_feature, 'gallery_file': gallery_files}
         file_name = "result_%s.npy" % args.model
         np.save(file_name, data)
-        print("'%s' saved" % file_name)
+        logger.info("'%s' saved" % file_name)
 
     index = sort_img(query_feature, gallery_feature)
 
@@ -285,8 +292,8 @@ def recognize_from_image(query_path, net):
     if MARKET_1501_DROP_SAME_CAMERA_LABEL:
         query_camera, query_label = get_id(query_path)
 
-    print('query_file:', query_path)
-    print('Top 10 images are as follow:')
+    logger.info('query_file:'+str(query_path))
+    logger.info('Top 10 images are as follow:')
     try:  # Visualize Ranking Result
         # Graphical User Interface is needed
         fig = plt.figure(figsize=(16, 4))
@@ -300,7 +307,7 @@ def recognize_from_image(query_path, net):
             if MARKET_1501_DROP_SAME_CAMERA_LABEL \
                     and not good_img(img_path, query_camera, query_label):
                 continue
-            print(img_path)
+            logger.info(img_path)
 
             ax = plt.subplot(1, 11, count + 2)
             ax.axis('off')
@@ -322,16 +329,19 @@ def recognize_from_image(query_path, net):
             if MARKET_1501_DROP_SAME_CAMERA_LABEL \
                     and not good_img(img_path, query_camera, query_label):
                 continue
-            print(img_path)
+            logger.info(img_path)
             count += 1
             if count >= 10:
                 break
-        print('If you want to see the visualization of the ranking result, graphical user interface is needed.')
+        logger.info('If you want to see the visualization of the ranking result, graphical user interface is needed.')
 
-    fig.savefig(args.savepath)
+    savepath = get_savepath(args.savepath, query_path)
+    logger.info(f'saved at : {savepath}')
+
+    fig.savefig(savepath)
 
     # plot result
-    print('Script finished successfully.')
+    logger.info('Script finished successfully.')
 
 
 def main():
@@ -348,10 +358,11 @@ def main():
 
     # initialize
     env_id = ailia.get_gpu_environment_id()
-    print(f'env_id: {env_id}')
+    logger.info(f'env_id: {env_id}')
     net = ailia.Net(model_path, weight_path, env_id=env_id)
 
-    recognize_from_image(args.input, net)
+    for input_path in args.input:
+        recognize_from_image(input_path, net)
 
 
 if __name__ == '__main__':
