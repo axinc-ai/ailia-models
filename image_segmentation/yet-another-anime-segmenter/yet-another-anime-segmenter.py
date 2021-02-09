@@ -9,11 +9,14 @@ import ailia
 import yaas_utils as yut
 
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser  # noqa: E402
+from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from webcamera_utils import adjust_frame_size, get_capture  # noqa: E402
 from image_utils import load_image  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 
+# logger
+from logging import getLogger   # noqa: E402
+logger = getLogger(__name__)
 
 # ======================
 # Parameters 1
@@ -69,54 +72,66 @@ def get_seg_img(img, preds):
 # Main functions
 # ======================
 def recognize_from_image():
-    # prepare input data
-    src_img = cv2.imread(args.input)
-    input_data = yut.preprocess(src_img)
-
     # net initialize
-    env_id = ailia.get_gpu_environment_id()
-    print(f'env_id: {env_id}')
-    segmentor = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+    if args.onnx:
+        import onnxruntime
+        sess = onnxruntime.InferenceSession(WEIGHT_PATH)
+    else:
+        # This model requires fuge gpu memory so fallback to cpu mode
+        env_id = args.env_id
+        if env_id != -1 and ailia.get_environment(env_id).props == "LOWPOWER":
+            env_id = -1
+        logger.info(f'env_id: {args.env_id}')
+        segmentor = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
 
     # inference
-    print('Start inference...')
-    if args.benchmark:
-        print('BENCHMARK mode')
-        for _ in range(5):
-            start = int(round(time.time() * 1000))
+    logger.info('Start inference...')
+
+    for image_path in args.input:
+        # prepare input data
+        src_img = cv2.imread(image_path)
+        input_data = yut.preprocess(src_img)
+
+        if args.benchmark:
+            logger.info('BENCHMARK mode')
+            for _ in range(5):
+                start = int(round(time.time() * 1000))
+                if args.onnx:
+                    input_name = sess.get_inputs()[0].name
+                    preds = sess.run(None, {input_name: input_data.astype(np.float32)})
+                    preds = yut.postprocess(preds, input_data.shape[2:], src_img)
+                    seg_img = get_seg_img(src_img, preds)
+                else:
+                    segmentor.set_input_shape(input_data.shape)
+                    preds = segmentor.predict([input_data])
+                    preds = yut.postprocess(preds, input_data.shape[2:], src_img)
+                    seg_img = get_seg_img(src_img, preds)
+                end = int(round(time.time() * 1000))
+                logger.info(f'\tailia processing time {end - start} ms')
+        else:
             if args.onnx:
                 input_name = sess.get_inputs()[0].name
                 preds = sess.run(None, {input_name: input_data.astype(np.float32)})
                 preds = yut.postprocess(preds, input_data.shape[2:], src_img)
+                print(preds)
                 seg_img = get_seg_img(src_img, preds)
             else:
                 segmentor.set_input_shape(input_data.shape)
                 preds = segmentor.predict([input_data])
                 preds = yut.postprocess(preds, input_data.shape[2:], src_img)
+                print(preds)
                 seg_img = get_seg_img(src_img, preds)
-            end = int(round(time.time() * 1000))
-            print(f'\tailia processing time {end - start} ms')
-    else:
-        if args.onnx:
-            input_name = sess.get_inputs()[0].name
-            preds = sess.run(None, {input_name: input_data.astype(np.float32)})
-            preds = yut.postprocess(preds, input_data.shape[2:], src_img)
-            seg_img = get_seg_img(src_img, preds)
-        else:
-            segmentor.set_input_shape(input_data.shape)
-            preds = segmentor.predict([input_data])
-            preds = yut.postprocess(preds, input_data.shape[2:], src_img)
-            seg_img = get_seg_img(src_img, preds)
 
-    cv2.imwrite(args.savepath, seg_img)
-    print('Script finished successfully.')
+        savepath = get_savepath(args.savepath, image_path)
+        logger.info(f'saved at : {savepath}')
+        cv2.imwrite(savepath, seg_img)
+    logger.info('Script finished successfully.')
 
 
 def recognize_from_video():
     # net initialize
-    env_id = ailia.get_gpu_environment_id()
-    print(f'env_id: {env_id}')
-    segmentor = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+    logger.info(f'env_id: {args.env_id}')
+    segmentor = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
 
     capture = get_capture(args.video)
 
@@ -159,7 +174,7 @@ def recognize_from_video():
 
     capture.release()
     cv2.destroyAllWindows()
-    print('Script finished successfully.')
+    logger.info('Script finished successfully.')
     pass
 
 
