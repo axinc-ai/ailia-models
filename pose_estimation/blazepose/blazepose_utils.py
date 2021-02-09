@@ -113,44 +113,6 @@ def decode_boxes(raw_boxes, anchors):
     return boxes
 
 
-<<<<<<< HEAD
-def raw_output_to_detections(raw_box, raw_score, anchors):
-    """The output of the neural network is an array of shape (b, 896, 12)
-    containing the bounding box regressor predictions, as well as an array
-    of shape (b, 896, 1) with the classification confidences.
-
-    This function converts these two "raw" arrays into proper detections.
-    Returns a list of (num_detections, 13) arrays, one for each image in
-    the batch.
-
-    This is based on the source code from:
-    mediapipe/calculators/tflite/tflite_tensors_to_detections_calculator.cc
-    mediapipe/calculators/tflite/tflite_tensors_to_detections_calculator.proto
-    """
-    detection_boxes = decode_boxes(raw_box, anchors)
-
-    thresh = 100.0
-    raw_score = raw_score.clip(-thresh, thresh)
-    # (instead of defining our own sigmoid function which yields a warning)
-    # expit = sigmoid
-    detection_scores = expit(raw_score).squeeze(axis=-1)
-
-    # Note: we stripped off the last dimension from the scores tensor
-    # because there is only has one class. Now we can simply use a mask
-    # to filter out the boxes with too low confidence.
-    min_score_thresh = 0.75
-    mask = detection_scores >= min_score_thresh
-
-    # Because each image from the batch can have a different number of
-    # detections, process them one at a time using a loop.
-    output_detections = []
-    for i in range(raw_box.shape[0]):
-        boxes = detection_boxes[i, mask[i]]
-        scores = np.expand_dims(detection_scores[i, mask[i]], axis=-1)
-        output_detections.append(np.concatenate((boxes, scores), axis=-1))
-
-    return output_detections
-=======
 def raw_output_to_detections(raw_box, raw_score, anchors, min_score_thresh):
         """The output of the neural network is an array of shape (b, 896, 12)
         containing the bounding box regressor predictions, as well as an array 
@@ -185,7 +147,6 @@ def raw_output_to_detections(raw_box, raw_score, anchors, min_score_thresh):
             output_detections.append(np.concatenate((boxes, scores), axis=-1))
 
         return output_detections
->>>>>>> master
 
 
 def intersect(box_a, box_b):
