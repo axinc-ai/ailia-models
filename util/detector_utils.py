@@ -10,7 +10,9 @@ logger = getLogger(__name__)
 
 
 def preprocessing_img(img):
-    if img.shape[2] == 3:
+    if len(img.shape) < 3:
+        img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGRA)
+    elif img.shape[2] == 3:
         img = cv2.cvtColor(img, cv2.COLOR_BGR2BGRA)
     elif img.shape[2] == 1:
         img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGRA)
