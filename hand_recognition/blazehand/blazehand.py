@@ -134,16 +134,18 @@ def recognize_from_image():
                         presence[1] = 1
                     draw_landmarks(src_img, landmark[:,:2], but.HAND_CONNECTIONS, size=2)
 
-    if presence[0] and presence[1]:
-        hand_presence = 'Left and right'
-    elif presence[0]:
-        hand_presence = 'Right'
-    elif presence[1]:
-        hand_presence = 'Left'
-    else:
-        hand_presence = 'No hand'
-    logger.info(f'Hand presence: {hand_presence}')
-    cv2.imwrite(args.savepath, src_img)
+        if presence[0] and presence[1]:
+            hand_presence = 'Left and right'
+        elif presence[0]:
+            hand_presence = 'Right'
+        elif presence[1]:
+            hand_presence = 'Left'
+        else:
+            hand_presence = 'No hand'
+        logger.info(f'Hand presence: {hand_presence}')
+        savepath = get_savepath(args.savepath, image_path)
+        logger.info(f'saved at : {savepath}')        
+        cv2.imwrite(savepath, src_img)
     logger.info('Script finished successfully.')
 
 
@@ -244,8 +246,6 @@ def recognize_from_video():
     if writer is not None:
         writer.release()
     cv2.destroyAllWindows()
-    if writer is not None:
-        writer.release()
     logger.info('Script finished successfully.')
 
 
