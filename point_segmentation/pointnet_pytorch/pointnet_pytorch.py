@@ -8,8 +8,12 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser  # noqa: E402
+from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
+
+# logger
+from logging import getLogger   # noqa: E402
+logger = getLogger(__name__)
 
 # ======================
 # Parameters
@@ -140,15 +144,15 @@ def recognize_from_points(filename, net_seg, net_cls):
     point = load_data(filename)
 
     # inference
-    print('Start inference...')
+    logger.info('Start inference...')
     if args.benchmark:
-        print('BENCHMARK mode')
+        logger.info('BENCHMARK mode')
         for i in range(5):
             start = int(round(time.time() * 1000))
             pred_seg = predict_seg(point, net_seg)
             pred_cls = predict_cls(point, net_cls)
             end = int(round(time.time() * 1000))
-            print(f'\tailia processing time {end - start} ms')
+            logger.info(f'\tailia processing time {end - start} ms')
     else:
         pred_seg = predict_seg(point, net_seg)
         pred_cls = predict_cls(point, net_cls)
@@ -179,11 +183,14 @@ def recognize_from_points(filename, net_seg, net_cls):
     ax.set_ylim(mid_y - max_range, mid_y + max_range)
     ax.set_zlim(mid_z - max_range, mid_z + max_range)
 
-    print('class --', pred_cls)
+    logger.info('class --'+str(pred_cls))
 
-    plt.savefig(args.savepath, dpi=120)
+    savepath = get_savepath(args.savepath, filename)
+    logger.info(f'saved at : {savepath}')
+
+    plt.savefig(savepath, dpi=120)
     plt.show()
-    print('Script finished successfully.')
+    logger.info('Script finished successfully.')
 
 
 def main():
@@ -208,20 +215,24 @@ def main():
     WEIGHT_PATH, MODEL_PATH, POINT_PATH = rec_model[args.choice_class]
 
     # model files check and download
-    print("=== Segmentation model ===")
+    logger.info("=== Segmentation model ===")
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
-    print("=== Classifier model ===")
+    logger.info("=== Classifier model ===")
     check_and_download_models(WEIGHT_PATH_CLASSIFIER, MODEL_PATH_CLASSIFIER, REMOTE_PATH)
 
     # load model
     env_id = ailia.get_gpu_environment_id()
-    print(f'env_id: {env_id}')
+    logger.info(f'env_id: {env_id}')
 
     # initialize
     net_seg = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
     net_cls = ailia.Net(MODEL_PATH_CLASSIFIER, WEIGHT_PATH_CLASSIFIER, env_id=env_id)
 
-    recognize_from_points(args.input if args.input else POINT_PATH, net_seg, net_cls)
+    if args.input:
+        for point_path in args.input:
+            recognize_from_points(point_path, net_seg, net_cls)
+    else:
+        recognize_from_points(POINT_PATH, net_seg, net_cls)
 
 
 if __name__ == '__main__':
