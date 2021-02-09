@@ -12,7 +12,7 @@ Range : [0, 1.0]
 
 ## Output
 
-<img src="MPII_out.png" width="320px">
+<img src="output.png" width="320px">
 
 - Confidence : (1, 224, 224, 16)
 - Range : [0, 1.0]
