@@ -43,7 +43,7 @@ parser = get_base_parser(
     IMAGE_PATH,
     SAVE_IMAGE_PATH,
 )
-args = update_parser(parser)
+args = update_parser(parser, large_model=True)
 
 
 # ======================
@@ -168,11 +168,7 @@ def display_objdetect_image(
 # ======================
 def recognize_from_image():
     # net initialize
-    # This model requires fuge gpu memory so fallback to cpu mode
-    env_id = args.env_id
-    if env_id != -1 and ailia.get_environment(env_id).props == "LOWPOWER":
-        env_id = -1
-    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
 
     # input image loop
     for image_path in args.input:
@@ -206,11 +202,7 @@ def recognize_from_image():
 
 def recognize_from_video():
     # net initialize
-    # This model requires fuge gpu memory so fallback to cpu mode
-    env_id = args.env_id
-    if env_id != -1 and ailia.get_environment(env_id).props == "LOWPOWER":
-        env_id = -1
-    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
 
     capture = webcamera_utils.get_capture(args.video)
 

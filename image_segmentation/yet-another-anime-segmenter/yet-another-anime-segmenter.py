@@ -39,7 +39,7 @@ parser.add_argument(
     help='By default, the ailia SDK is used, but with this option, ' +
     'you can switch to using ONNX Runtime'
 )
-args = update_parser(parser)
+args = update_parser(parser, large_model=True)
 
 
 # ======================
@@ -77,12 +77,7 @@ def recognize_from_image():
         import onnxruntime
         sess = onnxruntime.InferenceSession(WEIGHT_PATH)
     else:
-        # This model requires fuge gpu memory so fallback to cpu mode
-        env_id = args.env_id
-        if env_id != -1 and ailia.get_environment(env_id).props == "LOWPOWER":
-            env_id = -1
-        logger.info(f'env_id: {args.env_id}')
-        segmentor = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+        segmentor = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
 
     # inference
     logger.info('Start inference...')
@@ -113,13 +108,11 @@ def recognize_from_image():
                 input_name = sess.get_inputs()[0].name
                 preds = sess.run(None, {input_name: input_data.astype(np.float32)})
                 preds = yut.postprocess(preds, input_data.shape[2:], src_img)
-                print(preds)
                 seg_img = get_seg_img(src_img, preds)
             else:
                 segmentor.set_input_shape(input_data.shape)
                 preds = segmentor.predict([input_data])
                 preds = yut.postprocess(preds, input_data.shape[2:], src_img)
-                print(preds)
                 seg_img = get_seg_img(src_img, preds)
 
         savepath = get_savepath(args.savepath, image_path)
@@ -131,11 +124,7 @@ def recognize_from_image():
 def recognize_from_video():
     # net initialize
     # This model requires fuge gpu memory so fallback to cpu mode
-    env_id = args.env_id
-    if env_id != -1 and ailia.get_environment(env_id).props == "LOWPOWER":
-        env_id = -1
-    logger.info(f'env_id: {args.env_id}')
-    segmentor = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+    segmentor = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
 
     capture = get_capture(args.video)
 

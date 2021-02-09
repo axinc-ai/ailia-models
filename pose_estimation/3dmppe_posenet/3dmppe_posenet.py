@@ -56,7 +56,7 @@ parser = get_base_parser(
     IMAGE_OR_VIDEO_PATH,
     SAVE_IMAGE_OR_VIDEO_PATH,
 )
-args = update_parser(parser)
+args = update_parser(parser, large_model=True)
 
 
 # ======================
@@ -588,16 +588,12 @@ def main():
     check_and_download_models(WEIGHT_PATH_POSENET, MODEL_PATH_POSENET, REMOTE_PATH_POSENET)
 
     # net initialize
-    # This model requires fuge gpu memory so fallback to cpu mode
-    env_id = args.env_id
-    if env_id != -1 and ailia.get_environment(env_id).props == "LOWPOWER":
-        env_id = -1
     # Mask R-CNN
-    net_maskrcnn = ailia.Net(MODEL_PATH_MASKRCNN, WEIGHT_PATH_MASKRCNN, env_id=env_id)
+    net_maskrcnn = ailia.Net(MODEL_PATH_MASKRCNN, WEIGHT_PATH_MASKRCNN, env_id=args.env_id)
     # RootNet
-    net_root = ailia.Net(MODEL_PATH_ROOTNET, WEIGHT_PATH_ROOTNET, env_id=env_id)
+    net_root = ailia.Net(MODEL_PATH_ROOTNET, WEIGHT_PATH_ROOTNET, env_id=args.env_id)
     # PoseNet
-    net_pose = ailia.Net(MODEL_PATH_POSENET, WEIGHT_PATH_POSENET, env_id=env_id)
+    net_pose = ailia.Net(MODEL_PATH_POSENET, WEIGHT_PATH_POSENET, env_id=args.env_id)
 
     if args.video is None:
         # image mode

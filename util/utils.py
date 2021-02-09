@@ -101,7 +101,7 @@ def get_base_parser(
     return parser
 
 
-def update_parser(parser, check_input_type=True):
+def update_parser(parser, check_input_type=True, large_model=False):
     """Default check or update configurations should be placed here
 
     Parameters
@@ -128,6 +128,11 @@ def update_parser(parser, check_input_type=True):
             logger.error(f'specified env_id: {args.env_id} cannot found. ')
             logger.info('env_id updated to 0')
             args.env_id = 0
+
+        if large_model:
+            if args.env_id == ailia.get_gpu_environment_id() and ailia.get_environment(args.env_id).props == "LOWPOWER":
+                args.env_id = 0 # cpu
+                logger.info('This model requires fuge gpu memory so fallback to cpu mode')
 
     logger.info(f'env_id: {args.env_id}')
 

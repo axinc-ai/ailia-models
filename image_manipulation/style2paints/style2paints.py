@@ -48,7 +48,7 @@ SAVE_IMAGE_PATH = 'output.png'
 parser = get_base_parser(
     'Style2Paints model', IMAGE_PATH, SAVE_IMAGE_PATH
 )
-args = update_parser(parser)
+args = update_parser(parser, large_model=True)
 
 
 
@@ -343,19 +343,12 @@ def main():
     logger.info('=== gird model ===')
     check_and_download_models(WEIGHT_GIRD_PATH, MODEL_GIRD_PATH, REMOTE_PATH)
 
-    # This model requires fuge gpu memory so fallback to cpu mode
-    env_id = args.env_id
-    if env_id != -1 and ailia.get_environment(env_id).props == "LOWPOWER":
-        env_id = -1
-
-    logger.info(f'env_id: {env_id}')
-
     # initialize
-    net_head = ailia.Net(MODEL_HEAD_PATH, WEIGHT_HEAD_PATH, env_id=env_id)
-    net_neck = ailia.Net(MODEL_NECK_PATH, WEIGHT_NECK_PATH, env_id=env_id)
-    net_baby = ailia.Net(MODEL_BABY_PATH, WEIGHT_BABY_PATH, env_id=env_id)
-    net_tail = ailia.Net(MODEL_TAIL_PATH, WEIGHT_TAIL_PATH, env_id=env_id)
-    net_gird = ailia.Net(MODEL_GIRD_PATH, WEIGHT_GIRD_PATH, env_id=env_id)
+    net_head = ailia.Net(MODEL_HEAD_PATH, WEIGHT_HEAD_PATH, env_id=args.env_id)
+    net_neck = ailia.Net(MODEL_NECK_PATH, WEIGHT_NECK_PATH, env_id=args.env_id)
+    net_baby = ailia.Net(MODEL_BABY_PATH, WEIGHT_BABY_PATH, env_id=args.env_id)
+    net_tail = ailia.Net(MODEL_TAIL_PATH, WEIGHT_TAIL_PATH, env_id=args.env_id)
+    net_gird = ailia.Net(MODEL_GIRD_PATH, WEIGHT_GIRD_PATH, env_id=args.env_id)
 
     dict_net = {
         "head": net_head,
