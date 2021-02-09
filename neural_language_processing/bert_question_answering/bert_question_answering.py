@@ -36,7 +36,7 @@ parser.add_argument(
     '--context', '-c', metavar='TEXT', default=DEFAULT_CONTEXT,
     help='input context'
 )
-args = update_parser(parser)
+args = update_parser(parser, check_input_type=False)
 
 
 # ======================
@@ -180,8 +180,8 @@ def main():
         "context": args.context,
     }
 
-    logger.info("Question : ", args.question)
-    logger.info("Context : ", args.context)
+    logger.info("Question : " + str(args.question))
+    logger.info("Context : " + str(args.context))
 
     # Set defaults values
     handle_impossible_answer = False
@@ -225,8 +225,8 @@ def main():
                    for k in model_input_names}
         fw_args = {k: np.array(v) for (k, v) in fw_args.items()}
 
-        logger.debug("Input", fw_args)
-        logger.debug("Shape", fw_args["input_ids"].shape)
+        logger.debug("Input" + str(fw_args))
+        logger.debug("Shape" + str(fw_args["input_ids"].shape))
 
         net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
         net.set_input_shape(fw_args["input_ids"].shape)
@@ -242,7 +242,7 @@ def main():
         else:
             outputs = net.predict(fw_args)
 
-        logger.debug("Output", outputs)
+        logger.debug("Output"+str(outputs))
         start, end = outputs[0:2]
 
         min_null_score = 1000000  # large and positive
@@ -304,7 +304,7 @@ def main():
         )[:topk]
         all_answers += answers
 
-    logger.info("Answer : ", all_answers)
+    logger.info("Answer : "+str(all_answers))
     logger.info('Script finished successfully.')
 
 

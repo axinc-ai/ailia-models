@@ -29,7 +29,7 @@ parser.add_argument(
     '--input', '-i', metavar='TEXT', default=DEFAULT_TEXT,
     help='input text'
 )
-args = update_parser(parser)
+args = update_parser(parser, check_input_type=False)
 
 
 # ======================
@@ -58,7 +58,7 @@ def main():
         k: v.cpu().detach().numpy() for k, v in model_inputs.items()
     }
 
-    logger.info("Input : ", args.input)
+    logger.info("Input : "+str(args.input))
 
     # inference
     if args.benchmark:
@@ -76,8 +76,8 @@ def main():
     label_name = ["negative", "positive"]
 
     label_id = numpy.argmax(numpy.array(score))
-    logger.info("Label : ", label_name[label_id])
-    logger.info("Score : ", score[0][0][label_id])
+    logger.info("Label : "+str(label_name[label_id]))
+    logger.info("Score : "+str(score[0][0][label_id]))
 
     logger.info('Script finished successfully.')
 

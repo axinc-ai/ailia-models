@@ -17,19 +17,30 @@ log_level = INFO
 # params
 disable_stream_handler = False
 disable_file_handler = True  # set False if you want to save text log file
+display_date = False
 
 # =============================================================================
 
 # default logging format
-datefmt = '%Y/%m/%d %H:%M:%S'
-default_fmt = Formatter(
-    '[%(asctime)s.%(msecs)03d] %(levelname)5s '
-    '(%(process)d) %(filename)s: %(message)s',
-    datefmt=datefmt
-)
+if display_date:
+    datefmt = '%Y/%m/%d %H:%M:%S'
+    default_fmt = Formatter(
+        '[%(asctime)s.%(msecs)03d] %(levelname)5s '
+        '(%(process)d) %(filename)s: %(message)s',
+        datefmt=datefmt
+    )
+else:
+    default_fmt = Formatter(
+        '%(message)s'
+    )
 
 
 logger = getLogger()
+
+# remove duplicate handlers
+if (logger.hasHandlers()):
+    logger.handlers.clear()
+
 # the level of logging passed to the Handler
 logger.setLevel(log_level)
 

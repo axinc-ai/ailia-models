@@ -43,7 +43,7 @@ parser.add_argument(
     default='bert-base-japanese-whole-word-masking', choices=MODEL_LISTS,
     help='model lists: ' + ' | '.join(MODEL_LISTS)
 )
-args = update_parser(parser)
+args = update_parser(parser, check_input_type=False)
 
 
 # ======================
@@ -72,7 +72,7 @@ def main():
     logger.info("Input text : "+text)
 
     tokenized_text = tokenizer.tokenize(text)
-    logger.info("Tokenized text : ", tokenized_text)
+    logger.info("Tokenized text : " + str(tokenized_text))
 
     masked_index = -1
     for i in range(0, len(tokenized_text)):
@@ -84,7 +84,7 @@ def main():
         sys.exit(1)
 
     indexed_tokens = tokenizer.convert_tokens_to_ids(tokenized_text)
-    logger.info("Indexed tokens : ", indexed_tokens)
+    logger.info("Indexed tokens : "+str(indexed_tokens))
 
     ailia_model = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
 
@@ -117,7 +117,7 @@ def main():
     for i, index_t in enumerate(predictions.indices):
         index = index_t.item()
         token = tokenizer.convert_ids_to_tokens([index])[0]
-        logger.info(i, token)
+        logger.info(str(i)+" "+str(token))
 
     logger.info('Script finished successfully.')
 

@@ -101,7 +101,7 @@ def get_base_parser(
     return parser
 
 
-def update_parser(parser):
+def update_parser(parser, check_input_type=True):
     """Default check or update configurations should be placed here
 
     Parameters
@@ -170,8 +170,9 @@ def update_parser(parser):
     elif os.path.isfile(args.input):
         args.input = [args.input]
     else:
-        logger.error('specified input is not file path nor directory path')
-        sys.exit(0)
+        if check_input_type:
+            logger.error('specified input is not file path nor directory path')
+            sys.exit(0)
 
     # -------------------------------------------------------------------------
     return args

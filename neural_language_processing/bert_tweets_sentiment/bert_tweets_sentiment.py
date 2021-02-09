@@ -31,7 +31,7 @@ parser.add_argument(
     '--input', '-i', metavar='TEXT', default=DEFAULT_TEXT,
     help='input text'
 )
-args = update_parser(parser)
+args = update_parser(parser, check_input_type=False)
 
 
 # ======================
@@ -60,8 +60,8 @@ def main():
         k: v.cpu().detach().numpy() for k, v in model_inputs.items()
     }
 
-    logger.info("Text : ", args.input)
-    logger.info("Input : ", inputs_onnx)
+    logger.info("Text : "+str(args.input))
+    logger.info("Input : "+str(inputs_onnx))
 
     # inference
     if args.benchmark:
@@ -74,11 +74,11 @@ def main():
     else:
         score = ailia_model.predict(inputs_onnx)
 
-    logger.info("Output : ", score)
+    logger.info("Output : "+str(score))
 
     label_name = ["positive", "negative"]
 
-    logger.info("Label : ", label_name[numpy.argmax(numpy.array(score))])
+    logger.info("Label : "+str(label_name[numpy.argmax(numpy.array(score))]))
 
     logger.info('Script finished successfully.')
 

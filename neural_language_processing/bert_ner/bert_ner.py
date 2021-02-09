@@ -28,7 +28,7 @@ parser.add_argument(
     '--input', '-i', metavar='TEXT', default=SENTENCE,
     help='input text'
 )
-args = update_parser(parser)
+args = update_parser(parser, check_input_type=False)
 
 
 # ======================
@@ -56,7 +56,7 @@ def main():
         k: v.cpu().detach().numpy() for k, v in model_inputs.items()
     }
 
-    logger.info("Input : ", args.input)
+    logger.info("Input : " + str(args.input))
 
     # inference
     if args.benchmark:
@@ -106,7 +106,7 @@ def main():
 
         entities += [entity]
 
-    logger.info("Output : ", entities)
+    logger.info("Output : " + str(entities))
     logger.info('Script finished successfully.')
 
 

@@ -37,7 +37,7 @@ parser.add_argument(
     '--hypothesis_template', '-t', metavar='TEXT', default=HYPOTHESIS_TEMPLATE,
     help='input hypothesis template'
 )
-args = update_parser(parser)
+args = update_parser(parser, check_input_type=False)
 
 
 # ======================
@@ -89,9 +89,9 @@ def main():
         k: v.cpu().detach().numpy() for k, v in model_inputs.items()
     }
 
-    logger.info("Sentence : ", args.sentence)
-    logger.info("Candidate Labels : ", args.candidate_labels)
-    logger.info("Hypothesis Template : ", args.hypothesis_template)
+    logger.info("Sentence : "+str(args.sentence))
+    logger.info("Candidate Labels : "+str(args.candidate_labels))
+    logger.info("Hypothesis Template : "+str(args.hypothesis_template))
 
     # inference
     if args.benchmark:
@@ -115,9 +115,9 @@ def main():
         numpy.exp(entail_logits).sum(-1, keepdims=True)
 
     label_id = numpy.argmax(numpy.array(score))
-    logger.info("Label Id :", label_id)
-    logger.info("Label : ", candidate_labels[label_id])
-    logger.info("Score : ", score[0][label_id])
+    logger.info("Label Id :"+str(label_id))
+    logger.info("Label : "+str(candidate_labels[label_id]))
+    logger.info("Score : "+str(score[0][label_id]))
 
     logger.info('Script finished successfully.')
 
