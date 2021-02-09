@@ -120,13 +120,13 @@ def recognize_from_video(net):
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
 
-        logger.info('==============================================================')
+        logger.info('============================================')
         cv2.imshow('frame', image)
         image = Image.fromarray(np.uint8(image)).convert('L')
         image = pre_process(image)
         preds = predict(net, image)
         sim_pred = post_process(preds, len(preds), alphabet)
-        logger.info('String recognized from image is:', sim_pred)
+        logger.info('String recognized from image is:'+str(sim_pred))
 
         # save results
         # if writer is not None:
