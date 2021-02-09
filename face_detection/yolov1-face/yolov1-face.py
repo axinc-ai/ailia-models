@@ -40,7 +40,7 @@ IOU = 0.45
 # Arguemnt Parser Config
 # ======================
 parser = get_base_parser(
-    'Face Detection using Yolov1', IMAGE_HEIGHT, SAVE_IMAGE_PATH
+    'Face Detection using Yolov1', IMAGE_PATH, SAVE_IMAGE_PATH
 )
 args = update_parser(parser)
 

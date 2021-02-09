@@ -215,7 +215,7 @@ def recognize_from_video():
         LANDMARK2_MODEL_PATH, LANDMARK2_WEIGHT_PATH, env_id=args.env_id
     )
 
-    capture = webcamera_utils.get_capture(args.video)
+    capture = get_capture(args.video)
 
     # create video writer if savepath is specified as video format
     if args.savepath != SAVE_IMAGE_PATH:
