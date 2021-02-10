@@ -139,6 +139,7 @@ def recognize_from_image():
         logger.info(f'saved at : {savepath}')
         cv2.imwrite(savepath, res_img)
 
+        # write prediction
         if args.write_prediction:
             pred_file = '%s.txt' % savepath.rsplit('.', 1)[0]
             write_predictions(pred_file, detect_object, org_img, COCO_CATEGORY)

@@ -1,5 +1,6 @@
 import time
 import sys
+from collections import namedtuple
 
 import numpy as np
 import cv2
@@ -11,7 +12,7 @@ from centernet_utils import preprocess, postprocess
 sys.path.append('../../util')
 from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
-from detector_utils import load_image  # noqa: E402
+from detector_utils import load_image, write_predictions  # noqa: E402
 import webcamera_utils  # noqa: E402
 
 # logger
@@ -50,6 +51,11 @@ OPSET_LISTS = ['10', '11']
 # Arguemnt Parser Config
 # ======================
 parser = get_base_parser('CenterNet model', IMAGE_PATH, SAVE_IMAGE_PATH)
+parser.add_argument(
+    '-w', '--write_prediction',
+    action='store_true',
+    help='Flag to output the prediction file.'
+)
 parser.add_argument(
     '-o', '--opset', metavar='OPSET',
     default='10', choices=OPSET_LISTS,
@@ -174,6 +180,16 @@ def recognize_from_image(filename, detector):
     savepath = get_savepath(args.savepath, filename)
     logger.info(f'saved at : {savepath}')
     cv2.imwrite(savepath, im2show)
+
+    # write prediction
+    if args.write_prediction:
+        Detection = namedtuple('Detection', ['category', 'prob', 'x', 'y', 'w', 'h'])
+        ary = []
+        for i, box in enumerate(boxes):
+            d = Detection(int(cls_inds[i]), scores[i], box[0], box[1], box[2]-box[0], box[3]-box[1])
+            ary.append(d)
+        pred_file = '%s.txt' % savepath.rsplit('.', 1)[0]
+        write_predictions(pred_file, ary, img=None, category=COCO_CATEGORY)
 
     # cv2.imshow('demo', im2show)
     # cv2.waitKey(5000)
