@@ -10,7 +10,8 @@ import ailia
 sys.path.append('../../util')
 from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
-from detector_utils import plot_results, load_image, letterbox_convert, reverse_letterbox  # noqa: E402
+from detector_utils import plot_results, write_predictions  # noqa: E402
+from detector_utils import load_image, letterbox_convert, reverse_letterbox  # noqa: E402
 import webcamera_utils  # noqa: E402
 
 from yolov4_tiny_utils import post_processing  # noqa: E402
@@ -62,6 +63,11 @@ parser.add_argument(
     '-iou', '--iou',
     default=IOU, type=float,
     help='The detection iou for yolo. (default: '+str(IOU)+')'
+)
+parser.add_argument(
+    '-w', '--write_prediction',
+    action='store_true',
+    help='Flag to output the prediction file.'
 )
 parser.add_argument(
     '-dw', '--detection_width', metavar='DETECTION_WIDTH',
@@ -127,6 +133,12 @@ def recognize_from_image(detector):
         savepath = get_savepath(args.savepath, image_path)
         logger.info(f'saved at : {savepath}')
         cv2.imwrite(savepath, res_img)
+
+        # write prediction
+        if args.write_prediction:
+            pred_file = '%s.txt' % savepath.rsplit('.', 1)[0]
+            write_predictions(pred_file, detect_object, org_img, COCO_CATEGORY)
+
     logger.info('Script finished successfully.')
 
 

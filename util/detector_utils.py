@@ -10,7 +10,9 @@ logger = getLogger(__name__)
 
 
 def preprocessing_img(img):
-    if img.shape[2] == 3:
+    if len(img.shape) < 3:
+        img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGRA)
+    elif img.shape[2] == 3:
         img = cv2.cvtColor(img, cv2.COLOR_BGR2BGRA)
     elif img.shape[2] == 1:
         img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGRA)
@@ -160,3 +162,20 @@ def plot_results(detector, img, category, segm_masks=None, logging=True):
             1
         )
     return img
+
+
+def write_predictions(file_name, detector, img=None, category=None):
+    h, w = (img.shape[0], img.shape[1]) if img is not None else (1, 1)
+
+    count = detector.get_object_count() if hasattr(detector, 'get_object_count') else len(detector)
+
+    with open(file_name, 'w') as f:
+        for idx in range(count):
+            obj = detector.get_object(idx) if hasattr(detector, 'get_object') else detector[idx]
+            label = category[obj.category] if category else obj.category
+            f.write('%s %f %d %d %d %d\n' % (
+                label.replace(' ', '_'),
+                obj.prob,
+                int(w * obj.x), int(h * obj.y),
+                int(w * obj.w), int(h * obj.h),
+            ))

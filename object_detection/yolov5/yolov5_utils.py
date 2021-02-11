@@ -138,6 +138,8 @@ def post_processing(img, conf_thres, nms_thres, outputs):
 
     # output ailia format
     detections = batch_detections[0]
+    if detections is None:
+        return [[]]
 
     labels = detections[..., -1]
     boxs = detections[..., :4]
