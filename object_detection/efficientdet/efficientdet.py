@@ -1,5 +1,6 @@
 import sys, os
 import time
+from logging import getLogger
 
 import numpy as np
 import cv2
@@ -8,13 +9,15 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser  # noqa: E402
+from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from detector_utils import load_image  # noqa: E402
 from nms_utils import bb_intersection_over_union  # noqa: E402
 from webcamera_utils import get_capture  # noqa: E402
 
 from efficientdet_utils import *
+
+logger = getLogger(__name__)
 
 # ======================
 # Parameters
@@ -251,34 +254,38 @@ def predict(img, net):
     return out
 
 
-def recognize_from_image(filename, net):
+def recognize_from_image(image_path, net):
     # prepare input data
-    img = load_image(filename)
-    print(f'input image shape: {img.shape}')
+    img = load_image(image_path)
+    logger.debug(f'input image shape: {img.shape}')
 
     img = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
 
     # inference
-    print('Start inference...')
+    logger.info('Start inference...')
     if args.benchmark:
-        #if not args.onnx:
+        # if not args.onnx:
         #    net.set_profile_mode(True)
-        print('BENCHMARK mode')
+        logger.info('BENCHMARK mode')
         for i in range(5):
             start = int(round(time.time() * 1000))
             pred = predict(img, net)
             end = int(round(time.time() * 1000))
-            print(f'\tailia processing time {end - start} ms')
-        #if not args.onnx:
+            logger.info(f'\tailia processing time {end - start} ms')
+        # if not args.onnx:
         #    print(net.get_summary())
     else:
         pred = predict(img, net)
 
     # plot result
     imgs = display(pred, [img])
-    cv2.imwrite(args.savepath, imgs[0])
 
-    print('Script finished successfully.')
+    # plot result
+    savepath = get_savepath(args.savepath, image_path)
+    logger.info(f'saved at : {savepath}')
+    cv2.imwrite(savepath, imgs[0])
+
+    logger.info('Script finished successfully.')
 
 
 def recognize_from_video(video, net):
@@ -296,7 +303,7 @@ def recognize_from_video(video, net):
         cv2.imshow('frame', imgs[0])
 
     capture.release()
-    print('Script finished successfully.')
+    logger.info('Script finished successfully.')
 
 
 def main():
@@ -328,9 +335,13 @@ def main():
         net = onnxruntime.InferenceSession(weight_path)
 
     if args.video is not None:
+        # video mode
         recognize_from_video(args.video, net)
     else:
-        recognize_from_image(args.input, net)
+        # image mode
+        for image_path in args.input:
+            logger.info(image_path)
+            recognize_from_image(image_path, net)
 
 
 if __name__ == '__main__':
