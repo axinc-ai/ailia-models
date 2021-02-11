@@ -1,6 +1,10 @@
 import os
 import urllib.request
 
+# logger
+from logging import getLogger
+logger = getLogger(__name__)
+
 
 def progress_print(block_count, block_size, total_size):
     """
@@ -45,19 +49,19 @@ def check_and_download_models(weight_path, model_path, remote_path):
     """
 
     if not os.path.exists(weight_path):
-        print(f'Downloading onnx file... (save path: {weight_path})')
+        logger.info(f'Downloading onnx file... (save path: {weight_path})')
         urllib.request.urlretrieve(
             remote_path + os.path.basename(weight_path),
             weight_path,
-            progress_print
+            progress_print,
         )
-        print('\n')
+        logger.info('\n')
     if not os.path.exists(model_path):
-        print(f'Downloading prototxt file... (save path: {model_path})')
+        logger.info(f'Downloading prototxt file... (save path: {model_path})')
         urllib.request.urlretrieve(
             remote_path + os.path.basename(model_path),
             model_path,
-            progress_print
+            progress_print,
         )
-        print('\n')
-    print('ONNX file and Prototxt file are prepared!')
+        logger.info('\n')
+    logger.info('ONNX file and Prototxt file are prepared!')

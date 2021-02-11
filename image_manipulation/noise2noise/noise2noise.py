@@ -8,10 +8,14 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser  # noqa: E402
+from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from image_utils import load_image  # noqa: E402
 import webcamera_utils  # noqa: E402
+
+# logger
+from logging import getLogger   # noqa: E402
+logger = getLogger(__name__)
 
 
 # ======================
@@ -56,41 +60,48 @@ def add_noise(img, noise_param=50):
 # Main functions
 # ======================
 def recognize_from_image():
-    # prepare input data
-    img = load_image(
-        args.input,
-        (IMAGE_HEIGHT, IMAGE_WIDTH),
-        normalize_type='None',
-    )
-
-    if args.add_noise:
-        img = add_noise(img)
-
-    img = img / 255.0
-    input_data = img.transpose(2, 0, 1)
-    input_data.shape = (1, ) + input_data.shape
-
     # net initialize
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
 
-    # inference
-    print('Start inference...')
-    if args.benchmark:
-        print('BENCHMARK mode')
-        for i in range(5):
-            start = int(round(time.time() * 1000))
-            preds_ailia = net.predict(input_data)
-            end = int(round(time.time() * 1000))
-            print(f'\tailia processing time {end - start} ms')
-    else:
-        preds_ailia = net.predict(input_data)
+    # input image loop
+    for image_path in args.input:
+        # prepare input data
+        logger.info(image_path)
 
-    # postprocessing
-    output_img = preds_ailia[0].transpose(1, 2, 0) * 255
-    output_img = np.clip(output_img, 0, 255)
-    output_img = cv2.cvtColor(output_img, cv2.COLOR_RGB2BGR)
-    cv2.imwrite(args.savepath, output_img)
-    print('Script finished successfully.')
+        # prepare input data
+        img = load_image(
+            image_path,
+            (IMAGE_HEIGHT, IMAGE_WIDTH),
+            normalize_type='None',
+        )
+
+        if args.add_noise:
+            img = add_noise(img)
+
+        img = img / 255.0
+        input_data = img.transpose(2, 0, 1)
+        input_data.shape = (1, ) + input_data.shape
+
+        # inference
+        logger.info('Start inference...')
+        if args.benchmark:
+            logger.info('BENCHMARK mode')
+            for i in range(5):
+                start = int(round(time.time() * 1000))
+                preds_ailia = net.predict(input_data)
+                end = int(round(time.time() * 1000))
+                logger.info(f'\tailia processing time {end - start} ms')
+        else:
+            preds_ailia = net.predict(input_data)
+
+        # postprocessing
+        output_img = preds_ailia[0].transpose(1, 2, 0) * 255
+        output_img = np.clip(output_img, 0, 255)
+        output_img = cv2.cvtColor(output_img, cv2.COLOR_RGB2BGR)
+        savepath = get_savepath(args.savepath, image_path)
+        logger.info(f'saved at : {savepath}')
+        cv2.imwrite(savepath, output_img)
+    logger.info('Script finished successfully.')
 
 
 def recognize_from_video():
@@ -100,8 +111,8 @@ def recognize_from_video():
     capture = webcamera_utils.get_capture(args.video)
     # create video writer if savepath is specified as video format
     if args.savepath != SAVE_IMAGE_PATH:
-        print(
-            '[WARNING] currently, video results cannot be output correctly...'
+        logger.warning(
+            'currently, video results cannot be output correctly...'
         )
         # TODO: DEBUG: save image shape
         f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
@@ -149,7 +160,7 @@ def recognize_from_video():
     cv2.destroyAllWindows()
     if writer is not None:
         writer.release()
-    print('Script finished successfully.')
+    logger.info('Script finished successfully.')
 
 
 def main():

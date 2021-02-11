@@ -8,12 +8,16 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser  # noqa: E402
+from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from detector_utils import plot_results, load_image, letterbox_convert, reverse_letterbox  # noqa: E402
 import webcamera_utils  # noqa: E402
 
 import yolov5_utils  # noqa: E402
+
+# logger
+from logging import getLogger   # noqa: E402
+logger = getLogger(__name__)
 
 
 # ======================
@@ -25,7 +29,7 @@ DETECTION_SIZE_LISTS = [640, 1280]
 
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/yolov5/'
 
-IMAGE_PATH = 'bus.jpg'
+IMAGE_PATH = 'input.jpg'
 SAVE_IMAGE_PATH = 'output.png'
 
 COCO_CATEGORY = [
@@ -95,41 +99,48 @@ else:
 # Main functions
 # ======================
 def recognize_from_image():
-    # prepare input data
-    org_img = load_image(args.input)
-    org_img = cv2.cvtColor(org_img, cv2.COLOR_BGRA2BGR)
-    print(f'input image shape: {org_img.shape}')
-
-    img = letterbox_convert(org_img, (IMAGE_HEIGHT, IMAGE_WIDTH))
-
-    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-    img = np.transpose(img, [2, 0, 1])
-    img = img.astype(np.float32) / 255
-    img = np.expand_dims(img, 0)
-
     # net initialize
     detector = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
 
-    # inference
-    print('Start inference...')
-    if args.benchmark:
-        print('BENCHMARK mode')
-        for i in range(5):
-            start = int(round(time.time() * 1000))
+    # input image loop
+    for image_path in args.input:
+        # prepare input data
+        logger.info(image_path)
+
+        # prepare input data
+        org_img = load_image(image_path)
+        org_img = cv2.cvtColor(org_img, cv2.COLOR_BGRA2BGR)
+        logger.info(f'input image shape: {org_img.shape}')
+
+        img = letterbox_convert(org_img, (IMAGE_HEIGHT, IMAGE_WIDTH))
+
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        img = np.transpose(img, [2, 0, 1])
+        img = img.astype(np.float32) / 255
+        img = np.expand_dims(img, 0)
+
+        # inference
+        logger.info('Start inference...')
+        if args.benchmark:
+            logger.info('BENCHMARK mode')
+            for i in range(5):
+                start = int(round(time.time() * 1000))
+                output = detector.predict([img])
+                end = int(round(time.time() * 1000))
+                logger.info(f'\tailia processing time {end - start} ms')
+        else:
             output = detector.predict([img])
-            end = int(round(time.time() * 1000))
-            print(f'\tailia processing time {end - start} ms')
-    else:
-        output = detector.predict([img])
-    detect_object = yolov5_utils.post_processing(img, args.threshold, args.iou, output)
-    detect_object = reverse_letterbox(detect_object[0], org_img, (IMAGE_HEIGHT,IMAGE_WIDTH))
+        detect_object = yolov5_utils.post_processing(img, args.threshold, args.iou, output)
+        detect_object = reverse_letterbox(detect_object[0], org_img, (IMAGE_HEIGHT,IMAGE_WIDTH))
 
-    # plot result
-    res_img = plot_results(detect_object, org_img, COCO_CATEGORY)
+        # plot result
+        res_img = plot_results(detect_object, org_img, COCO_CATEGORY)
 
-    # plot result
-    cv2.imwrite(args.savepath, res_img)
-    print('Script finished successfully.')
+        # plot result
+        savepath = get_savepath(args.savepath, image_path)
+        logger.info(f'saved at : {savepath}')
+        cv2.imwrite(savepath, res_img)
+    logger.info('Script finished successfully.')
 
 
 def recognize_from_video():
@@ -177,7 +188,7 @@ def recognize_from_video():
     cv2.destroyAllWindows()
     if writer is not None:
         writer.release()
-    print('Script finished successfully.')
+    logger.info('Script finished successfully.')
 
 
 def main():

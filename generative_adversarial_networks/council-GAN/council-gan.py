@@ -8,10 +8,14 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser  # noqa: E402
+from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from yolo_face import FaceLocator  # noqa: E402
 import webcamera_utils  # noqa: E402
+
+# logger
+from logging import getLogger   # noqa: E402
+logger = getLogger(__name__)
 
 
 # ======================
@@ -186,31 +190,37 @@ def replace_face(img, replacement, coords):
 def transform_image():
     """Full transormation on a single image loaded from filepath in arguments.
     """
-    image = cv2.imread(args.input)
-
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
 
-    if args.face_recognition:
-        locator = FaceLocator()
-    else:
-        locator = None
+    # input image loop
+    for image_path in args.input:
+        # prepare input data
+        logger.info(image_path)
+        image = cv2.imread(image_path)
 
-    print('Start inference...')
+        if args.face_recognition:
+            locator = FaceLocator()
+        else:
+            locator = None
 
-    if args.benchmark:
-        print('BENCHMARK mode')
-        for i in range(5):
-            start = int(round(time.time() * 1000))
+        logger.info('Start inference...')
 
+        if args.benchmark:
+            logger.info('BENCHMARK mode')
+            for i in range(5):
+                start = int(round(time.time() * 1000))
+
+                out_image = process_frame(net, locator, image)
+
+                end = int(round(time.time() * 1000))
+                logger.info(f'\tailia processing time {end - start} ms')
+
+        else:
             out_image = process_frame(net, locator, image)
 
-            end = int(round(time.time() * 1000))
-            print(f'\tailia processing time {end - start} ms')
-
-    else:
-        out_image = process_frame(net, locator, image)
-
-    cv2.imwrite(args.savepath, out_image[..., ::-1])
+        savepath = get_savepath(args.savepath, image_path)
+        logger.info(f'saved at : {savepath}')
+        cv2.imwrite(savepath, out_image[..., ::-1])
     return True
 
 
@@ -277,7 +287,7 @@ def process_video():
     cv2.destroyAllWindows()
     if writer is not None:
         writer.release()
-    print('Script finished successfully.')
+    logger.info('Script finished successfully.')
 
 
 def main():
@@ -307,7 +317,8 @@ def main():
 
     WEIGHT_PATH = PATH_SUFFIX + '.onnx'
     MODEL_PATH = PATH_SUFFIX + '.onnx.prototxt'
-    print(WEIGHT_PATH, MODEL_PATH)
+    logger.debug(f'weight path : {WEIGHT_PATH}')
+    logger.debug(f'model path {MODEL_PATH}')
 
     # model files check and download
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)

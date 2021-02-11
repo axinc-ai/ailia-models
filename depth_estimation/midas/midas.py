@@ -9,11 +9,15 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser  # noqa: E402
+from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from webcamera_utils import get_capture, get_writer, \
     calc_adjust_fsize  # noqa: E402
 from image_utils import normalize_image  # noqa: E402
+
+# logger
+from logging import getLogger   # noqa: E402
+logger = getLogger(__name__)
 
 
 # ======================
@@ -72,7 +76,7 @@ def midas_resize(image, target_height, target_width):
 
 def midas_imread(image_path):
     if not os.path.isfile(image_path):
-        print(f'[ERROR] {image_path} not found.')
+        logger.error(f'{image_path} not found.')
         sys.exit()
     image = cv2.imread(image_path)
     if image.ndim == 2:
@@ -84,39 +88,46 @@ def midas_imread(image_path):
 
 
 def recognize_from_image():
-    # prepare input data
-    img = midas_imread(args.input)
-    img = img.transpose((2, 0, 1))  # channel first
-    img = img[np.newaxis, :, :, :]
-    print(f'input image shape: {img.shape}')
-
     # net initialize
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
-    net.set_input_shape(img.shape)
 
-    # inference
-    print('Start inference...')
-    if args.benchmark:
-        print('BENCHMARK mode')
-        for i in range(5):
-            start = int(round(time.time() * 1000))
+    # input image loop
+    for image_path in args.input:
+        logger.info(image_path)
+
+        # prepare input data
+        img = midas_imread(image_path)
+        img = img.transpose((2, 0, 1))  # channel first
+        img = img[np.newaxis, :, :, :]
+
+        logger.debug(f'input image shape: {img.shape}')
+        net.set_input_shape(img.shape)
+
+        # inference
+        logger.info('Start inference...')
+        if args.benchmark:
+            logger.info('BENCHMARK mode')
+            for i in range(5):
+                start = int(round(time.time() * 1000))
+                result = net.predict(img)
+                end = int(round(time.time() * 1000))
+                logger.info(f'\tailia processing time {end - start} ms')
+        else:
             result = net.predict(img)
-            end = int(round(time.time() * 1000))
-            print(f'\tailia processing time {end - start} ms')
-    else:
-        result = net.predict(img)
 
-    depth_min = result.min()
-    depth_max = result.max()
-    max_val = (2 ** 16) - 1
+        depth_min = result.min()
+        depth_max = result.max()
+        max_val = (2 ** 16) - 1
 
-    if depth_max - depth_min > np.finfo("float").eps:
-        out = max_val * (result - depth_min) / (depth_max - depth_min)
-    else:
-        out = 0
+        if depth_max - depth_min > np.finfo("float").eps:
+            out = max_val * (result - depth_min) / (depth_max - depth_min)
+        else:
+            out = 0
 
-    cv2.imwrite(args.savepath, out.transpose(1, 2, 0).astype("uint16"))
-    print('Script finished successfully.')
+        savepath = get_savepath(args.savepath, image_path, ext='.png')
+        logger.info(f'saved at : {savepath}')
+        cv2.imwrite(savepath, out.transpose(1, 2, 0).astype("uint16"))
+    logger.info('Script finished successfully.')
 
 
 def recognize_from_video():
@@ -127,8 +138,8 @@ def recognize_from_video():
 
     # create video writer if savepath is specified as video format
     if args.savepath != SAVE_IMAGE_PATH:
-        print(
-            '[WARNING] currently, video results cannot be output correctly...'
+        logger.warning(
+            'currently, video results cannot be output correctly...'
         )
         f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
         f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
@@ -174,7 +185,7 @@ def recognize_from_video():
     cv2.destroyAllWindows()
     if writer is not None:
         writer.release()
-    print('Script finished successfully.')
+    logger.info('Script finished successfully.')
 
 
 def main():

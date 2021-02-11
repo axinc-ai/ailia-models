@@ -1,8 +1,12 @@
 import os
 import sys
+
 import numpy as np
 import cv2
 import ailia
+
+from logging import getLogger
+logger = getLogger(__name__)
 
 
 def preprocessing_img(img):
@@ -17,7 +21,7 @@ def load_image(image_path):
     if os.path.isfile(image_path):
         img = cv2.imread(image_path, cv2.IMREAD_UNCHANGED)
     else:
-        print(f'[ERROR] {image_path} not found.')
+        logger.error(f'{image_path} not found.')
         sys.exit()
     return preprocessing_img(img)
 
@@ -73,7 +77,7 @@ def reverse_letterbox(detections, img, det_shape):
     
     new_detections = []
     for detection in detections:
-        print(detection)
+        logger.debug(detection)
         r = ailia.DetectorObject(
             category=detection.category,
             prob=detection.prob,

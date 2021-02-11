@@ -6,6 +6,9 @@ import cv2
 from utils import check_file_existance
 from image_utils import normalize_image
 
+from logging import getLogger
+logger = getLogger(__name__)
+
 
 def calc_adjust_fsize(f_height, f_width, height, width):
     # calculate the image size of the output('img') of adjust_frame_size
@@ -146,7 +149,7 @@ def get_capture(video):
         # webcamera-mode
         capture = cv2.VideoCapture(video_id)
         if not capture.isOpened():
-            print(f"[ERROR] webcamera (ID - {video_id}) not found")
+            logger.error(f"webcamera (ID - {video_id}) not found")
             sys.exit(0)
 
     except ValueError:

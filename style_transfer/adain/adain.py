@@ -8,11 +8,15 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser  # noqa: E402
+from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from image_utils import load_image  # noqa: E402
 import webcamera_utils  # noqa: E402
 import adain_utils  # noqa: E402
+
+# logger
+from logging import getLogger   # noqa: E402
+logger = getLogger(__name__)
 
 
 # ======================
@@ -62,45 +66,52 @@ def style_transfer(vgg, decoder, content, style, alpha=1.0):
 # Main functions
 # ======================
 def image_style_transfer():
-    # prepare input data
-    input_img = load_image(
-        args.input,
-        (IMAGE_HEIGHT, IMAGE_WIDTH),
-        normalize_type='255',
-        gen_input_ailia=True
-    )
-
-    src_h, src_w, _ = cv2.imread(args.input).shape
-    style_img = load_image(
-        args.style,
-        (IMAGE_HEIGHT, IMAGE_WIDTH),
-        normalize_type='255',
-        gen_input_ailia=True
-    )
-
     # net initialize
     vgg = ailia.Net(VGG_MODEL_PATH, VGG_WEIGHT_PATH, env_id=args.env_id)
     decoder = ailia.Net(DEC_MODEL_PATH, DEC_WEIGHT_PATH, env_id=args.env_id)
 
-    # inference
-    print('Start inference...')
-    if args.benchmark:
-        print('BENCHMARK mode')
-        for i in range(5):
-            start = int(round(time.time() * 1000))
-            preds_ailia = style_transfer(vgg, decoder, input_img, style_img)
-            end = int(round(time.time() * 1000))
-            print(f'\tailia processing time {end - start} ms')
-    else:
-        preds_ailia = style_transfer(vgg, decoder, input_img, style_img)
+    # input image loop
+    for image_path in args.input:
+        # prepare input data
+        logger.info(image_path)
+        input_img = load_image(
+            image_path,
+            (IMAGE_HEIGHT, IMAGE_WIDTH),
+            normalize_type='255',
+            gen_input_ailia=True,
+        )
 
-    res_img = cv2.cvtColor(
-        preds_ailia[0].transpose(1, 2, 0),
-        cv2.COLOR_RGB2BGR
-    )
-    res_img = cv2.resize(res_img, (src_w, src_h))
-    cv2.imwrite(args.savepath, np.clip(res_img * 255 + 0.5, 0, 255))
-    print('Script finished successfully.')
+        src_h, src_w, _ = cv2.imread(image_path).shape
+        style_img = load_image(
+            args.style,
+            (IMAGE_HEIGHT, IMAGE_WIDTH),
+            normalize_type='255',
+            gen_input_ailia=True,
+        )
+
+        # inference
+        logger.info('Start inference...')
+        if args.benchmark:
+            logger.info('BENCHMARK mode')
+            for i in range(5):
+                start = int(round(time.time() * 1000))
+                preds_ailia = style_transfer(
+                    vgg, decoder, input_img, style_img
+                )
+                end = int(round(time.time() * 1000))
+                logger.info(f'\tailia processing time {end - start} ms')
+        else:
+            preds_ailia = style_transfer(vgg, decoder, input_img, style_img)
+
+        res_img = cv2.cvtColor(
+            preds_ailia[0].transpose(1, 2, 0),
+            cv2.COLOR_RGB2BGR
+        )
+        res_img = cv2.resize(res_img, (src_w, src_h))
+        savepath = get_savepath(args.savepath, image_path)
+        logger.info(f'saved at : {savepath}')
+        cv2.imwrite(savepath, np.clip(res_img * 255 + 0.5, 0, 255))
+    logger.info('Script finished successfully.')
 
 
 def video_style_transfer():
@@ -160,7 +171,7 @@ def video_style_transfer():
     if writer is not None:
         writer.release()
 
-    print('Script finished successfully.')
+    logger.info('Script finished successfully.')
 
 
 def main():

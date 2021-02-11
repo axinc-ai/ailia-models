@@ -11,10 +11,14 @@ from deeplab_utils import *
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser  # noqa: E402
+from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from image_utils import load_image  # noqa: E402
 import webcamera_utils  # noqa: E402
+
+# logger
+from logging import getLogger   # noqa: E402
+logger = getLogger(__name__)
 
 
 # ======================
@@ -70,72 +74,80 @@ REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/deeplabv3/'
 def segment_from_image():
     # net initialize
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
-
     ailia_input_w = net.get_input_shape()[3]
     ailia_input_h = net.get_input_shape()[2]
     input_shape = [ailia_input_h, ailia_input_w]
 
-    # prepare input data
-    img = load_image(
-        args.input, input_shape, normalize_type='127.5', gen_input_ailia=True
-    )
+    # input image loop
+    for image_path in args.input:
+        # prepare input data
+        logger.info(image_path)
+        img = load_image(
+            image_path,
+            input_shape,
+            normalize_type='127.5',
+            gen_input_ailia=True,
+        )
 
-    # inference
-    print('Start inference...')
-    if args.benchmark:
-        print('BENCHMARK mode')
-        for i in range(5):
-            start = int(round(time.time() * 1000))
+        # inference
+        logger.info('Start inference...')
+        if args.benchmark:
+            logger.info('BENCHMARK mode')
+            for i in range(5):
+                start = int(round(time.time() * 1000))
+                preds_ailia = net.predict(img)[0]
+                end = int(round(time.time() * 1000))
+                logger.info(f'ailia processing time {end - start} ms')
+        else:
             preds_ailia = net.predict(img)[0]
-            end = int(round(time.time() * 1000))
-            print(f'ailia processing time {end - start} ms')
-    else:
-        preds_ailia = net.predict(img)[0]
 
-    # postprocessing
-    seg_map = np.argmax(preds_ailia.transpose(1, 2, 0), axis=2)
-    seg_image = label_to_color_image(seg_map).astype(np.uint8)
+        # postprocessing
+        seg_map = np.argmax(preds_ailia.transpose(1, 2, 0), axis=2)
+        seg_image = label_to_color_image(seg_map).astype(np.uint8)
 
-    # save just segmented image (simple)
-    # seg_image = cv2.cvtColor(seg_image, cv2.COLOR_RGB2BGR)
-    # cv2.imwrite('seg_test.png', seg_image)
+        # save just segmented image (simple)
+        # seg_image = cv2.cvtColor(seg_image, cv2.COLOR_RGB2BGR)
+        # cv2.imwrite('seg_test.png', seg_image)
 
-    # save org_img, segmentation-map, segmentation-overlay
-    org_img = cv2.cvtColor(cv2.imread(args.input), cv2.COLOR_BGR2RGB)
-    org_img = cv2.resize(org_img, (seg_image.shape[1], seg_image.shape[0]))
+        # save org_img, segmentation-map, segmentation-overlay
+        org_img = cv2.cvtColor(cv2.imread(image_path), cv2.COLOR_BGR2RGB)
+        org_img = cv2.resize(org_img, (seg_image.shape[1], seg_image.shape[0]))
 
-    plt.figure(figsize=(15, 5))
-    grid_spec = gridspec.GridSpec(1, 4, width_ratios=[6, 6, 6, 1])
+        plt.figure(figsize=(15, 5))
+        grid_spec = gridspec.GridSpec(1, 4, width_ratios=[6, 6, 6, 1])
 
-    plt.subplot(grid_spec[0])
-    plt.imshow(org_img)
-    plt.axis('off')
-    plt.title('input image')
+        plt.subplot(grid_spec[0])
+        plt.imshow(org_img)
+        plt.axis('off')
+        plt.title('input image')
 
-    plt.subplot(grid_spec[1])
-    plt.imshow(seg_image)
-    plt.axis('off')
-    plt.title('segmentation map')
+        plt.subplot(grid_spec[1])
+        plt.imshow(seg_image)
+        plt.axis('off')
+        plt.title('segmentation map')
 
-    plt.subplot(grid_spec[2])
-    plt.imshow(org_img)
-    plt.imshow(seg_image, alpha=0.7)
-    plt.axis('off')
-    plt.title('segmentation overlay')
+        plt.subplot(grid_spec[2])
+        plt.imshow(org_img)
+        plt.imshow(seg_image, alpha=0.7)
+        plt.axis('off')
+        plt.title('segmentation overlay')
 
-    unique_labels = np.unique(seg_map)
-    ax = plt.subplot(grid_spec[3])
-    plt.imshow(
-        FULL_COLOR_MAP[unique_labels].astype(np.uint8), interpolation='nearest'
-    )
-    ax.yaxis.tick_right()
-    plt.yticks(range(len(unique_labels)), LABEL_NAMES[unique_labels])
-    plt.xticks([], [])
-    ax.tick_params(width=0.0)
-    plt.grid('off')
-    plt.savefig(args.savepath)
+        unique_labels = np.unique(seg_map)
+        ax = plt.subplot(grid_spec[3])
+        plt.imshow(
+            FULL_COLOR_MAP[unique_labels].astype(np.uint8),
+            interpolation='nearest',
+        )
+        ax.yaxis.tick_right()
+        plt.yticks(range(len(unique_labels)), LABEL_NAMES[unique_labels])
+        plt.xticks([], [])
+        ax.tick_params(width=0.0)
+        plt.grid('off')
+        savepath = get_savepath(args.savepath, image_path)
+        logger.info(f'saved at : {savepath}')
+        plt.savefig(savepath)
 
-    print('Script finished successfully.')
+    logger.info('Script finished successfully.')
 
 
 def segment_from_video():
@@ -193,7 +205,7 @@ def segment_from_video():
     cv2.destroyAllWindows()
     if writer is not None:
         writer.release()
-    print('Script finished successfully.')
+    logger.info('Script finished successfully.')
 
 
 def main():

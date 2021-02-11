@@ -19,7 +19,7 @@ import mediapipe_iris_utils as iut
 
 sys.path.append('../../util')
 from utils import get_base_parser, update_parser  # noqa: E402
-from webcamera_utils import adjust_frame_size, get_capture  # noqa: E402
+import webcamera_utils  # noqa: E402
 from image_utils import load_image  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 
@@ -39,6 +39,10 @@ HAND_IMAGE_WIDTH = 256
 POSE_IMAGE_HEIGHT = 256
 POSE_IMAGE_WIDTH = 256
 
+HAND_DETECTION_THRESHOLD = 0.5
+HAND_LANDMARK_THRESHOLD = 0.5#0.75
+POSE_LANDMARK_THRESHOLD = 0.5
+
 # ======================
 # Argument Parser Config
 # ======================
@@ -56,6 +60,13 @@ parser.add_argument(
     '-b', '--bbox',
     action='store_true',
     help='Display detected bonding box'
+)
+parser.add_argument(
+    '--hands',
+    metavar='NUM_HANDS',
+    type=int,
+    default=2,
+    help='The maximum number of hands tracked (=2 by default)'
 )
 args = update_parser(parser)
 
@@ -164,7 +175,7 @@ def hsv_to_rgb(h, s, v):
 
 
 def line(input_img, landmarks, flags, point1, point2):
-    threshold = 0.5
+    threshold = POSE_LANDMARK_THRESHOLD
     for i in range(len(flags)):
         landmark, flag = landmarks[i], flags[i]
         if flag > threshold:
@@ -238,49 +249,65 @@ def display_hand_box(img, detections, with_keypoints=False):
 # Main functions
 # ======================
 
-def recognize_hand(frame,detector,estimator,out_frame=None):
-    img256, _, scale, pad = bhut.resize_pad(frame[:,:,::-1])
-    input_data = img256.astype('float32') / 255.
-    input_data = np.expand_dims(np.moveaxis(input_data, -1, 0), 0)
+class BlazeHand():
+    def __init__(self, num_hands):
+        # BlazeHand tracking variables initialization
+        self.num_hands = num_hands
+        self.tracking = False
+        self.tracked_hands = np.array([0.0] * num_hands)
+        self.rois = [None] * num_hands
 
-    # inference
-    # Palm detection
-    preds = detector.predict([input_data])
-    detections = bhut.detector_postprocess(preds,anchor_path="../../hand_recognition/blazehand/anchors.npy")
+    def recognize_hand(self, frame,detector,estimator,out_frame=None):
+        img256, _, scale, pad = bhut.resize_pad(frame[:,:,::-1])
+        input_data = img256.astype('float32') / 255.
+        input_data = np.expand_dims(np.moveaxis(input_data, -1, 0), 0)
 
-    # display bbox
-    if args.bbox:
-        detections2 = bhut.denormalize_detections(detections[0].copy(), scale, pad)
-        display_hand_box(out_frame, detections2)
+        # inference
+        # Perform palm detection on 1st frame and if at least 1 hand has low
+        # confidence (not detected)
+        if np.any(self.tracked_hands < HAND_DETECTION_THRESHOLD):
+            self.tracking = False
+            # Palm detection
+            preds = detector.predict([input_data])
+            detections = bhut.detector_postprocess(preds, anchor_path="../../hand_recognition/blazehand/anchors.npy")
+            if detections[0].size > 0:
+                self.tracking = True
+                self.roi_imgs, self.affines, _ = bhut.estimator_preprocess(frame, detections[0][:self.num_hands], scale, pad)
+        else:
+            for i, roi in enumerate(self.rois):
+                xc, yc, scale, theta = roi
+                roi_img, affine, _ = bhut.extract_roi(frame, xc, yc, theta, scale)
+                self.roi_imgs[i] = roi_img[0]
+                self.affines[i] = affine[0]
 
-    # Hand landmark estimation
-    presence = [0, 0] # [left, right]
-    if detections[0].size != 0:
-        img, affine, _ = bhut.estimator_preprocess(frame, detections, scale, pad)
-        estimator.set_input_shape(img.shape)
-        flags, handedness, normalized_landmarks = estimator.predict([img])
+        # display bbox
+        if args.bbox:
+            detections2 = bhut.denormalize_detections(detections[0].copy(), scale, pad)
+            display_hand_box(out_frame, detections2)
 
-        # postprocessing
-        landmarks = bhut.denormalize_landmarks(normalized_landmarks, affine)
-        for i in range(len(flags)):
-            landmark, flag, handed = landmarks[i], flags[i], handedness[i]
-            if flag > 0.75:
-                if handed > 0.5:
-                    presence[0] = 1
-                else:
-                    presence[1] = 1
-                draw_landmarks_hand(out_frame, landmark[:,:2], bhut.HAND_CONNECTIONS, size=4)
+        # Hand landmark estimation
+        presence = [0, 0] # [left, right]
+        if self.tracking:
+            # img, affine, _ = bhut.estimator_preprocess(frame, detections, scale, pad)
+            estimator.set_input_shape(self.roi_imgs.shape)
+            hand_flags, handedness, normalized_landmarks = estimator.predict([self.roi_imgs])
 
-    #if presence[0] and presence[1]:
-    #    text = 'Left and right'
-    #elif presence[0]:
-    #    text = 'Left'
-    #elif presence[1]:
-    #    text = 'Right'
-    #else:
-    #    text = 'No hand'
-    #cv2.putText(out_frame, text, (8, 24), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 255), 2)
+            # postprocessing
+            landmarks = bhut.denormalize_landmarks(normalized_landmarks, self.affines)
 
+            self.tracked_hands[:] = 0
+            n_imgs = len(hand_flags)
+            for i in range(n_imgs):
+                landmark, hand_flag, handed = landmarks[i], hand_flags[i], handedness[i]
+                if hand_flag > HAND_LANDMARK_THRESHOLD:
+                    if handed > 0.5:
+                        presence[0] = 1 # Left hand
+                    else:
+                        presence[1] = 1 # Right hand
+                    draw_landmarks_hand(out_frame, landmark[:,:2], bhut.HAND_CONNECTIONS, size=4)
+
+                    self.rois[i] = bhut.landmarks2roi(normalized_landmarks[i], self.affines[i])
+                self.tracked_hands[i] = hand_flag
 
 
 def recognize_pose(frame,detector,estimator,out_frame=None):
@@ -388,36 +415,38 @@ def recognize_from_video():
     pose_detector = ailia.Net(POSE_DETECTOR_MODEL_PATH, POSE_DETECTOR_WEIGHT_PATH, env_id=env_id)
     pose_estimator = ailia.Net(POSE_ESTIMATOR_MODEL_PATH, POSE_ESTIMATOR_WEIGHT_PATH, env_id=env_id)
 
-    capture = get_capture(args.video)
+    capture = webcamera_utils.get_capture(args.video)
 
     # create video writer if savepath is specified as video format
     if args.savepath != SAVE_IMAGE_PATH:
         f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
         f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
-        save_h, save_w = webcamera_utils.calc_adjust_fsize(
-            f_h, f_w, IMAGE_HEIGHT, IMAGE_WIDTH
-        )
-        writer = webcamera_utils.get_writer(args.savepath, save_h, save_w)
+        writer = webcamera_utils.get_writer(args.savepath, f_h, f_w)
     else:
         writer = None
+
+    hand = BlazeHand(args.hands)
 
     while(True):
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
-        
-        frame = np.ascontiguousarray(frame[:,::-1,:])
+
         out_frame = frame.copy()
         
         recognize_iris(frame,iris_detector,iris_estimator,iris_estimator2,out_frame=out_frame)
         recognize_pose(frame,pose_detector,pose_estimator,out_frame=out_frame)
-        recognize_hand(frame,hand_detector,hand_estimator,out_frame=out_frame)
+        hand.recognize_hand(frame,hand_detector,hand_estimator,out_frame=out_frame)
 
-        cv2.imshow('frame', out_frame)
+        visual_img = out_frame
+        if args.video == '0': # Flip horizontally if camera
+            visual_img = np.ascontiguousarray(out_frame[:,::-1,:])
+
+        cv2.imshow('frame', visual_img)
 
         # save results
         if writer is not None:
-            writer.write(frame)
+            writer.write(out_frame)
 
     capture.release()
     cv2.destroyAllWindows()
