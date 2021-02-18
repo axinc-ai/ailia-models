@@ -96,6 +96,9 @@ else:
 # Main functions
 # ======================
 def recognize_from_image(detector):
+    if args.profile:
+        detector.set_profile_mode(True)
+
     # input image loop
     for image_path in args.input:
         # prepare input data
@@ -138,6 +141,9 @@ def recognize_from_image(detector):
         if args.write_prediction:
             pred_file = '%s.txt' % savepath.rsplit('.', 1)[0]
             write_predictions(pred_file, detect_object, org_img, COCO_CATEGORY)
+
+    if args.profile:
+        print(detector.get_summary())
 
     logger.info('Script finished successfully.')
 

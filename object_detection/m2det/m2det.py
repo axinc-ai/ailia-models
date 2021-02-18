@@ -182,6 +182,9 @@ def detect_objects(img, detector):
 
 
 def recognize_from_image(filename, detector):
+    if args.profile:
+        detector.set_profile_mode(True)
+
     # load input image
     img = load_image(filename)
     img = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
@@ -214,9 +217,10 @@ def recognize_from_image(filename, detector):
     logger.info(f'saved at : {savepath}')
     cv2.imwrite(savepath, im2show)
 
-    # cv2.imshow('demo', im2show)
-    # cv2.waitKey(5000)
-    # cv2.destroyAllWindows()
+    if args.profile:
+        print(detector.get_summary())
+
+    logger.info('Script finished successfully.')
 
 
 def recognize_from_video(video, detector):
