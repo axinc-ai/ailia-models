@@ -147,6 +147,9 @@ def detect_objects(org_img, net):
 
 
 def recognize_from_image(filename, detector):
+    if args.profile:
+        detector.set_profile_mode(True)
+
     # load input image
     img = load_image(filename)
     img = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
@@ -191,9 +194,11 @@ def recognize_from_image(filename, detector):
         pred_file = '%s.txt' % savepath.rsplit('.', 1)[0]
         write_predictions(pred_file, ary, img=None, category=COCO_CATEGORY)
 
-    # cv2.imshow('demo', im2show)
-    # cv2.waitKey(5000)
-    # cv2.destroyAllWindows()
+    if args.profile:
+        print(detector.get_summary())
+
+    logger.info('Script finished successfully.')
+
 
 
 def recognize_from_video(video, detector):

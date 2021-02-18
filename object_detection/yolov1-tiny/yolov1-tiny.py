@@ -77,6 +77,8 @@ def recognize_from_image():
         algorithm=ailia.DETECTOR_ALGORITHM_YOLOV1,
         env_id=args.env_id,
     )
+    if args.profile:
+        detector.set_profile_mode(True)
 
     # input image loop
     for image_path in args.input:
@@ -102,6 +104,10 @@ def recognize_from_image():
         savepath = get_savepath(args.savepath, image_path)
         logger.info(f'saved at : {savepath}')
         cv2.imwrite(savepath, res_img)
+
+    if args.profile:
+        print(detector.get_summary())
+
     logger.info('Script finished successfully.')
 
 

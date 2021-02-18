@@ -107,6 +107,8 @@ else:
 def recognize_from_image():
     # net initialize
     detector = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
+    if args.profile:
+        detector.set_profile_mode(True)
 
     # input image loop
     for image_path in args.input:
@@ -151,6 +153,9 @@ def recognize_from_image():
         if args.write_prediction:
             pred_file = '%s.txt' % savepath.rsplit('.', 1)[0]
             write_predictions(pred_file, detect_object, org_img, COCO_CATEGORY)
+
+    if args.profile:
+        print(detector.get_summary())
 
     logger.info('Script finished successfully.')
 

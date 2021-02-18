@@ -98,6 +98,10 @@ def get_base_parser(
         '--debug', action='store_true',
         help='set default logger level to DEBUG (enable to show DEBUG logs)'
     )
+    parser.add_argument(
+        '--profile', action='store_true',
+        help='set profile mode (enable to show PROFILE logs)'
+    )
     return parser
 
 

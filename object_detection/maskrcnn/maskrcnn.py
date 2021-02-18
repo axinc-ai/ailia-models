@@ -169,6 +169,8 @@ def display_objdetect_image(
 def recognize_from_image():
     # net initialize
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
+    if args.profile:
+        net.set_profile_mode(True)
 
     # input image loop
     for image_path in args.input:
@@ -197,6 +199,10 @@ def recognize_from_image():
         display_objdetect_image(
             fig, ax, image, boxes, labels, scores, masks, savepath=savepath
         )
+
+    if args.profile:
+        print(net.get_summary())
+
     logger.info('Script finished successfully.')
 
 

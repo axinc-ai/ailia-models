@@ -255,6 +255,9 @@ def predict(img, net):
 
 
 def recognize_from_image(image_path, net):
+    if args.profile:
+        net.set_profile_mode(True)
+
     # prepare input data
     img = load_image(image_path)
     logger.debug(f'input image shape: {img.shape}')
@@ -284,6 +287,9 @@ def recognize_from_image(image_path, net):
     savepath = get_savepath(args.savepath, image_path)
     logger.info(f'saved at : {savepath}')
     cv2.imwrite(savepath, imgs[0])
+
+    if args.profile:
+        print(net.get_summary())
 
     logger.info('Script finished successfully.')
 

@@ -49,16 +49,6 @@ parser.add_argument(
     default=IOU, type=float,
     help='The detection iou for yolo. (default: '+str(IOU)+')'
 )
-parser.add_argument(
-    '-dw', '--detection_width',
-    default=DETECTION_SIZE, type=int,
-    help='The detection width and height for yolo. (default: 416)'
-)
-parser.add_argument(
-    '-dh', '--detection_height',
-    default=DETECTION_SIZE, type=int,
-    help='The detection height and height for yolo. (default: 416)'
-)
 args = update_parser(parser)
 
 
@@ -77,10 +67,8 @@ def recognize_from_image():
         algorithm=ailia.DETECTOR_ALGORITHM_YOLOV3,
         env_id=args.env_id,
     )
-    if args.detection_width != DETECTION_SIZE or args.detection_height != DETECTION_SIZE:
-        detector.set_input_shape(
-            args.detection_width, args.detection_height
-        )
+    if args.profile:
+        detector.set_profile_mode(True)
 
     # input image loop
     for image_path in args.input:
@@ -108,6 +96,10 @@ def recognize_from_image():
         savepath = get_savepath(args.savepath, image_path)
         logger.info(f'saved at : {savepath}')
         cv2.imwrite(savepath, res_img)
+
+    if args.profile:
+        print(detector.get_summary())
+
     logger.info('Script finished successfully.')
 
 
