@@ -126,10 +126,6 @@ def recognize_from_video():
         fig.colorbar(ii)
         plt.show()
 
-        # save results
-        if writer is not None:
-            fig.savefig()
-
 
     capture.release()
     cv2.destroyAllWindows()
