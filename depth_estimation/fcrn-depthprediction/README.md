@@ -4,6 +4,8 @@
 
 ![input](input.jpg)
 
+(Image from https://pixabay.com/photos/bedroom-cupboard-bed-room-sofa-1872196/)
+
 Shape : (1, 228, 304, 3)  
 
 ## Output
