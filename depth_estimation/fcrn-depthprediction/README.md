@@ -39,7 +39,7 @@ $ python3 fcrn-depthprediction.py --video VIDEO_PATH
 
 ## Framework
 
-Tensorflow
+TensorFlow
 
 ## Model Format
 
@@ -47,4 +47,4 @@ ONNX opset=11
 
 ## Netron
 
-[midas.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/midas/midas.onnx.prototxt)
+[ResNet50UpProj.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/fcrn-depthprediction/ResNet50UpProj.onnx.prototxt)

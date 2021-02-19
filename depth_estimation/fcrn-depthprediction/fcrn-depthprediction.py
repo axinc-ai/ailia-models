@@ -110,7 +110,7 @@ def recognize_from_video():
             break
 
         _, img = preprocess_frame(
-            frame, IMAGE_HEIGHT, IMAGE_WIDTH
+            frame, IMAGE_HEIGHT, IMAGE_WIDTH, normalize_type='None'
         )
 
         img = np.transpose(img, (0,2,3,1))
@@ -120,12 +120,10 @@ def recognize_from_video():
             input_shape_set = True
         result = net.predict(img)[0]
 
-
-        fig = plt.figure()
-        ii = plt.imshow(result)
-        fig.colorbar(ii)
-        plt.show()
-
+        plt.imshow(result)
+        plt.pause(.01)
+        if not plt.get_fignums():
+            break
 
     capture.release()
     cv2.destroyAllWindows()
@@ -136,7 +134,7 @@ def recognize_from_video():
 
 def main():
     # model files check and download
-    #check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
 
     if args.video is not None:
         # video mode
