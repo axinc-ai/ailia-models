@@ -14,7 +14,7 @@ from model_utils import check_and_download_models  # noqa: E402
 from detector_utils import load_image  # noqa: E402
 from webcamera_utils import get_capture  # noqa: E402
 
-from trid_utils import *  # noqa: E402
+from trid_photo_inpainting_utils import *  # noqa: E402
 
 logger = getLogger(__name__)
 
@@ -42,13 +42,6 @@ SAVE_IMAGE_PATH = 'output.png'
 
 parser = get_base_parser(
     '3d-photo-inpainting model', IMAGE_PATH, SAVE_IMAGE_PATH
-)
-parser.add_argument(
-    '-m', '--model', type=str, default='d0',
-    choices=(
-        'd0', 'd1', 'd2', 'd3', 'd4', 'd5', 'd6',
-    ),
-    help='choice model'
 )
 parser.add_argument(
     '--onnx',
@@ -104,7 +97,53 @@ def postprocess(depth, height, width):
         out = 0
 
     out = out.astype("uint16")
-    return out
+    return depth, out
+
+
+def make_video(image, depth, net_info):
+    config = {
+        'longer_side_len': 960,
+        'depth_threshold': 0.04,
+        'sparse_iter': 5,
+        'filter_size': [7, 7, 5, 5, 5],
+        'sigma_s': 4.0,
+        'sigma_r': 0.5,
+        'extrapolate_border': True,
+        'extrapolation_thickness': 60,
+    }
+    H, W = image.shape[:2]
+
+    output_h, output_w = depth.shape
+    frac = config['longer_side_len'] / max(output_h, output_w)
+    output_h, output_w = int(output_h * frac), int(output_w * frac)
+    image = cv2.resize(image, (output_w, output_h), interpolation=cv2.INTER_AREA)
+
+    depth = read_MiDaS_depth(depth, 3.0, output_h, output_w)
+    mean_loc_depth = depth[depth.shape[0] // 2, depth.shape[1] // 2]
+
+    vis_photos, vis_depths = sparse_bilateral_filtering(
+        depth.copy(), image.copy(),
+        config, num_iter=config['sparse_iter'])
+    depth = vis_depths[-1]
+
+    int_mtx = np.array(
+        [[max(H, W), 0, W // 2], [0, max(H, W), H // 2], [0, 0, 1]]
+    ).astype(np.float32)
+    if int_mtx.max() > 1:
+        int_mtx[0, :] = int_mtx[0, :] / float(W)
+        int_mtx[1, :] = int_mtx[1, :] / float(H)
+
+    logger.info(f"Writing depth ply (and basically doing everything) at {time.time()}")
+    rt_info = write_ply(
+        image, depth,
+        int_mtx, config,
+        net_info['color'],
+        net_info['edge'],
+        net_info['edge'],
+        net_info['depth']
+    )
+
+    verts, colors, faces, Height, Width, hFov, vFov = rt_info
 
 
 # ======================
@@ -129,9 +168,9 @@ def predict(img, net_info):
             {'img': img})
     output = output[0]
 
-    out = postprocess(output, target_height, target_width)
+    depth, out = postprocess(output, target_height, target_width)
 
-    return out
+    return depth, out
 
 
 def recognize_from_image(image_path, net_info):
@@ -155,12 +194,14 @@ def recognize_from_image(image_path, net_info):
         # if not args.onnx:
         #    print(net.get_summary())
     else:
-        depth = predict(img, net_info)
+        depth, out = predict(img, net_info)
 
     # plot result
     savepath = get_savepath(args.savepath, image_path)
     logger.info(f'saved at : {savepath}')
-    cv2.imwrite(savepath, depth)
+    cv2.imwrite(savepath, out)
+
+    make_video(img, depth, net_info)
 
     logger.info('Script finished successfully.')
 
