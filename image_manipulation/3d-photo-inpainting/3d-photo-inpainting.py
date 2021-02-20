@@ -104,10 +104,13 @@ def make_video(image, depth, net_info):
     config = {
         'longer_side_len': 960,
         'depth_threshold': 0.04,
+        'ext_edge_threshold': 0.002,
         'sparse_iter': 5,
         'filter_size': [7, 7, 5, 5, 5],
         'sigma_s': 4.0,
         'sigma_r': 0.5,
+        'redundant_number': 12,
+        'context_thickness': 140,
         'extrapolate_border': True,
         'extrapolation_thickness': 60,
     }

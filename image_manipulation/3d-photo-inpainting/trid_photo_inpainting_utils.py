@@ -345,6 +345,84 @@ def refine_color_around_edge(mesh, info_on_pix, edge_ccs, config, spdb=False):
     return mesh, info_on_pix
 
 
+def refine_depth_around_edge(
+        mask_depth, far_edge, uncleaned_far_edge, near_edge, mask, all_depth, config):
+    mask = mask.squeeze()
+    uncleaned_far_edge = uncleaned_far_edge.squeeze()
+    far_edge = far_edge.squeeze()
+    near_edge = near_edge.squeeze()
+    mask_depth = mask_depth.squeeze()
+    dilate_far_edge = cv2.dilate(
+        uncleaned_far_edge.astype(np.uint8),
+        kernel=np.array([[0, 1, 0], [1, 1, 1], [0, 1, 0]]).astype(np.uint8), iterations=1)
+    near_edge[dilate_far_edge == 0] = 0
+    dilate_near_edge = cv2.dilate(
+        near_edge.astype(np.uint8),
+        kernel=np.array([[0, 1, 0], [1, 1, 1], [0, 1, 0]]).astype(np.uint8), iterations=1)
+    far_edge[dilate_near_edge == 0] = 0
+    init_far_edge = far_edge.copy()
+    init_near_edge = near_edge.copy()
+    for i in range(config['depth_edge_dilate_2']):
+        init_far_edge = cv2.dilate(init_far_edge, kernel=np.array([[0, 1, 0], [1, 1, 1], [0, 1, 0]]).astype(np.uint8),
+                                   iterations=1)
+        init_far_edge[init_near_edge == 1] = 0
+        init_near_edge = cv2.dilate(init_near_edge, kernel=np.array([[0, 1, 0], [1, 1, 1], [0, 1, 0]]).astype(np.uint8),
+                                    iterations=1)
+        init_near_edge[init_far_edge == 1] = 0
+    init_far_edge[mask == 0] = 0
+    init_near_edge[mask == 0] = 0
+    hole_far_edge = 1 - init_far_edge
+    hole_near_edge = 1 - init_near_edge
+    while True:
+        change = False
+        hole_far_edge[init_near_edge == 1] = 0
+        hole_near_edge[init_far_edge == 1] = 0
+        far_pxs, far_pys = np.where((hole_far_edge == 0) * (init_far_edge == 1) > 0)
+        current_hole_far_edge = hole_far_edge.copy()
+        for far_px, far_py in zip(far_pxs, far_pys):
+            min_px = max(far_px - 1, 0)
+            max_px = min(far_px + 2, mask.shape[0] - 1)
+            min_py = max(far_py - 1, 0)
+            max_py = min(far_py + 2, mask.shape[1] - 1)
+            hole_far = current_hole_far_edge[min_px: max_px, min_py: max_py]
+            tmp_mask = mask[min_px: max_px, min_py: max_py]
+            all_depth_patch = all_depth[min_px: max_px, min_py: max_py] * 0
+            all_depth_mask = (all_depth_patch != 0).astype(np.uint8)
+            cross_element = np.array([[0, 1, 0], [1, 1, 1], [0, 1, 0]])[min_px - (far_px - 1): max_px - (far_px - 1),
+                            min_py - (far_py - 1): max_py - (far_py - 1)]
+            combine_mask = (tmp_mask + all_depth_mask).clip(0, 1) * hole_far * cross_element
+            tmp_patch = combine_mask * (mask_depth[min_px: max_px, min_py: max_py] + all_depth_patch)
+            number = np.count_nonzero(tmp_patch)
+            if number > 0:
+                mask_depth[far_px, far_py] = np.sum(tmp_patch).astype(np.float32) / max(number, 1e-6)
+                hole_far_edge[far_px, far_py] = 1
+                change = True
+        near_pxs, near_pys = np.where((hole_near_edge == 0) * (init_near_edge == 1) > 0)
+        current_hole_near_edge = hole_near_edge.copy()
+        for near_px, near_py in zip(near_pxs, near_pys):
+            min_px = max(near_px - 1, 0)
+            max_px = min(near_px + 2, mask.shape[0] - 1)
+            min_py = max(near_py - 1, 0)
+            max_py = min(near_py + 2, mask.shape[1] - 1)
+            hole_near = current_hole_near_edge[min_px: max_px, min_py: max_py]
+            tmp_mask = mask[min_px: max_px, min_py: max_py]
+            all_depth_patch = all_depth[min_px: max_px, min_py: max_py] * 0
+            all_depth_mask = (all_depth_patch != 0).astype(np.uint8)
+            cross_element = np.array([[0, 1, 0], [1, 1, 1], [0, 1, 0]])[min_px - near_px + 1:max_px - near_px + 1,
+                            min_py - near_py + 1:max_py - near_py + 1]
+            combine_mask = (tmp_mask + all_depth_mask).clip(0, 1) * hole_near * cross_element
+            tmp_patch = combine_mask * (mask_depth[min_px: max_px, min_py: max_py] + all_depth_patch)
+            number = np.count_nonzero(tmp_patch)
+            if number > 0:
+                mask_depth[near_px, near_py] = np.sum(tmp_patch) / max(number, 1e-6)
+                hole_near_edge[near_px, near_py] = 1
+                change = True
+        if change is False:
+            break
+
+    return mask_depth
+
+
 ### bilateral_filtering
 
 
@@ -381,7 +459,7 @@ def sparse_bilateral_filtering(
         vis_depth = bilateral_filter(
             vis_depth, config,
             discontinuity_map=discontinuity_map,
-            HR=HR, mask=mask, window_size=window_size
+            mask=mask, window_size=window_size
         )
 
     return save_images, save_depths
@@ -598,13 +676,11 @@ def filter_edge(mesh, edge_ccs, config, invalid=False):
     valid_edge_ccs = []
     for xidx, yy in enumerate(edge_ccs):
         if invalid is not True and len(context_ccs[xidx]) > 0:
-            # if len(context_ccs[xidx]) > 0:
             valid_edge_ccs.append(yy)
         elif invalid is True and len(context_ccs[xidx]) == 0:
             valid_edge_ccs.append(yy)
         else:
             valid_edge_ccs.append(set())
-    # valid_edge_ccs = [yy for xidx, yy in enumerate(edge_ccs) if len(context_ccs[xidx]) > 0]
 
     return valid_edge_ccs
 
@@ -703,6 +779,7 @@ def extrapolate(
     log_depth[mask > 0] = 0
     input_mean_depth = np.mean(log_depth[context > 0])
     input_zero_mean_depth = (log_depth - input_mean_depth) * context
+
     input_disp = 1. / np.abs(input_depth)
     input_disp[mask > 0] = 0
     input_disp = input_disp / input_disp.max()
@@ -721,44 +798,22 @@ def extrapolate(
         lambda x, y: (x + (input_other_edge_with_id == y).astype(np.uint8)).clip(0, 1),
         [np.zeros_like(mask)] + list(valid_edge_ids)
     )
-    t_edge = torch.FloatTensor(edge).to(device)[None, None, ...]
-    t_rgb = torch.FloatTensor(input_rgb).to(device).permute(2, 0, 1).unsqueeze(0)
-    t_mask = torch.FloatTensor(mask).to(device)[None, None, ...]
-    t_context = torch.FloatTensor(context).to(device)[None, None, ...]
-    t_disp = torch.FloatTensor(input_disp).to(device)[None, None, ...]
-    t_depth_zero_mean_depth = torch.FloatTensor(input_zero_mean_depth).to(device)[None, None, ...]
+    t_edge = edge[None, None, ...].astype(np.float32)
+    t_rgb = np.expand_dims(input_rgb.transpose(2, 0, 1), axis=0).astype(np.float32)
+    t_mask = mask[None, None, ...].astype(np.float32)
+    t_context = context[None, None, ...].astype(np.float32)
+    t_disp = input_disp[None, None, ...].astype(np.float32)
+    t_depth_zero_mean_depth = input_zero_mean_depth[None, None, ...]
 
-    depth_edge_output = depth_edge_model.forward_3P(t_mask, t_context, t_rgb, t_disp, t_edge, unit_length=128,
-                                                    cuda=device)
-    # print("------------------>")
-    # from torch.autograd import Variable
-    # import functools
-    # remove_all_spectral_norm(depth_edge_model)
-    # x = (
-    # Variable(t_mask),
-    # Variable(t_context),
-    # Variable(t_rgb),
-    # Variable(t_disp),
-    # Variable(t_edge),
-    # )
-    # depth_edge_model.forward = functools.partial(depth_edge_model.forward_3P, unit_length=128, cuda=device)
-    # torch.onnx.export(
-    # depth_edge_model, x, 'edge-model.onnx',
-    # input_names=["mask", "context", "rgb", "disp", "edge"],
-    # output_names=["depth_edge"],
-    # dynamic_axes={
-    # 'mask' : {2 : 'h', 3 : 'w'}, 'context' : {2 : 'h', 3 : 'w'}, 'rgb' : {2 : 'h', 3 : 'w'},
-    # 'disp' : {2 : 'h', 3 : 'w'}, 'edge' : {2 : 'h', 3 : 'w'}, 'depth_edge' : {2 : 'h', 3 : 'w'}},
-    # verbose=False, opset_version=11
-    # )
-    # print("<------------------")
-    # 1/0
-    t_output_edge = (depth_edge_output > config['ext_edge_threshold']).float() * t_mask + t_edge
-    output_raw_edge = t_output_edge.data.cpu().numpy().squeeze()
-    # import pdb; pdb.set_trace()
+    output = depth_edge_model.predict(
+        {'mask': t_mask, 'context': t_context, 'rgb': t_rgb, 'disp': t_disp, 'edge': t_edge})
+    depth_edge_output = output[0]
+
+    output_raw_edge = (depth_edge_output > config['ext_edge_threshold']).astype(np.float) * t_mask + t_edge
+    output_raw_edge = output_raw_edge.squeeze()
+
     mesh = netx.Graph()
     hxs, hys = np.where(output_raw_edge * mask > 0)
-    valid_map = mask + context
     for hx, hy in zip(hxs, hys):
         node = (hx, hy)
         mesh.add_node((hx, hy))
@@ -859,40 +914,15 @@ def extrapolate(
             if len(fpath) > 0:
                 for fp_node in fpath:
                     fpath_map[fp_node[0], fp_node[1]] = edge_id
-    # import pdb; pdb.set_trace()
-    far_edge = (fpath_map > -1).astype(np.uint8)
+
     update_edge = (npath_map > -1) * mask + edge
-    t_update_edge = torch.FloatTensor(update_edge).to(device)[None, None, ...]
-    depth_output = depth_feat_model.forward_3P(t_mask, t_context, t_depth_zero_mean_depth, t_update_edge,
-                                               unit_length=128,
-                                               cuda=device)
-    # print("------------------>")
-    # from torch.autograd import Variable
-    # import functools
-    # x = (
-    # Variable(t_mask),
-    # Variable(t_context),
-    # Variable(t_depth_zero_mean_depth),
-    # Variable(t_update_edge),
-    # )
-    # depth_feat_model.forward = functools.partial(depth_feat_model.forward_3P, unit_length=128, cuda=device)
-    # torch.onnx.export(
-    # depth_feat_model, x, 'depth-model.onnx',
-    # input_names=["mask", "context", "depth", "edge"],
-    # output_names=["depth_output"],
-    # dynamic_axes={
-    # 'mask' : {2 : 'h', 3 : 'w'}, 'context' : {2 : 'h', 3 : 'w'}, 'depth' : {2 : 'h', 3 : 'w'},
-    # 'edge' : {2 : 'h', 3 : 'w'}, 'depth_output' : {2 : 'h', 3 : 'w'}},
-    # verbose=False, opset_version=11
-    # )
-    # print("<------------------")
-    # 1/0
+    t_update_edge = update_edge[None, None, ...].astype(np.float32)
+    output = depth_feat_model.predict(
+        {'mask': t_mask, 'context': t_context, 'depth': t_depth_zero_mean_depth, 'edge': t_update_edge})
+    depth_output = output[0]
+
     depth_output = depth_output.cpu().data.numpy().squeeze()
     depth_output = np.exp(depth_output + input_mean_depth) * mask  # + input_depth * context
-    # if "right" in direc.lower() and "-" not in direc.lower():
-    #     plt.imshow(depth_output); plt.show()
-    #     import pdb; pdb.set_trace()
-    #     f, ((ax1, ax2)) = plt.subplots(1, 2, sharex=True, sharey=True); ax1.imshow(depth_output); ax2.imshow(npath_map + fpath_map); plt.show()
     for near_id in np.unique(npath_map[npath_map > -1]):
         depth_output = refine_depth_around_edge(depth_output.copy(),
                                                 (fpath_map == near_id).astype(np.uint8) * mask,  # far_edge_map_in_mask,
@@ -901,10 +931,7 @@ def extrapolate(
                                                 mask.copy(),
                                                 np.zeros_like(mask),
                                                 config)
-    # if "right" in direc.lower() and "-" not in direc.lower():
-    #     plt.imshow(depth_output); plt.show()
-    #     import pdb; pdb.set_trace()
-    #     f, ((ax1, ax2)) = plt.subplots(1, 2, sharex=True, sharey=True); ax1.imshow(depth_output); ax2.imshow(npath_map + fpath_map); plt.show()
+
     rgb_output = rgb_feat_model.forward_3P(t_mask, t_context, t_rgb, t_update_edge, unit_length=128,
                                            cuda=device)
     # print("------------------>")
