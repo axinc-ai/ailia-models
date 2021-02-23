@@ -18,9 +18,65 @@ __all__ = [
 ]
 
 
+onnx = True
+
+def edge_forward_3P(net, mask, context, rgb, disp, edge, unit_length=128):
+    input = np.concatenate((rgb, disp/disp.max(), edge, context, mask), axis=1)
+    n, c, h, w = input.shape
+    residual_h = int(np.ceil(h / float(unit_length)) * unit_length - h)
+    residual_w = int(np.ceil(w / float(unit_length)) * unit_length - w)
+    anchor_h = residual_h // 2
+    anchor_w = residual_w // 2
+    enlarge_input = np.zeros((n, c, h + residual_h, w + residual_w)).astype(np.float32)
+    enlarge_input[..., anchor_h:anchor_h + h, anchor_w:anchor_w + w] = input
+    if not onnx:
+        output = net.predict({'enlarge_input': enlarge_input})
+    else:
+        output = net.run(['edge_output'], {'enlarge_input': enlarge_input})
+    edge_output = output[0]
+    edge_output = edge_output[..., anchor_h:anchor_h + h, anchor_w:anchor_w + w]
+    return edge_output
+
+
+def depth_forward_3P(net, mask, context, depth, edge, unit_length=128):
+    input = np.concatenate((depth, edge, context, mask), axis=1)
+    n, c, h, w = input.shape
+    residual_h = int(np.ceil(h / float(unit_length)) * unit_length - h)
+    residual_w = int(np.ceil(w / float(unit_length)) * unit_length - w)
+    anchor_h = residual_h // 2
+    anchor_w = residual_w // 2
+    enlarge_input = np.zeros((n, c, h + residual_h, w + residual_w)).astype(np.float32)
+    enlarge_input[..., anchor_h:anchor_h + h, anchor_w:anchor_w + w] = input
+    if not onnx:
+        output = net.predict({'enlarge_input': enlarge_input})
+    else:
+        output = net.run(['depth_output'], {'enlarge_input': enlarge_input})
+    depth_output = output[0]
+    depth_output = depth_output[..., anchor_h:anchor_h + h, anchor_w:anchor_w + w]
+    return depth_output
+
+
+def color_forward_3P(net, mask, context, rgb, edge, unit_length=128):
+    input = np.concatenate((rgb, edge, context, mask), axis=1)
+    n, c, h, w = input.shape
+    residual_h = int(np.ceil(h / float(unit_length)) * unit_length - h)
+    residual_w = int(np.ceil(w / float(unit_length)) * unit_length - w)
+    anchor_h = residual_h // 2
+    anchor_w = residual_w // 2
+    enlarge_input = np.zeros((n, c, h + residual_h, w + residual_w)).astype(np.float32)
+    enlarge_input[..., anchor_h:anchor_h + h, anchor_w:anchor_w + w] = input
+    if not onnx:
+        output = net.predict({'enlarge_input': enlarge_input})
+    else:
+        output = net.run(['rgb_output'], {'enlarge_input': enlarge_input})
+    rgb_output = output[0]
+    rgb_output = rgb_output[..., anchor_h:anchor_h + h, anchor_w:anchor_w + w]
+    return rgb_output
+
+
 def open_small_mask(mask, context, open_iteration, kernel):
-    np_mask = mask.cpu().data.numpy().squeeze().astype(np.uint8)
-    np_context = context.cpu().data.numpy().squeeze().astype(np.uint8)
+    np_mask = mask.squeeze().astype(np.uint8)
+    np_context = context.squeeze().astype(np.uint8)
     np_input = np_mask + np_context
     for _ in range(open_iteration):
         np_input = cv2.erode(
@@ -28,7 +84,7 @@ def open_small_mask(mask, context, open_iteration, kernel):
             np.ones((kernel, kernel)),
             iterations=1)
     np_mask[(np_input - np_context) > 0] = 1
-    out_mask = torch.FloatTensor(np_mask).to(mask)[None, None, ...]
+    out_mask = np_mask.astype(mask.dtype)[None, None, ...]
 
     return out_mask
 
@@ -59,8 +115,6 @@ def filter_irrelevant_edge_new(
         ax2.imshow(context);
         ax3.imshow(other_edges_with_id * context + (-1) * (1 - context));
         plt.show()
-        import pdb;
-        pdb.set_trace()
     filter_self_edge = np.zeros_like(self_edge)
     for self_edge_id in self_edge_ids:
         filter_self_edge[other_edges_with_id == self_edge_id] = 1
@@ -90,6 +144,468 @@ def filter_irrelevant_edge_new(
     other_edges = (other_edges + extend_other_edges).clip(0, 1) * context
 
     return other_edges, end_depth_maps, other_edges_info
+
+
+def clean_far_edge_new(
+        input_edge, end_depth_maps, mask, context,
+        global_mesh, info_on_pix, self_edge, inpaint_id, config):
+    mesh = netx.Graph()
+    hxs, hys = np.where(input_edge * mask > 0)
+    valid_near_edge = (input_edge != 0).astype(np.uint8) * context
+    valid_map = mask + context
+    invalid_edge_ids = []
+    for hx, hy in zip(hxs, hys):
+        node = (hx, hy)
+        mesh.add_node((hx, hy))
+        eight_nes = [ne for ne in [(hx + 1, hy), (hx - 1, hy), (hx, hy + 1), (hx, hy - 1), \
+                                   (hx + 1, hy + 1), (hx - 1, hy - 1), (hx - 1, hy + 1), (hx + 1, hy - 1)] \
+                     if 0 <= ne[0] < input_edge.shape[0] and 0 <= ne[1] < input_edge.shape[1] and 0 < input_edge[
+                         ne[0], ne[1]]]  # or end_depth_maps[ne[0], ne[1]] != 0]
+        for ne in eight_nes:
+            mesh.add_edge(node, ne, length=np.hypot(ne[0] - hx, ne[1] - hy))
+            if end_depth_maps[ne[0], ne[1]] != 0:
+                mesh.nodes[ne[0], ne[1]]['cnt'] = True
+                mesh.nodes[ne[0], ne[1]]['depth'] = end_depth_maps[ne[0], ne[1]]
+            elif mask[ne[0], ne[1]] != 1:
+                four_nes = [nne for nne in
+                            [(ne[0] + 1, ne[1]), (ne[0] - 1, ne[1]), (ne[0], ne[1] + 1), (ne[0], ne[1] - 1)] \
+                            if nne[0] < end_depth_maps.shape[0] and nne[0] >= 0 and nne[1] < end_depth_maps.shape[1] and
+                            nne[1] >= 0]
+                for nne in four_nes:
+                    if end_depth_maps[nne[0], nne[1]] != 0:
+                        mesh.add_edge(nne, ne, length=np.hypot(nne[0] - ne[0], nne[1] - ne[1]))
+                        mesh.nodes[nne[0], nne[1]]['cnt'] = True
+                        mesh.nodes[nne[0], nne[1]]['depth'] = end_depth_maps[nne[0], nne[1]]
+    ccs = [*netx.connected_components(mesh)]
+    end_pts = []
+    for cc in ccs:
+        end_pts.append(set())
+        for node in cc:
+            if mesh.nodes[node].get('cnt') is not None:
+                end_pts[-1].add((node[0], node[1], mesh.nodes[node]['depth']))
+    predef_npaths = [None for _ in range(len(ccs))]
+    fpath_map = np.zeros_like(input_edge) - 1
+    npath_map = np.zeros_like(input_edge) - 1
+    npaths, fpaths = dict(), dict()
+    break_flag = False
+    end_idx = 0
+    while end_idx < len(end_pts):
+        end_pt, cc = [*zip(end_pts, ccs)][end_idx]
+        end_idx += 1
+        sorted_end_pt = []
+        fpath = []
+        iter_fpath = []
+        if len(end_pt) > 2 or len(end_pt) == 0:
+            if len(end_pt) > 2:
+                continue
+            continue
+        if len(end_pt) == 2:
+            ravel_end = [*end_pt]
+            tmp_sub_mesh = mesh.subgraph(list(cc)).copy()
+            tmp_npath = [*netx.shortest_path(tmp_sub_mesh, (ravel_end[0][0], ravel_end[0][1]),
+                                             (ravel_end[1][0], ravel_end[1][1]), weight='length')]
+            fpath_map1, npath_map1, disp_diff1 = plan_path(
+                mesh, info_on_pix, cc, ravel_end[0:1], global_mesh,
+                input_edge, mask, valid_map, inpaint_id, npath_map=None,
+                fpath_map=None, npath=tmp_npath)
+            fpath_map2, npath_map2, disp_diff2 = plan_path(
+                mesh, info_on_pix, cc, ravel_end[1:2], global_mesh,
+                input_edge, mask, valid_map, inpaint_id, npath_map=None,
+                fpath_map=None, npath=tmp_npath)
+            tmp_disp_diff = [disp_diff1, disp_diff2]
+            self_end = []
+            edge_len = []
+            ds_edge = cv2.dilate(self_edge.astype(np.uint8), np.ones((3, 3)), iterations=1)
+            if ds_edge[ravel_end[0][0], ravel_end[0][1]] > 0:
+                self_end.append(1)
+            else:
+                self_end.append(0)
+            if ds_edge[ravel_end[1][0], ravel_end[1][1]] > 0:
+                self_end.append(1)
+            else:
+                self_end.append(0)
+            edge_len = [np.count_nonzero(npath_map1), np.count_nonzero(npath_map2)]
+            sorted_end_pts = [xx[0] for xx in sorted(zip(ravel_end, self_end, edge_len, [disp_diff1, disp_diff2]),
+                                                     key=lambda x: (x[1], x[2]), reverse=True)]
+            re_npath_map1, re_fpath_map1 = (npath_map1 != -1).astype(np.uint8), (fpath_map1 != -1).astype(np.uint8)
+            re_npath_map2, re_fpath_map2 = (npath_map2 != -1).astype(np.uint8), (fpath_map2 != -1).astype(np.uint8)
+            if np.count_nonzero(re_npath_map1 * re_npath_map2 * mask) / \
+                    (np.count_nonzero((re_npath_map1 + re_npath_map2) * mask) + 1e-6) > 0.5 \
+                    and np.count_nonzero(re_fpath_map1 * re_fpath_map2 * mask) / \
+                    (np.count_nonzero((re_fpath_map1 + re_fpath_map2) * mask) + 1e-6) > 0.5 \
+                    and tmp_disp_diff[0] != -1 and tmp_disp_diff[1] != -1:
+                my_fpath_map, my_npath_map, npath, fpath = \
+                    plan_path_e2e(mesh, cc, sorted_end_pts, global_mesh, input_edge, mask, valid_map, inpaint_id,
+                                  npath_map=None, fpath_map=None)
+                npath_map[my_npath_map != -1] = my_npath_map[my_npath_map != -1]
+                fpath_map[my_fpath_map != -1] = my_fpath_map[my_fpath_map != -1]
+                if len(fpath) > 0:
+                    edge_id = global_mesh.nodes[[*sorted_end_pts][0]]['edge_id']
+                    fpaths[edge_id] = fpath
+                    npaths[edge_id] = npath
+                invalid_edge_ids.append(edge_id)
+            else:
+                if tmp_disp_diff[0] != -1:
+                    ratio_a = tmp_disp_diff[0] / (np.sum(tmp_disp_diff) + 1e-8)
+                else:
+                    ratio_a = 0
+                if tmp_disp_diff[1] != -1:
+                    ratio_b = tmp_disp_diff[1] / (np.sum(tmp_disp_diff) + 1e-8)
+                else:
+                    ratio_b = 0
+                npath_len = len(tmp_npath)
+                if npath_len > config['depth_edge_dilate_2'] * 2:
+                    npath_len = npath_len - (config['depth_edge_dilate_2'] * 1)
+                tmp_npath_a = tmp_npath[:int(np.floor(npath_len * ratio_a))]
+                tmp_npath_b = tmp_npath[::-1][:int(np.floor(npath_len * ratio_b))]
+                tmp_merge = []
+                if len(tmp_npath_a) > 0 and sorted_end_pts[0][0] == tmp_npath_a[0][0] and sorted_end_pts[0][1] == \
+                        tmp_npath_a[0][1]:
+                    if len(tmp_npath_a) > 0 and mask[tmp_npath_a[-1][0], tmp_npath_a[-1][1]] > 0:
+                        tmp_merge.append([sorted_end_pts[:1], tmp_npath_a])
+                    if len(tmp_npath_b) > 0 and mask[tmp_npath_b[-1][0], tmp_npath_b[-1][1]] > 0:
+                        tmp_merge.append([sorted_end_pts[1:2], tmp_npath_b])
+                elif len(tmp_npath_b) > 0 and sorted_end_pts[0][0] == tmp_npath_b[0][0] and sorted_end_pts[0][1] == \
+                        tmp_npath_b[0][1]:
+                    if len(tmp_npath_b) > 0 and mask[tmp_npath_b[-1][0], tmp_npath_b[-1][1]] > 0:
+                        tmp_merge.append([sorted_end_pts[:1], tmp_npath_b])
+                    if len(tmp_npath_a) > 0 and mask[tmp_npath_a[-1][0], tmp_npath_a[-1][1]] > 0:
+                        tmp_merge.append([sorted_end_pts[1:2], tmp_npath_a])
+                for tmp_idx in range(len(tmp_merge)):
+                    if len(tmp_merge[tmp_idx][1]) == 0:
+                        continue
+                    end_pts.append(tmp_merge[tmp_idx][0])
+                    ccs.append(set(tmp_merge[tmp_idx][1]))
+        if len(end_pt) == 1:
+            sub_mesh = mesh.subgraph(list(cc)).copy()
+            pnodes = netx.periphery(sub_mesh)
+            if len(end_pt) == 1:
+                ends = [*end_pt]
+            elif len(sorted_end_pt) == 1:
+                ends = [*sorted_end_pt]
+            try:
+                edge_id = global_mesh.nodes[ends[0]]['edge_id']
+            except:
+                raise
+            pnodes = sorted(pnodes,
+                            key=lambda x: np.hypot((x[0] - ends[0][0]), (x[1] - ends[0][1])),
+                            reverse=True)[0]
+            npath = [*netx.shortest_path(sub_mesh, (ends[0][0], ends[0][1]), pnodes, weight='length')]
+            for np_node in npath:
+                npath_map[np_node[0], np_node[1]] = edge_id
+            fpath = []
+            if global_mesh.nodes[ends[0]].get('far') is None:
+                print("None far")
+            else:
+                fnodes = global_mesh.nodes[ends[0]].get('far')
+                dmask = mask + 0
+                did = 0
+                while True:
+                    did += 1
+                    dmask = cv2.dilate(dmask, np.ones((3, 3)), iterations=1)
+                    if did > 3:
+                        break
+                    ffnode = [fnode for fnode in fnodes if
+                              (dmask[fnode[0], fnode[1]] > 0 and mask[fnode[0], fnode[1]] == 0 and \
+                               global_mesh.nodes[fnode].get('inpaint_id') != inpaint_id + 1)]
+                    if len(ffnode) > 0:
+                        fnode = ffnode[0]
+                        break
+                if len(ffnode) == 0:
+                    continue
+                fpath.append((fnode[0], fnode[1]))
+                barrel_dir = np.array([[1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0], [-1, -1], [0, -1], [1, -1]])
+                n2f_dir = (int(fnode[0] - npath[0][0]), int(fnode[1] - npath[0][1]))
+                while True:
+                    if barrel_dir[0, 0] == n2f_dir[0] and barrel_dir[0, 1] == n2f_dir[1]:
+                        n2f_barrel = barrel_dir.copy()
+                        break
+                    barrel_dir = np.roll(barrel_dir, 1, axis=0)
+                for step in range(0, len(npath)):
+                    if step == 0:
+                        continue
+                    elif step == 1:
+                        next_dir = (npath[step][0] - npath[step - 1][0], npath[step][1] - npath[step - 1][1])
+                        while True:
+                            if barrel_dir[0, 0] == next_dir[0] and barrel_dir[0, 1] == next_dir[1]:
+                                next_barrel = barrel_dir.copy()
+                                break
+                            barrel_dir = np.roll(barrel_dir, 1, axis=0)
+                        barrel_pair = np.stack((n2f_barrel, next_barrel), axis=0)
+                        n2f_dir = (barrel_pair[0, 0, 0], barrel_pair[0, 0, 1])
+                    elif step > 1:
+                        next_dir = (npath[step][0] - npath[step - 1][0], npath[step][1] - npath[step - 1][1])
+                        while True:
+                            if barrel_pair[1, 0, 0] == next_dir[0] and barrel_pair[1, 0, 1] == next_dir[1]:
+                                next_barrel = barrel_pair.copy()
+                                break
+                            barrel_pair = np.roll(barrel_pair, 1, axis=1)
+                        n2f_dir = (barrel_pair[0, 0, 0], barrel_pair[0, 0, 1])
+                    new_locs = []
+                    if abs(n2f_dir[0]) == 1:
+                        new_locs.append((npath[step][0] + n2f_dir[0], npath[step][1]))
+                    if abs(n2f_dir[1]) == 1:
+                        new_locs.append((npath[step][0], npath[step][1] + n2f_dir[1]))
+                    if len(new_locs) > 1:
+                        new_locs = sorted(new_locs,
+                                          key=lambda xx: np.hypot((xx[0] - fpath[-1][0]), (xx[1] - fpath[-1][1])))
+                    break_flag = False
+                    for new_loc in new_locs:
+                        new_loc_nes = [xx for xx in [(new_loc[0] + 1, new_loc[1]), (new_loc[0] - 1, new_loc[1]),
+                                                     (new_loc[0], new_loc[1] + 1), (new_loc[0], new_loc[1] - 1)] \
+                                       if xx[0] >= 0 and xx[0] < fpath_map.shape[0] and xx[1] >= 0 and xx[1] <
+                                       fpath_map.shape[1]]
+                        if np.all([(fpath_map[nlne[0], nlne[1]] == -1) for nlne in new_loc_nes]) != True:
+                            break
+                        if npath_map[new_loc[0], new_loc[1]] != -1:
+                            if npath_map[new_loc[0], new_loc[1]] != edge_id:
+                                break_flag = True
+                                break
+                            else:
+                                continue
+                        if valid_map[new_loc[0], new_loc[1]] == 0:
+                            break_flag = True
+                            break
+                        fpath.append(new_loc)
+                    if break_flag is True:
+                        break
+                if step != len(npath) - 1:
+                    for xx in npath[step:]:
+                        if npath_map[xx[0], xx[1]] == edge_id:
+                            npath_map[xx[0], xx[1]] = -1
+                    npath = npath[:step]
+            if len(fpath) > 0:
+                for fp_node in fpath:
+                    fpath_map[fp_node[0], fp_node[1]] = edge_id
+                fpaths[edge_id] = fpath
+                npaths[edge_id] = npath
+        fpath_map[valid_near_edge != 0] = -1
+        if len(fpath) > 0:
+            iter_fpath = copy.deepcopy(fpaths[edge_id])
+        for node in iter_fpath:
+            if valid_near_edge[node[0], node[1]] != 0:
+                fpaths[edge_id].remove(node)
+
+    return fpath_map, npath_map, False, npaths, fpaths, invalid_edge_ids
+
+
+def plan_path_e2e(
+        mesh, cc, end_pts, global_mesh, input_edge,
+        mask, valid_map, inpaint_id, npath_map=None,
+        fpath_map=None):
+    my_npath_map = np.zeros_like(input_edge) - 1
+    my_fpath_map = np.zeros_like(input_edge) - 1
+    sub_mesh = mesh.subgraph(list(cc)).copy()
+    ends_1, ends_2 = end_pts[0], end_pts[1]
+    edge_id = global_mesh.nodes[ends_1]['edge_id']
+    npath = [*netx.shortest_path(sub_mesh, (ends_1[0], ends_1[1]), (ends_2[0], ends_2[1]), weight='length')]
+    for np_node in npath:
+        my_npath_map[np_node[0], np_node[1]] = edge_id
+    fpath = []
+    if global_mesh.nodes[ends_1].get('far') is None:
+        print("None far")
+    else:
+        fnodes = global_mesh.nodes[ends_1].get('far')
+        dmask = mask + 0
+        while True:
+            dmask = cv2.dilate(dmask, np.ones((3, 3)), iterations=1)
+            ffnode = [fnode for fnode in fnodes if (dmask[fnode[0], fnode[1]] > 0 and mask[fnode[0], fnode[1]] == 0 and \
+                                                    global_mesh.nodes[fnode].get('inpaint_id') != inpaint_id + 1)]
+            if len(ffnode) > 0:
+                fnode = ffnode[0]
+                break
+        e_fnodes = global_mesh.nodes[ends_2].get('far')
+        dmask = mask + 0
+        while True:
+            dmask = cv2.dilate(dmask, np.ones((3, 3)), iterations=1)
+            e_ffnode = [e_fnode for e_fnode in e_fnodes if
+                        (dmask[e_fnode[0], e_fnode[1]] > 0 and mask[e_fnode[0], e_fnode[1]] == 0 and \
+                         global_mesh.nodes[e_fnode].get('inpaint_id') != inpaint_id + 1)]
+            if len(e_ffnode) > 0:
+                e_fnode = e_ffnode[0]
+                break
+        fpath.append((fnode[0], fnode[1]))
+        if len(e_ffnode) == 0 or len(ffnode) == 0:
+            return my_npath_map, my_fpath_map, [], []
+        barrel_dir = np.array([[1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0], [-1, -1], [0, -1], [1, -1]])
+        n2f_dir = (int(fnode[0] - npath[0][0]), int(fnode[1] - npath[0][1]))
+        while True:
+            if barrel_dir[0, 0] == n2f_dir[0] and barrel_dir[0, 1] == n2f_dir[1]:
+                n2f_barrel = barrel_dir.copy()
+                break
+            barrel_dir = np.roll(barrel_dir, 1, axis=0)
+        for step in range(0, len(npath)):
+            if step == 0:
+                continue
+            elif step == 1:
+                next_dir = (npath[step][0] - npath[step - 1][0], npath[step][1] - npath[step - 1][1])
+                while True:
+                    if barrel_dir[0, 0] == next_dir[0] and barrel_dir[0, 1] == next_dir[1]:
+                        next_barrel = barrel_dir.copy()
+                        break
+                    barrel_dir = np.roll(barrel_dir, 1, axis=0)
+                barrel_pair = np.stack((n2f_barrel, next_barrel), axis=0)
+                n2f_dir = (barrel_pair[0, 0, 0], barrel_pair[0, 0, 1])
+            elif step > 1:
+                next_dir = (npath[step][0] - npath[step - 1][0], npath[step][1] - npath[step - 1][1])
+                while True:
+                    if barrel_pair[1, 0, 0] == next_dir[0] and barrel_pair[1, 0, 1] == next_dir[1]:
+                        next_barrel = barrel_pair.copy()
+                        break
+                    barrel_pair = np.roll(barrel_pair, 1, axis=1)
+                n2f_dir = (barrel_pair[0, 0, 0], barrel_pair[0, 0, 1])
+            new_locs = []
+            if abs(n2f_dir[0]) == 1:
+                new_locs.append((npath[step][0] + n2f_dir[0], npath[step][1]))
+            if abs(n2f_dir[1]) == 1:
+                new_locs.append((npath[step][0], npath[step][1] + n2f_dir[1]))
+            if len(new_locs) > 1:
+                new_locs = sorted(new_locs, key=lambda xx: np.hypot((xx[0] - fpath[-1][0]), (xx[1] - fpath[-1][1])))
+            break_flag = False
+            for new_loc in new_locs:
+                new_loc_nes = [xx for xx in [(new_loc[0] + 1, new_loc[1]), (new_loc[0] - 1, new_loc[1]),
+                                             (new_loc[0], new_loc[1] + 1), (new_loc[0], new_loc[1] - 1)] \
+                               if xx[0] >= 0 and xx[0] < my_fpath_map.shape[0] and xx[1] >= 0 and xx[1] <
+                               my_fpath_map.shape[1]]
+                if fpath_map is not None and np.sum([fpath_map[nlne[0], nlne[1]] for nlne in new_loc_nes]) != 0:
+                    break_flag = True
+                    break
+                if my_npath_map[new_loc[0], new_loc[1]] != -1:
+                    continue
+                if npath_map is not None and npath_map[new_loc[0], new_loc[1]] != edge_id:
+                    break_flag = True
+                    break
+                fpath.append(new_loc)
+            if break_flag is True:
+                break
+        if (e_fnode[0], e_fnode[1]) not in fpath:
+            fpath.append((e_fnode[0], e_fnode[1]))
+        if step != len(npath) - 1:
+            for xx in npath[step:]:
+                if my_npath_map[xx[0], xx[1]] == edge_id:
+                    my_npath_map[xx[0], xx[1]] = -1
+            npath = npath[:step]
+        if len(fpath) > 0:
+            for fp_node in fpath:
+                my_fpath_map[fp_node[0], fp_node[1]] = edge_id
+
+    return my_fpath_map, my_npath_map, npath, fpath
+
+
+def plan_path(
+        mesh, info_on_pix, cc, end_pt, global_mesh, input_edge,
+        mask, valid_map, inpaint_id, npath_map=None,
+        fpath_map=None, npath=None):
+    my_npath_map = np.zeros_like(input_edge) - 1
+    my_fpath_map = np.zeros_like(input_edge) - 1
+    sub_mesh = mesh.subgraph(list(cc)).copy()
+    pnodes = netx.periphery(sub_mesh)
+    ends = [*end_pt]
+    edge_id = global_mesh.nodes[ends[0]]['edge_id']
+    pnodes = sorted(pnodes,
+                    key=lambda x: np.hypot((x[0] - ends[0][0]), (x[1] - ends[0][1])),
+                    reverse=True)[0]
+    if npath is None:
+        npath = [*netx.shortest_path(sub_mesh, (ends[0][0], ends[0][1]), pnodes, weight='length')]
+    else:
+        if (ends[0][0], ends[0][1]) == npath[0]:
+            npath = npath
+        elif (ends[0][0], ends[0][1]) == npath[-1]:
+            npath = npath[::-1]
+    for np_node in npath:
+        my_npath_map[np_node[0], np_node[1]] = edge_id
+    fpath = []
+    if global_mesh.nodes[ends[0]].get('far') is None:
+        print("None far")
+    else:
+        fnodes = global_mesh.nodes[ends[0]].get('far')
+        dmask = mask + 0
+        did = 0
+        while True:
+            did += 1
+            if did > 3:
+                return my_fpath_map, my_npath_map, -1
+            dmask = cv2.dilate(dmask, np.ones((3, 3)), iterations=1)
+            ffnode = [fnode for fnode in fnodes if (dmask[fnode[0], fnode[1]] > 0 and mask[fnode[0], fnode[1]] == 0 and \
+                                                    global_mesh.nodes[fnode].get('inpaint_id') != inpaint_id + 1)]
+            if len(ffnode) > 0:
+                fnode = ffnode[0]
+                break
+
+        fpath.append((fnode[0], fnode[1]))
+        disp_diff = 0.
+        for n_loc in npath:
+            if mask[n_loc[0], n_loc[1]] != 0:
+                disp_diff = abs(abs(1. / info_on_pix[(n_loc[0], n_loc[1])][0]['depth']) - abs(1. / ends[0][2]))
+                break
+        barrel_dir = np.array([[1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0], [-1, -1], [0, -1], [1, -1]])
+        n2f_dir = (int(fnode[0] - npath[0][0]), int(fnode[1] - npath[0][1]))
+        while True:
+            if barrel_dir[0, 0] == n2f_dir[0] and barrel_dir[0, 1] == n2f_dir[1]:
+                n2f_barrel = barrel_dir.copy()
+                break
+            barrel_dir = np.roll(barrel_dir, 1, axis=0)
+        for step in range(0, len(npath)):
+            if step == 0:
+                continue
+            elif step == 1:
+                next_dir = (npath[step][0] - npath[step - 1][0], npath[step][1] - npath[step - 1][1])
+                while True:
+                    if barrel_dir[0, 0] == next_dir[0] and barrel_dir[0, 1] == next_dir[1]:
+                        next_barrel = barrel_dir.copy()
+                        break
+                    barrel_dir = np.roll(barrel_dir, 1, axis=0)
+                barrel_pair = np.stack((n2f_barrel, next_barrel), axis=0)
+                n2f_dir = (barrel_pair[0, 0, 0], barrel_pair[0, 0, 1])
+            elif step > 1:
+                next_dir = (npath[step][0] - npath[step - 1][0], npath[step][1] - npath[step - 1][1])
+                while True:
+                    if barrel_pair[1, 0, 0] == next_dir[0] and barrel_pair[1, 0, 1] == next_dir[1]:
+                        next_barrel = barrel_pair.copy()
+                        break
+                    barrel_pair = np.roll(barrel_pair, 1, axis=1)
+                n2f_dir = (barrel_pair[0, 0, 0], barrel_pair[0, 0, 1])
+            new_locs = []
+            if abs(n2f_dir[0]) == 1:
+                new_locs.append((npath[step][0] + n2f_dir[0], npath[step][1]))
+            if abs(n2f_dir[1]) == 1:
+                new_locs.append((npath[step][0], npath[step][1] + n2f_dir[1]))
+            if len(new_locs) > 1:
+                new_locs = sorted(new_locs, key=lambda xx: np.hypot((xx[0] - fpath[-1][0]), (xx[1] - fpath[-1][1])))
+            break_flag = False
+            for new_loc in new_locs:
+                new_loc_nes = [xx for xx in [(new_loc[0] + 1, new_loc[1]), (new_loc[0] - 1, new_loc[1]),
+                                             (new_loc[0], new_loc[1] + 1), (new_loc[0], new_loc[1] - 1)] \
+                               if xx[0] >= 0 and xx[0] < my_fpath_map.shape[0] and xx[1] >= 0 and xx[1] <
+                               my_fpath_map.shape[1]]
+                if fpath_map is not None and np.all(
+                        [(fpath_map[nlne[0], nlne[1]] == -1) for nlne in new_loc_nes]) != True:
+                    break_flag = True
+                    break
+                if np.all([(my_fpath_map[nlne[0], nlne[1]] == -1) for nlne in new_loc_nes]) != True:
+                    break_flag = True
+                    break
+                if my_npath_map[new_loc[0], new_loc[1]] != -1:
+                    continue
+                if npath_map is not None and npath_map[new_loc[0], new_loc[1]] != edge_id:
+                    break_flag = True
+                    break
+                if valid_map[new_loc[0], new_loc[1]] == 0:
+                    break_flag = True
+                    break
+                fpath.append(new_loc)
+            if break_flag is True:
+                break
+        if step != len(npath) - 1:
+            for xx in npath[step:]:
+                if my_npath_map[xx[0], xx[1]] == edge_id:
+                    my_npath_map[xx[0], xx[1]] = -1
+            npath = npath[:step]
+        if len(fpath) > 0:
+            for fp_node in fpath:
+                my_fpath_map[fp_node[0], fp_node[1]] = edge_id
+
+    return my_fpath_map, my_npath_map, disp_diff
 
 
 def refresh_node(
@@ -129,6 +645,89 @@ def refresh_node(
         return mesh
     else:
         return mesh, None, None
+
+
+def create_placeholder(
+        context, mask, depth, fpath_map, npath_map, mesh, inpaint_id,
+        edge_ccs, extend_edge_cc, all_edge_maps, self_edge_id):
+    add_node_time = 0
+    add_edge_time = 0
+    add_far_near_time = 0
+    valid_area = context + mask
+    H, W = mesh.graph['H'], mesh.graph['W']
+    edge_cc = edge_ccs[self_edge_id]
+    num_com = len(edge_cc) + len(extend_edge_cc)
+    hxs, hys = np.where(mask > 0)
+    for hx, hy in zip(hxs, hys):
+        mesh.add_node((hx, hy), inpaint_id=inpaint_id + 1, num_context=num_com)
+    for hx, hy in zip(hxs, hys):
+        four_nes = [(x, y) for x, y in [(hx + 1, hy), (hx - 1, hy), (hx, hy + 1), (hx, hy - 1)] if \
+                    0 <= x < mesh.graph['H'] and 0 <= y < mesh.graph['W'] and valid_area[x, y] != 0]
+        for ne in four_nes:
+            if mask[ne[0], ne[1]] != 0:
+                if not mesh.has_edge((hx, hy), ne):
+                    mesh.add_edge((hx, hy), ne)
+            elif depth[ne[0], ne[1]] != 0:
+                if mesh.has_node((ne[0], ne[1], depth[ne[0], ne[1]])) and \
+                        not mesh.has_edge((hx, hy), (ne[0], ne[1], depth[ne[0], ne[1]])):
+                    mesh.add_edge((hx, hy), (ne[0], ne[1], depth[ne[0], ne[1]]))
+                else:
+                    print("Undefined context node.")
+    near_ids = np.unique(npath_map)
+    if near_ids[0] == -1: near_ids = near_ids[1:]
+    for near_id in near_ids:
+        hxs, hys = np.where((fpath_map == near_id) & (mask > 0))
+        if hxs.shape[0] > 0:
+            mesh.graph['max_edge_id'] = mesh.graph['max_edge_id'] + 1
+        else:
+            break
+        for hx, hy in zip(hxs, hys):
+            mesh.nodes[(hx, hy)]['edge_id'] = int(round(mesh.graph['max_edge_id']))
+            four_nes = [(x, y) for x, y in [(hx + 1, hy), (hx - 1, hy), (hx, hy + 1), (hx, hy - 1)] if \
+                        x < mesh.graph['H'] and x >= 0 and y < mesh.graph['W'] and y >= 0 and npath_map[
+                            x, y] == near_id]
+            for xx in four_nes:
+                xx_n = copy.deepcopy(xx)
+                if not mesh.has_node(xx_n):
+                    if mesh.has_node((xx_n[0], xx_n[1], depth[xx_n[0], xx_n[1]])):
+                        xx_n = (xx_n[0], xx_n[1], depth[xx_n[0], xx_n[1]])
+                if mesh.has_edge((hx, hy), xx_n):
+                    # pass
+                    mesh.remove_edge((hx, hy), xx_n)
+                if mesh.nodes[(hx, hy)].get('near') is None:
+                    mesh.nodes[(hx, hy)]['near'] = []
+                mesh.nodes[(hx, hy)]['near'].append(xx_n)
+        connect_point_exception = set()
+        hxs, hys = np.where((npath_map == near_id) & (all_edge_maps > -1))
+        for hx, hy in zip(hxs, hys):
+            unknown_id = int(round(all_edge_maps[hx, hy]))
+            if unknown_id != near_id and unknown_id != self_edge_id:
+                unknown_node = set([xx for xx in edge_ccs[unknown_id] if xx[0] == hx and xx[1] == hy])
+                connect_point_exception |= unknown_node
+        hxs, hys = np.where((npath_map == near_id) & (mask > 0))
+        if hxs.shape[0] > 0:
+            mesh.graph['max_edge_id'] = mesh.graph['max_edge_id'] + 1
+        else:
+            break
+        for hx, hy in zip(hxs, hys):
+            mesh.nodes[(hx, hy)]['edge_id'] = int(round(mesh.graph['max_edge_id']))
+            mesh.nodes[(hx, hy)]['connect_point_id'] = int(round(near_id))
+            mesh.nodes[(hx, hy)]['connect_point_exception'] = connect_point_exception
+            four_nes = [(x, y) for x, y in [(hx + 1, hy), (hx - 1, hy), (hx, hy + 1), (hx, hy - 1)] if \
+                        x < mesh.graph['H'] and x >= 0 and y < mesh.graph['W'] and y >= 0 and fpath_map[
+                            x, y] == near_id]
+            for xx in four_nes:
+                xx_n = copy.deepcopy(xx)
+                if not mesh.has_node(xx_n):
+                    if mesh.has_node((xx_n[0], xx_n[1], depth[xx_n[0], xx_n[1]])):
+                        xx_n = (xx_n[0], xx_n[1], depth[xx_n[0], xx_n[1]])
+                if mesh.has_edge((hx, hy), xx_n):
+                    mesh.remove_edge((hx, hy), xx_n)
+                if mesh.nodes[(hx, hy)].get('far') is None:
+                    mesh.nodes[(hx, hy)]['far'] = []
+                mesh.nodes[(hx, hy)]['far'].append(xx_n)
+
+    return mesh, add_node_time, add_edge_time, add_far_near_time
 
 
 def smooth_cntsyn_gap(
@@ -182,7 +781,8 @@ def require_depth_edge(context_edge, mask):
         return True
 
 
-def refine_color_around_edge(mesh, info_on_pix, edge_ccs, config, spdb=False):
+def refine_color_around_edge(
+        mesh, info_on_pix, edge_ccs, config, spdb=False):
     H, W = mesh.graph['H'], mesh.graph['W']
     tmp_edge_ccs = copy.deepcopy(edge_ccs)
     for edge_id, edge_cc in enumerate(edge_ccs):
@@ -302,8 +902,7 @@ def refine_color_around_edge(mesh, info_on_pix, edge_ccs, config, spdb=False):
                             re_color += mesh.nodes[ne_node]['backup_color'].astype(np.float32)
                             re_count += 1.
                         except:
-                            import pdb;
-                            pdb.set_trace()
+                            raise
                 if re_count > 0:
                     re_depth = re_depth / re_count
                     re_color = re_color / re_count
@@ -327,13 +926,11 @@ def refine_color_around_edge(mesh, info_on_pix, edge_ccs, config, spdb=False):
                 bfrc_canvas[node[0], node[1]] = mesh.nodes[node]['color'].astype(np.uint8)
                 aftc_canvas[node[0], node[1]] = mesh.nodes[node]['backup_color'].astype(np.uint8)
             f, (ax1, ax2, ax3, ax4) = plt.subplots(1, 4, sharex=True, sharey=True);
-            ax1.imshow(bfrd_canvas);
-            ax2.imshow(aftd_canvas);
-            ax3.imshow(bfrc_canvas);
-            ax4.imshow(aftc_canvas);
+            ax1.imshow(bfrd_canvas)
+            ax2.imshow(aftd_canvas)
+            ax3.imshow(bfrc_canvas)
+            ax4.imshow(aftc_canvas)
             plt.show()
-            import pdb;
-            pdb.set_trace()
         for node in refine_nodes:
             if mesh.nodes[node].get('refine_rgbd') is not None:
                 mesh.nodes[node].pop('refine_rgbd')
@@ -803,13 +1400,12 @@ def extrapolate(
     t_mask = mask[None, None, ...].astype(np.float32)
     t_context = context[None, None, ...].astype(np.float32)
     t_disp = input_disp[None, None, ...].astype(np.float32)
-    t_depth_zero_mean_depth = input_zero_mean_depth[None, None, ...]
+    t_depth_zero_mean_depth = input_zero_mean_depth[None, None, ...].astype(np.float32)
 
-    output = depth_edge_model.predict(
-        {'mask': t_mask, 'context': t_context, 'rgb': t_rgb, 'disp': t_disp, 'edge': t_edge})
-    depth_edge_output = output[0]
+    edge_output = edge_forward_3P(
+        depth_edge_model, t_mask, t_context, t_rgb, t_disp, t_edge)
 
-    output_raw_edge = (depth_edge_output > config['ext_edge_threshold']).astype(np.float) * t_mask + t_edge
+    output_raw_edge = (edge_output > config['ext_edge_threshold']).astype(np.float) * t_mask + t_edge
     output_raw_edge = output_raw_edge.squeeze()
 
     mesh = netx.Graph()
@@ -836,7 +1432,6 @@ def extrapolate(
     fpath_map = np.zeros_like(output_raw_edge) - 1
     npath_map = np.zeros_like(output_raw_edge) - 1
     for end_pt, cc in zip(end_pts, ccs):
-        sorted_end_pt = []
         if len(end_pt) >= 2:
             continue
         if len(end_pt) == 0:
@@ -857,8 +1452,6 @@ def extrapolate(
             if global_mesh.nodes[(ends[0][0] + all_anchor[0], ends[0][1] + all_anchor[2], -ends[0][2])].get(
                     'far') is None:
                 print("None far")
-                import pdb;
-                pdb.set_trace()
             else:
                 fnodes = global_mesh.nodes[(ends[0][0] + all_anchor[0], ends[0][1] + all_anchor[2], -ends[0][2])].get(
                     'far')
@@ -882,11 +1475,13 @@ def extrapolate(
                 for step in range(0, len(npath) - 1):
                     parr = (npath[step + 1][0] - npath[step][0], npath[step + 1][1] - npath[step][1])
                     new_loc = (fpath[-1][0] + parr[0], fpath[-1][1] + parr[1])
-                    new_loc_nes = [xx for xx in [(new_loc[0] + 1, new_loc[1]), (new_loc[0] - 1, new_loc[1]),
-                                                 (new_loc[0], new_loc[1] + 1), (new_loc[0], new_loc[1] - 1)] \
-                                   if
-                                   xx[0] >= 0 and xx[0] < fpath_map.shape[0] and xx[1] >= 0 and xx[1] < fpath_map.shape[
-                                       1]]
+                    new_loc_nes = [
+                        xx for xx in [
+                            (new_loc[0] + 1, new_loc[1]), (new_loc[0] - 1, new_loc[1]),
+                            (new_loc[0], new_loc[1] + 1), (new_loc[0], new_loc[1] - 1)] \
+                        if xx[0] >= 0 and xx[0] < fpath_map.shape[0] \
+                           and xx[1] >= 0 and xx[1] < fpath_map.shape[1]
+                    ]
                     if np.sum([fpath_map[nlne[0], nlne[1]] for nlne in new_loc_nes]) != -4:
                         break
                     if npath_map[new_loc[0], new_loc[1]] != -1:
@@ -917,57 +1512,30 @@ def extrapolate(
 
     update_edge = (npath_map > -1) * mask + edge
     t_update_edge = update_edge[None, None, ...].astype(np.float32)
-    output = depth_feat_model.predict(
-        {'mask': t_mask, 'context': t_context, 'depth': t_depth_zero_mean_depth, 'edge': t_update_edge})
-    depth_output = output[0]
 
-    depth_output = depth_output.cpu().data.numpy().squeeze()
+    depth_output = depth_forward_3P(
+        depth_feat_model, t_mask, t_context, t_depth_zero_mean_depth, t_update_edge)
+
+    depth_output = depth_output.squeeze()
     depth_output = np.exp(depth_output + input_mean_depth) * mask  # + input_depth * context
     for near_id in np.unique(npath_map[npath_map > -1]):
-        depth_output = refine_depth_around_edge(depth_output.copy(),
-                                                (fpath_map == near_id).astype(np.uint8) * mask,  # far_edge_map_in_mask,
-                                                (fpath_map == near_id).astype(np.uint8),  # far_edge_map,
-                                                (npath_map == near_id).astype(np.uint8) * mask,
-                                                mask.copy(),
-                                                np.zeros_like(mask),
-                                                config)
+        depth_output = refine_depth_around_edge(
+            depth_output.copy(),
+            (fpath_map == near_id).astype(np.uint8) * mask,  # far_edge_map_in_mask,
+            (fpath_map == near_id).astype(np.uint8),  # far_edge_map,
+            (npath_map == near_id).astype(np.uint8) * mask,
+            mask.copy(),
+            np.zeros_like(mask),
+            config)
 
-    rgb_output = rgb_feat_model.forward_3P(t_mask, t_context, t_rgb, t_update_edge, unit_length=128,
-                                           cuda=device)
-    # print("------------------>")
-    # from torch.autograd import Variable
-    # import functools
-    # x = (
-    # Variable(t_mask),
-    # Variable(t_context),
-    # Variable(t_rgb),
-    # Variable(t_update_edge),
-    # )
-    # rgb_feat_model.forward = functools.partial(rgb_feat_model.forward_3P, unit_length=128, cuda=device)
-    # torch.onnx.export(
-    # rgb_feat_model, x, 'color-model.onnx',
-    # input_names=["mask", "context", "rgb", "edge"],
-    # output_names=["rgb_output"],
-    # dynamic_axes={
-    # 'mask' : {2 : 'h', 3 : 'w'}, 'context' : {2 : 'h', 3 : 'w'}, 'rgb' : {2 : 'h', 3 : 'w'},
-    # 'edge' : {2 : 'h', 3 : 'w'}, 'rgb_output' : {2 : 'h', 3 : 'w'}},
-    # verbose=False, opset_version=11
-    # )
-    # print("<------------------")
-    # 1/0
+    rgb_output = color_forward_3P(rgb_feat_model, t_mask, t_context, t_rgb, t_update_edge)
 
-    # rgb_output = rgb_feat_model.forward_3P(t_mask, t_context, t_rgb, t_update_edge, unit_length=128, cuda=config['gpu_ids'])
-    if config.get('gray_image') is True:
-        rgb_output = rgb_output.mean(1, keepdim=True).repeat((1, 3, 1, 1))
     rgb_output = (
-            (rgb_output.squeeze().data.cpu().permute(1, 2, 0).numpy() * mask[..., None] + input_rgb) * 255).astype(
+            (rgb_output.squeeze().transpose(1, 2, 0) * mask[..., None] + input_rgb) * 255).astype(
         np.uint8)
     image[all_anchor[0]:all_anchor[1], all_anchor[2]:all_anchor[3]][mask > 0] = rgb_output[
         mask > 0]  # np.array([255,0,0]) # rgb_output[mask > 0]
     depth[all_anchor[0]:all_anchor[1], all_anchor[2]:all_anchor[3]][mask > 0] = depth_output[mask > 0]
-    # nxs, nys = np.where(mask > -1)
-    # for nx, ny in zip(nxs, nys):
-    #     info_on_pix[(nx, ny)][0]['color'] = rgb_output[]
 
     nxs, nys = np.where((npath_map > -1))
     for nx, ny in zip(nxs, nys):
@@ -1072,10 +1640,6 @@ def extrapolate(
                 global_mesh.nodes[self_node]['near'].append(ne_node)
 
     return info_on_pix, global_mesh, image, depth, edge_ccs
-    # for edge_cc in edge_ccs:
-    #     for edge_node in edge_cc:
-    #         edge_ccs
-    # context_ccs, mask_ccs, broken_mask_ccs, edge_ccs, erode_context_ccs, init_mask_connect, edge_maps, extend_context_ccs, extend_edge_ccs
 
 
 def get_valid_size(imap):
@@ -1166,8 +1730,6 @@ def fill_missing_node(mesh, info_on_pix, image, depth):
         for y in range(mesh.graph['bord_left'], mesh.graph['bord_right']):
             if info_on_pix.get((x, y)) is None:
                 print("fill missing node = ", x, y)
-                import pdb;
-                pdb.set_trace()
                 re_depth, re_count = 0, 0
                 for ne in [(x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)]:
                     if info_on_pix.get(ne) is not None:
@@ -1217,12 +1779,7 @@ def refresh_bord_depth(mesh, info_on_pix, image, depth):
             tgt_loc = (xy[0], xy[1] - 1)
         if tgt_loc is not None:
             ne_infos = info_on_pix.get(tgt_loc)
-            if ne_infos is None:
-                import pdb;
-                pdb.set_trace()
-            # if ne_infos is not None and len(ne_infos) == 1:
             tgt_depth = ne_infos[0]['depth']
-            tgt_disp = ne_infos[0]['disp']
             new_node = (xy[0], xy[1], tgt_depth)
             src_node = (tgt_loc[0], tgt_loc[1], tgt_depth)
             tgt_nes_loc = [(xx[0], xx[1]) \
@@ -1231,8 +1788,6 @@ def refresh_bord_depth(mesh, info_on_pix, image, depth):
                            if abs(xx[0] - xy[0]) == 1 and abs(xx[1] - xy[1]) == 1]
             tgt_nes_loc = [xx for xx in tgt_nes_loc if info_on_pix.get(xx) is not None]
             tgt_nes_loc.append(tgt_loc)
-            # if (xy[0], xy[1]) == (559, 60):
-            #     import pdb; pdb.set_trace()
             if info_on_pix.get(xy) is not None and len(info_on_pix.get(xy)) > 0:
                 old_depth = info_on_pix[xy][0].get('depth')
                 old_node = (xy[0], xy[1], old_depth)
@@ -1286,8 +1841,6 @@ def refresh_bord_depth(mesh, info_on_pix, image, depth):
         mesh.nodes[new_node]['far'] = None
         mesh.nodes[new_node]['near'] = None
     for xy in bord_nodes + corner_nodes:
-        # if (xy[0], xy[1]) == (559, 60):
-        #     import pdb; pdb.set_trace()
         depth[xy[0], xy[1]] = abs(info_on_pix[xy][0]['depth'])
     for xy in bord_nodes:
         cur_node = (xy[0], xy[1], info_on_pix[xy][0]['depth'])
@@ -1326,33 +1879,30 @@ def depth_inpainting(
                           depth_dict['real_depth'], depth_dict['zero_mean_depth'], depth_dict['edge'])
     tensor_depth_dict = convert2tensor(patch_depth_dict)
     resize_mask = open_small_mask(tensor_depth_dict['mask'], tensor_depth_dict['context'], 3, 41)
-    with torch.no_grad():
-        device = config["gpu_ids"] if isinstance(config["gpu_ids"], int) and config["gpu_ids"] >= 0 else "cpu"
-        depth_output = depth_feat_model.forward_3P(resize_mask,
-                                                   tensor_depth_dict['context'],
-                                                   tensor_depth_dict['zero_mean_depth'],
-                                                   tensor_depth_dict['edge'],
-                                                   unit_length=128,
-                                                   cuda=device)
-        depth_output = depth_output.cpu()
-    tensor_depth_dict['output'] = torch.exp(depth_output + depth_dict['mean_depth']) * \
-                                  tensor_depth_dict['mask'] + tensor_depth_dict['depth']
-    patch_depth_dict['output'] = tensor_depth_dict['output'].data.cpu().numpy().squeeze()
+
+    depth_output = depth_forward_3P(
+        depth_feat_model, 
+        resize_mask, tensor_depth_dict['context'], 
+        tensor_depth_dict['zero_mean_depth'], tensor_depth_dict['edge'])
+
+    tensor_depth_dict['output'] = \
+        np.exp(depth_output + depth_dict['mean_depth']) * \
+        tensor_depth_dict['mask'] + tensor_depth_dict['depth']
+    patch_depth_dict['output'] = tensor_depth_dict['output'].squeeze()
     depth_dict['output'] = np.zeros((mesh.graph['H'], mesh.graph['W']))
     depth_dict['output'][union_size['x_min']:union_size['x_max'], union_size['y_min']:union_size['y_max']] = \
         patch_depth_dict['output']
-    depth_output = depth_dict['output'] * depth_dict['mask'] + depth_dict['depth'] * depth_dict['context']
     depth_output = smooth_cntsyn_gap(
         depth_dict['output'].copy() * depth_dict['mask'] + depth_dict['depth'] * depth_dict['context'],
         depth_dict['mask'], depth_dict['context'],
         init_mask_region=depth_dict['mask'])
+
     if spdb is True:
         f, ((ax1, ax2)) = plt.subplots(1, 2, sharex=True, sharey=True);
         ax1.imshow(depth_output * depth_dict['mask'] + depth_dict['depth']);
         ax2.imshow(depth_dict['output'] * depth_dict['mask'] + depth_dict['depth']);
         plt.show()
-        import pdb;
-        pdb.set_trace()
+
     depth_dict['output'] = depth_output * depth_dict['mask'] + depth_dict['depth'] * depth_dict['context']
 
     return depth_dict
@@ -1540,6 +2090,26 @@ def get_depth_from_nodes(
     return rt_dict
 
 
+def get_rgb_from_nodes(context_cc, erode_context_cc, mask_cc, H, W, mesh):
+    context = np.zeros((H, W))
+    mask = np.zeros((H, W))
+    rgb = np.zeros((H, W, 3))
+    erode_context = np.zeros((H, W))
+    for node in context_cc:
+        rgb[node[0], node[1]] = np.array(mesh.nodes[node]['color'])
+        context[node[0], node[1]] = 1
+    rgb = rgb / 255.
+    for node in mask_cc:
+        mask[node[0], node[1]] = 1
+    for node in erode_context_cc:
+        erode_context[node[0], node[1]] = 1
+        mask[node[0], node[1]] = 1
+    rt_dict = {'rgb': rgb, 'context': context, 'mask': mask,
+               'erode': erode_context}
+
+    return rt_dict
+
+
 def crop_maps_by_size(size, *imaps):
     omaps = []
     for imap in imaps:
@@ -1552,9 +2122,9 @@ def convert2tensor(input_dict):
     rt_dict = {}
     for key, value in input_dict.items():
         if 'rgb' in key or 'color' in key:
-            rt_dict[key] = torch.FloatTensor(value).permute(2, 0, 1)[None, ...]
+            rt_dict[key] = value.transpose(2, 0, 1)[None, ...]
         else:
-            rt_dict[key] = torch.FloatTensor(value)[None, None, ...]
+            rt_dict[key] = value[None, None, ...]
 
     return rt_dict
 
@@ -1652,6 +2222,12 @@ def calculate_fov(mesh):
     return mesh
 
 
+def reproject_3d_int_detail(
+        sx, sy, z, k_00, k_02, k_11, k_12, w_offset, h_offset):
+    abs_z = abs(z)
+    return [abs_z * ((sy + 0.5 - w_offset) * k_00 + k_02), abs_z * ((sx + 0.5 - h_offset) * k_11 + k_12), abs_z]
+
+
 def generate_init_node(mesh, min_node_in_cc):
     mesh_nodes = mesh.nodes
 
@@ -1687,6 +2263,56 @@ def generate_init_node(mesh, min_node_in_cc):
     [mesh.remove_node(node) for node in remove_nodes]
 
     return mesh, info_on_pix
+
+
+def get_neighbors(mesh, node):
+    return [*mesh.neighbors(node)]
+
+
+def generate_face(mesh, info_on_pix, config):
+    H, W = mesh.graph['H'], mesh.graph['W']
+    str_faces = []
+    num_node = len(mesh.nodes)
+    ply_flag = config.get('save_ply')
+
+    def out_fmt(input, cur_id_b, cur_id_self, cur_id_a, ply_flag):
+        if ply_flag is True:
+            input.append(' '.join(['3', cur_id_b, cur_id_self, cur_id_a]) + '\n')
+        else:
+            input.append([cur_id_b, cur_id_self, cur_id_a])
+
+    mesh_nodes = mesh.nodes
+    for node in mesh_nodes:
+        cur_id_self = mesh_nodes[node]['cur_id']
+        ne_nodes = get_neighbors(mesh, node)
+        four_dir_nes = {'up': [], 'left': [],
+                        'down': [], 'right': []}
+        for ne_node in ne_nodes:
+            store_tuple = [ne_node, mesh_nodes[ne_node]['cur_id']]
+            if ne_node[0] == node[0]:
+                if ne_node[1] == ne_node[1] - 1:
+                    four_dir_nes['left'].append(store_tuple)
+                else:
+                    four_dir_nes['right'].append(store_tuple)
+            else:
+                if ne_node[0] == ne_node[0] - 1:
+                    four_dir_nes['up'].append(store_tuple)
+                else:
+                    four_dir_nes['down'].append(store_tuple)
+        for node_a, cur_id_a in four_dir_nes['up']:
+            for node_b, cur_id_b in four_dir_nes['right']:
+                out_fmt(str_faces, cur_id_b, cur_id_self, cur_id_a, ply_flag)
+        for node_a, cur_id_a in four_dir_nes['right']:
+            for node_b, cur_id_b in four_dir_nes['down']:
+                out_fmt(str_faces, cur_id_b, cur_id_self, cur_id_a, ply_flag)
+        for node_a, cur_id_a in four_dir_nes['down']:
+            for node_b, cur_id_b in four_dir_nes['left']:
+                out_fmt(str_faces, cur_id_b, cur_id_self, cur_id_a, ply_flag)
+        for node_a, cur_id_a in four_dir_nes['left']:
+            for node_b, cur_id_b in four_dir_nes['up']:
+                out_fmt(str_faces, cur_id_b, cur_id_self, cur_id_a, ply_flag)
+
+    return str_faces
 
 
 def reassign_floating_island(mesh, info_on_pix, image, depth):
@@ -1725,9 +2351,6 @@ def reassign_floating_island(mesh, info_on_pix, image, depth):
         lost_xs, lost_ys = np.where(label_lost_map == i)
         surr_edge_ids = {}
         for lost_x, lost_y in zip(lost_xs, lost_ys):
-            if (lost_x, lost_y) == (295, 389) or (lost_x, lost_y) == (296, 389):
-                import pdb;
-                pdb.set_trace()
             for ne in get_cross_nes(lost_x, lost_y):
                 if key_exist(info_on_pix, ne):
                     for info in info_on_pix[ne]:
@@ -1910,9 +2533,6 @@ def group_edges(LDI, config, image, remove_conflict_ordinal, spdb=False):
                             'must_connect']:
                             add_new_node(discont_graph, diag_candi)
                             add_new_edge(discont_graph, diag_candi, node)
-    if spdb == True:
-        import pdb;
-        pdb.set_trace()
     discont_ccs = [*netx.connected_components(discont_graph)]
     '''
     In some corner case, a depth edge "discont_cc" will contain both
@@ -1985,9 +2605,6 @@ def group_edges(LDI, config, image, remove_conflict_ordinal, spdb=False):
                 new_discont_ccs.append(discont_cc)
         discont_ccs = new_discont_ccs
         new_discont_ccs = None
-    if spdb == True:
-        import pdb;
-        pdb.set_trace()
 
     for edge_id, edge_cc in enumerate(discont_ccs):
         for node in edge_cc:
@@ -2179,8 +2796,7 @@ def remove_redundant_edge(
                                 point_to_id[ne] in point_to_adjoint.get(point_to_id[valid_edge_node], set()):
                             mesh.add_edge(valid_edge_node, ne)
                     except:
-                        import pdb;
-                        pdb.set_trace()
+                        raise
         if (invalid is not True and end_number >= 1) or (
                 invalid is True and end_number >= 2 and eight_end_number >= 1 and db_eight_end_number >= 1):
             for valid_edge_node in valid_edge_cc:
@@ -2333,8 +2949,7 @@ def remove_dangling(mesh, edge_ccs, edge_mesh, info_on_pix, image, depth, config
             try:
                 ne_cc = [ne_cc for ne_cc in ne_ccs if ne_node in ne_cc][0]
             except:
-                import pdb;
-                pdb.set_trace()
+                raise
             largest_cc = [xx for xx in ne_cc if abs(xx[0] - node[0]) + abs(xx[1] - node[1]) == 1]
             mesh.remove_edges_from([(xx, node) for xx in mesh.neighbors(node)])
             re_depth = {'value': 0, 'count': 0}
@@ -2397,7 +3012,6 @@ def context_and_holes(
     broken_mask_ccs = [set() for x in range(len(edge_ccs))]
     invalid_extend_edge_ccs = [set() for x in range(len(edge_ccs))]
     intouched_ccs = [set() for x in range(len(edge_ccs))]
-    redundant_ccs = [set() for x in range(len(edge_ccs))]
     if inpaint_iter == 0:
         background_thickness = config['background_thickness']
         context_thickness = config['context_thickness']
@@ -2490,16 +3104,10 @@ def context_and_holes(
                 tmp_context_nodes = [*context_ccs[edge_id]]
                 tmp_erode.append([*context_ccs[edge_id]])
                 context_map = np.zeros((mesh.graph['H'], mesh.graph['W']), dtype=np.bool)
-                if (context_map.astype(np.uint8) * mask_map.astype(np.uint8)).max() > 0:
-                    import pdb;
-                    pdb.set_trace()
                 for node in tmp_context_nodes:
                     context_map[node[0], node[1]] = True
                     context_depth[node[0], node[1]] = node[2]
                 context_map[mask_map == True] = False
-                if (context_map.astype(np.uint8) * mask_map.astype(np.uint8)).max() > 0:
-                    import pdb;
-                    pdb.set_trace()
                 tmp_intouched_nodes = [*intouched_ccs[edge_id]]
                 intouched_map = np.zeros((mesh.graph['H'], mesh.graph['W']), dtype=np.bool)
                 for node in tmp_intouched_nodes: intouched_map[node[0], node[1]] = True
@@ -2716,11 +3324,11 @@ def context_and_holes(
                         if bool(np.any(patch_context_map)) is True:
                             new_tmp_noncont_nodes.append(ne)
                             noncont_map[ne[0], ne[1]] = True
-            tmp_noncont_nodes = None
             tmp_noncont_nodes = set(new_tmp_noncont_nodes)
         if inpaint_iter == 0:
-            depth_dict = get_depth_from_maps(context_map, mask_map, context_depth, mesh.graph['H'], mesh.graph['W'],
-                                             log_depth=config['log_depth'])
+            depth_dict = get_depth_from_maps(
+                context_map, mask_map, context_depth, mesh.graph['H'], mesh.graph['W'],
+                log_depth=config['log_depth'])
             mask_size = get_valid_size(depth_dict['mask'])
             mask_size = dilate_valid_size(mask_size, depth_dict['mask'], dilate=[20, 20])
             context_size = get_valid_size(depth_dict['context'])
@@ -2771,8 +3379,7 @@ def context_and_holes(
                     functools.reduce(lambda x, y: x + y, [] + tmp_erode[:tmp_width])
                 )
         except:
-            import pdb;
-            pdb.set_trace()
+            raise
         erode_context_cc = copy.deepcopy(erode_context_ccs[edge_id])
         for erode_context_node in erode_context_cc:
             if (inpaint_iter != 0 and (mesh_nodes[erode_context_node].get('inpaint_id') is None or
@@ -2821,17 +3428,11 @@ def context_and_holes(
                     for node in invalid_extend_edge_ccs[ecnt_id]:
                         tmp_invalid_context_map[node[0], node[1]] = True
                     init_invalid_context_map = tmp_invalid_context_map.copy()
-                    init_context_map = tmp
-                    if (tmp_mask_map.astype(np.uint8) * tmp_context_map.astype(np.uint8)).max() > 0:
-                        import pdb;
-                        pdb.set_trace()
                     if vis_edge_id is not None and ecnt_id == vis_edge_id:
                         f, ((ax1, ax2)) = plt.subplots(1, 2, sharex=True, sharey=True)
                         ax1.imshow(tmp_context_map * 1);
                         ax2.imshow(init_invalid_context_map * 1 + tmp_context_map * 2)
                         plt.show()
-                        import pdb;
-                        pdb.set_trace()
                 else:
                     tmp_context_nodes = new_tmp_context_nodes
                     new_tmp_context_nodes = None
@@ -2870,19 +3471,14 @@ def context_and_holes(
                             new_tmp_mask_nodes.add(ne)
                             tmp_mask_map[ne[0], ne[1]] = True
             init_invalid_context_map[tmp_context_map] = False
-            _, tmp_label_map = cv2.connectedComponents((init_invalid_context_map | tmp_context_map).astype(np.uint8),
-                                                       connectivity=8)
-            tmp_label_ids = set(np.unique(tmp_label_map[init_invalid_context_map]))
-            if (tmp_mask_map.astype(np.uint8) * tmp_context_map.astype(np.uint8)).max() > 0:
-                import pdb;
-                pdb.set_trace()
+            _, tmp_label_map = cv2.connectedComponents(
+                (init_invalid_context_map | tmp_context_map).astype(np.uint8),
+                connectivity=8)
             if vis_edge_id is not None and ecnt_id == vis_edge_id:
                 f, ((ax1, ax2)) = plt.subplots(1, 2, sharex=True, sharey=True)
                 ax1.imshow(tmp_label_map);
                 ax2.imshow(init_invalid_context_map * 1 + tmp_context_map * 2)
                 plt.show()
-                import pdb;
-                pdb.set_trace()
             extend_context_ccs[ecnt_id] |= set(accum_context_cc)
             extend_context_ccs[ecnt_id] = extend_context_ccs[ecnt_id] - mask_ccs[ecnt_id]
             extend_erode_context_ccs[ecnt_id] = extend_context_ccs[ecnt_id] & constraint_erode_context_cc
@@ -2923,11 +3519,6 @@ def DL_inpaint_edge(
         specific_edge_id=-1,
         specific_edge_loc=None,
         inpaint_iter=0):
-    if isinstance(config["gpu_ids"], int) and (config["gpu_ids"] >= 0):
-        device = config["gpu_ids"]
-    else:
-        device = "cpu"
-
     edge_map = np.zeros_like(depth)
     new_edge_ccs = [set() for _ in range(len(edge_ccs))]
     edge_maps_with_id = edge_maps
@@ -2935,10 +3526,10 @@ def DL_inpaint_edge(
     edge_map = get_map_from_ccs(edge_ccs, mesh.graph['H'], mesh.graph['W'], mesh, edge_condition)
     np_depth, np_image = depth.copy(), image.copy()
     image_c = image.shape[-1]
-    image = torch.FloatTensor(image.transpose(2, 0, 1)).unsqueeze(0).to(device)
+    image = np.expand_dims(image.transpose(2, 0, 1), axis=0)
     if depth.ndim < 3:
         depth = depth[..., None]
-    depth = torch.FloatTensor(depth.transpose(2, 0, 1)).unsqueeze(0).to(device)
+    depth = np.expand_dims(depth.transpose(2, 0, 1), axis=0)
     mesh.graph['max_edge_id'] = len(edge_ccs)
     connnect_points_ccs = [set() for _ in range(len(edge_ccs))]
     gp_time, tmp_mesh_time, bilateral_time = 0, 0, 0
@@ -2983,56 +3574,55 @@ def DL_inpaint_edge(
                               edge_dict['rgb'], edge_dict['disp'], edge_dict['edge'])
         x_anchor, y_anchor = [union_size['x_min'], union_size['x_max']], [union_size['y_min'], union_size['y_max']]
         tensor_edge_dict = convert2tensor(patch_edge_dict)
-        input_edge_feat = torch.cat((tensor_edge_dict['rgb'],
-                                     tensor_edge_dict['disp'],
-                                     tensor_edge_dict['edge'],
-                                     1 - tensor_edge_dict['context'],
-                                     tensor_edge_dict['mask']), dim=1)
+        input_edge_feat = np.concatenate(
+            (tensor_edge_dict['rgb'],
+             tensor_edge_dict['disp'],
+             tensor_edge_dict['edge'],
+             1 - tensor_edge_dict['context'],
+             tensor_edge_dict['mask']), axis=1)
         if require_depth_edge(patch_edge_dict['edge'], patch_edge_dict['mask']) and inpaint_iter == 0:
-            with torch.no_grad():
-                depth_edge_output = depth_edge_model.forward_3P(tensor_edge_dict['mask'],
-                                                                tensor_edge_dict['context'],
-                                                                tensor_edge_dict['rgb'],
-                                                                tensor_edge_dict['disp'],
-                                                                tensor_edge_dict['edge'],
-                                                                unit_length=128,
-                                                                cuda=device)
-                depth_edge_output = depth_edge_output.cpu()
-            tensor_edge_dict['output'] = (depth_edge_output > config['ext_edge_threshold']).float() * tensor_edge_dict[
-                'mask'] + tensor_edge_dict['edge']
+            depth_edge_output = edge_forward_3P(
+                depth_edge_model,
+                tensor_edge_dict['mask'], tensor_edge_dict['context'],
+                tensor_edge_dict['rgb'], tensor_edge_dict['disp'],
+                tensor_edge_dict['edge'])
+
+            tensor_edge_dict['output'] = \
+                (depth_edge_output > config['ext_edge_threshold']).astype(np.float) \
+                * tensor_edge_dict['mask'] + tensor_edge_dict['edge']
         else:
             tensor_edge_dict['output'] = tensor_edge_dict['edge']
             depth_edge_output = tensor_edge_dict['edge'] + 0
-        patch_edge_dict['output'] = tensor_edge_dict['output'].squeeze().data.cpu().numpy()
+        patch_edge_dict['output'] = tensor_edge_dict['output'].squeeze()
         edge_dict['output'] = np.zeros((mesh.graph['H'], mesh.graph['W']))
         edge_dict['output'][union_size['x_min']:union_size['x_max'], union_size['y_min']:union_size['y_max']] = \
             patch_edge_dict['output']
         if require_depth_edge(patch_edge_dict['edge'], patch_edge_dict['mask']) and inpaint_iter == 0:
-            if ((depth_edge_output > config['ext_edge_threshold']).float() * tensor_edge_dict['mask']).max() > 0:
+            if ((depth_edge_output > config['ext_edge_threshold']).astype(np.float) * tensor_edge_dict[
+                'mask']).max() > 0:
                 try:
                     edge_dict['fpath_map'], edge_dict['npath_map'], break_flag, npaths, fpaths, invalid_edge_id = \
                         clean_far_edge_new(edge_dict['output'], end_depth_maps, edge_dict['mask'], edge_dict['context'],
                                            mesh, info_on_pix, edge_dict['self_edge'], inpaint_iter, config)
                 except:
-                    import pdb;
-                    pdb.set_trace()
+                    raise
                 pre_npath_map = edge_dict['npath_map'].copy()
                 if config.get('repeat_inpaint_edge') is True:
                     for _ in range(2):
                         tmp_input_edge = ((edge_dict['npath_map'] > -1) + edge_dict['edge']).clip(0, 1)
                         patch_tmp_input_edge = crop_maps_by_size(union_size, tmp_input_edge)[0]
-                        tensor_input_edge = torch.FloatTensor(patch_tmp_input_edge)[None, None, ...]
-                        depth_edge_output = depth_edge_model.forward_3P(tensor_edge_dict['mask'],
-                                                                        tensor_edge_dict['context'],
-                                                                        tensor_edge_dict['rgb'],
-                                                                        tensor_edge_dict['disp'],
-                                                                        tensor_input_edge,
-                                                                        unit_length=128,
-                                                                        cuda=device)
-                        depth_edge_output = depth_edge_output.cpu()
-                        depth_edge_output = (depth_edge_output > config['ext_edge_threshold']).float() * \
-                                            tensor_edge_dict['mask'] + tensor_edge_dict['edge']
-                        depth_edge_output = depth_edge_output.squeeze().data.cpu().numpy()
+                        tensor_input_edge = patch_tmp_input_edge[None, None, ...]
+                        
+                        depth_edge_output = edge_forward_3P(
+                            depth_edge_model,
+                            tensor_edge_dict['mask'], tensor_edge_dict['context'],
+                            tensor_edge_dict['rgb'], tensor_edge_dict['disp'],
+                            tensor_input_edge)
+
+                        depth_edge_output = \
+                            (depth_edge_output > config['ext_edge_threshold']).astype(np.float) * \
+                            tensor_edge_dict['mask'] + tensor_edge_dict['edge']
+                        depth_edge_output = depth_edge_output.squeeze()
                         full_depth_edge_output = np.zeros((mesh.graph['H'], mesh.graph['W']))
                         full_depth_edge_output[union_size['x_min']:union_size['x_max'],
                         union_size['y_min']:union_size['y_max']] = \
@@ -3048,9 +3638,6 @@ def DL_inpaint_edge(
                         start_mx, start_my = npath[0][0], npath[0][1]
                     if end_depth_maps[npath[-1][0], npath[-1][1]] != 0:
                         end_mx, end_my = npath[-1][0], npath[-1][1]
-                    if start_mx == -1:
-                        import pdb;
-                        pdb.set_trace()
                     valid_end_pt = () if end_mx == -1 else (end_mx, end_my, info_on_pix[(end_mx, end_my)][0]['depth'])
                     new_edge_info = dict(fpath=fpath,
                                          npath=npath,
@@ -3112,11 +3699,12 @@ def DL_inpaint_edge(
                               edge_dict['rgb'], edge_dict['disp'], edge_dict['edge'])
         x_anchor, y_anchor = [union_size['x_min'], union_size['x_max']], [union_size['y_min'], union_size['y_max']]
         tensor_edge_dict = convert2tensor(patch_edge_dict)
-        input_edge_feat = torch.cat((tensor_edge_dict['rgb'],
-                                     tensor_edge_dict['disp'],
-                                     tensor_edge_dict['edge'],
-                                     1 - tensor_edge_dict['context'],
-                                     tensor_edge_dict['mask']), dim=1)
+        input_edge_feat = np.concatenate(
+            (tensor_edge_dict['rgb'],
+             tensor_edge_dict['disp'],
+             tensor_edge_dict['edge'],
+             1 - tensor_edge_dict['context'],
+             tensor_edge_dict['mask']), axis=1)
         edge_dict['output'] = edge_dict['edge'].copy()
 
         if require_depth_edge(patch_edge_dict['edge'], patch_edge_dict['mask']) and inpaint_iter == 0:
@@ -3174,9 +3762,6 @@ def DL_inpaint_edge(
                             edge_dict['fpath_map'][fnode[0], fnode[1]] = cur_info['comp_edge_id']
                         for fnode in cur_info['npath']:
                             edge_dict['npath_map'][fnode[0], fnode[1]] = cur_info['comp_edge_id']
-            if edge_dict['npath_map'].min() == 0 or edge_dict['fpath_map'].min() == 0:
-                import pdb;
-                pdb.set_trace()
             edge_dict['output'] = (edge_dict['npath_map'] > -1) * edge_dict['mask'] + edge_dict['context'] * edge_dict[
                 'edge']
         mesh, _, _, _ = create_placeholder(edge_dict['context'], edge_dict['mask'],
@@ -3195,77 +3780,83 @@ def DL_inpaint_edge(
                                       union_size, depth_feat_model, edge_dict['output'])
         refine_depth_output = depth_dict['output'] * depth_dict['mask']
         for near_id in np.unique(edge_dict['npath_map'])[1:]:
-            refine_depth_output = refine_depth_around_edge(refine_depth_output.copy(),
-                                                           (edge_dict['fpath_map'] == near_id).astype(np.uint8) *
-                                                           edge_dict['mask'],
-                                                           (edge_dict['fpath_map'] == near_id).astype(np.uint8),
-                                                           (edge_dict['npath_map'] == near_id).astype(np.uint8) *
-                                                           edge_dict['mask'],
-                                                           depth_dict['mask'].copy(),
-                                                           depth_dict['output'] * depth_dict['context'],
-                                                           config)
+            refine_depth_output = refine_depth_around_edge(
+                refine_depth_output.copy(),
+                (edge_dict['fpath_map'] == near_id).astype(np.uint8) *
+                edge_dict['mask'],
+                (edge_dict['fpath_map'] == near_id).astype(np.uint8),
+                (edge_dict['npath_map'] == near_id).astype(np.uint8) *
+                edge_dict['mask'],
+                depth_dict['mask'].copy(),
+                depth_dict['output'] * depth_dict['context'],
+                config)
         depth_dict['output'][depth_dict['mask'] > 0] = refine_depth_output[depth_dict['mask'] > 0]
-        rgb_dict = get_rgb_from_nodes(context_cc | extend_context_cc,
-                                      erode_context_cc | extend_erode_context_ccs[edge_id], mask_cc, mesh.graph['H'],
-                                      mesh.graph['W'], mesh)
-        if np.all(rgb_dict['mask'] == edge_dict['mask']) is False:
-            import pdb;
-            pdb.set_trace()
+        rgb_dict = get_rgb_from_nodes(
+            context_cc | extend_context_cc,
+            erode_context_cc | extend_erode_context_ccs[edge_id], mask_cc, mesh.graph['H'],
+            mesh.graph['W'], mesh)
+
         rgb_dict['edge'] = edge_dict['output']
         patch_rgb_dict = dict()
         patch_rgb_dict['mask'], patch_rgb_dict['context'], patch_rgb_dict['rgb'], \
-        patch_rgb_dict['edge'] = crop_maps_by_size(union_size, rgb_dict['mask'],
-                                                   rgb_dict['context'], rgb_dict['rgb'],
-                                                   rgb_dict['edge'])
+        patch_rgb_dict['edge'] = crop_maps_by_size(
+            union_size, rgb_dict['mask'],
+            rgb_dict['context'], rgb_dict['rgb'],
+            rgb_dict['edge'])
         tensor_rgb_dict = convert2tensor(patch_rgb_dict)
-        resize_rgb_dict = {k: v.clone() for k, v in tensor_rgb_dict.items()}
+        resize_rgb_dict = {k: v.copy() for k, v in tensor_rgb_dict.items()}
         max_hw = np.array([*patch_rgb_dict['mask'].shape[-2:]]).max()
         init_frac = config['largest_size'] / (np.array([*patch_rgb_dict['mask'].shape[-2:]]).prod() ** 0.5)
         resize_hw = [patch_rgb_dict['mask'].shape[-2] * init_frac, patch_rgb_dict['mask'].shape[-1] * init_frac]
         resize_max_hw = max(resize_hw)
         frac = (np.floor(resize_max_hw / 128.) * 128.) / max_hw
         if frac < 1:
-            resize_mark = torch.nn.functional.interpolate(torch.cat((resize_rgb_dict['mask'],
-                                                                     resize_rgb_dict['context']),
-                                                                    dim=1),
-                                                          scale_factor=frac,
-                                                          mode='area')
-            resize_rgb_dict['mask'] = (resize_mark[:, 0:1] > 0).float()
-            resize_rgb_dict['context'] = (resize_mark[:, 1:2] == 1).float()
+            resize_mark = cv2.resize(
+                np.concatenate(
+                    (resize_rgb_dict['mask'], resize_rgb_dict['context']),
+                    axis=1).transpose(0, 2, 3, 1)[0],
+                None,
+                fx=frac, fy=frac,
+                interpolation=cv2.INTER_AREA).transpose(2, 0, 1)[None, :]
+            resize_rgb_dict['mask'] = (resize_mark[:, 0:1] > 0).astype(np.float)
+            resize_rgb_dict['context'] = (resize_mark[:, 1:2] == 1).astype(np.float)
             resize_rgb_dict['context'][resize_rgb_dict['mask'] > 0] = 0
-            resize_rgb_dict['rgb'] = torch.nn.functional.interpolate(resize_rgb_dict['rgb'],
-                                                                     scale_factor=frac,
-                                                                     mode='area')
+            resize_rgb_dict['rgb'] = cv2.resize(
+                resize_rgb_dict['rgb'].transpose(0, 2, 3, 1)[0],
+                None,
+                fx=frac, fy=frac,
+                interpolation=cv2.INTER_AREA).transpose(2, 0, 1)[None, :]
             resize_rgb_dict['rgb'] = resize_rgb_dict['rgb'] * resize_rgb_dict['context']
-            resize_rgb_dict['edge'] = torch.nn.functional.interpolate(resize_rgb_dict['edge'],
-                                                                      scale_factor=frac,
-                                                                      mode='area')
-            resize_rgb_dict['edge'] = (resize_rgb_dict['edge'] > 0).float() * 0
+            resize_rgb_dict['edge'] = cv2.resize(
+                resize_rgb_dict['edge'].transpose(0, 2, 3, 1)[0],
+                None,
+                fx=frac, fy=frac,
+                interpolation=cv2.INTER_AREA)[None, None, :]
+            resize_rgb_dict['edge'] = (resize_rgb_dict['edge'] > 0).astype(np.float) * 0
             resize_rgb_dict['edge'] = resize_rgb_dict['edge'] * (resize_rgb_dict['context'] + resize_rgb_dict['mask'])
-        rgb_input_feat = torch.cat((resize_rgb_dict['rgb'], resize_rgb_dict['edge']), dim=1)
+        rgb_input_feat = np.concatenate((resize_rgb_dict['rgb'], resize_rgb_dict['edge']), axis=1)
         rgb_input_feat[:, 3] = 1 - rgb_input_feat[:, 3]
         resize_mask = open_small_mask(resize_rgb_dict['mask'], resize_rgb_dict['context'], 3, 41)
         specified_hole = resize_mask
-        with torch.no_grad():
-            rgb_output = rgb_model.forward_3P(specified_hole,
-                                              resize_rgb_dict['context'],
-                                              resize_rgb_dict['rgb'],
-                                              resize_rgb_dict['edge'],
-                                              unit_length=128,
-                                              cuda=device)
-            rgb_output = rgb_output.cpu()
-            if config.get('gray_image') is True:
-                rgb_output = rgb_output.mean(1, keepdim=True).repeat((1, 3, 1, 1))
-            rgb_output = rgb_output.cpu()
+
+        rgb_output = color_forward_3P(
+            rgb_model, specified_hole, resize_rgb_dict['context'],
+            resize_rgb_dict['rgb'], resize_rgb_dict['edge'])
+
+        if config.get('gray_image') is True:
+            rgb_output = rgb_output.mean(1, keepdim=True).repeat((1, 3, 1, 1))
+
         resize_rgb_dict['output'] = rgb_output * resize_rgb_dict['mask'] + resize_rgb_dict['rgb']
         tensor_rgb_dict['output'] = resize_rgb_dict['output']
         if frac < 1:
-            tensor_rgb_dict['output'] = torch.nn.functional.interpolate(tensor_rgb_dict['output'],
-                                                                        size=tensor_rgb_dict['mask'].shape[-2:],
-                                                                        mode='bicubic')
-            tensor_rgb_dict['output'] = tensor_rgb_dict['output'] * \
-                                        tensor_rgb_dict['mask'] + (tensor_rgb_dict['rgb'] * tensor_rgb_dict['context'])
-        patch_rgb_dict['output'] = tensor_rgb_dict['output'].data.cpu().numpy().squeeze().transpose(1, 2, 0)
+            tensor_rgb_dict['output'] = cv2.resize(
+                tensor_rgb_dict['output'].transpose(0, 2, 3, 1)[0],
+                tensor_rgb_dict['mask'].shape[-2:][::-1],
+                interpolation=cv2.INTER_CUBIC).transpose(2, 0, 1)[None, :]
+            tensor_rgb_dict['output'] = \
+                tensor_rgb_dict['output'] * \
+                tensor_rgb_dict['mask'] + (tensor_rgb_dict['rgb'] * tensor_rgb_dict['context'])
+        patch_rgb_dict['output'] = tensor_rgb_dict['output'].squeeze().transpose(1, 2, 0)
         rgb_dict['output'] = np.zeros((mesh.graph['H'], mesh.graph['W'], 3))
         rgb_dict['output'][union_size['x_min']:union_size['x_max'], union_size['y_min']:union_size['y_max']] = \
             patch_rgb_dict['output']
@@ -3308,8 +3899,6 @@ def DL_inpaint_edge(
             if not (mesh.has_node(node)):
                 if not mesh.has_node((node[0], node[1])):
                     print("2D node not found.")
-                    import pdb;
-                    pdb.set_trace()
                 if inpaint_iter == 1:
                     paint = (rgb_dict['output'][hx, hy] * 255).astype(np.uint8)
                 else:
@@ -3360,8 +3949,7 @@ def DL_inpaint_edge(
             try:
                 new_edge_ccs[mesh.nodes[node].get('edge_id')].add(node)
             except:
-                import pdb;
-                pdb.set_trace()
+                raise
     specific_mask_nodes = None
     if inpaint_iter == 0:
         mesh, info_on_pix = refine_color_around_edge(mesh, info_on_pix, new_edge_ccs, config, False)
@@ -3601,38 +4189,37 @@ def write_ply(image,
                 node_str_color.append(str_color)
                 node_str_point.append(str_pt)
     str_faces = generate_face(input_mesh, info_on_pix, config)
-    if config['save_ply'] is True:
-        print("Writing mesh file %s ..." % ply_name)
-        with open(ply_name, 'w') as ply_fi:
-            ply_fi.write('ply\n' + 'format ascii 1.0\n')
-            ply_fi.write('comment H ' + str(int(input_mesh.graph['H'])) + '\n')
-            ply_fi.write('comment W ' + str(int(input_mesh.graph['W'])) + '\n')
-            ply_fi.write('comment hFov ' + str(float(input_mesh.graph['hFov'])) + '\n')
-            ply_fi.write('comment vFov ' + str(float(input_mesh.graph['vFov'])) + '\n')
-            ply_fi.write('element vertex ' + str(len(node_str_list)) + '\n')
-            ply_fi.write('property float x\n' + \
-                         'property float y\n' + \
-                         'property float z\n' + \
-                         'property uchar red\n' + \
-                         'property uchar green\n' + \
-                         'property uchar blue\n' + \
-                         'property uchar alpha\n')
-            ply_fi.write('element face ' + str(len(str_faces)) + '\n')
-            ply_fi.write('property list uchar int vertex_index\n')
-            ply_fi.write('end_header\n')
-            ply_fi.writelines(node_str_list)
-            ply_fi.writelines(str_faces)
-        ply_fi.close()
+    
+    # if config['save_ply'] is True:
+    #     print("Writing mesh file %s ..." % ply_name)
+    #     with open(ply_name, 'w') as ply_fi:
+    #         ply_fi.write('ply\n' + 'format ascii 1.0\n')
+    #         ply_fi.write('comment H ' + str(int(input_mesh.graph['H'])) + '\n')
+    #         ply_fi.write('comment W ' + str(int(input_mesh.graph['W'])) + '\n')
+    #         ply_fi.write('comment hFov ' + str(float(input_mesh.graph['hFov'])) + '\n')
+    #         ply_fi.write('comment vFov ' + str(float(input_mesh.graph['vFov'])) + '\n')
+    #         ply_fi.write('element vertex ' + str(len(node_str_list)) + '\n')
+    #         ply_fi.write('property float x\n' + \
+    #                      'property float y\n' + \
+    #                      'property float z\n' + \
+    #                      'property uchar red\n' + \
+    #                      'property uchar green\n' + \
+    #                      'property uchar blue\n' + \
+    #                      'property uchar alpha\n')
+    #         ply_fi.write('element face ' + str(len(str_faces)) + '\n')
+    #         ply_fi.write('property list uchar int vertex_index\n')
+    #         ply_fi.write('end_header\n')
+    #         ply_fi.writelines(node_str_list)
+    #         ply_fi.writelines(str_faces)
+    #     ply_fi.close()
 
-        return input_mesh
-    else:
-        H = int(input_mesh.graph['H'])
-        W = int(input_mesh.graph['W'])
-        hFov = input_mesh.graph['hFov']
-        vFov = input_mesh.graph['vFov']
-        node_str_color = np.array(node_str_color).astype(np.float32)
-        node_str_color[..., :3] = node_str_color[..., :3] / 255.
-        node_str_point = np.array(node_str_point)
-        str_faces = np.array(str_faces)
+    H = int(input_mesh.graph['H'])
+    W = int(input_mesh.graph['W'])
+    hFov = input_mesh.graph['hFov']
+    vFov = input_mesh.graph['vFov']
+    node_str_color = np.array(node_str_color).astype(np.float32)
+    node_str_color[..., :3] = node_str_color[..., :3] / 255.
+    node_str_point = np.array(node_str_point)
+    str_faces = np.array(str_faces)
 
-        return node_str_point, node_str_color, str_faces, H, W, hFov, vFov
+    return node_str_point, node_str_color, str_faces, H, W, hFov, vFov

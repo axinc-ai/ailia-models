@@ -110,8 +110,16 @@ def make_video(image, depth, net_info):
         'sigma_s': 4.0,
         'sigma_r': 0.5,
         'redundant_number': 12,
+        'background_thickness': 70,
         'context_thickness': 140,
+        'background_thickness_2': 70,
+        'context_thickness_2': 70,
+        'log_depth': True,
+        'largest_size': 512,
+        'depth_edge_dilate': 10,
+        'depth_edge_dilate_2': 5,
         'extrapolate_border': True,
+        'depth_edge_dilate_2': 5,
         'extrapolation_thickness': 60,
     }
     H, W = image.shape[:2]
