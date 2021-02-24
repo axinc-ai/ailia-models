@@ -10,11 +10,15 @@ import ailia
 # import original modules
 sys.path.append('../../util')
 import webcamera_utils  # noqa: E402
-from utils import get_base_parser, update_parser  # noqa: E402
+from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from detector_utils import load_image  # noqa: E402
 from hps_utils import xywh2cs, transform_logits, \
     get_affine_transform  # noqa: E402
+
+# logger
+from logging import getLogger   # noqa: E402
+logger = getLogger(__name__)
 
 
 # ======================
@@ -146,27 +150,28 @@ def detect_objects(img, detector):
 def recognize_from_image(filename, detector):
     # prepare input data
     img_0 = load_image(filename)
-    print(f'input image shape: {img_0.shape}')
+    logger.debug(f'input image shape: {img_0.shape}')
 
     img = cv2.cvtColor(img_0, cv2.COLOR_BGRA2BGR)
 
     # inference
-    print('Start inference...')
+    logger.info('Start inference...')
     if args.benchmark:
-        print('BENCHMARK mode')
+        logger.info('BENCHMARK mode')
         for i in range(5):
             start = int(round(time.time() * 1000))
             parsing_result = detect_objects(img, detector)
             end = int(round(time.time() * 1000))
-            print(f'\tailia processing time {end - start} ms')
+            logger.info(f'\tailia processing time {end - start} ms')
     else:
         parsing_result = detect_objects(img, detector)
 
     output_img = Image.fromarray(np.asarray(parsing_result, dtype=np.uint8))
     palette = get_palette(len(CATEGORY))
     output_img.putpalette(palette)
-    output_img.save(args.savepath)
-    print('Script finished successfully.')
+    savepath = get_savepath(args.savepath, filename)
+    logger.info(f'saved at : {savepath}')
+    output_img.save(savepath)
 
 
 def recognize_from_video(video, detector):
@@ -206,7 +211,6 @@ def recognize_from_video(video, detector):
     cv2.destroyAllWindows()
     if writer is not None:
         writer.release()
-    print('Script finished successfully.')
 
 
 def main():
@@ -222,7 +226,12 @@ def main():
         recognize_from_video(args.video, detector)
     else:
         # image mode
-        recognize_from_image(args.input, detector)
+        # input image loop
+        for image_path in args.input:
+            # prepare input data
+            logger.info(image_path)
+            recognize_from_image(image_path, detector)
+    logger.info('Script finished successfully.')
 
 
 if __name__ == '__main__':

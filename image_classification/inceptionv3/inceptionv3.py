@@ -13,6 +13,10 @@ from model_utils import check_and_download_models  # noqa: E402
 from image_utils import load_image  # noqa: E402
 import webcamera_utils  # noqa: E402
 
+# logger
+from logging import getLogger   # noqa: E402
+logger = getLogger(__name__)
+
 
 # ======================
 # Parameters
@@ -41,46 +45,51 @@ args = update_parser(parser)
 # Main functions
 # ======================
 def recognize_from_image():
-    # prepare input data
-    input_img = load_image(
-        args.input,
-        (IMAGE_HEIGHT, IMAGE_WIDTH),
-        normalize_type='None',
-    )
-    input_data = cv2.cvtColor(input_img, cv2.COLOR_BGR2BGRA)
-
     # net initialize
     classifier = ailia.Classifier(
         MODEL_PATH,
         WEIGHT_PATH,
         env_id=args.env_id,
         format=ailia.NETWORK_IMAGE_FORMAT_RGB,
-        range=ailia.NETWORK_IMAGE_RANGE_U_FP32
+        range=ailia.NETWORK_IMAGE_RANGE_U_FP32,
     )
 
-    # inference
-    print('Start inference...')
-    if args.benchmark:
-        print('BENCHMARK mode')
-        for i in range(5):
-            start = int(round(time.time() * 1000))
+    # input image loop
+    for image_path in args.input:
+        # prepare input data
+        logger.info(image_path)
+        input_img = load_image(
+            image_path,
+            (IMAGE_HEIGHT, IMAGE_WIDTH),
+            normalize_type='None',
+        )
+        input_data = cv2.cvtColor(input_img, cv2.COLOR_BGR2BGRA)
+
+        # inference
+        logger.info('Start inference...')
+        if args.benchmark:
+            logger.info('BENCHMARK mode')
+            for i in range(5):
+                start = int(round(time.time() * 1000))
+                classifier.compute(input_data, MAX_CLASS_COUNT)
+                end = int(round(time.time() * 1000))
+                logger.info(f'\tailia processing time {end - start} ms')
+        else:
             classifier.compute(input_data, MAX_CLASS_COUNT)
-            end = int(round(time.time() * 1000))
-            print(f'\tailia processing time {end - start} ms')
-    else:
-        classifier.compute(input_data, MAX_CLASS_COUNT)
 
-    count = classifier.get_class_count()
+        count = classifier.get_class_count()
 
-    # postprocessing
-    for idx in range(count):
-        # print result
-        print(f'+ idx={idx}')
-        info = classifier.get_class(idx)
-        print(f'  category={info.category}' +
-              f'[ {inceptionv3_labels.imagenet_category[info.category]} ]')
-        print(f'  prob={info.prob}')
-    print('Script finished successfully.')
+        # postprocessing
+        for idx in range(count):
+            # logger.info result
+            logger.info(f'+ idx={idx}')
+            info = classifier.get_class(idx)
+            logger.info(
+                f'  category={info.category}'
+                f'[ {inceptionv3_labels.imagenet_category[info.category]} ]'
+            )
+            logger.info(f'  prob={info.prob}')
+    logger.info('Script finished successfully.')
 
 
 def recognize_from_video():
@@ -90,7 +99,7 @@ def recognize_from_video():
         WEIGHT_PATH,
         env_id=args.env_id,
         format=ailia.NETWORK_IMAGE_FORMAT_RGB,
-        range=ailia.NETWORK_IMAGE_RANGE_U_FP32
+        range=ailia.NETWORK_IMAGE_RANGE_U_FP32,
     )
 
     capture = webcamera_utils.get_capture(args.video)
@@ -123,14 +132,16 @@ def recognize_from_video():
         # get result
         count = classifier.get_class_count()
 
-        print('==============================================================')
+        logger.info('=' * 80)
         for idx in range(count):
-            # print result
-            print(f'+ idx={idx}')
+            # logger.info result
+            logger.info(f'+ idx={idx}')
             info = classifier.get_class(idx)
-            print(f'  category={info.category}' +
-                  f'[ {inceptionv3_labels.imagenet_category[info.category]} ]')
-            print(f'  prob={info.prob}')
+            logger.info(
+                f'  category={info.category}'
+                f'[ {inceptionv3_labels.imagenet_category[info.category]} ]'
+            )
+            logger.info(f'  prob={info.prob}')
 
         cv2.imshow('frame', input_image)
         time.sleep(SLEEP_TIME)
@@ -143,7 +154,7 @@ def recognize_from_video():
     cv2.destroyAllWindows()
     if writer is not None:
         writer.release()
-    print('Script finished successfully.')
+    logger.info('Script finished successfully.')
 
 
 def main():

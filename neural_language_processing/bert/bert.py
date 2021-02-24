@@ -8,16 +8,21 @@ import warnings
 warnings.filterwarnings('ignore', category=FutureWarning)
 
 from transformers import BertTokenizer  # noqa: E402
-try:
-    from pyknp import Juman  # noqa: E402
-except ModuleNotFoundError:
-    print('[WARNING] pyknp module is not installed. (for japanese mode)')
 
 import ailia  # noqa: E402
 # import original modules
 sys.path.append('../../util')
 from utils import get_base_parser, update_parser  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
+
+# logger
+from logging import getLogger   # noqa: E402
+logger = getLogger(__name__)
+
+try:
+    from pyknp import Juman  # noqa: E402
+except ModuleNotFoundError:
+    logger.warning('pyknp module is not installed. (for japanese mode)')
 
 
 # ======================
@@ -46,7 +51,7 @@ args = update_parser(parser)
 # ======================
 NUM_PREDICT = 3  # Top NUM_PREDICT predictions will be displayed. (default=3)
 LANG = args.lang
-print('[INFO] language is set to ' + LANG)
+logger.info('language is set to ' + LANG)
 
 if LANG == 'en':
     WEIGHT_PATH = "bert-base-uncased.onnx"
@@ -140,7 +145,7 @@ def main():
         tokenizer = BertTokenizer(
             'vocab.txt',
             do_lower_case=False,
-            do_basic_tokenize=False
+            do_basic_tokenize=False,
         )
 
     # prepare data
@@ -154,14 +159,14 @@ def main():
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
 
     # inference
-    print('Start inference...')
+    logger.info('Start inference...')
     if args.benchmark:
-        print('BENCHMARK mode')
+        logger.info('BENCHMARK mode')
         for c in range(5):
             start = int(round(time.time() * 1000))
             preds_ailia = net.predict(input_data)
             end = int(round(time.time() * 1000))
-            print("\tailia processing time {} ms".format(end-start))
+            logger.info("\tailia processing time {} ms".format(end-start))
     else:
         preds_ailia = net.predict(input_data)
 
@@ -172,9 +177,9 @@ def main():
 
     predicted_tokens = tokenizer.convert_ids_to_tokens(predicted_indices)
 
-    print('Input sentence: ' + SENTENCE)
-    print(f'predicted top {NUM_PREDICT} words: {predicted_tokens}')
-    print('Script finished successfully.')
+    logger.info('Input sentence: ' + SENTENCE)
+    logger.info(f'predicted top {NUM_PREDICT} words: {predicted_tokens}')
+    logger.info('Script finished successfully.')
 
 
 if __name__ == "__main__":

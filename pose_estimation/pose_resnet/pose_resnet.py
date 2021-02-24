@@ -8,11 +8,15 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser  # noqa: E402
+from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from detector_utils import load_image  # noqa: E402
 import webcamera_utils  # noqa: E402
 from pose_resnet_util import compute, keep_aspect  # noqa: E402
+
+# logger
+from logging import getLogger   # noqa: E402
+logger = getLogger(__name__)
 
 
 # ======================
@@ -27,7 +31,7 @@ WEIGHT_PATH = 'yolov3.opt.onnx'
 MODEL_PATH = 'yolov3.opt.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/yolov3/'
 
-IMAGE_PATH = 'balloon.png'
+IMAGE_PATH = 'input.jpg'
 SAVE_IMAGE_PATH = 'output.png'
 
 COCO_CATEGORY = [
@@ -129,19 +133,19 @@ def plot_results(detector, pose, img, category, logging=True):
     h, w = img.shape[0], img.shape[1]
     count = detector.get_object_count()
     if logging:
-        print(f'object_count={count}')
+        logger.info(f'object_count={count}')
 
     for idx in range(count):
         obj = detector.get_object(idx)
         # print result
         if logging:
-            print(f'+ idx={idx}')
-            print(f'  category={obj.category}[ {category[obj.category]} ]')
-            print(f'  prob={obj.prob}')
-            print(f'  x={obj.x}')
-            print(f'  y={obj.y}')
-            print(f'  w={obj.w}')
-            print(f'  h={obj.h}')
+            logger.info(f'+ idx={idx}')
+            logger.info(f'  category={obj.category}[ {category[obj.category]} ]')
+            logger.info(f'  prob={obj.prob}')
+            logger.info(f'  x={obj.x}')
+            logger.info(f'  y={obj.y}')
+            logger.info(f'  w={obj.w}')
+            logger.info(f'  h={obj.h}')
         top_left = (int(w*obj.x), int(h*obj.y))
         bottom_right = (int(w*(obj.x+obj.w)), int(h*(obj.y+obj.h)))
         text_position = (int(w*obj.x)+4, int(h*(obj.y+obj.h)-8))
@@ -190,10 +194,6 @@ def plot_results(detector, pose, img, category, logging=True):
 # Main functions
 # ======================
 def recognize_from_image():
-    # prepare input data
-    img = load_image(args.input)
-    print(f'input image shape: {img.shape}')
-
     # net initialize
     detector = ailia.Detector(
         MODEL_PATH,
@@ -208,22 +208,31 @@ def recognize_from_image():
 
     pose = ailia.Net(POSE_MODEL_PATH, POSE_WEIGHT_PATH, env_id=args.env_id)
 
-    # inference
-    print('Start inference...')
-    if args.benchmark:
-        print('BENCHMARK mode')
-        for i in range(5):
-            start = int(round(time.time() * 1000))
-            detector.compute(img, THRESHOLD, IOU)
-            end = int(round(time.time() * 1000))
-            print(f'\tailia processing time {end - start} ms')
-    else:
-        detector.compute(img, THRESHOLD, IOU)
+    # input image loop
+    for image_path in args.input:
+        # prepare input data
+        logger.info(image_path)
+        img = load_image(image_path)
+        logger.debug(f'input image shape: {img.shape}')
 
-    # plot result
-    res_img = plot_results(detector, pose, img, COCO_CATEGORY)
-    cv2.imwrite(args.savepath, res_img)
-    print('Script finished successfully.')
+        # inference
+        logger.info('Start inference...')
+        if args.benchmark:
+            logger.info('BENCHMARK mode')
+            for i in range(5):
+                start = int(round(time.time() * 1000))
+                detector.compute(img, THRESHOLD, IOU)
+                end = int(round(time.time() * 1000))
+                logger.info(f'\tailia processing time {end - start} ms')
+        else:
+            detector.compute(img, THRESHOLD, IOU)
+
+        # plot result
+        res_img = plot_results(detector, pose, img, COCO_CATEGORY)
+        savepath = get_savepath(args.savepath, image_path)
+        logger.info(f'saved at : {savepath}')
+        cv2.imwrite(savepath, res_img)
+    logger.info('Script finished successfully.')
 
 
 def recognize_from_video():
@@ -267,7 +276,7 @@ def recognize_from_video():
     cv2.destroyAllWindows()
     if writer is not None:
         writer.release()
-    print('Script finished successfully.')
+    logger.info('Script finished successfully.')
 
 
 def main():

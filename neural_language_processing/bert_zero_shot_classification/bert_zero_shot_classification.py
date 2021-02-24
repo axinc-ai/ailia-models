@@ -10,6 +10,10 @@ sys.path.append('../../util')
 from utils import get_base_parser, update_parser  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 
+# logger
+from logging import getLogger   # noqa: E402
+logger = getLogger(__name__)
+
 
 # ======================
 # Arguemnt Parser Config
@@ -33,7 +37,7 @@ parser.add_argument(
     '--hypothesis_template', '-t', metavar='TEXT', default=HYPOTHESIS_TEMPLATE,
     help='input hypothesis template'
 )
-args = update_parser(parser)
+args = update_parser(parser, check_input_type=False)
 
 
 # ======================
@@ -85,18 +89,18 @@ def main():
         k: v.cpu().detach().numpy() for k, v in model_inputs.items()
     }
 
-    print("Sentence : ", args.sentence)
-    print("Candidate Labels : ", args.candidate_labels)
-    print("Hypothesis Template : ", args.hypothesis_template)
+    logger.info("Sentence : "+str(args.sentence))
+    logger.info("Candidate Labels : "+str(args.candidate_labels))
+    logger.info("Hypothesis Template : "+str(args.hypothesis_template))
 
     # inference
     if args.benchmark:
-        print('BENCHMARK mode')
+        logger.info('BENCHMARK mode')
         for i in range(5):
             start = int(round(time.time() * 1000))
             score = ailia_model.predict(inputs_onnx)
             end = int(round(time.time() * 1000))
-            print("\tailia processing time {} ms".format(end - start))
+            logger.info("\tailia processing time {} ms".format(end - start))
     else:
         score = ailia_model.predict(inputs_onnx)
 
@@ -111,11 +115,11 @@ def main():
         numpy.exp(entail_logits).sum(-1, keepdims=True)
 
     label_id = numpy.argmax(numpy.array(score))
-    print("Label Id :", label_id)
-    print("Label : ", candidate_labels[label_id])
-    print("Score : ", score[0][label_id])
+    logger.info("Label Id :"+str(label_id))
+    logger.info("Label : "+str(candidate_labels[label_id]))
+    logger.info("Score : "+str(score[0][label_id]))
 
-    print('Script finished successfully.')
+    logger.info('Script finished successfully.')
 
 
 if __name__ == "__main__":

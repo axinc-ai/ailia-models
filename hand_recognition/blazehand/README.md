@@ -72,6 +72,12 @@ If you pass `0` as an argument to VIDEO_PATH, you can use the webcam input inste
 $ python3 blazehand.py --video VIDEO_PATH --savepath SAVE_VIDEO_PATH
 ```
 
+By adding the `--hands` option, you can decide the maximum number of tracked hands.
+By default, it allows tracking up to 2 hands.
+```bash
+$ python3 blazehand.py --hands 3
+```
+
 ## Reference
 
 - [MediaPipePyTorch](https://github.com/zmurez/MediaPipePyTorch)

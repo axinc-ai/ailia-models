@@ -13,6 +13,10 @@ from model_utils import check_and_download_models  # noqa: E402
 from classifier_utils import plot_results, print_results  # noqa: E402
 import webcamera_utils  # noqa: E402
 
+# logger
+from logging import getLogger   # noqa: E402
+logger = getLogger(__name__)
+
 
 # ======================
 # Parameters 1
@@ -65,33 +69,36 @@ def preprocess_image(img):
 # Main functions
 # ======================
 def recognize_from_image():
-    # prepare input data
-    img = cv2.imread(args.input, cv2.IMREAD_UNCHANGED)
-    img = preprocess_image(img)
-
     # net initialize
     classifier = ailia.Classifier(
         MODEL_PATH,
         WEIGHT_PATH,
         env_id=args.env_id,
         format=ailia.NETWORK_IMAGE_FORMAT_RGB,
-        range=IMAGE_RANGE
+        range=IMAGE_RANGE,
     )
 
-    # inference
-    print('Start inference...')
-    if args.benchmark:
-        print('BENCHMARK mode')
-        for i in range(5):
-            start = int(round(time.time() * 1000))
-            classifier.compute(img, MAX_CLASS_COUNT)
-            end = int(round(time.time() * 1000))
-            print(f'\tailia processing time {end - start} ms')
-    else:
-        classifier.compute(img, MAX_CLASS_COUNT)
+    # input image loop
+    for image_path in args.input:
+        # prepare input data
+        logger.info(image_path)
+        img = cv2.imread(image_path, cv2.IMREAD_UNCHANGED)
+        img = preprocess_image(img)
 
-    # show results
-    print_results(classifier, resnet50_labels.imagenet_category)
+        # inference
+        logger.info('Start inference...')
+        if args.benchmark:
+            logger.info('BENCHMARK mode')
+            for i in range(5):
+                start = int(round(time.time() * 1000))
+                classifier.compute(img, MAX_CLASS_COUNT)
+                end = int(round(time.time() * 1000))
+                logger.info(f'\tailia processing time {end - start} ms')
+        else:
+            classifier.compute(img, MAX_CLASS_COUNT)
+
+        # show results
+        print_results(classifier, resnet50_labels.imagenet_category)
 
 
 def recognize_from_video():
@@ -101,7 +108,7 @@ def recognize_from_video():
         WEIGHT_PATH,
         env_id=args.env_id,
         format=ailia.NETWORK_IMAGE_FORMAT_RGB,
-        range=IMAGE_RANGE
+        range=IMAGE_RANGE,
     )
 
     capture = webcamera_utils.get_capture(args.video)
@@ -146,7 +153,7 @@ def recognize_from_video():
     cv2.destroyAllWindows()
     if writer is not None:
         writer.release()
-    print('Script finished successfully.')
+    logger.info('Script finished successfully.')
 
 
 def main():

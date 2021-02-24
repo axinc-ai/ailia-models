@@ -1,3 +1,4 @@
+import os
 import sys
 import time
 import math
@@ -11,10 +12,17 @@ import matplotlib.pyplot as plt
 import ailia
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser  # noqa: E402
+from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from image_utils import load_image  # noqa: E402
 import webcamera_utils  # noqa: E402
+
+sys.path.append('../../face_detection/blazeface')
+from blazeface_utils import compute_blazeface, crop_blazeface  # noqa: E402
+
+# logger
+from logging import getLogger   # noqa: E402
+logger = getLogger(__name__)
 
 
 # ======================
@@ -33,8 +41,6 @@ FACE_WEIGHT_PATH = 'blazeface.onnx'
 FACE_MODEL_PATH = 'blazeface.onnx.prototxt'
 FACE_REMOTE_PATH = "https://storage.googleapis.com/ailia-models/blazeface/"
 FACE_MARGIN = 1.2
-sys.path.append('../../face_detection/blazeface')
-from blazeface_utils import compute_blazeface, crop_blazeface  # noqa: E402
 
 # ======================
 # Argument Parser Config
@@ -83,7 +89,7 @@ def create_figure(active_3d):
     return fig, axs
 
 
-def plot_images(title, images, tile_shape):
+def plot_images(title, images, tile_shape, savepath):
     fig = plt.figure()
     plt.title(title)
     grid = ImageGrid(fig, 111,  nrows_ncols=tile_shape, share_all=True)
@@ -94,8 +100,9 @@ def plot_images(title, images, tile_shape):
     for i in range(images.shape[0]):
         grd = grid[i]
         grd.imshow(images[i])
-    split_fname = args.savepath.split('.')
+    split_fname = os.path.splitext(savepath)
     save_name = split_fname[0] + '_confidence.' + split_fname[1]
+    logger.info(f'saved at : {save_name}')
     fig.savefig(save_name)
 
 
@@ -316,74 +323,84 @@ def draw_gaussian(img, point, sigma):
 # Main functions
 # ======================
 def recognize_from_image():
-    # prepare input data
-    input_img = cv2.imread(args.input)
-    data = load_image(
-        args.input,
-        (IMAGE_HEIGHT, IMAGE_WIDTH),
-        normalize_type='255',
-        gen_input_ailia=True
-    )
-
     # net initialize
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
     if args.active_3d:
-        print('>>> 3D mode is activated!')
+        logger.info('>>> 3D mode is activated!')
         depth_net = ailia.Net(
             DEPTH_MODEL_PATH, DEPTH_WEIGHT_PATH, env_id=args.env_id
         )
 
-    # inference
-    print('Start inference...')
-    if args.benchmark:
-        print('BENCHMARK mode')
-        for i in range(5):
-            start = int(round(time.time() * 1000))
+    # input image loop
+    for image_path in args.input:
+        # prepare input data
+        logger.info(image_path)
+        input_img = cv2.imread(image_path)
+        data = load_image(
+            image_path,
+            (IMAGE_HEIGHT, IMAGE_WIDTH),
+            normalize_type='255',
+            gen_input_ailia=True
+        )
+
+        # inference
+        logger.info('Start inference...')
+        if args.benchmark:
+            logger.info('BENCHMARK mode')
+            for i in range(5):
+                start = int(round(time.time() * 1000))
+                preds_ailia = net.predict(data)
+                end = int(round(time.time() * 1000))
+                logger.info(f'\tailia processing time {end - start} ms')
+        else:
             preds_ailia = net.predict(data)
-            end = int(round(time.time() * 1000))
-            print(f'\tailia processing time {end - start} ms')
-    else:
-        preds_ailia = net.predict(data)
 
-    pts, pts_img = get_preds_from_hm(preds_ailia)
-    pts, pts_img = pts.reshape(68, 2) * 4, pts_img.reshape(68, 2)
+        pts, pts_img = get_preds_from_hm(preds_ailia)
+        pts, pts_img = pts.reshape(68, 2) * 4, pts_img.reshape(68, 2)
 
-    input_img = cv2.resize(
-        cv2.cvtColor(input_img, cv2.COLOR_BGR2RGB),
-        (IMAGE_WIDTH, IMAGE_HEIGHT)
-    )
+        input_img = cv2.resize(
+            cv2.cvtColor(input_img, cv2.COLOR_BGR2RGB),
+            (IMAGE_WIDTH, IMAGE_HEIGHT)
+        )
 
-    if args.active_3d:
-        # 3D mode
-        heatmaps = np.zeros((68, IMAGE_HEIGHT, IMAGE_WIDTH), dtype=np.float32)
-        for i in range(68):
-            if pts[i, 0] > 0:
-                heatmaps[i] = draw_gaussian(heatmaps[i], pts[i], 2)
-        heatmaps = heatmaps[np.newaxis, :, :, :]
-        depth_pred = depth_net.predict(np.concatenate((data, heatmaps), 1))
-        depth_pred = depth_pred.reshape(68, 1)
-        pts_img = np.concatenate((pts_img, depth_pred * 2), 1)
+        if args.active_3d:
+            # 3D mode
+            heatmaps = np.zeros(
+                (68, IMAGE_HEIGHT, IMAGE_WIDTH), dtype=np.float32
+            )
+            for i in range(68):
+                if pts[i, 0] > 0:
+                    heatmaps[i] = draw_gaussian(heatmaps[i], pts[i], 2)
+            heatmaps = heatmaps[np.newaxis, :, :, :]
+            depth_pred = depth_net.predict(np.concatenate((data, heatmaps), 1))
+            depth_pred = depth_pred.reshape(68, 1)
+            pts_img = np.concatenate((pts_img, depth_pred * 2), 1)
 
-    fig, axs = create_figure(active_3d=args.active_3d)
-    axs = visualize_results(axs, input_img, pts_img, active_3d=args.active_3d)
-    fig.savefig(args.savepath)
+        fig, axs = create_figure(active_3d=args.active_3d)
+        axs = visualize_results(
+            axs, input_img, pts_img, active_3d=args.active_3d
+        )
+        savepath = get_savepath(args.savepath, image_path)
+        logger.info(f'saved at : {savepath}')
+        fig.savefig(savepath)
 
-    # Confidence Map
-    channels = preds_ailia[0].shape[0]
-    cols = 8
-    plot_images(
-        'confidence',
-        preds_ailia[0],
-        tile_shape=((int)((channels+cols-1)/cols), cols)
-    )
-    print('Script finished successfully.')
+        # Confidence Map
+        channels = preds_ailia[0].shape[0]
+        cols = 8
+        plot_images(
+            'confidence',
+            preds_ailia[0],
+            tile_shape=((int)((channels+cols-1)/cols), cols),
+            savepath=savepath,
+        )
+    logger.info('Script finished successfully.')
 
 
 def recognize_from_video():
     # net initialize
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
     if args.active_3d:
-        print('>>> 3D mode is activated!')
+        logger.info('>>> 3D mode is activated!')
         depth_net = ailia.Net(
             DEPTH_MODEL_PATH, DEPTH_WEIGHT_PATH, env_id=args.env_id
         )
@@ -393,8 +410,8 @@ def recognize_from_video():
 
     # create video writer if savepath is specified as video format
     if args.savepath != SAVE_IMAGE_PATH:
-        print('[WARNING] currently video results output feature '
-              'is not supported in this model!')
+        logger.warning('[WARNING] currently video results output feature '
+                       'is not supported in this model!')
         # TODO: shape should be debugged!
         f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
         f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
@@ -479,7 +496,7 @@ def recognize_from_video():
     cv2.destroyAllWindows()
     if writer is not None:
         writer.release()
-    print('Script finished successfully.')
+    logger.info('Script finished successfully.')
 
 
 def main():

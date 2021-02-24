@@ -7,10 +7,14 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser  # noqa: E402
+from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from detector_utils import plot_results, load_image  # noqa: E402
 import webcamera_utils  # noqa: E402
+
+# logger
+from logging import getLogger   # noqa: E402
+logger = getLogger(__name__)
 
 
 # ======================
@@ -20,7 +24,7 @@ WEIGHT_PATH = 'pedestrian_detection.opt.onnx'
 MODEL_PATH = 'pedestrian_detection.opt.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/pedestrian_detection/'
 
-IMAGE_PATH = 'couple.jpg'
+IMAGE_PATH = 'input.jpg'
 SAVE_IMAGE_PATH = 'output.png'
 
 COCO_CATEGORY = [
@@ -45,16 +49,6 @@ parser.add_argument(
     default=IOU, type=float,
     help='The detection iou for yolo. (default: '+str(IOU)+')'
 )
-parser.add_argument(
-    '-dw', '--detection_width',
-    default=DETECTION_SIZE, type=int,
-    help='The detection width and height for yolo. (default: 416)'
-)
-parser.add_argument(
-    '-dh', '--detection_height',
-    default=DETECTION_SIZE, type=int,
-    help='The detection height and height for yolo. (default: 416)'
-)
 args = update_parser(parser)
 
 
@@ -62,10 +56,6 @@ args = update_parser(parser)
 # Main functions
 # ======================
 def recognize_from_image():
-    # prepare input data
-    img = load_image(args.input)
-    print(f'input image shape: {img.shape}')
-
     # net initialize
     detector = ailia.Detector(
         MODEL_PATH,
@@ -77,27 +67,40 @@ def recognize_from_image():
         algorithm=ailia.DETECTOR_ALGORITHM_YOLOV3,
         env_id=args.env_id,
     )
-    if args.detection_width != DETECTION_SIZE or args.detection_height != DETECTION_SIZE:
-        detector.set_input_shape(
-            args.detection_width, args.detection_height
-        )
+    if args.profile:
+        detector.set_profile_mode(True)
 
-    # inference
-    print('Start inference...')
-    if args.benchmark:
-        print('BENCHMARK mode')
-        for i in range(5):
-            start = int(round(time.time() * 1000))
+    # input image loop
+    for image_path in args.input:
+        # prepare input data
+        logger.info(image_path)
+
+        # prepare input data
+        img = load_image(image_path)
+        logger.info(f'input image shape: {img.shape}')
+
+        # inference
+        logger.info('Start inference...')
+        if args.benchmark:
+            logger.info('BENCHMARK mode')
+            for i in range(5):
+                start = int(round(time.time() * 1000))
+                detector.compute(img, args.threshold, args.iou)
+                end = int(round(time.time() * 1000))
+                logger.info(f'\tailia processing time {end - start} ms')
+        else:
             detector.compute(img, args.threshold, args.iou)
-            end = int(round(time.time() * 1000))
-            print(f'\tailia processing time {end - start} ms')
-    else:
-        detector.compute(img, args.threshold, args.iou)
 
-    # plot result
-    res_img = plot_results(detector, img, COCO_CATEGORY)
-    cv2.imwrite(args.savepath, res_img)
-    print('Script finished successfully.')
+        # plot result
+        res_img = plot_results(detector, img, COCO_CATEGORY)
+        savepath = get_savepath(args.savepath, image_path)
+        logger.info(f'saved at : {savepath}')
+        cv2.imwrite(savepath, res_img)
+
+    if args.profile:
+        print(detector.get_summary())
+
+    logger.info('Script finished successfully.')
 
 
 def recognize_from_video():
@@ -145,7 +148,7 @@ def recognize_from_video():
     cv2.destroyAllWindows()
     if writer is not None:
         writer.release()
-    print('Script finished successfully.')
+    logger.info('Script finished successfully.')
 
 
 def main():

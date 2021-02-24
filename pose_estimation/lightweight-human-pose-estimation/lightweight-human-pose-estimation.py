@@ -7,16 +7,20 @@ import numpy as np
 import ailia
 
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser  # noqa: E402
+from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from image_utils import load_image  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 import webcamera_utils  # noqa: E402
+
+# logger
+from logging import getLogger   # noqa: E402
+logger = getLogger(__name__)
 
 
 # ======================
 # Parameters 1
 # ======================
-IMAGE_PATH = 'balloon.png'
+IMAGE_PATH = 'input.jpg'
 SAVE_IMAGE_PATH = 'output.png'
 IMAGE_HEIGHT = 240
 IMAGE_WIDTH = 320
@@ -126,38 +130,44 @@ def display_result(input_img, pose):
 # Main functions
 # ======================
 def recognize_from_image():
-    # prepare input data
-    src_img = cv2.imread(args.input)
-    input_image = load_image(
-        args.input,
-        (IMAGE_HEIGHT, IMAGE_WIDTH),
-        normalize_type='None'
-    )
-    input_data = cv2.cvtColor(input_image, cv2.COLOR_RGB2BGRA)
-
     # net initialize
     pose = ailia.PoseEstimator(
         MODEL_PATH, WEIGHT_PATH, env_id=args.env_id, algorithm=ALGORITHM
     )
 
-    # inference
-    print('Start inference...')
-    if args.benchmark:
-        print('BENCHMARK mode')
-        for i in range(5):
-            start = int(round(time.time() * 1000))
-            _ = pose.compute(input_data)
-            end = int(round(time.time() * 1000))
-            print(f'\tailia processing time {end - start} ms')
-    else:
-        _ = pose.compute(input_data)
+    # input image loop
+    for image_path in args.input:
+        # prepare input data
+        logger.info(image_path)
+        # prepare input data
+        src_img = cv2.imread(image_path)
+        input_image = load_image(
+            image_path,
+            (IMAGE_HEIGHT, IMAGE_WIDTH),
+            normalize_type='None',
+        )
+        input_data = cv2.cvtColor(input_image, cv2.COLOR_RGB2BGRA)
 
-    # postprocessing
-    count = pose.get_object_count()
-    print(f'person_count={count}')
-    display_result(src_img, pose)
-    cv2.imwrite(args.savepath, src_img)
-    print('Script finished successfully.')
+        # inference
+        logger.info('Start inference...')
+        if args.benchmark:
+            logger.info('BENCHMARK mode')
+            for i in range(5):
+                start = int(round(time.time() * 1000))
+                _ = pose.compute(input_data)
+                end = int(round(time.time() * 1000))
+                logger.info(f'\tailia processing time {end - start} ms')
+        else:
+            _ = pose.compute(input_data)
+
+        # postprocessing
+        count = pose.get_object_count()
+        logger.info(f'person_count={count}')
+        display_result(src_img, pose)
+        savepath = get_savepath(args.savepath, image_path)
+        logger.info(f'saved at : {savepath}')
+        cv2.imwrite(savepath, src_img)
+    logger.info('Script finished successfully.')
 
 
 def recognize_from_video():
@@ -201,7 +211,7 @@ def recognize_from_video():
     cv2.destroyAllWindows()
     if writer is not None:
         writer.release()
-    print('Script finished successfully.')
+    logger.info('Script finished successfully.')
 
 
 def main():
