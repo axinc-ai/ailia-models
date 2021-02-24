@@ -43,12 +43,6 @@ args = update_parser(parser)
 # ======================
 # Main function
 # ======================
-def generate_first_sample():
-    first_samples = torch.LongTensor(1).zero_() + (256 // 2)
-    first_samples = Variable(first_samples)
-    return first_samples
-
-
 def get_model():
     if not args.onnx :
         logger.info('Use ailia')
@@ -60,9 +54,65 @@ def get_model():
     return net
 
 
-def generate_wave(net, samples, num_generate=16000, temperature=1.0, regularize=0.):
+def generate_first_sample():
+    first_samples = torch.randint(0, 256, (1028,))
+    #first_samples = torch.full((1028,),fill_value=126).long() # silence wave sample
+    return first_samples
+
+
+def output_wav(filename, rate, data):
+    from scipy.io.wavfile import write
+    write(filename, rate, data)
+
+
+def generate_wave(net, num_samples, first_samples=None, temperature=1.):
     tic = time.time()
 
+    receptive_field = 1021
+    classes = 256
+
+    generated = Variable(first_samples, volatile=True)
+    num_pad = receptive_field - generated.size(0)
+
+    #if num_pad > 0:
+    #    generated = _constant_pad_1d(generated, self.scope, pad_start=True)
+    #    print("pad zero")
+
+    for i in range(num_samples):
+        input = Variable(torch.FloatTensor(1, classes, receptive_field).zero_())
+        input = input.scatter_(1, generated[-receptive_field:].view(1, -1, receptive_field), 1.)
+
+        output = _inference(net, input)
+
+        x = output[:, :, -1].squeeze()
+
+        if temperature > 0:
+            x /= temperature
+            prob = F.softmax(x, dim=0)
+            prob = prob.cpu()
+            np_prob = prob.data.numpy()
+            x = np.random.choice(classes, p=np_prob)
+            x = Variable(torch.LongTensor([x]))#np.array([x])
+        else:
+            x = torch.max(x, 0)[1].float()
+
+        generated = torch.cat((generated, x), 0)
+
+        # progress feedback
+        if i % 1600 == 0:
+            print(str(100 * i // num_samples) + "% generated")
+
+    generated = (generated.float() / classes) * 2. - 1
+
+    mu_gen = _mu_law_expansion(generated, classes)
+    mu_gen = mu_gen.to('cpu').detach().numpy().copy() #to numpy
+
+    toc = time.time()
+    print("ailia processing does take {} seconds".format(str(toc-tic)))
+
+    return mu_gen
+
+    """
     num_samples = samples.size(0)
     input = Variable(torch.FloatTensor(1, 256, 1).zero_())
     input = input.scatter_(1, samples[0:1].view(1, -1, 1), 1.)
@@ -103,16 +153,7 @@ def generate_wave(net, samples, num_generate=16000, temperature=1.0, regularize=
 
     generated = (generated / 256) * 2. - 1
     mu_gen = _mu_law_expansion(generated, 256)
-
-    toc = time.time()
-
-    print("ailia processing does take {} seconds".format(str((toc-tic)*0.01)))
-    return mu_gen
-
-
-def output_wav(filename, rate, data):
-    from scipy.io.wavfile import write
-    write(filename, rate, data)
+    """
 
 
 def _inference(net, input):
@@ -120,16 +161,35 @@ def _inference(net, input):
     if not args.onnx:
         output = net.predict(input)
     else:
-        # TODO: fix original pytorch_wavenet code. there is missing input when exporting to onnx.
-        output = net.run([net.get_outputs()[0].name], {})
-        #output = net.run([net.get_outputs()[0].name], {"_": input})
-        output = torch.from_numpy(output[0].astype(np.float32)).clone()
-    return output
+        output = net.run([net.get_outputs()[0].name], {net.get_inputs()[0].name: input})
+
+    return torch.from_numpy(output[0].astype(np.float32)).clone()
 
 
 def _mu_law_expansion(data, mu):
     s = np.sign(data) * (np.exp(np.abs(data) * np.log(mu + 1)) - 1) / mu
     return s
+
+
+def _constant_pad_1d(input, target_size, dimension=0, value=0, pad_start=False):
+    num_pad = target_size - input.size(dimension)
+    assert num_pad >= 0, 'target size has to be greater than input size'
+
+    input_size = input.size()
+
+    size = list(input.size())
+    size[dimension] = target_size
+    output = input.new(*tuple(size)).fill_(value)
+    c_output = output
+
+    # crop output
+    if pad_start:
+        c_output = c_output.narrow(dimension, num_pad, c_output.size(dimension) - num_pad)
+    else:
+        c_output = c_output.narrow(dimension, 0, c_output.size(dimension) - num_pad)
+
+    c_output.copy_(input)
+    return output
 
 
 def main():
@@ -143,10 +203,12 @@ def main():
     sample = generate_first_sample()
 
     # generate wave
-    generated = generate_wave(net, sample, num_generate=160000)
+    generated = generate_wave(net, 16000, first_samples=sample, temperature=1.0)
 
     # output wav
-    output_wav('output.wav', 16000, generated)
+    output_wav('output.wav', 1600, generated)
+
+    print(generated)
 
     logger.info('Script finished successfully.')
 
