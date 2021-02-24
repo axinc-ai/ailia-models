@@ -1,5 +1,6 @@
 import sys, os
 import time
+import copy
 from logging import getLogger
 
 import numpy as np
@@ -102,7 +103,14 @@ def postprocess(depth, height, width):
 
 def make_video(image, depth, net_info):
     config = {
+        'fps': 40,
+        'num_frames': 240,
+        'traj_types': ['double-straight-line', 'double-straight-line', 'circle', 'circle'],
+        'x_shift_range': [0.00, 0.00, -0.02, -0.02],
+        'y_shift_range': [0.00, 0.00, -0.02, -0.00],
+        'z_shift_range': [-0.05, -0.05, -0.07, -0.07],
         'longer_side_len': 960,
+        'save_ply': True,
         'depth_threshold': 0.04,
         'ext_edge_threshold': 0.002,
         'sparse_iter': 5,
@@ -119,8 +127,10 @@ def make_video(image, depth, net_info):
         'depth_edge_dilate': 10,
         'depth_edge_dilate_2': 5,
         'extrapolate_border': True,
-        'depth_edge_dilate_2': 5,
         'extrapolation_thickness': 60,
+        'repeat_inpaint_edge': True,
+        'crop_border': [0.03, 0.03, 0.05, 0.03],
+        'anti_flickering': True,
     }
     H, W = image.shape[:2]
 
@@ -137,6 +147,23 @@ def make_video(image, depth, net_info):
         config, num_iter=config['sparse_iter'])
     depth = vis_depths[-1]
 
+    ## info
+    generic_pose = np.eye(4)
+    tgts_poses = []
+    for traj_idx in range(len(config['traj_types'])):
+        tgt_poses = []
+        sx, sy, sz = path_planning(
+            config['num_frames'],
+            config['x_shift_range'][traj_idx],
+            config['y_shift_range'][traj_idx],
+            config['z_shift_range'][traj_idx],
+            path_type=config['traj_types'][traj_idx])
+        for xx, yy, zz in zip(sx, sy, sz):
+            tgt_poses.append(generic_pose * 1.)
+            tgt_poses[-1][:3, -1] = np.array([xx, yy, zz])
+        tgts_poses.append(tgt_poses)
+    tgt_pose = generic_pose * 1
+    ref_pose = np.eye(4)
     int_mtx = np.array(
         [[max(H, W), 0, W // 2], [0, max(H, W), H // 2], [0, 0, 1]]
     ).astype(np.float32)
@@ -153,8 +180,32 @@ def make_video(image, depth, net_info):
         net_info['edge'],
         net_info['depth']
     )
+    if config.get('save_ply', False) is True:
+        verts, colors, faces, Height, Width, hFov, vFov = read_ply('moon.ply')
+    else:
+        verts, colors, faces, Height, Width, hFov, vFov = rt_info
 
-    verts, colors, faces, Height, Width, hFov, vFov = rt_info
+    normal_canvas, all_canvas = None, None
+    video_postfix = ['dolly-zoom-in', 'zoom-in', 'circle', 'swing']
+
+    logger.info(f"Making video at {time.time()}")
+    videos_poses, video_basename = copy.deepcopy(tgts_poses), 'moon'
+    top = (output_h // 2 - int_mtx[1, 2] * output_h)
+    left = (output_w // 2 - int_mtx[0, 2] * output_w)
+    down, right = top + output_h, left + output_w
+    border = [int(xx) for xx in [top, down, left, right]]
+
+    normal_canvas, all_canvas = output_3d_photo(
+        verts.copy(), colors.copy(), faces.copy(), copy.deepcopy(Height), copy.deepcopy(Width),
+        copy.deepcopy(hFov), copy.deepcopy(vFov),
+        copy.deepcopy(tgt_pose), video_postfix,
+        copy.deepcopy(ref_pose), 'video',
+        image.copy(), copy.deepcopy(int_mtx), config, image,
+        videos_poses, video_basename, output_h, output_w,
+        border=border, depth=depth, normal_canvas=normal_canvas, all_canvas=all_canvas,
+        mean_loc_depth=mean_loc_depth)
+
+    return
 
 
 # ======================
@@ -194,16 +245,12 @@ def recognize_from_image(image_path, net_info):
     # inference
     logger.info('Start inference...')
     if args.benchmark:
-        # if not args.onnx:
-        #    net.set_profile_mode(True)
         logger.info('BENCHMARK mode')
         for i in range(5):
             start = int(round(time.time() * 1000))
             pred = predict(img, net_info)
             end = int(round(time.time() * 1000))
             logger.info(f'\tailia processing time {end - start} ms')
-        # if not args.onnx:
-        #    print(net.get_summary())
     else:
         depth, out = predict(img, net_info)
 
@@ -258,6 +305,11 @@ def main():
         net_edge = onnxruntime.InferenceSession(WEIGHT_EDGE_PATH)
         net_depth = onnxruntime.InferenceSession(WEIGHT_DEPTH_PATH)
         net_color = onnxruntime.InferenceSession(WEIGHT_COLOR_PATH)
+
+    import onnxruntime
+    net_edge = onnxruntime.InferenceSession(WEIGHT_EDGE_PATH)
+    net_depth = onnxruntime.InferenceSession(WEIGHT_DEPTH_PATH)
+    net_color = onnxruntime.InferenceSession(WEIGHT_COLOR_PATH)
 
     net_info = {
         "MiDaS": net_midas,

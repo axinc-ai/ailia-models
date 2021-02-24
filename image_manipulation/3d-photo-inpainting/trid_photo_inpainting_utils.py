@@ -1,8 +1,10 @@
+import os
 import copy
 import functools
 
 import cv2
 import numpy as np
+from scipy.interpolate import interp1d
 from skimage.transform import resize
 import matplotlib.pyplot as plt
 
@@ -10,18 +12,27 @@ try:
     import cynetworkx as netx
 except ImportError:
     import networkx as netx
+import transforms3d
+
+from vispy import scene, io
+from vispy.scene import visuals
+from vispy.visuals.filters import Alpha
+from moviepy.editor import ImageSequenceClip
 
 __all__ = [
+    'path_planning',
     'read_MiDaS_depth',
     'sparse_bilateral_filtering',
     'write_ply',
+    'read_ply',
+    'output_3d_photo',
 ]
-
 
 onnx = True
 
+
 def edge_forward_3P(net, mask, context, rgb, disp, edge, unit_length=128):
-    input = np.concatenate((rgb, disp/disp.max(), edge, context, mask), axis=1)
+    input = np.concatenate((rgb, disp / disp.max(), edge, context, mask), axis=1)
     n, c, h, w = input.shape
     residual_h = int(np.ceil(h / float(unit_length)) * unit_length - h)
     residual_w = int(np.ceil(w / float(unit_length)) * unit_length - w)
@@ -72,6 +83,32 @@ def color_forward_3P(net, mask, context, rgb, edge, unit_length=128):
     rgb_output = output[0]
     rgb_output = rgb_output[..., anchor_h:anchor_h + h, anchor_w:anchor_w + w]
     return rgb_output
+
+
+def path_planning(num_frames, x, y, z, path_type=''):
+    if path_type == 'straight-line':
+        corner_points = np.array([[0, 0, 0], [(0 + x) * 0.5, (0 + y) * 0.5, (0 + z) * 0.5], [x, y, z]])
+        corner_t = np.linspace(0, 1, len(corner_points))
+        t = np.linspace(0, 1, num_frames)
+        cs = interp1d(corner_t, corner_points, axis=0, kind='quadratic')
+        spline = cs(t)
+        xs, ys, zs = [xx.squeeze() for xx in np.split(spline, 3, 1)]
+    elif path_type == 'double-straight-line':
+        corner_points = np.array([[-x, -y, -z], [0, 0, 0], [x, y, z]])
+        corner_t = np.linspace(0, 1, len(corner_points))
+        t = np.linspace(0, 1, num_frames)
+        cs = interp1d(corner_t, corner_points, axis=0, kind='quadratic')
+        spline = cs(t)
+        xs, ys, zs = [xx.squeeze() for xx in np.split(spline, 3, 1)]
+    elif path_type == 'circle':
+        xs, ys, zs = [], [], []
+        for frame_id, bs_shift_val in enumerate(np.arange(-2.0, 2.0, (4. / num_frames))):
+            xs += [np.cos(bs_shift_val * np.pi) * 1 * x]
+            ys += [np.sin(bs_shift_val * np.pi) * 1 * y]
+            zs += [np.cos(bs_shift_val * np.pi / 2.) * 1 * z]
+        xs, ys, zs = np.array(xs), np.array(ys), np.array(zs)
+
+    return xs, ys, zs
 
 
 def open_small_mask(mask, context, open_iteration, kernel):
@@ -1881,8 +1918,8 @@ def depth_inpainting(
     resize_mask = open_small_mask(tensor_depth_dict['mask'], tensor_depth_dict['context'], 3, 41)
 
     depth_output = depth_forward_3P(
-        depth_feat_model, 
-        resize_mask, tensor_depth_dict['context'], 
+        depth_feat_model,
+        resize_mask, tensor_depth_dict['context'],
         tensor_depth_dict['zero_mean_depth'], tensor_depth_dict['edge'])
 
     tensor_depth_dict['output'] = \
@@ -2273,7 +2310,7 @@ def generate_face(mesh, info_on_pix, config):
     H, W = mesh.graph['H'], mesh.graph['W']
     str_faces = []
     num_node = len(mesh.nodes)
-    ply_flag = config.get('save_ply')
+    ply_flag = config.get('save_ply', False)
 
     def out_fmt(input, cur_id_b, cur_id_self, cur_id_a, ply_flag):
         if ply_flag is True:
@@ -3612,7 +3649,7 @@ def DL_inpaint_edge(
                         tmp_input_edge = ((edge_dict['npath_map'] > -1) + edge_dict['edge']).clip(0, 1)
                         patch_tmp_input_edge = crop_maps_by_size(union_size, tmp_input_edge)[0]
                         tensor_input_edge = patch_tmp_input_edge[None, None, ...]
-                        
+
                         depth_edge_output = edge_forward_3P(
                             depth_edge_model,
                             tensor_edge_dict['mask'], tensor_edge_dict['context'],
@@ -4142,7 +4179,7 @@ def write_ply(image,
     vertex_id = 0
     input_mesh.graph['H'], input_mesh.graph['W'] = input_mesh.graph['noext_H'], input_mesh.graph['noext_W']
 
-    ply_flag = config.get('save_ply')
+    ply_flag = config.get('save_ply', False)
     if ply_flag is True:
         node_str_list = []
     else:
@@ -4189,37 +4226,277 @@ def write_ply(image,
                 node_str_color.append(str_color)
                 node_str_point.append(str_pt)
     str_faces = generate_face(input_mesh, info_on_pix, config)
-    
-    # if config['save_ply'] is True:
-    #     print("Writing mesh file %s ..." % ply_name)
-    #     with open(ply_name, 'w') as ply_fi:
-    #         ply_fi.write('ply\n' + 'format ascii 1.0\n')
-    #         ply_fi.write('comment H ' + str(int(input_mesh.graph['H'])) + '\n')
-    #         ply_fi.write('comment W ' + str(int(input_mesh.graph['W'])) + '\n')
-    #         ply_fi.write('comment hFov ' + str(float(input_mesh.graph['hFov'])) + '\n')
-    #         ply_fi.write('comment vFov ' + str(float(input_mesh.graph['vFov'])) + '\n')
-    #         ply_fi.write('element vertex ' + str(len(node_str_list)) + '\n')
-    #         ply_fi.write('property float x\n' + \
-    #                      'property float y\n' + \
-    #                      'property float z\n' + \
-    #                      'property uchar red\n' + \
-    #                      'property uchar green\n' + \
-    #                      'property uchar blue\n' + \
-    #                      'property uchar alpha\n')
-    #         ply_fi.write('element face ' + str(len(str_faces)) + '\n')
-    #         ply_fi.write('property list uchar int vertex_index\n')
-    #         ply_fi.write('end_header\n')
-    #         ply_fi.writelines(node_str_list)
-    #         ply_fi.writelines(str_faces)
-    #     ply_fi.close()
 
-    H = int(input_mesh.graph['H'])
-    W = int(input_mesh.graph['W'])
-    hFov = input_mesh.graph['hFov']
-    vFov = input_mesh.graph['vFov']
-    node_str_color = np.array(node_str_color).astype(np.float32)
-    node_str_color[..., :3] = node_str_color[..., :3] / 255.
-    node_str_point = np.array(node_str_point)
-    str_faces = np.array(str_faces)
+    if ply_flag is True:
+        ply_name = 'moon.ply'
+        print("Writing mesh file %s ..." % ply_name)
+        with open(ply_name, 'w') as ply_fi:
+            ply_fi.write('ply\n' + 'format ascii 1.0\n')
+            ply_fi.write('comment H ' + str(int(input_mesh.graph['H'])) + '\n')
+            ply_fi.write('comment W ' + str(int(input_mesh.graph['W'])) + '\n')
+            ply_fi.write('comment hFov ' + str(float(input_mesh.graph['hFov'])) + '\n')
+            ply_fi.write('comment vFov ' + str(float(input_mesh.graph['vFov'])) + '\n')
+            ply_fi.write('element vertex ' + str(len(node_str_list)) + '\n')
+            ply_fi.write('property float x\n' + \
+                         'property float y\n' + \
+                         'property float z\n' + \
+                         'property uchar red\n' + \
+                         'property uchar green\n' + \
+                         'property uchar blue\n' + \
+                         'property uchar alpha\n')
+            ply_fi.write('element face ' + str(len(str_faces)) + '\n')
+            ply_fi.write('property list uchar int vertex_index\n')
+            ply_fi.write('end_header\n')
+            ply_fi.writelines(node_str_list)
+            ply_fi.writelines(str_faces)
+        ply_fi.close()
+        
+        return input_mesh
+    else:
+        H = int(input_mesh.graph['H'])
+        W = int(input_mesh.graph['W'])
+        hFov = input_mesh.graph['hFov']
+        vFov = input_mesh.graph['vFov']
+        node_str_color = np.array(node_str_color).astype(np.float32)
+        node_str_color[..., :3] = node_str_color[..., :3] / 255.
+        node_str_point = np.array(node_str_point)
+        str_faces = np.array(str_faces)
 
-    return node_str_point, node_str_color, str_faces, H, W, hFov, vFov
+        return node_str_point, node_str_color, str_faces, H, W, hFov, vFov
+
+
+def read_ply(mesh_fi):
+    ply_fi = open(mesh_fi, 'r')
+    Height = None
+    Width = None
+    hFov = None
+    vFov = None
+    while True:
+        line = ply_fi.readline().split('\n')[0]
+        if line.startswith('element vertex'):
+            num_vertex = int(line.split(' ')[-1])
+        elif line.startswith('element face'):
+            num_face = int(line.split(' ')[-1])
+        elif line.startswith('comment'):
+            if line.split(' ')[1] == 'H':
+                Height = int(line.split(' ')[-1].split('\n')[0])
+            if line.split(' ')[1] == 'W':
+                Width = int(line.split(' ')[-1].split('\n')[0])
+            if line.split(' ')[1] == 'hFov':
+                hFov = float(line.split(' ')[-1].split('\n')[0])
+            if line.split(' ')[1] == 'vFov':
+                vFov = float(line.split(' ')[-1].split('\n')[0])
+        elif line.startswith('end_header'):
+            break
+    contents = ply_fi.readlines()
+    vertex_infos = contents[:num_vertex]
+    face_infos = contents[num_vertex:]
+    verts = []
+    colors = []
+    faces = []
+    for v_info in vertex_infos:
+        str_info = [float(v) for v in v_info.split('\n')[0].split(' ')]
+        if len(str_info) == 6:
+            vx, vy, vz, r, g, b = str_info
+        else:
+            vx, vy, vz, r, g, b, hi = str_info
+        verts.append([vx, vy, vz])
+        colors.append([r, g, b, hi])
+    verts = np.array(verts)
+    try:
+        colors = np.array(colors)
+        colors[..., :3] = colors[..., :3] / 255.
+    except:
+        import pdb
+        pdb.set_trace()
+
+    for f_info in face_infos:
+        _, v1, v2, v3 = [int(f) for f in f_info.split('\n')[0].split(' ')]
+        faces.append([v1, v2, v3])
+    faces = np.array(faces)
+
+    return verts, colors, faces, Height, Width, hFov, vFov
+
+
+class Canvas_view():
+    def __init__(self,
+                 fov,
+                 verts,
+                 faces,
+                 colors,
+                 canvas_size,
+                 factor=1,
+                 bgcolor='gray',
+                 proj='perspective',
+                 ):
+        self.canvas = scene.SceneCanvas(bgcolor=bgcolor, size=(canvas_size * factor, canvas_size * factor))
+        self.view = self.canvas.central_widget.add_view()
+        self.view.camera = 'perspective'
+        self.view.camera.fov = fov
+        self.mesh = visuals.Mesh(shading=None)
+        self.mesh.attach(Alpha(1.0))
+        self.view.add(self.mesh)
+        self.tr = self.view.camera.transform
+        self.mesh.set_data(vertices=verts, faces=faces, vertex_colors=colors[:, :3])
+        self.translate([0, 0, 0])
+        self.rotate(axis=[1, 0, 0], angle=180)
+        self.view_changed()
+
+    def translate(self, trans=[0, 0, 0]):
+        self.tr.translate(trans)
+
+    def rotate(self, axis=[1, 0, 0], angle=0):
+        self.tr.rotate(axis=axis, angle=angle)
+
+    def view_changed(self):
+        self.view.camera.view_changed()
+
+    def render(self):
+        return self.canvas.render()
+
+    def reinit_mesh(self, verts, faces, colors):
+        self.mesh.set_data(vertices=verts, faces=faces, vertex_colors=colors[:, :3])
+
+    def reinit_camera(self, fov):
+        self.view.camera.fov = fov
+        self.view.camera.view_changed()
+
+
+def output_3d_photo(
+        verts, colors, faces, Height, Width, hFov, vFov, tgt_poses, video_traj_types, ref_pose,
+        output_dir, ref_image, int_mtx, config, image, videos_poses, video_basename,
+        original_H=None, original_W=None, border=None, depth=None, normal_canvas=None,
+        all_canvas=None, mean_loc_depth=None):
+    cam_mesh = netx.Graph()
+    cam_mesh.graph['H'] = Height
+    cam_mesh.graph['W'] = Width
+    cam_mesh.graph['original_H'] = original_H
+    cam_mesh.graph['original_W'] = original_W
+    int_mtx_real_x = int_mtx[0] * Width
+    int_mtx_real_y = int_mtx[1] * Height
+    cam_mesh.graph['hFov'] = 2 * np.arctan((1. / 2.) * ((cam_mesh.graph['original_W']) / int_mtx_real_x[0]))
+    cam_mesh.graph['vFov'] = 2 * np.arctan((1. / 2.) * ((cam_mesh.graph['original_H']) / int_mtx_real_y[1]))
+    colors = colors[..., :3]
+
+    fov_in_rad = max(cam_mesh.graph['vFov'], cam_mesh.graph['hFov'])
+    fov = (fov_in_rad * 180 / np.pi)
+    print("fov: " + str(fov))
+    init_factor = 1
+    if config.get('anti_flickering') is True:
+        init_factor = 3
+    if (cam_mesh.graph['original_H'] is not None) and (cam_mesh.graph['original_W'] is not None):
+        canvas_w = cam_mesh.graph['original_W']
+        canvas_h = cam_mesh.graph['original_H']
+    else:
+        canvas_w = cam_mesh.graph['W']
+        canvas_h = cam_mesh.graph['H']
+    canvas_size = max(canvas_h, canvas_w)
+    if normal_canvas is None:
+        normal_canvas = Canvas_view(fov,
+                                    verts,
+                                    faces,
+                                    colors,
+                                    canvas_size=canvas_size,
+                                    factor=init_factor,
+                                    bgcolor='gray',
+                                    proj='perspective')
+    else:
+        normal_canvas.reinit_mesh(verts, faces, colors)
+        normal_canvas.reinit_camera(fov)
+    img = normal_canvas.render()
+    backup_img, backup_all_img, all_img_wo_bound = img.copy(), img.copy() * 0, img.copy() * 0
+    img = cv2.resize(img, (int(img.shape[1] / init_factor), int(img.shape[0] / init_factor)),
+                     interpolation=cv2.INTER_AREA)
+    if border is None:
+        border = [0, img.shape[0], 0, img.shape[1]]
+    H, W = cam_mesh.graph['H'], cam_mesh.graph['W']
+    if (cam_mesh.graph['original_H'] is not None) and (cam_mesh.graph['original_W'] is not None):
+        aspect_ratio = cam_mesh.graph['original_H'] / cam_mesh.graph['original_W']
+    else:
+        aspect_ratio = cam_mesh.graph['H'] / cam_mesh.graph['W']
+    if aspect_ratio > 1:
+        img_h_len = cam_mesh.graph['H'] if cam_mesh.graph.get('original_H') is None else cam_mesh.graph['original_H']
+        img_w_len = img_h_len / aspect_ratio
+        anchor = [0,
+                  img.shape[0],
+                  int(max(0, int((img.shape[1]) // 2 - img_w_len // 2))),
+                  int(min(int((img.shape[1]) // 2 + img_w_len // 2), (img.shape[1]) - 1))]
+    elif aspect_ratio <= 1:
+        img_w_len = cam_mesh.graph['W'] if cam_mesh.graph.get('original_W') is None else cam_mesh.graph['original_W']
+        img_h_len = img_w_len * aspect_ratio
+        anchor = [int(max(0, int((img.shape[0]) // 2 - img_h_len // 2))),
+                  int(min(int((img.shape[0]) // 2 + img_h_len // 2), (img.shape[0]) - 1)),
+                  0,
+                  img.shape[1]]
+    anchor = np.array(anchor)
+    plane_width = np.tan(fov_in_rad / 2.) * np.abs(mean_loc_depth)
+    for video_pose, video_traj_type in zip(videos_poses, video_traj_types):
+        stereos = []
+        tops = [];
+        buttoms = [];
+        lefts = [];
+        rights = []
+        for tp_id, tp in enumerate(video_pose):
+            rel_pose = np.linalg.inv(np.dot(tp, np.linalg.inv(ref_pose)))
+            axis, angle = transforms3d.axangles.mat2axangle(rel_pose[0:3, 0:3])
+            normal_canvas.rotate(axis=axis, angle=(angle * 180) / np.pi)
+            normal_canvas.translate(rel_pose[:3, 3])
+            new_mean_loc_depth = mean_loc_depth - float(rel_pose[2, 3])
+            if 'dolly' in video_traj_type:
+                new_fov = float((np.arctan2(plane_width, np.array([np.abs(new_mean_loc_depth)])) * 180. / np.pi) * 2)
+                normal_canvas.reinit_camera(new_fov)
+            else:
+                normal_canvas.reinit_camera(fov)
+            normal_canvas.view_changed()
+            img = normal_canvas.render()
+            img = cv2.GaussianBlur(img, (int(init_factor // 2 * 2 + 1), int(init_factor // 2 * 2 + 1)), 0)
+            img = cv2.resize(img, (int(img.shape[1] / init_factor), int(img.shape[0] / init_factor)),
+                             interpolation=cv2.INTER_AREA)
+            img = img[anchor[0]:anchor[1], anchor[2]:anchor[3]]
+            img = img[int(border[0]):int(border[1]), int(border[2]):int(border[3])]
+
+            if any(np.array(config['crop_border']) > 0.0):
+                H_c, W_c, _ = img.shape
+                o_t = int(H_c * config['crop_border'][0])
+                o_l = int(W_c * config['crop_border'][1])
+                o_b = int(H_c * config['crop_border'][2])
+                o_r = int(W_c * config['crop_border'][3])
+                img = img[o_t:H_c - o_b, o_l:W_c - o_r]
+                img = cv2.resize(img, (W_c, H_c), interpolation=cv2.INTER_CUBIC)
+
+            """
+            img = cv2.resize(img, (int(img.shape[1] / init_factor), int(img.shape[0] / init_factor)), interpolation=cv2.INTER_CUBIC)
+            img = img[anchor[0]:anchor[1], anchor[2]:anchor[3]]
+            img = img[int(border[0]):int(border[1]), int(border[2]):int(border[3])]
+
+            if config['crop_border'] is True:
+                top, buttom, left, right = find_largest_rect(img, bg_color=(128, 128, 128))
+                tops.append(top); buttoms.append(buttom); lefts.append(left); rights.append(right)
+            """
+            stereos.append(img[..., :3])
+            normal_canvas.translate(-rel_pose[:3, 3])
+            normal_canvas.rotate(axis=axis, angle=-(angle * 180) / np.pi)
+            normal_canvas.view_changed()
+        """
+        if config['crop_border'] is True:
+            atop, abuttom = min(max(tops), img.shape[0]//2 - 10), max(min(buttoms), img.shape[0]//2 + 10)
+            aleft, aright = min(max(lefts), img.shape[1]//2 - 10), max(min(rights), img.shape[1]//2 + 10)
+            atop -= atop % 2; abuttom -= abuttom % 2; aleft -= aleft % 2; aright -= aright % 2
+        else:
+            atop = 0; abuttom = img.shape[0] - img.shape[0] % 2; aleft = 0; aright = img.shape[1] - img.shape[1] % 2
+        """
+        atop = 0;
+        abuttom = img.shape[0] - img.shape[0] % 2;
+        aleft = 0;
+        aright = img.shape[1] - img.shape[1] % 2
+        crop_stereos = []
+        for stereo in stereos:
+            crop_stereos.append((stereo[atop:abuttom, aleft:aright, :3] * 1).astype(np.uint8))
+            stereos = crop_stereos
+        clip = ImageSequenceClip(stereos, fps=config['fps'])
+        if isinstance(video_basename, list):
+            video_basename = video_basename[0]
+        clip.write_videofile(os.path.join(output_dir, video_basename + '_' + video_traj_type + '.mp4'),
+                             fps=config['fps'])
+
+    return normal_canvas, all_canvas
