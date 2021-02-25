@@ -1,6 +1,7 @@
 import sys, os
 import time
 import copy
+import json
 from logging import getLogger
 
 import numpy as np
@@ -8,7 +9,6 @@ import cv2
 
 import ailia
 
-# import original modules
 sys.path.append('../../util')
 from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
@@ -45,9 +45,8 @@ parser = get_base_parser(
     '3d-photo-inpainting model', IMAGE_PATH, SAVE_IMAGE_PATH
 )
 parser.add_argument(
-    '--onnx',
-    action='store_true',
-    help='execute onnxruntime version.'
+    '--config', metavar='VIDEO_CONFIG', default='config.json',
+    help='Configure of video generate processing.'
 )
 args = update_parser(parser)
 
@@ -101,37 +100,7 @@ def postprocess(depth, height, width):
     return depth, out
 
 
-def make_video(image, depth, net_info):
-    config = {
-        'fps': 40,
-        'num_frames': 240,
-        'traj_types': ['double-straight-line', 'double-straight-line', 'circle', 'circle'],
-        'x_shift_range': [0.00, 0.00, -0.02, -0.02],
-        'y_shift_range': [0.00, 0.00, -0.02, -0.00],
-        'z_shift_range': [-0.05, -0.05, -0.07, -0.07],
-        'longer_side_len': 960,
-        'save_ply': True,
-        'depth_threshold': 0.04,
-        'ext_edge_threshold': 0.002,
-        'sparse_iter': 5,
-        'filter_size': [7, 7, 5, 5, 5],
-        'sigma_s': 4.0,
-        'sigma_r': 0.5,
-        'redundant_number': 12,
-        'background_thickness': 70,
-        'context_thickness': 140,
-        'background_thickness_2': 70,
-        'context_thickness_2': 70,
-        'log_depth': True,
-        'largest_size': 512,
-        'depth_edge_dilate': 10,
-        'depth_edge_dilate_2': 5,
-        'extrapolate_border': True,
-        'extrapolation_thickness': 60,
-        'repeat_inpaint_edge': True,
-        'crop_border': [0.03, 0.03, 0.05, 0.03],
-        'anti_flickering': True,
-    }
+def make_video(image, depth, net_info, config):
     H, W = image.shape[:2]
 
     output_h, output_w = depth.shape
@@ -181,7 +150,7 @@ def make_video(image, depth, net_info):
         net_info['depth']
     )
     if config.get('save_ply', False) is True:
-        verts, colors, faces, Height, Width, hFov, vFov = read_ply('moon.ply')
+        verts, colors, faces, Height, Width, hFov, vFov = read_ply('output.ply')
     else:
         verts, colors, faces, Height, Width, hFov, vFov = rt_info
 
@@ -189,17 +158,22 @@ def make_video(image, depth, net_info):
     video_postfix = ['dolly-zoom-in', 'zoom-in', 'circle', 'swing']
 
     logger.info(f"Making video at {time.time()}")
-    videos_poses, video_basename = copy.deepcopy(tgts_poses), 'moon'
+    video_basename = os.path.splitext(os.path.basename(config['image_path']))[0]
+    videos_poses = copy.deepcopy(tgts_poses)
     top = (output_h // 2 - int_mtx[1, 2] * output_h)
     left = (output_w // 2 - int_mtx[0, 2] * output_w)
     down, right = top + output_h, left + output_w
     border = [int(xx) for xx in [top, down, left, right]]
 
+    video_dir = 'video'
+    if not os.path.exists(video_dir):
+        os.makedirs(video_dir)
+
     normal_canvas, all_canvas = output_3d_photo(
         verts.copy(), colors.copy(), faces.copy(), copy.deepcopy(Height), copy.deepcopy(Width),
         copy.deepcopy(hFov), copy.deepcopy(vFov),
         copy.deepcopy(tgt_pose), video_postfix,
-        copy.deepcopy(ref_pose), 'video',
+        copy.deepcopy(ref_pose), video_dir,
         image.copy(), copy.deepcopy(int_mtx), config, image,
         videos_poses, video_basename, output_h, output_w,
         border=border, depth=depth, normal_canvas=normal_canvas, all_canvas=all_canvas,
@@ -221,13 +195,8 @@ def predict(img, net_info):
     img = preprocess(img)
 
     net = net_info["MiDaS"]
-    if not args.onnx:
-        net.set_input_shape(img.shape)
-        output = net.predict({'img': img})
-    else:
-        output = net.run(
-            ['out'],
-            {'img': img})
+    net.set_input_shape(img.shape)
+    output = net.predict({'img': img})
     output = output[0]
 
     depth, out = postprocess(output, target_height, target_width)
@@ -259,7 +228,11 @@ def recognize_from_image(image_path, net_info):
     logger.info(f'saved at : {savepath}')
     cv2.imwrite(savepath, out)
 
-    make_video(img, depth, net_info)
+    if args.config and os.path.exists(args.config):
+        with open(args.config) as f:
+            config = json.load(f)
+        config['image_path'] = image_path
+        make_video(img, depth, net_info, config)
 
     logger.info('Script finished successfully.')
 
@@ -293,23 +266,16 @@ def main():
     check_and_download_models(WEIGHT_COLOR_PATH, MODEL_COLOR_PATH, REMOTE_PATH)
 
     # initialize
-    if not args.onnx:
-        env_id = args.env_id
-        net_midas = ailia.Net(MODEL_MIDAS_PATH, WEIGHT_MIDAS_PATH, env_id=env_id)
-        net_edge = ailia.Net(MODEL_EDGE_PATH, WEIGHT_EDGE_PATH, env_id=env_id)
-        net_depth = ailia.Net(MODEL_DEPTH_PATH, WEIGHT_DEPTH_PATH, env_id=env_id)
-        net_color = ailia.Net(MODEL_COLOR_PATH, WEIGHT_COLOR_PATH, env_id=env_id)
-    else:
+    env_id = args.env_id
+    net_midas = ailia.Net(MODEL_MIDAS_PATH, WEIGHT_MIDAS_PATH, env_id=env_id)
+    net_edge = ailia.Net(MODEL_EDGE_PATH, WEIGHT_EDGE_PATH, env_id=env_id)
+    net_depth = ailia.Net(MODEL_DEPTH_PATH, WEIGHT_DEPTH_PATH, env_id=env_id)
+    net_color = ailia.Net(MODEL_COLOR_PATH, WEIGHT_COLOR_PATH, env_id=env_id)
+    if True:
         import onnxruntime
-        net_midas = onnxruntime.InferenceSession(WEIGHT_MIDAS_PATH)
         net_edge = onnxruntime.InferenceSession(WEIGHT_EDGE_PATH)
         net_depth = onnxruntime.InferenceSession(WEIGHT_DEPTH_PATH)
         net_color = onnxruntime.InferenceSession(WEIGHT_COLOR_PATH)
-
-    import onnxruntime
-    net_edge = onnxruntime.InferenceSession(WEIGHT_EDGE_PATH)
-    net_depth = onnxruntime.InferenceSession(WEIGHT_DEPTH_PATH)
-    net_color = onnxruntime.InferenceSession(WEIGHT_COLOR_PATH)
 
     net_info = {
         "MiDaS": net_midas,

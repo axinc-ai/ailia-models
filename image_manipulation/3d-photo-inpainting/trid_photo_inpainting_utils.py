@@ -3856,7 +3856,7 @@ def DL_inpaint_edge(
                 fx=frac, fy=frac,
                 interpolation=cv2.INTER_AREA).transpose(2, 0, 1)[None, :]
             resize_rgb_dict['mask'] = (resize_mark[:, 0:1] > 0).astype(np.float)
-            resize_rgb_dict['context'] = (resize_mark[:, 1:2] == 1).astype(np.float)
+            resize_rgb_dict['context'] = (np.abs(resize_mark[:, 1:2]-1) < 0.1).astype(np.float)
             resize_rgb_dict['context'][resize_rgb_dict['mask'] > 0] = 0
             resize_rgb_dict['rgb'] = cv2.resize(
                 resize_rgb_dict['rgb'].transpose(0, 2, 3, 1)[0],
@@ -4228,7 +4228,7 @@ def write_ply(image,
     str_faces = generate_face(input_mesh, info_on_pix, config)
 
     if ply_flag is True:
-        ply_name = 'moon.ply'
+        ply_name = 'output.ply'
         print("Writing mesh file %s ..." % ply_name)
         with open(ply_name, 'w') as ply_fi:
             ply_fi.write('ply\n' + 'format ascii 1.0\n')
