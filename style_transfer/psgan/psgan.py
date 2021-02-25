@@ -14,8 +14,14 @@ from setup import setup_config
 
 # Import original modules
 sys.path.append("../../util")
+from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # NOQA: E402
 from webcamera_utils import adjust_frame_size, get_capture  # NOQA: E402
+
+# Logger
+from logging import getLogger  # noqa: E402
+
+logger = getLogger(__name__)
 
 # ======================
 # Parameters
@@ -48,31 +54,10 @@ IMAGE_WIDTH = 361
 # ======================
 # Argument Parser Config
 # ======================
-parser = argparse.ArgumentParser(
-    description="PSGAN: Pose and Expression Robust Spatial-Aware GAN for "
-    + "Customizable Makeup Transfer"
-)
-parser.add_argument(
-    "-v",
-    "--video",
-    metavar="VIDEO",
-    default=None,
-    help="The input video path. "
-    + "If the VIDEO argument is set to 0, the webcam input will be used.",
-)
-parser.add_argument(
-    "-s",
-    "--savepath",
-    metavar="SAVE_IMAGE_PATH",
-    default=SAVE_IMAGE_PATH,
-    help="Save path for the output image.",
-)
-parser.add_argument(
-    "-b",
-    "--benchmark",
-    action="store_true",
-    help="Running the inference on the same input 5 times "
-    + "to measure execution performance. (Cannot be used in video mode)",
+parser = get_base_parser(
+    "PSGAN: Pose and Expression Robust Spatial-Aware GAN for Customizable Makeup Transfer",
+    SOURCE_IMAGE_PATH,
+    SAVE_IMAGE_PATH,
 )
 parser.add_argument(
     "--config_file",
@@ -106,7 +91,7 @@ parser.add_argument(
     help="Use dlib models for inference.",
 )
 
-args = parser.parse_args()
+args = update_parser(parser)
 config = setup_config(args)
 
 # ======================
@@ -140,7 +125,7 @@ def _prepare_data(args, preprocess, image_type, frame=None):
 
 def _initialize_net(args):
     env_id = ailia.get_gpu_environment_id()
-    print(f"env_id: {env_id}")
+    logger.info(f"env_id: {env_id}")
     if not args.onnx:
         net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
     else:
@@ -198,22 +183,24 @@ def transfer_to_image():
     net = _initialize_net(args)
 
     # Inference
-    print("Start inference...")
+    logger.info("Start inference...")
     if args.benchmark:
-        print("BENCHMARK mode")
+        logger.info("BENCHMARK mode")
         for i in range(5):
             start = int(round(time.time() * 1000))
             out = _transfer(real_A, real_B, mask_A, mask_B, diff_A, diff_B, net)
             end = int(round(time.time() * 1000))
-            print("\tailia processing time {} ms".format(end - start))
+            logger.info(f"\tailia processing time {end - start} ms")
     else:
         out = _transfer(real_A, real_B, mask_A, mask_B, diff_A, diff_B, net)
 
     # Postprocessing
     postprocess = PostProcess(config)
     image = _postprocessing(out[0], source, crop_face, postprocess)
-    image.save(args.savepath)
-    print("Script finished successfully.")
+    savepath = get_savepath(args.savepath, args.source_path)
+    image.save(savepath)
+    logger.info(f"saved at : {savepath}")
+    logger.info("Script finished successfully.")
 
 
 def transfer_to_video():
@@ -253,7 +240,7 @@ def transfer_to_video():
 
     capture.release()
     cv2.destroyAllWindows()
-    print("Script finished successfully.")
+    logger.info("Script finished successfully.")
 
 
 def main():

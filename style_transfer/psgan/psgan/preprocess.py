@@ -19,6 +19,11 @@ from image_utils import load_image  # noqa: E402
 sys.path.append("../../face_detection")
 from blazeface import blazeface_utils as but
 
+# Logger
+from logging import getLogger  # noqa: E402
+
+logger = getLogger(__name__)
+
 FACE_ALIGNMENT_IMAGE_HEIGHT = 256
 FACE_ALIGNMENT_IMAGE_WIDTH = 256
 FACE_DETECTOR_IMAGE_HEIGHT = 128
@@ -45,7 +50,7 @@ class FaceAlignment:
         self.use_onnx = use_onnx
         # initialize net
         env_id = ailia.get_gpu_environment_id()
-        print(f"env_id (face alignment): {env_id}")
+        logger.info(f"env_id (face alignment): {env_id}")
         if not self.use_onnx:
             self.net = ailia.Net(
                 self.face_alignment_model, self.face_alignment_weight, env_id=env_id
@@ -71,7 +76,7 @@ class FaceDetector:
         self.input = input
         # initialize net
         env_id = ailia.get_gpu_environment_id()
-        print(f"env_id (face detector): {env_id}")
+        logger.info(f"env_id (face detector): {env_id}")
         if not self.use_onnx:
             self.net = ailia.Net(
                 self.face_detector_model, self.face_detector_weight, env_id=env_id
