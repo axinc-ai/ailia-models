@@ -217,7 +217,7 @@ def recognize_from_image(image_path, net_info):
         logger.info('BENCHMARK mode')
         for i in range(5):
             start = int(round(time.time() * 1000))
-            pred = predict(img, net_info)
+            depth, out = predict(img, net_info)
             end = int(round(time.time() * 1000))
             logger.info(f'\tailia processing time {end - start} ms')
     else:
