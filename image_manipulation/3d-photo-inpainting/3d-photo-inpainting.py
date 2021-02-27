@@ -245,10 +245,10 @@ def recognize_from_video(video, net):
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
 
-        depth = predict(frame, net)
+        _, out = predict(frame, net)
 
         # plot result
-        cv2.imshow('frame', depth)
+        cv2.imshow('frame', out)
 
     capture.release()
     logger.info('Script finished successfully.')
