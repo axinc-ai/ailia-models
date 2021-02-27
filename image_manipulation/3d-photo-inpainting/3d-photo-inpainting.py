@@ -46,7 +46,7 @@ parser = get_base_parser(
 )
 parser.add_argument(
     '--config', metavar='VIDEO_CONFIG', default='config.json',
-    help='Configure of video generate processing.'
+    help='Configure of video generation processing.'
 )
 args = update_parser(parser)
 
@@ -233,6 +233,8 @@ def recognize_from_image(image_path, net_info):
             config = json.load(f)
         config['image_path'] = image_path
         make_video(img, depth, net_info, config)
+    else:
+        logger.info('Configure of video generate is not specified or not exists.')
 
     logger.info('Script finished successfully.')
 
