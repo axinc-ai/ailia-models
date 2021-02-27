@@ -208,6 +208,7 @@ The collection of pre-trained, state-of-the-art models.
 | [<img src="pose_estimation/blazepose/output.png" width=128px>](pose_estimation/blazepose/) |[blazepose](/pose_estimation/blazepose/) | [MediaPipePyTorch](https://github.com/zmurez/MediaPipePyTorch) | Pytorch | 1.2.5 and later |
 | [<img src="pose_estimation/3dmppe_posenet/output_pose_2d.jpg" width=128px>](pose_estimation/3dmppe_posenet/) |[3dmppe_posenet](/pose_estimation/3dmppe_posenet/) | [PoseNet of "Camera Distance-aware Top-down Approach for 3D Multi-person Pose Estimation from a Single RGB Image"](https://github.com/mks0601/3DMPPE_POSENET_RELEASE) | Pytorch | 1.2.6 and later |
 | [<img src="pose_estimation/efficientpose/output.png" width=128px>](pose_estimation/efficientpose/) |[efficientpose](/pose_estimation/efficientpose/) | [Code repo for EfficientPose](https://github.com/daniegr/EfficientPose) | TensorFlow | 1.2.6 and later |
+| [<img src="pose_estimation/pose-hg-3d/output.png" width=128px>](pose_estimation/pose-hg-3d/) |[pose-hg-3d](/pose_estimation/pose-hg-3d/) | [Towards 3D Human Pose Estimation in the Wild: a Weakly-supervised Approach](https://github.com/xingyizhou/pytorch-pose-hg-3d) | Pytorch | 1.2.6 and later |
 
 ## Rotation prediction
 
