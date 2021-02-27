@@ -123,9 +123,11 @@ def recognize_from_video():
         writer = None
 
     input_shape_set = False
+    debugger = Debugger()
     while(True):
         ret, frame = capture.read()
-
+        if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
 
         img, data = preprocess_frame(
             frame, IMAGE_HEIGHT, IMAGE_WIDTH, normalize_type='None'
@@ -147,12 +149,12 @@ def recognize_from_video():
         pred = transform_preds(pred, c, s, (64, 64))
         pred_3d = get_preds_3d(result[0], result[1])[0]
 
-        debugger = Debugger()
         debugger.add_img(img)
         debugger.add_point_2d(pred, (255, 0, 0))
         debugger.add_point_3d(pred_3d, 'b')
         debugger.show_all_imgs(pause=False)
-        debugger.show_3d()
+        plt.pause(.01)
+        debugger.ax.clear()
 
         if not plt.get_fignums():
             break

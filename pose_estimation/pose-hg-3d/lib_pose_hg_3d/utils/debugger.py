@@ -65,6 +65,8 @@ class Debugger(object):
     for xb, yb, zb in zip(Xb, Yb, Zb):
       self.ax.plot([xb], [yb], [zb], 'w')
     self.plt.show()
+
+
     
   def add_img(self, img, imgId = 'default'):
     self.imgs[imgId] = img.copy()
@@ -99,7 +101,6 @@ class Debugger(object):
           plt.imshow(cv2.cvtColor(v, cv2.COLOR_BGR2RGB))
         else:
           plt.imshow(v)
-      plt.show()
   
   def save_3d(self, path):
     max_range = np.array([self.xmax-self.xmin, self.ymax-self.ymin, self.zmax-self.zmin]).max()
