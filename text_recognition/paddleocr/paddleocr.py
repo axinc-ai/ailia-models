@@ -8,7 +8,6 @@ import numpy as np
 import math
 import time
 from PIL import Image, ImageDraw, ImageFont
-from shapely.geometry import Polygon
 import pyclipper
 
 import ailia
@@ -370,8 +369,11 @@ class DBPostProcess(object):
 
     def unclip(self, box):
         unclip_ratio = self.unclip_ratio
-        poly = Polygon(box)
-        distance = poly.area * unclip_ratio / poly.length
+        poly_area = (np.sqrt(np.sum((box[0, :] - box[1, :])**2)) * 
+                     np.sqrt(np.sum((box[0, :] - box[3, :])**2)))
+        poly_length = (np.sqrt(np.sum((box[0, :] - box[1, :])**2)) + 
+                       np.sqrt(np.sum((box[0, :] - box[3, :])**2))) * 2
+        distance = poly_area * unclip_ratio / poly_length
         offset = pyclipper.PyclipperOffset()
         offset.AddPath(box, pyclipper.JT_ROUND, pyclipper.ET_CLOSEDPOLYGON)
         expanded = np.array(offset.Execute(distance))
@@ -992,21 +994,23 @@ def draw_ocr_box_txt(image,
 
 
 def recognize_from_image(config, text_sys):
-    # read image
-    img = cv2.imread(args.input)
 
-    # exec ocr
-    dt_boxes, rec_res = text_sys(img)
+    for img_path in args.input:
+        # read image
+        img = cv2.imread(img_path)
 
-    image = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
-    boxes = dt_boxes
-    txts = [rec_res[i][0] for i in range(len(rec_res))]
-    scores = [rec_res[i][1] for i in range(len(rec_res))]
+        # exec ocr
+        dt_boxes, rec_res = text_sys(img)
 
-    draw_img = draw_ocr_box_txt(image, boxes, txts, scores,
-                                drop_score=config['drop_score'],
-                                font_path=config['vis_font_path'])
-    cv2.imwrite(args.savepath, draw_img[:, :, ::-1])
+        image = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+        boxes = dt_boxes
+        txts = [rec_res[i][0] for i in range(len(rec_res))]
+        scores = [rec_res[i][1] for i in range(len(rec_res))]
+
+        draw_img = draw_ocr_box_txt(image, boxes, txts, scores,
+                                    drop_score=config['drop_score'],
+                                    font_path=config['vis_font_path'])
+        cv2.imwrite(args.savepath, draw_img[:, :, ::-1])
 
     print('finished process and write result to %s!' % args.savepath)
 
