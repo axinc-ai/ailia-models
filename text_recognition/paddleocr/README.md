@@ -1,14 +1,21 @@
 # PoseNet of "Camera Distance-aware Top-down Approach for 3D Multi-person Pose Estimation from a Single RGB Image"
 
-### input
+## Input
+
 ![input image](input.jpg)
 
 (from https://github.com/PaddlePaddle/PaddleOCR/tree/dygraph/doc/imgs)
 
-### output
+<br/>
+
+## Output
+
 ![output_image](output.png)
 
-### usage
+<br/>
+
+## Usage
+
 Automatically downloads the onnx and prototxt files on the first run.
 It is necessary to be connected to the Internet while downloading.
 
@@ -34,20 +41,54 @@ $ python3 paddleocr.py -v VIDEO_PATH -s SAVE_VIDEO_PATH
 (ex) $ python3 paddleocr.py --video input.mp4 --savepath output.mp4
 ```
 
-### Reference
+<br/>
+
+## About font file
+
+Requires Japanese font.
+The default specification for each OS is as follows.
+
+```
+    if sys.platform == "win32":
+        # Windows
+        dc['vis_font_path'] = 'C:/windows/Fonts/meiryo.ttc'
+    elif sys.platform == "darwin":
+        # Mac OS
+        dc['vis_font_path'] = '/System/Library/Fonts/ヒラギノ丸ゴ ProN W4.ttc'
+    else:
+        # Linux
+        dc['vis_font_path'] = '/usr/share/fonts/opentype/ipaexfont-gothic/ipaexg.ttf'
+```
+
+If the Japanese font of the above path does not exist, please prepare it as described or change the specification in the program.
+In case of linux, you can get the target font by executing the following command.
+
+```
+apt install fonts-ipaexfont
+```
+
+<br/>
+
+## Reference
 
 [PaddleOCR : Awesome multilingual OCR toolkits based on PaddlePaddle](https://github.com/PaddlePaddle/PaddleOCR/tree/dygraph/doc/imgs)
 [PaddleOCR2Pytorch : PaddleOCR推理的pytorch实现和模型转换](https://github.com/frotms/PaddleOCR2Pytorch)
 
+<br/>
 
-### Framework
+## Framework
+
 Pytorch
 
-### Model Format
+<br/>
+
+## Model Format
+
 ONNX opset = 10
 
+<br/>
 
-### Netron
+## Netron
 
 [ch_ppocr_server_v2.0_det_train.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/paddle_ocr/ch_ppocr_server_v2.0_det_train.onnx.prototxt)
 [ch_ppocr_mobile_v2.0_cls_train.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/paddle_ocr/ch_ppocr_mobile_v2.0_cls_train.onnx.prototxt)
