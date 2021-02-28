@@ -366,14 +366,6 @@ class DBPostProcess(object):
                 continue
             box = np.array(box)
 
-            box_ = self.unclip_(points).reshape(-1, 1, 2)
-            box_, sside = self.get_mini_boxes(box_)
-            if sside < self.min_size + 2:
-                continue
-            box_ = np.array(box_)
-
-            print('diff_ratio = %.6f' % (np.mean(np.abs(box - box_)) / np.mean(box)))
-
             box[:, 0] = np.clip(
                 np.round(box[:, 0] / width * dest_width), 0, dest_width)
             box[:, 1] = np.clip(
@@ -381,17 +373,6 @@ class DBPostProcess(object):
             boxes.append(box.astype(np.int16))
             scores.append(score)
         return np.array(boxes, dtype=np.int16), scores
-
-    def unclip(self, box):
-        from shapely.geometry import Polygon
-        import pyclipper
-        unclip_ratio = self.unclip_ratio
-        poly = Polygon(box)
-        distance = poly.area * unclip_ratio / poly.length
-        offset = pyclipper.PyclipperOffset()
-        offset.AddPath(box, pyclipper.JT_ROUND, pyclipper.ET_CLOSEDPOLYGON)
-        expanded = np.array(offset.Execute(distance))
-        return expanded
 
     def xyrotate(self, coord_xy, angle, center_xy):
         # exec rotate
@@ -422,7 +403,7 @@ class DBPostProcess(object):
         
         return coord_xy_rotated
 
-    def unclip_(self, box):
+    def unclip(self, box):
         unclip_ratio = self.unclip_ratio
         poly_area = (np.sqrt(np.sum((box[0, :] - box[1, :])**2)) * 
                      np.sqrt(np.sum((box[0, :] - box[3, :])**2)))
