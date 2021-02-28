@@ -60,8 +60,8 @@ def get_default_config():
     dc = {}
     # params for text detector
     dc['det_algorithm'] = 'DB'
-    dc['det_limit_side_len'] = 1280 # 960
-    dc['det_limit_type'] = 'min' # 'max'
+    dc['det_limit_side_len'] = 1280  # 960
+    dc['det_limit_type'] = 'min'  # 'max'
 
     # DB params
     dc['det_db_thresh'] = 0.3
@@ -76,7 +76,15 @@ def get_default_config():
     dc['max_text_length'] = 25
     dc['rec_char_dict_path'] = './dict/japan_dict.txt'
     dc['use_space_char'] = True
-    dc['vis_font_path'] = './dict/ヒラギノ丸ゴ ProN W4.ttc'
+    if sys.platform == "win32":
+        # Windows
+        dc['vis_font_path'] = 'C:/windows/Fonts/meiryo.ttc'
+    elif sys.platform == "darwin":
+        # Mac OS
+        dc['vis_font_path'] = '/System/Library/Fonts/ヒラギノ丸ゴ ProN W4.ttc'
+    else:
+        # Linux
+        dc['vis_font_path'] = '/usr/share/fonts/opentype/ipaexfont-gothic/ipaexg.ttf'
     dc['drop_score'] = 0.5
     dc['limited_max_width'] = 1280
     dc['limited_min_width'] = 16
@@ -946,7 +954,7 @@ def draw_ocr_box_txt(image,
                      txts,
                      scores=None,
                      drop_score=0.5,
-                     font_path="./dict/ヒラギノ丸ゴ ProN W4.ttc"):
+                     font_path=''):
     h, w = image.height, image.width
     img_left = image.copy()
     img_right = Image.new('RGB', (w, h), (255, 255, 255))
