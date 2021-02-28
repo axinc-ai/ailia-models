@@ -1,4 +1,4 @@
-# PoseNet of "Camera Distance-aware Top-down Approach for 3D Multi-person Pose Estimation from a Single RGB Image"
+# PaddleOCR : Awesome multilingual OCR toolkits based on PaddlePaddle
 
 ## Input
 
@@ -72,7 +72,10 @@ apt install fonts-ipaexfont
 ## Reference
 
 [PaddleOCR : Awesome multilingual OCR toolkits based on PaddlePaddle](https://github.com/PaddlePaddle/PaddleOCR)
+
 [PaddleOCR2Pytorch : PaddleOCR推理的pytorch实现和模型转换](https://github.com/frotms/PaddleOCR2Pytorch)
+
+[Research of PaddleOCR](https://github.com/axinc-ai/ailia-models/issues/310)
 
 <br/>
 
