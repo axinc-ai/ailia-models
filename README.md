@@ -243,6 +243,7 @@ The collection of pre-trained, state-of-the-art models.
 | [<img src="text_recognition/etl/font.png" width=64px>](/text_recognition/etl/) |[etl](/text_recognition/etl) | Japanese Character Classification | Keras | 1.1.0 and later |
 | [<img src="text_recognition/deep-text-recognition-benchmark/demo_image/demo_1.png" width=64px>](text_recognition/deep-text-recognition-benchmark/) |[deep-text-recognition-benchmark](/text_recognition/deep-text-recognition-benchmark/) | [deep-text-recognition-benchmark](https://github.com/clovaai/deep-text-recognition-benchmark) | Pytorch | 1.2.6 and later |
 | [<img src="text_recognition/crnn.pytorch/demo.png" width=64px>](text_recognition/crnn.pytorch/) |[crnn.pytorch](/text_recognition/crnn.pytorch/) | [Convolutional Recurrent Neural Network](https://github.com/meijieru/crnn.pytorch) | Pytorch | 1.2.6 and later |
+| [<img src="text_recognition/paddleocr/output.png" width=64px>](text_recognition/paddleocr/) |[paddleocr](/text_recognition/paddleocr/) | [PaddleOCR : Awesome multilingual OCR toolkits based on PaddlePaddle](https://github.com/PaddlePaddle/PaddleOCR) | Pytorch | 1.2.6 and later |
 
 ## Commercial model
 
