@@ -8,7 +8,6 @@ import numpy as np
 import math
 import time
 from PIL import Image, ImageDraw, ImageFont
-import pyclipper
 
 import ailia
 
@@ -367,6 +366,14 @@ class DBPostProcess(object):
                 continue
             box = np.array(box)
 
+            box_ = self.unclip_(points).reshape(-1, 1, 2)
+            box_, sside = self.get_mini_boxes(box_)
+            if sside < self.min_size + 2:
+                continue
+            box_ = np.array(box_)
+
+            print('diff_ratio = %.6f' % (np.mean(np.abs(box - box_)) / np.mean(box)))
+
             box[:, 0] = np.clip(
                 np.round(box[:, 0] / width * dest_width), 0, dest_width)
             box[:, 1] = np.clip(
@@ -376,15 +383,84 @@ class DBPostProcess(object):
         return np.array(boxes, dtype=np.int16), scores
 
     def unclip(self, box):
+        from shapely.geometry import Polygon
+        import pyclipper
+        unclip_ratio = self.unclip_ratio
+        poly = Polygon(box)
+        distance = poly.area * unclip_ratio / poly.length
+        offset = pyclipper.PyclipperOffset()
+        offset.AddPath(box, pyclipper.JT_ROUND, pyclipper.ET_CLOSEDPOLYGON)
+        expanded = np.array(offset.Execute(distance))
+        return expanded
+
+    def xyrotate(self, coord_xy, angle, center_xy):
+        # exec rotate
+        rotation_matrix = cv2.getRotationMatrix2D((center_xy[0], center_xy[1]), angle, 1)
+        # make variable for output
+        coord_xy_rotated = np.zeros(np.shape(coord_xy))
+        # loop of coordinate
+        for coord_i in range(len(coord_xy)):
+            # set x, y
+            coord_x_tmp = coord_xy[coord_i, 0]
+            coord_y_tmp = coord_xy[coord_i, 1]
+            # slide to suit center of rotation
+            coord_x_tmp -= center_xy[0]
+            coord_y_tmp -= center_xy[1]
+            # exec rotation
+            coord_xy_tmp        = np.array([coord_x_tmp, coord_y_tmp])[:, np.newaxis]
+            rotation_matrix_tmp = np.array([[np.cos(-angle/180*np.pi), 
+                                            -np.sin(-angle/180*np.pi)], 
+                                            [np.sin(-angle/180*np.pi), 
+                                            np.cos(-angle/180*np.pi)]])
+            coord_xy_tmp        = rotation_matrix_tmp @ coord_xy_tmp
+            # re-slide to suit center of rotation
+            coord_xy_tmp     = coord_xy_tmp.reshape(-1)
+            coord_xy_tmp[0] += center_xy[0]
+            coord_xy_tmp[1] += center_xy[1]
+            # stock
+            coord_xy_rotated[coord_i, :] = coord_xy_tmp
+        
+        return coord_xy_rotated
+
+    def unclip_(self, box):
         unclip_ratio = self.unclip_ratio
         poly_area = (np.sqrt(np.sum((box[0, :] - box[1, :])**2)) * 
                      np.sqrt(np.sum((box[0, :] - box[3, :])**2)))
         poly_length = (np.sqrt(np.sum((box[0, :] - box[1, :])**2)) + 
                        np.sqrt(np.sum((box[0, :] - box[3, :])**2))) * 2
         distance = poly_area * unclip_ratio / poly_length
-        offset = pyclipper.PyclipperOffset()
-        offset.AddPath(box, pyclipper.JT_ROUND, pyclipper.ET_CLOSEDPOLYGON)
-        expanded = np.array(offset.Execute(distance))
+        # calc angle between upper side of bbox with x axis
+        u = box[1] - box[0]
+        v = box[1] - box[0]
+        v[1] = 0
+        i = np.inner(u, v)
+        n = np.linalg.norm(u) * np.linalg.norm(v)
+        c = i / n
+        angle = np.rad2deg(np.arccos(np.clip(c, -1.0, 1.0)))
+        # exec coordinates rotation 
+        box_ = self.xyrotate(coord_xy=box, angle=angle, 
+                             center_xy=np.mean(box, axis=0))
+        # calculate circle coordinates
+        pitch = 10
+        x_upper = np.cos(np.arange(1, 0, (-1/pitch)) * np.pi) * distance
+        y_upper = -np.sqrt(distance**2 - x_upper**2)
+        x_lower = np.cos(np.arange(0, 1, (1/pitch)) * np.pi) * distance
+        y_lower = np.sqrt(distance**2 - x_lower**2)
+        x = np.concatenate([x_upper, x_lower])
+        y = np.concatenate([y_upper, y_lower])
+        circle = np.concatenate([x[:, np.newaxis], y[:, np.newaxis]], axis=1)
+        # calculate circle coordinates around four corners
+        expanded = []
+        for box_tmp in box_:
+            expanded.append(circle + box_tmp)
+        expanded = np.array(expanded).reshape(-1, 2)
+        # narrow down circle coordinates to outside 
+        expanded = expanded[[25, 26, 27, 28, 29, 30, 50, 51, 52, 53, 54, 55, 
+                             75, 76, 77, 78, 79, 60,  0,  1,  2,  3,  4,  5]]
+        # exec coordinates re-rotation 
+        expanded = self.xyrotate(coord_xy=expanded, angle=-angle, 
+                                 center_xy=np.mean(box_, axis=0))
+        expanded = np.round(expanded).astype(np.int64)
         return expanded
 
     def get_mini_boxes(self, contour):
