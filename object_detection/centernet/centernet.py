@@ -61,6 +61,11 @@ parser.add_argument(
     default='10', choices=OPSET_LISTS,
     help='opset lists: ' + ' | '.join(OPSET_LISTS)
 )
+parser.add_argument(
+    '-bc', '--benchmark_count', metavar='BENCHMARK_COUNT',
+    default=5, type=int,
+    help='benchmark iteration count'
+)
 args = update_parser(parser)
 
 
@@ -156,12 +161,24 @@ def recognize_from_image(filename, detector):
 
     logger.info('Start inference...')
     if args.benchmark:
-        logger.info('BENCHMARK mode')
-        for i in range(5):
-            start = int(round(time.time() * 1000))
-            boxes, scores, cls_inds = detect_objects(img, detector)
-            end = int(round(time.time() * 1000))
-            logger.info(f'\tailia processing time {end - start} ms')
+        for mode in range(2):
+            if mode == 0:
+                logger.info('BENCHMARK mode (without post process)')
+            else:
+                logger.info('BENCHMARK mode (with post process)')
+            zeros = np.zeros((1,3,512,512))
+            total_time = 0
+            for i in range(args.benchmark_count):
+                start = int(round(time.time() * 1000))
+                if mode == 0:
+                    detector.predict(zeros)
+                else:
+                    boxes, scores, cls_inds = detect_objects(img, detector)
+                end = int(round(time.time() * 1000))
+                if i != 0:
+                    total_time = total_time + (end - start)
+                logger.info(f'\tailia processing time {end - start} ms')
+            logger.info(f'\taverage time {total_time / (args.benchmark_count-1)} ms')
     else:
         boxes, scores, cls_inds = detect_objects(img, detector)
 
@@ -212,6 +229,9 @@ def recognize_from_video(video, detector):
     else:
         writer = None
 
+    frame_count = 0
+    frame_digit = int(math.log10(capture.get(cv2.CAP_PROP_FRAME_COUNT)) + 1)
+    video_name = os.path.splitext(os.path.basename(args.video))[0]
     while(True):
         ret, img = capture.read()
 
@@ -222,9 +242,18 @@ def recognize_from_video(video, detector):
         boxes, scores, cls_inds = detect_objects(img, detector)
         img = draw_detection(img, boxes, scores, cls_inds)
         cv2.imshow('frame', img)
+
         # save results
         if writer is not None:
             writer.write(img)
+
+        # write prediction
+        if args.write_prediction:
+            savepath = get_savepath(args.savepath, video_name, post_fix = '_%s' % (str(frame_count).zfill(frame_digit) + '_res'), ext='.png')
+            pred_file = '%s.txt' % savepath.rsplit('.', 1)[0]
+            write_predictions(pred_file, detect_object, frame, COCO_CATEGORY)
+
+        frame_count += 1
 
     capture.release()
     cv2.destroyAllWindows()

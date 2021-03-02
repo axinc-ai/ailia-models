@@ -88,6 +88,11 @@ parser.add_argument(
     default=DETECTION_SIZE_LISTS[0], choices=DETECTION_SIZE_LISTS, type=int,
     help='detection size lists: ' + ' | '.join(map(str,DETECTION_SIZE_LISTS))
 )
+parser.add_argument(
+    '-bc', '--benchmark_count', metavar='BENCHMARK_COUNT',
+    default=5, type=int,
+    help='benchmark iteration count'
+)
 args = update_parser(parser)
 
 if args.detection_width != DETECTION_SIZE_LISTS[0] or args.detection_height != DETECTION_SIZE_LISTS[0]:
@@ -131,11 +136,15 @@ def recognize_from_image():
         logger.info('Start inference...')
         if args.benchmark:
             logger.info('BENCHMARK mode')
-            for i in range(5):
+            total_time = 0
+            for i in range(args.benchmark_count):
                 start = int(round(time.time() * 1000))
                 output = detector.predict([img])
                 end = int(round(time.time() * 1000))
+                if i != 0:
+                    total_time = total_time + (end - start)
                 logger.info(f'\tailia processing time {end - start} ms')
+            logger.info(f'\taverage time {total_time / (args.benchmark_count-1)} ms')
         else:
             output = detector.predict([img])
         detect_object = yolov5_utils.post_processing(img, args.threshold, args.iou, output)
@@ -175,6 +184,9 @@ def recognize_from_video():
     else:
         writer = None
 
+    frame_count = 0
+    frame_digit = int(math.log10(capture.get(cv2.CAP_PROP_FRAME_COUNT)) + 1)
+    video_name = os.path.splitext(os.path.basename(args.video))[0]
     while (True):
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
@@ -200,6 +212,14 @@ def recognize_from_video():
         # save results
         if writer is not None:
             writer.write(res_img)
+
+        # write prediction
+        if args.write_prediction:
+            savepath = get_savepath(args.savepath, video_name, post_fix = '_%s' % (str(frame_count).zfill(frame_digit) + '_res'), ext='.png')
+            pred_file = '%s.txt' % savepath.rsplit('.', 1)[0]
+            write_predictions(pred_file, detect_object, frame, COCO_CATEGORY)
+
+        frame_count += 1
 
     capture.release()
     cv2.destroyAllWindows()

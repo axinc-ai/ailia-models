@@ -83,6 +83,11 @@ parser.add_argument(
     default=DETECTION_SIZE_LISTS[0], choices=DETECTION_SIZE_LISTS, type=int,
     help='detection size lists: ' + ' | '.join(map(str,DETECTION_SIZE_LISTS))
 )
+parser.add_argument(
+    '-bc', '--benchmark_count', metavar='BENCHMARK_COUNT',
+    default=5, type=int,
+    help='benchmark iteration count'
+)
 args = update_parser(parser)
 
 if args.detection_width != DETECTION_SIZE_LISTS[0] or args.detection_height!=DETECTION_SIZE_LISTS[0]:
@@ -124,11 +129,15 @@ def recognize_from_image():
         logger.info('Start inference...')
         if args.benchmark:
             logger.info('BENCHMARK mode')
-            for i in range(5):
+            total_time = 0
+            for i in range(args.benchmark_count):
                 start = int(round(time.time() * 1000))
                 output = detector.predict([img])
                 end = int(round(time.time() * 1000))
+                if i != 0:
+                    total_time = total_time + (end - start)
                 logger.info(f'\tailia processing time {end - start} ms')
+            logger.info(f'\taverage time {total_time / (args.benchmark_count-1)} ms')
         else:
             output = detector.predict([img])
 
