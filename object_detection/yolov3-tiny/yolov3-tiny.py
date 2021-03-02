@@ -1,5 +1,6 @@
 import sys
 import time
+import math
 
 import cv2
 
@@ -173,9 +174,11 @@ def recognize_from_video():
     else:
         writer = None
 
-    frame_count = 0
-    frame_digit = int(math.log10(capture.get(cv2.CAP_PROP_FRAME_COUNT)) + 1)
-    video_name = os.path.splitext(os.path.basename(args.video))[0]
+    if args.write_prediction:
+        frame_count = 0
+        frame_digit = int(math.log10(capture.get(cv2.CAP_PROP_FRAME_COUNT)) + 1)
+        video_name = os.path.splitext(os.path.basename(args.video))[0]
+
     while(True):
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
@@ -195,8 +198,7 @@ def recognize_from_video():
             savepath = get_savepath(args.savepath, video_name, post_fix = '_%s' % (str(frame_count).zfill(frame_digit) + '_res'), ext='.png')
             pred_file = '%s.txt' % savepath.rsplit('.', 1)[0]
             write_predictions(pred_file, detect_object, frame, COCO_CATEGORY)
-
-        frame_count += 1
+            frame_count += 1
 
     capture.release()
     cv2.destroyAllWindows()
