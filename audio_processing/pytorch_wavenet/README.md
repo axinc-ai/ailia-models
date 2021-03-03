@@ -2,7 +2,7 @@
 
 ### input
 
-audio file
+audio file (randomly generated)
 
 ### output
 
