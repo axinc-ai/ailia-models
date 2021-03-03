@@ -67,11 +67,15 @@ def recognize_from_image():
         logger.info('Start inference...')
         if args.benchmark:
             logger.info('BENCHMARK mode')
-            for i in range(5):
+            total_time = 0
+            for i in range(args.benchmark_count):
                 start = int(round(time.time() * 1000))
                 result = net.predict(img)[0]
                 end = int(round(time.time() * 1000))
                 logger.info(f'\tailia processing time {end - start} ms')
+                if i != 0:
+                    total_time = total_time + (end - start)
+            logger.info(f'\taverage time {total_time / (args.benchmark_count-1)} ms')
         else:
             result = net.predict(img)[0]
 

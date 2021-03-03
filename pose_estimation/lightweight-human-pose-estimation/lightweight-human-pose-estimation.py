@@ -50,11 +50,6 @@ parser.add_argument(
     default=IMAGE_HEIGHT, type=int,
     help='The detection height and height for yolo. (default: 416)'
 )
-parser.add_argument(
-    '-bc', '--benchmark_count', metavar='BENCHMARK_COUNT',
-    default=5, type=int,
-    help='benchmark iteration count'
-)
 args = update_parser(parser)
 
 

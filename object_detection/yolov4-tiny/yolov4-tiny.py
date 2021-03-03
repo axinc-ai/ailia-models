@@ -82,11 +82,6 @@ parser.add_argument(
     help='detection size lists: ' + ' | '.join(map(str,DETECTION_SIZE_LISTS))
 )
 parser.add_argument(
-    '-bc', '--benchmark_count', metavar='BENCHMARK_COUNT',
-    default=5, type=int,
-    help='benchmark iteration count'
-)
-parser.add_argument(
     '-dt', '--detector',
     action='store_true',
     help='Use detector API (require ailia SDK 1.2.7).'

@@ -102,6 +102,11 @@ def get_base_parser(
         '--profile', action='store_true',
         help='set profile mode (enable to show PROFILE logs)'
     )
+    parser.add_argument(
+        '-bc', '--benchmark_count', metavar='BENCHMARK_COUNT',
+        default=5, type=int,
+        help='set iteration count of benchmark'
+    )
     return parser
 
 
