@@ -91,16 +91,21 @@ parser.add_argument(
     action='store_true',
     help='Use detector API (require ailia SDK 1.2.7).'
 )
+parser.add_argument(
+    '-m', '--model',
+    default="tiny",
+    help='Select custom model file.'
+)
 args = update_parser(parser)
 
 if args.detection_width != DETECTION_SIZE_LISTS[0] or args.detection_height!=DETECTION_SIZE_LISTS[0]:
-    WEIGHT_PATH = 'yolov4-tiny_'+str(args.detection_width)+'_'+str(args.detection_height)+'.onnx'
-    MODEL_PATH = 'yolov4-tiny_'+str(args.detection_width)+'_'+str(args.detection_height)+'.onnx.prototxt'
+    WEIGHT_PATH = 'yolov4-'+args.model+'_'+str(args.detection_width)+'_'+str(args.detection_height)+'.onnx'
+    MODEL_PATH = 'yolov4-'+args.model+'_'+str(args.detection_width)+'_'+str(args.detection_height)+'.onnx.prototxt'
     IMAGE_HEIGHT = args.detection_height
     IMAGE_WIDTH = args.detection_width
 else:
-    WEIGHT_PATH = 'yolov4-tiny.onnx'
-    MODEL_PATH = 'yolov4-tiny.onnx.prototxt'
+    WEIGHT_PATH = 'yolov4-'+args.model+'.onnx'
+    MODEL_PATH = 'yolov4-'+args.model+'.onnx.prototxt'
     IMAGE_HEIGHT = args.detection_height
     IMAGE_WIDTH = args.detection_width
 
