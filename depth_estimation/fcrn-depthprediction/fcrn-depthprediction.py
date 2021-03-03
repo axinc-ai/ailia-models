@@ -54,10 +54,11 @@ def recognize_from_image():
         logger.info(image_path)
 
         # prepare input data
-        img = Image.open(IMAGE_PATH)
+        img = Image.open(image_path)
         img = img.resize([IMAGE_WIDTH,IMAGE_HEIGHT], Image.ANTIALIAS)
         img = np.array(img).astype('float32')
         img = np.expand_dims(np.asarray(img), axis=0)
+        img = img[:,:,:,0:3]
 
         logger.info(f'input image shape: {img.shape}')
         net.set_input_shape(img.shape)
