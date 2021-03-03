@@ -63,11 +63,6 @@ parser.add_argument(
     default='10', choices=OPSET_LISTS,
     help='opset lists: ' + ' | '.join(OPSET_LISTS)
 )
-parser.add_argument(
-    '-bc', '--benchmark_count', metavar='BENCHMARK_COUNT',
-    default=5, type=int,
-    help='benchmark iteration count'
-)
 args = update_parser(parser)
 
 

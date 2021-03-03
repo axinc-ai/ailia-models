@@ -128,8 +128,35 @@ def display_result(input_img, person):
          ailia.POSE_KEYPOINT_KNEE_RIGHT)
 
 
-def plot_results(detector, pose, img, category, logging=True):
+def pose_estimation(detector, pose, img):
     pose_img = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
+    h, w = img.shape[0], img.shape[1]
+    count = detector.get_object_count()
+    pose_detections = []
+    for idx in range(count):
+        obj = detector.get_object(idx)
+        top_left = (int(w*obj.x), int(h*obj.y))
+        bottom_right = (int(w*(obj.x+obj.w)), int(h*(obj.y+obj.h)))
+        CATEGORY_PERSON = 0
+        if obj.category != CATEGORY_PERSON:
+            pose_detections.append(None)
+            continue
+        px1, py1, px2, py2 = keep_aspect(
+            top_left, bottom_right, pose_img, pose
+        )
+        crop_img = pose_img[py1:py2, px1:px2, :]
+        offset_x = px1/img.shape[1]
+        offset_y = py1/img.shape[0]
+        scale_x = crop_img.shape[1]/img.shape[1]
+        scale_y = crop_img.shape[0]/img.shape[0]
+        detections = compute(
+            pose, crop_img, offset_x, offset_y, scale_x, scale_y
+        )
+        pose_detections.append(detections)
+    return pose_detections
+
+
+def plot_results(detector, pose, img, category, pose_detections, logging=True):
     h, w = img.shape[0], img.shape[1]
     count = detector.get_object_count()
     if logging:
@@ -171,20 +198,10 @@ def plot_results(detector, pose, img, category, logging=True):
 
         # pose detection
         px1, py1, px2, py2 = keep_aspect(
-            top_left, bottom_right, pose_img, pose
+            top_left, bottom_right, img, pose
         )
-
-        crop_img = pose_img[py1:py2, px1:px2, :]
-        offset_x = px1/img.shape[1]
-        offset_y = py1/img.shape[0]
-        scale_x = crop_img.shape[1]/img.shape[1]
-        scale_y = crop_img.shape[0]/img.shape[0]
-        detections = compute(
-            pose, crop_img, offset_x, offset_y, scale_x, scale_y
-        )
-
+        detections = pose_detections[idx]
         cv2.rectangle(img, (px1, py1), (px2, py2), color, 1)
-
         display_result(img, detections)
 
     return img
@@ -217,18 +234,25 @@ def recognize_from_image():
 
         # inference
         logger.info('Start inference...')
+        detector.compute(img, THRESHOLD, IOU)
+
+        # pose estimation
         if args.benchmark:
             logger.info('BENCHMARK mode')
-            for i in range(5):
+            total_time = 0
+            for i in range(args.benchmark_count):
                 start = int(round(time.time() * 1000))
-                detector.compute(img, THRESHOLD, IOU)
+                pose_detections = pose_estimation(detector, pose, img)
                 end = int(round(time.time() * 1000))
-                logger.info(f'\tailia processing time {end - start} ms')
+                logger.info(f'\tailia processing detection time {end - start} ms')
+                if i != 0:
+                    total_time = total_time + (end - start)
+            logger.info(f'\taverage detection time {total_time / (args.benchmark_count-1)} ms')
         else:
-            detector.compute(img, THRESHOLD, IOU)
+            pose_detections = pose_estimation(detector, pose, img)
 
         # plot result
-        res_img = plot_results(detector, pose, img, COCO_CATEGORY)
+        res_img = plot_results(detector, pose, img, COCO_CATEGORY, pose_detections)
         savepath = get_savepath(args.savepath, image_path)
         logger.info(f'saved at : {savepath}')
         cv2.imwrite(savepath, res_img)
@@ -266,7 +290,8 @@ def recognize_from_video():
 
         img = cv2.cvtColor(frame, cv2.COLOR_BGR2BGRA)
         detector.compute(img, THRESHOLD, IOU)
-        res_img = plot_results(detector, pose, frame, COCO_CATEGORY, False)
+        pose_detections = pose_estimation(detector, pose, img)
+        res_img = plot_results(detector, pose, frame, COCO_CATEGORY, pose_detections, False)
         cv2.imshow('frame', res_img)
         # save results
         if writer is not None:

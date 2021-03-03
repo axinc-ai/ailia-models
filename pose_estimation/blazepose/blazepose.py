@@ -187,14 +187,19 @@ def recognize_from_image():
         logger.info('Start inference...')
         if args.benchmark:
             logger.info('BENCHMARK mode')
-            for _ in range(5):
-                start = int(round(time.time() * 1000))
+            total_time_detection = 0
+            total_time_estimation = 0
+            for i in range(args.benchmark_count):
                 # Person detection
+                start = int(round(time.time() * 1000))
                 detector_out = detector.predict([input_data])
                 detections = but.detector_postprocess(detector_out)
                 count = len(detections) if detections[0].size > 0 else 0
+                end = int(round(time.time() * 1000))
+                detection_time = (end - start)
 
                 # Pose estimation
+                start = int(round(time.time() * 1000))
                 landmarks = []
                 flags = []
                 if count > 0:
@@ -205,8 +210,19 @@ def recognize_from_image():
                     landmarks = but.denormalize_landmarks(
                         normalized_landmarks, affine
                     )
-                    end = int(round(time.time() * 1000))
-                logger.info(f'\tailia processing time {end - start} ms')
+                end = int(round(time.time() * 1000))
+                estimation_time = (end - start)
+
+                # Loggin
+                logger.info(f'\tailia processing detection time {detection_time} ms')
+                logger.info(f'\tailia processing estimation time {estimation_time} ms')
+
+                if i != 0:
+                    total_time_detection = total_time_detection + detection_time
+                    total_time_estimation = total_time_estimation+ estimation_time
+
+            logger.info(f'\taverage time detection {total_time_detection / (args.benchmark_count-1)} ms')
+            logger.info(f'\taverage time estimation {total_time_estimation / (args.benchmark_count-1)} ms')
         else:
             # Person detection
             detector_out = detector.predict([input_data])
