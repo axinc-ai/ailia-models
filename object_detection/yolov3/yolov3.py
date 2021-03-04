@@ -193,7 +193,7 @@ def recognize_from_video():
         if args.write_prediction:
             savepath = get_savepath(args.savepath, video_name, post_fix = '_%s' % (str(frame_count).zfill(frame_digit) + '_res'), ext='.png')
             pred_file = '%s.txt' % savepath.rsplit('.', 1)[0]
-            write_predictions(pred_file, detect_object, frame, COCO_CATEGORY)
+            write_predictions(pred_file, detector, frame, COCO_CATEGORY)
             frame_count += 1
 
     capture.release()
