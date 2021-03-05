@@ -251,7 +251,12 @@ def recognize_from_video(video, detector):
         if args.write_prediction:
             savepath = get_savepath(args.savepath, video_name, post_fix = '_%s' % (str(frame_count).zfill(frame_digit) + '_res'), ext='.png')
             pred_file = '%s.txt' % savepath.rsplit('.', 1)[0]
-            write_predictions(pred_file, detect_object, frame, COCO_CATEGORY)
+            Detection = namedtuple('Detection', ['category', 'prob', 'x', 'y', 'w', 'h'])
+            ary = []
+            for i, box in enumerate(boxes):
+                d = Detection(int(cls_inds[i]), scores[i], box[0], box[1], box[2]-box[0], box[3]-box[1])
+                ary.append(d)
+            write_predictions(pred_file, ary, frame, COCO_CATEGORY)
             frame_count += 1
 
     capture.release()
