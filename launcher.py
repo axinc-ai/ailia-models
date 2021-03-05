@@ -120,25 +120,19 @@ def display_ui(img, model_list, category_cnt, window_width, window_height):
             color = (255, 255, 255)
             if click_trig:
                 dir = "./"+model["category"]+"/"+model["model"]+"/"
-                cmd = "python"
-                if shutil.which("python3"):
-                    cmd = "python3"
-
+                cmd = sys.executable
                 if ("neural_language_processing" == model["category"]) or \
                    ("audio_processing" == model["category"]):
-                    options = None
+                    options = ""
                 else:
                     video_id = args.video
                     if not args.video:
                         video_id = 0
                     options = "-v "+str(video_id)
                 
-                if options==None:
-                    subprocess.run(
-                        [cmd, model["model"]+".py"], cwd=dir)
-                else:
-                    subprocess.run(
-                        [cmd, model["model"]+".py", options], cwd=dir)
+                cmd = cmd + " " + model["model"]+".py" + " " + options
+                
+                subprocess.check_call(cmd, cwd=dir, shell=True)
                 click_trig = False
 
         cv2.rectangle(img, (x, y), (x + w, y + h), color, thickness=-1)
