@@ -148,17 +148,29 @@ def plot_results(detector, img, category, segm_masks=None, logging=True):
     # draw label
     for idx in range(count):
         obj = detector.get_object(idx) if hasattr(detector, 'get_object') else detector[idx]
-        text_position = (int(w * obj.x) + 4, int(h * (obj.y + obj.h) - 8))
-        fontScale = w / 512.0
+        fontScale = w / 2048
 
+        text = category[obj.category] + " " + str(int(obj.prob*100)/100)
+        textsize = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, fontScale, 1)[0]
+        tw = textsize[0]
+        th = textsize[1]
+
+        margin = 3
+
+        top_left = (int(w * obj.x), int(h * obj.y))
+        bottom_right = (int(w * obj.x) + tw + margin, int(h * obj.y) + th + margin)
+        
         color = colors[idx]
+        cv2.rectangle(img, top_left, bottom_right, color, thickness=-1)
+
+        text_color = (255,255,255)
         cv2.putText(
             img,
-            category[obj.category],
-            text_position,
+            text,
+            (top_left[0], top_left[1] + th),
             cv2.FONT_HERSHEY_SIMPLEX,
             fontScale,
-            color,
+            text_color,
             1
         )
     return img
