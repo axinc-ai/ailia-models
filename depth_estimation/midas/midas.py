@@ -140,15 +140,21 @@ def recognize_from_video():
 
     capture = get_capture(args.video)
 
+    # allocate output buffer
+    f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
+
+    zero_frame = np.zeros((f_h,f_w,3))
+    resized_img = midas_resize(zero_frame, IMAGE_HEIGHT, IMAGE_WIDTH)
+    save_h, save_w = resized_img.shape[0], resized_img.shape[1]
+
+    output_frame = np.zeros((save_h,save_w*2,3))
+
     # create video writer if savepath is specified as video format
     if args.savepath != SAVE_IMAGE_PATH:
         logger.warning(
             'currently, video results cannot be output correctly...'
         )
-        f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
-        save_h, save_w = calc_adjust_fsize(f_h, f_w, IMAGE_HEIGHT, IMAGE_WIDTH)
-        # save_w * 2: we stack source frame and estimated heatmap
         writer = get_writer(args.savepath, save_h, save_w * 2)
     else:
         writer = None
@@ -159,15 +165,19 @@ def recognize_from_video():
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
 
-        resized_img = midas_resize(frame, IMAGE_HEIGHT, IMAGE_WIDTH)
+        # resize to midas input size
+        frame = midas_resize(frame, IMAGE_HEIGHT, IMAGE_WIDTH)
+        resized_img = normalize_image(frame, 'ImageNet')
         resized_img = resized_img.transpose((2, 0, 1))  # channel first
         resized_img = resized_img[np.newaxis, :, :, :]
 
+        # predict
         if(not input_shape_set):
             net.set_input_shape(resized_img.shape)
             input_shape_set = True
         result = net.predict(resized_img)
 
+        # normalize to 16bit
         depth_min = result.min()
         depth_max = result.max()
         max_val = (2 ** 16) - 1
@@ -176,14 +186,19 @@ def recognize_from_video():
         else:
             out = 0
 
-        res_img = out.transpose(1, 2, 0).astype("uint16")
-        cv2.imshow('depth', res_img)
+        # convert to 8bit
+        res_img = (out.transpose(1, 2, 0)/256).astype("uint8")
+        res_img = cv2.cvtColor(res_img, cv2.COLOR_GRAY2BGR)
+
+        output_frame[:,save_w:save_w*2,:]=res_img
+        output_frame[:,0:save_w,:]=frame
+        output_frame = output_frame.astype("uint8")
+
+        cv2.imshow('depth', output_frame)
 
         # save results
         if writer is not None:
-            # FIXME: cannot save correctly...
-            res_img = cv2.cvtColor(res_img, cv2.COLOR_GRAY2BGR)
-            writer.write(cv2.convertScaleAbs(res_img))
+            writer.write(output_frame)
 
     capture.release()
     cv2.destroyAllWindows()
