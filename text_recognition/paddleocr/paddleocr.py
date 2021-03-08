@@ -1116,7 +1116,7 @@ def recognize_from_video(config, text_sys):
 
         # write a frame image to video
         if video_writer is not None:
-            video_writer.write(vis_img)
+            video_writer.write(draw_img[:, :, ::-1])
 
     video_capture.release()
     cv2.destroyAllWindows()
