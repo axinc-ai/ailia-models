@@ -159,6 +159,7 @@ def recognize_from_video():
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
 
+        frame = normalize_image(frame, 'ImageNet')
         resized_img = midas_resize(frame, IMAGE_HEIGHT, IMAGE_WIDTH)
         resized_img = resized_img.transpose((2, 0, 1))  # channel first
         resized_img = resized_img[np.newaxis, :, :, :]
