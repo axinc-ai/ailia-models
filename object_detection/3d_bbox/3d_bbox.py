@@ -202,9 +202,8 @@ def recognize_from_video():
         )
         f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
         f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
-        save_h, save_w = calc_adjust_fsize(f_h, f_w, IMAGE_HEIGHT, IMAGE_WIDTH)
-        # save_w * 2: we stack source frame and estimated heatmap
-        writer = get_writer(args.savepath, save_h, save_w * 2)
+        save_h, save_w = f_h, f_w
+        writer = webcamera_utils.get_writer(args.savepath, save_h, save_w)
     else:
         writer = None
 
@@ -258,7 +257,7 @@ def recognize_from_video():
 
         # save results
         if writer is not None:
-            writer.write(res_img)
+            writer.write(img)
 
     capture.release()
     cv2.destroyAllWindows()
