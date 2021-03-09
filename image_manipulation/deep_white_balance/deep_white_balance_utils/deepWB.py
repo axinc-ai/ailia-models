@@ -8,7 +8,7 @@ __author__ = "Mahmoud Afifi"
 __credits__ = ["Mahmoud Afifi"]
 
 import numpy as np
-import deep_db_utils.utils as utls
+import deep_white_balance_utils.utils as utls
 
 
 def deep_wb(image, task='all', net_awb=None, net_t=None, net_s=None, device='cpu', s=656):
