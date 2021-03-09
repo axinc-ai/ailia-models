@@ -8,12 +8,17 @@
 Ailia input shape: (1, 3, 320, 656)
 
 ## Output
-### output_AWB
+### output_AWB (AWB)
 ![Input](output_AWB.png)
-### output_S
+### output_S (Shade WB)
 ![Input](output_S.png)
-### output_T
+### output_T (Tungsten WB)
 ![Input](output_T.png)
+
+
+### Note
+
+This Software is licensed under the Attribution-NonCommercial-ShareAlike 4.0 International.
 
 ## Usage
 Automatically downloads the onnx and prototxt files on the first run.

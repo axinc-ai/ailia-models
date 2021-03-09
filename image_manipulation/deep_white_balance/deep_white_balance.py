@@ -62,6 +62,9 @@ def recognize_from_image():
         logger.info(image_path)
 
         img = Image.open(image_path)
+        org_w = np.array(img).shape[1]
+        org_h = np.array(img).shape[0]
+
         img = img.resize((WIDTH_SIZE, HEIGHT_SIZE))
         logger.info(f'input image shape: {np.array(img).shape}')
 
@@ -82,9 +85,9 @@ def recognize_from_image():
         # save result
         out_awb, out_t, out_s = result
 
-        result_awb = to_image(out_awb)
-        result_t = to_image(out_t)
-        result_s = to_image(out_s)
+        result_awb = to_image(out_awb).resize((org_w,org_h))
+        result_t = to_image(out_t).resize((org_w,org_h))
+        result_s = to_image(out_s).resize((org_w,org_h))
 
         logger.info(f'saved at : {args.savepath}')
 
