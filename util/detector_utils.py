@@ -163,7 +163,7 @@ def plot_results(detector, img, category, segm_masks=None, logging=True):
         color = colors[idx]
         cv2.rectangle(img, top_left, bottom_right, color, thickness=-1)
 
-        text_color = (255,255,255)
+        text_color = (255,255,255,255)
         cv2.putText(
             img,
             text,
