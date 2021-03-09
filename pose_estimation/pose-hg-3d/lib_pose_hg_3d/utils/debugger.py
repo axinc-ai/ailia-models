@@ -118,3 +118,6 @@ class Debugger(object):
     for i, v in self.imgs.items():
       cv2.imwrite(path.format(i), v)
     
+  def save_video(self, writer):
+    for i, v in self.imgs.items():
+      writer.write(v)

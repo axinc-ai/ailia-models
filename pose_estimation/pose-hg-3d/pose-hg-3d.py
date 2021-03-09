@@ -116,9 +116,8 @@ def recognize_from_video():
         )
         f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
         f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
-        save_h, save_w = calc_adjust_fsize(f_h, f_w, IMAGE_HEIGHT, IMAGE_WIDTH)
-        # save_w * 2: we stack source frame and estimated heatmap
-        writer = get_writer(args.savepath, save_h, save_w * 2)
+        s = max(f_h, f_w) 
+        writer = get_writer(args.savepath, s, s)
     else:
         writer = None
 
@@ -158,6 +157,9 @@ def recognize_from_video():
 
         if not plt.get_fignums():
             break
+
+        if writer is not None:
+            debugger.save_video(writer)
 
     capture.release()
     cv2.destroyAllWindows()
