@@ -137,11 +137,13 @@ def recognize_from_video():
         result_d = to_image(out_d)
         result_c = to_image(out_c)
 
-        fig,ax = imshow(img, result_awb, result_t, result_f, result_d, result_c, result_s)
-        plt.show()
+        imshow(img, result_awb, result_t, result_f, result_d, result_c, result_s)
+        plt.pause(1)
 
         if not plt.get_fignums():
             break
+
+        plt.close()
 
     capture.release()
     cv2.destroyAllWindows()

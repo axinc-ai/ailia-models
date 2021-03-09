@@ -135,5 +135,3 @@ def imshow(img, *arguments, colortemp=None):
     plt.xticks([]), plt.yticks([])
     plt.axis('off')
 
-    return fig,ax
-
