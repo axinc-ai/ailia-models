@@ -123,7 +123,7 @@ def recognize_from_image():
             logger.info('BENCHMARK mode')
             for i in range(5):
                 start = int(round(time.time() * 1000))
-                net_yolov3.run(yolo_img, THRESHOLD, IOU)
+                detections = net_yolov3.run(yolo_img, THRESHOLD, IOU)
                 end = int(round(time.time() * 1000))
                 logger.info(f'\tailia processing time {end - start} ms')
         else:
