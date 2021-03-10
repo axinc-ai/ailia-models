@@ -23,8 +23,10 @@ logger = getLogger(__name__)
 # ======================
 # Parameters
 # ======================
-WEIGHT_PATH = 'midas.onnx'
-MODEL_PATH = 'midas.onnx.prototxt'
+WEIGHT_v20_PATH = 'midas.onnx'
+MODEL_v20_PATH = 'midas.onnx.prototxt'
+WEIGHT_v21_PATH = 'midas_v2.1.onnx'
+MODEL_v21_PATH = 'midas_v2.1.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/midas/'
 
 IMAGE_PATH = 'input.jpg'
@@ -38,6 +40,10 @@ IMAGE_MULTIPLE_OF = 32
 # Arguemnt Parser Config
 # ======================
 parser = get_base_parser('MiDaS model', IMAGE_PATH, SAVE_IMAGE_PATH)
+parser.add_argument(
+    '-v21', '--version21', dest='v21', action='store_true',
+    help='Use model version 2.1.'
+)
 args = update_parser(parser)
 
 
@@ -87,10 +93,7 @@ def midas_imread(image_path):
     return midas_resize(image, IMAGE_HEIGHT, IMAGE_WIDTH)
 
 
-def recognize_from_image():
-    # net initialize
-    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
-
+def recognize_from_image(net):
     # input image loop
     for image_path in args.input:
         logger.info(image_path)
@@ -134,10 +137,7 @@ def recognize_from_image():
     logger.info('Script finished successfully.')
 
 
-def recognize_from_video():
-    # net initialize
-    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
-
+def recognize_from_video(net):
     capture = get_capture(args.video)
 
     # allocate output buffer
@@ -208,14 +208,21 @@ def recognize_from_video():
 
 
 def main():
+    weight_path = WEIGHT_v21_PATH if args.v21 else WEIGHT_v20_PATH
+    model_path = MODEL_v21_PATH if args.v21 else MODEL_v20_PATH
+
     # model files check and download
-    check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
+    check_and_download_models(weight_path, model_path, REMOTE_PATH)
+
+    # net initialize
+    net = ailia.Net(model_path, weight_path, env_id=args.env_id)
+
     if args.video is not None:
         # video mode
-        recognize_from_video()
+        recognize_from_video(net)
     else:
         # image mode
-        recognize_from_image()
+        recognize_from_image(net)
 
 
 if __name__ == '__main__':
