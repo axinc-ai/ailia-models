@@ -27,12 +27,16 @@ WEIGHT_v20_PATH = 'midas.onnx'
 MODEL_v20_PATH = 'midas.onnx.prototxt'
 WEIGHT_v21_PATH = 'midas_v2.1.onnx'
 MODEL_v21_PATH = 'midas_v2.1.onnx.prototxt'
+WEIGHT_v21_SMALL_PATH = 'midas_v2.1_small.onnx'
+MODEL_v21_SMALL_PATH = 'midas_v2.1_small.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/midas/'
 
 IMAGE_PATH = 'input.jpg'
 SAVE_IMAGE_PATH = 'input_depth.png'
 IMAGE_HEIGHT = 384
 IMAGE_WIDTH = 384
+IMAGE_HEIGHT_SMALL = 256
+IMAGE_WIDTH_SMALL = 256
 IMAGE_MULTIPLE_OF = 32
 
 
@@ -43,6 +47,10 @@ parser = get_base_parser('MiDaS model', IMAGE_PATH, SAVE_IMAGE_PATH)
 parser.add_argument(
     '-v21', '--version21', dest='v21', action='store_true',
     help='Use model version 2.1.'
+)
+parser.add_argument(
+    '-t', '--model_type', default='large', choices=('large', 'small'),
+    help='model type: large or small. small can be specified only for version 2.1 model.'
 )
 args = update_parser(parser)
 
@@ -90,7 +98,9 @@ def midas_imread(image_path):
     image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
     image = normalize_image(image, 'ImageNet')
 
-    return midas_resize(image, IMAGE_HEIGHT, IMAGE_WIDTH)
+    h, w = (IMAGE_HEIGHT, IMAGE_WIDTH) if not args.v21 or args.model_type == 'large' \
+               else (IMAGE_HEIGHT_SMALL, IMAGE_WIDTH_SMALL)
+    return midas_resize(image, h, w)
 
 
 def recognize_from_image(net):
@@ -144,8 +154,11 @@ def recognize_from_video(net):
     f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
     f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
 
+    h, w = (IMAGE_HEIGHT, IMAGE_WIDTH) if not args.v21 or args.model_type == 'large' \
+               else (IMAGE_HEIGHT_SMALL, IMAGE_WIDTH_SMALL)
+
     zero_frame = np.zeros((f_h,f_w,3))
-    resized_img = midas_resize(zero_frame, IMAGE_HEIGHT, IMAGE_WIDTH)
+    resized_img = midas_resize(zero_frame, h, w)
     save_h, save_w = resized_img.shape[0], resized_img.shape[1]
 
     output_frame = np.zeros((save_h,save_w*2,3))
@@ -166,7 +179,7 @@ def recognize_from_video(net):
             break
 
         # resize to midas input size
-        frame = midas_resize(frame, IMAGE_HEIGHT, IMAGE_WIDTH)
+        frame = midas_resize(frame, h, w)
         resized_img = normalize_image(frame, 'ImageNet')
         resized_img = resized_img.transpose((2, 0, 1))  # channel first
         resized_img = resized_img[np.newaxis, :, :, :]
@@ -208,8 +221,10 @@ def recognize_from_video(net):
 
 
 def main():
-    weight_path = WEIGHT_v21_PATH if args.v21 else WEIGHT_v20_PATH
-    model_path = MODEL_v21_PATH if args.v21 else MODEL_v20_PATH
+    weight_path = (WEIGHT_v21_PATH if args.model_type == 'large' else WEIGHT_v21_SMALL_PATH) \
+        if args.v21 else WEIGHT_v20_PATH
+    model_path = (MODEL_v21_PATH if args.model_type == 'large' else MODEL_v21_SMALL_PATH) \
+        if args.v21 else MODEL_v20_PATH
 
     # model files check and download
     check_and_download_models(weight_path, model_path, REMOTE_PATH)
