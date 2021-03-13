@@ -6,6 +6,7 @@ import random
 
 import numpy as np
 import cv2
+from PIL import Image
 
 import ailia
 
@@ -72,7 +73,7 @@ def recognize_from_image(net):
         # prepare grand truth
         gt_img = load_image(image_path)
         gt_img = cv2.cvtColor(gt_img, cv2.COLOR_BGRA2RGB)
-        gt_img = cv2.resize(gt_img, (IMAGE_WIDTH, IMAGE_HEIGHT))
+        gt_img = np.array(Image.fromarray(gt_img).resize((IMAGE_WIDTH, IMAGE_HEIGHT), Image.BILINEAR))
         gt_img = normalize_image(gt_img, 'ImageNet')
         gt_img = gt_img.transpose((2, 0, 1))  # channel first
 
@@ -83,7 +84,7 @@ def recognize_from_image(net):
             mask_path = mask_paths[random.randint(0, N_mask - 1)]
         mask = load_image(mask_path)
         mask = cv2.cvtColor(mask, cv2.COLOR_BGRA2RGB)
-        mask = cv2.resize(mask, (IMAGE_WIDTH, IMAGE_HEIGHT))
+        mask = np.array(Image.fromarray(mask).resize((IMAGE_WIDTH, IMAGE_HEIGHT), Image.BILINEAR))
         mask = mask.transpose((2, 0, 1)) / 255  # channel first
 
         # prepare input data
