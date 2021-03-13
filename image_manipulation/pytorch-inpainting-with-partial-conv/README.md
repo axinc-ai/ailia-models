@@ -38,6 +38,12 @@ By adding the `--mask-index` option, you can specify index of mask file.
 $ python3 pytorch-inpainting-with-partial-conv.py --mask-index 12
 ```
 
+If you want to re-generate mask file, run generate_masks.py.  
+You can specify the number of files to generate by `--N` option.
+```bash
+$ python3 generate_masks.py --N 16
+```
+
 ## Reference
 
 [pytorch-inpainting-with-partial-conv](https://github.com/naoto0804/pytorch-inpainting-with-partial-conv)
