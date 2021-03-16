@@ -20,11 +20,9 @@ logger = getLogger(__name__)
 # ======================
 # PARAMETERS
 # ======================
-#WEIGHT_PATH = "wavenet_pytorch.onnx"
-#MODEL_PATH = "wavenet_pytorch.onnx.prototxt"
-#REMOTE_PATH = "../../../test/"
-WEIGHT_PATH = "./wavenet_pytorch_op_11.onnx"
-MODEL_PATH = "./wavenet_pytorch_op_11.onnx.prototxt"
+WEIGHT_PATH = "wavenet_pytorch_op_11.onnx"
+MODEL_PATH = "wavenet_pytorch_op_11.onnx.prototxt"
+REMOTE_PATH = "https://storage.googleapis.com/ailia-models/pytorch-wavenet/"
 
 
 # ======================
@@ -194,7 +192,7 @@ def _constant_pad_1d(input, target_size, dimension=0, value=0, pad_start=False):
 
 def main():
     # model files check and download
-    #check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
 
     # create instance
     net = get_model()
