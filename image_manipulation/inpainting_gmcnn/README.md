@@ -55,7 +55,7 @@ $ python3 inpainting_gmcnn.py --input IMAGE_PATH --savepath SAVE_IMAGE_PATH
 By adding the `--model` option, you can specify model type which is selected from "paris-streetview", "celebahq", "celebahq-512", "places2".  
 (default is paris-streetview)  
 And it can specify mask type "rect" or "stroke" after the `--mask-type` option.  
-(default is paris-streetview)
+(default is rect)
 ```bash
 $ python3 inpainting_gmcnn --model paris-streetview --mask_type rect
 ```
