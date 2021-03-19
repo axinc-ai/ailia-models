@@ -1,12 +1,8 @@
-import os
 import sys
 import time
-import glob
-import random
 
 import numpy as np
 import cv2
-from PIL import Image
 
 import ailia
 
@@ -14,7 +10,6 @@ import ailia
 sys.path.append('../../util')
 from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
-from image_utils import normalize_image  # noqa: E402
 from detector_utils import load_image  # noqa: E402
 
 # logger
@@ -41,11 +36,6 @@ REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/inpainting_gmcnn/'
 
 IMAGE_PATH = 'paris-streetview_001.png'
 SAVE_IMAGE_PATH = 'result.png'
-IMAGE_HEIGHT = 256
-IMAGE_WIDTH = 256
-
-NORM_MEAN = [0.485, 0.456, 0.406]
-NORM_STD = [0.229, 0.224, 0.225]
 
 # ======================
 # Arguemnt Parser Config
@@ -56,20 +46,16 @@ parser.add_argument(
     help='mask type'
 )
 parser.add_argument(
-    '-mt', '--mask-type', default="rect", choices=("rect", "stroke"),
+    '-mt', '--mask_type', default="rect", choices=("rect", "stroke"),
     help='mask type'
 )
 parser.add_argument(
     '--seed', type=int, default=1,
-    help='random seed'
+    help='random seed for random stroke mask'
 )
 parser.add_argument(
     '--random_mask', type=int, default=0,
-    help='using random mask'
-)
-parser.add_argument(
-    '--random_mask', type=int, default=0,
-    help='using random mask'
+    help='using random stroke mask'
 )
 parser.add_argument(
     '--mask_shape', type=str, default='128,128',
@@ -172,7 +158,7 @@ def main():
     }
     key = (args.model, args.mask_type)
     if key not in info:
-        logger.error("(MODEL = %s, MASK_TYPE = %s) is not supported." % key)
+        logger.error("(MODEL = %s, MASK_TYPE = %s) is unmatch." % key)
         logger.info("appropriate settings:\n"
                     "\t(MODEL = paris-streetview, MASK_TYPE = rect)\n"
                     "\t(MODEL = celebahq, MASK_TYPE = rect)\n"
