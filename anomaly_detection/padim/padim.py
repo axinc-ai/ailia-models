@@ -8,6 +8,13 @@ import pickle
 import numpy as np
 import cv2
 from PIL import Image
+from scipy.spatial.distance import mahalanobis
+from scipy.ndimage import gaussian_filter
+from sklearn.metrics import precision_recall_curve
+from skimage import morphology
+from skimage.segmentation import mark_boundaries
+import matplotlib
+import matplotlib.pyplot as plt
 
 import ailia
 
@@ -15,7 +22,6 @@ import ailia
 sys.path.append('../../util')
 from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
-from webcamera_utils import get_capture, get_writer  # noqa: E402
 from image_utils import normalize_image  # noqa: E402
 from detector_utils import load_image  # noqa: E402
 
@@ -34,10 +40,10 @@ WEIGHT_WIDE_RESNET50_2_PATH = 'wide_resnet50_2.onnx'
 MODEL_WIDE_RESNET50_2_PATH = 'wide_resnet50_2.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/padim/'
 
-IMAGE_PATH = 'img.png'
+IMAGE_PATH = 'bottle_broken-large_000.png'
 SAVE_IMAGE_PATH = 'output.png'
-IMAGE_HEIGHT = 240
-IMAGE_WIDTH = 320
+IMAGE_RESIZE = 256
+IMAGE_SIZE = 224
 
 # ======================
 # Arguemnt Parser Config
@@ -56,6 +62,10 @@ parser.add_argument(
     '-gt', '--gt_dir', metavar="DIR", default="./gt_masks",
     help='directory of the ground truth mask files.'
 )
+parser.add_argument(
+    '-th', '--threshold', type=float, default=None,
+    help='threshold'
+)
 args = update_parser(parser)
 
 
@@ -65,8 +75,8 @@ args = update_parser(parser)
 
 def preprocess(img, mask=False):
     h, w = img.shape[:2]
-    size = 256
-    crop_size = 224
+    size = IMAGE_RESIZE
+    crop_size = IMAGE_SIZE
 
     # resize
     if h > w:
@@ -85,6 +95,8 @@ def preprocess(img, mask=False):
     # normalize
     if not mask:
         img = normalize_image(img.astype(np.float32), 'ImageNet')
+    else:
+        img = img / 255
 
     img = img.transpose(2, 0, 1)  # HWC -> CHW
     img = np.expand_dims(img, axis=0)
@@ -144,6 +156,8 @@ def get_train_outputs(net, create_net, idx):
         for key, name in zip(train_outputs.keys(), ("356", "398", "460")):
             train_outputs[key].append(net.get_blob_data(name))
 
+    logger.info('postprocessing...')
+
     for k, v in train_outputs.items():
         train_outputs[k] = np.vstack(v)
 
@@ -173,6 +187,72 @@ def get_train_outputs(net, create_net, idx):
     return train_outputs
 
 
+def denormalization(x):
+    mean = np.array([0.485, 0.456, 0.406])
+    std = np.array([0.229, 0.224, 0.225])
+    x = (((x.transpose(1, 2, 0) * std) + mean) * 255.).astype(np.uint8)
+    return x
+
+
+def plot_fig(file_list, test_imgs, scores, gt_imgs, threshold, save_dir):
+    num = len(file_list)
+    vmax = scores.max() * 255.
+    vmin = scores.min() * 255.
+    for i in range(num):
+        image_path = file_list[i]
+        img = test_imgs[i]
+        img = denormalization(img)
+        gt = gt_imgs[i]
+        gt = gt.transpose(1, 2, 0).squeeze()
+        heat_map = scores[i] * 255
+        mask = scores[i]
+        mask[mask > threshold] = 1
+        mask[mask <= threshold] = 0
+        kernel = morphology.disk(4)
+        mask = morphology.opening(mask, kernel)
+        mask *= 255
+        vis_img = mark_boundaries(img, mask, color=(1, 0, 0), mode='thick')
+
+        fig_img, ax_img = plt.subplots(1, 5, figsize=(12, 3))
+        fig_img.subplots_adjust(right=0.9)
+        norm = matplotlib.colors.Normalize(vmin=vmin, vmax=vmax)
+        for ax_i in ax_img:
+            ax_i.axes.xaxis.set_visible(False)
+            ax_i.axes.yaxis.set_visible(False)
+        ax_img[0].imshow(img)
+        ax_img[0].title.set_text('Image')
+        ax_img[1].imshow(gt, cmap='gray')
+        ax_img[1].title.set_text('GroundTruth')
+        ax = ax_img[2].imshow(heat_map, cmap='jet', norm=norm)
+        ax_img[2].imshow(img, cmap='gray', interpolation='none')
+        ax_img[2].imshow(heat_map, cmap='jet', alpha=0.5, interpolation='none')
+        ax_img[2].title.set_text('Predicted heat map')
+        ax_img[3].imshow(mask, cmap='gray')
+        ax_img[3].title.set_text('Predicted mask')
+        ax_img[4].imshow(vis_img)
+        ax_img[4].title.set_text('Segmentation result')
+        left = 0.92
+        bottom = 0.15
+        width = 0.015
+        height = 1 - 2 * bottom
+        rect = [left, bottom, width, height]
+        cbar_ax = fig_img.add_axes(rect)
+        cb = plt.colorbar(ax, shrink=0.6, cax=cbar_ax, fraction=0.046)
+        cb.ax.tick_params(labelsize=8)
+        font = {
+            'family': 'serif',
+            'color': 'black',
+            'weight': 'normal',
+            'size': 8,
+        }
+        cb.set_label('Anomaly Score', fontdict=font)
+
+        savepath = get_savepath(save_dir, image_path, ext='.png')
+        logger.info(f'saved at : {savepath}')
+        fig_img.savefig(savepath, dpi=100)
+        plt.close()
+
+
 def recognize_from_image(net, create_net):
     batch_size = 32
     t_d = 1792
@@ -189,14 +269,14 @@ def recognize_from_image(net, create_net):
 
     gt_type_dir = args.gt_dir if args.gt_dir else None
 
-    test_imgs = args.input
+    test_imgs = []
     gt_imgs = []
 
     # input image loop
-    for i in range(0, len(test_imgs), batch_size):
+    for i in range(0, len(args.input), batch_size):
         # prepare input data
         imgs = []
-        for image_path in test_imgs[i:i + batch_size]:
+        for image_path in args.input[i:i + batch_size]:
             logger.info(image_path)
             img = load_image(image_path)
             img = cv2.cvtColor(img, cv2.COLOR_BGRA2RGB)
@@ -214,6 +294,9 @@ def recognize_from_image(net, create_net):
                     gt_img = preprocess(gt_img, mask=True)
                     gt_img = np.mean(gt_img, axis=1, keepdims=True)
 
+            gt_img = gt_img[0] if gt_img is not None else np.zeros((1, IMAGE_SIZE, IMAGE_SIZE))
+
+            test_imgs.append(img[0])
             gt_imgs.append(gt_img)
 
         imgs = np.vstack(imgs)
@@ -242,69 +325,58 @@ def recognize_from_image(net, create_net):
         for key, name in zip(test_outputs.keys(), ("356", "398", "460")):
             test_outputs[key].append(net.get_blob_data(name))
 
+    logger.info('postprocessing...')
+
     for k, v in test_outputs.items():
         test_outputs[k] = np.vstack(v)
 
-    for k, v in test_outputs.items():
-        print("%s--" % k, v)
-        print("%s--" % k, v.shape)
+    embedding_vectors = postprocess(test_outputs)
 
-        # savepath = get_savepath(args.savepath, image_path, ext='.png')
-        # logger.info(f'saved at : {savepath}')
-        # cv2.imwrite(savepath, xx)
+    # randomly select d dimension
+    embedding_vectors = embedding_vectors[:, idx, :, :]
 
-    logger.info('Script finished successfully.')
+    # calculate distance matrix
+    B, C, H, W = embedding_vectors.shape
+    embedding_vectors = embedding_vectors.reshape(B, C, H * W)
+    dist_list = []
+    for i in range(H * W):
+        mean = train_outputs[0][:, i]
+        conv_inv = np.linalg.inv(train_outputs[1][:, :, i])
+        dist = [mahalanobis(sample[:, i], mean, conv_inv) for sample in embedding_vectors]
+        dist_list.append(dist)
 
+    dist_list = np.array(dist_list).transpose(1, 0).reshape(B, H, W)
 
-def recognize_from_video(net):
-    capture = get_capture(args.video)
+    # upsample
+    score_map = np.asarray([
+        np.array(Image.fromarray(s).resize(
+            (IMAGE_SIZE, IMAGE_SIZE), resample=Image.BILINEAR)
+        ) for s in dist_list
+    ])
 
-    save_h, save_w = IMAGE_HEIGHT, IMAGE_WIDTH
-    output_frame = np.zeros((save_h, save_w * 2, 3))
+    # apply gaussian smoothing on the score map
+    for i in range(score_map.shape[0]):
+        score_map[i] = gaussian_filter(score_map[i], sigma=4)
 
-    # create video writer if savepath is specified as video format
-    if args.savepath != SAVE_IMAGE_PATH:
-        logger.warning(
-            'currently, video results cannot be output correctly...'
-        )
-        writer = get_writer(args.savepath, save_h, save_w * 2)
+    # Normalization
+    max_score = score_map.max()
+    min_score = score_map.min()
+    scores = (score_map - min_score) / (max_score - min_score)
+
+    if args.threshold is None:
+        # get optimal threshold
+        gt_mask = np.asarray(gt_imgs)
+        precision, recall, thresholds = precision_recall_curve(gt_mask.flatten(), scores.flatten())
+        a = 2 * precision * recall
+        b = precision + recall
+        f1 = np.divide(a, b, out=np.zeros_like(a), where=b != 0)
+        threshold = thresholds[np.argmax(f1)]
+        logger.info('Optimal threshold: %f' % threshold)
     else:
-        writer = None
+        threshold = args.threshold
 
-    input_shape_set = False
-    while (True):
-        ret, frame = capture.read()
-        if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
-            break
+    plot_fig(args.input, test_imgs, scores, gt_imgs, threshold, args.savepath)
 
-        img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        img = preprocess(img)
-
-        # predict
-        if (not input_shape_set):
-            net.set_input_shape(img.shape)
-            input_shape_set = True
-        output = net.predict(img)
-
-        hand_scoremap = output[0]
-        hand_scoremap = np.argmax(hand_scoremap, 2) * 128
-        res_img = hand_scoremap.astype("uint8")
-        res_img = cv2.cvtColor(res_img, cv2.COLOR_GRAY2BGR)
-
-        output_frame[:, save_w:save_w * 2, :] = res_img
-        output_frame[:, 0:save_w, :] = cv2.resize(frame, (IMAGE_WIDTH, IMAGE_HEIGHT))
-        output_frame = output_frame.astype("uint8")
-
-        cv2.imshow('frame', output_frame)
-
-        # save results
-        if writer is not None:
-            writer.write(output_frame)
-
-    capture.release()
-    cv2.destroyAllWindows()
-    if writer is not None:
-        writer.release()
     logger.info('Script finished successfully.')
 
 
@@ -327,12 +399,7 @@ def main():
         create_net = None
         net = _create_net()
 
-    if args.video is not None:
-        # video mode
-        recognize_from_video(net, create_net)
-    else:
-        # image mode
-        recognize_from_image(net, create_net)
+    recognize_from_image(net, create_net)
 
 
 if __name__ == '__main__':
