@@ -77,7 +77,7 @@ $ python3 inpainting_gmcnn.py --model places2 --mask_type stroke -i places2_001.
 
 ## Reference
 
-[Image Inpainting via Generative Multi-column Convolutional Neural Networks](https://github.com/naoto0804/pytorch-inpainting-with-partial-conv)
+[Image Inpainting via Generative Multi-column Convolutional Neural Networks](https://github.com/shepnerd/inpainting_gmcnn)
 
 ## Framework
 
@@ -90,7 +90,11 @@ ONNX opset=11
 ## Netron
 
 [paris-streetview_256x256_rect.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/inpainting_gmcnn/paris-streetview_256x256_rect.onnx.prototxt)
+
 [celebahq_256x256_rect.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/inpainting_gmcnn/celebahq_256x256_rect.onnx.prototxt)
+
 [celebahq_512x512_rect.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/inpainting_gmcnn/celebahq_512x512_rect.onnx.prototxt)
+
 [celebahq_512x512_freeform.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/inpainting_gmcnn/celebahq_512x512_freeform.onnx.prototxt)
+
 [places2_512x680_freeform.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/inpainting_gmcnn/places2_512x680_freeform.onnx.prototxt)
