@@ -1,16 +1,11 @@
-# ailia predict api sample
-
 import numpy as np
 import time
 import os
 import sys
 import cv2
-import torch
+import matplotlib.pyplot as plt
 
-from lib_nanodet.transform import pipeline
-from lib_nanodet.config import cfg, load_config
-from lib_nanodet.nanodet_head import NanoDetHead
-from lib_nanodet import visualize
+from nanodet_utils import NanoDetABC
 
 import ailia
 
@@ -28,38 +23,18 @@ logger = getLogger(__name__)
 
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
 
+# ======================
+# Parameters
+# ======================
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/nanodet/'
-
-# settings
-WEIGHT_PATH = "nanodet-EfficientNet-Lite2_512.opt.onnx"
-MODEL_PATH = "nanodet-EfficientNet-Lite2_512.opt.onnx.prototxt"
+WEIGHT_PATH = "nanodet-EfficientNet-Lite0_320.opt.onnx"
+MODEL_PATH = "nanodet-EfficientNet-Lite0_320.opt.onnx.prototxt"
 
 IMAGE_PATH = 'input.jpg'
 SAVE_IMAGE_PATH = 'output.jpg'
 
-# Default input size
-HEIGHT = 512
-WIDTH = 512
-
-model_conf_path = './config_nanodet/EfficientNet-Lite/nanodet-EfficientNet-Lite2_512.yml'
-load_config(cfg, model_conf_path)
-
-class_names = [
-    'person', 'bicycle', 'car', 'motorcycle', 'airplane', 'bus',
-    'train', 'truck', 'boat', 'traffic_light', 'fire_hydrant',
-    'stop_sign', 'parking_meter', 'bench', 'bird', 'cat', 'dog',
-    'horse', 'sheep', 'cow', 'elephant', 'bear', 'zebra', 'giraffe',
-    'backpack', 'umbrella', 'handbag', 'tie', 'suitcase', 'frisbee',
-    'skis', 'snowboard', 'sports_ball', 'kite', 'baseball_bat',
-    'baseball_glove', 'skateboard', 'surfboard', 'tennis_racket',
-    'bottle', 'wine_glass', 'cup', 'fork', 'knife', 'spoon', 'bowl',
-    'banana', 'apple', 'sandwich', 'orange', 'broccoli', 'carrot',
-    'hot_dog', 'pizza', 'donut', 'cake', 'chair', 'couch',
-    'potted_plant', 'bed', 'dining_table', 'toilet', 'tv', 'laptop',
-    'mouse', 'remote', 'keyboard', 'cell_phone', 'microwave',
-    'oven', 'toaster', 'sink', 'refrigerator', 'book', 'clock',
-    'vase', 'scissors', 'teddy_bear', 'hair_drier', 'toothbrush'
-]
+HEIGHT = 320
+WIDTH = 320
 
 # ======================
 # Arguemnt Parser Config
@@ -71,54 +46,16 @@ args = update_parser(parser)
 # ======================
 # Detection function
 # ======================
-def detection(raw_img, filename, net):
-    img_info = {}
-    img_info['file_name'] = filename
+class NanoDetDetection(NanoDetABC):
+    def __init__(self, model, *args, **kwargs):
+        super(NanoDetDetection, self).__init__(*args, **kwargs)
+        self.model = model
 
-    height, width = raw_img.shape[:2]
-    img_info['height'] = height
-    img_info['width'] = width
-    meta = dict(img_info=img_info,
-                raw_img=raw_img,
-                img=raw_img)
-
-    pipe = pipeline.Pipeline(cfg.data.val.pipeline, cfg.data.val.keep_ratio)
-    meta = pipe(meta, cfg.data.val.input_size)
-
-    img = cv2.resize(raw_img, (HEIGHT, WIDTH))
-    img = np.transpose(img, (2, 0, 1))
-    img = np.expand_dims(img, 0)
-    meta['img'] = img
-
-    trans_detections = []
-
-    detections = net.run(img)
-    for detection in detections:
-        trans_detections.append(detection.transpose(0, 2, 1))
-
-    cls_scores1, cls_scores2, cls_scores3 = trans_detections[:3]
-    bbox_preds1, bbox_preds2, bbox_preds3 = trans_detections[3:]
-
-    # ONNXエクスポートの際に予測結果の形状が変化するため修正
-    # → (nanodet_head.py:108行)の処理による影響
-    cls_scores1 = cls_scores1.reshape(1, 80, 64, 64)
-    cls_scores2 = cls_scores2.reshape(1, 80, 32, 32)
-    cls_scores3 = cls_scores3.reshape(1, 80, 16, 16)
-
-    bbox_preds1 = bbox_preds1.reshape(1, 44, 64, 64)
-    bbox_preds2 = bbox_preds2.reshape(1, 44, 32, 32)
-    bbox_preds3 = bbox_preds3.reshape(1, 44, 16, 16)
-
-    # 動作確認のためnumpy→torchへ変換する
-    cls_scores1 = torch.from_numpy(cls_scores1).clone()
-    cls_scores2 = torch.from_numpy(cls_scores2).clone()
-    cls_scores3 = torch.from_numpy(cls_scores3).clone()
-
-    bbox_preds1 = torch.from_numpy(bbox_preds1).clone()
-    bbox_preds2 = torch.from_numpy(bbox_preds2).clone()
-    bbox_preds3 = torch.from_numpy(bbox_preds3).clone()
-
-    return (cls_scores1, cls_scores2, cls_scores3), (bbox_preds1, bbox_preds2, bbox_preds3), meta
+    def infer_image(self, img_input):
+        inference_results = self.model.run(img_input)
+        scores = [np.squeeze(x) for x in inference_results[:3]]
+        raw_boxes = [np.squeeze(x) for x in inference_results[3:]]
+        return scores, raw_boxes
 
 
 # ======================
@@ -127,7 +64,7 @@ def detection(raw_img, filename, net):
 def recognize_from_image():
     env_id = ailia.get_gpu_environment_id()
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
-    # net.set_input_shape(WIDTH, HEIGHT)
+    detector = NanoDetDetection(net)
 
     # input image loop
     for image_path in args.input:
@@ -142,20 +79,19 @@ def recognize_from_image():
             logger.info('BENCHMARK mode')
             for i in range(5):
                 start = int(round(time.time() * 1000))
-                detection(raw_img, IMAGE_PATH, net)
+                bbox, label, score = detector.detect(raw_img)
                 end = int(round(time.time() * 1000))
                 logger.info(f'\tailia processing time {end - start} ms')
         else:
-            cls_scores, bbox_preds, meta = detection(raw_img, IMAGE_PATH, net)
-            preds = cls_scores, bbox_preds
-            cfg_head = cfg.model.arch.head
-            head = NanoDetHead(**cfg_head)
-            results = head.post_process(preds, meta)
-            result = visualize.show_result(raw_img, results, class_names)
+            bbox, label, score = detector.detect(raw_img)
+            img_draw = detector.draw_box(raw_img, bbox, label, score)
+            plt.imshow(img_draw[..., ::-1])
+            plt.axis('off')
+            plt.show()
 
         savepath = get_savepath(args.savepath, image_path)
         logger.info(f'saved at : {savepath}')
-        cv2.imwrite(savepath, result)
+        cv2.imwrite(savepath, img_draw)
 
     if cv2.waitKey(0) != 32:  # space bar
         exit()
@@ -165,7 +101,7 @@ def recognize_from_video():
     # net initialize
     env_id = ailia.get_gpu_environment_id()
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
-    net.set_input_shape(WIDTH, HEIGHT)
+    detector = NanoDetDetection(net)
 
     capture = webcamera_utils.get_capture(args.video)
 
@@ -187,16 +123,17 @@ def recognize_from_video():
             break
 
         raw_img = frame
-        cls_scores, bbox_preds, meta = detection(raw_img, IMAGE_PATH, net)
-        preds = cls_scores, bbox_preds
-        cfg_head = cfg.model.arch.head
-        head = NanoDetHead(**cfg_head)
-        results = head.post_process(preds, meta)
-        result = visualize.show_result(raw_img, results, class_names)
+        bbox, label, score = detector.detect(raw_img)
+        img_draw = detector.draw_box(raw_img, bbox, label, score)
+        plt.imshow(img_draw[..., ::-1])
+
+        plt.pause(.01)
+        if not plt.get_fignums():
+            break
 
         # save results
         if writer is not None:
-            writer.write(result)
+            writer.write(img_draw)
 
     capture.release()
     cv2.destroyAllWindows()
@@ -207,7 +144,7 @@ def recognize_from_video():
 
 def main():
     # model files check and download
-    # check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
 
     if args.video is not None:
         # video mode
