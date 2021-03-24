@@ -36,11 +36,13 @@ logger = getLogger(__name__)
 # Parameters
 # ======================
 
+WEIGHT_RESNET18_PATH = 'resnet18.onnx'
+MODEL_RESNET18_PATH = 'resnet18.onnx.prototxt'
 WEIGHT_WIDE_RESNET50_2_PATH = 'wide_resnet50_2.onnx'
 MODEL_WIDE_RESNET50_2_PATH = 'wide_resnet50_2.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/padim/'
 
-IMAGE_PATH = 'bottle_broken-large_000.png'
+IMAGE_PATH = 'bottle_000.png'
 SAVE_IMAGE_PATH = 'output.png'
 IMAGE_RESIZE = 256
 IMAGE_SIZE = 224
@@ -51,8 +53,16 @@ IMAGE_SIZE = 224
 
 parser = get_base_parser('PaDiM model', IMAGE_PATH, SAVE_IMAGE_PATH)
 parser.add_argument(
+    '-a', '--arch', default='wide_resnet50_2', choices=('resnet18', 'wide_resnet50_2'),
+    help='arch model.'
+)
+parser.add_argument(
     '-f', '--feat', metavar="PICKLE_FILE", default=None,
     help='train set feature pkl files.'
+)
+parser.add_argument(
+    '-bs', '--batch_size', default=32,
+    help='batch size.'
 )
 parser.add_argument(
     '-tr', '--train_dir', metavar="DIR", default="./train",
@@ -61,6 +71,10 @@ parser.add_argument(
 parser.add_argument(
     '-gt', '--gt_dir', metavar="DIR", default="./gt_masks",
     help='directory of the ground truth mask files.'
+)
+parser.add_argument(
+    '--seed', type=int, default=1024,
+    help='random seed'
 )
 parser.add_argument(
     '-th', '--threshold', type=float, default=None,
@@ -121,19 +135,22 @@ def get_train_outputs(net, create_net, idx):
         logger.info('loaded.')
         return train_outputs
 
+    batch_size = args.batch_size
+
     train_dir = args.train_dir
     train_imgs = sorted([
         os.path.join(train_dir, f) for f in os.listdir(train_dir)
         if f.endswith('.png') or f.endswith('.jpg')
     ])
+    if len(train_imgs) == 0:
+        logger.error("train images not found in '%s'" % train_dir)
+        sys.exit(-1)
+
+    logger.info('extract train set features')
 
     train_outputs = OrderedDict([
         ('layer1', []), ('layer2', []), ('layer3', [])
     ])
-    batch_size = 32
-
-    logger.info('extract train set features')
-
     for i in range(0, len(train_imgs), batch_size):
         # prepare input data
         imgs = []
@@ -253,26 +270,22 @@ def plot_fig(file_list, test_imgs, scores, gt_imgs, threshold, save_dir):
         plt.close()
 
 
-def recognize_from_image(net, create_net):
-    batch_size = 32
-    t_d = 1792
-    d = 550
+def recognize_from_image(net, create_net, params):
+    batch_size = args.batch_size
 
-    random.seed(1024)
-    idx = random.sample(range(0, t_d), d)
+    random.seed(args.seed)
+    idx = random.sample(range(0, params["t_d"]), params["d"])
 
     train_outputs = get_train_outputs(net, create_net, idx)
 
-    test_outputs = OrderedDict([
-        ('layer1', []), ('layer2', []), ('layer3', [])
-    ])
-
     gt_type_dir = args.gt_dir if args.gt_dir else None
-
     test_imgs = []
     gt_imgs = []
 
     # input image loop
+    test_outputs = OrderedDict([
+        ('layer1', []), ('layer2', []), ('layer3', [])
+    ])
     for i in range(0, len(args.input), batch_size):
         # prepare input data
         imgs = []
@@ -322,7 +335,7 @@ def recognize_from_image(net, create_net):
         else:
             _ = net.predict(imgs)
 
-        for key, name in zip(test_outputs.keys(), ("356", "398", "460")):
+        for key, name in zip(test_outputs.keys(), params["feat_names"]):
             test_outputs[key].append(net.get_blob_data(name))
 
     logger.info('postprocessing...')
@@ -382,11 +395,22 @@ def recognize_from_image(net, create_net):
 
 def main():
     info = {
-        "wide_resnet50_2": (WEIGHT_WIDE_RESNET50_2_PATH, MODEL_WIDE_RESNET50_2_PATH),
+        "resnet18": (
+            WEIGHT_RESNET18_PATH, MODEL_RESNET18_PATH,
+            ("140", "156", "172"), 448, 100),
+        "wide_resnet50_2": (
+            WEIGHT_WIDE_RESNET50_2_PATH, MODEL_WIDE_RESNET50_2_PATH,
+            ("356", "398", "460"), 1792, 550),
     }
     # model files check and download
-    weight_path, model_path = info["wide_resnet50_2"]
+    weight_path, model_path, feat_names, t_d, d = info[args.arch]
     check_and_download_models(weight_path, model_path, REMOTE_PATH)
+
+    params = {
+        "feat_names": feat_names,
+        "t_d": t_d,
+        "d": d,
+    }
 
     def _create_net():
         return ailia.Net(model_path, weight_path, env_id=args.env_id)
@@ -399,7 +423,7 @@ def main():
         create_net = None
         net = _create_net()
 
-    recognize_from_image(net, create_net)
+    recognize_from_image(net, create_net, params)
 
 
 if __name__ == '__main__':
