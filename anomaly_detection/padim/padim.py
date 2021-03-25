@@ -53,7 +53,7 @@ IMAGE_SIZE = 224
 
 parser = get_base_parser('PaDiM model', IMAGE_PATH, SAVE_IMAGE_PATH)
 parser.add_argument(
-    '-a', '--arch', default='wide_resnet50_2', choices=('resnet18', 'wide_resnet50_2'),
+    '-a', '--arch', default='resnet18', choices=('resnet18', 'wide_resnet50_2'),
     help='arch model.'
 )
 parser.add_argument(
@@ -170,7 +170,12 @@ def get_train_outputs(net, create_net, idx):
 
         _ = net.predict(imgs)
 
-        for key, name in zip(train_outputs.keys(), ("356", "398", "460")):
+        if args.arch=="resnet18":
+            feature_layer_names = ("140", "156", "172")
+        else:
+            feature_layer_names = ("356", "398", "460")
+
+        for key, name in zip(train_outputs.keys(), feature_layer_names):
             train_outputs[key].append(net.get_blob_data(name))
 
     logger.info('postprocessing...')
