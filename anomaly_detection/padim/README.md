@@ -17,7 +17,7 @@ Left to right: input, ground truth, predicted head map, predicted mask, segmenta
 ## Usage
 In order to get the feature vector of the normal product, it is necessary to prepare the file of the normal product.  
 By default, normal files are got from the `train` directory.  
-For the sample image, first download MVTec AD datasets and place `bottle/train/good/*.png` files to the `train` directory. 
+For the sample image, first download [MVTec AD datasets](https://www.mvtec.com/company/research/datasets/mvtec-ad/) and place `bottle/train/good/*.png` files to the `train` directory. 
 
 Automatically downloads the onnx and prototxt files on the first run.
 It is necessary to be connected to the Internet while downloading.
