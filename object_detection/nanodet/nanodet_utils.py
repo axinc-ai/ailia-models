@@ -1,22 +1,10 @@
-# -*- coding: utf-8 -*-
-
-'''
-name:       demo_mnn.py
-date:       2020-12-16 11:21:07
-Env.:       Python 3.7.3, WIN 10
-'''
-
-import argparse
-from pathlib import Path
-from abc import ABCMeta, abstractmethod
-
 import cv2
 import numpy as np
-import matplotlib.pyplot as plt
-from tqdm import tqdm
 from scipy.special import softmax
+from abc import ABCMeta, abstractmethod
 
-# Copy from nanodet/util/visualization.py
+import ailia
+
 _COLORS = np.array(
     [
         0.000, 0.447, 0.741,
@@ -199,18 +187,14 @@ def hard_nms(box_scores, iou_threshold, top_k=-1, candidate_size=200):
     scores = box_scores[:, -1]
     boxes = box_scores[:, :-1]
     picked = []
-    # _, indexes = scores.sort(descending=True)
     indexes = np.argsort(scores)
-    # indexes = indexes[:candidate_size]
     indexes = indexes[-candidate_size:]
     while len(indexes) > 0:
-        # current = indexes[0]
         current = indexes[-1]
         picked.append(current)
         if 0 < top_k == len(picked) or len(indexes) == 1:
             break
         current_box = boxes[current, :]
-        # indexes = indexes[1:]
         indexes = indexes[:-1]
         rest_boxes = boxes[indexes, :]
         iou = iou_of(
@@ -268,22 +252,6 @@ class NanoDetABC(metaclass=ABCMeta):
         self.img_mean = [103.53, 116.28, 123.675]
         self.img_std = [57.375, 57.12, 58.395]
         self.input_size = (self.input_shape[1], self.input_shape[0])
-        self.class_names = [
-            'person', 'bicycle', 'car', 'motorcycle', 'airplane', 'bus',
-            'train', 'truck', 'boat', 'traffic_light', 'fire_hydrant',
-            'stop_sign', 'parking_meter', 'bench', 'bird', 'cat', 'dog',
-            'horse', 'sheep', 'cow', 'elephant', 'bear', 'zebra', 'giraffe',
-            'backpack', 'umbrella', 'handbag', 'tie', 'suitcase', 'frisbee',
-            'skis', 'snowboard', 'sports_ball', 'kite', 'baseball_bat',
-            'baseball_glove', 'skateboard', 'surfboard', 'tennis_racket',
-            'bottle', 'wine_glass', 'cup', 'fork', 'knife', 'spoon', 'bowl',
-            'banana', 'apple', 'sandwich', 'orange', 'broccoli', 'carrot',
-            'hot_dog', 'pizza', 'donut', 'cake', 'chair', 'couch',
-            'potted_plant', 'bed', 'dining_table', 'toilet', 'tv', 'laptop',
-            'mouse', 'remote', 'keyboard', 'cell_phone', 'microwave',
-            'oven', 'toaster', 'sink', 'refrigerator', 'book', 'clock',
-            'vase', 'scissors', 'teddy_bear', 'hair_drier', 'toothbrush'
-        ]
 
     def preprocess(self, img):
         # resize image
@@ -372,40 +340,21 @@ class NanoDetABC(metaclass=ABCMeta):
         raw_shape = img.shape
         img_input, ResizeM = self.preprocess(img)
         scores, raw_boxes = self.infer_image(img_input)
-        bbox, label, score = self.postprocess(scores, raw_boxes, ResizeM, raw_shape)
-        return bbox, label, score
+        bboxs, labels, confs = self.postprocess(scores, raw_boxes, ResizeM, raw_shape)
 
-    def draw_box(self, raw_img, bbox, label, score):
-        img = raw_img.copy()
-        all_box = [[x, ] + y + [z, ] for x, y, z in zip(label, bbox.tolist(), score)]
-        img_draw = overlay_bbox_cv(img, all_box, self.class_names)
-        return img_draw
+        img_size_h, img_size_w = img.shape[:2]
+        output = []
+        for i, box in enumerate(bboxs):
+            x1, y1, x2, y2 = box
+            c = int(labels[i])
+            r = ailia.DetectorObject(
+                category=c,
+                prob=confs[i],
+                x=x1 / img_size_w,
+                y=y1 / img_size_h,
+                w=(x2 - x1) / img_size_w,
+                h=(y2 - y1) / img_size_h,
+            )
+            output.append(r)
 
-    def detect_folder(self, img_fold, result_path):
-        img_fold = Path(img_fold)
-        result_path = Path(result_path)
-        result_path.mkdir(parents=True, exist_ok=True)
-
-        img_name_list = filter(
-            lambda x: str(x).endswith('.png') or str(x).endswith('.jpg'),
-            img_fold.iterdir()
-        )
-        img_name_list = list(img_name_list)
-        print(f'find {len(img_name_list)} images')
-
-        for img_path in tqdm(img_name_list):
-            img = cv2.imread(str(img_path))
-            bbox, label, score = self.detect(img)
-            img_draw = self.draw_box(img, bbox, label, score)
-            save_path = str(result_path / img_path.name.replace(".png", ".jpg"))
-            cv2.imwrite(save_path, img_draw)
-
-
-def main(input_shape):
-    detector = NanoDetONNX('../weight/nanodet-EfficientNet-Lite2_512.onnx', input_shape=input_shape)
-    img = cv2.imread('../imgs/000252.jpg')
-    bbox, label, score = detector.detect(img)
-    img_draw = detector.draw_box(img, bbox, label, score)
-    plt.imshow(img_draw[..., ::-1])
-    plt.axis('off')
-    plt.show()
+        return output
