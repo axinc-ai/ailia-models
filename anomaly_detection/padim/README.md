@@ -36,7 +36,7 @@ $ python3 padim.py --input IMAGE_PATH --savepath SAVE_IMAGE_PATH
 The feature vectors created from files in the train directory are saved to the pickle file.  
 From the second time, by specifying the pickle file by `--feat` option,
 it can omit the calculation of the feature vector of the normal product.  
-The name of the pickle file is the same as the name of a normal product file directory.
+The name of the pickle file created is the same as the name of a normal product file directory.
 ```bash
 $ python3 padim.py --feat train.pkl
 ```
