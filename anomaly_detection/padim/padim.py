@@ -127,7 +127,7 @@ def postprocess(outputs):
     return embedding_vectors
 
 
-def get_train_outputs(net, create_net, idx):
+def get_train_outputs(net, create_net, params):
     if args.feat:
         logger.info('loading train set feature from: %s' % args.feat)
         with open(args.feat, 'rb') as f:
@@ -170,12 +170,7 @@ def get_train_outputs(net, create_net, idx):
 
         _ = net.predict(imgs)
 
-        if args.arch=="resnet18":
-            feature_layer_names = ("140", "156", "172")
-        else:
-            feature_layer_names = ("356", "398", "460")
-
-        for key, name in zip(train_outputs.keys(), feature_layer_names):
+        for key, name in zip(train_outputs.keys(), params["feat_names"]):
             train_outputs[key].append(net.get_blob_data(name))
 
     logger.info('postprocessing...')
@@ -186,6 +181,7 @@ def get_train_outputs(net, create_net, idx):
     embedding_vectors = postprocess(train_outputs)
 
     # randomly select d dimension
+    idx = params['idx']
     embedding_vectors = embedding_vectors[:, idx, :, :]
 
     # calculate multivariate Gaussian distribution
@@ -281,7 +277,8 @@ def recognize_from_image(net, create_net, params):
     random.seed(args.seed)
     idx = random.sample(range(0, params["t_d"]), params["d"])
 
-    train_outputs = get_train_outputs(net, create_net, idx)
+    params["idx"] = idx
+    train_outputs = get_train_outputs(net, create_net, params)
 
     gt_type_dir = args.gt_dir if args.gt_dir else None
     test_imgs = []
