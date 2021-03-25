@@ -2,7 +2,7 @@
 
 ## Input
 
-![Input](bottle_000.png)
+<img src="bottle_000.png" width="256" height="256">
 
 (Image from MVTec AD datasets https://www.mvtec.com/company/research/datasets/mvtec-ad/)
 
@@ -59,7 +59,7 @@ $ python3 padim.py -i bottle/test/broken_large --train_dir bottle/train/good --g
 ```
 
 By adding the `--arch` option, you can specify model type which is selected from "resnet18", "wide_resnet50_2".  
-(default is wide_resnet50_2)
+(default is resnet18)
 ```bash
 $ python3 padim.py --arch wide_resnet50_2
 ```
@@ -79,4 +79,5 @@ ONNX opset=11
 ## Netron
 
 [resnet18.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/padim/resnet18.onnx.prototxt)
+
 [wide_resnet50_2.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/padim/wide_resnet50_2.onnx.prototxt)
