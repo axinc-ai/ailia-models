@@ -61,7 +61,7 @@ COCO_CATEGORY = [
 parser = get_base_parser('nanodet model', IMAGE_PATH, SAVE_IMAGE_PATH)
 parser.add_argument(
     '--model_name',
-    default='nanodet_t',
+    default='nanodet_m',
     help='[nanodet-EfficientNet-Lite0_320, nanodet-EfficientNet-Lite1_416, nanodet-EfficientNet-Lite2_512'
          'nanodet_m, nanodet_m_416, nanodet_t, nanodet-RepVGG-A0_416]'
 )
@@ -118,21 +118,20 @@ def recognize_from_image():
             logger.info('BENCHMARK mode')
             for i in range(5):
                 start = int(round(time.time() * 1000))
-                detector.detect(raw_img)
+                detect_object = detector.detect(raw_img)
                 end = int(round(time.time() * 1000))
                 logger.info(f'\tailia processing time {end - start} ms')
         else:
             detect_object = detector.detect(raw_img)
-            detect_object = reverse_letterbox(detect_object, raw_img, (raw_img.shape[0], raw_img.shape[1]))
-            res_img = plot_results(detect_object, raw_img, COCO_CATEGORY)
-            cv2.imshow('frame', res_img)
+
+        detect_object = reverse_letterbox(detect_object, raw_img, (raw_img.shape[0], raw_img.shape[1]))
+        res_img = plot_results(detect_object, raw_img, COCO_CATEGORY)
 
         savepath = get_savepath(args.savepath, image_path)
         logger.info(f'saved at : {savepath}')
         cv2.imwrite(savepath, res_img)
 
-    if cv2.waitKey(0) != 32:  # space bar
-        exit()
+    logger.info('Script finished successfully.')
 
 
 def recognize_from_video():
