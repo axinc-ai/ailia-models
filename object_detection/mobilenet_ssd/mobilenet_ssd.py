@@ -102,7 +102,7 @@ def recognize_from_image():
             normalize_type='None',
         )
         if org_img.shape[2] == 3:
-            org_img = cv2.cvtColor(org_img, cv2.COLOR_BGR2BGRA)
+            org_img = cv2.cvtColor(org_img, cv2.COLOR_RGB2BGRA)
 
         # inference
         logger.info('Start inference...')

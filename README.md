@@ -4,7 +4,7 @@ The collection of pre-trained, state-of-the-art models.
 
 # About ailia SDK
 
-[ailia SDK](https://ailia.jp/en/) is a cross-platform high speed inference SDK. The ailia SDK provides a consistent C++ API on Windows, Mac, Linux, iOS, Android and Jetson. It supports Unity, Python and JNI for efficient AI implementation. The ailia SDK makes great use of the GPU via Vulkan and Metal to serve accelerated computing.
+[ailia SDK](https://ailia.jp/en/) is a cross-platform high speed inference SDK. The ailia SDK provides a consistent C++ API on Windows, Mac, Linux, iOS, Android, Jetson and Raspberry Pi. It supports Unity, Python and JNI for efficient AI implementation. The ailia SDK makes great use of the GPU via Vulkan and Metal to serve accelerated computing.
 
 # How to use
 
@@ -18,6 +18,12 @@ The collection of pre-trained, state-of-the-art models.
 |:-----------|------------:|:------------:|:------------:|:------------:|
 | [<img src="action_recognition/mars/inputs/input0.jpg" width=128px>](action_recognition/mars/) | [mars](/action_recognition/mars/) | [MARS: Motion-Augmented RGB Stream for Action Recognition](https://github.com/craston/MARS) | Pytorch | 1.2.4 and later |
 | [<img src="action_recognition/st_gcn/input.png" width=128px>](action_recognition/st_gcn/) | [st-gcn](/action_recognition/st_gcn/) | [ST-GCN](https://github.com/yysijie/st-gcn) | Pytorch | 1.2.5 and later |
+
+## Anomaly detection
+
+| | Model | Reference | Exported From | Supported Ailia Version |
+|:-----------|------------:|:------------:|:------------:|:------------:|
+| [<img src="anomaly_detection/padim/output.png" width=128px>](anomaly_detection/padim/) | [padim](/anomaly_detection/padim/) | [PaDiM-Anomaly-Detection-Localization-master](https://github.com/xiahaifeng1995/PaDiM-Anomaly-Detection-Localization-master) | Pytorch | 1.2.6 and later |
 
 ## Audio processing
 
@@ -33,7 +39,7 @@ The collection of pre-trained, state-of-the-art models.
 | | Model | Reference | Exported From | Supported Ailia Version |
 |:-----------|------------:|:------------:|:------------:|:------------:|
 | [<img src="crowd_counting/crowdcount-cascaded-mtl/result.png" width=256px>](crowd_counting/crowdcount-cascaded-mtl/) | [crowdcount-cascaded-mtl](/crowd_counting/crowdcount-cascaded-mtl) | [CNN-based Cascaded Multi-task Learning of <br/>High-level Prior and Density Estimation for Crowd Counting <br/>(Single Image Crowd Counting)](https://github.com/svishwa/crowdcount-cascaded-mtl) | Pytorch | 1.2.1 and later | 
-| [<img src="crowd_counting/c-3-framework/output.png" width=256px>](crowd_counting/c-3-framework/) | [c-3-framework](/crowd_counting/c-3-framework) | [C-3-Framework](https://github.com/gjy3035/C-3-Framework) | Pytorch | 1.2.5 and later | 
+| [<img src="crowd_counting/c-3-framework/output.png" width=256px>](crowd_counting/c-3-framework/) | [c-3-framework](/crowd_counting/c-3-framework) | [Crowd Counting Code Framework(C^3-Framework)](https://github.com/gjy3035/C-3-Framework) | Pytorch | 1.2.5 and later | 
 
 ## Deep fashion
 
@@ -102,6 +108,7 @@ The collection of pre-trained, state-of-the-art models.
 | | Model | Reference | Exported From | Supported Ailia Version |
 |:-----------|------------:|:------------:|:------------:|:------------:|
 | [<img src="hand_recognition/blazehand/output.png" width=128px>](hand_recognition/blazehand/) |[blazehand](/hand_recognition/blazehand/) | [MediaPipePyTorch](https://github.com/zmurez/MediaPipePyTorch) | Pytorch | 1.2.5 and later |
+| [<img src="hand_recognition/hand3d/output.png" width=128px>](hand_recognition/hand3d/) |[hand3d](/hand_recognition/hand3d/) | [ColorHandPose3D network](https://github.com/lmb-freiburg/hand3d) | TensorFlow | 1.2.5 and later |
 
 ## Image captioning
 
@@ -135,6 +142,9 @@ The collection of pre-trained, state-of-the-art models.
 | [<img src="image_manipulation/colorization/imgs_out/ansel_adams3_output.jpg" width=128px>](image_manipulation/colorization/) | [colorization](/image_manipulation/colorization/) | [Colorful Image Colorization](https://github.com/richzhang/colorization) | Pytorch | 1.2.2 and later |
 | [<img src="image_manipulation/u2net_portrait/your_portrait_results/GalGadot.jpg" width=128px>](image_manipulation/u2net_portrait/) | [u2net_portrait](/image_manipulation/u2net_portrait/) | [U^2-Net: Going Deeper with Nested U-Structure for Salient Object Detection](https://github.com/NathanUA/U-2-Net) | Pytorch | 1.2.2 and later |
 | [<img src="image_manipulation/style2paints/output.png" width=128px>](image_manipulation/style2paints/) | [style2paints](/image_manipulation/style2paints/) | [Style2Paints](https://github.com/lllyasviel/style2paints) | TensorFlow | 1.2.6 and later |
+| [<img src="image_manipulation/deep_white_balance/output_AWB.png" width=128px>](image_manipulation/deep_white_balance/) | [deep_white_balance](/image_manipulation/deep_white_balance/) | [Deep White-Balance Editing, CVPR 2020 (Oral)](https://github.com/mahmoudnafifi/Deep_White_Balance) | PyTorch | 1.2.6 and later |
+| [<img src="image_manipulation/pytorch-inpainting-with-partial-conv/result.png" width=128px>](image_manipulation/pytorch-inpainting-with-partial-conv/) | [inpainting-with-partial-conv](/image_manipulation/pytorch-inpainting-with-partial-conv/) | [pytorch-inpainting-with-partial-conv](https://github.com/naoto0804/pytorch-inpainting-with-partial-conv) | PyTorch | 1.2.6 and later |
+| [<img src="image_manipulation/inpainting_gmcnn/result_paris-streetview_rect.png" width=128px>](image_manipulation/inpainting_gmcnn/) | [inpainting_gmcnn](/image_manipulation/inpainting_gmcnn/) | [Image Inpainting via Generative Multi-column Convolutional Neural Networks](https://github.com/shepnerd/inpainting_gmcnn) | TensorFlow | 1.2.6 and later |
 
 
 ## Image segmentation
@@ -182,6 +192,7 @@ The collection of pre-trained, state-of-the-art models.
 | [<img src="object_detection/centernet/output.png" width=128px>](object_detection/centernet/) | [centernet](/object_detection/centernet/) | [CenterNet : Objects as Points](https://github.com/xingyizhou/CenterNet) | Pytorch | 1.2.1 and later |
 | [<img src="object_detection/pedestrian_detection/output.png" width=128px>](object_detection/pedestrian_detection/) | [pedestrian_detection](/object_detection/pedestrian_detection/) | [Pedestrian-Detection-on-YOLOv3_Research-and-APP](https://github.com/Zyjacya-In-love/Pedestrian-Detection-on-YOLOv3_Research-and-APP) | Keras | 1.2.1 and later |
 | [<img src="object_detection/efficientdet/output.png" width=128px>](object_detection/efficientdet/) | [efficientdet](/object_detection/efficientdet/) | [EfficientDet: Scalable and Efficient Object Detection, in PyTorch](https://github.com/toandaominh1997/EfficientDet.Pytorch) | Pytorch | 1.2.6 and later |
+| [<img src="object_detection/3d_bbox/output.png" width=128px>](object_detection/efficientdet/) | [3d_bbox](/object_detection/3d_bbox/) | [3D Bounding Box Estimation Using Deep Learning and Geometry](https://github.com/skhadem/3D-BoundingBox) | Pytorch | 1.2.6 and later |
 
 ## Object tracking
 
@@ -208,6 +219,7 @@ The collection of pre-trained, state-of-the-art models.
 | [<img src="pose_estimation/blazepose/output.png" width=128px>](pose_estimation/blazepose/) |[blazepose](/pose_estimation/blazepose/) | [MediaPipePyTorch](https://github.com/zmurez/MediaPipePyTorch) | Pytorch | 1.2.5 and later |
 | [<img src="pose_estimation/3dmppe_posenet/output_pose_2d.jpg" width=128px>](pose_estimation/3dmppe_posenet/) |[3dmppe_posenet](/pose_estimation/3dmppe_posenet/) | [PoseNet of "Camera Distance-aware Top-down Approach for 3D Multi-person Pose Estimation from a Single RGB Image"](https://github.com/mks0601/3DMPPE_POSENET_RELEASE) | Pytorch | 1.2.6 and later |
 | [<img src="pose_estimation/efficientpose/output.png" width=128px>](pose_estimation/efficientpose/) |[efficientpose](/pose_estimation/efficientpose/) | [Code repo for EfficientPose](https://github.com/daniegr/EfficientPose) | TensorFlow | 1.2.6 and later |
+| [<img src="pose_estimation/pose-hg-3d/output.png" width=128px>](pose_estimation/pose-hg-3d/) |[pose-hg-3d](/pose_estimation/pose-hg-3d/) | [Towards 3D Human Pose Estimation in the Wild: a Weakly-supervised Approach](https://github.com/xingyizhou/pytorch-pose-hg-3d) | Pytorch | 1.2.6 and later |
 
 ## Rotation prediction
 
@@ -243,6 +255,7 @@ The collection of pre-trained, state-of-the-art models.
 | [<img src="text_recognition/etl/font.png" width=64px>](/text_recognition/etl/) |[etl](/text_recognition/etl) | Japanese Character Classification | Keras | 1.1.0 and later |
 | [<img src="text_recognition/deep-text-recognition-benchmark/demo_image/demo_1.png" width=64px>](text_recognition/deep-text-recognition-benchmark/) |[deep-text-recognition-benchmark](/text_recognition/deep-text-recognition-benchmark/) | [deep-text-recognition-benchmark](https://github.com/clovaai/deep-text-recognition-benchmark) | Pytorch | 1.2.6 and later |
 | [<img src="text_recognition/crnn.pytorch/demo.png" width=64px>](text_recognition/crnn.pytorch/) |[crnn.pytorch](/text_recognition/crnn.pytorch/) | [Convolutional Recurrent Neural Network](https://github.com/meijieru/crnn.pytorch) | Pytorch | 1.2.6 and later |
+| [<img src="text_recognition/paddleocr/output.png" width=64px>](text_recognition/paddleocr/) |[paddleocr](/text_recognition/paddleocr/) | [PaddleOCR : Awesome multilingual OCR toolkits based on PaddlePaddle](https://github.com/PaddlePaddle/PaddleOCR) | Pytorch | 1.2.6 and later |
 
 ## Commercial model
 

@@ -151,7 +151,7 @@ def recognize_from_image():
 
             print_mars_result(result)
 
-            preview_img = cv2.imread(args.input + '/' + sorted_inputs_path[
+            preview_img = cv2.imread(sorted_inputs_path[
                     next_input_index - args.duration
             ])
             cv2.imshow('preview', preview_img)
@@ -160,7 +160,7 @@ def recognize_from_image():
                 input_blob[0, :, i, :, :] = input_blob[0, :, i + 1, :, :]
 
             img = load_image(
-                args.input + '/' + sorted_inputs_path[next_input_index],
+                sorted_inputs_path[next_input_index],
                 (IMAGE_HEIGHT, IMAGE_WIDTH),
                 normalize_type='None',
                 gen_input_ailia=True

@@ -1,5 +1,8 @@
+import os
 import time
 import sys
+import math
+
 from collections import namedtuple
 
 import numpy as np
@@ -12,7 +15,7 @@ from centernet_utils import preprocess, postprocess
 sys.path.append('../../util')
 from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
-from detector_utils import load_image, write_predictions  # noqa: E402
+from detector_utils import plot_results, load_image, write_predictions  # noqa: E402
 import webcamera_utils  # noqa: E402
 
 # logger
@@ -89,26 +92,6 @@ BASE = int(np.ceil(pow(len(COCO_CATEGORY), 1. / 3)))
 COLORS = [to_color(x, BASE) for x in range(len(COCO_CATEGORY))]
 
 
-def draw_detection(im, bboxes, scores, cls_inds):
-    imgcv = np.copy(im)
-    h, w, _ = imgcv.shape
-    for i, box in enumerate(bboxes):
-        cls_indx = int(cls_inds[i])
-        box = [int(_) for _ in box]
-        thick = int((h + w) / 300)
-        cv2.rectangle(
-            imgcv,
-            (box[0], box[1]),
-            (box[2], box[3]),
-            COLORS[cls_indx],
-            thick
-        )
-        mess = '%s: %.3f' % (COCO_CATEGORY[cls_indx], scores[i])
-        cv2.putText(imgcv, mess, (box[0], box[1] - 7),
-                    0, 1e-3 * h, COLORS[cls_indx], thick // 3)
-    return imgcv
-
-
 # ======================
 # Main functions
 # ======================
@@ -156,12 +139,24 @@ def recognize_from_image(filename, detector):
 
     logger.info('Start inference...')
     if args.benchmark:
-        logger.info('BENCHMARK mode')
-        for i in range(5):
-            start = int(round(time.time() * 1000))
-            boxes, scores, cls_inds = detect_objects(img, detector)
-            end = int(round(time.time() * 1000))
-            logger.info(f'\tailia processing time {end - start} ms')
+        for mode in range(2):
+            if mode == 0:
+                logger.info('BENCHMARK mode (without post process)')
+            else:
+                logger.info('BENCHMARK mode (with post process)')
+            zeros = np.zeros((1,3,512,512))
+            total_time = 0
+            for i in range(args.benchmark_count):
+                start = int(round(time.time() * 1000))
+                if mode == 0:
+                    detector.predict(zeros)
+                else:
+                    boxes, scores, cls_inds = detect_objects(img, detector)
+                end = int(round(time.time() * 1000))
+                if i != 0:
+                    total_time = total_time + (end - start)
+                logger.info(f'\tailia processing time {end - start} ms')
+            logger.info(f'\taverage time {total_time / (args.benchmark_count-1)} ms')
     else:
         boxes, scores, cls_inds = detect_objects(img, detector)
 
@@ -177,8 +172,14 @@ def recognize_from_image(filename, detector):
         # FIXME: do not use base 'except'
         pass
 
-    # show image
-    im2show = draw_detection(img, boxes, scores, cls_inds)
+    Detection = namedtuple('Detection', ['category', 'prob', 'x', 'y', 'w', 'h'])
+    ary = []
+    h, w = (img.shape[0], img.shape[1])
+    for i, box in enumerate(boxes):
+        d = Detection(int(cls_inds[i]), scores[i], box[0]/w, box[1]/h, (box[2]-box[0])/w, (box[3]-box[1])/h)
+        ary.append(d)
+
+    im2show = plot_results(ary, img, COCO_CATEGORY)
 
     savepath = get_savepath(args.savepath, filename)
     logger.info(f'saved at : {savepath}')
@@ -186,13 +187,8 @@ def recognize_from_image(filename, detector):
 
     # write prediction
     if args.write_prediction:
-        Detection = namedtuple('Detection', ['category', 'prob', 'x', 'y', 'w', 'h'])
-        ary = []
-        for i, box in enumerate(boxes):
-            d = Detection(int(cls_inds[i]), scores[i], box[0], box[1], box[2]-box[0], box[3]-box[1])
-            ary.append(d)
         pred_file = '%s.txt' % savepath.rsplit('.', 1)[0]
-        write_predictions(pred_file, ary, img=None, category=COCO_CATEGORY)
+        write_predictions(pred_file, ary, img, category=COCO_CATEGORY)
 
     if args.profile:
         print(detector.get_summary())
@@ -212,6 +208,11 @@ def recognize_from_video(video, detector):
     else:
         writer = None
 
+    if args.write_prediction:
+        frame_count = 0
+        frame_digit = int(math.log10(capture.get(cv2.CAP_PROP_FRAME_COUNT)) + 1)
+        video_name = os.path.splitext(os.path.basename(args.video))[0]
+
     while(True):
         ret, img = capture.read()
 
@@ -220,11 +221,27 @@ def recognize_from_video(video, detector):
             break
 
         boxes, scores, cls_inds = detect_objects(img, detector)
-        img = draw_detection(img, boxes, scores, cls_inds)
+
+        Detection = namedtuple('Detection', ['category', 'prob', 'x', 'y', 'w', 'h'])
+        ary = []
+        h, w = (img.shape[0], img.shape[1])
+        for i, box in enumerate(boxes):
+            d = Detection(int(cls_inds[i]), scores[i], box[0]/w, box[1]/h, (box[2]-box[0])/w, (box[3]-box[1])/h)
+            ary.append(d)
+
+        img = plot_results(ary, img, COCO_CATEGORY)
         cv2.imshow('frame', img)
+
         # save results
         if writer is not None:
             writer.write(img)
+
+        # write prediction
+        if args.write_prediction:
+            savepath = get_savepath(args.savepath, video_name, post_fix = '_%s' % (str(frame_count).zfill(frame_digit) + '_res'), ext='.png')
+            pred_file = '%s.txt' % savepath.rsplit('.', 1)[0]
+            write_predictions(pred_file, ary, img, COCO_CATEGORY)
+            frame_count += 1
 
     capture.release()
     cv2.destroyAllWindows()

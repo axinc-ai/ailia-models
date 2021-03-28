@@ -1,3 +1,4 @@
+import os
 import sys
 
 import numpy as np
@@ -116,6 +117,9 @@ def get_writer(savepath, height, width, fps=20, rgb=True):
     -------
     writer : cv2.VideoWriter()
     """
+    if os.path.isdir(savepath):
+        savepath = savepath + "/out.mp4"
+
     writer = cv2.VideoWriter(
         savepath,
         # cv2.VideoWriter_fourcc(*'MJPG'),  # avi mode

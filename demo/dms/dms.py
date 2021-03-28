@@ -403,7 +403,7 @@ def recognize_iris(frame,detector,estimator,estimator2,out_frame=None):
 
 def recognize_from_video():
     # net initialize
-    env_id = ailia.get_gpu_environment_id()
+    env_id = args.env_id
     print(f'env_id: {env_id}')
     iris_detector = ailia.Net(FACE_DETECTION_MODEL_PATH, FACE_DETECTION_WEIGHT_PATH, env_id=env_id)
     iris_estimator = ailia.Net(FACE_LANDMARK_MODEL_PATH, FACE_LANDMARK_WEIGHT_PATH, env_id=env_id)
