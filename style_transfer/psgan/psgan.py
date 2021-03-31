@@ -164,7 +164,7 @@ def _postprocessing(out, source, crop_face, postprocess):
     out_sqz0_nrm = (out_sqz0 - min_) / (max_ - min_ + 1e-5) * 255
     pil_img = Image.fromarray(np.transpose(out_sqz0_nrm, (1, 2, 0)).astype(np.uint8))
     source_crop = source.crop(
-        (crop_face.left(), crop_face.top(), crop_face.right(), crop_face.bottom())
+        (crop_face["left"], crop_face["top"], crop_face["right"], crop_face["bottom"])
     )
     return postprocess(source_crop, pil_img)
 

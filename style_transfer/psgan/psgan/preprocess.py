@@ -223,21 +223,44 @@ class PreProcess:
     def __call__(self, image: Image):
         if self.use_dlib:
             face = futils.dlib.detect(image)
+            if not face:
+                return None, None, None
+            else:
+                face_on_image = face[0]
+                image, face, crop_face = futils.dlib.crop(
+                    image,
+                    face_on_image,
+                    self.up_ratio,
+                    self.down_ratio,
+                    self.width_ratio,
+                )
+                face_on_image = [
+                    face_on_image.left(),
+                    face_on_image.top(),
+                    face_on_image.right(),
+                    face_on_image.bottom(),
+                ]
+                crop_face = {
+                    "left": crop_face.left(),
+                    "top": crop_face.top(),
+                    "right": crop_face.right(),
+                    "bottom": crop_face.bottom(),
+                }
         else:
             detected = self.face_detector.predict(image)
-            face = dlib.rectangles()
-            face.append(
-                dlib.rectangle(detected[1], detected[0], detected[3], detected[2])
-            )
+            face = [[detected[1], detected[0], detected[3], detected[2]]]
 
-        if not face:
-            return None, None, None
-
-        face_on_image = face[0]
-
-        image, face, crop_face = futils.dlib.crop(
-            image, face_on_image, self.up_ratio, self.down_ratio, self.width_ratio
-        )
+            if not face:
+                return None, None, None
+            else:
+                face_on_image = face[0]
+                image, face, crop_face = futils.nondlib.crop(
+                    image,
+                    face_on_image,
+                    self.up_ratio,
+                    self.down_ratio,
+                    self.width_ratio,
+                )
         np_image = np.array(image).astype(np.float32)
         mask = self.face_parse.parse(cv2.resize(np_image, (512, 512)))
         # obtain face parsing result
