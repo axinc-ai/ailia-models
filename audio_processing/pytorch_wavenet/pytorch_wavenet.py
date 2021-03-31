@@ -110,49 +110,6 @@ def generate_wave(net, num_samples, first_samples=None, temperature=1.):
 
     return mu_gen
 
-    """
-    num_samples = samples.size(0)
-    input = Variable(torch.FloatTensor(1, 256, 1).zero_())
-    input = input.scatter_(1, samples[0:1].view(1, -1, 1), 1.)
-
-    print("fill queues with given samples")
-    for i in range(num_samples - 1):
-        x = _inference(net, input)
-        input.zero_()
-        input = input.scatter_(1, samples[i + 1:i + 2].view(1, -1, 1), 1.).view(1, 256, 1)
-
-    print("generate new samples")
-    generated = np.array([])
-    regularizer = torch.pow(Variable(torch.arange(256)) - 256 / 2., 2)
-    regularizer = regularizer.squeeze() * regularize
-
-    for i in range(num_generate):
-        output = _inference(net, input) # output[0].shape = (1, 256, 1)
-
-        x = output.squeeze()
-
-        x -= regularizer
-
-        # sample from softmax distribution
-        x /= temperature
-        prob = F.softmax(x, dim=0)
-        prob = prob.cpu()
-        np_prob = prob.data.numpy()
-        x = np.random.choice(256, p=np_prob)
-        x = np.array([x])
-
-        o = (x / 256) * 2. - 1
-        generated = np.append(generated, o)
-
-        # set new input
-        x = Variable(torch.from_numpy(x).type(torch.LongTensor))
-        input.zero_()
-        input = input.scatter_(1, x.view(1, -1, 1), 1.).view(1, 256, 1)
-
-    generated = (generated / 256) * 2. - 1
-    mu_gen = _mu_law_expansion(generated, 256)
-    """
-
 
 def _inference(net, input):
     input = input.to('cpu').detach().numpy().copy()
