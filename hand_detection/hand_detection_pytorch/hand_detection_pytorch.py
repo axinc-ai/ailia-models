@@ -47,7 +47,7 @@ args = update_parser(parser)
 # ======================
 def recognize_from_image():
     # net initialize
-    detector = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
+    detector = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id, debug_log=args.debug)
 
     for image_path in args.input:
         # prepare input data
@@ -89,7 +89,7 @@ def recognize_from_image():
 
 def recognize_from_video():
     # net initialize
-    detector = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
+    detector = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id, debug_log=args.debug)
 
     capture = webcamera_utils.get_capture(args.video)
 

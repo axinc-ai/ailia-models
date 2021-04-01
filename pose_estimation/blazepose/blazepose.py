@@ -168,10 +168,10 @@ def display_result(input_img, count, landmarks, flags):
 def recognize_from_image():
     # net initialize
     detector = ailia.Net(
-        DETECTOR_MODEL_PATH, DETECTOR_WEIGHT_PATH, env_id=args.env_id
+        DETECTOR_MODEL_PATH, DETECTOR_WEIGHT_PATH, env_id=args.env_id, debug_log=args.debug
     )
     estimator = ailia.Net(
-        ESTIMATOR_MODEL_PATH, ESTIMATOR_WEIGHT_PATH, env_id=args.env_id
+        ESTIMATOR_MODEL_PATH, ESTIMATOR_WEIGHT_PATH, env_id=args.env_id, debug_log=args.debug
     )
 
     # input image loop
@@ -253,10 +253,10 @@ def recognize_from_image():
 def recognize_from_video():
     # net initialize
     detector = ailia.Net(
-        DETECTOR_MODEL_PATH, DETECTOR_WEIGHT_PATH, env_id=args.env_id
+        DETECTOR_MODEL_PATH, DETECTOR_WEIGHT_PATH, env_id=args.env_id, debug_log=args.debug
     )
     estimator = ailia.Net(
-        ESTIMATOR_MODEL_PATH, ESTIMATOR_WEIGHT_PATH, env_id=args.env_id
+        ESTIMATOR_MODEL_PATH, ESTIMATOR_WEIGHT_PATH, env_id=args.env_id, debug_log=args.debug
     )
 
     capture = webcamera_utils.get_capture(args.video)

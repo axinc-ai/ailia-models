@@ -117,13 +117,13 @@ def recognize_from_video():
         channel=ailia.NETWORK_IMAGE_CHANNEL_FIRST,
         range=ailia.NETWORK_IMAGE_RANGE_U_FP32,
         algorithm=ailia.DETECTOR_ALGORITHM_YOLOV3,
-        env_id=args.env_id
+        env_id=args.env_id, debug_log=args.debug
     )
 
     hand = ailia.PoseEstimator(
         HAND_MODEL_PATH,
         HAND_WEIGHT_PATH,
-        env_id=args.env_id,
+        env_id=args.env_id, debug_log=args.debug,
         algorithm=HAND_ALGORITHM
     )
     hand.set_threshold(0.1)

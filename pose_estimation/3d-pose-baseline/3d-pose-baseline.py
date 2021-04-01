@@ -426,10 +426,10 @@ def display_result(input_img, pose, baseline):
 def recognize_from_image():
     # net initialize
     pose = ailia.PoseEstimator(
-        MODEL_PATH, WEIGHT_PATH, env_id=args.env_id, algorithm=ALGORITHM
+        MODEL_PATH, WEIGHT_PATH, env_id=args.env_id, debug_log=args.debug, algorithm=ALGORITHM
     )
     baseline = ailia.Net(
-        BASELINE_MODEL_PATH, BASELINE_WEIGHT_PATH, env_id=args.env_id
+        BASELINE_MODEL_PATH, BASELINE_WEIGHT_PATH, env_id=args.env_id, debug_log=args.debug
     )
     baseline.set_input_shape((1, 32))
 
@@ -475,10 +475,10 @@ def recognize_from_image():
 def recognize_from_video():
     # net initialize
     pose = ailia.PoseEstimator(
-        MODEL_PATH, WEIGHT_PATH, env_id=args.env_id, algorithm=ALGORITHM
+        MODEL_PATH, WEIGHT_PATH, env_id=args.env_id, debug_log=args.debug, algorithm=ALGORITHM
     )
     baseline = ailia.Net(
-        BASELINE_MODEL_PATH, BASELINE_WEIGHT_PATH, env_id=args.env_id
+        BASELINE_MODEL_PATH, BASELINE_WEIGHT_PATH, env_id=args.env_id, debug_log=args.debug
     )
     baseline.set_input_shape((1, 32))
 

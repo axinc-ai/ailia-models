@@ -106,7 +106,7 @@ def recognize_from_video():
 
     # net initialize
     detector = init_detector(args.env_id)
-    extractor = ailia.Net(EX_MODEL_PATH, EX_WEIGHT_PATH, env_id=args.env_id)
+    extractor = ailia.Net(EX_MODEL_PATH, EX_WEIGHT_PATH, env_id=args.env_id, debug_log=args.debug)
 
     # tracker class instance
     metric = NearestNeighborDistanceMetric(
@@ -248,7 +248,7 @@ def compare_images():
 
     # net initialize
     detector = init_detector(args.env_id)
-    extractor = ailia.Net(EX_MODEL_PATH, EX_WEIGHT_PATH, env_id=args.env_id)
+    extractor = ailia.Net(EX_MODEL_PATH, EX_WEIGHT_PATH, env_id=args.env_id, debug_log=args.debug)
 
     # prepare input data
     input_data = []

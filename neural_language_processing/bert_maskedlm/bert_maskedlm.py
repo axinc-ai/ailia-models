@@ -86,7 +86,7 @@ def main():
     indexed_tokens = tokenizer.convert_tokens_to_ids(tokenized_text)
     logger.info("Indexed tokens : "+str(indexed_tokens))
 
-    ailia_model = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
+    ailia_model = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id, debug_log=args.debug)
 
     indexed_tokens = numpy.array(indexed_tokens)
     token_type_ids = numpy.zeros((1, len(tokenized_text)))

@@ -140,7 +140,7 @@ def display_result(input_img, pose):
 def recognize_from_image():
     # net initialize
     pose = ailia.PoseEstimator(
-        MODEL_PATH, WEIGHT_PATH, env_id=args.env_id, algorithm=ALGORITHM
+        MODEL_PATH, WEIGHT_PATH, env_id=args.env_id, debug_log=args.debug, algorithm=ALGORITHM
     )
     if args.threshold != THRESHOLD_DEFAULT:
         pose.set_threshold(args.threshold)
@@ -182,7 +182,7 @@ def recognize_from_image():
 def recognize_from_video():
     # net initialize
     pose = ailia.PoseEstimator(
-        MODEL_PATH, WEIGHT_PATH, env_id=args.env_id, algorithm=ALGORITHM
+        MODEL_PATH, WEIGHT_PATH, env_id=args.env_id, debug_log=args.debug, algorithm=ALGORITHM
     )
     if args.threshold != THRESHOLD_DEFAULT:
         pose.set_threshold(args.threshold)

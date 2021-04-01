@@ -49,7 +49,7 @@ def recognize_from_image():
     classifier = ailia.Classifier(
         MODEL_PATH,
         WEIGHT_PATH,
-        env_id=args.env_id,
+        env_id=args.env_id, debug_log=args.debug,
         format=ailia.NETWORK_IMAGE_FORMAT_RGB,
         range=ailia.NETWORK_IMAGE_RANGE_U_FP32,
     )
@@ -97,7 +97,7 @@ def recognize_from_video():
     classifier = ailia.Classifier(
         MODEL_PATH,
         WEIGHT_PATH,
-        env_id=args.env_id,
+        env_id=args.env_id, debug_log=args.debug,
         format=ailia.NETWORK_IMAGE_FORMAT_RGB,
         range=ailia.NETWORK_IMAGE_RANGE_U_FP32,
     )

@@ -239,7 +239,7 @@ def main():
 
     # initialize
     memory_mode = ailia.get_memory_mode(reduce_constant=True, reduce_interstage=True)
-    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id, memory_mode=memory_mode)
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id, debug_log=args.debug, memory_mode=memory_mode)
 
     if args.video is not None:
         recognize_from_video(args.video, net)

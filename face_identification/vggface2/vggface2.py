@@ -100,7 +100,7 @@ def preprocess(img, input_is_bgr=False):
 # ======================
 def compare_images():
     # net initialize
-    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id, debug_log=args.debug)
 
     features = []
 
@@ -140,7 +140,7 @@ def compare_images():
 
 def compare_videoframe_image():
     # net initialize
-    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id, debug_log=args.debug)
 
     # img part
     fname = args.video[1]

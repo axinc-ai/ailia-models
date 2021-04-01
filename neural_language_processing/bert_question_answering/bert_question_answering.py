@@ -228,7 +228,7 @@ def main():
         logger.debug("Input" + str(fw_args))
         logger.debug("Shape" + str(fw_args["input_ids"].shape))
 
-        net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
+        net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id, debug_log=args.debug)
         net.set_input_shape(fw_args["input_ids"].shape)
         if args.benchmark:
             logger.info('BENCHMARK mode')

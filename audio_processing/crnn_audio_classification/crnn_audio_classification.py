@@ -85,7 +85,7 @@ def main():
         data = sf.read(input_data_path)
 
         # create instance
-        session = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
+        session = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id, debug_log=args.debug)
 
         # inference
         logger.info('Start inference...')

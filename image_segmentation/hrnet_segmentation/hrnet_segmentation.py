@@ -66,7 +66,7 @@ REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/hrnet/'
 # ======================
 def recognize_from_image():
     # net initialize
-    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id, debug_log=args.debug)
 
     # input image loop
     for image_path in args.input:
@@ -106,7 +106,7 @@ def recognize_from_image():
 
 def recognize_from_video():
     # net initialize
-    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id, debug_log=args.debug)
 
     capture = webcamera_utils.get_capture(args.video)
 

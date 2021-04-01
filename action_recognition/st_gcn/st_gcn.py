@@ -340,7 +340,7 @@ def main():
     )
 
     # net initialize
-    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id, debug_log=args.debug)
 
     if args.arch == "pyopenpose":
         pose = op.WrapperPython()
@@ -351,7 +351,7 @@ def main():
         pose = ailia.PoseEstimator(
             MODEL_POSE_PATH,
             WEIGHT_POSE_PATH,
-            env_id=args.env_id,
+            env_id=args.env_id, debug_log=args.debug,
             algorithm=POSE_ALGORITHM
         )
         if args.arch == "openpose":

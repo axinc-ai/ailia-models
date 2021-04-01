@@ -131,7 +131,7 @@ def recognize_from_image():
     input_frame_size = len(sorted_inputs_path)
 
     # net initialize
-    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id, debug_log=args.debug)
     net.set_input_shape((1, 3, args.duration, IMAGE_HEIGHT, IMAGE_WIDTH))
 
     # inference
@@ -183,7 +183,7 @@ def recognize_from_video():
     capture = get_capture(args.video)
 
     # net initialize
-    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id, debug_log=args.debug)
     net.set_input_shape((1, 3, args.duration, IMAGE_HEIGHT, IMAGE_WIDTH))
 
     # prepare input data

@@ -70,7 +70,7 @@ def main():
 
     candidate_labels = CANDIDATE_LABELS.split(", ")
 
-    ailia_model = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
+    ailia_model = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id, debug_log=args.debug)
     tokenizer = AutoTokenizer.from_pretrained('roberta-large-mnli')
 
     model_inputs = preprocess(

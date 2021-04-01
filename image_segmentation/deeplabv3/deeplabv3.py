@@ -73,7 +73,7 @@ REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/deeplabv3/'
 # ======================
 def segment_from_image():
     # net initialize
-    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id, debug_log=args.debug)
     ailia_input_w = net.get_input_shape()[3]
     ailia_input_h = net.get_input_shape()[2]
     input_shape = [ailia_input_h, ailia_input_w]
@@ -156,7 +156,7 @@ def segment_from_image():
 
 def segment_from_video():
     # net initialize
-    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id, debug_log=args.debug)
 
     ailia_input_w = net.get_input_shape()[3]
     ailia_input_h = net.get_input_shape()[2]

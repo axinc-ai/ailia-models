@@ -51,7 +51,7 @@ def main():
     # model files check and download
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
 
-    ailia_model = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
+    ailia_model = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id, debug_log=args.debug)
     tokenizer = BertJapaneseTokenizer.from_pretrained(
         'cl-tohoku/bert-base-japanese-whole-word-masking'
     )

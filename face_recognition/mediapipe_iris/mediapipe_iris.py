@@ -119,13 +119,13 @@ def draw_eye_iris(
 def recognize_from_image():
     # net initialize
     detector = ailia.Net(
-        DETECTION_MODEL_PATH, DETECTION_WEIGHT_PATH, env_id=args.env_id
+        DETECTION_MODEL_PATH, DETECTION_WEIGHT_PATH, env_id=args.env_id, debug_log=args.debug
     )
     estimator = ailia.Net(
-        LANDMARK_MODEL_PATH, LANDMARK_WEIGHT_PATH, env_id=args.env_id
+        LANDMARK_MODEL_PATH, LANDMARK_WEIGHT_PATH, env_id=args.env_id, debug_log=args.debug
     )
     estimator2 = ailia.Net(
-        LANDMARK2_MODEL_PATH, LANDMARK2_WEIGHT_PATH, env_id=args.env_id
+        LANDMARK2_MODEL_PATH, LANDMARK2_WEIGHT_PATH, env_id=args.env_id, debug_log=args.debug
     )
 
     # prepare input data
@@ -206,13 +206,13 @@ def recognize_from_image():
 def recognize_from_video():
     # net initialize
     detector = ailia.Net(
-        DETECTION_MODEL_PATH, DETECTION_WEIGHT_PATH, env_id=args.env_id
+        DETECTION_MODEL_PATH, DETECTION_WEIGHT_PATH, env_id=args.env_id, debug_log=args.debug
     )
     estimator = ailia.Net(
-        LANDMARK_MODEL_PATH, LANDMARK_WEIGHT_PATH, env_id=args.env_id
+        LANDMARK_MODEL_PATH, LANDMARK_WEIGHT_PATH, env_id=args.env_id, debug_log=args.debug
     )
     estimator2 = ailia.Net(
-        LANDMARK2_MODEL_PATH, LANDMARK2_WEIGHT_PATH, env_id=args.env_id
+        LANDMARK2_MODEL_PATH, LANDMARK2_WEIGHT_PATH, env_id=args.env_id, debug_log=args.debug
     )
 
     capture = get_capture(args.video)

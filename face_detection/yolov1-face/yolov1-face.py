@@ -58,7 +58,7 @@ def recognize_from_image():
         channel=ailia.NETWORK_IMAGE_CHANNEL_FIRST,
         range=ailia.NETWORK_IMAGE_RANGE_S_FP32,
         algorithm=ailia.DETECTOR_ALGORITHM_YOLOV1,
-        env_id=args.env_id,
+        env_id=args.env_id, debug_log=args.debug,
     )
 
     # input image loop
@@ -98,7 +98,7 @@ def recognize_from_video():
         channel=ailia.NETWORK_IMAGE_CHANNEL_FIRST,
         range=ailia.NETWORK_IMAGE_RANGE_S_FP32,
         algorithm=ailia.DETECTOR_ALGORITHM_YOLOV1,
-        env_id=args.env_id,
+        env_id=args.env_id, debug_log=args.debug,
     )
 
     capture = webcamera_utils.get_capture(args.video)

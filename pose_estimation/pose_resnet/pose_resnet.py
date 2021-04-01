@@ -220,10 +220,10 @@ def recognize_from_image():
         channel=ailia.NETWORK_IMAGE_CHANNEL_FIRST,
         range=ailia.NETWORK_IMAGE_RANGE_U_FP32,
         algorithm=ailia.DETECTOR_ALGORITHM_YOLOV3,
-        env_id=args.env_id,
+        env_id=args.env_id, debug_log=args.debug,
     )
 
-    pose = ailia.Net(POSE_MODEL_PATH, POSE_WEIGHT_PATH, env_id=args.env_id)
+    pose = ailia.Net(POSE_MODEL_PATH, POSE_WEIGHT_PATH, env_id=args.env_id, debug_log=args.debug)
 
     # input image loop
     for image_path in args.input:
@@ -269,10 +269,10 @@ def recognize_from_video():
         channel=ailia.NETWORK_IMAGE_CHANNEL_FIRST,
         range=ailia.NETWORK_IMAGE_RANGE_U_FP32,
         algorithm=ailia.DETECTOR_ALGORITHM_YOLOV3,
-        env_id=args.env_id,
+        env_id=args.env_id, debug_log=args.debug,
     )
 
-    pose = ailia.Net(POSE_MODEL_PATH, POSE_WEIGHT_PATH, env_id=args.env_id)
+    pose = ailia.Net(POSE_MODEL_PATH, POSE_WEIGHT_PATH, env_id=args.env_id, debug_log=args.debug)
 
     capture = webcamera_utils.get_capture(args.video)
     # create video writer if savepath is specified as video format

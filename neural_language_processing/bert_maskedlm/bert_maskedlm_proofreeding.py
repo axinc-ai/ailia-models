@@ -133,7 +133,7 @@ def main():
             "cl-tohoku/"+args.arch
         )
 
-    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id, debug_log=args.debug)
     net.set_input_blob_shape(
         (1, PADDING_LEN), net.find_blob_index_by_name("token_type_ids")
     )

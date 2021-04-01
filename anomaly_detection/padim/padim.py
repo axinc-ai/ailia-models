@@ -415,7 +415,7 @@ def main():
     }
 
     def _create_net():
-        return ailia.Net(model_path, weight_path, env_id=args.env_id)
+        return ailia.Net(model_path, weight_path, env_id=args.env_id, debug_log=args.debug)
 
     # net initialize
     if True:

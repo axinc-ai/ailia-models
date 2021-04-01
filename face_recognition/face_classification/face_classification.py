@@ -68,7 +68,7 @@ def recognize_from_image():
     emotion_classifier = ailia.Classifier(
         EMOTION_MODEL_PATH,
         EMOTION_WEIGHT_PATH,
-        env_id=args.env_id,
+        env_id=args.env_id, debug_log=args.debug,
         format=ailia.NETWORK_IMAGE_FORMAT_GRAY,
         range=ailia.NETWORK_IMAGE_RANGE_S_FP32,
         channel=ailia.NETWORK_IMAGE_CHANNEL_FIRST,
@@ -76,7 +76,7 @@ def recognize_from_image():
     gender_classifier = ailia.Classifier(
         GENDER_MODEL_PATH,
         GENDER_WEIGHT_PATH,
-        env_id=args.env_id,
+        env_id=args.env_id, debug_log=args.debug,
         format=ailia.NETWORK_IMAGE_FORMAT_GRAY,
         range=ailia.NETWORK_IMAGE_RANGE_S_FP32,
         channel=ailia.NETWORK_IMAGE_CHANNEL_FIRST,
@@ -148,7 +148,7 @@ def recognize_from_video():
     emotion_classifier = ailia.Classifier(
         EMOTION_MODEL_PATH,
         EMOTION_WEIGHT_PATH,
-        env_id=args.env_id,
+        env_id=args.env_id, debug_log=args.debug,
         format=ailia.NETWORK_IMAGE_FORMAT_GRAY,
         range=ailia.NETWORK_IMAGE_RANGE_S_FP32,
         channel=ailia.NETWORK_IMAGE_CHANNEL_FIRST,
@@ -156,12 +156,12 @@ def recognize_from_video():
     gender_classifier = ailia.Classifier(
         GENDER_MODEL_PATH,
         GENDER_WEIGHT_PATH,
-        env_id=args.env_id,
+        env_id=args.env_id, debug_log=args.debug,
         format=ailia.NETWORK_IMAGE_FORMAT_GRAY,
         range=ailia.NETWORK_IMAGE_RANGE_S_FP32,
         channel=ailia.NETWORK_IMAGE_CHANNEL_FIRST,
     )
-    detector = ailia.Net(FACE_MODEL_PATH, FACE_WEIGHT_PATH, env_id=args.env_id)
+    detector = ailia.Net(FACE_MODEL_PATH, FACE_WEIGHT_PATH, env_id=args.env_id, debug_log=args.debug)
 
     capture = webcamera_utils.get_capture(args.video)
 

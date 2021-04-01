@@ -62,8 +62,8 @@ def result_plot(disp, original_width, original_height):
 # ======================
 def estimate_from_image():
     # net initialize
-    enc_net = ailia.Net(ENC_MODEL_PATH, ENC_WEIGHT_PATH, env_id=args.env_id)
-    dec_net = ailia.Net(DEC_MODEL_PATH, DEC_WEIGHT_PATH, env_id=args.env_id)
+    enc_net = ailia.Net(ENC_MODEL_PATH, ENC_WEIGHT_PATH, env_id=args.env_id, debug_log=args.debug)
+    dec_net = ailia.Net(DEC_MODEL_PATH, DEC_WEIGHT_PATH, env_id=args.env_id, debug_log=args.debug)
 
     # input image loop
     for image_path in args.input:
@@ -102,8 +102,8 @@ def estimate_from_image():
 
 def estimate_from_video():
     # net initialize
-    enc_net = ailia.Net(ENC_MODEL_PATH, ENC_WEIGHT_PATH, env_id=args.env_id)
-    dec_net = ailia.Net(DEC_MODEL_PATH, DEC_WEIGHT_PATH, env_id=args.env_id)
+    enc_net = ailia.Net(ENC_MODEL_PATH, ENC_WEIGHT_PATH, env_id=args.env_id, debug_log=args.debug)
+    dec_net = ailia.Net(DEC_MODEL_PATH, DEC_WEIGHT_PATH, env_id=args.env_id, debug_log=args.debug)
 
     capture = webcamera_utils.get_capture(args.video)
 

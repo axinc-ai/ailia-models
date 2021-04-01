@@ -190,7 +190,7 @@ def replace_face(img, replacement, coords):
 def transform_image():
     """Full transormation on a single image loaded from filepath in arguments.
     """
-    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id, debug_log=args.debug)
 
     # input image loop
     for image_path in args.input:
@@ -255,7 +255,7 @@ def process_array(net, img):
 
 def process_video():
     # net initialize
-    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id, debug_log=args.debug)
 
     if args.face_recognition:
         locator = FaceLocator()

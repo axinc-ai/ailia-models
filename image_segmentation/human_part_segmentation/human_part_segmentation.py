@@ -219,7 +219,7 @@ def main():
 
     # Workaround for accuracy issue on
     # ailia SDK 1.2.4 + opset11 + gpu (metal/vulkan)
-    detector = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
+    detector = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id, debug_log=args.debug)
 
     if args.video is not None:
         # video mode
