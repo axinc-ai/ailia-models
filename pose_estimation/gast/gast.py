@@ -5,14 +5,6 @@ import json
 
 import numpy as np
 import cv2
-from PIL import Image
-from scipy.spatial.distance import mahalanobis
-from scipy.ndimage import gaussian_filter
-from sklearn.metrics import precision_recall_curve
-from skimage import morphology
-from skimage.segmentation import mark_boundaries
-import matplotlib
-import matplotlib.pyplot as plt
 
 import ailia
 
@@ -42,7 +34,9 @@ MODEL_27FRAME_19JOINT_PATH = '27_frame_19_joint_model.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/gast/'
 
 VIDEO_PATH = './data/baseball.mp4'
-SAVE_PATH = 'output.png'
+SAVE_PATH = 'output.mp4'
+
+ROT = np.array([0.14070565, -0.15007018, -0.7552408, 0.62232804], dtype=np.float32)
 
 # ======================
 # Arguemnt Parser Config
@@ -113,17 +107,8 @@ def recognize_from_video(net, params):
     logger.info('Loading 2D keypoints ...')
     keypoints, scores, _, _ = load_json(keypoints_file, num_joints)
     keypoints = keypoints[0]
-    # print("keypoints---", keypoints)
-    # print("keypoints---", keypoints.shape)
-    # print("scores---", scores)
-    # print("scores---", scores.shape)
 
     keypoints, valid_frames = coco_h36m(keypoints)
-
-    # print("keypoints---", keypoints)
-    # print("keypoints---", keypoints.shape)
-    # print("valid_frames---", valid_frames)
-    # print("valid_frames---", valid_frames.shape)
 
     # Get the width and height of video
     width = int(round(cap.get(cv2.CAP_PROP_FRAME_WIDTH)))
@@ -143,7 +128,7 @@ def recognize_from_video(net, params):
     pad = (x - 1) // 2  # Padding on each side
     causal_shift = 0
 
-    joints_left, joints_right, keypoints_metadata = get_joints_info(num_joints)
+    joints_left, joints_right, h36m_skeleton, keypoints_metadata = get_joints_info(num_joints)
     kps_left, kps_right = joints_left, joints_right
 
     generator = DataLoader(
@@ -165,8 +150,21 @@ def recognize_from_video(net, params):
         predicted_3d_pos = predicted_3d_pos.squeeze(0)
         break
 
-    print("--", predicted_3d_pos)
-    print("--", predicted_3d_pos.shape)
+    prediction = camera_to_world(predicted_3d_pos, R=ROT, t=0)
+
+    # We don't have the trajectory, but at least we can rebase the height
+    prediction[:, :, 2] -= np.min(prediction[:, :, 2])
+
+    prediction_new = np.zeros((*input_keypoints.shape[:-1], 3), dtype=np.float32)
+    prediction_new[valid_frames] = prediction
+
+    logger.info('Rendering ...')
+    anim_output = {'Reconstruction': prediction_new}
+    render_animation(
+        keypoints, keypoints_metadata, anim_output, h36m_skeleton, 25, 3000,
+        np.array(70., dtype=np.float32), args.savepath,
+        cap, viewport=(width, height),
+        downsample=1, size=5)
 
     logger.info('Script finished successfully.')
 
