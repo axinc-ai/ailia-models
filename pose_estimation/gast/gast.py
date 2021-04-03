@@ -103,6 +103,75 @@ def load_json(file_path, num_joints, num_person=2):
         return keypoints, scores, label, label_index
 
 
+def revise_kpts(h36m_kpts, h36m_scores, valid_frames):
+    new_h36m_kpts = np.zeros_like(h36m_kpts)
+    for index, frames in enumerate(valid_frames):
+        kpts = h36m_kpts[index, frames]
+        score = h36m_scores[index, frames]
+
+        index_frame = np.where(np.sum(score < 0.3, axis=1) > 0)[0]
+
+        for frame in index_frame:
+            less_threshold_joints = np.where(score[frame] < 0.3)[0]
+
+            intersect = [i for i in [2, 3, 5, 6] if i in less_threshold_joints]
+
+            if [2, 3, 5, 6] == intersect:
+                kpts[frame, [2, 3, 5, 6]] = kpts[frame, [1, 1, 4, 4]]
+            elif [2, 3, 6] == intersect:
+                kpts[frame, [2, 3, 6]] = kpts[frame, [1, 1, 5]]
+            elif [3, 5, 6] == intersect:
+                kpts[frame, [3, 5, 6]] = kpts[frame, [2, 4, 4]]
+            elif [3, 6] == intersect:
+                kpts[frame, [3, 6]] = kpts[frame, [2, 5]]
+            elif [3] == intersect:
+                kpts[frame, 3] = kpts[frame, 2]
+            elif [6] == intersect:
+                kpts[frame, 6] = kpts[frame, 5]
+            else:
+                continue
+
+        new_h36m_kpts[index, frames] = kpts
+    return new_h36m_kpts
+
+
+def revise_skes(prediction, re_kpts, valid_frames):
+    ratio_2d_3d = 500.
+
+    new_prediction = np.zeros((*re_kpts.shape[:-1], 3), dtype=np.float32)
+    for i, frames in enumerate(valid_frames):
+        new_prediction[i, frames] = prediction[i]
+
+        # The origin of (x, y) is in the upper right corner,
+        # while the (x,y) coordinates in the image are in the upper left corner.
+        distance = re_kpts[i, frames[1:], :, :2] - re_kpts[i, frames[:1], :, :2]
+        distance = np.mean(distance[:, [1, 4, 11, 14]], axis=-2, keepdims=True)
+        new_prediction[i, frames[1:], :, 0] -= distance[..., 0] / ratio_2d_3d
+        new_prediction[i, frames[1:], :, 1] += distance[..., 1] / ratio_2d_3d
+
+    # The origin of (x, y) is in the upper right corner,
+    # while the (x,y) coordinates in the image are in the upper left corner.
+    # Calculate the relative distance between two people
+    if len(valid_frames) == 2:
+        intersec_frames = [frame for frame in valid_frames[0] if frame in valid_frames[1]]
+        absolute_distance = re_kpts[0, intersec_frames[:1], :, :2] - re_kpts[1, intersec_frames[:1], :, :2]
+        absolute_distance = np.mean(absolute_distance[:, [1, 4, 11, 14]], axis=-2, keepdims=True) / 2.
+
+        new_prediction[0, valid_frames[0], :, 0] -= absolute_distance[..., 0] / ratio_2d_3d
+        new_prediction[0, valid_frames[0], :, 1] += absolute_distance[..., 1] / ratio_2d_3d
+
+        new_prediction[1, valid_frames[1], :, 0] += absolute_distance[..., 0] / ratio_2d_3d
+        new_prediction[1, valid_frames[1], :, 1] -= absolute_distance[..., 1] / ratio_2d_3d
+
+    # Pre-processing the case where the movement of Z axis is relatively large, such as 'sitting down'
+    # Remove the absolute distance
+    # new_prediction[:, :, 1:] -= new_prediction[:, :, :1]
+    # new_prediction[:, :, 0] = 0
+    new_prediction[:, :, :, 2] -= np.amin(new_prediction[:, :, :, 2])
+
+    return new_prediction
+
+
 def gen_kpts(frames, yolo_model, pose_model, num_peroson=1):
     # collect keypoints coordinate
     logger.info('Generating 2D pose ...')
@@ -254,9 +323,49 @@ def preprocess(img, bboxs, num_pos=2):
     return inputs, img, centers, scales
 
 
-def recognize_from_video(net, info):
-    keypoints_file = args.keypoints_file
+def gen_pose(
+        kpts, valid_frames, width, height, net,
+        pad=13, causal_shift=0, num_joints=17):
+    joints_left, joints_right, h36m_skeleton, keypoints_metadata = get_joints_info(num_joints)
+    kps_left, kps_right = joints_left, joints_right
 
+    norm_seqs = []
+    for index, frames in enumerate(valid_frames):
+        seq_kps = kpts[index, frames]
+        norm_seq_kps = normalize_screen_coordinates(seq_kps, w=width, h=height)
+        norm_seqs.append(norm_seq_kps)
+
+    generator = DataLoader(
+        norm_seqs,
+        pad=pad, causal_shift=causal_shift,
+        kps_left=kps_left, kps_right=kps_right
+    )
+
+    prediction = []
+    for batch_2d in generator.next_epoch():
+        in_name = net.get_inputs()[0].name
+        out_name = net.get_outputs()[0].name
+        output = net.run([out_name],
+                         {in_name: batch_2d})
+        predicted_3d_pos = output[0]
+
+        predicted_3d_pos[1, :, :, 0] *= -1
+        predicted_3d_pos[1, :, joints_left + joints_right] = \
+            predicted_3d_pos[1, :, joints_right + joints_left]
+        predicted_3d_pos = np.mean(predicted_3d_pos, axis=0, keepdims=True)
+        predicted_3d_pos = predicted_3d_pos.squeeze(0)
+        prediction.append(predicted_3d_pos)
+
+    prediction_to_world = []
+    for i in range(len(prediction)):
+        sub_prediction = prediction[i]
+        sub_prediction = camera_to_world(sub_prediction, R=ROT, t=0)
+        prediction_to_world.append(sub_prediction)
+
+    return prediction_to_world
+
+
+def recognize_from_video(net, info):
     video_file = args.input[0]
     cap = get_capture(video_file)
     assert cap.isOpened(), 'Cannot capture source'
@@ -274,73 +383,57 @@ def recognize_from_video(net, info):
             continue
         frames.append(frame)
 
-    num_person = info["num_person"]
-    keypoints, scores = gen_kpts(
-        frames, info["yolo_model"], info["pose_net"],
-        num_peroson=num_person)
-    # keypoints, scores, valid_frames = h36m_coco_format(keypoints, scores)
-    # re_kpts = revise_kpts(keypoints, scores, valid_frames)
-    # num_person = len(re_kpts)
-
     num_joints = info["num_joints"]
 
-    logger.info('Loading 2D keypoints ...')
-    keypoints, scores, _, _ = load_json(keypoints_file, num_joints)
-    keypoints = keypoints[0]
+    keypoints_file = args.keypoints_file
+    if keypoints_file:
+        logger.info('Loading 2D keypoints ...')
+        keypoints, scores, _, _ = load_json(keypoints_file, num_joints)
+    else:
+        num_person = info["num_person"]
+        keypoints, scores = gen_kpts(
+            frames, info["yolo_model"], info["pose_model"],
+            num_peroson=num_person)
 
-    keypoints, valid_frames = coco_h36m(keypoints)
+    keypoints, scores, valid_frames = h36m_coco_format(keypoints, scores)
+    re_kpts = revise_kpts(keypoints, scores, valid_frames)
+    num_person = len(re_kpts)
 
-    # normalize keypoints
-    input_keypoints = normalize_screen_coordinates(
-        keypoints[..., :2], w=width, h=height)
-    # print("input_keypoints---", input_keypoints)
-
-    filter_widths = [3, 3, 3]
-    channels = 128
-    # print("filter_widths---", filter_widths)
-    # print("channels---", channels)
-
-    x = receptive_field(filter_widths)
-    pad = (x - 1) // 2  # Padding on each side
+    receptive_fields = 27
+    pad = (receptive_fields - 1) // 2  # Padding on each side
     causal_shift = 0
 
-    joints_left, joints_right, h36m_skeleton, keypoints_metadata = get_joints_info(num_joints)
-    kps_left, kps_right = joints_left, joints_right
+    logger.info('Generating 3D human pose ...')
+    prediction = gen_pose(
+        re_kpts, valid_frames, width, height, net,
+        pad, causal_shift, num_joints)
 
-    generator = DataLoader(
-        [input_keypoints[valid_frames]],
-        pad=pad, causal_shift=causal_shift,
-        kps_left=kps_left, kps_right=kps_right
-    )
-    for batch_2d in generator.next_epoch():
-        in_name = net.get_inputs()[0].name
-        out_name = net.get_outputs()[0].name
-        output = net.run([out_name],
-                         {in_name: batch_2d})
-        predicted_3d_pos = output[0]
+    _, _, h36m_skeleton, keypoints_metadata = get_joints_info(num_joints)
 
-        predicted_3d_pos[1, :, :, 0] *= -1
-        predicted_3d_pos[1, :, joints_left + joints_right] = \
-            predicted_3d_pos[1, :, joints_right + joints_left]
-        predicted_3d_pos = np.mean(predicted_3d_pos, axis=0, keepdims=True)
-        predicted_3d_pos = predicted_3d_pos.squeeze(0)
-        break
+    # Adding absolute distance to 3D poses and rebase the height
+    if num_person == 2:
+        prediction = revise_skes(prediction, re_kpts, valid_frames)
+    else:
+        prediction[0][:, :, 2] -= np.amin(prediction[0][:, :, 2])
 
-    prediction = camera_to_world(predicted_3d_pos, R=ROT, t=0)
+    # If output two 3D human poses, put them in the same 3D coordinate system
+    same_coord = False
+    if num_person == 2:
+        same_coord = True
 
-    # We don't have the trajectory, but at least we can rebase the height
-    prediction[:, :, 2] -= np.min(prediction[:, :, 2])
-
-    prediction_new = np.zeros((*input_keypoints.shape[:-1], 3), dtype=np.float32)
-    prediction_new[valid_frames] = prediction
+    anim_output = {}
+    for i, anim_prediction in enumerate(prediction):
+        anim_output.update({'Reconstruction %d' % (i + 1): anim_prediction})
 
     logger.info('Rendering ...')
-    anim_output = {'Reconstruction': prediction_new}
+    re_kpts = re_kpts.transpose(1, 0, 2, 3)  # (M, T, N, 2) --> (T, M, N, 2)
+    frames = [cv2.cvtColor(f, cv2.COLOR_BGR2RGB) for f in frames]
     render_animation(
-        keypoints, keypoints_metadata, anim_output, h36m_skeleton, 25, 3000,
+        re_kpts, keypoints_metadata, anim_output, h36m_skeleton, 25, 3000,
         np.array(70., dtype=np.float32), args.savepath,
-        cap, viewport=(width, height),
-        downsample=1, size=5)
+        frames, viewport=(width, height),
+        downsample=1, size=5,
+        com_reconstrcution=same_coord)
 
     logger.info('Script finished successfully.')
 
@@ -366,9 +459,6 @@ def main():
     num_person = 2
 
     # net initialize
-    import onnxruntime
-    net = onnxruntime.InferenceSession(weight_path)
-
     detector = ailia.Detector(
         MODEL_YOLOV3_PATH,
         WEIGHT_YOLOV3_PATH,
@@ -381,9 +471,12 @@ def main():
     )
     pose_net = ailia.Net(MODEL_POSE_PATH, WEIGHT_POSE_PATH, env_id=args.env_id)
 
+    import onnxruntime
+    net = onnxruntime.InferenceSession(weight_path)
+
     info = {
         "yolo_model": detector,
-        "pose_net": pose_net,
+        "pose_model": pose_net,
         "num_joints": num_joints,
         "num_person": num_person,
     }

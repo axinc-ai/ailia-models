@@ -1,6 +1,7 @@
 import math
 
 import matplotlib
+
 matplotlib.use('Agg')
 
 import numpy as np
@@ -15,9 +16,9 @@ __all__ = [
     'DataLoader',
     'ObjSort',
     'coco_h36m',
+    'h36m_coco_format',
     'get_joints_info',
     'normalize_screen_coordinates',
-    'receptive_field',
     'camera_to_world',
     'get_affine_transform',
     'get_final_preds',
@@ -315,6 +316,37 @@ def coco_h36m(keypoints):
     return keypoints_h36m, valid_frames
 
 
+def h36m_coco_format(keypoints, scores):
+    assert len(keypoints.shape) == 4 and len(scores.shape) == 3
+
+    h36m_kpts = []
+    h36m_scores = []
+    valid_frames = []
+
+    for i in range(keypoints.shape[0]):
+        kpts = keypoints[i]
+        score = scores[i]
+
+        new_score = np.zeros_like(score, dtype=np.float32)
+
+        if np.sum(kpts) != 0.:
+            kpts, valid_frame = coco_h36m(kpts)
+            h36m_kpts.append(kpts)
+            valid_frames.append(valid_frame)
+
+            new_score[:, h36m_coco_order] = score[:, coco_order]
+            new_score[:, 0] = np.mean(score[:, [11, 12]], axis=1, dtype=np.float32)
+            new_score[:, 8] = np.mean(score[:, [5, 6]], axis=1, dtype=np.float32)
+            new_score[:, 7] = np.mean(new_score[:, [0, 8]], axis=1, dtype=np.float32)
+            new_score[:, 10] = np.mean(score[:, [1, 2, 3, 4]], axis=1, dtype=np.float32)
+
+            h36m_scores.append(new_score)
+
+    h36m_kpts = np.asarray(h36m_kpts, dtype=np.float32)
+    h36m_scores = np.asarray(h36m_scores, dtype=np.float32)
+    return h36m_kpts, h36m_scores, valid_frames
+
+
 def get_joints_info(num_joints):
     # Body+toe keypoints
     if num_joints == 19:
@@ -346,22 +378,6 @@ def normalize_screen_coordinates(X, w, h):
 
     # Normalize so that [0, w] is mapped to [-1, 1], while preserving the aspect ratio
     return X / w * 2 - [1, h / w]
-
-
-def receptive_field(filter_widths):
-    """
-    Return the total receptive field of this model as # of frames.
-    """
-    pad = [filter_widths[0] // 2]
-    next_dilation = filter_widths[0]
-    for i in range(1, len(filter_widths)):
-        pad.append((filter_widths[i] - 1) * next_dilation // 2)
-        next_dilation *= filter_widths[i]
-
-    frames = 0
-    for f in pad:
-        frames += f
-    return 1 + 2 * frames
 
 
 def qort(q, v):
@@ -577,11 +593,41 @@ def get_final_preds(batch_heatmaps, center, scale):
     return preds, maxvals
 
 
+h36m_elbow_knee_v1 = [5, 15]
+h36m_elbow_knee_v2 = [2, 12]
+h36m_wrist_ankle_v1 = [6, 16]
+h36m_wrist_ankle_v2 = [3, 13]
+h36m_hip_shoulder = [1, 4, 11, 14]
+h36m_spine_neck = [7, 9]
+h36m_thorax_head = [8, 10]
+
+
+def h36m_color_edge(joint_num):
+    if joint_num in h36m_elbow_knee_v1:
+        color = 'peru'  # (205, 133, 63)
+    elif joint_num in h36m_elbow_knee_v2:
+        color = 'indianred'  # (205, 92, 92)
+    elif joint_num in h36m_wrist_ankle_v1:
+        color = 'coral'  # (255, 127, 80)
+    elif joint_num in h36m_wrist_ankle_v2:
+        # color = 'deepskyblue'
+        color = 'brown'  # (165, 42, 42)
+    elif joint_num in h36m_hip_shoulder:
+        # color = 'dodgerblue'
+        color = 'tan'  # (210, 180, 140)
+    elif joint_num in h36m_spine_neck:
+        color = 'olive'  # (128, 128, 0)
+    else:
+        color = 'purple'  # (128, 0, 128)
+    return color
+
+
 def render_animation(
         keypoints, keypoints_metadata, poses, skeleton, fps, bitrate,
         azim, output,
-        capture, viewport,
-        downsample=1, size=6):
+        frames, viewport,
+        downsample=1, size=5,
+        com_reconstrcution=False):
     """
     TODO
     Render an animation. The supported output modes are:
@@ -592,112 +638,154 @@ def render_animation(
      -- 'filename.gif': render and export the animation a gif file (requires imagemagick).
     """
     plt.ioff()
-    fig = plt.figure(figsize=(size * (1 + len(poses)), size))
-    ax_in = fig.add_subplot(1, 1 + len(poses), 1)
+
+    num_person = keypoints.shape[1]
+    if num_person == 2 and com_reconstrcution:
+        fig = plt.figure(figsize=(size * (1 + len(poses)), size))
+        ax_in = fig.add_subplot(1, 2, 1)
+    else:
+        fig = plt.figure(figsize=(size * (1 + len(poses)), size))
+        ax_in = fig.add_subplot(1, 1 + len(poses), 1)
     ax_in.get_xaxis().set_visible(False)
     ax_in.get_yaxis().set_visible(False)
     ax_in.set_axis_off()
 
     ax_3d = []
     lines_3d = []
-    trajectories = []
-    radius = 1.5
-    for index, (title, data) in enumerate(poses.items()):
-        ax = fig.add_subplot(1, 1 + len(poses), index + 2, projection='3d')
+    radius = 1.7
+    if num_person == 2 and com_reconstrcution:
+        ax = fig.add_subplot(1, 2, 2, projection='3d')
         ax.view_init(elev=15., azim=azim)
-        ax.set_xlim3d([-radius / 2, radius / 2])
+        ax.set_xlim3d([-radius, radius])
         ax.set_zlim3d([0, radius])
-        ax.set_ylim3d([-radius / 2, radius / 2])
-        ax.set_aspect('auto')
+        ax.set_ylim3d([-radius, radius])
         ax.set_xticklabels([])
         ax.set_yticklabels([])
         ax.set_zticklabels([])
         ax.dist = 7.5
-        # ax.set_title(title)
         ax_3d.append(ax)
         lines_3d.append([])
-        trajectories.append(data[:, 0, [0, 1]])
-    poses = list(poses.values())
 
-    # Load video frame
-    all_frames = []
-    while True:
-        ret, frame = capture.read()
-        if not ret:
-            break
+        poses = list(poses.values())
+    else:
+        for index, (title, data) in enumerate(poses.items()):
+            ax = fig.add_subplot(1, 1 + len(poses), index + 2, projection='3d')
+            ax.view_init(elev=15., azim=azim)
+            ax.set_xlim3d([-radius / 2, radius / 2])
+            ax.set_zlim3d([0, radius])
+            ax.set_ylim3d([-radius / 2, radius / 2])
+            ax.set_aspect('auto')
+            ax.set_xticklabels([])
+            ax.set_yticklabels([])
+            ax.set_zticklabels([])
+            ax.dist = 7.5
+            ax_3d.append(ax)
+            lines_3d.append([])
+        poses = list(poses.values())
 
-        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        all_frames.append(frame)
-
-    effective_length = min(keypoints.shape[0], len(all_frames))
-    all_frames = all_frames[:effective_length]
+    effective_length = min(keypoints.shape[0], len(frames))
+    frames = frames[:effective_length]
 
     if downsample > 1:
         keypoints = downsample_tensor(keypoints, downsample)
-        all_frames = downsample_tensor(np.array(all_frames), downsample).astype('uint8')
+        frames = downsample_tensor(np.array(frames), downsample).astype('uint8')
         for idx in range(len(poses)):
             poses[idx] = downsample_tensor(poses[idx], downsample)
-            trajectories[idx] = downsample_tensor(trajectories[idx], downsample)
         fps /= downsample
 
     initialized = False
     image = None
     lines = []
     points = None
-    limit = len(all_frames)
+    limit = len(frames)
     parents = skeleton.parents()
+    index = [i for i in np.arange(17)]
 
     def update_video(i):
         nonlocal initialized, image, lines, points
 
-        for n, ax in enumerate(ax_3d):
-            ax.set_xlim3d([-radius / 2 + trajectories[n][i, 0], radius / 2 + trajectories[n][i, 0]])
-            ax.set_ylim3d([-radius / 2 + trajectories[n][i, 1], radius / 2 + trajectories[n][i, 1]])
-
-        # Update 2D poses
         joints_right_2d = keypoints_metadata['keypoints_symmetry'][1]
-        colors_2d = np.full(keypoints.shape[1], 'black')
-        colors_2d[joints_right_2d] = 'red'
-        if not initialized:
-            image = ax_in.imshow(all_frames[i], aspect='equal')
 
-            for j, j_parent in enumerate(parents):
+        if num_person == 2:
+            joints_right_2d_two = []
+            joints_right_2d_two += joints_right_2d
+            joints_right_2d_second = [i + 17 for i in joints_right_2d]
+            joints_right_2d_two += joints_right_2d_second
+
+            colors_2d = np.full(34, 'black')
+            colors_2d[joints_right_2d_two] = 'red'
+        else:
+            colors_2d = np.full(17, 'black')
+            colors_2d[joints_right_2d] = 'red'
+
+        if not initialized:
+            image = ax_in.imshow(frames[i], aspect='equal')
+
+            for j, j_parent in zip(index, parents):
                 if j_parent == -1:
                     continue
 
-                if len(parents) == keypoints.shape[1] and keypoints_metadata['layout_name'] != 'coco':
-                    # Draw skeleton only if keypoints match (otherwise we don't have the parents definition)
-                    lines.append(ax_in.plot([keypoints[i, j, 0], keypoints[i, j_parent, 0]],
-                                            [keypoints[i, j, 1], keypoints[i, j_parent, 1]], color='pink'))
+                if len(parents) == 17 and keypoints_metadata['layout_name'] != 'coco':
+                    for m in range(num_person):
+                        # Draw skeleton only if keypoints match (otherwise we don't have the parents definition)
+                        lines.append(ax_in.plot(
+                            [keypoints[i, m, j, 0], keypoints[i, m, j_parent, 0]],
+                            [keypoints[i, m, j, 1], keypoints[i, m, j_parent, 1]],
+                            color='pink'))
 
-                col = color_edge(j)
-                for n, ax in enumerate(ax_3d):
-                    pos = poses[n][i]
-                    lines_3d[n].append(ax.plot([pos[j, 0], pos[j_parent, 0]],
-                                               [pos[j, 1], pos[j_parent, 1]],
-                                               [pos[j, 2], pos[j_parent, 2]], linewidth=3, zdir='z', c=col))
+                # Apply different colors for each joint
+                col = h36m_color_edge(j)
 
-            points = ax_in.scatter(*keypoints[i].T, 10, color=colors_2d, edgecolors='white', zorder=10)
+                if com_reconstrcution:
+                    for pose in poses:
+                        pos = pose[i]
+                        lines_3d[0].append(ax_3d[0].plot(
+                            [pos[j, 0], pos[j_parent, 0]],
+                            [pos[j, 1], pos[j_parent, 1]],
+                            [pos[j, 2], pos[j_parent, 2]],
+                            zdir='z', c=col, linewidth=3)
+                        )
+                else:
+                    for n, ax in enumerate(ax_3d):
+                        pos = poses[n][i]
+                        lines_3d[n].append(ax.plot(
+                            [pos[j, 0], pos[j_parent, 0]],
+                            [pos[j, 1], pos[j_parent, 1]],
+                            [pos[j, 2], pos[j_parent, 2]],
+                            zdir='z', c=col, linewidth=3)
+                        )
 
+            points = ax_in.scatter(
+                *keypoints[i].reshape(17 * num_person, 2).T, 10,
+                color=colors_2d, edgecolors='white', zorder=10)
             initialized = True
         else:
-            image.set_data(all_frames[i])
+            image.set_data(frames[i])
 
-            for j, j_parent in enumerate(parents):
+            for j, j_parent in zip(index, parents):
                 if j_parent == -1:
                     continue
 
-                if len(parents) == keypoints.shape[1] and keypoints_metadata['layout_name'] != 'coco':
-                    lines[j - 1][0].set_data([keypoints[i, j, 0], keypoints[i, j_parent, 0]],
-                                             [keypoints[i, j, 1], keypoints[i, j_parent, 1]])
+                if len(parents) == 17 and keypoints_metadata['layout_name'] != 'coco':
+                    for m in range(num_person):
+                        lines[j + 16 * m - 1][0].set_data(
+                            [keypoints[i, m, j, 0], keypoints[i, m, j_parent, 0]],
+                            [keypoints[i, m, j, 1], keypoints[i, m, j_parent, 1]])
 
-                for n, ax in enumerate(ax_3d):
-                    pos = poses[n][i]
-                    lines_3d[n][j - 1][0].set_xdata([pos[j, 0], pos[j_parent, 0]])
-                    lines_3d[n][j - 1][0].set_ydata([pos[j, 1], pos[j_parent, 1]])
-                    lines_3d[n][j - 1][0].set_3d_properties([pos[j, 2], pos[j_parent, 2]], zdir='z')
+                if com_reconstrcution:
+                    for k, pose in enumerate(poses):
+                        pos = pose[i]
+                        lines_3d[0][j + k * 16 - 1][0].set_xdata([pos[j, 0], pos[j_parent, 0]])
+                        lines_3d[0][j + k * 16 - 1][0].set_ydata([pos[j, 1], pos[j_parent, 1]])
+                        lines_3d[0][j + k * 16 - 1][0].set_3d_properties([pos[j, 2], pos[j_parent, 2]], zdir='z')
+                else:
+                    for n, ax in enumerate(ax_3d):
+                        pos = poses[n][i]
+                        lines_3d[n][j - 1][0].set_xdata([pos[j, 0], pos[j_parent, 0]])
+                        lines_3d[n][j - 1][0].set_ydata([pos[j, 1], pos[j_parent, 1]])
+                        lines_3d[n][j - 1][0].set_3d_properties([pos[j, 2], pos[j_parent, 2]], zdir='z')
 
-            points.set_offsets(keypoints[i])
+            points.set_offsets(keypoints[i].reshape(17 * num_person, 2))
 
         print('{}/{}      '.format(i, limit), end='\r')
 
