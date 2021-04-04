@@ -24,7 +24,6 @@ MODEL_PATH = 'edsr.onnx.prototxt'
 IMAGE_PATH = 'input.png'
 SAVE_IMAGE_PATH = 'output.png'
 SLEEP_TIME = 0
-base = os.path.dirname(os.path.abspath(__file__)) # 実行ファイルのディレクトリ名
 
 
 # ======================
@@ -85,14 +84,13 @@ def recognize_from_video():
     capture = webcamera_utils.get_capture(args.video)
 
     # create video writer if savepath is specified as video format
-    if args.savepath is not None:
+    if args.savepath != SAVE_IMAGE_PATH:
+        logger.warning(
+            'currently, video results cannot be output correctly...'
+        )
         f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
         f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
-        save_h, save_w = webcamera_utils.calc_adjust_fsize(
-            f_h, f_w, IMAGE_HEIGHT, IMAGE_WIDTH
-        )
-        # save_w * 2: we stack source frame and estimated heatmap
-        writer = webcamera_utils.get_writer(args.savepath, save_h, save_w)
+        writer = webcamera_utils.get_writer(args.savepath, f_h, f_w)
     else:
         writer = None
 
@@ -101,18 +99,24 @@ def recognize_from_video():
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
 
+        IMAGE_HEIGHT, IMAGE_WIDTH = frame.shape[0], frame.shape[1]
         input_image, input_data = webcamera_utils.preprocess_frame(
             frame, IMAGE_HEIGHT, IMAGE_WIDTH, normalize_type='None'
         )
+        #cv2.imshow('frame', input_image)
+        net.set_input_shape((1,3,IMAGE_HEIGHT,IMAGE_WIDTH))
 
         # Inference
-        preds_ailia = net.predict(input_data)
-
-        time.sleep(SLEEP_TIME)
-
+        
+        preds_ailia = net.predict(input_data)[0] 
+        output_img = preds_ailia.transpose(1, 2, 0)
+        output_img = np.clip(output_img, 0, 255)
+        output_img = cv2.cvtColor(output_img, cv2.COLOR_RGB2BGR)
+        cv2.imshow('frame', output_img)
+        
         # save results
         if writer is not None:
-            writer.write(input_image)
+            writer.write(output_img)
 
     capture.release()
     cv2.destroyAllWindows()
@@ -120,8 +124,15 @@ def recognize_from_video():
         writer.release()
     logger.info('Script finished successfully.')
 
+
 def main():
-    recognize_from_image()
+    
+    if args.video is not None:
+        # video mode
+        recognize_from_video()
+    else:
+        # image mode
+        recognize_from_image()
 
 
 if __name__ == '__main__':
