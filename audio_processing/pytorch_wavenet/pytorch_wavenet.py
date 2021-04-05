@@ -114,7 +114,7 @@ def generate_wave(net, num_samples, first_samples=None, temperature=1.):
 def _inference(net, input):
     input = input.to('cpu').detach().numpy().copy()
     if not args.onnx:
-        output = net.predict(input)
+        output = net.run(input)
     else:
         output = net.run([net.get_outputs()[0].name], {net.get_inputs()[0].name: input})
 
