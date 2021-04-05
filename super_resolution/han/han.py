@@ -8,7 +8,7 @@ import ailia
 # import original modules
 sys.path.append('../../util')
 from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
-#from model_utils import check_and_download_models  # noqa: E402
+from model_utils import check_and_download_models  # noqa: E402
 from image_utils import load_image  # noqa: E402
 
 # logger
@@ -51,11 +51,12 @@ if not args.normal:
 else:
     WEIGHT_PATH = 'han_BIX2.onnx'
     MODEL_PATH = 'han_BIX2.onnx.prototxt'
-REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/srresnet/'
+
 """
 
 WEIGHT_PATH = 'han_BIX2.onnx'
 MODEL_PATH = 'han_BIX2.onnx.prototxt'
+REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/han/'
 
 # ======================
 # Main functions
@@ -76,8 +77,6 @@ def recognize_from_image():
             gen_input_ailia=True,
         )
 
-        print(net.get_summary()) #Uncomment to see the layers not implemented
-
         # inference
         logger.info('Start inference...')
         if args.benchmark:
@@ -91,21 +90,18 @@ def recognize_from_image():
             preds_ailia = net.predict(input_data)
 
         # postprocessing
-        print(preds_ailia[0]) #Uncomment to see the prediction (currently 'nan')
-        
-        """
         output_img = preds_ailia[0].transpose((1, 2, 0))
         output_img = cv2.cvtColor(output_img, cv2.COLOR_RGB2BGR)
         savepath = get_savepath(args.savepath, image_path)
         logger.info(f'saved at : {savepath}')
         cv2.imwrite(savepath, output_img * 255)
-        """
+        
     logger.info('Script finished successfully.')
 
 
 def main():
     # model files check and download
-    #check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
 
     recognize_from_image()
 
