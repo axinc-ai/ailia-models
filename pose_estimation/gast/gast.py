@@ -11,16 +11,17 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
+from utils import get_base_parser, update_parser  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from image_utils import normalize_image  # noqa: E402
-from webcamera_utils import get_capture, get_writer  # noqa: E402
-from detector_utils import load_image  # noqa: E402
+from webcamera_utils import get_capture  # noqa: E402
 
 # logger
 from logging import getLogger  # noqa: E402
 
 from gast_utils import *
+from yolov3 import load_model as yolo_load
+from yolov3 import yolo_human_det as yolo_human_det_darknet
 
 logger = getLogger(__name__)
 
@@ -31,15 +32,16 @@ logger = getLogger(__name__)
 WEIGHT_YOLOV3_PATH = 'yolov3.opt.onnx'
 MODEL_YOLOV3_PATH = 'yolov3.opt.onnx.prototxt'
 REMOTE_YOLOV3_PATH = 'https://storage.googleapis.com/ailia-models/yolov3/'
+WEIGHT_YOLOV3_DARKNET_PATH = 'yolov3/checkpoint/yolov3.weights'
+DUMMY_YOLOV3_DARKNET_PATH = 'yolov3/checkpoint/'
+REMOTE_YOLOV3_DARKNET_PATH = 'https://pjreddie.com/media/files/'
 WEIGHT_POSE_PATH = 'pose_hrnet_w48_384x288.onnx'
 MODEL_POSE_PATH = 'pose_hrnet_w48_384x288.onnx.prototxt'
 WEIGHT_27FRAME_17JOINT_PATH = '27_frame_17_joint_model.onnx'
 MODEL_27FRAME_17JOINT_PATH = '27_frame_17_joint_model.onnx.prototxt'
-WEIGHT_27FRAME_19JOINT_PATH = '27_frame_19_joint_model.onnx'
-MODEL_27FRAME_19JOINT_PATH = '27_frame_19_joint_model.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/gast/'
 
-VIDEO_PATH = './data/baseball.mp4'
+VIDEO_PATH = 'baseball.mp4'
 SAVE_PATH = 'output.mp4'
 
 ROT = np.array([0.14070565, -0.15007018, -0.7552408, 0.62232804], dtype=np.float32)
@@ -50,8 +52,12 @@ ROT = np.array([0.14070565, -0.15007018, -0.7552408, 0.62232804], dtype=np.float
 
 parser = get_base_parser('GAST model', VIDEO_PATH, SAVE_PATH)
 parser.add_argument(
-    '-k', '--keypoints_file', default='./data/baseball.json', metavar='NAME',
-    help='The path of keypoints file'
+    '-np', '--num_person', type=int, default=1, choices=(1, 2),
+    help='number of estimated human poses. [1, 2]'
+)
+parser.add_argument(
+    '-dn', '--darknet', action='store_true',
+    help='use darknet for yolo.'
 )
 args = update_parser(parser)
 
@@ -182,8 +188,11 @@ def gen_kpts(frames, yolo_model, pose_model, num_peroson=1):
     scores_result = []
     for i in tqdm(range(len(frames))):
         frame = frames[i]
-        img = cv2.cvtColor(frame, cv2.COLOR_BGR2BGRA)
-        bboxs, scores = yolo_human_det(img, yolo_model)
+        if not args.darknet:
+            img = cv2.cvtColor(frame, cv2.COLOR_BGR2BGRA)
+            bboxs, scores = yolo_human_det(img, yolo_model)
+        else:
+            bboxs, scores = yolo_human_det_darknet(frame, yolo_model)
         if not bboxs.any():
             continue
 
@@ -370,6 +379,8 @@ def recognize_from_video(net, info):
     cap = get_capture(video_file)
     assert cap.isOpened(), 'Cannot capture source'
 
+    num_joints = 17
+
     # Get the width and height of video
     width = int(round(cap.get(cv2.CAP_PROP_FRAME_WIDTH)))
     height = int(round(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)))
@@ -383,17 +394,15 @@ def recognize_from_video(net, info):
             continue
         frames.append(frame)
 
-    num_joints = info["num_joints"]
-
-    keypoints_file = args.keypoints_file
-    if keypoints_file:
-        logger.info('Loading 2D keypoints ...')
-        keypoints, scores, _, _ = load_json(keypoints_file, num_joints)
-    else:
+    if True:
         num_person = info["num_person"]
         keypoints, scores = gen_kpts(
             frames, info["yolo_model"], info["pose_model"],
             num_peroson=num_person)
+    # else:
+    #     logger.info('Loading 2D keypoints ...')
+    #     keypoints_file = 'baseball.json'
+    #     keypoints, scores, _, _ = load_json(keypoints_file, num_joints)
 
     keypoints, scores, valid_frames = h36m_coco_format(keypoints, scores)
     re_kpts = revise_kpts(keypoints, scores, valid_frames)
@@ -407,8 +416,6 @@ def recognize_from_video(net, info):
     prediction = gen_pose(
         re_kpts, valid_frames, width, height, net,
         pad, causal_shift, num_joints)
-
-    _, _, h36m_skeleton, keypoints_metadata = get_joints_info(num_joints)
 
     # Adding absolute distance to 3D poses and rebase the height
     if num_person == 2:
@@ -425,15 +432,17 @@ def recognize_from_video(net, info):
     for i, anim_prediction in enumerate(prediction):
         anim_output.update({'Reconstruction %d' % (i + 1): anim_prediction})
 
+    _, _, h36m_skeleton, keypoints_metadata = get_joints_info(num_joints)
+
     logger.info('Rendering ...')
-    re_kpts = re_kpts.transpose(1, 0, 2, 3)  # (M, T, N, 2) --> (T, M, N, 2)
+    re_kpts = re_kpts.transpose((1, 0, 2, 3))  # (M, T, N, 2) --> (T, M, N, 2)
     frames = [cv2.cvtColor(f, cv2.COLOR_BGR2RGB) for f in frames]
     render_animation(
         re_kpts, keypoints_metadata, anim_output, h36m_skeleton, 25, 3000,
         np.array(70., dtype=np.float32), args.savepath,
         frames, viewport=(width, height),
         downsample=1, size=5,
-        com_reconstrcution=same_coord)
+        same_coord=same_coord)
 
     logger.info('Script finished successfully.')
 
@@ -441,43 +450,41 @@ def recognize_from_video(net, info):
 def main():
     # model files check and download
     logger.info("=== YOLOv3 model ===")
-    check_and_download_models(WEIGHT_YOLOV3_PATH, MODEL_YOLOV3_PATH, REMOTE_YOLOV3_PATH)
+    if not args.darknet:
+        check_and_download_models(WEIGHT_YOLOV3_PATH, MODEL_YOLOV3_PATH, REMOTE_YOLOV3_PATH)
+    else:
+        check_and_download_models(
+            WEIGHT_YOLOV3_DARKNET_PATH, DUMMY_YOLOV3_DARKNET_PATH, REMOTE_YOLOV3_DARKNET_PATH
+        )
     logger.info("=== HRNet model ===")
     check_and_download_models(WEIGHT_POSE_PATH, MODEL_POSE_PATH, REMOTE_PATH)
-
-    model_info = {
-        17: (
-            WEIGHT_27FRAME_17JOINT_PATH, MODEL_27FRAME_17JOINT_PATH),
-        19: (
-            WEIGHT_27FRAME_19JOINT_PATH, MODEL_27FRAME_19JOINT_PATH),
-    }
     logger.info("=== GAST model ===")
-    weight_path, model_path = model_info[17]
-    check_and_download_models(weight_path, model_path, REMOTE_PATH)
+    check_and_download_models(WEIGHT_27FRAME_17JOINT_PATH, MODEL_27FRAME_17JOINT_PATH, REMOTE_PATH)
 
-    num_joints = 17
-    num_person = 2
+    num_person = args.num_person
 
     # net initialize
-    detector = ailia.Detector(
-        MODEL_YOLOV3_PATH,
-        WEIGHT_YOLOV3_PATH,
-        80,
-        format=ailia.NETWORK_IMAGE_FORMAT_RGB,
-        channel=ailia.NETWORK_IMAGE_CHANNEL_FIRST,
-        range=ailia.NETWORK_IMAGE_RANGE_U_FP32,
-        algorithm=ailia.DETECTOR_ALGORITHM_YOLOV3,
-        env_id=args.env_id,
-    )
+    if not args.darknet:
+        detector = ailia.Detector(
+            MODEL_YOLOV3_PATH,
+            WEIGHT_YOLOV3_PATH,
+            80,
+            format=ailia.NETWORK_IMAGE_FORMAT_RGB,
+            channel=ailia.NETWORK_IMAGE_CHANNEL_FIRST,
+            range=ailia.NETWORK_IMAGE_RANGE_U_FP32,
+            algorithm=ailia.DETECTOR_ALGORITHM_YOLOV3,
+            env_id=args.env_id,
+        )
+    else:
+        detector = yolo_load(inp_dim=416)
     pose_net = ailia.Net(MODEL_POSE_PATH, WEIGHT_POSE_PATH, env_id=args.env_id)
 
     import onnxruntime
-    net = onnxruntime.InferenceSession(weight_path)
+    net = onnxruntime.InferenceSession(WEIGHT_27FRAME_17JOINT_PATH)
 
     info = {
         "yolo_model": detector,
         "pose_model": pose_net,
-        "num_joints": num_joints,
         "num_person": num_person,
     }
 

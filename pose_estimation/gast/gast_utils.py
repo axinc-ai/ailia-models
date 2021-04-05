@@ -15,7 +15,6 @@ from filterpy.kalman import KalmanFilter
 __all__ = [
     'DataLoader',
     'ObjSort',
-    'coco_h36m',
     'h36m_coco_format',
     'get_joints_info',
     'normalize_screen_coordinates',
@@ -52,12 +51,12 @@ class DataLoader(object):
                        'edge'),
                 axis=0)
 
-        batch_2d = np.concatenate((batch_2d, batch_2d), axis=0)
-        batch_2d[1, :, :, 0] *= -1
-        batch_2d[1, :, self.kps_left + self.kps_right] = \
-            batch_2d[1, :, self.kps_right + self.kps_left]
+            batch_2d = np.concatenate((batch_2d, batch_2d), axis=0)
+            batch_2d[1, :, :, 0] *= -1
+            batch_2d[1, :, self.kps_left + self.kps_right] = \
+                batch_2d[1, :, self.kps_right + self.kps_left]
 
-        yield batch_2d.astype(np.float32)
+            yield batch_2d.astype(np.float32)
 
 
 class Skeleton:
@@ -627,7 +626,7 @@ def render_animation(
         azim, output,
         frames, viewport,
         downsample=1, size=5,
-        com_reconstrcution=False):
+        same_coord=False):
     """
     TODO
     Render an animation. The supported output modes are:
@@ -640,7 +639,7 @@ def render_animation(
     plt.ioff()
 
     num_person = keypoints.shape[1]
-    if num_person == 2 and com_reconstrcution:
+    if num_person == 2 and same_coord:
         fig = plt.figure(figsize=(size * (1 + len(poses)), size))
         ax_in = fig.add_subplot(1, 2, 1)
     else:
@@ -653,7 +652,7 @@ def render_animation(
     ax_3d = []
     lines_3d = []
     radius = 1.7
-    if num_person == 2 and com_reconstrcution:
+    if num_person == 2 and same_coord:
         ax = fig.add_subplot(1, 2, 2, projection='3d')
         ax.view_init(elev=15., azim=azim)
         ax.set_xlim3d([-radius, radius])
@@ -665,7 +664,6 @@ def render_animation(
         ax.dist = 7.5
         ax_3d.append(ax)
         lines_3d.append([])
-
         poses = list(poses.values())
     else:
         for index, (title, data) in enumerate(poses.items()):
@@ -736,7 +734,7 @@ def render_animation(
                 # Apply different colors for each joint
                 col = h36m_color_edge(j)
 
-                if com_reconstrcution:
+                if same_coord:
                     for pose in poses:
                         pos = pose[i]
                         lines_3d[0].append(ax_3d[0].plot(
@@ -772,7 +770,7 @@ def render_animation(
                             [keypoints[i, m, j, 0], keypoints[i, m, j_parent, 0]],
                             [keypoints[i, m, j, 1], keypoints[i, m, j_parent, 1]])
 
-                if com_reconstrcution:
+                if same_coord:
                     for k, pose in enumerate(poses):
                         pos = pose[i]
                         lines_3d[0][j + k * 16 - 1][0].set_xdata([pos[j, 0], pos[j_parent, 0]])
