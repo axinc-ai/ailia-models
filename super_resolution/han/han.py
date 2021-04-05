@@ -51,7 +51,6 @@ if not args.normal:
 else:
     WEIGHT_PATH = 'han_BIX2.onnx'
     MODEL_PATH = 'han_BIX2.onnx.prototxt'
-
 """
 
 WEIGHT_PATH = 'han_BIX2.onnx'

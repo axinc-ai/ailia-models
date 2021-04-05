@@ -18,6 +18,9 @@ from utils import get_base_parser, update_parser  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 import webcamera_utils  # noqa: E402
 
+# logger
+from logging import getLogger   # noqa: E402
+logger = getLogger(__name__)
 
 import warnings
 warnings.simplefilter("ignore", DeprecationWarning)
@@ -223,7 +226,7 @@ class DetResizeForTest(object):
                 return None, (None, None)
             img = cv2.resize(img, (int(resize_w), int(resize_h)))
         except:
-            print(img.shape, resize_w, resize_h)
+            logger.error(img.shape, resize_w, resize_h)
             sys.exit(0)
         ratio_h = resize_h / float(h)
         ratio_w = resize_w / float(w)
@@ -657,11 +660,12 @@ class TextDetector():
             postprocess_params["unclip_ratio"] = OCR_CFG['det_db_unclip_ratio']
             postprocess_params["use_dilation"] = True
         else:
-            print("unknown det_algorithm:{}".format(self.det_algorithm))
+            logger.error("unknown det_algorithm:{}".format(self.det_algorithm))
             sys.exit(0)
 
         self.preprocess_op = create_operators(pre_process_list)
         self.postprocess_op = build_post_process(postprocess_params)
+        self.net = None
 
     def order_points_clockwise(self, pts):
         """
@@ -720,8 +724,9 @@ class TextDetector():
         starttime = time.time()
 
         # net initialize, Text Detection
-        net = ailia.Net(MODEL_PATH_DET, WEIGHT_PATH_DET, env_id=self.env_id)
-        outputs = net.predict(img)
+        if self.net==None or self.net.get_input_shape()!=img.shape:
+            self.net = ailia.Net(MODEL_PATH_DET, WEIGHT_PATH_DET, env_id=self.env_id)
+        outputs = self.net.predict(img)
 
         preds = {}
         if self.det_algorithm == 'DB':
@@ -750,6 +755,7 @@ class TextClassifier():
             "label_list": OCR_CFG['label_list'],
         }
         self.postprocess_op = build_post_process(postprocess_params)
+        self.net = None
 
     def resize_norm_img(self, img):
         imgC, imgH, imgW = self.cls_image_shape
@@ -804,9 +810,10 @@ class TextClassifier():
 
 
             # net initialize, Detection Boxes Rectify
-            net = ailia.Net(MODEL_PATH_CLS, WEIGHT_PATH_CLS, env_id=self.env_id)
-            net.set_input_shape(norm_img_batch.shape)
-            prob_out = net.predict(norm_img_batch)
+            if self.net==None or self.net.get_input_shape()!=norm_img_batch.shape:
+                self.net = ailia.Net(MODEL_PATH_CLS, WEIGHT_PATH_CLS, env_id=self.env_id)
+            self.net.set_input_shape(norm_img_batch.shape)
+            prob_out = self.net.predict(norm_img_batch)
 
             cls_result = self.postprocess_op(prob_out)
             elapse += time.time() - starttime
@@ -839,6 +846,7 @@ class TextRecognizer():
             "use_space_char": OCR_CFG['use_space_char']
         }
         self.postprocess_op = build_post_process(postprocess_params)
+        self.net = None
 
     def resize_norm_img(self, img, max_wh_ratio):
         imgC, imgH, imgW = self.rec_image_shape
@@ -896,8 +904,9 @@ class TextRecognizer():
             starttime = time.time()
 
             # net initialize, Text Recognition
-            net = ailia.Net(MODEL_PATH_REC, WEIGHT_PATH_REC, env_id=self.env_id)
-            preds = net.predict(norm_img_batch)
+            if self.net==None or self.net.get_input_shape()!=norm_img_batch.shape:
+                self.net = ailia.Net(MODEL_PATH_REC, WEIGHT_PATH_REC, env_id=self.env_id)
+            preds = self.net.predict(norm_img_batch)
 
             rec_result = self.postprocess_op(preds)
             for rno in range(len(rec_result)):
@@ -955,7 +964,7 @@ class TextSystem(object):
     def __call__(self, img):
         ori_im = img.copy()
         dt_boxes, elapse = self.text_detector(img)
-        print("dt_boxes num : {}, elapse : {}".format(
+        logger.info("dt_boxes num : {}, elapse : {}".format(
             len(dt_boxes), elapse))
         if dt_boxes is None:
             return None, None
@@ -970,11 +979,11 @@ class TextSystem(object):
         if self.use_angle_cls:
             img_crop_list, angle_list, elapse = self.text_classifier(
                 img_crop_list)
-            print("cls num  : {}, elapse : {}".format(
+            logger.info("cls num  : {}, elapse : {}".format(
                 len(img_crop_list), elapse))
 
         rec_res, elapse = self.text_recognizer(img_crop_list)
-        print("rec_res num  : {}, elapse : {}".format(
+        logger.info("rec_res num  : {}, elapse : {}".format(
             len(rec_res), elapse))
         filter_boxes, filter_rec_res = [], []
         for box, rec_reuslt in zip(dt_boxes, rec_res):
@@ -1077,7 +1086,7 @@ def recognize_from_image(config, text_sys):
                                     font_path=config['vis_font_path'])
         cv2.imwrite(args.savepath, draw_img[:, :, ::-1])
 
-    print('finished process and write result to %s!' % args.savepath)
+    logger.info('finished process and write result to %s!' % args.savepath)
 
 
 def recognize_from_video(config, text_sys):
@@ -1122,7 +1131,7 @@ def recognize_from_video(config, text_sys):
     cv2.destroyAllWindows()
     if video_writer is not None:
         video_writer.release()
-        print('finished process and write result to %s!' % args.savepath)
+        logger.info('finished process and write result to %s!' % args.savepath)
 
 
 def main():
@@ -1143,7 +1152,15 @@ def main():
     if args.video is not None:
         recognize_from_video(config, text_sys)
     else:
-        recognize_from_image(config, text_sys)
+        if args.benchmark:
+            logger.info('BENCHMARK mode')
+            for i in range(args.benchmark_count):
+                start = int(round(time.time() * 1000))
+                recognize_from_image(config, text_sys)
+                end = int(round(time.time() * 1000))
+                logger.info(f'\tailia processing time {end - start} ms')
+        else:
+            recognize_from_image(config, text_sys)
 
 
 if __name__ == '__main__':
