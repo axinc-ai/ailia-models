@@ -8,7 +8,7 @@ import ailia
 # import original modules
 sys.path.append('../../util')
 from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
-#from model_utils import check_and_download_models  # noqa: E402
+from model_utils import check_and_download_models  # noqa: E402
 from image_utils import load_image  # noqa: E402
 
 # logger
@@ -51,11 +51,12 @@ if not args.normal:
 else:
     WEIGHT_PATH = 'han_BIX2.onnx'
     MODEL_PATH = 'han_BIX2.onnx.prototxt'
-REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/srresnet/'
+REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/han/'
 """
 
 WEIGHT_PATH = 'han_BIX2.onnx'
 MODEL_PATH = 'han_BIX2.onnx.prototxt'
+REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/han/'
 
 # ======================
 # Main functions
@@ -105,7 +106,7 @@ def recognize_from_image():
 
 def main():
     # model files check and download
-    #check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
 
     recognize_from_image()
 
