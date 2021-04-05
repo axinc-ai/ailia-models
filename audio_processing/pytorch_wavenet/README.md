@@ -1,18 +1,24 @@
 # pytorch_wavenet
 
-### input
+### Input
 
 audio file (randomly generated)
 
-### output
+### Output
 
 audio file
 
 ### Usage
 
+Automatically downloads the onnx and prototxt files on the first run. It is necessary to be connected to the Internet while downloading.
+
+In this version, you have to use `--onnx` option.
+
 ```bash
 $ python3 pytorch_wavenet.py --onnx
 ```
+
+After running this program, output.wav, which is predicted besed on randomly generated wave data is generated.
 
 ### Reference
 
