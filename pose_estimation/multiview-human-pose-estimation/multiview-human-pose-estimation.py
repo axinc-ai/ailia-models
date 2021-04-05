@@ -52,9 +52,10 @@ def recognize_from_image():
     for image_path in args.input:
         logger.info(image_path)
 
-        img = cv2.imread(IMAGE_PATH, cv2.IMREAD_COLOR | cv2.IMREAD_IGNORE_ORIENTATION)
-        img = cv2.resize(img, (IMAGE_HEIGHT, IMAGE_WIDTH)) / 255
+        raw_img = cv2.imread(IMAGE_PATH, cv2.IMREAD_COLOR | cv2.IMREAD_IGNORE_ORIENTATION)
+        img = cv2.resize(raw_img, (IMAGE_HEIGHT, IMAGE_WIDTH)) / 255
         img = img.transpose(2, 0, 1)[np.newaxis, ...].astype(np.float32)
+        raw_img = raw_img.transpose(2, 0, 1)[np.newaxis, ...].astype(np.float32)
         logger.info(f'input image shape: {img.shape}')
 
         net.set_input_shape(img.shape)
@@ -65,7 +66,7 @@ def recognize_from_image():
             logger.info('BENCHMARK mode')
             for i in range(5):
                 start = int(round(time.time() * 1000))
-                result = net.run([img, img, img, img])
+                result = net.run(img)
                 end = int(round(time.time() * 1000))
                 logger.info(f'\tailia processing time {end - start} ms')
         else:
@@ -75,7 +76,7 @@ def recognize_from_image():
 
         savepath = get_savepath(args.savepath, image_path, ext='.jpg')
         logger.info(f'saved at : {savepath}')
-        grid_image, _ = show_heatmaps(img, heatmaps, normalize=True)
+        grid_image, _ = show_heatmaps(img, raw_img, heatmaps, normalize=True)
 
         cv2.imwrite(savepath, grid_image)
 
@@ -106,7 +107,7 @@ def recognize_from_video():
             break
 
         img = frame
-
+        raw_img = img.transpose(2, 0, 1)[np.newaxis, ...].astype(np.float32)
         img = cv2.resize(img, (IMAGE_HEIGHT, IMAGE_WIDTH)) / 255
         img = img.transpose(2, 0, 1)[np.newaxis, ...].astype(np.float32)
 
@@ -114,9 +115,8 @@ def recognize_from_video():
         result = net.run(img)
         heatmaps = result[0]
 
-        grid_image, pose_image = show_heatmaps(img, heatmaps, normalize=True)
-        pose_image = cv2.resize(pose_image, (IMAGE_HEIGHT, IMAGE_WIDTH))
-        cv2.imshow('Plot Pose 2D', pose_image)
+        _, _, pose_raw_image = show_heatmaps(img, raw_img, heatmaps, normalize=True)
+        cv2.imshow('Plot Pose 2D', pose_raw_image)
 
         if writer is not None:
             writer.write(img)
