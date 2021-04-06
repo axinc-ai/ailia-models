@@ -42,7 +42,7 @@ Choose the scale in [2, 3, 4, 8].
 $ python3 han.py --scale SCALE 
 ```
 
-If you want to the model trained on imaged degraded by the Blur-downscale Degradation Model, specify the `--blur` option.  
+If you want to the model trained on imaged degraded by the Blur-downscale Degradation Model (BD), specify the `--blur` option.  
 Only a 3-resolution scale can be used with this option. 
 ```bash
 $ python3 han.py --scale 3 --blur 

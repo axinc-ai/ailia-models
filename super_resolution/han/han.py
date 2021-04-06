@@ -43,7 +43,7 @@ parser.add_argument(
 parser.add_argument(
     '--blur', action='store_true',
     help=('By default, uses the model trained on images degraded with the Bicubic (BI) Degradation Model, ' + 
-          'but with this option, you can switch to the model trained on images degraded with the Blur-downscale Degradation Model. ' +
+          'but with this option, you can switch to the model trained on images degraded with the Blur-downscale Degradation Model (BD). ' +
           'A scale of 3 can only be used in combination with this option.')
 )
 args = update_parser(parser)
