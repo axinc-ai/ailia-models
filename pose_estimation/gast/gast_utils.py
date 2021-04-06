@@ -391,47 +391,13 @@ def qort(q, v):
     assert q.shape[:-1] == v.shape[:-1]
 
     qvec = q[..., 1:]
-    import torch
-    uv = torch.cross(qvec, v, dim=len(q.shape) - 1)
-    uuv = torch.cross(qvec, uv, dim=len(q.shape) - 1)
+    uv = np.cross(qvec, v, axis=len(q.shape) - 1)
+    uuv = np.cross(qvec, uv, axis=len(q.shape) - 1)
     return v + 2 * (q[..., :1] * uv + uuv)
 
 
-def wrap(func, *args, unsqueeze=False):
-    """
-    Wrap a torch function so it can be called with NumPy arrays.
-    Input and return types are seamlessly converted.
-    """
-
-    import torch
-    args = list(args)
-    for i, arg in enumerate(args):
-        if type(arg) == np.ndarray:
-            args[i] = torch.from_numpy(arg)
-            if unsqueeze:
-                args[i] = args[i].unsqueeze(0)
-
-    result = func(*args)
-
-    if isinstance(result, tuple):
-        result = list(result)
-        for i, res in enumerate(result):
-            if type(res) == torch.Tensor:
-                if unsqueeze:
-                    res = res.squeeze(0)
-                result[i] = res.numpy()
-        return tuple(result)
-    elif type(result) == torch.Tensor:
-        if unsqueeze:
-            result = result.squeeze(0)
-        result = result.numpy()
-        return result
-    else:
-        return result
-
-
 def camera_to_world(X, R, t):
-    return wrap(qort, np.tile(R, (*X.shape[:-1], 1)), X) + t
+    return qort(np.tile(R, (*X.shape[:-1], 1)), X) + t
 
 
 elbow_knee_v1 = [5, 15]
