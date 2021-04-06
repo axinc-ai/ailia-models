@@ -23,7 +23,6 @@ WEIGHT_PATH = 'edsr.onnx'
 MODEL_PATH = 'edsr.onnx.prototxt'
 IMAGE_PATH = 'input.png'
 SAVE_IMAGE_PATH = 'output.png'
-SLEEP_TIME = 0
 
 
 # ======================
@@ -103,17 +102,17 @@ def recognize_from_video():
         input_image, input_data = webcamera_utils.preprocess_frame(
             frame, IMAGE_HEIGHT, IMAGE_WIDTH, normalize_type='None'
         )
-        #cv2.imshow('frame', input_image)
         net.set_input_shape((1,3,IMAGE_HEIGHT,IMAGE_WIDTH))
 
         # Inference
-        
         preds_ailia = net.predict(input_data)[0] 
-        output_img = preds_ailia.transpose(1, 2, 0)
-        output_img = np.clip(output_img, 0, 255)
+        output_img = preds_ailia.transpose(1, 2, 0) / 255
         output_img = cv2.cvtColor(output_img, cv2.COLOR_RGB2BGR)
         cv2.imshow('frame', output_img)
-        
+        output_img *= 255
+        output_img = np.clip(output_img, 0, 255)     
+        #cv2.imwrite('pred.png', output_img) #please uncomment to save output
+
         # save results
         if writer is not None:
             writer.write(output_img)
