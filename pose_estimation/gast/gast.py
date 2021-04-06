@@ -20,8 +20,6 @@ from webcamera_utils import get_capture  # noqa: E402
 from logging import getLogger  # noqa: E402
 
 from gast_utils import *
-from yolov3 import load_model as yolo_load
-from yolov3 import yolo_human_det as yolo_human_det_darknet
 
 logger = getLogger(__name__)
 
@@ -197,6 +195,7 @@ def gen_kpts(frames, yolo_model, pose_model, num_peroson=1):
             img = cv2.cvtColor(frame, cv2.COLOR_BGR2BGRA)
             bboxs, scores = yolo_human_det(img, yolo_model)
         else:
+            from yolov3 import yolo_human_det as yolo_human_det_darknet
             bboxs, scores = yolo_human_det_darknet(frame, yolo_model)
         if not bboxs.any():
             continue
@@ -485,6 +484,7 @@ def main():
             env_id=args.env_id,
         )
     else:
+        from yolov3 import load_model as yolo_load
         detector = yolo_load(inp_dim=416)
     pose_net = ailia.Net(MODEL_POSE_PATH, WEIGHT_POSE_PATH, env_id=args.env_id)
 
