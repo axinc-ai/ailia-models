@@ -1,5 +1,6 @@
 import sys
 
+import time
 import numpy as np
 import cv2
 
@@ -19,13 +20,10 @@ logger = getLogger(__name__)
 # ======================
 # Parameters 1
 # ======================
-IMAGE_PATH = '000002_LR.png'
-SAVE_IMAGE_PATH = 'output.png'
+IMAGE_PATH = 'images/000002_LR.png'
+SAVE_IMAGE_PATH = 'images/output.png'
 IMAGE_HEIGHT = 194    # net.get_input_shape()[3]
 IMAGE_WIDTH = 194     # net.get_input_shape()[2]
-OUTPUT_HEIGHT = 194*2  # net.get_output_shape()[3]
-OUTPUT_WIDTH = 194*2   # net.get_output.shape()[2]
-
 
 # ======================
 # Argument Parser Config
@@ -36,7 +34,17 @@ parser = get_base_parser(
 parser.add_argument(
     '-n', '--normal', action='store_true',
     help=('By default, the optimized model is used, but with this option, ' +
-          'you can switch to the normal (not optimized) model')
+          'you can switch to the normal (not optimized) model.')
+)
+parser.add_argument(
+    '--scale', default=2, type=int, choices=[2, 3, 4, 8],
+    help=('Super-resolution scale. By default 2 (generates an image with twice the resolution).')
+)
+parser.add_argument(
+    '--blur', action='store_true',
+    help=('By default, uses the model trained on images degraded with the Bicubic (BI) Degradation Model, ' + 
+          'but with this option, you can switch to the model trained on images degraded with the Blur-downscale Degradation Model. ' +
+          'A scale of 3 can only be used in combination with this option.')
 )
 args = update_parser(parser)
 
@@ -44,18 +52,49 @@ args = update_parser(parser)
 # ======================
 # Parameters 2
 # ======================
-"""
-if not args.normal:
-    WEIGHT_PATH = 'han_BIX2.onnx.opt.onnx'
-    MODEL_PATH = 'han_BIX2.opt.onnx.prototxt'
+if args.blur:
+    args.scale = 3
+    if not args.normal:
+        WEIGHT_PATH = 'han_BDX3.opt.onnx'
+        MODEL_PATH = 'han_BDX3.opt.onnx.prototxt'
+    else:
+        WEIGHT_PATH = 'han_BDX3.onnx'
+        MODEL_PATH = 'han_BDX3.onnx.prototxt'
 else:
-    WEIGHT_PATH = 'han_BIX2.onnx'
-    MODEL_PATH = 'han_BIX2.onnx.prototxt'
-"""
+    if args.scale == 2:
+        if not args.normal:
+            WEIGHT_PATH = 'han_BIX2.opt.onnx'
+            MODEL_PATH = 'han_BIX2.opt.onnx.prototxt'
+        else:
+            WEIGHT_PATH = 'han_BIX2.onnx'
+            MODEL_PATH = 'han_BIX2.onnx.prototxt'
+    elif args.scale == 3:
+        if not args.normal:
+            WEIGHT_PATH = 'han_BIX3.opt.onnx'
+            MODEL_PATH = 'han_BIX3.opt.onnx.prototxt'
+        else:
+            WEIGHT_PATH = 'han_BIX3.onnx'
+            MODEL_PATH = 'han_BIX3.onnx.prototxt'
+    elif args.scale == 4:
+        if not args.normal:
+            WEIGHT_PATH = 'han_BIX4.opt.onnx'
+            MODEL_PATH = 'han_BIX4.opt.onnx.prototxt'
+        else:
+            WEIGHT_PATH = 'han_BIX4.onnx'
+            MODEL_PATH = 'han_BIX4.onnx.prototxt'
+    elif args.scale == 8:
+        if not args.normal:
+            WEIGHT_PATH = 'han_BIX8.opt.onnx'
+            MODEL_PATH = 'han_BIX8.opt.onnx.prototxt'
+        else:
+            WEIGHT_PATH = 'han_BIX8.onnx'
+            MODEL_PATH = 'han_BIX8.onnx.prototxt'
+    else:
+        logger.info('Incorrect scale (choose from 2, 3, 4 or 8).')
+        exit(-1)
 
-WEIGHT_PATH = 'han_BIX2.onnx'
-MODEL_PATH = 'han_BIX2.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/han/'
+
 
 # ======================
 # Main functions
@@ -63,12 +102,20 @@ REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/han/'
 def recognize_from_image():
     # net initialize
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
-    net.set_input_shape((1, 3, IMAGE_HEIGHT, IMAGE_WIDTH))
-
+    logger.info('Model: ' + WEIGHT_PATH[:-5])
+    logger.info('Scale: ' + str(args.scale))
+    
     # input image loop
     for image_path in args.input:
         # prepare input data
-        logger.info(image_path)
+        logger.info('Input image: ' + image_path)
+
+        img = cv2.imread(image_path)
+        IMAGE_HEIGHT = img.shape[0]
+        IMAGE_WIDTH = img.shape[1]
+
+        net.set_input_shape((1, 3, IMAGE_HEIGHT, IMAGE_WIDTH))
+
         input_data = load_image(
             image_path,
             (IMAGE_HEIGHT, IMAGE_WIDTH),
