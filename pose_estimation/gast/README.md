@@ -2,15 +2,13 @@
 
 ## Input
 
-<img src="img/baseball_040.png" width="480"><img src="img/baseball_050.png" width="480"><img src="img/baseball_060.png" width="480">  
-![Input](img/baseball_040.png)![Input](img/baseball_050.png)![Input](img/baseball_060.png)
+<img src="img/baseball_040.png" width="240"><img src="img/baseball_050.png" width="240"><img src="img/baseball_060.png" width="240">  
 
 (Video from https://github.com/fabro66/GAST-Net-3DPoseEstimation/blob/master/data/video/baseball.mp4)
 
 ## Output
 
-<img src="img/output_040.png" width="500"><img src="img/baseball_040.png" width="500"><img src="img/baseball_060.png" width="500">  
-![Output](img/output_040.png)![Output](img/output_050.png)![Output](img/output_060.png)
+<img src="img/output_040.png" width="500"><img src="img/output_050.png" width="500"><img src="img/output_060.png" width="500">  
 
 ## Requirements
 
