@@ -59,6 +59,11 @@ parser.add_argument(
     '-dn', '--darknet', action='store_true',
     help='use darknet for yolo.'
 )
+parser.add_argument(
+    '--onnx',
+    action='store_true',
+    help='execute onnxruntime version.'
+)
 args = update_parser(parser)
 
 
@@ -252,6 +257,7 @@ def yolo_human_det(img, detector, confidence=0.70, nms_thresh=0.4):
     for idx in range(count):
         obj = detector.get_object(idx)
         if obj.category != 0:
+            # not human
             continue
 
         bboxs.append(np.array([
@@ -352,10 +358,13 @@ def gen_pose(
 
     prediction = []
     for batch_2d in generator.next_epoch():
-        in_name = net.get_inputs()[0].name
-        out_name = net.get_outputs()[0].name
-        output = net.run([out_name],
-                         {in_name: batch_2d})
+        if not args.onnx:
+            output = net.predict({'inputs_2d': batch_2d})
+        else:
+            in_name = net.get_inputs()[0].name
+            out_name = net.get_outputs()[0].name
+            output = net.run([out_name],
+                             {in_name: batch_2d})
         predicted_3d_pos = output[0]
 
         predicted_3d_pos[1, :, :, 0] *= -1
@@ -375,7 +384,7 @@ def gen_pose(
 
 
 def recognize_from_video(net, info):
-    video_file = args.input[0]
+    video_file = args.video if args.video else args.input[0]
     cap = get_capture(video_file)
     assert cap.isOpened(), 'Cannot capture source'
 
@@ -479,15 +488,17 @@ def main():
         detector = yolo_load(inp_dim=416)
     pose_net = ailia.Net(MODEL_POSE_PATH, WEIGHT_POSE_PATH, env_id=args.env_id)
 
-    import onnxruntime
-    net = onnxruntime.InferenceSession(WEIGHT_27FRAME_17JOINT_PATH)
+    if not args.onnx:
+        net = ailia.Net(MODEL_27FRAME_17JOINT_PATH, WEIGHT_27FRAME_17JOINT_PATH, env_id=args.env_id)
+    else:
+        import onnxruntime
+        net = onnxruntime.InferenceSession(WEIGHT_27FRAME_17JOINT_PATH)
 
     info = {
         "yolo_model": detector,
         "pose_model": pose_net,
         "num_person": num_person,
     }
-
     recognize_from_video(net, info)
 
 
