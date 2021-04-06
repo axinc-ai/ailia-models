@@ -19,6 +19,10 @@ pip3 matplotlib==3.1.0
 pip3 install filterpy
 ```
 
+And following dependencies is required for creating .mp4 file.
+
+- ffmpeg
+
 ## Usage
 Automatically downloads the onnx and prototxt files on the first run.
 It is necessary to be connected to the Internet while downloading.
@@ -41,7 +45,7 @@ $ python3 gast.py -np 2
 ```
 
 The Gast-Net adopt YOLOv3 for human detection.  
-It use implementation of ailia for yolov3.
+It use implementation of ailia for YOLOv3.
 You can use `-dn` option to use implementation of Pytorch. (Then pytorch module is required.)
 ```bash
 $ python3 gast.py -dn
@@ -66,4 +70,5 @@ ONNX opset=11
 ## Netron
 
 [27_frame_17_joint_model.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/gast/27_frame_17_joint_model.onnx.prototxt)  
-[pose_hrnet_w48_384x288.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/gast/pose_hrnet_w48_384x288.onnx.prototxt)
+[pose_hrnet_w48_384x288.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/gast/pose_hrnet_w48_384x288.onnx.prototxt)  
+[yolov3.opt.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/yolov3/yolov3.opt.onnx.prototxt)  
