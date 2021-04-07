@@ -62,8 +62,8 @@ ONNX opset = 11
 ### Netron
 - General voice separation
 
-[second_voice_bank.best.opt.onnx.prototxt](https://lutzroeder.github.io/netron/?url=https://storage.googleapis.com/ailia-models/source_separation/second_voice_bank.best.opt.onnx.prototxt)
+[second_voice_bank.best.opt.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/unet_source_separation/second_voice_bank.best.opt.onnx.prototxt)
 
--Singing voice separation
+- Singing voice separation
 
-[RefineSpectrogramUnet.best.opt.onnx.prototxt](https://lutzroeder.github.io/netron/?url=https://storage.googleapis.com/ailia-models/source_separation/RefineSpectrogramUnet.best.opt.onnx.prototxt)
+[RefineSpectrogramUnet.best.opt.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/unet_source_separation/RefineSpectrogramUnet.best.opt.onnx.prototxt)
