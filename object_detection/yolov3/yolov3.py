@@ -22,8 +22,8 @@ logger = getLogger(__name__)
 # ======================
 # Parameters
 # ======================
-WEIGHT_PATH = 'yolov3.opt.onnx'
-MODEL_PATH = 'yolov3.opt.onnx.prototxt'
+WEIGHT_PATH = 'yolov3.opt2.onnx'
+MODEL_PATH = 'yolov3.opt2.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/yolov3/'
 
 IMAGE_PATH = 'input.jpg'
