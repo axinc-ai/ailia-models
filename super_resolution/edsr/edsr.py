@@ -3,6 +3,7 @@ import os
 import sys
 import ailia
 import numpy as np
+import time
 
 # import original modules
 sys.path.append('../../util')
@@ -92,6 +93,8 @@ def recognize_from_video():
         writer = webcamera_utils.get_writer(args.savepath, f_h, f_w)
     else:
         writer = None
+
+    time.sleep(1)  
 
     while(True):
         ret, frame = capture.read()
