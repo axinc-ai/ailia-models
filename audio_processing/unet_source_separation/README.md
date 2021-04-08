@@ -51,6 +51,8 @@ $ python3 unet_source_separation.py --input WAV_PATH --savepath SAVE_WAV_PATH --
 
 [source_separation](https://github.com/AppleHolic/source_separation)  
 
+[Singing Voice Separation Samples](https://www.youtube.com/playlist?list=PLQ4ukFz6Ieir5bZYOns08_2gMjt4hYP4I)
+
 ### Framework
 
 PyTorch 1.6.0
