@@ -4,12 +4,15 @@ import sys
 import ailia
 import numpy as np
 import time
+import ssl
+ssl._create_default_https_context = ssl._create_unverified_context
 
 # import original modules
 sys.path.append('../../util')
 from image_utils import load_image, get_image_shape  # noqa: E402
 from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 import webcamera_utils  # noqa: E402
+from model_utils import check_and_download_models  # noqa: E402
 
 # logger
 from logging import getLogger   # noqa: E402
@@ -24,6 +27,9 @@ WEIGHT_PATH = 'edsr.onnx'
 MODEL_PATH = 'edsr.onnx.prototxt'
 IMAGE_PATH = 'input.png'
 SAVE_IMAGE_PATH = 'output.png'
+TAG_WEIGHT_PATH = 'edsr.onnx'
+TAG_MODEL_PATH = 'edsr.onnx.prototxt'
+REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/edsr/'
 
 
 # ======================
@@ -128,6 +134,8 @@ def recognize_from_video():
 
 
 def main():
+    # model files check and download
+    check_and_download_models(TAG_WEIGHT_PATH, TAG_MODEL_PATH, REMOTE_PATH)
     
     if args.video is not None:
         # video mode
