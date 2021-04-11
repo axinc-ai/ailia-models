@@ -82,20 +82,25 @@ parser.add_argument(
     help='detection size lists: ' + ' | '.join(map(str,DETECTION_SIZE_LISTS))
 )
 parser.add_argument(
-    '-bc', '--benchmark_count', metavar='BENCHMARK_COUNT',
-    default=5, type=int,
-    help='benchmark iteration count'
+    '-dt', '--detector',
+    action='store_true',
+    help='Use detector API (require ailia SDK 1.2.7).'
+)
+parser.add_argument(
+    '-m', '--model',
+    default="tiny",
+    help='Select custom model file.'
 )
 args = update_parser(parser)
 
 if args.detection_width != DETECTION_SIZE_LISTS[0] or args.detection_height!=DETECTION_SIZE_LISTS[0]:
-    WEIGHT_PATH = 'yolov4-tiny_'+str(args.detection_width)+'_'+str(args.detection_height)+'.onnx'
-    MODEL_PATH = 'yolov4-tiny_'+str(args.detection_width)+'_'+str(args.detection_height)+'.onnx.prototxt'
+    WEIGHT_PATH = 'yolov4-'+args.model+'_'+str(args.detection_width)+'_'+str(args.detection_height)+'.onnx'
+    MODEL_PATH = 'yolov4-'+args.model+'_'+str(args.detection_width)+'_'+str(args.detection_height)+'.onnx.prototxt'
     IMAGE_HEIGHT = args.detection_height
     IMAGE_WIDTH = args.detection_width
 else:
-    WEIGHT_PATH = 'yolov4-tiny.onnx'
-    MODEL_PATH = 'yolov4-tiny.onnx.prototxt'
+    WEIGHT_PATH = 'yolov4-'+args.model+'.onnx'
+    MODEL_PATH = 'yolov4-'+args.model+'.onnx.prototxt'
     IMAGE_HEIGHT = args.detection_height
     IMAGE_WIDTH = args.detection_width
 
@@ -111,15 +116,17 @@ def recognize_from_image(detector):
         # prepare input data
         logger.info(image_path)
         org_img = load_image(image_path)
-        org_img = cv2.cvtColor(org_img, cv2.COLOR_BGRA2BGR)
-        logger.debug(f'input image shape: {org_img.shape}')
 
-        img = letterbox_convert(org_img, (IMAGE_HEIGHT, IMAGE_WIDTH))
+        if not args.detector:
+            org_img = cv2.cvtColor(org_img, cv2.COLOR_BGRA2BGR)
+            logger.debug(f'input image shape: {org_img.shape}')
 
-        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        img = np.transpose(img, [2, 0, 1])
-        img = img.astype(np.float32) / 255
-        img = np.expand_dims(img, 0)
+            img = letterbox_convert(org_img, (IMAGE_HEIGHT, IMAGE_WIDTH))
+
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+            img = np.transpose(img, [2, 0, 1])
+            img = img.astype(np.float32) / 255
+            img = np.expand_dims(img, 0)
 
         # inference
         logger.info('Start inference...')
@@ -128,20 +135,27 @@ def recognize_from_image(detector):
             total_time = 0
             for i in range(args.benchmark_count):
                 start = int(round(time.time() * 1000))
-                output = detector.predict([img])
+                if args.detector:
+                    detector.compute(org_img, args.threshold, args.iou)
+                else:
+                    output = detector.predict([img])
                 end = int(round(time.time() * 1000))
                 if i != 0:
                     total_time = total_time + (end - start)
                 logger.info(f'\tailia processing time {end - start} ms')
             logger.info(f'\taverage time {total_time / (args.benchmark_count-1)} ms')
         else:
-            output = detector.predict([img])
+            if args.detector:
+                detector.compute(org_img, args.threshold, args.iou)
+            else:
+                output = detector.predict([img])
 
-        detect_object = post_processing(img, args.threshold, args.iou, output)
-        detect_object = reverse_letterbox(detect_object[0], org_img, (IMAGE_HEIGHT,IMAGE_WIDTH))
-
-        # plot result
-        res_img = plot_results(detect_object, org_img, COCO_CATEGORY)
+        if not args.detector:
+            detect_object = post_processing(img, args.threshold, args.iou, output)
+            detect_object = reverse_letterbox(detect_object[0], org_img, (IMAGE_HEIGHT,IMAGE_WIDTH))
+            res_img = plot_results(detect_object, org_img, COCO_CATEGORY)
+        else:
+            res_img = plot_results(detector, org_img, COCO_CATEGORY)
 
         # plot result
         savepath = get_savepath(args.savepath, image_path)
@@ -180,19 +194,24 @@ def recognize_from_video(detector):
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
 
-        img = letterbox_convert(frame, (IMAGE_HEIGHT, IMAGE_WIDTH))
+        if args.detector:
+            img = cv2.cvtColor(frame, cv2.COLOR_BGR2BGRA)
+            detector.compute(img, args.threshold, args.iou)
+            res_img = plot_results(detector, frame, COCO_CATEGORY)
+        else:
+            img = letterbox_convert(frame, (IMAGE_HEIGHT, IMAGE_WIDTH))
 
-        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        img = np.transpose(img, [2, 0, 1])
-        img = img.astype(np.float32) / 255
-        img = np.expand_dims(img, 0)
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+            img = np.transpose(img, [2, 0, 1])
+            img = img.astype(np.float32) / 255
+            img = np.expand_dims(img, 0)
 
-        output = detector.predict([img])
-        detect_object = post_processing(
-            img, args.threshold, args.iou, output
-        )
-        detect_object = reverse_letterbox(detect_object[0], frame, (IMAGE_HEIGHT,IMAGE_WIDTH))
-        res_img = plot_results(detect_object, frame, COCO_CATEGORY)
+            output = detector.predict([img])
+            detect_object = post_processing(
+                img, args.threshold, args.iou, output
+            )
+            detect_object = reverse_letterbox(detect_object[0], frame, (IMAGE_HEIGHT,IMAGE_WIDTH))
+            res_img = plot_results(detect_object, frame, COCO_CATEGORY)
 
         cv2.imshow('frame', res_img)
         # save results
@@ -218,8 +237,20 @@ def main():
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
 
     # net initialize
-    detector = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
-    detector.set_input_shape((1, 3, IMAGE_HEIGHT, IMAGE_WIDTH))
+    if args.detector:
+        detector = ailia.Detector(
+            MODEL_PATH,
+            WEIGHT_PATH,
+            len(COCO_CATEGORY),
+            format=ailia.NETWORK_IMAGE_FORMAT_RGB,
+            channel=ailia.NETWORK_IMAGE_CHANNEL_FIRST,
+            range=ailia.NETWORK_IMAGE_RANGE_U_FP32,
+            algorithm=ailia.DETECTOR_ALGORITHM_YOLOV4,
+            env_id=args.env_id,
+        )
+    else:
+        detector = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
+        detector.set_input_shape((1, 3, IMAGE_HEIGHT, IMAGE_WIDTH))
 
     if args.video is not None:
         # video mode

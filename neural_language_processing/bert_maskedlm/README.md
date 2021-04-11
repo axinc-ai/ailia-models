@@ -75,6 +75,6 @@ ONNX opset = 11
 
 ### Netron
 
-- [bert-base-cased.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/bert_maskedlm/bert-base-cased.prototxt)
-- [bert-base-uncased.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/bert_maskedlm/bert-base-uncased.prototxt)
-- [bert-base-japanese-whole-word-masking](https://netron.app/?url=https://storage.googleapis.com/ailia-models/bert_maskedlm/bert-base-japanese-whole-word-masking)
+- [bert-base-cased.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/bert_maskedlm/bert-base-cased.onnx.prototxt)
+- [bert-base-uncased.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/bert_maskedlm/bert-base-uncased.onnx.prototxt)
+- [bert-base-japanese-whole-word-masking](https://netron.app/?url=https://storage.googleapis.com/ailia-models/bert_maskedlm/bert-base-japanese-whole-word-masking.onnx.prototxt)

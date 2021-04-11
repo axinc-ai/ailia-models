@@ -87,7 +87,7 @@ else :
 def src_sep(data, session) :
     # inference
     if not args.onnx :
-        sep = session.predict(data)
+        sep = session.run(data)[0]
 
     else :
         first_input_name = session.get_inputs()[0].name
@@ -129,7 +129,7 @@ def recognize_one_audio(input_path):
     # create instance
     if not args.onnx :
         logger.info('Use ailia')
-        env_id = ailia.get_gpu_environment_id()
+        env_id = args.env_id
         logger.info(f'env_id: {env_id}')
         session = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
     else :

@@ -1,3 +1,4 @@
+import os
 import sys
 import time
 import math
@@ -76,11 +77,6 @@ parser.add_argument(
     '-dh', '--detection_height',
     default=DETECTION_SIZE, type=int,
     help='The detection height and height for yolo. (default: 416)'
-)
-parser.add_argument(
-    '-bc', '--benchmark_count', metavar='BENCHMARK_COUNT',
-    default=5, type=int,
-    help='benchmark iteration count'
 )
 args = update_parser(parser)
 
@@ -197,7 +193,7 @@ def recognize_from_video():
         if args.write_prediction:
             savepath = get_savepath(args.savepath, video_name, post_fix = '_%s' % (str(frame_count).zfill(frame_digit) + '_res'), ext='.png')
             pred_file = '%s.txt' % savepath.rsplit('.', 1)[0]
-            write_predictions(pred_file, detect_object, frame, COCO_CATEGORY)
+            write_predictions(pred_file, detector, frame, COCO_CATEGORY)
             frame_count += 1
 
     capture.release()

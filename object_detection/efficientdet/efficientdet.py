@@ -11,7 +11,7 @@ import ailia
 sys.path.append('../../util')
 from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
-from detector_utils import load_image  # noqa: E402
+from detector_utils import load_image, plot_results  # noqa: E402
 from nms_utils import bb_intersection_over_union  # noqa: E402
 from webcamera_utils import get_capture  # noqa: E402
 
@@ -191,22 +191,26 @@ def postprocess(
     return out
 
 
-def display(preds, imgs):
-    for i in range(len(imgs)):
-        if len(preds[i]['rois']) == 0:
-            continue
+def convert_to_ailia_detector_object(preds, w, h):
+    i = 0
+    detector_object = []
+    for j in range(len(preds[i]['rois'])):
+        (x1, y1, x2, y2) = preds[i]['rois'][j].astype(np.int)
+        obj = preds[i]['class_ids'][j]
+        score = float(preds[i]['scores'][j])
 
-        for j in range(len(preds[i]['rois'])):
-            (x1, y1, x2, y2) = preds[i]['rois'][j].astype(np.int)
-            cv2.rectangle(imgs[i], (x1, y1), (x2, y2), (255, 255, 0), 2)
-            obj = obj_list[preds[i]['class_ids'][j]]
-            score = float(preds[i]['scores'][j])
+        r = ailia.DetectorObject(
+            category=obj,
+            prob=score,
+            x=x1 / w,
+            y=y1 / h,
+            w=(x2 - x1) / w,
+            h=(y2 - y1) / h,
+        )
 
-            cv2.putText(imgs[i], '{}, {:.3f}'.format(obj, score),
-                        (x1, y1 + 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5,
-                        (255, 255, 0), 1)
+        detector_object.append(r)
 
-    return imgs
+    return detector_object
 
 
 # ======================
@@ -267,26 +271,26 @@ def recognize_from_image(image_path, net):
     # inference
     logger.info('Start inference...')
     if args.benchmark:
-        # if not args.onnx:
-        #    net.set_profile_mode(True)
+        if not args.profile:
+            net.set_profile_mode(True)
         logger.info('BENCHMARK mode')
         for i in range(5):
             start = int(round(time.time() * 1000))
             pred = predict(img, net)
             end = int(round(time.time() * 1000))
             logger.info(f'\tailia processing time {end - start} ms')
-        # if not args.onnx:
-        #    print(net.get_summary())
+        if not args.profile:
+            print(net.get_summary())
     else:
         pred = predict(img, net)
 
     # plot result
-    imgs = display(pred, [img])
+    detect_object = convert_to_ailia_detector_object(pred, img.shape[1], img.shape[0])
+    img = plot_results(detect_object, img, obj_list)
 
-    # plot result
     savepath = get_savepath(args.savepath, image_path)
     logger.info(f'saved at : {savepath}')
-    cv2.imwrite(savepath, imgs[0])
+    cv2.imwrite(savepath, img)
 
     if args.profile:
         print(net.get_summary())
@@ -305,8 +309,10 @@ def recognize_from_video(video, net):
         pred = predict(frame, net)
 
         # plot result
-        imgs = display(pred, [frame])
-        cv2.imshow('frame', imgs[0])
+        detect_object = convert_to_ailia_detector_object(pred, frame.shape[1], frame.shape[0])
+        img = plot_results(detect_object, frame, obj_list)
+
+        cv2.imshow('frame', img)
 
     capture.release()
     logger.info('Script finished successfully.')

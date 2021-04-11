@@ -165,8 +165,8 @@ def recognize_from_image():
         logger.info('Start inference...')
         if args.benchmark:
             logger.info('BENCHMARK mode')
-            #model.set_profile_mode(True)
-            for _ in range(5):
+            total_time = 0
+            for i in range(args.benchmark_count):
                 start = int(round(time.time() * 1000))
                 if args.onnx:
                     ort_inputs = {model.get_inputs()[0].name: batch.astype(np.float32)}
@@ -175,7 +175,9 @@ def recognize_from_image():
                     model_out = model.predict([batch])[0]
                 end = int(round(time.time() * 1000))
                 logger.info(f'\tailia processing time {end - start} ms')
-            #print(model.get_summary())
+                if i != 0:
+                    total_time = total_time + (end - start)
+            logger.info(f'\taverage time {total_time / (args.benchmark_count-1)} ms')
         else:
             # Person detection
             #logger.info('batch.shape', batch.shape)

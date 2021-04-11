@@ -90,6 +90,10 @@ def get_base_parser(
               'the return value of ailia.get_gpu_environment_id will be used')
     )
     parser.add_argument(
+        '--env_list', action='store_true',
+        help='display environment list'
+    )
+    parser.add_argument(
         '--ftype', metavar='FILE_TYPE', default=input_ftype,
         choices=MODALITIES,
         help='file type list: ' + ' | '.join(MODALITIES)
@@ -101,6 +105,11 @@ def get_base_parser(
     parser.add_argument(
         '--profile', action='store_true',
         help='set profile mode (enable to show PROFILE logs)'
+    )
+    parser.add_argument(
+        '-bc', '--benchmark_count', metavar='BENCHMARK_COUNT',
+        default=5, type=int,
+        help='set iteration count of benchmark'
     )
     return parser
 
@@ -137,6 +146,11 @@ def update_parser(parser, check_input_type=True, large_model=False):
             if args.env_id == ailia.get_gpu_environment_id() and ailia.get_environment(args.env_id).props == "LOWPOWER":
                 args.env_id = 0 # cpu
                 logger.warning('This model requires fuge gpu memory so fallback to cpu mode')
+        
+        if args.env_list:
+            for idx in range(count) :
+                env = ailia.get_environment(idx)
+                logger.info("  env[" + str(idx) + "]=" + str(env))
 
     logger.info(f'env_id: {args.env_id}')
 

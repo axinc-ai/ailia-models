@@ -1,3 +1,4 @@
+import os
 import time
 import sys
 import math
@@ -14,7 +15,7 @@ from centernet_utils import preprocess, postprocess
 sys.path.append('../../util')
 from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
-from detector_utils import load_image, write_predictions  # noqa: E402
+from detector_utils import plot_results, load_image, write_predictions  # noqa: E402
 import webcamera_utils  # noqa: E402
 
 # logger
@@ -63,11 +64,6 @@ parser.add_argument(
     default='10', choices=OPSET_LISTS,
     help='opset lists: ' + ' | '.join(OPSET_LISTS)
 )
-parser.add_argument(
-    '-bc', '--benchmark_count', metavar='BENCHMARK_COUNT',
-    default=5, type=int,
-    help='benchmark iteration count'
-)
 args = update_parser(parser)
 
 
@@ -94,26 +90,6 @@ def to_color(indx, base):
 
 BASE = int(np.ceil(pow(len(COCO_CATEGORY), 1. / 3)))
 COLORS = [to_color(x, BASE) for x in range(len(COCO_CATEGORY))]
-
-
-def draw_detection(im, bboxes, scores, cls_inds):
-    imgcv = np.copy(im)
-    h, w, _ = imgcv.shape
-    for i, box in enumerate(bboxes):
-        cls_indx = int(cls_inds[i])
-        box = [int(_) for _ in box]
-        thick = int((h + w) / 300)
-        cv2.rectangle(
-            imgcv,
-            (box[0], box[1]),
-            (box[2], box[3]),
-            COLORS[cls_indx],
-            thick
-        )
-        mess = '%s: %.3f' % (COCO_CATEGORY[cls_indx], scores[i])
-        cv2.putText(imgcv, mess, (box[0], box[1] - 7),
-                    0, 1e-3 * h, COLORS[cls_indx], thick // 3)
-    return imgcv
 
 
 # ======================
@@ -196,8 +172,14 @@ def recognize_from_image(filename, detector):
         # FIXME: do not use base 'except'
         pass
 
-    # show image
-    im2show = draw_detection(img, boxes, scores, cls_inds)
+    Detection = namedtuple('Detection', ['category', 'prob', 'x', 'y', 'w', 'h'])
+    ary = []
+    h, w = (img.shape[0], img.shape[1])
+    for i, box in enumerate(boxes):
+        d = Detection(int(cls_inds[i]), scores[i], box[0]/w, box[1]/h, (box[2]-box[0])/w, (box[3]-box[1])/h)
+        ary.append(d)
+
+    im2show = plot_results(ary, img, COCO_CATEGORY)
 
     savepath = get_savepath(args.savepath, filename)
     logger.info(f'saved at : {savepath}')
@@ -205,13 +187,8 @@ def recognize_from_image(filename, detector):
 
     # write prediction
     if args.write_prediction:
-        Detection = namedtuple('Detection', ['category', 'prob', 'x', 'y', 'w', 'h'])
-        ary = []
-        for i, box in enumerate(boxes):
-            d = Detection(int(cls_inds[i]), scores[i], box[0], box[1], box[2]-box[0], box[3]-box[1])
-            ary.append(d)
         pred_file = '%s.txt' % savepath.rsplit('.', 1)[0]
-        write_predictions(pred_file, ary, img=None, category=COCO_CATEGORY)
+        write_predictions(pred_file, ary, img, category=COCO_CATEGORY)
 
     if args.profile:
         print(detector.get_summary())
@@ -244,7 +221,15 @@ def recognize_from_video(video, detector):
             break
 
         boxes, scores, cls_inds = detect_objects(img, detector)
-        img = draw_detection(img, boxes, scores, cls_inds)
+
+        Detection = namedtuple('Detection', ['category', 'prob', 'x', 'y', 'w', 'h'])
+        ary = []
+        h, w = (img.shape[0], img.shape[1])
+        for i, box in enumerate(boxes):
+            d = Detection(int(cls_inds[i]), scores[i], box[0]/w, box[1]/h, (box[2]-box[0])/w, (box[3]-box[1])/h)
+            ary.append(d)
+
+        img = plot_results(ary, img, COCO_CATEGORY)
         cv2.imshow('frame', img)
 
         # save results
@@ -255,7 +240,7 @@ def recognize_from_video(video, detector):
         if args.write_prediction:
             savepath = get_savepath(args.savepath, video_name, post_fix = '_%s' % (str(frame_count).zfill(frame_digit) + '_res'), ext='.png')
             pred_file = '%s.txt' % savepath.rsplit('.', 1)[0]
-            write_predictions(pred_file, detect_object, frame, COCO_CATEGORY)
+            write_predictions(pred_file, ary, img, COCO_CATEGORY)
             frame_count += 1
 
     capture.release()
