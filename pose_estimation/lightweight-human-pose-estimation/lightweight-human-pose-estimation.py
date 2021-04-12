@@ -191,7 +191,7 @@ def recognize_from_video():
     pose = ailia.PoseEstimator(
         MODEL_PATH, WEIGHT_PATH, env_id=args.env_id, algorithm=ALGORITHM
     )
-    if args.detection_width!=IMAGE_WIDTH or args.detection.height!=IMAGE_HEIGHT:
+    if args.detection_width!=IMAGE_WIDTH or args.detection_height!=IMAGE_HEIGHT:
         pose.set_input_shape((1,3,args.detection_height,args.detection_width))
 
     capture = webcamera_utils.get_capture(args.video)
