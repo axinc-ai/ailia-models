@@ -10,7 +10,8 @@ Ailia input shape : (1, 3, IMAGE_HEIGHT, IMAGE_WIDTH)
 
 ![Output](output.png)
 
-Ailia output shape : (1, 3, IMAGE_HEIGHT, IMAGE_WIDTH)
+Ailia output shape : (1, 3, IMAGE_HEIGHT * scale, IMAGE_WIDTH * scale)
+
 default : scale=2
 
 ## Usage
