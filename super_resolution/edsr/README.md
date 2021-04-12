@@ -4,6 +4,8 @@
 
 ![Input](input.png)
 
+(Image from https://github.com/sanghyun-son/EDSR-PyTorch/blob/master/test/0853x4.png)
+
 Ailia input shape : (1, 3, IMAGE_HEIGHT, IMAGE_WIDTH)  
 
 ## Output
