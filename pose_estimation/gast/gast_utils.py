@@ -733,20 +733,20 @@ def render_animation(
                 if len(parents) == 17 and keypoints_metadata['layout_name'] != 'coco':
                     for m in range(num_person):
                         lines[j + 16 * m - 1][0].set_data(
-                            [keypoints[i, m, j, 0], keypoints[i, m, j_parent, 0]],
-                            [keypoints[i, m, j, 1], keypoints[i, m, j_parent, 1]])
+                            np.array([keypoints[i, m, j, 0], keypoints[i, m, j_parent, 0]]),
+                            np.array([keypoints[i, m, j, 1], keypoints[i, m, j_parent, 1]]))
 
                 if same_coord:
                     for k, pose in enumerate(poses):
                         pos = pose[i]
-                        lines_3d[0][j + k * 16 - 1][0].set_xdata([pos[j, 0], pos[j_parent, 0]])
-                        lines_3d[0][j + k * 16 - 1][0].set_ydata([pos[j, 1], pos[j_parent, 1]])
+                        lines_3d[0][j + k * 16 - 1][0].set_xdata(np.array([pos[j, 0], pos[j_parent, 0]]))
+                        lines_3d[0][j + k * 16 - 1][0].set_ydata(np.array([pos[j, 1], pos[j_parent, 1]]))
                         lines_3d[0][j + k * 16 - 1][0].set_3d_properties([pos[j, 2], pos[j_parent, 2]], zdir='z')
                 else:
                     for n, ax in enumerate(ax_3d):
                         pos = poses[n][i]
-                        lines_3d[n][j - 1][0].set_xdata([pos[j, 0], pos[j_parent, 0]])
-                        lines_3d[n][j - 1][0].set_ydata([pos[j, 1], pos[j_parent, 1]])
+                        lines_3d[n][j - 1][0].set_xdata(np.array([pos[j, 0], pos[j_parent, 0]]))
+                        lines_3d[n][j - 1][0].set_ydata(np.array([pos[j, 1], pos[j_parent, 1]]))
                         lines_3d[n][j - 1][0].set_3d_properties([pos[j, 2], pos[j_parent, 2]], zdir='z')
 
             points.set_offsets(keypoints[i].reshape(17 * num_person, 2))

@@ -12,10 +12,9 @@
 
 ## Requirements
 
-This model requires additional module and specific version of module.
+This model requires additional module.
 
 ```
-pip3 matplotlib==3.1.0
 pip3 install filterpy
 ```
 
