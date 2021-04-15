@@ -30,9 +30,6 @@ logger = getLogger(__name__)
 WEIGHT_YOLOV3_PATH = 'yolov3.opt.onnx'
 MODEL_YOLOV3_PATH = 'yolov3.opt.onnx.prototxt'
 REMOTE_YOLOV3_PATH = 'https://storage.googleapis.com/ailia-models/yolov3/'
-WEIGHT_YOLOV3_DARKNET_PATH = 'yolov3/checkpoint/yolov3.weights'
-DUMMY_YOLOV3_DARKNET_PATH = 'yolov3/checkpoint/'
-REMOTE_YOLOV3_DARKNET_PATH = 'https://pjreddie.com/media/files/'
 WEIGHT_POSE_PATH = 'pose_hrnet_w48_384x288.onnx'
 MODEL_POSE_PATH = 'pose_hrnet_w48_384x288.onnx.prototxt'
 WEIGHT_27FRAME_17JOINT_PATH = '27_frame_17_joint_model.onnx'
@@ -54,10 +51,6 @@ parser.add_argument(
     help='number of estimated human poses. [1, 2]'
 )
 parser.add_argument(
-    '-dn', '--darknet', action='store_true',
-    help='use darknet for yolo.'
-)
-parser.add_argument(
     '--onnx',
     action='store_true',
     help='execute onnxruntime version.'
@@ -68,49 +61,6 @@ args = update_parser(parser)
 # ======================
 # Main functions
 # ======================
-
-def load_json(file_path, num_joints, num_person=2):
-    with open(file_path, 'r') as fr:
-        video_info = json.load(fr)
-
-    # Loading whole-body keypoints including body(17)+hand(42)+foot(6)+facial(68) joints
-    # 2D Whole-body human pose estimation paper: https://arxiv.org/abs/2007.11858
-    if num_joints == 19:
-        num_joints_revise = 133
-    else:
-        num_joints_revise = 17
-
-    label = video_info['label']
-    label_index = video_info['label_index']
-
-    num_frames = video_info['data'][-1]['frame_index']
-    keypoints = np.zeros((num_person, num_frames, num_joints_revise, 2), dtype=np.float32)
-    scores = np.zeros((num_person, num_frames, num_joints_revise), dtype=np.float32)
-
-    for frame_info in video_info['data']:
-        frame_index = frame_info['frame_index']
-
-        for index, skeleton_info in enumerate(frame_info['skeleton']):
-            pose = skeleton_info['pose']
-            score = skeleton_info['score']
-            bbox = skeleton_info['bbox']
-
-            if len(bbox) == 0 or index + 1 > num_person:
-                continue
-
-            pose = np.asarray(pose, dtype=np.float32)
-            score = np.asarray(score, dtype=np.float32)
-            score = score.reshape(-1)
-
-            keypoints[index, frame_index - 1] = pose
-            scores[index, frame_index - 1] = score
-
-    if num_joints != num_joints_revise:
-        # body(17) + foot(6) = 23
-        return keypoints[:, :, :23], scores[:, :, :23], label, label_index
-    else:
-        return keypoints, scores, label, label_index
-
 
 def revise_kpts(h36m_kpts, h36m_scores, valid_frames):
     new_h36m_kpts = np.zeros_like(h36m_kpts)
@@ -191,12 +141,8 @@ def gen_kpts(frames, yolo_model, pose_model, num_peroson=1):
     scores_result = []
     for i in tqdm(range(len(frames))):
         frame = frames[i]
-        if not args.darknet:
-            img = cv2.cvtColor(frame, cv2.COLOR_BGR2BGRA)
-            bboxs, scores = yolo_human_det(img, yolo_model)
-        else:
-            from yolov3 import yolo_human_det as yolo_human_det_darknet
-            bboxs, scores = yolo_human_det_darknet(frame, yolo_model)
+        img = cv2.cvtColor(frame, cv2.COLOR_BGR2BGRA)
+        bboxs, scores = yolo_human_det(img, yolo_model)
         if not bboxs.any():
             continue
 
@@ -402,15 +348,10 @@ def recognize_from_video(net, info):
             continue
         frames.append(frame)
 
-    if True:
-        num_person = info["num_person"]
-        keypoints, scores = gen_kpts(
-            frames, info["yolo_model"], info["pose_model"],
-            num_peroson=num_person)
-    # else:
-    #     logger.info('Loading 2D keypoints ...')
-    #     keypoints_file = 'baseball.json'
-    #     keypoints, scores, _, _ = load_json(keypoints_file, num_joints)
+    num_person = info["num_person"]
+    keypoints, scores = gen_kpts(
+        frames, info["yolo_model"], info["pose_model"],
+        num_peroson=num_person)
 
     keypoints, scores, valid_frames = h36m_coco_format(keypoints, scores)
     re_kpts = revise_kpts(keypoints, scores, valid_frames)
@@ -458,12 +399,7 @@ def recognize_from_video(net, info):
 def main():
     # model files check and download
     logger.info("=== YOLOv3 model ===")
-    if not args.darknet:
-        check_and_download_models(WEIGHT_YOLOV3_PATH, MODEL_YOLOV3_PATH, REMOTE_YOLOV3_PATH)
-    else:
-        check_and_download_models(
-            WEIGHT_YOLOV3_DARKNET_PATH, DUMMY_YOLOV3_DARKNET_PATH, REMOTE_YOLOV3_DARKNET_PATH
-        )
+    check_and_download_models(WEIGHT_YOLOV3_PATH, MODEL_YOLOV3_PATH, REMOTE_YOLOV3_PATH)
     logger.info("=== HRNet model ===")
     check_and_download_models(WEIGHT_POSE_PATH, MODEL_POSE_PATH, REMOTE_PATH)
     logger.info("=== GAST model ===")
@@ -472,20 +408,16 @@ def main():
     num_person = args.num_person
 
     # net initialize
-    if not args.darknet:
-        detector = ailia.Detector(
-            MODEL_YOLOV3_PATH,
-            WEIGHT_YOLOV3_PATH,
-            80,
-            format=ailia.NETWORK_IMAGE_FORMAT_RGB,
-            channel=ailia.NETWORK_IMAGE_CHANNEL_FIRST,
-            range=ailia.NETWORK_IMAGE_RANGE_U_FP32,
-            algorithm=ailia.DETECTOR_ALGORITHM_YOLOV3,
-            env_id=args.env_id,
-        )
-    else:
-        from yolov3 import load_model as yolo_load
-        detector = yolo_load(inp_dim=416)
+    detector = ailia.Detector(
+        MODEL_YOLOV3_PATH,
+        WEIGHT_YOLOV3_PATH,
+        80,
+        format=ailia.NETWORK_IMAGE_FORMAT_RGB,
+        channel=ailia.NETWORK_IMAGE_CHANNEL_FIRST,
+        range=ailia.NETWORK_IMAGE_RANGE_U_FP32,
+        algorithm=ailia.DETECTOR_ALGORITHM_YOLOV3,
+        env_id=args.env_id,
+    )
     pose_net = ailia.Net(MODEL_POSE_PATH, WEIGHT_POSE_PATH, env_id=args.env_id)
 
     if not args.onnx:
