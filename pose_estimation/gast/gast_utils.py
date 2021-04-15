@@ -8,7 +8,6 @@ import numpy as np
 from scipy.optimize import linear_sum_assignment
 import cv2
 import matplotlib.pyplot as plt
-from matplotlib.animation import FuncAnimation, writers
 from mpl_toolkits.mplot3d import axes3d, Axes3D
 from libs.filterpy.kalman import KalmanFilter
 import webcamera_utils
