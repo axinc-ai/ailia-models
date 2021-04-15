@@ -10,7 +10,7 @@ import cv2
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation, writers
 from mpl_toolkits.mplot3d import axes3d, Axes3D
-from filterpy.kalman import KalmanFilter
+from libs.filterpy.kalman import KalmanFilter
 
 __all__ = [
     'DataLoader',

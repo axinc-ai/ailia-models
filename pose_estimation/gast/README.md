@@ -12,13 +12,7 @@
 
 ## Requirements
 
-This model requires additional module.
-
-```
-pip3 install filterpy
-```
-
-And following dependencies is required for creating .mp4 file.
+The following dependencies is required for creating .mp4 file.
 
 - ffmpeg
 
