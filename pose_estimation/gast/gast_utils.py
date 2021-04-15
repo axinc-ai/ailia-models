@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation, writers
 from mpl_toolkits.mplot3d import axes3d, Axes3D
 from libs.filterpy.kalman import KalmanFilter
+import webcamera_utils
 
 __all__ = [
     'DataLoader',
@@ -755,14 +756,18 @@ def render_animation(
 
     fig.tight_layout()
 
-    anim = FuncAnimation(fig, update_video, frames=np.arange(0, limit), interval=1000 / fps, repeat=False)
-    if output.endswith('.mp4'):
-        Writer = writers['ffmpeg']
-        writer = Writer(fps=fps, metadata={}, bitrate=bitrate)
-        anim.save(output, writer=writer)
-    elif output.endswith('.gif'):
-        anim.save(output, dpi=80, writer='imagemagick')
-    else:
-        raise ValueError('Unsupported output format (only .mp4 and .gif are supported)')
+    # rendering to video
+    writer=None
+    for i in range(limit):
+        update_video(i)
+        fig.canvas.draw()
+        im = np.array(fig.canvas.renderer.buffer_rgba())
+        im = cv2.cvtColor(im, cv2.COLOR_RGBA2BGR)
+        if writer==None:
+            f_h = int(im.shape[0])
+            f_w = int(im.shape[1])
+            writer = webcamera_utils.get_writer(output, f_h, f_w, fps=fps)
+        writer.write(im)
+    writer.release()
 
     plt.close()

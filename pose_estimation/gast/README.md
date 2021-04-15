@@ -10,12 +10,6 @@
 
 <img src="img/output_040.png" width="500"><img src="img/output_050.png" width="500"><img src="img/output_060.png" width="500">  
 
-## Requirements
-
-The following dependencies is required for creating .mp4 file.
-
-- ffmpeg
-
 ## Usage
 Automatically downloads the onnx and prototxt files on the first run.
 It is necessary to be connected to the Internet while downloading.
