@@ -3,6 +3,7 @@ import time
 
 import numpy as np
 import cv2
+from PIL import Image
 
 import ailia
 
@@ -31,6 +32,10 @@ SAVE_IMAGE_PATH = 'output.png'
 # Arguemnt Parser Config
 # ======================
 parser = get_base_parser('DeblurGAN model', IMAGE_PATH, SAVE_IMAGE_PATH)
+parser.add_argument(
+    '-sz', '--fine_size', type=int, metavar='SIZE', default=None,
+    help='scale images to this size.'
+)
 args = update_parser(parser)
 
 
@@ -41,6 +46,16 @@ args = update_parser(parser)
 def preprocess(img):
     mean = np.array((0.5, 0.5, 0.5))
     std = np.array((0.5, 0.5, 0.5))
+
+    if args.fine_size:
+        target_width = args.fine_size
+        h, w = img.shape[:2]
+        if w != target_width:
+            h = int(target_width * h / w)
+            w = target_width
+            img = np.array(Image.fromarray(img).resize(
+                (w, h),
+                resample=Image.BICUBIC))
 
     img = img / 255
     img = (img - mean) / std
@@ -53,7 +68,7 @@ def preprocess(img):
 def postprocess(output):
     output = (output.transpose((1, 2, 0)) + 1) / 2.0 * 255.0
     img = output.astype(np.uint8)
-    img = img[:, :, ::-1]   # RGB -> BGR
+    img = img[:, :, ::-1]  # RGB -> BGR
 
     return img
 
