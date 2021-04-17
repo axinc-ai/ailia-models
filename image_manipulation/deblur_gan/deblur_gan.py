@@ -53,6 +53,7 @@ def preprocess(img):
 def postprocess(output):
     output = (output.transpose((1, 2, 0)) + 1) / 2.0 * 255.0
     img = output.astype(np.uint8)
+    img = img[:, :, ::-1]   # RGB -> BGR
 
     return img
 
