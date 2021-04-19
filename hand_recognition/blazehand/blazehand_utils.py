@@ -336,15 +336,20 @@ def detection2roi(detection, detection2roi_method='box'):
         raise NotImplementedError(
             "detection2roi_method [%s] not supported" % detection2roi_method)
 
-    yc += dy * scale
-    scale *= dscale
-
     # compute box rotation
     x0 = detection[:, 4+2*kp1]
     y0 = detection[:, 4+2*kp1+1]
     x1 = detection[:, 4+2*kp2]
     y1 = detection[:, 4+2*kp2+1]
     theta = np.arctan2(y0-y1, x0-x1) - theta0
+
+    center = np.stack((xc, yc), axis=1)
+    dy_axis = np.stack((x0, y0), axis=1) - np.stack((x1, y1), axis=1)
+    dy_axis /= np.linalg.norm(dy_axis)
+    center += dy * scale[..., np.newaxis] * dy_axis
+    xc, yc = center.T
+    scale *= dscale
+
     return xc, yc, scale, theta
 
 
