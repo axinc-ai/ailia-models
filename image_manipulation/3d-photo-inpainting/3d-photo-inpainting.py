@@ -48,6 +48,12 @@ parser.add_argument(
     '--config', metavar='VIDEO_CONFIG', default='config.json',
     help='Configure of video generation processing.'
 )
+parser.add_argument(
+    '-n', '--onnx', 
+    action='store_true',
+    default=False,
+    help='Use onnxruntime'
+)
 args = update_parser(parser)
 
 
@@ -273,12 +279,12 @@ def main():
     net_edge = ailia.Net(MODEL_EDGE_PATH, WEIGHT_EDGE_PATH, env_id=env_id)
     net_depth = ailia.Net(MODEL_DEPTH_PATH, WEIGHT_DEPTH_PATH, env_id=env_id)
     net_color = ailia.Net(MODEL_COLOR_PATH, WEIGHT_COLOR_PATH, env_id=env_id)
-    if True:
+    if args.onnx:
         import onnxruntime
         net_edge = onnxruntime.InferenceSession(WEIGHT_EDGE_PATH)
         net_depth = onnxruntime.InferenceSession(WEIGHT_DEPTH_PATH)
         net_color = onnxruntime.InferenceSession(WEIGHT_COLOR_PATH)
-
+    
     net_info = {
         "MiDaS": net_midas,
         "edge": net_edge,

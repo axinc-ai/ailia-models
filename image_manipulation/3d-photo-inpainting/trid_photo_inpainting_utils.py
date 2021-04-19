@@ -28,9 +28,6 @@ __all__ = [
     'output_3d_photo',
 ]
 
-onnx = True
-
-
 def edge_forward_3P(net, mask, context, rgb, disp, edge, unit_length=128):
     input = np.concatenate((rgb, disp / disp.max(), edge, context, mask), axis=1)
     n, c, h, w = input.shape
@@ -40,7 +37,7 @@ def edge_forward_3P(net, mask, context, rgb, disp, edge, unit_length=128):
     anchor_w = residual_w // 2
     enlarge_input = np.zeros((n, c, h + residual_h, w + residual_w)).astype(np.float32)
     enlarge_input[..., anchor_h:anchor_h + h, anchor_w:anchor_w + w] = input
-    if not onnx:
+    if not "onnxruntime" in str(type(net)):
         output = net.predict({'enlarge_input': enlarge_input})
     else:
         output = net.run(['edge_output'], {'enlarge_input': enlarge_input})
@@ -58,7 +55,7 @@ def depth_forward_3P(net, mask, context, depth, edge, unit_length=128):
     anchor_w = residual_w // 2
     enlarge_input = np.zeros((n, c, h + residual_h, w + residual_w)).astype(np.float32)
     enlarge_input[..., anchor_h:anchor_h + h, anchor_w:anchor_w + w] = input
-    if not onnx:
+    if not "onnxruntime" in str(type(net)):
         output = net.predict({'enlarge_input': enlarge_input})
     else:
         output = net.run(['depth_output'], {'enlarge_input': enlarge_input})
@@ -76,7 +73,7 @@ def color_forward_3P(net, mask, context, rgb, edge, unit_length=128):
     anchor_w = residual_w // 2
     enlarge_input = np.zeros((n, c, h + residual_h, w + residual_w)).astype(np.float32)
     enlarge_input[..., anchor_h:anchor_h + h, anchor_w:anchor_w + w] = input
-    if not onnx:
+    if not "onnxruntime" in str(type(net)):
         output = net.predict({'enlarge_input': enlarge_input})
     else:
         output = net.run(['rgb_output'], {'enlarge_input': enlarge_input})
