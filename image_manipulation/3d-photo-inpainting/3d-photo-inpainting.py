@@ -275,10 +275,15 @@ def main():
 
     # initialize
     env_id = args.env_id
+
+    # fixed input shape
     net_midas = ailia.Net(MODEL_MIDAS_PATH, WEIGHT_MIDAS_PATH, env_id=env_id)
-    net_edge = ailia.Net(MODEL_EDGE_PATH, WEIGHT_EDGE_PATH, env_id=env_id)
-    net_depth = ailia.Net(MODEL_DEPTH_PATH, WEIGHT_DEPTH_PATH, env_id=env_id)
-    net_color = ailia.Net(MODEL_COLOR_PATH, WEIGHT_COLOR_PATH, env_id=env_id)
+
+    # variable input shape
+    variable_input_shape_env_id = 0 #cpu
+    net_edge = ailia.Net(MODEL_EDGE_PATH, WEIGHT_EDGE_PATH, env_id=variable_input_shape_env_id)
+    net_depth = ailia.Net(MODEL_DEPTH_PATH, WEIGHT_DEPTH_PATH, env_id=variable_input_shape_env_id)
+    net_color = ailia.Net(MODEL_COLOR_PATH, WEIGHT_COLOR_PATH, env_id=variable_input_shape_env_id)
     if args.onnx:
         import onnxruntime
         net_edge = onnxruntime.InferenceSession(WEIGHT_EDGE_PATH)
