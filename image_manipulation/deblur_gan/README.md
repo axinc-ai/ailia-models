@@ -42,4 +42,4 @@ ONNX opset=11
 
 ## Netron
 
-[head.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/deblur_gan/net_G.onnx.prototxt)
+[net_G.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/deblur_gan/net_G.onnx.prototxt)
