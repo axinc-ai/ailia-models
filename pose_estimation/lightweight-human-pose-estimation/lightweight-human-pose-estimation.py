@@ -40,6 +40,16 @@ parser.add_argument(
     help='By default, the optimized model is used, but with this option, ' +
     'you can switch to the normal (not optimized) model'
 )
+parser.add_argument(
+    '-dw', '--detection_width',
+    default=IMAGE_WIDTH, type=int,
+    help='The detection width and height for yolo. (default: 416)'
+)
+parser.add_argument(
+    '-dh', '--detection_height',
+    default=IMAGE_HEIGHT, type=int,
+    help='The detection height and height for yolo. (default: 416)'
+)
 args = update_parser(parser)
 
 
@@ -134,6 +144,8 @@ def recognize_from_image():
     pose = ailia.PoseEstimator(
         MODEL_PATH, WEIGHT_PATH, env_id=args.env_id, algorithm=ALGORITHM
     )
+    if args.detection_width!=IMAGE_WIDTH or args.detection_height!=IMAGE_HEIGHT:
+        pose.set_input_shape((1,3,args.detection_height,args.detection_width))
 
     # input image loop
     for image_path in args.input:
@@ -143,7 +155,7 @@ def recognize_from_image():
         src_img = cv2.imread(image_path)
         input_image = load_image(
             image_path,
-            (IMAGE_HEIGHT, IMAGE_WIDTH),
+            (args.detection_height, args.detection_width),
             normalize_type='None',
         )
         input_data = cv2.cvtColor(input_image, cv2.COLOR_RGB2BGRA)
@@ -152,11 +164,15 @@ def recognize_from_image():
         logger.info('Start inference...')
         if args.benchmark:
             logger.info('BENCHMARK mode')
-            for i in range(5):
+            total_time = 0
+            for i in range(args.benchmark_count):
                 start = int(round(time.time() * 1000))
                 _ = pose.compute(input_data)
                 end = int(round(time.time() * 1000))
+                if i != 0:
+                    total_time = total_time + (end - start)
                 logger.info(f'\tailia processing time {end - start} ms')
+            logger.info(f'\taverage time {total_time / (args.benchmark_count-1)} ms')
         else:
             _ = pose.compute(input_data)
 
@@ -175,6 +191,8 @@ def recognize_from_video():
     pose = ailia.PoseEstimator(
         MODEL_PATH, WEIGHT_PATH, env_id=args.env_id, algorithm=ALGORITHM
     )
+    if args.detection_width!=IMAGE_WIDTH or args.detection_height!=IMAGE_HEIGHT:
+        pose.set_input_shape((1,3,args.detection_height,args.detection_width))
 
     capture = webcamera_utils.get_capture(args.video)
 
@@ -191,21 +209,19 @@ def recognize_from_video():
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
 
-        input_image, input_data = webcamera_utils.adjust_frame_size(
-            frame, IMAGE_HEIGHT, IMAGE_WIDTH,
-        )
-        input_data = cv2.cvtColor(input_data, cv2.COLOR_BGR2BGRA)
+        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2BGRA)
 
         # inference
-        _ = pose.compute(input_data)
+        _ = pose.compute(frame)
 
         # postprocessing
-        display_result(input_image, pose)
-        cv2.imshow('frame', input_image)
+        display_result(frame, pose)
+        cv2.imshow('frame', frame)
 
         # save results
         if writer is not None:
-            writer.write(input_image)
+            frame = cv2.cvtColor(frame, cv2.COLOR_BGRA2BGR)
+            writer.write(frame)
 
     capture.release()
     cv2.destroyAllWindows()

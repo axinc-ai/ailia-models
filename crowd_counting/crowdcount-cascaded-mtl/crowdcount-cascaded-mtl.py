@@ -20,8 +20,8 @@ logger = getLogger(__name__)
 # ======================
 # PARAMETERS
 # ======================
-WEIGHT_PATH = "crowdcount.onnx"
-MODEL_PATH = "crowdcount.onnx.prototxt"
+WEIGHT_PATH = "crowdcount.opt.onnx"
+MODEL_PATH = "crowdcount.opt.onnx.prototxt"
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/crowd_count/"
 
 IMAGE_PATH = 'test.jpeg'

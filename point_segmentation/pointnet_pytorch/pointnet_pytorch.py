@@ -221,7 +221,7 @@ def main():
     check_and_download_models(WEIGHT_PATH_CLASSIFIER, MODEL_PATH_CLASSIFIER, REMOTE_PATH)
 
     # load model
-    env_id = ailia.get_gpu_environment_id()
+    env_id = args.env_id
     logger.info(f'env_id: {env_id}')
 
     # initialize

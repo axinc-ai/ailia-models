@@ -2,6 +2,7 @@ export OPTION=-b
 cd ../
 cd action_recognition/mars; python3 mars.py ${OPTION}
 cd ../../action_recognition/st-gcn; python3 st-gcn.py ${OPTION}
+cd ../../anomaly_detection/padim; python3 padim.py ${OPTION}
 cd ../../audio_processing/crnn_audio_classification; python3 crnn_audio_classification.py ${OPTION}
 cd ../../audio_processing/deepspeech2; python3 deepspeech2.py ${OPTION}
 cd ../../audio_processing/pytorch-dc-tts/; python3 pytorch-dc-tts.py ${OPTION}
@@ -44,6 +45,7 @@ cd ../../hand_detection/yolov3-hand; python3 yolov3-hand.py ${OPTION}
 cd ../../hand_detection/hand_detection_pytorch python3 hand_detection_pytorch.py ${OPTION}
 cd ../../hand_detection/blazepalm; python3 blazepalm.py ${OPTION}
 cd ../../hand_recognition/blazehand; python3 blazehand.py ${OPTION}
+cd ../../hand_recognition/hand3d; python3 hand3d.py ${OPTION}
 cd ../../image_captioning/illustration2vec; python3 illustration2vec.py ${OPTION}
 cd ../../image_captioning/image_captioning_pytorch; python3 image_captioning_pytorch.py ${OPTION}
 cd ../../image_classification/efficientnet; python3 efficientnet.py ${OPTION}
@@ -58,9 +60,12 @@ cd ../../image_manipulation/3d-photo-inpainting; python3 3d-photo-inpainting.py 
 cd ../../image_manipulation/dewarpnet; python3 dewarpnet.py ${OPTION}
 cd ../../image_manipulation/illnet; python3 illnet.py ${OPTION}
 cd ../../image_manipulation/noise2noise; python3 noise2noise.py ${OPTION}
+cd ../../image_manipulation/pytorch-inpainting-with-partial-conv; python3 pytorch-inpainting-with-partial-conv.py ${OPTION}
 cd ../../image_manipulation/colorization; python3 colorization.py ${OPTION}
 cd ../../image_manipulation/u2net_portrait; python3 u2net_portrait.py ${OPTION}
 cd ../../image_manipulation/style2paints; python3 style2paints.py ${OPTION}
+cd ../../image_manipulation/deep_white_balance; python3 deep_white_balance.py ${OPTION}
+cd ../../image_manipulation/inpainting_gmcnn; python3 inpainting_gmcnn.py ${OPTION}
 cd ../../image_segmentation/deep-image-matting; python3 deep-image-matting.py ${OPTION}
 cd ../../image_segmentation/deeplabv3; python3 deeplabv3.py ${OPTION}
 cd ../../image_segmentation/hair_segmentation; python3 hair_segmentation.py ${OPTION}
@@ -80,6 +85,7 @@ cd ../../neural_language_processing/bert_question_answering; python3 bert_questi
 cd ../../neural_language_processing/bert_sentiment_analysis; python3 bert_sentiment_analysis.py ${OPTION}
 cd ../../neural_language_processing/bert_tweets_sentiment; python3 bert_tweets_sentiment.py ${OPTION}
 cd ../../neural_language_processing/bert_zero_shot_classification; python3 bert_zero_shot_classification.py ${OPTION}
+cd ../../object_detection/3d_bbox; python3 3d_bbox.py ${OPTION}
 cd ../../object_detection/centernet; python3 centernet.py ${OPTION}
 cd ../../object_detection/m2det; python3 m2det.py ${OPTION}
 cd ../../object_detection/maskrcnn; python3 maskrcnn.py ${OPTION}
@@ -93,6 +99,7 @@ cd ../../object_detection/yolov4-tiny; python3 yolov4-tiny.py ${OPTION}
 cd ../../object_detection/yolov5; python3 yolov5.py ${OPTION}
 cd ../../object_detection/pedestrian_detection; python3 pedestrian_detection.py ${OPTION}
 cd ../../object_detection/efficientdet; python3 efficientdet.py ${OPTION}
+cd ../../object_detection/nanodet; python3 nanodet.py ${OPTION}
 cd ../../object_tracking/deepsort; python3 deepsort.py ${OPTION}
 cd ../../object_tracking/person_reid_baseline_pytorch; python3 person_reid_baseline_pytorch.py ${OPTION}
 cd ../../point_segmentation/pointnet_pytorch python3 pointnet_pytorch.py ${OPTION}
@@ -104,15 +111,18 @@ cd ../../pose_estimation/pose_resnet; python3 pose_resnet.py ${OPTION}
 cd ../../pose_estimation/blazepose; python3 blazepose.py ${OPTION}
 cd ../../pose_estimation/3dmppe_posenet; python3 3dmppe_posenet.py ${OPTION}
 cd ../../pose_estimation/efficientpose; python3 efficientpose.py ${OPTION}
+cd ../../pose_estimation/pose-hg-3d; python3 pose-hg-3d.py ${OPTION}
 cd ../../rotation_prediction/rotnet; python3 rotnet.py ${OPTION}
 cd ../../style_transfer/adain; python3 adain.py ${OPTION}
 cd ../../super_resolution/srresnet; python3 srresnet.py ${OPTION}
+cd ../../super_resolution/edsr; python3 edsr.py ${OPTION}
 cd ../../text_detection/craft_pytorch; python3 craft_pytorch.py ${OPTION}
 cd ../../text_detection/pixel_link; python3 pixel_link.py ${OPTION}
 cd ../../text_detection/east; python3 east.py ${OPTION}
 cd ../../text_recognition/etl; python3 etl.py ${OPTION}
 cd ../../text_recognition/deep-text-recognition-benchmark; python3 deep-text-recognition-benchmark.py ${OPTION}
 cd ../../text_recognition/crnn.pytorch; python3 crnn.pytorch.py ${OPTION}
+cd ../../text_recognition/paddleocr; python3 paddleocr.py ${OPTION}
 #cd ../../commercial_model/acculus-pose; python3 acculus-hand.py ${OPTION}
 #cd ../../commercial_model/acculus-pose; python3 acculus-pose.py ${OPTION}
 #cd ../../commercial_model/acculus-pose; python3 acculus-up-pose.py ${OPTION}
