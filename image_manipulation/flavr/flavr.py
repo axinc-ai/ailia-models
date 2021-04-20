@@ -40,6 +40,11 @@ parser.add_argument(
     '-ip', '--interpolation', type=int, choices=(2, 4, 8), default=2,
     help='2x/4x/8x Interpolation'
 )
+parser.add_argument(
+    '--onnx',
+    action='store_true',
+    help='execute onnxruntime version.'
+)
 args = update_parser(parser)
 
 
@@ -77,8 +82,11 @@ def recognize_from_image(net, n_output):
     inputs = [int(i) - 1 for i in input_frames]
     images = [images[i] for i in inputs]
 
-    imgx = [net.get_inputs()[i].name for i in range(4)]
-    intx = [net.get_outputs()[i].name for i in range(1)]
+    if args.onnx:
+        imgx = [net.get_inputs()[i].name for i in range(4)]
+        intx = [net.get_outputs()[i].name for i in range(n_output)]
+    else:
+        imgx = ["img%d" % i for i in range(4)]
 
     # inference
     logger.info('Start inference...')
@@ -87,25 +95,28 @@ def recognize_from_image(net, n_output):
         total_time = 0
         for i in range(args.benchmark_count):
             start = int(round(time.time() * 1000))
-            # output = net.predict({'img': img})
-            output = net.run(intx,
-                             {k: v for k, v in zip(imgx, images)})
+            if args.onnx:
+                output = net.run(intx,
+                                 {k: v for k, v in zip(imgx, images)})
+            else:
+                output = net.predict({k: v for k, v in zip(imgx, images)})
             end = int(round(time.time() * 1000))
             logger.info(f'\tailia processing time {end - start} ms')
             if i != 0:
                 total_time = total_time + (end - start)
         logger.info(f'\taverage time {total_time / (args.benchmark_count - 1)} ms')
     else:
-        # output = net.predict({'img': img})
-        output = net.run(intx,
-                         {k: v for k, v in zip(imgx, images)})
+        if args.onnx:
+            output = net.run(intx,
+                             {k: v for k, v in zip(imgx, images)})
+        else:
+            output = net.predict({k: v for k, v in zip(imgx, images)})
 
-    output = output[0]
-    res_img = postprocess(output[0])
+    images = [postprocess(x[0]) for x in output]
 
     savepath = os.path.join(args.savepath, SAVE_IMAGE_PATH)
     logger.info(f'saved at : {savepath}')
-    cv2.imwrite(savepath, res_img)
+    cv2.imwrite(savepath, images[0])
 
     logger.info('Script finished successfully.')
 
@@ -121,9 +132,11 @@ def main():
     check_and_download_models(weight_path, model_path, REMOTE_PATH)
 
     # net initialize
-    # net = ailia.Net(model_path, weight_path, env_id=args.env_id)
-    import onnxruntime
-    net = onnxruntime.InferenceSession(weight_path)
+    if args.onnx:
+        import onnxruntime
+        net = onnxruntime.InferenceSession(weight_path)
+    else:
+        net = ailia.Net(model_path, weight_path, env_id=args.env_id)
 
     recognize_from_image(net, n_output)
 
