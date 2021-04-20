@@ -55,6 +55,11 @@ parser.add_argument(
     action='store_true',
     help='execute onnxruntime version.'
 )
+parser.add_argument(
+    '--low_memory',
+    action='store_true',
+    help='execute low memory version.'
+)
 args = update_parser(parser)
 
 
@@ -303,14 +308,22 @@ def gen_pose(
 
     prediction = []
     for batch_2d in generator.next_epoch():
-        if not args.onnx:
-            output = net.predict({'inputs_2d': batch_2d})
+        if args.low_memory:
+            frames = batch_2d.shape[1]-pad*2
+            predicted_3d_pos = np.zeros((2,frames,17,3))
+            for i in range(0,frames):
+                input_data = batch_2d[:,i:i+pad*2+1,:,:]
+                output = net.predict({'inputs_2d': input_data})
+                predicted_3d_pos[:,i:i+1,:,:] = output[0]
         else:
-            in_name = net.get_inputs()[0].name
-            out_name = net.get_outputs()[0].name
-            output = net.run([out_name],
-                             {in_name: batch_2d})
-        predicted_3d_pos = output[0]
+            if not args.onnx:
+                output = net.predict({'inputs_2d': batch_2d})
+            else:
+                in_name = net.get_inputs()[0].name
+                out_name = net.get_outputs()[0].name
+                output = net.run([out_name],
+                                {in_name: batch_2d})
+            predicted_3d_pos = output[0]
 
         predicted_3d_pos[1, :, :, 0] *= -1
         predicted_3d_pos[1, :, joints_left + joints_right] = \
