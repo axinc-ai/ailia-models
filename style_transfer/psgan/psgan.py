@@ -16,7 +16,7 @@ from setup import setup_config
 sys.path.append("../../util")
 from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # NOQA: E402
-from webcamera_utils import adjust_frame_size, get_capture  # NOQA: E402
+from webcamera_utils import adjust_frame_size, get_capture, cut_max_square  # NOQA: E402
 
 # Logger
 from logging import getLogger  # noqa: E402
@@ -223,7 +223,8 @@ def transfer_to_video():
 
         # Prepare input data
         frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        in_frame, frame = adjust_frame_size(frame, IMAGE_HEIGHT, IMAGE_WIDTH)
+        frame = cut_max_square(frame)
+        _, frame = adjust_frame_size(frame, IMAGE_HEIGHT, IMAGE_WIDTH)
         frame = Image.fromarray(frame)
         source, real_A, mask_A, diff_A, crop_face = _prepare_data(
             args, preprocess, "frame", frame
