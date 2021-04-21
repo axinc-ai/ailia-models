@@ -305,7 +305,7 @@ def detector_postprocess(preds_ailia, anchor_path='anchors.npy'):
     return filtered_detections
 
 
-def detection2roi(detection, detection2roi_method='box'):
+def detection2roi(detection):
     """ Convert detections from detector to an oriented bounding box.
 
     Adapted from:
@@ -317,24 +317,11 @@ def detection2roi(detection, detection2roi_method='box'):
     and shifted by dscale and dy.
 
     """
-    if detection2roi_method == 'box':
-        # compute box center and scale
-        # use mediapipe/calculators/util/detections_to_rects_calculator.cc
-        xc = (detection[:, 1] + detection[:, 3]) / 2
-        yc = (detection[:, 0] + detection[:, 2]) / 2
-        scale = (detection[:, 3] - detection[:, 1])  # assumes square boxes
-
-    elif detection2roi_method == 'alignment':
-        # compute box center and scale
-        # use mediapipe/calculators/util/alignment_points_to_rects_calculator.cc
-        xc = detection[:, 4+2*kp1]
-        yc = detection[:, 4+2*kp1+1]
-        x1 = detection[:, 4+2*kp2]
-        y1 = detection[:, 4+2*kp2+1]
-        scale = np.sqrt(((xc-x1)**2 + (yc-y1)**2)) * 2
-    else:
-        raise NotImplementedError(
-            "detection2roi_method [%s] not supported" % detection2roi_method)
+    # compute box center and scale
+    # use mediapipe/calculators/util/detections_to_rects_calculator.cc
+    xc = (detection[:, 1] + detection[:, 3]) / 2
+    yc = (detection[:, 0] + detection[:, 2]) / 2
+    scale = (detection[:, 3] - detection[:, 1])  # assumes square boxes
 
     # compute box rotation
     x0 = detection[:, 4+2*kp1]
@@ -344,8 +331,7 @@ def detection2roi(detection, detection2roi_method='box'):
     theta = np.arctan2(y0-y1, x0-x1) - theta0
 
     center = np.stack((xc, yc), axis=1)
-    dy_axis = np.stack((x0, y0), axis=1) - np.stack((x1, y1), axis=1)
-    dy_axis /= np.linalg.norm(dy_axis)
+    dy_axis = np.column_stack((-np.sin(theta), np.cos(theta)))
     center += dy * scale[..., np.newaxis] * dy_axis
     xc, yc = center.T
     scale *= dscale
