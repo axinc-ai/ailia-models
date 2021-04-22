@@ -29,7 +29,7 @@ WEIGHT_8x_PATH = 'FLAVR_8x.onnx'
 MODEL_8x_PATH = 'FLAVR_8x.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/flavr/'
 
-IMAGE_PATH = 'vimeo_septuplet/0266'
+IMAGE_PATH = 'sample'
 SAVE_IMAGE_PATH = 'output.png'
 
 # ======================
@@ -39,6 +39,11 @@ parser = get_base_parser('FLAVR model', IMAGE_PATH, SAVE_IMAGE_PATH)
 parser.add_argument(
     '-ip', '--interpolation', type=int, choices=(2, 4, 8), default=2,
     help='2x/4x/8x Interpolation'
+)
+parser.add_argument(
+    '-n', '--num_frame',
+    default=None,
+    help='select input frame numbers (string of four numbers). ex. "1357"'
 )
 parser.add_argument(
     '--onnx',
@@ -70,17 +75,15 @@ def postprocess(output):
 
 
 def recognize_from_image(net, n_output):
-    # input image loop
-    input_frames = "1357"
-
     # Load images
     images = [load_image(pth) for pth in args.input]
     images = [cv2.cvtColor(img, cv2.COLOR_BGRA2RGB) for img in images]
     images = [preprocess(img) for img in images]
 
     ## Select only relevant inputs
-    inputs = [int(i) - 1 for i in input_frames]
-    images = [images[i] for i in inputs]
+    if args.num_frame:
+        inputs = [int(i) - 1 for i in args.num_frame]
+        images = [images[i] for i in inputs]
 
     if args.onnx:
         imgx = [net.get_inputs()[i].name for i in range(4)]
@@ -115,8 +118,15 @@ def recognize_from_image(net, n_output):
     images = [postprocess(x[0]) for x in output]
 
     savepath = os.path.join(args.savepath, SAVE_IMAGE_PATH)
-    logger.info(f'saved at : {savepath}')
-    cv2.imwrite(savepath, images[0])
+    if 1 < n_output:
+        name, ext = os.path.splitext(savepath)
+        for i in range(n_output):
+            savepath = "%s_%s%s" % (name, i, ext)
+            logger.info(f'saved at : {savepath}')
+            cv2.imwrite(savepath, images[i])
+    else:
+        logger.info(f'saved at : {savepath}')
+        cv2.imwrite(savepath, images[0])
 
     logger.info('Script finished successfully.')
 
