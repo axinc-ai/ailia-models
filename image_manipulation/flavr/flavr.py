@@ -45,11 +45,6 @@ parser.add_argument(
     default=None,
     help='select input frame numbers (string of four numbers). ex. "1357"'
 )
-parser.add_argument(
-    '--onnx',
-    action='store_true',
-    help='execute onnxruntime version.'
-)
 args = update_parser(parser)
 
 
@@ -85,11 +80,7 @@ def recognize_from_image(net, n_output):
         inputs = [int(i) - 1 for i in args.num_frame]
         images = [images[i] for i in inputs]
 
-    if args.onnx:
-        imgx = [net.get_inputs()[i].name for i in range(4)]
-        intx = [net.get_outputs()[i].name for i in range(n_output)]
-    else:
-        imgx = ["img%d" % i for i in range(4)]
+    imgx = ["img%d" % i for i in range(4)]
 
     # inference
     logger.info('Start inference...')
@@ -98,22 +89,14 @@ def recognize_from_image(net, n_output):
         total_time = 0
         for i in range(args.benchmark_count):
             start = int(round(time.time() * 1000))
-            if args.onnx:
-                output = net.run(intx,
-                                 {k: v for k, v in zip(imgx, images)})
-            else:
-                output = net.predict({k: v for k, v in zip(imgx, images)})
+            output = net.predict({k: v for k, v in zip(imgx, images)})
             end = int(round(time.time() * 1000))
             logger.info(f'\tailia processing time {end - start} ms')
             if i != 0:
                 total_time = total_time + (end - start)
         logger.info(f'\taverage time {total_time / (args.benchmark_count - 1)} ms')
     else:
-        if args.onnx:
-            output = net.run(intx,
-                             {k: v for k, v in zip(imgx, images)})
-        else:
-            output = net.predict({k: v for k, v in zip(imgx, images)})
+        output = net.predict({k: v for k, v in zip(imgx, images)})
 
     images = [postprocess(x[0]) for x in output]
 
@@ -142,11 +125,7 @@ def main():
     check_and_download_models(weight_path, model_path, REMOTE_PATH)
 
     # net initialize
-    if args.onnx:
-        import onnxruntime
-        net = onnxruntime.InferenceSession(weight_path)
-    else:
-        net = ailia.Net(model_path, weight_path, env_id=args.env_id)
+    net = ailia.Net(model_path, weight_path, env_id=args.env_id)
 
     recognize_from_image(net, n_output)
 
