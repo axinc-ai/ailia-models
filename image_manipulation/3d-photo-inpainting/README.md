@@ -21,6 +21,22 @@ pip3 install networkx==2.3
 pip3 install cynetworkx
 ```
 
+If you using macOS bigsur, you must replace
+
+```
+appkit = cdll.LoadLibrary(util.find_library('AppKit')) #vispy/ext/cocoapy.py
+_fname = ctypes.util.find_library('OpenGL') #vispy/gloo/gl/gl2.py
+```
+
+with
+
+```
+appkit = cdll.LoadLibrary('/System/Library/Frameworks/AppKit.framework/Versions/Current/AppKit') #vispy/ext/cocoapy.py
+_fname = '/System/Library/Frameworks/OpenGL.framework/OpenGL' #vispy/gloo/gl/gl2.py
+```
+
+https://github.com/vispy/vispy/issues/1885
+
 ## Usage
 Automatically downloads the onnx and prototxt files on the first run.
 It is necessary to be connected to the Internet while downloading.
