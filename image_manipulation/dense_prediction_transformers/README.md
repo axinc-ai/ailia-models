@@ -1,11 +1,11 @@
 # dense_prediction_transformers
 
 ### Input
-image file
+image file (384x576)
 
 ### Output
 
-image file
+image file (384x576)
 
 ### Usage
 
@@ -37,5 +37,5 @@ ONNX opset = 11
 
 ### Netron
 
-[dpt_hybrid_monodepth.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/)    
-[dpt_hybrid_segmentation.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/)
+[dpt_hybrid_monodepth.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/dpt_hybrid_monodepth.onnx)    
+[dpt_hybrid_segmentation.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/dpt_hybrid_segmentation.onnx)
