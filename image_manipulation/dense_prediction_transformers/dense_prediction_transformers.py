@@ -94,15 +94,6 @@ def monodepth(optimize=True):
     os.makedirs('monodepth_outputs', exist_ok=True)
 
     for i, img_name in enumerate(img_names):
-        """
-            TODO: 縦横の可変長対応
-            onnxruntime.capi.onnxruntime_pybind11_state.RuntimeException:
-            [ONNXRuntimeError] : 6 : RUNTIME_EXCEPTION :
-            Non-zero status code returned while running Add node. Name:'Add_1391'
-            Status Message: /Users/runner/work/1/s/onnxruntime/core/providers/cpu/math/element_wise_ops.h:487
-            void onnxruntime::BroadcastIterator::Append(int64_t, int64_t) axis == 1 || axis == largest was false.
-            Attempting to broadcast an axis by a dimension other than 1. 829 by 1105
-        """
         img_raw = util.io.read_image(img_name)
         img = transform({"image": img_raw})["image"]
 
@@ -180,15 +171,6 @@ def segmentation(optimize=True):
     os.makedirs('segmentation_outputs', exist_ok=True)
 
     for i, img_name in enumerate(img_names):
-        """
-            TODO: 縦横の可変長対応
-            onnxruntime.capi.onnxruntime_pybind11_state.RuntimeException:
-            [ONNXRuntimeError] : 6 : RUNTIME_EXCEPTION :
-            Non-zero status code returned while running Add node. Name:'Add_1391'
-            Status Message: /Users/runner/work/1/s/onnxruntime/core/providers/cpu/math/element_wise_ops.h:487
-            void onnxruntime::BroadcastIterator::Append(int64_t, int64_t) axis == 1 || axis == largest was false.
-            Attempting to broadcast an axis by a dimension other than 1. 829 by 1105
-        """
         img_raw = util.io.read_image(img_name)
         img = transform({"image": img_raw})["image"]
 
