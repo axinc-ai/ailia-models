@@ -4,6 +4,7 @@ import os
 
 import numpy as np
 import cv2
+from tqdm import tqdm
 
 import ailia
 
@@ -12,6 +13,7 @@ sys.path.append('../../util')
 from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from detector_utils import load_image  # noqa: E402
+import webcamera_utils  # noqa: E402
 
 # logger
 from logging import getLogger  # noqa: E402
@@ -31,6 +33,7 @@ REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/flavr/'
 
 IMAGE_PATH = 'sample'
 SAVE_IMAGE_PATH = 'output.png'
+SAVE_VIDEO_PATH = 'output_%dx.mp4'
 
 # ======================
 # Arguemnt Parser Config
@@ -45,6 +48,11 @@ parser.add_argument(
     default=None,
     help='select input frame numbers (string of four numbers). ex. "1357"'
 )
+parser.add_argument(
+    '-hw', metavar='HEIGHT,WIDTH',
+    default="256,448",
+    help='Specify the size to resize.'
+)
 args = update_parser(parser)
 
 
@@ -53,6 +61,9 @@ args = update_parser(parser)
 # ======================
 
 def preprocess(img):
+    h, w = map(int, args.hw.split(','))
+    img = cv2.resize(img, (w, h))
+
     img = img / 255
     img = img.transpose(2, 0, 1)  # HWC -> CHW
     img = np.expand_dims(img, axis=0)
@@ -62,6 +73,7 @@ def preprocess(img):
 
 
 def postprocess(output):
+    output = output.clip(0.0, 1.0)
     output = output.transpose((1, 2, 0)) * 255.0
     img = output.astype(np.uint8)
     img = img[:, :, ::-1]  # RGB -> BGR
@@ -114,6 +126,63 @@ def recognize_from_image(net, n_output):
     logger.info('Script finished successfully.')
 
 
+def recognize_from_video(net, n_output):
+    cap = webcamera_utils.get_capture(args.video)
+
+    video_length = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    logger.info(f"video_length: {video_length}")
+
+    # create video writer if savepath is specified as video format
+    fps = int(cap.get(cv2.CAP_PROP_FPS))
+    f_h, f_w = map(int, args.hw.split(','))
+    savepath = os.path.join(args.savepath, SAVE_VIDEO_PATH % (n_output + 1))
+    writer = webcamera_utils.get_writer(savepath, f_h, f_w, fps=fps)
+
+    imgx = ["img%d" % i for i in range(4)]
+
+    images = []
+    inputs = []
+    if 0 < video_length:
+        it = iter(tqdm(range(video_length)))
+        next(it)
+    while True:
+        if 0 < video_length:
+            try:
+                next(it)
+            except StopIteration:
+                break
+        ret, frame = cap.read()
+        if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+
+        images.append(cv2.resize(frame, (f_w, f_h)))
+        inputs.append(
+            preprocess(cv2.cvtColor(frame, cv2.COLOR_BGRA2RGB))
+        )
+        if len(inputs) < 4:
+            continue
+        elif len(inputs) > 4:
+            inputs = inputs[1:]
+            images = images[1:]
+
+        output = net.predict({k: v for k, v in zip(imgx, inputs)})
+
+        if video_length < 0:
+            cv2.imshow('frame', frame)
+
+        # save results
+        writer.write(images[1])
+        for i in range(n_output):
+            out_img = postprocess(output[i][0])
+            writer.write(out_img)
+
+    cap.release()
+    cv2.destroyAllWindows()
+    if writer is not None:
+        writer.release()
+    logger.info('Script finished successfully.')
+
+
 def main():
     info = {
         2: (WEIGHT_2x_PATH, MODEL_2x_PATH, 1),
@@ -127,7 +196,12 @@ def main():
     # net initialize
     net = ailia.Net(model_path, weight_path, env_id=args.env_id)
 
-    recognize_from_image(net, n_output)
+    if args.video is not None:
+        # video mode
+        recognize_from_video(net, n_output)
+    else:
+        # image mode
+        recognize_from_image(net, n_output)
 
 
 if __name__ == '__main__':
