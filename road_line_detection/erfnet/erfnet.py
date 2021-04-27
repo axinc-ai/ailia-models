@@ -155,7 +155,7 @@ def recognize_from_video():
 
         # save results
         if writer is not None:
-            writer.write(out_img)
+            writer.write(output_buffer)
 
     capture.release()
     cv2.destroyAllWindows()
