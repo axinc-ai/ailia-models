@@ -110,12 +110,12 @@ def recognize_from_video():
         logger.warning(
             'currently, video results cannot be output correctly...'
         )
-        f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
-        save_h, save_w = f_h, f_w
-        writer = webcamera_utils.get_writer(args.savepath, save_h, save_w)
+        writer = webcamera_utils.get_writer(args.savepath, HEIGHT*2, WIDTH)
     else:
         writer = None
+
+    output_buffer = np.zeros((HEIGHT*2,WIDTH,3))
+    output_buffer = output_buffer.astype(np.uint8)
 
     while (True):
         ret, frame = capture.read()
@@ -124,8 +124,10 @@ def recognize_from_video():
 
         trans = Normalize(mean=(INPUT_MEAN, (0,)), std=(INPUT_STD, (1,)))
 
-        img = cv2.resize(frame, (WIDTH, HEIGHT))
-        img = np.expand_dims(img, 0)
+        # resize with keep aspect
+        frame,resized_img = webcamera_utils.adjust_frame_size(frame, HEIGHT, WIDTH)
+
+        img = np.expand_dims(resized_img, 0)
         img = trans(img)
         img = np.array(img).transpose(0, 3, 1, 2)
 
@@ -142,7 +144,14 @@ def recognize_from_video():
             cnt += 1
 
         out_img = np.array(out_img, dtype=np.uint8)
-        cv2.imshow('frame', out_img)
+
+        # create output img
+        output_buffer[0:HEIGHT,0:WIDTH,:] = resized_img
+        output_buffer[HEIGHT:HEIGHT*2,0:WIDTH,0] = out_img
+        output_buffer[HEIGHT:HEIGHT*2,0:WIDTH,1] = out_img
+        output_buffer[HEIGHT:HEIGHT*2,0:WIDTH,2] = out_img
+
+        cv2.imshow('output', output_buffer)
 
         # save results
         if writer is not None:
