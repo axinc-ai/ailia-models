@@ -42,6 +42,8 @@ The default setting is to use the optimized model and weights, but you can also 
 
 ## Reference
 
+[Codes-for-Lane-Detection](https://github.com/cardwing/Codes-for-Lane-Detection/)
+
 [ERFNet-CULane-PyTorch](https://github.com/cardwing/Codes-for-Lane-Detection/tree/master/ERFNet-CULane-PyTorch)
 
 ## Framework
