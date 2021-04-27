@@ -20,21 +20,21 @@ while downloading.
 For the sample image,
 
 ``` bash
-$ python3 erfnet-culane.py
+$ python3 codes-for-lane-detectionpy
 ```
 
 If you want to specify the input image, put the image path after the `--input` option.  
 You can use `--savepath` option to change the name of the output file to save.
 
 ```bash
-$ python3 erfnet-culane.py --input IMAGE_PATH --savepath SAVE_IMAGE_PATH
+$ python3 codes-for-lane-detection.py --input IMAGE_PATH --savepath SAVE_IMAGE_PATH
 ```
 
 By adding the `--video` option, you can input the video.   
 If you pass `0` as an argument to VIDEO_PATH, you can use the webcam input instead of the video file.
 
 ```bash
-$ python3 erfnet-culane.py --video VIDEO_PATH
+$ python3 codes-for-lane-detection.py --video VIDEO_PATH
 ```
 
 The default setting is to use the optimized model and weights, but you can also switch to the normal model by using the
@@ -56,4 +56,4 @@ ONNX opset = 11
 
 ## Netron
 
-[erfnet.opt.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/erfnet-culane/erfnet.opt.onnx.prototxt)
+[erfnet.opt.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/codes-for-lane-detection/erfnet.opt.onnx.prototxt)
