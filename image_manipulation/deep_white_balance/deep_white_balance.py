@@ -51,7 +51,7 @@ args = update_parser(parser)
 
 def recognize_from_image():
     # net initialize
-    env_id = ailia.get_gpu_environment_id()
+    env_id = args.env_id
     net_awb = ailia.Net(MODEL_AWB_PATH, WEIGHT_AWB_PATH, env_id=env_id)
     net_s = ailia.Net(MODEL_S_PATH, WEIGHT_S_PATH, env_id=env_id)
     net_t = ailia.Net(MODEL_T_PATH, WEIGHT_T_PATH, env_id=env_id)
@@ -99,7 +99,7 @@ def recognize_from_image():
 
 def recognize_from_video():
     # net initialize
-    env_id = ailia.get_gpu_environment_id()
+    env_id = args.env_id
     net_awb = ailia.Net(MODEL_AWB_PATH, WEIGHT_AWB_PATH, env_id=env_id)
     net_s = ailia.Net(MODEL_S_PATH, WEIGHT_S_PATH, env_id=env_id)
     net_t = ailia.Net(MODEL_T_PATH, WEIGHT_T_PATH, env_id=env_id)

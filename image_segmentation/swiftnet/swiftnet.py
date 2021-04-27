@@ -47,7 +47,7 @@ args = update_parser(parser)
 # ======================
 def recognize_from_image():
     # net initialize
-    env_id = ailia.get_gpu_environment_id()
+    env_id = args.env_id
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
 
     # input image loop
