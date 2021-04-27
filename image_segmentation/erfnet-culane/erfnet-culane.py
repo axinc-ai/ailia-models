@@ -24,7 +24,7 @@ os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
 # ======================
 # Parameters
 # ======================
-REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/erfnet/'
+REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/erfnet-culane/'
 IMAGE_PATH = 'input.jpg'
 SAVE_IMAGE_PATH = 'output.jpg'
 
