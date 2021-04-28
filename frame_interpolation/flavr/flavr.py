@@ -33,7 +33,6 @@ REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/flavr/'
 
 IMAGE_PATH = 'sample'
 SAVE_IMAGE_PATH = 'output.png'
-SAVE_VIDEO_PATH = 'output_%dx.mp4'
 
 # ======================
 # Arguemnt Parser Config
@@ -135,8 +134,12 @@ def recognize_from_video(net, n_output):
     # create video writer if savepath is specified as video format
     fps = int(cap.get(cv2.CAP_PROP_FPS))
     f_h, f_w = map(int, args.hw.split(','))
-    savepath = os.path.join(args.savepath, SAVE_VIDEO_PATH % (n_output + 1))
-    writer = webcamera_utils.get_writer(savepath, f_h, f_w, fps=fps)
+    if args.savepath!=SAVE_IMAGE_PATH:
+        writer = webcamera_utils.get_writer(args.savepath, f_h, f_w, fps=fps)
+
+    # create output buffer
+    output_buffer = np.zeros((f_h*(n_output+2),f_w,3))
+    output_buffer = output_buffer.astype(np.uint8)
 
     imgx = ["img%d" % i for i in range(4)]
 
@@ -167,14 +170,19 @@ def recognize_from_video(net, n_output):
 
         output = net.predict({k: v for k, v in zip(imgx, inputs)})
 
-        if video_length < 0:
-            cv2.imshow('frame', frame)
-
         # save results
-        writer.write(images[1])
+        if writer is not None:
+            writer.write(images[1])
+        output_buffer[0:f_h,0:f_w,:]=images[1]
+        output_buffer[f_h*(n_output+1):f_h*(n_output+2),0:f_w,:]=images[2]
         for i in range(n_output):
             out_img = postprocess(output[i][0])
-            writer.write(out_img)
+            if writer is not None:
+                writer.write(out_img)
+            output_buffer[f_h*(i+1):f_h*(i+2),0:f_w,:]=out_img
+        
+        #preview
+        cv2.imshow('frame', output_buffer)
 
     cap.release()
     cv2.destroyAllWindows()

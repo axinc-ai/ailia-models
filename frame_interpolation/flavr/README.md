@@ -32,13 +32,19 @@ By adding the `--video` option, you can input the video.
 If you pass `0` as an argument to VIDEO_PATH, you can use the webcam input instead of the video file.
 
 ```bash
-$ python3 flavr.py --video VIDEO_PATH
+$ python3 flavr.py --video VIDEO_PATH --savepath SAVE_VIDEO_PATH
 ```
 
 For multi frame interpolation model, you can specify the multiple of output frame (4 or 8) after the `-ip` option.
 
 ```bash
 $ python3 flavr.py -ip 4
+```
+
+You can set output video size using `-hw` option.
+
+```bash
+$ python3 flavr.py -hw 544,960
 ```
 
 ## Reference
