@@ -134,6 +134,7 @@ def recognize_from_video(net, n_output):
     # create video writer if savepath is specified as video format
     fps = int(cap.get(cv2.CAP_PROP_FPS))
     f_h, f_w = map(int, args.hw.split(','))
+    writer = None
     if args.savepath!=SAVE_IMAGE_PATH:
         writer = webcamera_utils.get_writer(args.savepath, f_h, f_w, fps=fps)
 
