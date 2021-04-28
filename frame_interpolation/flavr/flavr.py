@@ -52,7 +52,7 @@ parser.add_argument(
     default="256,448",
     help='Specify the size to resize.'
 )
-args = update_parser(parser)
+args = update_parser(parser, large_model=True)
 
 
 # ======================
