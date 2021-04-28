@@ -191,7 +191,7 @@ def recognize_from_video():
     pose = ailia.PoseEstimator(
         MODEL_PATH, WEIGHT_PATH, env_id=args.env_id, algorithm=ALGORITHM
     )
-    if args.detection_width!=IMAGE_WIDTH or args.detection.height!=IMAGE_HEIGHT:
+    if args.detection_width!=IMAGE_WIDTH or args.detection_height!=IMAGE_HEIGHT:
         pose.set_input_shape((1,3,args.detection_height,args.detection_width))
 
     capture = webcamera_utils.get_capture(args.video)
@@ -209,21 +209,19 @@ def recognize_from_video():
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
 
-        input_image, input_data = webcamera_utils.adjust_frame_size(
-            frame, args.detection_height, args.detection_width
-        )
-        input_data = cv2.cvtColor(input_data, cv2.COLOR_BGR2BGRA)
+        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2BGRA)
 
         # inference
-        _ = pose.compute(input_data)
+        _ = pose.compute(frame)
 
         # postprocessing
-        display_result(input_image, pose)
-        cv2.imshow('frame', input_image)
+        display_result(frame, pose)
+        cv2.imshow('frame', frame)
 
         # save results
         if writer is not None:
-            writer.write(input_image)
+            frame = cv2.cvtColor(frame, cv2.COLOR_BGRA2BGR)
+            writer.write(frame)
 
     capture.release()
     cv2.destroyAllWindows()

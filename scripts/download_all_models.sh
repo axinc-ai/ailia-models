@@ -65,6 +65,7 @@ cd ../../image_manipulation/u2net_portrait; python3 u2net_portrait.py ${OPTION}
 cd ../../image_manipulation/style2paints; python3 style2paints.py ${OPTION}
 cd ../../image_manipulation/deep_white_balance; python3 deep_white_balance.py ${OPTION}
 cd ../../image_manipulation/inpainting_gmcnn; python3 inpainting_gmcnn.py ${OPTION}
+cd ../../image_manipulation/deblur_gan; python3 deblur_gan.py ${OPTION}
 cd ../../image_segmentation/deep-image-matting; python3 deep-image-matting.py ${OPTION}
 cd ../../image_segmentation/deeplabv3; python3 deeplabv3.py ${OPTION}
 cd ../../image_segmentation/hair_segmentation; python3 hair_segmentation.py ${OPTION}
@@ -75,7 +76,9 @@ cd ../../image_segmentation/u2net; python3 u2net.py -a small ${OPTION}
 cd ../../image_segmentation/human_part_segmentation; python3 human_part_segmentation.py ${OPTION}
 cd ../../image_segmentation/pytorch-unet; python3 pytorch-unet.py ${OPTION}
 cd ../../image_segmentation/semantic-segmentation-mobilenet-v3; python3 semantic-segmentation-mobilenet-v3.py ${OPTION}
-cd ../../image_segmentation/yet-another-anime-segmenter python3 yet-another-anime-segmenter.py ${OPTION}
+cd ../../image_segmentation/yet-another-anime-segmenter; python3 yet-another-anime-segmenter.py ${OPTION}
+cd ../../image_segmentation/swiftnet; python3 swiftnet.py ${OPTION}
+cd ../../image_segmentation/codes-for-lane-detection; python3 codes-for-lane-detection.py ${OPTION}
 cd ../../neural_language_processing/bert; python3 bert.py ${OPTION}
 cd ../../neural_language_processing/bert_tweets_sentiment; python3 bert_tweets_sentiment.py ${OPTION}
 cd ../../neural_language_processing/bert_maskedlm; python3 bert_maskedlm.py ${OPTION}
@@ -98,6 +101,7 @@ cd ../../object_detection/yolov4-tiny; python3 yolov4-tiny.py ${OPTION}
 cd ../../object_detection/yolov5; python3 yolov5.py ${OPTION}
 cd ../../object_detection/pedestrian_detection; python3 pedestrian_detection.py ${OPTION}
 cd ../../object_detection/efficientdet; python3 efficientdet.py ${OPTION}
+cd ../../object_detection/nanodet; python3 nanodet.py ${OPTION}
 cd ../../object_tracking/deepsort; python3 deepsort.py ${OPTION}
 cd ../../object_tracking/person_reid_baseline_pytorch; python3 person_reid_baseline_pytorch.py ${OPTION}
 cd ../../point_segmentation/pointnet_pytorch python3 pointnet_pytorch.py ${OPTION}
@@ -114,6 +118,7 @@ cd ../../pose_estimation/gast; python3 gast.py ${OPTION}
 cd ../../rotation_prediction/rotnet; python3 rotnet.py ${OPTION}
 cd ../../style_transfer/adain; python3 adain.py ${OPTION}
 cd ../../super_resolution/srresnet; python3 srresnet.py ${OPTION}
+cd ../../super_resolution/edsr; python3 edsr.py ${OPTION}
 cd ../../text_detection/craft_pytorch; python3 craft_pytorch.py ${OPTION}
 cd ../../text_detection/pixel_link; python3 pixel_link.py ${OPTION}
 cd ../../text_detection/east; python3 east.py ${OPTION}

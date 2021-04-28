@@ -87,7 +87,7 @@ else :
 def src_sep(data, session) :
     # inference
     if not args.onnx :
-        sep = session.predict(data)
+        sep = session.run(data)[0]
 
     else :
         first_input_name = session.get_inputs()[0].name
