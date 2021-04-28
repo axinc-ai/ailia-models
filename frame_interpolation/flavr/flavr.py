@@ -1,6 +1,7 @@
 import sys
 import time
 import os
+import platform
 
 import numpy as np
 import cv2
@@ -201,6 +202,12 @@ def main():
     weight_path, model_path, n_output = info[args.interpolation]
     # model files check and download
     check_and_download_models(weight_path, model_path, REMOTE_PATH)
+
+    # macOS currently only supporting cpu mode
+    pf = platform.system()
+    if pf == 'Darwin':
+        args.env_id = 0
+        logger.warning("macOS currently only supporting cpu mode")
 
     # net initialize
     net = ailia.Net(model_path, weight_path, env_id=args.env_id)
