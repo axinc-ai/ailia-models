@@ -71,3 +71,51 @@ You can display a list of models and select them with the mouse by using the com
 ```
 python3 launcher.py
 ```
+
+## Options
+
+The following options can be specified for each model.
+
+```
+optional arguments:
+  -h, --help            show this help message and exit
+  -i IMAGE/VIDEO, --input IMAGE/VIDEO
+                        The default (model-dependent) input data (image /
+                        video) path. If a directory name is specified, the
+                        model will be run for the files inside. File type is
+                        specified by --ftype argument (default: lenna.png)
+  -v VIDEO, --video VIDEO
+                        You can convert the input video by entering style
+                        image.If the int variable is given, corresponding
+                        webcam input will be used. (default: None)
+  -s SAVE_PATH, --savepath SAVE_PATH
+                        Save path for the output (image / video / text).
+                        (default: output.png)
+  -b, --benchmark       Running the inference on the same input 5 times to
+                        measure execution performance. (Cannot be used in
+                        video mode) (default: False)
+  -e ENV_ID, --env_id ENV_ID
+                        A specific environment id can be specified. By
+                        default, the return value of
+                        ailia.get_gpu_environment_id will be used (default: 2)
+  --env_list            display environment list (default: False)
+  --ftype FILE_TYPE     file type list: image | video | audio (default: image)
+  --debug               set default logger level to DEBUG (enable to show
+                        DEBUG logs) (default: False)
+  --profile             set profile mode (enable to show PROFILE logs)
+                        (default: False)
+  -bc BENCHMARK_COUNT, --benchmark_count BENCHMARK_COUNT
+                        set iteration count of benchmark (default: 5)
+```                        
+
+For example, to run in CPU mode:
+
+```
+python3 yolov3-tiny.py -e 0
+```
+
+For example, to save to a video file:
+
+```
+python3 yolov3-tiny.py -i input.mp4 -s output.mp4
+```
