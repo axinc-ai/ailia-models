@@ -87,6 +87,14 @@ The collection of pre-trained, state-of-the-art models.
 | [<img src="face_recognition/facemesh/output.png" width=128px>](face_recognition/facemesh/) | [facemesh](/face_recognition/facemesh/) | [facemesh.pytorch](https://github.com/thepowerfuldeez/facemesh.pytorch) | Pytorch | 1.2.2 and later |
 | [<img src="face_recognition/mediapipe_iris/output.png" width=128px>](face_recognition/mediapipe_iris/) | [mediapipe_iris](/face_recognition/mediapipe_iris/) | [irislandmarks.pytorch](https://github.com/cedriclmenard/irislandmarks.pytorch) | Pytorch | 1.2.2 and later |
 
+
+## Frame Interpolation
+
+| | Model | Reference | Exported From | Supported Ailia Version |
+|:-----------|------------:|:------------:|:------------:|:------------:|
+| [<img src="frame_interpolation/flavr/sample_results/output.png" width=128px>](frame_interpolation/flavr/) | [flavr](/frame_interpolation/flavr/) | [FLAVR: Flow-Agnostic Video Representations for Fast Frame Interpolation](https://github.com/tarun005/FLAVR) | Pytorch | 1.2.7 and later |
+
+
 ## Generative adversarial networks
 
 | | Model | Reference | Exported From | Supported Ailia Version |
@@ -146,7 +154,6 @@ The collection of pre-trained, state-of-the-art models.
 | [<img src="image_manipulation/pytorch-inpainting-with-partial-conv/result.png" width=128px>](image_manipulation/pytorch-inpainting-with-partial-conv/) | [inpainting-with-partial-conv](/image_manipulation/pytorch-inpainting-with-partial-conv/) | [pytorch-inpainting-with-partial-conv](https://github.com/naoto0804/pytorch-inpainting-with-partial-conv) | PyTorch | 1.2.6 and later |
 | [<img src="image_manipulation/inpainting_gmcnn/result_paris-streetview_rect.png" width=128px>](image_manipulation/inpainting_gmcnn/) | [inpainting_gmcnn](/image_manipulation/inpainting_gmcnn/) | [Image Inpainting via Generative Multi-column Convolutional Neural Networks](https://github.com/shepnerd/inpainting_gmcnn) | TensorFlow | 1.2.6 and later |
 | [<img src="image_manipulation/deblur_gan/output.png" width=128px>](image_manipulation/deblur_gan/) | [deblur_gan](/image_manipulation/deblur_gan/) | [DeblurGAN](https://github.com/KupynOrest/DeblurGAN) | Pytorch | 1.2.6 and later |
-| [<img src="image_manipulation/flavr/sample_results/output.png" width=128px>](image_manipulation/flavr/) | [flavr](/image_manipulation/flavr/) | [FLAVR: Flow-Agnostic Video Representations for Fast Frame Interpolation](https://github.com/tarun005/FLAVR) | Pytorch | 1.2.6 and later |
 
 ## Image segmentation
 
