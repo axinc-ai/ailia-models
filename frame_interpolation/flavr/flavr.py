@@ -53,7 +53,7 @@ parser.add_argument(
     default="256,448",
     help='Specify the size to resize.'
 )
-args = update_parser(parser)
+args = update_parser(parser, large_model=True)
 
 
 # ======================
@@ -202,12 +202,6 @@ def main():
     weight_path, model_path, n_output = info[args.interpolation]
     # model files check and download
     check_and_download_models(weight_path, model_path, REMOTE_PATH)
-
-    # macOS currently only supporting cpu mode
-    pf = platform.system()
-    if pf == 'Darwin':
-        args.env_id = 0
-        logger.warning("macOS currently only supporting cpu mode")
 
     # net initialize
     net = ailia.Net(model_path, weight_path, env_id=args.env_id)
