@@ -130,14 +130,7 @@ def _initialize_net(args):
 
 def _transfer(real_A, real_B, mask_A, mask_B, diff_A, diff_B, net):
     if not args.onnx:
-        return net.predict(
-            [real_A,
-            real_B,
-            mask_A,
-            mask_B,
-            diff_A,
-            diff_B]
-        )
+        return net.predict([real_A, real_B, mask_A, mask_B, diff_A, diff_B])
     else:
         inputs = {
             net.get_inputs()[0].name: real_A,
