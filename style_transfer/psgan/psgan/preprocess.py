@@ -44,11 +44,13 @@ def copy_area(tar, src, lms):
 
 
 class FaceAlignment:
-    def __init__(self, use_onnx, face_alignment_model, face_alignment_weight, env_id):
+    def __init__(self, use_onnx, face_alignment_model, face_alignment_weight):
         self.face_alignment_model = face_alignment_model
         self.face_alignment_weight = face_alignment_weight
         self.use_onnx = use_onnx
         # initialize net
+        env_id = ailia.get_gpu_environment_id()
+        logger.info(f"env_id (face alignment): {env_id}")
         if not self.use_onnx:
             self.net = ailia.Net(
                 self.face_alignment_model, self.face_alignment_weight, env_id=env_id
@@ -67,12 +69,14 @@ class FaceAlignment:
 
 
 class FaceDetector:
-    def __init__(self, use_onnx, face_detector_model, face_detector_weight, input, env_id):
+    def __init__(self, use_onnx, face_detector_model, face_detector_weight, input):
         self.face_detector_model = face_detector_model
         self.face_detector_weight = face_detector_weight
         self.use_onnx = use_onnx
         self.input = input
         # initialize net
+        env_id = ailia.get_gpu_environment_id()
+        logger.info(f"env_id (face detector): {env_id}")
         if not self.use_onnx:
             self.net = ailia.Net(
                 self.face_detector_model, self.face_detector_weight, env_id=env_id
@@ -83,19 +87,12 @@ class FaceDetector:
             self.net = onnxruntime.InferenceSession(self.face_detector_weight)
 
     def predict(self, image: Image):
-        if self.input == None:
-            data = np.array(image)
-            data=cv2.resize(data, (FACE_DETECTOR_IMAGE_WIDTH, FACE_DETECTOR_IMAGE_HEIGHT))
-            data=data / 127.5 - 1.0
-            data = data.transpose((2, 0, 1))  # channel first
-            data = data[np.newaxis, :, :, :].astype(np.float32)  # (batch_size, channel, h, w)
-        else:
-            data = load_image(
-                self.input,
-                (FACE_DETECTOR_IMAGE_HEIGHT, FACE_DETECTOR_IMAGE_WIDTH),
-                normalize_type="127.5",
-                gen_input_ailia=True,
-            ).astype(np.float32)
+        data = load_image(
+            self.input,
+            (FACE_DETECTOR_IMAGE_HEIGHT, FACE_DETECTOR_IMAGE_WIDTH),
+            normalize_type="127.5",
+            gen_input_ailia=True,
+        ).astype(np.float32)
 
         if not self.use_onnx:
             preds_ailia = self.net.predict([data])
@@ -148,15 +145,12 @@ class PreProcess:
         self.use_onnx = args.onnx
         self.use_dlib = args.use_dlib
         if not self.use_dlib:
-            if not args.input:
-                self.input = None  # video mode
-            else:
-                self.input = args.input[0]
+            self.input = args.source_path
             self.face_alignment = FaceAlignment(
-                self.use_onnx, face_alignment_path[0], face_alignment_path[1], args.env_id
+                self.use_onnx, face_alignment_path[0], face_alignment_path[1]
             )
             self.face_detector = FaceDetector(
-                self.use_onnx, face_detector_path[0], face_detector_path[1], self.input, args.env_id
+                self.use_onnx, face_detector_path[0], face_detector_path[1], self.input
             )
 
     def relative2absolute(self, lms):
@@ -174,12 +168,13 @@ class PreProcess:
             )
             lms = lms.round()
         else:
-            data = np.array(image)
-            data=cv2.resize(data, (FACE_ALIGNMENT_IMAGE_WIDTH, FACE_ALIGNMENT_IMAGE_HEIGHT))
-            data=data / 255.0
-            data = data.transpose((2, 0, 1))  # channel first
-            data = data[np.newaxis, :, :, :].astype(np.float32)  # (batch_size, channel, h, w)
-
+            # prepare input data
+            data = load_image(
+                self.input,
+                (FACE_ALIGNMENT_IMAGE_HEIGHT, FACE_ALIGNMENT_IMAGE_WIDTH),
+                normalize_type="255",
+                gen_input_ailia=True,
+            ).astype(np.float32)
             preds_ailia = self.face_alignment.predict(data)
             pts, _ = _get_preds_from_hm(preds_ailia)
             lms = pts.reshape(68, 2) * 4

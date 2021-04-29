@@ -72,6 +72,12 @@ parser.add_argument(
     nargs=argparse.REMAINDER,
 )
 parser.add_argument(
+    "--source_path",
+    default=SOURCE_IMAGE_PATH,
+    metavar="FILE",
+    help="Path to source image",
+)
+parser.add_argument(
     "--reference_dir", default=REFERENCE_IMAGE_PATH, help="Path to reference images"
 )
 parser.add_argument(
@@ -99,7 +105,7 @@ def _prepare_data(args, preprocess, image_type, frame=None):
     diff = None
     crop_face = None
     if image_type == "source":
-        image = Image.open(args.input[0]).convert("RGB")
+        image = Image.open(args.source_path).convert("RGB")
         image_input, _, crop_face = preprocess(image)
     elif image_type == "reference":
         paths = list(Path(args.reference_dir).glob("*"))
@@ -118,8 +124,10 @@ def _prepare_data(args, preprocess, image_type, frame=None):
 
 
 def _initialize_net(args):
+    env_id = ailia.get_gpu_environment_id()
+    logger.info(f"env_id: {env_id}")
     if not args.onnx:
-        net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
+        net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
     else:
         import onnxruntime
 
@@ -189,7 +197,7 @@ def transfer_to_image():
     # Postprocessing
     postprocess = PostProcess(config)
     image = _postprocessing(out[0], source, crop_face, postprocess)
-    savepath = get_savepath(args.savepath, args.input[0])
+    savepath = get_savepath(args.savepath, args.source_path)
     image.save(savepath)
     logger.info(f"saved at : {savepath}")
     logger.info("Script finished successfully.")
