@@ -88,7 +88,7 @@ class FaceDetector:
             data=cv2.resize(data,(FACE_DETECTOR_IMAGE_WIDTH,FACE_DETECTOR_IMAGE_HEIGHT))
             data=data / 127.5 - 1.0
             data = data.transpose((2, 0, 1))  # channel first
-            data = data[np.newaxis, :, :, :]  # (batch_size, channel, h, w)
+            data = data[np.newaxis, :, :, :].astype(np.float32)  # (batch_size, channel, h, w)
         else:
             data = load_image(
                 self.input,
@@ -178,7 +178,7 @@ class PreProcess:
             data=cv2.resize(data,(FACE_ALIGNMENT_IMAGE_WIDTH,FACE_ALIGNMENT_IMAGE_HEIGHT))
             data=data / 255.0
             data = data.transpose((2, 0, 1))  # channel first
-            data = data[np.newaxis, :, :, :]  # (batch_size, channel, h, w)
+            data = data[np.newaxis, :, :, :].astype(np.float32)  # (batch_size, channel, h, w)
 
             preds_ailia = self.face_alignment.predict(data)
             pts, _ = _get_preds_from_hm(preds_ailia)
