@@ -83,12 +83,19 @@ class FaceDetector:
             self.net = onnxruntime.InferenceSession(self.face_detector_weight)
 
     def predict(self, image: Image):
-        data = load_image(
-            self.input,
-            (FACE_DETECTOR_IMAGE_HEIGHT, FACE_DETECTOR_IMAGE_WIDTH),
-            normalize_type="127.5",
-            gen_input_ailia=True,
-        ).astype(np.float32)
+        if self.input==None:
+            data = np.array(image)
+            data=cv2.resize(data,(FACE_DETECTOR_IMAGE_WIDTH,FACE_DETECTOR_IMAGE_HEIGHT))
+            data=data / 127.5 - 1.0
+            data = data.transpose((2, 0, 1))  # channel first
+            data = data[np.newaxis, :, :, :]  # (batch_size, channel, h, w)
+        else:
+            data = load_image(
+                self.input,
+                (FACE_DETECTOR_IMAGE_HEIGHT, FACE_DETECTOR_IMAGE_WIDTH),
+                normalize_type="127.5",
+                gen_input_ailia=True,
+            ).astype(np.float32)
 
         if not self.use_onnx:
             preds_ailia = self.net.predict([data])
@@ -141,7 +148,10 @@ class PreProcess:
         self.use_onnx = args.onnx
         self.use_dlib = args.use_dlib
         if not self.use_dlib:
-            self.input = args.input[0]
+            if not args.input:
+                self.input = None   # video mode
+            else:
+                self.input = args.input[0]
             self.face_alignment = FaceAlignment(
                 self.use_onnx, face_alignment_path[0], face_alignment_path[1], args.env_id
             )
@@ -164,13 +174,25 @@ class PreProcess:
             )
             lms = lms.round()
         else:
-            # prepare input data
-            data = load_image(
-                self.input,
-                (FACE_ALIGNMENT_IMAGE_HEIGHT, FACE_ALIGNMENT_IMAGE_WIDTH),
-                normalize_type="255",
-                gen_input_ailia=True,
-            ).astype(np.float32)
+            image_numpy = np.array(image)
+
+            if face[0]<0:
+                face[0]=0
+            if face[1]<0:
+                face[1]=0
+            if face[2]>image_numpy.shape[0]:
+                face[2]=image_numpy.shape[0]
+            if face[3]>image_numpy.shape[1]:
+                face[3]=image_numpy.shape[1]
+
+            face_image = image_numpy[face[1]:face[3],face[0]:face[2],:]
+
+            data = np.array(face_image)
+            data=cv2.resize(data,(FACE_ALIGNMENT_IMAGE_WIDTH,FACE_ALIGNMENT_IMAGE_HEIGHT))
+            data=data / 255.0
+            data = data.transpose((2, 0, 1))  # channel first
+            data = data[np.newaxis, :, :, :]  # (batch_size, channel, h, w)
+
             preds_ailia = self.face_alignment.predict(data)
             pts, _ = _get_preds_from_hm(preds_ailia)
             lms = pts.reshape(68, 2) * 4
