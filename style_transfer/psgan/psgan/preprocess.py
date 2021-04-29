@@ -174,20 +174,7 @@ class PreProcess:
             )
             lms = lms.round()
         else:
-            image_numpy = np.array(image)
-
-            if face[0]<0:
-                face[0]=0
-            if face[1]<0:
-                face[1]=0
-            if face[2]>image_numpy.shape[0]:
-                face[2]=image_numpy.shape[0]
-            if face[3]>image_numpy.shape[1]:
-                face[3]=image_numpy.shape[1]
-
-            face_image = image_numpy[face[1]:face[3],face[0]:face[2],:]
-
-            data = np.array(face_image)
+            data = np.array(image)
             data=cv2.resize(data,(FACE_ALIGNMENT_IMAGE_WIDTH,FACE_ALIGNMENT_IMAGE_HEIGHT))
             data=data / 255.0
             data = data.transpose((2, 0, 1))  # channel first
