@@ -144,7 +144,6 @@ The collection of pre-trained, state-of-the-art models.
 
 | | Model | Reference | Exported From | Supported Ailia Version |
 |:-----------|------------:|:------------:|:------------:|:------------:|
-| [<img src="image_manipulation/3d-photo-inpainting/output.png" width=128px>](image_manipulation/3d-photo-inpainting/) | [3d-photo-inpainting](/image_manipulation/3d-photo-inpainting/) | [3D Photography using Context-aware Layered Depth Inpainting](https://github.com/vt-vl-lab/3d-photo-inpainting) | Pytorch | 1.2.7 and later |
 | [<img src="image_manipulation/noise2noise/output.png" width=128px>](image_manipulation/noise2noise/) | [noise2noise](/image_manipulation/noise2noise/) | [Learning Image Restoration without Clean Data](https://github.com/joeylitalien/noise2noise-pytorch) | Pytorch | 1.2.0 and later |
 | [<img src="image_manipulation/dewarpnet/output.png" width=128px>](image_manipulation/dewarpnet/) | [dewarpnet](/image_manipulation/dewarpnet) | [DewarpNet: Single-Image Document Unwarping With Stacked 3D and 2D Regression Networks](https://github.com/cvlab-stonybrook/DewarpNet) | Pytorch | 1.2.1 and later |
 | [<img src="image_manipulation/illnet/output.png" width=128px>](image_manipulation/illnet/) | [illnet](/image_manipulation/illnet/) | [Document Rectification and Illumination Correction using a Patch-based CNN](https://github.com/xiaoyu258/DocProj) | Pytorch | 1.2.2 and later |
@@ -155,6 +154,7 @@ The collection of pre-trained, state-of-the-art models.
 | [<img src="image_manipulation/pytorch-inpainting-with-partial-conv/result.png" width=128px>](image_manipulation/pytorch-inpainting-with-partial-conv/) | [inpainting-with-partial-conv](/image_manipulation/pytorch-inpainting-with-partial-conv/) | [pytorch-inpainting-with-partial-conv](https://github.com/naoto0804/pytorch-inpainting-with-partial-conv) | PyTorch | 1.2.6 and later |
 | [<img src="image_manipulation/inpainting_gmcnn/result_paris-streetview_rect.png" width=128px>](image_manipulation/inpainting_gmcnn/) | [inpainting_gmcnn](/image_manipulation/inpainting_gmcnn/) | [Image Inpainting via Generative Multi-column Convolutional Neural Networks](https://github.com/shepnerd/inpainting_gmcnn) | TensorFlow | 1.2.6 and later |
 | [<img src="image_manipulation/deblur_gan/output.png" width=128px>](image_manipulation/deblur_gan/) | [deblur_gan](/image_manipulation/deblur_gan/) | [DeblurGAN](https://github.com/KupynOrest/DeblurGAN) | Pytorch | 1.2.6 and later |
+| [<img src="image_manipulation/3d-photo-inpainting/output.png" width=128px>](image_manipulation/3d-photo-inpainting/) | [3d-photo-inpainting](/image_manipulation/3d-photo-inpainting/) | [3D Photography using Context-aware Layered Depth Inpainting](https://github.com/vt-vl-lab/3d-photo-inpainting) | Pytorch | 1.2.7 and later |
 
 ## Image segmentation
 
@@ -246,6 +246,7 @@ The collection of pre-trained, state-of-the-art models.
 | | Model | Reference | Exported From | Supported Ailia Version |
 |:-----------|------------:|:------------:|:------------:|:------------:|
 | [<img src="style_transfer/adain/output.png" width=128px>](style_transfer/adain/) | [adain](/style_transfer/adain/) | [Arbitrary Style Transfer in Real-time with Adaptive Instance Normalization](https://github.com/naoto0804/pytorch-AdaIN)| Pytorch | 1.2.1 and later |
+| [<img src="style_transfer/psgan/output.png" width=128px>](style_transfer/psgan/) | [psgan](/style_transfer/psgan/) | [PSGAN: Pose and Expression Robust Spatial-Aware GAN for Customizable Makeup Transfer](https://github.com/wtjiang98/PSGAN)| Pytorch | 1.2.7 and later |
 
 
 ## Super resolution
