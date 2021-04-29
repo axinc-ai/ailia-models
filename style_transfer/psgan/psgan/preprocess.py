@@ -44,13 +44,11 @@ def copy_area(tar, src, lms):
 
 
 class FaceAlignment:
-    def __init__(self, use_onnx, face_alignment_model, face_alignment_weight):
+    def __init__(self, use_onnx, face_alignment_model, face_alignment_weight, env_id):
         self.face_alignment_model = face_alignment_model
         self.face_alignment_weight = face_alignment_weight
         self.use_onnx = use_onnx
         # initialize net
-        env_id = ailia.get_gpu_environment_id()
-        logger.info(f"env_id (face alignment): {env_id}")
         if not self.use_onnx:
             self.net = ailia.Net(
                 self.face_alignment_model, self.face_alignment_weight, env_id=env_id
@@ -69,14 +67,12 @@ class FaceAlignment:
 
 
 class FaceDetector:
-    def __init__(self, use_onnx, face_detector_model, face_detector_weight, input):
+    def __init__(self, use_onnx, face_detector_model, face_detector_weight, input, env_id):
         self.face_detector_model = face_detector_model
         self.face_detector_weight = face_detector_weight
         self.use_onnx = use_onnx
         self.input = input
         # initialize net
-        env_id = ailia.get_gpu_environment_id()
-        logger.info(f"env_id (face detector): {env_id}")
         if not self.use_onnx:
             self.net = ailia.Net(
                 self.face_detector_model, self.face_detector_weight, env_id=env_id
@@ -145,12 +141,12 @@ class PreProcess:
         self.use_onnx = args.onnx
         self.use_dlib = args.use_dlib
         if not self.use_dlib:
-            self.input = args.source_path
+            self.input = args.input[0]
             self.face_alignment = FaceAlignment(
-                self.use_onnx, face_alignment_path[0], face_alignment_path[1]
+                self.use_onnx, face_alignment_path[0], face_alignment_path[1], args.env_id
             )
             self.face_detector = FaceDetector(
-                self.use_onnx, face_detector_path[0], face_detector_path[1], self.input
+                self.use_onnx, face_detector_path[0], face_detector_path[1], self.input, args.env_id
             )
 
     def relative2absolute(self, lms):
