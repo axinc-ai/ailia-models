@@ -8,7 +8,9 @@
 
 ## Output
 
-![Output](output.png)
+![Output](example_moon_circle.jpg)
+
+[example_moon_circle.mp4](example_moon_circle.mp4)
 
 ## Requirements
 This model requires additional module.
