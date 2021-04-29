@@ -2,15 +2,17 @@
 
 
 ### input
-- input image  
+- input image (1x3x256x256)
+
 <img src="images/non-makeup/xfsy_0106.png" width="240px">
 
-- style image  
+- style image (1x3x256x256) 
+
 <img src="images/makeup/vFG586.png" width="240px">
 
 (These images from https://github.com/wtjiang98/PSGAN/tree/master/assets/images)
 
-### output
+### output (1x3x256x256)
 <img src="output.png" width="240px">
 
 ### usage
