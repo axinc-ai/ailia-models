@@ -36,6 +36,7 @@ cd ../../face_recognition/gazeml; python3 gazeml.py ${OPTION}
 cd ../../face_recognition/prnet; python3 prnet.py ${OPTION}
 cd ../../face_recognition/facemesh; python3 facemesh.py ${OPTION}
 cd ../../face_recognition/mediapipe_iris; python3 mediapipe_iris.py ${OPTION}
+cd ../../frame_interpolation/flavr; python3 flavr.py ${OPTION}
 cd ../../generative_adversarial_networks/council-GAN; python3 council-gan.py --glasses ${OPTION}
 cd ../../generative_adversarial_networks/council-GAN; python3 council-gan.py --m2f ${OPTION}
 cd ../../generative_adversarial_networks/council-GAN; python3 council-gan.py --anime ${OPTION}
@@ -56,6 +57,7 @@ cd ../../image_classification/mobilenetv3; python3 mobilenetv3.py ${OPTION}
 cd ../../image_classification/partialconv; python3 partialconv.py ${OPTION}
 cd ../../image_classification/resnet50; python3 resnet50.py ${OPTION}
 cd ../../image_classification/vgg16; python3 vgg16.py ${OPTION}
+cd ../../image_manipulation/3d-photo-inpainting; python3 3d-photo-inpainting.py ${OPTION}
 cd ../../image_manipulation/dewarpnet; python3 dewarpnet.py ${OPTION}
 cd ../../image_manipulation/illnet; python3 illnet.py ${OPTION}
 cd ../../image_manipulation/noise2noise; python3 noise2noise.py ${OPTION}
@@ -63,6 +65,7 @@ cd ../../image_manipulation/pytorch-inpainting-with-partial-conv; python3 pytorc
 cd ../../image_manipulation/colorization; python3 colorization.py ${OPTION}
 cd ../../image_manipulation/u2net_portrait; python3 u2net_portrait.py ${OPTION}
 cd ../../image_manipulation/style2paints; python3 style2paints.py ${OPTION}
+cd ../../image_manipulation/psgan; python3 psgan.py ${OPTION}
 cd ../../image_manipulation/deep_white_balance; python3 deep_white_balance.py ${OPTION}
 cd ../../image_manipulation/inpainting_gmcnn; python3 inpainting_gmcnn.py ${OPTION}
 cd ../../image_manipulation/deblur_gan; python3 deblur_gan.py ${OPTION}
@@ -114,6 +117,7 @@ cd ../../pose_estimation/blazepose; python3 blazepose.py ${OPTION}
 cd ../../pose_estimation/3dmppe_posenet; python3 3dmppe_posenet.py ${OPTION}
 cd ../../pose_estimation/efficientpose; python3 efficientpose.py ${OPTION}
 cd ../../pose_estimation/pose-hg-3d; python3 pose-hg-3d.py ${OPTION}
+cd ../../pose_estimation/gast; python3 gast.py ${OPTION}
 cd ../../rotation_prediction/rotnet; python3 rotnet.py ${OPTION}
 cd ../../style_transfer/adain; python3 adain.py ${OPTION}
 cd ../../super_resolution/srresnet; python3 srresnet.py ${OPTION}
