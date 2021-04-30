@@ -37,6 +37,8 @@ If you pass `0` as an argument to VIDEO_PATH, you can use the webcam input inste
 $ python3 psgan.py --video VIDEO_PATH --style STYLE_IMAGE_PATH
 ```
 
+By adding the `--use_dlib` option, you can use original version of face and landmark detection.
+
 ### Reference
 
 [PSGAN : Pose and Expression Robust Spatial-Aware GAN for Customizable Makeup Transfer](https://github.com/wtjiang98/PSGAN)
