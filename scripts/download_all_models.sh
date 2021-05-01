@@ -16,6 +16,7 @@ cd ../../deep_fashion/fashionai-key-points-detection; python3 fashionai-key-poin
 cd ../../deep_fashion/fashionai-key-points-detection; python3 fashionai-key-points-detection.py -c skirt ${OPTION}
 cd ../../deep_fashion/fashionai-key-points-detection; python3 fashionai-key-points-detection.py -c trousers ${OPTION}
 cd ../../deep_fashion/mmfashion; python3 mmfashion.py ${OPTION}
+cd ../../deep_fashion/mmfashion_tryon; python3 mmfashion_tryon.py ${OPTION}
 cd ../../depth_estimation/midas; python3 midas.py ${OPTION}
 cd ../../depth_estimation/monodepth2; python3 monodepth2.py ${OPTION}
 cd ../../depth_estimation/fcrn-depthprediction; python3 fcrn-depthprediction.py ${OPTION}
