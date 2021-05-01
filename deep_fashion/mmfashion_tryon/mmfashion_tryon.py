@@ -17,6 +17,8 @@ from detector_utils import load_image  # noqa: E402
 # logger
 from logging import getLogger  # noqa: E402
 
+from mmfashion_tryon_utils import *
+
 logger = getLogger(__name__)
 
 # ======================
@@ -28,7 +30,7 @@ WEIGHT_TOM_PATH = './TOM_epoch_40.onnx'
 MODEL_TOM_PATH = './TOM_epoch_40.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/mmfashion_tryon/'
 
-IMAGE_PATH = 'cloth/019029_1.jpg'
+IMAGE_CLOTH_PATH = 'cloth/019029_1.jpg'
 IMAGE_PERSON_PATH = 'image/000320_0.jpg'
 SAVE_IMAGE_PATH = 'output.png'
 
@@ -39,7 +41,7 @@ IMAGE_WIDTH = 192
 # Arguemnt Parser Config
 # ======================
 
-parser = get_base_parser('MMFashion tryon model', IMAGE_PATH, SAVE_IMAGE_PATH)
+parser = get_base_parser('MMFashion Virtual Try-on model', IMAGE_CLOTH_PATH, SAVE_IMAGE_PATH)
 parser.add_argument(
     '-p', '--person', metavar='IMAGE', default=IMAGE_PERSON_PATH,
     help='Image of person.'
@@ -53,10 +55,6 @@ parser.add_argument(
     '-k', '--keypoints', metavar='FILE/DIR', default='pose/',
     help='Keypoints json file. If a directory name is specified, '
          'find a json file with the same name as the person image file'
-)
-parser.add_argument(
-    '-cm', '--cloth_mask', metavar='IMAGE', default=None,
-    help='Image of cloth mask.'
 )
 parser.add_argument(
     '--onnx',
@@ -168,22 +166,21 @@ def cloth_agnostic():
     return agnostic
 
 
-def predict(GMM_net, TOM_net, cloth, cloth_mask, agnostic):
+def predict(GMM_net, TOM_net, cloth, agnostic):
     if not args.onnx:
         output = GMM_net.predict({
-            'cloth': cloth, 'cloth_mask': cloth_mask, 'agnostic': agnostic
+            'cloth': cloth, 'agnostic': agnostic
         })
     else:
         in0 = GMM_net.get_inputs()[0].name
         in1 = GMM_net.get_inputs()[1].name
-        in2 = GMM_net.get_inputs()[2].name
         out0 = GMM_net.get_outputs()[0].name
-        out1 = GMM_net.get_outputs()[1].name
         output = GMM_net.run(
-            [out0, out1],
-            {in0: cloth, in1: cloth_mask, in2: agnostic})
+            [out0],
+            {in0: cloth, in1: agnostic})
 
-    warped_cloth, warped_mask = output
+    grid = output[0]
+    warped_cloth = grid_sample(cloth, grid, padding_mode='border')
 
     if not args.onnx:
         output = TOM_net.predict({
@@ -199,7 +196,7 @@ def predict(GMM_net, TOM_net, cloth, cloth_mask, agnostic):
 
     tryon = output[0]
 
-    return tryon, warped_cloth, warped_mask
+    return tryon, warped_cloth
 
 
 def recognize_from_image(GMM_net, TOM_net):
@@ -216,17 +213,6 @@ def recognize_from_image(GMM_net, TOM_net):
         img = preprocess(img)
         img = np.expand_dims(img, axis=0)
 
-        # prepare cloth-mask image
-        if args.cloth_mask:
-            mask = load_image(args.cloth_mask)
-            mask = cv2.cvtColor(mask, cv2.COLOR_BGRA2GRAY)
-            mask = (mask > 128).astype(np.float32)
-            mask = np.expand_dims(mask, axis=0)
-            mask = np.expand_dims(mask, axis=0)
-        else:
-            h, w = img.shape[2:]
-            mask = np.ones((1, 1, h, w), dtype=np.float32)
-
         logger.debug(f'input image shape: {img.shape}')
 
         # inference
@@ -236,19 +222,18 @@ def recognize_from_image(GMM_net, TOM_net):
             total_time = 0
             for i in range(args.benchmark_count):
                 start = int(round(time.time() * 1000))
-                output = predict(GMM_net, TOM_net, img, mask, agnostic)
+                output = predict(GMM_net, TOM_net, img, agnostic)
                 end = int(round(time.time() * 1000))
                 logger.info(f'\tailia processing time {end - start} ms')
                 if i != 0:
                     total_time = total_time + (end - start)
             logger.info(f'\taverage time {total_time / (args.benchmark_count - 1)} ms')
         else:
-            output = predict(GMM_net, TOM_net, img, mask, agnostic)
+            output = predict(GMM_net, TOM_net, img, agnostic)
 
-        tryon, warped_cloth, warped_mask = output
+        tryon, warped_cloth = output
         tryon = post_processing(tryon[0])
         warped_cloth = post_processing(warped_cloth[0])
-        warped_mask = post_processing(warped_mask[0])
 
         savepath = get_savepath(args.savepath, image_path, ext='.png')
         logger.info(f'saved at : {savepath}')
@@ -257,11 +242,6 @@ def recognize_from_image(GMM_net, TOM_net):
         savepath_warp = '%s-warp-cloth%s' % os.path.splitext(savepath)
         logger.info(f'saved at : {savepath_warp}')
         cv2.imwrite(savepath_warp, warped_cloth)
-
-        if args.cloth_mask:
-            savepath_mask = '%s-warp-mask%s' % os.path.splitext(savepath)
-            logger.info(f'saved at : {savepath_mask}')
-            cv2.imwrite(savepath_mask, warped_mask)
 
     logger.info('Script finished successfully.')
 
