@@ -6,10 +6,10 @@
 ![Input](image/000320_0.jpg)
 ![Input](image-parse/000320_0.png)
 
-- cloth image
-- person image
-- parson-parse png image file created in palette mode that indexes 1, 2, 4, and 13 indicate the position of the head.
-- pose keypoints json file
+- Cloth image file
+- Person image file
+- Person-parse png image file created in palette mode that indexes 1, 2, 4, and 13 indicate the position of the head.
+- Pose keypoints json file
 
 (Image from VITON dataset https://drive.google.com/file/d/1MxCUvKxejnwWnoZ-KoCyMCXo3TLhRuTo/view)
 
