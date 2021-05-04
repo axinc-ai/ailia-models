@@ -124,7 +124,8 @@ def recognize_from_video():
         logger.warning(
             'currently, video results cannot be output correctly...'
         )
-        writer = webcamera_utils.get_writer(args.savepath, f_h, f_w, rgb=False)
+        #writer = webcamera_utils.get_writer(args.savepath, f_h, f_w, rgb=False) # alpha
+        writer = webcamera_utils.get_writer(args.savepath, f_h, f_w) # composite
     else:
         writer = None
 
