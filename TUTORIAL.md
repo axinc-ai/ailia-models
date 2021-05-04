@@ -21,7 +21,7 @@ pip3 install ./
 - You can find the location of Python site-packages directory using the following command.
 
 ```
-python -c "import site; print (site.getsitepackages())"
+pip3 show ailia
 ```
 
 ## Install required libraries for Python
