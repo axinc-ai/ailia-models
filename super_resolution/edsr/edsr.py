@@ -138,9 +138,8 @@ def recognize_from_video():
             preds_ailia = net.predict(input_data)[0] 
 
             # Postprocessing
-            output_img = preds_ailia.transpose(1, 2, 0) / 255
+            output_img = preds_ailia.transpose(1, 2, 0)
             output_img = cv2.cvtColor(output_img, cv2.COLOR_RGB2BGR)
-            output_img *= 255
             output_img = np.clip(output_img, 0, 255)
             output_img = output_img.astype(np.uint8)
 
