@@ -34,6 +34,11 @@ REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/edsr/'
 
 parser = get_base_parser('EDSR model', IMAGE_PATH, SAVE_IMAGE_PATH)
 parser.add_argument('--scale', choices=['2', '3', '4'], default='2', help='choose scale')
+parser.add_argument(
+    '--bilinear',
+    action='store_true',
+    help='execute bilinear version.'
+)
 args = update_parser(parser)
 
 
@@ -50,6 +55,10 @@ MODEL_PATH = 'edsr_scale' + args.scale + '.onnx.prototxt'
 # ======================
 
 def recognize_from_image():
+    if args.bilinear:
+        logger.error('bilinear mode only supporting in video input')
+        return
+
     # net initialize
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=-1)
     logger.info(IMAGE_PATH)
@@ -57,6 +66,7 @@ def recognize_from_image():
     for image_path in args.input:
 
         IMAGE_HEIGHT, IMAGE_WIDTH = get_image_shape(image_path)
+
         # prepare input data
         logger.info(image_path)
         input_data = load_image(
@@ -66,7 +76,6 @@ def recognize_from_image():
             normalize_type='None'
         )
         net.set_input_shape((1,3,IMAGE_HEIGHT,IMAGE_WIDTH))
-        #input_data = np.load('np_save.npy')
 
         # inference
         logger.info('Start inference...')
@@ -101,8 +110,8 @@ def recognize_from_video():
         logger.warning(
             'currently, video results cannot be output correctly...'
         )
-        f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
+        f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT) * int(args.scale))
+        f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH) * int(args.scale))
         writer = webcamera_utils.get_writer(args.savepath, f_h, f_w)
     else:
         writer = None
@@ -113,21 +122,29 @@ def recognize_from_video():
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
-
+            
         IMAGE_HEIGHT, IMAGE_WIDTH = frame.shape[0], frame.shape[1]
-        input_image, input_data = webcamera_utils.preprocess_frame(
-            frame, IMAGE_HEIGHT, IMAGE_WIDTH, normalize_type='None'
-        )
-        net.set_input_shape((1,3,IMAGE_HEIGHT,IMAGE_WIDTH))
 
-        # Inference
-        preds_ailia = net.predict(input_data)[0] 
-        output_img = preds_ailia.transpose(1, 2, 0) / 255
-        output_img = cv2.cvtColor(output_img, cv2.COLOR_RGB2BGR)
+        if args.bilinear:
+            output_img = cv2.resize(frame,(int(IMAGE_WIDTH*int(args.scale)),int(IMAGE_HEIGHT*int(args.scale))))
+        else:
+            # Preprocessing
+            input_image, input_data = webcamera_utils.preprocess_frame(
+                frame, IMAGE_HEIGHT, IMAGE_WIDTH, normalize_type='None'
+            )
+            net.set_input_shape((1,3,IMAGE_HEIGHT,IMAGE_WIDTH))
+
+            # Inference
+            preds_ailia = net.predict(input_data)[0] 
+
+            # Postprocessing
+            output_img = preds_ailia.transpose(1, 2, 0) / 255
+            output_img = cv2.cvtColor(output_img, cv2.COLOR_RGB2BGR)
+            output_img *= 255
+            output_img = np.clip(output_img, 0, 255)
+            output_img = output_img.astype(np.uint8)
+
         cv2.imshow('frame', output_img)
-        output_img *= 255
-        output_img = np.clip(output_img, 0, 255)     
-        #cv2.imwrite('pred.png', output_img) #please uncomment to save output
 
         # save results
         if writer is not None:
