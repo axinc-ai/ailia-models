@@ -13,7 +13,7 @@
 ```
 cd ailia_sdk/python
 python3 bootstrap.py
-pip3 install ./
+pip3 install .
 ```
 
 - In the evaluation version, place the license file in the same folder as libailia.dll ([python_path]/site_packages/ailia) on Windows and in ~/Library/SHALO/ on Mac.
@@ -58,20 +58,6 @@ pip3 install scikit-image
 sudo apt-get install libatlas-base-dev
 ```
 
-## Tutorial BLOG
-
-[ailia SDK tutorial (Python API) (EN)](https://medium.com/axinc-ai/ailia-sdk-tutorial-python-ea29ae990cf6)
-
-[ailia SDK tutorial (Python API) (JP)](https://medium.com/axinc/ailia-sdk-%E3%83%81%E3%83%A5%E3%83%BC%E3%83%88%E3%83%AA%E3%82%A2%E3%83%AB-python-28379dbc9649)
-
-## Launcher
-
-You can display a list of models and select them with the mouse by using the command below.
-
-```
-python3 launcher.py
-```
-
 ## Options
 
 The following options can be specified for each model.
@@ -108,14 +94,47 @@ optional arguments:
                         set iteration count of benchmark (default: 5)
 ```                        
 
-For example, to run in CPU mode:
+Input an image file, perform AI processing, and save the output to a file.
+
+```
+python3 yolov3-tiny.py -i input.png -s output.png
+```
+
+Input an video file, perform AI processing, and save the output to a video.
+
+```
+python3 yolov3-tiny.py -v input.mp4 -s output.mp4
+```
+
+Measure the execution time of the AI model.
+
+```
+python3 yolov3-tiny.py -b
+```
+
+Run AI model on CPU instead of GPU.
 
 ```
 python3 yolov3-tiny.py -e 0
 ```
 
-For example, to save to a video file:
+Get a list of executable environments.
 
 ```
-python3 yolov3-tiny.py -i input.mp4 -s output.mp4
+python3 yolov3-tiny.py --env_list
 ```
+
+## Launcher
+
+You can display a list of models and select them with the mouse by using the command below.
+
+```
+python3 launcher.py
+```
+
+## Tutorial BLOG
+
+[ailia SDK tutorial (Python API) (EN)](https://medium.com/axinc-ai/ailia-sdk-tutorial-python-ea29ae990cf6)
+
+[ailia SDK tutorial (Python API) (JP)](https://medium.com/axinc/ailia-sdk-%E3%83%81%E3%83%A5%E3%83%BC%E3%83%88%E3%83%AA%E3%82%A2%E3%83%AB-python-28379dbc9649)
+
