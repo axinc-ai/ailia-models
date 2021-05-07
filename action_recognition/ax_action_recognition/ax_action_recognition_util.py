@@ -8,8 +8,6 @@ TIME_RANGE = 15
 def pose_postprocess(pose_keypoints):
     thre = 0.2
     pose_keypoints[:, :, 0:2] = pose_keypoints[:, :, 0:2] - 0.5
-    # pose_keypoints[:, :, 0][pose_keypoints[:, :, 2] == 0] = 0
-    # pose_keypoints[:, :, 1][pose_keypoints[:, :, 2] == 0] = 0
     pose_keypoints[:, :, 0][pose_keypoints[:, :, 2] < thre] = 0
     pose_keypoints[:, :, 1][pose_keypoints[:, :, 2] < thre] = 0
     pose_keypoints[:, :, 2][pose_keypoints[:, :, 2] < thre] = 0
@@ -102,7 +100,6 @@ def draw_boxes(img, bbox, identities, actions, action_datas, offset=(0, 0)):
         # box text and bar
         id = int(identities[i])
         action = actions[i]
-        #action_data = action_datas[id]
         color = compute_color_for_labels(id)
         label = '{}{:d}'.format("", id)
         label = label + " " + action
@@ -120,9 +117,6 @@ def draw_boxes(img, bbox, identities, actions, action_datas, offset=(0, 0)):
             2
         )
 
-        #shape = action_data.shape
-        #if x1+shape[1]<=x2 and y1+shape[0]<=y2:
-        #    img[y1:y1+shape[0],x2-shape[1]:x2,:]=action_data
     return img
 
 def softmax(x):
