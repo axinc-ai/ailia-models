@@ -24,9 +24,9 @@ from image_utils import normalize_image  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from utils import check_file_existance  # noqa: E402
 
-sys.path.append('./preprocess')
-from normalize import pose_postprocess, normalize_keypoint,push_keypoint,TIME_RANGE
-from pose_resnet_util import get_final_preds, get_affine_transform, compute, keep_aspect
+from ax_action_recognition_util import pose_postprocess,TIME_RANGE
+sys.path.append('../../pose_estimation/pose_resnet')
+from pose_resnet_util import compute, keep_aspect
 
 # from scipy.special import softmax
 def softmax(x):
