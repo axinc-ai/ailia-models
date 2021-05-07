@@ -8,6 +8,9 @@
 
 (Video is generated from dataset in https://github.com/felixchenfy/Realtime-Action-Recognition)
 
+### Pose
+Shape : (1, 2, frame, 18, person)
+
 ## Output
 
 ![Output](punch_03-12-09-21-27-876_out.gif)
@@ -37,6 +40,8 @@ $ python3 ax_action_recognition.py --video VIDEO_PATH -a pose_resnet
 
 - [Realtime-Action-Recognition](https://github.com/felixchenfy/Realtime-Action-Recognition)
 - [ST-GCN](https://github.com/yysijie/st-gcn)
+
+The architecture of ax_action_recognition model is simplified from ST-GCN, and trained with Realtime-Action-Recognition dataset.
 
 ## Framework
 
