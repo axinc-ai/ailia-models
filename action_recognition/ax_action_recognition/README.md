@@ -8,14 +8,15 @@
 
 (Video is generated from dataset in https://github.com/felixchenfy/Realtime-Action-Recognition)
 
-### Pose
-Shape : (1, 2, frame, 18, person)
+Input shape : (1, C, T, V, M) = (1, 2, 15, 18, 1)
+C: channel number
+T: frame number
+V: keypoint number
+M: person ID
 
 ## Output
 
 ![Output](punch_03-12-09-21-27-876_out.gif)
-
-- output shape : (1, 2, out_frame, 18, person)
 
 ## Category
 
