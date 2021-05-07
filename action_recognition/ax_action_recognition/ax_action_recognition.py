@@ -12,19 +12,19 @@ import yaml
 
 import ailia
 
-sys.path.append('../tracker')
+sys.path.append('./tracker')
 from sort.tracker import Tracker
 from sort.nn_matching import NearestNeighborDistanceMetric
 from deepsort_utils import *
 
-sys.path.append('../util')
+sys.path.append('./util')
 from webcamera_utils import adjust_frame_size  # noqa: E402
 from image_utils import load_image  # noqa: E402
 from image_utils import normalize_image  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from utils import check_file_existance  # noqa: E402
 
-sys.path.append('../preprocess')
+sys.path.append('./preprocess')
 from normalize import pose_postprocess, normalize_keypoint,push_keypoint,TIME_RANGE
 from pose_resnet_util import get_final_preds, get_affine_transform, compute, keep_aspect
 
@@ -42,8 +42,6 @@ SAVE_IMAGE_PATH = ""
 ALGORITHM = ailia.POSE_ALGORITHM_LW_HUMAN_POSE
 
 MODEL_LISTS = ['lw_human_pose', 'pose_resnet']
-MODE_LISTS = ['default', 'dropout', 'metric','leaky']
-DATASET_KIND_LISTS = ['my-own', 'dk', 'action_recognition','alsok','mixed']
 FRAMEWORK_KIND_LISTS = ['ailia', 'keras', 'torch']
 ACTION_TYPE_LISTS = ['gcn','cnn']
 
@@ -89,21 +87,6 @@ parser.add_argument(
     help='model lists: ' + ' | '.join(MODEL_LISTS)
 )
 parser.add_argument(
-    '-m', '--mode', metavar='MODE',
-    default='default', choices=MODE_LISTS,
-    help='mode lists: ' + ' | '.join(MODE_LISTS)
-)
-parser.add_argument(
-    '-d', '--dataset', metavar='DATASET',
-    default='dataset',
-    help='dataset name for encoded skeleton images, better to start with the prefix of dataset'
-)
-parser.add_argument(
-    '-k', '--dataset_kind', metavar='DATASET_KIND',
-    default='my-own', choices=DATASET_KIND_LISTS,
-    help='dataset kind lists: ' + ' | '.join(DATASET_KIND_LISTS)
-)
-parser.add_argument(
     '-s', '--savepath', metavar='SAVE_IMAGE_PATH',
     default=SAVE_IMAGE_PATH,
     help='Save path for the output image or video.'
@@ -119,97 +102,36 @@ parser.add_argument(
     default=10,
     help='Input fps for the detection model'
 )
-parser.add_argument(
-    '-t', '--framework_type',
-    default='ailia',
-    help='Framwork type used for demo: ' + ' | '.join(FRAMEWORK_KIND_LISTS)
-)
-parser.add_argument(
-    '-c', '--action_model_type',
-    default='gcn', choices=ACTION_TYPE_LISTS,
-    help='Action recognition model type: gcn or cnn'
-)
-parser.add_argument(
-    '-y', '--action_model_args',
-    default='../train_ours.yaml',
-    help='yaml file for st-gcn action model arguments'
-)
-parser.add_argument(
-    '-e', '--add_erasing_mask', type=int,
-    default=0,
-    help='Test robustness of the model with black erasing mask, 1: add, 0: no add'
-)
 args = parser.parse_args()
 
-# Erasing frame range(% of the full image)
-TOP, DOWN, LEFT, RIGHT = 0.35, 0.65, 0.35, 0.65
+POSE_KEY = [
+    ailia.POSE_KEYPOINT_NOSE,
+    ailia.POSE_KEYPOINT_SHOULDER_CENTER,
+    ailia.POSE_KEYPOINT_SHOULDER_RIGHT,
+    ailia.POSE_KEYPOINT_ELBOW_RIGHT,
+    ailia.POSE_KEYPOINT_WRIST_RIGHT,
+    ailia.POSE_KEYPOINT_SHOULDER_LEFT,
+    ailia.POSE_KEYPOINT_ELBOW_LEFT,
+    ailia.POSE_KEYPOINT_WRIST_LEFT,
+    ailia.POSE_KEYPOINT_HIP_RIGHT,
+    ailia.POSE_KEYPOINT_KNEE_RIGHT,
+    ailia.POSE_KEYPOINT_ANKLE_RIGHT,
+    ailia.POSE_KEYPOINT_HIP_LEFT,
+    ailia.POSE_KEYPOINT_KNEE_LEFT,
+    ailia.POSE_KEYPOINT_ANKLE_LEFT,
+    ailia.POSE_KEYPOINT_EYE_RIGHT,
+    ailia.POSE_KEYPOINT_EYE_LEFT,
+    ailia.POSE_KEYPOINT_EAR_RIGHT,
+    ailia.POSE_KEYPOINT_EAR_LEFT,
+]
 
-if args.action_model_type == 'gcn':
-    if args.action_model_args is not None:
-        # load action model config file
-        with open(args.action_model_args, 'r') as f:
-            ama = yaml.load(f, Loader=yaml.FullLoader)
-            model_args = ama['model_args']
-            work_dir = ama['work_dir']
+def ailia_to_openpose(person):
+    pose_keypoints = np.zeros((18, 3))
+    for i, key in enumerate(POSE_KEY):
+        p = person.points[key]
+        pose_keypoints[i, :] = [p.x, p.y, p.score]
+    return pose_keypoints
 
-    POSE_KEY = [
-        ailia.POSE_KEYPOINT_NOSE,
-        ailia.POSE_KEYPOINT_SHOULDER_CENTER,
-        ailia.POSE_KEYPOINT_SHOULDER_RIGHT,
-        ailia.POSE_KEYPOINT_ELBOW_RIGHT,
-        ailia.POSE_KEYPOINT_WRIST_RIGHT,
-        ailia.POSE_KEYPOINT_SHOULDER_LEFT,
-        ailia.POSE_KEYPOINT_ELBOW_LEFT,
-        ailia.POSE_KEYPOINT_WRIST_LEFT,
-        ailia.POSE_KEYPOINT_HIP_RIGHT,
-        ailia.POSE_KEYPOINT_KNEE_RIGHT,
-        ailia.POSE_KEYPOINT_ANKLE_RIGHT,
-        ailia.POSE_KEYPOINT_HIP_LEFT,
-        ailia.POSE_KEYPOINT_KNEE_LEFT,
-        ailia.POSE_KEYPOINT_ANKLE_LEFT,
-        ailia.POSE_KEYPOINT_EYE_RIGHT,
-        ailia.POSE_KEYPOINT_EYE_LEFT,
-        ailia.POSE_KEYPOINT_EAR_RIGHT,
-        ailia.POSE_KEYPOINT_EAR_LEFT,
-    ]
-
-    def ailia_to_openpose(person):
-        pose_keypoints = np.zeros((18, 3))
-        for i, key in enumerate(POSE_KEY):
-            p = person.points[key]
-            pose_keypoints[i, :] = [p.x, p.y, p.score]
-        return pose_keypoints
-
-    ACTION_MODEL_NAME = 'action'
-    if args.framework_type == 'ailia':
-        ACTION_WEIGHT_PATH = '../st-gcn/st-gcn/'+work_dir+f"/{ACTION_MODEL_NAME}.onnx"
-        ACTION_MODEL_PATH = '../st-gcn/st-gcn/'+work_dir+f"/{ACTION_MODEL_NAME}.onnx.prototxt"
-    elif args.framework_type == 'torch':
-        sys.path.append('../st-gcn')
-        sys.path.append('../st-gcn/st-gcn')
-        from net.st_gcn import Model
-        import torch
-        from collections import OrderedDict
-
-        DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
-        ACTION_MODEL_PATH = '../st-gcn/st-gcn/'+work_dir+f"/{ACTION_MODEL_NAME}.pt"
-    else:
-        print("[ERROR] framework not found")
-        sys.exit(1)
-
-elif args.action_model_type == 'cnn':
-    ACTION_MODEL_NAME = 'action'
-    if args.framework_type == 'ailia':
-        ACTION_WEIGHT_PATH = "../train/pretrain/"+args.dataset_kind+"/"+args.dataset+"/"+args.arch+"/"+args.mode+f"/{ACTION_MODEL_NAME}.onnx"
-        ACTION_MODEL_PATH = "../train/pretrain/"+args.dataset_kind+"/"+args.dataset+"/"+args.arch+"/"+args.mode+f"/{ACTION_MODEL_NAME}.onnx.prototxt"
-    elif args.framework_type == 'keras':
-        import keras
-        from keras.models import load_model
-
-        ACTION_MODEL_PATH = "../train/pretrain/"+args.dataset_kind+"/"+args.dataset+"/"+args.arch+"/"+args.mode+f"/{ACTION_MODEL_NAME}.hdf5.intermediate"
-    else:
-        print("[ERROR] framework not found")
-        sys.exit(1)
 
 def load_weights(model, weights_path, ignore_weights=None):
     if ignore_weights is None:
@@ -271,6 +193,10 @@ DETECTOR_WEIGHT_PATH = 'yolov3.opt.onnx'
 DETECTOR_MODEL_PATH = 'yolov3.opt.onnx.prototxt'
 DETECTOR_REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/yolov3/'
 
+ACTION_WEIGHT_PATH = 'action.onnx'
+ACTION_MODEL_PATH = 'action.onnx.prototxt'
+ACTION_REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/ax_action_recognition/'
+
 # Deep sort model input
 EX_INPUT_HEIGHT = 128
 EX_INPUT_WIDTH = 64
@@ -285,30 +211,6 @@ THRESHOLD = 0.4
 MIN_CONFIDENCE = 0.3
 IOU = 0.45
 POSE_THRESHOLD = 0.3
-
-
-# ----------------------------------------------
-# metric
-# ----------------------------------------------
-
-custom_objects=None
-if args.mode=="metric":
-	from keras import regularizers
-	from keras import layers
-	import keras.backend as K
-
-	#This is custom layer way
-	# If you use trainable variables, you should write this way
-	# ref : https://www.tensorflow.org/api_docs/python/tf/keras/layers/Lambda#variables
-	class L2ConstrainLayer(layers.Layer):
-		def __init__(self, **kwargs):
-			super(L2ConstrainLayer, self).__init__()
-
-		def call(self, inputs, **kwargs):
-			#about l2_normalize https://www.tensorflow.org/api_docs/python/tf/keras/backend/l2_normalize?hl=ja
-			return K.l2_normalize(inputs, axis=1) * 30
-
-	custom_objects={'L2ConstrainLayer':L2ConstrainLayer}
 
 # ======================
 # Utils
@@ -407,14 +309,9 @@ def action_recognition(box,input_image,pose,detector,model,data):
 
     keypoints = []
     
-    if args.action_model_type == 'gcn':
-        openpose_keypoints=ailia_to_openpose(person)
-        frame = np.expand_dims(openpose_keypoints, axis=1)
-        frame = pose_postprocess(frame)
-    elif args.action_model_type == 'cnn':  
-        for i in range(0,ailia.POSE_KEYPOINT_CNT):
-            keypoints.append(person.points[i])
-        frame = push_keypoint(keypoints)
+    openpose_keypoints=ailia_to_openpose(person)
+    frame = np.expand_dims(openpose_keypoints, axis=1)
+    frame = pose_postprocess(frame)
 
     for i in range(TIME_RANGE-1):
         data[:,i,:]=data[:,i+1,:] #data: (ailia.POSE_KEYPOINT_CNT,TIME_RANGE,3)
@@ -426,84 +323,34 @@ def action_recognition(box,input_image,pose,detector,model,data):
         if np.sum(data[:,i,:])==0:
             zero_cnt=zero_cnt+1
 
-    if args.action_model_type == 'gcn':
-        if zero_cnt>=1:
-            return "-", person
+    if zero_cnt>=1:
+        return "-", person
 
-        if "C9" in args.dataset:
-            labels=['stand', 'walk', 'run', 'jump', 'sit', 'squat', 'kick', 'punch', 'wave']
-        elif args.dataset=="dataset3":
-            labels=["punch","sit","stand"]
-        else:
-            labels=["fallen","search-camera", "sit", "stand","take-objects"]
+    labels=['stand', 'walk', 'run', 'jump', 'sit', 'squat', 'kick', 'punch', 'wave']
 
-        # data = data[:18,...]
-        data_rgb = data.transpose((2 ,1, 0))
-        data_rgb = data_rgb[:2,...]   # May need to be removed?
 
-        data_rgb = np.expand_dims(data_rgb, axis=3)
-        data_rgb.shape = (1,) + data_rgb.shape
+    # data = data[:18,...]
+    data_rgb = data.transpose((2 ,1, 0))
+    data_rgb = data_rgb[:2,...]   # May need to be removed?
 
-        if args.framework_type == 'torch':
-            model.eval()
-            with torch.no_grad():
-                data_rgb = torch.from_numpy(data_rgb).float().to(DEVICE)
-                action = model(data_rgb).cpu().detach().numpy()
+    data_rgb = np.expand_dims(data_rgb, axis=3)
+    data_rgb.shape = (1,) + data_rgb.shape
 
-        elif args.framework_type == 'ailia':
-            model.set_input_shape(data_rgb.shape)
-            action = model.predict(data_rgb)
+    model.set_input_shape(data_rgb.shape)
+    action = model.predict(data_rgb)
 
-        action = softmax(action)
-        # print(action)
-        max_prob=0
-        class_idx=0
-        for i in range(len(labels)):
-            #if labels[i]!="sit" and labels[i]!="stand" and labels[i]!="walk" and labels[i]!="run":
-            #    continue
-            if max_prob<=action[0][i]:
-                max_prob = action[0][i]
-                class_idx = i
+    action = softmax(action)
+    # print(action)
+    max_prob=0
+    class_idx=0
+    for i in range(len(labels)):
+        #if labels[i]!="sit" and labels[i]!="stand" and labels[i]!="walk" and labels[i]!="run":
+        #    continue
+        if max_prob<=action[0][i]:
+            max_prob = action[0][i]
+            class_idx = i
 
-        return labels[class_idx]+" "+str(int(max_prob*100)/100),person
-
-    elif args.action_model_type == 'cnn':
-        if zero_cnt>=1:
-            flow = normalize_keypoint(data, threshold=POSE_THRESHOLD)
-            return "-", person, flow
-
-        if "C9" in args.dataset:
-            labels=['stand', 'walk', 'run', 'jump', 'sit', 'squat', 'kick', 'punch', 'wave']
-        elif args.dataset=="dataset3":
-            labels=["punch","sit","stand"]
-        else:
-            labels=["fallen","search-camera", "sit", "stand","take-objects-into-bag"]
-
-        data_rgb = normalize_keypoint(data, threshold=POSE_THRESHOLD)
-        flow = data_rgb.copy()
-        data_rgb = data_rgb[...,::-1]  #BGR 2 RGB
-        data_rgb = np.array(data_rgb, dtype=np.float32)/255.
-        data_rgb.shape = (1,) + data_rgb.shape
-
-        # data_rgb = data_rgb.transpose((0, 3, 1, 2))
-
-        """
-        Caution!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        """
-        # data_rgb = data_rgb[:,:16,:,2:] # May need to be removed
-
-        action = model.predict(data_rgb)
-
-        max_prob=0
-        class_idx=0
-        for i in range(len(labels)):
-            #if labels[i]!="sit" and labels[i]!="stand" and labels[i]!="walk" and labels[i]!="run":
-            #    continue
-            if max_prob<=action[0][i]:
-                max_prob = action[0][i]
-                class_idx = i
-
-        return labels[class_idx]+" "+str(int(max_prob*100)/100),person,flow
+    return labels[class_idx]+" "+str(int(max_prob*100)/100),person
 
 def resize(img, size=(EX_INPUT_WIDTH, EX_INPUT_HEIGHT)):
     return cv2.resize(img.astype(np.float32), size)
@@ -577,34 +424,9 @@ def recognize_from_video():
     )
 
     # action recognition
-    if args.action_model_type == 'gcn':
-        if args.framework_type == 'ailia':
-            env_id = ailia.get_gpu_environment_id()
-            print(f'env_id: {env_id}')
-            model = ailia.Net(ACTION_MODEL_PATH, ACTION_WEIGHT_PATH, env_id=env_id)
-        elif args.framework_type == 'torch':
-            model = Model(**model_args)
-            model = load_weights(model, ACTION_MODEL_PATH).to(DEVICE)
-            model.eval()
-
-            # torch.save(model.state_dict(), 'action_old_torch.pt', _use_new_zipfile_serialization=False)
-
-            # if True:
-            #     # Export onnx
-            #     x = torch.ones((1, 2, 15, 18, 1)).to(DEVICE)  # (1, channel, frame, joint, person)
-            #     out = model(x)
-            #     print('out', out)
-            #     torch.onnx.export(model, x, 'action.onnx', verbose=True, opset_version=11)
-            #     return None
-
-    elif args.action_model_type == 'cnn':
-        if args.framework_type == 'ailia':
-            env_id = ailia.get_gpu_environment_id()
-            print(f'env_id: {env_id}')
-            model = ailia.Net(ACTION_MODEL_PATH, ACTION_WEIGHT_PATH, env_id=env_id)
-        elif args.framework_type == 'keras':
-            model=load_model(ACTION_MODEL_PATH,custom_objects=custom_objects)
-            model.summary()
+    env_id = ailia.get_gpu_environment_id()
+    print(f'env_id: {env_id}')
+    model = ailia.Net(ACTION_MODEL_PATH, ACTION_WEIGHT_PATH, env_id=env_id)
 
     action_data = {}
 
@@ -617,9 +439,6 @@ def recognize_from_video():
         if args.video == '0' and time_curr-time_start > RECORD_TIME:
             break
         ret, frame = capture.read()
-        if ret and bool(args.add_erasing_mask):
-            h,w,c = frame.shape
-            frame[int(h*TOP):int(h*DOWN), int(w*LEFT):int(w*RIGHT),:] = 0
 
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
@@ -714,7 +533,6 @@ def recognize_from_video():
         # action detection
         actions = []
         persons = []
-        flows = []
         if len(outputs) > 0:
             bbox_xyxy = outputs[:, :4]
             identities = outputs[:, -1]
@@ -722,17 +540,10 @@ def recognize_from_video():
                 id = identities[i]
 
                 if not(id in action_data):
-                    if args.action_model_type == 'gcn':
-                        action_data[id] = np.zeros((ailia.POSE_KEYPOINT_CNT-1,TIME_RANGE,3))
-                    if args.action_model_type == 'cnn':
-                        action_data[id] = np.zeros((ailia.POSE_KEYPOINT_CNT,TIME_RANGE,3))
+                    action_data[id] = np.zeros((ailia.POSE_KEYPOINT_CNT-1,TIME_RANGE,3))
 
                 # action recognition
-                if args.action_model_type == 'gcn':
-                    action,person = action_recognition(box, input_image, pose, detector, model, action_data[id])
-                elif args.action_model_type == 'cnn':
-                    action,person,flow = action_recognition(box, input_image, pose, detector, model, action_data[id])
-                    flows.append(flow.astype(np.uint8))
+                action,person = action_recognition(box, input_image, pose, detector, model, action_data[id])
                 actions.append(action)
                 persons.append(person)
                 
@@ -750,12 +561,6 @@ def recognize_from_video():
         for person in persons:
             if person!=None:
                 display_result(input_image, person)
-
-        if args.action_model_type == 'cnn':
-            # draw flow
-            for i in range(len(flows)):
-                # input_image[0:19,TIME_RANGE*i:TIME_RANGE*(i+1),0:3]=flows[i][0:19,0:TIME_RANGE,0:3]
-                input_image[0:8,TIME_RANGE*i:TIME_RANGE*(i+1),0:3]=flows[i][0:8,0:TIME_RANGE,0:3]
 
         if writer is not None:
             writer.write(input_image)
@@ -786,10 +591,12 @@ def main():
     if args.arch=="lw_human_pose":
         check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
         check_and_download_models(EX_WEIGHT_PATH, EX_MODEL_PATH, EX_REMOTE_PATH)
+        check_and_download_models(ACTION_WEIGHT_PATH, ACTION_MODEL_PATH,ACTION_REMOTE_PATH)
     else:
         check_and_download_models(POSE_WEIGHT_PATH, POSE_MODEL_PATH, POSE_REMOTE_PATH)
         check_and_download_models(DETECTOR_WEIGHT_PATH, DETECTOR_MODEL_PATH, DETECTOR_REMOTE_PATH)
         check_and_download_models(EX_WEIGHT_PATH, EX_MODEL_PATH, EX_REMOTE_PATH)
+        check_and_download_models(ACTION_WEIGHT_PATH, ACTION_MODEL_PATH,ACTION_REMOTE_PATH)
 
     if args.video is not None:
         # video mode
