@@ -1,4 +1,4 @@
-# Action recognition
+# ax Action recognition
 # (c) 2020 ax Inc.
 
 import sys
@@ -56,6 +56,8 @@ COCO_CATEGORY = [
     "oven", "toaster", "sink", "refrigerator", "book", "clock", "vase",
     "scissors", "teddy bear", "hair drier", "toothbrush"
 ]
+
+LABELS=['stand', 'walk', 'run', 'jump', 'sit', 'squat', 'kick', 'punch', 'wave']
 
 FRAME_SKIP = True
 
@@ -127,42 +129,6 @@ def ailia_to_openpose(person):
         p = person.points[key]
         pose_keypoints[i, :] = [p.x, p.y, p.score]
     return pose_keypoints
-
-
-def load_weights(model, weights_path, ignore_weights=None):
-    if ignore_weights is None:
-        ignore_weights = []
-    if isinstance(ignore_weights, str):
-        ignore_weights = [ignore_weights]
-
-    print('Load weights from {}.'.format(weights_path))
-    weights = torch.load(weights_path)
-    weights = OrderedDict([[k.split('module.')[-1],
-                            v.cpu()] for k, v in weights.items()])
-
-    # filter weights
-    for i in ignore_weights:
-        ignore_name = list()
-        for w in weights:
-            if w.find(i) == 0:
-                ignore_name.append(w)
-        for n in ignore_name:
-            weights.pop(n)
-            print('Filter [{}] remove weights [{}].'.format(i,n))
-
-    for w in weights:
-        print('Load weights [{}].'.format(w))
-
-    try:
-        model.load_state_dict(weights)
-    except (KeyError, RuntimeError):
-        state = model.state_dict()
-        diff = list(set(state.keys()).difference(set(weights.keys())))
-        for d in diff:
-            print('Can not find weights [{}].'.format(d))
-        state.update(weights)
-        model.load_state_dict(state)
-    return model
 
 # ======================
 # Parameters 2
@@ -289,7 +255,7 @@ def action_recognition(box,input_image,pose,detector,model,data):
                 idx = i
 
         if idx == -1:
-            return "-", None, data
+            return "-", None
 
         person = pose.get_object_pose(idx)
     else:
@@ -302,8 +268,6 @@ def action_recognition(box,input_image,pose,detector,model,data):
         scale_y = crop_img.shape[0]/input_image.shape[0]
         detections = compute(pose,crop_img,offset_x,offset_y,scale_x,scale_y)
         person=detections
-
-    keypoints = []
     
     openpose_keypoints=ailia_to_openpose(person)
     frame = np.expand_dims(openpose_keypoints, axis=1)
@@ -322,12 +286,8 @@ def action_recognition(box,input_image,pose,detector,model,data):
     if zero_cnt>=1:
         return "-", person
 
-    labels=['stand', 'walk', 'run', 'jump', 'sit', 'squat', 'kick', 'punch', 'wave']
-
-
-    # data = data[:18,...]
     data_rgb = data.transpose((2 ,1, 0))
-    data_rgb = data_rgb[:2,...]   # May need to be removed?
+    data_rgb = data_rgb[:2,...]   # May need to be removed if input for action model changed
 
     data_rgb = np.expand_dims(data_rgb, axis=3)
     data_rgb.shape = (1,) + data_rgb.shape
@@ -336,17 +296,14 @@ def action_recognition(box,input_image,pose,detector,model,data):
     action = model.predict(data_rgb)
 
     action = softmax(action)
-    # print(action)
     max_prob=0
     class_idx=0
-    for i in range(len(labels)):
-        #if labels[i]!="sit" and labels[i]!="stand" and labels[i]!="walk" and labels[i]!="run":
-        #    continue
+    for i in range(len(LABELS)):
         if max_prob<=action[0][i]:
             max_prob = action[0][i]
             class_idx = i
 
-    return labels[class_idx]+" "+str(int(max_prob*100)/100),person
+    return LABELS[class_idx]+" "+str(int(max_prob*100)/100),person
 
 def resize(img, size=(EX_INPUT_WIDTH, EX_INPUT_HEIGHT)):
     return cv2.resize(img.astype(np.float32), size)
@@ -358,7 +315,6 @@ def resize(img, size=(EX_INPUT_WIDTH, EX_INPUT_HEIGHT)):
 
 def recognize_from_video():
     try:
-        video_id = int(args.video)
         print('[INFO] Webcam mode is activated')
         RECORD_TIME = 80
         capture = cv2.VideoCapture(int(args.video))
@@ -370,7 +326,6 @@ def recognize_from_video():
             capture = cv2.VideoCapture(args.video)
 
     frame_rate = capture.get(cv2.CAP_PROP_FPS)
-    print('frame_rate',frame_rate)
     if FRAME_SKIP:
         action_recognize_fps = int(args.fps)
     else:
@@ -472,7 +427,7 @@ def recognize_from_video():
         # bbox dilation just in case bbox too small,
         # delete this line if using a better pedestrian detector
         if args.arch=="pose_resnet":
-            # bbox_xywh[:, 3:] *= 1.2   #May need to be removed?
+            # bbox_xywh[:, 3:] *= 1.2   #May need to be removed in the future
             cls_conf = cls_conf[mask]
 
         # do tracking
@@ -567,9 +522,7 @@ def recognize_from_video():
             print("\r" + str(idx_frame + 1) + " / " + str(frame_nb) ,end="")
             if idx_frame == frame_nb - 1:
                 print()
-        # else:
-        #     h,w = input_image.shape[0], input_image.shape[1]
-        #     show_image = cv2.resize(input_image, (w//2, h//2), interpolation=cv2.INTER_CUBIC)
+
         cv2.imshow('frame', input_image)
 
         idx_frame = idx_frame + 1
