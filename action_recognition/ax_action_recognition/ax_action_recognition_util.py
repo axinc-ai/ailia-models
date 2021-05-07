@@ -124,3 +124,7 @@ def draw_boxes(img, bbox, identities, actions, action_datas, offset=(0, 0)):
         #if x1+shape[1]<=x2 and y1+shape[0]<=y2:
         #    img[y1:y1+shape[0],x2-shape[1]:x2,:]=action_data
     return img
+
+def softmax(x):
+    u = np.sum(np.exp(x))
+    return np.exp(x)/u

@@ -26,14 +26,10 @@ from image_utils import normalize_image  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from utils import check_file_existance  # noqa: E402
 
-from ax_action_recognition_util import pose_postprocess,TIME_RANGE,get_detector_result_lw_human_pose,draw_boxes
+from ax_action_recognition_util import pose_postprocess,TIME_RANGE,get_detector_result_lw_human_pose,draw_boxes,softmax
 sys.path.append('../../pose_estimation/pose_resnet')
-from pose_resnet_util import compute, keep_aspect
+from pose_resnet_util import compute,keep_aspect
 
-# from scipy.special import softmax
-def softmax(x):
-    u = np.sum(np.exp(x))
-    return np.exp(x)/u
 
 
 # ======================
