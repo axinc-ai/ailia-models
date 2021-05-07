@@ -11,10 +11,12 @@ import math
 
 import ailia
 
-sys.path.append('./tracker')
+# import tracking modules
+sys.path.append('../../object_tracking/deepsort')
 from sort.tracker import Tracker
 from sort.nn_matching import NearestNeighborDistanceMetric
-from deepsort_utils import *
+from deepsort_utils import Detection,xywh_to_xyxy,xywh_to_tlwh,tlwh_to_xyxy,xyxy_to_tlwh,\
+    get_detector_result,non_max_suppression
 
 # import original modules
 sys.path.append('../../util')
@@ -24,7 +26,7 @@ from image_utils import normalize_image  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from utils import check_file_existance  # noqa: E402
 
-from ax_action_recognition_util import pose_postprocess,TIME_RANGE
+from ax_action_recognition_util import pose_postprocess,TIME_RANGE,get_detector_result_lw_human_pose,draw_boxes
 sys.path.append('../../pose_estimation/pose_resnet')
 from pose_resnet_util import compute, keep_aspect
 
