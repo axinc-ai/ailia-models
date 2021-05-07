@@ -142,11 +142,10 @@ def recognize_from_video():
     capture = webcamera_utils.get_capture(args.video)
 
     if args.savepath != SAVE_IMAGE_PATH:
+        f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
         writer = webcamera_utils.get_writer(
-            args.savepath,
-            IMAGE_HEIGHT,
-            IMAGE_WIDTH,
-            fps=capture.get(cv2.CAP_PROP_FPS),
+            args.savepath, f_h, f_w
         )
     else:
         writer = None
@@ -156,11 +155,7 @@ def recognize_from_video():
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
 
-        _, resized_img = webcamera_utils.adjust_frame_size(
-            frame, IMAGE_HEIGHT, IMAGE_WIDTH
-        )
-
-        img = cv2.cvtColor(resized_img, cv2.COLOR_BGR2BGRA)
+        img = cv2.cvtColor(frame, cv2.COLOR_BGR2BGRA)
         detector.compute(img, THRESHOLD, IOU)
 
         detections = []
@@ -175,7 +170,7 @@ def recognize_from_video():
             iou_threshold=IOU
         )
 
-        res_img = plot_results(detections, resized_img, FACE_CATEGORY, False)
+        res_img = plot_results(detections, frame, FACE_CATEGORY, False)
         cv2.imshow('frame', res_img)
 
         # save results

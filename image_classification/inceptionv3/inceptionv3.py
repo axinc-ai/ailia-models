@@ -10,6 +10,7 @@ import inceptionv3_labels
 sys.path.append('../../util')
 from utils import get_base_parser, update_parser  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
+from classifier_utils import plot_results, print_results  # noqa: E402
 from image_utils import load_image  # noqa: E402
 import webcamera_utils  # noqa: E402
 
@@ -69,7 +70,7 @@ def recognize_from_image():
         logger.info('Start inference...')
         if args.benchmark:
             logger.info('BENCHMARK mode')
-            for i in range(5):
+            for i in range(args.benchmark_count):
                 start = int(round(time.time() * 1000))
                 classifier.compute(input_data, MAX_CLASS_COUNT)
                 end = int(round(time.time() * 1000))
@@ -77,18 +78,9 @@ def recognize_from_image():
         else:
             classifier.compute(input_data, MAX_CLASS_COUNT)
 
-        count = classifier.get_class_count()
+        # show results
+        print_results(classifier, inceptionv3_labels.imagenet_category)
 
-        # postprocessing
-        for idx in range(count):
-            # logger.info result
-            logger.info(f'+ idx={idx}')
-            info = classifier.get_class(idx)
-            logger.info(
-                f'  category={info.category}'
-                f'[ {inceptionv3_labels.imagenet_category[info.category]} ]'
-            )
-            logger.info(f'  prob={info.prob}')
     logger.info('Script finished successfully.')
 
 
@@ -108,10 +100,7 @@ def recognize_from_video():
     if args.savepath is not None:
         f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
         f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
-        save_h, save_w = webcamera_utils.calc_adjust_fsize(
-            f_h, f_w, IMAGE_HEIGHT, IMAGE_WIDTH
-        )
-        writer = webcamera_utils.get_writer(args.savepath, save_h, save_w)
+        writer = webcamera_utils.get_writer(args.savepath, f_h, f_w)
     else:
         writer = None
 
@@ -121,7 +110,7 @@ def recognize_from_video():
             break
 
         # prepare input data
-        input_image, input_data = webcamera_utils.adjust_frame_size(
+        _, input_data = webcamera_utils.adjust_frame_size(
             frame, IMAGE_HEIGHT, IMAGE_WIDTH
         )
         input_data = cv2.cvtColor(input_data, cv2.COLOR_BGR2BGRA)
@@ -130,25 +119,14 @@ def recognize_from_video():
         classifier.compute(input_data, MAX_CLASS_COUNT)
 
         # get result
-        count = classifier.get_class_count()
+        plot_results(frame, classifier, inceptionv3_labels.imagenet_category)
 
-        logger.info('=' * 80)
-        for idx in range(count):
-            # logger.info result
-            logger.info(f'+ idx={idx}')
-            info = classifier.get_class(idx)
-            logger.info(
-                f'  category={info.category}'
-                f'[ {inceptionv3_labels.imagenet_category[info.category]} ]'
-            )
-            logger.info(f'  prob={info.prob}')
-
-        cv2.imshow('frame', input_image)
+        cv2.imshow('frame', frame)
         time.sleep(SLEEP_TIME)
 
         # save results
         if writer is not None:
-            writer.write(input_image)
+            writer.write(frame)
 
     capture.release()
     cv2.destroyAllWindows()

@@ -129,9 +129,9 @@ def recognize_from_video():
 
     # create video writer if savepath is specified as video format
     if args.savepath != SAVE_IMAGE_PATH:
-        writer = webcamera_utils.get_writer(
-            args.savepath, IMAGE_HEIGHT, IMAGE_WIDTH
-        )
+        f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
+        writer = webcamera_utils.get_writer(args.savepath, f_h, f_w)
     else:
         writer = None
 
@@ -140,13 +140,9 @@ def recognize_from_video():
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
 
-        _, resized_img = webcamera_utils.adjust_frame_size(
-            frame, IMAGE_HEIGHT, IMAGE_WIDTH
-        )
-
-        img = cv2.cvtColor(resized_img, cv2.COLOR_RGB2BGRA)
+        img = cv2.cvtColor(frame, cv2.COLOR_RGB2BGRA)
         detector.compute(img, THRESHOLD, IOU)
-        res_img = plot_results(detector, resized_img, COCO_CATEGORY, False)
+        res_img = plot_results(detector, frame, COCO_CATEGORY, False)
         cv2.imshow('frame', res_img)
 
         # save results
