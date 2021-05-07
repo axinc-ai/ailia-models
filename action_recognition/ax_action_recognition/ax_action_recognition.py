@@ -42,8 +42,6 @@ SAVE_IMAGE_PATH = ""
 ALGORITHM = ailia.POSE_ALGORITHM_LW_HUMAN_POSE
 
 MODEL_LISTS = ['lw_human_pose', 'pose_resnet']
-FRAMEWORK_KIND_LISTS = ['ailia', 'keras', 'torch']
-ACTION_TYPE_LISTS = ['gcn','cnn']
 
 COCO_CATEGORY = [
     "person", "bicycle", "car", "motorcycle", "airplane", "bus", "train",
