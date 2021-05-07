@@ -89,7 +89,7 @@ def recognize_from_image():
         logger.info('Start inference...')
         if args.benchmark:
             logger.info('BENCHMARK mode')
-            for i in range(5):
+            for i in range(args.benchmark_count):
                 start = int(round(time.time() * 1000))
                 classifier.compute(img, MAX_CLASS_COUNT)
                 end = int(round(time.time() * 1000))
@@ -117,10 +117,7 @@ def recognize_from_video():
     if args.savepath is not None:
         f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
         f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
-        save_h, save_w = webcamera_utils.calc_adjust_fsize(
-            f_h, f_w, IMAGE_HEIGHT, IMAGE_WIDTH
-        )
-        writer = webcamera_utils.get_writer(args.savepath, save_h, save_w)
+        writer = webcamera_utils.get_writer(args.savepath, f_h, f_w)
     else:
         writer = None
 
@@ -129,25 +126,23 @@ def recognize_from_video():
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
 
-        in_frame, frame = webcamera_utils.adjust_frame_size(
+        _, resized_frame = webcamera_utils.adjust_frame_size(
             frame, IMAGE_HEIGHT, IMAGE_WIDTH
         )
-        frame = preprocess_image(frame)
+        resized_frame = preprocess_image(resized_frame)
 
         # inference
-        classifier.compute(frame, MAX_CLASS_COUNT)
+        classifier.compute(resized_frame, MAX_CLASS_COUNT)
 
         # get result
-        # count = classifier.get_class_count()
+        plot_results(frame, classifier, resnet50_labels.imagenet_category)
 
-        plot_results(in_frame, classifier, resnet50_labels.imagenet_category)
-
-        cv2.imshow('frame', in_frame)
+        cv2.imshow('frame', frame)
         time.sleep(SLEEP_TIME)
 
         # save results
         if writer is not None:
-            writer.write(in_frame)
+            writer.write(frame)
 
     capture.release()
     cv2.destroyAllWindows()
