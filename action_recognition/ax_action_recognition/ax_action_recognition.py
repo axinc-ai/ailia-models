@@ -8,7 +8,6 @@ import argparse
 import cv2
 import numpy as np
 import math
-import yaml
 
 import ailia
 
@@ -17,7 +16,8 @@ from sort.tracker import Tracker
 from sort.nn_matching import NearestNeighborDistanceMetric
 from deepsort_utils import *
 
-sys.path.append('./util')
+# import original modules
+sys.path.append('../../util')
 from webcamera_utils import adjust_frame_size  # noqa: E402
 from image_utils import load_image  # noqa: E402
 from image_utils import normalize_image  # noqa: E402
