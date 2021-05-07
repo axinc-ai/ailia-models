@@ -3,9 +3,19 @@
 ### Input
 image file (384x576)
 
+![Input](inputs/img251.jpg)
+
 ### Output
 
 image file (384x576)
+
+--task=monodepth_outputs
+
+![Output](monodepth_outputs/img251.png)
+
+--task=segmentation
+
+![Output](segmentation_outputs/img251.png)
 
 ### Usage
 
@@ -15,10 +25,11 @@ If you run by onnxruntime instead of ailia, you use `--onnx` option.
 
 This sample has monodepth and segmentation task. You have to add `--task=monodepth` in the case of running monodepth task and `--task=segmentation` in the case of running segmentation task.
 
-Below is example of running segmentation task by onnxruntime.
+Below is example of running segmentation task by cpu.
 
 ```bash
-$ python3 dense_prediction_transformers.py --task=segmentation --onnx
+$ python3 dense_prediction_transformers.py --task=monodepth -e 0
+$ python3 dense_prediction_transformers.py --task=segmentation -e 0
 ```
 
 After running this program, predicted images are saved in monodepth_outputs or segmentation_outputs directory.
