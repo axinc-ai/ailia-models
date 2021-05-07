@@ -28,7 +28,7 @@ WEIGHT_GMM_PATH = './GMM_epoch_40.onnx'
 MODEL_GMM_PATH = './GMM_epoch_40.onnx.prototxt'
 WEIGHT_TOM_PATH = './TOM_epoch_40.onnx'
 MODEL_TOM_PATH = './TOM_epoch_40.onnx.prototxt'
-REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/mmfashion_tryon/'
+REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/mmfashion_vto/'
 
 IMAGE_CLOTH_PATH = 'cloth/019029_1.jpg'
 IMAGE_PERSON_PATH = 'image/000320_0.jpg'
