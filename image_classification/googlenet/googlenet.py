@@ -76,15 +76,13 @@ def recognize_from_image():
         logger.info('Start inference...')
         if args.benchmark:
             logger.info('BENCHMARK mode')
-            for i in range(5):
+            for i in range(args.benchmark_count):
                 start = int(round(time.time() * 1000))
                 classifier.compute(input_data, MAX_CLASS_COUNT)
                 end = int(round(time.time() * 1000))
                 logger.info(f'\tailia processing time {end - start} ms')
         else:
             classifier.compute(input_data, MAX_CLASS_COUNT)
-
-        # count = classifier.get_class_count()
 
         # show results
         print_results(classifier, googlenet_labels.imagenet_category)
