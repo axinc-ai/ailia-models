@@ -31,6 +31,12 @@ If you pass `0` as an argument to VIDEO_PATH, you can use the webcam input inste
 $ python3 pspnet-hair-segmentation.py --video VIDEO_PATH
 ```
 
+By adding the `--model` option, you can specify model type which is selected from "resnet10", "squeezenet".  
+(default is resnet10)
+```bash
+$ python3 pspnet-hair-segmentation.py --model squeezenet
+```
+
 ### Reference
 
 [pytorch-hair-segmentation](https://github.com/YBIGTA/pytorch-hair-segmentation)
