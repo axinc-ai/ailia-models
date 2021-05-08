@@ -54,7 +54,6 @@ def recognize_from_image():
 
     prev_lanes = []
     prev_curves = np.zeros(10)
-    curve_mode = False
 
     # input image loop
     for image_path in args.input:
@@ -92,14 +91,12 @@ def recognize_from_image():
 
         # call to roneld and store output for next method call
         output_images, prev_lanes, prev_curves, curve_mode = \
-            roneld_lane_detection(lane_images, prev_lanes, prev_curves, curve_mode=curve_mode,
+            roneld_lane_detection(lane_images, prev_lanes, prev_curves, curve_mode=False,
                                   image=raw_img)
 
         savepath = get_savepath(args.savepath, image_path)
         logger.info(f'saved at : {savepath}')
         cv2.imwrite(savepath, raw_img)
-
-        #cv2.imshow("Lane image", raw_img)
 
     logger.info('Script finished successfully.')
 
@@ -110,6 +107,9 @@ def recognize_from_video():
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
 
     capture = webcamera_utils.get_capture(args.video)
+
+    prev_lanes = []
+    prev_curves = np.zeros(10)
 
     # create video writer if savepath is specified as video format
     if args.savepath != SAVE_IMAGE_PATH:
@@ -128,33 +128,32 @@ def recognize_from_video():
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
 
-        trans1 = ScaleNew(size=(WIDTH, HEIGHT),
-                          interpolation=(cv2.INTER_LINEAR, cv2.INTER_NEAREST))
-        trans2 = Normalize(mean=(INPUT_MEAN, (0,)), std=(INPUT_STD, (1,)))
+        trans = Normalize(mean=(INPUT_MEAN, (0,)), std=(INPUT_STD, (1,)))
 
         img = cv2.resize(frame, (WIDTH, HEIGHT))
         img = np.expand_dims(img, 0)
-        img = trans2(img)
+        img = trans(img)
         img = np.array(img).transpose(0, 3, 1, 2)
 
         output, output_exist = net.run(img)
         output = softmax(output, axis=1)
+        lane_images = []
 
-        cnt = 0
         for num in range(4):
-            prob_map = (output[0][num + 1] * 255).astype(int)
-            if cnt == 0:
-                out_img = prob_map
-            else:
-                out_img += prob_map
-            cnt += 1
+            lane_image = output[0][num + 1]
+            lane_image = (lane_image * 255).astype(int)
+            lane_images.append(lane_image)
 
-        out_img = np.array(out_img, dtype=np.uint8)
-        cv2.imshow('frame', out_img)
+        # call to roneld and store output for next method call
+        output_images, prev_lanes, prev_curves, curve_mode = \
+            roneld_lane_detection(lane_images, prev_lanes, prev_curves, curve_mode=False,
+                                  image=frame)
+
+        cv2.imshow('frame', frame)
 
         # save results
         if writer is not None:
-            writer.write(out_img)
+            writer.write(frame)
 
     capture.release()
     cv2.destroyAllWindows()
