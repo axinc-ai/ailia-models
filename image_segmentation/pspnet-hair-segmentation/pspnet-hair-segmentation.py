@@ -60,9 +60,9 @@ def img_resize(img, img_size):
 
     if img_size < max(h, w):
         if h < w:
-            img = cv2.resize(img, (img_size, int(h * img_size / w + 0.5)))
+            img = cv2.resize(img, (img_size, int(h * img_size / w + 0.5)), interpolation=cv2.INTER_AREA)
         else:
-            img = cv2.resize(img, (int(w * img_size / h + 0.5), img_size))
+            img = cv2.resize(img, (int(w * img_size / h + 0.5), img_size), interpolation=cv2.INTER_AREA)
 
     h, w = img.shape[:2]
     y = (img_size - h) // 2
