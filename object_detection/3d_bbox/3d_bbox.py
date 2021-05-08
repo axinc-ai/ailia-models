@@ -94,7 +94,7 @@ def recognize_from_image():
     averages = ClassAverages.ClassAverages()
     angle_bins = generate_bins(2)
 
-    env_id = ailia.get_gpu_environment_id()
+    env_id = args.env_id
     net_yolov3 = ailia.Detector(
             MODEL_PATH_YOLOV3,
             WEIGHT_PATH_YOLOV3,
@@ -179,7 +179,7 @@ def recognize_from_video():
     averages = ClassAverages.ClassAverages()
     angle_bins = generate_bins(2)
 
-    env_id = ailia.get_gpu_environment_id()
+    env_id = args.env_id
     net_yolov3 = ailia.Detector(
             MODEL_PATH_YOLOV3,
             WEIGHT_PATH_YOLOV3,

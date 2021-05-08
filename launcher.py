@@ -109,16 +109,30 @@ def hsv_to_rgb(h, s, v):
 def open_model(model):
     dir = "./"+model["category"]+"/"+model["model"]+"/"
     cmd = sys.executable
+
+    args_dict = vars(args)
+
     if ("neural_language_processing" == model["category"]) or \
         ("audio_processing" == model["category"]):
-        options = ""
+        args_dict["video"]=None
     else:
-        video_id = args.video
-        if not args.video:
-            video_id = 0
-        options = "-v "+str(video_id)
+        if not args_dict["video"]:
+            args_dict["video"]=0
+
+    options = ""
+    for key in args_dict:
+        if key=="ftype":
+            continue
+        if args_dict[key] is not None:
+            if args_dict[key] is True:
+                options = options + " --"+key
+            elif args_dict[key] is False:
+                continue
+            else:
+                options = options + " --"+key+" "+str(args_dict[key])
     
     cmd = cmd + " " + model["model"]+".py" + " " + options
+    print(cmd)
     
     subprocess.check_call(cmd, cwd=dir, shell=True)
 

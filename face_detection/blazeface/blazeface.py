@@ -99,10 +99,7 @@ def recognize_from_video():
     if args.savepath != SAVE_IMAGE_PATH:
         f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
         f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
-        save_h, save_w = webcamera_utils.calc_adjust_fsize(
-            f_h, f_w, IMAGE_HEIGHT, IMAGE_WIDTH
-        )
-        writer = webcamera_utils.get_writer(args.savepath, save_h, save_w)
+        writer = webcamera_utils.get_writer(args.savepath, f_h, f_w)
     else:
         writer = None
 
@@ -124,6 +121,14 @@ def recognize_from_video():
         # postprocessing
         detections = but.postprocess(preds_ailia)
         but.show_result(input_image, detections)
+
+        # remove padding
+        dh = input_image.shape[0]
+        dw = input_image.shape[1]
+        sh = frame.shape[0]
+        sw = frame.shape[1]
+        input_image = input_image[(dh-sh)//2:(dh-sh)//2+sh,(dw-sw)//2:(dw-sw)//2+sw,:]
+
         cv2.imshow('frame', input_image)
 
         # save results
