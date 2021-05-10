@@ -7,7 +7,7 @@ import cv2
 import ailia
 
 # import original modules
-sys.path.append('../util')
+sys.path.append('../../../util')
 from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from image_utils import load_image  # noqa: E402
@@ -22,7 +22,7 @@ logger = getLogger(__name__)
 # Parameters 1
 # ======================
 IMAGE_PATH = '00000.jpg'
-SAVE_IMAGE_PATH = 'output.png'
+SAVE_IMAGE_PATH = 'output.jpg'
 IMAGE_HEIGHT = 288    # net.get_input_shape()[3]
 IMAGE_WIDTH = 800     # net.get_input_shape()[2]
 OUTPUT_HEIGHT = 288  # net.get_output_shape()[3]
@@ -115,12 +115,93 @@ def recognize_from_image():
 
     logger.info('Script finished successfully.')
 
+
+def recognize_from_video():
+    # net initialize
+    env_id = args.env_id
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+
+    capture = webcamera_utils.get_capture(args.video)
+
+    # create video writer if savepath is specified as video format
+    if args.savepath != SAVE_IMAGE_PATH:
+        logger.warning(
+            'currently, video results cannot be output correctly...'
+        )
+        writer = webcamera_utils.get_writer(args.savepath, IMAGE_HEIGHT*2, IMAGE_WIDTH)
+    else:
+        writer = None
+
+    output_buffer = np.zeros((IMAGE_HEIGHT*2,IMAGE_WIDTH,3))
+    output_buffer = output_buffer.astype(np.uint8)
+
+    while (True):
+        ret, frame = capture.read()
+        if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+
+        # resize with keep aspect
+        frame,resized_img = webcamera_utils.adjust_frame_size(frame, IMAGE_HEIGHT, IMAGE_WIDTH)
+
+        img = resized_img[np.newaxis, :, :, :] # (batch_size, channel, h, w)
+        img = img.astype(np.float32)
+
+        output, output_exist = net.run([img])
+
+        init = False
+        for cnt in range(4):
+            prob_map = (output[0][:, :, cnt + 1] * 255).astype(int)
+            if not init:
+                if output_exist[0][cnt] > 0.5:
+                    out_img = prob_map
+                    init = True
+            else:
+                if output_exist[0][cnt] > 0.5:
+                    out_img += prob_map
+
+        if not init:
+            logger.info('Script finished successfully, but no output image.')
+            return
+
+        out_img = np.array(out_img, dtype=np.uint8)
+
+        # create output img
+        output_buffer[0:IMAGE_HEIGHT,0:IMAGE_WIDTH,:] = resized_img
+        output_buffer[IMAGE_HEIGHT:IMAGE_HEIGHT*2,0:IMAGE_WIDTH,0] = out_img
+        output_buffer[IMAGE_HEIGHT:IMAGE_HEIGHT*2,0:IMAGE_WIDTH,1] = out_img
+        output_buffer[IMAGE_HEIGHT:IMAGE_HEIGHT*2,0:IMAGE_WIDTH,2] = out_img
+
+        cv2.imshow('output', output_buffer)
+
+        # save results
+        if writer is not None:
+            writer.write(output_buffer)
+
+    capture.release()
+    cv2.destroyAllWindows()
+    if writer is not None:
+        writer.release()
+    logger.info('Script finished successfully.')
+
+
+def main():
+    # model files check and download
+    check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
+
+    if args.video is not None:
+        # video mode
+        recognize_from_video()
+    else:
+        # image mode
+        recognize_from_image()
+
+"""
 def main():
     # model files check and download
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
 
     recognize_from_image()
-
+"""
 
 if __name__ == '__main__':
     main()
