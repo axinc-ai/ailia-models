@@ -1,4 +1,4 @@
-# SRResNet
+# SCNN-Tensorflow
 
 ## Input
 
