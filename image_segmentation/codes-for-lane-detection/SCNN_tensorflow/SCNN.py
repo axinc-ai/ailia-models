@@ -52,7 +52,7 @@ if not args.normal:
 else:
     WEIGHT_PATH = 'SCNN_tensorflow.onnx'
     MODEL_PATH = 'SCNN_tensorflow.onnx.prototxt'
-REMOTE_PATH = ''
+REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/codes-for-lane-detection/'
 
 # ======================
 # Main functions

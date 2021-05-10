@@ -56,7 +56,6 @@ ONNX opset = 11
 
 ## Netron
 
-[SCNN.onnx.prototxt]()
+[SCNN.onnx.prototxt](https://storage.googleapis.com/ailia-models/codes-for-lane-detection/SCNN_tensorflow.onnx.prototxt)
 
-[SCNN.opt.onnx.prototxt]()
-
+[SCNN.opt.onnx.prototxt](https://storage.googleapis.com/ailia-models/codes-for-lane-detection/SCNN_tensorflow.opt.onnx.prototxt)
