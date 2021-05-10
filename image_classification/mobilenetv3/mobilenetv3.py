@@ -72,7 +72,7 @@ def recognize_from_image():
         logger.info('Start inference...')
         if args.benchmark:
             logger.info('BENCHMARK mode')
-            for i in range(5):
+            for i in range(args.benchmark_count):
                 start = int(round(time.time() * 1000))
                 preds_ailia = net.predict(input_data)
                 end = int(round(time.time() * 1000))
@@ -94,10 +94,7 @@ def recognize_from_video():
     if args.savepath is not None:
         f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
         f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
-        save_h, save_w = webcamera_utils.calc_adjust_fsize(
-            f_h, f_w, IMAGE_HEIGHT, IMAGE_WIDTH
-        )
-        writer = webcamera_utils.get_writer(args.savepath, save_h, save_w)
+        writer = webcamera_utils.get_writer(args.savepath, f_h, f_w)
     else:
         writer = None
 
@@ -106,7 +103,7 @@ def recognize_from_video():
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
 
-        input_image, input_data = webcamera_utils.preprocess_frame(
+        _, input_data = webcamera_utils.preprocess_frame(
             frame, IMAGE_HEIGHT, IMAGE_WIDTH, normalize_type='ImageNet'
         )
 
@@ -114,14 +111,14 @@ def recognize_from_video():
         preds_ailia = net.predict(input_data)
 
         plot_results(
-            input_image, preds_ailia, mobilenetv3_labels.imagenet_category
+            frame, preds_ailia, mobilenetv3_labels.imagenet_category
         )
-        cv2.imshow('frame', input_image)
+        cv2.imshow('frame', frame)
         time.sleep(SLEEP_TIME)
 
         # save results
         if writer is not None:
-            writer.write(input_image)
+            writer.write(frame)
 
     capture.release()
     cv2.destroyAllWindows()

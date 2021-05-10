@@ -49,6 +49,16 @@ parser.add_argument(
     default=IOU, type=float,
     help='The detection iou for yolo. (default: '+str(IOU)+')'
 )
+parser.add_argument(
+    '-dw', '--detection_width',
+    default=DETECTION_SIZE, type=int,
+    help='The detection width and height for yolo. (default: 416)'
+)
+parser.add_argument(
+    '-dh', '--detection_height',
+    default=DETECTION_SIZE, type=int,
+    help='The detection height and height for yolo. (default: 416)'
+)
 args = update_parser(parser)
 
 
@@ -69,6 +79,10 @@ def recognize_from_image():
     )
     if args.profile:
         detector.set_profile_mode(True)
+    if args.detection_width != DETECTION_SIZE or args.detection_height != DETECTION_SIZE:
+        detector.set_input_shape(
+            args.detection_width, args.detection_height
+        )
 
     # input image loop
     for image_path in args.input:

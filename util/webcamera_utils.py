@@ -55,6 +55,29 @@ def adjust_frame_size(frame, height, width):
     return img, resized_img
 
 
+def cut_max_square(frame: np.array) -> np.array:
+    """
+    Cut out a maximum square area from the center of given frame (np.array).
+    Parameters
+    ----------
+    frame: numpy array
+
+    Returns
+    -------
+    frame_square: numpy array
+        Maximum square area of the frame at its center
+    """
+    frame_height, frame_width, _ = frame.shape
+    frame_size_min = min(frame_width, frame_height)
+    if frame_width >= frame_height:
+        x, y = frame_width // 2 - frame_height // 2, 0
+    else:
+        x, y = 0, frame_height // 2 - frame_width // 2
+
+    frame_square = frame[y: (y + frame_size_min), x: (x + frame_size_min)]
+    return frame_square
+
+
 def preprocess_frame(
         frame, input_height, input_width, data_rgb=True, normalize_type='255'
 ):
