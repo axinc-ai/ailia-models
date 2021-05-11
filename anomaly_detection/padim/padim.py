@@ -378,6 +378,9 @@ def recognize_from_image(net, create_net, params):
     min_score = score_map.min()
     scores = (score_map - min_score) / (max_score - min_score)
 
+    # Calculated abnormal score
+    logger.info('Abnormal score: %f' % max_score)
+
     if args.threshold is None:
         # get optimal threshold
         gt_mask = np.asarray(gt_imgs)
