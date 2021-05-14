@@ -140,7 +140,7 @@ def get_train_outputs(net, create_net, params):
     train_dir = args.train_dir
     train_imgs = sorted([
         os.path.join(train_dir, f) for f in os.listdir(train_dir)
-        if f.endswith('.png') or f.endswith('.jpg')
+        if f.endswith('.png') or f.endswith('.jpg') or f.endswith('.bmp')
     ])
     if len(train_imgs) == 0:
         logger.error("train images not found in '%s'" % train_dir)
