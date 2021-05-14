@@ -1,6 +1,6 @@
 # ailia-models
 
-The collection of pre-trained, state-of-the-art models.
+The collection of pre-trained, state-of-the-art AI models.
 
 # About ailia SDK
 

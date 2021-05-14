@@ -140,7 +140,7 @@ def get_train_outputs(net, create_net, params):
     train_dir = args.train_dir
     train_imgs = sorted([
         os.path.join(train_dir, f) for f in os.listdir(train_dir)
-        if f.endswith('.png') or f.endswith('.jpg')
+        if f.endswith('.png') or f.endswith('.jpg') or f.endswith('.bmp')
     ])
     if len(train_imgs) == 0:
         logger.error("train images not found in '%s'" % train_dir)
@@ -377,6 +377,9 @@ def recognize_from_image(net, create_net, params):
     max_score = score_map.max()
     min_score = score_map.min()
     scores = (score_map - min_score) / (max_score - min_score)
+
+    # Calculated abnormal score
+    logger.info('Abnormal score: %f' % max_score)
 
     if args.threshold is None:
         # get optimal threshold
