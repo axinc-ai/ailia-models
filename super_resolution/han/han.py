@@ -3,6 +3,7 @@ import sys
 import time
 import numpy as np
 import cv2
+import imageio
 
 import ailia
 
@@ -99,6 +100,13 @@ REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/han/'
 # ======================
 # Main functions
 # ======================
+def quantize(img, rgb_range):
+    pixel_range = 255 / rgb_range
+    aux = img * pixel_range
+    aux = np.clip(aux, 0, 255)
+    aux = np.around(aux)
+    return aux / pixel_range
+
 def recognize_from_image():
     # net initialize
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
@@ -110,18 +118,25 @@ def recognize_from_image():
         # prepare input data
         logger.info('Input image: ' + image_path)
 
-        img = cv2.imread(image_path)
-        IMAGE_HEIGHT = img.shape[0]
-        IMAGE_WIDTH = img.shape[1]
+        # preprocessing
+        img = imageio.imread(image_path)
+        if img.ndim == 2:
+            img = np.expand_dims(img, axis=2)
+        c = img.shape[2]
+        if c == 1:
+            img = np.concatenate([img] * 3, 2)
+
+        img = np.ascontiguousarray(img.transpose((2, 0, 1)))
+        img = img.astype(np.float32)
+
+        img = img[np.newaxis, :, :, :] # (batch_size, channel, h, w)
+
+        
+
+        IMAGE_HEIGHT = img.shape[3]
+        IMAGE_WIDTH = img.shape[2]
 
         net.set_input_shape((1, 3, IMAGE_HEIGHT, IMAGE_WIDTH))
-
-        input_data = load_image(
-            image_path,
-            (IMAGE_HEIGHT, IMAGE_WIDTH),
-            normalize_type='255',
-            gen_input_ailia=True,
-        )
 
         # inference
         logger.info('Start inference...')
@@ -129,18 +144,18 @@ def recognize_from_image():
             logger.info('BENCHMARK mode')
             for i in range(5):
                 start = int(round(time.time() * 1000))
-                preds_ailia = net.predict(input_data)
+                preds_ailia = net.predict(img)
                 end = int(round(time.time() * 1000))
                 logger.info(f'\tailia processing time {end - start} ms')
         else:
-            preds_ailia = net.predict(input_data)
+            preds_ailia = net.predict(img)
 
         # postprocessing
-        output_img = preds_ailia[0].transpose((1, 2, 0))
-        output_img = cv2.cvtColor(output_img, cv2.COLOR_RGB2BGR)
+        output_img = quantize(preds_ailia[0], 255)
+        output_img = output_img.astype(np.uint8).transpose(1, 2, 0)
         savepath = get_savepath(args.savepath, image_path)
         logger.info(f'saved at : {savepath}')
-        cv2.imwrite(savepath, output_img * 255)
+        imageio.imwrite(savepath, output_img)
         
     logger.info('Script finished successfully.')
 

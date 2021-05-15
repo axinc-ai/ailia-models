@@ -4,23 +4,22 @@
 
 |            Input           |  Ailia input shape |    Range   | 
 | :------------------------: | :----------------: | :--------: | 
-| ![](images/000002_LR.png)  |    (1,3,194,194)   | [0.0, 1.0] |
-| ![](images/lenna.png)      |     (1,3,64,64)    | [0.0, 1.0] |
+| ![](images/000002_LR.png)  |    (1,3,194,194)   |  [0., 255.]  |
+| ![](images/lenna.png)      |    (1,3,256,256)   |  [0., 255.]  |
 
 ## Output
 
 | Resolution scale (Degradation model) |             x2 (BI)            |             x3  (BI)           |             x4 (BI)            |             x8 (BI)           |             x3 (BD)            |
 | :----------------------------------: | :----------------------------: | :----------------------------: | :----------------------------: | :---------------------: | :----------------------------: | 
-|                 Output               | ![](images/000002_LR_BIX2.png) | ![](images/000002_LR_BIX3.png) | ![](images/000002_LR_BIX4.png) | ![](images/000002_LR_BIX8.png) | ![](images/000002_LR_BDX3.png) |
+|                 Output               | ![](images/000002_SR_BIX2.png) | ![](images/000002_SR_BIX3.png) | ![](images/000002_SR_BIX4.png) | ![](images/000002_SR_BIX8.png) | ![](images/000002_SR_BDX3.png) |
 |           Ailia output shape         |           (1,3,388,388)        |           (1,3,582,582)        |           (1,3,776,776)        |          (1,3,1552,1552)      |          (1,3,582,582)         |
-|                  Range               |            [0.0, 1.0]          |            [0.0, 1.0]          |            [0.0, 1.0]          |            [0.0, 1.0]         |           [0.0, 1.0]           |
+|                  Range               |            [0., 255.]          |            [0., 255.]          |            [0., 255.]          |            [0., 255.]          |           [0., 255.]           |
 
-| Resolution scale (Degradation model) |           x2 (BI)          |            x3  (BI)        |            x4 (BI)         |           x8 (BI)          |            x3 (BD)       |
-| :----------------------------------: | :------------------------: | :------------------------: | :------------------------: | :------------------------: | :------------------------: | 
-|                 Output               | ![](images/lenna_BIX2.png) | ![](images/lenna_BIX3.png) | ![](images/lenna_BIX4.png) | ![](images/lenna_BIX8.png) | ![](images/lenna_BDX3.png) |
-|           Ailia output shape         |        (1,3,128,128)       |         (1,3,192,192)      |         (1,3,256,256)      |         (1,3,512,512)      |         (1,3,192,192)       |
-|                  Range               |          [0.0, 1.0]        |           [0.0, 1.0]       |           [0.0, 1.0]       |          [0.0, 1.0]        |          [0.0, 1.0]         |
-
+| Resolution scale (Degradation model) |           x2 (BI)          |   
+| :----------------------------------: | :------------------------: | 
+|                 Output               | ![](images/lenna_BIX2.png) | 
+|           Ailia output shape         |        (1,3,512,512)       |   
+|                  Range               |          [0., 255.]        | 
 ## Usage
 Automatically downloads the onnx and prototxt files when running.
 It is necessary to be connected to the Internet while downloading.
