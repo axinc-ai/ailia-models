@@ -47,6 +47,13 @@ Only a 3-resolution scale can be used with this option.
 $ python3 han.py --scale 3 --blur 
 ```
 
+By adding the `--video` option, you can input the video.   
+If you pass `0` as an argument to VIDEO_PATH, you can use the webcam input instead of the video file.
+
+```bash
+$ python3 SCNN.py --video VIDEO_PATH
+```
+
 The default setting is to use the optimized model and weights, but you can also switch to the normal model by using the `--normal` option.
 If the output image is entirely black, try to add the `-e 0` option.
 ``` bash

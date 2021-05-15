@@ -12,6 +12,7 @@ sys.path.append('../../util')
 from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from image_utils import load_image  # noqa: E402
+import webcamera_utils  # noqa: E402
 
 # logger
 from logging import getLogger   # noqa: E402
@@ -131,8 +132,7 @@ def recognize_from_image():
 
         img = img[np.newaxis, :, :, :] # (batch_size, channel, h, w)
 
-        
-
+        # Ailia Net input
         IMAGE_HEIGHT = img.shape[3]
         IMAGE_WIDTH = img.shape[2]
 
@@ -159,12 +159,66 @@ def recognize_from_image():
         
     logger.info('Script finished successfully.')
 
+def recognize_from_video():
+    # net initialize
+    env_id = args.env_id
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+
+    capture = webcamera_utils.get_capture(args.video)
+
+    # create video writer if savepath is specified as video format
+    if args.savepath != SAVE_IMAGE_PATH:
+        logger.warning(
+            'currently, video results cannot be output correctly...'
+        )
+        writer = webcamera_utils.get_writer(args.savepath, IMAGE_HEIGHT*2, IMAGE_WIDTH)
+    else:
+        writer = None
+
+    output_buffer = np.zeros((IMAGE_HEIGHT*2,IMAGE_WIDTH,3))
+    output_buffer = output_buffer.astype(np.uint8)
+
+    while (True):
+        ret, frame = capture.read()
+        if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+
+        # resize with keep aspect
+        frame,resized_img = webcamera_utils.adjust_frame_size(frame, IMAGE_HEIGHT, IMAGE_WIDTH)
+
+        img = np.ascontiguousarray(resized_img.transpose((2, 0, 1)))
+        img = img[np.newaxis, :, :, :] # (batch_size, channel, h, w)
+        img = img.astype(np.float32)
+
+        net.set_input_shape((1, 3, IMAGE_HEIGHT, IMAGE_WIDTH))
+
+        output = net.run(img)
+
+        out_img = quantize(output[0][0], 255)
+        out_img = out_img.astype(np.uint8).transpose(1, 2, 0)
+        cv2.imshow('output', out_img)
+
+        # save results
+        if writer is not None:
+            writer.write(out_img)
+
+    capture.release()
+    cv2.destroyAllWindows()
+    if writer is not None:
+        writer.release()
+    logger.info('Script finished successfully.')
+
 
 def main():
     # model files check and download
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
 
-    recognize_from_image()
+    if args.video is not None:
+        # video mode
+        recognize_from_video()
+    else:
+        # image mode
+        recognize_from_image()
 
 
 if __name__ == '__main__':
