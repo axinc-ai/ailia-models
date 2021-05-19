@@ -109,7 +109,7 @@ def recognize_one_audio(input_path):
         wav = wav.astype(np.float32)
 
     if wav.ndim == 2 :
-        wav = wav[:,0][np.newaxis,:]
+        wav = (wav[:,0][np.newaxis,:] + wav[:,1][np.newaxis,:])/2   # convert to mono
     else:
         wav = wav[np.newaxis,:]
 
