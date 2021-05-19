@@ -234,8 +234,8 @@ def plot_fig(file_list, test_imgs, scores, anormal_scores, gt_imgs, threshold, s
         fig_img, ax_img = plt.subplots(1, 5, figsize=(12, 3))
         fig_img.subplots_adjust(right=0.9)
 
-        fig_img.suptitle("Input : "+image_path+"  Anormal score : "+str(anormal_scores[i]))
-        logger.info("Anormal score : "+str(anormal_scores[i]))
+        fig_img.suptitle("Input : "+image_path+"  Anomaly score : "+str(anormal_scores[i]))
+        logger.info("Anomaly score : "+str(anormal_scores[i]))
 
         norm = matplotlib.colors.Normalize(vmin=vmin, vmax=vmax)
         for ax_i in ax_img:
