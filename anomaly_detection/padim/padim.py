@@ -212,7 +212,7 @@ def denormalization(x):
     return x
 
 
-def plot_fig(file_list, test_imgs, scores, gt_imgs, threshold, save_dir):
+def plot_fig(file_list, test_imgs, scores, anormal_scores, gt_imgs, threshold, save_dir):
     num = len(file_list)
     vmax = scores.max() * 255.
     vmin = scores.min() * 255.
@@ -233,6 +233,10 @@ def plot_fig(file_list, test_imgs, scores, gt_imgs, threshold, save_dir):
 
         fig_img, ax_img = plt.subplots(1, 5, figsize=(12, 3))
         fig_img.subplots_adjust(right=0.9)
+
+        fig_img.suptitle("Input : "+image_path+"  Anormal score : "+str(anormal_scores[i]))
+        logger.info("Anormal score : "+str(anormal_scores[i]))
+
         norm = matplotlib.colors.Normalize(vmin=vmin, vmax=vmax)
         for ax_i in ax_img:
             ax_i.axes.xaxis.set_visible(False)
@@ -378,8 +382,10 @@ def recognize_from_image(net, create_net, params):
     min_score = score_map.min()
     scores = (score_map - min_score) / (max_score - min_score)
 
-    # Calculated abnormal score
-    logger.info('Abnormal score: %f' % max_score)
+    # Calculated anormal score
+    anormal_scores=np.zeros((score_map.shape[0]))
+    for i in range(score_map.shape[0]):
+        anormal_scores[i]=score_map[i].max()
 
     if args.threshold is None:
         # get optimal threshold
@@ -393,7 +399,7 @@ def recognize_from_image(net, create_net, params):
     else:
         threshold = args.threshold
 
-    plot_fig(args.input, test_imgs, scores, gt_imgs, threshold, args.savepath)
+    plot_fig(args.input, test_imgs, scores, anormal_scores, gt_imgs, threshold, args.savepath)
 
     logger.info('Script finished successfully.')
 
@@ -427,6 +433,11 @@ def main():
     else:
         create_net = None
         net = _create_net()
+
+    # check input
+    if len(args.input)==0:
+        logger.error("Input file not found")
+        return
 
     recognize_from_image(net, create_net, params)
 
