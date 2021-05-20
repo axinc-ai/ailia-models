@@ -261,6 +261,11 @@ def generate_trimap(net, input_data):
     seg_data = trimap_data.copy()
 
     thre = 0.6
+    ite = 3
+
+    if args.arch == "u2net":
+        thre = 0.8
+        ite = 5
 
     thre = 255 * thre
     trimap_data[trimap_data < thre] = 0
@@ -274,7 +279,7 @@ def generate_trimap(net, input_data):
     if args.debug:
         dump_segmentation_threshold(trimap_data, src_data, w, h)
 
-    trimap_data = erode_and_dilate(trimap_data, k_size=(7, 7), ite=3)
+    trimap_data = erode_and_dilate(trimap_data, k_size=(7, 7), ite=ite)
 
     if args.debug:
         dump_trimap(trimap_data, src_data, w, h)
@@ -325,7 +330,7 @@ def recognize_from_image():
         SEGMENTATION_WEIGHT_PATH,
         env_id=args.env_id,
     )
-    #seg_net.set_input_shape((1,3,640,640))
+    seg_net.set_input_shape((1,3,640,320))
 
     # color space
     rgb_mode = args.framework=="torch"
@@ -341,6 +346,8 @@ def recognize_from_image():
         # create trimap
         if args.trimap == "":
             input_data = src_img
+            #if rgb_mode:
+            #    input_data = cv2.cvtColor(input_data, cv2.COLOR_RGB2BGR)
             trimap_data, seg_data = generate_trimap(seg_net, input_data)
         else:
             trimap_data = cv2.imread(args.trimap)
