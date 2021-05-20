@@ -299,13 +299,18 @@ def recognize_from_image():
         SEGMENTATION_WEIGHT_PATH,
         env_id=args.env_id,
     )
-    #seg_net.set_input_shape((1,3,640,320))
+    #seg_net.set_input_shape((1,3,640,640))
+
+    # color space
+    rgb_mode = True
 
     # input image loop
     for image_path in args.input:
         # prepare input data
         logger.info(image_path)
-        src_img = cv2.imread(image_path)
+        src_img = cv2.imread(image_path)    
+        if rgb_mode:
+            src_img = cv2.cvtColor(src_img, cv2.COLOR_BGR2RGB)
 
         # create trimap
         if args.trimap == "":
@@ -360,6 +365,10 @@ def recognize_from_image():
                 output_img[crop_pos[1]:crop_pos[1]+ch,crop_pos[0]:crop_pos[0]+cw,:] = res_img[0:ch,0:cw,:]
         
         # save
+        if rgb_mode:
+            output_img = output_img.astype(np.uint8)
+            output_img = cv2.cvtColor(output_img, cv2.COLOR_RGBA2BGRA)
+
         savepath = get_savepath(args.savepath, image_path)
         logger.info(f'saved at : {savepath}')
         cv2.imwrite(savepath, output_img)
