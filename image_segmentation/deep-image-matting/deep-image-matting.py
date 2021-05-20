@@ -56,7 +56,7 @@ parser.add_argument(
 args = update_parser(parser)
 
 if args.arch == 'u2net':
-    SEGMENTATION_WEIGHT_PATH = 'u2net.onnx'
+    SEGMENTATION_WEIGHT_PATH = 'u2net_opset11.onnx'
     SEGMENTATION_MODEL_PATH = SEGMENTATION_WEIGHT_PATH + '.prototxt'
     SEGMENTATION_REMOTE_PATH = \
         'https://storage.googleapis.com/ailia-models/u2net/'
@@ -79,14 +79,14 @@ img_rows = IMAGE_HEIGHT
 img_cols = IMAGE_WIDTH
 
 
-def safe_crop(mat, crop_size=(img_rows, img_cols)):
+def safe_crop(mat, crop_pos=(0,0), crop_size=(img_rows, img_cols)):
     crop_height, crop_width = crop_size
     if len(mat.shape) == 2:
         ret = np.zeros((crop_height, crop_width), np.float32)
     else:
         ret = np.zeros((crop_height, crop_width, 3), np.float32)
-    x = 0
-    y = 0
+    x = crop_pos[0]
+    y = crop_pos[1]
     crop = mat[y:y + crop_height, x:x + crop_width]
     h, w = crop.shape[:2]
     ret[0:h, 0:w] = crop
@@ -161,8 +161,8 @@ def imagenet_preprocess(input_data):
 
 
 def generate_trimap(net, input_data):
-    w = input_data.shape[1]
     h = input_data.shape[0]
+    w = input_data.shape[1]
 
     input_shape = net.get_input_shape()
     input_data = cv2.resize(input_data, (input_shape[2], input_shape[3]))
@@ -191,7 +191,7 @@ def generate_trimap(net, input_data):
         pred = sigmoid(pred)
 
     trimap_data = cv2.resize(pred * 255, (w, h))
-    trimap_data = trimap_data.reshape((w, h, 1))
+    trimap_data = trimap_data.reshape((h, w, 1))
 
     seg_data = trimap_data.copy()
 
@@ -271,42 +271,65 @@ def recognize_from_image():
         logger.info(image_path)
         src_img = cv2.imread(image_path)
 
-        crop_size = (
-            max(src_img.shape[0], src_img.shape[1]),
-            max(src_img.shape[0], src_img.shape[1]),
-        )
-
-        src_img = safe_crop(src_img, crop_size)
-
+        # create trimap
         if args.trimap == "":
             input_data = src_img
             trimap_data, seg_data = generate_trimap(seg_net, input_data)
         else:
             trimap_data = cv2.imread(args.trimap)
-            trimap_data = safe_crop(trimap_data, crop_size)
-            seg_data = trimap_data.copy()
 
-        input_data, src_img, trimap_data = matting_preprocess(
-            src_img, trimap_data, seg_data
-        )
+        # output image buffer
+        output_img = np.zeros((src_img.shape[0],src_img.shape[1],4))
 
-        # inference
-        logger.info('Start inference...')
-        if args.benchmark:
-            logger.info('BENCHMARK mode')
-            for i in range(5):
-                start = int(round(time.time() * 1000))
-                preds_ailia = net.predict(input_data)
-                end = int(round(time.time() * 1000))
-                logger.info(f'\tailia processing time {end - start} ms')
-        else:
-            preds_ailia = net.predict(input_data)
+        # tile loop
+        for y in range((src_img.shape[0]+IMAGE_HEIGHT-1)//IMAGE_HEIGHT):
+            for x in range((src_img.shape[1]+IMAGE_WIDTH-1)//IMAGE_WIDTH):
+                logger.info('Tile ('+str(x)+','+str(y)+')')
 
-        # post-processing
-        res_img = postprocess(src_img, trimap_data, preds_ailia)
+                # crop
+                crop_size = (
+                    max(src_img.shape[0], src_img.shape[1]),
+                    max(src_img.shape[0], src_img.shape[1]),
+                )
+
+                crop_size = (IMAGE_WIDTH, IMAGE_HEIGHT)
+                crop_pos = (x * IMAGE_WIDTH, y * IMAGE_HEIGHT)
+
+                src_crop_img = safe_crop(src_img, crop_pos, crop_size)
+                trimap_crop_data = safe_crop(trimap_data, crop_pos, crop_size)
+
+                seg_data = trimap_crop_data.copy()
+
+                input_data, src_crop_img, trimap_crop_data = matting_preprocess(
+                    src_crop_img, trimap_crop_data, seg_data
+                )
+
+                # inference
+                logger.info('Start inference...')
+                if args.benchmark:
+                    logger.info('BENCHMARK mode')
+                    for i in range(5):
+                        start = int(round(time.time() * 1000))
+                        preds_ailia = net.predict(input_data)
+                        end = int(round(time.time() * 1000))
+                        logger.info(f'\tailia processing time {end - start} ms')
+                else:
+                    preds_ailia = net.predict(input_data)
+
+                # post-processing
+                res_img = postprocess(src_crop_img, trimap_crop_data, preds_ailia)
+                ch = res_img.shape[0]
+                cw = res_img.shape[1]
+                if crop_pos[0] + cw >= output_img.shape[1]:
+                    cw = output_img.shape[1] - crop_pos[0]
+                if crop_pos[1] + ch >= output_img.shape[0]:
+                    ch = output_img.shape[0] - crop_pos[1]
+                output_img[crop_pos[1]:crop_pos[1]+ch,crop_pos[0]:crop_pos[0]+cw,:] = res_img[0:ch,0:cw,:]
+        
+        # save
         savepath = get_savepath(args.savepath, image_path)
         logger.info(f'saved at : {savepath}')
-        cv2.imwrite(savepath, res_img)
+        cv2.imwrite(savepath, output_img)
 
     logger.info('Script finished successfully.')
 
@@ -348,11 +371,12 @@ def recognize_from_video():
             IMAGE_WIDTH,
             normalize_type='None',
         )
+        crop_pos = (0, 0)
         crop_size = (
             max(src_img.shape[0], src_img.shape[1]),
             max(src_img.shape[0], src_img.shape[1])
         )
-        src_img = safe_crop(src_img, crop_size)
+        src_img = safe_crop(src_img, crop_pos, crop_size)
 
         trimap_data, seg_data = generate_trimap(seg_net, src_img)
 
