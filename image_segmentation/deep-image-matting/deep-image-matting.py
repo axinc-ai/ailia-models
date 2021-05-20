@@ -160,14 +160,53 @@ def imagenet_preprocess(input_data):
     return input_data
 
 
+def dump_segmentation(pred, src_data, w, h):
+    savedir = os.path.dirname(args.savepath)
+    segmentation_data = cv2.resize(pred * 255, (w, h))
+    segmentation_data = cv2.cvtColor(segmentation_data, cv2.COLOR_GRAY2BGR)
+    segmentation_data = (src_data + segmentation_data)/2
+    cv2.imwrite(os.path.join(savedir, "debug_segmentation.png"), segmentation_data)
+
+
+def dump_segmentation_threshold(trimap_data, src_data, w, h):
+    savedir = os.path.dirname(args.savepath)
+    segmentation_data = trimap_data.copy()
+    segmentation_data = cv2.cvtColor(segmentation_data, cv2.COLOR_GRAY2BGR)
+    segmentation_data = segmentation_data.astype(np.float)
+    segmentation_data = (src_data + segmentation_data)/2
+    cv2.imwrite(
+        os.path.join(savedir, "debug_segmentation_threshold.png"),
+        segmentation_data,
+    )
+
+
+def dump_trimap(trimap_data, src_data, w, h):
+    savedir = os.path.dirname(args.savepath)
+
+    cv2.imwrite(
+        os.path.join(savedir, "debug_trimap_gray.png"),
+        trimap_data,
+    )
+
+    segmentation_data = trimap_data.copy().astype(np.uint8)
+    segmentation_data = cv2.cvtColor(segmentation_data, cv2.COLOR_GRAY2BGR)
+    segmentation_data = segmentation_data.astype(np.float)
+    segmentation_data = (src_data + segmentation_data)/2
+
+    cv2.imwrite(
+        os.path.join(savedir, "debug_trimap.png"),
+        segmentation_data,
+    )
+
+
 def generate_trimap(net, input_data):
+    src_data = input_data.copy()
+    
     h = input_data.shape[0]
     w = input_data.shape[1]
 
     input_shape = net.get_input_shape()
     input_data = cv2.resize(input_data, (input_shape[2], input_shape[3]))
-
-    savedir = os.path.dirname(args.savepath)
 
     if args.arch == "deeplabv3":
         input_data = deeplabv3_preprocess(input_data)
@@ -183,7 +222,7 @@ def generate_trimap(net, input_data):
         pred = preds_ailia[0][0, 0, :, :]
 
     if args.debug:
-        cv2.imwrite(os.path.join(savedir, "debug_segmentation.png"), pred*255)
+        dump_segmentation(pred, src_data, w, h)
 
     if args.arch == "u2net":
         pred = norm(pred)
@@ -195,7 +234,9 @@ def generate_trimap(net, input_data):
 
     seg_data = trimap_data.copy()
 
-    thre = 255 * 0.6
+    thre = 0.6
+
+    thre = 255 * thre
     trimap_data[trimap_data < thre] = 0
     trimap_data[trimap_data >= thre] = 255
 
@@ -205,18 +246,12 @@ def generate_trimap(net, input_data):
     trimap_data = trimap_data.astype("uint8")
 
     if args.debug:
-        cv2.imwrite(
-            os.path.join(savedir, "debug_segmentation_threshold.png"),
-            trimap_data,
-        )
+        dump_segmentation_threshold(trimap_data, src_data, w, h)
 
     trimap_data = erode_and_dilate(trimap_data, k_size=(7, 7), ite=3)
 
     if args.debug:
-        cv2.imwrite(
-            os.path.join(savedir, "debug_trimap_full.png"),
-            trimap_data,
-        )
+        dump_trimap(trimap_data, src_data, w, h)
 
     return trimap_data, seg_data
 
@@ -235,9 +270,9 @@ def matting_preprocess(src_img, trimap_data, seg_data):
 
     input_data = input_data / 255.0
 
-    if args.debug:
-        cv2.imwrite(os.path.join(savedir, "debug_rgb.png"), src_img)
-        cv2.imwrite(os.path.join(savedir, "debug_trimap.png"), trimap_data)
+    #if args.debug:
+    #    cv2.imwrite(os.path.join(savedir, "debug_rgb.png"), src_img)
+    #    cv2.imwrite(os.path.join(savedir, "debug_trimap.png"), trimap_data)
 
     return input_data, src_img, trimap_data
 
@@ -264,6 +299,7 @@ def recognize_from_image():
         SEGMENTATION_WEIGHT_PATH,
         env_id=args.env_id,
     )
+    #seg_net.set_input_shape((1,3,640,320))
 
     # input image loop
     for image_path in args.input:
