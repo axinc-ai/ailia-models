@@ -287,11 +287,6 @@ def recognize_from_image():
                 logger.info('Tile ('+str(x)+','+str(y)+')')
 
                 # crop
-                crop_size = (
-                    max(src_img.shape[0], src_img.shape[1]),
-                    max(src_img.shape[0], src_img.shape[1]),
-                )
-
                 crop_size = (IMAGE_WIDTH, IMAGE_HEIGHT)
                 crop_pos = (x * IMAGE_WIDTH, y * IMAGE_HEIGHT)
 
@@ -318,6 +313,8 @@ def recognize_from_image():
 
                 # post-processing
                 res_img = postprocess(src_crop_img, trimap_crop_data, preds_ailia)
+
+                # copy
                 ch = res_img.shape[0]
                 cw = res_img.shape[1]
                 if crop_pos[0] + cw >= output_img.shape[1]:
@@ -347,17 +344,7 @@ def recognize_from_video():
     )
 
     capture = webcamera_utils.get_capture(args.video)
-
-    # create video writer if savepath is specified as video format
-    if args.savepath != SAVE_IMAGE_PATH:
-        logger.warning(
-            'currently, video results cannot be output correctly...'
-        )
-        writer = webcamera_utils.get_writer(
-            args.savepath, IMAGE_HEIGHT, IMAGE_WIDTH
-        )
-    else:
-        writer = None
+    writer = None
 
     while(True):
         ret, frame = capture.read()
@@ -365,44 +352,63 @@ def recognize_from_video():
             break
 
         # grab src image
-        src_img, input_data = webcamera_utils.preprocess_frame(
-            frame,
-            IMAGE_HEIGHT,
-            IMAGE_WIDTH,
-            normalize_type='None',
-        )
-        crop_pos = (0, 0)
-        crop_size = (
-            max(src_img.shape[0], src_img.shape[1]),
-            max(src_img.shape[0], src_img.shape[1])
-        )
-        src_img = safe_crop(src_img, crop_pos, crop_size)
+        src_img = frame
 
+        # limit resolution
+        w_limit = 640
+        if src_img.shape[0]>=w_limit:
+            src_img = cv2.resize(src_img,(w_limit,int(w_limit*src_img.shape[0]/src_img.shape[1])))
+
+        # output image buffer
+        output_img = np.zeros((src_img.shape[0],src_img.shape[1],4))
+
+        # create video writer if savepath is specified as video format
+        if args.savepath != SAVE_IMAGE_PATH:
+            if writer==None:
+                writer = webcamera_utils.get_writer(
+                    args.savepath, output_img.shape[0], output_img.shape[1]
+                )
+
+        # generate trimap
         trimap_data, seg_data = generate_trimap(seg_net, src_img)
-
-        input_data, src_img, trimap_data = matting_preprocess(
-            src_img, trimap_data, seg_data
-        )
-
-        preds_ailia = net.predict(input_data)
-
-        # postprocessing
-        res_img = postprocess(src_img, trimap_data, preds_ailia)
-        seg_img = res_img.copy()
-
-        # seg_data=safe_crop(seg_data, x, y, crop_size)
-        seg_img[:, :, 3] = seg_data[:, :, 0]
-        seg_img = composite(seg_img)
-        res_img = composite(res_img)
-
-        cv2.imshow('matting', res_img / 255.0)
-        cv2.imshow('masked', seg_img / 255.0)
         cv2.imshow('trimap', trimap_data / 255.0)
         cv2.imshow('segmentation', seg_data / 255.0)
 
-        # # save results
-        # if writer is not None:
-        #     writer.write(res_img)
+        # tile loop
+        for y in range((src_img.shape[0]+IMAGE_HEIGHT-1)//IMAGE_HEIGHT):
+            for x in range((src_img.shape[1]+IMAGE_WIDTH-1)//IMAGE_WIDTH):
+                logger.info('Tile ('+str(x)+','+str(y)+')')
+
+                crop_size = (IMAGE_WIDTH, IMAGE_HEIGHT)
+                crop_pos = (x * IMAGE_WIDTH, y * IMAGE_HEIGHT)
+
+                src_img_crop = safe_crop(src_img, crop_pos, crop_size)
+                trimap_data_crop = safe_crop(trimap_data, crop_pos, crop_size)
+
+                input_data, src_img_crop, trimap_data_crop = matting_preprocess(
+                    src_img_crop, trimap_data_crop, seg_data
+                )
+
+                preds_ailia = net.predict(input_data)
+
+                # postprocessing
+                res_img = postprocess(src_img_crop, trimap_data_crop, preds_ailia)
+                res_img = composite(res_img)
+
+                # copy
+                ch = res_img.shape[0]
+                cw = res_img.shape[1]
+                if crop_pos[0] + cw >= output_img.shape[1]:
+                    cw = output_img.shape[1] - crop_pos[0]
+                if crop_pos[1] + ch >= output_img.shape[0]:
+                    ch = output_img.shape[0] - crop_pos[1]
+                output_img[crop_pos[1]:crop_pos[1]+ch,crop_pos[0]:crop_pos[0]+cw,:] = res_img[0:ch,0:cw,:]
+
+        cv2.imshow('masked', output_img / 255.0)
+
+        # save results
+        if writer is not None:
+            writer.write(output_img[:,:,0:3].astype(np.uint8))
 
     capture.release()
     cv2.destroyAllWindows()
