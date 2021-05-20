@@ -302,7 +302,7 @@ def recognize_from_image():
     #seg_net.set_input_shape((1,3,640,640))
 
     # color space
-    rgb_mode = True
+    rgb_mode = False
 
     # input image loop
     for image_path in args.input:
