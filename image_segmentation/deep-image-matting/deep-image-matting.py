@@ -20,18 +20,16 @@ logger = getLogger(__name__)
 # ======================
 # Parameters
 # ======================
-WEIGHT_PATH = 'deep-image-matting.onnx'
-MODEL_PATH = WEIGHT_PATH + '.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/deep-image-matting/'
 
 IMAGE_PATH = 'input.png'
 TRIMAP_PATH = 'trimap.png'
 
 SAVE_IMAGE_PATH = 'output.png'
-IMAGE_HEIGHT = 320
-IMAGE_WIDTH = 320
 
 MODEL_LISTS = ['deeplabv3', 'u2net', 'pspnet']
+
+FRAMEWORK_LISTS = ['keras', 'torch']
 
 
 # ======================
@@ -49,9 +47,20 @@ parser.add_argument(
     help='model lists: ' + ' | '.join(MODEL_LISTS)
 )
 parser.add_argument(
+    '-f', '--framework', metavar='FRAMEWORK',
+    default='keras', choices=FRAMEWORK_LISTS,
+    help='framework lists: ' + ' | '.join(FRAMEWORK_LISTS)
+)
+parser.add_argument(
     '-d', '--debug',
     action='store_true',
     help='Dump debug images'
+)
+parser.add_argument(
+    '-n', '--onnx', 
+    action='store_true',
+    default=False,
+    help='Use onnxruntime'
 )
 args = update_parser(parser)
 
@@ -70,6 +79,17 @@ elif args.arch == 'pspnet':
     SEGMENTATION_MODEL_PATH = SEGMENTATION_WEIGHT_PATH + '.prototxt'
     SEGMENTATION_REMOTE_PATH = \
         'https://storage.googleapis.com/ailia-models/pspnet-hair-segmentation/'
+
+if args.framework == "keras":
+    WEIGHT_PATH = 'deep-image-matting.onnx'
+    IMAGE_HEIGHT = 320
+    IMAGE_WIDTH = 320
+else:
+    WEIGHT_PATH = 'deep-image-matting-pytorch.onnx'
+    IMAGE_HEIGHT = 1280
+    IMAGE_WIDTH = 1280
+
+MODEL_PATH = WEIGHT_PATH + '.prototxt'
 
 
 # ======================
@@ -104,6 +124,12 @@ def get_final_output(out, trimap):
 
 
 def postprocess(src_img, trimap, preds_ailia):
+    #print(preds_ailia.shape)
+    #print(trimap.shape)
+    #preds_ailia[0,trimap[:,:,0]==0] = 0.0
+    #preds_ailia[0,trimap[:,:,0]==255] = 0.0
+    #print(trimap)
+
     trimap = trimap[:, :, 0].reshape((IMAGE_HEIGHT, IMAGE_WIDTH))
 
     preds_ailia = preds_ailia.reshape((IMAGE_HEIGHT, IMAGE_WIDTH))
@@ -270,10 +296,6 @@ def matting_preprocess(src_img, trimap_data, seg_data):
 
     input_data = input_data / 255.0
 
-    #if args.debug:
-    #    cv2.imwrite(os.path.join(savedir, "debug_rgb.png"), src_img)
-    #    cv2.imwrite(os.path.join(savedir, "debug_trimap.png"), trimap_data)
-
     return input_data, src_img, trimap_data
 
 
@@ -291,8 +313,12 @@ def composite(img):
 def recognize_from_image():
     # net initialize
     env_id = 0  # use cpu because overflow fp16 range
-    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
-    net.set_input_shape((1, IMAGE_HEIGHT, IMAGE_WIDTH, 4))
+    if args.onnx:
+        import onnxruntime
+        net = onnxruntime.InferenceSession(WEIGHT_PATH)
+    else:
+        net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+        net.set_input_shape((1, IMAGE_HEIGHT, IMAGE_WIDTH, 4))
 
     seg_net = ailia.Net(
         SEGMENTATION_MODEL_PATH,
@@ -302,7 +328,7 @@ def recognize_from_image():
     #seg_net.set_input_shape((1,3,640,640))
 
     # color space
-    rgb_mode = False
+    rgb_mode = args.framework=="torch"
 
     # input image loop
     for image_path in args.input:
@@ -328,7 +354,7 @@ def recognize_from_image():
                 logger.info('Tile ('+str(x)+','+str(y)+')')
 
                 # crop
-                crop_size = (IMAGE_WIDTH, IMAGE_HEIGHT)
+                crop_size = (IMAGE_HEIGHT, IMAGE_WIDTH)
                 crop_pos = (x * IMAGE_WIDTH, y * IMAGE_HEIGHT)
 
                 src_crop_img = safe_crop(src_img, crop_pos, crop_size)
@@ -350,7 +376,14 @@ def recognize_from_image():
                         end = int(round(time.time() * 1000))
                         logger.info(f'\tailia processing time {end - start} ms')
                 else:
-                    preds_ailia = net.predict(input_data)
+                    if args.onnx:
+                        first_input_name = net.get_inputs()[0].name
+                        input_data = input_data.astype(np.float32)
+                        if args.framework=="torch":
+                            input_data = input_data.transpose((0, 3, 1, 2))
+                        preds_ailia = net.run([], {first_input_name: input_data})[0]
+                    else:
+                        preds_ailia = net.predict(input_data)
 
                 # post-processing
                 res_img = postprocess(src_crop_img, trimap_crop_data, preds_ailia)
