@@ -346,17 +346,89 @@ def dump_output(preds_ailia, trimap_crop_data, h, w):
     cv2.imwrite(os.path.join(savedir, "debug_trimap_input.png"), output)
 
 # ======================
+# Process one frame
+# ======================
+
+def process_one_frame(output_img,src_img,trimap_data,IMAGE_WIDTH,IMAGE_HEIGHT,PADDING,net):
+    for y in range((src_img.shape[0]+IMAGE_HEIGHT-PADDING*2-1)//(IMAGE_HEIGHT-PADDING*2)):
+        for x in range((src_img.shape[1]+IMAGE_WIDTH-PADDING*2-1)//(IMAGE_WIDTH-PADDING*2)):
+            logger.info('Tile ('+str(x)+','+str(y)+')')
+
+            # crop
+            crop_size = (IMAGE_HEIGHT, IMAGE_WIDTH)
+            crop_pos = (x * (IMAGE_WIDTH-PADDING*2) - PADDING, y * (IMAGE_HEIGHT-PADDING*2) - PADDING)
+
+            src_crop_img = safe_crop(src_img, crop_pos, crop_size)
+            trimap_crop_data = safe_crop(trimap_data, crop_pos, crop_size)
+
+            seg_data = trimap_crop_data.copy()
+
+            input_data, src_crop_img, trimap_crop_data = matting_preprocess(
+                src_crop_img, trimap_crop_data, seg_data, IMAGE_HEIGHT, IMAGE_WIDTH
+            )
+
+            # torch channel order
+            if args.framework=="torch":
+                input_data = input_data.transpose((0, 3, 1, 2))
+
+            # inference
+            logger.info('Start inference...')
+            if args.benchmark:
+                logger.info('BENCHMARK mode')
+                for i in range(5):
+                    start = int(round(time.time() * 1000))
+                    preds_ailia = net.predict(input_data)
+                    end = int(round(time.time() * 1000))
+                    logger.info(f'\tailia processing time {end - start} ms')
+            else:
+                if args.onnx:
+                    first_input_name = net.get_inputs()[0].name
+                    input_data = input_data.astype(np.float32)
+                    preds_ailia = net.run([], {first_input_name: input_data})[0]
+                else:
+                    preds_ailia = net.predict(input_data)
+
+            # dump output
+            if args.debug:
+                dump_output(preds_ailia,trimap_crop_data,IMAGE_HEIGHT,IMAGE_WIDTH)
+
+            # post-processing
+            res_img = postprocess(src_crop_img, trimap_crop_data, preds_ailia, IMAGE_HEIGHT, IMAGE_WIDTH)
+
+            # copy
+            active_pos=(crop_pos[0]+PADDING,crop_pos[1]+PADDING)
+            ch = res_img.shape[0]-PADDING*2
+            cw = res_img.shape[1]-PADDING*2
+            if active_pos[0] + cw >= output_img.shape[1]:
+                cw = output_img.shape[1] - active_pos[0]
+            if active_pos[1] + ch >= output_img.shape[0]:
+                ch = output_img.shape[0] - active_pos[1]
+            output_img[active_pos[1]:active_pos[1]+ch,active_pos[0]:active_pos[0]+cw,:] = res_img[PADDING:PADDING+ch,PADDING:PADDING+cw,:]
+
+
+def set_input_shape(net, src_img):
+    if args.framework=="keras":
+        IMAGE_WIDTH = 320
+        IMAGE_HEIGHT = 320
+        PADDING = 8
+        RGB_MODE = False
+        if not args.onnx:
+            net.set_input_shape((1, IMAGE_HEIGHT, IMAGE_WIDTH, 4))
+    else:
+        IMAGE_WIDTH = (src_img.shape[1]+31)//32*32
+        IMAGE_HEIGHT = (src_img.shape[0]+31)//32*32
+        PADDING = 0
+        RGB_MODE = True
+        if not args.onnx:
+            net.set_input_shape((1, 4, IMAGE_HEIGHT, IMAGE_WIDTH))
+    return IMAGE_WIDTH,IMAGE_HEIGHT,PADDING,RGB_MODE
+
+# ======================
 # Main functions
 # ======================
-def recognize_from_image():
-    # net initialize
-    env_id = 0  # use cpu because overflow fp16 range
-    if args.onnx:
-        import onnxruntime
-        net = onnxruntime.InferenceSession(WEIGHT_PATH)
-    else:
-        net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
 
+def recognize_from_image(net):
+    # trimap mode
     if args.trimap == "":
         seg_net = ailia.Net(
             SEGMENTATION_MODEL_PATH,
@@ -364,36 +436,23 @@ def recognize_from_image():
             env_id=args.env_id,
         )
 
-    # color space
-    rgb_mode = args.framework=="torch"
-
     # input image loop
     for image_path in args.input:
         # prepare input data
         logger.info(image_path)
         src_img = cv2.imread(image_path)    
-        if rgb_mode:
-            src_img = cv2.cvtColor(src_img, cv2.COLOR_BGR2RGB)
 
         # set input shape
-        if args.framework=="keras":
-            IMAGE_WIDTH = 320
-            IMAGE_HEIGHT = 320
-            if not args.onnx:
-                net.set_input_shape((1, IMAGE_HEIGHT, IMAGE_WIDTH, 4))
-        else:
-            IMAGE_WIDTH = (src_img.shape[1]+31)//32*32
-            IMAGE_HEIGHT = (src_img.shape[0]+31)//32*32
-            if not args.onnx:
-                net.set_input_shape((1, 4, IMAGE_HEIGHT, IMAGE_WIDTH))
+        IMAGE_WIDTH, IMAGE_HEIGHT, PADDING, RGB_MODE = set_input_shape(net, src_img)
+
+        if RGB_MODE:
+            src_img = cv2.cvtColor(src_img, cv2.COLOR_BGR2RGB)
 
         # create trimap
         if args.trimap == "":
             #if args.arch == "u2net":
             #    seg_net.set_input_shape((1,3,320,640))
             input_data = src_img
-            #if rgb_mode:
-            #    input_data = cv2.cvtColor(input_data, cv2.COLOR_RGB2BGR)
             trimap_data, seg_data = generate_trimap(seg_net, input_data)
         else:
             trimap_data = cv2.imread(args.trimap)
@@ -402,65 +461,10 @@ def recognize_from_image():
         output_img = np.zeros((src_img.shape[0],src_img.shape[1],4))
 
         # tile loop
-        if args.framework=="keras":
-            PADDING = 8
-        else:
-            PADDING = 0
-        for y in range((src_img.shape[0]+IMAGE_HEIGHT-PADDING*2-1)//(IMAGE_HEIGHT-PADDING*2)):
-            for x in range((src_img.shape[1]+IMAGE_WIDTH-PADDING*2-1)//(IMAGE_WIDTH-PADDING*2)):
-                logger.info('Tile ('+str(x)+','+str(y)+')')
-
-                # crop
-                crop_size = (IMAGE_HEIGHT, IMAGE_WIDTH)
-                crop_pos = (x * (IMAGE_WIDTH-PADDING*2) - PADDING, y * (IMAGE_HEIGHT-PADDING*2) - PADDING)
-
-                src_crop_img = safe_crop(src_img, crop_pos, crop_size)
-                trimap_crop_data = safe_crop(trimap_data, crop_pos, crop_size)
-
-                seg_data = trimap_crop_data.copy()
-
-                input_data, src_crop_img, trimap_crop_data = matting_preprocess(
-                    src_crop_img, trimap_crop_data, seg_data, IMAGE_HEIGHT, IMAGE_WIDTH
-                )
-
-                # inference
-                logger.info('Start inference...')
-                if args.benchmark:
-                    logger.info('BENCHMARK mode')
-                    for i in range(5):
-                        start = int(round(time.time() * 1000))
-                        preds_ailia = net.predict(input_data)
-                        end = int(round(time.time() * 1000))
-                        logger.info(f'\tailia processing time {end - start} ms')
-                else:
-                    if args.onnx:
-                        first_input_name = net.get_inputs()[0].name
-                        input_data = input_data.astype(np.float32)
-                        if args.framework=="torch":
-                            input_data = input_data.transpose((0, 3, 1, 2))
-                        preds_ailia = net.run([], {first_input_name: input_data})[0]
-                    else:
-                        preds_ailia = net.predict(input_data)
-
-                # dump output
-                if args.debug:
-                    dump_output(preds_ailia,trimap_crop_data,IMAGE_HEIGHT,IMAGE_WIDTH)
-
-                # post-processing
-                res_img = postprocess(src_crop_img, trimap_crop_data, preds_ailia, IMAGE_HEIGHT, IMAGE_WIDTH)
-
-                # copy
-                active_pos=(crop_pos[0]+PADDING,crop_pos[1]+PADDING)
-                ch = res_img.shape[0]-PADDING*2
-                cw = res_img.shape[1]-PADDING*2
-                if active_pos[0] + cw >= output_img.shape[1]:
-                    cw = output_img.shape[1] - active_pos[0]
-                if active_pos[1] + ch >= output_img.shape[0]:
-                    ch = output_img.shape[0] - active_pos[1]
-                output_img[active_pos[1]:active_pos[1]+ch,active_pos[0]:active_pos[0]+cw,:] = res_img[PADDING:PADDING+ch,PADDING:PADDING+cw,:]
+        process_one_frame(output_img,src_img,trimap_data,IMAGE_WIDTH,IMAGE_HEIGHT,PADDING,net)
         
         # save
-        if rgb_mode:
+        if RGB_MODE:
             output_img = output_img.astype(np.uint8)
             output_img = cv2.cvtColor(output_img, cv2.COLOR_RGBA2BGRA)
 
@@ -471,12 +475,8 @@ def recognize_from_image():
     logger.info('Script finished successfully.')
 
 
-def recognize_from_video():
-    # net initialize
-    env_id = 0  # use cpu because overflow fp16 range
-    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
-    net.set_input_shape((1, IMAGE_HEIGHT, IMAGE_WIDTH, 4))
-
+def recognize_from_video(net):
+    # segmentation net
     seg_net = ailia.Net(
         SEGMENTATION_MODEL_PATH,
         SEGMENTATION_WEIGHT_PATH,
@@ -499,8 +499,15 @@ def recognize_from_video():
         if src_img.shape[0]>=w_limit:
             src_img = cv2.resize(src_img,(w_limit,int(w_limit*src_img.shape[0]/src_img.shape[1])))
 
+       # set input shape
+        IMAGE_WIDTH, IMAGE_HEIGHT, PADDING, RGB_MODE = set_input_shape(net, src_img)
+
         # output image buffer
         output_img = np.zeros((src_img.shape[0],src_img.shape[1],4))
+
+        # color conversion
+        if RGB_MODE:
+            src_img = cv2.cvtColor(src_img, cv2.COLOR_BGR2RGB)
 
         # create video writer if savepath is specified as video format
         if args.savepath != SAVE_IMAGE_PATH:
@@ -515,40 +522,19 @@ def recognize_from_video():
         cv2.imshow('segmentation', seg_data / 255.0)
 
         # tile loop
-        for y in range((src_img.shape[0]+IMAGE_HEIGHT-1)//IMAGE_HEIGHT):
-            for x in range((src_img.shape[1]+IMAGE_WIDTH-1)//IMAGE_WIDTH):
-                logger.info('Tile ('+str(x)+','+str(y)+')')
+        process_one_frame(output_img,src_img,trimap_data,IMAGE_WIDTH,IMAGE_HEIGHT,PADDING,net)
+        output_img = composite(output_img)
+        
+        # save
+        output_img = output_img.astype(np.uint8)
+        if RGB_MODE:
+            output_img = cv2.cvtColor(output_img, cv2.COLOR_RGBA2BGRA)
 
-                crop_size = (IMAGE_WIDTH, IMAGE_HEIGHT)
-                crop_pos = (x * IMAGE_WIDTH, y * IMAGE_HEIGHT)
-
-                src_img_crop = safe_crop(src_img, crop_pos, crop_size)
-                trimap_data_crop = safe_crop(trimap_data, crop_pos, crop_size)
-
-                input_data, src_img_crop, trimap_data_crop = matting_preprocess(
-                    src_img_crop, trimap_data_crop, seg_data, IMAGE_HEIGHT, IMAGE_WIDTH
-                )
-
-                preds_ailia = net.predict(input_data)
-
-                # postprocessing
-                res_img = postprocess(src_img_crop, trimap_data_crop, preds_ailia, IMAGE_HEIGHT, IMAGE_WIDTH)
-                res_img = composite(res_img)
-
-                # copy
-                ch = res_img.shape[0]
-                cw = res_img.shape[1]
-                if crop_pos[0] + cw >= output_img.shape[1]:
-                    cw = output_img.shape[1] - crop_pos[0]
-                if crop_pos[1] + ch >= output_img.shape[0]:
-                    ch = output_img.shape[0] - crop_pos[1]
-                output_img[crop_pos[1]:crop_pos[1]+ch,crop_pos[0]:crop_pos[0]+cw,:] = res_img[0:ch,0:cw,:]
-
-        cv2.imshow('masked', output_img / 255.0)
+        cv2.imshow('frame', output_img)
 
         # save results
         if writer is not None:
-            writer.write(output_img[:,:,0:3].astype(np.uint8))
+            writer.write(output_img[:,:,0:3])
 
     capture.release()
     cv2.destroyAllWindows()
@@ -566,12 +552,20 @@ def main():
         SEGMENTATION_REMOTE_PATH,
     )
 
+    # net initialize
+    env_id = 0  # use cpu because overflow fp16 range
+    if args.onnx:
+        import onnxruntime
+        net = onnxruntime.InferenceSession(WEIGHT_PATH)
+    else:
+        net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+
     if args.video is not None:
         # video mode
-        recognize_from_video()
+        recognize_from_video(net)
     else:
         # image mode
-        recognize_from_image()
+        recognize_from_image(net)
 
 
 if __name__ == '__main__':
