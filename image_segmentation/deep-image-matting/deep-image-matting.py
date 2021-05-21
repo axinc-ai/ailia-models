@@ -370,8 +370,8 @@ def recognize_from_image():
 
         # create trimap
         if args.trimap == "":
-            if args.arch == "u2net":
-                seg_net.set_input_shape((1,3,640,320))
+            #if args.arch == "u2net":
+            #    seg_net.set_input_shape((1,3,320,640))
             input_data = src_img
             #if rgb_mode:
             #    input_data = cv2.cvtColor(input_data, cv2.COLOR_RGB2BGR)
