@@ -86,8 +86,8 @@ if args.framework == "keras":
     IMAGE_WIDTH = 320
 else:
     WEIGHT_PATH = 'deep-image-matting-pytorch.onnx'
-    IMAGE_HEIGHT = 1280
-    IMAGE_WIDTH = 1280
+    IMAGE_HEIGHT = 320
+    IMAGE_WIDTH = 640
 
 MODEL_PATH = WEIGHT_PATH + '.prototxt'
 
@@ -118,18 +118,19 @@ def safe_crop(mat, crop_pos=(0,0), crop_size=(img_rows, img_cols)):
 
 
 def get_final_output(out, trimap):
-    unknown_code = 128
-    mask = np.equal(trimap, unknown_code).astype(np.float32)
-    return (1 - mask) * trimap + mask * out
+    # based pytorch version
+    # supporting various unknown_code
+    out[trimap==0] = 0
+    out[trimap==255] = 255.0
+    return out
+
+    # based keras version
+    #unknown_code = 128
+    #mask = np.equal(trimap, unknown_code).astype(np.float32)
+    #return (1 - mask) * trimap + mask * out
 
 
 def postprocess(src_img, trimap, preds_ailia):
-    #print(preds_ailia.shape)
-    #print(trimap.shape)
-    #preds_ailia[0,trimap[:,:,0]==0] = 0.0
-    #preds_ailia[0,trimap[:,:,0]==255] = 0.0
-    #print(trimap)
-
     trimap = trimap[:, :, 0].reshape((IMAGE_HEIGHT, IMAGE_WIDTH))
 
     preds_ailia = preds_ailia.reshape((IMAGE_HEIGHT, IMAGE_WIDTH))
@@ -391,6 +392,28 @@ def recognize_from_image():
                         preds_ailia = net.run([], {first_input_name: input_data})[0]
                     else:
                         preds_ailia = net.predict(input_data)
+
+                # dump output
+                if args.debug:
+                    savedir = os.path.dirname(args.savepath)
+
+                    preds_ailia=preds_ailia.reshape((IMAGE_HEIGHT,IMAGE_WIDTH))
+                    output = (preds_ailia*255).astype(np.uint8)
+                    output = cv2.cvtColor(output, cv2.COLOR_GRAY2BGR)
+                    cv2.imwrite(os.path.join(savedir, "debug_output.png"), output)
+
+                    #preds_ailia=preds_ailia.reshape((IMAGE_HEIGHT,IMAGE_WIDTH))
+                    output = get_final_output(preds_ailia*255, trimap_crop_data[:, :, 0].reshape((IMAGE_HEIGHT, IMAGE_WIDTH)))
+                    output = output.astype(np.uint8)
+                    output = cv2.cvtColor(output, cv2.COLOR_GRAY2BGR)
+                    cv2.imwrite(os.path.join(savedir, "debug_output_masked.png"), output)
+
+                    output = (trimap_crop_data).astype(np.uint8)
+                    #for v in trimap_crop_data:
+                    #    for k in v:
+                    #        print(k)
+                    #output = cv2.cvtColor(output, cv2.COLOR_GRAY2BGR)
+                    cv2.imwrite(os.path.join(savedir, "debug_trimap_input.png"), output)
 
                 # post-processing
                 res_img = postprocess(src_crop_img, trimap_crop_data, preds_ailia)
