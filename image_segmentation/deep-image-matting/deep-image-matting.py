@@ -187,45 +187,6 @@ def imagenet_preprocess(input_data):
     return input_data
 
 
-def dump_segmentation(pred, src_data, w, h):
-    savedir = os.path.dirname(args.savepath)
-    segmentation_data = cv2.resize(pred * 255, (w, h))
-    segmentation_data = cv2.cvtColor(segmentation_data, cv2.COLOR_GRAY2BGR)
-    segmentation_data = (src_data + segmentation_data)/2
-    cv2.imwrite(os.path.join(savedir, "debug_segmentation.png"), segmentation_data)
-
-
-def dump_segmentation_threshold(trimap_data, src_data, w, h):
-    savedir = os.path.dirname(args.savepath)
-    segmentation_data = trimap_data.copy()
-    segmentation_data = cv2.cvtColor(segmentation_data, cv2.COLOR_GRAY2BGR)
-    segmentation_data = segmentation_data.astype(np.float)
-    segmentation_data = (src_data + segmentation_data)/2
-    cv2.imwrite(
-        os.path.join(savedir, "debug_segmentation_threshold.png"),
-        segmentation_data,
-    )
-
-
-def dump_trimap(trimap_data, src_data, w, h):
-    savedir = os.path.dirname(args.savepath)
-
-    cv2.imwrite(
-        os.path.join(savedir, "debug_trimap_gray.png"),
-        trimap_data,
-    )
-
-    segmentation_data = trimap_data.copy().astype(np.uint8)
-    segmentation_data = cv2.cvtColor(segmentation_data, cv2.COLOR_GRAY2BGR)
-    segmentation_data = segmentation_data.astype(np.float)
-    segmentation_data = (src_data + segmentation_data)/2
-
-    cv2.imwrite(
-        os.path.join(savedir, "debug_trimap.png"),
-        segmentation_data,
-    )
-
-
 def generate_trimap(net, input_data):
     src_data = input_data.copy()
     
@@ -314,6 +275,65 @@ def composite(img):
 
 
 # ======================
+# Debug functions
+# ======================
+
+def dump_segmentation(pred, src_data, w, h):
+    savedir = os.path.dirname(args.savepath)
+    segmentation_data = cv2.resize(pred * 255, (w, h))
+    segmentation_data = cv2.cvtColor(segmentation_data, cv2.COLOR_GRAY2BGR)
+    segmentation_data = (src_data + segmentation_data)/2
+    cv2.imwrite(os.path.join(savedir, "debug_segmentation.png"), segmentation_data)
+
+
+def dump_segmentation_threshold(trimap_data, src_data, w, h):
+    savedir = os.path.dirname(args.savepath)
+    segmentation_data = trimap_data.copy()
+    segmentation_data = cv2.cvtColor(segmentation_data, cv2.COLOR_GRAY2BGR)
+    segmentation_data = segmentation_data.astype(np.float)
+    segmentation_data = (src_data + segmentation_data)/2
+    cv2.imwrite(
+        os.path.join(savedir, "debug_segmentation_threshold.png"),
+        segmentation_data,
+    )
+
+
+def dump_trimap(trimap_data, src_data, w, h):
+    savedir = os.path.dirname(args.savepath)
+
+    cv2.imwrite(
+        os.path.join(savedir, "debug_trimap_gray.png"),
+        trimap_data,
+    )
+
+    segmentation_data = trimap_data.copy().astype(np.uint8)
+    segmentation_data = cv2.cvtColor(segmentation_data, cv2.COLOR_GRAY2BGR)
+    segmentation_data = segmentation_data.astype(np.float)
+    segmentation_data = (src_data + segmentation_data)/2
+
+    cv2.imwrite(
+        os.path.join(savedir, "debug_trimap.png"),
+        segmentation_data,
+    )
+
+
+def dump_output(preds_ailia, trimap_crop_data):
+    savedir = os.path.dirname(args.savepath)
+
+    preds_ailia=preds_ailia.reshape((IMAGE_HEIGHT,IMAGE_WIDTH))
+    output = (preds_ailia*255).astype(np.uint8)
+    output = cv2.cvtColor(output, cv2.COLOR_GRAY2BGR)
+    cv2.imwrite(os.path.join(savedir, "debug_output.png"), output)
+
+    output = get_final_output(preds_ailia*255, trimap_crop_data[:, :, 0].reshape((IMAGE_HEIGHT, IMAGE_WIDTH)))
+    output = output.astype(np.uint8)
+    output = cv2.cvtColor(output, cv2.COLOR_GRAY2BGR)
+    cv2.imwrite(os.path.join(savedir, "debug_output_masked.png"), output)
+
+    output = (trimap_crop_data).astype(np.uint8)
+    cv2.imwrite(os.path.join(savedir, "debug_trimap_input.png"), output)
+
+# ======================
 # Main functions
 # ======================
 def recognize_from_image():
@@ -395,25 +415,7 @@ def recognize_from_image():
 
                 # dump output
                 if args.debug:
-                    savedir = os.path.dirname(args.savepath)
-
-                    preds_ailia=preds_ailia.reshape((IMAGE_HEIGHT,IMAGE_WIDTH))
-                    output = (preds_ailia*255).astype(np.uint8)
-                    output = cv2.cvtColor(output, cv2.COLOR_GRAY2BGR)
-                    cv2.imwrite(os.path.join(savedir, "debug_output.png"), output)
-
-                    #preds_ailia=preds_ailia.reshape((IMAGE_HEIGHT,IMAGE_WIDTH))
-                    output = get_final_output(preds_ailia*255, trimap_crop_data[:, :, 0].reshape((IMAGE_HEIGHT, IMAGE_WIDTH)))
-                    output = output.astype(np.uint8)
-                    output = cv2.cvtColor(output, cv2.COLOR_GRAY2BGR)
-                    cv2.imwrite(os.path.join(savedir, "debug_output_masked.png"), output)
-
-                    output = (trimap_crop_data).astype(np.uint8)
-                    #for v in trimap_crop_data:
-                    #    for k in v:
-                    #        print(k)
-                    #output = cv2.cvtColor(output, cv2.COLOR_GRAY2BGR)
-                    cv2.imwrite(os.path.join(savedir, "debug_trimap_input.png"), output)
+                    dump_output(preds_ailia,trimap_crop_data)
 
                 # post-processing
                 res_img = postprocess(src_crop_img, trimap_crop_data, preds_ailia)
