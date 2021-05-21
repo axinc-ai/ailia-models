@@ -95,16 +95,35 @@ MODEL_PATH = WEIGHT_PATH + '.prototxt'
 
 #crop_pos=(x,y), crop_size=(height,width)
 def safe_crop(mat, crop_pos=(0,0), crop_size=(0,0)):
+    # destination buffer
     crop_height, crop_width = crop_size
     if len(mat.shape) == 2:
         ret = np.zeros((crop_height, crop_width), np.float32)
     else:
         ret = np.zeros((crop_height, crop_width, 3), np.float32)
+
+    # capture from
     x = crop_pos[0]
     y = crop_pos[1]
+
+    # copy to
+    dx = 0
+    dy = 0
+
+    # treat negative region
+    if x<0:
+        dx=-x
+        crop_width=crop_width+x
+        x=0
+    if y<0:
+        dy=-y
+        crop_height=crop_height+y
+        y=0
+
+    # copy
     crop = mat[y:y + crop_height, x:x + crop_width]
     h, w = crop.shape[:2]
-    ret[0:h, 0:w] = crop
+    ret[dy:dy+h, dx:dx+w] = crop
     return ret
 
 
@@ -383,13 +402,17 @@ def recognize_from_image():
         output_img = np.zeros((src_img.shape[0],src_img.shape[1],4))
 
         # tile loop
-        for y in range((src_img.shape[0]+IMAGE_HEIGHT-1)//IMAGE_HEIGHT):
-            for x in range((src_img.shape[1]+IMAGE_WIDTH-1)//IMAGE_WIDTH):
+        if args.framework=="keras":
+            PADDING = 8
+        else:
+            PADDING = 0
+        for y in range((src_img.shape[0]+IMAGE_HEIGHT-PADDING*2-1)//(IMAGE_HEIGHT-PADDING*2)):
+            for x in range((src_img.shape[1]+IMAGE_WIDTH-PADDING*2-1)//(IMAGE_WIDTH-PADDING*2)):
                 logger.info('Tile ('+str(x)+','+str(y)+')')
 
                 # crop
                 crop_size = (IMAGE_HEIGHT, IMAGE_WIDTH)
-                crop_pos = (x * IMAGE_WIDTH, y * IMAGE_HEIGHT)
+                crop_pos = (x * (IMAGE_WIDTH-PADDING*2) - PADDING, y * (IMAGE_HEIGHT-PADDING*2) - PADDING)
 
                 src_crop_img = safe_crop(src_img, crop_pos, crop_size)
                 trimap_crop_data = safe_crop(trimap_data, crop_pos, crop_size)
@@ -427,13 +450,14 @@ def recognize_from_image():
                 res_img = postprocess(src_crop_img, trimap_crop_data, preds_ailia, IMAGE_HEIGHT, IMAGE_WIDTH)
 
                 # copy
-                ch = res_img.shape[0]
-                cw = res_img.shape[1]
-                if crop_pos[0] + cw >= output_img.shape[1]:
-                    cw = output_img.shape[1] - crop_pos[0]
-                if crop_pos[1] + ch >= output_img.shape[0]:
-                    ch = output_img.shape[0] - crop_pos[1]
-                output_img[crop_pos[1]:crop_pos[1]+ch,crop_pos[0]:crop_pos[0]+cw,:] = res_img[0:ch,0:cw,:]
+                active_pos=(crop_pos[0]+PADDING,crop_pos[1]+PADDING)
+                ch = res_img.shape[0]-PADDING*2
+                cw = res_img.shape[1]-PADDING*2
+                if active_pos[0] + cw >= output_img.shape[1]:
+                    cw = output_img.shape[1] - active_pos[0]
+                if active_pos[1] + ch >= output_img.shape[0]:
+                    ch = output_img.shape[0] - active_pos[1]
+                output_img[active_pos[1]:active_pos[1]+ch,active_pos[0]:active_pos[0]+cw,:] = res_img[PADDING:PADDING+ch,PADDING:PADDING+cw,:]
         
         # save
         if rgb_mode:
