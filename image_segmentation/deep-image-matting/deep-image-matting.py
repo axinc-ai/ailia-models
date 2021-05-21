@@ -82,12 +82,8 @@ elif args.arch == 'pspnet':
 
 if args.framework == "keras":
     WEIGHT_PATH = 'deep-image-matting.onnx'
-    IMAGE_HEIGHT = 320
-    IMAGE_WIDTH = 320
 else:
     WEIGHT_PATH = 'deep-image-matting-pytorch.onnx'
-    IMAGE_HEIGHT = 320
-    IMAGE_WIDTH = 640
 
 MODEL_PATH = WEIGHT_PATH + '.prototxt'
 
@@ -95,11 +91,10 @@ MODEL_PATH = WEIGHT_PATH + '.prototxt'
 # ======================
 # Utils
 # ======================
-img_rows = IMAGE_HEIGHT
-img_cols = IMAGE_WIDTH
 
 
-def safe_crop(mat, crop_pos=(0,0), crop_size=(img_rows, img_cols)):
+#crop_pos=(x,y), crop_size=(height,width)
+def safe_crop(mat, crop_pos=(0,0), crop_size=(0,0)):
     crop_height, crop_width = crop_size
     if len(mat.shape) == 2:
         ret = np.zeros((crop_height, crop_width), np.float32)
@@ -110,10 +105,6 @@ def safe_crop(mat, crop_pos=(0,0), crop_size=(img_rows, img_cols)):
     crop = mat[y:y + crop_height, x:x + crop_width]
     h, w = crop.shape[:2]
     ret[0:h, 0:w] = crop
-    if crop_size != (img_rows, img_cols):
-        ret = cv2.resize(
-            ret, dsize=(img_rows, img_cols), interpolation=cv2.INTER_NEAREST
-        )
     return ret
 
 
@@ -130,14 +121,14 @@ def get_final_output(out, trimap):
     #return (1 - mask) * trimap + mask * out
 
 
-def postprocess(src_img, trimap, preds_ailia):
-    trimap = trimap[:, :, 0].reshape((IMAGE_HEIGHT, IMAGE_WIDTH))
+def postprocess(src_img, trimap, preds_ailia, h, w):
+    trimap = trimap[:, :, 0].reshape((h, w))
 
-    preds_ailia = preds_ailia.reshape((IMAGE_HEIGHT, IMAGE_WIDTH))
+    preds_ailia = preds_ailia.reshape((h, w))
     preds_ailia = preds_ailia * 255.0
     preds_ailia = get_final_output(preds_ailia, trimap)
 
-    output_data = np.zeros((IMAGE_HEIGHT, IMAGE_WIDTH, 4))
+    output_data = np.zeros((h, w, 4))
     output_data[:, :, 0] = src_img[:, :, 0]
     output_data[:, :, 1] = src_img[:, :, 1]
     output_data[:, :, 2] = src_img[:, :, 2]
@@ -147,6 +138,31 @@ def postprocess(src_img, trimap, preds_ailia):
     output_data[output_data < 0] = 0
 
     return output_data
+
+
+def matting_preprocess(src_img, trimap_data, seg_data, h, w):
+    input_data = np.zeros((1, h, w, 4))
+    input_data[:, :, :, 0:3] = src_img[:, :, 0:3]
+    input_data[:, :, :, 3] = trimap_data[:, :, 0]
+
+    savedir = os.path.dirname(args.savepath)
+    if args.debug:
+        cv2.imwrite(
+            os.path.join(savedir, "debug_input.png"),
+            input_data.reshape((h, w, 4)),
+        )
+
+    input_data = input_data / 255.0
+
+    return input_data, src_img, trimap_data
+
+
+def composite(img):
+    img[:, :, 0] = img[:, :, 0] * img[:, :, 3] / 255.0
+    img[:, :, 1] = img[:, :, 1] * img[:, :, 3] / \
+        255.0 + 255.0 * (1.0 - img[:, :, 3] / 255.0)
+    img[:, :, 2] = img[:, :, 2] * img[:, :, 3] / 255.0
+    return img
 
 
 # ======================
@@ -225,6 +241,8 @@ def generate_trimap(net, input_data):
     thre = 0.6
     ite = 3
 
+    if args.arch == "deeplabv3":
+        ite = 7
     if args.arch == "u2net":
         thre = 0.8
         ite = 5
@@ -247,31 +265,6 @@ def generate_trimap(net, input_data):
         dump_trimap(trimap_data, src_data, w, h)
 
     return trimap_data, seg_data
-
-
-def matting_preprocess(src_img, trimap_data, seg_data):
-    input_data = np.zeros((1, IMAGE_HEIGHT, IMAGE_WIDTH, 4))
-    input_data[:, :, :, 0:3] = src_img[:, :, 0:3]
-    input_data[:, :, :, 3] = trimap_data[:, :, 0]
-
-    savedir = os.path.dirname(args.savepath)
-    if args.debug:
-        cv2.imwrite(
-            os.path.join(savedir, "debug_input.png"),
-            input_data.reshape((IMAGE_HEIGHT, IMAGE_WIDTH, 4)),
-        )
-
-    input_data = input_data / 255.0
-
-    return input_data, src_img, trimap_data
-
-
-def composite(img):
-    img[:, :, 0] = img[:, :, 0] * img[:, :, 3] / 255.0
-    img[:, :, 1] = img[:, :, 1] * img[:, :, 3] / \
-        255.0 + 255.0 * (1.0 - img[:, :, 3] / 255.0)
-    img[:, :, 2] = img[:, :, 2] * img[:, :, 3] / 255.0
-    return img
 
 
 # ======================
@@ -317,15 +310,15 @@ def dump_trimap(trimap_data, src_data, w, h):
     )
 
 
-def dump_output(preds_ailia, trimap_crop_data):
+def dump_output(preds_ailia, trimap_crop_data, h, w):
     savedir = os.path.dirname(args.savepath)
 
-    preds_ailia=preds_ailia.reshape((IMAGE_HEIGHT,IMAGE_WIDTH))
+    preds_ailia=preds_ailia.reshape((h,w))
     output = (preds_ailia*255).astype(np.uint8)
     output = cv2.cvtColor(output, cv2.COLOR_GRAY2BGR)
     cv2.imwrite(os.path.join(savedir, "debug_output.png"), output)
 
-    output = get_final_output(preds_ailia*255, trimap_crop_data[:, :, 0].reshape((IMAGE_HEIGHT, IMAGE_WIDTH)))
+    output = get_final_output(preds_ailia*255, trimap_crop_data[:, :, 0].reshape((h, w)))
     output = output.astype(np.uint8)
     output = cv2.cvtColor(output, cv2.COLOR_GRAY2BGR)
     cv2.imwrite(os.path.join(savedir, "debug_output_masked.png"), output)
@@ -344,14 +337,13 @@ def recognize_from_image():
         net = onnxruntime.InferenceSession(WEIGHT_PATH)
     else:
         net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
-        net.set_input_shape((1, IMAGE_HEIGHT, IMAGE_WIDTH, 4))
 
-    seg_net = ailia.Net(
-        SEGMENTATION_MODEL_PATH,
-        SEGMENTATION_WEIGHT_PATH,
-        env_id=args.env_id,
-    )
-    seg_net.set_input_shape((1,3,640,320))
+    if args.trimap == "":
+        seg_net = ailia.Net(
+            SEGMENTATION_MODEL_PATH,
+            SEGMENTATION_WEIGHT_PATH,
+            env_id=args.env_id,
+        )
 
     # color space
     rgb_mode = args.framework=="torch"
@@ -364,8 +356,22 @@ def recognize_from_image():
         if rgb_mode:
             src_img = cv2.cvtColor(src_img, cv2.COLOR_BGR2RGB)
 
+        # set input shape
+        if args.framework=="keras":
+            IMAGE_WIDTH = 320
+            IMAGE_HEIGHT = 320
+            if not args.onnx:
+                net.set_input_shape((1, IMAGE_HEIGHT, IMAGE_WIDTH, 4))
+        else:
+            IMAGE_WIDTH = (src_img.shape[1]+31)//32*32
+            IMAGE_HEIGHT = (src_img.shape[0]+31)//32*32
+            if not args.onnx:
+                net.set_input_shape((1, 4, IMAGE_HEIGHT, IMAGE_WIDTH))
+
         # create trimap
         if args.trimap == "":
+            if args.arch == "u2net":
+                seg_net.set_input_shape((1,3,640,320))
             input_data = src_img
             #if rgb_mode:
             #    input_data = cv2.cvtColor(input_data, cv2.COLOR_RGB2BGR)
@@ -391,7 +397,7 @@ def recognize_from_image():
                 seg_data = trimap_crop_data.copy()
 
                 input_data, src_crop_img, trimap_crop_data = matting_preprocess(
-                    src_crop_img, trimap_crop_data, seg_data
+                    src_crop_img, trimap_crop_data, seg_data, IMAGE_HEIGHT, IMAGE_WIDTH
                 )
 
                 # inference
@@ -415,10 +421,10 @@ def recognize_from_image():
 
                 # dump output
                 if args.debug:
-                    dump_output(preds_ailia,trimap_crop_data)
+                    dump_output(preds_ailia,trimap_crop_data,IMAGE_HEIGHT,IMAGE_WIDTH)
 
                 # post-processing
-                res_img = postprocess(src_crop_img, trimap_crop_data, preds_ailia)
+                res_img = postprocess(src_crop_img, trimap_crop_data, preds_ailia, IMAGE_HEIGHT, IMAGE_WIDTH)
 
                 # copy
                 ch = res_img.shape[0]
@@ -496,13 +502,13 @@ def recognize_from_video():
                 trimap_data_crop = safe_crop(trimap_data, crop_pos, crop_size)
 
                 input_data, src_img_crop, trimap_data_crop = matting_preprocess(
-                    src_img_crop, trimap_data_crop, seg_data
+                    src_img_crop, trimap_data_crop, seg_data, IMAGE_HEIGHT, IMAGE_WIDTH
                 )
 
                 preds_ailia = net.predict(input_data)
 
                 # postprocessing
-                res_img = postprocess(src_img_crop, trimap_data_crop, preds_ailia)
+                res_img = postprocess(src_img_crop, trimap_data_crop, preds_ailia, IMAGE_HEIGHT, IMAGE_WIDTH)
                 res_img = composite(res_img)
 
                 # copy
