@@ -70,7 +70,6 @@ cd ../../image_manipulation/psgan; python3 psgan.py ${OPTION}
 cd ../../image_manipulation/deep_white_balance; python3 deep_white_balance.py ${OPTION}
 cd ../../image_manipulation/inpainting_gmcnn; python3 inpainting_gmcnn.py ${OPTION}
 cd ../../image_manipulation/deblur_gan; python3 deblur_gan.py ${OPTION}
-cd ../../image_manipulation/beauty_gan; python3 beauty_gan.py ${OPTION}
 cd ../../image_segmentation/deep-image-matting; python3 deep-image-matting.py ${OPTION}
 cd ../../image_segmentation/deeplabv3; python3 deeplabv3.py ${OPTION}
 cd ../../image_segmentation/hair_segmentation; python3 hair_segmentation.py ${OPTION}
@@ -122,6 +121,7 @@ cd ../../pose_estimation/pose-hg-3d; python3 pose-hg-3d.py ${OPTION}
 cd ../../pose_estimation/gast; python3 gast.py ${OPTION}
 cd ../../rotation_prediction/rotnet; python3 rotnet.py ${OPTION}
 cd ../../style_transfer/adain; python3 adain.py ${OPTION}
+cd ../../style_transfer/beauty_gan; python3 beauty_gan.py ${OPTION}
 cd ../../super_resolution/srresnet; python3 srresnet.py ${OPTION}
 cd ../../super_resolution/edsr; python3 edsr.py ${OPTION}
 cd ../../text_detection/craft_pytorch; python3 craft_pytorch.py ${OPTION}
