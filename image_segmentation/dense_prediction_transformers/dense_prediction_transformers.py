@@ -43,7 +43,7 @@ parser = get_base_parser(
 )
 parser.add_argument(
     '--task',
-    default='monodepth',
+    default='segmentation',
     choices=['monodepth', 'segmentation'],
     help=('specify task you want to run.')
 )
