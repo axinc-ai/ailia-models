@@ -66,7 +66,8 @@ def monodepth(optimize=True):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print("device: %s" % device)
 
-    net_w = net_h = 384
+    net_w = 576
+    net_h = 384
     normalization = NormalizeImage(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
     transform = Compose(
         [
@@ -142,7 +143,8 @@ def segmentation(optimize=True):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print("device: %s" % device)
 
-    net_w = net_h = 384
+    net_w = 576
+    net_h = 384
 
     normalization = NormalizeImage(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
     transform = Compose(
@@ -151,7 +153,7 @@ def segmentation(optimize=True):
                 net_w,
                 net_h,
                 resize_target=None,
-                keep_aspect_ratio=True,
+                keep_aspect_ratio=False,
                 ensure_multiple_of=32,
                 resize_method="minimal",
                 image_interpolation_method=cv2.INTER_CUBIC,
