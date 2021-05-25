@@ -168,15 +168,7 @@ def resize_depth(depth, width, height):
     return depth_resized
 
 
-def write_depth(path, depth, bits=1):
-    """Write depth map to pfm and png file.
-
-    Args:
-        path (str): filepath without extension
-        depth (array): depth
-    """
-    write_pfm(path + ".pfm", depth.astype(np.float32))
-
+def get_depth(depth, bits):
     depth_min = depth.min()
     depth_max = depth.max()
 
@@ -186,6 +178,20 @@ def write_depth(path, depth, bits=1):
         out = max_val * (depth - depth_min) / (depth_max - depth_min)
     else:
         out = np.zeros(depth.shape, dtype=depth.dtype)
+    
+    return out
+
+
+def write_depth(path, depth, bits=1):
+    """Write depth map to pfm and png file.
+
+    Args:
+        path (str): filepath without extension
+        depth (array): depth
+    """
+    write_pfm(path + ".pfm", depth.astype(np.float32))
+
+    out = get_depth(depth, bits)
 
     if bits == 1:
         cv2.imwrite(path, out.astype("uint8"))
@@ -193,6 +199,17 @@ def write_depth(path, depth, bits=1):
         cv2.imwrite(path, out.astype("uint16"))
 
     return
+
+
+def get_segm_img(image, labels, palette="detail", alpha=0.5):
+    mask = get_mask_pallete(labels, "ade20k")
+
+    img = Image.fromarray(np.uint8(255*image)).convert("RGBA")
+    seg = mask.convert("RGBA")
+
+    out = Image.blend(img, seg, alpha)
+
+    return out
 
 
 def write_segm_img(path, image, labels, palette="detail", alpha=0.5):
@@ -204,12 +221,7 @@ def write_segm_img(path, image, labels, palette="detail", alpha=0.5):
         labels (array): labeling of the image
     """
 
-    mask = get_mask_pallete(labels, "ade20k")
-
-    img = Image.fromarray(np.uint8(255*image)).convert("RGBA")
-    seg = mask.convert("RGBA")
-
-    out = Image.blend(img, seg, alpha)
+    out = get_segm_img(image, labels, palette, alpha)
 
     out.save(path)
 

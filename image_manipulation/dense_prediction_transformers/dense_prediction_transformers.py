@@ -8,6 +8,7 @@ import ailia
 sys.path.append('../../util')
 from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
+import webcamera_utils  # noqa: E402
 
 # import for dpt
 import glob
@@ -55,7 +56,7 @@ args = update_parser(parser)
 
 
 # ======================
-# Main functions
+# Utils
 # ======================
 
 def preprocess(img_raw):
@@ -77,6 +78,24 @@ def preprocess(img_raw):
     return img
 
 
+def postprocess(prediction, img_raw):
+    prediction = prediction[0]
+
+    if args.task == 'monodepth':
+        prediction = cv2.resize(prediction,(img_raw.shape[1],img_raw.shape[0]),interpolation=cv2.INTER_CUBIC)
+    elif args.task == 'segmentation':
+        scaled_predictin = np.zeros((prediction.shape[0],img_raw.shape[0],img_raw.shape[1]))
+        for i in range(prediction.shape[0]):
+            scaled_predictin[i] = cv2.resize(prediction[i],(img_raw.shape[1],img_raw.shape[0]),interpolation=cv2.INTER_CUBIC)
+        prediction = np.argmax(scaled_predictin, axis=0) + 1
+
+    return prediction
+
+
+# ======================
+# Main functions
+# ======================
+
 def recognize_from_image(net):
     for i, img_name in enumerate(args.input):
         img_raw = util.io.read_image(img_name)
@@ -90,15 +109,8 @@ def recognize_from_image(net):
             prediction = prediction[0]
         else:
             prediction = net.predict(sample)
-            prediction = prediction[0]
 
-        if args.task == 'monodepth':
-            prediction = cv2.resize(prediction,(img_raw.shape[1],img_raw.shape[0]),interpolation=cv2.INTER_CUBIC)
-        elif args.task == 'segmentation':
-            scaled_predictin = np.zeros((prediction.shape[0],img_raw.shape[0],img_raw.shape[1]))
-            for i in range(prediction.shape[0]):
-                scaled_predictin[i] = cv2.resize(prediction[i],(img_raw.shape[1],img_raw.shape[0]),interpolation=cv2.INTER_CUBIC)
-            prediction = np.argmax(scaled_predictin, axis=0) + 1
+        prediction = postprocess(prediction, img_raw)
 
         savepath = get_savepath(args.savepath, img_name)
         logger.info(f'saved at : {savepath}')
@@ -123,22 +135,38 @@ def recognize_from_video(net):
         writer = None
 
     while(True):
-        ret, img = capture.read()
+        ret, img_raw = capture.read()
+
         # press q to end video capture
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
 
-        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        (img_lab_orig, img_lab_rs) = preprocess(img)
-        out = net.predict({'input.1': img_lab_rs})[0]
-        out_img = post_process(out, img_lab_orig)
-        out_img = np.array(out_img * 255, dtype=np.uint8)
-        out_img = cv2.cvtColor(out_img, cv2.COLOR_RGB2BGR)
-        cv2.imshow('frame', out_img)
+        img = preprocess(img_raw)
+
+        sample = np.expand_dims(img,0)
+        
+        if args.onnx:
+            input_name = net.get_inputs()[0].name
+            prediction = net.run(None, {input_name: sample.astype(np.float32)})
+            prediction = prediction[0]
+        else:
+            prediction = net.predict(sample)
+
+        prediction = postprocess(prediction, img_raw)
+
+        if args.task == 'monodepth':
+            out = util.io.get_depth(prediction, bits=1)
+            out = out.astype("uint8")
+        elif args.task == 'segmentation':
+            out = util.io.get_segm_img(img_raw, prediction, alpha=0.5)
+            out = np.array(out)
+            out = cv2.cvtColor(out, cv2.COLOR_RGB2BGR) 
+
+        cv2.imshow('frame', out)
 
         # save results
         if writer is not None:
-            writer.write(out_img)
+            writer.write(out)
 
     capture.release()
     cv2.destroyAllWindows()
