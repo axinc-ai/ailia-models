@@ -29,18 +29,20 @@ WEIGHT_SEGMENTATION_PATH = "dpt_hybrid_segmentation.onnx"
 MODEL_SEGMENTATION_PATH = "dpt_hybrid_segmentation.onnx.prototxt"
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/dense_prediction_transformers/'
 
+IMAGE_PATH = 'input.jpg'
+SAVE_IMAGE_PATH = 'output.png'
 
 # ======================
 # Arguemnt Parser Config
 # ======================
 parser = get_base_parser(
     'Dense Prediction Transformers',
-    None,
-    None,
+    IMAGE_PATH,
+    SAVE_IMAGE_PATH,
 )
 parser.add_argument(
     '--task',
-    required=True,
+    required='monodepth",
     choices=['monodepth', 'segmentation'],
     help=('specify task you want to run.')
 )
@@ -75,23 +77,11 @@ def preprocess(img_raw):
     return img
 
 
-def monodepth(optimize=True):
-    img_names = args.input
-
-    if args.onnx:
-        import onnxruntime
-        net = onnxruntime.InferenceSession(WEIGHT_MONODEPTH_PATH)
-    else:
-        net = ailia.Net(MODEL_MONODEPTH_PATH, WEIGHT_MONODEPTH_PATH, env_id=args.env_id)
-
-    # create output folder
-    os.makedirs('monodepth_outputs', exist_ok=True)
-
-    for i, img_name in enumerate(img_names):
+def recognize_from_image(net):
+    for i, img_name in enumerate(args.input):
         img_raw = util.io.read_image(img_name)
         img = preprocess(img_raw)
 
-        # compute
         sample = np.expand_dims(img,0)
         
         if args.onnx:
@@ -100,66 +90,84 @@ def monodepth(optimize=True):
             prediction = prediction[0]
         else:
             prediction = net.predict(sample)
-
-        prediction = prediction[0]
-        prediction = cv2.resize(prediction,(img_raw.shape[1],img_raw.shape[0]),interpolation=cv2.INTER_CUBIC)
-
-        filename = os.path.join(
-            'monodepth_outputs', os.path.splitext(os.path.basename(img_name))[0]
-        )
-        util.io.write_depth(filename, prediction, bits=2)
-
-    return
-
-
-def segmentation(optimize=True):
-    img_names = args.input
-
-    if args.onnx:
-        import onnxruntime
-        net = onnxruntime.InferenceSession(WEIGHT_SEGMENTATION_PATH)
-    else:
-        net = ailia.Net(MODEL_SEGMENTATION_PATH, WEIGHT_SEGMENTATION_PATH, env_id=args.env_id)
-
-    # create output folder
-    os.makedirs('segmentation_outputs', exist_ok=True)
-
-    for i, img_name in enumerate(img_names):
-        img_raw = util.io.read_image(img_name)
-        img = preprocess(img_raw)
-
-        # compute
-        sample = np.expand_dims(img,0)
-
-        if args.onnx:
-            input_name = net.get_inputs()[0].name
-            prediction = net.run(None, {input_name: sample.astype(np.float32)})
             prediction = prediction[0]
-        else:
-            prediction = net.predict(sample)
-        prediction = prediction[0]
 
-        scaled_predictin = np.zeros((prediction.shape[0],img_raw.shape[0],img_raw.shape[1]))
-        for i in range(prediction.shape[0]):
-            scaled_predictin[i] = cv2.resize(prediction[i],(img_raw.shape[1],img_raw.shape[0]),interpolation=cv2.INTER_CUBIC)
-        prediction = np.argmax(scaled_predictin, axis=0) + 1
+        if args.task == 'monodepth':
+            prediction = cv2.resize(prediction,(img_raw.shape[1],img_raw.shape[0]),interpolation=cv2.INTER_CUBIC)
+        elif args.task == 'segmentation':
+            scaled_predictin = np.zeros((prediction.shape[0],img_raw.shape[0],img_raw.shape[1]))
+            for i in range(prediction.shape[0]):
+                scaled_predictin[i] = cv2.resize(prediction[i],(img_raw.shape[1],img_raw.shape[0]),interpolation=cv2.INTER_CUBIC)
+            prediction = np.argmax(scaled_predictin, axis=0) + 1
 
-        filename = os.path.join(
-            'segmentation_outputs', os.path.splitext(os.path.basename(img_name))[0]
-        )
-        util.io.write_segm_img(filename, img_raw, prediction, alpha=0.5)
+        savepath = get_savepath(args.savepath, img_name)
+        logger.info(f'saved at : {savepath}')
 
-    return
+        if args.task == 'monodepth':
+            util.io.write_depth(savepath, prediction, bits=2)
+        elif args.task == 'segmentation':
+            util.io.write_segm_img(savepath, img_raw, prediction, alpha=0.5)
 
+    logger.info('Script finished successfully.')
+
+
+def recognize_from_video(net):
+    capture = webcamera_utils.get_capture(args.video)
+
+    # create video writer if savepath is specified as video format
+    if args.savepath != SAVE_IMAGE_PATH:
+        f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
+        writer = webcamera_utils.get_writer(args.savepath, f_h, f_w)
+    else:
+        writer = None
+
+    while(True):
+        ret, img = capture.read()
+        # press q to end video capture
+        if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        (img_lab_orig, img_lab_rs) = preprocess(img)
+        out = net.predict({'input.1': img_lab_rs})[0]
+        out_img = post_process(out, img_lab_orig)
+        out_img = np.array(out_img * 255, dtype=np.uint8)
+        out_img = cv2.cvtColor(out_img, cv2.COLOR_RGB2BGR)
+        cv2.imshow('frame', out_img)
+
+        # save results
+        if writer is not None:
+            writer.write(out_img)
+
+    capture.release()
+    cv2.destroyAllWindows()
+    if writer is not None:
+        writer.release()
+    logger.info('Script finished successfully.')
 
 def main():
     if args.task == 'monodepth':
         check_and_download_models(WEIGHT_MONODEPTH_PATH, MODEL_MONODEPTH_PATH, REMOTE_PATH)
-        monodepth()
+        if args.onnx:
+            import onnxruntime
+            net = onnxruntime.InferenceSession(WEIGHT_MONODEPTH_PATH)
+        else:
+            net = ailia.Net(MODEL_MONODEPTH_PATH, WEIGHT_MONODEPTH_PATH, env_id=args.env_id)
     elif args.task == 'segmentation':
+        if args.onnx:
+            import onnxruntime
+            net = onnxruntime.InferenceSession(WEIGHT_SEGMENTATION_PATH)
+        else:
+            net = ailia.Net(MODEL_SEGMENTATION_PATH, WEIGHT_SEGMENTATION_PATH, env_id=args.env_id)
         check_and_download_models(WEIGHT_SEGMENTATION_PATH, MODEL_SEGMENTATION_PATH, REMOTE_PATH)
-        segmentation()
 
+    if args.video is not None:
+        # video mode
+        recognize_from_video(net)
+    else:
+        # image mode
+        recognize_from_image(net)
 
 if __name__ == '__main__':
     main()

@@ -188,9 +188,9 @@ def write_depth(path, depth, bits=1):
         out = np.zeros(depth.shape, dtype=depth.dtype)
 
     if bits == 1:
-        cv2.imwrite(path + ".png", out.astype("uint8"))
+        cv2.imwrite(path, out.astype("uint8"))
     elif bits == 2:
-        cv2.imwrite(path + ".png", out.astype("uint16"))
+        cv2.imwrite(path, out.astype("uint16"))
 
     return
 
@@ -211,6 +211,6 @@ def write_segm_img(path, image, labels, palette="detail", alpha=0.5):
 
     out = Image.blend(img, seg, alpha)
 
-    out.save(path + ".png")
+    out.save(path)
 
     return

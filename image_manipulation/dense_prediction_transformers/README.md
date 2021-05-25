@@ -1,23 +1,23 @@
 # dense_prediction_transformers
 
 ### Input
-image file (384x576)
+image file (576x384)
 
-![Input](inputs/girls-1209321_640.jpg)
+![Input](input.jpg)
 
 (Image from https://pixabay.com/ja/photos/%E5%A5%B3%E3%81%AE%E5%AD%90-%E5%98%98-%E3%82%AF%E3%83%A9%E3%82%B7%E3%83%83%E3%82%AF%E3%82%AB%E3%83%BC-1209321/)
 
 ### Output
 
-image file (384x576)
+image file (576x384)
 
 --task=monodepth_outputs
 
-![Output](monodepth_outputs/girls-1209321_640.png)
+![Output](output_monodepth.png)
 
 --task=segmentation
 
-![Output](segmentation_outputs/girls-1209321_640.png)
+![Output](output_segmentation.png)
 
 ### Usage
 
