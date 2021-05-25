@@ -22,7 +22,7 @@ logger = getLogger(__name__)
 # ======================
 # Parameters
 # ======================
-WEIGHT_RES_PATH = 'pspnet-hair-segmentation.onnx'
+WEIGHT_RES_PATH = 'pspnet-hair-segmentation.onnx' #you can also use 'pspnet_resnet101.onnx'
 MODEL_RES_PATH = WEIGHT_RES_PATH + '.prototxt'
 WEIGHT_SQZ_PATH = 'pspnet_squeezenet.onnx'
 MODEL_SQZ_PATH = WEIGHT_SQZ_PATH + '.prototxt'
@@ -31,7 +31,7 @@ REMOTE_PATH = \
 
 IMAGE_PATH = 'test.jpg'
 SAVE_IMAGE_PATH = 'output.png'
-IMAGE_SIZE_RES = 512
+IMAGE_SIZE_RES = 512 #if you want to use 'pspnet_resnet101.onnx', please set 592
 IMAGE_SIZE_SQZ = 592
 
 # ======================
