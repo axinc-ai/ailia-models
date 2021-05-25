@@ -43,7 +43,7 @@ parser = get_base_parser(
 )
 parser.add_argument(
     '--task',
-    required='monodepth',
+    default='monodepth',
     choices=['monodepth', 'segmentation'],
     help=('specify task you want to run.')
 )
@@ -103,12 +103,26 @@ def recognize_from_image(net):
 
         sample = np.expand_dims(img,0)
         
-        if args.onnx:
-            input_name = net.get_inputs()[0].name
-            prediction = net.run(None, {input_name: sample.astype(np.float32)})
-            prediction = prediction[0]
+        logger.info('Start inference...')
+        if args.benchmark:
+            logger.info('BENCHMARK mode')
+            for i in range(args.benchmark_count):
+                start = int(round(time.time() * 1000))
+                if args.onnx:
+                    input_name = net.get_inputs()[0].name
+                    prediction = net.run(None, {input_name: sample.astype(np.float32)})
+                    prediction = prediction[0]
+                else:
+                    prediction = net.predict(sample)
+                end = int(round(time.time() * 1000))
+                logger.info(f'\tailia processing time {end - start} ms')
         else:
-            prediction = net.predict(sample)
+            if args.onnx:
+                input_name = net.get_inputs()[0].name
+                prediction = net.run(None, {input_name: sample.astype(np.float32)})
+                prediction = prediction[0]
+            else:
+                prediction = net.predict(sample)
 
         prediction = postprocess(prediction, img_raw)
 
@@ -136,6 +150,7 @@ def recognize_from_video(net):
 
     while(True):
         ret, img_raw = capture.read()
+        img_raw = cv2.cvtColor(img_raw, cv2.COLOR_BGR2RGB) / 255.0
 
         # press q to end video capture
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
