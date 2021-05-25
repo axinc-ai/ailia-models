@@ -75,7 +75,7 @@ def monodepth(optimize=True):
                 net_w,
                 net_h,
                 resize_target=None,
-                keep_aspect_ratio=True,
+                keep_aspect_ratio=False,
                 ensure_multiple_of=32,
                 resize_method="minimal",
                 image_interpolation_method=cv2.INTER_CUBIC,
