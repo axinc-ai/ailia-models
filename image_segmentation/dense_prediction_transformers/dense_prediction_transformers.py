@@ -150,12 +150,12 @@ def recognize_from_video(net):
 
     while(True):
         ret, img_raw = capture.read()
-        img_raw = cv2.cvtColor(img_raw, cv2.COLOR_BGR2RGB) / 255.0
 
         # press q to end video capture
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
 
+        img_raw = cv2.cvtColor(img_raw, cv2.COLOR_BGR2RGB) / 255.0
         img = preprocess(img_raw)
 
         sample = np.expand_dims(img,0)
