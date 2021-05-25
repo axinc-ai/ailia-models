@@ -11,9 +11,7 @@ from model_utils import check_and_download_models  # noqa: E402
 
 # import for dpt
 import glob
-import torch
 import numpy as np
-from torchvision.transforms import Compose
 import util.io
 from dpt.transforms import Resize, NormalizeImage, PrepareForNet
 
@@ -57,33 +55,28 @@ args = update_parser(parser)
 # ======================
 # Main functions
 # ======================
-def monodepth(optimize=True):
-    # get input
-    img_names = glob.glob(os.path.join('inputs', '*'))
-    num_images = len(img_names)
 
-    # select device
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print("device: %s" % device)
-
+def preprocess(img_raw):
     net_w = 576
     net_h = 384
+    func = Resize(
+            net_w,
+            net_h,
+            resize_target=None,
+            keep_aspect_ratio=False,
+            ensure_multiple_of=32,
+            resize_method="minimal",
+            image_interpolation_method=cv2.INTER_CUBIC)
+    img = func({"image": img_raw})
     normalization = NormalizeImage(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
-    transform = Compose(
-        [
-            Resize(
-                net_w,
-                net_h,
-                resize_target=None,
-                keep_aspect_ratio=False,
-                ensure_multiple_of=32,
-                resize_method="minimal",
-                image_interpolation_method=cv2.INTER_CUBIC,
-            ),
-            normalization,
-            PrepareForNet(),
-        ]
-    )
+    img = normalization(img)
+    img = PrepareForNet()(img)
+    img = img["image"]
+    return img
+
+
+def monodepth(optimize=True):
+    img_names = args.input
 
     if args.onnx:
         import onnxruntime
@@ -96,35 +89,20 @@ def monodepth(optimize=True):
 
     for i, img_name in enumerate(img_names):
         img_raw = util.io.read_image(img_name)
-        img = transform({"image": img_raw})["image"]
+        img = preprocess(img_raw)
 
         # compute
-        with torch.no_grad():
-            sample = torch.from_numpy(img).to(device).unsqueeze(0)
-            if optimize == True and device == torch.device("cuda"):
-                sample = sample.to(memory_format=torch.channels_last)
-                sample = sample.half()
-            sample = sample.to('cpu').detach().numpy().copy()
+        sample = np.expand_dims(img,0)
+        
+        if args.onnx:
+            input_name = net.get_inputs()[0].name
+            prediction = net.run(None, {input_name: sample.astype(np.float32)})
+            prediction = prediction[0]
+        else:
+            prediction = net.predict(sample)
 
-            if args.onnx:
-                input_name = net.get_inputs()[0].name
-                prediction = net.run(None, {input_name: sample.astype(np.float32)})
-                prediction = prediction[0]
-            else:
-                prediction = net.predict(sample)
-
-            prediction = torch.from_numpy(prediction).to(device)
-            prediction = (
-                torch.nn.functional.interpolate(
-                    prediction.unsqueeze(1),
-                    size=img_raw.shape[:2],
-                    mode="bicubic",
-                    align_corners=False,
-                )
-                .squeeze()
-                .cpu()
-                .numpy()
-            )
+        prediction = prediction[0]
+        prediction = cv2.resize(prediction,(img_raw.shape[1],img_raw.shape[0]),interpolation=cv2.INTER_CUBIC)
 
         filename = os.path.join(
             'monodepth_outputs', os.path.splitext(os.path.basename(img_name))[0]
@@ -135,33 +113,7 @@ def monodepth(optimize=True):
 
 
 def segmentation(optimize=True):
-    # get input
-    img_names = glob.glob(os.path.join('inputs', '*'))
-    num_images = len(img_names)
-
-    # select device
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print("device: %s" % device)
-
-    net_w = 576
-    net_h = 384
-
-    normalization = NormalizeImage(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
-    transform = Compose(
-        [
-            Resize(
-                net_w,
-                net_h,
-                resize_target=None,
-                keep_aspect_ratio=False,
-                ensure_multiple_of=32,
-                resize_method="minimal",
-                image_interpolation_method=cv2.INTER_CUBIC,
-            ),
-            normalization,
-            PrepareForNet(),
-        ]
-    )
+    img_names = args.input
 
     if args.onnx:
         import onnxruntime
@@ -174,33 +126,23 @@ def segmentation(optimize=True):
 
     for i, img_name in enumerate(img_names):
         img_raw = util.io.read_image(img_name)
-        img = transform({"image": img_raw})["image"]
+        img = preprocess(img_raw)
 
         # compute
-        with torch.no_grad():
-            sample = torch.from_numpy(img).to(device).unsqueeze(0)
-            if optimize == True and device == torch.device("cuda"):
-                sample = sample.to(memory_format=torch.channels_last)
-                sample = sample.half()
-            sample = sample.to('cpu').detach().numpy().copy()
+        sample = np.expand_dims(img,0)
 
-            if args.onnx:
-                input_name = net.get_inputs()[0].name
-                prediction = net.run(None, {input_name: sample.astype(np.float32)})
-                prediction = prediction[0]
-            else:
-                prediction = net.predict(sample)
+        if args.onnx:
+            input_name = net.get_inputs()[0].name
+            prediction = net.run(None, {input_name: sample.astype(np.float32)})
+            prediction = prediction[0]
+        else:
+            prediction = net.predict(sample)
+        prediction = prediction[0]
 
-            prediction = torch.from_numpy(prediction).to(device)
-            prediction = torch.nn.functional.interpolate(
-                prediction,
-                size=img_raw.shape[:2],
-                mode="bicubic",
-                align_corners=False,
-            )
-            prediction = torch.argmax(prediction, dim=1) + 1
-            prediction = prediction.squeeze().cpu().numpy()
-
+        scaled_predictin = np.zeros((prediction.shape[0],img_raw.shape[0],img_raw.shape[1]))
+        for i in range(prediction.shape[0]):
+            scaled_predictin[i] = cv2.resize(prediction[i],(img_raw.shape[1],img_raw.shape[0]),interpolation=cv2.INTER_CUBIC)
+        prediction = np.argmax(scaled_predictin, axis=0) + 1
 
         filename = os.path.join(
             'segmentation_outputs', os.path.splitext(os.path.basename(img_name))[0]
