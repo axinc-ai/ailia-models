@@ -40,6 +40,16 @@ parser.add_argument(
     action='store_true',
     help='Composite input image and predicted alpha value'
 )
+parser.add_argument(
+    '-w', '--width',
+    default=IMAGE_SIZE, type=int,
+    help='The segmentation width and height for u2net. (default: 320)'
+)
+parser.add_argument(
+    '-h', '--height',
+    default=IMAGE_SIZE, type=int,
+    help='The segmentation height and height for u2net. (default: 320)'
+)
 args = update_parser(parser)
 
 
@@ -63,7 +73,7 @@ def preprocess(img):
     img = img_pad
 
     img = np.array(Image.fromarray(img).resize(
-        (IMAGE_SIZE, IMAGE_SIZE),
+        (args.width, args.height),
         resample=Image.ANTIALIAS))
 
     img = img / 255
@@ -120,11 +130,10 @@ def recognize_from_image(net):
         else:
             # composite
             h, w = img_0.shape[:2]
-            img = cv2.cvtColor(img_0, cv2.COLOR_BGRA2BGR)
-            img_bk = np.zeros((h, w, 3))
-            img_bk[:, :] = [64, 177, 0]
-            pred = np.expand_dims(pred, axis=2)
-            res_img = img * pred + img_bk * (1 - pred)
+            image = cv2.imread(image_path)
+            image = cv2.cvtColor(image, cv2.COLOR_BGR2BGRA)
+            image[:, :, 3] = cv2.resize(pred, (w, h)) * 255
+            res_img = image
 
         savepath = get_savepath(args.savepath, image_path)
         logger.info(f'saved at : {savepath}')
@@ -187,6 +196,8 @@ def main():
 
     # net initialize
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
+    if args.width!=IMAGE_SIZE or args.height!=IMAGE_SIZE:
+        net.set_input_shape((1,3,args.height,args.width))
 
     if args.video is not None:
         # video mode
