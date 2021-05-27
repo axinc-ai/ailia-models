@@ -35,7 +35,6 @@ CATEGORY = (
     'skin', 'face'
 )
 THRESHOLD = 0.3
-# IOU = 0.4
 
 RESIZE_RANGE = (750, 1101)
 NORM_MEAN = [123.675, 116.28, 103.53]
@@ -54,6 +53,11 @@ U2NET_IMAGE_SIZE = 320
 # Arguemnt Parser Config
 # ======================
 parser = get_base_parser('MMFashion model', IMAGE_PATH, SAVE_IMAGE_PATH)
+parser.add_argument(
+    '-th', '--threshold',
+    default=THRESHOLD, type=float,
+    help='The detection threshold for yolo. (default: '+str(THRESHOLD)+')'
+)
 parser.add_argument(
     '-pp', '--preprocess', metavar='ARCH',
     default=None, choices=U2NET_MODEL_LIST,
@@ -166,7 +170,7 @@ def post_processing(data, boxes, labels, masks):
         score = box[-1]
         x, y, x2, y2 = box[:4]
 
-        if score < THRESHOLD:
+        if score < args.threshold:
             continue
 
         w = (x2 - x)
