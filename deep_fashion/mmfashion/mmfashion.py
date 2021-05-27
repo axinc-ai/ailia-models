@@ -12,7 +12,7 @@ from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from detector_utils import plot_results, load_image  # noqa: E402
 from image_utils import normalize_image  # noqa: E402
-from webcamera_utils import get_capture  # noqa: E402
+import webcamera_utils  # noqa: E402
 
 # logger
 from logging import getLogger  # noqa: E402
@@ -34,7 +34,7 @@ CATEGORY = (
     'neckwear', 'headwear', 'eyeglass', 'belt', 'footwear', 'hair',
     'skin', 'face'
 )
-THRESHOLD = 0.3
+THRESHOLD = 0.6
 
 RESIZE_RANGE = (750, 1101)
 NORM_MEAN = [123.675, 116.28, 103.53]
@@ -261,7 +261,15 @@ def recognize_from_image(filename, detector, pp_net):
 
 
 def recognize_from_video(video, detector, pp_net):
-    capture = get_capture(args.video)
+    capture = webcamera_utils.get_capture(args.video)
+
+    # create video writer if savepath is specified as video format
+    if args.savepath != SAVE_IMAGE_PATH:
+        f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
+        writer = webcamera_utils.get_writer(args.savepath, f_h, f_w)
+    else:
+        writer = None
 
     while True:
         ret, frame = capture.read()
@@ -277,8 +285,15 @@ def recognize_from_video(video, detector, pp_net):
         )
         cv2.imshow('frame', res_img)
 
+        # save results
+        if writer is not None:
+            writer.write(res_img)
+
     capture.release()
     cv2.destroyAllWindows()
+    if writer is not None:
+        writer.release()
+    logger.info('Script finished successfully.')
 
 
 def main():
