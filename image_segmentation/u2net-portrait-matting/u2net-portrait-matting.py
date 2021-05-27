@@ -43,12 +43,12 @@ parser.add_argument(
 parser.add_argument(
     '-w', '--width',
     default=IMAGE_SIZE, type=int,
-    help='The segmentation width and height for u2net. (default: 320)'
+    help='The segmentation width and height for u2net.'
 )
 parser.add_argument(
     '-h', '--height',
     default=IMAGE_SIZE, type=int,
-    help='The segmentation height and height for u2net. (default: 320)'
+    help='The segmentation height and height for u2net.'
 )
 args = update_parser(parser)
 
@@ -196,8 +196,8 @@ def main():
 
     # net initialize
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
-    if args.width!=IMAGE_SIZE or args.height!=IMAGE_SIZE:
-        net.set_input_shape((1,3,args.height,args.width))
+    if args.width != IMAGE_SIZE or args.height != IMAGE_SIZE:
+        net.set_input_shape((1, 3, args.height, args.width))
 
     if args.video is not None:
         # video mode
