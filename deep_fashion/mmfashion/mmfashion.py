@@ -273,10 +273,8 @@ def recognize_from_video(video, detector, pp_net):
 
     while True:
         ret, frame = capture.read()
-        if cv2.waitKey(1) & 0xFF == ord('q'):
+        if cv2.waitKey(1) & 0xFF == ord('q') or not ret:
             break
-        if not ret:
-            continue
 
         x = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         detect_object, seg_masks = detect_objects(x, detector, pp_net)
