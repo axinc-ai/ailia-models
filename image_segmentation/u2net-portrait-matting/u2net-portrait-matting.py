@@ -196,8 +196,7 @@ def main():
 
     # net initialize
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
-    if args.width != IMAGE_SIZE or args.height != IMAGE_SIZE:
-        net.set_input_shape((1, 3, args.height, args.width))
+    net.set_input_shape((1, 3, args.height, args.width)) # dynamic axis
 
     if args.video is not None:
         # video mode
