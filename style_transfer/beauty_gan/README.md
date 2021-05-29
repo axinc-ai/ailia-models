@@ -38,6 +38,20 @@ You can use `--image_makeup` option to specify the makeup image file.
 $ python3 beauty_gan.py --image_makeup IMAGE_PATH
 ```
 
+By adding the `--video` option, you can input the video.   
+If you pass `0` as an argument to VIDEO_PATH, you can use the webcam input instead of the video file.
+
+```bash
+$ python3 beauty_gan.py --video VIDEO_PATH --savepath SAVE_VIDEO_PATH
+```
+
+In video mode, the output is for the entire input frame by default,
+but you can specify the `--focus` option to output with a face-focused image.
+
+```bash
+$ python3 beauty_gan.py --video VIDEO_PATH --focus
+```
+
 ## Reference
 
 - [BeautyGAN](https://github.com/wtjiang98/BeautyGAN_pytorch)
