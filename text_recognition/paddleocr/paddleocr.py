@@ -8,6 +8,7 @@ import numpy as np
 import math
 import time
 from PIL import Image, ImageDraw, ImageFont
+import unicodedata
 
 import ailia
 
@@ -124,7 +125,7 @@ def get_default_config():
     else:
         # Linux
         dc['vis_font_path'] = '/usr/share/fonts/opentype/ipaexfont-gothic/ipaexg.ttf'
-    dc['drop_score'] = 0.3  # 0.5  # this is threshold of rec
+    dc['drop_score'] = 0.5  # this is threshold of rec
     dc['rec_bbox_padding'] = 0.1
     dc['limited_max_width'] = 1280
     dc['limited_min_width'] = 16
@@ -1098,7 +1099,8 @@ def draw_ocr_box_txt(image,
                      txts,
                      scores=None,
                      drop_score=0.5,
-                     font_path=''):
+                     font_path='',
+                     bbox_padding=0.):
     h, w = image.height, image.width
     img_left = image.copy()
     img_right = Image.new('RGB', (w, h), (255, 255, 255))
@@ -1123,7 +1125,7 @@ def draw_ocr_box_txt(image,
         box_height = math.sqrt((box[0][0] - box[3][0])**2 + (box[0][1] - box[3][1])**2)
         box_width = math.sqrt((box[0][0] - box[1][0])**2 + (box[0][1] - box[1][1])**2)
         if box_height > 2 * box_width:
-            font_size = max(int(box_width * 0.9), 10)
+            font_size = max(int(box_width * 0.9 * (1 - bbox_padding)), 10)
             font = ImageFont.truetype(font_path, font_size, encoding="utf-8")
             cur_y = box[0][1]
             for c in txt:
@@ -1132,7 +1134,7 @@ def draw_ocr_box_txt(image,
                     (box[0][0] + 3, cur_y), c, fill=(0, 0, 0), font=font)
                 cur_y += char_size[1]
         else:
-            font_size = max(int(box_height * 0.8), 10)
+            font_size = max(int(box_height * 0.8 * (1 - bbox_padding)), 10)
             font = ImageFont.truetype(font_path, font_size, encoding="utf-8")
             draw_right.text(
                 [box[0][0], box[0][1]], txt, fill=(0, 0, 0), font=font)
@@ -1141,6 +1143,26 @@ def draw_ocr_box_txt(image,
     img_show.paste(img_left, (0, 0, w, h))
     img_show.paste(img_right, (w, 0, w * 2, h))
     return np.array(img_show)
+
+
+def adjust_half_and_full(txts):
+    # loop of txts
+    for i_txt in range(len(txts)):
+        txt_tmp = txts[i_txt]
+        flg_replace = False
+        print('txt_tmp =\n', txt_tmp)
+        for i_char in range(1, len(txt_tmp)):
+            char_tmp = txt_tmp[i_char]
+            print('char_tmp =', char_tmp)
+            if (char_tmp == '-'):
+                res = unicodedata.east_asian_width(txt_tmp[i_char-1])
+                if (res == 'W'):
+                    txt_tmp = txt_tmp.replace('%s-' % txt_tmp[i_char-1], 
+                                              '%sー' % txt_tmp[i_char-1])
+                    flg_replace = True
+        if flg_replace:
+            txts[i_txt] = txt_tmp
+    return txts
 
 
 def recognize_from_image(config, text_sys):
@@ -1157,9 +1179,13 @@ def recognize_from_image(config, text_sys):
         txts = [rec_res[i][0] for i in range(len(rec_res))]
         scores = [rec_res[i][1] for i in range(len(rec_res))]
 
+        # adjust halfwidth and fullwidth forms
+        txts = adjust_half_and_full(txts)
+
         draw_img = draw_ocr_box_txt(image, boxes, txts, scores,
                                     drop_score=config['drop_score'],
-                                    font_path=config['vis_font_path'])
+                                    font_path=config['vis_font_path'],
+                                    bbox_padding=config['rec_bbox_padding'])
         cv2.imwrite(args.savepath, draw_img[:, :, ::-1])
 
     logger.info('finished process and write result to %s!' % args.savepath)
