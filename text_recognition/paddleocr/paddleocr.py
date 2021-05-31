@@ -1150,10 +1150,8 @@ def adjust_half_and_full(txts):
     for i_txt in range(len(txts)):
         txt_tmp = txts[i_txt]
         flg_replace = False
-        print('txt_tmp =\n', txt_tmp)
         for i_char in range(1, len(txt_tmp)):
             char_tmp = txt_tmp[i_char]
-            print('char_tmp =', char_tmp)
             if (char_tmp == '-'):
                 res = unicodedata.east_asian_width(txt_tmp[i_char-1])
                 if (res == 'W'):
