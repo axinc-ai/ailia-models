@@ -81,6 +81,16 @@ parser.add_argument(
     '-ft', '--face_threshold', type=float, default=FACE_THRESHOLD,
     help='Threshold for face detection'
 )
+parser.add_argument(
+    '-m', '--match',
+    action='store_true',
+    help='Video matching mode.'
+)
+parser.add_argument(
+    '-sk', '--skip',
+    action='store_true',
+    help='Skip some frame.'
+)
 args = update_parser(parser)
 
 WEIGHT_PATH = args.arch + '.onnx'
@@ -156,8 +166,8 @@ def cosin_metric(x1, x2):
 # Face Tracking
 # ======================
 FACE_TRACK_T = 15   # Face buffer size
-FACE_REMOVE_T = 80  # Remove track after this frames
-
+FACE_REMOVE_T = -1  # Remove track after this frames
+FACE_TRACK_PERSON_MAX = 7   # Limit mode
 
 class FaceTrack():
     def __init__(self, id, fe, image, frame_no):
@@ -168,19 +178,21 @@ class FaceTrack():
         self.score = 0
 
     def update(self, fe, image, score, frame_no):
+        if FACE_TRACK_PERSON_MAX!=-1:
+            return
         self.fe.append(fe)
         self.image.append(image)
         self.frame_no.append(frame_no)
         self.score = score
 
     def pop(self, frame_no):
-        if len(self.frame_no) > FACE_TRACK_T:
+        if len(self.frame_no) > 1:
             self.fe.pop(0)
             self.image.pop(0)
             self.frame_no.pop(0)
 
         if len(self.frame_no) >= 1:
-            if frame_no - self.frame_no[0] >= FACE_REMOVE_T:
+            if frame_no - self.frame_no[0] >= FACE_REMOVE_T and FACE_REMOVE_T!=-1:
                 self.fe.pop(0)
                 self.image.pop(0)
                 self.frame_no.pop(0)
@@ -212,6 +224,14 @@ def face_identification(tracks, net, detections, frame_no):
 
         detections[i]["fe"] = fe_2
 
+    # sort
+    if FACE_TRACK_PERSON_MAX!=-1:
+        if len(detections)>=2:
+            if detections[0]["top_left"][0]>detections[1]["top_left"][0]:
+                temp = detections[0]
+                detections[0] = detections[1]
+                detections[1] = temp
+
     score_matrix = np.zeros((len(detections), len(tracks)))
     for i in range(len(detections)):
         for j in range(len(tracks)):
@@ -226,6 +246,8 @@ def face_identification(tracks, net, detections, frame_no):
             if len(tracks[j].fe) >= 1:
                 avg_sim = avg_sim / len(tracks[j].fe)
             score_matrix[i, j] = avg_sim
+            if FACE_TRACK_PERSON_MAX!=-1 and i==1:
+                tracks[j].score=avg_sim
 
     for i in range(len(detections)):
         if len(tracks) == 0:
@@ -244,14 +266,16 @@ def face_identification(tracks, net, detections, frame_no):
         detections[det_sim]["score_sim"] = score_sim
 
         score_matrix[det_sim, :] = 0
-        score_matrix[:, id_sim] = 0
+        if FACE_TRACK_PERSON_MAX==-1: # assign to only one person
+            score_matrix[:, id_sim] = 0
 
-    for i in range(len(tracks)):
-        tracks[i].score = 0
+    if FACE_TRACK_PERSON_MAX==-1:
+        for i in range(len(tracks)):
+            tracks[i].score = 0
 
     for i in range(len(detections)):
         # identification
-        if detections[i]["score_sim"] < args.threshold:
+        if detections[i]["score_sim"] < args.threshold and (FACE_TRACK_PERSON_MAX==-1 or len(tracks)<FACE_TRACK_PERSON_MAX):
             id_sim = len(tracks)
             fe_obj = FaceTrack(
                 id_sim,
@@ -380,6 +404,14 @@ def display_tracks(ui, w, h, tracks):
         color = hsv_to_rgb(256 * i / 16, 255, 255)
         cv2.rectangle(ui, (w, y0), (ui.shape[1]-2, y2-2), color, 2)
 
+        if FACE_TRACK_PERSON_MAX!=-1:
+            l = ui.shape[1]-2 - w
+            o = 22
+            s = l*tracks[i].score
+            if s<0:
+                s=0
+            cv2.rectangle(ui, (w, y0+o), (int(w + s), y0+o+4), color, -1)
+
         text_position = (w, y0 + 16)
 
         cv2.putText(
@@ -492,10 +524,16 @@ def compare_video():
         )
 
     # inference loop
+    frame_cnt = 0
     while(True):
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
+
+        if args.skip:
+            frame_cnt = frame_cnt + 1
+            if frame_cnt%4!=0:
+                continue
 
         # get frame size
         h, w = frame.shape[0], frame.shape[1]
@@ -527,6 +565,141 @@ def compare_video():
     logger.info('Script finished successfully.')
 
 
+def match_video():
+    # net initialize
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
+    BATCH_SIZE = net.get_input_shape()[0]
+
+    # detector initialize
+    if args.face == "blazeface":
+        detector = ailia.Net(
+            FACE_MODEL_PATH, FACE_WEIGHT_PATH, env_id=args.env_id
+        )
+    else:
+        detector = ailia.Detector(
+            FACE_MODEL_PATH,
+            FACE_WEIGHT_PATH,
+            len(FACE_CATEGORY),
+            format=ailia.NETWORK_IMAGE_FORMAT_RGB,
+            channel=ailia.NETWORK_IMAGE_CHANNEL_FIRST,
+            range=FACE_RANGE,
+            algorithm=FACE_ALGORITHM,
+            env_id=args.env_id
+        )
+
+    # web camera
+    capture = webcamera_utils.get_capture(args.video)
+
+    # ui buffer
+    ui_width = capture.get(cv2.CAP_PROP_FRAME_WIDTH)
+    ui_height = capture.get(cv2.CAP_PROP_FRAME_HEIGHT)
+    ui = np.zeros((int(ui_height), int(ui_width), 3), np.uint8)
+
+    # writer
+    writer = None
+    if args.savepath is not None:
+        writer = webcamera_utils.get_writer(
+            args.savepath,
+            ui.shape[0],
+            ui.shape[1],
+            fps=capture.get(cv2.CAP_PROP_FPS),
+        )
+
+    # inference loop
+    frame_cnt = 0
+    while(True):
+        ret, frame = capture.read()
+        if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+            
+        if args.skip:
+            frame_cnt = frame_cnt + 1
+            if frame_cnt%4!=0:
+                continue
+
+        # get frame size
+        h, w = frame.shape[0], frame.shape[1]
+
+        # get faces from image
+        detections = get_faces(detector, frame, w, h)
+
+        # first person
+        for i in range(len(detections)):
+            resized_frame = detections[i]["resized_frame"]
+
+            # prepare target face and input face
+            input_frame = preprocess_image(resized_frame, input_is_bgr=True)
+            if BATCH_SIZE == 4:
+                input_data = np.concatenate([input_frame, input_frame], axis=0)
+            else:
+                input_data = input_frame
+
+            # inference
+            preds_ailia = net.predict(input_data)
+
+            # postprocessing
+            if BATCH_SIZE == 4:
+                fe_1 = np.concatenate([preds_ailia[0], preds_ailia[1]], axis=0)
+                fe_2 = np.concatenate([preds_ailia[2], preds_ailia[3]], axis=0)
+            else:
+                fe_1 = np.concatenate([preds_ailia[0], preds_ailia[1]], axis=0)
+                fe_2 = fe_1
+
+            detections[i]["fe"] = fe_2
+
+        # postprocessing
+        sim = 0
+        if len(detections)>=2:
+            if detections[0]["top_left"][0]>detections[1]["top_left"][0]:
+                temp = detections[0]
+                detections[0] = detections[1]
+                detections[1] = temp
+            sim = cosin_metric(detections[0]["fe"], detections[1]["fe"])
+            detections[0]["id_sim"] = 0
+            if args.threshold < sim:
+                detections[1]["id_sim"] = 0
+                text = f"Same person (similality : {sim:5.3f})"
+                color = (0,255,0)
+            else:
+                detections[1]["id_sim"] = 1
+                text = f"Not same person (similality : {sim:5.3f})"
+                color = (0,0,255)
+
+        # display result
+        ui[:, :, :] = 0
+        ui[0:h, 0:w, :] = frame[:, :, :]
+        display_detections(ui, w, h, detections)
+
+        # display similality
+        fontScale = 1.0
+        thickness = 2
+        text_position = (16, h-64)
+
+        cv2.putText(
+            ui,
+            text,
+            text_position,
+            cv2.FONT_HERSHEY_SIMPLEX,
+            fontScale,
+            color,
+            thickness
+        )
+
+        # show
+        cv2.imshow('arcface', ui)
+
+        if writer is not None:
+            writer.write(ui)
+
+    if writer is not None:
+        writer.release()
+
+    capture.release()
+    cv2.destroyAllWindows()
+    logger.info('Script finished successfully.')
+
+
+
 def main():
     # model files check and download
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
@@ -541,8 +714,10 @@ def main():
         compare_images()
     else:
         # video mode
-        # comparing the specified image and the video
-        compare_video()
+        if args.match:
+            match_video()
+        else:
+            compare_video()
 
 
 if __name__ == "__main__":
