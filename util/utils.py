@@ -158,6 +158,7 @@ def update_parser(parser, check_input_type=True, large_model=False):
     # 2. update input
     if args.video is not None:
         args.ftype = 'video'
+        args.input = None # force video mode
 
     if args.input is None:
         # TODO: args.video, args.input is vague...

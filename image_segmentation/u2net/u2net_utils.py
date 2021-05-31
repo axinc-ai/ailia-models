@@ -7,12 +7,12 @@ def transform(image, scaled_size):
     # RescaleT part in original repo
     h, w = image.shape[:2]
     if h > w:
-        new_h, new_w = scaled_size*h/w, scaled_size
+        new_h, new_w = scaled_size[1]*h/w, scaled_size[0]
     else:
-        new_h, new_w = scaled_size, scaled_size*w/h
+        new_h, new_w = scaled_size[1], scaled_size[0]*w/h
     new_h, new_w = int(new_h), int(new_w)
     
-    image = cv2.resize(image, (scaled_size, scaled_size))
+    image = cv2.resize(image, (scaled_size[0], scaled_size[1]))
 
     # ToTensorLab part in original repo
     tmpImg = np.zeros((image.shape[0], image.shape[1], 3))
@@ -28,8 +28,10 @@ def transform(image, scaled_size):
     return tmpImg.transpose((2, 0, 1))[np.newaxis, :, :, :]
 
 
-def load_image(image_path, scaled_size):
+def load_image(image_path, scaled_size, rgb_mode):
     image = cv2.imread(image_path)
+    if rgb_mode and image.shape[2] == 3:
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
     h, w = image.shape[0], image.shape[1]
     if 2 == len(image.shape):
         image = image[:, :, np.newaxis]
