@@ -6,7 +6,10 @@ import glob
 import numpy as np
 from scipy.special import softmax
 
-from roneld_utils import roneld_lane_detection, ScaleNew, Normalize
+from roneld_utils import roneld_lane_detection
+
+sys.path.append('../codes-for-lane-detection')
+from codes_for_lane_detection_utils import crop_and_resize, preprocess, postprocess
 
 import ailia
 
@@ -29,12 +32,18 @@ REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/erfnet/'
 IMAGE_PATH = 'input.jpg'
 SAVE_IMAGE_PATH = 'output.jpg'
 
+MODEL_LISTS = ['erfnet']
 RESIZE_MODE_LISTS = ['padding', 'crop']
 
 # ======================
 # Arguemnt Parser Config
 # ======================
 parser = get_base_parser('roneld model', IMAGE_PATH, SAVE_IMAGE_PATH)
+parser.add_argument(
+    '-a', '--arch', metavar='ARCH',
+    default='erfnet', choices=MODEL_LISTS,
+    help='model lists: ' + ' | '.join(MODEL_LISTS)
+)
 parser.add_argument(
     '-r', '--resize', metavar='RESIZE',
     default='crop', choices=RESIZE_MODE_LISTS,
@@ -55,21 +64,6 @@ INPUT_STD = [1, 1, 1]
 # Main functions
 # ======================
 
-def crop_and_resize(raw_img):
-    if args.resize=="padding":
-        #add padding
-        frame,resized_img = webcamera_utils.adjust_frame_size(raw_img, HEIGHT, WIDTH)
-        return resized_img
-    elif args.resize=="crop":
-        #cut top
-        scale_x = (WIDTH / raw_img.shape[1])
-        crop_y = raw_img.shape[0] * scale_x - HEIGHT
-        crop_y = int(crop_y / scale_x)
-
-        img = raw_img[crop_y:, :, :]  #keep aspect
-        img = cv2.resize(img, (WIDTH, HEIGHT), interpolation = cv2.INTER_LINEAR)
-        return img
-    return None
 
 def recognize_from_image():
     env_id = ailia.get_gpu_environment_id()
@@ -82,20 +76,12 @@ def recognize_from_image():
     # input image loop
     for image_path in args.input:
         # prepare input data
-        logger.debug(f'input image: {image_path}')
         raw_img = cv2.imread(image_path)
-        logger.debug(f'input image shape: {raw_img.shape}')
 
-        trans = Normalize(mean=(INPUT_MEAN, (0,)), std=(INPUT_STD, (1,)))
-
-        raw_img = crop_and_resize(raw_img)
+        # preprocess
+        raw_img = crop_and_resize(raw_img,WIDTH,HEIGHT,args.arch,args.resize)
         img = raw_img
-
-        #img = cv2.resize(raw_img, (WIDTH, HEIGHT))
-
-        img = np.expand_dims(img, 0)
-        img = trans(img)
-        img = np.array(img).transpose(0, 3, 1, 2)
+        img = preprocess(img,args.arch)
 
         # inference
         logger.info('Start inference...')
@@ -109,7 +95,7 @@ def recognize_from_image():
         else:
             output, output_exist = net.run(img)
 
-        output = softmax(output, axis=1)
+        output = postprocess(output,args.arch)
         lane_images = []
 
         for num in range(4):
@@ -156,18 +142,17 @@ def recognize_from_video():
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
 
-        trans = Normalize(mean=(INPUT_MEAN, (0,)), std=(INPUT_STD, (1,)))
-
-        frame = crop_and_resize(frame)
+        # preprocess
+        frame = crop_and_resize(frame,WIDTH,HEIGHT,args.arch,args.resize)
         img = frame
+        img = preprocess(img,args.arch)
 
-        #img = cv2.resize(frame, (WIDTH, HEIGHT))
-        img = np.expand_dims(img, 0)
-        img = trans(img)
-        img = np.array(img).transpose(0, 3, 1, 2)
-
+        # inference
         output, output_exist = net.run(img)
-        output = softmax(output, axis=1)
+
+        # postprocess
+        output = postprocess(output,args.arch)
+
         lane_images = []
 
         for num in range(4):

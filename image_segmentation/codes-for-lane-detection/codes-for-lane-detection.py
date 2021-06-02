@@ -3,9 +3,8 @@ import time
 import os
 import sys
 import cv2
-from scipy.special import softmax
 
-from erfnet_utils import ScaleNew, Normalize
+from codes_for_lane_detection_utils import crop_and_resize, preprocess, postprocess
 
 import ailia
 
@@ -58,45 +57,9 @@ elif args.arch=="scnn":
     HEIGHT = 288
     WIDTH = 800
 
-INPUT_MEAN = [103.939, 116.779, 123.68]
-INPUT_STD = [1, 1, 1]
-
 # ======================
 # Main functions
 # ======================
-
-def crop_and_resize(raw_img):
-    if args.resize=="padding":
-        #add padding
-        frame,resized_img = webcamera_utils.adjust_frame_size(raw_img, HEIGHT, WIDTH)
-        return resized_img
-    elif args.resize=="crop":
-        #cut top
-        scale_x = (WIDTH / raw_img.shape[1])
-        crop_y = raw_img.shape[0] * scale_x - HEIGHT
-        crop_y = int(crop_y / scale_x)
-
-        img = raw_img[crop_y:, :, :]  #keep aspect
-        if args.arch=="erfnet":
-            img = cv2.resize(img, (WIDTH, HEIGHT), interpolation = cv2.INTER_LINEAR)
-        elif args.arch=="scnn":
-            img = cv2.resize(img, (WIDTH, HEIGHT), interpolation = cv2.INTER_CUBIC)
-        return img
-    return None
-
-def preprocess(img):
-    if args.arch=="erfnet":
-        #channel first
-        trans2 = Normalize(mean=(INPUT_MEAN, (0,)), std=(INPUT_STD, (1,)))
-        img = np.expand_dims(img, 0)
-        img = trans2(img)
-        img = np.array(img).transpose(0, 3, 1, 2)
-    elif args.arch=="scnn":
-        #channel last
-        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        x = img[np.newaxis, :, :, :]
-        img = x.astype(np.float32)
-    return img
 
 def recognize_from_image(net):
     # input image loop
@@ -106,8 +69,8 @@ def recognize_from_image(net):
         raw_img = cv2.imread(image_path)
         logger.debug(f'input image shape: {raw_img.shape}')
 
-        img = crop_and_resize(raw_img)
-        img = preprocess(img)
+        img = crop_and_resize(raw_img,WIDTH,HEIGHT,args.arch,args.resize)
+        img = preprocess(img,args.arch)
 
         # inference
         logger.info('Start inference...')
@@ -121,10 +84,7 @@ def recognize_from_image(net):
         else:
             output, output_exist = net.run(img)
 
-        if args.arch=="erfnet":
-            output = softmax(output, axis=1)
-        elif args.arch=="scnn":
-            output = output.transpose((0, 3, 1, 2))
+        output = postprocess(output,args.arch)
 
         cnt = 0
         for num in range(4):
@@ -162,15 +122,12 @@ def recognize_from_video(net):
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
     
-        resized_img = crop_and_resize(frame)
-        img = preprocess(resized_img)
+        resized_img = crop_and_resize(frame,WIDTH,HEIGHT,args.arch,args.resize)
+        img = preprocess(resized_img,args.arch)
 
         output, output_exist = net.run(img)
 
-        if args.arch=="erfnet":
-            output = softmax(output, axis=1)
-        elif args.arch=="scnn":
-            output = output.transpose((0, 3, 1, 2))
+        output = postprocess(output,args.arch)
 
         cnt = 0
         for num in range(4):
