@@ -8,6 +8,7 @@ import numpy as np
 import math
 import time
 from PIL import Image, ImageDraw, ImageFont
+import unicodedata
 
 import ailia
 
@@ -18,6 +19,9 @@ from utils import get_base_parser, update_parser  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 import webcamera_utils  # noqa: E402
 
+# logger
+from logging import getLogger   # noqa: E402
+logger = getLogger(__name__)
 
 import warnings
 warnings.simplefilter("ignore", DeprecationWarning)
@@ -25,20 +29,39 @@ warnings.simplefilter("ignore", DeprecationWarning)
 # ======================
 # Parameters
 # ======================
-WEIGHT_PATH_DET = 'ch_ppocr_server_v2.0_det_train.onnx'
-MODEL_PATH_DET = 'ch_ppocr_server_v2.0_det_train.onnx.prototxt'
-REMOTE_PATH_DET = 'https://storage.googleapis.com/ailia-models/paddle_ocr/'
+REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/paddle_ocr/'
 
-WEIGHT_PATH_CLS = 'ch_ppocr_mobile_v2.0_cls_train.onnx'
-MODEL_PATH_CLS = 'ch_ppocr_mobile_v2.0_cls_train.onnx.prototxt'
-REMOTE_PATH_CLS = 'https://storage.googleapis.com/ailia-models/paddle_ocr/'
+WEIGHT_PATH_DET_CHN = 'chi_eng_num_sym_server_det_org.onnx'
 
-WEIGHT_PATH_REC = 'japan_mobile_v2.0_rec_infer.onnx'
-MODEL_PATH_REC = 'japan_mobile_v2.0_rec_infer.onnx.prototxt'
-REMOTE_PATH_REC = 'https://storage.googleapis.com/ailia-models/paddle_ocr/'
+WEIGHT_PATH_CLS_CHN = 'chi_eng_num_sym_mobile_cls_org.onnx'
+
+WEIGHT_PATH_REC_JPN_MBL = 'jpn_eng_num_sym_mobile_rec_org.onnx'
+DICT_PATH_REC_JPN_MBL = './dict/jpn_eng_num_sym_org.txt'
+
+WEIGHT_PATH_REC_JPN_SVR = 'jpn_eng_num_sym_server_rec_add.onnx'
+DICT_PATH_REC_JPN_SVR = './dict/jpn_eng_num_sym_add.txt'
+
+WEIGHT_PATH_REC_ENG_MBL = 'eng_num_sym_mobile_rec_org.onnx'
+DICT_PATH_REC_ENG_MBL = './dict/eng_num_sym_org.txt'
+
+WEIGHT_PATH_REC_CHN_MBL = 'chi_eng_num_sym_mobile_rec_org.onnx'
+DICT_PATH_REC_CHN_MBL = './dict/chi_eng_num_sym_org.txt'
+
+WEIGHT_PATH_REC_CHN_SVR = 'chi_eng_num_sym_server_rec_org.onnx'
+DICT_PATH_REC_CHN_SVR = './dict/chi_eng_num_sym_org.txt'
+
+WEIGHT_PATH_REC_GER_MBL = 'ger_eng_num_sym_mobile_rec_org.onnx'
+DICT_PATH_REC_GER_MBL = './dict/ger_eng_num_sym_org.txt'
+
+WEIGHT_PATH_REC_FRE_MBL = 'fre_eng_num_sym_mobile_rec_org.onnx'
+DICT_PATH_REC_FRE_MBL = './dict/fre_eng_num_sym_org.txt'
+
+WEIGHT_PATH_REC_KOR_MBL = 'kor_eng_num_sym_mobile_rec_org.onnx'
+DICT_PATH_REC_KOR_MBL = './dict/kor_eng_num_sym_org.txt'
+
 
 IMAGE_OR_VIDEO_PATH = 'input.jpg'
-SAVE_IMAGE_OR_VIDEO_PATH = 'output.png' 
+SAVE_IMAGE_OR_VIDEO_PATH = 'output.png'
 
 
 # ======================
@@ -48,6 +71,22 @@ parser = get_base_parser(
     'PP-OCR: A Practical Ultra Lightweight OCR System',
     IMAGE_OR_VIDEO_PATH,
     SAVE_IMAGE_OR_VIDEO_PATH,
+)
+parser.add_argument(
+    '-c', '--case', type=str, default='mobile',
+    help=('You can choose the following model size.'
+          '  - mobile : fast and light but low accuracy'
+          '  - server : high accuracy but slow and heavy')
+)
+parser.add_argument(
+    '-l', '--language', type=str, default='japanese',
+    help=('You can specify OCR for the following languages.'
+          '  - japanese, jpn, jp'
+          '  - english, eng, en'
+          '  - chinese, chi, ch'
+          '  - german, ger, ge'
+          '  - french, fre, fr'
+          '  - korean, kor, ko')
 )
 args = update_parser(parser)
 
@@ -59,6 +98,7 @@ def get_default_config():
     dc = {}
     # params for text detector
     dc['det_algorithm'] = 'DB'
+    dc['det_model_path'] = WEIGHT_PATH_DET_CHN
     dc['det_limit_side_len'] = 1280  # 960
     dc['det_limit_type'] = 'min'  # 'max'
 
@@ -69,11 +109,12 @@ def get_default_config():
 
     # params for text recognizer
     dc['rec_algorithm'] = 'CRNN'
+    dc['rec_model_path'] = WEIGHT_PATH_REC_JPN_SVR
     dc['rec_image_shape'] = '3, 32, 320'
     dc['rec_char_type'] = 'ch'
     dc['rec_batch_num'] = 6
     dc['max_text_length'] = 25
-    dc['rec_char_dict_path'] = './dict/japan_dict.txt'
+    dc['rec_char_dict_path'] = DICT_PATH_REC_JPN_SVR
     dc['use_space_char'] = True
     if sys.platform == "win32":
         # Windows
@@ -84,16 +125,33 @@ def get_default_config():
     else:
         # Linux
         dc['vis_font_path'] = '/usr/share/fonts/opentype/ipaexfont-gothic/ipaexg.ttf'
-    dc['drop_score'] = 0.5
+    dc['drop_score'] = 0.5  # this is threshold of rec
+    dc['rec_bbox_padding'] = 0.1
     dc['limited_max_width'] = 1280
     dc['limited_min_width'] = 16
 
     # params for text classifier
     dc['use_angle_cls'] = True
+    dc['cls_model_path'] = WEIGHT_PATH_CLS_CHN
     dc['cls_image_shape'] = '3, 48, 192'
     dc['label_list'] = ['0', '180']
     dc['cls_batch_num'] = 30
     dc['cls_thresh'] = 0.9
+
+    return dc
+
+
+def set_config(dc, weight_path_det,
+               weight_path_rec, dict_path_rec, weight_path_cls):
+    # params for text detector
+    dc['det_model_path'] = weight_path_det
+
+    # params for text recognizer
+    dc['rec_model_path'] = weight_path_rec
+    dc['rec_char_dict_path'] = dict_path_rec
+
+    # params for text classifier
+    dc['cls_model_path'] = weight_path_cls
 
     return dc
 
@@ -127,7 +185,7 @@ def create_operators(op_param_list, global_config=None):
         op = eval(op_name)(**param)
         ops.append(op)
     return ops
-    
+
 
 def build_post_process(config, global_config=None):
     support_dict = [
@@ -223,7 +281,7 @@ class DetResizeForTest(object):
                 return None, (None, None)
             img = cv2.resize(img, (int(resize_w), int(resize_h)))
         except:
-            print(img.shape, resize_w, resize_h)
+            logger.error(img.shape, resize_w, resize_h)
             sys.exit(0)
         ratio_h = resize_h / float(h)
         ratio_w = resize_w / float(w)
@@ -562,6 +620,10 @@ class BaseRecLabelDecode(object):
                     if idx > 0 and text_index[batch_idx][idx - 1] == text_index[
                             batch_idx][idx]:
                         continue
+                # print('int(text_index[batch_idx][idx]) =', 
+                #        int(text_index[batch_idx][idx]))
+                # print('self.character[int(text_index[batch_idx][idx])] =', 
+                #        self.character[int(text_index[batch_idx][idx])])
                 char_list.append(self.character[int(text_index[batch_idx][
                     idx])])
                 if text_prob is not None:
@@ -657,11 +719,12 @@ class TextDetector():
             postprocess_params["unclip_ratio"] = OCR_CFG['det_db_unclip_ratio']
             postprocess_params["use_dilation"] = True
         else:
-            print("unknown det_algorithm:{}".format(self.det_algorithm))
+            logger.error("unknown det_algorithm:{}".format(self.det_algorithm))
             sys.exit(0)
 
         self.preprocess_op = create_operators(pre_process_list)
         self.postprocess_op = build_post_process(postprocess_params)
+        self.net = None
 
     def order_points_clockwise(self, pts):
         """
@@ -720,8 +783,10 @@ class TextDetector():
         starttime = time.time()
 
         # net initialize, Text Detection
-        net = ailia.Net(MODEL_PATH_DET, WEIGHT_PATH_DET, env_id=self.env_id)
-        outputs = net.predict(img)
+        if self.net==None or self.net.get_input_shape()!=img.shape:
+            self.net = ailia.Net(self.config['det_model_path']+'.prototxt',
+                                 self.config['det_model_path'], env_id=self.env_id)
+        outputs = self.net.predict(img)
 
         preds = {}
         if self.det_algorithm == 'DB':
@@ -750,6 +815,7 @@ class TextClassifier():
             "label_list": OCR_CFG['label_list'],
         }
         self.postprocess_op = build_post_process(postprocess_params)
+        self.net = None
 
     def resize_norm_img(self, img):
         imgC, imgH, imgW = self.cls_image_shape
@@ -804,9 +870,11 @@ class TextClassifier():
 
 
             # net initialize, Detection Boxes Rectify
-            net = ailia.Net(MODEL_PATH_CLS, WEIGHT_PATH_CLS, env_id=self.env_id)
-            net.set_input_shape(norm_img_batch.shape)
-            prob_out = net.predict(norm_img_batch)
+            if self.net==None or self.net.get_input_shape()!=norm_img_batch.shape:
+                self.net = ailia.Net(self.cfg['cls_model_path']+'.prototxt',
+                                     self.cfg['cls_model_path'], env_id=self.env_id)
+            self.net.set_input_shape(norm_img_batch.shape)
+            prob_out = self.net.predict(norm_img_batch)
 
             cls_result = self.postprocess_op(prob_out)
             elapse += time.time() - starttime
@@ -839,6 +907,7 @@ class TextRecognizer():
             "use_space_char": OCR_CFG['use_space_char']
         }
         self.postprocess_op = build_post_process(postprocess_params)
+        self.net = None
 
     def resize_norm_img(self, img, max_wh_ratio):
         imgC, imgH, imgW = self.rec_image_shape
@@ -896,8 +965,10 @@ class TextRecognizer():
             starttime = time.time()
 
             # net initialize, Text Recognition
-            net = ailia.Net(MODEL_PATH_REC, WEIGHT_PATH_REC, env_id=self.env_id)
-            preds = net.predict(norm_img_batch)
+            if self.net==None or self.net.get_input_shape()!=norm_img_batch.shape:
+                self.net = ailia.Net(self.config['rec_model_path']+'.prototxt',
+                                     self.config['rec_model_path'], env_id=self.env_id)
+            preds = self.net.predict(norm_img_batch)
 
             rec_result = self.postprocess_op(preds)
             for rno in range(len(rec_result)):
@@ -908,7 +979,7 @@ class TextRecognizer():
 
 class TextSystem(object):
     def __init__(self, config, env_id):
-        OCR_CFG = get_default_config()
+        OCR_CFG = config
         self.cfg = OCR_CFG
 
         self.text_detector = TextDetector(OCR_CFG, env_id)
@@ -917,7 +988,6 @@ class TextSystem(object):
         self.drop_score = OCR_CFG['drop_score']
         if self.use_angle_cls:
             self.text_classifier = TextClassifier(OCR_CFG, env_id)
-
 
     def get_rotate_crop_image(self, img, points):
         '''
@@ -955,13 +1025,31 @@ class TextSystem(object):
     def __call__(self, img):
         ori_im = img.copy()
         dt_boxes, elapse = self.text_detector(img)
-        print("dt_boxes num : {}, elapse : {}".format(
+        logger.info("dt_boxes num : {}, elapse : {}".format(
             len(dt_boxes), elapse))
         if dt_boxes is None:
             return None, None
         img_crop_list = []
 
         dt_boxes = sorted_boxes(dt_boxes)
+
+        if (len(dt_boxes) > 0):
+            ratio_padding = self.cfg['rec_bbox_padding']
+            dt_boxes = np.array(dt_boxes)
+            height_vec = dt_boxes[:, 2, :] - dt_boxes[:, 1, :]
+            width_vec = dt_boxes[:, 3, :] - dt_boxes[:, 0, :]
+            if (np.sum(height_vec**2) > np.sum(width_vec**2)):
+                height_vec = width_vec
+            padding_vec_tmp = height_vec * ratio_padding
+            padding_vec = padding_vec_tmp.copy()
+            padding_vec[:, 0] += padding_vec_tmp[:, 1]
+            padding_vec[:, 1] -= padding_vec_tmp[:, 0]
+            padding_vec = np.round(padding_vec)
+            dt_boxes[:, 0, :] -= padding_vec
+            dt_boxes[:, 2, :] += padding_vec
+            padding_vec[:, 0] *= -1
+            dt_boxes[:, 1, :] -= padding_vec
+            dt_boxes[:, 3, :] += padding_vec
 
         for bno in range(len(dt_boxes)):
             tmp_box = copy.deepcopy(dt_boxes[bno])
@@ -970,11 +1058,11 @@ class TextSystem(object):
         if self.use_angle_cls:
             img_crop_list, angle_list, elapse = self.text_classifier(
                 img_crop_list)
-            print("cls num  : {}, elapse : {}".format(
+            logger.info("cls num  : {}, elapse : {}".format(
                 len(img_crop_list), elapse))
 
         rec_res, elapse = self.text_recognizer(img_crop_list)
-        print("rec_res num  : {}, elapse : {}".format(
+        logger.info("rec_res num  : {}, elapse : {}".format(
             len(rec_res), elapse))
         filter_boxes, filter_rec_res = [], []
         for box, rec_reuslt in zip(dt_boxes, rec_res):
@@ -1011,7 +1099,8 @@ def draw_ocr_box_txt(image,
                      txts,
                      scores=None,
                      drop_score=0.5,
-                     font_path=''):
+                     font_path='',
+                     bbox_padding=0.):
     h, w = image.height, image.width
     img_left = image.copy()
     img_right = Image.new('RGB', (w, h), (255, 255, 255))
@@ -1033,12 +1122,10 @@ def draw_ocr_box_txt(image,
                 box[2][1], box[3][0], box[3][1]
             ],
             outline=color)
-        box_height = math.sqrt((box[0][0] - box[3][0])**2 + (box[0][1] - box[3][
-            1])**2)
-        box_width = math.sqrt((box[0][0] - box[1][0])**2 + (box[0][1] - box[1][
-            1])**2)
+        box_height = math.sqrt((box[0][0] - box[3][0])**2 + (box[0][1] - box[3][1])**2)
+        box_width = math.sqrt((box[0][0] - box[1][0])**2 + (box[0][1] - box[1][1])**2)
         if box_height > 2 * box_width:
-            font_size = max(int(box_width * 0.9), 10)
+            font_size = max(int(box_width * 0.9 * (1 - bbox_padding)), 10)
             font = ImageFont.truetype(font_path, font_size, encoding="utf-8")
             cur_y = box[0][1]
             for c in txt:
@@ -1047,7 +1134,7 @@ def draw_ocr_box_txt(image,
                     (box[0][0] + 3, cur_y), c, fill=(0, 0, 0), font=font)
                 cur_y += char_size[1]
         else:
-            font_size = max(int(box_height * 0.8), 10)
+            font_size = max(int(box_height * 0.8 * (1 - bbox_padding)), 10)
             font = ImageFont.truetype(font_path, font_size, encoding="utf-8")
             draw_right.text(
                 [box[0][0], box[0][1]], txt, fill=(0, 0, 0), font=font)
@@ -1056,6 +1143,24 @@ def draw_ocr_box_txt(image,
     img_show.paste(img_left, (0, 0, w, h))
     img_show.paste(img_right, (w, 0, w * 2, h))
     return np.array(img_show)
+
+
+def adjust_half_and_full(txts):
+    # loop of txts
+    for i_txt in range(len(txts)):
+        txt_tmp = txts[i_txt]
+        flg_replace = False
+        for i_char in range(1, len(txt_tmp)):
+            char_tmp = txt_tmp[i_char]
+            if (char_tmp == '-'):
+                res = unicodedata.east_asian_width(txt_tmp[i_char-1])
+                if (res == 'W'):
+                    txt_tmp = txt_tmp.replace('%s-' % txt_tmp[i_char-1], 
+                                              '%sー' % txt_tmp[i_char-1])
+                    flg_replace = True
+        if flg_replace:
+            txts[i_txt] = txt_tmp
+    return txts
 
 
 def recognize_from_image(config, text_sys):
@@ -1072,12 +1177,16 @@ def recognize_from_image(config, text_sys):
         txts = [rec_res[i][0] for i in range(len(rec_res))]
         scores = [rec_res[i][1] for i in range(len(rec_res))]
 
+        # adjust halfwidth and fullwidth forms
+        txts = adjust_half_and_full(txts)
+
         draw_img = draw_ocr_box_txt(image, boxes, txts, scores,
                                     drop_score=config['drop_score'],
-                                    font_path=config['vis_font_path'])
+                                    font_path=config['vis_font_path'],
+                                    bbox_padding=config['rec_bbox_padding'])
         cv2.imwrite(args.savepath, draw_img[:, :, ::-1])
 
-    print('finished process and write result to %s!' % args.savepath)
+    logger.info('finished process and write result to %s!' % args.savepath)
 
 
 def recognize_from_video(config, text_sys):
@@ -1112,7 +1221,7 @@ def recognize_from_video(config, text_sys):
                                     drop_score=config['drop_score'],
                                     font_path=config['vis_font_path'])
         # display
-        cv2.imshow("frame", draw_img[:, :, ::-1])
+        cv2.imshow('exec PaddleOCR', draw_img[:, :, ::-1])
 
         # write a frame image to video
         if video_writer is not None:
@@ -1122,28 +1231,75 @@ def recognize_from_video(config, text_sys):
     cv2.destroyAllWindows()
     if video_writer is not None:
         video_writer.release()
-        print('finished process and write result to %s!' % args.savepath)
+        logger.info('finished process and write result to %s!' % args.savepath)
 
 
 def main():
-    # model files check and download
-    check_and_download_models(WEIGHT_PATH_DET, MODEL_PATH_DET, REMOTE_PATH_DET)
-    check_and_download_models(WEIGHT_PATH_CLS, MODEL_PATH_CLS, REMOTE_PATH_CLS)
-    check_and_download_models(WEIGHT_PATH_REC, MODEL_PATH_REC, REMOTE_PATH_REC)
-
     # This model requires fuge gpu memory so fallback to cpu mode
     env_id = args.env_id
     if env_id != -1 and ailia.get_environment(env_id).props == "LOWPOWER":
         env_id = -1
 
-    # build ocr class
+    # get default config value and merge args
     config = get_default_config()
+    lang_tmp = args.language.lower()
+    if (lang_tmp == 'japanese') | (lang_tmp == 'jpn') | (lang_tmp == 'jp'):
+        if (args.case == 'mobile'):
+            config = set_config(config, WEIGHT_PATH_DET_CHN, WEIGHT_PATH_REC_JPN_MBL,
+                                        DICT_PATH_REC_JPN_MBL, WEIGHT_PATH_CLS_CHN)
+        elif (args.case == 'server'):
+            config = set_config(config, WEIGHT_PATH_DET_CHN, WEIGHT_PATH_REC_JPN_SVR,
+                                        DICT_PATH_REC_JPN_SVR, WEIGHT_PATH_CLS_CHN)
+    elif (lang_tmp == 'english') | (lang_tmp == 'eng') | (lang_tmp == 'en'):
+        if (args.case == 'mobile'):
+            config = set_config(config, WEIGHT_PATH_DET_CHN, WEIGHT_PATH_REC_ENG_MBL,
+                                        DICT_PATH_REC_ENG_MBL, WEIGHT_PATH_CLS_CHN)
+    elif (lang_tmp == 'chinese') | (lang_tmp == 'chi') | (lang_tmp == 'ch'):
+        if (args.case == 'mobile'):
+            config = set_config(config, WEIGHT_PATH_DET_CHN, WEIGHT_PATH_REC_CHN_MBL,
+                                        DICT_PATH_REC_CHN_MBL, WEIGHT_PATH_CLS_CHN)
+        elif (args.case == 'server'):
+            config = set_config(config, WEIGHT_PATH_DET_CHN, WEIGHT_PATH_REC_CHN_SVR,
+                                        DICT_PATH_REC_CHN_SVR, WEIGHT_PATH_CLS_CHN)
+    elif (lang_tmp == 'german') | (lang_tmp == 'ger') | (lang_tmp == 'ge'):
+        if (args.case == 'mobile'):
+            config = set_config(config, WEIGHT_PATH_DET_CHN, WEIGHT_PATH_REC_GER_MBL,
+                                        DICT_PATH_REC_GER_MBL, WEIGHT_PATH_CLS_CHN)
+    elif (lang_tmp == 'french') | (lang_tmp == 'fre') | (lang_tmp == 'fr'):
+        if (args.case == 'mobile'):
+            config = set_config(config, WEIGHT_PATH_DET_CHN, WEIGHT_PATH_REC_FRE_MBL,
+                                        DICT_PATH_REC_FRE_MBL, WEIGHT_PATH_CLS_CHN)
+    elif (lang_tmp == 'korean') | (lang_tmp == 'kor') | (lang_tmp == 'ko'):
+        if (args.case == 'mobile'):
+            config = set_config(config, WEIGHT_PATH_DET_CHN, WEIGHT_PATH_REC_KOR_MBL,
+                                        DICT_PATH_REC_KOR_MBL, WEIGHT_PATH_CLS_CHN)
+
+    # model files check and download
+    weight_path_det = config['det_model_path']
+    model_path_det = config['det_model_path'] + '.prototxt'
+    check_and_download_models(weight_path_det, model_path_det, REMOTE_PATH)
+    weight_path_cls = config['cls_model_path']
+    model_path_cls = config['cls_model_path'] + '.prototxt'
+    check_and_download_models(weight_path_cls, model_path_cls, REMOTE_PATH)
+    weight_path_rec = config['rec_model_path']
+    model_path_rec = config['rec_model_path'] + '.prototxt'
+    check_and_download_models(weight_path_rec, model_path_rec, REMOTE_PATH)
+
+    # build ocr class
     text_sys = TextSystem(config, env_id)
 
     if args.video is not None:
         recognize_from_video(config, text_sys)
     else:
-        recognize_from_image(config, text_sys)
+        if args.benchmark:
+            logger.info('BENCHMARK mode')
+            for i in range(args.benchmark_count):
+                start = int(round(time.time() * 1000))
+                recognize_from_image(config, text_sys)
+                end = int(round(time.time() * 1000))
+                logger.info(f'\tailia processing time {end - start} ms')
+        else:
+            recognize_from_image(config, text_sys)
 
 
 if __name__ == '__main__':

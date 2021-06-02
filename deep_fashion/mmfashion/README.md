@@ -28,7 +28,7 @@ CATEGORY = (
 )
 ```
 
-### usage
+## Usage
 Automatically downloads the onnx and prototxt files on the first run.
 It is necessary to be connected to the Internet while downloading.
 
@@ -47,6 +47,13 @@ By adding the `--video` option, you can input the video.
 If you pass `0` as an argument to VIDEO_PATH, you can use the webcam input instead of the video file.
 ```bash
 $ python3 mmfashion.py --video VIDEO_PATH
+```
+
+By specifying the 'large' or 'small' (architecture of the u2net model) with the `-pp` option,
+the background of the input image would be removed before inference.  
+This process improves the accuracy of detection.
+```bash
+$ python3 mmfashion.py -pp large
 ```
 
 ## Reference

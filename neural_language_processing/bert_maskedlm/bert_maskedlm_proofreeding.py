@@ -66,16 +66,10 @@ def softmax(x):
 def inference(net, tokenizer, tokenized_text, masked_index, original_text_len):
     indexed_tokens = tokenizer.convert_tokens_to_ids(tokenized_text)
 
-    if not args.onnx:
-        indexed_tokens = numpy.expand_dims(numpy.array(indexed_tokens), axis=0)
-        token_type_ids = numpy.zeros((1, len(tokenized_text)))
-        attention_mask = numpy.zeros((1, len(tokenized_text)))
-        attention_mask[:, 0:original_text_len] = 1
-    else:
-        indexed_tokens = [numpy.array(indexed_tokens)]
-        token_type_ids = [numpy.zeros((len(tokenized_text)))]
-        attention_mask = [numpy.zeros((len(tokenized_text)))]
-        attention_mask[0][0:original_text_len] = 1
+    indexed_tokens = numpy.expand_dims(numpy.array(indexed_tokens), axis=0)
+    token_type_ids = numpy.zeros((1, len(tokenized_text)))
+    attention_mask = numpy.zeros((1, len(tokenized_text)))
+    attention_mask[:, 0:original_text_len] = 1
 
     inputs_onnx = {
         "token_type_ids": token_type_ids,
@@ -144,14 +138,13 @@ def main():
         (1, PADDING_LEN), net.find_blob_index_by_name("attention_mask")
     )
 
-    with codecs.open(args.input, 'r', 'utf-8', 'ignore') as f:
+    with codecs.open(args.input[0], 'r', 'utf-8', 'ignore') as f:
         s = f.readlines()
 
     for text in s:
         tokenized_text = tokenizer.tokenize(text)
         original_text_len = len(tokenized_text)
 
-        # if not args.onnx:
         for j in range(len(tokenized_text), PADDING_LEN):
             tokenized_text.append('[PAD]')
 

@@ -56,7 +56,7 @@ def check_and_download_models(weight_path, model_path, remote_path):
             progress_print,
         )
         logger.info('\n')
-    if not os.path.exists(model_path):
+    if model_path!=None and not os.path.exists(model_path):
         logger.info(f'Downloading prototxt file... (save path: {model_path})')
         urllib.request.urlretrieve(
             remote_path + os.path.basename(model_path),
