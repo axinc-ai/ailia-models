@@ -8,7 +8,7 @@ from scipy.special import softmax
 
 from roneld_utils import roneld_lane_detection
 
-sys.path.append('../codes-for-lane-detection')
+sys.path.append('../../image_segmentation/codes-for-lane-detection')
 from codes_for_lane_detection_utils import crop_and_resize, preprocess, postprocess
 
 import ailia
