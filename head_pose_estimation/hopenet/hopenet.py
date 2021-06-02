@@ -154,7 +154,9 @@ class HeadPoseEstimator:
 
     def draw(self, img, head_poses, centers, horizontal_flip=False):
         """
-        Draws the head pose(s) on the image.
+        Draws the head pose(s) on the image. (Person POV) The axes correspond to
+        x (blue) oriented positively to the left, y (green) oriented positively
+        to the bottom and z (red) oriented positively to the back.
 
         Parameters
         ----------
