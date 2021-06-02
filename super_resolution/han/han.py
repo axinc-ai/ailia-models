@@ -22,10 +22,10 @@ logger = getLogger(__name__)
 # ======================
 # Parameters 1
 # ======================
-IMAGE_PATH = 'images/000002_LR.png'
-SAVE_IMAGE_PATH = 'images/output.png'
-IMAGE_HEIGHT = 194    # net.get_input_shape()[3]
-IMAGE_WIDTH = 194     # net.get_input_shape()[2]
+IMAGE_PATH = 'input.png'
+SAVE_IMAGE_PATH = 'output.png'
+#IMAGE_HEIGHT = 194    # net.get_input_shape()[3]
+#IMAGE_WIDTH = 194     # net.get_input_shape()[2]
 
 # ======================
 # Argument Parser Config
@@ -108,12 +108,7 @@ def quantize(img, rgb_range):
     aux = np.around(aux)
     return aux / pixel_range
 
-def recognize_from_image():
-    # net initialize
-    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
-    logger.info('Model: ' + WEIGHT_PATH[:-5])
-    logger.info('Scale: ' + str(args.scale))
-    
+def recognize_from_image(net):
     # input image loop
     for image_path in args.input:
         # prepare input data
@@ -133,10 +128,7 @@ def recognize_from_image():
         img = img[np.newaxis, :, :, :] # (batch_size, channel, h, w)
 
         # Ailia Net input
-        IMAGE_HEIGHT = img.shape[3]
-        IMAGE_WIDTH = img.shape[2]
-
-        net.set_input_shape((1, 3, IMAGE_HEIGHT, IMAGE_WIDTH))
+        net.set_input_shape((1, 3, img.shape[3], img.shape[2]))
 
         # inference
         logger.info('Start inference...')
@@ -159,29 +151,23 @@ def recognize_from_image():
         
     logger.info('Script finished successfully.')
 
-def recognize_from_video():
-    # net initialize
-    env_id = args.env_id
-    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
-
+def recognize_from_video(net):
     capture = webcamera_utils.get_capture(args.video)
 
     # create video writer if savepath is specified as video format
     if args.savepath != SAVE_IMAGE_PATH:
-        logger.warning(
-            'currently, video results cannot be output correctly...'
-        )
-        writer = webcamera_utils.get_writer(args.savepath, IMAGE_HEIGHT*2, IMAGE_WIDTH)
+        f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT) * int(args.scale))
+        f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH) * int(args.scale))
+        writer = webcamera_utils.get_writer(args.savepath, f_h, f_w)
     else:
         writer = None
-
-    output_buffer = np.zeros((IMAGE_HEIGHT*2,IMAGE_WIDTH,3))
-    output_buffer = output_buffer.astype(np.uint8)
 
     while (True):
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
+
+        IMAGE_HEIGHT, IMAGE_WIDTH = frame.shape[0], frame.shape[1]
 
         # resize with keep aspect
         frame,resized_img = webcamera_utils.adjust_frame_size(frame, IMAGE_HEIGHT, IMAGE_WIDTH)
@@ -213,12 +199,22 @@ def main():
     # model files check and download
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
 
+    # net initialize
+    env_id = args.env_id
+    if sys.platform == "darwin" :
+        env_id = 0
+        logger.info('This model not working on FP16. So running on CPU.')
+    memory_mode = ailia.get_memory_mode(reuse_interstage=True)
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id, memory_mode=memory_mode)
+    logger.info('Model: ' + WEIGHT_PATH[:-5])
+    logger.info('Scale: ' + str(args.scale))
+    
     if args.video is not None:
         # video mode
-        recognize_from_video()
+        recognize_from_video(net)
     else:
         # image mode
-        recognize_from_image()
+        recognize_from_image(net)
 
 
 if __name__ == '__main__':

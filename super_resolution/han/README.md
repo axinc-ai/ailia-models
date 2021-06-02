@@ -2,24 +2,20 @@
 
 ## Input
 
-|            Input           |  Ailia input shape |    Range   | 
-| :------------------------: | :----------------: | :--------: | 
-| ![](images/000002_LR.png)  |    (1,3,194,194)   |  [0., 255.]  |
-| ![](images/lenna.png)      |    (1,3,256,256)   |  [0., 255.]  |
+![Input](input.png)
+
+(Image from https://github.com/sanghyun-son/EDSR-PyTorch/blob/master/test/0853x4.png)
+
+Ailia input shape : (1, 3, IMAGE_HEIGHT, IMAGE_WIDTH)  
 
 ## Output
 
-| Resolution scale (Degradation model) |             x2 (BI)            |             x3  (BI)           |             x4 (BI)            |             x8 (BI)           |             x3 (BD)            |
-| :----------------------------------: | :----------------------------: | :----------------------------: | :----------------------------: | :---------------------: | :----------------------------: | 
-|                 Output               | ![](images/000002_SR_BIX2.png) | ![](images/000002_SR_BIX3.png) | ![](images/000002_SR_BIX4.png) | ![](images/000002_SR_BIX8.png) | ![](images/000002_SR_BDX3.png) |
-|           Ailia output shape         |           (1,3,388,388)        |           (1,3,582,582)        |           (1,3,776,776)        |          (1,3,1552,1552)      |          (1,3,582,582)         |
-|                  Range               |            [0., 255.]          |            [0., 255.]          |            [0., 255.]          |            [0., 255.]          |           [0., 255.]           |
+![Output](output.png)
 
-| Resolution scale (Degradation model) |           x2 (BI)          |   
-| :----------------------------------: | :------------------------: | 
-|                 Output               | ![](images/lenna_BIX2.png) | 
-|           Ailia output shape         |        (1,3,512,512)       |   
-|                  Range               |          [0., 255.]        | 
+Ailia output shape : (1, 3, IMAGE_HEIGHT * scale, IMAGE_WIDTH * scale)
+
+default : scale=2
+
 ## Usage
 Automatically downloads the onnx and prototxt files when running.
 It is necessary to be connected to the Internet while downloading.
@@ -51,7 +47,7 @@ By adding the `--video` option, you can input the video.
 If you pass `0` as an argument to VIDEO_PATH, you can use the webcam input instead of the video file.
 
 ```bash
-$ python3 SCNN.py --video VIDEO_PATH
+$ python3 han.py --video VIDEO_PATH
 ```
 
 The default setting is to use the optimized model and weights, but you can also switch to the normal model by using the `--normal` option.
