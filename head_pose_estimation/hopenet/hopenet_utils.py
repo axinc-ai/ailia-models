@@ -42,11 +42,11 @@ def resize_image(img, out_size, keep_aspect_ratio=True, return_scale_padding=Fal
     Returns
     -------
     resized: NumPy array
-        Resized image
+        Resized image.
     scale: NumPy array, optional
-        Resized / original, (scale_height, scale_width)
+        Resized / original, (scale_height, scale_width).
     padding: NumPy array, optional
-        Zero padding (top, bottom, left, right) added after resizing
+        Zero padding (top, bottom, left, right) added after resizing.
     """
     img_size = img.shape[:2]
     if isinstance(out_size, int):
@@ -73,6 +73,23 @@ def resize_image(img, out_size, keep_aspect_ratio=True, return_scale_padding=Fal
         return resized
 
 def face_detector_preprocess(img):
+    """
+    Preprocesses the image for the face detector.
+
+    Parameters
+    ----------
+    img: NumPy array
+        The image to format.
+
+    Returns
+    -------
+    input_face_det: NumPy array
+        Formatted image.
+    scale: NumPy array
+        Resized / original, (scale_height, scale_width)
+    padding: NumPy array
+        Zero padding (top, bottom, left, right) added after resizing
+    """
     input_face_det, scale, padding = resize_image(img[..., ::-1], 128, return_scale_padding=True)
     input_face_det = input_face_det.astype(np.float32) / 127.5 - 1.0
     input_face_det = np.moveaxis(input_face_det, -1, 0)[np.newaxis]
@@ -386,14 +403,34 @@ def extract_roi(frame, xc, yc, theta, scale):
 
 def head_pose_preprocess(img, detections, scale, padding):
     """
-    Extract ROI given detections
+    Preprocesses the image and face detections for the head pose estimator.
+
+    Parameters
+    ----------
+    img: NumPy array
+        The image to format.
+    detections: NumPy array
+        Face detections.
+    scale: NumPy array
+        Scale used when preprocessing the image for the face detection.
+        Resized / original, (scale_height, scale_width)
+    padding: NumPy array
+        Padding used when preprocessing the image for the face detection.
+        Zero padding (top, bottom, left, right) added after resizing
+
+    Returns
+    -------
+    input_hp: NumPy array
+        Formatted image.
+    centers: NumPy array
+        Center(s) (x, y) of the cropped faces.
+    theta: NumPy array
+        rotation angle(s) in radians of the cropping bounding boxes.
     """
     # Only handles detections from the 1st image
     detections = denormalize_detections(detections[0], 128, scale[0], padding[[0, 2]])
     xc, yc, scale, theta = detection2roi(detections)
     rois, _, _ = extract_roi(img, xc, yc, theta, scale)
-    # cv2.imshow('', ((np.moveaxis(rois, 1, -1)[0] + 1) * 127.5).astype(np.uint8))
-    # cv2.waitKey(0)
 
     tmp = (np.moveaxis(rois, 1, -1) + 1) / 2
     input_hp = np.empty((tmp.shape[0], 224, 224, 3), dtype=tmp.dtype)
@@ -408,14 +445,15 @@ def head_pose_preprocess(img, detections, scale, padding):
 
 def head_pose_postprocess(preds_hp, theta):
     """
-    Raw predictions from model are scores for yaw, pitch, roll
+    Postprocesses the raw head pose predictions (scores for yaw, pitch, roll)
+    and returns the head poses (roll, yaw, pitch) in radians.
 
     Parameters
     ----------
     preds_hp: NumPy array
         Raw head pose predictions.
-    theta: float
-        Rotation angle of cropping bounding box.
+    theta: NumPy array
+        rotation angle(s) in radians of the cropping bounding boxes.
 
     Returns
     -------
@@ -430,12 +468,7 @@ def head_pose_postprocess(preds_hp, theta):
         tmp = (pred * np.arange(66)[np.newaxis]).sum(axis=1)
         head_pose[:, i_new] = (tmp * 3 - 99)
     # At this point, we have roll left+, yaw right+, pitch up+ in degrees
-    # print(head_pose)
-    # print(theta * 180/np.pi)
     head_pose *= np.pi / 180
     head_pose[:, 0] += theta
     head_pose[:, 2] *= -1 # pitch down+
-    # head_pose[:, 0] *= -1 # pitch down+
-    # head_pose[:, 1] *= -1 # pitch down+
-    # print(head_pose * 180/np.pi)
     return head_pose

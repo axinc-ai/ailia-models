@@ -74,7 +74,11 @@ HEAD_POSE_REMOTE_PATH = f'https://storage.googleapis.com/ailia-models/hopenet/'
 # Utils
 # ======================
 class HeadPoseEstimator:
-    def __init__(self) -> None:
+    def __init__(self):
+        """
+        Class for estimating the head pose given an image or draw the detected
+        head pose on the image.
+        """
         # net initialize
         self.face_detector = ailia.Net(
             FACE_DETECTION_MODEL_PATH, FACE_DETECTION_WEIGHT_PATH, env_id=args.env_id
@@ -85,12 +89,12 @@ class HeadPoseEstimator:
 
     def predict(self, img):
         """
-        Estimate the head pose given an image.
+        Estimates the head pose given an image.
 
         Parameters
         ----------
         img: NumPy array
-            The image to resize (BGR channels).
+            The image in BGR channels.
 
         Returns
         -------
@@ -103,6 +107,7 @@ class HeadPoseEstimator:
         preds_det = self.face_detector.predict([input_face_det])
         detections = hut.face_detector_postprocess(preds_det)
 
+        # Head pose estimation
         input_hp_est, centers, theta = hut.head_pose_preprocess(img, detections, scale, padding)
         self.hp_estimator.set_input_shape(input_hp_est.shape)
         preds_hp = self.hp_estimator.predict([input_hp_est])
@@ -110,6 +115,26 @@ class HeadPoseEstimator:
         return head_poses, centers
 
     def _get_rot_mat(self, axis, angle):
+        """
+        Creates rotation matrix from axis (x, y or z) and angle. The axes of
+        reference correspond to x oriented positively to the left of the image,
+        y oriented positively to the bottom of the image and z oriented
+        positively to the back of the image.
+
+        Parameters
+        ----------
+        axis: str
+            Axis of rotation. Only x, y and z are supported.
+        angle: float
+            Angle of rotation in radians.
+
+        Returns
+        -------
+        rot_mat: NumPy array
+            Rotation matrix
+            Head pose(s) in radians. Roll (left+), yaw (right+), pitch (down+)
+            values are given in the detected person's frame of reference.
+        """
         rot_mat = np.zeros((3, 3), dtype=np.float32)
         if axis == 'z':
             i = 2
@@ -128,6 +153,25 @@ class HeadPoseEstimator:
         return rot_mat
 
     def draw(self, img, head_poses, centers, horizontal_flip=False):
+        """
+        Draws the head pose(s) on the image.
+
+        Parameters
+        ----------
+        img: NumPy array
+            The image to draw on (BGR channels).
+        head_poses: NumPy array
+            The head pose(s) to draw.
+        centers: NumPy array
+            The center(s) of origin of the head pose(s).
+        horizontal_flip: bool
+            Whether to consider a horizontally flipped image for drawing.
+
+        Returns
+        -------
+        new_img: NumPy array
+            Image with the head pose(s) drawn on it.
+        """
         new_img = img.copy()
         hp, c = head_poses[0], centers[0]
         rot_mat = self._get_rot_mat('z', hp[0])
@@ -146,11 +190,23 @@ class HeadPoseEstimator:
             color = [0, 0, 0]
             color[i] = 255
             cv2.arrowedLine(new_img, tuple(c.astype(int)), tip, tuple(color), thickness=2)
-        # cv2.imshow('', new_img)
-        # cv2.waitKey(0)
         return new_img
     
     def predict_and_draw(self, img):
+        """
+        Convenient method for predicting the head pose(s) and drawing them at
+        once.
+
+        Parameters
+        ----------
+        img: NumPy array
+            The image in BGR channels.
+
+        Returns
+        -------
+        new_img: NumPy array
+            Image with the head pose(s) drawn on it.
+        """
         head_poses, centers = self.predict(img)
         return self.draw(img, head_poses, centers)
 
@@ -206,7 +262,6 @@ def recognize_from_video():
         frame_draw = hp_estimator.draw(frame, *preds)
 
         if args.video == '0': # Flip horizontally if camera
-            # visual_img = np.ascontiguousarray(visual_img[:,::-1])
             visual_img = hp_estimator.draw(frame, *preds, horizontal_flip=True)
         else:
             visual_img = frame_draw
