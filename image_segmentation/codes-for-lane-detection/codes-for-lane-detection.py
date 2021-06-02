@@ -29,6 +29,7 @@ IMAGE_PATH = 'input.jpg'
 SAVE_IMAGE_PATH = 'output.jpg'
 
 MODEL_LISTS = ['erfnet', 'scnn']
+RESIZE_MODE_LISTS = ['padding', 'crop']
 
 # ======================
 # Arguemnt Parser Config
@@ -38,6 +39,11 @@ parser.add_argument(
     '-a', '--arch', metavar='ARCH',
     default='erfnet', choices=MODEL_LISTS,
     help='model lists: ' + ' | '.join(MODEL_LISTS)
+)
+parser.add_argument(
+    '-r', '--resize', metavar='RESIZE',
+    default='crop', choices=RESIZE_MODE_LISTS,
+    help='resize mode lists: ' + ' | '.join(RESIZE_MODE_LISTS)
 )
 args = update_parser(parser)
 
@@ -59,22 +65,35 @@ INPUT_STD = [1, 1, 1]
 # Main functions
 # ======================
 
-def preprocess(raw_img):
+def crop_and_resize(raw_img):
+    if args.resize=="padding":
+        #add padding
+        frame,resized_img = webcamera_utils.adjust_frame_size(raw_img, HEIGHT, WIDTH)
+        return resized_img
+    elif args.resize=="crop":
+        #cut top
+        scale_x = (WIDTH / raw_img.shape[1])
+        crop_y = raw_img.shape[0] * scale_x - HEIGHT
+        crop_y = int(crop_y / scale_x)
+
+        img = raw_img[crop_y:, :, :]  #keep aspect
+        if args.arch=="erfnet":
+            img = cv2.resize(img, (WIDTH, HEIGHT), interpolation = cv2.INTER_LINEAR)
+        elif args.arch=="scnn":
+            img = cv2.resize(img, (WIDTH, HEIGHT), interpolation = cv2.INTER_CUBIC)
+        return img
+    return None
+
+def preprocess(img):
     if args.arch=="erfnet":
         #channel first
-        trans1 = ScaleNew(size=(WIDTH, HEIGHT),
-                                     interpolation=(cv2.INTER_LINEAR, cv2.INTER_NEAREST))
         trans2 = Normalize(mean=(INPUT_MEAN, (0,)), std=(INPUT_STD, (1,)))
-
-        img = raw_img[240:, :, :]
         img = np.expand_dims(img, 0)
-        img = trans1(img)
         img = trans2(img)
         img = np.array(img).transpose(0, 3, 1, 2)
     elif args.arch=="scnn":
         #channel last
-        img = cv2.cvtColor(raw_img, cv2.COLOR_BGR2RGB)
-        img = cv2.resize(img, (WIDTH, HEIGHT), interpolation = cv2.INTER_CUBIC)
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         x = img[np.newaxis, :, :, :]
         img = x.astype(np.float32)
     return img
@@ -87,7 +106,8 @@ def recognize_from_image(net):
         raw_img = cv2.imread(image_path)
         logger.debug(f'input image shape: {raw_img.shape}')
 
-        img = preprocess(raw_img)
+        img = crop_and_resize(raw_img)
+        img = preprocess(img)
 
         # inference
         logger.info('Start inference...')
@@ -142,9 +162,7 @@ def recognize_from_video(net):
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
     
-        # resize with keep aspect
-        frame,resized_img = webcamera_utils.adjust_frame_size(frame, HEIGHT, WIDTH)
-
+        resized_img = crop_and_resize(frame)
         img = preprocess(resized_img)
 
         output, output_exist = net.run(img)
