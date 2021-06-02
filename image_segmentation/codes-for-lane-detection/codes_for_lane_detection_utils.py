@@ -11,11 +11,13 @@ def crop_and_resize(raw_img,WIDTH,HEIGHT,arch,resize):
         #add padding
         frame,resized_img = webcamera_utils.adjust_frame_size(raw_img, HEIGHT, WIDTH)
         return resized_img
-    elif resize=="crop":
+    elif resize=="crop_center" or resize=="crop_bottom":
         #crop bottom
         scale_x = (WIDTH / raw_img.shape[1])
         crop_y = raw_img.shape[0] * scale_x - HEIGHT
         crop_y = int(crop_y / scale_x)
+        if resize=="crop_center":
+            crop_y = int(crop_y/2)
 
         img = raw_img[crop_y:, :, :]  #keep aspect
         if arch=="erfnet":

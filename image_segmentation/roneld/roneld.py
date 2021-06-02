@@ -33,7 +33,7 @@ IMAGE_PATH = 'input.jpg'
 SAVE_IMAGE_PATH = 'output.jpg'
 
 MODEL_LISTS = ['erfnet']
-RESIZE_MODE_LISTS = ['padding', 'crop']
+RESIZE_MODE_LISTS = ['padding', 'crop_center', 'crop_bottom']
 
 # ======================
 # Arguemnt Parser Config
@@ -46,7 +46,7 @@ parser.add_argument(
 )
 parser.add_argument(
     '-r', '--resize', metavar='RESIZE',
-    default='crop', choices=RESIZE_MODE_LISTS,
+    default='crop_bottom', choices=RESIZE_MODE_LISTS,
     help='resize mode lists: ' + ' | '.join(RESIZE_MODE_LISTS)
 )
 args = update_parser(parser)
