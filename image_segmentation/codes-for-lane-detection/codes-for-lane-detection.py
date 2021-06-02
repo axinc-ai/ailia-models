@@ -28,17 +28,29 @@ REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/codes-for-lane-detect
 IMAGE_PATH = 'input.jpg'
 SAVE_IMAGE_PATH = 'output.jpg'
 
+MODEL_LISTS = ['erfnet', 'scnn']
+
 # ======================
 # Arguemnt Parser Config
 # ======================
 parser = get_base_parser('erfnet model', IMAGE_PATH, SAVE_IMAGE_PATH)
+parser.add_argument(
+    '-a', '--arch', metavar='ARCH',
+    default='erfnet', choices=MODEL_LISTS,
+    help='model lists: ' + ' | '.join(MODEL_LISTS)
+)
 args = update_parser(parser)
 
-WEIGHT_PATH = 'erfnet.opt.onnx'
-MODEL_PATH = 'erfnet.opt.onnx.prototxt'
-
-HEIGHT = 208
-WIDTH = 976
+if args.arch=="erfnet":
+    WEIGHT_PATH = 'erfnet.opt.onnx'
+    MODEL_PATH = 'erfnet.opt.onnx.prototxt'
+    HEIGHT = 208
+    WIDTH = 976
+elif args.arch=="scnn":
+    WEIGHT_PATH = 'SCNN_tensorflow.opt.onnx'
+    MODEL_PATH = 'SCNN_tensorflow.opt.onnx.prototxt'
+    HEIGHT = 288
+    WIDTH = 800
 
 INPUT_MEAN = [103.939, 116.779, 123.68]
 INPUT_STD = [1, 1, 1]
@@ -46,18 +58,10 @@ INPUT_STD = [1, 1, 1]
 # ======================
 # Main functions
 # ======================
-def recognize_from_image():
-    env_id = args.env_id
-    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
-    net.set_input_shape((1, 3, HEIGHT, WIDTH))
 
-    # input image loop
-    for image_path in args.input:
-        # prepare input data
-        logger.debug(f'input image: {image_path}')
-        raw_img = cv2.imread(image_path)
-        logger.debug(f'input image shape: {raw_img.shape}')
-
+def preprocess(raw_img):
+    if args.arch=="erfnet":
+        #channel first
         trans1 = ScaleNew(size=(WIDTH, HEIGHT),
                                      interpolation=(cv2.INTER_LINEAR, cv2.INTER_NEAREST))
         trans2 = Normalize(mean=(INPUT_MEAN, (0,)), std=(INPUT_STD, (1,)))
@@ -67,6 +71,23 @@ def recognize_from_image():
         img = trans1(img)
         img = trans2(img)
         img = np.array(img).transpose(0, 3, 1, 2)
+    elif args.arch=="scnn":
+        #channel last
+        img = cv2.cvtColor(raw_img, cv2.COLOR_BGR2RGB)
+        img = cv2.resize(img, (WIDTH, HEIGHT), interpolation = cv2.INTER_CUBIC)
+        x = img[np.newaxis, :, :, :]
+        img = x.astype(np.float32)
+    return img
+
+def recognize_from_image(net):
+    # input image loop
+    for image_path in args.input:
+        # prepare input data
+        logger.debug(f'input image: {image_path}')
+        raw_img = cv2.imread(image_path)
+        logger.debug(f'input image shape: {raw_img.shape}')
+
+        img = preprocess(raw_img)
 
         # inference
         logger.info('Start inference...')
@@ -80,7 +101,10 @@ def recognize_from_image():
         else:
             output, output_exist = net.run(img)
 
-        output = softmax(output, axis=1)
+        if args.arch=="erfnet":
+            output = softmax(output, axis=1)
+        elif args.arch=="scnn":
+            output = output.transpose((0, 3, 1, 2))
 
         cnt = 0
         for num in range(4):
@@ -98,11 +122,7 @@ def recognize_from_image():
     logger.info('Script finished successfully.')
 
 
-def recognize_from_video():
-    # net initialize
-    env_id = args.env_id
-    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
-
+def recognize_from_video(net):
     capture = webcamera_utils.get_capture(args.video)
 
     # create video writer if savepath is specified as video format
@@ -121,18 +141,18 @@ def recognize_from_video():
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
-
-        trans = Normalize(mean=(INPUT_MEAN, (0,)), std=(INPUT_STD, (1,)))
-
+    
         # resize with keep aspect
         frame,resized_img = webcamera_utils.adjust_frame_size(frame, HEIGHT, WIDTH)
 
-        img = np.expand_dims(resized_img, 0)
-        img = trans(img)
-        img = np.array(img).transpose(0, 3, 1, 2)
+        img = preprocess(resized_img)
 
         output, output_exist = net.run(img)
-        output = softmax(output, axis=1)
+
+        if args.arch=="erfnet":
+            output = softmax(output, axis=1)
+        elif args.arch=="scnn":
+            output = output.transpose((0, 3, 1, 2))
 
         cnt = 0
         for num in range(4):
@@ -168,12 +188,20 @@ def main():
     # model files check and download
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
 
+    # net initialize
+    env_id = args.env_id
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+    if args.arch=="erfnet":
+        net.set_input_shape((1, 3, HEIGHT, WIDTH))
+    elif args.arch=="scnn":
+        net.set_input_shape((1, HEIGHT, WIDTH, 3))
+
     if args.video is not None:
         # video mode
-        recognize_from_video()
+        recognize_from_video(net)
     else:
         # image mode
-        recognize_from_image()
+        recognize_from_image(net)
 
 
 if __name__ == '__main__':
