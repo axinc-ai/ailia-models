@@ -52,7 +52,10 @@ args = update_parser(parser)
 # Parameters 2
 # ======================
 FACE_DETECTION_MODEL_NAME = 'blazeface'
-HEAD_POSE_MODEL_NAME = 'hopenet_robust_alpha1'
+if args.lite:
+    HEAD_POSE_MODEL_NAME = 'hopenet_lite'
+else:
+    HEAD_POSE_MODEL_NAME = 'hopenet_robust_alpha1'
 if args.normal:
     FACE_DETECTION_WEIGHT_PATH = f'{FACE_DETECTION_MODEL_NAME}.onnx'
     FACE_DETECTION_MODEL_PATH = f'{FACE_DETECTION_MODEL_NAME}.onnx.prototxt'
@@ -125,14 +128,15 @@ class HeadPoseEstimator:
         return rot_mat
 
     def draw(self, img, head_poses, centers, horizontal_flip=False):
+        new_img = img.copy()
         hp, c = head_poses[0], centers[0]
-        new_img = img[:, ::-1].copy()
         rot_mat = self._get_rot_mat('z', hp[0])
         rot_mat = rot_mat @ self._get_rot_mat('y', hp[1])
         rot_mat = rot_mat @ self._get_rot_mat('x', hp[2])
         hp_vecs = rot_mat.T # Each row is rotated x, y, z respectively
         
         if horizontal_flip:
+            new_img = np.ascontiguousarray(new_img[:, ::-1])
             hp_vecs[0, 1] *= -1
             hp_vecs[1:, 0] *= -1
             c[0] = new_img.shape[1] - c[0]
