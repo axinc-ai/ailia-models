@@ -29,10 +29,17 @@ REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/erfnet/'
 IMAGE_PATH = 'input.jpg'
 SAVE_IMAGE_PATH = 'output.jpg'
 
+RESIZE_MODE_LISTS = ['padding', 'crop']
+
 # ======================
 # Arguemnt Parser Config
 # ======================
 parser = get_base_parser('roneld model', IMAGE_PATH, SAVE_IMAGE_PATH)
+parser.add_argument(
+    '-r', '--resize', metavar='RESIZE',
+    default='crop', choices=RESIZE_MODE_LISTS,
+    help='resize mode lists: ' + ' | '.join(RESIZE_MODE_LISTS)
+)
 args = update_parser(parser)
 
 WEIGHT_PATH = 'erfnet.opt.onnx'
@@ -47,6 +54,23 @@ INPUT_STD = [1, 1, 1]
 # ======================
 # Main functions
 # ======================
+
+def crop_and_resize(raw_img):
+    if args.resize=="padding":
+        #add padding
+        frame,resized_img = webcamera_utils.adjust_frame_size(raw_img, HEIGHT, WIDTH)
+        return resized_img
+    elif args.resize=="crop":
+        #cut top
+        scale_x = (WIDTH / raw_img.shape[1])
+        crop_y = raw_img.shape[0] * scale_x - HEIGHT
+        crop_y = int(crop_y / scale_x)
+
+        img = raw_img[crop_y:, :, :]  #keep aspect
+        img = cv2.resize(img, (WIDTH, HEIGHT), interpolation = cv2.INTER_LINEAR)
+        return img
+    return None
+
 def recognize_from_image():
     env_id = ailia.get_gpu_environment_id()
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
@@ -64,7 +88,11 @@ def recognize_from_image():
 
         trans = Normalize(mean=(INPUT_MEAN, (0,)), std=(INPUT_STD, (1,)))
 
-        img = cv2.resize(raw_img, (WIDTH, HEIGHT))
+        raw_img = crop_and_resize(raw_img)
+        img = raw_img
+
+        #img = cv2.resize(raw_img, (WIDTH, HEIGHT))
+
         img = np.expand_dims(img, 0)
         img = trans(img)
         img = np.array(img).transpose(0, 3, 1, 2)
@@ -130,7 +158,10 @@ def recognize_from_video():
 
         trans = Normalize(mean=(INPUT_MEAN, (0,)), std=(INPUT_STD, (1,)))
 
-        img = cv2.resize(frame, (WIDTH, HEIGHT))
+        frame = crop_and_resize(frame)
+        img = frame
+
+        #img = cv2.resize(frame, (WIDTH, HEIGHT))
         img = np.expand_dims(img, 0)
         img = trans(img)
         img = np.array(img).transpose(0, 3, 1, 2)
