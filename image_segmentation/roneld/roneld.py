@@ -57,9 +57,6 @@ MODEL_PATH = 'erfnet.opt.onnx.prototxt'
 HEIGHT = 208
 WIDTH = 976
 
-INPUT_MEAN = [103.939, 116.779, 123.68]
-INPUT_STD = [1, 1, 1]
-
 # ======================
 # Main functions
 # ======================
