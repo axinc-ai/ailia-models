@@ -69,6 +69,7 @@ def recognize_from_image():
 
     prev_lanes = []
     prev_curves = np.zeros(10)
+    curve_mode = False
 
     # input image loop
     for image_path in args.input:
@@ -102,7 +103,7 @@ def recognize_from_image():
 
         # call to roneld and store output for next method call
         output_images, prev_lanes, prev_curves, curve_mode = \
-            roneld_lane_detection(lane_images, prev_lanes, prev_curves, curve_mode=False,
+            roneld_lane_detection(lane_images, prev_lanes, prev_curves, curve_mode=curve_mode,
                                   image=raw_img)
 
         savepath = get_savepath(args.savepath, image_path)
@@ -121,6 +122,7 @@ def recognize_from_video():
 
     prev_lanes = []
     prev_curves = np.zeros(10)
+    curve_mode = False
 
     # create video writer if savepath is specified as video format
     if args.savepath != SAVE_IMAGE_PATH:
@@ -153,7 +155,7 @@ def recognize_from_video():
 
         # call to roneld and store output for next method call
         output_images, prev_lanes, prev_curves, curve_mode = \
-            roneld_lane_detection(lane_images, prev_lanes, prev_curves, curve_mode=False,
+            roneld_lane_detection(lane_images, prev_lanes, prev_curves, curve_mode=curve_mode,
                                   image=frame)
 
         cv2.imshow('frame', frame)
