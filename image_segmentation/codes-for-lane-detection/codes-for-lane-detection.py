@@ -61,6 +61,18 @@ elif args.arch=="scnn":
 # Main functions
 # ======================
 
+def colorize(output):
+    out_img = np.zeros((HEIGHT,WIDTH,3))
+    for num in range(4):
+        prob_map = (output[0][num + 1] * 255).astype(int)
+        if num==0:
+            out_img[:,:,0] += prob_map
+        if num==1 or num==3:
+            out_img[:,:,1] += prob_map
+        if num==2 or num==3:
+            out_img[:,:,2] += prob_map
+    return out_img
+
 def recognize_from_image(net):
     # input image loop
     for image_path in args.input:
@@ -85,15 +97,7 @@ def recognize_from_image(net):
             output, output_exist = net.run(img)
 
         output = postprocess(output,args.arch)
-
-        cnt = 0
-        for num in range(4):
-            prob_map = (output[0][num + 1] * 255).astype(int)
-            if cnt == 0:
-                out_img = prob_map
-            else:
-                out_img += prob_map
-            cnt += 1
+        out_img = colorize(output)
 
         savepath = get_savepath(args.savepath, image_path)
         logger.info(f'saved at : {savepath}')
@@ -128,23 +132,12 @@ def recognize_from_video(net):
         output, output_exist = net.run(img)
 
         output = postprocess(output,args.arch)
-
-        cnt = 0
-        for num in range(4):
-            prob_map = (output[0][num + 1] * 255).astype(int)
-            if cnt == 0:
-                out_img = prob_map
-            else:
-                out_img += prob_map
-            cnt += 1
-
+        out_img = colorize(output)
         out_img = np.array(out_img, dtype=np.uint8)
 
         # create output img
         output_buffer[0:HEIGHT,0:WIDTH,:] = resized_img
-        output_buffer[HEIGHT:HEIGHT*2,0:WIDTH,0] = out_img
-        output_buffer[HEIGHT:HEIGHT*2,0:WIDTH,1] = out_img
-        output_buffer[HEIGHT:HEIGHT*2,0:WIDTH,2] = out_img
+        output_buffer[HEIGHT:HEIGHT*2,0:WIDTH,:] = out_img
 
         cv2.imshow('output', output_buffer)
 

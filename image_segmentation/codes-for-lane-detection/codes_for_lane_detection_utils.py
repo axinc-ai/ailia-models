@@ -2,6 +2,10 @@ import numpy as np
 import cv2
 from scipy.special import softmax
 
+import sys
+sys.path.append('../../util')
+import webcamera_utils
+
 def crop_and_resize(raw_img,WIDTH,HEIGHT,arch,resize):
     if resize=="padding":
         #add padding
