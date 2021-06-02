@@ -180,7 +180,7 @@ def recognize_from_video(net):
 
         # save results
         if writer is not None:
-            writer.write(pred.astype(np.uint8))
+            writer.write(frame.astype(np.uint8))
 
     capture.release()
     cv2.destroyAllWindows()
