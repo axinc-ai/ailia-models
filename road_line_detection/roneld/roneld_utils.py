@@ -7,7 +7,7 @@ import warnings
 import cv2
 import numpy as np
 import scipy.integrate as integrate
-from numba import jit, prange, njit
+#from numba import jit, prange, njit
 from scipy import interpolate
 from typing import List
 
@@ -172,7 +172,7 @@ def roneld_lane_detection(lane_images:list, prev_lanes, prev_curves, curve_mode=
     # return output images and prev lanes and prev curves for the next call
     return output_images, prev_lanes, prev_curves, curve_mode
 
-@jit(fastmath=True)
+#@jit(fastmath=True)
 def plot_lines(display_lanes:list, output_images:list, lane_image_size:tuple, highest_point:int,
                image:np.array):
     """
@@ -190,7 +190,7 @@ def plot_lines(display_lanes:list, output_images:list, lane_image_size:tuple, hi
             # non-empty lane
             plot_line(lane, output_images[lane_index], lane_image_size, highest_point, image)
 
-@jit(fastmath=True)
+#@jit(fastmath=True)
 def plot_line(lane:dict, output_image:np.ndarray, image_shape:tuple, highest_point:int,
               image:np.ndarray):
     """
@@ -220,7 +220,7 @@ def plot_line(lane:dict, output_image:np.ndarray, image_shape:tuple, highest_poi
 
 
 
-@jit(fastmath=True)
+#@jit(fastmath=True)
 def plot_curves(display_lanes:list, output_images:list, lane_image_size:tuple,
                 highest_point:int, image=np.ndarray):
     """
@@ -274,7 +274,7 @@ def plot_curves(display_lanes:list, output_images:list, lane_image_size:tuple,
                                       output_images[lane_index].shape[0])),
                                  (0, 255, 0), 20)
 
-@njit(fastmath=True)
+#@njit(fastmath=True)
 def nb_max(array:np.ndarray):
     """
     finds max in array using parallel numba to speed it up
@@ -284,7 +284,7 @@ def nb_max(array:np.ndarray):
     return np.max(array)
 
 # same as linear_regression but in linear algebra form
-@jit(fastmath=True)
+#@jit(fastmath=True)
 def linear_regression_matrix(points: np.ndarray, confidence: np.ndarray):
     """
     weighted least-squares linear regression to find line given points and their confidence
@@ -322,7 +322,7 @@ def linear_regression_matrix(points: np.ndarray, confidence: np.ndarray):
 
 # takes points as input and clears the outliers by doing least squares regression and dumping a
 # portion of the furthest points in each iteration (by default, 5% of the points)
-@jit(fastmath=True)
+#@jit(fastmath=True)
 def clear_outliers(points: np.ndarray, confidence:np.ndarray, iterations=1, to_dump=0.05):
     """
     clears outliers based on horizontal distance between point and regression line
@@ -366,7 +366,7 @@ def point_distance_wrapper(line:list):
     return point_distance
 
 
-@jit(fastmath=True)
+#@jit(fastmath=True)
 def correlation_linear(points: np.ndarray):
     """
     calculates coefficeint of determination of points
@@ -386,7 +386,7 @@ def correlation_linear(points: np.ndarray):
         return 1
     return x_y_cov ** 2 / (x_var * y_var)
 
-@njit(fastmath=True)
+#@njit(fastmath=True)
 def line_distance(line1, line2, lane_image_size):
     """
     returns root mean square distance between two lines within the image
@@ -444,7 +444,7 @@ def square_distance_wrapper(line1:list, line2:list):
 
 
 # find the top and bottom point of lane in image (uses lane_ratio global variable)
-@jit(fastmath=True)
+#@jit(fastmath=True)
 def find_line_points(gradient: float, y_intercept: float, lane_image_size: tuple, bottom=-1,
                      top=-1):
     """
@@ -490,7 +490,7 @@ def find_line_points(gradient: float, y_intercept: float, lane_image_size: tuple
 
     return bottom_point, top_point
 
-@jit(fastmath=True)
+#@jit(fastmath=True)
 def find_highest_probability(lane_image:np.ndarray, start_row:int, end_row:int, left_bound=-1,
                              right_bound=-1):
     """
@@ -524,10 +524,10 @@ def find_highest_probability(lane_image:np.ndarray, start_row:int, end_row:int, 
 
 
 # get lanes
-@jit(fastmath=True)
+#@jit(fastmath=True)
 def get_all_lanes(lane_images:list, confidence_threshold:int):
     curr_lanes = [{} for _ in range(4)]
-    for i in prange(4):
+    for i in range(4):
         # the number in exists is present, so there should be a file to indicate the lane
         lane_image = lane_images[i]
         # (height, width, channels)
@@ -569,7 +569,7 @@ def get_all_lanes(lane_images:list, confidence_threshold:int):
 
 
 # get lane points for GOPALD method
-@jit(fastmath=True)
+#@jit(fastmath=True)
 def get_lane(lane_image:np.ndarray, row_stride=20, confidence_threshold=1):
     curr_lane = []
     row = 0
@@ -608,7 +608,7 @@ def get_lane(lane_image:np.ndarray, row_stride=20, confidence_threshold=1):
     return curr_lane, np.array(confidence)
 
 
-@jit(fastmath=True)
+#@jit(fastmath=True)
 def get_curr_lanes_age(matchings:list, prev_lanes:List[dict], curr_lanes:List[dict]):
     curr_lanes_age = []
 
@@ -673,7 +673,7 @@ def get_curr_lanes_age(matchings:list, prev_lanes:List[dict], curr_lanes:List[di
     return curr_lanes_age
 
 # match lanes in prev frame to lanes in current frame
-@jit(fastmath=True)
+#@jit(fastmath=True)
 def match_prev_curr(curr_lanes:List[dict], prev_lanes:List[dict], merge_distance:int,
                     lane_image_size:tuple):
     """
@@ -690,10 +690,10 @@ def match_prev_curr(curr_lanes:List[dict], prev_lanes:List[dict], merge_distance
     # between the current and prev lane (1D- and 2D-index)
     curr_matchings = [{} for _ in curr_lanes]
 
-    for i in prange(len(curr_lanes)):
+    for i in range(len(curr_lanes)):
         if curr_lanes[i] != {}:
             # if lane is not empty
-            for j in prange(len(prev_lanes)):
+            for j in range(len(prev_lanes)):
                 # compare one current lane and one prev lane
                 if line_distance(curr_lanes[i]["lane"], prev_lanes[j]["lane"], lane_image_size) < \
                         merge_distance:
@@ -736,7 +736,7 @@ def get_from_collection_wrapper(collection:dict):
     return get_from_collection
 
 
-@jit(fastmath=True)
+#@jit(fastmath=True)
 def rms(array: np.ndarray):
     """
     return root mean square of values in the array
@@ -748,7 +748,7 @@ def rms(array: np.ndarray):
     return math.sqrt((array ** 2).sum() / len(array))
 
 # find x_intercept for image with height, if gradient 0 then there is no x_intercept
-@jit(fastmath=True)
+#@jit(fastmath=True)
 def find_x_intercept(gradient:int, y_intercept:int, height:int):
     """
     Find x intercept of the line with the bottom of the image from the line parameters
