@@ -76,7 +76,7 @@ def recognize_from_image():
 
         savepath = get_savepath(args.savepath, image_path, ext='.jpg')
         logger.info(f'saved at : {savepath}')
-        grid_image, _ = show_heatmaps(img, raw_img, heatmaps, normalize=True)
+        grid_image, _, _ = show_heatmaps(img, raw_img, heatmaps, normalize=True)
 
         cv2.imwrite(savepath, grid_image)
 
@@ -115,7 +115,8 @@ def recognize_from_video():
         result = net.run(img)
         heatmaps = result[0]
 
-        _, _, pose_raw_image = show_heatmaps(img, raw_img, heatmaps, normalize=True)
+        grid_image, _, pose_raw_image = show_heatmaps(img, raw_img, heatmaps, normalize=True)
+        #cv2.imshow('Plot Pose 2D', grid_image)
         cv2.imshow('Plot Pose 2D', pose_raw_image)
 
         if writer is not None:
