@@ -53,16 +53,14 @@ def preprocess(x):
 
 
 def recognize_from_keypoints(net):
-    import h5py
-    f = h5py.File("NTU_CS.h5", 'r')
-    test_X = f['test_x'][:]
-    x = test_X[0]
+    for skel_path in args.input:
+        logger.info(skel_path)
 
-    # input image loop
-    for image_path in args.input:
-        logger.info(image_path)
+        bodies_data = get_raw_bodies_data(skel_path)
+        _, ske_joints, _ = get_raw_denoised_data(bodies_data)
+        ske_joints = seq_translation(ske_joints)
+        x = align_frames(ske_joints)
 
-        # prepare grand truth
         imgs, maxmin = preprocess(x)
 
         logger.debug(f'input image shape: {imgs.shape}')
