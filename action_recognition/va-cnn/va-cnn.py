@@ -2,21 +2,24 @@ import sys
 import time
 
 import numpy as np
-import cv2
-from PIL import Image
 
 import ailia
 
 # import original modules
 sys.path.append('../../util')
 from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
+from params import MODALITIES, EXTENSIONS  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 
 # logger
 from logging import getLogger  # noqa: E402
 
 from va_cnn_utils import *
+from vis_3d_ske import draw_ske_data
 from labels import LABELS
+
+MODALITIES.append('skel')
+EXTENSIONS['skel'] = ['*.skeleton']
 
 logger = getLogger(__name__)
 
@@ -28,12 +31,16 @@ MODEL_PATH = 'va-cnn.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/va-cnn/'
 
 INPUT_FILE = 'data/ntu/nturgb+d_skeletons/S001C001P001R001A001.skeleton'
-SAVE_IMAGE_PATH = None
+SAVE_PATH = 'output.mp4'
 
 # ======================
 # Arguemnt Parser Config
 # ======================
-parser = get_base_parser('View Adaptive Neural Networks', INPUT_FILE, SAVE_IMAGE_PATH)
+parser = get_base_parser('View Adaptive Neural Networks', INPUT_FILE, SAVE_PATH, input_ftype='skel')
+parser.add_argument(
+    '-s', '--save_video', action='store_true',
+    help='Save the video file.'
+)
 args = update_parser(parser)
 
 
@@ -86,6 +93,11 @@ def recognize_from_keypoints(net):
         i = np.argmax(pred, axis=-1)[0]
         label = LABELS[i]
         logger.info('Action estimate -> ' + label)
+
+        if args.save:
+            savepath = "%s.mp4" % bodies_data['name'] if 1 < len(args.input) else SAVE_PATH
+            logger.info(f'saved at : {savepath}')
+            draw_ske_data(x, savepath)
 
     logger.info('Script finished successfully.')
 
