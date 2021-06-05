@@ -131,14 +131,18 @@ def face_detect(img, face_net):
     w = xmax - xmin
     if h > w:
         p = (h - w) // 2
-        h = w
-        ymin += p
+        w = h
+        xmin -= p
     else:
         p = (w - h) // 2
-        w = h
-        xmin += p
+        h = w
+        ymin -= p
 
     img = img_0[ymin:ymin + h, xmin:xmin + w]
+
+    h2, w2 = img.shape[:2]
+    if h != h2 or w != w2:
+        return None, (0, 0)
 
     return img, (ymin, xmin)
 
