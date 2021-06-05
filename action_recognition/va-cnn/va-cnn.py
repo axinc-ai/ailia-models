@@ -94,7 +94,7 @@ def recognize_from_keypoints(net):
         label = LABELS[i]
         logger.info('Action estimate -> ' + label)
 
-        if args.save:
+        if args.save_video:
             savepath = "%s.mp4" % bodies_data['name'] if 1 < len(args.input) else SAVE_PATH
             logger.info(f'saved at : {savepath}')
             draw_ske_data(x, savepath)
