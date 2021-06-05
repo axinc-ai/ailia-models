@@ -3,6 +3,7 @@ import time
 
 import numpy as np
 import cv2
+from PIL import Image
 
 import ailia
 
@@ -10,76 +11,93 @@ import ailia
 sys.path.append('../../util')
 from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
+from detector_utils import load_image  # noqa: E402
 import webcamera_utils  # noqa: E402
-from u2net_utils import load_image, transform, save_result, norm  # noqa: E402
 
 # logger
-from logging import getLogger   # noqa: E402
-logger = getLogger(__name__)
+from logging import getLogger  # noqa: E402
 
+logger = getLogger(__name__)
 
 # ======================
 # Parameters
 # ======================
+WEIGHT_PATH = 'u2net-portrait-matting.onnx'
+MODEL_PATH = 'u2net-portrait-matting.onnx.prototxt'
+REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/u2net-portrait-matting/'
+
 IMAGE_PATH = 'input.png'
 SAVE_IMAGE_PATH = 'output.png'
-IMAGE_SIZE = 320
-MODEL_LISTS = ['small', 'large']
-OPSET_LISTS = ['10', '11']
-
+IMAGE_SIZE = 448
 
 # ======================
 # Arguemnt Parser Config
 # ======================
-parser = get_base_parser('U square net', IMAGE_PATH, SAVE_IMAGE_PATH)
-parser.add_argument(
-    '-a', '--arch', metavar='ARCH',
-    default='large', choices=MODEL_LISTS,
-    help='model lists: ' + ' | '.join(MODEL_LISTS)
-)
+
+parser = get_base_parser('U^2-Net - Portrait matting', IMAGE_PATH, SAVE_IMAGE_PATH)
 parser.add_argument(
     '-c', '--composite',
     action='store_true',
     help='Composite input image and predicted alpha value'
 )
 parser.add_argument(
-    '-o', '--opset', metavar='OPSET',
-    default='11', choices=OPSET_LISTS,
-    help='opset lists: ' + ' | '.join(OPSET_LISTS)
-)
-parser.add_argument(
     '-w', '--width',
     default=IMAGE_SIZE, type=int,
-    help='The segmentation width and height for u2net. (default: 320)'
+    help='The segmentation width and height for u2net.'
 )
 parser.add_argument(
     '-h', '--height',
     default=IMAGE_SIZE, type=int,
-    help='The segmentation height and height for u2net. (default: 320)'
-)
-parser.add_argument(
-    '--rgb',
-    action='store_true',
-    help='Use rgb color space (default: bgr)'
+    help='The segmentation height and height for u2net.'
 )
 args = update_parser(parser)
 
 
 # ======================
-# Parameters 2
-# ======================
-if args.opset == "10":
-    WEIGHT_PATH = 'u2net.onnx' if args.arch == 'large' else 'u2netp.onnx'
-else:
-    WEIGHT_PATH = 'u2net_opset11.onnx' \
-        if args.arch == 'large' else 'u2netp_opset11.onnx'
-MODEL_PATH = WEIGHT_PATH + '.prototxt'
-REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/u2net/'
-
-
-# ======================
 # Main functions
 # ======================
+
+def preprocess(img):
+    mean = np.array((0.5, 0.5, 0.5))
+    std = np.array((0.5, 0.5, 0.5))
+
+    h, w = img.shape[:2]
+    max_wh = max(h, w)
+    hp = (max_wh - w) // 2
+    vp = (max_wh - h) // 2
+
+    h, w = img.shape[:2]
+
+    img_pad = np.zeros((max_wh, max_wh, 3), dtype=np.uint8)
+    img_pad[vp:vp + h, hp:hp + w, ...] = img
+    img = img_pad
+
+    img = np.array(Image.fromarray(img).resize(
+        (args.width, args.height),
+        resample=Image.ANTIALIAS))
+
+    img = img / 255
+    img = (img - mean) / std
+    img = img.transpose(2, 0, 1)  # HWC -> CHW
+    img = np.expand_dims(img, axis=0)
+
+    return img.astype(np.float32), img_pad
+
+
+def postprocess(pred, img_0, img_pad):
+    h0, w0 = img_0.shape[:2]
+    h1, w1 = img_pad.shape[:2]
+    pred = cv2.resize(pred, (w1, h1), cv2.INTER_LINEAR)
+
+    vp = (h1 - h0) // 2
+    hp = (w1 - w0) // 2
+    pred = pred[vp:vp + h0, hp:hp + h1]
+
+    pred = np.clip(pred, 0, 1)
+
+    return pred
+
+
 def recognize_from_image(net):
     # input image loop
     for image_path in args.input:
@@ -87,11 +105,9 @@ def recognize_from_image(net):
         logger.info(image_path)
 
         # prepare input data
-        input_data, h, w = load_image(
-            image_path,
-            scaled_size=(args.width,args.height),
-            rgb_mode=args.rgb
-        )
+        img = img_0 = load_image(image_path)
+        img = cv2.cvtColor(img, cv2.COLOR_BGRA2RGB)
+        img, img_pad = preprocess(img)
 
         # inference
         logger.info('Start inference...')
@@ -99,27 +115,29 @@ def recognize_from_image(net):
             logger.info('BENCHMARK mode')
             for i in range(5):
                 start = int(round(time.time() * 1000))
-                preds_ailia = net.predict([input_data])
+                output = net.predict({'img': img})
                 end = int(round(time.time() * 1000))
                 logger.info(f'\tailia processing time {end - start} ms')
         else:
-            # dim = [(1, 1, 320, 320), (1, 1, 320, 320),..., ]  len=7
-            preds_ailia = net.predict([input_data])
+            output = net.predict({'img': img})
 
         # postprocessing
-        # we only use `d1` (the first output, check the original repository)
-        pred = preds_ailia[0][0, 0, :, :]
+        pred = output[0][0]
+        pred = postprocess(pred, img_0, img_pad)
 
-        savepath = get_savepath(args.savepath, image_path)
-        logger.info(f'saved at : {savepath}')
-        save_result(pred, savepath, [h, w])
-
-        # composite
-        if args.composite:
+        if not args.composite:
+            res_img = pred * 255
+        else:
+            # composite
+            h, w = img_0.shape[:2]
             image = cv2.imread(image_path)
             image = cv2.cvtColor(image, cv2.COLOR_BGR2BGRA)
             image[:, :, 3] = cv2.resize(pred, (w, h)) * 255
-            cv2.imwrite(savepath, image)
+            res_img = image
+
+        savepath = get_savepath(args.savepath, image_path)
+        logger.info(f'saved at : {savepath}')
+        cv2.imwrite(savepath, res_img)
 
     logger.info('Script finished successfully.')
 
@@ -134,46 +152,41 @@ def recognize_from_video(net):
         logger.warning(
             'currently, video results cannot be output correctly...'
         )
-        #writer = webcamera_utils.get_writer(args.savepath, f_h, f_w, rgb=False) # alpha
-        writer = webcamera_utils.get_writer(args.savepath, f_h, f_w) # composite
+        writer = webcamera_utils.get_writer(args.savepath, f_h, f_w)
     else:
         writer = None
 
-    while(True):
+    while True:
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
 
-        if args.rgb and image.shape[2] == 3:
-            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-
-        input_data = transform(frame, (args.width, args.height))
+        img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        img, img_pad = preprocess(img)
 
         # inference
-        preds_ailia = net.predict([input_data])
+        output = net.predict({'img': img})
 
         # postprocessing
-        pred = cv2.resize(norm(preds_ailia[0][0, 0, :, :]), (f_w, f_h))
+        pred = output[0][0]
+        pred = postprocess(pred, frame, img_pad)
 
         # force composite
         frame[:, :, 0] = frame[:, :, 0] * pred + 64 * (1 - pred)
         frame[:, :, 1] = frame[:, :, 1] * pred + 177 * (1 - pred)
         frame[:, :, 2] = frame[:, :, 2] * pred
-        pred = frame / 255.0
 
-        if args.rgb and image.shape[2] == 3:
-            pred = cv2.cvtColor(pred, cv2.COLOR_RGB2BGR)
-
-        cv2.imshow('frame', pred)
+        cv2.imshow('frame', frame)
 
         # save results
         if writer is not None:
-            writer.write((pred * 255).astype(np.uint8))
+            writer.write(frame.astype(np.uint8))
 
     capture.release()
     cv2.destroyAllWindows()
     if writer is not None:
         writer.release()
+
     logger.info('Script finished successfully.')
 
 
@@ -183,8 +196,7 @@ def main():
 
     # net initialize
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
-    if args.width!=IMAGE_SIZE or args.height!=IMAGE_SIZE:
-        net.set_input_shape((1,3,args.height,args.width))
+    net.set_input_shape((1, 3, args.height, args.width)) # dynamic axis
 
     if args.video is not None:
         # video mode

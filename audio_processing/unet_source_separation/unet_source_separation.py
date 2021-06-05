@@ -44,6 +44,12 @@ parser.add_argument(
     help='Use onnxruntime'
 )
 parser.add_argument(
+    '-st', '--stereo', 
+    action='store_true',
+    default=False,
+    help='Use stereo mode'
+)
+parser.add_argument(
     '-a', '--arch', 
     default='base', choices=MODEL_LISTS,
     help='model lists: ' + ' | '.join(MODEL_LISTS)
@@ -109,7 +115,10 @@ def recognize_one_audio(input_path):
         wav = wav.astype(np.float32)
 
     if wav.ndim == 2 :
-        wav = (wav[:,0][np.newaxis,:] + wav[:,1][np.newaxis,:])/2   # convert to mono
+        if args.stereo:
+            wav = np.transpose(wav,(1,0))   # stereo to batch
+        else:
+            wav = (wav[:,0][np.newaxis,:] + wav[:,1][np.newaxis,:])/2   # convert to mono
     else:
         wav = wav[np.newaxis,:]
 
@@ -131,7 +140,8 @@ def recognize_one_audio(input_path):
         logger.info('Use ailia')
         env_id = args.env_id
         logger.info(f'env_id: {env_id}')
-        session = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+        memory_mode = ailia.get_memory_mode(reuse_interstage=True)
+        session = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id, memory_mode=memory_mode)
     else :
         logger.info('Use onnxruntime')
         import onnxruntime

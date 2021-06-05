@@ -1,9 +1,14 @@
-import numpy as np
 import time
 import os
 import sys
 import cv2
+import glob
+import numpy as np
+from scipy.special import softmax
 
+from roneld_utils import roneld_lane_detection
+
+sys.path.append('../../image_segmentation/codes-for-lane-detection')
 from codes_for_lane_detection_utils import crop_and_resize, preprocess, postprocess
 
 import ailia
@@ -23,17 +28,17 @@ os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
 # ======================
 # Parameters
 # ======================
-REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/codes-for-lane-detection/'
+REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/erfnet/'
 IMAGE_PATH = 'input.jpg'
 SAVE_IMAGE_PATH = 'output.jpg'
 
-MODEL_LISTS = ['erfnet', 'scnn']
+MODEL_LISTS = ['erfnet']
 RESIZE_MODE_LISTS = ['padding', 'crop_center', 'crop_bottom']
 
 # ======================
 # Arguemnt Parser Config
 # ======================
-parser = get_base_parser('erfnet model', IMAGE_PATH, SAVE_IMAGE_PATH)
+parser = get_base_parser('roneld model', IMAGE_PATH, SAVE_IMAGE_PATH)
 parser.add_argument(
     '-a', '--arch', metavar='ARCH',
     default='erfnet', choices=MODEL_LISTS,
@@ -46,42 +51,34 @@ parser.add_argument(
 )
 args = update_parser(parser)
 
-if args.arch=="erfnet":
-    WEIGHT_PATH = 'erfnet.opt.onnx'
-    MODEL_PATH = 'erfnet.opt.onnx.prototxt'
-    HEIGHT = 208
-    WIDTH = 976
-elif args.arch=="scnn":
-    WEIGHT_PATH = 'SCNN_tensorflow.opt.onnx'
-    MODEL_PATH = 'SCNN_tensorflow.opt.onnx.prototxt'
-    HEIGHT = 288
-    WIDTH = 800
+WEIGHT_PATH = 'erfnet.opt.onnx'
+MODEL_PATH = 'erfnet.opt.onnx.prototxt'
+
+HEIGHT = 208
+WIDTH = 976
 
 # ======================
 # Main functions
 # ======================
 
-def colorize(output):
-    out_img = np.zeros((HEIGHT,WIDTH,3))
-    for num in range(4):
-        prob_map = (output[0][num + 1] * 255).astype(int)
-        if num==0:
-            out_img[:,:,0] += prob_map
-        if num==1 or num==3:
-            out_img[:,:,1] += prob_map
-        if num==2 or num==3:
-            out_img[:,:,2] += prob_map
-    return out_img
 
-def recognize_from_image(net):
+def recognize_from_image():
+    env_id = ailia.get_gpu_environment_id()
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+    net.set_input_shape((1, 3, HEIGHT, WIDTH))
+
+    prev_lanes = []
+    prev_curves = np.zeros(10)
+    curve_mode = False
+
     # input image loop
     for image_path in args.input:
         # prepare input data
-        logger.debug(f'input image: {image_path}')
         raw_img = cv2.imread(image_path)
-        logger.debug(f'input image shape: {raw_img.shape}')
 
-        img = crop_and_resize(raw_img,WIDTH,HEIGHT,args.arch,args.resize)
+        # preprocess
+        raw_img = crop_and_resize(raw_img,WIDTH,HEIGHT,args.arch,args.resize)
+        img = raw_img
         img = preprocess(img,args.arch)
 
         # inference
@@ -97,53 +94,75 @@ def recognize_from_image(net):
             output, output_exist = net.run(img)
 
         output = postprocess(output,args.arch)
-        out_img = colorize(output)
+        lane_images = []
+
+        for num in range(4):
+            lane_image = output[0][num + 1]
+            lane_image = (lane_image * 255).astype(int)
+            lane_images.append(lane_image)
+
+        # call to roneld and store output for next method call
+        output_images, prev_lanes, prev_curves, curve_mode = \
+            roneld_lane_detection(lane_images, prev_lanes, prev_curves, curve_mode=curve_mode,
+                                  image=raw_img)
 
         savepath = get_savepath(args.savepath, image_path)
         logger.info(f'saved at : {savepath}')
-        cv2.imwrite(savepath, out_img)
+        cv2.imwrite(savepath, raw_img)
 
     logger.info('Script finished successfully.')
 
 
-def recognize_from_video(net):
+def recognize_from_video():
+    # net initialize
+    env_id = ailia.get_gpu_environment_id()
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+
     capture = webcamera_utils.get_capture(args.video)
+
+    prev_lanes = []
+    prev_curves = np.zeros(10)
+    curve_mode = False
 
     # create video writer if savepath is specified as video format
     if args.savepath != SAVE_IMAGE_PATH:
-        logger.warning(
-            'currently, video results cannot be output correctly...'
-        )
-        writer = webcamera_utils.get_writer(args.savepath, HEIGHT*2, WIDTH)
+        writer = webcamera_utils.get_writer(args.savepath, HEIGHT, WIDTH)
     else:
         writer = None
-
-    output_buffer = np.zeros((HEIGHT*2,WIDTH,3))
-    output_buffer = output_buffer.astype(np.uint8)
 
     while (True):
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
-    
-        resized_img = crop_and_resize(frame,WIDTH,HEIGHT,args.arch,args.resize)
-        img = preprocess(resized_img,args.arch)
 
+        # preprocess
+        frame = crop_and_resize(frame,WIDTH,HEIGHT,args.arch,args.resize)
+        img = frame
+        img = preprocess(img,args.arch)
+
+        # inference
         output, output_exist = net.run(img)
 
+        # postprocess
         output = postprocess(output,args.arch)
-        out_img = colorize(output)
-        out_img = np.array(out_img, dtype=np.uint8)
 
-        # create output img
-        output_buffer[0:HEIGHT,0:WIDTH,:] = resized_img
-        output_buffer[HEIGHT:HEIGHT*2,0:WIDTH,:] = out_img
+        lane_images = []
 
-        cv2.imshow('output', output_buffer)
+        for num in range(4):
+            lane_image = output[0][num + 1]
+            lane_image = (lane_image * 255).astype(int)
+            lane_images.append(lane_image)
+
+        # call to roneld and store output for next method call
+        output_images, prev_lanes, prev_curves, curve_mode = \
+            roneld_lane_detection(lane_images, prev_lanes, prev_curves, curve_mode=curve_mode,
+                                  image=frame)
+
+        cv2.imshow('frame', frame)
 
         # save results
         if writer is not None:
-            writer.write(output_buffer)
+            writer.write(frame)
 
     capture.release()
     cv2.destroyAllWindows()
@@ -156,20 +175,12 @@ def main():
     # model files check and download
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
 
-    # net initialize
-    env_id = args.env_id
-    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
-    if args.arch=="erfnet":
-        net.set_input_shape((1, 3, HEIGHT, WIDTH))
-    elif args.arch=="scnn":
-        net.set_input_shape((1, HEIGHT, WIDTH, 3))
-
     if args.video is not None:
         # video mode
-        recognize_from_video(net)
+        recognize_from_video()
     else:
         # image mode
-        recognize_from_image(net)
+        recognize_from_image()
 
 
 if __name__ == '__main__':
