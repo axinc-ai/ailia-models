@@ -113,13 +113,14 @@ def face_detect(img, face_net):
 
     output = face_net.predict([img])
     detections = but.postprocess(output)
-
-    if len(detections) == 0 or detections[0].shape[0] == 0:
-        return None, (0, 0)
+    detections = detections[0]
 
     # sort by confidence
-    detections = sorted(detections, key=lambda x: x[0, 16], reverse=True)
-    detection = np.squeeze(detections[0])
+    detections = sorted(detections, key=lambda x: x[16], reverse=True)
+    if len(detections) == 0:
+        return None, (0, 0)
+
+    detection = detections[0]
 
     h, w = img_0.shape[:2]
     ymin = int(detection[0] * h)
