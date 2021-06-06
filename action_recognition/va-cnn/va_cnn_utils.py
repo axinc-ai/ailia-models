@@ -1,8 +1,8 @@
 import os
 
 import numpy as np
-import scipy
-import scipy.misc
+# import scipy.misc
+from PIL import Image
 
 # logger
 from logging import getLogger  # noqa: E402
@@ -464,6 +464,28 @@ def align_frames(ske_joints, frames_cnt=300):
     return aligned_skes_joints
 
 
+def bytescale(data, high=255, low=0):
+    cmin = data.min()
+    cmax = data.max()
+
+    cscale = cmax - cmin
+
+    scale = float(high - low) / cscale
+    bytedata = (data - cmin) * scale + low
+    return (bytedata.clip(low, high) + 0.5).astype(np.uint8)
+
+
+def toimage(data, high=255, low=0):
+    shape = list(data.shape)
+
+    bytedata = bytescale(data, high=high, low=low)
+    strdata = bytedata.tostring()
+    shape = (shape[1], shape[0])
+
+    image = Image.frombytes('RGB', shape, strdata)
+    return image
+
+
 def _center(rgb):
     rgb[:, :, 0] -= 110
     rgb[:, :, 1] -= 110
@@ -490,7 +512,9 @@ def torgb(ske_joints, max_val, min_val):
         #### original rescale to 0-255
         ske_joint = 255 * (ske_joint - min_val) / (max_val - min_val)
         rgb_ske = np.reshape(ske_joint, (ske_joint.shape[0], ske_joint.shape[1] // 3, 3))
-        rgb_ske = scipy.misc.imresize(rgb_ske, (224, 224)).astype(np.float32)
+        # rgb_ske = scipy.misc.imresize(rgb_ske, (224, 224)).astype(np.float32)
+        rgb_ske = np.array(toimage(rgb_ske).resize(
+            (224, 224), resample=Image.BILINEAR)).astype(np.float32)
         rgb_ske = _center(rgb_ske)
         rgb_ske = np.transpose(rgb_ske, [1, 0, 2])
         rgb_ske = np.transpose(rgb_ske, [2, 1, 0])
