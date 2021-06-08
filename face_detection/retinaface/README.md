@@ -19,8 +19,8 @@ python3 retinaface.py --arch mobile0.25
 ```
 
 If you want to specify the input image, put the image path after the `--input` option.  
-You can use `--savepath` option to change the name of the output file to save.
-You can alse use `--rescale` option to scale down the input image size to prevent memory overflow.
+You can use `--savepath` option to change the name of the output file to save.  
+You can alse use `--rescale` option to scale down the input image size to prevent memory overflow. By default the original image size is used as input.
 ```bash
 $ python3 retinaface.py  --input IMAGE_PATH --savepath SAVE_IMAGE_PATH
 ```
@@ -42,6 +42,5 @@ ONNX opset = 11
 
 ## Netron
 
-[retinaface_resnet50.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/retinaface/retinaface_resnet50.onnx.prototxt)
-
+[retinaface_resnet50.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/retinaface/retinaface_resnet50.onnx.prototxt)  
 [retinaface_mobile0.25.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/retinaface/retinaface_mobile0.25.onnx.prototxt)
