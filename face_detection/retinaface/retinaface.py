@@ -23,8 +23,8 @@ logger = getLogger(__name__)
 # ======================
 # PARAMETERS
 # ======================
-IMAGE_PATH = 'input.png'
-SAVE_IMAGE_PATH = 'result.png'
+IMAGE_PATH = 'selfie.png'
+SAVE_IMAGE_PATH = 'selfie_output.png'
 
 MODEL_LISTS = ['resnet50', 'mobile0.25']
 CONFIDENCE_THRES = 0.02
