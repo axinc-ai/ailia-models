@@ -127,6 +127,7 @@ cd ../../pose_estimation/pose-hg-3d; python3 pose-hg-3d.py ${OPTION}
 cd ../../pose_estimation/gast; python3 gast.py ${OPTION}
 cd ../../rotation_prediction/rotnet; python3 rotnet.py ${OPTION}
 cd ../../style_transfer/adain; python3 adain.py ${OPTION}
+cd ../../style_transfer/beauty_gan; python3 beauty_gan.py ${OPTION}
 cd ../../super_resolution/srresnet; python3 srresnet.py ${OPTION}
 cd ../../super_resolution/han; python3 han.py ${OPTION}
 cd ../../super_resolution/edsr; python3 edsr.py ${OPTION}
