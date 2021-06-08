@@ -64,6 +64,50 @@ elif args.arch == 'mobile0.25':
     MODEL_PATH = 'retinaface_mobile0.25.onnx.prototxt'    
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/retinaface/"
 
+def postprocessing(preds_ailia, input_data, cfg, dim):
+    IMAGE_WIDTH, IMAGE_HEIGHT = dim
+    scale = np.array([IMAGE_WIDTH, IMAGE_HEIGHT, IMAGE_WIDTH, IMAGE_HEIGHT])
+    loc, conf, landms = preds_ailia
+    priorbox = PriorBox(cfg, image_size=(IMAGE_HEIGHT, IMAGE_WIDTH))
+    priors = priorbox.forward()
+    boxes = rut.decode(np.squeeze(loc, axis=0), priors, cfg['variance'])
+    boxes = boxes * scale
+    scores = np.squeeze(conf, axis=0)[:, 1]
+    landms = rut.decode_landm(np.squeeze(landms, axis=0), priors, cfg['variance'])
+    scale1 = np.array([input_data.shape[3], input_data.shape[2], input_data.shape[3], input_data.shape[2],
+                            input_data.shape[3], input_data.shape[2], input_data.shape[3], input_data.shape[2],
+                            input_data.shape[3], input_data.shape[2]])
+    landms = landms * scale1
+
+    # ignore low scores
+    inds = np.where(scores > CONFIDENCE_THRES)[0]
+    boxes = boxes[inds]
+    landms = landms[inds]
+    scores = scores[inds]
+
+    # keep top-K before NMS
+    order = scores.argsort()[::-1][:TOP_K]
+    boxes = boxes[order]
+    landms = landms[order]
+    scores = scores[order]
+
+    # do NMS
+    dets = np.hstack((boxes, scores[:, np.newaxis])).astype(np.float32, copy=False)
+    keep = rut.py_cpu_nms(dets, NMS_THRES)
+    dets = dets[keep, :]
+    landms = landms[keep]
+
+    # keep top-K faster NMS
+    dets = dets[:KEEP_TOP_K, :]
+    landms = landms[:KEEP_TOP_K, :]
+
+    detections = np.concatenate((dets, landms), axis=1)
+    
+    return detections
+
+
+
+
 # ======================
 # Main functions
 # ======================
@@ -89,7 +133,7 @@ def recognize_from_image():
         dim = (IMAGE_WIDTH, IMAGE_HEIGHT)
         org_img = cv2.resize(org_img, dim, interpolation = cv2.INTER_AREA)
 
-        scale = np.array([IMAGE_WIDTH, IMAGE_HEIGHT, IMAGE_WIDTH, IMAGE_HEIGHT])
+        
         img = org_img - (104, 117, 123)
         input_data = img.transpose(2, 0, 1)
         input_data.shape = (1,) + input_data.shape
@@ -111,52 +155,13 @@ def recognize_from_image():
             preds_ailia = net.predict([input_data])
 
         # post-processing
-        loc, conf, landms = preds_ailia
-        priorbox = PriorBox(cfg, image_size=(IMAGE_HEIGHT, IMAGE_WIDTH))
-        priors = priorbox.forward()
-        boxes = rut.decode(np.squeeze(loc, axis=0), priors, cfg['variance'])
-        boxes = boxes * scale
-        scores = np.squeeze(conf, axis=0)[:, 1]
-        landms = rut.decode_landm(np.squeeze(landms, axis=0), priors, cfg['variance'])
-        scale1 = np.array([input_data.shape[3], input_data.shape[2], input_data.shape[3], input_data.shape[2],
-                               input_data.shape[3], input_data.shape[2], input_data.shape[3], input_data.shape[2],
-                               input_data.shape[3], input_data.shape[2]])
-        landms = landms * scale1
-
-        # ignore low scores
-        inds = np.where(scores > CONFIDENCE_THRES)[0]
-        boxes = boxes[inds]
-        landms = landms[inds]
-        scores = scores[inds]
-
-        # keep top-K before NMS
-        order = scores.argsort()[::-1][:TOP_K]
-        boxes = boxes[order]
-        landms = landms[order]
-        scores = scores[order]
-
-        # do NMS
-        dets = np.hstack((boxes, scores[:, np.newaxis])).astype(np.float32, copy=False)
-        keep = rut.py_cpu_nms(dets, NMS_THRES)
-        dets = dets[keep, :]
-        landms = landms[keep]
-
-        # keep top-K faster NMS
-        dets = dets[:KEEP_TOP_K, :]
-        landms = landms[:KEEP_TOP_K, :]
-
-        detections = np.concatenate((dets, landms), axis=1)
+        detections = postprocessing(preds_ailia, input_data, cfg, dim)
 
         # generate detections
         savepath = get_savepath(args.savepath, image_path)
         logger.info(f'saved at : {savepath}')
         rut.plot_detections(org_img, detections, vis_thres=VIS_THRES, save_image_path=savepath)
 
-        
-        # for detection in detections:
-        #     if detection[4] >= VIS_THRES:
-        #         continue
-        #     rut.plot_detections(org_img, detection, save_image_path=savepath)
     logger.info('Script finished successfully.')
 
 
@@ -190,7 +195,6 @@ def recognize_from_video():
         dim = (IMAGE_WIDTH, IMAGE_HEIGHT)
         input_image = cv2.resize(frame, dim, interpolation = cv2.INTER_AREA)
 
-        scale = np.array([IMAGE_WIDTH, IMAGE_HEIGHT, IMAGE_WIDTH, IMAGE_HEIGHT])
         img = input_image - (104, 117, 123)
         input_data = img.transpose(2, 0, 1)
         input_data.shape = (1,) + input_data.shape
@@ -199,43 +203,9 @@ def recognize_from_video():
         preds_ailia = net.predict([input_data])
 
         # post-processing
-        loc, conf, landms = preds_ailia
-        priorbox = PriorBox(cfg, image_size=(IMAGE_HEIGHT, IMAGE_WIDTH))
-        priors = priorbox.forward()
-        boxes = rut.decode(np.squeeze(loc, axis=0), priors, cfg['variance'])
-        boxes = boxes * scale
-        scores = np.squeeze(conf, axis=0)[:, 1]
-        landms = rut.decode_landm(np.squeeze(landms, axis=0), priors, cfg['variance'])
-        scale1 = np.array([input_data.shape[3], input_data.shape[2], input_data.shape[3], input_data.shape[2],
-                               input_data.shape[3], input_data.shape[2], input_data.shape[3], input_data.shape[2],
-                               input_data.shape[3], input_data.shape[2]])
-        landms = landms * scale1
+        detections = postprocessing(preds_ailia, input_data, cfg, dim)
 
-        # ignore low scores
-        inds = np.where(scores > CONFIDENCE_THRES)[0]
-        boxes = boxes[inds]
-        landms = landms[inds]
-        scores = scores[inds]
-
-        # keep top-K before NMS
-        order = scores.argsort()[::-1][:TOP_K]
-        boxes = boxes[order]
-        landms = landms[order]
-        scores = scores[order]
-
-        # do NMS
-        dets = np.hstack((boxes, scores[:, np.newaxis])).astype(np.float32, copy=False)
-        keep = rut.py_cpu_nms(dets, NMS_THRES)
-        dets = dets[keep, :]
-        landms = landms[keep]
-
-        # keep top-K faster NMS
-        dets = dets[:KEEP_TOP_K, :]
-        landms = landms[:KEEP_TOP_K, :]
-
-        detections = np.concatenate((dets, landms), axis=1)
         rut.plot_detections(input_image, detections, vis_thres=VIS_THRES)
-
         cv2.imshow('frame', input_image)
 
         # save results
