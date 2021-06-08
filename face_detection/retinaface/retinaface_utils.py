@@ -138,7 +138,7 @@ def py_cpu_nms(dets, thresh):
 
     return keep
 
-def plot_detections(img_raw, dets, vis_thres , save_image_path):
+def plot_detections(img_raw, dets, vis_thres , save_image_path=None):
     for b in dets:
         if b[4] < vis_thres:
             continue
@@ -157,5 +157,6 @@ def plot_detections(img_raw, dets, vis_thres , save_image_path):
         cv2.circle(img_raw, (b[11], b[12]), 1, (0, 255, 0), 4)
         cv2.circle(img_raw, (b[13], b[14]), 1, (255, 0, 0), 4)
 
-    # save image
-    cv2.imwrite(save_image_path, img_raw)        
+    if save_image_path is not None:
+        # save image
+        cv2.imwrite(save_image_path, img_raw)        
