@@ -48,10 +48,6 @@ parser.add_argument(
     default=IMAGE_MAKEUP_PATH, type=str, metavar='IMAGE',
     help='Makeup image.'
 )
-parser.add_argument(
-    '-f', '--focus', action='store_true',
-    help='Outputs a face-focused image in video mode.'
-)
 args = update_parser(parser)
 
 
@@ -194,27 +190,25 @@ def recognize_from_image(net):
 def recognize_from_video(net, face_net):
     capture = webcamera_utils.get_capture(args.video)
 
-    img_B = load_image(args.image_makeup)
-    img_B = cv2.cvtColor(img_B, cv2.COLOR_BGRA2RGB)
-    img_B, _ = preprocess(img_B)
-
-    focus = args.focus
-
     # create video writer if savepath is specified as video format
-    if focus:
-        f_h = f_w = IMAGE_SIZE
-    else:
-        f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
+    f_h = f_w = IMAGE_SIZE
     if args.savepath != SAVE_IMAGE_PATH:
         logger.warning(
             'currently, video results cannot be output correctly...'
         )
-        writer = webcamera_utils.get_writer(args.savepath, f_h, f_w)
+        writer = webcamera_utils.get_writer(args.savepath, f_h, f_w*2)
     else:
         writer = None
 
-    res_img = np.ones((f_h, f_w, 3))
+    # create output buffer
+    res_img = np.ones((f_h, f_w*2, 3))
+
+    # get style image
+    img_B = load_image(args.image_makeup)
+    img_B = cv2.cvtColor(img_B, cv2.COLOR_BGRA2RGB)
+    img_B_style = cv2.cvtColor(cv2.resize(img_B,(f_w//4,f_h//4)),cv2.COLOR_RGB2BGR) 
+    img_B, _ = preprocess(img_B)
+
     while True:
         ret, frame = capture.read()
         if cv2.waitKey(1) & 0xFF == ord('q'):
@@ -222,28 +216,23 @@ def recognize_from_video(net, face_net):
         if not ret:
             continue
 
+        # face detect
         img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         img_A, (y, x) = face_detect(img, face_net)
+        
+        if not(img_A is None):
+            res_img[:,0:f_w,:] = cv2.cvtColor(cv2.resize(img_A,(f_w,f_h)),cv2.COLOR_RGB2BGR)
+            res_img[f_h//4*3:f_h,0:f_w//4,:] = img_B_style
 
-        if img_A is None:
-            if not focus:
-                res_img = frame
-        else:
             img_A, scale = preprocess(img_A)
 
             output = net.predict({'img_A': img_A, 'img_B': img_B})
             fake_A, fake_B = output
 
-            res_img = postprocess(fake_A[0])
-
-            if not focus:
-                h, w = res_img.shape[:2]
-                h, w = int(h / scale), int(w / scale)
-                res_img = cv2.resize(res_img, (w, h))
-                frame[y:y + h, x:x + w] = res_img
-                res_img = frame
+            res_img[:,f_w:f_w*2,:] = postprocess(fake_A[0])
 
         # save results
+        res_img = res_img.astype(np.uint8)
         if writer is not None:
             writer.write(res_img)
 

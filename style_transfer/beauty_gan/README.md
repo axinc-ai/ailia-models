@@ -45,13 +45,6 @@ If you pass `0` as an argument to VIDEO_PATH, you can use the webcam input inste
 $ python3 beauty_gan.py --video VIDEO_PATH --savepath SAVE_VIDEO_PATH
 ```
 
-In video mode, the output is for the entire input frame by default,
-but you can specify the `--focus` option to output with a face-focused image.
-
-```bash
-$ python3 beauty_gan.py --video VIDEO_PATH --focus
-```
-
 ## Reference
 
 - [BeautyGAN](https://github.com/wtjiang98/BeautyGAN_pytorch)
