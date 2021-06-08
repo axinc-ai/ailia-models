@@ -89,18 +89,10 @@ def recognize_from_image():
         dim = (IMAGE_WIDTH, IMAGE_HEIGHT)
         org_img = cv2.resize(org_img, dim, interpolation = cv2.INTER_AREA)
 
-        # IMAGE_HEIGHT, IMAGE_WIDTH = org_img.shape[:2]
         scale = np.array([IMAGE_WIDTH, IMAGE_HEIGHT, IMAGE_WIDTH, IMAGE_HEIGHT])
         img = org_img - (104, 117, 123)
         input_data = img.transpose(2, 0, 1)
         input_data.shape = (1,) + input_data.shape
-
-        # input_data = load_image(
-        #     image_path,
-        #     (IMAGE_HEIGHT, IMAGE_WIDTH),
-        #     normalize_type='127.5',
-        #     gen_input_ailia=True
-        # )
 
         # inference
         logger.info('Start inference...')
@@ -158,7 +150,7 @@ def recognize_from_image():
         # generate detections
         savepath = get_savepath(args.savepath, image_path)
         logger.info(f'saved at : {savepath}')
-        rut.plot_detections(org_img, detections, vis_thres=VIS_THRES , save_image_path=savepath)
+        rut.plot_detections(org_img, detections, vis_thres=VIS_THRES, save_image_path=savepath)
 
         
         # for detection in detections:
@@ -170,7 +162,12 @@ def recognize_from_image():
 
 def recognize_from_video():
     # net initialize
+    if args.arch == "mobile0.25":
+        cfg = rut.cfg_mnet
+    elif args.arch == "resnet50":
+        cfg = rut.cfg_re50
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
+    resize = args.rescale
 
     capture = webcamera_utils.get_capture(args.video)
 
@@ -187,26 +184,57 @@ def recognize_from_video():
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
 
-        input_image, input_data = webcamera_utils.preprocess_frame(
-            frame, IMAGE_HEIGHT, IMAGE_WIDTH, normalize_type='127.5'
-        )
+        # resize image
+        IMAGE_WIDTH = int(frame.shape[1] / resize)
+        IMAGE_HEIGHT = int(frame.shape[0] / resize)
+        dim = (IMAGE_WIDTH, IMAGE_HEIGHT)
+        input_image = cv2.resize(frame, dim, interpolation = cv2.INTER_AREA)
+
+        scale = np.array([IMAGE_WIDTH, IMAGE_HEIGHT, IMAGE_WIDTH, IMAGE_HEIGHT])
+        img = input_image - (104, 117, 123)
+        input_data = img.transpose(2, 0, 1)
+        input_data.shape = (1,) + input_data.shape
 
         # inference
-        input_blobs = net.get_input_blob_list()
-        net.set_input_blob_data(input_data, input_blobs[0])
-        net.update()
-        preds_ailia = net.get_results()
+        preds_ailia = net.predict([input_data])
 
-        # postprocessing
-        detections = but.postprocess(preds_ailia)
-        but.show_result(input_image, detections)
+        # post-processing
+        loc, conf, landms = preds_ailia
+        priorbox = PriorBox(cfg, image_size=(IMAGE_HEIGHT, IMAGE_WIDTH))
+        priors = priorbox.forward()
+        boxes = rut.decode(np.squeeze(loc, axis=0), priors, cfg['variance'])
+        boxes = boxes * scale
+        scores = np.squeeze(conf, axis=0)[:, 1]
+        landms = rut.decode_landm(np.squeeze(landms, axis=0), priors, cfg['variance'])
+        scale1 = np.array([input_data.shape[3], input_data.shape[2], input_data.shape[3], input_data.shape[2],
+                               input_data.shape[3], input_data.shape[2], input_data.shape[3], input_data.shape[2],
+                               input_data.shape[3], input_data.shape[2]])
+        landms = landms * scale1
 
-        # remove padding
-        dh = input_image.shape[0]
-        dw = input_image.shape[1]
-        sh = frame.shape[0]
-        sw = frame.shape[1]
-        input_image = input_image[(dh-sh)//2:(dh-sh)//2+sh,(dw-sw)//2:(dw-sw)//2+sw,:]
+        # ignore low scores
+        inds = np.where(scores > CONFIDENCE_THRES)[0]
+        boxes = boxes[inds]
+        landms = landms[inds]
+        scores = scores[inds]
+
+        # keep top-K before NMS
+        order = scores.argsort()[::-1][:TOP_K]
+        boxes = boxes[order]
+        landms = landms[order]
+        scores = scores[order]
+
+        # do NMS
+        dets = np.hstack((boxes, scores[:, np.newaxis])).astype(np.float32, copy=False)
+        keep = rut.py_cpu_nms(dets, NMS_THRES)
+        dets = dets[keep, :]
+        landms = landms[keep]
+
+        # keep top-K faster NMS
+        dets = dets[:KEEP_TOP_K, :]
+        landms = landms[:KEEP_TOP_K, :]
+
+        detections = np.concatenate((dets, landms), axis=1)
+        rut.plot_detections(input_image, detections, vis_thres=VIS_THRES)
 
         cv2.imshow('frame', input_image)
 
