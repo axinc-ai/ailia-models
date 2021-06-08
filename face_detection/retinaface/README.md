@@ -43,4 +43,5 @@ ONNX opset = 11
 ## Netron
 
 [retinaface_resnet50.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/retinaface/retinaface_resnet50.onnx.prototxt)
+
 [retinaface_mobile0.25.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/retinaface/retinaface_mobile0.25.onnx.prototxt)
