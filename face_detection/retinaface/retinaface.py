@@ -46,6 +46,11 @@ parser.add_argument(
     default='resnet50', choices=MODEL_LISTS,
     help='model lists: ' + ' | '.join(MODEL_LISTS)
 )
+parser.add_argument(
+    '-r', '--rescale', metavar='RESCALE',
+    default=1, choices=MODEL_LISTS,
+    help='scale down the original image size to prevent memory overflow, otherwise original size is used'
+)
 args = update_parser(parser)
 
 # ======================
@@ -69,7 +74,7 @@ def recognize_from_image():
     elif args.arch == "resnet50":
         cfg = rut.cfg_re50
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
-    resize = 4
+    resize = args.rescale
 
     # input image loop
     for image_path in args.input:
