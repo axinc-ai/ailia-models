@@ -238,9 +238,16 @@ def keep_aspect(top_left, bottom_right, pose_img, pose):
     shape = pose.get_input_shape()
     aspect = shape[2]/shape[3]
     ow = (px2-px1)
-    w = (py2-py1)/aspect
-    px1 = px1 - (w-ow)/2
-    px2 = px1 + w
+    oh = (py2-py1)
+    oaspect = oh/ow
+    if aspect <= oaspect:
+        w = oh/aspect
+        px1 = px1 - (w-ow)/2
+        px2 = px1 + w
+    else:
+        h = ow*aspect
+        py1 = py1 - (h-oh)/2
+        py2 = py1 + h
 
     px1 = int(px1)
     px2 = int(px2)
