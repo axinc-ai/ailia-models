@@ -91,7 +91,7 @@ def postprocess(pred, img_0, img_pad):
 
     vp = (h1 - h0) // 2
     hp = (w1 - w0) // 2
-    pred = pred[vp:vp + h0, hp:hp + h1]
+    pred = pred[vp:vp + h0, hp:hp + w0]
 
     pred = np.clip(pred, 0, 1)
 
