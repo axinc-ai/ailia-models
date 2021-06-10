@@ -106,6 +106,9 @@ def predict(input):
     return preds[1]
 
 def main():
+    # model files check and download
+    check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
+
     inputs = glob.glob("./input_images/*.PNG")
     for input in tqdm(inputs):
         basename = os.path.basename(input)
