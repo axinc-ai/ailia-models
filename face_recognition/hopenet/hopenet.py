@@ -109,6 +109,8 @@ class HeadPoseEstimator:
 
         # Head pose estimation
         input_hp_est, centers, theta = hut.head_pose_preprocess(img, detections, scale, padding)
+        if input_hp_est.shape[0]==0:
+            return [], []
         self.hp_estimator.set_input_shape(input_hp_est.shape)
         preds_hp = self.hp_estimator.predict([input_hp_est])
         head_poses = hut.head_pose_postprocess(preds_hp, theta)
@@ -175,23 +177,26 @@ class HeadPoseEstimator:
             Image with the head pose(s) drawn on it.
         """
         new_img = img.copy()
-        hp, c = head_poses[0], centers[0]
-        rot_mat = self._get_rot_mat('z', hp[0])
-        rot_mat = rot_mat @ self._get_rot_mat('y', hp[1])
-        rot_mat = rot_mat @ self._get_rot_mat('x', hp[2])
-        hp_vecs = rot_mat.T # Each row is rotated x, y, z respectively
-        
         if horizontal_flip:
             new_img = np.ascontiguousarray(new_img[:, ::-1])
-            hp_vecs[0, 1] *= -1
-            hp_vecs[1:, 0] *= -1
-            c[0] = new_img.shape[1] - c[0]
 
-        for i, vec in enumerate(hp_vecs):
-            tip = tuple((c + 100 * vec[:2]).astype(int))
-            color = [0, 0, 0]
-            color[i] = 255
-            cv2.arrowedLine(new_img, tuple(c.astype(int)), tip, tuple(color), thickness=2)
+        for i in range(len(head_poses)):
+            hp, c = head_poses[i], centers[i]
+            rot_mat = self._get_rot_mat('z', hp[0])
+            rot_mat = rot_mat @ self._get_rot_mat('y', hp[1])
+            rot_mat = rot_mat @ self._get_rot_mat('x', hp[2])
+            hp_vecs = rot_mat.T # Each row is rotated x, y, z respectively
+            
+            if horizontal_flip:
+                hp_vecs[0, 1] *= -1
+                hp_vecs[1:, 0] *= -1
+                c[0] = new_img.shape[1] - c[0]
+
+            for i, vec in enumerate(hp_vecs):
+                tip = tuple((c + 100 * vec[:2]).astype(int))
+                color = [0, 0, 0]
+                color[i] = 255
+                cv2.arrowedLine(new_img, tuple(c.astype(int)), tip, tuple(color), thickness=2)
         return new_img
     
     def predict_and_draw(self, img):
