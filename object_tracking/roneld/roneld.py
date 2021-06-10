@@ -4,7 +4,6 @@ import sys
 import cv2
 import glob
 import numpy as np
-from scipy.special import softmax
 
 from roneld_utils import roneld_lane_detection
 
