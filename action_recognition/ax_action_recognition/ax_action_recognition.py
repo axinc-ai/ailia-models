@@ -25,6 +25,7 @@ from image_utils import load_image  # noqa: E402
 from image_utils import normalize_image  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from utils import check_file_existance  # noqa: E402
+from utils import get_base_parser, update_parser  # noqa: E402
 
 from ax_action_recognition_util import pose_postprocess,TIME_RANGE,get_detector_result_lw_human_pose,draw_boxes,softmax
 sys.path.append('../../pose_estimation/pose_resnet')
@@ -35,7 +36,6 @@ from pose_resnet_util import compute,keep_aspect
 # ======================
 # Parameters 1
 # ======================
-SAVE_IMAGE_PATH = ""
 
 ALGORITHM = ailia.POSE_ALGORITHM_LW_HUMAN_POSE
 
@@ -64,15 +64,7 @@ FRAME_SKIP = True
 # ======================
 # Arguemnt Parser Config
 # ======================
-parser = argparse.ArgumentParser(
-    description='Fast and accurate human pose 2D-estimation.'
-)
-parser.add_argument(
-    '-v', '--video', metavar='VIDEO',
-    default=None,
-    help='The input video path. ' +
-         'If the VIDEO argument is set to 0, the webcam input will be used.'
-)
+parser = get_base_parser('Action recognition', None, None)
 parser.add_argument(
     '-n', '--normal',
     action='store_true',
@@ -85,22 +77,11 @@ parser.add_argument(
     help='model lists: ' + ' | '.join(MODEL_LISTS)
 )
 parser.add_argument(
-    '-s', '--savepath', metavar='SAVE_IMAGE_PATH',
-    default=SAVE_IMAGE_PATH,
-    help='Save path for the output image or video.'
-)
-parser.add_argument(
-    '-b', '--benchmark',
-    action='store_true',
-    help='Running the inference on the same input 5 times ' +
-         'to measure execution performance. (Cannot be used in video mode)'
-)
-parser.add_argument(
     '-f', '--fps',
     default=10,
     help='Input fps for the detection model'
 )
-args = parser.parse_args()
+args = update_parser(parser)
 
 POSE_KEY = [
     ailia.POSE_KEYPOINT_NOSE,
@@ -340,7 +321,7 @@ def recognize_from_video():
         writer = None
 
     # pose estimation
-    env_id = ailia.get_gpu_environment_id()
+    env_id = args.env_id
     print(f'env_id: {env_id}')
     if args.arch=="lw_human_pose":
         pose = ailia.PoseEstimator(
@@ -375,7 +356,7 @@ def recognize_from_video():
     )
 
     # action recognition
-    env_id = ailia.get_gpu_environment_id()
+    env_id = args.env_id
     print(f'env_id: {env_id}')
     model = ailia.Net(ACTION_MODEL_PATH, ACTION_WEIGHT_PATH, env_id=env_id)
 
