@@ -75,7 +75,7 @@ def resize_pad(img):
     padw1 = padw//2
     padw2 = padw//2 + padw % 2
     img1 = cv2.resize(img, (w1, h1))
-    img1 = np.pad(img1, ((padh1, padh2), (padw1, padw2), (0, 0)))
+    img1 = np.pad(img1, ((padh1, padh2), (padw1, padw2), (0, 0)), mode='constant')
     pad = (int(padh1 * scale), int(padw1 * scale))
     img2 = cv2.resize(img1, (128, 128))
     return img1, img2, scale, pad
