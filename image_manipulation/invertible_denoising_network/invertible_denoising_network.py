@@ -95,8 +95,7 @@ def predict(input):
         }
         preds = sess.run(None, inputs)
     else:
-        print('Sample for ailia is not implemented.')
-        exit()
+        print('Waiting SDK update.')
         net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
         preds = net.predict({
             'input': input.astype(np.float32),
