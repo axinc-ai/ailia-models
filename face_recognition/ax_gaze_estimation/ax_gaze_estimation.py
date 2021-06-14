@@ -6,7 +6,7 @@ import cv2
 import numpy as np
 
 import ailia
-import gaze_estimation_utils as gut
+import ax_gaze_estimation_utils as gut
 
 sys.path.append('../../util')
 from utils import get_base_parser, update_parser,get_savepath  # noqa: E402
@@ -106,8 +106,8 @@ else:
     IRIS_LM_MODEL_PATH = f'{IRIS_LM_MODEL_NAME}.opt.onnx.prototxt'
     HEAD_POSE_WEIGHT_PATH = f'{HEAD_POSE_MODEL_NAME}.opt.onnx'
     HEAD_POSE_MODEL_PATH = f'{HEAD_POSE_MODEL_NAME}.opt.onnx.prototxt'
-    GAZE_WEIGHT_PATH = f'{GAZE_MODEL_NAME}.opt.onnx'
-    GAZE_MODEL_PATH = f'{GAZE_MODEL_NAME}.opt.onnx.prototxt'
+    GAZE_WEIGHT_PATH = f'{GAZE_MODEL_NAME}.opt.obf.onnx'
+    GAZE_MODEL_PATH = f'{GAZE_MODEL_NAME}.opt.obf.onnx.prototxt'
 FACE_DET_REMOTE_PATH = f'https://storage.googleapis.com/ailia-models/{FACE_DET_MODEL_NAME}/'
 FACE_LM_REMOTE_PATH = f'https://storage.googleapis.com/ailia-models/{FACE_LM_MODEL_NAME}/'
 IRIS_LM_REMOTE_PATH = f'https://storage.googleapis.com/ailia-models/mediapipe_{IRIS_LM_MODEL_NAME}/'
@@ -244,9 +244,11 @@ class GazeEstimator:
             with time_execution('\t\t\tpreprocessing'):
                 gaze_input_blob = self.gaze_estimator.get_input_blob_list()
                 gaze_input1 = np.moveaxis(face_imgs, 1, -1)
+                self.gaze_estimator.set_input_blob_shape(gaze_input1.shape, gaze_input_blob[0])
                 self.gaze_estimator.set_input_blob_data(gaze_input1, gaze_input_blob[0])
                 if self.include_head_pose:
                     gaze_input2 = hps
+                    self.gaze_estimator.set_input_blob_shape(gaze_input2.shape, gaze_input_blob[1])
                     self.gaze_estimator.set_input_blob_data(gaze_input2, gaze_input_blob[1])
             with time_execution('\t\tGaze estimation'):
                 self.gaze_estimator.update()
