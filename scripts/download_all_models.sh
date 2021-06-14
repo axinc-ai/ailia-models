@@ -40,6 +40,7 @@ cd ../../face_recognition/prnet; python3 prnet.py ${OPTION}
 cd ../../face_recognition/facemesh; python3 facemesh.py ${OPTION}
 cd ../../face_recognition/mediapipe_iris; python3 mediapipe_iris.py ${OPTION}
 cd ../../face_recognition/hopenet; python3 hopenet.py ${OPTION}
+cd ../../face_recognition/ax_gaze_estimation; python3 ax_gaze_estimation.py ${OPTION}
 cd ../../frame_interpolation/flavr; python3 flavr.py ${OPTION}
 cd ../../generative_adversarial_networks/council-GAN; python3 council-gan.py --glasses ${OPTION}
 cd ../../generative_adversarial_networks/council-GAN; python3 council-gan.py --m2f ${OPTION}
