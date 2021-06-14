@@ -46,7 +46,7 @@ parser = get_base_parser(
     SAVE_IMAGE_PATH,
 )
 parser.add_argument(
-    '-m', '--model_type', metavar='ARCH',
+    '-m', '--model', metavar='ARCH',
     default='full', choices=MODEL_LIST,
     help='Set model architecture: ' + ' | '.join(MODEL_LIST)
 )
@@ -297,7 +297,7 @@ def main():
         'full': (WEIGHT_FULL_PATH, MODEL_FULL_PATH),
         'heavy': (WEIGHT_HEAVY_PATH, MODEL_HEAVY_PATH),
     }
-    weight_path, model_path = info[args.model_type]
+    weight_path, model_path = info[args.model]
     check_and_download_models(weight_path, model_path, REMOTE_PATH)
 
     # load model
