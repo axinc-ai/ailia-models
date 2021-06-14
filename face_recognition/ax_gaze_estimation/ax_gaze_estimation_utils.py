@@ -1,7 +1,10 @@
 import cv2
 import numpy as np
-from scipy.special import expit, softmax
+from scipy.special import expit
 
+import sys
+sys.path.append('../../util')
+from math_utils import softmax
 
 num_coords = 16
 x_scale = 128.0
