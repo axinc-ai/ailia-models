@@ -143,7 +143,6 @@ class GazeEstimator:
         include_head_pose : bool, optional
             Estimate the gaze with or without head pose information.
         """
-
         self.include_iris = include_iris
         self.include_head_pose = include_head_pose
         # net initialize
@@ -194,7 +193,6 @@ class GazeEstimator:
             Centers (x, y) of the cropped face image(s). Used for drawing the
             head pose(s).
         """
-
         gazes_vec = None
         gaze_centers = None
         eyes_iris = None
@@ -293,7 +291,6 @@ class GazeEstimator:
         img_draw : NumPy array
             Image with the gaze(s) and landmarks (and head pose(s)) drawn on it.
         """
-
         with time_execution('\t\tDrawing'):
             img_draw = img.copy()
             if eyes_iris is not None and draw_iris:
@@ -330,7 +327,6 @@ class GazeEstimator:
         draw_head_pose : bool, optional
             Whether to draw the head pose(s) or not.
         """
-
         preds = self.predict(img, gazes_only=False)
         if preds[0] is not None:
             img_draw = self.draw(img, *preds, draw_iris=draw_iris,

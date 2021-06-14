@@ -478,7 +478,6 @@ def face_lm_postprocess(landmarks, affines):
     eye_centers: NumPy array
         Estimated eye centers.
     """
-
     landmarks_ = landmarks.copy()
     landmarks_ = denormalize_landmarks(landmarks_ / resolution, affines)
 
@@ -782,7 +781,6 @@ def draw_gazes(img, gazes, pupil_centers, horizontal_flip=False, base_color='r',
     thickness : int, optional
         Thickness of the gaze vector.
     """
-
     if horizontal_flip:
         gazes_draw = gazes.copy()
         gazes_draw[:, 0] *= -1
