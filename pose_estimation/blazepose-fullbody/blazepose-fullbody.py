@@ -65,20 +65,24 @@ def preprocess(img):
     return img
 
 
-def postprocess(normalized_landmarks):
-    num = len(normalized_landmarks)
-    landmarks = np.zeros((num, 33, 4))
+def sigmoid(x):
+    return 1.0 / (1.0 + np.exp(-x))
+
+
+def postprocess(landmarks):
+    num = len(landmarks)
+    normalized_landmarks = np.zeros((num, 33, 4))
     for i in range(num):
-        xx = normalized_landmarks[i]
+        xx = landmarks[i]
         for j in range(33):
             x = xx[j * 5] / IMAGE_SIZE
             y = xx[j * 5 + 1] / IMAGE_SIZE
             z = xx[j * 5 + 2] / IMAGE_SIZE
             visibility = xx[j * 5 + 3]
             presence = xx[j * 5 + 3]
-            landmarks[i, j] = (x, y, z, min(visibility, presence))
+            normalized_landmarks[i, j] = (x, y, z, sigmoid(min(visibility, presence)))
 
-    return landmarks
+    return normalized_landmarks
 
 
 def pose_estimate(net, img):
