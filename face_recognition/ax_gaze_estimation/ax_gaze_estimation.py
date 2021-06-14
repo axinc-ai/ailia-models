@@ -6,7 +6,7 @@ import cv2
 import numpy as np
 
 import ailia
-import gaze_estimation_utils as gut
+import ax_gaze_estimation_utils as gut
 
 sys.path.append('../../util')
 from utils import get_base_parser, update_parser,get_savepath  # noqa: E402
