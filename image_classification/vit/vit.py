@@ -215,7 +215,7 @@ def recognize_from_video():
     # capture video
     capture = webcamera_utils.get_capture(args.video)
     # create video writer if savepath is specified as video format
-    if args.savepath is not None:
+    if (args.savepath is not None) & (args.savepath.split('.')[-1] == 'mp4'):
         writer = webcamera_utils.get_writer(args.savepath,
                                             FIGURE_HEIGHT, FIGURE_WIDTH)
     else:
