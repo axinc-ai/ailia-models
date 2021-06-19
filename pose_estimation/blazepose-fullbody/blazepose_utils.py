@@ -336,10 +336,11 @@ def detection2roi(detection, detection2roi_method='alignment'):
 
     """
     # mediapipe/modules/pose_landmark/pose_detection_to_roi.pbtxt
-    kp1 = 2
-    kp2 = 3
+    kp1 = 0
+    kp2 = 1
     theta0 = 90 * np.pi / 180
-    dscale = 1.5
+    # dscale = 1.5
+    dscale = 1.1
     dy = 0.
 
     if detection2roi_method == 'box':
