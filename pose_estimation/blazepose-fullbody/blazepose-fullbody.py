@@ -29,6 +29,8 @@ WEIGHT_FULL_PATH = 'pose_landmark_full.onnx'
 MODEL_FULL_PATH = 'pose_landmark_full.onnx.prototxt'
 WEIGHT_HEAVY_PATH = 'pose_landmark_heavy.onnx'
 MODEL_HEAVY_PATH = 'pose_landmark_heavy.onnx.prototxt'
+WEIGHT_DETECTOR_PATH = 'pose_detection.onnx'
+MODEL_DETECTOR_PATH = 'pose_detection.onnx.prototxt'
 REMOTE_PATH = \
     'https://storage.googleapis.com/ailia-models/blazepose-fullbody/'
 
@@ -44,6 +46,10 @@ parser = get_base_parser(
     'BlazePose, an on-device real-time body pose tracking.',
     IMAGE_PATH,
     SAVE_IMAGE_PATH,
+)
+parser.add_argument(
+    '-d', '--detect', action='store_true',
+    help='Use human detector'
 )
 parser.add_argument(
     '-m', '--model', metavar='ARCH',
@@ -85,20 +91,52 @@ def postprocess(landmarks):
     return normalized_landmarks
 
 
-def pose_estimate(net, img):
+def pose_estimate(net, det_net, img):
     h, w = img.shape[:2]
-
-    img = preprocess(img)
+    src_img = img
 
     logger.debug(f'input image shape: {img.shape}')
 
-    output = net.predict([img])
-    normalized_landmarks, flags, _, _, _ = output
-    normalized_landmarks = postprocess(normalized_landmarks)
+    if det_net:
+        _, img224, scale, pad = but.resize_pad(img)
+        img224 = img224.astype('float32') / 255.
+        img224 = np.expand_dims(img224, axis=0)
 
-    landmarks = np.zeros_like(normalized_landmarks)
-    landmarks[:, :, 0] = normalized_landmarks[:, :, 0] * w
-    landmarks[:, :, 1] = normalized_landmarks[:, :, 1] * h
+        detector_out = det_net.predict([img224])
+        detections = but.detector_postprocess(detector_out)
+        count = len(detections) if detections[0].size != 0 else 0
+
+        # Pose estimation
+        imgs = []
+        if 0 < count:
+            imgs, affine, _ = but.estimator_preprocess(
+                src_img, detections, scale, pad
+            )
+
+        flags = []
+        landmarks = []
+        for i, img in enumerate(imgs):
+            img = np.expand_dims(img, axis=0)
+            output = net.predict([img])
+
+            normalized_landmarks, f, _, _, _ = output
+            normalized_landmarks = postprocess(normalized_landmarks)
+
+            flags.append(f[0])
+            landmarks.append(normalized_landmarks[0])
+
+        landmarks = np.stack(landmarks)
+        landmarks = but.denormalize_landmarks(landmarks, affine)
+    else:
+        img = preprocess(img)
+        output = net.predict([img])
+
+        normalized_landmarks, flags, _, _, _ = output
+        normalized_landmarks = postprocess(normalized_landmarks)
+
+        landmarks = np.zeros_like(normalized_landmarks)
+        landmarks[:, :, 0] = normalized_landmarks[:, :, 0] * w
+        landmarks[:, :, 1] = normalized_landmarks[:, :, 1] * h
 
     return flags, landmarks
 
@@ -212,7 +250,7 @@ def display_result(img, landmarks, flags):
 # Main functions
 # ======================
 
-def recognize_from_image(net):
+def recognize_from_image(net, det_net):
     # input image loop
     for image_path in args.input:
         # prepare input data
@@ -241,7 +279,7 @@ def recognize_from_image(net):
             logger.info(f'\taverage time estimation {total_time_estimation / (args.benchmark_count - 1)} ms')
         else:
             # inference
-            flags, landmarks = pose_estimate(net, img)
+            flags, landmarks = pose_estimate(net, det_net, img)
 
         # plot result
         src_img = cv2.cvtColor(src_img, cv2.COLOR_BGRA2BGR)
@@ -292,6 +330,10 @@ def recognize_from_video(net):
 
 def main():
     # model files check and download
+    if args.detect:
+        logger.info('=== detector model ===')
+        check_and_download_models(WEIGHT_DETECTOR_PATH, MODEL_DETECTOR_PATH, REMOTE_PATH)
+    logger.info('=== blazepose model ===')
     info = {
         'lite': (WEIGHT_LITE_PATH, MODEL_LITE_PATH),
         'full': (WEIGHT_FULL_PATH, MODEL_FULL_PATH),
@@ -305,6 +347,10 @@ def main():
     logger.info(f'env_id: {env_id}')
 
     # initialize
+    if args.detect:
+        det_net = ailia.Net(MODEL_DETECTOR_PATH, WEIGHT_DETECTOR_PATH, env_id=env_id)
+    else:
+        det_net = None
     net = ailia.Net(model_path, weight_path, env_id=env_id)
 
     if args.video is not None:
@@ -312,7 +358,7 @@ def main():
         recognize_from_video(net)
     else:
         # image mode
-        recognize_from_image(net)
+        recognize_from_image(net, det_net)
 
 
 if __name__ == '__main__':
