@@ -48,7 +48,7 @@ parser = get_base_parser(
     SAVE_IMAGE_PATH,
 )
 parser.add_argument(
-    '-d', '--detect', action='store_true',
+    '-d', '--detector', action='store_true',
     help='Use human detector'
 )
 parser.add_argument(
@@ -105,6 +105,17 @@ def pose_estimate(net, det_net, img):
         detector_out = det_net.predict([img224])
         detections = but.detector_postprocess(detector_out)
         count = len(detections) if detections[0].size != 0 else 0
+        # d = detections[0][0]
+        # y, x, y1, x1 = [int(i) for i in d[:4] * 128]
+        # p0_x, p0_y, p1_x, p1_y, p2_x, p2_y, p3_x, p3_y = [int(i) for i in d[4:12] * 128]
+        # img = input_data[0].transpose(1, 2, 0)[:,:,::-1]*255
+        # cv2.rectangle(img, (x, y), (x1, y1), (0,255,0),3)
+        # cv2.circle(img, (p0_x, p0_y), 4, (0,255,0), -1)
+        # cv2.circle(img, (p1_x, p1_y), 4, (0,255,0), -1)
+        # cv2.circle(img, (p2_x, p2_y), 4, (0,255,0), -1)
+        # cv2.circle(img, (p3_x, p3_y), 4, (0,255,0), -1)
+        # cv2.imwrite("hoge.png", img)
+        # 1/0
 
         # Pose estimation
         imgs = []
@@ -118,6 +129,8 @@ def pose_estimate(net, det_net, img):
         for i, img in enumerate(imgs):
             img = np.expand_dims(img, axis=0)
             output = net.predict([img])
+            # cv2.imwrite("hoge.png", img[0].transpose(1, 2, 0) * 255)
+            # 1 / 0
 
             normalized_landmarks, f, _, _, _ = output
             normalized_landmarks = postprocess(normalized_landmarks)
@@ -330,7 +343,7 @@ def recognize_from_video(net):
 
 def main():
     # model files check and download
-    if args.detect:
+    if args.detector:
         logger.info('=== detector model ===')
         check_and_download_models(WEIGHT_DETECTOR_PATH, MODEL_DETECTOR_PATH, REMOTE_PATH)
     logger.info('=== blazepose model ===')
@@ -347,7 +360,7 @@ def main():
     logger.info(f'env_id: {env_id}')
 
     # initialize
-    if args.detect:
+    if args.detector:
         det_net = ailia.Net(MODEL_DETECTOR_PATH, WEIGHT_DETECTOR_PATH, env_id=env_id)
     else:
         det_net = None
