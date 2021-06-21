@@ -53,7 +53,7 @@ parser.add_argument(
 )
 parser.add_argument(
     '-m', '--model', metavar='ARCH',
-    default='full', choices=MODEL_LIST,
+    default='heavy', choices=MODEL_LIST,
     help='Set model architecture: ' + ' | '.join(MODEL_LIST)
 )
 args = update_parser(parser)
@@ -280,7 +280,7 @@ def recognize_from_image(net, det_net):
             for i in range(args.benchmark_count):
                 # Pose estimation
                 start = int(round(time.time() * 1000))
-                flags, landmarks = pose_estimate(net, img)
+                flags, landmarks = pose_estimate(net, det_net, img)
                 end = int(round(time.time() * 1000))
                 estimation_time = (end - start)
 
@@ -306,7 +306,7 @@ def recognize_from_image(net, det_net):
     logger.info('Script finished successfully.')
 
 
-def recognize_from_video(net):
+def recognize_from_video(net, det_net):
     capture = webcamera_utils.get_capture(args.video)
 
     # create video writer if savepath is specified as video format
@@ -323,7 +323,8 @@ def recognize_from_video(net):
             break
 
         # inference
-        flags, landmarks = pose_estimate(net, frame)
+        frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        flags, landmarks = pose_estimate(net, det_net, frame_rgb)
 
         # plot result
         display_result(frame, landmarks, flags)
@@ -368,7 +369,7 @@ def main():
 
     if args.video is not None:
         # video mode
-        recognize_from_video(net)
+        recognize_from_video(net, det_net)
     else:
         # image mode
         recognize_from_image(net, det_net)
