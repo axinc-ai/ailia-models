@@ -48,6 +48,12 @@ parser.add_argument(
     help='The input model path.' +
          'you can set B_16 to select ViT-B_16'
 )
+parser.add_argument(
+    '-n', '--onnx', 
+    action='store_true',
+    default=False,
+    help='Use onnxruntime'
+)
 args = update_parser(parser)
 
 
@@ -153,8 +159,10 @@ def visualize_result(image, mask, probs, labels):
 # ======================
 def recognize_from_image():
     # provisional until equivalence verification
-    # classifier = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
-    ort_session = onnxruntime.InferenceSession(WEIGHT_PATH)
+    if args.onnx:
+        ort_session = onnxruntime.InferenceSession(WEIGHT_PATH)
+    else:
+        classifier = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
     # adjust prediction label
     labels = np.array(vit_labels.imagenet_category)
 
@@ -172,14 +180,20 @@ def recognize_from_image():
             for i in range(args.benchmark_count):
                 start = int(round(time.time() * 1000))
                 # compute ONNX Runtime output prediction
-                ort_inputs = {ort_session.get_inputs()[0].name: input_data}
-                ort_outs = ort_session.run(None, ort_inputs)
+                if args.onnx:
+                    ort_inputs = {ort_session.get_inputs()[0].name: input_data}
+                    ort_outs = ort_session.run(None, ort_inputs)
+                else:
+                    ort_outs = classifier.run(input_data)
                 end = int(round(time.time() * 1000))
                 logger.info(f'\tailia processing time {end - start} ms')
         else:
             # compute ONNX Runtime output prediction
-            ort_inputs = {ort_session.get_inputs()[0].name: input_data}
-            ort_outs = ort_session.run(None, ort_inputs)
+            if args.onnx:
+                ort_inputs = {ort_session.get_inputs()[0].name: input_data}
+                ort_outs = ort_session.run(None, ort_inputs)
+            else:
+                ort_outs = classifier.run(input_data)
 
         # pick up logits and attention map
         logits = ort_outs[0]
@@ -207,8 +221,10 @@ def recognize_from_image():
 
 def recognize_from_video():
     # provisional until equivalence verification
-    # classifier = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
-    ort_session = onnxruntime.InferenceSession(WEIGHT_PATH)
+    if args.onnx:
+        ort_session = onnxruntime.InferenceSession(WEIGHT_PATH)
+    else:
+        classifier = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
     # adjust prediction label
     labels = np.array(vit_labels.imagenet_category)
 
@@ -232,8 +248,11 @@ def recognize_from_video():
         input_data = prep_input(frame)
 
         # compute ONNX Runtime output prediction
-        ort_inputs = {ort_session.get_inputs()[0].name: input_data}
-        ort_outs = ort_session.run(None, ort_inputs)
+        if args.onnx:
+            ort_inputs = {ort_session.get_inputs()[0].name: input_data}
+            ort_outs = ort_session.run(None, ort_inputs)
+        else:
+            ort_outs = classifier.run(input_data)
 
         # pick up logits and attention map
         logits = ort_outs[0]
