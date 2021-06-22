@@ -1,9 +1,5 @@
-import numpy as np
-
-import dataloaders.transforms as transforms
 from dataloaders.dataloader import MyDataloader
-
-iheight, iwidth = 480, 640  # raw image size
+from dataloaders.utils import val_transform
 
 
 class NYUDataset(MyDataloader):
@@ -33,16 +29,4 @@ class NYUDataset(MyDataloader):
             )
 
     def val_transform(self, rgb, depth_np):
-        transform = transforms.Compose(
-            [
-                transforms.Resize((int(iwidth * (250.0 / iheight)), 250)),
-                transforms.CenterCrop((228, 304)),
-                transforms.Resize(self.output_size),
-            ]
-        )
-        rgb_np = transform(rgb)
-        rgb_np = np.asfarray(rgb_np, dtype="float") / 255
-        if depth_np is not None:
-            depth_np = transform(depth_np)
-
-        return rgb_np, depth_np
+        return val_transform(rgb, depth_np, self.output_size)

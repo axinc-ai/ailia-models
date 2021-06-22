@@ -1,6 +1,5 @@
-import sys
-
 import os
+import sys
 import time
 
 import cv2
@@ -10,6 +9,7 @@ from PIL import Image
 import ailia
 from dataloaders.dataloader import MyDataloader
 from dataloaders.nyu import NYUDataset
+from dataloaders.utils import val_transform
 from metrics import AverageMeter, Result
 import utils_misc
 
@@ -38,6 +38,7 @@ SAVE_IMAGE_PATH = "img"
 IMAGE_PATH = "data/img/00001.png"
 DEPTH_MIN = 0  # In meters.
 DEPTH_MAX = 5  # In meters.
+OUTPUT_SIZE = (224, 224)
 
 # ======================
 # Argument Parser Config
@@ -77,17 +78,17 @@ args = update_parser(parser)
 # ======================
 # Main functions
 # ======================
-def _make_dataset(img, transformer):
-    input_np, _ = transformer.val_transform(img, None)
+def _make_dataset(img):
+    input_np, _ = val_transform(img, None, OUTPUT_SIZE)
     input_tensor = input_np.transpose((2, 0, 1)).copy()
     while input_tensor.ndim < 3:
         input_tensor = np.expand_dims(input_tensor, 0)
     return [np.expand_dims(input_tensor, 0)]
 
 
-def _prepare_data(args, frame=None, transformer=None):
+def _prepare_data(args, frame=None):
     if args.video is not None:
-        return _make_dataset(frame, transformer)
+        return _make_dataset(frame)
     else:
         if args.validation_mode:
             # Data loading code
@@ -104,8 +105,7 @@ def _prepare_data(args, frame=None, transformer=None):
             path = os.path.join(".", IMAGE_PATH)
             with Image.open(path) as im:
                 rgb = np.asarray(im)
-            transformer = NYUDataset("./data", split="val", modality=args.modality)
-            return _make_dataset(rgb, transformer)
+            return _make_dataset(rgb)
 
 
 def _initialize_net(args):
@@ -225,9 +225,6 @@ def transfer_to_video():
     # Initialize net.
     net = _initialize_net(args)
 
-    # Initialize transformer.
-    transformer = NYUDataset("./data", split="val", modality=args.modality)
-
     capture = get_capture(args.video)
 
     while True:
@@ -238,7 +235,7 @@ def transfer_to_video():
         # Prepare input data.
         frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         frame = cut_max_square(frame)
-        dataset = _prepare_data(args, frame, transformer)
+        dataset = _prepare_data(args, frame)
 
         # Inference
         depth_pred_col = _estimate(dataset[0], net)
