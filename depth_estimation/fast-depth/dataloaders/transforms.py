@@ -1,18 +1,14 @@
-from __future__ import division
-
-from PIL import Image, ImageEnhance
-
 try:
     import accimage
 except ImportError:
     accimage = None
 
-import numpy as np
-import numbers
-import types
 import collections
-
+import numbers
+import numpy as np
+from PIL import Image, ImageEnhance
 import scipy.ndimage.interpolation as itpl
+import types
 
 
 def _is_numpy_image(img):
@@ -39,7 +35,7 @@ def adjust_brightness(img, brightness_factor):
         PIL Image: Brightness adjusted image.
     """
     if not _is_pil_image(img):
-        raise TypeError("img should be PIL Image. Got {}".format(type(img)))
+        raise TypeError(f"img should be PIL Image. Got {type(img)}.")
 
     enhancer = ImageEnhance.Brightness(img)
     img = enhancer.enhance(brightness_factor)
@@ -59,7 +55,7 @@ def adjust_contrast(img, contrast_factor):
         PIL Image: Contrast adjusted image.
     """
     if not _is_pil_image(img):
-        raise TypeError("img should be PIL Image. Got {}".format(type(img)))
+        raise TypeError(f"img should be PIL Image. Got {type(img)}.")
 
     enhancer = ImageEnhance.Contrast(img)
     img = enhancer.enhance(contrast_factor)
@@ -79,7 +75,7 @@ def adjust_saturation(img, saturation_factor):
         PIL Image: Saturation adjusted image.
     """
     if not _is_pil_image(img):
-        raise TypeError("img should be PIL Image. Got {}".format(type(img)))
+        raise TypeError(f"img should be PIL Image. Got {type(img)}.")
 
     enhancer = ImageEnhance.Color(img)
     img = enhancer.enhance(saturation_factor)
@@ -110,10 +106,10 @@ def adjust_hue(img, hue_factor):
         PIL Image: Hue adjusted image.
     """
     if not (-0.5 <= hue_factor <= 0.5):
-        raise ValueError("hue_factor is not in [-0.5, 0.5].".format(hue_factor))
+        raise ValueError(f"hue_factor {hue_factor} is not in [-0.5, 0.5].")
 
     if not _is_pil_image(img):
-        raise TypeError("img should be PIL Image. Got {}".format(type(img)))
+        raise TypeError(f"img should be PIL Image. Got {type(img)}.")
 
     input_mode = img.mode
     if input_mode in {"L", "1", "I", "F"}:
@@ -149,7 +145,7 @@ def adjust_gamma(img, gamma, gain=1):
         gain (float): The constant multiplier.
     """
     if not _is_pil_image(img):
-        raise TypeError("img should be PIL Image. Got {}".format(type(img)))
+        raise TypeError(f"img should be PIL Image. Got {type(img)}.")
 
     if gamma < 0:
         raise ValueError("Gamma should be a non-negative real number")
@@ -211,7 +207,7 @@ class NormalizeNumpyArray(object):
             Tensor: Normalized image.
         """
         if not (_is_numpy_image(img)):
-            raise TypeError("img should be ndarray. Got {}".format(type(img)))
+            raise TypeError(f"img should be ndarray. Got {type(img)}.")
         # TODO: make efficient
         for i in range(3):
             img[:, :, i] = (img[:, :, i] - self.mean[i]) / self.std[i]
@@ -275,7 +271,7 @@ class Resize(object):
             return np.array(Image.fromarray(img).resize(self.size, self.interpolation))
         else:
             RuntimeError(
-                "img should be ndarray with 2 or 3 dimensions. Got {}".format(img.ndim)
+                f"img should be ndarray with 2 or 3 dimensions. Got {img.ndim}."
             )
 
 
@@ -334,14 +330,14 @@ class CenterCrop(object):
         w: Width of the cropped image.
         """
         if not (_is_numpy_image(img)):
-            raise TypeError("img should be ndarray. Got {}".format(type(img)))
+            raise TypeError(f"img should be ndarray. Got {type(img)}.")
         if img.ndim == 3:
             return img[i : i + h, j : j + w, :]
         elif img.ndim == 2:
             return img[i : i + h, j : j + w]
         else:
             raise RuntimeError(
-                "img should be ndarray with 2 or 3 dimensions. Got {}".format(img.ndim)
+                f"img should be ndarray with 2 or 3 dimensions. Got {img.ndim}."
             )
 
 
@@ -400,14 +396,14 @@ class BottomCrop(object):
         w: Width of the cropped image.
         """
         if not (_is_numpy_image(img)):
-            raise TypeError("img should be ndarray. Got {}".format(type(img)))
+            raise TypeError(f"img should be ndarray. Got {type(img)}.")
         if img.ndim == 3:
             return img[i : i + h, j : j + w, :]
         elif img.ndim == 2:
             return img[i : i + h, j : j + w]
         else:
             raise RuntimeError(
-                "img should be ndarray with 2 or 3 dimensions. Got {}".format(img.ndim)
+                f"img should be ndarray with 2 or 3 dimensions. Got {img.ndim}."
             )
 
 
@@ -446,7 +442,7 @@ class HorizontalFlip(object):
             img (numpy.ndarray (C x H x W)): flipped image.
         """
         if not (_is_numpy_image(img)):
-            raise TypeError("img should be ndarray. Got {}".format(type(img)))
+            raise TypeError(f"img should be ndarray. Got {type(img)}.")
 
         if self.do_flip:
             return np.fliplr(img)
@@ -523,7 +519,7 @@ class ColorJitter(object):
             img (numpy.ndarray (C x H x W)): Color jittered image.
         """
         if not (_is_numpy_image(img)):
-            raise TypeError("img should be ndarray. Got {}".format(type(img)))
+            raise TypeError(f"img should be ndarray. Got {type(img)}.")
 
         pil = Image.fromarray(img)
         transform = self.get_params(
@@ -563,17 +559,17 @@ class Crop(object):
         i, j, h, w = self.i, self.j, self.h, self.w
 
         if not (_is_numpy_image(img)):
-            raise TypeError("img should be ndarray. Got {}".format(type(img)))
+            raise TypeError(f"img should be ndarray. Got {type(img)}.")
         if img.ndim == 3:
             return img[i : i + h, j : j + w, :]
         elif img.ndim == 2:
             return img[i : i + h, j : j + w]
         else:
             raise RuntimeError(
-                "img should be ndarray with 2 or 3 dimensions. Got {}".format(img.ndim)
+                f"img should be ndarray with 2 or 3 dimensions. Got {img.ndim}."
             )
 
     def __repr__(self):
-        return self.__class__.__name__ + "(i={0},j={1},h={2},w={3})".format(
-            self.i, self.j, self.h, self.w
+        return (
+            self.__class__.__name__ + f"(i={self.i},j={self.j},h={self.h},w={self.w})"
         )

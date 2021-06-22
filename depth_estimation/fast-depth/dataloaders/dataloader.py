@@ -49,7 +49,7 @@ class MyDataloader(object):
     def __init__(self, root, split, modality="rgb", loader=h5_loader):
         classes, class_to_idx = self.find_classes(root)
         imgs = self.make_dataset(root, class_to_idx)
-        assert len(imgs) > 0, "Found 0 images in subfolders of: " + root + "\n"
+        assert len(imgs) > 0, f"Found 0 images in subfolders of: {root}\n"
         self.root = root
         self.imgs = imgs
         self.classes = classes
@@ -63,19 +63,15 @@ class MyDataloader(object):
         else:
             raise (
                 RuntimeError(
-                    "Invalid dataset split: " + split + "\n"
+                    f"Invalid dataset split: {split}\n"
                     "Supported dataset splits are: train, val"
                 )
             )
         self.loader = loader
 
-        assert modality in self.modality_names, (
-            "Invalid modality split: "
-            + modality
-            + "\n"
-            + "Supported dataset splits are: "
-            + "".join(self.modality_names)
-        )
+        assert (
+            modality in self.modality_names
+        ), f"Invalid modality split: {modality}\nSupported dataset splits are: {''.join(self.modality_names)}"
         self.modality = modality
 
     def train_transform(self, rgb, depth):

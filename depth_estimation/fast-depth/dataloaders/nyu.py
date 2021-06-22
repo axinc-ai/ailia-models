@@ -23,7 +23,7 @@ class NYUDataset(MyDataloader):
         else:
             raise (
                 RuntimeError(
-                    "Invalid dataset split: " + self.split + "\n"
+                    f"Invalid dataset split: {self.split}\n"
                     "Supported dataset splits are: train, val"
                 )
             )

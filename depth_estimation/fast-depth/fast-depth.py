@@ -160,7 +160,7 @@ def _validate(val_loader, model, args):
         if (i + 1) % PRINT_FREQ == 0:
             logger.info(
                 "Test: [{0}/{1}]\t"
-                "t_CPU={cpu_time:.3f}({average.gpu_time:.3f})\n\t"
+                "t_CPU={cpu_time:.3f}({average.cpu_time:.3f})\n\t"
                 "RMSE={result.rmse:.2f}({average.rmse:.2f}) "
                 "MAE={result.mae:.2f}({average.mae:.2f}) "
                 "Delta1={result.delta1:.3f}({average.delta1:.3f}) "
