@@ -131,6 +131,7 @@ def _estimate(img, model):
 def _validate(val_loader, model, args):
     average_meter = AverageMeter()
     end = time.time()
+    img_merge = None
     for i, (img, target) in enumerate(val_loader):
         data_time = time.time() - end
 
@@ -148,14 +149,15 @@ def _validate(val_loader, model, args):
         if args.modality == "rgb":
             rgb = img
 
-        if i == 0:
-            img_merge = utils_misc.merge_into_row(rgb, target, pred)
-        elif i < 8:
-            row = utils_misc.merge_into_row(rgb, target, pred)
-            img_merge = utils_misc.add_row(img_merge, row)
-        elif i == 8:
-            filename = args.savepath + "/comparison_" + args.data + ".png"
-            utils_misc.save_image(img_merge, filename)
+        if not args.benchmark:
+            if i == 0:
+                img_merge = utils_misc.merge_into_row(rgb, target, pred)
+            elif i < 8:
+                row = utils_misc.merge_into_row(rgb, target, pred)
+                img_merge = utils_misc.add_row(img_merge, row)
+            elif i == 8:
+                filename = args.savepath + "/comparison_" + args.data + ".png"
+                utils_misc.save_image(img_merge, filename)
 
         if (i + 1) % PRINT_FREQ == 0:
             logger.info(
