@@ -13,6 +13,9 @@ from model_utils import check_and_download_models  # noqa: E402
 from image_utils import load_image  # noqa: E402
 import webcamera_utils  # noqa: E402
 
+import ssl
+ssl._create_default_https_context = ssl._create_unverified_context
+
 # logger
 from logging import getLogger   # noqa: E402
 logger = getLogger(__name__)
@@ -21,14 +24,18 @@ logger = getLogger(__name__)
 # ======================
 # PARAMETERS
 # ======================
-WEIGHT_PATH = 'blazeface.onnx'
-MODEL_PATH = 'blazeface.onnx.prototxt'
+WEIGHT_PATH1 = 'blazeface.onnx'
+MODEL_PATH1 = 'blazeface.onnx.prototxt'
+WEIGHT_PATH2 = 'blazefaceback.onnx'
+MODEL_PATH2 = 'blazefaceback.onnx.prototxt'
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/blazeface/"
 
 IMAGE_PATH = 'input.png'
 SAVE_IMAGE_PATH = 'result.png'
-IMAGE_HEIGHT = 128
-IMAGE_WIDTH = 128
+IMAGE_HEIGHT1 = 128
+IMAGE_WIDTH1 = 128
+IMAGE_HEIGHT2 = 256
+IMAGE_WIDTH2 = 256
 
 
 # ======================
@@ -39,6 +46,7 @@ parser = get_base_parser(
     IMAGE_PATH,
     SAVE_IMAGE_PATH,
 )
+parser.add_argument('-b', '--back', action='store_true')
 args = update_parser(parser)
 
 
@@ -47,7 +55,14 @@ args = update_parser(parser)
 # ======================
 def recognize_from_image():
     # net initialize
-    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
+    if args.back == True:
+        net = ailia.Net(MODEL_PATH2, WEIGHT_PATH2, env_id=args.env_id)
+        IMAGE_HEIGHT = IMAGE_HEIGHT2
+        IMAGE_WIDTH = IMAGE_WIDTH2
+    else:
+        net = ailia.Net(MODEL_PATH1, WEIGHT_PATH1, env_id=args.env_id)
+        IMAGE_HEIGHT = IMAGE_HEIGHT1
+        IMAGE_WIDTH = IMAGE_WIDTH1
 
     # input image loop
     for image_path in args.input:
@@ -76,10 +91,13 @@ def recognize_from_image():
                     total_time = total_time + (end - start)
             logger.info(f'\taverage time {total_time / (args.benchmark_count-1)} ms')
         else:
-            preds_ailia = net.predict([input_data])
+            preds_ailia = net.predict([input_data]) 
 
         # post-processing
-        detections = but.postprocess(preds_ailia)
+        if args.back == True:
+            detections = but.postprocess(preds_ailia, args.back, anchor_path='anchorsback.npy')
+        else:
+            detections = but.postprocess(preds_ailia, args.back)
 
         # generate detections
         savepath = get_savepath(args.savepath, image_path)
@@ -91,7 +109,14 @@ def recognize_from_image():
 
 def recognize_from_video():
     # net initialize
-    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
+    if args.back == True:
+        net = ailia.Net(MODEL_PATH2, WEIGHT_PATH2, env_id=args.env_id)
+        IMAGE_HEIGHT = IMAGE_HEIGHT2
+        IMAGE_WIDTH = IMAGE_WIDTH2
+    else:
+        net = ailia.Net(MODEL_PATH1, WEIGHT_PATH1, env_id=args.env_id)
+        IMAGE_HEIGHT = IMAGE_HEIGHT1
+        IMAGE_WIDTH = IMAGE_WIDTH1
 
     capture = webcamera_utils.get_capture(args.video)
 
@@ -144,7 +169,11 @@ def recognize_from_video():
 
 def main():
     # model files check and download
-    check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
+    if args.back == True:
+        check_and_download_models(WEIGHT_PATH2, MODEL_PATH2, REMOTE_PATH)
+        
+    else:
+        check_and_download_models(WEIGHT_PATH1, MODEL_PATH1, REMOTE_PATH)
 
     if args.video is not None:
         # video mode
