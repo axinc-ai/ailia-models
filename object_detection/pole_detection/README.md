@@ -9,6 +9,7 @@
 ![output_image](output.png)
 
 ### usage
+Automatically downloads the onnx and prototxt files on the first run. It is necessary to be connected to the Internet while downloading.
 
 For the sample image,
 ``` bash

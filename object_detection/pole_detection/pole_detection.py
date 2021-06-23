@@ -6,6 +6,7 @@ import skimage
 import cv2
 
 import onnxruntime
+import ailia
 
 from mrcnn.config import Config
 from mrcnn import utils
@@ -27,8 +28,8 @@ logger = getLogger(__name__)
 IMAGE_PATH = '48001.jpg'
 SAVE_IMAGE_PATH = 'output.png'
 WEIGHT_PATH = 'mask_rcnn_poles_resnet101.onnx'
-# MODEL_PATH = None
-# REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/'
+MODEL_PATH = 'mask_rcnn_poles_resnet101.onnx.prototxt'
+REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/detect-utility-poles/'
 
 SLEEP_TIME = 0
 
@@ -115,7 +116,7 @@ def recognize_from_video():
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
-        
+         
         image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
     
         molded_image, window, scale, padding, crop = utils.resize_image(
@@ -155,7 +156,7 @@ def recognize_from_video():
 def main():
 
     # model files check and download
-    # check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
 
     if args.video is not None:
         # video mode
