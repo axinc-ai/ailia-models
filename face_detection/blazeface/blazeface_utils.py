@@ -209,7 +209,7 @@ def weighted_non_max_suppression(detections):
     return output_detections    
 
 
-def postprocess(preds_ailia, back, anchor_path='anchors.npy'):
+def postprocess(preds_ailia, anchor_path='anchors.npy', back=False):
     raw_box = preds_ailia[0]  # (1, 896, 16)
     raw_score = preds_ailia[1]  # (1, 896, 1)
 

@@ -24,18 +24,21 @@ logger = getLogger(__name__)
 # ======================
 # PARAMETERS
 # ======================
-WEIGHT_PATH1 = 'blazeface.onnx'
-MODEL_PATH1 = 'blazeface.onnx.prototxt'
-WEIGHT_PATH2 = 'blazefaceback.onnx'
-MODEL_PATH2 = 'blazefaceback.onnx.prototxt'
+WEIGHT_PATH_FRONT = 'blazeface.onnx'
+MODEL_PATH_FRONT = 'blazeface.onnx.prototxt'
+ANCHOR_PATH_FRONT = 'anchors.npy'
+WEIGHT_PATH_BACK = 'blazefaceback.onnx'
+MODEL_PATH_BACK = 'blazefaceback.onnx.prototxt'
+ANCHOR_PATH_BACK = 'anchorsback.npy'
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/blazeface/"
 
 IMAGE_PATH = 'input.png'
 SAVE_IMAGE_PATH = 'result.png'
-IMAGE_HEIGHT1 = 128
-IMAGE_WIDTH1 = 128
-IMAGE_HEIGHT2 = 256
-IMAGE_WIDTH2 = 256
+
+IMAGE_HEIGHT_FRONT = 128
+IMAGE_WIDTH_FRONT = 128
+IMAGE_HEIGHT_BACK = 256
+IMAGE_WIDTH_BACK = 256
 
 
 # ======================
@@ -46,23 +49,22 @@ parser = get_base_parser(
     IMAGE_PATH,
     SAVE_IMAGE_PATH,
 )
-parser.add_argument('-b', '--back', action='store_true')
+parser.add_argument('-bk', '--back', action='store_true')
 args = update_parser(parser)
 
 
 # ======================
 # Main functions
 # ======================
-def recognize_from_image():
-    # net initialize
+def recognize_from_image(net):
     if args.back == True:
-        net = ailia.Net(MODEL_PATH2, WEIGHT_PATH2, env_id=args.env_id)
-        IMAGE_HEIGHT = IMAGE_HEIGHT2
-        IMAGE_WIDTH = IMAGE_WIDTH2
+        IMAGE_HEIGHT = IMAGE_HEIGHT_BACK
+        IMAGE_WIDTH = IMAGE_WIDTH_BACK
+        ANCHOR_PATH = ANCHOR_PATH_BACK
     else:
-        net = ailia.Net(MODEL_PATH1, WEIGHT_PATH1, env_id=args.env_id)
-        IMAGE_HEIGHT = IMAGE_HEIGHT1
-        IMAGE_WIDTH = IMAGE_WIDTH1
+        IMAGE_HEIGHT = IMAGE_HEIGHT_FRONT
+        IMAGE_WIDTH = IMAGE_WIDTH_FRONT
+        ANCHOR_PATH = ANCHOR_PATH_FRONT
 
     # input image loop
     for image_path in args.input:
@@ -94,10 +96,7 @@ def recognize_from_image():
             preds_ailia = net.predict([input_data]) 
 
         # post-processing
-        if args.back == True:
-            detections = but.postprocess(preds_ailia, args.back, anchor_path='anchorsback.npy')
-        else:
-            detections = but.postprocess(preds_ailia, args.back)
+        detections = but.postprocess(preds_ailia, anchor_path=ANCHOR_PATH, back=args.back)
 
         # generate detections
         savepath = get_savepath(args.savepath, image_path)
@@ -107,16 +106,15 @@ def recognize_from_image():
     logger.info('Script finished successfully.')
 
 
-def recognize_from_video():
-    # net initialize
+def recognize_from_video(net):
     if args.back == True:
-        net = ailia.Net(MODEL_PATH2, WEIGHT_PATH2, env_id=args.env_id)
-        IMAGE_HEIGHT = IMAGE_HEIGHT2
-        IMAGE_WIDTH = IMAGE_WIDTH2
+        IMAGE_HEIGHT = IMAGE_HEIGHT_BACK
+        IMAGE_WIDTH = IMAGE_WIDTH_BACK
+        ANCHOR_PATH = ANCHOR_PATH_BACK
     else:
-        net = ailia.Net(MODEL_PATH1, WEIGHT_PATH1, env_id=args.env_id)
-        IMAGE_HEIGHT = IMAGE_HEIGHT1
-        IMAGE_WIDTH = IMAGE_WIDTH1
+        IMAGE_HEIGHT = IMAGE_HEIGHT_FRONT
+        IMAGE_WIDTH = IMAGE_WIDTH_FRONT
+        ANCHOR_PATH = ANCHOR_PATH_FRONT
 
     capture = webcamera_utils.get_capture(args.video)
 
@@ -144,7 +142,7 @@ def recognize_from_video():
         preds_ailia = net.get_results()
 
         # postprocessing
-        detections = but.postprocess(preds_ailia)
+        detections = but.postprocess(preds_ailia, anchor_path=ANCHOR_PATH, back=args.back)
         but.show_result(input_image, detections)
 
         # remove padding
@@ -170,17 +168,22 @@ def recognize_from_video():
 def main():
     # model files check and download
     if args.back == True:
-        check_and_download_models(WEIGHT_PATH2, MODEL_PATH2, REMOTE_PATH)
-        
+        check_and_download_models(WEIGHT_PATH_BACK, MODEL_PATH_BACK, REMOTE_PATH)       
     else:
-        check_and_download_models(WEIGHT_PATH1, MODEL_PATH1, REMOTE_PATH)
+        check_and_download_models(WEIGHT_PATH_FRONT, MODEL_PATH_FRONT, REMOTE_PATH)
+
+    # net initialize
+    if args.back == True:
+        net = ailia.Net(MODEL_PATH_BACK, WEIGHT_PATH_BACK, env_id=args.env_id)
+    else:
+        net = ailia.Net(MODEL_PATH_FRONT, WEIGHT_PATH_FRONT, env_id=args.env_id)
 
     if args.video is not None:
         # video mode
-        recognize_from_video()
+        recognize_from_video(net)
     else:
         # image mode
-        recognize_from_image()
+        recognize_from_image(net)
 
 
 if __name__ == '__main__':
