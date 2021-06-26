@@ -71,6 +71,11 @@ parser.add_argument(
     metavar="PATH",
     help="Path to output directory",
 )
+parser.add_argument(
+    "--use_fixed_scale",
+    action="store_true",
+    help="Use fixed range of depth for color scale."
+)
 
 args = update_parser(parser)
 
@@ -116,13 +121,19 @@ def _infer(img, net):
     return net.predict(img)
 
 
-def _estimate(img, model):
+def _estimate(img, model, args):
     img_depth = _infer(img, model)
     depth_pred = np.squeeze(img_depth)
+    if args.use_fixed_scale:
+        scale_min = min(DEPTH_MIN, np.min(depth_pred))
+        scale_max = max(DEPTH_MAX, np.max(depth_pred))
+    else:
+        scale_min = np.min(depth_pred)
+        scale_max = np.max(depth_pred)
     depth_pred_col = utils_misc.colored_depthmap(
         depth_pred,
-        min(DEPTH_MIN, np.min(depth_pred)),
-        max(DEPTH_MAX, np.max(depth_pred)),
+        scale_min,
+        scale_max,
     )
 
     return depth_pred_col
@@ -209,14 +220,14 @@ def transfer_to_image():
             if args.validation_mode:
                 _validate(dataset, net, args)
             else:
-                _estimate(dataset[0], net)
+                _estimate(dataset[0], net, args)
             end = int(round(time.time() * 1000))
             logger.info(f"\tailia processing time {end - start} ms")
     else:
         if args.validation_mode:
             _validate(dataset, net, args)
         else:
-            depth_pred_col = _estimate(dataset[0], net)
+            depth_pred_col = _estimate(dataset[0], net, args)
             stem = os.path.splitext(os.path.basename(IMAGE_PATH))[0]
             filepath = os.path.join(args.savepath, f"{stem}_depth.png")
             utils_misc.save_image(depth_pred_col, filepath)
@@ -240,7 +251,7 @@ def transfer_to_video():
         dataset = _prepare_data(args, frame)
 
         # Inference
-        depth_pred_col = _estimate(dataset[0], net)
+        depth_pred_col = _estimate(dataset[0], net, args)
 
         # Postprocessing
         cv2.imshow(
