@@ -56,6 +56,11 @@ parser.add_argument(
     default='heavy', choices=MODEL_LIST,
     help='Set model architecture: ' + ' | '.join(MODEL_LIST)
 )
+parser.add_argument(
+    '-th', '--threshold',
+    default=0.5, type=float,
+    help='The detection threshold'
+)
 args = update_parser(parser)
 
 
@@ -137,6 +142,8 @@ def pose_estimate(net, det_net, img):
         landmarks = np.zeros_like(normalized_landmarks)
         landmarks[:, :, 0] = normalized_landmarks[:, :, 0] * w
         landmarks[:, :, 1] = normalized_landmarks[:, :, 1] * h
+        landmarks[:, :, 2] = normalized_landmarks[:, :, 2]
+        landmarks[:, :, 3] = normalized_landmarks[:, :, 3]
 
     return flags, landmarks
 
@@ -149,10 +156,14 @@ def hsv_to_rgb(h, s, v):
 
 
 def line(input_img, landmarks, flags, point1, point2):
-    threshold = 0.5
+    threshold = args.threshold
+
     for i in range(len(flags)):
         landmark, flag = landmarks[i], flags[i]
-        if flag > threshold:
+        conf1 = landmark[point1, 3]
+        conf2 = landmark[point2, 3]
+
+        if flag > threshold and conf1 > threshold and conf2 > threshold:
             color = hsv_to_rgb(255 * point1 / but.BLAZEPOSE_KEYPOINT_CNT, 255, 255)
 
             x1 = int(landmark[point1, 0])
