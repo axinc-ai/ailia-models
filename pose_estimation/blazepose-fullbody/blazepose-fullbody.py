@@ -163,7 +163,7 @@ def line(input_img, landmarks, flags, point1, point2):
         conf1 = landmark[point1, 3]
         conf2 = landmark[point2, 3]
 
-        if flag > threshold and conf1 > threshold and conf2 > threshold:
+        if flag >= threshold and conf1 >= threshold and conf2 >= threshold:
             color = hsv_to_rgb(255 * point1 / but.BLAZEPOSE_KEYPOINT_CNT, 255, 255)
 
             x1 = int(landmark[point1, 0])
