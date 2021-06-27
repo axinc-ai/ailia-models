@@ -9,6 +9,7 @@ import ailia
 sys.path.append('../../util')
 from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
+from image_utils import normalize_image  # noqa: E402C
 from detector_utils import load_image  # noqa: E402C
 import webcamera_utils  # noqa: E402
 
@@ -61,12 +62,63 @@ args = update_parser(parser)
 # Utils
 # ======================
 
-def preprocess(img):
-    img = cv2.resize(img, (IMAGE_SIZE, IMAGE_SIZE), interpolation=cv2.INTER_LINEAR)
-    img = img.astype(np.float32) / 255
+
+def _box2cs(box):
+    """This encodes bbox(x,y,w,h) into (center, scale)
+
+    Args:
+        x, y, w, h
+
+    Returns:
+        tuple: A tuple containing center and scale.
+
+        - np.ndarray[float32](2,): Center of the bbox (x, y).
+        - np.ndarray[float32](2,): Scale of the bbox w & h.
+    """
+
+    input_size = (IMAGE_SIZE, IMAGE_SIZE)
+    x, y, w, h = box[:4]
+
+    aspect_ratio = input_size[0] / input_size[1]
+    center = np.array([x + w * 0.5, y + h * 0.5], dtype=np.float32)
+
+    if w > aspect_ratio * h:
+        h = w * 1.0 / aspect_ratio
+    elif w < aspect_ratio * h:
+        w = h * aspect_ratio
+
+    # pixel std is 200.0
+    scale = np.array([w / 200.0, h / 200.0], dtype=np.float32)
+
+    scale = scale * 1.25
+
+    return center, scale
+
+
+def preprocess(img, bbox):
+    image_size = (IMAGE_SIZE, IMAGE_SIZE)
+
+    c, s = _box2cs(bbox)
+    r = 0
+
+    trans = get_affine_transform(c, s, r, image_size)
+    img = cv2.warpAffine(
+        img,
+        trans, (int(image_size[0]), int(image_size[1])),
+        flags=cv2.INTER_LINEAR)
+
+    # normalize
+    img = normalize_image(img, normalize_type='ImageNet')
+
+    img = img.transpose(2, 0, 1)  # HWC -> CHW
     img = np.expand_dims(img, axis=0)
 
-    return img
+    img_metas = [{
+        'center': c,
+        'scale': s,
+    }]
+
+    return img, img_metas
 
 
 def postprocess(output, img_metas):
@@ -159,9 +211,10 @@ def recognize_from_image(net):
         logger.info(image_path)
 
         img = src_img = load_image(image_path)
-        # img = cv2.cvtColor(img, cv2.COLOR_BGRA2RGB)
-        img = np.load("ca.npy")
-        img = np.expand_dims(img, axis=0)
+        img = cv2.cvtColor(img, cv2.COLOR_BGRA2RGB)
+
+        bbox = np.array([13, 36, 284, 192])
+        img, img_metas = preprocess(img, bbox)
 
         logger.debug(f'input image shape: {img.shape}')
 
@@ -189,28 +242,15 @@ def recognize_from_image(net):
 
         heatmap = output[0]
 
-        img_metas = [{
-            'center': np.array([155., 132.], dtype=np.float32),
-            'scale': np.array([1.775, 1.775], dtype=np.float32),
-        }]
         result = postprocess(heatmap, img_metas)
         pose = result['preds'][0]
 
-        # pose_results = []
-        # for pose, person_result, bbox_xyxy in zip(
-        #         poses, person_results, bboxes_xyxy
-        # ):
-        #     pose_result = person_result.copy()
-        #     pose_result['keypoints'] = pose
-        #     pose_result['bbox'] = bbox_xyxy
-        #     pose_results.append(pose_result)
-
         # plot result
-        # src_img = cv2.cvtColor(src_img, cv2.COLOR_BGRA2BGR)
         pose_results = [{
-            'bbox': np.array([13., 36., 296., 227.]),
+            'bbox': bbox,
             'keypoints': pose,
         }, ]
+        src_img = cv2.cvtColor(src_img, cv2.COLOR_BGRA2BGR)
         img = vis_pose_result(src_img, pose_results)
 
         # save results
