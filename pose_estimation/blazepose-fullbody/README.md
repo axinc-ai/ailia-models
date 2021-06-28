@@ -42,7 +42,7 @@ $ python3 blazepose-fullbody.py --model full
 
 ## Reference
 
-[MediaPipePyTorch](https://github.com/zmurez/MediaPipePyTorch)
+[MediaPipe](https://google.github.io/mediapipe/solutions/models.html#pose)
 
 ## Framework
 
