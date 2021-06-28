@@ -86,7 +86,7 @@ def postprocess(landmarks):
             y = xx[j * 5 + 1] / IMAGE_SIZE
             z = xx[j * 5 + 2] / IMAGE_SIZE
             visibility = xx[j * 5 + 3]
-            presence = xx[j * 5 + 3]
+            presence = xx[j * 5 + 4]
             normalized_landmarks[i, j] = (x, y, z, sigmoid(min(visibility, presence)))
 
     return normalized_landmarks
