@@ -7,10 +7,7 @@ import numpy as np
 from PIL import Image
 
 import ailia
-from dataloaders.dataloader import MyDataloader
-from dataloaders.nyu import NYUDataset
 from dataloaders.utils import val_transform
-from metrics import AverageMeter, Result
 import utils_misc
 
 # Import original modules.
@@ -30,9 +27,6 @@ logger = getLogger(__name__)
 WEIGHT_PATH = "fast-depth.onnx"
 MODEL_PATH = "fast-depth.onnx.prototxt"
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/fast-depth/"
-DATA_NAMES = ["nyudepthv2"]
-MODALITY_NAMES = MyDataloader.modality_names
-PRINT_FREQ = 1
 SOURCE_IMAGE_PATH = "data"
 SAVE_IMAGE_PATH = "img"
 IMAGE_PATH = "data/img/00001.png"
@@ -44,26 +38,6 @@ OUTPUT_SIZE = (224, 224)
 # Argument Parser Config
 # ======================
 parser = get_base_parser("FastDepth", SOURCE_IMAGE_PATH, SAVE_IMAGE_PATH)
-parser.add_argument(
-    "--data",
-    metavar="DATA",
-    default="nyudepthv2",
-    choices=DATA_NAMES,
-    help="dataset: " + " | ".join(DATA_NAMES) + " (default: nyudepthv2)",
-)
-parser.add_argument(
-    "--validation_mode",
-    action="store_true",
-    help="Validation mode",
-)
-parser.add_argument(
-    "--modality",
-    "-m",
-    metavar="MODALITY",
-    default="rgb",
-    choices=MODALITY_NAMES,
-    help="Modality: " + " | ".join(MODALITY_NAMES) + " (default: rgb)",
-)
 parser.add_argument(
     "--savepath",
     default="img",
@@ -95,22 +69,10 @@ def _prepare_data(args, frame=None):
     if args.video is not None:
         return _make_dataset(frame)
     else:
-        if args.validation_mode:
-            # Data loading code
-            logger.info("=> creating data loaders...")
-
-            if args.data == "nyudepthv2":
-                dat_dir = os.path.join(".", "data/h5", args.data, "val")
-                dataset = NYUDataset(dat_dir, split="val", modality=args.modality)
-                logger.info("=> data loaders created.")
-                return dataset
-            else:
-                raise RuntimeError("Dataset not found.")
-        else:
-            path = os.path.join(".", IMAGE_PATH)
-            with Image.open(path) as im:
-                rgb = np.asarray(im)
-            return _make_dataset(rgb)
+        path = os.path.join(".", IMAGE_PATH)
+        with Image.open(path) as im:
+            rgb = np.asarray(im)
+        return _make_dataset(rgb)
 
 
 def _initialize_net(args):
@@ -139,73 +101,8 @@ def _estimate(img, model, args):
     return depth_pred_col
 
 
-def _validate(val_loader, model, args):
-    average_meter = AverageMeter()
-    end = time.time()
-    img_merge = None
-    for i, (img, target) in enumerate(val_loader):
-        data_time = time.time() - end
-
-        # Compute output.
-        end = time.time()
-        pred = _infer(img, model)
-        cpu_time = time.time() - end
-
-        # Measure accuracy and record loss.
-        result = Result()
-        result.evaluate(pred, np.asarray(target.data))
-        average_meter.update(result, cpu_time, data_time, img.shape[0])
-        end = time.time()
-
-        if args.modality == "rgb":
-            rgb = img
-
-        if not args.benchmark:
-            if i == 0:
-                img_merge = utils_misc.merge_into_row(rgb, target, pred)
-            elif i < 8:
-                row = utils_misc.merge_into_row(rgb, target, pred)
-                img_merge = utils_misc.add_row(img_merge, row)
-            elif i == 8:
-                filename = args.savepath + "/comparison_" + args.data + ".png"
-                utils_misc.save_image(img_merge, filename)
-
-        if (i + 1) % PRINT_FREQ == 0:
-            logger.info(
-                "Test: [{0}/{1}]\t"
-                "t_CPU={cpu_time:.3f}({average.cpu_time:.3f})\n\t"
-                "RMSE={result.rmse:.2f}({average.rmse:.2f}) "
-                "MAE={result.mae:.2f}({average.mae:.2f}) "
-                "Delta1={result.delta1:.3f}({average.delta1:.3f}) "
-                "REL={result.absrel:.3f}({average.absrel:.3f}) "
-                "Lg10={result.lg10:.3f}({average.lg10:.3f}) ".format(
-                    i + 1,
-                    len(val_loader),
-                    cpu_time=cpu_time,
-                    result=result,
-                    average=average_meter.average(),
-                )
-            )
-
-    avg = average_meter.average()
-
-    logger.info(
-        "\n*\n"
-        "RMSE={average.rmse:.3f}\n"
-        "MAE={average.mae:.3f}\n"
-        "Delta1={average.delta1:.3f}\n"
-        "REL={average.absrel:.3f}\n"
-        "Lg10={average.lg10:.3f}\n"
-        "t_CPU={time:.3f}\n".format(average=avg, time=avg.cpu_time)
-    )
-
-    return avg, img_merge
-
-
-def transfer_to_image():
+def recognize_from_image():
     # Prepare input data.
-    if args.validation_mode:
-        logger.info("Validation mode")
     dataset = _prepare_data(args)
 
     # Initialize net.
@@ -217,24 +114,18 @@ def transfer_to_image():
         logger.info("BENCHMARK mode")
         for i in range(5):
             start = int(round(time.time() * 1000))
-            if args.validation_mode:
-                _validate(dataset, net, args)
-            else:
-                _estimate(dataset[0], net, args)
+            _estimate(dataset[0], net, args)
             end = int(round(time.time() * 1000))
             logger.info(f"\tailia processing time {end - start} ms")
     else:
-        if args.validation_mode:
-            _validate(dataset, net, args)
-        else:
-            depth_pred_col = _estimate(dataset[0], net, args)
-            stem = os.path.splitext(os.path.basename(IMAGE_PATH))[0]
-            filepath = os.path.join(args.savepath, f"{stem}_depth.png")
-            utils_misc.save_image(depth_pred_col, filepath)
+        depth_pred_col = _estimate(dataset[0], net, args)
+        stem = os.path.splitext(os.path.basename(IMAGE_PATH))[0]
+        filepath = os.path.join(args.savepath, f"{stem}_depth.png")
+        utils_misc.save_image(depth_pred_col, filepath)
     logger.info("Script finished successfully.")
 
 
-def transfer_to_video():
+def recognize_from_video():
     # Initialize net.
     net = _initialize_net(args)
 
@@ -273,10 +164,10 @@ def main():
 
     if args.video is not None:
         # Video mode
-        transfer_to_video()
+        recognize_from_video()
     else:
         # Image mode
-        transfer_to_image()
+        recognize_from_image()
 
 
 if __name__ == "__main__":

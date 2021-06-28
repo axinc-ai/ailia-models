@@ -34,11 +34,6 @@ If you pass `0` as an argument to VIDEO_PATH, you can use the webcam input inste
 $ python3 fast-depth.py --video VIDEO_PATH
 ```
 
-By adding the `--validation_mode` option, you can generate original comparison of true and estimated depth.
-```bash
-$ python3 fast-depth.py --validation_mode
-```
-
 ### Reference
 
 [ICRA 2019 "FastDepth: Fast Monocular Depth Estimation on Embedded Systems"](https://github.com/dwofk/fast-depth)
