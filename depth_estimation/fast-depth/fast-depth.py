@@ -11,7 +11,7 @@ import fast_depth_utils
 
 # Import original modules.
 sys.path.append("../../util")
-from utils import get_base_parser, update_parser  # noqa: E402
+from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # NOQA: E402
 from webcamera_utils import get_capture, cut_max_square  # NOQA: E402
 
@@ -26,9 +26,8 @@ logger = getLogger(__name__)
 WEIGHT_PATH = "fast-depth.onnx"
 MODEL_PATH = "fast-depth.onnx.prototxt"
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/fast-depth/"
-SOURCE_IMAGE_PATH = "data"
-SAVE_IMAGE_PATH = "img"
 IMAGE_PATH = "data/img/00001.png"
+SAVE_IMAGE_PATH = "output.png"
 DEPTH_MIN = 0  # In meters.
 DEPTH_MAX = 5  # In meters.
 OUTPUT_SIZE = (224, 224)
@@ -36,7 +35,7 @@ OUTPUT_SIZE = (224, 224)
 # ======================
 # Argument Parser Config
 # ======================
-parser = get_base_parser("FastDepth", SOURCE_IMAGE_PATH, SAVE_IMAGE_PATH)
+parser = get_base_parser("FastDepth", IMAGE_PATH, SAVE_IMAGE_PATH)
 parser.add_argument(
     "--savepath",
     default="img",
@@ -47,7 +46,7 @@ parser.add_argument(
 parser.add_argument(
     "--use_fixed_scale",
     action="store_true",
-    help="Use fixed range of depth for color scale."
+    help="Use fixed range of depth for color scale.",
 )
 
 args = update_parser(parser)
@@ -57,19 +56,18 @@ args = update_parser(parser)
 # Main functions
 # ======================
 def _make_dataset(img):
-    input_np, _ = fast_depth_utils.transform(img, None, OUTPUT_SIZE)
+    input_np = fast_depth_utils.transform(img, OUTPUT_SIZE)
     input_tensor = input_np.transpose((2, 0, 1)).copy()
     while input_tensor.ndim < 3:
         input_tensor = np.expand_dims(input_tensor, 0)
     return [np.expand_dims(input_tensor, 0)]
 
 
-def _prepare_data(args, frame=None):
+def _prepare_data(args, image_path=None, frame=None):
     if args.video is not None:
         return _make_dataset(frame)
     else:
-        path = os.path.join(".", IMAGE_PATH)
-        with Image.open(path) as im:
+        with Image.open(image_path) as im:
             rgb = np.asarray(im)
         return _make_dataset(rgb)
 
@@ -101,26 +99,30 @@ def _estimate(img, model, args):
 
 
 def recognize_from_image():
-    # Prepare input data.
-    dataset = _prepare_data(args)
+    # Input image loop
+    for image_path in args.input:
+        logger.info(image_path)
 
-    # Initialize net.
-    net = _initialize_net(args)
+        # Prepare input data.
+        dataset = _prepare_data(args, image_path=image_path)
 
-    # Inference
-    logger.info("Start inference...")
-    if args.benchmark:
-        logger.info("BENCHMARK mode")
-        for i in range(5):
-            start = int(round(time.time() * 1000))
-            _estimate(dataset[0], net, args)
-            end = int(round(time.time() * 1000))
-            logger.info(f"\tailia processing time {end - start} ms")
-    else:
-        depth_pred_col = _estimate(dataset[0], net, args)
-        stem = os.path.splitext(os.path.basename(IMAGE_PATH))[0]
-        filepath = os.path.join(args.savepath, f"{stem}_depth.png")
-        fast_depth_utils.save_image(depth_pred_col, filepath)
+        # Initialize net.
+        net = _initialize_net(args)
+
+        # Inference
+        logger.info("Start inference...")
+        if args.benchmark:
+            logger.info("BENCHMARK mode")
+            for i in range(5):
+                start = int(round(time.time() * 1000))
+                _estimate(dataset[0], net, args)
+                end = int(round(time.time() * 1000))
+                logger.info(f"\tailia processing time {end - start} ms")
+        else:
+            depth_pred_col = _estimate(dataset[0], net, args)
+            filepath = get_savepath(args.savepath, image_path, ext=".png")
+            logger.info(f"saved at : {filepath}")
+            fast_depth_utils.save_image(depth_pred_col, filepath)
     logger.info("Script finished successfully.")
 
 
@@ -138,7 +140,7 @@ def recognize_from_video():
         # Prepare input data.
         frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         frame = cut_max_square(frame)
-        dataset = _prepare_data(args, frame)
+        dataset = _prepare_data(args, frame=frame)
 
         # Inference
         depth_pred_col = _estimate(dataset[0], net, args)

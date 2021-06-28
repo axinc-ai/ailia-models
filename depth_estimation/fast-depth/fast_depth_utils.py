@@ -23,7 +23,7 @@ def save_image(img_merge, filename):
     img_merge.save(filename)
 
 
-def transform(rgb, depth_np, output_size):
+def transform(rgb, output_size):
     transformer = transforms.Compose(
         [
             transforms.Resize((int(IWIDTH * (250.0 / IHEIGHT)), 250)),
@@ -33,7 +33,5 @@ def transform(rgb, depth_np, output_size):
     )
     rgb_np = transformer(rgb)
     rgb_np = np.asfarray(rgb_np, dtype="float") / 255
-    if depth_np is not None:
-        depth_np = transformer(depth_np)
 
-    return rgb_np, depth_np
+    return rgb_np
