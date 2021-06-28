@@ -62,7 +62,7 @@ By adding the `--case` option, you can choose model size by case.
 ```bash
 $ python3 paddleocr.py --case CASE
 $ python3 paddleocr.py -c CASE
-(ex) $ python3 paddleocr.py --video server
+(ex) $ python3 paddleocr.py --case server
 ```
 The prepared language specifications are as follows.
   - mobile (default)

@@ -113,6 +113,7 @@ cd ../../object_detection/yolov5; python3 yolov5.py ${OPTION}
 cd ../../object_detection/pedestrian_detection; python3 pedestrian_detection.py ${OPTION}
 cd ../../object_detection/efficientdet; python3 efficientdet.py ${OPTION}
 cd ../../object_detection/nanodet; python3 nanodet.py ${OPTION}
+cd ../../object_detection/yolor; python3 yolor.py ${OPTION}
 cd ../../object_tracking/deepsort; python3 deepsort.py ${OPTION}
 cd ../../object_tracking/person_reid_baseline_pytorch; python3 person_reid_baseline_pytorch.py ${OPTION}
 cd ../../object_tracking/roneld; python3 roneld.py ${OPTION}
@@ -123,6 +124,7 @@ cd ../../pose_estimation/lightweight-human-pose-estimation-3d; python3 lightweig
 cd ../../pose_estimation/openpose; python3 openpose.py ${OPTION}
 cd ../../pose_estimation/pose_resnet; python3 pose_resnet.py ${OPTION}
 cd ../../pose_estimation/blazepose; python3 blazepose.py ${OPTION}
+cd ../../pose_estimation/blazepose-fullbody; python3 blazepose-fullbody.py ${OPTION}
 cd ../../pose_estimation/3dmppe_posenet; python3 3dmppe_posenet.py ${OPTION}
 cd ../../pose_estimation/efficientpose; python3 efficientpose.py ${OPTION}
 cd ../../pose_estimation/pose-hg-3d; python3 pose-hg-3d.py ${OPTION}
