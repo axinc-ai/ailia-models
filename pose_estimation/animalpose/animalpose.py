@@ -24,17 +24,25 @@ logger = getLogger(__name__)
 # Parameters
 # ======================
 
-MODEL_LIST = []
+MODEL_LIST = ['hrnet32', 'hrnet48']
 WEIGHT_HRNET_W32_PATH = 'hrnet_w32_256x256.onnx'
 MODEL_HRNET_W32_PATH = 'hrnet_w32_256x256.onnx.prototxt'
 WEIGHT_HRNET_W48_PATH = 'hrnet_w48_256x256.onnx'
 MODEL_HRNET_W48_PATH = 'hrnet_w48_256x256.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/animalpose/'
 
+WEIGHT_YOLOV3_PATH = 'yolov3.opt2.onnx'
+MODEL_YOLOV3_PATH = 'yolov3.opt2.onnx.prototxt'
+REMOTE_YOLOV3_PATH = 'https://storage.googleapis.com/ailia-models/yolov3/'
+
 # IMAGE_PATH = 'ho105.jpeg'
 IMAGE_PATH = 'ca110.jpeg'
 SAVE_IMAGE_PATH = 'output.png'
 IMAGE_SIZE = 256
+
+DETECTION_THRESHOLD = 0.4
+DETECTION_IOU = 0.45
+DETECTION_SIZE = 416
 
 # ======================
 # Argument Parser Config
@@ -47,8 +55,12 @@ parser = get_base_parser(
 )
 parser.add_argument(
     '-m', '--model', metavar='ARCH',
-    default='heavy', choices=MODEL_LIST,
+    default='hrnet32', choices=MODEL_LIST,
     help='Set model architecture: ' + ' | '.join(MODEL_LIST)
+)
+parser.add_argument(
+    '-d', '--detector', action='store_true',
+    help='Use yolov3 detector'
 )
 parser.add_argument(
     '-th', '--threshold',
@@ -173,6 +185,49 @@ def postprocess(output, img_metas):
     return result
 
 
+def pose_estimate(net, det_net, img):
+    h, w = img.shape[:2]
+
+    logger.debug(f'input image shape: {img.shape}')
+
+    if det_net:
+        det_net.set_input_shape(DETECTION_SIZE, DETECTION_SIZE)
+        det_net.compute(img, DETECTION_THRESHOLD, DETECTION_IOU)
+        count = det_net.get_object_count()
+
+        if 0 < count:
+            a = sorted([
+                det_net.get_object(i) for i in range(count)
+            ], key=lambda x: x.prob, reverse=True)
+            obj = a[0]
+            bbox = np.array([
+                int(w * obj.x), int(h * obj.y), int(w * obj.w), int(w * obj.h)
+            ])
+        else:
+            bbox = np.array([0, 0, w, h])
+    else:
+        bbox = np.array([0, 0, w, h])
+
+    img = cv2.cvtColor(img, cv2.COLOR_BGRA2RGB)
+    img, img_metas = preprocess(img, bbox)
+
+    # inference
+    output = net.predict([img])
+
+    heatmap = output[0]
+
+    result = postprocess(heatmap, img_metas)
+    pose = result['preds'][0]
+
+    # plot result
+    pose_results = [{
+        'bbox': bbox,
+        'keypoints': pose,
+    }, ]
+
+    return pose_results
+
+
 def vis_pose_result(img, result):
     palette = np.array([
         [255, 128, 0], [255, 153, 51], [255, 178, 102],
@@ -204,19 +259,13 @@ def vis_pose_result(img, result):
 # Main functions
 # ======================
 
-def recognize_from_image(net):
+def recognize_from_image(net, det_net):
     # input image loop
     for image_path in args.input:
         # prepare input data
         logger.info(image_path)
 
         img = src_img = load_image(image_path)
-        img = cv2.cvtColor(img, cv2.COLOR_BGRA2RGB)
-
-        bbox = np.array([13, 36, 284, 192])
-        img, img_metas = preprocess(img, bbox)
-
-        logger.debug(f'input image shape: {img.shape}')
 
         # inference
         logger.info('Start inference...')
@@ -226,7 +275,7 @@ def recognize_from_image(net):
             for i in range(args.benchmark_count):
                 # Pose estimation
                 start = int(round(time.time() * 1000))
-                output = net.predict([img])
+                pose_results = pose_estimate(net, det_net, img)
                 end = int(round(time.time() * 1000))
                 estimation_time = (end - start)
 
@@ -238,18 +287,9 @@ def recognize_from_image(net):
             logger.info(f'\taverage time estimation {total_time_estimation / (args.benchmark_count - 1)} ms')
         else:
             # inference
-            output = net.predict([img])
-
-        heatmap = output[0]
-
-        result = postprocess(heatmap, img_metas)
-        pose = result['preds'][0]
+            pose_results = pose_estimate(net, det_net, img)
 
         # plot result
-        pose_results = [{
-            'bbox': bbox,
-            'keypoints': pose,
-        }, ]
         src_img = cv2.cvtColor(src_img, cv2.COLOR_BGRA2BGR)
         img = vis_pose_result(src_img, pose_results)
 
@@ -261,7 +301,7 @@ def recognize_from_image(net):
     logger.info('Script finished successfully.')
 
 
-def recognize_from_video(net):
+def recognize_from_video(net, det_net):
     capture = webcamera_utils.get_capture(args.video)
 
     # create video writer if savepath is specified as video format
@@ -296,29 +336,43 @@ def recognize_from_video(net):
 
 def main():
     # model files check and download
-    # logger.info('=== animalpose model ===')
-    # info = {
-    #     'lite': (WEIGHT_LITE_PATH, MODEL_LITE_PATH),
-    #     'full': (WEIGHT_FULL_PATH, MODEL_FULL_PATH),
-    #     'heavy': (WEIGHT_HEAVY_PATH, MODEL_HEAVY_PATH),
-    # }
-    # weight_path, model_path = info[args.model]
-    # check_and_download_models(weight_path, model_path, REMOTE_PATH)
+    if args.detector:
+        logger.info('=== detector model ===')
+        check_and_download_models(WEIGHT_YOLOV3_PATH, MODEL_YOLOV3_PATH, REMOTE_YOLOV3_PATH)
+    logger.info('=== animalpose model ===')
+    info = {
+        'hrnet32': (WEIGHT_HRNET_W32_PATH, MODEL_HRNET_W32_PATH),
+        'hrnet48': (WEIGHT_HRNET_W48_PATH, MODEL_HRNET_W48_PATH),
+    }
+    weight_path, model_path = info[args.model]
+    check_and_download_models(weight_path, model_path, REMOTE_PATH)
 
     # load model
     env_id = ailia.get_gpu_environment_id()
     logger.info(f'env_id: {env_id}')
 
-    model_path = "hrnet_w32_256x256.onnx.prototxt"
-    weight_path = "hrnet_w32_256x256.onnx"
+    # initialize
+    if args.detector:
+        det_net = ailia.Detector(
+            MODEL_YOLOV3_PATH,
+            WEIGHT_YOLOV3_PATH,
+            80,
+            format=ailia.NETWORK_IMAGE_FORMAT_RGB,
+            channel=ailia.NETWORK_IMAGE_CHANNEL_FIRST,
+            range=ailia.NETWORK_IMAGE_RANGE_U_FP32,
+            algorithm=ailia.DETECTOR_ALGORITHM_YOLOV3,
+            env_id=args.env_id,
+        )
+    else:
+        det_net = None
     net = ailia.Net(model_path, weight_path, env_id=env_id)
 
     if args.video is not None:
         # video mode
-        recognize_from_video(net)
+        recognize_from_video(net, det_net)
     else:
         # image mode
-        recognize_from_image(net)
+        recognize_from_image(net, det_net)
 
 
 if __name__ == '__main__':
