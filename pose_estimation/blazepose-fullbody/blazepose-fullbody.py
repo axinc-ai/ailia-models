@@ -177,7 +177,7 @@ def circle(input_img, landmarks, flags):
 
                x1 = int(landmark[point1, 0])
                y1 = int(landmark[point1, 1])
-               cv2.circle(input_img, (x1, y1), line_width, color, thickness=1, lineType=cv2.LINE_8, shift=0)
+               cv2.circle(input_img, (x1, y1), line_width, color, thickness=2, lineType=cv2.LINE_8, shift=0)
 
 
 def display_result(img, landmarks, flags):
