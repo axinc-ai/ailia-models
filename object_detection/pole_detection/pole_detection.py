@@ -66,7 +66,7 @@ def recognize_from_image():
         model = onnxruntime.InferenceSession(WEIGHT_PATH)
     else:
         logger.info(f'env_id: {args.env_id}')
-        # model = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
+        model = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
         
     image = cv2.imread(IMAGE_PATH)
     image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
@@ -88,10 +88,16 @@ def recognize_from_image():
     anchors = utils.get_anchors(molded_images[0].shape)
     anchors = np.broadcast_to(anchors, (config.BATCH_SIZE,) + anchors.shape)
 
-    results = \
-        model.run(None, {"input_image": molded_images.astype(np.float32),
-                        "input_anchors": anchors,
-                        "input_image_meta": image_metas.astype(np.float32)})
+    if args.onnx:
+        results = \
+            model.run(None, {"input_image": molded_images.astype(np.float32),
+                            "input_anchors": anchors,
+                            "input_image_meta": image_metas.astype(np.float32)})
+    else:
+        results = \
+            model.run({"input_image": molded_images.astype(np.float32),
+                            "input_anchors": anchors,
+                            "input_image_meta": image_metas.astype(np.float32)})
 
     images = [image]
     windows = [window]
@@ -107,7 +113,7 @@ def recognize_from_video():
         model = onnxruntime.InferenceSession(WEIGHT_PATH)
     else:
         logger.info(f'env_id: {args.env_id}')
-        # model = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
+        model = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
 
     capture = webcamera_utils.get_capture(args.video)
 
@@ -136,10 +142,16 @@ def recognize_from_video():
         anchors = utils.get_anchors(molded_images[0].shape)
         anchors = np.broadcast_to(anchors, (config.BATCH_SIZE,) + anchors.shape)
         
-        results = \
-        model.run(None, {"input_image": molded_images.astype(np.float32),
-                        "input_anchors": anchors,
-                        "input_image_meta": image_metas.astype(np.float32)})
+        if args.onnx:
+            results = \
+            model.run(None, {"input_image": molded_images.astype(np.float32),
+                            "input_anchors": anchors,
+                            "input_image_meta": image_metas.astype(np.float32)})
+        else:
+            results = \
+            model.run({"input_image": molded_images.astype(np.float32),
+                            "input_anchors": anchors,
+                            "input_image_meta": image_metas.astype(np.float32)})
                         
         images = [image]
         windows = [window]
