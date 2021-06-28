@@ -69,8 +69,13 @@ parser.add_argument(
 )
 parser.add_argument(
     '-th', '--threshold',
-    default=0.5, type=float,
+    default=DETECTION_THRESHOLD, type=float,
     help='The detection threshold'
+)
+parser.add_argument(
+    '-iou', '--iou',
+    default=DETECTION_IOU, type=float,
+    help='The detection iou'
 )
 args = update_parser(parser)
 
@@ -170,22 +175,12 @@ def postprocess(output, img_metas):
     """
     batch_size = len(img_metas)
 
-    if 'bbox_id' in img_metas[0]:
-        bbox_ids = []
-    else:
-        bbox_ids = None
-
     c = np.zeros((batch_size, 2), dtype=np.float32)
     s = np.zeros((batch_size, 2), dtype=np.float32)
     score = np.ones(batch_size)
     for i in range(batch_size):
         c[i, :] = img_metas[i]['center']
         s[i, :] = img_metas[i]['scale']
-
-        if 'bbox_score' in img_metas[i]:
-            score[i] = np.array(img_metas[i]['bbox_score']).reshape(-1)
-        if bbox_ids is not None:
-            bbox_ids.append(img_metas[i]['bbox_id'])
 
     preds, maxvals = keypoints_from_heatmaps(output, c, s)
 
@@ -199,10 +194,8 @@ def postprocess(output, img_metas):
     all_boxes[:, 5] = score
 
     result = {}
-
     result['preds'] = all_preds
     result['boxes'] = all_boxes
-    result['bbox_ids'] = bbox_ids
 
     return result
 
@@ -214,7 +207,7 @@ def pose_estimate(net, det_net, img):
 
     if det_net:
         det_net.set_input_shape(DETECTION_SIZE, DETECTION_SIZE)
-        det_net.compute(img, DETECTION_THRESHOLD, DETECTION_IOU)
+        det_net.compute(img, args.threshold, args.iou)
         count = det_net.get_object_count()
 
         if 0 < count:
@@ -286,7 +279,7 @@ def recognize_from_image(net, det_net):
         # prepare input data
         logger.info(image_path)
 
-        img = src_img = load_image(image_path)
+        img = load_image(image_path)
 
         # inference
         logger.info('Start inference...')
@@ -311,8 +304,8 @@ def recognize_from_image(net, det_net):
             pose_results = pose_estimate(net, det_net, img)
 
         # plot result
-        src_img = cv2.cvtColor(src_img, cv2.COLOR_BGRA2BGR)
-        img = vis_pose_result(src_img, pose_results)
+        img = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
+        img = vis_pose_result(img, pose_results)
 
         # save results
         savepath = get_savepath(args.savepath, image_path)
@@ -339,7 +332,11 @@ def recognize_from_video(net, det_net):
             break
 
         # inference
-        pass
+        img = cv2.cvtColor(frame, cv2.COLOR_BGR2BGRA)
+        pose_results = pose_estimate(net, det_net, img)
+
+        # plot result
+        frame = vis_pose_result(frame, pose_results)
 
         cv2.imshow('frame', frame)
 
