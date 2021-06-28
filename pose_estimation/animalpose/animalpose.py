@@ -24,11 +24,17 @@ logger = getLogger(__name__)
 # Parameters
 # ======================
 
-MODEL_LIST = ['hrnet32', 'hrnet48']
+MODEL_LIST = ['hrnet32', 'hrnet48', 'res50', 'res101', 'res152']
 WEIGHT_HRNET_W32_PATH = 'hrnet_w32_256x256.onnx'
 MODEL_HRNET_W32_PATH = 'hrnet_w32_256x256.onnx.prototxt'
 WEIGHT_HRNET_W48_PATH = 'hrnet_w48_256x256.onnx'
 MODEL_HRNET_W48_PATH = 'hrnet_w48_256x256.onnx.prototxt'
+WEIGHT_RESNET_50_PATH = 'res50_256x256.onnx'
+MODEL_RESNET_50_PATH = 'res50_256x256.onnx.prototxt'
+WEIGHT_RESNET_101_PATH = 'res101_256x256.onnx'
+MODEL_RESNET_101_PATH = 'res101_256x256.onnx.prototxt'
+WEIGHT_RESNET_152_PATH = 'res152_256x256.onnx'
+MODEL_RESNET_152_PATH = 'res152_256x256.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/animalpose/'
 
 WEIGHT_YOLOV3_PATH = 'yolov3.opt2.onnx'
@@ -358,6 +364,9 @@ def main():
     info = {
         'hrnet32': (WEIGHT_HRNET_W32_PATH, MODEL_HRNET_W32_PATH),
         'hrnet48': (WEIGHT_HRNET_W48_PATH, MODEL_HRNET_W48_PATH),
+        'res50': (WEIGHT_RESNET_50_PATH, MODEL_RESNET_50_PATH),
+        'res101': (WEIGHT_RESNET_101_PATH, MODEL_RESNET_101_PATH),
+        'res152': (WEIGHT_RESNET_152_PATH, MODEL_RESNET_152_PATH),
     }
     weight_path, model_path = info[args.model]
     check_and_download_models(weight_path, model_path, REMOTE_PATH)
