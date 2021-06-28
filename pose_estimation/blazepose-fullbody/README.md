@@ -54,6 +54,6 @@ ONNX opset = 11
 
 ## Netron
 
-[pose_landmark_lite.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/blazepose/pose_landmark_lite.onnx.prototxt)  
-[pose_landmark_full.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/blazepose/pose_landmark_full.onnx.prototxt)  
-[pose_landmark_heavy.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/blazepose/pose_landmark_heavy.onnx.prototxt)
+[pose_landmark_lite.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/blazepose-fullbody/pose_landmark_lite.onnx.prototxt)  
+[pose_landmark_full.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/blazepose-fullbody/pose_landmark_full.onnx.prototxt)  
+[pose_landmark_heavy.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/blazepose-fullbody/pose_landmark_heavy.onnx.prototxt)
