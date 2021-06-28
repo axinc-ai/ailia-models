@@ -490,6 +490,59 @@ def transform_preds(
     return target_coords
 
 
+def color_val(color):
+    d = {
+        'red': (0, 0, 255),
+        'green': (0, 255, 0),
+        'blue': (255, 0, 0),
+        'cyan': (255, 255, 0),
+        'yellow': (0, 255, 255),
+        'magenta': (255, 0, 255),
+        'white': (255, 255, 255),
+        'black': (0, 0, 0)
+    }
+    return d[color]
+
+
+def imshow_bboxes(
+        img,
+        bboxes,
+        colors='green',
+        top_k=-1,
+        thickness=1):
+    """Draw bboxes on an image.
+    Args:
+        img (str or ndarray): The image to be displayed.
+        bboxes (list or ndarray): A list of ndarray of shape (k, 4).
+        colors (list[str or tuple or Color]): A list of colors.
+        top_k (int): Plot the first k bboxes only if set positive.
+        thickness (int): Thickness of lines.
+    Returns:
+        ndarray: The image with bboxes drawn on it.
+    """
+
+    if isinstance(bboxes, np.ndarray):
+        bboxes = [bboxes]
+    if not isinstance(colors, list):
+        colors = [colors for _ in range(len(bboxes))]
+    colors = [color_val(c) for c in colors]
+    assert len(bboxes) == len(colors)
+
+    for i, _bboxes in enumerate(bboxes):
+        _bboxes = _bboxes.astype(np.int32)
+        if top_k <= 0:
+            _top_k = _bboxes.shape[0]
+        else:
+            _top_k = min(top_k, _bboxes.shape[0])
+        for j in range(_top_k):
+            left_top = (_bboxes[j, 0], _bboxes[j, 1])
+            right_bottom = (_bboxes[j, 2], _bboxes[j, 3])
+            cv2.rectangle(
+                img, left_top, right_bottom, colors[i], thickness=thickness)
+
+    return img
+
+
 def imshow_keypoints(
         img,
         pose_result,
@@ -636,13 +689,12 @@ def show_result(
         bboxes = np.vstack(bbox_result)
 
         # draw bounding boxes
-        # mmcv.imshow_bboxes(
-        #     img,
-        #     bboxes,
-        #     colors=bbox_color,
-        #     top_k=-1,
-        #     thickness=thickness,
-        #     show=False)
+        imshow_bboxes(
+            img,
+            bboxes,
+            colors=bbox_color,
+            top_k=-1,
+            thickness=thickness)
 
         imshow_keypoints(img, pose_result, skeleton, kpt_score_thr,
                          pose_kpt_color, pose_limb_color, radius,

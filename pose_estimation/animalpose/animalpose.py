@@ -35,7 +35,6 @@ WEIGHT_YOLOV3_PATH = 'yolov3.opt2.onnx'
 MODEL_YOLOV3_PATH = 'yolov3.opt2.onnx.prototxt'
 REMOTE_YOLOV3_PATH = 'https://storage.googleapis.com/ailia-models/yolov3/'
 
-# IMAGE_PATH = 'ho105.jpeg'
 IMAGE_PATH = 'ca110.jpeg'
 SAVE_IMAGE_PATH = 'output.png'
 IMAGE_SIZE = 256
@@ -105,6 +104,23 @@ def _box2cs(box):
     scale = scale * 1.25
 
     return center, scale
+
+
+def _xywh2xyxy(bbox_xywh):
+    """Transform the bbox format from xywh to x1y1x2y2.
+
+    Args:
+        bbox_xywh (ndarray): Bounding boxes (with scores),
+            shaped (n, 4) or (n, 5). (left, top, width, height, [score])
+    Returns:
+        np.ndarray: Bounding boxes (with scores), shaped (n, 4) or
+          (n, 5). (left, top, right, bottom, [score])
+    """
+    bbox_xyxy = bbox_xywh.copy()
+    bbox_xyxy[2] = bbox_xyxy[2] + bbox_xyxy[0] - 1
+    bbox_xyxy[3] = bbox_xyxy[3] + bbox_xyxy[1] - 1
+
+    return bbox_xyxy
 
 
 def preprocess(img, bbox):
@@ -201,7 +217,7 @@ def pose_estimate(net, det_net, img):
             ], key=lambda x: x.prob, reverse=True)
             obj = a[0]
             bbox = np.array([
-                int(w * obj.x), int(h * obj.y), int(w * obj.w), int(w * obj.h)
+                int(w * obj.x), int(h * obj.y), int(w * obj.w), int(h * obj.h)
             ])
         else:
             bbox = np.array([0, 0, w, h])
@@ -213,7 +229,6 @@ def pose_estimate(net, det_net, img):
 
     # inference
     output = net.predict([img])
-
     heatmap = output[0]
 
     result = postprocess(heatmap, img_metas)
@@ -221,7 +236,7 @@ def pose_estimate(net, det_net, img):
 
     # plot result
     pose_results = [{
-        'bbox': bbox,
+        'bbox': _xywh2xyxy(bbox),
         'keypoints': pose,
     }, ]
 
