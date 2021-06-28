@@ -48,10 +48,6 @@ parser = get_base_parser(
     SAVE_IMAGE_PATH,
 )
 parser.add_argument(
-    '-d', '--detector', action='store_true',
-    help='Use human detector'
-)
-parser.add_argument(
     '-m', '--model', metavar='ARCH',
     default='heavy', choices=MODEL_LIST,
     help='Set model architecture: ' + ' | '.join(MODEL_LIST)
@@ -102,48 +98,36 @@ def pose_estimate(net, det_net, img):
 
     logger.debug(f'input image shape: {img.shape}')
 
-    if det_net:
-        _, img224, scale, pad = but.resize_pad(img)
-        img224 = img224.astype('float32') / 255.
-        img224 = np.expand_dims(img224, axis=0)
+    _, img224, scale, pad = but.resize_pad(img)
+    img224 = img224.astype('float32') / 255.
+    img224 = np.expand_dims(img224, axis=0)
 
-        detector_out = det_net.predict([img224])
-        detections = but.detector_postprocess(detector_out)
-        count = len(detections) if detections[0].size != 0 else 0
+    detector_out = det_net.predict([img224])
+    detections = but.detector_postprocess(detector_out)
+    count = len(detections) if detections[0].size != 0 else 0
 
-        # Pose estimation
-        imgs = []
-        if 0 < count:
-            imgs, affine, _ = but.estimator_preprocess(
-                src_img, detections, scale, pad
-            )
+    # Pose estimation
+    imgs = []
+    if 0 < count:
+        imgs, affine, _ = but.estimator_preprocess(
+            src_img, detections, scale, pad
+        )
 
-        flags = []
-        landmarks = []
-        for i, img in enumerate(imgs):
-            img = np.expand_dims(img, axis=0)
-            output = net.predict([img])
-
-            normalized_landmarks, f, _, _, _ = output
-            normalized_landmarks = postprocess(normalized_landmarks)
-
-            flags.append(f[0])
-            landmarks.append(normalized_landmarks[0])
-
-        landmarks = np.stack(landmarks)
-        landmarks = but.denormalize_landmarks(landmarks, affine)
-    else:
-        img = preprocess(img)
+    flags = []
+    landmarks = []
+    for i, img in enumerate(imgs):
+        img = np.expand_dims(img, axis=0)
         output = net.predict([img])
 
-        normalized_landmarks, flags, _, _, _ = output
+        normalized_landmarks, f, _, _, _ = output
         normalized_landmarks = postprocess(normalized_landmarks)
 
-        landmarks = np.zeros_like(normalized_landmarks)
-        landmarks[:, :, 0] = normalized_landmarks[:, :, 0] * w
-        landmarks[:, :, 1] = normalized_landmarks[:, :, 1] * h
-        landmarks[:, :, 2] = normalized_landmarks[:, :, 2]
-        landmarks[:, :, 3] = normalized_landmarks[:, :, 3]
+        flags.append(f[0])
+        landmarks.append(normalized_landmarks[0])
+
+    if len(imgs)>=1:
+        landmarks = np.stack(landmarks)
+        landmarks = but.denormalize_landmarks(landmarks, affine)
 
     return flags, landmarks
 
@@ -342,9 +326,8 @@ def recognize_from_video(net, det_net):
 
 def main():
     # model files check and download
-    if args.detector:
-        logger.info('=== detector model ===')
-        check_and_download_models(WEIGHT_DETECTOR_PATH, MODEL_DETECTOR_PATH, REMOTE_PATH)
+    logger.info('=== detector model ===')
+    check_and_download_models(WEIGHT_DETECTOR_PATH, MODEL_DETECTOR_PATH, REMOTE_PATH)
     logger.info('=== blazepose model ===')
     info = {
         'lite': (WEIGHT_LITE_PATH, MODEL_LITE_PATH),
@@ -359,10 +342,7 @@ def main():
     logger.info(f'env_id: {env_id}')
 
     # initialize
-    if args.detector:
-        det_net = ailia.Net(MODEL_DETECTOR_PATH, WEIGHT_DETECTOR_PATH, env_id=env_id)
-    else:
-        det_net = None
+    det_net = ailia.Net(MODEL_DETECTOR_PATH, WEIGHT_DETECTOR_PATH, env_id=env_id)
     net = ailia.Net(model_path, weight_path, env_id=env_id)
 
     if args.video is not None:

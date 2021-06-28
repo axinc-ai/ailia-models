@@ -40,11 +40,6 @@ By adding the `--model` option, you can specify model type which is selected fro
 $ python3 blazepose-fullbody.py --model full
 ```
 
-By specifying the `--detector` option, apply the detector.
-```bash
-$ python3 blazepose-fullbody.py --detector
-```
-
 ## Reference
 
 [MediaPipePyTorch](https://github.com/zmurez/MediaPipePyTorch)
