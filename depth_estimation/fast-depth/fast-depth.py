@@ -7,8 +7,7 @@ import numpy as np
 from PIL import Image
 
 import ailia
-from dataloaders.utils import val_transform
-import utils_misc
+import fast_depth_utils
 
 # Import original modules.
 sys.path.append("../../util")
@@ -58,7 +57,7 @@ args = update_parser(parser)
 # Main functions
 # ======================
 def _make_dataset(img):
-    input_np, _ = val_transform(img, None, OUTPUT_SIZE)
+    input_np, _ = fast_depth_utils.transform(img, None, OUTPUT_SIZE)
     input_tensor = input_np.transpose((2, 0, 1)).copy()
     while input_tensor.ndim < 3:
         input_tensor = np.expand_dims(input_tensor, 0)
@@ -92,7 +91,7 @@ def _estimate(img, model, args):
     else:
         scale_min = np.min(depth_pred)
         scale_max = np.max(depth_pred)
-    depth_pred_col = utils_misc.colored_depthmap(
+    depth_pred_col = fast_depth_utils.colored_depthmap(
         depth_pred,
         scale_min,
         scale_max,
@@ -121,7 +120,7 @@ def recognize_from_image():
         depth_pred_col = _estimate(dataset[0], net, args)
         stem = os.path.splitext(os.path.basename(IMAGE_PATH))[0]
         filepath = os.path.join(args.savepath, f"{stem}_depth.png")
-        utils_misc.save_image(depth_pred_col, filepath)
+        fast_depth_utils.save_image(depth_pred_col, filepath)
     logger.info("Script finished successfully.")
 
 
