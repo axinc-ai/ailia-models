@@ -68,6 +68,10 @@ parser.add_argument(
     help='Use yolov3 detector'
 )
 parser.add_argument(
+    '-n', '--max_num', default=None, type=int,
+    help='Maximum number to detect objects. (without setting is for unlimited)'
+)
+parser.add_argument(
     '-th', '--threshold',
     default=DETECTION_THRESHOLD, type=float,
     help='The detection threshold'
@@ -202,10 +206,9 @@ def postprocess(output, img_metas):
 
 def pose_estimate(net, det_net, img):
     h, w = img.shape[:2]
+    n = args.max_num
 
     logger.debug(f'input image shape: {img.shape}')
-
-    n = 3
 
     if det_net:
         det_net.set_input_shape(DETECTION_SIZE, DETECTION_SIZE)
@@ -216,6 +219,7 @@ def pose_estimate(net, det_net, img):
             a = sorted([
                 det_net.get_object(i) for i in range(count)
             ], key=lambda x: x.prob, reverse=True)
+            a = a[:n] if n else a
             bboxes = np.array([
                 (int(w * obj.x), int(h * obj.y), int(w * obj.w), int(h * obj.h))
                 for obj in a[:n]
