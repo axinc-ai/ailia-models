@@ -205,6 +205,8 @@ def pose_estimate(net, det_net, img):
 
     logger.debug(f'input image shape: {img.shape}')
 
+    n = 3
+
     if det_net:
         det_net.set_input_shape(DETECTION_SIZE, DETECTION_SIZE)
         det_net.compute(img, args.threshold, args.iou)
@@ -214,30 +216,33 @@ def pose_estimate(net, det_net, img):
             a = sorted([
                 det_net.get_object(i) for i in range(count)
             ], key=lambda x: x.prob, reverse=True)
-            obj = a[0]
-            bbox = np.array([
-                int(w * obj.x), int(h * obj.y), int(w * obj.w), int(h * obj.h)
+            bboxes = np.array([
+                (int(w * obj.x), int(h * obj.y), int(w * obj.w), int(h * obj.h))
+                for obj in a[:n]
             ])
         else:
-            bbox = np.array([0, 0, w, h])
+            bboxes = np.array([[0, 0, w, h]])
     else:
-        bbox = np.array([0, 0, w, h])
+        bboxes = np.array([[0, 0, w, h]])
 
-    img = cv2.cvtColor(img, cv2.COLOR_BGRA2RGB)
-    img, img_metas = preprocess(img, bbox)
+    img_0 = cv2.cvtColor(img, cv2.COLOR_BGRA2RGB)
 
-    # inference
-    output = net.predict([img])
-    heatmap = output[0]
+    pose_results = []
+    for bbox in bboxes:
+        img, img_metas = preprocess(img_0, bbox)
 
-    result = postprocess(heatmap, img_metas)
-    pose = result['preds'][0]
+        # inference
+        output = net.predict([img])
+        heatmap = output[0]
 
-    # plot result
-    pose_results = [{
-        'bbox': _xywh2xyxy(bbox),
-        'keypoints': pose,
-    }, ]
+        result = postprocess(heatmap, img_metas)
+        pose = result['preds'][0]
+
+        # plot result
+        pose_results.append({
+            'bbox': _xywh2xyxy(bbox),
+            'keypoints': pose,
+        })
 
     return pose_results
 
