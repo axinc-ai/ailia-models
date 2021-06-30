@@ -2,21 +2,15 @@
 
 ## Input
 
-![Input](ca110.jpeg)
+![Input](input.jpg)
 
-(Image from https://github.com/open-mmlab/mmpose/blob/master/tests/data/animalpose/ca110.jpeg)
+(Image from https://pixabay.com/ja/photos/%e7%89%9b-%e5%ae%b6%e7%95%9c-%e4%b9%b3%e7%89%9b-%e4%b9%b3%e7%94%a8%e7%89%9b-%e5%8b%95%e7%89%a9-5717276/)
 
 Shape : (1, 3, 256, 256)
 
 ## Output
 
-### result without detector
-
 ![Output](output.png)
-
-### result with detector
-
-![Output](output_detector.png)
 
 ## Usage
 Automatically downloads the onnx and prototxt files on the first run.
@@ -37,12 +31,6 @@ By adding the `--video` option, you can input the video.
 If you pass `0` as an argument to VIDEO_PATH, you can use the webcam input instead of the video file.
 ```bash
 $ python3 animalpose.py --video VIDEO_PATH
-```
-
-By specifying the `--detector` option, apply the detector.
-The yolov3 is used as detector.
-```bash
-$ python3 animalpose.py --detector
 ```
 
 ## Reference

@@ -64,10 +64,6 @@ parser.add_argument(
     help='Set model architecture: ' + ' | '.join(MODEL_LIST)
 )
 parser.add_argument(
-    '-d', '--detector', action='store_true',
-    help='Use yolov3 detector'
-)
-parser.add_argument(
     '-n', '--max_num', default=None, type=int,
     help='Maximum number to detect objects. (without setting is for unlimited)'
 )
@@ -265,15 +261,20 @@ def vis_pose_result(img, result):
                 [7, 8], [6, 9], [9, 13], [13, 17], [6, 10], [10, 14],
                 [14, 18], [7, 11], [11, 15], [15, 19], [7, 12], [12, 16],
                 [16, 20]]
-    pose_limb_color = palette[[0] * 20]
-    pose_kpt_color = palette[[0] * 20]
+    
+    #pose_limb_color = palette[[0] * 20]
+    #pose_kpt_color = palette[[0] * 20]
 
+    pose_limb_color = palette
+    pose_kpt_color = palette
+    
     img = show_result(
         img,
         result,
         skeleton,
         pose_kpt_color=pose_kpt_color,
-        pose_limb_color=pose_limb_color)
+        pose_limb_color=pose_limb_color,
+        thickness=3)
 
     return img
 
@@ -363,7 +364,9 @@ def recognize_from_video(net, det_net):
 
 def main():
     # model files check and download
-    if args.detector:
+    detector = True
+
+    if detector:
         logger.info('=== detector model ===')
         check_and_download_models(WEIGHT_YOLOV3_PATH, MODEL_YOLOV3_PATH, REMOTE_YOLOV3_PATH)
     logger.info('=== animalpose model ===')
@@ -382,7 +385,7 @@ def main():
     logger.info(f'env_id: {env_id}')
 
     # initialize
-    if args.detector:
+    if detector:
         det_net = ailia.Detector(
             MODEL_YOLOV3_PATH,
             WEIGHT_YOLOV3_PATH,
