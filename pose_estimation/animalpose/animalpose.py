@@ -41,7 +41,7 @@ WEIGHT_YOLOV3_PATH = 'yolov3.opt2.onnx'
 MODEL_YOLOV3_PATH = 'yolov3.opt2.onnx.prototxt'
 REMOTE_YOLOV3_PATH = 'https://storage.googleapis.com/ailia-models/yolov3/'
 
-IMAGE_PATH = 'ca110.jpeg'
+IMAGE_PATH = 'input.jpg'
 SAVE_IMAGE_PATH = 'output.png'
 IMAGE_SIZE = 256
 
