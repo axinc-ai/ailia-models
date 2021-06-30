@@ -40,7 +40,8 @@ If you pass `0` as an argument to VIDEO_PATH, you can use the webcam input inste
 ```bash
 $ python3 efficientnetv2.py --video VIDEO_PATH
 ```
-
+The default setting is to use the optimized model and weights, but you can also switch to the normal model by using the
+--normal option.
 
 ## Reference
 
@@ -57,4 +58,11 @@ Tensorflow
 
 ## Netron
 
-[efficientnetv2.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/efficientnetv2/efficientnetv2-b0.onnx.prototxt)
+[efficientnetv2-b0.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/efficientnetv2/efficientnetv2-b0.onnx.prototxt)
+
+[efficientnetv2-b1.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/efficientnetv2/efficientnetv2-b1.onnx.prototxt)
+
+[efficientnetv2-b2.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/efficientnetv2/efficientnetv2-b2.onnx.prototxt)
+
+[efficientnetv2-b3.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/efficientnetv2/efficientnetv2-b3.onnx.prototxt)
+

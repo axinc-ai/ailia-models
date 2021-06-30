@@ -21,8 +21,6 @@ logger = getLogger(__name__)
 # ======================
 # Parameters
 # ======================
-WEIGHT_PATH = 'efficientnetv2-b0.opt.onnx'
-MODEL_PATH = 'efficientnetv2-b0.opt.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/efficientnetv2/'
 
 IMAGE_PATH = 'input.jpg'
@@ -34,9 +32,16 @@ SLEEP_TIME = 0
 # Arguemnt Parser Config
 # ======================
 parser = get_base_parser('Image classification model: efficientnetv2', IMAGE_PATH, None)
+parser.add_argument(
+    '--model_name',
+    default='efficientnetv2-b0',
+    help='[efficientnetv2-b0, efficientnetv2-b1, efficientnetv2-b2, efficientnetv2-b3]'
+)
 args = update_parser(parser)
 
-
+MODEL_NAME = args.model_name
+WEIGHT_PATH = MODEL_NAME + '.opt.onnx'
+MODEL_PATH = MODEL_NAME + '.opt.onnx.prototxt'
 # ======================
 # Main functions
 # ======================
