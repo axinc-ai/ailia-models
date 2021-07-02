@@ -31,6 +31,10 @@ WEIGHT_PATH = 'yolov3.opt.onnx'
 MODEL_PATH = 'yolov3.opt.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/yolov3/'
 
+WEIGHT_PATH = 'yolov4_640_640.onnx'
+MODEL_PATH = 'yolov4_640_640.onnx.prototxt'
+REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/yolov4/'
+
 IMAGE_PATH = 'input.jpg'
 SAVE_IMAGE_PATH = 'output.png'
 
@@ -49,7 +53,7 @@ COCO_CATEGORY = [
     "oven", "toaster", "sink", "refrigerator", "book", "clock", "vase",
     "scissors", "teddy bear", "hair drier", "toothbrush"
 ]
-THRESHOLD = 0.4
+THRESHOLD = 0.1
 IOU = 0.45
 POSE_THRESHOLD = 0.1
 
@@ -164,6 +168,10 @@ def plot_results(detector, pose, img, category, pose_detections, logging=True):
 
     for idx in range(count):
         obj = detector.get_object(idx)
+
+        if(obj.category!=0):
+            continue
+
         # print result
         if logging:
             logger.info(f'+ idx={idx}')
@@ -261,6 +269,17 @@ def recognize_from_image():
 
 def recognize_from_video():
     # net initialize
+    #detector = ailia.Detector(
+    #    MODEL_PATH,
+    #    WEIGHT_PATH,
+    #    len(COCO_CATEGORY),
+    #    format=ailia.NETWORK_IMAGE_FORMAT_RGB,
+    #    channel=ailia.NETWORK_IMAGE_CHANNEL_FIRST,
+    #    range=ailia.NETWORK_IMAGE_RANGE_U_FP32,
+    #    algorithm=ailia.DETECTOR_ALGORITHM_YOLOV3,
+    #    env_id=args.env_id,
+    #)
+
     detector = ailia.Detector(
         MODEL_PATH,
         WEIGHT_PATH,
@@ -268,9 +287,10 @@ def recognize_from_video():
         format=ailia.NETWORK_IMAGE_FORMAT_RGB,
         channel=ailia.NETWORK_IMAGE_CHANNEL_FIRST,
         range=ailia.NETWORK_IMAGE_RANGE_U_FP32,
-        algorithm=ailia.DETECTOR_ALGORITHM_YOLOV3,
+        algorithm=ailia.DETECTOR_ALGORITHM_YOLOV4,
         env_id=args.env_id,
     )
+    #detector.set_input_shape(1280,1280)
 
     pose = ailia.Net(POSE_MODEL_PATH, POSE_WEIGHT_PATH, env_id=args.env_id)
 
