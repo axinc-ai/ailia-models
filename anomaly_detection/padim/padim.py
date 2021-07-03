@@ -80,6 +80,14 @@ parser.add_argument(
     '-th', '--threshold', type=float, default=None,
     help='threshold'
 )
+parser.add_argument(
+    '-ag', '--aug', action='store_true',
+    help='execute augmentation.'
+)
+parser.add_argument(
+    '-an', '--aug_num', type=int, default=5,
+    help='specify the amplification number of augmentation.'
+)
 args = update_parser(parser)
 
 
@@ -118,6 +126,53 @@ def preprocess(img, mask=False):
     return img
 
 
+def preprocess_aug(img, mask=False, angle_range=[-10, 10], 
+                   angle=None, pad_h=None, pad_w=None):
+    h, w = img.shape[:2]
+    size = IMAGE_RESIZE
+    crop_size = IMAGE_SIZE
+
+    # resize
+    if h > w:
+        size = (size, int(size * h / w))
+    else:
+        size = (int(size * w / h), size)
+    img = np.array(Image.fromarray(img).resize(
+        size, resample=Image.ANTIALIAS if not mask else Image.NEAREST))
+
+    # random rotate
+    if (angle is None):
+        angle = np.random.randint(angle_range[0], angle_range[0] + 1)
+    rot_mat = cv2.getRotationMatrix2D((w / 2, h / 2), angle, 1)
+    if (mask is True):
+        interpolation = cv2.INTER_NEAREST
+    else:
+        interpolation = cv2.INTER_LINEAR
+    img = cv2.warpAffine(src=img,
+                         M=rot_mat,
+                         dsize=(w, h),
+                         borderMode=cv2.BORDER_REPLICATE,
+                         flags=interpolation)
+
+    # random crop
+    if (pad_h is None):
+        pad_h = np.random.randint(0, (h - crop_size))
+    if (pad_w is None):
+        pad_w = np.random.randint(0, (w - crop_size))
+    img = img[pad_h:pad_h + crop_size, pad_w:pad_w + crop_size, :]
+
+    # normalize
+    if not mask:
+        img = normalize_image(img.astype(np.float32), 'ImageNet')
+    else:
+        img = img / 255
+
+    img = img.transpose(2, 0, 1)  # HWC -> CHW
+    img = np.expand_dims(img, axis=0)
+
+    return img, angle, pad_h, pad_w
+
+
 def postprocess(outputs):
     # Embedding concat
     embedding_vectors = outputs['layer1']
@@ -148,50 +203,74 @@ def get_train_outputs(net, create_net, params):
 
     logger.info('extract train set features')
 
-    train_outputs = OrderedDict([
-        ('layer1', []), ('layer2', []), ('layer3', [])
-    ])
-    for i in range(0, len(train_imgs), batch_size):
-        # prepare input data
-        imgs = []
-        for image_path in train_imgs[i:i + batch_size]:
-            logger.info(image_path)
-            img = load_image(image_path)
-            img = cv2.cvtColor(img, cv2.COLOR_BGRA2RGB)
-            img = preprocess(img)
-            imgs.append(img)
+    if args.aug:
+        aug_num = args.aug_num
+    else:
+        aug_num = 1
+    mean = None
+    N = 0
+    for i_aug in range(aug_num):
+        for i_img in range(0, len(train_imgs), batch_size):
+            # prepare input data
+            imgs = []
+            for image_path in train_imgs[i_img:i_img + batch_size]:
+                logger.info(image_path)
+                img = load_image(image_path)
+                img = cv2.cvtColor(img, cv2.COLOR_BGRA2RGB)
+                if (not args.aug):
+                    img = preprocess(img)
+                else:
+                    img, _, _, _ = preprocess_aug(img)
+                imgs.append(img)
 
-        imgs = np.vstack(imgs)
+            # countup N
+            N += len(imgs)
 
-        logger.debug(f'input images shape: {imgs.shape}')
-        if create_net:
-            net = create_net()
-        net.set_input_shape(imgs.shape)
+            imgs = np.vstack(imgs)
 
-        _ = net.predict(imgs)
+            logger.debug(f'input images shape: {imgs.shape}')
+            if create_net:
+                net = create_net()
+            net.set_input_shape(imgs.shape)
 
-        for key, name in zip(train_outputs.keys(), params["feat_names"]):
-            train_outputs[key].append(net.get_blob_data(name))
+            _ = net.predict(imgs)
 
-    logger.info('postprocessing...')
+            train_outputs = OrderedDict([
+                ('layer1', []), ('layer2', []), ('layer3', [])
+            ])
+            for key, name in zip(train_outputs.keys(), params["feat_names"]):
+                train_outputs[key].append(net.get_blob_data(name))
+            for k, v in train_outputs.items():
+                train_outputs[k] = v[0]
 
-    for k, v in train_outputs.items():
-        train_outputs[k] = np.vstack(v)
+            embedding_vectors = postprocess(train_outputs)
 
-    embedding_vectors = postprocess(train_outputs)
+            # randomly select d dimension
+            idx = params['idx']
+            embedding_vectors = embedding_vectors[:, idx, :, :]
 
-    # randomly select d dimension
-    idx = params['idx']
-    embedding_vectors = embedding_vectors[:, idx, :, :]
+            # calculate multivariate Gaussian distribution
+            B, C, H, W = embedding_vectors.shape
+            embedding_vectors = embedding_vectors.reshape(B, C, H * W)
 
-    # calculate multivariate Gaussian distribution
-    B, C, H, W = embedding_vectors.shape
-    embedding_vectors = embedding_vectors.reshape(B, C, H * W)
-    mean = np.mean(embedding_vectors, axis=0)
-    cov = np.zeros((C, C, H * W), dtype=np.float32)
-    I = np.identity(C)
+            # initialize mean and covariance matrix
+            if (mean is None):
+                mean = np.zeros((C, H * W), dtype=np.float32)
+                cov = np.zeros((C, C, H * W), dtype=np.float32)
+                I = np.identity(C)
+
+            # add up mean and covariance matrix
+            mean += np.sum(embedding_vectors, axis=0)
+            for i in range(H * W):
+                # https://github.com/numpy/numpy/blob/v1.21.0/numpy/lib/function_base.py#L2324-L2543
+                m = embedding_vectors[:, :, i]
+                m = m - (mean[:, [i]].T / N)
+                cov[:, :, i] += m.T @ m
+    # devide mean by N
+    mean = mean / N
+    # devide covariance by N-1, and calculate inverse
     for i in range(H * W):
-        cov[:, :, i] = np.cov(embedding_vectors[:, :, i], rowvar=False) + 0.01 * I
+        cov[:, :, i] = (cov[:, :, i] / (N - 1)) + 0.01 * I
 
     train_outputs = [mean, cov]
 
@@ -292,57 +371,69 @@ def recognize_from_image(net, create_net, params):
     test_outputs = OrderedDict([
         ('layer1', []), ('layer2', []), ('layer3', [])
     ])
-    for i in range(0, len(args.input), batch_size):
-        # prepare input data
-        imgs = []
-        for image_path in args.input[i:i + batch_size]:
-            logger.info(image_path)
-            img = load_image(image_path)
-            img = cv2.cvtColor(img, cv2.COLOR_BGRA2RGB)
-            img = preprocess(img)
-            imgs.append(img)
+    if args.aug:
+        aug_num = args.aug_num
+    else:
+        aug_num = 1
+    for i_aug in range(aug_num):
+        for i in range(0, len(args.input), batch_size):
+            # prepare input data
+            imgs = []
+            for image_path in args.input[i:i + batch_size]:
+                logger.info(image_path)
+                img = load_image(image_path)
+                img = cv2.cvtColor(img, cv2.COLOR_BGRA2RGB)
+                if (not args.aug):
+                    img = preprocess(img)
+                else:
+                    img, angle, pad_h, pad_w = preprocess_aug(img)
+                imgs.append(img)
 
-            # ground truth
-            gt_img = None
-            if gt_type_dir:
-                fname = os.path.splitext(os.path.basename(image_path))[0]
-                gt_fpath = os.path.join(gt_type_dir, fname + '_mask.png')
-                if os.path.exists(gt_fpath):
-                    gt_img = load_image(gt_fpath)
-                    gt_img = cv2.cvtColor(gt_img, cv2.COLOR_BGRA2RGB)
-                    gt_img = preprocess(gt_img, mask=True)
-                    gt_img = np.mean(gt_img, axis=1, keepdims=True)
+                # ground truth
+                gt_img = None
+                if gt_type_dir:
+                    fname = os.path.splitext(os.path.basename(image_path))[0]
+                    gt_fpath = os.path.join(gt_type_dir, fname + '_mask.png')
+                    if os.path.exists(gt_fpath):
+                        gt_img = load_image(gt_fpath)
+                        gt_img = cv2.cvtColor(gt_img, cv2.COLOR_BGRA2RGB)
+                        if (not args.aug):
+                            gt_img = preprocess(gt_img, mask=True)
+                        else:
+                            gt_img, _, _, _ = preprocess_aug(gt_img, angle=angle,
+                                                             pad_h=pad_h, pad_w=pad_w)
+                        gt_img = np.mean(gt_img, axis=1, keepdims=True)
 
-            gt_img = gt_img[0] if gt_img is not None else np.zeros((1, IMAGE_SIZE, IMAGE_SIZE))
+                gt_img = gt_img[0] if gt_img is not None else np.zeros((1, IMAGE_SIZE, IMAGE_SIZE))
 
-            test_imgs.append(img[0])
-            gt_imgs.append(gt_img)
+                test_imgs.append(img[0])
+                gt_imgs.append(gt_img)
 
-        imgs = np.vstack(imgs)
+            imgs = np.vstack(imgs)
 
-        logger.debug(f'input images shape: {imgs.shape}')
-        if create_net:
-            net = create_net()
-        net.set_input_shape(imgs.shape)
+            logger.debug(f'input images shape: {imgs.shape}')
+            if create_net:
+                net = create_net()
+            net.set_input_shape(imgs.shape)
 
-        # inference
-        logger.info('Start inference...')
-        if args.benchmark:
-            logger.info('BENCHMARK mode')
-            total_time = 0
-            for i in range(args.benchmark_count):
-                start = int(round(time.time() * 1000))
+            # inference
+            logger.info('Start inference...')
+            if args.benchmark:
+                logger.info('BENCHMARK mode')
+                total_time = 0
+                for i in range(args.benchmark_count):
+                    start = int(round(time.time() * 1000))
+                    _ = net.predict(imgs)
+                    end = int(round(time.time() * 1000))
+                    logger.info(f'\tailia processing time {end - start} ms')
+                    if i != 0:
+                        total_time = total_time + (end - start)
+                logger.info(f'\taverage time {total_time / (args.benchmark_count - 1)} ms')
+            else:
                 _ = net.predict(imgs)
-                end = int(round(time.time() * 1000))
-                logger.info(f'\tailia processing time {end - start} ms')
-                if i != 0:
-                    total_time = total_time + (end - start)
-            logger.info(f'\taverage time {total_time / (args.benchmark_count - 1)} ms')
-        else:
-            _ = net.predict(imgs)
 
-        for key, name in zip(test_outputs.keys(), params["feat_names"]):
-            test_outputs[key].append(net.get_blob_data(name))
+            for key, name in zip(test_outputs.keys(), params["feat_names"]):
+                test_outputs[key].append(net.get_blob_data(name))
 
     logger.info('postprocessing...')
 
