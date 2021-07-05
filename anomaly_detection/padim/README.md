@@ -6,7 +6,7 @@
 
 (Image from MVTec AD datasets https://www.mvtec.com/company/research/datasets/mvtec-ad/)
 
-Shape : (n, 3, 244, 244)
+Original image shape : (n, 3, 900, 900)
 
 ## Output
 
@@ -17,7 +17,7 @@ Left to right: input, ground truth, predicted head map, predicted mask, segmenta
 ## Usage
 In order to get the feature vector of the normal product, it is necessary to prepare the file of the normal product.  
 By default, normal files are got from the `train` directory.  
-For the sample image, first download [MVTec AD datasets](https://www.mvtec.com/company/research/datasets/mvtec-ad/) and place `bottle/train/good/*.png` files to the `train` directory. 
+For the sample image, first download [MVTec AD datasets](https://www.mvtec.com/company/research/datasets/mvtec-ad/) and place `bottle/train/good/*.png` files to the `train` directory.
 
 Automatically downloads the onnx and prototxt files on the first run.
 It is necessary to be connected to the Internet while downloading.
@@ -60,6 +60,18 @@ $ python3 padim.py -i bottle/test/broken_large --train_dir bottle/train/good --g
 
 By adding the `--arch` option, you can specify model type which is selected from "resnet18", "wide_resnet50_2".  
 (default is resnet18)
+```bash
+$ python3 padim.py --arch wide_resnet50_2
+```
+
+By adding the `--aug` option, you can process with augmentation.  
+(default is processing without augmentation)
+```bash
+$ python3 padim.py --arch wide_resnet50_2
+```
+
+By adding the `--aug_num` option, you can specify amplification factor of data by augmentation.
+(default is 5)
 ```bash
 $ python3 padim.py --arch wide_resnet50_2
 ```
