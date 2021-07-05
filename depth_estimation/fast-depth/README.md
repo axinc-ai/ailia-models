@@ -11,7 +11,7 @@ FastDepth: Fast Monocular Depth Estimation on Embedded Systems
 ### output
 - output image (1x1x224x224)
 
-<img src="./img/00001_depth.png" width="240px">
+<img src="./output.png" width="240px">
 
 ### usage
 Automatically downloads the onnx and prototxt files on the first run.
