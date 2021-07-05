@@ -144,6 +144,7 @@ The collection of pre-trained, state-of-the-art AI models.
 | [<img src="image_classification/mobilenetv3/clock.jpg" width=128px>](image_classification/mobilenetv3/) | [mobilenetv3](/image_classification/mobilenetv3/)|[PyTorch Implemention of MobileNet V3](https://github.com/d-li14/mobilenetv3.pytorch)|Pytorch| 1.2.1 and later |
 | [<img src="image_classification/partialconv/test_5735.JPEG" width=128px>](image_classification/partialconv/) | [partialconv](/image_classification/partialconv/)|[Partial Convolution Layer for Padding and Image Inpainting](https://github.com/NVIDIA/partialconv)|Pytorch| 1.2.0 and later |
 | [<img src="image_classification/efficientnet/clock.jpg" width=128px>](image_classification/efficientnet/)| [efficientnet](/image_classification/efficientnet/)|[A PyTorch implementation of EfficientNet]( https://github.com/lukemelas/EfficientNet-PyTorch)|Pytorch| 1.2.3 and later |
+| [<img src="image_classification/vit/output.png" width=128px>](image_classification/vit/)| [vit](/image_classification/vit/)|[Pytorch reimplementation of the Vision Transformer (An Image is Worth 16x16 Words: Transformers for Image Recognition at Scale)](https://github.com/jeonsworld/ViT-pytorch)|Pytorch| 1.2.7 and later |
 
 ## Image manipulation
 
