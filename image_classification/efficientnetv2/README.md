@@ -58,11 +58,11 @@ Tensorflow
 
 ## Netron
 
-[efficientnetv2-b0.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/efficientnetv2/efficientnetv2-b0.onnx.prototxt)
+[efficientnetv2-b0.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/efficientnetv2/efficientnetv2-b0.opt.onnx.prototxt)
 
-[efficientnetv2-b1.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/efficientnetv2/efficientnetv2-b1.onnx.prototxt)
+[efficientnetv2-b1.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/efficientnetv2/efficientnetv2-b1.opt.onnx.prototxt)
 
-[efficientnetv2-b2.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/efficientnetv2/efficientnetv2-b2.onnx.prototxt)
+[efficientnetv2-b2.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/efficientnetv2/efficientnetv2-b2.opt.onnx.prototxt)
 
-[efficientnetv2-b3.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/efficientnetv2/efficientnetv2-b3.onnx.prototxt)
+[efficientnetv2-b3.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/efficientnetv2/efficientnetv2-b3.opt.onnx.prototxt)
 
