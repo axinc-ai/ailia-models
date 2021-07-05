@@ -86,7 +86,7 @@ def postprocess(landmarks):
             y = xx[j * 5 + 1] / IMAGE_SIZE
             z = xx[j * 5 + 2] / IMAGE_SIZE
             visibility = xx[j * 5 + 3]
-            presence = xx[j * 5 + 3]
+            presence = xx[j * 5 + 4]
             normalized_landmarks[i, j] = (x, y, z, sigmoid(min(visibility, presence)))
 
     return normalized_landmarks
@@ -150,14 +150,39 @@ def line(input_img, landmarks, flags, point1, point2):
         if flag >= threshold and conf1 >= threshold and conf2 >= threshold:
             color = hsv_to_rgb(255 * point1 / but.BLAZEPOSE_KEYPOINT_CNT, 255, 255)
 
+            line_width = 5
+
             x1 = int(landmark[point1, 0])
             y1 = int(landmark[point1, 1])
             x2 = int(landmark[point2, 0])
             y2 = int(landmark[point2, 1])
-            cv2.line(input_img, (x1, y1), (x2, y2), color, 5)
+            cv2.line(input_img, (x1, y1), (x2, y2), color, line_width)
+
+def circle(input_img, landmarks, flags):
+    threshold = args.threshold
+
+    for i in range(len(flags)):
+        for point1 in range(11,33):
+          landmark, flag = landmarks[i], flags[i]
+          conf1 = landmark[point1, 3]
+
+          if flag >= threshold and conf1 >= threshold:
+               color = hsv_to_rgb(255 * point1 / but.BLAZEPOSE_KEYPOINT_CNT, 255, 255)
+
+               base_line_width = 5
+
+               line_width = landmark[point1, 2]
+               line_width = base_line_width - line_width/2 * 100
+               line_width = max(int(line_width),1)
+
+               x1 = int(landmark[point1, 0])
+               y1 = int(landmark[point1, 1])
+               cv2.circle(input_img, (x1, y1), line_width, color, thickness=2, lineType=cv2.LINE_8, shift=0)
 
 
 def display_result(img, landmarks, flags):
+    circle(img, landmarks, flags)
+
     line(img, landmarks, flags, but.BLAZEPOSE_KEYPOINT_NOSE,
          but.BLAZEPOSE_KEYPOINT_EYE_LEFT_INNER)
     line(img, landmarks, flags, but.BLAZEPOSE_KEYPOINT_EYE_LEFT_INNER,
