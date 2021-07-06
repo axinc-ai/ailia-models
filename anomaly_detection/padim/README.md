@@ -67,13 +67,13 @@ $ python3 padim.py --arch wide_resnet50_2
 By adding the `--aug` option, you can process with augmentation.  
 (default is processing without augmentation)
 ```bash
-$ python3 padim.py --arch wide_resnet50_2
+$ python3 padim.py --aug
 ```
 
 By adding the `--aug_num` option, you can specify amplification factor of data by augmentation.
 (default is 5)
 ```bash
-$ python3 padim.py --arch wide_resnet50_2
+$ python3 padim.py --aug --aug_num 5
 ```
 
 ## Reference
