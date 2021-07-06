@@ -1,12 +1,12 @@
 # RetinaFace
 
 ## Input
-<img src='selfie.png' width='240px'>
+<img src='selfie.png' width='480px'>
 
 (Image from https://github.com/dlunion/DBFace/blob/master/datas/selfie.jpg)
 
 ## Output
-<img src='selfie_output.png' width='240px'>
+<img src='selfie_output.png' width='480px'>
 
 ## Usage
 Automatically downloads the onnx and prototxt files on the first run.
