@@ -30,7 +30,7 @@ $ python paddleocr.py
 If you want to specify the input image, put the image path after the `--input` option.  
 You can use `--savepath` option to change the name of the output file to save.
 ```bash
-$ python3 paddleocr.py --input IMAGE_PATH --savepath SAVE_IMAGE_PATH
+$ python3 paddleocr.py --input IMAGE_PATH --savepath SAVE_IMAGE_PATH
 $ python3 paddleocr.py -i IMAGE_PATH -s SAVE_IMAGE_PATH
 ```
 
@@ -41,7 +41,34 @@ $ python3 paddleocr.py -v VIDEO_PATH -s SAVE_VIDEO_PATH
 (ex) $ python3 paddleocr.py --video input.mp4 --savepath output.mp4
 ```
 
+By adding the `--language` option, you can choose the language.
+```bash
+$ python3 paddleocr.py --lanuage LANGUAGE
+$ python3 paddleocr.py -l LANGUAGE
+(ex) $ python3 paddleocr.py --lanuage japanese
+```
+
+The prepared language specifications are as follows.
+  - japanese, jpn, jp (default)
+  - english, eng, en
+  - chinese, chi, ch
+  - german, ger, ge
+  - french, fre, fr
+  - korean, kor, ko
+
 <br/>
+
+By adding the `--case` option, you can choose model size by case.
+```bash
+$ python3 paddleocr.py --case CASE
+$ python3 paddleocr.py -c CASE
+(ex) $ python3 paddleocr.py --case server
+```
+The prepared language specifications are as follows.
+  - mobile (default)
+  - server (only Japanese and Chinese have server size models)
+
+<br>
 
 ## About font file
 

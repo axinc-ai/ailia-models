@@ -13,6 +13,9 @@ from model_utils import check_and_download_models  # noqa: E402
 from image_utils import load_image  # noqa: E402
 import webcamera_utils  # noqa: E402
 
+import ssl
+ssl._create_default_https_context = ssl._create_unverified_context
+
 # logger
 from logging import getLogger   # noqa: E402
 logger = getLogger(__name__)
@@ -21,14 +24,21 @@ logger = getLogger(__name__)
 # ======================
 # PARAMETERS
 # ======================
-WEIGHT_PATH = 'blazeface.onnx'
-MODEL_PATH = 'blazeface.onnx.prototxt'
+WEIGHT_PATH_FRONT = 'blazeface.onnx'
+MODEL_PATH_FRONT = 'blazeface.onnx.prototxt'
+ANCHOR_PATH_FRONT = 'anchors.npy'
+WEIGHT_PATH_BACK = 'blazefaceback.onnx'
+MODEL_PATH_BACK = 'blazefaceback.onnx.prototxt'
+ANCHOR_PATH_BACK = 'anchorsback.npy'
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/blazeface/"
 
 IMAGE_PATH = 'input.png'
 SAVE_IMAGE_PATH = 'result.png'
-IMAGE_HEIGHT = 128
-IMAGE_WIDTH = 128
+
+IMAGE_HEIGHT_FRONT = 128
+IMAGE_WIDTH_FRONT = 128
+IMAGE_HEIGHT_BACK = 256
+IMAGE_WIDTH_BACK = 256
 
 
 # ======================
@@ -39,15 +49,22 @@ parser = get_base_parser(
     IMAGE_PATH,
     SAVE_IMAGE_PATH,
 )
+parser.add_argument('-bk', '--back', action='store_true')
 args = update_parser(parser)
 
 
 # ======================
 # Main functions
 # ======================
-def recognize_from_image():
-    # net initialize
-    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
+def recognize_from_image(net):
+    if args.back == True:
+        IMAGE_HEIGHT = IMAGE_HEIGHT_BACK
+        IMAGE_WIDTH = IMAGE_WIDTH_BACK
+        ANCHOR_PATH = ANCHOR_PATH_BACK
+    else:
+        IMAGE_HEIGHT = IMAGE_HEIGHT_FRONT
+        IMAGE_WIDTH = IMAGE_WIDTH_FRONT
+        ANCHOR_PATH = ANCHOR_PATH_FRONT
 
     # input image loop
     for image_path in args.input:
@@ -76,10 +93,10 @@ def recognize_from_image():
                     total_time = total_time + (end - start)
             logger.info(f'\taverage time {total_time / (args.benchmark_count-1)} ms')
         else:
-            preds_ailia = net.predict([input_data])
+            preds_ailia = net.predict([input_data]) 
 
         # post-processing
-        detections = but.postprocess(preds_ailia)
+        detections = but.postprocess(preds_ailia, anchor_path=ANCHOR_PATH, back=args.back)
 
         # generate detections
         savepath = get_savepath(args.savepath, image_path)
@@ -89,9 +106,15 @@ def recognize_from_image():
     logger.info('Script finished successfully.')
 
 
-def recognize_from_video():
-    # net initialize
-    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
+def recognize_from_video(net):
+    if args.back == True:
+        IMAGE_HEIGHT = IMAGE_HEIGHT_BACK
+        IMAGE_WIDTH = IMAGE_WIDTH_BACK
+        ANCHOR_PATH = ANCHOR_PATH_BACK
+    else:
+        IMAGE_HEIGHT = IMAGE_HEIGHT_FRONT
+        IMAGE_WIDTH = IMAGE_WIDTH_FRONT
+        ANCHOR_PATH = ANCHOR_PATH_FRONT
 
     capture = webcamera_utils.get_capture(args.video)
 
@@ -119,7 +142,7 @@ def recognize_from_video():
         preds_ailia = net.get_results()
 
         # postprocessing
-        detections = but.postprocess(preds_ailia)
+        detections = but.postprocess(preds_ailia, anchor_path=ANCHOR_PATH, back=args.back)
         but.show_result(input_image, detections)
 
         # remove padding
@@ -144,14 +167,23 @@ def recognize_from_video():
 
 def main():
     # model files check and download
-    check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
+    if args.back == True:
+        check_and_download_models(WEIGHT_PATH_BACK, MODEL_PATH_BACK, REMOTE_PATH)       
+    else:
+        check_and_download_models(WEIGHT_PATH_FRONT, MODEL_PATH_FRONT, REMOTE_PATH)
+
+    # net initialize
+    if args.back == True:
+        net = ailia.Net(MODEL_PATH_BACK, WEIGHT_PATH_BACK, env_id=args.env_id)
+    else:
+        net = ailia.Net(MODEL_PATH_FRONT, WEIGHT_PATH_FRONT, env_id=args.env_id)
 
     if args.video is not None:
         # video mode
-        recognize_from_video()
+        recognize_from_video(net)
     else:
         # image mode
-        recognize_from_image()
+        recognize_from_image(net)
 
 
 if __name__ == '__main__':

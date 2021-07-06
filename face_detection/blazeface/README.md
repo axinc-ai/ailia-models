@@ -21,6 +21,13 @@ For the sample image,
 $ python3 blazeface.py 
 ```
 
+If you want to use the blazefaceback model, add the `--back` or `-b` option.   
+You can find details in the reference.   
+To summarize, blazefaceback is the model that is trained to match the back-facing camera.
+```bash
+$ python3 blazeface.py --back
+```
+
 If you want to specify the input image, put the image path after the `--input` option.  
 You can use `--savepath` option to change the name of the output file to save.
 ```bash
