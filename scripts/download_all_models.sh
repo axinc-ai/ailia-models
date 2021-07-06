@@ -21,6 +21,7 @@ cd ../../deep_fashion/mmfashion; python3 mmfashion.py ${OPTION}
 cd ../../depth_estimation/midas; python3 midas.py ${OPTION}
 cd ../../depth_estimation/monodepth2; python3 monodepth2.py ${OPTION}
 cd ../../depth_estimation/fcrn-depthprediction; python3 fcrn-depthprediction.py ${OPTION}
+cd ../../depth_estimation/fast-depth; python3 fast-depth.py ${OPTION}
 cd ../../face_detection/blazeface; python3 blazeface.py ${OPTION}
 cd ../../face_detection/dbface; python3 dbface.py ${OPTION}
 cd ../../face_detection/face-mask-detection; python3 face-mask-detection.py ${OPTION}
@@ -62,6 +63,8 @@ cd ../../image_classification/mobilenetv3; python3 mobilenetv3.py ${OPTION}
 cd ../../image_classification/partialconv; python3 partialconv.py ${OPTION}
 cd ../../image_classification/resnet50; python3 resnet50.py ${OPTION}
 cd ../../image_classification/vgg16; python3 vgg16.py ${OPTION}
+cd ../../image_classification/vit; python3 vit.py ${OPTION}
+cd ../../image_classification/efficientnetv2; python3 efficientnetv2.py ${OPTION}
 cd ../../image_manipulation/3d-photo-inpainting; python3 3d-photo-inpainting.py ${OPTION}
 cd ../../image_manipulation/dewarpnet; python3 dewarpnet.py ${OPTION}
 cd ../../image_manipulation/illnet; python3 illnet.py ${OPTION}
