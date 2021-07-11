@@ -22,8 +22,8 @@ logger = getLogger(__name__)
 # Parameters
 # ======================
 
-WEIGHT_PATH = 'u2net_human_seg.onnx'
-MODEL_PATH = 'u2net_human_seg.onnx.prototxt'
+WEIGHT_PATH = 'u2net-human-seg.onnx'
+MODEL_PATH = 'u2net-human-seg.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/u2net-human-seg/'
 
 IMAGE_PATH = 'input.jpg'

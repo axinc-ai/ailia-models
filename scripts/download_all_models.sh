@@ -92,6 +92,7 @@ cd ../../image_segmentation/swiftnet; python3 swiftnet.py ${OPTION}
 cd ../../image_segmentation/codes-for-lane-detection; python3 codes-for-lane-detection.py ${OPTION}
 cd ../../image_segmentation/dense_prediction_transformers; python3 dense_prediction_transformers.py ${OPTION}
 cd ../../image_segmentation/u2net-portrait-matting; python3 u2net-portrait-matting.py ${OPTION}
+cd ../../image_segmentation/u2net-human-seg; python3 u2net-human-seg.py ${OPTION}
 cd ../../image_segmentation/indexnet; python3 indexnet.py ${OPTION}
 cd ../../neural_language_processing/bert; python3 bert.py ${OPTION}
 cd ../../neural_language_processing/bert_tweets_sentiment; python3 bert_tweets_sentiment.py ${OPTION}
