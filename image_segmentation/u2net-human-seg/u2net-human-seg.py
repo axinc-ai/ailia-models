@@ -140,7 +140,7 @@ def recognize_from_image(net):
             res_img = img_0
 
         # save results
-        savepath = get_savepath(args.savepath, image_path)
+        savepath = get_savepath(args.savepath, image_path, ext='.png')
         logger.info(f'saved at : {savepath}')
         cv2.imwrite(savepath, res_img)
 
