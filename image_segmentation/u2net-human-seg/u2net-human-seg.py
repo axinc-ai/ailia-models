@@ -44,11 +44,6 @@ parser.add_argument(
     action='store_true',
     help='Composite input image and predicted alpha value'
 )
-parser.add_argument(
-    '--onnx',
-    action='store_true',
-    help='execute onnxruntime version.'
-)
 args = update_parser(parser)
 
 
@@ -82,11 +77,7 @@ def human_seg(net, img):
     img = preprocess(img)
 
     # feedforward
-    if not args.onnx:
-        output = net.predict([img])
-    else:
-        output = net.run(["d1", "d2", "d3", "d4", "d5", "d6", "d7"],
-                         {"image": img})
+    output = net.predict([img])
     d1, d2, d3, d4, d5, d6, d7 = output
     pred = d1[:, 0, :, :]
 
@@ -194,11 +185,7 @@ def main():
     logger.info(f'env_id: {env_id}')
 
     # initialize
-    if not args.onnx:
-        net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
-    else:
-        import onnxruntime
-        net = onnxruntime.InferenceSession(WEIGHT_PATH)
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
 
     if args.video is not None:
         # video mode
