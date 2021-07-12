@@ -1,7 +1,7 @@
 # U^2-Net - human segmentation
 
 ### Input
-![input_image](input.png)  
+![input_image](input.jpg)  
 (Image from https://github.com/xuebinqin/U-2-Net/blob/master/test_data/test_human_images/5-mental-skills-of-successful-athletes-image.jpg)
 - Ailia input shape: (1, 3, 320, 320)  
 
