@@ -19,6 +19,7 @@ from logging import getLogger  # noqa: E402
 
 from mmfashion_tryon_utils import *
 from pose_utils import *
+from hps_utils import *
 
 logger = getLogger(__name__)
 
@@ -39,12 +40,22 @@ WEIGHT_POSE_PATH = 'pose_resnet_50_256x192.onnx'
 MODEL_POSE_PATH = 'pose_resnet_50_256x192.onnx.prototxt'
 REMOTE_POSE_PATH = 'https://storage.googleapis.com/ailia-models/pose_resnet/'
 
+WEIGHT_SEG_PATH = 'resnet-lip.onnx'
+MODEL_SEG_PATH = 'resnet-lip.onnx.prototxt'
+REMOTE_SEG_PATH = 'https://storage.googleapis.com/ailia-models/human_part_segmentation/'
+
 IMAGE_CLOTH_PATH = 'cloth/019029_1.jpg'
 IMAGE_PERSON_PATH = 'image/000320_0.jpg'
 SAVE_IMAGE_PATH = 'output.png'
 
 IMAGE_HEIGHT = 256
 IMAGE_WIDTH = 192
+IMAGE_POSE_HEIGTH = 256
+IMAGE_POSE_WIDTH = 192
+IMAGE_LIP_SIZE = 473
+
+LIP_NORM_MEAN = [0.406, 0.456, 0.485]
+LIP_NORM_STD = [0.225, 0.224, 0.229]
 
 # ======================
 # Arguemnt Parser Config
@@ -56,7 +67,7 @@ parser.add_argument(
     help='Image of person.'
 )
 parser.add_argument(
-    '-pp', '--parse', metavar='IMAGE/DIR', default='image-parse/',
+    '-pp', '--parse', metavar='IMAGE/DIR', default=None,
     help='Parsed image of person image. If a directory name is specified, '
          'Search for a png file with the same name as the person image file'
 )
@@ -101,12 +112,12 @@ def post_processing(data):
 
 def pose_estimation(det_net, pose_net, img):
     h, w = img.shape[:2]
-
     THRESHOLD = 0.4
     IOU = 0.45
-    det_net.compute(img, THRESHOLD, IOU)
-
     CATEGORY_PERSON = 0
+
+    # detect bbox
+    det_net.compute(img, THRESHOLD, IOU)
     count = det_net.get_object_count()
     a = sorted([
         det_net.get_object(i) for i in range(count)
@@ -118,6 +129,7 @@ def pose_estimation(det_net, pose_net, img):
 
     img = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
 
+    # adjust bbox
     x0 = bbox[0]
     y0 = bbox[1]
     x1 = bbox[0] + bbox[2]
@@ -132,9 +144,7 @@ def pose_estimation(det_net, pose_net, img):
     scale_x = img.shape[1] / w
     scale_y = img.shape[0] / h
 
-    POSE_HEIGTH = 256
-    POSE_WIDTH = 192
-    img = cv2.resize(img, (POSE_WIDTH, POSE_HEIGTH))
+    img = cv2.resize(img, (IMAGE_POSE_WIDTH, IMAGE_POSE_HEIGTH))
 
     # BGR format
     mean = [0.485, 0.456, 0.406]
@@ -145,7 +155,7 @@ def pose_estimation(det_net, pose_net, img):
 
     output = pose_net.predict(img)
 
-    center = np.array([POSE_WIDTH / 2, POSE_HEIGTH / 2], dtype=np.float32)
+    center = np.array([IMAGE_POSE_WIDTH / 2, IMAGE_POSE_HEIGTH / 2], dtype=np.float32)
     scale = np.array([1, 1], dtype=np.float32)
     preds, maxvals = get_final_preds(output, [center], [scale])
 
@@ -174,14 +184,77 @@ def pose_estimation(det_net, pose_net, img):
             y = preds[0, i, 1]
 
         pose.append([
-            x / POSE_WIDTH * scale_x + offset_x,
-            y / POSE_HEIGTH * scale_y + offset_y,
+            x / IMAGE_POSE_WIDTH * scale_x + offset_x,
+            y / IMAGE_POSE_HEIGTH * scale_y + offset_y,
             0
         ])
 
-    pose = np.array(pose)
+    coco_pose = np.array([
+        pose[0],
+        pose[17],
+        pose[6],
+        pose[8],
+        pose[10],
+        pose[5],
+        pose[7],
+        pose[9],
+        pose[12],
+        pose[14],
+        pose[16],
+        pose[11],
+        pose[13],
+        pose[15],
+        pose[2],
+        pose[1],
+        pose[4],
+        pose[3],
+    ])
 
-    return pose[:18]
+    return coco_pose
+
+
+def human_seg(seg_net, img):
+    h, w, _ = img.shape
+
+    img_size = (IMAGE_LIP_SIZE, IMAGE_LIP_SIZE)
+
+    # Get person center and scale
+    center, s = xywh2cs(0, 0, w - 1, h - 1)
+    r = 0
+    trans = get_affine_transform(
+        center, s, r, img_size
+    )
+    img = cv2.warpAffine(
+        img,
+        trans,
+        (img_size[1], img_size[0]),
+        flags=cv2.INTER_LINEAR,
+        borderMode=cv2.BORDER_CONSTANT,
+        borderValue=(0, 0, 0))
+
+    # normalize
+    img = ((img / 255.0 - LIP_NORM_MEAN) / LIP_NORM_STD).astype(np.float32)
+
+    img = img.transpose(2, 0, 1)
+    img = np.expand_dims(img, 0)
+
+    # feedforward
+    output = seg_net.predict([img])
+    _, fusion, _ = output
+
+    fusion = fusion[0].transpose(1, 2, 0)
+    upsample_output = cv2.resize(
+        fusion, img_size, interpolation=cv2.INTER_LINEAR
+    )
+    parse = transform_logits(
+        upsample_output,
+        center, s, w, h,
+        input_size=img_size
+    )
+
+    parse = np.argmax(parse, axis=2)
+
+    return parse
 
 
 # ======================
@@ -198,15 +271,13 @@ def cloth_agnostic(det_net, pose_net, seg_net, img):
     # fine_height = h
     # fine_width = w
 
+    person_path = args.person
+    name = os.path.splitext(os.path.basename(person_path))[0]
+
     if det_net:
         pose_data = pose_estimation(det_net, pose_net, img)
         pose_data = pose_data * [fine_width, fine_height, 1]
     else:
-        person_path = args.person
-        name = os.path.splitext(os.path.basename(person_path))[0]
-        parse_path = (os.path.join(args.parse, '%s.png' % name) \
-                          if os.path.isdir(args.parse) else args.parse) \
-            if args.parse else '%s_parse.png' % name
         pose_path = (os.path.join(args.keypoints, '%s_keypoints.json' % name) \
                          if os.path.isdir(args.keypoints) else args.keypoints) \
             if args.keypoints else '%s_keypoints.json' % name
@@ -218,14 +289,26 @@ def cloth_agnostic(det_net, pose_net, seg_net, img):
             pose_data = np.array(pose_data)
             pose_data = pose_data.reshape((-1, 3))
 
+    img = cv2.cvtColor(img, cv2.COLOR_BGRA2RGB)
+
+    if seg_net:
+        im_parse = human_seg(seg_net, img)
+        head_ids = [1, 2, 4, 13]
+    else:
+        parse_path = (os.path.join(args.parse, '%s.png' % name) \
+                          if os.path.isdir(args.parse) else args.parse) \
+            if args.parse else '%s_parse.png' % name
+
+        im_parse = np.array(Image.open(parse_path))
+        head_ids = [1, 2, 4, 13]
+
     # person image
     im = preprocess(img)
 
     # parsing image
-    im_parse = np.array(Image.open(parse_path))
     parse_shape = (im_parse > 0).astype(np.float32)
     phead = sum([
-        (im_parse == i).astype(np.float32) for i in [1, 2, 4, 13]
+        (im_parse == i).astype(np.float32) for i in head_ids
     ])
 
     # shape downsample
@@ -360,6 +443,9 @@ def main():
         check_and_download_models(WEIGHT_YOLOV3_PATH, MODEL_YOLOV3_PATH, REMOTE_YOLOV3_PATH)
         logger.info('=== pose model ===')
         check_and_download_models(WEIGHT_POSE_PATH, MODEL_POSE_PATH, REMOTE_POSE_PATH)
+    if not args.parse:
+        logger.info('=== human segmentation model ===')
+        check_and_download_models(WEIGHT_SEG_PATH, MODEL_SEG_PATH, REMOTE_SEG_PATH)
 
     # initialize
     if args.onnx:
@@ -370,7 +456,6 @@ def main():
         GMM_net = ailia.Net(MODEL_GMM_PATH, WEIGHT_GMM_PATH, env_id=args.env_id)
         TOM_net = ailia.Net(MODEL_TOM_PATH, WEIGHT_TOM_PATH, env_id=args.env_id)
 
-    # initialize
     if not args.keypoints:
         det_net = ailia.Detector(
             MODEL_YOLOV3_PATH,
@@ -386,8 +471,11 @@ def main():
             MODEL_POSE_PATH, WEIGHT_POSE_PATH, env_id=args.env_id)
     else:
         det_net = pose_net = None
+    if not args.parse:
+        seg_net = ailia.Net(MODEL_SEG_PATH, WEIGHT_SEG_PATH, env_id=args.env_id)
+    else:
+        seg_net = None
 
-    seg_net = None
     recognize_from_image(GMM_net, TOM_net, det_net, pose_net, seg_net)
 
 
