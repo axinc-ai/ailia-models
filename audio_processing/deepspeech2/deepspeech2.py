@@ -1,10 +1,8 @@
 import sys
 import time
 
-import librosa
-import pyaudio
 import numpy as np
-import torch
+import pyaudio
 
 import ailia
 # import original moduls
@@ -84,29 +82,50 @@ parser.add_argument(
     default=DEFAULT_MODEL, choices=MODEL_LISTS,
     help='model lists: ' + ' | '.join(MODEL_LISTS)
 )
+parser.add_argument(
+    '--ailia_audio', action='store_true',
+    help='use ailia audio library'
+)
 args = update_parser(parser)
 
+if args.ailia_audio:
+  import ailia.audio
+  import soundfile as sf
+else:
+  import librosa
+  import torch
 
 # ======================
 # Utils
 # ======================
 def create_spectrogram(wav):
-    stft = librosa.stft(
-        wav,
-        n_fft=WIN_LENGTH,
-        win_length=WIN_LENGTH,
-        hop_length=HOP_LENGTH,
-        window='hamming',
-    )
-    stft, _ = librosa.magphase(stft)
-    spectrogram = np.log1p(stft)
-    spec_length = np.array(([stft.shape[1]-1]))
+    if args.ailia_audio:
+        spectrogram = ailia.audio.create_spectrogram(
+            wav,
+            fft_n=WIN_LENGTH,
+            hop_n=HOP_LENGTH,
+            win_n=WIN_LENGTH,
+            win_type="hamming",
+        )
+        spec_length = np.array(([spectrogram.shape[1]-1]))
+    else:
+        stft = librosa.stft(
+            wav,
+            n_fft=WIN_LENGTH,
+            win_length=WIN_LENGTH,
+            hop_length=HOP_LENGTH,
+            window='hamming',
+        )
+        print(stft)
+        stft, _ = librosa.magphase(stft)
+        spectrogram = np.log1p(stft)
+        spec_length = np.array(([stft.shape[1]-1]))
 
-    mean = spectrogram.mean()
-    std = spectrogram.std()
-    spectrogram -= mean
-    spectrogram /= std
-
+        mean = spectrogram.mean()
+        std = spectrogram.std()
+        spectrogram -= mean
+        spectrogram /= std
+    
     spectrogram = np.log1p(spectrogram)
     spectrogram = spectrogram[np.newaxis, np.newaxis, :, :]
 
@@ -151,7 +170,10 @@ def record_microphone_input():
     p.terminate()
 
     wav = np.array(frames)
-    return librosa.resample(wav, RECODING_SAMPING_RATE, SAMPLING_RATE)
+    if args.ailia_audio:
+        return ailia.audio.resample(wav, RECODING_SAMPING_RATE, SAMPLING_RATE)
+    else:
+        return librosa.resample(wav, RECODING_SAMPING_RATE, SAMPLING_RATE)
 
 
 def decode(sequence, size=None):
@@ -218,7 +240,11 @@ def wavfile_input_recognition():
 
     for soundf_path in args.input:
         logger.info(soundf_path)
-        wav = librosa.load(soundf_path, sr=SAMPLING_RATE)[0]
+        if args.ailia_audio:
+            wav,sr = sf.read(soundf_path)
+            wav = ailia.audio.resample(wav,sr,SAMPLING_RATE)
+        else:
+            wav = librosa.load(soundf_path, sr=SAMPLING_RATE)[0]
         spectrogram = create_spectrogram(wav)
         net.set_input_shape(spectrogram[0].shape)
 
