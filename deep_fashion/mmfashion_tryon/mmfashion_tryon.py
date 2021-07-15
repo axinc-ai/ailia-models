@@ -110,7 +110,7 @@ def post_processing(data):
     return img
 
 
-def pose_estimation(det_net, pose_net, img):
+def human_detect(det_net, img):
     h, w = img.shape[:2]
     THRESHOLD = 0.4
     IOU = 0.45
@@ -125,7 +125,11 @@ def pose_estimation(det_net, pose_net, img):
     bbox = [
         (w * obj.x, h * obj.y, w * obj.w, h * obj.h)
         for obj in a if obj.category == CATEGORY_PERSON
-    ][0]
+    ]
+    if 0 < len(bbox):
+        bbox = bbox[0]
+    else:
+        return img, (0, 0), (1, 1)
 
     img = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
 
@@ -135,7 +139,7 @@ def pose_estimation(det_net, pose_net, img):
     x1 = bbox[0] + bbox[2]
     y1 = bbox[0] + bbox[3]
     x0, y0, x1, y1 = keep_aspect(
-        x0, y0, x1, y1, h, w
+        x0, y0, x1, y1, IMAGE_POSE_HEIGTH, IMAGE_POSE_WIDTH
     )
     img = img[y0:y1, x0:x1, :]
 
@@ -144,6 +148,11 @@ def pose_estimation(det_net, pose_net, img):
     scale_x = img.shape[1] / w
     scale_y = img.shape[0] / h
 
+    return img, (offset_x, offset_y), (scale_x, scale_y)
+
+
+def pose_estimation(pose_net, img):
+    img = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
     img = cv2.resize(img, (IMAGE_POSE_WIDTH, IMAGE_POSE_HEIGTH))
 
     # BGR format
@@ -184,33 +193,37 @@ def pose_estimation(det_net, pose_net, img):
             y = preds[0, i, 1]
 
         pose.append([
-            x / IMAGE_POSE_WIDTH * scale_x + offset_x,
-            y / IMAGE_POSE_HEIGTH * scale_y + offset_y,
+            x / IMAGE_POSE_WIDTH,
+            y / IMAGE_POSE_HEIGTH,
             0
         ])
 
-    coco_pose = np.array([
-        pose[0],
-        pose[17],
-        pose[6],
-        pose[8],
-        pose[10],
-        pose[5],
-        pose[7],
-        pose[9],
-        pose[12],
-        pose[14],
-        pose[16],
-        pose[11],
-        pose[13],
-        pose[15],
-        pose[2],
-        pose[1],
-        pose[4],
-        pose[3],
+    pose = np.array([
+        pose[0],  # NOSE
+        pose[17],  # SHOULDER_CENTER
+        pose[6],  # SHOULDER_RIGHT
+        pose[8],  # ELBOW_RIGHT
+        pose[10],  # WRIST_RIGHT
+        pose[5],  # SHOULDER_LEFT
+        pose[7],  # ELBOW_LEFT
+        pose[9],  # WRIST_LEFT
+        pose[12],  # HIP_RIGHT
+        # pose[14],   # KNEE_RIGHT
+        # pose[16],   # ANKLE_RIGHT
+        [0, 0, 0],
+        [0, 0, 0],
+        pose[11],  # HIP_LEFT
+        # pose[13],   # KNEE_LEFT
+        # pose[15],   # ANKLE_LEFT
+        [0, 0, 0],
+        [0, 0, 0],
+        pose[2],  # EYE_RIGHT
+        pose[1],  # EYE_LEFT
+        pose[4],  # EAR_RIGHT
+        pose[3],  # EAR_LEFT
     ])
 
-    return coco_pose
+    return pose
 
 
 def human_seg(seg_net, img):
@@ -261,21 +274,20 @@ def human_seg(seg_net, img):
 # Main functions
 # ======================
 
-def cloth_agnostic(det_net, pose_net, seg_net, img):
+def cloth_agnostic(pose_net, seg_net, img):
     fine_height = IMAGE_HEIGHT
     fine_width = IMAGE_WIDTH
     radius = 5
 
-    h, w = img.shape[:2]
-
-    # fine_height = h
-    # fine_width = w
-
     person_path = args.person
     name = os.path.splitext(os.path.basename(person_path))[0]
 
-    if det_net:
-        pose_data = pose_estimation(det_net, pose_net, img)
+    img = cv2.resize(
+        img, (fine_width, fine_height), interpolation=cv2.INTER_LINEAR
+    )
+
+    if pose_net:
+        pose_data = pose_estimation(pose_net, img)
         pose_data = pose_data * [fine_width, fine_height, 1]
     else:
         pose_path = (os.path.join(args.keypoints, '%s_keypoints.json' % name) \
@@ -288,8 +300,6 @@ def cloth_agnostic(det_net, pose_net, seg_net, img):
             pose_data = pose_label['people'][0]['pose_keypoints']
             pose_data = np.array(pose_data)
             pose_data = pose_data.reshape((-1, 3))
-
-    img = cv2.cvtColor(img, cv2.COLOR_BGRA2RGB)
 
     if seg_net:
         im_parse = human_seg(seg_net, img)
@@ -386,7 +396,12 @@ def predict(GMM_net, TOM_net, cloth, agnostic):
 def recognize_from_image(GMM_net, TOM_net, det_net, pose_net, seg_net):
     img = load_image(args.person)
 
-    agnostic = cloth_agnostic(det_net, pose_net, seg_net, img)
+    if det_net:
+        img, offset, scale = human_detect(det_net, img)
+
+    img = cv2.cvtColor(img, cv2.COLOR_BGRA2RGB)
+
+    agnostic = cloth_agnostic(pose_net, seg_net, img)
     agnostic = np.expand_dims(agnostic, axis=0)
 
     # input image loop
@@ -396,6 +411,9 @@ def recognize_from_image(GMM_net, TOM_net, det_net, pose_net, seg_net):
         # prepare cloth image
         img = load_image(image_path)
         img = cv2.cvtColor(img, cv2.COLOR_BGRA2RGB)
+        img = cv2.resize(
+            img, (IMAGE_WIDTH, IMAGE_HEIGHT), interpolation=cv2.INTER_LINEAR
+        )
         img = preprocess(img)
         img = np.expand_dims(img, axis=0)
 
