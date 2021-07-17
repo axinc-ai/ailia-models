@@ -13,6 +13,7 @@ sys.path.append('../../util')
 from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from detector_utils import load_image  # noqa: E402
+import webcamera_utils  # noqa: E402
 
 # logger
 from logging import getLogger  # noqa: E402
@@ -63,16 +64,16 @@ LIP_NORM_STD = [0.225, 0.224, 0.229]
 
 parser = get_base_parser('MMFashion Virtual Try-on model', IMAGE_CLOTH_PATH, SAVE_IMAGE_PATH)
 parser.add_argument(
-    '-p', '--person', metavar='IMAGE', default=IMAGE_PERSON_PATH,
+    '-p', '--person', metavar='PERSON_IMAGE', default=IMAGE_PERSON_PATH,
     help='Image of person.'
 )
 parser.add_argument(
-    '-pp', '--parse', metavar='IMAGE/DIR', default=None,
+    '-pp', '--parse', metavar='PARSE_IMAGE/DIR', default=None,
     help='Parsed image of person image. If a directory name is specified, '
          'Search for a png file with the same name as the person image file'
 )
 parser.add_argument(
-    '-k', '--keypoints', metavar='FILE/DIR', default=None,
+    '-k', '--keypoints', metavar='KEYPOINT_FILE/DIR', default=None,
     help='Keypoints json file. If a directory name is specified, '
          'find a json file with the same name as the person image file'
 )
@@ -81,6 +82,7 @@ parser.add_argument(
     action='store_true',
     help='execute onnxruntime version.'
 )
+args_input = parser.parse_args().input
 args = update_parser(parser)
 
 
@@ -131,15 +133,13 @@ def human_detect(det_net, img):
     else:
         return img, (0, 0), (1, 1)
 
-    img = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
-
     # adjust bbox
     x0 = bbox[0]
     y0 = bbox[1]
     x1 = bbox[0] + bbox[2]
     y1 = bbox[0] + bbox[3]
     x0, y0, x1, y1 = keep_aspect(
-        x0, y0, x1, y1, IMAGE_POSE_HEIGTH, IMAGE_POSE_WIDTH
+        x0, y0, x1, y1, h, w, IMAGE_POSE_HEIGTH / IMAGE_POSE_WIDTH
     )
     img = img[y0:y1, x0:x1, :]
 
@@ -237,6 +237,7 @@ def human_seg(seg_net, img):
     trans = get_affine_transform(
         center, s, r, img_size
     )
+    img = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
     img = cv2.warpAffine(
         img,
         trans,
@@ -313,7 +314,8 @@ def cloth_agnostic(pose_net, seg_net, img):
         head_ids = [1, 2, 4, 13]
 
     # person image
-    im = preprocess(img)
+    img = cv2.cvtColor(img, cv2.COLOR_BGRA2RGB)
+    img = preprocess(img)
 
     # parsing image
     parse_shape = (im_parse > 0).astype(np.float32)
@@ -332,7 +334,7 @@ def cloth_agnostic(pose_net, seg_net, img):
     shape = preprocess(parse_shape)
 
     # upper cloth
-    im_h = im * phead - (1 - phead)  # [-1,1], fill 0 for other parts
+    im_h = img * phead - (1 - phead)  # [-1,1], fill 0 for other parts
 
     point_num = pose_data.shape[0]
     pose_map = np.zeros((point_num, fine_height, fine_width), dtype=np.float32)
@@ -399,8 +401,6 @@ def recognize_from_image(GMM_net, TOM_net, det_net, pose_net, seg_net):
     if det_net:
         img, offset, scale = human_detect(det_net, img)
 
-    img = cv2.cvtColor(img, cv2.COLOR_BGRA2RGB)
-
     agnostic = cloth_agnostic(pose_net, seg_net, img)
     agnostic = np.expand_dims(agnostic, axis=0)
 
@@ -450,18 +450,75 @@ def recognize_from_image(GMM_net, TOM_net, det_net, pose_net, seg_net):
     logger.info('Script finished successfully.')
 
 
+def recognize_from_video(GMM_net, TOM_net, det_net, pose_net, seg_net):
+    capture = webcamera_utils.get_capture(args.video)
+
+    # create video writer if savepath is specified as video format
+    if args.savepath != SAVE_IMAGE_PATH:
+        f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
+        writer = webcamera_utils.get_writer(args.savepath, f_h, f_w)
+    else:
+        writer = None
+
+    # prepare cloth image
+    image_path = args_input
+    img = load_image(image_path)
+    img = cv2.cvtColor(img, cv2.COLOR_BGRA2RGB)
+    img = cv2.resize(
+        img, (IMAGE_WIDTH, IMAGE_HEIGHT), interpolation=cv2.INTER_LINEAR
+    )
+    img = preprocess(img)
+    cloth_img = np.expand_dims(img, axis=0)
+
+    dummy = np.zeros(IMAGE_HEIGHT * IMAGE_WIDTH).reshape(IMAGE_HEIGHT, IMAGE_WIDTH)
+    while (True):
+        ret, frame = capture.read()
+        if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+
+        # inference
+        img = cv2.cvtColor(frame, cv2.COLOR_BGR2BGRA)
+        img, offset, scale = human_detect(det_net, img)
+        if offset == (0, 0):
+            # human is not detected
+            cv2.imshow('frame', dummy)
+            continue
+
+        agnostic = cloth_agnostic(pose_net, seg_net, img)
+        agnostic = np.expand_dims(agnostic, axis=0)
+
+        output = predict(GMM_net, TOM_net, cloth_img, agnostic)
+
+        tryon, _ = output
+        tryon = post_processing(tryon[0])
+
+        cv2.imshow('frame', tryon)
+
+        # save results
+        if writer is not None:
+            writer.write(frame)
+
+    capture.release()
+    cv2.destroyAllWindows()
+    if writer is not None:
+        writer.release()
+
+    logger.info('Script finished successfully.')
+
+
 def main():
     # model files check and download
     logger.info('=== GMM model ===')
     check_and_download_models(WEIGHT_GMM_PATH, MODEL_GMM_PATH, REMOTE_PATH)
     logger.info('=== TOM model ===')
     check_and_download_models(WEIGHT_TOM_PATH, MODEL_TOM_PATH, REMOTE_PATH)
-    if not args.keypoints:
+    if args.video or not args.keypoints:
         logger.info('=== detector model ===')
         check_and_download_models(WEIGHT_YOLOV3_PATH, MODEL_YOLOV3_PATH, REMOTE_YOLOV3_PATH)
         logger.info('=== pose model ===')
         check_and_download_models(WEIGHT_POSE_PATH, MODEL_POSE_PATH, REMOTE_POSE_PATH)
-    if not args.parse:
+    if args.video or not args.parse:
         logger.info('=== human segmentation model ===')
         check_and_download_models(WEIGHT_SEG_PATH, MODEL_SEG_PATH, REMOTE_SEG_PATH)
 
@@ -474,7 +531,7 @@ def main():
         GMM_net = ailia.Net(MODEL_GMM_PATH, WEIGHT_GMM_PATH, env_id=args.env_id)
         TOM_net = ailia.Net(MODEL_TOM_PATH, WEIGHT_TOM_PATH, env_id=args.env_id)
 
-    if not args.keypoints:
+    if args.video or not args.keypoints:
         det_net = ailia.Detector(
             MODEL_YOLOV3_PATH,
             WEIGHT_YOLOV3_PATH,
@@ -489,12 +546,17 @@ def main():
             MODEL_POSE_PATH, WEIGHT_POSE_PATH, env_id=args.env_id)
     else:
         det_net = pose_net = None
-    if not args.parse:
+    if args.video or not args.parse:
         seg_net = ailia.Net(MODEL_SEG_PATH, WEIGHT_SEG_PATH, env_id=args.env_id)
     else:
         seg_net = None
 
-    recognize_from_image(GMM_net, TOM_net, det_net, pose_net, seg_net)
+    if args.video is not None:
+        # video mode
+        recognize_from_video(GMM_net, TOM_net, det_net, pose_net, seg_net)
+    else:
+        # image mode
+        recognize_from_image(GMM_net, TOM_net, det_net, pose_net, seg_net)
 
 
 if __name__ == '__main__':

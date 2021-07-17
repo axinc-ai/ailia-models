@@ -9,13 +9,12 @@ __all__ = [
 ]
 
 
-def keep_aspect(x0, y0, x1, y1, h, w):
+def keep_aspect(x0, y0, x1, y1, h, w, aspect):
     x0 = max(0, x0)
     y0 = max(0, y0)
     x1 = min(w, x1)
     y1 = min(h, y1)
 
-    aspect = h / w
     ow = (x1 - x0)
     oh = (y1 - y0)
     oaspect = oh / ow
