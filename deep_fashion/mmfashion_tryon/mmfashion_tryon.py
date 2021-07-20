@@ -31,7 +31,7 @@ WEIGHT_GMM_PATH = './GMM_epoch_40.onnx'
 MODEL_GMM_PATH = './GMM_epoch_40.onnx.prototxt'
 WEIGHT_TOM_PATH = './TOM_epoch_40.onnx'
 MODEL_TOM_PATH = './TOM_epoch_40.onnx.prototxt'
-REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/mmfashion_vto/'
+REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/mmfashion_tryon/'
 
 WEIGHT_YOLOV3_PATH = 'yolov3.opt2.onnx'
 MODEL_YOLOV3_PATH = 'yolov3.opt2.onnx.prototxt'

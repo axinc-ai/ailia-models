@@ -65,5 +65,5 @@ ONNX opset=11
 
 ## Netron
 
-[GMM_epoch_40.onnx.prototxt](https://lutzroeder.github.io/netron/?url=https://storage.googleapis.com/ailia-models/mmfashion_tryon/GMM_epoch_40.onnx.prototxt)  
-[TOM_epoch_40.onnx.prototxt](https://lutzroeder.github.io/netron/?url=https://storage.googleapis.com/ailia-models/mmfashion_tryon/TOM_epoch_40.onnx.prototxt)  
+[GMM_epoch_40.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/mmfashion_tryon/GMM_epoch_40.onnx.prototxt)  
+[TOM_epoch_40.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/mmfashion_tryon/TOM_epoch_40.onnx.prototxt)  
