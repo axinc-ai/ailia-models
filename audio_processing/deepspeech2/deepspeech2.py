@@ -116,7 +116,6 @@ def create_spectrogram(wav):
             hop_length=HOP_LENGTH,
             window='hamming',
         )
-        print(stft)
         stft, _ = librosa.magphase(stft)
         spectrogram = np.log1p(stft)
         spec_length = np.array(([stft.shape[1]-1]))
