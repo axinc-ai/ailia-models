@@ -1,3 +1,5 @@
+import os
+import math
 import sys
 import time
 
@@ -8,22 +10,27 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser  # noqa: E402
+from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
-from detector_utils import plot_results, load_image  # noqa: E402
+from detector_utils import plot_results, write_predictions  # noqa: E402
+from detector_utils import load_image, letterbox_convert, reverse_letterbox  # noqa: E402
 import webcamera_utils  # noqa: E402
 
 import yolov4_utils  # noqa: E402
+
+# logger
+from logging import getLogger   # noqa: E402
+logger = getLogger(__name__)
 
 
 # ======================
 # Parameters
 # ======================
-WEIGHT_PATH = 'yolov4.onnx'
-MODEL_PATH = 'yolov4.onnx.prototxt'
+DETECTION_SIZE_LISTS = [416, 640, 1280]
+
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/yolov4/'
 
-IMAGE_PATH = 'dog.jpg'
+IMAGE_PATH = 'input.jpg'
 SAVE_IMAGE_PATH = 'output.png'
 
 COCO_CATEGORY = [
@@ -43,9 +50,6 @@ COCO_CATEGORY = [
 ]
 THRESHOLD = 0.4
 IOU = 0.45
-DETECTION_WIDTH = 416
-IMAGE_HEIGHT = 416
-IMAGE_WIDTH = 416
 
 
 # ======================
@@ -55,63 +59,109 @@ parser = get_base_parser(
     'Yolov4 model', IMAGE_PATH, SAVE_IMAGE_PATH,
 )
 parser.add_argument(
-    '-dw', '--detection_width',
-    default=DETECTION_WIDTH,
-    help='The detection width and height for yolo. (default: 416)'
+    '-th', '--threshold',
+    default=THRESHOLD, type=float,
+    help='The detection threshold for yolo. (default: '+str(THRESHOLD)+')'
+)
+parser.add_argument(
+    '-iou', '--iou',
+    default=IOU, type=float,
+    help='The detection iou for yolo. (default: '+str(IOU)+')'
+)
+parser.add_argument(
+    '-w', '--write_prediction',
+    action='store_true',
+    help='Flag to output the prediction file.'
+)
+parser.add_argument(
+    '-dw', '--detection_width', metavar='DETECTION_WIDTH',
+    default=DETECTION_SIZE_LISTS[0], choices=DETECTION_SIZE_LISTS, type=int,
+    help='detection size lists: ' + ' | '.join(map(str,DETECTION_SIZE_LISTS))
+)
+parser.add_argument(
+    '-dh', '--detection_height', metavar='DETECTION_HEIGHT',
+    default=DETECTION_SIZE_LISTS[0], choices=DETECTION_SIZE_LISTS, type=int,
+    help='detection size lists: ' + ' | '.join(map(str,DETECTION_SIZE_LISTS))
 )
 args = update_parser(parser)
 
+if args.detection_width != DETECTION_SIZE_LISTS[0] or args.detection_height!=DETECTION_SIZE_LISTS[0]:
+    WEIGHT_PATH = 'yolov4_'+str(args.detection_width)+'_'+str(args.detection_height)+'.onnx'
+    MODEL_PATH = 'yolov4_'+str(args.detection_width)+'_'+str(args.detection_height)+'.onnx.prototxt'
+    IMAGE_HEIGHT = args.detection_height
+    IMAGE_WIDTH = args.detection_width
+else:
+    WEIGHT_PATH = 'yolov4.onnx'
+    MODEL_PATH = 'yolov4.onnx.prototxt'
+    IMAGE_HEIGHT = args.detection_height
+    IMAGE_WIDTH = args.detection_width
 
 # ======================
 # Main functions
 # ======================
 def recognize_from_image():
-    # prepare input data
-    org_img = load_image(args.input)
-    print(f'input image shape: {org_img.shape}')
-
-    img = cv2.cvtColor(org_img, cv2.COLOR_BGRA2RGB)
-    img = cv2.resize(img, (IMAGE_WIDTH, IMAGE_HEIGHT))
-    img = np.transpose(img, [2, 0, 1])
-    img = img.astype(np.float32) / 255
-    img = np.expand_dims(img, 0)
-
     # net initialize
     detector = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
-    if int(args.detection_width) != DETECTION_WIDTH:
-        detector.set_input_shape(
-            (1, 3, int(args.detection_width), int(args.detection_width))
-        )
+    if args.profile:
+        detector.set_profile_mode(True)
 
-    # inference
-    print('Start inference...')
-    if args.benchmark:
-        print('BENCHMARK mode')
-        for i in range(5):
-            start = int(round(time.time() * 1000))
+    # input image loop
+    for image_path in args.input:
+        # prepare input data
+        logger.info(image_path)
+        org_img = load_image(image_path)
+        org_img = cv2.cvtColor(org_img, cv2.COLOR_BGRA2BGR)
+        logger.debug(f'input image shape: {org_img.shape}')
+
+        img = letterbox_convert(org_img, (IMAGE_HEIGHT, IMAGE_WIDTH))
+
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        img = np.transpose(img, [2, 0, 1])
+        img = img.astype(np.float32) / 255
+        img = np.expand_dims(img, 0)
+
+        # inference
+        logger.info('Start inference...')
+        if args.benchmark:
+            logger.info('BENCHMARK mode')
+            total_time = 0
+            for i in range(args.benchmark_count):
+                start = int(round(time.time() * 1000))
+                output = detector.predict([img])
+                end = int(round(time.time() * 1000))
+                if i != 0:
+                    total_time = total_time + (end - start)
+                logger.info(f'\tailia processing time {end - start} ms')
+            logger.info(f'\taverage time {total_time / (args.benchmark_count-1)} ms')
+        else:
             output = detector.predict([img])
-            end = int(round(time.time() * 1000))
-            print(f'\tailia processing time {end - start} ms')
-    else:
-        output = detector.predict([img])
-    detect_object = yolov4_utils.post_processing(img, THRESHOLD, IOU, output)
 
-    # plot result
-    res_img = plot_results(detect_object[0], org_img, COCO_CATEGORY)
+        detect_object = yolov4_utils.post_processing(img, args.threshold, args.iou, output)
+        detect_object = reverse_letterbox(detect_object[0], org_img, (IMAGE_HEIGHT,IMAGE_WIDTH))
 
-    # plot result
-    cv2.imwrite(args.savepath, res_img)
-    print('Script finished successfully.')
+        # plot result
+        res_img = plot_results(detect_object, org_img, COCO_CATEGORY)
+
+        # plot result
+        savepath = get_savepath(args.savepath, image_path)
+        logger.info(f'saved at : {savepath}')
+        cv2.imwrite(savepath, res_img)
+
+        # write prediction
+        if args.write_prediction:
+            pred_file = '%s.txt' % savepath.rsplit('.', 1)[0]
+            write_predictions(pred_file, detect_object, org_img, COCO_CATEGORY)
+
+    if args.profile:
+        print(detector.get_summary())
+
+    logger.info('Script finished successfully.')
 
 
 def recognize_from_video():
     # net initialize
     detector = None
     detector = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
-    if int(args.detection_width) != DETECTION_WIDTH:
-        detector.set_input_shape(
-            (1, 3, int(args.detection_width), int(args.detection_width))
-        )
 
     capture = webcamera_utils.get_capture(args.video)
 
@@ -123,34 +173,48 @@ def recognize_from_video():
     else:
         writer = None
 
+    if args.write_prediction:
+        frame_count = 0
+        frame_digit = int(math.log10(capture.get(cv2.CAP_PROP_FRAME_COUNT)) + 1)
+        video_name = os.path.splitext(os.path.basename(args.video))[0]
+
     while (True):
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
 
-        img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        img = cv2.resize(img, (IMAGE_WIDTH, IMAGE_HEIGHT))
+        img = letterbox_convert(frame, (IMAGE_HEIGHT, IMAGE_WIDTH))
+
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         img = np.transpose(img, [2, 0, 1])
         img = img.astype(np.float32) / 255
         img = np.expand_dims(img, 0)
 
         output = detector.predict([img])
         detect_object = yolov4_utils.post_processing(
-            img, THRESHOLD, IOU, output
+            img, args.threshold, args.iou, output
         )
-        res_img = plot_results(detect_object[0], frame, COCO_CATEGORY)
+        detect_object = reverse_letterbox(detect_object[0], frame, (IMAGE_HEIGHT,IMAGE_WIDTH))
+        res_img = plot_results(detect_object, frame, COCO_CATEGORY)
 
         cv2.imshow('frame', res_img)
 
         # save results
         if writer is not None:
             writer.write(res_img)
+        
+        # write prediction
+        if args.write_prediction:
+            savepath = get_savepath(args.savepath, video_name, post_fix = '_%s' % (str(frame_count).zfill(frame_digit) + '_res'), ext='.png')
+            pred_file = '%s.txt' % savepath.rsplit('.', 1)[0]
+            write_predictions(pred_file, detect_object, frame, COCO_CATEGORY)
+            frame_count += 1
 
     capture.release()
     cv2.destroyAllWindows()
     if writer is not None:
         writer.release()
-    print('Script finished successfully.')
+    logger.info('Script finished successfully.')
 
 
 def main():

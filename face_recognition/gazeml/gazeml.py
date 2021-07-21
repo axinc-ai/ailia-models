@@ -10,11 +10,16 @@ import ailia
 # import original modules
 sys.path.append('../../util')
 sys.path.append('../../face_detection/blazeface')
-from utils import get_base_parser, update_parser  # noqa: E402
+from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from image_utils import load_image  # noqa: E402
 import webcamera_utils  # noqa: E402
 from blazeface_utils import compute_blazeface_with_keypoint  # noqa: E402
+
+# logger
+from logging import getLogger   # noqa: E402
+logger = getLogger(__name__)
+
 
 # ======================
 # PARAMETERS
@@ -74,54 +79,59 @@ def plot_on_image(img, preds_ailia, eye_x, eye_y, eye_w, eye_h):
                 thickness=-1,
                 lineType=cv2.FILLED
             )
-        # print(f'[DEBUG]  x: {int(x):3d}\ty: {int(y):3d}\tprob:{prob}')
+        logger.debug(f'x: {int(x):3d}\ty: {int(y):3d}\tprob:{prob}')
 
 
 # ======================
 # Main functions
 # ======================
 def recognize_from_image():
-    # prepare input data
-    org_img = cv2.imread(args.input)
-    img = load_image(
-        args.input,
-        (IMAGE_HEIGHT, IMAGE_WIDTH),
-        rgb=False,
-        normalize_type='None'
-    )
-    img = cv2.equalizeHist(img)
-    if platform.system() == 'Darwin':  # For Mac OS (FP16)
-        data = img[np.newaxis, np.newaxis, :, :] / 255.0 - 0.5
-    else:
-        data = img[np.newaxis, np.newaxis, :, :] / 127.5 - 1.0
-    eyeI = np.concatenate((data, data), axis=0)
-    eyeI = eyeI.reshape(2, IMAGE_HEIGHT, IMAGE_WIDTH, 1)
-
     # net initialize
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
 
-    # inference
-    print('Start inference...')
-    if args.benchmark:
-        print('BENCHMARK mode')
-        for i in range(5):
-            start = int(round(time.time() * 1000))
+    # input image loop
+    for image_path in args.input:
+        # prepare input data
+        logger.info(image_path)
+        org_img = cv2.imread(image_path)
+        img = load_image(
+            image_path,
+            (IMAGE_HEIGHT, IMAGE_WIDTH),
+            rgb=False,
+            normalize_type='None',
+        )
+        img = cv2.equalizeHist(img)
+        if platform.system() == 'Darwin':  # For Mac OS (FP16)
+            data = img[np.newaxis, np.newaxis, :, :] / 255.0 - 0.5
+        else:
+            data = img[np.newaxis, np.newaxis, :, :] / 127.5 - 1.0
+        eyeI = np.concatenate((data, data), axis=0)
+        eyeI = eyeI.reshape(2, IMAGE_HEIGHT, IMAGE_WIDTH, 1)
+
+        # inference
+        logger.info('Start inference...')
+        if args.benchmark:
+            logger.info('BENCHMARK mode')
+            for i in range(5):
+                start = int(round(time.time() * 1000))
+                preds_ailia = net.predict(eyeI)
+                end = int(round(time.time() * 1000))
+                logger.info(f'\tailia processing time {end - start} ms')
+        else:
             preds_ailia = net.predict(eyeI)
-            end = int(round(time.time() * 1000))
-            print(f'\tailia processing time {end - start} ms')
-    else:
-        preds_ailia = net.predict(eyeI)
 
-    preds_ailia = net.get_blob_data(
-        net.find_blob_index_by_name(OUTPUT_BLOB_NAME)
-    )
+        preds_ailia = net.get_blob_data(
+            net.find_blob_index_by_name(OUTPUT_BLOB_NAME)
+        )
 
-    # postprocessing
-    plot_on_image(
-        org_img, preds_ailia, 0, 0, org_img.shape[1], org_img.shape[0]
-    )
-    cv2.imwrite(args.savepath, org_img)
-    print('Script finished successfully.')
+        # post-processing
+        plot_on_image(
+            org_img, preds_ailia, 0, 0, org_img.shape[1], org_img.shape[0]
+        )
+        savepath = get_savepath(args.savepath, image_path)
+        logger.info(f'saved at : {savepath}')
+        cv2.imwrite(savepath, org_img)
+    logger.info('Script finished successfully.')
 
 
 def recognize_from_video():
@@ -215,7 +225,7 @@ def recognize_from_video():
     cv2.destroyAllWindows()
     if writer is not None:
         writer.release()
-    print('Script finished successfully.')
+    logger.info('Script finished successfully.')
 
 
 def main():

@@ -8,10 +8,14 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser  # noqa: E402
+from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 import webcamera_utils  # noqa: E402
 from u2net_utils import load_image, transform, save_result, norm  # noqa: E402
+
+# logger
+from logging import getLogger   # noqa: E402
+logger = getLogger(__name__)
 
 
 # ======================
@@ -43,6 +47,21 @@ parser.add_argument(
     default='11', choices=OPSET_LISTS,
     help='opset lists: ' + ' | '.join(OPSET_LISTS)
 )
+parser.add_argument(
+    '-w', '--width',
+    default=IMAGE_SIZE, type=int,
+    help='The segmentation width and height for u2net. (default: 320)'
+)
+parser.add_argument(
+    '-h', '--height',
+    default=IMAGE_SIZE, type=int,
+    help='The segmentation height and height for u2net. (default: 320)'
+)
+parser.add_argument(
+    '--rgb',
+    action='store_true',
+    help='Use rgb color space (default: bgr)'
+)
 args = update_parser(parser)
 
 
@@ -61,59 +80,62 @@ REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/u2net/'
 # ======================
 # Main functions
 # ======================
-def recognize_from_image():
-    # prepare input data
-    input_data, h, w = load_image(
-        args.input,
-        scaled_size=IMAGE_SIZE,
-    )
+def recognize_from_image(net):
+    # input image loop
+    for image_path in args.input:
+        # prepare input data
+        logger.info(image_path)
 
-    # net initialize
-    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
+        # prepare input data
+        input_data, h, w = load_image(
+            image_path,
+            scaled_size=(args.width,args.height),
+            rgb_mode=args.rgb
+        )
 
-    # inference
-    print('Start inference...')
-    if args.benchmark:
-        print('BENCHMARK mode')
-        for i in range(5):
-            start = int(round(time.time() * 1000))
+        # inference
+        logger.info('Start inference...')
+        if args.benchmark:
+            logger.info('BENCHMARK mode')
+            for i in range(5):
+                start = int(round(time.time() * 1000))
+                preds_ailia = net.predict([input_data])
+                end = int(round(time.time() * 1000))
+                logger.info(f'\tailia processing time {end - start} ms')
+        else:
+            # dim = [(1, 1, 320, 320), (1, 1, 320, 320),..., ]  len=7
             preds_ailia = net.predict([input_data])
-            end = int(round(time.time() * 1000))
-            print(f'\tailia processing time {end - start} ms')
-    else:
-        # dim = [(1, 1, 320, 320), (1, 1, 320, 320),..., ]  len=7
-        preds_ailia = net.predict([input_data])
 
-    # postprocessing
-    # we only use `d1` (the first output, check the original repository)
-    pred = preds_ailia[0][0, 0, :, :]
+        # postprocessing
+        # we only use `d1` (the first output, check the original repository)
+        pred = preds_ailia[0][0, 0, :, :]
 
-    save_result(pred, args.savepath, [h, w])
+        savepath = get_savepath(args.savepath, image_path, ext='.png')
+        logger.info(f'saved at : {savepath}')
+        save_result(pred, savepath, [h, w])
 
-    # composite
-    if args.composite:
-        image = cv2.imread(args.input)
-        image = cv2.cvtColor(image, cv2.COLOR_BGR2BGRA)
-        image[:, :, 3] = cv2.resize(pred, (w, h)) * 255
-        cv2.imwrite(args.savepath, image)
+        # composite
+        if args.composite:
+            image = cv2.imread(image_path)
+            image = cv2.cvtColor(image, cv2.COLOR_BGR2BGRA)
+            image[:, :, 3] = cv2.resize(pred, (w, h)) * 255
+            cv2.imwrite(savepath, image)
 
-    print('Script finished successfully.')
+    logger.info('Script finished successfully.')
 
 
-def recognize_from_video():
-    # net initialize
-    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
-
+def recognize_from_video(net):
     capture = webcamera_utils.get_capture(args.video)
 
     # create video writer if savepath is specified as video format
     f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
     f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
     if args.savepath != SAVE_IMAGE_PATH:
-        print(
-            '[WARNING] currently, video results cannot be output correctly...'
+        logger.warning(
+            'currently, video results cannot be output correctly...'
         )
-        writer = webcamera_utils.get_writer(args.savepath, f_h, f_w, rgb=False)
+        #writer = webcamera_utils.get_writer(args.savepath, f_h, f_w, rgb=False) # alpha
+        writer = webcamera_utils.get_writer(args.savepath, f_h, f_w) # composite
     else:
         writer = None
 
@@ -122,7 +144,10 @@ def recognize_from_video():
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
 
-        input_data = transform(frame, IMAGE_SIZE)
+        if args.rgb and image.shape[2] == 3:
+            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+
+        input_data = transform(frame, (args.width, args.height))
 
         # inference
         preds_ailia = net.predict([input_data])
@@ -131,10 +156,13 @@ def recognize_from_video():
         pred = cv2.resize(norm(preds_ailia[0][0, 0, :, :]), (f_w, f_h))
 
         # force composite
-        frame[:, :, 0] = frame[:, :, 0] * pred
-        frame[:, :, 1] = frame[:, :, 1] * pred
+        frame[:, :, 0] = frame[:, :, 0] * pred + 64 * (1 - pred)
+        frame[:, :, 1] = frame[:, :, 1] * pred + 177 * (1 - pred)
         frame[:, :, 2] = frame[:, :, 2] * pred
         pred = frame / 255.0
+
+        if args.rgb and image.shape[2] == 3:
+            pred = cv2.cvtColor(pred, cv2.COLOR_RGB2BGR)
 
         cv2.imshow('frame', pred)
 
@@ -146,19 +174,24 @@ def recognize_from_video():
     cv2.destroyAllWindows()
     if writer is not None:
         writer.release()
-    print('Script finished successfully.')
+    logger.info('Script finished successfully.')
 
 
 def main():
     # model files check and download
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
 
+    # net initialize
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
+    if args.width!=IMAGE_SIZE or args.height!=IMAGE_SIZE:
+        net.set_input_shape((1,3,args.height,args.width))
+
     if args.video is not None:
         # video mode
-        recognize_from_video()
+        recognize_from_video(net)
     else:
         # image mode
-        recognize_from_image()
+        recognize_from_image(net)
 
 
 if __name__ == '__main__':

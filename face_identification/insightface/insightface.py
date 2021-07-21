@@ -12,18 +12,21 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser  # noqa: E402
+from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from detector_utils import load_image  # noqa: E402
 import webcamera_utils  # noqa: E402
 from insightface_utils import PriorBox, decode, decode_landm, nms, \
     face_align_norm_crop, draw_detection  # noqa: E402
 
+# logger
+from logging import getLogger   # noqa: E402
+logger = getLogger(__name__)
+
 
 # ======================
 # Parameters
 # ======================
-
 WEIGHT_DET_PATH = 'retinaface_resnet.onnx'
 MODEL_DET_PATH = 'retinaface_resnet.onnx.prototxt'
 WEIGHT_REC_R100_PATH = 'arcface_r100_v1.onnx'
@@ -49,6 +52,7 @@ Face = namedtuple('Face', [
     'landmark', 'x', 'y', 'w', 'h',
     'embedding', 'gender', 'age'
 ])
+
 
 # ======================
 # Arguemnt Parser Config
@@ -238,7 +242,7 @@ def predict(img, det_model, rec_model, ga_model):
 def recognize_from_image(filename, det_model, rec_model, ga_model):
     # prepare input data
     img = load_image(filename)
-    print(f'input image shape: {img.shape}')
+    logger.debug(f'input image shape: {img.shape}')
 
     # load identities
     ident_names, ident_feats = load_identities(rec_model)
@@ -246,14 +250,14 @@ def recognize_from_image(filename, det_model, rec_model, ga_model):
     img = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
 
     # inference
-    print('Start inference...')
+    logger.info('Start inference...')
     if args.benchmark:
-        print('BENCHMARK mode')
+        logger.info('BENCHMARK mode')
         for i in range(5):
             start = int(round(time.time() * 1000))
             faces = predict(img, det_model, rec_model, ga_model)
             end = int(round(time.time() * 1000))
-            print(f'\tailia processing time {end - start} ms')
+            logger.info(f'\tailia processing time {end - start} ms')
     else:
         faces = predict(img, det_model, rec_model, ga_model)
 
@@ -263,8 +267,9 @@ def recognize_from_image(filename, det_model, rec_model, ga_model):
     res_img = draw_detection(img, faces, ident_names)
 
     # plot result
-    cv2.imwrite(args.savepath, res_img)
-    print('Script finished successfully.')
+    savepath = get_savepath(args.savepath, filename)
+    logger.info(f'saved at : {savepath}')
+    cv2.imwrite(savepath, res_img)
 
 
 def recognize_from_video(video, det_model, rec_model, ga_model):
@@ -303,7 +308,6 @@ def recognize_from_video(video, det_model, rec_model, ga_model):
     cv2.destroyAllWindows()
     if writer is not None:
         writer.release()
-    print('Script finished successfully.')
 
 
 def main():
@@ -316,26 +320,27 @@ def main():
     WEIGHT_REC_PATH, MODEL_REC_PATH = rec_model[args.rec_model]
 
     # model files check and download
-    print("=== DET model ===")
+    logger.info("=== DET model ===")
     check_and_download_models(WEIGHT_DET_PATH, MODEL_DET_PATH, REMOTE_PATH)
-    print("=== REC model ===")
+    logger.info("=== REC model ===")
     check_and_download_models(WEIGHT_REC_PATH, MODEL_REC_PATH, REMOTE_PATH)
-    print("=== GA model ===")
+    logger.info("=== GA model ===")
     check_and_download_models(WEIGHT_GA_PATH, MODEL_GA_PATH, REMOTE_PATH)
 
-    # load model
-    env_id = ailia.get_gpu_environment_id()
-    print(f'env_id: {env_id}')
-
     # initialize
-    det_model = ailia.Net(MODEL_DET_PATH, WEIGHT_DET_PATH, env_id=env_id)
-    rec_model = ailia.Net(MODEL_REC_PATH, WEIGHT_REC_PATH, env_id=env_id)
-    ga_model = ailia.Net(MODEL_GA_PATH, WEIGHT_GA_PATH, env_id=env_id)
+    det_model = ailia.Net(MODEL_DET_PATH, WEIGHT_DET_PATH, env_id=args.env_id)
+    rec_model = ailia.Net(MODEL_REC_PATH, WEIGHT_REC_PATH, env_id=args.env_id)
+    ga_model = ailia.Net(MODEL_GA_PATH, WEIGHT_GA_PATH, env_id=args.env_id)
 
     if args.video is not None:
         recognize_from_video(args.video, det_model, rec_model, ga_model)
     else:
-        recognize_from_image(args.input, det_model, rec_model, ga_model)
+        # input image loop
+        for image_path in args.input:
+            # prepare input data
+            logger.info(image_path)
+            recognize_from_image(image_path, det_model, rec_model, ga_model)
+    logger.info('Script finished successfully.')
 
 
 if __name__ == '__main__':

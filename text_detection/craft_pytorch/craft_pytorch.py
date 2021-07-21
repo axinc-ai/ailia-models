@@ -8,9 +8,13 @@ import craft_pytorch_utils
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser  # noqa: E402
+from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 import webcamera_utils  # noqa: E402
+
+# logger
+from logging import getLogger   # noqa: E402
+logger = getLogger(__name__)
 
 
 # ======================
@@ -42,30 +46,35 @@ args = update_parser(parser)
 # Main functions
 # ======================
 def recognize_from_image():
-    # prepare input data
-    image = craft_pytorch_utils.load_image(args.input)
-    print(f'input image shape: {image.shape}')
-    x, ratio_w, ratio_h = craft_pytorch_utils.pre_process(image)
-
     # net initialize
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
-    net.set_input_shape((1, 3, x.shape[2], x.shape[3]))
 
-    # inference
-    print('Start inference...')
-    if args.benchmark:
-        print('BENCHMARK mode')
-        for i in range(5):
-            start = int(round(time.time() * 1000))
+    # input image loop
+    for image_path in args.input:
+        # prepare input data
+        logger.info(image_path)
+        image = craft_pytorch_utils.load_image(image_path)
+        logger.debug(f'input image shape: {image.shape}')
+        x, ratio_w, ratio_h = craft_pytorch_utils.pre_process(image)
+        net.set_input_shape((1, 3, x.shape[2], x.shape[3]))
+
+        # inference
+        logger.info('Start inference...')
+        if args.benchmark:
+            logger.info('BENCHMARK mode')
+            for i in range(5):
+                start = int(round(time.time() * 1000))
+                y, _ = net.predict({'input.1': x})
+                end = int(round(time.time() * 1000))
+                logger.info(f'\tailia processing time {end - start} ms')
+        else:
             y, _ = net.predict({'input.1': x})
-            end = int(round(time.time() * 1000))
-            print(f'\tailia processing time {end - start} ms')
-    else:
-        y, _ = net.predict({'input.1': x})
 
-    img = craft_pytorch_utils.post_process(y, image, ratio_w, ratio_h)
-    cv2.imwrite(args.savepath, img)
-    print('Script finished successfully.')
+        img = craft_pytorch_utils.post_process(y, image, ratio_w, ratio_h)
+        savepath = get_savepath(args.savepath, image_path)
+        logger.info(f'saved at : {savepath}')
+        cv2.imwrite(savepath, img)
+    logger.info('Script finished successfully.')
 
 
 def recognize_from_video():
@@ -103,7 +112,7 @@ def recognize_from_video():
     cv2.destroyAllWindows()
     if writer is not None:
         writer.release()
-    print('Script finished successfully.')
+    logger.info('Script finished successfully.')
 
 
 def main():

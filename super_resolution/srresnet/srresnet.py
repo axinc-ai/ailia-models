@@ -8,10 +8,14 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser  # noqa: E402
+from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from image_utils import load_image  # noqa: E402
 import webcamera_utils  # noqa: E402
+
+# logger
+from logging import getLogger   # noqa: E402
+logger = getLogger(__name__)
 
 
 # ======================
@@ -60,34 +64,39 @@ REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/srresnet/'
 # Main functions
 # ======================
 def recognize_from_image():
-    # prepare input data
-    input_data = load_image(
-        args.input,
-        (IMAGE_HEIGHT, IMAGE_WIDTH),
-        normalize_type='255',
-        gen_input_ailia=True
-    )
-
     # net initialize
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
 
-    # inference
-    print('Start inference...')
-    if args.benchmark:
-        print('BENCHMARK mode')
-        for i in range(5):
-            start = int(round(time.time() * 1000))
-            preds_ailia = net.predict(input_data)
-            end = int(round(time.time() * 1000))
-            print(f'\tailia processing time {end - start} ms')
-    else:
-        preds_ailia = net.predict(input_data)
+    # input image loop
+    for image_path in args.input:
+        # prepare input data
+        logger.info(image_path)
+        input_data = load_image(
+            image_path,
+            (IMAGE_HEIGHT, IMAGE_WIDTH),
+            normalize_type='255',
+            gen_input_ailia=True,
+        )
 
-    # postprocessing
-    output_img = preds_ailia[0].transpose((1, 2, 0))
-    output_img = cv2.cvtColor(output_img, cv2.COLOR_RGB2BGR)
-    cv2.imwrite(args.savepath, output_img * 255)
-    print('Script finished successfully.')
+        # inference
+        logger.info('Start inference...')
+        if args.benchmark:
+            logger.info('BENCHMARK mode')
+            for i in range(5):
+                start = int(round(time.time() * 1000))
+                preds_ailia = net.predict(input_data)
+                end = int(round(time.time() * 1000))
+                logger.info(f'\tailia processing time {end - start} ms')
+        else:
+            preds_ailia = net.predict(input_data)
+
+        # postprocessing
+        output_img = preds_ailia[0].transpose((1, 2, 0))
+        output_img = cv2.cvtColor(output_img, cv2.COLOR_RGB2BGR)
+        savepath = get_savepath(args.savepath, image_path)
+        logger.info(f'saved at : {savepath}')
+        cv2.imwrite(savepath, output_img * 255)
+    logger.info('Script finished successfully.')
 
 
 def tiling(net, img):
@@ -101,8 +110,8 @@ def tiling(net, img):
     output_w = w * scale
     output_h = h * scale
 
-    print(f'input image : {h}x{w}')
-    print(f'output image : {output_w}x{output_h}')
+    logger.debug(f'input image : {h}x{w}')
+    logger.debug(f'output image : {output_w}x{output_h}')
 
     img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
     img = img / 255.0
@@ -132,7 +141,7 @@ def tiling(net, img):
                 x*IMAGE_WIDTH:(x+1)*IMAGE_WIDTH
             ])
     end = int(round(time.time() * 1000))
-    print(f'ailia processing time {end - start} ms')
+    logger.info(f'ailia processing time {end - start} ms')
 
     # Postprocessing
     output_img = output_pad_img[0, :, :output_h, :output_w]
@@ -147,11 +156,17 @@ def recognize_from_image_tiling():
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
 
     # processing
-    img = cv2.imread(args.input)
-    output_img = tiling(net, img)
-
-    cv2.imwrite(args.savepath, output_img * 255)
-    print('Script finished successfully.')
+    # input image loop
+    for image_path in args.input:
+        # prepare input data
+        # TODO: FIXME: preprocess is different, is it intentionally...?
+        logger.info(image_path)
+        img = cv2.imread(image_path)
+        output_img = tiling(net, img)
+        savepath = get_savepath(args.savepath, image_path)
+        logger.info(f'saved at : {savepath}')
+        cv2.imwrite(savepath, output_img * 255)
+    logger.info('Script finished successfully.')
 
 
 def recognize_from_video():
@@ -162,8 +177,8 @@ def recognize_from_video():
 
     # create video writer if savepath is specified as video format
     if args.savepath != SAVE_IMAGE_PATH:
-        print(
-            '[WARNING] currently, video results cannot be output correctly...'
+        logger.warning(
+            'currently, video results cannot be output correctly...'
         )
         f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
         f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
@@ -190,7 +205,7 @@ def recognize_from_video():
     cv2.destroyAllWindows()
     if writer is not None:
         writer.release()
-    print('Script finished successfully.')
+    logger.info('Script finished successfully.')
 
 
 def main():

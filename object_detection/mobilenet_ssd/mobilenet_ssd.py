@@ -7,18 +7,22 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser  # noqa: E402
+from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from image_utils import load_image  # noqa: E402
 from detector_utils import plot_results  # noqa: E402
 import webcamera_utils  # noqa: E402
 
+# logger
+from logging import getLogger   # noqa: E402
+logger = getLogger(__name__)
+
 
 # ======================
 # Parameters 1
 # ======================
-IMAGE_PATH = 'couple.jpg'
-SAVE_IMAGE_PATH = 'annotated.png'
+IMAGE_PATH = 'input.jpg'
+SAVE_IMAGE_PATH = 'output.png'
 IMAGE_HEIGHT = 300
 IMAGE_WIDTH = 300
 MODEL_LISTS = ['mb1-ssd', 'mb2-ssd-lite']
@@ -71,15 +75,6 @@ VOC_CATEGORY = [
 # Main functions
 # ======================
 def recognize_from_image():
-    # prepare input data
-    org_img = load_image(
-        args.input,
-        (IMAGE_HEIGHT, IMAGE_WIDTH),
-        normalize_type='None',
-    )
-    if org_img.shape[2] == 3:
-        org_img = cv2.cvtColor(org_img, cv2.COLOR_BGR2BGRA)
-
     # net initialize
     categories = 80
     threshold = 0.4
@@ -94,23 +89,43 @@ def recognize_from_image():
         algorithm=ailia.DETECTOR_ALGORITHM_SSD,
         env_id=args.env_id,
     )
+    if args.profile:
+        detector.set_profile_mode(True)
 
-    # inference
-    print('Start inference...')
-    if args.benchmark:
-        print('BENCHMARK mode')
-        for i in range(5):
-            start = int(round(time.time() * 1000))
+    # input image loop
+    for image_path in args.input:
+        # prepare input data
+        logger.info(image_path)
+        org_img = load_image(
+            image_path,
+            (IMAGE_HEIGHT, IMAGE_WIDTH),
+            normalize_type='None',
+        )
+        if org_img.shape[2] == 3:
+            org_img = cv2.cvtColor(org_img, cv2.COLOR_RGB2BGRA)
+
+        # inference
+        logger.info('Start inference...')
+        if args.benchmark:
+            logger.info('BENCHMARK mode')
+            for i in range(5):
+                start = int(round(time.time() * 1000))
+                detector.compute(org_img, threshold, iou)
+                end = int(round(time.time() * 1000))
+                logger.info(f'\tailia processing time {end - start} ms')
+        else:
             detector.compute(org_img, threshold, iou)
-            end = int(round(time.time() * 1000))
-            print(f'\tailia processing time {end - start} ms')
-    else:
-        detector.compute(org_img, threshold, iou)
 
-    # postprocessing
-    res_img = plot_results(detector, org_img, VOC_CATEGORY)
-    cv2.imwrite(args.savepath, res_img)
-    print('Script finished successfully.')
+        # postprocessing
+        res_img = plot_results(detector, org_img, VOC_CATEGORY)
+        savepath = get_savepath(args.savepath, image_path)
+        logger.info(f'saved at : {savepath}')
+        cv2.imwrite(savepath, res_img)
+
+    if args.profile:
+        print(detector.get_summary())
+
+    logger.info('Script finished successfully.')
 
 
 def recognize_from_video():
@@ -133,9 +148,9 @@ def recognize_from_video():
 
     # create video writer if savepath is specified as video format
     if args.savepath != SAVE_IMAGE_PATH:
-        writer = webcamera_utils.get_writer(
-            args.savepath, IMAGE_HEIGHT, IMAGE_WIDTH
-        )
+        f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
+        writer = webcamera_utils.get_writer(args.savepath, f_h, f_w)
     else:
         writer = None
 
@@ -144,12 +159,9 @@ def recognize_from_video():
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
 
-        _, resized_img = webcamera_utils.adjust_frame_size(
-            frame, IMAGE_HEIGHT, IMAGE_WIDTH
-        )
-        img = cv2.cvtColor(resized_img, cv2.COLOR_BGR2BGRA)
+        img = cv2.cvtColor(frame, cv2.COLOR_BGR2BGRA)
         detector.compute(img, threshold, iou)
-        res_img = plot_results(detector, resized_img, VOC_CATEGORY, False)
+        res_img = plot_results(detector, frame, VOC_CATEGORY, False)
         cv2.imshow('frame', res_img)
 
         # save results
@@ -160,7 +172,7 @@ def recognize_from_video():
     cv2.destroyAllWindows()
     if writer is not None:
         writer.release()
-    print('Script finished successfully.')
+    logger.info('Script finished successfully.')
 
 
 def main():

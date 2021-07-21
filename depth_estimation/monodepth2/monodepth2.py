@@ -3,17 +3,21 @@ import time
 
 import cv2
 import matplotlib.pyplot as plt
-from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
+# from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 import numpy as np
 
 import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser  # noqa: E402
+from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from image_utils import load_image  # noqa: E402
 import webcamera_utils  # noqa: E402
+
+# logger
+from logging import getLogger   # noqa: E402
+logger = getLogger(__name__)
 
 
 # ======================
@@ -57,37 +61,43 @@ def result_plot(disp, original_width, original_height):
 # Main functions
 # ======================
 def estimate_from_image():
-    # prepare input data
-    org_height, org_width, _ = cv2.imread(args.input).shape
-    input_data = load_image(
-        args.input,
-        (IMAGE_HEIGHT, IMAGE_WIDTH),
-        gen_input_ailia=True
-    )
-
     # net initialize
     enc_net = ailia.Net(ENC_MODEL_PATH, ENC_WEIGHT_PATH, env_id=args.env_id)
     dec_net = ailia.Net(DEC_MODEL_PATH, DEC_WEIGHT_PATH, env_id=args.env_id)
 
-    # inference
-    print('Start inference...')
-    if args.benchmark:
-        print('BENCHMARK mode')
-        for i in range(5):
-            start = int(round(time.time() * 1000))
+    # input image loop
+    for image_path in args.input:
+        logger.info(image_path)
+
+        # prepare input data
+        input_data = load_image(
+            image_path,
+            (IMAGE_HEIGHT, IMAGE_WIDTH),
+            gen_input_ailia=True,
+        )
+        org_height, org_width, _ = cv2.imread(image_path).shape
+
+        # inference
+        logger.info('Start inference...')
+        if args.benchmark:
+            logger.info('BENCHMARK mode')
+            for i in range(5):
+                start = int(round(time.time() * 1000))
+                features = enc_net.predict([input_data])
+                preds_ailia = dec_net.predict(features)
+                end = int(round(time.time() * 1000))
+                logger.info(f'\tailia processing time {end - start} ms')
+        else:
             features = enc_net.predict([input_data])
             preds_ailia = dec_net.predict(features)
-            end = int(round(time.time() * 1000))
-            print(f'\tailia processing time {end - start} ms')
-    else:
-        features = enc_net.predict([input_data])
-        preds_ailia = dec_net.predict(features)
 
-    # postprocessing
-    disp = preds_ailia[-1]
-    disp_resized, vmax = result_plot(disp, org_width, org_height)
-    plt.imsave(args.savepath, disp_resized, cmap='magma', vmax=vmax)
-    print('Script finished successfully.')
+        # post-processing
+        disp = preds_ailia[-1]
+        disp_resized, vmax = result_plot(disp, org_width, org_height)
+        savepath = get_savepath(args.savepath, image_path, ext='.png')
+        logger.info(f'saved at : {savepath}')
+        plt.imsave(savepath, disp_resized, cmap='magma', vmax=vmax)
+    logger.info('Script finished successfully.')
 
 
 def estimate_from_video():
@@ -99,8 +109,8 @@ def estimate_from_video():
 
     # create video writer if savepath is specified as video format
     if args.savepath != SAVE_IMAGE_PATH:
-        print('[WARNING] currently video results output feature '
-              'is not supported in this model!')
+        logger.warning('currently video results output feature '
+                       'is not supported in this model!')
         f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
         f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
         save_h, save_w = webcamera_utils.calc_adjust_fsize(
@@ -160,7 +170,7 @@ def estimate_from_video():
     cv2.destroyAllWindows()
     if writer is not None:
         writer.release()
-    print('Script finished successfully.')
+    logger.info('Script finished successfully.')
 
 
 def main():

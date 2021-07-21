@@ -20,7 +20,7 @@ class FaceLocator():
         check_and_download_models(WEIGHT_PATH_YOLO, MODEL_PATH_YOLO, REMOTE_PATH_YOLO)
         
         # net initialize
-        env_id = ailia.get_gpu_environment_id()
+        env_id = args.env_id
         self.detector = detector = ailia.Detector(
                                     MODEL_PATH_YOLO,
                                     WEIGHT_PATH_YOLO,

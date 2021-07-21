@@ -7,10 +7,14 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser  # noqa: E402
+from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 import webcamera_utils  # noqa: E402
 from detector_utils import plot_results, load_image  # noqa: E402
+
+# logger
+from logging import getLogger   # noqa: E402
+logger = getLogger(__name__)
 
 
 # ======================
@@ -43,10 +47,6 @@ args = update_parser(parser)
 # Main functions
 # ======================
 def recognize_from_image():
-    # prepare input data
-    img = load_image(args.input)
-    print(f'input image shape: {img.shape}')
-
     # net initialize
     detector = ailia.Detector(
         MODEL_PATH,
@@ -59,22 +59,31 @@ def recognize_from_image():
         env_id=args.env_id
     )
 
-    # inference
-    print('Start inference...')
-    if args.benchmark:
-        print('BENCHMARK mode')
-        for i in range(5):
-            start = int(round(time.time() * 1000))
-            detector.compute(img, THRESHOLD, IOU)
-            end = int(round(time.time() * 1000))
-            print(f'\tailia processing time {end - start} ms')
-    else:
-        detector.compute(img, THRESHOLD, IOU)
+    # input image loop
+    for image_path in args.input:
+        # prepare input data
+        logger.info(image_path)
+        img = load_image(image_path)
+        logger.debug(f'input image shape: {img.shape}')
 
-    # plot result
-    res_img = plot_results(detector, img, FACE_CATEGORY)
-    cv2.imwrite(args.savepath, res_img)
-    print('Script finished successfully.')
+        # inference
+        logger.info('Start inference...')
+        if args.benchmark:
+            logger.info('BENCHMARK mode')
+            for i in range(5):
+                start = int(round(time.time() * 1000))
+                detector.compute(img, THRESHOLD, IOU)
+                end = int(round(time.time() * 1000))
+                logger.info(f'\tailia processing time {end - start} ms')
+        else:
+            detector.compute(img, THRESHOLD, IOU)
+
+        # plot result
+        res_img = plot_results(detector, img, FACE_CATEGORY)
+        savepath = get_savepath(args.savepath, image_path)
+        logger.info(f'saved at : {savepath}')
+        cv2.imwrite(savepath, res_img)
+    logger.info('Script finished successfully.')
 
 
 def recognize_from_video():
@@ -94,8 +103,10 @@ def recognize_from_video():
 
     # create video writer if savepath is specified as video format
     if args.savepath != SAVE_IMAGE_PATH:
+        f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
         writer = webcamera_utils.get_writer(
-            args.savepath, IMAGE_HEIGHT, IMAGE_WIDTH
+            args.savepath, f_h, f_w
         )
     else:
         writer = None
@@ -105,13 +116,9 @@ def recognize_from_video():
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
 
-        _, resized_img = webcamera_utils.adjust_frame_size(
-            frame, IMAGE_HEIGHT, IMAGE_WIDTH
-        )
-
-        img = cv2.cvtColor(resized_img, cv2.COLOR_BGR2BGRA)
+        img = cv2.cvtColor(frame, cv2.COLOR_BGR2BGRA)
         detector.compute(img, THRESHOLD, IOU)
-        res_img = plot_results(detector, resized_img, FACE_CATEGORY, False)
+        res_img = plot_results(detector, frame, FACE_CATEGORY, False)
         cv2.imshow('frame', res_img)
 
         # save results
@@ -122,7 +129,7 @@ def recognize_from_video():
     cv2.destroyAllWindows()
     if writer is not None:
         writer.release()
-    print('Script finished successfully.')
+    logger.info('Script finished successfully.')
 
 
 def main():

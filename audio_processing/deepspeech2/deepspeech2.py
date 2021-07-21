@@ -1,20 +1,28 @@
-import torch
-import numpy as np
 import sys
-import librosa
-import argparse
 import time
+
+import librosa
 import pyaudio
+import numpy as np
+import torch
 
 import ailia
-"""import original modules"""
-sys.path.append('../../util') 
-from model_utils import check_and_download_models
+# import original moduls
+sys.path.append('../../util')
+from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
+from model_utils import check_and_download_models  # noqa: E402
+
+# logger
+from logging import getLogger   # noqa: E402
+logger = getLogger(__name__)
+
 
 # ======================
 # Parameters
 # ======================
-MODEL_LISTS = ['an4_pretrained_v2', 'librispeech_pretrained_v2', 'ted_pretrained_v2']
+MODEL_LISTS = [
+    'an4_pretrained_v2', 'librispeech_pretrained_v2', 'ted_pretrained_v2'
+]
 
 DEFAULT_MODEL = 'librispeech_pretrained_v2'
 
@@ -33,68 +41,63 @@ LABELS = list('_\'ABCDEFGHIJKLMNOPQRSTUVWXYZ ')
 int_to_char = dict([(i, c) for (i, c) in enumerate(LABELS)])
 BRANK_LABEL_INDEX = 0
 
-#BeamCTCDecoder parameter
+# BeamCTCDecoder parameter
 LM_PATH = '3-gram.pruned.3e-7.arpa'
-ALPHA=1.97
-BETA=4.36 
-CUTOFF_TOP_N=40
-CUTOFF_PROB=1.0
-NUM_PROCESS=1
-BEAM_WIDTH=128
+ALPHA = 1.97
+BETA = 4.36
+CUTOFF_TOP_N = 40
+CUTOFF_PROB = 1.0
+NUM_PROCESS = 1
+BEAM_WIDTH = 128
 
-#pyaudio
+# pyaudio
 CHUNK = 1024
-FORMAT = pyaudio.paInt16 
-CHANNELS = 1             
-RECODING_SAMPING_RATE = 48000        
+FORMAT = pyaudio.paInt16
+CHANNELS = 1
+RECODING_SAMPING_RATE = 48000
 THRESHOLD = 0.02
 
 # ======================
 # Arguemnt Parser Config
 # ======================
-parser = argparse.ArgumentParser(
-    description='deepspeech2'
+parser = get_base_parser(
+    'deepspeech2', WAV_PATH, SAVE_TEXT_PATH, input_ftype='audio'
 )
+# overwrite
 parser.add_argument(
     '-i', '--input', metavar='WAV',
     default=WAV_PATH,
-    help='The input wav path.'
-)
-parser.add_argument(
-    '-s', '--savepath', metavar='SAVE_TEXT_PATH',
-    default=SAVE_TEXT_PATH,
-    help='Save path for the output text.'
-)
-parser.add_argument(
-    '-b', '--benchmark',
-    action='store_true',
-    help='Running the inference on the same input 5 times ' +
-         'to measure execution performance. (Cannot be used in video mode)'
+    help='The input wav path.',
 )
 parser.add_argument(
     '-V',
     action='store_true',
-    help='use microphone input'
+    help='use microphone input',
 )
 parser.add_argument(
     '-d', '--beamdecode',
     action='store_true',
-    help='use beam decoder'
+    help='use beam decoder',
 )
 parser.add_argument(
     '-a', '--arch', metavar='WEIGHT',
     default=DEFAULT_MODEL, choices=MODEL_LISTS,
     help='model lists: ' + ' | '.join(MODEL_LISTS)
 )
-args = parser.parse_args()
+args = update_parser(parser)
+
 
 # ======================
 # Utils
 # ======================
 def create_spectrogram(wav):
-    stft = librosa.stft(wav, n_fft=WIN_LENGTH,
-                        win_length=WIN_LENGTH, hop_length=HOP_LENGTH,
-                        window='hamming')
+    stft = librosa.stft(
+        wav,
+        n_fft=WIN_LENGTH,
+        win_length=WIN_LENGTH,
+        hop_length=HOP_LENGTH,
+        window='hamming',
+    )
     stft, _ = librosa.magphase(stft)
     spectrogram = np.log1p(stft)
     spec_length = np.array(([stft.shape[1]-1]))
@@ -111,18 +114,20 @@ def create_spectrogram(wav):
 
 
 def record_microphone_input():
-    print('Ready...')
+    logger.info('Ready...')
     time.sleep(1)
     p = pyaudio.PyAudio()
 
-    stream = p.open(format=FORMAT,
-                    channels=CHANNELS,
-                    rate=RECODING_SAMPING_RATE,
-                    input=True,
-                    frames_per_buffer=CHUNK)
+    stream = p.open(
+        format=FORMAT,
+        channels=CHANNELS,
+        rate=RECODING_SAMPING_RATE,
+        input=True,
+        frames_per_buffer=CHUNK,
+    )
 
-    #time.sleep(1)
-    print("Please speak something")
+    # time.sleep(1)
+    logger.info("Please speak something")
 
     frames = []
     count_uv = 0
@@ -138,9 +143,8 @@ def record_microphone_input():
             if count_uv > 48:
                 break
             frames.extend(data)
-        
 
-    #print("Translating")
+    # logger.info("Translating")
 
     stream.stop_stream()
     stream.close()
@@ -152,9 +156,9 @@ def record_microphone_input():
 
 def decode(sequence, size=None):
     sequence = np.argmax(sequence, -1)
-    
+
     text = ''
-    size  = int(size[0]) if size is not None else len(sequence)
+    size = int(size[0]) if size is not None else len(sequence)
     for i in range(size):
         char = int_to_char[sequence[i]]
         if char != int_to_char[BRANK_LABEL_INDEX]:
@@ -165,17 +169,21 @@ def decode(sequence, size=None):
     return text.lower()
 
 
-#言語モデルを使用したデコード
 def beam_ctc_decode(sequence, size=None, decoder=None):
+    """
+    Decode using language model
+    """
     out, scores, offsets, seq_len = decoder.decode(sequence, size)
 
-    results = []
+    # results = []
     for b, batch in enumerate(out):
         utterances = []
         for p, utt in enumerate(batch):
             size = seq_len[0][p]
             if size > 0:
-                transcript = ''.join(map(lambda x: int_to_char[x.item()], utt[0:size]))
+                transcript = ''.join(
+                    map(lambda x: int_to_char[x.item()], utt[0:size])
+                )
             else:
                 transcript = ''
         utterances.append(transcript)
@@ -193,78 +201,102 @@ def wavfile_input_recognition():
         except ImportError:
             raise ImportError("BeamCTCDecoder requires paddledecoder package.")
 
-        decoder = CTCBeamDecoder(LABELS, LM_PATH, ALPHA, BETA, CUTOFF_TOP_N, CUTOFF_PROB, BEAM_WIDTH,
-                                  NUM_PROCESS, BRANK_LABEL_INDEX)
-
-    wav = librosa.load(args.input, sr=SAMPLING_RATE)[0]
-    spectrogram = create_spectrogram(wav)
+        decoder = CTCBeamDecoder(
+            LABELS,
+            LM_PATH,
+            ALPHA,
+            BETA,
+            CUTOFF_TOP_N,
+            CUTOFF_PROB,
+            BEAM_WIDTH,
+            NUM_PROCESS,
+            BRANK_LABEL_INDEX,
+        )
 
     # net initialize
-    env_id = ailia.get_gpu_environment_id()
-    print(f'env_id: {env_id}')
-    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
-    net.set_input_shape(spectrogram[0].shape)
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
 
-    # inference
-    print('Start inference...')
-    if args.benchmark:
-        print('BENCHMARK mode')
-        for c in range(5):
-            start = int(round(time.time() * 1000))
+    for soundf_path in args.input:
+        logger.info(soundf_path)
+        wav = librosa.load(soundf_path, sr=SAMPLING_RATE)[0]
+        spectrogram = create_spectrogram(wav)
+        net.set_input_shape(spectrogram[0].shape)
+
+        # inference
+        logger.info('Start inference...')
+        if args.benchmark:
+            logger.info('BENCHMARK mode')
+            for c in range(5):
+                start = int(round(time.time() * 1000))
+                preds_ailia, output_length = net.predict(spectrogram)
+                end = int(round(time.time() * 1000))
+                logger.info("\tailia processing time {} ms".format(end-start))
+        else:
+            # Deep Speech output: output_probability, output_length
             preds_ailia, output_length = net.predict(spectrogram)
-            end = int(round(time.time() * 1000))
-            print("\tailia processing time {} ms".format(end-start))
-    else:
-        #Deep Speech output: output_probability, output_length
-        preds_ailia, output_length = net.predict(spectrogram)
 
-    #実装上、1度torch.Tensorに変換
-    if args.beamdecode:
-        text = beam_ctc_decode(torch.from_numpy(preds_ailia), torch.from_numpy(output_length), decoder)
-    else:
-        text = decode(preds_ailia[0], output_length)
+        if args.beamdecode:
+            text = beam_ctc_decode(
+                torch.from_numpy(preds_ailia),
+                torch.from_numpy(output_length),
+                decoder,
+            )
+        else:
+            text = decode(preds_ailia[0], output_length)
 
-    with open(args.savepath, 'w', encoding='utf-8') as f:
-        f.write(text)
-    print(f'predict sentence:\n{text}')
-    print('Script finished successfully.')
+        savepath = get_savepath(args.savepath, soundf_path, ext='.txt')
+        logger.info(f'Results saved at : {savepath}')
+        with open(savepath, 'w', encoding='utf-8') as f:
+            f.write(text)
+        logger.info(f'predict sentence:\n{text}')
+    logger.info('Script finished successfully.')
 
 
 # ======================
 # microphone input mode
 # ======================
 def microphone_input_recognition():
-    env_id = ailia.get_gpu_environment_id()
-    print(f'env_id: {env_id}')
-
     if args.beamdecode:
         try:
             from ctcdecode import CTCBeamDecoder
         except ImportError:
             raise ImportError("BeamCTCDecoder requires paddledecoder package.")
 
-        decoder = CTCBeamDecoder(LABELS, LM_PATH, ALPHA, BETA, CUTOFF_TOP_N, CUTOFF_PROB, BEAM_WIDTH,
-                                  NUM_PROCESS, BRANK_LABEL_INDEX)
+        decoder = CTCBeamDecoder(
+            LABELS,
+            LM_PATH,
+            ALPHA,
+            BETA,
+            CUTOFF_TOP_N,
+            CUTOFF_PROB,
+            BEAM_WIDTH,
+            NUM_PROCESS,
+            BRANK_LABEL_INDEX,
+        )
 
     while True:
         wav = record_microphone_input()
         spectrogram = create_spectrogram(wav)
 
         # net initialize
-        net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+        net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
         net.set_input_shape(spectrogram[0].shape)
 
         # inference
-        print('Translating...')
-        #Deep Speech output: output_probability, output_length
+        logger.info('Translating...')
+        # Deep Speech output: output_probability, output_length
         preds_ailia, output_length = net.predict(spectrogram)
 
         if args.beamdecode:
-            text = beam_ctc_decode(torch.from_numpy(preds_ailia), torch.from_numpy(output_length), decoder)
+            text = beam_ctc_decode(
+                torch.from_numpy(preds_ailia),
+                torch.from_numpy(output_length),
+                decoder,
+            )
         else:
             text = decode(preds_ailia[0], output_length)
 
-        print(f'predict sentence:\n{text}\n')
+        logger.info(f'predict sentence:\n{text}\n')
         time.sleep(1)
 
 
@@ -273,21 +305,21 @@ def main():
     if args.arch != WEIGHT_PATH:
         WEIGHT_PATH = args.arch + '.onnx'
         MODEL_PATH = WEIGHT_PATH + '.prototxt'
-    
+
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
     check_and_download_models(LM_PATH, LM_PATH, REMOTE_PATH)
-    
-    #マイク入力モード
+
+    # microphone input mode
     if args.V:
         try:
             microphone_input_recognition()
         except KeyboardInterrupt:
-            print('script finished successfully.')
+            logger.info('script finished successfully.')
 
-    #音声ファイル入力モード
+    # sound file input mode
     else:
         wavfile_input_recognition()
 
 
-if __name__=="__main__":
+if __name__ == "__main__":
     main()

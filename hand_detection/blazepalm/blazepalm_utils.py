@@ -1,6 +1,4 @@
 import cv2
-import matplotlib.patches as patches
-import matplotlib.pyplot as plt
 import numpy as np
 from scipy.special import expit
 
@@ -31,7 +29,7 @@ def resize_pad(img):
     """
 
     size0 = img.shape
-    if size0[0]>=size0[1]:
+    if size0[0] >= size0[1]:
         h1 = 256
         w1 = 256 * size0[1] // size0[0]
         padh = 0
@@ -44,77 +42,78 @@ def resize_pad(img):
         padw = 0
         scale = size0[0] / h1
     padh1 = padh//2
-    padh2 = padh//2 + padh%2
+    padh2 = padh//2 + padh % 2
     padw1 = padw//2
-    padw2 = padw//2 + padw%2
-    img1 = cv2.resize(img, (w1,h1))
-    img1 = np.pad(img1, ((padh1, padh2), (padw1, padw2), (0,0)))
+    padw2 = padw//2 + padw % 2
+    img1 = cv2.resize(img, (w1, h1))
+    img1 = np.pad(img1, ((padh1, padh2), (padw1, padw2), (0, 0)), mode='constant')
     pad = (int(padh1 * scale), int(padw1 * scale))
-    img2 = cv2.resize(img1, (128,128))
+    img2 = cv2.resize(img1, (128, 128))
     return img1, img2, scale, pad
 
 
 def decode_boxes(raw_boxes, anchors):
-        """Converts the predictions into actual coordinates using
-        the anchor boxes. Processes the entire batch at once.
-        """
-        boxes = np.zeros_like(raw_boxes)
+    """Converts the predictions into actual coordinates using
+    the anchor boxes. Processes the entire batch at once.
+    """
+    boxes = np.zeros_like(raw_boxes)
 
-        x_center = raw_boxes[..., 0] / x_scale * anchors[:, 2] + anchors[:, 0]
-        y_center = raw_boxes[..., 1] / y_scale * anchors[:, 3] + anchors[:, 1]
+    x_center = raw_boxes[..., 0] / x_scale * anchors[:, 2] + anchors[:, 0]
+    y_center = raw_boxes[..., 1] / y_scale * anchors[:, 3] + anchors[:, 1]
 
-        w = raw_boxes[..., 2] / w_scale * anchors[:, 2]
-        h = raw_boxes[..., 3] / h_scale * anchors[:, 3]
+    w = raw_boxes[..., 2] / w_scale * anchors[:, 2]
+    h = raw_boxes[..., 3] / h_scale * anchors[:, 3]
 
-        boxes[..., 0] = y_center - h / 2.  # ymin
-        boxes[..., 1] = x_center - w / 2.  # xmin
-        boxes[..., 2] = y_center + h / 2.  # ymax
-        boxes[..., 3] = x_center + w / 2.  # xmax
+    boxes[..., 0] = y_center - h / 2.  # ymin
+    boxes[..., 1] = x_center - w / 2.  # xmin
+    boxes[..., 2] = y_center + h / 2.  # ymax
+    boxes[..., 3] = x_center + w / 2.  # xmax
 
-        for k in range(num_keypoints):
-            offset = 4 + k*2
-            keypoint_x = raw_boxes[..., offset    ] / x_scale * anchors[:, 2] + anchors[:, 0]
-            keypoint_y = raw_boxes[..., offset + 1] / y_scale * anchors[:, 3] + anchors[:, 1]
-            boxes[..., offset    ] = keypoint_x
-            boxes[..., offset + 1] = keypoint_y
+    for k in range(num_keypoints):
+        offset = 4 + k*2
+        keypoint_x = raw_boxes[..., offset    ] / x_scale * anchors[:, 2] + anchors[:, 0]
+        keypoint_y = raw_boxes[..., offset + 1] / y_scale * anchors[:, 3] + anchors[:, 1]
+        boxes[..., offset    ] = keypoint_x
+        boxes[..., offset + 1] = keypoint_y
 
-        return boxes
+    return boxes
 
 
 def raw_output_to_detections(raw_box, raw_score, anchors):
-        """The output of the neural network is an array of shape (b, 896, 18)
-        containing the bounding box regressor predictions, as well as an array 
-        of shape (b, 896, 1) with the classification confidences.
+    """The output of the neural network is an array of shape (b, 896, 18)
+    containing the bounding box regressor predictions, as well as an array
+    of shape (b, 896, 1) with the classification confidences.
 
-        This function converts these two "raw" arrays into proper detections.
-        Returns a list of (num_detections, 13) arrays, one for each image in
-        the batch.
+    This function converts these two "raw" arrays into proper detections.
+    Returns a list of (num_detections, 13) arrays, one for each image in
+    the batch.
 
-        This is based on the source code from:
-        mediapipe/calculators/tflite/tflite_tensors_to_detections_calculator.cc
-        mediapipe/calculators/tflite/tflite_tensors_to_detections_calculator.proto
-        """
-        detection_boxes = decode_boxes(raw_box, anchors)
+    This is based on the source code from:
+    mediapipe/calculators/tflite/tflite_tensors_to_detections_calculator.cc
+    mediapipe/calculators/tflite/tflite_tensors_to_detections_calculator.proto
+    """
+    detection_boxes = decode_boxes(raw_box, anchors)
 
-        thresh = 100.0
-        raw_score = raw_score.clip(-thresh, thresh)
-        # expit = sigmoid (instead of defining our own sigmoid function which yields a warning)
-        detection_scores = expit(raw_score).squeeze(axis=-1)
-        
-        # Note: we stripped off the last dimension from the scores tensor
-        # because there is only has one class. Now we can simply use a mask
-        # to filter out the boxes with too low confidence.
-        mask = detection_scores >= min_score_thresh
+    thresh = 100.0
+    raw_score = raw_score.clip(-thresh, thresh)
+    # instead of defining our own sigmoid function which yields a warning)
+    # expit = sigmoid
+    detection_scores = expit(raw_score).squeeze(axis=-1)
 
-        # Because each image from the batch can have a different number of
-        # detections, process them one at a time using a loop.
-        output_detections = []
-        for i in range(raw_box.shape[0]):
-            boxes = detection_boxes[i, mask[i]]
-            scores = np.expand_dims(detection_scores[i, mask[i]], axis=-1)
-            output_detections.append(np.concatenate((boxes, scores), axis=-1))
+    # Note: we stripped off the last dimension from the scores tensor
+    # because there is only has one class. Now we can simply use a mask
+    # to filter out the boxes with too low confidence.
+    mask = detection_scores >= min_score_thresh
 
-        return output_detections
+    # Because each image from the batch can have a different number of
+    # detections, process them one at a time using a loop.
+    output_detections = []
+    for i in range(raw_box.shape[0]):
+        boxes = detection_boxes[i, mask[i]]
+        scores = np.expand_dims(detection_scores[i, mask[i]], axis=-1)
+        output_detections.append(np.concatenate((boxes, scores), axis=-1))
+
+    return output_detections
 
 
 def intersect(box_a, box_b):
@@ -133,12 +132,10 @@ def intersect(box_a, box_b):
     max_xy = np.minimum(
         np.repeat(np.expand_dims(box_a[:, 2:], axis=1), B, axis=1),
         np.repeat(np.expand_dims(box_b[:, 2:], axis=0), A, axis=0),
-        
     )
     min_xy = np.maximum(
         np.repeat(np.expand_dims(box_a[:, :2], axis=1), B, axis=1),
         np.repeat(np.expand_dims(box_b[:, :2], axis=0), A, axis=0),
-        
     )
     inter = np.clip((max_xy - min_xy), 0, None)
     return inter[:, :, 0] * inter[:, :, 1]
@@ -196,12 +193,13 @@ def weighted_non_max_suppression(detections):
     The input detections should be a Tensor of shape (count, 17).
 
     Returns a list of PyTorch tensors, one for each detected face.
-    
+
     This is based on the source code from:
     mediapipe/calculators/util/non_max_suppression_calculator.cc
     mediapipe/calculators/util/non_max_suppression_calculator.proto
     """
-    if len(detections) == 0: return []
+    if len(detections) == 0:
+        return []
 
     output_detections = []
 
@@ -212,7 +210,7 @@ def weighted_non_max_suppression(detections):
     while len(remaining) > 0:
         detection = detections[remaining[0]]
 
-        # Compute the overlap between the first box and the other 
+        # Compute the overlap between the first box and the other
         # remaining boxes. (Note that the other_boxes also include
         # the first_box.)
         first_box = detection[:4]
@@ -238,7 +236,7 @@ def weighted_non_max_suppression(detections):
 
         output_detections.append(weighted_detection)
 
-    return output_detections  
+    return output_detections
 
 
 def denormalize_detections(detections, scale, pad):

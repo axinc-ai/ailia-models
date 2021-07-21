@@ -8,11 +8,15 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser  # noqa: E402
+from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from detector_utils import load_image  # noqa: E402
 import webcamera_utils  # noqa: E402
 from pose_resnet_util import compute, keep_aspect  # noqa: E402
+
+# logger
+from logging import getLogger   # noqa: E402
+logger = getLogger(__name__)
 
 
 # ======================
@@ -27,7 +31,7 @@ WEIGHT_PATH = 'yolov3.opt.onnx'
 MODEL_PATH = 'yolov3.opt.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/yolov3/'
 
-IMAGE_PATH = 'balloon.png'
+IMAGE_PATH = 'input.jpg'
 SAVE_IMAGE_PATH = 'output.png'
 
 COCO_CATEGORY = [
@@ -124,24 +128,51 @@ def display_result(input_img, person):
          ailia.POSE_KEYPOINT_KNEE_RIGHT)
 
 
-def plot_results(detector, pose, img, category, logging=True):
+def pose_estimation(detector, pose, img):
     pose_img = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
     h, w = img.shape[0], img.shape[1]
     count = detector.get_object_count()
+    pose_detections = []
+    for idx in range(count):
+        obj = detector.get_object(idx)
+        top_left = (int(w*obj.x), int(h*obj.y))
+        bottom_right = (int(w*(obj.x+obj.w)), int(h*(obj.y+obj.h)))
+        CATEGORY_PERSON = 0
+        if obj.category != CATEGORY_PERSON:
+            pose_detections.append(None)
+            continue
+        px1, py1, px2, py2 = keep_aspect(
+            top_left, bottom_right, pose_img, pose
+        )
+        crop_img = pose_img[py1:py2, px1:px2, :]
+        offset_x = px1/img.shape[1]
+        offset_y = py1/img.shape[0]
+        scale_x = crop_img.shape[1]/img.shape[1]
+        scale_y = crop_img.shape[0]/img.shape[0]
+        detections = compute(
+            pose, crop_img, offset_x, offset_y, scale_x, scale_y
+        )
+        pose_detections.append(detections)
+    return pose_detections
+
+
+def plot_results(detector, pose, img, category, pose_detections, logging=True):
+    h, w = img.shape[0], img.shape[1]
+    count = detector.get_object_count()
     if logging:
-        print(f'object_count={count}')
+        logger.info(f'object_count={count}')
 
     for idx in range(count):
         obj = detector.get_object(idx)
         # print result
         if logging:
-            print(f'+ idx={idx}')
-            print(f'  category={obj.category}[ {category[obj.category]} ]')
-            print(f'  prob={obj.prob}')
-            print(f'  x={obj.x}')
-            print(f'  y={obj.y}')
-            print(f'  w={obj.w}')
-            print(f'  h={obj.h}')
+            logger.info(f'+ idx={idx}')
+            logger.info(f'  category={obj.category}[ {category[obj.category]} ]')
+            logger.info(f'  prob={obj.prob}')
+            logger.info(f'  x={obj.x}')
+            logger.info(f'  y={obj.y}')
+            logger.info(f'  w={obj.w}')
+            logger.info(f'  h={obj.h}')
         top_left = (int(w*obj.x), int(h*obj.y))
         bottom_right = (int(w*(obj.x+obj.w)), int(h*(obj.y+obj.h)))
         text_position = (int(w*obj.x)+4, int(h*(obj.y+obj.h)-8))
@@ -167,20 +198,10 @@ def plot_results(detector, pose, img, category, logging=True):
 
         # pose detection
         px1, py1, px2, py2 = keep_aspect(
-            top_left, bottom_right, pose_img, pose
+            top_left, bottom_right, img, pose
         )
-
-        crop_img = pose_img[py1:py2, px1:px2, :]
-        offset_x = px1/img.shape[1]
-        offset_y = py1/img.shape[0]
-        scale_x = crop_img.shape[1]/img.shape[1]
-        scale_y = crop_img.shape[0]/img.shape[0]
-        detections = compute(
-            pose, crop_img, offset_x, offset_y, scale_x, scale_y
-        )
-
+        detections = pose_detections[idx]
         cv2.rectangle(img, (px1, py1), (px2, py2), color, 1)
-
         display_result(img, detections)
 
     return img
@@ -190,10 +211,6 @@ def plot_results(detector, pose, img, category, logging=True):
 # Main functions
 # ======================
 def recognize_from_image():
-    # prepare input data
-    img = load_image(args.input)
-    print(f'input image shape: {img.shape}')
-
     # net initialize
     detector = ailia.Detector(
         MODEL_PATH,
@@ -208,22 +225,38 @@ def recognize_from_image():
 
     pose = ailia.Net(POSE_MODEL_PATH, POSE_WEIGHT_PATH, env_id=args.env_id)
 
-    # inference
-    print('Start inference...')
-    if args.benchmark:
-        print('BENCHMARK mode')
-        for i in range(5):
-            start = int(round(time.time() * 1000))
-            detector.compute(img, THRESHOLD, IOU)
-            end = int(round(time.time() * 1000))
-            print(f'\tailia processing time {end - start} ms')
-    else:
+    # input image loop
+    for image_path in args.input:
+        # prepare input data
+        logger.info(image_path)
+        img = load_image(image_path)
+        logger.debug(f'input image shape: {img.shape}')
+
+        # inference
+        logger.info('Start inference...')
         detector.compute(img, THRESHOLD, IOU)
 
-    # plot result
-    res_img = plot_results(detector, pose, img, COCO_CATEGORY)
-    cv2.imwrite(args.savepath, res_img)
-    print('Script finished successfully.')
+        # pose estimation
+        if args.benchmark:
+            logger.info('BENCHMARK mode')
+            total_time = 0
+            for i in range(args.benchmark_count):
+                start = int(round(time.time() * 1000))
+                pose_detections = pose_estimation(detector, pose, img)
+                end = int(round(time.time() * 1000))
+                logger.info(f'\tailia processing detection time {end - start} ms')
+                if i != 0:
+                    total_time = total_time + (end - start)
+            logger.info(f'\taverage detection time {total_time / (args.benchmark_count-1)} ms')
+        else:
+            pose_detections = pose_estimation(detector, pose, img)
+
+        # plot result
+        res_img = plot_results(detector, pose, img, COCO_CATEGORY, pose_detections)
+        savepath = get_savepath(args.savepath, image_path)
+        logger.info(f'saved at : {savepath}')
+        cv2.imwrite(savepath, res_img)
+    logger.info('Script finished successfully.')
 
 
 def recognize_from_video():
@@ -257,7 +290,8 @@ def recognize_from_video():
 
         img = cv2.cvtColor(frame, cv2.COLOR_BGR2BGRA)
         detector.compute(img, THRESHOLD, IOU)
-        res_img = plot_results(detector, pose, frame, COCO_CATEGORY, False)
+        pose_detections = pose_estimation(detector, pose, img)
+        res_img = plot_results(detector, pose, frame, COCO_CATEGORY, pose_detections, False)
         cv2.imshow('frame', res_img)
         # save results
         if writer is not None:
@@ -267,7 +301,7 @@ def recognize_from_video():
     cv2.destroyAllWindows()
     if writer is not None:
         writer.release()
-    print('Script finished successfully.')
+    logger.info('Script finished successfully.')
 
 
 def main():

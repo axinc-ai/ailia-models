@@ -8,23 +8,37 @@ import blazeface_utils as but
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser  # noqa: E402
+from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from image_utils import load_image  # noqa: E402
 import webcamera_utils  # noqa: E402
+
+import ssl
+ssl._create_default_https_context = ssl._create_unverified_context
+
+# logger
+from logging import getLogger   # noqa: E402
+logger = getLogger(__name__)
 
 
 # ======================
 # PARAMETERS
 # ======================
-WEIGHT_PATH = 'blazeface.onnx'
-MODEL_PATH = 'blazeface.onnx.prototxt'
+WEIGHT_PATH_FRONT = 'blazeface.onnx'
+MODEL_PATH_FRONT = 'blazeface.onnx.prototxt'
+ANCHOR_PATH_FRONT = 'anchors.npy'
+WEIGHT_PATH_BACK = 'blazefaceback.onnx'
+MODEL_PATH_BACK = 'blazefaceback.onnx.prototxt'
+ANCHOR_PATH_BACK = 'anchorsback.npy'
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/blazeface/"
 
 IMAGE_PATH = 'input.png'
 SAVE_IMAGE_PATH = 'result.png'
-IMAGE_HEIGHT = 128
-IMAGE_WIDTH = 128
+
+IMAGE_HEIGHT_FRONT = 128
+IMAGE_WIDTH_FRONT = 128
+IMAGE_HEIGHT_BACK = 256
+IMAGE_WIDTH_BACK = 256
 
 
 # ======================
@@ -35,53 +49,72 @@ parser = get_base_parser(
     IMAGE_PATH,
     SAVE_IMAGE_PATH,
 )
+parser.add_argument('-bk', '--back', action='store_true')
 args = update_parser(parser)
 
 
 # ======================
 # Main functions
 # ======================
-def recognize_from_image():
-    # prepare input data
-    org_img = load_image(
-        args.input,
-        (IMAGE_HEIGHT, IMAGE_WIDTH),
-    )
-
-    input_data = load_image(
-        args.input,
-        (IMAGE_HEIGHT, IMAGE_WIDTH),
-        normalize_type='127.5',
-        gen_input_ailia=True
-    )
-
-    # net initialize
-    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
-
-    # inference
-    print('Start inference...')
-    if args.benchmark:
-        print('BENCHMARK mode')
-        for i in range(5):
-            start = int(round(time.time() * 1000))
-            preds_ailia = net.predict([input_data])
-            end = int(round(time.time() * 1000))
-            print(f'\tailia processing time {end - start} ms')
+def recognize_from_image(net):
+    if args.back == True:
+        IMAGE_HEIGHT = IMAGE_HEIGHT_BACK
+        IMAGE_WIDTH = IMAGE_WIDTH_BACK
+        ANCHOR_PATH = ANCHOR_PATH_BACK
     else:
-        preds_ailia = net.predict([input_data])
+        IMAGE_HEIGHT = IMAGE_HEIGHT_FRONT
+        IMAGE_WIDTH = IMAGE_WIDTH_FRONT
+        ANCHOR_PATH = ANCHOR_PATH_FRONT
 
-    # postprocessing
-    detections = but.postprocess(preds_ailia)
+    # input image loop
+    for image_path in args.input:
+        # prepare input data
+        logger.info(image_path)
+        org_img = load_image(image_path, (IMAGE_HEIGHT, IMAGE_WIDTH))
 
-    # generate detections
-    for detection in detections:
-        but.plot_detections(org_img, detection, save_image_path=args.savepath)
-    print('Script finished successfully.')
+        input_data = load_image(
+            image_path,
+            (IMAGE_HEIGHT, IMAGE_WIDTH),
+            normalize_type='127.5',
+            gen_input_ailia=True
+        )
+
+        # inference
+        logger.info('Start inference...')
+        if args.benchmark:
+            logger.info('BENCHMARK mode')
+            total_time = 0
+            for i in range(args.benchmark_count):
+                start = int(round(time.time() * 1000))
+                preds_ailia = net.predict([input_data])
+                end = int(round(time.time() * 1000))
+                logger.info(f'\tailia processing time {end - start} ms')
+                if i != 0:
+                    total_time = total_time + (end - start)
+            logger.info(f'\taverage time {total_time / (args.benchmark_count-1)} ms')
+        else:
+            preds_ailia = net.predict([input_data]) 
+
+        # post-processing
+        detections = but.postprocess(preds_ailia, anchor_path=ANCHOR_PATH, back=args.back)
+
+        # generate detections
+        savepath = get_savepath(args.savepath, image_path)
+        logger.info(f'saved at : {savepath}')
+        for detection in detections:
+            but.plot_detections(org_img, detection, save_image_path=savepath)
+    logger.info('Script finished successfully.')
 
 
-def recognize_from_video():
-    # net initialize
-    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
+def recognize_from_video(net):
+    if args.back == True:
+        IMAGE_HEIGHT = IMAGE_HEIGHT_BACK
+        IMAGE_WIDTH = IMAGE_WIDTH_BACK
+        ANCHOR_PATH = ANCHOR_PATH_BACK
+    else:
+        IMAGE_HEIGHT = IMAGE_HEIGHT_FRONT
+        IMAGE_WIDTH = IMAGE_WIDTH_FRONT
+        ANCHOR_PATH = ANCHOR_PATH_FRONT
 
     capture = webcamera_utils.get_capture(args.video)
 
@@ -89,10 +122,7 @@ def recognize_from_video():
     if args.savepath != SAVE_IMAGE_PATH:
         f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
         f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
-        save_h, save_w = webcamera_utils.calc_adjust_fsize(
-            f_h, f_w, IMAGE_HEIGHT, IMAGE_WIDTH
-        )
-        writer = webcamera_utils.get_writer(args.savepath, save_h, save_w)
+        writer = webcamera_utils.get_writer(args.savepath, f_h, f_w)
     else:
         writer = None
 
@@ -112,8 +142,16 @@ def recognize_from_video():
         preds_ailia = net.get_results()
 
         # postprocessing
-        detections = but.postprocess(preds_ailia)
+        detections = but.postprocess(preds_ailia, anchor_path=ANCHOR_PATH, back=args.back)
         but.show_result(input_image, detections)
+
+        # remove padding
+        dh = input_image.shape[0]
+        dw = input_image.shape[1]
+        sh = frame.shape[0]
+        sw = frame.shape[1]
+        input_image = input_image[(dh-sh)//2:(dh-sh)//2+sh,(dw-sw)//2:(dw-sw)//2+sw,:]
+
         cv2.imshow('frame', input_image)
 
         # save results
@@ -124,19 +162,28 @@ def recognize_from_video():
     cv2.destroyAllWindows()
     if writer is not None:
         writer.release()
-    print('Script finished successfully.')
+    logger.info('Script finished successfully.')
 
 
 def main():
     # model files check and download
-    check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
+    if args.back == True:
+        check_and_download_models(WEIGHT_PATH_BACK, MODEL_PATH_BACK, REMOTE_PATH)       
+    else:
+        check_and_download_models(WEIGHT_PATH_FRONT, MODEL_PATH_FRONT, REMOTE_PATH)
+
+    # net initialize
+    if args.back == True:
+        net = ailia.Net(MODEL_PATH_BACK, WEIGHT_PATH_BACK, env_id=args.env_id)
+    else:
+        net = ailia.Net(MODEL_PATH_FRONT, WEIGHT_PATH_FRONT, env_id=args.env_id)
 
     if args.video is not None:
         # video mode
-        recognize_from_video()
+        recognize_from_video(net)
     else:
         # image mode
-        recognize_from_image()
+        recognize_from_image(net)
 
 
 if __name__ == '__main__':
