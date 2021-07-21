@@ -7,7 +7,6 @@ import numpy as np
 import ailia  # noqa: E402
 
 import soundfile as sf
-from scipy import signal
 
 # import original modules
 sys.path.append('../../util')
@@ -60,8 +59,10 @@ parser.add_argument(
 args = update_parser(parser)
 
 if args.ailia_audio:
+    import ailia.audio as ailia_audio
     from unet_source_separation_utils_ailia import preemphasis, inv_preemphasis, lowpass, tfconvert, zero_pad, calc_time  # noqa: E402
 else:
+    from scipy import signal
     from unet_source_separation_utils import preemphasis, inv_preemphasis, lowpass, tfconvert, zero_pad, calc_time  # noqa: E402
 
 
@@ -135,7 +136,10 @@ def recognize_one_audio(input_path):
     # convert sample rate
     logger.info('Converting sample rate...')
     if not sr == DESIRED_SR :
-        wav = signal.resample_poly(wav, DESIRED_SR, sr, axis=1)
+        if args.ailia_audio:
+            wav = ailia.audio.resample(wav,sr,DESIRED_SR)
+        else:
+            wav = signal.resample_poly(wav, DESIRED_SR, sr, axis=1)
 
     # apply preenphasis filter
     logger.info('Generating input feature...')
