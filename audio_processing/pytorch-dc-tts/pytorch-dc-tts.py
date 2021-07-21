@@ -5,7 +5,6 @@ import argparse
 import numpy as np
 
 import ailia  # noqa: E402
-from pytorch_dc_tts_utils import get_test_data, save_to_wav
 
 # import original modules
 sys.path.append('../../util')
