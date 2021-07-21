@@ -13,7 +13,6 @@ from scipy import signal
 sys.path.append('../../util')
 from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
-from unet_source_separation_utils import preemphasis, inv_preemphasis, lowpass, tfconvert, zero_pad, calc_time  # noqa: E402
 
 # logger
 from logging import getLogger   # noqa: E402
@@ -54,7 +53,16 @@ parser.add_argument(
     default='base', choices=MODEL_LISTS,
     help='model lists: ' + ' | '.join(MODEL_LISTS)
 )
+parser.add_argument(
+    '--ailia_audio', action='store_true',
+    help='use ailia audio library'
+)
 args = update_parser(parser)
+
+if args.ailia_audio:
+    from unet_source_separation_utils_ailia import preemphasis, inv_preemphasis, lowpass, tfconvert, zero_pad, calc_time  # noqa: E402
+else:
+    from unet_source_separation_utils import preemphasis, inv_preemphasis, lowpass, tfconvert, zero_pad, calc_time  # noqa: E402
 
 
 # ======================
