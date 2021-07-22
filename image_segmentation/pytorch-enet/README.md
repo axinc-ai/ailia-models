@@ -65,7 +65,7 @@ $ python3 pytorch-enet.py --video VIDEO_PATH
 By adding the `--model_type` option, you can specify mdoel type which is selected from "camvid", "cityscapes".  
 (default is camvid)
 ```bash
-$ python3 pytorch-enet --model_type camvid
+$ python3 pytorch-enet.py --model_type camvid
 ```
 
 ## Reference
