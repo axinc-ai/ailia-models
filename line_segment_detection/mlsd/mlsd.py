@@ -38,6 +38,8 @@ IMAGE_WIDTH = 512
 # ======================
 parser = get_base_parser('mlsd model', IMAGE_PATH, SAVE_IMAGE_PATH)
 args = update_parser(parser)
+args.env_id = 0
+logger.info('Change env_id: 0')
 
 # ======================
 # Main functions
@@ -66,15 +68,15 @@ def recognize_from_image():
         input_data = load_image(
             image_path,
             (IMAGE_HEIGHT, IMAGE_WIDTH),
-            normalize_type='ImageNet',
             gen_input_ailia=True,
         )
         img_input = input_data[0]
-        img_input = np.transpose(img_input, (1, 2, 0)) * 255
-        img_input = np.array(Image.open(image_path))
+        img_input = np.transpose(img_input, (1, 2, 0))*255
+        #img_input = np.array(Image.open(image_path))
 
         # inference
         logger.info('Start inference...')
+        logger.warning('Inference using CPU because model accuracy is low on GPU.')
         if args.benchmark:
             logger.info('BENCHMARK mode')
             for i in range(args.benchmark_count):
@@ -112,13 +114,10 @@ def recognize_from_video():
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
 
-        _, input_data = webcamera_utils.preprocess_frame(
-            frame, IMAGE_HEIGHT, IMAGE_WIDTH, normalize_type='ImageNet'
-        )
-        img_input = img_input[0]
-        img_input = np.transpose(img_input, (1, 2, 0)) * 255
+        img_input = np.array(frame)
 
         # inference
+        logger.warning('Inference using CPU because model accuracy is low on GPU.')
         preds_img = gradio_wrapper_for_LSD(img_input, net)
         cv2.imshow('frame', preds_img)
 
