@@ -76,7 +76,7 @@ CATEGORY_CITYSCAPES = OrderedDict([
 
 IMAGE_CAMVID_HEIGTH = 360
 IMAGE_CAMVID_WIDTH = 480
-WEIGHT_CITYSCAPES_HEIGHT = 512
+IMAGE_CITYSCAPES_HEIGHT = 512
 IMAGE_CITYSCAPES_WIDTH = 1024
 
 # ======================
@@ -258,7 +258,7 @@ def main():
         'camvid': (WEIGHT_CAMVID_PATH, MODEL_CAMVID_PATH,
                    (IMAGE_CAMVID_HEIGTH, IMAGE_CAMVID_WIDTH), CATEGORY_CAMVID),
         'cityscapes': (WEIGHT_CITYSCAPES_PATH, MODEL_CITYSCAPES_PATH,
-                       (WEIGHT_CITYSCAPES_HEIGHT, IMAGE_CITYSCAPES_WIDTH), CATEGORY_CITYSCAPES),
+                       (IMAGE_CITYSCAPES_HEIGHT, IMAGE_CITYSCAPES_WIDTH), CATEGORY_CITYSCAPES),
     }
     weight_path, model_path, img_size, category = info[args.model_type]
     check_and_download_models(weight_path, model_path, REMOTE_PATH)
