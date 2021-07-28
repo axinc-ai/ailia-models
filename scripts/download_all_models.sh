@@ -95,6 +95,7 @@ cd ../../image_segmentation/u2net-portrait-matting; python3 u2net-portrait-matti
 cd ../../image_segmentation/u2net-human-seg; python3 u2net-human-seg.py ${OPTION}
 cd ../../image_segmentation/indexnet; python3 indexnet.py ${OPTION}
 cd ../../image_segmentation/modnet; python3 modnet.py ${OPTION}
+cd ../../line_segment_detection/mlsd; python3 mlsd.py ${OPTION}
 cd ../../neural_language_processing/bert; python3 bert.py ${OPTION}
 cd ../../neural_language_processing/bert_tweets_sentiment; python3 bert_tweets_sentiment.py ${OPTION}
 cd ../../neural_language_processing/bert_maskedlm; python3 bert_maskedlm.py ${OPTION}

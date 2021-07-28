@@ -39,7 +39,7 @@ $ python3 mlsd.py --video VIDEO_PATH
 
 ## Reference
 
-[M-LSD](https://github.com/navervision/mlsd)
+[M-LSD: Towards Light-weight and Real-time Line Segment Detection](https://github.com/navervision/mlsd)
 
 ## Framework
 
