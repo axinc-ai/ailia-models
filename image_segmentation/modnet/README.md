@@ -41,7 +41,7 @@ $ python3 modnet.py --video VIDEO_PATH
 
 ## Reference
 
-[modnet](https://github.com/ZHKKKe/MODNet)
+[MODNet: Trimap-Free Portrait Matting in Real Time](https://github.com/ZHKKKe/MODNet)
 
 ## Framework
 
