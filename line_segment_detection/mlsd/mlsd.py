@@ -123,7 +123,7 @@ def recognize_from_video():
 
         # save results
         if writer is not None:
-            writer.write(frame)
+            writer.write(preds_img)
 
     capture.release()
     cv2.destroyAllWindows()
