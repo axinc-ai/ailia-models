@@ -10,7 +10,6 @@ import ailia
 sys.path.append('../../util')
 from utils import get_base_parser, update_parser  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
-from crnn_audio_classification_util import MelspectrogramStretch  # noqa: E402
 
 
 # logger
@@ -39,8 +38,16 @@ REMOTE_PATH = "https://storage.googleapis.com/ailia-models/crnn_audio_classifica
 # ======================
 parser = get_base_parser(
     'CRNN Audio Classification.', WAVE_PATH, None, input_ftype='audio')
+parser.add_argument(
+    '--ailia_audio', action='store_true',
+    help='use ailia audio library'
+)
 args = update_parser(parser)
 
+if args.ailia_audio:
+  from crnn_audio_classification_util_ailia import MelspectrogramStretch
+else:
+  from crnn_audio_classification_util import MelspectrogramStretch  # noqa: E402
 
 # ======================
 # Postprocess
