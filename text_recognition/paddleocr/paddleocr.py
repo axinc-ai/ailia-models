@@ -88,6 +88,18 @@ parser.add_argument(
           '  - french, fre, fr'
           '  - korean, kor, ko')
 )
+parser.add_argument(
+    '-lt', '--det_limit_type', type=str, default='max',
+    help=('You can limit the size of the input image for text detection.'
+          '  - max : Resize based on long side'
+          '  - min : Resize based on short side')
+)
+parser.add_argument(
+    '-ll', '--det_limit_side_len', type=int, default=960,
+    help=('You can limit the size of the input image for text detection.'
+          'Please set a positive integer.'
+          'Generally set to a multiple of 32, such as 960.')
+)
 args = update_parser(parser)
 
 
@@ -99,8 +111,8 @@ def get_default_config():
     # params for text detector
     dc['det_algorithm'] = 'DB'
     dc['det_model_path'] = WEIGHT_PATH_DET_CHN
-    dc['det_limit_side_len'] = 1280  # 960
-    dc['det_limit_type'] = 'min'  # 'max'
+    dc['det_limit_side_len'] = 0  # set by args, defalt 960
+    dc['det_limit_type'] = ''  # set by args, defalt max
 
     # DB params
     dc['det_db_thresh'] = 0.3
@@ -458,7 +470,7 @@ class DBPostProcess(object):
             coord_xy_tmp[1] += center_xy[1]
             # stock
             coord_xy_rotated[coord_i, :] = coord_xy_tmp
-        
+
         return coord_xy_rotated
 
     def unclip(self, box):
@@ -1242,6 +1254,8 @@ def main():
 
     # get default config value and merge args
     config = get_default_config()
+    config['det_limit_side_len'] = args.det_limit_side_len
+    config['det_limit_type'] = args.det_limit_type
     lang_tmp = args.language.lower()
     if (lang_tmp == 'japanese') | (lang_tmp == 'jpn') | (lang_tmp == 'jp'):
         if (args.case == 'mobile'):
