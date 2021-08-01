@@ -95,10 +95,10 @@ parser.add_argument(
           '  - min : Resize based on short side')
 )
 parser.add_argument(
-    '-ll', '--det_limit_side_len', type=int, default=1280,
+    '-ll', '--det_limit_side_len', type=int, default=1920,
     help=('You can limit the size of the input image for text detection.'
           'Please set a positive integer.'
-          'Generally set to a multiple of 32, such as 1280.')
+          'Generally set to a multiple of 32, such as 960.')
 )
 args = update_parser(parser)
 
@@ -111,7 +111,7 @@ def get_default_config():
     # params for text detector
     dc['det_algorithm'] = 'DB'
     dc['det_model_path'] = WEIGHT_PATH_DET_CHN
-    dc['det_limit_side_len'] = 0  # set by args, defalt 1280
+    dc['det_limit_side_len'] = 0  # set by args, defalt 1920
     dc['det_limit_type'] = ''  # set by args, defalt max
 
     # DB params
