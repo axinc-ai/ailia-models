@@ -29,7 +29,7 @@ WEIGHT_REGRESSION_PATH = 'regression_model_epoch120.onnx'
 MODEL_REGRESSION_PATH = 'regression_model_epoch120.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/3d-object-detection.pytorch/'
 
-IMAGE_PATH = 'bike_batch-4_38_0.jpg'
+IMAGE_PATH = 'demo.jpg'
 SAVE_IMAGE_PATH = 'output.png'
 IMAGE_DETECTION_SIZE = 300
 IMAGE_REGRESSION_SIZE = 224
