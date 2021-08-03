@@ -1,5 +1,6 @@
 import sys
 import time
+from dataclasses import dataclass, asdict
 
 import cv2
 import numpy as np
@@ -36,6 +37,22 @@ IMAGE_REGRESSION_SIZE = 224
 THRESHOLD = 0.7
 
 OBJECTRON_CLASSES = ('bike', 'book', 'bottle', 'cereal_box', 'camera', 'chair', 'cup', 'laptop', 'shoe')
+
+
+@dataclass
+class IOUTrackerConfig:
+    time_window: int = 10
+    continue_time_thresh: int = 5
+    track_clear_thresh: int = 3000
+    match_threshold: float = 0.4
+    track_detection_iou_thresh: float = 0.5
+    interpolate_time_thresh: float = 10
+    detection_filter_speed: float = 0.7
+    keypoints_filter_speed: float = 0.3
+    add_treshold: float = .1
+    no_updated_frames_treshold: int = 5
+    align_kp: bool = False
+
 
 # ======================
 # Argument Parser Config
@@ -83,17 +100,22 @@ def preprocess(img, shape, norm=None):
     return img
 
 
-def draw_detections(img, reg_detections, det_detections):
+def draw_detections(img, reg_detections, det_detections, ids=None, RGB=True):
     """Draws detections and labels"""
-    for det_out, reg_out in zip(det_detections, reg_detections):
+    for det_out, reg_out, _id in zip(
+            det_detections, reg_detections, ids if ids else ['ID x'] * len(reg_detections)):
         left, top, right, bottom = det_out
         kp = reg_out[0]
         label = reg_out[1]
         label = OBJECTRON_CLASSES[label]
-        cv2.rectangle(img, (left, top), (right, bottom),
-                      (0, 255, 0), thickness=2)
 
-        img = draw_kp(img, kp, None, RGB=True, normalized=False)
+        if _id != 'ID -1':
+            cv2.rectangle(img, (left, top), (right, bottom), (0, 255, 0), thickness=2)
+        else:
+            cv2.rectangle(img, (left, top), (right, bottom), (100, 100, 100), thickness=2)
+
+        if kp is not None and _id != 'ID -1':
+            img = draw_kp(img, kp, RGB=RGB, normalized=False)
 
         label_size, base_line = cv2.getTextSize(
             label, cv2.FONT_HERSHEY_SIMPLEX, 1, 1)
@@ -121,7 +143,7 @@ def transform_kp(kp: np.array, crop_cords: tuple):
 # Main functions
 # ======================
 
-def predict(det_net, reg_net, img):
+def predict(det_net, reg_net, img, decode=True):
     img_0 = img
     h, w = img.shape[:2]
 
@@ -169,15 +191,16 @@ def predict(det_net, reg_net, img):
         if num_det <= len(reg_detections):
             break
 
-    boxes = boxes[:, :4].astype(np.int32)
-    kps = [out[0].reshape(-1) for out in reg_detections]
+    n = len(reg_detections)
+    boxes = boxes[:n, :4].astype(np.int32)
+    kps = [out[0].reshape(9, 2) for out in reg_detections]
 
-    decoded_kps = [
-        transform_kp(np.array(kp).reshape(9, 2), rect[:4])
-        for kp, rect in zip(kps, boxes)
-    ]
-
-    reg_detections = [(kp, out[1]) for kp, out in zip(decoded_kps, reg_detections)]
+    if decode:
+        decoded_kps = [
+            transform_kp(kp, rect)
+            for kp, rect in zip(kps, boxes)
+        ]
+        reg_detections = [(kp, out[1]) for kp, out in zip(decoded_kps, reg_detections)]
 
     return reg_detections, boxes
 
@@ -233,6 +256,9 @@ def recognize_from_video(det_net, reg_net):
     else:
         writer = None
 
+    sct_config = IOUTrackerConfig()
+    sct_config = asdict(sct_config)
+    tracker = IOUTracker(**sct_config)
     while (True):
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
@@ -240,13 +266,24 @@ def recognize_from_video(det_net, reg_net):
 
         # inference
         img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        pred = predict(det_net, img)
+        reg_detections, boxes = predict(det_net, reg_net, img, decode=False)
 
-        # force composite
-        frame[:, :, 0] = frame[:, :, 0] * pred + 64 * (1 - pred)
-        frame[:, :, 1] = frame[:, :, 1] * pred + 177 * (1 - pred)
-        frame[:, :, 2] = frame[:, :, 2] * pred
+        kps = [out[0].reshape(-1) for out in reg_detections]
+        tracker.process(frame, boxes, kps)
+        tracked_objects = tracker.get_tracked_objects()
 
+        # get output from tracker
+        boxes = [x.rect for x in tracked_objects]
+        kps = [x.kp for x in tracked_objects]
+        ids = [x.label for x in tracked_objects]
+
+        # since we work with normilized kps within the tracker, now we should transform them back
+        decoded_kps = [
+            transform_kp(np.array(kp).reshape(9, 2), rect)
+            for kp, rect in zip(kps, boxes)]
+        reg_detections = [(kp, out[1]) for kp, out in zip(decoded_kps, reg_detections)]
+
+        frame = draw_detections(frame, reg_detections, boxes, ids, RGB=False)
         cv2.imshow('frame', frame)
 
         # save results
