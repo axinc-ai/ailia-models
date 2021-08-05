@@ -60,5 +60,5 @@ ONNX opset=11
 
 ## Netron
 
-[mnv2_ssd_300_2_heads.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/3d-object-detection.pytorch/mnv2_ssd_300_2_heads.onnx.prototxt)
+[mnv2_ssd_300_2_heads.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/3d-object-detection.pytorch/mnv2_ssd_300_2_heads.onnx.prototxt)  
 [regression_model_epoch120.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/3d-object-detection.pytorch/regression_model_epoch120.onnx.prototxt)
