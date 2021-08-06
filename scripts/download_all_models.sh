@@ -58,6 +58,7 @@ cd ../../image_captioning/image_captioning_pytorch; python3 image_captioning_pyt
 cd ../../image_classification/efficientnet; python3 efficientnet.py ${OPTION}
 cd ../../image_classification/googlenet; python3 googlenet.py ${OPTION}
 cd ../../image_classification/inceptionv3; python3 inceptionv3.py ${OPTION}
+cd ../../image_classification/inceptionv4; python3 inceptionv4.py ${OPTION}
 cd ../../image_classification/mobilenetv2; python3 mobilenetv2.py ${OPTION}
 cd ../../image_classification/mobilenetv3; python3 mobilenetv3.py ${OPTION}
 cd ../../image_classification/partialconv; python3 partialconv.py ${OPTION}
