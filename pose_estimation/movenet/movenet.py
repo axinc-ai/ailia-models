@@ -22,7 +22,7 @@ logger = getLogger(__name__)
 # Parameters
 # ======================
 
-IMAGE_PATH = 'input_image.jpeg'
+IMAGE_PATH = 'input.jpg'
 SAVE_IMAGE_PATH = 'output.png'
 MODEL_VARIANTS = ['thunder','lightning'] # thunder, lightning
 MODEL_VARIANT = 'thunder'
@@ -51,7 +51,7 @@ parser.add_argument(
 
 args = update_parser(parser)
 
-MODEL_NAME = 'movenet_{}'.format(args.model_variant.upper())
+MODEL_NAME = 'movenet_{}'.format(args.model_variant)
 WEIGHT_PATH = f'{MODEL_NAME}.onnx'
 MODEL_PATH = f'{MODEL_NAME}.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/movenet/'
@@ -80,7 +80,7 @@ def recognize_from_image():
         ort_inputs = { model.get_inputs()[0].name : input_image.astype(np.float32)}
         keypoint_with_scores = model.run(None,ort_inputs)[0]
     else:
-        keypoint_with_scores = model.run( input_image.astype(np.float32) )
+        keypoint_with_scores = model.run( input_image.astype(np.float32) )[0]
 
     # convert xy ratio for original image
     if image.shape[0] > image.shape[1]:
