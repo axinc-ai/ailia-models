@@ -90,7 +90,7 @@ def recognize_from_image():
     
     # draw keypoints on original image
     result_image = movenet_utils.draw_prediction_on_image( image, keypoint_with_scores)
-    cv2.imwrite(SAVE_IMAGE_PATH, result_image)
+    cv2.imwrite(SAVE_IMAGE_PATH, result_image.astype(np.uint8))
 
 def recognize_from_video():
     
@@ -137,7 +137,7 @@ def recognize_from_video():
         # update crop region
         crop_region = movenet_utils.determine_crop_region(keypoints_with_scores, image_height, image_width)
     
-        cv2.imshow('result', result_image)
+        cv2.imshow('result', result_image.astype(np.uint8))
 
     capture.release()
     cv2.destroyAllWindows()
