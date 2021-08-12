@@ -41,22 +41,13 @@ WIDTH = 640
 parser = get_base_parser(
     'PolyLaneNet', IMAGE_PATH, SAVE_IMAGE_PATH,
 )
-parser.add_argument(
-    '-o', '--onnx', action='store_true',
-    default=False, help='Use onnx runtime'
-)
 args = update_parser(parser)
-
-
-# ======================
-# Utils
-# ======================
 
 
 # ======================
 # Main functions
 # ======================
-def model_decode(output, conf_threshold=0.5, share_top_y=True):
+def decode(output, conf_threshold=0.5, share_top_y=True):
     sigmoid = nn.Sigmoid()
     output = output.reshape(len(output), -1, 7)  # score + upper + lower + 4 coeffs = 7
     output[:, :, 0] = sigmoid(output[:, :, 0])
@@ -66,7 +57,6 @@ def model_decode(output, conf_threshold=0.5, share_top_y=True):
         output[:, :, 0] = output[:, 0, 0].expand(output.shape[0], output.shape[1])
 
     return output
-
 
 
 def draw_annotation(img, pred):
@@ -125,6 +115,7 @@ def main():
     files = glob.glob('./inputs/*')
     for i, file in enumerate(files):
         print('processing {} image.'.format(i))
+
         # resize input image
         input = cv2.imread('{}'.format(file))
         height = input.shape[0]
@@ -132,15 +123,12 @@ def main():
         rate = HEIGHT/height
         rs_height = int(height*rate)
         rs_width = int(width*rate)
-
         if (rs_height!=HEIGHT or rs_width!=WIDTH):
             print('Invalid image shape')
             exit()
-
         input = cv2.resize(input, (rs_width, rs_height))
         image = input
         input = (input/255.).astype(np.float32)
-        #input = np.round(input, decimals=4)
         input = input.transpose(2, 0, 1)
         input = input[np.newaxis, :, :, :]
 
@@ -149,14 +137,14 @@ def main():
 
         # postprocess
         output = torch.from_numpy(output)
-        output = model_decode(output)
+        output = decode(output)
         output = output.cpu().numpy()
         original, predicted, overlayed = draw_annotation(image, output)
 
         # images
-        cv2.imwrite('outputs/{}_original.jpg'.format(i), original)
-        cv2.imwrite('outputs/{}_predicted.jpg'.format(i), predicted)
-        cv2.imwrite('outputs/{}_overlayed.jpg'.format(i), overlayed)
+        cv2.imwrite('outputs/{}_original.jpg'.format(i+1), original)
+        cv2.imwrite('outputs/{}_predicted.jpg'.format(i+1), predicted)
+        cv2.imwrite('outputs/{}_overlayed.jpg'.format(i+1), overlayed)
 
 
 if __name__ == '__main__':

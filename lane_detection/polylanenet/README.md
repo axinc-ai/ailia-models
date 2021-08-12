@@ -2,15 +2,15 @@
 
 ### input
 Images with the same aspect ratio as 360×640. This model detect lane from inputs.
-- input image
-![入力画像](./raws/original.jpg)
+- input image    
+![入力画像](./raws/original.jpg)    
 
 ### output
 Images which the detected lane in input images is colored in green.
-- output image (pverlayed)
+- output image (pverlayed)    
 ![出力画像1](./raws/overlayed.jpg)
 
-- output image (predicted)
+- output image (predicted)    
 ![出力画像2](./raws/predicted.jpg)
 
 ### Usage
