@@ -13,7 +13,7 @@ from model_utils import check_and_download_models  # noqa: E402
 from detector_utils import plot_results, load_image  # noqa: E402C
 import webcamera_utils  # noqa: E402
 
-from det3d_utils import *
+from detection_utils import *
 
 # logger
 from logging import getLogger  # noqa: E402
@@ -100,7 +100,10 @@ def preprocess(img, shape, norm=None):
     return img
 
 
-def draw_detections(img, reg_detections, det_detections, ids=None, RGB=True):
+def draw_detections(img, reg_detections, det_detections, ids=None, rgb=True):
+    # if image in RGB space --> convert to BGR
+    img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR) if rgb else img
+
     """Draws detections and labels"""
     for det_out, reg_out, _id in zip(
             det_detections, reg_detections, ids if ids else ['ID x'] * len(reg_detections)):
@@ -115,15 +118,18 @@ def draw_detections(img, reg_detections, det_detections, ids=None, RGB=True):
             cv2.rectangle(img, (left, top), (right, bottom), (100, 100, 100), thickness=2)
 
         if kp is not None and _id != 'ID -1':
-            img = draw_kp(img, kp, RGB=RGB, normalized=False)
+            img = draw_kp(img, kp, normalized=False)
 
         label_size, base_line = cv2.getTextSize(
             label, cv2.FONT_HERSHEY_SIMPLEX, 1, 1)
         top = max(top, label_size[1])
-        cv2.rectangle(img, (left, top - label_size[1]), (left + label_size[0], top + base_line),
-                      (255, 255, 255), cv2.FILLED)
-        cv2.putText(img, label, (left, top),
-                    cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0))
+        cv2.rectangle(
+            img,
+            (left, top - label_size[1]), (left + label_size[0], top + base_line),
+            (255, 255, 255), cv2.FILLED)
+        cv2.putText(
+            img, label, (left, top),
+            cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0))
 
     return img
 
@@ -283,7 +289,7 @@ def recognize_from_video(det_net, reg_net):
             for kp, rect in zip(kps, boxes)]
         reg_detections = [(kp, out[1]) for kp, out in zip(decoded_kps, reg_detections)]
 
-        frame = draw_detections(frame, reg_detections, boxes, ids, RGB=False)
+        frame = draw_detections(frame, reg_detections, boxes, ids, rgb=False)
         cv2.imshow('frame', frame)
 
         # save results

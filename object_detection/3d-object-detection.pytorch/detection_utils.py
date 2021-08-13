@@ -313,7 +313,7 @@ def normalize(image_shape, unnormalized_keypoints):
 
 
 def draw_kp(
-        img, keypoints, normalized=True, RGB=True, num_keypoints=9, label=None):
+        img, keypoints, normalized=True, num_keypoints=9, label=None):
     '''
     img: numpy three dimensional array
     keypoints: array like with shape [9,2]
@@ -323,8 +323,6 @@ def draw_kp(
     # if image transposed
     if img_copy.shape[0] == 3:
         img_copy = np.transpose(img_copy, (1, 2, 0))
-    # if image in RGB space --> convert to BGR
-    img_copy = cv2.cvtColor(img_copy, cv2.COLOR_RGB2BGR) if RGB else img_copy
     # expand dim with zeros, needed for drawing function API
     expanded_kp = np.zeros((num_keypoints, 3))
     keypoints = keypoints if normalized else normalize(img_copy.shape, keypoints)
