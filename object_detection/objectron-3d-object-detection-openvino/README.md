@@ -17,8 +17,8 @@ Automatically downloads the onnx and prototxt files on the first run.
 It is necessary to be connected to the Internet while downloading.
 
 For the sample image,
-``` bash
-$ python3 3d-object-detection.pytorch.py
+```bash
+$ python3 objectron-3d-object-detection
 ```
 
 If you want to specify the input image, put the image path after the `--input` option.  
@@ -36,7 +36,7 @@ $ python3 objectron-3d-object-detection --video VIDEO_PATH
 You can specify the "model type" by specifying after the `--model` option.
 The model type is selected from "sneaker", "chair".  
 ```bash
-$ python3 objectron-3d-object-detection --clothing-type blouse
+$ python3 objectron-3d-object-detection --model sneaker
 ```
 
 ## Reference
