@@ -25,7 +25,7 @@ logger = getLogger(__name__)
 # ======================
 
 #WEIGHT_PATH = 'spade_pix2pix.onnx'
-WEIGHT_PATH = 'out_spade_pix2pix.onnx'
+WEIGHT_PATH = 'spade_pix2pix.onnx'
 MODEL_PATH = 'spade_pix2pix.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/spade_pix2pix/'
 IN_IMAGE_PATH = './inputs/'
@@ -98,7 +98,7 @@ def main():
     # model files check and download
     #check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
 
-    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
+    #net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
 
     import onnxruntime
     net = onnxruntime.InferenceSession(WEIGHT_PATH)
@@ -153,8 +153,8 @@ def main():
         np.set_printoptions(threshold=np.inf)
         output = output[0]
 
-        print(output)
-        exit()
+        #print(output)
+        #exit()
 
         x_array = np.transpose(x_array, (1, 2, 0))
         out_array = np.transpose((output.squeeze(0) + 1) / 2, (1, 2, 0))
