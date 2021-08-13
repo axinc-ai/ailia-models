@@ -182,7 +182,7 @@ def recognize_from_image(net):
             for i in range(args.benchmark_count):
                 # Pose estimation
                 start = int(round(time.time() * 1000))
-                objs, hm = predict(net, img)
+                kps, hm = predict(net, img)
                 end = int(round(time.time() * 1000))
                 estimation_time = (end - start)
 
@@ -200,7 +200,7 @@ def recognize_from_image(net):
         kps = np.asarray(kps).reshape(-1, 8, 2)
         kps = [transform_kp(kp, (0, 0, w, h)) for kp in kps]
         if 0 < len(kps):
-            kps = np.insert(kps, 0, 0, axis=1)
+            kps = np.insert(kps, 0, -100, axis=1)
         res_img = draw_detections(img, kps)
 
         # save results
@@ -235,7 +235,7 @@ def recognize_from_video(net):
         kps = np.asarray(kps).reshape(-1, 8, 2)
         kps = [transform_kp(obj, (0, 0, w, h)) for obj in kps]
         if 0 < len(kps):
-            kps = np.insert(kps, 0, 0, axis=1)
+            kps = np.insert(kps, 0, -100, axis=1)
         frame = draw_detections(frame, kps, rgb=False)
 
         cv2.imshow('frame', frame)
