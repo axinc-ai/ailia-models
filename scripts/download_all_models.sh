@@ -9,6 +9,7 @@ cd ../../audio_processing/crnn_audio_classification; python3 crnn_audio_classifi
 cd ../../audio_processing/deepspeech2; python3 deepspeech2.py ${OPTION}
 cd ../../audio_processing/pytorch-dc-tts/; python3 pytorch-dc-tts.py ${OPTION}
 cd ../../audio_processing/unet_source_separation/; python3 unet_source_separation.py ${OPTION}
+cd ../../audio_processing/Parallel_is_All_You_Want/; python3 parallel_is_all_you_want.py ${OPTION}
 cd ../../crowd_counting/crowdcount-cascaded-mtl; python3 crowdcount-cascaded-mtl.py ${OPTION}
 cd ../../crowd_counting/c-3-framework; python3 c-3-framework.py ${OPTION}
 cd ../../deep_fashion/clothing-detection; python3 clothing-detection.py ${OPTION}

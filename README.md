@@ -35,6 +35,7 @@ The collection of pre-trained, state-of-the-art AI models.
 | [deepspeech2](/audio_processing/deepspeech2/) | [deepspeech.pytorch](https://github.com/SeanNaren/deepspeech.pytorch) | Pytorch | 1.2.2 and later |
 | [pytorch-dc-tts](/audio_processing/pytorch-dc-tts/) | [Efficiently Trainable Text-to-Speech System Based on Deep Convolutional Networks with Guided Attention](https://github.com/tugstugi/pytorch-dc-tts)   | Pytorch | 1.2.6 and later |
 | [unet_source_separation](/audio_processing/unet_source_separation/) | [source_separation](https://github.com/AppleHolic/source_separation)  | Pytorch | 1.2.6 and later |
+| [Parallel_is_All_You_Want](/audio_processing/Parallel_is_All_You_Want/) | [Parallel_is_All_You_Want](https://github.com/IliaZenkov/transformer-cnn-emotion-recognition)  | Pytorch | 1.2.7 and later |
 
 ## Crowd counting
 
