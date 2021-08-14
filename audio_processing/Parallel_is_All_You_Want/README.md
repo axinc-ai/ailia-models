@@ -26,6 +26,13 @@ Confidence: 0.99993193
 "sad", "angry", "fearful", "disgust"
 ```
 
+## Requirements
+This model requires additional module.
+
+```
+pip3 install librosa
+```
+
 ## Usage
 
 ```bash
