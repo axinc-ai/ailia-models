@@ -23,6 +23,7 @@ logger = getLogger(__name__)
 # ======================
 
 IMAGE_PATH = 'input.jpg'
+
 SAVE_IMAGE_PATH = 'output.png'
 MODEL_VARIANTS = ['thunder','lightning'] # thunder, lightning
 MODEL_VARIANT = 'thunder'
@@ -51,7 +52,7 @@ parser.add_argument(
 
 args = update_parser(parser)
 
-MODEL_NAME = 'movenet_{}'.format(args.model_variant)
+MODEL_NAME = 'movenet_{}'.format(args.model_variant.upper())
 WEIGHT_PATH = f'{MODEL_NAME}.onnx'
 MODEL_PATH = f'{MODEL_NAME}.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/movenet/'
@@ -71,26 +72,33 @@ def recognize_from_image():
     else:
         logger.info(f'env_id: {args.env_id}')
         model = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
-        
-    image = cv2.imread(IMAGE_PATH)
-    input_image, padding_ratio = movenet_utils.crop_and_padding(image,IMAGE_SIZE)
-    input_image = np.expand_dims(input_image, axis=0)
-        
-    if args.onnx:
-        ort_inputs = { model.get_inputs()[0].name : input_image.astype(np.float32)}
-        keypoint_with_scores = model.run(None,ort_inputs)[0]
-    else:
-        keypoint_with_scores = model.run( input_image.astype(np.float32) )[0]
-
-    # convert xy ratio for original image
-    if image.shape[0] > image.shape[1]:
-        keypoint_with_scores[0, 0, :, 1] = ( keypoint_with_scores[0, 0, :, 1] - padding_ratio ) / (1-2*padding_ratio)
-    else:
-        keypoint_with_scores[0, 0, :, 0] = ( keypoint_with_scores[0, 0, :, 0] - padding_ratio ) / (1-2*padding_ratio)
     
-    # draw keypoints on original image
-    result_image = movenet_utils.draw_prediction_on_image( image, keypoint_with_scores)
-    cv2.imwrite(SAVE_IMAGE_PATH, result_image.astype(np.uint8))
+    for image_path in args.input:
+
+        image = cv2.imread(image_path)
+        input_image, padding_ratio = movenet_utils.crop_and_padding(image,IMAGE_SIZE)
+        input_image = np.expand_dims(input_image, axis=0)
+            
+        if args.onnx:
+            ort_inputs = { model.get_inputs()[0].name : input_image.astype(np.float32)}
+            keypoint_with_scores = model.run(None,ort_inputs)[0]
+        else:
+            keypoint_with_scores = model.run( input_image.astype(np.float32) )
+
+        # convert xy ratio for original image
+        if image.shape[0] > image.shape[1]:
+            keypoint_with_scores[0, 0, :, 1] = ( keypoint_with_scores[0, 0, :, 1] - padding_ratio ) / (1-2*padding_ratio)
+        else:
+            keypoint_with_scores[0, 0, :, 0] = ( keypoint_with_scores[0, 0, :, 0] - padding_ratio ) / (1-2*padding_ratio)
+        
+        # plot result
+        result_image = movenet_utils.draw_prediction_on_image( image, keypoint_with_scores)
+        savepath = get_savepath(args.savepath, image_path)
+        logger.info(f'saved at : {savepath}')
+        print(result_image.shape)
+        cv2.imwrite(savepath, result_image)
+        
+    logger.info('Script finished successfully.')
 
 def recognize_from_video():
     
@@ -132,18 +140,16 @@ def recognize_from_video():
         keypoints_with_scores[0, 0, :, 1] = ( crop_region['x_min'] * image_width + crop_region['width'] * image_width * keypoints_with_scores[0, 0, :, 1]) / image_width
         
         # draw keypoints on original frame
-        result_image = movenet_utils.draw_prediction_on_image(frame,keypoints_with_scores, crop_region=None,close_figure=True, output_image_height=300)
+        result_image = movenet_utils.draw_prediction_on_image(frame,keypoints_with_scores)
 
         # update crop region
         crop_region = movenet_utils.determine_crop_region(keypoints_with_scores, image_height, image_width)
     
-        cv2.imshow('result', result_image.astype(np.uint8))
+        cv2.imshow('result', result_image)
 
     capture.release()
     cv2.destroyAllWindows()
     logger.info('Script finished successfully.')
-    pass
-
 
 def main():
 
