@@ -83,7 +83,7 @@ def recognize_from_image():
             ort_inputs = { model.get_inputs()[0].name : input_image.astype(np.float32)}
             keypoint_with_scores = model.run(None,ort_inputs)[0]
         else:
-            keypoint_with_scores = model.run( input_image.astype(np.float32) )
+            keypoint_with_scores = model.run( input_image.astype(np.float32) )[0]
 
         # convert xy ratio for original image
         if image.shape[0] > image.shape[1]:
