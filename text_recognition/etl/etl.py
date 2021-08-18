@@ -11,6 +11,10 @@ from utils import get_base_parser, update_parser  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 import webcamera_utils  # noqa: E402
 
+# logger
+from logging import getLogger   # noqa: E402
+logger = getLogger(__name__)
+
 
 # ======================
 # PARAMETERS
@@ -52,11 +56,6 @@ def preprocess_image(img):
 # Main functions
 # ======================
 def recognize_from_image():
-    # prepare input data
-    etl_word = codecs.open(ETL_PATH, 'r', 'utf-8').readlines()
-    img = cv2.imread(args.input, cv2.IMREAD_UNCHANGED)
-    img = preprocess_image(img)
-
     # net initialize
     classifier = ailia.Classifier(
         MODEL_PATH,
@@ -66,27 +65,37 @@ def recognize_from_image():
         range=ailia.NETWORK_IMAGE_RANGE_U_FP32,
     )
 
-    # inference
-    print('Start inference...')
-    if args.benchmark:
-        print('BENCHMARK mode')
-        for i in range(5):
-            start = int(round(time.time() * 1000))
+    # input image loop
+    for image_path in args.input:
+        # prepare input data
+        logger.info(image_path)
+        etl_word = codecs.open(ETL_PATH, 'r', 'utf-8').readlines()
+        img = cv2.imread(image_path, cv2.IMREAD_UNCHANGED)
+        img = preprocess_image(img)
+
+        # inference
+        logger.info('Start inference...')
+        if args.benchmark:
+            logger.info('BENCHMARK mode')
+            for i in range(5):
+                start = int(round(time.time() * 1000))
+                classifier.compute(img, MAX_CLASS_COUNT)
+                end = int(round(time.time() * 1000))
+                logger.info(f'\tailia processing time {end - start} ms')
+        else:
             classifier.compute(img, MAX_CLASS_COUNT)
-            end = int(round(time.time() * 1000))
-            print(f'\tailia processing time {end - start} ms')
-    else:
-        classifier.compute(img, MAX_CLASS_COUNT)
 
-    # get result
-    count = classifier.get_class_count()
-    print(f'class_count: {count}')
+        # get result
+        count = classifier.get_class_count()
+        logger.info(f'class_count: {count}')
 
-    for idx in range(count):
-        print(f"+ idx={idx}")
-        info = classifier.get_class(idx)
-        print(f"  category={info.category} [ {etl_word[info.category]} ]")
-        print(f"  prob={info.prob}")
+        for idx in range(count):
+            logger.info(f"+ idx={idx}")
+            info = classifier.get_class(idx)
+            logger.info(
+                f"  category={info.category} [ {etl_word[info.category]} ]"
+            )
+            logger.info(f"  prob={info.prob}")
 
 
 def recognize_from_video():
@@ -131,13 +140,15 @@ def recognize_from_video():
         # get result
         count = classifier.get_class_count()
 
-        print('==============================================================')
-        print(f'class_count: {count}')
+        logger.info('=' * 80)
+        logger.info(f'class_count: {count}')
         for idx in range(count):
-            print(f"+ idx={idx}")
+            logger.info(f"+ idx={idx}")
             info = classifier.get_class(idx)
-            print(f"  category={info.category} [ {etl_word[info.category]} ]")
-            print(f"  prob={info.prob}")
+            logger.info(
+                f"  category={info.category} [ {etl_word[info.category]} ]"
+            )
+            logger.info(f"  prob={info.prob}")
         cv2.imshow('frame', in_frame)
         # save results
         if writer is not None:
@@ -148,7 +159,7 @@ def recognize_from_video():
     cv2.destroyAllWindows()
     if writer is not None:
         writer.release()
-    print('Script finished successfully.')
+    logger.info('Script finished successfully.')
 
 
 def main():

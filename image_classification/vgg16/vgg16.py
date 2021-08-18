@@ -14,6 +14,10 @@ from image_utils import load_image  # noqa: E402
 from classifier_utils import plot_results, print_results  # noqa: E402
 import webcamera_utils  # noqa: E402
 
+# logger
+from logging import getLogger   # noqa: E402
+logger = getLogger(__name__)
+
 
 # ======================
 # Parameters
@@ -45,32 +49,35 @@ args = update_parser(parser)
 # Main functions
 # ======================
 def recognize_from_image():
-    # prepare input data
-    input_data = load_image(
-        args.input,
-        (IMAGE_HEIGHT, IMAGE_WIDTH),
-        normalize_type='ImageNet',
-        gen_input_ailia=True
-    )
-
     # net initialize
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
 
-    # inference
-    print('Start inference...')
-    if args.benchmark:
-        print('BENCHMARK mode')
-        for i in range(5):
-            start = int(round(time.time() * 1000))
-            preds_ailia = net.predict(input_data)
-            end = int(round(time.time() * 1000))
-            print(f'\tailia processing time {end - start} ms')
-    else:
-        preds_ailia = net.predict(input_data)
+    # input image loop
+    for image_path in args.input:
+        # prepare input data
+        logger.info(image_path)
+        input_data = load_image(
+            image_path,
+            (IMAGE_HEIGHT, IMAGE_WIDTH),
+            normalize_type='ImageNet',
+            gen_input_ailia=True,
+        )
 
-    # postprocessing
-    print_results(preds_ailia, vgg16_labels.imagenet_category)
-    print('Script finished successfully.')
+        # inference
+        logger.info('Start inference...')
+        if args.benchmark:
+            logger.info('BENCHMARK mode')
+            for i in range(args.benchmark_count):
+                start = int(round(time.time() * 1000))
+                preds_ailia = net.predict(input_data)
+                end = int(round(time.time() * 1000))
+                logger.info(f'\tailia processing time {end - start} ms')
+        else:
+            preds_ailia = net.predict(input_data)
+
+        # postprocessing
+        print_results(preds_ailia, vgg16_labels.imagenet_category)
+    logger.info('Script finished successfully.')
 
 
 def recognize_from_video():
@@ -83,10 +90,7 @@ def recognize_from_video():
     if args.savepath is not None:
         f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
         f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
-        save_h, save_w = webcamera_utils.calc_adjust_fsize(
-            f_h, f_w, IMAGE_HEIGHT, IMAGE_WIDTH
-        )
-        writer = webcamera_utils.get_writer(args.savepath, save_h, save_w)
+        writer = webcamera_utils.get_writer(args.savepath, f_h, f_w)
     else:
         writer = None
 
@@ -95,7 +99,7 @@ def recognize_from_video():
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
 
-        input_image, input_data = webcamera_utils.preprocess_frame(
+        _, input_data = webcamera_utils.preprocess_frame(
             frame, IMAGE_HEIGHT, IMAGE_WIDTH, normalize_type='ImageNet'
         )
 
@@ -103,19 +107,19 @@ def recognize_from_video():
         preds_ailia = net.predict(input_data)
 
         # postprocessing
-        plot_results(input_image, preds_ailia, vgg16_labels.imagenet_category)
-        cv2.imshow('frame', input_image)
+        plot_results(frame, preds_ailia, vgg16_labels.imagenet_category)
+        cv2.imshow('frame', frame)
         time.sleep(SLEEP_TIME)
 
         # save results
         if writer is not None:
-            writer.write(input_image)
+            writer.write(frame)
 
     capture.release()
     cv2.destroyAllWindows()
     if writer is not None:
         writer.release()
-    print('Script finished successfully.')
+    logger.info('Script finished successfully.')
 
 
 def main():

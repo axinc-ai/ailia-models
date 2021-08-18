@@ -10,7 +10,14 @@ import ailia
 sys.path.append('../../util')
 from utils import get_base_parser, update_parser  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
-from crnn_audio_classification_util import MelspectrogramStretch  # noqa: E402
+
+
+# logger
+from logging import getLogger   # noqa: E402
+logger = getLogger(__name__)
+
+
+# TODO: FIXME: crnn_audio_classification_util uses torchaudio & torch...
 
 
 # ======================
@@ -29,9 +36,18 @@ REMOTE_PATH = "https://storage.googleapis.com/ailia-models/crnn_audio_classifica
 # ======================
 # Arguemnt Parser Config
 # ======================
-parser = get_base_parser('CRNN Audio Classification.', WAVE_PATH, None)
+parser = get_base_parser(
+    'CRNN Audio Classification.', WAVE_PATH, None, input_ftype='audio')
+parser.add_argument(
+    '--ailia_audio', action='store_true',
+    help='use ailia audio library'
+)
 args = update_parser(parser)
 
+if args.ailia_audio:
+  from crnn_audio_classification_util_ailia import MelspectrogramStretch
+else:
+  from crnn_audio_classification_util import MelspectrogramStretch  # noqa: E402
 
 # ======================
 # Postprocess
@@ -70,27 +86,30 @@ def main():
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
 
     # load audio
-    data = sf.read(args.input)
+    for input_data_path in args.input:
+        logger.info('=' * 80)
+        logger.info(f'input: {input_data_path}')
+        data = sf.read(input_data_path)
 
-    # create instance
-    session = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
+        # create instance
+        session = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
 
-    # inference
-    print('Start inference...')
-    if args.benchmark:
-        print('BENCHMARK mode')
-        for c in range(5):
-            start = int(round(time.time() * 1000))
+        # inference
+        logger.info('Start inference...')
+        if args.benchmark:
+            logger.info('BENCHMARK mode')
+            for c in range(5):
+                start = int(round(time.time() * 1000))
+                label, conf = crnn(data, session)
+                end = int(round(time.time() * 1000))
+                logger.info("\tailia processing time {} ms".format(end-start))
+        else:
             label, conf = crnn(data, session)
-            end = int(round(time.time() * 1000))
-            print("\tailia processing time {} ms".format(end-start))
-    else:
-        label, conf = crnn(data, session)
 
-    print(label)
-    print(conf)
+        logger.info(label)
+        logger.info(conf)
 
-    print('Script finished successfully.')
+        logger.info('Script finished successfully.')
 
 
 if __name__ == "__main__":

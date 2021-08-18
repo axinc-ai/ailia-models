@@ -1,7 +1,6 @@
 import os
 import sys
 import time
-import argparse
 
 import numpy as np
 import cv2
@@ -26,6 +25,10 @@ from prnet_utils.write import write_obj_with_colors, write_obj_with_texture  # n
 from prnet_utils.cv_plot import plot_kpt, plot_vertices, plot_pose_box  # noqa: E402
 from prnet_utils.render import render_texture  # noqa: E402
 
+# logger
+from logging import getLogger   # noqa: E402
+logger = getLogger(__name__)
+
 
 # ======================
 # Parameters
@@ -37,14 +40,14 @@ REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/prnet/'
 IMAGE_PATH = 'image00430-cropped.jpg'
 SAVE_FOLDER = 'results'
 
-# INFO used only for texture editing mode
+# NOTE: used only for texture editing mode
 REF_IMAGE_PATH = 'uv-data/trump_cropped.png'
 UV_FACE_PATH = 'uv-data/uv_face.png'
 UV_FACE_EYES_PATH = 'uv-data/uv_face_eyes.png'
 
 
-# INFO In the original repository, "resolution of input and output image size"
-# can be specified separately (though the both size are fixed 256)
+# NOTE: In the original repository, "resolution of input and output image size"
+#       can be specified separately (though the both size are fixed 256)
 IMAGE_SIZE = 256
 
 # ntri x 3
@@ -123,268 +126,278 @@ args = update_parser(parser)
 # Main functions
 # ======================
 def recognize_from_image():
-    # prepare input data
-    name = os.path.splitext(os.path.basename(args.input))[0]
-    image = load_image(
-        args.input,
-        (IMAGE_SIZE, IMAGE_SIZE),
-        normalize_type='255',
-        gen_input_ailia=False
-    )
-
-    # for now, h == w == IMAGE_SIZE (as we resized the input when loading it)
-    h, w = image.shape[0], image.shape[1]
-    input_data = image[np.newaxis, :, :, :]
-
     # net initialize
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
     net.set_input_shape((1, 256, 256, 3))
 
-    # inference
-    print('Start inference...')
-    if args.benchmark:
-        print('BENCHMARK mode')
-        for i in range(5):
-            start = int(round(time.time() * 1000))
-            preds_ailia = net.predict(input_data)
-            end = int(round(time.time() * 1000))
-            print(f'\tailia processing time {end - start} ms')
-    else:
-        preds_ailia = net.predict(input_data)
+    # input image loop
+    for image_path in args.input:
+        # prepare input data
+        logger.info(image_path)
+        savepath = os.path.join(
+            args.savepath, os.path.splitext(os.path.basename(image_path))[0]
+        )
+        image = load_image(
+            image_path,
+            (IMAGE_SIZE, IMAGE_SIZE),
+            normalize_type='255',
+            gen_input_ailia=False,
+        )
 
-    # postprocessing
-    # INFO self.MaxPos
-    pos = preds_ailia[0] * IMAGE_SIZE * 1.1
+        # for now, h = w = IMAGE_SIZE (as we resized the input when loading it)
+        h, w = image.shape[0], image.shape[1]
+        input_data = image[np.newaxis, :, :, :]
 
-    if args.is3d or args.isMat or args.isPose:
-        # 3D vertices
-        vertices = get_vertices(pos, IMAGE_SIZE)
-        if args.isFront:
-            save_vertices = frontalize(vertices)
+        # inference
+        logger.info('Start inference...')
+        if args.benchmark:
+            logger.info('BENCHMARK mode')
+            for i in range(5):
+                start = int(round(time.time() * 1000))
+                preds_ailia = net.predict(input_data)
+                end = int(round(time.time() * 1000))
+                logger.info(f'\tailia processing time {end - start} ms')
         else:
-            save_vertices = vertices.copy()
-        save_vertices[:, 1] = h - 1 - save_vertices[:, 1]
+            preds_ailia = net.predict(input_data)
 
-    if args.is3d:
-        # corresponding colors
-        colors = get_colors(image, vertices)
+        # post-processing
+        # INFO self.MaxPos
+        pos = preds_ailia[0] * IMAGE_SIZE * 1.1
 
-        if args.isTexture:
-            if args.texture_size != 256:
-                pos_interpolated = resize(
-                    pos,
-                    (args.texture_size, args.texture_size),
-                    preserve_range=True
-                )
+        if args.is3d or args.isMat or args.isPose:
+            # 3D vertices
+            vertices = get_vertices(pos, IMAGE_SIZE)
+            if args.isFront:
+                save_vertices = frontalize(vertices)
             else:
-                pos_interpolated = pos.copy()
+                save_vertices = vertices.copy()
+            save_vertices[:, 1] = h - 1 - save_vertices[:, 1]
 
-            texture = cv2.remap(
-                image,
-                pos_interpolated[:, :, :2].astype(np.float32),
-                None,
-                interpolation=cv2.INTER_LINEAR,
-                borderMode=cv2.BORDER_CONSTANT,
-                borderValue=(0)
-            )
-            if args.isMask:
-                vertices_vis = get_visibility(vertices, TRIANGLES, h, w)
-                uv_mask = get_uv_mask(
-                    vertices_vis,
-                    TRIANGLES,
-                    UV_COORDS,
-                    h,
-                    w,
-                    IMAGE_SIZE
+        if args.is3d:
+            # corresponding colors
+            colors = get_colors(image, vertices)
+
+            if args.isTexture:
+                if args.texture_size != 256:
+                    pos_interpolated = resize(
+                        pos,
+                        (args.texture_size, args.texture_size),
+                        preserve_range=True
+                    )
+                else:
+                    pos_interpolated = pos.copy()
+
+                texture = cv2.remap(
+                    image,
+                    pos_interpolated[:, :, :2].astype(np.float32),
+                    None,
+                    interpolation=cv2.INTER_LINEAR,
+                    borderMode=cv2.BORDER_CONSTANT,
+                    borderValue=(0)
                 )
-                uv_mask = resize(
-                    uv_mask,
-                    (args.texture_size, args.texture_size),
-                    preserve_range=True
-                )
-                texture = texture * uv_mask[:, :, np.newaxis]
-                # save 3d face with texture(can open with meshlab)
-                write_obj_with_texture(
-                    os.path.join(args.savepath, name + '.obj'),
+                if args.isMask:
+                    vertices_vis = get_visibility(vertices, TRIANGLES, h, w)
+                    uv_mask = get_uv_mask(
+                        vertices_vis,
+                        TRIANGLES,
+                        UV_COORDS,
+                        h,
+                        w,
+                        IMAGE_SIZE
+                    )
+                    uv_mask = resize(
+                        uv_mask,
+                        (args.texture_size, args.texture_size),
+                        preserve_range=True
+                    )
+                    texture = texture * uv_mask[:, :, np.newaxis]
+                    # save 3d face with texture(can open with meshlab)
+                    write_obj_with_texture(
+                        savepath + '.obj',
+                        save_vertices,
+                        TRIANGLES,
+                        texture,
+                        UV_COORDS/IMAGE_SIZE
+                    )
+            else:
+                # save 3d face(can open with meshlab)
+                write_obj_with_colors(
+                    savepath + '.obj',
                     save_vertices,
                     TRIANGLES,
-                    texture,
-                    UV_COORDS/IMAGE_SIZE
+                    colors
                 )
+
+        if args.isDepth:
+            depth_image = get_depth_image(vertices, TRIANGLES, h, w, True)
+            depth = get_depth_image(vertices, TRIANGLES, h, w)
+            imsave(savepath + '_depth.jpg', depth_image)
+            sio.savemat(savepath + '_depth.mat', {'depth': depth})
+
+        if args.isMat:
+            sio.savemat(
+                savepath + '_mesh.mat',
+                {
+                    'vertices': vertices,
+                    'colors': colors,
+                    'triangles': TRIANGLES,
+                }
+            )
+
+        if args.isKpt:
+            # get landmarks
+            kpt = get_landmarks(pos)
+            np.savetxt(savepath + '_kpt.txt', kpt)
+
+        if args.isPose:
+            # estimate pose
+            camera_matrix, pose = estimate_pose(vertices)
+            np.savetxt(savepath + '_pose.txt', pose)
+            np.savetxt(savepath + '_camera_matrix.txt', camera_matrix)
+            np.savetxt(savepath + '_pose.txt', pose)
+
+        image = cv2.cvtColor(image.astype(np.float32), cv2.COLOR_RGB2BGR)
+        if args.isShow:
+            if args.isKpt:
+                cv2.imshow('sparse alignment', plot_kpt(image, kpt))
+            if args.is3d or args.isMat or args.isPose:
+                cv2.imshow('dense alignment', plot_vertices(image, vertices))
+            if args.isPose:
+                cv2.imshow('pose', plot_pose_box(image, camera_matrix, kpt))
+            cv2.waitKey(0)
         else:
-            # save 3d face(can open with meshlab)
-            write_obj_with_colors(
-                os.path.join(args.savepath, name + '.obj'),
-                save_vertices,
-                TRIANGLES,
-                colors
-            )
+            image = np.clip((image * 255), 0, 255)
+            if args.isKpt:
+                cv2.imwrite(
+                    savepath + '_sparse_alignment.png',
+                    plot_kpt(image, kpt).astype(np.uint8)
+                )
+            if args.is3d or args.isMat or args.isPose:
+                cv2.imwrite(
+                    savepath + '_dense_alignment.png',
+                    plot_vertices(image, vertices).astype(np.uint8)
+                )
+            if args.isPose:
+                cv2.imwrite(
+                    savepath + '_pose.png',
+                    plot_pose_box(image, camera_matrix, kpt).astype(np.uint8)
+                )
 
-    if args.isDepth:
-        depth_image = get_depth_image(vertices, TRIANGLES, h, w, True)
-        depth = get_depth_image(vertices, TRIANGLES, h, w)
-        imsave(os.path.join(args.savepath, name + '_depth.jpg'), depth_image)
-        sio.savemat(
-            os.path.join(args.savepath, name + '_depth.mat'),
-            {'depth': depth}
-        )
-
-    if args.isMat:
-        sio.savemat(
-            os.path.join(args.savepath, name + '_mesh.mat'),
-            {'vertices': vertices, 'colors': colors, 'triangles': TRIANGLES}
-        )
-
-    if args.isKpt:
-        # get landmarks
-        kpt = get_landmarks(pos)
-        np.savetxt(os.path.join(args.savepath, name + '_kpt.txt'), kpt)
-
-    if args.isPose:
-        # estimate pose
-        camera_matrix, pose = estimate_pose(vertices)
-        np.savetxt(os.path.join(args.savepath, name + '_pose.txt'), pose)
-        np.savetxt(
-            os.path.join(args.savepath, name + '_camera_matrix.txt'),
-            camera_matrix
-        )
-        np.savetxt(os.path.join(args.savepath, name + '_pose.txt'), pose)
-
-    image = cv2.cvtColor(image.astype(np.float32), cv2.COLOR_RGB2BGR)
-    if args.isShow:
-        if args.isKpt:
-            cv2.imshow('sparse alignment', plot_kpt(image, kpt))
-        if args.is3d or args.isMat or args.isPose:
-            cv2.imshow('dense alignment', plot_vertices(image, vertices))
-        if args.isPose:
-            cv2.imshow('pose', plot_pose_box(image, camera_matrix, kpt))
-        cv2.waitKey(0)
-    else:
-        image = np.clip((image * 255), 0, 255)
-        if args.isKpt:
-            cv2.imwrite(
-                os.path.join(args.savepath, 'sparse_alignment.png'),
-                plot_kpt(image, kpt).astype(np.uint8)
-            )
-        if args.is3d or args.isMat or args.isPose:
-            cv2.imwrite(
-                os.path.join(args.savepath, 'dense_alignment.png'),
-                plot_vertices(image, vertices).astype(np.uint8)
-            )
-        if args.isPose:
-            cv2.imwrite(
-                os.path.join(args.savepath, 'pose.png'),
-                plot_pose_box(image, camera_matrix, kpt).astype(np.uint8)
-            )
-
-    print('Script finished successfully.')
+    logger.info('Script finished successfully.')
 
 
 def texture_editing_from_images():
-    image = load_image(
-        args.input,
-        (IMAGE_SIZE, IMAGE_SIZE),
-        normalize_type='255',
-        gen_input_ailia=False
-    )
-
-    # for now, h == w == IMAGE_SIZE (as we resized the input when loading it)
-    h, w = image.shape[0], image.shape[1]
-    input_data = image[np.newaxis, :, :, :]
-
     # net initialize
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
     net.set_input_shape((1, 256, 256, 3))
 
-    # inference
-    # 1. 3d reconstruction --> get texture
-    pos = net.predict(input_data)[0] * IMAGE_SIZE * 1.1
-    vertices = get_vertices(pos, IMAGE_SIZE)
-    texture = cv2.remap(
-        image,
-        pos[:, :, :2].astype(np.float32),
-        None,
-        interpolation=cv2.INTER_NEAREST,
-        borderMode=cv2.BORDER_CONSTANT,
-        borderValue=(0)
-    )
+    # input image loop
+    for image_path in args.input:
+        # prepare input data
+        logger.info(image_path)
+        savepath = os.path.join(
+            args.savepath, os.path.splitext(os.path.basename(image_path))[0]
+        )
+        image = load_image(
+            image_path,
+            (IMAGE_SIZE, IMAGE_SIZE),
+            normalize_type='255',
+            gen_input_ailia=False,
+        )
 
-    # 2. texture editing
-    MODE = args.texture
+        # for now, h = w = IMAGE_SIZE (as we resized the input when loading it)
+        h, w = image.shape[0], image.shape[1]
+        input_data = image[np.newaxis, :, :, :]
 
-    ref_image = load_image(
-        args.refpath,
-        (IMAGE_SIZE, IMAGE_SIZE),
-        normalize_type='255',
-        gen_input_ailia=False
-    )
-    input_data = ref_image[np.newaxis, :, :, :]
-    ref_pos = net.predict(input_data)[0] * IMAGE_SIZE * 1.1
+        # inference
+        # 1. 3d reconstruction --> get texture
+        pos = net.predict(input_data)[0] * IMAGE_SIZE * 1.1
+        vertices = get_vertices(pos, IMAGE_SIZE)
+        texture = cv2.remap(
+            image,
+            pos[:, :, :2].astype(np.float32),
+            None,
+            interpolation=cv2.INTER_NEAREST,
+            borderMode=cv2.BORDER_CONSTANT,
+            borderValue=(0)
+        )
 
-    # texture from another image or a processed texture
-    ref_texture = cv2.remap(
-        ref_image,
-        ref_pos[:, :, :2].astype(np.float32),
-        None,
-        interpolation=cv2.INTER_NEAREST,
-        borderMode=cv2.BORDER_CONSTANT,
-        borderValue=(0)
-    )
+        # 2. texture editing
+        MODE = args.texture
 
-    # change part of texture (here, modify eyes as example)
-    if MODE == 0:
-        # load eye mask
-        uv_face_eye = imread(UV_FACE_EYES_PATH, as_grey=True) / 255.
-        uv_face = imread(UV_FACE_PATH, as_grey=True) / 255.
-        eye_mask = (abs(uv_face_eye - uv_face) > 0).astype(np.float32)
+        ref_image = load_image(
+            args.refpath,
+            (IMAGE_SIZE, IMAGE_SIZE),
+            normalize_type='255',
+            gen_input_ailia=False
+        )
+        input_data = ref_image[np.newaxis, :, :, :]
+        ref_pos = net.predict(input_data)[0] * IMAGE_SIZE * 1.1
 
-        # modify texture
-        new_texture = texture * \
-            (1 - eye_mask[:, :, np.newaxis]) + \
-            ref_texture*eye_mask[:, :, np.newaxis]
+        # texture from another image or a processed texture
+        ref_texture = cv2.remap(
+            ref_image,
+            ref_pos[:, :, :2].astype(np.float32),
+            None,
+            interpolation=cv2.INTER_NEAREST,
+            borderMode=cv2.BORDER_CONSTANT,
+            borderValue=(0)
+        )
 
-    # change whole face(face swap)
-    elif MODE == 1:
-        ref_vertices = get_vertices(ref_pos, IMAGE_SIZE)
-        new_texture = ref_texture  # (texture + ref_texture)/2.
+        # change part of texture (here, modify eyes as example)
+        if MODE == 0:
+            # load eye mask
+            uv_face_eye = imread(UV_FACE_EYES_PATH, as_grey=True) / 255.
+            uv_face = imread(UV_FACE_PATH, as_grey=True) / 255.
+            eye_mask = (abs(uv_face_eye - uv_face) > 0).astype(np.float32)
 
-    else:
-        print('Wrong Mode! Mode should be 0 or 1.')
-        exit()
+            # modify texture
+            new_texture = texture * \
+                (1 - eye_mask[:, :, np.newaxis]) + \
+                ref_texture*eye_mask[:, :, np.newaxis]
 
-    # 3. remap to input image (render).
-    vis_colors = np.ones((vertices.shape[0], 1))
-    face_mask = render_texture(
-        vertices.T, vis_colors.T, TRIANGLES.T, h, w, c=1
-    )
-    face_mask = np.squeeze(face_mask > 0).astype(np.float32)
+        # change whole face(face swap)
+        elif MODE == 1:
+            # ref_vertices = get_vertices(ref_pos, IMAGE_SIZE)
+            new_texture = ref_texture  # (texture + ref_texture)/2.
 
-    new_colors = get_colors_from_texture(new_texture, IMAGE_SIZE)
-    new_image = render_texture(
-        vertices.T, new_colors.T, TRIANGLES.T, h, w, c=3
-    )
-    new_image = image * (1 - face_mask[:, :, np.newaxis]) + \
-        new_image * face_mask[:, :, np.newaxis]
+        else:
+            logger.error('Wrong Mode! Mode should be 0 or 1.')
+            exit()
 
-    # Possion Editing for blending image
-    vis_ind = np.argwhere(face_mask > 0)
-    vis_min = np.min(vis_ind, 0)
-    vis_max = np.max(vis_ind, 0)
-    center = (
-        int((vis_min[1] + vis_max[1])/2+0.5),
-        int((vis_min[0] + vis_max[0])/2+0.5)
-    )
-    output = cv2.seamlessClone(
-        (new_image*255).astype(np.uint8),
-        (image*255).astype(np.uint8),
-        (face_mask*255).astype(np.uint8),
-        center,
-        cv2.NORMAL_CLONE
-    )
+        # 3. remap to input image (render).
+        vis_colors = np.ones((vertices.shape[0], 1))
+        face_mask = render_texture(
+            vertices.T, vis_colors.T, TRIANGLES.T, h, w, c=1
+        )
+        face_mask = np.squeeze(face_mask > 0).astype(np.float32)
 
-    # save output
-    imsave(os.path.join(args.savepath, 'texture_edited.png'), output)
-    print('Script finished successfully.')
+        new_colors = get_colors_from_texture(new_texture, IMAGE_SIZE)
+        new_image = render_texture(
+            vertices.T, new_colors.T, TRIANGLES.T, h, w, c=3
+        )
+        new_image = image * (1 - face_mask[:, :, np.newaxis]) + \
+            new_image * face_mask[:, :, np.newaxis]
+
+        # Possion Editing for blending image
+        vis_ind = np.argwhere(face_mask > 0)
+        vis_min = np.min(vis_ind, 0)
+        vis_max = np.max(vis_ind, 0)
+        center = (
+            int((vis_min[1] + vis_max[1])/2+0.5),
+            int((vis_min[0] + vis_max[0])/2+0.5)
+        )
+        output = cv2.seamlessClone(
+            (new_image*255).astype(np.uint8),
+            (image*255).astype(np.uint8),
+            (face_mask*255).astype(np.uint8),
+            center,
+            cv2.NORMAL_CLONE
+        )
+
+        # save output
+        imsave(savepath + '_texture_edited.png', output)
+    logger.info('Script finished successfully.')
 
 
 def recognize_from_video():
@@ -438,7 +451,7 @@ def recognize_from_video():
     cv2.destroyAllWindows()
     if writer is not None:
         writer.release()
-    print('Script finished successfully.')
+    logger.info('Script finished successfully.')
     """
 
 
@@ -447,7 +460,7 @@ def main():
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
 
     # make saved data directory
-    print(f'Make ./{args.savepath} directory if it does not exist')
+    logger.info(f'Make ./{args.savepath} directory if it does not exist')
     os.makedirs(args.savepath, exist_ok=True)
 
     if args.video is not None:

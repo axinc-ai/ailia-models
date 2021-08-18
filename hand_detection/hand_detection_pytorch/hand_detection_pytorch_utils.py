@@ -51,7 +51,7 @@ RESIZE = 1
 
 def pre_process(to_show):
     img = np.float32(to_show)
-    img = cv2.RESIZE(
+    img = cv2.resize(
         img, None, None, fx=RESIZE, fy=RESIZE, interpolation=cv2.INTER_LINEAR
     )
     scale = [img.shape[1], img.shape[0], img.shape[1], img.shape[0]]

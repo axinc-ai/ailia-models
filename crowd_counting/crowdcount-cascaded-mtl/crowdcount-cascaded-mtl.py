@@ -7,17 +7,21 @@ import numpy as np
 import ailia
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser  # noqa: E402
+from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from image_utils import load_image  # noqa: E402
 import webcamera_utils  # noqa: E402
+
+# logger
+from logging import getLogger   # noqa: E402
+logger = getLogger(__name__)
 
 
 # ======================
 # PARAMETERS
 # ======================
-WEIGHT_PATH = "crowdcount.onnx"
-MODEL_PATH = "crowdcount.onnx.prototxt"
+WEIGHT_PATH = "crowdcount.opt.onnx"
+MODEL_PATH = "crowdcount.opt.onnx.prototxt"
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/crowd_count/"
 
 IMAGE_PATH = 'test.jpeg'
@@ -39,54 +43,62 @@ args = update_parser(parser)
 # Main functions
 # ======================
 def estimate_from_image():
-    # prepare input data
-    org_img = load_image(
-        args.input,
-        (IMAGE_HEIGHT, IMAGE_WIDTH),
-        normalize_type='None'
-    )
-    input_data = load_image(
-        args.input,
-        (IMAGE_HEIGHT, IMAGE_WIDTH),
-        rgb=False,
-        normalize_type='None',
-        gen_input_ailia=True
-    )
-
     # net initialize
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
 
-    # inference
-    if args.benchmark:
-        print('BENCHMARK mode')
-        for i in range(5):
-            start = int(round(time.time() * 1000))
+    # input image loop
+    for image_path in args.input:
+        # prepare input data
+        logger.info(image_path)
+        org_img = load_image(
+            image_path,
+            (IMAGE_HEIGHT, IMAGE_WIDTH),
+            normalize_type='None',
+        )
+        org_img = cv2.cvtColor(org_img, cv2.COLOR_BGR2RGB)
+        input_data = load_image(
+            image_path,
+            (IMAGE_HEIGHT, IMAGE_WIDTH),
+            rgb=False,
+            normalize_type='None',
+            gen_input_ailia=True,
+        )
+
+        # inference
+        if args.benchmark:
+            logger.info('BENCHMARK mode')
+            for i in range(5):
+                start = int(round(time.time() * 1000))
+                preds_ailia = net.predict(input_data)
+                end = int(round(time.time() * 1000))
+                logger.info(f"\tailia processing time {end - start} ms")
+        else:
             preds_ailia = net.predict(input_data)
-            end = int(round(time.time() * 1000))
-            print("\tailia processing time {} ms".format(end - start))
-    else:
-        preds_ailia = net.predict(input_data)
 
-    # estimated crowd count
-    et_count = int(np.sum(preds_ailia))
+        # estimated crowd count
+        et_count = int(np.sum(preds_ailia))
 
-    # density map
-    density_map = (255 * preds_ailia / np.max(preds_ailia))[0][0]
-    density_map = cv2.resize(density_map, (IMAGE_WIDTH, IMAGE_HEIGHT))
-    heatmap = cv2.applyColorMap(density_map.astype(np.uint8), cv2.COLORMAP_JET)
-    cv2.putText(
-        heatmap,
-        f'Est Count: {et_count}',
-        (40, 440),  # position
-        cv2.FONT_HERSHEY_SIMPLEX,  # font
-        0.8,  # fontscale
-        (255, 255, 255),  # color
-        2  # thickness
-    )
+        # density map
+        density_map = (255 * preds_ailia / np.max(preds_ailia))[0][0]
+        density_map = cv2.resize(density_map, (IMAGE_WIDTH, IMAGE_HEIGHT))
+        heatmap = cv2.applyColorMap(
+            density_map.astype(np.uint8), cv2.COLORMAP_JET
+        )
+        cv2.putText(
+            heatmap,
+            f'Est Count: {et_count}',
+            (40, 440),  # position
+            cv2.FONT_HERSHEY_SIMPLEX,  # font
+            0.8,  # fontscale
+            (255, 255, 255),  # color
+            2,  # thickness
+        )
 
-    res_img = np.hstack((org_img, heatmap))
-    cv2.imwrite(args.savepath, res_img)
-    print('Script finished successfully.')
+        res_img = np.hstack((org_img, heatmap))
+        savepath = get_savepath(args.savepath, image_path)
+        logger.info(f'saved at : {savepath}')
+        cv2.imwrite(savepath, res_img)
+    logger.info('Script finished successfully.')
 
 
 def estimate_from_video():
@@ -155,7 +167,7 @@ def estimate_from_video():
     cv2.destroyAllWindows()
     if writer is not None:
         writer.release()
-    print('Script finished successfully.')
+    logger.info('Script finished successfully.')
 
 
 def main():

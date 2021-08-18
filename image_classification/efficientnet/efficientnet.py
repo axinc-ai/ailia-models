@@ -15,6 +15,10 @@ from image_utils import load_image  # noqa: E402
 from classifier_utils import plot_results, print_results  # noqa: E402
 import webcamera_utils  # noqa: E402
 
+# logger
+from logging import getLogger   # noqa: E402
+logger = getLogger(__name__)
+
 
 # ======================
 # PARAMETERS 1
@@ -52,45 +56,46 @@ SLEEP_TIME = 0  # for web cam mode
 # Main functions
 # ======================
 def recognize_from_image():
-    # prepare input data
-    input_data = load_image(
-        args.input,
-        (IMAGE_HEIGHT, IMAGE_WIDTH),
-        normalize_type='None',
-        gen_input_ailia=False
-    )
-    input_data = cv2.cvtColor(
-        input_data.astype(np.float32),
-        cv2.COLOR_RGB2BGRA
-    ).astype(np.uint8)
-
     # net initialize
     classifier = ailia.Classifier(
         MODEL_PATH,
         WEIGHT_PATH,
         env_id=args.env_id,
         format=ailia.NETWORK_IMAGE_FORMAT_RGB,
-        range=ailia.NETWORK_IMAGE_RANGE_S_FP32
+        range=ailia.NETWORK_IMAGE_RANGE_S_FP32,
     )
 
-    # inference
-    print('Start inference...')
-    if args.benchmark:
-        print('BENCHMARK mode')
-        for i in range(5):
-            start = int(round(time.time() * 1000))
+    # input image loop
+    for image_path in args.input:
+        # prepare input data
+        logger.info(image_path)
+        input_data = load_image(
+            image_path,
+            (IMAGE_HEIGHT, IMAGE_WIDTH),
+            normalize_type='None',
+            gen_input_ailia=False
+        )
+        input_data = cv2.cvtColor(
+            input_data.astype(np.float32),
+            cv2.COLOR_RGB2BGRA
+        ).astype(np.uint8)
+
+        # inference
+        logger.info('Start inference...')
+        if args.benchmark:
+            logger.info('BENCHMARK mode')
+            for i in range(args.benchmark_count):
+                start = int(round(time.time() * 1000))
+                classifier.compute(input_data, MAX_CLASS_COUNT)
+                end = int(round(time.time() * 1000))
+                logger.info(f'\tailia processing time {end - start} ms')
+        else:
             classifier.compute(input_data, MAX_CLASS_COUNT)
-            # count = classifier.get_class_count()
-            end = int(round(time.time() * 1000))
-            print(f'\tailia processing time {end - start} ms')
-    else:
-        classifier.compute(input_data, MAX_CLASS_COUNT)
-        # count = classifier.get_class_count()
 
-    # show results
-    print_results(classifier, efficientnet_labels.imagenet_category)
+        # show results
+        print_results(classifier, efficientnet_labels.imagenet_category)
 
-    print('Script finished successfully.')
+    logger.info('Script finished successfully.')
 
 
 def recognize_from_video():
@@ -100,7 +105,7 @@ def recognize_from_video():
         WEIGHT_PATH,
         env_id=args.env_id,
         format=ailia.NETWORK_IMAGE_FORMAT_RGB,
-        range=ailia.NETWORK_IMAGE_RANGE_S_FP32
+        range=ailia.NETWORK_IMAGE_RANGE_S_FP32,
     )
 
     capture = webcamera_utils.get_capture(args.video)
@@ -142,7 +147,7 @@ def recognize_from_video():
     if writer is not None:
         writer.release()
 
-    print('Script finished successfully.')
+    logger.info('Script finished successfully.')
 
 
 def main():

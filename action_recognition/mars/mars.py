@@ -117,11 +117,11 @@ def print_mars_result(result):
 def recognize_from_image():
     # prepare input data
     num = lambda val: int(re.sub("\\D", "", val))
-    sorted_inputs_path = sorted(os.listdir(args.input), key=num)
+    sorted_inputs_path = sorted(args.input, key=num)
     input_blob = np.empty((1, 3, args.duration, IMAGE_HEIGHT, IMAGE_WIDTH))
     for i, input_path in enumerate(sorted_inputs_path[0:args.duration]):
         img = load_image(
-            args.input + '/' + input_path,
+            input_path,
             (IMAGE_HEIGHT, IMAGE_WIDTH),
             normalize_type='None',
             gen_input_ailia=True
@@ -151,7 +151,7 @@ def recognize_from_image():
 
             print_mars_result(result)
 
-            preview_img = cv2.imread(args.input + '/' + sorted_inputs_path[
+            preview_img = cv2.imread(sorted_inputs_path[
                     next_input_index - args.duration
             ])
             cv2.imshow('preview', preview_img)
@@ -160,7 +160,7 @@ def recognize_from_image():
                 input_blob[0, :, i, :, :] = input_blob[0, :, i + 1, :, :]
 
             img = load_image(
-                args.input + '/' + sorted_inputs_path[next_input_index],
+                sorted_inputs_path[next_input_index],
                 (IMAGE_HEIGHT, IMAGE_WIDTH),
                 normalize_type='None',
                 gen_input_ailia=True

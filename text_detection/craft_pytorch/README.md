@@ -46,5 +46,5 @@ ONNX opset=10
 
 ## Netron
 
-[craft.onnx.prototxt](https://storage.googleapis.com/ailia-models/craft-pytorch/craft.onnx.prototxt)
+[craft.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/craft-pytorch/craft.onnx.prototxt)
 

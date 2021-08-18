@@ -54,17 +54,23 @@ def plot_detections(
     plt.savefig(save_image_path)
 
 
-def decode_boxes(raw_boxes, anchors):
+def decode_boxes(raw_boxes, back, anchors):
     """
     Converts the predictions into actual coordinates using
     the anchor boxes. Processes the entire batch at once.
     """
     boxes = np.zeros_like(raw_boxes)
 
-    x_scale = 128.0
-    y_scale = 128.0
-    h_scale = 128.0
-    w_scale = 128.0
+    if back == True:
+        x_scale = 256.0
+        y_scale = 256.0
+        h_scale = 256.0
+        w_scale = 256.0
+    else:
+        x_scale = 128.0
+        y_scale = 128.0
+        h_scale = 128.0
+        w_scale = 128.0
 
     x_center = raw_boxes[..., 0] / x_scale * anchors[:, 2] + anchors[:, 0]
     y_center = raw_boxes[..., 1] / y_scale * anchors[:, 3] + anchors[:, 1]
@@ -203,7 +209,7 @@ def weighted_non_max_suppression(detections):
     return output_detections    
 
 
-def postprocess(preds_ailia, anchor_path='anchors.npy'):
+def postprocess(preds_ailia, anchor_path='anchors.npy', back=False):
     raw_box = preds_ailia[0]  # (1, 896, 16)
     raw_score = preds_ailia[1]  # (1, 896, 1)
 
@@ -211,7 +217,7 @@ def postprocess(preds_ailia, anchor_path='anchors.npy'):
     score_thresh = 100.0
     min_score_thresh = 0.75
     
-    detection_boxes = decode_boxes(raw_box, anchors)  # (1, 896, 16)
+    detection_boxes = decode_boxes(raw_box, back, anchors)  # (1, 896, 16)
     raw_score = np.clip(raw_score, -score_thresh, score_thresh)  # (1, 896, 1)
     detection_scores = np.squeeze(sigmoid(raw_score), axis=-1)  # (1, 896)
     

@@ -1,3 +1,4 @@
+import os
 import sys
 
 import numpy as np
@@ -5,6 +6,9 @@ import cv2
 
 from utils import check_file_existance
 from image_utils import normalize_image
+
+from logging import getLogger
+logger = getLogger(__name__)
 
 
 def calc_adjust_fsize(f_height, f_width, height, width):
@@ -49,6 +53,29 @@ def adjust_frame_size(frame, height, width):
     ] = frame
     resized_img = cv2.resize(img, (width, height))
     return img, resized_img
+
+
+def cut_max_square(frame: np.array) -> np.array:
+    """
+    Cut out a maximum square area from the center of given frame (np.array).
+    Parameters
+    ----------
+    frame: numpy array
+
+    Returns
+    -------
+    frame_square: numpy array
+        Maximum square area of the frame at its center
+    """
+    frame_height, frame_width, _ = frame.shape
+    frame_size_min = min(frame_width, frame_height)
+    if frame_width >= frame_height:
+        x, y = frame_width // 2 - frame_height // 2, 0
+    else:
+        x, y = 0, frame_height // 2 - frame_width // 2
+
+    frame_square = frame[y: (y + frame_size_min), x: (x + frame_size_min)]
+    return frame_square
 
 
 def preprocess_frame(
@@ -113,6 +140,9 @@ def get_writer(savepath, height, width, fps=20, rgb=True):
     -------
     writer : cv2.VideoWriter()
     """
+    if os.path.isdir(savepath):
+        savepath = savepath + "/out.mp4"
+
     writer = cv2.VideoWriter(
         savepath,
         # cv2.VideoWriter_fourcc(*'MJPG'),  # avi mode
@@ -146,7 +176,7 @@ def get_capture(video):
         # webcamera-mode
         capture = cv2.VideoCapture(video_id)
         if not capture.isOpened():
-            print(f"[ERROR] webcamera (ID - {video_id}) not found")
+            logger.error(f"webcamera (ID - {video_id}) not found")
             sys.exit(0)
 
     except ValueError:

@@ -1,6 +1,9 @@
 import os
 
-bad_endings = ['with', 'in', 'on', 'of', 'a', 'at', 'to', 'for', 'an', 'this', 'his', 'her', 'that', 'the']
+bad_endings = [
+    'with', 'in', 'on', 'of', 'a', 'at', 'to', 'for', 'an', 'this', 'his',
+    'her', 'that', 'the',
+]
 
 
 # Input: seq, N*D numpy array, with element 0 .. vocab_size. 0 is END token.

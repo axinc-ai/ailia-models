@@ -8,10 +8,14 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser  # noqa: E402
+from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
-from detector_utils import load_image  # noqa: E402
+from detector_utils import plot_results, load_image  # noqa: E402
 import webcamera_utils  # noqa: E402
+
+# logger
+from logging import getLogger   # noqa: E402
+logger = getLogger(__name__)
 
 
 # ======================
@@ -22,7 +26,7 @@ WEIGHT_PATH = './m2det.onnx'
 MODEL_PATH = './m2det.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/m2det/'
 
-IMAGE_PATH = 'couple.jpg'
+IMAGE_PATH = 'input.jpg'
 SAVE_IMAGE_PATH = 'output.png'
 IMAGE_HEIGHT = 448  # for video mode
 IMAGE_WIDTH = 448  # for video mode
@@ -111,25 +115,23 @@ BASE = int(np.ceil(pow(len(COCO_CATEGORY), 1. / 3)))
 COLORS = [to_color(x, BASE) for x in range(len(COCO_CATEGORY))]
 
 
-def draw_detection(im, bboxes, scores, cls_inds):
-    imgcv = np.copy(im)
-    h, w, _ = imgcv.shape
+def convert_to_ailia_detector_object(bboxes, scores, cls_inds, w, h):
+    detector_object = []
     for i, box in enumerate(bboxes):
         cls_indx = int(cls_inds[i])
-        box = [int(_) for _ in box]
-        thick = int((h + w) / 300)
-        cv2.rectangle(
-            imgcv,
-            (box[0], box[1]),
-            (box[2], box[3]),
-            COLORS[cls_indx],
-            thick
-        )
-        mess = '%s: %.3f' % (COCO_CATEGORY[cls_indx], scores[i])
-        cv2.putText(imgcv, mess, (box[0], box[1] - 7),
-                    0, 1e-3 * h, COLORS[cls_indx], thick // 3)
-    return imgcv
 
+        r = ailia.DetectorObject(
+            category=cls_indx,
+            prob=scores[i],
+            x=box[0] / w,
+            y=box[1] / h,
+            w=(box[2] - box[0]) / w,
+            h=(box[3] - box[1]) / h,
+        )
+
+        detector_object.append(r)
+
+    return detector_object
 
 # ======================
 # Main functions
@@ -178,23 +180,26 @@ def detect_objects(img, detector):
 
 
 def recognize_from_image(filename, detector):
+    if args.profile:
+        detector.set_profile_mode(True)
+
     # load input image
     img = load_image(filename)
     img = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
 
-    print('Start inference...')
+    logger.info('Start inference...')
     if args.benchmark:
-        print('BENCHMARK mode')
+        logger.info('BENCHMARK mode')
         for i in range(5):
             start = int(round(time.time() * 1000))
             boxes, scores, cls_inds = detect_objects(img, detector)
             end = int(round(time.time() * 1000))
-            print(f'\tailia processing time {end - start} ms')
+            logger.info(f'\tailia processing time {end - start} ms')
     else:
         boxes, scores, cls_inds = detect_objects(img, detector)
 
     try:
-        print('\n'.join(
+        logger.info('\n'.join(
             ['pos:{}, ids:{}, score:{:.3f}'.format(
                 '(%.1f,%.1f,%.1f,%.1f)' % (box[0], box[1], box[2], box[3]),
                 COCO_CATEGORY[int(obj_cls)], score
@@ -205,14 +210,17 @@ def recognize_from_image(filename, detector):
         pass
 
     # show image
-    im2show = draw_detection(img, boxes, scores, cls_inds)
-    cv2.imwrite(args.savepath, im2show)
+    detect_object = convert_to_ailia_detector_object(boxes, scores, cls_inds, img.shape[1], img.shape[0])
+    img = plot_results(detect_object, img, COCO_CATEGORY)
 
-    print('Script finished successfully.')
+    savepath = get_savepath(args.savepath, filename)
+    logger.info(f'saved at : {savepath}')
+    cv2.imwrite(savepath, img)
 
-    # cv2.imshow('demo', im2show)
-    # cv2.waitKey(5000)
-    # cv2.destroyAllWindows()
+    if args.profile:
+        print(detector.get_summary())
+
+    logger.info('Script finished successfully.')
 
 
 def recognize_from_video(video, detector):
@@ -233,7 +241,10 @@ def recognize_from_video(video, detector):
             break
 
         boxes, scores, cls_inds = detect_objects(img, detector)
-        img = draw_detection(img, boxes, scores, cls_inds)
+
+        # show image
+        detect_object = convert_to_ailia_detector_object(boxes, scores, cls_inds, img.shape[1], img.shape[0])
+        img = plot_results(detect_object, img, COCO_CATEGORY)
         cv2.imshow('frame', img)
 
         # save results
@@ -244,7 +255,6 @@ def recognize_from_video(video, detector):
     cv2.destroyAllWindows()
     if writer is not None:
         writer.release()
-    print('Script finished successfully.')
 
 
 def main():
@@ -259,7 +269,13 @@ def main():
         recognize_from_video(args.video, detector)
     else:
         # image mode
-        recognize_from_image(args.input, detector)
+        # input image loop
+        for image_path in args.input:
+            # prepare input data
+            logger.info(image_path)
+            recognize_from_image(image_path, detector)
+
+    logger.info('Script finished successfully.')
 
 
 if __name__ == '__main__':

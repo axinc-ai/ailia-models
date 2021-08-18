@@ -10,6 +10,10 @@ sys.path.append('../../util')
 from utils import get_base_parser, update_parser  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 
+# logger
+from logging import getLogger   # noqa: E402
+logger = getLogger(__name__)
+
 
 # ======================
 # Arguemnt Parser Config
@@ -24,7 +28,7 @@ parser.add_argument(
     '--input', '-i', metavar='TEXT', default=SENTENCE,
     help='input text'
 )
-args = update_parser(parser)
+args = update_parser(parser, check_input_type=False)
 
 
 # ======================
@@ -52,16 +56,16 @@ def main():
         k: v.cpu().detach().numpy() for k, v in model_inputs.items()
     }
 
-    print("Input : ", args.input)
+    logger.info("Input : " + str(args.input))
 
     # inference
     if args.benchmark:
-        print('BENCHMARK mode')
+        logger.info('BENCHMARK mode')
         for i in range(5):
             start = int(round(time.time() * 1000))
             entities = ailia_model.predict(inputs_onnx)
             end = int(round(time.time() * 1000))
-            print("\tailia processing time {} ms".format(end - start))
+            logger.info("\tailia processing time {} ms".format(end - start))
     else:
         entities = ailia_model.predict(inputs_onnx)
 
@@ -74,7 +78,7 @@ def main():
         5: 'B-ORG',
         6: 'I-ORG',
         7: 'B-LOC',
-        8: 'I-LOC'
+        8: 'I-LOC',
     }
     ignore_labels = ['O']
 
@@ -102,8 +106,8 @@ def main():
 
         entities += [entity]
 
-    print("Output : ", entities)
-    print('Script finished successfully.')
+    logger.info("Output : " + str(entities))
+    logger.info('Script finished successfully.')
 
 
 if __name__ == "__main__":

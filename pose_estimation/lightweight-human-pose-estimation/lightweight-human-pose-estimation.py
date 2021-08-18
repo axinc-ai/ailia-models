@@ -7,16 +7,20 @@ import numpy as np
 import ailia
 
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser  # noqa: E402
+from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from image_utils import load_image  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 import webcamera_utils  # noqa: E402
+
+# logger
+from logging import getLogger   # noqa: E402
+logger = getLogger(__name__)
 
 
 # ======================
 # Parameters 1
 # ======================
-IMAGE_PATH = 'balloon.png'
+IMAGE_PATH = 'input.jpg'
 SAVE_IMAGE_PATH = 'output.png'
 IMAGE_HEIGHT = 240
 IMAGE_WIDTH = 320
@@ -35,6 +39,16 @@ parser.add_argument(
     action='store_true',
     help='By default, the optimized model is used, but with this option, ' +
     'you can switch to the normal (not optimized) model'
+)
+parser.add_argument(
+    '-dw', '--detection_width',
+    default=IMAGE_WIDTH, type=int,
+    help='The detection width and height for yolo. (default: 416)'
+)
+parser.add_argument(
+    '-dh', '--detection_height',
+    default=IMAGE_HEIGHT, type=int,
+    help='The detection height and height for yolo. (default: 416)'
 )
 args = update_parser(parser)
 
@@ -126,38 +140,50 @@ def display_result(input_img, pose):
 # Main functions
 # ======================
 def recognize_from_image():
-    # prepare input data
-    src_img = cv2.imread(args.input)
-    input_image = load_image(
-        args.input,
-        (IMAGE_HEIGHT, IMAGE_WIDTH),
-        normalize_type='None'
-    )
-    input_data = cv2.cvtColor(input_image, cv2.COLOR_RGB2BGRA)
-
     # net initialize
     pose = ailia.PoseEstimator(
         MODEL_PATH, WEIGHT_PATH, env_id=args.env_id, algorithm=ALGORITHM
     )
+    if args.detection_width!=IMAGE_WIDTH or args.detection_height!=IMAGE_HEIGHT:
+        pose.set_input_shape((1,3,args.detection_height,args.detection_width))
 
-    # inference
-    print('Start inference...')
-    if args.benchmark:
-        print('BENCHMARK mode')
-        for i in range(5):
-            start = int(round(time.time() * 1000))
+    # input image loop
+    for image_path in args.input:
+        # prepare input data
+        logger.info(image_path)
+        # prepare input data
+        src_img = cv2.imread(image_path)
+        input_image = load_image(
+            image_path,
+            (args.detection_height, args.detection_width),
+            normalize_type='None',
+        )
+        input_data = cv2.cvtColor(input_image, cv2.COLOR_RGB2BGRA)
+
+        # inference
+        logger.info('Start inference...')
+        if args.benchmark:
+            logger.info('BENCHMARK mode')
+            total_time = 0
+            for i in range(args.benchmark_count):
+                start = int(round(time.time() * 1000))
+                _ = pose.compute(input_data)
+                end = int(round(time.time() * 1000))
+                if i != 0:
+                    total_time = total_time + (end - start)
+                logger.info(f'\tailia processing time {end - start} ms')
+            logger.info(f'\taverage time {total_time / (args.benchmark_count-1)} ms')
+        else:
             _ = pose.compute(input_data)
-            end = int(round(time.time() * 1000))
-            print(f'\tailia processing time {end - start} ms')
-    else:
-        _ = pose.compute(input_data)
 
-    # postprocessing
-    count = pose.get_object_count()
-    print(f'person_count={count}')
-    display_result(src_img, pose)
-    cv2.imwrite(args.savepath, src_img)
-    print('Script finished successfully.')
+        # postprocessing
+        count = pose.get_object_count()
+        logger.info(f'person_count={count}')
+        display_result(src_img, pose)
+        savepath = get_savepath(args.savepath, image_path)
+        logger.info(f'saved at : {savepath}')
+        cv2.imwrite(savepath, src_img)
+    logger.info('Script finished successfully.')
 
 
 def recognize_from_video():
@@ -165,6 +191,8 @@ def recognize_from_video():
     pose = ailia.PoseEstimator(
         MODEL_PATH, WEIGHT_PATH, env_id=args.env_id, algorithm=ALGORITHM
     )
+    if args.detection_width!=IMAGE_WIDTH or args.detection_height!=IMAGE_HEIGHT:
+        pose.set_input_shape((1,3,args.detection_height,args.detection_width))
 
     capture = webcamera_utils.get_capture(args.video)
 
@@ -181,27 +209,25 @@ def recognize_from_video():
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
 
-        input_image, input_data = webcamera_utils.adjust_frame_size(
-            frame, IMAGE_HEIGHT, IMAGE_WIDTH,
-        )
-        input_data = cv2.cvtColor(input_data, cv2.COLOR_BGR2BGRA)
+        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2BGRA)
 
         # inference
-        _ = pose.compute(input_data)
+        _ = pose.compute(frame)
 
         # postprocessing
-        display_result(input_image, pose)
-        cv2.imshow('frame', input_image)
+        display_result(frame, pose)
+        cv2.imshow('frame', frame)
 
         # save results
         if writer is not None:
-            writer.write(input_image)
+            frame = cv2.cvtColor(frame, cv2.COLOR_BGRA2BGR)
+            writer.write(frame)
 
     capture.release()
     cv2.destroyAllWindows()
     if writer is not None:
         writer.release()
-    print('Script finished successfully.')
+    logger.info('Script finished successfully.')
 
 
 def main():

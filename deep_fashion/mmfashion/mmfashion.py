@@ -8,11 +8,16 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser  # noqa: E402
+from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from detector_utils import plot_results, load_image  # noqa: E402
-from webcamera_utils import get_capture  # noqa: E402
+from image_utils import normalize_image  # noqa: E402
+import webcamera_utils  # noqa: E402
 
+# logger
+from logging import getLogger  # noqa: E402
+
+logger = getLogger(__name__)
 
 # ======================
 # Parameters
@@ -29,25 +34,65 @@ CATEGORY = (
     'neckwear', 'headwear', 'eyeglass', 'belt', 'footwear', 'hair',
     'skin', 'face'
 )
-THRESHOLD = 0.3
-# IOU = 0.4
+THRESHOLD = 0.6
 
 RESIZE_RANGE = (750, 1101)
 NORM_MEAN = [123.675, 116.28, 103.53]
 NORM_STD = [58.395, 57.12, 57.375]
 RCNN_MASK_THRE = 0.5
 
+U2NET_MODEL_LIST = ['small', 'large']
+WEIGHT_U2NET_LARGE_PATH = 'u2net_opset11.onnx'
+MODEL_U2NET_LARGE_PATH = 'u2net_opset11.onnx.prototxt'
+WEIGHT_U2NET_SMALL_PATH = 'u2netp_opset11.onnx'
+MODEL_U2NET_SMALL_PATH = 'u2netp_opset11.onnx.prototxt'
+REMOTE_U2NET_PATH = 'https://storage.googleapis.com/ailia-models/u2net/'
+U2NET_IMAGE_SIZE = 320
 
 # ======================
 # Arguemnt Parser Config
 # ======================
 parser = get_base_parser('MMFashion model', IMAGE_PATH, SAVE_IMAGE_PATH)
+parser.add_argument(
+    '-th', '--threshold',
+    default=THRESHOLD, type=float,
+    help='The detection threshold for yolo. (default: '+str(THRESHOLD)+')'
+)
+parser.add_argument(
+    '-pp', '--preprocess', metavar='ARCH',
+    default=None, choices=U2NET_MODEL_LIST,
+    help='preprocess model (U square net) architecture: ' + ' | '.join(U2NET_MODEL_LIST)
+)
 args = update_parser(parser)
 
 
 # ======================
 # Secondaty Functions
 # ======================
+def transform(img, pp_net):
+    img_0 = img
+
+    img = cv2.resize(img, (U2NET_IMAGE_SIZE, U2NET_IMAGE_SIZE))
+
+    # ToTensorLab part in original repo
+    img = img / np.max(img) * 255
+    img = normalize_image(img, normalize_type='ImageNet')
+    input_data = img.transpose((2, 0, 1))[np.newaxis, :, :, :]
+
+    output = pp_net.predict(input_data)
+    pred = output[0, 0, :, :]
+
+    h, w = img_0.shape[:2]
+    mask = cv2.resize(pred, (w, h))
+    mask = np.clip(mask, 0, 1)
+    mask = np.expand_dims(mask, axis=2)
+
+    back = np.ones((h, w, 3)) * 255
+    img = img_0 * mask + back * (1 - mask)
+
+    return img
+
+
 def preprocess(img):
     h, w = img.shape[:2]
 
@@ -125,7 +170,7 @@ def post_processing(data, boxes, labels, masks):
         score = box[-1]
         x, y, x2, y2 = box[:4]
 
-        if score < THRESHOLD:
+        if score < args.threshold:
             continue
 
         w = (x2 - x)
@@ -166,8 +211,10 @@ def post_processing(data, boxes, labels, masks):
 # ======================
 
 
-def detect_objects(img, detector):
+def detect_objects(img, detector, pp_net):
     # initial preprocesses
+    if pp_net:
+        img = transform(img, pp_net)
     data = preprocess(img)
 
     # feedforward
@@ -185,68 +232,101 @@ def detect_objects(img, detector):
     return detect_object, seg_masks
 
 
-def recognize_from_image(filename, detector):
+def recognize_from_image(filename, detector, pp_net):
     # prepare input data
     img_0 = load_image(filename)
-    print(f'input image shape: {img_0.shape}')
+    logger.debug(f'input image shape: {img_0.shape}')
 
     img = cv2.cvtColor(img_0, cv2.COLOR_BGRA2RGB)
 
     # inference
-    print('Start inference...')
+    logger.info('Start inference...')
     if args.benchmark:
-        print('BENCHMARK mode')
+        logger.info('BENCHMARK mode')
         for i in range(5):
             start = int(round(time.time() * 1000))
-            detect_object, seg_masks = detect_objects(img, detector)
+            detect_object, seg_masks = detect_objects(img, detector, pp_net)
             end = int(round(time.time() * 1000))
-            print(f'\tailia processing time {end - start} ms')
+            logger.info(f'\tailia processing time {end - start} ms')
     else:
-        detect_object, seg_masks = detect_objects(img, detector)
+        detect_object, seg_masks = detect_objects(img, detector, pp_net)
 
     # plot result
     res_img = plot_results(
         detect_object, img_0, CATEGORY, segm_masks=seg_masks
     )
-    cv2.imwrite(args.savepath, res_img)
-    print('Script finished successfully.')
+    savepath = get_savepath(args.savepath, filename)
+    logger.info(f'saved at : {savepath}')
+    cv2.imwrite(savepath, res_img)
 
 
-def recognize_from_video(video, detector):
-    capture = get_capture(args.video)
+def recognize_from_video(video, detector, pp_net):
+    capture = webcamera_utils.get_capture(args.video)
+
+    # create video writer if savepath is specified as video format
+    if args.savepath != SAVE_IMAGE_PATH:
+        f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
+        writer = webcamera_utils.get_writer(args.savepath, f_h, f_w)
+    else:
+        writer = None
 
     while True:
         ret, frame = capture.read()
-        if cv2.waitKey(1) & 0xFF == ord('q'):
+        if cv2.waitKey(1) & 0xFF == ord('q') or not ret:
             break
-        if not ret:
-            continue
 
         x = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        detect_object, seg_masks = detect_objects(x, detector)
+        detect_object, seg_masks = detect_objects(x, detector, pp_net)
         res_img = plot_results(
             detect_object, frame, CATEGORY, segm_masks=seg_masks
         )
         cv2.imshow('frame', res_img)
 
+        # save results
+        if writer is not None:
+            writer.write(res_img)
+
     capture.release()
     cv2.destroyAllWindows()
-    print('Script finished successfully.')
+    if writer is not None:
+        writer.release()
+    logger.info('Script finished successfully.')
 
 
 def main():
     # model files check and download
+    logger.info('=== MMFashion model ===')
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
+    if args.preprocess:
+        info = {
+            'large': (
+                WEIGHT_U2NET_LARGE_PATH, MODEL_U2NET_LARGE_PATH),
+            'small': (
+                WEIGHT_U2NET_SMALL_PATH, MODEL_U2NET_SMALL_PATH),
+        }
+        weight_path, model_path = info[args.preprocess]
+        logger.info('=== U square net model ===')
+        check_and_download_models(weight_path, model_path, REMOTE_U2NET_PATH)
+    else:
+        weight_path = model_path = None
 
     # initialize
     detector = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
+    if weight_path:
+        pp_net = ailia.Net(model_path, weight_path, env_id=args.env_id)
+    else:
+        pp_net = None
 
     if args.video is not None:
         # video mode
-        recognize_from_video(args.video, detector)
+        recognize_from_video(args.video, detector, pp_net)
     else:
         # image mode
-        recognize_from_image(args.input, detector)
+        # input image loop
+        for image_path in args.input:
+            recognize_from_image(image_path, detector, pp_net)
+    logger.info('Script finished successfully.')
 
 
 if __name__ == '__main__':

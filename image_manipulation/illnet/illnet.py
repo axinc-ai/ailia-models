@@ -11,9 +11,13 @@ from illnet_utils import *
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser  # noqa: E402
+from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 import webcamera_utils  # noqa: E402
+
+# logger
+from logging import getLogger   # noqa: E402
+logger = getLogger(__name__)
 
 
 # ======================
@@ -42,27 +46,46 @@ args = update_parser(parser)
 # Main functions
 # ======================
 def recognize_from_image():
-    # prepare input data
-    img = io.imread(args.input)
-    img = preProcess(img)
-    input_data = padCropImg(img)
-    input_data = input_data.astype(np.float32) / 255.0
-
-    ynum = input_data.shape[0]
-    xnum = input_data.shape[1]
-
-    preds_ailia = np.zeros(
-        (ynum, xnum, PATCH_RES, PATCH_RES, 3), dtype=np.float32
-    )
-
     # net initialize
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
 
-    # inference
-    print('Start inference...')
-    if args.benchmark:
-        print('BENCHMARK mode')
-        for c in range(5):
+    # input image loop
+    for image_path in args.input:
+        # prepare input data
+        logger.info(image_path)
+        img = io.imread(image_path)
+        img = preProcess(img)
+        input_data = padCropImg(img)
+        input_data = input_data.astype(np.float32) / 255.0
+
+        ynum = input_data.shape[0]
+        xnum = input_data.shape[1]
+
+        preds_ailia = np.zeros(
+            (ynum, xnum, PATCH_RES, PATCH_RES, 3), dtype=np.float32
+        )
+
+        # inference
+        logger.info('Start inference...')
+        if args.benchmark:
+            logger.info('BENCHMARK mode')
+            for c in range(5):
+                start = int(round(time.time() * 1000))
+
+                for j in range(ynum):
+                    for i in range(xnum):
+                        patchImg = input_data[j, i]
+                        patchImg = (patchImg - 0.5) / 0.5
+                        patchImg = patchImg.transpose((2, 0, 1))
+                        patchImg = patchImg[np.newaxis, :, :, :]
+                        out = net.predict(patchImg)
+                        out = out.transpose((0, 2, 3, 1))[0]
+                        out = (np.clip(out, 0, 1) * 255).astype(np.uint8)
+                        preds_ailia[j, i] = out
+
+                end = int(round(time.time() * 1000))
+                logger.info(f'\tailia processing time {end - start} ms')
+        else:
             start = int(round(time.time() * 1000))
 
             for j in range(ynum):
@@ -77,33 +100,18 @@ def recognize_from_image():
                     preds_ailia[j, i] = out
 
             end = int(round(time.time() * 1000))
-            print(f'\tailia processing time {end - start} ms')
-    else:
-        start = int(round(time.time() * 1000))
 
-        for j in range(ynum):
-            for i in range(xnum):
-                patchImg = input_data[j, i]
-                patchImg = (patchImg - 0.5) / 0.5
-                patchImg = patchImg.transpose((2, 0, 1))
-                patchImg = patchImg[np.newaxis, :, :, :]
-                out = net.predict(patchImg)
-                out = out.transpose((0, 2, 3, 1))[0]
-                out = (np.clip(out, 0, 1) * 255).astype(np.uint8)
-                preds_ailia[j, i] = out
-
-        end = int(round(time.time() * 1000))
-
-    # postprocessing
-    resImg = composePatch(preds_ailia)
-    resImg = postProcess(resImg)
-    resImg.save(args.savepath)
-    print('Script finished successfully.')
+        # postprocessing
+        resImg = composePatch(preds_ailia)
+        resImg = postProcess(resImg)
+        savepath = get_savepath(args.savepath, image_path)
+        logger.info(f'saved at : {savepath}')
+        resImg.save(savepath)
+    logger.info('Script finished successfully.')
 
 
 def recognize_from_video():
-    # [WARNING] This is test impl
-    print('[WARNING] This is test implementation')
+    logger.warning('This is test implementation')
     # net initialize
 
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
@@ -169,7 +177,7 @@ def recognize_from_video():
     cv2.destroyAllWindows()
     if writer is not None:
         writer.release()
-    print('Script finished successfully.')
+    logger.info('Script finished successfully.')
 
 
 def main():
