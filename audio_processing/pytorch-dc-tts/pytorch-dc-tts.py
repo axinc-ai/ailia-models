@@ -5,7 +5,6 @@ import argparse
 import numpy as np
 
 import ailia  # noqa: E402
-from pytorch_dc_tts_utils import get_test_data, save_to_wav
 
 # import original modules
 sys.path.append('../../util')
@@ -44,7 +43,16 @@ parser.add_argument(
     '--input', '-i', metavar='TEXT', default=SENTENCE,
     help='input text'
 )
+parser.add_argument(
+    '--ailia_audio', action='store_true',
+    help='use ailia audio library'
+)
 args = update_parser(parser, check_input_type=False)
+
+if args.ailia_audio:
+    from pytorch_dc_tts_utils_ailia import get_test_data, save_to_wav
+else:
+    from pytorch_dc_tts_utils import get_test_data, save_to_wav
 
 # ======================
 # Main function

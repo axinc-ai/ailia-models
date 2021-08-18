@@ -58,6 +58,7 @@ cd ../../image_captioning/image_captioning_pytorch; python3 image_captioning_pyt
 cd ../../image_classification/efficientnet; python3 efficientnet.py ${OPTION}
 cd ../../image_classification/googlenet; python3 googlenet.py ${OPTION}
 cd ../../image_classification/inceptionv3; python3 inceptionv3.py ${OPTION}
+cd ../../image_classification/inceptionv4; python3 inceptionv4.py ${OPTION}
 cd ../../image_classification/mobilenetv2; python3 mobilenetv2.py ${OPTION}
 cd ../../image_classification/mobilenetv3; python3 mobilenetv3.py ${OPTION}
 cd ../../image_classification/partialconv; python3 partialconv.py ${OPTION}
@@ -95,6 +96,7 @@ cd ../../image_segmentation/dense_prediction_transformers; python3 dense_predict
 cd ../../image_segmentation/u2net-portrait-matting; python3 u2net-portrait-matting.py ${OPTION}
 cd ../../image_segmentation/u2net-human-seg; python3 u2net-human-seg.py ${OPTION}
 cd ../../image_segmentation/indexnet; python3 indexnet.py ${OPTION}
+cd ../../image_segmentation/modnet; python3 modnet.py ${OPTION}
 cd ../../neural_language_processing/bert; python3 bert.py ${OPTION}
 cd ../../neural_language_processing/bert_tweets_sentiment; python3 bert_tweets_sentiment.py ${OPTION}
 cd ../../neural_language_processing/bert_maskedlm; python3 bert_maskedlm.py ${OPTION}
