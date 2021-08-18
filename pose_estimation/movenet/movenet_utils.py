@@ -101,8 +101,10 @@ def draw_prediction_on_image(image, keypoints_with_scores):
       cv2.line(image, (x1, y1), (x2, y2), color, edge_line_width)
   
   # draw key points
-  for kpt_xy in kpts_absolute_xy:
-    cv2.circle(image, (kpt_xy[0], kpt_xy[1]), circle_line_width, color=(255,21,147), thickness=-1, lineType=cv2.LINE_8, shift=0)
+  for idx in range(0,len(kpts_absolute_xy)):
+    kpt_xy = kpts_absolute_xy[idx]
+    if kpts_scores[idx] > keypoint_threshold:
+      cv2.circle(image, (kpt_xy[0], kpt_xy[1]), circle_line_width, color=(255,21,147), thickness=-1, lineType=cv2.LINE_8, shift=0)
 
   return image
 

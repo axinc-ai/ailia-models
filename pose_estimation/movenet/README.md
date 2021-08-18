@@ -18,7 +18,7 @@ Range : [0, 1.0]
 
 <img src="output.png" width="320px">
 
-- Confidence : (1, 1, 17, 3)
+- 2D Keypoint + Confidence : (1, 1, 17, 3)
 - Range : [0, 1.0]
 
 ## Usage
