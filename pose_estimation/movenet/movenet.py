@@ -22,7 +22,7 @@ logger = getLogger(__name__)
 # Parameters
 # ======================
 
-IMAGE_PATH = 'input.jpg'
+IMAGE_PATH = 'girl-5204299_640.jpg'
 
 SAVE_IMAGE_PATH = 'output.png'
 MODEL_VARIANTS = ['thunder','lightning'] # thunder, lightning

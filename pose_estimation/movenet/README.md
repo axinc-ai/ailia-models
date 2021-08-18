@@ -2,9 +2,9 @@
 
 ## Input
 
-<img src="input.jpg" width="320px">
+<img src='input.jpg' width='320px'>
 
-(Image from https://images.pexels.com/photos/4384679/pexels-photo-4384679.jpeg)
+(Image from https://pixabay.com/ja/photos/%E5%A5%B3%E3%81%AE%E5%AD%90-%E7%BE%8E%E3%81%97%E3%81%84-%E8%8B%A5%E3%81%84-%E3%83%9B%E3%83%AF%E3%82%A4%E3%83%88-5204299/)
 
 Model variant: Thunder  
 Ailia input shape : (1, 256, 256, 3)  
