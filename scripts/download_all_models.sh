@@ -53,6 +53,7 @@ cd ../../hand_detection/hand_detection_pytorch python3 hand_detection_pytorch.py
 cd ../../hand_detection/blazepalm; python3 blazepalm.py ${OPTION}
 cd ../../hand_recognition/blazehand; python3 blazehand.py ${OPTION}
 cd ../../hand_recognition/hand3d; python3 hand3d.py ${OPTION}
+cd ../../hand_recognition/minimal-hand; python3 minimal-hand.py ${OPTION}
 cd ../../image_captioning/illustration2vec; python3 illustration2vec.py ${OPTION}
 cd ../../image_captioning/image_captioning_pytorch; python3 image_captioning_pytorch.py ${OPTION}
 cd ../../image_classification/efficientnet; python3 efficientnet.py ${OPTION}

@@ -42,7 +42,7 @@ $ python3 minimal-hand.py --video VIDEO_PATH
 
 ## Framework
 
-ONNX Runtime
+TensorFlow
 
 ## Model Format
 
