@@ -120,7 +120,7 @@ cd ../../object_detection/pedestrian_detection; python3 pedestrian_detection.py 
 cd ../../object_detection/efficientdet; python3 efficientdet.py ${OPTION}
 cd ../../object_detection/nanodet; python3 nanodet.py ${OPTION}
 cd ../../object_detection/yolor; python3 yolor.py ${OPTION}
-cd ../../object_detection/objectron-3d-object-detection-openvino; python3 objectron-3d-object-detection.py ${OPTION}
+cd ../../object_detection/objectron-3d-object-detection-openvino; python3 objectron-3d-object-detection-openvino.py ${OPTION}
 cd ../../object_tracking/deepsort; python3 deepsort.py ${OPTION}
 cd ../../object_tracking/person_reid_baseline_pytorch; python3 person_reid_baseline_pytorch.py ${OPTION}
 cd ../../object_tracking/roneld; python3 roneld.py ${OPTION}
