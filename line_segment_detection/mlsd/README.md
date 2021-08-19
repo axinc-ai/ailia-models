@@ -4,7 +4,7 @@
 
 ![Input](input.jpg)
 
-(Image from https://www.digsdigs.com/photos/2015/05/a-bold-minimalist-living-room-with-dark-stained-wood-geometric-touches-a-sectional-sofa-and-built-in-lights-for-a-futuristic-feel.jpg)
+(Image from https://pixabay.com/ja/photos/%e6%97%85%e8%a1%8c%e3%81%99%e3%82%8b-%e3%83%9b%e3%83%86%e3%83%ab%e3%81%ae%e9%83%a8%e5%b1%8b-%e3%83%9b%e3%83%86%e3%83%ab-1677347/)
 
 Input shape: (1, 512, 512, 4)
 

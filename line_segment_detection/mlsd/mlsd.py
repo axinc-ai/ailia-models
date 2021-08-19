@@ -59,20 +59,12 @@ def gradio_wrapper_for_LSD(img_input, net):
 def recognize_from_image():
     # net initialize
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
-    net.set_input_shape((1, IMAGE_WIDTH, IMAGE_HEIGHT, 4))
 
     # input image loop
     for image_path in args.input:
         # prepare input data
         logger.info(image_path)
-        input_data = load_image(
-            image_path,
-            (IMAGE_HEIGHT, IMAGE_WIDTH),
-            gen_input_ailia=True,
-        )
-        img_input = input_data[0]
-        img_input = np.transpose(img_input, (1, 2, 0))*255
-        #img_input = np.array(Image.open(image_path))
+        img_input = cv2.imread(image_path)
 
         # inference
         logger.info('Start inference...')
@@ -109,6 +101,8 @@ def recognize_from_video():
     else:
         writer = None
 
+    logger.warning('Inference using CPU because model accuracy is low on GPU.')
+
     while(True):
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
@@ -117,7 +111,6 @@ def recognize_from_video():
         img_input = np.array(frame)
 
         # inference
-        logger.warning('Inference using CPU because model accuracy is low on GPU.')
         preds_img = gradio_wrapper_for_LSD(img_input, net)
         cv2.imshow('frame', preds_img)
 
