@@ -47,8 +47,8 @@ parser.add_argument(
     help='model lists: ' + ' | '.join(MODEL_LISTS)
 )
 parser.add_argument(
-    '-r', '--rescale', metavar='RESCALE',
-    default=1, choices=MODEL_LISTS,
+    '-r', '--rescale', metavar='RESCALE', type=float,
+    default=1,
     help='scale down the original image size to prevent memory overflow, otherwise original size is used'
 )
 args = update_parser(parser)

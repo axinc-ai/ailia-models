@@ -110,7 +110,7 @@ def recognize_from_image(net):
         # we only use `d1` (the first output, check the original repository)
         pred = preds_ailia[0][0, 0, :, :]
 
-        savepath = get_savepath(args.savepath, image_path)
+        savepath = get_savepath(args.savepath, image_path, ext='.png')
         logger.info(f'saved at : {savepath}')
         save_result(pred, savepath, [h, w])
 

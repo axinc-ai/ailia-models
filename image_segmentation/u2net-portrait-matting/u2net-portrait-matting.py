@@ -135,7 +135,7 @@ def recognize_from_image(net):
             image[:, :, 3] = cv2.resize(pred, (w, h)) * 255
             res_img = image
 
-        savepath = get_savepath(args.savepath, image_path)
+        savepath = get_savepath(args.savepath, image_path, ext='.png')
         logger.info(f'saved at : {savepath}')
         cv2.imwrite(savepath, res_img)
 
