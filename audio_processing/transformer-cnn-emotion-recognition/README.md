@@ -1,4 +1,4 @@
-# Parallel is All You Want
+# transformer-cnn-emotion-recognition
 
 ## Input
 
@@ -36,12 +36,12 @@ pip3 install librosa
 ## Usage
 
 ```bash
-$ python3 parallel_is_all_you_want.py -i input.wav
+$ python3 transformer-cnn-emotion-recognition.py -i input.wav
 ```
 
 ## Reference
 
-[Parallel is All You Want](https://github.com/IliaZenkov/transformer-cnn-emotion-recognition)
+[Combining Spatial and Temporal Feature Representions of Speech Emotion by Parallelizing CNNs and Transformer-Encoders](https://github.com/IliaZenkov/transformer-cnn-emotion-recognition)
 
 ## Framework
 
