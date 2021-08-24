@@ -300,7 +300,7 @@ def recognize_from_image(det_net, reg_net, labels):
             total_time_estimation = 0
             for i in range(args.benchmark_count):
                 start = int(round(time.time() * 1000))
-                reg_detections, boxes = predict(det_net, reg_net, img, labels)
+                reg_detections, det_detections = predict(det_net, reg_net, img, labels)
                 end = int(round(time.time() * 1000))
                 estimation_time = (end - start)
 
