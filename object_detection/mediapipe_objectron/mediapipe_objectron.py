@@ -25,15 +25,21 @@ logger = getLogger(__name__)
 
 WEIGHT_DETECTION_PATH = 'object_detection_ssd_mobilenetv2_oidv4_fp16.onnx'
 MODEL_DETECTION_PATH = 'object_detection_ssd_mobilenetv2_oidv4_fp16.onnx.prototxt'
-WEIGHT_REGRESSION_PATH = 'object_detection_3d_sneakers.onnx'
-MODEL_REGRESSION_PATH = 'object_detection_3d_sneakers.onnx.prototxt'
+WEIGHT_SNEAKER_PATH = 'object_detection_3d_sneakers.onnx'
+MODEL_SNEAKER_PATH = 'object_detection_3d_sneakers.onnx.prototxt'
+WEIGHT_CHAIR_PATH = 'object_detection_3d_chair.onnx'
+MODEL_CHAIR_PATH = 'object_detection_3d_chair.onnx.prototxt'
+WEIGHT_CUP_PATH = 'object_detection_3d_cup.onnx'
+MODEL_CUP_PATH = 'object_detection_3d_cup.onnx.prototxt'
+WEIGHT_CAMERA_PATH = 'object_detection_3d_camera.onnx'
+MODEL_CAMERA_PATH = 'object_detection_3d_camera.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/mediapipe_objectron/'
 
 IMAGE_PATH = 'demo.jpg'
 SAVE_IMAGE_PATH = 'output.png'
 IMAGE_DETECTION_SIZE = 300
 IMAGE_REGRESSION_SIZE = 224
-THRESHOLD = 0.7
+THRESHOLD = 0.5
 
 OBJECTRON_CLASSES = (
     '???',
@@ -51,6 +57,10 @@ parser = get_base_parser(
     'mediapipe objectron',
     IMAGE_PATH,
     SAVE_IMAGE_PATH,
+)
+parser.add_argument(
+    '-m', '--model', default='sneaker', choices=('sneaker', 'chair', 'cup', 'camera'),
+    help='model type'
 )
 parser.add_argument(
     '-th', '--threshold',
@@ -189,27 +199,25 @@ def draw_detections(img, reg_detections, det_detections, ids=None, rgb=True):
         left, top, right, bottom = det_out
         kp = reg_out[0]
         label = reg_out[1]
-        label = OBJECTRON_CLASSES[label]
 
-        if _id != 'ID -1':
-            cv2.rectangle(img, (left, top), (right, bottom), (0, 255, 0), thickness=2)
-        else:
-            cv2.rectangle(img, (left, top), (right, bottom), (100, 100, 100), thickness=2)
+        # if _id != 'ID -1':
+        #     cv2.rectangle(img, (left, top), (right, bottom), (0, 255, 0), thickness=2)
+        # else:
+        #     cv2.rectangle(img, (left, top), (right, bottom), (100, 100, 100), thickness=2)
 
         if kp is not None and _id != 'ID -1':
             img = draw_kp(img, kp, normalized=False)
 
-        if 1:
-            label_size, base_line = cv2.getTextSize(
-                label, cv2.FONT_HERSHEY_SIMPLEX, 1, 1)
-            top = max(top, label_size[1])
-            cv2.rectangle(
-                img,
-                (left, top - label_size[1]), (left + label_size[0], top + base_line),
-                (255, 255, 255), cv2.FILLED)
-            cv2.putText(
-                img, label, (left, top),
-                cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0))
+        # label_size, base_line = cv2.getTextSize(
+        #     label, cv2.FONT_HERSHEY_SIMPLEX, 1, 1)
+        # top = max(top, label_size[1])
+        # cv2.rectangle(
+        #     img,
+        #     (left, top - label_size[1]), (left + label_size[0], top + base_line),
+        #     (255, 255, 255), cv2.FILLED)
+        # cv2.putText(
+        #     img, label, (left, top),
+        #     cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0))
 
     return img
 
@@ -219,7 +227,7 @@ def draw_detections(img, reg_detections, det_detections, ids=None, rgb=True):
 # ======================
 
 
-def predict(det_net, reg_net, img):
+def predict(det_net, reg_net, img, labels=None):
     img_0 = img
     im_h, im_w = img.shape[:2]
 
@@ -241,8 +249,13 @@ def predict(det_net, reg_net, img):
         b_x = (cx - w / 2) * im_w
         b_y = (cy - h / 2) * im_h
         b_w, b_h = w * im_w, h * im_h
+
         if score < threshold:
             break
+
+        label = OBJECTRON_CLASSES[cls]
+        if labels and label not in labels:
+            continue
 
         img, x, y, w, h = pad_scale(
             img_0,
@@ -255,14 +268,10 @@ def predict(det_net, reg_net, img):
         output = reg_net.predict([img])
 
         kp, prob = output
-        label = cls
         kp = kp[0].reshape(9, 2)
 
         kp[:, 0] = kp[:, 0] * w / IMAGE_REGRESSION_SIZE + x
         kp[:, 1] = kp[:, 1] * h / IMAGE_REGRESSION_SIZE + y
-
-        # output_points_3d = epnp(kp)
-        # box_fix(output_points_3d)
 
         reg_detections.append((kp, label))
         det_detections.append((b_x, b_y, b_x + b_w, b_y + b_h))
@@ -275,7 +284,7 @@ def predict(det_net, reg_net, img):
     return reg_detections, det_detections
 
 
-def recognize_from_image(det_net, reg_net):
+def recognize_from_image(det_net, reg_net, labels):
     # input image loop
     for image_path in args.input:
         # prepare input data
@@ -291,7 +300,7 @@ def recognize_from_image(det_net, reg_net):
             total_time_estimation = 0
             for i in range(args.benchmark_count):
                 start = int(round(time.time() * 1000))
-                reg_detections, boxes = predict(det_net, reg_net, img)
+                reg_detections, boxes = predict(det_net, reg_net, img, labels)
                 end = int(round(time.time() * 1000))
                 estimation_time = (end - start)
 
@@ -303,7 +312,7 @@ def recognize_from_image(det_net, reg_net):
             logger.info(f'\taverage time estimation {total_time_estimation / (args.benchmark_count - 1)} ms')
         else:
             # inference
-            reg_detections, det_detections = predict(det_net, reg_net, img)
+            reg_detections, det_detections = predict(det_net, reg_net, img, labels)
 
         # save results
         res_img = draw_detections(img, reg_detections, det_detections)
@@ -314,7 +323,7 @@ def recognize_from_image(det_net, reg_net):
     logger.info('Script finished successfully.')
 
 
-def recognize_from_video(det_net, reg_net):
+def recognize_from_video(det_net, reg_net, labels):
     capture = webcamera_utils.get_capture(args.video)
 
     # create video writer if savepath is specified as video format
@@ -332,7 +341,7 @@ def recognize_from_video(det_net, reg_net):
 
         # inference
         img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        reg_detections, det_detections = predict(det_net, reg_net, img)
+        reg_detections, det_detections = predict(det_net, reg_net, img, labels)
 
         frame = draw_detections(frame, reg_detections, det_detections, rgb=False)
         cv2.imshow('frame', frame)
@@ -350,10 +359,18 @@ def recognize_from_video(det_net, reg_net):
 
 
 def main():
+    dic_model = {
+        'sneaker': (WEIGHT_SNEAKER_PATH, MODEL_SNEAKER_PATH, ('Footwear',)),
+        'chair': (WEIGHT_CHAIR_PATH, MODEL_CHAIR_PATH, ('Chair',)),
+        'cup': (WEIGHT_CUP_PATH, MODEL_CUP_PATH, ('Coffee cup', 'Mug')),
+        'camera': (WEIGHT_CAMERA_PATH, MODEL_CAMERA_PATH, ('Camera',)),
+    }
+    weight_path, model_path, labels = dic_model[args.model]
+
     logger.info("=== detection model ===")
     check_and_download_models(WEIGHT_DETECTION_PATH, MODEL_DETECTION_PATH, REMOTE_PATH)
     logger.info("=== regression model ===")
-    check_and_download_models(WEIGHT_REGRESSION_PATH, MODEL_REGRESSION_PATH, REMOTE_PATH)
+    check_and_download_models(weight_path, model_path, REMOTE_PATH)
 
     # load model
     env_id = ailia.get_gpu_environment_id()
@@ -361,14 +378,14 @@ def main():
 
     # initialize
     det_net = ailia.Net(MODEL_DETECTION_PATH, WEIGHT_DETECTION_PATH, env_id=env_id)
-    reg_net = ailia.Net(MODEL_REGRESSION_PATH, WEIGHT_REGRESSION_PATH, env_id=env_id)
+    reg_net = ailia.Net(model_path, weight_path, env_id=env_id)
 
     if args.video is not None:
         # video mode
-        recognize_from_video(det_net, reg_net)
+        recognize_from_video(det_net, reg_net, labels)
     else:
         # image mode
-        recognize_from_image(det_net, reg_net)
+        recognize_from_image(det_net, reg_net, labels)
 
 
 if __name__ == '__main__':
