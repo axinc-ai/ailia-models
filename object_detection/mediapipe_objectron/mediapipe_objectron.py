@@ -54,7 +54,7 @@ OBJECTRON_CLASSES = (
 # ======================
 
 parser = get_base_parser(
-    'mediapipe objectron',
+    'MediaPipe Objectron',
     IMAGE_PATH,
     SAVE_IMAGE_PATH,
 )
