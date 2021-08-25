@@ -230,6 +230,7 @@ The collection of pre-trained, state-of-the-art AI models.
 | [<img src="object_detection/nanodet/output.jpg" width=128px>](object_detection/nanodet/) | [nanodet](/object_detection/nanodet/) | [NanoDet](https://github.com/RangiLyu/nanodet) | Pytorch | 1.2.6 and later |
 | [<img src="object_detection/yolor/output.jpg" width=128px>](object_detection/yolor/) | [yolor](/object_detection/yolor/) | [yolor](https://github.com/WongKinYiu/yolor/tree/paper) | Pytorch | 1.2.5 and later |
 | [<img src="object_detection/3d-object-detection.pytorch/output.png" width=128px>](object_detection/3d-object-detection.pytorch/) | [3d-object-detection.pytorch](/object_detection/3d-object-detection.pytorch/) | [3d-object-detection.pytorch](https://github.com/sovrasov/3d-object-detection.pytorch) | Pytorch | 1.2.8 and later |
+| [<img src="object_detection/mediapipe_objectron/output.png" width=128px>](object_detection/mediapipe_objectron/) | [mediapipe_objectron](/object_detection/mediapipe_objectron/) | [MediaPipe Objectron](https://github.com/google/mediapipe) | TensorFlow Lite | 1.2.5 and later |
 
 ## Object tracking
 
