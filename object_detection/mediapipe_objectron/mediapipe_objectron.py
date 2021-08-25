@@ -69,7 +69,7 @@ parser.add_argument(
 )
 parser.add_argument(
     '-n', '--num_detect',
-    default=1, type=int,
+    default=-1, type=int,
     help='The number of objects to detect.'
 )
 args = update_parser(parser)
@@ -276,7 +276,7 @@ def predict(det_net, reg_net, img, labels=None):
         reg_detections.append((kp, label))
         det_detections.append((b_x, b_y, b_x + b_w, b_y + b_h))
 
-        if num_det <= len(reg_detections):
+        if num_det != -1 and num_det <= len(reg_detections):
             break
 
     det_detections = np.array(det_detections, dtype=np.int32)
