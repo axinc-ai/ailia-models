@@ -19,6 +19,7 @@ cd ../../deep_fashion/fashionai-key-points-detection; python3 fashionai-key-poin
 cd ../../deep_fashion/fashionai-key-points-detection; python3 fashionai-key-points-detection.py -c skirt ${OPTION}
 cd ../../deep_fashion/fashionai-key-points-detection; python3 fashionai-key-points-detection.py -c trousers ${OPTION}
 cd ../../deep_fashion/mmfashion; python3 mmfashion.py ${OPTION}
+cd ../../deep_fashion/mmfashion_tryon; python3 mmfashion_tryon.py ${OPTION}
 cd ../../depth_estimation/midas; python3 midas.py ${OPTION}
 cd ../../depth_estimation/monodepth2; python3 monodepth2.py ${OPTION}
 cd ../../depth_estimation/fcrn-depthprediction; python3 fcrn-depthprediction.py ${OPTION}
@@ -54,6 +55,7 @@ cd ../../hand_detection/hand_detection_pytorch python3 hand_detection_pytorch.py
 cd ../../hand_detection/blazepalm; python3 blazepalm.py ${OPTION}
 cd ../../hand_recognition/blazehand; python3 blazehand.py ${OPTION}
 cd ../../hand_recognition/hand3d; python3 hand3d.py ${OPTION}
+cd ../../hand_recognition/minimal-hand; python3 minimal-hand.py ${OPTION}
 cd ../../image_captioning/illustration2vec; python3 illustration2vec.py ${OPTION}
 cd ../../image_captioning/image_captioning_pytorch; python3 image_captioning_pytorch.py ${OPTION}
 cd ../../image_classification/efficientnet; python3 efficientnet.py ${OPTION}
@@ -88,6 +90,7 @@ cd ../../image_segmentation/u2net; python3 u2net.py ${OPTION}
 cd ../../image_segmentation/u2net; python3 u2net.py -a small ${OPTION}
 cd ../../image_segmentation/human_part_segmentation; python3 human_part_segmentation.py ${OPTION}
 cd ../../image_segmentation/pytorch-unet; python3 pytorch-unet.py ${OPTION}
+cd ../../image_segmentation/pytorch-enet; python3 pytorch-unet.py ${OPTION}
 cd ../../image_segmentation/semantic-segmentation-mobilenet-v3; python3 semantic-segmentation-mobilenet-v3.py ${OPTION}
 cd ../../image_segmentation/yet-another-anime-segmenter; python3 yet-another-anime-segmenter.py ${OPTION}
 cd ../../image_segmentation/swiftnet; python3 swiftnet.py ${OPTION}
@@ -97,6 +100,7 @@ cd ../../image_segmentation/u2net-portrait-matting; python3 u2net-portrait-matti
 cd ../../image_segmentation/u2net-human-seg; python3 u2net-human-seg.py ${OPTION}
 cd ../../image_segmentation/indexnet; python3 indexnet.py ${OPTION}
 cd ../../image_segmentation/modnet; python3 modnet.py ${OPTION}
+cd ../../line_segment_detection/mlsd; python3 mlsd.py ${OPTION}
 cd ../../neural_language_processing/bert; python3 bert.py ${OPTION}
 cd ../../neural_language_processing/bert_tweets_sentiment; python3 bert_tweets_sentiment.py ${OPTION}
 cd ../../neural_language_processing/bert_maskedlm; python3 bert_maskedlm.py ${OPTION}
@@ -121,6 +125,7 @@ cd ../../object_detection/pedestrian_detection; python3 pedestrian_detection.py 
 cd ../../object_detection/efficientdet; python3 efficientdet.py ${OPTION}
 cd ../../object_detection/nanodet; python3 nanodet.py ${OPTION}
 cd ../../object_detection/yolor; python3 yolor.py ${OPTION}
+cd ../../object_detection/3d-object-detection.pytorch; python3 3d-object-detection.pytorch.py ${OPTION}
 cd ../../object_detection/mediapipe_objectron; python3 mediapipe_objectron.py ${OPTION}
 cd ../../object_tracking/deepsort; python3 deepsort.py ${OPTION}
 cd ../../object_tracking/person_reid_baseline_pytorch; python3 person_reid_baseline_pytorch.py ${OPTION}
@@ -138,6 +143,7 @@ cd ../../pose_estimation/efficientpose; python3 efficientpose.py ${OPTION}
 cd ../../pose_estimation/pose-hg-3d; python3 pose-hg-3d.py ${OPTION}
 cd ../../pose_estimation/gast; python3 gast.py ${OPTION}
 cd ../../pose_estimation/animalpose; python3 animalpose.py -d ${OPTION}
+cd ../../pose_estimation/movenet; python3 movenet.py -d ${OPTION}
 cd ../../rotation_prediction/rotnet; python3 rotnet.py ${OPTION}
 cd ../../style_transfer/adain; python3 adain.py ${OPTION}
 cd ../../style_transfer/beauty_gan; python3 beauty_gan.py ${OPTION}
