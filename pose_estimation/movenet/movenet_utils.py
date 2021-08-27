@@ -83,6 +83,9 @@ def draw_prediction_on_image(image, keypoints_with_scores):
   else:
     edge_line_width = 15
     circle_line_width = 20
+  
+  edge_line_width = edge_line_width//2
+  circle_line_width = circle_line_width//2
 
   # calculate absolute xy
   for idx in range(num_instances):

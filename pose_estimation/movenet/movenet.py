@@ -113,6 +113,14 @@ def recognize_from_video():
     capture = webcamera_utils.get_capture(args.video)
     first_frame_flag = False # to calculate crop region of first frame
 
+    # create video writer if savepath is specified as video format
+    if args.savepath != SAVE_IMAGE_PATH:
+        f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
+        writer = webcamera_utils.get_writer(args.savepath, f_h, f_w)
+    else:
+        writer = None
+
     while(True):
 
         ret, frame = capture.read()
@@ -147,8 +155,15 @@ def recognize_from_video():
     
         cv2.imshow('result', result_image)
 
+        # save results
+        if writer is not None:
+            writer.write(frame)
+
     capture.release()
     cv2.destroyAllWindows()
+    if writer is not None:
+        writer.release()
+
     logger.info('Script finished successfully.')
 
 def main():
