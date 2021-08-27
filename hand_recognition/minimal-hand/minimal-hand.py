@@ -105,8 +105,9 @@ def preprocess(img, img_size):
         margin = int((img.shape[0] - img.shape[1]) / 2)
         img = img[margin:-margin]
     else:
-        margin = int((img.shape[1] - img.shape[0]) / 2)
-        img = img[:, margin:-margin]
+        if img.shape[0] < img.shape[1]:
+            margin = int((img.shape[1] - img.shape[0]) / 2)
+            img = img[:, margin:-margin]
 
     if args.flip:
         img = np.flip(img, axis=1).copy()

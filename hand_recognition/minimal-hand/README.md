@@ -4,7 +4,7 @@
 
 ![Input](demo.jpg)
 
-(Image from http://zatugaku1128.com/wp-content/uploads/2016/06/%E5%B7%A6%E6%89%8B-300x297.jpg)
+(Image from https://github.com/CalciferZh/minimal-hand/blob/master/teaser.gif)
 
 ## Output
 
