@@ -22,6 +22,12 @@ Because ailia does not support InvDN model, you must add `--onnx` option when yo
 $ python3 invertible_denoising_network.py --onnx
 ```
 
+If you want to specify input image, run as below.
+
+``` bash
+$ python3 invertible_denoising_network.py -i input_images/1_00.PNG --onnx
+```
+
 ## Reference
 
 [Invertible Image Denoising](https://github.com/Yang-Liu1082/InvDN)

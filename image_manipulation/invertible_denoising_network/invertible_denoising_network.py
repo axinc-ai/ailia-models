@@ -108,7 +108,11 @@ def main():
     # model files check and download
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
 
-    inputs = glob.glob("./input_images/*.PNG")
+    if args.input:
+        inputs = glob.glob(args.input[0])
+    else:
+        inputs = glob.glob("./input_images/*.PNG")
+
     for input in tqdm(inputs):
         basename = os.path.basename(input)
 
