@@ -33,6 +33,13 @@ If you want to specify the input image, put the image path after the `--input` o
 $ python3 age-gender-recognition.py --input IMAGE_PATH
 ```
 
+By adding the `--video` option, you can input the video.   
+If you pass `0` as an argument to VIDEO_PATH, you can use the webcam input instead of the video file.  
+You can use --savepath option to specify the output file to save.
+```bash
+$ python3 age-gender-recognition.py --video VIDEO_PATH --savepath SAVE_VIDEO_PATH
+```
+
 ## Reference
 
 - [OpenVINO - Open Model Zoo repository - age-gender-recognition-retail-0013](https://github.com/openvinotoolkit/open_model_zoo/tree/master/models/intel/age-gender-recognition-retail-0013)

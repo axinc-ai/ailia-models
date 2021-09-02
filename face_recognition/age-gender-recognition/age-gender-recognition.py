@@ -33,7 +33,6 @@ FACE_REMOTE_PATH = "https://storage.googleapis.com/ailia-models/blazeface/"
 FACE_MARGIN = 1.0
 
 IMAGE_PATH = 'demo.jpg'
-SAVE_IMAGE_PATH = 'output.png'
 IMAGE_SIZE = 62
 
 # ======================
@@ -41,7 +40,7 @@ IMAGE_SIZE = 62
 # ======================
 
 parser = get_base_parser(
-    'age-gender-recognition', IMAGE_PATH, SAVE_IMAGE_PATH,
+    'age-gender-recognition', IMAGE_PATH, None,
 )
 args = update_parser(parser)
 
@@ -98,7 +97,7 @@ def recognize_from_video(net, detector):
     capture = webcamera_utils.get_capture(args.video)
 
     # create video writer if savepath is specified as video format
-    if args.savepath != SAVE_IMAGE_PATH:
+    if args.savepath is not None:
         f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
         f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
         writer = webcamera_utils.get_writer(args.savepath, f_h, f_w)
