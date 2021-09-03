@@ -270,7 +270,7 @@ def compute_blazeface_with_keypoint(detector, frame, anchor_path='anchors.npy', 
     face_detections = face_detections[0]
 
     detections = []
-    keypoints = []
+    detections_eyes = []
     for i, d in enumerate(face_detections):
         # face position
         obj = ailia.DetectorObject(
@@ -282,15 +282,37 @@ def compute_blazeface_with_keypoint(detector, frame, anchor_path='anchors.npy', 
             h=d[2] - d[0])
         detections.append(obj)
 
-        # keypoint potision
-        keypoint = {
-            "eye_left_x": d[4], "eye_left_y": d[5],
-            "eye_right_x": d[6], "eye_right_y": d[7]
-        }
-        keypoints.append(keypoint)
+        # keypoints
+        obj = ailia.DetectorObject(
+            category=0,
+            prob=1.0,
+            x=d[4],
+            y=d[5],
+            w=0,
+            h=0)
+        detections_eyes.append(obj)
+
+        obj = ailia.DetectorObject(
+            category=0,
+            prob=1.0,
+            x=d[6],
+            y=d[7],
+            w=0,
+            h=0)
+        detections_eyes.append(obj)
 
     # revert square from detections
     detections = reverse_letterbox(detections, frame, (BLAZEFACE_INPUT_IMAGE_HEIGHT,BLAZEFACE_INPUT_IMAGE_WIDTH))
+    detections_eyes = reverse_letterbox(detections_eyes, frame, (BLAZEFACE_INPUT_IMAGE_HEIGHT,BLAZEFACE_INPUT_IMAGE_WIDTH))
+
+    # convert to keypoints
+    keypoints = []
+    for i in range(len(detections_eyes)//2):
+        keypoint = {
+            "eye_left_x": detections_eyes[i*2+0].x, "eye_left_y": detections_eyes[i*2+0].y,
+            "eye_right_x": detections_eyes[i*2+1].x, "eye_right_y": detections_eyes[i*2+1].y
+        }
+        keypoints.append(keypoint)
 
     return detections, keypoints
 
