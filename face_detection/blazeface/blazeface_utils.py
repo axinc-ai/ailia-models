@@ -258,29 +258,26 @@ def compute_blazeface_with_keypoint(detector, frame, anchor_path='anchors.npy'):
     preds_ailia = detector.predict([input_data])
 
     # postprocessing
+    face_detections = postprocess(preds_ailia, anchor_path)
+    face_detections = face_detections[0]
+
     detections = []
     keypoints = []
-    blaze_face_detections = postprocess(preds_ailia, anchor_path)
-    for idx in range(len(blaze_face_detections)):
-        obj = blaze_face_detections[idx]
-        if len(obj)==0:
-            continue
-        d = obj[0]
-
+    for i, d in enumerate(face_detections):
         # face position
         obj = ailia.DetectorObject(
-            category = 0,
-            prob = 1.0,
-            x = d[1],
-            y = d[0],
-            w = d[3]-d[1],
-            h = d[2]-d[0] )
+            category=0,
+            prob=1.0,
+            x=d[1],
+            y=d[0],
+            w=d[3] - d[1],
+            h=d[2] - d[0])
         detections.append(obj)
 
         # keypoint potision
         keypoint = {
-            "eye_left_x":blaze_face_detections[idx][0][4],"eye_left_y":blaze_face_detections[idx][0][5],
-            "eye_right_x":blaze_face_detections[idx][0][6],"eye_right_y":blaze_face_detections[idx][0][7]
+            "eye_left_x": d[4], "eye_left_y": d[5],
+            "eye_right_x": d[6], "eye_right_y": d[7]
         }
         keypoints.append(keypoint)
 
