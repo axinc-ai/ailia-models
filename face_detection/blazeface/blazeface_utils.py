@@ -9,6 +9,9 @@ sys.path.append('../../util')
 from detector_utils import letterbox_convert, reverse_letterbox  # noqa: E402
 
 
+DEFAULT_MIN_SCORE_THRESH = 0.75
+
+
 def sigmoid(x):
     return 1.0 / (1.0 + np.exp(-x))
 
@@ -213,13 +216,12 @@ def weighted_non_max_suppression(detections):
     return output_detections    
 
 
-def postprocess(preds_ailia, anchor_path='anchors.npy', back=False):
+def postprocess(preds_ailia, anchor_path='anchors.npy', back=False, min_score_thresh = DEFAULT_MIN_SCORE_THRESH):
     raw_box = preds_ailia[0]  # (1, 896, 16)
     raw_score = preds_ailia[1]  # (1, 896, 1)
 
     anchors = np.load(anchor_path).astype(np.float32)
     score_thresh = 100.0
-    min_score_thresh = 0.75
     
     detection_boxes = decode_boxes(raw_box, back, anchors)  # (1, 896, 16)
     raw_score = np.clip(raw_score, -score_thresh, score_thresh)  # (1, 896, 1)
@@ -247,7 +249,7 @@ def postprocess(preds_ailia, anchor_path='anchors.npy', back=False):
     return filtered_detections
 
 
-def compute_blazeface_with_keypoint(detector, frame, anchor_path='anchors.npy', back=False):
+def compute_blazeface_with_keypoint(detector, frame, anchor_path='anchors.npy', back=False, min_score_thresh = DEFAULT_MIN_SCORE_THRESH):
     if back:
         BLAZEFACE_INPUT_IMAGE_HEIGHT = 256
         BLAZEFACE_INPUT_IMAGE_WIDTH = 256
@@ -266,7 +268,7 @@ def compute_blazeface_with_keypoint(detector, frame, anchor_path='anchors.npy', 
     preds_ailia = detector.predict([input_data])
 
     # postprocessing
-    face_detections = postprocess(preds_ailia, anchor_path, back=back)
+    face_detections = postprocess(preds_ailia, anchor_path, back=back, min_score_thresh=min_score_thresh)
     face_detections = face_detections[0]
 
     detections = []
@@ -317,8 +319,8 @@ def compute_blazeface_with_keypoint(detector, frame, anchor_path='anchors.npy', 
     return detections, keypoints
 
 
-def compute_blazeface(detector, frame, anchor_path='anchors.npy', back=False):
-    detections, keypoints = compute_blazeface_with_keypoint(detector, frame, anchor_path, back)
+def compute_blazeface(detector, frame, anchor_path='anchors.npy', back=False, min_score_thresh = DEFAULT_MIN_SCORE_THRESH):
+    detections, keypoints = compute_blazeface_with_keypoint(detector, frame, anchor_path, back=back, min_score_thresh=min_score_thresh)
     return detections
 
 

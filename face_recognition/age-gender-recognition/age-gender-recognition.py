@@ -34,6 +34,7 @@ FACE_REMOTE_PATH = "https://storage.googleapis.com/ailia-models/blazeface/"
 FACE_MARGIN = 1.0
 FACE_IMAGE_HEIGHT = 256
 FACE_IMAGE_WIDTH = 256
+FACE_MIN_SCORE_THRESH = 0.5
 
 IMAGE_PATH = 'demo.jpg'
 IMAGE_SIZE = 62
@@ -117,7 +118,8 @@ def recognize_from_frame(net, detector, frame):
         detector,
         frame,
         anchor_path='../../face_detection/blazeface/anchorsback.npy',
-        back=True
+        back=True,
+        min_score_thresh=FACE_MIN_SCORE_THRESH
     )
 
     for obj in detections:
