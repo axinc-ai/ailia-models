@@ -243,9 +243,13 @@ def postprocess(preds_ailia, anchor_path='anchors.npy', back=False):
     return filtered_detections
 
 
-def compute_blazeface_with_keypoint(detector, frame, anchor_path='anchors.npy'):
-    BLAZEFACE_INPUT_IMAGE_HEIGHT = 128
-    BLAZEFACE_INPUT_IMAGE_WIDTH = 128
+def compute_blazeface_with_keypoint(detector, frame, anchor_path='anchors.npy', back=False):
+    if back:
+        BLAZEFACE_INPUT_IMAGE_HEIGHT = 256
+        BLAZEFACE_INPUT_IMAGE_WIDTH = 256
+    else:
+        BLAZEFACE_INPUT_IMAGE_HEIGHT = 128
+        BLAZEFACE_INPUT_IMAGE_WIDTH = 128
 
     # preprocessing
     img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
@@ -258,7 +262,7 @@ def compute_blazeface_with_keypoint(detector, frame, anchor_path='anchors.npy'):
     preds_ailia = detector.predict([input_data])
 
     # postprocessing
-    face_detections = postprocess(preds_ailia, anchor_path)
+    face_detections = postprocess(preds_ailia, anchor_path, back=back)
     face_detections = face_detections[0]
 
     detections = []
@@ -284,8 +288,8 @@ def compute_blazeface_with_keypoint(detector, frame, anchor_path='anchors.npy'):
     return detections, keypoints
 
 
-def compute_blazeface(detector, frame, anchor_path='anchors.npy'):
-    detections, keypoints = compute_blazeface_with_keypoint(detector, frame, anchor_path)
+def compute_blazeface(detector, frame, anchor_path='anchors.npy', back=False):
+    detections, keypoints = compute_blazeface_with_keypoint(detector, frame, anchor_path, back)
     return detections
 
 

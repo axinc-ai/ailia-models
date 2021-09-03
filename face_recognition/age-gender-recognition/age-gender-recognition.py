@@ -29,12 +29,12 @@ WEIGHT_PATH = 'age-gender-recognition-retail-0013.onnx'
 MODEL_PATH = 'age-gender-recognition-retail-0013.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/age-gender-recognition/'
 
-FACE_WEIGHT_PATH = 'blazeface.onnx'
-FACE_MODEL_PATH = 'blazeface.onnx.prototxt'
+FACE_WEIGHT_PATH = 'blazefaceback.onnx'
+FACE_MODEL_PATH = 'blazefaceback.onnx.prototxt'
 FACE_REMOTE_PATH = "https://storage.googleapis.com/ailia-models/blazeface/"
 FACE_MARGIN = 1.0
-FACE_IMAGE_HEIGHT = 128
-FACE_IMAGE_WIDTH = 128
+FACE_IMAGE_HEIGHT = 256
+FACE_IMAGE_WIDTH = 256
 
 IMAGE_PATH = 'demo.jpg'
 IMAGE_SIZE = 62
@@ -120,9 +120,11 @@ def recognize_from_video(net, detector):
         detections = compute_blazeface(
             detector,
             img,
-            anchor_path='../../face_detection/blazeface/anchors.npy',
+            anchor_path='../../face_detection/blazeface/anchorsback.npy',
+            back=True
         )
 
+        # revert square from detections
         detections = reverse_letterbox(detections, frame, (FACE_IMAGE_HEIGHT,FACE_IMAGE_WIDTH))
 
         for obj in detections:
