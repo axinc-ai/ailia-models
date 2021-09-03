@@ -25,24 +25,24 @@ while downloading.
 
 For the sample image,
 ``` bash
-$ python3 age-gender-recognition.py 
+$ python3 age-gender-recognition-retail.py 
 ```
 
 If you want to specify the input image, put the image path after the `--input` option.
 ```bash
-$ python3 age-gender-recognition.py --input IMAGE_PATH
+$ python3 age-gender-recognition-retail.py --input IMAGE_PATH
 ```
 
 If you want to perform face detection in preprocessing, use the `--detection` option.
 ```bash
-$ python3 age-gender-recognition.py --input IMAGE_PATH --detection
+$ python3 age-gender-recognition-retail.py --input IMAGE_PATH --detection
 ```
 
 By adding the `--video` option, you can input the video.   
 If you pass `0` as an argument to VIDEO_PATH, you can use the webcam input instead of the video file.  
 You can use --savepath option to specify the output file to save.
 ```bash
-$ python3 age-gender-recognition.py --video VIDEO_PATH --savepath SAVE_VIDEO_PATH
+$ python3 age-gender-recognition-retail.py --video VIDEO_PATH --savepath SAVE_VIDEO_PATH
 ```
 
 ## Reference
@@ -60,4 +60,4 @@ ONNX opset = 11
 
 ## Netron
 
-[age-gender-recognition-retail-0013.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/age-gender-recognition/age-gender-recognition-retail-0013.onnx.prototxt)
+[age-gender-recognition-retail-0013.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/age-gender-recognition-retail/age-gender-recognition-retail-0013.onnx.prototxt)

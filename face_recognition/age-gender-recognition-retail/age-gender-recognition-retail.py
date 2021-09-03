@@ -26,7 +26,7 @@ logger = getLogger(__name__)
 
 WEIGHT_PATH = 'age-gender-recognition-retail-0013.onnx'
 MODEL_PATH = 'age-gender-recognition-retail-0013.onnx.prototxt'
-REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/age-gender-recognition/'
+REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/age-gender-recognition-retail/'
 
 FACE_WEIGHT_PATH = 'blazefaceback.onnx'
 FACE_MODEL_PATH = 'blazefaceback.onnx.prototxt'
