@@ -11,10 +11,12 @@ from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from image_utils import load_image  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 import webcamera_utils  # noqa: E402
+from detector_utils import letterbox_convert, reverse_letterbox  # noqa: E402
 
 # logger
 from logging import getLogger  # noqa: E402
 
+sys.path.append('../../face_detection/blazeface')
 from blazeface_utils import compute_blazeface, crop_blazeface  # noqa: E402
 
 logger = getLogger(__name__)
@@ -31,6 +33,8 @@ FACE_WEIGHT_PATH = 'blazeface.onnx'
 FACE_MODEL_PATH = 'blazeface.onnx.prototxt'
 FACE_REMOTE_PATH = "https://storage.googleapis.com/ailia-models/blazeface/"
 FACE_MARGIN = 1.0
+FACE_IMAGE_HEIGHT = 128
+FACE_IMAGE_WIDTH = 128
 
 IMAGE_PATH = 'demo.jpg'
 IMAGE_SIZE = 62
@@ -109,12 +113,18 @@ def recognize_from_video(net, detector):
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
 
+        # to square image
+        img = letterbox_convert(frame, (FACE_IMAGE_HEIGHT, FACE_IMAGE_WIDTH))
+
         # detect face
         detections = compute_blazeface(
             detector,
-            frame,
+            img,
             anchor_path='../../face_detection/blazeface/anchors.npy',
         )
+
+        detections = reverse_letterbox(detections, frame, (FACE_IMAGE_HEIGHT,FACE_IMAGE_WIDTH))
+
         for obj in detections:
             # get detected face
             crop_img, top_left, bottom_right = crop_blazeface(
@@ -138,8 +148,11 @@ def recognize_from_video(net, detector):
 
             # display label
             LABEL_WIDTH = bottom_right[1] - top_left[1]
-            LABEL_HEIGHT = 20
-            color = (255, 255, 255)
+            LABEL_HEIGHT = 40
+            if gender=="Male":
+                color = (255, 128, 128)
+            else:
+                color = (128, 128, 255)
             cv2.rectangle(frame, top_left, bottom_right, color, thickness=2)
             cv2.rectangle(
                 frame,
@@ -149,9 +162,9 @@ def recognize_from_video(net, detector):
                 thickness=-1,
             )
 
-            text_position = (top_left[0], top_left[1] + LABEL_HEIGHT // 2)
+            text_position = (top_left[0], top_left[1] + LABEL_HEIGHT * 3 // 4)
             color = (0, 0, 0)
-            fontScale = 0.5
+            fontScale = 1.0
             cv2.putText(
                 frame,
                 "{} {}".format(gender, age),
