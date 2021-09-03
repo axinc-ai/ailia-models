@@ -3,6 +3,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import ailia
+
+import sys
+sys.path.append('../../util')
 from detector_utils import letterbox_convert, reverse_letterbox  # noqa: E402
 
 
