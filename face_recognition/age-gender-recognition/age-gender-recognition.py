@@ -38,12 +38,19 @@ FACE_IMAGE_WIDTH = 256
 IMAGE_PATH = 'demo.jpg'
 IMAGE_SIZE = 62
 
+SAVE_IMAGE_PATH = 'output.png'
+
 # ======================
 # Argument Parser Config
 # ======================
 
 parser = get_base_parser(
-    'age-gender-recognition', IMAGE_PATH, None,
+    'age-gender-recognition', IMAGE_PATH, SAVE_IMAGE_PATH,
+)
+parser.add_argument(
+    '-d', '--detection',
+    action='store_true',
+    help='Use face detection.'
 )
 args = update_parser(parser)
 
@@ -52,12 +59,20 @@ args = update_parser(parser)
 # Main functions
 # ======================
 
-def recognize_from_image(net):
+def recognize_from_image(net, detector):
     # prepare input data
     # input image loop
     for image_path in args.input:
         # prepare input data
         logger.info(image_path)
+
+        if args.detection:
+            frame = cv2.imread(image_path)
+            recognize_from_frame(net, detector, frame)
+            savepath = get_savepath(args.savepath, image_path)
+            logger.info(f'saved at : {savepath}')
+            cv2.imwrite(savepath, frame)
+            continue
 
         img = load_image(
             image_path, (IMAGE_SIZE, IMAGE_SIZE),
@@ -96,6 +111,66 @@ def recognize_from_image(net):
     logger.info('Script finished successfully.')
 
 
+def recognize_from_frame(net, detector, frame):
+    # detect face
+    detections = compute_blazeface(
+        detector,
+        frame,
+        anchor_path='../../face_detection/blazeface/anchorsback.npy',
+        back=True
+    )
+
+    for obj in detections:
+        # get detected face
+        crop_img, top_left, bottom_right = crop_blazeface(
+            obj, FACE_MARGIN, frame
+        )
+        if crop_img.shape[0] <= 0 or crop_img.shape[1] <= 0:
+            continue
+
+        img = cv2.resize(crop_img, (IMAGE_SIZE, IMAGE_SIZE))
+        img = np.expand_dims(img, axis=0)  # 次元合せ
+
+        # inference
+        output = net.predict([img])
+        prob, age_conv3 = output
+        prob = prob[0][0][0]
+        age_conv3 = age_conv3[0][0][0][0]
+
+        i = np.argmax(prob)
+        gender = 'Female' if i == 0 else 'Male'
+        age = round(age_conv3 * 100)
+
+        # display label
+        LABEL_WIDTH = bottom_right[1] - top_left[1]
+        LABEL_HEIGHT = 20
+        if gender=="Male":
+            color = (255, 128, 128)
+        else:
+            color = (128, 128, 255)
+        cv2.rectangle(frame, top_left, bottom_right, color, thickness=2)
+        cv2.rectangle(
+            frame,
+            top_left,
+            (top_left[0] + LABEL_WIDTH, top_left[1] + LABEL_HEIGHT),
+            color,
+            thickness=-1,
+        )
+
+        text_position = (top_left[0], top_left[1] + LABEL_HEIGHT // 2)
+        color = (0, 0, 0)
+        fontScale = 0.5
+        cv2.putText(
+            frame,
+            "{} {}".format(gender, age),
+            text_position,
+            cv2.FONT_HERSHEY_SIMPLEX,
+            fontScale,
+            color,
+            1,
+        )
+
+
 def recognize_from_video(net, detector):
     capture = webcamera_utils.get_capture(args.video)
 
@@ -112,63 +187,7 @@ def recognize_from_video(net, detector):
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
 
-        # detect face
-        detections = compute_blazeface(
-            detector,
-            frame,
-            anchor_path='../../face_detection/blazeface/anchorsback.npy',
-            back=True
-        )
-
-        for obj in detections:
-            # get detected face
-            crop_img, top_left, bottom_right = crop_blazeface(
-                obj, FACE_MARGIN, frame
-            )
-            if crop_img.shape[0] <= 0 or crop_img.shape[1] <= 0:
-                continue
-
-            img = cv2.resize(crop_img, (IMAGE_SIZE, IMAGE_SIZE))
-            img = np.expand_dims(img, axis=0)  # 次元合せ
-
-            # inference
-            output = net.predict([img])
-            prob, age_conv3 = output
-            prob = prob[0][0][0]
-            age_conv3 = age_conv3[0][0][0][0]
-
-            i = np.argmax(prob)
-            gender = 'Female' if i == 0 else 'Male'
-            age = round(age_conv3 * 100)
-
-            # display label
-            LABEL_WIDTH = bottom_right[1] - top_left[1]
-            LABEL_HEIGHT = 40
-            if gender=="Male":
-                color = (255, 128, 128)
-            else:
-                color = (128, 128, 255)
-            cv2.rectangle(frame, top_left, bottom_right, color, thickness=2)
-            cv2.rectangle(
-                frame,
-                top_left,
-                (top_left[0] + LABEL_WIDTH, top_left[1] + LABEL_HEIGHT),
-                color,
-                thickness=-1,
-            )
-
-            text_position = (top_left[0], top_left[1] + LABEL_HEIGHT * 3 // 4)
-            color = (0, 0, 0)
-            fontScale = 1.0
-            cv2.putText(
-                frame,
-                "{} {}".format(gender, age),
-                text_position,
-                cv2.FONT_HERSHEY_SIMPLEX,
-                fontScale,
-                color,
-                1,
-            )
+        recognize_from_frame(net, detector, frame)
 
         # show result
         cv2.imshow('frame', frame)
@@ -205,7 +224,8 @@ def main():
     net = ailia.Net(
         MODEL_PATH, WEIGHT_PATH, env_id=env_id
     )
-    if args.video:
+    detector = None
+    if args.video or args.detection:
         detector = ailia.Net(FACE_MODEL_PATH, FACE_WEIGHT_PATH, env_id=args.env_id)
 
     # image mode
@@ -214,7 +234,7 @@ def main():
         recognize_from_video(net, detector)
     else:
         # image mode
-        recognize_from_image(net)
+        recognize_from_image(net, detector)
 
 
 if __name__ == '__main__':

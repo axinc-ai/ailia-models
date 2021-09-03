@@ -33,6 +33,11 @@ If you want to specify the input image, put the image path after the `--input` o
 $ python3 age-gender-recognition.py --input IMAGE_PATH
 ```
 
+If you want to perform face detection in preprocessing, use the `--detection` option.
+```bash
+$ python3 age-gender-recognition.py --input IMAGE_PATH --detection
+```
+
 By adding the `--video` option, you can input the video.   
 If you pass `0` as an argument to VIDEO_PATH, you can use the webcam input instead of the video file.  
 You can use --savepath option to specify the output file to save.
