@@ -11,7 +11,6 @@ from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from image_utils import load_image  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 import webcamera_utils  # noqa: E402
-from detector_utils import letterbox_convert, reverse_letterbox  # noqa: E402
 
 # logger
 from logging import getLogger  # noqa: E402
@@ -113,19 +112,13 @@ def recognize_from_video(net, detector):
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
 
-        # to square image
-        img = letterbox_convert(frame, (FACE_IMAGE_HEIGHT, FACE_IMAGE_WIDTH))
-
         # detect face
         detections = compute_blazeface(
             detector,
-            img,
+            frame,
             anchor_path='../../face_detection/blazeface/anchorsback.npy',
             back=True
         )
-
-        # revert square from detections
-        detections = reverse_letterbox(detections, frame, (FACE_IMAGE_HEIGHT,FACE_IMAGE_WIDTH))
 
         for obj in detections:
             # get detected face

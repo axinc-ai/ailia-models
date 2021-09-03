@@ -3,6 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import ailia
+from detector_utils import letterbox_convert, reverse_letterbox  # noqa: E402
 
 
 def sigmoid(x):
@@ -252,8 +253,8 @@ def compute_blazeface_with_keypoint(detector, frame, anchor_path='anchors.npy', 
         BLAZEFACE_INPUT_IMAGE_WIDTH = 128
 
     # preprocessing
-    img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-    image = cv2.resize(img, (BLAZEFACE_INPUT_IMAGE_WIDTH, BLAZEFACE_INPUT_IMAGE_HEIGHT))
+    image = letterbox_convert(frame, (BLAZEFACE_INPUT_IMAGE_HEIGHT, BLAZEFACE_INPUT_IMAGE_WIDTH))
+    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
     image = image.transpose((2, 0, 1))  # channel first
     image = image[np.newaxis, :, :, :]  # (batch_size, channel, h, w)
     input_data = image / 127.5 - 1.0
@@ -284,6 +285,9 @@ def compute_blazeface_with_keypoint(detector, frame, anchor_path='anchors.npy', 
             "eye_right_x": d[6], "eye_right_y": d[7]
         }
         keypoints.append(keypoint)
+
+    # revert square from detections
+    detections = reverse_letterbox(detections, frame, (BLAZEFACE_INPUT_IMAGE_HEIGHT,BLAZEFACE_INPUT_IMAGE_WIDTH))
 
     return detections, keypoints
 
