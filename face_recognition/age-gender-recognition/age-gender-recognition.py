@@ -31,7 +31,6 @@ REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/age-gender-recognitio
 FACE_WEIGHT_PATH = 'blazefaceback.onnx'
 FACE_MODEL_PATH = 'blazefaceback.onnx.prototxt'
 FACE_REMOTE_PATH = "https://storage.googleapis.com/ailia-models/blazeface/"
-FACE_MARGIN = 1.0
 FACE_IMAGE_HEIGHT = 256
 FACE_IMAGE_WIDTH = 256
 FACE_MIN_SCORE_THRESH = 0.5
@@ -122,10 +121,27 @@ def recognize_from_frame(net, detector, frame):
         min_score_thresh=FACE_MIN_SCORE_THRESH
     )
 
+    # adjust face rectangle
+    new_detections = []
+    for detection in detections:
+        margin = 1.5
+        r = ailia.DetectorObject(
+            category=detection.category,
+            prob=detection.prob,
+            x=detection.x-detection.w*(margin-1.0)/2,
+            y=detection.y-detection.h*(margin-1.0)/2-detection.h*margin/8,
+            w=detection.w*margin,
+            h=detection.h*margin,
+        )
+        new_detections.append(r)
+    detections = new_detections
+
+    # estimate age and gender
     for obj in detections:
         # get detected face
+        margin = 1.0
         crop_img, top_left, bottom_right = crop_blazeface(
-            obj, FACE_MARGIN, frame
+            obj, margin, frame
         )
         if crop_img.shape[0] <= 0 or crop_img.shape[1] <= 0:
             continue
