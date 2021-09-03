@@ -4,6 +4,13 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import ailia
 
+import sys
+sys.path.append('../../util')
+from detector_utils import letterbox_convert, reverse_letterbox  # noqa: E402
+
+
+DEFAULT_MIN_SCORE_THRESH = 0.75
+
 
 def sigmoid(x):
     return 1.0 / (1.0 + np.exp(-x))
@@ -209,13 +216,12 @@ def weighted_non_max_suppression(detections):
     return output_detections    
 
 
-def postprocess(preds_ailia, anchor_path='anchors.npy', back=False):
+def postprocess(preds_ailia, anchor_path='anchors.npy', back=False, min_score_thresh = DEFAULT_MIN_SCORE_THRESH):
     raw_box = preds_ailia[0]  # (1, 896, 16)
     raw_score = preds_ailia[1]  # (1, 896, 1)
 
     anchors = np.load(anchor_path).astype(np.float32)
     score_thresh = 100.0
-    min_score_thresh = 0.75
     
     detection_boxes = decode_boxes(raw_box, back, anchors)  # (1, 896, 16)
     raw_score = np.clip(raw_score, -score_thresh, score_thresh)  # (1, 896, 1)
@@ -243,13 +249,17 @@ def postprocess(preds_ailia, anchor_path='anchors.npy', back=False):
     return filtered_detections
 
 
-def compute_blazeface_with_keypoint(detector, frame, anchor_path='anchors.npy'):
-    BLAZEFACE_INPUT_IMAGE_HEIGHT = 128
-    BLAZEFACE_INPUT_IMAGE_WIDTH = 128
+def compute_blazeface_with_keypoint(detector, frame, anchor_path='anchors.npy', back=False, min_score_thresh = DEFAULT_MIN_SCORE_THRESH):
+    if back:
+        BLAZEFACE_INPUT_IMAGE_HEIGHT = 256
+        BLAZEFACE_INPUT_IMAGE_WIDTH = 256
+    else:
+        BLAZEFACE_INPUT_IMAGE_HEIGHT = 128
+        BLAZEFACE_INPUT_IMAGE_WIDTH = 128
 
     # preprocessing
-    img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-    image = cv2.resize(img, (BLAZEFACE_INPUT_IMAGE_WIDTH, BLAZEFACE_INPUT_IMAGE_HEIGHT))
+    image = letterbox_convert(frame, (BLAZEFACE_INPUT_IMAGE_HEIGHT, BLAZEFACE_INPUT_IMAGE_WIDTH))
+    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
     image = image.transpose((2, 0, 1))  # channel first
     image = image[np.newaxis, :, :, :]  # (batch_size, channel, h, w)
     input_data = image / 127.5 - 1.0
@@ -258,37 +268,59 @@ def compute_blazeface_with_keypoint(detector, frame, anchor_path='anchors.npy'):
     preds_ailia = detector.predict([input_data])
 
     # postprocessing
-    detections = []
-    keypoints = []
-    blaze_face_detections = postprocess(preds_ailia, anchor_path)
-    for idx in range(len(blaze_face_detections)):
-        obj = blaze_face_detections[idx]
-        if len(obj)==0:
-            continue
-        d = obj[0]
+    face_detections = postprocess(preds_ailia, anchor_path, back=back, min_score_thresh=min_score_thresh)
+    face_detections = face_detections[0]
 
+    detections = []
+    detections_eyes = []
+    for i, d in enumerate(face_detections):
         # face position
         obj = ailia.DetectorObject(
-            category = 0,
-            prob = 1.0,
-            x = d[1],
-            y = d[0],
-            w = d[3]-d[1],
-            h = d[2]-d[0] )
+            category=0,
+            prob=1.0,
+            x=d[1],
+            y=d[0],
+            w=d[3] - d[1],
+            h=d[2] - d[0])
         detections.append(obj)
 
-        # keypoint potision
+        # keypoints
+        obj = ailia.DetectorObject(
+            category=0,
+            prob=1.0,
+            x=d[4],
+            y=d[5],
+            w=0,
+            h=0)
+        detections_eyes.append(obj)
+
+        obj = ailia.DetectorObject(
+            category=0,
+            prob=1.0,
+            x=d[6],
+            y=d[7],
+            w=0,
+            h=0)
+        detections_eyes.append(obj)
+
+    # revert square from detections
+    detections = reverse_letterbox(detections, frame, (BLAZEFACE_INPUT_IMAGE_HEIGHT,BLAZEFACE_INPUT_IMAGE_WIDTH))
+    detections_eyes = reverse_letterbox(detections_eyes, frame, (BLAZEFACE_INPUT_IMAGE_HEIGHT,BLAZEFACE_INPUT_IMAGE_WIDTH))
+
+    # convert to keypoints
+    keypoints = []
+    for i in range(len(detections_eyes)//2):
         keypoint = {
-            "eye_left_x":blaze_face_detections[idx][0][4],"eye_left_y":blaze_face_detections[idx][0][5],
-            "eye_right_x":blaze_face_detections[idx][0][6],"eye_right_y":blaze_face_detections[idx][0][7]
+            "eye_left_x": detections_eyes[i*2+0].x, "eye_left_y": detections_eyes[i*2+0].y,
+            "eye_right_x": detections_eyes[i*2+1].x, "eye_right_y": detections_eyes[i*2+1].y
         }
         keypoints.append(keypoint)
 
     return detections, keypoints
 
 
-def compute_blazeface(detector, frame, anchor_path='anchors.npy'):
-    detections, keypoints = compute_blazeface_with_keypoint(detector, frame, anchor_path)
+def compute_blazeface(detector, frame, anchor_path='anchors.npy', back=False, min_score_thresh = DEFAULT_MIN_SCORE_THRESH):
+    detections, keypoints = compute_blazeface_with_keypoint(detector, frame, anchor_path, back=back, min_score_thresh=min_score_thresh)
     return detections
 
 
