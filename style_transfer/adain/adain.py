@@ -46,6 +46,11 @@ parser.add_argument(
     default=STYLE_PATH,
     help='The style image path.'
 )
+parser.add_argument(
+    '-a', '--alpha',
+    default=1.0, type=float,
+    help='Adjust the degree of stylization. It should be a value between 0.0 and 1.0(default).'
+)
 args = update_parser(parser)
 
 
@@ -53,7 +58,7 @@ args = update_parser(parser)
 # Utils
 # ======================
 # TODO multiple style image and weight feature
-def style_transfer(vgg, decoder, content, style, alpha=1.0):
+def style_transfer(vgg, decoder, content, style, alpha=args.alpha):
     assert (0.0 <= alpha <= 1.0)
     content_f = vgg.predict(content.astype(np.float32))
     style_f = vgg.predict(style)
