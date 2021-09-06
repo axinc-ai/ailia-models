@@ -35,8 +35,6 @@ EX_WEIGHT_PATH = 'deep_sort_vehicle.onnx'
 EX_MODEL_PATH = 'deep_sort_vehicle.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/deep_sort_vehicle/'
 
-VIDEO_PATH = 'sample.mp4'
-
 # Deep sort model input
 INPUT_HEIGHT = 128
 INPUT_WIDTH = 64
@@ -60,11 +58,11 @@ COCO_CATEGORY = [
 THRESHOLD = 0.1  # 0.4
 MIN_CONFIDENCE = 0.3
 IOU = 0.45
-# DETECT_CLASSES = [2, 5, 7]
-DETECT_CLASSES = [2]
+DETECT_CLASSES = [2, 5, 7]
+# DETECT_CLASSES = [2]
 
 # Metric parameters
-MAX_DISTANCE = 0.2  # threshold of matching object
+MAX_DISTANCE = 0.016  # threshold of matching object
 NN_BUDGET = 100
 
 # ======================
@@ -99,8 +97,9 @@ def euclidean_distance(x1, x2):
     x2 = x2.reshape(1, -1)
     a2, b2 = np.square(x1).sum(axis=1), np.square(x2).sum(axis=1)
     r2 = -2. * np.dot(x1, x2.T) + a2[:, None] + b2[None, :]
-    r2 = np.clip(r2, 0., float(np.inf))
-    return r2[0]
+    r2 = r2[0][0]
+    r2 = r2 ** 0.5
+    return r2
 
 
 # ======================
@@ -162,12 +161,16 @@ def recognize_from_video(detector, extractor):
         img_crops = []
         for box in bbox_xywh:
             x1, y1, x2, y2 = xywh_to_xyxy(box, h, w)
-            img_crops.append(frame[y1:y2, x1:x2])
+            img = frame[y1:y2, x1:x2]
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+            img_crops.append(img)
 
         if img_crops:
             # preprocess
             img_batch = np.concatenate([
-                normalize_image(resize(img), 'ImageNet')[np.newaxis, :, :, :]
+                normalize_image(
+                    resize(cv2.cvtColor(img, cv2.COLOR_BGR2RGB)), '255'
+                )[np.newaxis, :, :, :]
                 for img in img_crops
             ], axis=0).transpose(0, 3, 1, 2)
 
@@ -295,7 +298,7 @@ def compare_images(detector, extractor):
 
         # preprocess
         img = normalize_image(
-            resize(img), 'ImageNet'
+            resize(img), '255'
         )[np.newaxis, :, :, :].transpose(0, 3, 1, 2)
 
         if args.benchmark:
@@ -310,11 +313,11 @@ def compare_images(detector, extractor):
 
         features.append(feature[0])
 
-    sim = euclidean_distance(features[0], features[1])
-    if sim <= MAX_DISTANCE:
-        logger.info(f'{args.pairimage}: Same vehicle (confidence: {sim})')
+    dist = euclidean_distance(features[0], features[1])
+    if dist <= MAX_DISTANCE:
+        logger.info(f'{args.pairimage}: Same vehicle (distance: {dist})')
     else:
-        logger.info(f'{args.pairimage}: Different vehicle (confidence: {sim})')
+        logger.info(f'{args.pairimage}: Different vehicle (distance: {dist})')
 
 
 def main():
