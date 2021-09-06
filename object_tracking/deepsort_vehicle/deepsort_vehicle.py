@@ -33,7 +33,8 @@ DT_WEIGHT_PATH = 'yolov3.opt.onnx'
 DT_MODEL_PATH = 'yolov3.opt.onnx.prototxt'
 EX_WEIGHT_PATH = 'deep_sort_vehicle.onnx'
 EX_MODEL_PATH = 'deep_sort_vehicle.onnx.prototxt'
-REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/deep_sort_vehicle/'
+REMOTE_EX_PATH = 'https://storage.googleapis.com/ailia-models/deep_sort_vehicle/'
+REMOTE_DT_PATH = 'https://storage.googleapis.com/ailia-models/deep_sort/'
 
 # Deep sort model input
 INPUT_HEIGHT = 128
@@ -324,9 +325,9 @@ def main():
     # model files check and download
     if not args.no_detector:
         logger.info('Check Detector...')
-        check_and_download_models(DT_WEIGHT_PATH, DT_MODEL_PATH, REMOTE_PATH)
+        check_and_download_models(DT_WEIGHT_PATH, DT_MODEL_PATH, REMOTE_DT_PATH)
     logger.info('Check Extractor...')
-    check_and_download_models(EX_WEIGHT_PATH, EX_MODEL_PATH, REMOTE_PATH)
+    check_and_download_models(EX_WEIGHT_PATH, EX_MODEL_PATH, REMOTE_EX_PATH)
 
     env_id = ailia.get_gpu_environment_id()
     logger.info(f'env_id: {env_id}')
@@ -345,8 +346,9 @@ def main():
     extractor = ailia.Net(EX_MODEL_PATH, EX_WEIGHT_PATH, env_id=env_id)
 
     if args.benchmark:
-        args.pairimage[0] = "01347_c20012s1_00315_01.jpg"
-        args.pairimage[1] = "01347_c40152s1_00001_01.jpg"
+        args.no_detector = True
+        args.pairimage[0] = "01840_c40752s1_00280_01.jpg"
+        args.pairimage[1] = "01840_c40752s1_00307_01.jpg"
 
     if args.pairimage[0] is not None and args.pairimage[1] is not None:
         logger.info(
