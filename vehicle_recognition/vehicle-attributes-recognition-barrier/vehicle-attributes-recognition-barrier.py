@@ -59,10 +59,6 @@ THRESHOLD = 0.4
 IOU = 0.45
 DETECT_CLASSES = [2, 5, 7]
 
-# Metric parameters
-MAX_DISTANCE = 0.2  # threshold of matching object
-NN_BUDGET = 100
-
 # ======================
 # Argument Parser Config
 # ======================
