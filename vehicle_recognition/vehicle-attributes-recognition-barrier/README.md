@@ -51,6 +51,18 @@ If you want to specify the input image, put the image path after the `--input` o
 $ python3 vehicle-attributes-recognition-barrier.py --input IMAGE_PATH
 ```
 
+If you want to perform object detection in preprocessing, use the `--detection` option.
+```bash
+$ python3 vehicle-attributes-recognition-barrier.py --input IMAGE_PATH --detection
+```
+
+By adding the `--video` option, you can input the video.   
+If you pass `0` as an argument to VIDEO_PATH, you can use the webcam input instead of the video file.  
+You can use --savepath option to specify the output file to save.
+```bash
+$ python3 vehicle-attributes-recognition-barrier.py --video VIDEO_PATH --savepath SAVE_VIDEO_PATH
+```
+
 ## Reference
 
 - [OpenVINO - Open Model Zoo repository - vehicle-attributes-recognition-barrier-0042](https://github.com/openvinotoolkit/open_model_zoo/tree/master/models/intel/vehicle-attributes-recognition-barrier-0042)
