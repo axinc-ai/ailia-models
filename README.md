@@ -1,4 +1,4 @@
-# ailia-models
+<img src="ailia-models.png">
 
 The collection of pre-trained, state-of-the-art AI models.
 
