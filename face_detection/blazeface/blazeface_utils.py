@@ -1,7 +1,5 @@
 import cv2
 import numpy as np
-import matplotlib.pyplot as plt
-import matplotlib.patches as patches
 import ailia
 
 import sys
@@ -19,47 +17,30 @@ def sigmoid(x):
 def plot_detections(
         img, detections, with_keypoints=True, save_image_path='result.png'
 ):
-    fig, ax = plt.subplots(1, figsize=(10, 10))
-    ax.grid(False)
-    ax.imshow(img)
+    # color in BGR
+    box_color = (0, 0, 255)
+    dot_color = (0xfa, 0xce, 0x87)
+    thickness = 2
 
-    # if detections.ndim == 1:
-    # detections = np.expand_dims(detections, axis=0)
-
-    print(f'Found {detections.shape[0]} faces')
-        
     for i in range(detections.shape[0]):
-        ymin = detections[i, 0] * img.shape[0]
-        xmin = detections[i, 1] * img.shape[1]
-        ymax = detections[i, 2] * img.shape[0]
-        xmax = detections[i, 3] * img.shape[1]
+        ymin = int(detections[i, 0] * img.shape[0])
+        xmin = int(detections[i, 1] * img.shape[1])
+        ymax = int(detections[i, 2] * img.shape[0])
+        xmax = int(detections[i, 3] * img.shape[1])
 
-        rect = patches.Rectangle(
-            (xmin, ymin),
-            xmax - xmin,
-            ymax - ymin,
-            linewidth=1,
-            edgecolor="r",
-            facecolor="none", 
-            alpha=detections[i, 16]
-        )
-        ax.add_patch(rect)
+        p0 = (xmin, ymin)
+        p1 = (xmax, ymax)
+
+        img = cv2.rectangle(img, p0, p1, box_color, thickness)
 
         if with_keypoints:
             for k in range(6):
-                kp_x = detections[i, 4 + k*2    ] * img.shape[1]
-                kp_y = detections[i, 4 + k*2 + 1] * img.shape[0]
-                circle = patches.Circle(
-                    (kp_x, kp_y),
-                    radius=0.5,
-                    linewidth=1, 
-                    edgecolor="lightskyblue",
-                    facecolor="none", 
-                    alpha=detections[i, 16]
-                )
-                ax.add_patch(circle)
-    plt.savefig(save_image_path)
+                kp_x = int(detections[i, 4 + k*2    ] * img.shape[1])
+                kp_y = int(detections[i, 4 + k*2 + 1] * img.shape[0])
 
+                img = cv2.circle(img, (kp_x, kp_y), int(1.5*thickness), dot_color, -1)
+
+    cv2.imwrite(save_image_path, img)
 
 def decode_boxes(raw_boxes, back, anchors):
     """

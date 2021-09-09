@@ -158,6 +158,7 @@ cd ../../text_recognition/etl; python3 etl.py ${OPTION}
 cd ../../text_recognition/deep-text-recognition-benchmark; python3 deep-text-recognition-benchmark.py ${OPTION}
 cd ../../text_recognition/crnn.pytorch; python3 crnn.pytorch.py ${OPTION}
 cd ../../text_recognition/paddleocr; python3 paddleocr.py ${OPTION}
+cd ../../vehicle_recognition/vehicle-attributes-recognition-barrier; python3 vehicle-attributes-recognition-barrier.py ${OPTION}
 #cd ../../commercial_model/acculus-pose; python3 acculus-hand.py ${OPTION}
 #cd ../../commercial_model/acculus-pose; python3 acculus-pose.py ${OPTION}
 #cd ../../commercial_model/acculus-pose; python3 acculus-up-pose.py ${OPTION}
