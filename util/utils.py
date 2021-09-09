@@ -152,7 +152,10 @@ def update_parser(parser, check_input_type=True, large_model=False):
                 env = ailia.get_environment(idx)
                 logger.info("  env[" + str(idx) + "]=" + str(env))
 
-    logger.info(f'env_id: {args.env_id}')
+        logger.info(f'env_id: {args.env_id}')
+
+        env = ailia.get_environment(args.env_id)
+        logger.info(f'{env.name}')
 
     # -------------------------------------------------------------------------
     # 2. update input
