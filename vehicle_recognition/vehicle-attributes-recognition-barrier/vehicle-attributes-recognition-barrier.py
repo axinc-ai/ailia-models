@@ -11,6 +11,7 @@ from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from detector_utils import load_image  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 import webcamera_utils  # noqa: E402
+from nms_utils import nms_between_categories  # noqa: E402
 
 # logger
 from logging import getLogger  # noqa: E402
@@ -34,6 +35,9 @@ SAVE_IMAGE_PATH = 'output.png'
 
 COLOR_LIST = (
     'white', 'gray', 'yellow', 'red', 'green', 'blue', 'black'
+)
+COLOR_TABLE_LIST = (
+    (255,255,255), (192,192,192), (128,255,255), (128,128,255), (128,255,128), (255,128,128), (128,128,128)
 )
 TYPE_LIST = (
     'car', 'van', 'truck', 'bus'
@@ -117,8 +121,21 @@ def recognize_from_frame(net, detector, frame):
 
     frame = cv2.cvtColor(frame, cv2.COLOR_BGRA2BGR)
 
+    # nms
+    detections = []
     for idx in range(detector.get_object_count()):
         obj = detector.get_object(idx)
+        detections.append(obj)
+    detections = nms_between_categories(
+        detections,
+        frame.shape[1],
+        frame.shape[0],
+        categories=DETECT_CLASSES,
+        iou_threshold=IOU,
+    )
+
+    for idx in range(len(detections)):
+        obj = detections[idx]
         if obj.category not in DETECT_CLASSES:
             continue
 
@@ -135,11 +152,12 @@ def recognize_from_frame(net, detector, frame):
         out_typ, out_clr = output
         typ = TYPE_LIST[np.argmax(out_typ)]
         clr = COLOR_LIST[np.argmax(out_clr)]
+        clr_table = COLOR_TABLE_LIST[np.argmax(out_clr)]
 
         # draw label
         LABEL_WIDTH = bottom_right[1] - top_left[1]
         LABEL_HEIGHT = 20
-        color = (255, 128, 128)
+        color = clr_table#(255, 128, 128)
         cv2.rectangle(frame, top_left, bottom_right, color, thickness=2)
         cv2.rectangle(
             frame,
