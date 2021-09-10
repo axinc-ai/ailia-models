@@ -321,6 +321,8 @@ def main():
 
     weight_path, model_path = dic_model[args.model]
 
+    check_and_download_models(weight_path, model_path, REMOTE_PATH)
+
     # initialize
     logger.info(f'env_id: {args.env_id}')
     net = ailia.Net(model_path, weight_path, env_id=args.env_id)
