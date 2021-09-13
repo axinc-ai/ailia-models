@@ -128,7 +128,6 @@ cd ../../object_detection/nanodet; python3 nanodet.py ${OPTION}
 cd ../../object_detection/yolor; python3 yolor.py ${OPTION}
 cd ../../object_detection/3d-object-detection.pytorch; python3 3d-object-detection.pytorch.py ${OPTION}
 cd ../../object_detection/mediapipe_objectron; python3 mediapipe_objectron.py ${OPTION}
-cd ../../object_detection/vehicle-license-plate-detection-barrier; python3 vehicle-license-plate-detection-barrier.py ${OPTION}
 cd ../../object_tracking/deepsort; python3 deepsort.py ${OPTION}
 cd ../../object_tracking/person_reid_baseline_pytorch; python3 person_reid_baseline_pytorch.py ${OPTION}
 cd ../../object_tracking/roneld; python3 roneld.py ${OPTION}
@@ -161,6 +160,7 @@ cd ../../text_recognition/deep-text-recognition-benchmark; python3 deep-text-rec
 cd ../../text_recognition/crnn.pytorch; python3 crnn.pytorch.py ${OPTION}
 cd ../../text_recognition/paddleocr; python3 paddleocr.py ${OPTION}
 cd ../../vehicle_recognition/vehicle-attributes-recognition-barrier; python3 vehicle-attributes-recognition-barrier.py ${OPTION}
+cd ../../vehicle_recognition/vehicle-license-plate-detection-barrier; python3 vehicle-license-plate-detection-barrier.py ${OPTION}
 #cd ../../commercial_model/acculus-pose; python3 acculus-hand.py ${OPTION}
 #cd ../../commercial_model/acculus-pose; python3 acculus-pose.py ${OPTION}
 #cd ../../commercial_model/acculus-pose; python3 acculus-up-pose.py ${OPTION}
