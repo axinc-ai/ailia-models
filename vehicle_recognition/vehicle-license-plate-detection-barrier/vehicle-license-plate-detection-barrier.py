@@ -144,6 +144,8 @@ def recognize_from_image(net):
         img = load_image(image_path)
         img = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
 
+        img, resized_img = webcamera_utils.adjust_frame_size(img, IMAGE_SIZE, IMAGE_SIZE)
+
         # inference
         logger.info('Start inference...')
         if args.benchmark:
@@ -193,6 +195,8 @@ def recognize_from_video(net):
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
+
+        frame, resized_img = webcamera_utils.adjust_frame_size(frame, IMAGE_SIZE, IMAGE_SIZE)
 
         # inference
         detections = predict(net, frame)
