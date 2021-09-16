@@ -52,19 +52,19 @@ The model type is selected from "kitti", "kitti-grad", "nyu".
 $ python3 lap-depth.py --model_type kitti
 ```
 
-### Reference
+## Reference
 
 [LapDepth-release](https://github.com/tjqansthd/LapDepth-release)
 
-### Framework
+## Framework
 
 PyTorch
 
-### Model Format
+## Model Format
 
 ONNX opset = 11
 
-### Netron
+## Netron
 
 - [LDRN_KITTI_ResNext101_data.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/lap-depth/LDRN_KITTI_ResNext101_data.onnx.prototxt)
 - [LDRN_KITTI_ResNext101_data_grad.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/lap-depth/LDRN_KITTI_ResNext101_data_grad.onnx.prototxt)
