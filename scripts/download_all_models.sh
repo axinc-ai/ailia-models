@@ -82,13 +82,19 @@ cd ../../image_manipulation/psgan; python3 psgan.py ${OPTION}
 cd ../../image_manipulation/deep_white_balance; python3 deep_white_balance.py ${OPTION}
 cd ../../image_manipulation/inpainting_gmcnn; python3 inpainting_gmcnn.py ${OPTION}
 cd ../../image_manipulation/deblur_gan; python3 deblur_gan.py ${OPTION}
-cd ../../image_segmentation/deep-image-matting; python3 deep-image-matting.py ${OPTION}
+
+cd ../../background_ramoval/deep-image-matting; python3 deep-image-matting.py ${OPTION}
+cd ../../background_ramoval/u2net; python3 u2net.py ${OPTION}
+cd ../../background_ramoval/u2net; python3 u2net.py -a small ${OPTION}
+cd ../../background_ramoval/u2net-portrait-matting; python3 u2net-portrait-matting.py ${OPTION}
+cd ../../background_ramoval/u2net-human-seg; python3 u2net-human-seg.py ${OPTION}
+cd ../../background_ramoval/indexnet; python3 indexnet.py ${OPTION}
+cd ../../background_ramoval/modnet; python3 modnet.py ${OPTION}
+
 cd ../../image_segmentation/deeplabv3; python3 deeplabv3.py ${OPTION}
 cd ../../image_segmentation/hair_segmentation; python3 hair_segmentation.py ${OPTION}
 cd ../../image_segmentation/hrnet_segmentation; python3 hrnet_segmentation.py ${OPTION}
 cd ../../image_segmentation/pspnet-hair-segmentation; python3 pspnet-hair-segmentation.py ${OPTION}
-cd ../../image_segmentation/u2net; python3 u2net.py ${OPTION}
-cd ../../image_segmentation/u2net; python3 u2net.py -a small ${OPTION}
 cd ../../image_segmentation/human_part_segmentation; python3 human_part_segmentation.py ${OPTION}
 cd ../../image_segmentation/pytorch-unet; python3 pytorch-unet.py ${OPTION}
 cd ../../image_segmentation/pytorch-enet; python3 pytorch-unet.py ${OPTION}
@@ -97,10 +103,6 @@ cd ../../image_segmentation/yet-another-anime-segmenter; python3 yet-another-ani
 cd ../../image_segmentation/swiftnet; python3 swiftnet.py ${OPTION}
 cd ../../image_segmentation/codes-for-lane-detection; python3 codes-for-lane-detection.py ${OPTION}
 cd ../../image_segmentation/dense_prediction_transformers; python3 dense_prediction_transformers.py ${OPTION}
-cd ../../image_segmentation/u2net-portrait-matting; python3 u2net-portrait-matting.py ${OPTION}
-cd ../../image_segmentation/u2net-human-seg; python3 u2net-human-seg.py ${OPTION}
-cd ../../image_segmentation/indexnet; python3 indexnet.py ${OPTION}
-cd ../../image_segmentation/modnet; python3 modnet.py ${OPTION}
 cd ../../image_segmentation/road-segmentation-adas; python3 road-segmentation-adas.py ${OPTION}
 cd ../../line_segment_detection/mlsd; python3 mlsd.py ${OPTION}
 cd ../../neural_language_processing/bert; python3 bert.py ${OPTION}

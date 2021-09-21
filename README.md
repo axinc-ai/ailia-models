@@ -37,6 +37,17 @@ The collection of pre-trained, state-of-the-art AI models.
 | [unet_source_separation](/audio_processing/unet_source_separation/) | [source_separation](https://github.com/AppleHolic/source_separation)  | Pytorch | 1.2.6 and later |
 | [transformer-cnn-emotion-recognition](/audio_processing/transformer-cnn-emotion-recognition/) | [Combining Spatial and Temporal Feature Representions of Speech Emotion by Parallelizing CNNs and Transformer-Encoders](https://github.com/IliaZenkov/transformer-cnn-emotion-recognition)  | Pytorch | 1.2.5 and later |
 
+## Background removal
+
+| | Model | Reference | Exported From | Supported Ailia Version |
+|:-----------|------------:|:------------:|:------------:|:------------:|
+| [<img src="background_removal/u2net/output.png" width=128px>](background_removal/u2net/) | [U-2-Net](/background_removal/u2net/) | [U^2-Net: Going Deeper with Nested U-Structure for Salient Object Detection](https://github.com/NathanUA/U-2-Net) | Pytorch | 1.2.2 and later |
+| [<img src="background_removal/deep-image-matting/output.png" width=128px>](background_removal/deep-image-matting/) | [deep-image-matting](/background_removal/deep-image-matting/) | [Deep Image Matting](https://github.com/foamliu/Deep-Image-Matting)| Keras | 1.2.3 and later |
+| [<img src="background_removal/u2net-portrait-matting/output.png" width=128px>](background_removal/u2net-portrait-matting/) | [u2net-portrait-matting](/background_removal/u2net-portrait-matting/) | [U^2-Net - Portrait matting](https://github.com/dennisbappert/u-2-net-portrait) | Pytorch | 1.2.7 and later |
+| [<img src="background_removal/u2net-human-seg/output.png" width=128px>](background_removal/u2net-human-seg/) | [u2net-human-seg](/background_removal/u2net-human-seg/) | [U^2-Net - human segmentation](https://github.com/xuebinqin/U-2-Net) | Pytorch | 1.2.4 and later |
+| [<img src="background_removal/indexnet/output.png" width=128px>](background_removal/indexnet/) | [indexnet](/background_removal/indexnet/) | [Indices Matter: Learning to Index for Deep Image Matting](https://github.com/open-mmlab/mmediting/tree/master/configs/mattors/indexnet) | Pytorch | 1.2.7 and later |
+| [<img src="background_removal/modnet/output.jpg" width=128px>](background_removal/modnet/) | [modnet](/background_removal/modnet/) | [MODNet: Trimap-Free Portrait Matting in Real Time](https://github.com/ZHKKKe/MODNet) | Pytorch | 1.2.7 and later |
+
 ## Crowd counting
 
 | | Model | Reference | Exported From | Supported Ailia Version |
@@ -172,8 +183,6 @@ The collection of pre-trained, state-of-the-art AI models.
 | [<img src="image_segmentation/hrnet_segmentation/result.png" width=128px>](image_segmentation/hrnet_segmentation/) | [hrnet_segmentation](/image_segmentation/hrnet_segmentation/) | [High-resolution networks (HRNets) for Semantic Segmentation](https://github.com/HRNet/HRNet-Semantic-Segmentation) | Pytorch | 1.2.1 and later |
 | [<img src="image_segmentation/hair_segmentation/output.png" width=128px>](image_segmentation/hair_segmentation/) | [hair_segmentation](/image_segmentation/hair_segmentation/) | [hair segmentation in mobile device](https://github.com/thangtran480/hair-segmentation) | Keras | 1.2.1 and later |
 | [<img src="image_segmentation/pspnet-hair-segmentation/output.png" width=128px>](image_segmentation/pspnet-hair-segmentation/) | [pspnet-hair-segmentation](/image_segmentation/pspnet-hair-segmentation/) | [pytorch-hair-segmentation](https://github.com/YBIGTA/pytorch-hair-segmentation) | Pytorch | 1.2.2 and later |
-| [<img src="image_segmentation/u2net/output.png" width=128px>](image_segmentation/u2net/) | [U-2-Net](/image_segmentation/u2net/) | [U^2-Net: Going Deeper with Nested U-Structure for Salient Object Detection](https://github.com/NathanUA/U-2-Net) | Pytorch | 1.2.2 and later |
-| [<img src="image_segmentation/deep-image-matting/output.png" width=128px>](image_segmentation/deep-image-matting/) | [deep-image-matting](/image_segmentation/deep-image-matting/) | [Deep Image Matting](https://github.com/foamliu/Deep-Image-Matting)| Keras | 1.2.3 and later |
 | [<img src="image_segmentation/human_part_segmentation/output.png" width=128px>](image_segmentation/human_part_segmentation/) | [human_part_segmentation](/image_segmentation/human_part_segmentation/) | [Self Correction for Human Parsing](https://github.com/PeikeLi/Self-Correction-Human-Parsing) | Pytorch | 1.2.4 and later |
 | [<img src="image_segmentation/semantic-segmentation-mobilenet-v3/output.png" width=128px>](image_segmentation/semantic-segmentation-mobilenet-v3/) | [semantic-segmentation-mobilenet-v3](/image_segmentation/semantic-segmentation-mobilenet-v3) | [Semantic segmentation with MobileNetV3](https://github.com/OniroAI/Semantic-segmentation-with-MobileNetV3) | TensorFlow | 1.2.5 and later |
 | [<img src="image_segmentation/pytorch-unet/data/masks/0cdf5b5d0ce1_01.jpg" width=128px>](image_segmentation/pytorch-unet/) | [pytorch-unet](/image_segmentation/pytorch-unet/) | [Pytorch-Unet](https://github.com/milesial/Pytorch-UNet) | Pytorch | 1.2.5 and later |
@@ -182,10 +191,6 @@ The collection of pre-trained, state-of-the-art AI models.
 | [<img src="image_segmentation/swiftnet/output.png" width=128px>](image_segmentation/swiftnet/) | [swiftnet](/image_segmentation/swiftnet/) | [SwiftNet](https://github.com/orsic/swiftnet) | Pytorch | 1.2.6 and later |
 | [<img src="image_segmentation/codes-for-lane-detection/output.jpg" width=128px>](image_segmentation/codes-for-lane-detection/) | [codes-for-lane-detection](/image_segmentation/codes-for-lane-detection/) | [Codes-for-Lane-Detection](https://github.com/cardwing/Codes-for-Lane-Detection) | Pytorch | 1.2.6 and later |
 | [<img src="image_segmentation/dense_prediction_transformers/output_segmentation.png" width=128px>](image_segmentation/dense_prediction_transformers/) | [dense_prediction_transformers](/image_segmentation/dense_prediction_transformers/) | [dense_prediction_transformers](https://github.com/intel-isl/DPT)   | Pytorch | 1.2.7 and later |
-| [<img src="image_segmentation/u2net-portrait-matting/output.png" width=128px>](image_segmentation/u2net-portrait-matting/) | [u2net-portrait-matting](/image_segmentation/u2net-portrait-matting/) | [U^2-Net - Portrait matting](https://github.com/dennisbappert/u-2-net-portrait) | Pytorch | 1.2.7 and later |
-| [<img src="image_segmentation/u2net-human-seg/output.png" width=128px>](image_segmentation/u2net-human-seg/) | [u2net-human-seg](/image_segmentation/u2net-human-seg/) | [U^2-Net - human segmentation](https://github.com/xuebinqin/U-2-Net) | Pytorch | 1.2.4 and later |
-| [<img src="image_segmentation/indexnet/output.png" width=128px>](image_segmentation/indexnet/) | [indexnet](/image_segmentation/indexnet/) | [Indices Matter: Learning to Index for Deep Image Matting](https://github.com/open-mmlab/mmediting/tree/master/configs/mattors/indexnet) | Pytorch | 1.2.7 and later |
-| [<img src="image_segmentation/modnet/output.jpg" width=128px>](image_segmentation/modnet/) | [modnet](/image_segmentation/modnet/) | [MODNet: Trimap-Free Portrait Matting in Real Time](https://github.com/ZHKKKe/MODNet) | Pytorch | 1.2.7 and later |
 | [<img src="image_segmentation/road-segmentation-adas/output.png" width=128px>](image_segmentation/road-segmentation-adas/) | [road-segmentation-adas](/image_segmentation/road-segmentation-adas/) | [road-segmentation-adas-0001](https://github.com/openvinotoolkit/open_model_zoo/tree/master/models/intel/road-segmentation-adas-0001) | OpenVINO | 1.2.5 and later |
 
 ## Line Segment Detection
