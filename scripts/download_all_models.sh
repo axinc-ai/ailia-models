@@ -131,19 +131,19 @@ cd ../../object_tracking/deepsort; python3 deepsort.py ${OPTION}
 cd ../../object_tracking/person_reid_baseline_pytorch; python3 person_reid_baseline_pytorch.py ${OPTION}
 cd ../../object_tracking/abd_net; python3 abd_net.py ${OPTION}
 cd ../../point_segmentation/pointnet_pytorch python3 pointnet_pytorch.py ${OPTION}
-cd ../../pose_estimation/3d-pose-baseline; python3 3d-pose-baseline.py ${OPTION}
 cd ../../pose_estimation/lightweight-human-pose-estimation; python3 lightweight-human-pose-estimation.py ${OPTION}
-cd ../../pose_estimation/lightweight-human-pose-estimation-3d; python3 lightweight-human-pose-estimation-3d.py ${OPTION}
 cd ../../pose_estimation/openpose; python3 openpose.py ${OPTION}
 cd ../../pose_estimation/pose_resnet; python3 pose_resnet.py ${OPTION}
 cd ../../pose_estimation/blazepose; python3 blazepose.py ${OPTION}
-cd ../../pose_estimation/blazepose-fullbody; python3 blazepose-fullbody.py ${OPTION}
-cd ../../pose_estimation/3dmppe_posenet; python3 3dmppe_posenet.py ${OPTION}
 cd ../../pose_estimation/efficientpose; python3 efficientpose.py ${OPTION}
-cd ../../pose_estimation/pose-hg-3d; python3 pose-hg-3d.py ${OPTION}
-cd ../../pose_estimation/gast; python3 gast.py ${OPTION}
-cd ../../pose_estimation/animalpose; python3 animalpose.py -d ${OPTION}
 cd ../../pose_estimation/movenet; python3 movenet.py -d ${OPTION}
+cd ../../pose_estimation/animalpose; python3 animalpose.py -d ${OPTION}
+cd ../../pose_estimation_3d/3d-pose-baseline; python3 3d-pose-baseline.py ${OPTION}
+cd ../../pose_estimation_3d/lightweight-human-pose-estimation-3d; python3 lightweight-human-pose-estimation-3d.py ${OPTION}
+cd ../../pose_estimation_3d/blazepose-fullbody; python3 blazepose-fullbody.py ${OPTION}
+cd ../../pose_estimation_3d/3dmppe_posenet; python3 3dmppe_posenet.py ${OPTION}
+cd ../../pose_estimation_3d/pose-hg-3d; python3 pose-hg-3d.py ${OPTION}
+cd ../../pose_estimation_3d/gast; python3 gast.py ${OPTION}
 cd ../../road_detection/codes-for-lane-detection; python3 codes-for-lane-detection.py ${OPTION}
 cd ../../road_detection/roneld; python3 roneld.py ${OPTION}
 cd ../../road_detection/road-segmentation-adas; python3 road-segmentation-adas.py ${OPTION}
