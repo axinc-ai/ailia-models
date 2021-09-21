@@ -1,9 +1,9 @@
+import os
 import sys
 import time
 import random
 
 import numpy as np
-import soundfile as sf
 import librosa
 
 import ailia
@@ -24,8 +24,10 @@ logger = getLogger(__name__)
 
 WEIGHT_IDENT_PATH = './proposed_iden.onnx'
 MODEL_IDENT_PATH = './proposed_iden.onnx.prototxt'
-WEIGHT_CLASSIFIER_PATH = './proposed_iden_classifier.onnx'
-MODEL_CLASSIFIER_PATH = './proposed_iden_classifier.onnx.prototxt'
+WEIGHT_CLASSIFIER_PATH = './proposed_classifier.onnx'
+MODEL_CLASSIFIER_PATH = './proposed_classifier.onnx.prototxt'
+WEIGHT_VERI_PATH = './proposed_veri.onnx'
+MODEL_VERI_PATH = './proposed_veri.onnx.prototxt'
 REMOTE_PATH = \
     'https://storage.googleapis.com/ailia-models/auto_speech/'
 
@@ -42,6 +44,8 @@ N_FFT = 512
 # Audio volume normalization
 AUDIO_NORM_TARGET_dBFS = -30
 
+THRESHOLD = 0.26
+
 INT16_MAX = (2 ** 15) - 1
 
 # ======================
@@ -51,12 +55,35 @@ INT16_MAX = (2 ** 15) - 1
 parser = get_base_parser(
     'AutoSpeech', WAVE_PATH, None, input_ftype='audio'
 )
+parser.add_argument(
+    '-i1', '--input1', metavar='WAV', default=None,
+    help='Specify an wav file to compare with the input2 wav. (verification mode)'
+)
+parser.add_argument(
+    '-i2', '--input2', metavar='WAV', default=None,
+    help='Specify an wav file to compare with the input1 wav. (verification mode)'
+)
+parser.add_argument(
+    '-th', '--threshold',
+    default=THRESHOLD, type=float,
+    help='The similar threshold for verification.'
+)
 args = update_parser(parser)
 
 
 # ======================
 # Secondaty Functions
 # ======================
+
+def read_wave(path):
+    # prepare input data
+    wav, source_sr = librosa.load(path, sr=None)
+    # Resample the wav if needed
+    if source_sr is not None and source_sr != SAMPLING_RATE:
+        wav = librosa.resample(wav, source_sr, SAMPLING_RATE)
+
+    return wav
+
 
 def voxceleb1_ids():
     with open("VoxCeleb1_ids.txt") as f:
@@ -100,6 +127,13 @@ def generate_sequence(feature, partial_n_frames, shift=None):
     return test_sequence
 
 
+def cosine_similar(a, b, data_is_normalized=False):
+    if not data_is_normalized:
+        a = np.asarray(a) / np.linalg.norm(a, axis=1, keepdims=True)
+        b = np.asarray(b) / np.linalg.norm(b, axis=1, keepdims=True)
+    return np.dot(a, b.T)
+
+
 # ======================
 # Main functions
 # ======================
@@ -119,7 +153,7 @@ def preprocess(wav):
     return sequence
 
 
-def predict(wav, net, net_classifier):
+def predict(wav, net, net_classifier=None):
     # initial preprocesses
     sequence = preprocess(wav)
 
@@ -128,6 +162,10 @@ def predict(wav, net, net_classifier):
     output = output[0]
 
     output = np.mean(output, axis=0, keepdims=True)
+
+    if not net_classifier:
+        return output
+
     output = net_classifier.predict([output])
     output = output[0]
 
@@ -136,18 +174,14 @@ def predict(wav, net, net_classifier):
     return idx
 
 
-def recognize_from_audio(net, net_classifier):
+def eval_identification(net, net_classifier):
     ids = voxceleb1_ids()
 
     for input_path in args.input:
         logger.info(f'input: {input_path}')
 
         # prepare input data
-        # wav = sf.read(input_path)
-        wav, source_sr = librosa.load(input_path, sr=None)
-        # Resample the wav if needed
-        if source_sr is not None and source_sr != SAMPLING_RATE:
-            wav = librosa.resample(wav, source_sr, SAMPLING_RATE)
+        wav = read_wave(input_path)
 
         # inference
         logger.info('Start inference...')
@@ -166,20 +200,77 @@ def recognize_from_audio(net, net_classifier):
     logger.info('Script finished successfully.')
 
 
+def eval_verification(net):
+    threshold = args.threshold
+    input1 = args.input1
+    input2 = args.input2
+
+    if input1 is None:
+        logger.error('input1 is not specified')
+        sys.exit(-1)
+    elif not os.path.isfile(input1):
+        logger.error('specified input1 is not file path nor directory path')
+        sys.exit(-1)
+    if input2 is None:
+        logger.error('input2 is not specified')
+        sys.exit(-1)
+    elif not os.path.isfile(input2):
+        logger.error('specified input2 is not file path nor directory path')
+        sys.exit(-1)
+
+    logger.info(f'input1: {input1}')
+    logger.info(f'input2: {input2}')
+
+    # prepare input data
+    wav1 = read_wave(args.input1)
+    wav2 = read_wave(args.input2)
+
+    # inference
+    logger.info('Start inference...')
+    if args.benchmark:
+        logger.info('BENCHMARK mode')
+        for i in range(5):
+            start = int(round(time.time() * 1000))
+            output = predict(wav1, net)
+            output2 = predict(wav2, net)
+            end = int(round(time.time() * 1000))
+            logger.info(f'\tailia processing time {end - start} ms')
+    else:
+        output = predict(wav1, net)
+        output2 = predict(wav2, net)
+
+    similar = cosine_similar(output, output2)
+    logger.info(' similar: %.8f' % similar[0])
+    logger.info(' verification: %s (threshold: %.3f)' %
+                ('match' if similar[0] >= threshold else 'unmatch', threshold))
+
+    logger.info('Script finished successfully.')
+
+
 def main():
     # model files check and download
-    check_and_download_models(WEIGHT_IDENT_PATH, MODEL_IDENT_PATH, REMOTE_PATH)
-    check_and_download_models(WEIGHT_CLASSIFIER_PATH, MODEL_CLASSIFIER_PATH, REMOTE_PATH)
+    if args.input1 or args.input2:
+        check_and_download_models(WEIGHT_VERI_PATH, MODEL_VERI_PATH, REMOTE_PATH)
+    else:
+        logger.info('Checking identification model...')
+        check_and_download_models(WEIGHT_IDENT_PATH, MODEL_IDENT_PATH, REMOTE_PATH)
+        logger.info('Checking classification model...')
+        check_and_download_models(WEIGHT_CLASSIFIER_PATH, MODEL_CLASSIFIER_PATH, REMOTE_PATH)
 
     # load model
     env_id = ailia.get_gpu_environment_id()
     logger.info(f'env_id: {env_id}')
 
-    # initialize
-    net = ailia.Net(MODEL_IDENT_PATH, WEIGHT_IDENT_PATH, env_id=env_id)
-    net_classifier = ailia.Net(MODEL_CLASSIFIER_PATH, WEIGHT_CLASSIFIER_PATH, env_id=env_id)
+    if args.input1 or args.input2:
+        net = ailia.Net(MODEL_VERI_PATH, WEIGHT_VERI_PATH, env_id=env_id)
 
-    recognize_from_audio(net, net_classifier)
+        eval_verification(net)
+    else:
+        # initialize
+        net = ailia.Net(MODEL_IDENT_PATH, WEIGHT_IDENT_PATH, env_id=env_id)
+        net_classifier = ailia.Net(MODEL_CLASSIFIER_PATH, WEIGHT_CLASSIFIER_PATH, env_id=env_id)
+
+        eval_identification(net, net_classifier)
 
 
 if __name__ == '__main__':
