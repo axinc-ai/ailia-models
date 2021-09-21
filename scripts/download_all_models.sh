@@ -10,6 +10,13 @@ cd ../../audio_processing/deepspeech2; python3 deepspeech2.py ${OPTION}
 cd ../../audio_processing/pytorch-dc-tts/; python3 pytorch-dc-tts.py ${OPTION}
 cd ../../audio_processing/unet_source_separation/; python3 unet_source_separation.py ${OPTION}
 cd ../../audio_processing/transformer-cnn-emotion-recognition/; python3 transformer-cnn-emotion-recognition.py ${OPTION}
+cd ../../background_ramoval/deep-image-matting; python3 deep-image-matting.py ${OPTION}
+cd ../../background_ramoval/u2net; python3 u2net.py ${OPTION}
+cd ../../background_ramoval/u2net; python3 u2net.py -a small ${OPTION}
+cd ../../background_ramoval/u2net-portrait-matting; python3 u2net-portrait-matting.py ${OPTION}
+cd ../../background_ramoval/u2net-human-seg; python3 u2net-human-seg.py ${OPTION}
+cd ../../background_ramoval/indexnet; python3 indexnet.py ${OPTION}
+cd ../../background_ramoval/modnet; python3 modnet.py ${OPTION}
 cd ../../crowd_counting/crowdcount-cascaded-mtl; python3 crowdcount-cascaded-mtl.py ${OPTION}
 cd ../../crowd_counting/c-3-framework; python3 c-3-framework.py ${OPTION}
 cd ../../deep_fashion/clothing-detection; python3 clothing-detection.py ${OPTION}
@@ -82,15 +89,6 @@ cd ../../image_manipulation/psgan; python3 psgan.py ${OPTION}
 cd ../../image_manipulation/deep_white_balance; python3 deep_white_balance.py ${OPTION}
 cd ../../image_manipulation/inpainting_gmcnn; python3 inpainting_gmcnn.py ${OPTION}
 cd ../../image_manipulation/deblur_gan; python3 deblur_gan.py ${OPTION}
-
-cd ../../background_ramoval/deep-image-matting; python3 deep-image-matting.py ${OPTION}
-cd ../../background_ramoval/u2net; python3 u2net.py ${OPTION}
-cd ../../background_ramoval/u2net; python3 u2net.py -a small ${OPTION}
-cd ../../background_ramoval/u2net-portrait-matting; python3 u2net-portrait-matting.py ${OPTION}
-cd ../../background_ramoval/u2net-human-seg; python3 u2net-human-seg.py ${OPTION}
-cd ../../background_ramoval/indexnet; python3 indexnet.py ${OPTION}
-cd ../../background_ramoval/modnet; python3 modnet.py ${OPTION}
-
 cd ../../image_segmentation/deeplabv3; python3 deeplabv3.py ${OPTION}
 cd ../../image_segmentation/hair_segmentation; python3 hair_segmentation.py ${OPTION}
 cd ../../image_segmentation/hrnet_segmentation; python3 hrnet_segmentation.py ${OPTION}
@@ -101,9 +99,7 @@ cd ../../image_segmentation/pytorch-enet; python3 pytorch-unet.py ${OPTION}
 cd ../../image_segmentation/semantic-segmentation-mobilenet-v3; python3 semantic-segmentation-mobilenet-v3.py ${OPTION}
 cd ../../image_segmentation/yet-another-anime-segmenter; python3 yet-another-anime-segmenter.py ${OPTION}
 cd ../../image_segmentation/swiftnet; python3 swiftnet.py ${OPTION}
-cd ../../image_segmentation/codes-for-lane-detection; python3 codes-for-lane-detection.py ${OPTION}
 cd ../../image_segmentation/dense_prediction_transformers; python3 dense_prediction_transformers.py ${OPTION}
-cd ../../image_segmentation/road-segmentation-adas; python3 road-segmentation-adas.py ${OPTION}
 cd ../../line_segment_detection/mlsd; python3 mlsd.py ${OPTION}
 cd ../../neural_language_processing/bert; python3 bert.py ${OPTION}
 cd ../../neural_language_processing/bert_tweets_sentiment; python3 bert_tweets_sentiment.py ${OPTION}
@@ -133,7 +129,6 @@ cd ../../object_detection/3d-object-detection.pytorch; python3 3d-object-detecti
 cd ../../object_detection/mediapipe_objectron; python3 mediapipe_objectron.py ${OPTION}
 cd ../../object_tracking/deepsort; python3 deepsort.py ${OPTION}
 cd ../../object_tracking/person_reid_baseline_pytorch; python3 person_reid_baseline_pytorch.py ${OPTION}
-cd ../../object_tracking/roneld; python3 roneld.py ${OPTION}
 cd ../../object_tracking/abd_net; python3 abd_net.py ${OPTION}
 cd ../../point_segmentation/pointnet_pytorch python3 pointnet_pytorch.py ${OPTION}
 cd ../../pose_estimation/3d-pose-baseline; python3 3d-pose-baseline.py ${OPTION}
@@ -149,6 +144,9 @@ cd ../../pose_estimation/pose-hg-3d; python3 pose-hg-3d.py ${OPTION}
 cd ../../pose_estimation/gast; python3 gast.py ${OPTION}
 cd ../../pose_estimation/animalpose; python3 animalpose.py -d ${OPTION}
 cd ../../pose_estimation/movenet; python3 movenet.py -d ${OPTION}
+cd ../../road_detection/codes-for-lane-detection; python3 codes-for-lane-detection.py ${OPTION}
+cd ../../road_detection/roneld; python3 roneld.py ${OPTION}
+cd ../../road_detection/road-segmentation-adas; python3 road-segmentation-adas.py ${OPTION}
 cd ../../rotation_prediction/rotnet; python3 rotnet.py ${OPTION}
 cd ../../style_transfer/adain; python3 adain.py ${OPTION}
 cd ../../style_transfer/beauty_gan; python3 beauty_gan.py ${OPTION}

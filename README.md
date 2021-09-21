@@ -189,11 +189,9 @@ The collection of pre-trained, state-of-the-art AI models.
 | [<img src="image_segmentation/pytorch-enet/output.png" width=128px>](image_segmentation/pytorch-enet/) | [pytorch-enet](/image_segmentation/pytorch-enet/) | [PyTorch-ENet](https://github.com/davidtvs/PyTorch-ENet) | Pytorch | 1.2.8 and later |
 | [<img src="image_segmentation/yet-another-anime-segmenter/output.png" width=128px>](image_segmentation/yet-another-anime-segmenter/) | [yet-another-anime-segmenter](/image_segmentation/yet-another-anime-segmenter/) | [Yet-Another-Anime-Segmenter](https://github.com/zymk9/Yet-Another-Anime-Segmenter) | Pytorch | 1.2.6 and later |
 | [<img src="image_segmentation/swiftnet/output.png" width=128px>](image_segmentation/swiftnet/) | [swiftnet](/image_segmentation/swiftnet/) | [SwiftNet](https://github.com/orsic/swiftnet) | Pytorch | 1.2.6 and later |
-| [<img src="image_segmentation/codes-for-lane-detection/output.jpg" width=128px>](image_segmentation/codes-for-lane-detection/) | [codes-for-lane-detection](/image_segmentation/codes-for-lane-detection/) | [Codes-for-Lane-Detection](https://github.com/cardwing/Codes-for-Lane-Detection) | Pytorch | 1.2.6 and later |
 | [<img src="image_segmentation/dense_prediction_transformers/output_segmentation.png" width=128px>](image_segmentation/dense_prediction_transformers/) | [dense_prediction_transformers](/image_segmentation/dense_prediction_transformers/) | [dense_prediction_transformers](https://github.com/intel-isl/DPT)   | Pytorch | 1.2.7 and later |
-| [<img src="image_segmentation/road-segmentation-adas/output.png" width=128px>](image_segmentation/road-segmentation-adas/) | [road-segmentation-adas](/image_segmentation/road-segmentation-adas/) | [road-segmentation-adas-0001](https://github.com/openvinotoolkit/open_model_zoo/tree/master/models/intel/road-segmentation-adas-0001) | OpenVINO | 1.2.5 and later |
 
-## Line Segment Detection
+## Line segment detection
 
 | | Model | Reference | Exported From | Supported Ailia Version |
 |:-----------|------------:|:------------:|:------------:|:------------:|
@@ -240,7 +238,6 @@ The collection of pre-trained, state-of-the-art AI models.
 |:-----------|------------:|:------------:|:------------:|:------------:|
 | [<img src="object_tracking/deepsort/demo.gif" width=128px>](object_tracking/deepsort/) | [deepsort](/object_tracking/deepsort/) | [Deep Sort with PyTorch](https://github.com/ZQPei/deep_sort_pytorch) | Pytorch | 1.2.3 and later |
 | [<img src="object_tracking/person_reid_baseline_pytorch/output.png" width=128px>](object_tracking/person_reid_baseline_pytorch/) | [person_reid_baseline_pytorch](/object_tracking/person_reid_baseline_pytorch/) | [UTS-Person-reID-Practical](https://github.com/layumi/Person_reID_baseline_pytorch) | Pytorch | 1.2.6 and later |
-| [<img src="object_tracking/roneld/output.jpg" width=128px>](object_tracking/roneld/) | [roneld](/object_tracking/roneld/) | [RONELD-Lane-Detection](https://github.com/czming/RONELD-Lane-Detection) | Pytorch | 1.2.6 and later |
 | [<img src="object_tracking/abd_net/output.png" width=128px>](object_tracking/abd_net/) | [abd_net](/object_tracking/abd_net/) | [Attentive but Diverse Person Re-Identification](https://github.com/VITA-Group/ABD-Net) | Pytorch | 1.2.7 and later |
 
 ## Point segmentation
@@ -266,6 +263,14 @@ The collection of pre-trained, state-of-the-art AI models.
 | [<img src="pose_estimation/gast/img/output_040.png" width=128px>](pose_estimation/gast/) |[gast](/pose_estimation/gast/) | [A Graph Attention Spatio-temporal Convolutional Networks for 3D Human Pose Estimation in Video (GAST-Net)](https://github.com/fabro66/GAST-Net-3DPoseEstimation) | Pytorch | 1.2.7 and later |
 | [<img src="pose_estimation/animalpose/output.png" width=128px>](pose_estimation/animalpose/) |[animalpose](/pose_estimation/animalpose/) | [MMPose - 2D animal pose estimation](https://github.com/open-mmlab/mmpose) | Pytorch | 1.2.7 and later |
 | [<img src="pose_estimation/movenet/output.png" width=128px>](pose_estimation/movenet/) |[movenet](/pose_estimation/movenet/) | [Code repo for movenet](https://www.tensorflow.org/hub/tutorials/movenet) | TensorFlow | 1.2.8 and later |
+
+## Road detection
+
+| | Model | Reference | Exported From | Supported Ailia Version |
+|:-----------|------------:|:------------:|:------------:|:------------:|
+| [<img src="road_detection/codes-for-lane-detection/output.jpg" width=128px>](road_detection/codes-for-lane-detection/) | [codes-for-lane-detection](/road_detection/codes-for-lane-detection/) | [Codes-for-Lane-Detection](https://github.com/cardwing/Codes-for-Lane-Detection) | Pytorch | 1.2.6 and later |
+| [<img src="road_detection/roneld/output.jpg" width=128px>](object_tracking/roneld/) | [roneld](/object_tracking/roneld/) | [RONELD-Lane-Detection](https://github.com/czming/RONELD-Lane-Detection) | Pytorch | 1.2.6 and later |
+| [<img src="road_detection/road-segmentation-adas/output.png" width=128px>](road_detection/road-segmentation-adas/) | [road-segmentation-adas](/road_detection/road-segmentation-adas/) | [road-segmentation-adas-0001](https://github.com/openvinotoolkit/open_model_zoo/tree/master/models/intel/road-segmentation-adas-0001) | OpenVINO | 1.2.5 and later |
 
 ## Rotation prediction
 
