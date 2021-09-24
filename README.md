@@ -158,7 +158,7 @@ The collection of pre-trained, state-of-the-art AI models.
 | [<img src="image_classification/efficientnet/clock.jpg" width=128px>](image_classification/efficientnet/)| [efficientnet](/image_classification/efficientnet/)|[A PyTorch implementation of EfficientNet]( https://github.com/lukemelas/EfficientNet-PyTorch)|Pytorch| 1.2.3 and later |
 | [<img src="image_classification/efficientnetv2/input.jpg" width=128px>](image_classification/efficientnetv2/)| [efficientnetv2](/image_classification/efficientnetv2/)|[EfficientNetV2]( https://github.com/google/automl/tree/master/efficientnetv2 )|Pytorch| 1.2.4 and later |
 | [<img src="image_classification/vit/output.png" width=128px>](image_classification/vit/)| [vit](/image_classification/vit/)|[Pytorch reimplementation of the Vision Transformer (An Image is Worth 16x16 Words: Transformers for Image Recognition at Scale)](https://github.com/jeonsworld/ViT-pytorch)|Pytorch| 1.2.7 and later |
-| [<img src="image_classification/wide_resnet50/dog.jpg" width=128px>](image_classification/wide_resnet50/)| [wide_resnet50](/image_classification/wide_resnet50/)|[Wide Resnet](https://pytorch.org/hub/pytorch_vision_wide_resnet/)|Pytorch| 1.2.7 and later |
+| [<img src="image_classification/wide_resnet50/dog.jpg" width=128px>](image_classification/wide_resnet50/)| [wide_resnet50](/image_classification/wide_resnet50/)|[Wide Resnet](https://pytorch.org/hub/pytorch_vision_wide_resnet/)|Pytorch| 1.2.5 and later |
 
 ## Image inpainting
 
