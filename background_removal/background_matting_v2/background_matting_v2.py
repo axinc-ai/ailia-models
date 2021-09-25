@@ -213,9 +213,8 @@ def main():
     check_and_download_models(weight_path, model_path, REMOTE_PATH)
 
     # load model
-    env_id = ailia.get_gpu_environment_id()
-    logger.info(f'env_id: {env_id}')
-
+    env_id = args.env_id
+    
     # net initialize
     if not args.onnx:
         net = ailia.Net(model_path, weight_path, env_id=env_id)
