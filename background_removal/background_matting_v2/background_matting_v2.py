@@ -80,14 +80,19 @@ def preprocess(img, shape=None):
     return img
 
 
-def post_process(*args):
+def post_process(*args, a=False):
     pha, fgr, pha_sm, fgr_sm, err_sm, ref_sm = args
 
-    com = np.concatenate([fgr * np.not_equal(pha, 0), pha], axis=1)
+    if a:
+        com = np.concatenate([fgr * np.not_equal(pha, 0), pha], axis=1)
+    else:
+        bg_clr = np.array([
+            120 / 255, 255 / 255, 155 / 255
+        ]).reshape((1, 3, 1, 1))
+        com = pha * fgr + (1 - pha) * bg_clr
 
     img = com.transpose((0, 2, 3, 1))[0] * 255
     img = img.astype(np.uint8)
-    img = cv2.cvtColor(img, cv2.COLOR_RGBA2BGRA)
 
     return img
 
@@ -109,6 +114,7 @@ def predict(net, img, bgr_img):
 
 
 def recognize_from_image(net):
+    # prepare background image
     bgr_img = bgr_image()
 
     # input image loop
@@ -141,7 +147,8 @@ def recognize_from_image(net):
             output = predict(net, img, bgr_img)
 
         # postprocessing
-        res_img = post_process(*output)
+        res_img = post_process(*output, a=True)
+        res_img = cv2.cvtColor(res_img, cv2.COLOR_RGBA2BGRA)
 
         savepath = get_savepath(args.savepath, image_path, ext='.png')
         logger.info(f'saved at : {savepath}')
@@ -164,8 +171,8 @@ def recognize_from_video(net):
     else:
         writer = None
 
+    # prepare background image
     bgr_img = bgr_image((f_h, f_w))
-    bg_clr = np.array([120 / 255, 255 / 255, 155 / 255]).reshape((1, 3, 1, 1))
 
     while True:
         ret, frame = capture.read()
@@ -177,11 +184,7 @@ def recognize_from_video(net):
         output = predict(net, img, bgr_img)
 
         # postprocessing
-        pha, fgr = output[:2]
-        com = pha * fgr + (1 - pha) * bg_clr
-
-        res_img = com.transpose((0, 2, 3, 1))[0] * 255
-        res_img = res_img.astype(np.uint8)
+        res_img = post_process(*output, a=False)
         res_img = cv2.cvtColor(res_img, cv2.COLOR_RGB2BGR)
 
         cv2.imshow('frame', res_img)
