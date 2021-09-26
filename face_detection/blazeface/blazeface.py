@@ -70,7 +70,7 @@ def recognize_from_image(net):
     for image_path in args.input:
         # prepare input data
         logger.info(image_path)
-        org_img = load_image(image_path, (IMAGE_HEIGHT, IMAGE_WIDTH))
+        org_img = cv2.imread(image_path, cv2.IMREAD_COLOR)
 
         input_data = load_image(
             image_path,
