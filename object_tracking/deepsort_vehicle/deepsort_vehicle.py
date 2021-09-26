@@ -329,8 +329,7 @@ def main():
     logger.info('Check Extractor...')
     check_and_download_models(EX_WEIGHT_PATH, EX_MODEL_PATH, REMOTE_EX_PATH)
 
-    env_id = ailia.get_gpu_environment_id()
-    logger.info(f'env_id: {env_id}')
+    env_id = args.env_id
 
     # net initialize
     detector = ailia.Detector(
