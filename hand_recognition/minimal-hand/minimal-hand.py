@@ -252,14 +252,10 @@ def main():
     # model files check and download
     check_and_download_models(WEIGHT_DET_PATH, MODEL_DET_PATH, REMOTE_PATH)
 
-    # load model
-    env_id = ailia.get_gpu_environment_id()
-    print(f'env_id: {env_id}')
-
     # initialize
     if not args.onnx:
-        det_model = ailia.Net(MODEL_DET_PATH, WEIGHT_DET_PATH, env_id=env_id)
-        # ik_model = ailia.Net(MODEL_IK_PATH, WEIGHT_IK_PATH, env_id=env_id)
+        det_model = ailia.Net(MODEL_DET_PATH, WEIGHT_DET_PATH, env_id=args.env_id)
+        # ik_model = ailia.Net(MODEL_IK_PATH, WEIGHT_IK_PATH, env_id=args.env_id)
     else:
         import onnxruntime
         det_model = onnxruntime.InferenceSession(WEIGHT_DET_PATH)

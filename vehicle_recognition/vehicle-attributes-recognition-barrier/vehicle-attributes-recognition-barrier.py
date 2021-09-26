@@ -278,9 +278,7 @@ def main():
             DT_WEIGHT_PATH, DT_MODEL_PATH, DT_REMOTE_PATH
         )
 
-    # load model
-    env_id = ailia.get_gpu_environment_id()
-    logger.info(f'env_id: {env_id}')
+    env_id = args.env_id
 
     # net initialize
     net = ailia.Net(

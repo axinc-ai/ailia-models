@@ -235,8 +235,7 @@ def main():
         )
 
     # load model
-    env_id = ailia.get_gpu_environment_id()
-    logger.info(f'env_id: {env_id}')
+    env_id = args.env_id
 
     # net initialize
     net = ailia.Net(
@@ -244,7 +243,7 @@ def main():
     )
     detector = None
     if args.video or args.detection:
-        detector = ailia.Net(FACE_MODEL_PATH, FACE_WEIGHT_PATH, env_id=args.env_id)
+        detector = ailia.Net(FACE_MODEL_PATH, FACE_WEIGHT_PATH, env_id=env_id)
 
     # image mode
     if args.video is not None:
