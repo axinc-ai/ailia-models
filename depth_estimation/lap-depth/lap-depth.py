@@ -212,13 +212,9 @@ def main():
 
     check_and_download_models(weight_path, model_path, REMOTE_PATH)
 
-    # load model
-    env_id = ailia.get_gpu_environment_id()
-    logger.info(f'env_id: {env_id}')
-
     # initialize
     if not args.onnx:
-        net = ailia.Net(model_path, weight_path, env_id=env_id)
+        net = ailia.Net(model_path, weight_path, env_id=args.env_id)
     else:
         import onnxruntime
         net = onnxruntime.InferenceSession(weight_path)
