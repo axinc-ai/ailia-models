@@ -157,12 +157,8 @@ def main():
     # model files check and download
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
 
-    # load model
-    env_id = ailia.get_gpu_environment_id()
-    logger.info(f'env_id: {env_id}')
-
     # initialize
-    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
 
     recognize_from_audio(net)
 
