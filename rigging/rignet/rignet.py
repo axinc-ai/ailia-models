@@ -723,8 +723,7 @@ def main():
     # load model
     net_info = {}
     if not args.onnx:
-        env_id = ailia.get_gpu_environment_id()
-        print(f'env_id: {env_id}')
+        env_id = args.env_id
 
         net_info['jointNet'] = ailia.Net(MODEL_JOINTNET_PATH, WEIGHT_JOINTNET_PATH, env_id=env_id)
         net_info['rootNet'] = {
