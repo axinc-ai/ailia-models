@@ -61,7 +61,7 @@ MODEL_PATH = MODEL_NAME + ".opt.onnx.prototxt"
 HEIGHT = MODEL_PARAMS[MODEL_NAME]['input_shape'][0]
 WIDTH = MODEL_PARAMS[MODEL_NAME]['input_shape'][1]
 
-SCORE_THR = 0.3
+SCORE_THR = 0.4
 
 # ======================
 # Main functions
@@ -100,15 +100,30 @@ def recognize_from_image():
         boxes_xyxy[:, 2] = boxes[:, 0] + boxes[:, 2] / 2.
         boxes_xyxy[:, 3] = boxes[:, 1] + boxes[:, 3] / 2.
         boxes_xyxy /= ratio
-        dets = multiclass_nms(boxes_xyxy, scores, nms_thr=0.45, score_thr=0.1)
+        dets = multiclass_nms(boxes_xyxy, scores, nms_thr=0.45, score_thr=0.8)
         if dets is not None:
+            img_size_h, img_size_w = raw_img.shape[:2]
+            detect_object = []
             final_boxes, final_scores, final_cls_inds = dets[:, :4], dets[:, 4], dets[:, 5]
-            raw_img = vis(raw_img, final_boxes, final_scores, final_cls_inds,
-                             conf=SCORE_THR, class_names=COCO_CLASSES)
+            for i, box in enumerate(final_boxes):
+                x1, y1, x2, y2 = box
+                c = int(final_cls_inds[i])
+                r = ailia.DetectorObject(
+                    category=c,
+                    prob=final_scores[i],
+                    x=x1 / img_size_w,
+                    y=y1 / img_size_h,
+                    w=(x2 - x1) / img_size_w,
+                    h=(y2 - y1) / img_size_h,
+                )
+                detect_object.append(r)
+
+            detect_object = reverse_letterbox(detect_object, raw_img, (raw_img.shape[0], raw_img.shape[1]))
+            res_img = plot_results(detect_object, raw_img, COCO_CLASSES)
 
         savepath = get_savepath(args.savepath, image_path)
         logger.info(f'saved at : {savepath}')
-        cv2.imwrite(savepath, raw_img)
+        cv2.imwrite(savepath, res_img)
 
     logger.info('Script finished successfully.')
 
@@ -150,16 +165,31 @@ def recognize_from_video():
         boxes_xyxy[:, 2] = boxes[:, 0] + boxes[:, 2] / 2.
         boxes_xyxy[:, 3] = boxes[:, 1] + boxes[:, 3] / 2.
         boxes_xyxy /= ratio
-        dets = multiclass_nms(boxes_xyxy, scores, nms_thr=0.45, score_thr=0.1)
+        dets = multiclass_nms(boxes_xyxy, scores, nms_thr=0.45, score_thr=0.8)
         if dets is not None:
+            img_size_h, img_size_w = raw_img.shape[:2]
+            detect_object = []
             final_boxes, final_scores, final_cls_inds = dets[:, :4], dets[:, 4], dets[:, 5]
-            raw_img = vis(raw_img, final_boxes, final_scores, final_cls_inds,
-                          conf=SCORE_THR, class_names=COCO_CLASSES)
-        cv2.imshow('frame', raw_img)
+            for i, box in enumerate(final_boxes):
+                x1, y1, x2, y2 = box
+                c = int(final_cls_inds[i])
+                r = ailia.DetectorObject(
+                    category=c,
+                    prob=final_scores[i],
+                    x=x1 / img_size_w,
+                    y=y1 / img_size_h,
+                    w=(x2 - x1) / img_size_w,
+                    h=(y2 - y1) / img_size_h,
+                )
+                detect_object.append(r)
+
+            detect_object = reverse_letterbox(detect_object, raw_img, (raw_img.shape[0], raw_img.shape[1]))
+            res_img = plot_results(detect_object, raw_img, COCO_CLASSES)
+        cv2.imshow('frame', res_img)
 
         # save results
         if writer is not None:
-            writer.write(raw_img)
+            writer.write(res_img)
 
     capture.release()
     cv2.destroyAllWindows()
