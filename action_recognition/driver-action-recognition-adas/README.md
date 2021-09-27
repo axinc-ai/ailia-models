@@ -2,7 +2,7 @@
 
 ## Input
 
-<img src="img/img_000.png" width="240"><img src="img/img_015.png" width="240"><img src="img/img_030.png" width="240">
+<img src="img/img_000.png" width="320"><img src="img/img_015.png" width="320"><img src="img/img_030.png" width="320">
 
 (Image from https://github.com/openvinotoolkit/open_model_zoo/blob/master/demos/action_recognition_demo/python/action_recognition.gif)
 
