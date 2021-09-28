@@ -4,6 +4,7 @@ cd action_recognition/mars; python3 mars.py ${OPTION}
 cd ../../action_recognition/st-gcn; python3 st-gcn.py ${OPTION}
 cd ../../action_recognition/ax_action_recognition; python3 ax_action_recognition.py ${OPTION}
 cd ../../action_recognition/va-cnn; python3 va-cnn.py ${OPTION}
+cd ../../action_recognition/driver-action-recognition-adas; python3 driver-action-recognition-adas.py ${OPTION}
 cd ../../anomaly_detection/padim; python3 padim.py ${OPTION}
 cd ../../audio_processing/crnn_audio_classification; python3 crnn_audio_classification.py ${OPTION}
 cd ../../audio_processing/deepspeech2; python3 deepspeech2.py ${OPTION}

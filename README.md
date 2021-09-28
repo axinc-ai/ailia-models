@@ -20,6 +20,7 @@ The collection of pre-trained, state-of-the-art AI models.
 | [<img src="action_recognition/st_gcn/input.png" width=128px>](action_recognition/st_gcn/) | [st-gcn](/action_recognition/st_gcn/) | [ST-GCN](https://github.com/yysijie/st-gcn) | Pytorch | 1.2.5 and later |
 | [<img src="action_recognition/ax_action_recognition/punch_03-12-09-21-27-876_out.gif" width=128px>](action_recognition/ax_action_recognition/) | [ax_action_recognition](/action_recognition/ax_action_recognition/) | [Realtime-Action-Recognition](https://github.com/felixchenfy/Realtime-Action-Recognition) | Pytorch | 1.2.7 and later |
 | [<img src="action_recognition/va-cnn/image/f-0.png" width=128px>](action_recognition/va-cnn/) | [va-cnn](/action_recognition/va-cnn/) | [View Adaptive Neural Networks (VA) for Skeleton-based Human Action Recognition](https://github.com/microsoft/View-Adaptive-Neural-Networks-for-Skeleton-based-Human-Action-Recognition) | Pytorch | 1.2.7 and later |
+| [<img src="action_recognition/driver-action-recognition-adas/img/out_030.png" width=128px>](action_recognition/driver-action-recognition-adas/) | [driver-action-recognition-adas](/action_recognition/driver-action-recognition-adas/) | [driver-action-recognition-adas-0002](https://github.com/openvinotoolkit/open_model_zoo/tree/master/models/intel/driver-action-recognition-adas-0002) | OpenVINO | 1.2.5 and later |
 
 ## Anomaly detection
 
