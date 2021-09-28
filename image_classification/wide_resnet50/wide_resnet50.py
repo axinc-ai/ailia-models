@@ -1,20 +1,26 @@
-import sys
 import time
+import sys
 
 import cv2
 import numpy as np
-from skimage import transform
+from PIL import Image
 
 import ailia
 
+# import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
+from utils import get_base_parser, update_parser  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
+from classifier_utils import plot_results, print_results  # noqa: E402
 from detector_utils import load_image  # noqa: E402C
+from image_utils import normalize_image  # noqa: E402C
+from math_utils import softmax  # noqa: E402C
 import webcamera_utils  # noqa: E402
 
 # logger
 from logging import getLogger  # noqa: E402
+
+from imagenet_classes import imagenet_classes
 
 logger = getLogger(__name__)
 
@@ -22,43 +28,48 @@ logger = getLogger(__name__)
 # Parameters
 # ======================
 
-WEIGHT_PATH = 'u2net-human-seg.onnx'
-MODEL_PATH = 'u2net-human-seg.onnx.prototxt'
-REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/u2net-human-seg/'
+WEIGHT_PATH = 'wide_resnet50_2.onnx'
+MODEL_PATH = 'wide_resnet50_2.onnx.prototxt'
+REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/wide_resnet50/'
 
-IMAGE_PATH = 'input.jpg'
-SAVE_IMAGE_PATH = 'output.png'
-IMAGE_SIZE = 320
+IMAGE_PATH = 'dog.jpg'
+IMAGE_SIZE = 224
 
 # ======================
-# Argument Parser Config
+# Arguemnt Parser Config
 # ======================
 
 parser = get_base_parser(
-    'U^2-Net - human segmentation',
-    IMAGE_PATH,
-    SAVE_IMAGE_PATH,
-)
-parser.add_argument(
-    '-c', '--composite',
-    action='store_true',
-    help='Composite input image and predicted alpha value'
+    'WIDE RESNET', IMAGE_PATH, None
 )
 args = update_parser(parser)
 
 
 # ======================
-# Utils
+# Main functions
 # ======================
 
 def preprocess(img):
-    img = transform.resize(img, (IMAGE_SIZE, IMAGE_SIZE), mode='constant')
+    h, w = img.shape[:2]
 
-    img = img / np.max(img)
-    img[:, :, 0] = (img[:, :, 0] - 0.485) / 0.229
-    img[:, :, 1] = (img[:, :, 1] - 0.456) / 0.224
-    img[:, :, 2] = (img[:, :, 2] - 0.406) / 0.225
-    img = img.astype(np.float32)
+    resize = 256
+    if h > w:
+        h = resize * h // w
+        w = resize
+    else:
+        w = resize * w // h
+        h = resize
+
+    img = np.array(Image.fromarray(img).resize((w, h), Image.BILINEAR))
+
+    if h > IMAGE_SIZE:
+        pad = (h - IMAGE_SIZE) // 2
+        img = img[pad:pad + IMAGE_SIZE, :]
+    if w > IMAGE_SIZE:
+        pad = (w - IMAGE_SIZE) // 2
+        img = img[:, pad:pad + IMAGE_SIZE]
+
+    img = normalize_image(img, normalize_type='ImageNet')
 
     img = img.transpose((2, 0, 1))
     img = np.expand_dims(img, axis=0)
@@ -66,39 +77,24 @@ def preprocess(img):
     return img
 
 
-# ======================
-# Main functions
-# ======================
-
-def human_seg(net, img):
-    h, w = img.shape[:2]
-
-    # initial preprocesses
+def predict(net, img):
     img = preprocess(img)
 
     # feedforward
     output = net.predict([img])
-    d1, d2, d3, d4, d5, d6, d7 = output
-    pred = d1[:, 0, :, :]
+    output = output[0]
 
-    # post processes
-    ma = np.max(pred)
-    mi = np.min(pred)
-    pred = (pred - mi) / (ma - mi)
+    prob = softmax(output)
 
-    pred = pred.transpose(1, 2, 0)  # CHW -> HWC
-    pred = cv2.resize(pred, (w, h), cv2.INTER_LINEAR)
-
-    return pred
+    return prob[0]
 
 
 def recognize_from_image(net):
     # input image loop
     for image_path in args.input:
-        # prepare input data
         logger.info(image_path)
 
-        img = img_0 = load_image(image_path)
+        img = load_image(image_path)
         img = cv2.cvtColor(img, cv2.COLOR_BGRA2RGB)
 
         # inference
@@ -107,33 +103,22 @@ def recognize_from_image(net):
             logger.info('BENCHMARK mode')
             total_time_estimation = 0
             for i in range(args.benchmark_count):
-                # Pose estimation
                 start = int(round(time.time() * 1000))
-                pred = human_seg(net, img)
+                prob = predict(net, img)
                 end = int(round(time.time() * 1000))
                 estimation_time = (end - start)
 
-                # Loggin
+                # Logging
                 logger.info(f'\tailia processing estimation time {estimation_time} ms')
                 if i != 0:
                     total_time_estimation = total_time_estimation + estimation_time
 
             logger.info(f'\taverage time estimation {total_time_estimation / (args.benchmark_count - 1)} ms')
         else:
-            # inference
-            pred = human_seg(net, img)
+            prob = predict(net, img)
 
-        if not args.composite:
-            res_img = pred * 255
-        else:
-            # composite
-            img_0[:, :, 3] = pred * 255
-            res_img = img_0
-
-        # save results
-        savepath = get_savepath(args.savepath, image_path, ext='.png')
-        logger.info(f'saved at : {savepath}')
-        cv2.imwrite(savepath, res_img)
+        # show result
+        print_results([prob], imagenet_classes)
 
     logger.info('Script finished successfully.')
 
@@ -142,7 +127,7 @@ def recognize_from_video(net):
     capture = webcamera_utils.get_capture(args.video)
 
     # create video writer if savepath is specified as video format
-    if args.savepath != SAVE_IMAGE_PATH:
+    if args.savepath is not None:
         f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
         f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
         writer = webcamera_utils.get_writer(args.savepath, f_h, f_w)
@@ -154,14 +139,13 @@ def recognize_from_video(net):
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
 
-        # inference
-        img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        pred = human_seg(net, img)
+        img = cv2.cvtColor(frame, cv2.COLOR_BGRA2RGB)
 
-        # force composite
-        frame[:, :, 0] = frame[:, :, 0] * pred + 64 * (1 - pred)
-        frame[:, :, 1] = frame[:, :, 1] * pred + 177 * (1 - pred)
-        frame[:, :, 2] = frame[:, :, 2] * pred
+        # inference
+        prob = predict(net, img)
+
+        # get result
+        plot_results(frame, [prob], imagenet_classes)
 
         cv2.imshow('frame', frame)
 
@@ -178,14 +162,11 @@ def recognize_from_video(net):
 
 
 def main():
+    # model files check and download
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
 
-    # load model
-    env_id = ailia.get_gpu_environment_id()
-    logger.info(f'env_id: {env_id}')
-
     # initialize
-    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
 
     if args.video is not None:
         # video mode

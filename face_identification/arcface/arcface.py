@@ -538,6 +538,8 @@ def main():
     if args.video is None:
         # still image mode
         # comparing two images specified args.inputs
+        if len(args.inputs)==0:
+            args.inputs=[IMG_PATH_1,IMG_PATH_2]
         compare_images()
     else:
         # video mode
