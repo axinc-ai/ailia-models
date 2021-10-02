@@ -45,7 +45,7 @@ parser = get_base_parser(
 # NOTE: arcface has different usage for `--input` with other models
 parser.add_argument(
     '-i', '--inputs', metavar='IMAGES', nargs=2,
-    default=['input_before.png', 'input_after.png'],
+    default=[IMAGE_BEFORE_PATH, IMAGE_AFTER_PATH],
     help='Two image paths for calculating the optical flow.'
 )
 parser.add_argument(
@@ -82,6 +82,9 @@ WEIGHT_PATH_UB = 'raft-' + args.model + '_update_block.onnx'
 MODEL_PATH_UB = 'raft-' + args.model + '_update_block.onnx.prototxt'
 REMOTE_PATH_UB = 'https://storage.googleapis.com/ailia-models/raft/'
 
+if (args.iterations > 0):
+    ITERS = args.iterations
+
 if (args.model == 'things'):
     ITERS = 12
     HDIM = 128
@@ -90,9 +93,6 @@ else:
     ITERS = 5
     HDIM = 96
     CORR_RADIUS = 3
-
-if (args.iterations > 0):
-    ITERS = args.iterations
 
 
 # ======================
@@ -547,7 +547,7 @@ def flow_to_image(flow_uv, clip_flow=None, convert_to_bgr=False):
     v = flow_uv[:,:,1]
     rad = np.sqrt(np.square(u) + np.square(v))
     rad_max = np.max(rad)
-    epsilon = 1e-5
+    epsilon = 0.01  # 1e-5  # adjusted (original is 1e-5)
     u = u / (rad_max + epsilon)
     v = v / (rad_max + epsilon)
     return flow_uv_to_colors(u, v, convert_to_bgr)
@@ -563,8 +563,8 @@ def recognize_from_image():
     update_block = ailia.Net(MODEL_PATH_UB, WEIGHT_PATH_UB, env_id=0)
 
     # set filename of images
-    imfile1 = IMAGE_BEFORE_PATH
-    imfile2 = IMAGE_AFTER_PATH
+    imfile1 = args.inputs[0]
+    imfile2 = args.inputs[1]
     logger.info(imfile1)
     logger.info(imfile2)
     # load images
