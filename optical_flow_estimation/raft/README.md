@@ -3,10 +3,10 @@
 ## input
 
 （1 frame before）<br/>
-<img src="https://user-images.githubusercontent.com/9916906/135715920-3f3db27c-9efc-4199-924b-4f3ae99455f5.png" alt="drawing" width="400"/>
+<img src="https://user-images.githubusercontent.com/9916906/135715920-3f3db27c-9efc-4199-924b-4f3ae99455f5.png" alt="drawing" width="300"/>
 
 （1 frame after）<br/>
-<img src="https://user-images.githubusercontent.com/9916906/135715898-4a34ff94-80f1-40fd-b9d4-9d9bf4f3e9a6.png" alt="drawing" width="400"/>
+<img src="https://user-images.githubusercontent.com/9916906/135715898-4a34ff94-80f1-40fd-b9d4-9d9bf4f3e9a6.png" alt="drawing" width="300"/>
 
 (from https://pixabay.com/videos/car-racing-motor-sports-action-74/)
 
@@ -15,10 +15,15 @@
 ## output
 
 （estimated optical flow）<br/>
-<img src="https://user-images.githubusercontent.com/9916906/135715855-28781f4a-1b11-4032-a785-7cbf9be0cced.png" alt="drawing" width="400"/>
+<img src="https://user-images.githubusercontent.com/9916906/135715855-28781f4a-1b11-4032-a785-7cbf9be0cced.png" alt="drawing" width="300"/>
+
+Color is an estimation of the direction in which the object moved between frames.<br/>
+<img src="https://user-images.githubusercontent.com/9916906/135722785-b14895af-9434-4a6b-90d1-6e72be3e3222.png" alt="drawing" width="150"/>
+
+<br/>
 
 （video's output）<br/>
-<img src="https://user-images.githubusercontent.com/9916906/135719449-a5546878-5cc4-431c-8d5f-c8ba33e88929.gif" alt="drawing" width="400"/>
+<img src="https://user-images.githubusercontent.com/9916906/135719449-a5546878-5cc4-431c-8d5f-c8ba33e88929.gif" alt="drawing" width="300"/>
 
 <br/>
 
