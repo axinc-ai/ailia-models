@@ -47,6 +47,8 @@ $ python3 raft.py -v VIDEO_PATH -s SAVE_VIDEO_PATH
 (ex) $ python3 raft.py --video input.mp4 --savepath output.mp4
 ```
 
+By the way, if the input data has a high resolution then the accuracy tends to be high, and if the input data has a low resolution then the processing speed tends to be high.
+
 <br/>
 
 ## Reference
