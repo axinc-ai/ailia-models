@@ -29,8 +29,12 @@ $ python3 invertible_denoising_network.py -i input_images/1_00.PNG --onnx
 ```
 
 ## Reference
-
+- Repository    
 [Invertible Image Denoising](https://github.com/Yang-Liu1082/InvDN)
+
+- Input images    
+SIDD Benchmark > Download > SIDD Benchmark Data > Noisy sRGB data    
+[Smartphone Image Denoising Dataset](https://www.eecs.yorku.ca/~kamel/sidd/benchmark.php)
 
 ## Framework
 
