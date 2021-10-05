@@ -33,6 +33,10 @@ MODEL_LISTS = [
 
 SLEEP_TIME = 0  # for web cam mode
 
+RESIZE_ENABLE = True
+RESIZE_WIDTH = 512
+RESIZE_ALIGNMENT = 32
+
 # ======================
 # Argument Parser Config
 # ======================
@@ -664,6 +668,14 @@ def recognize_from_video():
     capture = webcamera_utils.get_capture(args.video)
     H = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
     W = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
+    
+    # resize input video for performance
+    if RESIZE_ENABLE:
+        if W > RESIZE_WIDTH:
+            d = W / RESIZE_WIDTH
+            W = int((W / d - (RESIZE_ALIGNMENT-1))//RESIZE_ALIGNMENT * RESIZE_ALIGNMENT)
+            H = int((H / d - (RESIZE_ALIGNMENT-1))//RESIZE_ALIGNMENT * RESIZE_ALIGNMENT)
+
     fps = capture.get(cv2.CAP_PROP_FPS)
     # create video writer if savepath is specified as video format
     if (args.savepath is not None) & (args.savepath.split('.')[-1] == 'mp4'):
@@ -673,10 +685,14 @@ def recognize_from_video():
 
     # read frame
     ret, frame_before = capture.read()
+    if RESIZE_ENABLE:
+        frame_before = cv2.resize(frame_before, (W,H))
     frame_before = frame_before[..., ::-1]  # BGR2RGB
     while(True):
         # read frame
         ret, frame_after = capture.read()
+        if RESIZE_ENABLE:
+            frame_after = cv2.resize(frame_after, (W,H))
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
 
