@@ -19,7 +19,8 @@ from logging import getLogger  # noqa: E402
 
 logger = getLogger(__name__)
 
-from this_utils import anchor_generator
+from this_utils import anchor_generator, box_decode
+from this_utils import remove_small_boxes, box_nms
 
 # ======================
 # Parameters
@@ -79,8 +80,15 @@ args = update_parser(parser)
 # Secondaty Functions
 # ======================
 
-# def draw_bbox(img, bboxes):
-#     return img
+def sigmoid(x):
+    return 1.0 / (1.0 + np.exp(-x))
+
+
+def permute_and_flatten(layer, N, A, C, H, W):
+    layer = layer.reshape(N, -1, C, H, W)
+    layer = layer.transpose(0, 3, 4, 1, 2)
+    layer = layer.reshape(N, -1, C)
+    return layer
 
 
 # ======================
@@ -117,7 +125,73 @@ def preprocess(img, image_shape):
     return img
 
 
-def predict(rpn, box, tracker, img, anchor):
+def rpn_post_processing(anchors, objectness, box_regression):
+    pre_nms_top_n = 1000
+    min_size = 0
+    post_nms_top_n = 300
+    nms_thresh = 0.7
+
+    sampled_boxes = []
+    num_levels = len(objectness)
+    anchors = zip(*anchors)
+    for a, o, b in zip(anchors, objectness, box_regression):
+        N, A, H, W = o.shape
+
+        # put in the same format as anchors
+        o = permute_and_flatten(o, N, A, 1, H, W).reshape(N, -1)
+        o = sigmoid(o)
+
+        b = permute_and_flatten(b, N, A, 4, H, W)
+
+        num_anchors = A * H * W
+
+        pre_nms_top_n = min(pre_nms_top_n, num_anchors)
+        topk_idx = np.argsort(-o, axis=1)[:, :pre_nms_top_n]
+        # o = np.take(o, topk_idx[0], axis=1)
+        o = o[:, topk_idx[0]]
+
+        batch_idx = np.arange(N)[:, None]
+        b = b[batch_idx, topk_idx]
+
+        concat_anchors = np.concatenate(a, axis=0)
+        concat_anchors = concat_anchors.reshape(N, -1, 4)[batch_idx, topk_idx]
+
+        proposals = box_decode(
+            b.reshape(-1, 4), concat_anchors.reshape(-1, 4),
+            weights=(1.0, 1.0, 1.0, 1.0)
+        )
+        proposals = proposals.reshape(N, -1, 4)
+
+        result = []
+        for proposal, scores in zip(proposals, o):
+            proposal = remove_small_boxes(proposal, min_size)
+            proposal = box_nms(
+                proposal,
+                scores,
+                nms_thresh,
+                max_proposals=post_nms_top_n,
+            )
+            print("boxlist----", proposal.shape)
+            result.append(proposal)
+    1 / 0
+
+    #     sampled_boxes.append(result)
+    #
+    # boxlists = zip(*sampled_boxes)
+    # boxlists = [cat_boxlist(boxlist) for boxlist in boxlists]
+    #
+    # if num_levels > 1:
+    #     boxlists = select_over_all_levels(boxlists)
+
+
+def post_processing(pixel_pos_scores, link_pos_scores, image_shape):
+    mask = decode_batch(pixel_pos_scores, link_pos_scores)[0, ...]
+    bboxes = mask_to_bboxes(mask, image_shape)
+
+    return bboxes
+
+
+def predict(rpn, box, tracker, img, anchors):
     # shape = (IMAGE_HEIGHT, IMAGE_WIDTH)
     # img = preprocess(img, shape)
 
@@ -130,9 +204,12 @@ def predict(rpn, box, tracker, img, anchor):
     features = output[:5]
     objectness = output[5:10]
     rpn_box_regression = output[10:]
-    print("features--", features[0].shape)
-    print("objectness--", objectness[0].shape)
-    print("rpn_box_regression--", rpn_box_regression[0].shape)
+    # print("features--", features[0].shape)
+    # print("objectness--", objectness[0].shape)
+    # print("rpn_box_regression--", rpn_box_regression[0].shape)
+    rpn_post_processing(anchors, objectness, rpn_box_regression)
+
+    # bboxes = post_processing(pixel_pos_scores, link_pos_scores, img.shape)
 
     return
 
@@ -153,7 +230,7 @@ def recognize_from_video(rpn, box, tracker):
     else:
         writer = None
 
-    anchor = anchor_generator(
+    anchors = anchor_generator(
         ((200, 320), (100, 160), (50, 80), (25, 40), (13, 20))
     )
 
@@ -166,7 +243,7 @@ def recognize_from_video(rpn, box, tracker):
         # inference
         # img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         img = frame
-        output = predict(rpn, box, tracker, img, anchor)
+        output = predict(rpn, box, tracker, img, anchors)
 
         i += 1
         continue

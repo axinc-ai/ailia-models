@@ -1,7 +1,12 @@
+import math
+
 import numpy as np
 
 __all__ = [
     'anchor_generator',
+    'box_decode',
+    'remove_small_boxes',
+    'box_nms',
 ]
 
 
@@ -94,7 +99,7 @@ def _grid_anchors(grid_sizes):
         shifts_y = np.arange(
             0, grid_height * stride, step=stride, dtype=np.float32
         )
-        shift_y, shift_x = np.meshgrid(shifts_y, shifts_x)
+        shift_x, shift_y = np.meshgrid(shifts_x, shifts_y)
         shift_x = shift_x.reshape(-1)
         shift_y = shift_y.reshape(-1)
         shifts = np.stack((shift_x, shift_y, shift_x, shift_y), axis=1)
@@ -111,3 +116,113 @@ def anchor_generator(grid_sizes):
         _grid_anchors(grid_sizes)
     ]
     return anchors
+
+
+def box_decode(rel_codes, boxes, weights):
+    """
+    From a set of original boxes and encoded relative box offsets,
+    get the decoded boxes.
+    """
+
+    boxes = boxes.astype(rel_codes.dtype)
+
+    TO_REMOVE = 1
+    widths = boxes[:, 2] - boxes[:, 0] + TO_REMOVE
+    heights = boxes[:, 3] - boxes[:, 1] + TO_REMOVE
+    ctr_x = boxes[:, 0] + 0.5 * widths
+    ctr_y = boxes[:, 1] + 0.5 * heights
+
+    wx, wy, ww, wh = weights
+    dx = rel_codes[:, 0::4] / wx
+    dy = rel_codes[:, 1::4] / wy
+    dw = rel_codes[:, 2::4] / ww
+    dh = rel_codes[:, 3::4] / wh
+
+    # Prevent sending too large values into exp()
+    bbox_xform_clip = math.log(1000. / 16)
+    dw = np.clip(dw, None, bbox_xform_clip)
+    dh = np.clip(dh, None, bbox_xform_clip)
+
+    pred_ctr_x = dx * widths[:, None] + ctr_x[:, None]
+    pred_ctr_y = dy * heights[:, None] + ctr_y[:, None]
+    pred_w = np.exp(dw) * widths[:, None]
+    pred_h = np.exp(dh) * heights[:, None]
+
+    pred_boxes = np.zeros_like(rel_codes)
+    # x1
+    pred_boxes[:, 0::4] = pred_ctr_x - 0.5 * pred_w
+    # y1
+    pred_boxes[:, 1::4] = pred_ctr_y - 0.5 * pred_h
+    # x2
+    pred_boxes[:, 2::4] = pred_ctr_x + 0.5 * pred_w - 1
+    # y2
+    pred_boxes[:, 3::4] = pred_ctr_y + 0.5 * pred_h - 1
+
+    return pred_boxes
+
+
+def remove_small_boxes(bboxes, min_size):
+    """
+    Only keep boxes with both sides >= min_size
+    """
+
+    x1, y1, x2, y2 = np.split(bboxes, 4, axis=1)
+    ws, hs = x2 - x1 + 1, y2 - y1 + 1
+
+    keep = np.nonzero(
+        (ws >= min_size) & (hs >= min_size)
+    )[0]
+
+    return bboxes[keep]
+
+
+def _box_nms(dets, scores, threshold):
+    x1, y1, x2, y2 = np.split(dets, 4, axis=1)
+    areas = (x2 - x1 + 1) * (y2 - y1 + 1)
+    order = np.argsort(scores)[::-1]
+
+    n = dets.shape[0]
+    suppressed = np.zeros(n)
+
+    for _i in range(n):
+        i = order[_i]
+        if suppressed[i] == 1:
+            continue
+
+        ix1 = x1[i]
+        iy1 = y1[i]
+        ix2 = x2[i]
+        iy2 = y2[i]
+        iarea = areas[i]
+
+        for _j in range(_i + 1, n):
+            j = order[_j]
+            if suppressed[j] == 1:
+                continue
+
+            xx1 = max(ix1, x1[j])
+            yy1 = max(iy1, y1[j])
+            xx2 = min(ix2, x2[j])
+            yy2 = min(iy2, y2[j])
+
+            w = max(0, xx2 - xx1 + 1)
+            h = max(0, yy2 - yy1 + 1)
+
+            inter = w * h
+            ovr = inter / (iarea + areas[j] - inter)
+            if ovr[0] >= threshold:
+                suppressed[j] = 1
+
+    return np.nonzero(suppressed == 0)[0]
+
+
+def box_nms(bboxes, scores, nms_thresh, max_proposals=-1):
+    """
+    Performs non-maximum suppression on a bboxes, with scores
+    """
+    keep = _box_nms(bboxes, scores, nms_thresh)
+    if max_proposals > 0:
+        keep = keep[: max_proposals]
+    bboxes = bboxes[keep]
+
+    return bboxes
