@@ -254,6 +254,12 @@ The collection of pre-trained, state-of-the-art AI models.
 | [<img src="object_tracking/person_reid_baseline_pytorch/output.png" width=128px>](object_tracking/person_reid_baseline_pytorch/) | [person_reid_baseline_pytorch](/object_tracking/person_reid_baseline_pytorch/) | [UTS-Person-reID-Practical](https://github.com/layumi/Person_reID_baseline_pytorch) | Pytorch | 1.2.6 and later | |
 | [<img src="object_tracking/abd_net/output.png" width=128px>](object_tracking/abd_net/) | [abd_net](/object_tracking/abd_net/) | [Attentive but Diverse Person Re-Identification](https://github.com/VITA-Group/ABD-Net) | Pytorch | 1.2.7 and later | |
 
+## Optical Flow Estimation
+
+| | Model | Reference | Exported From | Supported Ailia Version | Blog |
+|:-----------|------------:|:------------:|:------------:|:------------:|:------------:|
+| [<img src="optical_flow_estimation/raft/output.png" width=128px>](optical_flow_estimation/raft/) | [raft](/optical_flow_estimation/raft/) | [RAFT: Recurrent All Pairs Field Transforms for Optical Flow](https://github.com/princeton-vl/RAFT) | Pytorch | 1.2.6 and later |
+
 ## Point segmentation
 
 | | Model | Reference | Exported From | Supported Ailia Version | Blog |
