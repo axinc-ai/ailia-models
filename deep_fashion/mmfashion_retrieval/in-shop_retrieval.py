@@ -53,12 +53,12 @@ parser.add_argument(
 )
 parser.add_argument(
     '--gallery',
-    type=str,
+    default='./gallery', type=str,
     help="Path to the root folder of the images' gallery"
 )
 parser.add_argument(
     '--img_file',
-    type=str,
+    default='./gallery/gallery_img.txt', type=str,
     help="Path to the images' filename of the gallery (.txt file)"
 )
 parser.add_argument(
