@@ -8,6 +8,7 @@ import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.spatial.distance import cosine
+from pathlib import Path
 
 import ailia
 
@@ -26,9 +27,9 @@ logger = getLogger(__name__)
 # ======================
 # Parameters
 # ======================
-WEIGHT_PATH = './in-shop_retriever.onnx'
-MODEL_PATH = './in-shop_retriever.onnx.prototxt'
-#REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/mmfashion/'
+WEIGHT_PATH = 'in-shop_retriever.onnx'
+MODEL_PATH = 'in-shop_retriever.onnx.prototxt'
+REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/mmfashion_retrieval/'
 
 IMAGE_PATH = './06_1_front.jpg'
 SAVE_IMAGE_PATH = 'output.png'
@@ -52,13 +53,18 @@ parser.add_argument(
 )
 parser.add_argument(
     '--gallery',
-    default='/Users/nathan/Desktop/mmfashion/data/In-shop/Img', type=str,
+    type=str,
     help="Path to the root folder of the images' gallery"
 )
 parser.add_argument(
     '--img_file',
-    default='/Users/nathan/Desktop/mmfashion/data/In-shop/Anno/gallery_img.txt', type=str,
+    type=str,
     help="Path to the images' filename of the gallery (.txt file)"
+)
+parser.add_argument(
+    '--generate_img_file',
+    action='store_true',
+    help="Whether to generate the 'gallery_img.txt' file that contains the images' filename of the gallery."
 )
 parser.add_argument(
     '-k', '--topk',
@@ -66,6 +72,8 @@ parser.add_argument(
     help='Retrieve the top k results'
 )
 args = update_parser(parser)
+if not (args.gallery):
+    parser.error('Argument --gallery is required.')
 
 def check(onnx_model):
     onnx.checker.check_model(onnx_model)
@@ -134,15 +142,11 @@ def recognize_from_image(filename, net):
         preds_ailia = net.predict(img)
 
     #logger.info(f'output shape: {preds_ailia.shape}')
+    search_gallery(net, preds_ailia, filename)
 
-    gallery_idx2im = {}
-    gallery_imgs = open(args.img_file,'r').readlines()
-    for i, img in enumerate(gallery_imgs):
-        gallery_idx2im[i] = img.strip('\n')
-
-    gallery_embeds = process_embeds(gallery_imgs, net)
-
-    show_retrieved_images(preds_ailia, gallery_embeds, gallery_idx2im, args.topk, filename)
+    savepath = get_savepath(args.savepath, filename)
+    plt.savefig(savepath, bbox_inches='tight')
+    logger.info(f'saved at : {savepath}')
 
 def process_embeds(filenames, model):
     embeds = []
@@ -161,36 +165,47 @@ def process_embeds(filenames, model):
         embed = model.predict(img)
         embeds.append(embed)
 
+        #if len(embeds) == 1000: break
+
     return embeds
 
+def search_gallery(net, pred, filename=None):
+    gallery_idx2im = {}
+    gallery_imgs = open(args.img_file,'r').readlines()
+    for i, img in enumerate(gallery_imgs):
+        gallery_idx2im[i] = img.strip('\n')
+
+    gallery_embeds = process_embeds(gallery_imgs, net)
+
+    show_retrieved_images(pred, gallery_embeds, gallery_idx2im, args.topk, filename)
+
 def show_topk_retrieved_images(retrieved_idxes, gallery_idx2im, input_image):
-        fig = plt.figure(figsize=(15, 2.5))
-        k=1
-        show_img(input_image, fig, 'Input image', len(retrieved_idxes)+1, k)
+    fig = plt.figure(figsize=(15, 2.5))
+    k=1
+    n=len(retrieved_idxes)
+    if input_image is not None:
+        n+=1
+        show_img(input_image, fig, 'Input image', n, k)
 
-        for idx in retrieved_idxes:
-            k+=1
-            retrieved_img = gallery_idx2im[idx]
-            filename = os.path.join(args.gallery, retrieved_img)
-            print(filename)
-            show_img(filename, fig, f'Top-{k-1} result', len(retrieved_idxes)+1, k)
-
-        savepath = get_savepath(args.savepath, input_image)
-        plt.savefig(savepath, bbox_inches='tight')
-        logger.info(f'saved at : {savepath}')
+    for idx in retrieved_idxes:
+        k+=1
+        retrieved_img = gallery_idx2im[idx]
+        filename = os.path.join(args.gallery, retrieved_img)
+        print(filename)
+        show_img(filename, fig, f'Top-{k-1} result', n, k)   
 
 def show_retrieved_images(query_feat, gallery_embeds, gallery_idx2im, topk, filename):
-        query_dist = []
-        for i, feat in enumerate(gallery_embeds):
-            cosine_dist = cosine(
-                feat.reshape(1, -1), query_feat.reshape(1, -1))
-            query_dist.append(cosine_dist)
+    query_dist = []
+    for i, feat in enumerate(gallery_embeds):
+        cosine_dist = cosine(
+            feat.reshape(1, -1), query_feat.reshape(1, -1))
+        query_dist.append(cosine_dist)
 
-        query_dist = np.array(query_dist)
-        order = np.argsort(query_dist)
+    query_dist = np.array(query_dist)
+    order = np.argsort(query_dist)
 
-        logger.info('Retrieved Top%d Results' % topk)
-        show_topk_retrieved_images(order[:topk], gallery_idx2im, filename)
+    logger.info('Retrieved Top%d Results' % topk)
+    show_topk_retrieved_images(order[:topk], gallery_idx2im, filename)
 
 def show_img(filename, fig, title, topk, idx):
     img = plt.imread(filename)
@@ -199,30 +214,87 @@ def show_img(filename, fig, title, topk, idx):
     imgplot = plt.imshow(img)
     ax.set_title(title)
 
+"""
+def recognize_from_video(filename, net):
+    capture = webcamera_utils.get_capture(args.video)
+
+    # create video writer if savepath is specified as video format
+    if args.savepath != SAVE_IMAGE_PATH:
+        f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
+        writer = webcamera_utils.get_writer(args.savepath, f_h, f_w)
+    else:
+        writer = None
+
+    while True:
+        ret, frame = capture.read()
+        if cv2.waitKey(1) & 0xFF == ord('q') or not ret:
+            break
+
+        x = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        preds_ailia = net.predict(frame)
+        search_gallery(net, preds_ailia)
+
+        # save results
+        if writer is not None:
+            savepath = get_savepath(args.savepath, filename)
+            plt.savefig(savepath, bbox_inches='tight')
+            #writer.write(res_img)
+        plt.show()
+
+    capture.release()
+    cv2.destroyAllWindows()
+    if writer is not None:
+        writer.release()
+    logger.info('Script finished successfully.')
+"""
+
+def generate_images_filename_txt(root):
+    paths = list(Path(root).rglob("*.[jJ|pP][pP|nN][gG]"))
+    filenames = [path.relative_to(root) for path in paths]
+    folder = os.path.join(root, 'gallery_img.txt')
+    with open(folder, 'w') as f:
+        for filename in filenames:
+            f.write("%s\n" % filename)
+    logger.info(f'Gallery image filenames saved at : {folder}')
+    args.img_file = folder
+
 def main():
     # model files check and download
-    #check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
     
     # debug
     if args.debug:
         onnx_model = onnx.load(WEIGHT_PATH)
         check(onnx_model)
     else:
-        if args.onnx_runtime:
-            # image mode
-            # input image loop
-            ort_session = onnxruntime.InferenceSession(WEIGHT_PATH)
+        # generate gallery images filename .txt file
+        if args.generate_img_file:
+            generate_images_filename_txt(args.gallery)
 
-            for image_path in args.input:
-                recognize_from_image_onnx(image_path, ort_session)
-            logger.info('Script finished successfully.')
+        if not (args.img_file):
+            parser.error('Either argument --img_file or --generate_img_file is required.')
+
+        # net initialize
+        net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
+
+        if args.video is not None:
+            # video mode
+            #recognize_from_video(SAVE_IMAGE_PATH, net)
+            pass
         else:
-            # net initialize
-            net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
-            # input image loop
-            for image_path in args.input:
-                recognize_from_image(image_path, net)
-            logger.info('Script finished successfully.')
+            # image mode
+            if args.onnx_runtime:
+                # onnx runtime
+                ort_session = onnxruntime.InferenceSession(WEIGHT_PATH)
+                # input image loop
+                for image_path in args.input:
+                    recognize_from_image_onnx(image_path, ort_session)
+            else:
+                # input image loop
+                for image_path in args.input:
+                    recognize_from_image(image_path, net)
+    logger.info('Script finished successfully.')
 
 if __name__ == '__main__':
     main()
