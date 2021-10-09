@@ -13,14 +13,16 @@ from utils import get_base_parser, update_parser
 from model_utils import check_and_download_models  # noqa: E402
 from detector_utils import load_image  # noqa: E402C
 from image_utils import load_image, normalize_image  # noqa: E402C
+from math_utils import softmax  # noqa: E402C
 from webcamera_utils import get_capture, get_writer  # noqa: E402
 # logger
 from logging import getLogger  # noqa: E402
 
 logger = getLogger(__name__)
 
-from this_utils import anchor_generator, box_decode
-from this_utils import remove_small_boxes, box_nms
+from this_utils import BBox, anchor_generator, box_decode
+from this_utils import remove_small_boxes, boxes_nms, boxes_cat
+from this_utils import select_over_all_levels, filter_results
 
 # ======================
 # Parameters
@@ -132,7 +134,6 @@ def rpn_post_processing(anchors, objectness, box_regression):
     nms_thresh = 0.7
 
     sampled_boxes = []
-    num_levels = len(objectness)
     anchors = zip(*anchors)
     for a, o, b in zip(anchors, objectness, box_regression):
         N, A, H, W = o.shape
@@ -147,7 +148,6 @@ def rpn_post_processing(anchors, objectness, box_regression):
 
         pre_nms_top_n = min(pre_nms_top_n, num_anchors)
         topk_idx = np.argsort(-o, axis=1)[:, :pre_nms_top_n]
-        # o = np.take(o, topk_idx[0], axis=1)
         o = o[:, topk_idx[0]]
 
         batch_idx = np.arange(N)[:, None]
@@ -163,43 +163,155 @@ def rpn_post_processing(anchors, objectness, box_regression):
         proposals = proposals.reshape(N, -1, 4)
 
         result = []
-        for proposal, scores in zip(proposals, o):
-            proposal = remove_small_boxes(proposal, min_size)
-            proposal = box_nms(
-                proposal,
-                scores,
+        for proposal, score in zip(proposals, o):
+            boxes = BBox(bbox=proposal, scores=score)
+            boxes = remove_small_boxes(boxes, min_size)
+            boxes = boxes_nms(
+                boxes,
                 nms_thresh,
                 max_proposals=post_nms_top_n,
             )
-            print("boxlist----", proposal.shape)
-            result.append(proposal)
+            print("boxlist----", boxes.bbox.shape)
+            result.append(boxes)
+
+        sampled_boxes.append(result)
+
+    boxlists = zip(*sampled_boxes)
+    boxlist = [boxes_cat(boxlist) for boxlist in boxlists]
+
+    boxlist = select_over_all_levels(boxlist)
+    print("boxlist--", boxlist[0].bbox)
+    print("boxlist--", boxlist[0].bbox.shape)
+
+    return boxlist[0]
+
+
+def post_processing(class_logits, box_regression, bbox, ids=None, labels=None):
+    prob = softmax(class_logits, -1)
+
+    proposals = box_decode(
+        box_regression, bbox,
+        weights=(10.0, 10.0, 5.0, 5.0)
+    )
+
+    num_classes = prob.shape[1]
+
+    # deafult id is -1
+    ids = ids if ids else np.zeros(len(bbox)) - 1
+
+    labels = []
+
+    # this only happens for tracks
+    if labels is not None and 0 < len(labels):
+        # tracks
+        track_inds = np.nonzero(ids >= 0)[0]
+
+        # avoid track bbs be suppressed during nms
+        if track_inds:
+            prob_cp = np.array(prob)
+            prob[track_inds, :] = 0.
+            prob[track_inds, labels] = prob_cp[track_inds, labels] + 1.
+
+    boxes = BBox(
+        bbox=proposals.reshape(-1, 4),
+        scores=prob.reshape(-1),
+        ids=ids
+    )
+    boxes.bbox[:, 0] = boxes.bbox[:, 0].clip(0, max=800 - 1)
+    boxes.bbox[:, 1] = boxes.bbox[:, 1].clip(0, max=1280 - 1)
+    boxes.bbox[:, 2] = boxes.bbox[:, 2].clip(0, max=800 - 1)
+    boxes.bbox[:, 3] = boxes.bbox[:, 3].clip(0, max=1280 - 1)
+
+    boxes = filter_results(boxes, num_classes)
+
+    return boxes
+
+
+def solver(boxes):
+    """
+    The solver is to merge predictions from detection branch as well as from track branch.
+    The goal is to assign an unique track id to bounding boxes that are deemed tracked
+    :param detection: it includes three set of distinctive prediction:
+    prediction propagated from active tracks, (2 >= score > 1, id >= 0),
+    prediction propagated from dormant tracks, (2 >= score > 1, id >= 0),
+    prediction from detection (1 > score > 0, id = -1).
+    :return:
+    """
+    print(boxes.bbox)
+    print(boxes.bbox.shape)
     1 / 0
 
-    #     sampled_boxes.append(result)
-    #
-    # boxlists = zip(*sampled_boxes)
-    # boxlists = [cat_boxlist(boxlist) for boxlist in boxlists]
-    #
-    # if num_levels > 1:
-    #     boxlists = select_over_all_levels(boxlists)
+    if len(detection) == 0:
+        return [detection]
+
+    track_pool = self.track_pool
+
+    all_ids = detection.get_field('ids')
+    all_scores = detection.get_field('scores')
+    active_ids = track_pool.get_active_ids()
+    dormant_ids = track_pool.get_dormant_ids()
+    device = all_ids.device
+
+    active_mask = torch.tensor([int(x) in active_ids for x in all_ids], device=device)
+
+    # differentiate active tracks from dormant tracks with scores
+    # active tracks, (3 >= score > 2, id >= 0),
+    # dormant tracks, (2 >= score > 1, id >= 0),
+    # By doing this, dormant tracks will be merged to active tracks during nms,
+    # if they highly overlap
+    all_scores[active_mask] += 1.
+
+    nms_detection, nms_ids, nms_scores = self.get_nms_boxes(detection)
+
+    combined_detection = nms_detection
+    _ids = combined_detection.get_field('ids')
+    _scores = combined_detection.get_field('scores')
+
+    # start track ids
+    start_idxs = ((_ids < 0) & (_scores >= self.start_thresh)).nonzero()
+
+    # inactive track ids
+    inactive_idxs = ((_ids >= 0) & (_scores < self.track_thresh))
+    nms_track_ids = set(_ids[_ids >= 0].tolist())
+    all_track_ids = set(all_ids[all_ids >= 0].tolist())
+    # active tracks that are removed by nms
+    nms_removed_ids = all_track_ids - nms_track_ids
+    inactive_ids = set(_ids[inactive_idxs].tolist()) | nms_removed_ids
+
+    # resume dormant mask, if needed
+    dormant_mask = torch.tensor([int(x) in dormant_ids for x in _ids], device=device)
+    resume_ids = _ids[dormant_mask & (_scores >= self.resume_track_thresh)]
+    for _id in resume_ids.tolist():
+        track_pool.resume_track(_id)
+
+    for _idx in start_idxs:
+        _ids[_idx] = track_pool.start_track()
+
+    active_ids = track_pool.get_active_ids()
+    for _id in inactive_ids:
+        if _id in active_ids:
+            track_pool.suspend_track(_id)
+
+    # make sure that the ids for inactive tracks in current frame are meaningless (< 0)
+    _ids[inactive_idxs] = -1
+
+    track_pool.expire_tracks()
+    track_pool.increment_frame()
+
+    return [combined_detection]
 
 
-def post_processing(pixel_pos_scores, link_pos_scores, image_shape):
-    mask = decode_batch(pixel_pos_scores, link_pos_scores)[0, ...]
-    bboxes = mask_to_bboxes(mask, image_shape)
-
-    return bboxes
-
-
-def predict(rpn, box, tracker, img, anchors):
+def predict(rpn, box, tracker, img, anchors, cache={}):
     # shape = (IMAGE_HEIGHT, IMAGE_WIDTH)
     # img = preprocess(img, shape)
 
     # feedforward
+    print("1-----------")
     if not args.onnx:
         output = rpn.predict([img])
     else:
         output = rpn.run(None, {'img': img})
+    print("2-----------")
 
     features = output[:5]
     objectness = output[5:10]
@@ -207,11 +319,51 @@ def predict(rpn, box, tracker, img, anchors):
     # print("features--", features[0].shape)
     # print("objectness--", objectness[0].shape)
     # print("rpn_box_regression--", rpn_box_regression[0].shape)
-    rpn_post_processing(anchors, objectness, rpn_box_regression)
+    boxes = rpn_post_processing(anchors, objectness, rpn_box_regression)
+    print("3-----------")
 
-    # bboxes = post_processing(pixel_pos_scores, link_pos_scores, img.shape)
+    proposals = boxes.bbox
 
-    return
+    # roi_heads
+    inputs = features[:4] + [proposals]
+    if not args.onnx:
+        output = box.predict(inputs)
+    else:
+        output = box.run(
+            None, {k: v for k, v in zip((
+                "features_0", "features_1", "features_2", "features_3", "proposals"),
+                inputs)})
+    class_logits, box_regression = output
+    print("4-----------")
+
+    boxes = post_processing(class_logits, box_regression, proposals)
+    print("5-----------")
+
+    # track_memory = None
+    # inputs = features[:4] + [track_memory]
+    # if not args.onnx:
+    #     output = tracker.predict(inputs)
+    # else:
+    #     output = tracker.run(
+    #         None, {k: v for k, v in zip((
+    #             "features_0", "features_1", "features_2", "features_3",
+    #             "boxes", "sr", "template_features"),
+    #             inputs)})
+    # y, tracks, loss_track = output
+
+    # solver is only needed during inference
+    # if tracks is not None:
+    #     tracks = self._refine_tracks(features, tracks)
+    #     detections = [cat_boxlist(detections + tracks)]
+
+    boxes = solver(boxes)
+
+    # # get the current state for tracking
+    # x = get_track_memory(features, detections)
+
+    # cache['x'] = x
+
+    return boxes
 
 
 def recognize_from_video(rpn, box, tracker):

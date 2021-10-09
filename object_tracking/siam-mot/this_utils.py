@@ -1,13 +1,24 @@
+from collections import namedtuple
 import math
 
 import numpy as np
 
 __all__ = [
+    'BBox',
     'anchor_generator',
     'box_decode',
     'remove_small_boxes',
-    'box_nms',
+    'select_over_all_levels',
+    'filter_results',
 ]
+
+BBox = namedtuple('BBox', [
+    'bbox',
+    'scores',
+    'ids',
+    'labels',
+])
+BBox.__new__.__defaults__ = (None, None, None, None)
 
 
 def _generate_anchors(base_size, scales, aspect_ratios):
@@ -161,21 +172,6 @@ def box_decode(rel_codes, boxes, weights):
     return pred_boxes
 
 
-def remove_small_boxes(bboxes, min_size):
-    """
-    Only keep boxes with both sides >= min_size
-    """
-
-    x1, y1, x2, y2 = np.split(bboxes, 4, axis=1)
-    ws, hs = x2 - x1 + 1, y2 - y1 + 1
-
-    keep = np.nonzero(
-        (ws >= min_size) & (hs >= min_size)
-    )[0]
-
-    return bboxes[keep]
-
-
 def _box_nms(dets, scores, threshold):
     x1, y1, x2, y2 = np.split(dets, 4, axis=1)
     areas = (x2 - x1 + 1) * (y2 - y1 + 1)
@@ -216,13 +212,143 @@ def _box_nms(dets, scores, threshold):
     return np.nonzero(suppressed == 0)[0]
 
 
-def box_nms(bboxes, scores, nms_thresh, max_proposals=-1):
+def boxes_nms(boxes, nms_thresh, max_proposals=-1):
     """
     Performs non-maximum suppression on a bboxes, with scores
     """
-    keep = _box_nms(bboxes, scores, nms_thresh)
+
+    bbox = boxes.bbox
+    scores = boxes.scores
+
+    keep = _box_nms(bbox, scores, nms_thresh)
     if max_proposals > 0:
         keep = keep[: max_proposals]
-    bboxes = bboxes[keep]
 
-    return bboxes
+    return boxes_filter(boxes, keep)
+
+
+def boxes_filter(boxes, keep):
+    d = dict(
+        bbox=boxes.bbox[keep],
+        scores=None,
+        ids=None,
+        labels=None,
+    )
+    for key in ['scores', 'ids', 'labels']:
+        data = getattr(boxes, key)
+        if data is not None:
+            data = data[keep]
+            d[key] = data
+
+    new_boxes = BBox(**d)
+
+    return new_boxes
+
+
+def boxes_cat(boxlist):
+    def _cat(xx, axis=0):
+        if len(xx) == 1:
+            return xx[0]
+        return np.concatenate(xx, axis=axis)
+
+    d = dict(
+        bbox=_cat([b.bbox for b in boxlist], axis=0),
+        scores=None,
+        ids=None,
+        labels=None,
+    )
+    for key in ['scores', 'ids', 'labels']:
+        a = [getattr(b, key) for b in boxlist]
+        a = [d for d in a if d is not None]
+        if a:
+            data = _cat(a, axis=0)
+            d[key] = data
+
+    cat_boxes = BBox(**d)
+
+    return cat_boxes
+
+
+def remove_small_boxes(boxes, min_size):
+    """
+    Only keep boxes with both sides >= min_size
+    """
+
+    bbox = boxes.bbox
+
+    x1, y1, x2, y2 = np.split(bbox, 4, axis=1)
+    ws, hs = x2 - x1 + 1, y2 - y1 + 1
+
+    keep = np.nonzero(
+        (ws >= min_size) & (hs >= min_size)
+    )[0]
+
+    return boxes_filter(boxes, keep)
+
+
+def select_over_all_levels(boxlist):
+    fpn_post_nms_top_n = 300
+
+    for i, boxes in enumerate(boxlist):
+        scores = boxes.scores
+        post_nms_top_n = min(fpn_post_nms_top_n, len(scores))
+
+        topk_idx = np.argsort(-scores)[:post_nms_top_n]
+        boxlist[i] = boxes_filter(boxes, topk_idx)
+
+    return boxlist
+
+
+def filter_results(bboxes, num_classes):
+    """Returns bounding-box detection results by thresholding on scores and
+    applying non-maximum suppression (NMS).
+    """
+    # unwrap the boxlist to avoid additional overhead.
+    # if we had multi-class NMS, we could perform this directly on the boxlist
+    score_thresh = 0.05
+
+    boxes = bboxes.bbox.reshape(-1, num_classes * 4)
+    scores = bboxes.scores.reshape(-1, num_classes)
+    ids = bboxes.ids
+
+    result = [None for _ in range(1, num_classes)]
+
+    # Apply threshold on detection probabilities and apply NMS
+    # Skip j = 0, because it's the background class
+    inds_all = scores > score_thresh
+    for j in range(1, num_classes):
+        inds = inds_all[:, j].nonzero()[0]
+        scores_j = scores[inds, j]
+        boxes_j = boxes[inds, j * 4: (j + 1) * 4]
+        ids_j = ids[inds]
+
+        det_idx = ids_j < 0
+        det_boxlist = BBox(
+            bbox=boxes_j[det_idx, :],
+            scores=scores_j[det_idx],
+            ids=ids_j[det_idx]
+        )
+        det_boxlist = boxes_nms(det_boxlist, nms_thresh=0.5)
+
+        track_idx = ids_j >= 0
+        # track_box is available
+        if np.any(track_idx > 0):
+            track_boxlist = BBox(
+                bbox=boxes_j[track_idx, :],
+                scores=scores_j[track_idx],
+                ids=scores_j[track_idx],
+            )
+            det_boxlist = boxes_cat([det_boxlist, track_boxlist])
+
+        num_labels = len(det_boxlist)
+        det_boxlist = BBox(
+            det_boxlist.bbox,
+            det_boxlist.scores,
+            det_boxlist.ids,
+            np.full((num_labels,), j)
+        )
+        result[j - 1] = det_boxlist
+
+    result = boxes_cat(result)
+
+    return result
