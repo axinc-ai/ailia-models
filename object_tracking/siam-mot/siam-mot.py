@@ -1,5 +1,5 @@
 import sys
-import time
+from functools import partial
 
 import numpy as np
 import cv2
@@ -23,6 +23,7 @@ logger = getLogger(__name__)
 from this_utils import BBox, anchor_generator, box_decode
 from this_utils import remove_small_boxes, boxes_nms, boxes_cat
 from this_utils import select_over_all_levels, filter_results
+from track_utils import track_utils, track_pool, track_head, track_solver
 
 # ======================
 # Parameters
@@ -176,6 +177,10 @@ def rpn_post_processing(anchors, objectness, box_regression):
 
         sampled_boxes.append(result)
 
+    # boxlists = zip(*sampled_boxes)
+    # boxlists = [
+    #     [np.concatenate(x, axis=0) for x in zip(*boxlist)] for boxlist in boxlists
+    # ]
     boxlists = zip(*sampled_boxes)
     boxlist = [boxes_cat(boxlist) for boxlist in boxlists]
 
@@ -186,7 +191,7 @@ def rpn_post_processing(anchors, objectness, box_regression):
     return boxlist[0]
 
 
-def post_processing(class_logits, box_regression, bbox, ids=None, labels=None):
+def post_processing(class_logits, box_regression, bbox, ids=None):
     prob = softmax(class_logits, -1)
 
     proposals = box_decode(
@@ -217,91 +222,47 @@ def post_processing(class_logits, box_regression, bbox, ids=None, labels=None):
         scores=prob.reshape(-1),
         ids=ids
     )
-    boxes.bbox[:, 0] = boxes.bbox[:, 0].clip(0, max=800 - 1)
-    boxes.bbox[:, 1] = boxes.bbox[:, 1].clip(0, max=1280 - 1)
-    boxes.bbox[:, 2] = boxes.bbox[:, 2].clip(0, max=800 - 1)
-    boxes.bbox[:, 3] = boxes.bbox[:, 3].clip(0, max=1280 - 1)
+    boxes.bbox[:, 0] = boxes.bbox[:, 0].clip(0, max=1280 - 1)
+    boxes.bbox[:, 1] = boxes.bbox[:, 1].clip(0, max=800 - 1)
+    boxes.bbox[:, 2] = boxes.bbox[:, 2].clip(0, max=1280 - 1)
+    boxes.bbox[:, 3] = boxes.bbox[:, 3].clip(0, max=800 - 1)
 
     boxes = filter_results(boxes, num_classes)
 
     return boxes
 
 
-def solver(boxes):
+def extract_cache(feat_ext, features, detection):
     """
-    The solver is to merge predictions from detection branch as well as from track branch.
-    The goal is to assign an unique track id to bounding boxes that are deemed tracked
-    :param detection: it includes three set of distinctive prediction:
-    prediction propagated from active tracks, (2 >= score > 1, id >= 0),
-    prediction propagated from dormant tracks, (2 >= score > 1, id >= 0),
-    prediction from detection (1 > score > 0, id = -1).
-    :return:
+    Get the cache (state) that is necessary for tracking
+    output: (features for tracking targets,
+             search region,
+             detection bounding boxes)
     """
-    print(boxes.bbox)
-    print(boxes.bbox.shape)
-    1 / 0
 
-    if len(detection) == 0:
-        return [detection]
+    # get cache features for search region
+    # FPN features
+    inputs = features[:4] + [detection.bbox]
+    if not args.onnx:
+        output = feat_ext.predict(inputs)
+    else:
+        output = feat_ext.run(
+            None, {k: v for k, v in zip((
+                "feature_0", "feature_1", "feature_2", "feature_3", "proposals"),
+                inputs)})
+    x = output[0]
+    print("x---", x)
+    print("x---", x.shape)
 
-    track_pool = self.track_pool
+    sr = track_utils.update_boxes_in_pad_images(detection)
+    sr = track_utils.extend_bbox(sr)
 
-    all_ids = detection.get_field('ids')
-    all_scores = detection.get_field('scores')
-    active_ids = track_pool.get_active_ids()
-    dormant_ids = track_pool.get_dormant_ids()
-    device = all_ids.device
+    cache = (x, sr, detection)
 
-    active_mask = torch.tensor([int(x) in active_ids for x in all_ids], device=device)
-
-    # differentiate active tracks from dormant tracks with scores
-    # active tracks, (3 >= score > 2, id >= 0),
-    # dormant tracks, (2 >= score > 1, id >= 0),
-    # By doing this, dormant tracks will be merged to active tracks during nms,
-    # if they highly overlap
-    all_scores[active_mask] += 1.
-
-    nms_detection, nms_ids, nms_scores = self.get_nms_boxes(detection)
-
-    combined_detection = nms_detection
-    _ids = combined_detection.get_field('ids')
-    _scores = combined_detection.get_field('scores')
-
-    # start track ids
-    start_idxs = ((_ids < 0) & (_scores >= self.start_thresh)).nonzero()
-
-    # inactive track ids
-    inactive_idxs = ((_ids >= 0) & (_scores < self.track_thresh))
-    nms_track_ids = set(_ids[_ids >= 0].tolist())
-    all_track_ids = set(all_ids[all_ids >= 0].tolist())
-    # active tracks that are removed by nms
-    nms_removed_ids = all_track_ids - nms_track_ids
-    inactive_ids = set(_ids[inactive_idxs].tolist()) | nms_removed_ids
-
-    # resume dormant mask, if needed
-    dormant_mask = torch.tensor([int(x) in dormant_ids for x in _ids], device=device)
-    resume_ids = _ids[dormant_mask & (_scores >= self.resume_track_thresh)]
-    for _id in resume_ids.tolist():
-        track_pool.resume_track(_id)
-
-    for _idx in start_idxs:
-        _ids[_idx] = track_pool.start_track()
-
-    active_ids = track_pool.get_active_ids()
-    for _id in inactive_ids:
-        if _id in active_ids:
-            track_pool.suspend_track(_id)
-
-    # make sure that the ids for inactive tracks in current frame are meaningless (< 0)
-    _ids[inactive_idxs] = -1
-
-    track_pool.expire_tracks()
-    track_pool.increment_frame()
-
-    return [combined_detection]
+    return cache
 
 
-def predict(rpn, box, tracker, img, anchors, cache={}):
+def predict(rpn, box, tracker, feat_ext, img, anchors, cache={}):
     # shape = (IMAGE_HEIGHT, IMAGE_WIDTH)
     # img = preprocess(img, shape)
 
@@ -324,7 +285,8 @@ def predict(rpn, box, tracker, img, anchors, cache={}):
 
     proposals = boxes.bbox
 
-    # roi_heads
+    ### roi_heads.box
+
     inputs = features[:4] + [proposals]
     if not args.onnx:
         output = box.predict(inputs)
@@ -339,34 +301,60 @@ def predict(rpn, box, tracker, img, anchors, cache={}):
     boxes = post_processing(class_logits, box_regression, proposals)
     print("5-----------")
 
-    # track_memory = None
-    # inputs = features[:4] + [track_memory]
-    # if not args.onnx:
-    #     output = tracker.predict(inputs)
-    # else:
-    #     output = tracker.run(
-    #         None, {k: v for k, v in zip((
-    #             "features_0", "features_1", "features_2", "features_3",
-    #             "boxes", "sr", "template_features"),
-    #             inputs)})
-    # y, tracks, loss_track = output
+    ### roi_heads.track
+
+    track_head.feature_extractor = feat_ext
+
+    track_memory = cache.get('x', None)
+
+    track_boxes = None
+    if track_memory is None:
+        track_pool.reset()
+        y, tracks = {}, track_boxes
+    else:
+        template_features, sr, template_boxes = track_memory
+        inputs = features[:4] + [template_features, sr, template_boxes]
+        if not args.onnx:
+            output = tracker.predict(inputs)
+        else:
+            output = tracker.run(
+                None, {k: v for k, v in zip((
+                    "features_0", "features_1", "features_2", "features_3",
+                    "boxes", "sr", "template_features"),
+                    inputs)})
+        cls_logits, center_logits, reg_logits = output
+
+        cls_logits = F.interpolate(cls_logits, scale_factor=16, mode='bicubic')
+        center_logits = F.interpolate(center_logits, scale_factor=16, mode='bicubic')
+        reg_logits = F.interpolate(reg_logits, scale_factor=16, mode='bicubic')
+
+        locations = get_locations(sr_features, template_features, sr, shift_xy=(shift_x, shift_y), up_scale=16)
+
+        assert len(boxes) == 1
+        bb, bb_conf = decode_response(cls_logits, center_logits, reg_logits, locations, boxes[0],
+                                      use_centerness=self.use_centerness, sigma=self.sigma)
+        track_result = wrap_results_to_boxlist(bb, bb_conf, boxes, amodal=self.amodal)
+
+        y, tracks = {}, track_result
 
     # solver is only needed during inference
-    # if tracks is not None:
-    #     tracks = self._refine_tracks(features, tracks)
-    #     detections = [cat_boxlist(detections + tracks)]
+    if tracks is not None:
+        tracks = self._refine_tracks(features, tracks)
+        boxes = [cat_boxlist(boxes + tracks)]
 
-    boxes = solver(boxes)
+    boxes = track_solver.solve(boxes)
 
-    # # get the current state for tracking
-    # x = get_track_memory(features, detections)
+    # get the current state for tracking
+    x = track_head.get_track_memory(
+        features, boxes,
+        extract_cache=partial(extract_cache, feat_ext))
 
-    # cache['x'] = x
+    cache['x'] = x
 
     return boxes
 
 
-def recognize_from_video(rpn, box, tracker):
+def recognize_from_video(rpn, box, tracker, feat_ext):
     video_file = args.video if args.video else args.input[0]
     capture = get_capture(video_file)
     assert capture.isOpened(), 'Cannot capture source'
@@ -392,10 +380,14 @@ def recognize_from_video(rpn, box, tracker):
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
 
+        if i > 2:
+            break
+        frame = np.load("%03d.npy" % (i + 1))
+
         # inference
         # img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         img = frame
-        output = predict(rpn, box, tracker, img, anchors)
+        output = predict(rpn, box, tracker, feat_ext, img, anchors)
 
         i += 1
         continue
@@ -447,8 +439,9 @@ def main():
         rpn = onnxruntime.InferenceSession("rpn.onnx")
         box = onnxruntime.InferenceSession("box.onnx")
         tracker = onnxruntime.InferenceSession("tracker.onnx")
+        feat_ext = onnxruntime.InferenceSession("feat_ext.onnx")
 
-    recognize_from_video(rpn, box, tracker)
+    recognize_from_video(rpn, box, tracker, feat_ext)
 
 
 if __name__ == '__main__':
