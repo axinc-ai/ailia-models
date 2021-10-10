@@ -20,10 +20,11 @@ from logging import getLogger  # noqa: E402
 
 logger = getLogger(__name__)
 
-from this_utils import BBox, anchor_generator, box_decode
+from this_utils import BBox, sigmoid, anchor_generator, box_decode
 from this_utils import remove_small_boxes, boxes_nms, boxes_cat
 from this_utils import select_over_all_levels, filter_results
 from track_utils import track_utils, track_pool, track_head, track_solver
+from track_utils import get_locations, decode_response, results_to_boxes
 
 # ======================
 # Parameters
@@ -82,10 +83,6 @@ args = update_parser(parser)
 # ======================
 # Secondaty Functions
 # ======================
-
-def sigmoid(x):
-    return 1.0 / (1.0 + np.exp(-x))
-
 
 def permute_and_flatten(layer, N, A, C, H, W):
     layer = layer.reshape(N, -1, C, H, W)
@@ -251,15 +248,115 @@ def extract_cache(feat_ext, features, detection):
                 "feature_0", "feature_1", "feature_2", "feature_3", "proposals"),
                 inputs)})
     x = output[0]
-    print("x---", x)
-    print("x---", x.shape)
 
-    sr = track_utils.update_boxes_in_pad_images(detection)
+    sr = track_utils.update_boxes_in_pad_images([detection])
     sr = track_utils.extend_bbox(sr)
 
-    cache = (x, sr, detection)
+    cache = (x, sr, [detection])
 
     return cache
+
+
+def track_forward(tracker, features, track_memory):
+    track_boxes = None
+    if track_memory is None:
+        track_pool.reset()
+        y, tracks = {}, track_boxes
+    else:
+        template_features, sr, template_boxes = track_memory
+        n = len(template_features)
+        sr_features = np.zeros((n, 128, 30, 30))
+        cls_logits = np.zeros((n, 2, 16, 16))
+        center_logits = np.zeros((n, 1, 16, 16))
+        reg_logits = np.zeros((n, 4, 16, 16))
+        for i in range(0, n, 20):
+            # batch size: 20
+            n = min(i + 20, len(template_features))
+            in_boxes = np.zeros((20, 4), dtype=np.float32)
+            in_search_region = np.zeros((20, 4), dtype=np.float32)
+            in_template_features = np.zeros((20, 128, 15, 15), dtype=np.float32)
+
+            in_boxes[:n - i] = template_boxes[0].bbox[i:n]
+            in_search_region[:n - i] = sr[0].bbox[i:n]
+            in_template_features[:n - i] = template_features[i:n]
+            inputs = features[:4] + [in_boxes, in_search_region, in_template_features]
+            if not args.onnx:
+                output = tracker.predict(inputs)
+            else:
+                output = tracker.run(
+                    None, {k: v for k, v in zip((
+                        "feature_0", "feature_1", "feature_2", "feature_3",
+                        "boxes", "sr", "template_features"),
+                        inputs)})
+            sr_features[i:n] = output[0][:n - i]
+            cls_logits[i:n] = output[1][:n - i]
+            center_logits[i:n] = output[2][:n - i]
+            reg_logits[i:n] = output[3][:n - i]
+        # sr_features = sr_features[1:]
+        # cls_logits = cls_logits[1:]
+        # center_logits = center_logits[1:]
+        # reg_logits = reg_logits[1:]
+
+        import torch
+        import torch.nn.functional as F
+        cls_logits = np.asarray(F.interpolate(torch.from_numpy(cls_logits), scale_factor=16, mode='bicubic'))
+        center_logits = np.asarray(F.interpolate(torch.from_numpy(center_logits), scale_factor=16, mode='bicubic'))
+        reg_logits = np.asarray(F.interpolate(torch.from_numpy(reg_logits), scale_factor=16, mode='bicubic'))
+
+        shift_x = shift_y = 512
+        locations = get_locations(
+            sr_features, template_features, sr, shift_xy=(shift_x, shift_y), up_scale=16)
+
+        use_centerness = True
+        sigma = 0.4
+        bb, bb_conf = decode_response(
+            cls_logits, center_logits, reg_logits, locations, template_boxes[0],
+            use_centerness=use_centerness, sigma=sigma)
+        amodal = False
+        track_result = results_to_boxes(bb, bb_conf, template_boxes, amodal=amodal)
+
+        y, tracks = {}, track_result
+
+    return y, tracks
+
+
+def _refine_tracks(box, features, tracks):
+    """
+    Use box head to refine the bounding box location
+    The final vis score is an average between appearance and matching score
+    """
+    if len(tracks[0].bbox) == 0:
+        return tracks[0]
+
+    track_scores = tracks[0].scores + 1.
+
+    proposals = tracks[0].bbox.astype(np.float32)
+    inputs = features[:4] + [proposals]
+    if not args.onnx:
+        output = box.predict(inputs)
+    else:
+        output = box.run(
+            None, {k: v for k, v in zip((
+                "feature_0", "feature_1", "feature_2", "feature_3", "proposals"),
+                inputs)})
+    class_logits, box_regression = output
+    tracks = post_processing(class_logits, box_regression, proposals)
+
+    det_scores = tracks.scores
+    det_boxes = tracks.bbox
+
+    # TODO fix
+    # scores = (det_scores + track_scores) / 2.
+    scores = det_scores
+    boxes = det_boxes
+
+    r_tracks = BBox(
+        bbox=boxes,
+        scores=scores,
+        ids=tracks.ids,
+        labels=tracks.labels,
+    )
+    return [r_tracks]
 
 
 def predict(rpn, box, tracker, feat_ext, img, anchors, cache={}):
@@ -283,17 +380,16 @@ def predict(rpn, box, tracker, feat_ext, img, anchors, cache={}):
     boxes = rpn_post_processing(anchors, objectness, rpn_box_regression)
     print("3-----------")
 
-    proposals = boxes.bbox
-
     ### roi_heads.box
 
+    proposals = boxes.bbox
     inputs = features[:4] + [proposals]
     if not args.onnx:
         output = box.predict(inputs)
     else:
         output = box.run(
             None, {k: v for k, v in zip((
-                "features_0", "features_1", "features_2", "features_3", "proposals"),
+                "feature_0", "feature_1", "feature_2", "feature_3", "proposals"),
                 inputs)})
     class_logits, box_regression = output
     print("4-----------")
@@ -303,48 +399,17 @@ def predict(rpn, box, tracker, feat_ext, img, anchors, cache={}):
 
     ### roi_heads.track
 
-    track_head.feature_extractor = feat_ext
-
     track_memory = cache.get('x', None)
+    y, tracks = track_forward(tracker, features, track_memory)
 
-    track_boxes = None
-    if track_memory is None:
-        track_pool.reset()
-        y, tracks = {}, track_boxes
-    else:
-        template_features, sr, template_boxes = track_memory
-        inputs = features[:4] + [template_features, sr, template_boxes]
-        if not args.onnx:
-            output = tracker.predict(inputs)
-        else:
-            output = tracker.run(
-                None, {k: v for k, v in zip((
-                    "features_0", "features_1", "features_2", "features_3",
-                    "boxes", "sr", "template_features"),
-                    inputs)})
-        cls_logits, center_logits, reg_logits = output
-
-        cls_logits = F.interpolate(cls_logits, scale_factor=16, mode='bicubic')
-        center_logits = F.interpolate(center_logits, scale_factor=16, mode='bicubic')
-        reg_logits = F.interpolate(reg_logits, scale_factor=16, mode='bicubic')
-
-        locations = get_locations(sr_features, template_features, sr, shift_xy=(shift_x, shift_y), up_scale=16)
-
-        assert len(boxes) == 1
-        bb, bb_conf = decode_response(cls_logits, center_logits, reg_logits, locations, boxes[0],
-                                      use_centerness=self.use_centerness, sigma=self.sigma)
-        track_result = wrap_results_to_boxlist(bb, bb_conf, boxes, amodal=self.amodal)
-
-        y, tracks = {}, track_result
-
-    # solver is only needed during inference
     if tracks is not None:
-        tracks = self._refine_tracks(features, tracks)
-        boxes = [cat_boxlist(boxes + tracks)]
+        tracks = _refine_tracks(box, features, tracks)
+        boxes = boxes_cat([boxes] + tracks)
 
     boxes = track_solver.solve(boxes)
 
     # get the current state for tracking
+    track_head.feature_extractor = feat_ext
     x = track_head.get_track_memory(
         features, boxes,
         extract_cache=partial(extract_cache, feat_ext))
