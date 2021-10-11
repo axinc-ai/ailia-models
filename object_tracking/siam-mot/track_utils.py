@@ -1,8 +1,9 @@
 import numpy as np
-
 from math_utils import softmax
-
 from this_utils import BBox, sigmoid, boxes_nms, boxes_filter, boxes_cat
+
+IMAGE_HEIGHT = 800
+IMAGE_WIDTH = 1280
 
 
 class TrackUtils(object):
@@ -209,9 +210,8 @@ class TrackHead(object):
         self.track_utils = track_utils
         self.track_pool = track_pool
 
-    def get_track_memory(self, features, track, extract_cache):
+    def get_track_memory(self, net, features, track, opt_onnx=False):
         active_tracks = self._get_track_targets(track)
-        print("active_tracks---", active_tracks.bbox.shape)
         print("active_tracks---", active_tracks.ids)
         print("active_tracks---", active_tracks.labels)
 
@@ -222,15 +222,11 @@ class TrackHead(object):
             template_features = np.array([])
             sr = copy.deepcopy(active_tracks)
             sr.size = [
-                1280 + self.track_utils.pad_pixels * 2,
-                800 + self.track_utils.pad_pixels * 2]
+                IMAGE_WIDTH + self.track_utils.pad_pixels * 2,
+                IMAGE_HEIGHT + self.track_utils.pad_pixels * 2]
             track_memory = (template_features, [sr], [active_tracks])
         else:
-            track_memory = extract_cache(features, active_tracks)
-            print("track_memory------", len(track_memory))
-            print("track_memory------", track_memory[0].shape)
-            print("track_memory------", track_memory[1])
-            print("track_memory------", track_memory[2])
+            track_memory = extract_cache(net, features, active_tracks, opt_onnx)
 
         track_memory = self._update_memory_with_dormant_track(track_memory)
 
@@ -330,8 +326,6 @@ class TrackSolver(object):
         # By doing this, dormant tracks will be merged to active tracks during nms,
         # if they highly overlap
         all_scores[active_mask] += 1.
-        print("all_scores------", all_scores)
-        print("all_scores------", all_scores.shape)
 
         nms_detection, nms_ids, nms_scores = self.get_nms_boxes(boxes)
 
@@ -370,46 +364,7 @@ class TrackSolver(object):
         track_pool.expire_tracks()
         track_pool.increment_frame()
 
-        print("combined_detection---", combined_detection.bbox)
-        print("combined_detection---", combined_detection.bbox.shape)
         return combined_detection
-
-
-def decode_response(
-        cls_logits, center_logits, reg_logits, locations, boxes,
-        use_centerness=True, sigma=0.4):
-    cls_logits = softmax(cls_logits, axis=1)
-    cls_logits = cls_logits[:, 1:2, :, :]
-    if use_centerness:
-        centerness = sigmoid(center_logits)
-        obj_confidence = cls_logits * centerness
-    else:
-        obj_confidence = cls_logits
-
-    num_track_objects = obj_confidence.shape[0]
-    obj_confidence = obj_confidence.reshape((num_track_objects, -1))
-    tlbr = reg_logits.reshape((num_track_objects, 4, -1))
-
-    scale_penalty = _get_scale_penalty(tlbr, boxes)
-    cos_window = _get_cosine_window_penalty(tlbr)
-    p_obj_confidence = (obj_confidence * scale_penalty) * (1 - sigma) + sigma * cos_window
-
-    idxs = np.argmax(p_obj_confidence, axis=1)
-
-    target_ids = np.arange(num_track_objects)
-    bb_c = locations[target_ids, idxs, :]
-    shift_tlbr = tlbr[target_ids, :, idxs]
-
-    bb_tl_x = bb_c[:, 0:1] - shift_tlbr[:, 0:1]
-    bb_tl_y = bb_c[:, 1:2] - shift_tlbr[:, 1:2]
-    bb_br_x = bb_c[:, 0:1] + shift_tlbr[:, 2:3]
-    bb_br_y = bb_c[:, 1:2] + shift_tlbr[:, 3:4]
-    bb = np.concatenate((bb_tl_x, bb_tl_y, bb_br_x, bb_br_y), axis=1)
-
-    cls_logits = cls_logits.reshape((num_track_objects, -1))
-    bb_conf = cls_logits[target_ids, idxs]
-
-    return bb, bb_conf
 
 
 def _get_scale_penalty(tlbr: np.ndarray, boxes: BBox):
@@ -443,34 +398,6 @@ def _get_cosine_window_penalty(tlbr: np.ndarray):
     window = window.reshape(-1)
 
     return window[None, :]
-
-
-def results_to_boxes(bb, bb_conf, boxes: [BBox], amodal=False):
-    num_boxes_per_image = [len(b.bbox) for b in boxes]
-    bb = np.split(bb, num_boxes_per_image, axis=0)
-    bb_conf = np.split(bb_conf, num_boxes_per_image, axis=0)
-
-    track_boxes = []
-    for _bb, _bb_conf, _boxes in zip(bb, bb_conf, boxes):
-        _bb = _bb.reshape(-1, 4)
-        track_box = BBox(
-            bbox=_bb,
-            ids=_boxes.ids,
-            labels=_boxes.labels,
-            scores=_bb_conf,
-        )
-        if not amodal:
-            track_box.bbox[:, 0] = track_box.bbox[:, 0].clip(0, max=1280 - 1)
-            track_box.bbox[:, 1] = track_box.bbox[:, 1].clip(0, max=800 - 1)
-            track_box.bbox[:, 2] = track_box.bbox[:, 2].clip(0, max=1280 - 1)
-            track_box.bbox[:, 3] = track_box.bbox[:, 3].clip(0, max=800 - 1)
-            box = track_box.bbox
-            keep = (box[:, 3] > box[:, 1]) & (box[:, 2] > box[:, 0])
-            track_box = boxes_filter(track_box, keep)
-
-        track_boxes.append(track_box)
-
-    return track_boxes
 
 
 def get_locations(
@@ -514,6 +441,165 @@ def get_locations(
     locations[:, :, 1] -= shift_xy[1]
 
     return locations
+
+
+def decode_response(
+        cls_logits, center_logits, reg_logits, locations, boxes,
+        use_centerness=True, sigma=0.4):
+    cls_logits = softmax(cls_logits, axis=1)
+    cls_logits = cls_logits[:, 1:2, :, :]
+    if use_centerness:
+        centerness = sigmoid(center_logits)
+        obj_confidence = cls_logits * centerness
+    else:
+        obj_confidence = cls_logits
+
+    num_track_objects = obj_confidence.shape[0]
+    obj_confidence = obj_confidence.reshape((num_track_objects, -1))
+    tlbr = reg_logits.reshape((num_track_objects, 4, -1))
+
+    scale_penalty = _get_scale_penalty(tlbr, boxes)
+    cos_window = _get_cosine_window_penalty(tlbr)
+    p_obj_confidence = (obj_confidence * scale_penalty) * (1 - sigma) + sigma * cos_window
+
+    idxs = np.argmax(p_obj_confidence, axis=1)
+
+    target_ids = np.arange(num_track_objects)
+    bb_c = locations[target_ids, idxs, :]
+    shift_tlbr = tlbr[target_ids, :, idxs]
+
+    bb_tl_x = bb_c[:, 0:1] - shift_tlbr[:, 0:1]
+    bb_tl_y = bb_c[:, 1:2] - shift_tlbr[:, 1:2]
+    bb_br_x = bb_c[:, 0:1] + shift_tlbr[:, 2:3]
+    bb_br_y = bb_c[:, 1:2] + shift_tlbr[:, 3:4]
+    bb = np.concatenate((bb_tl_x, bb_tl_y, bb_br_x, bb_br_y), axis=1)
+
+    cls_logits = cls_logits.reshape((num_track_objects, -1))
+    bb_conf = cls_logits[target_ids, idxs]
+
+    return bb, bb_conf
+
+
+def results_to_boxes(bb, bb_conf, boxes: [BBox], amodal=False):
+    num_boxes_per_image = [len(b.bbox) for b in boxes]
+    bb = np.split(bb, num_boxes_per_image, axis=0)
+    bb_conf = np.split(bb_conf, num_boxes_per_image, axis=0)
+
+    track_boxes = []
+    for _bb, _bb_conf, _boxes in zip(bb, bb_conf, boxes):
+        _bb = _bb.reshape(-1, 4)
+        track_box = BBox(
+            bbox=_bb,
+            ids=_boxes.ids,
+            labels=_boxes.labels,
+            scores=_bb_conf,
+        )
+        if not amodal:
+            track_box.bbox[:, 0] = track_box.bbox[:, 0].clip(0, max=IMAGE_WIDTH - 1)
+            track_box.bbox[:, 1] = track_box.bbox[:, 1].clip(0, max=IMAGE_HEIGHT - 1)
+            track_box.bbox[:, 2] = track_box.bbox[:, 2].clip(0, max=IMAGE_WIDTH - 1)
+            track_box.bbox[:, 3] = track_box.bbox[:, 3].clip(0, max=IMAGE_HEIGHT - 1)
+            box = track_box.bbox
+            keep = (box[:, 3] > box[:, 1]) & (box[:, 2] > box[:, 0])
+            track_box = boxes_filter(track_box, keep)
+
+        track_boxes.append(track_box)
+
+    return track_boxes
+
+
+def track_forward(net, features, track_memory, opt_onnx=False):
+    track_boxes = None
+    if track_memory is None:
+        track_pool.reset()
+        y, tracks = {}, track_boxes
+    else:
+        template_features, sr, template_boxes = track_memory
+
+        n = len(template_features)
+        sr_features = np.zeros((n, 128, 30, 30))
+        cls_logits = np.zeros((n, 2, 16, 16))
+        center_logits = np.zeros((n, 1, 16, 16))
+        reg_logits = np.zeros((n, 4, 16, 16))
+
+        # batch size = 20
+        for i in range(0, n, 20):
+            # batch size: 20
+            n = min(i + 20, len(template_features))
+            in_boxes = np.zeros((20, 4), dtype=np.float32)
+            in_search_region = np.zeros((20, 4), dtype=np.float32)
+            in_template_features = np.zeros((20, 128, 15, 15), dtype=np.float32)
+
+            in_boxes[:n - i] = template_boxes[0].bbox[i:n]
+            in_search_region[:n - i] = sr[0].bbox[i:n]
+            in_template_features[:n - i] = template_features[i:n]
+            inputs = features[:4] + [in_boxes, in_search_region, in_template_features]
+            if not opt_onnx:
+                output = net.predict(inputs)
+            else:
+                output = net.run(
+                    None, {k: v for k, v in zip((
+                        "feature_0", "feature_1", "feature_2", "feature_3",
+                        "boxes", "sr", "template_features"),
+                        inputs)})
+            sr_features[i:n] = output[0][:n - i]
+            cls_logits[i:n] = output[1][:n - i]
+            center_logits[i:n] = output[2][:n - i]
+            reg_logits[i:n] = output[3][:n - i]
+
+        # TODO implement by numpy
+        import torch
+        import torch.nn.functional as F
+        cls_logits = np.asarray(F.interpolate(torch.from_numpy(cls_logits), scale_factor=16, mode='bicubic'))
+        center_logits = np.asarray(F.interpolate(torch.from_numpy(center_logits), scale_factor=16, mode='bicubic'))
+        reg_logits = np.asarray(F.interpolate(torch.from_numpy(reg_logits), scale_factor=16, mode='bicubic'))
+
+        shift_x = shift_y = 512
+        locations = get_locations(
+            sr_features, template_features, sr, shift_xy=(shift_x, shift_y), up_scale=16)
+
+        use_centerness = True
+        sigma = 0.4
+        bb, bb_conf = decode_response(
+            cls_logits, center_logits, reg_logits, locations, template_boxes[0],
+            use_centerness=use_centerness, sigma=sigma)
+        amodal = False
+        track_result = results_to_boxes(bb, bb_conf, template_boxes, amodal=amodal)
+
+        y, tracks = {}, track_result
+
+    return y, tracks
+
+
+def extract_cache(net, features, detection, opt_onnx):
+    """
+    Get the cache (state) that is necessary for tracking
+    output: (features for tracking targets,
+             search region,
+             detection bounding boxes)
+    """
+
+    # get cache features for search region
+    # FPN features
+    inputs = features[:4] + [detection.bbox]
+    if not opt_onnx:
+        output = net.predict(inputs)
+    else:
+        output = net.run(
+            None, {k: v for k, v in zip((
+                "feature_0", "feature_1", "feature_2", "feature_3", "proposals"),
+                inputs)})
+    x = output[0]
+
+    sr = track_utils.update_boxes_in_pad_images([detection])
+    sr = track_utils.extend_bbox(sr)
+
+    cache = (x, sr, [detection])
+
+    return cache
+
+
+###
 
 
 track_utils = TrackUtils(

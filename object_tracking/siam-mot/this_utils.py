@@ -8,6 +8,9 @@ __all__ = [
     'sigmoid',
     'anchor_generator',
     'box_decode',
+    'boxes_nms',
+    'boxes_filter',
+    'boxes_cat',
     'remove_small_boxes',
     'select_over_all_levels',
     'filter_results',
@@ -341,16 +344,16 @@ def filter_results(bboxes, num_classes):
             track_boxlist = BBox(
                 bbox=boxes_j[track_idx, :],
                 scores=scores_j[track_idx],
-                ids=scores_j[track_idx],
+                ids=ids_j[track_idx],
             )
             det_boxlist = boxes_cat([det_boxlist, track_boxlist])
 
-        num_labels = len(det_boxlist)
+        num_labels = len(det_boxlist.bbox)
         det_boxlist = BBox(
-            det_boxlist.bbox,
-            det_boxlist.scores,
-            det_boxlist.ids,
-            np.full((num_labels,), j)
+            bbox=det_boxlist.bbox,
+            scores=det_boxlist.scores,
+            ids=det_boxlist.ids,
+            labels=np.full((num_labels,), j)
         )
         result[j - 1] = det_boxlist
 
