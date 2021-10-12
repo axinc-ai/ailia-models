@@ -1,5 +1,4 @@
 import sys
-from functools import partial
 
 import numpy as np
 import cv2
@@ -12,7 +11,6 @@ import ailia
 sys.path.append('../../util')
 from utils import get_base_parser, update_parser
 from model_utils import check_and_download_models  # noqa: E402
-from detector_utils import load_image  # noqa: E402C
 from image_utils import load_image, normalize_image  # noqa: E402C
 from math_utils import softmax  # noqa: E402C
 from webcamera_utils import get_capture, get_writer  # noqa: E402
@@ -30,12 +28,16 @@ from track_utils import track_forward, track_utils, track_head, track_solver
 # Parameters
 # ======================
 
-WEIGHT_PATH = 'xxx.onnx'
-MODEL_PATH = 'xxx.onnx.prototxt'
-WEIGHT_XXX_PATH = 'xxx.onnx'
-MODEL_XXX_PATH = 'xxx.onnx.prototxt'
+WEIGHT_RPN_PATH = 'rpn.onnx'
+MODEL_RPN_PATH = 'rpn.onnx.prototxt'
+WEIGHT_BOX_PATH = 'box.onnx'
+MODEL_BOX_PATH = 'box.onnx.prototxt'
+WEIGHT_TRACK_PATH = 'track.onnx'
+MODEL_TRACK_PATH = 'track.onnx.prototxt'
+WEIGHT_FEAT_EXT_PATH = 'feat_ext.onnx'
+MODEL_FEAT_EXT_PATH = 'feat_ext.onnx.prototxt'
 REMOTE_PATH = \
-    'https://storage.googleapis.com/ailia-models/xxx/'
+    'https://storage.googleapis.com/ailia-models/siam-mot/'
 
 VIDEO_PATH = 'Cars-1900.mp4'
 
@@ -125,9 +127,11 @@ def preprocess(img):
     im_h, im_w, _ = img.shape
 
     if im_h > im_w:
+        scale = h / im_h
         ow = (h * im_w) // im_h
         oh = h
     else:
+        scale = w / im_w
         oh = (w * im_h) // im_w
         ow = w
     if ow != im_w or oh != im_h:
@@ -145,7 +149,7 @@ def preprocess(img):
     img = img.transpose(2, 0, 1)  # HWC -> CHW
     img = img.astype(np.float32)
 
-    return img
+    return img, (x, y), scale
 
 
 def rpn_post_processing(anchors, objectness, box_regression):
@@ -203,10 +207,6 @@ def rpn_post_processing(anchors, objectness, box_regression):
 
         sampled_boxes.append(result)
 
-    # boxlists = zip(*sampled_boxes)
-    # boxlists = [
-    #     [np.concatenate(x, axis=0) for x in zip(*boxlist)] for boxlist in boxlists
-    # ]
     boxlists = zip(*sampled_boxes)
     boxlist = [boxes_cat(boxlist) for boxlist in boxlists]
 
@@ -295,7 +295,8 @@ def refine_tracks(net, features, tracks):
 
 
 def predict(rpn, box, tracker, feat_ext, img, anchors, cache={}):
-    img = preprocess(img)
+    h, w, _ = img.shape
+    img, pad, scale = preprocess(img)
 
     # feedforward
     print("1-----------")
@@ -340,11 +341,15 @@ def predict(rpn, box, tracker, feat_ext, img, anchors, cache={}):
     boxes = track_solver.solve(boxes)
 
     # get the current state for tracking
-    track_head.feature_extractor = feat_ext
     x = track_head.get_track_memory(
         feat_ext, features, boxes, args.onnx)
 
     cache['x'] = x
+
+    boxes.bbox[:, 0] = (boxes.bbox[:, 0] - pad[0]) / scale
+    boxes.bbox[:, 1] = (boxes.bbox[:, 1] - pad[1]) / scale
+    boxes.bbox[:, 2] = (boxes.bbox[:, 2] - pad[0]) / scale
+    boxes.bbox[:, 3] = (boxes.bbox[:, 3] - pad[1]) / scale
 
     return boxes
 
@@ -369,26 +374,14 @@ def recognize_from_video(rpn, box, tracker, feat_ext):
         ((200, 320), (100, 160), (50, 80), (25, 40), (13, 20))
     )
 
-    i = 0
     while True:
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
 
-        _frame = frame
-
         # inference
         img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         boxes = predict(rpn, box, tracker, feat_ext, img, anchors)
-
-        i += 1
-        # continue
-
-        new_frame = np.zeros((IMAGE_HEIGHT, IMAGE_WIDTH, 3), dtype=np.uint8)
-        h, w = _frame.shape[:2]
-        pad_h = (IMAGE_HEIGHT - h) // 2
-        new_frame[pad_h:pad_h + h, :, :] = _frame
-        frame = new_frame
 
         res_img = frame_vis_generator(frame, boxes)
 
@@ -408,38 +401,39 @@ def recognize_from_video(rpn, box, tracker, feat_ext):
 
 
 def main():
-    # dic_model = {
-    #     'xxx': (WEIGHT_PATH, MODEL_PATH),
-    #     'XXX': (WEIGHT_XXX_PATH, MODEL_XXX_PATH),
-    # }
-    # weight_path, model_path = dic_model[args.model_type]
-    #
-    # # model files check and download
-    # logger.info('Checking XXX model...')
-    # check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
-    # logger.info('Checking XXX model...')
-    # check_and_download_models(WEIGHT_XXX_PATH, MODEL_XXX_PATH, REMOTE_PATH)
-    #
-    # if args.video or args.detection:
-    #     logger.info('Check object detection model...')
-    #     check_and_download_models(
-    #         WEIGHT_XXX_PATH, MODEL_XXX_PATH, REMOTE_PATH
-    #     )
+    WEIGHT_RPN_PATH = 'rpn.onnx'
+    MODEL_RPN_PATH = 'rpn.onnx.prototxt'
+    WEIGHT_BOX_PATH = 'box.onnx'
+    MODEL_BOX_PATH = 'box.onnx.prototxt'
+    WEIGHT_TRACK_PATH = 'track.onnx'
+    MODEL_TRACK_PATH = 'track.onnx.prototxt'
+    WEIGHT_FEAT_EXT_PATH = 'feat_ext.onnx'
+    MODEL_FEAT_EXT_PATH = 'feat_ext.onnx.prototxt'
 
-    # load model
+    # model files check and download
+    logger.info('Checking RPN model...')
+    check_and_download_models(WEIGHT_RPN_PATH, MODEL_RPN_PATH, REMOTE_PATH)
+    logger.info('Checking BOX model...')
+    check_and_download_models(WEIGHT_BOX_PATH, MODEL_BOX_PATH, REMOTE_PATH)
+    logger.info('Checking TRACK model...')
+    check_and_download_models(WEIGHT_TRACK_PATH, MODEL_TRACK_PATH, REMOTE_PATH)
+    logger.info('Checking FEAT_EXT model...')
+    check_and_download_models(WEIGHT_FEAT_EXT_PATH, MODEL_FEAT_EXT_PATH, REMOTE_PATH)
+
     env_id = args.env_id
 
     # initialize
     if not args.onnx:
-        rpn = ailia.Net("rpn.onnx.prototxt", "rpn.onnx", env_id=env_id)
-        box = ailia.Net("box.onnx.prototxt", "box.onnx", env_id=env_id)
-        tracker = ailia.Net("tracker.onnx.prototxt", "tracker.onnx", env_id=env_id)
+        rpn = ailia.Net(MODEL_RPN_PATH, WEIGHT_RPN_PATH, env_id=env_id)
+        box = ailia.Net(MODEL_BOX_PATH, WEIGHT_BOX_PATH, env_id=env_id)
+        tracker = ailia.Net(MODEL_TRACK_PATH, WEIGHT_TRACK_PATH, env_id=env_id)
+        feat_ext = ailia.Net(MODEL_FEAT_EXT_PATH, WEIGHT_FEAT_EXT_PATH, env_id=env_id)
     else:
         import onnxruntime
-        rpn = onnxruntime.InferenceSession("rpn.onnx")
-        box = onnxruntime.InferenceSession("box.onnx")
-        tracker = onnxruntime.InferenceSession("tracker.onnx")
-        feat_ext = onnxruntime.InferenceSession("feat_ext.onnx")
+        rpn = onnxruntime.InferenceSession(WEIGHT_RPN_PATH)
+        box = onnxruntime.InferenceSession(WEIGHT_BOX_PATH)
+        tracker = onnxruntime.InferenceSession(WEIGHT_TRACK_PATH)
+        feat_ext = onnxruntime.InferenceSession(WEIGHT_FEAT_EXT_PATH)
 
     recognize_from_video(rpn, box, tracker, feat_ext)
 

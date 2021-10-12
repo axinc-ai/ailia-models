@@ -1,4 +1,9 @@
 import numpy as np
+from PIL import Image
+
+# import torch
+# import torch.nn.functional as F
+
 from math_utils import softmax
 from this_utils import BBox, sigmoid, boxes_nms, boxes_filter, boxes_cat
 
@@ -33,7 +38,6 @@ class TrackUtils(object):
             w_ext = bbox_w * (self.search_expansion / 2.)
             h_ext = bbox_h * (self.search_expansion / 2.)
 
-            # todo: need to check the equation later
             min_w_ext = (self.min_search_wh - bbox_w) / (self.search_expansion * 2.)
             min_h_ext = (self.min_search_wh - bbox_h) / (self.search_expansion * 2.)
 
@@ -205,8 +209,6 @@ class TrackHead(object):
     def __init__(self, track_utils, track_pool):
         super(TrackHead, self).__init__()
 
-        self.feature_extractor = None
-
         self.track_utils = track_utils
         self.track_pool = track_pool
 
@@ -251,10 +253,11 @@ class TrackHead(object):
             buffer_feat = []
         else:
             buffer_feat = [track_memory[0]]
-        # TODO value check
+
         features = np.concatenate(buffer_feat + cached_features, axis=0)
         sr = boxes_cat(track_memory[1] + [x[1] for x in dormant_caches])
         boxes = boxes_cat(track_memory[2] + [x[2] for x in dormant_caches])
+
         return features, [sr], [boxes]
 
     def _get_track_targets(self, target):
@@ -547,12 +550,28 @@ def track_forward(net, features, track_memory, opt_onnx=False):
             center_logits[i:n] = output[2][:n - i]
             reg_logits[i:n] = output[3][:n - i]
 
-        # TODO implement by numpy
-        import torch
-        import torch.nn.functional as F
-        cls_logits = np.asarray(F.interpolate(torch.from_numpy(cls_logits), scale_factor=16, mode='bicubic'))
-        center_logits = np.asarray(F.interpolate(torch.from_numpy(center_logits), scale_factor=16, mode='bicubic'))
-        reg_logits = np.asarray(F.interpolate(torch.from_numpy(reg_logits), scale_factor=16, mode='bicubic'))
+        # Upsampling
+        # cls_logits = np.asarray(F.interpolate(torch.from_numpy(cls_logits), scale_factor=16, mode='bicubic'))
+        # center_logits = np.asarray(F.interpolate(torch.from_numpy(center_logits), scale_factor=16, mode='bicubic'))
+        # reg_logits = np.asarray(F.interpolate(torch.from_numpy(reg_logits), scale_factor=16, mode='bicubic'))
+        n, c, h, w = cls_logits.shape
+        cls_logits = np.stack([
+            np.stack([
+                np.asarray(Image.fromarray(cls_logits[i, j]).resize((w * 16, h * 16), Image.BICUBIC))
+                for j in range(c)
+            ]) for i in range(n)])
+        n, c, h, w = center_logits.shape
+        center_logits = np.stack([
+            np.stack([
+                np.asarray(Image.fromarray(center_logits[i, j]).resize((w * 16, h * 16), Image.BICUBIC))
+                for j in range(c)
+            ]) for i in range(n)])
+        n, c, h, w = reg_logits.shape
+        reg_logits = np.stack([
+            np.stack([
+                np.asarray(Image.fromarray(reg_logits[i, j]).resize((w * 16, h * 16), Image.BICUBIC))
+                for j in range(c)
+            ]) for i in range(n)])
 
         shift_x = shift_y = 512
         locations = get_locations(
