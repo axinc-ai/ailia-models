@@ -19,10 +19,10 @@ from logging import getLogger  # noqa: E402
 
 logger = getLogger(__name__)
 
-from this_utils import BBox, sigmoid, anchor_generator, box_decode
-from this_utils import remove_small_boxes, boxes_nms, boxes_cat, boxes_filter
-from this_utils import select_over_all_levels, filter_results
-from track_utils import track_forward, track_utils, track_head, track_solver
+from this_utils import BBox, box_decode
+from this_utils import boxes_cat, boxes_filter
+from this_utils import filter_results
+from track_utils import track_forward, track_head, track_solver
 
 # ======================
 # Parameters
@@ -152,69 +152,6 @@ def preprocess(img):
     return img, (x, y), scale
 
 
-def rpn_post_processing(anchors, objectness, box_regression):
-    pre_nms_top_n = 1000
-    min_size = 0
-    post_nms_top_n = 300
-    nms_thresh = 0.7
-
-    sampled_boxes = []
-    anchors = zip(*anchors)
-    for a, o, b in zip(anchors, objectness, box_regression):
-        N, A, H, W = o.shape
-
-        # put in the same format as anchors
-        o = permute_and_flatten(o, N, A, 1, H, W).reshape(N, -1)
-        o = sigmoid(o)
-
-        b = permute_and_flatten(b, N, A, 4, H, W)
-
-        num_anchors = A * H * W
-
-        pre_nms_top_n = min(pre_nms_top_n, num_anchors)
-        topk_idx = np.argsort(-o, axis=1)[:, :pre_nms_top_n]
-        o = o[:, topk_idx[0]]
-
-        batch_idx = np.arange(N)[:, None]
-        b = b[batch_idx, topk_idx]
-
-        concat_anchors = np.concatenate(a, axis=0)
-        concat_anchors = concat_anchors.reshape(N, -1, 4)[batch_idx, topk_idx]
-
-        proposals = box_decode(
-            b.reshape(-1, 4), concat_anchors.reshape(-1, 4),
-            weights=(1.0, 1.0, 1.0, 1.0)
-        )
-        proposals = proposals.reshape(N, -1, 4)
-
-        result = []
-        for proposal, score in zip(proposals, o):
-            boxes = BBox(bbox=proposal, scores=score)
-
-            boxes.bbox[:, 0] = boxes.bbox[:, 0].clip(0, max=IMAGE_WIDTH - 1)
-            boxes.bbox[:, 1] = boxes.bbox[:, 1].clip(0, max=IMAGE_HEIGHT - 1)
-            boxes.bbox[:, 2] = boxes.bbox[:, 2].clip(0, max=IMAGE_WIDTH - 1)
-            boxes.bbox[:, 3] = boxes.bbox[:, 3].clip(0, max=IMAGE_HEIGHT - 1)
-
-            boxes = remove_small_boxes(boxes, min_size)
-            boxes = boxes_nms(
-                boxes,
-                nms_thresh,
-                max_proposals=post_nms_top_n,
-            )
-            print("boxlist----", boxes.bbox.shape)
-            result.append(boxes)
-
-        sampled_boxes.append(result)
-
-    boxlists = zip(*sampled_boxes)
-    boxlist = [boxes_cat(boxlist) for boxlist in boxlists]
-
-    boxlist = select_over_all_levels(boxlist)
-
-    return boxlist[0]
-
-
 def post_processing(
         class_logits, box_regression, bbox,
         ids=None, labels=None):
@@ -294,7 +231,7 @@ def refine_tracks(net, features, tracks):
     return [r_tracks]
 
 
-def predict(rpn, box, tracker, feat_ext, img, anchors, cache={}):
+def predict(rpn, box, tracker, feat_ext, img, cache={}):
     h, w, _ = img.shape
     img, pad, scale = preprocess(img)
 
@@ -307,10 +244,9 @@ def predict(rpn, box, tracker, feat_ext, img, anchors, cache={}):
     print("2-----------")
 
     features = output[:5]
-    objectness = output[5:10]
-    rpn_box_regression = output[10:]
-    boxes = rpn_post_processing(anchors, objectness, rpn_box_regression)
-    print("3-----------")
+    proposal = output[5]
+    score = output[6]
+    boxes = BBox(bbox=proposal, scores=score)
 
     ### roi_heads.box
 
@@ -370,10 +306,6 @@ def recognize_from_video(rpn, box, tracker, feat_ext):
     else:
         writer = None
 
-    anchors = anchor_generator(
-        ((200, 320), (100, 160), (50, 80), (25, 40), (13, 20))
-    )
-
     while True:
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
@@ -381,7 +313,7 @@ def recognize_from_video(rpn, box, tracker, feat_ext):
 
         # inference
         img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        boxes = predict(rpn, box, tracker, feat_ext, img, anchors)
+        boxes = predict(rpn, box, tracker, feat_ext, img)
 
         res_img = frame_vis_generator(frame, boxes)
 
@@ -401,15 +333,6 @@ def recognize_from_video(rpn, box, tracker, feat_ext):
 
 
 def main():
-    WEIGHT_RPN_PATH = 'rpn.onnx'
-    MODEL_RPN_PATH = 'rpn.onnx.prototxt'
-    WEIGHT_BOX_PATH = 'box.onnx'
-    MODEL_BOX_PATH = 'box.onnx.prototxt'
-    WEIGHT_TRACK_PATH = 'track.onnx'
-    MODEL_TRACK_PATH = 'track.onnx.prototxt'
-    WEIGHT_FEAT_EXT_PATH = 'feat_ext.onnx'
-    MODEL_FEAT_EXT_PATH = 'feat_ext.onnx.prototxt'
-
     # model files check and download
     logger.info('Checking RPN model...')
     check_and_download_models(WEIGHT_RPN_PATH, MODEL_RPN_PATH, REMOTE_PATH)
