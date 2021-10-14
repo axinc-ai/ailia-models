@@ -103,6 +103,16 @@ class TrackPool(object):
         self._max_dormant_frames = max_dormant_frames
         self._max_entangle_length = max_entangle_length
 
+    def suspend_track(self, track_id):
+        """
+        Suspend an active track, and add it to dormant track pools
+        """
+        if track_id not in self._active_ids:
+            raise ValueError
+
+        self._active_ids.remove(track_id)
+        self._dormant_ids[track_id] = self._frame_idx - 1
+
     def expire_tracks(self):
         """
         Expire the suspended tracks after they are inactive
@@ -223,9 +233,6 @@ class TrackHead(object):
             import copy
             template_features = np.array([])
             sr = copy.deepcopy(active_tracks)
-            sr.size = [
-                IMAGE_WIDTH + self.track_utils.pad_pixels * 2,
-                IMAGE_HEIGHT + self.track_utils.pad_pixels * 2]
             track_memory = (template_features, [sr], [active_tracks])
         else:
             track_memory = extract_cache(net, features, active_tracks, opt_onnx)
@@ -520,6 +527,10 @@ def track_forward(net, features, track_memory, opt_onnx=False):
         template_features, sr, template_boxes = track_memory
 
         n = len(template_features)
+        if n == 0:
+            y, tracks = {}, None
+            return y, tracks
+
         sr_features = np.zeros((n, 128, 30, 30))
         cls_logits = np.zeros((n, 2, 16, 16))
         center_logits = np.zeros((n, 1, 16, 16))
