@@ -49,7 +49,7 @@ IMAGE_WIDTH = 1280
 # ======================
 
 parser = get_base_parser(
-    'XXX', VIDEO_PATH, None
+    'SiamMOT', VIDEO_PATH, None
 )
 parser.add_argument(
     '--onnx',
@@ -62,13 +62,6 @@ args = update_parser(parser)
 # ======================
 # Secondaty Functions
 # ======================
-
-def permute_and_flatten(layer, N, A, C, H, W):
-    layer = layer.reshape(N, -1, C, H, W)
-    layer = layer.transpose(0, 3, 4, 1, 2)
-    layer = layer.reshape(N, -1, C)
-    return layer
-
 
 def get_colors(n, colormap="gist_ncar"):
     # Get n color samples from the colormap, derived from: https://stackoverflow.com/a/25730396/583620
@@ -126,14 +119,21 @@ def preprocess(img):
     h, w = (IMAGE_HEIGHT, IMAGE_WIDTH)
     im_h, im_w, _ = img.shape
 
-    if im_h > im_w:
-        scale = h / im_h
-        ow = (h * im_w) // im_h
-        oh = h
+    max_orig_size = max(im_h, im_w)
+    min_orig_size = min(im_h, im_w)
+    if max_orig_size / min_orig_size * h > w:
+        size = int(round(w * min_orig_size / max_orig_size))
     else:
-        scale = w / im_w
-        oh = (w * im_h) // im_w
-        ow = w
+        size = h
+
+    if im_h > im_w:
+        scale = size / im_w
+        ow = size
+        oh = (size * im_h) // im_w
+    else:
+        scale = size / im_h
+        oh = size
+        ow = (size * im_w) // im_h
     if ow != im_w or oh != im_h:
         img = np.array(Image.fromarray(img).resize((ow, oh), Image.BILINEAR))
 
@@ -165,7 +165,7 @@ def post_processing(
     num_classes = prob.shape[1]
 
     # deafult id is -1
-    ids = ids if ids is not None else np.zeros(len(bbox)) - 1
+    ids = ids if ids is not None else np.zeros(len(bbox), dtype=int) - 1
 
     # this only happens for tracks
     if labels is not None and 0 < len(labels):
@@ -236,12 +236,10 @@ def predict(rpn, box, tracker, feat_ext, img, cache={}):
     img, pad, scale = preprocess(img)
 
     # feedforward
-    print("1-----------")
     if not args.onnx:
         output = rpn.predict([img])
     else:
         output = rpn.run(None, {'img': img})
-    print("2-----------")
 
     features = output[:5]
     proposal = output[5]
@@ -260,10 +258,7 @@ def predict(rpn, box, tracker, feat_ext, img, cache={}):
                 "feature_0", "feature_1", "feature_2", "feature_3", "proposals"),
                 inputs)})
     class_logits, box_regression = output
-    print("4-----------")
-
     boxes = post_processing(class_logits, box_regression, proposals)
-    print("5-----------")
 
     ### roi_heads.track
 

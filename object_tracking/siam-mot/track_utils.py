@@ -224,8 +224,6 @@ class TrackHead(object):
 
     def get_track_memory(self, net, features, track, opt_onnx=False):
         active_tracks = self._get_track_targets(track)
-        print("active_tracks---", active_tracks.ids)
-        print("active_tracks---", active_tracks.labels)
 
         # no need for feature extraction of search region if
         # the tracker is tracktor, or no trackable instances
