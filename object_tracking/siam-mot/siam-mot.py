@@ -1,4 +1,5 @@
 import sys
+import time
 
 import numpy as np
 import cv2
@@ -11,7 +12,7 @@ import ailia
 sys.path.append('../../util')
 from utils import get_base_parser, update_parser
 from model_utils import check_and_download_models  # noqa: E402
-from image_utils import load_image, normalize_image  # noqa: E402C
+from image_utils import normalize_image  # noqa: E402C
 from math_utils import softmax  # noqa: E402C
 from webcamera_utils import get_capture, get_writer  # noqa: E402
 # logger
@@ -285,6 +286,31 @@ def predict(rpn, box, tracker, feat_ext, img, cache={}):
     return boxes
 
 
+def benchmarking(rpn, box, tracker, feat_ext):
+    video_file = args.video if args.video else args.input[0]
+    capture = get_capture(video_file)
+    assert capture.isOpened(), 'Cannot capture source'
+
+    _, frame = capture.read()
+    img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+
+    logger.info('BENCHMARK mode')
+
+    total_time_estimation = 0
+    for i in range(args.benchmark_count):
+        start = int(round(time.time() * 1000))
+        predict(rpn, box, tracker, feat_ext, img)
+        end = int(round(time.time() * 1000))
+        estimation_time = (end - start)
+
+        # Loggin
+        logger.info(f'\tailia processing estimation time {estimation_time} ms')
+        if i != 0:
+            total_time_estimation = total_time_estimation + estimation_time
+
+    logger.info(f'\taverage time estimation {total_time_estimation / (args.benchmark_count - 1)} ms')
+
+
 def recognize_from_video(rpn, box, tracker, feat_ext):
     video_file = args.video if args.video else args.input[0]
     capture = get_capture(video_file)
@@ -353,7 +379,10 @@ def main():
         tracker = onnxruntime.InferenceSession(WEIGHT_TRACK_PATH)
         feat_ext = onnxruntime.InferenceSession(WEIGHT_FEAT_EXT_PATH)
 
-    recognize_from_video(rpn, box, tracker, feat_ext)
+    if args.benchmark:
+        benchmarking(rpn, box, tracker, feat_ext)
+    else:
+        recognize_from_video(rpn, box, tracker, feat_ext)
 
 
 if __name__ == '__main__':
