@@ -14,7 +14,7 @@ import ailia
 sys.path.append('../../util')
 from utils import get_base_parser, update_parser, get_savepath
 from model_utils import check_and_download_models
-from detector_utils import reverse_letterbox, plot_results, write_predictions
+from detector_utils import load_image, reverse_letterbox, plot_results, write_predictions
 import webcamera_utils
 
 # logger
@@ -96,6 +96,61 @@ WIDTH = MODEL_PARAMS[MODEL_NAME]['input_shape'][1]
 # ======================
 # Main functions
 # ======================
+def recognize_from_image_detector():
+    env_id = args.env_id
+    det = ailia.Detector(
+            MODEL_PATH,
+            WEIGHT_PATH,
+            len(COCO_CATEGORY),
+            format=ailia.NETWORK_IMAGE_FORMAT_RGB,
+            channel=ailia.NETWORK_IMAGE_CHANNEL_FIRST,
+            range=ailia.NETWORK_IMAGE_RANGE_U_FP32,
+            algorithm=ailia.DETECTOR_ALGORITHM_YOLOX,
+            env_id=env_id)
+
+    # input image loop
+    for image_path in args.input:
+        # prepare input data
+        logger.debug(f'input image: {image_path}')
+        # raw_img = cv2.imread(image_path)
+        raw_img = load_image(image_path)
+        logger.debug(f'input image shape: {raw_img.shape}')
+        img, ratio = preprocess(raw_img, (HEIGHT, WIDTH))
+
+        # inference
+        logger.info('Start inference...')
+        if args.benchmark:
+            logger.info('BENCHMARK mode')
+            for i in range(5):
+                start = int(round(time.time() * 1000))
+                output = det.compute(img[None, :, :, :])
+                end = int(round(time.time() * 1000))
+                logger.info(f'\tailia processing time {end - start} ms')
+        else:
+            print(img.shape)
+            # output = det.compute(img, 0.4, 0.45)
+            output = det.compute(raw_img, args.iou, args.threshold)
+
+        res_img = plot_results(det, raw_img, COCO_CATEGORY)
+
+        # plot result
+        savepath = get_savepath(args.savepath, image_path)
+        logger.info(f'saved at : {savepath}')
+        cv2.imwrite(savepath, res_img)
+
+        """
+        predictions = postprocess(output[0], (HEIGHT, WIDTH))[0]
+        detect_object = predictions_to_object(predictions, raw_img, ratio, args.iou, args.threshold)
+        detect_object = reverse_letterbox(detect_object, raw_img, (raw_img.shape[0], raw_img.shape[1]))
+        res_img = plot_results(detect_object, raw_img, COCO_CATEGORY)
+
+        savepath = get_savepath(args.savepath, image_path)
+        logger.info(f'saved at : {savepath}')
+        cv2.imwrite(savepath, res_img)
+        """
+
+    logger.info('Script finished successfully.')
+
 def recognize_from_image():
     env_id = args.env_id
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
@@ -206,7 +261,8 @@ def main():
         recognize_from_video()
     else:
         # image mode
-        recognize_from_image()
+        # recognize_from_image()
+        recognize_from_image_detector()
 
 
 if __name__ == '__main__':
