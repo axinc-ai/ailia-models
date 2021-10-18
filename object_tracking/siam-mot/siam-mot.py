@@ -29,18 +29,26 @@ from track_utils import track_forward, track_head, track_solver
 # Parameters
 # ======================
 
-WEIGHT_RPN_PATH = 'rpn.onnx'
-MODEL_RPN_PATH = 'rpn.onnx.prototxt'
-WEIGHT_BOX_PATH = 'box.onnx'
-MODEL_BOX_PATH = 'box.onnx.prototxt'
-WEIGHT_TRACK_PATH = 'track.onnx'
-MODEL_TRACK_PATH = 'track.onnx.prototxt'
-WEIGHT_FEAT_EXT_PATH = 'feat_ext.onnx'
-MODEL_FEAT_EXT_PATH = 'feat_ext.onnx.prototxt'
+WEIGHT_PERSON_RPN_PATH = 'person_rpn.onnx'
+MODEL_PERSON_RPN_PATH = 'person_rpn.onnx.prototxt'
+WEIGHT_PERSON_BOX_PATH = 'person_box.onnx'
+MODEL_PERSON_BOX_PATH = 'person_box.onnx.prototxt'
+WEIGHT_PERSON_TRACK_PATH = 'person_track.onnx'
+MODEL_PERSON_TRACK_PATH = 'person_track.onnx.prototxt'
+WEIGHT_PERSON_FEAT_EXT_PATH = 'person_feat_ext.onnx'
+MODEL_PERSON_FEAT_EXT_PATH = 'person_feat_ext.onnx.prototxt'
+WEIGHT_VEHICLE_RPN_PATH = 'person_vehicle_rpn.onnx'
+MODEL_VEHICLE_RPN_PATH = 'person_vehicle_rpn.onnx.prototxt'
+WEIGHT_VEHICLE_BOX_PATH = 'person_vehicle_box.onnx'
+MODEL_VEHICLE_BOX_PATH = 'person_vehicle_box.onnx.prototxt'
+WEIGHT_VEHICLE_TRACK_PATH = 'person_vehicle_track.onnx'
+MODEL_VEHICLE_TRACK_PATH = 'person_vehicle_track.onnx.prototxt'
+WEIGHT_VEHICLE_FEAT_EXT_PATH = 'person_vehicle_feat_ext.onnx'
+MODEL_VEHICLE_FEAT_EXT_PATH = 'person_vehicle_feat_ext.onnx.prototxt'
 REMOTE_PATH = \
     'https://storage.googleapis.com/ailia-models/siam-mot/'
 
-VIDEO_PATH = 'Cars-1900.mp4'
+VIDEO_PATH = 'demo.mp4'
 
 IMAGE_HEIGHT = 800
 IMAGE_WIDTH = 1280
@@ -51,6 +59,10 @@ IMAGE_WIDTH = 1280
 
 parser = get_base_parser(
     'SiamMOT', VIDEO_PATH, None
+)
+parser.add_argument(
+    '-t', '--track-class', default='person', choices=('person', 'person_vehicle'),
+    help='Tracking person or person/vehicle jointly'
 )
 parser.add_argument(
     '--onnx',
@@ -354,30 +366,45 @@ def recognize_from_video(rpn, box, tracker, feat_ext):
 
 
 def main():
+    dic_model = {
+        'person': (
+            WEIGHT_PERSON_RPN_PATH, MODEL_PERSON_RPN_PATH,
+            WEIGHT_PERSON_BOX_PATH, MODEL_PERSON_BOX_PATH,
+            WEIGHT_PERSON_TRACK_PATH, MODEL_PERSON_TRACK_PATH,
+            WEIGHT_PERSON_FEAT_EXT_PATH, MODEL_PERSON_FEAT_EXT_PATH),
+        'person_vehicle': (
+            WEIGHT_VEHICLE_RPN_PATH, MODEL_VEHICLE_RPN_PATH,
+            WEIGHT_VEHICLE_BOX_PATH, MODEL_VEHICLE_BOX_PATH,
+            WEIGHT_VEHICLE_TRACK_PATH, MODEL_VEHICLE_TRACK_PATH,
+            WEIGHT_VEHICLE_FEAT_EXT_PATH, MODEL_VEHICLE_FEAT_EXT_PATH),
+    }
+    weight_rpn_path, model_rpn_path, weight_box_path, model_box_path, \
+    weight_track_path, model_track_path, weight_feat_path, model_feat_path = dic_model[args.track_class]
+
     # model files check and download
     logger.info('Checking RPN model...')
-    check_and_download_models(WEIGHT_RPN_PATH, MODEL_RPN_PATH, REMOTE_PATH)
+    check_and_download_models(weight_rpn_path, model_rpn_path, REMOTE_PATH)
     logger.info('Checking BOX model...')
-    check_and_download_models(WEIGHT_BOX_PATH, MODEL_BOX_PATH, REMOTE_PATH)
+    check_and_download_models(weight_box_path, model_box_path, REMOTE_PATH)
     logger.info('Checking TRACK model...')
-    check_and_download_models(WEIGHT_TRACK_PATH, MODEL_TRACK_PATH, REMOTE_PATH)
+    check_and_download_models(weight_track_path, model_track_path, REMOTE_PATH)
     logger.info('Checking FEAT_EXT model...')
-    check_and_download_models(WEIGHT_FEAT_EXT_PATH, MODEL_FEAT_EXT_PATH, REMOTE_PATH)
+    check_and_download_models(weight_feat_path, model_feat_path, REMOTE_PATH)
 
     env_id = args.env_id
 
     # initialize
     if not args.onnx:
-        rpn = ailia.Net(MODEL_RPN_PATH, WEIGHT_RPN_PATH, env_id=env_id)
-        box = ailia.Net(MODEL_BOX_PATH, WEIGHT_BOX_PATH, env_id=env_id)
-        tracker = ailia.Net(MODEL_TRACK_PATH, WEIGHT_TRACK_PATH, env_id=env_id)
-        feat_ext = ailia.Net(MODEL_FEAT_EXT_PATH, WEIGHT_FEAT_EXT_PATH, env_id=env_id)
+        rpn = ailia.Net(model_rpn_path, weight_rpn_path, env_id=env_id)
+        box = ailia.Net(model_box_path, weight_box_path, env_id=env_id)
+        tracker = ailia.Net(model_track_path, weight_track_path, env_id=env_id)
+        feat_ext = ailia.Net(model_feat_path, weight_feat_path, env_id=env_id)
     else:
         import onnxruntime
-        rpn = onnxruntime.InferenceSession(WEIGHT_RPN_PATH)
-        box = onnxruntime.InferenceSession(WEIGHT_BOX_PATH)
-        tracker = onnxruntime.InferenceSession(WEIGHT_TRACK_PATH)
-        feat_ext = onnxruntime.InferenceSession(WEIGHT_FEAT_EXT_PATH)
+        rpn = onnxruntime.InferenceSession(weight_rpn_path)
+        box = onnxruntime.InferenceSession(weight_box_path)
+        tracker = onnxruntime.InferenceSession(weight_track_path)
+        feat_ext = onnxruntime.InferenceSession(weight_feat_path)
 
     if args.benchmark:
         benchmarking(rpn, box, tracker, feat_ext)
