@@ -26,7 +26,7 @@ The collection of pre-trained, state-of-the-art AI models.
 
 | | Model | Reference | Exported From | Supported Ailia Version | Blog |
 |:-----------|------------:|:------------:|:------------:|:------------:|:------------:|
-| [<img src="anomaly_detection/padim/output.png" width=128px>](anomaly_detection/padim/) | [padim](/anomaly_detection/padim/) | [PaDiM-Anomaly-Detection-Localization-master](https://github.com/xiahaifeng1995/PaDiM-Anomaly-Detection-Localization-master) | Pytorch | 1.2.6 and later | [JP](https://medium.com/axinc/padim-%E5%86%8D%E5%AD%A6%E7%BF%92%E4%B8%8D%E8%A6%81%E3%81%A7%E4%B8%8D%E8%89%AF%E5%93%81%E6%A4%9C%E7%9F%A5%E3%82%92%E8%A1%8C%E3%81%86%E6%A9%9F%E6%A2%B0%E5%AD%A6%E7%BF%92%E3%83%A2%E3%83%87%E3%83%AB-69add653fbd3) |
+| [<img src="anomaly_detection/padim/output.png" width=128px>](anomaly_detection/padim/) | [padim](/anomaly_detection/padim/) | [PaDiM-Anomaly-Detection-Localization-master](https://github.com/xiahaifeng1995/PaDiM-Anomaly-Detection-Localization-master) | Pytorch | 1.2.6 and later | [EN](https://medium.com/axinc-ai/padim-a-machine-learning-model-for-detecting-defective-products-without-retraining-5daa6f203377) [JP](https://medium.com/axinc/padim-%E5%86%8D%E5%AD%A6%E7%BF%92%E4%B8%8D%E8%A6%81%E3%81%A7%E4%B8%8D%E8%89%AF%E5%93%81%E6%A4%9C%E7%9F%A5%E3%82%92%E8%A1%8C%E3%81%86%E6%A9%9F%E6%A2%B0%E5%AD%A6%E7%BF%92%E3%83%A2%E3%83%87%E3%83%AB-69add653fbd3) |
 
 ## Audio processing
 
@@ -64,6 +64,7 @@ The collection of pre-trained, state-of-the-art AI models.
 |[<img src="deep_fashion/clothing-detection/output_modanet.png" width=128px>](deep_fashion/clothing-detection/) | [clothing-detection](/deep_fashion/clothing-detection/) | [Clothing-Detection](https://github.com/simaiden/Clothing-Detection) | Pytorch | 1.2.1 and later | [EN](https://medium.com/axinc-ai/clothingdetection-a-machine-learning-model-for-detecting-clothing-dab99e1492eb) [JP](https://medium.com/axinc/clothingdetection-%E6%9C%8D%E8%A3%85%E3%82%92%E6%A4%9C%E5%87%BA%E3%81%99%E3%82%8B%E6%A9%9F%E6%A2%B0%E5%AD%A6%E7%BF%92%E3%83%A2%E3%83%87%E3%83%AB-e75cc8bc75b7) |
 |[<img src="deep_fashion/mmfashion/output.png" width=128px>](deep_fashion/mmfashion/) | [mmfashion](/deep_fashion/mmfashion/) | [MMFashion](https://github.com/open-mmlab/mmfashion) | Pytorch | 1.2.5 and later | [EN](https://medium.com/axinc-ai/mmfashion-a-machine-learning-model-for-fashion-segmentation-a043fa972a2a) [JP](https://medium.com/axinc/mmfashion-%E3%83%95%E3%82%A1%E3%83%83%E3%82%B7%E3%83%A7%E3%83%B3%E3%82%92%E3%82%BB%E3%82%B0%E3%83%A1%E3%83%B3%E3%83%86%E3%83%BC%E3%82%B7%E3%83%A7%E3%83%B3%E3%81%99%E3%82%8B%E6%A9%9F%E6%A2%B0%E5%AD%A6%E7%BF%92%E3%83%A2%E3%83%87%E3%83%AB-c486af72fdb5) |
 |[<img src="deep_fashion/mmfashion_tryon/output.png" width=128px>](deep_fashion/mmfashion_tryon/) | [mmfashion_tryon](/deep_fashion/mmfashion_tryon/) | [MMFashion virtual try-on](https://github.com/open-mmlab/mmfashion) | Pytorch | 1.2.8 and later |
+|[<img src="deep_fashion/mmfashion_retrieval/output.png" width=128px>](deep_fashion/mmfashion_retrieval/) | [mmfashion_retrieval](/deep_fashion/mmfashion_retrieval/) | [MMFashion In-Shop Clothes Retrieval](https://github.com/open-mmlab/mmfashion) | Pytorch | 1.2.5 and later |
 |[<img src="deep_fashion/fashionai-key-points-detection/output_blouse.png" width=128px>](deep_fashion/fashionai-key-points-detection/) | [fashionai-key-points-detection](/deep_fashion/fashionai-key-points-detection/) | [A Pytorch Implementation of Cascaded Pyramid Network for FashionAI Key Points Detection](https://github.com/gathierry/FashionAI-KeyPointsDetectionOfApparel) | Pytorch | 1.2.5 and later |
 
 ## Depth estimation
@@ -254,6 +255,12 @@ The collection of pre-trained, state-of-the-art AI models.
 | [<img src="object_tracking/person_reid_baseline_pytorch/output.png" width=128px>](object_tracking/person_reid_baseline_pytorch/) | [person_reid_baseline_pytorch](/object_tracking/person_reid_baseline_pytorch/) | [UTS-Person-reID-Practical](https://github.com/layumi/Person_reID_baseline_pytorch) | Pytorch | 1.2.6 and later | |
 | [<img src="object_tracking/abd_net/output.png" width=128px>](object_tracking/abd_net/) | [abd_net](/object_tracking/abd_net/) | [Attentive but Diverse Person Re-Identification](https://github.com/VITA-Group/ABD-Net) | Pytorch | 1.2.7 and later | |
 | [<img src="object_tracking/siam-mot/output.png" width=128px>](object_tracking/siam-mot/) | [siam-mot](/object_tracking/siam-mot/) | [SiamMOT](https://github.com/amazon-research/siam-mot) | Pytorch | 1.2.9 and later | |
+
+## Optical Flow Estimation
+
+| | Model | Reference | Exported From | Supported Ailia Version | Blog |
+|:-----------|------------:|:------------:|:------------:|:------------:|:------------:|
+| [<img src="optical_flow_estimation/raft/output.png" width=128px>](optical_flow_estimation/raft/) | [raft](/optical_flow_estimation/raft/) | [RAFT: Recurrent All Pairs Field Transforms for Optical Flow](https://github.com/princeton-vl/RAFT) | Pytorch | 1.2.6 and later |
 
 ## Point segmentation
 
