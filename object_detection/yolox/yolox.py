@@ -3,6 +3,7 @@ import time
 import os
 import sys
 import cv2
+import math
 
 from yolox_utils.data_augment import preproc as preprocess
 from yolox_utils.coco_classes import COCO_CLASSES
@@ -15,7 +16,7 @@ import ailia
 sys.path.append('../../util')
 from utils import get_base_parser, update_parser, get_savepath
 from model_utils import check_and_download_models
-from detector_utils import reverse_letterbox, plot_results
+from detector_utils import reverse_letterbox, plot_results, write_predictions
 import webcamera_utils
 
 # logger
@@ -51,7 +52,11 @@ parser.add_argument(
     help='[yolox_nano, yolox_tiny, yolox_s, yolox_m, yolox_l,'
          'yolox_darknet, yolox_x]'
 )
-
+parser.add_argument(
+    '-w', '--write_prediction',
+    action='store_true',
+    help='Flag to output the prediction file.'
+)
 args = update_parser(parser)
 
 MODEL_NAME = args.model_name
@@ -125,6 +130,11 @@ def recognize_from_image():
         logger.info(f'saved at : {savepath}')
         cv2.imwrite(savepath, res_img)
 
+        # write prediction
+        if args.write_prediction:
+            pred_file = '%s.txt' % savepath.rsplit('.', 1)[0]
+            write_predictions(pred_file, detect_object, raw_img, COCO_CLASSES)
+
     logger.info('Script finished successfully.')
 
 
@@ -146,6 +156,11 @@ def recognize_from_video():
         writer = webcamera_utils.get_writer(args.savepath, save_h, save_w)
     else:
         writer = None
+
+    if args.write_prediction:
+        frame_count = 0
+        frame_digit = int(math.log10(capture.get(cv2.CAP_PROP_FRAME_COUNT)) + 1)
+        video_name = os.path.splitext(os.path.basename(args.video))[0]
 
     while (True):
         ret, frame = capture.read()
@@ -190,6 +205,13 @@ def recognize_from_video():
         # save results
         if writer is not None:
             writer.write(res_img)
+
+        # write prediction
+        if args.write_prediction:
+            savepath = get_savepath(args.savepath, video_name, post_fix = '_%s' % (str(frame_count).zfill(frame_digit) + '_res'), ext='.png')
+            pred_file = '%s.txt' % savepath.rsplit('.', 1)[0]
+            write_predictions(pred_file, detect_object, frame, COCO_CLASSES)
+            frame_count += 1
 
     capture.release()
     cv2.destroyAllWindows()
