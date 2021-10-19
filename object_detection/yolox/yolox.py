@@ -5,10 +5,8 @@ import sys
 import cv2
 import math
 
-from yolox_utils.data_augment import preproc as preprocess
-from yolox_utils.coco_classes import COCO_CLASSES
-from yolox_utils.demo_utils import multiclass_nms, demo_postprocess
-from yolox_utils.visualize import vis
+from yolox_utils import preproc as preprocess
+from yolox_utils import multiclass_nms, postprocess
 
 import ailia
 
@@ -42,6 +40,22 @@ REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/yolox/'
 IMAGE_PATH = 'input.jpg'
 SAVE_IMAGE_PATH = 'output.jpg'
 
+COCO_CATEGORY = [
+    "person", "bicycle", "car", "motorcycle", "airplane", "bus", "train",
+    "truck", "boat", "traffic light", "fire hydrant", "stop sign",
+    "parking meter", "bench", "bird", "cat", "dog", "horse", "sheep", "cow",
+    "elephant", "bear", "zebra", "giraffe", "backpack", "umbrella",
+    "handbag", "tie", "suitcase", "frisbee", "skis", "snowboard",
+    "sports ball", "kite", "baseball bat", "baseball glove", "skateboard",
+    "surfboard", "tennis racket", "bottle", "wine glass", "cup", "fork",
+    "knife", "spoon", "bowl", "banana", "apple", "sandwich", "orange",
+    "broccoli", "carrot", "hot dog", "pizza", "donut", "cake", "chair",
+    "couch", "potted plant", "bed", "dining table", "toilet", "tv",
+    "laptop", "mouse", "remote", "keyboard", "cell phone", "microwave",
+    "oven", "toaster", "sink", "refrigerator", "book", "clock", "vase",
+    "scissors", "teddy bear", "hair drier", "toothbrush"
+]
+
 # ======================
 # Arguemnt Parser Config
 # ======================
@@ -67,6 +81,7 @@ HEIGHT = MODEL_PARAMS[MODEL_NAME]['input_shape'][0]
 WIDTH = MODEL_PARAMS[MODEL_NAME]['input_shape'][1]
 
 SCORE_THR = 0.4
+
 
 # ======================
 # Main functions
@@ -95,7 +110,7 @@ def recognize_from_image():
         else:
             output = output = net.run(img[None, :, :, :])
 
-        predictions = demo_postprocess(output[0], (HEIGHT, WIDTH))[0]
+        predictions = postprocess(output[0], (HEIGHT, WIDTH))[0]
         boxes = predictions[:, :4]
         scores = predictions[:, 4:5] * predictions[:, 5:]
 
@@ -124,7 +139,7 @@ def recognize_from_image():
                 detect_object.append(r)
 
             detect_object = reverse_letterbox(detect_object, raw_img, (raw_img.shape[0], raw_img.shape[1]))
-            res_img = plot_results(detect_object, raw_img, COCO_CLASSES)
+            res_img = plot_results(detect_object, raw_img, COCO_CATEGORY)
 
         savepath = get_savepath(args.savepath, image_path)
         logger.info(f'saved at : {savepath}')
@@ -133,7 +148,7 @@ def recognize_from_image():
         # write prediction
         if args.write_prediction:
             pred_file = '%s.txt' % savepath.rsplit('.', 1)[0]
-            write_predictions(pred_file, detect_object, raw_img, COCO_CLASSES)
+            write_predictions(pred_file, detect_object, raw_img, COCO_CATEGORY)
 
     logger.info('Script finished successfully.')
 
@@ -170,7 +185,7 @@ def recognize_from_video():
         raw_img = frame
         img, ratio = preprocess(raw_img, (HEIGHT, WIDTH))
         output = net.run(img[None, :, :, :])
-        predictions = demo_postprocess(output[0], (HEIGHT, WIDTH))[0]
+        predictions = postprocess(output[0], (HEIGHT, WIDTH))[0]
         boxes = predictions[:, :4]
         scores = predictions[:, 4:5] * predictions[:, 5:]
 
@@ -199,7 +214,7 @@ def recognize_from_video():
                 detect_object.append(r)
 
             detect_object = reverse_letterbox(detect_object, raw_img, (raw_img.shape[0], raw_img.shape[1]))
-            res_img = plot_results(detect_object, raw_img, COCO_CLASSES)
+            res_img = plot_results(detect_object, raw_img, COCO_CATEGORY)
         cv2.imshow('frame', res_img)
 
         # save results
@@ -210,7 +225,7 @@ def recognize_from_video():
         if args.write_prediction:
             savepath = get_savepath(args.savepath, video_name, post_fix = '_%s' % (str(frame_count).zfill(frame_digit) + '_res'), ext='.png')
             pred_file = '%s.txt' % savepath.rsplit('.', 1)[0]
-            write_predictions(pred_file, detect_object, frame, COCO_CLASSES)
+            write_predictions(pred_file, detect_object, frame, COCO_CATEGORY)
             frame_count += 1
 
     capture.release()

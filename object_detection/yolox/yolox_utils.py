@@ -1,17 +1,27 @@
-#!/usr/bin/env python3
-# -*- coding:utf-8 -*-
-# Copyright (c) 2014-2021 Megvii Inc. All rights reserved.
-
 import os
 
 import numpy as np
+import math
 
-__all__ = ["mkdir", "nms", "multiclass_nms", "demo_postprocess"]
+import cv2
 
+def preproc(img, input_size, swap=(2, 0, 1)):
+    if len(img.shape) == 3:
+        padded_img = np.ones((input_size[0], input_size[1], 3), dtype=np.uint8) * 114
+    else:
+        padded_img = np.ones(input_size, dtype=np.uint8) * 114
 
-def mkdir(path):
-    if not os.path.exists(path):
-        os.makedirs(path)
+    r = min(input_size[0] / img.shape[0], input_size[1] / img.shape[1])
+    resized_img = cv2.resize(
+        img,
+        (int(img.shape[1] * r), int(img.shape[0] * r)),
+        interpolation=cv2.INTER_LINEAR,
+    ).astype(np.uint8)
+    padded_img[: int(img.shape[0] * r), : int(img.shape[1] * r)] = resized_img
+
+    padded_img = padded_img.transpose(swap)
+    padded_img = np.ascontiguousarray(padded_img, dtype=np.float32)
+    return padded_img, r
 
 
 def nms(boxes, scores, nms_thr):
@@ -96,7 +106,7 @@ def multiclass_nms_class_agnostic(boxes, scores, nms_thr, score_thr):
     return dets
 
 
-def demo_postprocess(outputs, img_size, p6=False):
+def postprocess(outputs, img_size, p6=False):
 
     grids = []
     expanded_strides = []
