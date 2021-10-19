@@ -2,6 +2,7 @@ import os
 
 import numpy as np
 import math
+import ailia
 
 import cv2
 
@@ -132,3 +133,35 @@ def postprocess(outputs, img_size, p6=False):
     outputs[..., 2:4] = np.exp(outputs[..., 2:4]) * expanded_strides
 
     return outputs
+
+
+def predictions_to_object(predictions,raw_img,ratio,nms_thr,score_thr):
+    boxes = predictions[:, :4]
+    scores = predictions[:, 4:5] * predictions[:, 5:]
+
+    boxes_xyxy = np.ones_like(boxes)
+    boxes_xyxy[:, 0] = boxes[:, 0] - boxes[:, 2] / 2.
+    boxes_xyxy[:, 1] = boxes[:, 1] - boxes[:, 3] / 2.
+    boxes_xyxy[:, 2] = boxes[:, 0] + boxes[:, 2] / 2.
+    boxes_xyxy[:, 3] = boxes[:, 1] + boxes[:, 3] / 2.
+    boxes_xyxy /= ratio
+    dets = multiclass_nms(boxes_xyxy, scores, nms_thr, score_thr)
+
+    detect_object = []
+    if dets is not None:
+        img_size_h, img_size_w = raw_img.shape[:2]
+        final_boxes, final_scores, final_cls_inds = dets[:, :4], dets[:, 4], dets[:, 5]
+        for i, box in enumerate(final_boxes):
+            x1, y1, x2, y2 = box
+            c = int(final_cls_inds[i])
+            r = ailia.DetectorObject(
+                category=c,
+                prob=final_scores[i],
+                x=x1 / img_size_w,
+                y=y1 / img_size_h,
+                w=(x2 - x1) / img_size_w,
+                h=(y2 - y1) / img_size_h,
+            )
+            detect_object.append(r)
+    
+    return detect_object
