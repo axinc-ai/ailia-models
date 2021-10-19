@@ -56,6 +56,9 @@ COCO_CATEGORY = [
     "scissors", "teddy bear", "hair drier", "toothbrush"
 ]
 
+SCORE_THR = 0.4
+NMS_THR = 0.45
+
 # ======================
 # Arguemnt Parser Config
 # ======================
@@ -71,6 +74,16 @@ parser.add_argument(
     action='store_true',
     help='Flag to output the prediction file.'
 )
+parser.add_argument(
+    '-th', '--threshold',
+    default=SCORE_THR, type=float,
+    help='The detection threshold for yolo. (default: '+str(SCORE_THR)+')'
+)
+parser.add_argument(
+    '-iou', '--iou',
+    default=NMS_THR, type=float,
+    help='The detection iou for yolo. (default: '+str(NMS_THR)+')'
+)
 args = update_parser(parser)
 
 MODEL_NAME = args.model_name
@@ -79,9 +92,6 @@ MODEL_PATH = MODEL_NAME + ".opt.onnx.prototxt"
 
 HEIGHT = MODEL_PARAMS[MODEL_NAME]['input_shape'][0]
 WIDTH = MODEL_PARAMS[MODEL_NAME]['input_shape'][1]
-
-SCORE_THR = 0.4
-
 
 # ======================
 # Main functions
@@ -120,7 +130,7 @@ def recognize_from_image():
         boxes_xyxy[:, 2] = boxes[:, 0] + boxes[:, 2] / 2.
         boxes_xyxy[:, 3] = boxes[:, 1] + boxes[:, 3] / 2.
         boxes_xyxy /= ratio
-        dets = multiclass_nms(boxes_xyxy, scores, nms_thr=0.45, score_thr=0.8)
+        dets = multiclass_nms(boxes_xyxy, scores, nms_thr=args.iou, score_thr=args.threshold)
         if dets is not None:
             img_size_h, img_size_w = raw_img.shape[:2]
             detect_object = []
@@ -195,7 +205,7 @@ def recognize_from_video():
         boxes_xyxy[:, 2] = boxes[:, 0] + boxes[:, 2] / 2.
         boxes_xyxy[:, 3] = boxes[:, 1] + boxes[:, 3] / 2.
         boxes_xyxy /= ratio
-        dets = multiclass_nms(boxes_xyxy, scores, nms_thr=0.45, score_thr=0.8)
+        dets = multiclass_nms(boxes_xyxy, scores, nms_thr=args.iou, score_thr=args.threshold)
         if dets is not None:
             img_size_h, img_size_w = raw_img.shape[:2]
             detect_object = []
