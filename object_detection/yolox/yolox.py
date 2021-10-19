@@ -64,7 +64,7 @@ NMS_THR = 0.45
 # ======================
 parser = get_base_parser('yolox model', IMAGE_PATH, SAVE_IMAGE_PATH)
 parser.add_argument(
-    '--model_name',
+    '-m', '--model_name',
     default='yolox_s',
     help='[yolox_nano, yolox_tiny, yolox_s, yolox_m, yolox_l,'
          'yolox_darknet, yolox_x]'
