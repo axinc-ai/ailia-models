@@ -133,7 +133,10 @@ class STrack(BaseTrack):
 
 
 class BYTETracker(object):
-    def __init__(self, track_thresh=0.6, track_buffer=30, match_thresh=0.9, frame_rate=30):
+    def __init__(
+            self, track_thresh=0.6, track_buffer=30,
+            match_thresh=0.9, frame_rate=30,
+            mot20=False):
         self.tracked_stracks = []  # type: list[STrack]
         self.lost_stracks = []  # type: list[STrack]
         self.removed_stracks = []  # type: list[STrack]
@@ -144,6 +147,7 @@ class BYTETracker(object):
         self.det_thresh = track_thresh + 0.1
         self.buffer_size = int(frame_rate / 30.0 * track_buffer)
         self.max_time_lost = self.buffer_size
+        self.mot20 = mot20
         self.kalman_filter = KalmanFilter()
 
     def update(self, output_results):
@@ -153,8 +157,12 @@ class BYTETracker(object):
         lost_stracks = []
         removed_stracks = []
 
-        scores = output_results[:, 4] * output_results[:, 5]
-        bboxes = output_results[:, :4]  # x1y1x2y2
+        if output_results.shape[1] == 5:
+            scores = output_results[:, 4]
+            bboxes = output_results[:, :4]
+        else:
+            scores = output_results[:, 4] * output_results[:, 5]
+            bboxes = output_results[:, :4]  # x1y1x2y2
 
         remain_inds = scores > self.track_thresh
         inds_low = scores > 0.1
@@ -188,7 +196,7 @@ class BYTETracker(object):
         # Predict the current location with KF
         STrack.multi_predict(strack_pool)
         dists = matching.iou_distance(strack_pool, detections)
-        if True:  # not self.args.mot20:
+        if not self.mot20:
             dists = matching.fuse_score(dists, detections)
 
         matches, u_track, u_detection = matching.linear_assignment(dists, thresh=self.match_thresh)
@@ -233,7 +241,7 @@ class BYTETracker(object):
         '''Deal with unconfirmed tracks, usually tracks with only one beginning frame'''
         detections = [detections[i] for i in u_detection]
         dists = matching.iou_distance(unconfirmed, detections)
-        if True:  # not self.args.mot20:
+        if not self.mot20:
             dists = matching.fuse_score(dists, detections)
 
         matches, u_unconfirmed, u_detection = matching.linear_assignment(dists, thresh=0.7)
