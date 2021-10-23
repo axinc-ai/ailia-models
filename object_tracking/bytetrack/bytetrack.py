@@ -181,7 +181,7 @@ def postprocess(output, ratio, p6=False, nms_thre=0.7, score_thre=0.1):
 
     dets = multiclass_nms(boxes_xyxy, scores, nms_thr=nms_thre, score_thr=score_thre)
 
-    return dets[:, :-1]
+    return dets[:, :-1] if dets is not None else np.zeros((0, 5))
 
 
 def predict(net, img):

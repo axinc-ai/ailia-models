@@ -1,11 +1,8 @@
 import numpy as np
-import scipy
 import lap
-from scipy.spatial.distance import cdist
+
 
 # from cython_bbox import bbox_overlaps
-
-from . import kalman_filter
 
 
 def linear_assignment(cost_matrix, thresh):
