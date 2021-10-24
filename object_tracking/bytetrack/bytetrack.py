@@ -55,11 +55,6 @@ parser.add_argument(
     help="NMS threshould.",
 )
 parser.add_argument(
-    "--with_p6",
-    action="store_true",
-    help="Whether your model uses p6 in FPN/PAN.",
-)
-parser.add_argument(
     '-m', '--model_type', default='mot17', choices=('mot17', 'mot20'),
     help='model type'
 )
@@ -192,10 +187,9 @@ def predict(net, img):
     output = net.predict([img])
     output = output[0]
 
-    with_p6 = args.with_p6
     score_thre = args.score_thre
     nms_thre = args.nms_thre
-    dets = postprocess(output, ratio, img_size, nms_thre=nms_thre, score_thre=score_thre, p6=with_p6)
+    dets = postprocess(output, ratio, img_size, nms_thre=nms_thre, score_thre=score_thre)
 
     return dets
 
