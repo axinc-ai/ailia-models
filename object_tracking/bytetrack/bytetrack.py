@@ -11,7 +11,6 @@ import ailia
 sys.path.append('../../util')
 from utils import get_base_parser, update_parser
 from model_utils import check_and_download_models  # noqa: E402
-from detector_utils import load_image  # noqa: E402C
 from image_utils import normalize_image  # noqa: E402C
 from webcamera_utils import get_capture, get_writer  # noqa: E402
 # logger
@@ -26,24 +25,26 @@ from tracker.byte_tracker import BYTETracker
 # Parameters
 # ======================
 
-WEIGHT_PATH = 'bytetrack_x_mot17.onnx'
-MODEL_PATH = 'bytetrack_x_mot17.onnx.prototxt'
+WEIGHT_MOT17_PATH = 'bytetrack_x_mot17.onnx'
+MODEL_MOT17_PATH = 'bytetrack_x_mot17.onnx.prototxt'
 WEIGHT_MOT20_PATH = 'bytetrack_x_mot20.onnx'
 MODEL_MOT20_PATH = 'bytetrack_x_mot20.onnx.prototxt'
 REMOTE_PATH = \
     'https://storage.googleapis.com/ailia-models/bytetrack/'
 
-IMAGE_PATH = 'demo.mp4'
+VIDEO_PATH = 'demo.mp4'
 
-THRESHOLD = 0.4
-IOU = 0.45
+IMAGE_MOT17_HEIGHT = 800
+IMAGE_MOT17_WIDTH = 1440
+IMAGE_MOT20_HEIGHT = 896
+IMAGE_MOT20_WIDTH = 1600
 
 # ======================
 # Arguemnt Parser Config
 # ======================
 
 parser = get_base_parser(
-    'ByteTrack', IMAGE_PATH, None
+    'ByteTrack', VIDEO_PATH, None
 )
 parser.add_argument(
     "--score_thre", type=float, default=0.1,
@@ -59,7 +60,7 @@ parser.add_argument(
     help="Whether your model uses p6 in FPN/PAN.",
 )
 parser.add_argument(
-    '-m', '--model_type', default='xxx', choices=('xxx', 'XXX'),
+    '-m', '--model_type', default='mot17', choices=('mot17', 'mot20'),
     help='model type'
 )
 # tracking args
@@ -67,7 +68,6 @@ parser.add_argument("--track_thresh", type=float, default=0.5, help="tracking co
 parser.add_argument("--track_buffer", type=int, default=30, help="the frames for keep lost tracks")
 parser.add_argument("--match_thresh", type=float, default=0.8, help="matching threshold for tracking")
 parser.add_argument('--min-box-area', type=float, default=10, help='filter out tiny boxes')
-parser.add_argument("--mot20", dest="mot20", default=False, action="store_true", help="test mot20.")
 args = update_parser(parser)
 
 
@@ -115,8 +115,8 @@ def frame_vis_generator(frame, bboxes, ids):
 # Main functions
 # ======================
 
-def preprocess(img, image_shape):
-    h, w = image_shape
+def preprocess(img, img_size):
+    h, w = img_size
     im_h, im_w, _ = img.shape
 
     r = min(h / im_h, w / im_w)
@@ -141,9 +141,7 @@ def preprocess(img, image_shape):
     return img, r
 
 
-def postprocess(output, ratio, p6=False, nms_thre=0.7, score_thre=0.1):
-    img_size = (800, 1440)
-
+def postprocess(output, ratio, img_size, p6=False, nms_thre=0.7, score_thre=0.1):
     grids = []
     expanded_strides = []
 
@@ -185,8 +183,10 @@ def postprocess(output, ratio, p6=False, nms_thre=0.7, score_thre=0.1):
 
 
 def predict(net, img):
-    shape = (800, 1440)
-    img, ratio = preprocess(img, shape)
+    img_size = (IMAGE_MOT17_HEIGHT, IMAGE_MOT17_WIDTH) \
+        if args.model_type == 'mot17' else (IMAGE_MOT20_HEIGHT, IMAGE_MOT20_WIDTH)
+
+    img, ratio = preprocess(img, img_size)
 
     # feedforward
     output = net.predict([img])
@@ -195,78 +195,38 @@ def predict(net, img):
     with_p6 = args.with_p6
     score_thre = args.score_thre
     nms_thre = args.nms_thre
-    dets = postprocess(output, ratio, nms_thre=nms_thre, score_thre=score_thre, p6=with_p6)
+    dets = postprocess(output, ratio, img_size, nms_thre=nms_thre, score_thre=score_thre, p6=with_p6)
 
     return dets
 
 
-def recognize_from_image(net):
-    min_box_area = args.min_box_area
+def benchmarking(net):
+    video_file = args.video if args.video else args.input[0]
+    capture = get_capture(video_file)
+    assert capture.isOpened(), 'Cannot capture source'
 
-    tracker = BYTETracker(
-        track_thresh=args.track_thresh, track_buffer=args.track_buffer,
-        match_thresh=args.match_thresh, frame_rate=30,
-        mot20=args.mot20)
+    _, frame = capture.read()
 
-    # input image loop
-    for image_path in args.input:
-        logger.info(image_path)
+    logger.info('BENCHMARK mode')
 
-        # prepare input data
-        img = load_image(image_path)
-        img = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
+    total_time_estimation = 0
+    for i in range(args.benchmark_count):
+        start = int(round(time.time() * 1000))
+        predict(net, frame)
+        end = int(round(time.time() * 1000))
+        estimation_time = (end - start)
 
-        # inference
-        logger.info('Start inference...')
-        if args.benchmark:
-            logger.info('BENCHMARK mode')
-            total_time_estimation = 0
-            for i in range(args.benchmark_count):
-                start = int(round(time.time() * 1000))
-                output = predict(net, img)
-                end = int(round(time.time() * 1000))
-                estimation_time = (end - start)
+        # Loggin
+        logger.info(f'\tailia processing estimation time {estimation_time} ms')
+        if i != 0:
+            total_time_estimation = total_time_estimation + estimation_time
 
-                # Loggin
-                logger.info(f'\tailia processing estimation time {estimation_time} ms')
-                if i != 0:
-                    total_time_estimation = total_time_estimation + estimation_time
-
-            logger.info(f'\taverage time estimation {total_time_estimation / (args.benchmark_count - 1)} ms')
-        else:
-            output = predict(net, img)
-
-        # run tracking
-        online_targets = tracker.update(output)
-        online_tlwhs = []
-        online_ids = []
-        online_scores = []
-        for t in online_targets:
-            tlwh = t.tlwh
-            tid = t.track_id
-            vertical = tlwh[2] / tlwh[3] > 1.6
-            if tlwh[2] * tlwh[3] > min_box_area and not vertical:
-                online_tlwhs.append(tlwh)
-                online_ids.append(tid)
-                online_scores.append(t.score)
-
-        print("online_tlwhs--", len(online_tlwhs))
-        print("online_tlwhs--", online_tlwhs)
-        print("online_ids--", online_ids)
-        print("online_ids--", len(online_ids))
-        print("online_scores--", online_scores)
-        print("online_scores--", len(online_scores))
-
-        res_img = frame_vis_generator(img, online_tlwhs, online_ids)
-
-        # plot result
-        cv2.imwrite(args.savepath, res_img)
-
-    logger.info('Script finished successfully.')
+    logger.info(f'\taverage time estimation {total_time_estimation / (args.benchmark_count - 1)} ms')
 
 
 def recognize_from_video(net):
     min_box_area = args.min_box_area
+    mot20 = args.model_type == 'mot20'
 
     video_file = args.video if args.video else args.input[0]
     capture = get_capture(video_file)
@@ -286,7 +246,7 @@ def recognize_from_video(net):
     tracker = BYTETracker(
         track_thresh=args.track_thresh, track_buffer=args.track_buffer,
         match_thresh=args.match_thresh, frame_rate=30,
-        mot20=args.mot20)
+        mot20=mot20)
 
     while True:
         ret, frame = capture.read()
@@ -329,24 +289,23 @@ def recognize_from_video(net):
 
 def main():
     dic_model = {
-        'xxx': (WEIGHT_PATH, MODEL_PATH),
-        'XXX': (WEIGHT_MOT20_PATH, MODEL_MOT20_PATH),
+        'mot17': (WEIGHT_MOT17_PATH, MODEL_MOT17_PATH),
+        'mot20': (WEIGHT_MOT20_PATH, MODEL_MOT20_PATH),
     }
     weight_path, model_path = dic_model[args.model_type]
 
     # model files check and download
     check_and_download_models(weight_path, model_path, REMOTE_PATH)
 
-    # load model
     env_id = args.env_id
 
     # initialize
-    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+    net = ailia.Net(model_path, weight_path, env_id=env_id)
 
-    if args.video is not None:
-        recognize_from_video(net)
+    if args.benchmark:
+        benchmarking(net)
     else:
-        recognize_from_image(net)
+        recognize_from_video(net)
 
 
 if __name__ == '__main__':
