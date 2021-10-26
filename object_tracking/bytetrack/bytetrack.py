@@ -203,7 +203,7 @@ def predict(net, img):
         'yolox_tiny': (IMAGE_YOLOX_TINY_HEIGHT, IMAGE_YOLOX_TINY_WIDTH),
     }
     model_type = args.model_type
-    img_size = dic_model[args.model_type]
+    img_size = dic_model[model_type]
 
     img, ratio = preprocess(img, img_size, normalize=model_type.startswith('mot'))
 
