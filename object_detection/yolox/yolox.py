@@ -130,9 +130,9 @@ def recognize_from_image_detector():
         else:
             print(img.shape)
             print(raw_img.shape)
-            output = det.run(img, args.iou, args.threshold)
+            output = det.run(img, args.threshold, args.iou)
 
-        res_img = plot_results(det, raw_img, COCO_CATEGORY)
+        res_img = plot_results(det, raw_img, COCO_CATEGORY, multiply_size=False)
 
         # plot result
         savepath = get_savepath(args.savepath, image_path)
@@ -180,12 +180,8 @@ def recognize_from_image():
         else:
             output = net.run(img[None, :, :, :])
 
-        print(output[0])
-        np.save('output.npy', output[0])
         predictions = postprocess(output[0], (HEIGHT, WIDTH))[0]
-        print(predictions)
         detect_object = predictions_to_object(predictions, raw_img, ratio, args.iou, args.threshold)
-        print(detect_object)
         detect_object = reverse_letterbox(detect_object, raw_img, (raw_img.shape[0], raw_img.shape[1]))
         res_img = plot_results(detect_object, raw_img, COCO_CATEGORY)
 
@@ -199,7 +195,6 @@ def recognize_from_image():
             write_predictions(pred_file, detect_object, raw_img, COCO_CATEGORY)
 
     logger.info('Script finished successfully.')
-
 
 def recognize_from_video():
     # net initialize

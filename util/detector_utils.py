@@ -76,7 +76,7 @@ def reverse_letterbox(detections, img, det_shape):
         start = (det_shape[0:2] - np.array(img.shape[0:2]) / scale) // 2
         pad_x = start[1]*scale
         pad_y = start[0]*scale
-    
+
     new_detections = []
     for detection in detections:
         logger.debug(detection)
@@ -89,20 +89,23 @@ def reverse_letterbox(detections, img, det_shape):
             h=(detection.h*(h+pad_y*2))/h,
         )
         new_detections.append(r)
-    
+
     return new_detections
 
 
-def plot_results(detector, img, category, segm_masks=None, logging=True):
+def plot_results(detector, img, category, segm_masks=None, logging=True, multiply_size=True):
     """
     :param detector: ailia.Detector, or list of ailia.DetectorObject
     :param img: ndarray data of image
     :param category: list of category_name
     :param segm_masks:
     :param logging: output log flg
+    :param multiply_size: multiply width and height by object's width and height
     :return:
     """
-    h, w = img.shape[0], img.shape[1]
+    h, w = 1.0, 1.0
+    if multiply_size:
+        h, w = img.shape[0], img.shape[1]
 
     count = detector.get_object_count() if hasattr(detector, 'get_object_count') else len(detector)
     if logging:
@@ -148,7 +151,7 @@ def plot_results(detector, img, category, segm_masks=None, logging=True):
     # draw label
     for idx in range(count):
         obj = detector.get_object(idx) if hasattr(detector, 'get_object') else detector[idx]
-        fontScale = w / 2048
+        fontScale = img.shape[1] / 2048
 
         text = category[obj.category] + " " + str(int(obj.prob*100)/100)
         textsize = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, fontScale, 1)[0]
@@ -159,7 +162,7 @@ def plot_results(detector, img, category, segm_masks=None, logging=True):
 
         top_left = (int(w * obj.x), int(h * obj.y))
         bottom_right = (int(w * obj.x) + tw + margin, int(h * obj.y) + th + margin)
-        
+
         color = colors[idx]
         cv2.rectangle(img, top_left, bottom_right, color, thickness=-1)
 
