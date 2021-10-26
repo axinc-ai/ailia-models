@@ -114,7 +114,6 @@ def recognize_from_image_detector():
         logger.debug(f'input image: {image_path}')
         raw_img = cv2.imread(image_path, cv2.IMREAD_COLOR)
         raw_img = cv2.cvtColor(raw_img, cv2.COLOR_BGR2BGRA)
-        # raw_img = load_image(image_path)
         logger.debug(f'input image shape: {raw_img.shape}')
         img, ratio = preprocess(raw_img, (HEIGHT, WIDTH), (0, 1, 2))
 
@@ -124,13 +123,11 @@ def recognize_from_image_detector():
             logger.info('BENCHMARK mode')
             for i in range(5):
                 start = int(round(time.time() * 1000))
-                output = det.compute(img[None, :, :, :])
+                det.compute(img, args.threshold, args.iou)
                 end = int(round(time.time() * 1000))
                 logger.info(f'\tailia processing time {end - start} ms')
         else:
-            print(img.shape)
-            print(raw_img.shape)
-            output = det.run(img, args.threshold, args.iou)
+            det.compute(img, args.threshold, args.iou)
 
         res_img = plot_results(det, raw_img, COCO_CATEGORY, multiply_size=False)
 
@@ -138,17 +135,6 @@ def recognize_from_image_detector():
         savepath = get_savepath(args.savepath, image_path)
         logger.info(f'saved at : {savepath}')
         cv2.imwrite(savepath, res_img)
-
-        """
-        predictions = postprocess(output[0], (HEIGHT, WIDTH))[0]
-        detect_object = predictions_to_object(predictions, raw_img, ratio, args.iou, args.threshold)
-        detect_object = reverse_letterbox(detect_object, raw_img, (raw_img.shape[0], raw_img.shape[1]))
-        res_img = plot_results(detect_object, raw_img, COCO_CATEGORY)
-
-        savepath = get_savepath(args.savepath, image_path)
-        logger.info(f'saved at : {savepath}')
-        cv2.imwrite(savepath, res_img)
-        """
 
     logger.info('Script finished successfully.')
 
