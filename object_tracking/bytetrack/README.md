@@ -32,10 +32,19 @@ You can use `--savepath` option to specify the name of the output file to save.
 $ python3 bytetrack.py --video VIDEO_PATH --savepath SAVE_FILE_PATH
 ```
 
-By adding the `--model_type` option, you can specify model type which is selected from "mot17", "mot20".  
-(default is mot17)
+By adding the `--model_type` option, you can specify model type which is selected from below. (default is mot17_x)
+
+- mot17_x (800x1440)
+- mot17_s (608x1088)
+- mot20_x (896x1600)
+- yolox_s (640x640)
+- yolox_tiny (416x416)
+
+The values in parentheses represent the size of the image given to the model.  
+The models whose names start with "yolox" are pure models from yolox. On the other hand, the models starting with "mot" are fine-tuned models based on the yolox model.
+
 ```bash
-$ python3 bytetrack.py --model_type mot17
+$ python3 bytetrack.py --model_type mot17_x
 ```
 
 ## Reference
