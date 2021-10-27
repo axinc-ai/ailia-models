@@ -2,6 +2,8 @@ import sys
 import time
 
 import numpy as np
+import torch
+from torch.nn import functional as F
 import cv2
 import onnx
 import onnxruntime
@@ -68,8 +70,8 @@ args = update_parser(parser)
 def check(onnx_model):
     onnx.checker.check_model(onnx_model)
 
-def run_on_batch(inputs, net, iters, avg_image):
-    y_hat, latent = None, None
+def run_on_batch(inputs, net, iters, avg_image, onnx=False):
+    y_hat, latent = None, np.load('latent_avg.npy')
     results_batch = {idx: [] for idx in range(inputs.shape[0])}
     results_latent = {idx: [] for idx in range(inputs.shape[0])}
     for iter in range(iters):
@@ -84,7 +86,12 @@ def run_on_batch(inputs, net, iters, avg_image):
             #logger.info(x_input.shape)
 
         logger.info(f"Iteration {iter+1}/{iters}")
-        y_hat, latent = net.forward(x_input, latent=latent)
+        if not onnx:
+            y_hat, latent = net.predict(x_input, latent=latent)
+        else: 
+            ort_inputs = {net.get_inputs()[0].name: x_input.astype(np.float32), net.get_inputs()[1].name: latent.astype(np.float32)}
+            ort_outs = net.run(None, ort_inputs)
+            y_hat, latent = ort_outs[0], ort_outs[1]
 
         # store intermediate outputs
         for idx in range(inputs.shape[0]):
@@ -92,7 +99,8 @@ def run_on_batch(inputs, net, iters, avg_image):
             #results_latent[idx].append(latent[idx].cpu().numpy())
             results_latent[idx].append(latent[idx])
 
-        y_hat = net.face_pool(y_hat)
+        #y_hat = cv2.resize(y_hat, (256, 256))
+        y_hat = F.adaptive_avg_pool2d(torch.from_numpy(y_hat), (256, 256)).numpy()
 
     return results_batch, results_latent
 
@@ -102,58 +110,10 @@ def np2im(var, input=False):
         var.transpose(1, 2, 0),
         cv2.COLOR_RGB2BGR
     )
-    if not input:
-        var = ((var + 1) / 2)
     var[var < 0] = 0
     var[var > 1] = 1
     var = var * 255
     return var.astype('uint8')
-
-def recognize_from_image_onnx(filename, ort_session):
-
-    #logger.info(filename)
-    input_img = load_image(
-        filename,
-        (RESIZE_HEIGHT, RESIZE_WIDTH),
-        normalize_type='255',
-        gen_input_ailia=True,
-    )
-    #logger.info(input_img.shape)
-
-    avg_img = load_image(
-        AVERAGE_IMAGE_PATH,
-        (RESIZE_HEIGHT, RESIZE_WIDTH),
-        normalize_type='255',
-        gen_input_ailia=True,
-    )
-    #logger.info(avg_img.shape)
-
-    avg_img = (avg_img * 2) - 1
-
-    avg_image_for_batch = np.tile(avg_img, (input_img.shape[0], 1, 1, 1))
-    x_input = np.concatenate((input_img, avg_image_for_batch), axis=1)
-
-    #logger.info(x_input.shape)
-
-    ort_inputs = {ort_session.get_inputs()[0].name: x_input, 
-                    ort_session.get_inputs()[1].name: np.random.randn(1, 18, 512).astype(np.float32)
-                }
-
-    # inference
-    logger.info('Start inference...')
-    if args.benchmark:
-        logger.info('BENCHMARK mode')
-        for i in range(5):
-            start = int(round(time.time() * 1000))
-            ort_outs = ort_session.run(None, ort_inputs)
-            pred = ort_outs[0]
-            end = int(round(time.time() * 1000))
-            logger.info(f'\tailia processing time {end - start} ms')
-    else:
-        ort_outs = ort_session.run(None, ort_inputs)
-        pred = ort_outs[0]
-
-    logger.info(f'output shape: {pred.shape}')
 
 def post_processing(result_batch, input_img):
     for i in range(input_img.shape[0]):
@@ -172,7 +132,7 @@ def post_processing(result_batch, input_img):
 # ======================
 # Main functions
 # ======================
-def recognize_from_image(filename, net):
+def recognize_from_image(filename, net, onnx=False):
 
     #logger.info(filename)
     input_img = load_image(
@@ -206,12 +166,21 @@ def recognize_from_image(filename, net):
     if args.benchmark:
         logger.info('BENCHMARK mode')
         for i in range(5):
-            start = int(round(time.time() * 1000))
-            result_batch, result_latents = run_on_batch(input_img_resized, net, args.iteration, avg_img)
-            end = int(round(time.time() * 1000))
-            logger.info(f'\tailia processing time {end - start} ms')
+            if not onnx:
+                start = int(round(time.time() * 1000))
+                result_batch, result_latents = run_on_batch(input_img_resized, net, args.iteration, avg_img)
+                end = int(round(time.time() * 1000))
+                logger.info(f'\tailia processing time {end - start} ms')
+            else:
+                start = int(round(time.time() * 1000))
+                result_batch, result_latents = run_on_batch(input_img_resized, net, args.iteration, avg_img, onnx=True)
+                end = int(round(time.time() * 1000))
+                logger.info(f'\tonnx runtime processing time {end - start} ms')
     else:
-        result_batch, result_latents = run_on_batch(input_img_resized, net, args.iteration, avg_img)
+        if not onnx:
+            result_batch, result_latents = run_on_batch(input_img_resized, net, args.iteration, avg_img)
+        else:
+            result_batch, result_latents = run_on_batch(input_img_resized, net, args.iteration, avg_img, onnx=True)
 
     res = post_processing(result_batch, input_img)
             
@@ -299,14 +268,25 @@ def main():
             # image mode
             if args.onnx_runtime:
                 # onnx runtime
-                ort_session = onnxruntime.InferenceSession(WEIGHT_PATH)
+                if args.benchmark:
+                    start = int(round(time.time() * 1000))
+                    ort_session = onnxruntime.InferenceSession(WEIGHT_PATH)
+                    end = int(round(time.time() * 1000))
+                    logger.info(f'\tonnx runtime initializing time {end - start} ms')
+                else:
+                    ort_session = onnxruntime.InferenceSession(WEIGHT_PATH)
                 # input image loop
                 for image_path in args.input:
-                    recognize_from_image_onnx(image_path, ort_session)
+                    recognize_from_image(image_path, ort_session, onnx=True)
             else:
                 # net initialize
-                net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
-                #net = None
+                if args.benchmark:
+                    start = int(round(time.time() * 1000))
+                    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
+                    end = int(round(time.time() * 1000))
+                    logger.info(f'\tailia initializing time {end - start} ms')
+                else:
+                    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
                 # input image loop
                 for image_path in args.input:
                     recognize_from_image(image_path, net)
