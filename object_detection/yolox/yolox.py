@@ -84,6 +84,11 @@ parser.add_argument(
     default=NMS_THR, type=float,
     help='The detection iou for yolo. (default: '+str(NMS_THR)+')'
 )
+parser.add_argument(
+    '-dt', '--detector',
+    action='store_true',
+    help='Use detector API (require ailia SDK 1.2.9).'
+)
 args = update_parser(parser)
 
 MODEL_NAME = args.model_name
@@ -96,25 +101,24 @@ WIDTH = MODEL_PARAMS[MODEL_NAME]['input_shape'][1]
 # ======================
 # Main functions
 # ======================
-def recognize_from_image_detector():
-    env_id = args.env_id
-    det = ailia.Detector(
-            MODEL_PATH,
-            WEIGHT_PATH,
-            len(COCO_CATEGORY),
-            format=ailia.NETWORK_IMAGE_FORMAT_BGR,
-            channel=ailia.NETWORK_IMAGE_CHANNEL_FIRST,
-            range=ailia.NETWORK_IMAGE_RANGE_U_INT8,
-            algorithm=ailia.DETECTOR_ALGORITHM_YOLOX,
-            env_id=env_id)
-
+def recognize_from_image(detector):
     # input image loop
     for image_path in args.input:
         # prepare input data
         logger.debug(f'input image: {image_path}')
         raw_img = cv2.imread(image_path, cv2.IMREAD_COLOR)
-        raw_img = cv2.cvtColor(raw_img, cv2.COLOR_BGR2BGRA)
+        if args.detector:
+            raw_img = cv2.cvtColor(raw_img, cv2.COLOR_BGR2BGRA)
+        else:
+            img, ratio = preprocess(raw_img, (HEIGHT, WIDTH))
         logger.debug(f'input image shape: {raw_img.shape}')
+
+        def compute():
+            if args.detector:
+                detector.compute(raw_img, args.threshold, args.iou)
+                return None
+            else:
+                return detector.run(img[None, :, :, :])
 
         # inference
         logger.info('Start inference...')
@@ -122,54 +126,21 @@ def recognize_from_image_detector():
             logger.info('BENCHMARK mode')
             for i in range(5):
                 start = int(round(time.time() * 1000))
-                det.compute(raw_img, args.threshold, args.iou)
+                output = compute()
                 end = int(round(time.time() * 1000))
                 logger.info(f'\tailia processing time {end - start} ms')
         else:
-            det.compute(raw_img, args.threshold, args.iou)
+            output = compute()
 
-        res_img = plot_results(det, raw_img, COCO_CATEGORY)
+        if args.detector:
+            res_img = plot_results(detector, raw_img, COCO_CATEGORY)
+        else:
+            predictions = postprocess(output[0], (HEIGHT, WIDTH))[0]
+            detect_object = predictions_to_object(predictions, raw_img, ratio, args.iou, args.threshold)
+            detect_object = reverse_letterbox(detect_object, raw_img, (raw_img.shape[0], raw_img.shape[1]))
+            res_img = plot_results(detect_object, raw_img, COCO_CATEGORY)
 
         # plot result
-        savepath = get_savepath(args.savepath, image_path)
-        logger.info(f'saved at : {savepath}')
-        cv2.imwrite(savepath, res_img)
-
-    logger.info('Script finished successfully.')
-
-def recognize_from_image():
-    env_id = args.env_id
-    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
-
-    # input image loop
-    for image_path in args.input:
-        # prepare input data
-        logger.debug(f'input image: {image_path}')
-        raw_img = cv2.imread(image_path)
-        logger.debug(f'input image shape: {raw_img.shape}')
-        img, ratio = preprocess(raw_img, (HEIGHT, WIDTH))
-
-        # inference
-        logger.info('Start inference...')
-        if args.benchmark:
-            logger.info('BENCHMARK mode')
-            total_time = 0
-            for i in range(args.benchmark_count):
-                start = int(round(time.time() * 1000))
-                output = net.run(img[None, :, :, :])
-                end = int(round(time.time() * 1000))
-                if i != 0:
-                    total_time = total_time + (end - start)
-                logger.info(f'\tailia processing time {end - start} ms')
-            logger.info(f'\taverage time {total_time / (args.benchmark_count-1)} ms')
-        else:
-            output = net.run(img[None, :, :, :])
-
-        predictions = postprocess(output[0], (HEIGHT, WIDTH))[0]
-        detect_object = predictions_to_object(predictions, raw_img, ratio, args.iou, args.threshold)
-        detect_object = reverse_letterbox(detect_object, raw_img, (raw_img.shape[0], raw_img.shape[1]))
-        res_img = plot_results(detect_object, raw_img, COCO_CATEGORY)
-
         savepath = get_savepath(args.savepath, image_path)
         logger.info(f'saved at : {savepath}')
         cv2.imwrite(savepath, res_img)
@@ -181,11 +152,7 @@ def recognize_from_image():
 
     logger.info('Script finished successfully.')
 
-def recognize_from_video():
-    # net initialize
-    env_id = args.env_id
-    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
-
+def recognize_from_video(detector):
     capture = webcamera_utils.get_capture(args.video)
 
     # create video writer if savepath is specified as video format
@@ -211,12 +178,17 @@ def recognize_from_video():
             break
 
         raw_img = frame
-        img, ratio = preprocess(raw_img, (HEIGHT, WIDTH))
-        output = net.run(img[None, :, :, :])
-        predictions = postprocess(output[0], (HEIGHT, WIDTH))[0]
-        detect_object = predictions_to_object(predictions, raw_img, ratio, args.iou, args.threshold)
-        detect_object = reverse_letterbox(detect_object, raw_img, (raw_img.shape[0], raw_img.shape[1]))
-        res_img = plot_results(detect_object, raw_img, COCO_CATEGORY)
+        if args.detector:
+            raw_img = cv2.cvtColor(raw_img, cv2.COLOR_BGR2BGRA)
+            detector.compute(raw_img, args.threshold, args.iou)
+            res_img = plot_results(detector, raw_img, COCO_CATEGORY)
+        else:
+            img, ratio = preprocess(raw_img, (HEIGHT, WIDTH))
+            output = net.run(img[None, :, :, :])
+            predictions = postprocess(output[0], (HEIGHT, WIDTH))[0]
+            detect_object = predictions_to_object(predictions, raw_img, ratio, args.iou, args.threshold)
+            detect_object = reverse_letterbox(detect_object, raw_img, (raw_img.shape[0], raw_img.shape[1]))
+            res_img = plot_results(detect_object, raw_img, COCO_CATEGORY)
         cv2.imshow('frame', res_img)
 
         # save results
@@ -236,18 +208,30 @@ def recognize_from_video():
         writer.release()
     logger.info('Script finished successfully.')
 
-
 def main():
     # model files check and download
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
 
+    env_id = args.env_id
+    if args.detector:
+        detector = ailia.Detector(
+                MODEL_PATH,
+                WEIGHT_PATH,
+                len(COCO_CATEGORY),
+                format=ailia.NETWORK_IMAGE_FORMAT_BGR,
+                channel=ailia.NETWORK_IMAGE_CHANNEL_FIRST,
+                range=ailia.NETWORK_IMAGE_RANGE_U_INT8,
+                algorithm=ailia.DETECTOR_ALGORITHM_YOLOX,
+                env_id=env_id)
+    else:
+        detector = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+
     if args.video is not None:
         # video mode
-        recognize_from_video()
+        recognize_from_video(detector)
     else:
         # image mode
-        # recognize_from_image()
-        recognize_from_image_detector()
+        recognize_from_image(detector)
 
 
 if __name__ == '__main__':
