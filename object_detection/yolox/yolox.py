@@ -115,7 +115,6 @@ def recognize_from_image_detector():
         raw_img = cv2.imread(image_path, cv2.IMREAD_COLOR)
         raw_img = cv2.cvtColor(raw_img, cv2.COLOR_BGR2BGRA)
         logger.debug(f'input image shape: {raw_img.shape}')
-        img, ratio = preprocess(raw_img, (HEIGHT, WIDTH), (0, 1, 2))
 
         # inference
         logger.info('Start inference...')
@@ -123,13 +122,13 @@ def recognize_from_image_detector():
             logger.info('BENCHMARK mode')
             for i in range(5):
                 start = int(round(time.time() * 1000))
-                det.compute(img, args.threshold, args.iou)
+                det.compute(raw_img, args.threshold, args.iou)
                 end = int(round(time.time() * 1000))
                 logger.info(f'\tailia processing time {end - start} ms')
         else:
-            det.compute(img, args.threshold, args.iou)
+            det.compute(raw_img, args.threshold, args.iou)
 
-        res_img = plot_results(det, raw_img, COCO_CATEGORY, multiply_size=False)
+        res_img = plot_results(det, raw_img, COCO_CATEGORY)
 
         # plot result
         savepath = get_savepath(args.savepath, image_path)

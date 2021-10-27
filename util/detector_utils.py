@@ -93,19 +93,16 @@ def reverse_letterbox(detections, img, det_shape):
     return new_detections
 
 
-def plot_results(detector, img, category, segm_masks=None, logging=True, multiply_size=True):
+def plot_results(detector, img, category, segm_masks=None, logging=True):
     """
     :param detector: ailia.Detector, or list of ailia.DetectorObject
     :param img: ndarray data of image
     :param category: list of category_name
     :param segm_masks:
     :param logging: output log flg
-    :param multiply_size: multiply width and height by object's width and height
     :return:
     """
-    h, w = 1.0, 1.0
-    if multiply_size:
-        h, w = img.shape[0], img.shape[1]
+    h, w = img.shape[0], img.shape[1]
 
     count = detector.get_object_count() if hasattr(detector, 'get_object_count') else len(detector)
     if logging:
