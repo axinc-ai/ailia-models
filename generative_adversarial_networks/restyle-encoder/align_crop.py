@@ -29,6 +29,12 @@ def get_landmark(filepath):
     """
     detector = dlib.get_frontal_face_detector()
     # download model from: http://dlib.net/files/shape_predictor_68_face_landmarks.dat.bz2
+    if not os.path.exists('./shape_predictor_68_face_landmarks.dat'):
+        print('Downloading files for aligning face image...')
+        os.system('wget http://dlib.net/files/shape_predictor_68_face_landmarks.dat.bz2')
+        os.system('bzip2 -dk shape_predictor_68_face_landmarks.dat.bz2')
+        os.system('rm shape_predictor_68_face_landmarks.dat.bz2')
+
     predictor = dlib.shape_predictor('./shape_predictor_68_face_landmarks.dat')
 
     img = dlib.load_rgb_image(filepath)
@@ -137,22 +143,3 @@ def align_face(filepath):
 
         # Save aligned image.
         return img
-
-
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('-i', type=str, default='img')
-    args = parser.parse_args()
-
-    out_root = 'img/aligned'
-
-    if os.path.isdir(args.i):
-        for root, dirs, files in os.walk(args.i):
-            if files:
-                out_dir = os.path.join(out_root, root[len(args.i):])
-                if not os.path.isdir(out_dir):
-                    os.makedirs(out_dir)
-                for f in files:
-                    aligned = align_face(os.path.join(root, f))
-                    if aligned is not None:
-                        aligned.save(os.path.join(out_dir, f))
