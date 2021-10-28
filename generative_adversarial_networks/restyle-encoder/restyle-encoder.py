@@ -1,9 +1,12 @@
+import os
 import sys
+import subprocess
 import time
 
 import numpy as np
 import torch
 from torch.nn import functional as F
+import torchvision.transforms as transforms
 import cv2
 import onnx
 import onnxruntime
@@ -16,6 +19,7 @@ from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from image_utils import load_image  # noqa: E402
 import webcamera_utils  # noqa: E402
+from align_crop import align_face # noqa: E402
 
 # logger
 from logging import getLogger   # noqa: E402
@@ -29,9 +33,9 @@ WEIGHT_PATH = 'restyle-encoder.onnx'
 MODEL_PATH = 'restyle-encoder.onnx.prototxt'
 #REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/restyle-encoder/'
 
-IMAGE_PATH = 'face_img.jpg'
-AVERAGE_IMAGE_PATH = 'avg_image.jpg'
-SAVE_IMAGE_PATH = 'output.png'
+IMAGE_PATH = 'img/face_img.jpg'
+SAVE_IMAGE_PATH = 'img/output.png'
+ALIGNED_PATH = 'img/aligned/'
 
 IMAGE_HEIGHT = 1024
 IMAGE_WIDTH = 1024
@@ -110,6 +114,8 @@ def np2im(var, input=False):
         var.transpose(1, 2, 0),
         cv2.COLOR_RGB2BGR
     )
+    if not input:
+        var = ((var + 1) / 2)
     var[var < 0] = 0
     var[var > 1] = 1
     var = var * 255
@@ -132,29 +138,36 @@ def post_processing(result_batch, input_img):
 # ======================
 # Main functions
 # ======================
-def recognize_from_image(filename, net, onnx=False):
+def recognize_from_image(filename, net, onnx=False): 
+
+    aligned = align_face(filename)
+    if aligned is not None:
+        path = os.path.join(ALIGNED_PATH, filename.split('/')[-1])
+        aligned.save(path)
+    else: 
+        path = filename
 
     #logger.info(filename)
     input_img = load_image(
-        filename,
+        path,
         (IMAGE_HEIGHT, IMAGE_WIDTH),
         normalize_type='255',
         gen_input_ailia=True,
     )
     #logger.info(input_img.shape)
 
+    
     input_img_resized = load_image(
-        filename,
+        path,
         (RESIZE_HEIGHT, RESIZE_WIDTH),
         normalize_type='255',
         gen_input_ailia=True,
     )
-    #logger.info(input_img_resized.shape)
+    #logger.info(input_img_resized.shape) 
+    input_img_resized = (input_img_resized * 2) - 1
 
     avg_img = np.load('average/avg_image.npy')
     #logger.info(avg_img.shape)
-
-    #avg_img = (avg_img * 2) - 1
     
     # inference
     logger.info('Start inference...')
@@ -183,14 +196,6 @@ def recognize_from_image(filename, net, onnx=False):
     logger.info(f'saved at : {savepath}')
     cv2.imwrite(savepath, res)
 
-    """
-    # To be removed
-    for i in range(input_img.shape[0]):
-        input_im = np2im(input_img[i], input=True)
-    savepath = get_savepath(args.savepath, filename)
-    logger.info(f'saved at : {savepath}')
-    cv2.imwrite(savepath, input_im)
-    """
 
 def recognize_from_video(filename, net):
 
@@ -205,13 +210,7 @@ def recognize_from_video(filename, net):
         writer = None
 
     # Average image
-    avg_img = load_image(
-        AVERAGE_IMAGE_PATH,
-        (RESIZE_HEIGHT, RESIZE_WIDTH),
-        normalize_type='255',
-        gen_input_ailia=True
-    )
-    avg_img = (avg_img * 2) - 1
+    avg_img = np.load('average/avg_image.npy')
 
     while(True):
         ret, frame = capture.read()
@@ -225,6 +224,7 @@ def recognize_from_video(filename, net):
 
         resized_input = cv2.resize(input_data[0].transpose(1,2,0), (RESIZE_HEIGHT, RESIZE_WIDTH))
         resized_input = np.expand_dims(resized_input.transpose(2,0,1), axis=0)
+        resized_input = (resized_input * 2) - 1
 
         # inference
         result_batch, result_latents = run_on_batch(resized_input, net, args.iteration, avg_img)
