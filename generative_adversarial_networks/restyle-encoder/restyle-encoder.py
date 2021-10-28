@@ -71,7 +71,7 @@ def check(onnx_model):
     onnx.checker.check_model(onnx_model)
 
 def run_on_batch(inputs, net, iters, avg_image, onnx=False):
-    y_hat, latent = None, np.load('latent_avg.npy')
+    y_hat, latent = None, np.load('average/latent_avg.npy')
     results_batch = {idx: [] for idx in range(inputs.shape[0])}
     results_latent = {idx: [] for idx in range(inputs.shape[0])}
     for iter in range(iters):
@@ -151,15 +151,10 @@ def recognize_from_image(filename, net, onnx=False):
     )
     #logger.info(input_img_resized.shape)
 
-    avg_img = load_image(
-        AVERAGE_IMAGE_PATH,
-        (RESIZE_HEIGHT, RESIZE_WIDTH),
-        normalize_type='255',
-        gen_input_ailia=True,
-    )
+    avg_img = np.load('average/avg_image.npy')
     #logger.info(avg_img.shape)
 
-    avg_img = (avg_img * 2) - 1
+    #avg_img = (avg_img * 2) - 1
     
     # inference
     logger.info('Start inference...')
