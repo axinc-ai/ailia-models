@@ -151,7 +151,15 @@ def update_parser(parser, check_input_type=True, large_model=False):
             for idx in range(count) :
                 env = ailia.get_environment(idx)
                 logger.info("  env[" + str(idx) + "]=" + str(env))
-
+        
+        if args.env_id == ailia.ENVIRONMENT_AUTO:
+            args.env_id = ailia.get_gpu_environment_id()
+            if args.env_id == ailia.ENVIRONMENT_AUTO:
+                logger.info('env_id updated to 0')
+                args.env_id = 0
+            else:
+                logger.info('env_id updated to ' + str(args.env_id) + '(from get_gpu_environment_id())')
+        
         logger.info(f'env_id: {args.env_id}')
 
         env = ailia.get_environment(args.env_id)

@@ -151,8 +151,7 @@ def main():
         os.mkdir(args.output)
 
     # net initialize
-    env_id = ailia.get_gpu_environment_id()
-    print(f'env_id: {env_id}')
+    env_id = args.env_id
     if args.arch == 'blazeface':
         detector = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
     else:
