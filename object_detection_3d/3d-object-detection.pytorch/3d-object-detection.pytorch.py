@@ -310,17 +310,13 @@ def main():
     logger.info("=== regression model ===")
     check_and_download_models(WEIGHT_REGRESSION_PATH, MODEL_REGRESSION_PATH, REMOTE_PATH)
 
-    # load model
-    env_id = ailia.get_gpu_environment_id()
-    logger.info(f'env_id: {env_id}')
-
     # initialize
-    det_net = ailia.Net(MODEL_DETECTION_PATH, WEIGHT_DETECTION_PATH, env_id=env_id)
+    det_net = ailia.Net(MODEL_DETECTION_PATH, WEIGHT_DETECTION_PATH, env_id=args.env_id)
     if args.onnx:
         import onnxruntime
         reg_net = onnxruntime.InferenceSession(WEIGHT_REGRESSION_PATH)
     else:
-        reg_net = ailia.Net(MODEL_REGRESSION_PATH, WEIGHT_REGRESSION_PATH, env_id=env_id)
+        reg_net = ailia.Net(MODEL_REGRESSION_PATH, WEIGHT_REGRESSION_PATH, env_id=args.env_id)
 
     if args.video is not None:
         # video mode

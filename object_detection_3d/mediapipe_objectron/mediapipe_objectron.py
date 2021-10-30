@@ -372,9 +372,7 @@ def main():
     logger.info("=== regression model ===")
     check_and_download_models(weight_path, model_path, REMOTE_PATH)
 
-    # load model
-    env_id = ailia.get_gpu_environment_id()
-    logger.info(f'env_id: {env_id}')
+    env_id = args.env_id
 
     # initialize
     det_net = ailia.Net(MODEL_DETECTION_PATH, WEIGHT_DETECTION_PATH, env_id=env_id)

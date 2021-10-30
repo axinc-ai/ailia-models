@@ -257,9 +257,7 @@ def main():
         logger.info('Checking classification model...')
         check_and_download_models(WEIGHT_CLASSIFIER_PATH, MODEL_CLASSIFIER_PATH, REMOTE_PATH)
 
-    # load model
-    env_id = ailia.get_gpu_environment_id()
-    logger.info(f'env_id: {env_id}')
+    env_id = args.env_id
 
     if args.input1 or args.input2:
         net = ailia.Net(MODEL_VERI_PATH, WEIGHT_VERI_PATH, env_id=env_id)
