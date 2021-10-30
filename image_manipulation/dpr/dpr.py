@@ -10,7 +10,7 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath
+from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from detector_utils import load_image  # noqa: E402C
 from webcamera_utils import get_capture, get_writer  # noqa: E402
@@ -76,6 +76,8 @@ def read_sh():
         key = os.path.splitext(os.path.basename(args.sh))[0]
         sh_data[key] = sh[:9] * 0.7
 
+    assert 0 < len(sh_data), 'SH file not found'
+
     return sh_data
 
 
@@ -108,6 +110,9 @@ def render_shading(sh_data):
         shading = shading * valid
 
         savepath = '%s.png' % key
+        savepath = get_savepath(
+            args.savepath if os.path.isdir(args.savepath) else savepath,
+            savepath, post_fix='')
         logger.info(f'saved at : {savepath}')
         cv2.imwrite(savepath, shading)
 
@@ -156,8 +161,10 @@ def predict(net, img, sh_data):
     for key, sh in sorted(sh_data.items()):
         sh = np.reshape(sh, (1, 9, 1, 1)).astype(np.float32)
 
+        if not args.video:
+            logger.info(f'SH : {key}')
+
         # feedforward
-        logger.info(f'SH : {key}')
         output = net.predict([img_l, sh])
         if model_type == '512':
             out_l, out_light = output
@@ -211,9 +218,10 @@ def recognize_from_image(net):
             cv2.imwrite(savepath, out_imgs[0])
         else:
             for i, name in enumerate(sorted(sh_data.keys())):
-                save_image = '%s_%s.png' % (os.path.splitext(os.path.basename(image_path))[0], name)
+                savepath = '%s_%s.png' % (os.path.splitext(os.path.basename(image_path))[0], name)
                 savepath = get_savepath(
-                    args.savepath if os.path.isdir(args.savepath) else save_image, save_image)
+                    args.savepath if os.path.isdir(args.savepath) else savepath,
+                    savepath, post_fix='')
                 logger.info(f'saved at : {savepath}')
                 cv2.imwrite(savepath, out_imgs[i])
 
@@ -237,6 +245,10 @@ def recognize_from_video(net):
         writer = None
 
     sh_data = read_sh()
+    if 1 < len(sh_data):
+        # Squeeze to only one
+        key = list(sh_data.keys())[0]
+        sh_data = {key: sh_data[key]}
 
     if args.shading:
         render_shading(sh_data)
