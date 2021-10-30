@@ -135,6 +135,7 @@ cd ../../object_detection_3d/mediapipe_objectron; python3 mediapipe_objectron.py
 cd ../../object_tracking/deepsort; python3 deepsort.py ${OPTION}
 cd ../../object_tracking/person_reid_baseline_pytorch; python3 person_reid_baseline_pytorch.py ${OPTION}
 cd ../../object_tracking/abd_net; python3 abd_net.py ${OPTION}
+cd ../../object_tracking/siam-mot; python3 siam-mot.py ${OPTION}
 cd ../../object_tracking/bytetrack; python3 bytetrack.py ${OPTION}
 cd ../../optical_flow_estimation/raft; python3 raft.py ${OPTION}
 cd ../../point_segmentation/pointnet_pytorch python3 pointnet_pytorch.py ${OPTION}
