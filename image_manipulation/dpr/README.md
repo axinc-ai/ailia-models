@@ -2,7 +2,7 @@
 
 ## Input
 
-![Input](obama.jpg)
+<img src="obama.jpg" width="360px" >
 
 (Image from https://github.com/zhhoper/DPR/blob/master/data/obama.jpg)
 
@@ -17,18 +17,18 @@
 ## Output
 
 <p>
-<img src="result/obama_rotate_light_00.jpg" width="120px" >
-<img src="result/obama_rotate_light_01.jpg" width="120px" >
-<img src="result/obama_rotate_light_02.jpg" width="120x" >
-<img src="result/obama_rotate_light_03.jpg" width="120px" >
-<img src="result/obama_rotate_light_04.jpg" width="120px" >
-<img src="result/obama_rotate_light_05.jpg" width="120px" >
-<img src="result/obama_rotate_light_06.jpg" width="120px" >
+<img src="result/obama_rotate_light_00.png" width="120px" >
+<img src="result/obama_rotate_light_01.png" width="120px" >
+<img src="result/obama_rotate_light_02.png" width="120px" >
+<img src="result/obama_rotate_light_03.png" width="120px" >
+<img src="result/obama_rotate_light_04.png" width="120px" >
+<img src="result/obama_rotate_light_05.png" width="120px" >
+<img src="result/obama_rotate_light_06.png" width="120px" >
 </p>
 <p>
 <img src="result/rotate_light_00.png" width="120px" >
 <img src="result/rotate_light_01.png" width="120px" >
-<img src="result/rotate_light_02.png" width="120x" >
+<img src="result/rotate_light_02.png" width="120px" >
 <img src="result/rotate_light_03.png" width="120px" >
 <img src="result/rotate_light_04.png" width="120px" >
 <img src="result/rotate_light_05.png" width="120px" >
