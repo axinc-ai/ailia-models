@@ -1,17 +1,28 @@
-#!/usr/bin/env python3
-# -*- coding:utf-8 -*-
-# Copyright (c) 2014-2021 Megvii Inc. All rights reserved.
-
 import os
 
 import numpy as np
+import math
+import ailia
 
-__all__ = ["mkdir", "nms", "multiclass_nms", "demo_postprocess"]
+import cv2
 
+def preproc(img, input_size, swap=(2, 0, 1)):
+    if len(img.shape) == 3:
+        padded_img = np.ones((input_size[0], input_size[1], 3), dtype=np.uint8) * 114
+    else:
+        padded_img = np.ones(input_size, dtype=np.uint8) * 114
 
-def mkdir(path):
-    if not os.path.exists(path):
-        os.makedirs(path)
+    r = min(input_size[0] / img.shape[0], input_size[1] / img.shape[1])
+    resized_img = cv2.resize(
+        img,
+        (int(img.shape[1] * r), int(img.shape[0] * r)),
+        interpolation=cv2.INTER_LINEAR,
+    ).astype(np.uint8)
+    padded_img[: int(img.shape[0] * r), : int(img.shape[1] * r)] = resized_img
+
+    padded_img = padded_img.transpose(swap)
+    padded_img = np.ascontiguousarray(padded_img, dtype=np.float32)
+    return padded_img, r
 
 
 def nms(boxes, scores, nms_thr):
@@ -96,7 +107,7 @@ def multiclass_nms_class_agnostic(boxes, scores, nms_thr, score_thr):
     return dets
 
 
-def demo_postprocess(outputs, img_size, p6=False):
+def postprocess(outputs, img_size, p6=False):
 
     grids = []
     expanded_strides = []
@@ -122,3 +133,35 @@ def demo_postprocess(outputs, img_size, p6=False):
     outputs[..., 2:4] = np.exp(outputs[..., 2:4]) * expanded_strides
 
     return outputs
+
+
+def predictions_to_object(predictions,raw_img,ratio,nms_thr,score_thr):
+    boxes = predictions[:, :4]
+    scores = predictions[:, 4:5] * predictions[:, 5:]
+
+    boxes_xyxy = np.ones_like(boxes)
+    boxes_xyxy[:, 0] = boxes[:, 0] - boxes[:, 2] / 2.
+    boxes_xyxy[:, 1] = boxes[:, 1] - boxes[:, 3] / 2.
+    boxes_xyxy[:, 2] = boxes[:, 0] + boxes[:, 2] / 2.
+    boxes_xyxy[:, 3] = boxes[:, 1] + boxes[:, 3] / 2.
+    boxes_xyxy /= ratio
+    dets = multiclass_nms(boxes_xyxy, scores, nms_thr, score_thr)
+
+    detect_object = []
+    if dets is not None:
+        img_size_h, img_size_w = raw_img.shape[:2]
+        final_boxes, final_scores, final_cls_inds = dets[:, :4], dets[:, 4], dets[:, 5]
+        for i, box in enumerate(final_boxes):
+            x1, y1, x2, y2 = box
+            c = int(final_cls_inds[i])
+            r = ailia.DetectorObject(
+                category=c,
+                prob=final_scores[i],
+                x=x1 / img_size_w,
+                y=y1 / img_size_h,
+                w=(x2 - x1) / img_size_w,
+                h=(y2 - y1) / img_size_h,
+            )
+            detect_object.append(r)
+    
+    return detect_object
