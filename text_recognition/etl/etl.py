@@ -71,6 +71,9 @@ def recognize_from_image():
         logger.info(image_path)
         etl_word = codecs.open(ETL_PATH, 'r', 'utf-8').readlines()
         img = cv2.imread(image_path, cv2.IMREAD_UNCHANGED)
+        if img is None:
+            logger.error("can not open "+image_path)
+            continue
         img = preprocess_image(img)
 
         # inference
@@ -93,7 +96,7 @@ def recognize_from_image():
             logger.info(f"+ idx={idx}")
             info = classifier.get_class(idx)
             logger.info(
-                f"  category={info.category} [ {etl_word[info.category]} ]"
+                f"  category={info.category} [ {etl_word[info.category].rstrip()} ]"
             )
             logger.info(f"  prob={info.prob}")
 
@@ -146,7 +149,7 @@ def recognize_from_video():
             logger.info(f"+ idx={idx}")
             info = classifier.get_class(idx)
             logger.info(
-                f"  category={info.category} [ {etl_word[info.category]} ]"
+                f"  category={info.category} [ {etl_word[info.category].rstrip()} ]"
             )
             logger.info(f"  prob={info.prob}")
         cv2.imshow('frame', in_frame)
