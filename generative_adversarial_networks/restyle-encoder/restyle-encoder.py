@@ -4,9 +4,6 @@ import subprocess
 import time
 
 import numpy as np
-import torch
-from torch.nn import functional as F
-import torchvision.transforms as transforms
 import cv2
 import onnx
 import onnxruntime
@@ -31,6 +28,8 @@ logger = getLogger(__name__)
 # ======================
 WEIGHT_PATH = 'restyle-encoder.onnx'
 MODEL_PATH = 'restyle-encoder.onnx.prototxt'
+FACE_POOL_WEIGHT_PATH = 'face_pool.onnx'
+FACE_POOL_MODEL_PATH = 'face_pool.onnx.prototxt'
 #REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/restyle-encoder/'
 
 IMAGE_PATH = 'img/face_img.jpg'
@@ -74,7 +73,7 @@ args = update_parser(parser)
 def check(onnx_model):
     onnx.checker.check_model(onnx_model)
 
-def run_on_batch(inputs, net, iters, avg_image, onnx=False):
+def run_on_batch(inputs, net, face_pool_net, iters, avg_image, onnx=False):
     y_hat, latent = None, np.load('average/latent_avg.npy')
     results_batch = {idx: [] for idx in range(inputs.shape[0])}
     results_latent = {idx: [] for idx in range(inputs.shape[0])}
@@ -103,8 +102,12 @@ def run_on_batch(inputs, net, iters, avg_image, onnx=False):
             #results_latent[idx].append(latent[idx].cpu().numpy())
             results_latent[idx].append(latent[idx])
 
-        #y_hat = cv2.resize(y_hat, (256, 256))
-        y_hat = F.adaptive_avg_pool2d(torch.from_numpy(y_hat), (256, 256)).numpy()
+        if not onnx:
+            y_hat = face_pool_net.predict(y_hat)
+        else:
+            ort_inputs = {face_pool_net.get_inputs()[0].name: y_hat.astype(np.float32)}
+            ort_outs = face_pool_net.run(None, ort_inputs)
+            y_hat = ort_outs[0]
 
     return results_batch, results_latent
 
@@ -138,7 +141,7 @@ def post_processing(result_batch, input_img):
 # ======================
 # Main functions
 # ======================
-def recognize_from_image(filename, net, onnx=False): 
+def recognize_from_image(filename, net, face_pool_net, onnx=False): 
 
     aligned = align_face(filename)
     if aligned is not None:
@@ -176,19 +179,19 @@ def recognize_from_image(filename, net, onnx=False):
         for i in range(5):
             if not onnx:
                 start = int(round(time.time() * 1000))
-                result_batch, result_latents = run_on_batch(input_img_resized, net, args.iteration, avg_img)
+                result_batch, result_latents = run_on_batch(input_img_resized, net, face_pool_net, args.iteration, avg_img)
                 end = int(round(time.time() * 1000))
                 logger.info(f'\tailia processing time {end - start} ms')
             else:
                 start = int(round(time.time() * 1000))
-                result_batch, result_latents = run_on_batch(input_img_resized, net, args.iteration, avg_img, onnx=True)
+                result_batch, result_latents = run_on_batch(input_img_resized, net, face_pool_net, args.iteration, avg_img, onnx=True)
                 end = int(round(time.time() * 1000))
                 logger.info(f'\tonnx runtime processing time {end - start} ms')
     else:
         if not onnx:
-            result_batch, result_latents = run_on_batch(input_img_resized, net, args.iteration, avg_img)
+            result_batch, result_latents = run_on_batch(input_img_resized, net, face_pool_net, args.iteration, avg_img)
         else:
-            result_batch, result_latents = run_on_batch(input_img_resized, net, args.iteration, avg_img, onnx=True)
+            result_batch, result_latents = run_on_batch(input_img_resized, net, face_pool_net, args.iteration, avg_img, onnx=True)
 
     res = post_processing(result_batch, input_img)
             
@@ -197,7 +200,7 @@ def recognize_from_image(filename, net, onnx=False):
     cv2.imwrite(savepath, res)
 
 
-def recognize_from_video(filename, net):
+def recognize_from_video(filename, net, face_pool_net):
 
     capture = webcamera_utils.get_capture(args.video)
 
@@ -227,7 +230,7 @@ def recognize_from_video(filename, net):
         resized_input = (resized_input * 2) - 1
 
         # inference
-        result_batch, result_latents = run_on_batch(resized_input, net, args.iteration, avg_img)
+        result_batch, result_latents = run_on_batch(resized_input, net, face_pool_net, args.iteration, avg_img)
 
         # post-processing
         res_img = post_processing(result_batch, input_data)
@@ -247,6 +250,7 @@ def recognize_from_video(filename, net):
 def main():
     # model files check and download
     #check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
+    #check_and_download_models(FACE_POOL_WEIGHT_PATH, FACE_POOL_MODEL_PATH, REMOTE_PATH)
 
     # debug
     if args.debug:
@@ -257,8 +261,9 @@ def main():
         if args.video is not None:
             # net initialize
             net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
+            face_pool_net = ailia.Net(FACE_POOL_MODEL_PATH, FACE_POOL_WEIGHT_PATH, env_id=args.env_id)
             # video mode
-            recognize_from_video(SAVE_IMAGE_PATH, net)
+            recognize_from_video(SAVE_IMAGE_PATH, net, face_pool_net)
         else:
             # image mode
             if args.onnx_runtime:
@@ -266,25 +271,29 @@ def main():
                 if args.benchmark:
                     start = int(round(time.time() * 1000))
                     ort_session = onnxruntime.InferenceSession(WEIGHT_PATH)
+                    face_pool_ort_session = onnxruntime.InferenceSession(FACE_POOL_WEIGHT_PATH)
                     end = int(round(time.time() * 1000))
                     logger.info(f'\tonnx runtime initializing time {end - start} ms')
                 else:
                     ort_session = onnxruntime.InferenceSession(WEIGHT_PATH)
+                    face_pool_ort_session = onnxruntime.InferenceSession(FACE_POOL_WEIGHT_PATH)
                 # input image loop
                 for image_path in args.input:
-                    recognize_from_image(image_path, ort_session, onnx=True)
+                    recognize_from_image(image_path, ort_session, face_pool_ort_session, onnx=True)
             else:
                 # net initialize
                 if args.benchmark:
                     start = int(round(time.time() * 1000))
                     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
+                    face_pool_net = ailia.Net(FACE_POOL_MODEL_PATH, FACE_POOL_WEIGHT_PATH, env_id=args.env_id)
                     end = int(round(time.time() * 1000))
                     logger.info(f'\tailia initializing time {end - start} ms')
                 else:
                     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
+                    face_pool_net = ailia.Net(FACE_POOL_MODEL_PATH, FACE_POOL_WEIGHT_PATH, env_id=args.env_id)
                 # input image loop
                 for image_path in args.input:
-                    recognize_from_image(image_path, net)
+                    recognize_from_image(image_path, net, face_pool_net)
     logger.info('Script finished successfully.')
 
 
