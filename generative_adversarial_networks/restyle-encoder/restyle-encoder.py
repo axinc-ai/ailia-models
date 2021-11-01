@@ -28,8 +28,8 @@ logger = getLogger(__name__)
 # ======================
 WEIGHT_PATH = 'restyle-encoder.onnx'
 MODEL_PATH = 'restyle-encoder.onnx.prototxt'
-FACE_POOL_WEIGHT_PATH = 'face_pool.onnx'
-FACE_POOL_MODEL_PATH = 'face_pool.onnx.prototxt'
+FACE_POOL_WEIGHT_PATH = 'face-pool.onnx'
+FACE_POOL_MODEL_PATH = 'face-pool.onnx.prototxt'
 #REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/restyle-encoder/'
 
 IMAGE_PATH = 'img/face_img.jpg'
