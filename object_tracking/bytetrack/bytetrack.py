@@ -29,6 +29,8 @@ WEIGHT_MOT17_X_PATH = 'bytetrack_x_mot17.onnx'
 MODEL_MOT17_X_PATH = 'bytetrack_x_mot17.onnx.prototxt'
 WEIGHT_MOT17_S_PATH = 'bytetrack_s_mot17.onnx'
 MODEL_MOT17_S_PATH = 'bytetrack_s_mot17.onnx.prototxt'
+WEIGHT_MOT17_TINY_PATH = 'bytetrack_tiny_mot17.onnx'
+MODEL_MOT17_TINY_PATH = 'bytetrack_tiny_mot17.onnx.prototxt'
 WEIGHT_MOT20_X_PATH = 'bytetrack_x_mot20.onnx'
 MODEL_MOT20_X_PATH = 'bytetrack_x_mot20.onnx.prototxt'
 REMOTE_PATH = \
@@ -47,6 +49,8 @@ IMAGE_MOT17_X_HEIGHT = 800
 IMAGE_MOT17_X_WIDTH = 1440
 IMAGE_MOT17_S_HEIGHT = 608
 IMAGE_MOT17_S_WIDTH = 1088
+IMAGE_MOT17_TINY_HEIGHT = 416
+IMAGE_MOT17_TINY_WIDTH = 416
 IMAGE_MOT20_X_HEIGHT = 896
 IMAGE_MOT20_X_WIDTH = 1600
 IMAGE_YOLOX_S_HEIGHT = 640
@@ -71,7 +75,7 @@ parser.add_argument(
 )
 parser.add_argument(
     '-m', '--model_type', default='mot17_x',
-    choices=('mot17_x', 'mot20_x', 'mot17_s', 'yolox_s', 'yolox_tiny'),
+    choices=('mot17_x', 'mot20_x', 'mot17_s', 'mot17_tiny', 'yolox_s', 'yolox_tiny'),
     help='model type'
 )
 # tracking args
@@ -198,6 +202,7 @@ def predict(net, img):
     dic_model = {
         'mot17_x': (IMAGE_MOT17_X_HEIGHT, IMAGE_MOT17_X_WIDTH),
         'mot17_s': (IMAGE_MOT17_S_HEIGHT, IMAGE_MOT17_S_WIDTH),
+        'mot17_tiny': (IMAGE_MOT17_TINY_HEIGHT, IMAGE_MOT17_TINY_WIDTH),
         'mot20_x': (IMAGE_MOT20_X_HEIGHT, IMAGE_MOT20_X_WIDTH),
         'yolox_s': (IMAGE_YOLOX_S_HEIGHT, IMAGE_YOLOX_S_WIDTH),
         'yolox_tiny': (IMAGE_YOLOX_TINY_HEIGHT, IMAGE_YOLOX_TINY_WIDTH),
@@ -312,6 +317,7 @@ def main():
     dic_model = {
         'mot17_x': (WEIGHT_MOT17_X_PATH, MODEL_MOT17_X_PATH),
         'mot17_s': (WEIGHT_MOT17_S_PATH, MODEL_MOT17_S_PATH),
+        'mot17_tiny': (WEIGHT_MOT17_TINY_PATH, MODEL_MOT17_TINY_PATH),
         'mot20_x': (WEIGHT_MOT20_X_PATH, MODEL_MOT20_X_PATH),
         'yolox_s': (WEIGHT_YOLOX_S_PATH, MODEL_YOLOX_S_PATH),
         'yolox_tiny': (WEIGHT_YOLOX_TINY_PATH, MODEL_YOLOX_TINY_PATH),
