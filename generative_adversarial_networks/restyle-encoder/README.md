@@ -3,8 +3,9 @@
 ## Input
 
 [<img src="img/face_img.jpg" width=256px>](img/face_img.jpg)
+[<img src="img/toonify_img.jpg" width=256px>](img/toonify_img.jpg)
 
-(Image from https://github.com/yuval-alaluf/restyle-encoder/blob/main/notebooks/images/face_img.jpg)
+(Image from https://github.com/yuval-alaluf/restyle-encoder/blob/main/notebooks/images/)
 
 Shape : (1, 3, 1024, 1024)
 
@@ -12,9 +13,16 @@ Face alignment and reshaped to : (1, 3, 256, 256)
 
 ## Output
 
+### Encoder
+
 ![Output](img/output.png)
 
-From left to right: 1st, 2nd, 3rd, 4th, 5th iteration, and original (face aligned) image.
+### Toonification
+
+![Toonified Output](img/output_toonify.png)
+
+
+Note: From left to right: 1st, 2nd, 3rd, 4th, 5th iteration, and original (face aligned) image.
 
 ## Usage
 Automatically downloads the onnx and prototxt files on the first run.
@@ -25,9 +33,20 @@ For the sample image,
 $ python3 restyle-encoder.py
 ```
 
+If you want to specify the input image, put the image path after the `--input` option.  
+You can use `--savepath` option to change the name of the output file to save.
+```bash
+$ python3 restyle-encoder.py --input IMAGE_PATH --savepath SAVE_IMAGE_PATH
+```
+
 By specifying the `-iter` option, you can choose how many iterations you want to generate the output image (default 5).
 ```bash
 $ python3 restyle-encoder.py -iter 3
+```
+
+By specifying the `-toon` option, you can run the toonification task.
+```bash
+$ python3 restyle-encoder.py -iter 4 -toon --input img/toonify_img.jpg --savepath img/output_toonify.png
 ```
 
 By adding the `--video` option, you can input the video.   

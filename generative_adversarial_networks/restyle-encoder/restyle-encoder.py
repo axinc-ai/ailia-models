@@ -28,8 +28,12 @@ logger = getLogger(__name__)
 # ======================
 WEIGHT_PATH = 'restyle-encoder.onnx'
 MODEL_PATH = 'restyle-encoder.onnx.prototxt'
+
 FACE_POOL_WEIGHT_PATH = 'face-pool.onnx'
 FACE_POOL_MODEL_PATH = 'face-pool.onnx.prototxt'
+
+TOONIFY_WEIGHT_PATH = 'toonify.onnx'
+TOONIFY_MODEL_PATH = 'toonify.onnx.prototxt'
 #REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/restyle-encoder/'
 
 IMAGE_PATH = 'img/face_img.jpg'
@@ -55,6 +59,11 @@ parser.add_argument(
     help='Number of iterations per batch (default 5)'
 )
 parser.add_argument(
+    '-toon', '--toonify',
+    action='store_true',
+    help='Run the toonification task'
+)
+parser.add_argument(
     '-d', '--debug',
     action='store_true',
     help='Debugger'
@@ -73,10 +82,13 @@ args = update_parser(parser)
 def check(onnx_model):
     onnx.checker.check_model(onnx_model)
 
-def run_on_batch(inputs, net, face_pool_net, iters, avg_image, onnx=False):
+def run_on_batch(inputs, net, face_pool_net, iters, avg_image, toonify=None, onnx=False):
     y_hat, latent = None, np.load('average/latent_avg.npy')
     results_batch = {idx: [] for idx in range(inputs.shape[0])}
-    results_latent = {idx: [] for idx in range(inputs.shape[0])}
+
+    if toonify is not None:
+        iters += 1
+
     for iter in range(iters):
         if iter == 0:
             #logger.info(avg_image.shape)
@@ -84,23 +96,37 @@ def run_on_batch(inputs, net, face_pool_net, iters, avg_image, onnx=False):
             #logger.info(avg_image_for_batch.shape)
             x_input = np.concatenate((inputs, avg_image_for_batch), axis=1)
             #logger.info(x_input.shape)
+
+            logger.info(f"Iteration {iter+1}/{iters}")
+            if not onnx:
+                y_hat, latent = net.predict(x_input, latent=latent)
+            else: 
+                ort_inputs = {net.get_inputs()[0].name: x_input.astype(np.float32), net.get_inputs()[1].name: latent.astype(np.float32)}
+                ort_outs = net.run(None, ort_inputs)
+                y_hat, latent = ort_outs[0], ort_outs[1]
+
         else:
             x_input = np.concatenate((inputs, y_hat), axis=1)
             #logger.info(x_input.shape)
 
-        logger.info(f"Iteration {iter+1}/{iters}")
-        if not onnx:
-            y_hat, latent = net.predict(x_input, latent=latent)
-        else: 
-            ort_inputs = {net.get_inputs()[0].name: x_input.astype(np.float32), net.get_inputs()[1].name: latent.astype(np.float32)}
-            ort_outs = net.run(None, ort_inputs)
-            y_hat, latent = ort_outs[0], ort_outs[1]
+            logger.info(f"Iteration {iter+1}/{iters}")
+            if not onnx:
+                if toonify is None:
+                    y_hat, latent = net.predict(x_input, latent=latent)
+                else: 
+                    y_hat, latent = toonify.predict(x_input, latent=latent)
+            else: 
+                ort_inputs = {net.get_inputs()[0].name: x_input.astype(np.float32), net.get_inputs()[1].name: latent.astype(np.float32)}
+                if toonify is None:
+                    ort_outs = net.run(None, ort_inputs)
+                    y_hat, latent = ort_outs[0], ort_outs[1]
+                else:
+                    ort_outs = toonify.run(None, ort_inputs)
+                    y_hat, latent = ort_outs[0], ort_outs[1]
 
         # store intermediate outputs
         for idx in range(inputs.shape[0]):
             results_batch[idx].append(y_hat[idx])
-            #results_latent[idx].append(latent[idx].cpu().numpy())
-            results_latent[idx].append(latent[idx])
 
         if not onnx:
             y_hat = face_pool_net.predict(y_hat)
@@ -109,7 +135,7 @@ def run_on_batch(inputs, net, face_pool_net, iters, avg_image, onnx=False):
             ort_outs = face_pool_net.run(None, ort_inputs)
             y_hat = ort_outs[0]
 
-    return results_batch, results_latent
+    return results_batch
 
 def np2im(var, input=False):
     var = var.astype('float32')
@@ -124,13 +150,15 @@ def np2im(var, input=False):
     var = var * 255
     return var.astype('uint8')
 
-def post_processing(result_batch, input_img):
+def post_processing(result_batch, input_img, toonify=False):
     for i in range(input_img.shape[0]):
-        results = [np2im(result_batch[i][iter_idx]) for iter_idx in range(args.iteration)]
+        n = args.iteration
+        if toonify: 
+            n += 1 
+        results = [np2im(result_batch[i][iter_idx]) for iter_idx in range(n)]
 
         # save step-by-step results side-by-side
         input_im = np2im(input_img[i], input=True)
-        #res = np.array(results[0].resize(resize_amount))
         res = np.array(results[0])
         for idx, result in enumerate(results[1:]):
             res = np.concatenate([res, result], axis=1)
@@ -141,7 +169,7 @@ def post_processing(result_batch, input_img):
 # ======================
 # Main functions
 # ======================
-def recognize_from_image(filename, net, face_pool_net, onnx=False): 
+def recognize_from_image(filename, net, face_pool_net, toonify=None, onnx=False): 
 
     aligned = align_face(filename)
     if aligned is not None:
@@ -178,29 +206,50 @@ def recognize_from_image(filename, net, face_pool_net, onnx=False):
         logger.info('BENCHMARK mode')
         for i in range(5):
             if not onnx:
-                start = int(round(time.time() * 1000))
-                result_batch, result_latents = run_on_batch(input_img_resized, net, face_pool_net, args.iteration, avg_img)
-                end = int(round(time.time() * 1000))
-                logger.info(f'\tailia processing time {end - start} ms')
+                if toonify is None:
+                    start = int(round(time.time() * 1000))
+                    result_batch = run_on_batch(input_img_resized, net, face_pool_net, args.iteration, avg_img)
+                    end = int(round(time.time() * 1000))
+                    logger.info(f'\tailia processing time {end - start} ms')
+                else:
+                    start = int(round(time.time() * 1000))
+                    result_batch = run_on_batch(input_img_resized, net, face_pool_net, args.iteration, avg_img, toonify=toonify)
+                    end = int(round(time.time() * 1000))
+                    logger.info(f'\tailia processing time {end - start} ms')
             else:
-                start = int(round(time.time() * 1000))
-                result_batch, result_latents = run_on_batch(input_img_resized, net, face_pool_net, args.iteration, avg_img, onnx=True)
-                end = int(round(time.time() * 1000))
-                logger.info(f'\tonnx runtime processing time {end - start} ms')
+                if toonify is None:
+                    start = int(round(time.time() * 1000))
+                    result_batch = run_on_batch(input_img_resized, net, face_pool_net, args.iteration, avg_img, onnx=True)
+                    end = int(round(time.time() * 1000))
+                    logger.info(f'\tonnx runtime processing time {end - start} ms')
+                else:
+                    start = int(round(time.time() * 1000))
+                    result_batch = run_on_batch(input_img_resized, net, face_pool_net, args.iteration, avg_img, toonify=toonify, onnx=True)
+                    end = int(round(time.time() * 1000))
+                    logger.info(f'\tailia processing time {end - start} ms')
     else:
         if not onnx:
-            result_batch, result_latents = run_on_batch(input_img_resized, net, face_pool_net, args.iteration, avg_img)
+            if toonify is None:
+                result_batch = run_on_batch(input_img_resized, net, face_pool_net, args.iteration, avg_img)
+            else:
+                result_batch= run_on_batch(input_img_resized, net, face_pool_net, args.iteration, avg_img, toonify=toonify)
         else:
-            result_batch, result_latents = run_on_batch(input_img_resized, net, face_pool_net, args.iteration, avg_img, onnx=True)
+            if toonify is None:
+                result_batch = run_on_batch(input_img_resized, net, face_pool_net, args.iteration, avg_img, onnx=True)
+            else:
+                result_batch = run_on_batch(input_img_resized, net, face_pool_net, args.iteration, avg_img, toonify=toonify, onnx=True)
 
-    res = post_processing(result_batch, input_img)
+    if toonify is not None:
+        res = post_processing(result_batch, input_img, True)
+    else:
+        res = post_processing(result_batch, input_img)
             
     savepath = get_savepath(args.savepath, filename)
     logger.info(f'saved at : {savepath}')
     cv2.imwrite(savepath, res)
 
 
-def recognize_from_video(filename, net, face_pool_net):
+def recognize_from_video(filename, net, face_pool_net, toonify=None):
 
     capture = webcamera_utils.get_capture(args.video)
 
@@ -230,10 +279,14 @@ def recognize_from_video(filename, net, face_pool_net):
         resized_input = (resized_input * 2) - 1
 
         # inference
-        result_batch, result_latents = run_on_batch(resized_input, net, face_pool_net, args.iteration, avg_img)
-
-        # post-processing
-        res_img = post_processing(result_batch, input_data)
+        if toonify is None:
+            result_batch, result_latents = run_on_batch(resized_input, net, face_pool_net, args.iteration, avg_img)
+            # post-processing
+            res_img = post_processing(result_batch, input_data)
+        else:
+            result_batch, result_latents = run_on_batch(resized_input, net, face_pool_net, args.iteration, avg_img, toonify=toonify)
+            # post-processing
+            res_img = post_processing(result_batch, input_data, toonify=True)
 
         cv2.imshow('frame', res_img)
 
@@ -251,19 +304,29 @@ def main():
     # model files check and download
     #check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
     #check_and_download_models(FACE_POOL_WEIGHT_PATH, FACE_POOL_MODEL_PATH, REMOTE_PATH)
+    #check_and_download_models(TOONIFY_WEIGHT_PATH, TOONIFY_MODEL_PATH, REMOTE_PATH)
 
     # debug
     if args.debug:
         onnx_model = onnx.load(WEIGHT_PATH)
         check(onnx_model)
+        onnx_model = onnx.load(FACE_POOL_WEIGHT_PATH)
+        check(onnx_model)
+        if args.toonify:
+            onnx_model = onnx.load(TOONIFY_WEIGHT_PATH)
+            check(onnx_model)
         logger.info('Debug OK.')
     else:
         if args.video is not None:
             # net initialize
             net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
             face_pool_net = ailia.Net(FACE_POOL_MODEL_PATH, FACE_POOL_WEIGHT_PATH, env_id=args.env_id)
+            if args.toonify:
+                toonify_net = ailia.Net(TOONIFY_MODEL_PATH, TOONIFY_WEIGHT_PATH, env_id=args.env_id)
+            else: 
+                toonify_net = None
             # video mode
-            recognize_from_video(SAVE_IMAGE_PATH, net, face_pool_net)
+            recognize_from_video(SAVE_IMAGE_PATH, net, face_pool_net, toonify_net)
         else:
             # image mode
             if args.onnx_runtime:
@@ -272,28 +335,44 @@ def main():
                     start = int(round(time.time() * 1000))
                     ort_session = onnxruntime.InferenceSession(WEIGHT_PATH)
                     face_pool_ort_session = onnxruntime.InferenceSession(FACE_POOL_WEIGHT_PATH)
+                    if args.toonify:
+                        toonify_ort_session = onnxruntime.InferenceSession(TOONIFY_WEIGHT_PATH)
+                    else: 
+                        toonify_ort_session = None
                     end = int(round(time.time() * 1000))
                     logger.info(f'\tonnx runtime initializing time {end - start} ms')
                 else:
                     ort_session = onnxruntime.InferenceSession(WEIGHT_PATH)
                     face_pool_ort_session = onnxruntime.InferenceSession(FACE_POOL_WEIGHT_PATH)
+                    if args.toonify:
+                        toonify_ort_session = onnxruntime.InferenceSession(TOONIFY_WEIGHT_PATH)
+                    else: 
+                        toonify_ort_session = None
                 # input image loop
                 for image_path in args.input:
-                    recognize_from_image(image_path, ort_session, face_pool_ort_session, onnx=True)
+                    recognize_from_image(image_path, ort_session, face_pool_ort_session, toonify=toonify_ort_session, onnx=True)
             else:
                 # net initialize
                 if args.benchmark:
                     start = int(round(time.time() * 1000))
                     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
                     face_pool_net = ailia.Net(FACE_POOL_MODEL_PATH, FACE_POOL_WEIGHT_PATH, env_id=args.env_id)
+                    if args.toonify:
+                        toonify_net = ailia.Net(TOONIFY_MODEL_PATH, TOONIFY_WEIGHT_PATH, env_id=args.env_id)
+                    else: 
+                        toonify_net = None
                     end = int(round(time.time() * 1000))
                     logger.info(f'\tailia initializing time {end - start} ms')
                 else:
                     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
                     face_pool_net = ailia.Net(FACE_POOL_MODEL_PATH, FACE_POOL_WEIGHT_PATH, env_id=args.env_id)
+                    if args.toonify:
+                        toonify_net = ailia.Net(TOONIFY_MODEL_PATH, TOONIFY_WEIGHT_PATH, env_id=args.env_id)
+                    else: 
+                        toonify_net = None
                 # input image loop
                 for image_path in args.input:
-                    recognize_from_image(image_path, net, face_pool_net)
+                    recognize_from_image(image_path, net, face_pool_net, toonify=toonify_net)
     logger.info('Script finished successfully.')
 
 
