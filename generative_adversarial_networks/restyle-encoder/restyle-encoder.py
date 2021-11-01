@@ -99,7 +99,7 @@ def run_on_batch(inputs, net, face_pool_net, iters, avg_image, toonify=None, onn
 
             logger.info(f"Iteration {iter+1}/{iters}")
             if not onnx:
-                y_hat, latent = net.predict(x_input, latent=latent)
+                y_hat, latent = net.predict({'x_input': x_input, 'latent_input': latent})
             else: 
                 ort_inputs = {net.get_inputs()[0].name: x_input.astype(np.float32), net.get_inputs()[1].name: latent.astype(np.float32)}
                 ort_outs = net.run(None, ort_inputs)
@@ -112,9 +112,9 @@ def run_on_batch(inputs, net, face_pool_net, iters, avg_image, toonify=None, onn
             logger.info(f"Iteration {iter+1}/{iters}")
             if not onnx:
                 if toonify is None:
-                    y_hat, latent = net.predict(x_input, latent=latent)
+                    y_hat, latent = net.predict({'x_input': x_input, 'latent_input': latent})
                 else: 
-                    y_hat, latent = toonify.predict(x_input, latent=latent)
+                    y_hat, latent = toonify.predict({'x_input': x_input, 'latent_input': latent})
             else: 
                 ort_inputs = {net.get_inputs()[0].name: x_input.astype(np.float32), net.get_inputs()[1].name: latent.astype(np.float32)}
                 if toonify is None:
@@ -280,11 +280,11 @@ def recognize_from_video(filename, net, face_pool_net, toonify=None):
 
         # inference
         if toonify is None:
-            result_batch, result_latents = run_on_batch(resized_input, net, face_pool_net, args.iteration, avg_img)
+            result_batch = run_on_batch(resized_input, net, face_pool_net, args.iteration, avg_img)
             # post-processing
             res_img = post_processing(result_batch, input_data)
         else:
-            result_batch, result_latents = run_on_batch(resized_input, net, face_pool_net, args.iteration, avg_img, toonify=toonify)
+            result_batch = run_on_batch(resized_input, net, face_pool_net, args.iteration, avg_img, toonify=toonify)
             # post-processing
             res_img = post_processing(result_batch, input_data, toonify=True)
 
