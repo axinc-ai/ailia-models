@@ -134,6 +134,7 @@ def recognize_from_image(detector):
 
         if args.detector:
             res_img = plot_results(detector, raw_img, COCO_CATEGORY)
+            detect_object = detector
         else:
             predictions = postprocess(output[0], (HEIGHT, WIDTH))[0]
             detect_object = predictions_to_object(predictions, raw_img, ratio, args.iou, args.threshold)
@@ -182,9 +183,10 @@ def recognize_from_video(detector):
             raw_img = cv2.cvtColor(raw_img, cv2.COLOR_BGR2BGRA)
             detector.compute(raw_img, args.threshold, args.iou)
             res_img = plot_results(detector, raw_img, COCO_CATEGORY)
+            detect_object = detector
         else:
             img, ratio = preprocess(raw_img, (HEIGHT, WIDTH))
-            output = net.run(img[None, :, :, :])
+            output = detector.run(img[None, :, :, :])
             predictions = postprocess(output[0], (HEIGHT, WIDTH))[0]
             detect_object = predictions_to_object(predictions, raw_img, ratio, args.iou, args.threshold)
             detect_object = reverse_letterbox(detect_object, raw_img, (raw_img.shape[0], raw_img.shape[1]))
