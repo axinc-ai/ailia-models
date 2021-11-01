@@ -21,8 +21,7 @@ Face alignment and reshaped to : (1, 3, 256, 256)
 
 ![Toonified Output](img/output_toonify.png)
 
-
-Note: From left to right: 1st, 2nd, 3rd, 4th, 5th iteration, and original (face aligned) image.
+\* Note: From left to right: 1st, 2nd, 3rd, 4th, 5th iteration, and original (face aligned) image.
 
 ## Usage
 Automatically downloads the onnx and prototxt files on the first run.
@@ -46,7 +45,7 @@ $ python3 restyle-encoder.py -iter 3 -e 0
 
 By specifying the `-toon` option, you can run the toonification task.
 ```bash
-$ python3 restyle-encoder.py -iter 4 -toon --input img/toonify_img.jpg --savepath img/output_toonify.png -e 0
+$ python3 restyle-encoder.py -toon --input img/toonify_img.jpg --savepath img/output_toonify.png -e 0
 ```
 
 By adding the `--video` option, you can input the video.   
