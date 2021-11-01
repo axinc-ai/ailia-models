@@ -13,11 +13,11 @@ Face alignment and reshaped to : (1, 3, 256, 256)
 
 ## Output
 
-### Encoder
+### Inversion task
 
 ![Output](img/output.png)
 
-### Toonification
+### Toonification task
 
 ![Toonified Output](img/output_toonify.png)
 
