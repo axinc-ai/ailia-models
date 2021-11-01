@@ -1,8 +1,8 @@
-# Restyle Encoder
+# ReStyle
 
 ## Input
 
-![Input](img/face_img.jpg)
+[<img src="img/face_img.jpg" width=256px>](img/face_img.jpg)
 
 (Image from https://github.com/yuval-alaluf/restyle-encoder/blob/main/notebooks/images/face_img.jpg)
 
@@ -38,7 +38,7 @@ $ python3 restyle-encoder.py --video VIDEO_PATH
 
 ## Reference
 
-- [Restyle Encoder](https://github.com/yuval-alaluf/restyle-encoder)
+- [ReStyle](https://github.com/yuval-alaluf/restyle-encoder)
 
 ## Framework
 
