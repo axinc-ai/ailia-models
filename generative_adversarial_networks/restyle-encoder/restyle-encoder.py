@@ -2,16 +2,17 @@ import os
 import sys
 import subprocess
 import time
+import argparse
 
 import numpy as np
 import cv2
-import onnx
-import onnxruntime
 
 import ailia
 
 # import original modules
 sys.path.append('../../util')
+sys.path.append('../../style_transfer') # import setup for face alignement (psgan)
+sys.path.append('../../style_transfer/psgan') # import preprocess for face alignement (psgan)
 from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from image_utils import load_image  # noqa: E402
@@ -21,7 +22,6 @@ from align_crop import align_face # noqa: E402
 # logger
 from logging import getLogger   # noqa: E402
 logger = getLogger(__name__)
-
 
 # ======================
 # Parameters
@@ -35,7 +35,18 @@ FACE_POOL_MODEL_PATH = 'face-pool.onnx.prototxt'
 TOONIFY_WEIGHT_PATH = 'toonify.onnx'
 TOONIFY_MODEL_PATH = 'toonify.onnx.prototxt'
 
+FACE_ALIGNMENT_WEIGHT_PATH = "../../face_recognition/face_alignment/2DFAN-4.onnx"
+FACE_ALIGNMENT_MODEL_PATH = "../../face_recognition/face_alignment/2DFAN-4.onnx.prototxt"
+
+FACE_DETECTOR_WEIGHT_PATH = "../../face_detection/blazeface/blazeface.onnx"
+FACE_DETECTOR_MODEL_PATH = "../../face_detection/blazeface/blazeface.onnx.prototxt"
+
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/restyle_encoder/'
+FACE_ALIGNMENT_REMOTE_PATH = "https://storage.googleapis.com/ailia-models/face_alignment/"
+FACE_DETECTOR_REMOTE_PATH = "https://storage.googleapis.com/ailia-models/blazeface/"
+
+face_alignment_path = [FACE_ALIGNMENT_MODEL_PATH, FACE_ALIGNMENT_WEIGHT_PATH]
+face_detector_path = [FACE_DETECTOR_MODEL_PATH, FACE_DETECTOR_WEIGHT_PATH]
 
 IMAGE_PATH = 'img/face_img.jpg'
 SAVE_IMAGE_PATH = 'img/output.png'
@@ -52,7 +63,7 @@ RESIZE_WIDTH = 256
 # Arguemnt Parser Config
 # ======================
 parser = get_base_parser(
-    'Restyle Encoder', IMAGE_PATH, SAVE_IMAGE_PATH,
+    'ReStyle', IMAGE_PATH, SAVE_IMAGE_PATH,
 )
 parser.add_argument(
     '-iter', '--iteration',
@@ -70,9 +81,26 @@ parser.add_argument(
     help='Debugger'
 )
 parser.add_argument(
-    '--onnx_runtime',
+    '--onnx',
     action='store_true',
     help='Inference using onnx runtime'
+)
+parser.add_argument(
+    "--use_dlib",
+    action="store_true",
+    help="Use dlib models for face alignment",
+)
+parser.add_argument(
+    "--config_file",
+    default="../../style_transfer/psgan/configs/base.yaml",
+    metavar="FILE",
+    help="Path to config file for psgan",
+)
+parser.add_argument(
+    "opts",
+    help="Modify config options using the command-line (for psgan)",
+    default=None,
+    nargs=argparse.REMAINDER,
 )
 args = update_parser(parser)
 
@@ -80,7 +108,9 @@ args = update_parser(parser)
 # ======================
 # Utils
 # ======================
-def check(onnx_model):
+def check(path):
+    import onnx
+    onnx_model = onnx.load(path)
     onnx.checker.check_model(onnx_model)
 
 def run_on_batch(inputs, net, face_pool_net, iters, avg_image, toonify=None, onnx=False):
@@ -170,7 +200,7 @@ def post_processing(result_batch, input_img):
 def recognize_from_image(filename, net, face_pool_net, toonify=None, onnx=False): 
 
     # face alignment
-    aligned = align_face(filename)
+    aligned = align_face(filename, args, face_alignment_path, face_detector_path)
     if aligned is not None:
         path = os.path.join(ALIGNED_PATH, filename.split('/')[-1])
         aligned.save(path)
@@ -307,17 +337,28 @@ def main():
     # toonification task
     if args.toonify:
         check_and_download_models(TOONIFY_WEIGHT_PATH, TOONIFY_MODEL_PATH, REMOTE_PATH)
+    if not args.use_dlib:
+        check_and_download_models(
+            FACE_ALIGNMENT_WEIGHT_PATH,
+            FACE_ALIGNMENT_MODEL_PATH,
+            FACE_ALIGNMENT_REMOTE_PATH
+        )
+        check_and_download_models(
+            FACE_DETECTOR_WEIGHT_PATH,
+            FACE_DETECTOR_MODEL_PATH,
+            FACE_DETECTOR_REMOTE_PATH
+        )
 
     # debug
     if args.debug:
-        onnx_model = onnx.load(WEIGHT_PATH)
-        check(onnx_model)
-        onnx_model = onnx.load(FACE_POOL_WEIGHT_PATH)
-        check(onnx_model)
+        check(WEIGHT_PATH)
+        check(FACE_POOL_WEIGHT_PATH)
         # toonification task
         if args.toonify:
-            onnx_model = onnx.load(TOONIFY_WEIGHT_PATH)
-            check(onnx_model)
+            check(TOONIFY_WEIGHT_PATH)
+        if args.use_dlib:
+            check(FACE_ALIGNMENT_WEIGHT_PATH)
+            check(FACE_DETECTOR_WEIGHT_PATH)
         logger.info('Debug OK.')
     else:
         if args.video is not None:
@@ -332,7 +373,9 @@ def main():
             recognize_from_video(SAVE_IMAGE_PATH, net, face_pool_net, toonify_net)
         else:
             # image mode
-            if args.onnx_runtime:
+            if args.onnx:
+                import onnxruntime
+
                 # onnx runtime
                 if args.benchmark:
                     start = int(round(time.time() * 1000))

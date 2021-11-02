@@ -13,59 +13,71 @@ requirements:
     # http://dlib.net/files/shape_predictor_68_face_landmarks.dat.bz2
 """
 
-import argparse
 import numpy as np
 import os
 import PIL
 import PIL.Image
 import scipy
 import scipy.ndimage
-import dlib
 
-
-def get_landmark(filepath):
-    """get landmark with dlib
+def get_landmark(filepath, args, face_alignment_path, face_detector_path):
+    """get landmark with and without dlib
     :return: np.array shape=(68, 2)
     """
-    detector = dlib.get_frontal_face_detector()
-    # download model from: http://dlib.net/files/shape_predictor_68_face_landmarks.dat.bz2
-    if not os.path.exists('./shape_predictor_68_face_landmarks.dat'):
-        print('Downloading files for aligning face image...')
-        os.system('wget http://dlib.net/files/shape_predictor_68_face_landmarks.dat.bz2')
-        os.system('bzip2 -dk shape_predictor_68_face_landmarks.dat.bz2')
-        os.system('rm shape_predictor_68_face_landmarks.dat.bz2')
+    if args.use_dlib:
+        import dlib
 
-    predictor = dlib.shape_predictor('./shape_predictor_68_face_landmarks.dat')
+        detector = dlib.get_frontal_face_detector()
+        # download model from: http://dlib.net/files/shape_predictor_68_face_landmarks.dat.bz2
+        if not os.path.exists('./shape_predictor_68_face_landmarks.dat'):
+            print('Downloading files for aligning face image...')
+            os.system('wget http://dlib.net/files/shape_predictor_68_face_landmarks.dat.bz2')
+            os.system('bzip2 -dk shape_predictor_68_face_landmarks.dat.bz2')
+            os.system('rm shape_predictor_68_face_landmarks.dat.bz2')
 
-    img = dlib.load_rgb_image(filepath)
-    dets = detector(img, 1)
+        predictor = dlib.shape_predictor('./shape_predictor_68_face_landmarks.dat')
 
-    # print("Number of faces detected: {}".format(len(dets)))
-    shape = None
-    for k, d in enumerate(dets):
-        # print("Detection {}: Left: {} Top: {} Right: {} Bottom: {}".format(
-            # k, d.left(), d.top(), d.right(), d.bottom()))
-        # Get the landmarks/parts for the face in box d.
-        shape = predictor(img, d)
-        # print("Part 0: {}, Part 1: {} ...".format(shape.part(0), shape.part(1)))
+        img = dlib.load_rgb_image(filepath)
+        dets = detector(img, 1)
 
-    if shape is not None:
-        t = list(shape.parts())
-        a = []
-        for tt in t:
-            a.append([tt.x, tt.y])
-        lm = np.array(a)
-        # lm is a shape=(68,2) np.array
-        return lm
+        # print("Number of faces detected: {}".format(len(dets)))
+        shape = None
+        for k, d in enumerate(dets):
+            # print("Detection {}: Left: {} Top: {} Right: {} Bottom: {}".format(
+                # k, d.left(), d.top(), d.right(), d.bottom()))
+            # Get the landmarks/parts for the face in box d.
+            shape = predictor(img, d)
+            # print("Part 0: {}, Part 1: {} ...".format(shape.part(0), shape.part(1)))
+
+        if shape is not None:
+            t = list(shape.parts())
+            a = []
+            for tt in t:
+                a.append([tt.x, tt.y])
+            lm = np.array(a)
+            # lm is a shape=(68,2) np.array
+    else: 
+        from psgan.preprocess import PreProcess
+        from setup import setup_config
+
+        config = setup_config(args)
+        preprocess = PreProcess(
+                config, args, None, face_alignment_path, face_detector_path, need_parser=False, return_landmarks=True
+            )
+
+        image = PIL.Image.open(filepath).convert("RGB")
+        image = image.resize((256,256))
+        lm = preprocess(image)
+
+    return lm
 
     
-def align_face(filepath):
+def align_face(filepath, args, face_alignment_path, face_detector_path):
     """
     :param filepath: str
     :return: PIL Image
     """
-
-    lm = get_landmark(filepath)
+    lm = get_landmark(filepath, args, face_alignment_path, face_detector_path)
 
     if lm is not None:
         lm_chin          = lm[0  : 17]  # left-right
@@ -101,8 +113,13 @@ def align_face(filepath):
         # read image
         img = PIL.Image.open(filepath)
 
-        output_size=1024
-        transform_size=4096
+        if args.use_dlib:
+            output_size=1024
+            transform_size=4096
+        else:
+            img = img.resize((256,256))
+            output_size=256
+            transform_size=1024
         enable_padding=True
 
         # Shrink.

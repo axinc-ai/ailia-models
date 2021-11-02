@@ -27,36 +27,40 @@ Face alignment and reshaped to : (1, 3, 256, 256)
 Automatically downloads the onnx and prototxt files on the first run.
 It is necessary to be connected to the Internet while downloading.
 
-For the sample image (running on CPU),
+For the sample image,
 ```bash
-$ python3 restyle-encoder.py -e 0
+$ python3 restyle-encoder.py 
 ```
 
 If you want to specify the input image, put the image path after the `--input` option.  
 You can use `--savepath` option to change the name of the output file to save.
 ```bash
-$ python3 restyle-encoder.py --input IMAGE_PATH --savepath SAVE_IMAGE_PATH -e 0
+$ python3 restyle-encoder.py --input IMAGE_PATH --savepath SAVE_IMAGE_PATH 
 ```
 
 By specifying the `-iter` option, you can choose how many iterations you want to generate the output image (default 5).
 ```bash
-$ python3 restyle-encoder.py -iter 3 -e 0
+$ python3 restyle-encoder.py -iter 3 
 ```
 
 By specifying the `-toon` option, you can run the toonification task.
 ```bash
-$ python3 restyle-encoder.py -toon --input img/toonify_img.jpg --savepath img/output_toonify.png -e 0
+$ python3 restyle-encoder.py -toon --input img/toonify_img.jpg --savepath img/output_toonify.png 
 ```
 
 By adding the `--video` option, you can input the video.   
 If you pass `0` as an argument to VIDEO_PATH, you can use the webcam input instead of the video file.
 ```bash
-$ python3 restyle-encoder.py --video VIDEO_PATH -e 0
+$ python3 restyle-encoder.py --video VIDEO_PATH 
 ```
+
+By adding the `--use_dlib` option, you can use original version of face alignment.
 
 ## Reference
 
 - [ReStyle](https://github.com/yuval-alaluf/restyle-encoder)
+
+- [PSGAN](https://github.com/axinc-ai/ailia-models/tree/master/style_transfer/psgan) (face alignment without dlib)
 
 ## Framework
 
