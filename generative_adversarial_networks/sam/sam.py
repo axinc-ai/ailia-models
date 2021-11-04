@@ -27,9 +27,15 @@ logger = getLogger(__name__)
 # ======================
 # Parameters
 # ======================
-WEIGHT_PATH = 'sam/sam.onnx'
-MODEL_PATH = 'sam.onnx.prototxt'
-REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/sam/'
+#WEIGHT_PATH = 'sam/sam.onnx'
+#MODEL_PATH = 'sam/sam.onnx.prototxt'
+ENCODER_WEIGHT_PATH = 'encoder.onnx'
+ENCODER_MODEL_PATH = 'encoder.onnx.prototxt'
+PRETRAINED_ENCODER_WEIGHT_PATH = 'pretrained-encoder.onnx'
+PRETRAINED_ENCODER_MODEL_PATH = 'pretrained-encoder.onnx.prototxt'
+DECODER_WEIGHT_PATH = 'decoder.onnx'
+DECODER_MODEL_PATH = 'decoder.onnx.prototxt'
+#REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/sam/'
 
 FACE_ALIGNMENT_WEIGHT_PATH = "../../face_recognition/face_alignment/2DFAN-4.onnx"
 FACE_ALIGNMENT_MODEL_PATH = "../../face_recognition/face_alignment/2DFAN-4.onnx.prototxt"
@@ -96,17 +102,39 @@ args = update_parser(parser)
 
 def run_on_batch(inputs, net, onnx=False):
     results_batch = {}
+    encoder, pretrained_encoder, decoder = net
+    latent_avg = np.load('latent_avg.npy')
     for idx, image in enumerate(inputs):
         logger.info(f'Inference {idx+1}/{len(inputs)}')
         # ailia prediction 
         if not onnx:
-            y_hat = net.predict(image)
+            codes = encoder.predict(image)
+            encoded_latents = pretrained_encoder.predict(image[:, :-1, :, :])
+            encoded_latents = encoded_latents + latent_avg
+            codes = codes + encoded_latents
+            y_hat = decoder.predict([codes])[0]
+            #y_hat = net.predict(image)
         # onnx runtime prediction
         else: 
-            ort_inputs = {net.get_inputs()[0].name: image.astype(np.float32)}
-            ort_outs = net.run(None, ort_inputs)
+            ort_inputs = {encoder.get_inputs()[0].name: image.astype(np.float32)}
+            ort_outs = encoder.run(None, ort_inputs)
+            codes = ort_outs[0]
+
+            ort_inputs = {pretrained_encoder.get_inputs()[0].name: image[:, :-1, :, :].astype(np.float32)}
+            ort_outs = pretrained_encoder.run(None, ort_inputs)
+            encoded_latents = ort_outs[0]
+
+            encoded_latents = encoded_latents + latent_avg
+            codes = codes + encoded_latents
+
+            ort_inputs = {decoder.get_inputs()[0].name: codes.astype(np.float32)}
+            ort_outs = decoder.run(None, ort_inputs)
             y_hat = ort_outs[0]
-        results_batch[idx]=y_hat
+
+            #ort_inputs = {net.get_inputs()[0].name: image.astype(np.float32)}
+            #ort_outs = net.run(None, ort_inputs)
+            #y_hat = ort_outs[0]
+        results_batch[idx] = y_hat
 
     return results_batch
 
@@ -257,6 +285,9 @@ def recognize_from_video(filename, net):
 def main():
     # model files check and download
     #check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
+    #check_and_download_models(ENCODER_WEIGHT_PATH, ENCODER_MODEL_PATH, REMOTE_PATH)
+    #check_and_download_models(PRETRAINED_ENCODER_WEIGHT_PATH, PRETRAINED_ENCODER_MODEL_PATH, REMOTE_PATH)
+    #check_and_download_models(DECODER_WEIGHT_PATH, DECODER_MODEL_PATH, REMOTE_PATH)
     if not args.use_dlib:
         check_and_download_models(
             FACE_ALIGNMENT_WEIGHT_PATH,
@@ -271,7 +302,10 @@ def main():
 
     if args.video is not None:
         # net initialize
-        net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
+        encoder = ailia.Net(ENCODER_MODEL_PATH, ENCODER_WEIGHT_PATH, env_id=args.env_id)
+        pretrained_encoder = ailia.Net(PRETRAINED_ENCODER_MODEL_PATH, PRETRAINED_ENCODER_WEIGHT_PATH, env_id=args.env_id)
+        decoder = ailia.Net(DECODER_MODEL_PATH, DECODER_WEIGHT_PATH, env_id=args.env_id)
+        net = (encoder, pretrained_encoder, decoder)
         # video mode
         recognize_from_video(SAVE_IMAGE_PATH, net)
     else:
@@ -282,11 +316,17 @@ def main():
             # onnx runtime
             if args.benchmark:
                 start = int(round(time.time() * 1000))
-                ort_session = onnxruntime.InferenceSession(WEIGHT_PATH)
+                encoder = onnxruntime.InferenceSession(ENCODER_WEIGHT_PATH)
+                pretrained_encoder = onnxruntime.InferenceSession(PRETRAINED_ENCODER_WEIGHT_PATH)
+                decoder = onnxruntime.InferenceSession(DECODER_WEIGHT_PATH)
+                ort_session = (encoder, pretrained_encoder, decoder)
                 end = int(round(time.time() * 1000))
                 logger.info(f'\tonnx runtime initializing time {end - start} ms')
             else:
-                ort_session = onnxruntime.InferenceSession(WEIGHT_PATH)
+                encoder = onnxruntime.InferenceSession(ENCODER_WEIGHT_PATH)
+                pretrained_encoder = onnxruntime.InferenceSession(PRETRAINED_ENCODER_WEIGHT_PATH)
+                decoder = onnxruntime.InferenceSession(DECODER_WEIGHT_PATH)
+                ort_session = (encoder, pretrained_encoder, decoder)
             # input image loop
             for image_path in args.input:
                 recognize_from_image(image_path, ort_session, onnx=True)
@@ -294,11 +334,17 @@ def main():
             # net initialize
             if args.benchmark:
                 start = int(round(time.time() * 1000))
-                net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
+                encoder = ailia.Net(ENCODER_MODEL_PATH, ENCODER_WEIGHT_PATH, env_id=args.env_id)
+                pretrained_encoder = ailia.Net(PRETRAINED_ENCODER_MODEL_PATH, PRETRAINED_ENCODER_WEIGHT_PATH, env_id=args.env_id)
+                decoder = ailia.Net(DECODER_MODEL_PATH, DECODER_WEIGHT_PATH, env_id=args.env_id)
+                net = (encoder, pretrained_encoder, decoder)
                 end = int(round(time.time() * 1000))
                 logger.info(f'\tailia initializing time {end - start} ms')
             else:
-                net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
+                encoder = ailia.Net(ENCODER_MODEL_PATH, ENCODER_WEIGHT_PATH, env_id=args.env_id)
+                pretrained_encoder = ailia.Net(PRETRAINED_ENCODER_MODEL_PATH, PRETRAINED_ENCODER_WEIGHT_PATH, env_id=args.env_id)
+                decoder = ailia.Net(DECODER_MODEL_PATH, DECODER_WEIGHT_PATH, env_id=args.env_id)
+                net = (encoder, pretrained_encoder, decoder)
             # input image loop
             for image_path in args.input:
                 recognize_from_image(image_path, net)
