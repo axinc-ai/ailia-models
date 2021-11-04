@@ -244,9 +244,6 @@ def recognize_from_video(filename, net):
     else:
         writer = None
 
-    # average image
-    avg_img = np.load('average/avg_image.npy')
-
     while(True):
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
@@ -261,12 +258,9 @@ def recognize_from_video(filename, net):
         resized_input = np.expand_dims(resized_input.transpose(2,0,1), axis=0)
         resized_input = (resized_input * 2) - 1
 
-        # inference
-        if toonify is None:
-            result_batch = run_on_batch(resized_input, net, face_pool_net, args.iteration, avg_img)
-        # toonification task
-        else:
-            result_batch = run_on_batch(resized_input, net, face_pool_net, args.iteration, avg_img, toonify=toonify)
+        input_batch = [add_aging_channel(resized_input[0], age) for age in args.target_age.split(',')]
+
+        result_batch = run_on_batch(input_batch, net)
             
         # post-processing
         res_img = post_processing(result_batch, input_data)
