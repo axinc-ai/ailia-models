@@ -89,6 +89,16 @@ parser.add_argument(
     action='store_true',
     help='Use detector API (require ailia SDK 1.2.9).'
 )
+parser.add_argument(
+    '-dw', '--detection_width',
+    default=-1, type=int,
+    help='The detection width and height for yolo. (default: auto)'
+)
+parser.add_argument(
+    '-dh', '--detection_height',
+    default=-1, type=int,
+    help='The detection height and height for yolo. (default: auto)'
+)
 args = update_parser(parser)
 
 MODEL_NAME = args.model_name
@@ -124,11 +134,15 @@ def recognize_from_image(detector):
         logger.info('Start inference...')
         if args.benchmark:
             logger.info('BENCHMARK mode')
-            for i in range(5):
+            total_time = 0
+            for i in range(args.benchmark_count):
                 start = int(round(time.time() * 1000))
                 output = compute()
                 end = int(round(time.time() * 1000))
+                if i != 0:
+                    total_time = total_time + (end - start)
                 logger.info(f'\tailia processing time {end - start} ms')
+            logger.info(f'\taverage time {total_time / (args.benchmark_count-1)} ms')
         else:
             output = compute()
 
@@ -225,8 +239,14 @@ def main():
                 range=ailia.NETWORK_IMAGE_RANGE_U_INT8,
                 algorithm=ailia.DETECTOR_ALGORITHM_YOLOX,
                 env_id=env_id)
+        if args.detection_width!=-1 or args.detection_height!=-1:
+            detector.set_input_shape(args.detection_width,args.detection_height)
     else:
         detector = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+        if args.detection_width!=-1 or args.detection_height!=-1:
+            WIDTH=args.detection_width
+            HEIGHT=args.detection_height
+            detector.set_input_shape((1,3,HEIGHT,WIDTH))
 
     if args.video is not None:
         # video mode
