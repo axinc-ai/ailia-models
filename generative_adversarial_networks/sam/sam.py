@@ -67,6 +67,7 @@ parser = get_base_parser(
     'SAM', IMAGE_PATH, SAVE_IMAGE_PATH,
 )
 parser.add_argument(
+    '-age',
     '--target_age', 
     type=str, 
     default='10,30,50,70,90',
