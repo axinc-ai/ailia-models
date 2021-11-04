@@ -11,7 +11,7 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
-sys.path.append('../restyle-encoder')
+sys.path.append('../restyle-encoder') #import align_crop.py
 sys.path.append('../../style_transfer') # import setup for face alignement (psgan)
 sys.path.append('../../style_transfer/psgan') # import preprocess for face alignement (psgan)
 from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
@@ -27,8 +27,6 @@ logger = getLogger(__name__)
 # ======================
 # Parameters
 # ======================
-#WEIGHT_PATH = 'sam/sam.onnx'
-#MODEL_PATH = 'sam/sam.onnx.prototxt'
 ENCODER_WEIGHT_PATH = 'encoder.onnx'
 ENCODER_MODEL_PATH = 'encoder.onnx.prototxt'
 PRETRAINED_ENCODER_WEIGHT_PATH = 'pretrained-encoder.onnx'
@@ -114,7 +112,6 @@ def run_on_batch(inputs, net, onnx=False):
             encoded_latents = encoded_latents + latent_avg
             codes = codes + encoded_latents
             y_hat = decoder.predict([codes])[0]
-            #y_hat = net.predict(image)
         # onnx runtime prediction
         else: 
             ort_inputs = {encoder.get_inputs()[0].name: image.astype(np.float32)}
@@ -132,9 +129,6 @@ def run_on_batch(inputs, net, onnx=False):
             ort_outs = decoder.run(None, ort_inputs)
             y_hat = ort_outs[0]
 
-            #ort_inputs = {net.get_inputs()[0].name: image.astype(np.float32)}
-            #ort_outs = net.run(None, ort_inputs)
-            #y_hat = ort_outs[0]
         results_batch[idx] = y_hat
 
     return results_batch
@@ -279,7 +273,6 @@ def recognize_from_video(filename, net):
 
 def main():
     # model files check and download
-    #check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
     #check_and_download_models(ENCODER_WEIGHT_PATH, ENCODER_MODEL_PATH, REMOTE_PATH)
     #check_and_download_models(PRETRAINED_ENCODER_WEIGHT_PATH, PRETRAINED_ENCODER_MODEL_PATH, REMOTE_PATH)
     #check_and_download_models(DECODER_WEIGHT_PATH, DECODER_MODEL_PATH, REMOTE_PATH)
