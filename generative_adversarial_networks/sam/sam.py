@@ -10,8 +10,8 @@ import cv2
 import ailia
 
 # import original modules
-sys.path.append('../../util')
 sys.path.append('../restyle-encoder') #import align_crop.py
+sys.path.append('../../util')
 sys.path.append('../../style_transfer') # import setup for face alignement (psgan)
 sys.path.append('../../style_transfer/psgan') # import preprocess for face alignement (psgan)
 from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
@@ -33,7 +33,7 @@ PRETRAINED_ENCODER_WEIGHT_PATH = 'pretrained-encoder.onnx'
 PRETRAINED_ENCODER_MODEL_PATH = 'pretrained-encoder.onnx.prototxt'
 DECODER_WEIGHT_PATH = 'decoder.onnx'
 DECODER_MODEL_PATH = 'decoder.onnx.prototxt'
-#REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/sam/'
+REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/sam/'
 
 FACE_ALIGNMENT_WEIGHT_PATH = "../../face_recognition/face_alignment/2DFAN-4.onnx"
 FACE_ALIGNMENT_MODEL_PATH = "../../face_recognition/face_alignment/2DFAN-4.onnx.prototxt"
@@ -273,9 +273,9 @@ def recognize_from_video(filename, net):
 
 def main():
     # model files check and download
-    #check_and_download_models(ENCODER_WEIGHT_PATH, ENCODER_MODEL_PATH, REMOTE_PATH)
-    #check_and_download_models(PRETRAINED_ENCODER_WEIGHT_PATH, PRETRAINED_ENCODER_MODEL_PATH, REMOTE_PATH)
-    #check_and_download_models(DECODER_WEIGHT_PATH, DECODER_MODEL_PATH, REMOTE_PATH)
+    check_and_download_models(ENCODER_WEIGHT_PATH, ENCODER_MODEL_PATH, REMOTE_PATH)
+    check_and_download_models(PRETRAINED_ENCODER_WEIGHT_PATH, PRETRAINED_ENCODER_MODEL_PATH, REMOTE_PATH)
+    check_and_download_models(DECODER_WEIGHT_PATH, DECODER_MODEL_PATH, REMOTE_PATH)
     if not args.use_dlib:
         check_and_download_models(
             FACE_ALIGNMENT_WEIGHT_PATH,
