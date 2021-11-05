@@ -88,9 +88,12 @@ def recognize_from_image(net):
     right_img = cv2.imread(args.right)
 
     # get model info
-    input_name = net.get_inputs()[0].name
-    output_name = net.get_outputs()[0].name
-    input_shape = net.get_inputs()[0].shape
+    if args.onnx:
+        input_name = net.get_inputs()[0].name
+        output_name = net.get_outputs()[0].name
+        input_shape = net.get_inputs()[0].shape
+    else:
+        input_shape = net.get_input_shape()
 
     # preprocessing
     input_tensor = preprocessing(left_img,right_img,input_shape)
@@ -98,8 +101,8 @@ def recognize_from_image(net):
     if args.onnx:
         disparity_map = net.run( [output_name], { input_name : input_tensor })[0][0]
     else:
-        disparity_map = model.run(imgs)[0]
-        
+        disparity_map = net.run( input_tensor )[0][0]
+
     # estimate depth
     disparity_map = np.array(disparity_map)
     depth_map = camera_config.f*camera_config.baseline / disparity_map
@@ -122,9 +125,12 @@ def recognize_from_video(net):
     right_images.sort()
 
     # get model info
-    input_name = net.get_inputs()[0].name
-    output_name = net.get_outputs()[0].name
-    input_shape = net.get_inputs()[0].shape
+    if args.onnx:
+        input_name = net.get_inputs()[0].name
+        output_name = net.get_outputs()[0].name
+        input_shape = net.get_inputs()[0].shape
+    else:
+        input_shape = net.get_input_shape()
 
     cv2.namedWindow("Estimated depth", cv2.WINDOW_NORMAL)
     for left_path, right_path in zip(left_images, right_images):
@@ -139,7 +145,7 @@ def recognize_from_video(net):
         if args.onnx:
             disparity_map = net.run( [output_name], { input_name : input_tensor })[0][0]
         else:
-            disparity_map = model.run(imgs)[0]
+            disparity_map = net.run( input_tensor )[0][0]
         
         # estimate depth
         disparity_map = np.array(disparity_map)#.astype(np.uint8)
