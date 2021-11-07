@@ -1,4 +1,4 @@
-# SAM
+# Age Transformation Using a Style-Based Regression Model
 
 ## Input
 
