@@ -25,19 +25,38 @@ from tracker.byte_tracker import BYTETracker
 # Parameters
 # ======================
 
-WEIGHT_MOT17_PATH = 'bytetrack_x_mot17.onnx'
-MODEL_MOT17_PATH = 'bytetrack_x_mot17.onnx.prototxt'
-WEIGHT_MOT20_PATH = 'bytetrack_x_mot20.onnx'
-MODEL_MOT20_PATH = 'bytetrack_x_mot20.onnx.prototxt'
+WEIGHT_MOT17_X_PATH = 'bytetrack_x_mot17.onnx'
+MODEL_MOT17_X_PATH = 'bytetrack_x_mot17.onnx.prototxt'
+WEIGHT_MOT17_S_PATH = 'bytetrack_s_mot17.onnx'
+MODEL_MOT17_S_PATH = 'bytetrack_s_mot17.onnx.prototxt'
+WEIGHT_MOT17_TINY_PATH = 'bytetrack_tiny_mot17.onnx'
+MODEL_MOT17_TINY_PATH = 'bytetrack_tiny_mot17.onnx.prototxt'
+WEIGHT_MOT20_X_PATH = 'bytetrack_x_mot20.onnx'
+MODEL_MOT20_X_PATH = 'bytetrack_x_mot20.onnx.prototxt'
 REMOTE_PATH = \
     'https://storage.googleapis.com/ailia-models/bytetrack/'
 
+WEIGHT_YOLOX_S_PATH = 'yolox_s.opt.onnx'
+MODEL_YOLOX_S_PATH = 'yolox_s.opt.onnx.prototxt'
+WEIGHT_YOLOX_TINY_PATH = 'yolox_tiny.opt.onnx'
+MODEL_YOLOX_TINY_PATH = 'yolox_tiny.opt.onnx.prototxt'
+REMOTE_YOLOX_PATH = \
+    'https://storage.googleapis.com/ailia-models/yolox/'
+
 VIDEO_PATH = 'demo.mp4'
 
-IMAGE_MOT17_HEIGHT = 800
-IMAGE_MOT17_WIDTH = 1440
-IMAGE_MOT20_HEIGHT = 896
-IMAGE_MOT20_WIDTH = 1600
+IMAGE_MOT17_X_HEIGHT = 800
+IMAGE_MOT17_X_WIDTH = 1440
+IMAGE_MOT17_S_HEIGHT = 608
+IMAGE_MOT17_S_WIDTH = 1088
+IMAGE_MOT17_TINY_HEIGHT = 416
+IMAGE_MOT17_TINY_WIDTH = 416
+IMAGE_MOT20_X_HEIGHT = 896
+IMAGE_MOT20_X_WIDTH = 1600
+IMAGE_YOLOX_S_HEIGHT = 640
+IMAGE_YOLOX_S_WIDTH = 640
+IMAGE_YOLOX_TINY_HEIGHT = 416
+IMAGE_YOLOX_TINY_WIDTH = 416
 
 # ======================
 # Arguemnt Parser Config
@@ -55,7 +74,8 @@ parser.add_argument(
     help="NMS threshould.",
 )
 parser.add_argument(
-    '-m', '--model_type', default='mot17', choices=('mot17', 'mot20'),
+    '-m', '--model_type', default='mot17_x',
+    choices=('mot17_x', 'mot20_x', 'mot17_s', 'mot17_tiny', 'yolox_s', 'yolox_tiny'),
     help='model type'
 )
 # tracking args
@@ -110,7 +130,7 @@ def frame_vis_generator(frame, bboxes, ids):
 # Main functions
 # ======================
 
-def preprocess(img, img_size):
+def preprocess(img, img_size, normalize=True):
     h, w = img_size
     im_h, im_w, _ = img.shape
 
@@ -126,8 +146,9 @@ def preprocess(img, img_size):
     img = np.ones((h, w, 3)) * 114.0
     img[: oh, : ow] = resized_img
 
-    img = img[:, :, ::-1]  # BGR -> RGB
-    img = normalize_image(img, 'ImageNet')
+    if normalize:
+        img = img[:, :, ::-1]  # BGR -> RGB
+        img = normalize_image(img, 'ImageNet')
 
     img = img.transpose((2, 0, 1))
     img = np.expand_dims(img, axis=0)
@@ -178,14 +199,25 @@ def postprocess(output, ratio, img_size, p6=False, nms_thre=0.7, score_thre=0.1)
 
 
 def predict(net, img):
-    img_size = (IMAGE_MOT17_HEIGHT, IMAGE_MOT17_WIDTH) \
-        if args.model_type == 'mot17' else (IMAGE_MOT20_HEIGHT, IMAGE_MOT20_WIDTH)
+    dic_model = {
+        'mot17_x': (IMAGE_MOT17_X_HEIGHT, IMAGE_MOT17_X_WIDTH),
+        'mot17_s': (IMAGE_MOT17_S_HEIGHT, IMAGE_MOT17_S_WIDTH),
+        'mot17_tiny': (IMAGE_MOT17_TINY_HEIGHT, IMAGE_MOT17_TINY_WIDTH),
+        'mot20_x': (IMAGE_MOT20_X_HEIGHT, IMAGE_MOT20_X_WIDTH),
+        'yolox_s': (IMAGE_YOLOX_S_HEIGHT, IMAGE_YOLOX_S_WIDTH),
+        'yolox_tiny': (IMAGE_YOLOX_TINY_HEIGHT, IMAGE_YOLOX_TINY_WIDTH),
+    }
+    model_type = args.model_type
+    img_size = dic_model[model_type]
 
-    img, ratio = preprocess(img, img_size)
+    img, ratio = preprocess(img, img_size, normalize=model_type.startswith('mot'))
 
     # feedforward
     output = net.predict([img])
     output = output[0]
+
+    # For yolox, retrieve only the person class
+    output = output[..., :6]
 
     score_thre = args.score_thre
     nms_thre = args.nms_thre
@@ -283,13 +315,20 @@ def recognize_from_video(net):
 
 def main():
     dic_model = {
-        'mot17': (WEIGHT_MOT17_PATH, MODEL_MOT17_PATH),
-        'mot20': (WEIGHT_MOT20_PATH, MODEL_MOT20_PATH),
+        'mot17_x': (WEIGHT_MOT17_X_PATH, MODEL_MOT17_X_PATH),
+        'mot17_s': (WEIGHT_MOT17_S_PATH, MODEL_MOT17_S_PATH),
+        'mot17_tiny': (WEIGHT_MOT17_TINY_PATH, MODEL_MOT17_TINY_PATH),
+        'mot20_x': (WEIGHT_MOT20_X_PATH, MODEL_MOT20_X_PATH),
+        'yolox_s': (WEIGHT_YOLOX_S_PATH, MODEL_YOLOX_S_PATH),
+        'yolox_tiny': (WEIGHT_YOLOX_TINY_PATH, MODEL_YOLOX_TINY_PATH),
     }
-    weight_path, model_path = dic_model[args.model_type]
+    model_type = args.model_type
+    weight_path, model_path = dic_model[model_type]
 
     # model files check and download
-    check_and_download_models(weight_path, model_path, REMOTE_PATH)
+    check_and_download_models(
+        weight_path, model_path,
+        REMOTE_PATH if model_type.startswith('mot') else REMOTE_YOLOX_PATH)
 
     env_id = args.env_id
 
