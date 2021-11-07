@@ -132,6 +132,7 @@ class PreProcess:
         face_alignment_path=None,
         face_detector_path=None,
         need_parser=True,
+        return_landmarks=False
     ):
         self.img_size = config.DATA.IMG_SIZE
 
@@ -171,6 +172,7 @@ class PreProcess:
                 self.input,
                 args.env_id,
             )
+        self.return_landmarks = return_landmarks
 
     def relative2absolute(self, lms):
         return lms * self.img_size
@@ -283,6 +285,11 @@ class PreProcess:
                     self.down_ratio,
                     self.width_ratio,
                 )
+        
+        lms = self.detect_landmark(image, face)
+        if self.return_landmarks:
+            return lms
+            
         np_image = np.array(image).astype(np.float32)
         mask = self.face_parse.parse(cv2.resize(np_image, (512, 512)))
         # obtain face parsing result
@@ -293,8 +300,6 @@ class PreProcess:
             )
         )
         mask = np.expand_dims(mask, (0, 1))
-
-        lms = self.detect_landmark(image, face)
 
         mask, diff = self.process(mask, lms)
         image = image.resize((self.img_size, self.img_size), Image.ANTIALIAS)

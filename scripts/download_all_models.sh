@@ -64,6 +64,7 @@ cd ../../generative_adversarial_networks/council-GAN; python3 council-gan.py --m
 cd ../../generative_adversarial_networks/council-GAN; python3 council-gan.py --anime ${OPTION}
 cd ../../generative_adversarial_networks/pytorch-gan; python3 pytorch-gnet.py -m celeb ${OPTION}
 cd ../../generative_adversarial_networks/pytorch-gan; python3 pytorch-gnet.py -m anime ${OPTION}
+cd ../../generative_adversarial_networks/restyle-encoder; python3 restyle-encoder.py ${OPTION}
 cd ../../hand_detection/yolov3-hand; python3 yolov3-hand.py ${OPTION}
 cd ../../hand_detection/hand_detection_pytorch python3 hand_detection_pytorch.py ${OPTION}
 cd ../../hand_detection/blazepalm; python3 blazepalm.py ${OPTION}
