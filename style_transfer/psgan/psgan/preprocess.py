@@ -289,7 +289,7 @@ class PreProcess:
         lms = self.detect_landmark(image, face)
         if self.return_landmarks:
             return lms
-            
+
         np_image = np.array(image).astype(np.float32)
         mask = self.face_parse.parse(cv2.resize(np_image, (512, 512)))
         # obtain face parsing result
