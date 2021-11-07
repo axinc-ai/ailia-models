@@ -21,11 +21,11 @@ args = update_parser(parser)
 # Settings
 # ======================
 
-BUTTON_WIDTH = 400
+BUTTON_WIDTH = 350
 BUTTON_HEIGHT = 20
 BUTTON_MARGIN = 2
 
-WINDOW_ROW = 25
+WINDOW_ROW = 34
 
 # ======================
 # Model search
