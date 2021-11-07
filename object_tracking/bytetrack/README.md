@@ -36,6 +36,7 @@ By adding the `--model_type` option, you can specify model type which is selecte
 
 - mot17_x (800x1440)
 - mot17_s (608x1088)
+- mot17_tiny (416x416)
 - mot20_x (896x1600)
 - yolox_s (640x640)
 - yolox_tiny (416x416)
