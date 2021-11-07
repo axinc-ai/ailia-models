@@ -8,7 +8,7 @@ import cv2
 
 def preproc(img, input_size, swap=(2, 0, 1)):
     if len(img.shape) == 3:
-        padded_img = np.ones((input_size[0], input_size[1], 3), dtype=np.uint8) * 114
+        padded_img = np.ones((input_size[0], input_size[1], img.shape[2]), dtype=np.uint8) * 114
     else:
         padded_img = np.ones(input_size, dtype=np.uint8) * 114
 
@@ -163,5 +163,5 @@ def predictions_to_object(predictions,raw_img,ratio,nms_thr,score_thr):
                 h=(y2 - y1) / img_size_h,
             )
             detect_object.append(r)
-    
+
     return detect_object
