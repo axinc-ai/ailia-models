@@ -27,11 +27,11 @@ logger = getLogger(__name__)
 # ======================
 # Parameters
 # ======================
-ENCODER_WEIGHT_PATH = 'encoder.onnx'
+ENCODER_WEIGHT_PATH = 'encoder-fp16.onnx'
 ENCODER_MODEL_PATH = 'encoder.onnx.prototxt'
-PRETRAINED_ENCODER_WEIGHT_PATH = 'pretrained-encoder.onnx'
+PRETRAINED_ENCODER_WEIGHT_PATH = 'pretrained-encoder-fp16.onnx'
 PRETRAINED_ENCODER_MODEL_PATH = 'pretrained-encoder.onnx.prototxt'
-DECODER_WEIGHT_PATH = 'decoder.onnx'
+DECODER_WEIGHT_PATH = 'decoder-fp16.onnx'
 DECODER_MODEL_PATH = 'decoder.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/sam/'
 

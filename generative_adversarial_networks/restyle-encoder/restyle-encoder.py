@@ -26,13 +26,13 @@ logger = getLogger(__name__)
 # ======================
 # Parameters
 # ======================
-WEIGHT_PATH = 'restyle-encoder.onnx'
+WEIGHT_PATH = 'restyle-encoder-fp16.onnx'
 MODEL_PATH = 'restyle-encoder.onnx.prototxt'
 
-FACE_POOL_WEIGHT_PATH = 'face-pool.onnx'
+FACE_POOL_WEIGHT_PATH = 'face-pool-fp16.onnx'
 FACE_POOL_MODEL_PATH = 'face-pool.onnx.prototxt'
 
-TOONIFY_WEIGHT_PATH = 'toonify.onnx'
+TOONIFY_WEIGHT_PATH = 'toonify-fp16.onnx'
 TOONIFY_MODEL_PATH = 'toonify.onnx.prototxt'
 
 FACE_ALIGNMENT_WEIGHT_PATH = "../../face_recognition/face_alignment/2DFAN-4.onnx"
