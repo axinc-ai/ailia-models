@@ -111,17 +111,24 @@ def get_colors(n, colormap="gist_ncar"):
 num_colors = 50
 vis_colors = get_colors(num_colors)
 
+ENABLE_CATEGORY = ["person", "bicycle", "car", "motorcycle", "bus", "truck"]
 
-def frame_vis_generator(frame, bboxes, ids):
+def frame_vis_generator(frame, bboxes, ids, categories):
     for i, entity_id in enumerate(ids):
         color = vis_colors[int(entity_id) % num_colors]
 
         x1, y1, w, h = np.round(bboxes[i]).astype(int)
         x2 = x1 + w
         y2 = y1 + h
+
+        label = " "+ENABLE_CATEGORY[int(categories[i])]
+
+        #s = 1.5
+        s = 1.0
+
         cv2.rectangle(frame, (x1, y1), (x2, y2), color=color, thickness=3)
-        cv2.putText(frame, str(entity_id), (x1 + 5, y1 + 40),
-                    cv2.FONT_HERSHEY_SIMPLEX, 1.5, color, thickness=3)
+        cv2.putText(frame, str(entity_id)+label, (x1 + 5, y1 + 40),
+                    cv2.FONT_HERSHEY_SIMPLEX, s, color, thickness=3)
 
     return frame
 
@@ -195,7 +202,7 @@ def postprocess(output, ratio, img_size, p6=False, nms_thre=0.7, score_thre=0.1)
 
     dets = multiclass_nms(boxes_xyxy, scores, nms_thr=nms_thre, score_thr=score_thre)
 
-    return dets[:, :-1] if dets is not None else np.zeros((0, 5))
+    return dets[:, :] if dets is not None else np.zeros((0, 6))
 
 
 def predict(net, img):
@@ -217,7 +224,7 @@ def predict(net, img):
     output = output[0]
 
     # For yolox, retrieve only the person class
-    output = output[..., :6]
+    output = output[..., :5+len(ENABLE_CATEGORY)]
 
     score_thre = args.score_thre
     nms_thre = args.nms_thre
@@ -287,6 +294,7 @@ def recognize_from_video(net):
         online_tlwhs = []
         online_ids = []
         online_scores = []
+        online_categories = []
         for t in online_targets:
             tlwh = t.tlwh
             tid = t.track_id
@@ -295,8 +303,9 @@ def recognize_from_video(net):
                 online_tlwhs.append(tlwh)
                 online_ids.append(tid)
                 online_scores.append(t.score)
+                online_categories.append(t.category)
 
-        res_img = frame_vis_generator(frame, online_tlwhs, online_ids)
+        res_img = frame_vis_generator(frame, online_tlwhs, online_ids, online_categories)
 
         # show
         cv2.imshow('frame', res_img)

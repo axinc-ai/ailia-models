@@ -55,6 +55,7 @@ COCO_CATEGORY = [
     "oven", "toaster", "sink", "refrigerator", "book", "clock", "vase",
     "scissors", "teddy bear", "hair drier", "toothbrush"
 ]
+ENABLE_CATEGORY = ["person", "bicycle", "car", "motorcycle", "bus", "truck"]
 
 SCORE_THR = 0.4
 NMS_THR = 0.45
@@ -204,7 +205,25 @@ def recognize_from_video(detector):
             predictions = postprocess(output[0], (HEIGHT, WIDTH))[0]
             detect_object = predictions_to_object(predictions, raw_img, ratio, args.iou, args.threshold)
             detect_object = reverse_letterbox(detect_object, raw_img, (raw_img.shape[0], raw_img.shape[1]))
-            res_img = plot_results(detect_object, raw_img, COCO_CATEGORY)
+
+            #filter
+            detect_object2 = []
+            for detection in detect_object:
+                if COCO_CATEGORY[detection.category] in ENABLE_CATEGORY:
+                    c = detection.category
+                    if COCO_CATEGORY[c] == "bus" or COCO_CATEGORY[c] == "truck":
+                        c = 0
+                    r = ailia.DetectorObject(
+                            category=c,
+                            prob=detection.prob,
+                            x=detection.x,
+                            y=detection.y,
+                            w=detection.w,
+                            h=detection.h
+                        )
+                    detect_object2.append(r)
+
+            res_img = plot_results(detect_object2, raw_img, ENABLE_CATEGORY)
         cv2.imshow('frame', res_img)
 
         # save results
