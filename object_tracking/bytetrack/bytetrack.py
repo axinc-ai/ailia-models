@@ -121,7 +121,13 @@ def frame_vis_generator(frame, bboxes, ids, categories):
         x2 = x1 + w
         y2 = y1 + h
 
-        label = " "+ENABLE_CATEGORY[int(categories[i])]
+        c = int(categories[i])
+        if ENABLE_CATEGORY[c] == "bus" or ENABLE_CATEGORY[c] == "truck":
+            c = 2
+        #if w*h/frame.shape[0]/frame.shape[1] >= 0.25:
+        #    continue
+                    
+        label = " "+ENABLE_CATEGORY[c]
 
         #s = 1.5
         s = 1.0
