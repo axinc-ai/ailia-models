@@ -117,9 +117,7 @@ def recognize_from_image(detector):
         # prepare input data
         logger.debug(f'input image: {image_path}')
         raw_img = cv2.imread(image_path, cv2.IMREAD_COLOR)
-        if args.detector:
-            raw_img = cv2.cvtColor(raw_img, cv2.COLOR_BGR2BGRA)
-        else:
+        if not args.detector:
             img, ratio = preprocess(raw_img, (HEIGHT, WIDTH))
         logger.debug(f'input image shape: {raw_img.shape}')
 
@@ -194,7 +192,6 @@ def recognize_from_video(detector):
 
         raw_img = frame
         if args.detector:
-            raw_img = cv2.cvtColor(raw_img, cv2.COLOR_BGR2BGRA)
             detector.compute(raw_img, args.threshold, args.iou)
             res_img = plot_results(detector, raw_img, COCO_CATEGORY)
             detect_object = detector

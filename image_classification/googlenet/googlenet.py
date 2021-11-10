@@ -61,16 +61,8 @@ def recognize_from_image():
     for image_path in args.input:
         # prepare input data
         logger.info(image_path)
-        input_data = load_image(
-            image_path,
-            (IMAGE_HEIGHT, IMAGE_WIDTH),
-            normalize_type='None',
-            gen_input_ailia=False
-        )
-        input_data = cv2.cvtColor(
-            input_data.astype(np.float32),
-            cv2.COLOR_RGB2BGRA
-        ).astype(np.uint8)
+        input_data = cv2.imread(image_path, cv2.IMREAD_COLOR)
+        input_data = cv2.resize(input_data, (IMAGE_WIDTH, IMAGE_HEIGHT))
 
         # inference
         logger.info('Start inference...')

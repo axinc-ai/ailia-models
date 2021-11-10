@@ -150,12 +150,11 @@ def recognize_from_image():
         # prepare input data
         logger.info(image_path)
         src_img = cv2.imread(image_path)
-        input_image = load_image(
+        input_data = load_image(
             image_path,
             (IMAGE_HEIGHT, IMAGE_WIDTH),
             normalize_type='None'
         )
-        input_data = cv2.cvtColor(input_image, cv2.COLOR_RGB2BGRA)
 
         # inference
         logger.info('Start inference...')
