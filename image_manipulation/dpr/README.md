@@ -1,5 +1,10 @@
 # Deep Single-Image Portrait Relighting
 
+## Causion
+
+The original repository does not contain a license file. If you use it, please do so at your own risk.
+https://github.com/zhhoper/DPR
+
 ## Input
 
 <img src="obama.jpg" width="360px" >
