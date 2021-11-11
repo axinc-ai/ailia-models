@@ -1,7 +1,6 @@
 import time
 import sys
 import os
-import onnxruntime as rt
 from transformers import T5Tokenizer
 import numpy
 
@@ -32,16 +31,6 @@ parser.add_argument(
 )
 args = update_parser(parser, check_input_type=False)
 
-
-ONNX_PROVIDERS = ["CUDAExecutionProvider", "CPUExecutionProvider",]
-
-# ======================
-# OPTIMIZATIONS
-# ======================
-opt = rt.SessionOptions()
-opt.graph_optimization_level = rt.GraphOptimizationLevel.ORT_ENABLE_EXTENDED
-opt.log_severity_level = 4
-opt.execution_mode = rt.ExecutionMode.ORT_SEQUENTIAL
 
 # ======================
 # PARAMETERS
