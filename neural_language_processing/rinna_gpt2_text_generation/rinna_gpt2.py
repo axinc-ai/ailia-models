@@ -7,7 +7,6 @@ import numpy
 
 from utils_rinna_gpt2 import *
 import ailia
-sys.path.append('rinna_gpt2')
 
 sys.path.append('../../util')
 from utils import get_base_parser, update_parser  # noqa: E402
@@ -16,9 +15,6 @@ from model_utils import check_and_download_models  # noqa: E402
 # logger
 from logging import getLogger   # noqa: E402
 logger = getLogger(__name__)
-
-onnx_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'rinna_gpt2')
-os.chdir(onnx_dir)
 
 # ======================
 # Arguemnt Parser Config
