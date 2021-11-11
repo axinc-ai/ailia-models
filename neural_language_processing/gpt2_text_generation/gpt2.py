@@ -1,13 +1,9 @@
 import time
 import sys
-import os
-import onnxruntime as rt
 from transformers import AutoTokenizer
-import numpy
 
 from utils_gpt2 import *
 import ailia
-sys.path.append('gpt2')
 
 sys.path.append('../../util')
 from utils import get_base_parser, update_parser  # noqa: E402
@@ -17,8 +13,6 @@ from model_utils import check_and_download_models  # noqa: E402
 from logging import getLogger   # noqa: E402
 logger = getLogger(__name__)
 
-onnx_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'gpt2')
-os.chdir(onnx_dir)
 
 # ======================
 # Arguemnt Parser Config
@@ -32,20 +26,12 @@ parser.add_argument(
     '--input', '-i', default=DEFAULT_TEXT
 )
 parser.add_argument(
-    '--outlength', '-o', default=50
+    '--outlength', '-o', default=30
 )
 args = update_parser(parser, check_input_type=False)
 
 
 ONNX_PROVIDERS = ["CUDAExecutionProvider", "CPUExecutionProvider",]
-
-# ======================
-# OPTIMIZATIONS
-# ======================
-opt = rt.SessionOptions()
-opt.graph_optimization_level = rt.GraphOptimizationLevel.ORT_ENABLE_EXTENDED
-opt.log_severity_level = 4
-opt.execution_mode = rt.ExecutionMode.ORT_SEQUENTIAL
 
 # ======================
 # PARAMETERS
