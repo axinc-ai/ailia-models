@@ -213,7 +213,7 @@ def recognize_from_video(detector):
                     c = detection.category
                     if COCO_CATEGORY[c] == "bus" or COCO_CATEGORY[c] == "truck":
                         c = 2
-                    if detection.w*detection.h>=0.25:
+                    if detection.w*detection.h>=0.1 and detection.x>=0.5:
                         continue
                     r = ailia.DetectorObject(
                             category=c,
