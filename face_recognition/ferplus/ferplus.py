@@ -30,15 +30,18 @@ WEIGHT_MAJOR_PATH = 'VGG13_majority.onnx'
 MODEL_MAJOR_PATH = 'VGG13_majority.onnx.prototxt'
 WEIGHT_PROB_PATH = 'VGG13_probability.onnx'
 MODEL_PROB_PATH = 'VGG13_probability.onnx.prototxt'
-REMOTE_PATH = \
-    'https://storage.googleapis.com/ailia-models/ferplus/'
+WEIGHT_CRSE_PATH = 'VGG13_crossentropy.onnx'
+MODEL_CRSE_PATH = 'VGG13_crossentropy.onnx.prototxt'
+WEIGHT_MLTT_PATH = 'VGG13_multi_target.onnx'
+MODEL_MLTT_PATH = 'VGG13_multi_target.onnx.prototxt'
+REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/ferplus/'
 
 FACE_WEIGHT_PATH = 'blazefaceback.onnx'
 FACE_MODEL_PATH = 'blazefaceback.onnx.prototxt'
 FACE_REMOTE_PATH = "https://storage.googleapis.com/ailia-models/blazeface/"
 FACE_MIN_SCORE_THRESH = 0.5
 
-IMAGE_PATH = 'demo.png'
+IMAGE_PATH = 'img/fer0032227.png'
 SAVE_IMAGE_PATH = 'output.png'
 
 IMAGE_HEIGHT = 64
@@ -68,8 +71,9 @@ parser.add_argument(
     help='Use object detection.'
 )
 parser.add_argument(
-    '-m', '--model_type', default='majority', choices=('majority', 'probability'),
-    help='model type'
+    '-m', '--model_name', default='majority',
+    choices=('majority', 'probability', 'crossentropy', 'multi_target'),
+    help='model name'
 )
 args = update_parser(parser)
 
@@ -321,8 +325,10 @@ def main():
     dic_model = {
         'majority': (WEIGHT_MAJOR_PATH, MODEL_MAJOR_PATH),
         'probability': (WEIGHT_PROB_PATH, MODEL_PROB_PATH),
+        'crossentropy': (WEIGHT_CRSE_PATH, MODEL_CRSE_PATH),
+        'multi_target': (WEIGHT_MLTT_PATH, MODEL_MLTT_PATH),
     }
-    weight_path, model_path = dic_model[args.model_type]
+    weight_path, model_path = dic_model[args.model_name]
     check_and_download_models(weight_path, model_path, REMOTE_PATH)
 
     if args.video or args.detection:
