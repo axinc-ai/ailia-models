@@ -123,6 +123,6 @@ ONNX opset = 9
 ## Netron
 
 [VGG13_majority.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/ferplus/VGG13_majority.onnx.prototxt)  
-[VGG13_probability.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/ferplus/VGG13_probability.onnx.prototxt)
-[VGG13_crossentropy.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/ferplus/VGG13_crossentropy.onnx.prototxt)
+[VGG13_probability.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/ferplus/VGG13_probability.onnx.prototxt)  
+[VGG13_crossentropy.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/ferplus/VGG13_crossentropy.onnx.prototxt)  
 [VGG13_multi_target.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/ferplus/VGG13_multi_target.onnx.prototxt)
