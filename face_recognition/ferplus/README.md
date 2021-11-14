@@ -47,31 +47,31 @@ Shape: (1, 1, 64, 64)
 <tr>
 <td>
   <img src="img/fer0032227.png" width="96px">
-  <div style="text-align: center;">happiness</div>
+  <div>happiness</div>
 </td>
 <td>
   <img src="img/fer0032328.png" width="96px">
-  <div style="text-align: center;">surprise</div>
+  <div>surprise</div>
 </td>
 <td>
   <img src="img/fer0032363.png" width="96px">
-  <div style="text-align: center;">sadness</div>
+  <div>sadness</div>
 </td>
 <td>
   <img src="img/fer0032285.png" width="96px">
-  <div style="text-align: center;">anger</div>
+  <div>anger</div>
 </td>
 <td>
   <img src="img/fer0033915.png" width="96px">
-  <div style="text-align: center;">disgust</div>
+  <div>disgust</div>
 </td>
 <td>
   <img src="img/fer0033721.png" width="96px">
-  <div style="text-align: center;">fear</div>
+  <div>fear</div>
 </td>
 <td>
   <img src="img/fer0033894.png" width="96px">
-  <div style="text-align: center;">contempt</div>
+  <div>contempt</div>
 </td>
 </tr>
 </table>
