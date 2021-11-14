@@ -2,27 +2,31 @@
 
 ## Input
 
-<div style="float: left">
+<table>
+<tr>
+<td>
   <img src="img/fer0032227.png" width="96px">
-</div>
-<div style="float: left; padding-left: 8px;">
+</td>
+<td>
   <img src="img/fer0032328.png" width="96px">
-</div>
-<div style="float: left; padding-left: 8px;">
+</td>
+<td>
   <img src="img/fer0032363.png" width="96px">
-</div>
-<div style="float: left; padding-left: 8px;">
+</td>
+<td>
   <img src="img/fer0032285.png" width="96px">
-</div>
-<div style="float: left; padding-left: 8px;">
+</td>
+<td>
   <img src="img/fer0033915.png" width="96px">
-</div>
-<div style="float: left; padding-left: 8px;">
+</td>
+<td>
   <img src="img/fer0033721.png" width="96px">
-</div>
-<div style="float: left; padding-left: 8px;">
+</td>
+<td>
   <img src="img/fer0033894.png" width="96px">
-</div>
+</td>
+</tr>
+</table>
 
 (Image
 from https://www.kaggle.com/c/challenges-in-representation-learning-facial-expression-recognition-challenge/data)
@@ -39,34 +43,38 @@ Shape: (1, 1, 64, 64)
 
 ### Example
 
-<div style="float: left">
+<table>
+<tr>
+<td>
   <img src="img/fer0032227.png" width="96px">
   <div style="text-align: center;">happiness</div>
-</div>
-<div style="float: left; padding-left: 8px;">
+</td>
+<td>
   <img src="img/fer0032328.png" width="96px">
   <div style="text-align: center;">surprise</div>
-</div>
-<div style="float: left; padding-left: 8px;">
+</td>
+<td>
   <img src="img/fer0032363.png" width="96px">
   <div style="text-align: center;">sadness</div>
-</div>
-<div style="float: left; padding-left: 8px;">
+</td>
+<td>
   <img src="img/fer0032285.png" width="96px">
   <div style="text-align: center;">anger</div>
-</div>
-<div style="float: left; padding-left: 8px;">
+</td>
+<td>
   <img src="img/fer0033915.png" width="96px">
   <div style="text-align: center;">disgust</div>
-</div>
-<div style="float: left; padding-left: 8px;">
+</td>
+<td>
   <img src="img/fer0033721.png" width="96px">
   <div style="text-align: center;">fear</div>
-</div>
-<div style="float: left; padding-left: 8px;">
+</td>
+<td>
   <img src="img/fer0033894.png" width="96px">
   <div style="text-align: center;">contempt</div>
-</div>
+</td>
+</tr>
+</table>
 
 ## Usage
 
