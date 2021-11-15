@@ -38,7 +38,7 @@ ONNX_PROVIDERS = ["CUDAExecutionProvider", "CPUExecutionProvider",]
 # ======================
 WEIGHT_PATH = "gpt2-medium.onnx"
 MODEL_PATH = "gpt2-medium.onnx.prototxt"
-REMOTE_PATH = "https://storage.googleapis.com/ailia-models/gpt2_text_generation/"
+REMOTE_PATH = "https://storage.googleapis.com/ailia-models/gpt2/"
 
 
 # ======================
@@ -66,5 +66,5 @@ def main():
 
 if __name__ == "__main__":
     # model files check and download
-    #check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
     main()

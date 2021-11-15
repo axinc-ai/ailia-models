@@ -27,4 +27,4 @@ ONNX opset = 11
 
 ### Netron
 
-- [gpt2/gpt2-medium.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/gpt2_text_generation/gpt2/gpt2-medium.onnx.prototxt)
+- [gpt2/gpt2-medium.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/gpt2/gpt2-medium.onnx.prototxt)
