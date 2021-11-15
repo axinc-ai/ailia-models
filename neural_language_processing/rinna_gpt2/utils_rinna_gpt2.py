@@ -28,7 +28,10 @@ def generate_text(tokenizer, ailia_model, span, outputlength, onnx_runtime=False
       out_str += token
       input = np.append(model_input['input_ids'][:,1:], index)
       model_input['input_ids'] = np.expand_dims(input, 0)
-      out = ailia_model.run(model_input)
+      if onnx_runtime:
+        out = ailia_model.run(None,model_input)
+      else:
+        out = ailia_model.run(model_input)
       predictions = np.argpartition(-out[0][0, -1], K)[:K]
 
       if token == "<unk>":
