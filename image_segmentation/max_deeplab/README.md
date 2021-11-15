@@ -22,6 +22,8 @@ $ python3 max_deeplab.py
 
 If you want to specify the input image, put the image path after the `--input` option.  
 You can use `--savepath` option to change the name of the output file to save.
+
+Inference can be performed with ONNX-Runtime by setting `--onnx`.
 ```bash
 $ python3 max_deeplab.py --input IMAGE_PATH --savepath SAVE_IMAGE_PATH
 ```

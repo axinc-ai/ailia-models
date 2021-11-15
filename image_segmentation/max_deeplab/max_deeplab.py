@@ -26,8 +26,8 @@ logger = getLogger(__name__)
 # ======================
 # Parameters
 # ======================
-WEIGHT_PATH = "max_deeplab.onnx"
-
+WEIGHT_PATH = "max_deeplab.opt.onnx"
+MODEL_PATH = "max_deeplab.opt.onnx.prototxt"
 IMAGE_PATH = 'input.jpg'
 SAVE_IMAGE_PATH = 'output.jpg'
 HEIGHT = 224
@@ -38,6 +38,10 @@ N = 30
 # Arguemnt Parser Config
 # ======================
 parser = get_base_parser('max_deeplab model', IMAGE_PATH, SAVE_IMAGE_PATH)
+parser.add_argument(
+    '--onnx',
+    action='store_true'
+)
 args = update_parser(parser)
 
 
@@ -45,12 +49,15 @@ args = update_parser(parser)
 # Main functions
 # ======================
 def recognize_from_image():
-    # onnxruntime initialize
-    session = onnxruntime.InferenceSession(WEIGHT_PATH)
-    input_name = session.get_inputs()[0].name
-    output_name1 = session.get_outputs()[0].name
-    output_name2 = session.get_outputs()[1].name
-    output_name3 = session.get_outputs()[2].name
+    if args.onnx == True:
+        net = onnxruntime.InferenceSession(WEIGHT_PATH)
+        input_name = net.get_inputs()[0].name
+        output_name1 = net.get_outputs()[0].name
+        output_name2 = net.get_outputs()[1].name
+        output_name3 = net.get_outputs()[2].name
+    else:
+        env_id = args.env_id
+        net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
 
     # input image loop
     for image_path in args.input:
@@ -71,11 +78,18 @@ def recognize_from_image():
             logger.info('BENCHMARK mode')
             for i in range(5):
                 start = int(round(time.time() * 1000))
-                out = session.run([output_name1, output_name2, output_name3], {input_name: img})
+                if args.onnx == True:
+                    out = net.run([output_name1, output_name2, output_name3], {input_name: img})
+                else:
+                    out = net.run(img)
+
                 end = int(round(time.time() * 1000))
                 logger.info(f'\tailia processing time {end - start} ms')
         else:
-            out = session.run([output_name1, output_name2, output_name3], {input_name: img})
+            if args.onnx == True:
+                out = net.run([output_name1, output_name2, output_name3], {input_name: img})
+            else:
+                out = net.run(img)
 
         # postprocessing
         instances, classes, keep_pred_instances = shape_pred(out, N)
@@ -91,12 +105,15 @@ def recognize_from_image():
 
 
 def recognize_from_video():
-    # onnxruntime initialize
-    session = onnxruntime.InferenceSession(WEIGHT_PATH)
-    input_name = session.get_inputs()[0].name
-    output_name1 = session.get_outputs()[0].name
-    output_name2 = session.get_outputs()[1].name
-    output_name3 = session.get_outputs()[2].name
+    if args.onnx == True:
+        net = onnxruntime.InferenceSession(WEIGHT_PATH)
+        input_name = net.get_inputs()[0].name
+        output_name1 = net.get_outputs()[0].name
+        output_name2 = net.get_outputs()[1].name
+        output_name3 = net.get_outputs()[2].name
+    else:
+        env_id = args.env_id
+        net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
 
     capture = webcamera_utils.get_capture(args.video)
 
@@ -122,7 +139,10 @@ def recognize_from_video():
         input = np.array([input], np.float32)
 
         # inference
-        pred = session.run([output_name1, output_name2, output_name3], {input_name: input})
+        if args.onnx == True:
+            pred = net.run([output_name1, output_name2, output_name3], {input_name: input})
+        else:
+            pred = net.run(input)
 
         # postprocessing
         instances, classes, keep_pred_instances = shape_pred(pred, N)
