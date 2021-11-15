@@ -58,6 +58,7 @@ cd ../../face_recognition/mediapipe_iris; python3 mediapipe_iris.py ${OPTION}
 cd ../../face_recognition/hopenet; python3 hopenet.py ${OPTION}
 cd ../../face_recognition/ax_gaze_estimation; python3 ax_gaze_estimation.py ${OPTION}
 cd ../../face_recognition/age-gender-recognition-retail; python3 age-gender-recognition-retail.py ${OPTION}
+cd ../../face_recognition/ferplus; python3 ferplus.py ${OPTION}
 cd ../../frame_interpolation/flavr; python3 flavr.py ${OPTION}
 cd ../../generative_adversarial_networks/council-GAN; python3 council-gan.py --glasses ${OPTION}
 cd ../../generative_adversarial_networks/council-GAN; python3 council-gan.py --m2f ${OPTION}
