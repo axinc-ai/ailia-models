@@ -28,6 +28,11 @@ parser.add_argument(
 parser.add_argument(
     '--outlength', '-o', default=30
 )
+parser.add_argument(
+    '--onnx',
+    action='store_true',
+    help='By default, the ailia SDK is used, but with this option, you can switch to using ONNX Runtime'
+)
 args = update_parser(parser, check_input_type=False)
 
 
@@ -45,7 +50,11 @@ REMOTE_PATH = "https://storage.googleapis.com/ailia-models/gpt2/"
 # Main function
 # ======================
 def main():
-    ailia_model = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
+    if args.onnx:
+        import onnxruntime
+        ailia_model = onnxruntime.InferenceSession(WEIGHT_PATH)
+    else:
+        ailia_model = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
     tokenizer = AutoTokenizer.from_pretrained("gpt2-medium")
     logger.info("Input : "+args.input)
 
@@ -54,11 +63,11 @@ def main():
         logger.info('BENCHMARK mode')
         for i in range(5):
             start = int(round(time.time() * 1000))
-            output = generate_text(tokenizer, ailia_model, args.input, args.outlength)
+            output = generate_text(tokenizer, ailia_model, args.input, args.outlength, args.onnx)
             end = int(round(time.time() * 1000))
             logger.info("\tailia processing time {} ms".format(end - start))
     else:
-        output = generate_text(tokenizer, ailia_model, args.input, args.outlength)
+        output = generate_text(tokenizer, ailia_model, args.input, args.outlength, args.onnx)
 
     logger.info("output : "+output)
     logger.info('Script finished successfully.')
