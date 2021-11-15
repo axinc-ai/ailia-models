@@ -29,6 +29,11 @@ parser.add_argument(
 parser.add_argument(
     '--outlength', '-o', default=50
 )
+parser.add_argument(
+    '--onnx',
+    action='store_true',
+    help='By default, the ailia SDK is used, but with this option, you can switch to using ONNX Runtime'
+)
 args = update_parser(parser, check_input_type=False)
 
 
@@ -37,14 +42,18 @@ args = update_parser(parser, check_input_type=False)
 # ======================
 WEIGHT_PATH = "japanese-gpt2-small.onnx"
 MODEL_PATH = "japanese-gpt2-small.onnx.prototxt"
-REMOTE_PATH = "https://storage.googleapis.com/ailia-models/rinna_gpt2_text_generation/"
+REMOTE_PATH = "https://storage.googleapis.com/ailia-models/rinna_gpt2/"
 
 
 # ======================
 # Main function
 # ======================
 def main():
-    ailia_model = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
+    if args.onnx:
+        import onnxruntime
+        ailia_model = onnxruntime.InferenceSession(WEIGHT_PATH)
+    else:
+        ailia_model = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
     tokenizer = T5Tokenizer.from_pretrained("rinna/japanese-gpt2-small")
     logger.info("Input : "+args.input)
 
@@ -53,11 +62,11 @@ def main():
         logger.info('BENCHMARK mode')
         for i in range(5):
             start = int(round(time.time() * 1000))
-            output = generate_text(tokenizer, ailia_model, args.input, args.outlength)
+            output = generate_text(tokenizer, ailia_model, args.input, args.outlength, args.onnx)
             end = int(round(time.time() * 1000))
             logger.info("\tailia processing time {} ms".format(end - start))
     else:
-        output = generate_text(tokenizer, ailia_model, args.input, args.outlength)
+        output = generate_text(tokenizer, ailia_model, args.input, args.outlength, args.onnx)
 
     logger.info("output : "+output)
     logger.info('Script finished successfully.')
@@ -65,5 +74,5 @@ def main():
 
 if __name__ == "__main__":
     # model files check and download
-    #check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
     main()

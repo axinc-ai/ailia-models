@@ -1,7 +1,7 @@
 import numpy as np
 
 
-def generate_text(tokenizer, ailia_model, span, outputlength):
+def generate_text(tokenizer, ailia_model, span, outputlength, onnx_runtime=False):
     model_input = tokenizer.encode_plus(span)
     model_input = {name : np.atleast_2d(value) for name, value in model_input.items()}
 
@@ -9,7 +9,10 @@ def generate_text(tokenizer, ailia_model, span, outputlength):
     model_input['attention_mask'] = np.array(model_input['attention_mask'][:, :16], dtype='int64')
     extra_inputs = np.array(model_input['input_ids'][:, 16:], dtype='int64')[0]
 
-    onnx_result = ailia_model.run(model_input)
+    if onnx_runtime:
+      onnx_result = ailia_model.run(None,model_input)
+    else:
+      onnx_result = ailia_model.run(model_input)
 
     K=outputlength
     predictions = np.argpartition(-onnx_result[0][0, -1], K)[:K]
