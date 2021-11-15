@@ -26,8 +26,10 @@ logger = getLogger(__name__)
 # ======================
 # Parameters
 # ======================
-WEIGHT_PATH = "max_deeplab.opt.onnx"
-MODEL_PATH = "max_deeplab.opt.onnx.prototxt"
+WEIGHT_PATH = "max_deeplab.onnx"
+MODEL_PATH = "max_deeplab.onnx.prototxt"
+REMOTE_PATH = "https://storage.googleapis.com/ailia-models/max_deeplab/"
+
 IMAGE_PATH = 'input.jpg'
 SAVE_IMAGE_PATH = 'output.jpg'
 HEIGHT = 224
@@ -164,6 +166,7 @@ def recognize_from_video():
 
 
 def main():
+    check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
     if args.video is not None:
         # video mode
         recognize_from_video()
