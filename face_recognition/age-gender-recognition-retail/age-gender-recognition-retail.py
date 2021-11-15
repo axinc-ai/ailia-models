@@ -228,7 +228,7 @@ def main():
     check_and_download_models(
         WEIGHT_PATH, MODEL_PATH, REMOTE_PATH
     )
-    if args.video:
+    if args.video or args.detection:
         logger.info('=== face detection model ===')
         check_and_download_models(
             FACE_WEIGHT_PATH, FACE_MODEL_PATH, FACE_REMOTE_PATH
