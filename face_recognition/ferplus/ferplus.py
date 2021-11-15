@@ -245,7 +245,7 @@ def recognize_from_frame(net, detector, frame):
         new_detections.append(r)
     detections = new_detections
 
-    # estimate age and gender
+    # estimate emotion
     for obj in detections:
         # get detected face
         margin = 1.0
