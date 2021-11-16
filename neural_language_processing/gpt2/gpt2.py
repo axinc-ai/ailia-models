@@ -18,7 +18,7 @@ logger = getLogger(__name__)
 # Arguemnt Parser Config
 # ======================
 
-DEFAULT_TEXT = 'My name is Clara and I am'
+DEFAULT_TEXT = 'I like '
 
 parser = get_base_parser('gpt2 text generation', None, None)
 # overwrite
@@ -41,8 +41,8 @@ ONNX_PROVIDERS = ["CUDAExecutionProvider", "CPUExecutionProvider",]
 # ======================
 # PARAMETERS
 # ======================
-WEIGHT_PATH = "gpt2-medium.onnx"
-MODEL_PATH = "gpt2-medium.onnx.prototxt"
+WEIGHT_PATH = "gpt2-medium.opt.onnx"
+MODEL_PATH = "gpt2-medium.opt.onnx.prototxt"
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/gpt2/"
 
 
