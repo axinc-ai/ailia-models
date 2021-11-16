@@ -10,9 +10,15 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
+from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from detector_utils import load_image  # noqa: E402
 from webcamera_utils import get_capture  # noqa: E402
+
+# logger
+from logging import getLogger  # noqa: E402
+
+logger = getLogger(__name__)
 
 # ======================
 # Parameters
@@ -57,30 +63,7 @@ class MPIIHandJoints:
 # Arguemnt Parser Config
 # ======================
 
-parser = argparse.ArgumentParser(
-    description='minimal-hand model'
-)
-parser.add_argument(
-    '-i', '--input', metavar='IMAGE',
-    default=IMAGE_PATH,
-    help='The input image path.'
-)
-parser.add_argument(
-    '-v', '--video', metavar='VIDEO',
-    default=None,
-    help='The input video path. ' +
-         'If the VIDEO argument is set to 0, the webcam input will be used.'
-)
-parser.add_argument(
-    '-s', '--savepath', metavar='SAVE_IMAGE_PATH', default=SAVE_IMAGE_PATH,
-    help='Save path for the output image.'
-)
-parser.add_argument(
-    '-b', '--benchmark',
-    action='store_true',
-    help='Running the inference on the same input 5 times ' +
-         'to measure execution performance. (Cannot be used in video mode)'
-)
+parser = get_base_parser('minimal-hand mode', IMAGE_PATH, SAVE_IMAGE_PATH)
 parser.add_argument(
     '--right-hand',
     dest='flip',
@@ -92,7 +75,7 @@ parser.add_argument(
     action='store_true',
     help='execute onnxruntime version.'
 )
-args = parser.parse_args()
+args = update_parser(parser)
 
 
 # ======================
@@ -186,35 +169,41 @@ def predict(img, det_model):
 
 
 def recognize_from_image(filename, det_model):
-    # prepare input data
-    img = load_image(filename)
-    print(f'input image shape: {img.shape}')
+    # input image loop
+    for image_path in args.input:
+        logger.info(image_path)
 
-    img = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
+        # prepare input data
+        img = load_image(image_path)
+        print(f'input image shape: {img.shape}')
 
-    # inference
-    print('Start inference...')
-    if args.benchmark:
-        print('BENCHMARK mode')
-        for i in range(5):
-            start = int(round(time.time() * 1000))
+        img = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
+
+        # inference
+        print('Start inference...')
+        if args.benchmark:
+            print('BENCHMARK mode')
+            for i in range(5):
+                start = int(round(time.time() * 1000))
+                xyz = predict(img, det_model)
+                end = int(round(time.time() * 1000))
+                print(f'\tailia processing time {end - start} ms')
+        else:
             xyz = predict(img, det_model)
-            end = int(round(time.time() * 1000))
-            print(f'\tailia processing time {end - start} ms')
-    else:
-        xyz = predict(img, det_model)
 
-    """
-    plot result
-    """
-    fig = plt.figure(figsize=plt.figaspect(0.5), tight_layout=True)
-    ax1 = fig.add_subplot(1, 2, 1)
-    ax2 = fig.add_subplot(1, 2, 2, projection='3d')
-    axs = [ax1, ax2]
+        """
+        plot result
+        """
+        fig = plt.figure(figsize=plt.figaspect(0.5), tight_layout=True)
+        ax1 = fig.add_subplot(1, 2, 1)
+        ax2 = fig.add_subplot(1, 2, 2, projection='3d')
+        axs = [ax1, ax2]
 
-    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-    visualize_results(axs, img, xyz)
-    fig.savefig(args.savepath)
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        visualize_results(axs, img, xyz)
+
+        savepath = get_savepath(args.savepath, image_path, ext='.png')
+        fig.savefig(savepath)
 
     print('Script finished successfully.')
 
