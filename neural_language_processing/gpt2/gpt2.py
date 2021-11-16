@@ -63,11 +63,11 @@ def main():
         logger.info('BENCHMARK mode')
         for i in range(5):
             start = int(round(time.time() * 1000))
-            output = generate_text(tokenizer, ailia_model, args.input, args.outlength, args.onnx)
+            output = generate_text(tokenizer, ailia_model, args.input, int(args.outlength), args.onnx)
             end = int(round(time.time() * 1000))
             logger.info("\tailia processing time {} ms".format(end - start))
     else:
-        output = generate_text(tokenizer, ailia_model, args.input, args.outlength, args.onnx)
+        output = generate_text(tokenizer, ailia_model, args.input, int(args.outlength), args.onnx)
 
     logger.info("output : "+output)
     logger.info('Script finished successfully.')

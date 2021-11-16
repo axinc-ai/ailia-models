@@ -10,7 +10,7 @@ A `SENTENCE`.
 Set the `SENTENCE` and the `CHARCOUNT` (number of characters to be output) in the argument.
 
 ```bash
-$ python3 rinna_gpt2.py -i "My name is Clara and I am" -o 30
+$ python3 gpt2.py -i "My name is Clara and I am" -o 30
 ...
 Input  :  My name is Clara and I am
 Output :  My name is Clara and I am 17 weeks from conception; and it appears as being of an inferior order: the "lower and better way". This would certainly come close, given Trump
