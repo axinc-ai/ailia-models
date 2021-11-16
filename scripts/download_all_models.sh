@@ -1,7 +1,7 @@
 export OPTION=-b
 cd ../
 cd action_recognition/mars; python3 mars.py ${OPTION}
-cd ../../action_recognition/st-gcn; python3 st-gcn.py ${OPTION}
+cd ../../action_recognition/st_gcn; python3 st_gcn.py ${OPTION}
 cd ../../action_recognition/ax_action_recognition; python3 ax_action_recognition.py ${OPTION}
 cd ../../action_recognition/va-cnn; python3 va-cnn.py ${OPTION}
 cd ../../action_recognition/driver-action-recognition-adas; python3 driver-action-recognition-adas.py ${OPTION}
@@ -62,6 +62,7 @@ cd ../../generative_adversarial_networks/council-GAN; python3 council-gan.py --m
 cd ../../generative_adversarial_networks/council-GAN; python3 council-gan.py --anime ${OPTION}
 cd ../../generative_adversarial_networks/pytorch-gan; python3 pytorch-gnet.py -m celeb ${OPTION}
 cd ../../generative_adversarial_networks/pytorch-gan; python3 pytorch-gnet.py -m anime ${OPTION}
+cd ../../generative_adversarial_networks/psgan; python3 psgan.py ${OPTION}
 cd ../../hand_detection/yolov3-hand; python3 yolov3-hand.py ${OPTION}
 cd ../../hand_detection/hand_detection_pytorch python3 hand_detection_pytorch.py ${OPTION}
 cd ../../hand_detection/blazepalm; python3 blazepalm.py ${OPTION}
@@ -91,7 +92,6 @@ cd ../../image_manipulation/noise2noise; python3 noise2noise.py ${OPTION}
 cd ../../image_manipulation/colorization; python3 colorization.py ${OPTION}
 cd ../../image_manipulation/u2net_portrait; python3 u2net_portrait.py ${OPTION}
 cd ../../image_manipulation/style2paints; python3 style2paints.py ${OPTION}
-cd ../../image_manipulation/psgan; python3 psgan.py ${OPTION}
 cd ../../image_manipulation/deep_white_balance; python3 deep_white_balance.py ${OPTION}
 cd ../../image_manipulation/deblur_gan; python3 deblur_gan.py ${OPTION}
 cd ../../image_segmentation/deeplabv3; python3 deeplabv3.py ${OPTION}
@@ -100,7 +100,7 @@ cd ../../image_segmentation/hrnet_segmentation; python3 hrnet_segmentation.py ${
 cd ../../image_segmentation/pspnet-hair-segmentation; python3 pspnet-hair-segmentation.py ${OPTION}
 cd ../../image_segmentation/human_part_segmentation; python3 human_part_segmentation.py ${OPTION}
 cd ../../image_segmentation/pytorch-unet; python3 pytorch-unet.py ${OPTION}
-cd ../../image_segmentation/pytorch-enet; python3 pytorch-unet.py ${OPTION}
+cd ../../image_segmentation/pytorch-enet; python3 pytorch-enet.py ${OPTION}
 cd ../../image_segmentation/semantic-segmentation-mobilenet-v3; python3 semantic-segmentation-mobilenet-v3.py ${OPTION}
 cd ../../image_segmentation/yet-another-anime-segmenter; python3 yet-another-anime-segmenter.py ${OPTION}
 cd ../../image_segmentation/swiftnet; python3 swiftnet.py ${OPTION}
