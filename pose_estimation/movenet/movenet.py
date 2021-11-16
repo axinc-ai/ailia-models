@@ -22,7 +22,7 @@ logger = getLogger(__name__)
 # Parameters
 # ======================
 
-IMAGE_PATH = 'girl-5204299_640.jpg'
+IMAGE_PATH = 'input.jpg'
 
 SAVE_IMAGE_PATH = 'output.png'
 MODEL_VARIANTS = ['thunder','lightning'] # thunder, lightning
@@ -52,7 +52,7 @@ parser.add_argument(
 
 args = update_parser(parser)
 
-MODEL_NAME = 'movenet_{}'.format(args.model_variant.upper())
+MODEL_NAME = 'movenet_{}'.format(args.model_variant)
 WEIGHT_PATH = f'{MODEL_NAME}.onnx'
 MODEL_PATH = f'{MODEL_NAME}.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/movenet/'
