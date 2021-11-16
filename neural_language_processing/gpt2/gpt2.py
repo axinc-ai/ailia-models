@@ -18,7 +18,7 @@ logger = getLogger(__name__)
 # Arguemnt Parser Config
 # ======================
 
-DEFAULT_TEXT = 'I like '
+DEFAULT_TEXT = 'My name is Clara and I am'
 
 parser = get_base_parser('gpt2 text generation', None, None)
 # overwrite
