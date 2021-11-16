@@ -83,7 +83,7 @@ def recognize_from_image():
             logger.info('BENCHMARK mode')
             for i in range(5):
                 start = int(round(time.time() * 1000))
-                preds_ailia = net.predict(input_data)
+                preds_ailia = net.predict(input_data)[0]
                 end = int(round(time.time() * 1000))
                 logger.info(f'\tailia processing time {end - start} ms')
         else:
