@@ -27,4 +27,4 @@ ONNX opset = 11
 
 ### Netron
 
-- [rinna_gpt2/japanese-gpt2-small.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/rinna_gpt2_text_generation/rinna_gpt2/japanese-gpt2-small.onnx.prototxt)
+- [rinna_gpt2/japanese-gpt2-small.opt.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/rinna_gpt2/japanese-gpt2-small.opt.onnx.prototxt)
