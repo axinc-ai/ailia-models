@@ -51,7 +51,7 @@ HM_STRIDE = 4
 # ======================
 # Arguemnt Parser Config
 # ======================
-parser = get_base_parser('FashionAI model', None, SAVE_IMAGE_PATH)
+parser = get_base_parser('FashionAI model', IMAGE_BLOUSE_PATH, SAVE_IMAGE_PATH)
 parser.add_argument(
     '-c', '--clothing-type', type=str, default='blouse',
     choices=('blouse', 'dress', 'outwear', 'skirt', 'trousers'),
