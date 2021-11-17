@@ -53,7 +53,8 @@ def main():
         import onnxruntime
         ailia_model = onnxruntime.InferenceSession(WEIGHT_PATH)
     else:
-        ailia_model = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
+        logger.info("This model requires multiple input shape, so running on CPU")
+        ailia_model = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=0)#args.env_id)
     tokenizer = T5Tokenizer.from_pretrained("rinna/japanese-gpt2-small")
     logger.info("Input : "+args.input)
 
