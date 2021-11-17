@@ -1,24 +1,20 @@
-import sys
+import os, sys
+import glob
 import time
-
 import numpy as np
 import cv2
-
+from tqdm import tqdm
 import ailia
-
 # import original modules
 sys.path.append('../../util')
 from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
-
 # logger
 from logging import getLogger   # noqa: E402
 logger = getLogger(__name__)
-
 # for PolyLaneNet
 import torch
 import torch.nn as nn
-import glob
 
 
 # ======================
@@ -28,8 +24,8 @@ WEIGHT_PATH = 'polylanenet.onnx'
 MODEL_PATH = 'polylanenet.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/polylanenet/'
 
-IMAGE_PATH = 'inputs'
-SAVE_IMAGE_PATH = 'outputs'
+IMAGE_PATH = 'input'
+SAVE_IMAGE_PATH = 'output'
 
 HEIGHT = 360
 WIDTH = 640
@@ -40,6 +36,9 @@ WIDTH = 640
 # ======================
 parser = get_base_parser(
     'PolyLaneNet', IMAGE_PATH, SAVE_IMAGE_PATH,
+)
+parser.add_argument(
+    '--input_name'
 )
 args = update_parser(parser)
 
@@ -106,45 +105,95 @@ def draw_annotation(img, pred):
     return original, predicted, overlayed
 
 
+def get_files(dirname):
+    files = glob.glob(dirname)
+    if not files:
+        print('specified files is empty.')
+        exit()
+    return files
+
+
+def predict(net, filename):
+    # resize input image
+    input = cv2.imread('{}'.format(filename))
+    height = input.shape[0]
+    width = input.shape[1]
+    rate = HEIGHT/height
+    rs_height = int(height*rate)
+    rs_width = int(width*rate)
+    if (rs_height!=HEIGHT or rs_width!=WIDTH):
+        print('Invalid image shape')
+        exit()
+    input = cv2.resize(input, (rs_width, rs_height))
+    image = input
+    input = (input/255.).astype(np.float32)
+    input = input.transpose(2, 0, 1)
+    input = input[np.newaxis, :, :, :]
+    # predict
+    output = net.predict(input)
+    # postprocess
+    output = torch.from_numpy(output)
+    output = decode(output)
+    output = output.cpu().numpy()
+
+    return output, image
+
+
 def main():
     # model files check and download
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
 
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
 
-    files = glob.glob('./inputs/*')
-    for i, file in enumerate(files):
-        print('processing {} image.'.format(i))
+    if not os.path.exists('./output'):
+        os.mkdir('./output')
 
-        # resize input image
-        input = cv2.imread('{}'.format(file))
-        height = input.shape[0]
-        width = input.shape[1]
-        rate = HEIGHT/height
-        rs_height = int(height*rate)
-        rs_width = int(width*rate)
-        if (rs_height!=HEIGHT or rs_width!=WIDTH):
-            print('Invalid image shape')
+    if args.ftype == 'image':
+        if not os.path.exists('./output/image'):
+            os.mkdir('./output/image')
+
+        files = get_files('./input/image/*.jpg')
+
+        for i, file in enumerate(tqdm(files)):
+            output, image = predict(net, file)
+            _, _, overlayed = draw_annotation(image, output)
+            cv2.imwrite('./output/image/{}.jpg'.format(i+1), overlayed)
+
+    elif args.ftype == 'video':
+        if not os.path.exists('./output/video'):
+            os.mkdir('./output/video')
+
+        if args.input_name is None:
+            print('input_name is empty.')
             exit()
-        input = cv2.resize(input, (rs_width, rs_height))
-        image = input
-        input = (input/255.).astype(np.float32)
-        input = input.transpose(2, 0, 1)
-        input = input[np.newaxis, :, :, :]
 
-        # predict
-        output = net.predict(input)
+        files = get_files('./input/video/{}/*.jpg'.format(args.input_name))
+        filename = '_'.join(args.input_name.split('/'))+'.mp4'
 
-        # postprocess
-        output = torch.from_numpy(output)
-        output = decode(output)
-        output = output.cpu().numpy()
-        original, predicted, overlayed = draw_annotation(image, output)
+        # sort
+        tmp = [file.split('/')[-1].replace('.jpg', '') for file in files]
+        tmp = sorted(tmp, key=int)
+        files = ['./input/video/{}/{}.jpg'.format(args.input_name, file) for file in tmp]
 
-        # images
-        cv2.imwrite('outputs/{}_original.jpg'.format(i+1), original)
-        cv2.imwrite('outputs/{}_predicted.jpg'.format(i+1), predicted)
-        cv2.imwrite('outputs/{}_overlayed.jpg'.format(i+1), overlayed)
+        # create video
+        video = cv2.VideoWriter(
+                './output/video/{}'.format(filename),
+                cv2.VideoWriter_fourcc('m','p','4', 'v'), #mp4フォーマット
+                float(30), #fps
+                (WIDTH, HEIGHT) #size
+        )
+
+        # pred
+        for file in tqdm(files):
+            output, image = predict(net, file)
+            _, _, overlayed = draw_annotation(image, output)
+            video.write(overlayed)
+        video.release()
+        print('Video saved as {}'.format(filename))
+
+    else:
+        print('invalid ftype.')
+        exit()
 
 
 if __name__ == '__main__':
