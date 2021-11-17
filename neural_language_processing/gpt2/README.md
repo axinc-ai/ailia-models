@@ -13,7 +13,7 @@ Set the `SENTENCE` and the `CHARCOUNT` (number of characters to be output) in th
 $ python3 gpt2.py -i "My name is Clara and I am" -o 30
 ...
 Input  :  My name is Clara and I am
-Output :  My name is Clara and I am 17 weeks from conception; and it appears as being of an inferior order: the "lower and better way". This would certainly come close, given Trump
+Output :  My name is Clara and I am 17 weeks old baby. Today i will tell ya what the future looks very very dark with me baby! In case u got questions please give email.
 ```
 
 ### Reference
