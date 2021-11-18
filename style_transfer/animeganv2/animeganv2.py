@@ -32,7 +32,7 @@ MODEL_CELEBA_PATH = 'celeba_distill.onnx.prototxt'
 WEIGHT_FACE_PAINT_PATH = 'face_paint_512_v2.onnx'
 MODEL_FACE_PAINT_PATH = 'face_paint_512_v2.onnx.prototxt'
 REMOTE_PATH = \
-    'https://storage.googleapis.com/ailia-models/animegan2/'
+    'https://storage.googleapis.com/ailia-models/animeganv2/'
 
 IMAGE_PATH = 'sample.jpg'
 SAVE_IMAGE_PATH = 'output.png'
