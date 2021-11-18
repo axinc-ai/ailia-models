@@ -38,7 +38,10 @@ parser = get_base_parser(
     'PolyLaneNet', IMAGE_PATH, SAVE_IMAGE_PATH,
 )
 parser.add_argument(
-    '--input_name'
+    '--input_type', choices=['image', 'video'], required=True
+)
+parser.add_argument(
+    '--input_name', required=True
 )
 args = update_parser(parser)
 
@@ -107,15 +110,14 @@ def draw_annotation(img, pred):
 
 def get_files(dirname):
     files = glob.glob(dirname)
-    if not files:
+    if len(files)==0:
         print('specified files is empty.')
         exit()
     return files
 
 
-def predict(net, filename):
+def predict(net, input):
     # resize input image
-    input = cv2.imread('{}'.format(filename))
     height = input.shape[0]
     width = input.shape[1]
     rate = HEIGHT/height
@@ -152,43 +154,78 @@ def main():
         if not os.path.exists('./output/image'):
             os.mkdir('./output/image')
 
-        files = get_files('./input/image/*.jpg')
-
-        for i, file in enumerate(tqdm(files)):
-            output, image = predict(net, file)
+        # image to image
+        if args.input_type == 'image':
+            files = get_files('./input/image/{}'.format(args.input_name))
+            input = cv2.imread('{}'.format(files[0]))
+            output, image = predict(net, input)
             _, _, overlayed = draw_annotation(image, output)
-            cv2.imwrite('./output/image/{}.jpg'.format(i+1), overlayed)
+            cv2.imwrite('./output/image/{}'.format(args.input_name), overlayed)
+
+        # video to image
+        elif args.input_type == 'video':
+            print('Not implemented.')
+            exit()
 
     elif args.ftype == 'video':
         if not os.path.exists('./output/video'):
             os.mkdir('./output/video')
 
-        if args.input_name is None:
-            print('input_name is empty.')
-            exit()
+        # image to video
+        if args.input_type == 'image':
+            files = get_files('./input/video/{}/*.jpg'.format(args.input_name))
+            filename = '_'.join(args.input_name.split('/'))+'.mp4'
 
-        files = get_files('./input/video/{}/*.jpg'.format(args.input_name))
-        filename = '_'.join(args.input_name.split('/'))+'.mp4'
+            # sort
+            tmp = [file.split('/')[-1].replace('.jpg', '') for file in files]
+            tmp = sorted(tmp, key=int)
+            files = ['./input/video/{}/{}.jpg'.format(args.input_name, file) for file in tmp]
 
-        # sort
-        tmp = [file.split('/')[-1].replace('.jpg', '') for file in files]
-        tmp = sorted(tmp, key=int)
-        files = ['./input/video/{}/{}.jpg'.format(args.input_name, file) for file in tmp]
+            # create video
+            video = cv2.VideoWriter(
+                    './output/video/{}'.format(filename),
+                    cv2.VideoWriter_fourcc('m','p','4', 'v'), #mp4フォーマット
+                    float(30), #fps
+                    (WIDTH, HEIGHT) #size
+            )
 
-        # create video
-        video = cv2.VideoWriter(
-                './output/video/{}'.format(filename),
-                cv2.VideoWriter_fourcc('m','p','4', 'v'), #mp4フォーマット
-                float(30), #fps
-                (WIDTH, HEIGHT) #size
-        )
+            # pred
+            for file in tqdm(files):
+                input = cv2.imread('{}'.format(file))
+                output, image = predict(net, input)
+                _, _, overlayed = draw_annotation(image, output)
+                video.write(overlayed)
+            video.release()
 
-        # pred
-        for file in tqdm(files):
-            output, image = predict(net, file)
-            _, _, overlayed = draw_annotation(image, output)
-            video.write(overlayed)
-        video.release()
+        # video to video
+        elif args.input_type == 'video':
+            cap = cv2.VideoCapture('./input/video/{}'.format(args.input_name))
+            if not cap.isOpened():
+                print('Video is not opened.')
+                exit()
+            filename = '_'.join(args.input_name.split('/'))
+
+            # create video
+            output_video = cv2.VideoWriter(
+                    './output/video/{}'.format(filename),
+                    cv2.VideoWriter_fourcc('m','p','4', 'v'), #mp4フォーマット
+                    float(30), #fps
+                    (WIDTH, HEIGHT) #size
+            )
+
+            i = 1
+            pbar = tqdm(total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)))
+            while True:
+                pbar.update(i)
+                ret, frame = cap.read()
+                if not ret:
+                    break
+                output, image = predict(net, frame)
+                _, _, overlayed = draw_annotation(image, output)
+                output_video.write(overlayed)
+            cap.release()
+            output_video.release()
+
         print('Video saved as {}'.format(filename))
 
     else:
