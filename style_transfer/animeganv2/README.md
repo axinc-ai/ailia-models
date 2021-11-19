@@ -2,13 +2,13 @@
 
 ## Input
 
-![Input](sample.jpg)
+<img src="sample.jpg" width="512px">
 
 (Image from https://github.com/bryandlee/animegan2-pytorch/blob/main/samples/inputs/3.jpg)
 
 ## Output
 
-![Output](output.png)
+<img src="output.png" width="512px">
 
 ## Usage
 Automatically downloads the onnx and prototxt files on the first run.
