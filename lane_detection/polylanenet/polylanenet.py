@@ -12,9 +12,6 @@ from model_utils import check_and_download_models  # noqa: E402
 # logger
 from logging import getLogger   # noqa: E402
 logger = getLogger(__name__)
-# for PolyLaneNet
-import torch
-import torch.nn as nn
 
 
 # ======================
@@ -49,8 +46,11 @@ args = update_parser(parser)
 # ======================
 # Main functions
 # ======================
+def sigmoid(x):
+    return 1 / (1 + np.exp(-x))
+
+
 def decode(output, conf_threshold=0.5, share_top_y=True):
-    sigmoid = nn.Sigmoid()
     output = output.reshape(len(output), -1, 7)  # score + upper + lower + 4 coeffs = 7
     output[:, :, 0] = sigmoid(output[:, :, 0])
     output[output[:, :, 0] < conf_threshold] = 0
@@ -134,9 +134,7 @@ def predict(net, input):
     # predict
     output = net.predict(input)
     # postprocess
-    output = torch.from_numpy(output)
     output = decode(output)
-    output = output.cpu().numpy()
 
     return output, image
 
