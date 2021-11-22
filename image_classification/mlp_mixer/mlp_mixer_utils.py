@@ -15,3 +15,7 @@ def preprocess_input(im, height, width):
     im = np.expand_dims(im, 0)
     return im
 
+def softmax(x):
+    f = np.exp(x)/np.sum(np.exp(x), axis = 1, keepdims = True)
+
+    return f

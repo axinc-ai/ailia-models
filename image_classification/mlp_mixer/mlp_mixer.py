@@ -40,7 +40,7 @@ parser = get_base_parser(
 )
 parser.add_argument(
     '-m', '--model_name',
-    default='Mixer-L_16',
+    default='Mixer-B_16',
     help='[Mixer-L_16, Mixer-B_16]'
 )
 args = update_parser(parser)
@@ -75,6 +75,7 @@ def recognize_from_image():
                 logger.info(f'\tailia processing time {end - start} ms')
         else:
             preds = net.predict(input_data)
+            preds = softmax(preds)
 
         # show results
         print_results(preds, labels)
@@ -109,6 +110,7 @@ def recognize_from_video():
 
         # inference
         preds = net.predict(input_data)
+        preds = softmax(preds)
 
         # get result
         print_results(preds, labels)
