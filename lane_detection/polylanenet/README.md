@@ -1,11 +1,11 @@
 # PolyLaneNet: Lane Estimation via Deep Polynomial Regression
 
-### input
+### Input
 Images with the same aspect ratio as 360×640. This model detect lane from inputs.
 - input image    
 ![入力画像](./raws/original.jpg)    
 
-### output
+### Output
 Images which the detected lane in input images is colored in green.
 - output image    
 Four green lines mean each detected lane which model predicted and numbers attached to each line mean line number.
