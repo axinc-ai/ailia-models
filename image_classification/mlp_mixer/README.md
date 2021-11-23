@@ -12,13 +12,13 @@ Range: [0.0, 255.0]
 class_count=3
 + idx=0
   category=5[dog ]
-  prob=2.362039566040039
+  prob=0.9998886585235596
 + idx=1
   category=3[cat ]
-  prob=1.0062607526779175
+  prob=5.7395416661165655e-05
 + idx=2
   category=2[bird ]
-  prob=0.6622800827026367
+  prob=3.886506237904541e-05
 ```
 
 ## Usage
@@ -47,7 +47,7 @@ $ python3 mlp_mixer.py --video VIDEO_PATH
 
 ## Model Format
 
-ONNX opset = 11
+ONNX opset = 12
 
 ## Framework
 
@@ -56,4 +56,9 @@ pytorch
 ## Netron
 
 [Mixer-B_16.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/mlp_mixer/Mixer-B_16.onnx.prototxt)
+
 [Mixer-L_16.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/mlp_mixer/Mixer-L_16.onnx.prototxt)
+
+[Mixer-B_16-21k.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/mlp_mixer/Mixer-B_16-21k.onnx.prototxt)
+
+[Mixer-L_16-21k.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/mlp_mixer/Mixer-L_16-21k.onnx.prototxt)

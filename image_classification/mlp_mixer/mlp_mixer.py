@@ -41,7 +41,7 @@ parser = get_base_parser(
 parser.add_argument(
     '-m', '--model_name',
     default='Mixer-B_16',
-    help='[Mixer-L_16, Mixer-B_16]'
+    help='[Mixer-L_16, Mixer-B_16, Mixer-L_16-21k, Mixer-B_16-21k]'
 )
 args = update_parser(parser)
 
