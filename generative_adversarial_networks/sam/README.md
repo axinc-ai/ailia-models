@@ -62,8 +62,8 @@ ONNX opset=11
 
 ## Netron
 
-[encoder.onnx.prototxt](https://lutzroeder.github.io/netron/?url=https://storage.googleapis.com/ailia-models/sam/encoder.onnx.prototxt)
+[encoder.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/sam/encoder.onnx.prototxt)
 
-[pretrained-encoder.onnx.prototxt](https://lutzroeder.github.io/netron/?url=https://storage.googleapis.com/ailia-models/sam/pretrained-encoder.onnx.prototxt)
+[pretrained-encoder.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/sam/pretrained-encoder.onnx.prototxt)
 
-[decoder.onnx.prototxt](https://lutzroeder.github.io/netron/?url=https://storage.googleapis.com/ailia-models/sam/decoder.onnx.prototxt)
+[decoder.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/sam/decoder.onnx.prototxt)
