@@ -74,8 +74,8 @@ ONNX opset=11
 
 ## Netron
 
-[restyle-encoder.onnx.prototxt](https://lutzroeder.github.io/netron/?url=https://storage.googleapis.com/ailia-models/restyle-encoder/restyle-encoder.onnx.prototxt)
+[restyle-encoder.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/restyle_encoder/restyle-encoder.onnx.prototxt)
 
-[face-pool.onnx.prototxt](https://lutzroeder.github.io/netron/?url=https://storage.googleapis.com/ailia-models/restyle-encoder/face-pool.onnx.prototxt)
+[face-pool.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/restyle_encoder/face-pool.onnx.prototxt)
 
-[toonify.onnx.prototxt](https://lutzroeder.github.io/netron/?url=https://storage.googleapis.com/ailia-models/restyle-encoder/toonify.onnx.prototxt)
+[toonify.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/restyle_encoder/toonify.onnx.prototxt)
