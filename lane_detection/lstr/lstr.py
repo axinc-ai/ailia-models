@@ -13,10 +13,6 @@ from model_utils import check_and_download_models  # noqa: E402
 from logging import getLogger   # noqa: E402
 logger = getLogger(__name__)
 
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-
 
 # ======================
 # Parameters
@@ -32,6 +28,9 @@ HEIGHT = 360
 WIDTH = 640
 VIDEO_HEIGHT = 1280
 VIDEO_WIDTH = 720
+
+DB_MEAN = [0.40789655, 0.44719303, 0.47026116]
+DB_STD = [0.2886383, 0.27408165, 0.27809834]
 
 
 # ======================
@@ -52,84 +51,15 @@ args = update_parser(parser)
 # ======================
 # Main functions
 # ======================
-class PostProcess(nn.Module):
-    @torch.no_grad()
-    def forward(self, out_logits, out_curves, target_sizes):
-        out_logits = out_logits[0].unsqueeze(0)
-        out_curves = out_curves[0].unsqueeze(0)
-        assert len(out_logits) == len(target_sizes)
-        assert target_sizes.shape[1] == 2
-        prob = F.softmax(out_logits, -1)
-        scores, labels = prob.max(-1)
-        labels[labels != 1] = 0
-        results = torch.cat([labels.unsqueeze(-1).float(), out_curves], dim=-1)
-
-        return results
+def _normalize(image, mean, std):
+    image -= mean
+    image /= std
 
 
-def draw_annotation(pred, img):
-    # img = img.transpose(1, 2, 0)
-    img = (img - np.min(img)) / (np.max(img) - np.min(img))
-    img = (img * 255).astype(np.uint8)
-
-    img_h, img_w, _ = img.shape
-
-    # Draw predictions
-    # pred = pred[pred[:, 0] != 0]  # filter invalid lanes
-    pred = pred[pred[:, 0].astype(int) == 1]
-    overlay = img.copy()
-    cv2.rectangle(img, (5, 10), (5 + 1270, 25 + 30 * pred.shape[0] + 10), (255, 255, 255), thickness=-1)
-    cv2.putText(img, 'Predicted curve parameters:', (10, 30), fontFace=cv2.FONT_HERSHEY_PLAIN, fontScale=1.5, color=(0, 0, 0), thickness=2)
-
-    for i, lane in enumerate(pred):
-        PRED_HIT_COLOR = (0, 255, 0)
-        color = PRED_HIT_COLOR
-        lane = lane[1:]  # remove conf
-        lower, upper = lane[0], lane[1]
-        lane = lane[2:]  # remove upper, lower positions
-
-        # generate points from the polynomial
-        ys = np.linspace(lower, upper, num=100)
-        points = np.zeros((len(ys), 2), dtype=np.int32)
-        points[:, 1] = (ys * img_h).astype(int)
-        points[:, 0] = ((lane[0] / (ys - lane[1]) ** 2 + lane[2] / (ys - lane[1]) + lane[3] + lane[4] * ys - lane[5]) * img_w).astype(int)
-        #points[:, 0] = ((lane[0] / (ys - lane[1]) ** 2 + lane[2] / (ys - lane[1]) + lane[3] + lane[4] * ys - lane[5])).astype(int)
-
-        points = points[(points[:, 0] > 0) & (points[:, 0] < img_w)]
-
-        # draw lane with a polyline on the overlay
-        for current_point, next_point in zip(points[:-1], points[1:]):
-            overlay = cv2.line(overlay, tuple(current_point), tuple(next_point), color=color, thickness=7)
-
-        # draw lane ID
-        #print(points)
-        if len(points) > 0:
-            cv2.putText(img, str(i), tuple(points[len(points)//3]), fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=2, color=(0, 255, 255),
-                        thickness=5)
-            content = "{}: k''={:.3}, f''={:.3}, m''={:.3}, n'={:.3}, b''={:.3}, b'''={:.3}, alpha={}, beta={}".format(
-                str(i), lane[0], lane[1], lane[2], lane[3], lane[4], lane[5], int(lower * img_h),
-                int(upper * img_w)
-            )
-            cv2.putText(img, content, (10, 30 * (i + 2)), fontFace=cv2.FONT_HERSHEY_PLAIN,
-                        fontScale=1.5, color=color, thickness=2)
-
-        """
-        # draw lane accuracy
-        if len(points) > 0:
-            cv2.putText(img,
-                        '{:.2f}'.format(accs[i] * 100),
-                        tuple(points[len(points) // 2] - 30),
-                        fontFace=cv2.FONT_HERSHEY_SIMPLEX,
-                        fontScale=1,
-                        color=color,
-                        thickness=3)
-        """
-
-    # Add lanes overlay
-    w = 0.5
-    img = ((1. - w) * img + w * overlay).astype(np.uint8)
-
-    return img
+def _softmax(x, axis=None):
+    e_x = np.exp(x - np.max(x, axis=axis, keepdims=True))
+    e_x = e_x / np.sum(e_x, axis=axis, keepdims=True)
+    return e_x
 
 
 def get_files(dirname):
@@ -140,15 +70,8 @@ def get_files(dirname):
     return files
 
 
-def _normalize(image, mean, std):
-    image -= mean
-    image /= std
-    
-
 def predict(net, image):
-    repeat = 1
     height, width = image.shape[0:2]
-
     images = np.zeros((1, 3, HEIGHT, WIDTH), dtype=np.float32)
     masks = np.ones((1, 1, HEIGHT, WIDTH), dtype=np.float32)
     pad_image = image.copy()
@@ -157,28 +80,70 @@ def predict(net, image):
     resized_mask = cv2.resize(pad_mask, (WIDTH, HEIGHT))
     masks[0][0] = resized_mask.squeeze()
     resized_image = resized_image / 255.
-    _normalize(resized_image, [0.40789655, 0.44719303, 0.47026116], [0.2886383, 0.27408165, 0.27809834]) #TODO: implement db.mean, db.std
+    _normalize(resized_image, DB_MEAN, DB_STD)
     resized_image = resized_image.transpose(2, 0, 1)
-    images[0]     = resized_image
-    images = torch.from_numpy(images)
-    masks  = torch.from_numpy(masks)
-    images = images.repeat(repeat, 1, 1, 1)
-    masks  = masks.repeat(repeat, 1, 1, 1)
-    images = images.to('cpu').detach().numpy().copy()
-    masks = masks.to('cpu').detach().numpy().copy()
-
+    images[0] = resized_image
     outputs = net.predict([images, masks])
     return outputs
 
 
 def postprocess(out_pred_logits, out_pred_curves, orig_target_sizes):
-    p = PostProcess()
+    out_logits = np.expand_dims(out_pred_logits[0], axis=0)
+    out_curves = np.expand_dims(out_pred_curves[0], axis=0)
 
-    out_pred_logits = torch.from_numpy(out_pred_logits)
-    out_pred_curves = torch.from_numpy(out_pred_curves)
-    results = p(out_pred_logits, out_pred_curves, orig_target_sizes)
+    assert len(out_logits) == len(orig_target_sizes)
+    assert orig_target_sizes.shape[1] == 2
 
+    prob = _softmax(out_logits, -1)
+    labels = np.argmax(prob, axis=-1)
+    labels[labels != 1] = 0
+    labels = np.expand_dims(labels, axis=-1).astype(float)
+
+    results = np.concatenate((labels, out_curves), axis=-1)
     return results
+
+
+def draw_annotation(pred, img):
+    img = (img - np.min(img)) / (np.max(img) - np.min(img))
+    img = (img * 255).astype(np.uint8)
+    img_h, img_w, _ = img.shape
+
+    # Draw predictions
+    # pred = pred[pred[:, 0] != 0]  # filter invalid lanes
+    pred = pred[pred[:, 0].astype(int) == 1]
+    overlay = img.copy()
+    cv2.rectangle(img, (5, 10), (5 + 1270, 25 + 30 * pred.shape[0] + 10), (255, 255, 255), thickness=-1)
+    cv2.putText(img, 'Predicted curve parameters:', (10, 30), fontFace=cv2.FONT_HERSHEY_PLAIN, fontScale=1.5, color=(0, 0, 0), thickness=2)
+
+    for i, lane in enumerate(pred):
+        color = (0, 255, 0)
+        lane = lane[1:]  # remove conf
+        lower, upper = lane[0], lane[1]
+        lane = lane[2:]  # remove upper, lower positions
+
+        # generate points from the polynomial
+        ys = np.linspace(lower, upper, num=100)
+        points = np.zeros((len(ys), 2), dtype=np.int32)
+        points[:, 1] = (ys * img_h).astype(int)
+        points[:, 0] = ((lane[0] / (ys - lane[1]) ** 2 + lane[2] / (ys - lane[1]) + lane[3] + lane[4] * ys - lane[5]) * img_w).astype(int)
+        points = points[(points[:, 0] > 0) & (points[:, 0] < img_w)]
+
+        # draw lane with a polyline on the overlay
+        for current_point, next_point in zip(points[:-1], points[1:]):
+            overlay = cv2.line(overlay, tuple(current_point), tuple(next_point), color=color, thickness=7)
+
+        # draw lane ID
+        if len(points) > 0:
+            cv2.putText(img, str(i), tuple(points[len(points)//3]), fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=2, color=(0, 255, 255), thickness=5)
+            content = "{}: k''={:.3}, f''={:.3}, m''={:.3}, n'={:.3}, b''={:.3}, b'''={:.3}, alpha={}, beta={}".format(
+                str(i), lane[0], lane[1], lane[2], lane[3], lane[4], lane[5], int(lower * img_h),
+                int(upper * img_w)
+            )
+            cv2.putText(img, content, (10, 30 * (i + 2)), fontFace=cv2.FONT_HERSHEY_PLAIN, fontScale=1.5, color=color, thickness=2)
+
+    w = 0.5
+    img = ((1. - w) * img + w * overlay).astype(np.uint8) # Add lanes overlay
+    return img
 
 
 def main():
@@ -188,7 +153,7 @@ def main():
     print('ftype={}, input_type={}, input_name={}'.format(args.ftype, args.input_type, args.input_name))
 
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
-    orig_target_sizes = torch.tensor([HEIGHT, WIDTH]).unsqueeze(0)
+    orig_target_sizes = np.expand_dims(np.array([HEIGHT, WIDTH]), axis=0)
 
     if not os.path.exists('./output'):
         os.mkdir('./output')
@@ -204,7 +169,7 @@ def main():
             image = cv2.imread('{}'.format(image_file[0]))
             out_pred_logits, out_pred_curves, _, _, weights = predict(net, image)
             results = postprocess(out_pred_logits, out_pred_curves, orig_target_sizes)
-            preds = draw_annotation(results[0].cpu().numpy(), image)
+            preds = draw_annotation(results[0], image)
             cv2.imwrite('./output/image/{}'.format(os.path.basename(image_file[-1]) + '.jpg'), preds)
 
         # video to image
@@ -243,7 +208,7 @@ def main():
                 frame = cv2.resize(frame, dsize=(VIDEO_HEIGHT, VIDEO_WIDTH))
                 out_pred_logits, out_pred_curves, _, _, weights = predict(net, frame)
                 results = postprocess(out_pred_logits, out_pred_curves, orig_target_sizes)
-                preds = draw_annotation(results[0].cpu().numpy(), frame)
+                preds = draw_annotation(results[0], frame)
                 output_video.write(preds)
             cap.release()
             output_video.release()
