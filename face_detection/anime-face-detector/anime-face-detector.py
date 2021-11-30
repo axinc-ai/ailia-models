@@ -19,6 +19,7 @@ from logging import getLogger  # noqa: E402
 
 from post_transforms_utils import flip_back, get_affine_transform
 from top_down_utils import keypoints_from_heatmaps
+from visual_utils import visualize
 
 logger = getLogger(__name__)
 
@@ -38,6 +39,15 @@ REMOTE_PATH = \
 IMAGE_PATH = 'input.jpg'
 SAVE_IMAGE_PATH = 'output.png'
 
+IMAGE_YOLOV3_HEIGHT = IMAGE_YOLOV3_WIDTH = 608
+IMAGE_FASTERRCNN_HEIGHT = 800
+IMAGE_FASTERRCNN_WIDTH = 1333
+
+LANDMARK_SCORE_THRESHOLD = 0.3
+SHOW_BOX_SCORE = True
+DRAW_CONTOUR = True
+SKIP_CONTOUR_WITH_LOW_SCORE = True
+
 # ======================
 # Arguemnt Parser Config
 # ======================
@@ -45,13 +55,8 @@ SAVE_IMAGE_PATH = 'output.png'
 parser = get_base_parser(
     'Anime Face Detector', IMAGE_PATH, SAVE_IMAGE_PATH
 )
-# parser.add_argument(
-#     '-d', '--detection',
-#     action='store_true',
-#     help='Use object detection.'
-# )
 parser.add_argument(
-    '-d', '--detector', default=None, choices=('yolov3', 'faster-rcnn'),
+    '-d', '--detector', default='yolov3', choices=('yolov3', 'faster-rcnn'),
     help='face detector model.'
 )
 args = update_parser(parser)
@@ -105,7 +110,7 @@ def preprocess(img, resize_shape):
     im_h, im_w, _ = img.shape
 
     # adaptive_resize
-    scale = h / max(im_h, im_w)
+    scale = min(h / im_h, w / im_w)
     ow, oh = int(im_w * scale), int(im_h * scale)
     if ow != im_w or oh != im_h:
         _img = cv2.resize(img, (ow, oh), interpolation=cv2.INTER_LINEAR)
@@ -158,10 +163,11 @@ def box2cs(box):
 
 
 def detect_faces(img, face_detector):
+    shape = (IMAGE_YOLOV3_HEIGHT, IMAGE_YOLOV3_WIDTH) \
+        if args.detector == "yolov3" \
+        else (IMAGE_FASTERRCNN_HEIGHT, IMAGE_FASTERRCNN_WIDTH)
     im_h, im_w = img.shape[:2]
 
-    # shape = (IMAGE_HEIGHT, IMAGE_WIDTH)
-    shape = (608, 608)
     img, pad_hw, resized_hw = preprocess(img, shape)
 
     # feedforward
@@ -174,10 +180,10 @@ def detect_faces(img, face_detector):
     pad_y = pad_hw[0]
     resized_x = resized_hw[1]
     resized_y = resized_hw[0]
-    boxes[:, 0] = boxes[:, 0] - pad_y
-    boxes[:, 2] = boxes[:, 2] - pad_x
-    boxes[:, [0, 2]] = boxes[:, [0, 2]] * im_h / resized_y
-    boxes[:, [1, 3]] = boxes[:, [1, 3]] * im_w / resized_x
+    boxes[:, [0, 2]] = boxes[:, [0, 2]] - pad_x
+    boxes[:, [1, 3]] = boxes[:, [1, 3]] - pad_y
+    boxes[:, [0, 2]] = boxes[:, [0, 2]] * im_w / resized_x
+    boxes[:, [1, 3]] = boxes[:, [1, 3]] * im_h / resized_y
 
     # scale boxes
     boxes = update_pred_box(boxes)
@@ -185,7 +191,7 @@ def detect_faces(img, face_detector):
     return boxes
 
 
-def keypoint_head_decode(output, img_metas):
+def keypoint_decode(output, img_metas):
     """Decode keypoints from heatmaps.
 
     Args:
@@ -223,13 +229,12 @@ def predict(landmark_detector, face_detector, img):
     else:
         h, w = img.shape[:2]
         bboxes = [np.array([0, 0, w - 1, h - 1, 1])]
+    bboxes = np.array(bboxes)
 
     pose_results = []
-
     if len(bboxes) == 0:
         return pose_results
 
-    bboxes = np.array(bboxes)
     bboxes_xywh = xyxy2xywh(bboxes)
 
     img_size = (256, 256)
@@ -274,9 +279,9 @@ def predict(landmark_detector, face_detector, img):
 
         heatmap = (heatmap + flipped_heatmap) * 0.5
 
-    keypoint_result = keypoint_head_decode(heatmap, img_metas)
+    keypoint_result = keypoint_decode(heatmap, img_metas)
 
-    return keypoint_result
+    return keypoint_result, bboxes
 
 
 def recognize_from_image(landmark_detector, face_detector):
@@ -306,12 +311,18 @@ def recognize_from_image(landmark_detector, face_detector):
 
             logger.info(f'\taverage time estimation {total_time_estimation / (args.benchmark_count - 1)} ms')
         else:
-            preds = predict(landmark_detector, face_detector, img)
+            keypoints, bboxes = predict(landmark_detector, face_detector, img)
 
-        # # plot result
-        # savepath = get_savepath(args.savepath, image_path, ext='.png')
-        # logger.info(f'saved at : {savepath}')
-        # cv2.imwrite(savepath, res_img)
+        res_img = visualize(
+            img, keypoints, bboxes,
+            LANDMARK_SCORE_THRESHOLD,
+            SHOW_BOX_SCORE, DRAW_CONTOUR,
+            SKIP_CONTOUR_WITH_LOW_SCORE)
+
+        # plot result
+        savepath = get_savepath(args.savepath, image_path, ext='.png')
+        logger.info(f'saved at : {savepath}')
+        cv2.imwrite(savepath, res_img)
 
     logger.info('Script finished successfully.')
 
@@ -338,18 +349,21 @@ def recognize_from_video(landmark_detector, face_detector):
             break
 
         # inference
-        img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        preds = predict(landmark_detector, face_detector, img)
+        keypoints, bboxes = predict(landmark_detector, face_detector, frame)
 
-        # # plot result
-        # res_img = draw_bbox(frame, bboxes)
-        #
-        # # show
-        # cv2.imshow('frame', res_img)
-        #
-        # # save results
-        # if writer is not None:
-        #     writer.write(res_img.astype(np.uint8))
+        # plot result
+        res_img = visualize(
+            frame, keypoints, bboxes,
+            LANDMARK_SCORE_THRESHOLD,
+            SHOW_BOX_SCORE, DRAW_CONTOUR,
+            SKIP_CONTOUR_WITH_LOW_SCORE)
+
+        # show
+        cv2.imshow('frame', res_img)
+
+        # save results
+        if writer is not None:
+            writer.write(res_img.astype(np.uint8))
 
     capture.release()
     cv2.destroyAllWindows()
@@ -364,30 +378,23 @@ def main():
     logger.info('Checking detect_landmarks model...')
     check_and_download_models(WEIGHT_LANDMARK_PATH, MODEL_LANDMARK_PATH, REMOTE_PATH)
 
-    model_path = weight_path = None
-    if args.video or args.detector:
-        args.detector = args.detector if args.detector else 'yolov3'
+    dic_model = {
+        'yolov3': (WEIGHT_YOLOV3_PATH, MODEL_YOLOV3_PATH),
+        'faster-rcnn': (WEIGHT_FASTERRCNN_PATH, MODEL_FASTERRCNN_PATH),
+    }
+    weight_path, model_path = dic_model[args.detector]
 
-        dic_model = {
-            'yolov3': (WEIGHT_YOLOV3_PATH, MODEL_YOLOV3_PATH),
-            'faster-rcnn': (WEIGHT_LANDMARK_PATH, MODEL_LANDMARK_PATH),
-        }
-        weight_path, model_path = dic_model[args.detector]
-
-        logger.info('Check face_detector model...')
-        check_and_download_models(
-            weight_path, model_path, REMOTE_PATH
-        )
+    logger.info('Check face_detector model...')
+    check_and_download_models(
+        weight_path, model_path, REMOTE_PATH
+    )
 
     env_id = args.env_id
 
     # initialize
+    face_detector = ailia.Net(model_path, weight_path, env_id=env_id)
     landmark_detector = ailia.Net(
         MODEL_LANDMARK_PATH, WEIGHT_LANDMARK_PATH, env_id=env_id)
-    if model_path:
-        face_detector = ailia.Net(model_path, weight_path, env_id=env_id)
-    else:
-        face_detector = None
 
     if args.video is not None:
         recognize_from_video(landmark_detector, face_detector)
