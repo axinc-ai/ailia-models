@@ -1,7 +1,7 @@
 export OPTION=-b
 cd ../
 cd action_recognition/mars; python3 mars.py ${OPTION}
-cd ../../action_recognition/st-gcn; python3 st-gcn.py ${OPTION}
+cd ../../action_recognition/st_gcn; python3 st_gcn.py ${OPTION}
 cd ../../action_recognition/ax_action_recognition; python3 ax_action_recognition.py ${OPTION}
 cd ../../action_recognition/va-cnn; python3 va-cnn.py ${OPTION}
 cd ../../action_recognition/driver-action-recognition-adas; python3 driver-action-recognition-adas.py ${OPTION}
@@ -19,6 +19,7 @@ cd ../../background_ramoval/u2net-portrait-matting; python3 u2net-portrait-matti
 cd ../../background_ramoval/u2net-human-seg; python3 u2net-human-seg.py ${OPTION}
 cd ../../background_ramoval/indexnet; python3 indexnet.py ${OPTION}
 cd ../../background_ramoval/modnet; python3 modnet.py ${OPTION}
+cd ../../background_ramoval/background_matting_v2; python3 background_matting_v2.py ${OPTION}
 cd ../../crowd_counting/crowdcount-cascaded-mtl; python3 crowdcount-cascaded-mtl.py ${OPTION}
 cd ../../crowd_counting/c-3-framework; python3 c-3-framework.py ${OPTION}
 cd ../../deep_fashion/clothing-detection; python3 clothing-detection.py ${OPTION}
@@ -34,6 +35,8 @@ cd ../../depth_estimation/midas; python3 midas.py ${OPTION}
 cd ../../depth_estimation/monodepth2; python3 monodepth2.py ${OPTION}
 cd ../../depth_estimation/fcrn-depthprediction; python3 fcrn-depthprediction.py ${OPTION}
 cd ../../depth_estimation/fast-depth; python3 fast-depth.py ${OPTION}
+cd ../../depth_estimation/lap-depth; python3 lap-depth.py ${OPTION}
+cd ../../depth_estimation/hitnet; python3 hitnet.py ${OPTION}
 cd ../../face_detection/blazeface; python3 blazeface.py ${OPTION}
 cd ../../face_detection/dbface; python3 dbface.py ${OPTION}
 cd ../../face_detection/face-mask-detection; python3 face-mask-detection.py ${OPTION}
@@ -55,12 +58,16 @@ cd ../../face_recognition/mediapipe_iris; python3 mediapipe_iris.py ${OPTION}
 cd ../../face_recognition/hopenet; python3 hopenet.py ${OPTION}
 cd ../../face_recognition/ax_gaze_estimation; python3 ax_gaze_estimation.py ${OPTION}
 cd ../../face_recognition/age-gender-recognition-retail; python3 age-gender-recognition-retail.py ${OPTION}
+cd ../../face_recognition/ferplus; python3 ferplus.py ${OPTION}
 cd ../../frame_interpolation/flavr; python3 flavr.py ${OPTION}
 cd ../../generative_adversarial_networks/council-GAN; python3 council-gan.py --glasses ${OPTION}
 cd ../../generative_adversarial_networks/council-GAN; python3 council-gan.py --m2f ${OPTION}
 cd ../../generative_adversarial_networks/council-GAN; python3 council-gan.py --anime ${OPTION}
 cd ../../generative_adversarial_networks/pytorch-gan; python3 pytorch-gnet.py -m celeb ${OPTION}
 cd ../../generative_adversarial_networks/pytorch-gan; python3 pytorch-gnet.py -m anime ${OPTION}
+cd ../../generative_adversarial_networks/restyle-encoder; python3 restyle-encoder.py ${OPTION}
+cd ../../generative_adversarial_networks/sam; python3 sam.py ${OPTION}
+cd ../../generative_adversarial_networks/psgan; python3 psgan.py ${OPTION}
 cd ../../hand_detection/yolov3-hand; python3 yolov3-hand.py ${OPTION}
 cd ../../hand_detection/hand_detection_pytorch python3 hand_detection_pytorch.py ${OPTION}
 cd ../../hand_detection/blazepalm; python3 blazepalm.py ${OPTION}
@@ -90,7 +97,6 @@ cd ../../image_manipulation/noise2noise; python3 noise2noise.py ${OPTION}
 cd ../../image_manipulation/colorization; python3 colorization.py ${OPTION}
 cd ../../image_manipulation/u2net_portrait; python3 u2net_portrait.py ${OPTION}
 cd ../../image_manipulation/style2paints; python3 style2paints.py ${OPTION}
-cd ../../image_manipulation/psgan; python3 psgan.py ${OPTION}
 cd ../../image_manipulation/deep_white_balance; python3 deep_white_balance.py ${OPTION}
 cd ../../image_manipulation/deblur_gan; python3 deblur_gan.py ${OPTION}
 cd ../../image_segmentation/deeplabv3; python3 deeplabv3.py ${OPTION}
@@ -99,7 +105,7 @@ cd ../../image_segmentation/hrnet_segmentation; python3 hrnet_segmentation.py ${
 cd ../../image_segmentation/pspnet-hair-segmentation; python3 pspnet-hair-segmentation.py ${OPTION}
 cd ../../image_segmentation/human_part_segmentation; python3 human_part_segmentation.py ${OPTION}
 cd ../../image_segmentation/pytorch-unet; python3 pytorch-unet.py ${OPTION}
-cd ../../image_segmentation/pytorch-enet; python3 pytorch-unet.py ${OPTION}
+cd ../../image_segmentation/pytorch-enet; python3 pytorch-enet.py ${OPTION}
 cd ../../image_segmentation/semantic-segmentation-mobilenet-v3; python3 semantic-segmentation-mobilenet-v3.py ${OPTION}
 cd ../../image_segmentation/yet-another-anime-segmenter; python3 yet-another-anime-segmenter.py ${OPTION}
 cd ../../image_segmentation/swiftnet; python3 swiftnet.py ${OPTION}
@@ -113,6 +119,8 @@ cd ../../neural_language_processing/bert_question_answering; python3 bert_questi
 cd ../../neural_language_processing/bert_sentiment_analysis; python3 bert_sentiment_analysis.py ${OPTION}
 cd ../../neural_language_processing/bert_tweets_sentiment; python3 bert_tweets_sentiment.py ${OPTION}
 cd ../../neural_language_processing/bert_zero_shot_classification; python3 bert_zero_shot_classification.py ${OPTION}
+cd ../../neural_language_processing/gpt2; python3 gpt2.py ${OPTION}
+cd ../../neural_language_processing/rinna_gpt2; python3 rinna_gpt2.py ${OPTION}
 cd ../../object_detection/centernet; python3 centernet.py ${OPTION}
 cd ../../object_detection/m2det; python3 m2det.py ${OPTION}
 cd ../../object_detection/maskrcnn; python3 maskrcnn.py ${OPTION}
@@ -135,6 +143,7 @@ cd ../../object_detection_3d/mediapipe_objectron; python3 mediapipe_objectron.py
 cd ../../object_tracking/deepsort; python3 deepsort.py ${OPTION}
 cd ../../object_tracking/person_reid_baseline_pytorch; python3 person_reid_baseline_pytorch.py ${OPTION}
 cd ../../object_tracking/abd_net; python3 abd_net.py ${OPTION}
+cd ../../object_tracking/siam-mot; python3 siam-mot.py ${OPTION}
 cd ../../object_tracking/bytetrack; python3 bytetrack.py ${OPTION}
 cd ../../optical_flow_estimation/raft; python3 raft.py ${OPTION}
 cd ../../point_segmentation/pointnet_pytorch python3 pointnet_pytorch.py ${OPTION}
@@ -157,6 +166,7 @@ cd ../../road_detection/road-segmentation-adas; python3 road-segmentation-adas.p
 cd ../../rotation_prediction/rotnet; python3 rotnet.py ${OPTION}
 cd ../../style_transfer/adain; python3 adain.py ${OPTION}
 cd ../../style_transfer/beauty_gan; python3 beauty_gan.py ${OPTION}
+cd ../../style_transfer/animeganv2; python3 animeganv2.py ${OPTION}
 cd ../../super_resolution/srresnet; python3 srresnet.py ${OPTION}
 cd ../../super_resolution/han; python3 han.py ${OPTION}
 cd ../../super_resolution/edsr; python3 edsr.py ${OPTION}

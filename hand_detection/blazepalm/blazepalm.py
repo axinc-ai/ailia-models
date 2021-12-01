@@ -142,7 +142,7 @@ def recognize_from_image():
                 preds = net.predict([input_data])
                 normalized_detections = but.postprocess(preds,anchor_path=ANCHOR_PATH,resolution=IMAGE_WIDTH)[0]
                 detections = but.denormalize_detections(
-                    normalized_detections, scale, pad
+                    normalized_detections, scale, pad, resolution=IMAGE_WIDTH
                 )
                 end = int(round(time.time() * 1000))
                 logger.info(f'\tailia processing time {end - start} ms')
