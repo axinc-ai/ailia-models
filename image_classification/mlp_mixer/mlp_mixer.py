@@ -5,6 +5,7 @@ import cv2
 import ailia
 
 from mlp_mixer_utils import *
+from mlp_mixer_labels import imagenet_category
 
 # import original modules
 sys.path.append('../../util')
@@ -18,7 +19,6 @@ import webcamera_utils  # noqa: E402
 from logging import getLogger   # noqa: E402
 logger = getLogger(__name__)
 
-labels = ('airplane', 'automobile', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
 
 # ======================
 # Parameters
@@ -40,14 +40,14 @@ parser = get_base_parser(
 )
 parser.add_argument(
     '-m', '--model_name',
-    default='Mixer-B_16',
-    help='[Mixer-L_16, Mixer-B_16, Mixer-L_16-21k, Mixer-B_16-21k]'
+    default='Mixer-L_16',
+    help='[Mixer-L_16, Mixer-B_16]'
 )
 args = update_parser(parser)
 
 MODEL_NAME = args.model_name
-WEIGHT_PATH = MODEL_NAME + ".onnx"
-MODEL_PATH = MODEL_NAME + ".onnx.prototxt"
+WEIGHT_PATH = MODEL_NAME + ".opt.onnx"
+MODEL_PATH = MODEL_NAME + ".opt.onnx.prototxt"
 
 
 # ======================
@@ -78,7 +78,7 @@ def recognize_from_image():
             preds = softmax(preds)
 
         # show results
-        print_results(preds, labels)
+        print_results(preds, imagenet_category)
 
     logger.info('Script finished successfully.')
 
@@ -113,7 +113,7 @@ def recognize_from_video():
         preds = softmax(preds)
 
         # get result
-        print_results(preds, labels)
+        print_results(preds, imagenet_category)
 
         cv2.imshow('frame', frame)
         time.sleep(SLEEP_TIME)
