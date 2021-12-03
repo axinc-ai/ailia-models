@@ -44,6 +44,7 @@ cd ../../face_detection/face-mask-detection; python3 face-mask-detection.py -a m
 cd ../../face_detection/yolov1-face; python3 yolov1-face.py ${OPTION}
 cd ../../face_detection/yolov3-face; python3 yolov3-face.py ${OPTION}
 cd ../../face_detection/retinaface; python3 retinaface.py ${OPTION}
+cd ../../face_detection/anime-face-detector; python3 anime-face-detector.py ${OPTION}
 cd ../../face_identification/arcface; python3 arcface.py ${OPTION}
 cd ../../face_identification/insightface; python3 insightface.py ${OPTION}
 cd ../../face_identification/vggface2; python3 vggface2.py ${OPTION}
