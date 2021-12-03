@@ -55,10 +55,6 @@ pytorch
 
 ## Netron
 
-[Mixer-B_16.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/mlp_mixer/Mixer-B_16.onnx.prototxt)
+[Mixer-B_16.opt.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/mlp_mixer/Mixer-B_16.opt.onnx.prototxt)
 
-[Mixer-L_16.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/mlp_mixer/Mixer-L_16.onnx.prototxt)
-
-[Mixer-B_16-21k.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/mlp_mixer/Mixer-B_16-21k.onnx.prototxt)
-
-[Mixer-L_16-21k.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/mlp_mixer/Mixer-L_16-21k.onnx.prototxt)
+[Mixer-L_16.opt.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/mlp_mixer/Mixer-L_16.opt.onnx.prototxt)
