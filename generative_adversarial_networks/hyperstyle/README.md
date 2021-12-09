@@ -21,7 +21,7 @@ Shape : (1, 3, 1024, 1024)
 ### Domain adaptation task
 
 | [<img src="img/watson-cartoon.png" width=256px>](img/watson-cartoon.png) | [<img src="img/watson-disney-princess.png" width=256px>](img/watson-disney-princess.png) | [<img src="img/watson-pixar.png" width=256px>](img/watson-pixar.png) | [<img src="img/watson-sketch.png" width=256px>](img/watson-sketch.png) |
-|:--------------:|:------------:|:------------:|:------------:|:------------:|
+|:--------------:|:------------:|:------------:|:------------:|
 | <b>Cartoon</b> | <b>Disney Princess</b> | <b>Pixar</b> | <b>Sketch</b> | 
 
 ## Usage

@@ -8,9 +8,8 @@ import cv2
 
 import ailia
 
-AILIA_MODELS_BASE_DIR = '../..'
-CHECKPOINTS = 'checkpoints/'
-AVERAGE = 'average/'
+# parameters
+from utils_ import AILIA_MODELS_BASE_DIR, CHECKPOINTS, AVERAGE, CHOICES, IMAGE_HEIGHT, IMAGE_WIDTH, RESIZE_HEIGHT, RESIZE_WIDTH, IMAGE_PATH, SAVE_IMAGE_PATH, ALIGNED_PATH
 
 # import original modules
 sys.path.append(os.path.join(AILIA_MODELS_BASE_DIR, 'util'))
@@ -21,15 +20,15 @@ from model_utils import check_and_download_models  # noqa: E402
 from image_utils import load_image  # noqa: E402
 import webcamera_utils  # noqa: E402
 from align_crop import align_face # noqa: E402
+from utils_ import np2im
 
 # logger
 from logging import getLogger   # noqa: E402
 logger = getLogger(__name__)
 
 # ======================
-# Parameters
+# MODELS
 # ======================
-CHOICES = ["cartoon", "disney-princess", "sketch", "pixar"]
 
 WEIGHT_PATH = os.path.join(CHECKPOINTS, 'hyperstyle.onnx')
 MODEL_PATH = os.path.join(CHECKPOINTS, 'hyperstyle.onnx.prototxt')
@@ -70,16 +69,6 @@ FACE_DETECTOR_REMOTE_PATH = "https://storage.googleapis.com/ailia-models/blazefa
 
 face_alignment_path = [FACE_ALIGNMENT_MODEL_PATH, FACE_ALIGNMENT_WEIGHT_PATH]
 face_detector_path = [FACE_DETECTOR_MODEL_PATH, FACE_DETECTOR_WEIGHT_PATH]
-
-IMAGE_PATH = 'img/watson.jpg'
-SAVE_IMAGE_PATH = 'img/output.png'
-ALIGNED_PATH = 'img/aligned/'
-
-IMAGE_HEIGHT = 1024
-IMAGE_WIDTH = 1024
-
-RESIZE_HEIGHT = 256
-RESIZE_WIDTH = 256
 
 
 # ======================
@@ -272,19 +261,6 @@ def inference(inputs, nets, iters):
         e4e_avg_img = np.load(os.path.join(AVERAGE, 'e4e_image_avg.npy'))
         result_batch = run_domain_adaptation(inputs, nets, iters, e4e_avg_img, weights_deltas)
     return result_batch, latent
-
-def np2im(var, input=False):
-    var = var.astype('float32')
-    var = cv2.cvtColor(
-        var.transpose(1, 2, 0),
-        cv2.COLOR_RGB2BGR
-    )
-    if not input:
-        var = ((var + 1) / 2)
-    var[var < 0] = 0
-    var[var > 1] = 1
-    var = var * 255
-    return var.astype('uint8')
 
 def post_processing(result_batch, input_img):
     for i in range(input_img.shape[0]):
