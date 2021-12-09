@@ -8,8 +8,7 @@ import cv2
 
 import ailia
 
-#AILIA_MODELS_BASE_DIR = '../..'
-AILIA_MODELS_BASE_DIR = '/Users/nathan/Documents/ax/ailia-models'
+AILIA_MODELS_BASE_DIR = '../..'
 CHECKPOINTS = 'checkpoints/'
 AVERAGE = 'average/'
 
@@ -408,13 +407,14 @@ def main():
             check(FACE_DETECTOR_WEIGHT_PATH)
         logger.info('Debug OK.')
     else:
-        nets = [ailia.Net(model, weight, env_id=args.env_id) for model, weight in zip(models, weights)]
         # net initialize
+        nets = [ailia.Net(model, weight, env_id=args.env_id) for model, weight in zip(models, weights)]
+        # video mode
         if args.video is not None:
-            # video mode
+            
             recognize_from_video(SAVE_IMAGE_PATH, nets)
+        # image mode
         else:
-            # image mode
             # input image loop
             for image_path in args.input:
                 recognize_from_image(image_path, nets)
