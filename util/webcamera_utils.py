@@ -1,5 +1,6 @@
 import os
 import sys
+import re
 
 import numpy as np
 import cv2
@@ -140,6 +141,26 @@ def get_writer(savepath, height, width, fps=20, rgb=True):
     -------
     writer : cv2.VideoWriter()
     """
+    # stream output
+    if re.match(r'localhost\:',savepath) or re.match(r'[0-9]+(?:\.[0-9]+){3}\:',savepath):
+        # Usage : 
+        #   server : python3 xxx.py -v 0 -s localhost:5000
+        #   client : gst-launch-1.0 -v tcpclientsrc host=localhost port=5000 ! gdpdepay ! videoconvert ! autovideosink sync=false
+
+        bitrate = 10000000
+        tcp = True
+        ip = savepath.split(":")[0]
+        port = savepath.split(":")[1]
+        logger.info("gstreamer open with ip "+str(ip)+" port "+str(port))
+        encoder = 'nvvidconv ! nvv4l2h264enc bitrate=' + str(bitrate) + ' insert-sps-pps=true maxperf-enable=1'
+        sink =  'appsrc ! video/x-raw,format=BGR ! queue ! videoconvert ! video/x-raw,format=BGRx ! ' + encoder + ' ! rtph264pay config-interval=1 ! ' + ('gdppay ! tcpserversink' if tcp else 'udpsink') + ' host=' + str(ip) + ' port=' + str(port)
+        writer = cv2.VideoWriter(sink, 0, int(fps), (width, height))
+        if not writer.isOpened():
+            logger.error(f"gstreamer could not open")
+            sys.exit(0)
+        return writer
+
+    # file output
     if os.path.isdir(savepath):
         savepath = savepath + "/out.mp4"
 
