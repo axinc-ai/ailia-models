@@ -112,12 +112,17 @@ parser.add_argument(
 parser.add_argument(
     "--latent",
     action="store_true",
-    help="Save the latent image",
+    help="Save the latent image and numpy file",
 )
 parser.add_argument(
     "--use_dlib",
     action="store_true",
     help="Use dlib models for face alignment",
+)
+parser.add_argument(
+    "--onnx",
+    action="store_true",
+    help="Use onnxruntime for inference",
 )
 parser.add_argument(
     "--config_file",
