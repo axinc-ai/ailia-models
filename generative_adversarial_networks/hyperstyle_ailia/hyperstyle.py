@@ -89,15 +89,25 @@ parser = get_base_parser(
     "Hyperstyle", IMAGE_PATH, SAVE_IMAGE_PATH,
 )
 parser.add_argument(
-    "-iter", "--iteration",
-    default=2, type=int,
-    help="Number of iterations per batch (default 2)"
+    "--inversion",
+    action="store_true",
+    help="Run the inversion task",
+)
+parser.add_argument(
+    "--adaptation",
+    action="store_true",
+    help="Run the adaptation task",
 )
 parser.add_argument(
     "-m", "--model", 
     type=str, default="cartoon", 
-    help="Choose the domain you want", 
+    help="Choose the domain you want (for domain adaptation task)", 
     choices=CHOICES
+)
+parser.add_argument(
+    "-iter", "--iteration",
+    default=2, type=int,
+    help="Number of iterations per batch (default 2)"
 )
 parser.add_argument(
     "-d", "--debug",
@@ -108,11 +118,6 @@ parser.add_argument(
     "--side_by_side",
     action="store_true",
     help="Save the input and output images side-by-side",
-)
-parser.add_argument(
-    "--latent",
-    action="store_true",
-    help="Save the latent image and numpy file",
 )
 parser.add_argument(
     "--use_dlib",
@@ -234,9 +239,10 @@ def filter_non_ffhq_layers_in_toonify_model(weights_deltas):
             weights_deltas[i] = np.zeros(weights_deltas[i].shape)
     return weights_deltas
 
-def run_domain_adaptation(inputs, nets, iters, avg_image):
+def run_domain_adaptation(inputs, nets, iters, avg_image, weights_deltas=None):
     _, latents = run_on_batch(inputs, nets[5], nets[6], iters, avg_image)
-    _, result_latent, weights_deltas, _, no_resize = run_inversion(inputs, nets, iters)
+    if weights_deltas is None:
+        _, _, weights_deltas, _, _ = run_inversion(inputs, nets, iters)
     weights_deltas = filter_non_ffhq_layers_in_toonify_model(weights_deltas)
 
     """
@@ -253,7 +259,19 @@ def run_domain_adaptation(inputs, nets, iters, avg_image):
     # Fine-tuned generator
     result_batch, _ = nets[8].run(params)
 
-    return result_batch, (no_resize, result_latent)
+    return result_batch
+
+def inference(inputs, nets, iters):
+    latent, result_batch, weights_deltas = None, None, None
+    # Inversion task
+    if args.inversion:
+        _, result_latent, weights_deltas, _, no_resize = run_inversion(inputs, nets, iters)
+        latent = (no_resize, result_latent)
+    # Domain adaptation task
+    if args.adaptation:
+        e4e_avg_img = np.load(os.path.join(AVERAGE, 'e4e_image_avg.npy'))
+        result_batch = run_domain_adaptation(inputs, nets, iters, e4e_avg_img, weights_deltas)
+    return result_batch, latent
 
 def np2im(var, input=False):
     var = var.astype('float32')
@@ -278,6 +296,28 @@ def post_processing(result_batch, input_img):
             res = curr_result
     
     return res
+
+def save_results(result_adaptation, result_inversion, input_img, filename):
+    # post processing
+    if args.adaptation:
+        res = post_processing(result_adaptation, input_img)
+        savepath = get_savepath(args.savepath, filename)
+        # save image from domain adaptation
+        logger.info(f'saved at : {savepath}')
+        cv2.imwrite(savepath, res)
+
+    if args.inversion:
+        latent_img = post_processing(result_inversion[0], input_img)
+        basename = os.path.splitext(os.path.basename(args.savepath))
+        # save latent image from inversion
+        savepath = os.path.join(os.path.dirname(args.savepath), f"{basename[0]}-latent{basename[1]}")
+        logger.info(f'saved at : {savepath}')
+        cv2.imwrite(savepath, latent_img)
+        # save latent numpy file
+        for i in range(input_img.shape[0]):
+            savepath = os.path.join(os.path.dirname(args.savepath), f"{basename[0]}-latent.npy")
+            logger.info(f'saved at : {savepath}')
+            np.save(savepath, result_inversion[1][i])
 
 # ======================
 # Main functions
@@ -305,8 +345,6 @@ def recognize_from_image(filename, nets):
         gen_input_ailia=True,
     )
     input_img_resized = (input_img_resized * 2) - 1
-
-    e4e_avg_img = np.load(os.path.join(AVERAGE, 'e4e_image_avg.npy'))
     
     # inference
     logger.info('Start inference...')
@@ -315,26 +353,14 @@ def recognize_from_image(filename, nets):
         for i in range(5):
             # ailia prediction
             start = int(round(time.time() * 1000))
-            result_batch, result_inversion = run_domain_adaptation(input_img_resized, nets, args.iteration, e4e_avg_img)
+            result_adaptation, result_inversion = inference(input_img_resized, nets, args.iteration)
             end = int(round(time.time() * 1000))
             logger.info(f'\tailia processing time {end - start} ms')
     else:
         # ailia prediction
-        result_batch, result_inversion = run_domain_adaptation(input_img_resized, nets, args.iteration, e4e_avg_img)
-
-    # post processing
-    res = post_processing(result_batch, input_img)
-    if args.latent:
-        latent_img = post_processing(result_inversion[0], input_img)
-        basename = os.path.splitext(os.path.basename(args.savepath))
-        cv2.imwrite(os.path.join(os.path.dirname(args.savepath), f"{basename[0]}-latent{basename[1]}"), latent_img)
-        for i in range(input_img.shape[0]):
-            np.save(os.path.join(os.path.dirname(args.savepath), f"{basename[0]}-latent.npy"), result_inversion[1][i])
-
-    # save results       
-    savepath = get_savepath(args.savepath, filename)
-    logger.info(f'saved at : {savepath}')
-    cv2.imwrite(savepath, res)
+        result_adaptation, result_inversion = inference(input_img_resized, nets, args.iteration)
+    
+    save_results(result_adaptation, result_inversion, input_img, filename)
 
 
 def recognize_from_video(filename, nets):
@@ -348,9 +374,6 @@ def recognize_from_video(filename, nets):
         )
     else:
         writer = None
-
-    # average image
-    e4e_avg_img = np.load(os.path.join(AVERAGE, 'e4e_image_avg.npy'))
 
     while(True):
         ret, frame = capture.read()
@@ -367,15 +390,25 @@ def recognize_from_video(filename, nets):
         resized_input = (resized_input * 2) - 1
 
         # inference
-        result_batch = run_domain_adaptation(resized_input, nets, args.iteration, e4e_avg_img)
+        result_adaptation, result_inversion = inference(resized_input, nets, args.iteration)
             
         # post-processing
-        res_img = post_processing(result_batch, input_data)
-        cv2.imshow('frame', res_img)
+        if args.inversion:
+            res_img = post_processing(result_inversion[0], input_data)
+            cv2.imshow('frame', res_img)
+            # save results
+            if writer is not None:
+                writer.write(res_img)
+                basename = os.path.splitext(os.path.basename(args.savepath))
+                savepath = os.path.join(os.path.dirname(args.savepath), f"{basename[0]}-latent.npy")
+                np.save(savepath, result_inversion[1][0])
 
-        # save results
-        if writer is not None:
-            writer.write(res_img)
+        if args.adaptation:
+            res_img = post_processing(result_adaptation, input_data)
+            cv2.imshow('frame', res_img)
+            # save results
+            if writer is not None:
+                writer.write(res_img)
 
     capture.release()
     cv2.destroyAllWindows()
@@ -416,7 +449,6 @@ def main():
         nets = [ailia.Net(model, weight, env_id=args.env_id) for model, weight in zip(models, weights)]
         # video mode
         if args.video is not None:
-            
             recognize_from_video(SAVE_IMAGE_PATH, nets)
         # image mode
         else:
