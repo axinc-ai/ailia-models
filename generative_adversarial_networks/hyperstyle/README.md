@@ -4,7 +4,7 @@
 
 [<img src="img/watson.jpg" width=256px>](img/watson.jpg)
 
-(Image from https://github.com/yuval-alaluf/hyperstyle/blob/main/notebooks/images/animations/)
+(Image from https://github.com/yuval-alaluf/hyperstyle/tree/main/notebooks/images/animations)
 
 Shape : (1, 3, 1024, 1024)
 
