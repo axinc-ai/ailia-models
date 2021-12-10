@@ -6,9 +6,9 @@ import os
 from utils_ import np2im, INTERFACEGAN_EDITING
 
 edit_paths = {
-	'age': os.path.join(INTERFACEGAN_EDITING, 'age.pt'),
-	'smile': os.path.join(INTERFACEGAN_EDITING, 'smile.pt'),
-	'pose': os.path.join(INTERFACEGAN_EDITING, 'pose.pt'),
+	'age': os.path.join(INTERFACEGAN_EDITING, 'age.npy'),
+	'smile': os.path.join(INTERFACEGAN_EDITING, 'smile.npy'),
+	'pose': os.path.join(INTERFACEGAN_EDITING, 'pose.npy'),
 }
 
 class FaceEditor:
@@ -28,15 +28,15 @@ class FaceEditor:
             for f in range(*factor_range):
                 edit_latent = latents + f * direction
                 edit_latents.append(edit_latent)
-            edit_latents = np.transpose(np.stack(edit_latents), (0,1))
         else:
-            edit_latents = latents + factor * direction
+            edit_latents.append(latents + factor * direction)
+        edit_latents = np.stack(edit_latents)
         return self._latents_to_image(edit_latents, weights_deltas)
 
     def _latents_to_image(self, all_latents, weights_deltas):
-        sample_results = {}
-        for idx, sample_latents in enumerate(all_latents):
-            sample_deltas = [d[idx] if d is not None else None for d in weights_deltas]
+        sample_results, images = {}, []
+        for _, sample_latents in enumerate(all_latents):
+            sample_deltas = [d[0] if d is not None else None for d in weights_deltas]
             """
             images, _ = self.generator([sample_latents],
                                            weights_deltas=sample_deltas,
@@ -46,6 +46,7 @@ class FaceEditor:
             params = {str(i): sample_deltas[i-1] for i in range(2, 27)}
             params['[sample_latents]'] = sample_latents
             params['sample_deltas'] = sample_deltas[0]
-            images, _ = self.generator.run(params)
-            sample_results[idx] = [np2im(image) for image in images]
+            image, _ = self.generator.run(params)
+            images.append(image)
+        sample_results[0] = [np2im(image[0]) for image in images]
         return sample_results

@@ -24,11 +24,19 @@ Shape : (1, 3, 1024, 1024)
 |:--------------:|:------------:|:------------:|:------------:|
 | <b>Cartoon</b> | <b>Disney Princess</b> | <b>Pixar</b> | <b>Sketch</b> | 
 
+### Editing task
+
+![img/watson-age-editing.png](img/watson-age-editing.png)
+
+![img/watson-pose-editing.png](img/watson-pose-editing.png) 
+
+![img/watson-smile-editing.png](img/watson-smile-editing.png) 
+
 ## Usage
 Automatically downloads the onnx and prototxt files on the first run.
 It is necessary to be connected to the Internet while downloading.
 
-The options `--inversion` and `--adaptation` enable you to choose the task to run. You can use both simultaneously, but should at least provide one.
+The options `--inversion`, `--adaptation`, and `--editing` enable you to choose the task to run. You can use several simultaneously, but should at least provide one.
 
 For the sample image (inversion),
 ```bash
@@ -40,25 +48,25 @@ For the sample image (cartoon domain adaptation),
 $ python3 hyperstyle.py --adaptation
 ```
 
+For the sample image (age editing),
+```bash
+$ python3 hyperstyle.py --editing --factor_range -f 4
+```
+
 If you want to specify the input image, put the image path after the `--input` option.  
 You can use `--savepath` option to change the name of the output file to save.
 ```bash
-$ python3 hyperstyle.py --inversion --adaptation --input IMAGE_PATH --savepath SAVE_IMAGE_PATH 
-```
-
-By specifying the `-m` option, you can choose the domain for the domain adaptation task. This argument must be one of the following: `cartoon`, `disney-princess`, `pixar`, or `sketch`.
-```bash
-$ python3 hyperstyle.py --adaptation -m pixar
+$ python3 hyperstyle.py --inversion --adaptation --editing --input IMAGE_PATH --savepath SAVE_IMAGE_PATH 
 ```
 
 By specifying the `-iter` option, you can choose how many iterations you want to generate the output image (default 2).
 ```bash
-$ python3 hyperstyle.py --inversion --adaptation -iter 5 
+$ python3 hyperstyle.py --inversion --adaptation --editing -iter 5 
 ```
 
 By specifying the `--side_by_side` option, the input image will be saved side-by-side with the output image.
 ```bash
-$ python3 hyperstyle.py --inversion --adaptation --side_by_side 
+$ python3 hyperstyle.py --inversion --adaptation --editing --side_by_side 
 ```
 
 By adding the `--video` option, you can input the video.   
@@ -68,6 +76,28 @@ $ python3 hyperstyle.py --adaptation --video VIDEO_PATH
 ```
 
 By adding the `--use_dlib` option, you can use original version of face alignment.
+
+### Details on the Domain adaptation task
+By specifying the `-m` option, you can choose the domain for the domain adaptation task. This argument must be one of the following: `cartoon`, `disney-princess`, `pixar`, or `sketch`.
+```bash
+$ python3 hyperstyle.py --adaptation -m pixar
+```
+
+### Details on the Editing task
+By specifying the `--edit_directions` option, you can choose the editing directions. This argument must be a comma-separated list of any combination of these elements: `age`, `pose`, and `smile`.
+```bash
+$ python3 hyperstyle.py --editing --edit_directions pose,smile
+```
+
+By specifying the `-f` option, you can choose the factor for editing.
+```bash
+$ python3 hyperstyle.py --editing -f 2
+```
+
+By specifying the `--factor_range` option, you can choose to apply a range of factors (-f, f) for editing, where f is the argument of the `-f` option (default 1).
+```bash
+$ python3 hyperstyle.py --editing --factor_range
+```
 
 ## Reference
 

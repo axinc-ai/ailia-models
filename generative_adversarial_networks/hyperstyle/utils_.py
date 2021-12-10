@@ -11,6 +11,7 @@ AVERAGE = 'average/'
 INTERFACEGAN_EDITING = 'editing/interfacegan_directions'
 
 CHOICES = ["cartoon", "disney-princess", "sketch", "pixar"]
+EDIT_DIRECTIONS = ["age", "smile", "pose"]
 
 IMAGE_HEIGHT = 1024
 IMAGE_WIDTH = 1024
