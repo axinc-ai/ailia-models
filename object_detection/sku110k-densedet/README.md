@@ -4,7 +4,7 @@
 
 ![Input](demo.jpg)
 
-(Image from http://images.cocodataset.org/zips/val2017.zip)
+(Image from https://github.com/eg4000/SKU110K_CVPR19)
 
 Shape : (1, 3, 2560, 2560)
 
