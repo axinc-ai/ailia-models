@@ -6,7 +6,7 @@
 
 (Image from http://images.cocodataset.org/zips/val2017.zip)
 
-Shape : (1, 3, 1856, 3008)
+Shape : (1, 3, 2560, 2560)
 
 ## Output
 
