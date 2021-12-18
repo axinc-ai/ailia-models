@@ -85,10 +85,7 @@ def preprocess(img, image_shape):
     im_h, im_w, _ = img.shape
 
     # keep_aspect
-    scale = min(
-        max(image_shape) / max(im_h, im_w),
-        min(image_shape) / min(im_h, im_w)
-    )
+    scale = min(h / im_h, w / im_w)
     ow, oh = int(im_w * scale + 0.5), int(im_h * scale + 0.5)
     if ow != im_w or oh != im_h:
         img = cv2.resize(img, (ow, oh), interpolation=cv2.INTER_LINEAR)
