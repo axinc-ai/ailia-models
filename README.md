@@ -249,6 +249,7 @@ The collection of pre-trained, state-of-the-art AI models.
 | [<img src="object_detection/efficientdet/output.png" width=128px>](object_detection/efficientdet/) | [efficientdet](/object_detection/efficientdet/) | [EfficientDet: Scalable and Efficient Object Detection, in PyTorch](https://github.com/toandaominh1997/EfficientDet.Pytorch) | Pytorch | 1.2.6 and later |
 | [<img src="object_detection/nanodet/output.jpg" width=128px>](object_detection/nanodet/) | [nanodet](/object_detection/nanodet/) | [NanoDet](https://github.com/RangiLyu/nanodet) | Pytorch | 1.2.6 and later |
 | [<img src="object_detection/mobile_object_localizer/output.png" width=128px>](object_detection/mobile_object_localizer/) | [mobile_object_localizer](/object_detection/mobile_object_localizer/) | [mobile_object_localizer_v1](https://tfhub.dev/google/object_detection/mobile_object_localizer_v1/1) | TensorFlow Hub | 1.2.6 and later |
+| [<img src="object_detection/sku110k-densedet/output.png" width=128px>](object_detection/sku110k-densedet/) | [sku110k-densedet](/object_detection/sku110k-densedet/) | [SKU110K-DenseDet](https://github.com/Media-Smart/SKU110K-DenseDet) | Pytorch | 1.2.9 and later |
 
 ## Object detection 3d
 
