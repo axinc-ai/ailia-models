@@ -195,8 +195,7 @@ def recognize_from_video(net):
             break
 
         # inference
-        img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        bboxes = predict(net, img)
+        bboxes = predict(net, frame)
 
         # plot result
         res_img = draw_bbox(frame, bboxes)
