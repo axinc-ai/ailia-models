@@ -44,6 +44,11 @@ parser.add_argument(
     help='Save pseudo color prediction.'
 )
 parser.add_argument(
+    '--aug_pred',
+    action='store_true',
+    help='Whether to use flip augment for prediction.'
+)
+parser.add_argument(
     '--onnx',
     action='store_true',
     help='execute onnxruntime version.'
@@ -103,6 +108,11 @@ def get_pseudo(pred):
     return pred_mask
 
 
+def softmax(x, axis=1):
+    f_x = np.exp(x) / np.sum(np.exp(x), axis=axis)
+    return f_x
+
+
 # ======================
 # Main functions
 # ======================
@@ -118,8 +128,9 @@ def preprocess(img):
 
 
 def predict(net, img):
-    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    aug_pred = args.aug_pred
 
+    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
     img = preprocess(img)
 
     # feedforward
@@ -127,9 +138,23 @@ def predict(net, img):
         output = net.predict([img])
     else:
         output = net.run(None, {'img': img})
-    logits = output[0]
+    logit = output[0]
 
-    pred = np.argmax(logits, axis=1).astype(np.uint8)
+    # augment inference
+    if aug_pred:
+        final_logit = softmax(logit, axis=1)
+
+        img = img[:, :, :, ::-1]
+        if not args.onnx:
+            output = net.predict([img])
+        else:
+            output = net.run(None, {'img': img})
+        logit = output[0][:, :, :, ::-1]
+        final_logit += softmax(logit, axis=1)
+
+        logit = final_logit
+
+    pred = np.argmax(logit, axis=1).astype(np.uint8)
 
     return pred[0]
 
