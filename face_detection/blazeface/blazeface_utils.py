@@ -1,17 +1,14 @@
+import sys
+
 import cv2
 import numpy as np
 import ailia
 
-import sys
 sys.path.append('../../util')
 from detector_utils import letterbox_convert, reverse_letterbox  # noqa: E402
-
+from math_utils import sigmoid  # noqa: E402
 
 DEFAULT_MIN_SCORE_THRESH = 0.75
-
-
-def sigmoid(x):
-    return 1.0 / (1.0 + np.exp(-x))
 
 
 def plot_detections(
