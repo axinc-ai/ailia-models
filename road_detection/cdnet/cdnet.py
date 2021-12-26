@@ -44,6 +44,18 @@ args = update_parser(parser)
 # Secondaty Functions
 # ======================
 
+def sigmoid(x):
+    return 1.0 / (1.0 + np.exp(-x))
+
+
+def make_grid(nx=20, ny=20):
+    xv, yv = np.meshgrid(np.arange(nx), np.arange(ny))
+    xy = np.stack((xv, yv), axis=2).reshape((1, 1, ny, nx, 2))
+    xy = xy.astype(np.float32)
+
+    return xy
+
+
 # def draw_bbox(img, bboxes):
 #     return img
 
@@ -51,6 +63,12 @@ args = update_parser(parser)
 # ======================
 # Main functions
 # ======================
+
+cache = {
+    "grid": [None, None, None],
+    "anchor_grid": np.load("anchor_grid.npy")
+}
+
 
 def preprocess(img):
     h, w = (IMAGE_SIZE, IMAGE_SIZE)
@@ -89,8 +107,25 @@ def preprocess(img):
     return img, recover_xy
 
 
-def post_processing(output):
-    return None
+def post_processing(x):
+    stride = [8, 16, 32]
+    grid = cache['grid']
+    anchor_grid = cache['anchor_grid']
+
+    z = []
+    for i, _ in enumerate(x):
+        bs, _, ny, nx, _ = x[i].shape
+        if grid[i] is None or grid[i].shape[2:4] != x[i].shape[2:4]:
+            grid[i] = make_grid(nx, ny)
+
+        y = sigmoid(x[i])
+        y[..., 0:2] = (y[..., 0:2] * 2. - 0.5 + grid[i]) * stride[i]  # xy
+        y[..., 2:4] = (y[..., 2:4] * 2) ** 2 * anchor_grid[i]  # wh
+        z.append(y.reshape((bs, -1, 7)))
+
+    z = np.concatenate(z, axis=1)
+
+    return z
 
 
 def predict(net, img):
