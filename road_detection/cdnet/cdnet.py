@@ -11,6 +11,7 @@ sys.path.append('../../util')
 from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from detector_utils import load_image  # noqa: E402C
+from nms_utils import nms_boxes  # noqa: E402C
 from webcamera_utils import get_capture, get_writer  # noqa: E402
 # logger
 from logging import getLogger  # noqa: E402
@@ -29,6 +30,8 @@ IMAGE_PATH = 'demo.png'
 SAVE_IMAGE_PATH = 'output.png'
 
 IMAGE_SIZE = 640
+
+names = ['crosswalk', 'guide_arrows']
 
 # ======================
 # Arguemnt Parser Config
@@ -56,8 +59,107 @@ def make_grid(nx=20, ny=20):
     return xy
 
 
-# def draw_bbox(img, bboxes):
-#     return img
+def xywh2xyxy(x):
+    y = np.zeros_like(x)
+    y[:, 0] = x[:, 0] - x[:, 2] / 2  # top left x
+    y[:, 1] = x[:, 1] - x[:, 3] / 2  # top left y
+    y[:, 2] = x[:, 0] + x[:, 2] / 2  # bottom right x
+    y[:, 3] = x[:, 1] + x[:, 3] / 2  # bottom right y
+
+    return y
+
+
+def non_max_suppression(
+        prediction,
+        conf_thres=0.1, iou_thres=0.6,
+        classes=None, agnostic=False):
+    """Performs Non-Maximum Suppression (NMS) on inference results
+
+    Returns:
+         detections with shape: nx6 (x1, y1, x2, y2, conf, cls)
+    """
+
+    nc = prediction[0].shape[1] - 5  # number of classes
+    xc = prediction[..., 4] > conf_thres  # candidates
+
+    # Settings
+    min_wh, max_wh = 2, 4096  # (pixels) minimum and maximum box width and height
+    max_det = 300  # maximum number of detections per image
+
+    multi_label = nc > 1  # multiple labels per box (adds 0.5ms/img)
+
+    output = [None] * prediction.shape[0]
+    for xi, x in enumerate(prediction):  # image index, image inference
+        # Apply constraints
+        x = x[xc[xi]]  # confidence
+
+        # If none remain process next image
+        if not x.shape[0]:
+            continue
+
+        # Compute conf
+        x[:, 5:] *= x[:, 4:5]  # conf = obj_conf * cls_conf
+
+        # Box (center x, center y, width, height) to (x1, y1, x2, y2)
+        box = xywh2xyxy(x[:, :4])
+
+        # Detections matrix nx6 (xyxy, conf, cls)
+        if multi_label:
+            i, j = (x[:, 5:] > conf_thres).nonzero()
+            x = np.concatenate((box[i], x[i, j + 5, None], j[:, None]), axis=1)
+        else:  # best class only
+            conf = x[:, 5:].max(1, keepdims=True)
+            j = x[:, 5:].argmax(axis=1).reshape(-1, 1)
+            x = np.concatenate((box, conf, j), axis=1)
+            x = x[conf.reshape(-1) > conf_thres]
+
+        # Filter by class
+        if classes:
+            idx = (x[:, 5:6] == np.array(classes)).any(axis=1)
+            x = x[idx]
+
+        # If none remain process next image
+        n = x.shape[0]  # number of boxes
+        if not n:
+            continue
+
+        # Batched NMS
+        c = x[:, 5:6] * (0 if agnostic else max_wh)  # classes
+        boxes, scores = x[:, :4] + c, x[:, 4]  # boxes (offset by class), scores
+        idx = nms_boxes(boxes, scores, iou_thres)
+        idx = idx[:max_det]
+
+        output[xi] = x[idx]
+
+    return output
+
+
+def plot_one_box(x, img, color, label=None, line_thickness=None):
+    # Plots one bounding box on image img
+    tl = line_thickness or round(0.002 * (img.shape[0] + img.shape[1]) / 2) + 1  # line/font thickness
+    c1, c2 = (int(x[0]), int(x[1])), (int(x[2]), int(x[3]))
+    cv2.rectangle(img, c1, c2, color, thickness=tl, lineType=cv2.LINE_AA)
+    if label:
+        tf = max(tl - 1, 1)  # font thickness
+        t_size = cv2.getTextSize(label, 0, fontScale=tl / 3, thickness=tf)[0]
+        c2 = c1[0] + t_size[0], c1[1] - t_size[1] - 3
+        cv2.rectangle(img, c1, c2, color, -1, cv2.LINE_AA)  # filled
+        cv2.putText(img, label, (c1[0], c1[1] - 2), 0, tl / 3, [225, 255, 255], thickness=tf, lineType=cv2.LINE_AA)
+
+
+def draw_result(img, pred):
+    plot_classes = ('crosswalk',)
+
+    if pred is None:
+        return img
+
+    for *xyxy, conf, cls in pred:
+        label = '%s %.2f' % (names[int(cls)], conf)
+        if names[int(cls)] in plot_classes:
+            color = (255, 85, 33)
+            plot_one_box(xyxy, img, label=label, color=color, line_thickness=5)
+
+    return img
 
 
 # ======================
@@ -89,7 +191,7 @@ def preprocess(img):
     rest_w = img.shape[1] % 32
     dh = 0 if rest_h == 0 else (32 - rest_h) / 2
     dw = 0 if rest_w == 0 else (32 - rest_w) / 2
-    recover_xy = [ow, oh, int(x1) - dw, int(y1) - dh]
+    ofs_xy = (int(x1) - dw, int(y1) - dh)
 
     top, bottom = int(round(dh - 0.1)), int(round(dh + 0.1))
     left, right = int(round(dw - 0.1)), int(round(dw + 0.1))
@@ -104,7 +206,7 @@ def preprocess(img):
     img = np.expand_dims(img, axis=0)
     img = img.astype(np.float32)
 
-    return img, recover_xy
+    return img, r, ofs_xy
 
 
 def post_processing(x):
@@ -129,12 +231,24 @@ def post_processing(x):
 
 
 def predict(net, img):
-    img, _ = preprocess(img)
+    img, r, xy = preprocess(img)
 
     # feedforward
     output = net.predict([img])
 
     pred = post_processing(output)
+
+    conf_thres = 0.4
+    iou_thres = 0.5
+    pred = non_max_suppression(
+        pred, conf_thres, iou_thres)
+
+    pred = pred[0]
+
+    if pred is not None:
+        pred[:, 0], pred[:, 2] = pred[:, 0] + xy[0], pred[:, 2] + xy[0]
+        pred[:, 1], pred[:, 3] = pred[:, 1] + xy[1], pred[:, 3] + xy[1]
+        pred[:, :4] = (pred[:, :4] / r).round()
 
     return pred
 
@@ -168,7 +282,7 @@ def recognize_from_image(net):
         else:
             pred = predict(net, img)
 
-        res_img = img
+        res_img = draw_result(img, pred)
 
         # plot result
         savepath = get_savepath(args.savepath, image_path, ext='.png')
@@ -203,7 +317,7 @@ def recognize_from_video(net):
         img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         pred = predict(net, img)
 
-        res_img = img
+        res_img = draw_result(img, pred)
 
         # show
         cv2.imshow('frame', res_img)
