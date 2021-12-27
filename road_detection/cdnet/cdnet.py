@@ -16,6 +16,8 @@ from webcamera_utils import get_capture, get_writer  # noqa: E402
 # logger
 from logging import getLogger  # noqa: E402
 
+from post_utils import DmPost
+
 logger = getLogger(__name__)
 
 # ======================
@@ -26,7 +28,7 @@ WEIGHT_PATH = 'cdnet.onnx'
 MODEL_PATH = 'cdnet.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/cdnet/'
 
-IMAGE_PATH = 'demo.png'
+IMAGE_PATH = 'example/filename_00036.jpg'
 SAVE_IMAGE_PATH = 'output.png'
 
 IMAGE_SIZE = 640
@@ -254,6 +256,8 @@ def predict(net, img):
 
 
 def recognize_from_image(net):
+    dp = DmPost()
+
     # input image loop
     for image_path in args.input:
         logger.info(image_path)
@@ -282,7 +286,8 @@ def recognize_from_image(net):
         else:
             pred = predict(net, img)
 
-        res_img = draw_result(img, pred)
+        img = draw_result(img, pred)
+        res_img = dp.dmpost(img, pred, names=names)
 
         # plot result
         savepath = get_savepath(args.savepath, image_path, ext='.png')
