@@ -10,15 +10,15 @@ import numpy as np
 class DmPost(object):
     """damei post"""
 
-    def __init__(self):
+    def __init__(self, clrl):
         self.crossout = self.init_crossout()
         self.vetors = self.init_vectors()
         self.old_vectors, self.frame_thresh, self.old_fileorder = \
             self.init_jitter_pretection_params()  # Used for jitter protection
-        self.rect = self.init_rect()
+        self.rect = cv2.imread("settings/rect.jpg")
         self.t_inter = self.init_others()
-        self.control_line = (400, 680)
-        self.red_line = 0.5
+        self.control_line = clrl['control_line']
+        self.red_line = clrl['red_line']
         self.det_id = 0
         self.v_idx = 0
 
@@ -41,16 +41,12 @@ class DmPost(object):
 
         return vectors
 
-    def init_rect(self):
-        img_size = (720, 1280)
+    def init_rect(self, shape):
+        h, w = shape[:2]
         scale_factor = 3.5
-        resized_width = int(img_size[1] / scale_factor)
-
-        rect = cv2.imread("settings/rect.jpg")
+        resized_width = int(w / scale_factor)
         rect_resized_size = (resized_width, 200)
-        rect = cv2.resize(rect, rect_resized_size, interpolation=cv2.INTER_LINEAR)
-
-        return rect
+        self.rect = cv2.resize(self.rect, rect_resized_size, interpolation=cv2.INTER_LINEAR)
 
     def init_jitter_pretection_params(self, time_thresh=2):
         # The sampling rate of the original video, 1 frame corresponds to 1/25 = 40ms
@@ -113,7 +109,7 @@ class DmPost(object):
 
         cv2.line(img, top[0], top[1], color=(30, 30, 224), thickness=lt)
         cv2.line(img, button[0], button[1], color=(30, 30, 224), thickness=lt)
-        cv2.line(img, middle[0], middle[1], color=(120, 85, 220), thickness=lt)  # 粉色
+        cv2.line(img, middle[0], middle[1], color=(120, 85, 220), thickness=lt)  # pink
         cv2.arrowedLine(img, arrow[0], arrow[1], (120, 85, 220), 5, 8, 0, 0.3)
         cv2.putText(img, 'Control Line', textpos, 0, lt / 3, (30, 30, 224), thickness=tf, lineType=cv2.LINE_AA)
 
@@ -148,7 +144,7 @@ class DmPost(object):
                     distances = np.sum(np.square(currentcxy - lastcxy), axis=1)  # distance
                     valid_idx = np.argmin(distances)
 
-                print(f'WANING: detect.py post, the detected crosswalk is more than one, use the {valid_idx + 1} one')
+                print(f'WANING: the detected crosswalk is more than one, use the {valid_idx + 1} one')
                 crosswalk = crosswalk[valid_idx, :].reshape(1, -1)
                 det = det[valid_idx, :].reshape(1, -1)
         else:
@@ -163,7 +159,8 @@ class DmPost(object):
             crossout[det_id, 4:6] = crosswalk[0, 5: 7]  # xc, yc
             index = det_id
         else:
-            crossout[0:-1:, 1::] = crossout[1::, 1::]  # 除了序号列的所有行向上平移一格
+            # All rows except the serial number column are shifted up by one grid
+            crossout[0:-1:, 1::] = crossout[1::, 1::]
             # Last column update value
             crossout[-1, 1] = det_id
             crossout[-1, 2] = det_id
@@ -192,6 +189,7 @@ class DmPost(object):
         # The y distance of the vector is divided by the scale and then divided by the time interpolate
 
         # Draw results
+        self.init_rect(img.shape)
         rect_pos = (20, 20)
         img = self.imgAdd(self.rect, img, rect_pos[1], rect_pos[0], alpha=0.5)
 
@@ -234,7 +232,7 @@ class DmPost(object):
                     else:
                         crossout[index, 6] += 1  # count+1
                         prt_str = \
-                            f'\nThe vehicle crossed a crosswalk!!' \
+                            f'\n > The vehicle crossed a crosswalk!!' \
                             f' count+1, conf: {crosswalk[0, 4]:.2f},' \
                             f' current count: {int(crossout[index, 6])}.'
                         print(prt_str)
@@ -250,7 +248,7 @@ class DmPost(object):
         status = 'No crosswalk' if vt.shape[0] == 0 else 'Crossing'
         self.imgputText(img, f'status: {status}', pos, lt, tf)
 
-        prt_str = f'detect_id: {det_id} speed: {speed} count: {count} status: {status}'
+        prt_str = f' > detect_id: {det_id} speed: {speed} count: {count} status: {status}'
         print(prt_str)
 
         return img

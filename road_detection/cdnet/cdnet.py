@@ -1,5 +1,6 @@
 import sys
 import time
+import yaml
 
 import numpy as np
 import cv2
@@ -28,10 +29,13 @@ WEIGHT_PATH = 'cdnet.onnx'
 MODEL_PATH = 'cdnet.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/cdnet/'
 
-IMAGE_PATH = 'example/filename_00036.jpg'
+IMAGE_PATH = 'example/filename_00038.jpg'
 SAVE_IMAGE_PATH = 'output.png'
 
 IMAGE_SIZE = 640
+
+THRESHOLD = 0.4
+IOU = 0.5
 
 names = ['crosswalk', 'guide_arrows']
 
@@ -42,12 +46,40 @@ names = ['crosswalk', 'guide_arrows']
 parser = get_base_parser(
     'CDNet', IMAGE_PATH, SAVE_IMAGE_PATH
 )
+parser.add_argument(
+    '-th', '--threshold',
+    default=THRESHOLD, type=float,
+    help='object confidence threshold'
+)
+parser.add_argument(
+    '-iou', '--iou',
+    default=IOU, type=float,
+    help='IOU threshold for NMS'
+)
+parser.add_argument(
+    '--plot-classes', metavar='NAME', nargs='+',
+    default=('crosswalk',),
+    help='specifies which classes will be drawn. it is selected from (crosswalk, guide_arrows)'
+)
+parser.add_argument(
+    '--control-line-setting', type=str,
+    default='settings/cl_setting.yaml',
+    help='control line setting'
+)
 args = update_parser(parser)
 
 
 # ======================
 # Secondaty Functions
 # ======================
+
+def init_clrl():
+    conf_file = args.control_line_setting
+    with open(conf_file, 'r') as f:
+        conls = yaml.load(f, Loader=yaml.FullLoader)
+
+    return conls
+
 
 def sigmoid(x):
     return 1.0 / (1.0 + np.exp(-x))
@@ -150,7 +182,7 @@ def plot_one_box(x, img, color, label=None, line_thickness=None):
 
 
 def draw_result(img, pred):
-    plot_classes = ('crosswalk',)
+    plot_classes = args.plot_classes
 
     if pred is None:
         return img
@@ -173,6 +205,8 @@ cache = {
     "anchor_grid": np.load("anchor_grid.npy")
 }
 
+clrl = init_clrl()
+
 
 def preprocess(img):
     h, w = (IMAGE_SIZE, IMAGE_SIZE)
@@ -184,7 +218,7 @@ def preprocess(img):
     if ow != im_w or oh != im_h:
         img = cv2.resize(img, (ow, oh), interpolation=cv2.INTER_LINEAR)
 
-    control_line = (400, 680)
+    control_line = clrl['control_line']
     x1, x2 = 0, ow
     y1, y2 = control_line[0] / im_h * oh, control_line[1] / im_h * oh
     img = img[int(y1):int(y2), :]
@@ -233,6 +267,9 @@ def post_processing(x):
 
 
 def predict(net, img):
+    conf_thres = args.threshold
+    iou_thres = args.iou
+
     img, r, xy = preprocess(img)
 
     # feedforward
@@ -240,13 +277,10 @@ def predict(net, img):
 
     pred = post_processing(output)
 
-    conf_thres = 0.4
-    iou_thres = 0.5
     pred = non_max_suppression(
         pred, conf_thres, iou_thres)
 
     pred = pred[0]
-
     if pred is not None:
         pred[:, 0], pred[:, 2] = pred[:, 0] + xy[0], pred[:, 2] + xy[0]
         pred[:, 1], pred[:, 3] = pred[:, 1] + xy[1], pred[:, 3] + xy[1]
@@ -256,7 +290,7 @@ def predict(net, img):
 
 
 def recognize_from_image(net):
-    dp = DmPost()
+    dp = DmPost(clrl)
 
     # input image loop
     for image_path in args.input:
@@ -287,7 +321,10 @@ def recognize_from_image(net):
             pred = predict(net, img)
 
         img = draw_result(img, pred)
-        res_img = dp.dmpost(img, pred, names=names)
+        if 1 < len(args.input):
+            res_img = dp.dmpost(img, pred, names=names)
+        else:
+            res_img = img
 
         # plot result
         savepath = get_savepath(args.savepath, image_path, ext='.png')
@@ -313,6 +350,7 @@ def recognize_from_video(net):
     else:
         writer = None
 
+    dp = DmPost(clrl)
     while True:
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
@@ -322,7 +360,8 @@ def recognize_from_video(net):
         img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         pred = predict(net, img)
 
-        res_img = draw_result(img, pred)
+        img = draw_result(img, pred)
+        res_img = dp.dmpost(img, pred, names=names)
 
         # show
         cv2.imshow('frame', res_img)
