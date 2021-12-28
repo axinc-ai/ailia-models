@@ -6,7 +6,8 @@
 
 (Image from MVTec AD datasets https://www.mvtec.com/company/research/datasets/mvtec-ad/)
 
-Original image shape : (n, 3, 900, 900)
+- Original image shape : (n, 3, 900, 900)
+- Input shape : (n, 3, 224, 224)
 
 ## Output
 
