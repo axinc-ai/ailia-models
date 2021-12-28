@@ -159,7 +159,8 @@ def recognize_from_video():
         img_crops = []
         for box in bbox_xywh:
             x1, y1, x2, y2 = xywh_to_xyxy(box, h, w)
-            img_crops.append(frame[y1:y2, x1:x2])
+            img = cv2.cvtColor(frame[y1:y2, x1:x2], cv2.COLOR_BGR2RGB)
+            img_crops.append(img)
 
         if img_crops:
             # preprocess

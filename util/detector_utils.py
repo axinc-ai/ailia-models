@@ -76,7 +76,7 @@ def reverse_letterbox(detections, img, det_shape):
         start = (det_shape[0:2] - np.array(img.shape[0:2]) / scale) // 2
         pad_x = start[1]*scale
         pad_y = start[0]*scale
-    
+
     new_detections = []
     for detection in detections:
         logger.debug(detection)
@@ -89,7 +89,7 @@ def reverse_letterbox(detections, img, det_shape):
             h=(detection.h*(h+pad_y*2))/h,
         )
         new_detections.append(r)
-    
+
     return new_detections
 
 
@@ -148,7 +148,7 @@ def plot_results(detector, img, category, segm_masks=None, logging=True):
     # draw label
     for idx in range(count):
         obj = detector.get_object(idx) if hasattr(detector, 'get_object') else detector[idx]
-        fontScale = w / 2048
+        fontScale = img.shape[1] / 2048
 
         text = category[obj.category] + " " + str(int(obj.prob*100)/100)
         textsize = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, fontScale, 1)[0]
@@ -159,7 +159,7 @@ def plot_results(detector, img, category, segm_masks=None, logging=True):
 
         top_left = (int(w * obj.x), int(h * obj.y))
         bottom_right = (int(w * obj.x) + tw + margin, int(h * obj.y) + th + margin)
-        
+
         color = colors[idx]
         cv2.rectangle(img, top_left, bottom_right, color, thickness=-1)
 
