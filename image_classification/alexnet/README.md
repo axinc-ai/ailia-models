@@ -1,6 +1,10 @@
 # AlexNet
 
 ## Input
+#### Image mode
+Input file type must be .jpg image.
+#### Video mode
+Input file type must be .mp4 video.
 
 ![Input](input/dog.jpg)
 
@@ -21,7 +25,13 @@ Automatically downloads the onnx and prototxt files on the first run. It is nece
 For the sample image,
 
 ```
-$ python3 alexnet.py --input input/dog.jpg
+$ python3 alexnet.py --input input/[your sample.jpg path]
+```
+
+For the sample video,
+
+```
+$ python3 alexnet.py --video input/[your sample.mp4 path]
 ```
 
 ## Reference
