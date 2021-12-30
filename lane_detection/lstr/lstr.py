@@ -39,12 +39,6 @@ DB_STD = [0.2886383, 0.27408165, 0.27809834]
 parser = get_base_parser(
     'LSTR', IMAGE_PATH, SAVE_IMAGE_PATH,
 )
-parser.add_argument(
-    '--input_type', choices=['image', 'video'], required=True
-)
-parser.add_argument(
-    '--input_name', required=True
-)
 args = update_parser(parser)
 
 
@@ -146,11 +140,61 @@ def draw_annotation(pred, img):
     return img
 
 
+def recognize_from_image(net, orig_target_sizes, output_name):
+    image_file = get_files('./input/image/{}'.format(output_name))
+    image = cv2.imread('{}'.format(image_file[0]))
+    out_pred_logits, out_pred_curves, _, _, weights = predict(net, image)
+    results = postprocess(out_pred_logits, out_pred_curves, orig_target_sizes)
+    preds = draw_annotation(results[0], image)
+    cv2.imwrite('./output/image/{}'.format(os.path.basename(image_file[-1]) + '.jpg'), preds)
+    print('Image saved as {}'.format(os.path.basename(image_file[-1]) + '.jpg'))
+
+
+def recognize_from_video(net, orig_target_sizes, output_name):
+    cap = cv2.VideoCapture('./input/video/{}'.format(output_name))
+    if not cap.isOpened():
+        print('Video is not opened.')
+        exit()
+    filename = '_'.join(output_name.split('/'))
+
+    output_video = cv2.VideoWriter(
+        './output/video/{}'.format(filename),
+        cv2.VideoWriter_fourcc('m','p','4', 'v'), #mp4フォーマット
+        float(30), #fps
+        (VIDEO_HEIGHT, VIDEO_WIDTH) #size
+    )
+
+    i = 1
+    pbar = tqdm(total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)))
+    while True:
+        pbar.update(i)
+        ret, frame = cap.read()
+        if not ret:
+            break
+        frame = cv2.resize(frame, dsize=(VIDEO_HEIGHT, VIDEO_WIDTH))
+        out_pred_logits, out_pred_curves, _, _, weights = predict(net, frame)
+        results = postprocess(out_pred_logits, out_pred_curves, orig_target_sizes)
+        preds = draw_annotation(results[0], frame)
+        output_video.write(preds)
+    cap.release()
+    output_video.release()
+    print('Video saved as {}'.format(filename))
+
+
 def main():
     # model files check and download
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
 
-    print('ftype={}, input_type={}, input_name={}'.format(args.ftype, args.input_type, args.input_name))
+    # show configuration
+    input_type = 'image' if args.input is not None else 'video'
+    if args.input is not None:
+        output_name = args.input[0].replace('./input/image/', '')
+    elif args.video is not None:
+        output_name = args.video.replace('./input/video/', '')
+    else:
+        print('invalid args.')
+        exit()
+    print('ftype={}, input_type={}, filename={}'.format(args.ftype, input_type, output_name))
 
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
     orig_target_sizes = np.expand_dims(np.array([HEIGHT, WIDTH]), axis=0)
@@ -162,61 +206,17 @@ def main():
     if not os.path.exists('./output/video'):
         os.mkdir('./output/video')
 
-    if args.ftype == 'image':
-        # image to image
-        if args.input_type == 'image':
-            image_file = get_files('./input/image/{}'.format(args.input_name))
-            image = cv2.imread('{}'.format(image_file[0]))
-            out_pred_logits, out_pred_curves, _, _, weights = predict(net, image)
-            results = postprocess(out_pred_logits, out_pred_curves, orig_target_sizes)
-            preds = draw_annotation(results[0], image)
-            cv2.imwrite('./output/image/{}'.format(os.path.basename(image_file[-1]) + '.jpg'), preds)
-
-        # video to image
-        elif args.input_type == 'video':
-            print('Not implemented.')
-            exit()
-
-    elif args.ftype == 'video':
-        # image to video
-        if args.input_type == 'image':
-            print('Not implemented.')
-            exit()
-
-        # video to video
-        elif args.input_type == 'video':
-            cap = cv2.VideoCapture('./input/video/{}'.format(args.input_name))
-            if not cap.isOpened():
-                print('Video is not opened.')
-                exit()
-            filename = '_'.join(args.input_name.split('/'))
-
-            output_video = cv2.VideoWriter(
-                    './output/video/{}'.format(filename),
-                    cv2.VideoWriter_fourcc('m','p','4', 'v'), #mp4フォーマット
-                    float(30), #fps
-                    (VIDEO_HEIGHT, VIDEO_WIDTH) #size
-            )
-
-            i = 1
-            pbar = tqdm(total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)))
-            while True:
-                pbar.update(i)
-                ret, frame = cap.read()
-                if not ret:
-                    break
-                frame = cv2.resize(frame, dsize=(VIDEO_HEIGHT, VIDEO_WIDTH))
-                out_pred_logits, out_pred_curves, _, _, weights = predict(net, frame)
-                results = postprocess(out_pred_logits, out_pred_curves, orig_target_sizes)
-                preds = draw_annotation(results[0], frame)
-                output_video.write(preds)
-            cap.release()
-            output_video.release()
-        print('Video saved as {}'.format(filename))
-
+    # predict
+    if args.input is not None and args.ftype == 'image': # image to image
+        recognize_from_image(net, orig_target_sizes, output_name)
+    elif args.input is not None and args.ftype == 'video': # image to video
+        print('Not implemented.')
+    elif args.video is not None and args.ftype == 'video': # video to video
+        recognize_from_video(net, orig_target_sizes, output_name)
+    elif args.video is not None and args.ftype == 'image': # video to image
+        print('Not implemented.')
     else:
         print('invalid ftype.')
-        exit()
 
 
 if __name__ == '__main__':

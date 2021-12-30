@@ -15,15 +15,15 @@ Predicted curve parameters are showed at the top of the image.
 ### Usage
 You have to specify input filetype and input filepath.    
 - Image mode (image to image)   
-You run sample script as below if your desired file is in {Path to LSTR}/input/image/1.jpg.
+You run sample script as below if your desired file path is {Path to LSTR}/input/image/1.jpg.
 ```bash
-$python3 lstr.py --ftype image --input_type image --input_name 1.jpg
+$ python3 lstr.py --ftype image --input ./input/image/1.jpg
 ```
 
 - Video mode (video to video)   
-You run sample script as below if your desired file is in {Path to LSTR}/input/video/video1.mp4
+You run sample script as below if your desired file path is {Path to LSTR}/input/video/video1.mp4.
 ```bash
-$python3 lstr.py --ftype video --input_type video --input_name video1.mp4
+$ python3 lstr.py --ftype video --video ./input/video/video1.mp4
 ```
 
 
