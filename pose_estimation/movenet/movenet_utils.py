@@ -97,17 +97,17 @@ def draw_prediction_on_image(image, keypoints_with_scores):
   # draw edge
   for edge_pair, color in KEYPOINT_EDGE_INDS_TO_COLOR.items():
     if (kpts_scores[edge_pair[0]] > keypoint_threshold and kpts_scores[edge_pair[1]] > keypoint_threshold):
-      x1 = kpts_absolute_xy[edge_pair[0], 0]
-      y1 = kpts_absolute_xy[edge_pair[0], 1]
-      x2 = kpts_absolute_xy[edge_pair[1], 0]
-      y2 = kpts_absolute_xy[edge_pair[1], 1]
+      x1 = int(kpts_absolute_xy[edge_pair[0], 0])
+      y1 = int(kpts_absolute_xy[edge_pair[0], 1])
+      x2 = int(kpts_absolute_xy[edge_pair[1], 0])
+      y2 = int(kpts_absolute_xy[edge_pair[1], 1])
       cv2.line(image, (x1, y1), (x2, y2), color, edge_line_width)
   
   # draw key points
   for idx in range(0,len(kpts_absolute_xy)):
     kpt_xy = kpts_absolute_xy[idx]
     if kpts_scores[idx] > keypoint_threshold:
-      cv2.circle(image, (kpt_xy[0], kpt_xy[1]), circle_line_width, color=(255,21,147), thickness=-1, lineType=cv2.LINE_8, shift=0)
+      cv2.circle(image, (int(kpt_xy[0]), int(kpt_xy[1])), circle_line_width, color=(255,21,147), thickness=-1, lineType=cv2.LINE_8, shift=0)
 
   return image
 

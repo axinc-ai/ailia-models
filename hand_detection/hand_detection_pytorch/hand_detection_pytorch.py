@@ -76,10 +76,10 @@ def recognize_from_image():
         for i in range(dets.shape[0]):
             cv2.rectangle(
                 to_show,
-                (dets[i][0], dets[i][1]),
-                (dets[i][2], dets[i][3]),
+                (int(dets[i][0]), int(dets[i][1])),
+                (int(dets[i][2]), int(dets[i][3])),
                 [0, 0, 255],
-                3,
+                3
             )
         savepath = get_savepath(args.savepath, image_path)
         logger.info(f'saved at : {savepath}')
@@ -116,8 +116,8 @@ def recognize_from_video():
         for i in range(dets.shape[0]):
             cv2.rectangle(
                 to_show,
-                (dets[i][0], dets[i][1]),
-                (dets[i][2], dets[i][3]),
+                (int(dets[i][0]), int(dets[i][1])),
+                (int(dets[i][2]), int(dets[i][3])),
                 [0, 0, 255],
                 3
             )

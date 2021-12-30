@@ -346,9 +346,7 @@ def main():
     file_list = get_evaluation_files(args.input)
 
     # net initialize
-    env_id = ailia.get_gpu_environment_id()
-    print(f'env_id: {env_id}')
-    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
 
     # get feature values
     fe_list = get_feature_values(net, file_list)

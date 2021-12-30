@@ -138,3 +138,15 @@ python3 launcher.py
 
 [ailia SDK tutorial (Python API) (JP)](https://medium.com/axinc/ailia-sdk-%E3%83%81%E3%83%A5%E3%83%BC%E3%83%88%E3%83%AA%E3%82%A2%E3%83%AB-python-28379dbc9649)
 
+[ailia SDK tutorial (C++ API) (EN)](https://medium.com/axinc-ai/ailia-sdk-tutorial-c-75e59bbefffe)
+
+[ailia SDK tutorial (C++ API) (JP)](https://medium.com/axinc/ailia-sdk-%E3%83%81%E3%83%A5%E3%83%BC%E3%83%88%E3%83%AA%E3%82%A2%E3%83%AB-c-dc949d9dcd28)
+
+[ailia SDK tutorial (Unity/C# API) (EN)](https://medium.com/axinc-ai/ailia-sdk-tutorial-unity-54f2a8155b8f)
+
+[ailia SDK tutorial (Unity/C# API) (JP)](https://medium.com/axinc/ailia-sdk-%E3%83%81%E3%83%A5%E3%83%BC%E3%83%88%E3%83%AA%E3%82%A2%E3%83%AB-unity-257fa1e98777)
+
+[ailia SDK tutorial (JNI API) (EN)](https://medium.com/axinc-ai/ailia-sdk-tutorial-jni-92b797725e08)
+
+[ailia SDK tutorial (JNI API) (JP)](https://medium.com/axinc/ailia-sdk-%E3%83%81%E3%83%A5%E3%83%BC%E3%83%88%E3%83%AA%E3%82%A2%E3%83%AB-jni-7a11c1da08dc)
+
