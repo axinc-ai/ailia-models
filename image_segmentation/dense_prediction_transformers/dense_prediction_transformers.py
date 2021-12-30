@@ -198,12 +198,12 @@ def main():
         else:
             net = ailia.Net(MODEL_MONODEPTH_PATH, WEIGHT_MONODEPTH_PATH, env_id=args.env_id)
     elif args.task == 'segmentation':
+        check_and_download_models(WEIGHT_SEGMENTATION_PATH, MODEL_SEGMENTATION_PATH, REMOTE_PATH)
         if args.onnx:
             import onnxruntime
             net = onnxruntime.InferenceSession(WEIGHT_SEGMENTATION_PATH)
         else:
             net = ailia.Net(MODEL_SEGMENTATION_PATH, WEIGHT_SEGMENTATION_PATH, env_id=args.env_id)
-        check_and_download_models(WEIGHT_SEGMENTATION_PATH, MODEL_SEGMENTATION_PATH, REMOTE_PATH)
 
     if args.video is not None:
         # video mode
