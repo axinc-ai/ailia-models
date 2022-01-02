@@ -136,6 +136,8 @@ def predict(net, img, text):
 
 
 def recognize_from_image(net):
+    top_k = 5
+
     text_inputs = args.text_inputs
     desc_file = args.desc_file
     if desc_file:
@@ -172,7 +174,7 @@ def recognize_from_image(net):
         else:
             pred = predict(net, img, text_inputs)
 
-    inds = np.argsort(-pred)[:5]
+    inds = np.argsort(-pred)[:top_k]
     logger.info("Top predictions:\n")
     for i in inds:
         logger.info(f"{text_inputs[i]:>16s}: {100 * pred[i]:.2f}%")

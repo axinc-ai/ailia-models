@@ -78,6 +78,7 @@ cd ../../hand_recognition/hand3d; python3 hand3d.py ${OPTION}
 cd ../../hand_recognition/minimal-hand; python3 minimal-hand.py ${OPTION}
 cd ../../image_captioning/illustration2vec; python3 illustration2vec.py ${OPTION}
 cd ../../image_captioning/image_captioning_pytorch; python3 image_captioning_pytorch.py ${OPTION}
+cd ../../image_captioning/clip; python3 clip.py ${OPTION}
 cd ../../image_classification/efficientnet; python3 efficientnet.py ${OPTION}
 cd ../../image_classification/googlenet; python3 googlenet.py ${OPTION}
 cd ../../image_classification/inceptionv3; python3 inceptionv3.py ${OPTION}
