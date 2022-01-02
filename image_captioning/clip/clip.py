@@ -17,9 +17,10 @@ from math_utils import softmax  # noqa: E402C
 from logging import getLogger  # noqa: E402
 
 from simple_tokenizer import SimpleTokenizer as _Tokenizer
-import cifar100
 
 logger = getLogger(__name__)
+
+_tokenizer = _Tokenizer()
 
 # ======================
 # Parameters
@@ -27,10 +28,9 @@ logger = getLogger(__name__)
 
 WEIGHT_PATH = 'ViT-B32.onnx'
 MODEL_PATH = 'ViT-B32.onnx.prototxt'
-REMOTE_PATH = \
-    'https://storage.googleapis.com/ailia-models/xxx/'
+REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/clip/'
 
-IMAGE_PATH = 'demo.png'
+IMAGE_PATH = 'chelsea.png'
 SAVE_IMAGE_PATH = 'output.png'
 
 IMAGE_SIZE = 224
@@ -48,23 +48,20 @@ parser.add_argument(
     help='Input text. (can be specified multiple times)'
 )
 parser.add_argument(
+    '--desc_file', default=None, metavar='DESC_FILE', type=str,
+    help='description file'
+)
+parser.add_argument(
     '--onnx',
     action='store_true',
     help='execute onnxruntime version.'
 )
 args = update_parser(parser)
 
-# ======================
-# Secondaty Functions
-# ======================
-
 
 # ======================
 # Main functions
 # ======================
-
-_tokenizer = _Tokenizer()
-
 
 def tokenize(texts, context_length=77, truncate=False):
     if isinstance(texts, str):
@@ -124,7 +121,6 @@ def predict(net, img, text):
     img = preprocess(img)
 
     text = tokenize(text)
-    text = text.astype(np.int64)
 
     # feedforward
     if not args.onnx:
@@ -141,8 +137,12 @@ def predict(net, img, text):
 
 def recognize_from_image(net):
     text_inputs = args.text_inputs
-    if text_inputs is None:
-        text_inputs = [f"a {c}" for c in cifar100.classes]
+    desc_file = args.desc_file
+    if desc_file:
+        with open(desc_file) as f:
+            text_inputs = [x.strip() for x in f.readlines() if x.strip()]
+    elif text_inputs is None:
+        text_inputs = [f"a {c}" for c in ("human", "dog", "cat")]
 
     # input image loop
     for image_path in args.input:
