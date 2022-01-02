@@ -175,7 +175,7 @@ def recognize_from_image(net):
             pred = predict(net, img, text_inputs)
 
     inds = np.argsort(-pred)[:top_k]
-    logger.info("Top predictions:\n")
+    logger.info("Top predictions:")
     for i in inds:
         logger.info(f"{text_inputs[i]:>16s}: {100 * pred[i]:.2f}%")
 
@@ -190,7 +190,11 @@ def main():
 
     # initialize
     if not args.onnx:
-        net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+        logger.info("This model requires 10GB or more memory.")
+        memory_mode = ailia.get_memory_mode(
+            reduce_constant=True, ignore_input_with_initializer=True,
+            reduce_interstage=False, reuse_interstage=False)
+        net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id, memory_mode=memory_mode)
     else:
         import onnxruntime
         net = onnxruntime.InferenceSession(WEIGHT_PATH)
