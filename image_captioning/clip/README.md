@@ -43,7 +43,7 @@ Default labels is "a human", "a dog" and "a cat".
 $ python3 clip.py --text "a human" --text "a dog" --text "a cat"
 ```
 
-If you want to load a subset of the texture labels you input into the model from a file, use the --desc_file option.
+If you want to load a subset of the texture labels you input into the model from a file, use the `--desc_file` option.
 ```bash
 $ python3 clip.py --desc_file imagenet_classes.txt
 ```
