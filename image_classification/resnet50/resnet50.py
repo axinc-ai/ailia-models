@@ -25,7 +25,6 @@ MODEL_NAMES = ['resnet50.opt', 'resnet50', 'resnet50_pytorch']
 IMAGE_PATH = 'pizza.jpg'
 IMAGE_HEIGHT = 224
 IMAGE_WIDTH = 224
-IMAGE_RANGE = ailia.NETWORK_IMAGE_RANGE_S_INT8
 
 MAX_CLASS_COUNT = 3
 SLEEP_TIME = 0
@@ -45,6 +44,10 @@ parser.add_argument(
 )
 args = update_parser(parser)
 
+if args.arch=="resnet50_pytorch":
+    IMAGE_RANGE = ailia.NETWORK_IMAGE_RANGE_IMAGENET
+else:
+    IMAGE_RANGE = ailia.NETWORK_IMAGE_RANGE_S_INT8
 
 # ======================
 # Parameters 2

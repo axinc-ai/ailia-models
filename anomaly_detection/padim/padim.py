@@ -42,8 +42,8 @@ WEIGHT_WIDE_RESNET50_2_PATH = 'wide_resnet50_2.onnx'
 MODEL_WIDE_RESNET50_2_PATH = 'wide_resnet50_2.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/padim/'
 
-IMAGE_PATH = 'bottle_000.png'
-SAVE_IMAGE_PATH = 'output.png'
+IMAGE_PATH = './bottle_000.png'
+SAVE_IMAGE_PATH = './output.png'
 IMAGE_RESIZE = 256
 IMAGE_SIZE = 224
 
@@ -79,6 +79,14 @@ parser.add_argument(
 parser.add_argument(
     '-th', '--threshold', type=float, default=None,
     help='threshold'
+)
+parser.add_argument(
+    '-ag', '--aug', action='store_true',
+    help='process with augmentation.'
+)
+parser.add_argument(
+    '-an', '--aug_num', type=int, default=5,
+    help='specify the amplification number of augmentation.'
 )
 args = update_parser(parser)
 
@@ -118,6 +126,55 @@ def preprocess(img, mask=False):
     return img
 
 
+def preprocess_aug(img, mask=False, angle_range=[-10, 10], return_refs=False):
+    h, w = img.shape[:2]
+    size = IMAGE_RESIZE
+    crop_size = IMAGE_SIZE
+
+    # resize
+    if h > w:
+        size = (size, int(size * h / w))
+    else:
+        size = (int(size * w / h), size)
+    img = np.array(Image.fromarray(img).resize(
+        size, resample=Image.ANTIALIAS if not mask else Image.NEAREST))
+
+    # for visualize
+    img_resized = img.copy()
+
+    # random rotate
+    if not mask:
+        h, w = img.shape[:2]
+        angle = np.random.randint(angle_range[0], angle_range[0] + 1)
+        rot_mat = cv2.getRotationMatrix2D((w / 2, h / 2), angle, 1)
+        img = cv2.warpAffine(src=img,
+                             M=rot_mat,
+                             dsize=(w, h),
+                             borderMode=cv2.BORDER_REPLICATE,
+                             flags=cv2.INTER_LINEAR)
+
+    # random crop
+    if not mask:
+        h, w = img.shape[:2]
+        pad_h = np.random.randint(0, (h - crop_size))
+        pad_w = np.random.randint(0, (w - crop_size))
+        img = img[pad_h:pad_h + crop_size, pad_w:pad_w + crop_size, :]
+
+    # normalize
+    if not mask:
+        img = normalize_image(img.astype(np.float32), 'ImageNet')
+    else:
+        img = img / 255
+
+    img = img.transpose(2, 0, 1)  # HWC -> CHW
+    img = np.expand_dims(img, axis=0)
+
+    if return_refs:
+        return img, img_resized, angle, pad_h, pad_w
+    else:
+        return img
+
+
 def postprocess(outputs):
     # Embedding concat
     embedding_vectors = outputs['layer1']
@@ -135,7 +192,7 @@ def get_train_outputs(net, create_net, params):
         logger.info('loaded.')
         return train_outputs
 
-    batch_size = args.batch_size
+    batch_size = int(args.batch_size)
 
     train_dir = args.train_dir
     train_imgs = sorted([
@@ -146,52 +203,87 @@ def get_train_outputs(net, create_net, params):
         logger.error("train images not found in '%s'" % train_dir)
         sys.exit(-1)
 
-    logger.info('extract train set features')
+    if not args.aug:
+        logger.info('extract train set features without augmentation')
+        aug_num = 1
+    else:
+        logger.info('extract train set features with augmentation')
+        aug_num = args.aug_num
+    mean = None
+    N = 0
+    for i_aug in range(aug_num):
+        for i_img in range(0, len(train_imgs), batch_size):
+            # prepare input data
+            imgs = []
+            if not args.aug:
+                logger.info('from (%s ~ %s) ' %
+                            (train_imgs[i_img],
+                             train_imgs[min(len(train_imgs) - 1,
+                                            i_img + batch_size)]))
+            else:
+                logger.info('from (%s ~ %s) on augmentation lap %d' %
+                            (train_imgs[i_img],
+                             train_imgs[min(len(train_imgs) - 1,
+                                            i_img + batch_size)], i_aug))
+            for image_path in train_imgs[i_img:i_img + batch_size]:
+                img = load_image(image_path)
+                img = cv2.cvtColor(img, cv2.COLOR_BGRA2RGB)
+                if not args.aug:
+                    img = preprocess(img)
+                else:
+                    img = preprocess_aug(img)
+                imgs.append(img)
 
-    train_outputs = OrderedDict([
-        ('layer1', []), ('layer2', []), ('layer3', [])
-    ])
-    for i in range(0, len(train_imgs), batch_size):
-        # prepare input data
-        imgs = []
-        for image_path in train_imgs[i:i + batch_size]:
-            logger.info(image_path)
-            img = load_image(image_path)
-            img = cv2.cvtColor(img, cv2.COLOR_BGRA2RGB)
-            img = preprocess(img)
-            imgs.append(img)
+            # countup N
+            N += len(imgs)
 
-        imgs = np.vstack(imgs)
+            imgs = np.vstack(imgs)
 
-        logger.debug(f'input images shape: {imgs.shape}')
-        if create_net:
-            net = create_net()
-        net.set_input_shape(imgs.shape)
+            logger.debug(f'input images shape: {imgs.shape}')
+            if create_net:
+                net = create_net()
+            net.set_input_shape(imgs.shape)
 
-        _ = net.predict(imgs)
+            # inference
+            _ = net.predict(imgs)
 
-        for key, name in zip(train_outputs.keys(), params["feat_names"]):
-            train_outputs[key].append(net.get_blob_data(name))
+            train_outputs = OrderedDict([
+                ('layer1', []), ('layer2', []), ('layer3', [])
+            ])
+            for key, name in zip(train_outputs.keys(), params["feat_names"]):
+                train_outputs[key].append(net.get_blob_data(name))
+            for k, v in train_outputs.items():
+                train_outputs[k] = v[0]
 
-    logger.info('postprocessing...')
+            embedding_vectors = postprocess(train_outputs)
 
-    for k, v in train_outputs.items():
-        train_outputs[k] = np.vstack(v)
+            # randomly select d dimension
+            idx = params['idx']
+            embedding_vectors = embedding_vectors[:, idx, :, :]
 
-    embedding_vectors = postprocess(train_outputs)
+            # reshape 2d pixels to 1d features
+            B, C, H, W = embedding_vectors.shape
+            embedding_vectors = embedding_vectors.reshape(B, C, H * W)
 
-    # randomly select d dimension
-    idx = params['idx']
-    embedding_vectors = embedding_vectors[:, idx, :, :]
+            # initialize mean and covariance matrix
+            if (mean is None):
+                mean = np.zeros((C, H * W), dtype=np.float32)
+                cov = np.zeros((C, C, H * W), dtype=np.float32)
 
-    # calculate multivariate Gaussian distribution
-    B, C, H, W = embedding_vectors.shape
-    embedding_vectors = embedding_vectors.reshape(B, C, H * W)
-    mean = np.mean(embedding_vectors, axis=0)
-    cov = np.zeros((C, C, H * W), dtype=np.float32)
+            # calculate multivariate Gaussian distribution
+            # (add up mean and covariance matrix)
+            mean += np.sum(embedding_vectors, axis=0)
+            for i in range(H * W):
+                # https://github.com/numpy/numpy/blob/v1.21.0/numpy/lib/function_base.py#L2324-L2543
+                m = embedding_vectors[:, :, i]
+                m = m - (mean[:, [i]].T / N)
+                cov[:, :, i] += m.T @ m
+    # devide mean by N
+    mean = mean / N
+    # devide covariance by N-1, and calculate inverse
     I = np.identity(C)
     for i in range(H * W):
-        cov[:, :, i] = np.cov(embedding_vectors[:, :, i], rowvar=False) + 0.01 * I
+        cov[:, :, i] = (cov[:, :, i] / (N - 1)) + 0.01 * I
 
     train_outputs = [mean, cov]
 
@@ -212,14 +304,15 @@ def denormalization(x):
     return x
 
 
-def plot_fig(file_list, test_imgs, scores, anormal_scores, gt_imgs, threshold, save_dir):
+def plot_fig(file_list, test_imgs, scores, anormal_scores, gt_imgs, threshold, savepath):
     num = len(file_list)
     vmax = scores.max() * 255.
     vmin = scores.min() * 255.
     for i in range(num):
         image_path = file_list[i]
         img = test_imgs[i]
-        img = denormalization(img)
+        if not args.aug:
+            img = denormalization(img)
         gt = gt_imgs[i]
         gt = gt.transpose(1, 2, 0).squeeze()
         heat_map = scores[i] * 255
@@ -269,14 +362,20 @@ def plot_fig(file_list, test_imgs, scores, anormal_scores, gt_imgs, threshold, s
         }
         cb.set_label('Anomaly Score', fontdict=font)
 
-        savepath = get_savepath(save_dir, image_path, ext='.png')
-        logger.info(f'saved at : {savepath}')
-        fig_img.savefig(savepath, dpi=100)
+        if ('.' in savepath.split('/')[-1]):
+            savepath_tmp = get_savepath(savepath, image_path, ext='.png')
+        else:
+            filename_tmp = image_path.split('/')[-1]
+            ext_tmp = '.' + filename_tmp.split('.')[-1]
+            filename_tmp = filename_tmp.replace(ext_tmp, '.png')
+            savepath_tmp = '%s/%s' % (savepath, filename_tmp)
+        logger.info(f'saved at : {savepath_tmp}')
+        fig_img.savefig(savepath_tmp, dpi=100)
         plt.close()
 
 
 def recognize_from_image(net, create_net, params):
-    batch_size = args.batch_size
+    batch_size = int(args.batch_size)
 
     random.seed(args.seed)
     idx = random.sample(range(0, params["t_d"]), params["d"])
@@ -287,91 +386,162 @@ def recognize_from_image(net, create_net, params):
     gt_type_dir = args.gt_dir if args.gt_dir else None
     test_imgs = []
     gt_imgs = []
+    angle_list = []
+    pad_h_list = []
+    pad_w_list = []
 
-    # input image loop
-    test_outputs = OrderedDict([
-        ('layer1', []), ('layer2', []), ('layer3', [])
-    ])
-    for i in range(0, len(args.input), batch_size):
-        # prepare input data
-        imgs = []
-        for image_path in args.input[i:i + batch_size]:
-            logger.info(image_path)
-            img = load_image(image_path)
-            img = cv2.cvtColor(img, cv2.COLOR_BGRA2RGB)
-            img = preprocess(img)
-            imgs.append(img)
-
-            # ground truth
-            gt_img = None
-            if gt_type_dir:
-                fname = os.path.splitext(os.path.basename(image_path))[0]
-                gt_fpath = os.path.join(gt_type_dir, fname + '_mask.png')
-                if os.path.exists(gt_fpath):
-                    gt_img = load_image(gt_fpath)
-                    gt_img = cv2.cvtColor(gt_img, cv2.COLOR_BGRA2RGB)
-                    gt_img = preprocess(gt_img, mask=True)
-                    gt_img = np.mean(gt_img, axis=1, keepdims=True)
-
-            gt_img = gt_img[0] if gt_img is not None else np.zeros((1, IMAGE_SIZE, IMAGE_SIZE))
-
-            test_imgs.append(img[0])
-            gt_imgs.append(gt_img)
-
-        imgs = np.vstack(imgs)
-
-        logger.debug(f'input images shape: {imgs.shape}')
-        if create_net:
-            net = create_net()
-        net.set_input_shape(imgs.shape)
-
-        # inference
-        logger.info('Start inference...')
-        if args.benchmark:
-            logger.info('BENCHMARK mode')
-            total_time = 0
-            for i in range(args.benchmark_count):
-                start = int(round(time.time() * 1000))
-                _ = net.predict(imgs)
-                end = int(round(time.time() * 1000))
-                logger.info(f'\tailia processing time {end - start} ms')
-                if i != 0:
-                    total_time = total_time + (end - start)
-            logger.info(f'\taverage time {total_time / (args.benchmark_count - 1)} ms')
-        else:
-            _ = net.predict(imgs)
-
-        for key, name in zip(test_outputs.keys(), params["feat_names"]):
-            test_outputs[key].append(net.get_blob_data(name))
-
-    logger.info('postprocessing...')
-
-    for k, v in test_outputs.items():
-        test_outputs[k] = np.vstack(v)
-
-    embedding_vectors = postprocess(test_outputs)
-
-    # randomly select d dimension
-    embedding_vectors = embedding_vectors[:, idx, :, :]
-
-    # calculate distance matrix
-    B, C, H, W = embedding_vectors.shape
-    embedding_vectors = embedding_vectors.reshape(B, C, H * W)
+    if not args.aug:
+        logger.info('infer without augmentation')
+        aug_num = 1
+    else:
+        logger.info('infer with augmentation')
+        aug_num = args.aug_num
+    N = 0
     dist_list = []
-    for i in range(H * W):
-        mean = train_outputs[0][:, i]
-        conv_inv = np.linalg.inv(train_outputs[1][:, :, i])
-        dist = [mahalanobis(sample[:, i], mean, conv_inv) for sample in embedding_vectors]
-        dist_list.append(dist)
+    if not args.aug:
+        aug_num = 1
+    else:
+        aug_num = args.aug_num
+    for i_aug in range(aug_num):
+        for i_img in range(0, len(args.input), batch_size):
+            # prepare input data
+            imgs = []
+            if not args.aug:
+                logger.info('from (%s ~ %s) ' %
+                            (args.input[i_img],
+                             args.input[min(len(args.input) - 1,
+                                            i_img + batch_size)]))
+            else:
+                logger.info('from (%s ~ %s) on augmentation lap %d' %
+                            (args.input[i_img],
+                             args.input[min(len(args.input) - 1,
+                                            i_img + batch_size)], i_aug))
+            for image_path in args.input[i_img:i_img + batch_size]:
+                img = load_image(image_path)
+                img = cv2.cvtColor(img, cv2.COLOR_BGRA2RGB)
+                if not args.aug:
+                    img = preprocess(img)
+                    test_imgs.append(img[0])
+                else:
+                    (img, img_resized, angle, 
+                     pad_h, pad_w) = preprocess_aug(img, return_refs=True)
+                    test_imgs.append(img_resized)
+                    angle_list.append(angle)
+                    pad_h_list.append(pad_h)
+                    pad_w_list.append(pad_w)
+                imgs.append(img)
 
-    dist_list = np.array(dist_list).transpose(1, 0).reshape(B, H, W)
+                # ground truth
+                gt_img = None
+                if gt_type_dir:
+                    fname = os.path.splitext(os.path.basename(image_path))[0]
+                    gt_fpath = os.path.join(gt_type_dir, fname + '_mask.png')
+                    if os.path.exists(gt_fpath):
+                        gt_img = load_image(gt_fpath)
+                        gt_img = cv2.cvtColor(gt_img, cv2.COLOR_BGRA2RGB)
+                        if not args.aug:
+                            gt_img = preprocess(gt_img, mask=True)
+                            if gt_img is not None:
+                                gt_img = gt_img[0, [0]]
+                            else:
+                                gt_img = np.zeros((1, IMAGE_SIZE, IMAGE_SIZE))
+                        else:
+                            gt_img = preprocess_aug(gt_img, mask=True)
+                            if gt_img is not None:
+                                gt_img = gt_img[0, [0]]
+                            else:
+                                gt_img = np.zeros((1, IMAGE_RESIZE, IMAGE_RESIZE))
 
-    # upsample
-    score_map = np.asarray([
-        np.array(Image.fromarray(s).resize(
-            (IMAGE_SIZE, IMAGE_SIZE), resample=Image.BILINEAR)
-        ) for s in dist_list
-    ])
+                gt_imgs.append(gt_img)
+
+            # countup N
+            N += len(imgs)
+
+            imgs = np.vstack(imgs)
+
+            logger.debug(f'input images shape: {imgs.shape}')
+            if create_net:
+                net = create_net()
+            net.set_input_shape(imgs.shape)
+
+            # inference
+            if args.benchmark:
+                logger.info('BENCHMARK mode')
+                total_time = 0
+                for i in range(args.benchmark_count):
+                    start = int(round(time.time() * 1000))
+                    _ = net.predict(imgs)
+                    end = int(round(time.time() * 1000))
+                    logger.info(f'\tailia processing time {end - start} ms')
+                    if i != 0:
+                        total_time = total_time + (end - start)
+                logger.info(f'\taverage time {total_time / (args.benchmark_count - 1)} ms')
+            else:
+                _ = net.predict(imgs)
+
+            test_outputs = OrderedDict([
+                ('layer1', []), ('layer2', []), ('layer3', [])
+            ])
+            for key, name in zip(test_outputs.keys(), params["feat_names"]):
+                test_outputs[key].append(net.get_blob_data(name))
+            for k, v in test_outputs.items():
+                test_outputs[k] = v[0]
+
+            embedding_vectors = postprocess(test_outputs)
+
+            # randomly select d dimension
+            embedding_vectors = embedding_vectors[:, idx, :, :]
+
+            # reshape 2d pixels to 1d features
+            B, C, H, W = embedding_vectors.shape
+            embedding_vectors = embedding_vectors.reshape(B, C, H * W)
+
+            # calculate distance matrix
+            dist_tmp = np.zeros([B, (H*W)])
+            for i in range(H * W):
+                mean = train_outputs[0][:, i]
+                conv_inv = np.linalg.inv(train_outputs[1][:, :, i])
+                dist = [mahalanobis(sample[:, i], mean, conv_inv) for sample in embedding_vectors]
+                dist_tmp[:, i] = dist
+            dist_list.append(dist_tmp)
+
+    dist_list = np.vstack(dist_list)
+    dist_list = dist_list.reshape(N, H, W)
+
+    if not args.aug:
+        # upsample
+        score_map = np.asarray([
+            np.array(Image.fromarray(s).resize(
+                (IMAGE_SIZE, IMAGE_SIZE), resample=Image.BILINEAR)
+            ) for s in dist_list
+        ])
+    else:
+        # upsample and reverse augmentation
+        score_map = np.zeros([N, IMAGE_RESIZE, IMAGE_RESIZE])
+        for i in range(score_map.shape[0]):
+            score_map_tmp = dist_list[i]
+            score_map_tmp = Image.fromarray(score_map_tmp)
+            score_map_tmp = score_map_tmp.resize((IMAGE_SIZE, IMAGE_SIZE),
+                                                 resample=Image.BILINEAR)
+            score_map_tmp = np.array(score_map_tmp)
+            # reverse crop
+            pad_top = pad_h_list[i]
+            pad_left = pad_w_list[i]
+            pad_bottom = IMAGE_RESIZE - IMAGE_SIZE - pad_h
+            pad_right = IMAGE_RESIZE - IMAGE_SIZE - pad_w
+            score_map_tmp = np.pad(score_map_tmp, ((pad_top, pad_bottom),
+                                                   (pad_left, pad_right)))
+            # reverse rotate
+            angle = angle_list[i]
+            rot_mat = cv2.getRotationMatrix2D((IMAGE_RESIZE / 2, IMAGE_RESIZE / 2), -angle, 1)
+            score_map_tmp = cv2.warpAffine(src=score_map_tmp,
+                                           M=rot_mat,
+                                           dsize=(IMAGE_RESIZE, IMAGE_RESIZE),
+                                           borderMode=cv2.BORDER_REPLICATE,
+                                           flags=cv2.INTER_LINEAR)
+            score_map[i] = score_map_tmp
+        score_map = score_map.reshape(args.aug_num, -1, IMAGE_RESIZE, IMAGE_RESIZE)
+        score_map = np.mean(score_map, axis=0)
 
     # apply gaussian smoothing on the score map
     for i in range(score_map.shape[0]):
@@ -383,13 +553,16 @@ def recognize_from_image(net, create_net, params):
     scores = (score_map - min_score) / (max_score - min_score)
 
     # Calculated anormal score
-    anormal_scores=np.zeros((score_map.shape[0]))
+    anormal_scores = np.zeros((score_map.shape[0]))
     for i in range(score_map.shape[0]):
-        anormal_scores[i]=score_map[i].max()
+        anormal_scores[i] = score_map[i].max()
 
     if args.threshold is None:
         # get optimal threshold
-        gt_mask = np.asarray(gt_imgs)
+        if not args.aug:
+            gt_mask = np.asarray(gt_imgs)
+        else:
+            gt_mask = np.asarray(gt_imgs[:int(len(gt_imgs)/args.aug_num)])
         precision, recall, thresholds = precision_recall_curve(gt_mask.flatten(), scores.flatten())
         a = 2 * precision * recall
         b = precision + recall
