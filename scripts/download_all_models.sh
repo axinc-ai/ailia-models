@@ -78,7 +78,6 @@ cd ../../hand_recognition/hand3d; python3 hand3d.py ${OPTION}
 cd ../../hand_recognition/minimal-hand; python3 minimal-hand.py ${OPTION}
 cd ../../image_captioning/illustration2vec; python3 illustration2vec.py ${OPTION}
 cd ../../image_captioning/image_captioning_pytorch; python3 image_captioning_pytorch.py ${OPTION}
-cd ../../image_captioning/clip; python3 clip.py ${OPTION}
 cd ../../image_classification/efficientnet; python3 efficientnet.py ${OPTION}
 cd ../../image_classification/googlenet; python3 googlenet.py ${OPTION}
 cd ../../image_classification/inceptionv3; python3 inceptionv3.py ${OPTION}
@@ -93,6 +92,7 @@ cd ../../image_classification/efficientnetv2; python3 efficientnetv2.py ${OPTION
 cd ../../image_classification/wide_resnet50; python3 wide_resnet50.py ${OPTION}
 cd ../../image_classification/mlp_mixer; python3 mlp_mixer.py ${OPTION}
 cd ../../image_classification/alexnet; python3 alexnet.py ${OPTION}
+cd ../../image_classification/clip; python3 clip.py ${OPTION}
 cd ../../image_inpainting/3d-photo-inpainting; python3 3d-photo-inpainting.py ${OPTION}
 cd ../../image_inpainting/inpainting_gmcnn; python3 inpainting_gmcnn.py ${OPTION}
 cd ../../image_inpainting/pytorch-inpainting-with-partial-conv; python3 pytorch-inpainting-with-partial-conv.py ${OPTION}
