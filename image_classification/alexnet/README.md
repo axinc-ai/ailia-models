@@ -6,16 +6,20 @@ Input file type must be .jpg image.
 #### Video mode
 Input file type must be .mp4 video.
 
-![Input](input/dog.jpg)
+![Input](clock.jpg)
 
 ## Output
 ```
-[Image_1] input/dog.jpg
-	Samoyed 0.7245363593101501
-	wallaby 0.13860034942626953
-	Pomeranian 0.05935253947973251
-	Angora 0.022971760481595993
-	Arctic fox 0.012396696954965591
+class_count=3
++ idx=0
+  category=409[analog clock ]
+  prob=0.8660851716995239
++ idx=1
+  category=892[wall clock ]
+  prob=0.13281846046447754
++ idx=2
+  category=826[stopwatch, stop watch ]
+  prob=0.0008276691660284996
 ```
 
 ## Usage
@@ -25,13 +29,13 @@ Automatically downloads the onnx and prototxt files on the first run. It is nece
 For the sample image,
 
 ```
-$ python3 alexnet.py --input input/[your sample.jpg path]
+$ python3 alexnet.py --input [your sample.jpg path]
 ```
 
 For the sample video,
 
 ```
-$ python3 alexnet.py --video input/[your sample.mp4 path]
+$ python3 alexnet.py --video [your sample.mp4 path]
 ```
 
 ## Reference

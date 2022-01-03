@@ -3,6 +3,7 @@ import sys
 import cv2
 import numpy as np
 import ailia
+import alexnet_labels
 
 # import original modules
 sys.path.append('../../util')
@@ -10,6 +11,7 @@ from utils import get_base_parser, update_parser  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from image_utils import load_image  # noqa: E402
 from classifier_utils import plot_results, print_results  # noqa: E402
+import webcamera_utils  # noqa: E402
 
 # logger
 from logging import getLogger  # noqa: E402
@@ -24,7 +26,7 @@ from PIL import Image
 MODEL_PATH  = "alexnet.onnx.prototxt"
 WEIGHT_PATH = "alexnet.onnx"
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/alexnet/"
-IMAGE_PATH = "input/dog.jpg"
+IMAGE_PATH = "clock.jpg"
 IMAGE_HEIGHT = 224
 IMAGE_WIDTH = 224
 
@@ -39,16 +41,8 @@ args = update_parser(parser)
 # ======================
 # Main functions
 # ======================
-def _get_image(filename):
-    input_image = Image.open(filename)
-    input_batch = _preprocess_image(input_image)
-    return input_batch
-
 
 def _preprocess_image(img):
-    if args.video is not None:
-        img = Image.fromarray(img)
-
     # alternative to transforms.Resize(256)
     size = 256
     w = np.asarray(img).shape[1]
@@ -85,74 +79,58 @@ def _preprocess_image(img):
     return input_batch
 
 
-def _get_prob(output, topk=5):
-    prob = _softmax(output[0])
-    idx = np.argsort(-prob)[:topk]
-    y = prob[idx]
-    topk_prob = y
-    topk_catid = idx
-    return topk_prob, topk_catid
-
-
 def _softmax(x, axis=None):
     e_x = np.exp(x - np.max(x, axis=axis, keepdims=True))
     e_x = e_x / np.sum(e_x, axis=axis, keepdims=True)
     return e_x
 
 
-def _get_labels():
-    categories = []
-    with open("imagenet_classes.txt", "r") as f:
-        categories = [s.strip() for s in f.readlines()]
-    return categories
-
-
 def recognize_from_image():
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
-    labels = _get_labels()
 
     # input image loop
     for i, image_path in enumerate(args.input):
-        input_batch = _get_image(image_path)
-        output = net.predict(input_batch)
-        topk_prob, topk_catid = _get_prob(output)
-        print('[Image_{}] {}'.format(i+1, image_path))
-        for k in range(topk_prob.shape[0]):
-            print('\t{} {}'.format(labels[topk_catid[k]], topk_prob[k]))
+        input_batch = cv2.imread(image_path)
+        input_batch = _preprocess_image(input_batch)
+        
+        # inference
+        logger.info('Start inference...')
+        if args.benchmark:
+            logger.info('BENCHMARK mode')
+            for i in range(args.benchmark_count):
+                start = int(round(time.time() * 1000))
+                output = net.predict(input_batch)
+                end = int(round(time.time() * 1000))
+                logger.info(f'\tailia processing time {end - start} ms')
+        else:
+            output = net.predict(input_batch)
+
+        output =  _softmax(output)
+        print_results(output, alexnet_labels.imagenet_category)
 
     logger.info('Script finished successfully.')
 
 
 def recognize_from_video():
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
-    labels = _get_labels()
 
-    cap = cv2.VideoCapture(args.video)
-    if not cap.isOpened():
-        print('Video is not opened.')
-        exit()
-    f_h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    f_w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    capture = webcamera_utils.get_capture(args.video)
 
-    idx = -1
     while True:
-        idx += 1
-        ret, frame = cap.read()
-        if not ret:
+        ret, frame = capture.read()
+        if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
-        # predict
-        if idx%(cap.get(cv2.CAP_PROP_FPS)*5) != 0:
-            continue
-        else:
-            frame = cv2.resize(frame, dsize=(f_h, f_w))
-            input_batch = _preprocess_image(frame)
-            output = net.predict(input_batch)
-            topk_prob, topk_catid = _get_prob(output)
-            print('[Image] second: {}, frame: {}, path: {}'.format(idx//cap.get(cv2.CAP_PROP_FPS), idx, args.video))
-            for k in range(topk_prob.shape[0]):
-                print('\t{} {}'.format(labels[topk_catid[k]], topk_prob[k]))
 
-    cap.release()
+        input_batch = _preprocess_image(frame)
+        output = net.predict(input_batch)
+        output =  _softmax(output)
+
+        plot_results(
+            frame, output, alexnet_labels.imagenet_category
+        )
+        cv2.imshow('frame', frame)
+
+    capture.release()
     logger.info('Script finished successfully.')
 
 
