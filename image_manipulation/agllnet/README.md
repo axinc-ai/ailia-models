@@ -3,15 +3,13 @@
 ## Input
 ![Input](input.png)
 
+(Image from https://github.com/yu-li/AGLLNet/blob/main/input/5047.png)
+
 Ailia input shape: (1, 3, 768, 1152)
 
 ## Output
 ![Output](output.png)
 
-
-## Note
-
-This Software is licensed under the Attribution-NonCommercial-ShareAlike 4.0 International.
 
 ## Usage
 Automatically downloads the onnx and prototxt files on the first run.
