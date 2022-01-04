@@ -41,7 +41,7 @@ parser = get_base_parser(
 )
 parser.add_argument(
     '-i2', '--input2', default=None,
-    help='The second input image path.'
+    help='The second input image path. The first input is left sight image, and second is right sight image.'
 )
 parser.add_argument(
     '--onnx',
@@ -153,8 +153,7 @@ def recognize_from_image(net):
         logger.error("Only two images can be specified for input.")
         sys.exit(-1)
 
-    # prepare input data
-    logger.info(image_paths)
+    logger.info({k: v for k, v in zip(('left', 'right'), image_paths)})
 
     # prepare input data
     images = [load_image(p) for p in image_paths]
