@@ -3,27 +3,28 @@
 ### Input
 Images with the same aspect ratio as 360×640. This model detect lane from inputs.
 - input image    
-![入力画像](./raw/input.jpg)    
+![入力画像](input.jpg)    
+(Image from https://github.com/TuSimple/tusimple-benchmark)
 
 ### Output
 Images which the detected lane in input images is colored in green.
 - output image    
 Four green lines mean each detected lane which model predicted and numbers attached to each line mean line number.    
 Predicted curve parameters are showed at the top of the image.
-![出力画像](./raw/output.jpg)
+![出力画像](output.jpg)
 
 ### Usage
 You have to specify input filetype and input filepath.    
 - Image mode (image to image)   
 You run sample script as below if your desired file path is {Path to LSTR}/input/image/1.jpg.
 ```bash
-$ python3 lstr.py --ftype image --input ./input/image/1.jpg
+$ python3 lstr.py --input input.jpg
 ```
 
 - Video mode (video to video)   
 You run sample script as below if your desired file path is {Path to LSTR}/input/video/video1.mp4.
 ```bash
-$ python3 lstr.py --ftype video --video ./input/video/video1.mp4
+$ python3 lstr.py -v input.mp4
 ```
 
 

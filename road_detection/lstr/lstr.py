@@ -3,12 +3,13 @@ import glob
 import time
 import numpy as np
 import cv2
-from tqdm import tqdm
 import ailia
 # import original modules
 sys.path.append('../../util')
 from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
+import webcamera_utils
+
 # logger
 from logging import getLogger   # noqa: E402
 logger = getLogger(__name__)
@@ -21,8 +22,8 @@ WEIGHT_PATH = 'lstr.onnx'
 MODEL_PATH = 'lstr.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/lstr/'
 
-IMAGE_PATH = 'input'
-SAVE_IMAGE_PATH = 'output'
+IMAGE_PATH = 'input.jpg'
+SAVE_IMAGE_PATH = 'output.jpg'
 
 HEIGHT = 360
 WIDTH = 640
@@ -54,14 +55,6 @@ def _softmax(x, axis=None):
     e_x = np.exp(x - np.max(x, axis=axis, keepdims=True))
     e_x = e_x / np.sum(e_x, axis=axis, keepdims=True)
     return e_x
-
-
-def get_files(dirname):
-    files = glob.glob(dirname)
-    if len(files)==0:
-        print('specified files is empty.')
-        exit()
-    return files
 
 
 def predict(net, image):
@@ -140,83 +133,66 @@ def draw_annotation(pred, img):
     return img
 
 
-def recognize_from_image(net, orig_target_sizes, output_name):
-    image_file = get_files('./input/image/{}'.format(output_name))
-    image = cv2.imread('{}'.format(image_file[0]))
-    out_pred_logits, out_pred_curves, _, _, weights = predict(net, image)
-    results = postprocess(out_pred_logits, out_pred_curves, orig_target_sizes)
-    preds = draw_annotation(results[0], image)
-    cv2.imwrite('./output/image/{}'.format(os.path.basename(image_file[-1]) + '.jpg'), preds)
-    print('Image saved as {}'.format(os.path.basename(image_file[-1]) + '.jpg'))
+def recognize_from_image(net, orig_target_sizes):
+    # input image loop
+    for image_path in args.input:
+        # prepare input data
+        image = cv2.imread(image_path)
+
+        out_pred_logits, out_pred_curves, _, _, weights = predict(net, image)
+        results = postprocess(out_pred_logits, out_pred_curves, orig_target_sizes)
+        preds = draw_annotation(results[0], image)
+
+        savepath = get_savepath(args.savepath, image_path)
+        logger.info(f'saved at : {savepath}')
+        cv2.imwrite(savepath, preds)
+
+    logger.info('Script finished successfully.')
 
 
-def recognize_from_video(net, orig_target_sizes, output_name):
-    cap = cv2.VideoCapture('./input/video/{}'.format(output_name))
-    if not cap.isOpened():
-        print('Video is not opened.')
-        exit()
-    filename = '_'.join(output_name.split('/'))
+def recognize_from_video(net, orig_target_sizes):
+    capture = webcamera_utils.get_capture(args.video)
 
-    output_video = cv2.VideoWriter(
-        './output/video/{}'.format(filename),
-        cv2.VideoWriter_fourcc('m','p','4', 'v'), #mp4フォーマット
-        float(30), #fps
-        (VIDEO_HEIGHT, VIDEO_WIDTH) #size
-    )
+    # create video writer if savepath is specified as video format
+    if args.savepath != SAVE_IMAGE_PATH:
+        writer = webcamera_utils.get_writer(args.savepath, HEIGHT, WIDTH)
+    else:
+        writer = None
 
-    i = 1
-    pbar = tqdm(total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)))
     while True:
-        pbar.update(i)
-        ret, frame = cap.read()
-        if not ret:
+        ret, frame = capture.read()
+        if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
+
         frame = cv2.resize(frame, dsize=(VIDEO_HEIGHT, VIDEO_WIDTH))
         out_pred_logits, out_pred_curves, _, _, weights = predict(net, frame)
         results = postprocess(out_pred_logits, out_pred_curves, orig_target_sizes)
         preds = draw_annotation(results[0], frame)
-        output_video.write(preds)
-    cap.release()
-    output_video.release()
-    print('Video saved as {}'.format(filename))
+        cv2.imshow('frame', preds)
+
+        # save results
+        if writer is not None:
+            writer.write(preds)
+
+    capture.release()
+    cv2.destroyAllWindows()
+    if writer is not None:
+        writer.release()
+    logger.info('Script finished successfully.')
 
 
 def main():
     # model files check and download
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
 
-    # show configuration
-    input_type = 'image' if args.input is not None else 'video'
-    if args.input is not None:
-        output_name = args.input[0].replace('./input/image/', '')
-    elif args.video is not None:
-        output_name = args.video.replace('./input/video/', '')
-    else:
-        print('invalid args.')
-        exit()
-    print('ftype={}, input_type={}, filename={}'.format(args.ftype, input_type, output_name))
-
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
     orig_target_sizes = np.expand_dims(np.array([HEIGHT, WIDTH]), axis=0)
 
-    if not os.path.exists('./output'):
-        os.mkdir('./output')
-    if not os.path.exists('./output/image'):
-        os.mkdir('./output/image')
-    if not os.path.exists('./output/video'):
-        os.mkdir('./output/video')
-
     # predict
-    if args.input is not None and args.ftype == 'image': # image to image
-        recognize_from_image(net, orig_target_sizes, output_name)
-    elif args.input is not None and args.ftype == 'video': # image to video
-        print('Not implemented.')
-    elif args.video is not None and args.ftype == 'video': # video to video
-        recognize_from_video(net, orig_target_sizes, output_name)
-    elif args.video is not None and args.ftype == 'image': # video to image
-        print('Not implemented.')
+    if args.video is not None:
+        recognize_from_video(net, orig_target_sizes)
     else:
-        print('invalid ftype.')
+        recognize_from_image(net, orig_target_sizes)
 
 
 if __name__ == '__main__':
