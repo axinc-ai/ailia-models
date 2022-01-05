@@ -89,6 +89,7 @@ The collection of pre-trained, state-of-the-art AI models.
 | [<img src="face_detection/face-mask-detection/output.png" width=128px>](face_detection/face-mask-detection/)| [face-mask-detection](/face_detection/face-mask-detection/) | [Face detection using keras-yolov3](https://github.com/axinc-ai/yolov3-face) | Keras | 1.2.1 and later | [EN](https://medium.com/axinc-ai/facemaskdetection-a-machine-learning-model-to-determine-if-a-person-is-wearing-a-mask-e5a581ea8af9) [JP](https://medium.com/axinc/facemaskdetection-%E3%83%9E%E3%82%B9%E3%82%AF%E3%82%92%E4%BB%98%E3%81%91%E3%81%A6%E3%81%84%E3%82%8B%E3%81%8B%E3%82%92%E5%88%A4%E5%AE%9A%E3%81%99%E3%82%8B%E6%A9%9F%E6%A2%B0%E5%AD%A6%E7%BF%92%E3%83%A2%E3%83%87%E3%83%AB-b06793f79a97) |
 | [<img src="face_detection/dbface/selfie_output.png" width=128px>](face_detection/dbface/)| [dbface](face_detection/dbface/) | [DBFace : real-time, single-stage detector for face detection, <br/>with faster speed and higher accuracy](https://github.com/dlunion/DBFace) | Pytorch | 1.2.2 and later | 
 | [<img src="face_detection/retinaface/selfie_output.png" width=128px>](face_detection/retinaface/)| [retinaface](face_detection/retinaface/) | [RetinaFace: Single-stage Dense Face Localisation in the Wild.](https://github.com/biubug6/Pytorch_Retinaface) | Pytorch | 1.2.5 and later | 
+| [<img src="face_detection/anime-face-detector/output.png" width=128px>](face_detection/anime-face-detector/)| [anime-face-detector](face_detection/anime-face-detector/) | [Anime Face Detector](https://github.com/hysts/anime-face-detector) | Pytorch | 1.2.6 and later | 
 
 ## Face identification
 
@@ -113,6 +114,7 @@ The collection of pre-trained, state-of-the-art AI models.
 | [<img src="face_recognition/ax_gaze_estimation/output.png" width=128px>](face_recognition/ax_gaze_estimation/) | [ax_gaze_estimation](/face_recognition/ax_gaze_estimation/) | ax Gaze Estimation | Pytorch | 1.2.2 and later | [EN](https://medium.com/axinc-ai/axgazeestimation-a-machine-learning-model-for-estimating-gaze-c9648042d637) [JP](https://medium.com/axinc/axgazeestimation-%E8%A6%96%E7%B7%9A%E3%82%92%E6%8E%A8%E5%AE%9A%E3%81%99%E3%82%8B%E6%A9%9F%E6%A2%B0%E5%AD%A6%E7%BF%92%E3%83%A2%E3%83%87%E3%83%AB-8446a791968) |
 | [<img src="face_recognition/age-gender-recognition-retail/demo.jpg" width=128px>](face_recognition/age-gender-recognition-retail/) | [age-gender-recognition-retail](/face_recognition/age-gender-recognition-retail/) | [age-gender-recognition-retail-0013](https://github.com/openvinotoolkit/open_model_zoo/tree/master/models/intel/age-gender-recognition-retail-0013) | OpenVINO | 1.2.5 and later | [EN](https://medium.com/axinc-ai/agegenderrecognitionretail-a-machine-learning-model-to-identify-age-and-gender-8506510414b) [JP](https://medium.com/axinc/agegenderrecognitionretail-%E5%B9%B4%E9%BD%A2%E3%81%A8%E6%80%A7%E5%88%A5%E3%82%92%E4%BA%88%E6%B8%AC%E3%81%99%E3%82%8B%E6%A9%9F%E6%A2%B0%E5%AD%A6%E7%BF%92%E3%83%A2%E3%83%87%E3%83%AB-3632935d19ec) |
 | [<img src="face_recognition/ferplus/img/fer0032227.png" width=128px>](face_recognition/ferplus/) | [ferplus](/face_recognition/ferplus/) | [FER+](https://github.com/microsoft/FERPlus) | CNTK | 1.2.2 and later |
+| [<img src="face_recognition/face-anti-spoofing/output.png" width=128px>](face_recognition/face-anti-spoofing/) | [face-anti-spoofing](/face_recognition/face-anti-spoofing/) | [Lightweight Face Anti Spoofing](https://github.com/kprokofi/light-weight-face-anti-spoofing) | Pytorch | 1.2.5 and later |
 
 ## Frame Interpolation
 
@@ -168,6 +170,10 @@ The collection of pre-trained, state-of-the-art AI models.
 | [<img src="image_classification/efficientnetv2/input.jpg" width=128px>](image_classification/efficientnetv2/)| [efficientnetv2](/image_classification/efficientnetv2/)|[EfficientNetV2]( https://github.com/google/automl/tree/master/efficientnetv2 )|Pytorch| 1.2.4 and later | |
 | [<img src="image_classification/vit/output.png" width=128px>](image_classification/vit/)| [vit](/image_classification/vit/)|[Pytorch reimplementation of the Vision Transformer (An Image is Worth 16x16 Words: Transformers for Image Recognition at Scale)](https://github.com/jeonsworld/ViT-pytorch)|Pytorch| 1.2.7 and later | [JP](https://medium.com/axinc/vision-transformer-%E7%95%B3%E3%81%BF%E8%BE%BC%E3%81%BF%E6%BC%94%E7%AE%97%E3%82%92%E7%94%A8%E3%81%84%E3%81%AA%E3%81%84%E6%9C%80%E6%96%B0%E7%94%BB%E5%83%8F%E8%AD%98%E5%88%A5%E6%8A%80%E8%A1%93-84f06978a17f) |
 | [<img src="image_classification/wide_resnet50/dog.jpg" width=128px>](image_classification/wide_resnet50/)| [wide_resnet50](/image_classification/wide_resnet50/)|[Wide Resnet](https://pytorch.org/hub/pytorch_vision_wide_resnet/)|Pytorch| 1.2.5 and later | |
+| [<img src="image_classification/mlp_mixer/input.jpg" width=128px>](image_classification/mlp_mixer/)| [mlp_mixer](/image_classification/mlp_mixer/)|[MLP-Mixer](https://github.com/jeonsworld/MLP-Mixer-Pytorch)|Pytorch| 1.2.9 and later | |
+| [<img src="image_classification/alexnet/clock.jpg" width=128px>](image_classification/alexnet/) | [alexnet](/image_classification/alexnet/)|[AlexNet PyTorch](https://pytorch.org/hub/pytorch_vision_alexnet/)|Pytorch| 1.2.5 and later | |
+| [<img src="image_classification/clip/chelsea.png" width=128px>](image_classification/clip/) | [clip](/image_classification/clip/)|[CLIP](https://github.com/openai/CLIP) | Pytorch | 1.2.9 and later | |
+
 
 ## Image inpainting
 
@@ -189,6 +195,8 @@ The collection of pre-trained, state-of-the-art AI models.
 | [<img src="image_manipulation/style2paints/output.png" width=128px>](image_manipulation/style2paints/) | [style2paints](/image_manipulation/style2paints/) | [Style2Paints](https://github.com/lllyasviel/style2paints) | TensorFlow | 1.2.6 and later |
 | [<img src="image_manipulation/deep_white_balance/output_AWB.png" width=128px>](image_manipulation/deep_white_balance/) | [deep_white_balance](/image_manipulation/deep_white_balance/) | [Deep White-Balance Editing, CVPR 2020 (Oral)](https://github.com/mahmoudnafifi/Deep_White_Balance) | PyTorch | 1.2.6 and later |
 | [<img src="image_manipulation/deblur_gan/output.png" width=128px>](image_manipulation/deblur_gan/) | [deblur_gan](/image_manipulation/deblur_gan/) | [DeblurGAN](https://github.com/KupynOrest/DeblurGAN) | Pytorch | 1.2.6 and later |
+| [<img src="image_manipulation/invertible_denoising_network/output.png" width=128px>](image_manipulation/invertible_denoising_network/) | [invertible_denoising_network](/image_manipulation/invertible_denoising_network/) | [Invertible Image Denoising](https://github.com/Yang-Liu1082/InvDN) | Pytorch | 1.2.8 and later |
+| [<img src="image_manipulation/agllnet/output.png" width=128px>](image_manipulation/agllnet/) | [agllnet](/image_manipulation/agllnet/) | [AGLLNet: Attention Guided Low-light Image Enhancement (IJCV 2021)](https://github.com/yu-li/AGLLNet) | Pytorch | 1.2.9 and later |
 
 ## Image segmentation
 
@@ -205,6 +213,7 @@ The collection of pre-trained, state-of-the-art AI models.
 | [<img src="image_segmentation/yet-another-anime-segmenter/output.png" width=128px>](image_segmentation/yet-another-anime-segmenter/) | [yet-another-anime-segmenter](/image_segmentation/yet-another-anime-segmenter/) | [Yet Another Anime Segmenter](https://github.com/zymk9/Yet-Another-Anime-Segmenter) | Pytorch | 1.2.6 and later | |
 | [<img src="image_segmentation/swiftnet/output.png" width=128px>](image_segmentation/swiftnet/) | [swiftnet](/image_segmentation/swiftnet/) | [SwiftNet](https://github.com/orsic/swiftnet) | Pytorch | 1.2.6 and later | |
 | [<img src="image_segmentation/dense_prediction_transformers/output_segmentation.png" width=128px>](image_segmentation/dense_prediction_transformers/) | [dense_prediction_transformers](/image_segmentation/dense_prediction_transformers/) | [Vision Transformers for Dense Prediction](https://github.com/intel-isl/DPT)   | Pytorch | 1.2.7 and later | [EN](https://medium.com/axinc-ai/dpt-segmentation-model-using-vision-transformer-b479f3027468) [JP](https://medium.com/axinc/dpt-vision-transformer%E3%82%92%E4%BD%BF%E7%94%A8%E3%81%97%E3%81%9F%E3%82%BB%E3%82%B0%E3%83%A1%E3%83%B3%E3%83%86%E3%83%BC%E3%82%B7%E3%83%A7%E3%83%B3%E3%83%A2%E3%83%87%E3%83%AB-88db4842b4a7) |
+| [<img src="image_segmentation/paddleseg/output.png" width=128px>](image_segmentation/paddleseg/) | [paddleseg](/image_segmentation/paddleseg/) | [PaddleSeg](https://github.com/PaddlePaddle/PaddleSeg/tree/release/2.3/contrib/CityscapesSOTA) | Pytorch | 1.2.7 and later | |
 
 ## Line segment detection
 
@@ -246,6 +255,9 @@ The collection of pre-trained, state-of-the-art AI models.
 | [<img src="object_detection/pedestrian_detection/output.png" width=128px>](object_detection/pedestrian_detection/) | [pedestrian_detection](/object_detection/pedestrian_detection/) | [Pedestrian-Detection-on-YOLOv3_Research-and-APP](https://github.com/Zyjacya-In-love/Pedestrian-Detection-on-YOLOv3_Research-and-APP) | Keras | 1.2.1 and later |
 | [<img src="object_detection/efficientdet/output.png" width=128px>](object_detection/efficientdet/) | [efficientdet](/object_detection/efficientdet/) | [EfficientDet: Scalable and Efficient Object Detection, in PyTorch](https://github.com/toandaominh1997/EfficientDet.Pytorch) | Pytorch | 1.2.6 and later |
 | [<img src="object_detection/nanodet/output.jpg" width=128px>](object_detection/nanodet/) | [nanodet](/object_detection/nanodet/) | [NanoDet](https://github.com/RangiLyu/nanodet) | Pytorch | 1.2.6 and later |
+| [<img src="object_detection/mobile_object_localizer/output.png" width=128px>](object_detection/mobile_object_localizer/) | [mobile_object_localizer](/object_detection/mobile_object_localizer/) | [mobile_object_localizer_v1](https://tfhub.dev/google/object_detection/mobile_object_localizer_v1/1) | TensorFlow Hub | 1.2.6 and later | [JP](https://medium.com/axinc/mobileobjectlocalizer-%E4%BB%BB%E6%84%8F%E3%81%AE%E7%89%A9%E4%BD%93%E3%82%92%E6%A4%9C%E5%87%BA%E3%81%A7%E3%81%8D%E3%82%8B%E7%89%A9%E4%BD%93%E6%A4%9C%E5%87%BA%E3%83%A2%E3%83%87%E3%83%AB-595b54cfab26) |
+| [<img src="object_detection/sku110k-densedet/output.png" width=128px>](object_detection/sku110k-densedet/) | [sku110k-densedet](/object_detection/sku110k-densedet/) | [SKU110K-DenseDet](https://github.com/Media-Smart/SKU110K-DenseDet) | Pytorch | 1.2.9 and later | [JP](https://medium.com/axinc/sku110k-densedet-%E5%BA%97%E8%88%97%E5%86%85%E3%81%AE%E5%95%86%E5%93%81%E3%82%92%E6%A4%9C%E5%87%BA%E3%81%A7%E3%81%8D%E3%82%8B%E6%A9%9F%E6%A2%B0%E5%AD%A6%E7%BF%92%E3%83%A2%E3%83%87%E3%83%AB-b775184b5e46) |
+
 
 ## Object detection 3d
 
@@ -307,6 +319,7 @@ The collection of pre-trained, state-of-the-art AI models.
 | [<img src="road_detection/codes-for-lane-detection/output.jpg" width=128px>](road_detection/codes-for-lane-detection/) | [codes-for-lane-detection](/road_detection/codes-for-lane-detection/) | [Codes-for-Lane-Detection](https://github.com/cardwing/Codes-for-Lane-Detection) | Pytorch | 1.2.6 and later | [EN](https://medium.com/axinc-ai/codesforlanedetection-a-machine-learning-model-for-detecting-white-lines-on-roads-7bee3aad818d) [JP](https://medium.com/axinc/codesforlanedetection-%E9%81%93%E8%B7%AF%E3%81%AE%E7%99%BD%E7%B7%9A%E3%82%92%E6%A4%9C%E5%87%BA%E3%81%99%E3%82%8B%E6%A9%9F%E6%A2%B0%E5%AD%A6%E7%BF%92%E3%83%A2%E3%83%87%E3%83%AB-1ffe7c6ccf1e) |
 | [<img src="road_detection/roneld/output.jpg" width=128px>](road_detection/roneld/) | [roneld](/road_detection/roneld/) | [RONELD-Lane-Detection](https://github.com/czming/RONELD-Lane-Detection) | Pytorch | 1.2.6 and later |
 | [<img src="road_detection/road-segmentation-adas/output.png" width=128px>](road_detection/road-segmentation-adas/) | [road-segmentation-adas](/road_detection/road-segmentation-adas/) | [road-segmentation-adas-0001](https://github.com/openvinotoolkit/open_model_zoo/tree/master/models/intel/road-segmentation-adas-0001) | OpenVINO | 1.2.5 and later |
+| [<img src="road_detection/cdnet/output/filename_00038_res.png" width=128px>](road_detection/cdnet/) | [cdnet](/road_detection/cdnet/) | [CDNet](https://github.com/zhangzhengde0225/CDNet) | Pytorch | 1.2.5 and later |
 | [<img src="road_detection/lstr/output.jpg" width=128px>](road_detection/lstr/) | [lstr](/road_detection/lstr/) | [LSTR](https://github.com/liuruijin17/LSTR) | Pytorch | 1.2.8 and later |
 
 ## Rotation prediction
