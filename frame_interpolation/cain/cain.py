@@ -15,7 +15,6 @@ from model_utils import check_and_download_models  # noqa: E402
 from detector_utils import load_image  # noqa: E402
 from image_utils import normalize_image  # noqa: E402C
 import webcamera_utils  # noqa: E402
-
 # logger
 from logging import getLogger  # noqa: E402
 
@@ -49,6 +48,33 @@ args = update_parser(parser, large_model=True)
 # ======================
 
 def preprocess(img):
+    im_h, im_w, _ = img.shape
+
+    ow, oh = im_w, im_h
+    if im_w % (1 << 7) != 0:
+        ow = (((im_w >> 7) + 1) << 7)
+    if im_h % (1 << 7) != 0:
+        oh = (((im_h >> 7) + 1) << 7)
+
+    pad = np.zeros((oh, ow, 3))
+    pad_h = (oh - im_h) // 2
+    pad_w = (ow - im_w) // 2
+
+    # reflection padding
+    pad[pad_h:pad_h + im_h, pad_w:pad_w + im_w, :] = img
+    if 0 < pad_w:
+        ref = img[:, ::-1, :]
+        pad[pad_h:pad_h + im_h, :pad_w, :] = ref[:, -pad_w:, :]
+        rem = ow - pad_w - im_w
+        pad[pad_h:pad_h + im_h, -rem:, :] = ref[:, :rem, :]
+    if 0 < pad_h:
+        ref = pad[pad_h:pad_h + im_h, :, :][::-1]
+        pad[:pad_h, ...] = ref[-pad_h:, ...]
+        rem = oh - pad_h - im_h
+        pad[-rem:, ...] = ref[:rem, ...]
+
+    img = pad
+
     img = normalize_image(img, normalize_type='255')
 
     img = img[:, :, ::-1]  # BGR -> RGB
@@ -56,7 +82,7 @@ def preprocess(img):
     img = np.expand_dims(img, axis=0)
     img = img.astype(np.float32)
 
-    return img
+    return img, (pad_h, pad_w)
 
 
 def post_processing(output):
@@ -69,14 +95,19 @@ def post_processing(output):
 
 
 def predict(net, img1, img2):
-    img1 = preprocess(img1)
-    img2 = preprocess(img2)
+    h, w = img1.shape[:2]
+
+    img1, pad = preprocess(img1)
+    img2, _ = preprocess(img2)
 
     # feedforward
     output = net.predict([img1, img2])
     out, feats = output
 
     out_img = post_processing(out[0])
+
+    pad_h, pad_w = pad
+    out_img = out_img[pad_h:pad_h + h, pad_w:pad_w + w, :]
 
     return out_img
 
@@ -138,8 +169,6 @@ def recognize_from_video(net):
     fps = int(capture.get(cv2.CAP_PROP_FPS))
     f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
     f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
-    f_h = 256
-    f_w = 448
     writer = None
     if args.savepath != SAVE_IMAGE_PATH:
         writer = webcamera_utils.get_writer(args.savepath, f_h, f_w, fps=fps)
