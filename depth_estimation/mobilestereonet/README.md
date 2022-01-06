@@ -20,7 +20,7 @@ For the sample image,
 $ python3 mobilestereonet.py
 ```
 
-If you want to specify the input image, put the left sight image path after the `--input` option, and the right sight image aftter the `--input2` option.  
+If you want to specify the input image, put the left sight image path after the `--input` option, and the right sight image path after the `--input2` option.  
 You can use `--savepath` option to change the name of the output file to save.
 ```bash
 $ python3 mobilestereonet.py --input LEFT_IMAGE_PATH --input2 RIGHT_IMAGE_PATH --savepath SAVE_IMAGE_PATH
