@@ -40,6 +40,11 @@ parser.add_argument(
     '-i2', '--input2', default=None,
     help='The second input image path.'
 )
+parser.add_argument(
+    '-hw', metavar='HEIGHT,WIDTH',
+    default="256,448",
+    help='Specify the size to resize.'
+)
 args = update_parser(parser, large_model=True)
 
 
@@ -167,8 +172,7 @@ def recognize_from_video(net):
 
     # create video writer if savepath is specified as video format
     fps = int(capture.get(cv2.CAP_PROP_FPS))
-    f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
+    f_h, f_w = map(int, args.hw.split(','))
     writer = None
     if args.savepath != SAVE_IMAGE_PATH:
         writer = webcamera_utils.get_writer(args.savepath, f_h, f_w, fps=fps)
@@ -192,28 +196,28 @@ def recognize_from_video(net):
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
 
-        # inputs.append(frame)
+        # set inputs
         images.append(cv2.resize(frame, (f_w, f_h)))
         if len(images) < 2:
             continue
         elif len(images) > 2:
             images = images[1:]
 
+        # inference
         img1, img2 = images
         out_img = predict(net, img1, img2)
+
+        output_buffer[:f_h, :f_w, :] = images[0]
+        output_buffer[f_h * 1:f_h * 2, :f_w, :] = out_img
+        output_buffer[f_h * 2:f_h * 3, :f_w, :] = images[1]
+
+        # preview
+        cv2.imshow('frame', output_buffer)
 
         # save results
         if writer is not None:
             writer.write(images[0])
-        output_buffer[:f_h, :f_w, :] = images[0]
-        output_buffer[f_h * 2:f_h * 3, :f_w, :] = images[1]
-
-        if writer is not None:
             writer.write(out_img)
-        output_buffer[f_h:f_h * 2, :f_w, :] = out_img
-
-        # preview
-        cv2.imshow('frame', output_buffer)
 
     capture.release()
     cv2.destroyAllWindows()
