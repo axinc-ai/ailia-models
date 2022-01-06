@@ -20,7 +20,7 @@ For the sample images,
 $ python3 cain.py
 ```
 
-If you want to specify the input image, put the first image path after the `--input` option, and the next image after the `--input2` option.  
+If you want to specify the input image, put the first image path after the `--input` option, and the next image path after the `--input2` option.  
 You can use `--savepath` option to change the name of the output file to save.
 ```bash
 $ python3 cain.py --input IMAGE_PATH1 --input2 IMAGE_PATH2 --savepath SAVE_IMAGE_PATH
