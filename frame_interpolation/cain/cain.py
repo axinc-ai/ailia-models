@@ -37,13 +37,13 @@ SAVE_IMAGE_PATH = 'output.png'
 
 parser = get_base_parser('CAIN', IMAGE_PATH, SAVE_IMAGE_PATH)
 parser.add_argument(
-    '-i2', '--input2', default=None,
+    '-i2', '--input2', metavar='IMAGE2', default=None,
     help='The second input image path.'
 )
 parser.add_argument(
     '-hw', metavar='HEIGHT,WIDTH',
     default="256,448",
-    help='Specify the size to resize.'
+    help='Specify the size to resize on video mode.'
 )
 args = update_parser(parser, large_model=True)
 
