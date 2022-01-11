@@ -121,6 +121,7 @@ The collection of pre-trained, state-of-the-art AI models.
 | | Model | Reference | Exported From | Supported Ailia Version | Blog |
 |:-----------|------------:|:------------:|:------------:|:------------:|:------------:|
 | [<img src="frame_interpolation/flavr/sample_results/output.png" width=128px>](frame_interpolation/flavr/) | [flavr](/frame_interpolation/flavr/) | [FLAVR: Flow-Agnostic Video Representations for Fast Frame Interpolation](https://github.com/tarun005/FLAVR) | Pytorch | 1.2.7 and later | [EN](https://medium.com/axinc-ai/flavr-a-machine-learning-model-to-increase-video-frame-rate-758fe8132818) [JP](https://medium.com/axinc/flavr-%E5%8B%95%E7%94%BB%E3%81%AE%E3%83%95%E3%83%AC%E3%83%BC%E3%83%A0%E3%83%AC%E3%83%BC%E3%83%88%E3%82%92%E4%B8%8A%E3%81%92%E3%82%8B%E6%A9%9F%E6%A2%B0%E5%AD%A6%E7%BF%92%E3%83%A2%E3%83%87%E3%83%AB-6a18211445da) |
+| [<img src="frame_interpolation/cain/sample_results/output_0.png" width=128px>](frame_interpolation/cain/) | [cain](/frame_interpolation/cain/) | [Channel Attention Is All You Need for Video Frame Interpolation](https://github.com/myungsub/CAIN) | Pytorch | 1.2.5 and later | |
 
 ## Generative adversarial networks
 
