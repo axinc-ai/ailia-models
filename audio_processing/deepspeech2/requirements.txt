@@ -10,7 +10,7 @@ joblib==0.17.0
 librosa==0.8.0
 llvmlite==0.34.0
 numba==0.51.2
-numpy==1.19.2
+numpy==1.21.0
 packaging==20.4
 Pillow==9.0.0
 pooch==1.2.0
