@@ -1,5 +1,6 @@
 import os
 import urllib.request
+import ssl
 
 # logger
 from logging import getLogger
@@ -31,6 +32,22 @@ def progress_print(block_count, block_size, total_size):
     total_size_kb = total_size / 1024
     print(f'[{bar} {percentage:.2f}% ( {total_size_kb:.0f}KB )]', end='\r')
 
+def urlretrieve(remote_path,weight_path,progress_print):
+    try:
+        #raise ssl.SSLError # test
+        urllib.request.urlretrieve(
+            remote_path,
+            weight_path,
+            progress_print,
+        )
+    except ssl.SSLError as e:
+        logger.info(f'SSLError detected, so try to download without ssl')
+        remote_path = remote_path.replace("https","http")
+        urllib.request.urlretrieve(
+            remote_path,
+            weight_path,
+            progress_print,
+        )
 
 def check_and_download_models(weight_path, model_path, remote_path):
     """
@@ -50,7 +67,7 @@ def check_and_download_models(weight_path, model_path, remote_path):
 
     if not os.path.exists(weight_path):
         logger.info(f'Downloading onnx file... (save path: {weight_path})')
-        urllib.request.urlretrieve(
+        urlretrieve(
             remote_path + os.path.basename(weight_path),
             weight_path,
             progress_print,
@@ -58,7 +75,7 @@ def check_and_download_models(weight_path, model_path, remote_path):
         logger.info('\n')
     if model_path!=None and not os.path.exists(model_path):
         logger.info(f'Downloading prototxt file... (save path: {model_path})')
-        urllib.request.urlretrieve(
+        urlretrieve(
             remote_path + os.path.basename(model_path),
             model_path,
             progress_print,
