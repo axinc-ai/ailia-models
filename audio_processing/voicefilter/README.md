@@ -26,8 +26,7 @@ For the sample wav,
 $ python3 voicefilter.py --input 000006-mixed.wav --reference_file 000006-target.wav
 ```
 
-If you want to specify the mixed audio, put the file path after the `--input` option,  
-and to specify the reference audio, put the file path after the `--reference_file` option.   
+If you want to specify the mixed audio, put the file path after the `--input` option, and to specify the reference audio, put the file path after the `--reference_file` option.   
 You can use `--savepath` option to change the name of the output file to save.
 ```bash
 $ python3 voicefilter.py --input MIXED_WAV --reference_file REFERENCE_WAV --savepath SAVE_PATH
@@ -48,5 +47,5 @@ ONNX opset=11
 
 ## Netron
 
-[embedder.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/voicefilter/embedder.onnx.prototxt)
+[embedder.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/voicefilter/embedder.onnx.prototxt)  
 [model.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/voicefilter/model.onnx.prototxt)
