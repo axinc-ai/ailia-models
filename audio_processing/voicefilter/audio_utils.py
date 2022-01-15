@@ -1,4 +1,4 @@
-# adapted from Keith Ito's tacotron implementation
+# adapted from Keith Ito's tacotron implementation (MIT License)
 # https://github.com/keithito/tacotron/blob/master/util/audio.py
 
 import librosa
