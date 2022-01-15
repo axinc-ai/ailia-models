@@ -3,19 +3,22 @@
 ## Input
 
 Audio file
-```
-Mixed audio: Ex. 000006-mixed.wav
-```
-```
-Reference audio for d-vector: Ex. 000006-target.wav
-```
+
+- Mixed audio
+
+https://user-images.githubusercontent.com/29946532/149611959-9a055cf4-fe38-4204-8e0d-f40630de35c6.mov
+
+- Reference audio for d-vector
+
+https://user-images.githubusercontent.com/29946532/149612070-8905cebc-24de-4b55-b903-04bb857f645c.mov
 
 ## Output
 
 Audio file
-```
-Estimated audio: output.wav
-```
+
+- Estimated audio
+
+https://user-images.githubusercontent.com/29946532/149612149-9517ec76-821a-4a88-a9d3-01cfdf82dc77.mov
 
 ## Usage
 Automatically downloads the onnx and prototxt files on the first run.
