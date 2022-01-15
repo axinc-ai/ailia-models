@@ -28,7 +28,7 @@ class Dotdict(dict):
 hp = Dotdict({
     "audio": {
         "n_fft": 1200,
-        # num_freq: 601  # n_fft//2 + 1
+        "num_freq": 601,  # n_fft//2 + 1
         "sample_rate": 16000,
         "hop_length": 160,
         "win_length": 400,

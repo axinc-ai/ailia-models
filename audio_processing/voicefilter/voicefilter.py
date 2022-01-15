@@ -28,7 +28,7 @@ WEIGHT_EMB_PATH = 'embedder.onnx'
 MODEL_EMB_PATH = 'embedder.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/voicefilter/'
 
-WAVE_PATH = "1089-134691-0000.flac"
+WAVE_PATH = "000006-mixed.wav"
 SAVE_PATH = 'output.wav'
 
 # Audio
@@ -45,11 +45,6 @@ parser.add_argument(
     '-r', '--reference_file',
     default=None, type=str,
     help='path of reference wav file'
-)
-parser.add_argument(
-    '--onnx',
-    action='store_true',
-    help='execute onnxruntime version.'
 )
 args = update_parser(parser)
 
@@ -136,12 +131,8 @@ def main():
 
     env_id = args.env_id
 
-    if not args.onnx:
-        net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
-        embedder = ailia.Net(MODEL_EMB_PATH, WEIGHT_EMB_PATH, env_id=env_id)
-    else:
-        import onnxruntime
-        net = onnxruntime.InferenceSession(WEIGHT_PATH)
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+    embedder = ailia.Net(MODEL_EMB_PATH, WEIGHT_EMB_PATH, env_id=env_id)
 
     audio_recognition(net, embedder)
 
