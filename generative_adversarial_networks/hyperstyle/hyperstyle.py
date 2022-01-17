@@ -150,12 +150,26 @@ parser.add_argument(
     default=None,
     nargs=argparse.REMAINDER,
 )
+parser.add_argument(
+    "--onnx",
+    action="store_true",
+)
 args = update_parser(parser)
 
 
 # ======================
 # Utils
 # ======================
+from contextlib import contextmanager
+@contextmanager
+def time_exec(msg, indent_lvl=0):
+    indent = '  ' * indent_lvl if indent_lvl > 0 else ''
+    start = time.perf_counter()
+    logger.info(f'{indent}Start {msg}')
+    yield
+    end = time.perf_counter()
+    logger.info(f'{indent}End {msg}, took {end - start} seconds')
+
 def check(path):
     import onnx
     onnx_model = onnx.load(path)
@@ -180,15 +194,30 @@ def run_on_batch(inputs, net, face_pool_net, iters, avg_image_for_batch):
             x_input = np.concatenate([inputs, y_hat], axis=1)
 
         # ReStyle e4e
-        y_hat, latent = net.predict({'x_input': x_input, 'latent_in': latent})
+        if args.onnx:
+            y_hat, latent = net.run(None, {'x_input': x_input, 'latent_in': latent})
+        else:
+            # x_input = x_input.astype(np.float32)
+            y_hat, latent = net.predict({'x_input': x_input, 'latent_in': latent})
 
         # resize input to 256 before feeding into next iteration
-        y_hat = face_pool_net.predict(y_hat)
+        if args.onnx:
+            _inputs = face_pool_net.get_inputs()
+            input_feed = {_inputs[0].name: y_hat}
+            y_hat = face_pool_net.run(None, input_feed)[0]
+        else:
+            y_hat = face_pool_net.predict(y_hat)
 
     return y_hat, latent
 
 def get_initial_inversion(x, encoder, decoder, face_pool_decoder):
-    codes = encoder.predict(x)
+    if args.onnx:
+        _inputs = encoder.get_inputs()
+        input_feed = {_inputs[0].name: x.astype(np.float32)}
+        codes = encoder.run(None, input_feed)[0]
+    else:
+        codes = encoder.predict(x)
+        # codes = encoder.predict(x.astype(np.float32))
     latent_avg = np.load(os.path.join(AVERAGE, 'hyperstyle_latent_avg.npy'))
 
     if codes.ndim == 2:
@@ -197,9 +226,19 @@ def get_initial_inversion(x, encoder, decoder, face_pool_decoder):
         codes = codes + np.tile(latent_avg, (codes.shape[0], 1, 1, 1))
     codes = codes[0]
     
-    y_hat = decoder.predict([codes])[0]
+    if args.onnx:
+        _inputs = decoder.get_inputs()
+        input_feed = {_inputs[0].name: codes}
+        y_hat = decoder.run(None, input_feed)[0]
+    else:
+        y_hat = decoder.predict([codes])[0]
 
-    y_hat = face_pool_decoder.predict(y_hat)
+    if args.onnx:
+        _inputs = face_pool_decoder.get_inputs()
+        input_feed = {_inputs[0].name: y_hat}
+        y_hat = face_pool_decoder.run(None, input_feed)[0]
+    else:
+        y_hat = face_pool_decoder.predict(y_hat)
     return y_hat, codes
 
 
@@ -207,14 +246,22 @@ def run_inversion(inputs, nets, iters):
     latent, weights_deltas = None, None
 
     # Encoder, Decoder
-    y_hat, codes = get_initial_inversion(inputs, nets[7], nets[3], nets[4])
+    with time_exec('get_initial_inversion', 2):
+        y_hat, codes = get_initial_inversion(inputs, nets[7], nets[3], nets[4])
 
     for iter in range(iters):
         # Hyperstyle
         x_input = np.concatenate([inputs, y_hat], axis=1)
 
         # Hyperstyle - Hypernet
-        hypernet_outputs = nets[0].run(x_input)
+        with time_exec('Hypernet', 2):
+            if args.onnx:
+                _inputs = nets[0].get_inputs()
+                input_feed = {_inputs[0].name: x_input}
+                hypernet_outputs = nets[0].run(None, input_feed)
+            else:
+                hypernet_outputs = nets[0].run(x_input)
+                # hypernet_outputs = nets[0].run(x_input.astype(np.float32))
 
         if weights_deltas is None:
             weights_deltas = hypernet_outputs
@@ -226,11 +273,21 @@ def run_inversion(inputs, nets, iters):
         params['[codes]'] = codes
         params['weights_deltas'] = weights_deltas[0]
         # Hyperstyle - Decoder
-        y_hat, latent = nets[1].run(params)
+        with time_exec('Decoder', 2):
+            if args.onnx:
+                y_hat, latent = nets[1].run(None, params)
+            else:
+                y_hat, latent = nets[1].run(params)
 
         # resize input to 256 before feeding into next iteration
         no_resize = y_hat
-        y_hat = nets[2].predict(y_hat)
+        with time_exec('predict', 2):
+            if args.onnx:
+                _inputs = nets[2].get_inputs()
+                input_feed = {_inputs[0].name: y_hat}
+                y_hat = nets[2].run(None, input_feed)[0]
+            else:
+                y_hat = nets[2].predict(y_hat)
 
     return y_hat, latent, weights_deltas, codes, no_resize
 
@@ -239,22 +296,32 @@ def filter_non_ffhq_layers_in_toonify_model(weights_deltas):
     toonify_ffhq_layer_idx = [14, 15, 17, 18, 20, 21, 23, 24]
     for i in range(len(weights_deltas)):
         if weights_deltas[i] is not None and i not in toonify_ffhq_layer_idx:
-            weights_deltas[i] = np.zeros(weights_deltas[i].shape)
+            # weights_deltas[i] = np.zeros(weights_deltas[i].shape)
+            weights_deltas[i] = np.zeros(weights_deltas[i].shape, dtype=np.float32)
     return weights_deltas
 
 def run_domain_adaptation(inputs, nets, iters, avg_image, weights_deltas=None):
     aux = (None, None, None)
-    _, latents = run_on_batch(inputs, nets[5], nets[6], iters, avg_image)
+    with time_exec('run_on_batch', 1):
+        _, latents = run_on_batch(inputs, nets[5], nets[6], iters, avg_image)
     if weights_deltas is None:
-        y_hat, _, weights_deltas, codes, _ = run_inversion(inputs, nets, iters)
-        aux = (y_hat, weights_deltas, codes)
-    weights_deltas = filter_non_ffhq_layers_in_toonify_model(weights_deltas)
+        with time_exec('run_inversion', 1):
+            y_hat, _, weights_deltas, codes, _ = run_inversion(inputs, nets, iters)
+            aux = (y_hat, weights_deltas, codes)
+    with time_exec('filter_non_ffhq_layers_in_toonify_model', 1):
+        weights_deltas = filter_non_ffhq_layers_in_toonify_model(weights_deltas)
 
     params = {str(i): weights_deltas[i-1] for i in range(2, 27)}
+    # params = {str(i): weights_deltas[i-1].astype(np.float32) for i in range(2, 27)}
     params['[latents]'] = latents
     params['weights_deltas'] = weights_deltas[0]
+    # params['weights_deltas'] = weights_deltas[0].astype(np.float32)
     # Fine-tuned generator
-    result_batch, _ = nets[8].run(params)
+    with time_exec('fine-tuned generator inference', 1):
+        if args.onnx:
+            result_batch, _ = nets[8].run(None, params)
+        else:
+            result_batch, _ = nets[8].run(params)
 
     return result_batch, aux
 
@@ -293,9 +360,10 @@ def inference(inputs, nets, iters):
     # domain adaptation task
     if args.adaptation:
         e4e_avg_img = np.load(os.path.join(AVERAGE, 'e4e_image_avg.npy'))
-        result_batch, aux = run_domain_adaptation(inputs, nets, iters, e4e_avg_img, weights_deltas)
-        if (y_hat is None) or (weights_deltas is None) or (codes is None):
-            y_hat, weights_deltas, codes = aux
+        with time_exec('run_domain_adaptation'):
+            result_batch, aux = run_domain_adaptation(inputs, nets, iters, e4e_avg_img, weights_deltas)
+            if (y_hat is None) or (weights_deltas is None) or (codes is None):
+                y_hat, weights_deltas, codes = aux
     # editing task
     if args.editing:
         result_editing = run_editing(inputs, nets, iters, y_hat, weights_deltas, codes)
@@ -371,27 +439,29 @@ def save_results(result_adaptation, result_inversion, result_editing, input_img,
 # ======================
 def recognize_from_image(filename, nets): 
     # face alignment
-    aligned = align_face(filename, args, face_alignment_path, face_detector_path)
-    if aligned is not None:
-        path = os.path.join(ALIGNED_PATH, filename.split('/')[-1])
-        aligned.save(path)
-    else: 
-        path = filename
+    with time_exec('align_face'):
+        aligned = align_face(filename, args, face_alignment_path, face_detector_path)
+        if aligned is not None:
+            path = os.path.join(ALIGNED_PATH, filename.split('/')[-1])
+            aligned.save(path)
+        else: 
+            path = filename
 
-    input_img = load_image(
-        filename,
-        (IMAGE_HEIGHT, IMAGE_WIDTH),
-        normalize_type='255',
-        gen_input_ailia=True,
-    )
+    with time_exec('image loading'):
+        input_img = load_image(
+            filename,
+            (IMAGE_HEIGHT, IMAGE_WIDTH),
+            normalize_type='255',
+            gen_input_ailia=True,
+        ).astype(np.float32)
 
-    input_img_resized = load_image(
-        path,
-        (RESIZE_HEIGHT, RESIZE_WIDTH),
-        normalize_type='255',
-        gen_input_ailia=True,
-    )
-    input_img_resized = (input_img_resized * 2) - 1
+        input_img_resized = load_image(
+            path,
+            (RESIZE_HEIGHT, RESIZE_WIDTH),
+            normalize_type='255',
+            gen_input_ailia=True,
+        ).astype(np.float32)
+        input_img_resized = (input_img_resized * 2) - 1
     
     # inference
     logger.info('Start inference...')
@@ -405,7 +475,8 @@ def recognize_from_image(filename, nets):
             logger.info(f'\tailia processing time {end - start} ms')
     else:
         # ailia prediction
-        result_adaptation, result_inversion, result_editing = inference(input_img_resized, nets, args.iteration)
+        with time_exec('inference'):
+            result_adaptation, result_inversion, result_editing = inference(input_img_resized, nets, args.iteration)
     
     save_results(result_adaptation, result_inversion, result_editing, input_img, filename)
 
@@ -503,7 +574,12 @@ def main():
         logger.info('Debug OK.')
     else:
         # net initialize
-        nets = [ailia.Net(model, weight, env_id=args.env_id) for model, weight in zip(models, weights)]
+        if args.onnx:
+            with time_exec('create ONNX sessions'):
+                nets = [ort.InferenceSession(model) for model in weights]
+        else:
+            with time_exec('create ailia.Net'):
+                nets = [ailia.Net(model, weight, env_id=args.env_id) for model, weight in zip(models, weights)]
         # video mode
         if args.video is not None:
             recognize_from_video(SAVE_IMAGE_PATH, nets)
@@ -516,6 +592,9 @@ def main():
 
 
 if __name__ == '__main__':
+    if args.onnx:
+        import onnxruntime as ort
+
     if args.model in CHOICES:
         FINE_TUNED_WEIGHT_PATH = os.path.join(CHECKPOINTS, f'{args.model}.onnx')
         FINE_TUNED_MODEL_PATH = os.path.join(CHECKPOINTS, f'{args.model}.onnx.prototxt')
