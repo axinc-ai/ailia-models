@@ -20,13 +20,19 @@ Audio file
 
 https://user-images.githubusercontent.com/29946532/149612149-9517ec76-821a-4a88-a9d3-01cfdf82dc77.mov
 
+- Ground truth
+
+
+
+(Audio from http://swpark.me/voicefilter/)
+
 ## Usage
 Automatically downloads the onnx and prototxt files on the first run.
 It is necessary to be connected to the Internet while downloading.
 
 For the sample wav,
 ```bash
-$ python3 voicefilter.py --input 000006-mixed.wav --reference_file 000006-target.wav
+$ python3 voicefilter.py --input mixed.wav --reference_file ref-voice.wav
 ```
 
 If you want to specify the mixed audio, put the file path after the `--input` option, and to specify the reference audio, put the file path after the `--reference_file` option.   
