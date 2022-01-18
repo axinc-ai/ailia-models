@@ -6,11 +6,11 @@ Audio file
 
 - Mixed audio
 
-https://user-images.githubusercontent.com/29946532/149611959-9a055cf4-fe38-4204-8e0d-f40630de35c6.mov
+https://user-images.githubusercontent.com/29946532/149924386-1a67ec3c-390a-422e-b0b3-9540dff58c72.mov
 
 - Reference audio for d-vector
 
-https://user-images.githubusercontent.com/29946532/149612070-8905cebc-24de-4b55-b903-04bb857f645c.mov
+https://user-images.githubusercontent.com/29946532/149924422-3620f0fb-dca7-45a9-a465-c22bfb00d7ae.mov
 
 ## Output
 
@@ -18,11 +18,11 @@ Audio file
 
 - Estimated audio
 
-https://user-images.githubusercontent.com/29946532/149612149-9517ec76-821a-4a88-a9d3-01cfdf82dc77.mov
+https://user-images.githubusercontent.com/29946532/149924467-124a6605-1a52-41ce-8d79-bc54335a0f28.mov
 
 - Ground truth
 
-
+https://user-images.githubusercontent.com/29946532/149924495-1398c57b-5e8a-4012-8e9a-97e655a3ea26.mov
 
 (Audio from http://swpark.me/voicefilter/)
 
