@@ -28,7 +28,7 @@ WEIGHT_EMB_PATH = 'embedder.onnx'
 MODEL_EMB_PATH = 'embedder.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/voicefilter/'
 
-WAVE_PATH = "000006-mixed.wav"
+WAVE_PATH = "mixed.wav"
 SAVE_PATH = 'output.wav'
 
 # Audio
@@ -43,7 +43,7 @@ parser = get_base_parser(
 )
 parser.add_argument(
     '-r', '--reference_file',
-    default=None, type=str,
+    default="ref-voice.wav", type=str,
     help='path of reference wav file'
 )
 args = update_parser(parser)

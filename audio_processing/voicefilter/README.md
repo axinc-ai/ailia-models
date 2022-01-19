@@ -12,6 +12,9 @@ https://user-images.githubusercontent.com/29946532/149924386-1a67ec3c-390a-422e-
 
 https://user-images.githubusercontent.com/29946532/149924422-3620f0fb-dca7-45a9-a465-c22bfb00d7ae.mov
 
+Input an audio file that is spoken by multiple people and an audio file that contains the voices of the people you want to extract.
+The voice of one person is extracted and output.
+
 ## Output
 
 Audio file
