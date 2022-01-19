@@ -579,7 +579,9 @@ def main():
                 nets = [ort.InferenceSession(model) for model in weights]
         else:
             with time_exec('create ailia.Net'):
-                nets = [ailia.Net(model, weight, env_id=args.env_id) for model, weight in zip(models, weights)]
+                # mem_mode = None # require 24GiB 
+                mem_mode = ailia.get_memory_mode(reduce_constant=True, reuse_interstage=True) # require 16GiB
+                nets = [ailia.Net(model, weight, env_id=args.env_id, memory_mode=mem_mode) for model, weight in zip(models, weights)]
         # video mode
         if args.video is not None:
             recognize_from_video(SAVE_IMAGE_PATH, nets)
