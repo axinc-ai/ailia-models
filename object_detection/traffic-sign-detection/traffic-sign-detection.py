@@ -21,11 +21,13 @@ logger = getLogger(__name__)
 # Parameters
 # ======================
 
-WEIGHT_PATH = 'faster_rcnn_resnet50.onnx'
-MODEL_PATH = 'faster_rcnn_resnet50.onnx.prototxt'
+WEIGHT_RESNET50_PATH = 'faster_rcnn_resnet50.onnx'
+MODEL_RESNET50_PATH = 'faster_rcnn_resnet50.onnx.prototxt'
+WEIGHT_INCEPTION_RESNET_PATH = 'faster_rcnn_inception_resnet_v2_atrous.onnx'
+MODEL_INCEPTION_RESNET_PATH = 'faster_rcnn_inception_resnet_v2_atrous.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/traffic-sign-detection/'
 
-IMAGE_PATH = 'demo.png'
+IMAGE_PATH = 'demo.jpg'
 SAVE_IMAGE_PATH = 'output.png'
 
 class_name = [
@@ -40,6 +42,10 @@ class_name = [
 
 parser = get_base_parser(
     'Traffic Sign Detection', IMAGE_PATH, SAVE_IMAGE_PATH
+)
+parser.add_argument(
+    '-m', '--model_type', default='resnet50', choices=('resnet50', 'inception_resnet'),
+    help='model type'
 )
 parser.add_argument(
     '--onnx',
@@ -178,8 +184,7 @@ def recognize_from_video(net):
             break
 
         # inference
-        img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        bboxes = predict(net, img)
+        bboxes = predict(net, frame)
 
         # plot result
         res_img = draw_bbox(frame, bboxes)
@@ -200,17 +205,23 @@ def recognize_from_video(net):
 
 
 def main():
+    dic_model = {
+        'resnet50': (WEIGHT_RESNET50_PATH, MODEL_RESNET50_PATH),
+        'inception_resnet': (WEIGHT_INCEPTION_RESNET_PATH, MODEL_INCEPTION_RESNET_PATH),
+    }
+    weight_path, model_path = dic_model[args.model_type]
+
     # model files check and download
-    check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
+    check_and_download_models(weight_path, model_path, REMOTE_PATH)
 
     env_id = args.env_id
 
     # initialize
     if not args.onnx:
-        net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+        net = ailia.Net(model_path, weight_path, env_id=env_id)
     else:
         import onnxruntime
-        net = onnxruntime.InferenceSession(WEIGHT_PATH)
+        net = onnxruntime.InferenceSession(weight_path)
 
     if args.video is not None:
         recognize_from_video(net)
