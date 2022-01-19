@@ -38,6 +38,7 @@ The collection of pre-trained, state-of-the-art AI models.
 | [unet_source_separation](/audio_processing/unet_source_separation/) | [source_separation](https://github.com/AppleHolic/source_separation)  | Pytorch | 1.2.6 and later | [EN](https://medium.com/axinc-ai/unetsourceseparation-a-machine-learning-model-to-remove-audio-noise-and-extract-voices-5acae8c37291) [JP](https://medium.com/axinc/unetsourceseparation-%E9%9B%91%E9%9F%B3%E3%82%92%E9%99%A4%E5%8E%BB%E3%81%97%E3%81%A6%E5%A3%B0%E3%81%A0%E3%81%91%E3%82%92%E6%8A%BD%E5%87%BA%E3%81%99%E3%82%8B%E6%A9%9F%E6%A2%B0%E5%AD%A6%E7%BF%92%E3%83%A2%E3%83%87%E3%83%AB-5d23fd054eac) |
 | [transformer-cnn-emotion-recognition](/audio_processing/transformer-cnn-emotion-recognition/) | [Combining Spatial and Temporal Feature Representions of Speech Emotion by Parallelizing CNNs and Transformer-Encoders](https://github.com/IliaZenkov/transformer-cnn-emotion-recognition)  | Pytorch | 1.2.5 and later |
 | [auto_speech](/audio_processing/auto_speech/) | [AutoSpeech: Neural Architecture Search for Speaker Recognition](https://github.com/VITA-Group/AutoSpeech)  | Pytorch | 1.2.5 and later | [EN](https://medium.com/axinc-ai/autospeech-speech-based-person-identification-model-f01822f6d8e5) [JP](https://medium.com/axinc/autospeech-%E9%9F%B3%E5%A3%B0%E3%81%AB%E3%82%88%E3%82%8B%E5%80%8B%E4%BA%BA%E8%AD%98%E5%88%A5%E3%83%A2%E3%83%87%E3%83%AB-267a00f26a4a) |
+| [voicefilter](/audio_processing/voicefilter/) | [VoiceFilter](https://github.com/mindslab-ai/voicefilter)  | Pytorch | 1.2.7 and later | |
 
 ## Background removal
 
