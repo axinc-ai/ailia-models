@@ -21,10 +21,10 @@ logger = getLogger(__name__)
 # Parameters
 # ======================
 
-WEIGHT_PATH = 'MIMO-UNetPlus.onnx'
-MODEL_PATH = 'MIMO-UNetPlus.onnx.prototxt'
-WEIGHT_XXX_PATH = 'MIMO-UNet.onnx'
-MODEL_XXX_PATH = 'MIMO-UNet.onnx.prototxt'
+WEIGHT_UNETPLUS_PATH = 'MIMO-UNetPlus.onnx'
+MODEL_UNETPLUS_PATH = 'MIMO-UNetPlus.onnx.prototxt'
+WEIGHT_UNET_PATH = 'MIMO-UNet.onnx'
+MODEL_UNET_PATH = 'MIMO-UNet.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/mimo-unet/'
 
 IMAGE_PATH = 'demo.png'
@@ -60,8 +60,7 @@ def predict(net, img):
     pred = output[2]
 
     pred = pred[0]
-    pred = np.clip(pred, 0, 1)
-    pred = pred * 255 + 0.5
+    pred = np.clip(pred * 255 + 0.5, 0, 255)
     pred = pred.transpose(1, 2, 0)  # CHW -> HWC
     pred = pred.astype(np.uint8)
 
@@ -152,8 +151,8 @@ def recognize_from_video(net):
 
 def main():
     dic_model = {
-        'MIMO-UNetPlus': (WEIGHT_PATH, MODEL_PATH),
-        'MIMO-UNet': (WEIGHT_XXX_PATH, MODEL_XXX_PATH),
+        'MIMO-UNetPlus': (WEIGHT_UNETPLUS_PATH, MODEL_UNETPLUS_PATH),
+        'MIMO-UNet': (WEIGHT_UNET_PATH, MODEL_UNET_PATH),
     }
     weight_path, model_path = dic_model[args.model_type]
 
