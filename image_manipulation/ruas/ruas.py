@@ -43,7 +43,6 @@ WIDTH_SIZE = 768
 
 config_h = 320
 config_w = 320
-input_dir = 'input/'
 
 
 # ======================
@@ -72,18 +71,27 @@ def _load_images_transform(filename):
     return img_norm
 
 
-def _get_item(image_path):
-    low = _load_images_transform(image_path)
-    h = low.shape[0]
-    w = low.shape[1]
+def _preprocess(img):
+    h = img.shape[0]
+    w = img.shape[1]
 
     h_offset = random.randint(0, max(0, h - config_h - 1))
     w_offset = random.randint(0, max(0, w - config_w - 1))
 
-    low = np.asarray(low, dtype=np.float32)
-    low = np.transpose(low[:, :, :], (2, 0, 1))
+    img = np.asarray(img, dtype=np.float32)
+    img = np.transpose(img[:, :, :], (2, 0, 1))
+    img = torch.from_numpy(img)
 
-    return torch.from_numpy(low)
+    img = img.unsqueeze(0)
+    img = img.to('cpu').detach().numpy().copy()
+
+    return img
+
+
+def _get_item(image_path):
+    img = _load_images_transform(image_path)
+    img = _preprocess(img)
+    return img
 
 
 def _save_images(tensor, filename):
@@ -98,49 +106,86 @@ def _save_images(tensor, filename):
 def recognize_from_image(net):
     print('image mode.')
 
-    # input image loop
     for image_path in args.input:
-        # prepare input data
         logger.info(image_path)
 
         input = _get_item(image_path)
-        input = input.unsqueeze(0)
-        input = input.to('cpu').detach().numpy().copy()
         output = net.run(input)
-        u_list = output[0:4]
-        r_list = output[4:7]
+        u_list = output[0:4] #r_list = output[4:7]
 
-        filename = image_path.replace(input_dir, '')
         if args.model == 'lol':
-            _save_images(u_list[-1], filename)
+            out_img = u_list[-1]
         elif args.model == 'upe' or args.model == 'dark':
-            _save_images(u_list[-2], filename)
+            out_img = u_list[-2]
 
+        filename = image_path.replace('input/', '')
+        _save_images(out_img, filename)
 
 
 def recognize_from_video(net):
     print('video mode.')
 
+    capture = webcamera_utils.get_capture(args.video)
+
+    # create video writer if savepath is specified as video format
+    if args.savepath != SAVE_IMAGE_PATH:
+        f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
+        writer = webcamera_utils.get_writer(args.savepath, f_h, f_w)
+    else:
+        writer = None
+
+    i = 0
+    while(True):
+        i += 1
+        ret, img = capture.read()
+        # press q to end video capture
+        if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        input = _preprocess(img)
+        input = (input/ 255.).astype(np.float32)
+        output = net.run(input)
+        u_list = output[0:4]
+        r_list = output[4:7]
+
+        if args.model == 'lol':
+            out_img = u_list[-1]
+        elif args.model == 'upe' or args.model == 'dark':
+            out_img = u_list[-2]
+
+        output = out_img[0]
+        output = (np.transpose(output, (1, 2, 0)))
+        output = np.clip(output * 255.0, 0, 255.0).astype('uint8')
+
+        # save results
+        if writer is not None:
+            writer.write(output)
+
+        print('processed {}th frame.'.format(i))
+
+    capture.release()
+    cv2.destroyAllWindows()
+    if writer is not None:
+        writer.release()
+    logger.info('Script finished successfully.')
+
 
 def main():
     if args.model == 'upe':
-        #check_and_download_models(UPE_WEIGHT_PATH, UPE_MODEL_PATH, REMOTE_PATH)
+        check_and_download_models(UPE_WEIGHT_PATH, UPE_MODEL_PATH, REMOTE_PATH)
         net = ailia.Net(UPE_MODEL_PATH, UPE_WEIGHT_PATH, env_id=args.env_id)
     elif args.model == 'lol':
-        #check_and_download_models(LOL_WEIGHT_PATH, LOL_MODEL_PATH, REMOTE_PATH)
+        check_and_download_models(LOL_WEIGHT_PATH, LOL_MODEL_PATH, REMOTE_PATH)
         net = ailia.Net(LOL_MODEL_PATH, LOL_WEIGHT_PATH, env_id=args.env_id)
     elif args.model == 'dark':
-        #check_and_download_models(DARK_WEIGHT_PATH, DARK_MODEL_PATH, REMOTE_PATH)
+        check_and_download_models(DARK_WEIGHT_PATH, DARK_MODEL_PATH, REMOTE_PATH)
         net = ailia.Net(DARK_MODEL_PATH, DARK_WEIGHT_PATH, env_id=args.env_id)
-    else:
-        print('Invalid model.')
-        exit()
 
-    if args.video is not None:
-        # video mode
+    if args.video is not None: # video mode
         recognize_from_video(net)
-    else:
-        # image mode
+    else: # image mode
         recognize_from_image(net)
 
 
