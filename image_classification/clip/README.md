@@ -48,6 +48,11 @@ If you want to load a subset of the texture labels you input into the model from
 $ python3 clip.py --desc_file imagenet_classes.txt
 ```
 
+By adding the `--model_type` option, you can specify model type which is selected from "ViTB32", "RN50". (default is ViTB32)
+```bash
+$ python3 clip.py --model_type ViTB32
+```
+
 ## Reference
 
 - [CLIP](https://github.com/openai/CLIP)
@@ -62,4 +67,7 @@ ONNX opset=11
 
 ## Netron
 
-[ViT-B32.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/clip/ViT-B32.onnx.prototxt)
+[ViT-B32-encode_image.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/clip/ViT-B32-encode_image.onnx.prototxt)  
+[ViT-B32-encode_text.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/clip/ViT-B32-encode_text.onnx.prototxt)  
+[RN50-encode_image.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/clip/RN50-encode_image.onnx.prototxt)  
+[RN50-encode_text.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/clip/RN50-encode_text.onnx.prototxt)

@@ -30,6 +30,10 @@ WEIGHT_VITB32_IMAGE_PATH = 'ViT-B32-encode_image.onnx'
 MODEL_VITB32_IMAGE_PATH = 'ViT-B32-encode_image.onnx.prototxt'
 WEIGHT_VITB32_TEXT_PATH = 'ViT-B32-encode_text.onnx'
 MODEL_VITB32_TEXT_PATH = 'ViT-B32-encode_text.onnx.prototxt'
+WEIGHT_RN50_IMAGE_PATH = 'RN50-encode_image.onnx'
+MODEL_RN50_IMAGE_PATH = 'RN50-encode_image.onnx.prototxt'
+WEIGHT_RN50_TEXT_PATH = 'RN50-encode_text.onnx'
+MODEL_RN50_TEXT_PATH = 'RN50-encode_text.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/clip/'
 
 IMAGE_PATH = 'chelsea.png'
@@ -54,6 +58,10 @@ parser.add_argument(
     help='description file'
 )
 parser.add_argument(
+    '-m', '--model_type', default='ViTB32', choices=('ViTB32', 'RN50'),
+    help='model type'
+)
+parser.add_argument(
     '--onnx',
     action='store_true',
     help='execute onnxruntime version.'
@@ -72,7 +80,7 @@ def tokenize(texts, context_length=77, truncate=False):
     sot_token = _tokenizer.encoder["<|startoftext|>"]
     eot_token = _tokenizer.encoder["<|endoftext|>"]
     all_tokens = [[sot_token] + _tokenizer.encode(text) + [eot_token] for text in texts]
-    result = np.zeros((len(all_tokens), context_length), dtype=np.int)
+    result = np.zeros((len(all_tokens), context_length), dtype=np.int64)
 
     for i, tokens in enumerate(all_tokens):
         if len(tokens) > context_length:
@@ -208,16 +216,21 @@ def recognize_from_image(net_image, net_text):
 
 
 def main():
-    WEGHT_IMAGE_PATH = WEIGHT_VITB32_IMAGE_PATH
-    MODEL_IMAGE_PATH = MODEL_VITB32_IMAGE_PATH
-    WEGHT_TEXT_PATH = WEIGHT_VITB32_TEXT_PATH
-    MODEL_TEXT_PATH = MODEL_VITB32_TEXT_PATH
+    dic_model = {
+        'ViTB32': (
+            (WEIGHT_VITB32_IMAGE_PATH, MODEL_VITB32_IMAGE_PATH),
+            (WEIGHT_VITB32_TEXT_PATH, MODEL_VITB32_TEXT_PATH)),
+        'RN50': (
+            (WEIGHT_RN50_IMAGE_PATH, MODEL_RN50_IMAGE_PATH),
+            (WEIGHT_RN50_TEXT_PATH, MODEL_RN50_TEXT_PATH)),
+    }
+    (WEIGHT_IMAGE_PATH, MODEL_IMAGE_PATH), (WEIGHT_TEXT_PATH, MODEL_TEXT_PATH) = dic_model[args.model_type]
 
     # model files check and download
     logger.info('Checking encode_image model...')
-    check_and_download_models(WEGHT_IMAGE_PATH, MODEL_IMAGE_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_IMAGE_PATH, MODEL_IMAGE_PATH, REMOTE_PATH)
     logger.info('Checking encode_text model...')
-    check_and_download_models(WEGHT_TEXT_PATH, MODEL_TEXT_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_TEXT_PATH, MODEL_TEXT_PATH, REMOTE_PATH)
 
     env_id = args.env_id
 
@@ -227,12 +240,12 @@ def main():
         memory_mode = ailia.get_memory_mode(
             reduce_constant=True, ignore_input_with_initializer=True,
             reduce_interstage=False, reuse_interstage=False)
-        net_image = ailia.Net(MODEL_IMAGE_PATH, WEGHT_IMAGE_PATH, env_id=env_id, memory_mode=memory_mode)
-        net_text = ailia.Net(MODEL_TEXT_PATH, WEGHT_TEXT_PATH, env_id=env_id, memory_mode=memory_mode)
+        net_image = ailia.Net(MODEL_IMAGE_PATH, WEIGHT_IMAGE_PATH, env_id=env_id, memory_mode=memory_mode)
+        net_text = ailia.Net(MODEL_TEXT_PATH, WEIGHT_TEXT_PATH, env_id=env_id, memory_mode=memory_mode)
     else:
         import onnxruntime
-        net_image = onnxruntime.InferenceSession(WEGHT_IMAGE_PATH)
-        net_text = onnxruntime.InferenceSession(WEGHT_TEXT_PATH)
+        net_image = onnxruntime.InferenceSession(WEIGHT_IMAGE_PATH)
+        net_text = onnxruntime.InferenceSession(WEIGHT_TEXT_PATH)
 
     recognize_from_image(net_image, net_text)
 
