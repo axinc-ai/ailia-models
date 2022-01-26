@@ -19,8 +19,6 @@ logger = getLogger(__name__)
 # import for ruas
 import random
 from PIL import Image
-import torch
-import torchvision.transforms as transforms
 
 
 # ======================
@@ -62,29 +60,20 @@ args = update_parser(parser)
 
 
 def _load_images_transform(filename):
-    im = Image.open(filename).convert('RGB')
-    transform_list = []
-    transform_list += [transforms.ToTensor()]
-    transform = transforms.Compose(transform_list)
-    img_norm = transform(im).numpy()
-    img_norm = np.transpose(img_norm, (1, 2, 0))
-    return img_norm
+    img = Image.open(filename).convert('RGB')
+    img = np.array(img)
+    img = (img/ 255.).astype(np.float32)
+    return img
 
 
 def _preprocess(img):
     h = img.shape[0]
     w = img.shape[1]
-
     h_offset = random.randint(0, max(0, h - config_h - 1))
     w_offset = random.randint(0, max(0, w - config_w - 1))
-
     img = np.asarray(img, dtype=np.float32)
     img = np.transpose(img[:, :, :], (2, 0, 1))
-    img = torch.from_numpy(img)
-
-    img = img.unsqueeze(0)
-    img = img.to('cpu').detach().numpy().copy()
-
+    img = img[np.newaxis, :, :, :]
     return img
 
 

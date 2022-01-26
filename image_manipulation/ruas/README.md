@@ -41,7 +41,7 @@ $ python3 ruas.py --input input/20.png --model dark
 By adding the `--video` option, you can input the video.
 If you pass `0` as an argument to VIDEO_PATH, you can use the webcam input instead of the video file.
 ```bash
-$ python3 XXX
+$ python3 ruas.py --video VIDEO_PATH --model MODEL_NAME
 ```
 
 ## Reference
