@@ -226,7 +226,7 @@ The collection of pre-trained, state-of-the-art AI models.
 
 | | Model | Reference | Exported From | Supported Ailia Version | Blog |
 |:-----------|------------:|:------------:|:------------:|:------------:|:------------:|
-| [<img src="low_light_image_enhancement/agllnet/output.png" width=128px>](low_light_image_enhancement/agllnet/) | [agllnet](/low_light_image_enhancement/agllnet/) | [AGLLNet: Attention Guided Low-light Image Enhancement (IJCV 2021)](https://github.com/yu-li/AGLLNet) | Pytorch | 1.2.9 and later |
+| [<img src="low_light_image_enhancement/agllnet/output.png" width=128px>](low_light_image_enhancement/agllnet/) | [agllnet](/low_light_image_enhancement/agllnet/) | [AGLLNet: Attention Guided Low-light Image Enhancement (IJCV 2021)](https://github.com/yu-li/AGLLNet) | Pytorch | 1.2.9 and later | [JP](https://medium.com/axinc/agllnet-%E6%9A%97%E3%81%84%E7%94%BB%E5%83%8F%E3%82%92%E6%98%8E%E3%82%8B%E3%81%8F%E3%81%99%E3%82%8B%E6%A9%9F%E6%A2%B0%E5%AD%A6%E7%BF%92%E3%83%A2%E3%83%87%E3%83%AB-d59181ad89a9) |
 
 ## Natural language processing
 
