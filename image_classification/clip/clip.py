@@ -26,8 +26,14 @@ _tokenizer = _Tokenizer()
 # Parameters
 # ======================
 
-WEIGHT_PATH = 'ViT-B32.onnx'
-MODEL_PATH = 'ViT-B32.onnx.prototxt'
+WEIGHT_VITB32_IMAGE_PATH = 'ViT-B32-encode_image.onnx'
+MODEL_VITB32_IMAGE_PATH = 'ViT-B32-encode_image.onnx.prototxt'
+WEIGHT_VITB32_TEXT_PATH = 'ViT-B32-encode_text.onnx'
+MODEL_VITB32_TEXT_PATH = 'ViT-B32-encode_text.onnx.prototxt'
+WEIGHT_RN50_IMAGE_PATH = 'RN50-encode_image.onnx'
+MODEL_RN50_IMAGE_PATH = 'RN50-encode_image.onnx.prototxt'
+WEIGHT_RN50_TEXT_PATH = 'RN50-encode_text.onnx'
+MODEL_RN50_TEXT_PATH = 'RN50-encode_text.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/clip/'
 
 IMAGE_PATH = 'chelsea.png'
@@ -52,6 +58,10 @@ parser.add_argument(
     help='description file'
 )
 parser.add_argument(
+    '-m', '--model_type', default='ViTB32', choices=('ViTB32', 'RN50'),
+    help='model type'
+)
+parser.add_argument(
     '--onnx',
     action='store_true',
     help='execute onnxruntime version.'
@@ -70,7 +80,7 @@ def tokenize(texts, context_length=77, truncate=False):
     sot_token = _tokenizer.encoder["<|startoftext|>"]
     eot_token = _tokenizer.encoder["<|endoftext|>"]
     all_tokens = [[sot_token] + _tokenizer.encode(text) + [eot_token] for text in texts]
-    result = np.zeros((len(all_tokens), context_length), dtype=np.int)
+    result = np.zeros((len(all_tokens), context_length), dtype=np.int64)
 
     for i, tokens in enumerate(all_tokens):
         if len(tokens) > context_length:
@@ -81,6 +91,8 @@ def tokenize(texts, context_length=77, truncate=False):
                 raise RuntimeError(f"Input {texts[i]} is too long for context length {context_length}")
 
         result[i, :len(tokens)] = np.array(tokens)
+
+    result = result.astype(np.int64)
 
     return result
 
@@ -117,25 +129,44 @@ def preprocess(img):
     return img
 
 
-def predict(net, img, text):
+def predict(net, img, text_feature):
     img = preprocess(img)
-
-    text = tokenize(text)
 
     # feedforward
     if not args.onnx:
-        output = net.predict([img, text])
+        output = net.predict([img])
     else:
-        output = net.run(None, {'image': img, 'text': text})
+        output = net.run(None, {'image': img})
 
-    logits_per_image, logits_per_text = output
+    image_feature = output[0]
+
+    image_feature = image_feature / np.linalg.norm(image_feature, ord=2, axis=-1, keepdims=True)
+
+    logit_scale = 100
+    logits_per_image = (image_feature * logit_scale).dot(text_feature.T)
 
     pred = softmax(logits_per_image, axis=1)
 
     return pred[0]
 
 
-def recognize_from_image(net):
+def predict_text_feature(net, text):
+    text = tokenize(text)
+
+    # feedforward
+    if not args.onnx:
+        output = net.predict([text])
+    else:
+        output = net.run(None, {'text': text})
+
+    text_feature = output[0]
+
+    text_feature = text_feature / np.linalg.norm(text_feature, ord=2, axis=-1, keepdims=True)
+
+    return text_feature
+
+
+def recognize_from_image(net_image, net_text):
     top_k = 5
 
     text_inputs = args.text_inputs
@@ -146,13 +177,15 @@ def recognize_from_image(net):
     elif text_inputs is None:
         text_inputs = [f"a {c}" for c in ("human", "dog", "cat")]
 
+    text_feature = predict_text_feature(net_text, text_inputs)
+
     # input image loop
     for image_path in args.input:
         logger.info(image_path)
 
         # prepare input data
         img = load_image(image_path)
-        img = cv2.cvtColor(img, cv2.COLOR_BGRA2RGB)
+        img = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
 
         # inference
         logger.info('Start inference...')
@@ -161,7 +194,7 @@ def recognize_from_image(net):
             total_time_estimation = 0
             for i in range(args.benchmark_count):
                 start = int(round(time.time() * 1000))
-                pred = predict(net, img, text_inputs)
+                pred = predict(net_image, img, text_feature)
                 end = int(round(time.time() * 1000))
                 estimation_time = (end - start)
 
@@ -172,7 +205,7 @@ def recognize_from_image(net):
 
             logger.info(f'\taverage time estimation {total_time_estimation / (args.benchmark_count - 1)} ms')
         else:
-            pred = predict(net, img, text_inputs)
+            pred = predict(net_image, img, text_feature)
 
     inds = np.argsort(-pred)[:top_k]
     logger.info("Top predictions:")
@@ -183,8 +216,21 @@ def recognize_from_image(net):
 
 
 def main():
+    dic_model = {
+        'ViTB32': (
+            (WEIGHT_VITB32_IMAGE_PATH, MODEL_VITB32_IMAGE_PATH),
+            (WEIGHT_VITB32_TEXT_PATH, MODEL_VITB32_TEXT_PATH)),
+        'RN50': (
+            (WEIGHT_RN50_IMAGE_PATH, MODEL_RN50_IMAGE_PATH),
+            (WEIGHT_RN50_TEXT_PATH, MODEL_RN50_TEXT_PATH)),
+    }
+    (WEIGHT_IMAGE_PATH, MODEL_IMAGE_PATH), (WEIGHT_TEXT_PATH, MODEL_TEXT_PATH) = dic_model[args.model_type]
+
     # model files check and download
-    check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
+    logger.info('Checking encode_image model...')
+    check_and_download_models(WEIGHT_IMAGE_PATH, MODEL_IMAGE_PATH, REMOTE_PATH)
+    logger.info('Checking encode_text model...')
+    check_and_download_models(WEIGHT_TEXT_PATH, MODEL_TEXT_PATH, REMOTE_PATH)
 
     env_id = args.env_id
 
@@ -194,12 +240,14 @@ def main():
         memory_mode = ailia.get_memory_mode(
             reduce_constant=True, ignore_input_with_initializer=True,
             reduce_interstage=False, reuse_interstage=False)
-        net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id, memory_mode=memory_mode)
+        net_image = ailia.Net(MODEL_IMAGE_PATH, WEIGHT_IMAGE_PATH, env_id=env_id, memory_mode=memory_mode)
+        net_text = ailia.Net(MODEL_TEXT_PATH, WEIGHT_TEXT_PATH, env_id=env_id, memory_mode=memory_mode)
     else:
         import onnxruntime
-        net = onnxruntime.InferenceSession(WEIGHT_PATH)
+        net_image = onnxruntime.InferenceSession(WEIGHT_IMAGE_PATH)
+        net_text = onnxruntime.InferenceSession(WEIGHT_TEXT_PATH)
 
-    recognize_from_image(net)
+    recognize_from_image(net_image, net_text)
 
 
 if __name__ == '__main__':
