@@ -24,8 +24,7 @@ WEIGHT_PATH = 'landmarks_classifier_asia_V1_1.onnx'
 MODEL_PATH = 'landmarks_classifier_asia_V1_1.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/landmarks_classifier_asia/'
 
-IMAGE_PATH = 'demo.png'
-SAVE_IMAGE_PATH = 'output.png'
+IMAGE_PATH = 'image_1.jpg'
 
 IMAGE_SIZE = 321
 
@@ -36,7 +35,7 @@ LABEL_MAP_FILE = 'landmarks_classifier_asia_V1_label_map.csv'
 # ======================
 
 parser = get_base_parser(
-    'landmarks_classifier_asia', IMAGE_PATH, SAVE_IMAGE_PATH
+    'landmarks_classifier_asia', IMAGE_PATH, None
 )
 parser.add_argument(
     '-n', '--top_k', default=20, type=int,
@@ -46,11 +45,6 @@ parser.add_argument(
     '-k', '--keep_ratio',
     action='store_true',
     help='keep ratio on resize.'
-)
-parser.add_argument(
-    '--onnx',
-    action='store_true',
-    help='execute onnxruntime version.'
 )
 args = update_parser(parser)
 
@@ -136,10 +130,7 @@ def predict(net, img):
     img = preprocess(img)
 
     # feedforward
-    if not args.onnx:
-        output = net.predict([img])
-    else:
-        output = net.run(None, {'keras_layer_input': img})
+    output = net.predict([img])
 
     logits = output[0]
 
@@ -179,7 +170,7 @@ def recognize_from_image(net):
 
         pred = post_processing(logits, label_map, label_set)
 
-        logger.info("Top predictions:")
+        logger.info("TopK predictions:")
         for x in pred:
             logger.info(f"  {x[0]}: {100 * x[1]:.2f}%")
 
@@ -193,11 +184,7 @@ def main():
     env_id = args.env_id
 
     # initialize
-    if not args.onnx:
-        net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
-    else:
-        import onnxruntime
-        net = onnxruntime.InferenceSession(WEIGHT_PATH)
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
 
     recognize_from_image(net)
 
