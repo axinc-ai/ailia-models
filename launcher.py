@@ -119,20 +119,21 @@ def open_model(model):
         if not args_dict["video"]:
             args_dict["video"]=0
 
-    options = ""
+    options = []
     for key in args_dict:
         if key=="ftype":
             continue
         if args_dict[key] is not None:
             if args_dict[key] is True:
-                options = options + " --"+key
+                options.append("--"+key)
             elif args_dict[key] is False:
                 continue
             else:
-                options = options + " --"+key+" "+str(args_dict[key])
+                options.append("--"+key)
+                options.append(str(args_dict[key]))
     
-    cmd = cmd + " " + model["model"]+".py" + " " + options
-    print(cmd)
+    cmd = [cmd, model["model"]+".py"] + options
+    print(" ".join(cmd))
     
     subprocess.check_call(cmd, cwd=dir, shell=True)
 
