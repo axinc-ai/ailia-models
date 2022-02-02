@@ -2,7 +2,7 @@
 
 ## Input
 
-![Input](input_1.jpg)
+![Input](image_1.jpg)
 
 (Image from https://pixabay.com/photos/japan-tokyo-tower-landmark-343444/)
 
