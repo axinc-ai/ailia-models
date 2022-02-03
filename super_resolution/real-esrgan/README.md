@@ -6,11 +6,17 @@
 
 (Image from https://github.com/xinntao/Real-ESRGAN/tree/master/inputs/ADE_val_00000114.jpg)
 
+![Input](input_anime.jpg)
+
+(Image from https://github.com/xinntao/Real-ESRGAN/blob/master/inputs/0030.jpg)
+
 Ailia input shape: (1, 3, 256, 256)
 
 ## Output
 
 ![Output](output.jpg)
+
+![Output](output_anime.jpg)
 
 ## Usage
 
@@ -20,7 +26,13 @@ while downloading.
 For the sample image,
 
 ``` bash
-$ python3 real-esrgan.py
+$ python3 real_esrgan.py
+```
+
+You can also use an anime-specific super-resolution model by adding the -m RealESRGAN_anime option.
+
+```bash
+$ python3 real_esrgan.py -m RealESRGAN_anime -i input_anime.jpg -s output_anime.jpg
 ```
 
 If you want to specify the input image, put the image path after the `--input` option.  
@@ -34,11 +46,8 @@ By adding the `--video` option, you can input the video.
 If you pass `0` as an argument to VIDEO_PATH, you can use the webcam input instead of the video file.
 
 ```bash
-$ python3 real-esrgan.py --video VIDEO_PATH
+$ python3 real_esrgan.py --video VIDEO_PATH
 ```
-
-The default setting is to use the optimized model and weights, but you can also switch to the normal model by using the
---normal option.
 
 ## Reference
 

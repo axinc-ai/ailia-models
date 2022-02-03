@@ -7,7 +7,7 @@ import cv2
 import ailia
 
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser  # noqa: E402
+from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from webcamera_utils import get_writer, get_capture  # noqa: E402
 
@@ -51,29 +51,32 @@ WEIGHT_PATH = args.model + '.opt.onnx'
 
 
 def enhance_image():
-    # prepare input data
-    img = cv2.imread(INPUT_IMAGE_PATH, cv2.IMREAD_UNCHANGED)
-    img = cv2.resize(img, dsize=(H, W))
+    for image_path in args.input:
+        # prepare input data
+        img = cv2.imread(image_path, cv2.IMREAD_UNCHANGED)
+        img = cv2.resize(img, dsize=(H, W))
 
-    # net initialize
-    model = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
-    upsampler = RealESRGAN(model)
+        # net initialize
+        model = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
+        upsampler = RealESRGAN(model)
 
-    # inference
-    logger.info('Start inference...')
-    if args.benchmark:
-        logger.info('BENCHMARK mode')
-        for i in range(5):
-            start = int(round(time.time() * 1000))
+        # inference
+        logger.info('Start inference...')
+        if args.benchmark:
+            logger.info('BENCHMARK mode')
+            for i in range(5):
+                start = int(round(time.time() * 1000))
+                output = upsampler.enhance(img)
+                end = int(round(time.time() * 1000))
+                logger.info(f'\tailia processing time {end - start} ms')
+        else:
             output = upsampler.enhance(img)
-            end = int(round(time.time() * 1000))
-            logger.info(f'\tailia processing time {end - start} ms')
-    else:
-        output = upsampler.enhance(img)
 
-    cv2.imwrite(args.savepath, output)
+        savepath = get_savepath(args.savepath, image_path)
+        logger.info(f'saved at : {savepath}')
+        cv2.imwrite(savepath, output)
 
-    logger.info('Script finished successfully.')
+        logger.info('Script finished successfully.')
 
 
 def enhance_video():
