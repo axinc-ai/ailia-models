@@ -14,6 +14,9 @@ from model_utils import check_and_download_models  # noqa: E402
 # logger
 from logging import getLogger  # noqa: E402
 
+from piano_transcription_utils import RegressionPostProcessor
+from piano_transcription_utils import write_events_to_midi
+
 logger = getLogger(__name__)
 
 # ======================
@@ -171,8 +174,26 @@ def preprocess(audio):
     return batch
 
 
-def post_processing(output):
-    return None
+def post_processing(output_dict):
+    frames_per_second = 100
+    classes_num = 88
+    onset_threshold = 0.3
+    offset_threshod = 0.3
+    frame_threshold = 0.1
+    pedal_offset_threshold = 0.2
+
+    post_processor = RegressionPostProcessor(
+        frames_per_second,
+        classes_num=classes_num, onset_threshold=onset_threshold,
+        offset_threshold=offset_threshod,
+        frame_threshold=frame_threshold,
+        pedal_offset_threshold=pedal_offset_threshold)
+
+    # Post process output_dict to MIDI events
+    (est_note_events, est_pedal_events) = \
+        post_processor.output_dict_to_midi_events(output_dict)
+
+    return est_note_events, est_pedal_events
 
 
 def predict(net_note, net_pedal, audio):
@@ -228,10 +249,7 @@ def predict(net_note, net_pedal, audio):
     for key in output_dict.keys():
         output_dict[key] = deframe(output_dict[key])[0: audio_len]
 
-    # pred = post_processing(output)
-    pred = None
-
-    return pred
+    return output_dict
 
 
 def audio_recognition(net_note, net_pedal):
@@ -241,7 +259,33 @@ def audio_recognition(net_note, net_pedal):
         # Load audio
         (audio, _) = load_audio(audio_path, sr=SAMPLING_RATE, mono=True)
 
-        output = predict(net_note, net_pedal, audio)
+        # inference
+        logger.info('Start inference...')
+        if args.benchmark:
+            logger.info('BENCHMARK mode')
+            total_time_estimation = 0
+            for i in range(args.benchmark_count):
+                start = int(round(time.time() * 1000))
+                output_dict = predict(net_note, net_pedal, audio)
+                end = int(round(time.time() * 1000))
+                estimation_time = (end - start)
+
+                # Loggin
+                logger.info(f'\tailia processing estimation time {estimation_time} ms')
+                if i != 0:
+                    total_time_estimation = total_time_estimation + estimation_time
+
+            logger.info(f'\taverage time estimation {total_time_estimation / (args.benchmark_count - 1)} ms')
+        else:
+            output_dict = predict(net_note, net_pedal, audio)
+
+        est_note_events, est_pedal_events = post_processing(output_dict)
+
+        midi_path = get_savepath(args.savepath, audio_path, ext='.mid')
+        logger.info(f'saved at : {midi_path}')
+        write_events_to_midi(
+            start_time=0, note_events=est_note_events,
+            pedal_events=est_pedal_events, midi_path=midi_path)
 
     logger.info('Script finished successfully.')
 
