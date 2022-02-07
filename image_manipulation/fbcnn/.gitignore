@@ -1,0 +1,6 @@
+testsets/*
+*.mp4
+*.bmp
+*.png
+!input.bmp
+!output.bmp
