@@ -16,6 +16,8 @@ from webcamera_utils import get_capture, get_writer  # noqa: E402
 # logger
 from logging import getLogger  # noqa: E402
 
+from datasets import get_lvis_meta_v1
+
 logger = getLogger(__name__)
 
 # ======================
@@ -114,8 +116,138 @@ def paste_masks_in_image(
     return img_masks
 
 
-# def draw_bbox(img, bboxes):
-#     return img
+def mask_to_polygons(mask):
+    # cv2.RETR_CCOMP flag retrieves all the contours and arranges them to a 2-level
+    # hierarchy. External contours (boundary) of the object are placed in hierarchy-1.
+    # Internal contours (holes) are placed in hierarchy-2.
+    # cv2.CHAIN_APPROX_NONE flag gets vertices of polygons from contours.
+
+    mask = np.ascontiguousarray(mask)  # some versions of cv2 does not support incontiguous arr
+    res = cv2.findContours(mask.astype("uint8"), cv2.RETR_CCOMP, cv2.CHAIN_APPROX_NONE)
+    hierarchy = res[-1]
+    if hierarchy is None:  # empty mask
+        return [], False
+
+    has_holes = (hierarchy.reshape(-1, 4)[:, 3] >= 0).sum() > 0
+    res = res[-2]
+    res = [x.flatten() for x in res]
+
+    # These coordinates from OpenCV are integers in range [0, W-1 or H-1].
+    # We add 0.5 to turn them into real-value coordinate space. A better solution
+    # would be to first +0.5 and then dilate the returned polygon by 0.5.
+    res = [x + 0.5 for x in res if len(x) >= 6]
+
+    return res, has_holes
+
+
+def draw_predictions(img, predictions):
+    height, width = img.shape[:2]
+
+    default_font_size = int(max(np.sqrt(height * width) // 90, 10))
+
+    boxes = predictions["pred_boxes"].astype(np.int64)
+    scores = predictions["scores"]
+    classes = predictions["pred_classes"].tolist()
+    masks = predictions["pred_masks"].astype(np.uint8)
+
+    class_names = get_lvis_meta_v1()["thing_classes"]
+    labels = [class_names[i] for i in classes]
+    labels = ["{} {:.0f}%".format(l, s * 100) for l, s in zip(labels, scores)]
+
+    num_instances = len(boxes)
+    assigned_colors = np.array([
+        [0.667, 0., 0.5],
+        [1., 0.333, 0.],
+        [1., 0.333, 0.5],
+        [0., 0.333, 0.],
+        [0.333, 0.333, 0.],
+        [0.333, 1., 1.],
+        [1., 0., 0.],
+        [0., 0.667, 0.],
+        [1., 0., 1.],
+        [0.333, 1., 0.5],
+        [1., 0., 0.],
+        [0., 0.5, 0.],
+        [0., 1., 0.5],
+        [1., 0.667, 0.5],
+        [1., 0.5, 0.],
+        [0., 0., 0.5],
+        [0.667, 0.333, 0.],
+        [1., 0.667, 0.],
+        [0.667, 0.667, 0.],
+        [1., 0.333, 0.5],
+        [1., 0., 0.],
+        [0.333, 0., 0.5],
+        [0., 0.167, 0.],
+        [0., 0., 0.667],
+        [0., 0.333, 1.],
+        [0.494, 0.184, 0.556],
+        [0.749, 0.749, 0.],
+        [0.494, 0.184, 0.556],
+        [1., 0.667, 0.]
+    ])
+    assigned_colors = (assigned_colors * 255)
+
+    areas = np.prod(boxes[:, 2:] - boxes[:, :2], axis=1)
+    if areas is not None:
+        sorted_idxs = np.argsort(-areas).tolist()
+        # Re-order overlapped instances in descending order.
+        boxes = boxes[sorted_idxs]
+        labels = [labels[k] for k in sorted_idxs]
+        masks = [masks[idx] for idx in sorted_idxs]
+        assigned_colors = [assigned_colors[idx] for idx in sorted_idxs]
+
+    for i in range(num_instances):
+        color = assigned_colors[i]
+
+        # draw box
+        x0, y0, x1, y1 = boxes[i]
+        cv2.rectangle(
+            img, (x0, y0), (x1, y1),
+            color=color,
+            thickness=default_font_size // 4)
+
+        # draw segment
+        polygons, _ = mask_to_polygons(masks[i])
+        for points in polygons:
+            points = np.array(points).reshape((1, -1, 2)).astype(np.int32)
+            cv2.fillPoly(img, pts=[points], color=color)
+
+    for i in range(num_instances):
+        color = assigned_colors[i]
+        x0, y0, x1, y1 = boxes[i]
+
+        SMALL_OBJECT_AREA_THRESH = 1000
+        instance_area = (y1 - y0) * (x1 - x0)
+
+        # for small objects, draw text at the side to avoid occlusion
+        text_pos = (x0, y0)  # if drawing boxes, put text on the box corner.
+        if instance_area < SMALL_OBJECT_AREA_THRESH or y1 - y0 < 40:
+            if y1 >= height - 5:
+                text_pos = (x1, y0)
+            else:
+                text_pos = (x0, y1)
+
+        # draw label
+        x, y = text_pos
+        text = labels[i]
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        height_ratio = (y1 - y0) / np.sqrt(height * width)
+        font_scale = (
+                np.clip((height_ratio - 0.02) / 0.08 + 1, 1.2, 2) * 0.5)
+        font_thickness = 1
+        text_size, _ = cv2.getTextSize(text, font, font_scale, font_thickness)
+        text_w, text_h = text_size
+        cv2.rectangle(img, text_pos, (int(x + text_w * 0.6), y + text_h), (0, 0, 0), -1)
+        cv2.putText(
+            img, text, (x, y + text_h - 5),
+            fontFace=font,
+            fontScale=font_scale * 0.6,
+            color=color,
+            thickness=font_thickness,
+            lineType=cv2.LINE_AA)
+
+    return img
 
 
 # ======================
@@ -204,7 +336,6 @@ def predict(net, img):
         pred_boxes, scores, pred_classes, pred_masks,
         (im_h, im_w), pred_hw
     )
-    print(pred)
 
     return pred
 
@@ -219,7 +350,7 @@ def recognize_from_image(net):
         # img = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
         img = Image.open(image_path)
         img = np.asarray(img)
-        img = img[:, :, ::-1]
+        img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
 
         # inference
         logger.info('Start inference...')
@@ -241,10 +372,12 @@ def recognize_from_image(net):
         else:
             pred = predict(net, img)
 
+        res_img = draw_predictions(img, pred)
+
         # plot result
-        # savepath = get_savepath(args.savepath, image_path, ext='.png')
-        # logger.info(f'saved at : {savepath}')
-        # cv2.imwrite(savepath, res_img)
+        savepath = get_savepath(args.savepath, image_path, ext='.png')
+        logger.info(f'saved at : {savepath}')
+        cv2.imwrite(savepath, res_img)
 
     logger.info('Script finished successfully.')
 
