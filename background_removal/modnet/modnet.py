@@ -26,6 +26,11 @@ IMAGE_PATH = 'input.jpg'
 SAVE_IMAGE_PATH = 'output.jpg'
 
 parser = get_base_parser('modnet model', IMAGE_PATH, SAVE_IMAGE_PATH)
+parser.add_argument(
+    '-c', '--composite',
+    action='store_true',
+    help='Composite input image and predicted alpha value'
+)
 args = update_parser(parser)
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/modnet/'
 
@@ -73,6 +78,11 @@ def recognize_from_image():
 
         matte = (np.squeeze(pred[0]) * 255).astype('uint8')
         matte = cv2.resize(matte, dsize=(im_w, im_h), interpolation=cv2.INTER_AREA)
+
+        if args.composite:
+            img = cv2.cvtColor(raw_img, cv2.COLOR_BGR2BGRA)
+            img[:,:,3] = matte
+            matte = img
 
         savepath = get_savepath(args.savepath, image_path)
         logger.info(f'saved at : {savepath}')
