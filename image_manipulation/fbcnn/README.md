@@ -1,4 +1,4 @@
-# FBCNN
+# FBCNN : Towards Flexible Blind JPEG Artifacts Removal
 
 ## Input
 <img src='input.bmp' width='360px'>
