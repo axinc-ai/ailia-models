@@ -10,12 +10,13 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
-from model_utils import check_and_download_models  # noqa: E402
-from detector_utils import load_image  # noqa: E402C
-from webcamera_utils import get_capture, get_writer  # noqa: E402
+from utils import get_base_parser, update_parser, get_savepath  # noqa
+from model_utils import check_and_download_models  # noqa
+from detector_utils import load_image  # noqa
+from webcamera_utils import get_capture, get_writer  # noqa
+from functional import grid_sample  # noqa
 # logger
-from logging import getLogger  # noqa: E402
+from logging import getLogger  # noqa
 
 from dataset_utils import get_lvis_meta_v1
 from color_utils import random_color, color_brightness
@@ -88,10 +89,7 @@ def do_paste_mask(masks, boxes, im_h, im_w):
     gy = np.repeat(img_y[:, :, None], img_x.shape[1], axis=2)
     grid = np.stack([gx, gy], axis=3)
 
-    import torch
-    from torch.nn import functional as F
-    img_masks = F.grid_sample(torch.from_numpy(masks), torch.from_numpy(grid), align_corners=False)
-    img_masks = img_masks.numpy()
+    img_masks = grid_sample(masks, grid, align_corners=False)
 
     return img_masks[:, 0]
 
@@ -349,6 +347,7 @@ def recognize_from_image(net):
         else:
             pred = predict(net, img)
 
+        # draw prediction
         res_img = draw_predictions(img, pred)
 
         # plot result
@@ -381,15 +380,17 @@ def recognize_from_video(net):
             break
 
         # inference
-        img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        pred = predict(net, img)
+        pred = predict(net, frame)
 
-        # # show
-        # cv2.imshow('frame', res_img)
-        #
-        # # save results
-        # if writer is not None:
-        #     writer.write(res_img.astype(np.uint8))
+        # draw prediction
+        res_img = draw_predictions(frame, pred)
+
+        # show
+        cv2.imshow('frame', res_img)
+
+        # save results
+        if writer is not None:
+            writer.write(res_img.astype(np.uint8))
 
     capture.release()
     cv2.destroyAllWindows()
