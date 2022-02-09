@@ -1,4 +1,4 @@
-from lvis_v1_categories import LVIS_CATEGORIES as LVIS_V1_CATEGORIES
+from datasets.lvis_v1_categories import LVIS_CATEGORIES as LVIS_V1_CATEGORIES
 
 
 def get_lvis_meta_v1():

@@ -1,5 +1,6 @@
 import sys
 import time
+import datetime
 
 import numpy as np
 import cv2
@@ -16,7 +17,8 @@ from webcamera_utils import get_capture, get_writer  # noqa: E402
 # logger
 from logging import getLogger  # noqa: E402
 
-from datasets import get_lvis_meta_v1
+from dataset_utils import get_lvis_meta_v1
+from color_utils import random_color, color_brightness
 
 logger = getLogger(__name__)
 
@@ -28,7 +30,7 @@ WEIGHT_PATH = 'Detic_C2_SwinB_896_4x_IN-21K+COCO.onnx'
 MODEL_PATH = 'Detic_C2_SwinB_896_4x_IN-21K+COCO.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/detic/'
 
-IMAGE_PATH = 'demo.png'
+IMAGE_PATH = 'desk.jpg'
 SAVE_IMAGE_PATH = 'output.png'
 
 IMAGE_SIZE = 800
@@ -40,6 +42,10 @@ IMAGE_MAX_SIZE = 1333
 
 parser = get_base_parser(
     'Detic', IMAGE_PATH, SAVE_IMAGE_PATH
+)
+parser.add_argument(
+    '--seed', type=int, default=int(datetime.datetime.now().strftime('%Y%m%d')),
+    help='random seed'
 )
 parser.add_argument(
     '--onnx',
@@ -143,8 +149,6 @@ def mask_to_polygons(mask):
 def draw_predictions(img, predictions):
     height, width = img.shape[:2]
 
-    default_font_size = int(max(np.sqrt(height * width) // 90, 10))
-
     boxes = predictions["pred_boxes"].astype(np.int64)
     scores = predictions["scores"]
     classes = predictions["pred_classes"].tolist()
@@ -155,38 +159,9 @@ def draw_predictions(img, predictions):
     labels = ["{} {:.0f}%".format(l, s * 100) for l, s in zip(labels, scores)]
 
     num_instances = len(boxes)
-    assigned_colors = np.array([
-        [0.667, 0., 0.5],
-        [1., 0.333, 0.],
-        [1., 0.333, 0.5],
-        [0., 0.333, 0.],
-        [0.333, 0.333, 0.],
-        [0.333, 1., 1.],
-        [1., 0., 0.],
-        [0., 0.667, 0.],
-        [1., 0., 1.],
-        [0.333, 1., 0.5],
-        [1., 0., 0.],
-        [0., 0.5, 0.],
-        [0., 1., 0.5],
-        [1., 0.667, 0.5],
-        [1., 0.5, 0.],
-        [0., 0., 0.5],
-        [0.667, 0.333, 0.],
-        [1., 0.667, 0.],
-        [0.667, 0.667, 0.],
-        [1., 0.333, 0.5],
-        [1., 0., 0.],
-        [0.333, 0., 0.5],
-        [0., 0.167, 0.],
-        [0., 0., 0.667],
-        [0., 0.333, 1.],
-        [0.494, 0.184, 0.556],
-        [0.749, 0.749, 0.],
-        [0.494, 0.184, 0.556],
-        [1., 0.667, 0.]
-    ])
-    assigned_colors = (assigned_colors * 255)
+
+    np.random.seed(args.seed)
+    assigned_colors = [random_color(maximum=255) for _ in range(num_instances)]
 
     areas = np.prod(boxes[:, 2:] - boxes[:, :2], axis=1)
     if areas is not None:
@@ -197,13 +172,16 @@ def draw_predictions(img, predictions):
         masks = [masks[idx] for idx in sorted_idxs]
         assigned_colors = [assigned_colors[idx] for idx in sorted_idxs]
 
+    default_font_size = int(max(np.sqrt(height * width) // 90, 10))
+
     for i in range(num_instances):
         color = assigned_colors[i]
+        img_b = img.copy()
 
         # draw box
         x0, y0, x1, y1 = boxes[i]
         cv2.rectangle(
-            img, (x0, y0), (x1, y1),
+            img_b, (x0, y0), (x1, y1),
             color=color,
             thickness=default_font_size // 4)
 
@@ -211,7 +189,9 @@ def draw_predictions(img, predictions):
         polygons, _ = mask_to_polygons(masks[i])
         for points in polygons:
             points = np.array(points).reshape((1, -1, 2)).astype(np.int32)
-            cv2.fillPoly(img, pts=[points], color=color)
+            cv2.fillPoly(img_b, pts=[points], color=color)
+
+        img = cv2.addWeighted(img, 0.5, img_b, 0.5, 0)
 
     for i in range(num_instances):
         color = assigned_colors[i]
@@ -243,7 +223,7 @@ def draw_predictions(img, predictions):
             img, text, (x, y + text_h - 5),
             fontFace=font,
             fontScale=font_scale * 0.6,
-            color=color,
+            color=color_brightness(color, brightness_factor=0.7),
             thickness=font_thickness,
             lineType=cv2.LINE_AA)
 
@@ -346,11 +326,8 @@ def recognize_from_image(net):
         logger.info(image_path)
 
         # prepare input data
-        # img = load_image(image_path)
-        # img = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
-        img = Image.open(image_path)
-        img = np.asarray(img)
-        img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+        img = load_image(image_path)
+        img = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
 
         # inference
         logger.info('Start inference...')
