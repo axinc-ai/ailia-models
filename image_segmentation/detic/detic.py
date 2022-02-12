@@ -48,7 +48,7 @@ parser = get_base_parser(
 )
 parser.add_argument(
     '--seed', type=int, default=int(datetime.datetime.now().strftime('%Y%m%d')),
-    help='random seed'
+    help='random seed for selection the color of the box'
 )
 parser.add_argument(
     '-vc', '--vocabulary', default='lvis', choices=('lvis', 'in21k'),
