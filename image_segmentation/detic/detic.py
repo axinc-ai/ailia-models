@@ -18,7 +18,7 @@ from functional import grid_sample  # noqa
 # logger
 from logging import getLogger  # noqa
 
-from dataset_utils import get_lvis_meta_v1
+from dataset_utils import get_lvis_meta_v1, get_in21k_meta_v1
 from color_utils import random_color, color_brightness
 
 logger = getLogger(__name__)
@@ -27,8 +27,10 @@ logger = getLogger(__name__)
 # Parameters
 # ======================
 
-WEIGHT_PATH = 'Detic_C2_SwinB_896_4x_IN-21K+COCO.onnx'
-MODEL_PATH = 'Detic_C2_SwinB_896_4x_IN-21K+COCO.onnx.prototxt'
+WEIGHT_LVIS_PATH = 'Detic_C2_SwinB_896_4x_IN-21K+COCO_lvis.onnx'
+MODEL_LVIS_PATH = 'Detic_C2_SwinB_896_4x_IN-21K+COCO_lvis.onnx.prototxt'
+WEIGHT_IN21K_PATH = 'Detic_C2_SwinB_896_4x_IN-21K+COCO_in21k.onnx'
+MODEL_IN21K_PATH = 'Detic_C2_SwinB_896_4x_IN-21K+COCO_in21k.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/detic/'
 
 IMAGE_PATH = 'desk.jpg'
@@ -47,6 +49,10 @@ parser = get_base_parser(
 parser.add_argument(
     '--seed', type=int, default=int(datetime.datetime.now().strftime('%Y%m%d')),
     help='random seed'
+)
+parser.add_argument(
+    '-vc', '--vocabulary', default='lvis', choices=('lvis', 'in21k'),
+    help='vocabulary'
 )
 parser.add_argument(
     '--onnx',
@@ -145,6 +151,8 @@ def mask_to_polygons(mask):
 
 
 def draw_predictions(img, predictions):
+    vocabulary = args.vocabulary
+
     height, width = img.shape[:2]
 
     boxes = predictions["pred_boxes"].astype(np.int64)
@@ -152,7 +160,9 @@ def draw_predictions(img, predictions):
     classes = predictions["pred_classes"].tolist()
     masks = predictions["pred_masks"].astype(np.uint8)
 
-    class_names = get_lvis_meta_v1()["thing_classes"]
+    class_names = (
+        get_lvis_meta_v1() if vocabulary == 'lvis' else get_in21k_meta_v1()
+    )["thing_classes"]
     labels = [class_names[i] for i in classes]
     labels = ["{} {:.0f}%".format(l, s * 100) for l, s in zip(labels, scores)]
 
@@ -347,6 +357,8 @@ def recognize_from_image(net):
         else:
             pred = predict(net, img)
 
+        logger.info('detected %d instances' % len(pred['pred_boxes']))
+
         # draw prediction
         res_img = draw_predictions(img, pred)
 
@@ -401,6 +413,12 @@ def recognize_from_video(net):
 
 
 def main():
+    dic_model = {
+        'lvis': (WEIGHT_LVIS_PATH, MODEL_LVIS_PATH),
+        'in21k': (WEIGHT_IN21K_PATH, MODEL_IN21K_PATH),
+    }
+    WEIGHT_PATH, MODEL_PATH = dic_model[args.vocabulary]
+
     # model files check and download
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
 
