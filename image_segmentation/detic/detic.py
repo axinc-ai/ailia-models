@@ -184,6 +184,7 @@ def draw_predictions(img, predictions):
 
     for i in range(num_instances):
         color = assigned_colors[i]
+        color = (int(color[0]),int(color[1]),int(color[2]))
         img_b = img.copy()
 
         # draw box
@@ -203,6 +204,11 @@ def draw_predictions(img, predictions):
 
     for i in range(num_instances):
         color = assigned_colors[i]
+        color_text = color_brightness(color, brightness_factor=0.7)
+
+        color = (int(color[0]),int(color[1]),int(color[2]))
+        color_text = (int(color_text[0]),int(color_text[1]),int(color_text[2]))
+
         x0, y0, x1, y1 = boxes[i]
 
         SMALL_OBJECT_AREA_THRESH = 1000
@@ -231,7 +237,7 @@ def draw_predictions(img, predictions):
             img, text, (x, y + text_h - 5),
             fontFace=font,
             fontScale=font_scale * 0.6,
-            color=color_brightness(color, brightness_factor=0.7),
+            color=color_text,
             thickness=font_thickness,
             lineType=cv2.LINE_AA)
 
