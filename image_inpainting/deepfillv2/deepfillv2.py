@@ -53,7 +53,7 @@ parser.add_argument(
     help='mask type'
 )
 parser.add_argument(
-    '-mt', '--mask_type', default="stroke", choices=("rect", "stroke"),
+    '-mt', '--mask_type', default="rect", choices=("rect", "stroke"),
     help='mask type'
 )
 parser.add_argument(
