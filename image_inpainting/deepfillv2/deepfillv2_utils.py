@@ -56,3 +56,33 @@ def generate_mask_stroke(im_size, parts=16, maxVertex=24, maxLength=100, maxBrus
         mask = mask + np_free_form_mask(maxVertex, maxLength, maxBrushWidth, maxAngle, h, w)
     mask = np.minimum(mask, 1.0)
     return mask
+
+def pad(img, ds_factor=32, mode='reflect'):
+    h, w = img.shape[:2]
+
+    new_h = ds_factor * ((h - 1) // ds_factor + 1)
+    new_w = ds_factor * ((w - 1) // ds_factor + 1)
+
+    pad_h = new_h - h
+    pad_w = new_w - w
+    if new_h != h or new_w != w:
+        pad_width = ((0, pad_h), (0, pad_w), (0, 0))
+        img = np.pad(img, pad_width[:img.ndim], mode = mode)
+    
+    return img
+
+def imnormalize(img, mean, std, to_rgb=True):
+    img = img.copy().astype(np.float32)
+    return imnormalize_(img, mean, std, to_rgb)
+
+
+def imnormalize_(img, mean, std, to_rgb=True):
+    # cv2 inplace normalization does not accept uint8
+    assert img.dtype != np.uint8
+    mean = np.float64(mean.reshape(1, -1))
+    stdinv = 1 / np.float64(std.reshape(1, -1))
+    if to_rgb:
+        cv2.cvtColor(img, cv2.COLOR_BGR2RGB, img)  # inplace
+    cv2.subtract(img, mean, img)  # inplace
+    cv2.multiply(img, stdinv, img)  # inplace
+    return img
