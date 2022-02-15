@@ -18,7 +18,7 @@ from detector_utils import load_image  # noqa: E402
 # logger
 from logging import getLogger  # noqa: E402
 
-from deepfillv2_utils import *
+from deepfillv2_utils import generate_mask_rect, generate_mask_stroke, pad, imnormalize
 
 logger = getLogger(__name__)
 
@@ -69,10 +69,6 @@ parser.add_argument(
     help='given mask parameters: h,w'
 )
 parser.add_argument(
-    '-rm', '--run_mode', default="ailia", choices=("ailia", "onnxruntime"),
-    help='framework to run model'
-)
-parser.add_argument(
     '-ir', '--img_res', type=int, default=256, choices=(256, 512, 1024),
     help='mask type'
 )
@@ -82,36 +78,6 @@ args = update_parser(parser)
 # ======================
 # Main functions
 # ======================
-
-def pad(img, ds_factor=32, mode='reflect'):
-    h, w = img.shape[:2]
-
-    new_h = ds_factor * ((h - 1) // ds_factor + 1)
-    new_w = ds_factor * ((w - 1) // ds_factor + 1)
-
-    pad_h = new_h - h
-    pad_w = new_w - w
-    if new_h != h or new_w != w:
-        pad_width = ((0, pad_h), (0, pad_w), (0, 0))
-        img = np.pad(img, pad_width[:img.ndim], mode = mode)
-    
-    return img
-
-def imnormalize(img, mean, std, to_rgb=True):
-    img = img.copy().astype(np.float32)
-    return imnormalize_(img, mean, std, to_rgb)
-
-
-def imnormalize_(img, mean, std, to_rgb=True):
-    # cv2 inplace normalization does not accept uint8
-    assert img.dtype != np.uint8
-    mean = np.float64(mean.reshape(1, -1))
-    stdinv = 1 / np.float64(std.reshape(1, -1))
-    if to_rgb:
-        cv2.cvtColor(img, cv2.COLOR_BGR2RGB, img)  # inplace
-    cv2.subtract(img, mean, img)  # inplace
-    cv2.multiply(img, stdinv, img)  # inplace
-    return img
 
 def recognize_from_image(net, img_shape):
     if args.random_mask:
@@ -135,12 +101,6 @@ def recognize_from_image(net, img_shape):
             mask = generate_mask_stroke(
                 im_size=(img_shape[0], img_shape[1]),
                 parts=8, maxBrushWidth=24, maxLength=100, maxVertex=20)
-
-        # mask = load_image("D:/ax/ailia-models/image_inpainting/deepfillv2/bbox_mask1.png")
-        # mask = cv2.cvtColor(mask, cv2.COLOR_BGRA2RGB)
-        # mask = cv2.resize(mask, (256, 256))
-        # mask = mask[:,:,:1]
-        # mask[mask > 0] = 1.
 
         # prepare input data
         img_mask = gt_img * (1 - mask) + 255 * mask
@@ -168,20 +128,15 @@ def recognize_from_image(net, img_shape):
             total_time = 0
             for i in range(args.benchmark_count):
                 start = int(round(time.time() * 1000))
-                output = net.predict(data)
+                output = net.run(data)
                 end = int(round(time.time() * 1000))
                 logger.info(f'\tailia processing time {end - start} ms')
                 if i != 0:
                     total_time = total_time + (end - start)
             logger.info(f'\taverage time {total_time / (args.benchmark_count - 1)} ms')
         else:
-            if args.run_mode == 'ailia':
-                # output = net.predict(data)
-                output = net.run(data)
-            elif args.run_mode == 'onnxruntime':
-                output = net.run(None, {
-                    'input': data,
-                    })
+            output = net.run(data)
+
         output = output[1] # The outputs are 2 images, 1st is coarse one, 2nd is the refined one (output name = "1802")
         
         fake_img = output * mask + img * (1. - mask)
@@ -220,13 +175,7 @@ def main():
     check_and_download_models(weight_path, model_path, REMOTE_PATH)
 
     # net initialize
-    if args.run_mode == 'ailia':
-        net = ailia.Net(model_path, weight_path, env_id=args.env_id)
-    elif args.run_mode == 'onnxruntime':
-        # check by onnx
-        onnx_model = onnx.load(weight_path)
-        onnx.checker.check_model(onnx_model)
-        net = rt.InferenceSession(weight_path)
+    net = ailia.Net(model_path, weight_path, env_id=args.env_id)
 
     recognize_from_image(net, img_shape)
 
