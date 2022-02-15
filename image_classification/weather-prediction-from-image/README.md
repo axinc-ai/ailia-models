@@ -37,16 +37,16 @@ You're very welcome to check introductory informations and details of the projec
 
 ## ailia
 ### Input
-- input image (1x3x250x250)
+- input image
 
-<img src="./data/img/00001.png" width="240px">
+<img src="./data/img/3020580824.jpg">
 
-(Extracted from [the dataset above](http://cs.nyu.edu/~silberman/datasets/nyu_depth_v2.html).)
+(Extracted from the dataset above.)
 
 ### Output
-- output image (1x1x224x224)
+- output image with weather class (one of "Cloudy", "Sunny", "Rainy", "Snowy", "Foggy") and probability annotated
 
-<img src="./output.png" width="240px">
+<img src="./output.png">
 
 ### Usage
 Automatically downloads the onnx and prototxt files on the first run.
