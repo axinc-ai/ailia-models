@@ -97,8 +97,8 @@ ONNX opset=11
 
 [celeba_256x256.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/deepfillv2/deepfillv2_celeba_256x256.onnx.prototxt)
 
-[places_256x256.onnx.prototxt](https://netron.app/?url=https://netron.app/?url=https://storage.googleapis.com/ailia-models/deepfillv2/deepfillv2_places_256x256.onnx.prototxt)
+[places_256x256.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/deepfillv2/deepfillv2_places_256x256.onnx.prototxt)
 
-[places_512x512.onnx.prototxt](https://netron.app/?url=https://netron.app/?url=https://storage.googleapis.com/ailia-models/deepfillv2/deepfillv2_places_512x512.onnx.prototxt)
+[places_512x512.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/deepfillv2/deepfillv2_places_512x512.onnx.prototxt)
 
-[places_1024x1024.onnx.prototxt](https://netron.app/?url=https://netron.app/?url=https://storage.googleapis.com/ailia-models/deepfillv2/deepfillv2_places_1024x1024.onnx.prototxt)
+[places_1024x1024.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/deepfillv2/deepfillv2_places_1024x1024.onnx.prototxt)
