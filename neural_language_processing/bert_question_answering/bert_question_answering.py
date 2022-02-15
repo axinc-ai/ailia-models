@@ -2,7 +2,7 @@ import time
 import sys
 
 import numpy as np
-from transformers.tokenization_auto import AutoTokenizer
+from transformers import AutoTokenizer
 from transformers.data import SquadExample, squad_convert_examples_to_features
 from typing import Dict, List, Tuple, Union
 from transformers.tokenization_utils_base import PaddingStrategy
