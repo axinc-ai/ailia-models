@@ -1,5 +1,4 @@
 import cv2
-from keras.preprocessing import image as image_utils
 import numpy as np
 from PIL import Image
 from PIL import ImageDraw
@@ -54,7 +53,7 @@ def prepare_data_set(image, size):
 
 def _image_to_matrix(img):
     img = PIL.ImageOps.invert(img)  # inverts it
-    return image_utils.img_to_array(img)  # converts it to array
+    return np.array(img)  # converts it to array
 
 
 def save_image(text, img, filename):
