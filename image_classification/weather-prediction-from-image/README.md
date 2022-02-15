@@ -76,4 +76,4 @@ keras
 ONNX opset = 13
 
 ### Netron
-- [weather-prediction-from-image_trainedModelE20.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/fast-depth/weather-prediction-from-image_trainedModelE20.onnx.prototxt)
+- [weather-prediction-from-image_trainedModelE20.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/weather-prediction-from-image/weather-prediction-from-image_trainedModelE20.onnx.prototxt)
