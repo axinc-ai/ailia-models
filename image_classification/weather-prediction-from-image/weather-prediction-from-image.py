@@ -129,20 +129,13 @@ def recognize_from_video():
 
         # Inference
         weather, prob = _estimate(dataset, net)
-        print(weather)
 
         # Postprocessing
         cv2.imshow(
             "frame",
-            cv2.putText(
-                cv2.cvtColor(frame, cv2.COLOR_RGB2BGR),
+            weather_prediction_from_image_utils.annotate_video(
+                frame,
                 _output_text(weather, prob),
-                (100, 100),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                1,
-                (0, 0, 255),
-                2,
-                cv2.LINE_AA,
             ),
         )
 

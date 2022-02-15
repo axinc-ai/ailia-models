@@ -60,3 +60,16 @@ def save_image(text, img, filename):
     annotate_text = ImageDraw.Draw(img)
     annotate_text.text((10, 10), text, fill=(255, 0, 0))
     img.save(filename)
+
+
+def annotate_video(frame, text):
+    return cv2.putText(
+        cv2.cvtColor(frame, cv2.COLOR_RGB2BGR),
+        text,
+        (100, 100),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        1,
+        (0, 0, 255),
+        2,
+        cv2.LINE_AA,
+    )
