@@ -73,7 +73,7 @@ $ python3 weather-prediction-from-image.py --video VIDEO_PATH
 keras
 
 ### Model Format
-ONNX opset = 13
+ONNX opset = 11
 
 ### Netron
 - [weather-prediction-from-image_trainedModelE20.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/weather-prediction-from-image/weather-prediction-from-image_trainedModelE20.onnx.prototxt)
