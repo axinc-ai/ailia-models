@@ -160,3 +160,5 @@ python3 launcher.py
 - [API reference (EN)](https://axinc-ai.github.io/ailia-sdk/api/java/en/)
 - [Android Studio Sample Project](https://github.com/axinc-ai/ailia-android-studio)
 
+### Kotlin
+-  [Android Studio Sample Project](https://github.com/axinc-ai/ailia-android-studio-kotlin)

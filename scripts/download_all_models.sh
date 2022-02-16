@@ -99,6 +99,7 @@ cd ../../image_classification/landmarks_classifier_asia; python3 landmarks_class
 cd ../../image_inpainting/3d-photo-inpainting; python3 3d-photo-inpainting.py ${OPTION}
 cd ../../image_inpainting/inpainting_gmcnn; python3 inpainting_gmcnn.py ${OPTION}
 cd ../../image_inpainting/pytorch-inpainting-with-partial-conv; python3 pytorch-inpainting-with-partial-conv.py ${OPTION}
+cd ../../image_inpainting/deepfillv2; python3 deepfillv2.py ${OPTION}
 cd ../../image_manipulation/dewarpnet; python3 dewarpnet.py ${OPTION}
 cd ../../image_manipulation/illnet; python3 illnet.py ${OPTION}
 cd ../../image_manipulation/noise2noise; python3 noise2noise.py ${OPTION}
@@ -144,6 +145,7 @@ cd ../../object_detection/yolov4; python3 yolov4.py ${OPTION}
 cd ../../object_detection/yolov4-tiny; python3 yolov4-tiny.py ${OPTION}
 cd ../../object_detection/yolov5; python3 yolov5.py ${OPTION}
 cd ../../object_detection/yolox; python3 yolox.py ${OPTION}
+cd ../../object_detection/yolox-ti-lite; python3 yolox-ti-lite.py ${OPTION}
 cd ../../object_detection/pedestrian_detection; python3 pedestrian_detection.py ${OPTION}
 cd ../../object_detection/efficientdet; python3 efficientdet.py ${OPTION}
 cd ../../object_detection/nanodet; python3 nanodet.py ${OPTION}
