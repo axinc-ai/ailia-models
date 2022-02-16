@@ -75,5 +75,9 @@ keras
 ### Model Format
 ONNX opset = 11
 
+### Reference
+
+[Weather Prediction From Image - (Warmth Of Image)](https://github.com/berkgulay/weather-prediction-from-image)
+
 ### Netron
 - [weather-prediction-from-image_trainedModelE20.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/weather-prediction-from-image/weather-prediction-from-image_trainedModelE20.onnx.prototxt)

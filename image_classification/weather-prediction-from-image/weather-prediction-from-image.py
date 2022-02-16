@@ -99,16 +99,19 @@ def recognize_from_image():
             logger.info("BENCHMARK mode")
             for i in range(5):
                 start = int(round(time.time() * 1000))
-                _estimate(dataset, net)
+                weather, prob = _estimate(dataset, net)
                 end = int(round(time.time() * 1000))
                 logger.info(f"\tailia processing time {end - start} ms")
-        else:
-            weather, prob = _estimate(dataset, net)
-            filepath = get_savepath(args.savepath, image_path, ext=".png")
-            weather_prediction_from_image_utils.save_image(
-                _output_text(weather, prob), image, filepath
-            )
-            logger.info(f"saved at : {filepath}")
+
+        # show result
+        weather, prob = _estimate(dataset, net)
+        logger.info(f"result : {weather} {prob}")
+        filepath = get_savepath(args.savepath, image_path, ext=".png")
+        weather_prediction_from_image_utils.save_image(
+            _output_text(weather, prob), image, filepath
+        )
+        logger.info(f"saved at : {filepath}")
+
     logger.info("Script finished successfully.")
 
 
