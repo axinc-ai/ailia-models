@@ -21,9 +21,7 @@ logger = getLogger(__name__)
 # ======================
 
 SAVE_IMAGE_PATH = 'output.jpg'
-
 INPUT_IMAGE_PATH = 'input.jpg'
-# INPUT_IMAGE_PATH = '02370.jpg'
 
 MODEL_LISTS = ['culane','tusimple']
 
@@ -43,7 +41,6 @@ parser.add_argument(
 )
 parser.add_argument(
     '-v', '--video', type=str,
-    # default=STEREO_DATA,
     help='The input video for pole detection.'
 )
 parser.add_argument(
@@ -70,6 +67,9 @@ else:
 
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/ultra-fast-lane-detection/'
 
+INPUT_HEIGHT = 288
+INPUT_WIDTH = 800
+
 # # ======================
 # # Main functions
 # # ======================
@@ -80,72 +80,90 @@ mean = np.array([0.406, 0.456, 0.485]) # this is correct
 std = np.array([0.225, 0.224, 0.229])
 
 def preprocessing(img):
-
-    input_img = cv2.resize(img,(800,288))
+    original_img,img = webcamera_utils.adjust_frame_size(img, INPUT_HEIGHT, INPUT_WIDTH)
     
-    input_img = cv2.cvtColor(input_img, cv2.COLOR_BGR2RGB)
+    input_img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
     input_img = input_img / 255.0
     input_img = input_img - mean / std    
     input_img = input_img.transpose(2, 0, 1)
     
-    return np.expand_dims(input_img, 0).astype(np.float32)
+    return img, np.expand_dims(input_img, 0).astype(np.float32)
+
+culane_row_anchor = [121, 131, 141, 150, 160, 170, 180, 189, 199, 209, 219, 228, 238, 248, 258, 267, 277, 287]
+tusimple_row_anchor = [ 64,  68,  72,  76,  80,  84,  88,  92,  96, 100, 104, 108, 112,
+            116, 120, 124, 128, 132, 136, 140, 144, 148, 152, 156, 160, 164,
+            168, 172, 176, 180, 184, 188, 192, 196, 200, 204, 208, 212, 216,
+            220, 224, 228, 232, 236, 240, 244, 248, 252, 256, 260, 264, 268,
+            272, 276, 280, 284]
+
+def postprocessing(vis,y):
+    if args.arch=="culane":
+        row_anchor = culane_row_anchor
+        griding_num = 200
+        cls_num_per_lane = 18
+    else:
+        row_anchor = tusimple_row_anchor
+        griding_num = 100
+        cls_num_per_lane = 56
+
+    col_sample = np.linspace(0, INPUT_WIDTH - 1, griding_num)
+    col_sample_w = col_sample[1] - col_sample[0]
+    img_w, img_h = INPUT_WIDTH, INPUT_HEIGHT
+
+    out_j = y
+    out_j = out_j[:, ::-1, :]
+    prob = scipy.special.softmax(out_j[:-1, :, :], axis=0)
+
+    idx = np.arange(griding_num) + 1
+    idx = idx.reshape(-1, 1, 1)
+    loc = np.sum(prob * idx, axis=0)
+    out_j = np.argmax(out_j, axis=0)
+    loc[out_j == griding_num] = 0
+    out_j = loc
+
+    # import pdb; pdb.set_trace()
+    for i in range(out_j.shape[1]):
+        if np.sum(out_j[:, i] != 0) > 2:
+            for k in range(out_j.shape[0]):
+                if out_j[k, i] > 0:
+                    ppp = (int(out_j[k, i] * col_sample_w * img_w / INPUT_WIDTH) - 1, int(img_h * (row_anchor[cls_num_per_lane-1-k]/INPUT_HEIGHT)) - 1 )
+                    cv2.circle(vis,ppp,5,(0,255,0),-1)
 
 import scipy.special, tqdm
 
-griding_num = 200
-culane_row_anchor = [121, 131, 141, 150, 160, 170, 180, 189, 199, 209, 219, 228, 238, 248, 258, 267, 277, 287]
-cls_num_per_lane = 18
 def recognize_from_image(net):
     # input image loop
     for image_path in args.input:
         img = cv2.imread(image_path)
 
-        input_name = 'input.1'
-        output_name = '200'
-
-        input_tensor = preprocessing(img)
-
         if args.onnx:
-            y = net.run( [output_name], { input_name : input_tensor })[0][0]
+            input_name = 'input.1'
+            output_name = '200'
+
+        img, input_tensor = preprocessing(img)
+
+        logger.info('Start inference...')
+        if args.benchmark:
+            logger.info('BENCHMARK mode')
+            for i in range(args.benchmark_count):
+                start = int(round(time.time() * 1000))
+                if args.onnx:
+                    y = net.run( [output_name], { input_name : input_tensor })[0][0]
+                else:
+                    y = net.run(input_tensor)[0][0]
+                end = int(round(time.time() * 1000))
+                logger.info(f'\tailia processing time {end - start} ms')
         else:
-            y = net.run(input_tensor)[0][0]
+            if args.onnx:
+                y = net.run( [output_name], { input_name : input_tensor })[0][0]
+            else:
+                y = net.run(input_tensor)[0][0]
 
-        col_sample = np.linspace(0, 800 - 1, griding_num)
-        col_sample_w = col_sample[1] - col_sample[0]
-        img_w, img_h = 1640, 590
-        row_anchor = culane_row_anchor
-
-        print(np.array(y).shape)
-        out_j = y
-        out_j = out_j[:, ::-1, :]
-        prob = scipy.special.softmax(out_j[:-1, :, :], axis=0)
-
-        idx = np.arange(griding_num) + 1
-        idx = idx.reshape(-1, 1, 1)
-        print(idx.shape)
-        loc = np.sum(prob * idx, axis=0)
-        out_j = np.argmax(out_j, axis=0)
-        loc[out_j == griding_num] = 0
-        out_j = loc
-
-        print(out_j.shape)
-
-        # import pdb; pdb.set_trace()
-        vis = cv2.imread(args.input[0])
-        for i in range(out_j.shape[1]):
-            if np.sum(out_j[:, i] != 0) > 2:
-                for k in range(out_j.shape[0]):
-                    if out_j[k, i] > 0:
-                        ppp = (int(out_j[k, i] * col_sample_w * img_w / 800) - 1, int(img_h * (row_anchor[cls_num_per_lane-1-k]/288)) - 1 )
-                        cv2.circle(vis,ppp,5,(0,255,0),-1)
-
-        
-        # print(y.shape)
-        save_img = cv2.resize( vis , ( int(vis.shape[1] / 4 ) , int(vis.shape[0] / 4 )))
+        postprocessing(img,y)
 
         savepath = get_savepath(args.savepath, image_path)
         logger.info(f'saved at : {savepath}')
-        cv2.imwrite(savepath, save_img)
+        cv2.imwrite(savepath, img)
 
     logger.info('Script finished successfully.')
 
@@ -153,59 +171,45 @@ def recognize_from_video(net):
 
     capture = webcamera_utils.get_capture(args.video)
 
-    input_name = 'input.1'
-    output_name = '200'
+    # create video writer if savepath is specified as video format
+    if args.savepath != SAVE_IMAGE_PATH:
+        f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
+        writer = webcamera_utils.get_writer(args.savepath, INPUT_HEIGHT, INPUT_WIDTH)
+    else:
+        writer = None
+
+    if args.onnx:
+        input_name = 'input.1'
+        output_name = '200'
 
     while (True):
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
 
-        print(frame.shape)
-
         input_img = frame
-        input_tensor = preprocessing(input_img)
+        img, input_tensor = preprocessing(input_img)
 
-   
         if args.onnx:
             y = net.run( [output_name], { input_name : input_tensor })[0][0]
         else:
-            disparity_map = model.run(imgs)[0]
+            y = net.run(input_tensor)[0][0]
 
-        print(y)
-
-        col_sample = np.linspace(0, 800 - 1, griding_num)
-        col_sample_w = col_sample[1] - col_sample[0]
-        img_w, img_h = 1640, 590
-        row_anchor = culane_row_anchor
-
-        # print(np.array(y).shape)
-        out_j = y
-        out_j = out_j[:, ::-1, :]
-        prob = scipy.special.softmax(out_j[:-1, :, :], axis=0)
-
-        idx = np.arange(griding_num) + 1
-        idx = idx.reshape(-1, 1, 1)
-        loc = np.sum(prob * idx, axis=0)
-        out_j = np.argmax(out_j, axis=0)
-        loc[out_j == griding_num] = 0
-        out_j = loc
-
-        # import pdb; pdb.set_trace()
-        vis = frame
-        for i in range(out_j.shape[1]):
-            if np.sum(out_j[:, i] != 0) > 2:
-                for k in range(out_j.shape[0]):
-                    if out_j[k, i] > 0:
-                        ppp = (int(out_j[k, i] * col_sample_w * img_w / 800) - 1, int(img_h * (row_anchor[cls_num_per_lane-1-k]/288)) - 1 )
-                        cv2.circle(vis,ppp,5,(0,255,0),-1)
-
+        postprocessing(img,y)
     
-        cv2.imshow('output', vis)
+        cv2.imshow('output', img)
         cv2.waitKey(3)
+
+        # save results
+        if writer is not None:
+            writer.write(img)
 
     capture.release()
     cv2.destroyAllWindows()
+    if writer is not None:
+        writer.release()
+
     logger.info('Script finished successfully.')
   
 def main():
