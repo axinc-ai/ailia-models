@@ -176,7 +176,7 @@ The collection of pre-trained, state-of-the-art AI models.
 | [<img src="image_classification/alexnet/clock.jpg" width=128px>](image_classification/alexnet/) | [alexnet](/image_classification/alexnet/)|[AlexNet PyTorch](https://pytorch.org/hub/pytorch_vision_alexnet/)|Pytorch| 1.2.5 and later | |
 | [<img src="image_classification/clip/chelsea.png" width=128px>](image_classification/clip/) | [clip](/image_classification/clip/)|[CLIP](https://github.com/openai/CLIP) | Pytorch | 1.2.9 and later | [JP](https://medium.com/axinc/clip-%E8%B6%85%E5%A4%A7%E8%A6%8F%E6%A8%A1%E3%83%87%E3%83%BC%E3%82%BF%E3%82%BB%E3%83%83%E3%83%88%E3%81%A7%E4%BA%8B%E5%89%8D%E5%AD%A6%E7%BF%92%E3%81%95%E3%82%8C-%E5%86%8D%E5%AD%A6%E7%BF%92%E3%81%AA%E3%81%97%E3%81%A7%E4%BB%BB%E6%84%8F%E3%81%AE%E7%89%A9%E4%BD%93%E3%82%92%E8%AD%98%E5%88%A5%E3%81%A7%E3%81%8D%E3%82%8B%E7%89%A9%E4%BD%93%E8%AD%98%E5%88%A5%E3%83%A2%E3%83%87%E3%83%AB-2ebc5c1666f) |
 | [<img src="image_classification/landmarks_classifier_asia/image_1.jpg" width=128px>](image_classification/landmarks_classifier_asia/) | [landmarks_classifier_asia](/image_classification/landmarks_classifier_asia/)|[Landmarks classifier_asia_V1.1](https://tfhub.dev/google/on_device_vision/classifier/landmarks_classifier_asia_V1/1) | TensorFlow Hub | 1.2.4 and later | |
-| [<img src="image_classification/weather-prediction-from-image/output.png" width=128px>](image_classification/weather-prediction-from-image/) | [weather-prediction-from-image](/image_classification/weather-prediction-from-image/)|[Weather Prediction From Image - (Warmth Of Image)](https://github.com/berkgulay/weather-prediction-from-image) | Keras | 1.2.9 and later | |
+| [<img src="image_classification/weather-prediction-from-image/output.png" width=128px>](image_classification/weather-prediction-from-image/) | [weather-prediction-from-image](/image_classification/weather-prediction-from-image/)|[Weather Prediction From Image - (Warmth Of Image)](https://github.com/berkgulay/weather-prediction-from-image) | Keras | 1.2.5 and later | |
 
 
 ## Image inpainting
@@ -332,6 +332,7 @@ The collection of pre-trained, state-of-the-art AI models.
 | [<img src="road_detection/road-segmentation-adas/output.png" width=128px>](road_detection/road-segmentation-adas/) | [road-segmentation-adas](/road_detection/road-segmentation-adas/) | [road-segmentation-adas-0001](https://github.com/openvinotoolkit/open_model_zoo/tree/master/models/intel/road-segmentation-adas-0001) | OpenVINO | 1.2.5 and later |
 | [<img src="road_detection/cdnet/output/filename_00038_res.png" width=128px>](road_detection/cdnet/) | [cdnet](/road_detection/cdnet/) | [CDNet](https://github.com/zhangzhengde0225/CDNet) | Pytorch | 1.2.5 and later |
 | [<img src="road_detection/lstr/output.jpg" width=128px>](road_detection/lstr/) | [lstr](/road_detection/lstr/) | [LSTR](https://github.com/liuruijin17/LSTR) | Pytorch | 1.2.8 and later |
+| [<img src="road_detection/ultra-fast-lane-detection/output.jpg" width=128px>](road_detection/ultra-fast-lane-detection/) | [ultra-fast-lane-detection](/road_detection/ultra-fast-lane-detection/) | [Ultra-Fast-Lane-Detection](https://github.com/cfzd/Ultra-Fast-Lane-Detection) | Pytorch | 1.2.6 and later |
 
 ## Rotation prediction
 
