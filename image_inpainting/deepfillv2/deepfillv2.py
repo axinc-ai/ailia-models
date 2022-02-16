@@ -1,6 +1,7 @@
 import sys
 import time
 import os
+import platform
 
 import numpy as np
 import cv2
@@ -169,6 +170,10 @@ def main():
                     "\t(MODEL = celeba, IMG_RESOLUTION = 256)\n"
                     "\t(MODEL = places, IMG_RESOLUTION = 256 or 512 or 1024)")
         sys.exit(-1)
+
+    if "FP16" in ailia.get_environment(args.env_id).props or platform.system() == 'Darwin':
+        logger.warning('This model do not work on FP16. So use CPU mode.')
+        args.env_id = 0
 
     # model files check and download
     weight_path, model_path, img_shape = info[key]
