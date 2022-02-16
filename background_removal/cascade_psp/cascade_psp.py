@@ -3,7 +3,6 @@ import time
 
 import numpy as np
 import cv2
-from PIL import Image
 
 import ailia
 
@@ -23,8 +22,8 @@ logger = getLogger(__name__)
 # ======================
 WEIGHT_INTER_S8_PATH = 'inter_s8.onnx'
 MODEL_INTER_S8_PATH = 'inter_s8.onnx.prototxt'
-WEIGHT_PATH = 'model.onnx'
-MODEL_PATH = 'model.onnx.prototxt'
+WEIGHT_PATH = 'refinement.onnx'
+MODEL_PATH = 'refinement.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/cascade_psp/'
 
 IMAGE_PATH = 'aeroplane.jpg'
@@ -138,8 +137,6 @@ def predict(net, net_s8, img, seg):
 
     img = preprocess(img)
     seg = preprocess(seg, gray=True)
-    # print(mask_img[:, :, 1020:1050, 1020:1050])
-    # print(mask_img.shape)
 
     """
     Global Step
@@ -153,9 +150,6 @@ def predict(net, net_s8, img, seg):
     else:
         im_small = img
         seg_small = seg
-
-    # print(seg_small[:, :, 260:270, 260:270])
-    # print(seg_small.shape)
 
     output = safe_forward(net_s8, im_small, seg_small)
     inter_s8 = output[0]
@@ -308,7 +302,7 @@ def recognize_from_image(net, net_s8):
 def main():
     logger.info('Checking refinement model...')
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
-    logger.info('Checking S8 model...')
+    logger.info('Checking s8 model...')
     check_and_download_models(WEIGHT_INTER_S8_PATH, MODEL_INTER_S8_PATH, REMOTE_PATH)
 
     # load model
