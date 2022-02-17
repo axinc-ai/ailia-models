@@ -71,7 +71,7 @@ ONNX opset=10
 
 ## Netron
 
-[yolov2.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/yolov2-tiny/yolov2-tiny-coco.onnx.prototxt)
+[yolov2-tiny-coco.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/yolov2-tiny/yolov2-tiny-coco.onnx.prototxt)
 
 
-[yolov2.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/yolov2-tiny/yolov2-tiny-voc.onnx.prototxt)
+[yolov2-tiny-voc.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/yolov2-tiny/yolov2-tiny-voc.onnx.prototxt)
