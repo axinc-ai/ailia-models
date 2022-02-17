@@ -140,12 +140,14 @@ python3 launcher.py
 - [API reference (EN)](https://axinc-ai.github.io/ailia-sdk/api/python/en/)
 - [Models](https://github.com/axinc-ai/ailia-models)
 
+* Note: All the python models will also work with C++/Unity(C#)/Java(JNI)/Kotlin but you may need to write the pre/post processing code.
+
 ### C++
 
 - [ailia SDK C++ Tutorial (EN)](https://medium.com/axinc-ai/ailia-sdk-tutorial-c-75e59bbefffe) [(JP)](https://medium.com/axinc/ailia-sdk-%E3%83%81%E3%83%A5%E3%83%BC%E3%83%88%E3%83%AA%E3%82%A2%E3%83%AB-c-dc949d9dcd28)
 - [API reference (EN)](https://axinc-ai.github.io/ailia-sdk/api/cpp/en/) [(JP)](https://axinc-ai.github.io/ailia-sdk/api/cpp/jp/)
 - [Models](https://github.com/axinc-ai/ailia-models-cpp)
-- [Xcode Sample Project](https://github.com/axinc-ai/ailia-xcode)
+- [iOS Xcode Sample Project](https://github.com/axinc-ai/ailia-xcode)
 - [Android NDK Sample Project](https://github.com/axinc-ai/ailia-android-ndk)
 
 ### Unity
@@ -160,3 +162,5 @@ python3 launcher.py
 - [API reference (EN)](https://axinc-ai.github.io/ailia-sdk/api/java/en/)
 - [Android Studio Sample Project](https://github.com/axinc-ai/ailia-android-studio)
 
+### Kotlin
+-  [Android Studio Sample Project](https://github.com/axinc-ai/ailia-android-studio-kotlin)

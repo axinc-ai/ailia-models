@@ -676,10 +676,10 @@ def recognize_from_video():
             W = int((W / d - (RESIZE_ALIGNMENT-1))//RESIZE_ALIGNMENT * RESIZE_ALIGNMENT)
             H = int((H / d - (RESIZE_ALIGNMENT-1))//RESIZE_ALIGNMENT * RESIZE_ALIGNMENT)
 
-    fps = capture.get(cv2.CAP_PROP_FPS)
     # create video writer if savepath is specified as video format
     if (args.savepath is not None) & (args.savepath.split('.')[-1] == 'mp4'):
-        writer = webcamera_utils.get_writer(args.savepath, H*3, W, fps=fps*0.8)
+        fps = capture.get(cv2.CAP_PROP_FPS)
+        writer = webcamera_utils.get_writer(args.savepath, H*3, W, fps=fps)
     else:
         writer = None
 
@@ -779,8 +779,6 @@ def recognize_from_video():
 
         # visualize
         img_BGR = viz(image1_org, image2_org, flow_up)
-        # save visualization
-        logger.info(f'saved at : {args.savepath}')
 
         # view result figure
         cv2.imshow('frame', img_BGR)
