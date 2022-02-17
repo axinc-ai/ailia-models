@@ -22,10 +22,7 @@ from yolo_utils import *
 # ======================
 # Parameters
 # ======================
-WEIGHT_PATH = 'yolov2.onnx'
-MODEL_PATH = 'yolov2.onnx.prototxt'
-REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/yolov2/'
-
+REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/yolov2-tiny/'
 IMAGE_PATH = 'input.jpg'
 SAVE_IMAGE_PATH = 'output.png'
 IMAGE_HEIGHT = 416  # for video mode
@@ -89,6 +86,17 @@ parser.add_argument(
     metavar='DATASET', default='coco'
 )
 args = update_parser(parser)
+
+if args.dataset=='voc':
+    ANCHORS  = VOC_ANCHORS
+    CATEGORY = VOC_CATEGORY
+    WEIGHT_PATH = 'yolov2-tiny-voc.onnx'
+    MODEL_PATH  = 'yolov2-tiny-voc.onnx.prototxt'
+elif args.dataset=='coco':
+    ANCHORS  = COCO_ANCHORS
+    CATEGORY = COCO_CATEGORY
+    WEIGHT_PATH = 'yolov2-tiny-coco.onnx'
+    MODEL_PATH  = 'yolov2-tiny-coco.onnx.prototxt'
 
 def detect(img,output,savepath='output.png', conf_thresh=0.5, nms_thresh=0.4,video=False):
     num_classes = len(CATEGORY) 
@@ -218,7 +226,7 @@ def recognize_from_video():
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break 
         if args.detector:
-            img = cv2.cvtColor(frame, cv2.COLOR_RGB2BGRA)
+            img = cv2.cvtColor(frame, cv2.COLOR_BGR2BGRA)
             detector.compute(img, THRESHOLD, IOU)
             res_img = plot_results(detector, frame, CATEGORY, False)
         else:
@@ -247,24 +255,7 @@ def recognize_from_video():
 
 def main():
     # model files check and download
-    #check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
-    
-    global WEIGHT_PATH 
-    global MODEL_PATH
-    global ANCHORS
-    global CATEGORY
-    if args.dataset=='voc':
-        ANCHORS  = VOC_ANCHORS
-        CATEGORY = VOC_CATEGORY
-        WEIGHT_PATH = 'yolov2-tiny-voc.onnx'
-        MODEL_PATH  = 'yolov2-tiny-voc.onnx.prototxt'
-        check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
-    elif args.dataset=='coco':
-        ANCHORS  = COCO_ANCHORS
-        CATEGORY = COCO_CATEGORY
-        WEIGHT_PATH = 'yolov2-tiny-coco.onnx'
-        MODEL_PATH  = 'yolov2-tiny-coco.onnx.prototxt'
-        check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
     
     if args.video is not None:
         # video mode
