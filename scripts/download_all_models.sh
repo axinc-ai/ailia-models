@@ -141,6 +141,7 @@ cd ../../object_detection/maskrcnn; python3 maskrcnn.py ${OPTION}
 cd ../../object_detection/mobilenet_ssd; python3 mobilenet_ssd.py ${OPTION}
 cd ../../object_detection/yolov1-tiny; python3 yolov1-tiny.py ${OPTION}
 cd ../../object_detection/yolov2; python3 yolov2.py ${OPTION}
+cd ../../object_detection/yolov2-tiny; python3 yolov2-tiny.py ${OPTION}
 cd ../../object_detection/yolov3; python3 yolov3.py ${OPTION}
 cd ../../object_detection/yolov3-tiny; python3 yolov3-tiny.py ${OPTION}
 cd ../../object_detection/yolov4; python3 yolov4.py ${OPTION}
