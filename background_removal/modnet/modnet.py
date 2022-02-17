@@ -26,14 +26,18 @@ IMAGE_PATH = 'input.jpg'
 SAVE_IMAGE_PATH = 'output.jpg'
 
 parser = get_base_parser('modnet model', IMAGE_PATH, SAVE_IMAGE_PATH)
+parser.add_argument(
+    '-c', '--composite',
+    action='store_true',
+    help='Composite input image and predicted alpha value'
+)
 args = update_parser(parser)
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/modnet/'
 
 WEIGHT_PATH = "modnet.opt.onnx"
 MODEL_PATH = "modnet.opt.onnx.prototxt"
 
-HEIGHT = 512
-WIDTH = 736
+INFERENCE_HEIGHT = 512
 
 # ======================
 # Main functions
@@ -50,7 +54,7 @@ def recognize_from_image():
         img = cv2.cvtColor(raw_img, cv2.COLOR_BGR2RGB)
         img = (img - 127.5) / 127.5
         im_h, im_w, im_c = img.shape
-        x, y = get_scale_factor(im_h, im_w, 512)
+        x, y = get_scale_factor(im_h, im_w, INFERENCE_HEIGHT)
         img = cv2.resize(img, None, fx=x, fy=y, interpolation=cv2.INTER_AREA)
 
         img = np.transpose(img)
@@ -73,6 +77,11 @@ def recognize_from_image():
 
         matte = (np.squeeze(pred[0]) * 255).astype('uint8')
         matte = cv2.resize(matte, dsize=(im_w, im_h), interpolation=cv2.INTER_AREA)
+
+        if args.composite:
+            img = cv2.cvtColor(raw_img, cv2.COLOR_BGR2BGRA)
+            img[:,:,3] = matte
+            matte = img
 
         savepath = get_savepath(args.savepath, image_path)
         logger.info(f'saved at : {savepath}')
@@ -107,7 +116,7 @@ def recognize_from_video():
         raw_img = frame
         img = (raw_img - 127.5) / 127.5
         im_h, im_w, im_c = img.shape
-        x, y = get_scale_factor(im_h, im_w, 512)
+        x, y = get_scale_factor(im_h, im_w, INFERENCE_HEIGHT)
         img = cv2.resize(img, None, fx=x, fy=y, interpolation=cv2.INTER_AREA)
 
         img = np.transpose(img)
@@ -115,8 +124,14 @@ def recognize_from_video():
         img = np.expand_dims(img, axis=0).astype('float32')
 
         pred = detector.predict(img)
-        matte = (np.squeeze(pred[0]) * 255).astype('uint8')
+        matte = np.squeeze(pred[0])
         matte = cv2.resize(matte, dsize=(im_w, im_h), interpolation=cv2.INTER_AREA)
+
+        # force composite
+        frame[:, :, 0] = frame[:, :, 0] * matte + 64 * (1 - matte)
+        frame[:, :, 1] = frame[:, :, 1] * matte + 177 * (1 - matte)
+        frame[:, :, 2] = frame[:, :, 2] * matte
+        matte = frame.astype('uint8')
 
         cv2.imshow('frame', matte)
 
