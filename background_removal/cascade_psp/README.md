@@ -39,6 +39,12 @@ You can specify the mask image by put the file path after the `--mask_image` opt
 $ python3 cascade_psp.py --input IMAGE_PATH --mask_image MASK_IMAGE_PATH
 ```
 
+Use the ｀--generate_mask｀ option to automatically generate a mask image using u2net.
+
+```bash
+python3 cascade_psp.py --generate_mask -i input.jpg
+```
+
 ## Reference
 
 - [CascadePSP](https://github.com/hkchengrex/CascadePSP)

@@ -42,6 +42,16 @@ parser.add_argument(
     '-m', '--mask_image', default=IMAGE_MASK_PATH,
     help='mask image'
 )
+parser.add_argument(
+    '-g', '--generate_mask',
+    action='store_true',
+    help='Generate mask image using u2net'
+)
+parser.add_argument(
+    '-c', '--composite',
+    action='store_true',
+    help='Composite input image and predicted alpha value'
+)
 args = update_parser(parser)
 
 
@@ -80,6 +90,52 @@ def resize(img, size=None, out_shape=None, method='bilinear'):
         img = np.asarray(img)
 
     return img
+
+
+# ======================
+# Generate mask image
+# ======================
+
+MASK_WEIGHT_PATH = 'u2net_opset11.onnx'
+MASK_MODEL_PATH = MASK_WEIGHT_PATH + '.prototxt'
+MASK_REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/u2net/'
+
+def imagenet_preprocess(input_data):
+    input_data = input_data / 255.0
+    input_data[:, :, 0] = (input_data[:, :, 0]-0.485)/0.229
+    input_data[:, :, 1] = (input_data[:, :, 1]-0.456)/0.224
+    input_data[:, :, 2] = (input_data[:, :, 2]-0.406)/0.225
+    input_data = input_data.transpose((2, 0, 1))[np.newaxis, :, :, :]
+    return input_data
+
+def norm(pred):
+    ma = np.max(pred)
+    mi = np.min(pred)
+    return (pred - mi) / (ma - mi)
+
+def generate_mask(net, input_data):
+    src_data = input_data.copy()
+    
+    h = input_data.shape[0]
+    w = input_data.shape[1]
+
+    input_shape = net.get_input_shape()
+    input_data = cv2.resize(input_data, (input_shape[2], input_shape[3]))
+    input_data = imagenet_preprocess(input_data)
+
+    preds_ailia = net.predict([input_data])
+
+    pred = preds_ailia[0][0, 0, :, :]
+    pred = norm(pred)
+
+    pred = cv2.resize(pred * 255, (w, h))
+    pred = pred.reshape((h, w, 1))
+
+    thre = 128
+    pred[pred > thre] = 255
+    pred[pred <= thre] = 0
+
+    return pred
 
 
 # ======================
@@ -141,6 +197,7 @@ def predict(net, net_s8, img, seg):
     """
     Global Step
     """
+    logger.info("Begin global step")
     if max(im_h, im_w) > L:
         im_small = resize(img, size=L, method='area')
         seg_small = resize(seg, size=L, method='area')
@@ -160,6 +217,7 @@ def predict(net, net_s8, img, seg):
     """
     Local step
     """
+    logger.info("Begin local step")
     new_size = max(im_h, im_w)
     im_small = resize(img, size=new_size, method='area')
     seg_small = resize(seg, size=new_size, method='area')
@@ -179,6 +237,7 @@ def predict(net, net_s8, img, seg):
 
     used_start_idx = {}
     for x_idx in range(w // step_size + 1):
+        logger.info("Processing "+str(x_idx)+"/"+str((w // step_size + 1)))
         for y_idx in range((h) // step_size + 1):
             start_x = x_idx * step_size
             start_y = y_idx * step_size
@@ -254,11 +313,11 @@ def predict(net, net_s8, img, seg):
 
 
 def recognize_from_image(net, net_s8):
-    mask_path = args.mask_image
-
     # prepare mask image
-    mask_img = load_image(mask_path)
-    mask_img = cv2.cvtColor(mask_img, cv2.COLOR_BGRA2GRAY)
+    if not args.generate_mask:
+        mask_path = args.mask_image
+        mask_img = load_image(mask_path)
+        mask_img = cv2.cvtColor(mask_img, cv2.COLOR_BGRA2GRAY)
 
     # input image loop
     for image_path in args.input:
@@ -268,6 +327,14 @@ def recognize_from_image(net, net_s8):
         # prepare input data
         img = load_image(image_path)
         img = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
+
+        # generate mask
+        if args.generate_mask:
+            check_and_download_models(MASK_WEIGHT_PATH, MASK_MODEL_PATH, MASK_REMOTE_PATH)
+            mask_net = ailia.Net(MASK_MODEL_PATH, MASK_WEIGHT_PATH, env_id=args.env_id)
+            mask_output = generate_mask(mask_net, img)
+            mask_img = mask_output[:,:,0]
+            cv2.imwrite("generated_mask.png",mask_output)
 
         # inference
         logger.info('Start inference...')
@@ -292,6 +359,11 @@ def recognize_from_image(net, net_s8):
         # postprocessing
         res_img = (output * 255).astype(np.uint8)
 
+        if args.composite:
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2BGRA)
+            img[:,:,3] = res_img
+            res_img = img
+
         savepath = get_savepath(args.savepath, image_path, ext='.png')
         logger.info(f'saved at : {savepath}')
         cv2.imwrite(savepath, res_img)
@@ -304,6 +376,10 @@ def main():
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
     logger.info('Checking s8 model...')
     check_and_download_models(WEIGHT_INTER_S8_PATH, MODEL_INTER_S8_PATH, REMOTE_PATH)
+
+    if args.video:
+        logger.error("This model does not support video mode.")
+        return
 
     # load model
     env_id = args.env_id
