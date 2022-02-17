@@ -23,7 +23,7 @@ pip3 install networkx==2.3
 pip3 install cynetworkx
 ```
 
-If you using macOS bigsur, you must replace
+If you are using macOS bigsur, you must replace
 
 ```
 appkit = cdll.LoadLibrary(util.find_library('AppKit')) #vispy/ext/cocoapy.py
