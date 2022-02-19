@@ -1,11 +1,9 @@
 import sys
-import time
 
 import numpy as np
 import cv2
-from PIL import Image
 from pymatting.alpha.estimate_alpha_cf import estimate_alpha_cf
-from scipy.ndimage.morphology import binary_erosion
+from scipy.ndimage import binary_erosion
 
 import ailia
 
@@ -15,6 +13,7 @@ from utils import get_base_parser, update_parser, get_savepath  # noqa
 from model_utils import check_and_download_models  # noqa
 from detector_utils import load_image  # noqa
 from image_utils import normalize_image  # noqa
+from webcamera_utils import get_capture, get_writer  # noqa
 # logger
 from logging import getLogger  # noqa: E402
 
@@ -30,6 +29,8 @@ MASK_REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/u2net/'
 
 IMAGE_PATH = 'animal-1.jpg'
 SAVE_IMAGE_PATH = 'output.png'
+
+IMAGE_SIZE = 320
 
 # ======================
 # Arguemnt Parser Config
@@ -59,11 +60,17 @@ def norm_pred(d: np.ndarray) -> np.ndarray:
 # ======================
 
 def preprocess(img):
-    # img = img[:, :, ::-1]  # BGR -> RGB
+    use_skimage = False
 
-    from skimage import transform
-    img = transform.resize(img, (320, 320), mode="constant")
-    img = img / np.max(img)
+    img = img[:, :, ::-1]  # BGR -> RGB
+
+    if not use_skimage:
+        img = cv2.resize(img, (IMAGE_SIZE, IMAGE_SIZE))
+        img = img / 255
+    else:
+        from skimage import transform
+        img = transform.resize(img, (IMAGE_SIZE, IMAGE_SIZE), mode="constant")
+        img = img / np.max(img)
 
     # normalize
     img[:, :, 0] = (img[:, :, 0] - 0.485) / 0.229
@@ -126,11 +133,9 @@ def predict(net, img):
     pred = d1[0, 0, :, :]
     pred = norm_pred(pred)
 
-    # pred = cv2.resize(pred * 255, (w, h))
-    # pred = pred.reshape((h, w, 1))
-    mask = Image.fromarray(pred * 255).convert("L")
-    mask = mask.resize((im_w, im_h), Image.LANCZOS)
-    mask = np.array(mask)
+    mask = cv2.resize(
+        pred * 255, (im_w, im_h),
+        interpolation=cv2.INTER_LANCZOS4)
 
     return mask
 
@@ -142,23 +147,70 @@ def recognize_from_image(net):
         logger.info(image_path)
 
         # prepare input data
-        # img = load_image(image_path)
-        # img = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
-        img = Image.open(image_path).convert("RGB")
-        img = np.array(img)
+        img = load_image(image_path)
+        img = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
 
         # inference
         mask = predict(net, img)
+
+        # refine alpha
+        # res_img = mask
         res_img = estimate_alpha(img, mask)
 
         if args.composite:
-            img = cv2.cvtColor(img, cv2.COLOR_RGB2BGRA)
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2BGRA)
             img[:, :, 3] = res_img
             res_img = img
 
         savepath = get_savepath(args.savepath, image_path, ext='.png')
         logger.info(f'saved at : {savepath}')
         cv2.imwrite(savepath, res_img)
+
+    logger.info('Script finished successfully.')
+
+
+def recognize_from_video(net):
+    video_file = args.video if args.video else args.input[0]
+    capture = get_capture(video_file)
+    assert capture.isOpened(), 'Cannot capture source'
+
+    # create video writer if savepath is specified as video format
+    f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
+    if args.savepath != SAVE_IMAGE_PATH:
+        logger.warning(
+            'currently, video results cannot be output correctly...'
+        )
+        writer = get_writer(args.savepath, f_h, f_w)
+    else:
+        writer = None
+
+    while True:
+        ret, frame = capture.read()
+        if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+        frame = cv2.imread("animal-1.jpg")
+
+        # inference
+        mask = predict(net, frame)
+        alpha = estimate_alpha(frame, mask)
+
+        alpha = alpha[:, :, None].astype(np.float32) / 255
+        back = np.ones_like(frame) * 255
+        res_img = frame * alpha + (back * (1 - alpha))
+        res_img = res_img.astype(np.uint8)
+
+        # show
+        cv2.imshow('frame', res_img)
+
+        # save results
+        if writer is not None:
+            writer.write(res_img)
+
+    capture.release()
+    cv2.destroyAllWindows()
+    if writer is not None:
+        writer.release()
 
     logger.info('Script finished successfully.')
 
@@ -172,7 +224,10 @@ def main():
     # net initialize
     net = ailia.Net(MASK_MODEL_PATH, MASK_WEIGHT_PATH, env_id=env_id)
 
-    recognize_from_image(net)
+    if args.video is not None:
+        recognize_from_video(net)
+    else:
+        recognize_from_image(net)
 
 
 if __name__ == '__main__':
