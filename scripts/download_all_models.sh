@@ -22,6 +22,7 @@ cd ../../background_ramoval/indexnet; python3 indexnet.py ${OPTION}
 cd ../../background_ramoval/modnet; python3 modnet.py ${OPTION}
 cd ../../background_ramoval/background_matting_v2; python3 background_matting_v2.py ${OPTION}
 cd ../../background_ramoval/cascade_psp; python3 cascade_psp.py ${OPTION}
+cd ../../background_ramoval/rembg; python3 rembg.py ${OPTION}
 cd ../../crowd_counting/crowdcount-cascaded-mtl; python3 crowdcount-cascaded-mtl.py ${OPTION}
 cd ../../crowd_counting/c-3-framework; python3 c-3-framework.py ${OPTION}
 cd ../../deep_fashion/clothing-detection; python3 clothing-detection.py ${OPTION}
