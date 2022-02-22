@@ -94,6 +94,7 @@ cd ../../image_classification/vgg16; python3 vgg16.py ${OPTION}
 cd ../../image_classification/vit; python3 vit.py ${OPTION}
 cd ../../image_classification/efficientnetv2; python3 efficientnetv2.py ${OPTION}
 cd ../../image_classification/wide_resnet50; python3 wide_resnet50.py ${OPTION}
+cd ../../image_classification/resnet18; python3 resnet18.py ${OPTION}
 cd ../../image_classification/mlp_mixer; python3 mlp_mixer.py ${OPTION}
 cd ../../image_classification/alexnet; python3 alexnet.py ${OPTION}
 cd ../../image_classification/clip; python3 clip.py ${OPTION}
