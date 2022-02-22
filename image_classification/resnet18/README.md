@@ -43,7 +43,7 @@ $ python3 resnet18.py --video VIDEO_PATH
 
 ## Reference
 
-[Deep Residual Learning for Image Recognition]( https://github.com/KaimingHe/deep-residual-networks)
+[ResNet18]( https://pytorch.org/vision/main/generated/torchvision.models.resnet18.html)
 
 ## Model Format
 
