@@ -123,7 +123,6 @@ cd ../../image_segmentation/yet-another-anime-segmenter; python3 yet-another-ani
 cd ../../image_segmentation/swiftnet; python3 swiftnet.py ${OPTION}
 cd ../../image_segmentation/dense_prediction_transformers; python3 dense_prediction_transformers.py ${OPTION}
 cd ../../image_segmentation/paddleseg; python3 paddleseg.py ${OPTION}
-cd ../../image_segmentation/detic; python3 detic.py ${OPTION}
 cd ../../line_segment_detection/mlsd; python3 mlsd.py ${OPTION}
 cd ../../low_light_image_enhancement/agllnet; python3 agllnet.py ${OPTION}
 cd ../../neural_language_processing/bert; python3 bert.py ${OPTION}
@@ -156,6 +155,7 @@ cd ../../object_detection/nanodet; python3 nanodet.py ${OPTION}
 cd ../../object_detection/yolor; python3 yolor.py ${OPTION}
 cd ../../object_detection/mobile_object_localizer; python3 mobile_object_localizer.py ${OPTION}
 cd ../../object_detection/sku100k-densedet; python3 yolor.py ${OPTION}
+cd ../../object_detection/detic; python3 detic.py ${OPTION}
 cd ../../object_detection_3d/3d_bbox; python3 3d_bbox.py ${OPTION}
 cd ../../object_detection_3d/3d-object-detection.pytorch; python3 3d-object-detection.pytorch.py ${OPTION}
 cd ../../object_detection_3d/mediapipe_objectron; python3 mediapipe_objectron.py ${OPTION}
