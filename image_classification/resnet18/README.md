@@ -32,7 +32,7 @@ $ python3 resnet18.py
 
 If you want to specify the input image, put the image path after the `--input` option.  
 ```bash
-$ python3 ??? --input IMAGE_PATH
+$ python3 resnet18.py --input IMAGE_PATH
 ```
 
 By adding the `--video` option, you can input the video.   
@@ -43,7 +43,7 @@ $ python3 resnet18.py --video VIDEO_PATH
 
 ## Reference
 
-[ResNet18]( https://pytorch.org/vision/main/generated/torchvision.models.resnet18.html)
+[ResNet18](https://pytorch.org/vision/main/generated/torchvision.models.resnet18.html)
 
 ## Model Format
 
