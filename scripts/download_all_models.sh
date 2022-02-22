@@ -126,6 +126,7 @@ cd ../../image_segmentation/swiftnet; python3 swiftnet.py ${OPTION}
 cd ../../image_segmentation/dense_prediction_transformers; python3 dense_prediction_transformers.py ${OPTION}
 cd ../../image_segmentation/paddleseg; python3 paddleseg.py ${OPTION}
 cd ../../line_segment_detection/mlsd; python3 mlsd.py ${OPTION}
+cd ../../line_segment_detection/dexined; python3 dexined.py ${OPTION}
 cd ../../low_light_image_enhancement/agllnet; python3 agllnet.py ${OPTION}
 cd ../../neural_language_processing/bert; python3 bert.py ${OPTION}
 cd ../../neural_language_processing/bert_tweets_sentiment; python3 bert_tweets_sentiment.py ${OPTION}

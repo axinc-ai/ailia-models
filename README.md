@@ -227,6 +227,7 @@ The collection of pre-trained, state-of-the-art AI models.
 | | Model | Reference | Exported From | Supported Ailia Version | Blog |
 |:-----------|------------:|:------------:|:------------:|:------------:|:------------:|
 | [<img src="line_segment_detection/mlsd/output.jpg" width=128px>](line_segment_detection/mlsd/) | [mlsd](/line_segment_detection/mlsd/) | [M-LSD: Towards Light-weight and Real-time Line Segment Detection](https://github.com/navervision/mlsd) | TensorFlow | 1.2.8 and later |  [EN](https://medium.com/axinc-ai/m-lsd-machine-learning-model-for-detecting-wireframes-ac1b618f459b) [JP](https://medium.com/axinc/m-lsd-%E3%83%AF%E3%82%A4%E3%83%A4%E3%83%BC%E3%83%95%E3%83%AC%E3%83%BC%E3%83%A0%E3%82%92%E6%A4%9C%E5%87%BA%E3%81%99%E3%82%8B%E6%A9%9F%E6%A2%B0%E5%AD%A6%E7%BF%92%E3%83%A2%E3%83%87%E3%83%AB-876bef18d908) |
+| [<img src="line_segment_detection/dexined/output.png" width=128px>](line_segment_detection/dexined/) | [dexined](/line_segment_detection/dexined/) | [DexiNed: Dense Extreme Inception Network for Edge Detection](https://github.com/xavysp/DexiNed) | Pytorch | 1.2.5 and later | |
 
 ## Low Light Image Enhancement
 
