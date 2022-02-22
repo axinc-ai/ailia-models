@@ -30,7 +30,8 @@ DEFAULT_CONTEXT = ("ailia SDK is a highly performant single inference engine "
 #DEFAULT_QUESTION = 'Why is model conversion important?'
 #DEFAULT_CONTEXT = 'The option to convert models between FARM and transformers gives freedom to the user and let people easily switch between frameworks.'
 
-TRANSFORMER_VERSION=4
+import transformers
+TRANSFORMER_VERSION=int(transformers.__version__.split(".")[0])
 
 parser = get_base_parser('bert question answering.', None, None)
 parser.add_argument(
