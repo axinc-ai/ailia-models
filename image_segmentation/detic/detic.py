@@ -1,6 +1,7 @@
 import sys
 import time
 import datetime
+import platform
 
 import numpy as np
 import cv2
@@ -429,14 +430,17 @@ def main():
     # model files check and download
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
 
-    env_id = args.env_id
+    # disable FP16
+    if "FP16" in ailia.get_environment(args.env_id).props or platform.system() == 'Darwin':
+        logger.warning('This model do not work on FP16. So use CPU mode.')
+        args.env_id = 0
 
     # initialize
     if not args.onnx:
         memory_mode = ailia.get_memory_mode(
             reduce_constant=True, ignore_input_with_initializer=True,
             reduce_interstage=False, reuse_interstage=True)
-        net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)#, memory_mode = memory_mode)
+        net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id, memory_mode = memory_mode)
     else:
         import onnxruntime
         net = onnxruntime.InferenceSession(WEIGHT_PATH)
