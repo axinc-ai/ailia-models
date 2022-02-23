@@ -159,6 +159,7 @@ cd ../../object_detection/yolor; python3 yolor.py ${OPTION}
 cd ../../object_detection/mobile_object_localizer; python3 mobile_object_localizer.py ${OPTION}
 cd ../../object_detection/sku100k-densedet; python3 yolor.py ${OPTION}
 cd ../../object_detection/traffic-sign-detection; python3 traffic-sign-detection.py ${OPTION}
+cd ../../object_detection/detic; python3 detic.py ${OPTION}
 cd ../../object_detection_3d/3d_bbox; python3 3d_bbox.py ${OPTION}
 cd ../../object_detection_3d/3d-object-detection.pytorch; python3 3d-object-detection.pytorch.py ${OPTION}
 cd ../../object_detection_3d/mediapipe_objectron; python3 mediapipe_objectron.py ${OPTION}
