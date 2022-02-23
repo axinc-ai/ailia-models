@@ -189,7 +189,6 @@ def recognize_from_video(net):
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
-        frame = cv2.imread("animal-1.jpg")
 
         # inference
         mask = predict(net, frame)
