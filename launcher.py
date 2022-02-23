@@ -134,8 +134,7 @@ def open_model(model):
     
     cmd = [cmd, model["model"]+".py"] + options
     print(" ".join(cmd))
-    
-    subprocess.check_call(cmd, cwd=dir, shell=True)
+    subprocess.check_call(cmd, cwd=dir, shell=False)
 
 
 def display_loading(img, model):
