@@ -22,6 +22,7 @@ cd ../../background_ramoval/indexnet; python3 indexnet.py ${OPTION}
 cd ../../background_ramoval/modnet; python3 modnet.py ${OPTION}
 cd ../../background_ramoval/background_matting_v2; python3 background_matting_v2.py ${OPTION}
 cd ../../background_ramoval/cascade_psp; python3 cascade_psp.py ${OPTION}
+cd ../../background_ramoval/rembg; python3 rembg.py ${OPTION}
 cd ../../crowd_counting/crowdcount-cascaded-mtl; python3 crowdcount-cascaded-mtl.py ${OPTION}
 cd ../../crowd_counting/c-3-framework; python3 c-3-framework.py ${OPTION}
 cd ../../deep_fashion/clothing-detection; python3 clothing-detection.py ${OPTION}
@@ -93,6 +94,7 @@ cd ../../image_classification/vgg16; python3 vgg16.py ${OPTION}
 cd ../../image_classification/vit; python3 vit.py ${OPTION}
 cd ../../image_classification/efficientnetv2; python3 efficientnetv2.py ${OPTION}
 cd ../../image_classification/wide_resnet50; python3 wide_resnet50.py ${OPTION}
+cd ../../image_classification/resnet18; python3 resnet18.py ${OPTION}
 cd ../../image_classification/mlp_mixer; python3 mlp_mixer.py ${OPTION}
 cd ../../image_classification/alexnet; python3 alexnet.py ${OPTION}
 cd ../../image_classification/clip; python3 clip.py ${OPTION}
@@ -124,6 +126,7 @@ cd ../../image_segmentation/swiftnet; python3 swiftnet.py ${OPTION}
 cd ../../image_segmentation/dense_prediction_transformers; python3 dense_prediction_transformers.py ${OPTION}
 cd ../../image_segmentation/paddleseg; python3 paddleseg.py ${OPTION}
 cd ../../line_segment_detection/mlsd; python3 mlsd.py ${OPTION}
+cd ../../line_segment_detection/dexined; python3 dexined.py ${OPTION}
 cd ../../low_light_image_enhancement/agllnet; python3 agllnet.py ${OPTION}
 cd ../../neural_language_processing/bert; python3 bert.py ${OPTION}
 cd ../../neural_language_processing/bert_tweets_sentiment; python3 bert_tweets_sentiment.py ${OPTION}
@@ -155,6 +158,7 @@ cd ../../object_detection/nanodet; python3 nanodet.py ${OPTION}
 cd ../../object_detection/yolor; python3 yolor.py ${OPTION}
 cd ../../object_detection/mobile_object_localizer; python3 mobile_object_localizer.py ${OPTION}
 cd ../../object_detection/sku100k-densedet; python3 yolor.py ${OPTION}
+cd ../../object_detection/traffic-sign-detection; python3 traffic-sign-detection.py ${OPTION}
 cd ../../object_detection/detic; python3 detic.py ${OPTION}
 cd ../../object_detection_3d/3d_bbox; python3 3d_bbox.py ${OPTION}
 cd ../../object_detection_3d/3d-object-detection.pytorch; python3 3d-object-detection.pytorch.py ${OPTION}
