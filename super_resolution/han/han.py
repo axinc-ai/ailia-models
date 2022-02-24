@@ -204,7 +204,7 @@ def main():
     if sys.platform == "darwin" :
         env_id = 0
         logger.info('This model not working on FP16. So running on CPU.')
-    memory_mode = ailia.get_memory_mode(reuse_interstage=True)
+    memory_mode = ailia.get_memory_mode(reduce_constant=True, reduce_interstage=True)
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id, memory_mode=memory_mode)
     logger.info('Model: ' + WEIGHT_PATH[:-5])
     logger.info('Scale: ' + str(args.scale))
