@@ -168,7 +168,8 @@ def display_objdetect_image(
 # ======================
 def recognize_from_image():
     # net initialize
-    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
+    mem_mode = ailia.get_memory_mode(reduce_constant=True, reuse_interstage=True)
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id, memory_mode=mem_mode)
     if args.profile:
         net.set_profile_mode(True)
 
@@ -208,7 +209,8 @@ def recognize_from_image():
 
 def recognize_from_video():
     # net initialize
-    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
+    mem_mode = ailia.get_memory_mode(reduce_constant=True, reuse_interstage=True)
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id, memory_mode=mem_mode)
 
     capture = webcamera_utils.get_capture(args.video)
 
