@@ -108,8 +108,11 @@ def generate_video():
         writer = None
 
     # inference
+    frame_shown = False
     while(True):
         if (cv2.waitKey(1) & 0xFF == ord('q')):
+            break
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) < 1:
             break
 
         # prepare input data
@@ -132,6 +135,7 @@ def generate_video():
 
         image = cv2.cvtColor(outp.astype(np.uint8), cv2.COLOR_RGB2BGR)
         cv2.imshow("frame", image)
+        frame_shown = True
 
         # save results
         if writer is not None:

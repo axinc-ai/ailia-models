@@ -232,7 +232,9 @@ def main():
     while(True):
         if cv2.waitKey(1) & 0xFF == ord('q') and invalidate_quit_cnt<=0:
             break
-
+        if cv2.getWindowProperty('ailia MODELS', cv2.WND_PROP_VISIBLE) < 1:
+            break
+        
         if model_request is not None and model_loading_cnt<=0:
             open_model(model_request)
             model_request=None
