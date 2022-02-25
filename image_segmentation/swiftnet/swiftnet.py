@@ -83,9 +83,6 @@ def recognize_from_image():
         logger.info(f'saved at : {savepath}')
         pred.save(savepath)
 
-        if cv2.waitKey(0) != 32:  # space bar
-            exit()
-
 
 def recognize_from_video():
     # net initialize
