@@ -132,10 +132,13 @@ def recognize_from_video():
         writer = None
 
     logger.info('Start Inference...')
+    frame_shown = False
     while(True):
         idx_frame += 1
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) < 1:
             break
 
         # In order to use ailia.Detector, the input should have 4 channels.
@@ -220,6 +223,7 @@ def recognize_from_video():
             results.append((idx_frame - 1, bbox_tlwh, identities))
 
         cv2.imshow('frame', frame)
+        frame_shown = True
 
         if writer is not None:
             writer.write(frame)

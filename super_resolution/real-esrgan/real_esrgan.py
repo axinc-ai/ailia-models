@@ -96,10 +96,13 @@ def enhance_video():
         writer = get_writer(args.savepath, save_h, save_w * 2)
     else:
         writer = None
-
+    
+    frame_shown = False
     while (True):
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) < 1:
             break
 
         img = cv2.resize(frame, dsize=(H, W))
@@ -109,6 +112,7 @@ def enhance_video():
 
         #plot result
         cv2.imshow('frame', output)
+        frame_shown = True
 
         if writer is not None:
             writer.release()
