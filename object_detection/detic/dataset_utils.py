@@ -1,5 +1,5 @@
-from datasets.lvis_v1_categories import LVIS_CATEGORIES as LVIS_V1_CATEGORIES
-from datasets.in21k_categories import IN21K_CATEGORIES
+from datasets_detic.lvis_v1_categories import LVIS_CATEGORIES as LVIS_V1_CATEGORIES
+from datasets_detic.in21k_categories import IN21K_CATEGORIES
 
 
 def get_lvis_meta_v1():
