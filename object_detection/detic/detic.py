@@ -437,9 +437,17 @@ def main():
 
     # initialize
     if not args.onnx:
-        memory_mode = ailia.get_memory_mode(
-            reduce_constant=True, ignore_input_with_initializer=True,
-            reduce_interstage=False, reuse_interstage=True)
+        if args.env_id == 0:
+            # CPU supporting reuse_interstage
+            memory_mode = ailia.get_memory_mode(
+                reduce_constant=True, ignore_input_with_initializer=True,
+                reduce_interstage=False, reuse_interstage=True)
+        else:
+            # cuDNN only worked with reduce_interstage
+            logger.info("GPU only worked with reduce_interstage")
+            memory_mode = ailia.get_memory_mode(
+                reduce_constant=True, ignore_input_with_initializer=True,
+                reduce_interstage=True, reuse_interstage=False)
         net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id, memory_mode = memory_mode)
     else:
         import onnxruntime
