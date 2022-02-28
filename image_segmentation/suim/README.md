@@ -4,15 +4,11 @@
 
 ![Input](input.jpg)
 
-(Image from https://www.cityscapes-dataset.com/)
-
-/datasets/Cityscapes/rgb/test/munich/munich_000000_000019_leftImg8bit.png
-
-Ailia input shape: (1, 3, 1024, 2048)
+(Image from https://github.com/IRVLab/SUIM/blob/master/data/test/images/d_r_47_.jpg)
 
 ## Output
 
-![Output](output/HDs_output.jpg)
+![Output](output.jpg)
 
 ## Usage
 

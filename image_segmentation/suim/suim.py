@@ -2,7 +2,6 @@ import sys
 import time
 import numpy as np
 import cv2
-from PIL import Image
 
 import ailia
 
@@ -38,6 +37,45 @@ parser = get_base_parser('suim model', IMAGE_PATH, SAVE_IMAGE_PATH)
 args = update_parser(parser)
 
 # ======================
+# Visualize
+# ======================
+
+def get_color_map(num_classes):
+    num_classes += 1
+    cm = num_classes * [0, 0, 0]
+    for i in range(0, num_classes):
+        j = 0
+        lab = i
+        while lab:
+            cm[i * 3] |= (((lab >> 0) & 1) << (7 - j))
+            cm[i * 3 + 1] |= (((lab >> 1) & 1) << (7 - j))
+            cm[i * 3 + 2] |= (((lab >> 2) & 1) << (7 - j))
+            j += 1
+            lab >>= 3
+
+    cm = cm[3:]
+
+    return cm
+
+color_map = get_color_map(256)
+
+def visualize(img, result, weight=0.6):
+    cm = [
+        color_map[i:i + 3] for i in range(0, len(color_map), 3)
+    ]
+    cm = np.array(cm).astype("uint8")
+
+    # Use OpenCV LUT for color mapping
+    c1 = cv2.LUT(result, cm[:, 0])
+    c2 = cv2.LUT(result, cm[:, 1])
+    c3 = cv2.LUT(result, cm[:, 2])
+    pseudo_img = np.dstack((c1, c2, c3))
+
+    vis_result = cv2.addWeighted(img, weight, pseudo_img, 1 - weight, 0)
+
+    return vis_result
+
+# ======================
 # Main functions
 # ======================
 def recognize_from_image():
@@ -49,12 +87,13 @@ def recognize_from_image():
     for image_path in args.input:
         # prepare input data
         logger.debug(f'input image: {image_path}')
-        img = Image.open(image_path)
-        img = np.array(img) / 255.
-        logger.debug(f'input image shape: {img.shape}')
+        img = cv2.imread(image_path)
         img = cv2.resize(img, (WIDTH, HEIGHT))
+        img_data = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        img_data = img_data / 255.
+        logger.debug(f'input image shape: {img_data.shape}')
 
-        img = np.expand_dims(img, 0)
+        img_data = np.expand_dims(img_data, 0)
 
         # inference
         logger.info('Start inference...')
@@ -62,33 +101,24 @@ def recognize_from_image():
             logger.info('BENCHMARK mode')
             for i in range(5):
                 start = int(round(time.time() * 1000))
-                pred = net.predict(img)
+                pred = net.predict(img_data)
                 end = int(round(time.time() * 1000))
                 logger.info(f'\tailia processing time {end - start} ms')
         else:
-            pred = net.predict(img)
+            pred = net.predict(img_data)
 
         # postprocessing
         pred[pred > 0.5] = 1.
         pred[pred <= 0.5] = 0.
 
-
         # save individual output masks
-        ROs = np.reshape(pred[0, :, :, 0], (HEIGHT, WIDTH))
-        FVs = np.reshape(pred[0, :, :, 1], (HEIGHT, WIDTH))
-        HDs = np.reshape(pred[0, :, :, 2], (HEIGHT, WIDTH))
-        RIs = np.reshape(pred[0, :, :, 3], (HEIGHT, WIDTH))
-        WRs = np.reshape(pred[0, :, :, 4], (HEIGHT, WIDTH))
+        pred = np.argmax(pred, axis=3).astype(np.uint8)[0]
+        output = visualize(img, pred, weight=0.6)
 
         # save
         savepath = get_savepath(args.savepath, image_path)
         logger.info(f'saved at : {savepath}')
-
-        Image.fromarray(np.uint8(ROs * 255.)).save('output/' + 'ROs' + savepath)
-        Image.fromarray(np.uint8(FVs * 255.)).save('output/' + 'FVs' + savepath)
-        Image.fromarray(np.uint8(HDs * 255.)).save('output/' + 'HDs_' + savepath)
-        Image.fromarray(np.uint8(RIs * 255.)).save('output/' + 'RIs_' + savepath)
-        Image.fromarray(np.uint8(WRs * 255.)).save('output/' + 'WRs_' + savepath)
+        cv2.imwrite(savepath,output)
 
         if cv2.waitKey(0) != 32:  # space bar
             exit()
@@ -107,7 +137,7 @@ def recognize_from_video():
         logger.warning(
             'currently, video results cannot be output correctly...'
         )
-        writer = webcamera_utils.get_writer(args.savepath, f_h, f_w, rgb=False)
+        writer = webcamera_utils.get_writer(args.savepath, HEIGHT, WIDTH, rgb=False)
     else:
         writer = None
 
@@ -116,7 +146,9 @@ def recognize_from_video():
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
 
-        input = cv2.resize(frame, (WIDTH, HEIGHT))/ 255.
+        frame = cv2.resize(frame, (WIDTH, HEIGHT))
+        input = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        input = input / 255.
         input = np.expand_dims(input, 0)
 
         # inference
@@ -127,13 +159,14 @@ def recognize_from_video():
         pred[pred <= 0.5] = 0.
 
         # save individual output masks
-        HDs = np.reshape(pred[0, :, :, 2], (HEIGHT, WIDTH))
+        pred = np.argmax(pred, axis=3).astype(np.uint8)[0]
+        output = visualize(frame, pred, weight=0.6)
 
-        cv2.imshow('frame', HDs)
+        cv2.imshow('frame', output)
 
         # save results
         if writer is not None:
-            writer.write(HDs)
+            writer.write(output)
 
     capture.release()
     cv2.destroyAllWindows()
