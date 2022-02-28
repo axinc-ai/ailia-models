@@ -2,10 +2,6 @@ import sys
 import time
 import numpy as np
 import cv2
-from PIL import Image as pimg
-
-from swiftnet_utils.labels import labels
-from swiftnet_utils.color_lables import ColorizeLabels
 
 import ailia
 
@@ -23,24 +19,61 @@ logger = getLogger(__name__)
 # ======================
 # Parameters
 # ======================
-REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/swiftnet/'
+REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/suim/'
 
-WEIGHT_PATH = "swiftnet.opt.onnx"
-MODEL_PATH = "swiftnet.opt.onnx.prototxt"
+WEIGHT_PATH = "suim.opt.onnx"
+MODEL_PATH = "suim.opt.onnx.prototxt"
 
-IMAGE_PATH = 'input.png'
-SAVE_IMAGE_PATH = 'output.png'
-HEIGHT = 1024
-WIDTH = 2048
+IMAGE_PATH = 'input.jpg'
+SAVE_IMAGE_PATH = 'output.jpg'
+HEIGHT = 256
+WIDTH = 320
 
-color_info = [label.color for label in labels if label.ignoreInEval is False]
 
 # ======================
 # Arguemnt Parser Config
 # ======================
-parser = get_base_parser('swiftnet model', IMAGE_PATH, SAVE_IMAGE_PATH)
+parser = get_base_parser('suim model', IMAGE_PATH, SAVE_IMAGE_PATH)
 args = update_parser(parser)
 
+# ======================
+# Visualize
+# ======================
+
+def get_color_map(num_classes):
+    num_classes += 1
+    cm = num_classes * [0, 0, 0]
+    for i in range(0, num_classes):
+        j = 0
+        lab = i
+        while lab:
+            cm[i * 3] |= (((lab >> 0) & 1) << (7 - j))
+            cm[i * 3 + 1] |= (((lab >> 1) & 1) << (7 - j))
+            cm[i * 3 + 2] |= (((lab >> 2) & 1) << (7 - j))
+            j += 1
+            lab >>= 3
+
+    cm = cm[3:]
+
+    return cm
+
+color_map = get_color_map(256)
+
+def visualize(img, result, weight=0.6):
+    cm = [
+        color_map[i:i + 3] for i in range(0, len(color_map), 3)
+    ]
+    cm = np.array(cm).astype("uint8")
+
+    # Use OpenCV LUT for color mapping
+    c1 = cv2.LUT(result, cm[:, 0])
+    c2 = cv2.LUT(result, cm[:, 1])
+    c3 = cv2.LUT(result, cm[:, 2])
+    pseudo_img = np.dstack((c1, c2, c3))
+
+    vis_result = cv2.addWeighted(img, weight, pseudo_img, 1 - weight, 0)
+
+    return vis_result
 
 # ======================
 # Main functions
@@ -55,10 +88,12 @@ def recognize_from_image():
         # prepare input data
         logger.debug(f'input image: {image_path}')
         img = cv2.imread(image_path)
-        logger.debug(f'input image shape: {img.shape}')
         img = cv2.resize(img, (WIDTH, HEIGHT))
-        img = img.transpose(2, 0, 1)
-        img = np.expand_dims(img, 0)
+        img_data = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        img_data = img_data / 255.
+        logger.debug(f'input image shape: {img_data.shape}')
+
+        img_data = np.expand_dims(img_data, 0)
 
         # inference
         logger.info('Start inference...')
@@ -66,22 +101,27 @@ def recognize_from_image():
             logger.info('BENCHMARK mode')
             for i in range(5):
                 start = int(round(time.time() * 1000))
-                pred = net.predict(img)
+                pred = net.predict(img_data)
                 end = int(round(time.time() * 1000))
                 logger.info(f'\tailia processing time {end - start} ms')
         else:
-            pred = net.predict(img)
+            pred = net.predict(img_data)
 
         # postprocessing
-        to_color = ColorizeLabels(color_info)
-        pred = np.argmax(pred, axis=1)
-        pred = to_color(pred).astype(np.uint8)
-        pred = pimg.fromarray(pred[0])
+        pred[pred > 0.5] = 1.
+        pred[pred <= 0.5] = 0.
+
+        # save individual output masks
+        pred = np.argmax(pred, axis=3).astype(np.uint8)[0]
+        output = visualize(img, pred, weight=0.6)
 
         # save
         savepath = get_savepath(args.savepath, image_path)
         logger.info(f'saved at : {savepath}')
-        pred.save(savepath)
+        cv2.imwrite(savepath,output)
+
+        if cv2.waitKey(0) != 32:  # space bar
+            exit()
 
 
 def recognize_from_video():
@@ -97,7 +137,7 @@ def recognize_from_video():
         logger.warning(
             'currently, video results cannot be output correctly...'
         )
-        writer = webcamera_utils.get_writer(args.savepath, f_h, f_w, rgb=False)
+        writer = webcamera_utils.get_writer(args.savepath, HEIGHT, WIDTH, rgb=False)
     else:
         writer = None
 
@@ -106,23 +146,27 @@ def recognize_from_video():
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
 
-        input = cv2.resize(frame, (WIDTH, HEIGHT))
-        input = input.transpose(2, 0, 1)
+        frame = cv2.resize(frame, (WIDTH, HEIGHT))
+        input = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        input = input / 255.
         input = np.expand_dims(input, 0)
 
         # inference
         pred = net.predict(input)
 
         # postprocessing
-        to_color = ColorizeLabels(color_info)
-        pred = np.argmax(pred, axis=1)[0]
-        pred = to_color(pred).astype(np.uint8)
+        pred[pred > 0.5] = 1.
+        pred[pred <= 0.5] = 0.
 
-        cv2.imshow('frame', pred)
+        # save individual output masks
+        pred = np.argmax(pred, axis=3).astype(np.uint8)[0]
+        output = visualize(frame, pred, weight=0.6)
+
+        cv2.imshow('frame', output)
 
         # save results
         if writer is not None:
-            writer.write(pred)
+            writer.write(output)
 
     capture.release()
     cv2.destroyAllWindows()
