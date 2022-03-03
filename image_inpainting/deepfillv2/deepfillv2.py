@@ -75,7 +75,7 @@ parser.add_argument(
 )
 parser.add_argument(
     '-ir', '--img_res', type=int, default=256, choices=(256, 512, 1024),
-    help='mask type'
+    help='image resolution'
 )
 args = update_parser(parser)
 
