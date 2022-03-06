@@ -16,6 +16,14 @@ from skimage.segmentation import mark_boundaries
 import matplotlib
 import matplotlib.pyplot as plt
 
+use_pytorch = False
+try:
+    import torch
+
+    use_pytorch = True
+except ModuleNotFoundError:
+    pass
+
 import ailia
 
 # import original modules
@@ -83,7 +91,7 @@ args = update_parser(parser)
 
 
 # ======================
-# 
+# Secondaty Functions
 # ======================
 
 def calc_dist_matrix(x, y):
@@ -93,6 +101,47 @@ def calc_dist_matrix(x, y):
     dist_matrix = np.sqrt(dist_matrix)
 
     return dist_matrix
+
+
+def plot_fig(
+        file_list, test_imgs,
+        score_map,
+        gt_imgs, threshold, save_path):
+    for t_idx in range(len(file_list)):
+        image_path = file_list[t_idx]
+        test_img = test_imgs[t_idx]
+        test_gt = gt_imgs[t_idx]
+        test_pred = score_map[t_idx]
+        test_pred[test_pred <= threshold] = 0
+        test_pred[test_pred > threshold] = 1
+        test_pred_img = test_img.copy()
+        test_pred_img[test_pred == 0] = 0
+
+        fig_img, ax_img = plt.subplots(1, 4, figsize=(12, 4)) \
+            if test_gt is not None \
+            else plt.subplots(1, 3, figsize=(12, 4))
+        fig_img.subplots_adjust(left=0, right=1, bottom=0, top=1)
+        for ax_i in ax_img:
+            ax_i.axes.xaxis.set_visible(False)
+            ax_i.axes.yaxis.set_visible(False)
+
+        i = 0
+        ax_img[0].imshow(test_img)
+        ax_img[0].title.set_text('Image')
+        if test_gt is not None:
+            i = 1
+            ax_img[i].imshow(test_gt, cmap='gray')
+            ax_img[i].title.set_text('GroundTruth')
+        ax_img[i + 1].imshow(test_pred, cmap='gray')
+        ax_img[i + 1].title.set_text('Predicted mask')
+        ax_img[i + 2].imshow(test_pred_img)
+        ax_img[i + 2].title.set_text('Predicted anomalous image')
+
+        # plot result
+        p = get_savepath(save_path, image_path, ext='.png')
+        logger.info(f'saved at : {p}')
+        fig_img.savefig(p, dpi=100)
+        plt.close()
 
 
 # ======================
@@ -116,7 +165,7 @@ def preprocess(img, mask=False):
     h, w = img.shape[:2]
     pad_h = (h - crop_size) // 2
     pad_w = (w - crop_size) // 2
-    img = img[pad_h:pad_h + crop_size, pad_w:pad_w + crop_size, :]
+    img = img_resized = img[pad_h:pad_h + crop_size, pad_w:pad_w + crop_size, :]
 
     # normalize
     if not mask:
@@ -127,7 +176,7 @@ def preprocess(img, mask=False):
     img = img.transpose(2, 0, 1)  # HWC -> CHW
     img = np.expand_dims(img, axis=0)
 
-    return img
+    return img, img_resized
 
 
 def preprocess_aug(img, mask=False, angle_range=[-10, 10], return_refs=False):
@@ -276,12 +325,13 @@ def recognize_from_image(net):
     else:
         logger.info('infer with augmentation')
         aug_num = args.aug_num
-    N = 0
-    dist_list = []
+
     if not args.aug:
         aug_num = 1
     else:
         aug_num = args.aug_num
+
+    score_map_list = []
     for i_aug in range(aug_num):
         test_outputs = OrderedDict([
             ('layer1', []), ('layer2', []), ('layer3', []),
@@ -304,8 +354,8 @@ def recognize_from_image(net):
                 img = load_image(image_path)
                 img = cv2.cvtColor(img, cv2.COLOR_BGRA2RGB)
                 if not args.aug:
-                    img = preprocess(img)
-                    test_imgs.append(img[0])
+                    img, img_resized = preprocess(img)
+                    test_imgs.append(img_resized)
                 else:
                     (img, img_resized, angle,
                      pad_h, pad_w) = preprocess_aug(img, return_refs=True)
@@ -323,28 +373,15 @@ def recognize_from_image(net):
                     if os.path.exists(gt_fpath):
                         gt_img = load_image(gt_fpath)
                         gt_img = cv2.cvtColor(gt_img, cv2.COLOR_BGRA2RGB)
-                        if not args.aug:
-                            gt_img = preprocess(gt_img, mask=True)
-                            if gt_img is not None:
-                                gt_img = gt_img[0, [0]]
-                            else:
-                                gt_img = np.zeros((1, IMAGE_SIZE, IMAGE_SIZE))
-                        else:
-                            gt_img = preprocess_aug(gt_img, mask=True)
-                            if gt_img is not None:
-                                gt_img = gt_img[0, [0]]
-                            else:
-                                gt_img = np.zeros((1, IMAGE_RESIZE, IMAGE_RESIZE))
+                        _, gt_img = preprocess(gt_img, mask=True)
+                    else:
+                        gt_img = np.ones((IMAGE_RESIZE, IMAGE_RESIZE, 3))
 
                 gt_imgs.append(gt_img)
-
-            # countup N
-            N += len(imgs)
 
             imgs = np.vstack(imgs)
 
             logger.debug(f'input images shape: {imgs.shape}')
-            # net.set_input_shape(imgs.shape)
 
             # inference
             if args.benchmark:
@@ -369,95 +406,83 @@ def recognize_from_image(net):
         for k, v in test_outputs.items():
             test_outputs[k] = np.vstack(v)
 
+        # calculate distance matrix
         dist_matrix = calc_dist_matrix(
             test_outputs['avgpool'].reshape(test_outputs['avgpool'].shape[0], -1),
             train_outputs['avgpool'].reshape(train_outputs['avgpool'].shape[0], -1))
 
+        # select K nearest neighbor
         top_k = 5
         topk_indexes = np.argsort(dist_matrix, axis=1)
         topk_indexes = topk_indexes[:, :top_k]
-        print(topk_indexes)
-        print(topk_indexes.shape)
-        1 / 0
 
-        print("---", test_outputs['avgpool'].shape)
         for t_idx in range(test_outputs['avgpool'].shape[0]):
             score_maps = []
             for layer_name in ['layer1', 'layer2', 'layer3']:  # for each layer
-                score_map = np.ones((1, 1, 224, 224))
+                # construct a gallery of features at all pixel locations of the K nearest neighbors
+                topk_feat_map = train_outputs[layer_name][topk_indexes[t_idx]]
+                test_feat_map = test_outputs[layer_name][t_idx:t_idx + 1]
+
+                feat_gallery = topk_feat_map.transpose(0, 3, 2, 1)
+                feat_gallery = feat_gallery.reshape(-1, feat_gallery.shape[-1])
+                feat_gallery = feat_gallery[:, :, None, None]
+
+                # calculate distance matrix
+                dist_matrix_list = []
+                if use_pytorch and torch.cuda.is_available():
+                    feat_gallery = torch.tensor(feat_gallery, device='cuda')
+                    test_feat_map = torch.tensor(test_feat_map, device='cuda')
+                    for d_idx in range(feat_gallery.shape[0] // 100):
+                        dist_matrix = torch.pow(torch.mean(torch.pow(
+                            feat_gallery[d_idx * 100:d_idx * 100 + 100] - test_feat_map, 2), 1),
+                            0.5)
+                        dist_matrix_list.append(dist_matrix.cpu().detach().numpy())
+                else:
+                    for d_idx in range(feat_gallery.shape[0] // 100):
+                        dist_matrix = np.power(feat_gallery[d_idx * 100:d_idx * 100 + 100] - test_feat_map, 2)
+                        dist_matrix = np.mean(dist_matrix, axis=1)
+                        dist_matrix = np.sqrt(dist_matrix)
+                        dist_matrix_list.append(dist_matrix)
+
+                dist_matrix = np.vstack(dist_matrix_list)
+                score_map = np.min(dist_matrix, axis=0)
+                score_map = np.asarray(
+                    Image.fromarray(score_map).resize(
+                        (IMAGE_SIZE, IMAGE_SIZE), resample=Image.BILINEAR))
+                score_map = score_map[None, None, :, :]
                 score_maps.append(score_map)
 
-            # score_map = torch.mean(torch.cat(score_maps, 0), dim=0)
-            dist_list.append(score_map)
+            score_maps = np.vstack(score_maps)
+            score_map = np.mean(score_maps, axis=0)
+            score_map_list.append(score_map)
 
-    dist_list = np.vstack(dist_list)
-    # dist_list = dist_list.reshape(N, H, W)
-    print(dist_list.shape)
-    1 / 0
+    score_map = np.vstack(score_map_list)
 
-    if not args.aug:
-        # upsample
-        score_map = np.asarray([
-            np.array(Image.fromarray(s).resize(
-                (IMAGE_SIZE, IMAGE_SIZE), resample=Image.BILINEAR)
-            ) for s in dist_list
-        ])
-    else:
-        # upsample and reverse augmentation
-        score_map = np.zeros([N, IMAGE_RESIZE, IMAGE_RESIZE])
-        for i in range(score_map.shape[0]):
-            score_map_tmp = dist_list[i]
-            score_map_tmp = Image.fromarray(score_map_tmp)
-            score_map_tmp = score_map_tmp.resize((IMAGE_SIZE, IMAGE_SIZE),
-                                                 resample=Image.BILINEAR)
-            score_map_tmp = np.array(score_map_tmp)
-            # reverse crop
-            pad_top = pad_h_list[i]
-            pad_left = pad_w_list[i]
-            pad_bottom = IMAGE_RESIZE - IMAGE_SIZE - pad_h
-            pad_right = IMAGE_RESIZE - IMAGE_SIZE - pad_w
-            score_map_tmp = np.pad(score_map_tmp, ((pad_top, pad_bottom),
-                                                   (pad_left, pad_right)))
-            # reverse rotate
-            angle = angle_list[i]
-            rot_mat = cv2.getRotationMatrix2D((IMAGE_RESIZE / 2, IMAGE_RESIZE / 2), -angle, 1)
-            score_map_tmp = cv2.warpAffine(src=score_map_tmp,
-                                           M=rot_mat,
-                                           dsize=(IMAGE_RESIZE, IMAGE_RESIZE),
-                                           borderMode=cv2.BORDER_REPLICATE,
-                                           flags=cv2.INTER_LINEAR)
-            score_map[i] = score_map_tmp
-        score_map = score_map.reshape(args.aug_num, -1, IMAGE_RESIZE, IMAGE_RESIZE)
-        score_map = np.mean(score_map, axis=0)
+    # if args.aug:
+    #     score_map = score_map.reshape(args.aug_num, -1, IMAGE_RESIZE, IMAGE_RESIZE)
+    #     score_map = np.mean(score_map, axis=0)
 
     # apply gaussian smoothing on the score map
     for i in range(score_map.shape[0]):
         score_map[i] = gaussian_filter(score_map[i], sigma=4)
 
-    # Normalization
-    max_score = score_map.max()
-    min_score = score_map.min()
-    scores = (score_map - min_score) / (max_score - min_score)
+    # if args.threshold is None:
+    #     # get optimal threshold
+    #     if not args.aug:
+    #         gt_mask = np.asarray(gt_imgs)
+    #     else:
+    #         gt_mask = np.asarray(gt_imgs[:int(len(gt_imgs) / args.aug_num)])
+    #     precision, recall, thresholds = precision_recall_curve(gt_mask.flatten(), scores.flatten())
+    #     a = 2 * precision * recall
+    #     b = precision + recall
+    #     f1 = np.divide(a, b, out=np.zeros_like(a), where=b != 0)
+    #     threshold = thresholds[np.argmax(f1)]
+    #     logger.info('Optimal threshold: %f' % threshold)
+    # else:
+    #     threshold = args.threshold
+    threshold = 0.099386305
 
-    # Calculated anormal score
-    anormal_scores = np.zeros((score_map.shape[0]))
-    for i in range(score_map.shape[0]):
-        anormal_scores[i] = score_map[i].max()
-
-    if args.threshold is None:
-        # get optimal threshold
-        if not args.aug:
-            gt_mask = np.asarray(gt_imgs)
-        else:
-            gt_mask = np.asarray(gt_imgs[:int(len(gt_imgs) / args.aug_num)])
-        precision, recall, thresholds = precision_recall_curve(gt_mask.flatten(), scores.flatten())
-        a = 2 * precision * recall
-        b = precision + recall
-        f1 = np.divide(a, b, out=np.zeros_like(a), where=b != 0)
-        threshold = thresholds[np.argmax(f1)]
-        logger.info('Optimal threshold: %f' % threshold)
-    else:
-        threshold = args.threshold
+    plot_fig(args.input, test_imgs, score_map, gt_imgs, threshold, args.savepath)
 
     logger.info('Script finished successfully.')
 
