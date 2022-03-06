@@ -464,13 +464,13 @@ def recognize_from_image(net):
 
     # apply gaussian smoothing on the score map
     for i in range(score_map.shape[0]):
-        score_map[i] = gaussian_filter(score_map[i], sigma=4)
+        score_map_list[i] = gaussian_filter(score_map_list[i], sigma=4)
 
     if args.threshold is None:
         # get optimal threshold
         flatten_gt_mask_list = np.concatenate(gt_masks).ravel()
         flatten_score_map_list = np.concatenate(score_map_list).ravel()
-
+        
         # get optimal threshold
         precision, recall, thresholds = precision_recall_curve(flatten_gt_mask_list, flatten_score_map_list)
         a = 2 * precision * recall
