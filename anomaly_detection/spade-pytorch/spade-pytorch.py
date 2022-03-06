@@ -11,9 +11,6 @@ from PIL import Image
 from scipy.spatial.distance import mahalanobis
 from scipy.ndimage import gaussian_filter
 from sklearn.metrics import precision_recall_curve
-from skimage import morphology
-from skimage.segmentation import mark_boundaries
-import matplotlib
 import matplotlib.pyplot as plt
 
 use_pytorch = False
@@ -165,18 +162,18 @@ def preprocess(img, mask=False):
     h, w = img.shape[:2]
     pad_h = (h - crop_size) // 2
     pad_w = (w - crop_size) // 2
-    img = img_resized = img[pad_h:pad_h + crop_size, pad_w:pad_w + crop_size, :]
+    img = img_cropped = img[pad_h:pad_h + crop_size, pad_w:pad_w + crop_size, ...]
 
     # normalize
     if not mask:
         img = normalize_image(img.astype(np.float32), 'ImageNet')
+        img = img.transpose(2, 0, 1)  # HWC -> CHW
     else:
         img = img / 255
 
-    img = img.transpose(2, 0, 1)  # HWC -> CHW
     img = np.expand_dims(img, axis=0)
 
-    return img, img_resized
+    return img, img_cropped
 
 
 def preprocess_aug(img, mask=False, angle_range=[-10, 10], return_refs=False):
@@ -278,9 +275,9 @@ def get_train_outputs(net):
                 img = cv2.cvtColor(img, cv2.COLOR_BGRA2RGB)
 
                 if not args.aug:
-                    img = preprocess(img)
+                    img, _ = preprocess(img)
                 else:
-                    img = preprocess_aug(img)
+                    img, _ = preprocess_aug(img)
 
                 imgs.append(img)
 
@@ -315,6 +312,7 @@ def recognize_from_image(net):
     gt_type_dir = args.gt_dir if args.gt_dir else None
     test_imgs = []
     gt_imgs = []
+    gt_masks = []
     angle_list = []
     pad_h_list = []
     pad_w_list = []
@@ -354,30 +352,30 @@ def recognize_from_image(net):
                 img = load_image(image_path)
                 img = cv2.cvtColor(img, cv2.COLOR_BGRA2RGB)
                 if not args.aug:
-                    img, img_resized = preprocess(img)
-                    test_imgs.append(img_resized)
+                    img, img_cropped = preprocess(img)
+                    test_imgs.append(img_cropped)
                 else:
-                    (img, img_resized, angle,
+                    (img, img_cropped, angle,
                      pad_h, pad_w) = preprocess_aug(img, return_refs=True)
-                    test_imgs.append(img_resized)
+                    test_imgs.append(img_cropped)
                     angle_list.append(angle)
                     pad_h_list.append(pad_h)
                     pad_w_list.append(pad_w)
                 imgs.append(img)
 
                 # ground truth
-                gt_img = None
-                if gt_type_dir:
-                    fname = os.path.splitext(os.path.basename(image_path))[0]
-                    gt_fpath = os.path.join(gt_type_dir, fname + '_mask.png')
-                    if os.path.exists(gt_fpath):
-                        gt_img = load_image(gt_fpath)
-                        gt_img = cv2.cvtColor(gt_img, cv2.COLOR_BGRA2RGB)
-                        _, gt_img = preprocess(gt_img, mask=True)
-                    else:
-                        gt_img = np.ones((IMAGE_RESIZE, IMAGE_RESIZE, 3))
+                fname = os.path.splitext(os.path.basename(image_path))[0]
+                gt_fpath = os.path.join(gt_type_dir, fname + '_mask.png')
+                if os.path.exists(gt_fpath):
+                    gt_img = load_image(gt_fpath)
+                    gt_img = cv2.cvtColor(gt_img, cv2.COLOR_BGRA2GRAY)
+                    gt_mask, gt_img = preprocess(gt_img, mask=True)
+                else:
+                    gt_img = np.zeros((IMAGE_SIZE, IMAGE_SIZE))
+                    gt_mask = gt_img[None, :, :]
 
                 gt_imgs.append(gt_img)
+                gt_masks.append(gt_mask)
 
             imgs = np.vstack(imgs)
 
@@ -416,7 +414,11 @@ def recognize_from_image(net):
         topk_indexes = np.argsort(dist_matrix, axis=1)
         topk_indexes = topk_indexes[:, :top_k]
 
-        for t_idx in range(test_outputs['avgpool'].shape[0]):
+        n = test_outputs['avgpool'].shape[0]
+        for t_idx in range(n):
+            logger.info("| localization | %s/%s | %s"
+                        % (t_idx + 1, n, args.input[t_idx]))
+
             score_maps = []
             for layer_name in ['layer1', 'layer2', 'layer3']:  # for each layer
                 # construct a gallery of features at all pixel locations of the K nearest neighbors
@@ -456,8 +458,6 @@ def recognize_from_image(net):
             score_map = np.mean(score_maps, axis=0)
             score_map_list.append(score_map)
 
-    score_map = np.vstack(score_map_list)
-
     # if args.aug:
     #     score_map = score_map.reshape(args.aug_num, -1, IMAGE_RESIZE, IMAGE_RESIZE)
     #     score_map = np.mean(score_map, axis=0)
@@ -466,22 +466,23 @@ def recognize_from_image(net):
     for i in range(score_map.shape[0]):
         score_map[i] = gaussian_filter(score_map[i], sigma=4)
 
-    # if args.threshold is None:
-    #     # get optimal threshold
-    #     if not args.aug:
-    #         gt_mask = np.asarray(gt_imgs)
-    #     else:
-    #         gt_mask = np.asarray(gt_imgs[:int(len(gt_imgs) / args.aug_num)])
-    #     precision, recall, thresholds = precision_recall_curve(gt_mask.flatten(), scores.flatten())
-    #     a = 2 * precision * recall
-    #     b = precision + recall
-    #     f1 = np.divide(a, b, out=np.zeros_like(a), where=b != 0)
-    #     threshold = thresholds[np.argmax(f1)]
-    #     logger.info('Optimal threshold: %f' % threshold)
-    # else:
-    #     threshold = args.threshold
-    threshold = 0.099386305
+    if args.threshold is None:
+        # get optimal threshold
+        flatten_gt_mask_list = np.concatenate(gt_masks).ravel()
+        flatten_score_map_list = np.concatenate(score_map_list).ravel()
 
+        # get optimal threshold
+        precision, recall, thresholds = precision_recall_curve(flatten_gt_mask_list, flatten_score_map_list)
+        a = 2 * precision * recall
+        b = precision + recall
+        f1 = np.divide(a, b, out=np.zeros_like(a), where=b != 0)
+        threshold = thresholds[np.argmax(f1)]
+
+        logger.info('Optimal threshold: %f' % threshold)
+    else:
+        threshold = args.threshold
+
+    score_map = np.vstack(score_map_list)
     plot_fig(args.input, test_imgs, score_map, gt_imgs, threshold, args.savepath)
 
     logger.info('Script finished successfully.')
