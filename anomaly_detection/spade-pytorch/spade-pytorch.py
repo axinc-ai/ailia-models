@@ -69,10 +69,6 @@ parser.add_argument(
     help='directory of the ground truth mask files.'
 )
 parser.add_argument(
-    '--seed', type=int, default=1024,
-    help='random seed'
-)
-parser.add_argument(
     '-th', '--threshold', type=float, default=None,
     help='threshold'
 )
@@ -463,14 +459,14 @@ def recognize_from_image(net):
     #     score_map = np.mean(score_map, axis=0)
 
     # apply gaussian smoothing on the score map
-    for i in range(score_map.shape[0]):
+    for i in range(len(score_map_list)):
         score_map_list[i] = gaussian_filter(score_map_list[i], sigma=4)
 
     if args.threshold is None:
         # get optimal threshold
         flatten_gt_mask_list = np.concatenate(gt_masks).ravel()
         flatten_score_map_list = np.concatenate(score_map_list).ravel()
-        
+
         # get optimal threshold
         precision, recall, thresholds = precision_recall_curve(flatten_gt_mask_list, flatten_score_map_list)
         a = 2 * precision * recall
