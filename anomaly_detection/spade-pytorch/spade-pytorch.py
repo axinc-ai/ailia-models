@@ -16,7 +16,6 @@ import matplotlib.pyplot as plt
 use_pytorch = False
 try:
     import torch
-
     use_pytorch = True
 except ModuleNotFoundError:
     pass
@@ -188,8 +187,8 @@ def preprocess_aug(img, mask=False, angle_range=[-10, 10], return_refs=False):
     # for visualize
     img_resized = img.copy()
 
-    # random rotate
     if not mask:
+        # random rotate
         h, w = img.shape[:2]
         angle = np.random.randint(angle_range[0], angle_range[0] + 1)
         rot_mat = cv2.getRotationMatrix2D((w / 2, h / 2), angle, 1)
@@ -199,8 +198,7 @@ def preprocess_aug(img, mask=False, angle_range=[-10, 10], return_refs=False):
                              borderMode=cv2.BORDER_REPLICATE,
                              flags=cv2.INTER_LINEAR)
 
-    # random crop
-    if not mask:
+        # random crop
         h, w = img.shape[:2]
         pad_h = np.random.randint(0, (h - crop_size))
         pad_w = np.random.randint(0, (w - crop_size))
@@ -209,16 +207,16 @@ def preprocess_aug(img, mask=False, angle_range=[-10, 10], return_refs=False):
     # normalize
     if not mask:
         img = normalize_image(img.astype(np.float32), 'ImageNet')
+        img = img.transpose(2, 0, 1)  # HWC -> CHW
     else:
         img = img / 255
 
-    img = img.transpose(2, 0, 1)  # HWC -> CHW
     img = np.expand_dims(img, axis=0)
 
     if return_refs:
         return img, img_resized, angle, pad_h, pad_w
     else:
-        return img
+        return img, img_resized
 
 
 def get_train_outputs(net):
@@ -309,9 +307,6 @@ def recognize_from_image(net):
     test_imgs = []
     gt_imgs = []
     gt_masks = []
-    angle_list = []
-    pad_h_list = []
-    pad_w_list = []
 
     if not args.aug:
         logger.info('infer without augmentation')
@@ -320,17 +315,15 @@ def recognize_from_image(net):
         logger.info('infer with augmentation')
         aug_num = args.aug_num
 
-    if not args.aug:
-        aug_num = 1
-    else:
-        aug_num = args.aug_num
-
     score_map_list = []
     for i_aug in range(aug_num):
         test_outputs = OrderedDict([
             ('layer1', []), ('layer2', []), ('layer3', []),
             ('avgpool', []),
         ])
+        aug_list = []
+
+        # batch loop
         for i_img in range(0, len(args.input), batch_size):
             # prepare input data
             imgs = []
@@ -344,34 +337,37 @@ def recognize_from_image(net):
                             (args.input[i_img],
                              args.input[min(len(args.input) - 1,
                                             i_img + batch_size)], i_aug))
+
             for image_path in args.input[i_img:i_img + batch_size]:
                 img = load_image(image_path)
                 img = cv2.cvtColor(img, cv2.COLOR_BGRA2RGB)
                 if not args.aug:
-                    img, img_cropped = preprocess(img)
-                    test_imgs.append(img_cropped)
+                    img, vis_img = preprocess(img)
                 else:
-                    (img, img_cropped, angle,
+                    (img, vis_img, angle,
                      pad_h, pad_w) = preprocess_aug(img, return_refs=True)
-                    test_imgs.append(img_cropped)
-                    angle_list.append(angle)
-                    pad_h_list.append(pad_h)
-                    pad_w_list.append(pad_w)
+                    aug_list.append((angle, pad_h, pad_w))
                 imgs.append(img)
+                test_imgs.append(vis_img)
 
                 # ground truth
-                fname = os.path.splitext(os.path.basename(image_path))[0]
-                gt_fpath = os.path.join(gt_type_dir, fname + '_mask.png')
-                if os.path.exists(gt_fpath):
-                    gt_img = load_image(gt_fpath)
-                    gt_img = cv2.cvtColor(gt_img, cv2.COLOR_BGRA2GRAY)
-                    gt_mask, gt_img = preprocess(gt_img, mask=True)
-                else:
-                    gt_img = np.zeros((IMAGE_SIZE, IMAGE_SIZE))
-                    gt_mask = gt_img[None, :, :]
+                if i_aug == 0:
+                    fname = os.path.splitext(os.path.basename(image_path))[0]
+                    gt_fpath = os.path.join(gt_type_dir, fname + '_mask.png')
+                    if os.path.exists(gt_fpath):
+                        gt_img = load_image(gt_fpath)
+                        gt_img = cv2.cvtColor(gt_img, cv2.COLOR_BGRA2GRAY)
+                        if not args.aug:
+                            gt_mask, gt_img = preprocess(gt_img, mask=True)
+                        else:
+                            gt_mask, gt_img = preprocess_aug(gt_img, mask=True)
+                    else:
+                        gt_img = np.zeros((IMAGE_SIZE, IMAGE_SIZE) \
+                                              if not args.aug else (IMAGE_RESIZE, IMAGE_RESIZE))
+                        gt_mask = gt_img[None, :, :]
 
-                gt_imgs.append(gt_img)
-                gt_masks.append(gt_mask)
+                    gt_imgs.append(gt_img)
+                    gt_masks.append(gt_mask)
 
             imgs = np.vstack(imgs)
 
@@ -452,11 +448,29 @@ def recognize_from_image(net):
 
             score_maps = np.vstack(score_maps)
             score_map = np.mean(score_maps, axis=0)
+            if args.aug:
+                # reverse crop
+                angle, pad_top, pad_left = aug_list[t_idx]
+                pad_bottom = IMAGE_RESIZE - IMAGE_SIZE - pad_top
+                pad_right = IMAGE_RESIZE - IMAGE_SIZE - pad_left
+                score_map = np.pad(np.squeeze(score_map),
+                                   ((pad_top, pad_bottom), (pad_left, pad_right)))
+                # reverse rotate
+                rot_mat = cv2.getRotationMatrix2D((IMAGE_RESIZE / 2, IMAGE_RESIZE / 2), -angle, 1)
+                score_map = cv2.warpAffine(src=score_map,
+                                           M=rot_mat,
+                                           dsize=(IMAGE_RESIZE, IMAGE_RESIZE),
+                                           borderMode=cv2.BORDER_REPLICATE,
+                                           flags=cv2.INTER_LINEAR)
+                score_map = score_map[None, :, :]
+
             score_map_list.append(score_map)
 
-    # if args.aug:
-    #     score_map = score_map.reshape(args.aug_num, -1, IMAGE_RESIZE, IMAGE_RESIZE)
-    #     score_map = np.mean(score_map, axis=0)
+    if args.aug:
+        score_map = np.stack(score_map_list)
+        score_map = score_map.reshape(args.aug_num, -1, IMAGE_RESIZE, IMAGE_RESIZE)
+        score_map = np.mean(score_map, axis=0)
+        score_map_list = score_map[:, None, :, :]
 
     # apply gaussian smoothing on the score map
     for i in range(len(score_map_list)):
