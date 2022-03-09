@@ -35,7 +35,7 @@ FACIAL_HAIR_CLASSES = ['moustache', 'beard', 'mouth_side_hair']
 # Argument Parser Config
 # ======================
 parser:argparse.ArgumentParser = get_base_parser(
-    'Face Mesh, an on-device real-time face recognition.',
+    'ax Facial Features',
     IMAGE_PATH,
     SAVE_IMAGE_PATH,
 )
