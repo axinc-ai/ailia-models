@@ -40,12 +40,6 @@ parser:argparse.ArgumentParser = get_base_parser(
     SAVE_IMAGE_PATH,
 )
 parser.add_argument(
-    '-n', '--normal',
-    action='store_true',
-    help='By default, the optimized model is used, but with this option, ' +
-    'you can switch to the normal (not optimized) model'
-)
-parser.add_argument(
     '-m', '--mode', nargs='+', default=['eyelids', 'eyelashes', 'facial_hair']
 )
 args = update_parser(parser)
@@ -63,9 +57,11 @@ MODELS = {
 }
 
 for k, v in MODELS.items():
-    stem = k
-    if not args.normal:
-        stem += '.opt'
+    stem = f'{k}.opt'
+
+    if k[:3] == 'ax_':
+        stem += '.obf'
+        v['remote_path'] = f'https://storage.googleapis.com/ailia-models/ax_facial_features/'
 
     if 'weight_path' not in v:
         v['weight_path'] = f'{stem}.onnx'
