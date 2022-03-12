@@ -16,6 +16,7 @@ import matplotlib.pyplot as plt
 use_pytorch = False
 try:
     import torch
+
     use_pytorch = True
 except ModuleNotFoundError:
     pass
@@ -362,8 +363,9 @@ def recognize_from_image(net):
                         else:
                             gt_mask, gt_img = preprocess_aug(gt_img, mask=True)
                     else:
-                        gt_img = np.zeros((IMAGE_SIZE, IMAGE_SIZE) \
-                                              if not args.aug else (IMAGE_RESIZE, IMAGE_RESIZE))
+                        gt_img = np.zeros(
+                            (IMAGE_SIZE, IMAGE_SIZE) if not args.aug
+                            else (IMAGE_RESIZE, IMAGE_RESIZE))
                         gt_mask = gt_img[None, :, :]
 
                     gt_imgs.append(gt_img)
