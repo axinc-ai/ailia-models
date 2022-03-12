@@ -89,7 +89,7 @@ $ python3 spade-pytorch.py --aug --aug_num 5
 
 ## Reference
 
-[PaDiM-Anomaly-Detection-Localization-master](https://github.com/xiahaifeng1995/PaDiM-Anomaly-Detection-Localization-master)
+[Sub-Image Anomaly Detection with Deep Pyramid Correspondences](https://github.com/byungjae89/SPADE-pytorch)
 
 ## Framework
 
@@ -101,6 +101,4 @@ ONNX opset=11
 
 ## Netron
 
-[resnet18.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/padim/resnet18.onnx.prototxt)
-
-[wide_resnet50_2.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/padim/wide_resnet50_2.onnx.prototxt)
+[wide_resnet50_2.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/spade-pytorch/wide_resnet50_2.onnx.prototxt)

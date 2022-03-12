@@ -8,7 +8,6 @@ import pickle
 import numpy as np
 import cv2
 from PIL import Image
-from scipy.spatial.distance import mahalanobis
 from scipy.ndimage import gaussian_filter
 from sklearn.metrics import precision_recall_curve
 import matplotlib.pyplot as plt
@@ -40,7 +39,7 @@ logger = getLogger(__name__)
 
 WEIGHT_PATH = 'wide_resnet50_2.onnx'
 MODEL_PATH = 'wide_resnet50_2.onnx.prototxt'
-REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/padim/'
+REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/spade-pytorch'
 
 IMAGE_PATH = './bottle_000.png'
 SAVE_IMAGE_PATH = './output.png'
@@ -71,6 +70,10 @@ parser.add_argument(
 parser.add_argument(
     '-th', '--threshold', type=float, default=None,
     help='threshold'
+)
+parser.add_argument(
+    '--seed', type=int, default=1024,
+    help='random seed'
 )
 parser.add_argument(
     '-ag', '--aug', action='store_true',
@@ -302,6 +305,7 @@ def get_train_outputs(net):
 def recognize_from_image(net):
     batch_size = int(args.batch_size)
 
+    np.random.seed(args.seed)
     train_outputs = get_train_outputs(net)
 
     gt_type_dir = args.gt_dir if args.gt_dir else None
