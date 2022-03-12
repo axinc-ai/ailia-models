@@ -70,9 +70,9 @@ You can specify the directory of ground truth files with the `--gt_dir` option.
 $ python3 spade-pytorch.py --gt_dir gt_masks
 ```
 
-For bottle in MVTec AD datasets.
+The threshold is calculated using the test images and the ground truth images, but you can also give a threshold.
 ```bash
-$ python3 spade-pytorch.py -i bottle/test/broken_large --train_dir bottle/train/good --gt_dir bottle/test/ground_truth/broken_large
+$ python3 spade-pytorch.py --threshold 0.099380
 ```
 
 By adding the `--aug` option, you can process with augmentation.  
