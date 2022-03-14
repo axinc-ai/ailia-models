@@ -28,10 +28,14 @@ logger = getLogger(__name__)
 # Parameters
 # ======================
 
-WEIGHT_LVIS_PATH = 'Detic_C2_SwinB_896_4x_IN-21K+COCO_lvis.onnx'
-MODEL_LVIS_PATH = 'Detic_C2_SwinB_896_4x_IN-21K+COCO_lvis.onnx.prototxt'
-WEIGHT_IN21K_PATH = 'Detic_C2_SwinB_896_4x_IN-21K+COCO_in21k.onnx'
-MODEL_IN21K_PATH = 'Detic_C2_SwinB_896_4x_IN-21K+COCO_in21k.onnx.prototxt'
+WEIGHT_SWINB_LVIS_PATH = 'Detic_C2_SwinB_896_4x_IN-21K+COCO_lvis.onnx'
+MODEL_SWINB_LVIS_PATH = 'Detic_C2_SwinB_896_4x_IN-21K+COCO_lvis.onnx.prototxt'
+WEIGHT_SWINB_IN21K_PATH = 'Detic_C2_SwinB_896_4x_IN-21K+COCO_in21k.onnx'
+MODEL_SWINB_IN21K_PATH = 'Detic_C2_SwinB_896_4x_IN-21K+COCO_in21k.onnx.prototxt'
+WEIGHT_R50_LVIS_PATH = 'Detic_C2_R50_640_4x_lvis.onnx'
+MODEL_R50_LVIS_PATH = 'Detic_C2_R50_640_4x_lvis.onnx.prototxt'
+WEIGHT_R50_IN21K_PATH = 'Detic_C2_R50_640_4x_in21k.onnx'
+MODEL_R50_IN21K_PATH = 'Detic_C2_R50_640_4x_in21k.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/detic/'
 
 IMAGE_PATH = 'desk.jpg'
@@ -50,6 +54,10 @@ parser = get_base_parser(
 parser.add_argument(
     '--seed', type=int, default=int(datetime.datetime.now().strftime('%Y%m%d')),
     help='random seed for selection the color of the box'
+)
+parser.add_argument(
+    '-m', '--model_type', default='SwinB_896_4x', choices=('SwinB_896_4x', 'R50_640_4x'),
+    help='model type'
 )
 parser.add_argument(
     '-vc', '--vocabulary', default='lvis', choices=('lvis', 'in21k'),
@@ -164,8 +172,8 @@ def draw_predictions(img, predictions):
     class_names = (
         get_lvis_meta_v1() if vocabulary == 'lvis' else get_in21k_meta_v1()
     )["thing_classes"]
-    #labels = [class_names[i] for i in classes] # onnx runtime
-    labels = [class_names[int(i)] for i in classes] # ailia always returns float tensor so need to add cast
+    # labels = [class_names[i] for i in classes] # onnx runtime
+    labels = [class_names[int(i)] for i in classes]  # ailia always returns float tensor so need to add cast
     labels = ["{} {:.0f}%".format(l, s * 100) for l, s in zip(labels, scores)]
 
     num_instances = len(boxes)
@@ -186,7 +194,7 @@ def draw_predictions(img, predictions):
 
     for i in range(num_instances):
         color = assigned_colors[i]
-        color = (int(color[0]),int(color[1]),int(color[2]))
+        color = (int(color[0]), int(color[1]), int(color[2]))
         img_b = img.copy()
 
         # draw box
@@ -208,8 +216,8 @@ def draw_predictions(img, predictions):
         color = assigned_colors[i]
         color_text = color_brightness(color, brightness_factor=0.7)
 
-        color = (int(color[0]),int(color[1]),int(color[2]))
-        color_text = (int(color_text[0]),int(color_text[1]),int(color_text[2]))
+        color = (int(color[0]), int(color[1]), int(color[2]))
+        color_text = (int(color_text[0]), int(color_text[1]), int(color_text[2]))
 
         x0, y0, x1, y1 = boxes[i]
 
@@ -422,10 +430,13 @@ def recognize_from_video(net):
 
 def main():
     dic_model = {
-        'lvis': (WEIGHT_LVIS_PATH, MODEL_LVIS_PATH),
-        'in21k': (WEIGHT_IN21K_PATH, MODEL_IN21K_PATH),
+        ('SwinB_896_4x', 'lvis'): (WEIGHT_SWINB_LVIS_PATH, MODEL_SWINB_LVIS_PATH),
+        ('SwinB_896_4x', 'in21k'): (WEIGHT_SWINB_IN21K_PATH, MODEL_SWINB_IN21K_PATH),
+        ('R50_640_4x', 'lvis'): (WEIGHT_R50_LVIS_PATH, MODEL_R50_LVIS_PATH),
+        ('R50_640_4x', 'in21k'): (WEIGHT_R50_IN21K_PATH, MODEL_R50_IN21K_PATH),
     }
-    WEIGHT_PATH, MODEL_PATH = dic_model[args.vocabulary]
+    key = (args.model_type, args.vocabulary)
+    WEIGHT_PATH, MODEL_PATH = dic_model[key]
 
     # model files check and download
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
@@ -448,7 +459,7 @@ def main():
             memory_mode = ailia.get_memory_mode(
                 reduce_constant=True, ignore_input_with_initializer=True,
                 reduce_interstage=True, reuse_interstage=False)
-        net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id, memory_mode = memory_mode)
+        net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id, memory_mode=memory_mode)
     else:
         import onnxruntime
         net = onnxruntime.InferenceSession(WEIGHT_PATH)
