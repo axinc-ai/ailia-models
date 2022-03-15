@@ -39,7 +39,7 @@ logger = getLogger(__name__)
 
 WEIGHT_PATH = 'wide_resnet50_2.onnx'
 MODEL_PATH = 'wide_resnet50_2.onnx.prototxt'
-REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/spade-pytorch'
+REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/spade-pytorch/'
 
 IMAGE_PATH = './bottle_000.png'
 SAVE_IMAGE_PATH = './output.png'
