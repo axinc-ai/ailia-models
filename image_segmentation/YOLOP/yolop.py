@@ -10,9 +10,7 @@ print(sys.path)
 import cv2
 import torch
 import numpy as np
-import PIL.Image as image
 
-from lib.config import cfg
 from lib.utils.utils import create_logger
 from lib.dataset import LoadImages, LoadStreams
 from lib.core.general import non_max_suppression
@@ -55,11 +53,8 @@ def resize_unscale(img, new_shape=(640, 640), color=114):
 
 
 
-def detect(cfg,opt):
-
-    logger, _, _ = create_logger(
-        cfg, cfg.LOG_DIR, 'demo')
-    #save_det_path = f"./pictures/detect_onnx.jpg"
+#def detect(cfg,opt):
+def detect(opt):
 
     # Set Dataloader
     if opt.source.isnumeric():
@@ -69,7 +64,6 @@ def detect(cfg,opt):
     else:
         dataset = LoadImages(opt.source, img_size=opt.img_size)
         bs = 1  # batch_size
-
 
     # Run inference
     t0 = time.time()
@@ -206,4 +200,4 @@ if __name__ == '__main__':
 
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
     with torch.no_grad():
-        detect(cfg,opt)
+        detect(opt)
