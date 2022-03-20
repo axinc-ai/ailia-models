@@ -8,7 +8,6 @@ sys.path.append(BASE_DIR)
 
 print(sys.path)
 import cv2
-import torch
 import numpy as np
 
 from lib.utils.utils import create_logger
@@ -98,10 +97,9 @@ def detect(opt):
 
         det_out, da_seg_out, ll_seg_out = net.run(img)
 
-        det_out = torch.from_numpy(det_out).float()
-        boxes = non_max_suppression(det_out, conf_thres=opt.conf_thres, iou_thres=opt.iou_thres, classes=None, agnostic=False)[0]
+        boxes = non_max_suppression(det_out, conf_thres=opt.conf_thres, iou_thres=opt.iou_thres, agnostic=False)[0]
+        #boxes = non_max_suppression(det_out, conf_thres=opt.conf_thres, iou_thres=opt.iou_thres, classes=None, agnostic=False)[0]
 
-        boxes = boxes.cpu().numpy().astype(np.float32)
 
         if boxes.shape[0] == 0:
             print("no bounding boxes detected.")
@@ -199,5 +197,4 @@ if __name__ == '__main__':
     opt = parser.parse_args()
 
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
-    with torch.no_grad():
-        detect(opt)
+    detect(opt)

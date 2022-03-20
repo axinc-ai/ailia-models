@@ -9,9 +9,7 @@ from threading import Thread
 import cv2
 import math
 import numpy as np
-import torch
 from PIL import Image, ExifTags
-from torch.utils.data import Dataset
 from tqdm import tqdm
 
 from ..utils import letterbox_for_img, clean_str
@@ -84,7 +82,6 @@ class LoadImages:  # for inference
             print('image %g/%g %s: \n' % (self.count, self.nf, path), end='')
             h0, w0 = img0.shape[:2]
 
-        #img0 = cv2.resize(img0,dsize=(640,640))
         # Padded resize
         img, ratio, pad = letterbox_for_img(img0, new_shape=self.img_size, auto=True)
         h, w = img.shape[:2]
