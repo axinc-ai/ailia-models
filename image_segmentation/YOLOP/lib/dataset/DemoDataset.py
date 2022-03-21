@@ -141,7 +141,6 @@ class LoadStreams:  # multiple IP or RTSP cameras
 
         # check for common shapes
 
-        print("---------------")
         s = np.stack([letterbox_for_img(x, self.img_size, auto=self.auto)[0].shape for x in self.imgs], 0)  # shapes
         self.rect = np.unique(s, axis=0).shape[0] == 1  # rect inference if all shapes equal
         if not self.rect:
@@ -174,7 +173,6 @@ class LoadStreams:  # multiple IP or RTSP cameras
 
         h0, w0 = img0[0].shape[:2]
         
-        print("---------------")
         img, _, pad = letterbox_for_img(img0[0], self.img_size, auto=self.rect and self.auto)
 
         # Stack
