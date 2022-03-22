@@ -1,5 +1,8 @@
 import numpy as np
 import cv2
+import matplotlib.pyplot as plt
+
+from points_utils import plot_2d_bbox, plot_3d_bbox
 
 SIZE = 200.0
 
@@ -44,6 +47,17 @@ def get_affine_transform(
         trans = cv2.getAffineTransform(np.float32(src), np.float32(dst))
 
     return trans
+
+
+def affine_transform_modified(pts, t):
+    """
+    Apply affine transformation with homogeneous coordinates.
+    """
+    # pts of shape [n, 2]
+    new_pts = np.hstack([pts, np.ones((len(pts), 1))]).T
+    new_pts = t @ new_pts
+
+    return new_pts[:2, :].T
 
 
 def get_3rd_point(a, b):
@@ -199,3 +213,51 @@ def kpts2cs(
         new_keypoints[visible_indices, :2] = visible_keypoints - new_origin
 
     return center, crop_size, new_keypoints, vis_rate
+
+
+def plot_2d_objects(
+        img, record,
+        color_dict={
+            'bbox_2d': 'r',
+            'bbox_3d': 'r',
+            'kpts': ['rx', 'b']
+        }):
+    fig = plt.figure(figsize=(11.3, 9))
+    ax = plt.subplot(111)
+
+    height, width, _ = img.shape
+    ax.imshow(img)
+    ax.set_xlim([0, width])
+    ax.set_ylim([0, height])
+    ax.invert_yaxis()
+
+    for idx in range(len(record['kpts_2d_pred'])):
+        kpts = record['kpts_2d_pred'][idx].reshape(-1, 2)
+        bbox = record['bbox_resize'][idx]
+        plot_2d_bbox(ax, bbox, color_dict['bbox_2d'])
+        # predicted key-points
+        ax.plot(kpts[:, 0], kpts[:, 1], color_dict['kpts'][0])
+
+    if 'kpts_2d_gt' in record:
+        # plot ground truth 2D screen coordinates
+        for idx, kpts_gt in enumerate(record['kpts_2d_gt']):
+            kpts_gt = kpts_gt.reshape(-1, 3)
+            plot_3d_bbox(ax, kpts_gt[1:, :2], color='g', linestyle='-.')
+
+    if 'arrow' in record:
+        for idx in range(len(record['arrow'])):
+            start = record['arrow'][idx][:, 0]
+            end = record['arrow'][idx][:, 1]
+            x, y = start
+            dx, dy = end - start
+            ax.arrow(x, y, dx, dy, color='r', lw=4, head_width=5, alpha=0.5)
+
+    # save intermediate results
+    fig.gca().set_axis_off()
+    fig.subplots_adjust(
+        top=1, bottom=0, right=1, left=0,
+        hspace=0, wspace=0)
+    fig.gca().xaxis.set_major_locator(plt.NullLocator())
+    fig.gca().yaxis.set_major_locator(plt.NullLocator())
+
+    return fig

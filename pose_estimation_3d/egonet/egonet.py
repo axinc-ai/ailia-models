@@ -18,7 +18,8 @@ from webcamera_utils import get_capture, get_writer  # noqa
 from logging import getLogger  # noqa
 
 from egonet_utils import kpts2cs, cs2bbox
-from egonet_utils import modify_bbox, get_affine_transform
+from egonet_utils import modify_bbox, get_affine_transform, affine_transform_modified
+from egonet_utils import plot_2d_objects
 from instance_utils import get_2d_3d_pair
 
 logger = getLogger(__name__)
@@ -57,19 +58,26 @@ args = update_parser(parser)
 # Secondaty Functions
 # ======================
 
-def read_record(img, label_path, calib_path):
-    list_2d, list_3d, list_id, pv, raw_bboxes = \
+def read_annot(
+        img,
+        label_path,
+        calib_path,
+        add_gt=False):
+    list_2d, list_3d, list_id, pv, K, raw_bboxes = \
         get_2d_3d_pair(
             img,
             label_path, calib_path,
             augment=False, add_raw_bbox=True)
 
     bboxes = np.array([])
+    all_keypoints_2d = np.array([])
+    all_keypoints_3d = np.array([])
     if len(list_2d) != 0:
         for idx, kpts in enumerate(list_2d):
             list_2d[idx] = kpts.reshape(1, -1, 3)
             list_3d[idx] = list_3d[idx].reshape(1, -1, 3)
         all_keypoints_2d = np.concatenate(list_2d, axis=0)
+        all_keypoints_3d = np.concatenate(list_3d, axis=0)
 
         # compute 2D bounding box based on the projected 3D boxes
         bboxes_kpt = []
@@ -83,15 +91,20 @@ def read_record(img, label_path, calib_path):
 
         bboxes = np.vstack(bboxes_kpt)
 
-    d = {'bbox_2d': bboxes}
-
+    d = {
+        'bbox_2d': bboxes,
+        'kpts_3d': all_keypoints_3d,
+        'K': K,
+    }
+    if add_gt:
+        d['kpts'] = all_keypoints_2d
+        d['kpts_3d_gt'] = all_keypoints_3d
     return d
 
 
 # ======================
 # Main functions
 # ======================
-
 
 def crop_single_instance(
         img,
@@ -146,7 +159,36 @@ def crop_instances(img, annot_dict):
 
     all_instances = np.concatenate(all_instances, axis=0)
 
-    return all_instances
+    return all_instances, all_records
+
+
+def add_orientation_arrow(record):
+    """
+    Generate an arrow for each predicted orientation for visualization.
+    """
+    pred_kpts = record['kpts_3d_pred']
+    gt_kpts = record['kpts_3d_gt']
+    K = record['K']
+
+    arrow_2d = np.zeros((len(pred_kpts), 2, 2))
+    for idx in range(len(pred_kpts)):
+        vector_3d = (pred_kpts[idx][1] - pred_kpts[idx][5])
+        arrow_3d = np.concatenate([
+            gt_kpts[idx][0].reshape(3, 1),
+            (gt_kpts[idx][0] + vector_3d).reshape(3, 1)
+        ], axis=1)
+        projected = K @ arrow_3d
+        arrow_2d[idx][0] = projected[0, :] / projected[2, :]
+        arrow_2d[idx][1] = projected[1, :] / projected[2, :]
+
+        # fix the arrow length if not fore-shortened
+        vector_2d = arrow_2d[idx][:, 1] - arrow_2d[idx][:, 0]
+        length = np.linalg.norm(vector_2d)
+        if length > 50:
+            vector_2d = vector_2d / length * 60
+        arrow_2d[idx][:, 1] = arrow_2d[idx][:, 0] + vector_2d
+
+    return arrow_2d
 
 
 def post_processing(output):
@@ -154,7 +196,7 @@ def post_processing(output):
 
 
 def predict(net_HC, net_L, img, annot_dict):
-    instances = crop_instances(img, annot_dict)
+    instances, records = crop_instances(img, annot_dict)
 
     # feedforward
     if not args.onnx:
@@ -162,10 +204,50 @@ def predict(net_HC, net_L, img, annot_dict):
     else:
         output = net_HC.run(None, {'input': instances})
 
-    # pred = post_processing(output)
-    pred = None
+    _, local_coord = output
 
-    return pred
+    # local part coordinates
+    resolution = [IMAGE_SIZE, IMAGE_SIZE]
+    width, height = resolution
+    local_coord *= np.array(resolution).reshape(1, 1, 2)
+
+    # transform local part coordinates to screen coordinates
+    centers = [x['center'] for x in records]
+    scales = [x['scale'] for x in records]
+    rots = [x['rotation'] for x in records]
+    for instance_idx in range(len(local_coord)):
+        trans_inv = get_affine_transform(
+            centers[instance_idx],
+            scales[instance_idx],
+            rots[instance_idx],
+            (height, width),
+            inv=1)
+        screen_coord = affine_transform_modified(
+            local_coord[instance_idx],
+            trans_inv)
+        records[instance_idx]['kpts'] = screen_coord
+
+    # assemble a dictionary where each key corresponds to one image
+    ret = {
+        'center': [],
+        'scale': [],
+        'rotation': [],
+        'bbox_resize': [],  # resized bounding box
+        'kpts_2d_pred': [],
+        'label': [],
+        'score': []
+    }
+    for record in records:
+        ret['kpts_2d_pred'].append(record['kpts'].reshape(1, -1))
+        ret['bbox_resize'].append(record['bbox_resize'])
+    if 'kpts' in annot_dict:
+        ret['kpts_2d_gt'] = annot_dict['kpts']
+    if 'kpts_3d_gt' in annot_dict and 'K' in annot_dict:
+        ret['kpts_3d_gt'] = annot_dict['kpts_3d_gt']
+        ret['K'] = annot_dict['K']
+        ret['arrow'] = add_orientation_arrow(ret)
+
+    return ret
 
 
 def recognize_from_image(net_HC, net_L):
@@ -179,7 +261,9 @@ def recognize_from_image(net_HC, net_L):
 
         label_path = "label_006272.txt"
         calib_path = "calib_006272.txt"
-        annot_dict = read_record(img, label_path, calib_path)
+        annot_dict = read_annot(
+            img, label_path, calib_path,
+            add_gt=True)
 
         # inference
         logger.info('Start inference...')
@@ -188,7 +272,7 @@ def recognize_from_image(net_HC, net_L):
             total_time_estimation = 0
             for i in range(args.benchmark_count):
                 start = int(round(time.time() * 1000))
-                out = predict(net_HC, net_L, img, annot_dict)
+                record = predict(net_HC, net_L, img, annot_dict)
                 end = int(round(time.time() * 1000))
                 estimation_time = (end - start)
 
@@ -199,12 +283,18 @@ def recognize_from_image(net_HC, net_L):
 
             logger.info(f'\taverage time estimation {total_time_estimation / (args.benchmark_count - 1)} ms')
         else:
-            out = predict(net_HC, net_L, img, annot_dict)
+            record = predict(net_HC, net_L, img, annot_dict)
 
-        # # plot result
-        # savepath = get_savepath(args.savepath, image_path, ext='.png')
-        # logger.info(f'saved at : {savepath}')
-        # cv2.imwrite(savepath, res_img)
+        # plot 2D predictions
+        color_dict = {
+            'bbox_2d': 'y',
+            'bbox_3d': 'y',
+            'kpts': ['yx', 'y']
+        }
+        fig = plot_2d_objects(img, record, color_dict)
+        save_path = get_savepath(args.savepath, image_path, ext='.png')
+        logger.info(f'saved at : {save_path}')
+        fig.savefig(save_path, dpi=100, bbox_inches='tight', pad_inches=0)
 
     logger.info('Script finished successfully.')
 

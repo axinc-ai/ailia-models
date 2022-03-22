@@ -395,7 +395,7 @@ def get_2d_3d_pair(
     else:
         list_2d, list_3d, ids, pose_vecs = [], [], [], []
 
-    ret = list_2d, list_3d, ids, pose_vecs
+    ret = list_2d, list_3d, ids, pose_vecs, K
     if add_raw_bbox:
         ret = ret + (bboxes,)
 
