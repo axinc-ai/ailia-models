@@ -6,14 +6,11 @@ from pathlib import Path
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(BASE_DIR)
 
-print(sys.path)
 import cv2
 import numpy as np
 
-from lib.utils.utils import create_logger
-from lib.dataset import LoadImages, LoadStreams
-from lib.core.general import non_max_suppression
 from tqdm import tqdm
+from yolop_utils import non_max_suppression , LoadImages, LoadStreams
 
 import ailia
 sys.path.append('../../util')
@@ -52,7 +49,6 @@ def resize_unscale(img, new_shape=(640, 640), color=114):
 
 
 
-#def detect(cfg,opt):
 def detect(opt):
 
     # Set Dataloader
@@ -98,7 +94,6 @@ def detect(opt):
         det_out, da_seg_out, ll_seg_out = net.run(img)
 
         boxes = non_max_suppression(det_out, conf_thres=opt.conf_thres, iou_thres=opt.iou_thres, agnostic=False)[0]
-        #boxes = non_max_suppression(det_out, conf_thres=opt.conf_thres, iou_thres=opt.iou_thres, classes=None, agnostic=False)[0]
 
 
         if boxes.shape[0] == 0:
