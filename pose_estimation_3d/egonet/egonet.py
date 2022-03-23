@@ -34,6 +34,8 @@ WEIGHT_L_PATH = 'L.onnx'
 MODEL_L_PATH = 'L.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/egonet/'
 
+LS_path = 'LS.npy'
+
 IMAGE_PATH = 'demo.png'
 SAVE_IMAGE_PATH = 'output.png'
 
@@ -100,6 +102,42 @@ def read_annot(
         d['kpts'] = all_keypoints_2d
         d['kpts_3d_gt'] = all_keypoints_3d
     return d
+
+
+def normalize_1d(data, mean, std, individual=False):
+    """
+    Normalizes 1D data with mean and standard deviation.
+
+    data: dictionary where values are
+    mean: np vector with the mean of the data
+    std: np vector with the standard deviation of the data
+    individual: whether to perform normalization independently for each input
+
+    Returns
+    data_out: normalized data
+    """
+    if individual:
+        # this representation has the implicit assumption that the representation
+        # is translational and scaling invariant
+        num_data = len(data)
+        data = data.reshape(num_data, -1, 2)
+        mean_x = np.mean(data[:, :, 0], axis=1).reshape(num_data, 1)
+        std_x = np.std(data[:, :, 0], axis=1)
+        mean_y = np.mean(data[:, :, 1], axis=1).reshape(num_data, 1)
+        std_y = np.std(data[:, :, 1], axis=1)
+        denominator = (0.5 * (std_x + std_y)).reshape(num_data, 1)
+        data[:, :, 0] = (data[:, :, 0] - mean_x) / denominator
+        data[:, :, 1] = (data[:, :, 1] - mean_y) / denominator
+        data_out = data.reshape(num_data, -1)
+    else:
+        data_out = (data - mean) / std
+
+    return data_out
+
+
+def unnormalize_1d(normalized_data, mean, std):
+    orig_data = normalized_data * std + mean
+    return orig_data
 
 
 # ======================
@@ -191,18 +229,11 @@ def add_orientation_arrow(record):
     return arrow_2d
 
 
-def post_processing(output):
-    return None
-
-
-def predict(net_HC, net_L, img, annot_dict):
+def predict(HC, L, LS, img, annot_dict):
     instances, records = crop_instances(img, annot_dict)
 
     # feedforward
-    if not args.onnx:
-        output = net_HC.predict([instances])
-    else:
-        output = net_HC.run(None, {'input': instances})
+    output = HC.predict([instances])
 
     _, local_coord = output
 
@@ -227,30 +258,39 @@ def predict(net_HC, net_L, img, annot_dict):
             trans_inv)
         records[instance_idx]['kpts'] = screen_coord
 
-    # assemble a dictionary where each key corresponds to one image
-    ret = {
-        'center': [],
-        'scale': [],
-        'rotation': [],
-        'bbox_resize': [],  # resized bounding box
-        'kpts_2d_pred': [],
-        'label': [],
-        'score': []
+    # assemble a dictionary where each key
+    records = {
+        'bbox_resize': [x['bbox_resize'] for x in records],  # resized bounding box
+        'kpts_2d_pred': [x['kpts'].reshape(1, -1) for x in records],
     }
-    for record in records:
-        ret['kpts_2d_pred'].append(record['kpts'].reshape(1, -1))
-        ret['bbox_resize'].append(record['bbox_resize'])
+
+    # lift_2d_to_3d
+    data = np.concatenate(records['kpts_2d_pred'], axis=0)
+    data = normalize_1d(data, LS['mean_in'], LS['std_in'])
+    data = data.astype(np.float32)
+    output = L.predict([data])
+    prediction = output[0]
+    prediction = unnormalize_1d(
+        prediction,
+        LS['mean_out'],
+        LS['std_out']
+    )
+    records['kpts_3d_pred'] = prediction.reshape(len(prediction), -1, 3)
+
     if 'kpts' in annot_dict:
-        ret['kpts_2d_gt'] = annot_dict['kpts']
+        records['kpts_2d_gt'] = annot_dict['kpts']
     if 'kpts_3d_gt' in annot_dict and 'K' in annot_dict:
-        ret['kpts_3d_gt'] = annot_dict['kpts_3d_gt']
-        ret['K'] = annot_dict['K']
-        ret['arrow'] = add_orientation_arrow(ret)
+        records['kpts_3d_gt'] = annot_dict['kpts_3d_gt']
+        records['K'] = annot_dict['K']
+        records['arrow'] = add_orientation_arrow(records)
 
-    return ret
+    return records
 
 
-def recognize_from_image(net_HC, net_L):
+def recognize_from_image(HC, L):
+    # the statistics used by the lifter for normalizing inputs
+    LS = np.load(LS_path, allow_pickle=True).item()
+
     # input image loop
     for image_path in args.input:
         logger.info(image_path)
@@ -272,7 +312,7 @@ def recognize_from_image(net_HC, net_L):
             total_time_estimation = 0
             for i in range(args.benchmark_count):
                 start = int(round(time.time() * 1000))
-                record = predict(net_HC, net_L, img, annot_dict)
+                record = predict(HC, L, LS, img, annot_dict)
                 end = int(round(time.time() * 1000))
                 estimation_time = (end - start)
 
@@ -283,7 +323,7 @@ def recognize_from_image(net_HC, net_L):
 
             logger.info(f'\taverage time estimation {total_time_estimation / (args.benchmark_count - 1)} ms')
         else:
-            record = predict(net_HC, net_L, img, annot_dict)
+            record = predict(HC, L, LS, img, annot_dict)
 
         # plot 2D predictions
         color_dict = {
@@ -309,17 +349,13 @@ def main():
     env_id = args.env_id
 
     # initialize
-    if not args.onnx:
-        net_HC = ailia.Net(MODEL_HC_PATH, WEIGHT_HC_PATH, env_id=env_id)
-        net_L = ailia.Net(MODEL_L_PATH, WEIGHT_L_PATH, env_id=env_id)
-    else:
-        import onnxruntime
-        net_HC = onnxruntime.InferenceSession(WEIGHT_HC_PATH)
+    HC = ailia.Net(MODEL_HC_PATH, WEIGHT_HC_PATH, env_id=env_id)
+    L = ailia.Net(MODEL_L_PATH, WEIGHT_L_PATH, env_id=env_id)
 
     if args.video is not None:
         pass
     else:
-        recognize_from_image(net_HC, net_L)
+        recognize_from_image(HC, L)
 
 
 if __name__ == '__main__':
