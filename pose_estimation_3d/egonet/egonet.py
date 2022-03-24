@@ -1,9 +1,10 @@
 import sys
+import os
 import time
 
 import numpy as np
 import cv2
-from PIL import Image
+import matplotlib.pyplot as plt
 
 import ailia
 
@@ -19,7 +20,9 @@ from logging import getLogger  # noqa
 
 from egonet_utils import kpts2cs, cs2bbox
 from egonet_utils import modify_bbox, get_affine_transform, affine_transform_modified
-from egonet_utils import plot_2d_objects
+from egonet_utils import get_observation_angle_trans, get_observation_angle_proj
+from egonet_utils import get_6d_rep, get_pred_str
+from egonet_utils import plot_2d_objects, plot_3d_objects
 from instance_utils import get_2d_3d_pair
 
 logger = getLogger(__name__)
@@ -99,6 +102,8 @@ def read_annot(
         'K': K,
     }
     if add_gt:
+        pvs = np.vstack(pv) if len(pv) != 0 else []
+        d['pose_vecs_gt'] = pvs
         d['kpts'] = all_keypoints_2d
         d['kpts_3d_gt'] = all_keypoints_3d
     return d
@@ -229,6 +234,38 @@ def add_orientation_arrow(record):
     return arrow_2d
 
 
+def gather_lifting_results(
+        record,
+        get_str=False,
+        alpha_mode='trans'):
+    """
+    Convert network outputs to pose angles.
+    """
+    # prepare the prediction strings for submission
+    # compute the roll, pitch and yaw angle of the predicted bounding box
+    record['euler_angles'], record['translation'] = \
+        get_6d_rep(record['kpts_3d_pred'])
+
+    if alpha_mode == 'trans':
+        record['alphas'] = get_observation_angle_trans(
+            record['euler_angles'],
+            record['translation']
+        )
+    elif alpha_mode == 'proj':
+        record['alphas'] = get_observation_angle_proj(
+            record['euler_angles'],
+            record['kpts_2d_pred'],
+            record['K']
+        )
+    else:
+        raise NotImplementedError
+
+    if get_str:
+        record['pred_str'] = get_pred_str(record)
+
+    return record
+
+
 def predict(HC, L, LS, img, annot_dict):
     instances, records = crop_instances(img, annot_dict)
 
@@ -279,10 +316,15 @@ def predict(HC, L, LS, img, annot_dict):
 
     if 'kpts' in annot_dict:
         records['kpts_2d_gt'] = annot_dict['kpts']
+    if 'pose_vecs_gt' in annot_dict:
+        records['pose_vecs_gt'] = annot_dict['pose_vecs_gt']
     if 'kpts_3d_gt' in annot_dict and 'K' in annot_dict:
         records['kpts_3d_gt'] = annot_dict['kpts_3d_gt']
         records['K'] = annot_dict['K']
         records['arrow'] = add_orientation_arrow(records)
+
+    # refine and gather the prediction strings
+    records = gather_lifting_results(records)
 
     return records
 
@@ -335,6 +377,29 @@ def recognize_from_image(HC, L):
         save_path = get_savepath(args.savepath, image_path, ext='.png')
         logger.info(f'saved at : {save_path}')
         fig.savefig(save_path, dpi=100, bbox_inches='tight', pad_inches=0)
+        plt.close()
+
+        if 1:
+            all_kpts_3d_pred = record['kpts_3d_pred'].reshape(len(record['kpts_3d_pred']), -1)
+            if 'kpts_3d_gt' in record:
+                all_kpts_3d_gt = record['kpts_3d_gt']
+                all_pose_vecs_gt = record['pose_vecs_gt']
+            else:
+                all_kpts_3d_gt = None
+                all_pose_vecs_gt = None
+            fig = plot_3d_objects(
+                all_kpts_3d_pred,
+                all_kpts_3d_gt,
+                all_pose_vecs_gt,
+                record,
+                color=color_dict['bbox_3d'],
+            )
+            plt.show()
+
+            ex = os.path.splitext(save_path)
+            save_path = '%s_3d%s' % ex
+            logger.info(f'saved at : {save_path}')
+            fig.savefig(save_path, dpi=100, bbox_inches='tight', pad_inches=0)
 
     logger.info('Script finished successfully.')
 

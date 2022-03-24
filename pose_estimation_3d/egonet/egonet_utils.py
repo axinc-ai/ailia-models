@@ -1,10 +1,41 @@
+from copy import deepcopy
+import math
+
 import numpy as np
 import cv2
 import matplotlib.pyplot as plt
 
+from scipy.spatial.transform import Rotation
+
 from points_utils import plot_2d_bbox, plot_3d_bbox
+from points_utils import plot_scene_3dbox, draw_pose_vecs
 
 SIZE = 200.0
+
+# indices used for performing interpolation
+# key->value: style->index arrays
+interp_dict = {
+    'bbox12': (
+        np.array([1, 3, 5, 7,  # h direction
+                  1, 2, 3, 4,  # l direction
+                  1, 2, 5, 6]),  # w direction
+        np.array([2, 4, 6, 8,
+                  5, 6, 7, 8,
+                  3, 4, 7, 8])
+    ),
+    'bbox12l': (
+        np.array([1, 2, 3, 4, ]),  # w direction
+        np.array([5, 6, 7, 8])
+    ),
+    'bbox12h': (
+        np.array([1, 3, 5, 7]),  # w direction
+        np.array([2, 4, 6, 8])
+    ),
+    'bbox12w': (
+        np.array([1, 2, 5, 6]),  # w direction
+        np.array([3, 4, 7, 8])
+    ),
+}
 
 
 def get_affine_transform(
@@ -215,6 +246,190 @@ def kpts2cs(
     return center, crop_size, new_keypoints, vis_rate
 
 
+def get_observation_angle_trans(euler_angles, translations):
+    """
+    Convert orientation in camera coordinate into local coordinate system
+    utilizing known object location (translation)
+    """
+    alphas = euler_angles[:, 1].copy()
+    for idx in range(len(euler_angles)):
+        ry3d = euler_angles[idx][1]  # orientation in the camera coordinate system
+        x3d, z3d = translations[idx][0], translations[idx][2]
+        alpha = ry3d - math.atan2(-z3d, x3d) - 0.5 * math.pi
+        # alpha = ry3d - math.atan2(x3d, z3d)# - 0.5 * math.pi
+        while alpha > math.pi: alpha -= math.pi * 2
+        while alpha < (-math.pi): alpha += math.pi * 2
+        alphas[idx] = alpha
+
+    return alphas
+
+
+def get_observation_angle_proj(euler_angles, kpts, K):
+    """
+    Convert orientation in camera coordinate into local coordinate system
+    utilizing the projection of object on the image plane
+    """
+    f = K[0, 0]
+    cx = K[0, 2]
+    kpts_x = [kpts[i][0, 0] for i in range(len(kpts))]
+    alphas = euler_angles[:, 1].copy()
+    for idx in range(len(euler_angles)):
+        ry3d = euler_angles[idx][1]  # orientation in the camera coordinate system
+        x3d, z3d = kpts_x[idx] - cx, f
+        alpha = ry3d - math.atan2(-z3d, x3d) - 0.5 * math.pi
+        # alpha = ry3d - math.atan2(x3d, z3d)# - 0.5 * math.pi
+        while alpha > math.pi: alpha -= math.pi * 2
+        while alpha < (-math.pi): alpha += math.pi * 2
+        alphas[idx] = alpha
+
+    return alphas
+
+
+def get_template(prediction, interp_coef=[0.332, 0.667]):
+    """
+    Construct a template 3D cuboid at canonical pose. The 3D cuboid is
+    represented as part coordinates in the camera coordinate system.
+    """
+    parents = prediction[interp_dict['bbox12'][0] - 1]
+    children = prediction[interp_dict['bbox12'][1] - 1]
+    lines = parents - children
+    lines = np.sqrt(np.sum(lines ** 2, axis=1))
+
+    # averaged over the four parallel line segments
+    h, l, w = np.sum(lines[:4]) / 4, np.sum(lines[4:8]) / 4, np.sum(lines[8:]) / 4
+    x_corners = [l, l, l, l, 0, 0, 0, 0]
+    y_corners = [0, h, 0, h, 0, h, 0, h]
+    z_corners = [w, w, 0, 0, w, w, 0, 0]
+    x_corners += - np.float32(l) / 2
+    y_corners += - np.float32(h)
+    z_corners += - np.float32(w) / 2
+    corners_3d = np.array([x_corners, y_corners, z_corners])
+    if len(prediction) == 32:
+        pidx, cidx = interp_dict['bbox12']
+        parents, children = corners_3d[:, pidx - 1], corners_3d[:, cidx - 1]
+        lines = children - parents
+        new_joints = [(parents + interp_coef[i] * lines) for i in range(len(interp_coef))]
+        corners_3d = np.hstack([corners_3d, np.hstack(new_joints)])
+
+    return corners_3d
+
+
+def compute_rigid_transform(X, Y, W=None):
+    """
+    A least-sqaure estimate of rigid transformation by SVD.
+
+    Reference: https://content.sakai.rutgers.edu/access/content/group/
+    7bee3f05-9013-4fc2-8743-3c5078742791/material/svd_ls_rotation.pdf
+
+    X, Y: [d, N] N data points of dimention d
+    W: [N, ] optional weight (importance) matrix for N data points
+    """
+
+    # find mean column wise
+    centroid_X = np.mean(X, axis=1, keepdims=True)
+    centroid_Y = np.mean(Y, axis=1, keepdims=True)
+    # subtract mean
+    Xm = X - centroid_X
+    Ym = Y - centroid_Y
+    if W is None:
+        H = Xm @ Ym.T
+    else:
+        W = np.diag(W) if len(W.shape) == 1 else W
+        H = Xm @ W @ Ym.T
+
+    # find rotation
+    U, S, Vt = np.linalg.svd(H)
+    R = Vt.T @ U.T
+    if np.linalg.det(R) < 0:
+        # the global minimizer with a orthogonal transformation is not possible
+        # the next best transformation is chosen
+        Vt[-1, :] *= -1
+        R = Vt.T @ U.T
+    t = -R @ centroid_X + centroid_Y
+
+    return R, t
+
+
+def kpts_to_euler(template, prediction):
+    """
+    Convert the predicted cuboid representation to euler angles.
+    """
+    # estimate roll, pitch, yaw of the prediction by comparing with a
+    # reference bounding box
+    # prediction and template of shape [3, N_points]
+    R, T = compute_rigid_transform(template, prediction)
+    # in the order of yaw, pitch and roll
+    angles = Rotation.from_matrix(R).as_euler('yxz', degrees=False)
+    # re-order in the order of x, y and z
+    angles = angles[[1, 0, 2]]
+
+    return angles, T
+
+
+def get_6d_rep(predictions):
+    """
+    Get the 6DoF representation of a 3D prediction.
+    """
+    predictions = predictions.reshape(len(predictions), -1, 3)
+    all_angles = []
+    for instance_idx in range(len(predictions)):
+        prediction = predictions[instance_idx]
+        # templates are 3D boxes with no rotation
+        # the prediction is estimated as the rotation between prediction and template
+        template = get_template(prediction)
+        instance_angle, instance_trans = kpts_to_euler(template, prediction.T)
+        all_angles.append(instance_angle.reshape(1, 3))
+
+    angles = np.concatenate(all_angles)
+    # the first point is the predicted point center
+    translation = predictions[:, 0, :]
+
+    return angles, translation
+
+
+def get_instance_str(dic):
+    """
+    Produce KITTI style prediction string for one instance.
+    """
+    string = ""
+    string += dic['class'] + " "
+    string += "{:.1f} ".format(dic['truncation'])
+    string += "{:.1f} ".format(dic['occlusion'])
+    string += "{:.6f} ".format(dic['alpha'])
+    string += "{:.6f} {:.6f} {:.6f} {:.6f} ".format(dic['bbox'][0], dic['bbox'][1], dic['bbox'][2], dic['bbox'][3])
+    string += "{:.6f} {:.6f} {:.6f} ".format(dic['dimensions'][1], dic['dimensions'][2], dic['dimensions'][0])
+    string += "{:.6f} {:.6f} {:.6f} ".format(dic['locations'][0], dic['locations'][1], dic['locations'][2])
+    string += "{:.6f} ".format(dic['rot_y'])
+    if 'score' in dic:
+        string += "{:.8f} ".format(dic['score'])
+    else:
+        string += "{:.8f} ".format(1.0)
+
+    return string
+
+
+def get_pred_str(record):
+    """
+    Produce KITTI style prediction string for a record dictionary.
+    """
+    # replace the rotation predictions of input bounding boxes
+    updated_txt = deepcopy(record['raw_txt_format'])
+    for instance_id in range(len(record['euler_angles'])):
+        updated_txt[instance_id]['rot_y'] = record['euler_angles'][instance_id, 1]
+        updated_txt[instance_id]['alpha'] = record['alphas'][instance_id]
+
+    pred_str = ""
+    angles = record['euler_angles']
+    for instance_id in range(len(angles)):
+        # format a string for submission
+        tempt_str = get_instance_str(updated_txt[instance_id])
+        if instance_id != len(angles) - 1:
+            tempt_str += '\n'
+        pred_str += tempt_str
+
+    return pred_str
+
+
 def plot_2d_objects(
         img, record,
         color_dict={
@@ -259,5 +474,47 @@ def plot_2d_objects(
         hspace=0, wspace=0)
     fig.gca().xaxis.set_major_locator(plt.NullLocator())
     fig.gca().yaxis.set_major_locator(plt.NullLocator())
+
+    return fig
+
+
+def plot_3d_objects(prediction, target, pose_vecs_gt, record, color):
+    if target is not None:
+        p3d_gt = target.reshape(len(target), -1, 3)
+    else:
+        p3d_gt = None
+    p3d_pred = prediction.reshape(len(prediction), -1, 3)
+
+    if "kpts_3d_before" in record:
+        # use predicted translation for visualization
+        p3d_pred = np.concatenate([record['kpts_3d_before'][:, [0], :], p3d_pred], axis=1)
+    elif p3d_gt is not None and p3d_gt.shape[1] == p3d_pred.shape[1] + 1:
+        # use ground truth translation for visualization
+        p3d_pred = np.concatenate([p3d_gt[:, [0], :], p3d_pred], axis=1)
+    else:
+        raise NotImplementedError
+
+    fig = plt.figure()
+    ax = plt.subplot(111, projection='3d')
+
+    # plotting a set of 3D boxes
+    ax = plot_scene_3dbox(ax, p3d_pred, p3d_gt, color=color)
+    ax.set_title("GT: black w/o Ego-Net: magenta w/ Ego-Net: red/yellow")
+    draw_pose_vecs(ax, pose_vecs_gt)
+
+    # draw pose angle predictions
+    translation = p3d_pred[:, 0, :]
+    pose_vecs_pred = np.concatenate([translation, record['euler_angles']], axis=1)
+    draw_pose_vecs(ax, pose_vecs_pred, color=color)
+    if 'kpts_3d_before' in record:
+        # plot input 3D bounding boxes before using Ego-Net
+        kpts_3d_before = record['kpts_3d_before']
+        plot_scene_3dbox(ax, kpts_3d_before, color='m')
+        pose_vecs_before = np.zeros((len(kpts_3d_before), 6))
+        for idx in range(len(pose_vecs_before)):
+            pose_vecs_before[idx][0:3] = record['raw_txt_format'][idx]['locations']
+            pose_vecs_before[idx][4] = record['raw_txt_format'][idx]['rot_y']
+
+        draw_pose_vecs(ax, pose_vecs_before, color='m')
 
     return fig
