@@ -43,8 +43,8 @@ By adding the `--language` option, you can choose the language.
 ```bash
 $ python3 easyocr.py --language LANGUAGE
 $ python3 easyocr.py -l LANGUAGE
-(ex) $ python3 easyocr.py --language japanese
-(ex) $ python3 easyocr.py -l japanese
+(ex) $ python3 easyocr.py --language chinese
+(ex) $ python3 easyocr.py -l chinese
 ```
 
 The prepared language are as follows.
@@ -54,6 +54,16 @@ The prepared language are as follows.
   - french
   - korean
   - thai
+
+
+```bash
+(ex) $ python3 easyocr.py --language chinese --input example/chinese.jpg
+(ex) $ python3 easyocr.py --language japanese --input example/japanese.jpg
+(ex) $ python3 easyocr.py --language english --input example/english.png
+(ex) $ python3 easyocr.py --language french --input example/french.jpg
+(ex) $ python3 easyocr.py --language korean --input example/korean.png
+(ex) $ python3 easyocr.py --language thai --input example/thai.jpg
+```
 
 ## Reference
 [Jaided AI: EasyOCR demo](https://www.jaided.ai/easyocr/)    
