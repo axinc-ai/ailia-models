@@ -28,8 +28,24 @@ min_size = 20
 slope_ths = 0.1
 ycenter_ths = 0.5
 height_ths = 0.5
-width_ths = 0.5
-add_margin = 0.1
+width_ths = 0.5 #width_ths = 1.0
+add_margin = 0.1 #add_margin = 0.5
+
+# for recognition
+imgH = 64
+batch_size = 1
+contrast_ths = 0.1
+adjust_contrast = 0.5
+filter_ths = 0.003
+workers = 0 #workers = 1
+#y_ths = 0.5
+#x_ths = 1.0
+#beamWidth= 5
+#allowlist = None
+#blocklist = None
+#detail = 1
+#rotation_info = None
+#paragraph = False
 
 
 # ======================
@@ -48,7 +64,7 @@ def normalizeMeanVariance(in_img, mean=(0.485, 0.456, 0.406), variance=(0.229, 0
     return img
 
 
-def resize_aspect_ratio(img, square_size, interpolation, mag_ratio=1):
+def resize_aspect_ratio(img, square_size, interpolation):
     height, width, channel = img.shape
 
     # magnify image size
@@ -87,7 +103,7 @@ def detect(net, image):
     # resize
     img_resized_list = []
     for img in image_arrs:
-        img_resized, target_ratio, size_heatmap = resize_aspect_ratio(img, canvas_size, cv2.INTER_LINEAR, mag_ratio)
+        img_resized, target_ratio, size_heatmap = resize_aspect_ratio(img, canvas_size, cv2.INTER_LINEAR)
         img_resized_list.append(img_resized)
     ratio_h = ratio_w = 1 / target_ratio
 
@@ -125,7 +141,7 @@ def detect(net, image):
     return boxes_list, polys_list
 
 
-def group_text_box(polys, slope_ths = 0.1, ycenter_ths = 0.5, height_ths = 0.5, width_ths = 1.0, add_margin = 0.05, sort_output = True):
+def group_text_box(polys, sort_output = True):
     # poly top-left, top-right, low-right, low-left
     horizontal_list, free_list, combined_list, merged_list = [],[],[],[]
 
@@ -248,8 +264,7 @@ def detector_predict(net, image):
     # convert bbox [x1, x2, y1, y2]
     horizontal_list_agg, free_list_agg = [], []
     for text_box in text_box_list:
-        horizontal_list, free_list = group_text_box(text_box, slope_ths, ycenter_ths, height_ths,
-                                                    width_ths, add_margin, (optimal_num_chars is None))
+        horizontal_list, free_list = group_text_box(text_box, (optimal_num_chars is None))
         if min_size:
             horizontal_list = [i for i in horizontal_list if max(i[1] - i[0], i[3] - i[2]) > min_size]
             free_list = [i for i in free_list if max(diff([c[0] for c in i]), diff([c[1] for c in i])) > min_size]
@@ -515,15 +530,15 @@ def get_image_list(horizontal_list, free_list, img, model_height = 64, sort_outp
     return image_list, max_width
 
 
-def recognize(language, net, converter, test_loader, batch_max_length, ignore_idx, char_group_idx, beamWidth= 5, device = 'cpu'):
+def recognize(language, net, converter, test_loader, batch_max_length, ignore_idx):
     result = []
     with torch.no_grad():
         for t, image_tensors in enumerate(test_loader):
             batch_size = image_tensors.size(0)
-            image = image_tensors.to(device)
+            image = image_tensors
             # For max length prediction
-            length_for_pred = torch.IntTensor([batch_max_length] * batch_size).to(device)
-            text_for_pred = torch.LongTensor(batch_size, batch_max_length + 1).fill_(0).to(device)
+            length_for_pred = torch.IntTensor([batch_max_length] * batch_size)
+            text_for_pred = torch.LongTensor(batch_size, batch_max_length + 1).fill_(0)
 
             tmp = image
             tmp = tmp.squeeze(0)
@@ -560,8 +575,6 @@ def recognize(language, net, converter, test_loader, batch_max_length, ignore_id
 
             preds = net.predict(image)
 
-            # TODO:
-
             image = torch.from_numpy(image)
             preds = torch.from_numpy(preds)
 
@@ -580,7 +593,7 @@ def recognize(language, net, converter, test_loader, batch_max_length, ignore_id
             preds_prob[:,:,ignore_idx] = 0.
             pred_norm = preds_prob.sum(axis=2)
             preds_prob = preds_prob/np.expand_dims(pred_norm, axis=-1)
-            preds_prob = torch.from_numpy(preds_prob).float().to(device)
+            preds_prob = torch.from_numpy(preds_prob).float()
 
 
             # Select max probabilty (greedy decoding) then decode index to character
@@ -606,12 +619,9 @@ def recognize(language, net, converter, test_loader, batch_max_length, ignore_id
     return result
 
 
-def get_text(language, character, imgH, imgW, recognizer, converter, image_list,\
-             ignore_char = '', beamWidth =5, batch_size=1, contrast_ths=0.1,\
-             adjust_contrast=0.5, filter_ths = 0.003, workers = 1, device = 'cpu'):
+def get_text(language, character, imgH, imgW, recognizer, converter, image_list, ignore_char = ''):
     batch_max_length = int(imgW/10)
 
-    char_group_idx = {}
     ignore_idx = []
     for char in ignore_char:
         try: ignore_idx.append(character.index(char)+1)
@@ -626,8 +636,7 @@ def get_text(language, character, imgH, imgW, recognizer, converter, image_list,
         num_workers=int(workers), collate_fn=AlignCollate_normal, pin_memory=True)
 
     # predict first round
-    result1 = recognize(language, recognizer, converter, test_loader,batch_max_length,\
-                                 ignore_idx, char_group_idx, beamWidth, device = device)
+    result1 = recognize(language, recognizer, converter, test_loader,batch_max_length, ignore_idx)
 
     # predict second round
     low_confident_idx = [i for i,item in enumerate(result1) if (item[1] < contrast_ths)]
@@ -638,8 +647,7 @@ def get_text(language, character, imgH, imgW, recognizer, converter, image_list,
         test_loader = torch.utils.data.DataLoader(
                         test_data, batch_size=batch_size, shuffle=False,
                         num_workers=int(workers), collate_fn=AlignCollate_contrast, pin_memory=True)
-        result2 = recognize(language, recognizer, converter, test_loader, batch_max_length,\
-                                     ignore_idx, char_group_idx, beamWidth, device = device)
+        result2 = recognize(language, recognizer, converter, test_loader, batch_max_length, ignore_idx)
 
     result = []
     for i, zipped in enumerate(zip(coord, result1)):
@@ -656,21 +664,6 @@ def get_text(language, character, imgH, imgW, recognizer, converter, image_list,
 
 
 def recognizer_predict(language, lang_list, character, symbol, net, image_grey, horizontal_list, free_list):
-    imgH = 64
-    beamWidth= 5
-    batch_size = 1
-    workers = 0
-    allowlist = None
-    blocklist = None
-    detail = 1
-    rotation_info = None
-    paragraph = False
-    contrast_ths = 0.1
-    adjust_contrast = 0.5
-    filter_ths = 0.003
-    y_ths = 0.5
-    x_ths = 1.0
-
     lang_char = set_language_list(lang_list, symbol)
     ignore_char = ''.join(set(character)-set(lang_char))
     separator_list = {}
@@ -692,16 +685,14 @@ def recognizer_predict(language, lang_list, character, symbol, net, image_grey, 
         f_list = []
         image_list, max_width = get_image_list(h_list, f_list, image_grey)
         result0 = get_text(language, character, imgH, int(max_width), net, converter, image_list,\
-                      ignore_char, beamWidth, batch_size, contrast_ths, adjust_contrast, filter_ths,\
-                      workers)
+                      ignore_char)
         result += result0
     for bbox in free_list:
         h_list = []
         f_list = [bbox]
         image_list, max_width = get_image_list(h_list, f_list, image_grey)
         result0 = get_text(language, character, imgH, int(max_width), net, converter, image_list,\
-                      ignore_char, beamWidth, batch_size, contrast_ths, adjust_contrast, filter_ths,\
-                      workers)
+                      ignore_char)
         result += result0
 
     return result

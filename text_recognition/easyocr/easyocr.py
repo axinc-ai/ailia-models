@@ -22,32 +22,26 @@ from easyocr_utils import *
 # ======================
 # PARAMETERS
 # ======================
-DETECTOR_MODEL_PATH = 'detector_craft.onnx.prototxt'
-DETECTOR_WEIGHT_PATH = 'detector_craft.onnx'
-
-RECOGNIZER_CHINESE_MODEL_PATH = 'recognizer_zh_sim_g2.onnx.prototxt'
-RECOGNIZER_CHINESE_WEIGHT_PATH = 'recognizer_zh_sim_g2.onnx'
-
-RECOGNIZER_JAPANESE_MODEL_PATH = 'recognizer_japanese_g2.onnx.prototxt'
+DETECTOR_MODEL_PATH             = 'detector_craft.onnx.prototxt'
+DETECTOR_WEIGHT_PATH            = 'detector_craft.onnx'
+RECOGNIZER_CHINESE_MODEL_PATH   = 'recognizer_zh_sim_g2.onnx.prototxt'
+RECOGNIZER_CHINESE_WEIGHT_PATH  = 'recognizer_zh_sim_g2.onnx'
+RECOGNIZER_JAPANESE_MODEL_PATH  = 'recognizer_japanese_g2.onnx.prototxt'
 RECOGNIZER_JAPANESE_WEIGHT_PATH = 'recognizer_japanese_g2.onnx'
-
-RECOGNIZER_ENGLISH_MODEL_PATH = 'recognizer_english_g2.onnx.prototxt'
-RECOGNIZER_ENGLISH_WEIGHT_PATH = 'recognizer_english_g2.onnx'
-
-RECOGNIZER_FRENCH_MODEL_PATH = 'recognizer_latin_g2.onnx.prototxt'
-RECOGNIZER_FRENCH_WEIGHT_PATH = 'recognizer_latin_g2.onnx'
-
-RECOGNIZER_KOREAN_MODEL_PATH = 'recognizer_korean_g2.onnx.prototxt'
-RECOGNIZER_KOREAN_WEIGHT_PATH = 'recognizer_korean_g2.onnx'
-
-RECOGNIZER_THAI_MODEL_PATH = 'recognizer_thai.onnx.prototxt'
-RECOGNIZER_THAI_WEIGHT_PATH = 'recognizer_thai.onnx'
+RECOGNIZER_ENGLISH_MODEL_PATH   = 'recognizer_english_g2.onnx.prototxt'
+RECOGNIZER_ENGLISH_WEIGHT_PATH  = 'recognizer_english_g2.onnx'
+RECOGNIZER_FRENCH_MODEL_PATH    = 'recognizer_latin_g2.onnx.prototxt'
+RECOGNIZER_FRENCH_WEIGHT_PATH   = 'recognizer_latin_g2.onnx'
+RECOGNIZER_KOREAN_MODEL_PATH    = 'recognizer_korean_g2.onnx.prototxt'
+RECOGNIZER_KOREAN_WEIGHT_PATH   = 'recognizer_korean_g2.onnx'
+RECOGNIZER_THAI_MODEL_PATH      = 'recognizer_thai.onnx.prototxt'
+RECOGNIZER_THAI_WEIGHT_PATH     = 'recognizer_thai.onnx'
 
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/easyocr/'
 
 IMAGE_PATH = 'example/chinese.jpg'
-IMAGE_WIDTH = 100
-IMAGE_HEIGHT = 100
+IMAGE_WIDTH = 640
+IMAGE_HEIGHT = 339
 
 
 # ======================
@@ -65,6 +59,16 @@ args = update_parser(parser)
 # ======================
 # Main functions
 # ======================
+def predict(img, img_grey):
+    # detect
+    horizontal_list, free_list = detector_predict(detector, img)
+
+    # recognize
+    result = recognizer_predict(args.language, lang_list, character, symbol, recognizer, img_grey, horizontal_list[0], free_list[0])
+
+    return result
+
+
 def recognize_from_image():
     for image_path in args.input:
         # prepare input data
@@ -73,16 +77,16 @@ def recognize_from_image():
         img = cv2.imread(image_path)
 
         # predict
-        horizontal_list, free_list = detector_predict(detector, img)
-        result = recognizer_predict(args.language, lang_list, character, symbol, recognizer, img_grey, horizontal_list[0], free_list[0])
+        result = predict(img, img_grey)
 
         # show
-        logger.info('detect result')
-        logger.info('{}, {}'.format(horizontal_list[0], free_list[0]))
-        #logger.info('recognize result {}'.format(result))
-        logger.info('recognize result')
+        print('recognize result')
         for r in result:
-            logger.info(r)
+            print(r)
+
+
+def recognize_from_video():
+    return
 
 
 if __name__ == '__main__':
@@ -140,8 +144,7 @@ if __name__ == '__main__':
     # predict
     if args.video is not None:
         # video mode
-        #recognize_from_video()
-        exit()
+        recognize_from_video()
     else:
         # image mode
         recognize_from_image()
