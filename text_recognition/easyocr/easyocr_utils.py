@@ -4,9 +4,7 @@ import cv2
 import numpy as np
 from PIL import Image
 
-import torch
-import torch.nn.functional as F
-import torchvision.transforms as transforms
+from scipy.special import softmax
 
 from craft_utils import getDetBoxes, adjustResultCoordinates
 from config.model import recognition_models
@@ -337,73 +335,54 @@ class CTCLabelConverter(object):
 class NormalizePAD(object):
 
     def __init__(self, max_size, PAD_type='right'):
-        self.toTensor = transforms.ToTensor()
         self.max_size = max_size
         self.max_width_half = math.floor(max_size[2] / 2)
         self.PAD_type = PAD_type
 
     def __call__(self, img):
-        img = self.toTensor(img)
-        img.sub_(0.5).div_(0.5)
-        c, h, w = img.size()
-        Pad_img = torch.FloatTensor(*self.max_size).fill_(0)
+        img = np.array(img)/255
+        img = img[np.newaxis, :, :]
+        img = (img-0.5)/0.5
+        c, h, w = img.shape
+
+        Pad_img = np.zeros(self.max_size)
         Pad_img[:, :, :w] = img  # right pad
         if self.max_size[2] != w:  # add border Pad
-            Pad_img[:, :, w:] = img[:, :, w - 1].unsqueeze(2).expand(c, h, self.max_size[2] - w)
+            tmp = img[:, :, w - 1]
+            tmp = tmp[:, :, np.newaxis]
+            Pad_img[:, :, w:] = tmp.repeat(self.max_size[2] - w, axis=2)
 
         return Pad_img
 
 
-class AlignCollate(object):
+def preprocess(img, imgH, imgW, keep_ratio_with_pad=False, adjust_contrast = 0.):
 
-    def __init__(self, imgH=32, imgW=100, keep_ratio_with_pad=False, adjust_contrast = 0.):
-        self.imgH = imgH
-        self.imgW = imgW
-        self.keep_ratio_with_pad = keep_ratio_with_pad
-        self.adjust_contrast = adjust_contrast
+    img = Image.fromarray(img, 'L')
+    images = [img]
+    resized_max_w = imgW
+    input_channel = 1
+    transform = NormalizePAD((input_channel, imgH, resized_max_w))
 
-    def __call__(self, batch):
-        batch = filter(lambda x: x is not None, batch)
-        images = batch
+    resized_images = []
+    for image in images:
+        w, h = image.size
+        #### augmentation here - change contrast
+        if adjust_contrast > 0:
+            image = np.array(image.convert("L"))
+            image = adjust_contrast_grey(image, target = adjust_contrast)
+            image = Image.fromarray(image, 'L')
 
-        resized_max_w = self.imgW
-        input_channel = 1
-        transform = NormalizePAD((input_channel, self.imgH, resized_max_w))
+        ratio = w / float(h)
+        if math.ceil(imgH * ratio) > imgW:
+            resized_w = imgW
+        else:
+            resized_w = math.ceil(imgH * ratio)
 
-        resized_images = []
-        for image in images:
-            w, h = image.size
-            #### augmentation here - change contrast
-            if self.adjust_contrast > 0:
-                image = np.array(image.convert("L"))
-                image = adjust_contrast_grey(image, target = self.adjust_contrast)
-                image = Image.fromarray(image, 'L')
+        resized_image = image.resize((resized_w, imgH), Image.BICUBIC)
+        resized_images.append(transform(resized_image))
 
-            ratio = w / float(h)
-            if math.ceil(self.imgH * ratio) > self.imgW:
-                resized_w = self.imgW
-            else:
-                resized_w = math.ceil(self.imgH * ratio)
-
-            resized_image = image.resize((resized_w, self.imgH), Image.BICUBIC)
-            resized_images.append(transform(resized_image))
-
-        image_tensors = torch.cat([t.unsqueeze(0) for t in resized_images], 0)
-        return image_tensors
-
-
-class ListDataset(torch.utils.data.Dataset):
-
-    def __init__(self, image_list):
-        self.image_list = image_list
-        self.nSamples = len(image_list)
-
-    def __len__(self):
-        return self.nSamples
-
-    def __getitem__(self, index):
-        img = self.image_list[index]
-        return Image.fromarray(img, 'L')
+    image_tensors = np.concatenate([t[np.newaxis, :, :, :] for t in resized_images], 0)
+    return image_tensors
 
 
 def custom_mean(x):
@@ -530,91 +509,65 @@ def get_image_list(horizontal_list, free_list, img, model_height = 64, sort_outp
     return image_list, max_width
 
 
-def recognize(language, net, converter, test_loader, batch_max_length, ignore_idx):
+def recognize(language, net, converter, img_list, batch_max_length, ignore_idx):
     result = []
-    with torch.no_grad():
-        for t, image_tensors in enumerate(test_loader):
-            batch_size = image_tensors.size(0)
-            image = image_tensors
-            # For max length prediction
-            length_for_pred = torch.IntTensor([batch_max_length] * batch_size)
-            text_for_pred = torch.LongTensor(batch_size, batch_max_length + 1).fill_(0)
+    for t, image_tensors in enumerate(img_list):
+        batch_size = image_tensors.shape[0]
+        image = image_tensors
+        tmp = image.squeeze()
 
-            tmp = image
-            tmp = tmp.squeeze(0)
-            tmp = tmp.squeeze(0)
-            tmp = tmp.to('cpu').detach().numpy().copy()
+        #
+        # Set appropriate constant width because current onnx exporter does not support operator adaptive pooling with dynamic axis.
+        #
+        # ONNX export of operator adaptive pooling, since output_size is not constant..
+        # Please feel free to request support or submit a pull request on PyTorch GitHub.
+        #
+        if language == 'chinese':
+            tmp = cv2.resize(tmp, (128, 64))
+        elif language == 'japanese':
+            tmp = cv2.resize(tmp, (422, 64))
+        elif language == 'english':
+            tmp = cv2.resize(tmp, (680, 64))
+        elif language == 'french':
+            tmp = cv2.resize(tmp, (268, 64))
+        elif language == 'korean':
+            tmp = cv2.resize(tmp, (150, 64))
+        elif language == 'thai':
+            tmp = cv2.resize(tmp, (192, 64))
+        else:
+            exit()
 
-            #
-            # Set appropriate constant width because current onnx exporter does not support operator adaptive pooling with dynamic axis.
-            #
-            # ONNX export of operator adaptive pooling, since output_size is not constant..
-            # Please feel free to request support or submit a pull request on PyTorch GitHub.
-            #
-            if language == 'chinese':
-                tmp = cv2.resize(tmp, (128, 64))
-            elif language == 'japanese':
-                tmp = cv2.resize(tmp, (422, 64))
-            elif language == 'english':
-                tmp = cv2.resize(tmp, (680, 64))
-            elif language == 'french':
-                tmp = cv2.resize(tmp, (268, 64))
-            elif language == 'korean':
-                tmp = cv2.resize(tmp, (150, 64))
-            elif language == 'thai':
-                tmp = cv2.resize(tmp, (192, 64))
+        image = tmp[np.newaxis, np.newaxis, :, :]
+
+        preds = net.predict(image)
+
+        # Select max probabilty (greedy decoding) then decode index to character
+        preds_size = [preds.shape[1]] * batch_size
+
+        ######## filter ignore_char, rebalance
+        preds_prob = softmax(preds, axis=2)
+        preds_prob[:,:,ignore_idx] = 0.
+        pred_norm = preds_prob.sum(axis=2)
+        preds_prob = preds_prob/np.expand_dims(pred_norm, axis=-1)
+
+        # Select max probabilty (greedy decoding) then decode index to character
+        preds_index = np.argmax(preds_prob, axis=2)
+        preds_index = np.squeeze(preds_index)
+        preds_str = converter.decode_greedy(preds_index, preds_size)
+
+        values = preds_prob.max(axis=2)
+        indices = preds_prob.argmax(axis=2)
+        preds_max_prob = []
+        for v,i in zip(values, indices):
+            max_probs = v[i!=0]
+            if len(max_probs)>0:
+                preds_max_prob.append(max_probs)
             else:
-                exit()
+                preds_max_prob.append(np.array([0]))
 
-            tmp = tmp[np.newaxis, np.newaxis, :, :]
-            image = torch.from_numpy(tmp)
-            text_for_pred = torch.zeros(1, 10)
-
-            image = image.to('cpu').detach().numpy().copy()
-            text_for_pred = text_for_pred.to('cpu').detach().numpy().copy()
-
-            preds = net.predict(image)
-
-            image = torch.from_numpy(image)
-            preds = torch.from_numpy(preds)
-
-
-            # Select max probabilty (greedy decoding) then decode index to character
-            preds_size = torch.IntTensor([preds.size(1)] * batch_size)
-
-            ######## filter ignore_char, rebalance
-            from scipy.special import softmax
-            #preds_prob = F.softmax(tmp, dim=2)
-            preds = preds.to('cpu').detach().numpy().copy()
-            preds_prob = softmax(preds, axis=2)
-            preds_prob = torch.from_numpy(preds_prob)
-            #preds_prob = F.softmax(preds, dim=2)
-            preds_prob = preds_prob.cpu().detach().numpy()
-            preds_prob[:,:,ignore_idx] = 0.
-            pred_norm = preds_prob.sum(axis=2)
-            preds_prob = preds_prob/np.expand_dims(pred_norm, axis=-1)
-            preds_prob = torch.from_numpy(preds_prob).float()
-
-
-            # Select max probabilty (greedy decoding) then decode index to character
-            _, preds_index = preds_prob.max(2)
-            preds_index = preds_index.view(-1)
-            preds_str = converter.decode_greedy(preds_index.data.cpu().detach().numpy(), preds_size.data)
-
-            preds_prob = preds_prob.cpu().detach().numpy()
-            values = preds_prob.max(axis=2)
-            indices = preds_prob.argmax(axis=2)
-            preds_max_prob = []
-            for v,i in zip(values, indices):
-                max_probs = v[i!=0]
-                if len(max_probs)>0:
-                    preds_max_prob.append(max_probs)
-                else:
-                    preds_max_prob.append(np.array([0]))
-
-            for pred, pred_max_prob in zip(preds_str, preds_max_prob):
-                confidence_score = custom_mean(pred_max_prob)
-                result.append([pred, confidence_score])
+        for pred, pred_max_prob in zip(preds_str, preds_max_prob):
+            confidence_score = custom_mean(pred_max_prob)
+            result.append([pred, confidence_score])
 
     return result
 
@@ -629,25 +582,18 @@ def get_text(language, character, imgH, imgW, recognizer, converter, image_list,
 
     coord = [item[0] for item in image_list]
     img_list = [item[1] for item in image_list]
-    AlignCollate_normal = AlignCollate(imgH=imgH, imgW=imgW, keep_ratio_with_pad=True)
-    test_data = ListDataset(img_list)
-    test_loader = torch.utils.data.DataLoader(
-        test_data, batch_size=batch_size, shuffle=False,
-        num_workers=int(workers), collate_fn=AlignCollate_normal, pin_memory=True)
+    input_list = [preprocess(img, imgH, imgW, keep_ratio_with_pad=True) for img in img_list]
 
     # predict first round
-    result1 = recognize(language, recognizer, converter, test_loader,batch_max_length, ignore_idx)
+    result1 = recognize(language, recognizer, converter, input_list, batch_max_length, ignore_idx)
 
     # predict second round
     low_confident_idx = [i for i,item in enumerate(result1) if (item[1] < contrast_ths)]
     if len(low_confident_idx) > 0:
         img_list2 = [img_list[i] for i in low_confident_idx]
-        AlignCollate_contrast = AlignCollate(imgH=imgH, imgW=imgW, keep_ratio_with_pad=True, adjust_contrast=adjust_contrast)
-        test_data = ListDataset(img_list2)
-        test_loader = torch.utils.data.DataLoader(
-                        test_data, batch_size=batch_size, shuffle=False,
-                        num_workers=int(workers), collate_fn=AlignCollate_contrast, pin_memory=True)
-        result2 = recognize(language, recognizer, converter, test_loader, batch_max_length, ignore_idx)
+        input_list2 = [preprocess(img, imgH, imgW, keep_ratio_with_pad=True, adjust_contrast=adjust_contrast) for img in img_list2]
+
+        result2 = recognize(language, recognizer, converter, input_list2, batch_max_length, ignore_idx)
 
     result = []
     for i, zipped in enumerate(zip(coord, result1)):
