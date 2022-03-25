@@ -9,7 +9,7 @@ import ailia
 sys.path.append('../../util')
 from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
-from webcamera_utils import adjust_frame_size, get_capture  # noqa: E402
+import webcamera_utils  # noqa: E402
 
 # logger
 from logging import getLogger   # noqa: E402
@@ -73,11 +73,11 @@ def recognize_from_image():
     for image_path in args.input:
         # prepare input data
         logger.info(image_path)
-        img_grey = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
+        img_gray = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
         img = cv2.imread(image_path)
 
         # predict
-        result = predict(img, img_grey)
+        result = predict(img, img_gray)
 
         # show
         print('recognize result')
@@ -86,7 +86,27 @@ def recognize_from_image():
 
 
 def recognize_from_video():
-    return
+    capture = webcamera_utils.get_capture(args.video)
+
+    i = 0
+    while(True):
+        i += 1
+        ret, frame = capture.read()
+        if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+
+        frame_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+
+        # predict
+        result = predict(frame, frame_gray)
+
+        # show
+        print('[{}] recognize result'.format(i))
+        for r in result:
+            print(r)
+
+    capture.release()
+    logger.info('Script finished successfully.')
 
 
 if __name__ == '__main__':
