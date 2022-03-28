@@ -33,8 +33,8 @@ GRAY_MODEL_PATH = "fbcnn_gray.onnx.prototxt"
 GRAY_DOUBLEJPEG_WEIGHT_PATH = "fbcnn_gray_doublejpeg.onnx"
 GRAY_DOUBLEJPEG_MODEL_PATH = "fbcnn_gray_doublejpeg.onnx.prototxt"
 
-IMAGE_PATH = 'input.bmp'
-SAVE_IMAGE_PATH = 'output.bmp'
+IMAGE_PATH = 'input.png'
+SAVE_IMAGE_PATH = 'output.png'
 
 COLOR_REAL_H = 256
 COLOR_REAL_W = 256
@@ -170,7 +170,16 @@ def restore_from_image(net, n_channels, qf, qf2):
         # predict
         img_name, ext = os.path.splitext(os.path.basename(image_path))
         img = imread_uint(image_path, n_channels=n_channels)
-        img = predict(img, net, n_channels, qf, qf2)
+        if args.benchmark:
+            logger.info('BENCHMARK mode')
+            input = img
+            for _ in range(5):
+                start = int(round(time.time() * 1000))
+                img = predict(input, net, n_channels, qf, qf2)
+                end = int(round(time.time() * 1000))
+                print(f'\tailia processing time {end - start} ms')
+        else:
+            img = predict(img, net, n_channels, qf, qf2)
         img = np.squeeze(img)
         if img.ndim == 3:
             img = img[:, :, [2, 1, 0]]

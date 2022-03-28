@@ -10,16 +10,16 @@ Range: [0, 1]
 
 ## Output
 Model 1: color(default)  
-<img src='output_color.bmp' width='360px'>
+<img src='output_color.png' width='360px'>
 
 Model 2: color_real    
-<img src='output_color_real.bmp' width='360px'>
+<img src='output_color_real.png' width='360px'>
 
 Model 3: gray    
-<img src='output_gray.bmp' width='360px'>
+<img src='output_gray.png' width='360px'>
 
 Model 4: gray_doublejpeg    
-<img src='output_gray_doublejpeg.bmp' width='360px'>
+<img src='output_gray_doublejpeg.png' width='360px'>
 
 ## Usage
 Automatically downloads the onnx and prototxt files on the first run.
