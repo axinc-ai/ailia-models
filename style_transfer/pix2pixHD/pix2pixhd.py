@@ -66,7 +66,6 @@ if os.path.isfile(args.instance_map):
 
 def preprocess(img):
     oh, ow = (IMAGE_HEIGHT, IMAGE_WIDTH)
-    print(img.shape)
     img = cv2.resize(img, (ow, oh), interpolation=cv2.INTER_CUBIC)
     if len(img.shape) == 2:
         img = np.expand_dims(img, axis=2)
@@ -89,8 +88,8 @@ def preprocess(img):
 
 
 def post_processing(img, im_hw):
-    img = img.transpose(1, 2, 0) * 255.0
-    img = np.clip(img, 0, 255)
+    img = (img.transpose(1, 2, 0) + 1) / 2.0 * 255.0
+    img = np.clip(img, 0, 255).astype(np.uint8)
     img = cv2.resize(img, (im_hw[1], im_hw[0]))
 
     return img
@@ -124,11 +123,8 @@ def predict(net, img, inst_map):
 
     # get edges from instance map
     edge_map = get_edges(inst_map)
-    print('input_label', input_label.shape)
-    print('edge_map', edge_map.shape)
     input_label = np.concatenate((input_label, edge_map), axis=1)
 
-    print('input_label', input_label.shape, input_label)
     # feedforward
     if not args.onnx:
         output = net.predict([input_label])
@@ -138,8 +134,7 @@ def predict(net, img, inst_map):
     output = output[0]
 
     img = post_processing(output[0], (im_h, im_w))
-    # img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
-    img = img.astype(np.uint8)
+    img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
 
     return img
 
