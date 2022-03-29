@@ -2,6 +2,8 @@
 
 ## Input
 
+Notice: The current streetview model need both label map and instance map as input, since the original pytorch model was trained with both maps as input.
+
 ### Input label map
 <img src="frankfurt_000000_000576_gtFine_labelIds.png" width="512px">
 
@@ -23,7 +25,7 @@ For the sample image,
 $ python3 pix2pixhd.py
 ```
 
-If you want to specify the input image, put the image path after the `--input` option.  
+If you want to specify the input label map and instance map, put the label image path and instance image map after the `--input` and `--instance_map` options respectively.
 You can use `--savepath` option to change the name of the output file to save.
 ```bash
 $ python3 pix2pixhd.py --input IMAGE_PATH --savepath SAVE_IMAGE_PATH
