@@ -5,7 +5,44 @@ from pathlib import Path
 
 import numpy as np
 import cv2
-from nms import nms
+
+def nms_cpu(boxes, confs, nms_thresh=0.5, min_mode=False):
+    # print(boxes.shape)
+    x1 = boxes[:, 0]
+    y1 = boxes[:, 1]
+    x2 = boxes[:, 2]
+    y2 = boxes[:, 3]
+
+    areas = (x2 - x1) * (y2 - y1)
+    order = confs.argsort()[::-1]
+
+    keep = []
+    while order.size > 0:
+        idx_self = order[0]
+        idx_other = order[1:]
+
+        keep.append(idx_self)
+
+        xx1 = np.maximum(x1[idx_self], x1[idx_other])
+        yy1 = np.maximum(y1[idx_self], y1[idx_other])
+        xx2 = np.minimum(x2[idx_self], x2[idx_other])
+        yy2 = np.minimum(y2[idx_self], y2[idx_other])
+
+        w = np.maximum(0.0, xx2 - xx1)
+        h = np.maximum(0.0, yy2 - yy1)
+        inter = w * h
+
+        if min_mode:
+            over = inter / np.minimum(areas[order[0]], areas[order[1:]])
+        else:
+            over = inter / (areas[order[0]] + areas[order[1:]] - inter)
+
+        inds = np.where(over <= nms_thresh)[0]
+        order = order[inds + 1]
+
+    return np.array(keep)
+
+
 
 def non_max_suppression(prediction, conf_thres=0.25, iou_thres=0.45, agnostic=False, labels=()):
     """Performs Non-Maximum Suppression (NMS) on inference results 
@@ -73,9 +110,9 @@ def non_max_suppression(prediction, conf_thres=0.25, iou_thres=0.45, agnostic=Fa
         # Batched NMS
         c = x[:, 5:6] * (0 if agnostic else max_wh)  # classes
         boxes, scores = x[:, :4] + c, x[:, 4]  # boxes (offset by class), scores
-        xywh = xyxy2xywh(boxes).tolist()
-        score    = scores.tolist()
-        i = np.array(nms.boxes(xywh, score, nms_threshold=iou_thres))
+        xywh = xyxy2xywh(boxes)
+        i = nms_cpu(xywh, scores, nms_thresh=iou_thres)
+
         if i.shape[0] > max_det:  # limit detections
             i = i[:max_det]
         if merge and (1 < n < 3E3):  # Merge NMS (boxes merged using weighted mean)
