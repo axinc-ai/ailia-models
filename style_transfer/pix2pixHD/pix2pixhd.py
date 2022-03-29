@@ -22,11 +22,11 @@ logger = getLogger(__name__)
 # Parameters
 # ======================
 
-WEIGHT_PATH = 'generator_streetview_op11.onnx'
-MODEL_PATH = 'generator_streetview_op11.onnx.prototxt'
+WEIGHT_PATH = 'pix2pixhd.onnx'
+MODEL_PATH = 'pix2pixhd.onnx.prototxt'
 
 REMOTE_PATH = \
-    'https://storage.googleapis.com/ailia-models/animeganv2/'
+    'https://storage.googleapis.com/ailia-models/pix2pixhd/'
 
 IMAGE_PATH = 'frankfurt_000000_000576_gtFine_labelIds.png'
 INST_PATH = 'frankfurt_000000_000576_gtFine_instanceIds.png'
@@ -43,7 +43,7 @@ parser = get_base_parser(
     'pix2pixHD', IMAGE_PATH, SAVE_IMAGE_PATH,
 )
 parser.add_argument(
-    '-im', '--instance_map', type=str, default=None,
+    '-im', '--instance_map', type=str, default=INST_PATH,
     help='The instance map to input with label image'
 )
 parser.add_argument(
@@ -84,13 +84,14 @@ def preprocess(img):
     img = np.expand_dims(img, axis=0)
     img = img.astype(np.float32)
 
-    return img, (h, w)
+    return img
 
 
 def post_processing(img, im_hw):
     img = (img.transpose(1, 2, 0) + 1) / 2.0 * 255.0
     img = np.clip(img, 0, 255).astype(np.uint8)
     img = cv2.resize(img, (im_hw[1], im_hw[0]))
+    img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
 
     return img
 
@@ -104,15 +105,14 @@ def get_edges(t):
     return edge.astype('float32')
 
 def predict(net, img, inst_map):
-    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB) # Need grayscale?
+    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
     im_h, im_w = img.shape[:2]
     inst_map = cv2.cvtColor(inst_map, cv2.COLOR_BGR2GRAY)
     inst_map = np.expand_dims(inst_map, axis=2)
-    inst_h, ins_w = inst_map.shape[:2]
 
-    img, resized_hw = preprocess(img)
+    img = preprocess(img)
     img = img * 255.0
-    inst_map, resized_inst_hw = preprocess(inst_map)
+    inst_map = preprocess(inst_map)
 
     # create one-hot vector for label map 
     size = img.shape
@@ -134,7 +134,6 @@ def predict(net, img, inst_map):
     output = output[0]
 
     img = post_processing(output[0], (im_h, im_w))
-    img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
 
     return img
 
@@ -181,7 +180,7 @@ def recognize_from_image(net):
 
 def main():
     weight_path, model_path = WEIGHT_PATH, MODEL_PATH
-    # check_and_download_models(weight_path, model_path, REMOTE_PATH)
+    check_and_download_models(weight_path, model_path, REMOTE_PATH)
 
     env_id = args.env_id
 
@@ -192,6 +191,7 @@ def main():
         import onnxruntime
         net = onnxruntime.InferenceSession(weight_path)
 
+    # The exported model need both input label map and instance map, so only image mode is implemented but not video mode
     recognize_from_image(net)
 
 
