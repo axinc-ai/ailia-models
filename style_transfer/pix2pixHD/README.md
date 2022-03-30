@@ -10,6 +10,10 @@ Notice: The current streetview model need both label map and instance map as inp
 ### Input instance map
 <img src="frankfurt_000000_000576_gtFine_instanceIds.png" width="512px">
 
+Standard shape of 2 maps: (1, 1024, 2048, 1) grayscale, in the format B, H, W, C
+
+If input shape is not matched, it will be reshaped to : (1, 1024, 2048, 1) 
+
 (Images from https://www.cityscapes-dataset.com/)
 
 ## Output
