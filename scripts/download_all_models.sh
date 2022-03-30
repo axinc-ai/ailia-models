@@ -196,6 +196,7 @@ cd ../../rotation_prediction/rotnet; python3 rotnet.py ${OPTION}
 cd ../../style_transfer/adain; python3 adain.py ${OPTION}
 cd ../../style_transfer/beauty_gan; python3 beauty_gan.py ${OPTION}
 cd ../../style_transfer/animeganv2; python3 animeganv2.py ${OPTION}
+cd ../../style_transfer/pix2pixHD; python3 pix2pixhd.py ${OPTION}
 cd ../../super_resolution/srresnet; python3 srresnet.py ${OPTION}
 cd ../../super_resolution/han; python3 han.py ${OPTION}
 cd ../../super_resolution/edsr; python3 edsr.py ${OPTION}
