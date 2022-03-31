@@ -32,7 +32,7 @@ $ python3 pix2pixhd.py
 If you want to specify the input label map and instance map, put the label image path and instance image map after the `--input` and `--instance_map` options respectively.
 You can use `--savepath` option to change the name of the output file to save.
 ```bash
-$ python3 pix2pixhd.py --input IMAGE_PATH --savepath SAVE_IMAGE_PATH
+$ python3 pix2pixhd.py --input IMAGE_PATH --instance_map INSTANCE_PATH --savepath SAVE_IMAGE_PATH
 ```
 
 ## Reference
