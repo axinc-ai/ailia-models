@@ -313,7 +313,7 @@ def main():
     textCamera.set("Input")
 
     textPreview = tk.StringVar(frame)
-    textPreview.set("Please push 'q' key for finish running model.")
+    textPreview.set("Please hold 'q' key for finish running model.")
 
     textEnvironment = tk.StringVar(frame)
     textEnvironment.set("Environment")
