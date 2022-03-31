@@ -6,6 +6,9 @@ import numpy
 import subprocess
 import shutil
 import sys
+from PIL import Image, ImageTk
+
+# for macOS, please install "brew install python-tk@3.9"
 import tkinter as tk
 from tkinter import ttk
 
@@ -205,6 +208,22 @@ def display_ui(img, model_list, category_cnt, window_width, window_height):
 
 
 ListboxModel = None
+canvas = None
+canvas_item = None
+
+def load_image(path):
+    print(path)
+    global canvas, canvas_item
+    image_bgr = cv2.imread(path)
+    image_bgr = cv2.resize(image_bgr,(320,240))
+    image_rgb = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB) # imreadはBGRなのでRGBに変換
+    image_pil = Image.fromarray(image_rgb) # RGBからPILフォーマットへ変換
+    image_tk  = ImageTk.PhotoImage(image_pil) # ImageTkフォーマットへ変換
+    if canvas_item == None:
+        canvas_item = canvas.create_image(0, 0, image=image_tk, anchor=tk.NW)
+    else:
+        canvas.itemconfig(canvas_item,image=image_tk)
+
 
 def search():
     global model_list
@@ -237,9 +256,23 @@ def get_camera_list():
         cap.release()
     return cameras
 
+def model_changed(event):
+    selection = event.widget.curselection()
+    if selection:
+        index = selection[0]
+        model_request = model_list[index]
+        for ext in [".jpg",".png"]:
+            image_path = "./"+model_request["category"]+"/"+model_request["model"]+"/output"+ext
+            if os.path.exists(image_path):
+                load_image(image_path)
+                print(image_path)
+                print(index)
+                break
+
 def main():
     global ListboxModel
     global model_list, model_request, model_loading_cnt, invalidate_quit_cnt
+    global canvas
 
     model_list, category_cnt = search_model()
 
@@ -271,6 +304,8 @@ def main():
     ListboxModel = tk.Listbox(frame, listvariable=lists, width=50, height=20, selectmode="single")
     ListboxCamera = tk.Listbox(frame, listvariable=listsCamera, width=50, height=2, selectmode="single")
 
+    ListboxModel.bind("<<ListboxSelect>>", model_changed)
+
     # スクロールバーの作成
     scrollbar = tk.Scrollbar(frame, orient=tk.VERTICAL, command=ListboxModel.yview)
 
@@ -301,17 +336,12 @@ def main():
 
     button = tk.Button(frame, textvariable=text, command=search, width=10)
 
-    from PIL import Image, ImageTk
 
-    image_bgr = cv2.imread("./object_detection/yolox/output.jpg")
-    image_bgr = cv2.resize(image_bgr,(320,240))
-    image_rgb = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB) # imreadはBGRなのでRGBに変換
-    image_pil = Image.fromarray(image_rgb) # RGBからPILフォーマットへ変換
-    image_tk  = ImageTk.PhotoImage(image_pil) # ImageTkフォーマットへ変換
+
 
     canvas = tk.Canvas(frame, bg="black", width=320, height=240)
     canvas.place(x=0, y=0)
-    canvas.create_image(0, 0, image=image_tk, anchor=tk.NW)
+    load_image("./object_detection/yolox/output.jpg")
 
     # 各種ウィジェットの設置
     labelModel.grid(row=0, column=0, sticky=tk.NW)
