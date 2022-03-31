@@ -6,11 +6,15 @@ import numpy
 import subprocess
 import shutil
 import sys
+import glob
+import ailia
+
 from PIL import Image, ImageTk
 
 # for macOS, please install "brew install python-tk@3.9"
 import tkinter as tk
 from tkinter import ttk
+import tkinter.filedialog
 
 sys.path.append('./util')
 from utils import get_base_parser, update_parser  # noqa: E402
@@ -21,16 +25,6 @@ from utils import get_base_parser, update_parser  # noqa: E402
 parser = get_base_parser('ailia MODELS launcher', None, None)
 args = update_parser(parser)
 
-
-# ======================
-# Settings
-# ======================
-
-BUTTON_WIDTH = 350
-BUTTON_HEIGHT = 20
-BUTTON_MARGIN = 2
-
-WINDOW_ROW = 34
 
 # ======================
 # Model search
@@ -77,27 +71,6 @@ def search_model():
 # Model List
 # ======================
 
-mx = 0
-my = 0
-click_trig = False
-model_request = None
-model_loading_cnt = 0
-invalidate_quit_cnt = 0
-
-def mouse_callback(event, x, y, flags, param):
-    global mx, my, click_trig
-    if event == cv2.EVENT_LBUTTONDOWN:
-        click_trig = True
-    mx = x
-    my = y
-
-
-def hsv_to_rgb(h, s, v):
-    bgr = cv2.cvtColor(
-        numpy.array([[[h, s, v]]], dtype=numpy.uint8), cv2.COLOR_HSV2BGR
-    )[0][0]
-    return (int(bgr[2]), int(bgr[1]), int(bgr[0]))
-
 
 def open_model(model):
     dir = "./"+model["category"]+"/"+model["model"]+"/"
@@ -128,35 +101,6 @@ def open_model(model):
     cmd = [cmd, model["model"]+".py"] + options
     print(" ".join(cmd))
     subprocess.check_call(cmd, cwd=dir, shell=False)
-
-
-def display_loading(img, model):
-    text = "Loading "+model["model"]
-
-    fontScale = 0.75
-
-    textsize = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, fontScale, 1)[0]
-    tw = textsize[0]
-    th = textsize[1]
-
-    margin = 8
-
-    top_left = ((img.shape[1] - tw)//2 - margin, (img.shape[0] - th)//2 - margin)
-    bottom_right = (top_left[0] + tw + margin*2, top_left[1] + th + margin*2)
-    
-    color = (255,255,255,255)
-    cv2.rectangle(img, top_left, bottom_right, color, thickness=-1)
-
-    text_color = (0,0,0,255)
-    cv2.putText(
-        img,
-        text,
-        (top_left[0], top_left[1] + th + margin),
-        cv2.FONT_HERSHEY_SIMPLEX,
-        fontScale,
-        text_color,
-        1
-    )
 
 
 def display_ui(img, model_list, category_cnt, window_width, window_height):
@@ -208,12 +152,15 @@ def display_ui(img, model_list, category_cnt, window_width, window_height):
 
 
 ListboxModel = None
+textModelDetail = None
+
 canvas = None
 canvas_item = None
+image_tk = None
 
 def load_image(path):
     print(path)
-    global canvas, canvas_item
+    global canvas, canvas_item, image_tk
     image_bgr = cv2.imread(path)
     image_bgr = cv2.resize(image_bgr,(320,240))
     image_rgb = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB) # imreadはBGRなのでRGBに変換
@@ -240,7 +187,7 @@ def search():
     open_model(model_request)
 
 def get_camera_list():
-    return [0]
+    return ["Camera 0"]
 
     print("List cameras")
     index = 0
@@ -249,7 +196,7 @@ def get_camera_list():
         print(index)
         cap = cv2.VideoCapture(index)
         if cap.isOpened():
-            cameras.append(index)
+            cameras.append("Camera "+index)
         else:
             break
         index=index+1
@@ -260,28 +207,56 @@ def model_changed(event):
     selection = event.widget.curselection()
     if selection:
         index = selection[0]
-        model_request = model_list[index]
-        for ext in [".jpg",".png"]:
-            image_path = "./"+model_request["category"]+"/"+model_request["model"]+"/output"+ext
+    else:
+        index = 0
+    load_detail(index)
+
+def load_detail(index):
+    model_request = model_list[index]
+
+    base_path =  "./"+model_request["category"]+"/"+model_request["model"]+"/"
+
+    image_exist = False
+    for ext in [".jpg",".png"]:
+        image_path = base_path + "output" + ext
+        if os.path.exists(image_path):
+            load_image(image_path)
+            image_exist = True
+            break
+
+    if not image_exist:
+        files = glob.glob(base_path+"*.jpg")
+        files.extend(glob.glob(base_path+"*.png"))
+        for image_path in files:
             if os.path.exists(image_path):
                 load_image(image_path)
-                print(image_path)
-                print(index)
                 break
 
+    global textModelDetail
+
+    f = open(base_path+"README.md")
+    text = f.readlines()
+    text = text[0].replace("# ","")
+    textModelDetail.set(text)
+
+
+def file_dialog():
+    global listsCamera, ListboxCamera
+    fTyp = [("Image File or Video File", "*")]
+    iDir = os.path.abspath(os.path.dirname(__file__))
+    file_name = tk.filedialog.askopenfilename(filetypes=fTyp, initialdir=iDir)
+    if len(file_name) != 0:
+        camera_list.append(file_name)
+        listsCamera.set(camera_list)
+        ListboxCamera.select_clear()
+        ListboxCamera.select_set(len(camera_list)-1)
+
 def main():
-    global ListboxModel
+    global ListboxModel, textModelDetail
     global model_list, model_request, model_loading_cnt, invalidate_quit_cnt
-    global canvas
+    global canvas, inputFile, listsCamera, camera_list, ListboxCamera
 
     model_list, category_cnt = search_model()
-
-    #WINDOW_COL = int((len(model_list)+WINDOW_ROW-1)/WINDOW_ROW)
-
-    #window_width = (BUTTON_WIDTH + BUTTON_MARGIN) * WINDOW_COL
-    #window_height = (BUTTON_HEIGHT + BUTTON_MARGIN) * WINDOW_ROW
-
-    #img = numpy.zeros((window_height, window_width, 3)).astype(numpy.uint8)
 
     # rootメインウィンドウの設定
     root = tk.Tk()
@@ -297,12 +272,24 @@ def main():
     for i in range(len(model_list)):
         models.append(""+model_list[i]["category"]+" : "+model_list[i]["model"])
 
+    env_list = []
+    for env in ailia.get_environment_list():
+        env_list.append(env.name)
+
+    camera_list = get_camera_list()
+
     lists = tk.StringVar(value=models)
-    listsCamera = tk.StringVar(value=get_camera_list())
+    listsCamera = tk.StringVar(value=camera_list)
+    listEnvironment =tk.StringVar(value=env_list)
 
     # 各種ウィジェットの作成
-    ListboxModel = tk.Listbox(frame, listvariable=lists, width=50, height=20, selectmode="single")
-    ListboxCamera = tk.Listbox(frame, listvariable=listsCamera, width=50, height=2, selectmode="single")
+    ListboxModel = tk.Listbox(frame, listvariable=lists, width=40, height=20, selectmode="single", exportselection=False)
+    ListboxCamera = tk.Listbox(frame, listvariable=listsCamera, width=40, height=4, selectmode="single", exportselection=False)
+    ListboxEnvironment = tk.Listbox(frame, listvariable=listEnvironment, width=40, height=4, selectmode="single", exportselection=False)
+
+    ListboxModel.select_set(0)
+    ListboxCamera.select_set(0)
+    ListboxEnvironment.select_set(args.env_id)
 
     ListboxModel.bind("<<ListboxSelect>>", model_changed)
 
@@ -313,86 +300,68 @@ def main():
     ListboxModel["yscrollcommand"] = scrollbar.set
 
     # StringVarのインスタンスを格納する変数textの設定
-    text = tk.StringVar(frame)
-    text.set("Run")
+    textRun = tk.StringVar(frame)
+    textRun.set("Run")
+
+    textInputFile = tk.StringVar(frame)
+    textInputFile.set("Add File")
 
     textModel = tk.StringVar(frame)
     textModel.set("Models")
 
     textCamera = tk.StringVar(frame)
-    textCamera.set("Cameras")
+    textCamera.set("Input")
 
     textPreview = tk.StringVar(frame)
-    textPreview.set("Preview")
+    textPreview.set("Please push 'q' key for finish running model.")
 
     textEnvironment = tk.StringVar(frame)
     textEnvironment.set("Environment")
+
+    textModelDetail = tk.StringVar(frame)
+    textModelDetail.set("ModelDetail")
 
     # 各種ウィジェットの作成
     labelModel = tk.Label(frame, textvariable=textModel)
     labelCamera = tk.Label(frame, textvariable=textCamera)
     labelPreview = tk.Label(frame, textvariable=textPreview)
     labelEnvironment = tk.Label(frame, textvariable=textEnvironment)
+    labelModelDetail = tk.Label(frame, textvariable=textModelDetail)
 
-    button = tk.Button(frame, textvariable=text, command=search, width=10)
-
-
-
+    button = tk.Button(frame, textvariable=textRun, command=search, width=10)
+    buttonInputFile = tk.Button(frame, textvariable=textInputFile, command=file_dialog, width=10)
+    check = tk.Checkbutton(frame, text='Save results')
 
     canvas = tk.Canvas(frame, bg="black", width=320, height=240)
     canvas.place(x=0, y=0)
-    load_image("./object_detection/yolox/output.jpg")
+    load_detail(0)
 
     # 各種ウィジェットの設置
     labelModel.grid(row=0, column=0, sticky=tk.NW)
-    ListboxModel.grid(row=1, column=0, sticky=tk.NW, rowspan = 2)
-    scrollbar.grid(row=1, column=1, sticky=(tk.N, tk.S), rowspan = 2)
+    ListboxModel.grid(row=1, column=0, sticky=tk.NW)
+    scrollbar.grid(row=1, column=1, sticky=(tk.N, tk.S))
 
-    labelPreview.grid(row=0, column=2, sticky=tk.NW)
     canvas.grid(row=1, column=2, sticky=tk.NW)
+    labelModelDetail.grid(row=0, column=2, sticky=tk.NW)
 
-    labelCamera.grid(row=0, column=3, sticky=tk.NW)
-    ListboxCamera.grid(row=1, column=3, sticky=tk.NW)
+    labelCamera.grid(row=3, column=0, sticky=tk.NW)
+    ListboxCamera.grid(row=4, column=0, sticky=tk.NW)
 
-    button.grid(row=4, column=0, sticky=tk.NW)
+    labelEnvironment.grid(row=3, column=2, sticky=tk.NW)
+    ListboxEnvironment.grid(row=4, column=2, sticky=tk.NW)
 
+    button.grid(row=2, column=0, sticky=tk.NW)
+    buttonInputFile.grid(row=6, column=0, sticky=tk.NW)
+    check.grid(row=2, column=2, sticky=tk.NW)
+
+    labelPreview.grid(row=7, column=0, sticky=tk.NW)
 
 
     # メインフレームの作成と設置
     frame = ttk.Frame(root)
     frame.pack(padx=20, pady=10)
 
-
-
     root.mainloop()
-
-
-    #cv2.imshow('ailia MODELS', img)
-    #cv2.setMouseCallback("ailia MODELS", mouse_callback)
-
-    #while(True):
-    #    if cv2.waitKey(1) & 0xFF == ord('q') and invalidate_quit_cnt<=0:
-    #        break
-
-    #    if model_request is not None and model_loading_cnt<=0:
-    #        open_model(model_request)
-    #        model_request=None
-    #        invalidate_quit_cnt=10
-    #        click_trig=False
-    #        continue
-
-    #    if model_request is not None:
-    #        display_loading(img, model_request)
-    #        model_loading_cnt = model_loading_cnt - 1
-    #    else:
-    #        display_ui(img, model_list, category_cnt, window_width, window_height)
-    #        invalidate_quit_cnt = invalidate_quit_cnt -1
-
-    #    cv2.imshow('ailia MODELS', img)
-
-
-    #cv2.destroyAllWindows()
-
 
 if __name__ == '__main__':
     main()
