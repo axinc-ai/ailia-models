@@ -6,6 +6,8 @@ import numpy
 import subprocess
 import shutil
 import sys
+import tkinter as tk
+from tkinter import ttk
 
 sys.path.append('./util')
 from utils import get_base_parser, update_parser  # noqa: E402
@@ -33,20 +35,8 @@ WINDOW_ROW = 34
 
 IGNORE_LIST = [
     "commercial_model", "validation", ".git", "log", "prnet", "bert",
-    "illustration2vec", "etl", "vggface2", "anomaly_detection"
+    "illustration2vec", "etl", "vggface2", "anomaly_detection", "natural_language_processing", "audio_processing"
 ]
-
-try:
-    import transformers
-except ModuleNotFoundError:
-    IGNORE_LIST.append("natural_language_processing")
-    pass
-
-try:
-    import torchaudio
-except ModuleNotFoundError:
-    IGNORE_LIST.append("audio_processing")
-    pass
 
 def search_model():
     file_list = []
@@ -214,44 +204,168 @@ def display_ui(img, model_list, category_cnt, window_width, window_height):
     click_trig = False
 
 
+ListboxModel = None
+
+def search():
+    global model_list
+    print(model_list)
+
+    global ListboxModel
+    selected = [ int(x) for x in ListboxModel.curselection()]
+    print("search "+str(selected))
+
+    if selected==[]:
+        selected=[0]
+
+    model_request=model_list[int(selected[0])]
+    open_model(model_request)
+
+def get_camera_list():
+    return [0]
+
+    print("List cameras")
+    index = 0
+    cameras = []
+    while True:
+        print(index)
+        cap = cv2.VideoCapture(index)
+        if cap.isOpened():
+            cameras.append(index)
+        else:
+            break
+        index=index+1
+        cap.release()
+    return cameras
+
 def main():
-    global model_request, model_loading_cnt, invalidate_quit_cnt
+    global ListboxModel
+    global model_list, model_request, model_loading_cnt, invalidate_quit_cnt
 
     model_list, category_cnt = search_model()
 
-    WINDOW_COL = int((len(model_list)+WINDOW_ROW-1)/WINDOW_ROW)
+    #WINDOW_COL = int((len(model_list)+WINDOW_ROW-1)/WINDOW_ROW)
 
-    window_width = (BUTTON_WIDTH + BUTTON_MARGIN) * WINDOW_COL
-    window_height = (BUTTON_HEIGHT + BUTTON_MARGIN) * WINDOW_ROW
+    #window_width = (BUTTON_WIDTH + BUTTON_MARGIN) * WINDOW_COL
+    #window_height = (BUTTON_HEIGHT + BUTTON_MARGIN) * WINDOW_ROW
 
-    img = numpy.zeros((window_height, window_width, 3)).astype(numpy.uint8)
+    #img = numpy.zeros((window_height, window_width, 3)).astype(numpy.uint8)
 
-    cv2.imshow('ailia MODELS', img)
-    cv2.setMouseCallback("ailia MODELS", mouse_callback)
+    # rootメインウィンドウの設定
+    root = tk.Tk()
+    root.title("ailia MODELS")
+    root.geometry("800x600")
 
-    while(True):
-        if cv2.waitKey(1) & 0xFF == ord('q') and invalidate_quit_cnt<=0:
-            break
+    # メインフレームの作成と設置
+    frame = ttk.Frame(root)
+    frame.pack(padx=20,pady=10)
 
-        if model_request is not None and model_loading_cnt<=0:
-            open_model(model_request)
-            model_request=None
-            invalidate_quit_cnt=10
-            click_trig=False
-            continue
+    # Listboxの選択肢
+    models = []
+    for i in range(len(model_list)):
+        models.append(""+model_list[i]["category"]+" : "+model_list[i]["model"])
 
-        if model_request is not None:
-            display_loading(img, model_request)
-            model_loading_cnt = model_loading_cnt - 1
-        else:
-            display_ui(img, model_list, category_cnt, window_width, window_height)
-            invalidate_quit_cnt = invalidate_quit_cnt -1
+    lists = tk.StringVar(value=models)
+    listsCamera = tk.StringVar(value=get_camera_list())
 
-        cv2.imshow('ailia MODELS', img)
+    # 各種ウィジェットの作成
+    ListboxModel = tk.Listbox(frame, listvariable=lists, width=50, height=20, selectmode="single")
+    ListboxCamera = tk.Listbox(frame, listvariable=listsCamera, width=50, height=2, selectmode="single")
+
+    # スクロールバーの作成
+    scrollbar = tk.Scrollbar(frame, orient=tk.VERTICAL, command=ListboxModel.yview)
+
+    # スクロールバーをListboxに反映
+    ListboxModel["yscrollcommand"] = scrollbar.set
+
+    # StringVarのインスタンスを格納する変数textの設定
+    text = tk.StringVar(frame)
+    text.set("Run")
+
+    textModel = tk.StringVar(frame)
+    textModel.set("Models")
+
+    textCamera = tk.StringVar(frame)
+    textCamera.set("Cameras")
+
+    textPreview = tk.StringVar(frame)
+    textPreview.set("Preview")
+
+    textEnvironment = tk.StringVar(frame)
+    textEnvironment.set("Environment")
+
+    # 各種ウィジェットの作成
+    labelModel = tk.Label(frame, textvariable=textModel)
+    labelCamera = tk.Label(frame, textvariable=textCamera)
+    labelPreview = tk.Label(frame, textvariable=textPreview)
+    labelEnvironment = tk.Label(frame, textvariable=textEnvironment)
+
+    button = tk.Button(frame, textvariable=text, command=search, width=10)
+
+    from PIL import Image, ImageTk
+
+    image_bgr = cv2.imread("./object_detection/yolox/output.jpg")
+    image_bgr = cv2.resize(image_bgr,(320,240))
+    image_rgb = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB) # imreadはBGRなのでRGBに変換
+    image_pil = Image.fromarray(image_rgb) # RGBからPILフォーマットへ変換
+    image_tk  = ImageTk.PhotoImage(image_pil) # ImageTkフォーマットへ変換
+
+    canvas = tk.Canvas(frame, bg="black", width=320, height=240)
+    canvas.place(x=0, y=0)
+    canvas.create_image(0, 0, image=image_tk, anchor=tk.NW)
+
+    # 各種ウィジェットの設置
+    labelModel.grid(row=0, column=0, sticky=tk.NW)
+    ListboxModel.grid(row=1, column=0, sticky=tk.NW, rowspan = 2)
+    scrollbar.grid(row=1, column=1, sticky=(tk.N, tk.S), rowspan = 2)
+
+    labelPreview.grid(row=0, column=2, sticky=tk.NW)
+    canvas.grid(row=1, column=2, sticky=tk.NW)
+
+    labelCamera.grid(row=0, column=3, sticky=tk.NW)
+    ListboxCamera.grid(row=1, column=3, sticky=tk.NW)
+
+    button.grid(row=4, column=0, sticky=tk.NW)
 
 
-    cv2.destroyAllWindows()
+
+    # メインフレームの作成と設置
+    frame = ttk.Frame(root)
+    frame.pack(padx=20, pady=10)
+
+
+
+    root.mainloop()
+
+
+    #cv2.imshow('ailia MODELS', img)
+    #cv2.setMouseCallback("ailia MODELS", mouse_callback)
+
+    #while(True):
+    #    if cv2.waitKey(1) & 0xFF == ord('q') and invalidate_quit_cnt<=0:
+    #        break
+
+    #    if model_request is not None and model_loading_cnt<=0:
+    #        open_model(model_request)
+    #        model_request=None
+    #        invalidate_quit_cnt=10
+    #        click_trig=False
+    #        continue
+
+    #    if model_request is not None:
+    #        display_loading(img, model_request)
+    #        model_loading_cnt = model_loading_cnt - 1
+    #    else:
+    #        display_ui(img, model_list, category_cnt, window_width, window_height)
+    #        invalidate_quit_cnt = invalidate_quit_cnt -1
+
+    #    cv2.imshow('ailia MODELS', img)
+
+
+    #cv2.destroyAllWindows()
 
 
 if __name__ == '__main__':
     main()
+
+
+
