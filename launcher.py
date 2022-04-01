@@ -39,7 +39,7 @@ IGNORE_LIST = [
 try:
     import transformers
 except ModuleNotFoundError:
-    IGNORE_LIST.append("neural_language_processing")
+    IGNORE_LIST.append("natural_language_processing")
     pass
 
 try:
@@ -112,7 +112,7 @@ def open_model(model):
 
     args_dict = vars(args)
 
-    if ("neural_language_processing" == model["category"]) or \
+    if ("natural_language_processing" == model["category"]) or \
         ("audio_processing" == model["category"]):
         args_dict["video"]=None
     else:

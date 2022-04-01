@@ -57,7 +57,8 @@ def enhance_image():
         img = cv2.resize(img, dsize=(H, W))
 
         # net initialize
-        model = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
+        mem_mode = ailia.get_memory_mode(reduce_constant=True, ignore_input_with_initializer=True, reduce_interstage=False, reuse_interstage=True)
+        model = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id, memory_mode=mem_mode)
         upsampler = RealESRGAN(model)
 
         # inference
