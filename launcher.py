@@ -25,6 +25,13 @@ from utils import get_base_parser, update_parser  # noqa: E402
 parser = get_base_parser('ailia MODELS launcher', None, None)
 args = update_parser(parser)
 
+# ======================
+# Global settings
+# ======================
+
+camera_index = 0
+env_index = args.env_id
+model_index = 0
 
 # ======================
 # Model search
@@ -35,7 +42,7 @@ IGNORE_LIST = [
     "illustration2vec", "etl", "vggface2", "anomaly_detection", "natural_language_processing", "audio_processing"
 ]
 
-def search_model():
+def get_model_list():
     file_list = []
     for current, subfolders, subfiles in os.walk("./"):
         file_list.append(current)
@@ -64,99 +71,73 @@ def search_model():
                     "model": files[2],
                 })
                 model_exist[files[2]] = True
-    return model_list, len(category_list)
+
+
+    model_name_list = []
+    for i in range(len(model_list)):
+        model_name_list.append(""+model_list[i]["category"]+" : "+model_list[i]["model"])
+
+    return model_list, model_name_list, len(category_list)
 
 
 # ======================
-# Model List
+# Environment
 # ======================
 
+def get_camera_list():
+    return ["Camera:0"]
 
-def open_model(model):
-    dir = "./"+model["category"]+"/"+model["model"]+"/"
-    cmd = sys.executable
+    print("List cameras")
+    index = 0
+    cameras = []
+    while True:
+        print(index)
+        cap = cv2.VideoCapture(index)
+        if cap.isOpened():
+            cameras.append("Camera:"+index)
+        else:
+            break
+        index=index+1
+        cap.release()
+    return cameras
 
-    args_dict = vars(args)
-
-    if ("natural_language_processing" == model["category"]) or \
-        ("audio_processing" == model["category"]):
-        args_dict["video"]=None
+def camera_changed(event):
+    global camera_index, camera_list
+    selection = event.widget.curselection()
+    if selection:
+        camera_index = selection[0]
     else:
-        if not args_dict["video"]:
-            args_dict["video"]=0
+        camera_index = 0   
+    print("camera",camera_index)
 
-    options = []
-    for key in args_dict:
-        if key=="ftype":
-            continue
-        if args_dict[key] is not None:
-            if args_dict[key] is True:
-                options.append("--"+key)
-            elif args_dict[key] is False:
-                continue
-            else:
-                options.append("--"+key)
-                options.append(str(args_dict[key]))
-    
-    cmd = [cmd, model["model"]+".py"] + options
-    print(" ".join(cmd))
-    subprocess.check_call(cmd, cwd=dir, shell=False)
+def get_env_list():
+    env_list = []
+    for env in ailia.get_environment_list():
+        env_list.append(env.name)
+    return env_list  
 
+def environment_changed(event):
+    global env_index
+    selection = event.widget.curselection()
+    if selection:
+        env_index = selection[0]
+    else:
+        env_index = 0
+    print("env",env_index)
 
-def display_ui(img, model_list, category_cnt, window_width, window_height):
-    global mx, my, click_trig, model_request, model_loading_cnt
-
-    cv2.rectangle(img, (0,0), (img.shape[1],img.shape[0]), (0,0,0,255), thickness=-1)
-
-    x = BUTTON_MARGIN
-    y = BUTTON_MARGIN
-    w = BUTTON_WIDTH
-    h = BUTTON_HEIGHT
-
-    for model in model_list:
-        color = hsv_to_rgb(
-            256 * model["category_id"] / (category_cnt+1), 128, 255
-        )
-
-        if mx >= x and mx <= x+w and my >= y and my <= y+h:
-            color = (255, 255, 255)
-            if click_trig:
-                model_request = model
-                model_loading_cnt = 10
-                click_trig = False
-
-        cv2.rectangle(img, (x, y), (x + w, y + h), color, thickness=-1)
-
-        text_position = (x+4, y+int(BUTTON_HEIGHT/2)+4)
-
-        color = (0, 0, 0)
-        fontScale = 0.5
-
-        cv2.putText(
-            img,
-            model["category"]+" : "+model["model"],
-            text_position,
-            cv2.FONT_HERSHEY_SIMPLEX,
-            fontScale,
-            color,
-            1
-        )
-
-        y = y + h + BUTTON_MARGIN
-
-        if y >= window_height:
-            y = BUTTON_MARGIN
-            x = x + w + BUTTON_MARGIN
-
-    click_trig = False
+# ======================
+# Change model
+# ======================
 
 
-ListboxModel = None
-textModelDetail = None
-
-canvas = None
-canvas_item = None
-image_tk = None
+def model_changed(event):
+    global model_index
+    selection = event.widget.curselection()
+    if selection:
+        model_index = selection[0]
+    else:
+        model_index = 0
+    load_detail(model_index)
 
 def load_image(path):
     print(path)
@@ -170,46 +151,6 @@ def load_image(path):
         canvas_item = canvas.create_image(0, 0, image=image_tk, anchor=tk.NW)
     else:
         canvas.itemconfig(canvas_item,image=image_tk)
-
-
-def search():
-    global model_list
-    print(model_list)
-
-    global ListboxModel
-    selected = [ int(x) for x in ListboxModel.curselection()]
-    print("search "+str(selected))
-
-    if selected==[]:
-        selected=[0]
-
-    model_request=model_list[int(selected[0])]
-    open_model(model_request)
-
-def get_camera_list():
-    return ["Camera 0"]
-
-    print("List cameras")
-    index = 0
-    cameras = []
-    while True:
-        print(index)
-        cap = cv2.VideoCapture(index)
-        if cap.isOpened():
-            cameras.append("Camera "+index)
-        else:
-            break
-        index=index+1
-        cap.release()
-    return cameras
-
-def model_changed(event):
-    selection = event.widget.curselection()
-    if selection:
-        index = selection[0]
-    else:
-        index = 0
-    load_detail(index)
 
 def load_detail(index):
     model_request = model_list[index]
@@ -240,23 +181,93 @@ def load_detail(index):
     textModelDetail.set(text)
 
 
+# ======================
+# Run model
+# ======================
+
+def open_model(model):
+    dir = "./"+model["category"]+"/"+model["model"]+"/"
+    cmd = sys.executable
+
+    args_dict = vars(args)
+
+    if "Camera:" in camera_list[camera_index]:
+        video_name = camera_index
+    else:
+        video_name = camera_list[camera_index]
+
+    if not(("natural_language_processing" == model["category"]) or ("audio_processing" == model["category"])):
+        if ".png" in str(video_name) or ".jpg" in str(video_name):
+            if "video" in args_dict:
+                del args_dict["video"]
+            args_dict["input"]=video_name
+            args_dict["savepath"]="temp.png"
+        else:
+            args_dict["video"]=video_name
+
+    args_dict["env_id"]=env_index
+
+    options = []
+    for key in args_dict:
+        if key=="ftype":
+            continue
+        if args_dict[key] is not None:
+            if args_dict[key] is True:
+                options.append("--"+key)
+            elif args_dict[key] is False:
+                continue
+            else:
+                options.append("--"+key)
+                options.append(str(args_dict[key]))
+    
+    cmd = [cmd, model["model"]+".py"] + options
+    print(" ".join(cmd))
+    subprocess.check_call(cmd, cwd=dir, shell=False)
+
+    if "input" in args_dict:
+        model_request = model_list[model_index]
+        load_image("./"+model_request["category"]+"/"+model_request["model"]+"/"+"temp.png")
+
+
+def run_button_clicked():
+    global model_list
+    model_request=model_list[int(model_index)]
+    open_model(model_request)
+
+
+# ======================
+# Select file
+# ======================
+
 def file_dialog():
-    global listsCamera, ListboxCamera
+    global listsCamera, ListboxCamera, camera_index
     fTyp = [("Image File or Video File", "*")]
     iDir = os.path.abspath(os.path.dirname(__file__))
     file_name = tk.filedialog.askopenfilename(filetypes=fTyp, initialdir=iDir)
     if len(file_name) != 0:
         camera_list.append(file_name)
         listsCamera.set(camera_list)
-        ListboxCamera.select_clear()
-        ListboxCamera.select_set(len(camera_list)-1)
+        ListboxCamera.select_clear(camera_index)
+        camera_index = len(camera_list)-1
+        ListboxCamera.select_set(camera_index)
+
+# ======================
+# GUI
+# ======================
+
+#ListboxModel = None
+#textModelDetail = None
+
+#canvas = None
+canvas_item = None
+#image_tk = None
 
 def main():
     global ListboxModel, textModelDetail
     global model_list, model_request, model_loading_cnt, invalidate_quit_cnt
     global canvas, inputFile, listsCamera, camera_list, ListboxCamera
 
-    model_list, category_cnt = search_model()
+    model_list, model_name_list, category_cnt = get_model_list()
 
     # rootメインウィンドウの設定
     root = tk.Tk()
@@ -268,17 +279,10 @@ def main():
     frame.pack(padx=20,pady=10)
 
     # Listboxの選択肢
-    models = []
-    for i in range(len(model_list)):
-        models.append(""+model_list[i]["category"]+" : "+model_list[i]["model"])
-
-    env_list = []
-    for env in ailia.get_environment_list():
-        env_list.append(env.name)
-
+    env_list = get_env_list()
     camera_list = get_camera_list()
 
-    lists = tk.StringVar(value=models)
+    lists = tk.StringVar(value=model_name_list)
     listsCamera = tk.StringVar(value=camera_list)
     listEnvironment =tk.StringVar(value=env_list)
 
@@ -287,11 +291,13 @@ def main():
     ListboxCamera = tk.Listbox(frame, listvariable=listsCamera, width=40, height=4, selectmode="single", exportselection=False)
     ListboxEnvironment = tk.Listbox(frame, listvariable=listEnvironment, width=40, height=4, selectmode="single", exportselection=False)
 
-    ListboxModel.select_set(0)
-    ListboxCamera.select_set(0)
-    ListboxEnvironment.select_set(args.env_id)
-
     ListboxModel.bind("<<ListboxSelect>>", model_changed)
+    ListboxCamera.bind("<<ListboxSelect>>", camera_changed)
+    ListboxEnvironment.bind("<<ListboxSelect>>", environment_changed)
+
+    ListboxModel.select_set(model_index)
+    ListboxCamera.select_set(camera_index)
+    ListboxEnvironment.select_set(env_index)
 
     # スクロールバーの作成
     scrollbar = tk.Scrollbar(frame, orient=tk.VERTICAL, command=ListboxModel.yview)
@@ -328,7 +334,7 @@ def main():
     labelEnvironment = tk.Label(frame, textvariable=textEnvironment)
     labelModelDetail = tk.Label(frame, textvariable=textModelDetail)
 
-    button = tk.Button(frame, textvariable=textRun, command=search, width=10)
+    button = tk.Button(frame, textvariable=textRun, command=run_button_clicked, width=10)
     buttonInputFile = tk.Button(frame, textvariable=textInputFile, command=file_dialog, width=10)
     check = tk.Checkbutton(frame, text='Save results')
 
