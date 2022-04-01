@@ -43,6 +43,8 @@ IGNORE_LIST = [
 ]
 
 def get_model_list():
+    global model_index
+
     file_list = []
     for current, subfolders, subfiles in os.walk("./"):
         file_list.append(current)
@@ -76,6 +78,8 @@ def get_model_list():
     model_name_list = []
     for i in range(len(model_list)):
         model_name_list.append(""+model_list[i]["category"]+" : "+model_list[i]["model"])
+        if model_list[i]["model"]=="yolox":
+            model_index = i
 
     return model_list, model_name_list, len(category_list)
 
@@ -185,7 +189,15 @@ def load_detail(index):
 # Run model
 # ======================
 
+proc = None
+
 def open_model(model):
+    global proc
+
+    if not (proc==None):
+        proc.kill()
+        proc=None
+
     dir = "./"+model["category"]+"/"+model["model"]+"/"
     cmd = sys.executable
 
@@ -222,17 +234,29 @@ def open_model(model):
     
     cmd = [cmd, model["model"]+".py"] + options
     print(" ".join(cmd))
-    subprocess.check_call(cmd, cwd=dir, shell=False)
 
-    if "input" in args_dict:
+    if not ("video" in args_dict):
+        subprocess.check_call(cmd, cwd=dir, shell=False)
         model_request = model_list[model_index]
         load_image("./"+model_request["category"]+"/"+model_request["model"]+"/"+"temp.png")
+    else:
+        proc = subprocess.Popen(cmd, cwd=dir)
+        outs, errs = proc.communicate(timeout=1)
+    
 
 
 def run_button_clicked():
     global model_list
     model_request=model_list[int(model_index)]
     open_model(model_request)
+
+
+def stop_button_clicked():
+    global proc
+
+    if not (proc==None):
+        proc.kill()
+        proc=None
 
 
 # ======================
@@ -309,6 +333,9 @@ def main():
     textRun = tk.StringVar(frame)
     textRun.set("Run")
 
+    textStop = tk.StringVar(frame)
+    textStop.set("Stop")
+
     textInputFile = tk.StringVar(frame)
     textInputFile.set("Add File")
 
@@ -334,33 +361,35 @@ def main():
     labelEnvironment = tk.Label(frame, textvariable=textEnvironment)
     labelModelDetail = tk.Label(frame, textvariable=textModelDetail)
 
-    button = tk.Button(frame, textvariable=textRun, command=run_button_clicked, width=10)
+    buttonRun = tk.Button(frame, textvariable=textRun, command=run_button_clicked, width=10)
+    buttonStop = tk.Button(frame, textvariable=textStop, command=stop_button_clicked, width=10)
     buttonInputFile = tk.Button(frame, textvariable=textInputFile, command=file_dialog, width=10)
     check = tk.Checkbutton(frame, text='Save results')
 
     canvas = tk.Canvas(frame, bg="black", width=320, height=240)
     canvas.place(x=0, y=0)
-    load_detail(0)
+    load_detail(model_index)
 
     # 各種ウィジェットの設置
-    labelModel.grid(row=0, column=0, sticky=tk.NW)
-    ListboxModel.grid(row=1, column=0, sticky=tk.NW)
-    scrollbar.grid(row=1, column=1, sticky=(tk.N, tk.S))
+    labelModel.grid(row=0, column=0, sticky=tk.NW, columnspan=2)
+    ListboxModel.grid(row=1, column=0, sticky=tk.NW, columnspan=2)
+    scrollbar.grid(row=1, column=2, sticky=(tk.N, tk.S))
 
-    canvas.grid(row=1, column=2, sticky=tk.NW)
-    labelModelDetail.grid(row=0, column=2, sticky=tk.NW)
+    canvas.grid(row=1, column=3, sticky=tk.NW)
+    labelModelDetail.grid(row=0, column=3, sticky=tk.NW)
 
-    labelCamera.grid(row=3, column=0, sticky=tk.NW)
-    ListboxCamera.grid(row=4, column=0, sticky=tk.NW)
+    labelCamera.grid(row=3, column=0, sticky=tk.NW, columnspan=2)
+    ListboxCamera.grid(row=4, column=0, sticky=tk.NW, columnspan=2)
 
-    labelEnvironment.grid(row=3, column=2, sticky=tk.NW)
-    ListboxEnvironment.grid(row=4, column=2, sticky=tk.NW)
+    labelEnvironment.grid(row=3, column=3, sticky=tk.NW)
+    ListboxEnvironment.grid(row=4, column=3, sticky=tk.NW)
 
-    button.grid(row=2, column=0, sticky=tk.NW)
+    buttonRun.grid(row=2, column=0, sticky=tk.NW)
+    buttonStop.grid(row=2, column=1, sticky=tk.NW)
     buttonInputFile.grid(row=6, column=0, sticky=tk.NW)
-    check.grid(row=2, column=2, sticky=tk.NW)
+    #check.grid(row=2, column=2, sticky=tk.NW)
 
-    labelPreview.grid(row=7, column=0, sticky=tk.NW)
+    #labelPreview.grid(row=7, column=0, sticky=tk.NW)
 
 
     # メインフレームの作成と設置
