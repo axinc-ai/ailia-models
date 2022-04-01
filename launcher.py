@@ -29,7 +29,8 @@ args = update_parser(parser)
 # Global settings
 # ======================
 
-camera_index = 0
+input_index = 0
+output_index = 0
 env_index = args.env_id
 model_index = 0
 
@@ -88,31 +89,43 @@ def get_model_list():
 # Environment
 # ======================
 
-def get_camera_list():
+def get_input_list():
     return ["Camera:0"]
 
     print("List cameras")
     index = 0
-    cameras = []
+    inputs = []
     while True:
         print(index)
         cap = cv2.VideoCapture(index)
         if cap.isOpened():
-            cameras.append("Camera:"+index)
+            inputs.append("Camera:"+index)
         else:
             break
         index=index+1
         cap.release()
-    return cameras
+    return inputs
 
-def camera_changed(event):
-    global camera_index, camera_list
+def input_changed(event):
+    global input_index
     selection = event.widget.curselection()
     if selection:
-        camera_index = selection[0]
+        input_index = selection[0]
     else:
-        camera_index = 0   
-    print("camera",camera_index)
+        input_index = 0   
+    print("input",input_index)
+
+def get_output_list():
+    return ["Display:0"]
+
+def output_changed(event):
+    global output_index
+    selection = event.widget.curselection()
+    if selection:
+        output_index = selection[0]
+    else:
+        output_index = 0   
+    print("output",output_index)
 
 def get_env_list():
     env_list = []
@@ -203,19 +216,28 @@ def open_model(model):
 
     args_dict = vars(args)
 
-    if "Camera:" in camera_list[camera_index]:
-        video_name = camera_index
+    if "Camera:" in input_list[input_index]:
+        video_name = input_index
     else:
-        video_name = camera_list[camera_index]
+        video_name = input_list[input_index]
+    
+    if "Display:" in output_list[output_index]:
+        save_name = "temp.png"
+        save_path = "./"+model_request["category"]+"/"+model_request["model"]+"/"+"temp.png"
+    else:
+        save_name = output_list[output_index]
+        save_path = output_list[output_index]
 
     if not(("natural_language_processing" == model["category"]) or ("audio_processing" == model["category"])):
         if ".png" in str(video_name) or ".jpg" in str(video_name):
             if "video" in args_dict:
                 del args_dict["video"]
             args_dict["input"]=video_name
-            args_dict["savepath"]="temp.png"
+            args_dict["savepath"]=save_name
         else:
             args_dict["video"]=video_name
+            if not ("Display:" in output_list[output_index]):
+                args_dict["savepath"]=save_name
 
     args_dict["env_id"]=env_index
 
@@ -238,7 +260,7 @@ def open_model(model):
     if not ("video" in args_dict):
         subprocess.check_call(cmd, cwd=dir, shell=False)
         model_request = model_list[model_index]
-        load_image("./"+model_request["category"]+"/"+model_request["model"]+"/"+"temp.png")
+        load_image(save_path)
     else:
         proc = subprocess.Popen(cmd, cwd=dir)
         outs, errs = proc.communicate(timeout=1)
@@ -263,17 +285,29 @@ def stop_button_clicked():
 # Select file
 # ======================
 
-def file_dialog():
-    global listsCamera, ListboxCamera, camera_index
+def input_file_dialog():
+    global listsInput, ListboxInput, input_index
     fTyp = [("Image File or Video File", "*")]
     iDir = os.path.abspath(os.path.dirname(__file__))
     file_name = tk.filedialog.askopenfilename(filetypes=fTyp, initialdir=iDir)
     if len(file_name) != 0:
-        camera_list.append(file_name)
-        listsCamera.set(camera_list)
-        ListboxCamera.select_clear(camera_index)
-        camera_index = len(camera_list)-1
-        ListboxCamera.select_set(camera_index)
+        input_list.append(file_name)
+        listsInput.set(input_list)
+        ListboxInput.select_clear(input_index)
+        input_index = len(input_list)-1
+        ListboxInput.select_set(input_index)
+
+def output_file_dialog():
+    global listsOutput, ListboxOutput, output_index
+    fTyp = [("Image File or Video File", "*")]
+    iDir = os.path.abspath(os.path.dirname(__file__))
+    file_name = tk.filedialog.asksaveasfilename(filetypes=fTyp, initialdir=iDir)
+    if len(file_name) != 0:
+        output_list.append(file_name)
+        listsOutput.set(output_list)
+        ListboxOutput.select_clear(output_index)
+        output_index = len(output_list)-1
+        ListboxOutput.select_set(output_index)
 
 # ======================
 # GUI
@@ -289,14 +323,16 @@ canvas_item = None
 def main():
     global ListboxModel, textModelDetail
     global model_list, model_request, model_loading_cnt, invalidate_quit_cnt
-    global canvas, inputFile, listsCamera, camera_list, ListboxCamera
+    global canvas
+    global inputFile, listsInput, input_list, ListboxInput
+    global outputFile, listsOutput, output_list, ListboxOutput
 
     model_list, model_name_list, category_cnt = get_model_list()
 
     # rootメインウィンドウの設定
     root = tk.Tk()
     root.title("ailia MODELS")
-    root.geometry("800x600")
+    root.geometry("1200x600")
 
     # メインフレームの作成と設置
     frame = ttk.Frame(root)
@@ -304,23 +340,28 @@ def main():
 
     # Listboxの選択肢
     env_list = get_env_list()
-    camera_list = get_camera_list()
+    input_list = get_input_list()
+    output_list = get_output_list()
 
     lists = tk.StringVar(value=model_name_list)
-    listsCamera = tk.StringVar(value=camera_list)
+    listsInput = tk.StringVar(value=input_list)
+    listsOutput = tk.StringVar(value=output_list)
     listEnvironment =tk.StringVar(value=env_list)
 
     # 各種ウィジェットの作成
-    ListboxModel = tk.Listbox(frame, listvariable=lists, width=40, height=20, selectmode="single", exportselection=False)
-    ListboxCamera = tk.Listbox(frame, listvariable=listsCamera, width=40, height=4, selectmode="single", exportselection=False)
+    ListboxModel = tk.Listbox(frame, listvariable=lists, width=40, height=30, selectmode="single", exportselection=False)
+    ListboxInput = tk.Listbox(frame, listvariable=listsInput, width=40, height=4, selectmode="single", exportselection=False)
+    ListboxOutput = tk.Listbox(frame, listvariable=listsOutput, width=40, height=4, selectmode="single", exportselection=False)
     ListboxEnvironment = tk.Listbox(frame, listvariable=listEnvironment, width=40, height=4, selectmode="single", exportselection=False)
 
     ListboxModel.bind("<<ListboxSelect>>", model_changed)
-    ListboxCamera.bind("<<ListboxSelect>>", camera_changed)
+    ListboxInput.bind("<<ListboxSelect>>", input_changed)
+    ListboxOutput.bind("<<ListboxSelect>>", output_changed)
     ListboxEnvironment.bind("<<ListboxSelect>>", environment_changed)
 
     ListboxModel.select_set(model_index)
-    ListboxCamera.select_set(camera_index)
+    ListboxInput.select_set(input_index)
+    ListboxOutput.select_set(output_index)
     ListboxEnvironment.select_set(env_index)
 
     # スクロールバーの作成
@@ -331,22 +372,25 @@ def main():
 
     # StringVarのインスタンスを格納する変数textの設定
     textRun = tk.StringVar(frame)
-    textRun.set("Run")
+    textRun.set("Run model")
 
     textStop = tk.StringVar(frame)
-    textStop.set("Stop")
+    textStop.set("Stop model")
 
     textInputFile = tk.StringVar(frame)
-    textInputFile.set("Add File")
+    textInputFile.set("Add input file")
+
+    textOutputFile = tk.StringVar(frame)
+    textOutputFile.set("Add output file")
 
     textModel = tk.StringVar(frame)
     textModel.set("Models")
 
-    textCamera = tk.StringVar(frame)
-    textCamera.set("Input")
+    textInput = tk.StringVar(frame)
+    textInput.set("Input")
 
-    textPreview = tk.StringVar(frame)
-    textPreview.set("Please hold 'q' key for finish running model.")
+    textOutput = tk.StringVar(frame)
+    textOutput.set("Output")
 
     textEnvironment = tk.StringVar(frame)
     textEnvironment.set("Environment")
@@ -356,41 +400,41 @@ def main():
 
     # 各種ウィジェットの作成
     labelModel = tk.Label(frame, textvariable=textModel)
-    labelCamera = tk.Label(frame, textvariable=textCamera)
-    labelPreview = tk.Label(frame, textvariable=textPreview)
+    labelInput = tk.Label(frame, textvariable=textInput)
+    labelOutput = tk.Label(frame, textvariable=textOutput)
     labelEnvironment = tk.Label(frame, textvariable=textEnvironment)
     labelModelDetail = tk.Label(frame, textvariable=textModelDetail)
 
     buttonRun = tk.Button(frame, textvariable=textRun, command=run_button_clicked, width=10)
     buttonStop = tk.Button(frame, textvariable=textStop, command=stop_button_clicked, width=10)
-    buttonInputFile = tk.Button(frame, textvariable=textInputFile, command=file_dialog, width=10)
-    check = tk.Checkbutton(frame, text='Save results')
+    buttonInputFile = tk.Button(frame, textvariable=textInputFile, command=input_file_dialog, width=10)
+    buttonOutputFile = tk.Button(frame, textvariable=textOutputFile, command=output_file_dialog, width=10)
 
     canvas = tk.Canvas(frame, bg="black", width=320, height=240)
     canvas.place(x=0, y=0)
     load_detail(model_index)
 
     # 各種ウィジェットの設置
-    labelModel.grid(row=0, column=0, sticky=tk.NW, columnspan=2)
-    ListboxModel.grid(row=1, column=0, sticky=tk.NW, columnspan=2)
-    scrollbar.grid(row=1, column=2, sticky=(tk.N, tk.S))
+    labelModel.grid(row=0, column=0, sticky=tk.NW, rowspan=12)
+    ListboxModel.grid(row=1, column=0, sticky=tk.NW, rowspan=12)
+    scrollbar.grid(row=1, column=1, sticky=(tk.N, tk.S), rowspan=12)
 
-    canvas.grid(row=1, column=3, sticky=tk.NW)
-    labelModelDetail.grid(row=0, column=3, sticky=tk.NW)
+    labelModelDetail.grid(row=0, column=2, sticky=tk.NW)
+    canvas.grid(row=1, column=2, sticky=tk.NW, rowspan=4)
 
-    labelCamera.grid(row=3, column=0, sticky=tk.NW, columnspan=2)
-    ListboxCamera.grid(row=4, column=0, sticky=tk.NW, columnspan=2)
+    labelInput.grid(row=5, column=2, sticky=tk.NW, columnspan=2)
+    ListboxInput.grid(row=6, column=2, sticky=tk.NW, columnspan=2)
+    buttonInputFile.grid(row=7, column=2, sticky=tk.NW)
 
-    labelEnvironment.grid(row=3, column=3, sticky=tk.NW)
-    ListboxEnvironment.grid(row=4, column=3, sticky=tk.NW)
+    labelOutput.grid(row=8, column=2, sticky=tk.NW)
+    ListboxOutput.grid(row=9, column=2, sticky=tk.NW, columnspan=2)
+    buttonOutputFile.grid(row=10, column=2, sticky=tk.NW)
 
-    buttonRun.grid(row=2, column=0, sticky=tk.NW)
-    buttonStop.grid(row=2, column=1, sticky=tk.NW)
-    buttonInputFile.grid(row=6, column=0, sticky=tk.NW)
-    #check.grid(row=2, column=2, sticky=tk.NW)
+    labelEnvironment.grid(row=0, column=4, sticky=tk.NW, columnspan=2)
+    ListboxEnvironment.grid(row=1, column=4, sticky=tk.NW, columnspan=2)
 
-    #labelPreview.grid(row=7, column=0, sticky=tk.NW)
-
+    buttonRun.grid(row=2, column=4, sticky=tk.NW)
+    buttonStop.grid(row=2, column=5, sticky=tk.NW)
 
     # メインフレームの作成と設置
     frame = ttk.Frame(root)
