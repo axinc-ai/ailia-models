@@ -52,9 +52,20 @@ parser = get_base_parser(
     'EgoNet', IMAGE_PATH, SAVE_IMAGE_PATH
 )
 parser.add_argument(
-    '--onnx',
-    action='store_true',
-    help='execute onnxruntime version.'
+    '--label_path', type=str, default=None,
+    help='label_path'
+)
+parser.add_argument(
+    '--gt_label_path', type=str, default=None,
+    help='gt_label_path'
+)
+parser.add_argument(
+    '--calib_path', type=str, default=None,
+    help='calib_path'
+)
+parser.add_argument(
+    '--plot_3d', action='store_true',
+    help='plot_3d'
 )
 args = update_parser(parser)
 
@@ -62,6 +73,24 @@ args = update_parser(parser)
 # ======================
 # Secondaty Functions
 # ======================
+
+def get_path(path, dirname, name):
+    if path is None:
+        file_path = "%s/%s.txt" % (dirname, name)
+        if os.path.exists(file_path):
+            return file_path
+        else:
+            return None
+    elif os.path.isdir(path):
+        file_path = "%s/%s.txt" % (dirname, name)
+        if os.path.exists(file_path):
+            return file_path
+    elif os.path.exists(path):
+        return path
+
+    logger.error("[%s] file is not found. (path: %s)" % (dirname, path))
+    sys.exit(-1)
+
 
 def read_annot(
         img,
@@ -106,6 +135,7 @@ def read_annot(
         d['pose_vecs_gt'] = pvs
         d['kpts'] = all_keypoints_2d
         d['kpts_3d_gt'] = all_keypoints_3d
+
     return d
 
 
@@ -283,23 +313,25 @@ def predict(HC, L, LS, img, annot_dict):
     centers = [x['center'] for x in records]
     scales = [x['scale'] for x in records]
     rots = [x['rotation'] for x in records]
-    for instance_idx in range(len(local_coord)):
+    for i in range(len(local_coord)):
         trans_inv = get_affine_transform(
-            centers[instance_idx],
-            scales[instance_idx],
-            rots[instance_idx],
+            centers[i],
+            scales[i],
+            rots[i],
             (height, width),
             inv=1)
         screen_coord = affine_transform_modified(
-            local_coord[instance_idx],
+            local_coord[i],
             trans_inv)
-        records[instance_idx]['kpts'] = screen_coord
+        records[i]['kpts'] = screen_coord
 
     # assemble a dictionary where each key
     records = {
         'bbox_resize': [x['bbox_resize'] for x in records],  # resized bounding box
         'kpts_2d_pred': [x['kpts'].reshape(1, -1) for x in records],
     }
+    if 'kpts_3d' in annot_dict:
+        records['kpts_3d'] = annot_dict['kpts_3d']
 
     # lift_2d_to_3d
     data = np.concatenate(records['kpts_2d_pred'], axis=0)
@@ -329,9 +361,11 @@ def predict(HC, L, LS, img, annot_dict):
     return records
 
 
-def recognize_from_image(HC, L):
-    # the statistics used by the lifter for normalizing inputs
-    LS = np.load(LS_path, allow_pickle=True).item()
+def recognize_from_image(HC, LS, L):
+    label_path = args.label_path
+    calib_path = args.calib_path
+    gt_label_path = args.gt_label_path
+    plot_3d = args.plot_3d
 
     # input image loop
     for image_path in args.input:
@@ -341,11 +375,28 @@ def recognize_from_image(HC, L):
         img = load_image(image_path)
         img = cv2.cvtColor(img, cv2.COLOR_BGRA2RGB)
 
-        label_path = "label_006272.txt"
-        calib_path = "calib_006272.txt"
-        annot_dict = read_annot(
-            img, label_path, calib_path,
-            add_gt=True)
+        name = os.path.splitext(os.path.basename(image_path))[0]
+        label_path = get_path(label_path, "label", name)
+        calib_path = get_path(calib_path, "calib", name)
+        gt_label_path = get_path(gt_label_path, "gt_label", name)
+
+        if label_path or gt_label_path:
+            if not calib_path:
+                logger.error("calib file not specified or not found.")
+                sys.exit(-1)
+
+        if label_path:
+            annot_dict = read_annot(
+                img, label_path, calib_path)
+        else:
+            raise NotImplementedError("no detector.")
+
+        if gt_label_path:
+            gt_annot_dict = read_annot(
+                img, gt_label_path, calib_path,
+                add_gt=True)
+        else:
+            gt_annot_dict = None
 
         # inference
         logger.info('Start inference...')
@@ -367,33 +418,51 @@ def recognize_from_image(HC, L):
         else:
             record = predict(HC, L, LS, img, annot_dict)
 
+        # inference with gt
+        if gt_annot_dict:
+            gt_record = predict(HC, L, LS, img, gt_annot_dict)
+        else:
+            gt_record = None
+
         # plot 2D predictions
         color_dict = {
-            'bbox_2d': 'y',
-            'bbox_3d': 'y',
-            'kpts': ['yx', 'y']
+            'bbox_2d': 'r',
+            'kpts': 'rx',
         }
-        fig = plot_2d_objects(img, record, color_dict)
+        fig, ax = plot_2d_objects(img, record, color_dict)
+        if gt_record:
+            color_dict = {
+                'bbox_2d': 'y',
+                'kpts': 'yx'
+            }
+            plot_2d_objects(img, gt_record, color_dict, ax=ax)
+
         save_path = get_savepath(args.savepath, image_path, ext='.png')
         logger.info(f'saved at : {save_path}')
         fig.savefig(save_path, dpi=100, bbox_inches='tight', pad_inches=0)
         plt.close()
 
-        if 1:
+        if plot_3d:
             all_kpts_3d_pred = record['kpts_3d_pred'].reshape(len(record['kpts_3d_pred']), -1)
-            if 'kpts_3d_gt' in record:
-                all_kpts_3d_gt = record['kpts_3d_gt']
-                all_pose_vecs_gt = record['pose_vecs_gt']
-            else:
-                all_kpts_3d_gt = None
-                all_pose_vecs_gt = None
-            fig = plot_3d_objects(
+            fig, ax = plot_3d_objects(
                 all_kpts_3d_pred,
-                all_kpts_3d_gt,
-                all_pose_vecs_gt,
+                None,
+                None,
                 record,
-                color=color_dict['bbox_3d'],
+                color='r',
             )
+            if gt_record:
+                all_kpts_3d_pred = gt_record['kpts_3d_pred'].reshape(len(record['kpts_3d_pred']), -1)
+                all_kpts_3d_gt = gt_record['kpts_3d_gt']
+                all_pose_vecs_gt = gt_record['pose_vecs_gt']
+                _, ax = plot_3d_objects(
+                    all_kpts_3d_pred,
+                    all_kpts_3d_gt,
+                    all_pose_vecs_gt,
+                    gt_record,
+                    color='y',
+                    ax=ax
+                )
             plt.show()
 
             ex = os.path.splitext(save_path)
@@ -417,10 +486,13 @@ def main():
     HC = ailia.Net(MODEL_HC_PATH, WEIGHT_HC_PATH, env_id=env_id)
     L = ailia.Net(MODEL_L_PATH, WEIGHT_L_PATH, env_id=env_id)
 
+    # the statistics used by the lifter for normalizing inputs
+    LS = np.load(LS_path, allow_pickle=True).item()
+
     if args.video is not None:
         pass
     else:
-        recognize_from_image(HC, L)
+        recognize_from_image(HC, LS, L)
 
 
 if __name__ == '__main__':

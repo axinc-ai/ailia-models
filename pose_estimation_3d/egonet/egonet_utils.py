@@ -436,22 +436,26 @@ def plot_2d_objects(
             'bbox_2d': 'r',
             'bbox_3d': 'r',
             'kpts': ['rx', 'b']
-        }):
-    fig = plt.figure(figsize=(11.3, 9))
-    ax = plt.subplot(111)
+        },
+        ax=None):
+    if ax:
+        fig = None
+    else:
+        fig = plt.figure(figsize=(11.3, 9))
+        ax = plt.subplot(111)
 
-    height, width, _ = img.shape
-    ax.imshow(img)
-    ax.set_xlim([0, width])
-    ax.set_ylim([0, height])
-    ax.invert_yaxis()
+        height, width, _ = img.shape
+        ax.imshow(img)
+        ax.set_xlim([0, width])
+        ax.set_ylim([0, height])
+        ax.invert_yaxis()
 
     for idx in range(len(record['kpts_2d_pred'])):
         kpts = record['kpts_2d_pred'][idx].reshape(-1, 2)
         bbox = record['bbox_resize'][idx]
         plot_2d_bbox(ax, bbox, color_dict['bbox_2d'])
         # predicted key-points
-        ax.plot(kpts[:, 0], kpts[:, 1], color_dict['kpts'][0])
+        ax.plot(kpts[:, 0], kpts[:, 1], color_dict['kpts'])
 
     if 'kpts_2d_gt' in record:
         # plot ground truth 2D screen coordinates
@@ -467,54 +471,63 @@ def plot_2d_objects(
             dx, dy = end - start
             ax.arrow(x, y, dx, dy, color='r', lw=4, head_width=5, alpha=0.5)
 
-    # save intermediate results
-    fig.gca().set_axis_off()
-    fig.subplots_adjust(
-        top=1, bottom=0, right=1, left=0,
-        hspace=0, wspace=0)
-    fig.gca().xaxis.set_major_locator(plt.NullLocator())
-    fig.gca().yaxis.set_major_locator(plt.NullLocator())
+    if fig:
+        fig.gca().set_axis_off()
+        fig.subplots_adjust(
+            top=1, bottom=0, right=1, left=0,
+            hspace=0, wspace=0)
+        fig.gca().xaxis.set_major_locator(plt.NullLocator())
+        fig.gca().yaxis.set_major_locator(plt.NullLocator())
 
-    return fig
+    return fig, ax
 
 
-def plot_3d_objects(prediction, target, pose_vecs_gt, record, color):
+def plot_3d_objects(prediction, target, pose_vecs_gt, record, color, ax=None):
     if target is not None:
         p3d_gt = target.reshape(len(target), -1, 3)
     else:
         p3d_gt = None
     p3d_pred = prediction.reshape(len(prediction), -1, 3)
 
-    if "kpts_3d_before" in record:
-        # use predicted translation for visualization
-        p3d_pred = np.concatenate([record['kpts_3d_before'][:, [0], :], p3d_pred], axis=1)
-    elif p3d_gt is not None and p3d_gt.shape[1] == p3d_pred.shape[1] + 1:
+    if p3d_gt is not None:
         # use ground truth translation for visualization
         p3d_pred = np.concatenate([p3d_gt[:, [0], :], p3d_pred], axis=1)
+    elif "kpts_3d" in record:
+        # use predicted translation for visualization
+        p3d_pred = np.concatenate([record['kpts_3d'][:, [0], :], p3d_pred], axis=1)
     else:
         raise NotImplementedError
 
-    fig = plt.figure()
-    ax = plt.subplot(111, projection='3d')
+    if ax:
+        fig = None
+    else:
+        fig = plt.figure()
+        ax = plt.subplot(111, projection='3d')
+        
+        ax.set_title("GT: black w/o Ego-Net: magenta w/ Ego-Net: red/yellow")
 
     # plotting a set of 3D boxes
     ax = plot_scene_3dbox(ax, p3d_pred, p3d_gt, color=color)
-    ax.set_title("GT: black w/o Ego-Net: magenta w/ Ego-Net: red/yellow")
-    draw_pose_vecs(ax, pose_vecs_gt)
-
     # draw pose angle predictions
     translation = p3d_pred[:, 0, :]
     pose_vecs_pred = np.concatenate([translation, record['euler_angles']], axis=1)
     draw_pose_vecs(ax, pose_vecs_pred, color=color)
-    if 'kpts_3d_before' in record:
+    draw_pose_vecs(ax, pose_vecs_gt)
+
+    if p3d_gt is None:
         # plot input 3D bounding boxes before using Ego-Net
-        kpts_3d_before = record['kpts_3d_before']
-        plot_scene_3dbox(ax, kpts_3d_before, color='m')
-        pose_vecs_before = np.zeros((len(kpts_3d_before), 6))
-        for idx in range(len(pose_vecs_before)):
-            pose_vecs_before[idx][0:3] = record['raw_txt_format'][idx]['locations']
-            pose_vecs_before[idx][4] = record['raw_txt_format'][idx]['rot_y']
+        kpts_3d = record['kpts_3d']
+        plot_scene_3dbox(ax, kpts_3d, color='m')
+        # pose_vecs_before = np.zeros((len(kpts_3d), 6))
+        # for idx in range(len(pose_vecs_before)):
+            # pose_vecs_before[idx][0:3] = record['raw_txt_format'][idx]['locations']
+            # pose_vecs_before[idx][4] = record['raw_txt_format'][idx]['rot_y']
+        # draw_pose_vecs(ax, pose_vecs_before, color='m')
 
-        draw_pose_vecs(ax, pose_vecs_before, color='m')
+    if fig:
+        fig.gca().set_axis_off()
+        fig.subplots_adjust(
+            top=1, bottom=0, right=1, left=0,
+            hspace=0, wspace=0)
 
-    return fig
+    return fig, ax
