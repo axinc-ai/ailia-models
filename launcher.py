@@ -90,16 +90,16 @@ def get_model_list():
 # ======================
 
 def get_input_list():
-    return ["Camera:0"]
+    #return ["Camera:0"]
 
-    print("List cameras")
+    #print("List cameras")
     index = 0
     inputs = []
     while True:
         print(index)
         cap = cv2.VideoCapture(index)
         if cap.isOpened():
-            inputs.append("Camera:"+index)
+            inputs.append("Camera:"+str(index))
         else:
             break
         index=index+1
@@ -211,6 +211,8 @@ def open_model(model):
         proc.kill()
         proc=None
 
+    model_request = model_list[model_index]
+
     dir = "./"+model["category"]+"/"+model["model"]+"/"
     cmd = sys.executable
 
@@ -259,7 +261,6 @@ def open_model(model):
 
     if not ("video" in args_dict):
         subprocess.check_call(cmd, cwd=dir, shell=False)
-        model_request = model_list[model_index]
         load_image(save_path)
     else:
         proc = subprocess.Popen(cmd, cwd=dir)
