@@ -90,13 +90,12 @@ def get_model_list():
 # ======================
 
 def get_input_list():
-    #return ["Camera:0"]
+    if args.debug:
+        return ["Camera:0"]
 
-    #print("List cameras")
     index = 0
     inputs = []
     while True:
-        print(index)
         cap = cv2.VideoCapture(index)
         if cap.isOpened():
             inputs.append("Camera:"+str(index))
@@ -156,14 +155,18 @@ def model_changed(event):
         model_index = 0
     load_detail(model_index)
 
-def load_image(path):
-    print(path)
-    global canvas, canvas_item, image_tk
+def create_photo_image(path,w=320,h=240):
     image_bgr = cv2.imread(path)
-    image_bgr = cv2.resize(image_bgr,(320,240))
+    #image_bgr = cv2.resize(image_bgr,(w,h))
     image_rgb = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB) # imreadはBGRなのでRGBに変換
     image_pil = Image.fromarray(image_rgb) # RGBからPILフォーマットへ変換
+    image_pil.thumbnail((w,h), Image.ANTIALIAS)
     image_tk  = ImageTk.PhotoImage(image_pil) # ImageTkフォーマットへ変換
+    return image_tk
+
+def load_image(path):
+    global canvas, canvas_item, image_tk
+    image_tk = create_photo_image(path)
     if canvas_item == None:
         canvas_item = canvas.create_image(0, 0, image=image_tk, anchor=tk.NW)
     else:
@@ -406,14 +409,20 @@ def main():
     labelEnvironment = tk.Label(frame, textvariable=textEnvironment)
     labelModelDetail = tk.Label(frame, textvariable=textModelDetail)
 
-    buttonRun = tk.Button(frame, textvariable=textRun, command=run_button_clicked, width=10)
-    buttonStop = tk.Button(frame, textvariable=textStop, command=stop_button_clicked, width=10)
-    buttonInputFile = tk.Button(frame, textvariable=textInputFile, command=input_file_dialog, width=10)
-    buttonOutputFile = tk.Button(frame, textvariable=textOutputFile, command=output_file_dialog, width=10)
+    buttonRun = tk.Button(frame, textvariable=textRun, command=run_button_clicked, width=14)
+    buttonStop = tk.Button(frame, textvariable=textStop, command=stop_button_clicked, width=14)
+    buttonInputFile = tk.Button(frame, textvariable=textInputFile, command=input_file_dialog, width=14)
+    buttonOutputFile = tk.Button(frame, textvariable=textOutputFile, command=output_file_dialog, width=14)
 
     canvas = tk.Canvas(frame, bg="black", width=320, height=240)
     canvas.place(x=0, y=0)
     load_detail(model_index)
+
+    logo = tk.Canvas(frame, bg="black", width=320, height=124)
+    logo.place(x=0, y=0)
+    global logo_img
+    logo_img = create_photo_image("ailia-models.png",320,124)
+    logo_item = logo.create_image(0, 0, image=logo_img, anchor=tk.NW)
 
     # 各種ウィジェットの設置
     labelModel.grid(row=0, column=0, sticky=tk.NW, rowspan=12)
@@ -434,8 +443,10 @@ def main():
     labelEnvironment.grid(row=0, column=4, sticky=tk.NW, columnspan=2)
     ListboxEnvironment.grid(row=1, column=4, sticky=tk.NW, columnspan=2)
 
-    buttonRun.grid(row=2, column=4, sticky=tk.NW)
-    buttonStop.grid(row=2, column=5, sticky=tk.NW)
+    buttonRun.grid(row=3, column=4, sticky=tk.NW)
+    buttonStop.grid(row=3, column=5, sticky=tk.NW)
+
+    logo.grid(row=2, column=4, sticky=tk.NW, columnspan=2, rowspan=1)
 
     # メインフレームの作成と設置
     frame = ttk.Frame(root)
