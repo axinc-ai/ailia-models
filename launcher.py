@@ -198,6 +198,9 @@ def load_detail(index):
     f = open(base_path+"README.md")
     text = f.readlines()
     text = text[0].replace("# ","")
+    text = text.replace("\r","")
+    text = text.replace("\n","")
+    text = text[:40]
     textModelDetail.set(text)
 
 
@@ -267,15 +270,15 @@ def open_model(model):
         load_image(save_path)
     else:
         proc = subprocess.Popen(cmd, cwd=dir)
-        outs, errs = proc.communicate(timeout=1)
-    
-
+        try:
+            outs, errs = proc.communicate(timeout=1)
+        except subprocess.TimeoutExpired:
+            pass
 
 def run_button_clicked():
     global model_list
     model_request=model_list[int(model_index)]
     open_model(model_request)
-
 
 def stop_button_clicked():
     global proc
@@ -317,12 +320,7 @@ def output_file_dialog():
 # GUI
 # ======================
 
-#ListboxModel = None
-#textModelDetail = None
-
-#canvas = None
 canvas_item = None
-#image_tk = None
 
 def main():
     global ListboxModel, textModelDetail
