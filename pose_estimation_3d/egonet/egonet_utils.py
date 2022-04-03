@@ -503,7 +503,6 @@ def plot_3d_objects(prediction, target, pose_vecs_gt, record, color, ax=None):
     else:
         fig = plt.figure()
         ax = plt.subplot(111, projection='3d')
-        
         ax.set_title("GT: black w/o Ego-Net: magenta w/ Ego-Net: red/yellow")
 
     # plotting a set of 3D boxes
@@ -518,11 +517,11 @@ def plot_3d_objects(prediction, target, pose_vecs_gt, record, color, ax=None):
         # plot input 3D bounding boxes before using Ego-Net
         kpts_3d = record['kpts_3d']
         plot_scene_3dbox(ax, kpts_3d, color='m')
-        # pose_vecs_before = np.zeros((len(kpts_3d), 6))
-        # for idx in range(len(pose_vecs_before)):
-            # pose_vecs_before[idx][0:3] = record['raw_txt_format'][idx]['locations']
-            # pose_vecs_before[idx][4] = record['raw_txt_format'][idx]['rot_y']
-        # draw_pose_vecs(ax, pose_vecs_before, color='m')
+        pose_vecs_before = np.zeros((len(kpts_3d), 6))
+        for idx in range(len(pose_vecs_before)):
+            pose_vecs_before[idx][0:3] = record['raw_anns'][idx]['locations']
+            pose_vecs_before[idx][4] = record['raw_anns'][idx]['rot_y']
+        draw_pose_vecs(ax, pose_vecs_before, color='m')
 
     if fig:
         fig.gca().set_axis_off()

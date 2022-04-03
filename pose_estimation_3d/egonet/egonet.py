@@ -96,8 +96,9 @@ def read_annot(
         img,
         label_path,
         calib_path,
-        add_gt=False):
-    list_2d, list_3d, list_id, pv, K, raw_bboxes = \
+        add_gt=False,
+        enlarge=None):
+    list_2d, list_3d, list_id, pv, K, anns, raw_bboxes = \
         get_2d_3d_pair(
             img,
             label_path, calib_path,
@@ -129,11 +130,20 @@ def read_annot(
         'bbox_2d': bboxes,
         'kpts_3d': all_keypoints_3d,
         'K': K,
+        'raw_anns': anns
     }
+    if enlarge is not None:
+        target_ar = 1.
+        for i in range(len(bboxes)):
+            bboxes[i] = modify_bbox(
+                bboxes[i],
+                target_ar=target_ar,
+                enlarge=enlarge
+            )['bbox']
     if add_gt:
         pvs = np.vstack(pv) if len(pv) != 0 else []
         d['pose_vecs_gt'] = pvs
-        d['kpts'] = all_keypoints_2d
+        d['kpts_2d_gt'] = all_keypoints_2d
         d['kpts_3d_gt'] = all_keypoints_3d
 
     return d
@@ -225,9 +235,9 @@ def crop_instances(img, annot_dict):
         all_records.append({
             'center': c,
             'scale': s,
+            'rotation': r,
             'bbox': bbox,
             'bbox_resize': ret['bbox'],
-            'rotation': r,
         })
 
     all_instances = np.concatenate(all_instances, axis=0)
@@ -323,15 +333,16 @@ def predict(HC, L, LS, img, annot_dict):
         screen_coord = affine_transform_modified(
             local_coord[i],
             trans_inv)
-        records[i]['kpts'] = screen_coord
+        records[i]['kpts_2d_pred'] = screen_coord
 
     # assemble a dictionary where each key
     records = {
         'bbox_resize': [x['bbox_resize'] for x in records],  # resized bounding box
-        'kpts_2d_pred': [x['kpts'].reshape(1, -1) for x in records],
+        'kpts_2d_pred': [x['kpts_2d_pred'].reshape(1, -1) for x in records],
     }
     if 'kpts_3d' in annot_dict:
         records['kpts_3d'] = annot_dict['kpts_3d']
+        records['raw_anns'] = annot_dict['raw_anns']
 
     # lift_2d_to_3d
     data = np.concatenate(records['kpts_2d_pred'], axis=0)
@@ -346,10 +357,10 @@ def predict(HC, L, LS, img, annot_dict):
     )
     records['kpts_3d_pred'] = prediction.reshape(len(prediction), -1, 3)
 
-    if 'kpts' in annot_dict:
-        records['kpts_2d_gt'] = annot_dict['kpts']
     if 'pose_vecs_gt' in annot_dict:
         records['pose_vecs_gt'] = annot_dict['pose_vecs_gt']
+    if 'kpts_2d_gt' in annot_dict:
+        records['kpts_2d_gt'] = annot_dict['kpts_2d_gt']
     if 'kpts_3d_gt' in annot_dict and 'K' in annot_dict:
         records['kpts_3d_gt'] = annot_dict['kpts_3d_gt']
         records['K'] = annot_dict['K']
@@ -386,8 +397,10 @@ def recognize_from_image(HC, LS, L):
                 sys.exit(-1)
 
         if label_path:
+            enlarge = 1.2
             annot_dict = read_annot(
-                img, label_path, calib_path)
+                img, label_path, calib_path,
+                enlarge=enlarge)
         else:
             raise NotImplementedError("no detector.")
 
@@ -463,12 +476,12 @@ def recognize_from_image(HC, LS, L):
                     color='y',
                     ax=ax
                 )
-            plt.show()
 
             ex = os.path.splitext(save_path)
             save_path = '%s_3d%s' % ex
             logger.info(f'saved at : {save_path}')
             fig.savefig(save_path, dpi=100, bbox_inches='tight', pad_inches=0)
+            plt.show()
 
     logger.info('Script finished successfully.')
 
