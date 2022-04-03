@@ -21,9 +21,9 @@ from logging import getLogger  # noqa
 from egonet_utils import kpts2cs, cs2bbox
 from egonet_utils import modify_bbox, get_affine_transform, affine_transform_modified
 from egonet_utils import get_observation_angle_trans, get_observation_angle_proj
-from egonet_utils import get_6d_rep, get_pred_str
+from egonet_utils import get_6d_rep
 from egonet_utils import plot_2d_objects, plot_3d_objects
-from instance_utils import get_2d_3d_pair
+from instance_utils import csv_read_annot, get_2d_3d_pair
 
 logger = getLogger(__name__)
 
@@ -53,19 +53,23 @@ parser = get_base_parser(
 )
 parser.add_argument(
     '--label_path', type=str, default=None,
-    help='label_path'
+    help='the label file or stored directory path.'
 )
 parser.add_argument(
     '--gt_label_path', type=str, default=None,
-    help='gt_label_path'
+    help='the ground truth label file or stored directory path.'
 )
 parser.add_argument(
     '--calib_path', type=str, default=None,
-    help='calib_path'
+    help='the calibration file or stored directory path'
+)
+parser.add_argument(
+    '--detector', action='store_true',
+    help='Use object detection.'
 )
 parser.add_argument(
     '--plot_3d', action='store_true',
-    help='plot_3d'
+    help='draw a 3d plot.'
 )
 args = update_parser(parser)
 
@@ -74,21 +78,24 @@ args = update_parser(parser)
 # Secondaty Functions
 # ======================
 
-def get_path(path, dirname, name):
+def get_path(path, file_typ, name):
     if path is None:
-        file_path = "%s/%s.txt" % (dirname, name)
+        file_path = "%s/%s.txt" % (file_typ, name)
         if os.path.exists(file_path):
+            logger.info("%s file: %s" % (file_typ, file_path))
             return file_path
         else:
             return None
     elif os.path.isdir(path):
-        file_path = "%s/%s.txt" % (dirname, name)
+        file_path = "%s/%s.txt" % (file_typ, name)
         if os.path.exists(file_path):
+            logger.info("%s file: %s" % (file_typ, file_path))
             return file_path
     elif os.path.exists(path):
+        logger.info("%s file: %s" % (file_typ, path))
         return path
 
-    logger.error("[%s] file is not found. (path: %s)" % (dirname, path))
+    logger.error("%s file is not found. (path: %s)" % (file_typ, path))
     sys.exit(-1)
 
 
@@ -97,40 +104,75 @@ def read_annot(
         label_path,
         calib_path,
         add_gt=False,
+        use_raw_bbox=True,
         enlarge=None):
-    list_2d, list_3d, list_id, pv, K, anns, raw_bboxes = \
-        get_2d_3d_pair(
-            img,
-            label_path, calib_path,
-            augment=False, add_raw_bbox=True)
+    if calib_path is not None:
+        list_2d, list_3d, list_id, pv, K, anns, raw_bboxes = \
+            get_2d_3d_pair(
+                img,
+                label_path, calib_path,
+                augment=False, add_raw_bbox=True)
 
-    bboxes = np.array([])
-    all_keypoints_2d = np.array([])
-    all_keypoints_3d = np.array([])
-    if len(list_2d) != 0:
-        for idx, kpts in enumerate(list_2d):
-            list_2d[idx] = kpts.reshape(1, -1, 3)
-            list_3d[idx] = list_3d[idx].reshape(1, -1, 3)
-        all_keypoints_2d = np.concatenate(list_2d, axis=0)
-        all_keypoints_3d = np.concatenate(list_3d, axis=0)
+        all_keypoints_2d = np.array([])
+        all_keypoints_3d = np.array([])
+        if len(list_2d) != 0:
+            for idx, kpts in enumerate(list_2d):
+                list_2d[idx] = kpts.reshape(1, -1, 3)
+                list_3d[idx] = list_3d[idx].reshape(1, -1, 3)
+            all_keypoints_2d = np.concatenate(list_2d, axis=0)
+            all_keypoints_3d = np.concatenate(list_3d, axis=0)
 
-        # compute 2D bounding box based on the projected 3D boxes
-        bboxes_kpt = []
-        for idx, keypoints in enumerate(all_keypoints_2d):
-            # relatively tight bounding box: use enlarge = 1.0
-            # delete invisible instances
-            center, crop_size, _, _ = kpts2cs(
-                keypoints[:, :2], enlarge=1.01)
-            bbox = np.array(cs2bbox(center, crop_size))
-            bboxes_kpt.append(np.array(bbox).reshape(1, 4))
+            # compute 2D bounding box based on the projected 3D boxes
+            bboxes_kpt = []
+            for idx, keypoints in enumerate(all_keypoints_2d):
+                # relatively tight bounding box: use enlarge = 1.0
+                # delete invisible instances
+                center, crop_size, _, _ = kpts2cs(
+                    keypoints[:, :2], enlarge=1.01)
+                bbox = np.array(cs2bbox(center, crop_size))
+                bboxes_kpt.append(np.array(bbox).reshape(1, 4))
 
-        bboxes = np.vstack(bboxes_kpt)
+        bboxes = np.array([])
+        if use_raw_bbox:
+            bboxes = np.vstack(raw_bboxes)
+        elif len(bboxes_kpt) != 0:
+            bboxes = np.vstack(bboxes_kpt)
+    else:
+        anns = csv_read_annot(label_path)
+        bboxes = []
+        for i, a in enumerate(anns):
+            bboxes.append(np.array(a["bbox"]).reshape(1, 4))
+        bboxes = np.vstack(bboxes)
 
     d = {
         'bbox_2d': bboxes,
-        'kpts_3d': all_keypoints_3d,
-        'K': K,
         'raw_anns': anns
+    }
+    if calib_path is not None:
+        d['kpts_3d'] = all_keypoints_3d
+        d['K'] = K
+        if add_gt:
+            pvs = np.vstack(pv) if len(pv) != 0 else []
+            d['pose_vecs_gt'] = pvs
+            d['kpts_2d_gt'] = all_keypoints_2d
+            d['kpts_3d_gt'] = all_keypoints_3d
+
+    if enlarge is not None:
+        target_ar = 1.
+        for i in range(len(bboxes)):
+            bboxes[i] = modify_bbox(
+                bboxes[i],
+                target_ar=target_ar,
+                enlarge=enlarge
+            )['bbox']
+
+    return d
+
+
+def detect_cars(net, img, enlarge=None):
+    bboxes = np.array([])
+    d = {
+        'bbox_2d': bboxes,
     }
     if enlarge is not None:
         target_ar = 1.
@@ -140,11 +182,6 @@ def read_annot(
                 target_ar=target_ar,
                 enlarge=enlarge
             )['bbox']
-    if add_gt:
-        pvs = np.vstack(pv) if len(pv) != 0 else []
-        d['pose_vecs_gt'] = pvs
-        d['kpts_2d_gt'] = all_keypoints_2d
-        d['kpts_3d_gt'] = all_keypoints_3d
 
     return d
 
@@ -276,7 +313,6 @@ def add_orientation_arrow(record):
 
 def gather_lifting_results(
         record,
-        get_str=False,
         alpha_mode='trans'):
     """
     Convert network outputs to pose angles.
@@ -300,13 +336,16 @@ def gather_lifting_results(
     else:
         raise NotImplementedError
 
-    if get_str:
-        record['pred_str'] = get_pred_str(record)
-
     return record
 
 
 def predict(HC, L, LS, img, annot_dict):
+    if len(annot_dict['bbox_2d']) == 0:
+        records = {
+            'kpts_2d_pred': []
+        }
+        return records
+
     instances, records = crop_instances(img, annot_dict)
 
     # feedforward
@@ -377,6 +416,8 @@ def recognize_from_image(HC, LS, L):
     calib_path = args.calib_path
     gt_label_path = args.gt_label_path
     plot_3d = args.plot_3d
+    detection = args.detector
+    detector = None
 
     # input image loop
     for image_path in args.input:
@@ -391,18 +432,20 @@ def recognize_from_image(HC, LS, L):
         calib_path = get_path(calib_path, "calib", name)
         gt_label_path = get_path(gt_label_path, "gt_label", name)
 
-        if label_path or gt_label_path:
-            if not calib_path:
-                logger.error("calib file not specified or not found.")
-                sys.exit(-1)
+        if gt_label_path and not calib_path:
+            logger.error("calib file not specified or not found.")
+            sys.exit(-1)
 
-        if label_path:
+        if detection:
+            annot_dict = detect_cars(detector, img)
+        elif label_path is not None:
             enlarge = 1.2
             annot_dict = read_annot(
                 img, label_path, calib_path,
                 enlarge=enlarge)
         else:
-            raise NotImplementedError("no detector.")
+            logger.error("should specify the label file or detector.")
+            sys.exit(-1)
 
         if gt_label_path:
             gt_annot_dict = read_annot(

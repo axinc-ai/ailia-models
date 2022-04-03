@@ -408,28 +408,6 @@ def get_instance_str(dic):
     return string
 
 
-def get_pred_str(record):
-    """
-    Produce KITTI style prediction string for a record dictionary.
-    """
-    # replace the rotation predictions of input bounding boxes
-    updated_txt = deepcopy(record['raw_txt_format'])
-    for instance_id in range(len(record['euler_angles'])):
-        updated_txt[instance_id]['rot_y'] = record['euler_angles'][instance_id, 1]
-        updated_txt[instance_id]['alpha'] = record['alphas'][instance_id]
-
-    pred_str = ""
-    angles = record['euler_angles']
-    for instance_id in range(len(angles)):
-        # format a string for submission
-        tempt_str = get_instance_str(updated_txt[instance_id])
-        if instance_id != len(angles) - 1:
-            tempt_str += '\n'
-        pred_str += tempt_str
-
-    return pred_str
-
-
 def plot_2d_objects(
         img, record,
         color_dict={
