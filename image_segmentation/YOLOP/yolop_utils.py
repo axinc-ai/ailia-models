@@ -110,8 +110,7 @@ def non_max_suppression(prediction, conf_thres=0.25, iou_thres=0.45, agnostic=Fa
         # Batched NMS
         c = x[:, 5:6] * (0 if agnostic else max_wh)  # classes
         boxes, scores = x[:, :4] + c, x[:, 4]  # boxes (offset by class), scores
-        xywh = xyxy2xywh(boxes)
-        i = nms_cpu(xywh, scores, nms_thresh=iou_thres)
+        i = nms_cpu(boxes, scores, nms_thresh=iou_thres)
 
         if i.shape[0] > max_det:  # limit detections
             i = i[:max_det]
@@ -247,7 +246,6 @@ class LoadImages:  # for inference
             # Read image
             self.count += 1
             img0 = cv2.imread(path, cv2.IMREAD_COLOR | cv2.IMREAD_IGNORE_ORIENTATION)  # BGR
-            #img0 = cv2.cvtColor(img0, cv2.COLOR_BGR2RGB)
             assert img0 is not None, 'Image Not Found ' + path
             print('image %g/%g %s: \n' % (self.count, self.nf, path), end='')
             h0, w0 = img0.shape[:2]
@@ -262,7 +260,6 @@ class LoadImages:  # for inference
         img = np.ascontiguousarray(img)
 
 
-        # cv2.imwrite(path + '.letterbox.jpg', 255 * img.transpose((1, 2, 0))[:, :, ::-1])  # save letterbox image
         return path, img, img0, self.cap, shapes
 
     def new_video(self, path):
