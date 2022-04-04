@@ -120,10 +120,13 @@ def recognize_from_video():
     net = _initialize_net(args)
 
     capture = get_capture(args.video)
-
+    
+    frame_shown = False
     while True:
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord("q")) or not ret:
+            break
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) < 1:
             break
 
         # Prepare input data.
@@ -141,6 +144,7 @@ def recognize_from_video():
                 _output_text(weather, prob),
             ),
         )
+        frame_shown = True
 
     capture.release()
     cv2.destroyAllWindows()

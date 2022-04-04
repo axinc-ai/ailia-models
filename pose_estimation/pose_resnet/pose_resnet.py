@@ -282,10 +282,13 @@ def recognize_from_video():
         writer = webcamera_utils.get_writer(args.savepath, f_h, f_w)
     else:
         writer = None
-
+    
+    frame_shown = False
     while(True):
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) < 1:
             break
 
         img = cv2.cvtColor(frame, cv2.COLOR_BGR2BGRA)
@@ -293,6 +296,7 @@ def recognize_from_video():
         pose_detections = pose_estimation(detector, pose, img)
         res_img = plot_results(detector, pose, frame, COCO_CATEGORY, pose_detections, False)
         cv2.imshow('frame', res_img)
+        frame_shown = True
         # save results
         if writer is not None:
             writer.write(res_img)

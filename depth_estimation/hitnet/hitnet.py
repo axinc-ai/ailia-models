@@ -160,8 +160,10 @@ def recognize_from_video(net):
 
         # Press key q to stop
         if cv2.waitKey(1) == ord('q'):
-            cv2.destroyAllWindows()
             break
+        if cv2.getWindowProperty('Estimated depth', cv2.WND_PROP_VISIBLE) < 1:
+            break
+
     
     cv2.destroyAllWindows()
     logger.info('Script finished successfully.')

@@ -182,10 +182,14 @@ def recognize_from_video(net):
     if args.onnx:
         input_name = 'input.1'
         output_name = '200'
-
+    
+    
+    frame_shown = False
     while (True):
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+        if frame_shown and cv2.getWindowProperty('output', cv2.WND_PROP_VISIBLE) < 1:
             break
 
         input_img = frame
@@ -199,6 +203,7 @@ def recognize_from_video(net):
         postprocessing(img,y)
     
         cv2.imshow('output', img)
+        frame_shown = True
         cv2.waitKey(3)
 
         # save results

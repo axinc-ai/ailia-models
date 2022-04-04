@@ -136,10 +136,13 @@ def recognize_from_video():
         writer = get_writer(args.savepath, f_h, f_w)
     else:
         writer = None
-
+    
+    frame_shown = False
     while(True):
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) < 1:
             break
 
         img = cv2.cvtColor(frame, cv2.COLOR_BGR2BGRA)
@@ -179,6 +182,7 @@ def recognize_from_video():
             display_result(frame, hand, top_left, bottom_right)
 
         cv2.imshow('frame', frame)
+        frame_shown = True
 
         # save results
         if writer is not None:

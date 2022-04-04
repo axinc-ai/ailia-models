@@ -215,10 +215,13 @@ def recognize_from_video():
     else:
         writer = None
 
+    frame_shown = False
     while(True):
         # read frame
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) < 1:
             break
 
         # preprocessing
@@ -244,6 +247,7 @@ def recognize_from_video():
 
         # view result figure
         cv2.imshow('frame', frame_figure[..., ::-1])
+        frame_shown = True
         time.sleep(SLEEP_TIME)
         # save result
         if writer is not None:

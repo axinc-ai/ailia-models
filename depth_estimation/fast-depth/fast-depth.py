@@ -131,10 +131,13 @@ def recognize_from_video():
     net = _initialize_net(args)
 
     capture = get_capture(args.video)
-
+    
+    frame_shown = False
     while True:
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord("q")) or not ret:
+            break
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) < 1:
             break
 
         # Prepare input data.
@@ -149,6 +152,7 @@ def recognize_from_video():
         cv2.imshow(
             "frame", cv2.cvtColor(depth_pred_col.astype("uint8"), cv2.COLOR_RGB2BGR)
         )
+        frame_shown = True
 
     capture.release()
     cv2.destroyAllWindows()
