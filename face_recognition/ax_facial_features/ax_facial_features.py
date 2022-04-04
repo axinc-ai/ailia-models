@@ -262,12 +262,14 @@ def recognize_from_video():
         writer = get_writer(args.savepath, f_h, f_w)
     else:
         writer = None
-
+    
+    frame_shown = False
     while(True):
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
-
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) < 1:
+            break
         # inference
         res = predict(models, frame)
         if len(res) > 0:
@@ -284,6 +286,7 @@ def recognize_from_video():
             visual_img = frame_draw
 
         cv2.imshow('frame', visual_img)
+        frame_shown = True
 
         # save results
         if writer is not None:

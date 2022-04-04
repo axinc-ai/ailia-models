@@ -151,7 +151,7 @@ def recognize_from_video(filename, net):
         ret, frame = capture.read()
         if cv2.waitKey(1) & 0xFF == ord('q') or not ret:
             break
-
+            
         x = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         x = preprocess(x)
         preds_ailia = net.predict(x)

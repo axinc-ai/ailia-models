@@ -494,10 +494,13 @@ def recognize_from_video():
         writer = webcamera_utils.get_writer(args.savepath, f_h, f_w)
     else:
         writer = None
-
+    
+    frame_shown = False
     while(True):
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) < 1:
             break
 
         input_image, input_data = webcamera_utils.adjust_frame_size(
@@ -511,6 +514,7 @@ def recognize_from_video():
         # postprocessing
         display_result(input_image, pose, baseline)
         cv2.imshow('frame', input_image)
+        frame_shown = True
 
         # display 3d pose
         plt.pause(0.01)

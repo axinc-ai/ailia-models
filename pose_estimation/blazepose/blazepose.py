@@ -269,9 +269,12 @@ def recognize_from_video():
     else:
         writer = None
 
+    frame_shown = False
     while(True):
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) < 1:
             break
 
         _, img128, scale, pad = but.resize_pad(frame[:, :, ::-1])
@@ -297,6 +300,7 @@ def recognize_from_video():
         # postprocessing
         display_result(frame, count, landmarks, flags)
         cv2.imshow('frame', frame)
+        frame_shown = True
 
         # save results
         if writer is not None:

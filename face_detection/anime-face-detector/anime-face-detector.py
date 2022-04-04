@@ -342,10 +342,13 @@ def recognize_from_video(landmark_detector, face_detector):
         writer = get_writer(args.savepath, f_h, f_w)
     else:
         writer = None
-
+    
+    frame_shown = False
     while True:
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) < 1:
             break
 
         # inference
@@ -360,6 +363,7 @@ def recognize_from_video(landmark_detector, face_detector):
 
         # show
         cv2.imshow('frame', res_img)
+        frame_shown = True
 
         # save results
         if writer is not None:

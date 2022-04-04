@@ -688,12 +688,16 @@ def recognize_from_video():
     if RESIZE_ENABLE:
         frame_before = cv2.resize(frame_before, (W,H))
     frame_before = frame_before[..., ::-1]  # BGR2RGB
+    
+    frame_shown = False
     while(True):
         # read frame
         ret, frame_after = capture.read()
         if RESIZE_ENABLE:
             frame_after = cv2.resize(frame_after, (W,H))
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) < 1:
             break
 
         # preprocessing
@@ -782,6 +786,7 @@ def recognize_from_video():
 
         # view result figure
         cv2.imshow('frame', img_BGR)
+        frame_shown = True
         time.sleep(SLEEP_TIME)
         # save result
         if writer is not None:

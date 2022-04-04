@@ -547,11 +547,14 @@ def recognize_from_video(vid_path, net_maskrcnn, net_root, net_pose):
         video_writer = None
 
     # frame read and exec segmentation
+    frame_shown = False
     while(True):
         # frame read
         ret, original_img = video_capture.read()
 
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) < 1:
             break
 
         # cast to pillow for mask r-cnn
@@ -568,6 +571,7 @@ def recognize_from_video(vid_path, net_maskrcnn, net_root, net_pose):
         
         # display
         cv2.imshow("frame", vis_img)
+        frame_shown = True
 
         # write a frame image to video
         if video_writer is not None:

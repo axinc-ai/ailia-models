@@ -472,9 +472,13 @@ def recognize_from_video(GMM_net, TOM_net, det_net, pose_net, seg_net):
     cloth_img = np.expand_dims(img, axis=0)
 
     dummy = np.zeros(IMAGE_HEIGHT * IMAGE_WIDTH).reshape(IMAGE_HEIGHT, IMAGE_WIDTH)
+    
+    frame_shown = False
     while (True):
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) < 1:
             break
 
         # inference
@@ -483,6 +487,7 @@ def recognize_from_video(GMM_net, TOM_net, det_net, pose_net, seg_net):
         if offset == (0, 0):
             # human is not detected
             cv2.imshow('frame', dummy)
+            frame_shown = True
             continue
 
         agnostic = cloth_agnostic(pose_net, seg_net, img)
@@ -494,6 +499,7 @@ def recognize_from_video(GMM_net, TOM_net, det_net, pose_net, seg_net):
         tryon = post_processing(tryon[0])
 
         cv2.imshow('frame', tryon)
+        frame_shown = True
 
         # save results
         if writer is not None:

@@ -144,8 +144,11 @@ def recognize_from_image():
             end = int(round(time.time() * 1000))
             print(f'\tailia processing time {end - start} ms')
     else:
+        frame_shown = False
         while(next_input_index < input_frame_size):
             if cv2.waitKey(1) & 0xFF == ord('q'):
+                break
+            if frame_shown and cv2.getWindowProperty('preview', cv2.WND_PROP_VISIBLE) < 1:
                 break
             result = net.predict(input_blob)
 
@@ -155,7 +158,8 @@ def recognize_from_image():
                     next_input_index - args.duration
             ])
             cv2.imshow('preview', preview_img)
-
+            frame_shown = True
+            
             for i in range(args.duration - 1):
                 input_blob[0, :, i, :, :] = input_blob[0, :, i + 1, :, :]
 
@@ -198,11 +202,15 @@ def recognize_from_video():
 
     next_input_index = args.duration - 1
     input_frame_size = capture.get(cv2.CAP_PROP_FRAME_COUNT)
-
+    
+    frame_shown = False
     while(next_input_index <= input_frame_size or input_frame_size == 0):
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
+        if frame_shown and cv2.getWindowProperty('preview', cv2.WND_PROP_VISIBLE) < 1:
+            break
+            
         original_queue.append(frame)
         input_blob[0, :, args.duration - 1, :, :] = convert_input_frame(frame)
 
@@ -213,6 +221,7 @@ def recognize_from_video():
         plot_results(preview_img, result, HMDB51_LABEL)
 
         cv2.imshow('preview', preview_img)
+        frame_shown = True
 
         for i in range(args.duration - 1):
             input_blob[0, :, i, :, :] = input_blob[0, :, i + 1, :, :]
