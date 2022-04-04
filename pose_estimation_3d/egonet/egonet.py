@@ -12,7 +12,7 @@ import ailia
 sys.path.append('../../util')
 from utils import get_base_parser, update_parser, get_savepath  # noqa
 from model_utils import check_and_download_models  # noqa
-from detector_utils import load_image  # noqa
+from detector_utils import load_image, letterbox_convert, reverse_letterbox  # noqa
 from image_utils import normalize_image  # noqa
 from webcamera_utils import get_capture, get_writer  # noqa
 # logger
@@ -24,6 +24,9 @@ from egonet_utils import get_observation_angle_trans, get_observation_angle_proj
 from egonet_utils import get_6d_rep
 from egonet_utils import plot_2d_objects, plot_3d_objects
 from instance_utils import csv_read_annot, get_2d_3d_pair
+
+sys.path.append('../../object_detection/yolov4')
+import yolov4_utils
 
 logger = getLogger(__name__)
 
@@ -37,12 +40,20 @@ WEIGHT_L_PATH = 'L.onnx'
 MODEL_L_PATH = 'L.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/egonet/'
 
+WEIGHT_YOLOV4_PATH = 'yolov4.onnx'
+MODEL_YOLOV4_PATH = 'yolov4.onnx.prototxt'
+REMOTE_YOLOV4_PATH = 'https://storage.googleapis.com/ailia-models/yolov4/'
+
 LS_path = 'LS.npy'
 
 IMAGE_PATH = 'demo.png'
 SAVE_IMAGE_PATH = 'output.png'
 
 IMAGE_SIZE = 256
+IMAGE_YOLO_SIZE = 416
+
+THRESHOLD = 0.4
+IOU = 0.45
 
 # ======================
 # Arguemnt Parser Config
@@ -53,19 +64,29 @@ parser = get_base_parser(
 )
 parser.add_argument(
     '--label_path', type=str, default=None,
-    help='the label file or stored directory path.'
+    help='the label file (object labels for image) or stored directory path.'
 )
 parser.add_argument(
     '--gt_label_path', type=str, default=None,
-    help='the ground truth label file or stored directory path.'
+    help='the ground truth label file (ground truth object labels for image) or stored directory path.'
 )
 parser.add_argument(
     '--calib_path', type=str, default=None,
-    help='the calibration file or stored directory path'
+    help='the calibration file (Camera parameters for image) or stored directory path'
 )
 parser.add_argument(
     '--detector', action='store_true',
     help='Use object detection.'
+)
+parser.add_argument(
+    '-th', '--threshold',
+    default=THRESHOLD, type=float,
+    help='object confidence threshold'
+)
+parser.add_argument(
+    '-iou', '--iou',
+    default=IOU, type=float,
+    help='IOU threshold for NMS'
 )
 parser.add_argument(
     '--plot_3d', action='store_true',
@@ -103,6 +124,7 @@ def read_annot(
         img,
         label_path,
         calib_path,
+        pred=False,
         add_gt=False,
         use_raw_bbox=True,
         enlarge=None):
@@ -111,6 +133,7 @@ def read_annot(
             get_2d_3d_pair(
                 img,
                 label_path, calib_path,
+                pred=pred,
                 augment=False, add_raw_bbox=True)
 
         all_keypoints_2d = np.array([])
@@ -138,7 +161,7 @@ def read_annot(
         elif len(bboxes_kpt) != 0:
             bboxes = np.vstack(bboxes_kpt)
     else:
-        anns = csv_read_annot(label_path)
+        anns = csv_read_annot(label_path, pred=pred)
         bboxes = []
         for i, a in enumerate(anns):
             bboxes.append(np.array(a["bbox"]).reshape(1, 4))
@@ -166,11 +189,51 @@ def read_annot(
                 enlarge=enlarge
             )['bbox']
 
+    if pred:
+        thres = args.threshold
+        indices = [i for i in range(len(anns)) if anns[i]['score'] >= thres]
+        d["bbox_2d"] = d["bbox_2d"][indices]
+        d["kpts_3d"] = d["kpts_3d"][indices]
+        if add_gt:
+            d['pose_vecs_gt'] = d['pose_vecs_gt'][indices]
+            d['kpts_2d_gt'] = d['kpts_2d_gt'][indices]
+            d['kpts_3d_gt'] = d['kpts_3d_gt'][indices]
+
     return d
 
 
-def detect_cars(net, img, enlarge=None):
-    bboxes = np.array([])
+def detect_cars(img, enlarge=None):
+    thres = args.threshold
+    iou = args.threshold
+
+    h, w, _ = img.shape
+    img = letterbox_convert(img, (IMAGE_YOLO_SIZE, IMAGE_YOLO_SIZE))
+
+    img = np.transpose(img, [2, 0, 1])
+    img = img.astype(np.float32) / 255
+    img = np.expand_dims(img, 0)
+
+    output = detect_cars.net.predict([img])
+
+    detect_object = yolov4_utils.post_processing(img, thres, iou, output)
+    detect_object = reverse_letterbox(detect_object[0], img, (IMAGE_YOLO_SIZE, IMAGE_YOLO_SIZE))
+
+    bboxes = []
+    car_class = 2
+    for d in detect_object:
+        if d.category != car_class:
+            continue
+        xmin = d.x * w
+        ymin = d.y * h
+        xmax = xmin + d.w * w
+        ymax = ymin + d.h * h
+        bboxes.append(np.array([xmin, ymin, xmax, ymax]).reshape(1, 4))
+
+    if bboxes:
+        bboxes = np.vstack(bboxes)
+    else:
+        bboxes = np.array([])
+
     d = {
         'bbox_2d': bboxes,
     }
@@ -381,6 +444,7 @@ def predict(HC, L, LS, img, annot_dict):
     }
     if 'kpts_3d' in annot_dict:
         records['kpts_3d'] = annot_dict['kpts_3d']
+    if 'raw_anns' in annot_dict:
         records['raw_anns'] = annot_dict['raw_anns']
 
     # lift_2d_to_3d
@@ -417,7 +481,6 @@ def recognize_from_image(HC, LS, L):
     gt_label_path = args.gt_label_path
     plot_3d = args.plot_3d
     detection = args.detector
-    detector = None
 
     # input image loop
     for image_path in args.input:
@@ -428,7 +491,8 @@ def recognize_from_image(HC, LS, L):
         img = cv2.cvtColor(img, cv2.COLOR_BGRA2RGB)
 
         name = os.path.splitext(os.path.basename(image_path))[0]
-        label_path = get_path(label_path, "label", name)
+        if not detection:
+            label_path = get_path(label_path, "label", name)
         calib_path = get_path(calib_path, "calib", name)
         gt_label_path = get_path(gt_label_path, "gt_label", name)
 
@@ -436,12 +500,13 @@ def recognize_from_image(HC, LS, L):
             logger.error("calib file not specified or not found.")
             sys.exit(-1)
 
+        enlarge = 1.2
         if detection:
-            annot_dict = detect_cars(detector, img)
+            annot_dict = detect_cars(img, enlarge=enlarge)
         elif label_path is not None:
-            enlarge = 1.2
             annot_dict = read_annot(
                 img, label_path, calib_path,
+                pred=True,
                 enlarge=enlarge)
         else:
             logger.error("should specify the label file or detector.")
@@ -535,6 +600,9 @@ def main():
     check_and_download_models(WEIGHT_HC_PATH, MODEL_HC_PATH, REMOTE_PATH)
     logger.info('Checking L model...')
     check_and_download_models(WEIGHT_L_PATH, MODEL_L_PATH, REMOTE_PATH)
+    if args.detector:
+        logger.info('Checking detector model...')
+        check_and_download_models(WEIGHT_YOLOV4_PATH, MODEL_YOLOV4_PATH, REMOTE_YOLOV4_PATH)
 
     env_id = args.env_id
 
@@ -544,6 +612,10 @@ def main():
 
     # the statistics used by the lifter for normalizing inputs
     LS = np.load(LS_path, allow_pickle=True).item()
+
+    if args.detector:
+        detect_cars.net = ailia.Net(
+            MODEL_YOLOV4_PATH, WEIGHT_YOLOV4_PATH, env_id=env_id)
 
     if args.video is not None:
         pass

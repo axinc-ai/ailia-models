@@ -481,7 +481,7 @@ def plot_3d_objects(prediction, target, pose_vecs_gt, record, color, ax=None):
     else:
         fig = plt.figure()
         ax = plt.subplot(111, projection='3d')
-        ax.set_title("GT: black w/o Ego-Net: magenta w/ Ego-Net: red/yellow")
+        ax.set_title("3D key-points from the detections: magenta | GT: black | Apply Ego-Net: red/yellow")
 
     # plotting a set of 3D boxes
     ax = plot_scene_3dbox(ax, p3d_pred, p3d_gt, color=color)

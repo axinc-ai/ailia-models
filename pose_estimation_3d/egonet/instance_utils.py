@@ -325,12 +325,13 @@ def get_2d_3d_pair(
         calib_path,
         in_rep='coordinates2d',
         out_rep='R3d+T',
+        pred=False,
         augment=False,
         augment_times=1,
         add_visibility=True,
         add_raw_bbox=False,  # add original bbox annotation from KITTI
         filter_outlier=False):
-    anns = csv_read_annot(label_path)
+    anns = csv_read_annot(label_path, pred=pred)
     P = csv_read_calib(calib_path)
 
     # The intrinsics may vary slightly for different images
