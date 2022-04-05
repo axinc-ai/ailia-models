@@ -155,7 +155,7 @@ def recognize_from_video(net):
         # press q to end video capture
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
-        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) < 1:
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
             break
 
         img_raw = cv2.cvtColor(img_raw, cv2.COLOR_BGR2RGB) / 255.0

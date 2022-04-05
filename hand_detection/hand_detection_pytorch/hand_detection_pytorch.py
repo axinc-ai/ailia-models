@@ -107,7 +107,7 @@ def recognize_from_video():
         # press q to end video capture
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
-        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) < 1:
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
             break
 
         img, scale = hand_detection_pytorch_utils.pre_process(to_show)

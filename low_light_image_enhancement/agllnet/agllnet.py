@@ -109,7 +109,7 @@ def recognize_from_video():
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
-        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) < 1:
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
             break
 
         input = cv2.resize(frame, (HEIGHT_SIZE, WIDTH_SIZE), interpolation=cv2.INTER_LANCZOS4) / 255.

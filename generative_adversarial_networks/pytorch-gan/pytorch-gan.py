@@ -112,7 +112,7 @@ def generate_video():
     while(True):
         if (cv2.waitKey(1) & 0xFF == ord('q')):
             break
-        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) < 1:
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
             break
 
         # prepare input data
