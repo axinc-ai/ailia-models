@@ -4,6 +4,8 @@
 
 ![Input](input.jpg)
 
+(Image from https://github.com/hustvl/YOLOP/blob/main/inference/images/0ace96c3-48481887.jpg)
+
 Ailia input shape: (1, 3, 1280, 720)
 Range: [-1.0, 1.0]
 
