@@ -52,7 +52,7 @@ IMAGE_HEIGHT = 339
 # Arguemnt Parser Config
 # ======================
 parser = get_base_parser(
-    'Ready-to-use OCR', IMAGE_PATH, None
+    'Ready-to-use OCR', IMAGE_PATH, SAVE_IMAGE_OR_VIDEO_PATH
 )
 parser.add_argument(
     '-l', '--language', type=str, default='chinese',
@@ -91,6 +91,7 @@ def recognize_from_image():
         # draw result
         draw_img = draw_ocr_box_txt(img, result)
         cv2.imwrite(args.savepath, draw_img)
+    logger.info('Script finished successfully.')
 
 
 def recognize_from_video():
@@ -104,10 +105,14 @@ def recognize_from_video():
         video_writer = None
 
     i = 0
+    frame_shown = False
     while(True):
         i += 1
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+        print(cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE))
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) < 1:
             break
 
         frame_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
@@ -121,9 +126,12 @@ def recognize_from_video():
             print(f'  word={r[1]} confidence={r[2]} bbox={r[0]}')
 
         # write a frame image to video
+        draw_frame = draw_ocr_box_txt(frame, result)
         if video_writer is not None:
-            draw_frame = draw_ocr_box_txt(frame, result)
             video_writer.write(draw_frame)
+
+        cv2.imshow('frame', draw_frame)
+        frame_shown = True
 
     capture.release()
     cv2.destroyAllWindows()
