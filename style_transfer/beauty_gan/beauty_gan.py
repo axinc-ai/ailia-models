@@ -214,7 +214,7 @@ def recognize_from_video(net, face_net):
         ret, frame = capture.read()
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
-        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) < 1:
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
             break
         if not ret:
             continue

@@ -112,7 +112,7 @@ def recognize_from_video():
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
         print(cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE))
-        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) < 1:
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
             break
 
         frame_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)

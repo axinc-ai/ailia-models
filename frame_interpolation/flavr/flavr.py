@@ -161,7 +161,7 @@ def recognize_from_video(net, n_output):
         ret, frame = cap.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
-        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) < 1:
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
             break
 
         images.append(cv2.resize(frame, (f_w, f_h)))
