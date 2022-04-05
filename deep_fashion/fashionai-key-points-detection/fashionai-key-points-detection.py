@@ -197,9 +197,12 @@ def recognize_from_image(filename, net):
 def recognize_from_video(video, net):
     capture = get_capture(video)
 
+    frame_shown = False
     while (True):
         ret, frame = capture.read()
         if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) < 1:
             break
         if not ret:
             continue
@@ -209,6 +212,7 @@ def recognize_from_video(video, net):
 
         # show
         cv2.imshow('frame', res_img)
+        frame_shown = True
 
     capture.release()
     cv2.destroyAllWindows()

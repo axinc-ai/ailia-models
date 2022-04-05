@@ -162,9 +162,12 @@ def recognize_from_video(net):
     else:
         writer = None
 
+    frame_shown = False
     while (True):
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+        if frame_shown and cv2.getWindowProperty('output', cv2.WND_PROP_VISIBLE) < 1:
             break
 
         IMAGE_HEIGHT, IMAGE_WIDTH = frame.shape[0], frame.shape[1]
@@ -183,6 +186,7 @@ def recognize_from_video(net):
         out_img = quantize(output[0][0], 255)
         out_img = out_img.astype(np.uint8).transpose(1, 2, 0)
         cv2.imshow('output', out_img)
+        frame_shown = True
 
         # save results
         if writer is not None:

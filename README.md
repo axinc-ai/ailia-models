@@ -27,6 +27,7 @@ The collection of pre-trained, state-of-the-art AI models.
 | | Model | Reference | Exported From | Supported Ailia Version | Blog |
 |:-----------|------------:|:------------:|:------------:|:------------:|:------------:|
 | [<img src="anomaly_detection/padim/output.png" width=128px>](anomaly_detection/padim/) | [padim](/anomaly_detection/padim/) | [PaDiM-Anomaly-Detection-Localization-master](https://github.com/xiahaifeng1995/PaDiM-Anomaly-Detection-Localization-master) | Pytorch | 1.2.6 and later | [EN](https://medium.com/axinc-ai/padim-a-machine-learning-model-for-detecting-defective-products-without-retraining-5daa6f203377) [JP](https://medium.com/axinc/padim-%E5%86%8D%E5%AD%A6%E7%BF%92%E4%B8%8D%E8%A6%81%E3%81%A7%E4%B8%8D%E8%89%AF%E5%93%81%E6%A4%9C%E7%9F%A5%E3%82%92%E8%A1%8C%E3%81%86%E6%A9%9F%E6%A2%B0%E5%AD%A6%E7%BF%92%E3%83%A2%E3%83%87%E3%83%AB-69add653fbd3) |
+| [<img src="anomaly_detection/spade-pytorch/output.png" width=128px>](anomaly_detection/spade-pytorch/) | [spade-pytorch](/anomaly_detection/spade-pytorch/) | [Sub-Image Anomaly Detection with Deep Pyramid Correspondences](https://github.com/byungjae89/SPADE-pytorch) | Pytorch | 1.2.6 and later | |
 
 ## Audio processing
 
@@ -242,15 +243,15 @@ The collection of pre-trained, state-of-the-art AI models.
 
 | Model | Reference | Exported From | Supported Ailia Version | Blog |
 |------------:|:------------:|:------------:|:------------:|:------------:|
-|[bert](/neural_language_processing/bert) | [pytorch-pretrained-bert](https://pypi.org/project/pytorch-pretrained-bert/) | Pytorch | 1.2.2 and later | [EN](https://medium.com/axinc-ai/bert-a-machine-learning-model-for-efficient-natural-language-processing-aef3081c24e8) [JP](https://medium.com/axinc/bert-%E8%87%AA%E7%84%B6%E8%A8%80%E8%AA%9E%E5%87%A6%E7%90%86%E3%82%92%E5%8A%B9%E7%8E%87%E7%9A%84%E3%81%AB%E5%AD%A6%E7%BF%92%E3%81%99%E3%82%8B%E6%A9%9F%E6%A2%B0%E5%AD%A6%E7%BF%92%E3%83%A2%E3%83%87%E3%83%AB-3a9c27d78cf8) |
-|[bert_maskedlm](/neural_language_processing/bert_maskedlm) | [huggingface/transformers](https://github.com/huggingface/transformers) | Pytorch | 1.2.5 and later |
-|[bert_ner](/neural_language_processing/bert_ner) | [huggingface/transformers](https://github.com/huggingface/transformers) | Pytorch | 1.2.5 and later |
-|[bert_question_answering](/neural_language_processing/bert_question_answering) | [huggingface/transformers](https://github.com/huggingface/transformers) | Pytorch | 1.2.5 and later |
-|[bert_sentiment_analysis](/neural_language_processing/bert_sentiment_analysis) | [huggingface/transformers](https://github.com/huggingface/transformers) | Pytorch | 1.2.5 and later |
-|[bert_zero_shot_classification](/neural_language_processing/bert_zero_shot_classification) | [huggingface/transformers](https://github.com/huggingface/transformers) | Pytorch | 1.2.5 and later |
-|[bert_tweets_sentiment](/neural_language_processing/bert_tweets_sentiment) | [huggingface/transformers](https://github.com/huggingface/transformers) | Pytorch | 1.2.5 and later |
-|[gpt2](/neural_language_processing/gpt2) | [GPT-2](https://github.com/onnx/models/blob/master/text/machine_comprehension/gpt-2/README.md) | Pytorch | 1.2.7 and later |
-|[rinna_gpt2](/neural_language_processing/rinna_gpt2) | [japanese-pretrained-models](https://github.com/rinnakk/japanese-pretrained-models)   | Pytorch | 1.2.7 and later |
+|[bert](/natural_language_processing/bert) | [pytorch-pretrained-bert](https://pypi.org/project/pytorch-pretrained-bert/) | Pytorch | 1.2.2 and later | [EN](https://medium.com/axinc-ai/bert-a-machine-learning-model-for-efficient-natural-language-processing-aef3081c24e8) [JP](https://medium.com/axinc/bert-%E8%87%AA%E7%84%B6%E8%A8%80%E8%AA%9E%E5%87%A6%E7%90%86%E3%82%92%E5%8A%B9%E7%8E%87%E7%9A%84%E3%81%AB%E5%AD%A6%E7%BF%92%E3%81%99%E3%82%8B%E6%A9%9F%E6%A2%B0%E5%AD%A6%E7%BF%92%E3%83%A2%E3%83%87%E3%83%AB-3a9c27d78cf8) |
+|[bert_maskedlm](/natural_language_processing/bert_maskedlm) | [huggingface/transformers](https://github.com/huggingface/transformers) | Pytorch | 1.2.5 and later |
+|[bert_ner](/natural_language_processing/bert_ner) | [huggingface/transformers](https://github.com/huggingface/transformers) | Pytorch | 1.2.5 and later |
+|[bert_question_answering](/natural_language_processing/bert_question_answering) | [huggingface/transformers](https://github.com/huggingface/transformers) | Pytorch | 1.2.5 and later |
+|[bert_sentiment_analysis](/natural_language_processing/bert_sentiment_analysis) | [huggingface/transformers](https://github.com/huggingface/transformers) | Pytorch | 1.2.5 and later |
+|[bert_zero_shot_classification](/natural_language_processing/bert_zero_shot_classification) | [huggingface/transformers](https://github.com/huggingface/transformers) | Pytorch | 1.2.5 and later |
+|[bert_tweets_sentiment](/natural_language_processing/bert_tweets_sentiment) | [huggingface/transformers](https://github.com/huggingface/transformers) | Pytorch | 1.2.5 and later |
+|[gpt2](/natural_language_processing/gpt2) | [GPT-2](https://github.com/onnx/models/blob/master/text/machine_comprehension/gpt-2/README.md) | Pytorch | 1.2.7 and later |
+|[rinna_gpt2](/natural_language_processing/rinna_gpt2) | [japanese-pretrained-models](https://github.com/rinnakk/japanese-pretrained-models)   | Pytorch | 1.2.7 and later |
 
 ## Object detection
 
@@ -343,6 +344,7 @@ The collection of pre-trained, state-of-the-art AI models.
 | [<img src="road_detection/cdnet/output/filename_00038_res.png" width=128px>](road_detection/cdnet/) | [cdnet](/road_detection/cdnet/) | [CDNet](https://github.com/zhangzhengde0225/CDNet) | Pytorch | 1.2.5 and later |
 | [<img src="road_detection/lstr/output.jpg" width=128px>](road_detection/lstr/) | [lstr](/road_detection/lstr/) | [LSTR](https://github.com/liuruijin17/LSTR) | Pytorch | 1.2.8 and later |
 | [<img src="road_detection/ultra-fast-lane-detection/output.jpg" width=128px>](road_detection/ultra-fast-lane-detection/) | [ultra-fast-lane-detection](/road_detection/ultra-fast-lane-detection/) | [Ultra-Fast-Lane-Detection](https://github.com/cfzd/Ultra-Fast-Lane-Detection) | Pytorch | 1.2.6 and later |
+| [<img src="road_detection/yolop/output.jpg" width=128px>](road_detection/yolop/) | [yolop](/road_detection/yolop/) | [YOLOP](https://github.com/hustvl/YOLOP) | Pytorch | 1.2.6 and later |
 
 ## Rotation prediction
 
@@ -358,6 +360,7 @@ The collection of pre-trained, state-of-the-art AI models.
 | [<img src="style_transfer/psgan/output.png" width=128px>](style_transfer/psgan/) | [psgan](/style_transfer/psgan/) | [PSGAN: Pose and Expression Robust Spatial-Aware GAN for Customizable Makeup Transfer](https://github.com/wtjiang98/PSGAN)| Pytorch | 1.2.7 and later | |
 | [<img src="style_transfer/beauty_gan/output.png" width=128px>](style_transfer/beauty_gan/) | [beauty_gan](/style_transfer/beauty_gan/) | [BeautyGAN](https://github.com/wtjiang98/BeautyGAN_pytorch) | Pytorch | 1.2.7 and later | |
 | [<img src="style_transfer/animeganv2/output.png" width=128px>](style_transfer/animeganv2/) | [animeganv2](/style_transfer/animeganv2/) | [PyTorch Implementation of AnimeGANv2](https://github.com/bryandlee/animegan2-pytorch) | Pytorch | 1.2.5 and later | |
+| [<img src="style_transfer/pix2pixHD/output.png" width=128px>](style_transfer/pix2pixHD/) | [pix2pixHD](/style_transfer/pix2pixHD/) | [pix2pixHD: High-Resolution Image Synthesis and Semantic Manipulation with Conditional GANs](https://github.com/NVIDIA/pix2pixHD) | Pytorch | 1.2.6 and later | |
 
 ## Super resolution
 

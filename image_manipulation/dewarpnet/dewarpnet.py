@@ -147,9 +147,12 @@ def unwarp_from_video():
     else:
         writer = None
 
+    frame_shown = False
     while(True):
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) < 1:
             break
 
         org_image, input_data = webcamera_utils.preprocess_frame(
@@ -159,6 +162,7 @@ def unwarp_from_video():
         uwpred = run_inference(wc_net, bm_net, input_data, org_image)
 
         cv2.imshow('frame', uwpred)
+        frame_shown = True
         # TODO: FIXME:
         # >>> error: (-215:Assertion failed)
         # >>> image.depth() == CV_8U in function 'write'

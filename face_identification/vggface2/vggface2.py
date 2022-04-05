@@ -160,9 +160,12 @@ def compare_videoframe_image():
     else:
         writer = None
 
+    frame_shown = True
     while(True):
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) < 1:
             break
 
         _, resized_frame = webcamera_utils.adjust_frame_size(
@@ -184,6 +187,7 @@ def compare_videoframe_image():
         else:
             logger.info('Not same person')
         cv2.imshow('frame', resized_frame)
+        frame_shown = False
         time.sleep(SLEEP_TIME)
 
         # save results

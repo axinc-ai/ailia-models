@@ -270,15 +270,19 @@ def process_video():
     else:
         writer = None
 
+    frame_shown = False
     while(True):
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) < 1:
             break
 
         img = process_frame(net, locator, frame)
 
         img = img[..., ::-1]
         cv2.imshow('frame', img)
+        frame_shown = True
         # save results
         if writer is not None:
             writer.write(img)

@@ -140,9 +140,12 @@ def recognize_from_video(video, net):
     else:
         writer = None
 
+    frame_shown = True
     while True:
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) < 1:
             break
 
         out_mask = predict(frame, net)
@@ -155,6 +158,7 @@ def recognize_from_video(video, net):
 
         # show
         cv2.imshow('frame', res_img)
+        frame_shown = False
         # save results
         if writer is not None:
             writer.write(res_img)

@@ -349,10 +349,16 @@ def recognize_from_video(net):
     capture = webcamera_utils.get_capture(args.video)
     writer = None
 
+    frame_shown = False
     while(True):
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
+        if frame_shown and cv2.getWindowProperty('trimap', cv2.WND_PROP_VISIBLE) < 1:
+            break
+        if frame_shown and cv2.getWindowProperty('segmentation', cv2.WND_PROP_VISIBLE) < 1:
+            break
+
 
         # grab src image
         src_img = frame
@@ -383,6 +389,7 @@ def recognize_from_video(net):
         trimap_data, seg_data = generate_trimap(seg_net, src_img, args)
         cv2.imshow('trimap', trimap_data / 255.0)
         cv2.imshow('segmentation', seg_data / 255.0)
+        frame_shown = True
 
         # tile loop
         process_one_frame(output_img,src_img,trimap_data,IMAGE_WIDTH,IMAGE_HEIGHT,PADDING,net)
