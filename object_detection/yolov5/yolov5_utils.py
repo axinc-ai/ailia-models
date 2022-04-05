@@ -103,6 +103,13 @@ def post_processing(img, conf_thres, nms_thres, outputs):
         outputx = outputs[0]
     else:
         # yolov5 v1
+
+        #(1, 3, 80, 80, 85) # anchor 0
+        #(1, 3, 40, 40, 85) # anchor 1
+        #(1, 3, 20, 20, 85) # anchor 2
+
+        #[cx,cy,w,h,conf,pred_cls(80)]
+
         for index, out in enumerate(outputs):
             batch = out.shape[1]
             feature_h = out.shape[2]
