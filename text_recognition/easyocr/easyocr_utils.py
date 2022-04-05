@@ -1,8 +1,10 @@
 import os
+import sys
 import math
+import random
 import cv2
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFont
 
 from scipy.special import softmax
 
@@ -642,3 +644,51 @@ def recognizer_predict(language, lang_list, character, symbol, net, image_grey, 
         result += result0
 
     return result
+
+
+def draw_ocr_box_txt(image, result, bbox_padding=0.):
+    detected_image = image
+    recognized_image = Image.new('RGB', (image.shape[1], image.shape[0]), (255, 255, 255))
+    draw_recognized = ImageDraw.Draw(recognized_image)
+
+    if sys.platform == "win32":
+        # Windows
+        font_path = 'C:/windows/Fonts/meiryo.ttc'
+    elif sys.platform == "darwin":
+        # Mac OS
+        font_path = '/System/Library/Fonts/ヒラギノ丸ゴ ProN W4.ttc'
+    else:
+        # Linux
+        font_path = '/usr/share/fonts/opentype/ipaexfont-gothic/ipaexg.ttf'
+
+    for r in result:
+        color = (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
+        bbox = r[0]
+        # detected image (left)
+        cv2.rectangle(detected_image, (bbox[3][0], bbox[3][1]), (bbox[1][0], bbox[1][1]), color, thickness=2)
+        # recognized image (right)
+        draw_recognized.polygon([
+            bbox[0][0], bbox[0][1], bbox[1][0], bbox[1][1], bbox[2][0],
+            bbox[2][1], bbox[3][0], bbox[3][1]
+        ], outline=color)
+        box_height = math.sqrt((bbox[0][0] - bbox[3][0])**2 + (bbox[0][1] - bbox[3][1])**2)
+        box_width = math.sqrt((bbox[0][0] - bbox[1][0])**2 + (bbox[0][1] - bbox[1][1])**2)
+        if box_height > 2 * box_width:
+            font_size = max(int(box_width * 0.9 * (1 - bbox_padding)), 10)
+            font = ImageFont.truetype(font_path, font_size, encoding="utf-8")
+            cur_y = bbox[0][1]
+            for c in r[1]:
+                char_size = font.getsize(c)
+                draw_recognized.text(
+                    (bbox[0][0] + 3, cur_y), c, fill=(0, 0, 0), font=font)
+                cur_y += char_size[1]
+        else:
+            font_size = max(int(box_height * 0.8 * (1 - bbox_padding)), 10)
+            font = ImageFont.truetype(font_path, font_size, encoding="utf-8")
+            draw_recognized.text(
+                [bbox[0][0], bbox[0][1]], r[1], fill=(0, 0, 0), font=font)
+
+    recognized_image = np.array(recognized_image)
+    image = cv2.hconcat([detected_image, recognized_image])
+
+    return image

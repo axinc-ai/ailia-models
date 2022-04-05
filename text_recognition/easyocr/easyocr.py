@@ -40,8 +40,12 @@ RECOGNIZER_THAI_WEIGHT_PATH     = 'recognizer_thai.onnx'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/easyocr/'
 
 IMAGE_PATH = 'example/chinese.jpg'
+IMAGE_OR_VIDEO_PATH = 'input.jpg'
+SAVE_IMAGE_OR_VIDEO_PATH = 'output.png'
+
 IMAGE_WIDTH = 640
 IMAGE_HEIGHT = 339
+
 
 
 # ======================
@@ -79,14 +83,25 @@ def recognize_from_image():
         # predict
         result = predict(img, img_gray)
 
-        # show
-        print('recognize result')
+        # print result
+        print('==============================================================')
         for r in result:
-            print(r)
+            print(f'  word={r[1]} confidence={r[2]} bbox={r[0]}')
+
+        # draw result
+        draw_img = draw_ocr_box_txt(img, result)
+        cv2.imwrite(args.savepath, draw_img)
 
 
 def recognize_from_video():
     capture = webcamera_utils.get_capture(args.video)
+
+    if args.savepath != SAVE_IMAGE_OR_VIDEO_PATH:
+        f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH)) * 2
+        video_writer = webcamera_utils.get_writer(args.savepath, f_h, f_w)
+    else:
+        video_writer = None
 
     i = 0
     while(True):
@@ -100,12 +115,21 @@ def recognize_from_video():
         # predict
         result = predict(frame, frame_gray)
 
-        # show
-        print('[{}] recognize result'.format(i))
+        # print result
+        print('==============================================================')
         for r in result:
-            print(r)
+            print(f'  word={r[1]} confidence={r[2]} bbox={r[0]}')
+
+        # write a frame image to video
+        if video_writer is not None:
+            draw_frame = draw_ocr_box_txt(frame, result)
+            video_writer.write(draw_frame)
 
     capture.release()
+    cv2.destroyAllWindows()
+    if video_writer is not None:
+        video_writer.release()
+        logger.info('finished process and write result to %s!' % args.savepath)
     logger.info('Script finished successfully.')
 
 

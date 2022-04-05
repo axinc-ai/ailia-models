@@ -9,20 +9,20 @@ Ready-to-use OCR with 80+ supported languages and all popular writing scripts in
 
 ## Output
 
-recognized text    
-shape is (binding box, recognized text, confidence score)
+recognized text and visualized image
 
 ```
-recognize result
-([[86, 80], [134, 80], [134, 128], [86, 128]], '西', 0.5986109503715511)
-([[187, 75], [469, 75], [469, 165], [187, 165]], '愚园路', 0.7509350273962178)
-([[517, 81], [565, 81], [565, 123], [517, 123]], '东', 0.9941764272051365)
-([[78, 126], [136, 126], [136, 156], [78, 156]], '315', 0.9999935304043551)
-([[514, 124], [574, 124], [574, 156], [514, 156]], '309', 0.9999765305361424)
-([[81, 175], [125, 175], [125, 211], [81, 211]], 'I', 0.9425757451290373)
-([[226, 171], [414, 171], [414, 220], [226, 220]], 'Yyan Rd', 0.6217804142448365)
-([[529, 173], [569, 173], [569, 213], [529, 213]], 'E', 0.03826956319031538)
+  word=西 bbox=[[86, 80], [134, 80], [134, 128], [86, 128]] confidence=0.5982276948352592
+  word=愚园路 bbox=[[187, 75], [469, 75], [469, 165], [187, 165]] confidence=0.7516731254579294
+  word=东 bbox=[[517, 81], [565, 81], [565, 123], [517, 123]] confidence=0.9942460813641709
+  word=315 bbox=[[78, 126], [136, 126], [136, 156], [78, 156]] confidence=0.9999935304043551
+  word=309 bbox=[[514, 124], [574, 124], [574, 156], [514, 156]] confidence=0.9999759111084772
+  word=I bbox=[[81, 175], [125, 175], [125, 211], [81, 211]] confidence=0.9417670402058889
+  word=Yyan Rd bbox=[[226, 171], [414, 171], [414, 220], [226, 220]] confidence=0.6218364490642484
+  word=E bbox=[[529, 173], [569, 173], [569, 213], [529, 213]] confidence=0.038355074509201836
 ```
+
+![output image](output.png)
 
 ## Usage
 
@@ -35,8 +35,10 @@ $ python3 easyocr.py
 ```
 
 If you want to specify the input image, put the image path after the `--input` option.  
+You can use `--savepath` option to change the name of the output file to save.
 ```bash
 $ python3 easyocr.py --input IMAGE_PATH
+$ python3 easyocr.py -i IMAGE_PATH -s SAVE_IMAGE_PATH
 ```
 
 By adding the `--video` option, you can input the video.   
