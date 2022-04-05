@@ -27,7 +27,7 @@ logger = getLogger(__name__)
 # Parameters
 # ======================
 
-MODEL_LISTS = ['yolov5s', 'yolov5m', 'yolov5l', 'yolov5x']
+MODEL_LISTS = ['yolov5s', 'yolov5m', 'yolov5l', 'yolov5x', 'yolov5s6']
 DETECTION_SIZE_LISTS = [640, 1280]
 
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/yolov5/'

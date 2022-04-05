@@ -98,40 +98,38 @@ def post_processing(img, conf_thres, nms_thres, outputs):
     a = np.array(anchors).reshape(3, -1, 2)
     anchor_grid = a.copy().reshape(3, 1, -1, 1, 1, 2)
 
-    #onnx output
-    #(1, 3, 80, 80, 85) # anchor 0
-    #(1, 3, 40, 40, 85) # anchor 1
-    #(1, 3, 20, 20, 85) # anchor 2
+    if len(outputs)==1:
+        # yolov5 v6
+        outputx = outputs[0]
+    else:
+        # yolov5 v1
+        for index, out in enumerate(outputs):
+            batch = out.shape[1]
+            feature_h = out.shape[2]
+            feature_w = out.shape[3]
 
-    #[cx,cy,w,h,conf,pred_cls(80)]
+            # Feature map corresponds to the original image zoom factor
+            stride_w = int(img_size_w / feature_w)
+            stride_h = int(img_size_h / feature_h)
 
-    for index, out in enumerate(outputs):
-        batch = out.shape[1]
-        feature_h = out.shape[2]
-        feature_w = out.shape[3]
+            grid_x, grid_y = np.meshgrid(np.arange(feature_w), np.arange(feature_h))
 
-        # Feature map corresponds to the original image zoom factor
-        stride_w = int(img_size_w / feature_w)
-        stride_h = int(img_size_h / feature_h)
+            # cx, cy, w, h
+            pred_boxes = np.zeros(out[..., :4].shape)
+            pred_boxes[..., 0] = (sigmoid(out[..., 0]) * 2.0 - 0.5 + grid_x) * stride_w  # cx
+            pred_boxes[..., 1] = (sigmoid(out[..., 1]) * 2.0 - 0.5 + grid_y) * stride_h  # cy
+            pred_boxes[..., 2:4] = (sigmoid(out[..., 2:4]) * 2) ** 2 * anchor_grid[index]  # wh
 
-        grid_x, grid_y = np.meshgrid(np.arange(feature_w), np.arange(feature_h))
+            conf = sigmoid(out[..., 4])
+            pred_cls = sigmoid(out[..., 5:])
 
-        # cx, cy, w, h
-        pred_boxes = np.zeros(out[..., :4].shape)
-        pred_boxes[..., 0] = (sigmoid(out[..., 0]) * 2.0 - 0.5 + grid_x) * stride_w  # cx
-        pred_boxes[..., 1] = (sigmoid(out[..., 1]) * 2.0 - 0.5 + grid_y) * stride_h  # cy
-        pred_boxes[..., 2:4] = (sigmoid(out[..., 2:4]) * 2) ** 2 * anchor_grid[index]  # wh
+            output = np.concatenate((pred_boxes.reshape(batch_size, -1, 4),
+                                conf.reshape(batch_size, -1, 1),
+                                pred_cls.reshape(batch_size, -1, num_classes)),
+                                -1)
+            boxs.append(output)
 
-        conf = sigmoid(out[..., 4])
-        pred_cls = sigmoid(out[..., 5:])
-
-        output = np.concatenate((pred_boxes.reshape(batch_size, -1, 4),
-                            conf.reshape(batch_size, -1, 1),
-                            pred_cls.reshape(batch_size, -1, num_classes)),
-                            -1)
-        boxs.append(output)
-
-    outputx = np.concatenate(boxs, 1)
+        outputx = np.concatenate(boxs, 1)
 
     # NMS
     batch_detections = non_max_suppression(outputx, num_classes, conf_thres=conf_thres, nms_thres=nms_thres)
