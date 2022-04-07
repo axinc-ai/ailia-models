@@ -25,8 +25,8 @@ logger = getLogger(__name__)
 # ======================
 # Parameters
 # ======================
-WEIGHT_PATH = 'mask_rcnn_R_50_FPN_1x.onnx'
-MODEL_PATH = 'mask_rcnn_R_50_FPN_1x.onnx.prototxt'
+WEIGHT_PATH = 'mask_rcnn_R_50_FPN_1x.opt.onnx'
+MODEL_PATH = 'mask_rcnn_R_50_FPN_1x.opt.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/mask_rcnn/'
 
 IMAGE_PATH = 'demo.jpg'

@@ -32,8 +32,8 @@ warnings.simplefilter("ignore", DeprecationWarning)
 # ======================
 # Parameters
 # ======================
-WEIGHT_PATH_MASKRCNN = 'mask_rcnn_R_50_FPN_1x.onnx'
-MODEL_PATH_MASKRCNN = 'mask_rcnn_R_50_FPN_1x.onnx.prototxt'
+WEIGHT_PATH_MASKRCNN = 'mask_rcnn_R_50_FPN_1x.opt.onnx'
+MODEL_PATH_MASKRCNN = 'mask_rcnn_R_50_FPN_1x.opt.onnx.prototxt'
 REMOTE_PATH_MASKRCNN = 'https://storage.googleapis.com/ailia-models/mask_rcnn/'
 
 WEIGHT_PATH_ROOTNET = 'rootnet_snapshot_18.opt.onnx'
