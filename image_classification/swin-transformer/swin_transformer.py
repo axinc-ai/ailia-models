@@ -11,8 +11,9 @@ sys.path.append('../../util')
 from utils import get_base_parser, update_parser  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from image_utils import load_image  # noqa: E402
-from classifier_utils import plot_results, print_results  # noqa: E402
 import webcamera_utils  # noqa: E402
+
+from swin_transformer_utils import plot_results, print_results
 
 # logger
 from logging import getLogger   # noqa: E402
@@ -26,7 +27,7 @@ WEIGHT_PATH = 'swin-transformer_tiny_patch4_window7_224.onnx'
 MODEL_PATH = 'swin-transformer_tiny_patch4_window7_224.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/swin-transformer/'
 
-IMAGE_PATH = 'example/ILSVRC2012_val_00026142.JPEG'
+IMAGE_PATH = 'input.jpg'
 IMAGE_HEIGHT = 224
 IMAGE_WIDTH = 224
 
@@ -87,20 +88,8 @@ def recognize_from_image():
         output = net.predict(input)
 
         # postprocess
-        topk = 3
         output = output[0]
-        unsorted_max_indices = np.argpartition(-output, topk)[:topk]
-        output = output[unsorted_max_indices]
-        indices = np.argsort(-output)
-        max_k_indices = unsorted_max_indices[indices]
-
-        # show
-        print('==============================================================')
-        for idx in range(topk):
-            print(f'+ idx={idx}')
-            print(f'  category={max_k_indices[idx]}['
-                  f'{labels[max_k_indices[idx]][1]} ]')
-            print(f'  prob={output[indices[idx]]}')
+        print_results(output, labels)
 
     logger.info('Script finished successfully.')
 
@@ -113,6 +102,14 @@ def recognize_from_video():
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
 
     capture = webcamera_utils.get_capture(args.video)
+
+    # create video writer if savepath is specified as video format
+    if args.savepath is not None:
+        f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
+        writer = webcamera_utils.get_writer(args.savepath, f_h, f_w)
+    else:
+        writer = None
 
     while(True):
         ret, frame = capture.read()
@@ -144,14 +141,19 @@ def recognize_from_video():
         output = net.predict(input)
 
         # postprocess
-        output = np.argmax(output, axis=1)
+        output = output[0]
+        plot_results(frame, output, labels)
 
-        # show
-        logger.info('class = {}'.format(labels[output[0]][1]))
+        cv2.imshow('frame', frame)
+
+        # save results
+        if writer is not None:
+            writer.write(frame)
 
     capture.release()
     cv2.destroyAllWindows()
-
+    if writer is not None:
+        writer.release()
     logger.info('Script finished successfully.')
 
 

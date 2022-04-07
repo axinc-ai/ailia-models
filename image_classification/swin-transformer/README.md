@@ -2,7 +2,7 @@
 
 ## Input
 
-![Input](example/ILSVRC2012_val_00026142.JPEG)
+![Input](input.jpg)
 
 (from https://www.kaggle.com/datasets/ifigotin/imagenetmini-1000)
 
@@ -11,6 +11,7 @@ Shape : (1,3,224,224)
 ## Output
 
 ```
+class_count=3
 + idx=0
   category=981[ballplayer, baseball player ]
   prob=8.67708683013916
@@ -29,18 +30,18 @@ It is necessary to be connected to the Internet while downloading.
 
 For the sample image,
 ``` bash
-$ python3 swin-transformer.py
+$ python3 swin_transformer.py
 ```
 
 If you want to specify the input image, put the image path after the `--input` option.  
 ```bash
-$ python3 swin-transformer.py --input IMAGE_PATH
+$ python3 swin_transformer.py --input IMAGE_PATH
 ```
 
 By adding the `--video` option, you can input the video.   
 If you pass `0` as an argument to VIDEO_PATH, you can use the webcam input instead of the video file.
 ```bash
-$ python3 swin-transformer.py --video VIDEO_PATH
+$ python3 swin_transformer.py --video VIDEO_PATH
 ```
 
 
