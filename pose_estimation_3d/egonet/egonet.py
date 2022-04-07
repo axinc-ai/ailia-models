@@ -46,7 +46,7 @@ REMOTE_YOLOV4_PATH = 'https://storage.googleapis.com/ailia-models/yolov4/'
 
 LS_path = 'LS.npy'
 
-IMAGE_PATH = 'demo.png'
+IMAGE_PATH = '007161.png'
 SAVE_IMAGE_PATH = 'output.png'
 
 IMAGE_SIZE = 256
@@ -617,10 +617,7 @@ def main():
         detect_cars.net = ailia.Net(
             MODEL_YOLOV4_PATH, WEIGHT_YOLOV4_PATH, env_id=env_id)
 
-    if args.video is not None:
-        pass
-    else:
-        recognize_from_image(HC, LS, L)
+    recognize_from_image(HC, LS, L)
 
 
 if __name__ == '__main__':
