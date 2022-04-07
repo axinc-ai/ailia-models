@@ -1,0 +1,14 @@
+basedir = ./data/nerf_llff_data/fern
+dataset_type = llff
+factor = 4
+
+no_batching = False
+i_embed = 0
+N_samples = 64
+N_importance = 128
+use_viewdirs = True
+lrate_decay = 250
+
+llffhold = 8
+
+N_rand = 4096
