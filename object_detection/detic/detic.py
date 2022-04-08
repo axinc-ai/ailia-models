@@ -42,7 +42,7 @@ IMAGE_PATH = 'desk.jpg'
 SAVE_IMAGE_PATH = 'output.png'
 
 IMAGE_SIZE = 800
-IMAGE_MAX_SIZE = 1333
+IMAGE_MAX_SIZE = 800 #tempolary limit to 800px (original : 1333)
 
 # ======================
 # Arguemnt Parser Config
