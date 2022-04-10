@@ -25,24 +25,31 @@ import os
 # ======================
 # PARAMETERS 1
 # ======================
-IMAGE_PATH = "input.jpg"
+IMAGE_PATH = "input_imagenet.jpg"
 IMAGE_HEIGHT = 32
 IMAGE_WIDTH = 32
-CLASSES = ['airplane', 'automobile', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck']
 
 
 # ======================
 # Argument Parser Config
 # ======================
 parser = get_base_parser("ConvNeXt is ", IMAGE_PATH, None,)
+parser.add_argument('-m', '--model', metavar='MODEL',
+                    default="base_1k", choices=['base_1k', 'small_1k', 'tiny_1k', 'cifar10'])
 args = update_parser(parser)
 
 
 # ==========================
 # MODEL AND OTHER PARAMETERS
 # ==========================
-MODEL_PATH = "convnext_tiny_CIFAR-10.onnx.prototxt"
-WEIGHT_PATH = "convnext_tiny_CIFAR-10.onnx"
+CIFAR10_MODEL_PATH   = "convnext_tiny_CIFAR-10.onnx.prototxt"
+CIFAR10_WEIGHT_PATH  = "convnext_tiny_CIFAR-10.onnx"
+BASE_1k_MODEL_PATH   = "convnext_base_1k_224_ema.onnx.prototxt"
+BASE_1k_WEIGHT_PATH  = "convnext_base_1k_224_ema.onnx"
+SMALL_1k_MODEL_PATH  = "convnext_small_1k_224_ema.onnx.prototxt"
+SMALL_1k_WEIGHT_PATH = "convnext_small_1k_224_ema.onnx"
+TINY_1k_MODEL_PATH   = "convnext_tiny_1k_224_ema.onnx.prototxt"
+TINY_1k_WEIGHT_PATH  = "convnext_tiny_1k_224_ema.onnx"
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/convnext/"
 
 
@@ -73,7 +80,7 @@ def _preprocess(img):
     img = img[np.newaxis, :, :, :]
     return img
 
-def recognize_from_image(net):
+def recognize_from_image(net, classes):
     for image_path in args.input:
         # prepare input data
         if os.path.isfile(image_path):
@@ -87,11 +94,11 @@ def recognize_from_image(net):
         output = net.predict(image)
         pred_class = np.argmax(output)
 
-        print('predicted class = {}({}), {}'.format(pred_class, CLASSES[pred_class], image_path))
+        print('predicted class = {}({}), {}'.format(pred_class, classes[pred_class], image_path))
 
     return
 
-def recognize_from_video(net):
+def recognize_from_video(net, classes):
     capture = webcamera_utils.get_capture(args.video)
 
     i = 0
@@ -106,23 +113,50 @@ def recognize_from_video(net):
         output = net.predict(frame)
         pred_class = np.argmax(output)
 
-        print('predicted class = {}({}) frame = {}'.format(pred_class, CLASSES[pred_class], i))
+        print('predicted class = {}({}) frame = {}'.format(pred_class, classes[pred_class], i))
 
     capture.release()
     cv2.destroyAllWindows()
     return
 
 def main():
-    # model files check and download
-    check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
+    if args.model == 'base_1k':
+        # model files check and download
+        check_and_download_models(BASE_1k_WEIGHT_PATH, BASE_1k_MODEL_PATH, REMOTE_PATH)
+        # net initialize
+        net = ailia.Net(BASE_1k_MODEL_PATH, BASE_1k_WEIGHT_PATH, env_id=args.env_id)
+    elif args.model == 'small_1k':
+        # model files check and download
+        check_and_download_models(SMALL_1k_WEIGHT_PATH, SMALL_1k_MODEL_PATH, REMOTE_PATH)
+        # net initialize
+        net = ailia.Net(SMALL_1k_MODEL_PATH, SMALL_1k_WEIGHT_PATH, env_id=args.env_id)
+    elif args.model == 'tiny_1k':
+        # model files check and download
+        check_and_download_models(TINY_1k_WEIGHT_PATH, TINY_1k_MODEL_PATH, REMOTE_PATH)
+        # net initialize
+        net = ailia.Net(TINY_1k_MODEL_PATH, TINY_1k_WEIGHT_PATH, env_id=args.env_id)
+    elif args.model == 'cifar10':
+        # model files check and download
+        check_and_download_models(CIFAR10_WEIGHT_PATH, CIFAR10_MODEL_PATH, REMOTE_PATH)
+        # net initialize
+        net = ailia.Net(CIFAR10_MODEL_PATH, CIFAR10_WEIGHT_PATH, env_id=args.env_id)
+    else:
+        exit()
 
-    # net initialize
-    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
+    if args.model in ['base_1k', 'small_1k', 'tiny_1k']:
+        classes = {}
+        with open('label_table.txt', 'r') as f:
+             data = f.readlines()
+             for d in data:
+                 d = d.replace('\n', '').split('\t')
+                 classes[int(d[0])] = d[2]
+    else:
+        classes = ['airplane', 'automobile', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck']
 
     if args.video is not None: # video mode
-        recognize_from_video(net)
+        recognize_from_video(net, classes)
     else: # image mode
-        recognize_from_image(net)
+        recognize_from_image(net, classes)
 
     logger.info('Script finished successfully.')
 
