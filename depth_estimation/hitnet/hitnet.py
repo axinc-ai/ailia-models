@@ -161,7 +161,7 @@ def recognize_from_video(net):
         # Press key q to stop
         if cv2.waitKey(1) == ord('q'):
             break
-        if cv2.getWindowProperty('Estimated depth', cv2.WND_PROP_VISIBLE) < 1:
+        if cv2.getWindowProperty('Estimated depth', cv2.WND_PROP_VISIBLE) == 0:
             break
 
     

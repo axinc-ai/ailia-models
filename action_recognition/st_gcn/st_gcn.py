@@ -240,7 +240,7 @@ def recognize_from_file(input, pose, net):
             cv2.imshow("ST-GCN", image)
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
-            if cv2.getWindowProperty('ST-GCN', cv2.WND_PROP_VISIBLE) < 1:
+            if cv2.getWindowProperty('ST-GCN', cv2.WND_PROP_VISIBLE) == 0:
                 break
 
 
@@ -259,7 +259,7 @@ def recognize_realtime(video, pose, net):
         ret, frame = capture.read()
         if cv2.waitKey(1) & 0xFF == ord('q') or not ret:
             break
-        if frame_shown and cv2.getWindowProperty('ST-GCN', cv2.WND_PROP_VISIBLE) < 1:
+        if frame_shown and cv2.getWindowProperty('ST-GCN', cv2.WND_PROP_VISIBLE) == 0:
             break
 
         source_H, source_W, _ = frame.shape
