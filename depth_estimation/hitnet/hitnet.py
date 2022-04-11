@@ -131,6 +131,10 @@ def recognize_from_video(net):
         input_shape = net.get_inputs()[0].shape
     else:
         input_shape = net.get_input_shape()
+    
+    if not left_images or not right_images:
+        logger.error("This model requires stereo images")
+        return
 
     cv2.namedWindow("Estimated depth", cv2.WINDOW_NORMAL)
     for left_path, right_path in zip(left_images, right_images):

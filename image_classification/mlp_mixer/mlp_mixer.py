@@ -116,7 +116,7 @@ def recognize_from_video():
         preds = softmax(preds)
 
         # get result
-        print_results(preds, imagenet_category)
+        plot_results(frame, preds, imagenet_category)
 
         cv2.imshow('frame', frame)
         frame_shown = True
