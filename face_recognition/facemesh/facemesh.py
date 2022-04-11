@@ -67,6 +67,8 @@ LANDMARK_REMOTE_PATH = f'https://storage.googleapis.com/ailia-models/{LANDMARK_M
 # Utils
 # ======================
 def draw_roi(img, roi):
+    if len(roi) <= 0:
+        return
     for i in range(roi.shape[0]):
         (x1, x2, x3, x4), (y1, y2, y3, y4) = roi[i]
         cv2.line(img, (int(x1), int(y1)), (int(x2), int(y2)), (0, 0, 0), 2)
@@ -149,11 +151,15 @@ def recognize_from_image():
         logger.info('Start inference...')
         if args.benchmark:
             logger.info('BENCHMARK mode')
-            for _ in range(args.benchmark_count):
+            total_time = 0
+            for i in range(args.benchmark_count):
                 start = int(round(time.time() * 1000))
                 landmarks, confidences, box = estimate_landmarks(input_data, src_img, scale, pad, detector, fut, estimator)
                 end = int(round(time.time() * 1000))
+                if i != 0:
+                    total_time = total_time + (end - start)
                 logger.info(f'\tailia processing time {end - start} ms')
+            logger.info(f'\taverage time {total_time / (args.benchmark_count-1)} ms')
         else:
             landmarks, confidences, box = estimate_landmarks(input_data, src_img, scale, pad, detector, fut, estimator)
         
