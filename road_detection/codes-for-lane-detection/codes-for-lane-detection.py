@@ -120,10 +120,13 @@ def recognize_from_video(net):
 
     output_buffer = np.zeros((HEIGHT*2,WIDTH,3))
     output_buffer = output_buffer.astype(np.uint8)
-
+    
+    frame_shown = False
     while (True):
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+        if frame_shown and cv2.getWindowProperty('output', cv2.WND_PROP_VISIBLE) == 0:
             break
     
         resized_img = crop_and_resize(frame,WIDTH,HEIGHT,args.arch,args.resize)
@@ -140,6 +143,7 @@ def recognize_from_video(net):
         output_buffer[HEIGHT:HEIGHT*2,0:WIDTH,:] = out_img
 
         cv2.imshow('output', output_buffer)
+        frame_shown = True
 
         # save results
         if writer is not None:

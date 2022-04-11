@@ -199,11 +199,14 @@ def transfer_to_video():
     postprocess = PostProcess(config)
 
     capture = get_capture(args.video)
-
+    
+    frame_shown = False
     while True:
         ret, frame = capture.read()
         out = None
         if (cv2.waitKey(1) & 0xFF == ord("q")) or not ret:
+            break
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
             break
 
         # Prepare input data
@@ -223,6 +226,7 @@ def transfer_to_video():
         if out:
             image = _postprocessing(out[0], source, crop_face, postprocess)
             cv2.imshow("frame", cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR))
+            frame_shown = True
 
     capture.release()
     cv2.destroyAllWindows()

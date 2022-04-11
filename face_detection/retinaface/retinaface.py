@@ -117,7 +117,8 @@ def recognize_from_image():
         cfg = rut.cfg_mnet
     elif args.arch == "resnet50":
         cfg = rut.cfg_re50
-    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
+    mem_mode = ailia.get_memory_mode(reduce_constant=True, reuse_interstage=True)
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id, memory_mode=mem_mode)
     resize = args.rescale
 
     # input image loop
@@ -171,7 +172,8 @@ def recognize_from_video():
         cfg = rut.cfg_mnet
     elif args.arch == "resnet50":
         cfg = rut.cfg_re50
-    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
+    mem_mode = ailia.get_memory_mode(reduce_constant=True, reuse_interstage=True)
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id, memory_mode=mem_mode)
     resize = args.rescale
 
     capture = webcamera_utils.get_capture(args.video)
@@ -184,9 +186,12 @@ def recognize_from_video():
     else:
         writer = None
 
+    frame_shown = False
     while(True):
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
             break
 
         # resize image
@@ -207,6 +212,7 @@ def recognize_from_video():
 
         rut.plot_detections(input_image, detections, vis_thres=VIS_THRES)
         cv2.imshow('frame', input_image)
+        frame_shown = True
 
         # save results
         if writer is not None:

@@ -278,6 +278,7 @@ def get_train_outputs(net, create_net, params):
                 m = embedding_vectors[:, :, i]
                 m = m - (mean[:, [i]].T / N)
                 cov[:, :, i] += m.T @ m
+
     # devide mean by N
     mean = mean / N
     # devide covariance by N-1, and calculate inverse
@@ -327,8 +328,8 @@ def plot_fig(file_list, test_imgs, scores, anormal_scores, gt_imgs, threshold, s
         fig_img, ax_img = plt.subplots(1, 5, figsize=(12, 3))
         fig_img.subplots_adjust(right=0.9)
 
-        fig_img.suptitle("Input : "+image_path+"  Anomaly score : "+str(anormal_scores[i]))
-        logger.info("Anomaly score : "+str(anormal_scores[i]))
+        fig_img.suptitle("Input : " + image_path + "  Anomaly score : " + str(anormal_scores[i]))
+        logger.info("Anomaly score : " + str(anormal_scores[i]))
 
         norm = matplotlib.colors.Normalize(vmin=vmin, vmax=vmax)
         for ax_i in ax_img:
@@ -396,12 +397,9 @@ def recognize_from_image(net, create_net, params):
     else:
         logger.info('infer with augmentation')
         aug_num = args.aug_num
+
     N = 0
     dist_list = []
-    if not args.aug:
-        aug_num = 1
-    else:
-        aug_num = args.aug_num
     for i_aug in range(aug_num):
         for i_img in range(0, len(args.input), batch_size):
             # prepare input data
@@ -423,7 +421,7 @@ def recognize_from_image(net, create_net, params):
                     img = preprocess(img)
                     test_imgs.append(img[0])
                 else:
-                    (img, img_resized, angle, 
+                    (img, img_resized, angle,
                      pad_h, pad_w) = preprocess_aug(img, return_refs=True)
                     test_imgs.append(img_resized)
                     angle_list.append(angle)
@@ -497,7 +495,7 @@ def recognize_from_image(net, create_net, params):
             embedding_vectors = embedding_vectors.reshape(B, C, H * W)
 
             # calculate distance matrix
-            dist_tmp = np.zeros([B, (H*W)])
+            dist_tmp = np.zeros([B, (H * W)])
             for i in range(H * W):
                 mean = train_outputs[0][:, i]
                 conv_inv = np.linalg.inv(train_outputs[1][:, :, i])
@@ -527,8 +525,8 @@ def recognize_from_image(net, create_net, params):
             # reverse crop
             pad_top = pad_h_list[i]
             pad_left = pad_w_list[i]
-            pad_bottom = IMAGE_RESIZE - IMAGE_SIZE - pad_h
-            pad_right = IMAGE_RESIZE - IMAGE_SIZE - pad_w
+            pad_bottom = IMAGE_RESIZE - IMAGE_SIZE - pad_top
+            pad_right = IMAGE_RESIZE - IMAGE_SIZE - pad_left
             score_map_tmp = np.pad(score_map_tmp, ((pad_top, pad_bottom),
                                                    (pad_left, pad_right)))
             # reverse rotate
@@ -562,7 +560,7 @@ def recognize_from_image(net, create_net, params):
         if not args.aug:
             gt_mask = np.asarray(gt_imgs)
         else:
-            gt_mask = np.asarray(gt_imgs[:int(len(gt_imgs)/args.aug_num)])
+            gt_mask = np.asarray(gt_imgs[:int(len(gt_imgs) / args.aug_num)])
         precision, recall, thresholds = precision_recall_curve(gt_mask.flatten(), scores.flatten())
         a = 2 * precision * recall
         b = precision + recall
@@ -608,7 +606,7 @@ def main():
         net = _create_net()
 
     # check input
-    if len(args.input)==0:
+    if len(args.input) == 0:
         logger.error("Input file not found")
         return
 

@@ -149,9 +149,12 @@ def recognize_from_video():
     else:
         writer = None
 
+    frame_shown = False
     while(True):
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
             break
 
         # detect eyes
@@ -217,6 +220,7 @@ def recognize_from_video():
             )
 
         cv2.imshow('frame', frame)
+        frame_shown = True
         # save results
         if writer is not None:
             writer.write(frame)

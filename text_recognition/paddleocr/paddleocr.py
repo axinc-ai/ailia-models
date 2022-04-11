@@ -1214,13 +1214,16 @@ def recognize_from_video(config, text_sys):
         video_writer = None
 
     # frame read and exec segmentation
+    frame_shown = False
     while(True):
         # frame read
         ret, img = video_capture.read()
 
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
-
+        if frame_shown and cv2.getWindowProperty('exec PaddleOCR', cv2.WND_PROP_VISIBLE) == 0:
+            break
+        
         # exec ocr
         dt_boxes, rec_res = text_sys(img)
 
@@ -1234,6 +1237,7 @@ def recognize_from_video(config, text_sys):
                                     font_path=config['vis_font_path'])
         # display
         cv2.imshow('exec PaddleOCR', draw_img[:, :, ::-1])
+        frame_shown = True
 
         # write a frame image to video
         if video_writer is not None:

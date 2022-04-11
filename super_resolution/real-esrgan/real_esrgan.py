@@ -57,7 +57,8 @@ def enhance_image():
         img = cv2.resize(img, dsize=(H, W))
 
         # net initialize
-        model = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
+        mem_mode = ailia.get_memory_mode(reduce_constant=True, ignore_input_with_initializer=True, reduce_interstage=False, reuse_interstage=True)
+        model = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id, memory_mode=mem_mode)
         upsampler = RealESRGAN(model)
 
         # inference
@@ -96,10 +97,13 @@ def enhance_video():
         writer = get_writer(args.savepath, save_h, save_w * 2)
     else:
         writer = None
-
+    
+    frame_shown = False
     while (True):
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
             break
 
         img = cv2.resize(frame, dsize=(H, W))
@@ -109,6 +113,7 @@ def enhance_video():
 
         #plot result
         cv2.imshow('frame', output)
+        frame_shown = True
 
         if writer is not None:
             writer.release()

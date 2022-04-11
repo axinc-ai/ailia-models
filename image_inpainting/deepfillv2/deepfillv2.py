@@ -70,8 +70,12 @@ parser.add_argument(
     help='given mask parameters: h,w'
 )
 parser.add_argument(
+    '-mp', '--mask_path', metavar='MASK_PATH', default=None,
+    help='using mask image from mask path'
+)
+parser.add_argument(
     '-ir', '--img_res', type=int, default=256, choices=(256, 512, 1024),
-    help='mask type'
+    help='image resolution'
 )
 args = update_parser(parser)
 
@@ -91,17 +95,25 @@ def recognize_from_image(net, img_shape):
         # prepare ground truth
         gt_img = load_image(image_path)
         gt_img = cv2.cvtColor(gt_img, cv2.COLOR_BGRA2BGR)
+        img_shape_ori = gt_img.shape[:2] # H,W
         gt_img = cv2.resize(gt_img, img_shape)
 
         # prepare mask
-        if args.mask_type == 'rect':
-            str_mask_shape = args.mask_shape.split(',')
-            mask_shape = [int(x) for x in str_mask_shape]
-            mask = generate_mask_rect(img_shape, mask_shape, args.random_mask)
+        if args.mask_path is None:
+            if args.mask_type == 'rect':
+                str_mask_shape = args.mask_shape.split(',')
+                mask_shape = [int(x) for x in str_mask_shape]
+                mask = generate_mask_rect(img_shape, mask_shape, args.random_mask)
+            else:
+                mask = generate_mask_stroke(
+                    im_size=(img_shape[0], img_shape[1]),
+                    parts=8, maxBrushWidth=24, maxLength=100, maxVertex=20)
         else:
-            mask = generate_mask_stroke(
-                im_size=(img_shape[0], img_shape[1]),
-                parts=8, maxBrushWidth=24, maxLength=100, maxVertex=20)
+            mask = load_image(args.mask_path)
+            mask = cv2.cvtColor(mask, cv2.COLOR_BGRA2RGB)
+            mask = cv2.resize(mask, img_shape)
+            mask = mask[:,:,:1]
+            mask[mask > 0] = 1.
 
         # prepare input data
         img_mask = gt_img * (1 - mask) + 255 * mask
@@ -153,6 +165,10 @@ def recognize_from_image(net, img_shape):
         savepath = get_savepath(args.savepath, image_path, ext='.png')
         logger.info(f'saved at : {savepath}')
         cv2.imwrite(savepath, res_img)
+
+        fake_img = cv2.resize(fake_img, img_shape_ori[::-1])
+        fake_img_path = savepath.split('.png')[0] + '_fake_img.png'
+        cv2.imwrite(fake_img_path, fake_img)
 
     logger.info('Script finished successfully.')
 

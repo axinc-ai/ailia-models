@@ -492,9 +492,12 @@ def compare_video():
         )
 
     # inference loop
+    frame_shown = False
     while(True):
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+        if frame_shown and cv2.getWindowProperty('arcface', cv2.WND_PROP_VISIBLE) == 0:
             break
 
         # get frame size
@@ -515,6 +518,7 @@ def compare_video():
 
         # show
         cv2.imshow('arcface', ui)
+        frame_shown = True
 
         if writer is not None:
             writer.write(ui)

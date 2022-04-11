@@ -212,9 +212,12 @@ def recognize_from_video():
 
     capture = get_capture(args.video)
 
+    frame_shown = False
     while(True):
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
             break
 
         # prepare input data
@@ -239,9 +242,12 @@ def recognize_from_video():
 
         display_result(frame, coordinates)
         cv2.imshow('frame', frame)
+        frame_shown = True
         # e_utils.display_camera(cv2, frame, coordinates, image_height, image_width)
         
         if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
+        if cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
             break
 
     capture.release()

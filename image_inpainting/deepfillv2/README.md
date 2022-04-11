@@ -81,6 +81,13 @@ For Places with random strokes.
 $ python3 deepfillv2.py --model places --mask_type stroke -i places2_001.png
 ```
 
+Also if you want to use your own mask instead of the auto-generated one, you can specify your mask path by `--mask_path`.
+
+```bash
+$ python3 deepfillv2.py --model places --mask_path your_mask_path
+```
+
+
 ## Reference
 
 [Free-Form Image Inpainting with Gated Convolution](https://github.com/open-mmlab/mmediting/tree/master/configs/inpainting/deepfillv2)

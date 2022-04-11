@@ -158,10 +158,13 @@ def recognize_from_video(net, orig_target_sizes):
         writer = webcamera_utils.get_writer(args.savepath, HEIGHT, WIDTH)
     else:
         writer = None
-
+    
+    frame_shown = False
     while True:
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
             break
 
         frame = cv2.resize(frame, dsize=(VIDEO_HEIGHT, VIDEO_WIDTH))
@@ -169,6 +172,7 @@ def recognize_from_video(net, orig_target_sizes):
         results = postprocess(out_pred_logits, out_pred_curves, orig_target_sizes)
         preds = draw_annotation(results[0], frame)
         cv2.imshow('frame', preds)
+        frame_shown = True
 
         # save results
         if writer is not None:

@@ -234,10 +234,13 @@ def recognize_from_video(video, detector):
     else:
         writer = None
 
+    frame_shown = False
     while(True):
         ret, img = capture.read()
         # press q to end video capture
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
             break
 
         boxes, scores, cls_inds = detect_objects(img, detector)
@@ -246,6 +249,7 @@ def recognize_from_video(video, detector):
         detect_object = convert_to_ailia_detector_object(boxes, scores, cls_inds, img.shape[1], img.shape[0])
         img = plot_results(detect_object, img, COCO_CATEGORY)
         cv2.imshow('frame', img)
+        frame_shown = True
 
         # save results
         if writer is not None:

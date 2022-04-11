@@ -209,9 +209,12 @@ def recognize_from_video(net, face_net):
     img_B_style = cv2.cvtColor(cv2.resize(img_B,(f_w//4,f_h//4)),cv2.COLOR_RGB2BGR) 
     img_B, _ = preprocess(img_B)
 
+    frame_shown = False
     while True:
         ret, frame = capture.read()
         if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
             break
         if not ret:
             continue
@@ -238,6 +241,7 @@ def recognize_from_video(net, face_net):
 
         # show
         cv2.imshow('frame', res_img)
+        frame_shown = True
 
     capture.release()
     cv2.destroyAllWindows()
