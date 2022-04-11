@@ -395,9 +395,6 @@ def recognize_from_video(net):
     f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
     f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
     if args.savepath != SAVE_IMAGE_PATH:
-        logger.warning(
-            'currently, video results cannot be output correctly...'
-        )
         writer = get_writer(args.savepath, f_h, f_w)
     else:
         writer = None
@@ -422,6 +419,7 @@ def recognize_from_video(net):
 
         # save results
         if writer is not None:
+            res_img = cv2.resize(res_img, (f_w,f_h))
             writer.write(res_img.astype(np.uint8))
 
     capture.release()
