@@ -247,7 +247,7 @@ def recognize_from_video():
         
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
-        if cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) < 1:
+        if cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
             break
 
     capture.release()

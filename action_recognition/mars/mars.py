@@ -148,7 +148,7 @@ def recognize_from_image():
         while(next_input_index < input_frame_size):
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
-            if frame_shown and cv2.getWindowProperty('preview', cv2.WND_PROP_VISIBLE) < 1:
+            if frame_shown and cv2.getWindowProperty('preview', cv2.WND_PROP_VISIBLE) == 0:
                 break
             result = net.predict(input_blob)
 
@@ -208,7 +208,7 @@ def recognize_from_video():
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
-        if frame_shown and cv2.getWindowProperty('preview', cv2.WND_PROP_VISIBLE) < 1:
+        if frame_shown and cv2.getWindowProperty('preview', cv2.WND_PROP_VISIBLE) == 0:
             break
             
         original_queue.append(frame)

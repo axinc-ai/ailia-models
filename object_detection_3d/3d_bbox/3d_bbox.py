@@ -212,7 +212,7 @@ def recognize_from_video():
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
-        if frame_shown and cv2.getWindowProperty('3D detections', cv2.WND_PROP_VISIBLE) < 1:
+        if frame_shown and cv2.getWindowProperty('3D detections', cv2.WND_PROP_VISIBLE) == 0:
             break
 
         img = frame
