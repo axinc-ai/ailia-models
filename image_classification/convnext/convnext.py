@@ -92,14 +92,22 @@ def recognize_from_image(net, classes):
         # inference
         image = _preprocess(image)
         output = net.predict(image)
-        pred_class = np.argmax(output)
 
-        print('predicted class = {}({}), {}'.format(pred_class, classes[pred_class], image_path))
+        # show results
+        print_results(output, classes)
 
-    return
+    logger.info('Script finished successfully.')
+
 
 def recognize_from_video(net, classes):
     capture = webcamera_utils.get_capture(args.video)
+    # create video writer if savepath is specified as video format
+    if args.savepath is not None:
+        f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
+        writer = webcamera_utils.get_writer(args.savepath, f_h, f_w)
+    else:
+        writer = None
 
     i = 0
     while(True):
@@ -109,15 +117,24 @@ def recognize_from_video(net, classes):
             break
 
         # inference
-        frame = _preprocess(frame)
-        output = net.predict(frame)
+        img = _preprocess(frame)
+        output = net.predict(img)
         pred_class = np.argmax(output)
 
-        print('predicted class = {}({}) frame = {}'.format(pred_class, classes[pred_class], i))
+        plot_results(frame, output, classes)
+
+        cv2.imshow('frame', frame)
+
+        # save results
+        if writer is not None:
+            writer.write(frame)
 
     capture.release()
     cv2.destroyAllWindows()
-    return
+    if writer is not None:
+        writer.release()
+
+    logger.info('Script finished successfully.')
 
 def main():
     if args.model == 'base_1k':
