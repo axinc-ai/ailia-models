@@ -3,6 +3,7 @@ import sys
 
 import cv2
 import numpy as np
+import platform
 
 import ailia
 
@@ -137,6 +138,10 @@ def recognize_from_video(net, classes):
     logger.info('Script finished successfully.')
 
 def main():
+    if "FP16" in ailia.get_environment(args.env_id).props or platform.system() == 'Darwin':
+        logger.warning('This model do not work on FP16. So use CPU mode.')
+        args.env_id = 0
+
     if args.model == 'base_1k':
         # model files check and download
         check_and_download_models(BASE_1k_WEIGHT_PATH, BASE_1k_MODEL_PATH, REMOTE_PATH)
