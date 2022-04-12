@@ -10,6 +10,9 @@
 
 ![Output](output.png)
 
+- red: use detected bbox
+- yellow: use ground truth bbox
+
 ## Data Preparation
 
 You need to download KITTI dataset [here](http://www.cvlibs.net/datasets/kitti/eval_object.php?obj_benchmark=3d). Download left images, calibration files and labels. Also download the [D4LCN.zip](https://drive.google.com/drive/folders/1atfXLmsLFG6XEtNnwZuEYLydKqjr7Icf?usp=sharing) (predicted).  
