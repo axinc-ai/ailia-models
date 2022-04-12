@@ -57,6 +57,12 @@ For images without a label file, you can use the `--detector` option to get the 
 $ python3 egonet.py --detector
 ```
 
+By adding the `--video` option, you can input the video.   
+If you pass `0` as an argument to VIDEO_PATH, you can use the webcam input instead of the video file.
+```bash
+$ python3 egonet.py --video VIDEO_PATH
+```
+
 ## Reference
 
 - [EgoNet](https://github.com/Nicholasli1995/EgoNet)

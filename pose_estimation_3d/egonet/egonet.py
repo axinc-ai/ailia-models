@@ -1,9 +1,11 @@
 import sys
 import os
 import time
+from io import BytesIO
 
 import numpy as np
 import cv2
+from PIL import Image
 import matplotlib.pyplot as plt
 
 import ailia
@@ -594,12 +596,77 @@ def recognize_from_image(HC, LS, L):
     logger.info('Script finished successfully.')
 
 
+def recognize_from_video(HC, LS, L):
+    video_file = args.video if args.video else args.input[0]
+    capture = get_capture(video_file)
+    assert capture.isOpened(), 'Cannot capture source'
+
+    # create video writer if savepath is specified as video format
+    if args.savepath != SAVE_IMAGE_PATH:
+        f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
+
+        # Draw dummy data to get the size of the output
+        dummy = np.zeros((f_h, f_w, 3))
+        fig, ax = plot_2d_objects(dummy, {'kpts_2d_pred': []}, {})
+        buf = BytesIO()
+        fig.savefig(buf, format='png', bbox_inches='tight', pad_inches=0)
+        plt.close()
+
+        out_w, out_h = Image.open(buf).size
+        writer = get_writer(args.savepath, out_h, out_w)
+    else:
+        writer = None
+
+    color_dict = {
+        'bbox_2d': 'r',
+        'kpts': 'rx',
+    }
+    while True:
+        ret, frame = capture.read()
+        if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+
+        img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        enlarge = 1.2
+        annot_dict = detect_cars(img, enlarge=enlarge)
+
+        # inference
+        record = predict(HC, L, LS, img, annot_dict)
+
+        # plot 2D predictions
+        fig, ax = plot_2d_objects(img, record, color_dict)
+        buf = BytesIO()
+        fig.savefig(buf, format='png', bbox_inches='tight', pad_inches=0)
+        plt.close()
+
+        res_img = np.array(Image.open(buf))
+        res_img = cv2.cvtColor(res_img, cv2.COLOR_RGB2BGR)
+
+        # show
+        cv2.imshow('frame', res_img)
+
+        # save results
+        if writer is not None:
+            writer.write(res_img)
+
+    capture.release()
+    cv2.destroyAllWindows()
+    if writer is not None:
+        writer.release()
+
+    logger.info('Script finished successfully.')
+
+
 def main():
     # model files check and download
     logger.info('Checking HC model...')
     check_and_download_models(WEIGHT_HC_PATH, MODEL_HC_PATH, REMOTE_PATH)
     logger.info('Checking L model...')
     check_and_download_models(WEIGHT_L_PATH, MODEL_L_PATH, REMOTE_PATH)
+
+    if args.video is not None:
+        args.detector = True
     if args.detector:
         logger.info('Checking detector model...')
         check_and_download_models(WEIGHT_YOLOV4_PATH, MODEL_YOLOV4_PATH, REMOTE_YOLOV4_PATH)
@@ -617,7 +684,10 @@ def main():
         detect_cars.net = ailia.Net(
             MODEL_YOLOV4_PATH, WEIGHT_YOLOV4_PATH, env_id=env_id)
 
-    recognize_from_image(HC, LS, L)
+    if args.video is not None:
+        recognize_from_video(HC, LS, L)
+    else:
+        recognize_from_image(HC, LS, L)
 
 
 if __name__ == '__main__':
