@@ -243,7 +243,6 @@ def render(H, W, focal,
 
 def create_nerf(args, model):
     """Instantiate NeRF's MLP model."""
-
     embed_fn, input_ch = get_embedder(args.multires, args.i_embed)
     embeddirs_fn = None
     if args.use_viewdirs:

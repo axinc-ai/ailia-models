@@ -23,11 +23,12 @@ logger = getLogger(__name__)
 # ======================
 basedir = './data/nerf_llff_data'
 config = 'config.txt'
-IMAGE_PATH = basedir + '/images_4/image000.png'
+IMAGE_PATH = './sample.png'
 SAVE_IMAGE_PATH = basedir + '/output/sample.mp4'
 
 H = 756.0
 W = 1008.0
+C = 3
 focal = 815.1316
 
 WEIGHT_PATH = "nerf.opt.onnx"
@@ -53,7 +54,8 @@ def main():
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
     render_poses = load_llff_data(args.datadir, args.factor,
                                     recenter=True, bd_factor=.75,
-                                    spherify=args.spherify)
+                                    spherify=args.spherify,
+                                    image_shape=(H, W, C))
 
     render_kwargs = utils_nerf.create_nerf(args, net)
     bds_dict = {

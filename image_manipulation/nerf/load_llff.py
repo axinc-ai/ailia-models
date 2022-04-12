@@ -2,91 +2,13 @@ import numpy as np
 import os, imageio
 
 
-########## Slightly modified version of LLFF data loading code 
-##########  see https://github.com/Fyusion/LLFF for original
-
-def _minify(basedir, factors=[], resolutions=[]):
-    needtoload = False
-    for r in factors:
-        imgdir = os.path.join(basedir, 'images_{}'.format(r))
-        if not os.path.exists(imgdir):
-            needtoload = True
-    for r in resolutions:
-        imgdir = os.path.join(basedir, 'images_{}x{}'.format(r[1], r[0]))
-        if not os.path.exists(imgdir):
-            needtoload = True
-    if not needtoload:
-        return
-    
-    from shutil import copy
-    from subprocess import check_output
-    
-    imgdir = os.path.join(basedir, 'images')
-    imgs = [os.path.join(imgdir, f) for f in sorted(os.listdir(imgdir))]
-    imgs = [f for f in imgs if any([f.endswith(ex) for ex in ['JPG', 'jpg', 'png', 'jpeg', 'PNG']])]
-    imgdir_orig = imgdir
-    
-    wd = os.getcwd()
-
-    for r in factors + resolutions:
-        if isinstance(r, int):
-            name = 'images_{}'.format(r)
-            resizearg = '{}%'.format(100./r)
-        else:
-            name = 'images_{}x{}'.format(r[1], r[0])
-            resizearg = '{}x{}'.format(r[1], r[0])
-        imgdir = os.path.join(basedir, name)
-        if os.path.exists(imgdir):
-            continue
-
-        os.makedirs(imgdir)
-        check_output('cp {}/* {}'.format(imgdir_orig, imgdir), shell=True)
-        
-        ext = imgs[0].split('.')[-1]
-        args = ' '.join(['mogrify', '-resize', resizearg, '-format', 'png', '*.{}'.format(ext)])
-        os.chdir(imgdir)
-        check_output(args, shell=True)
-        os.chdir(wd)
-        
-        if ext != 'png':
-            check_output('rm {}/*.{}'.format(imgdir, ext), shell=True)
-            print('Removed duplicates')
-        print('Done')
-
-        
-        
-def _load_data(basedir, factor=None, load_imgs=True):
-    
+def _load_data(basedir, image_shape, factor=None):
     poses_arr = np.load(os.path.join(basedir, 'poses_bounds.npy'))
     poses = poses_arr[:, :-2].reshape([-1, 3, 5]).transpose([1,2,0])
     bds = poses_arr[:, -2:].transpose([1,0])
-
-    sfx = ''
-    
-    if factor is not None:
-        sfx = '_{}'.format(factor)
-        _minify(basedir, factors=[factor])
-        factor = factor
-
-    else:
-        factor = 1
-    
-    imgdir = os.path.join(basedir, 'images' + sfx)
-    if not os.path.exists(imgdir):
-        print( imgdir, 'does not exist, returning' )
-        return
-    
-    imgfiles = [os.path.join(imgdir, f) for f in sorted(os.listdir(imgdir)) if f.endswith('JPG') or f.endswith('jpg') or f.endswith('png')]
-    if poses.shape[-1] != len(imgfiles):
-        print( 'Mismatch between imgs {} and poses {} !!!!'.format(len(imgfiles), poses.shape[-1]) )
-        return
-    
-    sh = imageio.imread(imgfiles[0]).shape
+    sh = image_shape
     poses[:2, 4, :] = np.array(sh[:2]).reshape([2, 1])
     poses[2, 4, :] = poses[2, 4, :] * 1./factor
-    
-    if not load_imgs:
-        return poses, bds
 
     return poses, bds
     
@@ -102,12 +24,7 @@ def viewmatrix(z, up, pos):
     m = np.stack([vec0, vec1, vec2, pos], 1)
     return m
 
-def ptstocam(pts, c2w):
-    tt = np.matmul(c2w[:3,:3].T, (pts-c2w[:3,3])[...,np.newaxis])[...,0]
-    return tt
-
 def poses_avg(poses):
-
     hwf = poses[0, :3, -1:]
 
     center = poses[:, :3, 3].mean(0)
@@ -116,7 +33,6 @@ def poses_avg(poses):
     c2w = np.concatenate([viewmatrix(vec2, up, center), hwf], 1)
     
     return c2w
-
 
 
 def render_path_spiral(c2w, up, rads, focal, zdelta, zrate, rots, N):
@@ -133,7 +49,6 @@ def render_path_spiral(c2w, up, rads, focal, zdelta, zrate, rots, N):
 
 
 def recenter_poses(poses):
-
     poses_ = poses+0
     bottom = np.reshape([0,0,0,1.], [1,4])
     c2w = poses_avg(poses)
@@ -147,11 +62,7 @@ def recenter_poses(poses):
     return poses
 
 
-#####################
-
-
 def spherify_poses(poses, bds):
-    
     p34_to_44 = lambda p : np.concatenate([p, np.tile(np.reshape(np.eye(4)[-1,:], [1,1,4]), [p.shape[0], 1,1])], 1)
     
     rays_d = poses[:,:3,2:3]
@@ -189,7 +100,6 @@ def spherify_poses(poses, bds):
     new_poses = []
     
     for th in np.linspace(0.,2.*np.pi, 120):
-
         camorigin = np.array([radcircle * np.cos(th), radcircle * np.sin(th), zh])
         up = np.array([0,0,-1.])
 
@@ -209,8 +119,8 @@ def spherify_poses(poses, bds):
     return poses_reset, new_poses, bds
     
 
-def load_llff_data(basedir, factor=8, recenter=True, bd_factor=.75, spherify=False, path_zflat=False):
-    poses, bds = _load_data(basedir, factor=factor) # factor=8 downsamples original imgs by 8x
+def load_llff_data(basedir, factor=8, recenter=True, bd_factor=.75, spherify=False, image_shape=None):
+    poses, bds = _load_data(basedir, image_shape, factor=factor)
 
     # Correct rotation matrix ordering and move variable dim to axis 0
     poses = np.concatenate([poses[:, 1:2, :], -poses[:, 0:1, :], poses[:, 2:, :]], 1)
@@ -229,10 +139,8 @@ def load_llff_data(basedir, factor=8, recenter=True, bd_factor=.75, spherify=Fal
         poses, render_poses, bds = spherify_poses(poses, bds)
 
     else:
-        
         c2w = poses_avg(poses)
 
-        ## Get spiral
         # Get average pose
         up = normalize(poses[:, :3, 1].sum(0))
 
@@ -243,9 +151,8 @@ def load_llff_data(basedir, factor=8, recenter=True, bd_factor=.75, spherify=Fal
         focal = mean_dz
 
         # Get radii for spiral path
-        shrink_factor = .8
         zdelta = close_depth * .2
-        tt = poses[:,:3,3] # ptstocam(poses[:3,3,:].T, c2w).T
+        tt = poses[:,:3,3]
         rads = np.percentile(np.abs(tt), 90, 0)
         c2w_path = c2w
         N_views = 120

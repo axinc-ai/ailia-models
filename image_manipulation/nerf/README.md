@@ -1,7 +1,7 @@
 # NeRF
 
 ## Input
-![Input](./data/nerf_llff_data/images_4/image000.png)
+![Input](./sample.png)
 
 (from https://drive.google.com/file/d/1P6KIDAr68twCJqcq2BJH6cgTOXXxAFIv/view?usp=sharing)
 
