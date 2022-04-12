@@ -410,6 +410,7 @@ def get_instance_str(dic):
 
 def plot_2d_objects(
         img, record,
+        draw_bbox=False,
         color_dict={
             'bbox_2d': 'r',
             'bbox_3d': 'r',
@@ -439,6 +440,11 @@ def plot_2d_objects(
         # plot ground truth 2D screen coordinates
         for idx, kpts_gt in enumerate(record['kpts_2d_gt']):
             kpts_gt = kpts_gt.reshape(-1, 3)
+            plot_3d_bbox(ax, kpts_gt[1:, :2], color='g', linestyle='-.')
+    elif draw_bbox:
+        # plot predicted 2D screen coordinates
+        for idx, kpts_gt in enumerate(record['kpts_2d_pred']):
+            kpts_gt = kpts_gt.reshape(-1, 2)
             plot_3d_bbox(ax, kpts_gt[1:, :2], color='g', linestyle='-.')
 
     if 'arrow' in record:

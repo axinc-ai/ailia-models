@@ -552,13 +552,13 @@ def recognize_from_image(HC, LS, L):
             'bbox_2d': 'r',
             'kpts': 'rx',
         }
-        fig, ax = plot_2d_objects(img, record, color_dict)
+        fig, ax = plot_2d_objects(img, record, draw_bbox=(not gt_record), color_dict=color_dict)
         if gt_record:
             color_dict = {
                 'bbox_2d': 'y',
                 'kpts': 'yx'
             }
-            plot_2d_objects(img, gt_record, color_dict, ax=ax)
+            plot_2d_objects(img, gt_record, color_dict=color_dict, ax=ax)
 
         save_path = get_savepath(args.savepath, image_path, ext='.png')
         logger.info(f'saved at : {save_path}')
@@ -612,8 +612,8 @@ def recognize_from_video(HC, LS, L):
         buf = BytesIO()
         fig.savefig(buf, format='png', bbox_inches='tight', pad_inches=0)
         plt.close()
-
         out_w, out_h = Image.open(buf).size
+
         writer = get_writer(args.savepath, out_h, out_w)
     else:
         writer = None
@@ -635,11 +635,10 @@ def recognize_from_video(HC, LS, L):
         record = predict(HC, L, LS, img, annot_dict)
 
         # plot 2D predictions
-        fig, ax = plot_2d_objects(img, record, color_dict)
+        fig, ax = plot_2d_objects(img, record, draw_bbox=True, color_dict=color_dict)
         buf = BytesIO()
         fig.savefig(buf, format='png', bbox_inches='tight', pad_inches=0)
         plt.close()
-
         res_img = np.array(Image.open(buf))
         res_img = cv2.cvtColor(res_img, cv2.COLOR_RGB2BGR)
 
