@@ -301,9 +301,12 @@ def recognize_from_image(image_path, net):
 def recognize_from_video(video, net):
     capture = get_capture(video)
 
+    frame_shown = False
     while True:
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
             break
 
         pred = predict(frame, net)
@@ -313,6 +316,7 @@ def recognize_from_video(video, net):
         img = plot_results(detect_object, frame, obj_list)
 
         cv2.imshow('frame', img)
+        frame_shown = True
 
     capture.release()
     logger.info('Script finished successfully.')

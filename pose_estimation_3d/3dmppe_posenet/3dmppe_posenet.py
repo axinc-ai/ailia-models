@@ -32,8 +32,8 @@ warnings.simplefilter("ignore", DeprecationWarning)
 # ======================
 # Parameters
 # ======================
-WEIGHT_PATH_MASKRCNN = 'mask_rcnn_R_50_FPN_1x.onnx'
-MODEL_PATH_MASKRCNN = 'mask_rcnn_R_50_FPN_1x.onnx.prototxt'
+WEIGHT_PATH_MASKRCNN = 'mask_rcnn_R_50_FPN_1x.opt.onnx'
+MODEL_PATH_MASKRCNN = 'mask_rcnn_R_50_FPN_1x.opt.onnx.prototxt'
 REMOTE_PATH_MASKRCNN = 'https://storage.googleapis.com/ailia-models/mask_rcnn/'
 
 WEIGHT_PATH_ROOTNET = 'rootnet_snapshot_18.opt.onnx'
@@ -547,11 +547,14 @@ def recognize_from_video(vid_path, net_maskrcnn, net_root, net_pose):
         video_writer = None
 
     # frame read and exec segmentation
+    frame_shown = False
     while(True):
         # frame read
         ret, original_img = video_capture.read()
 
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
             break
 
         # cast to pillow for mask r-cnn
@@ -568,6 +571,7 @@ def recognize_from_video(vid_path, net_maskrcnn, net_root, net_pose):
         
         # display
         cv2.imshow("frame", vis_img)
+        frame_shown = True
 
         # write a frame image to video
         if video_writer is not None:

@@ -224,6 +224,10 @@ def main():
         key = cv2.waitKey(delay)
         if key == esc_code or key == q_code:
             break
+        if cv2.getWindowProperty('ICV 3D Human Pose Estimation', cv2.WND_PROP_VISIBLE) == 0:
+            break
+        if cv2.getWindowProperty(canvas_3d_window_name, cv2.WND_PROP_VISIBLE) == 0:
+            break
         if key == p_code:
             if delay == 1:
                 delay = 0
@@ -239,7 +243,11 @@ def main():
                 plotter.plot(canvas_3d, poses_3d, edges)
                 cv2.imshow(canvas_3d_window_name, canvas_3d)
                 key = cv2.waitKey(33)
+                if cv2.getWindowProperty(canvas_3d_window_name, cv2.WND_PROP_VISIBLE) == 0:
+                    break
             if key == esc_code or key == q_code:
+                break
+            elif cv2.getWindowProperty(canvas_3d_window_name, cv2.WND_PROP_VISIBLE) == 0:
                 break
             else:
                 delay = 1

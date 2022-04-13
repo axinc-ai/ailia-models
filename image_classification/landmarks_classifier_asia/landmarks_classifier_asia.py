@@ -10,7 +10,9 @@ import ailia
 sys.path.append('../../util')
 from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
+from classifier_utils import plot_results, print_results  # noqa: E402
 from detector_utils import load_image  # noqa: E402C
+import webcamera_utils  # noqa: E402
 # logger
 from logging import getLogger  # noqa: E402
 
@@ -109,21 +111,14 @@ def preprocess(img):
 def post_processing(logits, label_map, label_set):
     top_k = args.top_k
 
+    # The same category is defined more than once. So summarize it.
     upd_logits = np.ones_like(logits) * -1e+3
     for name, ids in label_set.items():
         i = np.argmax(logits[ids])
         _id = ids[i]
         upd_logits[_id] = logits[_id]
 
-    idx = np.argsort(-upd_logits)
-    idx = idx[:top_k]
-
-    pred = []
-    for i in idx:
-        name = label_map[i]
-        pred.append((name, upd_logits[i]))
-
-    return pred
+    return upd_logits
 
 
 def predict(net, img):
@@ -146,7 +141,7 @@ def recognize_from_image(net):
 
         # prepare input data
         img = load_image(image_path)
-        img = cv2.cvtColor(img, cv2.COLOR_BGRA2RGB)
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
         # inference
         logger.info('Start inference...')
@@ -168,14 +163,53 @@ def recognize_from_image(net):
         else:
             logits = predict(net, img)
 
-        pred = post_processing(logits, label_map, label_set)
+        upd_logits = post_processing(logits, label_map, label_set)
 
-        logger.info("TopK predictions:")
-        for x in pred:
-            logger.info(f"  {x[0]}: {100 * x[1]:.2f}%")
+        pred = np.expand_dims(upd_logits,axis=0)
+        print_results(pred, label_map, top_k=args.top_k)
 
     logger.info('Script finished successfully.')
 
+
+def recognize_from_video(net):
+    label_map, label_set = read_label_map()
+
+    capture = webcamera_utils.get_capture(args.video)
+    # create video writer if savepath is specified as video format
+    if args.savepath is not None:
+        f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
+        writer = webcamera_utils.get_writer(args.savepath, f_h, f_w)
+    else:
+        writer = None
+
+    frame_shown = False
+    while(True):
+        ret, frame = capture.read()
+        if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
+            break
+
+        img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        logits = predict(net, img)
+        upd_logits = post_processing(logits, label_map, label_set)
+
+        plot_results(frame, np.expand_dims(upd_logits,axis=0), label_map, top_k=args.top_k)
+
+        cv2.imshow('frame', frame)
+        frame_shown = True
+
+        # save results
+        if writer is not None:
+            writer.write(frame)
+
+    capture.release()
+    cv2.destroyAllWindows()
+    if writer is not None:
+        writer.release()
+
+    logger.info('Script finished successfully.')
 
 def main():
     # model files check and download
@@ -186,7 +220,12 @@ def main():
     # initialize
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
 
-    recognize_from_image(net)
+    if args.video is not None:
+        # video mode
+        recognize_from_video(net)
+    else:
+        # image mode
+        recognize_from_image(net)
 
 
 if __name__ == '__main__':

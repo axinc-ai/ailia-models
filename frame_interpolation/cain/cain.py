@@ -186,6 +186,8 @@ def recognize_from_video(net):
     if 0 < video_length:
         it = iter(tqdm(range(video_length)))
         next(it)
+        
+    frame_shown = False
     while True:
         if 0 < video_length:
             try:
@@ -194,6 +196,8 @@ def recognize_from_video(net):
                 break
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
             break
 
         # set inputs
@@ -213,6 +217,7 @@ def recognize_from_video(net):
 
         # preview
         cv2.imshow('frame', output_buffer)
+        frame_shown = True
 
         # save results
         if writer is not None:

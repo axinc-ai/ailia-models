@@ -139,10 +139,14 @@ def recognize_from_video():
     else:
         writer = None
 
+    frame_shown = False
     while(True):
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
+        if frame_shown and cv2.getWindowProperty('Segmented frame', cv2.WND_PROP_VISIBLE) == 0:
+            break
+
 
         frame = np.ascontiguousarray(frame[:,::-1,:])
 
@@ -161,6 +165,7 @@ def recognize_from_video():
             seg_img = get_seg_img(frame, preds)
 
         cv2.imshow('Segmented frame', seg_img)
+        frame_shown = True
 
         # save results
         if writer is not None:

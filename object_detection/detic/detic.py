@@ -42,7 +42,7 @@ IMAGE_PATH = 'desk.jpg'
 SAVE_IMAGE_PATH = 'output.png'
 
 IMAGE_SIZE = 800
-IMAGE_MAX_SIZE = 1333
+IMAGE_MAX_SIZE = 800 #tempolary limit to 800px (original : 1333)
 
 # ======================
 # Arguemnt Parser Config
@@ -395,16 +395,16 @@ def recognize_from_video(net):
     f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
     f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
     if args.savepath != SAVE_IMAGE_PATH:
-        logger.warning(
-            'currently, video results cannot be output correctly...'
-        )
         writer = get_writer(args.savepath, f_h, f_w)
     else:
         writer = None
-
+    
+    frame_shown = False
     while True:
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
             break
 
         # inference
@@ -415,9 +415,11 @@ def recognize_from_video(net):
 
         # show
         cv2.imshow('frame', res_img)
+        frame_shown = True
 
         # save results
         if writer is not None:
+            res_img = cv2.resize(res_img, (f_w,f_h))
             writer.write(res_img.astype(np.uint8))
 
     capture.release()

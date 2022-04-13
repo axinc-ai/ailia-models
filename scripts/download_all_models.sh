@@ -102,6 +102,8 @@ cd ../../image_classification/alexnet; python3 alexnet.py ${OPTION}
 cd ../../image_classification/clip; python3 clip.py ${OPTION}
 cd ../../image_classification/landmarks_classifier_asia; python3 landmarks_classifier_asia.py ${OPTION}
 cd ../../image_classification/weather-prediction-from-image; python3 weather-prediction-from-image.py ${OPTION}
+cd ../../image_classification/convnext; python3 convnext.py ${OPTION}
+cd ../../image_classification/swin-transformer; python3 swin_transformer.py ${OPTION}
 cd ../../image_inpainting/3d-photo-inpainting; python3 3d-photo-inpainting.py ${OPTION}
 cd ../../image_inpainting/inpainting_gmcnn; python3 inpainting_gmcnn.py ${OPTION}
 cd ../../image_inpainting/pytorch-inpainting-with-partial-conv; python3 pytorch-inpainting-with-partial-conv.py ${OPTION}
@@ -193,6 +195,7 @@ cd ../../road_detection/road-segmentation-adas; python3 road-segmentation-adas.p
 cd ../../road_detection/cdnet; python3 cdnet.py ${OPTION}
 cd ../../road_detection/lstr; python3 lstr.py ${OPTION}
 cd ../../road_detection/ultra-fast-lane-detection; python3 ultra-fast-lane-detection.py ${OPTION}
+cd ../../road_detection/yolop; python3 yolop.py ${OPTION}
 cd ../../rotation_prediction/rotnet; python3 rotnet.py ${OPTION}
 cd ../../style_transfer/adain; python3 adain.py ${OPTION}
 cd ../../style_transfer/beauty_gan; python3 beauty_gan.py ${OPTION}
@@ -209,6 +212,7 @@ cd ../../text_recognition/etl; python3 etl.py ${OPTION}
 cd ../../text_recognition/deep-text-recognition-benchmark; python3 deep-text-recognition-benchmark.py ${OPTION}
 cd ../../text_recognition/crnn.pytorch; python3 crnn.pytorch.py ${OPTION}
 cd ../../text_recognition/paddleocr; python3 paddleocr.py ${OPTION}
+cd ../../text_recognition/easyocr; python3 easyocr.py ${OPTION}
 cd ../../vehicle_recognition/vehicle-attributes-recognition-barrier; python3 vehicle-attributes-recognition-barrier.py ${OPTION}
 cd ../../vehicle_recognition/vehicle-license-plate-detection-barrier; python3 vehicle-license-plate-detection-barrier.py ${OPTION}
 #cd ../../commercial_model/acculus-pose; python3 acculus-hand.py ${OPTION}

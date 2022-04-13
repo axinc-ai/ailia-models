@@ -140,12 +140,15 @@ def recognize_from_video():
         writer = webcamera_utils.get_writer(args.savepath, HEIGHT, WIDTH, rgb=False)
     else:
         writer = None
-
+    
+    frame_shown = False
     while (True):
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
-
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
+            break
+        
         frame = cv2.resize(frame, (WIDTH, HEIGHT))
         input = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         input = input / 255.
@@ -163,6 +166,7 @@ def recognize_from_video():
         output = visualize(frame, pred, weight=0.6)
 
         cv2.imshow('frame', output)
+        frame_shown = True
 
         # save results
         if writer is not None:
