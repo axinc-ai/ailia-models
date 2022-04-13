@@ -1,6 +1,5 @@
 
 from helpers import *
-import onnxruntime
 
 def batchify(fn, chunk):
     """Constructs a version of 'fn' that applies to smaller batches."""
@@ -9,7 +8,10 @@ def batchify(fn, chunk):
 
     def ret(inputs):
         inputs = np.array(inputs, dtype=np.float32)
-        return np.concatenate([fn.run(np.array(inputs[i:i+chunk]))[0] for i in range(0, inputs.shape[0], chunk)], 0)
+        if "onnxruntime" in str(type(fn)):
+            return np.concatenate([fn.run(None,{"input_1":np.array(inputs[i:i+chunk])})[0] for i in range(0, inputs.shape[0], chunk)], 0)
+        else:
+            return np.concatenate([fn.run(np.array(inputs[i:i+chunk]))[0] for i in range(0, inputs.shape[0], chunk)], 0)
     return ret
 
 
@@ -281,45 +283,45 @@ def create_nerf(args, model):
 
 
 def config_parser(parser):
-    parser.add_argument("--expname", type=str, help='experiment name')
+    #parser.add_argument("--expname", type=str, help='experiment name')
     parser.add_argument("--basedir", type=str, default='./logs/',
                         help='where to store ckpts and logs')
     parser.add_argument("--datadir", type=str,
                         default='./data/nerf_llff_data/', help='input data directory')
 
     # training options
-    parser.add_argument("--netdepth", type=int, default=8,
-                        help='layers in network')
-    parser.add_argument("--netwidth", type=int, default=256,
-                        help='channels per layer')
-    parser.add_argument("--netdepth_fine", type=int,
-                        default=8, help='layers in fine network')
-    parser.add_argument("--netwidth_fine", type=int, default=256,
-                        help='channels per layer in fine network')
-    parser.add_argument("--N_rand", type=int, default=32*32*4,
-                        help='batch size (number of random rays per gradient step)')
-    parser.add_argument("--lrate", type=float,
-                        default=5e-4, help='learning rate')
-    parser.add_argument("--lrate_decay", type=int, default=250,
-                        help='exponential learning rate decay (in 1000s)')
-    parser.add_argument("--chunk", type=int, default=1024*32,
-                        help='number of rays processed in parallel, decrease if running out of memory')
+    #parser.add_argument("--netdepth", type=int, default=8,
+    #                    help='layers in network')
+    #parser.add_argument("--netwidth", type=int, default=256,
+    #                    help='channels per layer')
+    #parser.add_argument("--netdepth_fine", type=int,
+    #                    default=8, help='layers in fine network')
+    #parser.add_argument("--netwidth_fine", type=int, default=256,
+    #                    help='channels per layer in fine network')
+    #parser.add_argument("--N_rand", type=int, default=32*32*4,
+    #                    help='batch size (number of random rays per gradient step)')
+    #parser.add_argument("--lrate", type=float,
+    #                    default=5e-4, help='learning rate')
+    #parser.add_argument("--lrate_decay", type=int, default=250,
+    #                    help='exponential learning rate decay (in 1000s)')
+    #parser.add_argument("--chunk", type=int, default=1024*32,
+    #                    help='number of rays processed in parallel, decrease if running out of memory')
     parser.add_argument("--netchunk", type=int, default=1024*64,
                         help='number of pts sent through network in parallel, decrease if running out of memory')
-    parser.add_argument("--no_batching", action='store_true',
-                        help='only take random rays from 1 image at a time')
-    parser.add_argument("--no_reload", action='store_true',
-                        help='do not reload weights from saved ckpt')
-    parser.add_argument("--ft_path", type=str, default=None,
-                        help='specific weights npy file to reload for coarse network')
-    parser.add_argument("--random_seed", type=int, default=None,
-                        help='fix random seed for repeatability')
+    #parser.add_argument("--no_batching", action='store_true',
+    #                    help='only take random rays from 1 image at a time')
+    #parser.add_argument("--no_reload", action='store_true',
+    #                    help='do not reload weights from saved ckpt')
+    #parser.add_argument("--ft_path", type=str, default=None,
+    #                    help='specific weights npy file to reload for coarse network')
+    #parser.add_argument("--random_seed", type=int, default=None,
+    #                    help='fix random seed for repeatability')
     
     # pre-crop options
-    parser.add_argument("--precrop_iters", type=int, default=0,
-                        help='number of steps to train on central crops')
-    parser.add_argument("--precrop_frac", type=float,
-                        default=.5, help='fraction of img taken for central crops')    
+    #parser.add_argument("--precrop_iters", type=int, default=0,
+    #                    help='number of steps to train on central crops')
+    #parser.add_argument("--precrop_frac", type=float,
+    #                    default=.5, help='fraction of img taken for central crops')    
 
     # rendering options
     parser.add_argument("--N_samples", type=int, default=64,
