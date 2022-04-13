@@ -197,6 +197,7 @@ cd ../../road_detection/cdnet; python3 cdnet.py ${OPTION}
 cd ../../road_detection/lstr; python3 lstr.py ${OPTION}
 cd ../../road_detection/ultra-fast-lane-detection; python3 ultra-fast-lane-detection.py ${OPTION}
 cd ../../road_detection/yolop; python3 yolop.py ${OPTION}
+cd ../../road_detection/hybridnets; python3 hybridnets.py ${OPTION}
 cd ../../rotation_prediction/rotnet; python3 rotnet.py ${OPTION}
 cd ../../style_transfer/adain; python3 adain.py ${OPTION}
 cd ../../style_transfer/beauty_gan; python3 beauty_gan.py ${OPTION}
