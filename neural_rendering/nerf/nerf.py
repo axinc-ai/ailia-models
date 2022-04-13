@@ -33,6 +33,7 @@ focal = 815.1316
 
 WEIGHT_PATH = "nerf.opt.onnx"
 MODEL_PATH = "nerf.opt.onnx.prototxt"
+REMOTE_PATH = "https://storage.googleapis.com/ailia-models/nerf/"
 
 # ======================
 # Arguemnt Parser Config

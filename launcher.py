@@ -33,7 +33,7 @@ WINDOW_ROW = 34
 
 IGNORE_LIST = [
     "commercial_model", "validation", ".git", "log", "prnet", "bert",
-    "illustration2vec", "etl", "vggface2", "anomaly_detection"
+    "illustration2vec", "etl", "vggface2", "anomaly_detection", "neural_rendering"
 ]
 
 try:
