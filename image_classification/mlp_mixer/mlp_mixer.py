@@ -97,9 +97,12 @@ def recognize_from_video():
     else:
         writer = None
 
+    frame_shown = False
     while(True):
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
             break
 
         # prepare input data
@@ -113,9 +116,10 @@ def recognize_from_video():
         preds = softmax(preds)
 
         # get result
-        print_results(preds, imagenet_category)
+        plot_results(frame, preds, imagenet_category)
 
         cv2.imshow('frame', frame)
+        frame_shown = True
         time.sleep(SLEEP_TIME)
 
         # save results

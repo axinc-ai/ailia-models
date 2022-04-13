@@ -12,7 +12,9 @@ sys.path.append('../../util')
 from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from detector_utils import load_image  # noqa: E402C
+from classifier_utils import plot_results, print_results  # noqa: E402
 from math_utils import softmax  # noqa: E402C
+import webcamera_utils  # noqa: E402
 # logger
 from logging import getLogger  # noqa: E402
 
@@ -167,8 +169,6 @@ def predict_text_feature(net, text):
 
 
 def recognize_from_image(net_image, net_text):
-    top_k = 5
-
     text_inputs = args.text_inputs
     desc_file = args.desc_file
     if desc_file:
@@ -207,10 +207,58 @@ def recognize_from_image(net_image, net_text):
         else:
             pred = predict(net_image, img, text_feature)
 
-    inds = np.argsort(-pred)[:top_k]
-    logger.info("Top predictions:")
-    for i in inds:
-        logger.info(f"{text_inputs[i]:>16s}: {100 * pred[i]:.2f}%")
+        # show results
+        pred = np.expand_dims(pred,axis=0)
+        print_results(pred, text_inputs)
+
+    logger.info('Script finished successfully.')
+
+
+def recognize_from_video(net_image, net_text):
+    text_inputs = args.text_inputs
+    desc_file = args.desc_file
+    if desc_file:
+        with open(desc_file) as f:
+            text_inputs = [x.strip() for x in f.readlines() if x.strip()]
+    elif text_inputs is None:
+        text_inputs = [f"a {c}" for c in ("human", "dog", "cat")]
+
+    text_feature = predict_text_feature(net_text, text_inputs)
+
+    capture = webcamera_utils.get_capture(args.video)
+    # create video writer if savepath is specified as video format
+    if args.savepath is not None:
+        f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
+        writer = webcamera_utils.get_writer(args.savepath, f_h, f_w)
+    else:
+        writer = None
+
+    frame_shown = False
+    while(True):
+        ret, frame = capture.read()
+        if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
+            break
+
+        img = frame
+        
+        pred = predict(net_image, img, text_feature)
+
+        plot_results(frame, np.expand_dims(pred,axis=0), text_inputs)
+
+        cv2.imshow('frame', frame)
+        frame_shown = True
+
+        # save results
+        if writer is not None:
+            writer.write(frame)
+
+    capture.release()
+    cv2.destroyAllWindows()
+    if writer is not None:
+        writer.release()
 
     logger.info('Script finished successfully.')
 
@@ -247,8 +295,12 @@ def main():
         net_image = onnxruntime.InferenceSession(WEIGHT_IMAGE_PATH)
         net_text = onnxruntime.InferenceSession(WEIGHT_TEXT_PATH)
 
-    recognize_from_image(net_image, net_text)
-
+    if args.video is not None:
+        # video mode
+        recognize_from_video(net_image, net_text)
+    else:
+        # image mode
+        recognize_from_image(net_image, net_text)
 
 if __name__ == '__main__':
     main()

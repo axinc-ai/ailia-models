@@ -125,12 +125,15 @@ def recognize_from_video():
         writer = webcamera_utils.get_writer(args.savepath, save_h, save_w)
     else:
         writer = None
-
+    
+    frame_shown = False
     while(True):
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
-
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
+            break
+        
         in_frame, frame = webcamera_utils.adjust_frame_size(
             frame, IMAGE_HEIGHT, IMAGE_WIDTH
         )
@@ -153,6 +156,7 @@ def recognize_from_video():
             )
             logger.info(f"  prob={info.prob}")
         cv2.imshow('frame', in_frame)
+        frame_shown = True
         # save results
         if writer is not None:
             writer.write(in_frame)

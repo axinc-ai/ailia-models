@@ -114,9 +114,12 @@ def recognize_from_video():
     else:
         writer = None
 
+    frame_shown = False
     while(True):
         ret, frame = cap.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
             break
 
         _, resized_image = webcamera_utils.adjust_frame_size(frame, 256, 256)
@@ -126,6 +129,7 @@ def recognize_from_video():
         # half and half
         noised_frame[:,128:256,:] = denoised_frame[:,128:256,:]
         cv2.imshow('frame', noised_frame)
+        frame_shown = True
 
         # save results
         if writer is not None:

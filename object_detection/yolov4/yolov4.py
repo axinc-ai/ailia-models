@@ -186,9 +186,12 @@ def recognize_from_video(detector):
         frame_digit = int(math.log10(capture.get(cv2.CAP_PROP_FRAME_COUNT)) + 1)
         video_name = os.path.splitext(os.path.basename(args.video))[0]
 
+    frame_shown = False
     while (True):
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
             break
 
         if args.detector:
@@ -211,6 +214,7 @@ def recognize_from_video(detector):
             res_img = plot_results(detect_object, frame, COCO_CATEGORY)
 
         cv2.imshow('frame', res_img)
+        frame_shown = True
 
         # save results
         if writer is not None:

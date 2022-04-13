@@ -233,17 +233,21 @@ def recognize_from_video():
     else:
         writer = None
 
+    frame_shown = False
     while(True):
         ret, img = capture.read()
 
         # press q to end video capture
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
+            break
 
         input_img = preprocess(img, False)
         d1, d2, d3, d4, d5, d6, d7 = net.predict({'input.1': input_img})
         out_img = post_process(d1)
         cv2.imshow('frame', out_img)
+        frame_shown = True
 
         if writer is not None:
             writer.write(out_img)

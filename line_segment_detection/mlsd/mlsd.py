@@ -103,9 +103,12 @@ def recognize_from_video():
 
     logger.warning('Inference using CPU because model accuracy is low on GPU.')
 
+    frame_shown = False
     while(True):
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
             break
 
         img_input = np.array(frame)
@@ -113,6 +116,7 @@ def recognize_from_video():
         # inference
         preds_img = gradio_wrapper_for_LSD(img_input, net)
         cv2.imshow('frame', preds_img)
+        frame_shown = True
 
         # save results
         if writer is not None:

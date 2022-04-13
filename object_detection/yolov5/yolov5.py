@@ -27,7 +27,7 @@ logger = getLogger(__name__)
 # Parameters
 # ======================
 
-MODEL_LISTS = ['yolov5s', 'yolov5m', 'yolov5l', 'yolov5x']
+MODEL_LISTS = ['yolov5s', 'yolov5m', 'yolov5l', 'yolov5x', 'yolov5s6']
 DETECTION_SIZE_LISTS = [640, 1280]
 
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/yolov5/'
@@ -186,9 +186,12 @@ def recognize_from_video():
         frame_digit = int(math.log10(capture.get(cv2.CAP_PROP_FRAME_COUNT)) + 1)
         video_name = os.path.splitext(os.path.basename(args.video))[0]
 
+    frame_shown = False
     while (True):
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
             break
         
         img = letterbox_convert(frame, (IMAGE_HEIGHT, IMAGE_WIDTH))
@@ -207,6 +210,7 @@ def recognize_from_video():
         res_img = plot_results(detect_object, frame, COCO_CATEGORY)
 
         cv2.imshow('frame', res_img)
+        frame_shown = True
 
         # save results
         if writer is not None:

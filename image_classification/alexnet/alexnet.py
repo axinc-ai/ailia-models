@@ -115,10 +115,13 @@ def recognize_from_video():
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
 
     capture = webcamera_utils.get_capture(args.video)
-
+    
+    frame_shown = False
     while True:
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
             break
 
         input_batch = _preprocess_image(frame)
@@ -129,6 +132,7 @@ def recognize_from_video():
             frame, output, alexnet_labels.imagenet_category
         )
         cv2.imshow('frame', frame)
+        frame_shown = True
 
     capture.release()
     logger.info('Script finished successfully.')

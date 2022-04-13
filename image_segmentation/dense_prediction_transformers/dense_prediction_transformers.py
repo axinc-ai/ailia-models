@@ -148,11 +148,14 @@ def recognize_from_video(net):
     else:
         writer = None
 
+    frame_shown = False
     while(True):
         ret, img_raw = capture.read()
 
         # press q to end video capture
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
             break
 
         img_raw = cv2.cvtColor(img_raw, cv2.COLOR_BGR2RGB) / 255.0
@@ -178,6 +181,7 @@ def recognize_from_video(net):
             out = cv2.cvtColor(out, cv2.COLOR_RGB2BGR) 
 
         cv2.imshow('frame', out)
+        frame_shown = True
 
         # save results
         if writer is not None:

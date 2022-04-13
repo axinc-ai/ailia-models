@@ -207,9 +207,12 @@ def recognize_from_video():
     else:
         writer = None
 
+    frame_shown = False
     while(True):
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+        if frame_shown and cv2.getWindowProperty('3D detections', cv2.WND_PROP_VISIBLE) == 0:
             break
 
         img = frame
@@ -254,6 +257,7 @@ def recognize_from_video():
             location = plot_regressed_3d_bbox(img, proj_matrix, box_2d, dim, alpha, theta_ray)
 
             cv2.imshow('3D detections', img)
+            frame_shown = True
 
         # save results
         if writer is not None:

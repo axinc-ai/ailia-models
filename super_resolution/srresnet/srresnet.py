@@ -186,9 +186,12 @@ def recognize_from_video():
     else:
         writer = None
 
+    frame_shown = False
     while(True):
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
             break
 
         h, w = frame.shape[0], frame.shape[1]
@@ -197,6 +200,7 @@ def recognize_from_video():
         output_img = tiling(net, frame)
 
         cv2.imshow('frame', output_img)
+        frame_shown = True
         # # save results
         # if writer is not None:
         #     writer.write(output_img)

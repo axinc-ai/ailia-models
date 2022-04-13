@@ -121,10 +121,13 @@ def recognize_from_video():
     else:
         writer = None
 
+    frame_shown = False
     while(True):
 
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+        if frame_shown and cv2.getWindowProperty('result', cv2.WND_PROP_VISIBLE) == 0:
             break
         
         image_height, image_width, _ = frame.shape
@@ -154,6 +157,7 @@ def recognize_from_video():
         crop_region = movenet_utils.determine_crop_region(keypoints_with_scores, image_height, image_width)
     
         cv2.imshow('result', result_image)
+        frame_shown = True
 
         # save results
         if writer is not None:

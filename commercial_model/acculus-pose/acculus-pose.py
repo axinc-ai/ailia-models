@@ -168,10 +168,13 @@ def recognize_from_video():
     )
 
     capture = get_capture(args.video)
-
+    
+    frame_shown = False
     while(True):
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
             break
 
         input_image, input_data = adjust_frame_size(
@@ -185,6 +188,7 @@ def recognize_from_video():
         # postprocessing
         display_result(input_image, pose)
         cv2.imshow('frame', input_image)
+        frame_shown = True
 
     capture.release()
     cv2.destroyAllWindows()
