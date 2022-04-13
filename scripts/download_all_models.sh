@@ -169,6 +169,7 @@ cd ../../object_detection/detic; python3 detic.py ${OPTION}
 cd ../../object_detection_3d/3d_bbox; python3 3d_bbox.py ${OPTION}
 cd ../../object_detection_3d/3d-object-detection.pytorch; python3 3d-object-detection.pytorch.py ${OPTION}
 cd ../../object_detection_3d/mediapipe_objectron; python3 mediapipe_objectron.py ${OPTION}
+cd ../../object_detection_3d/egonet; python3 egonet.py ${OPTION}
 cd ../../object_tracking/deepsort; python3 deepsort.py ${OPTION}
 cd ../../object_tracking/person_reid_baseline_pytorch; python3 person_reid_baseline_pytorch.py ${OPTION}
 cd ../../object_tracking/abd_net; python3 abd_net.py ${OPTION}
@@ -189,7 +190,6 @@ cd ../../pose_estimation_3d/blazepose-fullbody; python3 blazepose-fullbody.py ${
 cd ../../pose_estimation_3d/3dmppe_posenet; python3 3dmppe_posenet.py ${OPTION}
 cd ../../pose_estimation_3d/pose-hg-3d; python3 pose-hg-3d.py ${OPTION}
 cd ../../pose_estimation_3d/gast; python3 gast.py ${OPTION}
-cd ../../pose_estimation_3d/egonet; python3 egonet.py ${OPTION}
 cd ../../road_detection/codes-for-lane-detection; python3 codes-for-lane-detection.py ${OPTION}
 cd ../../road_detection/roneld; python3 roneld.py ${OPTION}
 cd ../../road_detection/road-segmentation-adas; python3 road-segmentation-adas.py ${OPTION}
