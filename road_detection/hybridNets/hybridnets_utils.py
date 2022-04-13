@@ -9,7 +9,7 @@ import warnings
 from glob import glob
 from typing import Union
 from functools import partial
-from prefetch_generator import BackgroundGenerator
+#from prefetch_generator import BackgroundGenerator
 import random
 import itertools
 import yaml

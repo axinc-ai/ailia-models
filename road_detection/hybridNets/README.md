@@ -4,6 +4,8 @@
 
 ![Input](input.jpg)
 
+(Image from https://github.com/datvuthanh/HybridNets/blob/main/demo/image/1.jpg)
+
 Ailia input shape: (1, 3, 1280, 720)
 Range: [-1.0, 1.0]
 
