@@ -143,6 +143,7 @@ cd ../../natural_language_processing/bert_tweets_sentiment; python3 bert_tweets_
 cd ../../natural_language_processing/bert_zero_shot_classification; python3 bert_zero_shot_classification.py ${OPTION}
 cd ../../natural_language_processing/gpt2; python3 gpt2.py ${OPTION}
 cd ../../natural_language_processing/rinna_gpt2; python3 rinna_gpt2.py ${OPTION}
+cd ../../neural_rendering/nerf; python3 nerf.py ${OPTION}
 cd ../../object_detection/centernet; python3 centernet.py ${OPTION}
 cd ../../object_detection/m2det; python3 m2det.py ${OPTION}
 cd ../../object_detection/maskrcnn; python3 maskrcnn.py ${OPTION}
@@ -168,6 +169,7 @@ cd ../../object_detection/detic; python3 detic.py ${OPTION}
 cd ../../object_detection_3d/3d_bbox; python3 3d_bbox.py ${OPTION}
 cd ../../object_detection_3d/3d-object-detection.pytorch; python3 3d-object-detection.pytorch.py ${OPTION}
 cd ../../object_detection_3d/mediapipe_objectron; python3 mediapipe_objectron.py ${OPTION}
+cd ../../object_detection_3d/egonet; python3 egonet.py ${OPTION}
 cd ../../object_tracking/deepsort; python3 deepsort.py ${OPTION}
 cd ../../object_tracking/person_reid_baseline_pytorch; python3 person_reid_baseline_pytorch.py ${OPTION}
 cd ../../object_tracking/abd_net; python3 abd_net.py ${OPTION}
