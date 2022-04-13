@@ -39,7 +39,7 @@ model_index = 0
 # ======================
 
 IGNORE_LIST = [
-    "commercial_model", "validation", ".git", "log", "prnet", "bert",
+    "commercial_model", "validation", ".git", "log", "prnet", "bert", "neural_rendering",
     "illustration2vec", "etl", "vggface2", "anomaly_detection", "natural_language_processing", "audio_processing"
 ]
 
