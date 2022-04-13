@@ -296,6 +296,7 @@ The collection of pre-trained, state-of-the-art AI models.
 | [<img src="object_detection_3d/3d_bbox/output.png" width=128px>](object_detection_3d/efficientdet/) | [3d_bbox](/object_detection_3d/3d_bbox/) | [3D Bounding Box Estimation Using Deep Learning and Geometry](https://github.com/skhadem/3D-BoundingBox) | Pytorch | 1.2.6 and later | |
 | [<img src="object_detection_3d/3d-object-detection.pytorch/output.png" width=128px>](object_detection_3d/3d-object-detection.pytorch/) | [3d-object-detection.pytorch](/object_detection_3d/3d-object-detection.pytorch/) | [3d-object-detection.pytorch](https://github.com/sovrasov/3d-object-detection.pytorch) | Pytorch | 1.2.8 and later | [EN](https://medium.com/axinc-ai/3dobjectdetectionpytorch-3d-object-detection-model-3e1da4c53f) [JP](https://medium.com/axinc/3dobjectdetectionpytorch-3d%E3%81%AE%E7%89%A9%E4%BD%93%E6%A4%9C%E5%87%BA%E3%83%A2%E3%83%87%E3%83%AB-8df18b8eb5d1) |
 | [<img src="object_detection_3d/mediapipe_objectron/output.png" width=128px>](object_detection_3d/mediapipe_objectron/) | [mediapipe_objectron](/object_detection_3d/mediapipe_objectron/) | [MediaPipe Objectron](https://github.com/google/mediapipe) | TensorFlow Lite | 1.2.5 and later | |
+| [<img src="object_detection_3d/egonet/output.png" width=128px>](object_detection_3d/egonet/) |[egonet](/object_detection_3d/egonet/) | [EgoNet](https://github.com/Nicholasli1995/EgoNet) | Pytorch | 1.2.9 and later | |
 
 ## Object tracking
 
