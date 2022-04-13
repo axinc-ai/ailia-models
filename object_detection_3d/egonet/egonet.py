@@ -27,9 +27,6 @@ from egonet_utils import get_6d_rep
 from egonet_utils import plot_2d_objects, plot_3d_objects
 from instance_utils import csv_read_annot, get_2d_3d_pair
 
-sys.path.append('../../object_detection/yolov4')
-import yolov4_utils
-
 logger = getLogger(__name__)
 
 # ======================
@@ -42,9 +39,9 @@ WEIGHT_L_PATH = 'L.onnx'
 MODEL_L_PATH = 'L.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/egonet/'
 
-WEIGHT_YOLOV4_PATH = 'yolov4.onnx'
-MODEL_YOLOV4_PATH = 'yolov4.onnx.prototxt'
-REMOTE_YOLOV4_PATH = 'https://storage.googleapis.com/ailia-models/yolov4/'
+WEIGHT_YOLOX_PATH = 'yolox_s.opt.onnx'
+MODEL_YOLOX_PATH = 'yolox_s.opt.onnx.prototxt'
+REMOTE_YOLOX_PATH = 'https://storage.googleapis.com/ailia-models/yolox/'
 
 LS_path = 'LS.npy'
 
@@ -52,7 +49,10 @@ IMAGE_PATH = '007161.png'
 SAVE_IMAGE_PATH = 'output.png'
 
 IMAGE_SIZE = 256
-IMAGE_YOLO_SIZE = 416
+IMAGE_YOLO_SIZE = 640
+
+DATASET_WIDTH = 1238
+DATASET_HEIGHT = 374
 
 THRESHOLD = 0.4
 IOU = 0.45
@@ -209,22 +209,21 @@ def detect_cars(img, enlarge=None):
     iou = args.threshold
 
     h, w, _ = img.shape
-    img = letterbox_convert(img, (IMAGE_YOLO_SIZE, IMAGE_YOLO_SIZE))
+    img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
 
-    img = np.transpose(img, [2, 0, 1])
-    img = img.astype(np.float32) / 255
-    img = np.expand_dims(img, 0)
-
-    output = detect_cars.net.predict([img])
-
-    detect_object = yolov4_utils.post_processing(img, thres, iou, output)
-    detect_object = reverse_letterbox(detect_object[0], img, (IMAGE_YOLO_SIZE, IMAGE_YOLO_SIZE))
+    detect_cars.net.compute(img, thres, iou)
+    count = detect_cars.net.get_object_count()
+    detect_object = []
+    for idx in range(count):
+        obj = detect_cars.net.get_object(idx) 
+        detect_object.append(obj)
 
     bboxes = []
-    car_class = 2
+    car_class = [2, 5, 6] #car bus truck
     for d in detect_object:
-        if d.category != car_class:
+        if not(d.category in car_class):
             continue
+
         xmin = d.x * w
         ymin = d.y * h
         xmax = xmin + d.w * w
@@ -477,6 +476,16 @@ def predict(HC, L, LS, img, annot_dict):
     return records
 
 
+def crop_center(img):
+    scale_x = (DATASET_WIDTH / img.shape[1])
+    crop_y = img.shape[0] * scale_x - DATASET_HEIGHT
+    crop_y = int(crop_y / scale_x) #bottom
+    crop_y = int(crop_y/2) #center
+    img = img[crop_y:, :, :]  #keep aspect
+    img = cv2.resize(img, (DATASET_WIDTH, DATASET_HEIGHT), interpolation = cv2.INTER_LINEAR)
+    return img
+
+
 def recognize_from_image(HC, LS, L):
     label_path = args.label_path
     calib_path = args.calib_path
@@ -603,8 +612,8 @@ def recognize_from_video(HC, LS, L):
 
     # create video writer if savepath is specified as video format
     if args.savepath != SAVE_IMAGE_PATH:
-        f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
+        f_h = DATASET_HEIGHT#int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        f_w = DATASET_WIDTH#int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
 
         # Draw dummy data to get the size of the output
         dummy = np.zeros((f_h, f_w, 3))
@@ -632,6 +641,8 @@ def recognize_from_video(HC, LS, L):
             break
 
         img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        img = crop_center(img)
+
         enlarge = 1.2
         annot_dict = detect_cars(img, enlarge=enlarge)
 
@@ -673,7 +684,7 @@ def main():
         args.detector = True
     if args.detector:
         logger.info('Checking detector model...')
-        check_and_download_models(WEIGHT_YOLOV4_PATH, MODEL_YOLOV4_PATH, REMOTE_YOLOV4_PATH)
+        check_and_download_models(WEIGHT_YOLOX_PATH, MODEL_YOLOX_PATH, REMOTE_YOLOX_PATH)
 
     env_id = args.env_id
 
@@ -685,9 +696,17 @@ def main():
     LS = np.load(LS_path, allow_pickle=True).item()
 
     if args.detector:
-        detect_cars.net = ailia.Net(
-            MODEL_YOLOV4_PATH, WEIGHT_YOLOV4_PATH, env_id=env_id)
-
+        detect_cars.net = ailia.Detector(
+                MODEL_YOLOX_PATH,
+                WEIGHT_YOLOX_PATH,
+                80,
+                format=ailia.NETWORK_IMAGE_FORMAT_BGR,
+                channel=ailia.NETWORK_IMAGE_CHANNEL_FIRST,
+                range=ailia.NETWORK_IMAGE_RANGE_U_INT8,
+                algorithm=ailia.DETECTOR_ALGORITHM_YOLOX,
+                env_id=env_id)
+        detect_cars.net.set_input_shape(IMAGE_YOLO_SIZE,IMAGE_YOLO_SIZE)
+        
     if args.video is not None:
         recognize_from_video(HC, LS, L)
     else:
