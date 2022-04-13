@@ -76,7 +76,7 @@ parser.add_argument("--render_only", action='store_true',
                     help='do not optimize, reload weights and render out render_poses path')
 parser.add_argument("--render_test", action='store_true',
                     help='render the test set instead of render_poses path')
-parser.add_argument("--render_factor", type=int, default=8,
+parser.add_argument("--render_factor", type=int, default=4,
                     help='downsampling factor to speed up rendering, set 4 or 8 for fast preview')
 
 # dataset options

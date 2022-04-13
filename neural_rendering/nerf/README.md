@@ -43,7 +43,7 @@ You can set rendering angle by `--angle`. The range is 0 to 119.
 python3 nerf.py --angle 100
 ```
 
-Downsampling factor to speed up rendering, set 4 or 8 for fast preview. Default is 8.
+Downsampling factor to speed up rendering, set 4 or 8 for fast preview. Default is 4.
 
 ``` bash
 python3 nerf.py --render_factor 8
