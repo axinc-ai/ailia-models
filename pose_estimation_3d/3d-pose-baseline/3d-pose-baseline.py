@@ -46,7 +46,7 @@ parser.add_argument(
     'you can switch to the normal (not optimized) model'
 )
 parser.add_argument(
-    '-g', '--gui',
+    '--gui',
     action='store_true',
     help='Operate the detection result with GUI'
 )

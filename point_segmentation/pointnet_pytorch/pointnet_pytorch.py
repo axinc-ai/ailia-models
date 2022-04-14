@@ -89,7 +89,7 @@ parser.add_argument(
     help='choice class'
 )
 parser.add_argument(
-    '-g', '--gui',
+    '--gui',
     action='store_true',
     help='Operate the detection result with GUI'
 )
