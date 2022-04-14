@@ -77,7 +77,11 @@ parser.add_argument(
     '-bs', '--batchsize', type=int, default=256,
     help='Batchsize.'
 )
-
+parser.add_argument(
+    '--gui',
+    action='store_true',
+    help='Display preview in GUI.'
+)
 args = update_parser(parser)
 
 
@@ -299,7 +303,8 @@ def recognize_from_image(query_path, net):
         fig = plt.figure(figsize=(16, 4))
         ax = plt.subplot(1, 11, 1)
         ax.axis('off')
-        imshow(query_path, 'query')
+        if args.gui:
+            imshow(query_path, 'query')
 
         count = 0
         for i in range(len(index)):
@@ -316,7 +321,8 @@ def recognize_from_image(query_path, net):
                 '%d' % (count + 1),
                 color='black' if not MARKET_1501_DROP_SAME_CAMERA_LABEL \
                     else 'green' if label == query_label else 'red')
-            imshow(img_path)
+            if args.gui:
+                imshow(img_path)
 
             count += 1
             if count >= 10:
