@@ -78,6 +78,11 @@ parser.add_argument(
     choices=('mot17_x', 'mot20_x', 'mot17_s', 'mot17_tiny', 'yolox_s', 'yolox_tiny'),
     help='model type'
 )
+parser.add_argument(
+    '--gui',
+    action='store_true',
+    help='Display preview in GUI.'
+)
 # tracking args
 parser.add_argument("--track_thresh", type=float, default=0.5, help="tracking confidence threshold")
 parser.add_argument("--track_buffer", type=int, default=30, help="the frames for keep lost tracks")
@@ -302,8 +307,11 @@ def recognize_from_video(net):
         res_img = frame_vis_generator(frame, online_tlwhs, online_ids)
 
         # show
-        cv2.imshow('frame', res_img)
-        frame_shown = True
+        if args.gui or args.video:
+            cv2.imshow('frame', res_img)
+            frame_shown = True
+        else:
+            print("Online ids",online_ids)
 
         # save results
         if writer is not None:

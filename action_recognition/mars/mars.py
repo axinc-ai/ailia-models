@@ -98,6 +98,11 @@ parser.add_argument(
     '-t', '--top', metavar='TOP', default=3, type=int,
     help='Number of outputs for category.',
 )
+parser.add_argument(
+    '--gui',
+    action='store_true',
+    help='Display preview in GUI.'
+)
 args = update_parser(parser)
 
 
@@ -157,8 +162,9 @@ def recognize_from_image():
             preview_img = cv2.imread(sorted_inputs_path[
                     next_input_index - args.duration
             ])
-            cv2.imshow('preview', preview_img)
-            frame_shown = True
+            if args.gui:
+                cv2.imshow('preview', preview_img)
+                frame_shown = True
             
             for i in range(args.duration - 1):
                 input_blob[0, :, i, :, :] = input_blob[0, :, i + 1, :, :]
