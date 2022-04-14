@@ -88,6 +88,11 @@ parser.add_argument(
     ),
     help='choice class'
 )
+parser.add_argument(
+    '-g', '--gui',
+    action='store_true',
+    help='Operate the detection result with GUI'
+)
 args = update_parser(parser)
 
 
@@ -189,7 +194,9 @@ def recognize_from_points(filename, net_seg, net_cls):
     logger.info(f'saved at : {savepath}')
 
     plt.savefig(savepath, dpi=120)
-    plt.show()
+    if args.gui:
+        plt.show()
+        
     logger.info('Script finished successfully.')
 
 

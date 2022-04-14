@@ -1,6 +1,7 @@
 import sys
 import time
 import math
+import pathlib
 
 import cv2
 import numpy as np
@@ -43,6 +44,11 @@ parser.add_argument(
     action='store_true',
     help='By default, the optimized model is used, but with this option, ' +
     'you can switch to the normal (not optimized) model'
+)
+parser.add_argument(
+    '-g', '--gui',
+    action='store_true',
+    help='Operate the detection result with GUI'
 )
 args = update_parser(parser)
 
@@ -464,12 +470,16 @@ def recognize_from_image():
         savepath = get_savepath(args.savepath, image_path)
         logger.info(f'saved at : {savepath}')
         cv2.imwrite(savepath, src_img)
-    logger.info('Script finished successfully.')
 
-    # display 3d pose
-    plt.show()
-    # fig = plt.figure()
-    # fig.savefig("output_3dpose.png")
+        # display 3d pose
+        savepath_3d = pathlib.PurePath(savepath)
+        savepath_3d = savepath_3d.stem+"_3dpose"+savepath_3d.suffix
+        logger.info(f'saved at : {savepath_3d}')
+        plt.savefig(savepath_3d, dpi=120)
+        if args.gui:
+            plt.show()
+
+    logger.info('Script finished successfully.')
 
 
 def recognize_from_video():

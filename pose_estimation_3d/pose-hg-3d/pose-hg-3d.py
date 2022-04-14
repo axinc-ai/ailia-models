@@ -5,6 +5,7 @@ from PIL import Image
 import numpy as np
 import cv2
 from matplotlib import pyplot as plt
+import pathlib
 
 import ailia
 from lib_pose_hg_3d.utils.debugger import Debugger
@@ -44,6 +45,11 @@ std = np.array([0.229, 0.224, 0.225], np.float32).reshape(1, 1, 3)
 # Arguemnt Parser Config
 # ======================
 parser = get_base_parser('pose_hg_3d model', IMAGE_PATH, SAVE_IMAGE_PATH)
+parser.add_argument(
+    '-g', '--gui',
+    action='store_true',
+    help='Operate the detection result with GUI'
+)
 args = update_parser(parser)
 
 
@@ -96,8 +102,15 @@ def recognize_from_image():
         debugger.add_point_2d(pred, (255, 0, 0))
         debugger.add_point_3d(pred_3d, 'b')
         debugger.show_all_imgs(pause=False)
-        debugger.show_3d()
+        if args.gui:
+            debugger.show_3d()
 
+        savepath_3d = pathlib.PurePath(savepath)
+        savepath_3d = savepath_3d.stem+"_3dpose"+savepath_3d.suffix
+        logger.info(f'saved at : {savepath_3d}')
+        debugger.save_3d(savepath_3d)
+
+        logger.info(f'saved at : {savepath}')
         debugger.save_all_imgs(savepath)
 
     logger.info('Script finished successfully.')
