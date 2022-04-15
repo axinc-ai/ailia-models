@@ -30,7 +30,7 @@ class MelspectrogramStretch(object):
     def forward(self, data):
         wav,_ = data
         x = self.stft(wav)
-        print(x.shape)
+        #print(x.shape)
         # x -> (fft_length//2+1,channel)
 
         # print(x.shape)  #([1025, 176, 2])

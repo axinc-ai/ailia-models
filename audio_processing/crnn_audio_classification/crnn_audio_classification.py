@@ -6,6 +6,9 @@ import numpy as np
 
 import ailia
 
+import pyaudio
+#import librosa
+
 # import original modules
 sys.path.append('../../util')
 from utils import get_base_parser, update_parser  # noqa: E402
@@ -32,6 +35,17 @@ WEIGHT_PATH = "crnn_audio_classification.onnx"
 MODEL_PATH = "crnn_audio_classification.onnx.prototxt"
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/crnn_audio_classification/"
 
+# pyaudio
+CHUNK = 1024
+FORMAT = pyaudio.paInt16
+CHANNELS = 1
+RECODING_SAMPING_RATE = 48000
+THRESHOLD = 0.02
+
+SAMPLING_RATE = 16000
+WIN_LENGTH = int(SAMPLING_RATE * 0.02)
+HOP_LENGTH = int(SAMPLING_RATE * 0.01)
+
 
 # ======================
 # Arguemnt Parser Config
@@ -41,6 +55,17 @@ parser = get_base_parser(
 parser.add_argument(
     '--ailia_audio', action='store_true',
     help='use ailia audio library'
+)
+# overwrite
+parser.add_argument(
+    '-i', '--input', metavar='WAV',
+    default=WAVE_PATH,
+    help='The input wav path.',
+)
+parser.add_argument(
+    '-v',
+    action='store_true',
+    help='use microphone input',
 )
 args = update_parser(parser)
 
@@ -64,6 +89,87 @@ def postprocess(x):
 
 
 # ======================
+# Sound Utils
+# ======================
+def record_microphone_input():
+    logger.info('Ready...')
+    time.sleep(1)
+    p = pyaudio.PyAudio()
+
+    stream = p.open(
+        format=FORMAT,
+        channels=CHANNELS,
+        rate=RECODING_SAMPING_RATE,
+        input=True,
+        frames_per_buffer=CHUNK,
+    )
+
+    time.sleep(1)
+    logger.info("Please speak something")
+
+    frames = []
+    count_uv = 0
+
+    stream.start_stream()
+    while True:
+        if len(frames) > 500000:
+            break
+        data = np.frombuffer(stream.read(CHUNK), dtype=np.int16) / 32768.0
+        if data.max() > THRESHOLD:
+            frames.extend(data)
+            count_uv = 0
+        elif len(frames) > 0:
+            count_uv += 1
+            if count_uv > 48:
+                break
+            frames.extend(data)
+
+    # logger.info("Translating")
+
+    stream.stop_stream()
+    stream.close()
+    p.terminate()
+
+    wav = np.array(frames)
+    if args.ailia_audio:
+        return ailia.audio.resample(wav, RECODING_SAMPING_RATE, SAMPLING_RATE)
+    else:
+        return librosa.resample(wav, RECODING_SAMPING_RATE, SAMPLING_RATE)
+
+
+def create_spectrogram(wav):
+    if args.ailia_audio:
+        spectrogram = ailia.audio.create_spectrogram(
+            wav,
+            fft_n=WIN_LENGTH,
+            hop_n=HOP_LENGTH,
+            win_n=WIN_LENGTH,
+            win_type="hamming",
+        )
+        spec_length = np.array(([spectrogram.shape[1]-1]))
+    else:
+        stft = librosa.stft(
+            wav,
+            n_fft=WIN_LENGTH,
+            win_length=WIN_LENGTH,
+            hop_length=HOP_LENGTH,
+            window='hamming',
+        )
+        stft, _ = librosa.magphase(stft)
+        spectrogram = np.log1p(stft)
+        spec_length = np.array(([stft.shape[1]-1]))
+
+        mean = spectrogram.mean()
+        std = spectrogram.std()
+        spectrogram -= mean
+        spectrogram /= std
+
+    spectrogram = np.log1p(spectrogram)
+
+    return (spectrogram, spec_length)
+
+
+# ======================
 # Main function
 # ======================
 def crnn(data, session):
@@ -74,6 +180,11 @@ def crnn(data, session):
     # inference
     lengths_np = np.zeros((1))
     lengths_np[0] = lengths[0]
+
+    new_xt = np.zeros((1, 1, 128, 176))
+    new_xt[:, :, :xt.shape[2], :xt.shape[3]] = xt
+    xt = new_xt
+    lengths_np = np.array([176.])
     results = session.predict({"data": xt, "lengths": lengths_np})
 
     label, conf = postprocess(results[0])
@@ -81,10 +192,27 @@ def crnn(data, session):
     return label, conf
 
 
-def main():
-    # model files check and download
-    check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
+def microphone_input_recognition():
+    try:
+        print('processing...')
+        while True:
+            wav = record_microphone_input()
 
+            # create instance
+            session = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
+
+            data = (wav, SAMPLING_RATE) # TODO: change 48000
+
+            label, conf = crnn(data, session)
+
+            logger.info(label)
+            logger.info(conf)
+
+    except KeyboardInterrupt:
+        logger.info('script finished successfully.')
+
+
+def wavfile_input_recognition():
     # load audio
     for input_data_path in args.input:
         logger.info('=' * 80)
@@ -110,6 +238,18 @@ def main():
         logger.info(conf)
 
         logger.info('Script finished successfully.')
+
+
+def main():
+    # model files check and download
+    check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
+
+    # microphone input mode
+    if args.v:
+        microphone_input_recognition()
+    # sound file input mode
+    else:
+        wavfile_input_recognition()
 
 
 if __name__ == "__main__":
