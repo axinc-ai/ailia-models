@@ -1,12 +1,10 @@
 import sys
 import os
 import time
-from io import BytesIO
+import math
 
 import numpy as np
 import cv2
-from PIL import Image
-import matplotlib.pyplot as plt
 
 import ailia
 
@@ -20,6 +18,9 @@ from nms_utils import nms_boxes  # noqa
 from webcamera_utils import get_capture, get_writer  # noqa
 # logger
 from logging import getLogger  # noqa
+
+from d4lcn_utils import bbox_transform_inv, hill_climb
+from d4lcn_utils import convertAlpha2Rot, convertRot2Alpha
 
 logger = getLogger(__name__)
 
@@ -75,60 +76,78 @@ def get_depth(path, name):
     sys.exit(-1)
 
 
-def bbox_transform_inv(boxes, deltas, means=None, stds=None):
-    """
-    Compute the bbox target transforms in 3D.
+def pred_str(aboxes):
+    lbls = ['Car', 'Pedestrian', 'Cyclist']
+    nms_topN = 40
 
-    Translations are done as simple difference, whereas others involving
-    scaling are done in log space (hence, log(1) = 0, log(0.8) < 0 and
-    log(1.2) > 0 which is a good property).
-    """
+    p2 = np.array(
+        [[721.5377, 0., 609.5593, 44.85728],
+         [0., 721.5377, 172.854, 0.2163791],
+         [0., 0., 1., 0.00274588],
+         [0., 0., 0., 1.]])
+    p2_inv = np.linalg.inv(p2)
 
-    if boxes.shape[0] == 0:
-        return np.zeros((0, deltas.shape[1]), dtype=deltas.dtype)
+    results = []
+    for boxind in range(0, min(nms_topN, aboxes.shape[0])):
+        box = aboxes[boxind, :]
+        score = box[4]
+        cls = lbls[int(box[5] - 1)]
 
-    widths = boxes[:, 2] - boxes[:, 0] + 1.0
-    heights = boxes[:, 3] - boxes[:, 1] + 1.0
-    ctr_x = boxes[:, 0] + 0.5 * widths
-    ctr_y = boxes[:, 1] + 0.5 * heights
+        if score < 0.75:
+            continue
 
-    dx = deltas[:, 0]
-    dy = deltas[:, 1]
-    dw = deltas[:, 2]
-    dh = deltas[:, 3]
+        # 2D box
+        x1 = box[0]
+        y1 = box[1]
+        x2 = box[2]
+        y2 = box[3]
+        width = (x2 - x1 + 1)
+        height = (y2 - y1 + 1)
 
-    if stds is not None:
-        dx *= stds[0]
-        dy *= stds[1]
-        dw *= stds[2]
-        dh *= stds[3]
+        # plot 3D box
+        x3d = box[6]
+        y3d = box[7]
+        z3d = box[8]
+        w3d = box[9]
+        h3d = box[10]
+        l3d = box[11]
+        ry3d = box[12]
 
-    if means is not None:
-        dx += means[0]
-        dy += means[1]
-        dw += means[2]
-        dh += means[3]
+        # Inverse matrix and scale, to 3d camera coordinate
+        coord3d = np.linalg.inv(p2).dot(np.array([x3d * z3d, y3d * z3d, 1 * z3d, 1]))
+        # convert alpha into ry3d
+        ry3d = convertAlpha2Rot(ry3d, coord3d[2], coord3d[0])
 
-    pred_ctr_x = dx * widths + ctr_x
-    pred_ctr_y = dy * heights + ctr_y
-    pred_w = np.exp(dw) * widths
-    pred_h = np.exp(dh) * heights
+        step_r = 0.3 * math.pi
+        r_lim = 0.01
+        box_2d = np.array([x1, y1, width, height])
 
-    pred_boxes = np.zeros(deltas.shape)
+        z3d, ry3d, verts_best = hill_climb(
+            p2, p2_inv, box_2d, x3d, y3d, z3d, w3d, h3d, l3d, ry3d,
+            step_r_init=step_r, r_lim=r_lim)
 
-    # x1, y1, x2, y2
-    pred_boxes[:, 0] = pred_ctr_x - 0.5 * pred_w
-    pred_boxes[:, 1] = pred_ctr_y - 0.5 * pred_h
-    pred_boxes[:, 2] = pred_ctr_x + 0.5 * pred_w
-    pred_boxes[:, 3] = pred_ctr_y + 0.5 * pred_h
+        # predict a more accurate projection
+        coord3d = np.linalg.inv(p2).dot(np.array([x3d * z3d, y3d * z3d, 1 * z3d, 1]))
+        alpha = convertRot2Alpha(ry3d, coord3d[2], coord3d[0])
 
-    return pred_boxes
+        x3d = coord3d[0]
+        y3d = coord3d[1]
+        z3d = coord3d[2]
+
+        y3d += h3d / 2
+
+        results.append(
+            '{} -1 -1 {:.6f} {:.6f} {:.6f} {:.6f} {:.6f} '
+            '{:.6f} {:.6f} {:.6f} {:.6f} {:.6f} {:.6f} {:.6f} {:.6f}'.format(
+                cls, alpha, x1, y1, x2, y2, h3d, w3d, l3d, x3d, y3d, z3d, ry3d, score))
+
+    pred_str = '\n'.join(results)
+    return pred_str
 
 
 # ======================
 # Main functions
 # ======================
-
 
 def preprocess(img, depth):
     h, w = img.shape[:2]
@@ -361,7 +380,7 @@ def recognize_from_image(net):
             total_time_estimation = 0
             for i in range(args.benchmark_count):
                 start = int(round(time.time() * 1000))
-                output = predict(net, img, depth)
+                aboxes = predict(net, img, depth)
                 end = int(round(time.time() * 1000))
                 estimation_time = (end - start)
 
@@ -372,7 +391,9 @@ def recognize_from_image(net):
 
             logger.info(f'\taverage time estimation {total_time_estimation / (args.benchmark_count - 1)} ms')
         else:
-            output = predict(net, img, depth)
+            aboxes = predict(net, img, depth)
+
+        results_str = pred_str(aboxes)
 
         save_path = get_savepath(args.savepath, image_path, ext='.png')
         logger.info(f'saved at : {save_path}')
