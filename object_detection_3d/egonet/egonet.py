@@ -110,7 +110,7 @@ def get_path(path, file_typ, name):
         else:
             return None
     elif os.path.isdir(path):
-        file_path = "%s/%s.txt" % (file_typ, name)
+        file_path = "%s/%s.txt" % (path, name)
         if os.path.exists(file_path):
             logger.info("%s file: %s" % (file_typ, file_path))
             return file_path
