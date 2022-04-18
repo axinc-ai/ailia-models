@@ -24,8 +24,6 @@ logger = getLogger(__name__)
 # ======================
 IMAGE_PATH = 'input.png'
 SAVE_IMAGE_PATH = 'output.png'
-#IMAGE_HEIGHT = 194    # net.get_input_shape()[3]
-#IMAGE_WIDTH = 194     # net.get_input_shape()[2]
 
 # ======================
 # Argument Parser Config
@@ -121,6 +119,8 @@ def recognize_from_image(net):
         c = img.shape[2]
         if c == 1:
             img = np.concatenate([img] * 3, 2)
+        elif c == 4:
+            img = img[:,:,0:3]
 
         img = np.ascontiguousarray(img.transpose((2, 0, 1)))
         img = img.astype(np.float32)
