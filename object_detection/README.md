@@ -26,6 +26,10 @@ Detect bounding box of objects from single image.
 
 Basically the accuracy of object detection algorithm is calculated by mAP. In this page, mAP was calculated using this repository.
 
+https://github.com/axinc-ai/ailia-models-measurement/
+
+The repository uses Object-Detection-Metrics for mAP calculation.
+
 https://github.com/rafaelpadilla/Object-Detection-Metrics
 
 We used COCO2017 val images for testing. We set parameters, iou = 0.5 (mAP50) and iou = 0.75 (mAP75), detection threshold = 0.01 (Because small value achieves high accuracy).
