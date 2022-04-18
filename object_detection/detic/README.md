@@ -50,5 +50,7 @@ ONNX opset=11
 
 ## Netron
 
-[Detic_C2_SwinB_896_4x_IN-21K+COCO_lvis.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/detic/Detic_C2_SwinB_896_4x_IN-21K+COCO_lvis.onnx.prototxt)  
-[Detic_C2_SwinB_896_4x_IN-21K+COCO_in21k.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/detic/Detic_C2_SwinB_896_4x_IN-21K+COCO_in21k.onnx.prototxt)
+- [Detic_C2_SwinB_896_4x_IN-21K+COCO_lvis.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/detic/Detic_C2_SwinB_896_4x_IN-21K%2bCOCO_lvis.onnx.prototxt)  
+- [Detic_C2_SwinB_896_4x_IN-21K+COCO_in21k.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/detic/Detic_C2_SwinB_896_4x_IN-21K%2bCOCO_in21k.onnx.prototxt)
+- [Detic_C2_R50_640_4x_lvis.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/detic/Detic_C2_R50_640_4x_lvis.onnx.prototxt)
+- [Detic_C2_R50_640_4x_in21k.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/detic/Detic_C2_R50_640_4x_in21k.onnx.prototxt)
