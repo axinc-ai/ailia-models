@@ -503,29 +503,29 @@ def recognize_from_image(HC, LS, L):
 
         name = os.path.splitext(os.path.basename(image_path))[0]
         if not detection:
-            label_path = get_path(label_path, "label", name)
-        calib_path = get_path(calib_path, "calib", name)
-        gt_label_path = get_path(gt_label_path, "gt_label", name)
+            label_file_path = get_path(label_path, "label", name)
+        calib_file_path = get_path(calib_path, "calib", name)
+        gt_label_file_path = get_path(gt_label_path, "gt_label", name)
 
-        if gt_label_path and not calib_path:
+        if gt_label_file_path and not calib_file_path:
             logger.error("calib file not specified or not found.")
             sys.exit(-1)
 
         enlarge = 1.2
         if detection:
             annot_dict = detect_cars(img, enlarge=enlarge)
-        elif label_path is not None:
+        elif label_file_path is not None:
             annot_dict = read_annot(
-                img, label_path, calib_path,
+                img, label_file_path, calib_file_path,
                 pred=True,
                 enlarge=enlarge)
         else:
             logger.error("should specify the label file or detector.")
             sys.exit(-1)
 
-        if gt_label_path:
+        if gt_label_file_path:
             gt_annot_dict = read_annot(
-                img, gt_label_path, calib_path,
+                img, gt_label_file_path, calib_file_path,
                 add_gt=True)
         else:
             gt_annot_dict = None
