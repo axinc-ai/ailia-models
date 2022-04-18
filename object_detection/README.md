@@ -13,7 +13,7 @@ Detect bounding box of objects from single image.
 |[yolov4](./yolov4/)|43.02|64.38|129.5|416|2020.4|
 |[yolox_s](./yolox/)|39.53|56.35|26.8|640|2021.8|
 |[yolov3](./yolov3/)|36.94|65.23|65.86|416|2018.4|
-|[yolov5s6](./yolov5/)|TBD|TBD|16.8|640|2021.10|
+|[yolov5s6](./yolov5/)|35.12|51.90|16.8|640|2021.10|
 |[yolov5s](./yolov5/)|34.11|51.89|16.5|640|2020.6|
 |[yolox_tiny](./yolox/)|31.36|47.04|6.45|416|2021.8|
 |[yolox_nano](./yolox/)|24.15|39.03|1.08|416|2021.8|
