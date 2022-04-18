@@ -1,10 +1,12 @@
 import sys
 import os
 import time
+from io import StringIO
 import math
 
 import numpy as np
 import cv2
+import matplotlib.pyplot as plt
 
 import ailia
 
@@ -13,14 +15,14 @@ sys.path.append('../../util')
 from utils import get_base_parser, update_parser, get_savepath  # noqa
 from model_utils import check_and_download_models  # noqa
 from detector_utils import load_image  # noqa
-from image_utils import normalize_image  # noqa
 from nms_utils import nms_boxes  # noqa
-from webcamera_utils import get_capture, get_writer  # noqa
 # logger
 from logging import getLogger  # noqa
 
 from d4lcn_utils import bbox_transform_inv, hill_climb
 from d4lcn_utils import convertAlpha2Rot, convertRot2Alpha
+from instance_utils import read_annot, read_calib_file, get_2d
+from points_utils import plot_3d_bbox
 
 logger = getLogger(__name__)
 
@@ -45,8 +47,12 @@ parser = get_base_parser(
     'D4LCN', IMAGE_PATH, SAVE_IMAGE_PATH
 )
 parser.add_argument(
+    '--calib_path', type=str, default=None,
+    help='the calibration file (Camera parameters for image) or stored directory path'
+)
+parser.add_argument(
     '--depth_path', type=str, default=None,
-    help='the label file (object labels for image) or stored directory path.'
+    help='the depth file (depth maps for image) or stored directory path.'
 )
 args = update_parser(parser)
 
@@ -55,14 +61,37 @@ args = update_parser(parser)
 # Secondaty Functions
 # ======================
 
+def get_path(path, name):
+    if path is None:
+        path = "calib"
+        file_path = "%s/%s.txt" % (path, name)
+        if os.path.exists(file_path):
+            logger.info("calib file: %s" % file_path)
+            return file_path
+        # else:
+        #     return None
+    elif os.path.isdir(path):
+        file_path = "%s/%s.txt" % (path, name)
+        if os.path.exists(file_path):
+            logger.info("calib file: %s" % file_path)
+            return file_path
+    elif os.path.exists(path):
+        logger.info("calib file: %s" % path)
+        return path
+
+    logger.error("calib file is not found. (path: %s)" % path)
+    sys.exit(-1)
+
+
 def get_depth(path, name):
     if path is None:
-        file_path = "depth/%s.png" % name
+        path = "depth"
+        file_path = "%s/%s.png" % (path, name)
         if os.path.exists(file_path):
             logger.info("depth file: %s" % file_path)
             return file_path
-        else:
-            return None
+        # else:
+        #     return None
     elif os.path.isdir(path):
         file_path = "%s/%s.png" % (path, name)
         if os.path.exists(file_path):
@@ -76,15 +105,10 @@ def get_depth(path, name):
     sys.exit(-1)
 
 
-def pred_str(aboxes):
+def pred_str(aboxes, p2):
     lbls = ['Car', 'Pedestrian', 'Cyclist']
     nms_topN = 40
 
-    p2 = np.array(
-        [[721.5377, 0., 609.5593, 44.85728],
-         [0., 721.5377, 172.854, 0.2163791],
-         [0., 0., 1., 0.00274588],
-         [0., 0., 0., 1.]])
     p2_inv = np.linalg.inv(p2)
 
     results = []
@@ -143,6 +167,31 @@ def pred_str(aboxes):
 
     pred_str = '\n'.join(results)
     return pred_str
+
+
+def draw_results(img, kpts_2d):
+    fig = plt.figure(figsize=(11.3, 9))
+    ax = plt.subplot(111)
+
+    fig.gca().set_axis_off()
+    fig.subplots_adjust(
+        top=1, bottom=0, right=1, left=0,
+        hspace=0, wspace=0)
+    fig.gca().xaxis.set_major_locator(plt.NullLocator())
+    fig.gca().yaxis.set_major_locator(plt.NullLocator())
+
+    height, width, _ = img.shape
+    ax.imshow(img)
+    ax.set_xlim([0, width])
+    ax.set_ylim([0, height])
+    ax.invert_yaxis()
+
+    # plot predicted 2D screen coordinates
+    for idx, kpts in enumerate(kpts_2d):
+        kpts = kpts.reshape(-1, 2)
+        plot_3d_bbox(ax, kpts[1:, :2], color='chartreuse', linestyle='-')
+
+    return fig
 
 
 # ======================
@@ -357,6 +406,7 @@ def predict(net, img, depth):
 
 def recognize_from_image(net):
     depth_path = args.depth_path
+    calib_path = args.calib_path
 
     # input image loop
     for image_path in args.input:
@@ -368,10 +418,14 @@ def recognize_from_image(net):
 
         # depth
         name = os.path.splitext(os.path.basename(image_path))[0]
-        depth_path = get_depth(depth_path, name)
-        depth = cv2.imread(depth_path, cv2.IMREAD_UNCHANGED)
+        path = get_depth(depth_path, name)
+        depth = cv2.imread(path, cv2.IMREAD_UNCHANGED)
         depth = depth[:, :, np.newaxis]
         depth = np.tile(depth, (1, 1, 3))
+
+        # read in calib
+        path = get_path(calib_path, name)
+        p2 = read_calib_file(path)
 
         # inference
         logger.info('Start inference...')
@@ -393,9 +447,18 @@ def recognize_from_image(net):
         else:
             aboxes = predict(net, img, depth)
 
-        results_str = pred_str(aboxes)
+        results_str = pred_str(aboxes, p2)
+        logger.info(results_str)
+
+        buf = StringIO(results_str)
+        anns = read_annot(buf)
+        kpts_2d = get_2d(anns, p2[:3])
+
+        fig = draw_results(cv2.cvtColor(img, cv2.COLOR_BGR2RGB), kpts_2d)
 
         save_path = get_savepath(args.savepath, image_path, ext='.png')
+        fig.savefig(save_path, dpi=100, bbox_inches='tight', pad_inches=0)
+        plt.close()
         logger.info(f'saved at : {save_path}')
 
     logger.info('Script finished successfully.')
