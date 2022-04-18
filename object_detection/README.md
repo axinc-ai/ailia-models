@@ -43,7 +43,7 @@ GFlops was referred from below site.
 - yolov4 : https://github.com/Tianxiaomo/pytorch-YOLOv4 https://docs.openvino.ai/latest/omz_models_model_yolo_v4_tiny_tf.html
 - yolov3 : https://pjreddie.com/darknet/yolo/
 
-# Models for segmentation mask
+## Models for segmentation mask
 
 Detect bounding box and mask of objects from single image.
 
