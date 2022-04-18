@@ -111,6 +111,10 @@ def estimate_alpha(
     trimap[is_foreground] = 255
     trimap[is_background] = 0
 
+    # fix trimap did not contain foreground values
+    if not(255 in trimap):
+        return np.zeros(mask.shape)
+
     # build the cutout image
     img_normalized = img / 255.0
     trimap_normalized = trimap / 255.0
