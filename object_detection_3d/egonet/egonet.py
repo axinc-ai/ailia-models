@@ -215,13 +215,13 @@ def detect_cars(img, enlarge=None):
     count = detect_cars.net.get_object_count()
     detect_object = []
     for idx in range(count):
-        obj = detect_cars.net.get_object(idx) 
+        obj = detect_cars.net.get_object(idx)
         detect_object.append(obj)
 
     bboxes = []
-    car_class = [2, 5, 6] #car bus truck
+    car_class = [2, 5, 6]  # car bus truck
     for d in detect_object:
-        if not(d.category in car_class):
+        if not (d.category in car_class):
             continue
 
         xmin = d.x * w
@@ -479,10 +479,10 @@ def predict(HC, L, LS, img, annot_dict):
 def crop_center(img):
     scale_x = (DATASET_WIDTH / img.shape[1])
     crop_y = img.shape[0] * scale_x - DATASET_HEIGHT
-    crop_y = int(crop_y / scale_x) #bottom
-    crop_y = int(crop_y/2) #center
-    img = img[crop_y:, :, :]  #keep aspect
-    img = cv2.resize(img, (DATASET_WIDTH, DATASET_HEIGHT), interpolation = cv2.INTER_LINEAR)
+    crop_y = int(crop_y / scale_x)  # bottom
+    crop_y = int(crop_y / 2)  # center
+    img = img[crop_y:, :, :]  # keep aspect
+    img = cv2.resize(img, (DATASET_WIDTH, DATASET_HEIGHT), interpolation=cv2.INTER_LINEAR)
     return img
 
 
@@ -612,8 +612,8 @@ def recognize_from_video(HC, LS, L):
 
     # create video writer if savepath is specified as video format
     if args.savepath != SAVE_IMAGE_PATH:
-        f_h = DATASET_HEIGHT#int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        f_w = DATASET_WIDTH#int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
+        f_h = DATASET_HEIGHT  # int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        f_w = DATASET_WIDTH  # int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
 
         # Draw dummy data to get the size of the output
         dummy = np.zeros((f_h, f_w, 3))
@@ -697,16 +697,16 @@ def main():
 
     if args.detector:
         detect_cars.net = ailia.Detector(
-                MODEL_YOLOX_PATH,
-                WEIGHT_YOLOX_PATH,
-                80,
-                format=ailia.NETWORK_IMAGE_FORMAT_BGR,
-                channel=ailia.NETWORK_IMAGE_CHANNEL_FIRST,
-                range=ailia.NETWORK_IMAGE_RANGE_U_INT8,
-                algorithm=ailia.DETECTOR_ALGORITHM_YOLOX,
-                env_id=env_id)
-        detect_cars.net.set_input_shape(IMAGE_YOLO_SIZE,IMAGE_YOLO_SIZE)
-        
+            MODEL_YOLOX_PATH,
+            WEIGHT_YOLOX_PATH,
+            80,
+            format=ailia.NETWORK_IMAGE_FORMAT_BGR,
+            channel=ailia.NETWORK_IMAGE_CHANNEL_FIRST,
+            range=ailia.NETWORK_IMAGE_RANGE_U_INT8,
+            algorithm=ailia.DETECTOR_ALGORITHM_YOLOX,
+            env_id=env_id)
+        detect_cars.net.set_input_shape(IMAGE_YOLO_SIZE, IMAGE_YOLO_SIZE)
+
     if args.video is not None:
         recognize_from_video(HC, LS, L)
     else:
