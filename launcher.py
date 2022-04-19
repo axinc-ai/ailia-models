@@ -456,9 +456,15 @@ def main():
 
     root.mainloop()
 
+def download_models():
+    global model_list
+    for model in model_list:
+        cmd = [sys.executable, model["model"]+".py", "-e", "0", "-b", "-bc", "1"]
+        subprocess.check_call(cmd, cwd=dir, shell=False)
+
 if __name__ == '__main__':
     if args.download_only:
-        print("OK")
+        download_models()
     else:
         main()
 
