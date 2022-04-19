@@ -23,6 +23,10 @@ from utils import get_base_parser, update_parser  # noqa: E402
 # Arguemnt Parser Config
 # ======================
 parser = get_base_parser('ailia MODELS launcher', None, None)
+parser.add_argument(
+    '--download_only', action='store_true',
+    help='download all model files for offline use'
+)
 args = update_parser(parser)
 
 # ======================
@@ -453,7 +457,10 @@ def main():
     root.mainloop()
 
 if __name__ == '__main__':
-    main()
+    if args.download_only:
+        print("OK")
+    else:
+        main()
 
 
 
