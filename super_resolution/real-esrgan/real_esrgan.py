@@ -24,9 +24,6 @@ logger = getLogger(__name__)
 INPUT_IMAGE_PATH = 'input.jpg'
 SAVE_IMAGE_PATH = 'output.jpg'
 
-W = 256
-H = 256
-
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/real-esrgan/'
 
 # =======================
@@ -54,11 +51,11 @@ def enhance_image():
     for image_path in args.input:
         # prepare input data
         img = cv2.imread(image_path, cv2.IMREAD_UNCHANGED)
-        img = cv2.resize(img, dsize=(H, W))
 
         # net initialize
         mem_mode = ailia.get_memory_mode(reduce_constant=True, ignore_input_with_initializer=True, reduce_interstage=False, reuse_interstage=True)
         model = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id, memory_mode=mem_mode)
+        model.set_input_shape((3,img.shape[1],img.shape[0]))
         upsampler = RealESRGAN(model)
 
         # inference
@@ -106,7 +103,8 @@ def enhance_video():
         if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
             break
 
-        img = cv2.resize(frame, dsize=(H, W))
+        h, w = frame.shape[0], frame.shape[1]
+        img = frame[h//2:h//2+h//4, w//2:w//2+w//4, :]
 
         # inference
         output = upsampler.enhance(img)
