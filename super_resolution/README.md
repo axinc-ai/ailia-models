@@ -21,7 +21,7 @@ Refereed from https://paperswithcode.com/sota/image-super-resolution-on-bsd100-4
 ### Actual image quality
 
 An example is shown on the following site.
-https://github.com/axinc-ai/ailia-models-measurement
+https://github.com/axinc-ai/ailia-models-measurement/tree/main/super_resolution
 
 ## Leader board
 
