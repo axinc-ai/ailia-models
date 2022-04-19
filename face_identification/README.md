@@ -6,10 +6,10 @@ Identify person from face.
 
 ### Cityscapes
 
-|Name|Accuracy (LFW)|Publish Date|
+|Name|Accuracy (LFW 100person)|Publish Date|
 |-----|-----|-----|
-|[arcface (resnet18)](./arcface/)||2018|
-|[vggface2 (resnet50)](./vggface2/)||2018|
+|[arcface (resnet18)](./arcface/)|99.93|2018|
+|[vggface2 (resnet50)](./vggface2/)|99.91|2018|
 
 ## Metrics
 
