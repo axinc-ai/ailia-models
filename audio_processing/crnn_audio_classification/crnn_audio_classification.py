@@ -6,7 +6,10 @@ import numpy as np
 
 import ailia
 
+import cv2
 import pyaudio
+import io
+import matplotlib.pyplot as plt
 #import librosa
 
 # import original modules
@@ -195,7 +198,13 @@ def crnn(data, session):
 def microphone_input_recognition():
     try:
         print('processing...')
+        frame_shown = False
         while True:
+            if (cv2.waitKey(1) & 0xFF == ord('q')):
+                break
+            if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
+                break
+
             wav = record_microphone_input()
 
             # create instance
@@ -204,6 +213,20 @@ def microphone_input_recognition():
             data = (wav, SAMPLING_RATE) # TODO: change 48000
 
             label, conf = crnn(data, session)
+
+            plt.specgram(wav,Fs=1)
+            plt.title('Predicted class is = {}, confidence = {}'.format(label, conf))
+
+            buf = io.BytesIO()
+            plt.savefig(buf, format='png')
+            buf.seek(0)
+            img_arr = np.frombuffer(buf.getvalue(), dtype=np.uint8)
+            buf.close()
+            img = cv2.imdecode(img_arr, 1)
+
+            cv2.imshow('frame', img)
+            frame_shown = True
+            time.sleep(0)
 
             logger.info(label)
             logger.info(conf)
