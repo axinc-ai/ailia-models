@@ -2,16 +2,16 @@
 
 ## Models for image segmentation
 
-Segmentation the input image by category.
+Generate segmentation the input image by category.
 
 ### Cityscapes
 
 |Name|mIoU|Publish Date|
 |-----|-----|-----|
 |[paddleseg (MscaleOCRNet HRNet_w48)](./paddleseg/)|86.89|2021|
-|[hrnet (HRNetV2-W48)](./hrnet/)|81.1|2019|
-|[hrnet (HRNetV2-W18-Small-v2)](./hrnet/)|76.2|2019|
-|[hrnet (HRNetV2-W18-Small-v1)](./hrnet/)|70.3|2019|
+|[hrnet (HRNetV2-W48)](./hrnet_segmentation/)|81.1|2019|
+|[hrnet (HRNetV2-W18-Small-v2)](./hrnet_segmentation/)|76.2|2019|
+|[hrnet (HRNetV2-W18-Small-v1)](./hrnet_segmentation/)|70.3|2019|
 
 ### Ade20k
 
