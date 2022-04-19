@@ -114,7 +114,7 @@ def record_microphone_input():
     while True:
         if len(frames) > 500000:
             break
-        data = np.frombuffer(stream.read(CHUNK), dtype=np.int16) / 32768.0
+        data = np.frombuffer(stream.read(CHUNK, exception_on_overflow=False), dtype=np.int16) / 32768.0
         if data.max() > THRESHOLD:
             frames.extend(data)
             count_uv = 0
