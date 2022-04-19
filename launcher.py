@@ -457,10 +457,16 @@ def main():
     root.mainloop()
 
 def download_models():
-    global model_list
+    model_list, _, __ = get_model_list()
+    fail_models = []
     for model in model_list:
-        cmd = [sys.executable, model["model"]+".py", "-e", "0", "-b", "-bc", "1"]
-        subprocess.check_call(cmd, cwd=dir, shell=False)
+        dir = "./"+model["category"]+"/"+model["model"]+"/"
+        cmd = [sys.executable, model["model"]+".py", "-e", "0", "-b", "-bc", "2"]
+        status = subprocess.run(cmd, cwd=dir, shell=False)
+        if status.returncode != 0:
+            fail_models.append(model["model"])
+    for f in fail_models:
+        print(f)
 
 if __name__ == '__main__':
     if args.download_only:
