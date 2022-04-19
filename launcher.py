@@ -458,15 +458,32 @@ def main():
 
 def download_models():
     model_list, _, __ = get_model_list()
+    skip_models = []
+    downloaded_models = []
     fail_models = []
+    
     for model in model_list:
         dir = "./"+model["category"]+"/"+model["model"]+"/"
+        if len(glob.glob(f"{dir}/*.onnx") + glob.glob(f"{dir}/*.caffemodel")) != 0:
+            skip_models.append(model["model"])
+            continue
         cmd = [sys.executable, model["model"]+".py", "-e", "0", "-b", "-bc", "2"]
         status = subprocess.run(cmd, cwd=dir, shell=False)
-        if status.returncode != 0:
+        if status.returncode == 0:
+            downloaded_models.append(model["model"])
+        else:
             fail_models.append(model["model"])
-    for f in fail_models:
-        print(f)
+        
+    print("DOWNLOAD FINISHED")
+    print("SKIPPED MODEL")
+    for model in skip_models:
+        print(f" +{model}")
+    print("DOWNLOADED MODEL")
+    for model in downloaded_models:
+        print(f" +{model}")
+    print("FAIL MODEL")
+    for model in fail_models:
+        print(f" +{model}")
 
 if __name__ == '__main__':
     if args.download_only:
