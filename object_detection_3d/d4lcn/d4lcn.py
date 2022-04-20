@@ -34,7 +34,7 @@ WEIGHT_PATH = 'd4lcn.onnx'
 MODEL_PATH = 'd4lcn.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/d4lcn/'
 
-IMAGE_PATH = '000001.png'
+IMAGE_PATH = '000005.png'
 SAVE_IMAGE_PATH = 'output.png'
 
 IMAGE_HEIGHT = 512
@@ -138,7 +138,7 @@ def pred_str(aboxes, p2):
         ry3d = box[12]
 
         # Inverse matrix and scale, to 3d camera coordinate
-        coord3d = np.linalg.inv(p2).dot(np.array([x3d * z3d, y3d * z3d, 1 * z3d, 1]))
+        coord3d = p2_inv.dot(np.array([x3d * z3d, y3d * z3d, 1 * z3d, 1]))
         # convert alpha into ry3d
         ry3d = convertAlpha2Rot(ry3d, coord3d[2], coord3d[0])
 
@@ -151,7 +151,7 @@ def pred_str(aboxes, p2):
             step_r_init=step_r, r_lim=r_lim)
 
         # predict a more accurate projection
-        coord3d = np.linalg.inv(p2).dot(np.array([x3d * z3d, y3d * z3d, 1 * z3d, 1]))
+        coord3d = p2_inv.dot(np.array([x3d * z3d, y3d * z3d, 1 * z3d, 1]))
         alpha = convertRot2Alpha(ry3d, coord3d[2], coord3d[0])
 
         x3d = coord3d[0]
@@ -474,7 +474,10 @@ def main():
     env_id = args.env_id
 
     # initialize
-    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+    memory_mode = ailia.get_memory_mode(
+        reduce_constant=True, ignore_input_with_initializer=True,
+        reduce_interstage=True, reuse_interstage=False)
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id, memory_mode=memory_mode)
 
     recognize_from_image(net)
 
