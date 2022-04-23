@@ -6,6 +6,9 @@
 
 (Image from https://www.cityscapes-dataset.com/downloads/)
 
+- cityscapes: (1, 3, 512, 1024)
+- camvid: (1, 3, 768, 1024)
+
 ## Output
 
 <img src="output.png" width="512px">
