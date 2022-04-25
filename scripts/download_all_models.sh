@@ -129,6 +129,7 @@ cd ../../image_segmentation/yet-another-anime-segmenter; python3 yet-another-ani
 cd ../../image_segmentation/swiftnet; python3 swiftnet.py ${OPTION}
 cd ../../image_segmentation/dense_prediction_transformers; python3 dense_prediction_transformers.py ${OPTION}
 cd ../../image_segmentation/paddleseg; python3 paddleseg.py ${OPTION}
+cd ../../image_segmentation/pp_liteseg; python3 pp_liteseg.py ${OPTION}
 cd ../../image_segmentation/suim; python3 suim.py ${OPTION}
 cd ../../line_segment_detection/mlsd; python3 mlsd.py ${OPTION}
 cd ../../line_segment_detection/dexined; python3 dexined.py ${OPTION}
