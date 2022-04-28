@@ -42,6 +42,9 @@ parser.add_argument(
 )
 args = update_parser(parser)
 
+if args.write_prediction:
+    MAX_CLASS_COUNT = 5
+
 IMAGE_RANGE = ailia.NETWORK_IMAGE_RANGE_IMAGENET
 
 IMAGE_FORMAT = ailia.NETWORK_IMAGE_FORMAT_BGR

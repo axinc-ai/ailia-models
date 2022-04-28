@@ -54,6 +54,9 @@ if args.arch=="resnet50_pytorch":
 else:
     IMAGE_RANGE = ailia.NETWORK_IMAGE_RANGE_S_INT8
 
+if args.write_prediction:
+    MAX_CLASS_COUNT = 5
+
 # ======================
 # Parameters 2
 # ======================
