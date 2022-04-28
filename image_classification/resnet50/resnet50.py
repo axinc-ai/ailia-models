@@ -8,9 +8,9 @@ import resnet50_labels
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser  # noqa: E402
+from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
-from classifier_utils import plot_results, print_results  # noqa: E402
+from classifier_utils import plot_results, print_results, write_predictions  # noqa: E402
 import webcamera_utils  # noqa: E402
 
 # logger
@@ -41,6 +41,11 @@ parser.add_argument(
     default='resnet50.opt', choices=MODEL_NAMES,
     help=('model architecture: ' + ' | '.join(MODEL_NAMES) +
           ' (default: resnet50.opt)')
+)
+parser.add_argument(
+    '-w', '--write_prediction',
+    action='store_true',
+    help='Flag to output the prediction file.'
 )
 args = update_parser(parser)
 
@@ -102,6 +107,14 @@ def recognize_from_image():
 
         # show results
         print_results(classifier, resnet50_labels.imagenet_category)
+
+        # write prediction
+        if args.write_prediction:
+            savepath = get_savepath(args.savepath, image_path)
+            pred_file = '%s.txt' % savepath.rsplit('.', 1)[0]
+            write_predictions(pred_file, classifier, resnet50_labels.imagenet_category)
+
+    logger.info('Script finished successfully.')
 
 
 def recognize_from_video():
