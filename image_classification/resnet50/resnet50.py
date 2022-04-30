@@ -1,5 +1,6 @@
 import time
 import sys
+import numpy as np
 
 import cv2
 
@@ -69,6 +70,8 @@ REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/resnet50/'
 # Utils
 # ======================
 def preprocess_image(img):
+    if len(img.shape) == 2:
+        img = np.expand_dims(img, axis=2)
     if img.shape[2] == 3:
         img = cv2.cvtColor(img, cv2.COLOR_BGR2BGRA)
     elif img.shape[2] == 1:
