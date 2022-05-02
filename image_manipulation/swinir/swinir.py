@@ -92,7 +92,7 @@ def add_noise(img, noise_param=50):
 def predict(net, input):
     logger.info('predicting...')
     if not args.onnx:
-        output = net.predict(input)
+        output = net.run(input)
     else:
         output = net.run(None, {'input': input})
     return output
@@ -251,7 +251,6 @@ def main():
     logger.info('initializing model...')
     if not args.onnx:
         logger.info('Ailia is not implemented. Please wait future update.')
-        exit()
         net = ailia.Net(model_path, weight_path, env_id=args.env_id)
     else:
         import onnxruntime
