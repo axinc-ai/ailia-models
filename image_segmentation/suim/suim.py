@@ -119,9 +119,7 @@ def recognize_from_image():
         savepath = get_savepath(args.savepath, image_path)
         logger.info(f'saved at : {savepath}')
         cv2.imwrite(savepath,output)
-
-        if cv2.waitKey(0) != 32:  # space bar
-            exit()
+    logger.info('Script finished successfully.')
 
 
 def recognize_from_video():
