@@ -184,13 +184,14 @@ def good_img(img_path, query_camera, query_label):
     return True
 
 
-def imshow(path, title=None):
+def imshow(path, title=None, wait=False):
     """Imshow for Tensor."""
     im = plt.imread(path)
     plt.imshow(im)
     if title is not None:
         plt.title(title)
-    plt.pause(0.001)  # pause a bit so that plots are updated
+    if wait:
+        plt.pause(0.001)  # pause a bit so that plots are updated
 
 
 # ======================
@@ -303,8 +304,8 @@ def recognize_from_image(query_path, net):
         fig = plt.figure(figsize=(16, 4))
         ax = plt.subplot(1, 11, 1)
         ax.axis('off')
-        if args.gui:
-            imshow(query_path, 'query')
+        
+        imshow(query_path, 'query', wait=args.gui)
 
         count = 0
         for i in range(len(index)):
@@ -321,8 +322,7 @@ def recognize_from_image(query_path, net):
                 '%d' % (count + 1),
                 color='black' if not MARKET_1501_DROP_SAME_CAMERA_LABEL \
                     else 'green' if label == query_label else 'red')
-            if args.gui:
-                imshow(img_path)
+            imshow(img_path, wait=args.gui)
 
             count += 1
             if count >= 10:
