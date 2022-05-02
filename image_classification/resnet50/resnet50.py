@@ -23,7 +23,7 @@ logger = getLogger(__name__)
 # Parameters 1
 # ======================
 MODEL_NAMES = ['resnet50.opt', 'resnet50', 'resnet50_pytorch']
-TTA_NAMES = ['none', '1_crop']
+TTA_NAMES = ['none', '1_crop', 'alignment']
 IMAGE_PATH = 'pizza.jpg'
 IMAGE_HEIGHT = 224
 IMAGE_WIDTH = 224
@@ -83,13 +83,18 @@ def preprocess_image(img):
         img = cv2.cvtColor(img, cv2.COLOR_BGR2BGRA)
     elif img.shape[2] == 1:
         img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGRA)
-    if args.tta == "1_crop":
+    if args.tta == "1_crop" or args.tta == "alignment":
+        resize = 256
+        crop = 224
+        if args.tta == "alignment":
+            resize = crop
+        pad = (resize - crop)//2
         if img.shape[0] < img.shape[1]:
-            img = cv2.resize(img, (int(img.shape[1]*256/img.shape[0]), 256))
-            img = img[16:16+224,(img.shape[1]-224)//2:(img.shape[1]-224)//2+224,:]
+            img = cv2.resize(img, (int(img.shape[1]*resize/img.shape[0]), resize))
+            img = img[pad:pad+crop,(img.shape[1]-crop)//2:(img.shape[1]-crop)//2+crop,:]
         else:
-            img = cv2.resize(img, (256, int(img.shape[0]*256/img.shape[1])))
-            img = img[(img.shape[0]-224)//2:(img.shape[0]-224)//2+224,16:16+224,:]
+            img = cv2.resize(img, (resize, int(img.shape[0]*resize/img.shape[1])))
+            img = img[(img.shape[0]-crop)//2:(img.shape[0]-crop)//2+crop,pad:pad+crop,:]
         img = img.copy()
     return img
 
