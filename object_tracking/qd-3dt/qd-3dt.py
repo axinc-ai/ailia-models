@@ -3,7 +3,7 @@ import time
 
 import numpy as np
 import cv2
-from PIL import Image
+from pyquaternion import Quaternion
 
 import ailia
 
@@ -18,6 +18,7 @@ from webcamera_utils import get_capture, get_writer  # noqa
 from logging import getLogger  # noqa
 
 from video_utils import load_annotations
+import tracking_utils as tu
 
 logger = getLogger(__name__)
 
@@ -104,6 +105,18 @@ def post_processing(output):
 
 def predict(net_det, net_pred, net_ref, img, img_info):
     img, img_shape, scale_factor = preprocess(img)
+
+    calib = img_info['cali']
+    ori_shape = (img_info['height'], img_info['width'], 3)
+    if ori_shape != img_shape:
+        focal_length = calib[0][0]
+        width = img_shape[1]
+        height = img_shape[0]
+        calib = [[focal_length * scale_factor, 0, width / 2.0, 0],
+                 [0, focal_length * scale_factor, height / 2.0, 0],
+                 [0, 0, 1, 0]]
+
+    img_info['calib'] = calib
     img_shape = np.array(img_shape, dtype=np.int64)
     scale_factor = np.array(scale_factor, dtype=np.float32)
 
@@ -114,9 +127,37 @@ def predict(net_det, net_pred, net_ref, img, img_info):
         output = net_det.run(None, {'img': img, 'img_shape': img_shape, 'scale_factor': scale_factor})
 
     det_bboxes, det_labels, embeds, det_depths, det_depths_uncertainty, det_dims, det_alphas, det_2dcs = output
-    print(det_bboxes)
-    print(det_bboxes.shape)
-    print(img_info)
+
+    # TODO: use boxes_3d to match KF3d in tracker
+    projection = np.array(img_info['calib'])
+    position = np.array(img_info['pose']['position'])
+    r_camera_to_world = tu.angle2rot(np.array(img_info['pose']['rotation']))
+    rotation = np.array(r_camera_to_world)
+    cam_rot_quat = Quaternion(matrix=r_camera_to_world)
+
+    corners = tu.imagetocamera(det_2dcs, det_depths, projection)
+    corners_global = tu.cameratoworld(corners, position, rotation)
+    det_yaws = tu.alpha2yaw(
+        det_alphas, corners[:, 0:1], corners[:, 2:3])
+
+    quat_det_yaws_world = {'roll_pitch': [], 'yaw_world': []}
+    for det_yaw in det_yaws:
+        yaw_quat = Quaternion(
+            axis=[0, 1, 0], radians=det_yaw)
+        rotation_world = cam_rot_quat * yaw_quat
+        if rotation_world.z < 0:
+            rotation_world *= -1
+        roll_world, pitch_world, yaw_world = tu.quaternion_to_euler(
+            rotation_world.w, rotation_world.x, rotation_world.y,
+            rotation_world.z)
+        quat_det_yaws_world['roll_pitch'].append(
+            [roll_world, pitch_world])
+        quat_det_yaws_world['yaw_world'].append(yaw_world)
+
+    det_yaws_world = np.array(quat_det_yaws_world['yaw_world'])[:, None]
+    det_boxes_3d = np.concatenate([
+        corners_global, det_yaws_world, det_dims
+    ], axis=1)
 
     # pred = post_processing(output)
     #
