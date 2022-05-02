@@ -19,6 +19,8 @@ from logging import getLogger  # noqa
 
 from video_utils import load_annotations
 import tracking_utils as tu
+from motion_tracker import MotionTracker
+import tracker_model
 
 logger = getLogger(__name__)
 
@@ -103,8 +105,41 @@ def post_processing(output):
     return None
 
 
-def predict(net_det, net_pred, net_ref, img, img_info):
+def predict(net_det, lstm_pred, lstm_refine, img, img_info):
     img, img_shape, scale_factor = preprocess(img)
+
+    track_config = {
+        'lstm_pred': lstm_pred,
+        'lstm_refine': lstm_refine,
+        'init_score_thr': 0.8,
+        'init_track_id': 0,
+        'obj_score_thr': 0.5,
+        'match_score_thr': 0.5,
+        'memo_tracklet_frames': 10,
+        'memo_backdrop_frames': 1,
+        'memo_momentum': 0.8,
+        'motion_momentum': 0.9,
+        'nms_conf_thr': 0.5,
+        'nms_backdrop_iou_thr': 0.3,
+        'nms_class_iou_thr': 0.7,
+        'loc_dim': 7,
+        'with_deep_feat': True,
+        'with_cats': True,
+        'with_bbox_iou': True,
+        'with_depth_ordering': True,
+        'track_bbox_iou': 'box3d',
+        'depth_match_metric': 'motion',
+        'match_metric': 'cycle_softmax',
+        'match_algo': 'greedy',
+        'with_depth_uncertainty': True
+    }
+    if predict.tracker is None:
+        predict.tracker = MotionTracker(**track_config)
+    elif img_info.get('first_frame', False):
+        num_tracklets = predict.tracker.num_tracklets
+        track_config['init_track_id'] = num_tracklets
+        del predict.tracker
+        predict.tracker = MotionTracker(**track_config)
 
     calib = img_info['cali']
     ori_shape = (img_info['height'], img_info['width'], 3)
@@ -159,12 +194,29 @@ def predict(net_det, net_pred, net_ref, img, img_info):
         corners_global, det_yaws_world, det_dims
     ], axis=1)
 
+    frame_ind = img_info.get('frame_id', -1)
+    pure_det = False
+    match_bboxes, match_labels, match_boxes_3ds, ids, inds, valids = \
+        predict.tracker.match(
+            bboxes=det_bboxes,
+            labels=det_labels,
+            boxes_3d=det_boxes_3d,
+            depth_uncertainty=det_depths_uncertainty,
+            position=position,
+            rotation=rotation,
+            embeds=embeds,
+            cur_frame=frame_ind,
+            pure_det=pure_det)
+
     # pred = post_processing(output)
     #
     # return pred
 
 
-def recognize_from_image(net_det, net_pred, net_ref):
+predict.tracker = None
+
+
+def recognize_from_image(net_det, lstm_pred, lstm_ref):
     img_infos = load_annotations('tracking_val.json')
 
     img_infos = [x for x in img_infos if x['video_id'] == 0]
@@ -185,7 +237,7 @@ def recognize_from_image(net_det, net_pred, net_ref):
             total_time_estimation = 0
             for i in range(args.benchmark_count):
                 start = int(round(time.time() * 1000))
-                out = predict(net_det, net_pred, net_ref, img, img_info)
+                out = predict(net_det, lstm_pred, lstm_ref, img, img_info)
                 end = int(round(time.time() * 1000))
                 estimation_time = (end - start)
 
@@ -196,7 +248,7 @@ def recognize_from_image(net_det, net_pred, net_ref):
 
             logger.info(f'\taverage time estimation {total_time_estimation / (args.benchmark_count - 1)} ms')
         else:
-            out = predict(net_det, net_pred, net_ref, img, img_info)
+            out = predict(net_det, lstm_pred, lstm_ref, img, img_info)
 
         # # plot result
         # savepath = get_savepath(args.savepath, image_path, ext='.png')
@@ -220,15 +272,16 @@ def main():
     # initialize
     if not args.onnx:
         net_det = ailia.Net(MODEL_DETECTOR_PATH, WEIGHT_DETECTOR_PATH, env_id=env_id)
-        net_pred = ailia.Net(MODEL_MOTION_PRED_PATH, WEIGHT_MOTION_PRED_PATH, env_id=env_id)
-        net_ref = ailia.Net(MODEL_MOTION_RFINE_PATH, WEIGHT_MOTION_RFINE_PATH, env_id=env_id)
+        lstm_pred = ailia.Net(MODEL_MOTION_PRED_PATH, WEIGHT_MOTION_PRED_PATH, env_id=env_id)
+        lstm_ref = ailia.Net(MODEL_MOTION_RFINE_PATH, WEIGHT_MOTION_RFINE_PATH, env_id=env_id)
     else:
         import onnxruntime
         net_det = onnxruntime.InferenceSession(WEIGHT_DETECTOR_PATH)
-        net_pred = onnxruntime.InferenceSession(WEIGHT_MOTION_PRED_PATH)
-        net_ref = onnxruntime.InferenceSession(WEIGHT_MOTION_RFINE_PATH)
+        lstm_pred = onnxruntime.InferenceSession(WEIGHT_MOTION_PRED_PATH)
+        lstm_ref = onnxruntime.InferenceSession(WEIGHT_MOTION_RFINE_PATH)
+        tracker_model.onnx = True
 
-    recognize_from_image(net_det, net_pred, net_ref)
+    recognize_from_image(net_det, lstm_pred, lstm_ref)
 
 
 if __name__ == '__main__':

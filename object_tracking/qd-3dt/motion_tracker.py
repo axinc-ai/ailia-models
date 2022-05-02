@@ -1,9 +1,14 @@
 import numpy as np
+from scipy.spatial import distance_matrix
+
+from tracker_model import LSTM3DTracker
 
 
 class MotionTracker:
     def __init__(
             self,
+            lstm_pred,
+            lstm_refine,
             init_score_thr: float = 0.8,
             init_track_id: int = 0,
             obj_score_thr: float = 0.5,
@@ -21,8 +26,6 @@ class MotionTracker:
             with_bbox_iou: bool = True,
             with_depth_ordering: bool = True,
             with_depth_uncertainty: bool = True,
-            tracker_model_name: str = 'KalmanBox3DTracker',
-            lstm_name: str = 'LSTM',
             track_bbox_iou: str = 'bbox',
             depth_match_metric: str = 'centriod',
             match_metric: str = 'cycle_softmax',
@@ -54,8 +57,8 @@ class MotionTracker:
         self.with_bbox_iou = with_bbox_iou
         self.track_bbox_iou = track_bbox_iou
         self.depth_match_metric = depth_match_metric
-        # self.tracker_model = get_tracker(tracker_model_name)
-        self.tracker_model_name = tracker_model_name
+        self.lstm_pred = lstm_pred
+        self.lstm_refine = lstm_refine
         self.loc_dim = loc_dim
         self.match_metric = match_metric
         self.match_algo = match_algo
@@ -66,6 +69,143 @@ class MotionTracker:
         self.backdrops = []
 
         np.set_printoptions(formatter={'float': '{: 0.3f}'.format})
+
+    @property
+    def empty(self):
+        return False if self.tracklets else True
+
+    def update_memo(
+            self, ids, bboxes, boxes_3d, depth_uncertainty, embeds,
+            labels, cur_frame):
+        tracklet_inds = ids > -1
+
+        # update memo
+        for tid, bbox, box_3d, d_uncertainty, embed, label in zip(
+                ids[tracklet_inds], bboxes[tracklet_inds],
+                boxes_3d[tracklet_inds], depth_uncertainty[tracklet_inds],
+                embeds[tracklet_inds], labels[tracklet_inds]):
+            tid = int(tid)
+            if tid in self.tracklets.keys():
+                self.tracklets[tid]['bbox'] = bbox
+                self.tracklets[tid]['tracker'].update(box_3d, d_uncertainty)
+
+                tracker_box = self.tracklets[tid]['tracker'].get_state()[:7]
+                pd_box_3d = box_3d.new_tensor(tracker_box)
+
+                velocity = (pd_box_3d - self.tracklets[tid]['box_3d']) / (
+                        cur_frame - self.tracklets[tid]['last_frame'])
+
+                self.tracklets[tid]['box_3d'] = pd_box_3d
+                self.tracklets[tid]['embed'] += self.memo_momentum * (
+                        embed - self.tracklets[tid]['embed'])
+                self.tracklets[tid]['label'] = label
+                self.tracklets[tid]['velocity'] = \
+                    (self.tracklets[tid]['velocity'] * self.tracklets[tid]['acc_frame'] + velocity) \
+                    / (self.tracklets[tid]['acc_frame'] + 1)
+                self.tracklets[tid]['last_frame'] = cur_frame
+                self.tracklets[tid]['acc_frame'] += 1
+            else:
+                tracker = LSTM3DTracker(
+                    self.lstm_pred,
+                    self.lstm_refine,
+                    self.loc_dim,
+                    box_3d,
+                    d_uncertainty,
+                )
+                self.tracklets[tid] = dict(
+                    bbox=bbox,
+                    box_3d=box_3d,
+                    tracker=tracker,
+                    embed=embed,
+                    label=label,
+                    last_frame=cur_frame,
+                    velocity=np.zeros_like(box_3d),
+                    acc_frame=0)
+
+        # Handle vanished tracklets
+        for tid in self.tracklets:
+            if cur_frame > self.tracklets[tid]['last_frame'] and tid > -1:
+                self.tracklets[tid]['box_3d'][:self.loc_dim] = self.tracklets[
+                    tid]['box_3d'].new_tensor(
+                    self.tracklets[tid]['tracker'].predict()
+                    [:self.loc_dim])
+
+        # Add backdrops
+        backdrop_inds = np.nonzero(ids == -1)[0]
+        ious = bbox_overlaps(bboxes[backdrop_inds, :-1], bboxes[:, :-1])
+        for i, ind in enumerate(backdrop_inds):
+            if (ious[i, :ind] > self.nms_backdrop_iou_thr).any():
+                backdrop_inds[i] = -1
+        backdrop_inds = backdrop_inds[backdrop_inds > -1]
+
+        backdrop_tracker = [
+            LSTM3DTracker(
+                self.lstm_pred,
+                self.lstm_refine,
+                self.loc_dim,
+                boxes_3d[bd_ind],
+                depth_uncertainty[bd_ind],
+            ) for bd_ind in backdrop_inds
+        ]
+        self.backdrops.insert(
+            0,
+            dict(
+                bboxes=bboxes[backdrop_inds],
+                boxes_3d=boxes_3d[backdrop_inds],
+                tracker=backdrop_tracker,
+                embeds=embeds[backdrop_inds],
+                labels=labels[backdrop_inds]))
+
+        # pop memo
+        invalid_ids = []
+        for k, v in self.tracklets.items():
+            if cur_frame - v['last_frame'] >= self.memo_tracklet_frames:
+                invalid_ids.append(k)
+        for invalid_id in invalid_ids:
+            self.tracklets.pop(invalid_id)
+
+        if len(self.backdrops) > self.memo_backdrop_frames:
+            self.backdrops.pop()
+
+    @property
+    def memo(self):
+        memo_embeds = []
+        memo_ids = []
+        memo_bboxes = []
+        memo_boxes_3d = []
+        memo_trackers = []
+        memo_labels = []
+        memo_vs = []
+        for k, v in self.tracklets.items():
+            memo_bboxes.append(v['bbox'][None, :])
+            memo_boxes_3d.append(v['box_3d'][None, :])
+            memo_trackers.append(v['tracker'])
+            memo_embeds.append(v['embed'][None, :])
+            memo_ids.append(k)
+            memo_labels.append(v['label'].reshape(1, 1))
+            memo_vs.append(v['velocity'][None, :])
+        memo_ids = np.array(memo_ids, dtype=np.long).reshape(1, -1)
+
+        for backdrop in self.backdrops:
+            backdrop_ids = np.full(
+                (1, backdrop['embeds'].shape[0]), -1, dtype=np.long)
+            backdrop_vs = np.zeros_like(backdrop['boxes_3d'])
+            memo_bboxes.append(backdrop['bboxes'])
+            memo_boxes_3d.append(backdrop['boxes_3d'])
+            memo_trackers.extend(backdrop['tracker'])
+            memo_embeds.append(backdrop['embeds'])
+            memo_ids = np.concatenate([memo_ids, backdrop_ids], axis=1)
+            memo_labels.append(backdrop['labels'][:, None])
+            memo_vs.append(backdrop_vs)
+
+        memo_bboxes = np.concatenate(memo_bboxes, axis=0)
+        memo_boxes_3d = np.concatenate(memo_boxes_3d, axis=0)
+        memo_embeds = np.concatenate(memo_embeds, axis=0)
+        memo_labels = np.concatenate(memo_labels, axis=0).squeeze(1)
+        memo_vs = np.concatenate(memo_vs, axis=0)
+
+        return memo_bboxes, memo_labels, memo_boxes_3d, memo_trackers, memo_embeds, \
+               memo_ids.squeeze(0), memo_vs
 
     def match(
             self,
@@ -81,16 +221,16 @@ class MotionTracker:
         """Match incoming detection results with embedding and 3D infos
 
         Args:
-            bboxes (torch.tensor): (N, 5), [x1, y1, x2, y2, conf]
-            labels (torch.tensor): (N,)
-            boxes_3d (torch.tensor): (N, 7), 3D information stored
+            bboxes: (N, 5), [x1, y1, x2, y2, conf]
+            labels: (N,)
+            boxes_3d: (N, 7), 3D information stored
                                      in world coordinates with the format
                                      [X, Y, Z, theta, h, w, l]
-            depth_uncertainty (torch.tensor): (N, ), confidence in depth
+            depth_uncertainty: (N, ), confidence in depth
                                      estimation
-            position (torch.tensor): (3, ), camera position
-            rotation (torch.tensor): (3, 3), camera rotation
-            embeds (torch.tensor): (N, C), extracted box feature
+            position: (3, ), camera position
+            rotation: (3, 3), camera rotation
+            embeds: (N, C), extracted box feature
             cur_frame (int): indicates the frame index
             pure_det (bool): output pure detection. Defaults False.
 
@@ -103,9 +243,9 @@ class MotionTracker:
         if depth_uncertainty is None or not self.with_depth_uncertainty:
             depth_uncertainty = np.array((boxes_3d.shape[0], 1))
 
-        _, inds = (
-                bboxes[:, -1] * depth_uncertainty.flatten()
-        ).sort(descending=True)
+        inds = np.argsort(
+            bboxes[:, -1] * depth_uncertainty.flatten()
+        )[::-1]
         bboxes = bboxes[inds, :]
         labels = labels[inds]
         embeds = embeds[inds, :]
@@ -113,23 +253,25 @@ class MotionTracker:
         depth_uncertainty = depth_uncertainty[inds]
 
         if pure_det:
-            valids = np.ones((bboxes.size(0)), dtype=np.bool)
+            valids = np.ones((bboxes.shape[0]), dtype=np.bool)
             ids = np.arange(
                 self.num_tracklets,
-                self.num_tracklets + bboxes.size(0),
+                self.num_tracklets + bboxes.shape[0],
                 dtype=np.long)
-            self.num_tracklets += bboxes.size(0)
+            self.num_tracklets += bboxes.shape[0]
 
             return bboxes, labels, boxes_3d, ids, inds, valids
 
         # duplicate removal for potential backdrops and cross classes
-        valids = bboxes.new_ones((bboxes.size(0)))
+        valids = np.ones(bboxes.shape[0])
         ious = bbox_overlaps(bboxes[:, :-1], bboxes[:, :-1])
-        for i in range(1, bboxes.size(0)):
-            thr = self.nms_backdrop_iou_thr if bboxes[
-                                                   i, -1] < self.obj_score_thr else self.nms_class_iou_thr
+        for i in range(1, bboxes.shape[0]):
+            thr = self.nms_backdrop_iou_thr \
+                if bboxes[i, -1] < self.obj_score_thr \
+                else self.nms_class_iou_thr
             if (ious[i, :i] > thr).any():
                 valids[i] = 0
+
         valids = valids == 1
         bboxes = bboxes[valids, :]
         labels = labels[valids]
@@ -138,66 +280,51 @@ class MotionTracker:
         depth_uncertainty = depth_uncertainty[valids]
 
         # init ids container
-        ids = torch.full((bboxes.size(0),), -1, dtype=torch.long)
+        ids = np.full((bboxes.shape[0],), -1, dtype=np.long)
 
         # match if buffer is not empty
-        if bboxes.size(0) > 0 and not self.empty:
+        if bboxes.shape[0] > 0 and not self.empty:
             memo_bboxes, memo_labels, memo_boxes_3d, \
             memo_trackers, memo_embeds, memo_ids, memo_vs = self.memo
 
-            mmcv.check_accum_time('predict', counting=True)
-            memo_boxes_3d_predict = memo_boxes_3d.detach().clone()
-            # print("predict---->")
+            memo_boxes_3d_predict = memo_boxes_3d
             for ind, memo_tracker in enumerate(memo_trackers):
                 memo_velo = memo_tracker.predict(
                     update_state=memo_tracker.age != 0)
-                memo_boxes_3d_predict[ind, :3] += memo_boxes_3d.new_tensor(
-                    memo_velo[7:])
-            mmcv.check_accum_time('predict', counting=False)
+                memo_boxes_3d_predict[ind, :3] += np.array(memo_velo[7:])
 
             if self.with_bbox_iou:
-
                 def get_xy_box(boxes_3d_world):
                     box_x_cen = boxes_3d_world[:, 0]
                     box_y_cen = boxes_3d_world[:, 1]
                     box_width = boxes_3d_world[:, 5]
                     box_length = boxes_3d_world[:, 6]
 
-                    dets_xy_box = torch.stack([
-                        box_x_cen - box_width / 2.0, box_y_cen -
-                        box_length / 2.0, box_x_cen + box_width / 2.0,
+                    dets_xy_box = np.stack([
+                        box_x_cen - box_width / 2.0,
+                        box_y_cen - box_length / 2.0,
+                        box_x_cen + box_width / 2.0,
                         box_y_cen + box_length / 2.0
-                    ],
-                        dim=1)
+                    ], axis=1)
                     return dets_xy_box
 
                 if self.track_bbox_iou == 'box2d':
-                    scores_iou = bbox_overlaps(bboxes[:, :-1],
-                                               memo_bboxes[:, :-1])
-                elif self.track_bbox_iou == 'bev':
-                    dets_xy_box = get_xy_box(boxes_3d)
-                    memo_dets_xy_box = get_xy_box(memo_boxes_3d_predict)
-                    scores_iou = bbox_overlaps(dets_xy_box, memo_dets_xy_box)
+                    scores_iou = bbox_overlaps(
+                        bboxes[:, :-1], memo_bboxes[:, :-1])
                 elif self.track_bbox_iou == 'box3d':
-                    depth_weight = F.pairwise_distance(
-                        boxes_3d[..., None],
-                        memo_boxes_3d_predict[..., None].transpose(2, 0))
-                    scores_iou = torch.exp(-depth_weight / 10.0)
-                elif self.track_bbox_iou == 'box2d_depth_aware':
-                    depth_weight = F.pairwise_distance(
-                        boxes_3d[..., None],
-                        memo_boxes_3d_predict[..., None].transpose(2, 0))
-                    scores_iou = torch.exp(-depth_weight / 10.0)
-                    scores_iou *= bbox_overlaps(bboxes[:, :-1],
-                                                memo_bboxes[:, :-1])
+                    a = boxes_3d[..., None]
+                    b = memo_boxes_3d_predict[..., None].transpose(2, 1, 0)
+                    depth_weight = np.power(a - b, 2)
+                    depth_weight = np.sum(depth_weight, axis=1)
+                    depth_weight = np.sqrt(depth_weight)
+                    scores_iou = np.exp(-depth_weight / 10.0)
                 else:
                     raise NotImplementedError
             else:
                 scores_iou = bboxes.new_ones(
-                    [bboxes.size(0), memo_bboxes.size(0)])
+                    [bboxes.shape[0], memo_bboxes.shape[0]])
 
             if self.with_deep_feat:
-
                 def compute_quasi_dense_feat_match(embeds, memo_embeds):
                     if self.match_metric == 'cycle_softmax':
                         feats = torch.mm(embeds, memo_embeds.t())
@@ -222,9 +349,8 @@ class MotionTracker:
 
             # Match with depth ordering
             if self.with_depth_ordering:
-
-                def compute_boxoverlap_with_depth(obsv_boxes_3d, memo_boxes_3d,
-                                                  memo_vs):
+                def compute_boxoverlap_with_depth(
+                        obsv_boxes_3d, memo_boxes_3d, memo_vs):
                     # Sum up all the available region of each tracker
                     if self.depth_match_metric == 'centroid':
                         depth_weight = F.pairwise_distance(
@@ -310,7 +436,7 @@ class MotionTracker:
 
             # Assign matching
             if self.match_algo == 'greedy':
-                for i in range(bboxes.size(0)):
+                for i in range(bboxes.shape[0]):
                     conf, memo_ind = torch.max(scores[i, :], dim=0)
                     tid = memo_ids[memo_ind]
                     # Matching confidence
@@ -348,89 +474,73 @@ class MotionTracker:
                                 ids[i] = -2
                 del matched_indices
 
-        new_inds = (ids == -1) & (bboxes[:, 4] > self.init_score_thr).cpu()
+        new_inds = (ids == -1) & (bboxes[:, 4] > self.init_score_thr)
         num_news = new_inds.sum()
-        ids[new_inds] = torch.arange(
+        ids[new_inds] = np.arange(
             self.num_tracklets,
             self.num_tracklets + num_news,
-            dtype=torch.long)
+            dtype=np.long)
         self.num_tracklets += num_news
 
-        self.update_memo(ids, bboxes, boxes_3d, depth_uncertainty, embeds,
-                         labels, cur_frame)
+        self.update_memo(
+            ids, bboxes, boxes_3d, depth_uncertainty, embeds,
+            labels, cur_frame)
 
-        update_bboxes = bboxes.detach().clone()
-        update_labels = labels.detach().clone()
-        update_boxes_3d = boxes_3d.detach().clone()
+        update_bboxes = bboxes
+        update_labels = labels
+        update_boxes_3d = boxes_3d
         for tid in ids[ids > -1]:
             update_boxes_3d[ids == tid] = self.tracklets[int(tid)]['box_3d']
-        update_ids = ids.detach().clone()
-
-        if self._debug:
-            print(
-                f"Updt: {update_boxes_3d.shape}\tUpdt ID: {update_ids.cpu().numpy()}\n"
-                f"{update_boxes_3d.cpu().numpy()}")
+        update_ids = ids
 
         return update_bboxes, update_labels, update_boxes_3d, update_ids, inds, valids
 
 
-def bbox_overlaps(bboxes1, bboxes2, mode='iou', is_aligned=False):
-    """Calculate overlap between two set of bboxes.
-
-    If ``is_aligned`` is ``False``, then calculate the ious between each bbox
-    of bboxes1 and bboxes2, otherwise the ious between each aligned pair of
-    bboxes1 and bboxes2.
+def bbox_overlaps(bboxes1, bboxes2, mode='iou'):
+    """Calculate the ious between each bbox of bboxes1 and bboxes2.
 
     Args:
-        bboxes1 (Tensor): shape (m, 4)
-        bboxes2 (Tensor): shape (n, 4), if is_aligned is ``True``, then m and n
-            must be equal.
-        mode (str): "iou" (intersection over union) or iof (intersection over
-            foreground).
-
+        bboxes1(ndarray): shape (n, 4)
+        bboxes2(ndarray): shape (k, 4)
+        mode(str): iou (intersection over union) or iof (intersection
+            over foreground)
     Returns:
-        ious(Tensor): shape (m, n) if is_aligned == False else shape (m, 1)
+        ious(ndarray): shape (n, k)
     """
-
     assert mode in ['iou', 'iof']
 
-    rows = bboxes1.size(0)
-    cols = bboxes2.size(0)
-    if is_aligned:
-        assert rows == cols
-
+    bboxes1 = bboxes1.astype(np.float32)
+    bboxes2 = bboxes2.astype(np.float32)
+    rows = bboxes1.shape[0]
+    cols = bboxes2.shape[0]
+    ious = np.zeros((rows, cols), dtype=np.float32)
     if rows * cols == 0:
-        return bboxes1.new(rows, 1) if is_aligned else bboxes1.new(rows, cols)
+        return ious
 
-    if is_aligned:
-        lt = torch.max(bboxes1[:, :2], bboxes2[:, :2])  # [rows, 2]
-        rb = torch.min(bboxes1[:, 2:], bboxes2[:, 2:])  # [rows, 2]
+    exchange = False
+    if bboxes1.shape[0] > bboxes2.shape[0]:
+        bboxes1, bboxes2 = bboxes2, bboxes1
+        ious = np.zeros((cols, rows), dtype=np.float32)
+        exchange = True
 
-        wh = (rb - lt + 1).clamp(min=0)  # [rows, 2]
-        overlap = wh[:, 0] * wh[:, 1]
-        area1 = (bboxes1[:, 2] - bboxes1[:, 0] + 1) * (
+    area1 = (bboxes1[:, 2] - bboxes1[:, 0] + 1) * (
             bboxes1[:, 3] - bboxes1[:, 1] + 1)
-
+    area2 = (bboxes2[:, 2] - bboxes2[:, 0] + 1) * (
+            bboxes2[:, 3] - bboxes2[:, 1] + 1)
+    for i in range(bboxes1.shape[0]):
+        x_start = np.maximum(bboxes1[i, 0], bboxes2[:, 0])
+        y_start = np.maximum(bboxes1[i, 1], bboxes2[:, 1])
+        x_end = np.minimum(bboxes1[i, 2], bboxes2[:, 2])
+        y_end = np.minimum(bboxes1[i, 3], bboxes2[:, 3])
+        overlap = np.maximum(x_end - x_start + 1, 0) * np.maximum(
+            y_end - y_start + 1, 0)
         if mode == 'iou':
-            area2 = (bboxes2[:, 2] - bboxes2[:, 0] + 1) * (
-                bboxes2[:, 3] - bboxes2[:, 1] + 1)
-            ious = overlap / (area1 + area2 - overlap)
+            union = area1[i] + area2 - overlap
         else:
-            ious = overlap / area1
-    else:
-        lt = torch.max(bboxes1[:, None, :2], bboxes2[:, :2])  # [rows, cols, 2]
-        rb = torch.min(bboxes1[:, None, 2:], bboxes2[:, 2:])  # [rows, cols, 2]
+            union = area1[i] if not exchange else area2
+        ious[i, :] = overlap / union
 
-        wh = (rb - lt + 1).clamp(min=0)  # [rows, cols, 2]
-        overlap = wh[:, :, 0] * wh[:, :, 1]
-        area1 = (bboxes1[:, 2] - bboxes1[:, 0] + 1) * (
-            bboxes1[:, 3] - bboxes1[:, 1] + 1)
-
-        if mode == 'iou':
-            area2 = (bboxes2[:, 2] - bboxes2[:, 0] + 1) * (
-                bboxes2[:, 3] - bboxes2[:, 1] + 1)
-            ious = overlap / (area1[:, None] + area2 - overlap)
-        else:
-            ious = overlap / (area1[:, None])
+    if exchange:
+        ious = ious.T
 
     return ious
