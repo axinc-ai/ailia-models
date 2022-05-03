@@ -4,7 +4,7 @@ MODALITIES = ['image', 'video', 'audio']
 
 # recognized extension (for glob.glob)
 EXTENSIONS = {
-    'image': ['*.png', '*.jpg', '*.jpeg', '*.JPEG', '*.bmp'],
+    'image': ['*.png', '*.jpg', '*.[jJ][pP][eE][gG]', '*.bmp'],
     'video': ['*.mp4'],
     'audio': ['*.mp3', '*.wav'],
 }
