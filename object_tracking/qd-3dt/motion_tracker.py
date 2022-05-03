@@ -1,5 +1,7 @@
 import numpy as np
-from scipy.spatial import distance_matrix
+from scipy.optimize import linear_sum_assignment as linear_assignment
+
+from math_utils import softmax
 
 from tracker_model import LSTM3DTracker
 
@@ -90,10 +92,11 @@ class MotionTracker:
                 self.tracklets[tid]['tracker'].update(box_3d, d_uncertainty)
 
                 tracker_box = self.tracklets[tid]['tracker'].get_state()[:7]
-                pd_box_3d = box_3d.new_tensor(tracker_box)
+                pd_box_3d = np.array(tracker_box)
 
-                velocity = (pd_box_3d - self.tracklets[tid]['box_3d']) / (
-                        cur_frame - self.tracklets[tid]['last_frame'])
+                velocity = \
+                    (pd_box_3d - self.tracklets[tid]['box_3d']) \
+                    / (cur_frame - self.tracklets[tid]['last_frame'])
 
                 self.tracklets[tid]['box_3d'] = pd_box_3d
                 self.tracklets[tid]['embed'] += self.memo_momentum * (
@@ -125,10 +128,9 @@ class MotionTracker:
         # Handle vanished tracklets
         for tid in self.tracklets:
             if cur_frame > self.tracklets[tid]['last_frame'] and tid > -1:
-                self.tracklets[tid]['box_3d'][:self.loc_dim] = self.tracklets[
-                    tid]['box_3d'].new_tensor(
-                    self.tracklets[tid]['tracker'].predict()
-                    [:self.loc_dim])
+                self.tracklets[tid]['box_3d'][:self.loc_dim] = np.array(
+                    self.tracklets[tid]['tracker'].predict()[:self.loc_dim]
+                )
 
         # Add backdrops
         backdrop_inds = np.nonzero(ids == -1)[0]
@@ -287,7 +289,7 @@ class MotionTracker:
             memo_bboxes, memo_labels, memo_boxes_3d, \
             memo_trackers, memo_embeds, memo_ids, memo_vs = self.memo
 
-            memo_boxes_3d_predict = memo_boxes_3d
+            memo_boxes_3d_predict = memo_boxes_3d.copy()
             for ind, memo_tracker in enumerate(memo_trackers):
                 memo_velo = memo_tracker.predict(
                     update_state=memo_tracker.age != 0)
@@ -314,30 +316,24 @@ class MotionTracker:
                 elif self.track_bbox_iou == 'box3d':
                     a = boxes_3d[..., None]
                     b = memo_boxes_3d_predict[..., None].transpose(2, 1, 0)
-                    depth_weight = np.power(a - b, 2)
-                    depth_weight = np.sum(depth_weight, axis=1)
-                    depth_weight = np.sqrt(depth_weight)
+                    depth_weight = pairwise_distance(a, b)
                     scores_iou = np.exp(-depth_weight / 10.0)
                 else:
                     raise NotImplementedError
             else:
-                scores_iou = bboxes.new_ones(
+                scores_iou = np.ones(
                     [bboxes.shape[0], memo_bboxes.shape[0]])
 
             if self.with_deep_feat:
                 def compute_quasi_dense_feat_match(embeds, memo_embeds):
                     if self.match_metric == 'cycle_softmax':
-                        feats = torch.mm(embeds, memo_embeds.t())
-                        d2t_scores = feats.softmax(dim=1)
-                        t2d_scores = feats.softmax(dim=0)
+                        feats = np.matmul(embeds, memo_embeds.T)
+                        d2t_scores = softmax(feats, axis=1)
+                        t2d_scores = softmax(feats, axis=0)
                         scores_feat = (d2t_scores + t2d_scores) / 2
                     elif self.match_metric == 'softmax':
-                        feats = torch.mm(embeds, memo_embeds.t())
-                        scores_feat = feats.softmax(dim=1)
-                    elif self.match_metric == 'cosine':
-                        scores_feat = torch.mm(
-                            F.normalize(embeds, p=2, dim=1),
-                            F.normalize(memo_embeds, p=2, dim=1).t())
+                        feats = np.matmul(embeds, memo_embeds.T)
+                        scores_feat = softmax(feats, axis=1)
                     else:
                         raise NotImplementedError
                     return scores_feat
@@ -345,7 +341,7 @@ class MotionTracker:
                 scores_feat = compute_quasi_dense_feat_match(
                     embeds, memo_embeds)
             else:
-                scores_feat = scores_iou.new_ones(scores_iou.shape)
+                scores_feat = np.ones(scores_iou.shape)
 
             # Match with depth ordering
             if self.with_depth_ordering:
@@ -353,60 +349,29 @@ class MotionTracker:
                         obsv_boxes_3d, memo_boxes_3d, memo_vs):
                     # Sum up all the available region of each tracker
                     if self.depth_match_metric == 'centroid':
-                        depth_weight = F.pairwise_distance(
-                            obsv_boxes_3d[..., :3, None],
-                            memo_boxes_3d[..., :3, None].transpose(2, 0))
-                        depth_weight = torch.exp(-depth_weight / 10.0)
-                    elif self.depth_match_metric == 'cosine':
-                        match_corners_observe = tu.worldtocamera_torch(
-                            obsv_boxes_3d[:, :3], position, rotation)
-                        match_corners_predict = tu.worldtocamera_torch(
-                            memo_boxes_3d[:, :3], position, rotation)
-                        depth_weight = F.cosine_similarity(
-                            match_corners_observe[..., None],
-                            match_corners_predict[..., None].transpose(2, 0))
-                        depth_weight += 1.0
-                        depth_weight /= 2.0
-                    elif self.depth_match_metric == 'pure_motion':
-                        # Moving distance should be aligned
-                        # V_observed-tracked vs. V_velocity
-                        depth_weight = F.pairwise_distance(
-                            obsv_boxes_3d[..., :3, None] -
-                            memo_boxes_3d[..., :3, None].transpose(2, 0),
-                            memo_vs[..., :3, None].transpose(2, 0))
-                        depth_weight = torch.exp(-depth_weight / 5.0)
-                        # Moving direction should be aligned
-                        # Set to 0.5 when two vector not within +-90 degree
-                        cos_sim = F.cosine_similarity(
-                            obsv_boxes_3d[..., :2, None] -
-                            memo_boxes_3d[..., :2, None].transpose(2, 0),
-                            memo_vs[..., :2, None].transpose(2, 0))
-                        cos_sim += 1.0
-                        cos_sim /= 2.0
-                        depth_weight *= cos_sim
+                        a = obsv_boxes_3d[..., :3, None]
+                        b = memo_boxes_3d[..., :3, None].transpose(2, 1, 0)
+                        depth_weight = pairwise_distance(a, b)
+                        depth_weight = np.exp(-depth_weight / 10.0)
                     elif self.depth_match_metric == 'motion':
-                        centroid_weight = F.pairwise_distance(
-                            obsv_boxes_3d[..., :3, None],
-                            memo_boxes_3d_predict[..., :3,
-                            None].transpose(2, 0))
-                        centroid_weight = torch.exp(-centroid_weight / 10.0)
+                        a = obsv_boxes_3d[..., :3, None]
+                        b = memo_boxes_3d_predict[..., :3, None].transpose(2, 1, 0)
+                        centroid_weight = pairwise_distance(a, b)
+                        centroid_weight = np.exp(-centroid_weight / 10.0)
                         # Moving distance should be aligned
                         # V_observed-tracked vs. V_velocity
-                        motion_weight = F.pairwise_distance(
-                            obsv_boxes_3d[..., :3, None] -
-                            memo_boxes_3d[..., :3, None].transpose(2, 0),
-                            memo_vs[..., :3, None].transpose(2, 0))
-                        motion_weight = torch.exp(-motion_weight / 5.0)
+                        a = obsv_boxes_3d[..., :3, None] - memo_boxes_3d[..., :3, None].transpose(2, 1, 0)
+                        b = memo_vs[..., :3, None].transpose(2, 1, 0)
+                        motion_weight = pairwise_distance(a, b)
+                        motion_weight = np.exp(-motion_weight / 5.0)
                         # Moving direction should be aligned
                         # Set to 0.5 when two vector not within +-90 degree
-                        cos_sim = F.cosine_similarity(
-                            obsv_boxes_3d[..., :2, None] -
-                            memo_boxes_3d[..., :2, None].transpose(2, 0),
-                            memo_vs[..., :2, None].transpose(2, 0))
+                        a = obsv_boxes_3d[..., :2, None] - memo_boxes_3d[..., :2, None].transpose(2, 1, 0)
+                        b = memo_vs[..., :2, None].transpose(2, 1, 0)
+                        cos_sim = cosine_similarity(a, b)
                         cos_sim += 1.0
                         cos_sim /= 2.0
-                        depth_weight = cos_sim * centroid_weight + (
-                                1.0 - cos_sim) * motion_weight
+                        depth_weight = cos_sim * centroid_weight + (1.0 - cos_sim) * motion_weight
                     else:
                         raise NotImplementedError
 
@@ -419,33 +384,33 @@ class MotionTracker:
                     scores_depth = compute_boxoverlap_with_depth(
                         boxes_3d, memo_boxes_3d_predict, memo_vs)
             else:
-                scores_depth = scores_iou.new_ones(scores_iou.shape)
+                scores_depth = np.array(scores_iou.shape)
 
             if self.with_cats:
-                cat_same = labels.view(-1, 1) == memo_labels.view(1, -1)
-                scores_cats = cat_same.float()
+                cat_same = labels.reshape(-1, 1) == memo_labels.reshape(1, -1)
+                scores_cats = cat_same.astype(np.float32)
             else:
-                scores_cats = scores_iou.new_ones(scores_iou.shape)
+                scores_cats = np.array(scores_iou.shape)
 
             scores = self.bbox_affinity_weight * scores_iou * scores_depth + \
                      self.feat_affinity_weight * scores_feat
             scores /= (self.bbox_affinity_weight + self.feat_affinity_weight)
-            scores *= (scores_iou > 0.0).float()
-            scores *= (scores_depth > 0.0).float()
+            scores *= (scores_iou > 0.0).astype(np.float32)
+            scores *= (scores_depth > 0.0).astype(np.float32)
             scores *= scores_cats
 
             # Assign matching
             if self.match_algo == 'greedy':
                 for i in range(bboxes.shape[0]):
-                    conf, memo_ind = torch.max(scores[i, :], dim=0)
+                    memo_ind = np.argmax(scores[i, :], axis=0)
+                    conf = scores[i, memo_ind]
                     tid = memo_ids[memo_ind]
                     # Matching confidence
                     if conf > self.match_score_thr:
                         # Update existing tracklet
                         if tid > -1:
                             # Keep object with high 3D objectness
-                            if bboxes[i, -1] * depth_uncertainty[
-                                i] > self.obj_score_thr:
+                            if bboxes[i, -1] * depth_uncertainty[i] > self.obj_score_thr:
                                 ids[i] = tid
                                 scores[:i, memo_ind] = 0
                                 scores[i + 1:, memo_ind] = 0
@@ -455,7 +420,7 @@ class MotionTracker:
                                     ids[i] = -2
             elif self.match_algo == 'hungarian':
                 # Hungarian
-                matched_indices = linear_assignment(-scores.cpu().numpy())
+                matched_indices = linear_assignment(-scores)
                 for idx in range(len(matched_indices[0])):
                     i = matched_indices[0][idx]
                     memo_ind = matched_indices[1][idx]
@@ -463,8 +428,7 @@ class MotionTracker:
                     tid = memo_ids[memo_ind]
                     if conf > self.match_score_thr and tid > -1:
                         # Keep object with high 3D objectness
-                        if bboxes[i, -1] * depth_uncertainty[
-                            i] > self.obj_score_thr:
+                        if bboxes[i, -1] * depth_uncertainty[i] > self.obj_score_thr:
                             ids[i] = tid
                             scores[:i, memo_ind] = 0
                             scores[i + 1:, memo_ind] = 0
@@ -494,6 +458,21 @@ class MotionTracker:
         update_ids = ids
 
         return update_bboxes, update_labels, update_boxes_3d, update_ids, inds, valids
+
+
+def pairwise_distance(a, b):
+    pdist = np.power(a - b, 2)
+    pdist = np.sum(pdist, axis=1)
+    pdist = np.sqrt(pdist)
+    return pdist
+
+
+def cosine_similarity(a, b, eps=1e-12):
+    cos_sim = np.zeros((a.shape[0], a.shape[-1]))
+    for i, x in enumerate(a):
+        cos_sim[i, ...] = np.diag(np.dot(x.T, b[0]))
+        cos_sim[i, ...] /= np.linalg.norm(x.T, axis=1) * np.linalg.norm(b[0], axis=0) + eps
+    return cos_sim
 
 
 def bbox_overlaps(bboxes1, bboxes2, mode='iou'):

@@ -61,6 +61,118 @@ class LSTM3DTracker(object):
     def fix_alpha(angle: float) -> float:
         return (angle + np.pi) % (2 * np.pi) - np.pi
 
+    @staticmethod
+    def update_array(
+            origin_array: np.ndarray,
+            input_array: np.ndarray) -> np.ndarray:
+        new_array = origin_array.copy()
+        new_array[:-1] = origin_array[1:]
+        new_array[-1:] = input_array
+        return new_array
+
+    def _init_history(self, bbox3D):
+        self.ref_history = self.update_array(self.ref_history, bbox3D)
+        self.history = np.tile([
+            self.ref_history[-1] - self.ref_history[-2]],
+            (self.nfr, 1))
+        self.prev_ref[:self.loc_dim] = self.obj_state[:self.loc_dim]
+        if self.loc_dim > 3:
+            self.avg_angle = self.fix_alpha(
+                self.ref_history[:, 3]).mean(axis=0)
+            self.avg_dim = self.ref_history.mean(axis=0)[4:]
+        else:
+            self.avg_angle = self.prev_obs[3]
+            self.avg_dim = np.array(self.prev_obs[4:])
+
+    def _update_history(self, bbox3D):
+        self.ref_history = self.update_array(self.ref_history, bbox3D)
+        self.history = self.update_array(
+            self.history, self.ref_history[-1] - self.ref_history[-2])
+        # align orientation history
+        self.history[:, 3] = self.history[-1, 3]
+        self.prev_ref[:self.loc_dim] = self.obj_state[:self.loc_dim]
+        if self.loc_dim > 3:
+            self.avg_angle = self.fix_alpha(
+                self.ref_history[:, 3]).mean(axis=0)
+            self.avg_dim = self.ref_history.mean(axis=0)[4:]
+        else:
+            self.avg_angle = self.prev_obs[3]
+            self.avg_dim = np.array(self.prev_obs[4:])
+
+    def update(self, bbox3D, info):
+        """
+        Updates the state vector with observed bbox.
+        """
+        self.time_since_update = 0
+        self.hits += 1
+        self.hit_streak += 1
+
+        if self.age == 1:
+            self.obj_state[:self.loc_dim] = bbox3D[:self.loc_dim].copy()
+
+        if self.loc_dim > 3:
+            # orientation correction
+            self.obj_state[3] = self.fix_alpha(self.obj_state[3])
+            bbox3D[3] = self.fix_alpha(bbox3D[3])
+
+            # if the angle of two theta is not acute angle
+            # make the theta still in the range
+            curr_yaw = bbox3D[3]
+            if np.pi / 2.0 < abs(curr_yaw -
+                                 self.obj_state[3]) < np.pi * 3 / 2.0:
+                self.obj_state[3] += np.pi
+                if self.obj_state[3] > np.pi:
+                    self.obj_state[3] -= np.pi * 2
+                if self.obj_state[3] < -np.pi:
+                    self.obj_state[3] += np.pi * 2
+
+            # now the angle is acute: < 90 or > 270,
+            # convert the case of > 270 to < 90
+            if abs(curr_yaw - self.obj_state[3]) >= np.pi * 3 / 2.0:
+                if curr_yaw > 0:
+                    self.obj_state[3] += np.pi * 2
+                else:
+                    self.obj_state[3] -= np.pi * 2
+
+        location = self.obj_state[:self.loc_dim].reshape(1, self.loc_dim).astype(np.float32)
+        observation = bbox3D[:self.loc_dim].reshape(1, self.loc_dim).astype(np.float32)
+        prev_location = self.prev_ref[:self.loc_dim].reshape(1, self.loc_dim).astype(np.float32)
+        confidence = info.reshape(1, 1).astype(np.float32)
+        h_0, c_0 = self.hidden_ref
+        if not onnx:
+            output = self.lstm_refine.predict([
+                location, observation, prev_location, confidence,
+                h_0, c_0
+            ])
+        else:
+            output = self.lstm_refine.run(
+                None,
+                {'location': location, 'observation': observation,
+                 'prev_location': prev_location, 'confidence': confidence,
+                 'h_0': h_0, 'c_0': c_0})
+        refined_loc, h_1, c_1 = output
+        self.hidden_ref = (h_1, c_1)
+
+        refined_obj = refined_loc.flatten()
+        if self.loc_dim > 3:
+            refined_obj[3] = self.fix_alpha(refined_obj[3])
+
+        self.obj_state[:self.loc_dim] = refined_obj
+        self.prev_obs = bbox3D
+
+        if np.pi / 2.0 < abs(bbox3D[3] - self.avg_angle) < np.pi * 3 / 2.0:
+            for r_indx in range(len(self.ref_history)):
+                self.ref_history[r_indx][3] = self.fix_alpha(
+                    self.ref_history[r_indx][3] + np.pi)
+
+        if self.init_flag:
+            self._init_history(refined_obj)
+            self.init_flag = False
+        else:
+            self._update_history(refined_obj)
+
+        self.info = info
+
     def predict(self, update_state: bool = True):
         """
         Advances the state vector and returns the predicted bounding box
@@ -98,3 +210,9 @@ class LSTM3DTracker(object):
         self.time_since_update += 1
 
         return pred_state.flatten()
+
+    def get_state(self):
+        """
+        Returns the current bounding box estimate.
+        """
+        return self.obj_state.flatten()

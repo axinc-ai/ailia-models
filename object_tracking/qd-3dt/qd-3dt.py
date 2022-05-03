@@ -194,7 +194,7 @@ def predict(net_det, lstm_pred, lstm_refine, img, img_info):
         corners_global, det_yaws_world, det_dims
     ], axis=1)
 
-    frame_ind = img_info.get('frame_id', -1)
+    frame_ind = img_info.get('index', -1)
     pure_det = False
     match_bboxes, match_labels, match_boxes_3ds, ids, inds, valids = \
         predict.tracker.match(
