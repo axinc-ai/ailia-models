@@ -1,3 +1,4 @@
+import os
 import json
 from collections import defaultdict
 import itertools
@@ -193,7 +194,8 @@ def load_annotations(ann_file):
         img_ids = vid.getImgIdsFromVidId(vid_id)
         for img_id in img_ids:
             info = vid.loadImgs([img_id])[0]
-            info['filename'] = info['file_name']
+            info['filename'] = file_name = info['file_name']
+            info['vid_name'] = os.path.dirname(file_name).split('/')[-1]
             info['type'] = 'VID'
             info['first_frame'] = True if info['index'] == 0 else False
             img_infos.append(info)

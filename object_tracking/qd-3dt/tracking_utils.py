@@ -4,6 +4,19 @@ import numpy as np
 import numba
 
 
+def yaw2alpha(rot_y, x_loc, z_loc):
+    """
+    Get alpha by rotation_y - theta
+    rotation_y : Rotation ry around Y-axis in camera coordinates [-pi..pi]
+    x : Object center x to the camera center (x-W/2), in pixels
+    alpha : Observation angle of object, ranging [-pi..pi]
+    """
+    torch_pi = np.array([np.pi])
+    alpha = rot_y - np.arctan2(x_loc, z_loc)
+    alpha = (alpha + torch_pi) % (2 * torch_pi) - torch_pi
+    return alpha
+
+
 def alpha2yaw(alpha, x_loc, z_loc):
     """
     Get rotation_y by alpha + theta
@@ -37,6 +50,26 @@ def imagetocamera(points, depths, projection):
     return corners_cam
 
 
+def cameratoimage(corners, projection, invalid_value=-1000):
+    """
+    corners: (N, 3), N points on X(right)-Y(down)-Z(front) camera plane
+    projection: (3, 4), projection matrix
+
+    points: (N, 2), N points on X-Y image plane
+    """
+    assert corners.shape[1] == 3, "Shape ({}) not fit".format(corners.shape)
+
+    points = np.matmul(np.concatenate([
+        corners, np.ones((corners.shape[0], 1))
+    ], axis=1), projection.T)
+
+    # [x, y, z] -> [x/z, y/z]
+    mask = points[:, 2:3] > 0
+    points_img = (points[:, :2] / points[:, 2:3]) * mask + invalid_value * np.logical_not(mask)
+
+    return points_img
+
+
 def cameratoworld(corners, position, rotation):
     """
     corners: (N, 3), N points on X(right)-Y(down)-Z(front) camera coordinate
@@ -49,6 +82,35 @@ def cameratoworld(corners, position, rotation):
     """
     corners_global = np.matmul(corners, rotation.T) + position[None]
     return corners_global
+
+
+def worldtocamera(corners_global, position, rotation):
+    """
+    corners_global: (N, 3), N points on X(right)-Y(front)-Z(up) world coordinate (GTA)
+                    or X(front)-Y(left)-Z(up) velodyne coordinates (KITTI)
+    pose: a class with position, rotation of the frame
+        rotation:  (3, 3), rotation along camera coordinates
+        position:  (3,), translation of world coordinates
+
+    corners: (N, 3), N points on X(right)-Y(down)-Z(front) camera coordinate
+    """
+    assert corners_global.shape[1] == 3, ("Shape ({}) not fit".format(
+        corners_global.shape))
+    corners = np.matmul(corners_global - position[None], rotation)
+    return corners
+
+
+@numba.jit()
+def alpha2rot_y(alpha, x, FOCAL_LENGTH):
+    """
+    Get rotation_y by alpha + theta
+    alpha : Observation angle of object, ranging [-pi..pi]
+    x : Object center x to the camera center (x-W/2), in pixels
+    rotation_y : Rotation ry around Y-axis in camera coordinates [-pi..pi]
+    """
+    rot_y = alpha + np.arctan2(x, FOCAL_LENGTH)
+    rot_y = (rot_y + np.pi) % (2 * np.pi) - np.pi
+    return rot_y
 
 
 @numba.jit(nopython=True, nogil=True)
@@ -110,6 +172,19 @@ def rotate(vector, angle, inverse=False):
         return np.dot(np.dot(np.dot(RX.T, RY.T), RZ.T), vector)
     else:
         return np.dot(np.dot(np.dot(RZ, RY), RX), vector)
+
+
+def euler_to_quaternion(roll, pitch, yaw):
+    qx = np.sin(roll / 2) * np.cos(pitch / 2) * np.cos(yaw / 2) \
+         - np.cos(roll / 2) * np.sin(pitch / 2) * np.sin(yaw / 2)
+    qy = np.cos(roll / 2) * np.sin(pitch / 2) * np.cos(yaw / 2) \
+         + np.sin(roll / 2) * np.cos(pitch / 2) * np.sin(yaw / 2)
+    qz = np.cos(roll / 2) * np.cos(pitch / 2) * np.sin(yaw / 2) \
+         - np.sin(roll / 2) * np.sin(pitch / 2) * np.cos(yaw / 2)
+    qw = np.cos(roll / 2) * np.cos(pitch / 2) * np.cos(yaw / 2) \
+         + np.sin(roll / 2) * np.sin(pitch / 2) * np.sin(yaw / 2)
+
+    return [qw, qx, qy, qz]
 
 
 def quaternion_to_euler(w, x, y, z):
