@@ -8,10 +8,10 @@ import mobilenetv2_labels
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser  # noqa: E402
+from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from image_utils import load_image  # noqa: E402
-from classifier_utils import plot_results, print_results  # noqa: E402
+from classifier_utils import plot_results, print_results, write_predictions  # noqa: E402
 import webcamera_utils  # noqa: E402
 
 # logger
@@ -41,6 +41,11 @@ parser.add_argument(
     action='store_true',
     help='By default, the optimized model is used, but with this option, ' +
     'you can switch to the normal (not optimized) model'
+)
+parser.add_argument(
+    '-w', '--write_prediction',
+    action='store_true',
+    help='Flag to output the prediction file.'
 )
 args = update_parser(parser)
 
@@ -89,6 +94,13 @@ def recognize_from_image():
             preds_ailia = net.predict(input_data)
 
         print_results(preds_ailia, mobilenetv2_labels.imagenet_category)
+
+        # write prediction
+        if args.write_prediction:
+            savepath = get_savepath(args.savepath, image_path)
+            pred_file = '%s.txt' % savepath.rsplit('.', 1)[0]
+            write_predictions(pred_file, preds_ailia, mobilenetv2_labels.imagenet_category)
+
     logger.info('Script finished successfully.')
 
 

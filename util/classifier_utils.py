@@ -86,3 +86,16 @@ def plot_results(input_image, classifier, labels, top_k=MAX_CLASS_COUNT, logging
         )
 
         y=y + h + RECT_MARGIN
+
+
+def write_predictions(file_name, classifier, labels):
+    top_k = 5
+    top_scores, scores = get_top_scores(classifier, top_k)
+    top_k = min(len(top_scores),top_k)
+    with open(file_name, 'w') as f:
+        for idx in range(top_k):
+            f.write('%s %d %f\n' % (
+                labels[top_scores[idx]].replace(' ', '_'),
+                top_scores[idx],
+                scores[top_scores[idx]]
+            ))
