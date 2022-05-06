@@ -7,8 +7,8 @@ def grid_sample(
         image, grid,
         padding_mode='zeros',
         align_corners=False,
-        torch_grid_sampler=False):
-    if torch_grid_sampler:
+        use_torch=False):
+    if use_torch:
         import torch
         from torch.nn import functional as F
 
