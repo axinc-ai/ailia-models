@@ -6,8 +6,9 @@ import numpy as np
 def grid_sample(
         image, grid,
         padding_mode='zeros',
-        align_corners=False):
-    try:
+        align_corners=False,
+        torch_grid_sampler=False):
+    if torch_grid_sampler:
         import torch
         from torch.nn import functional as F
 
@@ -17,7 +18,7 @@ def grid_sample(
             padding_mode=padding_mode,
             align_corners=align_corners)
         output = output.numpy()
-    except ModuleNotFoundError:
+    else:
         output = _grid_sample(
             image, grid,
             padding_mode=padding_mode,
