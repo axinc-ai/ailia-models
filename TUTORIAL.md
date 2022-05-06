@@ -135,7 +135,7 @@ python3 launcher.py
 ## Demo application for iOS/Android
 - [ailia AI showcase for iOS](https://apps.apple.com/jp/app/ailia-ai-showcase/id1522828798)
 - [ailia AI showcase for Android](https://play.google.com/store/apps/details?id=jp.axinc.ailia_ai_showcase)
-- Contact [us](contact@axinc.jp) for other platforms (Windows/macOS/Linux)
+- Contact [us](<mailto:contact@axinc.jp>) for other platforms (Windows/macOS/Linux)
 
 ## API Documentations and Tutorial BLOG
 
