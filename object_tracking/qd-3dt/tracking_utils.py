@@ -100,6 +100,103 @@ def worldtocamera(corners_global, position, rotation):
     return corners
 
 
+def computeboxes(roty, dim, loc):
+    '''Get 3D bbox vertex in camera coordinates
+    Input:
+        roty: (1,), object orientation, -pi ~ pi
+        box_dim: a tuple of (h, w, l)
+        loc: (3,), box 3D center
+    Output:
+        vertex: numpy array of shape (8, 3) for bbox vertex
+    '''
+    roty = roty[0]
+    R = np.array([
+        [+np.cos(roty), 0, +np.sin(roty)], [0, 1, 0],
+        [-np.sin(roty), 0, +np.cos(roty)]
+    ])
+    corners = get_vertex(dim)
+    corners = corners.dot(R.T) + loc
+    return corners
+
+
+def get_vertex(box_dim):
+    '''Get 3D bbox vertex (used for the upper volume iou calculation)
+    Input:
+        box_dim: a tuple of (h, w, l)
+    Output:
+        vertex: numpy array of shape (8, 3) for bbox vertex
+    '''
+    h, w, l = box_dim
+    corners = np.array([
+        [l / 2, l / 2, -l / 2, -l / 2, l / 2, l / 2, -l / 2, -l / 2],
+        [h / 2, h / 2, h / 2, h / 2, -h / 2, -h / 2, -h / 2, -h / 2],
+        [w / 2, -w / 2, -w / 2, w / 2, w / 2, -w / 2, -w / 2, w / 2]
+    ])
+    return corners.T
+
+
+def get_3d_bbox_vertex(cam_calib, cam_pose, points3d, cam_near_clip=0.15):
+    '''Get 3D bbox vertex in camera coordinates
+    Input:
+        cam_calib: (3, 4), projection matrix
+        cam_pose: a class with position, rotation of the frame
+            rotation:  (3, 3), rotation along camera coordinates
+            position:  (3), translation of world coordinates
+        points3d: (8, 3), box 3D center in camera coordinates
+        cam_near_clip: in meter, distance to the near plane
+    Output:
+        points: numpy array of shape (8, 2) for bbox in image coordinates
+    '''
+    lineorder = np.array(
+        [
+            [1, 2, 6, 5],  # front face
+            [2, 3, 7, 6],  # left face
+            [3, 4, 8, 7],  # back face
+            [4, 1, 5, 8],
+            [1, 6, 5, 2]
+        ],
+        dtype=np.int32) - 1  # right
+
+    points = []
+
+    # In camera coordinates
+    cam_dir = np.array([0, 0, 1])
+    center_pt = cam_dir * cam_near_clip
+
+    for i in range(len(lineorder)):
+        for j in range(4):
+            p1 = points3d[lineorder[i, j]].copy()
+            p2 = points3d[lineorder[i, (j + 1) % 4]].copy()
+
+            before1 = is_before_clip_plane_camera(
+                p1[np.newaxis], cam_near_clip)[0]
+            before2 = is_before_clip_plane_camera(
+                p2[np.newaxis], cam_near_clip)[0]
+
+            inter = get_intersect_point(center_pt, cam_dir, p1, p2)
+
+            if not (before1 or before2):
+                # print("Not before 1 or 2")
+                continue
+            elif before1 and before2:
+                # print("Both 1 and 2")
+                vp1 = p1
+                vp2 = p2
+            elif before1 and not before2:
+                # print("before 1 not 2")
+                vp1 = p1
+                vp2 = inter
+            elif before2 and not before1:
+                # print("before 2 not 1")
+                vp1 = inter
+                vp2 = p2
+
+            cp1 = cameratoimage(vp1[np.newaxis], cam_calib)[0]
+            cp2 = cameratoimage(vp2[np.newaxis], cam_calib)[0]
+            points.append((cp1, cp2))
+    return points
+
+
 @numba.jit()
 def alpha2rot_y(alpha, x, FOCAL_LENGTH):
     """
@@ -172,6 +269,42 @@ def rotate(vector, angle, inverse=False):
         return np.dot(np.dot(np.dot(RX.T, RY.T), RZ.T), vector)
     else:
         return np.dot(np.dot(np.dot(RZ, RY), RX), vector)
+
+
+@numba.jit(nopython=True)
+def get_intersect_point(center_pt, cam_dir, vertex1, vertex2):
+    # get the intersection point of two 3D points and a plane
+    c1 = center_pt[0]
+    c2 = center_pt[1]
+    c3 = center_pt[2]
+    a1 = cam_dir[0]
+    a2 = cam_dir[1]
+    a3 = cam_dir[2]
+    x1 = vertex1[0]
+    y1 = vertex1[1]
+    z1 = vertex1[2]
+    x2 = vertex2[0]
+    y2 = vertex2[1]
+    z2 = vertex2[2]
+
+    k_up = abs(a1 * (x1 - c1) + a2 * (y1 - c2) + a3 * (z1 - c3))
+    k_down = abs(a1 * (x1 - x2) + a2 * (y1 - y2) + a3 * (z1 - z2))
+    if k_up > k_down:
+        k = 1
+    else:
+        k = k_up / k_down
+    inter_point = (1 - k) * vertex1 + k * vertex2
+    return inter_point
+
+
+def is_before_clip_plane_camera(points_camera, cam_near_clip=0.15):
+    """
+    points_camera: (N, 3), N points on X(right)-Y(down)-Z(front) camera coordinate
+    cam_near_clip: scalar, the near projection plane
+
+    is_before: bool, is the point locate before the near clip plane
+    """
+    return points_camera[:, 2] > cam_near_clip
 
 
 def euler_to_quaternion(roll, pitch, yaw):

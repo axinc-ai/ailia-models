@@ -25,6 +25,7 @@ from video_utils import load_annotations
 import tracking_utils as tu
 from motion_tracker import MotionTracker
 import tracker_model
+from plot_tracking import read_coco, Visualizer
 
 logger = getLogger(__name__)
 
@@ -40,7 +41,7 @@ WEIGHT_MOTION_REFINE_PATH = 'nuScenes_LSTM_motion_refine.onnx'
 MODEL_MOTION_REFINE_PATH = 'nuScenes_LSTM_motion_refine.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/qd-3dt/'
 
-INPUT_PATH = 'data/nuscenes/anns/tracking_val.json'
+INPUT_PATH = 'data/nuscenes/anns/tracking_val_mini.json'
 SAVE_IMAGE_PATH = 'output'
 
 IMAGE_MAX = 1600
@@ -48,8 +49,8 @@ IMAGE_MIN = 900
 
 CLASSES = {
     'bicycle': 0, 'motorcycle': 1, 'pedestrian': 2,
-    'bus': 3, 'car': 4, 'trailer': 5,
-    'truck': 6, 'construction_vehicle': 7, 'traffic_cone': 8, 'barrier': 9
+    'bus': 3, 'car': 4, 'trailer': 5, 'truck': 6,
+    'construction_vehicle': 7, 'traffic_cone': 8, 'barrier': 9
 }
 
 NUM_BBOX_HEAD_CLASS = 12
@@ -150,6 +151,7 @@ def plt_3d_tracklets(
         label = items['label']
 
         x1, y1, x2, y2, _ = bbox.astype(np.int32)
+        random.seed(id)
         bbox_color = random.choice(plt_3d_tracklets.cm)
         bbox_color = bbox_color.tolist()[::-1]
 
@@ -627,6 +629,10 @@ def recognize_from_image(net_det, lstm_pred, lstm_ref):
     if args.video_id is not None:
         img_infos = [x for x in img_infos if x['video_id'] == args.video_id]
 
+    logger.info('VIDEO_ID: %s' % ', '.join([
+        str(x) for x in sorted(set(x['video_id'] for x in img_infos))
+    ]))
+
     coco_outputs = defaultdict(list)
     pred_id = 0
 
@@ -669,6 +675,7 @@ def recognize_from_image(net_det, lstm_pred, lstm_ref):
         os.makedirs(out_folder, exist_ok=True)
         img_name = os.path.basename(img_info['file_name'])
         save_file = os.path.join(out_folder, img_name.split('-')[-1])
+        logger.info(f'saved at : {save_file}')
         cv2.imwrite(save_file, img)
 
         # save text
@@ -689,6 +696,15 @@ def recognize_from_image(net_det, lstm_pred, lstm_ref):
     logger.info(f'saved at : {out_json}')
     with open(out_json, 'w') as fp:
         json.dump(coco_outputs, fp)
+
+    # Visualize
+    info_pd = read_coco(
+        coco_outputs,
+        category=['Bicycle', 'Motorcycle', 'Pedestrian', 'Bus', 'Car', 'Trailer', 'Truck'])
+    vis = Visualizer(res_folder=args.savepath)
+
+    logger.info('Ploting 3D boxes and BEV.')
+    vis.save_vid(info_pd)
 
     logger.info('Script finished successfully.')
 
