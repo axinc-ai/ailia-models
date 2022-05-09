@@ -41,7 +41,7 @@ WEIGHT_MOTION_REFINE_PATH = 'nuScenes_LSTM_motion_refine.onnx'
 MODEL_MOTION_REFINE_PATH = 'nuScenes_LSTM_motion_refine.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/qd-3dt/'
 
-INPUT_PATH = 'data/nuscenes/anns/tracking_val_mini.json'
+INPUT_PATH = 'data/nuscenes/anns/tracking_val_mini_v0.json'
 SAVE_IMAGE_PATH = 'output'
 
 IMAGE_MAX = 1600
@@ -560,29 +560,14 @@ def predict(net_det, lstm_pred, lstm_refine, img, img_info):
     img, img_shape, scale_factor = preprocess(img)
 
     track_config = {
-        'lstm_pred': lstm_pred,
-        'lstm_refine': lstm_refine,
-        'init_score_thr': 0.8,
-        'init_track_id': 0,
-        'obj_score_thr': 0.5,
-        'match_score_thr': 0.5,
-        'memo_tracklet_frames': 10,
-        'memo_backdrop_frames': 1,
-        'memo_momentum': 0.8,
-        'motion_momentum': 0.9,
-        'nms_conf_thr': 0.5,
-        'nms_backdrop_iou_thr': 0.3,
-        'nms_class_iou_thr': 0.7,
-        'loc_dim': 7,
-        'with_deep_feat': True,
-        'with_cats': True,
-        'with_bbox_iou': True,
-        'with_depth_ordering': True,
-        'track_bbox_iou': 'box3d',
-        'depth_match_metric': 'motion',
-        'match_metric': 'cycle_softmax',
-        'match_algo': 'greedy',
-        'with_depth_uncertainty': True
+        'lstm_pred': lstm_pred, 'lstm_refine': lstm_refine,
+        'init_score_thr': 0.8, 'init_track_id': 0, 'obj_score_thr': 0.5, 'match_score_thr': 0.5,
+        'memo_tracklet_frames': 10, 'memo_backdrop_frames': 1, 'memo_momentum': 0.8,
+        'motion_momentum': 0.9, 'nms_conf_thr': 0.5, 'nms_backdrop_iou_thr': 0.3,
+        'nms_class_iou_thr': 0.7, 'loc_dim': 7, 'with_deep_feat': True, 'with_cats': True,
+        'with_bbox_iou': True, 'with_depth_ordering': True,
+        'track_bbox_iou': 'box3d', 'depth_match_metric': 'motion', 'match_metric': 'cycle_softmax',
+        'match_algo': 'greedy', 'with_depth_uncertainty': True
     }
     if predict.tracker is None:
         predict.tracker = MotionTracker(**track_config)
