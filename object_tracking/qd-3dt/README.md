@@ -14,6 +14,14 @@
 ![Output](example/out_00000002.png)
 ![Output](example/out_00000004.png)
 
+## Requirements
+This model requires additional module.
+
+```
+pip3 install numba
+pip3 install pyquaternion
+```
+
 ## Data Preparation
 
 You need to download nuScenes dataset [here](https://www.nuscenes.org/download?externalData=all&mapData=all&modalities=Any).
