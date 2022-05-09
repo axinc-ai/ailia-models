@@ -48,14 +48,13 @@ The sample code outputs the following file.
 - output/txts/VID_NAME.txt ... prediction results (text)
 - output/output.json ... prediction results (coco format)
 
-If you want to specify the frame information file for inference (COCO format json file), put the file path after the `--input` option.  
+If you want to specify the "frame information file" for inference (COCO format json file), put the file path after the `--input` option.  
 You can use `--savepath` option to change the name of the output directory to save.
 ```bash
 $ python3 qd-3dt.py --input FILE_PATH --savepath SAVE_DIRE_PATH
 ```
 
-The depth file and calib file are automatically found in the predetermined path.  
-If you want to specify directory or directly file path, put the path after the `--calib_path` option.
+You can specify the VIDEO_ID after the `--video_id` option to filter the output video.
 ```bash
 $ python3 qd-3dt.py --video_id VIDEO_ID
 ```
