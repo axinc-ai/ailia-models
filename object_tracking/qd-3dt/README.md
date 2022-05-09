@@ -31,7 +31,7 @@ qd-3dt
       ├── CAM_FRONT
 ```
 
-The "frame information file" for inference (default: data/nuscens/ann/tracking_val_mini_v0.json) is generated using the script [here](https://github.com/SysCV/qd-3dt/tree/main/scripts).
+The "frame information file" for inference (default: data/nuscenes/anns/tracking_val_mini_v0.json) is generated using the script [here](https://github.com/SysCV/qd-3dt/tree/main/scripts).
 Click [this document](https://github.com/SysCV/qd-3dt/blob/main/readme/DATA.md) for the detailed manual.
 
 ## Usage
