@@ -2,9 +2,9 @@
 
 ## Input
 
-<img src="example/img_00000000.jpg" width="300">
-<img src="example/img_00000002.jpg" width="300">
-<img src="example/img_00000004.jpg" width="300">
+<img src="example/img_00000000.jpg" width="360">
+<img src="example/img_00000002.jpg" width="360">
+<img src="example/img_00000004.jpg" width="360">
 
 (Image from https://www.nuscenes.org/download?externalData=all&mapData=all&modalities=Any)
 
@@ -17,7 +17,7 @@
 ## Data Preparation
 
 You need to download nuScenes dataset [here](https://www.nuscenes.org/download?externalData=all&mapData=all&modalities=Any).
-This sample code uses Mini-Set (v1.0-mini.tar, 10 scenes), which is a subset of trainval.  
+The images used in this sample code is Mini-Set (v1.0-mini.tar, 10 scenes), which is a subset of trainval.  
 Unzip, and place (or symlink) the data as below.
 ```
 qd-3dt
@@ -30,6 +30,9 @@ qd-3dt
       ├── CAM_BACK_RIGHT
       ├── CAM_FRONT
 ```
+
+The "frame information file" for inference (default: data/nuscens/ann/tracking_val_mini_v0.json) is generated using the script [here](https://github.com/SysCV/qd-3dt/tree/main/scripts).
+Click [this document](https://github.com/SysCV/qd-3dt/blob/main/readme/DATA.md) for the detailed manual.
 
 ## Usage
 Automatically downloads the onnx and prototxt files on the first run.
