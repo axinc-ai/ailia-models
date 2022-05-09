@@ -40,7 +40,7 @@ qd-3dt
 ```
 
 The "frame information file" for inference (default: data/nuscenes/anns/tracking_val_mini_v0.json) is generated using the script [here](https://github.com/SysCV/qd-3dt/tree/main/scripts).
-Click [this document](https://github.com/SysCV/qd-3dt/blob/main/readme/DATA.md) for the detailed manual.
+Check [this document](https://github.com/SysCV/qd-3dt/blob/main/readme/DATA.md) for the detailed manual.
 
 ## Usage
 Automatically downloads the onnx and prototxt files on the first run.
