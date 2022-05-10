@@ -549,7 +549,7 @@ class Visualizer:
             (self.bev_size, self.bev_size))
 
         max_frames = len(pd_seq['frames'])
-        print(f"Seq ID: {n_seq_pd}\n"
+        print(f"Video ID: {n_seq_pd}\n"
               f"PD frames: {max_frames}")
 
         loc_world_hist_pd = {}
@@ -560,7 +560,7 @@ class Visualizer:
             pd_annos = {}
 
             if n_frame % 100 == 0:
-                print(f"Seq {n_seq_pd}, Frame {n_frame} ...")
+                print(f"Frame {n_frame} ...")
 
             # Get objects
             img = cv2.imread(pd_objects['im_path'])
