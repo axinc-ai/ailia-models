@@ -1,7 +1,7 @@
 # ailia MODELS tutorial
 
 In this tutorial we will explain how to use ailia from python language.
-If you want to from other languages(C++/C#(Unity)/JNI/Kotlin) see the link at the bottom of this tutorial.
+If you want to use ailia from other languages(C++/C#(Unity)/JNI/Kotlin) see the link at the bottom of this tutorial.
 
 ## Requirements
 
