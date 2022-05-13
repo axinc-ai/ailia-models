@@ -297,7 +297,6 @@ def resize(img, size=(EX_INPUT_WIDTH, EX_INPUT_HEIGHT)):
 def recognize_from_video():
     try:
         print('[INFO] Webcam mode is activated')
-        RECORD_TIME = 80
         capture = cv2.VideoCapture(int(args.video))
         if not capture.isOpened():
             print("[ERROR] webcamera not found")
@@ -365,12 +364,8 @@ def recognize_from_video():
     frame_nb = int(capture.get(cv2.CAP_PROP_FRAME_COUNT))
     idx_frame = 0
 
-    time_start = time.time()
     frame_shown = False
     while(True):
-        time_curr = time.time()
-        if args.video == '0' and time_curr-time_start > RECORD_TIME:
-            break
         ret, frame = capture.read()
 
         if cv2.waitKey(1) & 0xFF == ord('q'):
