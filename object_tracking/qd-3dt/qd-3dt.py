@@ -81,7 +81,7 @@ parser.add_argument(
     help='The default (model-dependent) input data (json) path. '
 )
 parser.add_argument(
-    '-v', '--video_id', metavar='VIDEO_ID', type=int, default=None,
+    '-vid', '--video_id', metavar='VIDEO_ID', type=int, default=None,
     help='filter video id.'
 )
 parser.add_argument(
@@ -315,14 +315,14 @@ def general_output(
         img_info['index'] = img_info['key_frame_index']
 
     img_info['id'] = len(coco_json['images'])
-    vid_name = os.path.dirname(img_info['file_name']).split('/')[-1]
+    vid_name = img_info['vid_name']
     if img_info['first_frame']:
         coco_json['videos'].append(
             dict(id=img_info['video_id'], name=vid_name))
 
     # pruning img_info
-    img_info.pop('filename')
-    img_info.pop('type')
+    img_info.pop('filename', None)
+    img_info.pop('type', None)
     coco_json['images'].append(img_info)
 
     # Expand dimension of results
@@ -694,6 +694,67 @@ def recognize_from_image(net_det, lstm_pred, lstm_ref):
     logger.info('Script finished successfully.')
 
 
+def recognize_from_video(net_det, lstm_pred, lstm_ref):
+    video_file = args.video if args.video else args.input[0]
+    capture = get_capture(video_file)
+    assert capture.isOpened(), 'Cannot capture source'
+
+    # create video writer if savepath is specified as video format
+    if args.savepath != SAVE_IMAGE_PATH:
+        f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
+        writer = get_writer(args.savepath, f_h, f_w)
+    else:
+        writer = None
+
+    coco_outputs = defaultdict(list)
+    pred_id = 0
+    first_frame = True
+
+    frame_shown = False
+    while True:
+        ret, frame = capture.read()
+        if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
+            break
+
+        h, w = frame.shape[:2]
+        img_info = {
+            'height': h, 'width': w,
+            'cali': [
+                [1252.8131103515625, 0.0, 826.588134765625, 0.0],
+                [0.0, 1252.8131103515625, 469.9846496582031, 0.0],
+                [0.0, 0.0, 1.0, 0.0],
+            ],
+            'pose': {
+                'rotation': [0., 0., 0.],
+                'position': [0., 0., 0.],
+            },
+            'file_name': f,
+            'vid_name': 'CAM_FRONT',
+            'video_id': 0,
+            'index': i,
+            'first_frame': first_frame,
+        }
+        output = predict(net_det, lstm_pred, lstm_ref, frame, img_info)
+
+        use_3d_center = True
+        coco_outputs, pred_id = general_output(
+            coco_outputs, output, img_info,
+            use_3d_center, pred_id,
+            nusc_mapping)
+
+        first_frame = False
+
+    capture.release()
+    cv2.destroyAllWindows()
+    if writer is not None:
+        writer.release()
+
+    logger.info('Script finished successfully.')
+
+
 def main():
     # model files check and download
     logger.info('Checking DETECTOR model...')
@@ -717,7 +778,10 @@ def main():
         lstm_ref = onnxruntime.InferenceSession(WEIGHT_MOTION_REFINE_PATH)
         tracker_model.onnx = True
 
-    recognize_from_image(net_det, lstm_pred, lstm_ref)
+    if args.video is not None:
+        recognize_from_video(net_det, lstm_pred, lstm_ref)
+    else:
+        recognize_from_image(net_det, lstm_pred, lstm_ref)
 
 
 if __name__ == '__main__':
