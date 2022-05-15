@@ -1,4 +1,5 @@
 import os
+from typing import Optional
 
 import numpy as np
 import cv2
@@ -261,8 +262,7 @@ def merge_vid(vidname1, vidname2, outputname):
     # Default resolutions of the frame are obtained.The default resolutions
     # are system dependent.
     # We convert the resolutions from float to integer.
-    # https://docs.opencv.org/2.4/modules/highgui/doc
-    # /reading_and_writing_images_and_video.html#videocapture-get
+    # https://docs.opencv.org/2.4/modules/highgui/doc/reading_and_writing_images_and_video.html#videocapture-get
     frame_width = int(cap1.get(3))
     frame_height = int(cap1.get(4))
     fps1 = cap1.get(5)
@@ -317,7 +317,7 @@ def merge_vid(vidname1, vidname2, outputname):
 class Visualizer:
     def __init__(
             self,
-            res_folder: str,
+            res_folder: Optional[str],
             fps: float = 7.0,
             draw_bev: bool = True,
             draw_2d: bool = False,
@@ -423,6 +423,122 @@ class Visualizer:
             self.FONT_SCALE * 0.5, (0, 0, 0), self.FONT_THICKNESS,
             cv2.LINE_AA)
         return frame
+
+    def draw_annos(
+            self,
+            img, pd_objects,
+            cmap=None, id_to_color={}, loc_world_hist_pd={}):
+        cam_coords = np.array(pd_objects['cam_loc'])
+        cam_rotation = np.array(pd_objects['cam_rot'])
+        cam_calib = np.array(pd_objects['cam_calib'])
+        cam_pose = Pose(cam_coords, cam_rotation)
+
+        if cmap is None:
+            cmap = RandomColor(50)
+
+        pd_annos = {}
+        if len(pd_objects['annotations']) > 0:
+            pd_annos = sorted(
+                pd_objects['annotations'],
+                key=lambda x: x['location'][2],
+                reverse=True)
+
+        for hypo in pd_annos:
+            # Get information of gt and pd
+            tid_pd_str = f"{hypo['track_id']}PD"
+            tid_pd = hypo['track_id']
+            box_pd = np.array(hypo['box']).astype(int)
+            _, w_pd, l_pd = hypo['dimension']
+            hypo_dict = self.get_3d_info(hypo, cam_calib, cam_pose)
+            center_pd = hypo_dict['center']
+            loc_world_pd = hypo_dict['loc_world']
+            yaw_pd = hypo_dict['yaw']
+            yaw_world_pd = hypo_dict['yaw_world_quat']
+            box3d_pd = hypo_dict['box3d']
+            obj_class_pd = hypo_dict['class']
+            if tid_pd not in loc_world_hist_pd:
+                loc_world_hist_pd[tid_pd] = {
+                    'loc': [loc_world_pd],
+                    'yaw': [yaw_world_pd]
+                }
+            elif len(loc_world_hist_pd[tid_pd]['loc']) > self.num_hist:
+                loc_world_hist_pd[tid_pd]['loc'] = \
+                    loc_world_hist_pd[tid_pd]['loc'][1:] + [loc_world_pd]
+                loc_world_hist_pd[tid_pd]['yaw'] = \
+                    loc_world_hist_pd[tid_pd]['yaw'][1:] + [yaw_world_pd]
+            else:
+                loc_world_hist_pd[tid_pd]['loc'].append(loc_world_pd)
+                loc_world_hist_pd[tid_pd]['yaw'].append(yaw_world_pd)
+
+            # Get box color
+            # color is in BGR format (for cv2), color[:-1] in RGB format
+            # (for plt)
+            if tid_pd_str not in list(id_to_color):
+                id_to_color[tid_pd_str] = cmap.get_random_color(scale=255)
+            color = id_to_color[tid_pd_str]
+
+            if self.draw_tid:
+                info_str = f"{obj_class_pd}{tid_pd}PD"
+            else:
+                info_str = f"{obj_class_pd}"
+
+            # Make rectangle
+            if self.draw_3d:
+                # Make rectangle
+                img = self.draw_3d_bbox(
+                    img,
+                    box3d_pd,
+                    cam_calib,
+                    cam_pose,
+                    line_color=color,
+                    corner_info=info_str)
+
+            if self.draw_2d:
+                self.draw_2d_bbox(
+                    img,
+                    box_pd,
+                    line_color=color,
+                    line_width=3,
+                    corner_info=info_str)
+
+            if self.draw_traj:
+                # Draw trajectories
+                img = self.draw_3d_traj(
+                    img,
+                    loc_world_hist_pd[tid_pd]['loc'],
+                    cam_calib,
+                    cam_pose,
+                    line_color=color)
+
+            if self.draw_bev:
+                # Change BGR to RGB
+                color_bev = [c / 255.0 for c in color[::-1]]
+                center_hist_pd = tu.worldtocamera(
+                    np.vstack(loc_world_hist_pd[tid_pd]['loc']),
+                    cam_pose.position, cam_pose.rotation)[:, [0, 2]]
+                quat_cam_rot_t = Quaternion(matrix=cam_pose.rotation.T)
+                yaw_hist_pd = []
+                for quat_yaw_world_pd in loc_world_hist_pd[tid_pd]['yaw']:
+                    rotation_cam = quat_cam_rot_t * quat_yaw_world_pd
+                    vtrans = np.dot(
+                        rotation_cam.rotation_matrix,
+                        np.array([1, 0, 0]))
+                    yaw_hist_pd.append(
+                        -np.arctan2(vtrans[2], vtrans[0]).tolist())
+                yaw_hist_pd = np.vstack(yaw_hist_pd)
+                plot_bev_obj(
+                    self.ax,
+                    center_pd,
+                    center_hist_pd,
+                    yaw_pd,
+                    yaw_hist_pd,
+                    l_pd,
+                    w_pd,
+                    color_bev,
+                    'PD',
+                    line_width=2)
+
+        return img
 
     def draw_bev_canvas(self):
         # Set x, y limit and mark border
@@ -554,10 +670,9 @@ class Visualizer:
 
         loc_world_hist_pd = {}
         for n_frame in range(max_frames):
-            self.FOCAL_LENGTH = pd_seq['frames'][n_frame]['cam_calib'][0][0]
+            pd_objects = pd_seq['frames'][n_frame]
 
-            pd_objects = pd_seq['frames'].get(n_frame, {'annotations': []})
-            pd_annos = {}
+            self.FOCAL_LENGTH = pd_objects['cam_calib'][0][0]
 
             if n_frame % 100 == 0:
                 print(f"Frame {n_frame} ...")
@@ -577,111 +692,11 @@ class Visualizer:
                 self.FONT_SCALE, (0, 0, 0),
                 self.FONT_THICKNESS * 2, cv2.LINE_AA)
 
-            cam_coords = np.array(pd_objects['cam_loc'])
-            cam_rotation = np.array(pd_objects['cam_rot'])
-            cam_calib = np.array(pd_objects['cam_calib'])
-            cam_pose = Pose(cam_coords, cam_rotation)
-
-            if len(pd_objects['annotations']) > 0:
-                pd_annos = sorted(
-                    pd_objects['annotations'],
-                    key=lambda x: x['location'][2],
-                    reverse=True)
-
-            for hypo in pd_annos:
-                # Get information of gt and pd
-                tid_pd_str = f"{hypo['track_id']}PD"
-                tid_pd = hypo['track_id']
-                box_pd = np.array(hypo['box']).astype(int)
-                _, w_pd, l_pd = hypo['dimension']
-                hypo_dict = self.get_3d_info(hypo, cam_calib, cam_pose)
-                center_pd = hypo_dict['center']
-                loc_world_pd = hypo_dict['loc_world']
-                yaw_pd = hypo_dict['yaw']
-                yaw_world_pd = hypo_dict['yaw_world_quat']
-                box3d_pd = hypo_dict['box3d']
-                obj_class_pd = hypo_dict['class']
-                if tid_pd not in loc_world_hist_pd:
-                    loc_world_hist_pd[tid_pd] = {
-                        'loc': [loc_world_pd],
-                        'yaw': [yaw_world_pd]
-                    }
-                elif len(loc_world_hist_pd[tid_pd]['loc']) > self.num_hist:
-                    loc_world_hist_pd[tid_pd]['loc'] = \
-                        loc_world_hist_pd[tid_pd]['loc'][1:] + [loc_world_pd]
-                    loc_world_hist_pd[tid_pd]['yaw'] = \
-                        loc_world_hist_pd[tid_pd]['yaw'][1:] + [yaw_world_pd]
-                else:
-                    loc_world_hist_pd[tid_pd]['loc'].append(loc_world_pd)
-                    loc_world_hist_pd[tid_pd]['yaw'].append(yaw_world_pd)
-
-                # Get box color
-                # color is in BGR format (for cv2), color[:-1] in RGB format
-                # (for plt)
-                if tid_pd_str not in list(id_to_color):
-                    id_to_color[tid_pd_str] = cmap.get_random_color(scale=255)
-                color = id_to_color[tid_pd_str]
-
-                if self.draw_tid:
-                    info_str = f"{obj_class_pd}{tid_pd}PD"
-                else:
-                    info_str = f"{obj_class_pd}"
-
-                # Make rectangle
-                if self.draw_3d:
-                    # Make rectangle
-                    img = self.draw_3d_bbox(
-                        img,
-                        box3d_pd,
-                        cam_calib,
-                        cam_pose,
-                        line_color=color,
-                        corner_info=info_str)
-
-                if self.draw_2d:
-                    self.draw_2d_bbox(
-                        img,
-                        box_pd,
-                        line_color=color,
-                        line_width=3,
-                        corner_info=info_str)
-
-                if self.draw_traj:
-                    # Draw trajectories
-                    img = self.draw_3d_traj(
-                        img,
-                        loc_world_hist_pd[tid_pd]['loc'],
-                        cam_calib,
-                        cam_pose,
-                        line_color=color)
-
-                if self.draw_bev:
-                    # Change BGR to RGB
-                    color_bev = [c / 255.0 for c in color[::-1]]
-                    center_hist_pd = tu.worldtocamera(
-                        np.vstack(loc_world_hist_pd[tid_pd]['loc']),
-                        cam_pose.position, cam_pose.rotation)[:, [0, 2]]
-                    quat_cam_rot_t = Quaternion(matrix=cam_pose.rotation.T)
-                    yaw_hist_pd = []
-                    for quat_yaw_world_pd in loc_world_hist_pd[tid_pd]['yaw']:
-                        rotation_cam = quat_cam_rot_t * quat_yaw_world_pd
-                        vtrans = np.dot(
-                            rotation_cam.rotation_matrix,
-                            np.array([1, 0, 0]))
-                        yaw_hist_pd.append(
-                            -np.arctan2(vtrans[2], vtrans[0]).tolist())
-                    yaw_hist_pd = np.vstack(yaw_hist_pd)
-                    plot_bev_obj(
-                        self.ax,
-                        center_pd,
-                        center_hist_pd,
-                        yaw_pd,
-                        yaw_hist_pd,
-                        l_pd,
-                        w_pd,
-                        color_bev,
-                        'PD',
-                        line_width=2)
+            img = self.draw_annos(
+                img, pd_objects,
+                cmap=cmap,
+                id_to_color=id_to_color,
+                loc_world_hist_pd=loc_world_hist_pd)
 
             # Plot
             if vid_trk and (self.draw_3d or self.draw_2d):

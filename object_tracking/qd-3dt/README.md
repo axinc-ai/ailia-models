@@ -70,6 +70,13 @@ You can specify the VIDEO_ID after the `--video_id` option to filter the output 
 $ python3 qd-3dt.py --video_id VIDEO_ID
 ```
 
+By adding the `--video` option, you can input the video.   
+If you pass `0` as an argument to VIDEO_PATH, you can use the webcam input instead of the video file.  
+In this mode, calibration, rotation and position information are not used for inference.
+```bash
+$ python3 qd-3dt.py --video VIDEO_PATH
+```
+
 ## Reference
 
 - [Monocular Quasi-Dense 3D Object Tracking](https://github.com/SysCV/qd-3dt)

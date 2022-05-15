@@ -7,6 +7,7 @@ from collections import defaultdict
 
 import numpy as np
 import cv2
+from matplotlib import pyplot as plt
 from pyquaternion import Quaternion
 
 import ailia
@@ -25,7 +26,7 @@ from video_utils import load_annotations
 import tracking_utils as tu
 from motion_tracker import MotionTracker
 import tracker_model
-from plot_tracking import read_coco, Visualizer
+from plot_tracking import read_coco, Visualizer, RandomColor, fig2data
 
 logger = getLogger(__name__)
 
@@ -702,7 +703,7 @@ def recognize_from_video(net_det, lstm_pred, lstm_ref):
     # create video writer if savepath is specified as video format
     if args.savepath != SAVE_IMAGE_PATH:
         f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
+        f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH)) + f_h
         writer = get_writer(args.savepath, f_h, f_w)
     else:
         writer = None
@@ -711,6 +712,13 @@ def recognize_from_video(net_det, lstm_pred, lstm_ref):
     pred_id = 0
     first_frame = True
 
+    # Visualize
+    id_to_color = {}
+    loc_world_hist_pd = {}
+    cmap = RandomColor(100)
+    vis = Visualizer(res_folder=None)
+
+    i = 0
     frame_shown = False
     while True:
         ret, frame = capture.read()
@@ -731,8 +739,8 @@ def recognize_from_video(net_det, lstm_pred, lstm_ref):
                 'rotation': [0., 0., 0.],
                 'position': [0., 0., 0.],
             },
-            'file_name': f,
-            'vid_name': 'CAM_FRONT',
+            'file_name': None,
+            'vid_name': '',
             'video_id': 0,
             'index': i,
             'first_frame': first_frame,
@@ -744,8 +752,36 @@ def recognize_from_video(net_det, lstm_pred, lstm_ref):
             coco_outputs, output, img_info,
             use_3d_center, pred_id,
             nusc_mapping)
+        info_pd = read_coco(
+            coco_outputs,
+            category=['Bicycle', 'Motorcycle', 'Pedestrian', 'Bus', 'Car', 'Trailer', 'Truck'])
+
+        pd_objects = info_pd[0]['frames'][i]
+        img1 = vis.draw_annos(
+            frame, pd_objects,
+            cmap=cmap,
+            id_to_color=id_to_color,
+            loc_world_hist_pd=loc_world_hist_pd)
+        vis.draw_bev_canvas()
+        img2 = fig2data(vis.fig)
+        plt.cla()
+
+        img2 = cv2.resize(img2, (img1.shape[0], img1.shape[0]))
+        out_frame = np.hstack([img1, img2])
+
+        # show
+        cv2.imshow('frame', out_frame)
+        frame_shown = True
+
+        # save results
+        if writer is not None:
+            writer.write(out_frame)
+
+        coco_outputs["images"].clear()
+        coco_outputs["annotations"].clear()
 
         first_frame = False
+        i += 1
 
     capture.release()
     cv2.destroyAllWindows()
