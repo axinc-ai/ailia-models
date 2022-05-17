@@ -148,7 +148,7 @@ python3 launcher.py
 - [API reference (EN)](https://axinc-ai.github.io/ailia-sdk/api/python/en/)
 - [ailia Models](https://github.com/axinc-ai/ailia-models) (* This site)
 
-* Note: All the python models will also work with C++/Unity(C#)/Java(JNI)/Kotlin but you may need to write the pre/post processing code.
+* Note: All python models will also work with C++/Unity(C#)/Java(JNI)/Kotlin but you may need to write the pre/post processing code.
 
 ### C++
 
