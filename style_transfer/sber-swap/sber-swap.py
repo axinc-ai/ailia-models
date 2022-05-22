@@ -3,7 +3,6 @@ import time
 
 import numpy as np
 import cv2
-from PIL import Image
 
 import ailia
 
@@ -20,6 +19,8 @@ from logging import getLogger  # noqa
 import face_detect_crop
 from face_detect_crop import crop_face, get_kps
 import face_align
+from image_infer import get_landmarks
+from masks import face_mask_static
 
 logger = getLogger(__name__)
 
@@ -70,9 +71,27 @@ args = update_parser(parser)
 # Secondaty Functions
 # ======================
 
+def get_final_img(output, tar_img):
+    final_img, crop_img, tfm = output
 
-# def draw_bbox(img, bboxes):
-#     return img
+    h, w = tar_img.shape[:2]
+    final = tar_img.copy()
+
+    landmarks = get_landmarks(final_img)
+    landmarks_tgt = get_landmarks(crop_img)
+
+    mask, _ = face_mask_static(
+        crop_img, landmarks, landmarks_tgt, None)
+    mat_rev = cv2.invertAffineTransform(tfm)
+
+    swap_t = cv2.warpAffine(final_img, mat_rev, (w, h), borderMode=cv2.BORDER_REPLICATE)
+    mask_t = cv2.warpAffine(mask, mat_rev, (w, h))
+    mask_t = np.expand_dims(mask_t, 2)
+
+    final = mask_t * swap_t + (1 - mask_t) * final
+    final = final.astype(np.uint8)
+
+    return final
 
 
 # ======================
@@ -98,40 +117,40 @@ def preprocess(img, half_scale=True):
     return img
 
 
-def post_processing(output):
-    return None
-
-
 def predict(net_iface, net_back, net_G, src_embeds, tar_img):
     kps = get_kps(tar_img, net_iface)
 
     M, _ = face_align.estimate_norm(kps[0], CROP_SIZE, mode='None')
-    img = cv2.warpAffine(tar_img, M, (CROP_SIZE, CROP_SIZE), borderValue=0.0)
+    crop_img = cv2.warpAffine(tar_img, M, (CROP_SIZE, CROP_SIZE), borderValue=0.0)
 
-    # target embeds
-    _img = preprocess(img)
-    if not args.onnx:
-        output = net_back.predict([_img])
-    else:
-        output = net_back.run(None, {'img': _img})
-    target_embeds = output[0]
+    # # target embeds
+    # img = preprocess(crop_img)
+    # if not args.onnx:
+    #     output = net_back.predict([img])
+    # else:
+    #     output = net_back.run(None, {'img': img})
+    # target_embeds = output[0]
 
     new_size = (256, 256)
-    img = cv2.resize(img, new_size)
+    img = cv2.resize(crop_img, new_size)
+    img = preprocess(img[:, :, ::-1], half_scale=False)
+    img = img.astype(np.float16)
 
-    _img = preprocess(img[:, :, ::-1], half_scale=False)
-    _img = _img.astype(np.float16)
+    # feedforward
     if not args.onnx:
-        output = net_G.predict([_img, src_embeds])
+        output = net_G.predict([img, src_embeds])
     else:
-        output = net_G.run(None, {'target': _img, 'source_emb': src_embeds})
+        output = net_G.run(None, {'target': img, 'source_emb': src_embeds})
     y_st = output[0]
 
-    # pred = post_processing(output)
+    y_st = y_st[0].transpose(1, 2, 0)
+    y_st = y_st * 127.5 + 127.5
+    y_st = y_st[:, :, ::-1]  # RGB -> BGR
+    y_st = y_st.astype(np.uint8)
 
-    # return pred
+    final_img = cv2.resize(y_st, (CROP_SIZE, CROP_SIZE))
 
-    return 0
+    return final_img, crop_img, M
 
 
 def recognize_from_image(net_iface, net_back, net_G):
@@ -168,7 +187,7 @@ def recognize_from_image(net_iface, net_back, net_G):
             total_time_estimation = 0
             for i in range(args.benchmark_count):
                 start = int(round(time.time() * 1000))
-                out = predict(net_iface, net_back, net_G, src_embeds, tar_img)
+                output = predict(net_iface, net_back, net_G, src_embeds, tar_img)
                 end = int(round(time.time() * 1000))
                 estimation_time = (end - start)
 
@@ -179,14 +198,14 @@ def recognize_from_image(net_iface, net_back, net_G):
 
             logger.info(f'\taverage time estimation {total_time_estimation / (args.benchmark_count - 1)} ms')
         else:
-            out = predict(net_iface, net_back, net_G, src_embeds, tar_img)
+            output = predict(net_iface, net_back, net_G, src_embeds, tar_img)
 
-        # res_img = draw_bbox(out)
-        #
-        # # plot result
-        # savepath = get_savepath(args.savepath, image_path, ext='.png')
-        # logger.info(f'saved at : {savepath}')
-        # cv2.imwrite(savepath, res_img)
+        res_img = get_final_img(output, tar_img)
+
+        # plot result
+        savepath = get_savepath(args.savepath, image_path, ext='.png')
+        logger.info(f'saved at : {savepath}')
+        cv2.imwrite(savepath, res_img)
 
     logger.info('Script finished successfully.')
 
