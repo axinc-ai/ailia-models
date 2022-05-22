@@ -12,13 +12,14 @@ sys.path.append('../../util')
 from utils import get_base_parser, update_parser, get_savepath  # noqa
 from model_utils import check_and_download_models  # noqa
 from detector_utils import load_image  # noqa
-# from image_utils import load_image, normalize_image  # noqa
+from image_utils import normalize_image  # noqa
 from webcamera_utils import get_capture, get_writer  # noqa
 # logger
 from logging import getLogger  # noqa
 
 import face_detect_crop
-from face_detect_crop import crop_face
+from face_detect_crop import crop_face, get_kps
+import face_align
 
 logger = getLogger(__name__)
 
@@ -30,6 +31,8 @@ WEIGHT_G_PATH = 'G_unet_2blocks.onnx'
 MODEL_G_PATH = 'G_unet_2blocks.onnx.prototxt'
 WEIGHT_ARCFACE_PATH = 'scrfd_10g_bnkps.onnx'
 MODEL_ARCFACE_PATH = 'scrfd_10g_bnkps.onnx.prototxt'
+WEIGHT_BACKBONE_PATH = 'arcface_backbone.onnx'
+MODEL_BACKBONE_PATH = 'arcface_backbone.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/sber-swap/'
 
 IMAGE_PATH = 'beckham.jpg'
@@ -76,32 +79,21 @@ args = update_parser(parser)
 # Main functions
 # ======================
 
-def preprocess(img, image_shape):
-    h, w = image_shape
-    im_h, im_w, _ = img.shape
+def preprocess(img, half_scale=True):
+    # if half_scale:
+    #     im_h, im_w, _ = img.shape
+    #     img = np.array(Image.fromarray(img).resize((im_w // 2, im_h // 2), Image.BILINEAR))
 
-    # adaptive_resize
-    scale = h / min(im_h, im_w)
-    ow, oh = int(im_w * scale), int(im_h * scale)
-    if ow != im_w or oh != im_h:
-        img = cv2.resize(img, (ow, oh), interpolation=cv2.INTER_LINEAR)
+    img = normalize_image(img, normalize_type='127.5')
 
-    img = np.array(Image.fromarray(img).resize((ow, oh), Image.BILINEAR))
-
-    # center_crop
-    if ow > w:
-        x = (ow - w) // 2
-        img = img[:, x:x + w, :]
-    if oh > h:
-        y = (oh - h) // 2
-        img = img[y:y + h, :, :]
-
-    # img = normalize_image(img, normalize_type='ImageNet')
-
-    img = img / 255
     img = img.transpose(2, 0, 1)  # HWC -> CHW
     img = np.expand_dims(img, axis=0)
     img = img.astype(np.float32)
+
+    if half_scale:
+        import torch
+        import torch.nn.functional as F
+        img = F.interpolate(torch.from_numpy(img), scale_factor=0.5, mode='bilinear', align_corners=True).numpy()
 
     return img
 
@@ -110,22 +102,39 @@ def post_processing(output):
     return None
 
 
-def predict(net, img):
-    shape = (IMAGE_HEIGHT, IMAGE_WIDTH)
-    img = preprocess(img, shape)
+def predict(net_iface, net_back, net_G, src_embeds, tar_img):
+    kps = get_kps(tar_img, net_iface)
 
-    # feedforward
+    M, _ = face_align.estimate_norm(kps[0], CROP_SIZE, mode='None')
+    img = cv2.warpAffine(tar_img, M, (CROP_SIZE, CROP_SIZE), borderValue=0.0)
+
+    # target embeds
+    _img = preprocess(img)
     if not args.onnx:
-        output = net.predict([img])
+        output = net_back.predict([_img])
     else:
-        output = net.run(None, {'src': img})
+        output = net_back.run(None, {'img': _img})
+    target_embeds = output[0]
 
-    pred = post_processing(output)
+    new_size = (256, 256)
+    img = cv2.resize(img, new_size)
 
-    return pred
+    _img = preprocess(img[:, :, ::-1], half_scale=False)
+    _img = _img.astype(np.float16)
+    if not args.onnx:
+        output = net_G.predict([_img, src_embeds])
+    else:
+        output = net_G.run(None, {'target': _img, 'source_emb': src_embeds})
+    y_st = output[0]
+
+    # pred = post_processing(output)
+
+    # return pred
+
+    return 0
 
 
-def recognize_from_image(net_iface, net_G):
+def recognize_from_image(net_iface, net_back, net_G):
     source_path = args.source
     logger.info('SOURCE: {}'.format(source_path))
 
@@ -133,15 +142,24 @@ def recognize_from_image(net_iface, net_G):
     src_img = cv2.cvtColor(src_img, cv2.COLOR_BGRA2BGR)
 
     src_img = crop_face(src_img, net_iface, CROP_SIZE)
-    src_img = src_img[:, :, ::-1]  # BRG -> RGB
+    src_img = src_img[:, :, ::-1]  # BGR -> RGB
+
+    # source embeds
+    img = preprocess(src_img)
+    if not args.onnx:
+        output = net_back.predict([img])
+    else:
+        output = net_back.run(None, {'img': img})
+    src_embeds = output[0]
+    src_embeds = src_embeds.astype(np.float16)
 
     # input image loop
     for image_path in args.input:
         logger.info(image_path)
 
         # prepare input data
-        img = load_image(image_path)
-        img = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
+        tar_img = load_image(image_path)
+        tar_img = cv2.cvtColor(tar_img, cv2.COLOR_BGRA2BGR)
 
         # inference
         logger.info('Start inference...')
@@ -150,7 +168,7 @@ def recognize_from_image(net_iface, net_G):
             total_time_estimation = 0
             for i in range(args.benchmark_count):
                 start = int(round(time.time() * 1000))
-                out = predict(net_G, img)
+                out = predict(net_iface, net_back, net_G, src_embeds, tar_img)
                 end = int(round(time.time() * 1000))
                 estimation_time = (end - start)
 
@@ -161,7 +179,7 @@ def recognize_from_image(net_iface, net_G):
 
             logger.info(f'\taverage time estimation {total_time_estimation / (args.benchmark_count - 1)} ms')
         else:
-            out = predict(net_G, img)
+            out = predict(net_iface, net_back, net_G, src_embeds, tar_img)
 
         # res_img = draw_bbox(out)
         #
@@ -173,7 +191,7 @@ def recognize_from_image(net_iface, net_G):
     logger.info('Script finished successfully.')
 
 
-def recognize_from_video(net_iface, net_G):
+def recognize_from_video(net_iface, net_back, net_G):
     video_file = args.video if args.video else args.input[0]
     capture = get_capture(video_file)
     assert capture.isOpened(), 'Cannot capture source'
@@ -224,23 +242,27 @@ def main():
     check_and_download_models(WEIGHT_G_PATH, MODEL_G_PATH, REMOTE_PATH)
     logger.info('Checking arcface model...')
     check_and_download_models(WEIGHT_ARCFACE_PATH, MODEL_ARCFACE_PATH, REMOTE_PATH)
+    logger.info('Checking backbone model...')
+    check_and_download_models(WEIGHT_BACKBONE_PATH, MODEL_BACKBONE_PATH, REMOTE_PATH)
 
     env_id = args.env_id
 
     # initialize
     if not args.onnx:
         net_iface = ailia.Net(MODEL_ARCFACE_PATH, WEIGHT_ARCFACE_PATH, env_id=env_id)
+        net_back = ailia.Net(MODEL_BACKBONE_PATH, WEIGHT_BACKBONE_PATH, env_id=env_id)
         net_G = ailia.Net(MODEL_G_PATH, WEIGHT_G_PATH, env_id=env_id)
     else:
         import onnxruntime
         net_iface = onnxruntime.InferenceSession(WEIGHT_ARCFACE_PATH)
+        net_back = onnxruntime.InferenceSession(WEIGHT_BACKBONE_PATH)
         net_G = onnxruntime.InferenceSession(WEIGHT_G_PATH)
         face_detect_crop.onnx = True
 
     if args.video is not None:
-        recognize_from_video(net_iface, net_G)
+        recognize_from_video(net_iface, net_back, net_G)
     else:
-        recognize_from_image(net_iface, net_G)
+        recognize_from_image(net_iface, net_back, net_G)
 
 
 if __name__ == '__main__':

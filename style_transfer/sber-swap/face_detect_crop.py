@@ -2,6 +2,7 @@ import numpy as np
 import cv2
 
 from nms_utils import nms_boxes
+
 import face_align
 
 onnx = False
@@ -144,7 +145,7 @@ def detect_face(img, net_iface, nms_threshold):
     return det, kpss
 
 
-def crop_face(img, net_iface, crop_size, nms_threshold=0.4):
+def get_kps(img, net_iface, nms_threshold=0.4):
     """
     Crop face from image and resize
     """
@@ -161,7 +162,20 @@ def crop_face(img, net_iface, crop_size, nms_threshold=0.4):
             kps = kpss[i]
         kps_list.append(kps)
 
-    M, _ = face_align.estimate_norm(kps_list[0], crop_size, mode='None')
+    return kps_list
+
+
+def crop_face(img, net_iface, crop_size, nms_threshold=0.4):
+    """
+    Crop face from image and resize
+    """
+
+    kps = get_kps(img, net_iface, nms_threshold)
+
+    if kps is None:
+        return None
+
+    M, _ = face_align.estimate_norm(kps[0], crop_size, mode='None')
     align_img = cv2.warpAffine(img, M, (crop_size, crop_size), borderValue=0.0)
 
     return align_img
