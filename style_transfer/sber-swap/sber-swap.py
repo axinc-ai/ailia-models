@@ -21,7 +21,7 @@ import face_detect_crop
 from face_detect_crop import crop_face, get_kps
 import face_align
 import image_infer
-from image_infer import get_landmarks
+from image_infer import setup_mxnet, get_landmarks
 from masks import face_mask_static
 
 logger = getLogger(__name__)
@@ -38,8 +38,8 @@ WEIGHT_ARCFACE_PATH = 'scrfd_10g_bnkps.onnx'
 MODEL_ARCFACE_PATH = 'scrfd_10g_bnkps.onnx.prototxt'
 WEIGHT_BACKBONE_PATH = 'arcface_backbone.onnx'
 MODEL_BACKBONE_PATH = 'arcface_backbone.onnx.prototxt'
-WEIGHT_LANDMARK_PATH = 'face_landmarks.onnx'
-MODEL_LANDMARK_PATH = 'face_landmarks.onnx.prototxt'
+# WEIGHT_LANDMARK_PATH = 'face_landmarks.onnx'
+# MODEL_LANDMARK_PATH = 'face_landmarks.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/sber-swap/'
 
 IMAGE_PATH = 'beckham.jpg'
@@ -294,8 +294,8 @@ def main():
     check_and_download_models(WEIGHT_ARCFACE_PATH, MODEL_ARCFACE_PATH, REMOTE_PATH)
     logger.info('Checking backbone model...')
     check_and_download_models(WEIGHT_BACKBONE_PATH, MODEL_BACKBONE_PATH, REMOTE_PATH)
-    logger.info('Checking landmark model...')
-    check_and_download_models(WEIGHT_LANDMARK_PATH, MODEL_LANDMARK_PATH, REMOTE_PATH)
+    # logger.info('Checking landmark model...')
+    # check_and_download_models(WEIGHT_LANDMARK_PATH, MODEL_LANDMARK_PATH, REMOTE_PATH)
 
     env_id = args.env_id
 
@@ -304,15 +304,17 @@ def main():
         net_iface = ailia.Net(MODEL_ARCFACE_PATH, WEIGHT_ARCFACE_PATH, env_id=env_id)
         net_back = ailia.Net(MODEL_BACKBONE_PATH, WEIGHT_BACKBONE_PATH, env_id=env_id)
         net_G = ailia.Net(MODEL_G_PATH, WEIGHT_G_PATH, env_id=env_id)
-        net_lmk = ailia.Net(MODEL_LANDMARK_PATH, WEIGHT_LANDMARK_PATH, env_id=env_id)
+        # net_lmk = ailia.Net(MODEL_LANDMARK_PATH, WEIGHT_LANDMARK_PATH, env_id=env_id)
     else:
         import onnxruntime
         net_iface = onnxruntime.InferenceSession(WEIGHT_ARCFACE_PATH)
         net_back = onnxruntime.InferenceSession(WEIGHT_BACKBONE_PATH)
         net_G = onnxruntime.InferenceSession(WEIGHT_G_PATH)
-        net_lmk = onnxruntime.InferenceSession(WEIGHT_LANDMARK_PATH)
+        # net_lmk = onnxruntime.InferenceSession(WEIGHT_LANDMARK_PATH)
         face_detect_crop.onnx = True
-        image_infer.onnx = True
+        # image_infer.onnx = True
+
+    net_lmk = setup_mxnet()
 
     if args.video is not None:
         recognize_from_video(net_iface, net_back, net_G, net_lmk)
