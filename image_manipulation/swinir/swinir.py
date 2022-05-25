@@ -155,7 +155,9 @@ def recognize(img_lq, net):
     output = output.squeeze()
     if output.ndim == 3:
         output = np.transpose(output[[2, 1, 0], :, :], (1, 2, 0))  # CHW-RGB to HCW-BGR
-    output = (output * 255.0).round().astype(np.uint8)  # float32 to uint8
+    output = (output * 255.0).round()
+    output = np.clip(output, 0, 255)
+    output = output.astype(np.uint8)  # float32 to uint8
 
     return output
 
