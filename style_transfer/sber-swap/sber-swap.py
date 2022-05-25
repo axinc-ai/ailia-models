@@ -3,6 +3,7 @@ import time
 
 import numpy as np
 import cv2
+from PIL import Image
 
 import ailia
 
@@ -25,6 +26,8 @@ from masks import face_mask_static
 
 logger = getLogger(__name__)
 
+use_pytorch = False
+
 # ======================
 # Parameters
 # ======================
@@ -45,11 +48,7 @@ SAVE_IMAGE_PATH = 'output.png'
 
 CROP_SIZE = 224
 
-IMAGE_HEIGHT = 224
-IMAGE_WIDTH = 224
-
-THRESHOLD = 0.4
-IOU = 0.45
+IOU = 0.4
 
 # ======================
 # Arguemnt Parser Config
@@ -61,6 +60,11 @@ parser = get_base_parser(
 parser.add_argument(
     '-src', '--source', default=SOURCE_PATH,
     help='source image'
+)
+parser.add_argument(
+    '-iou', '--iou',
+    default=IOU, type=float,
+    help='IOU threshold for NMS'
 )
 parser.add_argument(
     '--onnx',
@@ -102,9 +106,9 @@ def get_final_img(output, tar_img, net_lmk):
 # ======================
 
 def preprocess(img, half_scale=True):
-    # if half_scale:
-    #     im_h, im_w, _ = img.shape
-    #     img = np.array(Image.fromarray(img).resize((im_w // 2, im_h // 2), Image.BILINEAR))
+    if half_scale and not use_pytorch:
+        im_h, im_w, _ = img.shape
+        img = np.array(Image.fromarray(img).resize((im_w // 2, im_h // 2), Image.BILINEAR))
 
     img = normalize_image(img, normalize_type='127.5')
 
@@ -112,27 +116,24 @@ def preprocess(img, half_scale=True):
     img = np.expand_dims(img, axis=0)
     img = img.astype(np.float32)
 
-    if half_scale:
+    if half_scale and use_pytorch:
         import torch
         import torch.nn.functional as F
-        img = F.interpolate(torch.from_numpy(img), scale_factor=0.5, mode='bilinear', align_corners=True).numpy()
+        img = F.interpolate(
+            torch.from_numpy(img), scale_factor=0.5, mode='bilinear', align_corners=True
+        ).numpy()
 
     return img
 
 
-def predict(net_iface, net_back, net_G, src_embeds, tar_img):
-    kps = get_kps(tar_img, net_iface)
+def predict(net_iface, net_G, src_embeds, tar_img):
+    kps = get_kps(tar_img, net_iface, nms_threshold=args.iou)
+
+    if kps is None:
+        return None
 
     M, _ = face_align.estimate_norm(kps[0], CROP_SIZE, mode='None')
     crop_img = cv2.warpAffine(tar_img, M, (CROP_SIZE, CROP_SIZE), borderValue=0.0)
-
-    # # target embeds
-    # img = preprocess(crop_img)
-    # if not args.onnx:
-    #     output = net_back.predict([img])
-    # else:
-    #     output = net_back.run(None, {'img': img})
-    # target_embeds = output[0]
 
     new_size = (256, 256)
     img = cv2.resize(crop_img, new_size)
@@ -158,12 +159,14 @@ def predict(net_iface, net_back, net_G, src_embeds, tar_img):
 
 def recognize_from_image(net_iface, net_back, net_G, net_lmk):
     source_path = args.source
-    logger.info('SOURCE: {}'.format(source_path))
+    logger.info('Source: {}'.format(source_path))
 
     src_img = load_image(source_path)
     src_img = cv2.cvtColor(src_img, cv2.COLOR_BGRA2BGR)
-
-    src_img = crop_face(src_img, net_iface, CROP_SIZE)
+    src_img = crop_face(src_img, net_iface, CROP_SIZE, nms_threshold=args.iou)
+    if src_img is None:
+        logger.info("Source face not recognized.")
+        sys.exit(0)
     src_img = src_img[:, :, ::-1]  # BGR -> RGB
 
     # source embeds
@@ -177,7 +180,7 @@ def recognize_from_image(net_iface, net_back, net_G, net_lmk):
 
     # input image loop
     for image_path in args.input:
-        logger.info(image_path)
+        logger.info('Target: {}'.format(image_path))
 
         # prepare input data
         tar_img = load_image(image_path)
@@ -190,7 +193,7 @@ def recognize_from_image(net_iface, net_back, net_G, net_lmk):
             total_time_estimation = 0
             for i in range(args.benchmark_count):
                 start = int(round(time.time() * 1000))
-                output = predict(net_iface, net_back, net_G, src_embeds, tar_img)
+                output = predict(net_iface, net_G, src_embeds, tar_img)
                 end = int(round(time.time() * 1000))
                 estimation_time = (end - start)
 
@@ -201,7 +204,11 @@ def recognize_from_image(net_iface, net_back, net_G, net_lmk):
 
             logger.info(f'\taverage time estimation {total_time_estimation / (args.benchmark_count - 1)} ms')
         else:
-            output = predict(net_iface, net_back, net_G, src_embeds, tar_img)
+            output = predict(net_iface, net_G, src_embeds, tar_img)
+
+        if output is None:
+            logger.info("Target face not recognized.")
+            continue
 
         res_img = get_final_img(output, tar_img, net_lmk)
 
@@ -217,6 +224,26 @@ def recognize_from_video(net_iface, net_back, net_G, net_lmk):
     video_file = args.video if args.video else args.input[0]
     capture = get_capture(video_file)
     assert capture.isOpened(), 'Cannot capture source'
+
+    source_path = args.source
+    logger.info('Source: {}'.format(source_path))
+
+    src_img = load_image(source_path)
+    src_img = cv2.cvtColor(src_img, cv2.COLOR_BGRA2BGR)
+    src_img = crop_face(src_img, net_iface, CROP_SIZE)
+    if src_img is None:
+        logger.info("Source face not recognized.")
+        sys.exit(0)
+    src_img = src_img[:, :, ::-1]  # BGR -> RGB
+
+    # source embeds
+    img = preprocess(src_img)
+    if not args.onnx:
+        output = net_back.predict([img])
+    else:
+        output = net_back.run(None, {'img': img})
+    src_embeds = output[0]
+    src_embeds = src_embeds.astype(np.float16)
 
     # create video writer if savepath is specified as video format
     if args.savepath != SAVE_IMAGE_PATH:
@@ -235,20 +262,21 @@ def recognize_from_video(net_iface, net_back, net_G, net_lmk):
             break
 
         # inference
-        img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        out = predict(net_G, img)
+        output = predict(net_iface, net_G, src_embeds, frame)
 
-        # # plot result
-        # res_img = draw_bbox(frame, out)
-        #
-        # # show
-        # cv2.imshow('frame', res_img)
-        # frame_shown = True
-        #
-        # # save results
-        # if writer is not None:
-        #     res_img = res_img.astype(np.uint8)
-        #     writer.write(res_img)
+        if output:
+            # plot result
+            res_img = get_final_img(output, frame, net_lmk)
+        else:
+            res_img = frame
+
+        # show
+        cv2.imshow('frame', res_img)
+        frame_shown = True
+
+        # save results
+        if writer is not None:
+            writer.write(res_img)
 
     capture.release()
     cv2.destroyAllWindows()
