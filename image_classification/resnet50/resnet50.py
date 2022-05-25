@@ -1,5 +1,6 @@
 import time
 import sys
+import numpy as np
 
 import cv2
 
@@ -8,9 +9,9 @@ import resnet50_labels
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser  # noqa: E402
+from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
-from classifier_utils import plot_results, print_results  # noqa: E402
+from classifier_utils import plot_results, print_results, write_predictions  # noqa: E402
 import webcamera_utils  # noqa: E402
 
 # logger
@@ -22,6 +23,7 @@ logger = getLogger(__name__)
 # Parameters 1
 # ======================
 MODEL_NAMES = ['resnet50.opt', 'resnet50', 'resnet50_pytorch']
+TTA_NAMES = ['none', '1_crop', 'keep_aspect']
 IMAGE_PATH = 'pizza.jpg'
 IMAGE_HEIGHT = 224
 IMAGE_WIDTH = 224
@@ -42,12 +44,26 @@ parser.add_argument(
     help=('model architecture: ' + ' | '.join(MODEL_NAMES) +
           ' (default: resnet50.opt)')
 )
+parser.add_argument(
+    '--tta', '-t', metavar='TTA',
+    default='none', choices=TTA_NAMES,
+    help=('tta scheme: ' + ' | '.join(TTA_NAMES) +
+          ' (default: none)')
+)
+parser.add_argument(
+    '-w', '--write_prediction',
+    action='store_true',
+    help='Flag to output the prediction file.'
+)
 args = update_parser(parser)
 
 if args.arch=="resnet50_pytorch":
     IMAGE_RANGE = ailia.NETWORK_IMAGE_RANGE_IMAGENET
 else:
     IMAGE_RANGE = ailia.NETWORK_IMAGE_RANGE_S_INT8
+
+if args.write_prediction:
+    MAX_CLASS_COUNT = 5
 
 # ======================
 # Parameters 2
@@ -61,10 +77,25 @@ REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/resnet50/'
 # Utils
 # ======================
 def preprocess_image(img):
+    if len(img.shape) == 2:
+        img = np.expand_dims(img, axis=2)
     if img.shape[2] == 3:
         img = cv2.cvtColor(img, cv2.COLOR_BGR2BGRA)
     elif img.shape[2] == 1:
         img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGRA)
+    if args.tta == "1_crop" or args.tta == "keep_aspect":
+        resize = 256
+        crop = 224
+        if args.tta == "keep_aspect":
+            resize = crop
+        pad = (resize - crop)//2
+        if img.shape[0] < img.shape[1]:
+            img = cv2.resize(img, (int(img.shape[1]*resize/img.shape[0]), resize))
+            img = img[pad:pad+crop,(img.shape[1]-crop)//2:(img.shape[1]-crop)//2+crop,:]
+        else:
+            img = cv2.resize(img, (resize, int(img.shape[0]*resize/img.shape[1])))
+            img = img[(img.shape[0]-crop)//2:(img.shape[0]-crop)//2+crop,pad:pad+crop,:]
+        img = img.copy()
     return img
 
 
@@ -102,6 +133,14 @@ def recognize_from_image():
 
         # show results
         print_results(classifier, resnet50_labels.imagenet_category)
+
+        # write prediction
+        if args.write_prediction:
+            savepath = get_savepath(args.savepath, image_path)
+            pred_file = '%s.txt' % savepath.rsplit('.', 1)[0]
+            write_predictions(pred_file, classifier, resnet50_labels.imagenet_category)
+
+    logger.info('Script finished successfully.')
 
 
 def recognize_from_video():
