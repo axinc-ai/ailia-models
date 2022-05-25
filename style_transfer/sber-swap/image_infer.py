@@ -31,6 +31,8 @@ def setup_mxnet():
         )])
     model.set_params(arg_params, aux_params)
 
+    get_landmarks.mxnet = True
+
     return model
 
 
@@ -57,14 +59,15 @@ def get_landmarks(net_lmk, img):
     data = data.astype(np.float32)
 
     # feedforward
-    # if not onnx:
-    #     output = net_lmk.predict([data])
-    # else:
-    #     output = net_lmk.run(None, {'data': data})
-    data = mx.nd.array(data)
-    db = mx.io.DataBatch(data=(data,))
-    net_lmk.forward(db, is_train=False)
-    output = net_lmk.get_outputs()[-1].asnumpy()
+    if get_landmarks.mxnet:
+        data = mx.nd.array(data)
+        db = mx.io.DataBatch(data=(data,))
+        net_lmk.forward(db, is_train=False)
+        output = net_lmk.get_outputs()[-1].asnumpy()
+    elif not onnx:
+        output = net_lmk.predict([data])
+    else:
+        output = net_lmk.run(None, {'data': data})
 
     pred = output[0]
 
@@ -75,3 +78,6 @@ def get_landmarks(net_lmk, img):
     pred = trans_points2d(pred, IM)
 
     return pred
+
+
+get_landmarks.mxnet = False

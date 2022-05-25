@@ -38,8 +38,8 @@ WEIGHT_ARCFACE_PATH = 'scrfd_10g_bnkps.onnx'
 MODEL_ARCFACE_PATH = 'scrfd_10g_bnkps.onnx.prototxt'
 WEIGHT_BACKBONE_PATH = 'arcface_backbone.onnx'
 MODEL_BACKBONE_PATH = 'arcface_backbone.onnx.prototxt'
-# WEIGHT_LANDMARK_PATH = 'face_landmarks.onnx'
-# MODEL_LANDMARK_PATH = 'face_landmarks.onnx.prototxt'
+WEIGHT_LANDMARK_PATH = 'face_landmarks.onnx'
+MODEL_LANDMARK_PATH = 'face_landmarks.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/sber-swap/'
 
 IMAGE_PATH = 'beckham.jpg'
@@ -108,7 +108,8 @@ def get_final_img(output, tar_img, net_lmk):
 def preprocess(img, half_scale=True):
     if half_scale and not use_pytorch:
         im_h, im_w, _ = img.shape
-        img = np.array(Image.fromarray(img).resize((im_w // 2, im_h // 2), Image.BILINEAR))
+        img = np.array(Image.fromarray(img).resize(
+            (im_w // 2, im_h // 2), Image.Resampling.BILINEAR))
 
     img = normalize_image(img, normalize_type='127.5')
 
@@ -311,8 +312,9 @@ def main():
         net_back = onnxruntime.InferenceSession(WEIGHT_BACKBONE_PATH)
         net_G = onnxruntime.InferenceSession(WEIGHT_G_PATH)
         # net_lmk = onnxruntime.InferenceSession(WEIGHT_LANDMARK_PATH)
+
         face_detect_crop.onnx = True
-        # image_infer.onnx = True
+        image_infer.onnx = True
 
     net_lmk = setup_mxnet()
 
