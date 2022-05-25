@@ -2,13 +2,16 @@
 
 ## Input
 
-- Source image
-
-<img src="elon_musk.jpg" height="480px">
-
-- Target image
-
-<img src="beckham.jpg" height="480px">
+<table>
+<tr>
+<th>Source image</th>
+<th>Target image</th>
+</tr>
+<tr>
+<td><img src="elon_musk.jpg" width="320px"></td>
+<td><img src="beckham.jpg" width="320px"></td>
+</tr>
+</table>
 
 (Image from https://github.com/ai-forever/sber-swap/tree/main/examples/images)
 
@@ -21,7 +24,7 @@ pip3 install mxnet
 
 ## Output
 
-<img src="output.png" height="480px">
+<img src="output.png" width="320px">
 
 ## Usage
 Automatically downloads the onnx and prototxt files on the first run.
