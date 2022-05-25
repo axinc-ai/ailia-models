@@ -50,6 +50,7 @@ $ python3 swinir.py --video VIDEO_PATH --onnx
 (ex) $ python3 swinir.py --video demo.mp4 --onnx
 (ex) $ python3 swinir.py --video demo.mp4 -s output2.mp4 --onnx
 (ex) $ python3 swinir.py --video demo.mp4 --model_name classical --onnx
+(ex) $ python3 swinir.py --video demo.mp4 -s output.mp4 --model_name lightweight --onnx
 ```
 ## Reference
 

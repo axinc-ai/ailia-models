@@ -90,7 +90,6 @@ def add_noise(img, noise_param=50):
 # ======================
 
 def predict(net, input):
-    logger.info('predicting...')
     if not args.onnx:
         output = net.run(input)
     else:
@@ -104,9 +103,17 @@ def recognize(img_lq, net):
 
     if args.model_name == 'jpeg':
         window_size = 7
+        tile = 70
     else:
         window_size = 8
+        tile = 80
 
+    if args.model_name in ['classical', 'lightweight']:
+        scale = 2
+    elif args.model_name == 'real':
+        scale = 4
+    else:
+        scale = 1
 
     # pad input image to be a multiple of window_size
     h_old, w_old = img_lq.shape[2], img_lq.shape[3]
@@ -121,11 +128,30 @@ def recognize(img_lq, net):
         img_lq = cv2.cvtColor(img_lq, cv2.COLOR_BGR2GRAY)
         img_lq = img_lq[np.newaxis, np.newaxis, :, :]
 
-    input = img_lq
+    # test the image tile by tile
+    b, c, h, w = img_lq.shape
+    tile = min(tile, h, w)
+    assert tile % window_size == 0, "tile size should be a multiple of window_size"
+    tile_overlap = 32 # Overlapping of different tiles #tile_overlap = args.tile_overlap
+    sf = scale
+    stride = tile - tile_overlap
+    h_idx_list = list(range(0, h-tile, stride)) + [h-tile]
+    w_idx_list = list(range(0, w-tile, stride)) + [w-tile]
+    E = np.zeros([b, c, h*sf, w*sf]) #E = torch.zeros(b, c, h*sf, w*sf).type_as(img_lq)
+    W = np.zeros_like(E) #W = torch.zeros_like(E)
 
-    output = predict(net, input)
-
-    output = output[0]
+    print('Tile lists', h_idx_list, w_idx_list)
+    logger.info('Predicting...')
+    for h_idx in h_idx_list:
+        for w_idx in w_idx_list:
+            logger.info('Predicting h_idx = {}, w_idx = {}'.format(h_idx, w_idx))
+            in_patch = img_lq[..., h_idx:h_idx+tile, w_idx:w_idx+tile]
+            output = predict(net, in_patch)
+            out_patch = output[0]
+            out_patch_mask = np.ones_like(out_patch)
+            E[..., h_idx*sf:(h_idx+tile)*sf, w_idx*sf:(w_idx+tile)*sf] += out_patch
+            W[..., h_idx*sf:(h_idx+tile)*sf, w_idx*sf:(w_idx+tile)*sf] += out_patch_mask
+    output = E/W
     output = output.squeeze()
     if output.ndim == 3:
         output = np.transpose(output[[2, 1, 0], :, :], (1, 2, 0))  # CHW-RGB to HCW-BGR
@@ -207,9 +233,9 @@ def recognize_from_video(net, input_size, save_size):
 
 def main():
     logger.info('model_name = {}'.format(args.model_name))
-    if args.model_name in ['color', 'jpeg']:
-        logger.info('Script finished because seleted model is too large. Please wait future update.')
-        exit()
+    #if args.model_name in ['color', 'jpeg']:
+    #    logger.info('Script finished because seleted model is too large. Please wait future update.')
+    #    exit()
 
     # set param
     if args.model_name == 'classical':
@@ -220,6 +246,10 @@ def main():
         model_path, weight_path = MODEL_REAL_PATH, WEIGHT_REAL_PATH
     elif args.model_name == 'gray':
         model_path, weight_path = MODEL_GRAY_PATH, WEIGHT_GRAY_PATH
+    elif args.model_name == 'color':
+        model_path, weight_path = MODEL_COLOR_PATH, WEIGHT_COLOR_PATH
+    elif args.model_name == 'jpeg':
+        model_path, weight_path = MODEL_JPEG_PATH, WEIGHT_JPEG_PATH
 
     if args.video is None:
         default_flag = (len(args.input)==1 and args.input[0]==IMAGE_CLASSICAL_PATH)
@@ -229,6 +259,10 @@ def main():
             args.input[0] = IMAGE_REAL_PATH if default_flag else args.input[0]
         elif args.model_name == 'gray':
             args.input[0] = IMAGE_GRAY_PATH if default_flag else args.input[0]
+        elif args.model_name == 'color':
+            args.input[0] = IMAGE_COLOR_PATH if default_flag else args.input[0]
+        elif args.model_name == 'jpeg':
+            args.input[0] = IMAGE_JPEG_PATH if default_flag else args.input[0]
 
     if args.video is not None:
         if args.model_name == 'classical':
