@@ -1,8 +1,6 @@
 import numpy as np
 import cv2
 
-import mxnet as mx
-
 M = np.array([
     [0.57142857, 0., 32.], [0., 0.57142857, 32.]
 ])
@@ -15,6 +13,7 @@ onnx = False
 
 
 def setup_mxnet():
+    import mxnet as mx
     prefix = "./coordinate_reg/model/2d106det"
     ctx = mx.cpu()
 
@@ -60,6 +59,8 @@ def get_landmarks(net_lmk, img):
 
     # feedforward
     if get_landmarks.mxnet:
+        import mxnet as mx
+        
         data = mx.nd.array(data)
         db = mx.io.DataBatch(data=(data,))
         net_lmk.forward(db, is_train=False)

@@ -15,13 +15,6 @@
 
 (Image from https://github.com/ai-forever/sber-swap/tree/main/examples/images)
 
-## Requirements
-This model requires additional module.
-
-```
-pip3 install mxnet
-```
-
 ## Output
 
 <img src="output.png" width="320px">
@@ -58,10 +51,20 @@ Pytorch
 
 ## Model Format
 
-ONNX opset=11
+- G_unet_2blocks.onnx.prototxt
+- scrfd_10g_bnkps.onnx.prototxt
+- arcface_backbone.onnx.prototxt
+
+  ONNX opset=11
+
+
+- face_landmarks.onnx.prototxt
+
+  ONNX opset=12
 
 ## Netron
 
 [G_unet_2blocks.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/sber-swap/G_unet_2blocks.onnx.prototxt)  
 [scrfd_10g_bnkps.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/sber-swap/scrfd_10g_bnkps.onnx.prototxt)  
-[arcface_backbone.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/sber-swap/arcface_backbone.onnx.prototxt)
+[arcface_backbone.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/sber-swap/arcface_backbone.onnx.prototxt)  
+[face_landmarks.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/sber-swap/face_landmarks.onnx.prototxt)
