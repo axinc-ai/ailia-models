@@ -38,10 +38,11 @@ dog_bark
 
 ```bash
 $ python3 crnn_audio_classification.py -i INPUT_PATH
+(ex)$ python3 crnn_audio_classification.py -i 24965__www-bonson-ca__bigdogbarking-02.wav
 ```
 
 ```bash
-$ python3 crnn_audio_classification.py -v
+$ python3 crnn_audio_classification.py -v --ailia_audio
 ```
 
 ### Reference

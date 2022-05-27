@@ -7,7 +7,6 @@ import numpy as np
 import ailia
 
 import cv2
-import pyaudio
 import io
 import matplotlib.pyplot as plt
 #import librosa
@@ -38,13 +37,6 @@ WEIGHT_PATH = "crnn_audio_classification.onnx"
 MODEL_PATH = "crnn_audio_classification.onnx.prototxt"
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/crnn_audio_classification/"
 
-# pyaudio
-CHUNK = 1024
-FORMAT = pyaudio.paInt16
-CHANNELS = 1
-RECODING_SAMPING_RATE = 48000
-THRESHOLD = 0.02
-
 SAMPLING_RATE = 16000
 WIN_LENGTH = int(SAMPLING_RATE * 0.02)
 HOP_LENGTH = int(SAMPLING_RATE * 0.01)
@@ -73,9 +65,18 @@ parser.add_argument(
 args = update_parser(parser)
 
 if args.ailia_audio:
-  from crnn_audio_classification_util_ailia import MelspectrogramStretch
+    from crnn_audio_classification_util_ailia import MelspectrogramStretch
 else:
-  from crnn_audio_classification_util import MelspectrogramStretch  # noqa: E402
+    from crnn_audio_classification_util import MelspectrogramStretch  # noqa: E402
+
+if args.v:
+    import pyaudio
+    # pyaudio parameters
+    CHUNK = 1024
+    FORMAT = pyaudio.paInt16
+    CHANNELS = 1
+    RECODING_SAMPING_RATE = 48000
+    THRESHOLD = 0.02
 
 # ======================
 # Postprocess
