@@ -10,6 +10,9 @@ import ailia
 
 from PIL import Image, ImageTk
 
+sys.path.append('../../util')
+from padim_utils import *
+
 # for macOS, please install "brew install python-tk@3.9"
 import tkinter as tk
 from tkinter import ttk
@@ -135,6 +138,7 @@ def get_training_file_list():
     image_list = []
     for image_path in files:
         image_list.append(image_path)
+    image_list.sort()
     return image_list
 
 def get_test_file_list():
