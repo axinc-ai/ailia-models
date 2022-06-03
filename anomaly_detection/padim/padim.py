@@ -8,9 +8,6 @@ import pickle
 import numpy as np
 import cv2
 from PIL import Image
-from scipy.spatial.distance import mahalanobis
-from scipy.ndimage import gaussian_filter
-from sklearn.metrics import precision_recall_curve
 from skimage import morphology
 from skimage.segmentation import mark_boundaries
 import matplotlib
@@ -195,64 +192,6 @@ def train_from_image(net, params):
 
     return train_outputs
 
-
-def infer_one_image(net, params, train_outputs, img):
-    # prepare input data
-    imgs = []
-    imgs.append(img)
-    imgs = np.vstack(imgs)
-
-    # inference
-    net.set_input_shape(imgs.shape)
-    _ = net.predict(imgs)
-
-    test_outputs = OrderedDict([
-        ('layer1', []), ('layer2', []), ('layer3', [])
-    ])
-    for key, name in zip(test_outputs.keys(), params["feat_names"]):
-        test_outputs[key].append(net.get_blob_data(name))
-    for k, v in test_outputs.items():
-        test_outputs[k] = v[0]
-
-    embedding_vectors = postprocess(test_outputs)
-
-    # randomly select d dimension
-    idx = train_outputs[2]
-    embedding_vectors = embedding_vectors[:, idx, :, :]
-
-    # reshape 2d pixels to 1d features
-    B, C, H, W = embedding_vectors.shape
-    embedding_vectors = embedding_vectors.reshape(B, C, H * W)
-
-    # calculate distance matrix
-    dist_tmp = np.zeros([B, (H * W)])
-    for i in range(H * W):
-        mean = train_outputs[0][:, i]
-        conv_inv = np.linalg.inv(train_outputs[1][:, :, i])
-        dist = [mahalanobis(sample[:, i], mean, conv_inv) for sample in embedding_vectors]
-        dist_tmp[:, i] = dist
-
-    # upsample
-    dist_tmp = dist_tmp.reshape(H, W)
-    dist_tmp = np.array(Image.fromarray(dist_tmp).resize(
-            (IMAGE_SIZE, IMAGE_SIZE), resample=Image.BILINEAR)
-        )
-
-    # apply gaussian smoothing on the score map
-    dist_tmp = gaussian_filter(dist_tmp, sigma=4)
-
-    return dist_tmp
-
-def decide_threshold(scores, gt_imgs):
-    # get optimal threshold
-    gt_mask = np.asarray(gt_imgs)
-    precision, recall, thresholds = precision_recall_curve(gt_mask.flatten(), scores.flatten())
-    a = 2 * precision * recall
-    b = precision + recall
-    f1 = np.divide(a, b, out=np.zeros_like(a), where=b != 0)
-    threshold = thresholds[np.argmax(f1)]
-    return threshold
-
 def load_gt_imgs(gt_type_dir):
     gt_imgs = []
     for i_img in range(0, len(args.input)):
@@ -272,6 +211,7 @@ def load_gt_imgs(gt_type_dir):
         gt_imgs.append(gt_img)
     return gt_imgs
 
+
 def decide_threshold_from_gt_image(net, params, train_outputs, gt_imgs):
     score_map = []
     for i_img in range(0, len(args.input)):
@@ -282,18 +222,11 @@ def decide_threshold_from_gt_image(net, params, train_outputs, gt_imgs):
         img = cv2.cvtColor(img, cv2.COLOR_BGRA2RGB)
         img = preprocess(img)
 
-        dist_tmp = infer_one_image(net, params, train_outputs, img)
+        dist_tmp = infer(net, params, train_outputs, img)
 
         score_map.append(dist_tmp)
 
-    N = len(score_map)
-    score_map = np.vstack(score_map)
-    score_map = score_map.reshape(N, IMAGE_SIZE, IMAGE_SIZE)
-
-    # Normalization
-    max_score = score_map.max()
-    min_score = score_map.min()
-    scores = (score_map - min_score) / (max_score - min_score)
+    scores = normalize_scores(score_map)
 
     threshold = decide_threshold(scores, gt_imgs)
     return threshold
@@ -317,30 +250,19 @@ def infer_from_image(net, params, train_outputs, threshold, gt_imgs):
             total_time = 0
             for i in range(args.benchmark_count):
                 start = int(round(time.time() * 1000))
-                dist_tmp = infer_one_image(net, params, train_outputs, img)
+                dist_tmp = infer(net, params, train_outputs, img)
                 end = int(round(time.time() * 1000))
                 logger.info(f'\tailia processing time {end - start} ms')
                 if i != 0:
                     total_time = total_time + (end - start)
             logger.info(f'\taverage time {total_time / (args.benchmark_count - 1)} ms')
         else:
-            dist_tmp = infer_one_image(net, params, train_outputs, img)
+            dist_tmp = infer(net, params, train_outputs, img)
 
         score_map.append(dist_tmp)
 
-    N = len(score_map)
-    score_map = np.vstack(score_map)
-    score_map = score_map.reshape(N, IMAGE_SIZE, IMAGE_SIZE)
-
-    # Normalization
-    max_score = score_map.max()
-    min_score = score_map.min()
-    scores = (score_map - min_score) / (max_score - min_score)
-
-    # Calculated anormal score
-    anormal_scores = np.zeros((score_map.shape[0]))
-    for i in range(score_map.shape[0]):
-        anormal_scores[i] = score_map[i].max()
+    scores = normalize_scores(score_map)
+    anormal_scores = calculate_anormal_scores(score_map)
 
     # Plot gt image
     plot_fig(args.input, test_imgs, scores, anormal_scores, gt_imgs, threshold, args.savepath)

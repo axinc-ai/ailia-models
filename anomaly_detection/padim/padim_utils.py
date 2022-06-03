@@ -13,6 +13,11 @@ from PIL import Image
 from image_utils import normalize_image  # noqa: E402
 from detector_utils import load_image  # noqa: E402
 
+from scipy.spatial.distance import mahalanobis
+from scipy.ndimage import gaussian_filter
+
+from sklearn.metrics import precision_recall_curve
+
 IMAGE_RESIZE = 256
 IMAGE_SIZE = 224
 
@@ -252,3 +257,86 @@ def training(net, params, idx, batch_size, train_dir, aug, aug_num, logger):
 
     train_outputs = [mean, cov, idx]
     return train_outputs
+
+def infer(net, params, train_outputs, img):
+    # prepare input data
+    imgs = []
+    imgs.append(img)
+    imgs = np.vstack(imgs)
+
+    # inference
+    net.set_input_shape(imgs.shape)
+    _ = net.predict(imgs)
+
+    test_outputs = OrderedDict([
+        ('layer1', []), ('layer2', []), ('layer3', [])
+    ])
+    for key, name in zip(test_outputs.keys(), params["feat_names"]):
+        test_outputs[key].append(net.get_blob_data(name))
+    for k, v in test_outputs.items():
+        test_outputs[k] = v[0]
+
+    embedding_vectors = postprocess(test_outputs)
+
+    # randomly select d dimension
+    idx = train_outputs[2]
+    embedding_vectors = embedding_vectors[:, idx, :, :]
+
+    # reshape 2d pixels to 1d features
+    B, C, H, W = embedding_vectors.shape
+    embedding_vectors = embedding_vectors.reshape(B, C, H * W)
+
+    # calculate distance matrix
+    dist_tmp = np.zeros([B, (H * W)])
+    for i in range(H * W):
+        mean = train_outputs[0][:, i]
+        conv_inv = np.linalg.inv(train_outputs[1][:, :, i])
+        dist = [mahalanobis(sample[:, i], mean, conv_inv) for sample in embedding_vectors]
+        dist_tmp[:, i] = dist
+
+    # upsample
+    dist_tmp = dist_tmp.reshape(H, W)
+    dist_tmp = np.array(Image.fromarray(dist_tmp).resize(
+            (IMAGE_SIZE, IMAGE_SIZE), resample=Image.BILINEAR)
+        )
+
+    # apply gaussian smoothing on the score map
+    dist_tmp = gaussian_filter(dist_tmp, sigma=4)
+
+    return dist_tmp
+
+
+def normalize_scores(score_map):
+    N = len(score_map)
+    score_map = np.vstack(score_map)
+    score_map = score_map.reshape(N, IMAGE_SIZE, IMAGE_SIZE)
+
+    # Normalization
+    max_score = score_map.max()
+    min_score = score_map.min()
+    scores = (score_map - min_score) / (max_score - min_score)
+
+    return scores
+
+def calculate_anormal_scores(score_map):
+    N = len(score_map)
+    score_map = np.vstack(score_map)
+    score_map = score_map.reshape(N, IMAGE_SIZE, IMAGE_SIZE)
+
+    # Calculated anormal score
+    anormal_scores = np.zeros((score_map.shape[0]))
+    for i in range(score_map.shape[0]):
+        anormal_scores[i] = score_map[i].max()
+    
+    return anormal_scores
+
+
+def decide_threshold(scores, gt_imgs):
+    # get optimal threshold
+    gt_mask = np.asarray(gt_imgs)
+    precision, recall, thresholds = precision_recall_curve(gt_mask.flatten(), scores.flatten())
+    a = 2 * precision * recall
+    b = precision + recall
+    f1 = np.divide(a, b, out=np.zeros_like(a), where=b != 0)
+    threshold = thresholds[np.argmax(f1)]
+    return threshold
