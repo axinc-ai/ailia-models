@@ -5,10 +5,6 @@ from collections import OrderedDict
 import random
 import pickle
 
-#__all__ = [
-#    'embedding_concat',
-#]
-
 from PIL import Image
 from image_utils import normalize_image  # noqa: E402
 from detector_utils import load_image  # noqa: E402
@@ -18,8 +14,16 @@ from scipy.ndimage import gaussian_filter
 
 from sklearn.metrics import precision_recall_curve
 
+from skimage import morphology
+from skimage.segmentation import mark_boundaries
+
 IMAGE_RESIZE = 256
 IMAGE_SIZE = 224
+
+WEIGHT_RESNET18_PATH = 'resnet18.onnx'
+MODEL_RESNET18_PATH = 'resnet18.onnx.prototxt'
+WEIGHT_WIDE_RESNET50_2_PATH = 'wide_resnet50_2.onnx'
+MODEL_WIDE_RESNET50_2_PATH = 'wide_resnet50_2.onnx.prototxt'
 
 def embedding_concat(x, y):
     B, C1, H1, W1 = x.shape
@@ -166,7 +170,11 @@ def postprocess(outputs):
 
     return embedding_vectors
 
-def training(net, params, idx, batch_size, train_dir, aug, aug_num, logger):
+def training(net, params, batch_size, train_dir, aug, aug_num, seed, logger):
+    # set seed
+    random.seed(seed)
+    idx = random.sample(range(0, params["t_d"]), params["d"])
+
     train_imgs = sorted([
         os.path.join(train_dir, f) for f in os.listdir(train_dir)
         if f.endswith('.png') or f.endswith('.jpg') or f.endswith('.bmp')
@@ -340,3 +348,44 @@ def decide_threshold(scores, gt_imgs):
     f1 = np.divide(a, b, out=np.zeros_like(a), where=b != 0)
     threshold = thresholds[np.argmax(f1)]
     return threshold
+
+
+def get_params(arch):
+    # model settings
+    info = {
+        "resnet18": (
+            WEIGHT_RESNET18_PATH, MODEL_RESNET18_PATH,
+            ("140", "156", "172"), 448, 100),
+        "wide_resnet50_2": (
+            WEIGHT_WIDE_RESNET50_2_PATH, MODEL_WIDE_RESNET50_2_PATH,
+            ("356", "398", "460"), 1792, 550),
+    }
+    weight_path, model_path, feat_names, t_d, d = info[arch]
+
+    # create param
+    params = {
+        "feat_names": feat_names,
+        "t_d": t_d,
+        "d": d,
+    }
+
+    return weight_path, model_path, params
+
+
+def denormalization(x):
+    mean = np.array([0.485, 0.456, 0.406])
+    std = np.array([0.229, 0.224, 0.225])
+    x = (((x.transpose(1, 2, 0) * std) + mean) * 255.).astype(np.uint8)
+    return x
+
+
+def visualize(img, score, threshold):
+    heat_map = score * 255
+    mask = score
+    mask[mask > threshold] = 1
+    mask[mask <= threshold] = 0
+    kernel = morphology.disk(4)
+    mask = morphology.opening(mask, kernel)
+    mask *= 255
+    vis_img = mark_boundaries(img, mask, color=(1, 0, 0), mode='thick')   
+    return heat_map, mask, vis_img

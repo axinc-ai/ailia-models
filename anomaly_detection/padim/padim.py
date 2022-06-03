@@ -8,8 +8,6 @@ import pickle
 import numpy as np
 import cv2
 from PIL import Image
-from skimage import morphology
-from skimage.segmentation import mark_boundaries
 import matplotlib
 import matplotlib.pyplot as plt
 
@@ -33,10 +31,6 @@ logger = getLogger(__name__)
 # Parameters
 # ======================
 
-WEIGHT_RESNET18_PATH = 'resnet18.onnx'
-MODEL_RESNET18_PATH = 'resnet18.onnx.prototxt'
-WEIGHT_WIDE_RESNET50_2_PATH = 'wide_resnet50_2.onnx'
-MODEL_WIDE_RESNET50_2_PATH = 'wide_resnet50_2.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/padim/'
 
 IMAGE_PATH = './bottle_000.png'
@@ -93,13 +87,6 @@ args = update_parser(parser)
 # ======================
 
 
-def denormalization(x):
-    mean = np.array([0.485, 0.456, 0.406])
-    std = np.array([0.229, 0.224, 0.225])
-    x = (((x.transpose(1, 2, 0) * std) + mean) * 255.).astype(np.uint8)
-    return x
-
-
 def plot_fig(file_list, test_imgs, scores, anormal_scores, gt_imgs, threshold, savepath):
     num = len(file_list)
     vmax = scores.max() * 255.
@@ -113,14 +100,7 @@ def plot_fig(file_list, test_imgs, scores, anormal_scores, gt_imgs, threshold, s
             gt = gt.transpose(1, 2, 0).squeeze()
         else:
             gt = np.zeros((1,1,1))
-        heat_map = scores[i] * 255
-        mask = scores[i]
-        mask[mask > threshold] = 1
-        mask[mask <= threshold] = 0
-        kernel = morphology.disk(4)
-        mask = morphology.opening(mask, kernel)
-        mask *= 255
-        vis_img = mark_boundaries(img, mask, color=(1, 0, 0), mode='thick')
+        heat_map, mask, vis_img = visualize(img, scores[i], threshold)
 
         fig_img, ax_img = plt.subplots(1, 5, figsize=(12, 3))
         fig_img.subplots_adjust(right=0.9)
@@ -173,14 +153,8 @@ def plot_fig(file_list, test_imgs, scores, anormal_scores, gt_imgs, threshold, s
 
 
 def train_from_image(net, params):
-    batch_size = int(args.batch_size)
-
-    # set seed
-    random.seed(args.seed)
-    idx = random.sample(range(0, params["t_d"]), params["d"])
-
     # training
-    train_outputs = training(net, params, idx, int(args.batch_size), args.train_dir, args.aug, args.aug_num, logger)
+    train_outputs = training(net, params, int(args.batch_size), args.train_dir, args.aug, args.aug_num, args.seed, logger)
 
     # save learned distribution
     train_dir = args.train_dir
@@ -290,27 +264,11 @@ def recognize_from_image(net, params):
     infer_from_image(net, params, train_outputs, threshold, gt_imgs)
     logger.info('Script finished successfully.')
 
+
 def main():
-    # model settings
-    info = {
-        "resnet18": (
-            WEIGHT_RESNET18_PATH, MODEL_RESNET18_PATH,
-            ("140", "156", "172"), 448, 100),
-        "wide_resnet50_2": (
-            WEIGHT_WIDE_RESNET50_2_PATH, MODEL_WIDE_RESNET50_2_PATH,
-            ("356", "398", "460"), 1792, 550),
-    }
-
     # model files check and download
-    weight_path, model_path, feat_names, t_d, d = info[args.arch]
+    weight_path, model_path, params = get_params(args.arch)
     check_and_download_models(weight_path, model_path, REMOTE_PATH)
-
-    # create param
-    params = {
-        "feat_names": feat_names,
-        "t_d": t_d,
-        "d": d,
-    }
 
     # create net instance
     net = ailia.Net(model_path, weight_path, env_id=args.env_id)
