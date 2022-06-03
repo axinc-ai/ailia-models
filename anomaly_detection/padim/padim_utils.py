@@ -17,7 +17,6 @@ from sklearn.metrics import precision_recall_curve
 from skimage import morphology
 from skimage.segmentation import mark_boundaries
 
-IMAGE_RESIZE = 256
 IMAGE_SIZE = 224
 
 WEIGHT_RESNET18_PATH = 'resnet18.onnx'
@@ -82,9 +81,8 @@ def embedding_concat(x, y):
 #
 #     return z
 
-def preprocess(img, mask=False):
+def preprocess(img, size, mask=False):
     h, w = img.shape[:2]
-    size = IMAGE_RESIZE
     crop_size = IMAGE_SIZE
 
     # resize
@@ -113,9 +111,8 @@ def preprocess(img, mask=False):
     return img
 
 
-def preprocess_aug(img, mask=False, angle_range=[-10, 10], return_refs=False):
+def preprocess_aug(img, size, mask=False, angle_range=[-10, 10], return_refs=False):
     h, w = img.shape[:2]
-    size = IMAGE_RESIZE
     crop_size = IMAGE_SIZE
 
     # resize
@@ -170,7 +167,7 @@ def postprocess(outputs):
 
     return embedding_vectors
 
-def training(net, params, batch_size, train_dir, aug, aug_num, seed, logger):
+def training(net, params, size, batch_size, train_dir, aug, aug_num, seed, logger):
     # set seed
     random.seed(seed)
     idx = random.sample(range(0, params["t_d"]), params["d"])
@@ -209,9 +206,9 @@ def training(net, params, batch_size, train_dir, aug, aug_num, seed, logger):
                 img = load_image(image_path)
                 img = cv2.cvtColor(img, cv2.COLOR_BGRA2RGB)
                 if not aug:
-                    img = preprocess(img)
+                    img = preprocess(img, size)
                 else:
-                    img = preprocess_aug(img)
+                    img = preprocess_aug(img, size)
                 imgs.append(img)
 
             # countup N

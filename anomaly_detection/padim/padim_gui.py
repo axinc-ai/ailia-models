@@ -105,6 +105,7 @@ def load_detail(image_path):
 # ======================
 
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/padim/'
+IMAGE_RESIZE = 224
 
 def train_button_clicked():
     global train_folder
@@ -124,7 +125,7 @@ def train_button_clicked():
     aug = False
     aug_num = 0
     seed = 1024
-    train_outputs = training(net, params, batch_size, train_dir, aug, aug_num, seed, logger)
+    train_outputs = training(net, params, IMAGE_RESIZE, batch_size, train_dir, aug, aug_num, seed, logger)
 
     # save learned distribution
     train_feat_file = "train.pkl"
@@ -163,7 +164,7 @@ def test_button_clicked():
         image_path = test_list[i_img]
         img = load_image(image_path)
         img = cv2.cvtColor(img, cv2.COLOR_BGRA2RGB)
-        img = preprocess(img)
+        img = preprocess(img, IMAGE_RESIZE)
 
         test_imgs.append(img[0])
         if image_path in score_cache:
