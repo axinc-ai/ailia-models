@@ -19,6 +19,7 @@ import tkinter as tk
 from tkinter import ttk
 import tkinter.filedialog
 
+import log_init
 from logging import getLogger  # noqa: E402
 
 logger = getLogger(__name__)
@@ -31,6 +32,7 @@ logger = getLogger(__name__)
 input_index = 0
 output_index = 0
 result_index = 0
+slider_index = 50
 
 # ======================
 # Environment
@@ -64,8 +66,8 @@ def result_changed(event):
     load_detail(result_list[result_index])
 
 def slider_changed(event):
-    global scale
-    print(scale.get())
+    global scale, slider_index
+    slider_index = scale.get()
 
 # ======================
 # Change file
@@ -74,10 +76,10 @@ def slider_changed(event):
 
 def create_photo_image(path,w=320,h=320):
     image_bgr = cv2.imread(path)
-    #image_bgr = cv2.resize(image_bgr,(w,h))
+    image_bgr = cv2.resize(image_bgr,(w,h))
     image_rgb = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB) # imreadはBGRなのでRGBに変換
     image_pil = Image.fromarray(image_rgb) # RGBからPILフォーマットへ変換
-    image_pil.thumbnail((w,h), Image.ANTIALIAS)
+    #image_pil.thumbnail((w,h), Image.ANTIALIAS)
     image_tk  = ImageTk.PhotoImage(image_pil) # ImageTkフォーマットへ変換
     return image_tk
 
@@ -116,18 +118,26 @@ def train_button_clicked():
     net = ailia.Net(model_path, weight_path, env_id=env_id)
 
     # training
-    train_outputs = training(net, params, int(args.batch_size), args.train_dir, args.aug, args.aug_num, args.seed, logger)
+    batch_size = 32
+    train_dir = "train"
+    aug = False
+    aug_num = 0
+    seed = 1024
+    train_outputs = training(net, params, batch_size, train_dir, aug, aug_num, seed, logger)
 
     # save learned distribution
-    train_dir = args.train_dir
-    train_feat_file = "%s.pkl" % os.path.basename(train_dir)
+    train_feat_file = "train.pkl"
+    #train_dir = args.train_dir
+    #train_feat_file = "%s.pkl" % os.path.basename(train_dir)
     logger.info('saving train set feature to: %s ...' % train_feat_file)
     with open(train_feat_file, 'wb') as f:
         pickle.dump(train_outputs, f)
     logger.info('saved.')
 
+score_cache = {}
 
 def test_button_clicked():
+    global score_cache
     print("begin test")
 
     # model files check and download
@@ -150,27 +160,38 @@ def test_button_clicked():
         logger.info('from (%s) ' % (test_list[i_img]))
 
         image_path = test_list[i_img]
-        print(image_path)
         img = load_image(image_path)
-        print(img.shape)
         img = cv2.cvtColor(img, cv2.COLOR_BGRA2RGB)
         img = preprocess(img)
 
         test_imgs.append(img[0])
-        dist_tmp = infer(net, params, train_outputs, img)
+        if image_path in score_cache:
+            dist_tmp = score_cache[image_path].copy()
+        else:
+            dist_tmp = infer(net, params, train_outputs, img)
+            score_cache[image_path] = dist_tmp.copy()
         score_map.append(dist_tmp)
 
     scores = normalize_scores(score_map)
     anormal_scores = calculate_anormal_scores(score_map)
 
     # Plot gt image
-    threshold = 0.5
+    os.makedirs("result", exist_ok=True)
+    global result_list, listsResult, ListboxResult
+    threshold = slider_index / 100.0
     for i in range(0, scores.shape[0]):
         img = denormalization(test_imgs[i])
         heat_map, mask, vis_img = visualize(img, scores[i], threshold)
-        cv2.imshow("frame", vis_img)
-        key = cv2.waitKey(3000)
+        vis_img = (vis_img * 255).astype(np.uint8)
+        path = test_list[i].split("/")
+        output_path = "result/"+path[len(path)-1]
+        cv2.imwrite(output_path, vis_img)       
+        if not (output_path in result_list):
+            result_list.append(output_path)
 
+    listsResult.set(result_list)
+    load_detail(result_list[0])
+    ListboxResult.select_set(0)
 
 
 # ======================
@@ -215,7 +236,7 @@ def get_test_file_list():
     return ["bottle_000.png"]
 
 def get_result_file_list():
-    return ["output.png"]
+    return []
 
 # ======================
 # GUI
@@ -225,6 +246,7 @@ canvas_item = None
 
 def main():
     global train_list, test_list, result_list
+    global listsResult, ListboxResult
     #global ListboxModel, textModelDetail
     #global model_list, model_request, model_loading_cnt, invalidate_quit_cnt
     global canvas, scale
@@ -337,7 +359,7 @@ def main():
 
     # スライダーの作成
     var_scale = tk.DoubleVar()
-    var_scale.set(50)
+    var_scale.set(slider_index)
     scale = tk.Scale(
         frame,
         variable=var_scale,
