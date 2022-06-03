@@ -161,7 +161,7 @@ def postprocess(outputs):
 
     return embedding_vectors
 
-def training(net, params, batch_size, train_dir, aug, aug_num, logger):
+def training(net, params, idx, batch_size, train_dir, aug, aug_num, logger):
     train_imgs = sorted([
         os.path.join(train_dir, f) for f in os.listdir(train_dir)
         if f.endswith('.png') or f.endswith('.jpg') or f.endswith('.bmp')
@@ -223,7 +223,6 @@ def training(net, params, batch_size, train_dir, aug, aug_num, logger):
             embedding_vectors = postprocess(train_outputs)
 
             # randomly select d dimension
-            idx = params['idx']
             embedding_vectors = embedding_vectors[:, idx, :, :]
 
             # reshape 2d pixels to 1d features
@@ -251,13 +250,5 @@ def training(net, params, batch_size, train_dir, aug, aug_num, logger):
     for i in range(H * W):
         cov[:, :, i] = (cov[:, :, i] / (N - 1)) + 0.01 * I
 
-    train_outputs = [mean, cov]
-
-    # save learned distribution
-    train_feat_file = "%s.pkl" % os.path.basename(train_dir)
-    logger.info('saving train set feature to: %s ...' % train_feat_file)
-    with open(train_feat_file, 'wb') as f:
-        pickle.dump(train_outputs, f)
-    logger.info('saved.')
-
+    train_outputs = [mean, cov, idx]
     return train_outputs

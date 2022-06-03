@@ -96,7 +96,6 @@ args = update_parser(parser)
 # ======================
 
 
-
 def denormalization(x):
     mean = np.array([0.485, 0.456, 0.406])
     std = np.array([0.229, 0.224, 0.225])
@@ -111,10 +110,12 @@ def plot_fig(file_list, test_imgs, scores, anormal_scores, gt_imgs, threshold, s
     for i in range(num):
         image_path = file_list[i]
         img = test_imgs[i]
-        if not args.aug:
-            img = denormalization(img)
-        gt = gt_imgs[i]
-        gt = gt.transpose(1, 2, 0).squeeze()
+        img = denormalization(img)
+        if gt_imgs is not None:
+            gt = gt_imgs[i]
+            gt = gt.transpose(1, 2, 0).squeeze()
+        else:
+            gt = np.zeros((1,1,1))
         heat_map = scores[i] * 255
         mask = scores[i]
         mask[mask > threshold] = 1
@@ -177,18 +178,25 @@ def plot_fig(file_list, test_imgs, scores, anormal_scores, gt_imgs, threshold, s
 def train_from_image(net, params):
     batch_size = int(args.batch_size)
 
+    # set seed
     random.seed(args.seed)
     idx = random.sample(range(0, params["t_d"]), params["d"])
 
-    params["idx"] = idx
+    # training
+    train_outputs = training(net, params, idx, int(args.batch_size), args.train_dir, args.aug, args.aug_num, logger)
 
-    batch_size = int(args.batch_size)
+    # save learned distribution
     train_dir = args.train_dir
-    train_outputs = training(net, params, batch_size, train_dir, args.aug, args.aug_num, logger)
+    train_feat_file = "%s.pkl" % os.path.basename(train_dir)
+    logger.info('saving train set feature to: %s ...' % train_feat_file)
+    with open(train_feat_file, 'wb') as f:
+        pickle.dump(train_outputs, f)
+    logger.info('saved.')
 
     return train_outputs
 
-def infer_one_image(net, params, train_outputs, idx, img):
+
+def infer_one_image(net, params, train_outputs, img):
     # prepare input data
     imgs = []
     imgs.append(img)
@@ -209,6 +217,7 @@ def infer_one_image(net, params, train_outputs, idx, img):
     embedding_vectors = postprocess(test_outputs)
 
     # randomly select d dimension
+    idx = train_outputs[2]
     embedding_vectors = embedding_vectors[:, idx, :, :]
 
     # reshape 2d pixels to 1d features
@@ -232,7 +241,7 @@ def infer_one_image(net, params, train_outputs, idx, img):
     # apply gaussian smoothing on the score map
     dist_tmp = gaussian_filter(dist_tmp, sigma=4)
 
-    return dist_tmp, B, C, H, W 
+    return dist_tmp
 
 def decide_threshold(scores, gt_imgs):
     # get optimal threshold
@@ -263,30 +272,44 @@ def load_gt_imgs(gt_type_dir):
         gt_imgs.append(gt_img)
     return gt_imgs
 
-def infer_from_image(net, params, train_outputs):
-    random.seed(args.seed)
-    idx = random.sample(range(0, params["t_d"]), params["d"])
-
-    params["idx"] = idx
-
-    gt_type_dir = args.gt_dir if args.gt_dir else None
-    gt_imgs = load_gt_imgs(gt_type_dir)
-
-    test_imgs = []
-    angle_list = []
-    pad_h_list = []
-    pad_w_list = []
-
+def decide_threshold_from_gt_image(net, params, train_outputs, gt_imgs):
     score_map = []
     for i_img in range(0, len(args.input)):
-        logger.info('from (%s) ' %
-                    (args.input[i_img]))
+        logger.info('from (%s) ' % (args.input[i_img]))
 
         image_path = args.input[i_img]
         img = load_image(image_path)
         img = cv2.cvtColor(img, cv2.COLOR_BGRA2RGB)
-
         img = preprocess(img)
+
+        dist_tmp = infer_one_image(net, params, train_outputs, img)
+
+        score_map.append(dist_tmp)
+
+    N = len(score_map)
+    score_map = np.vstack(score_map)
+    score_map = score_map.reshape(N, IMAGE_SIZE, IMAGE_SIZE)
+
+    # Normalization
+    max_score = score_map.max()
+    min_score = score_map.min()
+    scores = (score_map - min_score) / (max_score - min_score)
+
+    threshold = decide_threshold(scores, gt_imgs)
+    return threshold
+
+def infer_from_image(net, params, train_outputs, threshold, gt_imgs):
+    test_imgs = []
+
+    score_map = []
+    for i_img in range(0, len(args.input)):
+        logger.info('from (%s) ' % (args.input[i_img]))
+
+        image_path = args.input[i_img]
+        img = load_image(image_path)
+        img = cv2.cvtColor(img, cv2.COLOR_BGRA2RGB)
+        img = preprocess(img)
+
         test_imgs.append(img[0])
 
         if args.benchmark:
@@ -294,14 +317,14 @@ def infer_from_image(net, params, train_outputs):
             total_time = 0
             for i in range(args.benchmark_count):
                 start = int(round(time.time() * 1000))
-                dist_tmp, B, C, H, W = infer_one_image(net, params, train_outputs, idx, img)
+                dist_tmp = infer_one_image(net, params, train_outputs, img)
                 end = int(round(time.time() * 1000))
                 logger.info(f'\tailia processing time {end - start} ms')
                 if i != 0:
                     total_time = total_time + (end - start)
             logger.info(f'\taverage time {total_time / (args.benchmark_count - 1)} ms')
         else:
-            dist_tmp, B, C, H, W = infer_one_image(net, params, train_outputs, idx, img)
+            dist_tmp = infer_one_image(net, params, train_outputs, img)
 
         score_map.append(dist_tmp)
 
@@ -319,15 +342,8 @@ def infer_from_image(net, params, train_outputs):
     for i in range(score_map.shape[0]):
         anormal_scores[i] = score_map[i].max()
 
-    if args.threshold is None:
-        threshold = decide_threshold(scores, gt_imgs)
-        logger.info('Optimal threshold: %f' % threshold)
-    else:
-        threshold = args.threshold
-
+    # Plot gt image
     plot_fig(args.input, test_imgs, scores, anormal_scores, gt_imgs, threshold, args.savepath)
-
-    logger.info('Script finished successfully.')
 
 
 def recognize_from_image(net, params):
@@ -339,7 +355,18 @@ def recognize_from_image(net, params):
     else:
         train_outputs = train_from_image(net, params)
 
-    infer_from_image(net, params, train_outputs)
+    if args.threshold is None:
+        gt_type_dir = args.gt_dir if args.gt_dir else None
+        gt_imgs = load_gt_imgs(gt_type_dir)
+
+        threshold = decide_threshold_from_gt_image(net, params, train_outputs, gt_imgs)
+        logger.info('Optimal threshold: %f' % threshold)
+    else:
+        threshold = args.threshold
+        gt_imgs = None
+
+    infer_from_image(net, params, train_outputs, threshold, gt_imgs)
+    logger.info('Script finished successfully.')
 
 def main():
     # model settings
