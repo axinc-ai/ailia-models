@@ -188,58 +188,15 @@ def train_from_image(net, params):
 
     return train_outputs
 
-def infer_one_image(net, params, train_outputs, dist_list, i_img, batch_size, test_imgs, gt_type_dir, gt_imgs, idx):
+def infer_one_image(net, params, train_outputs, idx, img):
     # prepare input data
     imgs = []
-    logger.info('from (%s ~ %s) ' %
-                (args.input[i_img],
-                    args.input[min(len(args.input) - 1,
-                                i_img + batch_size)]))
-    for image_path in args.input[i_img:i_img + batch_size]:
-        img = load_image(image_path)
-        img = cv2.cvtColor(img, cv2.COLOR_BGRA2RGB)
-        img = preprocess(img)
-        test_imgs.append(img[0])
-        imgs.append(img)
-
-        # ground truth
-        gt_img = None
-        if gt_type_dir:
-            fname = os.path.splitext(os.path.basename(image_path))[0]
-            gt_fpath = os.path.join(gt_type_dir, fname + '_mask.png')
-            if os.path.exists(gt_fpath):
-                gt_img = load_image(gt_fpath)
-                gt_img = cv2.cvtColor(gt_img, cv2.COLOR_BGRA2RGB)
-                gt_img = preprocess(gt_img, mask=True)
-                if gt_img is not None:
-                    gt_img = gt_img[0, [0]]
-                else:
-                    gt_img = np.zeros((1, IMAGE_SIZE, IMAGE_SIZE))
-
-        gt_imgs.append(gt_img)
-
-    # countup N
-    #N += len(imgs)
-
+    imgs.append(img)
     imgs = np.vstack(imgs)
 
-    logger.debug(f'input images shape: {imgs.shape}')
-    net.set_input_shape(imgs.shape)
-
     # inference
-    if args.benchmark:
-        logger.info('BENCHMARK mode')
-        total_time = 0
-        for i in range(args.benchmark_count):
-            start = int(round(time.time() * 1000))
-            _ = net.predict(imgs)
-            end = int(round(time.time() * 1000))
-            logger.info(f'\tailia processing time {end - start} ms')
-            if i != 0:
-                total_time = total_time + (end - start)
-        logger.info(f'\taverage time {total_time / (args.benchmark_count - 1)} ms')
-    else:
-        _ = net.predict(imgs)
+    net.set_input_shape(imgs.shape)
+    _ = net.predict(imgs)
 
     test_outputs = OrderedDict([
         ('layer1', []), ('layer2', []), ('layer3', [])
@@ -265,43 +222,92 @@ def infer_one_image(net, params, train_outputs, dist_list, i_img, batch_size, te
         conv_inv = np.linalg.inv(train_outputs[1][:, :, i])
         dist = [mahalanobis(sample[:, i], mean, conv_inv) for sample in embedding_vectors]
         dist_tmp[:, i] = dist
-    dist_list.append(dist_tmp)
-    return B, C, H, W 
 
+    # upsample
+    dist_tmp = dist_tmp.reshape(H, W)
+    dist_tmp = np.array(Image.fromarray(dist_tmp).resize(
+            (IMAGE_SIZE, IMAGE_SIZE), resample=Image.BILINEAR)
+        )
+
+    # apply gaussian smoothing on the score map
+    dist_tmp = gaussian_filter(dist_tmp, sigma=4)
+
+    return dist_tmp, B, C, H, W 
+
+def decide_threshold(scores, gt_imgs):
+    # get optimal threshold
+    gt_mask = np.asarray(gt_imgs)
+    precision, recall, thresholds = precision_recall_curve(gt_mask.flatten(), scores.flatten())
+    a = 2 * precision * recall
+    b = precision + recall
+    f1 = np.divide(a, b, out=np.zeros_like(a), where=b != 0)
+    threshold = thresholds[np.argmax(f1)]
+    return threshold
+
+def load_gt_imgs(gt_type_dir):
+    gt_imgs = []
+    for i_img in range(0, len(args.input)):
+        image_path = args.input[i_img]
+        gt_img = None
+        if gt_type_dir:
+            fname = os.path.splitext(os.path.basename(image_path))[0]
+            gt_fpath = os.path.join(gt_type_dir, fname + '_mask.png')
+            if os.path.exists(gt_fpath):
+                gt_img = load_image(gt_fpath)
+                gt_img = cv2.cvtColor(gt_img, cv2.COLOR_BGRA2RGB)
+                gt_img = preprocess(gt_img, mask=True)
+                if gt_img is not None:
+                    gt_img = gt_img[0, [0]]
+                else:
+                    gt_img = np.zeros((1, IMAGE_SIZE, IMAGE_SIZE))
+        gt_imgs.append(gt_img)
+    return gt_imgs
 
 def infer_from_image(net, params, train_outputs):
-    batch_size = 1#int(args.batch_size)
     random.seed(args.seed)
     idx = random.sample(range(0, params["t_d"]), params["d"])
 
     params["idx"] = idx
 
     gt_type_dir = args.gt_dir if args.gt_dir else None
+    gt_imgs = load_gt_imgs(gt_type_dir)
+
     test_imgs = []
-    gt_imgs = []
     angle_list = []
     pad_h_list = []
     pad_w_list = []
 
-    N = 0
-    dist_list = []
-    for i_img in range(0, len(args.input), batch_size):
-        B, C, H, W = infer_one_image(net, params, train_outputs, dist_list, i_img, batch_size, test_imgs, gt_type_dir, gt_imgs, idx)
-        N = N + 1
+    score_map = []
+    for i_img in range(0, len(args.input)):
+        logger.info('from (%s) ' %
+                    (args.input[i_img]))
 
-    dist_list = np.vstack(dist_list)
-    dist_list = dist_list.reshape(N, H, W)
+        image_path = args.input[i_img]
+        img = load_image(image_path)
+        img = cv2.cvtColor(img, cv2.COLOR_BGRA2RGB)
 
-    # upsample
-    score_map = np.asarray([
-        np.array(Image.fromarray(s).resize(
-            (IMAGE_SIZE, IMAGE_SIZE), resample=Image.BILINEAR)
-        ) for s in dist_list
-    ])
+        img = preprocess(img)
+        test_imgs.append(img[0])
 
-    # apply gaussian smoothing on the score map
-    for i in range(score_map.shape[0]):
-        score_map[i] = gaussian_filter(score_map[i], sigma=4)
+        if args.benchmark:
+            logger.info('BENCHMARK mode')
+            total_time = 0
+            for i in range(args.benchmark_count):
+                start = int(round(time.time() * 1000))
+                dist_tmp, B, C, H, W = infer_one_image(net, params, train_outputs, idx, img)
+                end = int(round(time.time() * 1000))
+                logger.info(f'\tailia processing time {end - start} ms')
+                if i != 0:
+                    total_time = total_time + (end - start)
+            logger.info(f'\taverage time {total_time / (args.benchmark_count - 1)} ms')
+        else:
+            dist_tmp, B, C, H, W = infer_one_image(net, params, train_outputs, idx, img)
+
+        score_map.append(dist_tmp)
+
+    N = len(score_map)
+    score_map = np.vstack(score_map)
+    score_map = score_map.reshape(N, IMAGE_SIZE, IMAGE_SIZE)
 
     # Normalization
     max_score = score_map.max()
@@ -314,16 +320,7 @@ def infer_from_image(net, params, train_outputs):
         anormal_scores[i] = score_map[i].max()
 
     if args.threshold is None:
-        # get optimal threshold
-        if not args.aug:
-            gt_mask = np.asarray(gt_imgs)
-        else:
-            gt_mask = np.asarray(gt_imgs[:int(len(gt_imgs) / args.aug_num)])
-        precision, recall, thresholds = precision_recall_curve(gt_mask.flatten(), scores.flatten())
-        a = 2 * precision * recall
-        b = precision + recall
-        f1 = np.divide(a, b, out=np.zeros_like(a), where=b != 0)
-        threshold = thresholds[np.argmax(f1)]
+        threshold = decide_threshold(scores, gt_imgs)
         logger.info('Optimal threshold: %f' % threshold)
     else:
         threshold = args.threshold
@@ -341,6 +338,7 @@ def recognize_from_image(net, params):
         logger.info('loaded.')
     else:
         train_outputs = train_from_image(net, params)
+
     infer_from_image(net, params, train_outputs)
 
 def main():
