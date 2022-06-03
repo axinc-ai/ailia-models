@@ -12,11 +12,17 @@ from PIL import Image, ImageTk
 
 sys.path.append('../../util')
 from padim_utils import *
+from model_utils import check_and_download_models  # noqa: E402
 
 # for macOS, please install "brew install python-tk@3.9"
 import tkinter as tk
 from tkinter import ttk
 import tkinter.filedialog
+
+from logging import getLogger  # noqa: E402
+
+logger = getLogger(__name__)
+
 
 # ======================
 # Global settings
@@ -75,7 +81,7 @@ def create_photo_image(path,w=320,h=320):
     image_tk  = ImageTk.PhotoImage(image_pil) # ImageTkフォーマットへ変換
     return image_tk
 
-def load_image(path):
+def load_canvas_image(path):
     global canvas, canvas_item, image_tk
     image_tk = create_photo_image(path)
     if canvas_item == None:
@@ -87,7 +93,7 @@ def load_detail(image_path):
     image_exist = False
     for ext in [".jpg",".png"]:
         if os.path.exists(image_path):
-            load_image(image_path)
+            load_canvas_image(image_path)
             image_exist = True
             break
 
@@ -96,11 +102,75 @@ def load_detail(image_path):
 # Run model
 # ======================
 
+REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/padim/'
+
 def train_button_clicked():
     print("begin training")
 
+    # model files check and download
+    weight_path, model_path, params = get_params("resnet18")
+    check_and_download_models(weight_path, model_path, REMOTE_PATH)
+
+    # create net instance
+    env_id = ailia.get_gpu_environment_id()
+    net = ailia.Net(model_path, weight_path, env_id=env_id)
+
+    # training
+    train_outputs = training(net, params, int(args.batch_size), args.train_dir, args.aug, args.aug_num, args.seed, logger)
+
+    # save learned distribution
+    train_dir = args.train_dir
+    train_feat_file = "%s.pkl" % os.path.basename(train_dir)
+    logger.info('saving train set feature to: %s ...' % train_feat_file)
+    with open(train_feat_file, 'wb') as f:
+        pickle.dump(train_outputs, f)
+    logger.info('saved.')
+
+
 def test_button_clicked():
     print("begin test")
+
+    # model files check and download
+    weight_path, model_path, params = get_params("resnet18")
+    check_and_download_models(weight_path, model_path, REMOTE_PATH)
+
+    # create net instance
+    env_id = ailia.get_gpu_environment_id()
+    net = ailia.Net(model_path, weight_path, env_id=env_id)
+
+    # load trained model
+    with open("train.pkl", 'rb') as f:
+        train_outputs = pickle.load(f)
+
+    # file loop
+    test_imgs = []
+
+    score_map = []
+    for i_img in range(0, len(test_list)):
+        logger.info('from (%s) ' % (test_list[i_img]))
+
+        image_path = test_list[i_img]
+        print(image_path)
+        img = load_image(image_path)
+        print(img.shape)
+        img = cv2.cvtColor(img, cv2.COLOR_BGRA2RGB)
+        img = preprocess(img)
+
+        test_imgs.append(img[0])
+        dist_tmp = infer(net, params, train_outputs, img)
+        score_map.append(dist_tmp)
+
+    scores = normalize_scores(score_map)
+    anormal_scores = calculate_anormal_scores(score_map)
+
+    # Plot gt image
+    threshold = 0.5
+    for i in range(0, scores.shape[0]):
+        img = denormalization(test_imgs[i])
+        heat_map, mask, vis_img = visualize(img, scores[i], threshold)
+        cv2.imshow("frame", vis_img)
+        key = cv2.waitKey(3000)
+
 
 
 # ======================
