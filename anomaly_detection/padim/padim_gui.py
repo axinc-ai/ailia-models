@@ -1,9 +1,8 @@
-# ailia MODELS launcher
+# PaDiM GUI launcher
 
 import os
 import cv2
 import numpy
-import subprocess
 import shutil
 import sys
 import glob
@@ -22,7 +21,7 @@ import tkinter.filedialog
 
 input_index = 0
 output_index = 0
-model_index = 0
+result_index = 0
 
 # ======================
 # Environment
@@ -35,7 +34,6 @@ def input_changed(event):
         input_index = selection[0]
     else:
         input_index = 0   
-    print("input",train_list[input_index])
     load_detail(train_list[input_index])
 
 def output_changed(event):
@@ -45,25 +43,27 @@ def output_changed(event):
         output_index = selection[0]
     else:
         output_index = 0   
-    print("output",test_list[output_index])
     load_detail(test_list[output_index])
 
-
-# ======================
-# Change model
-# ======================
-
-
-def model_changed(event):
-    global model_index
+def result_changed(event):
+    global result_index
     selection = event.widget.curselection()
     if selection:
-        model_index = selection[0]
+        result_index = selection[0]
     else:
-        model_index = 0
-    load_detail(model_index)
+        result_index = 0   
+    load_detail(result_list[result_index])
 
-def create_photo_image(path,w=320,h=240):
+def slider_changed(event):
+    global scale
+    print(scale.get())
+
+# ======================
+# Change file
+# ======================
+
+
+def create_photo_image(path,w=320,h=320):
     image_bgr = cv2.imread(path)
     #image_bgr = cv2.resize(image_bgr,(w,h))
     image_rgb = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB) # imreadはBGRなのでRGBに変換
@@ -92,73 +92,6 @@ def load_detail(image_path):
 # ======================
 # Run model
 # ======================
-
-proc = None
-
-def open_model(model):
-    global proc
-
-    if not (proc==None):
-        proc.kill()
-        proc=None
-
-    model_request = model_list[model_index]
-
-    dir = "./"+model["category"]+"/"+model["model"]+"/"
-    cmd = sys.executable
-
-    args_dict = vars(args)
-
-    if "Camera:" in input_list[input_index]:
-        video_name = input_index
-    else:
-        video_name = input_list[input_index]
-    
-    if "Display:" in output_list[output_index]:
-        save_name = "temp.png"
-        save_path = "./"+model_request["category"]+"/"+model_request["model"]+"/"+"temp.png"
-    else:
-        save_name = output_list[output_index]
-        save_path = output_list[output_index]
-
-    if not(("natural_language_processing" == model["category"]) or ("audio_processing" == model["category"])):
-        if ".png" in str(video_name) or ".jpg" in str(video_name):
-            if "video" in args_dict:
-                del args_dict["video"]
-            args_dict["input"]=video_name
-            args_dict["savepath"]=save_name
-        else:
-            args_dict["video"]=video_name
-            if not ("Display:" in output_list[output_index]):
-                args_dict["savepath"]=save_name
-
-    args_dict["env_id"]=env_index
-
-    options = []
-    for key in args_dict:
-        if key=="ftype":
-            continue
-        if args_dict[key] is not None:
-            if args_dict[key] is True:
-                options.append("--"+key)
-            elif args_dict[key] is False:
-                continue
-            else:
-                options.append("--"+key)
-                options.append(str(args_dict[key]))
-    
-    cmd = [cmd, model["model"]+".py"] + options
-    print(" ".join(cmd))
-
-    if not ("video" in args_dict):
-        subprocess.check_call(cmd, cwd=dir, shell=False)
-        load_image(save_path)
-    else:
-        proc = subprocess.Popen(cmd, cwd=dir)
-        try:
-            outs, errs = proc.communicate(timeout=1)
-        except subprocess.TimeoutExpired:
-            pass
 
 def train_button_clicked():
     print("begin training")
@@ -207,6 +140,9 @@ def get_training_file_list():
 def get_test_file_list():
     return ["bottle_000.png"]
 
+def get_result_file_list():
+    return ["output.png"]
+
 # ======================
 # GUI
 # ======================
@@ -214,10 +150,10 @@ def get_test_file_list():
 canvas_item = None
 
 def main():
-    global train_list, test_list
+    global train_list, test_list, result_list
     #global ListboxModel, textModelDetail
     #global model_list, model_request, model_loading_cnt, invalidate_quit_cnt
-    global canvas
+    global canvas, scale
     #global inputFile, listsInput, input_list, ListboxInput
     #global outputFile, listsOutput, output_list, ListboxOutput
 
@@ -235,25 +171,30 @@ def main():
     # Listboxの選択肢
     train_list = get_training_file_list()
     test_list = get_test_file_list()
+    result_list = get_result_file_list()
 
     listsInput = tk.StringVar(value=train_list)
     listsOutput = tk.StringVar(value=test_list)
+    listsResult = tk.StringVar(value=result_list)
 
     # 各種ウィジェットの作成
-    ListboxInput = tk.Listbox(frame, listvariable=listsInput, width=40, height=12, selectmode="single", exportselection=False)
-    ListboxOutput = tk.Listbox(frame, listvariable=listsOutput, width=40, height=12, selectmode="single", exportselection=False)
+    ListboxInput = tk.Listbox(frame, listvariable=listsInput, width=20, height=12, selectmode="single", exportselection=False)
+    ListboxOutput = tk.Listbox(frame, listvariable=listsOutput, width=20, height=12, selectmode="single", exportselection=False)
+    ListboxResult = tk.Listbox(frame, listvariable=listsResult, width=20, height=12, selectmode="single", exportselection=False)
 
     ListboxInput.bind("<<ListboxSelect>>", input_changed)
     ListboxOutput.bind("<<ListboxSelect>>", output_changed)
+    ListboxResult.bind("<<ListboxSelect>>", result_changed)
 
     ListboxInput.select_set(input_index)
     ListboxOutput.select_set(output_index)
+    ListboxResult.select_set(result_index)
 
     # スクロールバーの作成
-    scrollbar = tk.Scrollbar(frame, orient=tk.VERTICAL, command=ListboxInput.yview)
+    #scrollbar = tk.Scrollbar(frame, orient=tk.VERTICAL, command=ListboxInput.yview)
 
     # スクロールバーをListboxに反映
-    ListboxInput["yscrollcommand"] = scrollbar.set
+    #ListboxInput["yscrollcommand"] = scrollbar.set
 
     # StringVarのインスタンスを格納する変数textの設定
     textRun = tk.StringVar(frame)
@@ -266,7 +207,7 @@ def main():
     textInputFile.set("Select train folder")
 
     textOutputFile = tk.StringVar(frame)
-    textOutputFile.set("Add test image")
+    textOutputFile.set("Select test folder")
 
     textInput = tk.StringVar(frame)
     textInput.set("Train images")
@@ -274,46 +215,65 @@ def main():
     textOutput = tk.StringVar(frame)
     textOutput.set("Test images")
 
+    textResult = tk.StringVar(frame)
+    textResult.set("Result images")
+
     textModelDetail = tk.StringVar(frame)
     textModelDetail.set("Preview")
 
+    textSlider = tk.StringVar(frame)
+    textSlider.set("Threshold")
+
     # 各種ウィジェットの作成
-    #labelModel = tk.Label(frame, textvariable=textModel)
     labelInput = tk.Label(frame, textvariable=textInput)
     labelOutput = tk.Label(frame, textvariable=textOutput)
+    labelResult = tk.Label(frame, textvariable=textResult)
     labelModelDetail = tk.Label(frame, textvariable=textModelDetail)
+    labelSlider = tk.Label(frame, textvariable=textSlider)
 
     buttonRun = tk.Button(frame, textvariable=textRun, command=train_button_clicked, width=14)
     buttonStop = tk.Button(frame, textvariable=textStop, command=test_button_clicked, width=14)
     buttonInputFile = tk.Button(frame, textvariable=textInputFile, command=train_file_dialog, width=14)
     buttonOutputFile = tk.Button(frame, textvariable=textOutputFile, command=test_file_dialog, width=14)
 
-    canvas = tk.Canvas(frame, bg="black", width=320, height=240)
+    canvas = tk.Canvas(frame, bg="black", width=320, height=320)
     canvas.place(x=0, y=0)
-    #load_detail(model_index)
 
-    logo = tk.Canvas(frame, bg="black", width=320, height=124)
-    logo.place(x=0, y=0)
-    global logo_img
-    logo_img = create_photo_image("../../ailia-models.png",320,124)
-    logo_item = logo.create_image(0, 0, image=logo_img, anchor=tk.NW)
+    load_detail(test_list[0])
 
     # 各種ウィジェットの設置
     labelInput.grid(row=0, column=0, sticky=tk.NW, rowspan=1)
-    ListboxInput.grid(row=1, column=0, sticky=tk.NW, rowspan=12)
-    buttonInputFile.grid(row=13, column=0, sticky=tk.NW)
-    buttonRun.grid(row=14, column=0, sticky=tk.NW)
-    scrollbar.grid(row=1, column=1, sticky=(tk.N, tk.S), rowspan=12)
+    ListboxInput.grid(row=1, column=0, sticky=tk.NW, rowspan=4)
+    buttonInputFile.grid(row=6, column=0, sticky=tk.NW)
 
-    labelOutput.grid(row=0, column=2, sticky=tk.NW)
-    ListboxOutput.grid(row=1, column=2, sticky=tk.NW, rowspan=12)
-    buttonOutputFile.grid(row=13, column=2, sticky=tk.NW)
-    buttonStop.grid(row=14, column=2, sticky=tk.NW)
+    labelOutput.grid(row=0, column=1, sticky=tk.NW)
+    ListboxOutput.grid(row=1, column=1, sticky=tk.NW, rowspan=4)
+    buttonOutputFile.grid(row=6, column=1, sticky=tk.NW)
+
+    labelResult.grid(row=0, column=2, sticky=tk.NW)
+    ListboxResult.grid(row=1, column=2, sticky=tk.NW, rowspan=4)
 
     labelModelDetail.grid(row=0, column=3, sticky=tk.NW)
     canvas.grid(row=1, column=3, sticky=tk.NW, rowspan=4)
 
-    logo.grid(row=6, column=3, sticky=tk.NW, columnspan=2, rowspan=1)
+    buttonRun.grid(row=6, column=3, sticky=tk.NW)
+    buttonStop.grid(row=7, column=3, sticky=tk.NW)
+
+    labelSlider.grid(row=8, column=3, sticky=tk.NW)
+
+    # スライダーの作成
+    var_scale = tk.DoubleVar()
+    var_scale.set(50)
+    scale = tk.Scale(
+        frame,
+        variable=var_scale,
+        orient=tk.HORIZONTAL,
+        tickinterval=20,
+        length=200,
+    )
+    scale.grid(row=9, column=3, sticky=tk.NW)
+    print(var_scale.get())
+    scale.bind("<ButtonRelease-1>", slider_changed)
 
     # メインフレームの作成と設置
     frame = ttk.Frame(root)
