@@ -107,6 +107,7 @@ def load_detail(image_path):
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/padim/'
 
 def train_button_clicked():
+    global train_folder
     print("begin training")
 
     # model files check and download
@@ -119,7 +120,7 @@ def train_button_clicked():
 
     # training
     batch_size = 32
-    train_dir = "train"
+    train_dir = train_folder
     aug = False
     aug_num = 0
     seed = 1024
@@ -198,41 +199,56 @@ def test_button_clicked():
 # Select file
 # ======================
 
+train_folder = "train"
+test_folder = None
+
 def train_file_dialog():
     global listsInput, ListboxInput, input_index
-    fTyp = [("Image File or Video File", "*")]
+    global train_folder
+    global train_list
     iDir = os.path.abspath(os.path.dirname(__file__))
-    file_name = tk.filedialog.askopenfilename(filetypes=fTyp, initialdir=iDir)
+    file_name = tk.filedialog.askdirectory(initialdir=iDir)
     if len(file_name) != 0:
-        input_list.append(file_name)
-        listsInput.set(input_list)
-        ListboxInput.select_clear(input_index)
-        input_index = len(input_list)-1
-        ListboxInput.select_set(input_index)
+        train_folder = file_name
+        train_list = get_training_file_list()
+        listsInput.set(train_list)
+        train_index = 0
+        ListboxInput.select_set(0)
+        load_detail(train_list[0])
 
 def test_file_dialog():
     global listsOutput, ListboxOutput, output_index
-    fTyp = [("Image File or Video File", "*")]
+    global test_folder
+    global test_list
     iDir = os.path.abspath(os.path.dirname(__file__))
-    file_name = tk.filedialog.asksaveasfilename(filetypes=fTyp, initialdir=iDir)
+    file_name = tk.filedialog.askdirectory(initialdir=iDir)
     if len(file_name) != 0:
-        output_list.append(file_name)
-        listsOutput.set(output_list)
-        ListboxOutput.select_clear(output_index)
-        output_index = len(output_list)-1
-        ListboxOutput.select_set(output_index)
+        test_folder = file_name
+        test_list = get_test_file_list()
+        listsOutput.set(test_list)
+        test_index = 0
+        ListboxOutput.select_set(0)
+        load_detail(test_list[0])
 
-def get_training_file_list():
-    base_path = "train/"
+def get_file_list(folder):
+    base_path = folder+"/"
     files = glob.glob(base_path+"*.jpg")
     files.extend(glob.glob(base_path+"*.png"))
+    files.extend(glob.glob(base_path+"*.bmp"))
     image_list = []
     for image_path in files:
         image_list.append(image_path)
     image_list.sort()
     return image_list
 
+def get_training_file_list():
+    global train_folder
+    return get_file_list(train_folder)
+
 def get_test_file_list():
+    global test_folder
+    if test_folder!=None:
+        return get_file_list(test_folder)
     return ["bottle_000.png"]
 
 def get_result_file_list():
@@ -247,13 +263,9 @@ canvas_item = None
 def main():
     global train_list, test_list, result_list
     global listsResult, ListboxResult
-    #global ListboxModel, textModelDetail
-    #global model_list, model_request, model_loading_cnt, invalidate_quit_cnt
     global canvas, scale
-    #global inputFile, listsInput, input_list, ListboxInput
-    #global outputFile, listsOutput, output_list, ListboxOutput
-
-    #model_list, model_name_list, category_cnt = get_model_list()
+    global inputFile, listsInput, input_list, ListboxInput
+    global outputFile, listsOutput, output_list, ListboxOutput
 
     # rootメインウィンドウの設定
     root = tk.Tk()
