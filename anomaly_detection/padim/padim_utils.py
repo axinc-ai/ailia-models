@@ -263,7 +263,11 @@ def training(net, params, batch_size, train_dir, aug, aug_num, seed, logger):
     for i in range(H * W):
         cov[:, :, i] = (cov[:, :, i] / (N - 1)) + 0.01 * I
 
-    train_outputs = [mean, cov, idx]
+    cov_inv = np.zeros(cov.shape)
+    for i in range(H * W):
+        cov_inv[:, :, i] = np.linalg.inv(cov[:, :, i])
+    
+    train_outputs = [mean, cov, cov_inv, idx]
     return train_outputs
 
 def infer(net, params, train_outputs, img):
@@ -287,7 +291,7 @@ def infer(net, params, train_outputs, img):
     embedding_vectors = postprocess(test_outputs)
 
     # randomly select d dimension
-    idx = train_outputs[2]
+    idx = train_outputs[3]
     embedding_vectors = embedding_vectors[:, idx, :, :]
 
     # reshape 2d pixels to 1d features
@@ -298,7 +302,7 @@ def infer(net, params, train_outputs, img):
     dist_tmp = np.zeros([B, (H * W)])
     for i in range(H * W):
         mean = train_outputs[0][:, i]
-        conv_inv = np.linalg.inv(train_outputs[1][:, :, i])
+        conv_inv = train_outputs[2][:, :, i] # calculate inverse on training phase (np.linalg.inv(train_outputs[1][:, :, i]))
         dist = [mahalanobis(sample[:, i], mean, conv_inv) for sample in embedding_vectors]
         dist_tmp[:, i] = dist
 
