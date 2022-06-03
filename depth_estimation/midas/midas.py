@@ -2,21 +2,21 @@ import os
 import sys
 import time
 
-import numpy as np
-import cv2
-
 import ailia
+import cv2
+import numpy as np
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
-from model_utils import check_and_download_models  # noqa: E402
-from webcamera_utils import get_capture, get_writer, \
-    calc_adjust_fsize  # noqa: E402
-from image_utils import normalize_image  # noqa: E402
-
 # logger
-from logging import getLogger   # noqa: E402
+from logging import getLogger  # noqa: E402
+
+from image_utils import imread, normalize_image  # noqa: E402
+from model_utils import check_and_download_models  # noqa: E402
+from utils import get_base_parser, get_savepath, update_parser  # noqa: E402
+from webcamera_utils import calc_adjust_fsize  # noqa: E402
+from webcamera_utils import get_capture, get_writer
+
 logger = getLogger(__name__)
 
 
@@ -92,7 +92,7 @@ def midas_imread(image_path):
     if not os.path.isfile(image_path):
         logger.error(f'{image_path} not found.')
         sys.exit()
-    image = cv2.imread(image_path)
+    image = imread(image_path)
     if image.ndim == 2:
         image = cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
     image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)

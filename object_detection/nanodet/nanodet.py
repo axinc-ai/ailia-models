@@ -1,22 +1,23 @@
-import numpy as np
-import time
 import os
 import sys
+import time
+
+import ailia
 import cv2
+import numpy as np
 
 from nanodet_utils import NanoDetABC
 
-import ailia
-
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath
-from model_utils import check_and_download_models
-from detector_utils import reverse_letterbox, plot_results
-import webcamera_utils
-
 # logger
 from logging import getLogger
+
+import webcamera_utils
+from detector_utils import plot_results, reverse_letterbox
+from image_utils import imread  # noqa: E402
+from model_utils import check_and_download_models
+from utils import get_base_parser, get_savepath, update_parser
 
 logger = getLogger(__name__)
 
@@ -109,7 +110,7 @@ def recognize_from_image():
     for image_path in args.input:
         # prepare input data
         logger.debug(f'input image: {image_path}')
-        raw_img = cv2.imread(image_path)
+        raw_img = imread(image_path)
         logger.debug(f'input image shape: {raw_img.shape}')
 
         # inference

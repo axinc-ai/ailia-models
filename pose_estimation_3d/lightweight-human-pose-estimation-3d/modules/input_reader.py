@@ -1,5 +1,8 @@
 import cv2
 
+sys.path.append('../../../util')
+from image_utils import imread  # noqa: E402
+
 
 class ImageReader:
     def __init__(self, file_names):
@@ -13,7 +16,7 @@ class ImageReader:
     def __next__(self):
         if self.idx == self.max_idx:
             raise StopIteration
-        img = cv2.imread(self.file_names[self.idx], cv2.IMREAD_COLOR)
+        img = imread(self.file_names[self.idx], cv2.IMREAD_COLOR)
         if img.size == 0:
             raise IOError(
                 'Image {} cannot be read'.format(self.file_names[self.idx])

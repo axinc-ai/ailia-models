@@ -1,11 +1,17 @@
-import sys
 import os
+import sys
+from logging import getLogger
 
 import cv2
 import numpy as np
 
-from logging import getLogger
 logger = getLogger(__name__)
+
+
+def imread(filename, flags=cv2.IMREAD_COLOR):
+    data = np.fromfile(filename, np.int8)
+    img = cv2.imdecode(data, flags)
+    return img
 
 
 def normalize_image(image, normalize_type='255'):
@@ -80,7 +86,7 @@ def load_image(
     # rgb == True --> cv2.IMREAD_COLOR
     # rbg == False --> cv2.IMREAD_GRAYSCALE
     if os.path.isfile(image_path):
-        image = cv2.imread(image_path, int(rgb))
+        image = imread(image_path, int(rgb))
     else:
         logger.error(f'{image_path} not found.')
         sys.exit()
@@ -99,7 +105,7 @@ def load_image(
 
 
 def get_image_shape(image_path):
-    tmp = cv2.imread(image_path)
+    tmp = imread(image_path)
     height, width = tmp.shape[0], tmp.shape[1]
     return height, width
 

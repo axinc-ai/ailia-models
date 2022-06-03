@@ -1,22 +1,24 @@
+import glob
 import sys
 import time
-import numpy as np
-import glob
-import cv2
 
-import onnxruntime
 import ailia
+import cv2
+import numpy as np
+import onnxruntime
 
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
-from model_utils import check_and_download_models  # noqa: E402
-import webcamera_utils  # noqa: E402
-
 # logger
-from logging import getLogger   # noqa: E402
+from logging import getLogger  # noqa: E402
+
+import webcamera_utils  # noqa: E402
+from image_utils import imread  # noqa: E402
+from model_utils import check_and_download_models  # noqa: E402
+from utils import get_base_parser, get_savepath, update_parser  # noqa: E402
+
 logger = getLogger(__name__)
 
-from utils_hitnet import draw_disparity, draw_depth, CameraConfig
+from utils_hitnet import CameraConfig, draw_depth, draw_disparity
 
 camera_config =  CameraConfig(0.546, 1000)
 max_distance = 30
@@ -84,8 +86,8 @@ def preprocessing(left_img,right_img,input_shape):
 def recognize_from_image(net):
     
     # read left and right images
-    left_img = cv2.imread(args.left)
-    right_img = cv2.imread(args.right)
+    left_img = imread(args.left)
+    right_img = imread(args.right)
 
     # get model info
     if args.onnx:
@@ -140,8 +142,8 @@ def recognize_from_video(net):
     for left_path, right_path in zip(left_images, right_images):
 
         # Read frame from the video
-        left_img = cv2.imread(left_path)
-        right_img = cv2.imread(right_path)
+        left_img = imread(left_path)
+        right_img = imread(right_path)
 
         # preprocessing
         input_tensor = preprocessing(left_img,right_img,input_shape)

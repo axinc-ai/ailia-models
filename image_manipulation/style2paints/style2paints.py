@@ -1,23 +1,25 @@
-import sys, os
-import time
 import argparse
 import json
-
-import numpy as np
-import cv2
+import os
+import sys
+import time
 
 import ailia
+import cv2
+import numpy as np
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
-from model_utils import check_and_download_models  # noqa: E402
+# logger
+from logging import getLogger  # noqa: E402
+
 from detector_utils import load_image  # noqa: E402C
+from image_utils import imread  # noqa: E402
+from model_utils import check_and_download_models  # noqa: E402
+from utils import get_base_parser, get_savepath, update_parser  # noqa: E402
 
 from style2paints_utils import *
 
-# logger
-from logging import getLogger   # noqa: E402
 logger = getLogger(__name__)
 
 
@@ -196,7 +198,7 @@ def predict(img, dict_net, options):
     img = sensitive(img, s=5.0)
     img = go_tail(dict_net['tail'], img)
     cv2.imwrite('./sketch.improved.jpg', img)
-    img = cv2.imread('./sketch.improved.jpg')
+    img = imread('./sketch.improved.jpg')
 
     std = cal_std(img)
     logger.info('std = ' + str(std))
@@ -299,7 +301,7 @@ def recognize_from_image(filename, dict_net):
             ref_file = options.get("reference", "style.jpg")
             if not os.path.exists(ref_file):
                 raise FileNotFoundError('%s not exists' % ref_file)
-            reference = cv2.imread(ref_file)
+            reference = imread(ref_file)
             scale = max(reference.shape[:2]) / 256
             if scale > 1.0:
                 reference = cv2.resize(

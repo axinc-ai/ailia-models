@@ -1,27 +1,26 @@
-import time
-import sys
-
-import cv2
-import numpy as np
 import platform
+import sys
+import time
 
 import ailia
+import cv2
+import numpy as np
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser  # noqa: E402
-from model_utils import check_and_download_models  # noqa: E402
-from image_utils import load_image  # noqa: E402
-from classifier_utils import plot_results, print_results  # noqa: E402
-import webcamera_utils  # noqa: E402
-
 # logger
-from logging import getLogger   # noqa: E402
+from logging import getLogger  # noqa: E402
+
+import webcamera_utils  # noqa: E402
+from classifier_utils import plot_results, print_results  # noqa: E402
+from image_utils import imread, load_image  # noqa: E402
+from model_utils import check_and_download_models  # noqa: E402
+from utils import get_base_parser, update_parser  # noqa: E402
+
 logger = getLogger(__name__)
 
 # for ConvNeXt
 import os
-
 
 # ======================
 # PARAMETERS 1
@@ -85,7 +84,7 @@ def recognize_from_image(net, classes):
     for image_path in args.input:
         # prepare input data
         if os.path.isfile(image_path):
-            image = cv2.imread(image_path, cv2.IMREAD_COLOR)
+            image = imread(image_path, cv2.IMREAD_COLOR)
         else:
             logger.error(f'{image_path} not found.')
             exit()

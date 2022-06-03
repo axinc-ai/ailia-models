@@ -1,17 +1,22 @@
-import os, sys
 import glob
+import os
+import sys
 import time
-import numpy as np
-import cv2
+
 import ailia
+import cv2
+import numpy as np
+
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
-from model_utils import check_and_download_models  # noqa: E402
-import webcamera_utils
-
 # logger
-from logging import getLogger   # noqa: E402
+from logging import getLogger  # noqa: E402
+
+import webcamera_utils
+from image_utils import imread  # noqa: E402
+from model_utils import check_and_download_models  # noqa: E402
+from utils import get_base_parser, get_savepath, update_parser  # noqa: E402
+
 logger = getLogger(__name__)
 
 
@@ -137,7 +142,7 @@ def recognize_from_image(net, orig_target_sizes):
     # input image loop
     for image_path in args.input:
         # prepare input data
-        image = cv2.imread(image_path)
+        image = imread(image_path)
 
         out_pred_logits, out_pred_curves, _, _, weights = predict(net, image)
         results = postprocess(out_pred_logits, out_pred_curves, orig_target_sizes)
