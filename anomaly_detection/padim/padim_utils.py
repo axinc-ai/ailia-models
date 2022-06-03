@@ -58,38 +58,19 @@ def embedding_concat(x, y):
 
     return a
 
-#
-# def embedding_concat(x, y):
-#     import torch
-#     import torch.nn.functional as F
-#
-#     x = torch.from_numpy(x)
-#     y = torch.from_numpy(y)
-#
-#     B, C1, H1, W1 = x.size()
-#     _, C2, H2, W2 = y.size()
-#     s = int(H1 / H2)
-#     x = F.unfold(x, kernel_size=s, dilation=1, stride=s)
-#     x = x.view(B, C1, -1, H2, W2)
-#     z = torch.zeros(B, C1 + C2, x.size(2), H2, W2)
-#     for i in range(x.size(2)):
-#         z[:, :, i, :, :] = torch.cat((x[:, :, i, :, :], y), 1)
-#     z = z.view(B, -1, H2 * W2)
-#     z = F.fold(z, kernel_size=s, output_size=(H1, W1), stride=s)
-#
-#     z = z.numpy()
-#
-#     return z
 
-def preprocess(img, size, mask=False):
+def preprocess(img, size, mask=False, keep_aspect = True):
     h, w = img.shape[:2]
     crop_size = IMAGE_SIZE
 
     # resize
-    if h > w:
-        size = (size, int(size * h / w))
+    if keep_aspect:
+        if h > w:
+            size = (size, int(size * h / w))
+        else:
+            size = (int(size * w / h), size)
     else:
-        size = (int(size * w / h), size)
+        size = (size, size)
     img = np.array(Image.fromarray(img).resize(
         size, resample=Image.ANTIALIAS if not mask else Image.NEAREST))
 
@@ -111,15 +92,18 @@ def preprocess(img, size, mask=False):
     return img
 
 
-def preprocess_aug(img, size, mask=False, angle_range=[-10, 10], return_refs=False):
+def preprocess_aug(img, size, mask=False, keep_aspect = True, angle_range=[-10, 10], return_refs=False):
     h, w = img.shape[:2]
     crop_size = IMAGE_SIZE
 
     # resize
-    if h > w:
-        size = (size, int(size * h / w))
+    if keep_aspect:
+        if h > w:
+            size = (size, int(size * h / w))
+        else:
+            size = (int(size * w / h), size)
     else:
-        size = (int(size * w / h), size)
+        size = (size, size)
     img = np.array(Image.fromarray(img).resize(
         size, resample=Image.ANTIALIAS if not mask else Image.NEAREST))
 
@@ -167,7 +151,7 @@ def postprocess(outputs):
 
     return embedding_vectors
 
-def training(net, params, size, batch_size, train_dir, aug, aug_num, seed, logger):
+def training(net, params, size, keep_aspect, batch_size, train_dir, aug, aug_num, seed, logger):
     # set seed
     random.seed(seed)
     idx = random.sample(range(0, params["t_d"]), params["d"])
@@ -206,9 +190,9 @@ def training(net, params, size, batch_size, train_dir, aug, aug_num, seed, logge
                 img = load_image(image_path)
                 img = cv2.cvtColor(img, cv2.COLOR_BGRA2RGB)
                 if not aug:
-                    img = preprocess(img, size)
+                    img = preprocess(img, size, keep_aspect=keep_aspect)
                 else:
-                    img = preprocess_aug(img, size)
+                    img = preprocess_aug(img, size, keep_aspect=keep_aspect)
                 imgs.append(img)
 
             # countup N

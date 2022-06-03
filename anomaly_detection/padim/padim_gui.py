@@ -34,6 +34,10 @@ output_index = 0
 result_index = 0
 slider_index = 50
 
+REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/padim/'
+IMAGE_RESIZE = 224
+KEEP_ASPECT = False
+
 # ======================
 # Environment
 # ======================
@@ -104,9 +108,6 @@ def load_detail(image_path):
 # Run model
 # ======================
 
-REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/padim/'
-IMAGE_RESIZE = 224
-
 def train_button_clicked():
     global train_folder
     print("begin training")
@@ -125,7 +126,7 @@ def train_button_clicked():
     aug = False
     aug_num = 0
     seed = 1024
-    train_outputs = training(net, params, IMAGE_RESIZE, batch_size, train_dir, aug, aug_num, seed, logger)
+    train_outputs = training(net, params, IMAGE_RESIZE, KEEP_ASPECT, batch_size, train_dir, aug, aug_num, seed, logger)
 
     # save learned distribution
     train_feat_file = "train.pkl"
@@ -164,7 +165,7 @@ def test_button_clicked():
         image_path = test_list[i_img]
         img = load_image(image_path)
         img = cv2.cvtColor(img, cv2.COLOR_BGRA2RGB)
-        img = preprocess(img, IMAGE_RESIZE)
+        img = preprocess(img, IMAGE_RESIZE, keep_aspect=KEEP_ASPECT)
 
         test_imgs.append(img[0])
         if image_path in score_cache:
@@ -181,6 +182,7 @@ def test_button_clicked():
     os.makedirs("result", exist_ok=True)
     global result_list, listsResult, ListboxResult
     threshold = slider_index / 100.0
+    result_list = []
     for i in range(0, scores.shape[0]):
         img = denormalization(test_imgs[i])
         heat_map, mask, vis_img = visualize(img, scores[i], threshold)
@@ -188,8 +190,7 @@ def test_button_clicked():
         path = test_list[i].split("/")
         output_path = "result/"+path[len(path)-1]
         cv2.imwrite(output_path, vis_img)       
-        if not (output_path in result_list):
-            result_list.append(output_path)
+        result_list.append(output_path)
 
     listsResult.set(result_list)
     load_detail(result_list[0])

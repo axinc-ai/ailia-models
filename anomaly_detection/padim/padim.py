@@ -35,6 +35,7 @@ REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/padim/'
 IMAGE_PATH = './bottle_000.png'
 SAVE_IMAGE_PATH = './output.png'
 IMAGE_RESIZE = 256
+KEEP_ASPECT = True
 
 # ======================
 # Arguemnt Parser Config
@@ -152,7 +153,7 @@ def plot_fig(file_list, test_imgs, scores, anormal_scores, gt_imgs, threshold, s
 
 def train_from_image(net, params):
     # training
-    train_outputs = training(net, params, IMAGE_RESIZE, int(args.batch_size), args.train_dir, args.aug, args.aug_num, args.seed, logger)
+    train_outputs = training(net, params, IMAGE_RESIZE, KEEP_ASPECT, int(args.batch_size), args.train_dir, args.aug, args.aug_num, args.seed, logger)
 
     # save learned distribution
     train_dir = args.train_dir
@@ -175,7 +176,7 @@ def load_gt_imgs(gt_type_dir):
             if os.path.exists(gt_fpath):
                 gt_img = load_image(gt_fpath)
                 gt_img = cv2.cvtColor(gt_img, cv2.COLOR_BGRA2RGB)
-                gt_img = preprocess(gt_img, IMAGE_RESIZE, mask=True)
+                gt_img = preprocess(gt_img, IMAGE_RESIZE, mask=True, keep_aspect=KEEP_ASPECT)
                 if gt_img is not None:
                     gt_img = gt_img[0, [0]]
                 else:
@@ -192,7 +193,7 @@ def decide_threshold_from_gt_image(net, params, train_outputs, gt_imgs):
         image_path = args.input[i_img]
         img = load_image(image_path)
         img = cv2.cvtColor(img, cv2.COLOR_BGRA2RGB)
-        img = preprocess(img, IMAGE_RESIZE)
+        img = preprocess(img, IMAGE_RESIZE, keep_aspect=KEEP_ASPECT)
 
         dist_tmp = infer(net, params, train_outputs, img)
 
@@ -213,7 +214,7 @@ def infer_from_image(net, params, train_outputs, threshold, gt_imgs):
         image_path = args.input[i_img]
         img = load_image(image_path)
         img = cv2.cvtColor(img, cv2.COLOR_BGRA2RGB)
-        img = preprocess(img, IMAGE_RESIZE)
+        img = preprocess(img, IMAGE_RESIZE, keep_aspect=KEEP_ASPECT)
 
         test_imgs.append(img[0])
 
