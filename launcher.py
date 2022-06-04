@@ -195,7 +195,7 @@ def load_detail(index):
 
     global textModelDetail
 
-    f = open(base_path+"README.md")
+    f = open(base_path+"README.md", encoding="utf8")
     text = f.readlines()
     text = text[0].replace("# ","")
     text = text.replace("\r","")

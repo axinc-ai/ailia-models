@@ -8,7 +8,8 @@ import numpy as np
 
 logger = getLogger(__name__)
 
-from .image_utils import imread  # noqa: E402
+sys.path.append(os.path.dirname(__file__))
+from image_utils import imread  # noqa: E402
 
 
 def preprocessing_img(img):

@@ -331,6 +331,7 @@ class GazeEstimator:
         draw_head_pose : bool, optional
             Whether to draw the head pose(s) or not.
         """
+        img_draw = img.copy()
         preds = self.predict(img, gazes_only=False)
         if preds[0] is not None:
             img_draw = self.draw(img, *preds, draw_iris=draw_iris,

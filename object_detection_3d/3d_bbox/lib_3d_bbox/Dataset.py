@@ -12,7 +12,7 @@ from lib_3d_bbox.File import *
 
 from .ClassAverages import ClassAverages
 
-sys.path.append('../../../util')
+sys.path.append(os.path.join(os.path.dirname(__file__), "../../../util"))
 
 from image_utils import imread  # noqa: E402
 

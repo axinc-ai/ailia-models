@@ -1,6 +1,9 @@
+import os
+import sys
+
 import cv2
 
-sys.path.append('../../../util')
+sys.path.append(os.path.join(os.path.dirname(__file__), "../../../util"))
 from image_utils import imread  # noqa: E402
 
 
