@@ -27,10 +27,12 @@ logger = getLogger(__name__)
 # Parameters
 # ======================
 
-WEIGHT_PATH = 'picodet_l_640_coco.onnx'
-MODEL_PATH = 'picodet_l_640_coco.onnx.prototxt'
-WEIGHT_XXX_PATH = 'xxx.onnx'
-MODEL_XXX_PATH = 'xxx.onnx.prototxt'
+WEIGHT_S_416_PATH = 'picodet_s_416_coco.onnx'
+MODEL_S_416_PATH = 'picodet_s_416_coco.onnx.prototxt'
+WEIGHT_M_416_PATH = 'picodet_m_416_coco.onnx'
+MODEL_M_416_PATH = 'picodet_m_416_coco.onnx.prototxt'
+WEIGHT_L_640_PATH = 'picodet_l_640_coco.onnx'
+MODEL_L_640_PATH = 'picodet_l_640_coco.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/picodet/'
 
 CLASS_NAMES = (
@@ -47,11 +49,11 @@ CLASS_NAMES = (
     'scissors',
     'teddy bear', 'hair drier', 'toothbrush')
 
-IMAGE_PATH = 'demo.png'
+IMAGE_PATH = 'demo.jpg'
 SAVE_IMAGE_PATH = 'output.png'
 
-THRESHOLD = 0.4
-IOU = 0.45
+THRESHOLD = 0.3
+IOU = 0.6
 
 # ======================
 # Arguemnt Parser Config
@@ -71,8 +73,8 @@ parser.add_argument(
     help='IOU threshold for NMS'
 )
 parser.add_argument(
-    '-m', '--model_type', default='picodet-s-416',
-    choices=('picodet-s-416', 'picodet-m-416', 'picodet-l-640'),
+    '-m', '--model_type', default='s-416',
+    choices=('s-416', 'm-416', 'l-640'),
     help='model type'
 )
 args = update_parser(parser)
@@ -225,20 +227,28 @@ def post_processing(output, img_shape, scale_factor):
         bbox_preds[i][0] for i in range(num_levels)
     ]
 
+    num_classes = len(CLASS_NAMES)
+    nms_thre = args.iou
+
     det_bboxes, det_labels = get_bboxes(
         cls_score_list, bbox_pred_list, mlvl_priors,
-        img_shape, len(CLASS_NAMES),
-        scale_factor=scale_factor, with_nms=True,
+        img_shape, num_classes,
+        scale_factor=scale_factor, with_nms=True, nms_thre=nms_thre
     )
 
-    num_classes = 80
     bbox_result = bbox2result(det_bboxes, det_labels, num_classes)
 
     return bbox_result
 
 
 def predict(net, img):
-    shape = (640, 640)
+    dic_shape = {
+        's-416': (416, 416),
+        'm-416': (416, 416),
+        'l-640': (640, 640),
+    }
+    shape = dic_shape[args.model_type]
+
     img, scale_factor = preprocess(img, shape)
 
     # feedforward
@@ -278,7 +288,8 @@ def recognize_from_image(net):
         else:
             bbox_result = predict(net, img)
 
-        res_img = show_result(img, bbox_result, CLASS_NAMES)
+        score_thr = args.threshold
+        res_img = show_result(img, bbox_result, CLASS_NAMES, score_thr=score_thr)
 
         # plot result
         savepath = get_savepath(args.savepath, image_path, ext='.png')
@@ -301,6 +312,8 @@ def recognize_from_video(net):
     else:
         writer = None
 
+    score_thr = args.threshold
+
     frame_shown = False
     while True:
         ret, frame = capture.read()
@@ -311,19 +324,19 @@ def recognize_from_video(net):
 
         # inference
         img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        output = predict(net, img)
+        bbox_result = predict(net, img)
 
-        # # plot result
-        # res_img = draw_bbox(frame, out)
-        #
-        # # show
-        # cv2.imshow('frame', res_img)
-        # frame_shown = True
-        #
-        # # save results
-        # if writer is not None:
-        #     res_img = res_img.astype(np.uint8)
-        #     writer.write(res_img)
+        # plot result
+        res_img = show_result(frame, bbox_result, CLASS_NAMES, score_thr=score_thr)
+
+        # show
+        cv2.imshow('frame', res_img)
+        frame_shown = True
+
+        # save results
+        if writer is not None:
+            res_img = res_img.astype(np.uint8)
+            writer.write(res_img)
 
     capture.release()
     cv2.destroyAllWindows()
@@ -334,12 +347,12 @@ def recognize_from_video(net):
 
 
 def main():
-    # logger.info('=== Sample model ===')
-    # dic_model = {
-    #     'xxx': (WEIGHT_PATH, MODEL_PATH),
-    #     'XXX': (WEIGHT_XXX_PATH, MODEL_XXX_PATH),
-    # }
-    # weight_path, model_path = dic_model[args.model_type]
+    dic_model = {
+        's-416': (WEIGHT_S_416_PATH, MODEL_S_416_PATH),
+        'm-416': (WEIGHT_M_416_PATH, MODEL_M_416_PATH),
+        'l-640': (WEIGHT_L_640_PATH, MODEL_L_640_PATH),
+    }
+    WEIGHT_PATH, MODEL_PATH = dic_model[args.model_type]
 
     # model files check and download
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)

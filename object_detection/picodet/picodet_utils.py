@@ -244,6 +244,7 @@ def bbox_post_process(
         mlvl_bboxes,
         scale_factor=None,
         with_nms=True,
+        nms_thre=0.6,
         mlvl_score_factors=None):
     """bbox post-processing method.
 
@@ -296,7 +297,6 @@ def bbox_post_process(
         mlvl_scores = mlvl_scores * mlvl_score_factors
 
     max_per_img = 100
-    nms_thre = 0.6
     if with_nms:
         if len(mlvl_bboxes) == 0:
             det_bboxes = np.concatenate([mlvl_bboxes, mlvl_scores[:, None]], -1)
@@ -321,13 +321,13 @@ def get_bboxes(
         bbox_pred_list,
         mlvl_priors,
         img_shape,
-        cls_out_channels,
+        cls_channels,
         scale_factor=None,
-        with_nms=True):
+        with_nms=True,
+        nms_thre=0.6):
     """Transform outputs of a single image into bbox predictions.
 
     Args:
-        img:
         cls_score_list (list[Tensor]): Box scores from all scale
             levels of a single image, each item has shape
             (num_priors * num_classes, H, W).
@@ -338,11 +338,12 @@ def get_bboxes(
             the priors of a single level in feature pyramid, has shape
             (num_priors, 4).
         img_shape:
-        cls_out_channels:
+        cls_channels:
         scale_factor (ndarray, optional): Scale factor of the image arange
             as (w_scale, h_scale, w_scale, h_scale).
         with_nms (bool): If True, do nms before return boxes.
             Default: True.
+        nms_thre:
 
     Returns:
         tuple[Tensor]: Results of detected bboxes and labels. If with_nms
@@ -358,9 +359,6 @@ def get_bboxes(
             - det_labels (Tensor): Predicted labels of the corresponding \
                 box with shape [num_bboxes].
     """
-    score_thr = 0.025
-    nms_pre = 1000
-
     reg_max = 7
     integral = Integral(reg_max)
 
@@ -373,7 +371,7 @@ def get_bboxes(
                 prior_generator_strides, mlvl_priors)):
         bbox_pred = bbox_pred.transpose(1, 2, 0)
         bbox_pred = integral.forward(bbox_pred) * stride[0]
-        scores = cls_score.transpose(1, 2, 0).reshape(-1, cls_out_channels)
+        scores = cls_score.transpose(1, 2, 0).reshape(-1, cls_channels)
         scores = sigmoid(scores)
 
         # After https://github.com/open-mmlab/mmdetection/pull/6268/,
@@ -381,6 +379,8 @@ def get_bboxes(
         # There is no difference in performance for most models. If you
         # find a slight drop in performance, you can set a larger
         # `nms_pre` than before.
+        score_thr = 0.025
+        nms_pre = 1000
         results = filter_scores_and_topk(
             scores, score_thr, nms_pre,
             dict(bbox_pred=bbox_pred, priors=priors))
@@ -400,4 +400,5 @@ def get_bboxes(
         mlvl_labels,
         mlvl_bboxes,
         scale_factor,
-        with_nms=with_nms)
+        with_nms=with_nms,
+        nms_thre=nms_thre)
