@@ -137,6 +137,9 @@ def train_button_clicked():
     # training
     batch_size = 32
     train_dir = train_folder
+    if train_dir == "camera":
+        global train_list, input_index
+        train_dir = train_list[input_index].split(":")[1]
     aug = False
     aug_num = 0
     seed = 1024
@@ -220,7 +223,12 @@ def test_from_folder(net, params, train_outputs, threshold):
 def test_from_video(net, params, train_outputs, threshold):
     result_path = "result.mp4"
 
-    capture = webcamera_utils.get_capture(test_folder)
+    video_path = test_folder
+    if video_path == "camera":
+        global test_list, output_index
+        video_path = test_list[output_index].split(":")[1]
+
+    capture = webcamera_utils.get_capture(video_path)
     f_h = int(IMAGE_SIZE)
     f_w = int(IMAGE_SIZE) * 3
     writer = webcamera_utils.get_writer(result_path, f_h, f_w)
@@ -303,11 +311,8 @@ def train_camera_dialog():
     global listsInput, ListboxInput, input_index
     global train_folder
     global train_list
-    file_name = "0"
-    if args.video:
-        file_name = str(args.video)
-    train_folder = file_name
-    train_list = ["camera"+file_name]
+    train_folder = "camera"
+    train_list = get_camera_list()
     listsInput.set(train_list)
     train_index = 0
     ListboxInput.select_set(0)
@@ -351,17 +356,26 @@ def test_camera_dialog():
     global test_folder
     global test_list
     global test_type
-    file_name = "0"
-    if args.video:
-        file_name = str(args.video)
-    test_folder = file_name
-    test_list = ["camera"+file_name]
+    test_folder = "camera"
+    test_list = get_camera_list()
     listsOutput.set(test_list)
     test_index = 0
     ListboxOutput.select_set(0)
     load_detail(test_list[0])
     test_type = "videp"
 
+def get_camera_list():
+    index = 0
+    inputs = []
+    while True:
+        cap = cv2.VideoCapture(index)
+        if cap.isOpened():
+            inputs.append("camera:"+str(index))
+        else:
+            break
+        index=index+1
+        cap.release()
+    return inputs
 
 def get_file_list(folder):
     base_path = folder+"/"
