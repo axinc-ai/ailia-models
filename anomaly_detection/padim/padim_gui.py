@@ -13,6 +13,7 @@ from PIL import Image, ImageTk
 sys.path.append('../../util')
 from padim_utils import *
 from model_utils import check_and_download_models  # noqa: E402
+import webcamera_utils  # noqa: E402
 
 # for macOS, please install "brew install python-tk@3.9"
 import tkinter as tk
@@ -22,8 +23,12 @@ import tkinter.filedialog
 import log_init
 from logging import getLogger  # noqa: E402
 
+from utils import get_base_parser, update_parser  # noqa: E402
+
 logger = getLogger(__name__)
 
+parser = get_base_parser('PaDiM GUI', None, None)
+args = update_parser(parser)
 
 # ======================
 # Global settings
@@ -37,6 +42,10 @@ slider_index = 50
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/padim/'
 IMAGE_RESIZE = 224
 KEEP_ASPECT = False
+
+train_folder = None
+test_folder = None
+test_type = "folder"
 
 # ======================
 # Environment
@@ -80,6 +89,10 @@ def slider_changed(event):
 
 def create_photo_image(path,w=320,h=320):
     image_bgr = cv2.imread(path)
+    if image_bgr is None:
+        capture = cv2.VideoCapture(path)
+        ret, image_bgr = capture.read()
+        capture.release()
     image_bgr = cv2.resize(image_bgr,(w,h))
     image_rgb = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB) # imreadはBGRなのでRGBに変換
     image_pil = Image.fromarray(image_rgb) # RGBからPILフォーマットへ変換
@@ -117,8 +130,7 @@ def train_button_clicked():
     check_and_download_models(weight_path, model_path, REMOTE_PATH)
 
     # create net instance
-    env_id = ailia.get_gpu_environment_id()
-    net = ailia.Net(model_path, weight_path, env_id=env_id)
+    net = ailia.Net(model_path, weight_path, env_id=args.env_id)
 
     # training
     batch_size = 32
@@ -154,7 +166,15 @@ def test_button_clicked():
     # load trained model
     with open("train.pkl", 'rb') as f:
         train_outputs = pickle.load(f)
+    
+    threshold = slider_index / 100.0
 
+    if test_type == "folder":
+        test_from_folder(net, params, train_outputs, threshold)
+    else:
+        test_from_video(net, params, train_outputs, threshold)
+
+def test_from_folder(net, params, train_outputs, threshold):
     # file loop
     test_imgs = []
 
@@ -181,14 +201,13 @@ def test_button_clicked():
     # Plot gt image
     os.makedirs("result", exist_ok=True)
     global result_list, listsResult, ListboxResult
-    threshold = slider_index / 100.0
     result_list = []
     for i in range(0, scores.shape[0]):
         img = denormalization(test_imgs[i])
         heat_map, mask, vis_img = visualize(img, scores[i], threshold)
         vis_img = (vis_img * 255).astype(np.uint8)
-        path = test_list[i].split("/")
-        output_path = "result/"+path[len(path)-1]
+        dirname, path = os.path.split(test_list[i])
+        output_path = "result/"+path
         cv2.imwrite(output_path, vis_img)       
         result_list.append(output_path)
 
@@ -196,6 +215,51 @@ def test_button_clicked():
     load_detail(result_list[0])
     ListboxResult.select_set(0)
 
+def test_from_video(net, params, train_outputs, threshold):
+    result_path = "result.mp4"
+
+    capture = webcamera_utils.get_capture(test_folder)
+    f_h = int(IMAGE_SIZE)
+    f_w = int(IMAGE_SIZE) * 3
+    writer = webcamera_utils.get_writer(result_path, f_h, f_w)
+
+    score_map = []
+
+    frame_shown = False
+    while(True):
+        ret, frame = capture.read()
+        if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
+            break
+
+        img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        img = preprocess(img, IMAGE_RESIZE, keep_aspect=KEEP_ASPECT)
+
+        dist_tmp = infer(net, params, train_outputs, img)
+
+        score_map.append(dist_tmp)
+        scores = normalize_scores(score_map)    # min max is calculated dynamically, please set fixed min max value from calibration data for production
+
+        heat_map, mask, vis_img = visualize(denormalization(img[0]), scores[len(scores)-1], threshold)
+        frame = pack_visualize(heat_map, mask, vis_img, scores)
+
+        cv2.imshow('frame', frame)
+        frame_shown = True
+
+        if writer is not None:
+            writer.write(frame)
+
+    capture.release()
+    cv2.destroyAllWindows()
+    if writer is not None:
+        writer.release()
+
+    global result_list, listsResult, ListboxResult
+    result_list = [result_path]
+    listsResult.set(result_list)
+    load_detail(result_list[0])
+    ListboxResult.select_set(0)
 
 # ======================
 # Select file
@@ -205,6 +269,21 @@ train_folder = "train"
 test_folder = None
 
 def train_file_dialog():
+    global listsInput, ListboxInput, input_index
+    global train_folder
+    global train_list
+    fTyp = [("Image File or Video File", "*")]
+    iDir = os.path.abspath(os.path.dirname(__file__))
+    file_name = tk.filedialog.askopenfilename(filetypes=fTyp, initialdir=iDir)
+    if len(file_name) != 0:
+        train_folder = file_name
+        train_list = [file_name]
+        listsInput.set(train_list)
+        train_index = 0
+        ListboxInput.select_set(0)
+        load_detail(train_list[0])
+
+def train_folder_dialog():
     global listsInput, ListboxInput, input_index
     global train_folder
     global train_list
@@ -218,10 +297,42 @@ def train_file_dialog():
         ListboxInput.select_set(0)
         load_detail(train_list[0])
 
+def train_camera_dialog():
+    global listsInput, ListboxInput, input_index
+    global train_folder
+    global train_list
+    file_name = "0"
+    if args.video:
+        file_name = str(args.video)
+    train_folder = file_name
+    train_list = ["camera"+file_name]
+    listsInput.set(train_list)
+    train_index = 0
+    ListboxInput.select_set(0)
+    load_detail(train_list[0])
+
 def test_file_dialog():
     global listsOutput, ListboxOutput, output_index
     global test_folder
     global test_list
+    global test_type
+    fTyp = [("Image File or Video File", "*")]
+    iDir = os.path.abspath(os.path.dirname(__file__))
+    file_name = tk.filedialog.askopenfilename(filetypes=fTyp, initialdir=iDir)
+    if len(file_name) != 0:
+        test_folder = file_name
+        test_list = [file_name]
+        listsOutput.set(test_list)
+        test_index = 0
+        ListboxOutput.select_set(0)
+        load_detail(test_list[0])
+        test_type = "video"
+
+def test_folder_dialog():
+    global listsOutput, ListboxOutput, output_index
+    global test_folder
+    global test_list
+    global test_type
     iDir = os.path.abspath(os.path.dirname(__file__))
     file_name = tk.filedialog.askdirectory(initialdir=iDir)
     if len(file_name) != 0:
@@ -231,6 +342,24 @@ def test_file_dialog():
         test_index = 0
         ListboxOutput.select_set(0)
         load_detail(test_list[0])
+        test_type = "folder"
+
+def test_camera_dialog():
+    global listsOutput, ListboxOutput, output_index
+    global test_folder
+    global test_list
+    global test_type
+    file_name = "0"
+    if args.video:
+        file_name = str(args.video)
+    test_folder = file_name
+    test_list = ["camera"+file_name]
+    listsOutput.set(test_list)
+    test_index = 0
+    ListboxOutput.select_set(0)
+    load_detail(test_list[0])
+    test_type = "videp"
+
 
 def get_file_list(folder):
     base_path = folder+"/"
@@ -313,11 +442,23 @@ def main():
     textStop = tk.StringVar(frame)
     textStop.set("Test")
 
-    textInputFile = tk.StringVar(frame)
-    textInputFile.set("Select train folder")
+    textTrainFolder = tk.StringVar(frame)
+    textTrainFolder.set("Train from folder")
 
-    textOutputFile = tk.StringVar(frame)
-    textOutputFile.set("Select test folder")
+    textTrainVideo = tk.StringVar(frame)
+    textTrainVideo.set("Train from video")
+
+    textTrainCamera = tk.StringVar(frame)
+    textTrainCamera.set("Train from camera")
+
+    textTestFolder = tk.StringVar(frame)
+    textTestFolder.set("Test from folder")
+
+    textTestVideo = tk.StringVar(frame)
+    textTestVideo.set("Test from video")
+
+    textTestCamera = tk.StringVar(frame)
+    textTestCamera.set("Test from camera")
 
     textInput = tk.StringVar(frame)
     textInput.set("Train images")
@@ -343,8 +484,14 @@ def main():
 
     buttonRun = tk.Button(frame, textvariable=textRun, command=train_button_clicked, width=14)
     buttonStop = tk.Button(frame, textvariable=textStop, command=test_button_clicked, width=14)
-    buttonInputFile = tk.Button(frame, textvariable=textInputFile, command=train_file_dialog, width=14)
-    buttonOutputFile = tk.Button(frame, textvariable=textOutputFile, command=test_file_dialog, width=14)
+
+    buttonTrainFolder = tk.Button(frame, textvariable=textTrainFolder, command=train_folder_dialog, width=14)
+    buttonTrainVideo = tk.Button(frame, textvariable=textTrainVideo, command=train_file_dialog, width=14)
+    buttonTrainCamera = tk.Button(frame, textvariable=textTrainCamera, command=train_camera_dialog, width=14)
+
+    buttonTestFolder = tk.Button(frame, textvariable=textTestFolder, command=test_folder_dialog, width=14)
+    buttonTestVideo = tk.Button(frame, textvariable=textTestVideo, command=test_file_dialog, width=14)
+    buttonTestCamera = tk.Button(frame, textvariable=textTestCamera, command=test_camera_dialog, width=14)
 
     canvas = tk.Canvas(frame, bg="black", width=320, height=320)
     canvas.place(x=0, y=0)
@@ -354,11 +501,15 @@ def main():
     # 各種ウィジェットの設置
     labelInput.grid(row=0, column=0, sticky=tk.NW, rowspan=1)
     ListboxInput.grid(row=1, column=0, sticky=tk.NW, rowspan=4)
-    buttonInputFile.grid(row=6, column=0, sticky=tk.NW)
+    buttonTrainFolder.grid(row=6, column=0, sticky=tk.NW)
+    buttonTrainVideo.grid(row=7, column=0, sticky=tk.NW)
+    buttonTrainCamera.grid(row=8, column=0, sticky=tk.NW)
 
     labelOutput.grid(row=0, column=1, sticky=tk.NW)
     ListboxOutput.grid(row=1, column=1, sticky=tk.NW, rowspan=4)
-    buttonOutputFile.grid(row=6, column=1, sticky=tk.NW)
+    buttonTestFolder.grid(row=6, column=1, sticky=tk.NW)
+    buttonTestVideo.grid(row=7, column=1, sticky=tk.NW)
+    buttonTestCamera.grid(row=8, column=1, sticky=tk.NW)
 
     labelResult.grid(row=0, column=2, sticky=tk.NW)
     ListboxResult.grid(row=1, column=2, sticky=tk.NW, rowspan=4)
