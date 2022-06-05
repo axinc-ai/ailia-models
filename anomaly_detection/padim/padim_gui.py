@@ -445,13 +445,6 @@ def main():
     ListboxOutput.select_set(output_index)
     ListboxResult.select_set(result_index)
 
-    # スクロールバーの作成
-    #scrollbar = tk.Scrollbar(frame, orient=tk.VERTICAL, command=ListboxInput.yview)
-
-    # スクロールバーをListboxに反映
-    #ListboxInput["yscrollcommand"] = scrollbar.set
-
-    # StringVarのインスタンスを格納する変数textの設定
     textRun = tk.StringVar(frame)
     textRun.set("Train")
 
@@ -549,7 +542,6 @@ def main():
         length=200,
     )
     scale.grid(row=9, column=3, sticky=tk.NW, columnspan=3)
-    print(var_scale.get())
     scale.bind("<ButtonRelease-1>", slider_changed)
 
     # メインフレームの作成と設置
