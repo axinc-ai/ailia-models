@@ -242,8 +242,7 @@ def bbox_post_process(
         mlvl_scores,
         mlvl_labels,
         mlvl_bboxes,
-        scale_factor,
-        rescale=False,
+        scale_factor=None,
         with_nms=True,
         mlvl_score_factors=None):
     """bbox post-processing method.
@@ -255,17 +254,13 @@ def bbox_post_process(
         mlvl_scores (list[Tensor]): Box scores from all scale
             levels of a single image, each item has shape
             (num_bboxes, ).
-       mlvl_labels (list[Tensor]): Box class labels from all scale
+        mlvl_labels (list[Tensor]): Box class labels from all scale
             levels of a single image, each item has shape
             (num_bboxes, ).
         mlvl_bboxes (list[Tensor]): Decoded bboxes from all scale
             levels of a single image, each item has shape (num_bboxes, 4).
         scale_factor (ndarray, optional): Scale factor of the image arange
             as (w_scale, h_scale, w_scale, h_scale).
-        cfg (mmcv.Config): Test / postprocessing configuration,
-            if None, test_cfg would be used.
-        rescale (bool): If True, return boxes in original image space.
-            Default: False.
         with_nms (bool): If True, do nms before return boxes.
             Default: True.
         mlvl_score_factors (list[Tensor], optional): Score factor from
@@ -288,7 +283,7 @@ def bbox_post_process(
     """
 
     mlvl_bboxes = np.concatenate(mlvl_bboxes)
-    if rescale:
+    if scale_factor is not None:
         mlvl_bboxes /= scale_factor
 
     mlvl_scores = np.concatenate(mlvl_scores)
@@ -325,11 +320,14 @@ def get_bboxes(
         cls_score_list,
         bbox_pred_list,
         mlvl_priors,
-        rescale=False,
+        img_shape,
+        cls_out_channels,
+        scale_factor=None,
         with_nms=True):
     """Transform outputs of a single image into bbox predictions.
 
     Args:
+        img:
         cls_score_list (list[Tensor]): Box scores from all scale
             levels of a single image, each item has shape
             (num_priors * num_classes, H, W).
@@ -339,8 +337,10 @@ def get_bboxes(
         mlvl_priors (list[Tensor]): Each element in the list is
             the priors of a single level in feature pyramid, has shape
             (num_priors, 4).
-        rescale (bool): If True, return boxes in original image space.
-            Default: False.
+        img_shape:
+        cls_out_channels:
+        scale_factor (ndarray, optional): Scale factor of the image arange
+            as (w_scale, h_scale, w_scale, h_scale).
         with_nms (bool): If True, do nms before return boxes.
             Default: True.
 
@@ -358,8 +358,6 @@ def get_bboxes(
             - det_labels (Tensor): Predicted labels of the corresponding \
                 box with shape [num_bboxes].
     """
-    img_shape = (640, 640, 3)
-    cls_out_channels = 80
     score_thr = 0.025
     nms_pre = 1000
 
@@ -397,11 +395,9 @@ def get_bboxes(
         mlvl_scores.append(scores)
         mlvl_labels.append(labels)
 
-    scale_factor = np.array([1., 1.498829, 1., 1.498829])
     return bbox_post_process(
         mlvl_scores,
         mlvl_labels,
         mlvl_bboxes,
         scale_factor,
-        rescale=rescale,
         with_nms=with_nms)

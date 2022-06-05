@@ -3,7 +3,9 @@ import time
 
 import numpy as np
 import cv2
-from PIL import Image
+import matplotlib.pyplot as plt
+from matplotlib.patches import Polygon
+from matplotlib.collections import PatchCollection
 
 import ailia
 
@@ -12,7 +14,7 @@ sys.path.append('../../util')
 from utils import get_base_parser, update_parser, get_savepath  # noqa
 from model_utils import check_and_download_models  # noqa
 from detector_utils import load_image  # noqa
-# from image_utils import load_image, normalize_image  # noqa
+from image_utils import normalize_image  # noqa
 from webcamera_utils import get_capture, get_writer  # noqa
 # logger
 from logging import getLogger  # noqa
@@ -31,6 +33,20 @@ WEIGHT_XXX_PATH = 'xxx.onnx'
 MODEL_XXX_PATH = 'xxx.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/picodet/'
 
+CLASS_NAMES = (
+    'person', 'bicycle', 'car', 'motorcycle', 'airplane', 'bus', 'train', 'truck', 'boat', 'traffic light',
+    'fire hydrant',
+    'stop sign', 'parking meter', 'bench', 'bird', 'cat', 'dog', 'horse', 'sheep', 'cow', 'elephant', 'bear', 'zebra',
+    'giraffe', 'backpack', 'umbrella', 'handbag', 'tie', 'suitcase', 'frisbee', 'skis', 'snowboard', 'sports ball',
+    'kite',
+    'baseball bat', 'baseball glove', 'skateboard', 'surfboard', 'tennis racket', 'bottle', 'wine glass', 'cup', 'fork',
+    'knife', 'spoon', 'bowl', 'banana', 'apple', 'sandwich', 'orange', 'broccoli', 'carrot', 'hot dog', 'pizza',
+    'donut',
+    'cake', 'chair', 'couch', 'potted plant', 'bed', 'dining table', 'toilet', 'tv', 'laptop', 'mouse', 'remote',
+    'keyboard', 'cell phone', 'microwave', 'oven', 'toaster', 'sink', 'refrigerator', 'book', 'clock', 'vase',
+    'scissors',
+    'teddy bear', 'hair drier', 'toothbrush')
+
 IMAGE_PATH = 'demo.png'
 SAVE_IMAGE_PATH = 'output.png'
 
@@ -42,7 +58,7 @@ IOU = 0.45
 # ======================
 
 parser = get_base_parser(
-    'XXX', IMAGE_PATH, SAVE_IMAGE_PATH
+    'PP-PicoDet', IMAGE_PATH, SAVE_IMAGE_PATH
 )
 parser.add_argument(
     '-th', '--threshold',
@@ -55,7 +71,8 @@ parser.add_argument(
     help='IOU threshold for NMS'
 )
 parser.add_argument(
-    '-m', '--model_type', default='xxx', choices=('xxx', 'XXX'),
+    '-m', '--model_type', default='picodet-s-416',
+    choices=('picodet-s-416', 'picodet-m-416', 'picodet-l-640'),
     help='model type'
 )
 args = update_parser(parser)
@@ -65,8 +82,92 @@ args = update_parser(parser)
 # Secondaty Functions
 # ======================
 
-# def draw_bbox(img, bboxes):
-#     return img
+def show_result(
+        img,
+        bbox_result,
+        class_names,
+        score_thr=0.3,
+        bbox_color=(72, 101, 241),
+        text_color=(72, 101, 241),
+        thickness=2,
+        font_size=13):
+    bboxes = np.vstack(bbox_result)
+    labels = [
+        np.full(bbox.shape[0], i, dtype=np.int32)
+        for i, bbox in enumerate(bbox_result)
+    ]
+    labels = np.concatenate(labels)
+
+    if score_thr > 0:
+        scores = bboxes[:, -1]
+        inds = scores > score_thr
+        bboxes = bboxes[inds, :]
+        labels = labels[inds]
+
+    bbox_color = [color / 255 for color in bbox_color[::-1]]
+    text_color = [color / 255 for color in text_color[::-1]]
+
+    img = img[:, :, ::-1]  # BGR -> RGB
+
+    width, height = img.shape[1], img.shape[0]
+
+    fig = plt.figure('', frameon=False)
+    canvas = fig.canvas
+    dpi = fig.get_dpi()
+
+    # add a small EPS to avoid precision lost due to matplotlib's truncation
+    # (https://github.com/matplotlib/matplotlib/issues/15363)
+    eps = 1e-2
+    fig.set_size_inches((width + eps) / dpi, (height + eps) / dpi)
+
+    # remove white edges by set subplot margin
+    plt.subplots_adjust(left=0, right=1, bottom=0, top=1)
+    ax = plt.gca()
+    ax.axis('off')
+
+    polygons = []
+    color = []
+    for i, (bbox, label) in enumerate(zip(bboxes, labels)):
+        bbox_int = bbox.astype(np.int32)
+        poly = [[bbox_int[0], bbox_int[1]], [bbox_int[0], bbox_int[3]],
+                [bbox_int[2], bbox_int[3]], [bbox_int[2], bbox_int[1]]]
+        np_poly = np.array(poly).reshape((4, 2))
+        polygons.append(Polygon(np_poly))
+        color.append(bbox_color)
+        label_text = class_names[
+            label] if class_names is not None else f'class {label}'
+        if len(bbox) > 4:
+            label_text += f'|{bbox[-1]:.02f}'
+        ax.text(
+            bbox_int[0],
+            bbox_int[1],
+            f'{label_text}',
+            bbox={
+                'facecolor': 'black',
+                'alpha': 0.8,
+                'pad': 0.7,
+                'edgecolor': 'none'
+            },
+            color=text_color,
+            fontsize=font_size,
+            verticalalignment='top',
+            horizontalalignment='left')
+
+    plt.imshow(img)
+
+    p = PatchCollection(
+        polygons, facecolor='none', edgecolors=color, linewidths=thickness)
+    ax.add_collection(p)
+
+    stream, _ = canvas.print_to_buffer()
+    buffer = np.frombuffer(stream, dtype=np.uint8)
+    img_rgba = buffer.reshape(height, width, 4)
+    rgb, alpha = np.split(img_rgba, [3], axis=2)
+    img = rgb.astype(np.uint8)
+
+    img = img[:, :, ::-1]  # RGB -> BGR
+
+    return img
 
 
 # ======================
@@ -77,33 +178,38 @@ def preprocess(img, image_shape):
     h, w = image_shape
     im_h, im_w, _ = img.shape
 
-    # adaptive_resize
-    scale = h / min(im_h, im_w)
-    ow, oh = int(im_w * scale), int(im_h * scale)
-    if ow != im_w or oh != im_h:
-        img = cv2.resize(img, (ow, oh), interpolation=cv2.INTER_LINEAR)
+    img = img[:, :, ::-1]  # BGR -> RGB
+    img = cv2.resize(img, (w, h), interpolation=cv2.INTER_LINEAR)
 
-    img = np.array(Image.fromarray(img).resize((ow, oh), Image.BILINEAR))
-
-    # center_crop
-    if ow > w:
-        x = (ow - w) // 2
-        img = img[:, x:x + w, :]
-    if oh > h:
-        y = (oh - h) // 2
-        img = img[y:y + h, :, :]
+    w_scale = w / im_w
+    h_scale = h / im_h
+    scale_factor = np.array([
+        w_scale, h_scale, w_scale, h_scale],
+        dtype=np.float32)
 
     img = normalize_image(img, normalize_type='ImageNet')
 
-    img = img / 255
+    divisor = 32
+    pad_h = int(np.ceil(h / divisor)) * divisor
+    pad_w = int(np.ceil(w / divisor)) * divisor
+
+    padding = (0, 0, max(pad_w - w, 0), max(pad_h - h, 0))
+
+    img = cv2.copyMakeBorder(
+        img,
+        padding[1], padding[3],
+        padding[0], padding[2],
+        cv2.BORDER_CONSTANT,
+        value=0)
+
     img = img.transpose(2, 0, 1)  # HWC -> CHW
     img = np.expand_dims(img, axis=0)
     img = img.astype(np.float32)
 
-    return img
+    return img, scale_factor
 
 
-def post_processing(output):
+def post_processing(output, img_shape, scale_factor):
     cls_scores = output[:4]
     bbox_preds = output[4:]
 
@@ -119,28 +225,28 @@ def post_processing(output):
         bbox_preds[i][0] for i in range(num_levels)
     ]
 
-    rescale = True
     det_bboxes, det_labels = get_bboxes(
         cls_score_list, bbox_pred_list, mlvl_priors,
-        rescale, with_nms=True,
+        img_shape, len(CLASS_NAMES),
+        scale_factor=scale_factor, with_nms=True,
     )
 
     num_classes = 80
-    bbox_results = bbox2result(det_bboxes, det_labels, num_classes)
+    bbox_result = bbox2result(det_bboxes, det_labels, num_classes)
 
-    return bbox_results
+    return bbox_result
 
 
 def predict(net, img):
-    shape = (IMAGE_HEIGHT, IMAGE_WIDTH)
-    img = preprocess(img, shape)
+    shape = (640, 640)
+    img, scale_factor = preprocess(img, shape)
 
     # feedforward
     output = net.predict([img])
 
-    bbox_results = post_processing(output)
+    bbox_result = post_processing(output, shape, scale_factor)
 
-    return bbox_results
+    return bbox_result
 
 
 def recognize_from_image(net):
@@ -159,7 +265,7 @@ def recognize_from_image(net):
             total_time_estimation = 0
             for i in range(args.benchmark_count):
                 start = int(round(time.time() * 1000))
-                output = predict(net, img)
+                bbox_result = predict(net, img)
                 end = int(round(time.time() * 1000))
                 estimation_time = (end - start)
 
@@ -170,14 +276,14 @@ def recognize_from_image(net):
 
             logger.info(f'\taverage time estimation {total_time_estimation / (args.benchmark_count - 1)} ms')
         else:
-            output = predict(net, img)
+            bbox_result = predict(net, img)
 
-        # res_img = draw_bbox(out)
-        #
-        # # plot result
-        # savepath = get_savepath(args.savepath, image_path, ext='.png')
-        # logger.info(f'saved at : {savepath}')
-        # cv2.imwrite(savepath, res_img)
+        res_img = show_result(img, bbox_result, CLASS_NAMES)
+
+        # plot result
+        savepath = get_savepath(args.savepath, image_path, ext='.png')
+        logger.info(f'saved at : {savepath}')
+        cv2.imwrite(savepath, res_img)
 
     logger.info('Script finished successfully.')
 
