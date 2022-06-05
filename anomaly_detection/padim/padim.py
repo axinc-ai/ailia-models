@@ -18,6 +18,7 @@ sys.path.append('../../util')
 from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from detector_utils import load_image  # noqa: E402
+import webcamera_utils  # noqa: E402
 
 # logger
 from logging import getLogger  # noqa: E402
@@ -151,19 +152,23 @@ def plot_fig(file_list, test_imgs, scores, anormal_scores, gt_imgs, threshold, s
         plt.close()
 
 
-def train_from_image(net, params):
+def train_from_image_or_video(net, params):
     # training
     train_outputs = training(net, params, IMAGE_RESIZE, KEEP_ASPECT, int(args.batch_size), args.train_dir, args.aug, args.aug_num, args.seed, logger)
 
     # save learned distribution
-    train_dir = args.train_dir
-    train_feat_file = "%s.pkl" % os.path.basename(train_dir)
+    if args.feat:
+        train_feat_file = args.feat
+    else:
+        train_dir = args.train_dir
+        train_feat_file = "%s.pkl" % os.path.basename(train_dir)
     logger.info('saving train set feature to: %s ...' % train_feat_file)
     with open(train_feat_file, 'wb') as f:
         pickle.dump(train_outputs, f)
     logger.info('saved.')
 
     return train_outputs
+
 
 def load_gt_imgs(gt_type_dir):
     gt_imgs = []
@@ -202,9 +207,14 @@ def decide_threshold_from_gt_image(net, params, train_outputs, gt_imgs):
     scores = normalize_scores(score_map)
 
     threshold = decide_threshold(scores, gt_imgs)
+
     return threshold
 
 def infer_from_image(net, params, train_outputs, threshold, gt_imgs):
+    if len(args.input) == 0:
+        logger.error("Input file not found")
+        return
+
     test_imgs = []
 
     score_map = []
@@ -241,26 +251,76 @@ def infer_from_image(net, params, train_outputs, threshold, gt_imgs):
     plot_fig(args.input, test_imgs, scores, anormal_scores, gt_imgs, threshold, args.savepath)
 
 
-def recognize_from_image(net, params):
+def infer_from_video(net, params, train_outputs, threshold):
+    capture = webcamera_utils.get_capture(args.video)
+    if args.savepath != SAVE_IMAGE_PATH:
+        f_h = int(IMAGE_SIZE)
+        f_w = int(IMAGE_SIZE) * 3
+        writer = webcamera_utils.get_writer(args.savepath, f_h, f_w)
+    else:
+        writer = None
+
+    score_map = []
+
+    frame_shown = False
+    while(True):
+        ret, frame = capture.read()
+        if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
+            break
+
+        img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        img = preprocess(img, IMAGE_RESIZE, keep_aspect=KEEP_ASPECT)
+
+        dist_tmp = infer(net, params, train_outputs, img)
+
+        score_map.append(dist_tmp)
+        scores = normalize_scores(score_map)    # min max is calculated dynamically, please set fixed min max value from calibration data for production
+
+        heat_map, mask, vis_img = visualize(denormalization(img[0]), scores[len(scores)-1], threshold)
+        frame = pack_visualize(heat_map, mask, vis_img, scores)
+
+        cv2.imshow('frame', frame)
+        frame_shown = True
+
+        if writer is not None:
+            writer.write(frame)
+
+    capture.release()
+    cv2.destroyAllWindows()
+    if writer is not None:
+        writer.release()
+
+
+def train_and_infer(net, params):
     if args.feat:
         logger.info('loading train set feature from: %s' % args.feat)
         with open(args.feat, 'rb') as f:
             train_outputs = pickle.load(f)
         logger.info('loaded.')
     else:
-        train_outputs = train_from_image(net, params)
+        train_outputs = train_from_image_or_video(net, params)
 
     if args.threshold is None:
-        gt_type_dir = args.gt_dir if args.gt_dir else None
-        gt_imgs = load_gt_imgs(gt_type_dir)
+        if args.video:
+            threshold = 0.5
+            gt_imgs = None
+            logger.info('Please set threshold manually for video mdoe')
+        else:
+            gt_type_dir = args.gt_dir if args.gt_dir else None
+            gt_imgs = load_gt_imgs(gt_type_dir)
 
-        threshold = decide_threshold_from_gt_image(net, params, train_outputs, gt_imgs)
-        logger.info('Optimal threshold: %f' % threshold)
+            threshold = decide_threshold_from_gt_image(net, params, train_outputs, gt_imgs)
+            logger.info('Optimal threshold: %f' % threshold)
     else:
         threshold = args.threshold
         gt_imgs = None
 
-    infer_from_image(net, params, train_outputs, threshold, gt_imgs)
+    if args.video:
+        infer_from_video(net, params, train_outputs, threshold)
+    else:
+        infer_from_image(net, params, train_outputs, threshold, gt_imgs)
     logger.info('Script finished successfully.')
 
 
@@ -273,11 +333,7 @@ def main():
     net = ailia.Net(model_path, weight_path, env_id=args.env_id)
 
     # check input
-    if len(args.input) == 0:
-        logger.error("Input file not found")
-        return
-
-    recognize_from_image(net, params)
+    train_and_infer(net, params)
 
 
 if __name__ == '__main__':

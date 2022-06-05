@@ -151,18 +151,45 @@ def postprocess(outputs):
 
     return embedding_vectors
 
+
+def capture_training_frames_from_video(train_dir):
+    if os.path.isfile(train_dir):
+        capture = cv2.VideoCapture(train_dir)
+    else:
+        capture = cv2.VideoCapture(int(train_dir))
+    if not capture:
+        logger.error("file open failed")
+        sts.exit(-1)
+    train_imgs = []
+    while(True):
+        ret, frame = capture.read()
+        if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+        cv2.imshow("capture", frame)
+        train_imgs.append(frame)
+        if len(train_imgs) >= 200:
+            break
+    capture.release()
+    cv2.destroyAllWindows()
+    return train_imgs
+
+
 def training(net, params, size, keep_aspect, batch_size, train_dir, aug, aug_num, seed, logger):
     # set seed
     random.seed(seed)
     idx = random.sample(range(0, params["t_d"]), params["d"])
 
-    train_imgs = sorted([
-        os.path.join(train_dir, f) for f in os.listdir(train_dir)
-        if f.endswith('.png') or f.endswith('.jpg') or f.endswith('.bmp')
-    ])
-    if len(train_imgs) == 0:
-        logger.error("train images not found in '%s'" % train_dir)
-        sys.exit(-1)
+    if os.path.isdir(train_dir):
+        train_imgs = sorted([
+            os.path.join(train_dir, f) for f in os.listdir(train_dir)
+            if f.endswith('.png') or f.endswith('.jpg') or f.endswith('.bmp')
+        ])
+        if len(train_imgs) == 0:
+            logger.error("train images not found in '%s'" % train_dir)
+            sys.exit(-1)
+    else:
+        logger.info("capture 200 frames from video")
+        train_imgs = capture_training_frames_from_video(train_dir)
 
     if not aug:
         logger.info('extract train set features without augmentation')
@@ -178,17 +205,20 @@ def training(net, params, size, keep_aspect, batch_size, train_dir, aug, aug_num
             imgs = []
             if not aug:
                 logger.info('from (%s ~ %s) ' %
-                            (train_imgs[i_img],
-                             train_imgs[min(len(train_imgs) - 1,
-                                            i_img + batch_size)]))
+                            (i_img,
+                             min(len(train_imgs) - 1,
+                                            i_img + batch_size)))
             else:
                 logger.info('from (%s ~ %s) on augmentation lap %d' %
-                            (train_imgs[i_img],
-                             train_imgs[min(len(train_imgs) - 1,
-                                            i_img + batch_size)], i_aug))
+                            (i_img,
+                             min(len(train_imgs) - 1,
+                                            i_img + batch_size), i_aug))
             for image_path in train_imgs[i_img:i_img + batch_size]:
-                img = load_image(image_path)
-                img = cv2.cvtColor(img, cv2.COLOR_BGRA2RGB)
+                if type(image_path) is str:
+                    img = load_image(image_path)
+                    img = cv2.cvtColor(img, cv2.COLOR_BGRA2RGB)
+                else:
+                    img = cv2.cvtColor(image_path, cv2.COLOR_BGR2RGB)
                 if not aug:
                     img = preprocess(img, size, keep_aspect=keep_aspect)
                 else:
@@ -372,5 +402,24 @@ def visualize(img, score, threshold):
     kernel = morphology.disk(4)
     mask = morphology.opening(mask, kernel)
     mask *= 255
-    vis_img = mark_boundaries(img, mask, color=(1, 0, 0), mode='thick')   
+    vis_img = mark_boundaries(img, mask, color=(1, 0, 0), mode='thick')  
     return heat_map, mask, vis_img
+
+
+def pack_visualize(heat_map, mask, vis_img, scores):
+    vis_img = (vis_img * 255).astype(np.uint8)
+    vis_img = cv2.cvtColor(vis_img, cv2.COLOR_RGB2BGR)
+
+    mask = mask.astype(np.uint8)
+    mask = cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR)
+
+    heat_map = (heat_map - scores.min() * 255) / (scores.max() * 255 - scores.min() * 255)
+    heat_map = (heat_map * 255).astype(np.uint8)
+    heat_map = cv2.applyColorMap(heat_map, cv2.COLORMAP_JET)
+
+    frame = np.zeros((IMAGE_SIZE, IMAGE_SIZE * 3, 3), dtype=np.uint8)
+    frame[:,0:IMAGE_SIZE,:] = heat_map
+    frame[:,IMAGE_SIZE:IMAGE_SIZE*2,:] = mask
+    frame[:,IMAGE_SIZE*2:IMAGE_SIZE*3,:] = vis_img
+
+    return frame
