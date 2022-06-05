@@ -86,17 +86,19 @@ def slider_changed(event):
 # Change file
 # ======================
 
+CANVAS_W = 480
+CANVAS_H = 160
 
-def create_photo_image(path,w=320,h=320):
+def create_photo_image(path,w=CANVAS_W,h=CANVAS_H):
     image_bgr = cv2.imread(path)
     if image_bgr is None:
         capture = cv2.VideoCapture(path)
         ret, image_bgr = capture.read()
         capture.release()
-    image_bgr = cv2.resize(image_bgr,(w,h))
+    #image_bgr = cv2.resize(image_bgr,(w,h))
     image_rgb = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB) # imreadはBGRなのでRGBに変換
     image_pil = Image.fromarray(image_rgb) # RGBからPILフォーマットへ変換
-    #image_pil.thumbnail((w,h), Image.ANTIALIAS)
+    image_pil.thumbnail((w,h), Image.ANTIALIAS)
     image_tk  = ImageTk.PhotoImage(image_pil) # ImageTkフォーマットへ変換
     return image_tk
 
@@ -205,10 +207,10 @@ def test_from_folder(net, params, train_outputs, threshold):
     for i in range(0, scores.shape[0]):
         img = denormalization(test_imgs[i])
         heat_map, mask, vis_img = visualize(img, scores[i], threshold)
-        vis_img = (vis_img * 255).astype(np.uint8)
+        frame = pack_visualize(heat_map, mask, vis_img, scores)
         dirname, path = os.path.split(test_list[i])
         output_path = "result/"+path
-        cv2.imwrite(output_path, vis_img)       
+        cv2.imwrite(output_path, frame)       
         result_list.append(output_path)
 
     listsResult.set(result_list)
@@ -443,22 +445,22 @@ def main():
     textStop.set("Test")
 
     textTrainFolder = tk.StringVar(frame)
-    textTrainFolder.set("Train from folder")
+    textTrainFolder.set("Open folder")
 
     textTrainVideo = tk.StringVar(frame)
-    textTrainVideo.set("Train from video")
+    textTrainVideo.set("Open video")
 
     textTrainCamera = tk.StringVar(frame)
-    textTrainCamera.set("Train from camera")
+    textTrainCamera.set("Open camera")
 
     textTestFolder = tk.StringVar(frame)
-    textTestFolder.set("Test from folder")
+    textTestFolder.set("Open folder")
 
     textTestVideo = tk.StringVar(frame)
-    textTestVideo.set("Test from video")
+    textTestVideo.set("Open video")
 
     textTestCamera = tk.StringVar(frame)
-    textTestCamera.set("Test from camera")
+    textTestCamera.set("Open camera")
 
     textInput = tk.StringVar(frame)
     textInput.set("Train images")
@@ -482,8 +484,8 @@ def main():
     labelModelDetail = tk.Label(frame, textvariable=textModelDetail)
     labelSlider = tk.Label(frame, textvariable=textSlider)
 
-    buttonRun = tk.Button(frame, textvariable=textRun, command=train_button_clicked, width=14)
-    buttonStop = tk.Button(frame, textvariable=textStop, command=test_button_clicked, width=14)
+    buttonTrain = tk.Button(frame, textvariable=textRun, command=train_button_clicked, width=14)
+    buttonTest = tk.Button(frame, textvariable=textStop, command=test_button_clicked, width=14)
 
     buttonTrainFolder = tk.Button(frame, textvariable=textTrainFolder, command=train_folder_dialog, width=14)
     buttonTrainVideo = tk.Button(frame, textvariable=textTrainVideo, command=train_file_dialog, width=14)
@@ -493,7 +495,7 @@ def main():
     buttonTestVideo = tk.Button(frame, textvariable=textTestVideo, command=test_file_dialog, width=14)
     buttonTestCamera = tk.Button(frame, textvariable=textTestCamera, command=test_camera_dialog, width=14)
 
-    canvas = tk.Canvas(frame, bg="black", width=320, height=320)
+    canvas = tk.Canvas(frame, bg="black", width=CANVAS_W, height=CANVAS_H)
     canvas.place(x=0, y=0)
 
     load_detail(test_list[0])
@@ -514,13 +516,13 @@ def main():
     labelResult.grid(row=0, column=2, sticky=tk.NW)
     ListboxResult.grid(row=1, column=2, sticky=tk.NW, rowspan=4)
 
-    labelModelDetail.grid(row=0, column=3, sticky=tk.NW)
-    canvas.grid(row=1, column=3, sticky=tk.NW, rowspan=4)
+    labelModelDetail.grid(row=0, column=3, sticky=tk.NW, columnspan=3)
+    canvas.grid(row=1, column=3, sticky=tk.NW, rowspan=4, columnspan=3)
 
-    buttonRun.grid(row=6, column=3, sticky=tk.NW)
-    buttonStop.grid(row=7, column=3, sticky=tk.NW)
+    buttonTrain.grid(row=6, column=3, sticky=tk.NW)
+    buttonTest.grid(row=6, column=4, sticky=tk.NW)
 
-    labelSlider.grid(row=8, column=3, sticky=tk.NW)
+    labelSlider.grid(row=8, column=3, sticky=tk.NW, columnspan=3)
 
     # スライダーの作成
     var_scale = tk.DoubleVar()
@@ -532,7 +534,7 @@ def main():
         tickinterval=20,
         length=200,
     )
-    scale.grid(row=9, column=3, sticky=tk.NW)
+    scale.grid(row=9, column=3, sticky=tk.NW, columnspan=3)
     print(var_scale.get())
     scale.bind("<ButtonRelease-1>", slider_changed)
 
