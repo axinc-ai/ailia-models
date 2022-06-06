@@ -40,12 +40,12 @@ result_index = 0
 slider_index = 50
 
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/padim/'
-IMAGE_RESIZE = 224
-KEEP_ASPECT = False
 
 train_folder = None
 test_folder = None
 test_type = "folder"
+
+score_cache = {}
 
 # ======================
 # Environment
@@ -123,6 +123,17 @@ def load_detail(image_path):
 # Run model
 # ======================
 
+def get_keep_aspect():
+    global valueKeepAspect
+    return valueKeepAspect.get()
+
+def get_image_resize():
+    global valueCenterCrop
+    image_resize = 224
+    if valueCenterCrop.get():
+        image_resize = 256
+    return image_resize
+
 def train_button_clicked():
     global train_folder
     print("begin training")
@@ -143,7 +154,7 @@ def train_button_clicked():
     aug = False
     aug_num = 0
     seed = 1024
-    train_outputs = training(net, params, IMAGE_RESIZE, KEEP_ASPECT, batch_size, train_dir, aug, aug_num, seed, logger)
+    train_outputs = training(net, params, get_image_resize(), get_keep_aspect(), batch_size, train_dir, aug, aug_num, seed, logger)
 
     # save learned distribution
     train_feat_file = "train.pkl"
@@ -154,11 +165,18 @@ def train_button_clicked():
         pickle.dump(train_outputs, f)
     logger.info('saved.')
 
-score_cache = {}
+    score_cache = {}
 
 def test_button_clicked():
     global score_cache
+    global valueKeepAspect, valueCenterCrop
     print("begin test")
+
+    if "keep_aspect" in score_cache:
+        if score_cache["keep_aspect"] != get_keep_aspect() or score_cache["image_resize"] != get_image_resize():
+            score_cache = {}
+    score_cache["keep_aspect"] = get_keep_aspect()
+    score_cache["image_resize"] = get_image_resize()
 
     # model files check and download
     weight_path, model_path, params = get_params("resnet18")
@@ -190,7 +208,7 @@ def test_from_folder(net, params, train_outputs, threshold):
         image_path = test_list[i_img]
         img = load_image(image_path)
         img = cv2.cvtColor(img, cv2.COLOR_BGRA2RGB)
-        img = preprocess(img, IMAGE_RESIZE, keep_aspect=KEEP_ASPECT)
+        img = preprocess(img, get_image_resize(), keep_aspect=get_keep_aspect())
 
         test_imgs.append(img[0])
         if image_path in score_cache:
@@ -244,7 +262,7 @@ def test_from_video(net, params, train_outputs, threshold):
             break
 
         img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        img = preprocess(img, IMAGE_RESIZE, keep_aspect=KEEP_ASPECT)
+        img = preprocess(img, get_image_resize(), keep_aspect=get_keep_aspect())
 
         dist_tmp = infer(net, params, train_outputs, img)
 
@@ -305,7 +323,8 @@ def train_folder_dialog():
         listsInput.set(train_list)
         train_index = 0
         ListboxInput.select_set(0)
-        load_detail(train_list[0])
+        if len(train_list)>=1:
+            load_detail(train_list[0])
 
 def train_camera_dialog():
     global listsInput, ListboxInput, input_index
@@ -332,7 +351,8 @@ def test_file_dialog():
         listsOutput.set(test_list)
         test_index = 0
         ListboxOutput.select_set(0)
-        load_detail(test_list[0])
+        if len(test_list)>=1:
+            load_detail(test_list[0])
         test_type = "video"
 
 def test_folder_dialog():
@@ -413,6 +433,7 @@ def main():
     global canvas, scale
     global inputFile, listsInput, input_list, ListboxInput
     global outputFile, listsOutput, output_list, ListboxOutput
+    global valueKeepAspect, valueCenterCrop
 
     # rootメインウィンドウの設定
     root = tk.Tk()
@@ -481,14 +502,29 @@ def main():
     textModelDetail = tk.StringVar(frame)
     textModelDetail.set("Preview")
 
+    textCheckbox = tk.StringVar(frame)
+    textCheckbox.set("Train settings")
+
+    textTestSettings = tk.StringVar(frame)
+    textTestSettings.set("Test settings")
+
     textSlider = tk.StringVar(frame)
-    textSlider.set("Threshold")
+    textSlider.set("threshold")
+
+    valueKeepAspect = tkinter.BooleanVar()
+    valueKeepAspect.set(True)
+    valueCenterCrop = tkinter.BooleanVar()
+    valueCenterCrop.set(True)
+    chkKeepAspect = tk.Checkbutton(frame, variable=valueKeepAspect, text='keep aspect')
+    chkCenterCrop = tk.Checkbutton(frame, variable=valueCenterCrop, text='center crop')
 
     # 各種ウィジェットの作成
     labelInput = tk.Label(frame, textvariable=textInput)
     labelOutput = tk.Label(frame, textvariable=textOutput)
     labelResult = tk.Label(frame, textvariable=textResult)
     labelModelDetail = tk.Label(frame, textvariable=textModelDetail)
+    labelCheckbox = tk.Label(frame, textvariable=textCheckbox)
+    labelTestSettings = tk.Label(frame, textvariable=textTestSettings)
     labelSlider = tk.Label(frame, textvariable=textSlider)
 
     buttonTrain = tk.Button(frame, textvariable=textRun, command=train_button_clicked, width=14)
@@ -506,6 +542,17 @@ def main():
     canvas.place(x=0, y=0)
 
     load_detail(test_list[0])
+
+    var_scale = tk.DoubleVar()
+    var_scale.set(slider_index)
+    scale = tk.Scale(
+        frame,
+        variable=var_scale,
+        orient=tk.HORIZONTAL,
+        tickinterval=20,
+        length=200,
+    )
+    scale.bind("<ButtonRelease-1>", slider_changed)
 
     # 各種ウィジェットの設置
     labelInput.grid(row=0, column=0, sticky=tk.NW, rowspan=1)
@@ -529,20 +576,13 @@ def main():
     buttonTrain.grid(row=6, column=3, sticky=tk.NW)
     buttonTest.grid(row=6, column=4, sticky=tk.NW)
 
-    labelSlider.grid(row=8, column=3, sticky=tk.NW, columnspan=3)
+    labelCheckbox.grid(row=8, column=3, sticky=tk.NW)
+    chkKeepAspect.grid(row=9, column=3,  sticky=tk.NW)
+    chkCenterCrop.grid(row=10, column=3,  sticky=tk.NW)
 
-    # スライダーの作成
-    var_scale = tk.DoubleVar()
-    var_scale.set(slider_index)
-    scale = tk.Scale(
-        frame,
-        variable=var_scale,
-        orient=tk.HORIZONTAL,
-        tickinterval=20,
-        length=200,
-    )
-    scale.grid(row=9, column=3, sticky=tk.NW, columnspan=3)
-    scale.bind("<ButtonRelease-1>", slider_changed)
+    labelTestSettings.grid(row=8, column=4, sticky=tk.NW, columnspan=3)
+    labelSlider.grid(row=9, column=4, sticky=tk.NW, columnspan=3)
+    scale.grid(row=10, column=4, sticky=tk.NW, columnspan=3)
 
     # メインフレームの作成と設置
     frame = ttk.Frame(root)
