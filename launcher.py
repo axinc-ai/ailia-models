@@ -165,6 +165,8 @@ def create_photo_image(path,w=320,h=240):
     return image_tk
 
 def load_image(path):
+    if not os.path.isfile(path):
+        return
     global canvas, canvas_item, image_tk
     image_tk = create_photo_image(path)
     if canvas_item == None:
