@@ -86,99 +86,6 @@ parser.add_argument(
 )
 args = update_parser(parser)
 
-
-# ======================
-# Secondaty Functions
-# ======================
-
-def show_result(
-        img,
-        bbox_result,
-        class_names,
-        score_thr=0.3,
-        bbox_color=(72, 101, 241),
-        text_color=(72, 101, 241),
-        thickness=2,
-        font_size=13):
-    bboxes = np.vstack(bbox_result)
-    labels = [
-        np.full(bbox.shape[0], i, dtype=np.int32)
-        for i, bbox in enumerate(bbox_result)
-    ]
-    labels = np.concatenate(labels)
-
-    if score_thr > 0:
-        scores = bboxes[:, -1]
-        inds = scores > score_thr
-        bboxes = bboxes[inds, :]
-        labels = labels[inds]
-
-    bbox_color = [color / 255 for color in bbox_color[::-1]]
-    text_color = [color / 255 for color in text_color[::-1]]
-
-    img = img[:, :, ::-1]  # BGR -> RGB
-
-    width, height = img.shape[1], img.shape[0]
-
-    fig = plt.figure('', frameon=False)
-    canvas = fig.canvas
-    dpi = fig.get_dpi()
-
-    # add a small EPS to avoid precision lost due to matplotlib's truncation
-    # (https://github.com/matplotlib/matplotlib/issues/15363)
-    eps = 1e-2
-    fig.set_size_inches((width + eps) / dpi, (height + eps) / dpi)
-
-    # remove white edges by set subplot margin
-    plt.subplots_adjust(left=0, right=1, bottom=0, top=1)
-    ax = plt.gca()
-    ax.axis('off')
-
-    polygons = []
-    color = []
-    for i, (bbox, label) in enumerate(zip(bboxes, labels)):
-        bbox_int = bbox.astype(np.int32)
-        poly = [[bbox_int[0], bbox_int[1]], [bbox_int[0], bbox_int[3]],
-                [bbox_int[2], bbox_int[3]], [bbox_int[2], bbox_int[1]]]
-        np_poly = np.array(poly).reshape((4, 2))
-        polygons.append(Polygon(np_poly))
-        color.append(bbox_color)
-        label_text = class_names[
-            label] if class_names is not None else f'class {label}'
-        if len(bbox) > 4:
-            label_text += f'|{bbox[-1]:.02f}'
-        ax.text(
-            bbox_int[0],
-            bbox_int[1],
-            f'{label_text}',
-            bbox={
-                'facecolor': 'black',
-                'alpha': 0.8,
-                'pad': 0.7,
-                'edgecolor': 'none'
-            },
-            color=text_color,
-            fontsize=font_size,
-            verticalalignment='top',
-            horizontalalignment='left')
-
-    plt.imshow(img)
-
-    p = PatchCollection(
-        polygons, facecolor='none', edgecolors=color, linewidths=thickness)
-    ax.add_collection(p)
-
-    stream, _ = canvas.print_to_buffer()
-    buffer = np.frombuffer(stream, dtype=np.uint8)
-    img_rgba = buffer.reshape(height, width, 4)
-    rgb, alpha = np.split(img_rgba, [3], axis=2)
-    img = rgb.astype(np.uint8)
-
-    img = img[:, :, ::-1]  # RGB -> BGR
-
-    return img
-
-
 # ======================
 # Main functions
 # ======================
@@ -349,10 +256,10 @@ def recognize_from_video(net):
 
         # inference
         img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        bbox_result = predict(net, img)
+        detect_object = predict(net, img)
 
         # plot result
-        res_img = show_result(frame, bbox_result, COCO_CATEGORY, score_thr=score_thr)
+        res_img = plot_results(detect_object, frame, COCO_CATEGORY)
 
         # show
         cv2.imshow('frame', res_img)
