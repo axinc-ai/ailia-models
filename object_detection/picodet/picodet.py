@@ -13,13 +13,13 @@ import ailia
 sys.path.append('../../util')
 from utils import get_base_parser, update_parser, get_savepath  # noqa
 from model_utils import check_and_download_models  # noqa
-from detector_utils import load_image  # noqa
 from image_utils import normalize_image  # noqa
+from detector_utils import load_image, plot_results, write_predictions  # noqa
 from webcamera_utils import get_capture, get_writer  # noqa
 # logger
 from logging import getLogger  # noqa
 
-from picodet_utils import grid_priors, get_bboxes, bbox2result
+from picodet_utils import grid_priors, get_bboxes
 
 logger = getLogger(__name__)
 
@@ -35,19 +35,21 @@ WEIGHT_L_640_PATH = 'picodet_l_640_coco.onnx'
 MODEL_L_640_PATH = 'picodet_l_640_coco.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/picodet/'
 
-CLASS_NAMES = (
-    'person', 'bicycle', 'car', 'motorcycle', 'airplane', 'bus', 'train', 'truck', 'boat', 'traffic light',
-    'fire hydrant',
-    'stop sign', 'parking meter', 'bench', 'bird', 'cat', 'dog', 'horse', 'sheep', 'cow', 'elephant', 'bear', 'zebra',
-    'giraffe', 'backpack', 'umbrella', 'handbag', 'tie', 'suitcase', 'frisbee', 'skis', 'snowboard', 'sports ball',
-    'kite',
-    'baseball bat', 'baseball glove', 'skateboard', 'surfboard', 'tennis racket', 'bottle', 'wine glass', 'cup', 'fork',
-    'knife', 'spoon', 'bowl', 'banana', 'apple', 'sandwich', 'orange', 'broccoli', 'carrot', 'hot dog', 'pizza',
-    'donut',
-    'cake', 'chair', 'couch', 'potted plant', 'bed', 'dining table', 'toilet', 'tv', 'laptop', 'mouse', 'remote',
-    'keyboard', 'cell phone', 'microwave', 'oven', 'toaster', 'sink', 'refrigerator', 'book', 'clock', 'vase',
-    'scissors',
-    'teddy bear', 'hair drier', 'toothbrush')
+COCO_CATEGORY = (
+    "person", "bicycle", "car", "motorcycle", "airplane", "bus", "train",
+    "truck", "boat", "traffic light", "fire hydrant", "stop sign",
+    "parking meter", "bench", "bird", "cat", "dog", "horse", "sheep", "cow",
+    "elephant", "bear", "zebra", "giraffe", "backpack", "umbrella",
+    "handbag", "tie", "suitcase", "frisbee", "skis", "snowboard",
+    "sports ball", "kite", "baseball bat", "baseball glove", "skateboard",
+    "surfboard", "tennis racket", "bottle", "wine glass", "cup", "fork",
+    "knife", "spoon", "bowl", "banana", "apple", "sandwich", "orange",
+    "broccoli", "carrot", "hot dog", "pizza", "donut", "cake", "chair",
+    "couch", "potted plant", "bed", "dining table", "toilet", "tv",
+    "laptop", "mouse", "remote", "keyboard", "cell phone", "microwave",
+    "oven", "toaster", "sink", "refrigerator", "book", "clock", "vase",
+    "scissors", "teddy bear", "hair drier", "toothbrush"
+)
 
 IMAGE_PATH = 'demo.jpg'
 SAVE_IMAGE_PATH = 'output.png'
@@ -71,6 +73,11 @@ parser.add_argument(
     '-iou', '--iou',
     default=IOU, type=float,
     help='IOU threshold for NMS'
+)
+parser.add_argument(
+    '-w', '--write_prediction',
+    action='store_true',
+    help='Flag to output the prediction file.'
 )
 parser.add_argument(
     '-m', '--model_type', default='s-416',
@@ -211,7 +218,8 @@ def preprocess(img, image_shape):
     return img, scale_factor
 
 
-def post_processing(output, img_shape, scale_factor):
+def post_processing(img, output, out_shape, scale_factor):
+    im_h, im_w = img.shape[:2]
     cls_scores = output[:4]
     bbox_preds = output[4:]
 
@@ -227,18 +235,31 @@ def post_processing(output, img_shape, scale_factor):
         bbox_preds[i][0] for i in range(num_levels)
     ]
 
-    num_classes = len(CLASS_NAMES)
+    num_classes = len(COCO_CATEGORY)
     nms_thre = args.iou
 
     det_bboxes, det_labels = get_bboxes(
         cls_score_list, bbox_pred_list, mlvl_priors,
-        img_shape, num_classes,
+        out_shape, num_classes,
         scale_factor=scale_factor, with_nms=True, nms_thre=nms_thre
     )
 
-    bbox_result = bbox2result(det_bboxes, det_labels, num_classes)
+    detections = []
+    for bbox, label in zip(det_bboxes, det_labels):
+        x1, y1, x2, y2, prob = bbox
+        if prob < args.threshold:
+            break
+        r = ailia.DetectorObject(
+            category=label,
+            prob=bbox[4],
+            x=x1 / im_w,
+            y=y1 / im_h,
+            w=(x2 - x1) / im_w,
+            h=(y2 - y1) / im_h,
+        )
+        detections.append(r)
 
-    return bbox_result
+    return detections
 
 
 def predict(net, img):
@@ -249,14 +270,14 @@ def predict(net, img):
     }
     shape = dic_shape[args.model_type]
 
-    img, scale_factor = preprocess(img, shape)
+    pp_img, scale_factor = preprocess(img, shape)
 
     # feedforward
-    output = net.predict([img])
+    output = net.predict([pp_img])
 
-    bbox_result = post_processing(output, shape, scale_factor)
+    detect_object = post_processing(img, output, shape, scale_factor)
 
-    return bbox_result
+    return detect_object
 
 
 def recognize_from_image(net):
@@ -275,7 +296,7 @@ def recognize_from_image(net):
             total_time_estimation = 0
             for i in range(args.benchmark_count):
                 start = int(round(time.time() * 1000))
-                bbox_result = predict(net, img)
+                detect_object = predict(net, img)
                 end = int(round(time.time() * 1000))
                 estimation_time = (end - start)
 
@@ -286,15 +307,19 @@ def recognize_from_image(net):
 
             logger.info(f'\taverage time estimation {total_time_estimation / (args.benchmark_count - 1)} ms')
         else:
-            bbox_result = predict(net, img)
+            detect_object = predict(net, img)
 
-        score_thr = args.threshold
-        res_img = show_result(img, bbox_result, CLASS_NAMES, score_thr=score_thr)
+        res_img = plot_results(detect_object, img, COCO_CATEGORY)
 
         # plot result
         savepath = get_savepath(args.savepath, image_path, ext='.png')
         logger.info(f'saved at : {savepath}')
         cv2.imwrite(savepath, res_img)
+
+        # write prediction
+        if args.write_prediction:
+            pred_file = '%s.txt' % savepath.rsplit('.', 1)[0]
+            write_predictions(pred_file, detect_object, img, COCO_CATEGORY)
 
     logger.info('Script finished successfully.')
 
@@ -327,7 +352,7 @@ def recognize_from_video(net):
         bbox_result = predict(net, img)
 
         # plot result
-        res_img = show_result(frame, bbox_result, CLASS_NAMES, score_thr=score_thr)
+        res_img = show_result(frame, bbox_result, COCO_CATEGORY, score_thr=score_thr)
 
         # show
         cv2.imshow('frame', res_img)
