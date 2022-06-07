@@ -148,7 +148,7 @@ def post_processing(img, output, out_shape, scale_factor):
     det_bboxes, det_labels = get_bboxes(
         cls_score_list, bbox_pred_list, mlvl_priors,
         out_shape, num_classes,
-        scale_factor=scale_factor, with_nms=True, nms_thre=nms_thre
+        scale_factor=scale_factor, with_nms=True, nms_thre=nms_thre, score_thr = args.threshold
     )
 
     detections = []
@@ -180,7 +180,23 @@ def predict(net, img):
     pp_img, scale_factor = preprocess(img, shape)
 
     # feedforward
-    output = net.predict([pp_img])
+    if args.benchmark:
+        logger.info('BENCHMARK mode')
+        total_time_estimation = 0
+        for i in range(args.benchmark_count):
+            start = int(round(time.time() * 1000))
+            output = net.predict([pp_img])
+            end = int(round(time.time() * 1000))
+            estimation_time = (end - start)
+
+            # Loggin
+            logger.info(f'\tailia processing estimation time {estimation_time} ms')
+            if i != 0:
+                total_time_estimation = total_time_estimation + estimation_time
+
+        logger.info(f'\taverage time estimation {total_time_estimation / (args.benchmark_count - 1)} ms')
+    else:
+        output = net.predict([pp_img])
 
     detect_object = post_processing(img, output, shape, scale_factor)
 
@@ -198,24 +214,7 @@ def recognize_from_image(net):
 
         # inference
         logger.info('Start inference...')
-        if args.benchmark:
-            logger.info('BENCHMARK mode')
-            total_time_estimation = 0
-            for i in range(args.benchmark_count):
-                start = int(round(time.time() * 1000))
-                detect_object = predict(net, img)
-                end = int(round(time.time() * 1000))
-                estimation_time = (end - start)
-
-                # Loggin
-                logger.info(f'\tailia processing estimation time {estimation_time} ms')
-                if i != 0:
-                    total_time_estimation = total_time_estimation + estimation_time
-
-            logger.info(f'\taverage time estimation {total_time_estimation / (args.benchmark_count - 1)} ms')
-        else:
-            detect_object = predict(net, img)
-
+        detect_object = predict(net, img)
         res_img = plot_results(detect_object, img, COCO_CATEGORY)
 
         # plot result
