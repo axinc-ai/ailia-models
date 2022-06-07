@@ -307,7 +307,8 @@ def get_bboxes(
         cls_channels,
         scale_factor=None,
         with_nms=True,
-        nms_thre=0.6):
+        nms_thre=0.6,
+        score_thr = 0.025):
     """Transform outputs of a single image into bbox predictions.
 
     Args:
@@ -362,7 +363,6 @@ def get_bboxes(
         # There is no difference in performance for most models. If you
         # find a slight drop in performance, you can set a larger
         # `nms_pre` than before.
-        score_thr = 0.025
         nms_pre = 1000
         results = filter_scores_and_topk(
             scores, score_thr, nms_pre,
