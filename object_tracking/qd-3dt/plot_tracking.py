@@ -1,18 +1,22 @@
 import os
+from logging import getLogger  # noqa
 from typing import Optional
 
-import numpy as np
 import cv2
-from matplotlib import pyplot as plt
+import numpy as np
 from matplotlib import patches as mpatches
+from matplotlib import pyplot as plt
 from matplotlib.ticker import MultipleLocator
 from pyquaternion import Quaternion
-
-from logging import getLogger  # noqa
 
 import tracking_utils as tu
 
 logger = getLogger(__name__)
+import sys
+
+sys.path.append('../../util')
+
+from image_utils import imread  # noqa: E402
 
 
 def xywh2xyxy(bbox: list):
@@ -678,7 +682,7 @@ class Visualizer:
                 print(f"Frame {n_frame} ...")
 
             # Get objects
-            img = cv2.imread(pd_objects['im_path'])
+            img = imread(pd_objects['im_path'])
             (test_width, text_height), baseline = cv2.getTextSize(
                 str(n_frame), self.FONT, self.FONT_SCALE,
                 self.FONT_THICKNESS * 2)

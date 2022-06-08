@@ -3,21 +3,22 @@ import colorsys
 import sys
 import time
 
+import ailia
 import cv2
 import numpy as np
 
-import ailia
 import ax_facial_features_utils as fut
 
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
-from webcamera_utils import get_capture, get_writer  # noqa: E402
-from image_utils import load_image  # noqa: E402
-from model_utils import check_and_download_models  # noqa: E402
-from math_utils import softmax
-
 # logger
-from logging import getLogger   # noqa: E402
+from logging import getLogger  # noqa: E402
+
+from image_utils import imread, load_image  # noqa: E402
+from math_utils import softmax
+from model_utils import check_and_download_models  # noqa: E402
+from utils import get_base_parser, get_savepath, update_parser  # noqa: E402
+from webcamera_utils import get_capture, get_writer  # noqa: E402
+
 logger = getLogger(__name__)
 
 
@@ -230,7 +231,7 @@ def recognize_from_image():
         for i in range(n):
             start = time.perf_counter()
             for img_path in args.input:
-                img = cv2.imread(img_path)
+                img = imread(img_path)
                 res = predict(models, img)
                 print_results(res)
             duration = time.perf_counter() - start
@@ -242,7 +243,7 @@ def recognize_from_image():
         )
     else:
         for img_path in args.input:
-            img = cv2.imread(img_path)
+            img = imread(img_path)
             res = predict(models, img)
             print_results(res)
             # plot_results(img, res, horizontal_flip=True)

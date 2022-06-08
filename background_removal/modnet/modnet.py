@@ -1,21 +1,22 @@
 #ailia detector api sample
-import numpy as np
-import time
 import sys
+import time
+
+import ailia
 import cv2
+import numpy as np
 
 from modnet_utils import get_scale_factor
 
-import ailia
-
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath
-from model_utils import check_and_download_models
-import webcamera_utils
-
 # logger
 from logging import getLogger
+
+import webcamera_utils
+from image_utils import imread  # noqa: E402
+from model_utils import check_and_download_models
+from utils import get_base_parser, get_savepath, update_parser
 
 logger = getLogger(__name__)
 
@@ -50,7 +51,7 @@ def recognize_from_image():
     for image_path in args.input:
         # prepare input data
         logger.debug(f'input image: {image_path}')
-        raw_img = cv2.imread(image_path)
+        raw_img = imread(image_path)
         img = cv2.cvtColor(raw_img, cv2.COLOR_BGR2RGB)
         img = (img - 127.5) / 127.5
         im_h, im_w, im_c = img.shape

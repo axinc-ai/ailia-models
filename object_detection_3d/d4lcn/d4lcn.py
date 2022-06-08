@@ -1,27 +1,28 @@
-import sys
+import math
 import os
+import sys
 import time
 from io import StringIO
-import math
-
-import numpy as np
-import cv2
-import matplotlib.pyplot as plt
 
 import ailia
+import cv2
+import matplotlib.pyplot as plt
+import numpy as np
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath  # noqa
-from model_utils import check_and_download_models  # noqa
-from detector_utils import load_image  # noqa
-from nms_utils import nms_boxes  # noqa
 # logger
 from logging import getLogger  # noqa
 
-from d4lcn_utils import bbox_transform_inv, hill_climb
-from d4lcn_utils import convertAlpha2Rot, convertRot2Alpha
-from instance_utils import read_annot, read_calib_file, get_2d
+from detector_utils import load_image  # noqa
+from image_utils import imread  # noqa: E402
+from model_utils import check_and_download_models  # noqa
+from nms_utils import nms_boxes  # noqa
+from utils import get_base_parser, get_savepath, update_parser  # noqa
+
+from d4lcn_utils import (bbox_transform_inv, convertAlpha2Rot,
+                         convertRot2Alpha, hill_climb)
+from instance_utils import get_2d, read_annot, read_calib_file
 from points_utils import plot_3d_bbox
 
 logger = getLogger(__name__)
@@ -419,7 +420,7 @@ def recognize_from_image(net):
         # depth
         name = os.path.splitext(os.path.basename(image_path))[0]
         path = get_depth(depth_path, name)
-        depth = cv2.imread(path, cv2.IMREAD_UNCHANGED)
+        depth = imread(path, cv2.IMREAD_UNCHANGED)
         depth = depth[:, :, np.newaxis]
         depth = np.tile(depth, (1, 1, 3))
 

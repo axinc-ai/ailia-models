@@ -1,24 +1,26 @@
-import numpy as np
-import time
+import math
 import os
 import sys
-import cv2
-import math
-
-from yolox_utils import preproc as preprocess
-from yolox_utils import multiclass_nms, postprocess, predictions_to_object
+import time
 
 import ailia
+import cv2
+import numpy as np
+
+from yolox_utils import multiclass_nms, postprocess, predictions_to_object
+from yolox_utils import preproc as preprocess
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath
-from model_utils import check_and_download_models
-from detector_utils import load_image, reverse_letterbox, plot_results, write_predictions
-import webcamera_utils
-
 # logger
 from logging import getLogger
+
+import webcamera_utils
+from detector_utils import (load_image, plot_results, reverse_letterbox,
+                            write_predictions)
+from image_utils import imread  # noqa: E402
+from model_utils import check_and_download_models
+from utils import get_base_parser, get_savepath, update_parser
 
 logger = getLogger(__name__)
 
@@ -116,7 +118,7 @@ def recognize_from_image(detector):
     for image_path in args.input:
         # prepare input data
         logger.debug(f'input image: {image_path}')
-        raw_img = cv2.imread(image_path, cv2.IMREAD_COLOR)
+        raw_img = imread(image_path, cv2.IMREAD_COLOR)
         if not args.detector:
             img, ratio = preprocess(raw_img, (HEIGHT, WIDTH))
         logger.debug(f'input image shape: {raw_img.shape}')

@@ -1,24 +1,26 @@
 import argparse
-import os, sys
+import os
+import sys
 import time
 from pathlib import Path
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(BASE_DIR)
 
-import cv2
-import numpy as np
-
-from tqdm import tqdm
-from yolop_utils import non_max_suppression , LoadImages, LoadStreams,letterbox_for_img
-import matplotlib.pyplot as plt
-
 import ailia
+import cv2
+import matplotlib.pyplot as plt
+import numpy as np
+from tqdm import tqdm
+
+from yolop_utils import (LoadImages, LoadStreams, letterbox_for_img,
+                         non_max_suppression)
+
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath
-from model_utils import check_and_download_models  # noqa: E402
 import webcamera_utils  # noqa: E402
+from model_utils import check_and_download_models  # noqa: E402
 from PIL import Image
+from utils import get_base_parser, get_savepath, update_parser
 
 WEIGHT_PATH = 'yolop.onnx'
 MODEL_PATH  = 'yolop.onnx.prototxt'

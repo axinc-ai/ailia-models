@@ -1,22 +1,23 @@
 import sys
 import time
-import cv2
 
 import ailia
+import cv2
 
-from mlp_mixer_utils import *
 from mlp_mixer_labels import imagenet_category
+from mlp_mixer_utils import *
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser  # noqa: E402
-from model_utils import check_and_download_models  # noqa: E402
-from classifier_utils import plot_results, print_results  # noqa: E402
-from image_utils import load_image  # noqa: E402
-import webcamera_utils  # noqa: E402
-
 # logger
-from logging import getLogger   # noqa: E402
+from logging import getLogger  # noqa: E402
+
+import webcamera_utils  # noqa: E402
+from classifier_utils import plot_results, print_results  # noqa: E402
+from image_utils import imread, load_image  # noqa: E402
+from model_utils import check_and_download_models  # noqa: E402
+from utils import get_base_parser, update_parser  # noqa: E402
+
 logger = getLogger(__name__)
 
 
@@ -61,7 +62,7 @@ def recognize_from_image():
     for image_path in args.input:
         # prepare input data
         logger.info(image_path)
-        input_img = cv2.imread(image_path)
+        input_img = imread(image_path)
         input_data = preprocess_input(input_img, IMAGE_HEIGHT, IMAGE_WIDTH)
 
         # inference

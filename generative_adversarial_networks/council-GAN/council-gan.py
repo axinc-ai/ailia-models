@@ -1,20 +1,22 @@
 import sys
 import time
 
+import ailia
 import cv2
 import numpy as np
 
-import ailia
-
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
-from model_utils import check_and_download_models  # noqa: E402
-from yolo_face import FaceLocator  # noqa: E402
-import webcamera_utils  # noqa: E402
-
 # logger
-from logging import getLogger   # noqa: E402
+from logging import getLogger  # noqa: E402
+
+import webcamera_utils  # noqa: E402
+from image_utils import imread  # noqa: E402
+from model_utils import check_and_download_models  # noqa: E402
+from utils import get_base_parser, get_savepath, update_parser  # noqa: E402
+
+from yolo_face import FaceLocator  # noqa: E402
+
 logger = getLogger(__name__)
 
 
@@ -196,7 +198,7 @@ def transform_image():
     for image_path in args.input:
         # prepare input data
         logger.info(image_path)
-        image = cv2.imread(image_path)
+        image = imread(image_path)
 
         if args.face_recognition:
             locator = FaceLocator()

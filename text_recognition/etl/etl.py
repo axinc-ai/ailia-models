@@ -1,18 +1,20 @@
+import codecs
 import sys
 import time
-import codecs
-
-import cv2
 
 import ailia
+import cv2
+
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser  # noqa: E402
-from model_utils import check_and_download_models  # noqa: E402
-import webcamera_utils  # noqa: E402
-
 # logger
-from logging import getLogger   # noqa: E402
+from logging import getLogger  # noqa: E402
+
+import webcamera_utils  # noqa: E402
+from image_utils import imread  # noqa: E402
+from model_utils import check_and_download_models  # noqa: E402
+from utils import get_base_parser, update_parser  # noqa: E402
+
 logger = getLogger(__name__)
 
 
@@ -70,7 +72,7 @@ def recognize_from_image():
         # prepare input data
         logger.info(image_path)
         etl_word = codecs.open(ETL_PATH, 'r', 'utf-8').readlines()
-        img = cv2.imread(image_path, cv2.IMREAD_UNCHANGED)
+        img = imread(image_path, cv2.IMREAD_UNCHANGED)
         if img is None:
             logger.error("can not open "+image_path)
             continue

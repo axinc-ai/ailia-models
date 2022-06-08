@@ -1,10 +1,15 @@
-import time
-import os
 import glob
+import os
+import sys
+import time
 from pathlib import Path
 
-import numpy as np
 import cv2
+import numpy as np
+
+sys.path.append('../../util')
+from image_utils import imread  # noqa: E402
+
 
 def nms_cpu(boxes, confs, nms_thresh=0.5, min_mode=False):
     # print(boxes.shape)
@@ -245,7 +250,7 @@ class LoadImages:  # for inference
         else:
             # Read image
             self.count += 1
-            img0 = cv2.imread(path, cv2.IMREAD_COLOR | cv2.IMREAD_IGNORE_ORIENTATION)  # BGR
+            img0 = imread(path, cv2.IMREAD_COLOR | cv2.IMREAD_IGNORE_ORIENTATION)  # BGR
             assert img0 is not None, 'Image Not Found ' + path
             print('image %g/%g %s: \n' % (self.count, self.nf, path), end='')
             h0, w0 = img0.shape[:2]

@@ -1,22 +1,22 @@
 import sys
 import time
 
-import numpy as np
-import cv2
-
 import ailia
+import cv2
+import numpy as np
+
 import blazeface_utils as but
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
-from model_utils import check_and_download_models  # noqa: E402
-from image_utils import normalize_image  # noqa: E402C
-from detector_utils import load_image  # noqa: E402C
-import webcamera_utils  # noqa: E402
-
 # logger
 from logging import getLogger  # noqa: E402
+
+import webcamera_utils  # noqa: E402
+from detector_utils import load_image  # noqa: E402C
+from image_utils import imread, normalize_image  # noqa: E402C
+from model_utils import check_and_download_models  # noqa: E402
+from utils import get_base_parser, get_savepath, update_parser  # noqa: E402
 
 logger = getLogger(__name__)
 
@@ -97,7 +97,7 @@ def recognize_from_image(net):
     for image_path in args.input:
         # prepare input data
         logger.info(image_path)
-        org_img = cv2.imread(image_path, cv2.IMREAD_COLOR)
+        org_img = imread(image_path, cv2.IMREAD_COLOR)
 
         input_data = load_image(image_path)
         input_data = cv2.cvtColor(input_data, cv2.COLOR_BGRA2RGB)

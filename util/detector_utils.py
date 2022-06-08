@@ -1,12 +1,15 @@
 import os
 import sys
-
-import numpy as np
-import cv2
-import ailia
-
 from logging import getLogger
+
+import ailia
+import cv2
+import numpy as np
+
 logger = getLogger(__name__)
+
+sys.path.append(os.path.dirname(__file__))
+from image_utils import imread  # noqa: E402
 
 
 def preprocessing_img(img):
@@ -21,7 +24,7 @@ def preprocessing_img(img):
 
 def load_image(image_path):
     if os.path.isfile(image_path):
-        img = cv2.imread(image_path, cv2.IMREAD_UNCHANGED)
+        img = imread(image_path, cv2.IMREAD_UNCHANGED)
     else:
         logger.error(f'{image_path} not found.')
         sys.exit()

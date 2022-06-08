@@ -1,19 +1,19 @@
-import time
 import sys
-
-import numpy as np
-import cv2
-import matplotlib.pyplot as plt
+import time
 
 import ailia
+import cv2
+import matplotlib.pyplot as plt
+import numpy as np
 
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
-from image_utils import load_image  # noqa: E402
-from model_utils import check_and_download_models  # noqa: E402
-
 # logger
-from logging import getLogger   # noqa: E402
+from logging import getLogger  # noqa: E402
+
+from image_utils import imread, load_image  # noqa: E402
+from model_utils import check_and_download_models  # noqa: E402
+from utils import get_base_parser, get_savepath, update_parser  # noqa: E402
+
 logger = getLogger(__name__)
 
 
@@ -84,7 +84,7 @@ def main():
     for image_path in args.input:
         # prepare input data
         logger.info(image_path)
-        src_img = cv2.imread(image_path)
+        src_img = imread(image_path)
         input_image = load_image(
             image_path,
             (IMAGE_HEIGHT, IMAGE_WIDTH),

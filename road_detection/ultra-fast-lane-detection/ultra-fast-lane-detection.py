@@ -1,19 +1,21 @@
+import glob
 import sys
 import time
-import numpy as np
-import glob
-import cv2
 
-import onnxruntime
 import ailia
+import cv2
+import numpy as np
+import onnxruntime
 
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
-from model_utils import check_and_download_models  # noqa: E402
-import webcamera_utils  # noqa: E402
-
 # logger
-from logging import getLogger   # noqa: E402
+from logging import getLogger  # noqa: E402
+
+import webcamera_utils  # noqa: E402
+from image_utils import imread  # noqa: E402
+from model_utils import check_and_download_models  # noqa: E402
+from utils import get_base_parser, get_savepath, update_parser  # noqa: E402
+
 logger = getLogger(__name__)
 
 # ======================
@@ -129,12 +131,14 @@ def postprocessing(vis,y):
                     ppp = (int(out_j[k, i] * col_sample_w * img_w / INPUT_WIDTH) - 1, int(img_h * (row_anchor[cls_num_per_lane-1-k]/INPUT_HEIGHT)) - 1 )
                     cv2.circle(vis,ppp,5,(0,255,0),-1)
 
-import scipy.special, tqdm
+import scipy.special
+import tqdm
+
 
 def recognize_from_image(net):
     # input image loop
     for image_path in args.input:
-        img = cv2.imread(image_path)
+        img = imread(image_path)
 
         if args.onnx:
             input_name = 'input.1'

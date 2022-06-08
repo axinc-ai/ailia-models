@@ -1,21 +1,22 @@
 import sys
 import time
 
+import ailia
 import cv2
 import numpy as np
 
-import ailia
 import blazepalm_utils as but
 
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
-from webcamera_utils import get_capture, get_writer  # noqa: E402
-from image_utils import load_image  # noqa: E402
-from model_utils import check_and_download_models  # noqa: E402
-import webcamera_utils  # noqa: E402
-
 # logger
-from logging import getLogger   # noqa: E402
+from logging import getLogger  # noqa: E402
+
+import webcamera_utils  # noqa: E402
+from image_utils import imread, load_image  # noqa: E402
+from model_utils import check_and_download_models  # noqa: E402
+from utils import get_base_parser, get_savepath, update_parser  # noqa: E402
+from webcamera_utils import get_capture, get_writer  # noqa: E402
+
 logger = getLogger(__name__)
 
 
@@ -126,7 +127,7 @@ def recognize_from_image():
     for image_path in args.input:
         # prepare input data
         logger.info(image_path)
-        src_img = cv2.imread(image_path)
+        src_img = imread(image_path)
         img256, _, scale, pad = but.resize_pad(src_img[:, :, ::-1],IMAGE_WIDTH)
         input_data = img256.astype('float32') / 255.
         input_data = np.expand_dims(np.moveaxis(input_data, -1, 0), 0)
