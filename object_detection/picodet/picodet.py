@@ -27,6 +27,8 @@ logger = getLogger(__name__)
 # Parameters
 # ======================
 
+WEIGHT_S_320_PATH = 'picodet_s_320_coco.onnx'
+MODEL_S_320_PATH = 'picodet_s_320_coco.onnx.prototxt'
 WEIGHT_S_416_PATH = 'picodet_s_416_coco.onnx'
 MODEL_S_416_PATH = 'picodet_s_416_coco.onnx.prototxt'
 WEIGHT_M_416_PATH = 'picodet_m_416_coco.onnx'
@@ -81,10 +83,11 @@ parser.add_argument(
 )
 parser.add_argument(
     '-m', '--model_type', default='s-416',
-    choices=('s-416', 'm-416', 'l-640'),
+    choices=('s-320', 's-416', 'm-416', 'l-640'),
     help='model type'
 )
 args = update_parser(parser)
+
 
 # ======================
 # Main functions
@@ -148,7 +151,7 @@ def post_processing(img, output, out_shape, scale_factor):
     det_bboxes, det_labels = get_bboxes(
         cls_score_list, bbox_pred_list, mlvl_priors,
         out_shape, num_classes,
-        scale_factor=scale_factor, with_nms=True, nms_thre=nms_thre, score_thr = args.threshold
+        scale_factor=scale_factor, with_nms=True, nms_thre=nms_thre, score_thr=args.threshold
     )
 
     detections = []
@@ -171,6 +174,7 @@ def post_processing(img, output, out_shape, scale_factor):
 
 def predict(net, img):
     dic_shape = {
+        's-320': (320, 320),
         's-416': (416, 416),
         'm-416': (416, 416),
         'l-640': (640, 640),
@@ -279,6 +283,7 @@ def recognize_from_video(net):
 
 def main():
     dic_model = {
+        's-320': (WEIGHT_S_320_PATH, MODEL_S_320_PATH),
         's-416': (WEIGHT_S_416_PATH, MODEL_S_416_PATH),
         'm-416': (WEIGHT_M_416_PATH, MODEL_M_416_PATH),
         'l-640': (WEIGHT_L_640_PATH, MODEL_L_640_PATH),
