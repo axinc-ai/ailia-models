@@ -324,12 +324,11 @@ def recognize_from_video(net):
 def main():
     # model files check and download
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
-    if args.trimap == "":
-        check_and_download_models(
-            SEGMENTATION_WEIGHT_PATH,
-            SEGMENTATION_MODEL_PATH,
-            SEGMENTATION_REMOTE_PATH,
-        )
+    check_and_download_models(
+        SEGMENTATION_WEIGHT_PATH,
+        SEGMENTATION_MODEL_PATH,
+        SEGMENTATION_REMOTE_PATH,
+    )
 
     # net initialize
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH)

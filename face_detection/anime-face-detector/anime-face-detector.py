@@ -233,7 +233,7 @@ def predict(landmark_detector, face_detector, img):
 
     pose_results = []
     if len(bboxes) == 0:
-        return pose_results
+        return pose_results, bboxes
 
     bboxes_xywh = xyxy2xywh(bboxes)
 
