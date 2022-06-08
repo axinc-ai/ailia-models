@@ -71,8 +71,8 @@ cd ../../frame_interpolation/cain; python3 cain.py ${OPTION}
 cd ../../generative_adversarial_networks/council-GAN; python3 council-gan.py --glasses ${OPTION}
 cd ../../generative_adversarial_networks/council-GAN; python3 council-gan.py --m2f ${OPTION}
 cd ../../generative_adversarial_networks/council-GAN; python3 council-gan.py --anime ${OPTION}
-cd ../../generative_adversarial_networks/pytorch-gan; python3 pytorch-gnet.py -m celeb ${OPTION}
-cd ../../generative_adversarial_networks/pytorch-gan; python3 pytorch-gnet.py -m anime ${OPTION}
+cd ../../generative_adversarial_networks/pytorch-gan; python3 pytorch-gan.py -m celeb ${OPTION}
+cd ../../generative_adversarial_networks/pytorch-gan; python3 pytorch-gan.py -m anime ${OPTION}
 cd ../../generative_adversarial_networks/restyle-encoder; python3 restyle-encoder.py ${OPTION}
 cd ../../generative_adversarial_networks/sam; python3 sam.py ${OPTION}
 cd ../../generative_adversarial_networks/psgan; python3 psgan.py ${OPTION}
