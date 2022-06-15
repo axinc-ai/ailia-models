@@ -27,10 +27,18 @@ logger = getLogger(__name__)
 # Parameters
 # ======================
 
-WEIGHT_PATH = 'xxx.onnx'
-MODEL_PATH = 'xxx.onnx.prototxt'
-WEIGHT_XXX_PATH = 'xxx.onnx'
-MODEL_XXX_PATH = 'xxx.onnx.prototxt'
+WEIGHT_TRANS_EMB_PATH = 'transformer_emb.onnx'
+MODEL_TRANS_EMB_PATH = 'transformer_emb.onnx.prototxt'
+WEIGHT_TRANS_ATTN_PATH = 'transformer_attn.onnx'
+MODEL_TRANS_ATTN_PATH = 'transformer_attn.onnx.prototxt'
+WEIGHT_DFSN_EMB_PATH = 'diffusion_emb.onnx'
+MODEL_DFSN_EMB_PATH = 'diffusion_emb.onnx.prototxt'
+WEIGHT_DFSN_MID_PATH = 'diffusion_mid.onnx'
+MODEL_DFSN_MID_PATH = 'diffusion_mid.onnx.prototxt'
+WEIGHT_DFSN_OUT_PATH = 'diffusion_out.onnx'
+MODEL_DFSN_OUT_PATH = 'diffusion_out.onnx.prototxt'
+WEIGHT_AUTO_ENC_PATH = 'autoencoder.onnx'
+MODEL_AUTO_ENC_PATH = 'autoencoder.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/latent-diffusion-txt2img/'
 
 # ======================
@@ -77,7 +85,28 @@ def make_ddim_sampling_parameters(alphacums, ddim_timesteps, eta):
 # Main functions
 # ======================
 
+"""
+ddim_timesteps
+"""
+ddim_num_steps = 50
+ddpm_num_timesteps = 1000
+ddim_timesteps = make_ddim_timesteps(
+    ddim_num_steps, ddpm_num_timesteps)
 
+"""
+ddim sampling parameters
+"""
+ddim_eta = 0.0
+ddim_sigmas, ddim_alphas, ddim_alphas_prev = \
+    make_ddim_sampling_parameters(
+        alphacums=alphas_cumprod,
+        ddim_timesteps=ddim_timesteps,
+        eta=ddim_eta)
+
+ddim_sqrt_one_minus_alphas = np.sqrt(1. - ddim_alphas)
+
+
+# encoder
 class BERTEmbedder:
     """ Uses a pretrained BERT tokenizer by huggingface. Vocab size: 30522 (?)"""
 
@@ -108,27 +137,6 @@ class BERTEmbedder:
         z = output[0]
 
         return z
-
-
-"""
-ddim_timesteps
-"""
-ddim_num_steps = 50
-ddpm_num_timesteps = 1000
-ddim_timesteps = make_ddim_timesteps(
-    ddim_num_steps, ddpm_num_timesteps)
-
-"""
-ddim sampling parameters
-"""
-ddim_eta = 0.0
-ddim_sigmas, ddim_alphas, ddim_alphas_prev = \
-    make_ddim_sampling_parameters(
-        alphacums=alphas_cumprod,
-        ddim_timesteps=ddim_timesteps,
-        eta=ddim_eta)
-
-ddim_sqrt_one_minus_alphas = np.sqrt(1. - ddim_alphas)
 
 
 def ddim_sampling(
@@ -238,13 +246,26 @@ def apply_model(models, x, t, cc):
     return out
 
 
+# decoder
+def decode_first_stage(models, z):
+    scale_factor = 0.18215
+    z = z / scale_factor
+
+    autoencoder = models['autoencoder']
+    if not args.onnx:
+        output = autoencoder.predict([z])
+    else:
+        output = autoencoder.run(None, {'input': z})
+    dec = output[0]
+
+    return dec
+
+
 def recognize_from_text(models):
     n_samples = 4
     n_iter = 1
     scale = 5.0
     H = W = 256
-
-    ddim_steps = 50
 
     transformer_emb = models['transformer_emb']
     transformer_attn = models['transformer_attn']
@@ -263,6 +284,21 @@ def recognize_from_text(models):
             models, c, shape,
             unconditional_guidance_scale=scale,
             unconditional_conditioning=uc)
+        # samples = np.load("samples.npy")
+        # print("samples_ddim---", samples_ddim)
+        # print("samples_ddim---", samples_ddim.shape)
+
+        x_samples_ddim = decode_first_stage(models, samples)
+        x_samples_ddim = np.clip((x_samples_ddim + 1.0) / 2.0, a_min=0.0, a_max=1.0)
+
+        base_count = 0
+        for x_sample in x_samples_ddim:
+            x_sample = x_sample.transpose(1, 2, 0)  # CHW -> HWC
+            x_sample = x_sample * 255
+            img = x_sample.astype(np.uint8)
+
+            Image.fromarray(img).save(f"{base_count:04}.png")
+            base_count += 1
 
     logger.info('Script finished successfully.')
 
@@ -272,20 +308,30 @@ def main():
 
     # initialize
     if not args.onnx:
-        transformer_emb = ailia.Net("transformer_emb.onnx.prototxt", "transformer_emb.onnx", env_id=env_id)
-        transformer_attn = ailia.Net("transformer_attn.onnx.prototxt", "transformer_attn.onnx", env_id=env_id)
-        diffusion_emb = ailia.Net("diffusion_emb.onnx.prototxt", "diffusion_emb.onnx", env_id=env_id)
-        diffusion_mid = ailia.Net("diffusion_mid.onnx.prototxt", "diffusion_mid.onnx", env_id=env_id)
-        diffusion_out = ailia.Net("diffusion_out.onnx.prototxt", "diffusion_out.onnx", env_id=env_id)
-        autoencoder = ailia.Net("autoencoder.onnx.prototxt", "autoencoder.onnx", env_id=env_id)
+        logger.info("This model requires 10GB or more memory.")
+        memory_mode = ailia.get_memory_mode(
+            reduce_constant=True, ignore_input_with_initializer=True,
+            reduce_interstage=False, reuse_interstage=False)
+        transformer_emb = ailia.Net(
+            MODEL_TRANS_EMB_PATH, WEIGHT_TRANS_EMB_PATH, env_id=env_id, memory_mode=memory_mode)
+        transformer_attn = ailia.Net(
+            MODEL_TRANS_ATTN_PATH, WEIGHT_TRANS_ATTN_PATH, env_id=env_id, memory_mode=memory_mode)
+        diffusion_emb = ailia.Net \
+            (MODEL_DFSN_EMB_PATH, WEIGHT_DFSN_EMB_PATH, env_id=env_id, memory_mode=memory_mode)
+        diffusion_mid = ailia.Net(
+            MODEL_DFSN_MID_PATH, WEIGHT_DFSN_MID_PATH, env_id=env_id, memory_mode=memory_mode)
+        diffusion_out = ailia.Net(
+            MODEL_DFSN_OUT_PATH, WEIGHT_DFSN_OUT_PATH, env_id=env_id, memory_mode=memory_mode)
+        autoencoder = ailia.Net(
+            MODEL_AUTO_ENC_PATH, WEIGHT_AUTO_ENC_PATH, env_id=env_id, memory_mode=memory_mode)
     else:
         import onnxruntime
-        transformer_emb = onnxruntime.InferenceSession("transformer_emb.onnx", env_id=env_id)
-        transformer_attn = onnxruntime.InferenceSession("transformer_attn.onnx", env_id=env_id)
-        diffusion_emb = onnxruntime.InferenceSession("diffusion_emb.onnx", env_id=env_id)
-        diffusion_mid = onnxruntime.InferenceSession("diffusion_mid.onnx", env_id=env_id)
-        diffusion_out = onnxruntime.InferenceSession("diffusion_out.onnx", env_id=env_id)
-        autoencoder = onnxruntime.InferenceSession("autoencoder.onnx", env_id=env_id)
+        transformer_emb = onnxruntime.InferenceSession(WEIGHT_TRANS_EMB_PATH)
+        transformer_attn = onnxruntime.InferenceSession(WEIGHT_TRANS_ATTN_PATH)
+        diffusion_emb = onnxruntime.InferenceSession(WEIGHT_DFSN_EMB_PATH)
+        diffusion_mid = onnxruntime.InferenceSession(WEIGHT_DFSN_MID_PATH)
+        diffusion_out = onnxruntime.InferenceSession(WEIGHT_DFSN_OUT_PATH)
+        autoencoder = onnxruntime.InferenceSession(WEIGHT_AUTO_ENC_PATH)
 
     models = dict(
         transformer_emb=transformer_emb,
