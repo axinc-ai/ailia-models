@@ -14,6 +14,7 @@ sys.path.append('../../util')
 from utils import get_base_parser, update_parser, get_savepath
 from model_utils import check_and_download_models  # noqa: E402
 import webcamera_utils  # noqa: E402
+from image_utils import imread  # noqa: E402
 
 # logger
 from logging import getLogger
@@ -191,7 +192,7 @@ def recognize_from_image(net):
     for image_path in args.input:
         # prepare input data
         logger.debug(f'input image: {image_path}')
-        raw_img = cv2.imread(image_path)
+        raw_img = imread(image_path)
         print(image_path)
         logger.debug(f'input image shape: {raw_img.shape}')
 
@@ -202,13 +203,13 @@ def recognize_from_image(net):
             for i in range(5):
                 start = int(round(time.time() * 1000))
 
-                frame = cv2.imread(image_path)
+                frame = imread(image_path)
                 frame = evalimage(net,frame)
     
                 end = int(round(time.time() * 1000))
                 logger.info(f'\tailia processing time {end - start} ms')
         else:
-            frame = cv2.imread(image_path)
+            frame = imread(image_path)
             frame = evalimage(net,frame)
 
         savepath = get_savepath(args.savepath, image_path)
