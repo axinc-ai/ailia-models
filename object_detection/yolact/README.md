@@ -51,4 +51,4 @@ ONNX opset=11
 
 ## Netron
 
-[yolact.onnx.prototxt](hhttps://storage.googleapis.com/ailia-models/image_segmentation/yolact.onnx.prototxt)
+[yolact.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/yolact/yolact.onnx.prototxt)
