@@ -10,6 +10,8 @@ import cv2
 import numpy as np
 from PIL import Image
 
+import faceutils as futils
+
 import argparse
 parser = argparse.ArgumentParser()
 parser.add_argument("--use_dlib",action="store_true")
@@ -18,9 +20,6 @@ args = parser.parse_args()
 if args.use_dlib:
     import dlib
     import faceutils.dlibutils as futils_dlib
-
-import faceutils.nondlibutils as futils_nondlib
-import faceutils.mask as futils_mask
 
 sys.path.append("../../util")
 from image_utils import load_image  # noqa: E402
@@ -153,7 +152,7 @@ class PreProcess:
         ys = ys[None].repeat(config.PREPROCESS.LANDMARK_POINTS, axis=0)
         self.fix = np.concatenate([ys, xs], axis=0)
         if need_parser:
-            self.face_parse = futils_mask.FaceParser(
+            self.face_parse = futils.mask.FaceParser(
                 args=args, face_parser_path=face_parser_path
             )
         self.up_ratio = config.PREPROCESS.UP_RATIO
@@ -287,7 +286,7 @@ class PreProcess:
                 return None, None, None
             else:
                 face_on_image = face[0]
-                image, face, crop_face = futils_nondlib.crop(
+                image, face, crop_face = futils.nondlib.crop(
                     image,
                     face_on_image,
                     self.up_ratio,
