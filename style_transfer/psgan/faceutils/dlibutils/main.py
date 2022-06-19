@@ -1,8 +1,8 @@
 import numpy as np
 from PIL import Image
+import dlib
 from concern.image import resize_by_max
 
-import dlib
 detector = dlib.get_frontal_face_detector()
 
 def detect(image: Image) -> "faces":
