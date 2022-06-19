@@ -32,6 +32,7 @@ WEIGHT_AUTO_ENC_PATH = 'autoencoder.onnx'
 MODEL_AUTO_ENC_PATH = 'autoencoder.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/latent-diffusion-inpainting/'
 
+IMAGE_PATH = 'demo.png'
 SAVE_IMAGE_PATH = 'output.png'
 
 # ======================
@@ -39,15 +40,7 @@ SAVE_IMAGE_PATH = 'output.png'
 # ======================
 
 parser = get_base_parser(
-    'Latent Diffusion', None, SAVE_IMAGE_PATH
-)
-parser.add_argument(
-    "--n_iter", type=int, default=1,
-    help="sample this often",
-)
-parser.add_argument(
-    "--n_samples", type=int, default=4,
-    help="how many samples to produce for the given prompt",
+    'Latent Diffusion', IMAGE_PATH, SAVE_IMAGE_PATH
 )
 parser.add_argument(
     "--ddim_steps", type=int, default=50,
@@ -58,27 +51,11 @@ parser.add_argument(
     help="ddim eta (eta=0.0 corresponds to deterministic sampling)",
 )
 parser.add_argument(
-    "--H", metavar="height", type=int, default=256,
-    help="image height, in pixel space",
-)
-parser.add_argument(
-    "--W", metavar="width", type=int, default=256,
-    help="image width, in pixel space",
-)
-parser.add_argument(
-    "--scale", type=float, default=5.0,
-    help="unconditional guidance scale: eps = eps(x, empty) + scale * (eps(x, cond) - eps(x, empty))",
-)
-parser.add_argument(
-    "--seed", type=int, default=None,
-    help="random seed",
-)
-parser.add_argument(
     '--onnx',
     action='store_true',
     help='execute onnxruntime version.'
 )
-args = update_parser(parser, check_input_type=False)
+args = update_parser(parser)
 
 
 # ======================
@@ -159,7 +136,6 @@ def ddim_sampling(
         cond, shape):
     img = np.random.randn(shape[0] * shape[1] * shape[2] * shape[3]).reshape(shape)
     img = img.astype(np.float32)
-    img = np.load("img.npy")
 
     timesteps = ddim_timesteps
     time_range = np.flip(timesteps)
@@ -303,9 +279,9 @@ def recognize_from_image(models):
         # prepare input data
         img = load_image(image_path)
         img = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
-        # mask = load_image(mask_path)
-        # mask = cv2.cvtColor(img, cv2.COLOR_BGRA2GRAY)
-        mask = np.array(Image.open(mask_path).convert("L"))
+        mask = load_image(mask_path)
+        mask = cv2.cvtColor(mask, cv2.COLOR_BGRA2GRAY)
+        # mask = np.array(Image.open(mask_path).convert("L"))
 
         # inference
         logger.info('Start inference...')
