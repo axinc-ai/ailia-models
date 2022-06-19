@@ -2,8 +2,7 @@
 
 ## Input
 
-<img src="demo.png" height="256px"/>
-<img src="demo_mask.png" height="256px"/>
+<img src="demo.png" height="256px"/> <img src="demo_mask.png" height="256px"/>
 
 (Image from https://github.com/CompVis/latent-diffusion/tree/main/data/inpainting_examples)
 
