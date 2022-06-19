@@ -5,6 +5,7 @@ from concern.image import resize_by_max
 
 detector = dlib.get_frontal_face_detector()
 
+
 def detect(image: Image) -> "faces":
     image = np.asarray(image)
     h, w = image.shape[:2]
