@@ -37,7 +37,7 @@ $ python3 yolact.py --video VIDEO_PATH
 
 ## Reference
 
-- [yolact](https://github.com/dbolya/yolact)
+- [You Only Look At CoefficienTs](https://github.com/dbolya/yolact)
 
 ## Framework
 
