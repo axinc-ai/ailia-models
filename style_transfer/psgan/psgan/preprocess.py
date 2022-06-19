@@ -7,7 +7,6 @@ sys.path.append(pwd + "/..")
 
 import ailia
 import cv2
-import dlib
 import numpy as np
 from PIL import Image
 
@@ -154,6 +153,8 @@ class PreProcess:
         self.face_class = config.PREPROCESS.FACE_CLASS
         self.use_onnx = args.onnx
         self.use_dlib = args.use_dlib
+        if self.use_dlib:
+            import dlib
         if not self.use_dlib:
             if not args.input:
                 self.input = None  # video mode
