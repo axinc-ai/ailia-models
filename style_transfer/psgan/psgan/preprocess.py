@@ -7,11 +7,19 @@ sys.path.append(pwd + "/..")
 
 import ailia
 import cv2
-import dlib
 import numpy as np
 from PIL import Image
 
 import faceutils as futils
+
+import argparse
+parser = argparse.ArgumentParser()
+parser.add_argument("--use_dlib",action="store_true")
+args = parser.parse_args()
+
+if args.use_dlib:
+    import dlib
+    import faceutils.dlibutils as futils_dlib
 
 sys.path.append("../../util")
 from image_utils import load_image  # noqa: E402
@@ -183,7 +191,7 @@ class PreProcess:
                 pwd + "/../faceutils/dlibutils/shape_predictor_68_face_landmarks.dat"
             )
             lms = (
-                futils.dlib.landmarks(predictor, image, face)
+                futils_dlib.landmarks(predictor, image, face)
                 * self.img_size
                 / image.width
             )
@@ -246,12 +254,12 @@ class PreProcess:
 
     def __call__(self, image: Image):
         if self.use_dlib:
-            face = futils.dlib.detect(image)
+            face = futils_dlib.detect(image)
             if not face:
                 return None, None, None
             else:
                 face_on_image = face[0]
-                image, face, crop_face = futils.dlib.crop(
+                image, face, crop_face = futils_dlib.crop(
                     image,
                     face_on_image,
                     self.up_ratio,
