@@ -10,7 +10,17 @@ import cv2
 import numpy as np
 from PIL import Image
 
-import faceutils as futils
+import argparse
+parser = argparse.ArgumentParser()
+parser.add_argument("--use_dlib",action="store_true")
+args = parser.parse_args()
+
+if args.use_dlib:
+    import dlib
+    import faceutils.dlibutils as futils_dlib
+
+import faceutils.nondlibutils as futils_nondlib
+import faceutils.mask as futils_mask
 
 sys.path.append("../../util")
 from image_utils import load_image  # noqa: E402
@@ -143,7 +153,7 @@ class PreProcess:
         ys = ys[None].repeat(config.PREPROCESS.LANDMARK_POINTS, axis=0)
         self.fix = np.concatenate([ys, xs], axis=0)
         if need_parser:
-            self.face_parse = futils.mask.FaceParser(
+            self.face_parse = futils_mask.FaceParser(
                 args=args, face_parser_path=face_parser_path
             )
         self.up_ratio = config.PREPROCESS.UP_RATIO
@@ -153,8 +163,6 @@ class PreProcess:
         self.face_class = config.PREPROCESS.FACE_CLASS
         self.use_onnx = args.onnx
         self.use_dlib = args.use_dlib
-        if self.use_dlib:
-            import dlib
         if not self.use_dlib:
             if not args.input:
                 self.input = None  # video mode
@@ -184,7 +192,7 @@ class PreProcess:
                 pwd + "/../faceutils/dlibutils/shape_predictor_68_face_landmarks.dat"
             )
             lms = (
-                futils.dlib.landmarks(predictor, image, face)
+                futils_dlib.landmarks(predictor, image, face)
                 * self.img_size
                 / image.width
             )
@@ -247,12 +255,12 @@ class PreProcess:
 
     def __call__(self, image: Image):
         if self.use_dlib:
-            face = futils.dlib.detect(image)
+            face = futils_dlib.detect(image)
             if not face:
                 return None, None, None
             else:
                 face_on_image = face[0]
-                image, face, crop_face = futils.dlib.crop(
+                image, face, crop_face = futils_dlib.crop(
                     image,
                     face_on_image,
                     self.up_ratio,
@@ -279,7 +287,7 @@ class PreProcess:
                 return None, None, None
             else:
                 face_on_image = face[0]
-                image, face, crop_face = futils.nondlib.crop(
+                image, face, crop_face = futils_nondlib.crop(
                     image,
                     face_on_image,
                     self.up_ratio,

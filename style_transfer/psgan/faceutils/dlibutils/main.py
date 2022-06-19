@@ -2,10 +2,10 @@ import numpy as np
 from PIL import Image
 from concern.image import resize_by_max
 
-def detect(image: Image) -> "faces":
-    import dlib
-    detector = dlib.get_frontal_face_detector()
+import dlib
+detector = dlib.get_frontal_face_detector()
 
+def detect(image: Image) -> "faces":
     image = np.asarray(image)
     h, w = image.shape[:2]
     image = resize_by_max(image, 361)
