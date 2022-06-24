@@ -28,6 +28,8 @@ logger = getLogger(__name__)
 
 WEIGHT_FST_ENC_PATH = 'first_stage_encode.onnx'
 MODEL_FST_ENC_PATH = 'first_stage_encode.onnx.prototxt'
+WEIGHT_FST_DEC_PATH = 'first_stage_decode.onnx'
+MODEL_FST_DEC_PATH = 'first_stage_decode.onnx.prototxt'
 # WEIGHT_DFSN_PATH = 'diffusion_model.onnx'
 # MODEL_DFSN_PATH = 'diffusion_model.onnx.prototxt'
 # WEIGHT_AUTO_ENC_PATH = 'autoencoder.onnx'
@@ -116,14 +118,19 @@ def preprocess(img):
     up_f = 4
     oh, ow = up_f * im_h, up_f * im_w
 
-    img = cv2.resize(img, (ow, oh), interpolation=cv2.INTER_LINEAR)
     img = normalize_image(img, normalize_type='255')
 
-    img = img.transpose(2, 0, 1)  # HWC -> CHW
-    img = np.expand_dims(img, axis=0)
-    img = img.astype(np.float32)
+    c = img * 2 - 1
+    c = c.transpose(2, 0, 1)  # HWC -> CHW
+    c = np.expand_dims(c, axis=0)
+    c = c.astype(np.float32)
 
-    return img
+    c_up = cv2.resize(img, (ow, oh), interpolation=cv2.INTER_LINEAR)
+    c_up = c_up.transpose(2, 0, 1)  # HWC -> CHW
+    c_up = np.expand_dims(c_up, axis=0)
+    c_up = c_up.astype(np.float32)
+
+    return c_up, c
 
 
 def ddim_sampling(
@@ -205,12 +212,14 @@ def encode_first_stage(models, x):
 
     # Reshape to img shape
     z = z.reshape((bs, -1, ks[0], ks[1], z.shape[-1]))  # (bn, nc, ks[0], ks[1], L)
+    z = z.astype(np.float32)
 
+    logger.info('process first_stage_encode...')
     first_stage_encode = models['first_stage_encode']
     outputs = []
     for i in range(z.shape[-1]):
         x = z[:, :, :, :, i]
-        if not args.onnx:
+        if True:  # not args.onnx:
             output = first_stage_encode.predict([x])
         else:
             output = first_stage_encode.run(None, {'x': x})
@@ -230,6 +239,48 @@ def encode_first_stage(models, x):
     return decoded
 
 
+def decode_first_stage(models, z):
+    ks = (128, 128)
+    stride = (64, 64)
+    uf = 4
+
+    bs, nc, h, w = z.shape
+
+    fold, unfold, weighting = get_fold_unfold(z, ks, stride, uf=uf)
+
+    z, o_shape, _ = unfold(z)  # (bn, nc * prod(**ks), L)
+
+    # Reshape to img shape
+    z = z.reshape((bs, -1, ks[0], ks[1], z.shape[-1]))  # (bn, nc, ks[0], ks[1], L )
+    z = z.astype(np.float32)
+
+    logger.info('process first_stage_decode...')
+    first_stage_decode = models['first_stage_decode']
+    outputs = []
+    for i in range(z.shape[-1]):
+        print(i)
+        x = z[:, :, :, :, i]
+        if not args.onnx:
+            output = first_stage_decode.predict([x])
+        else:
+            output = first_stage_decode.run(None, {'x': x})
+        outputs.append(output[0])
+
+    o = np.stack(outputs, axis=-1)  # # (bn, nc, ks[0], ks[1], L)
+    o = o * weighting
+
+    # Reverse reshape to img shape
+    o = o.reshape((o.shape[0], -1, o.shape[-1]))  # (bn, nc * ks[0] * ks[1], L)
+    # stitch crops together
+    decoded = fold(o, I_shape=(1, 3, h * uf, w * uf), O_shape=o_shape)
+
+    normalization = fold(weighting, I_shape=(1, 1, h * uf, w * uf), O_shape=o_shape)
+    normalization = normalization.reshape(1, 1, h * uf, w * uf)
+    decoded = decoded / normalization  # norm is shape (1, 1, h, w)
+
+    return decoded
+
+
 # ddpm
 def apply_model(models, x, t, cond):
     diffusion_model = models["diffusion_model"]
@@ -244,29 +295,27 @@ def apply_model(models, x, t, cond):
     return x_recon
 
 
-# decoder
-def decode_first_stage(models, z):
-    scale_factor = 1.0
-    z = z / scale_factor
-
-    autoencoder = models['autoencoder']
-    if not args.onnx:
-        output = autoencoder.predict([z])
-    else:
-        output = autoencoder.run(None, {'z': z})
-    dec = output[0]
-
-    return dec
-
-
 def predict(models, img):
     img = img[:, :, ::-1]  # BGR -> RGB
 
-    img = preprocess(img)
+    c_up, c = preprocess(img)
+    xc = c
 
-    encode_first_stage(models, img)
+    z = encode_first_stage(models, c_up)
+    x = c_up
 
-    x_samples_ddim = decode_first_stage(models, samples)
+    xrec = decode_first_stage(models, z)
+
+    print("z---", z)
+    print("z---", z.shape)
+    print("c---", c)
+    print("c---", c.shape)
+    print("x---", x)
+    print("x---", x.shape)
+    print("xrec---", xrec)
+    print("xrec---", xrec.shape)
+    print("xc---", xc)
+    print("xc---", xc.shape)
 
     return None
 
@@ -311,8 +360,7 @@ def recognize_from_image(models):
 
 def main():
     check_and_download_models(WEIGHT_FST_ENC_PATH, MODEL_FST_ENC_PATH, REMOTE_PATH)
-    # check_and_download_models(WEIGHT_DFSN_PATH, MODEL_DFSN_PATH, REMOTE_PATH)
-    # check_and_download_models(WEIGHT_AUTO_ENC_PATH, MODEL_AUTO_ENC_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_FST_DEC_PATH, MODEL_FST_DEC_PATH, REMOTE_PATH)
 
     env_id = args.env_id
 
@@ -322,14 +370,20 @@ def main():
         memory_mode = ailia.get_memory_mode(
             reduce_constant=True, ignore_input_with_initializer=True,
             reduce_interstage=False, reuse_interstage=False)
-        first_stage_encode = ailia.Net(
-            MODEL_FST_ENC_PATH, WEIGHT_FST_ENC_PATH, env_id=env_id, memory_mode=memory_mode)
+        # first_stage_encode = ailia.Net(
+        #     MODEL_FST_ENC_PATH, WEIGHT_FST_ENC_PATH, env_id=env_id, memory_mode=memory_mode)
+        first_stage_decode = ailia.Net(
+            MODEL_FST_DEC_PATH, WEIGHT_FST_DEC_PATH, env_id=env_id, memory_mode=memory_mode)
     else:
         import onnxruntime
-        first_stage_encode = onnxruntime.InferenceSession(WEIGHT_FST_ENC_PATH)
+        # first_stage_encode = onnxruntime.InferenceSession(WEIGHT_FST_ENC_PATH)
+        first_stage_decode = onnxruntime.InferenceSession(WEIGHT_FST_DEC_PATH)
 
+    first_stage_encode = ailia.Net(
+        MODEL_FST_ENC_PATH, WEIGHT_FST_ENC_PATH, env_id=env_id)
     models = dict(
         first_stage_encode=first_stage_encode,
+        first_stage_decode=first_stage_decode,
     )
     recognize_from_image(models)
 
