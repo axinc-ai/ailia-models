@@ -30,6 +30,8 @@ WEIGHT_FST_ENC_PATH = 'first_stage_encode.onnx'
 MODEL_FST_ENC_PATH = 'first_stage_encode.onnx.prototxt'
 WEIGHT_FST_DEC_PATH = 'first_stage_decode.onnx'
 MODEL_FST_DEC_PATH = 'first_stage_decode.onnx.prototxt'
+WEIGHT_DFSN_PATH = 'diffusion_model.onnx'
+MODEL_DFSN_PATH = 'diffusion_model.onnx.prototxt'
 # WEIGHT_DFSN_PATH = 'diffusion_model.onnx'
 # MODEL_DFSN_PATH = 'diffusion_model.onnx.prototxt'
 # WEIGHT_AUTO_ENC_PATH = 'autoencoder.onnx'
@@ -47,11 +49,11 @@ parser = get_base_parser(
     'Latent Diffusion', IMAGE_PATH, SAVE_IMAGE_PATH
 )
 parser.add_argument(
-    "--ddim_steps", type=int, default=50,
+    "--ddim_steps", type=int, default=100,
     help="number of ddim sampling steps",
 )
 parser.add_argument(
-    "--ddim_eta", type=float, default=0.0,
+    "--ddim_eta", type=float, default=1.0,
     help="ddim eta (eta=0.0 corresponds to deterministic sampling)",
 )
 parser.add_argument(
@@ -133,9 +135,19 @@ def preprocess(img):
     return c_up, c
 
 
+def postprocess(sample):
+    sample = np.clip(sample, -1., 1.)
+    sample = (sample + 1.) / 2. * 255
+    sample = np.transpose(sample, (1, 2, 0))
+    sample = sample[:, :, ::-1]  # RGB -> BGR
+    sample = sample.astype(np.uint8)
+
+    return sample
+
+
 def ddim_sampling(
-        models,
-        cond, shape):
+        models, cond):
+    shape = cond.shape
     img = np.random.randn(shape[0] * shape[1] * shape[2] * shape[3]).reshape(shape)
     img = img.astype(np.float32)
 
@@ -233,7 +245,6 @@ def encode_first_stage(models, x):
     decoded = fold(o, I_shape=(1, 3, h // df, w // df), O_shape=o_shape)
 
     normalization = fold(weighting, I_shape=(1, 1, h // df, w // df), O_shape=o_shape)
-    normalization = normalization.reshape(1, 1, h // df, w // df)
     decoded = decoded / normalization
 
     return decoded
@@ -254,11 +265,11 @@ def decode_first_stage(models, z):
     z = z.reshape((bs, -1, ks[0], ks[1], z.shape[-1]))  # (bn, nc, ks[0], ks[1], L )
     z = z.astype(np.float32)
 
-    logger.info('process first_stage_decode...')
+    logger.info('first_stage_decode...')
+
     first_stage_decode = models['first_stage_decode']
     outputs = []
     for i in range(z.shape[-1]):
-        print(i)
         x = z[:, :, :, :, i]
         if not args.onnx:
             output = first_stage_decode.predict([x])
@@ -275,22 +286,51 @@ def decode_first_stage(models, z):
     decoded = fold(o, I_shape=(1, 3, h * uf, w * uf), O_shape=o_shape)
 
     normalization = fold(weighting, I_shape=(1, 1, h * uf, w * uf), O_shape=o_shape)
-    normalization = normalization.reshape(1, 1, h * uf, w * uf)
     decoded = decoded / normalization  # norm is shape (1, 1, h, w)
 
     return decoded
 
 
 # ddpm
-def apply_model(models, x, t, cond):
-    diffusion_model = models["diffusion_model"]
+def apply_model(models, x_noisy, t, cond):
+    ks = (128, 128)
+    stride = (64, 64)
 
-    xc = np.concatenate([x, cond], axis=1)
-    if not args.onnx:
-        output = diffusion_model.predict([xc, t])
-    else:
-        output = diffusion_model.run(None, {'xc': xc, 't': t})
-    x_recon = output[0]
+    bs, nc, h, w = x_noisy.shape
+
+    fold, unfold, weighting = get_fold_unfold(x_noisy, ks, stride)
+
+    z, o_shape, _ = unfold(x_noisy)  # (bn, nc * prod(**ks), L)
+    # Reshape to img shape
+    z = z.reshape((bs, -1, ks[0], ks[1], z.shape[-1]))  # (bn, nc, ks[0], ks[1], L )
+    z_list = [z[:, :, :, :, i] for i in range(z.shape[-1])]
+
+    c, *_ = unfold(cond)
+    c = c.reshape((bs, -1, ks[0], ks[1], c.shape[-1]))  # (bn, nc, ks[0], ks[1], L )
+    cond_list = [c[:, :, :, :, i] for i in range(c.shape[-1])]
+
+    # apply model by loop over crops
+    diffusion_model = models["diffusion_model"]
+    outputs = []
+    for i in range(z.shape[-1]):
+        x = z_list[i]
+        cond = cond_list[i]
+        xc = np.concatenate([x, cond], axis=1)
+        xc = xc.astype(np.float32)
+        if not args.onnx:
+            output = diffusion_model.predict([xc, t])
+        else:
+            output = diffusion_model.run(None, {'xc': xc, 't': t})
+        outputs.append(output[0])
+
+    o = np.stack(outputs, axis=-1)
+    o = o * weighting
+
+    # Reverse reshape to img shape
+    o = o.reshape((o.shape[0], -1, o.shape[-1]))  # (bn, nc * ks[0] * ks[1], L)
+    # stitch crops together
+    normalization = fold(weighting, I_shape=(1, 1, h, w), O_shape=o_shape)
+    x_recon = fold(o, I_shape=(1, 3, h, w), O_shape=o_shape) / normalization
 
     return x_recon
 
@@ -298,26 +338,15 @@ def apply_model(models, x, t, cond):
 def predict(models, img):
     img = img[:, :, ::-1]  # BGR -> RGB
 
-    c_up, c = preprocess(img)
-    xc = c
+    _, c = preprocess(img)
 
-    z = encode_first_stage(models, c_up)
-    x = c_up
+    samples = ddim_sampling(models, c)
 
-    xrec = decode_first_stage(models, z)
+    x_sample = decode_first_stage(models, samples)
 
-    print("z---", z)
-    print("z---", z.shape)
-    print("c---", c)
-    print("c---", c.shape)
-    print("x---", x)
-    print("x---", x.shape)
-    print("xrec---", xrec)
-    print("xrec---", xrec.shape)
-    print("xc---", xc)
-    print("xc---", xc.shape)
+    img = postprocess(x_sample[0])
 
-    return None
+    return img
 
 
 def recognize_from_image(models):
@@ -328,7 +357,6 @@ def recognize_from_image(models):
         # prepare input data
         img = load_image(image_path)
         img = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
-        # mask = np.array(Image.open(mask_path).convert("L"))
 
         # inference
         logger.info('Start inference...')
@@ -337,7 +365,7 @@ def recognize_from_image(models):
             total_time_estimation = 0
             for i in range(args.benchmark_count):
                 start = int(round(time.time() * 1000))
-                output = predict(models, img)
+                img = predict(models, img)
                 end = int(round(time.time() * 1000))
                 estimation_time = (end - start)
 
@@ -348,12 +376,12 @@ def recognize_from_image(models):
 
             logger.info(f'\taverage time estimation {total_time_estimation / (args.benchmark_count - 1)} ms')
         else:
-            output = predict(models, img)
+            img = predict(models, img)
 
-        # # plot result
-        # savepath = get_savepath(args.savepath, image_path, ext='.png')
-        # logger.info(f'saved at : {savepath}')
-        # cv2.imwrite(savepath, output)
+        # plot result
+        savepath = get_savepath(args.savepath, image_path, ext='.png')
+        logger.info(f'saved at : {savepath}')
+        cv2.imwrite(savepath, img)
 
     logger.info('Script finished successfully.')
 
@@ -361,6 +389,7 @@ def recognize_from_image(models):
 def main():
     check_and_download_models(WEIGHT_FST_ENC_PATH, MODEL_FST_ENC_PATH, REMOTE_PATH)
     check_and_download_models(WEIGHT_FST_DEC_PATH, MODEL_FST_DEC_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_DFSN_PATH, MODEL_DFSN_PATH, REMOTE_PATH)
 
     env_id = args.env_id
 
@@ -374,16 +403,20 @@ def main():
         #     MODEL_FST_ENC_PATH, WEIGHT_FST_ENC_PATH, env_id=env_id, memory_mode=memory_mode)
         first_stage_decode = ailia.Net(
             MODEL_FST_DEC_PATH, WEIGHT_FST_DEC_PATH, env_id=env_id, memory_mode=memory_mode)
+        diffusion_model = ailia.Net(
+            MODEL_DFSN_PATH, WEIGHT_DFSN_PATH, env_id=env_id, memory_mode=memory_mode)
     else:
         import onnxruntime
         # first_stage_encode = onnxruntime.InferenceSession(WEIGHT_FST_ENC_PATH)
         first_stage_decode = onnxruntime.InferenceSession(WEIGHT_FST_DEC_PATH)
+        diffusion_model = onnxruntime.InferenceSession(WEIGHT_DFSN_PATH)
 
     first_stage_encode = ailia.Net(
         MODEL_FST_ENC_PATH, WEIGHT_FST_ENC_PATH, env_id=env_id)
     models = dict(
         first_stage_encode=first_stage_encode,
         first_stage_decode=first_stage_decode,
+        diffusion_model=diffusion_model,
     )
     recognize_from_image(models)
 
