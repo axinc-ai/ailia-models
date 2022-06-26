@@ -385,6 +385,7 @@ The collection of pre-trained, state-of-the-art AI models.
 | [<img src="super_resolution/edsr/output.png" width=128px>](super_resolution/edsr/) | [edsr](/super_resolution/edsr/) | [Enhanced Deep Residual Networks for Single Image Super-Resolution](https://github.com/sanghyun-son/EDSR-PyTorch.git) | Pytorch | 1.2.6 and later | [EN](https://medium.com/axinc-ai/edsr-a-machine-learning-model-for-super-resolution-image-processing-9deaf36b24ed) [JP](https://medium.com/axinc/edsr-%E7%94%BB%E5%83%8F%E3%81%AE%E8%B6%85%E8%A7%A3%E5%83%8F%E5%87%A6%E7%90%86%E3%82%92%E8%A1%8C%E3%81%86%E6%A9%9F%E6%A2%B0%E5%AD%A6%E7%BF%92%E3%83%A2%E3%83%87%E3%83%AB-2842b1d244d) |
 | [<img src="super_resolution/han/output.png" width=128px>](super_resolution/han/) | [han](/super_resolution/han/) | [Single Image Super-Resolution via a Holistic Attention Network](https://github.com/wwlCape/HAN) | Pytorch | 1.2.6 and later |
 | [<img src="super_resolution/real-esrgan/output_anime.jpg" width=128px>](super_resolution/real-esrgan/) | [real-esrgan](/super_resolution/real-esrgan/) | [Real-ESRGAN](https://github.com/xinntao/Real-ESRGAN) | Pytorch | 1.2.9 and later |
+| [<img src="super_resolution/latent-diffusion-superresolution/output.png" width=128px>](super_resolution/latent-diffusion-superresolution/) | [latent-diffusion-superresolution](/super_resolution/latent-diffusion-superresolution/) | [Latent Diffusion - Super-resolution](https://github.com/CompVis/latent-diffusion) | Pytorch | 1.2.9 and later |
 
 ## Text detection
 
