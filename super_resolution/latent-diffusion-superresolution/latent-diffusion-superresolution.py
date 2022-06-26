@@ -1,10 +1,8 @@
-import os
 import sys
 import time
 
 import numpy as np
 import cv2
-from PIL import Image
 
 import ailia
 
@@ -26,8 +24,6 @@ logger = getLogger(__name__)
 # Parameters
 # ======================
 
-WEIGHT_FST_ENC_PATH = 'first_stage_encode.onnx'
-MODEL_FST_ENC_PATH = 'first_stage_encode.onnx.prototxt'
 WEIGHT_FST_DEC_PATH = 'first_stage_decode.onnx'
 MODEL_FST_DEC_PATH = 'first_stage_decode.onnx.prototxt'
 WEIGHT_DFSN_PATH = 'diffusion_model.onnx'
@@ -38,7 +34,7 @@ MODEL_DFSN_PATH = 'diffusion_model.onnx.prototxt'
 # MODEL_AUTO_ENC_PATH = 'autoencoder.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/latent-diffusion-superresolution/'
 
-IMAGE_PATH = 'custom_fox.jpg'
+IMAGE_PATH = 'demo.jpg'
 SAVE_IMAGE_PATH = 'output.png'
 
 # ======================
@@ -212,44 +208,6 @@ def p_sample_ddim(
     return x_prev, pred_x0
 
 
-def encode_first_stage(models, x):
-    ks = (128, 128)
-    stride = (64, 64)
-    df = 4
-
-    bs, nc, h, w = x.shape
-
-    fold, unfold, weighting = get_fold_unfold(x, ks, stride, df=df)
-    z, o_shape, _ = unfold(x)  # (bn, nc * prod(**ks), L)
-
-    # Reshape to img shape
-    z = z.reshape((bs, -1, ks[0], ks[1], z.shape[-1]))  # (bn, nc, ks[0], ks[1], L)
-    z = z.astype(np.float32)
-
-    logger.info('process first_stage_encode...')
-    first_stage_encode = models['first_stage_encode']
-    outputs = []
-    for i in range(z.shape[-1]):
-        x = z[:, :, :, :, i]
-        if True:  # not args.onnx:
-            output = first_stage_encode.predict([x])
-        else:
-            output = first_stage_encode.run(None, {'x': x})
-        outputs.append(output[0])
-
-    o = np.stack(outputs, axis=-1)
-    o = o * weighting
-
-    # Reverse reshape to img shape
-    o = o.reshape((o.shape[0], -1, o.shape[-1]))  # (bn, nc * ks[0] * ks[1], L)
-    decoded = fold(o, I_shape=(1, 3, h // df, w // df), O_shape=o_shape)
-
-    normalization = fold(weighting, I_shape=(1, 1, h // df, w // df), O_shape=o_shape)
-    decoded = decoded / normalization
-
-    return decoded
-
-
 def decode_first_stage(models, z):
     ks = (128, 128)
     stride = (64, 64)
@@ -387,7 +345,6 @@ def recognize_from_image(models):
 
 
 def main():
-    check_and_download_models(WEIGHT_FST_ENC_PATH, MODEL_FST_ENC_PATH, REMOTE_PATH)
     check_and_download_models(WEIGHT_FST_DEC_PATH, MODEL_FST_DEC_PATH, REMOTE_PATH)
     check_and_download_models(WEIGHT_DFSN_PATH, MODEL_DFSN_PATH, REMOTE_PATH)
 
@@ -399,22 +356,16 @@ def main():
         memory_mode = ailia.get_memory_mode(
             reduce_constant=True, ignore_input_with_initializer=True,
             reduce_interstage=False, reuse_interstage=False)
-        # first_stage_encode = ailia.Net(
-        #     MODEL_FST_ENC_PATH, WEIGHT_FST_ENC_PATH, env_id=env_id, memory_mode=memory_mode)
         first_stage_decode = ailia.Net(
             MODEL_FST_DEC_PATH, WEIGHT_FST_DEC_PATH, env_id=env_id, memory_mode=memory_mode)
         diffusion_model = ailia.Net(
             MODEL_DFSN_PATH, WEIGHT_DFSN_PATH, env_id=env_id, memory_mode=memory_mode)
     else:
         import onnxruntime
-        # first_stage_encode = onnxruntime.InferenceSession(WEIGHT_FST_ENC_PATH)
         first_stage_decode = onnxruntime.InferenceSession(WEIGHT_FST_DEC_PATH)
         diffusion_model = onnxruntime.InferenceSession(WEIGHT_DFSN_PATH)
 
-    first_stage_encode = ailia.Net(
-        MODEL_FST_ENC_PATH, WEIGHT_FST_ENC_PATH, env_id=env_id)
     models = dict(
-        first_stage_encode=first_stage_encode,
         first_stage_decode=first_stage_decode,
         diffusion_model=diffusion_model,
     )
