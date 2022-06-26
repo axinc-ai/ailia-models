@@ -39,5 +39,5 @@ ONNX opset=12
 
 ## Netron
 
-[diffusion_model.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/latent-diffusion-superresolution/diffusion_model.onnx.prototxt)
+[diffusion_model.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/latent-diffusion-superresolution/diffusion_model.onnx.prototxt)  
 [first_stage_decode.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/latent-diffusion-superresolution/first_stage_decode.onnx.prototxt)
