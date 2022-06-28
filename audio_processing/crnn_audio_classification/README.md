@@ -37,7 +37,12 @@ dog_bark
 ### Usage
 
 ```bash
-$ python3 crnn-audio-classification.py -i input.wav
+$ python3 crnn_audio_classification.py -i INPUT_PATH
+(ex)$ python3 crnn_audio_classification.py -i 24965__www-bonson-ca__bigdogbarking-02.wav
+```
+
+```bash
+$ python3 crnn_audio_classification.py -v --ailia_audio
 ```
 
 ### Reference
@@ -45,6 +50,11 @@ $ python3 crnn-audio-classification.py -i input.wav
 
 ### Framework
 PyTorch 1.6.0
+
+### Library
+torchaudio
+portaudio
+pyaudio
 
 ### Model Format
 ONNX opset = 10
