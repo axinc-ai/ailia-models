@@ -51,6 +51,10 @@ COCO_CATEGORY = [
 # Arguemnt Parser Config
 # ======================
 parser = get_base_parser('DAB-DETR model', IMAGE_PATH, SAVE_IMAGE_PATH)
+parser.add_argument(
+    '-o', '--onnx', action='store_true',
+    help="Option to use onnxrutime to run or not."
+)
 args = update_parser(parser)
 
 WEIGHT_PATH = "dab_detr.onnx"
@@ -74,7 +78,10 @@ def recognize_from_image():
     '''
 
     # Onnx runtime
-    session = onnxruntime.InferenceSession(WEIGHT_PATH)
+    if args.onnx:
+        session = onnxruntime.InferenceSession(WEIGHT_PATH)
+    else:
+        session = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id = args.env_id)
 
     # input image loop
     for image_path in args.input:
@@ -90,7 +97,7 @@ def recognize_from_image():
             for i in range(args.benchmark_count):
                 start = int(round(time.time() * 1000))
                 detect = Detect(session, img)
-                output = detect.detect()
+                output = detect.detect(args)
                 end = int(round(time.time() * 1000))
                 if i != 0:
                     total_time = total_time + (end - start)
@@ -101,8 +108,8 @@ def recognize_from_image():
 
         # inference
         logger.info('Start inference...')
-        detect = Detect(session, img)
-        output = detect.detect()
+        detect = Detect(session, img, args)
+        output = detect.detect(args)
 
         detect_object = reverse_letterbox(output, raw_img, (raw_img.shape[0], raw_img.shape[1]))
         res_img = plot_results(detect_object, raw_img, COCO_CATEGORY)
@@ -117,7 +124,10 @@ def recognize_from_image():
 
 def recognize_from_video():
     # net initialize
-    session = onnxruntime.InferenceSession(WEIGHT_PATH)
+    if args.onnx:
+        session = onnxruntime.InferenceSession(WEIGHT_PATH)
+    else:
+        session = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id = args.env_id)
 
     capture = webcamera_utils.get_capture(args.video)
 
@@ -139,8 +149,8 @@ def recognize_from_video():
 
         img = cv2.resize(frame, dsize=(HEIGHT, WIDTH))
 
-        detect = Detect(session, img)
-        output = detect.detect()
+        detect = Detect(session, img, args)
+        output = detect.detect(args)
 
         detect_object = reverse_letterbox(output, frame, (frame.shape[0], frame.shape[1]))
         res_img = plot_results(detect_object, frame, COCO_CATEGORY)

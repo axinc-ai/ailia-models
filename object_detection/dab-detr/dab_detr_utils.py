@@ -86,17 +86,18 @@ class PostProcess:
 
 
 class Detect:
-    def __init__(self, session, img, thershold=0.4):
+    def __init__(self, session, img, args, thershold=0.4):
         self.session = session
         self.img = img
-        self.input_name1 = session.get_inputs()[0].name
-        self.input_name2 = session.get_inputs()[1].name
-        self.output_name1 = session.get_outputs()[0].name
-        self.output_name2 = session.get_outputs()[1].name
+        if args.onnx:
+            self.input_name1 = session.get_inputs()[0].name
+            self.input_name2 = session.get_inputs()[1].name
+            self.output_name1 = session.get_outputs()[0].name
+            self.output_name2 = session.get_outputs()[1].name
         self.thershold = thershold
 
 
-    def detect(self):
+    def detect(self, args):
         mean = [0.485, 0.456, 0.406]
         std = [0.229, 0.224, 0.225]
 
@@ -104,8 +105,14 @@ class Detect:
         img = preprosess.normalization()
         mask = preprosess.create_masks()
 
-        out_logits = self.session.run([self.output_name1], {self.input_name1: img, self.input_name2: mask})[0]
-        out_bbox = self.session.run([self.output_name2], {self.input_name1: img, self.input_name2: mask})[0]
+        if args.onnx:
+            out_logits = self.session.run([self.output_name1], {self.input_name1: img, self.input_name2: mask})[0]
+            out_bbox = self.session.run([self.output_name2], {self.input_name1: img, self.input_name2: mask})[0]
+        else:
+            outputs = self.session.run({img,  mask})
+            out_logits = outputs[0]
+            out_bbox = outpus[1]
+
         postprocessors = PostProcess()
         results = postprocessors.forward((out_logits, out_bbox))[0]
 
