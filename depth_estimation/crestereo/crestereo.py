@@ -5,7 +5,6 @@ import time
 import argparse
 from glob import glob
 import numpy as np
-from imread_from_url import imread_from_url
 
 from crestereo_util import CREStereo
 
@@ -164,7 +163,7 @@ def recognize_from_video(net):
 def main():
 
     # model files check and download
-    #check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
 
     # net initialize
     if args.onnx:

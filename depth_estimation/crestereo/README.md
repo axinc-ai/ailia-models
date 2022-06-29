@@ -48,7 +48,7 @@ $ python3 monodepth2.py --video_rigth RIGTH_VIDEO_PATH --video_left LEFT_VIDEO_P
 
 ### Reference
 
-[crestereo](https://github.com/ibaiGorordo/ONNX-CREStereo-Depth-Estimation)
+[ONNX-CREStereo-Depth-Estimation](https://github.com/ibaiGorordo/ONNX-CREStereo-Depth-Estimation)
 
 ### Framework
 PyTorch 1.11.0
