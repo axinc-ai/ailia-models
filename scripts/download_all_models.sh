@@ -26,6 +26,8 @@ cd ../../background_ramoval/cascade_psp; python3 cascade_psp.py ${OPTION}
 cd ../../background_ramoval/rembg; python3 rembg.py ${OPTION}
 cd ../../crowd_counting/crowdcount-cascaded-mtl; python3 crowdcount-cascaded-mtl.py ${OPTION}
 cd ../../crowd_counting/c-3-framework; python3 c-3-framework.py ${OPTION}
+cd ../../diffusion/latent-diffusion-superresolution; python3 latent-diffusion-superresolution.py ${OPTION}
+cd ../../diffusion/latent-diffusion-txt2img python3 latent-diffusion-txt2img.py ${OPTION}
 cd ../../deep_fashion/clothing-detection; python3 clothing-detection.py ${OPTION}
 cd ../../deep_fashion/fashionai-key-points-detection; python3 fashionai-key-points-detection.py -c blouse ${OPTION}
 cd ../../deep_fashion/fashionai-key-points-detection; python3 fashionai-key-points-detection.py -c dress ${OPTION}
@@ -168,6 +170,8 @@ cd ../../object_detection/sku100k-densedet; python3 yolor.py ${OPTION}
 cd ../../object_detection/traffic-sign-detection; python3 traffic-sign-detection.py ${OPTION}
 cd ../../object_detection/detic; python3 detic.py ${OPTION}
 cd ../../object_detection/picodet; python3 picodet.py ${OPTION}
+cd ../../object_detection/yolact; python3 yolact.py ${OPTION}
+#cd ../../object_detection/dab-detr; python3 dab-detr.py ${OPTION}
 cd ../../object_detection_3d/3d_bbox; python3 3d_bbox.py ${OPTION}
 cd ../../object_detection_3d/3d-object-detection.pytorch; python3 3d-object-detection.pytorch.py ${OPTION}
 cd ../../object_detection_3d/mediapipe_objectron; python3 mediapipe_objectron.py ${OPTION}
