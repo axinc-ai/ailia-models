@@ -88,6 +88,7 @@ The collection of pre-trained, state-of-the-art AI models.
 | | Model | Reference | Exported From | Supported Ailia Version | Blog |
 |:-----------|------------:|:------------:|:------------:|:------------:|:------------:|
 | [<img src="diffusion/latent-diffusion-superresolution/output.png" width=128px>](diffusion/latent-diffusion-superresolution/) | [latent-diffusion-superresolution](/diffusion/latent-diffusion-superresolution/) | [Latent Diffusion - Super-resolution](https://github.com/CompVis/latent-diffusion) | Pytorch | 1.2.10 and later |
+| [<img src="diffusion/latent-diffusion-txt2img/output.png" width=128px>](diffusion/latent-diffusion-superresolution/) | [latent-diffusion-txt2img](/diffusion/latent-diffusion-txt2img/) | [Latent Diffusion - txt2img](https://github.com/CompVis/latent-diffusion) | Pytorch | 1.2.10 and later |
 
 
 ## Face detection
