@@ -14,7 +14,7 @@ sys.path.append('../../util')
 from utils import get_base_parser, update_parser, get_savepath  # noqa
 from model_utils import check_and_download_models  # noqa
 # from image_utils import load_image, normalize_image  # noqa
-from detector_utils import load_image  # noqa
+from detector_utils import load_image, plot_results  # noqa
 from webcamera_utils import get_capture, get_writer  # noqa
 from math_utils import sigmoid
 from nms_utils import batched_nms
@@ -22,6 +22,7 @@ from nms_utils import batched_nms
 from logging import getLogger  # noqa
 
 from glip_utils import run_ner, create_positive_map
+from glip_utils import create_positive_map_label_to_token_from_positive_map
 from bert_model import language_backbone
 from anchor import anchor_generator
 
@@ -179,7 +180,8 @@ def preprocess(img, image_shape):
 def post_processing(
         box_regression, centerness, anchors,
         box_cls,
-        dot_product_logits):
+        dot_product_logits,
+        positive_map):
     sampled_boxes = []
     anchors = [anchors]
     anchors = list(zip(*anchors))
@@ -190,7 +192,6 @@ def post_processing(
         if dot_product_logits is not None:
             d = dot_product_logits[idx]
 
-        positive_map = {1: [1, 2, 3], 2: [5], 3: [7, 8]}
         sampled_boxes.append(
             forward_for_single_feature_map(b, c, a, o, d, positive_map)
         )
@@ -292,6 +293,7 @@ def convert_grounding_to_od_logits(
 
 
 def predict(models, img):
+    im_h, im_w = 480, 640
     # img = preprocess(img, shape)
 
     caption = 'bobble heads on top of the shelf'
@@ -307,10 +309,9 @@ def predict(models, img):
         return_tensors='pt',
         truncation=True)
 
-    tokens_positive, entries = run_ner(caption)
+    tokens_positive, entity_names = run_ner(caption)
     positive_map = create_positive_map(tokenized, tokens_positive)
-    print(positive_map)
-    1/0
+    positive_map = create_positive_map_label_to_token_from_positive_map(positive_map, plus=1)
 
     # language embedding
     net = models['language_backbone']
@@ -350,44 +351,55 @@ def predict(models, img):
     image_height, image_width = (800, 1066)
     anchors = anchor_generator((image_height, image_width), features)
 
-    proposals = post_processing(box_regression, centerness, anchors, box_cls, dot_product_logits)
+    proposals = post_processing(
+        box_regression, centerness, anchors, box_cls, dot_product_logits, positive_map)
     proposals = proposals[0]
 
-    height, width = (480, 640)
-
-    bbox, labels, scores = proposals
+    bboxes, labels, scores = proposals
 
     # reshape prediction into the original image size
-    ratio_height, ratio_width = height / image_height, width / image_width
-    xmin, ymin, xmax, ymax = np.split(bbox, 4, axis=-1)
+    ratio_height, ratio_width = im_h / image_height, im_w / image_width
+    xmin, ymin, xmax, ymax = np.split(bboxes, 4, axis=-1)
     scaled_xmin = xmin * ratio_width
     scaled_xmax = xmax * ratio_width
     scaled_ymin = ymin * ratio_height
     scaled_ymax = ymax * ratio_height
-    bbox = np.concatenate(
+    bboxes = np.concatenate(
         (scaled_xmin, scaled_ymin, scaled_xmax, scaled_ymax), axis=-1
     )
 
     thresh = 0.5
     keep = np.nonzero(scores > thresh)[0]
-    bbox = bbox[keep]
+    bboxes = bboxes[keep]
     labels = labels[keep]
     scores = scores[keep]
 
     # sort
     ind = np.argsort(-scores)
-    bbox = bbox[ind]
+    bboxes = bboxes[ind]
     labels = labels[ind]
     scores = scores[ind]
 
-    print(bbox)
-    print(bbox.shape)
-    print(labels)
-    print(scores)
+    new_labels = []
+    for i in labels:
+        if i <= len(entity_names):
+            new_labels.append(entity_names[i - 1])
+    labels = new_labels
 
-    noun_phrases = find_noun_phrases(caption)
+    detections = []
+    for bbox, score, label in zip(bboxes, scores, labels):
+        x1, y1, x2, y2 = bbox
+        r = ailia.DetectorObject(
+            category=label,
+            prob=score,
+            x=x1 / im_w,
+            y=y1 / im_h,
+            w=(x2 - x1) / im_w,
+            h=(y2 - y1) / im_h,
+        )
+        detections.append(r)
 
-    return (bbox, labels, scores)
+    return detections
 
 
 def recognize_from_image(models):
@@ -406,7 +418,7 @@ def recognize_from_image(models):
             total_time_estimation = 0
             for i in range(args.benchmark_count):
                 start = int(round(time.time() * 1000))
-                out = predict(models, img)
+                detect_objects = predict(models, img)
                 end = int(round(time.time() * 1000))
                 estimation_time = (end - start)
 
@@ -417,12 +429,14 @@ def recognize_from_image(models):
 
             logger.info(f'\taverage time estimation {total_time_estimation / (args.benchmark_count - 1)} ms')
         else:
-            out = predict(models, img)
+            detect_objects = predict(models, img)
 
-        # # plot result
-        # savepath = get_savepath(args.savepath, image_path, ext='.png')
-        # logger.info(f'saved at : {savepath}')
-        # cv2.imwrite(savepath, res_img)
+        res_img = plot_results(detect_objects, img, None)
+
+        # plot result
+        savepath = get_savepath(args.savepath, image_path, ext='.png')
+        logger.info(f'saved at : {savepath}')
+        cv2.imwrite(savepath, res_img)
 
     logger.info('Script finished successfully.')
 

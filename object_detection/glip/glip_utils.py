@@ -34,6 +34,14 @@ def run_ner(caption):
     return tokens_positive, labels
 
 
+def create_positive_map_label_to_token_from_positive_map(positive_map, plus=0):
+    positive_map_label_to_token = {}
+    for i in range(len(positive_map)):
+        positive_map_label_to_token[i + plus] = np.nonzero(positive_map[i])[0].tolist()
+
+    return positive_map_label_to_token
+
+
 def create_positive_map(tokenized, tokens_positive):
     """construct a map such that positive_map[i,j] = True iff box i is associated to token j"""
     positive_map = np.zeros((len(tokens_positive), 256))
@@ -69,7 +77,7 @@ def create_positive_map(tokenized, tokens_positive):
                 continue
 
             assert beg_pos is not None and end_pos is not None
-            positive_map[j, beg_pos: end_pos + 1].fill_(1)
+            positive_map[j, beg_pos: end_pos + 1] = 1
 
     return positive_map / (positive_map.sum(-1)[:, None] + 1e-6)
 
