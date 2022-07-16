@@ -4,7 +4,6 @@ import math
 
 import numpy as np
 import cv2
-from PIL import Image
 
 from transformers import AutoTokenizer
 
@@ -18,9 +17,11 @@ from model_utils import check_and_download_models  # noqa
 from detector_utils import load_image  # noqa
 from webcamera_utils import get_capture, get_writer  # noqa
 from math_utils import sigmoid
+from nms_utils import batched_nms
 # logger
 from logging import getLogger  # noqa
 
+from glip_utils import run_ner, create_positive_map
 from bert_model import language_backbone
 from anchor import anchor_generator
 
@@ -63,9 +64,6 @@ args = update_parser(parser)
 # Secondaty Functions
 # ======================
 
-# def draw_bbox(img, bboxes):
-#     return img
-
 
 def permute_and_flatten(layer, N, A, C, H, W):
     layer = layer.reshape(N, -1, C, H, W)
@@ -106,6 +104,70 @@ def box_decode(preds, anchors):
     return pred_boxes
 
 
+def clip_to_image(bbox, image_size):
+    TO_REMOVE = 1
+    x1s = np.clip(bbox[:, 0], 0, image_size[1] - TO_REMOVE)
+    y1s = np.clip(bbox[:, 1], 0, image_size[0] - TO_REMOVE)
+    x2s = np.clip(bbox[:, 2], 0, image_size[1] - TO_REMOVE)
+    y2s = np.clip(bbox[:, 3], 0, image_size[0] - TO_REMOVE)
+    bbox = np.stack((x1s, y1s, x2s, y2s), axis=-1)
+
+    return bbox
+
+
+def remove_small_boxes(bbox, min_size):
+    xmin, ymin, xmax, ymax = np.split(bbox, 4, axis=-1)
+    TO_REMOVE = 1
+    ws = xmax - xmin + TO_REMOVE,
+    hs = ymax - ymin + TO_REMOVE
+
+    ws = np.squeeze(ws)
+    hs = np.squeeze(hs)
+    keep = ((ws >= min_size) & (hs >= min_size)).nonzero()[0]
+
+    return keep
+
+
+def cat_boxlist(bboxes):
+    bbox = np.concatenate([x[0] for x in bboxes], axis=0)
+    labels = np.concatenate([x[1] for x in bboxes], axis=0)
+    scores = np.concatenate([x[2] for x in bboxes], axis=0)
+
+    return (bbox, labels, scores)
+
+
+def select_over_all_levels(boxlists):
+    nms_thresh = 0.6
+    fpn_post_nms_top_n = 100
+
+    num_images = len(boxlists)
+    results = []
+    for i in range(num_images):
+        (bbox, labels, scores) = boxlists[i]
+
+        # multiclass nms
+        keep = batched_nms(bbox, scores, labels, nms_thresh)
+        bbox = bbox[keep]
+        scores = scores[keep]
+        labels = labels[keep]
+
+        number_of_detections = len(keep)
+
+        # Limit to max_per_image detections **over all classes**
+        if number_of_detections > fpn_post_nms_top_n:
+            kth = number_of_detections - fpn_post_nms_top_n + 1
+            image_thresh = np.partition(scores, kth)[kth]
+            keep = scores >= image_thresh
+            keep = np.nonzero(keep)[0]
+            bbox = bbox[keep]
+            scores = scores[keep]
+            labels = labels[keep]
+
+        results.append((bbox, labels, scores))
+
+    return results
+
+
 # ======================
 # Main functions
 # ======================
@@ -123,12 +185,6 @@ def post_processing(
     anchors = list(zip(*anchors))
 
     for idx, (b, c, a) in enumerate(zip(box_regression, centerness, anchors)):
-        # print(b)
-        # print(b.shape)
-        # print(c)
-        # print(c.shape)
-        # print(a)
-
         if box_cls is not None:
             o = box_cls[idx]
         if dot_product_logits is not None:
@@ -141,8 +197,8 @@ def post_processing(
 
     boxlists = list(zip(*sampled_boxes))
     boxlists = [cat_boxlist(boxlist) for boxlist in boxlists]
-    if not (self.bbox_aug_enabled and not self.bbox_aug_vote):
-        boxlists = self.select_over_all_levels(boxlists)
+
+    boxlists = select_over_all_levels(boxlists)
 
     return boxlists
 
@@ -163,7 +219,6 @@ def forward_for_single_feature_map(
 
     # binary dot product focal version
     if dot_product_logits is not None:
-        # print('Dot Product.')
         dot_product_logits = sigmoid(dot_product_logits)
         scores = convert_grounding_to_od_logits(
             logits=dot_product_logits, box_cls=box_cls,
@@ -190,6 +245,7 @@ def forward_for_single_feature_map(
         per_box_cls = per_box_cls[per_candidate_inds]
 
         top_k_indices = np.argsort(-per_box_cls)[:per_pre_nms_top_n]
+        per_box_cls = per_box_cls[top_k_indices]
 
         per_candidate_nonzeros = np.stack(per_candidate_inds.nonzero())
         per_candidate_nonzeros = per_candidate_nonzeros.T
@@ -202,20 +258,23 @@ def forward_for_single_feature_map(
             per_box_regression[per_box_loc, :].reshape(-1, 4),
             per_anchors.bbox[per_box_loc, :].reshape(-1, 4)
         )
-        print("--")
-        print(detections)
-        print(detections.shape)
-        continue
-
-        boxlist = BoxList(detections, per_anchors.size, mode="xyxy")
 
         labels = per_class
         scores = np.sqrt(per_box_cls)
+        bbox = clip_to_image(detections, per_anchors.image_size)
 
-        boxlist = boxlist.clip_to_image(remove_empty=False)
-        boxlist = remove_small_boxes(boxlist, self.min_size)
+        # remove_empty
+        keep = (bbox[:, 3] > bbox[:, 1]) & (bbox[:, 2] > bbox[:, 0])
+        bbox = bbox[keep]
+        labels = labels[keep]
+        scores = scores[keep]
 
-        results.append(boxlist)
+        keep = remove_small_boxes(bbox, 0)
+        bbox = bbox[keep]
+        labels = labels[keep]
+        scores = scores[keep]
+
+        results.append((bbox, labels, scores))
 
     return results
 
@@ -235,18 +294,23 @@ def convert_grounding_to_od_logits(
 def predict(models, img):
     # img = preprocess(img, shape)
 
-    captions = ['bobble heads on top of the shelf']
+    caption = 'bobble heads on top of the shelf'
 
     tokenizer = models["tokenizer"]
     max_length = 256
 
     tokenized = tokenizer.batch_encode_plus(
-        captions,
+        [caption],
         max_length=max_length,
         padding='max_length',
         return_special_tokens_mask=True,
         return_tensors='pt',
         truncation=True)
+
+    tokens_positive, entries = run_ner(caption)
+    positive_map = create_positive_map(tokenized, tokens_positive)
+    print(positive_map)
+    1/0
 
     # language embedding
     net = models['language_backbone']
@@ -267,7 +331,6 @@ def predict(models, img):
     features = output
     hidden = language_dict_features["hidden"]
     masks = language_dict_features["masks"]
-    embedding = language_dict_features['embedded']
 
     net = models['rpn']
     if not args.onnx:
@@ -287,9 +350,44 @@ def predict(models, img):
     image_height, image_width = (800, 1066)
     anchors = anchor_generator((image_height, image_width), features)
 
-    post_processing(box_regression, centerness, anchors, box_cls, dot_product_logits)
+    proposals = post_processing(box_regression, centerness, anchors, box_cls, dot_product_logits)
+    proposals = proposals[0]
 
-    return
+    height, width = (480, 640)
+
+    bbox, labels, scores = proposals
+
+    # reshape prediction into the original image size
+    ratio_height, ratio_width = height / image_height, width / image_width
+    xmin, ymin, xmax, ymax = np.split(bbox, 4, axis=-1)
+    scaled_xmin = xmin * ratio_width
+    scaled_xmax = xmax * ratio_width
+    scaled_ymin = ymin * ratio_height
+    scaled_ymax = ymax * ratio_height
+    bbox = np.concatenate(
+        (scaled_xmin, scaled_ymin, scaled_xmax, scaled_ymax), axis=-1
+    )
+
+    thresh = 0.5
+    keep = np.nonzero(scores > thresh)[0]
+    bbox = bbox[keep]
+    labels = labels[keep]
+    scores = scores[keep]
+
+    # sort
+    ind = np.argsort(-scores)
+    bbox = bbox[ind]
+    labels = labels[ind]
+    scores = scores[ind]
+
+    print(bbox)
+    print(bbox.shape)
+    print(labels)
+    print(scores)
+
+    noun_phrases = find_noun_phrases(caption)
+
+    return (bbox, labels, scores)
 
 
 def recognize_from_image(models):
