@@ -31,7 +31,7 @@ class AffineGridGen(Module):
         theta = theta.contiguous()
         batch_size = theta.size()[0]
         out_size = torch.Size((batch_size,self.out_ch,self.out_h,self.out_w))
-        tmp = F.affine_grid(theta, out_size)
+        tmp = F.affine_grid(theta, out_size) # torch.nn.functional
         return tmp
 
 
@@ -465,7 +465,7 @@ class GeometricTnf(object):
             return sampling_grid
 
         # sample transformed image
-        warped_image_batch = F.grid_sample(image_batch, sampling_grid)
+        warped_image_batch = F.grid_sample(image_batch, sampling_grid) # torch.nn.functional
 
         if return_sampling_grid and return_warped_image:
             return (warped_image_batch,sampling_grid)
