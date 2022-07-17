@@ -3,13 +3,18 @@ import numpy as np
 language_dim = 768
 num_layers = 1
 
+onnx = False
 
-def language_backbone(net, input, mask, token):
-    output = net.run(None, {
-        'input_ids': input,
-        'attention_mask': mask,
-        'token_type_ids': token,
-    })
+
+def bert_encoder(net, input, mask, token):
+    if not onnx:
+        output = net.predict([input, mask, token])
+    else:
+        output = net.run(None, {
+            'input_ids': input,
+            'attention_mask': mask,
+            'token_type_ids': token,
+        })
     last_hidden_state, _ = output[:2]
     hidden_states = output[2:]
 

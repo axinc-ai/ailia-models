@@ -1,4 +1,6 @@
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
+from collections import namedtuple
+
 import numpy as np
 
 
@@ -119,17 +121,13 @@ def get_visibility(anchors, image_height, image_width):
     return inds_inside
 
 
-from collections import namedtuple
-
-BoxList = namedtuple('BoxList', ['bbox', 'image_size', 'visibility'])
-
-
 def anchor_generator(image_size, feature_maps):
     grid_sizes = [feature_map.shape[-2:] for feature_map in feature_maps]
     anchors_over_all_feature_maps = grid_anchors(grid_sizes)
 
     image_height, image_width = image_size
 
+    BoxList = namedtuple('BoxList', ['bbox', 'image_size', 'visibility'])
     anchors = []
     for anchors_per_feature_map in anchors_over_all_feature_maps:
         inds_inside = get_visibility(anchors_per_feature_map, image_height, image_width)

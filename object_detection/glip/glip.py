@@ -4,6 +4,7 @@ import math
 
 import numpy as np
 import cv2
+from PIL import Image
 
 from transformers import AutoTokenizer
 
@@ -13,7 +14,7 @@ import ailia
 sys.path.append('../../util')
 from utils import get_base_parser, update_parser, get_savepath  # noqa
 from model_utils import check_and_download_models  # noqa
-# from image_utils import load_image, normalize_image  # noqa
+from image_utils import normalize_image  # noqa
 from detector_utils import load_image, plot_results  # noqa
 from webcamera_utils import get_capture, get_writer  # noqa
 from math_utils import sigmoid
@@ -23,7 +24,8 @@ from logging import getLogger  # noqa
 
 from glip_utils import run_ner, create_positive_map
 from glip_utils import create_positive_map_label_to_token_from_positive_map
-from bert_model import language_backbone
+import bert_model
+from bert_model import bert_encoder
 from anchor import anchor_generator
 
 logger = getLogger(__name__)
@@ -32,19 +34,20 @@ logger = getLogger(__name__)
 # Parameters
 # ======================
 
-WEIGHT_BKBN_PATH = "backbone.onnx"
-MODEL_BKBN_PATH = "backbone.onnx.prototxt"
-WEIGHT_BERT_PATH = "language_backbone.onnx"
-MODEL_BERT_PATH = "language_backbone.onnx.prototxt"
-WEIGHT_RPN_PATH = "rpn.onnx"
-MODEL_RPN_PATH = "rpn.onnx.prototxt"
+WEIGHT_BKBN_PATH = "swin_tiny_backbone.onnx"
+MODEL_BKBN_PATH = "swin_tiny_backbone.onnx.prototxt"
+WEIGHT_BERT_PATH = "swin_tiny_bert.onnx"
+MODEL_BERT_PATH = "swin_tiny_bert.onnx.prototxt"
+WEIGHT_RPN_PATH = "swin_tiny_rpn.onnx"
+MODEL_RPN_PATH = "swin_tiny_rpn.onnx.prototxt"
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/glip/'
 
 IMAGE_PATH = 'demo.jpg'
 SAVE_IMAGE_PATH = 'output.png'
 
-IMAGE_HEIGHT = 224
-IMAGE_WIDTH = 224
+IMG_MIN_SIZE = 800
+
+THRESHOLD = 0.5
 
 # ======================
 # Arguemnt Parser Config
@@ -52,6 +55,15 @@ IMAGE_WIDTH = 224
 
 parser = get_base_parser(
     'GLIP', IMAGE_PATH, SAVE_IMAGE_PATH
+)
+parser.add_argument(
+    '-c', '--caption', default='sofa . remote . dog . person . car . sky . plane',
+    help='The caption for detect.'
+)
+parser.add_argument(
+    '-th', '--threshold',
+    default=THRESHOLD, type=float,
+    help='The detection threshold.'
 )
 parser.add_argument(
     '--onnx',
@@ -87,7 +99,7 @@ def box_decode(preds, anchors):
     dw = preds[:, 2::4] / ww
     dh = preds[:, 3::4] / wh
 
-    # Prevent sending too large values into torch.exp()
+    # Prevent sending too large values into exp()
     dw = np.clip(dw, None, math.log(1000. / 16))
     dh = np.clip(dh, None, math.log(1000. / 16))
 
@@ -173,8 +185,24 @@ def select_over_all_levels(boxlists):
 # Main functions
 # ======================
 
-def preprocess(img, image_shape):
-    pass
+def preprocess(img):
+    im_h, im_w, _ = img.shape
+
+    img = img[:, :, ::-1]  # BGR -> RGB
+
+    # adaptive_resize
+    scale = IMG_MIN_SIZE / min(im_h, im_w)
+    ow, oh = int(im_w * scale), int(im_h * scale)
+    if ow != im_w or oh != im_h:
+        img = np.array(Image.fromarray(img).resize((ow, oh), Image.Resampling.BILINEAR))
+
+    img = normalize_image(img, 'ImageNet')
+
+    img = img[:, :, ::-1]  # RGB -> BGR
+    img = img.transpose(2, 0, 1)  # HWC -> CHW
+    img = img.astype(np.float32)
+
+    return img
 
 
 def post_processing(
@@ -208,7 +236,7 @@ def forward_for_single_feature_map(
         box_regression, centerness, anchors,
         box_cls=None,
         dot_product_logits=None,
-        positive_map=None, ):
+        positive_map=None):
     N, A, H, W = box_regression.shape
     A = A // 4
 
@@ -292,11 +320,19 @@ def convert_grounding_to_od_logits(
     return scores
 
 
-def predict(models, img):
-    im_h, im_w = 480, 640
-    # img = preprocess(img, shape)
+def predict(models, img, caption):
+    im_h, im_w = img.shape[:2]
 
-    caption = 'bobble heads on top of the shelf'
+    img = preprocess(img)
+    pp_h, pp_w = img.shape[1:]
+
+    # padding
+    size_divisible = 32
+    pad_h = int(math.ceil(pp_h / size_divisible) * size_divisible)
+    pad_w = int(math.ceil(pp_w / size_divisible) * size_divisible)
+    pad_img = np.zeros((1, 3, pad_h, pad_w), dtype=np.float32)
+    pad_img[0, :, :pp_h, :pp_w] = img
+    img = pad_img
 
     tokenizer = models["tokenizer"]
     max_length = 256
@@ -314,14 +350,12 @@ def predict(models, img):
     positive_map = create_positive_map_label_to_token_from_positive_map(positive_map, plus=1)
 
     # language embedding
-    net = models['language_backbone']
-    language_dict_features = language_backbone(
+    net = models['bert_encoder']
+    language_dict_features = bert_encoder(
         net,
         tokenized.input_ids.numpy(),
         tokenized.attention_mask.numpy(),
         tokenized.token_type_ids.numpy())
-
-    img = np.load("images.npy")
 
     net = models['backbone']
     if not args.onnx:
@@ -348,8 +382,7 @@ def predict(models, img):
     centerness = output[10:15]
     dot_product_logits = output[15:]
 
-    image_height, image_width = (800, 1066)
-    anchors = anchor_generator((image_height, image_width), features)
+    anchors = anchor_generator((pp_h, pp_w), features)
 
     proposals = post_processing(
         box_regression, centerness, anchors, box_cls, dot_product_logits, positive_map)
@@ -358,7 +391,7 @@ def predict(models, img):
     bboxes, labels, scores = proposals
 
     # reshape prediction into the original image size
-    ratio_height, ratio_width = im_h / image_height, im_w / image_width
+    ratio_height, ratio_width = im_h / pp_h, im_w / pp_w
     xmin, ymin, xmax, ymax = np.split(bboxes, 4, axis=-1)
     scaled_xmin = xmin * ratio_width
     scaled_xmax = xmax * ratio_width
@@ -368,7 +401,7 @@ def predict(models, img):
         (scaled_xmin, scaled_ymin, scaled_xmax, scaled_ymax), axis=-1
     )
 
-    thresh = 0.5
+    thresh = args.threshold
     keep = np.nonzero(scores > thresh)[0]
     bboxes = bboxes[keep]
     labels = labels[keep]
@@ -403,6 +436,8 @@ def predict(models, img):
 
 
 def recognize_from_image(models):
+    caption = args.caption
+
     # input image loop
     for image_path in args.input:
         logger.info(image_path)
@@ -418,7 +453,7 @@ def recognize_from_image(models):
             total_time_estimation = 0
             for i in range(args.benchmark_count):
                 start = int(round(time.time() * 1000))
-                detect_objects = predict(models, img)
+                detect_objects = predict(models, img, caption)
                 end = int(round(time.time() * 1000))
                 estimation_time = (end - start)
 
@@ -429,9 +464,9 @@ def recognize_from_image(models):
 
             logger.info(f'\taverage time estimation {total_time_estimation / (args.benchmark_count - 1)} ms')
         else:
-            detect_objects = predict(models, img)
+            detect_objects = predict(models, img, caption)
 
-        res_img = plot_results(detect_objects, img, None)
+        res_img = plot_results(detect_objects, img)
 
         # plot result
         savepath = get_savepath(args.savepath, image_path, ext='.png')
@@ -454,6 +489,8 @@ def recognize_from_video(models):
     else:
         writer = None
 
+    caption = args.caption
+
     frame_shown = False
     while True:
         ret, frame = capture.read()
@@ -463,11 +500,10 @@ def recognize_from_video(models):
             break
 
         # inference
-        img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        out = predict(net, img)
+        detect_objects = predict(models, frame, caption)
 
         # plot result
-        res_img = draw_bbox(frame, out)
+        res_img = plot_results(detect_objects, frame)
 
         # show
         cv2.imshow('frame', res_img)
@@ -497,20 +533,21 @@ def main():
     # initialize
     if not args.onnx:
         backbone = ailia.Net(MODEL_BKBN_PATH, WEIGHT_BKBN_PATH, env_id=env_id)
-        language_backbone = ailia.Net(MODEL_BERT_PATH, WEIGHT_BERT_PATH, env_id=env_id)
+        bert_encoder = ailia.Net(MODEL_BERT_PATH, WEIGHT_BERT_PATH, env_id=env_id)
         rpn = ailia.Net(MODEL_RPN_PATH, WEIGHT_RPN_PATH, env_id=env_id)
     else:
         import onnxruntime
         backbone = onnxruntime.InferenceSession(WEIGHT_BKBN_PATH)
-        language_backbone = onnxruntime.InferenceSession(WEIGHT_BERT_PATH)
+        bert_encoder = onnxruntime.InferenceSession(WEIGHT_BERT_PATH)
         rpn = onnxruntime.InferenceSession(WEIGHT_RPN_PATH)
+        bert_model.onnx = True
 
     tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
 
     models = dict(
         tokenizer=tokenizer,
         backbone=backbone,
-        language_backbone=language_backbone,
+        bert_encoder=bert_encoder,
         rpn=rpn,
     )
 
