@@ -12,15 +12,6 @@ from PIL import Image
 
 import faceutils as futils
 
-import argparse
-parser = argparse.ArgumentParser()
-parser.add_argument("--use_dlib",action="store_true")
-args = parser.parse_args()
-
-if args.use_dlib:
-    import dlib
-    import faceutils.dlibutils as futils_dlib
-
 sys.path.append("../../util")
 from image_utils import load_image  # noqa: E402
 
@@ -187,6 +178,8 @@ class PreProcess:
 
     def detect_landmark(self, image, face):
         if self.use_dlib:
+            import dlib
+            import faceutils.dlibutils as futils_dlib
             predictor = dlib.shape_predictor(
                 pwd + "/../faceutils/dlibutils/shape_predictor_68_face_landmarks.dat"
             )
@@ -254,6 +247,7 @@ class PreProcess:
 
     def __call__(self, image: Image):
         if self.use_dlib:
+            import faceutils.dlibutils as futils_dlib
             face = futils_dlib.detect(image)
             if not face:
                 return None, None, None
