@@ -160,9 +160,10 @@ def post_processing(preds, img_size):
                     w=(x2 - x1),
                     h=(y2 - y1),
                 )
-                detections.append(r)
+                output.append(r)
+        detections.append(output)
 
-    return detections
+    return detections[0]
 
 
 def predict(net, img):
