@@ -120,8 +120,8 @@ def plot_results(detector, img, category=None, segm_masks=None, logging=True):
         if logging:
             print(f'+ idx={idx}')
             print(
-                f'  category={obj.category}[ {category[obj.category]} ]'
-                if isinstance(obj.category, int) and category is not None
+                f'  category={obj.category}[ {category[int(obj.category)]} ]'
+                if not isinstance(obj.category, str) and category is not None
                 else f'  category=[ {obj.category} ]'
             )
             print(f'  prob={obj.prob}')
@@ -158,8 +158,8 @@ def plot_results(detector, img, category=None, segm_masks=None, logging=True):
         obj = detector.get_object(idx) if hasattr(detector, 'get_object') else detector[idx]
         fontScale = img.shape[1] / 2048
 
-        category = category[obj.category] \
-            if isinstance(obj.category, int) and category is not None \
+        category = category[int(obj.category)] \
+            if not isinstance(obj.category, int) and category is not None \
             else obj.category
         text = "{} {}".format(category, int(obj.prob * 100) / 100)
         textsize = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, fontScale, 1)[0]
