@@ -1,20 +1,20 @@
+import argparse
+import os
 import sys
 import time
+from glob import glob
+
+import ailia
 import cv2
 import numpy as np
-from glob import glob
+
 from hybridnets_utils import *
 
-
-import os
-import argparse
-import ailia
-
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath
-from model_utils import check_and_download_models  # noqa: E402
 import webcamera_utils  # noqa: E402
-
+from image_utils import imread  # noqa: E402
+from model_utils import check_and_download_models  # noqa: E402
+from utils import get_base_parser, get_savepath, update_parser
 
 WEIGHT_PATH = 'hybridnets.onnx'
 MODEL_PATH  = 'hybridnets.onnx.prototxt'
@@ -145,7 +145,7 @@ def recognize_from_image():
         video_flag = any([True] * ni + [False] * nv)
         
         if video_flag:
-            image = cv2.imread(image_path)
+            image = imread(image_path)
 
             image = detect(image,model,color_list)
 

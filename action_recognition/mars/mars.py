@@ -1,22 +1,20 @@
 import os
+import re
 import sys
 import time
-import re
 from collections import deque
 
-import numpy as np
-import cv2
-
 import ailia
+import cv2
+import numpy as np
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser  # noqa: E402
-from model_utils import check_and_download_models  # noqa: E402
-from webcamera_utils import get_capture  # noqa: E402
-from image_utils import load_image  # noqa: E402
 from classifier_utils import plot_results  # noqa: E402
-
+from image_utils import imread, load_image  # noqa: E402
+from model_utils import check_and_download_models  # noqa: E402
+from utils import get_base_parser, update_parser  # noqa: E402
+from webcamera_utils import get_capture  # noqa: E402
 
 # ======================
 # Parameters
@@ -159,7 +157,7 @@ def recognize_from_image():
 
             print_mars_result(result)
 
-            preview_img = cv2.imread(sorted_inputs_path[
+            preview_img = imread(sorted_inputs_path[
                     next_input_index - args.duration
             ])
             if args.gui:

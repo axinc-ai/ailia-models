@@ -1,27 +1,29 @@
 import os
+import pathlib
 import sys
 import time
-from PIL import Image
-import numpy as np
-import cv2
-from matplotlib import pyplot as plt
-import pathlib
 
 import ailia
+import cv2
+import numpy as np
+from matplotlib import pyplot as plt
+from PIL import Image
+
 from lib_pose_hg_3d.utils.debugger import Debugger
-from lib_pose_hg_3d.utils.image import get_affine_transform, transform_preds
 from lib_pose_hg_3d.utils.eval import get_preds, get_preds_3d
+from lib_pose_hg_3d.utils.image import get_affine_transform, transform_preds
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
-from model_utils import check_and_download_models  # noqa: E402
-from webcamera_utils import get_capture, get_writer, \
-    calc_adjust_fsize ,preprocess_frame # noqa: E402
-from image_utils import normalize_image  # noqa: E402
-
 # logger
-from logging import getLogger   # noqa: E402
+from logging import getLogger  # noqa: E402
+
+from image_utils import imread, normalize_image  # noqa: E402
+from model_utils import check_and_download_models  # noqa: E402
+from utils import get_base_parser, get_savepath, update_parser  # noqa: E402
+from webcamera_utils import (calc_adjust_fsize, get_capture,  # noqa: E402
+                             get_writer, preprocess_frame)
+
 logger = getLogger(__name__)
 os.environ['KMP_DUPLICATE_LIB_OK']='TRUE'
 
@@ -64,7 +66,7 @@ def recognize_from_image():
     for image_path in args.input:
         logger.info(image_path)
 
-        img = cv2.imread(IMAGE_PATH)
+        img = imread(IMAGE_PATH)
         s = max(img.shape[0], img.shape[1]) * 1.0
         c = np.array([img.shape[1] / 2., img.shape[0] / 2.], dtype=np.float32)
         trans_input = get_affine_transform(

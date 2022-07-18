@@ -1,20 +1,22 @@
-from contextlib import contextmanager
 import sys
 import time
+from contextlib import contextmanager
 
+import ailia
 import cv2
 import numpy as np
 
-import ailia
 import ax_gaze_estimation_utils as gut
 
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser,get_savepath  # noqa: E402
-from webcamera_utils import get_capture, get_writer  # noqa: E402
-from model_utils import check_and_download_models  # noqa: E402
-
 # logger
-from logging import getLogger   # noqa: E402
+from logging import getLogger  # noqa: E402
+
+from image_utils import imread  # noqa: E402
+from model_utils import check_and_download_models  # noqa: E402
+from utils import get_base_parser, get_savepath, update_parser  # noqa: E402
+from webcamera_utils import get_capture, get_writer  # noqa: E402
+
 logger = getLogger(__name__)
 
 
@@ -329,6 +331,7 @@ class GazeEstimator:
         draw_head_pose : bool, optional
             Whether to draw the head pose(s) or not.
         """
+        img_draw = img.copy()
         preds = self.predict(img, gazes_only=False)
         if preds[0] is not None:
             img_draw = self.draw(img, *preds, draw_iris=draw_iris,
@@ -345,7 +348,7 @@ def recognize_from_image():
     # input image loop
     for image_path in args.input:
         logger.info(image_path)
-        src_img = cv2.imread(image_path)
+        src_img = imread(image_path)
 
         # inference
         logger.info('Start inference...')

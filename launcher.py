@@ -1,22 +1,22 @@
 # ailia MODELS launcher
 
-import os
-import cv2
-import numpy
-import subprocess
-import shutil
-import sys
 import glob
-import ailia
-
-from PIL import Image, ImageTk
-
+import os
+import shutil
+import subprocess
+import sys
 # for macOS, please install "brew install python-tk@3.9"
 import tkinter as tk
-from tkinter import ttk
 import tkinter.filedialog
+from tkinter import ttk
+
+import ailia
+import cv2
+import numpy
+from PIL import Image, ImageTk
 
 sys.path.append('./util')
+from image_utils import imread  # noqa: E402
 from utils import get_base_parser, update_parser  # noqa: E402
 
 # ======================
@@ -156,7 +156,7 @@ def model_changed(event):
     load_detail(model_index)
 
 def create_photo_image(path,w=320,h=240):
-    image_bgr = cv2.imread(path)
+    image_bgr = imread(path)
     #image_bgr = cv2.resize(image_bgr,(w,h))
     image_rgb = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB) # imreadはBGRなのでRGBに変換
     image_pil = Image.fromarray(image_rgb) # RGBからPILフォーマットへ変換
@@ -165,6 +165,8 @@ def create_photo_image(path,w=320,h=240):
     return image_tk
 
 def load_image(path):
+    if not os.path.isfile(path):
+        return
     global canvas, canvas_item, image_tk
     image_tk = create_photo_image(path)
     if canvas_item == None:
@@ -195,7 +197,7 @@ def load_detail(index):
 
     global textModelDetail
 
-    f = open(base_path+"README.md")
+    f = open(base_path+"README.md", encoding="utf8")
     text = f.readlines()
     text = text[0].replace("# ","")
     text = text.replace("\r","")

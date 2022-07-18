@@ -1,21 +1,23 @@
-import numpy as np
-import time
 import os
 import sys
-import cv2
-
-from codes_for_lane_detection_utils import crop_and_resize, preprocess, postprocess
+import time
 
 import ailia
+import cv2
+import numpy as np
+
+from codes_for_lane_detection_utils import (crop_and_resize, postprocess,
+                                            preprocess)
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath
-from model_utils import check_and_download_models
-import webcamera_utils
-
 # logger
 from logging import getLogger
+
+import webcamera_utils
+from image_utils import imread  # noqa: E402
+from model_utils import check_and_download_models
+from utils import get_base_parser, get_savepath, update_parser
 
 logger = getLogger(__name__)
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
@@ -78,7 +80,7 @@ def recognize_from_image(net):
     for image_path in args.input:
         # prepare input data
         logger.debug(f'input image: {image_path}')
-        raw_img = cv2.imread(image_path)
+        raw_img = imread(image_path)
         logger.debug(f'input image shape: {raw_img.shape}')
 
         img = crop_and_resize(raw_img,WIDTH,HEIGHT,args.arch,args.resize)

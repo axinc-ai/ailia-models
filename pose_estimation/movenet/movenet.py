@@ -1,21 +1,23 @@
 import sys
 import time
-import numpy as np
-import skimage
-import cv2
 
-import onnxruntime
 import ailia
+import cv2
+import numpy as np
+import onnxruntime
+import skimage
 
 import movenet_utils
 
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
-from model_utils import check_and_download_models  # noqa: E402
-import webcamera_utils  # noqa: E402
-
 # logger
-from logging import getLogger   # noqa: E402
+from logging import getLogger  # noqa: E402
+
+import webcamera_utils  # noqa: E402
+from image_utils import imread  # noqa: E402
+from model_utils import check_and_download_models  # noqa: E402
+from utils import get_base_parser, get_savepath, update_parser  # noqa: E402
+
 logger = getLogger(__name__)
 
 # ======================
@@ -75,7 +77,7 @@ def recognize_from_image():
     
     for image_path in args.input:
 
-        image = cv2.imread(image_path)
+        image = imread(image_path)
         input_image, padding_ratio = movenet_utils.crop_and_padding(image,IMAGE_SIZE)
         input_image = np.expand_dims(input_image, axis=0)
             

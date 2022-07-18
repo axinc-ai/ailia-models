@@ -1,23 +1,24 @@
 import sys
 import time
 
-import numpy as np
-import cv2
-
 import ailia
+import cv2
+import numpy as np
+
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
-from model_utils import check_and_download_models  # noqa: E402
-import webcamera_utils  # noqa: E402
-
 # logger
-from logging import getLogger   # noqa: E402
+from logging import getLogger  # noqa: E402
+
+import webcamera_utils  # noqa: E402
+from image_utils import imread  # noqa: E402
+from model_utils import check_and_download_models  # noqa: E402
+from utils import get_base_parser, get_savepath, update_parser  # noqa: E402
+
 logger = getLogger(__name__)
 
 # for EasyOCR
 from easyocr_utils import *
-
 
 # ======================
 # PARAMETERS
@@ -77,8 +78,8 @@ def recognize_from_image():
     for image_path in args.input:
         # prepare input data
         logger.info(image_path)
-        img_gray = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
-        img = cv2.imread(image_path)
+        img_gray = imread(image_path, cv2.IMREAD_GRAYSCALE)
+        img = imread(image_path)
 
         # predict
         result = predict(img, img_gray)
