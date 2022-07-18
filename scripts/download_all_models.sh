@@ -173,7 +173,7 @@ cd ../../object_detection/traffic-sign-detection; python3 traffic-sign-detection
 cd ../../object_detection/detic; python3 detic.py ${OPTION}
 cd ../../object_detection/picodet; python3 picodet.py ${OPTION}
 cd ../../object_detection/yolact; python3 yolact.py ${OPTION}
-#cd ../../object_detection/dab-detr; python3 dab-detr.py ${OPTION}
+cd ../../object_detection/dab-detr; python3 dab-detr.py ${OPTION}
 cd ../../object_detection_3d/3d_bbox; python3 3d_bbox.py ${OPTION}
 cd ../../object_detection_3d/3d-object-detection.pytorch; python3 3d-object-detection.pytorch.py ${OPTION}
 cd ../../object_detection_3d/mediapipe_objectron; python3 mediapipe_objectron.py ${OPTION}
@@ -217,6 +217,7 @@ cd ../../super_resolution/srresnet; python3 srresnet.py ${OPTION}
 cd ../../super_resolution/han; python3 han.py ${OPTION}
 cd ../../super_resolution/edsr; python3 edsr.py ${OPTION}
 cd ../../super_resolution/real-esrgan; python3 real-esrgan.py ${OPTION}
+cd ../../super_resolution/swinir; python3 swinir.py ${OPTION}
 cd ../../text_detection/craft_pytorch; python3 craft_pytorch.py ${OPTION}
 cd ../../text_detection/pixel_link; python3 pixel_link.py ${OPTION}
 cd ../../text_detection/east; python3 east.py ${OPTION}
