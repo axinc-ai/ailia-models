@@ -286,7 +286,6 @@ def main():
     # initialize
     logger.info('initializing model...')
     if not args.onnx:
-        logger.info('Ailia is not implemented. Please wait future update.')
         net = ailia.Net(model_path, weight_path, env_id=args.env_id)
     else:
         import onnxruntime
