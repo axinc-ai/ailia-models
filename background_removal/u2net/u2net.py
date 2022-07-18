@@ -1,20 +1,22 @@
 import sys
 import time
 
-import numpy as np
-import cv2
-
 import ailia
+import cv2
+import numpy as np
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
-from model_utils import check_and_download_models  # noqa: E402
-import webcamera_utils  # noqa: E402
-from u2net_utils import load_image, transform, save_result, norm  # noqa: E402
-
 # logger
-from logging import getLogger   # noqa: E402
+from logging import getLogger  # noqa: E402
+
+import webcamera_utils  # noqa: E402
+from image_utils import imread  # noqa: E402
+from model_utils import check_and_download_models  # noqa: E402
+from utils import get_base_parser, get_savepath, update_parser  # noqa: E402
+
+from u2net_utils import load_image, norm, save_result, transform  # noqa: E402
+
 logger = getLogger(__name__)
 
 
@@ -116,7 +118,7 @@ def recognize_from_image(net):
 
         # composite
         if args.composite:
-            image = cv2.imread(image_path)
+            image = imread(image_path)
             image = cv2.cvtColor(image, cv2.COLOR_BGR2BGRA)
             image[:, :, 3] = cv2.resize(pred, (w, h)) * 255
             cv2.imwrite(savepath, image)

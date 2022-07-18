@@ -2,24 +2,23 @@ import os
 import sys
 import time
 
-from matplotlib import pyplot as plt
-
+import ailia
 import cv2
 import numpy as np
-
-import ailia
+from matplotlib import pyplot as plt
 
 # import original modules
 sys.path.append('../../util')
 sys.path.append('../../face_detection/blazeface')
-from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
-from model_utils import check_and_download_models  # noqa: E402
-from image_utils import load_image  # noqa: E402
+# logger
+from logging import getLogger  # noqa: E402
+
 import webcamera_utils  # noqa: E402
 from blazeface_utils import compute_blazeface, crop_blazeface  # noqa: E402
+from image_utils import imread, load_image  # noqa: E402
+from model_utils import check_and_download_models  # noqa: E402
+from utils import get_base_parser, get_savepath, update_parser  # noqa: E402
 
-# logger
-from logging import getLogger   # noqa: E402
 logger = getLogger(__name__)
 
 
@@ -154,7 +153,7 @@ def recognize_from_video():
         # postprocessing
         fig = gen_img_from_predsailia(input_data, preds_ailia)
         fig.savefig('tmp.png')
-        img = cv2.imread('tmp.png')
+        img = imread('tmp.png')
         cv2.imshow('frame', img)
         frame_shown = True
 

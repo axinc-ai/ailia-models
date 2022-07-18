@@ -80,3 +80,20 @@ def nms_boxes(boxes, scores, iou_thres):
         keep.append(is_keep)
 
     return np.array(keep).nonzero()[0]
+
+
+def batched_nms(boxes, scores, labels, iou_thres):
+    a = []
+    for i in np.unique(labels):
+        idx = (labels == i)
+        idx = np.nonzero(idx)[0]
+        i = nms_boxes(boxes[idx], scores[idx], iou_thres)
+        idx = idx[i]
+        a.append(idx)
+
+    keep = np.concatenate(a)
+    scores = scores[keep]
+    idxs = np.argsort(-scores)
+    keep = keep[idxs]
+
+    return keep

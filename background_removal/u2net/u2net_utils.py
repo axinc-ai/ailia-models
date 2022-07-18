@@ -1,6 +1,12 @@
+import sys
+
 import cv2
 import numpy as np
 from PIL import Image
+
+sys.path.append('../../util')
+
+from image_utils import imread  # noqa: E402
 
 
 def transform(image, scaled_size):
@@ -29,7 +35,7 @@ def transform(image, scaled_size):
 
 
 def load_image(image_path, scaled_size, rgb_mode):
-    image = cv2.imread(image_path)
+    image = imread(image_path)
     if rgb_mode and image.shape[2] == 3:
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
     h, w = image.shape[0], image.shape[1]

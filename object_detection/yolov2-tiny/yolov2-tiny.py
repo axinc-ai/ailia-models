@@ -1,20 +1,21 @@
 import sys
 import time
 
-import numpy as np
-import cv2
-
 import ailia
+import cv2
+import numpy as np
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
-from model_utils import check_and_download_models  # noqa: E402
-from detector_utils import plot_results, load_image  # noqa: E402
-import webcamera_utils  # noqa: E402
-
 # logger
-from logging import getLogger   # noqa: E402
+from logging import getLogger  # noqa: E402
+
+import webcamera_utils  # noqa: E402
+from detector_utils import load_image, plot_results  # noqa: E402
+from image_utils import imread  # noqa: E402
+from model_utils import check_and_download_models  # noqa: E402
+from utils import get_base_parser, get_savepath, update_parser  # noqa: E402
+
 logger = getLogger(__name__)
 
 from yolo_utils import *
@@ -183,7 +184,7 @@ def recognize_from_image():
                 savepath = get_savepath(args.savepath, image_path)
 
                 img_PIL = Image.open(image_path).convert('RGB')
-                input_data = cv2.imread(image_path)
+                input_data = imread(image_path)
                 input_data = cv2.resize(input_data, (416,416))/ 255
                 input_data = input_data.transpose((2,0,1))
                 input_data = input_data[np.newaxis,:,:,:].astype(np.float32)

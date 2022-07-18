@@ -1,19 +1,20 @@
 import sys
 import time
 
+import ailia
 import cv2
 import numpy as np
 
-import ailia
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
-from model_utils import check_and_download_models  # noqa: E402
-from image_utils import load_image  # noqa: E402
-import webcamera_utils  # noqa: E402
-
 # logger
-from logging import getLogger   # noqa: E402
+from logging import getLogger  # noqa: E402
+
+import webcamera_utils  # noqa: E402
+from image_utils import imread, load_image  # noqa: E402
+from model_utils import check_and_download_models  # noqa: E402
+from utils import get_base_parser, get_savepath, update_parser  # noqa: E402
+
 logger = getLogger(__name__)
 
 
@@ -100,7 +101,7 @@ def unwarp_from_image():
     for image_path in args.input:
         # prepare input data
         logger.info(image_path)
-        org_img = cv2.imread(image_path)
+        org_img = imread(image_path)
         img = load_image(
             image_path,
             (WC_IMG_HEIGHT, WC_IMG_WIDTH),
