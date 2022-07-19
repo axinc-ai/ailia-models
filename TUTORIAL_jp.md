@@ -85,7 +85,7 @@ sudo apt-get install libatlas-base-dev
   -i IMAGE/VIDEO, --input IMAGE/VIDEO
                         デフォルトの (モデルよって入力ファイル形式が違う)
                         入力データ（画像やビデオ)へのパスの指定。
-                        ディレクトリが指定された場合は、中にそれぞれのファイルに
+                        ディレクトリが指定された場合は、中にあるそれぞれのファイルに
                         対して推論が実行される。ファイルの種類の指定は
                         --ftype引数で指定できる。（デフォルトは画像）
   -v VIDEO, --video VIDEO
