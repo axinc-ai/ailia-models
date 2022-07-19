@@ -10,6 +10,8 @@ The collection of pre-trained, state-of-the-art AI models.
 
 [ailia MODELS tutorial](TUTORIAL.md)
 
+[ailia MODELS tutorial 日本語版](TUTORIAL_jp.md)
+
 # Supported models
 
 ## Action recognition
@@ -299,7 +301,8 @@ The collection of pre-trained, state-of-the-art AI models.
 | [<img src="object_detection/detic/output.png" width=128px>](object_detection/detic/) | [detic](/object_detection/detic/) | [Detecting Twenty-thousand Classes using Image-level Supervision](https://github.com/facebookresearch/Detic) | Pytorch | 1.2.10 and later |[JP](https://medium.com/axinc/detic-21k%E3%82%AF%E3%83%A9%E3%82%B9%E3%82%92%E9%AB%98%E7%B2%BE%E5%BA%A6%E3%81%AB%E3%82%BB%E3%82%B0%E3%83%A1%E3%83%B3%E3%83%86%E3%83%BC%E3%82%B7%E3%83%A7%E3%83%B3%E3%81%A7%E3%81%8D%E3%82%8B%E7%89%A9%E4%BD%93%E6%A4%9C%E5%87%BA%E3%83%A2%E3%83%87%E3%83%AB-1b8f777ee89a) |
 | [<img src="object_detection/picodet/output.png" width=128px>](object_detection/picodet/) | [picodet](/object_detection/picodet/) | [PP-PicoDet](https://github.com/Bo396543018/Picodet_Pytorch) | Pytorch | 1.2.10 and later | |
 | [<img src="object_detection/yolact/output.png" width=128px>](object_detection/yolact/) | [yolact](/object_detection/yolact/) | [You Only Look At CoefficienTs](https://github.com/dbolya/yolact) | Pytorch | 1.2.6 and later | |
-| [<img src="object_detection/glip/output.png" width=128px>](object_detection/glip/) | [glip](/object_detection/glip/) | [GLIP](https://github.com/microsoft/GLIP) | Pytorch | 1.2.11 and later | |
+| [<img src="object_detection/fastest-det/output.png" width=128px>](object_detection/fastest-det/) | [fastest-det](/object_detection/fastest-det/) | [FastestDet](https://github.com/dog-qiuqiu/FastestDet) | Pytorch | 1.2.5 and later | |
+| [<img src="object_detection/glip/output.png" width=128px>](object_detection/glip/) | [glip](/object_detection/glip/) | [GLIP](https://github.com/microsoft/GLIP) | Pytorch | 1.2.12 and later | |
 
 <!--
 | [<img src="object_detection/dab-detr/output.jpg" width=128px>](object_detection/dab-detr/) | [dab-detr](/object_detection/dab-detr/) | [DAB-DETR](https://github.com/IDEA-opensource/DAB-DETR) | Pytorch | 1.2.0 and later | |
@@ -398,6 +401,7 @@ The collection of pre-trained, state-of-the-art AI models.
 | [<img src="super_resolution/edsr/output.png" width=128px>](super_resolution/edsr/) | [edsr](/super_resolution/edsr/) | [Enhanced Deep Residual Networks for Single Image Super-Resolution](https://github.com/sanghyun-son/EDSR-PyTorch.git) | Pytorch | 1.2.6 and later | [EN](https://medium.com/axinc-ai/edsr-a-machine-learning-model-for-super-resolution-image-processing-9deaf36b24ed) [JP](https://medium.com/axinc/edsr-%E7%94%BB%E5%83%8F%E3%81%AE%E8%B6%85%E8%A7%A3%E5%83%8F%E5%87%A6%E7%90%86%E3%82%92%E8%A1%8C%E3%81%86%E6%A9%9F%E6%A2%B0%E5%AD%A6%E7%BF%92%E3%83%A2%E3%83%87%E3%83%AB-2842b1d244d) |
 | [<img src="super_resolution/han/output.png" width=128px>](super_resolution/han/) | [han](/super_resolution/han/) | [Single Image Super-Resolution via a Holistic Attention Network](https://github.com/wwlCape/HAN) | Pytorch | 1.2.6 and later |
 | [<img src="super_resolution/real-esrgan/output_anime.jpg" width=128px>](super_resolution/real-esrgan/) | [real-esrgan](/super_resolution/real-esrgan/) | [Real-ESRGAN](https://github.com/xinntao/Real-ESRGAN) | Pytorch | 1.2.9 and later |
+| [<img src="super_resolution/rcan-it/output.png" width=128px>](super_resolution/rcan-it/) | [rcan-it](/super_resolution/rcan-it/) | [Revisiting RCAN: Improved Training for Image Super-Resolution](https://github.com/zudi-lin/rcan-it) | Pytorch | 1.2.10 and later |
 
 ## Text detection
 

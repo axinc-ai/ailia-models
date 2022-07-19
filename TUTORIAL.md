@@ -74,8 +74,8 @@ optional arguments:
                         model will be run for the files inside. File type is
                         specified by --ftype argument (default: lenna.png)
   -v VIDEO, --video VIDEO
-                        You can convert the input video by entering style
-                        image.If the int variable is given, corresponding
+                        Run the inference against live camera image.
+                        If an integer value is given, corresponding
                         webcam input will be used. (default: None)
   -s SAVE_PATH, --savepath SAVE_PATH
                         Save path for the output (image / video / text).
@@ -106,7 +106,7 @@ python3 yolov3-tiny.py -i input.png -s output.png
 Input an video file, perform AI processing, and save the output to a video.
 
 ```
-python3 yolov3-tiny.py -v input.mp4 -s output.mp4
+python3 yolov3-tiny.py -i input.mp4 -s output.mp4
 ```
 
 Measure the execution time of the AI model.
@@ -127,6 +127,13 @@ Get a list of executable environments.
 python3 yolov3-tiny.py --env_list
 ```
 
+Run the inference against live video stream.
+(Press 'Q' to quit)
+
+```
+python3 yolov3-tiny.py -v 0
+```
+
 ## Launcher
 
 You can display a list of models and select them with the mouse by using the command below.
@@ -134,6 +141,10 @@ You can display a list of models and select them with the mouse by using the com
 ```
 python3 launcher.py
 ```
+
+<img src="launcher.png">
+
+
 
 ## Demo application for iOS/Android
 - [ailia AI showcase for iOS](https://apps.apple.com/jp/app/ailia-ai-showcase/id1522828798)
