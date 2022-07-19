@@ -8,7 +8,7 @@ The collection of pre-trained, state-of-the-art AI models.
 
 # How to use
 
-[ailia MODELS tutorial](TUTORIAL.md)
+[ailia MODELS tutorial](TUTORIAL.md) [日本語版](TUTORIAL_jp.md)
 
 # Supported models
 
