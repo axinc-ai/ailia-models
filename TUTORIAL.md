@@ -165,7 +165,7 @@ python3 launcher.py
 
 - [ailia SDK C++ Tutorial (EN)](https://medium.com/axinc-ai/ailia-sdk-tutorial-c-75e59bbefffe) [(JP)](https://medium.com/axinc/ailia-sdk-%E3%83%81%E3%83%A5%E3%83%BC%E3%83%88%E3%83%AA%E3%82%A2%E3%83%AB-c-dc949d9dcd28)
 - [API reference (EN)](https://axinc-ai.github.io/ailia-sdk/api/cpp/en/) [(JP)](https://axinc-ai.github.io/ailia-sdk/api/cpp/jp/)
-- [ailia Models](https://github.com/axinc-ai/ailia-models-cpp)
+- [ailia Models for C++](https://github.com/axinc-ai/ailia-models-cpp)
 - [iOS Xcode Sample Project](https://github.com/axinc-ai/ailia-xcode)
 - [Android NDK Sample Project](https://github.com/axinc-ai/ailia-android-ndk)
 
@@ -173,7 +173,7 @@ python3 launcher.py
 
 - [ailia SDK Unity(C#) Tutorial (EN)](https://medium.com/axinc-ai/ailia-sdk-tutorial-unity-54f2a8155b8f) [(JP)](https://medium.com/axinc/ailia-sdk-%E3%83%81%E3%83%A5%E3%83%BC%E3%83%88%E3%83%AA%E3%82%A2%E3%83%AB-unity-257fa1e98777)
 - [API reference (EN)](https://axinc-ai.github.io/ailia-sdk/api/unity/en/) [(JP)](https://axinc-ai.github.io/ailia-sdk/api/unity/jp/)
-- [ailia Models](https://github.com/axinc-ai/ailia-models-unity)
+- [ailia Models for C#(Unity)](https://github.com/axinc-ai/ailia-models-unity)
 
 ### Java
 
