@@ -28,8 +28,8 @@ logger = getLogger(__name__)
 
 WEIGHT_PATH = 'GFPGANv1.3.onnx'
 MODEL_PATH = 'GFPGANv1.3.onnx.prototxt'
-WEIGHT_DET_PATH = "detection_Resnet50.onnx"
-MODEL_DET_PATH = "detection_Resnet50.onnx.prototxt"
+WEIGHT_DET_PATH = "retinaface_resnet50.onnx"
+MODEL_DET_PATH = "retinaface_resnet50.onnx.prototxt"
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/gfpgan/'
 
 REALESRGAN_MODEL = 'https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.1/RealESRGAN_x2plus.pth'
@@ -63,14 +63,6 @@ parser.add_argument(
     help='Use realesrgan module.'
 )
 args = update_parser(parser)
-
-
-# ======================
-# Secondaty Functions
-# ======================
-
-# def draw_bbox(img, bboxes):
-#     return img
 
 
 # ======================
