@@ -3,7 +3,6 @@ import time
 
 import numpy as np
 import cv2
-from PIL import Image
 
 import ailia
 
@@ -18,6 +17,8 @@ from webcamera_utils import get_capture, get_writer  # noqa
 from logging import getLogger  # noqa
 
 from face_restoration import get_face_landmarks_5
+from face_restoration import align_warp_face, get_inverse_affine
+from face_restoration import paste_faces_to_image
 
 logger = getLogger(__name__)
 
@@ -27,7 +28,11 @@ logger = getLogger(__name__)
 
 WEIGHT_PATH = 'GFPGANv1.3.onnx'
 MODEL_PATH = 'GFPGANv1.3.onnx.prototxt'
+WEIGHT_DET_PATH = "detection_Resnet50.onnx"
+MODEL_DET_PATH = "detection_Resnet50.onnx.prototxt"
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/gfpgan/'
+
+REALESRGAN_MODEL = 'https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.1/RealESRGAN_x2plus.pth'
 
 IMAGE_PATH = 'demo.png'
 SAVE_IMAGE_PATH = 'output.png'
@@ -42,9 +47,20 @@ parser = get_base_parser(
     'GFPGAN', IMAGE_PATH, SAVE_IMAGE_PATH
 )
 parser.add_argument(
-    '-d', '--detection',
-    action='store_true',
-    help='Use object detection.'
+    '-u', '--upscale', type=int, default=1,
+    help='The final upsampling scale of the image.'
+)
+parser.add_argument(
+    '--aligned', action='store_true',
+    help='Input is aligned faces.'
+)
+parser.add_argument(
+    '--facexlib', action='store_true',
+    help='Use facexlib module.'
+)
+parser.add_argument(
+    '--realesrgan', action='store_true',
+    help='Use realesrgan module.'
 )
 args = update_parser(parser)
 
@@ -85,16 +101,17 @@ def post_processing(pred):
 
 
 def predict(models, img):
-    face_restor = models.get("face_restor")
     face_det = models.get("face_det")
+    face_restor = models.get("face_restor")
+    realesrgan = models.get("upsampler")
 
-    if not face_restor:
-        img = cv2.resize(img, (IMAGE_SIZE, IMAGE_SIZE))
-        cropped_faces = [img]
-    else:
-        all_landmarks_5 = get_face_landmarks_5(
+    upscale = args.upscale
+
+    if face_det:
+        det_faces, all_landmarks_5 = get_face_landmarks_5(
             face_det, img, eye_dist_threshold=5)
-
+        cropped_faces, affine_matrices = align_warp_face(img, all_landmarks_5)
+    elif face_restor:
         face_restor.clean_all()
         face_restor.read_image(img)
         # get face landmarks for each face
@@ -103,10 +120,14 @@ def predict(models, img):
         # align and warp each face
         face_restor.align_warp_face()
         cropped_faces = face_restor.cropped_faces
+    else:
+        img = cv2.resize(img, (IMAGE_SIZE, IMAGE_SIZE))
+        cropped_faces = [img]
 
     gfpgan = models["gfpgan"]
 
     # face restoration
+    restored_faces = []
     for cropped_face in cropped_faces:
         x = preprocess(cropped_face)
 
@@ -115,13 +136,29 @@ def predict(models, img):
         pred = output[0]
 
         restored_face = post_processing(pred)
+        restored_faces.append(restored_face)
 
         if face_restor:
             face_restor.add_restored_face(restored_face)
 
-    if face_restor:
+    if upscale > 1:
+        if realesrgan:
+            img = realesrgan.enhance(img, outscale=upscale)[0]
+        else:
+            h, w = img.shape[:2]
+            h_up, w_up = int(h * upscale), int(w * upscale)
+            img = cv2.resize(img, (w_up, h_up), interpolation=cv2.INTER_LANCZOS4)
+
+    if face_det:
+        inverse_affine_matrices = get_inverse_affine(affine_matrices, upscale_factor=upscale)
+        restored_img = paste_faces_to_image(
+            img, restored_faces, inverse_affine_matrices,
+            upscale_factor=upscale)
+    elif face_restor:
         face_restor.get_inverse_affine(None)
         restored_img = face_restor.paste_faces_to_input_image(upsample_img=img)
+    else:
+        restored_img = restored_faces[0]
 
     return restored_img
 
@@ -207,47 +244,52 @@ def recognize_from_video(models):
 def main():
     # model files check and download
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
-
-    WEIGHT_DET_PATH = "detection_Resnet50.onnx"
-    MODEL_DET_PATH = "detection_Resnet50.onnx.prototxt"
-    # DETECTION_MODEL_PATH = "blazeface.onnx.prototxt"
-    # DETECTION_WEIGHT_PATH = "blazeface.onnx"
-    # check_and_download_models(
-    #     DETECTION_WEIGHT_PATH, DETECTION_MODEL_PATH,
-    #     "https://storage.googleapis.com/ailia-models/blazeface/")
+    if not args.aligned and not args.facexlib:
+        check_and_download_models(WEIGHT_DET_PATH, MODEL_DET_PATH, REMOTE_PATH)
 
     env_id = args.env_id
 
     # initialize
     gfpgan = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
-    face_det = ailia.Net(MODEL_DET_PATH, WEIGHT_DET_PATH, env_id=env_id)
 
     models = {
         "gfpgan": gfpgan,
-        "face_det": face_det,
     }
 
-    upscale = 1
+    upscale = args.upscale
+    if not args.aligned:
+        if args.facexlib:
+            import torch
+            from facexlib.utils.face_restoration_helper import FaceRestoreHelper
 
-    if args.video or args.detection:
-        import torch
-        from facexlib.utils.face_restoration_helper import FaceRestoreHelper
+            device = 'cuda' if torch.cuda.is_available() else 'cpu'
+            face_restor = FaceRestoreHelper(
+                upscale,
+                face_size=IMAGE_SIZE,
+                crop_ratio=(1, 1),
+                det_model='retinaface_resnet50',
+                use_parse=True,
+                device=device)
+            models["face_restor"] = face_restor
+        else:
+            face_det = ailia.Net(MODEL_DET_PATH, WEIGHT_DET_PATH, env_id=env_id)
+            models["face_det"] = face_det
 
-        device = 'cuda' if torch.cuda.is_available() else 'cpu'
-        face_restor = FaceRestoreHelper(
-            upscale,
-            face_size=IMAGE_SIZE,
-            crop_ratio=(1, 1),
-            det_model='retinaface_resnet50',
-            save_ext='png',
-            use_parse=True,
-            device=device)
-        models["face_restor"] = face_restor
+    if upscale > 1 and args.realesrgan:
+        from basicsr.archs.rrdbnet_arch import RRDBNet
+        from realesrgan import RealESRGANer
 
-        # detector = ailia.Net(
-        #     DETECTION_MODEL_PATH, DETECTION_WEIGHT_PATH, env_id=args.env_id
-        # )
-        # models["detector"] = detector
+        model = RRDBNet(num_in_ch=3, num_out_ch=3, num_feat=64, num_block=23, num_grow_ch=32, scale=2)
+        bg_tile = 400
+        upsampler = RealESRGANer(
+            scale=upscale,
+            model_path=REALESRGAN_MODEL,
+            model=model,
+            tile=bg_tile,
+            tile_pad=10,
+            pre_pad=0,
+            half=True)  # need to set False in CPU mode
+        models["upsampler"] = upsampler
 
     if args.video is not None:
         recognize_from_video(models)
