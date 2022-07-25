@@ -6,12 +6,6 @@ import cv2
 from PIL import Image
 import ailia
 
-import torch
-from torch.autograd import Variable as V
-import torchvision.models as models
-from torchvision import transforms as trn
-from torch.nn import functional as F
-
 
 # import original modules
 sys.path.append('../../util')
@@ -30,9 +24,9 @@ logger = getLogger(__name__)
 # Parameters 1
 # ======================
 IMAGE_PATH = 'input.jpg'
+SAVE_IMAGE_PATH = 'output.png'
 IMAGE_HEIGHT = 224
 IMAGE_WIDTH = 224
-SAVE_IMAGE_PATH = 'output.png'
 
 
 # ======================
@@ -65,6 +59,10 @@ REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/places365/'
 # ======================
 # Utils
 # ======================
+def softmax(x):
+    u = np.sum(np.exp(x))
+    return np.exp(x)/u
+
 def get_model():
     if args.model == 'resnet18':
         model_path, weight_path = RESNET18_MODEL_PATH, RESNET18_WEIGHT_PATH
@@ -124,21 +122,20 @@ def get_label_scene_attribute():
         W_attribute = np.load(file_name_W)
     return labels_attribute, W_attribute
 
-def get_centre_crop():
+def apply_centre_crop(img):
     if args.model in ['wideresnet18']:
-        centre_crop = trn.Compose([
-            trn.Resize((224,224)),
-            trn.ToTensor(),
-            trn.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
-        ])
+        img = cv2.resize(img, (224, 224))
     else:
-        centre_crop = trn.Compose([
-            trn.Resize((256,256)),
-            trn.CenterCrop(224),
-            trn.ToTensor(),
-            trn.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
-        ])
-    return centre_crop
+        img = cv2.resize(img, (256, 256))
+        pad = int((256-224)/2)
+        img = img[pad:-pad, pad:-pad, :]
+    img = img / 255
+    mean, std = [0.485, 0.456, 0.406], [0.229, 0.224, 0.225]
+    for i in range(3):
+        img[:, :, i] = (img[:, :, i]-mean[i])/std[i]
+    img = img.transpose(2, 0, 1)
+    img = img[np.newaxis, :, :, :]
+    return img
     
 def returnCAM(feature_conv, weight_softmax, class_idx):
     # generate the class activation maps upsample to 256x256
@@ -158,31 +155,24 @@ def returnCAM(feature_conv, weight_softmax, class_idx):
 # ======================
 # Main functions
 # ======================
-def recognize_from_image(net, weight, centre_crop,
-                         classes, labels_IO, labels_attribute, W_attribute):
+def recognize_from_image(net, weight, classes, labels_IO, labels_attribute, W_attribute):
     # input image loop
     for image_path in args.input:
         # prepare input data
         logger.info(image_path)
         img = Image.open(image_path)
-        img = V(centre_crop(img).unsqueeze(0))
+        img = apply_centre_crop(np.array(img))
 
-        img = img.to('cpu').detach().numpy().copy()
         output = net.predict({'input_img': img})
-        logit = output[0]
-        logit = torch.from_numpy(logit.astype(np.float32)).clone()
+        logit = output[0].astype(np.float32)
 
         if args.model in ['wideresnet18']:
-            out_layer4, out_avgpool = output[1], output[2]
-            out_layer4 = torch.from_numpy(out_layer4.astype(np.float32)).clone()
-            out_avgpool = torch.from_numpy(out_avgpool.astype(np.float32)).clone()
-            out_layer4 = np.squeeze(out_layer4)
-            out_avgpool = np.squeeze(out_avgpool)
+            out_layer4  = np.squeeze(output[1].astype(np.float32))
+            out_avgpool = np.squeeze(output[2].astype(np.float32))
 
-        h_x = F.softmax(logit, 1).data.squeeze()
-        probs, idx = h_x.sort(0, True)
-        probs = probs.numpy()
-        idx = idx.numpy()
+        h_x = softmax(logit[0])
+        idx = np.argsort(-h_x)
+        probs = h_x[idx]
 
         logger.info('prediction on {}'.format(image_path))
 
@@ -207,22 +197,21 @@ def recognize_from_image(net, weight, centre_crop,
             print('--SCENE ATTRIBUTES:')
             print('\t', ', '.join([labels_attribute[idx_a[i]] for i in range(-1,-10,-1)]))
 
-            # generate class activation mapping
-            logger.info('Class activation map is saved as cam.jpg')
-            CAMs = returnCAM(out_layer4, weight, [idx[0]])
-
-            # render the CAM and output
-            img = cv2.imread(image_path)
-            height, width, _ = img.shape
-            heatmap = cv2.applyColorMap(cv2.resize(CAMs[0],(width, height)), cv2.COLORMAP_JET)
-            result = heatmap * 0.4 + img * 0.5
             if args.savepath is not None:
+                # generate class activation mapping
+                logger.info('Class activation map is saved as {}'.format(args.savepath))
+                CAMs = returnCAM(out_layer4, weight, [idx[0]])
+
+                # render the CAM and output
+                img = cv2.imread(image_path)
+                height, width, _ = img.shape
+                heatmap = cv2.applyColorMap(cv2.resize(CAMs[0],(width, height)), cv2.COLORMAP_JET)
+                result = heatmap * 0.4 + img * 0.5
                 cv2.imwrite(args.savepath, result)
 
     logger.info('Script finished successfully.')
 
-def recognize_from_video(net, weight, centre_crop,
-                         classes, labels_IO, labels_attribute, W_attribute):
+def recognize_from_video(net, weight, classes, labels_IO, labels_attribute, W_attribute):
     capture = webcamera_utils.get_capture(args.video)
 
     # create video writer if savepath is specified as video format
@@ -246,23 +235,18 @@ def recognize_from_video(net, weight, centre_crop,
         # prepare input data
         org = frame
         frame = Image.fromarray(frame)
-        img = V(centre_crop(frame).unsqueeze(0))
-        img = img.to('cpu').detach().numpy().copy()
+        img = apply_centre_crop(np.array(frame))
+
         output = net.predict({'input_img': img})
-        logit = output[0]
-        logit = torch.from_numpy(logit.astype(np.float32)).clone()
+        logit = output[0].astype(np.float32)
 
         if args.model in ['wideresnet18']:
-            out_layer4, out_avgpool = output[1], output[2]
-            out_layer4 = torch.from_numpy(out_layer4.astype(np.float32)).clone()
-            out_avgpool = torch.from_numpy(out_avgpool.astype(np.float32)).clone()
-            out_layer4 = np.squeeze(out_layer4)
-            out_avgpool = np.squeeze(out_avgpool)
+            out_layer4  = np.squeeze(output[1].astype(np.float32))
+            out_avgpool = np.squeeze(output[2].astype(np.float32))
 
-        h_x = F.softmax(logit, 1).data.squeeze()
-        probs, idx = h_x.sort(0, True)
-        probs = probs.numpy()
-        idx = idx.numpy()
+        h_x = softmax(logit[0])
+        idx = np.argsort(-h_x)
+        probs = h_x[idx]
 
         logger.info('prediction on index_{}'.format(frame_i))
         frame_i += 1
@@ -288,18 +272,18 @@ def recognize_from_video(net, weight, centre_crop,
             print('--SCENE ATTRIBUTES:')
             print('\t', ', '.join([labels_attribute[idx_a[i]] for i in range(-1,-10,-1)]))
 
-            # generate class activation mapping
-            logger.info('Class activation map is saved as cam.jpg')
-            CAMs = returnCAM(out_layer4, weight, [idx[0]])
-
-            # render the CAM and output
-            height, width, _ = org.shape
-            heatmap = cv2.applyColorMap(cv2.resize(CAMs[0],(width, height)), cv2.COLORMAP_JET)
-            result = heatmap * 0.4 + org * 0.5
-            result = result.astype(np.uint8)
-            cv2.imshow('Class activation map', result)
-            frame_shown = True
             if writer is not None:
+                # generate class activation mapping
+                logger.info('Class activation map is saved.')
+                CAMs = returnCAM(out_layer4, weight, [idx[0]])
+
+                # render the CAM and output
+                height, width, _ = org.shape
+                heatmap = cv2.applyColorMap(cv2.resize(CAMs[0],(width, height)), cv2.COLORMAP_JET)
+                result = heatmap * 0.4 + org * 0.5
+                result = result.astype(np.uint8)
+                cv2.imshow('Class activation map', result)
+                frame_shown = True
                 writer.write(result)
 
     capture.release()
@@ -314,9 +298,6 @@ def main():
     # net initialize
     net, weight = get_model()
 
-    # get centre crop
-    centre_crop = get_centre_crop()
-
     # get label
     classes = get_label_scene_category()
     labels_IO = get_label_indoor_and_outdoor()
@@ -324,12 +305,10 @@ def main():
 
     if args.video is not None:
         # video mode
-        recognize_from_video(net, weight, centre_crop,
-                             classes, labels_IO, labels_attribute, W_attribute)
+        recognize_from_video(net, weight, classes, labels_IO, labels_attribute, W_attribute)
     else:
         # image mode
-        recognize_from_image(net, weight, centre_crop,
-                             classes, labels_IO, labels_attribute, W_attribute)
+        recognize_from_image(net, weight, classes, labels_IO, labels_attribute, W_attribute)
 
 
 if __name__ == '__main__':

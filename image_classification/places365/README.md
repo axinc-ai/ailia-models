@@ -11,11 +11,11 @@ Ailia input shape: (1, 3, 224, 224)
 If model type is resnet18, resnet50 or alexnet, result is as below. 
 ```
 --SCENE CATEGORIES:
-	0.617 -> patio
-	0.298 -> restaurant_patio
-	0.021 -> porch
-	0.019 -> beer_garden
-	0.013 -> courtyard
+	0.616 -> patio
+	0.314 -> restaurant_patio
+	0.020 -> beer_garden
+	0.011 -> courtyard
+	0.011 -> porch
 ```
 
 If model type is wideresnet18, result is as below and class activation map is generated.
@@ -23,13 +23,13 @@ If model type is wideresnet18, result is as below and class activation map is ge
 --TYPE OF ENVIRONMENT:
 	outdoor
 --SCENE CATEGORIES:
-	0.675 -> patio
-	0.063 -> porch
-	0.043 -> restaurant_patio
-	0.027 -> courtyard
-	0.014 -> beer_garden
+	0.651 -> patio
+	0.068 -> restaurant_patio
+	0.043 -> porch
+	0.026 -> courtyard
+	0.022 -> picnic_area
 --SCENE ATTRIBUTES:
-	 man-made, no horizon, natural light, foliage, wood, open area, vegetation, leaves, reading
+	 man-made, no horizon, natural light, open area, foliage, wood, vegetation, leaves, trees
 ```
 
 Class activation map
