@@ -3,7 +3,6 @@ import time
 
 import numpy as np
 import cv2
-from PIL import Image
 
 import ailia
 
@@ -11,7 +10,7 @@ import ailia
 sys.path.append('../../util')
 from utils import get_base_parser, update_parser, get_savepath  # noqa
 from model_utils import check_and_download_models  # noqa
-from image_utils import imread, normalize_image  # noqa
+from image_utils import normalize_image  # noqa
 from detector_utils import load_image  # noqa
 from webcamera_utils import get_capture, get_writer  # noqa
 # logger
@@ -49,7 +48,6 @@ args = update_parser(parser)
 # Secondaty Functions
 # ======================
 
-
 def dense_feature_matching(
         map_A, map_B, ratio_th, bidirectional=True):
     # normalize and reshape feature maps
@@ -81,6 +79,114 @@ def dense_feature_matching(
     points_B = points_B[:, ~discard]
 
     return points_A, points_B
+
+
+def refine_points(
+        points_A, points_B,
+        activations_A, activations_B,
+        ratio_th=0.9, bidirectional=True):
+    # normalize and reshape feature maps
+    d1 = activations_A[0] / np.expand_dims(np.sqrt(np.square(activations_A[0]).sum(axis=0)), axis=0)
+    d2 = activations_B[0] / np.expand_dims(np.sqrt(np.square(activations_B[0]).sum(axis=0)), axis=0)
+
+    # get number of points
+    ch = d1.shape[0]
+    num_input_points = points_A.shape[1]
+
+    if num_input_points == 0:
+        return points_A, points_B
+
+    # upsample points
+    points_A *= 2
+    points_B *= 2
+
+    # neighborhood to search
+    neighbors = np.array([[0, 0], [0, 1], [1, 0], [1, 1]])
+
+    # allocate space for scores
+    scores = np.zeros((num_input_points, neighbors.shape[0], neighbors.shape[0]))
+
+    # for each point search the refined matches in given [finer] resolution
+    for i, n_A in enumerate(neighbors):
+        for j, n_B in enumerate(neighbors):
+            # get features in the given neighborhood
+            act_A = d1[:, points_A[1, :] + n_A[1], points_A[0, :] + n_A[0]].reshape(ch, -1)
+            act_B = d2[:, points_B[1, :] + n_B[1], points_B[0, :] + n_B[0]].reshape(ch, -1)
+
+            # compute mse
+            scores[:, i, j] = np.sum(act_A * act_B, axis=0)
+
+    # retrieve top 2 nearest neighbors from A2B
+    score_A = -np.sort(-scores, axis=2)[:, :, :2]
+    match_A = np.argsort(-scores, axis=2)[:, :, :2]
+
+    score_A = 2 - 2 * score_A
+
+    # compute lowe's ratio
+    ratio_A2B = score_A[:, :, 0] / (score_A[:, :, 1] + 1e-8)
+
+    # select the best match
+    match_A2B = match_A[:, :, 0]
+    score_A2B = score_A[:, :, 0]
+
+    # retrieve top 2 nearest neighbors from B2A
+    x = scores.transpose(0, 2, 1)
+    score_B = -np.sort(-x, axis=2)[:, :, :2]
+    match_B = np.argsort(-x, axis=2)[:, :, :2]
+
+    score_B = 2 - 2 * score_B
+
+    # compute lowe's ratio
+    ratio_B2A = score_B[:, :, 0] / (score_B[:, :, 1] + 1e-8)
+
+    # select the best match
+    match_B2A = match_B[:, :, 0]
+
+    # check for unique matches and apply ratio test
+    ind_A = (np.expand_dims(np.arange(num_input_points), axis=1) * neighbors.shape[0] + match_A2B).flatten()
+    ind_B = (np.expand_dims(np.arange(num_input_points), axis=1) * neighbors.shape[0] + match_B2A).flatten()
+
+    ind = np.arange(num_input_points * neighbors.shape[0])
+
+    # if not bidirectional, do not use ratios from B to A
+    ratio_B2A[:] *= 1 if bidirectional else 0  # discard ratio21 to get the same results with matlab
+
+    mask = np.logical_and(
+        np.where(ratio_A2B > ratio_B2A, ratio_A2B, ratio_B2A) < ratio_th,
+        (ind_B[ind_A] == ind).reshape(num_input_points, -1))
+
+    # set a large SSE score for mathces above ratio threshold and not on to one (score_A2B <=4 so use 5)
+    score_A2B[~mask] = 5
+
+    # each input point can generate max two output points, so discard the two with highest SSE
+    discard = np.argsort(-score_A2B, axis=1)[:, :2]
+
+    mask[np.arange(num_input_points), discard[:, 0]] = 0
+    mask[np.arange(num_input_points), discard[:, 1]] = 0
+
+    # x & y coordiates of candidate match points of A
+    x = np.repeat(np.expand_dims(points_A[0, :], axis=0), 4, axis=0).T \
+        + np.repeat(np.expand_dims(neighbors[:, 0], axis=0), num_input_points, axis=0)
+    y = np.repeat(np.expand_dims(points_A[1, :], axis=0), 4, axis=0).T \
+        + np.repeat(np.expand_dims(neighbors[:, 1], axis=0), num_input_points, axis=0)
+
+    refined_points_A = np.stack((x[mask], y[mask]))
+
+    # x & y coordiates of candidate match points of A
+    x = np.repeat(np.expand_dims(points_B[0, :], axis=0), 4, axis=0).T \
+        + neighbors[:, 0][match_A2B]
+    y = np.repeat(np.expand_dims(points_B[1, :], axis=0), 4, axis=0).T \
+        + neighbors[:, 1][match_A2B]
+
+    refined_points_B = np.stack((x[mask], y[mask]))
+
+    # if the number of refined matches is not enough to estimate homography,
+    # but number of initial matches is enough, use initial points
+    if refined_points_A.shape[1] < 4 and num_input_points > refined_points_A.shape[1]:
+        refined_points_A = points_A
+        refined_points_B = points_B
+
+    return refined_points_A, refined_points_B
 
 
 def mnn_ratio_matcher(
@@ -128,16 +234,20 @@ def draw_matches(img_A, img_B, keypoints0, keypoints1):
     p2s = []
     dmatches = []
     for i, (x1, y1) in enumerate(keypoints0):
+        x2, y2 = keypoints1[i]
         p1s.append(cv2.KeyPoint(x1, y1, 1))
-        p2s.append(cv2.KeyPoint(keypoints1[i][0], keypoints1[i][1], 1))
+        p2s.append(cv2.KeyPoint(x2, y2, 1))
         j = len(p1s) - 1
         dmatches.append(cv2.DMatch(j, j, 1))
 
     matched_images = cv2.drawMatches(
-        cv2.cvtColor(img_A, cv2.COLOR_RGB2BGR), p1s,
-        cv2.cvtColor(img_B, cv2.COLOR_RGB2BGR), p2s, dmatches, None)
+        img_A, p1s,
+        img_B, p2s, dmatches, None)
 
-    return matched_images
+    x = np.concatenate([img_A, img_B], axis=1)
+    res_img = np.concatenate([x, matched_images], axis=0)
+
+    return res_img
 
 
 # ======================
@@ -146,8 +256,6 @@ def draw_matches(img_A, img_B, keypoints0, keypoints1):
 
 def preprocess(img):
     im_h, im_w, _ = img.shape
-
-    img = img[:, :, ::-1]  # BGR -> RGB
 
     img = normalize_image(img, normalize_type='ImageNet')
 
@@ -165,20 +273,19 @@ def preprocess(img):
     img = np.expand_dims(img, axis=0)
     img = img.astype(np.float32)
 
-    return img, None
-
-
-def post_processing(output):
-    return None
+    return img, (pad_right, pad_bottom)
 
 
 def predict(net, img_A, img_B):
-    img_A, pad_A = preprocess(img_A)
-    img_B, pad_B = preprocess(img_B)
+    img_A = img_A[:, :, ::-1]  # BGR -> RGB
+    img_B = img_B[:, :, ::-1]  # BGR -> RGB
+
+    inp_A, pad_A = preprocess(img_A)
+    inp_B, pad_B = preprocess(img_B)
 
     # feedforward
-    activations_A = net.predict([img_A])
-    activations_B = net.predict([img_B])
+    activations_A = net.predict([inp_A])
+    activations_B = net.predict([inp_B])
 
     # initiate warped image, its activations, initial&final estimate of homography
     H_init = np.eye(3, dtype=np.double)
@@ -210,35 +317,39 @@ def predict(net, img_A, img_B):
 
     # warp image B onto image A
     img_C = cv2.warpPerspective(img_B, H_init, (img_A.shape[1], img_A.shape[0]))
-    img_C, pad_C = preprocess(img_C)
+    inp_C, pad_C = preprocess(img_C)
 
-    activations_C = net.predict([img_C])
+    activations_C = net.predict([inp_C])
 
     # initiate matches
     points_A, points_C = dense_feature_matching(
         activations_A[-2], activations_C[-2],
         ratio_th[-2], bidirectional)
 
-    # for k in range(len(activations_A) - 3, -1, -1):
-    #     points_A, points_C = refine_points(
-    #         points_A, points_C, activations_A[k], activations_C[k],
-    #         ratio_th[k], bidirectional)
-    #
-    # # warp points form C to B (H_init is zero-based, use zero-based points)
-    # points_B = torch.from_numpy(np.linalg.inv(H_init)) @ torch.vstack(
-    #     (points_C, torch.ones((1, points_C.size(1))))).double()
-    # points_B = points_B[0:2, :] / points_B[2, :]
-    #
-    # points_A = points_A.double()
-    #
-    # # optional
-    # in_image = torch.logical_and(
-    #     points_A[0, :] < (inp_A.shape[3] - padding_A[0] - 16),
-    #     points_A[1, :] < (inp_A.shape[2] - padding_A[1] - 16))
-    # in_image = torch.logical_and(
-    #     in_image,
-    #     torch.logical_and(points_B[0, :] < (inp_B.shape[3] - padding_B[0] - 16),
-    #                       points_B[1, :] < (inp_B.shape[3] - padding_B[1] - 16)))
+    for k in range(len(activations_A) - 3, -1, -1):
+        points_A, points_C = refine_points(
+            points_A, points_C, activations_A[k], activations_C[k],
+            ratio_th[k], bidirectional)
+
+    # warp points form C to B (H_init is zero-based, use zero-based points)
+    points_B = np.linalg.inv(H_init) @ \
+               np.vstack([
+                   points_C, np.ones((1, points_C.shape[1]))
+               ])
+    points_B = points_B[0:2, :] / points_B[2, :]
+
+    points_A = points_A.astype(np.double)
+    points_B = points_B.astype(np.double)
+
+    # optional
+    in_image = np.logical_and(
+        points_A[0, :] < (inp_A.shape[3] - pad_A[0] - 16),
+        points_A[1, :] < (inp_A.shape[2] - pad_A[1] - 16))
+    in_image = np.logical_and(
+        in_image,
+        np.logical_and(
+            points_B[0, :] < (inp_B.shape[3] - pad_B[0] - 16),
+            points_B[1, :] < (inp_B.shape[3] - pad_B[1] - 16)))
 
     points_A = points_A[:, in_image]
     points_B = points_B[:, in_image]
