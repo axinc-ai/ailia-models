@@ -196,7 +196,7 @@ The collection of pre-trained, state-of-the-art AI models.
 | [<img src="image_classification/weather-prediction-from-image/output.png" width=128px>](image_classification/weather-prediction-from-image/) | [weather-prediction-from-image](/image_classification/weather-prediction-from-image/)|[Weather Prediction From Image - (Warmth Of Image)](https://github.com/berkgulay/weather-prediction-from-image) | Keras | 1.2.5 and later | |
 | [<img src="image_classification/swin-transformer/input.jpg" width=128px>](image_classification/swin-transformer/) | [swin-transformer](/image_classification/swin-transformer/)|[Swin Transformer](https://github.com/microsoft/Swin-Transformer) | Pytorch | 1.2.6 and later | |
 | [<img src="image_classification/convnext/input_imagenet.jpg" width=128px>](image_classification/convnext/) | [convnext](/image_classification/convnext/)|[A PyTorch implementation of ConvNeXt](https://github.com/facebookresearch/ConvNeXt) | Pytorch | 1.2.5 and later | |
-
+| [<img src="image_classification/places365/input.jpg" width=128px>](image_classification/places365/) | [places365](/image_classification/places365/)|[Release of Places365-CNNs](https://github.com/CSAILVision/places365) | Pytorch | 1.2.5 and later | |
 
 ## Image inpainting
 

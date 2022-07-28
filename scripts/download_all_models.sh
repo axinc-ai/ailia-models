@@ -108,6 +108,7 @@ cd ../../image_classification/landmarks_classifier_asia; python3 landmarks_class
 cd ../../image_classification/weather-prediction-from-image; python3 weather-prediction-from-image.py ${OPTION}
 cd ../../image_classification/convnext; python3 convnext.py ${OPTION}
 cd ../../image_classification/swin-transformer; python3 swin_transformer.py ${OPTION}
+cd ../../image_classification/places365; python3 places365.py ${OPTION}
 cd ../../image_inpainting/3d-photo-inpainting; python3 3d-photo-inpainting.py ${OPTION}
 cd ../../image_inpainting/inpainting_gmcnn; python3 inpainting_gmcnn.py ${OPTION}
 cd ../../image_inpainting/pytorch-inpainting-with-partial-conv; python3 pytorch-inpainting-with-partial-conv.py ${OPTION}
