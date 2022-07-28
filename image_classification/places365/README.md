@@ -2,6 +2,7 @@
 
 ### Input
 ![input_image](input.jpg)
+
 from https://github.com/CSAILVision/places365
 
 Ailia input shape: (1, 3, 224, 224) 
