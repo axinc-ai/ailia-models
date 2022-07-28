@@ -1,0 +1,10 @@
+testsets/*
+*.mp4
+*.bmp
+*.png
+!input.png
+!output.png
+!output_color.png
+!output_color_real.png
+!output_gray.png
+!output_gray_doublejpeg.png
