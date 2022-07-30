@@ -1,8 +1,10 @@
 import sys
 import time
+import io
 
 import numpy as np
 import cv2
+import matplotlib.pyplot as plt
 
 import ailia
 
@@ -40,6 +42,10 @@ parser = get_base_parser(
 parser.add_argument(
     '-i2', '--input2', metavar='IMAGE2', default=IMAGE_B_PATH,
     help='Pair image path of input image.'
+)
+parser.add_argument(
+    '-kp', '--draw-keypoints', action='store_true',
+    help='Save keypoints result.'
 )
 args = update_parser(parser)
 
@@ -250,6 +256,26 @@ def draw_matches(img_A, img_B, keypoints0, keypoints1):
     return res_img
 
 
+def plot_keypoints(img, pts):
+    f, a = plt.subplots()
+    a.set_axis_off()
+    f.subplots_adjust(left=0, right=1, bottom=0, top=1)
+
+    a.plot(pts[0, :], pts[1, :], marker='+', linestyle='none', color='red')
+    a.imshow(img)
+
+    io_buf = io.BytesIO()
+    f.savefig(io_buf, format='raw')
+    io_buf.seek(0)
+    data = np.frombuffer(io_buf.getvalue(), dtype=np.uint8)
+
+    w, h = f.canvas.get_width_height()
+    img = data.reshape(h, w, -1)
+    img = cv2.cvtColor(img, cv2.COLOR_RGBA2BGR)
+
+    return img
+
+
 # ======================
 # Main functions
 # ======================
@@ -403,9 +429,16 @@ def recognize_from_image(net):
             out = predict(net, img_A, img_B)
 
         H, H_init, points_A, points_B = out
+
+        # display results
+        if args.draw_keypoints:
+            plot_A = plot_keypoints(img_A, points_A)
+            plot_B = plot_keypoints(img_B, points_B)
+            cv2.imwrite("A.png", plot_A)
+            cv2.imwrite("B.png", plot_B)
+
         keypoints0 = points_A.T
         keypoints1 = points_B.T
-
         res_img = draw_matches(img_A, img_B, keypoints0, keypoints1)
 
         # plot result
