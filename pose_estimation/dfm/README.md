@@ -1,4 +1,4 @@
-# DFM: A Performance Baseline for Deep Feature Matching
+# DFM: Deep Feature Matching
 
 ## Input
 
