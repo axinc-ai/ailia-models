@@ -54,14 +54,14 @@ ONNX opset = 11
 
 ## Netron
 
-[yolov7.opt.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/yolov7/yolov7.opt.onnx.prototxt)
+[yolov7.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/yolov7/yolov7.onnx.prototxt)
 
-[yolov7x.opt.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/yolov7/yolov7x.opt.onnx.prototxt)
+[yolov7x.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/yolov7/yolov7x.onnx.prototxt)
 
-[yolov7_w6.opt.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/yolov7/yolov7_w6.opt.onnx.prototxt)
+[yolov7_w6.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/yolov7/yolov7_w6.onnx.prototxt)
 
-[yolov7_e6.opt.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/yolov7/yolov7_e6.opt.onnx.prototxt)
+[yolov7_e6.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/yolov7/yolov7_e6.onnx.prototxt)
 
-[yolov7_d6.opt.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/yolov7/yolov7_d6.opt.onnx.prototxt)
+[yolov7_d6.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/yolov7/yolov7_d6.onnx.prototxt)
 
-[yolov7_e6e.opt.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/yolov7/yolov7_e6e.opt.onnx.prototxt)
+[yolov7_e6e.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/yolov7/yolov7_e6e.onnx.prototxt)
