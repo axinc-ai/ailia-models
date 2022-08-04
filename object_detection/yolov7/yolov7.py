@@ -7,8 +7,7 @@ import ailia
 import cv2
 import numpy as np
 
-from yolov7_utils import postprocess, predictions_to_object, check_img_size
-from yolov7_utils import preproc as preprocess
+from yolov7_utils import postprocess, predictions_to_object, check_img_size, letterbox
 
 # import original modules
 sys.path.append('../../util')
@@ -101,12 +100,12 @@ parser.add_argument(
 parser.add_argument(
     '-dw', '--detection_width',
     default=-1, type=int,
-    help='The detection width and height for yolo. (default: auto)'
+    help='The detection width and height for yolo. (default: 640)'
 )
 parser.add_argument(
     '-dh', '--detection_height',
     default=-1, type=int,
-    help='The detection height and height for yolo. (default: auto)'
+    help='The detection height and height for yolo. (default: 640)'
 )
 parser.add_argument(
     '--classes', nargs='+', 
@@ -136,8 +135,12 @@ def recognize_from_image(detector):
         # prepare input data
         logger.debug(f'input image: {image_path}')
         raw_img = cv2.imread(image_path)  # BGR
-        img, ratio = preprocess(raw_img, (HEIGHT, WIDTH))
-        img /= 255.0  # 0 - 255 to 0.0 - 1.0
+        # Padded resize
+        img = letterbox(raw_img, (HEIGHT, WIDTH), stride=STRIDE)[0]
+        # Convert
+        img = img[:, :, ::-1].transpose(2, 0, 1)  # BGR to RGB
+        img = np.ascontiguousarray(img)
+        img = img/255.0  # 0 - 255 to 0.0 - 1.0
             
         logger.debug(f'input image shape: {raw_img.shape}')
 
@@ -158,9 +161,7 @@ def recognize_from_image(detector):
             output = detector.run(img[None, :, :, :])
 
         predictions = postprocess(output, ANCHORS, p6=STRIDE==64)[0]
-
-        detect_object = predictions_to_object(predictions, raw_img, ratio, args.iou, args.threshold)
-        detect_object = reverse_letterbox(detect_object, raw_img, (raw_img.shape[0], raw_img.shape[1]))
+        detect_object = predictions_to_object(predictions, raw_img, args.iou, args.threshold, img.shape)
         res_img = plot_results(detect_object, raw_img, COCO_CATEGORY)
 
         # plot result
@@ -201,12 +202,15 @@ def recognize_from_video(detector):
             break
 
         raw_img = frame
-        img, ratio = preprocess(raw_img, (HEIGHT, WIDTH))
-        img /= 255.0  # 0 - 255 to 0.0 - 1.0
+        # Padded resize
+        img = letterbox(raw_img, (HEIGHT, WIDTH), stride=STRIDE)[0]
+        # Convert
+        img = img[:, :, ::-1].transpose(2, 0, 1)  # BGR to RGB
+        img = np.ascontiguousarray(img)
+        img = img/255.0  # 0 - 255 to 0.0 - 1.0
         output = detector.run(img[None, :, :, :])
         predictions = postprocess(output, ANCHORS, p6=STRIDE==64)[0]
-        detect_object = predictions_to_object(predictions, raw_img, ratio, args.iou, args.threshold)
-        detect_object = reverse_letterbox(detect_object, raw_img, (raw_img.shape[0], raw_img.shape[1]))
+        detect_object = predictions_to_object(predictions, raw_img, args.iou, args.threshold, img.shape)
         res_img = plot_results(detect_object, raw_img, COCO_CATEGORY)
         cv2.imshow('frame', res_img)
         frame_shown = True

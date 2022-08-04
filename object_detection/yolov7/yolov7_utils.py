@@ -17,24 +17,37 @@ def make_divisible(x, divisor):
     # Returns x evenly divisible by divisor
     return math.ceil(x / divisor) * divisor
 
-def preproc(img, input_size, swap=(2, 0, 1)):
-    if len(img.shape) == 3:
-        padded_img = np.ones((input_size[0], input_size[1], img.shape[2]), dtype=np.uint8) * 114
-    else:
-        padded_img = np.ones(input_size, dtype=np.uint8) * 114
+def letterbox(img, new_shape=(640, 640), color=(114, 114, 114), auto=True, scaleFill=False, scaleup=True, stride=32):
+    # Resize and pad image while meeting stride-multiple constraints
+    shape = img.shape[:2]  # current shape [height, width]
+    if isinstance(new_shape, int):
+        new_shape = (new_shape, new_shape)
 
-    r = min(input_size[0] / img.shape[0], input_size[1] / img.shape[1])
-    resized_img = cv2.resize(
-        img,
-        (int(img.shape[1] * r), int(img.shape[0] * r)),
-        interpolation=cv2.INTER_LINEAR,
-    ).astype(np.uint8)
-    padded_img[: int(img.shape[0] * r), : int(img.shape[1] * r)] = resized_img
+    # Scale ratio (new / old)
+    r = min(new_shape[0] / shape[0], new_shape[1] / shape[1])
+    if not scaleup:  # only scale down, do not scale up (for better test mAP)
+        r = min(r, 1.0)
 
-    padded_img = padded_img.transpose(swap)
-    padded_img = np.ascontiguousarray(padded_img, dtype=np.float32)
-    return padded_img, r
+    # Compute padding
+    ratio = r, r  # width, height ratios
+    new_unpad = int(round(shape[1] * r)), int(round(shape[0] * r))
+    dw, dh = new_shape[1] - new_unpad[0], new_shape[0] - new_unpad[1]  # wh padding
+    if auto:  # minimum rectangle
+        dw, dh = np.mod(dw, stride), np.mod(dh, stride)  # wh padding
+    elif scaleFill:  # stretch
+        dw, dh = 0.0, 0.0
+        new_unpad = (new_shape[1], new_shape[0])
+        ratio = new_shape[1] / shape[1], new_shape[0] / shape[0]  # width, height ratios
 
+    dw /= 2  # divide padding into 2 sides
+    dh /= 2
+
+    if shape[::-1] != new_unpad:  # resize
+        img = cv2.resize(img, new_unpad, interpolation=cv2.INTER_LINEAR)
+    top, bottom = int(round(dh - 0.1)), int(round(dh + 0.1))
+    left, right = int(round(dw - 0.1)), int(round(dw + 0.1))
+    img = cv2.copyMakeBorder(img, top, bottom, left, right, cv2.BORDER_CONSTANT, value=color)  # add border
+    return img, r, (dw, dh)
 
 def nms(boxes, scores, nms_thr):
     """Single class NMS implemented in Numpy."""
@@ -145,7 +158,7 @@ def _make_grid(nx=20, ny=20):
     xv, yv = np.meshgrid(np.arange(nx), np.arange(ny))
     return np.stack((xv, yv), 2).reshape(1, 1, ny, nx, 2).astype(np.float32)
 
-def predictions_to_object(predictions,raw_img,ratio,nms_thr,score_thr):
+def predictions_to_object(predictions, raw_img, nms_thr, score_thr, img_shape):
     boxes = predictions[:, :4]
     scores = predictions[:, 4:5] * predictions[:, 5:]
 
@@ -154,11 +167,12 @@ def predictions_to_object(predictions,raw_img,ratio,nms_thr,score_thr):
     boxes_xyxy[:, 1] = boxes[:, 1] - boxes[:, 3] / 2.
     boxes_xyxy[:, 2] = boxes[:, 0] + boxes[:, 2] / 2.
     boxes_xyxy[:, 3] = boxes[:, 1] + boxes[:, 3] / 2.
-    boxes_xyxy /= ratio
     dets = multiclass_nms(boxes_xyxy, scores, nms_thr, score_thr)
 
     detect_object = []
     if dets is not None:
+        # Rescale boxes from img_size to im0 size
+        dets[:, :4] = scale_coords(img_shape[1:], dets[:, :4], raw_img.shape).round()
         img_size_h, img_size_w = raw_img.shape[:2]
         final_boxes, final_scores, final_cls_inds = dets[:, :4], dets[:, 4], dets[:, 5]
         for i, box in enumerate(final_boxes):
@@ -175,3 +189,28 @@ def predictions_to_object(predictions,raw_img,ratio,nms_thr,score_thr):
             detect_object.append(r)
 
     return detect_object
+
+def scale_coords(img1_shape, coords, img0_shape, ratio_pad=None):
+    # Rescale coords (xyxy) from img1_shape to img0_shape
+    if ratio_pad is None:  # calculate from img0_shape
+        gain = min(img1_shape[0] / img0_shape[0], img1_shape[1] / img0_shape[1])  # gain  = old / new
+        pad = (img1_shape[1] - img0_shape[1] * gain) / 2, (img1_shape[0] - img0_shape[0] * gain) / 2  # wh padding
+    else:
+        gain = ratio_pad[0][0]
+        pad = ratio_pad[1]
+
+    coords[:, [0, 2]] -= pad[0]  # x padding
+    coords[:, [1, 3]] -= pad[1]  # y padding
+    coords[:, :4] /= gain
+    coords = clip_coords(coords, img0_shape)
+    return coords
+
+
+def clip_coords(boxes, img_shape):
+    # Clip bounding xyxy bounding boxes to image shape (height, width)
+    boxes[:, 0] = boxes[:, 0].clip(0, img_shape[1])  # x1
+    boxes[:, 1] = boxes[:, 1].clip(0, img_shape[0])  # y1
+    boxes[:, 2] = boxes[:, 2].clip(0, img_shape[1])  # x2
+    boxes[:, 3] = boxes[:, 3].clip(0, img_shape[0])  # y2
+
+    return boxes
