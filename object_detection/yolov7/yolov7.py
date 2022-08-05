@@ -45,6 +45,9 @@ MODEL_PARAMS = {'yolov7': {'input_shape': [640, 640], 'max_stride': 32, 'anchors
                     ]},
                 'yolov7_e6e': {'input_shape': [1280, 1280], 'max_stride': 64, 'anchors':[
                     [19,27, 44,40, 38,94 ], [96,68, 86,152, 180,137 ], [140,301, 303,264, 238,542], [436,615, 739,380, 925,792]
+                    ]},
+                'yolov7_tiny': {'input_shape': [512, 512], 'max_stride': 32, 'anchors':[
+                    [12,16, 19,36, 40,28], [36,75, 76,55, 72,146], [142,110, 192,243, 459,401]
                     ]}
                 }
 
@@ -80,7 +83,7 @@ parser.add_argument(
     '-m', '--model_name',
     default='yolov7',
     help='[yolov7, yolov7x, yolov7_w6, yolov7_e6, yolov7_d6,'
-         'yolov7_e6e]'
+         'yolov7_e6e, yolov7_tiny]'
 )
 parser.add_argument(
     '-w', '--write_prediction',
