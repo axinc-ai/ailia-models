@@ -1,6 +1,7 @@
 import sys
 import time
 import math
+from collections import namedtuple
 
 import cv2
 import numpy as np
@@ -18,6 +19,7 @@ import webcamera_utils
 from logging import getLogger  # noqa
 
 from detection_utils import pose_detection
+from drawing_utils import draw_landmarks, plot_landmarks
 
 logger = getLogger(__name__)
 
@@ -47,7 +49,7 @@ IMAGE_LMK_SIZE = 256
 # ======================
 
 parser = get_base_parser(
-    'BlazePose, an on-device real-time body pose tracking.',
+    'MediaPipe Pose',
     IMAGE_PATH,
     SAVE_IMAGE_PATH,
 )
@@ -55,6 +57,10 @@ parser.add_argument(
     '-m', '--model', metavar='ARCH',
     default='heavy', choices=MODEL_LIST,
     help='Set model architecture: ' + ' | '.join(MODEL_LIST)
+)
+parser.add_argument(
+    '--world_landmark', action='store_true',
+    help='Plot the POSE_WORLD_LANDMARKS.'
 )
 parser.add_argument(
     '--onnx',
@@ -65,25 +71,51 @@ args = update_parser(parser)
 
 
 # ======================
-# Utils
+# Secondaty Functions
 # ======================
 
 def preprocess_detection(img):
     im_h, im_w, _ = img.shape
 
-    # adaptive_resize
-    scale = IMAGE_DET_SIZE / max(im_h, im_w)
-    ow, oh = int(im_w * scale), int(im_h * scale)
-    if ow != im_w or oh != im_h:
-        img = cv2.resize(img, (ow, oh), interpolation=cv2.INTER_LINEAR)
+    """
+    resize & padding
+    """
+    cv_resize = False
 
-    pad_h = pad_w = 0
-    if ow != IMAGE_DET_SIZE or oh != IMAGE_DET_SIZE:
-        pad_img = np.zeros((IMAGE_DET_SIZE, IMAGE_DET_SIZE, 3))
-        pad_h = (IMAGE_DET_SIZE - oh) // 2
-        pad_w = (IMAGE_DET_SIZE - ow) // 2
-        pad_img[pad_h:pad_h + oh, pad_w:pad_w + ow, :] = img
-        img = pad_img
+    if cv_resize:
+        scale = IMAGE_DET_SIZE / max(im_h, im_w)
+        ow, oh = int(im_w * scale), int(im_h * scale)
+        if ow != im_w or oh != im_h:
+            img = cv2.resize(img, (ow, oh), interpolation=cv2.INTER_LINEAR)
+
+        pad_h = pad_w = 0
+        if ow != IMAGE_DET_SIZE or oh != IMAGE_DET_SIZE:
+            pad_img = np.zeros((IMAGE_DET_SIZE, IMAGE_DET_SIZE, 3))
+            pad_h = (IMAGE_DET_SIZE - oh) // 2
+            pad_w = (IMAGE_DET_SIZE - ow) // 2
+            pad_img[pad_h:pad_h + oh, pad_w:pad_w + ow, :] = img
+            img = pad_img
+    else:
+        box_size = max(im_h, im_w)
+        scale = IMAGE_DET_SIZE / box_size
+        ow, oh = int(im_w * scale), int(im_h * scale)
+        pad_h = pad_w = 0
+        if ow != IMAGE_DET_SIZE or oh != IMAGE_DET_SIZE:
+            pad_h = (IMAGE_DET_SIZE - oh) // 2
+            pad_w = (IMAGE_DET_SIZE - ow) // 2
+
+        rotated_rect = ((im_w // 2, im_h // 2), (box_size, box_size), 0)
+        pts1 = cv2.boxPoints(rotated_rect)
+
+        h = w = IMAGE_DET_SIZE
+        pts2 = np.float32([[0, h], [0, 0], [w, 0], [w, h]])
+        M = cv2.getPerspectiveTransform(pts1, pts2)
+        img = cv2.warpPerspective(
+            img, M, (w, h), flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT)
+
+    """
+    normalize & reshape
+    """
 
     img = normalize_image(img, normalize_type='127.5')
 
@@ -147,7 +179,7 @@ def refine_landmark_from_heatmap(landmarks, heatmap):
     kernel is at least min_confidence_to_refine big.
     """
     min_confidence_to_refine = 0.5
-    kernel_size = 7
+    kernel_size = 9
     offset = (kernel_size - 1) // 2
 
     hm_height, hm_width, hm_channels = heatmap.shape
@@ -181,6 +213,10 @@ def refine_landmark_from_heatmap(landmarks, heatmap):
 
     return landmarks
 
+
+# ======================
+# Main functions
+# ======================
 
 def pose_estimate(net, det_net, img):
     im_h, im_w = img.shape[:2]
@@ -245,6 +281,10 @@ def pose_estimate(net, det_net, img):
 
     all_world_landmarks = all_world_landmarks[0]
 
+    # the actual pose landmarks
+    all_landmarks = all_landmarks[:33, ...]
+    all_world_landmarks = all_world_landmarks[:33, ...]
+
     # Projects the landmarks in the local coordinates of the
     # (potentially letterboxed) ROI back to the global coordinates
     cosa = math.cos(rotation)
@@ -263,12 +303,16 @@ def pose_estimate(net, det_net, img):
         landmark[0] = cosa * x - sina * y
         landmark[1] = sina * x + cosa * y
 
-    return all_landmarks, all_world_landmarks
+    PoseLandmark = namedtuple('PoseLandmark', ['x', 'y', 'z', 'visibility', 'presence'])
+    out_landmarks = [PoseLandmark(lm[0], lm[1], lm[2], lm[3], lm[4]) for lm in all_landmarks]
+    PoseWorldLandmark = namedtuple('PoseWorldLandmark', ['x', 'y', 'z', 'visibility'])
+    out_world_landmarks = [
+        PoseWorldLandmark(wld[0], wld[1], wld[2], lm[3])
+        for lm, wld in zip(all_landmarks, all_world_landmarks)
+    ]
 
+    return out_landmarks, out_world_landmarks
 
-# ======================
-# Main functions
-# ======================
 
 def recognize_from_image(net, det_net):
     # input image loop
@@ -278,6 +322,7 @@ def recognize_from_image(net, det_net):
 
         img = load_image(image_path)
         img = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
+        image_height, image_width, _ = img.shape
 
         # inference
         logger.info('Start inference...')
@@ -303,17 +348,22 @@ def recognize_from_image(net, det_net):
 
         landmarks, world_landmarks = output
 
-        print(landmarks)
-        print(world_landmarks)
+        logger.info(
+            f'Nose coordinates: ('
+            f'{landmarks[0].x * image_width}, '
+            f'{landmarks[0].y * image_height})'
+        )
 
-        # # plot result
-        # src_img = cv2.cvtColor(src_img, cv2.COLOR_BGRA2BGR)
-        # display_result(src_img, landmarks, flags)
-        #
-        # # save results
-        # savepath = get_savepath(args.savepath, image_path)
-        # logger.info(f'saved at : {savepath}')
-        # cv2.imwrite(savepath, src_img)
+        # plot result
+        draw_landmarks(img, landmarks)
+
+        if args.world_landmark:
+            plot_landmarks(world_landmarks)
+
+        # save results
+        savepath = get_savepath(args.savepath, image_path)
+        logger.info(f'saved at : {savepath}')
+        cv2.imwrite(savepath, img)
 
     logger.info('Script finished successfully.')
 
@@ -330,7 +380,7 @@ def recognize_from_video(net, det_net):
         writer = None
 
     frame_shown = False
-    while (True):
+    while True:
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
@@ -342,6 +392,7 @@ def recognize_from_video(net, det_net):
         landmarks, world_landmarks = output
 
         # plot result
+        draw_landmarks(frame, landmarks)
         cv2.imshow('frame', frame)
         frame_shown = True
 
