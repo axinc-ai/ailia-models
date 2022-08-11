@@ -80,9 +80,27 @@ def preprocess_detection(img):
     """
     resize & padding
     """
-    cv_resize = False
+    warp_resize = True
 
-    if cv_resize:
+    if warp_resize:
+        box_size = max(im_h, im_w)
+        rotated_rect = ((im_w // 2, im_h // 2), (box_size, box_size), 0)
+        pts1 = cv2.boxPoints(rotated_rect)
+
+        h = w = IMAGE_DET_SIZE
+        pts2 = np.float32([[0, h], [0, 0], [w, 0], [w, h]])
+        M = cv2.getPerspectiveTransform(pts1, pts2)
+        img = cv2.warpPerspective(
+            img, M, (w, h), flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT)
+
+        pad_h = pad_w = 0
+        dst_aspect_ratio = h / w
+        src_aspect_ratio = im_h / im_w
+        if dst_aspect_ratio > src_aspect_ratio:
+            pad_h = (1 - src_aspect_ratio / dst_aspect_ratio) / 2
+        else:
+            pad_w = (1 - dst_aspect_ratio / src_aspect_ratio) / 2
+    else:
         scale = IMAGE_DET_SIZE / max(im_h, im_w)
         ow, oh = int(im_w * scale), int(im_h * scale)
         if ow != im_w or oh != im_h:
@@ -95,23 +113,9 @@ def preprocess_detection(img):
             pad_w = (IMAGE_DET_SIZE - ow) // 2
             pad_img[pad_h:pad_h + oh, pad_w:pad_w + ow, :] = img
             img = pad_img
-    else:
-        box_size = max(im_h, im_w)
-        scale = IMAGE_DET_SIZE / box_size
-        ow, oh = int(im_w * scale), int(im_h * scale)
-        pad_h = pad_w = 0
-        if ow != IMAGE_DET_SIZE or oh != IMAGE_DET_SIZE:
-            pad_h = (IMAGE_DET_SIZE - oh) // 2
-            pad_w = (IMAGE_DET_SIZE - ow) // 2
 
-        rotated_rect = ((im_w // 2, im_h // 2), (box_size, box_size), 0)
-        pts1 = cv2.boxPoints(rotated_rect)
-
-        h = w = IMAGE_DET_SIZE
-        pts2 = np.float32([[0, h], [0, 0], [w, 0], [w, h]])
-        M = cv2.getPerspectiveTransform(pts1, pts2)
-        img = cv2.warpPerspective(
-            img, M, (w, h), flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT)
+        pad_h = pad_h / IMAGE_DET_SIZE
+        pad_w = pad_w / IMAGE_DET_SIZE
 
     """
     normalize & reshape
@@ -123,7 +127,7 @@ def preprocess_detection(img):
     img = np.expand_dims(img, axis=0)
     img = img.astype(np.float32)
 
-    return img, (pad_h / IMAGE_DET_SIZE, pad_w / IMAGE_DET_SIZE)
+    return img, (pad_h, pad_w)
 
 
 def preprocess_landmark(img, center, box_size, rotation):
