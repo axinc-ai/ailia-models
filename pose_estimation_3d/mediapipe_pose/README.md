@@ -38,9 +38,9 @@ $ python3 mediapipe_pose.py --video VIDEO_PATH
 ```
 
 By adding the `--model` option, you can specify model type which is selected from "lite", "full", "heavy".  
-(default is full)
+(default is heavy)
 ```bash
-$ python3 mediapipe_pose.py --model full
+$ python3 mediapipe_pose.py --model heavy
 ```
 
 By specifying the `--world_landmark` option, POSE_WORLD_LANDMARKS plot is drawn.
