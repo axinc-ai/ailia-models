@@ -44,7 +44,7 @@ $ python3 yolov7.py --model_name yolov7x
 
 You can use `--detection_width` and `--detection_height` options to change the detection resolution
 ```bash
-$ python3 yolov6.py --detection_width 1280 --detection_height 1280
+$ python3 yolov7.py --detection_width 1280 --detection_height 1280
 ```
 
 
