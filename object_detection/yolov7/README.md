@@ -37,8 +37,16 @@ If you pass `0` as an argument to VIDEO_PATH, you can use the webcam input inste
 $ python3 yolov7.py --video VIDEO_PATH
 ```
 
-The default setting is to use the optimized model and weights, but you can also switch to the normal model by using the
---normal option.
+You can use `--model_name` option to change the model architecture.
+```bash
+$ python3 yolov7.py --model_name yolov7x
+```
+
+You can use `--detection_width` and `--detection_height` options to change the detection resolution
+```bash
+$ python3 yolov6.py --detection_width 1280 --detection_height 1280
+```
+
 
 ## Reference
 
