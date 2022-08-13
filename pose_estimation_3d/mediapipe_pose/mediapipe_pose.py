@@ -234,7 +234,7 @@ def pose_estimate(net, det_net, img):
 
     # feedforward
     if not args.onnx:
-        output = net.predict([input])
+        output = det_net.predict([input])
     else:
         output = det_net.run(None, {'input_1': input})
     detections, scores = output
