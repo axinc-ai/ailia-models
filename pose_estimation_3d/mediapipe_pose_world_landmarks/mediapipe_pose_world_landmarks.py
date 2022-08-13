@@ -36,7 +36,7 @@ WEIGHT_HEAVY_PATH = 'pose_landmark_heavy.onnx'
 MODEL_HEAVY_PATH = 'pose_landmark_heavy.onnx.prototxt'
 WEIGHT_DETECTOR_PATH = 'pose_detection.onnx'
 MODEL_DETECTOR_PATH = 'pose_detection.onnx.prototxt'
-REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/mediapipe_pose/'
+REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/mediapipe_pose_world_landmarks/'
 
 IMAGE_PATH = 'demo.png'
 SAVE_IMAGE_PATH = 'output.png'
