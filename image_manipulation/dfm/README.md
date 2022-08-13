@@ -1,4 +1,4 @@
-# DFM: Deep Feature Matching
+# DFM: A Performance Baseline for Deep Feature Matching
 
 ## Input
 
@@ -25,6 +25,9 @@
 - Plot keypoints for img_B
 
 ![Output](B.png)
+
+## Caution
+The software can only be used for personal, research, academic and non-commercial purposes.
 
 ## Usage
 Automatically downloads the onnx and prototxt files on the first run.
