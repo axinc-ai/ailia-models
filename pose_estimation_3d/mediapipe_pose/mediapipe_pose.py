@@ -414,7 +414,7 @@ def recognize_from_video(net, det_net):
 
 def main():
     # model files check and download
-    # check_and_download_models(WEIGHT_DETECTOR_PATH, MODEL_DETECTOR_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_DETECTOR_PATH, MODEL_DETECTOR_PATH, REMOTE_PATH)
     info = {
         'lite': (WEIGHT_LITE_PATH, MODEL_LITE_PATH),
         'full': (WEIGHT_FULL_PATH, MODEL_FULL_PATH),
