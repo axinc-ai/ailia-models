@@ -147,6 +147,8 @@ The collection of pre-trained, state-of-the-art AI models.
 | [<img src="generative_adversarial_networks/council-GAN/output_glasses.png" width=128px>](generative_adversarial_networks/council-GAN/) | [council-GAN](/generative_adversarial_networks/council-GAN)| [Council-GAN](https://github.com/Onr/Council-GAN)| Pytorch | 1.2.4 and later |
 | [<img src="generative_adversarial_networks/restyle-encoder/img/face_img.jpg" width=128px>](generative_adversarial_networks/restyle-encoder/) | [restyle-encoder](/generative_adversarial_networks/restyle-encoder)| [ReStyle](https://github.com/yuval-alaluf/restyle-encoder)| Pytorch | 1.2.9 and later |
 | [<img src="generative_adversarial_networks/sam/img/input.jpg" width=128px>](generative_adversarial_networks/sam/) | [sam](/generative_adversarial_networks/sam)| [Age Transformation Using a Style-Based Regression Model](https://github.com/yuval-alaluf/SAM)| Pytorch | 1.2.9 and later |
+| [<img src="generative_adversarial_networks/gfpgan/out_03.png" width=128px>](generative_adversarial_networks/gfpgan/) | [gfpgan](/generative_adversarial_networks/gfpgan)| [GFP-GAN: Towards Real-World Blind Face Restoration with Generative Facial Prior](https://github.com/TencentARC/GFPGAN)| Pytorch | 1.2.10 and later |
+| [<img src="generative_adversarial_networks/sber-swap/output.png" width=128px>](generative_adversarial_networks/sber-swap/) | [sber-swap](/generative_adversarial_networks/sber-swap/) | [SberSwap](https://github.com/ai-forever/sber-swap) | Pytorch | 1.2.12 and later | |
 
 ## Hand detection
 
@@ -195,7 +197,7 @@ The collection of pre-trained, state-of-the-art AI models.
 | [<img src="image_classification/weather-prediction-from-image/output.png" width=128px>](image_classification/weather-prediction-from-image/) | [weather-prediction-from-image](/image_classification/weather-prediction-from-image/)|[Weather Prediction From Image - (Warmth Of Image)](https://github.com/berkgulay/weather-prediction-from-image) | Keras | 1.2.5 and later | |
 | [<img src="image_classification/swin-transformer/input.jpg" width=128px>](image_classification/swin-transformer/) | [swin-transformer](/image_classification/swin-transformer/)|[Swin Transformer](https://github.com/microsoft/Swin-Transformer) | Pytorch | 1.2.6 and later | |
 | [<img src="image_classification/convnext/input_imagenet.jpg" width=128px>](image_classification/convnext/) | [convnext](/image_classification/convnext/)|[A PyTorch implementation of ConvNeXt](https://github.com/facebookresearch/ConvNeXt) | Pytorch | 1.2.5 and later | |
-
+| [<img src="image_classification/places365/input.jpg" width=128px>](image_classification/places365/) | [places365](/image_classification/places365/)|[Release of Places365-CNNs](https://github.com/CSAILVision/places365) | Pytorch | 1.2.5 and later | |
 
 ## Image inpainting
 
@@ -285,6 +287,8 @@ The collection of pre-trained, state-of-the-art AI models.
 | [<img src="object_detection/yolov4/output.png" width=128px>](object_detection/yolov4/) | [yolov4](/object_detection/yolov4/) | [Pytorch-YOLOv4](https://github.com/Tianxiaomo/pytorch-YOLOv4) | Pytorch | 1.2.4 and later | [EN](https://medium.com/axinc-ai/yolov4-a-machine-learning-model-to-detect-the-position-and-type-of-an-object-4f108ed0507b) [JP](https://medium.com/axinc/yolov4-%E7%89%A9%E4%BD%93%E3%82%92%E6%A4%9C%E5%87%BA%E3%81%99%E3%82%8B%E6%A9%9F%E6%A2%B0%E5%AD%A6%E7%BF%92%E3%83%A2%E3%83%87%E3%83%AB-480f0a635317) |
 | [<img src="object_detection/yolov4-tiny/output.png" width=128px>](object_detection/yolov4-tiny/) | [yolov4-tiny](/object_detection/yolov4-tiny/) | [Pytorch-YOLOv4](https://github.com/Tianxiaomo/pytorch-YOLOv4) | Pytorch | 1.2.5 and later |
 | [<img src="object_detection/yolov5/output.png" width=128px>](object_detection/yolov5/) | [yolov5](/object_detection/yolov5/) | [yolov5](https://github.com/ultralytics/yolov5) | Pytorch | 1.2.5 and later | [EN](https://medium.com/axinc-ai/yolov5-the-latest-model-for-object-detection-b13320ec516b) [JP](https://medium.com/axinc/yolov5-%E7%89%A9%E4%BD%93%E6%A4%9C%E5%87%BA%E3%81%AE%E6%9C%80%E6%96%B0%E3%83%A2%E3%83%87%E3%83%AB-5b7316d1e54d) |
+| [<img src="object_detection/yolov6/output.jpg" width=128px>](object_detection/yolov6/) | [yolov6](/object_detection/yolov6/) | [YOLOV6](https://github.com/meituan/YOLOv6) | Pytorch | 1.2.10 and later | |
+| [<img src="object_detection/yolov7/output.jpg" width=128px>](object_detection/yolov7/) | [yolov7](/object_detection/yolov7/) | [YOLOv7](https://github.com/WongKinYiu/yolov7) | Pytorch | 1.2.7 and later | |
 | [<img src="object_detection/yolor/output.jpg" width=128px>](object_detection/yolor/) | [yolor](/object_detection/yolor/) | [yolor](https://github.com/WongKinYiu/yolor/tree/paper) | Pytorch | 1.2.5 and later |
 | [<img src="object_detection/yolox/output.jpg" width=128px>](object_detection/yolox/) | [yolox](/object_detection/yolox/) | [YOLOX](https://github.com/Megvii-BaseDetection/YOLOX) | Pytorch | 1.2.6 and later | [EN](https://medium.com/axinc-ai/yolox-object-detection-model-exceeding-yolov5-d6cea6d3c4bc) [JP](https://medium.com/axinc/yolox-yolov5%E3%82%92%E8%B6%85%E3%81%88%E3%82%8B%E7%89%A9%E4%BD%93%E6%A4%9C%E5%87%BA%E3%83%A2%E3%83%87%E3%83%AB-e9706e15fef2) |
 | [<img src="object_detection/yolox-ti-lite/output.jpg" width=128px>](object_detection/yolox-ti-lite/) | [yolox-ti-lite](/object_detection/yolox-ti-lite/) | [edgeai-yolox](https://github.com/TexasInstruments/edgeai-yolox) | Pytorch | 1.2.9 and later | |
@@ -302,10 +306,7 @@ The collection of pre-trained, state-of-the-art AI models.
 | [<img src="object_detection/picodet/output.png" width=128px>](object_detection/picodet/) | [picodet](/object_detection/picodet/) | [PP-PicoDet](https://github.com/Bo396543018/Picodet_Pytorch) | Pytorch | 1.2.10 and later | |
 | [<img src="object_detection/yolact/output.png" width=128px>](object_detection/yolact/) | [yolact](/object_detection/yolact/) | [You Only Look At CoefficienTs](https://github.com/dbolya/yolact) | Pytorch | 1.2.6 and later | |
 | [<img src="object_detection/fastest-det/output.png" width=128px>](object_detection/fastest-det/) | [fastest-det](/object_detection/fastest-det/) | [FastestDet](https://github.com/dog-qiuqiu/FastestDet) | Pytorch | 1.2.5 and later | |
-
-<!--
-| [<img src="object_detection/dab-detr/output.jpg" width=128px>](object_detection/dab-detr/) | [dab-detr](/object_detection/dab-detr/) | [DAB-DETR](https://github.com/IDEA-opensource/DAB-DETR) | Pytorch | 1.2.0 and later | |
--->
+| [<img src="object_detection/dab-detr/output.jpg" width=128px>](object_detection/dab-detr/) | [dab-detr](/object_detection/dab-detr/) | [DAB-DETR](https://github.com/IDEA-opensource/DAB-DETR) | Pytorch | 1.2.12 and later | |
 
 ## Object detection 3d
 
@@ -362,6 +363,7 @@ The collection of pre-trained, state-of-the-art AI models.
 | [<img src="pose_estimation_3d/blazepose-fullbody/output.png" width=128px>](pose_estimation_3d/blazepose-fullbody/) |[blazepose-fullbody](/pose_estimation_3d/blazepose-fullbody/) | [MediaPipe](https://google.github.io/mediapipe/solutions/models.html#pose) | TensorFlow Lite | 1.2.5 and later | [EN](https://medium.com/axinc-ai/blazepose-a-3d-pose-estimation-model-d8689d06b7c4) [JP](https://medium.com/axinc/blazepose-3%E6%AC%A1%E5%85%83%E5%BA%A7%E6%A8%99%E3%82%92%E5%8F%96%E5%BE%97%E5%8F%AF%E8%83%BD%E3%81%AA%E9%AA%A8%E6%A0%BC%E6%A4%9C%E5%87%BA%E3%83%A2%E3%83%87%E3%83%AB-a6c588013009) |
 | [<img src="pose_estimation_3d/3dmppe_posenet/output_pose_2d.jpg" width=128px>](pose_estimation_3d/3dmppe_posenet/) |[3dmppe_posenet](/pose_estimation_3d/3dmppe_posenet/) | [PoseNet of "Camera Distance-aware Top-down Approach for 3D Multi-person Pose Estimation from a Single RGB Image"](https://github.com/mks0601/3DMPPE_POSENET_RELEASE) | Pytorch | 1.2.6 and later | |
 | [<img src="pose_estimation_3d/gast/img/output_040.png" width=128px>](pose_estimation_3d/gast/) |[gast](/pose_estimation_3d/gast/) | [A Graph Attention Spatio-temporal Convolutional Networks for 3D Human Pose Estimation in Video (GAST-Net)](https://github.com/fabro66/GAST-Net-3DPoseEstimation) | Pytorch | 1.2.7 and later | [EN](https://medium.com/axinc-ai/gast-a-machine-learning-model-that-predicts-a-3d-skeleton-from-a-2d-skeleton-44449d1ff78d) [JP](https://medium.com/axinc/gast-2d%E3%81%AE%E9%AA%A8%E6%A0%BC%E3%81%8B%E3%82%893d%E3%81%AE%E9%AA%A8%E6%A0%BC%E3%82%92%E4%BA%88%E6%B8%AC%E3%81%99%E3%82%8B%E6%A9%9F%E6%A2%B0%E5%AD%A6%E7%BF%92%E3%83%A2%E3%83%87%E3%83%AB-6c70fc4b3b3a) |
+| [<img src="pose_estimation_3d/mediapipe_pose_world_landmarks/output.png" width=128px>](pose_estimation_3d/mediapipe_pose_world_landmarks/) |[mediapipe_pose_world_landmarks](/pose_estimation_3d/mediapipe_pose_world_landmarks/) | [MediaPipe Pose real-world 3D coordinates](https://google.github.io/mediapipe/solutions/pose.html#pose_world_landmarks) | TensorFlow Lite | 1.2.10 and later | |
 
 ## Road detection
 
@@ -401,6 +403,7 @@ The collection of pre-trained, state-of-the-art AI models.
 | [<img src="super_resolution/han/output.png" width=128px>](super_resolution/han/) | [han](/super_resolution/han/) | [Single Image Super-Resolution via a Holistic Attention Network](https://github.com/wwlCape/HAN) | Pytorch | 1.2.6 and later |
 | [<img src="super_resolution/real-esrgan/output_anime.jpg" width=128px>](super_resolution/real-esrgan/) | [real-esrgan](/super_resolution/real-esrgan/) | [Real-ESRGAN](https://github.com/xinntao/Real-ESRGAN) | Pytorch | 1.2.9 and later |
 | [<img src="super_resolution/rcan-it/output.png" width=128px>](super_resolution/rcan-it/) | [rcan-it](/super_resolution/rcan-it/) | [Revisiting RCAN: Improved Training for Image Super-Resolution](https://github.com/zudi-lin/rcan-it) | Pytorch | 1.2.10 and later |
+| [<img src="super_resolution/swinir/output_classical.png" width=128px>](super_resolution/swinir/) | [swinir](/super_resolution/swinir/) | [SwinIR: Image Restoration Using Swin Transformer](https://github.com/JingyunLiang/SwinIR) | Pytorch | 1.2.12 and later |
 
 ## Text detection
 
