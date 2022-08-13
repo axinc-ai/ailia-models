@@ -4,6 +4,8 @@
 
 ![Input](input.png)
 
+Image credit: "Day 21 Occupy Wall Street October 6 2011 Shankbone 6" by david_shankbone is marked under CC PDM 1.0. To view the terms, visit https://creativecommons.org/publicdomain/mark/1.0/
+
 Ailia input shape: (1, 3, 224, 224)
 
 ## Output

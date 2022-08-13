@@ -31,7 +31,7 @@ os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
 # ======================
 # Parameters
 # ======================
-REMOTE_PATH_FACE = 'https://storage.googleapis.com/ailia-models/retina_face/'
+REMOTE_PATH_FACE = 'https://storage.googleapis.com/ailia-models/6d_repnet/'
 REMOTE_PATH_6DRepNet = 'https://storage.googleapis.com/ailia-models/6d_repnet/'
 
 # settings
