@@ -240,6 +240,8 @@ def pose_estimate(net, det_net, img):
     detections, scores = output
 
     box, score = pose_detection(detections, scores, pad)
+    if len(box) == 0:
+        return [], []
 
     # Calculates region of interest based on pose detection, so that can be used
     # to detect landmarks.

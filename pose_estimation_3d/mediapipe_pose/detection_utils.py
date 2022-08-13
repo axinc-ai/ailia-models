@@ -138,6 +138,9 @@ def weighted_nms(boxes, scores):
         out_boxes.append(weighted_detection)
         out_scores.append(np.max(scores[idx]))
 
+    if len(out_boxes) == 0:
+        return [], []
+
     out_boxes = np.vstack(out_boxes)
     out_scores = np.array(out_scores)
 
@@ -159,6 +162,9 @@ def pose_detection(detections, scores, pad):
 
     # Performs non-max suppression to remove excessive detections.
     boxes, scores = weighted_nms(boxes, scores)
+
+    if len(boxes) == 0:
+        return [], []
 
     # Adjusts detection locations (already normalized to [0.f, 1.f]) on the
     # letterboxed image (after image transformation with the FIT scale mode)
