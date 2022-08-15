@@ -172,8 +172,7 @@ def draw_predictions(img, predictions):
     class_names = (
         get_lvis_meta_v1() if vocabulary == 'lvis' else get_in21k_meta_v1()
     )["thing_classes"]
-    # labels = [class_names[i] for i in classes] # onnx runtime
-    labels = [class_names[int(i)] for i in classes]  # ailia always returns float tensor so need to add cast
+    labels = [class_names[i] for i in classes]
     labels = ["{} {:.0f}%".format(l, s * 100) for l, s in zip(labels, scores)]
 
     num_instances = len(boxes)
