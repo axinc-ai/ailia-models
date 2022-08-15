@@ -63,7 +63,7 @@ ONNX opset=12
 
 ## Netron
 
-[pose_detection.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/mediapipe_pose/pose_detection.onnx.prototxt)  
-[pose_landmark_lite.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/mediapipe_pose/pose_landmark_lite.onnx.prototxt)  
-[pose_landmark_full.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/mediapipe_pose/pose_landmark_full.onnx.prototxt)  
-[pose_landmark_heavy.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/mediapipe_pose/pose_landmark_heavy.onnx.prototxt)
+[pose_detection.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/mediapipe_pose_world_landmarks/pose_detection.onnx.prototxt)  
+[pose_landmark_lite.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/mediapipe_pose_world_landmarks/pose_landmark_lite.onnx.prototxt)  
+[pose_landmark_full.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/mediapipe_pose_world_landmarks/pose_landmark_full.onnx.prototxt)  
+[pose_landmark_heavy.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/mediapipe_pose_world_landmarks/pose_landmark_heavy.onnx.prototxt)
