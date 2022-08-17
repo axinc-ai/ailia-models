@@ -2,9 +2,7 @@
 
 ## Input
 
-![Input](input.jpg)
-
-(Image from https://github.com/xinntao/Real-ESRGAN/tree/master/inputs/ADE_val_00000114.jpg)
+![Input](input_anime.jpg)
 
 Ailia input shape: (1, 3, 256, 256)
 
@@ -25,9 +23,10 @@ $ python3 real-esrgan.py
 
 If you want to specify the input image, put the image path after the `--input` option.  
 You can use `--savepath` option to change the name of the output file to save.
+( You can change the model by specifying `--model`)
 
 ```bash
-$ python3 real-esrgan.py --input IMAGE_PATH --savepath SAVE_IMAGE_PATH
+$ python3 real-esrgan.py --input IMAGE_PATH --savepath SAVE_IMAGE_PATH --model RealESRGAN_anime_v3
 ```
 
 By adding the `--video` option, you can input the video.   
@@ -44,6 +43,8 @@ The default setting is to use the optimized model and weights, but you can also 
 
 [Real-ESRGAN](https://github.com/xinntao/Real-ESRGAN)
 
+[Anime Video Models](https://github.com/xinntao/Real-ESRGAN/blob/master/docs/anime_video_model.md)
+
 ## Framework
 
 Pytorch
@@ -55,3 +56,5 @@ ONNX opset = 12
 ## Netron
 
 [RealESRGAN.opt.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/real-esrgan/RealESRGAN.opt.onnx.prototxt)
+
+[realesr-animevideov3.opt.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/real-esrgan/realesr-animevideov3.opt.onnx.prototxt)
