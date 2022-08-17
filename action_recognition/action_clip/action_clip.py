@@ -1,4 +1,5 @@
 import argparse
+import os
 import sys
 
 import ailia
@@ -238,6 +239,10 @@ def recognize_from_video(args, models, model_params):
 
 
 def main():
+    if args.video is None:
+        args.video = os.path.join(
+            os.path.dirname(__file__), 'action_recognition.gif'
+        )
     text_inputs = args.text_inputs
     desc_file = args.desc_file
     if desc_file:

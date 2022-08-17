@@ -88,6 +88,10 @@ pip3 install ftfy regex
 Automatically downloads the onnx and prototxt files on the first run.
 It is necessary to be connected to the Internet while downloading.
 
+The following runs a basic inference on the sample GIF.
+```bash
+$ python3 action_clip.py
+
 By adding the `--video` option, you can input the video. Webcam input is not supported.
 ```bash
 $ python3 action_clip.py --video VIDEO_PATH
