@@ -1,5 +1,6 @@
 export OPTION=-b
 cd ../
+cd ../../action_recognition/action_clip; python3 action_clip.py ${OPTION}
 cd action_recognition/mars; python3 mars.py ${OPTION}
 cd ../../action_recognition/st_gcn; python3 st_gcn.py ${OPTION}
 cd ../../action_recognition/ax_action_recognition; python3 ax_action_recognition.py ${OPTION}
