@@ -51,6 +51,14 @@ parser.add_argument(
     '-m', '--model_type', default='vit-32-8f', choices=('vit-32-8f'),
     help='model type'
 )
+parser.add_argument(
+    '--sliding_window', action='store_true', default=False,
+    help='option to use sliding window method to load the video'
+)
+parser.add_argument(
+    '-f', '--fps', default=None,
+    help='Input fps for the detection model'
+)
 args = update_parser(parser)
 
 
@@ -216,22 +224,96 @@ def recognize_from_video(args, models, model_params):
 
     num_segments = model_params['num_segments']
     frame_cnt = int(capture.get(cv2.CAP_PROP_FRAME_COUNT))
-    intervals = (
-        np.linspace(0, frame_cnt, num_segments+1).round().astype(np.int64)
-    )
-    sample_ids = [
-        np.random.randint(intervals[i], intervals[i+1])
-        for i in range(num_segments)
-    ]
 
-    frames = []
-    for idx in sample_ids:
-        capture.set(cv2.CAP_PROP_POS_FRAMES, idx)
-        ret, frame = capture.read()
-        frames.append(frame)
+    if args.sliding_window:
+        FRAME_SKIP = bool(args.fps)
+        frame_rate = capture.get(cv2.CAP_PROP_FPS)
+        action_recognize_fps = int(args.fps) if FRAME_SKIP else frame_rate
+    
+        if args.savepath != "":
+            size = (int(capture.get(cv2.CAP_PROP_FRAME_WIDTH)),
+                    int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT)))
+            fmt = cv2.VideoWriter_fourcc('m', 'p', '4', 'v')
+            writer = cv2.VideoWriter(args.savepath, fmt, action_recognize_fps, size)
+        else:
+            writer = None
 
-    scores = predict(models, args.text_inputs, frames, num_segments)[0]
-    print_results(scores, args.text_inputs, logger)
+        frame_nb = int(capture.get(cv2.CAP_PROP_FRAME_COUNT))
+        idx_frame = 0
+        
+        frames = []
+        frame_shown = False
+        while(True):
+            ret, frame = capture.read()
+
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                break
+            # if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
+            #     break
+            
+            if (not ret) or (frame_nb>=1 and idx_frame>=frame_nb):
+                break
+
+            if FRAME_SKIP:
+                mod = round(frame_rate/action_recognize_fps)
+                if mod>=1:
+                    if idx_frame%mod != 0:
+                        idx_frame = idx_frame + 1
+                        continue
+            label = 'Not yet'
+            if len(frames) >= num_segments:
+                frames = frames[:-1] + [frame]
+                scores = predict(models, args.text_inputs, frames, num_segments)[0]
+                label = args.text_inputs[np.argsort(-scores)[0]]
+            else:
+                frames.append(frame)
+
+            loc_ratio = 0.15
+            cv2.putText(
+                frame,
+                label,
+                (int(size[0]*loc_ratio), int(size[1]*loc_ratio)),
+                cv2.FONT_HERSHEY_PLAIN,
+                2,
+                [255, 255, 255],
+                2
+            )
+
+            if writer is not None:
+                writer.write(frame)
+
+                # show progress
+                if idx_frame == "0":
+                    print()
+                print("\r" + str(idx_frame + 1) + " / " + str(frame_nb) ,end="")
+                if idx_frame == frame_nb - 1:
+                    print()
+
+            # cv2.imshow('frame', frame)
+            frame_shown = True
+
+            idx_frame = idx_frame + 1
+
+        if writer is not None:
+            writer.release()
+
+    else:
+        intervals = (
+            np.linspace(0, frame_cnt, num_segments+1).round().astype(np.int64)
+        )
+        sample_ids = [
+            np.random.randint(intervals[i], intervals[i+1])
+            for i in range(num_segments)
+        ]
+
+        frames = []
+        for idx in sample_ids:
+            capture.set(cv2.CAP_PROP_POS_FRAMES, idx)
+            ret, frame = capture.read()
+            frames.append(frame)
+
+        scores = predict(models, args.text_inputs, frames, num_segments)[0]
+        print_results(scores, args.text_inputs, logger)
 
     capture.release()
     cv2.destroyAllWindows()
