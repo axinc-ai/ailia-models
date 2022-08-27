@@ -42,7 +42,7 @@ IMAGE_PATH = 'desk.jpg'
 SAVE_IMAGE_PATH = 'output.png'
 
 IMAGE_SIZE = 800
-IMAGE_MAX_SIZE = 800 #tempolary limit to 800px (original : 1333)
+IMAGE_MAX_SIZE = 800  # tempolary limit to 800px (original : 1333)
 
 # ======================
 # Arguemnt Parser Config
@@ -286,33 +286,19 @@ def preprocess(img):
     return img
 
 
-def post_processing(
-        pred_boxes, scores, pred_classes, pred_masks, im_hw, pred_hw):
-    scale_x, scale_y = (
-        im_hw[1] / pred_hw[1],
-        im_hw[0] / pred_hw[0],
-    )
+def predict(net, img):
+    im_h, im_w = img.shape[:2]
+    img = preprocess(img)
+    pred_hw = img.shape[-2:]
 
-    pred_boxes[:, 0::2] *= scale_x
-    pred_boxes[:, 1::2] *= scale_y
-    pred_boxes[:, [0, 2]] = np.clip(pred_boxes[:, [0, 2]], 0, im_hw[1])
-    pred_boxes[:, [1, 3]] = np.clip(pred_boxes[:, [1, 3]], 0, im_hw[0])
+    # feedforward
+    im_hw = np.array([im_h, im_w])
+    if not args.onnx:
+        output = net.predict([img, im_hw])
+    else:
+        output = net.run(None, {'img': img, 'im_hw': im_hw})
 
-    threshold = 0
-    widths = pred_boxes[:, 2] - pred_boxes[:, 0]
-    heights = pred_boxes[:, 3] - pred_boxes[:, 1]
-    keep = (widths > threshold) & (heights > threshold)
-
-    pred_boxes = pred_boxes[keep]
-    scores = scores[keep]
-    pred_classes = pred_classes[keep]
-    pred_masks = pred_masks[keep]
-
-    mask_threshold = 0.5
-    pred_masks = paste_masks_in_image(
-        pred_masks[:, 0, :, :], pred_boxes,
-        (im_hw[0], im_hw[1]), mask_threshold
-    )
+    pred_boxes, scores, pred_classes, pred_masks = output
 
     pred = {
         'pred_boxes': pred_boxes,
@@ -320,27 +306,6 @@ def post_processing(
         'pred_classes': pred_classes,
         'pred_masks': pred_masks,
     }
-    return pred
-
-
-def predict(net, img):
-    im_h, im_w = img.shape[:2]
-    img = preprocess(img)
-    pred_hw = img.shape[-2:]
-
-    # feedforward
-    if not args.onnx:
-        output = net.predict([img])
-    else:
-        output = net.run(None, {'img': img})
-
-    pred_boxes, scores, pred_classes, pred_masks = output
-
-    pred = post_processing(
-        pred_boxes, scores, pred_classes, pred_masks,
-        (im_h, im_w), pred_hw
-    )
-
     return pred
 
 
@@ -398,7 +363,7 @@ def recognize_from_video(net):
         writer = get_writer(args.savepath, f_h, f_w)
     else:
         writer = None
-    
+
     frame_shown = False
     while True:
         ret, frame = capture.read()
@@ -419,7 +384,7 @@ def recognize_from_video(net):
 
         # save results
         if writer is not None:
-            res_img = cv2.resize(res_img, (f_w,f_h))
+            res_img = cv2.resize(res_img, (f_w, f_h))
             writer.write(res_img.astype(np.uint8))
 
     capture.release()
