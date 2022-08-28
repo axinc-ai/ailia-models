@@ -52,7 +52,25 @@ args = update_parser(parser, large_model=True)
 # ======================
 
 def recognize_from_image(net):
-    net.predict()
+    # Prepare dataset
+    dataset = Dataset()
+    sample = dataset.prepare()
+
+    # Extract features
+    extractor = FeaturesExtractor(if_SP=False)
+    matches_use_ori, quality_use = extractor.extract(sample["matches_good"])
+    pts_normalized_in, pts1, pts2, T1, T2 = extractor.get_input(matches_use_ori, quality_use)
+
+    # Predict
+    matches_good_unique_num = sample["matches_good_unique_nums"]
+    t_scene_scale = sample["t_scene"]
+    logits, logits_layers, F_est, epi_res_layers, T1, T2, out_layers, pts1, pts2, weights, residual_layers, weights_layers = \
+    net.predict(pts_normalized_in, pts1, pts2, T1, T2, matches_good_unique_num, t_scene_scale)
+
+    # Debug
+    print(logits[0, :10], logits.shape)
+    print(F_est, F_est.shape)
+    exit()
     
 
 def main():
