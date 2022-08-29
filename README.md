@@ -23,6 +23,7 @@ The collection of pre-trained, state-of-the-art AI models.
 | [<img src="action_recognition/ax_action_recognition/punch_03-12-09-21-27-876_out.gif" width=128px>](action_recognition/ax_action_recognition/) | [ax_action_recognition](/action_recognition/ax_action_recognition/) | [Realtime-Action-Recognition](https://github.com/felixchenfy/Realtime-Action-Recognition) | Pytorch | 1.2.7 and later | |
 | [<img src="action_recognition/va-cnn/image/f-0.png" width=128px>](action_recognition/va-cnn/) | [va-cnn](/action_recognition/va-cnn/) | [View Adaptive Neural Networks (VA) for Skeleton-based Human Action Recognition](https://github.com/microsoft/View-Adaptive-Neural-Networks-for-Skeleton-based-Human-Action-Recognition) | Pytorch | 1.2.7 and later ||
 | [<img src="action_recognition/driver-action-recognition-adas/img/out_030.png" width=128px>](action_recognition/driver-action-recognition-adas/) | [driver-action-recognition-adas](/action_recognition/driver-action-recognition-adas/) | [driver-action-recognition-adas-0002](https://github.com/openvinotoolkit/open_model_zoo/tree/master/models/intel/driver-action-recognition-adas-0002) | OpenVINO | 1.2.5 and later | |
+| [<img src="action_recognition/action_clip/action_recognition.gif" width=128px>](action_recognition/action_clip/) | [action_clip](/action_recognition/action_clip/) | [ActionCLIP](https://github.com/sallymmx/ActionCLIP) | Pytorch | 1.2.7 and later | |
 
 ## Anomaly detection
 
@@ -199,6 +200,7 @@ The collection of pre-trained, state-of-the-art AI models.
 | [<img src="image_classification/swin-transformer/input.jpg" width=128px>](image_classification/swin-transformer/) | [swin-transformer](/image_classification/swin-transformer/)|[Swin Transformer](https://github.com/microsoft/Swin-Transformer) | Pytorch | 1.2.6 and later | |
 | [<img src="image_classification/convnext/input_imagenet.jpg" width=128px>](image_classification/convnext/) | [convnext](/image_classification/convnext/)|[A PyTorch implementation of ConvNeXt](https://github.com/facebookresearch/ConvNeXt) | Pytorch | 1.2.5 and later | |
 | [<img src="image_classification/places365/input.jpg" width=128px>](image_classification/places365/) | [places365](/image_classification/places365/)|[Release of Places365-CNNs](https://github.com/CSAILVision/places365) | Pytorch | 1.2.5 and later | |
+| [<img src="image_classification/mobileone/clock.jpg" width=128px>](image_classification/mobileone/) | [mobileone](/image_classification/mobileone/)|[A PyTorch implementation of MobileOne](https://github.com/apple/ml-mobileone) | Pytorch | 1.2.1 and later | |
 
 ## Image inpainting
 
@@ -222,6 +224,7 @@ The collection of pre-trained, state-of-the-art AI models.
 | [<img src="image_manipulation/deep_white_balance/output_AWB.png" width=128px>](image_manipulation/deep_white_balance/) | [deep_white_balance](/image_manipulation/deep_white_balance/) | [Deep White-Balance Editing, CVPR 2020 (Oral)](https://github.com/mahmoudnafifi/Deep_White_Balance) | PyTorch | 1.2.6 and later |
 | [<img src="image_manipulation/deblur_gan/output.png" width=128px>](image_manipulation/deblur_gan/) | [deblur_gan](/image_manipulation/deblur_gan/) | [DeblurGAN](https://github.com/KupynOrest/DeblurGAN) | Pytorch | 1.2.6 and later |
 | [<img src="image_manipulation/invertible_denoising_network/output.png" width=128px>](image_manipulation/invertible_denoising_network/) | [invertible_denoising_network](/image_manipulation/invertible_denoising_network/) | [Invertible Image Denoising](https://github.com/Yang-Liu1082/InvDN) | Pytorch | 1.2.8 and later |
+| [<img src="image_manipulation/dfm/output.png" width=128px>](image_manipulation/dfm/) | [dfm](/image_manipulation/dfm/) | [Deep Feature Matching](https://github.com/ufukefe/DFM) | Pytorch | 1.2.6 and later |
 
 ## Image segmentation
 

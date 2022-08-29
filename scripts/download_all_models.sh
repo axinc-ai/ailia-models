@@ -1,6 +1,7 @@
 export OPTION=-b
 cd ../
 cd action_recognition/mars; python3 mars.py ${OPTION}
+cd ../../action_recognition/action_clip; python3 action_clip.py ${OPTION}
 cd ../../action_recognition/st_gcn; python3 st_gcn.py ${OPTION}
 cd ../../action_recognition/ax_action_recognition; python3 ax_action_recognition.py ${OPTION}
 cd ../../action_recognition/va-cnn; python3 va-cnn.py ${OPTION}
@@ -111,6 +112,7 @@ cd ../../image_classification/weather-prediction-from-image; python3 weather-pre
 cd ../../image_classification/convnext; python3 convnext.py ${OPTION}
 cd ../../image_classification/swin-transformer; python3 swin_transformer.py ${OPTION}
 cd ../../image_classification/places365; python3 places365.py ${OPTION}
+cd ../../image_classification/mobileone; python3 mobileone.py ${OPTION}
 cd ../../image_inpainting/3d-photo-inpainting; python3 3d-photo-inpainting.py ${OPTION}
 cd ../../image_inpainting/inpainting_gmcnn; python3 inpainting_gmcnn.py ${OPTION}
 cd ../../image_inpainting/pytorch-inpainting-with-partial-conv; python3 pytorch-inpainting-with-partial-conv.py ${OPTION}
@@ -124,6 +126,7 @@ cd ../../image_manipulation/style2paints; python3 style2paints.py ${OPTION}
 cd ../../image_manipulation/deep_white_balance; python3 deep_white_balance.py ${OPTION}
 cd ../../image_manipulation/deblur_gan; python3 deblur_gan.py ${OPTION}
 cd ../../image_manipulation/invertible_denoising_network; python3 invertible_denoising_network.py ${OPTION}
+cd ../../image_manipulation/dfm; python3 dfm.py ${OPTION}
 cd ../../image_segmentation/deeplabv3; python3 deeplabv3.py ${OPTION}
 cd ../../image_segmentation/hair_segmentation; python3 hair_segmentation.py ${OPTION}
 cd ../../image_segmentation/hrnet_segmentation; python3 hrnet_segmentation.py ${OPTION}
