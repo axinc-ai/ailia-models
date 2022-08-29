@@ -4,7 +4,7 @@ import numpy as np
 import cv2
 
 import ailia
-import ml_mobileone_labels
+import mobileone_labels
 
 # import original modules
 sys.path.append('../../util')
@@ -23,9 +23,9 @@ logger = getLogger(__name__)
 # ======================
 # Parameters
 # ======================
-REMOTE_PATH = "https://storage.googleapis.com/ailia-models/ml-mobileone/"
+REMOTE_PATH = "https://storage.googleapis.com/ailia-models/mobileone/"
 
-IMAGE_PATH = 'input.jpg'
+IMAGE_PATH = 'clock.jpg'
 IMAGE_HEIGHT = 256
 IMAGE_WIDTH = 256
 MAX_CLASS_COUNT = 5
@@ -58,7 +58,7 @@ def recognize_from_image():
     for image_path in args.input:
         # prepare input data
         logger.info(image_path)
-        input_data = cv2.imread(image_path)
+        input_data = imread(image_path)
         input_data = cv2.resize(input_data, dsize=(256, 256))
         input_data = input_data.transpose(2, 0, 1)
         input_data = input_data[np.newaxis, :, :, :]
@@ -77,7 +77,7 @@ def recognize_from_image():
             preds = net.predict(input_data)
 
         # show results
-        print_results(preds, ml_mobileone_labels.imagenet_category)
+        print_results(preds, mobileone_labels.imagenet_category)
 
     logger.info('Script finished successfully.')
 
@@ -115,7 +115,7 @@ def recognize_from_video():
         preds = net.predict(input_data)
 
         # get result
-        plot_results(frame, preds, ml_mobileone_labels.imagenet_category)
+        plot_results(frame, preds, mobileone_labels.imagenet_category)
 
         cv2.imshow('frame', frame)
         frame_shown = True
