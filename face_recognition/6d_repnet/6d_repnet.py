@@ -70,8 +70,8 @@ def recognize_from_image():
     for image_path in args.input:
         # prepare input data
         logger.debug(f'input image: {image_path}')
-        raw_img = Image.open(image_path)
-        resize_img = raw_img.resize((640, 480))
+        raw_img = cv2.imread(image_path)
+        resize_img = cv2.resize(raw_img, dsize=(640, 480))
         resize_img = np.array(resize_img)
         logger.debug(f'input image shape: {resize_img.shape}')
 
@@ -95,9 +95,7 @@ def recognize_from_image():
             y_max = y_max + int(0.2 * bbox_width)
 
             img = resize_img[y_min:y_max, x_min:x_max]
-            img = Image.fromarray(img)
-            img = img.convert('RGB')
-            img = img.resize((HEIGHT, WIDTH))
+            img = cv2.resize(img, dsize=(HEIGHT, WIDTH))
             img = utils.transform(img, MEAN, STD)
 
             img = np.expand_dims(img, 0)
@@ -124,6 +122,7 @@ def recognize_from_image():
         # plot result
         savepath = get_savepath(args.savepath, image_path)
         logger.info(f'saved at : {savepath}')
+        resize_img = cv2.cvtColor(resize_img, cv2.COLOR_BGR2RGB)
         Image.fromarray(resize_img).save(savepath)
 
     logger.info('Script finished successfully.')
@@ -156,8 +155,8 @@ def recognize_from_video():
         if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
             break
 
-        raw_img = frame
-        faces = detector(raw_img)
+        frame = cv2.resize(frame, dsize=(640, 480))
+        faces = detector(frame)
         for box, landmarks, score in faces:
             # Print the location of each face in this image
             if score < .95:
@@ -175,9 +174,7 @@ def recognize_from_video():
             y_max = y_max + int(0.2 * bbox_width)
 
             img = frame[y_min:y_max, x_min:x_max]
-            img = Image.fromarray(img)
-            img = img.convert('RGB')
-            img = img.resize((HEIGHT, WIDTH))
+            img = cv2.resize(img, dsize=(HEIGHT, WIDTH))
             img = utils.transform(img, MEAN, STD)
 
             img = np.expand_dims(img, 0)
@@ -193,7 +190,13 @@ def recognize_from_video():
             end = time.time()
             print('Head pose estimation: %2f ms' % ((end - start) * 1000.))
 
-            utils.compute_euler_angles_from_rotation_matrices(R_pred) * 180 / np.pi
+            euler = utils.compute_euler_angles_from_rotation_matrices(R_pred) * 180 / np.pi
+            p_pred_deg = euler[:, 0]
+            y_pred_deg = euler[:, 1]
+            r_pred_deg = euler[:, 2]
+
+            utils.plot_pose_cube(frame, y_pred_deg, p_pred_deg, r_pred_deg, x_min + int(.5 * (
+                    x_max - x_min)), y_min + int(.5 * (y_max - y_min)), size=bbox_width)
 
         cv2.imshow("Demo", frame)
         cv2.waitKey(5)
