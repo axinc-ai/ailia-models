@@ -67,10 +67,15 @@ def recognize_from_image(net):
     logits, logits_layers, F_est, epi_res_layers, T1, T2, out_layers, pts1, pts2, weights, residual_layers, weights_layers = \
     net.predict(pts_normalized_in, pts1, pts2, T1, T2, matches_good_unique_num, t_scene_scale)
 
+    # Visualize
+    visalizer = Visualizer()
+    visalizer.show(sample)
+
     # Debug
-    print(logits[0, :10], logits.shape)
-    print(F_est, F_est.shape)
-    exit()
+    #print(sample.keys())
+    #print(logits[0, :10], logits.shape)
+    #print(F_est, F_est.shape)
+    #exit()
     
 
 def main():

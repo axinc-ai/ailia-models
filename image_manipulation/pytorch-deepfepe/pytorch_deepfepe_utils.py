@@ -6,9 +6,8 @@ import time
 
 import ailia
 import cv2
+import math
 import numpy as np
-
-from pytorch_deepfepe_utils import *
 
 # import original modules
 sys.path.append('../../util')
@@ -28,7 +27,10 @@ config = {
     "data": {
         "sequence_length": 2,
         "delta_ij": 1,
-        "good_num": 1000
+        "good_num": 1000,
+        "image": {
+            "size": [2710, 3384, 3]
+        }
     }
 }
 
@@ -103,6 +105,120 @@ class Dataset():
         assert Rt.shape==(3, 4)
         return np.vstack((Rt, np.array([[0., 0., 0., 1.]], dtype=Rt.dtype)))
 
+    def scale_P(self, P, sx, sy, if_print=False):
+        if if_print:
+            print(f'---scale_P - sx={sx}, sy={sy}')
+        assert P.shape==(3, 4)
+        out = np.copy(P)
+        out[0] *= sx
+        out[1] *= sy
+        return out
+
+    def add_scaled_K(self, sample, zoom_xy=[1,1]):
+        """
+        # scale calibration matrix based on img_zoom ratio. Add to the dict
+        """
+        if zoom_xy[0] != 1 or zoom_xy[1] != 1:
+            print("note: scaled_K with zoom_xy = {}".format(zoom_xy))
+        P_rect_ori = np.concatenate((sample['K_ori'], [[0], [0], [0]]), axis=1).astype(np.float32)
+        P_rect_scale = self.scale_P(
+            P_rect_ori, zoom_xy[0], zoom_xy[1]
+        )
+        K = P_rect_scale[:, :3]
+        sample.update({
+            'K': K,
+            "K_inv": np.linalg.inv(K),
+        })
+        #logging.debug(f"K_ori: {sample['K_ori']}, type: {sample['K_ori'].dtype}, K: {sample['K']}, type: {K.dtype}")
+        return sample
+
+    def get_E_F(self, sample):
+        """
+        # add essential and fundamental matrix based on K.
+        # *** must use the updated K!!!
+        """
+        relative_scene_pose = sample['relative_scene_poses'][1]
+        sample["E"], sample["F"] = self.E_F_from_Rt_np(
+            relative_scene_pose[:3, :3],
+            relative_scene_pose[:3, 3:4],
+            sample["K"],
+        )
+        return sample
+
+    def E_F_from_Rt_np(self, R, t, K):
+        """ Better use F instead of E """
+        t_gt_x = self.skew_symmetric_np(t)
+    #     print(t_gt_x, R_th)
+        E_gt = t_gt_x@R
+        if len(R.shape)==2:
+            F_gt = np.linalg.inv(K).T @ E_gt @ np.linalg.inv(K)
+        else:
+            F_gt = np.linalg.inv(K).transpose(1, 2) @ E_gt @ np.linalg.inv(K)
+        return E_gt, F_gt
+
+    def skew_symmetric_np(self, v): # v: [3, 1] or [batch_size, 3, 1]
+        if len(v.shape)==2:
+            zero = np.zeros_like(v[0, 0])
+            M = np.stack([
+                zero, -v[2, 0], v[1, 0],
+                v[2, 0], zero, -v[0, 0],
+                -v[1, 0], v[0, 0], zero,
+            ], axis=0)
+            return M.reshape(3, 3)
+        else:
+            zero = np.zeros_like(v[:, 0, 0])
+            M = np.stack([
+                zero, -v[:, 2, 0], v[:, 1, 0],
+                v[:, 2, 0], zero, -v[:, 0, 0],
+                -v[:, 1, 0], v[:, 0, 0], zero,
+            ], axis=1)
+            return M.reshape(-1, 3, 3)
+
+    def homo_np(self, x):
+        # input: x [N, D]
+        # output: x_homo [N, D+1]
+        N = x.shape[0]
+        x_homo = np.hstack((x, np.ones((N, 1), dtype=x.dtype)))
+        return x_homo
+
+    def get_virt_x1x2_np(self, im_shape, F_gt, K, pts1_virt_b, pts2_virt_b): ##  [RUI] TODO!!!!! Convert into seq loader!
+        ## s.t. SHOULD BE ALL ZEROS: losses = utils_F.compute_epi_residual(pts1_virt_ori, pts2_virt_ori, F_gts, loss_params['clamp_at'])
+        ## Reproject by minimizing distance to groundtruth epipolar lines
+        pts1_virt, pts2_virt = cv2.correctMatches(F_gt, np.expand_dims(pts2_virt_b, 0), np.expand_dims(pts1_virt_b, 0))
+        pts1_virt[np.isnan(pts1_virt)] = 0.
+        pts2_virt[np.isnan(pts2_virt)] = 0.
+
+        # nan1 = np.logical_and(
+        #         np.logical_not(np.isnan(pts1_virt[:,:,0])),
+        #         np.logical_not(np.isnan(pts1_virt[:,:,1])))
+        # nan2 = np.logical_and(
+        #         np.logical_not(np.isnan(pts2_virt[:,:,0])),
+        #         np.logical_not(np.isnan(pts2_virt[:,:,1])))
+        # _, midx = np.where(np.logical_and(nan1, nan2))
+        # good_pts = len(midx)
+        # while good_pts < num_pts_full:
+        #     midx = np.hstack((midx, midx[:(num_pts_full-good_pts)]))
+        #     good_pts = len(midx)
+        # midx = midx[:num_pts_full]
+        # pts1_virt = pts1_virt[:,midx]
+        # pts2_virt = pts2_virt[:,midx]
+
+        pts1_virt = self.homo_np(pts1_virt[0])
+        pts2_virt = self.homo_np(pts2_virt[0])
+        pts1_virt_normalized = (np.linalg.inv(K) @ pts1_virt.T).T
+        pts2_virt_normalized = (np.linalg.inv(K) @ pts1_virt.T).T
+        return pts1_virt_normalized, pts2_virt_normalized, pts1_virt, pts2_virt
+
+    def get_virt_x1x2_grid(self, im_shape):
+        step = 0.1
+        sz1 = im_shape
+        sz2 = im_shape
+        xx, yy = np.meshgrid(np.arange(0, 1 , step), np.arange(0, 1, step))
+        num_pts_full = len(xx.flatten())
+        pts1_virt_b = np.float32(np.vstack((sz1[1]*xx.flatten(),sz1[0]*yy.flatten())).T)
+        pts2_virt_b = np.float32(np.vstack((sz2[1]*xx.flatten(),sz2[0]*yy.flatten())).T)
+        return pts1_virt_b, pts2_virt_b
+
     def prepare(self, frame_id = '000000'):
         sequence_length = config["data"]["sequence_length"]
         delta_ij = config["data"]["delta_ij"]
@@ -112,15 +228,17 @@ class Dataset():
         frame_id = frame[1]
         frame_num = int(frame_id)
 
+        K = self._load_as_array(os.path.join(scene, "cam.npy")).astype(np.float32).reshape((3, 3))
+        poses = self._load_as_array(os.path.join(scene, "poses.npy"))
+        poses = poses.astype(np.float32).reshape(-1, 3, 4)
+
         sample = {
+            "K_ori": K,
             "scene": scene,
             "imgs": [],
             "ids": [],
             "relative_scene_poses": []
         }
-
-        poses = self._load_as_array(os.path.join(scene, "poses.npy"))
-        poses = poses.astype(np.float32).reshape(-1, 3, 4)
 
         for k in range(0, sequence_length):
             j = k * delta_ij + frame_num
@@ -143,6 +261,20 @@ class Dataset():
             zoom_xys.append(zoom_xy)
         zoom_xy = zoom_xys[-1] #### assume images are in the same size
 
+        sample = self.add_scaled_K(sample, zoom_xy=zoom_xy)
+        sample = self.get_E_F(sample)
+
+        pts1_virt_b, pts2_virt_b = self.get_virt_x1x2_grid(sizerHW)
+        sample["pts1_virt_normalized"], sample["pts2_virt_normalized"], sample["pts1_virt"], sample["pts2_virt"] = \
+        self.get_virt_x1x2_np(
+            config["data"]["image"]["size"],
+            sample["F"],
+            sample["K"],
+            pts1_virt_b,
+            pts2_virt_b,
+        )
+
+
         ids = sample["ids"]
 
         dump_ij_match_quality_file_name = os.path.join(sample["scene"], "ij_match_quality_{}-{}".format(ids[0], ids[1]))
@@ -161,9 +293,17 @@ class Dataset():
                 print("NOT Find {}".format(dump_ij_match_quality_file))
                 exit()
 
+        matches_all = match_qualitys[0][:, :4]
+        matches_all = self._scale_points(matches_all, zoom_xy, loop_length=4)
+        choice_all = self._crop_or_pad_choice(
+            matches_all.shape[0], 
+            2000, 
+            shuffle=True
+        )
+        matches_all = matches_all[choice_all]
+
         matches_good = match_qualitys[1][:, :4]
         matches_good = self._scale_points(matches_good, zoom_xy, loop_length=4)
-
         choice_good = self._crop_or_pad_choice(
             matches_good.shape[0],
             config["data"]["good_num"],
@@ -179,11 +319,12 @@ class Dataset():
         Rt_scene = sample["relative_scene_poses"][1]
         t_scene = Rt_scene[:3, 3:4]
 
-        sample = {
+        sample.update({
+            "matches_all": matches_all,
             "matches_good": matches_good,
             "matches_good_unique_nums": matches_good_unique_nums,
-            "t_scene": t_scene
-        }
+            "t_scene": t_scene,
+        })
 
         return sample
 
@@ -469,3 +610,51 @@ class DeepFNet():
         out_layers.append(out)
 
         return logits.squeeze(1), logits_layers, out, epi_res_layers, T1, T2, out_layers, pts1, pts2, weights_prod, residual_layers, weights_layers
+
+
+### Visualize ###
+def rot12_to_angle_error(R0, R1):
+    r, _ = cv2.Rodrigues(R0.dot(R1.T))
+    rotation_error_from_identity = np.linalg.norm(r) / np.pi * 180.
+    # another_way = np.rad2deg(np.arccos(np.clip((np.trace(R0 @ (R1.T)) - 1) / 2, -1., 1.)))
+    # print(rotation_error_from_identity, another_way)
+    return rotation_error_from_identity
+    # return another_way
+
+def dotproduct(v1, v2):
+    return sum((a*b) for a, b in zip(v1, v2))
+
+def length(v):
+    return math.sqrt(dotproduct(v, v)) + 1e-10
+
+def vector_angle(v1, v2):
+    """ v1, v2: [N, 1] or (N)
+        return: angles in degree: () """
+    dot_product = dotproduct(v1, v2) / (length(v1) * length(v2) + 1e-10)
+    return math.acos(np.clip(dot_product, -1., 1.)) / np.pi * 180.
+
+class Visualizer():
+    def __init__(self, if_SP=False):
+        self.if_SP = if_SP
+    
+    def show(self, sample):
+        imgs = sample["imgs"]                # [batch_size, H, W, 3]
+        Ks = sample["K"]         # [batch_size, 3, 3]
+        K_invs = sample["K_inv"] # [batch_size, 3, 3]
+        #scene_names = sample["scene_name"]
+        #frame_ids = sample["frame_ids"]
+        scene_poses = sample["relative_scene_poses"]  # list of sequence_length tensors, which with size [batch_size, 4, 4]; the first being identity, the rest are [[R; t], [0, 1]]
+        matches_all, matches_good = sample["matches_all"], sample["matches_good"]
+        delta_Rtijs_4_4 = scene_poses[1]  # [batch_size, 4, 4], asserting we have 2 frames where scene_poses[0] are all identities
+        E_gts, F_gts = sample["E"], sample["F"]
+        pts1_virt_normalizedK, pts2_virt_normalizedK = sample["pts1_virt_normalized"], sample["pts2_virt_normalized"]
+        pts1_virt_ori, pts2_virt_ori = sample["pts1_virt"], sample["pts2_virt"]
+
+        # Show angle info from dataset.
+        delta_Rtijs_4_4_cpu_np = delta_Rtijs_4_4
+        delta_Rtij_inv = np.linalg.inv(delta_Rtijs_4_4_cpu_np)
+        angle_R = rot12_to_angle_error(np.eye(3), delta_Rtij_inv[:3, :3])
+        angle_t = vector_angle(
+            np.array([[0.0], [0.0], [1.0]]), delta_Rtij_inv[:3, 3:4]
+        )
+        print("Between frames: The rotation angle (degree) %.4f, and translation angle (degree) %.4f" % (angle_R, angle_t))
