@@ -66,10 +66,17 @@ def recognize_from_image(net):
     t_scene_scale = sample["t_scene"]
     logits, logits_layers, F_est, epi_res_layers, T1, T2, out_layers, pts1, pts2, weights, residual_layers, weights_layers = \
     net.predict(pts_normalized_in, pts1, pts2, T1, T2, matches_good_unique_num, t_scene_scale)
+    outs = {
+        'weights': weights,
+        'F_est': F_est,
+        'T1': T1,
+        'T2': T2,
+        'out_layers': out_layers,
+    }
 
     # Visualize
     visalizer = Visualizer()
-    visalizer.show(sample)
+    visalizer.show(sample, outs)
 
     # Debug
     #print(sample.keys())
