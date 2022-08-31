@@ -62,27 +62,12 @@ def recognize_from_image(net):
     pts_normalized_in, pts1, pts2, T1, T2 = extractor.get_input(matches_use_ori, quality_use)
 
     # Predict
-    matches_good_unique_num = sample["matches_good_unique_nums"]
-    t_scene_scale = sample["t_scene"]
-    logits, logits_layers, F_est, epi_res_layers, T1, T2, out_layers, pts1, pts2, weights, residual_layers, weights_layers = \
-    net.predict(pts_normalized_in, pts1, pts2, T1, T2, matches_good_unique_num, t_scene_scale)
-    outs = {
-        'weights': weights,
-        'F_est': F_est,
-        'T1': T1,
-        'T2': T2,
-        'out_layers': out_layers,
-    }
+    _, _, F_est, _, T1, T2, out_layers, _, _, weights, _, _ = \
+    net.predict(pts_normalized_in, pts1, pts2, T1, T2, sample["matches_good_unique_nums"], sample["t_scene"])
 
     # Visualize
     visalizer = Visualizer()
-    visalizer.show(sample, outs)
-
-    # Debug
-    #print(sample.keys())
-    #print(logits[0, :10], logits.shape)
-    #print(F_est, F_est.shape)
-    #exit()
+    visalizer.show(sample, weights, F_est, T1, T2, out_layers)
     
 
 def main():
