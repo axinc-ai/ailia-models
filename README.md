@@ -57,6 +57,7 @@ The collection of pre-trained, state-of-the-art AI models.
 | [<img src="background_removal/background_matting_v2/output.png" width=128px>](background_removal/background_matting_v2/) | [background_matting_v2](/background_removal/background_matting_v2/) | [Real-Time High-Resolution Background Matting](https://github.com/PeterL1n/BackgroundMattingV2) | Pytorch | 1.2.9 and later |
 | [<img src="background_removal/cascade_psp/output.png" width=128px>](background_removal/cascade_psp/) | [cascade_psp](/background_removal/cascade_psp/) | [CascadePSP](https://github.com/hkchengrex/CascadePSP) | Pytorch | 1.2.9 and later |
 | [<img src="background_removal/rembg/output.png" width=128px>](background_removal/rembg/) | [rembg](/background_removal/rembg/) | [Rembg](https://github.com/danielgatis/rembg) | Pytorch | 1.2.4 and later |
+| [<img src="background_removal/dis_seg/output.jpg" width=128px>](background_removal/dis_seg/) | [dis_seg](/background_removal/dis_seg/) | [Highly Accurate Dichotomous Image Segmentation](https://github.com/xuebinqin/DIS) | Pytorch | 1.2.10 and later |
 
 ## Crowd counting
 
