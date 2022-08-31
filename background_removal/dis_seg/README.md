@@ -37,7 +37,7 @@ The default setting is to use the optimized model and weights, but you can also 
 
 ### Reference
 
-[DIS (github)](https://github.com/xuebinqin/DIS)
+[Highly Accurate Dichotomous Image Segmentation](https://github.com/xuebinqin/DIS)
 
 ### Framework
 PyTorch
