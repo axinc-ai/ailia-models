@@ -36,7 +36,9 @@ REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/dehamer/'
 IMAGE_PATH = 'canyon.png'
 SAVE_IMAGE_PATH = 'output.png'
 
-IMAGE_MAX_SIZE = 1152
+# IMAGE_MAX_SIZE = 768
+IMAGE_MAX_SIZE = 960
+# IMAGE_MAX_SIZE = 1152
 
 # ======================
 # Arguemnt Parser Config
@@ -54,11 +56,6 @@ args = update_parser(parser)
 
 
 # ======================
-# Secondaty Functions
-# ======================
-
-
-# ======================
 # Main functions
 # ======================
 
@@ -68,12 +65,12 @@ def preprocess(img):
     img = img[:, :, ::-1]  # BGR -> RGB
 
     scale = IMAGE_MAX_SIZE / max(im_h, im_w)
+    oh = im_h
+    ow = im_w
     if scale < 1:
         oh = int(im_h * scale + 0.5)
         ow = int(im_w * scale + 0.5)
         img = cv2.resize(img, (ow, oh), interpolation=cv2.INTER_LINEAR)
-    else:
-        scale = 1
 
     mean = np.array((0.64, 0.6, 0.58))
     std = np.array((0.14, 0.15, 0.152))
@@ -82,19 +79,19 @@ def preprocess(img):
     img = (img - mean) / std
 
     pad_img = np.zeros((IMAGE_MAX_SIZE, IMAGE_MAX_SIZE, 3))
-    pad_img[:im_h, :im_w, ...] = img
+    pad_img[:oh, :ow, ...] = img
     img = pad_img
 
     img = img.transpose((2, 0, 1))  # HWC -> CHW
     img = np.expand_dims(img, axis=0)
     img = img.astype(np.float32)
 
-    return img, scale
+    return img, (oh, ow)
 
 
 def predict(net, img):
     im_h, im_w = img.shape[:2]
-    img, _ = preprocess(img)
+    img, pp_hw = preprocess(img)
 
     # feedforward
     if not args.onnx:
@@ -107,7 +104,10 @@ def predict(net, img):
     # postprocess
     dehaze = dehaze[0].transpose((1, 2, 0))  # CHW -> HWC
     dehaze *= 255
-    dehaze = dehaze[:im_h, :im_w, ...]
+    dehaze = np.clip(dehaze, 0, 255)
+    dehaze = dehaze[:pp_hw[0], :pp_hw[1], ...]
+    if pp_hw[0] != im_h or pp_hw[1] != im_w:
+        dehaze = cv2.resize(dehaze, (im_w, im_h), interpolation=cv2.INTER_LINEAR)
     dehaze = dehaze[:, :, ::-1]  # RGB -> BGR
     dehaze = dehaze.astype(np.uint8)
 
@@ -204,7 +204,11 @@ def main():
 
     # initialize
     if not args.onnx:
-        net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
+        memory_mode = ailia.get_memory_mode(
+            reduce_constant=True, ignore_input_with_initializer=True,
+            reduce_interstage=False, reuse_interstage=True)
+        net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id, memory_mode=memory_mode)
+        # net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
     else:
         import onnxruntime
         net = onnxruntime.InferenceSession(WEIGHT_PATH)
