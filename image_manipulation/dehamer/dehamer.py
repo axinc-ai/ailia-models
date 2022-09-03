@@ -36,9 +36,7 @@ REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/dehamer/'
 IMAGE_PATH = 'canyon.png'
 SAVE_IMAGE_PATH = 'output.png'
 
-# IMAGE_MAX_SIZE = 768
 IMAGE_MAX_SIZE = 960
-# IMAGE_MAX_SIZE = 1152
 
 # ======================
 # Arguemnt Parser Config
@@ -46,6 +44,10 @@ IMAGE_MAX_SIZE = 960
 
 parser = get_base_parser(
     'Dehamer', IMAGE_PATH, SAVE_IMAGE_PATH
+)
+parser.add_argument(
+    '-m', '--model_type', default='outdoor', choices=('NH', 'dense', 'indoor', 'outdoor'),
+    help='model type'
 )
 parser.add_argument(
     '--onnx',
@@ -62,25 +64,36 @@ args = update_parser(parser)
 def preprocess(img):
     im_h, im_w, _ = img.shape
 
-    img = img[:, :, ::-1]  # BGR -> RGB
-
-    scale = IMAGE_MAX_SIZE / max(im_h, im_w)
-    oh = im_h
-    ow = im_w
-    if scale < 1:
-        oh = int(im_h * scale + 0.5)
-        ow = int(im_w * scale + 0.5)
-        img = cv2.resize(img, (ow, oh), interpolation=cv2.INTER_LINEAR)
+    img = _img = img[:, :, ::-1]  # BGR -> RGB
+    
+    simple_resize = False
+    pad_tile = False
+    
+    if simple_resize:
+        img = cv2.resize(img, (IMAGE_MAX_SIZE, IMAGE_MAX_SIZE), interpolation=cv2.INTER_LINEAR)
+        oh = ow = IMAGE_MAX_SIZE
+    else:
+        scale = IMAGE_MAX_SIZE / max(im_h, im_w)
+        oh = im_h
+        ow = im_w
+        if scale < 1:
+            oh = int(im_h * scale + 0.5)
+            ow = int(im_w * scale + 0.5)
+            img = cv2.resize(img, (ow, oh), interpolation=cv2.INTER_LINEAR)
+        
+        if pad_tile:
+            pad_img = np.tile(img, (int(np.ceil(IMAGE_MAX_SIZE / oh)), int(np.ceil(IMAGE_MAX_SIZE / ow)), 1))
+            img = pad_img[:IMAGE_MAX_SIZE, :IMAGE_MAX_SIZE, ...]
+        else:
+            pad_img = cv2.resize(_img, (IMAGE_MAX_SIZE, IMAGE_MAX_SIZE), interpolation=cv2.INTER_LINEAR)
+            pad_img[:oh, :ow, ...] = img
+            img = pad_img
 
     mean = np.array((0.64, 0.6, 0.58))
     std = np.array((0.14, 0.15, 0.152))
 
     img = img / 255
     img = (img - mean) / std
-
-    pad_img = np.zeros((IMAGE_MAX_SIZE, IMAGE_MAX_SIZE, 3))
-    pad_img[:oh, :ow, ...] = img
-    img = pad_img
 
     img = img.transpose((2, 0, 1))  # HWC -> CHW
     img = np.expand_dims(img, axis=0)
@@ -195,20 +208,22 @@ def recognize_from_video(net):
 def main():
     dic_model = {
         'NH': (WEIGHT_NH_PATH, MODEL_NH_PATH),
+        'dense': (WEIGHT_DENSE_PATH, MODEL_DENSE_PATH),
+        'indoor': (WEIGHT_INDOOR_PATH, MODEL_INDOOR_PATH),
         'outdoor': (WEIGHT_OUTDOOR_PATH, MODEL_OUTDOOR_PATH),
     }
-    WEIGHT_PATH, MODEL_PATH = dic_model['outdoor']
+    WEIGHT_PATH, MODEL_PATH = dic_model[args.model_type]
 
     # model files check and download
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
 
     # initialize
     if not args.onnx:
-        memory_mode = ailia.get_memory_mode(
-            reduce_constant=True, ignore_input_with_initializer=True,
-            reduce_interstage=False, reuse_interstage=True)
-        net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id, memory_mode=memory_mode)
-        # net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
+        # memory_mode = ailia.get_memory_mode(
+        # reduce_constant=True, ignore_input_with_initializer=True,
+        # reduce_interstage=False, reuse_interstage=True)
+        # net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id, memory_mode=memory_mode)
+        net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
     else:
         import onnxruntime
         net = onnxruntime.InferenceSession(WEIGHT_PATH)
