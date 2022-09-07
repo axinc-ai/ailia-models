@@ -1,15 +1,21 @@
 import cv2
 import numpy as np
 import imageio
-import torch
 
 
 def estimate_for_model(pts1, pts2, weights):
-    pts1 = torch.from_numpy(pts1).to(torch.float32)
-    pts2 = torch.from_numpy(pts2).to(torch.float32)
-    weights = torch.from_numpy(weights).to(torch.float32)
+    """Forward pass.
 
-    mask = torch.ones(3)
+    Args:
+        pts1 (tensor): points in first image
+        pts2 (tensor): points in second image
+        weights (tensor): estimated weights
+
+    Returns:
+        tensor: estimated fundamental matrix
+    """
+
+    mask = np.ones(3)
     mask[-1] = 0
 
     def normalize(pts, weights):
@@ -23,18 +29,21 @@ def estimate_for_model(pts1, pts2, weights):
             tensor: normalized points
         """
 
-        denom = weights.sum(1)
+        denom = weights.sum(axis=1)
 
-        center = torch.sum(pts * weights, 1) / denom
-        dist = pts - center.unsqueeze(1)
-        meandist = (
-            (weights * (dist[:, :, :2].pow(2).sum(2).sqrt().unsqueeze(2))).sum(1)
-            / denom
-        ).squeeze(1)
+        center = np.sum(pts * weights, 1) / denom
+        dist = pts - center[:, np.newaxis, :]
+        dist = dist[:, :, :2]
+        dist = np.power(dist, 2)
+        dist = np.sum(dist, axis=2)
+        dist = np.sqrt(dist)
+        dist = dist[:, :, np.newaxis]
+        meandist = (weights * dist).sum(axis=1) / denom
+        meandist = np.squeeze(meandist, 1)
 
         scale = 1.4142 / meandist
 
-        transform = torch.zeros((pts.size(0), 3, 3), device=pts.device)
+        transform = np.zeros((pts.shape[0], 3, 3))
 
         transform[:, 0, 0] = scale
         transform[:, 1, 1] = scale
@@ -42,7 +51,7 @@ def estimate_for_model(pts1, pts2, weights):
         transform[:, 0, 2] = -center[:, 0] * scale
         transform[:, 1, 2] = -center[:, 1] * scale
 
-        pts_out = torch.bmm(transform, pts.permute(0, 2, 1))
+        pts_out = transform @ pts.transpose(0, 2, 1)
 
         return pts_out, transform
 
@@ -58,50 +67,40 @@ def estimate_for_model(pts1, pts2, weights):
             tensor: estimated fundamental matrix
         """
 
-        weights = weights.squeeze(1).unsqueeze(2)
+        weights = np.squeeze(weights, 1)[:, :, np.newaxis]
 
         pts1n, transform1 = normalize(pts1, weights)
         pts2n, transform2 = normalize(pts2, weights)
 
-        p = torch.cat(
-            (pts1n[:, 0].unsqueeze(1) * pts2n, pts1n[:, 1].unsqueeze(1) * pts2n, pts2n),
-            1,
-        ).permute(0, 2, 1)
+        t1 = (pts1n[:, 0])[:, np.newaxis, :] * pts2n
+        t2 = (pts1n[:, 1])[:, np.newaxis, :] * pts2n
+        p = np.concatenate([t1, t2, pts2n], axis=1).transpose(0, 2, 1)
 
         X = p * weights
 
         out_batch = []
 
-        for batch in range(X.size(0)):
+        for batch in range(X.shape[0]):
             # solve homogeneous least squares problem
-            _, _, V = torch.svd(X[batch])
-            F = V[:, -1].view(3, 3)
+            _, _, V = np.linalg.svd(X[batch])
+            V = V.T
+            F = V[:, -1].reshape(3, 3)
 
             # model extractor
-            U, S, V = torch.svd(F)
-            F_projected = U.mm((S * mask).diag()).mm(V.t())
+            U, S, V = np.linalg.svd(F)
+            V = V.T
 
-            out_batch.append(F_projected.unsqueeze(0))
+            F_projected = U @ (np.diag(S * mask)) @ V.T
+            F_projected = F_projected[np.newaxis, :, :]
 
-        out = torch.cat(out_batch, 0)
-        out = transform1.permute(0, 2, 1).bmm(out).bmm(transform2)
+            out_batch.append(F_projected)
+
+        out = np.concatenate(out_batch, axis=0)
+        out = (transform1.transpose(0, 2, 1) @ out) @ transform2
 
         return out
 
-    """Forward pass.
-
-    Args:
-        pts1 (tensor): points in first image
-        pts2 (tensor): points in second image
-        weights (tensor): estimated weights
-
-    Returns:
-        tensor: estimated fundamental matrix
-    """
-
     out = weighted_svd(pts1, pts2, weights)
-
-    out = out.to('cpu').detach().numpy().copy()
 
     return out
 
@@ -173,14 +172,9 @@ def robust_symmetric_epipolar_distance(pts1, pts2, fundamental_mat, gamma=0.5):
     Returns:
         tensor: robust symmetric epipolar distance
     """
-    pts1 = torch.from_numpy(pts1).to(torch.float32)
-    pts2 = torch.from_numpy(pts2).to(torch.float32)
-    fundamental_mat = torch.from_numpy(fundamental_mat).to(torch.float32)
 
     sed = symmetric_epipolar_distance(pts1, pts2, fundamental_mat)
-    ret = torch.clamp(sed, max=gamma)
-
-    ret = ret.to('cpu').detach().numpy().copy()
+    ret = np.clip(sed, None, gamma)
     ret = ret[:, np.newaxis, :]
 
     return ret
@@ -198,13 +192,11 @@ def symmetric_epipolar_distance(pts1, pts2, fundamental_mat):
         tensor: symmetric epipolar distance
     """
 
-    line_1 = torch.bmm(pts1, fundamental_mat)
-    line_2 = torch.bmm(pts2, fundamental_mat.permute(0, 2, 1))
-
-    scalar_product = (pts2 * line_1).sum(2)
-
-    ret = scalar_product.abs() * (
-        1 / line_1[:, :, :2].norm(2, 2) + 1 / line_2[:, :, :2].norm(2, 2)
+    line_1 = pts1 @ fundamental_mat
+    line_2 = pts2 @ fundamental_mat.transpose(0, 2, 1)
+    scalar_product = np.sum(pts2 * line_1, axis=2)
+    ret = np.absolute(scalar_product) * (
+        1 / np.linalg.norm(line_1[:, :, :2], axis=2) + 1 / np.linalg.norm(line_2[:, :, :2], axis=2)
     )
 
     return ret
@@ -238,14 +230,6 @@ def crop_or_pad_choice(in_num_points, out_num_points, shuffle=False):
 def load_image(img_file, show_zoom_info=True):
     img_ori = imageio.imread(img_file)
     return img_ori, (1.0, 1.0), img_ori
-
-    #if [img_height, img_width] == [img_ori.shape[0], img_ori.shape[1]]:
-    #    return img_ori, (1.0, 1.0), img_ori
-    #else:
-    #    zoom_y = img_height / img_ori.shape[0]
-    #    zoom_x = img_width / img_ori.shape[1]
-    #    img = cv2.resize(img_ori, dsize=(img_height, img_width))
-    #    return img, (zoom_x, zoom_y), img_ori
 
 
 def get_sift_features(img_ori, zoom_xy):
