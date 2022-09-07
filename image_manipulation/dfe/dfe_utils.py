@@ -228,13 +228,13 @@ def crop_or_pad_choice(in_num_points, out_num_points, shuffle=False):
 
     
 def load_image(img_file, show_zoom_info=True):
-    img_ori = imageio.imread(img_file)
+    img_ori = cv2.imread(img_file)
     return img_ori, (1.0, 1.0), img_ori
 
 
 def get_sift_features(img_ori, zoom_xy):
     sift_num = 2000
-    sift = cv2.xfeatures2d.SIFT_create(nfeatures=sift_num, contrastThreshold=1e-5)
+    sift = cv2.SIFT_create(nfeatures=sift_num, contrastThreshold=1e-5)
     kp, des = sift.detectAndCompute(img_ori, None)
     x_all = np.array([p.pt for p in kp])
     x_all = (x_all * np.array([[zoom_xy[0], zoom_xy[1]]])).astype(np.float32)

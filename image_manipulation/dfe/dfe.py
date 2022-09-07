@@ -34,8 +34,8 @@ WEIGHT_ITER_PATH = 'WeightEstimatorNet_iter.onnx'
 MODEL_ITER_PATH = 'WeightEstimatorNet_iter.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/dfe/'
 
-IMAGE_A_PATH = 'img_A.jpg'
-IMAGE_B_PATH = 'img_B.jpg'
+IMAGE_A_PATH = 'img_A.png'
+IMAGE_B_PATH = 'img_B.png' # base
 SAVE_IMAGE_PATH = 'output.png'
 
 
@@ -44,10 +44,10 @@ SAVE_IMAGE_PATH = 'output.png'
 # ======================
 
 parser = get_base_parser(
-    'DFE', IMAGE_A_PATH, SAVE_IMAGE_PATH
+    'DFE', IMAGE_B_PATH, SAVE_IMAGE_PATH
 )
 parser.add_argument(
-    '-i2', '--input2', metavar='IMAGE2', default=IMAGE_B_PATH,
+    '-i2', '--input2', metavar='IMAGE2', default=IMAGE_A_PATH,
     help='Pair image path of input image.'
 )
 parser.add_argument(
@@ -70,7 +70,7 @@ def draw_epipolar(img1, img2, F, x1, x2):
     ptsCAM1 = ptsCAM1.astype(int)
     ptsCAM2 = ptsCAM2.astype(int)
 
-    F, mask = cv2.findFundamentalMat(ptsCAM1, ptsCAM2, cv2.FM_LMEDS)
+    #F, mask = cv2.findFundamentalMat(ptsCAM1, ptsCAM2, cv2.FM_LMEDS)
 
     # draw points
     for points in ptsCAM1:
@@ -161,7 +161,7 @@ def recognize_from_image():
     net_init = ailia.Net(MODEL_INIT_PATH, WEIGHT_INIT_PATH, env_id=env_id)
     net_iter = ailia.Net(MODEL_ITER_PATH, WEIGHT_ITER_PATH, env_id=env_id)
 
-    img_A, zoom_xy_A, img_ori_A = load_image(args.input2)
+    img_A, zoom_xy_A, img_ori_A = load_image(args.input2) # base image
     sift_kp_A, sift_des_A = get_sift_features(img_ori_A, zoom_xy_A)
 
     # input image loop
