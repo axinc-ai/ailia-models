@@ -85,7 +85,7 @@ parser.add_argument(
     help="unconditional guidance scale: eps = eps(x, empty) + scale * (eps(x, cond) - eps(x, empty))",
 )
 parser.add_argument(
-    "--seed", type=int, default=42,
+    "--seed", type=int, default=1111,
     help="random seed",
 )
 parser.add_argument(
@@ -174,7 +174,6 @@ def plms_sampling(
         unconditional_guidance_scale=1.0,
         unconditional_conditioning=None):
     img = np.random.randn(shape[0] * shape[1] * shape[2] * shape[3]).reshape(shape)
-    img = np.load("img.npy")  ###
     img = img.astype(np.float32)
 
     timesteps = ddim_timesteps
@@ -356,7 +355,7 @@ def p_sample_ddim(
     noise = sigma_t * np.random.randn(x.size).reshape(x.shape) * temperature
     x_prev = np.sqrt(a_prev) * pred_x0 + dir_xt + noise
 
-    return x_prev, pred_x0, e_t
+    return x_prev, pred_x0
 
 
 # ddpm
@@ -521,7 +520,6 @@ def main():
         memory_mode = ailia.get_memory_mode(
             reduce_constant=True, ignore_input_with_initializer=True,
             reduce_interstage=False, reuse_interstage=False)
-        memory_mode = None
         diffusion_emb = ailia.Net \
             (MODEL_DFSN_EMB_PATH, WEIGHT_DFSN_EMB_PATH, env_id=env_id, memory_mode=memory_mode)
         diffusion_mid = ailia.Net(
