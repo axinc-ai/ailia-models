@@ -85,7 +85,7 @@ parser.add_argument(
     help="unconditional guidance scale: eps = eps(x, empty) + scale * (eps(x, cond) - eps(x, empty))",
 )
 parser.add_argument(
-    "--seed", type=int, default=1111,
+    "--seed", type=int, default=1001,
     help="random seed",
 )
 parser.add_argument(
