@@ -44,7 +44,7 @@ Furthermore, increasing `--ddim_steps` generally also gives higher quality sampl
 
 ## Reference
 
-- [Latent Diffusion Models](https://github.com/CompVis/latent-diffusion)
+- [Stable Diffusion](https://github.com/CompVis/stable-diffusion)
 
 ## Framework
 
@@ -56,7 +56,7 @@ ONNX opset=12
 
 ## Netron
 
-[diffusion_emb.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/latent-diffusion-txt2img/diffusion_emb.onnx.prototxt)  
-[diffusion_mid.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/latent-diffusion-txt2img/diffusion_mid.onnx.prototxt)  
-[diffusion_out.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/latent-diffusion-txt2img/diffusion_out.onnx.prototxt)  
-[autoencoder.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/latent-diffusion-txt2img/autoencoder.onnx.prototxt)
+[diffusion_emb.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/stable-diffusion-txt2img/diffusion_emb.onnx.prototxt)  
+[diffusion_mid.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/stable-diffusion-txt2img/diffusion_mid.onnx.prototxt)  
+[diffusion_out.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/stable-diffusion-txt2img/diffusion_out.onnx.prototxt)  
+[autoencoder.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/stable-diffusion-txt2img/autoencoder.onnx.prototxt)
