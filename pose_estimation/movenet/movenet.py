@@ -85,7 +85,19 @@ def recognize_from_image():
             ort_inputs = { model.get_inputs()[0].name : input_image.astype(np.float32)}
             keypoint_with_scores = model.run(None,ort_inputs)[0]
         else:
-            keypoint_with_scores = model.run( input_image.astype(np.float32) )[0]
+            if args.benchmark:
+                logger.info('BENCHMARK mode')
+                total_time = 0
+                for i in range(args.benchmark_count):
+                    start = int(round(time.time() * 1000))
+                    keypoint_with_scores = model.run( input_image.astype(np.float32) )[0]
+                    end = int(round(time.time() * 1000))
+                    logger.info(f'\tailia processing detection time {end - start} ms')
+                    if i != 0:
+                        total_time = total_time + (end - start)
+                logger.info(f'\taverage detection time {total_time / (args.benchmark_count-1)} ms')
+            else:
+                keypoint_with_scores = model.run( input_image.astype(np.float32) )[0]
 
         # convert xy ratio for original image
         if image.shape[0] > image.shape[1]:
