@@ -174,7 +174,6 @@ def plms_sampling(
         unconditional_guidance_scale=1.0,
         unconditional_conditioning=None):
     img = np.random.randn(shape[0] * shape[1] * shape[2] * shape[3]).reshape(shape)
-    img = img.astype(np.float32)
 
     timesteps = ddim_timesteps
     time_range = np.flip(timesteps)
@@ -209,7 +208,6 @@ def plms_sampling(
             old_eps=old_eps, t_next=ts_next,
         )
         img, pred_x0, e_t = outs
-        img = img.astype(np.float32)
         old_eps.append(e_t)
         if len(old_eps) >= 4:
             old_eps.pop(0)
@@ -260,7 +258,6 @@ def p_sample_plms(
     if len(old_eps) == 0:
         # Pseudo Improved Euler (2nd order)
         x_prev, pred_x0 = get_x_prev_and_pred_x0(e_t, index)
-        x_prev = x_prev.astype(np.float32)
         e_t_next = get_model_output(x_prev, t_next)
         e_t_prime = (e_t + e_t_next) / 2
     elif len(old_eps) == 1:
@@ -285,7 +282,6 @@ def ddim_sampling(
         unconditional_guidance_scale=1.0,
         unconditional_conditioning=None):
     img = np.random.randn(shape[0] * shape[1] * shape[2] * shape[3]).reshape(shape)
-    img = img.astype(np.float32)
 
     timesteps = ddim_timesteps
     time_range = np.flip(timesteps)
@@ -315,7 +311,6 @@ def ddim_sampling(
             unconditional_guidance_scale=unconditional_guidance_scale,
             unconditional_conditioning=unconditional_conditioning,
         )
-        img = img.astype(np.float32)
 
     return img
 
@@ -364,6 +359,7 @@ def apply_model(models, x, t, cc):
     diffusion_mid = models["diffusion_mid"]
     diffusion_out = models["diffusion_out"]
 
+    x = x.astype(np.float16)
     if not args.onnx:
         output = diffusion_emb.predict([x, t, cc])
     else:
@@ -397,6 +393,7 @@ def apply_model(models, x, t, cc):
 def decode_first_stage(models, z):
     scale_factor = 0.18215
     z = z / scale_factor
+    z = z.astype(np.float32)
 
     autoencoder = models['autoencoder']
     if not args.onnx:
