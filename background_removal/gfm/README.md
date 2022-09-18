@@ -34,7 +34,7 @@ $ python3 gfm.py --video VIDEO_PATH
 ```
 
 You can specify the "model type" by specifying after the `--model_type` option.
-The model type is selected from "r34_2b_tt", "d121_tt".  
+The model type is selected from "r34_2b_tt", "d121_tt", "d121_rim".  
 ```bash
 $ python3 gfm.py --model_type r34_2b_tt
 ```

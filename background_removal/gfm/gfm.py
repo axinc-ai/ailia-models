@@ -27,12 +27,15 @@ WEIGHT_R342B_TT_PATH = 'gfm_r34_2b_tt.onnx'
 MODEL_R342B_TT_PATH = 'gfm_r34_2b_tt.onnx.prototxt'
 WEIGHT_D121_TT_PATH = 'gfm_d121_tt.onnx'
 MODEL_D121_TT_TT_PATH = 'gfm_d121_tt.onnx.prototxt'
+WEIGHT_D121_RIM_PATH = 'gfm_d121_rim.onnx'
+MODEL_D121_RIM_TT_PATH = 'gfm_d121_rim.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/gfm/'
 
 IMAGE_PATH = 'demo.jpg'
 SAVE_IMAGE_PATH = 'output.png'
 
 IMAGE_SIZE = 480
+IMAGE_RIM_SIZE = 960
 
 # ======================
 # Arguemnt Parser Config
@@ -42,7 +45,7 @@ parser = get_base_parser(
     'GFM', IMAGE_PATH, SAVE_IMAGE_PATH
 )
 parser.add_argument(
-    '-m', '--model_type', default='r34_2b_tt', choices=('r34_2b_tt', 'd121_tt'),
+    '-m', '--model_type', default='r34_2b_tt', choices=('r34_2b_tt', 'd121_tt', 'd121_rim'),
     help='model type'
 )
 args = update_parser(parser)
@@ -99,14 +102,16 @@ def resize_pad(img, ratio):
     resize_h = int(h * ratio)
     resize_w = int(w * ratio)
 
-    scale = IMAGE_SIZE / max(resize_h, resize_w)
+    image_size = IMAGE_RIM_SIZE if args.model_type.endswith('_rim') else IMAGE_SIZE
+
+    scale = image_size / max(resize_h, resize_w)
     if scale < 1:
         resize_w, resize_h = int(resize_w * scale), int(resize_h * scale)
 
     img = resize(img, (resize_h, resize_w)) * 255.0
 
-    if resize_w != IMAGE_SIZE or resize_h != IMAGE_SIZE:
-        pad_img = np.ones((IMAGE_SIZE, IMAGE_SIZE, 3)) * 255
+    if resize_w != image_size or resize_h != image_size:
+        pad_img = np.ones((image_size, image_size, 3)) * 255
         pad_img[:resize_h, :resize_w, ...] = img
         img = pad_img
 
@@ -132,12 +137,40 @@ def predict(net, img):
 
     simple_resize = False
     if simple_resize:
-        img = resize(img, (IMAGE_SIZE, IMAGE_SIZE)) * 255.0
-        img = preprocess(img)
+        if args.model_type.endswith('_rim'):
+            img = resize(img, (IMAGE_RIM_SIZE, IMAGE_RIM_SIZE)) * 255.0
+            img = preprocess(img)
+
+            # feedforward
+            output = net.predict([img])
+            _, _, pred_tt, _, _, pred_ft, _, _, pred_bt, pred_fusion = output
+
+            pred_tt = resize(pred_tt[0, 0, :, :], (h, w))
+            pred_ft = resize(pred_ft[0, 0, :, :], (h, w))
+            pred_bt = resize(pred_bt[0, 0, :, :], (h, w))
+            pred_fusion = resize(pred_fusion[0, 0, :, :], (h, w))
+
+            return pred_tt, pred_ft, pred_bt, pred_fusion
+        else:
+            img = resize(img, (IMAGE_SIZE, IMAGE_SIZE)) * 255.0
+            img = preprocess(img)
+
+            # feedforward
+            output = net.predict([img])
+            pred_glance, pred_focus, pred_fusion = post_processing(output)
+    elif args.model_type.endswith('_rim'):
+        scale_img, resize_hw = resize_pad(img, 1)
 
         # feedforward
-        output = net.predict([img])
-        pred_glance, pred_focus, pred_fusion = post_processing(output)
+        output = net.predict([scale_img])
+        _, _, pred_tt, _, _, pred_ft, _, _, pred_bt, pred_fusion = output
+
+        pred_tt = resize(pred_tt[0, 0, :, :][:resize_hw[0], :resize_hw[1]], (h, w))
+        pred_ft = resize(pred_ft[0, 0, :, :][:resize_hw[0], :resize_hw[1]], (h, w))
+        pred_bt = resize(pred_bt[0, 0, :, :][:resize_hw[0], :resize_hw[1]], (h, w))
+        pred_fusion = resize(pred_fusion[0, 0, :, :][:resize_hw[0], :resize_hw[1]], (h, w))
+
+        return pred_tt, pred_ft, pred_bt, pred_fusion
     else:
         # Combine 1/3 glance and 1/2 focus
         global_ratio = 1 / 3
@@ -251,6 +284,7 @@ def main():
     dic_model = {
         'r34_2b_tt': (WEIGHT_R342B_TT_PATH, MODEL_R342B_TT_PATH),
         'd121_tt': (WEIGHT_D121_TT_PATH, MODEL_D121_TT_TT_PATH),
+        'd121_rim': (WEIGHT_D121_RIM_PATH, MODEL_D121_RIM_TT_PATH),
     }
     WEIGHT_PATH, MODEL_PATH = dic_model[args.model_type]
 
