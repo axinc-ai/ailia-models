@@ -1,52 +1,61 @@
-# This file is part of OpenCV Zoo project.
-# It is subject to the license terms in the LICENSE file found in the same directory.
-#
-# Copyright (C) 2021, Shenzhen Institute of Artificial Intelligence and Robotics for Society, all rights reserved.
-# Third party copyrights are property of their respective owners.
-
+from unicodedata import category
 import cv2 
 import sys
-import argparse
 import numpy as np
 
-from qrcode_wechatqrcode_utils import WeChatQRCode
+import ailia
 
 # import original modules
 sys.path.append('../../util')
 from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
-from detector_utils import plot_results, load_image  # noqa: E402
+from detector_utils import plot_results, load_image, letterbox_convert, reverse_letterbox  # noqa: E402
 import webcamera_utils  # noqa: E402
 
 # logger
 from logging import getLogger   # noqa: E402
 logger = getLogger(__name__)
 
+# ======================
+# Parameters
+# ======================
+MODEL_PARAMS = {'detect_2021nov': {'input_shape': [384, 384], 'max_stride': 32, 'anchors':[
+                    [12,16, 19,36, 40,28], [36,75, 76,55, 72,146], [142,110, 192,243, 459,401]
+                    ]},
+                }
 
-WEIGHT_DETCT_PATH = 'detect.caffemodel'
-MODEL_DETECT_PATH = 'detect.prototxt'
-WEIGHT_SR_PATH = 'sr.caffemodel'
-MODEL_SR_PATH = 'sr.prototxt'
-REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/qrcode_wechatqrcode/'
+REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/yolov7/'
 
 IMAGE_PATH = 'input.jpg'
 SAVE_IMAGE_PATH = 'output.jpg'
 
-
-
-def str2bool(v):
-    if v.lower() in ['on', 'yes', 'true', 'y', 't']:
-        return True
-    elif v.lower() in ['off', 'no', 'false', 'n', 'f']:
-        return False
-    else:
-        raise NotImplementedError
-
 # ======================
 # Arguemnt Parser Config
 # ======================
-parser = get_base_parser('Yolov2 model', IMAGE_PATH, SAVE_IMAGE_PATH)
+parser = get_base_parser('QR detection model', IMAGE_PATH, SAVE_IMAGE_PATH)
+parser.add_argument(
+    '-m', '--model_name',
+    default='detect_2021nov',
+)
+parser.add_argument(
+    '-w', '--write_prediction',
+    action='store_true',
+    help='Flag to output the prediction file.'
+)
+# parser.add_argument(
+#     '--agnostic-nms', 
+#     action='store_true', help='class-agnostic NMS'
+# )
 args = update_parser(parser)
+
+MODEL_NAME = args.model_name
+WEIGHT_PATH = MODEL_NAME + ".caffemodel"
+MODEL_PATH = MODEL_NAME + ".prototxt"
+
+HEIGHT = MODEL_PARAMS[MODEL_NAME]['input_shape'][0]
+WIDTH = MODEL_PARAMS[MODEL_NAME]['input_shape'][1]
+STRIDE = MODEL_PARAMS[MODEL_NAME]['max_stride']
+ANCHORS = MODEL_PARAMS[MODEL_NAME]['anchors']
 
 def visualize(image, res, points, points_color=(0, 255, 0), text_color=(0, 255, 0), fps=None):
     output = image.copy()
@@ -72,50 +81,97 @@ def visualize(image, res, points, points_color=(0, 255, 0), text_color=(0, 255, 
 
     return output
 
+def preprocess(img):
+    img = letterbox_convert(img, (WIDTH, HEIGHT))
+    img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    cv2.imwrite('post-processed.png', img)
+    img = img / 255.0  # 0 - 255 to 0.0 - 1.0
+    return img
 
+def reverse_letterbox(detections, raw_img_shape, letter_img_shape):
+    rh = raw_img_shape[0]
+    rw = raw_img_shape[1]
+    lh = letter_img_shape[0]
+    lw = letter_img_shape[1]
+    
+    scale = np.min((lh / rh, lw / rw))
+    pad = (np.array(letter_img_shape[0:2]) - np.array(raw_img_shape[0:2]) * scale) // 2
 
-def recognize_from_image():
-    # net initialize
-    model = WeChatQRCode(MODEL_DETECT_PATH,
-        WEIGHT_DETCT_PATH,
-        MODEL_SR_PATH,
-        WEIGHT_SR_PATH)
+    new_detections = []
+    for d in detections:
+        r = ailia.DetectorObject(
+            category = d.category,
+            prob = d.prob,
+            x = (d.x - pad[1]) / scale,
+            y = (d.y - pad[0]) / scale,
+            w = d.w / scale,
+            h = d.h / scale,
+        )
+        new_detections.append(r)
+    return new_detections
 
+def recognize_from_image(net):
     # input image loop
     for image_path in args.input:
         # prepare input data
         logger.info(image_path)
-        img = load_image(image_path)
-        logger.debug(f'input image shape: {img.shape}')
+        raw_img = cv2.imread(image_path)
+        logger.debug(f'input image shape: {raw_img.shape}')
+
+        img = preprocess(raw_img)
 
         # inference
         logger.info('Start inference...')
         if args.benchmark:
             logger.info('BENCHMARK mode')
-            for i in range(5):
+            total_time = 0
+            for i in range(args.benchmark_count):
                 start = int(round(time.time() * 1000))
-                res, points = model.infer(img)
+                res = net.run(img[None, None, :, :])
                 end = int(round(time.time() * 1000))
+                if i != 0:
+                    total_time = total_time + (end - start)
                 logger.info(f'\tailia processing time {end - start} ms')
+            logger.info(f'\taverage time {total_time / (args.benchmark_count-1)} ms')
         else:
-            res, points = model.infer(img)
+            res = net.run(img[None, None, :, :])
+
+        detections = []
 
         # plot result
-        result = visualize(img, res, points)
+        out = res[0][0][0][0]
+        width = img.shape[1]
+        height = img.shape[0]
+
+        left = int(out[3] * width)
+        top = int(out[4] * height)
+        right = int(out[5] * width)
+        bottom = int(out[6] * height)
+        d = ailia.DetectorObject(
+            category=out[1],
+            prob=out[2],
+            x=left,
+            y=top,
+            w=right - left,
+            h=bottom - top,
+        )
+        detections.append(d)
+
+        detections = reverse_letterbox(detections, raw_img.shape, img.shape)
+
+        for d in detections:
+            cv2.rectangle(raw_img, (int(d.x), int(d.y)), (int(d.x + d.w), int(d.y + d.h)), (255, 0, 0))
+
+        cv2.imshow("QR", raw_img)
+        cv2.waitKey()
+
         savepath = get_savepath(args.savepath, image_path)
+        cv2.imwrite(savepath, raw_img)
         logger.info(f'saved at : {savepath}')
-        cv2.imwrite(savepath, result)
 
     logger.info('Script finished successfully.')
 
-
-def recognize_from_video():
-    # net initialize
-    model = WeChatQRCode(MODEL_DETECT_PATH,
-        WEIGHT_DETCT_PATH,
-        MODEL_SR_PATH,
-        WEIGHT_SR_PATH)
-
+def recognize_from_video(net):
     capture = webcamera_utils.get_capture(args.video)
 
     # create video writer if savepath is specified as video format
@@ -149,19 +205,16 @@ def recognize_from_video():
 
 def main():
     # model files check and download
+    # check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
 
-    #check_and_download_models(WEIGHT_DETCT_PATH, MODEL_DETECT_PATH, REMOTE_PATH)
-    #check_and_download_models(WEIGHT_SR_PATH, MODEL_SR_PATH, REMOTE_PATH)
+    env_id = args.env_id
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+    net.set_input_shape((1, 1, WIDTH, HEIGHT))
 
     if args.video is not None:
-        # video mode
-        recognize_from_video()
+        recognize_from_video(net)
     else:
-        # image mode
-        recognize_from_image()
-
+        recognize_from_image(net)
 
 if __name__ == '__main__':
     main()
-
-
