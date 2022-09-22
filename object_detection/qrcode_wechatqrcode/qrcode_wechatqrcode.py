@@ -2,14 +2,16 @@ from unicodedata import category
 import cv2 
 import sys
 import numpy as np
+import time
 
 import ailia
+
+from qrcode_wechatqrcode_utils import preprocess, postprocess, reverse_letterbox
 
 # import original modules
 sys.path.append('../../util')
 from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
-from detector_utils import plot_results, load_image, letterbox_convert, reverse_letterbox  # noqa: E402
 import webcamera_utils  # noqa: E402
 
 # logger
@@ -42,10 +44,6 @@ parser.add_argument(
     action='store_true',
     help='Flag to output the prediction file.'
 )
-# parser.add_argument(
-#     '--agnostic-nms', 
-#     action='store_true', help='class-agnostic NMS'
-# )
 args = update_parser(parser)
 
 MODEL_NAME = args.model_name
@@ -81,35 +79,6 @@ def visualize(image, res, points, points_color=(0, 255, 0), text_color=(0, 255, 
 
     return output
 
-def preprocess(img):
-    img = letterbox_convert(img, (WIDTH, HEIGHT))
-    img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    cv2.imwrite('post-processed.png', img)
-    img = img / 255.0  # 0 - 255 to 0.0 - 1.0
-    return img
-
-def reverse_letterbox(detections, raw_img_shape, letter_img_shape):
-    rh = raw_img_shape[0]
-    rw = raw_img_shape[1]
-    lh = letter_img_shape[0]
-    lw = letter_img_shape[1]
-    
-    scale = np.min((lh / rh, lw / rw))
-    pad = (np.array(letter_img_shape[0:2]) - np.array(raw_img_shape[0:2]) * scale) // 2
-
-    new_detections = []
-    for d in detections:
-        r = ailia.DetectorObject(
-            category = d.category,
-            prob = d.prob,
-            x = (d.x - pad[1]) / scale,
-            y = (d.y - pad[0]) / scale,
-            w = d.w / scale,
-            h = d.h / scale,
-        )
-        new_detections.append(r)
-    return new_detections
-
 def recognize_from_image(net):
     # input image loop
     for image_path in args.input:
@@ -118,10 +87,11 @@ def recognize_from_image(net):
         raw_img = cv2.imread(image_path)
         logger.debug(f'input image shape: {raw_img.shape}')
 
-        img = preprocess(raw_img)
+        img = preprocess(raw_img, (HEIGHT, WIDTH))
 
         # inference
         logger.info('Start inference...')
+        res = None
         if args.benchmark:
             logger.info('BENCHMARK mode')
             total_time = 0
@@ -136,27 +106,7 @@ def recognize_from_image(net):
         else:
             res = net.run(img[None, None, :, :])
 
-        detections = []
-
-        # plot result
-        out = res[0][0][0][0]
-        width = img.shape[1]
-        height = img.shape[0]
-
-        left = int(out[3] * width)
-        top = int(out[4] * height)
-        right = int(out[5] * width)
-        bottom = int(out[6] * height)
-        d = ailia.DetectorObject(
-            category=out[1],
-            prob=out[2],
-            x=left,
-            y=top,
-            w=right - left,
-            h=bottom - top,
-        )
-        detections.append(d)
-
+        detections = postprocess(img, res)
         detections = reverse_letterbox(detections, raw_img.shape, img.shape)
 
         for d in detections:
@@ -183,18 +133,24 @@ def recognize_from_video(net):
         writer = None
 
     while(True):
-        ret, frame = capture.read()
+        ret, raw_frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
 
-        res, points = model.infer(frame)
-        result = visualize(frame, res, points)
-        cv2.imshow('frame', result)
-        frame_shown = True
+        frame = preprocess(raw_frame, (HEIGHT, WIDTH))
+        
+        res = net.run(frame[None, None, :, :])
+        detections = postprocess(frame, res)
+        detections = reverse_letterbox(detections, raw_frame.shape, frame.shape)
+
+        for d in detections:
+            cv2.rectangle(raw_frame, (int(d.x), int(d.y)), (int(d.x + d.w), int(d.y + d.h)), (255, 0, 0))
+
+        cv2.imshow('frame', raw_frame)
 
         # save results
         if writer is not None:
-            writer.write(res_img)
+            writer.write(raw_frame)
 
     capture.release()
     cv2.destroyAllWindows()
