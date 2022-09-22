@@ -1,9 +1,11 @@
 import numpy as np
 import cv2
 import matplotlib.pyplot as plt
-import torch
-import torch.nn as nn
-import torchgeometry as tgm
+
+# for pytorch-superpoint
+from functional import grid_sample  # noqa
+from scipy.special import softmax
+
 
 CONFIG = {
     'detection_threshold': 0.015,
@@ -13,23 +15,26 @@ CONFIG = {
     }
 }
 
-class DepthToSpace(nn.Module):
+
+class DepthToSpaceNumpy():
     def __init__(self, block_size):
-        super(DepthToSpace, self).__init__()
         self.block_size = block_size
         self.block_size_sq = block_size*block_size
 
     def forward(self, input):
-        output = input.permute(0, 2, 3, 1)
-        (batch_size, d_height, d_width, d_depth) = output.size()
+        output = input.transpose((0, 2, 3, 1))
+        (batch_size, d_height, d_width, d_depth) = output.shape
         s_depth = int(d_depth / self.block_size_sq)
         s_width = int(d_width * self.block_size)
         s_height = int(d_height * self.block_size)
-        t_1 = output.reshape(batch_size, d_height, d_width, self.block_size_sq, s_depth)
-        spl = t_1.split(self.block_size, 3)
-        stack = [t_t.reshape(batch_size, d_height, s_width, s_depth) for t_t in spl]
-        output = torch.stack(stack,0).transpose(0,1).permute(0,2,1,3,4).reshape(batch_size, s_height, s_width, s_depth)
-        output = output.permute(0, 3, 1, 2)
+        t_1 = output.reshape([batch_size, d_height, d_width, self.block_size_sq, s_depth])
+        spl = np.split(t_1, self.block_size, 3)
+        stack = [t_t.reshape([batch_size, d_height, s_width, s_depth]) for t_t in spl]
+        output = np.stack(stack, axis=0)
+        output = np.swapaxes(output, 0, 1)
+        output = output.transpose((0,2,1,3,4))
+        output = output.reshape([batch_size, s_height, s_width, s_depth])
+        output = output.transpose((0, 3, 1, 2))
         return output
 
 def flattenDetection(semi, tensor=False):
@@ -53,29 +58,19 @@ def flattenDetection(semi, tensor=False):
     if len(semi.shape) == 4:
         batch = True
         batch_size = semi.shape[0]
-    # if tensor:
-    #     semi.exp_()
-    #     d = semi.sum(dim=1) + 0.00001
-    #     d = d.view(d.shape[0], 1, d.shape[1], d.shape[2])
-    #     semi = semi / d  # how to /(64,15,20)
-
-    #     nodust = semi[:, :-1, :, :]
-    #     heatmap = flatten64to1(nodust, tensor=tensor)
-    # else:
-    # Convert pytorch -> numpy.
-    # --- Process points.
-    # dense = nn.functional.softmax(semi, dim=0) # [65, Hc, Wc]
     if batch:
-        dense = nn.functional.softmax(semi, dim=1) # [batch, 65, Hc, Wc]
+        #dense = nn.functional.softmax(semi, dim=1) # [batch, 65, Hc, Wc]
+        dense = softmax(semi, axis=1)
         # Remove dustbin.
         nodust = dense[:, :-1, :, :]
     else:
-        dense = nn.functional.softmax(semi, dim=0) # [65, Hc, Wc]
+        #dense = nn.functional.softmax(semi, dim=0) # [65, Hc, Wc]
+        dense = softmax(semi, axis=0)
         nodust = dense[:-1, :, :].unsqueeze(0)
     # Reshape to get full resolution heatmap.
     # heatmap = flatten64to1(nodust, tensor=True) # [1, H, W]
-    depth2space = DepthToSpace(8)
-    heatmap = depth2space(nodust)
+    depth2space = DepthToSpaceNumpy(8)
+    heatmap = depth2space.forward(nodust)
     heatmap = heatmap.squeeze(0) if not batch else heatmap
     return heatmap
 
@@ -96,7 +91,6 @@ def getPtsFromHeatmap(heatmap):
     border_remove = 4  # Remove points this close to the border.
 
     heatmap = heatmap.squeeze()
-    # print("heatmap sq:", heatmap.shape)
     H, W = heatmap.shape[0], heatmap.shape[1]
     xs, ys = np.where(heatmap >= conf_thresh)  # Confidence threshold.
     sparsemap = (heatmap >= conf_thresh)
@@ -192,52 +186,43 @@ def soft_argmax_points(heatmap, pts, patch_size=5):
     pts = pts[0].transpose().copy()
     patches = extract_patch_from_points(heatmap, pts, patch_size=patch_size)
     patches = np.stack(patches)
-    patches_torch = torch.tensor(patches, dtype=torch.float32).unsqueeze(0)
+    patches = patches[np.newaxis, :, :, :]
 
     # norm patches
-    patches_torch = norm_patches(patches_torch)
+    patches = norm_patches(patches)
+    patches = do_log(patches)
+    dxdy = soft_argmax_2d(patches, normalized_coordinates=False)
 
-    patches_torch = do_log(patches_torch)
-    # patches_torch = do_log(patches_torch)
-    # print("one tims of log!")
-    # print("patches: ", patches_torch.shape)
-    # print("pts: ", pts.shape)
-
-    dxdy = soft_argmax_2d(patches_torch, normalized_coordinates=False)
-    # print("dxdy: ", dxdy.shape)
     points = pts
-    points[:,:2] = points[:,:2] + dxdy.numpy().squeeze() - patch_size//2
-    patches = patches_torch.numpy().squeeze()
+    points[:,:2] = points[:,:2] + dxdy.squeeze() - patch_size//2
     pts_subpixel = [points.transpose().copy()]
     return pts_subpixel.copy()
 
 def desc_to_sparseDesc(pts_nms_batch, out_desc):
-    # pts_nms_batch = [self.getPtsFromHeatmap(h) for h in heatmap_np]
     desc_sparse_batch = [sample_desc_from_points(out_desc, pts) for pts in pts_nms_batch]
     return desc_sparse_batch
 
 def sample_desc_from_points(coarse_desc, pts):
     cell = 8
 
-    coarse_desc = torch.from_numpy(coarse_desc)
-
-    # --- Process descriptor.
     H, W = coarse_desc.shape[2]*cell, coarse_desc.shape[3]*cell
     D = coarse_desc.shape[1]
     if pts.shape[1] == 0:
         desc = np.zeros((D, 0))
     else:
         # Interpolate into descriptor map using 2D point locations.
-        samp_pts = torch.from_numpy(pts[:2, :].copy())
+        samp_pts = pts[:2, :].copy()
         samp_pts[0, :] = (samp_pts[0, :] / (float(W) / 2.)) - 1.
         samp_pts[1, :] = (samp_pts[1, :] / (float(H) / 2.)) - 1.
-        samp_pts = samp_pts.transpose(0, 1).contiguous()
-        samp_pts = samp_pts.view(1, 1, -1, 2)
-        samp_pts = samp_pts.float()
-        #samp_pts = samp_pts.to(self.device)
-        #samp_pts = torch.from_numpy(samp_pts)
-        desc = torch.nn.functional.grid_sample(coarse_desc, samp_pts, align_corners=True)
-        desc = desc.data.cpu().numpy().reshape(D, -1)
+        samp_pts = np.swapaxes(samp_pts, 0, 1)
+        samp_pts = np.ascontiguousarray(samp_pts)
+        samp_pts = samp_pts.reshape([1, 1, -1, 2])
+        samp_pts = samp_pts.astype(np.float32)
+
+        #desc = torch.nn.functional.grid_sample(coarse_desc, samp_pts, align_corners=True)
+        desc = grid_sample(coarse_desc, samp_pts, align_corners=True)
+
+        desc = desc.reshape(D, -1)
         desc /= np.linalg.norm(desc, axis=0)[np.newaxis, :]
     return desc
 
@@ -245,21 +230,6 @@ def sample_desc_from_points(coarse_desc, pts):
 """
 From: pytorch-superpoint/evaluation.py
 """
-def warpLabels(pnts, homography, H, W):
-    import torch
-    """
-    input:
-        pnts: numpy
-        homography: numpy
-    output:
-        warped_pnts: numpy
-    """
-    pnts = torch.tensor(pnts).long()
-    homography = torch.tensor(homography, dtype=torch.float32)
-    warped_pnts = warp_points(torch.stack((pnts[:, 0], pnts[:, 1]), dim=1),
-                                homography)  # check the (x, y)
-    warped_pnts = filter_points(warped_pnts, torch.tensor([W, H])).round().long()
-    return warped_pnts.numpy()
 
 def getInliers(matches, H, epi=3, verbose=False):
     """
@@ -280,27 +250,6 @@ def getInliers(matches, H, epi=3, verbose=False):
                             ", percentage: ", inliers.sum() / inliers.shape[0])
 
     return inliers
-
-def getInliers_cv(matches, H=None, epi=3, verbose=False):
-    import cv2
-    # count inliers: use opencv homography estimation
-    # Estimate the homography between the matches using RANSAC
-    H, inliers = cv2.findHomography(matches[:, [0, 1]],
-                                    matches[:, [2, 3]],
-                                    cv2.RANSAC)
-    inliers = inliers.flatten()
-    print("Total matches: ", inliers.shape[0], 
-            ", inliers: ", inliers.sum(),
-            ", percentage: ", inliers.sum() / inliers.shape[0])
-    return inliers
-
-def computeAP(m_test, m_score):
-    from sklearn.metrics import average_precision_score
-
-    average_precision = average_precision_score(m_test, m_score)
-    print('Average precision-recall score: {0:0.2f}'.format(
-        average_precision))
-    return average_precision
 
 def flipArr(arr):
     return arr.max() - arr
@@ -509,8 +458,6 @@ def extract_patch_from_points(heatmap, points, patch_size=5):
     this function works in numpy
     """
     # numpy
-    if type(heatmap) is torch.Tensor:
-        heatmap = toNumpy(heatmap)
     heatmap = heatmap.squeeze()  # [H, W]
     # padding
     pad_size = int(patch_size/2)
@@ -518,11 +465,8 @@ def extract_patch_from_points(heatmap, points, patch_size=5):
     # crop it
     patches = []
     ext = lambda img, pnt, wid: img[pnt[1]:pnt[1]+wid, pnt[0]:pnt[0]+wid]
-    #print("heatmap: ", heatmap.shape)
     for i in range(points.shape[0]):
-        # print("point: ", points[i,:])
         patch = ext(heatmap, points[i,:].astype(int), patch_size)
-        # print("patch: ", patch.shape)
         patches.append(patch)
         
         # if i > 10: break
@@ -537,77 +481,67 @@ def soft_argmax_2d(patches, normalized_coordinates=True):
         coor: (B, N, 2)  (x, y)
 
     """
-    m = tgm.contrib.SpatialSoftArgmax2d(normalized_coordinates=normalized_coordinates)
-    coords = m(patches)  # 1x4x2
+    m = SpatialSoftArgmax2dNumpy(normalized_coordinates=normalized_coordinates)
+    coords = m.forward(patches)  # 1x4x2
+
     return coords
 
 def norm_patches(patches):
     patch_size = patches.shape[-1]
-    patches = patches.view(-1, 1, patch_size*patch_size)
-    d = torch.sum(patches, dim=-1).unsqueeze(-1) + 1e-6
+    patches = patches.reshape([-1, 1, patch_size*patch_size])
+    d = np.sum(patches, axis=-1)[:, :, np.newaxis] + 1e-6
     patches = patches/d
-    patches = patches.view(-1, 1, patch_size, patch_size)
-    # print("patches: ", patches.shape)
+    patches = patches.reshape([-1, 1, patch_size, patch_size])
     return patches
 
 def do_log(patches):
     patches[patches<0] = 1e-6
-    patches_log = torch.log(patches)
+    patches_log = np.log(patches)
     return patches_log
 
 
 """
-From: pytorch-superpoint/utils/var_dim.py
+From: 
+    torchgeometry.contrib.spatial_soft_argmax2d
+    https://kornia.readthedocs.io/en/v0.1.2/_modules/torchgeometry/contrib/spatial_soft_argmax2d.html
 """
 
-def squeezeToNumpy(tensor_arr):
-    return tensor_arr.detach().cpu().numpy().squeeze()
+from typing import Optional
 
+class SpatialSoftArgmax2dNumpy():
+    def __init__(self, normalized_coordinates: Optional[bool] = True) -> None:
+        self.normalized_coordinates: Optional[bool] = normalized_coordinates
+        self.eps: float = 1e-6
 
-"""
-From: pytorch-superpoint/utils/utils.py
-"""
+    def create_meshgrid(self, x, normalized_coordinates: Optional[bool]):
+        _, _, height, width = x.shape
+        if normalized_coordinates:
+            xs = np.linspace(-1.0, 1.0, width)
+            ys = np.linspace(-1.0, 1.0, height)
+        else:
+            xs = np.linspace(0, width - 1, width)
+            ys = np.linspace(0, height - 1, height)
+        output = np.meshgrid(xs, ys)
+        output = (output[1], output[0])
+        return output  # pos_y, pos_x
 
-def warp_points(points, homographies, device='cpu'):
-    """
-    Warp a list of points with the given homography.
+    def forward(self, input):
+        batch_size, channels, height, width = input.shape
+        x = input.reshape([batch_size, channels, -1])
 
-    Arguments:
-        points: list of N points, shape (N, 2(x, y))).
-        homography: batched or not (shapes (B, 3, 3) and (...) respectively).
+        # compute softmax with max substraction trick
+        x_max = np.max(x, axis=-1, keepdims=True)
+        exp_x = np.exp(x - x_max)
+        exp_x_sum = 1.0 / (exp_x.sum(axis=-1, keepdims=True) + self.eps)
 
-    Returns: a Tensor of shape (N, 2) or (B, N, 2(x, y)) (depending on whether the homography
-            is batched) containing the new coordinates of the warped points.
+        # create coordinates grid
+        pos_y, pos_x = self.create_meshgrid(input, self.normalized_coordinates)
+        pos_x = pos_x.reshape(-1)
+        pos_y = pos_y.reshape(-1)
 
-    """
-    # expand points len to (x, y, 1)
-    no_batches = len(homographies.shape) == 2
-    homographies = homographies.unsqueeze(0) if no_batches else homographies
-    # homographies = homographies.unsqueeze(0) if len(homographies.shape) == 2 else homographies
-    batch_size = homographies.shape[0]
-    points = torch.cat((points.float(), torch.ones((points.shape[0], 1)).to(device)), dim=1)
-    points = points.to(device)
-    homographies = homographies.view(batch_size*3,3)
-    # warped_points = homographies*points
-    # points = points.double()
-    warped_points = homographies@points.transpose(0,1)
-    # warped_points = np.tensordot(homographies, points.transpose(), axes=([2], [0]))
-    # normalize the points
-    warped_points = warped_points.view([batch_size, 3, -1])
-    warped_points = warped_points.transpose(2, 1)
-    warped_points = warped_points[:, :, :2] / warped_points[:, :, 2:]
-    return warped_points[0,:,:] if no_batches else warped_points
-
-def filter_points(points, shape, return_mask=False):
-    ### check!
-    points = points.float()
-    shape = shape.float()
-    mask = (points >= 0) * (points <= shape-1)
-    mask = (torch.prod(mask, dim=-1) == 1)
-    if return_mask:
-        return points[mask], mask
-    return points [mask]
-    # return points [torch.prod(mask, dim=-1) == 1]
-
-def toNumpy(tensor):
-    return tensor.detach().cpu().numpy()
+        # compute the expected coordinates
+        expected_y = np.sum((pos_y * exp_x) * exp_x_sum, axis=-1, keepdims=True)
+        expected_x = np.sum((pos_x * exp_x) * exp_x_sum, axis=-1, keepdims=True)
+        output = np.concatenate([expected_x, expected_y], axis=-1)
+        output = output.reshape([batch_size, channels, 2])
+        return output

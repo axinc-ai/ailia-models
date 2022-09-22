@@ -55,9 +55,6 @@ args = update_parser(parser)
 # Main functions
 # ======================
 
-import torch
-import torch.nn as nn
-
 def preprocess(image):
     sizer = np.array([240, 320])
     s = max(sizer /image.shape[:2])
@@ -76,9 +73,7 @@ def predict(net, img_A, img_B):
     def run(net, img):
         out = net.run(img)
         out_semi, out_desc = out[0], out[1]
-        out_semi = torch.from_numpy(out_semi)
         heatmap = flattenDetection(out_semi, tensor=True) 
-        heatmap = heatmap.to('cpu').detach().numpy().copy()
         return heatmap, out_desc
     
     pred = {}
