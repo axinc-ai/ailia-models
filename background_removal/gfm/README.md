@@ -54,5 +54,5 @@ ONNX opset=11
 ## Netron
 
 [gfm_d121_tt.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/gfm/gfm_d121_tt.onnx.prototxt)  
-[gfm_d121_rim.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/fgm/gfm_d121_rim.onnx.prototxt)  
-[gfm_r34_2b_tt.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/fgm/gfm_r34_2b_tt.onnx.prototxt)  
+[gfm_d121_rim.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/gfm/gfm_d121_rim.onnx.prototxt)  
+[gfm_r34_2b_tt.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/gfm/gfm_r34_2b_tt.onnx.prototxt)  
