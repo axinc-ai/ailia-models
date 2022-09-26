@@ -17,6 +17,12 @@ Ailia input shape: (1, 3, 896, 1280)
 Automatically downloads the onnx and prototxt files on the first run. It is necessary to be connected to the Internet
 while downloading.
 
+Setup environments.
+
+```
+$ pip3 install -r requirements.txt
+```
+
 For the sample image,
 
 ``` bash

@@ -39,16 +39,16 @@ def preprocess(img: cv2.Mat, det_shape: tuple) -> cv2.Mat:
     img = img / 255.0  # 0 - 255 to 0.0 - 1.0
     return img
 
-def postprocess(img: cv2.Mat, res: np.ndarray) -> List[ailia.DetectorObject]:
+def postprocess(img: cv2.Mat, raw_image_shape: tuple, res: np.ndarray) -> List[ailia.DetectorObject]:
     detections = []
     for out in res[0][0][0]:
         width = img.shape[1]
         height = img.shape[0]
 
-        left = int(out[3] * width)
-        top = int(out[4] * height)
-        right = int(out[5] * width)
-        bottom = int(out[6] * height)
+        left = out[3] * width
+        top = out[4] * height
+        right = out[5] * width
+        bottom = out[6] * height
         d = ailia.DetectorObject(
             category=out[1],
             prob=out[2],
@@ -59,7 +59,7 @@ def postprocess(img: cv2.Mat, res: np.ndarray) -> List[ailia.DetectorObject]:
         )
         detections.append(d)
 
-    return nms(detections, 0.4)
+    return reverse_letterbox(nms(detections, 0.2), raw_image_shape, img.shape)
 
 def reverse_letterbox(detections: List[ailia.DetectorObject], raw_img_shape: tuple, letter_img_shape: tuple) -> List[ailia.DetectorObject]:
     rh = raw_img_shape[0]
@@ -75,10 +75,10 @@ def reverse_letterbox(detections: List[ailia.DetectorObject], raw_img_shape: tup
         r = ailia.DetectorObject(
             category = d.category,
             prob = d.prob,
-            x = (d.x - pad[1]) / scale,
-            y = (d.y - pad[0]) / scale,
-            w = d.w / scale,
-            h = d.h / scale,
+            x = int((d.x - pad[1]) / scale),
+            y = int((d.y - pad[0]) / scale),
+            w = int(d.w / scale),
+            h = int(d.h / scale),
         )
         new_detections.append(r)
     return new_detections

@@ -1,8 +1,11 @@
+from base64 import decode
 from unicodedata import category
+from unittest import result
 import cv2 
 import sys
 import numpy as np
 import time
+import pyzbar.pyzbar as zbar
 
 import ailia
 
@@ -55,29 +58,25 @@ WIDTH = MODEL_PARAMS[MODEL_NAME]['input_shape'][1]
 STRIDE = MODEL_PARAMS[MODEL_NAME]['max_stride']
 ANCHORS = MODEL_PARAMS[MODEL_NAME]['anchors']
 
-def visualize(image, res, points, points_color=(0, 255, 0), text_color=(0, 255, 0), fps=None):
-    output = image.copy()
-    h, w, _ = output.shape
+def visualize(raw_img, detections):
+    result_img = raw_img.copy()
 
-    if fps is not None:
-        cv2.putText(output, 'FPS: {:.2f}'.format(fps), (0, 15), cv2.FONT_HERSHEY_SIMPLEX, 0.5, text_color)
+    for d in detections:
+        EXTRA_OFFSET = 10
+        left = max(d.x - EXTRA_OFFSET, 0)
+        top = max(d.y - EXTRA_OFFSET, 0)
+        right = min(d.x + d.w + EXTRA_OFFSET, raw_img.shape[1])
+        bottom = min(d.y + d.h + EXTRA_OFFSET, raw_img.shape[0])
+        cropped = raw_img[top:bottom, left:right, :]
 
-    fontScale = 0.5
-    fontSize = 1
-    for r, p in zip(res, points):
-        p = p.astype(np.int32)
-        for _p in p:
-            cv2.circle(output, _p, 10, points_color, -1)
+        decoded = zbar.decode(cropped)
+        if len(decoded) > 0:
+            text = decoded[0].data.decode()
+            cv2.putText(result_img, text, (d.x, d.y + d.h), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), thickness=2)
 
-        qrcode_center_x = int((p[0][0] + p[2][0]) / 2)
-        qrcode_center_y = int((p[0][1] + p[2][1]) / 2)
+        cv2.rectangle(result_img, (d.x, d.y), (d.x + d.w, d.y + d.h), (255, 0, 0))
 
-        text_size, baseline = cv2.getTextSize(r, cv2.FONT_HERSHEY_DUPLEX, fontScale, fontSize)
-        text_x = qrcode_center_x - int(text_size[0] / 2)
-        text_y = qrcode_center_y - int(text_size[1] / 2)
-        cv2.putText(output, '{}'.format(r), (text_x, text_y), cv2.FONT_HERSHEY_DUPLEX, fontScale, text_color, fontSize)
-
-    return output
+    return result_img
 
 def recognize_from_image(net):
     # input image loop
@@ -106,17 +105,14 @@ def recognize_from_image(net):
         else:
             res = net.run(img[None, None, :, :])
 
-        detections = postprocess(img, res)
-        detections = reverse_letterbox(detections, raw_img.shape, img.shape)
+        detections = postprocess(img, raw_img.shape, res)
+        result_img = visualize(raw_img, detections)
 
-        for d in detections:
-            cv2.rectangle(raw_img, (int(d.x), int(d.y)), (int(d.x + d.w), int(d.y + d.h)), (255, 0, 0))
-
-        cv2.imshow("QR", raw_img)
+        cv2.imshow("QR", result_img)
         cv2.waitKey()
 
         savepath = get_savepath(args.savepath, image_path)
-        cv2.imwrite(savepath, raw_img)
+        cv2.imwrite(savepath, result_img)
         logger.info(f'saved at : {savepath}')
 
     logger.info('Script finished successfully.')
@@ -140,17 +136,14 @@ def recognize_from_video(net):
         frame = preprocess(raw_frame, (HEIGHT, WIDTH))
         
         res = net.run(frame[None, None, :, :])
-        detections = postprocess(frame, res)
-        detections = reverse_letterbox(detections, raw_frame.shape, frame.shape)
+        detections = postprocess(frame, raw_frame.shape, res)
+        result_frame = visualize(raw_frame, detections)
 
-        for d in detections:
-            cv2.rectangle(raw_frame, (int(d.x), int(d.y)), (int(d.x + d.w), int(d.y + d.h)), (255, 0, 0))
-
-        cv2.imshow('frame', raw_frame)
+        cv2.imshow('frame', result_frame)
 
         # save results
         if writer is not None:
-            writer.write(raw_frame)
+            writer.write(result_frame)
 
     capture.release()
     cv2.destroyAllWindows()
