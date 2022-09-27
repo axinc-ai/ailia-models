@@ -13,9 +13,12 @@ from utils import get_base_parser, update_parser, get_savepath  # noqa
 from model_utils import check_and_download_models  # noqa
 from image_utils import normalize_image  # noqa
 from detector_utils import load_image  # noqa
+from math_utils import softmax
 from webcamera_utils import get_capture, get_writer  # noqa
 # logger
 from logging import getLogger  # noqa
+
+from tokenizer import Tokenize, SimpleTokenizer
 
 logger = getLogger(__name__)
 
@@ -36,6 +39,8 @@ CLASSES = (
 IMAGE_PATH = 'voc.jpg'
 SAVE_IMAGE_PATH = 'output.png'
 
+MAX_SEQ_LEN = 77
+
 # ======================
 # Arguemnt Parser Config
 # ======================
@@ -49,6 +54,19 @@ args = update_parser(parser)
 # ======================
 # Secondaty Functions
 # ======================
+
+def build_class_tokens(text_transform, classnames):
+    tokens = []
+    templates = ['a photo of a {}.']
+    for classname in classnames:
+        # format with class
+        tokens.append(np.stack([text_transform(template.format(classname)) for template in templates]))
+
+    # [N, T, L], N: number of instance, T: number of captions (including ensembled), L: sequence length
+    tokens = np.stack(tokens)
+
+    return tokens
+
 
 def seg2coord(seg_map):
     """
@@ -155,7 +173,48 @@ def preprocess(img):
     return img
 
 
-def predict(net, img):
+def post_processing(text_embedding, attn_map, grouped_img_tokens, img_avg_feat):
+    # [H, W, G]
+    onehot_attn_map = np.eye(attn_map.shape[-1])[np.argmax(attn_map, axis=-1)]
+
+    num_fg_classes = text_embedding.shape[0]
+    class_offset = 1
+    text_tokens = text_embedding
+    num_classes = num_fg_classes + 1
+
+    logit_scale = 4.2057
+    logit_scale = np.clip(np.exp(logit_scale), None, 100)
+    # [G, N]
+    group_affinity_mat = (grouped_img_tokens @ text_tokens.T) * logit_scale
+    pre_group_affinity_mat = softmax(group_affinity_mat, axis=-1)
+
+    avg_affinity_mat = (img_avg_feat @ text_tokens.T) * logit_scale
+    avg_affinity_mat = softmax(avg_affinity_mat, axis=-1)
+
+    k = min(5, num_fg_classes)
+    indices = np.argsort(-avg_affinity_mat, axis=-1)[..., :k]
+    affinity_mask = np.sum(np.eye(avg_affinity_mat.shape[-1])[indices[0]], axis=0, keepdims=True)
+    affinity_mask = ~affinity_mask.astype(bool)
+    affinity_mask = np.repeat(affinity_mask, group_affinity_mat.shape[0], axis=0)
+    group_affinity_mat[affinity_mask] = float('-inf')
+    group_affinity_mat = softmax(group_affinity_mat, axis=-1)
+
+    # TODO: check if necessary
+    group_affinity_mat *= pre_group_affinity_mat
+
+    pred_logits = np.zeros((num_classes,) + attn_map.shape[:2])
+
+    pred_logits[class_offset:] = (onehot_attn_map @ group_affinity_mat).transpose(2, 0, 1)
+    bg_thresh = 0.95
+    bg_thresh = min(bg_thresh, np.max(group_affinity_mat))
+    pred_logits[0, (onehot_attn_map @ group_affinity_mat).max(axis=-1) < bg_thresh] = 1
+
+    seg_logit = np.expand_dims(pred_logits, axis=0)
+
+    return seg_logit
+
+
+def predict(net, img, text_embedding):
     h, w, _ = img.shape
 
     img = img[:, :, ::-1]  # BGR -> RGB
@@ -163,14 +222,17 @@ def predict(net, img):
 
     # feedforward
     output = net.predict([img])
-    seg_logit = output[0]
+    # seg_logit = output[0]
+    attn_map, grouped_img_tokens, img_avg_feat = output
+
+    seg_logit = post_processing(text_embedding, attn_map, grouped_img_tokens, img_avg_feat)
 
     seg_pred = np.argmax(seg_logit, axis=1)
 
     return seg_pred[0]
 
 
-def recognize_from_image(net):
+def recognize_from_image(net, text_embedding):
     # input image loop
     for image_path in args.input:
         logger.info(image_path)
@@ -186,7 +248,7 @@ def recognize_from_image(net):
             total_time_estimation = 0
             for i in range(args.benchmark_count):
                 start = int(round(time.time() * 1000))
-                pred = predict(net, img)
+                pred = predict(net, img, text_embedding)
                 end = int(round(time.time() * 1000))
                 estimation_time = (end - start)
 
@@ -197,7 +259,7 @@ def recognize_from_image(net):
 
             logger.info(f'\taverage time estimation {total_time_estimation / (args.benchmark_count - 1)} ms')
         else:
-            pred = predict(net, img)
+            pred = predict(net, img, text_embedding)
 
         res_img = show_result(img, pred)
 
@@ -209,7 +271,7 @@ def recognize_from_image(net):
     logger.info('Script finished successfully.')
 
 
-def recognize_from_video(net):
+def recognize_from_video(net, text_embedding):
     video_file = args.video if args.video else args.input[0]
     capture = get_capture(video_file)
     assert capture.isOpened(), 'Cannot capture source'
@@ -232,7 +294,7 @@ def recognize_from_video(net):
 
         # inference
         img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        out = predict(net, img)
+        out = predict(net, img, text_embedding)
         pred = out[2]
 
         # plot result
@@ -262,12 +324,19 @@ def main():
     env_id = args.env_id
 
     # initialize
-    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+    text_enc = ailia.Net("multi_label_contrastive.onnx.prototxt", "multi_label_contrastive.onnx", env_id=env_id)
+
+    # text_embedding
+    transform = Tokenize(SimpleTokenizer(), max_seq_len=MAX_SEQ_LEN)
+    text_tokens = build_class_tokens(transform, CLASSES[1:])
+    output = text_enc.predict([text_tokens])
+    text_embedding = output[0]
 
     if args.video is not None:
-        recognize_from_video(net)
+        recognize_from_video(net, text_embedding)
     else:
-        recognize_from_image(net)
+        recognize_from_image(net, text_embedding)
 
 
 if __name__ == '__main__':
