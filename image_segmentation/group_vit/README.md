@@ -31,6 +31,18 @@ If you pass `0` as an argument to VIDEO_PATH, you can use the webcam input inste
 $ python3 group_vit.py --video VIDEO_PATH
 ```
 
+You can specify the "model type" by specifying after the `--model_type` option.
+The model type is selected from "yfcc", "redcap".  
+```bash
+$ python3 group_vit.py --model_type yfcc
+```
+
+To add an additional class label, specify it after the `--additional-class` option.
+This can be specified with list of multiple items.
+```bash
+$ python3 group_vit.py --additional-class bookshelf
+```
+
 ## Reference
 
 - [GroupViT](https://github.com/NVlabs/GroupViT)
@@ -45,4 +57,7 @@ ONNX opset=11
 
 ## Netron
 
-[group_vit_gcc_yfcc_30e-74d335e6.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/group_vit/group_vit_gcc_yfcc_30e-74d335e6.onnx.prototxt)
+[group_vit_gcc_yfcc_30e-74d335e6.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/group_vit/group_vit_gcc_yfcc_30e-74d335e6.onnx.prototxt)  
+[group_vit_gcc_yfcc_mlc.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/group_vit/group_vit_gcc_yfcc_mlc.onnx.prototxt)  
+[group_vit_gcc_redcap_30e-3dd09a76.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/group_vit/group_vit_gcc_redcap_30e-3dd09a76.onnx.prototxt)  
+[group_vit_gcc_redcap_mlc.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/group_vit/group_vit_gcc_redcap_mlc.onnx.prototxt)

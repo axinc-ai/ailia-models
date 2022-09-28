@@ -1,5 +1,6 @@
 import sys
 import time
+import os.path as osp
 
 import numpy as np
 import cv2
@@ -26,20 +27,33 @@ logger = getLogger(__name__)
 # Parameters
 # ======================
 
-WEIGHT_PATH = 'group_vit_gcc_yfcc_30e-74d335e6.onnx'
-MODEL_PATH = 'group_vit_gcc_yfcc_30e-74d335e6.onnx.prototxt'
+WEIGHT_YFCC_PATH = 'group_vit_gcc_yfcc_30e-74d335e6.onnx'
+MODEL_YFCC_PATH = 'group_vit_gcc_yfcc_30e-74d335e6.onnx.prototxt'
+WEIGHT_YFCC_MLC_PATH = 'group_vit_gcc_yfcc_mlc.onnx'
+MODEL_YFCC_MLC_PATH = 'group_vit_gcc_yfcc_mlc.onnx.prototxt'
+WEIGHT_REDCAP_PATH = 'group_vit_gcc_redcap_30e-3dd09a76.onnx'
+MODEL_REDCAP_PATH = 'group_vit_gcc_redcap_30e-3dd09a76.onnx.prototxt'
+WEIGHT_REDCAP_MLC_PATH = 'group_vit_gcc_redcap_mlc.onnx'
+MODEL_REDCAP_MLC_PATH = 'group_vit_gcc_redcap_mlc.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/group_vit/'
 
-CLASSES = (
+CLASSES = [
     'background', 'aeroplane', 'bicycle', 'bird', 'boat', 'bottle', 'bus',
     'car', 'cat', 'chair', 'cow', 'table', 'dog', 'horse',
     'motorbike', 'person', 'plant', 'sheep', 'sofa', 'train', 'monitor'
-)
+]
 
 IMAGE_PATH = 'voc.jpg'
 SAVE_IMAGE_PATH = 'output.png'
+PALLET_TEXT = 'group_palette.txt'
 
 MAX_SEQ_LEN = 77
+
+PALETTE = [
+    [0, 0, 0], [128, 0, 0], [0, 128, 0], [128, 128, 0], [0, 0, 128], [128, 0, 128], [0, 128, 128],
+    [128, 128, 128], [64, 0, 0], [192, 0, 0], [64, 128, 0], [192, 128, 0], [64, 0, 128], [192, 0, 128],
+    [64, 128, 128], [192, 128, 128], [0, 64, 0], [128, 64, 0], [0, 192, 0], [128, 192, 0], [0, 64, 128]
+]
 
 # ======================
 # Arguemnt Parser Config
@@ -47,6 +61,14 @@ MAX_SEQ_LEN = 77
 
 parser = get_base_parser(
     'GroupViT', IMAGE_PATH, SAVE_IMAGE_PATH
+)
+parser.add_argument(
+    '-ac', '--additional-class', default=None, nargs='+',
+    help='Specify the additional classes, could be a list.',
+)
+parser.add_argument(
+    '-m', '--model_type', default='yfcc', choices=('yfcc', 'redcap'),
+    help='model type'
 )
 args = update_parser(parser)
 
@@ -87,14 +109,8 @@ def seg2coord(seg_map):
 
 
 def blend_result(img, seg, opacity=0.5):
-    palette = np.array([
-        [0, 0, 0], [128, 0, 0], [0, 128, 0], [128, 128, 0], [0, 0, 128], [128, 0, 128], [0, 128, 128],
-        [128, 128, 128], [64, 0, 0], [192, 0, 0], [64, 128, 0], [192, 128, 0], [64, 0, 128], [192, 0, 128],
-        [64, 128, 128], [192, 128, 128], [0, 64, 0], [128, 64, 0], [0, 192, 0], [128, 192, 0], [0, 64, 128]
-    ])
-
     color_seg = np.zeros((seg.shape[0], seg.shape[1], 3), dtype=np.uint8)
-    for label, color in enumerate(palette):
+    for label, color in enumerate(PALETTE):
         color_seg[seg == label, :] = color
     # convert to BGR
     color_seg = color_seg[..., ::-1]
@@ -164,6 +180,17 @@ def show_result(img, pred):
 
 
 def preprocess(img):
+    h, w, _ = img.shape
+
+    max_long_edge = 2048
+    max_short_edge = 448
+    scale_factor = min(
+        max_long_edge / max(h, w), max_short_edge / min(h, w))
+
+    oh, ow = int(h * scale_factor + 0.5), int(w * scale_factor + 0.5)
+    if oh != h or ow != w:
+        img = cv2.resize(img, (ow, oh), interpolation=cv2.INTER_LINEAR)
+
     img = normalize_image(img, normalize_type='ImageNet')
 
     img = img.transpose(2, 0, 1)  # HWC -> CHW
@@ -199,7 +226,6 @@ def post_processing(text_embedding, attn_map, grouped_img_tokens, img_avg_feat):
     group_affinity_mat[affinity_mask] = float('-inf')
     group_affinity_mat = softmax(group_affinity_mat, axis=-1)
 
-    # TODO: check if necessary
     group_affinity_mat *= pre_group_affinity_mat
 
     pred_logits = np.zeros((num_classes,) + attn_map.shape[:2])
@@ -222,14 +248,18 @@ def predict(net, img, text_embedding):
 
     # feedforward
     output = net.predict([img])
-    # seg_logit = output[0]
     attn_map, grouped_img_tokens, img_avg_feat = output
 
     seg_logit = post_processing(text_embedding, attn_map, grouped_img_tokens, img_avg_feat)
+    seg_logit = (seg_logit[0]).transpose(1, 2, 0)
 
-    seg_pred = np.argmax(seg_logit, axis=1)
+    oh, ow, _ = seg_logit.shape
+    if oh != oh or ow != w:
+        seg_logit = cv2.resize(seg_logit, (w, h), interpolation=cv2.INTER_LINEAR)
 
-    return seg_pred[0]
+    seg_pred = np.argmax(seg_logit, axis=-1)
+
+    return seg_pred
 
 
 def recognize_from_image(net, text_embedding):
@@ -294,8 +324,7 @@ def recognize_from_video(net, text_embedding):
 
         # inference
         img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        out = predict(net, img, text_embedding)
-        pred = out[2]
+        pred = predict(net, img, text_embedding)
 
         # plot result
         res_img = show_result(frame, pred)
@@ -318,14 +347,42 @@ def recognize_from_video(net, text_embedding):
 
 
 def main():
+    dic_model = {
+        'yfcc': {
+            'enc_dec': (WEIGHT_YFCC_PATH, MODEL_YFCC_PATH),
+            'txt_enc': (WEIGHT_YFCC_MLC_PATH, MODEL_YFCC_MLC_PATH)
+        },
+        'redcap': {
+            'enc_dec': (WEIGHT_REDCAP_PATH, MODEL_REDCAP_PATH),
+            'txt_enc': (WEIGHT_REDCAP_MLC_PATH, MODEL_REDCAP_MLC_PATH)
+        },
+    }
+    info = dic_model[args.model_type]
+    WEIGHT_PATH, MODEL_PATH = info['enc_dec']
+    WEIGHT_TXTENC_PATH, MODEL_TXTENC_PATH = info['txt_enc']
+
     # model files check and download
+    check_and_download_models(WEIGHT_TXTENC_PATH, MODEL_TXTENC_PATH, REMOTE_PATH)
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
 
     env_id = args.env_id
 
     # initialize
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
-    text_enc = ailia.Net("multi_label_contrastive.onnx.prototxt", "multi_label_contrastive.onnx", env_id=env_id)
+    text_enc = ailia.Net(MODEL_TXTENC_PATH, WEIGHT_TXTENC_PATH, env_id=env_id)
+
+    # additional classes
+    additional_classes = args.additional_class
+    if additional_classes:
+        CLASSES.extend(additional_classes)
+        EXT_PALETTE = np.loadtxt(
+            osp.join(osp.dirname(osp.abspath(__file__)), PALLET_TEXT),
+            dtype=np.uint8)[:, ::-1]
+        PALETTE.extend(
+            EXT_PALETTE[
+                np.random.choice(
+                    range(EXT_PALETTE.shape[0]), len(additional_classes))
+            ])
 
     # text_embedding
     transform = Tokenize(SimpleTokenizer(), max_seq_len=MAX_SEQ_LEN)
