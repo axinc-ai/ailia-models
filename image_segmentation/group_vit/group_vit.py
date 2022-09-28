@@ -55,6 +55,11 @@ PALETTE = [
     [64, 128, 128], [192, 128, 128], [0, 64, 0], [128, 64, 0], [0, 192, 0], [128, 192, 0], [0, 64, 128]
 ]
 
+LOGIT_SCALE = {
+    'yfcc': 4.2057,
+    'redcap': 4.0383,
+}
+
 # ======================
 # Arguemnt Parser Config
 # ======================
@@ -209,7 +214,7 @@ def post_processing(text_embedding, attn_map, grouped_img_tokens, img_avg_feat):
     text_tokens = text_embedding
     num_classes = num_fg_classes + 1
 
-    logit_scale = 4.2057
+    logit_scale = LOGIT_SCALE[args.model_type]
     logit_scale = np.clip(np.exp(logit_scale), None, 100)
     # [G, N]
     group_affinity_mat = (grouped_img_tokens @ text_tokens.T) * logit_scale
