@@ -142,6 +142,7 @@ cd ../../image_segmentation/dense_prediction_transformers; python3 dense_predict
 cd ../../image_segmentation/paddleseg; python3 paddleseg.py ${OPTION}
 cd ../../image_segmentation/pp_liteseg; python3 pp_liteseg.py ${OPTION}
 cd ../../image_segmentation/suim; python3 suim.py ${OPTION}
+cd ../../image_segmentation/group_vit; python3 group_vit.py ${OPTION}
 cd ../../line_segment_detection/mlsd; python3 mlsd.py ${OPTION}
 cd ../../line_segment_detection/dexined; python3 dexined.py ${OPTION}
 cd ../../low_light_image_enhancement/agllnet; python3 agllnet.py ${OPTION}
