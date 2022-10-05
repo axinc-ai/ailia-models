@@ -15,11 +15,7 @@ def calc_scale(min_scale, max_scale, stride_index, num_strides):
         return min_scale + (max_scale - min_scale) * 1.0 * stride_index / (num_strides - 1.0)
 
 
-def get_anchor(
-        num_layers,
-        strides,
-        input_size_height,
-        input_size_width):
+def get_anchor(num_layers, strides, input_height, input_width):
     opt_aspect_ratios = [1.0]
     min_scale = 0.1484375
     max_scale = 0.75
@@ -62,8 +58,8 @@ def get_anchor(
             anchor_width.append(scales[i] * ratio_sqrts)
 
         stride = strides[layer_id]
-        feature_map_height = int(np.ceil(1.0 * input_size_height / stride))
-        feature_map_width = int(np.ceil(1.0 * input_size_width / stride))
+        feature_map_height = int(np.ceil(1.0 * input_height / stride))
+        feature_map_width = int(np.ceil(1.0 * input_width / stride))
 
         for y in np.arange(feature_map_height):
             for x in np.arange(feature_map_width):
@@ -114,12 +110,11 @@ def decode_boxes(raw_boxes, anchors, num_boxes, num_coords, num_keypoints, scale
     return boxes
 
 
-def weighted_nms(boxes, scores):
-    scale = IMAGE_SIZE
+def weighted_nms(boxes, scores, img_size):
     min_suppression_threshold = 0.3
 
     px_boxes = np.zeros((len(boxes), 4))
-    px_boxes[:, :4] = boxes[:, :4] * scale
+    px_boxes[:, :4] = boxes[:, :4] * img_size
 
     packed_idx = packed_nms(px_boxes, scores, min_suppression_threshold)
 
@@ -147,16 +142,16 @@ def weighted_nms(boxes, scores):
 anchors = get_anchor(
     num_layers=5,
     strides=[8, 16, 32, 32, 32],
-    input_size_height=IMAGE_SIZE,
-    input_size_width=IMAGE_SIZE)
+    input_height=IMAGE_SIZE,
+    input_width=IMAGE_SIZE)
 
 
 def pose_detection(detections, scores, pad):
     num_boxes = 2254
     num_coords = 12
     num_keypoints = 4
-    scale = IMAGE_SIZE
-    boxes = decode_boxes(detections[0], anchors, num_boxes, num_coords, num_keypoints, scale)
+    img_size = IMAGE_SIZE
+    boxes = decode_boxes(detections[0], anchors, num_boxes, num_coords, num_keypoints, img_size)
     scores = np.clip(scores[0, :, 0], -100, 100)
     scores = sigmoid(scores)
 
@@ -166,7 +161,7 @@ def pose_detection(detections, scores, pad):
     scores = scores[idx]
 
     # Performs non-max suppression to remove excessive detections.
-    boxes, scores = weighted_nms(boxes, scores)
+    boxes, scores = weighted_nms(boxes, scores, img_size)
 
     if len(boxes) == 0:
         return [], []
