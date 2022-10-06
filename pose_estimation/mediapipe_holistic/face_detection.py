@@ -8,26 +8,28 @@ from math_utils import sigmoid
 
 from detection_utils import get_anchor, decode_boxes, weighted_nms
 
-IMAGE_FACE_SIZE = 128
+FACE_DET_SIZE = 128
+FACE_LMK_SIZE = 192
 
 onnx = False
 
 anchors = get_anchor(
     num_layers=4,
     strides=[8, 16, 16, 16],
-    input_height=IMAGE_FACE_SIZE,
-    input_width=IMAGE_FACE_SIZE)
+    input_height=FACE_DET_SIZE,
+    input_width=FACE_DET_SIZE)
 
 
 def predict_face_mesh(img, face_landmarks, models):
     im_h, im_w = img.shape[:2]
 
+    # Gets ROI for re-crop model from face-related pose landmarks.
+    ## Converts face-related pose landmarks to a detection that tightly encloses all landmarks
     xmin = np.min(face_landmarks[:, 0])
     xmax = np.max(face_landmarks[:, 0])
     ymin = np.min(face_landmarks[:, 1])
     ymax = np.max(face_landmarks[:, 1])
-
-    # ROI
+    ## ROI
     width = xmax - xmin
     height = ymax - ymin
     x_center, y_center = (xmin + width / 2), (ymin + height / 2)
@@ -48,6 +50,7 @@ def predict_face_mesh(img, face_landmarks, models):
     width = long_side / im_w * 3
     height = long_side / im_h * 3
 
+    # Transforms the input image into a 128x128 tensor while keeping the aspect
     width, height = width * im_w, height * im_h
     center = (x_center * im_w, y_center * im_h)
     rotated_rect = (center, (width, height), rotation * 180. / np.pi)
@@ -73,7 +76,7 @@ def predict_face_mesh(img, face_landmarks, models):
     def project_fn(x, y):
         return transform_matrix[:2, [0, 1, 3]] @ np.array([x, y, 1])
 
-    h = w = IMAGE_FACE_SIZE
+    h = w = FACE_DET_SIZE
     pts2 = np.float32([[0, h], [0, 0], [w, 0], [w, h]])
     M = cv2.getPerspectiveTransform(pts1, pts2)
     transformed = cv2.warpPerspective(
@@ -81,8 +84,8 @@ def predict_face_mesh(img, face_landmarks, models):
 
     # print(transformed)
     # print(transformed.shape)
-    # cv2.imwrite("face_mesh.png", transformed)
-    transformed = cv2.imread("face_mesh_0.png")
+    # cv2.imwrite("face_det.png", transformed)
+    transformed = cv2.imread("face_det_0.png")
 
     transformed = normalize_image(transformed, '127.5')
     transformed = transformed.transpose(2, 0, 1)  # HWC -> CHW
@@ -90,19 +93,19 @@ def predict_face_mesh(img, face_landmarks, models):
     input = transformed.astype(np.float32)
 
     # feedforward
-    net = models['face_net']
+    net = models['face_det']
     if not onnx:
         output = net.predict([input])
     else:
         output = net.run(None, {'input': input})
     scores, detections = output
 
+    # Decodes the detection tensors, based on the SSD anchors
     num_boxes = 896
     num_coords = 16
     num_keypoints = 6
-    img_size = IMAGE_FACE_SIZE
+    img_size = FACE_DET_SIZE
     boxes = decode_boxes(detections[0], anchors, num_boxes, num_coords, num_keypoints, img_size)
-
     scores = np.clip(scores[0, :, 0], -100, 100)
     scores = sigmoid(scores)
 
@@ -115,7 +118,8 @@ def predict_face_mesh(img, face_landmarks, models):
     # Performs non-max suppression to remove excessive detections.
     boxes, scores = weighted_nms(boxes, scores, img_size)
 
-    # DetectionProjection
+    # Projects the detections from input tensor to the corresponding locations on
+    # the original image
     for i in range(len(boxes)):
         a = boxes[i]
         for j in range(0, len(a[4:]), 2):
@@ -132,7 +136,6 @@ def predict_face_mesh(img, face_landmarks, models):
         xmax, ymax = np.max(c, axis=0)
         a[:4] = xmin, ymin, xmax, ymax
 
-    # NormRectFromKeyPoints
     keys_x = boxes[0, list(range(4, 4 + num_keypoints * 2, 2))]
     keys_y = boxes[0, list(range(5, 5 + num_keypoints * 2, 2))]
     xmin = np.min(keys_x)
@@ -140,22 +143,26 @@ def predict_face_mesh(img, face_landmarks, models):
     xmax = np.max(keys_x)
     ymax = np.max(keys_y)
 
-    # Right eye
+    # Converts the face detection into a rectangle (normalized by image size)
+    # that encloses the face and is rotated such that the line connecting right side
+    # of the right eye and left side of the left eye is aligned with the X-axis of
+    # the rectangle.
+    ## Right eye
     x0 = boxes[0, 4] * im_w
     y0 = boxes[0, 5] * im_h
-    # Left eye
+    ## Left eye
     x1 = boxes[0, 6] * im_w
     y1 = boxes[0, 7] * im_h
     angle = -math.atan2(-(y1 - y0), x1 - x0)
     rotation = angle - 2 * np.pi * np.floor((angle - (-np.pi)) / (2 * np.pi))
-
-    # ROI
+    ## ROI
     x_center = (xmin + xmax) / 2
     y_center = (ymin + ymax) / 2
     width = xmax - xmin
     height = ymax - ymin
 
-    # TransformNormRect
+    # Expands and shifts the rectangle that contains the face so that it's likely
+    # to cover the entire face.
     shift_x = 0
     shift_y = -0.1
     x_shift = (im_w * width * shift_x * math.cos(rotation) - im_h * height * shift_y * math.sin(rotation)) / im_w
@@ -163,16 +170,62 @@ def predict_face_mesh(img, face_landmarks, models):
     x_center += x_shift
     y_center += y_shift
 
-    # Expands face rectangle so that it becomes big enough for face detector to
-    # localize it accurately.
     long_side = max(width * im_w, height * im_h)
     width = long_side / im_w * 2
     height = long_side / im_h * 2
 
-    # width, height = width * im_w, height * im_h
-    # center = (x_center * im_w, y_center * im_h)
-    # rotated_rect = (center, (width, height), rotation * 180. / np.pi)
-    # pts1 = cv2.boxPoints(rotated_rect)
-    print("rect ---", x_center, y_center, width, height)
+    width, height = width * im_w, height * im_h
+    center = (x_center * im_w, y_center * im_h)
+    rotated_rect = (center, (width, height), rotation * 180. / np.pi)
+    pts1 = cv2.boxPoints(rotated_rect)
 
-    # FaceLandmarkCpu
+    h = w = FACE_LMK_SIZE
+    pts2 = np.float32([[0, h], [0, 0], [w, 0], [w, h]])
+    M = cv2.getPerspectiveTransform(pts1, pts2)
+    transformed = cv2.warpPerspective(
+        img, M, (w, h), flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_REPLICATE)
+
+    # print(transformed)
+    # print(transformed.shape)
+    # cv2.imwrite("face_mesh.png", transformed)
+    transformed = cv2.imread("face_mesh_0.png")
+
+    transformed = normalize_image(transformed, '255')
+    transformed = transformed.transpose(2, 0, 1)  # HWC -> CHW
+    transformed = np.expand_dims(transformed, axis=0)
+    input = transformed.astype(np.float32)
+
+    # feedforward
+    net = models['face_lmk']
+    if not onnx:
+        output = net.predict([input])
+    else:
+        output = net.run(None, {'input_1': input})
+    flag, left_eye, left_iris, lips, mesh, right_eye, right_iris = output
+
+    # score of face presence
+    face_presence_score = sigmoid(flag[0, 0, 0, 0])
+
+    # Applies a threshold to the confidence score to determine whether a face is
+    # present.
+
+    # Drop landmarks tensors if face is not present.
+
+    # Decodes the landmark tensors into a vector of landmarks, where the landmark
+    # coordinates are normalized by the size of the input image to the model.
+    mesh_landmarks = mesh.reshape(-1, 3) / FACE_LMK_SIZE
+    lips_landmarks = lips.reshape(-1, 2) / FACE_LMK_SIZE
+    left_eye_landmarks = left_eye.reshape(-1, 2) / FACE_LMK_SIZE
+    right_eye_landmarks = right_eye.reshape(-1, 2) / FACE_LMK_SIZE
+    left_iris_landmarks = left_iris.reshape(-1, 2) / FACE_LMK_SIZE
+    right_iris_landmarks = right_iris.reshape(-1, 2) / FACE_LMK_SIZE
+
+    # Projects the landmarks from the cropped face image to the corresponding
+    # locations on the full image before cropping (input to the graph).
+
+    print(mesh_landmarks.shape)
+    print(lips_landmarks.shape)
+    print(left_eye_landmarks.shape)
+    print(right_eye_landmarks.shape)
+    print(left_iris_landmarks.shape)
+    print(right_iris_landmarks.shape)

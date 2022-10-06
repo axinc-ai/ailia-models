@@ -507,21 +507,25 @@ def main():
     if not args.onnx:
         det_net = ailia.Net(MODEL_DETECTOR_PATH, WEIGHT_DETECTOR_PATH, env_id=env_id)
         lmk_net = ailia.Net(model_path, weight_path, env_id=env_id)
-        face_net = ailia.Net("face_detection_short_range.onnx.prototxt", "face_detection_short_range.onnx",
-                             env_id=env_id)
+        face_det = ailia.Net(
+            "face_detection_short_range.onnx.prototxt", "face_detection_short_range.onnx", env_id=env_id)
+        face_lmk = ailia.Net(
+            "face_landmark_with_attention.onnx.prototxt", "face_landmark_with_attention.onnx", env_id=env_id)
         hand_net = ailia.Net("hand_recrop.onnx.prototxt", "hand_recrop.onnx", env_id=env_id)
     else:
         import onnxruntime
         det_net = onnxruntime.InferenceSession(WEIGHT_DETECTOR_PATH)
         lmk_net = onnxruntime.InferenceSession(weight_path)
-        face_net = onnxruntime.InferenceSession("face_detection_short_range.onnx")
+        face_det = onnxruntime.InferenceSession("face_detection_short_range.onnx")
+        face_lmk = onnxruntime.InferenceSession("face_landmark_with_attention.onnx")
         hand_net = onnxruntime.InferenceSession("hand_recrop.onnx")
         face_detection.onnx = True
 
     models = {
         'det_net': det_net,
         'lmk_net': lmk_net,
-        'face_net': face_net,
+        'face_det': face_det,
+        'face_lmk': face_lmk,
         'hand_net': hand_net,
     }
 
