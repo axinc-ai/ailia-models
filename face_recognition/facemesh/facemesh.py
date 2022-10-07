@@ -49,7 +49,14 @@ args = update_parser(parser)
 # Parameters 2
 # ======================
 DETECTION_MODEL_NAME = 'blazeface'
-LANDMARK_MODEL_NAME = 'facemesh'
+
+# Legacy model
+# LANDMARK_MODEL_NAME = 'facemesh'
+
+# ConstantPad2d model
+# https://github.com/thepowerfuldeez/facemesh.pytorch/issues/3
+LANDMARK_MODEL_NAME = 'facemesh_constantpad2d'
+
 if args.normal:
     DETECTION_WEIGHT_PATH = f'{DETECTION_MODEL_NAME}.onnx'
     DETECTION_MODEL_PATH = f'{DETECTION_MODEL_NAME}.onnx.prototxt'
