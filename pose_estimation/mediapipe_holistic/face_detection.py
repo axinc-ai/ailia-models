@@ -7,6 +7,7 @@ from image_utils import normalize_image
 from math_utils import sigmoid
 
 from detection_utils import get_anchor, decode_boxes, weighted_nms
+from face_refinement import indexes_mapping, indexes_for_average
 
 FACE_DET_SIZE = 128
 FACE_LMK_SIZE = 192
@@ -20,7 +21,7 @@ anchors = get_anchor(
     input_width=FACE_DET_SIZE)
 
 
-def predict_face_mesh(img, face_landmarks, models):
+def face_estimate(img, face_landmarks, models):
     im_h, im_w = img.shape[:2]
 
     # Gets ROI for re-crop model from face-related pose landmarks.
@@ -85,7 +86,7 @@ def predict_face_mesh(img, face_landmarks, models):
     # print(transformed)
     # print(transformed.shape)
     # cv2.imwrite("face_det.png", transformed)
-    transformed = cv2.imread("face_det_0.png")
+    # transformed = cv2.imread("face_det_0.png")
 
     transformed = normalize_image(transformed, '127.5')
     transformed = transformed.transpose(2, 0, 1)  # HWC -> CHW
@@ -174,9 +175,8 @@ def predict_face_mesh(img, face_landmarks, models):
     width = long_side / im_w * 2
     height = long_side / im_h * 2
 
-    width, height = width * im_w, height * im_h
     center = (x_center * im_w, y_center * im_h)
-    rotated_rect = (center, (width, height), rotation * 180. / np.pi)
+    rotated_rect = (center, (width * im_w, height * im_h), rotation * 180. / np.pi)
     pts1 = cv2.boxPoints(rotated_rect)
 
     h = w = FACE_LMK_SIZE
@@ -188,7 +188,7 @@ def predict_face_mesh(img, face_landmarks, models):
     # print(transformed)
     # print(transformed.shape)
     # cv2.imwrite("face_mesh.png", transformed)
-    transformed = cv2.imread("face_mesh_0.png")
+    # transformed = cv2.imread("face_mesh_0.png")
 
     transformed = normalize_image(transformed, '255')
     transformed = transformed.transpose(2, 0, 1)  # HWC -> CHW
@@ -220,12 +220,41 @@ def predict_face_mesh(img, face_landmarks, models):
     left_iris_landmarks = left_iris.reshape(-1, 2) / FACE_LMK_SIZE
     right_iris_landmarks = right_iris.reshape(-1, 2) / FACE_LMK_SIZE
 
+    landmarks = np.zeros((478, 3))
+
+    for i, lmks in enumerate([
+        mesh_landmarks, lips_landmarks,
+        left_eye_landmarks, right_eye_landmarks,
+        left_iris_landmarks, right_iris_landmarks
+    ]):
+        for j, index in enumerate(indexes_mapping[i]):
+            landmarks[index, :2] = lmks[j, :2]
+
+    # z copy
+    ## 0 - mesh
+    for j, index in enumerate(indexes_mapping[0]):
+        landmarks[index, 2] = mesh_landmarks[j, 2]
+
+    # z average
+    ## 4 - left iris
+    landmarks[indexes_mapping[4], 2] = np.mean(landmarks[indexes_for_average[4], 2])
+    ## 5 - right iris
+    landmarks[indexes_mapping[5], 2] = np.mean(landmarks[indexes_for_average[5], 2])
+
     # Projects the landmarks from the cropped face image to the corresponding
     # locations on the full image before cropping (input to the graph).
+    def project_fn(x, y, z):
+        x -= 0.5
+        y -= 0.5
+        new_x = math.cos(rotation) * x - math.sin(rotation) * y
+        new_y = math.sin(rotation) * x + math.cos(rotation) * y
+        new_x = new_x * width + x_center
+        new_y = new_y * height + y_center
+        new_z = z * width  # Scale Z coordinate as X.
+        return new_x, new_y, new_z
 
-    print(mesh_landmarks.shape)
-    print(lips_landmarks.shape)
-    print(left_eye_landmarks.shape)
-    print(right_eye_landmarks.shape)
-    print(left_iris_landmarks.shape)
-    print(right_iris_landmarks.shape)
+    for lmks in landmarks:
+        x, y, z = lmks
+        lmks[...] = project_fn(x, y, z)
+
+    return landmarks

@@ -21,7 +21,9 @@ from logging import getLogger  # noqa
 from detection_utils import pose_detection, get_anchor, decode_boxes
 from drawing_utils import draw_landmarks, plot_landmarks
 import face_detection
-from face_detection import predict_face_mesh
+import hand_detection
+from face_detection import face_estimate
+from hand_detection import hands_estimate
 
 logger = getLogger(__name__)
 
@@ -220,70 +222,6 @@ def refine_landmark_from_heatmap(landmarks, heatmap):
     return landmarks
 
 
-def predict_hand(img, hand_landmarks, models):
-    im_h, im_w = img.shape[:2]
-
-    threshold = 0.1
-    accept = hand_landmarks[0, 3] > threshold
-
-    x_wrist = hand_landmarks[0, 0] * im_w
-    y_wrist = hand_landmarks[0, 1] * im_h
-    x_index = hand_landmarks[2, 0] * im_w
-    y_index = hand_landmarks[2, 1] * im_h
-    x_pinky = hand_landmarks[1, 0] * im_w
-    y_pinky = hand_landmarks[1, 1] * im_h
-
-    # Estimate middle finger
-    x_middle = (2. * x_index + x_pinky) / 3.
-    y_middle = (2. * y_index + y_pinky) / 3.
-
-    # Crop center as middle finger
-    center_x = x_middle
-    center_y = y_middle
-
-    box_size = np.sqrt(
-        (x_middle - x_wrist) * (x_middle - x_wrist)
-        + (y_middle - y_wrist) * (y_middle - y_wrist)) * 2.0
-
-    angle = np.pi * 0.5 - math.atan2(-(y_middle - y_wrist), x_middle - x_wrist)
-    rotation = angle - 2 * np.pi * np.floor((angle - (-np.pi)) / (2 * np.pi))
-
-    center_x = center_x / im_w
-    center_y = center_y / im_h
-    width = box_size / im_w
-    height = box_size / im_h
-
-    # print("1---", center_x, center_y, width, height)
-
-    shift_x = 0
-    shift_y = -0.1
-    x_shift = (im_w * width * shift_x * math.cos(rotation) - im_h * height * shift_y * math.sin(rotation)) / im_w
-    y_shift = (im_w * width * shift_x * math.sin(rotation) + im_h * height * shift_y * math.cos(rotation)) / im_h
-    center_x += x_shift
-    center_y += y_shift
-
-    long_side = max(width * im_w, height * im_h)
-    width = long_side / im_w * 2.7
-    height = long_side / im_h * 2.7
-
-    # print("2---", center_x, center_y, width, height)
-
-    width, height = width * im_w, height * im_h
-    center = (center_x * im_w, center_y * im_h)
-    rotated_rect = (center, (width, height), rotation * 180. / np.pi)
-    pts1 = cv2.boxPoints(rotated_rect)
-
-    h = w = 256
-    pts2 = np.float32([[0, h], [0, 0], [w, 0], [w, h]])
-    M = cv2.getPerspectiveTransform(pts1, pts2)
-    transformed = cv2.warpPerspective(
-        img, M, (w, h), flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_REPLICATE)
-
-    # cv2.imwrite("hand.png", transformed)
-
-    pass
-
-
 # ======================
 # Main functions
 # ======================
@@ -378,22 +316,25 @@ def pose_estimate(models, img):
         landmark[1] = sina * x + cosa * y
 
     PoseLandmark = namedtuple('PoseLandmark', ['x', 'y', 'z', 'visibility', 'presence'])
-    out_landmarks = [PoseLandmark(lm[0], lm[1], lm[2], lm[3], lm[4]) for lm in all_landmarks]
+    pose_landmarks = [PoseLandmark(lm[0], lm[1], lm[2], lm[3], lm[4]) for lm in all_landmarks]
     PoseWorldLandmark = namedtuple('PoseWorldLandmark', ['x', 'y', 'z', 'visibility'])
-    out_world_landmarks = [
+    pose_world_landmarks = [
         PoseWorldLandmark(wld[0], wld[1], wld[2], lm[3])
         for lm, wld in zip(all_landmarks, all_world_landmarks)
     ]
 
     face_landmarks = all_landmarks[:11, ...]
-    predict_face_mesh(img, face_landmarks, models)
+    face_landmarks = face_estimate(img, face_landmarks, models)
 
-    # left_hand_landmarks = all_landmarks[[15, 17, 19], ...]
-    # predict_hand(img, left_hand_landmarks, models)
-    # right_hand_landmarks = all_landmarks[[16, 18, 20], ...]
-    # predict_hand(img, right_hand_landmarks, models)
+    left_hand_landmarks = all_landmarks[[15, 17, 19], ...]
+    right_hand_landmarks = all_landmarks[[16, 18, 20], ...]
+    left_hand_landmarks, right_hand_landmarks = hands_estimate(
+        img, left_hand_landmarks, right_hand_landmarks, models)
 
-    return out_landmarks, out_world_landmarks
+    return \
+        pose_landmarks, pose_world_landmarks, \
+        left_hand_landmarks, right_hand_landmarks, \
+        face_landmarks
 
 
 def recognize_from_image(models):
@@ -428,19 +369,21 @@ def recognize_from_image(models):
             # inference
             output = pose_estimate(models, img)
 
-        landmarks, world_landmarks = output
+        pose_landmarks, pose_world_landmarks, \
+        left_hand_landmarks, right_hand_landmarks, \
+        face_landmarks = output
 
         logger.info(
             f'Nose coordinates: ('
-            f'{landmarks[0].x * image_width}, '
-            f'{landmarks[0].y * image_height})'
+            f'{pose_landmarks[0].x * image_width}, '
+            f'{pose_landmarks[0].y * image_height})'
         )
 
         # plot result
-        draw_landmarks(img, landmarks)
+        draw_landmarks(img, pose_landmarks)
 
         if args.world_landmark:
-            plot_landmarks(world_landmarks)
+            plot_landmarks(pose_world_landmarks)
 
         # save results
         savepath = get_savepath(args.savepath, image_path)
@@ -471,10 +414,12 @@ def recognize_from_video(models):
 
         # inference
         output = pose_estimate(models, frame)
-        landmarks, world_landmarks = output
+        pose_landmarks, pose_world_landmarks, \
+        left_hand_landmarks, right_hand_landmarks, \
+        face_landmarks = output
 
         # plot result
-        draw_landmarks(frame, landmarks)
+        draw_landmarks(frame, pose_landmarks)
         cv2.imshow('frame', frame)
         frame_shown = True
 
@@ -520,6 +465,7 @@ def main():
         face_lmk = onnxruntime.InferenceSession("face_landmark_with_attention.onnx")
         hand_net = onnxruntime.InferenceSession("hand_recrop.onnx")
         face_detection.onnx = True
+        hand_detection.onnx = True
 
     models = {
         'det_net': det_net,
