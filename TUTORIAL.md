@@ -51,6 +51,8 @@ pip3 install numpy
 sudo apt install nvidia-jetpack
 ```
 
+* Note that Jetson Orin require ailia 1.2.13 or above. Please contact us if you would like to use an early build of ailia 1.2.13.
+
 ### For Raspberry Pi
 
 ```
