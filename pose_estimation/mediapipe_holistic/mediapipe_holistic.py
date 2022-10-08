@@ -333,8 +333,8 @@ def pose_estimate(models, img):
 
     left_hand_landmarks = all_landmarks[[15, 17, 19], ...]
     right_hand_landmarks = all_landmarks[[16, 18, 20], ...]
-    # left_hand_landmarks, right_hand_landmarks = hands_estimate(
-    #     img, left_hand_landmarks, right_hand_landmarks, models)
+    left_hand_landmarks, right_hand_landmarks = hands_estimate(
+        img, left_hand_landmarks, right_hand_landmarks, models)
 
     PoseLandmark = namedtuple('PoseLandmark', ['x', 'y', 'z', 'visibility', 'presence'])
     Landmark = namedtuple('Landmark', ['x', 'y', 'z'])
@@ -466,9 +466,9 @@ def main():
     ## face model
     check_and_download_models(WEIGHT_FACE_DETECTOR_PATH, MODEL_FACE_DETECTOR_PATH, REMOTE_PATH)
     check_and_download_models(WEIGHT_FACE_LANDMARK_PATH, MODEL_FACE_LANDMARK_PATH, REMOTE_PATH)
-    # ## hand model
-    # check_and_download_models(WEIGHT_HAND_DETECTOR_PATH, MODEL_HAND_DETECTOR_PATH, REMOTE_PATH)
-    # check_and_download_models(WEIGHT_HAND_LANDMARK_PATH, MODEL_HAND_LANDMARK_PATH, REMOTE_PATH)
+    ## hand model
+    check_and_download_models(WEIGHT_HAND_DETECTOR_PATH, MODEL_HAND_DETECTOR_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_HAND_LANDMARK_PATH, MODEL_HAND_LANDMARK_PATH, REMOTE_PATH)
 
     env_id = args.env_id
 
@@ -478,16 +478,16 @@ def main():
         pose_lmk = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
         face_det = ailia.Net(MODEL_FACE_DETECTOR_PATH, WEIGHT_FACE_DETECTOR_PATH, env_id=env_id)
         face_lmk = ailia.Net(MODEL_FACE_LANDMARK_PATH, WEIGHT_FACE_LANDMARK_PATH, env_id=env_id)
-        # hand_det = ailia.Net(MODEL_HAND_DETECTOR_PATH, WEIGHT_HAND_DETECTOR_PATH, env_id=env_id)
-        # hand_lmk = ailia.Net(MODEL_HAND_LANDMARK_PATH, WEIGHT_HAND_LANDMARK_PATH, env_id=env_id)
+        hand_det = ailia.Net(MODEL_HAND_DETECTOR_PATH, WEIGHT_HAND_DETECTOR_PATH, env_id=env_id)
+        hand_lmk = ailia.Net(MODEL_HAND_LANDMARK_PATH, WEIGHT_HAND_LANDMARK_PATH, env_id=env_id)
     else:
         import onnxruntime
         pose_det = onnxruntime.InferenceSession(WEIGHT_DETECTOR_PATH)
         pose_lmk = onnxruntime.InferenceSession(WEIGHT_PATH)
         face_det = onnxruntime.InferenceSession(WEIGHT_FACE_DETECTOR_PATH)
         face_lmk = onnxruntime.InferenceSession(WEIGHT_FACE_LANDMARK_PATH)
-        # hand_det = onnxruntime.InferenceSession(WEIGHT_HAND_DETECTOR_PATH)
-        # hand_lmk = onnxruntime.InferenceSession(WEIGHT_HAND_LANDMARK_PATH)
+        hand_det = onnxruntime.InferenceSession(WEIGHT_HAND_DETECTOR_PATH)
+        hand_lmk = onnxruntime.InferenceSession(WEIGHT_HAND_LANDMARK_PATH)
         face_detection.onnx = True
         hand_detection.onnx = True
 
@@ -496,8 +496,8 @@ def main():
         'pose_lmk': pose_lmk,
         'face_det': face_det,
         'face_lmk': face_lmk,
-        # 'hand_det': hand_det,
-        # 'hand_lmk': hand_lmk,
+        'hand_det': hand_det,
+        'hand_lmk': hand_lmk,
     }
 
     if args.video is not None:

@@ -32,8 +32,8 @@ def hand_estimate(img, hand_landmarks, models):
     y_middle = (2. * y_index + y_pinky) / 3.
 
     # Crop center as middle finger
-    center_x = x_middle
-    center_y = y_middle
+    x_center = x_middle
+    y_center = y_middle
 
     box_size = np.sqrt(
         (x_middle - x_wrist) * (x_middle - x_wrist)
@@ -42,27 +42,23 @@ def hand_estimate(img, hand_landmarks, models):
     angle = np.pi * 0.5 - math.atan2(-(y_middle - y_wrist), x_middle - x_wrist)
     rotation = angle - 2 * np.pi * np.floor((angle - (-np.pi)) / (2 * np.pi))
 
-    center_x = center_x / im_w
-    center_y = center_y / im_h
+    x_center = x_center / im_w
+    y_center = y_center / im_h
     width = box_size / im_w
     height = box_size / im_h
-
-    # print("1---", center_x, center_y, width, height)
 
     shift_x = 0
     shift_y = -0.1
     x_shift = (im_w * width * shift_x * math.cos(rotation) - im_h * height * shift_y * math.sin(rotation)) / im_w
     y_shift = (im_w * width * shift_x * math.sin(rotation) + im_h * height * shift_y * math.cos(rotation)) / im_h
-    center_x += x_shift
-    center_y += y_shift
+    x_center += x_shift
+    y_center += y_shift
 
     long_side = max(width * im_w, height * im_h)
     width = long_side / im_w * 2.7
     height = long_side / im_h * 2.7
 
-    # print("2---", center_x, center_y, width, height)
-
-    center = (center_x * im_w, center_y * im_h)
+    center = (x_center * im_w, y_center * im_h)
     rotated_rect = (center, (width * im_w, height * im_h), rotation * 180. / np.pi)
     pts1 = cv2.boxPoints(rotated_rect)
 
@@ -80,22 +76,58 @@ def hand_estimate(img, hand_landmarks, models):
     transformed = np.expand_dims(transformed, axis=0)
     input = transformed.astype(np.float32)
 
+    # Predicts hand re-crop rectangle
+    net = models['hand_det']
+    if not onnx:
+        output = net.predict([input])
+    else:
+        output = net.run(None, {'input_1': input})
+    output_crop = output[0]
+
     # -- hand_recrop_by_roi
 
-    # Decodes the landmark tensors into a vector of landmarks
-
-    # Adjusts landmarks (already normalized to [0.f, 1.f]) on
-    # the letterboxed hand image
+    landmarks = output_crop.reshape(-1, 2) / HAND_CROP_SIZE
 
     # Projects the landmarks from the cropped hand image to the corresponding
     # locations on the full image before cropping
+    def project_fn(x, y):
+        x -= 0.5
+        y -= 0.5
+        new_x = math.cos(rotation) * x - math.sin(rotation) * y
+        new_y = math.sin(rotation) * x + math.cos(rotation) * y
+        new_x = new_x * width + x_center
+        new_y = new_y * height + y_center
+        return new_x, new_y
 
-    # Converts hand landmarks to a detection that tightly encloses all landmarks
-    # - LandmarksToDetectionCalculator
+    for lmks in landmarks:
+        x, y = lmks
+        lmks[...] = project_fn(x, y)
+
+    print(landmarks)
+    print(landmarks.shape)
+
+    # # Converts hand landmarks to a detection that tightly encloses all landmarks
+    # # - LandmarksToDetectionCalculator
+    # xmin = np.min(landmarks[:, 0])
+    # ymin = np.min(landmarks[:, 1])
+    # xmax = np.max(landmarks[:, 0])
+    # ymax = np.max(landmarks[:, 1])
 
     # Converts hand detection into a rectangle based on center and scale alignment
     # points
     # - AlignmentPointsRectsCalculator
+    x0, x1 = landmarks[:, 0] * im_w
+    y0, y1 = landmarks[:, 1] * im_h
+    box_size = ((x1 - x0) ** 2 + (y1 - y0) ** 2) ** 0.5
+    box_size *= 2
+    angle = (np.pi * -90 / 180) - math.atan2(-(y1 - y0), x1 - x0)
+    rotation = angle - 2 * np.pi * np.floor((angle - (-np.pi)) / (2 * np.pi))
+    ## ROI
+    x_center = x0 / im_w
+    y_center = y0 / im_h
+    width = box_size / im_w
+    height = box_size / im_h
+    print(x_center, y_center, width, height, rotation)
 
     # Slighly moves hand re-crop rectangle from wrist towards fingertips. Due to the
     # new hand cropping logic, crop border is to close to finger tips while a lot of

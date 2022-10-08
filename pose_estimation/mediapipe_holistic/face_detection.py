@@ -107,7 +107,6 @@ def face_estimate(img, face_landmarks, models):
 
     min_score_thresh = 0.5
     idx = scores >= min_score_thresh
-    # print(np.nonzero(idx))
     boxes = boxes[idx]
     scores = scores[idx]
 
