@@ -18,8 +18,8 @@ import webcamera_utils
 # logger
 from logging import getLogger  # noqa
 
-from detection_utils import pose_detection, get_anchor, decode_boxes
-from drawing_utils import draw_landmarks, plot_landmarks
+from detection_utils import pose_detection
+from drawing_utils import draw_landmarks, draw_face_landmarks, plot_landmarks
 import face_detection
 import hand_detection
 from face_detection import face_estimate
@@ -31,6 +31,7 @@ logger = getLogger(__name__)
 # Parameters
 # ======================
 
+# pose model
 MODEL_LIST = ['lite', 'full', 'heavy']
 WEIGHT_LITE_PATH = 'pose_landmark_lite.onnx'
 MODEL_LITE_PATH = 'pose_landmark_lite.onnx.prototxt'
@@ -40,7 +41,14 @@ WEIGHT_HEAVY_PATH = 'pose_landmark_heavy.onnx'
 MODEL_HEAVY_PATH = 'pose_landmark_heavy.onnx.prototxt'
 WEIGHT_DETECTOR_PATH = 'pose_detection.onnx'
 MODEL_DETECTOR_PATH = 'pose_detection.onnx.prototxt'
-REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/mediapipe_pose_world_landmarks/'
+REMOTE_POSE_PATH = 'https://storage.googleapis.com/ailia-models/mediapipe_pose_world_landmarks/'
+
+# face model
+WEIGHT_FACE_DETECTOR_PATH = 'face_detection_short_range.onnx'
+MODEL_FACE_DETECTOR_PATH = 'face_detection_short_range.onnx.prototxt'
+WEIGHT_FACE_LANDMARK_PATH = 'face_landmark_with_attention.onnx'
+MODEL_FACE_LANDMARK_PATH = 'face_landmark_with_attention.onnx.prototxt'
+REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/mediapipe_holistic/'
 
 IMAGE_PATH = 'demo.jpg'
 SAVE_IMAGE_PATH = 'output.png'
@@ -315,21 +323,24 @@ def pose_estimate(models, img):
         landmark[0] = cosa * x - sina * y
         landmark[1] = sina * x + cosa * y
 
-    PoseLandmark = namedtuple('PoseLandmark', ['x', 'y', 'z', 'visibility', 'presence'])
-    pose_landmarks = [PoseLandmark(lm[0], lm[1], lm[2], lm[3], lm[4]) for lm in all_landmarks]
-    PoseWorldLandmark = namedtuple('PoseWorldLandmark', ['x', 'y', 'z', 'visibility'])
-    pose_world_landmarks = [
-        PoseWorldLandmark(wld[0], wld[1], wld[2], lm[3])
-        for lm, wld in zip(all_landmarks, all_world_landmarks)
-    ]
-
     face_landmarks = all_landmarks[:11, ...]
     face_landmarks = face_estimate(img, face_landmarks, models)
 
     left_hand_landmarks = all_landmarks[[15, 17, 19], ...]
     right_hand_landmarks = all_landmarks[[16, 18, 20], ...]
-    left_hand_landmarks, right_hand_landmarks = hands_estimate(
-        img, left_hand_landmarks, right_hand_landmarks, models)
+    # left_hand_landmarks, right_hand_landmarks = hands_estimate(
+    #     img, left_hand_landmarks, right_hand_landmarks, models)
+
+    PoseLandmark = namedtuple('PoseLandmark', ['x', 'y', 'z', 'visibility', 'presence'])
+    Landmark = namedtuple('Landmark', ['x', 'y', 'z'])
+    PoseWorldLandmark = namedtuple('PoseWorldLandmark', ['x', 'y', 'z', 'visibility'])
+
+    pose_landmarks = [PoseLandmark(lm[0], lm[1], lm[2], lm[3], lm[4]) for lm in all_landmarks]
+    face_landmarks = [Landmark(lm[0], lm[1], lm[2]) for lm in face_landmarks]
+    pose_world_landmarks = [
+        PoseWorldLandmark(wld[0], wld[1], wld[2], lm[3])
+        for lm, wld in zip(all_landmarks, all_world_landmarks)
+    ]
 
     return \
         pose_landmarks, pose_world_landmarks, \
@@ -381,6 +392,7 @@ def recognize_from_image(models):
 
         # plot result
         draw_landmarks(img, pose_landmarks)
+        draw_face_landmarks(img, face_landmarks)
 
         if args.world_landmark:
             plot_landmarks(pose_world_landmarks)
@@ -437,33 +449,35 @@ def recognize_from_video(models):
 
 def main():
     # model files check and download
-    check_and_download_models(WEIGHT_DETECTOR_PATH, MODEL_DETECTOR_PATH, REMOTE_PATH)
+    ## pose model
+    check_and_download_models(WEIGHT_DETECTOR_PATH, MODEL_DETECTOR_PATH, REMOTE_POSE_PATH)
     info = {
         'lite': (WEIGHT_LITE_PATH, MODEL_LITE_PATH),
         'full': (WEIGHT_FULL_PATH, MODEL_FULL_PATH),
         'heavy': (WEIGHT_HEAVY_PATH, MODEL_HEAVY_PATH),
     }
-    weight_path, model_path = info[args.model]
-    check_and_download_models(weight_path, model_path, REMOTE_PATH)
+    WEIGHT_PATH, MODEL_PATH = info[args.model]
+    ## face model
+    check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_POSE_PATH)
+    check_and_download_models(WEIGHT_FACE_DETECTOR_PATH, MODEL_FACE_DETECTOR_PATH, REMOTE_POSE_PATH)
+    check_and_download_models(WEIGHT_FACE_LANDMARK_PATH, MODEL_FACE_LANDMARK_PATH, REMOTE_POSE_PATH)
 
     env_id = args.env_id
 
     # initialize
     if not args.onnx:
         det_net = ailia.Net(MODEL_DETECTOR_PATH, WEIGHT_DETECTOR_PATH, env_id=env_id)
-        lmk_net = ailia.Net(model_path, weight_path, env_id=env_id)
-        face_det = ailia.Net(
-            "face_detection_short_range.onnx.prototxt", "face_detection_short_range.onnx", env_id=env_id)
-        face_lmk = ailia.Net(
-            "face_landmark_with_attention.onnx.prototxt", "face_landmark_with_attention.onnx", env_id=env_id)
-        hand_net = ailia.Net("hand_recrop.onnx.prototxt", "hand_recrop.onnx", env_id=env_id)
+        lmk_net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+        face_det = ailia.Net(MODEL_FACE_DETECTOR_PATH, WEIGHT_FACE_DETECTOR_PATH, env_id=env_id)
+        face_lmk = ailia.Net(MODEL_FACE_LANDMARK_PATH, WEIGHT_FACE_LANDMARK_PATH, env_id=env_id)
+        # hand_net = ailia.Net("hand_recrop.onnx.prototxt", "hand_recrop.onnx", env_id=env_id)
     else:
         import onnxruntime
         det_net = onnxruntime.InferenceSession(WEIGHT_DETECTOR_PATH)
-        lmk_net = onnxruntime.InferenceSession(weight_path)
-        face_det = onnxruntime.InferenceSession("face_detection_short_range.onnx")
-        face_lmk = onnxruntime.InferenceSession("face_landmark_with_attention.onnx")
-        hand_net = onnxruntime.InferenceSession("hand_recrop.onnx")
+        lmk_net = onnxruntime.InferenceSession(WEIGHT_PATH)
+        face_det = onnxruntime.InferenceSession(WEIGHT_FACE_DETECTOR_PATH)
+        face_lmk = onnxruntime.InferenceSession(WEIGHT_FACE_LANDMARK_PATH)
+        # hand_net = onnxruntime.InferenceSession("hand_recrop.onnx")
         face_detection.onnx = True
         hand_detection.onnx = True
 
@@ -472,7 +486,7 @@ def main():
         'lmk_net': lmk_net,
         'face_det': face_det,
         'face_lmk': face_lmk,
-        'hand_net': hand_net,
+        # 'hand_net': hand_net,
     }
 
     if args.video is not None:

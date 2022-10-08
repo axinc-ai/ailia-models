@@ -3,6 +3,8 @@ import math
 import cv2
 import matplotlib.pyplot as plt
 
+from face_mesh_const import FACEMESH_TESSELATION
+
 _PRESENCE_THRESHOLD = 0.5
 _VISIBILITY_THRESHOLD = 0.5
 
@@ -20,6 +22,7 @@ LANDMARK_CENTER = (0,)
 LANDMARK_LEFT = (1, 2, 3, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31)
 
 WHITE_COLOR = (224, 224, 224)
+GRAY_COLOR = (128, 128, 128)
 BLACK_COLOR = (0, 0, 0)
 RED_COLOR = (0, 0, 255)
 
@@ -95,6 +98,39 @@ def draw_landmarks(
         # Fill color into the circle
         cv2.circle(
             image, landmark_px, circle_radius, color, thickness)
+
+    return
+
+
+def draw_face_landmarks(
+        image,
+        landmark_list):
+    """Draws the landmarks and the connections on the image.
+
+    Args:
+      image: A three channel BGR image represented as numpy ndarray.
+      landmark_list: A normalized landmark list proto message to be annotated on the image.
+    """
+    image_rows, image_cols, _ = image.shape
+    idx_to_coordinates = {}
+
+    for idx, landmark in enumerate(landmark_list):
+        landmark_px = _normalized_to_pixel_coordinates(
+            landmark.x, landmark.y, image_cols, image_rows)
+        if landmark_px:
+            idx_to_coordinates[idx] = landmark_px
+
+    thickness = 1
+
+    # Draws the connections if the start and end landmarks are both visible.
+    for connection in FACEMESH_TESSELATION:
+        start_idx = connection[0]
+        end_idx = connection[1]
+        if start_idx in idx_to_coordinates and end_idx in idx_to_coordinates:
+            cv2.line(
+                image, idx_to_coordinates[start_idx],
+                idx_to_coordinates[end_idx],
+                GRAY_COLOR, thickness)
 
     return
 

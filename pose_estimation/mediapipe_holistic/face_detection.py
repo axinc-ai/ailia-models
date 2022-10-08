@@ -7,7 +7,7 @@ from image_utils import normalize_image
 from math_utils import sigmoid
 
 from detection_utils import get_anchor, decode_boxes, weighted_nms
-from face_refinement import indexes_mapping, indexes_for_average
+from face_mesh_const import INDEXES_MAPPING, INDEXES_FOR_AVERAGE
 
 FACE_DET_SIZE = 128
 FACE_LMK_SIZE = 192
@@ -82,11 +82,6 @@ def face_estimate(img, face_landmarks, models):
     M = cv2.getPerspectiveTransform(pts1, pts2)
     transformed = cv2.warpPerspective(
         img, M, (w, h), flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT)
-
-    # print(transformed)
-    # print(transformed.shape)
-    # cv2.imwrite("face_det.png", transformed)
-    # transformed = cv2.imread("face_det_0.png")
 
     transformed = normalize_image(transformed, '127.5')
     transformed = transformed.transpose(2, 0, 1)  # HWC -> CHW
@@ -185,11 +180,6 @@ def face_estimate(img, face_landmarks, models):
     transformed = cv2.warpPerspective(
         img, M, (w, h), flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_REPLICATE)
 
-    # print(transformed)
-    # print(transformed.shape)
-    # cv2.imwrite("face_mesh.png", transformed)
-    # transformed = cv2.imread("face_mesh_0.png")
-
     transformed = normalize_image(transformed, '255')
     transformed = transformed.transpose(2, 0, 1)  # HWC -> CHW
     transformed = np.expand_dims(transformed, axis=0)
@@ -206,10 +196,9 @@ def face_estimate(img, face_landmarks, models):
     # score of face presence
     face_presence_score = sigmoid(flag[0, 0, 0, 0])
 
-    # Applies a threshold to the confidence score to determine whether a face is
-    # present.
-
     # Drop landmarks tensors if face is not present.
+    if face_presence_score < 0.5:
+        return np.zeros((0, 3))
 
     # Decodes the landmark tensors into a vector of landmarks, where the landmark
     # coordinates are normalized by the size of the input image to the model.
@@ -227,19 +216,19 @@ def face_estimate(img, face_landmarks, models):
         left_eye_landmarks, right_eye_landmarks,
         left_iris_landmarks, right_iris_landmarks
     ]):
-        for j, index in enumerate(indexes_mapping[i]):
+        for j, index in enumerate(INDEXES_MAPPING[i]):
             landmarks[index, :2] = lmks[j, :2]
 
     # z copy
     ## 0 - mesh
-    for j, index in enumerate(indexes_mapping[0]):
+    for j, index in enumerate(INDEXES_MAPPING[0]):
         landmarks[index, 2] = mesh_landmarks[j, 2]
 
     # z average
     ## 4 - left iris
-    landmarks[indexes_mapping[4], 2] = np.mean(landmarks[indexes_for_average[4], 2])
+    landmarks[INDEXES_MAPPING[4], 2] = np.mean(landmarks[INDEXES_FOR_AVERAGE[4], 2])
     ## 5 - right iris
-    landmarks[indexes_mapping[5], 2] = np.mean(landmarks[indexes_for_average[5], 2])
+    landmarks[INDEXES_MAPPING[5], 2] = np.mean(landmarks[INDEXES_FOR_AVERAGE[5], 2])
 
     # Projects the landmarks from the cropped face image to the corresponding
     # locations on the full image before cropping (input to the graph).
