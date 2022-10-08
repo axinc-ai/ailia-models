@@ -250,7 +250,7 @@ def pose_estimate(models, img):
     input, pad = preprocess_detection(img)
 
     # feedforward
-    det_net = models['det_net']
+    det_net = models['pose_det']
     if not args.onnx:
         output = det_net.predict([input])
     else:
@@ -282,7 +282,7 @@ def pose_estimate(models, img):
     input_tensors = preprocess_landmark(img, center, box_size, rotation)
 
     # feedforward
-    net = models['lmk_net']
+    net = models['pose_lmk']
     if not args.onnx:
         output = net.predict([input_tensors])
     else:
@@ -474,16 +474,16 @@ def main():
 
     # initialize
     if not args.onnx:
-        det_net = ailia.Net(MODEL_DETECTOR_PATH, WEIGHT_DETECTOR_PATH, env_id=env_id)
-        lmk_net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+        pose_det = ailia.Net(MODEL_DETECTOR_PATH, WEIGHT_DETECTOR_PATH, env_id=env_id)
+        pose_lmk = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
         face_det = ailia.Net(MODEL_FACE_DETECTOR_PATH, WEIGHT_FACE_DETECTOR_PATH, env_id=env_id)
         face_lmk = ailia.Net(MODEL_FACE_LANDMARK_PATH, WEIGHT_FACE_LANDMARK_PATH, env_id=env_id)
         # hand_det = ailia.Net(MODEL_HAND_DETECTOR_PATH, WEIGHT_HAND_DETECTOR_PATH, env_id=env_id)
         # hand_lmk = ailia.Net(MODEL_HAND_LANDMARK_PATH, WEIGHT_HAND_LANDMARK_PATH, env_id=env_id)
     else:
         import onnxruntime
-        det_net = onnxruntime.InferenceSession(WEIGHT_DETECTOR_PATH)
-        lmk_net = onnxruntime.InferenceSession(WEIGHT_PATH)
+        pose_det = onnxruntime.InferenceSession(WEIGHT_DETECTOR_PATH)
+        pose_lmk = onnxruntime.InferenceSession(WEIGHT_PATH)
         face_det = onnxruntime.InferenceSession(WEIGHT_FACE_DETECTOR_PATH)
         face_lmk = onnxruntime.InferenceSession(WEIGHT_FACE_LANDMARK_PATH)
         # hand_det = onnxruntime.InferenceSession(WEIGHT_HAND_DETECTOR_PATH)
@@ -492,8 +492,8 @@ def main():
         hand_detection.onnx = True
 
     models = {
-        'det_net': det_net,
-        'lmk_net': lmk_net,
+        'pose_det': pose_det,
+        'pose_lmk': pose_lmk,
         'face_det': face_det,
         'face_lmk': face_lmk,
         # 'hand_det': hand_det,
