@@ -48,6 +48,11 @@ WEIGHT_FACE_DETECTOR_PATH = 'face_detection_short_range.onnx'
 MODEL_FACE_DETECTOR_PATH = 'face_detection_short_range.onnx.prototxt'
 WEIGHT_FACE_LANDMARK_PATH = 'face_landmark_with_attention.onnx'
 MODEL_FACE_LANDMARK_PATH = 'face_landmark_with_attention.onnx.prototxt'
+# hand model
+WEIGHT_HAND_DETECTOR_PATH = 'hand_recrop.onnx'
+MODEL_HAND_DETECTOR_PATH = 'hand_recrop.onnx.prototxt'
+WEIGHT_HAND_LANDMARK_PATH = 'hand_landmark_full.onnx'
+MODEL_HAND_LANDMARK_PATH = 'hand_landmark_full.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/mediapipe_holistic/'
 
 IMAGE_PATH = 'demo.jpg'
@@ -457,10 +462,13 @@ def main():
         'heavy': (WEIGHT_HEAVY_PATH, MODEL_HEAVY_PATH),
     }
     WEIGHT_PATH, MODEL_PATH = info[args.model]
-    ## face model
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_POSE_PATH)
-    check_and_download_models(WEIGHT_FACE_DETECTOR_PATH, MODEL_FACE_DETECTOR_PATH, REMOTE_POSE_PATH)
-    check_and_download_models(WEIGHT_FACE_LANDMARK_PATH, MODEL_FACE_LANDMARK_PATH, REMOTE_POSE_PATH)
+    ## face model
+    check_and_download_models(WEIGHT_FACE_DETECTOR_PATH, MODEL_FACE_DETECTOR_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_FACE_LANDMARK_PATH, MODEL_FACE_LANDMARK_PATH, REMOTE_PATH)
+    # ## hand model
+    # check_and_download_models(WEIGHT_HAND_DETECTOR_PATH, MODEL_HAND_DETECTOR_PATH, REMOTE_PATH)
+    # check_and_download_models(WEIGHT_HAND_LANDMARK_PATH, MODEL_HAND_LANDMARK_PATH, REMOTE_PATH)
 
     env_id = args.env_id
 
@@ -470,14 +478,16 @@ def main():
         lmk_net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
         face_det = ailia.Net(MODEL_FACE_DETECTOR_PATH, WEIGHT_FACE_DETECTOR_PATH, env_id=env_id)
         face_lmk = ailia.Net(MODEL_FACE_LANDMARK_PATH, WEIGHT_FACE_LANDMARK_PATH, env_id=env_id)
-        # hand_net = ailia.Net("hand_recrop.onnx.prototxt", "hand_recrop.onnx", env_id=env_id)
+        # hand_det = ailia.Net(MODEL_HAND_DETECTOR_PATH, WEIGHT_HAND_DETECTOR_PATH, env_id=env_id)
+        # hand_lmk = ailia.Net(MODEL_HAND_LANDMARK_PATH, WEIGHT_HAND_LANDMARK_PATH, env_id=env_id)
     else:
         import onnxruntime
         det_net = onnxruntime.InferenceSession(WEIGHT_DETECTOR_PATH)
         lmk_net = onnxruntime.InferenceSession(WEIGHT_PATH)
         face_det = onnxruntime.InferenceSession(WEIGHT_FACE_DETECTOR_PATH)
         face_lmk = onnxruntime.InferenceSession(WEIGHT_FACE_LANDMARK_PATH)
-        # hand_net = onnxruntime.InferenceSession("hand_recrop.onnx")
+        # hand_det = onnxruntime.InferenceSession(WEIGHT_HAND_DETECTOR_PATH)
+        # hand_lmk = onnxruntime.InferenceSession(WEIGHT_HAND_LANDMARK_PATH)
         face_detection.onnx = True
         hand_detection.onnx = True
 
@@ -486,7 +496,8 @@ def main():
         'lmk_net': lmk_net,
         'face_det': face_det,
         'face_lmk': face_lmk,
-        # 'hand_net': hand_net,
+        # 'hand_det': hand_det,
+        # 'hand_lmk': hand_lmk,
     }
 
     if args.video is not None:
