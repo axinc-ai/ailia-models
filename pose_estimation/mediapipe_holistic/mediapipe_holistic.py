@@ -72,7 +72,7 @@ parser = get_base_parser(
 )
 parser.add_argument(
     '-m', '--model', metavar='ARCH',
-    default='heavy', choices=MODEL_LIST,
+    default='full', choices=MODEL_LIST,
     help='Set model architecture: ' + ' | '.join(MODEL_LIST)
 )
 parser.add_argument(
@@ -437,6 +437,8 @@ def recognize_from_video(models):
 
         # plot result
         draw_landmarks(frame, pose_landmarks)
+        draw_face_landmarks(frame, face_landmarks)
+
         cv2.imshow('frame', frame)
         frame_shown = True
 
