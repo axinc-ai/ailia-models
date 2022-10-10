@@ -15,6 +15,7 @@ from image_utils import imread, load_image  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from utils import get_base_parser, get_savepath, update_parser  # noqa: E402
 from webcamera_utils import get_capture, get_writer  # noqa: E402
+from facemesh_const import FACEMESH_TESSELATION
 
 logger = getLogger(__name__)
 
@@ -42,6 +43,12 @@ parser.add_argument(
     help='By default, the optimized model is used, but with this option, ' +
     'you can switch to the normal (not optimized) model'
 )
+parser.add_argument(
+    '-l', '--legacy',
+    action='store_true',
+    help='By default, the constantpad2d model is used, but with this option, ' +
+    'you can switch to the reflectionpad2d model'
+)
 args = update_parser(parser)
 
 
@@ -50,12 +57,13 @@ args = update_parser(parser)
 # ======================
 DETECTION_MODEL_NAME = 'blazeface'
 
-# Legacy model
-# LANDMARK_MODEL_NAME = 'facemesh'
-
-# ConstantPad2d model
-# https://github.com/thepowerfuldeez/facemesh.pytorch/issues/3
-LANDMARK_MODEL_NAME = 'facemesh_constantpad2d'
+if args.legacy:
+    # Legacy model
+    LANDMARK_MODEL_NAME = 'facemesh'
+else:
+    # ConstantPad2d model
+    # https://github.com/thepowerfuldeez/facemesh.pytorch/issues/3
+    LANDMARK_MODEL_NAME = 'facemesh_constantpad2d'
 
 if args.normal:
     DETECTION_WEIGHT_PATH = f'{DETECTION_MODEL_NAME}.onnx'
@@ -101,7 +109,7 @@ def estimate_landmarks(input_data, src_img, scale, pad, detector, fut, estimator
     if detections[0].size != 0:
         imgs, affines, box = fut.estimator_preprocess(
             src_img[:, :, ::-1], detections, scale, pad
-        )
+        ) # BGR -> RGB
 
         dynamic_input_shape = False
 
@@ -132,6 +140,20 @@ def estimate_landmarks(input_data, src_img, scale, pad, detector, fut, estimator
         return landmarks, confidences, box
 
     return [], [], []
+
+
+def draw_face_landmarks(
+        image,
+        landmark_list,
+        size = 1):
+    for connection in FACEMESH_TESSELATION:
+        start_idx = connection[0]
+        end_idx = connection[1]
+        sx, sy = int(landmark_list[start_idx][0]), int(landmark_list[start_idx][1])
+        ex, ey = int(landmark_list[end_idx][0]), int(landmark_list[end_idx][1])
+        cv2.line(
+            image, (sx,sy), (ex,ey),
+            (0, 255, 0), size)
 
 
 # ======================
@@ -174,7 +196,8 @@ def recognize_from_image():
         draw_roi(src_img, box)
         for i in range(len(landmarks)):
             landmark, confidence = landmarks[i], confidences[i]
-            draw_landmarks(src_img, landmark[:, :2], size=1)
+            #draw_landmarks(src_img, landmark[:, :2], size=1)
+            draw_face_landmarks(src_img, landmark[:, :2], size=1)
 
         savepath = get_savepath(args.savepath, image_path)
         logger.info(f'saved at : {savepath}')
@@ -221,7 +244,8 @@ def recognize_from_video():
             landmark, confidence = landmarks[i], confidences[i]
             # if confidence > 0:
             # Can be > 1, no idea what it represents
-            draw_landmarks(frame, landmark[:, :2], size=1)
+            #draw_landmarks(frame, landmark[:, :2], size=1)
+            draw_face_landmarks(frame, landmark[:, :2], size=1)
 
         visual_img = frame
         if args.video == '0': # Flip horizontally if camera
