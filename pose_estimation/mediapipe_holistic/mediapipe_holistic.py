@@ -342,6 +342,8 @@ def pose_estimate(models, img):
 
     pose_landmarks = [PoseLandmark(lm[0], lm[1], lm[2], lm[3], lm[4]) for lm in all_landmarks]
     face_landmarks = [Landmark(lm[0], lm[1], lm[2]) for lm in face_landmarks]
+    left_hand_landmarks = [Landmark(lm[0], lm[1], lm[2]) for lm in left_hand_landmarks]
+    right_hand_landmarks = [Landmark(lm[0], lm[1], lm[2]) for lm in right_hand_landmarks]
     pose_world_landmarks = [
         PoseWorldLandmark(wld[0], wld[1], wld[2], lm[3])
         for lm, wld in zip(all_landmarks, all_world_landmarks)

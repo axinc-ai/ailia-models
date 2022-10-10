@@ -4,9 +4,6 @@ import cv2
 import numpy as np
 
 from image_utils import normalize_image
-from math_utils import sigmoid
-
-from detection_utils import get_anchor, decode_boxes, weighted_nms
 
 HAND_CROP_SIZE = 256
 HAND_LMK_SIZE = 224
@@ -17,9 +14,15 @@ onnx = False
 def hand_estimate(img, hand_landmarks, models):
     im_h, im_w = img.shape[:2]
 
+    # Drops hand-related pose landmarks if pose wrist is not visible. It will
+    # prevent from predicting hand landmarks on the current frame.
     threshold = 0.1
     accept = hand_landmarks[0, 3] > threshold
+    if not accept:
+        return np.zeros((0, 3)), np.zeros((0, 2))
 
+    # Converts hand-related pose landmarks to a detection that tightly encloses all
+    # of them.
     x_wrist = hand_landmarks[0, 0] * im_w
     y_wrist = hand_landmarks[0, 1] * im_h
     x_index = hand_landmarks[2, 0] * im_w
@@ -35,6 +38,7 @@ def hand_estimate(img, hand_landmarks, models):
     x_center = x_middle
     y_center = y_middle
 
+    # Converts hand detection to a normalized hand rectangle.
     box_size = np.sqrt(
         (x_middle - x_wrist) * (x_middle - x_wrist)
         + (y_middle - y_wrist) * (y_middle - y_wrist)) * 2.0
@@ -47,6 +51,8 @@ def hand_estimate(img, hand_landmarks, models):
     width = box_size / im_w
     height = box_size / im_h
 
+    # Expands the palm rectangle so that it becomes big enough for hand re-crop
+    # model to localize it accurately.
     shift_x = 0
     shift_y = -0.1
     x_shift = (im_w * width * shift_x * math.cos(rotation) - im_h * height * shift_y * math.sin(rotation)) / im_w
@@ -68,9 +74,6 @@ def hand_estimate(img, hand_landmarks, models):
     transformed = cv2.warpPerspective(
         img, M, (w, h), flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_REPLICATE)
 
-    # cv2.imwrite("hand.png", transformed)
-    transformed = cv2.imread("hand_left_0.png")
-
     transformed = normalize_image(transformed, '255')
     transformed = transformed.transpose(2, 0, 1)  # HWC -> CHW
     transformed = np.expand_dims(transformed, axis=0)
@@ -83,8 +86,6 @@ def hand_estimate(img, hand_landmarks, models):
     else:
         output = net.run(None, {'input_1': input})
     output_crop = output[0]
-
-    # -- hand_recrop_by_roi
 
     landmarks = output_crop.reshape(-1, 2) / HAND_CROP_SIZE
 
@@ -103,19 +104,8 @@ def hand_estimate(img, hand_landmarks, models):
         x, y = lmks
         lmks[...] = project_fn(x, y)
 
-    print(landmarks)
-    print(landmarks.shape)
-
-    # # Converts hand landmarks to a detection that tightly encloses all landmarks
-    # # - LandmarksToDetectionCalculator
-    # xmin = np.min(landmarks[:, 0])
-    # ymin = np.min(landmarks[:, 1])
-    # xmax = np.max(landmarks[:, 0])
-    # ymax = np.max(landmarks[:, 1])
-
     # Converts hand detection into a rectangle based on center and scale alignment
     # points
-    # - AlignmentPointsRectsCalculator
     x0, x1 = landmarks[:, 0] * im_w
     y0, y1 = landmarks[:, 1] * im_h
     box_size = ((x1 - x0) ** 2 + (y1 - y0) ** 2) ** 0.5
@@ -127,48 +117,94 @@ def hand_estimate(img, hand_landmarks, models):
     y_center = y0 / im_h
     width = box_size / im_w
     height = box_size / im_h
-    print(x_center, y_center, width, height, rotation)
 
     # Slighly moves hand re-crop rectangle from wrist towards fingertips. Due to the
     # new hand cropping logic, crop border is to close to finger tips while a lot of
     # space is below the wrist. And when moving hand up fast (with fingers pointing
     # up) and using hand rect from the previous frame for tracking - fingertips can
-    # be cropped. This adjustment partially solves it, but hand cropping logic
-    # should be reviewed.
-    # - RectTransformationCalculator
+    # be cropped.
+    shift_x = 0
+    shift_y = -0.1
+    x_shift = (im_w * width * shift_x * math.cos(rotation) - im_h * height * shift_y * math.sin(rotation)) / im_w
+    y_shift = (im_w * width * shift_x * math.sin(rotation) + im_h * height * shift_y * math.cos(rotation)) / im_h
+    x_center += x_shift
+    y_center += y_shift
 
-    # HandLandmarkCpu
+    long_side = max(width * im_w, height * im_h)
+    width = long_side / im_w
+    height = long_side / im_h
 
-    # Transforms a region of image into a 224x224 tensor while keeping the aspect
-    # ratio, and therefore may result in potential letterboxing.
+    center = (x_center * im_w, y_center * im_h)
+    rotated_rect = (center, (width * im_w, height * im_h), rotation * 180. / np.pi)
+    pts1 = cv2.boxPoints(rotated_rect)
 
-    # Converts the hand-flag tensor into a float that represents the confidence
-    # score of hand presence.
+    h = w = HAND_LMK_SIZE
+    pts2 = np.float32([[0, h], [0, 0], [w, 0], [w, h]])
+    M = cv2.getPerspectiveTransform(pts1, pts2)
+    transformed = cv2.warpPerspective(
+        img, M, (w, h), flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_REPLICATE)
+
+    transformed = normalize_image(transformed, '255')
+    transformed = transformed.transpose(2, 0, 1)  # HWC -> CHW
+    transformed = np.expand_dims(transformed, axis=0)
+    input = transformed.astype(np.float32)
+
+    # feedforward
+    net = models['hand_lmk']
+    if not onnx:
+        output = net.predict([input])
+    else:
+        output = net.run(None, {'input_1': input})
+    landmarks, hand_flag, handedness, world_landmarks = output
 
     # Applies a threshold to the confidence score to determine whether a hand is
     # present.
-
-    # Converts the handedness tensor into a float that represents the classification
-    # score of handedness.
+    threshold = 0.5
+    accept = hand_flag[0, 0] > threshold
+    if not accept:
+        return np.zeros((0, 3)), np.zeros((0, 2))
 
     # Decodes the landmark tensors into a list of landmarks, where the landmark
     # coordinates are normalized by the size of the input image to the model.
-    # - TensorsToLandmarksCalculator
+    landmarks = landmarks.reshape(-1, 3) / HAND_LMK_SIZE
+    world_landmarks = world_landmarks.reshape(-1, 3)
 
-    # Adjusts landmarks (already normalized to [0.f, 1.f]) on the letterboxed hand
-    # image (after image transformation with the FIT scale mode)
-    # - LandmarkLetterboxRemovalCalculator
+    normalize_z = 0.4
+    landmarks[:, 2] = landmarks[:, 2] / normalize_z
 
     # Projects the landmarks from the cropped hand image to the corresponding
     # locations on the full image before cropping (input to the graph).
-    # - LandmarkProjectionCalculator
+    cosa = math.cos(rotation)
+    sina = math.sin(rotation)
 
-    x = np.array([])
-    return x
+    def project_fn(x, y, z):
+        x -= 0.5
+        y -= 0.5
+        new_x = cosa * x - sina * y
+        new_y = sina * x + cosa * y
+        new_x = new_x * width + x_center
+        new_y = new_y * height + y_center
+        new_z = z * width  # Scale Z coordinate as X.
+        return new_x, new_y, new_z
+
+    for lmks in landmarks:
+        x, y, z = lmks
+        lmks[...] = project_fn(x, y, z)
+
+    def project_fn(x, y):
+        new_x = cosa * x - sina * y
+        new_y = sina * x + cosa * y
+        return new_x, new_y
+
+    for lmks in world_landmarks:
+        x, y, _ = lmks
+        lmks[:2] = project_fn(x, y)
+
+    return landmarks, world_landmarks
 
 
 def hands_estimate(img, left_hand_landmarks, right_hand_landmarks, models):
-    left_hand_landmarks = hand_estimate(img, left_hand_landmarks, models)
-    # right_hand_landmarks = hand_estimate(img, right_hand_landmarks, models)
+    left_hand_landmarks, _ = hand_estimate(img, left_hand_landmarks, models)
+    right_hand_landmarks, _ = hand_estimate(img, right_hand_landmarks, models)
 
     return left_hand_landmarks, right_hand_landmarks
