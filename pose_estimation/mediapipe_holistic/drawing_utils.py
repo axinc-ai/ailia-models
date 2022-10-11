@@ -3,7 +3,7 @@ import math
 import cv2
 import matplotlib.pyplot as plt
 
-from face_mesh_const import FACEMESH_TESSELATION
+from landmark_const import HAND_CONNECTION, FACEMESH_TESSELATION
 
 _PRESENCE_THRESHOLD = 0.5
 _VISIBILITY_THRESHOLD = 0.5
@@ -131,6 +131,83 @@ def draw_face_landmarks(
                 image, idx_to_coordinates[start_idx],
                 idx_to_coordinates[end_idx],
                 GRAY_COLOR, thickness)
+
+    return
+
+
+def draw_hand_landmarks(
+        image,
+        landmark_list):
+    """Draws the landmarks and the connections on the image.
+
+    Args:
+      image: A three channel BGR image represented as numpy ndarray.
+      landmark_list: A normalized landmark list proto message to be annotated on the image.
+    """
+    image_rows, image_cols, _ = image.shape
+    idx_to_coordinates = {}
+
+    for idx, landmark in enumerate(landmark_list):
+        landmark_px = _normalized_to_pixel_coordinates(
+            landmark.x, landmark.y, image_cols, image_rows)
+        if landmark_px:
+            idx_to_coordinates[idx] = landmark_px
+
+    # Draws the connections if the start and end landmarks are both visible.
+    for connection in HAND_CONNECTION:
+        color = GRAY_COLOR
+        thickness = 3
+        if connection in ((1, 2), (2, 3), (3, 4)):
+            color = (180, 229, 255)
+            thickness = 2
+        elif connection in ((5, 6), (6, 7), (7, 8)):
+            color = (128, 64, 128)
+            thickness = 2
+        elif connection in ((9, 10), (10, 11), (11, 12)):
+            color = (0, 204, 255)
+            thickness = 2
+        elif connection in ((13, 14), (14, 15), (15, 16)):
+            color = (48, 255, 48)
+            thickness = 2
+        elif connection in ((17, 18), (18, 19), (19, 20)):
+            color = (192, 101, 21)
+            thickness = 2
+        start_idx = connection[0]
+        end_idx = connection[1]
+        if start_idx in idx_to_coordinates and end_idx in idx_to_coordinates:
+            cv2.line(
+                image, idx_to_coordinates[start_idx],
+                idx_to_coordinates[end_idx],
+                color, thickness)
+
+    for idx, landmark_px in idx_to_coordinates.items():
+        color = (48, 48, 255)
+        thickness = -1
+        circle_radius = 5
+        if idx in (2, 3, 4):
+            # THUMB_MCP, THUMB_IP, THUMB_TIP
+            color = (180, 229, 255)
+        elif idx in (6, 7, 8):
+            # INDEX_FINGER_PIP, INDEX_FINGER_DIP, INDEX_FINGER_TIP
+            color = (128, 64, 128)
+        elif idx in (10, 11, 12):
+            # MIDDLE_FINGER_PIP, MIDDLE_FINGER_DIP, MIDDLE_FINGER_TIP
+            color = (0, 204, 255)
+        elif idx in (14, 15, 16):
+            # RING_FINGER_PIP, RING_FINGER_DIP, RING_FINGER_TIP
+            color = (48, 255, 48)
+        elif idx in (18, 19, 20):
+            # PINKY_PIP, PINKY_DIP, PINKY_TIP
+            color = (192, 101, 21)
+
+        # White circle border
+        circle_border_radius = max(
+            circle_radius + 1, int(circle_radius * 1.2))
+        cv2.circle(
+            image, landmark_px, circle_border_radius, WHITE_COLOR, thickness)
+        # Fill color into the circle
+        cv2.circle(
+            image, landmark_px, circle_radius, color, thickness)
 
     return
 

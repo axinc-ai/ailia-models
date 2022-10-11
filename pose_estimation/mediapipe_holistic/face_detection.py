@@ -7,7 +7,7 @@ from image_utils import normalize_image
 from math_utils import sigmoid
 
 from detection_utils import get_anchor, decode_boxes, weighted_nms
-from face_mesh_const import INDEXES_MAPPING, INDEXES_FOR_AVERAGE
+from landmark_const import INDEXES_MAPPING, INDEXES_FOR_AVERAGE
 
 FACE_DET_SIZE = 128
 FACE_LMK_SIZE = 192
