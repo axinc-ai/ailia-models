@@ -32,7 +32,7 @@ $ python3 mediapipe_holistic.py --video VIDEO_PATH
 ```
 
 By adding the `--model` option, you can specify pose model type which is selected from "lite", "full", "heavy".  
-(default is heavy)
+(default is full)
 ```bash
 $ python3 mediapipe_holistic.py --model heavy
 ```
