@@ -2,7 +2,7 @@
 
 ## Input
 
-![Input](demo.png)
+![Input](demo.jpg)
 
 (Image from https://mediapipe.page.link/pose_py_colab)
 
