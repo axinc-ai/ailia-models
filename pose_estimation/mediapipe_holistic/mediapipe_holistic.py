@@ -19,7 +19,7 @@ import webcamera_utils
 from logging import getLogger  # noqa
 
 from detection_utils import pose_detection
-from drawing_utils import draw_landmarks, draw_face_landmarks, plot_landmarks
+from drawing_utils import draw_landmarks, draw_face_landmarks, draw_hand_landmarks, plot_landmarks
 import face_detection
 import hand_detection
 from face_detection import face_estimate
@@ -58,8 +58,8 @@ REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/mediapipe_holistic/'
 IMAGE_PATH = 'demo.jpg'
 SAVE_IMAGE_PATH = 'output.png'
 
-IMAGE_DET_SIZE = 224
-IMAGE_LMK_SIZE = 256
+POSE_DET_SIZE = 224
+POSE_LMK_SIZE = 256
 
 # ======================
 # Argument Parser Config
@@ -104,7 +104,7 @@ def preprocess_detection(img):
         rotated_rect = ((im_w // 2, im_h // 2), (box_size, box_size), 0)
         pts1 = cv2.boxPoints(rotated_rect)
 
-        h = w = IMAGE_DET_SIZE
+        h = w = POSE_DET_SIZE
         pts2 = np.float32([[0, h], [0, 0], [w, 0], [w, h]])
         M = cv2.getPerspectiveTransform(pts1, pts2)
         img = cv2.warpPerspective(
@@ -118,21 +118,21 @@ def preprocess_detection(img):
         else:
             pad_w = (1 - dst_aspect_ratio / src_aspect_ratio) / 2
     else:
-        scale = IMAGE_DET_SIZE / max(im_h, im_w)
+        scale = POSE_DET_SIZE / max(im_h, im_w)
         ow, oh = int(im_w * scale), int(im_h * scale)
         if ow != im_w or oh != im_h:
             img = cv2.resize(img, (ow, oh), interpolation=cv2.INTER_LINEAR)
 
         pad_h = pad_w = 0
-        if ow != IMAGE_DET_SIZE or oh != IMAGE_DET_SIZE:
-            pad_img = np.zeros((IMAGE_DET_SIZE, IMAGE_DET_SIZE, 3))
-            pad_h = (IMAGE_DET_SIZE - oh) // 2
-            pad_w = (IMAGE_DET_SIZE - ow) // 2
+        if ow != POSE_DET_SIZE or oh != POSE_DET_SIZE:
+            pad_img = np.zeros((POSE_DET_SIZE, POSE_DET_SIZE, 3))
+            pad_h = (POSE_DET_SIZE - oh) // 2
+            pad_w = (POSE_DET_SIZE - ow) // 2
             pad_img[pad_h:pad_h + oh, pad_w:pad_w + ow, :] = img
             img = pad_img
 
-        pad_h = pad_h / IMAGE_DET_SIZE
-        pad_w = pad_w / IMAGE_DET_SIZE
+        pad_h = pad_h / POSE_DET_SIZE
+        pad_w = pad_w / POSE_DET_SIZE
 
     """
     normalize & reshape
@@ -153,7 +153,7 @@ def preprocess_landmark(img, center, box_size, rotation):
     rotated_rect = (center, (box_size, box_size), rotation * 180. / np.pi)
     pts1 = cv2.boxPoints(rotated_rect)
 
-    h = w = IMAGE_LMK_SIZE
+    h = w = POSE_LMK_SIZE
     pts2 = np.float32([[0, h], [0, 0], [w, 0], [w, h]])
     M = cv2.getPerspectiveTransform(pts1, pts2)
     transformed = cv2.warpPerspective(
@@ -296,7 +296,7 @@ def pose_estimate(models, img):
     all_world_landmarks = to_landmark(world_landmark_tensor)
 
     # Output normalized landmarks
-    h = w = IMAGE_LMK_SIZE
+    h = w = POSE_LMK_SIZE
     raw_landmarks[:, :, 0] = raw_landmarks[:, :, 0] / w
     raw_landmarks[:, :, 1] = raw_landmarks[:, :, 1] / h
     raw_landmarks[:, :, 2] = raw_landmarks[:, :, 2] / w
@@ -333,8 +333,8 @@ def pose_estimate(models, img):
 
     left_hand_landmarks = all_landmarks[[15, 17, 19], ...]
     right_hand_landmarks = all_landmarks[[16, 18, 20], ...]
-    # left_hand_landmarks, right_hand_landmarks = hands_estimate(
-    #     img, left_hand_landmarks, right_hand_landmarks, models)
+    left_hand_landmarks, right_hand_landmarks = hands_estimate(
+        img, left_hand_landmarks, right_hand_landmarks, models)
 
     PoseLandmark = namedtuple('PoseLandmark', ['x', 'y', 'z', 'visibility', 'presence'])
     Landmark = namedtuple('Landmark', ['x', 'y', 'z'])
@@ -342,6 +342,8 @@ def pose_estimate(models, img):
 
     pose_landmarks = [PoseLandmark(lm[0], lm[1], lm[2], lm[3], lm[4]) for lm in all_landmarks]
     face_landmarks = [Landmark(lm[0], lm[1], lm[2]) for lm in face_landmarks]
+    left_hand_landmarks = [Landmark(lm[0], lm[1], lm[2]) for lm in left_hand_landmarks]
+    right_hand_landmarks = [Landmark(lm[0], lm[1], lm[2]) for lm in right_hand_landmarks]
     pose_world_landmarks = [
         PoseWorldLandmark(wld[0], wld[1], wld[2], lm[3])
         for lm, wld in zip(all_landmarks, all_world_landmarks)
@@ -398,6 +400,8 @@ def recognize_from_image(models):
         # plot result
         draw_landmarks(img, pose_landmarks)
         draw_face_landmarks(img, face_landmarks)
+        draw_hand_landmarks(img, left_hand_landmarks)
+        draw_hand_landmarks(img, right_hand_landmarks)
 
         if args.world_landmark:
             plot_landmarks(pose_world_landmarks)
@@ -438,6 +442,8 @@ def recognize_from_video(models):
         # plot result
         draw_landmarks(frame, pose_landmarks)
         draw_face_landmarks(frame, face_landmarks)
+        draw_hand_landmarks(frame, left_hand_landmarks)
+        draw_hand_landmarks(frame, right_hand_landmarks)
 
         cv2.imshow('frame', frame)
         frame_shown = True
@@ -468,9 +474,9 @@ def main():
     ## face model
     check_and_download_models(WEIGHT_FACE_DETECTOR_PATH, MODEL_FACE_DETECTOR_PATH, REMOTE_PATH)
     check_and_download_models(WEIGHT_FACE_LANDMARK_PATH, MODEL_FACE_LANDMARK_PATH, REMOTE_PATH)
-    # ## hand model
-    # check_and_download_models(WEIGHT_HAND_DETECTOR_PATH, MODEL_HAND_DETECTOR_PATH, REMOTE_PATH)
-    # check_and_download_models(WEIGHT_HAND_LANDMARK_PATH, MODEL_HAND_LANDMARK_PATH, REMOTE_PATH)
+    ## hand model
+    check_and_download_models(WEIGHT_HAND_DETECTOR_PATH, MODEL_HAND_DETECTOR_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_HAND_LANDMARK_PATH, MODEL_HAND_LANDMARK_PATH, REMOTE_PATH)
 
     env_id = args.env_id
 
@@ -480,16 +486,16 @@ def main():
         pose_lmk = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
         face_det = ailia.Net(MODEL_FACE_DETECTOR_PATH, WEIGHT_FACE_DETECTOR_PATH, env_id=env_id)
         face_lmk = ailia.Net(MODEL_FACE_LANDMARK_PATH, WEIGHT_FACE_LANDMARK_PATH, env_id=env_id)
-        # hand_det = ailia.Net(MODEL_HAND_DETECTOR_PATH, WEIGHT_HAND_DETECTOR_PATH, env_id=env_id)
-        # hand_lmk = ailia.Net(MODEL_HAND_LANDMARK_PATH, WEIGHT_HAND_LANDMARK_PATH, env_id=env_id)
+        hand_det = ailia.Net(MODEL_HAND_DETECTOR_PATH, WEIGHT_HAND_DETECTOR_PATH, env_id=env_id)
+        hand_lmk = ailia.Net(MODEL_HAND_LANDMARK_PATH, WEIGHT_HAND_LANDMARK_PATH, env_id=env_id)
     else:
         import onnxruntime
         pose_det = onnxruntime.InferenceSession(WEIGHT_DETECTOR_PATH)
         pose_lmk = onnxruntime.InferenceSession(WEIGHT_PATH)
         face_det = onnxruntime.InferenceSession(WEIGHT_FACE_DETECTOR_PATH)
         face_lmk = onnxruntime.InferenceSession(WEIGHT_FACE_LANDMARK_PATH)
-        # hand_det = onnxruntime.InferenceSession(WEIGHT_HAND_DETECTOR_PATH)
-        # hand_lmk = onnxruntime.InferenceSession(WEIGHT_HAND_LANDMARK_PATH)
+        hand_det = onnxruntime.InferenceSession(WEIGHT_HAND_DETECTOR_PATH)
+        hand_lmk = onnxruntime.InferenceSession(WEIGHT_HAND_LANDMARK_PATH)
         face_detection.onnx = True
         hand_detection.onnx = True
 
@@ -498,8 +504,8 @@ def main():
         'pose_lmk': pose_lmk,
         'face_det': face_det,
         'face_lmk': face_lmk,
-        # 'hand_det': hand_det,
-        # 'hand_lmk': hand_lmk,
+        'hand_det': hand_det,
+        'hand_lmk': hand_lmk,
     }
 
     if args.video is not None:
