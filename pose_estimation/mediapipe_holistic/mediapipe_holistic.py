@@ -259,7 +259,7 @@ def pose_estimate(models, img):
 
     box, score = pose_detection(detections, scores, pad)
     if len(box) == 0:
-        return [], []
+        return [], [], [], [], []
 
     # Calculates region of interest based on pose detection, so that can be used
     # to detect landmarks.
@@ -390,6 +390,10 @@ def recognize_from_image(models):
         pose_landmarks, pose_world_landmarks, \
         left_hand_landmarks, right_hand_landmarks, \
         face_landmarks = output
+        
+        if len(pose_landmarks) == 0:
+            logger.info('pose not detected.')
+            continue
 
         logger.info(
             f'Nose coordinates: ('
@@ -440,10 +444,11 @@ def recognize_from_video(models):
         face_landmarks = output
 
         # plot result
-        draw_landmarks(frame, pose_landmarks)
-        draw_face_landmarks(frame, face_landmarks)
-        draw_hand_landmarks(frame, left_hand_landmarks)
-        draw_hand_landmarks(frame, right_hand_landmarks)
+        if 0 < len(pose_landmarks):
+            draw_landmarks(frame, pose_landmarks)
+            draw_face_landmarks(frame, face_landmarks)
+            draw_hand_landmarks(frame, left_hand_landmarks)
+            draw_hand_landmarks(frame, right_hand_landmarks)
 
         cv2.imshow('frame', frame)
         frame_shown = True
