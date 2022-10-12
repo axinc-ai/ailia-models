@@ -49,6 +49,18 @@ parser.add_argument(
     help='By default, the constantpad2d model is used, but with this option, ' +
     'you can switch to the reflectionpad2d model'
 )
+parser.add_argument(
+    '--attention',
+    action='store_true',
+    help='By default, the constantpad2d model is used, but with this option, ' +
+    'you can switch to the attention model'
+)
+parser.add_argument(
+    '--back',
+    action='store_true',
+    help='By default, the front camera model is used, but with this option, ' +
+    'you can switch to the back camera model'
+)
 args = update_parser(parser)
 
 
@@ -56,27 +68,39 @@ args = update_parser(parser)
 # Parameters 2
 # ======================
 DETECTION_MODEL_NAME = 'blazeface'
+LANDMARK_MODEL_NAME = 'facemesh'
+
+if args.back:
+    DETECTION_MODEL_DETAIL_NAME = 'blazefaceback'
+    args.normal = True
+else:
+    DETECTION_MODEL_DETAIL_NAME = 'blazeface'
 
 if args.legacy:
     # Legacy model
-    LANDMARK_MODEL_NAME = 'facemesh'
+    LANDMARK_MODEL_DETAIL_NAME = 'facemesh'
 else:
     # ConstantPad2d model
     # https://github.com/thepowerfuldeez/facemesh.pytorch/issues/3
-    LANDMARK_MODEL_NAME = 'facemesh_constantpad2d'
+    LANDMARK_MODEL_DETAIL_NAME = 'facemesh_constantpad2d'
+
+if args.attention:
+    LANDMARK_MODEL_NAME = 'mediapipe_holistic'
+    LANDMARK_MODEL_DETAIL_NAME = 'face_landmark_with_attention'
+    args.normal = True
 
 if args.normal:
-    DETECTION_WEIGHT_PATH = f'{DETECTION_MODEL_NAME}.onnx'
-    DETECTION_MODEL_PATH = f'{DETECTION_MODEL_NAME}.onnx.prototxt'
-    LANDMARK_WEIGHT_PATH = f'{LANDMARK_MODEL_NAME}.onnx'
-    LANDMARK_MODEL_PATH = f'{LANDMARK_MODEL_NAME}.onnx.prototxt'
+    DETECTION_WEIGHT_PATH = f'{DETECTION_MODEL_DETAIL_NAME}.onnx'
+    DETECTION_MODEL_PATH = f'{DETECTION_MODEL_DETAIL_NAME}.onnx.prototxt'
+    LANDMARK_WEIGHT_PATH = f'{LANDMARK_MODEL_DETAIL_NAME}.onnx'
+    LANDMARK_MODEL_PATH = f'{LANDMARK_MODEL_DETAIL_NAME}.onnx.prototxt'
 else:
-    DETECTION_WEIGHT_PATH = f'{DETECTION_MODEL_NAME}.opt.onnx'
-    DETECTION_MODEL_PATH = f'{DETECTION_MODEL_NAME}.opt.onnx.prototxt'
-    LANDMARK_WEIGHT_PATH = f'{LANDMARK_MODEL_NAME}.opt.onnx'
-    LANDMARK_MODEL_PATH = f'{LANDMARK_MODEL_NAME}.opt.onnx.prototxt'
+    DETECTION_WEIGHT_PATH = f'{DETECTION_MODEL_DETAIL_NAME}.opt.onnx'
+    DETECTION_MODEL_PATH = f'{DETECTION_MODEL_DETAIL_NAME}.opt.onnx.prototxt'
+    LANDMARK_WEIGHT_PATH = f'{LANDMARK_MODEL_DETAIL_NAME}.opt.onnx'
+    LANDMARK_MODEL_PATH = f'{LANDMARK_MODEL_DETAIL_NAME}.opt.onnx.prototxt'
 DETECTION_REMOTE_PATH = f'https://storage.googleapis.com/ailia-models/{DETECTION_MODEL_NAME}/'
-LANDMARK_REMOTE_PATH = f'https://storage.googleapis.com/ailia-models/facemesh/'
+LANDMARK_REMOTE_PATH = f'https://storage.googleapis.com/ailia-models/{LANDMARK_MODEL_NAME}/'
 
 
 # ======================
@@ -103,7 +127,7 @@ def draw_landmarks(img, points, color=(0, 0, 255), size=2):
 def estimate_landmarks(input_data, src_img, scale, pad, detector, fut, estimator):
     # Face detection
     preds = detector.predict([input_data])
-    detections = fut.detector_postprocess(preds)
+    detections = fut.detector_postprocess(preds, back = args.back)
 
     # Face landmark estimation
     if detections[0].size != 0:
@@ -115,7 +139,12 @@ def estimate_landmarks(input_data, src_img, scale, pad, detector, fut, estimator
 
         if dynamic_input_shape:
             estimator.set_input_shape(imgs.shape)
-            landmarks, confidences = estimator.predict([imgs])
+            if args.attention:
+                outputs = estimator.predict([imgs[i:i+1, :, :, :]])
+                landmark = outputs[4]
+                confidences = outputs[0]
+            else:
+                landmarks, confidences = estimator.predict([imgs])
             landmarks = landmarks.reshape((imgs.shape[0],1404))
             confidences = confidences.reshape((imgs.shape[0],1))
             normalized_landmarks = landmarks / 192.0
@@ -127,7 +156,12 @@ def estimate_landmarks(input_data, src_img, scale, pad, detector, fut, estimator
             confidences = np.zeros((imgs.shape[0], 1))
 
             for i in range(imgs.shape[0]):
-                landmark, confidences[i, :] = estimator.predict([imgs[i:i+1, :, :, :]])
+                if args.attention:
+                    outputs = estimator.predict([imgs[i:i+1, :, :, :]])
+                    landmark = outputs[4]
+                    confidences[i, :] = outputs[0]
+                else:
+                    landmark, confidences[i, :] = estimator.predict([imgs[i:i+1, :, :, :]])
                 normalized_landmark = landmark / 192.0
 
                 # postprocessing
@@ -173,8 +207,11 @@ def recognize_from_image():
         # prepare input data
         logger.info(image_path)
         src_img = imread(image_path)
-        _, img128, scale, pad = fut.resize_pad(src_img[:, :, ::-1])
-        input_data = img128.astype('float32') / 127.5 - 1.0
+        img256, img128, scale, pad = fut.resize_pad(src_img[:, :, ::-1])
+        if args.back:
+            input_data = img256.astype('float32') / 127.5 - 1.0
+        else:
+            input_data = img128.astype('float32') / 127.5 - 1.0
         input_data = np.expand_dims(np.moveaxis(input_data, -1, 0), 0)
 
         # inference
