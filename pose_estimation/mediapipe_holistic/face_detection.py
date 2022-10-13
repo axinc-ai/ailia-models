@@ -110,6 +110,9 @@ def face_estimate(img, face_landmarks, models):
     boxes = boxes[idx]
     scores = scores[idx]
 
+    if len(boxes) == 0:
+        return np.zeros((0, 3))
+
     # Performs non-max suppression to remove excessive detections.
     boxes, scores = weighted_nms(boxes, scores, img_size)
 
