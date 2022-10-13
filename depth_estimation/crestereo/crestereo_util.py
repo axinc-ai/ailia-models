@@ -85,7 +85,7 @@ class CREStereo():
 		if self.args.onnx:
 			return self.session.run(self.output_names, {self.input_names[0]: left_tensor, self.input_names[1]: right_tensor})[0]
 		else:
-			return self.session.predict({"left": left_tensor, "right": right_tensor })
+			return self.session.predict({"left": left_tensor, "right": right_tensor })[0]
 		
 	def inference_with_flow(self, left_tensor_half, right_tensor_half, left_tensor, right_tensor):
 
