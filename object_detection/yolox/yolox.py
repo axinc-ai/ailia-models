@@ -254,7 +254,11 @@ def main():
         recognize_from_video(detector)
     else:
         # image mode
+        if args.profile:
+            detector.set_profile_mode(True)
         recognize_from_image(detector)
+        if args.profile:
+            print(detector.get_summary())
 
 
 if __name__ == '__main__':
