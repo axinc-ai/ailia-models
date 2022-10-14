@@ -84,6 +84,5 @@ ONNX opset = 10
 - [facemesh.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/facemesh/facemesh.onnx.prototxt)
 - [facemesh.opt.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/facemesh/facemesh.onnx.prototxt)
 - [facemesh_constantpad2d.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/facemesh/facemesh_constantpad2d.onnx.prototxt)
-- [facemesh_constantpad2d.opt.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/facemesh/facemesh_constantpad2d.opt.onnx.prototxt)
-
+- [face_landmark_with_attention.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/mediapipe_holistic/face_landmark_with_attention.onnx.prototxt)
 

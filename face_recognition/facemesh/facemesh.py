@@ -38,27 +38,13 @@ parser = get_base_parser(
     SAVE_IMAGE_PATH,
 )
 parser.add_argument(
-    '-n', '--normal',
-    action='store_true',
-    help='By default, the optimized model is used, but with this option, ' +
-    'you can switch to the normal (not optimized) model'
-)
-parser.add_argument(
-    '-l', '--legacy',
-    action='store_true',
-    help='By default, the constantpad2d model is used, but with this option, ' +
-    'you can switch to the reflectionpad2d model'
-)
-parser.add_argument(
-    '--attention',
-    action='store_true',
-    help='By default, the constantpad2d model is used, but with this option, ' +
-    'you can switch to the attention model'
+    '-m', '--model_type', default='normal', choices=('legacy', 'normal', 'refine'),
+    help='facial landmark model type, legacy model uses reflectionpad2d, normal model uses constantpad2d, refine model uses attention'
 )
 parser.add_argument(
     '--back',
     action='store_true',
-    help='By default, the front camera model is used, but with this option, ' +
+    help='By default, the front camera model is used for face detection, but with this option, ' +
     'you can switch to the back camera model'
 )
 args = update_parser(parser)
@@ -68,37 +54,37 @@ args = update_parser(parser)
 # Parameters 2
 # ======================
 DETECTION_MODEL_NAME = 'blazeface'
-LANDMARK_MODEL_NAME = 'facemesh'
+if args.model_type == "refine":
+    LANDMARK_MODEL_NAME = 'mediapipe_holistic'
+else:
+    LANDMARK_MODEL_NAME = 'facemesh'
 
 if args.back:
     DETECTION_MODEL_DETAIL_NAME = 'blazefaceback'
-    args.normal = True
 else:
     DETECTION_MODEL_DETAIL_NAME = 'blazeface'
 
-if args.legacy:
-    # Legacy model
+if args.model_type == "legacy":
     LANDMARK_MODEL_DETAIL_NAME = 'facemesh'
-else:
-    # ConstantPad2d model
-    # https://github.com/thepowerfuldeez/facemesh.pytorch/issues/3
-    LANDMARK_MODEL_DETAIL_NAME = 'facemesh_constantpad2d'
-
-if args.attention:
-    LANDMARK_MODEL_NAME = 'mediapipe_holistic'
+elif args.model_type == "normal":
+    LANDMARK_MODEL_DETAIL_NAME = 'facemesh_constantpad2d'   # https://github.com/thepowerfuldeez/facemesh.pytorch/issues/3
+elif args.model_type == "refine":
     LANDMARK_MODEL_DETAIL_NAME = 'face_landmark_with_attention'
-    args.normal = True
 
-if args.normal:
-    DETECTION_WEIGHT_PATH = f'{DETECTION_MODEL_DETAIL_NAME}.onnx'
-    DETECTION_MODEL_PATH = f'{DETECTION_MODEL_DETAIL_NAME}.onnx.prototxt'
+if args.model_type == "normal":
+    LANDMARK_WEIGHT_PATH = f'{LANDMARK_MODEL_DETAIL_NAME}.opt.onnx'
+    LANDMARK_MODEL_PATH = f'{LANDMARK_MODEL_DETAIL_NAME}.opt.onnx.prototxt'
+else:
     LANDMARK_WEIGHT_PATH = f'{LANDMARK_MODEL_DETAIL_NAME}.onnx'
     LANDMARK_MODEL_PATH = f'{LANDMARK_MODEL_DETAIL_NAME}.onnx.prototxt'
+
+if args.back:
+    DETECTION_WEIGHT_PATH = f'{DETECTION_MODEL_DETAIL_NAME}.onnx'
+    DETECTION_MODEL_PATH = f'{DETECTION_MODEL_DETAIL_NAME}.onnx.prototxt'
 else:
     DETECTION_WEIGHT_PATH = f'{DETECTION_MODEL_DETAIL_NAME}.opt.onnx'
     DETECTION_MODEL_PATH = f'{DETECTION_MODEL_DETAIL_NAME}.opt.onnx.prototxt'
-    LANDMARK_WEIGHT_PATH = f'{LANDMARK_MODEL_DETAIL_NAME}.opt.onnx'
-    LANDMARK_MODEL_PATH = f'{LANDMARK_MODEL_DETAIL_NAME}.opt.onnx.prototxt'
+
 DETECTION_REMOTE_PATH = f'https://storage.googleapis.com/ailia-models/{DETECTION_MODEL_NAME}/'
 LANDMARK_REMOTE_PATH = f'https://storage.googleapis.com/ailia-models/{LANDMARK_MODEL_NAME}/'
 
@@ -139,7 +125,7 @@ def estimate_landmarks(input_data, src_img, scale, pad, detector, fut, estimator
 
         if dynamic_input_shape:
             estimator.set_input_shape(imgs.shape)
-            if args.attention:
+            if args.model_type == "refine":
                 outputs = estimator.predict([imgs[i:i+1, :, :, :]])
                 landmark = outputs[4]
                 confidences = outputs[0]
@@ -156,7 +142,7 @@ def estimate_landmarks(input_data, src_img, scale, pad, detector, fut, estimator
             confidences = np.zeros((imgs.shape[0], 1))
 
             for i in range(imgs.shape[0]):
-                if args.attention:
+                if args.model_type == "refine":
                     outputs = estimator.predict([imgs[i:i+1, :, :, :]])
                     landmark = outputs[4]
                     confidences[i, :] = outputs[0]

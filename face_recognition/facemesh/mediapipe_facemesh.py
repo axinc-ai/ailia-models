@@ -24,9 +24,9 @@ if ".mp4" in file:
 # Open mediapipe
 drawing_spec = mp_drawing.DrawingSpec(thickness=1, circle_radius=1)
 with mp_face_mesh.FaceMesh(
-    static_image_mode=True,  # False for blazeface
+    static_image_mode=True,
     max_num_faces=1,
-    refine_landmarks=False,
+    refine_landmarks=False,  # True for attention model
     min_detection_confidence=0.5) as face_mesh:
 
   if ".mp4" in file:
