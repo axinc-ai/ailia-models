@@ -35,7 +35,7 @@ If you pass `0` as an argument to VIDEO_PATH, you can use the webcam input inste
 $ python3 dehamer.py --video VIDEO_PATH
 ```
 
-By adding the `--model_type` option, you can specify model type which is selected from "NH", "dense", "indoor", "outdoor". (default is outdoor)
+By adding the `--model_type` option, you can specify model type which is selected from "NH", "dense", "indoor", "outdoor". (default is NH)
 ```bash
 $ python3 dehamer.py --model_type outdoor
 ```
