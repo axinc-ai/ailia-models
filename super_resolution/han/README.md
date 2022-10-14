@@ -70,17 +70,17 @@ ONNX opset = 11
 
 ## Netron
 
-[han_BIX2.onnx.prototxt](https://storage.googleapis.com/ailia-models/han/han_BIX2.onnx.prototxt)
-[han_BIX2.opt.onnx.prototxt](https://storage.googleapis.com/ailia-models/han/han_BIX2.opt.onnx.prototxt)
+[han_BIX2.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/han/han_BIX2.onnx.prototxt)
+[han_BIX2.opt.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/han/han_BIX2.opt.onnx.prototxt)
 
-[han_BIX3.onnx.prototxt](https://storage.googleapis.com/ailia-models/han/han_BIX3.onnx.prototxt)
-[han_BIX3.opt.onnx.prototxt](https://storage.googleapis.com/ailia-models/han/han_BIX3.opt.onnx.prototxt)
+[han_BIX3.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/han/han_BIX3.onnx.prototxt)
+[han_BIX3.opt.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/han/han_BIX3.opt.onnx.prototxt)
 
-[han_BIX4.onnx.prototxt](https://storage.googleapis.com/ailia-models/han/han_BIX4.onnx.prototxt)
-[han_BIX4.opt.onnx.prototxt](https://storage.googleapis.com/ailia-models/han/han_BIX4.opt.onnx.prototxt)
+[han_BIX4.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/han/han_BIX4.onnx.prototxt)
+[han_BIX4.opt.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/han/han_BIX4.opt.onnx.prototxt)
 
-[han_BIX8.onnx.prototxt](https://storage.googleapis.com/ailia-models/han/han_BIX8.onnx.prototxt)
-[han_BIX8.opt.onnx.prototxt](https://storage.googleapis.com/ailia-models/han/han_BIX8.opt.onnx.prototxt)
+[han_BIX8.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/han/han_BIX8.onnx.prototxt)
+[han_BIX8.opt.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/han/han_BIX8.opt.onnx.prototxt)
 
-[han_BDX3.onnx.prototxt](https://storage.googleapis.com/ailia-models/han/han_BDX3.onnx.prototxt)
-[han_BDX3.opt.onnx.prototxt](https://storage.googleapis.com/ailia-models/han/han_BDX3.opt.onnx.prototxt)
+[han_BDX3.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/han/han_BDX3.onnx.prototxt)
+[han_BDX3.opt.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/han/han_BDX3.opt.onnx.prototxt)

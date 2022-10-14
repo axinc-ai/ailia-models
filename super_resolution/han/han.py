@@ -24,8 +24,6 @@ logger = getLogger(__name__)
 # ======================
 IMAGE_PATH = 'input.png'
 SAVE_IMAGE_PATH = 'output.png'
-#IMAGE_HEIGHT = 194    # net.get_input_shape()[3]
-#IMAGE_WIDTH = 194     # net.get_input_shape()[2]
 
 # ======================
 # Argument Parser Config
@@ -121,6 +119,8 @@ def recognize_from_image(net):
         c = img.shape[2]
         if c == 1:
             img = np.concatenate([img] * 3, 2)
+        elif c == 4:
+            img = img[:,:,0:3]
 
         img = np.ascontiguousarray(img.transpose((2, 0, 1)))
         img = img.astype(np.float32)
@@ -162,9 +162,12 @@ def recognize_from_video(net):
     else:
         writer = None
 
+    frame_shown = False
     while (True):
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+        if frame_shown and cv2.getWindowProperty('output', cv2.WND_PROP_VISIBLE) == 0:
             break
 
         IMAGE_HEIGHT, IMAGE_WIDTH = frame.shape[0], frame.shape[1]
@@ -183,6 +186,7 @@ def recognize_from_video(net):
         out_img = quantize(output[0][0], 255)
         out_img = out_img.astype(np.uint8).transpose(1, 2, 0)
         cv2.imshow('output', out_img)
+        frame_shown = True
 
         # save results
         if writer is not None:
@@ -201,10 +205,10 @@ def main():
 
     # net initialize
     env_id = args.env_id
-    if sys.platform == "darwin" :
+    if "FP16" in ailia.get_environment(args.env_id).props or sys.platform == "darwin" :
         env_id = 0
         logger.info('This model not working on FP16. So running on CPU.')
-    memory_mode = ailia.get_memory_mode(reuse_interstage=True)
+    memory_mode = ailia.get_memory_mode(reduce_constant=True, reduce_interstage=True)
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id, memory_mode=memory_mode)
     logger.info('Model: ' + WEIGHT_PATH[:-5])
     logger.info('Scale: ' + str(args.scale))

@@ -1,18 +1,21 @@
-import sys, os
-import time
 import copy
-import json
-from logging import getLogger
-import numpy as np
-import cv2
-import ailia
 import glob
+import json
+import os
+import sys
+import time
+from logging import getLogger
+
+import ailia
+import cv2
+import numpy as np
 import torch
 
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
-from model_utils import check_and_download_models  # noqa: E402
 import webcamera_utils  # noqa: E402
+from image_utils import imread  # noqa: E402
+from model_utils import check_and_download_models  # noqa: E402
+from utils import get_base_parser, get_savepath, update_parser  # noqa: E402
 
 logger = getLogger(__name__)
 
@@ -89,7 +92,7 @@ def recognize_from_image():
     for image_path in args.input:
         savepath = get_savepath(args.savepath, image_path)
         logger.info(f'saved at : {savepath}')
-        image = cv2.imread(image_path)
+        image = imread(image_path)
         image = net.predict(image)
         cv2.imwrite(
             savepath,
@@ -114,9 +117,12 @@ def recognize_from_video():
     else:
         writer = None
 
+    frame_shown = False
     while(True):
         ret, frame = cap.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
             break
 
         _, resized_image = webcamera_utils.adjust_frame_size(frame, 256, 256)
@@ -126,6 +132,7 @@ def recognize_from_video():
         # half and half
         noised_frame[:,128:256,:] = denoised_frame[:,128:256,:]
         cv2.imshow('frame', noised_frame)
+        frame_shown = True
 
         # save results
         if writer is not None:

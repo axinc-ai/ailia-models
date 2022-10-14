@@ -1,21 +1,22 @@
+import argparse
 import sys
 import time
-import argparse
 
+import ailia
 import cv2
 import numpy as np
 
-import ailia
 import yaas_utils as yut
 
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
-from webcamera_utils import adjust_frame_size, get_capture  # noqa: E402
-from image_utils import load_image  # noqa: E402
-from model_utils import check_and_download_models  # noqa: E402
-
 # logger
-from logging import getLogger   # noqa: E402
+from logging import getLogger  # noqa: E402
+
+from image_utils import imread, load_image  # noqa: E402
+from model_utils import check_and_download_models  # noqa: E402
+from utils import get_base_parser, get_savepath, update_parser  # noqa: E402
+from webcamera_utils import adjust_frame_size, get_capture  # noqa: E402
+
 logger = getLogger(__name__)
 
 # ======================
@@ -84,7 +85,7 @@ def recognize_from_image():
 
     for image_path in args.input:
         # prepare input data
-        src_img = cv2.imread(image_path)
+        src_img = imread(image_path)
         input_data = yut.preprocess(src_img)
 
         if args.benchmark:
@@ -139,10 +140,14 @@ def recognize_from_video():
     else:
         writer = None
 
+    frame_shown = False
     while(True):
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
+        if frame_shown and cv2.getWindowProperty('Segmented frame', cv2.WND_PROP_VISIBLE) == 0:
+            break
+
 
         frame = np.ascontiguousarray(frame[:,::-1,:])
 
@@ -161,6 +166,7 @@ def recognize_from_video():
             seg_img = get_seg_img(frame, preds)
 
         cv2.imshow('Segmented frame', seg_img)
+        frame_shown = True
 
         # save results
         if writer is not None:

@@ -1,19 +1,21 @@
 import sys
 import time
 
+import ailia
 import cv2
 
-import ailia
 import hand_detection_pytorch_utils
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
-from model_utils import check_and_download_models  # noqa: E402
-import webcamera_utils  # noqa: E402
-
 # logger
-from logging import getLogger   # noqa: E402
+from logging import getLogger  # noqa: E402
+
+import webcamera_utils  # noqa: E402
+from image_utils import imread  # noqa: E402
+from model_utils import check_and_download_models  # noqa: E402
+from utils import get_base_parser, get_savepath, update_parser  # noqa: E402
+
 logger = getLogger(__name__)
 
 
@@ -53,7 +55,7 @@ def recognize_from_image():
         # prepare input data
         logger.info(image_path)
 
-        to_show = cv2.imread(image_path, cv2.IMREAD_COLOR)
+        to_show = imread(image_path, cv2.IMREAD_COLOR)
         logger.info(f'input image shape: {to_show.shape}')
         img, scale = hand_detection_pytorch_utils.pre_process(to_show)
         detector.set_input_shape((1, 3, img.shape[2], img.shape[3]))
@@ -101,10 +103,13 @@ def recognize_from_video():
     else:
         writer = None
 
+    frame_shown = False
     while(True):
         ret, to_show = capture.read()
         # press q to end video capture
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
             break
 
         img, scale = hand_detection_pytorch_utils.pre_process(to_show)
@@ -122,6 +127,7 @@ def recognize_from_video():
                 3
             )
         cv2.imshow('frame', to_show)
+        frame_shown = True
         # save results
         if writer is not None:
             writer.write(to_show)

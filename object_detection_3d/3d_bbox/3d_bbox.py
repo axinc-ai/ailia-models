@@ -1,30 +1,33 @@
 #ailia predict api sample
 
-import numpy as np
-import time
+import argparse
 import os
 import sys
-import cv2
-from PIL import Image
-from matplotlib import pyplot as plt
-import argparse
+import time
 
 import ailia
+import cv2
+import numpy as np
+from matplotlib import pyplot as plt
+from PIL import Image
 
-from lib_3d_bbox.Dataset import *
-from lib_3d_bbox.Plotting import *
 from lib_3d_bbox import ClassAverages
+from lib_3d_bbox.Dataset import *
 from lib_3d_bbox.Math import *
+from lib_3d_bbox.Plotting import *
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
-from model_utils import check_and_download_models  # noqa: E402
-from detector_utils import plot_results, write_predictions, load_image  # noqa: E402
-import webcamera_utils  # noqa: E402
-
 # logger
-from logging import getLogger   # noqa: E402
+from logging import getLogger  # noqa: E402
+
+import webcamera_utils  # noqa: E402
+from detector_utils import (load_image, plot_results,  # noqa: E402
+                            write_predictions)
+from image_utils import imread  # noqa: E402
+from model_utils import check_and_download_models  # noqa: E402
+from utils import get_base_parser, get_savepath, update_parser  # noqa: E402
+
 logger = getLogger(__name__)
 
 os.environ['KMP_DUPLICATE_LIB_OK']='TRUE'
@@ -91,7 +94,7 @@ args = update_parser(parser)
 # Main functions
 # ======================
 def recognize_from_image():
-    averages = ClassAverages.ClassAverages()
+    averages = ClassAverages()
     angle_bins = generate_bins(2)
 
     env_id = args.env_id
@@ -112,7 +115,7 @@ def recognize_from_image():
     for image_path in args.input:
         # prepare input data
         logger.debug(f'input image: {image_path}')
-        img = cv2.imread(image_path)
+        img = imread(image_path)
         logger.debug(f'input image shape: {img.shape}')
         yolo_img = cv2.cvtColor(img, cv2.COLOR_BGR2BGRA)
         logger.debug(f'yolo input image shape: {yolo_img.shape}')
@@ -176,7 +179,7 @@ def recognize_from_image():
 
 def recognize_from_video():
     # net initialize
-    averages = ClassAverages.ClassAverages()
+    averages = ClassAverages()
     angle_bins = generate_bins(2)
 
     env_id = args.env_id
@@ -207,9 +210,12 @@ def recognize_from_video():
     else:
         writer = None
 
+    frame_shown = False
     while(True):
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+        if frame_shown and cv2.getWindowProperty('3D detections', cv2.WND_PROP_VISIBLE) == 0:
             break
 
         img = frame
@@ -254,6 +260,7 @@ def recognize_from_video():
             location = plot_regressed_3d_bbox(img, proj_matrix, box_2d, dim, alpha, theta_ray)
 
             cv2.imshow('3D detections', img)
+            frame_shown = True
 
         # save results
         if writer is not None:

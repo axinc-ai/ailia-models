@@ -1,21 +1,22 @@
 import sys
 import time
 
-import numpy as np
-import cv2
-from PIL import Image
-
 import ailia
+import cv2
+import numpy as np
+from PIL import Image
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
-from model_utils import check_and_download_models  # noqa: E402
-from detector_utils import load_image  # noqa: E402
-import webcamera_utils  # noqa: E402
 
 # logger
 from logging import getLogger  # noqa: E402
+
+import webcamera_utils  # noqa: E402
+from detector_utils import load_image  # noqa: E402
+from image_utils import imread  # noqa: E402
+from model_utils import check_and_download_models  # noqa: E402
+from utils import get_base_parser, get_savepath, update_parser  # noqa: E402
 
 logger = getLogger(__name__)
 
@@ -130,7 +131,7 @@ def recognize_from_image(net):
         else:
             # composite
             h, w = img_0.shape[:2]
-            image = cv2.imread(image_path)
+            image = imread(image_path)
             image = cv2.cvtColor(image, cv2.COLOR_BGR2BGRA)
             image[:, :, 3] = cv2.resize(pred, (w, h)) * 255
             res_img = image
@@ -156,10 +157,14 @@ def recognize_from_video(net):
     else:
         writer = None
 
+    frame_shown = False
     while True:
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
+            break
+
 
         img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         img, img_pad = preprocess(img)
@@ -177,6 +182,7 @@ def recognize_from_video(net):
         frame[:, :, 2] = frame[:, :, 2] * pred
 
         cv2.imshow('frame', frame)
+        frame_shown = True
 
         # save results
         if writer is not None:

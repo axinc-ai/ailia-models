@@ -34,7 +34,7 @@ class FaceParser:
 
 
 def _initialize_net(args, face_parser_path):
-    env_id = ailia.get_gpu_environment_id()
+    env_id = args.env_id
     logger.info(f"env_id (face parser): {env_id}")
     if not args.onnx:
         net = ailia.Net(face_parser_path[0], face_parser_path[1], env_id=env_id)

@@ -1,29 +1,31 @@
 import os
-os.environ["KMP_DUPLICATE_LIB_OK"] = "True"
-import sys
 
-import cv2
+os.environ["KMP_DUPLICATE_LIB_OK"] = "True"
 import copy
-import numpy as np
 import math
+import sys
 import time
-from PIL import Image, ImageDraw, ImageFont
 import unicodedata
 
 import ailia
-
+import cv2
+import numpy as np
+from PIL import Image, ImageDraw, ImageFont
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser  # noqa: E402
-from model_utils import check_and_download_models  # noqa: E402
-import webcamera_utils  # noqa: E402
-
 # logger
-from logging import getLogger   # noqa: E402
+from logging import getLogger  # noqa: E402
+
+import webcamera_utils  # noqa: E402
+from image_utils import imread  # noqa: E402
+from model_utils import check_and_download_models  # noqa: E402
+from utils import get_base_parser, update_parser  # noqa: E402
+
 logger = getLogger(__name__)
 
 import warnings
+
 warnings.simplefilter("ignore", DeprecationWarning)
 
 # ======================
@@ -1179,7 +1181,7 @@ def recognize_from_image(config, text_sys):
 
     for img_path in args.input:
         # read image
-        img = cv2.imread(img_path)
+        img = imread(img_path)
 
         # exec ocr
         dt_boxes, rec_res = text_sys(img)
@@ -1214,13 +1216,16 @@ def recognize_from_video(config, text_sys):
         video_writer = None
 
     # frame read and exec segmentation
+    frame_shown = False
     while(True):
         # frame read
         ret, img = video_capture.read()
 
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
-
+        if frame_shown and cv2.getWindowProperty('exec PaddleOCR', cv2.WND_PROP_VISIBLE) == 0:
+            break
+        
         # exec ocr
         dt_boxes, rec_res = text_sys(img)
 
@@ -1234,6 +1239,7 @@ def recognize_from_video(config, text_sys):
                                     font_path=config['vis_font_path'])
         # display
         cv2.imshow('exec PaddleOCR', draw_img[:, :, ::-1])
+        frame_shown = True
 
         # write a frame image to video
         if video_writer is not None:

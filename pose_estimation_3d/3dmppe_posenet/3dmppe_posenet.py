@@ -1,39 +1,44 @@
-import sys
 import os
+import sys
+
 os.environ["KMP_DUPLICATE_LIB_OK"] = "True"
-import os.path as osp
 import argparse
-import numpy as np
 import math
+import os.path as osp
+
 import cv2
-from PIL import Image
 import matplotlib
+import numpy as np
+from PIL import Image
+
 matplotlib.use('Agg')
-import matplotlib.pyplot as plt
-from tqdm import tqdm
 import time
 
 import ailia
-
+import matplotlib.pyplot as plt
+from tqdm import tqdm
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
-from model_utils import check_and_download_models  # noqa: E402
-import webcamera_utils  # noqa: E402
-
 # logger
-from logging import getLogger   # noqa: E402
+from logging import getLogger  # noqa: E402
+
+import webcamera_utils  # noqa: E402
+from image_utils import imread  # noqa: E402
+from model_utils import check_and_download_models  # noqa: E402
+from utils import get_base_parser, get_savepath, update_parser  # noqa: E402
+
 logger = getLogger(__name__)
 
 import warnings
+
 warnings.simplefilter("ignore", DeprecationWarning)
 
 # ======================
 # Parameters
 # ======================
-WEIGHT_PATH_MASKRCNN = 'mask_rcnn_R_50_FPN_1x.onnx'
-MODEL_PATH_MASKRCNN = 'mask_rcnn_R_50_FPN_1x.onnx.prototxt'
+WEIGHT_PATH_MASKRCNN = 'mask_rcnn_R_50_FPN_1x.opt.onnx'
+MODEL_PATH_MASKRCNN = 'mask_rcnn_R_50_FPN_1x.opt.onnx.prototxt'
 REMOTE_PATH_MASKRCNN = 'https://storage.googleapis.com/ailia-models/mask_rcnn/'
 
 WEIGHT_PATH_ROOTNET = 'rootnet_snapshot_18.opt.onnx'
@@ -221,7 +226,9 @@ def pixel2cam(pixel_coord, f, c):
     return cam_coord
 
 
-from matplotlib.axes._axes import _log as matplotlib_axes_logger  # provisional...
+from matplotlib.axes._axes import \
+    _log as matplotlib_axes_logger  # provisional...
+
 matplotlib_axes_logger.setLevel('ERROR')                          # provisional...
 def vis_keypoints(img, kps, kps_lines, kp_thresh=0.4, alpha=1):
 
@@ -508,10 +515,10 @@ def recognize_from_image(img_path, net_maskrcnn, net_root, net_pose):
     for image_path in img_path:
         # prepare input data
         logger.info(image_path)
-        src_img = cv2.imread(image_path)
+        src_img = imread(image_path)
 
         # load image for pposenet
-        original_img = cv2.imread(image_path)
+        original_img = imread(image_path)
 
         # cast to pillow for mask r-cnn
         image = Image.fromarray(original_img.copy()[:, :, ::-1])
@@ -547,11 +554,14 @@ def recognize_from_video(vid_path, net_maskrcnn, net_root, net_pose):
         video_writer = None
 
     # frame read and exec segmentation
+    frame_shown = False
     while(True):
         # frame read
         ret, original_img = video_capture.read()
 
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
             break
 
         # cast to pillow for mask r-cnn
@@ -568,6 +578,7 @@ def recognize_from_video(vid_path, net_maskrcnn, net_root, net_pose):
         
         # display
         cv2.imshow("frame", vis_img)
+        frame_shown = True
 
         # write a frame image to video
         if video_writer is not None:

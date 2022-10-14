@@ -1,12 +1,15 @@
 import os
 import sys
-
-import numpy as np
-import cv2
-import ailia
-
 from logging import getLogger
+
+import ailia
+import cv2
+import numpy as np
+
 logger = getLogger(__name__)
+
+sys.path.append(os.path.dirname(__file__))
+from image_utils import imread  # noqa: E402
 
 
 def preprocessing_img(img):
@@ -21,7 +24,7 @@ def preprocessing_img(img):
 
 def load_image(image_path):
     if os.path.isfile(image_path):
-        img = cv2.imread(image_path, cv2.IMREAD_UNCHANGED)
+        img = imread(image_path, cv2.IMREAD_UNCHANGED)
     else:
         logger.error(f'{image_path} not found.')
         sys.exit()
@@ -148,7 +151,7 @@ def plot_results(detector, img, category, segm_masks=None, logging=True):
     # draw label
     for idx in range(count):
         obj = detector.get_object(idx) if hasattr(detector, 'get_object') else detector[idx]
-        fontScale = img.shape[1] / 2048
+        fontScale = w / 2048
 
         text = category[obj.category] + " " + str(int(obj.prob*100)/100)
         textsize = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, fontScale, 1)[0]
@@ -157,8 +160,28 @@ def plot_results(detector, img, category, segm_masks=None, logging=True):
 
         margin = 3
 
-        top_left = (int(w * obj.x), int(h * obj.y))
-        bottom_right = (int(w * obj.x) + tw + margin, int(h * obj.y) + th + margin)
+        x1 = int(w * obj.x)
+        y1 = int(h * obj.y)
+        x2 = x1 + tw + margin
+        y2 = y1 + th + margin
+
+        # check the x,y x2,y2 are inside the image
+        if x1 < 0:
+            x1 = 0
+        elif x2 > w:
+            x1 = w - (tw + margin)
+
+        if y1 < 0:
+            y1 = 0
+        elif y2 > h:
+            y1 = h - (th + margin)
+
+        # recompute x2, y2 if shift occured
+        x2 = x1 + tw + margin
+        y2 = y1 + th + margin
+
+        top_left = (x1, y1)
+        bottom_right = (x2, y2)
 
         color = colors[idx]
         cv2.rectangle(img, top_left, bottom_right, color, thickness=-1)

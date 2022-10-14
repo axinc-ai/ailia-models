@@ -1,4 +1,4 @@
-numpy==1.18.5
+numpy==1.22.0
 onnxruntime==1.4.0
 soundfile==0.10.3.post1
 scipy==1.5.2

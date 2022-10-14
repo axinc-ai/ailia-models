@@ -156,16 +156,20 @@ def recognize_from_video(video):
     else:
         writer = None
 
+    frame_shown = False
     while(True):
         ret, img = capture.read()
         # press q to end video capture
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
             break
 
         objs = detect_objects(img, detector)
         for obj in objs:
             dbface_utils.drawbbox(img, obj)
         cv2.imshow('frame', img)
+        frame_shown = True
 
         # save results
         if writer is not None:

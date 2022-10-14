@@ -151,9 +151,12 @@ def recognize_from_video(net, img_size):
     else:
         writer = None
 
+    frame_shown = False
     while (True):
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
             break
 
         # prepare input data
@@ -172,6 +175,7 @@ def recognize_from_video(net, img_size):
         x = (pad_img.shape[1] - w) // 2
         res_img = res_img[y:y + h, x:x + w, ...]
         cv2.imshow('frame', res_img / 255.0)
+        frame_shown = True
 
         # # save results
         # if writer is not None:

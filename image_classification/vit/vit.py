@@ -1,27 +1,28 @@
-import time
-import sys
 import platform
+import sys
+import time
 
-import numpy as np
 import cv2
-
 import matplotlib
+import numpy as np
+
 matplotlib.use('Agg')
+import ailia
 import matplotlib.pyplot as plt
 
-import ailia
 import vit_labels
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser  # noqa: E402
-from model_utils import check_and_download_models  # noqa: E402
-from image_utils import load_image  # noqa: E402
-from classifier_utils import plot_results, print_results  # noqa: E402
-import webcamera_utils  # noqa: E402
-
 # logger
-from logging import getLogger   # noqa: E402
+from logging import getLogger  # noqa: E402
+
+import webcamera_utils  # noqa: E402
+from classifier_utils import plot_results, print_results  # noqa: E402
+from image_utils import imread, load_image  # noqa: E402
+from model_utils import check_and_download_models  # noqa: E402
+from utils import get_base_parser, update_parser  # noqa: E402
+
 logger = getLogger(__name__)
 
 
@@ -101,7 +102,8 @@ def calc_attention_map(att_mat, height_org=224, width_org=224):
     return mask
 
 
-import warnings                                      # provisional...
+import warnings  # provisional...
+
 warnings.simplefilter('ignore', DeprecationWarning)  # provisional...
 def visualize_result(image, mask, probs, labels):
     # adjust for output
@@ -161,7 +163,7 @@ def recognize_from_image():
     for image_path in args.input:
         # prepare input data
         logger.info(image_path)
-        image = cv2.imread(image_path)[:, :, ::-1]
+        image = imread(image_path)[:, :, ::-1]
         input_data = prep_input(image)
 
         # inference
@@ -215,10 +217,13 @@ def recognize_from_video():
     else:
         writer = None
 
+    frame_shown = False
     while(True):
         # read frame
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
             break
 
         # preprocessing
@@ -244,6 +249,7 @@ def recognize_from_video():
 
         # view result figure
         cv2.imshow('frame', frame_figure[..., ::-1])
+        frame_shown = True
         time.sleep(SLEEP_TIME)
         # save result
         if writer is not None:

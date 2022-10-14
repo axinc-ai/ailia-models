@@ -37,6 +37,11 @@ IMAGE_SIZE = 224
 # ======================
 
 parser = get_base_parser('driver-action-recognition-adas', VIDEO_PATH, None)
+parser.add_argument(
+    '--gui',
+    action='store_true',
+    help='Display preview in GUI.'
+)
 args = update_parser(parser)
 
 
@@ -110,9 +115,12 @@ def recognize_from_video(enc, dec):
     sequence_size = 16
 
     embeddings = []
+    frame_shown = False
     while True:
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
             break
 
         img = preprocess(frame)
@@ -144,7 +152,11 @@ def recognize_from_video(enc, dec):
 
         frame = render_frame(frame, display_text)
 
-        cv2.imshow('frame', frame)
+        if args.gui or args.video:
+            cv2.imshow('frame', frame)
+            frame_shown = True
+        else:
+            print(display_text)
 
         # save results
         if writer is not None:
