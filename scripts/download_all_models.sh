@@ -46,6 +46,7 @@ cd ../../depth_estimation/fcrn-depthprediction; python3 fcrn-depthprediction.py 
 cd ../../depth_estimation/fast-depth; python3 fast-depth.py ${OPTION}
 cd ../../depth_estimation/lap-depth; python3 lap-depth.py ${OPTION}
 cd ../../depth_estimation/hitnet; python3 hitnet.py ${OPTION}
+cd ../../depth_estimation/crestereo; python3 crestereo.py ${OPTION}
 cd ../../depth_estimation/mobilestereonet; python3 mobilestereonet.py ${OPTION}
 cd ../../face_detection/blazeface; python3 blazeface.py ${OPTION}
 cd ../../face_detection/dbface; python3 dbface.py ${OPTION}
@@ -129,6 +130,7 @@ cd ../../image_manipulation/deep_white_balance; python3 deep_white_balance.py ${
 cd ../../image_manipulation/deblur_gan; python3 deblur_gan.py ${OPTION}
 cd ../../image_manipulation/invertible_denoising_network; python3 invertible_denoising_network.py ${OPTION}
 cd ../../image_manipulation/dfm; python3 dfm.py ${OPTION}
+cd ../../image_manipulation/dehamer; python3 dehamer.py ${OPTION}
 cd ../../image_segmentation/deeplabv3; python3 deeplabv3.py ${OPTION}
 cd ../../image_segmentation/hair_segmentation; python3 hair_segmentation.py ${OPTION}
 cd ../../image_segmentation/hrnet_segmentation; python3 hrnet_segmentation.py ${OPTION}
@@ -185,6 +187,7 @@ cd ../../object_detection/picodet; python3 picodet.py ${OPTION}
 cd ../../object_detection/yolact; python3 yolact.py ${OPTION}
 cd ../../object_detection/fastest-det; python3 fastest-det.py ${OPTION}
 cd ../../object_detection/dab-detr; python3 dab-detr.py ${OPTION}
+cd ../../object_detection/glip; python3 glip.py ${OPTION}
 cd ../../object_detection_3d/3d_bbox; python3 3d_bbox.py ${OPTION}
 cd ../../object_detection_3d/3d-object-detection.pytorch; python3 3d-object-detection.pytorch.py ${OPTION}
 cd ../../object_detection_3d/mediapipe_objectron; python3 mediapipe_objectron.py ${OPTION}
