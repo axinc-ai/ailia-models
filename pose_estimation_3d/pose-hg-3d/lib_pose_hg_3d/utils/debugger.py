@@ -109,7 +109,7 @@ class Debugger(object):
     Zb = 0.5*max_range*np.mgrid[-1:2:2,-1:2:2,-1:2:2][2].flatten() + 0.5*(self.zmax+self.zmin)
     for xb, yb, zb in zip(Xb, Yb, Zb):
       self.ax.plot([xb], [yb], [zb], 'w')
-    self.plt.savefig(path, bbox_inches='tight', frameon = False)
+    self.plt.savefig(path, bbox_inches='tight')
   
   def save_img(self, imgId = 'default', path = '../debug/'):
     cv2.imwrite(path + '{}.png'.format(imgId), self.imgs[imgId])
