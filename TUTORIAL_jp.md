@@ -65,6 +65,8 @@ pip3 install numpy
 sudo apt install nvidia-jetpack
 ```
 
+* Jetson Orinにて使用される場合はailia 1.2.13以降が必要です。
+
 ### Raspberry Pi では以下のコマンドを実行
 
 ```
@@ -171,7 +173,7 @@ python3 launcher.py
 ## iOS/Android 向けデモアプリ（ストアからダウンロード）
 - [ailia AI showcase for iOS](https://apps.apple.com/jp/app/ailia-ai-showcase/id1522828798)
 - [ailia AI showcase for Android](https://play.google.com/store/apps/details?id=jp.axinc.ailia_ai_showcase)
-- Windows/macOS/Linuxなどのプラットフォーム用な[こちら](<mailto:contact@axinc.jp>)に問い合わせてください
+- Windows/macOS/Linuxなどのプラットフォーム用は[こちら](<mailto:contact@axinc.jp>)に問い合わせてください
 
 ## API マニュアルとチュートリアル解説ブログ
 

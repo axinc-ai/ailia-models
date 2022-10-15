@@ -4,7 +4,7 @@ The collection of pre-trained, state-of-the-art AI models.
 
 # About ailia SDK
 
-[ailia SDK](https://axinc.jp/en/solutions/ailia_sdk.html) is a self-contained cross-platform high speed inference SDK. The ailia SDK provides a consistent C++ API on Windows, Mac, Linux, iOS, Android, Jetson and Raspberry Pi. It supports Unity, Python and JNI for efficient AI implementation. The ailia SDK makes great use of the GPU via Vulkan and Metal to serve accelerated computing.
+[ailia SDK](https://axinc.jp/en/solutions/ailia_sdk.html) is a self-contained cross-platform high speed inference SDK.  ailia SDK provides a consistent C++ API on Windows, Mac, Linux, iOS, Android, Jetson and Raspberry Pi. It also supports Unity(C#), Python and JNI for efficient AI implementation. The ailia SDK makes great use of the GPU via Vulkan and Metal to serve accelerated computing.
 
 # How to use
 
@@ -57,6 +57,7 @@ The collection of pre-trained, state-of-the-art AI models.
 | [<img src="background_removal/background_matting_v2/output.png" width=128px>](background_removal/background_matting_v2/) | [background_matting_v2](/background_removal/background_matting_v2/) | [Real-Time High-Resolution Background Matting](https://github.com/PeterL1n/BackgroundMattingV2) | Pytorch | 1.2.9 and later |
 | [<img src="background_removal/cascade_psp/output.png" width=128px>](background_removal/cascade_psp/) | [cascade_psp](/background_removal/cascade_psp/) | [CascadePSP](https://github.com/hkchengrex/CascadePSP) | Pytorch | 1.2.9 and later |
 | [<img src="background_removal/rembg/output.png" width=128px>](background_removal/rembg/) | [rembg](/background_removal/rembg/) | [Rembg](https://github.com/danielgatis/rembg) | Pytorch | 1.2.4 and later |
+| [<img src="background_removal/dis_seg/output.jpg" width=128px>](background_removal/dis_seg/) | [dis_seg](/background_removal/dis_seg/) | [Highly Accurate Dichotomous Image Segmentation](https://github.com/xuebinqin/DIS) | Pytorch | 1.2.10 and later |
 
 ## Crowd counting
 
@@ -132,6 +133,7 @@ The collection of pre-trained, state-of-the-art AI models.
 | [<img src="face_recognition/ferplus/img/fer0032227.png" width=128px>](face_recognition/ferplus/) | [ferplus](/face_recognition/ferplus/) | [FER+](https://github.com/microsoft/FERPlus) | CNTK | 1.2.2 and later |
 | [<img src="face_recognition/face-anti-spoofing/output.png" width=128px>](face_recognition/face-anti-spoofing/) | [face-anti-spoofing](/face_recognition/face-anti-spoofing/) | [Lightweight Face Anti Spoofing](https://github.com/kprokofi/light-weight-face-anti-spoofing) | Pytorch | 1.2.5 and later | [EN](https://medium.com/axinc-ai/faceantispoofing-a-machine-learning-model-to-determine-if-a-face-is-real-b6c30f12abb6) [JP](https://medium.com/axinc/faceantispoofing-%E6%9C%AC%E7%89%A9%E3%81%AE%E9%A1%94%E3%81%8B%E3%81%A9%E3%81%86%E3%81%8B%E3%82%92%E5%88%A4%E5%AE%9A%E3%81%99%E3%82%8B%E6%A9%9F%E6%A2%B0%E5%AD%A6%E7%BF%92%E3%83%A2%E3%83%87%E3%83%AB-c7092c1dde43) |
 | [<img src="face_recognition/ax_facial_features/man-with-beard.jpg" width=128px>](face_recognition/ax_facial_features) | [ax_facial_features](/face_recognition/ax_facial_features/)| ax Facial Features | Pytorch | 1.2.5 and later |[EN](https://medium.com/axinc-ai/ax-facial-features-eyelids-eyelashes-and-facial-hair-classification-9b3b12f1d6a1) |
+| [<img src="face_recognition/6d_repnet/output.png" width=128px>](face_recognition/6d_repnet/) | [6d_repnet](/face_recognition/6d_repnet/) | [6D Rotation Representation for Unconstrained Head Pose Estimation (Pytorch)](https://github.com/thohemp/6DRepNet) | Pytorch | 1.2.6 and later |
 
 ## Frame Interpolation
 
@@ -199,6 +201,7 @@ The collection of pre-trained, state-of-the-art AI models.
 | [<img src="image_classification/swin-transformer/input.jpg" width=128px>](image_classification/swin-transformer/) | [swin-transformer](/image_classification/swin-transformer/)|[Swin Transformer](https://github.com/microsoft/Swin-Transformer) | Pytorch | 1.2.6 and later | |
 | [<img src="image_classification/convnext/input_imagenet.jpg" width=128px>](image_classification/convnext/) | [convnext](/image_classification/convnext/)|[A PyTorch implementation of ConvNeXt](https://github.com/facebookresearch/ConvNeXt) | Pytorch | 1.2.5 and later | |
 | [<img src="image_classification/places365/input.jpg" width=128px>](image_classification/places365/) | [places365](/image_classification/places365/)|[Release of Places365-CNNs](https://github.com/CSAILVision/places365) | Pytorch | 1.2.5 and later | |
+| [<img src="image_classification/mobileone/clock.jpg" width=128px>](image_classification/mobileone/) | [mobileone](/image_classification/mobileone/)|[A PyTorch implementation of MobileOne](https://github.com/apple/ml-mobileone) | Pytorch | 1.2.1 and later | |
 
 ## Image inpainting
 
@@ -309,6 +312,7 @@ The collection of pre-trained, state-of-the-art AI models.
 | [<img src="object_detection/yolact/output.png" width=128px>](object_detection/yolact/) | [yolact](/object_detection/yolact/) | [You Only Look At CoefficienTs](https://github.com/dbolya/yolact) | Pytorch | 1.2.6 and later | |
 | [<img src="object_detection/fastest-det/output.png" width=128px>](object_detection/fastest-det/) | [fastest-det](/object_detection/fastest-det/) | [FastestDet](https://github.com/dog-qiuqiu/FastestDet) | Pytorch | 1.2.5 and later | |
 | [<img src="object_detection/dab-detr/output.jpg" width=128px>](object_detection/dab-detr/) | [dab-detr](/object_detection/dab-detr/) | [DAB-DETR](https://github.com/IDEA-opensource/DAB-DETR) | Pytorch | 1.2.12 and later | |
+| [<img src="object_detection/poly_yolo/output.jpg" width=128px>](object_detection/poly_yolo/) | [poly_yolo](/object_detection/poly_yolo/) | [Poly YOLO](https://gitlab.com/irafm-ai/poly-yolo/) | Keras | 1.2.6 and later | |
 
 ## Object detection 3d
 
@@ -354,6 +358,7 @@ The collection of pre-trained, state-of-the-art AI models.
 | [<img src="pose_estimation/efficientpose/output.png" width=128px>](pose_estimation/efficientpose/) |[efficientpose](/pose_estimation/efficientpose/) | [Code repo for EfficientPose](https://github.com/daniegr/EfficientPose) | TensorFlow | 1.2.6 and later |
 | [<img src="pose_estimation/movenet/output.png" width=128px>](pose_estimation/movenet/) |[movenet](/pose_estimation/movenet/) | [Code repo for movenet](https://www.tensorflow.org/hub/tutorials/movenet) | TensorFlow | 1.2.8 and later | [EN](https://medium.com/axinc-ai/movenet-pose-estimation-for-video-with-intense-motion-2b92f53f3c8) [JP](https://medium.com/axinc/movenet-%E5%8B%95%E3%81%8D%E3%81%AE%E6%BF%80%E3%81%97%E3%81%84%E5%8B%95%E7%94%BB%E5%90%91%E3%81%91%E9%AA%A8%E6%A0%BC%E6%A4%9C%E5%87%BA%E3%83%A2%E3%83%87%E3%83%AB-d26d9e06126c)|
 | [<img src="pose_estimation/animalpose/output.png" width=128px>](pose_estimation/animalpose/) |[animalpose](/pose_estimation/animalpose/) | [MMPose - 2D animal pose estimation](https://github.com/open-mmlab/mmpose) | Pytorch | 1.2.7 and later | [EN](https://medium.com/axinc-ai/animalpose-pose-esimation-for-animals-700603e0dbae) [JP](https://medium.com/axinc/animalpose-%E5%8B%95%E7%89%A9%E3%81%AE%E9%AA%A8%E6%A0%BC%E6%A4%9C%E5%87%BA%E3%83%A2%E3%83%87%E3%83%AB-f7f667c0e69d) |
+| [<img src="pose_estimation/mediapipe_holistic/output.png" width=128px>](pose_estimation/mediapipe_holistic/) |[mediapipe_holistic](/pose_estimation/mediapipe_holistic/) | [MediaPipe Holistic](https://google.github.io/mediapipe/solutions/holistic.html) | TensorFlow | 1.2.9 and later | |
 
 ## Pose estimation 3d
 
