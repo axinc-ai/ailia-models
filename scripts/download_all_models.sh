@@ -184,6 +184,7 @@ cd ../../object_detection/picodet; python3 picodet.py ${OPTION}
 cd ../../object_detection/yolact; python3 yolact.py ${OPTION}
 cd ../../object_detection/fastest-det; python3 fastest-det.py ${OPTION}
 cd ../../object_detection/dab-detr; python3 dab-detr.py ${OPTION}
+cd ../../object_detection/poly_yolo; python3 poly_yolo.py ${OPTION}
 cd ../../object_detection_3d/3d_bbox; python3 3d_bbox.py ${OPTION}
 cd ../../object_detection_3d/3d-object-detection.pytorch; python3 3d-object-detection.pytorch.py ${OPTION}
 cd ../../object_detection_3d/mediapipe_objectron; python3 mediapipe_objectron.py ${OPTION}
