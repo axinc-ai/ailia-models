@@ -5,7 +5,6 @@ import cv2
 import matplotlib
 from PIL import Image
 import time
-import onnxruntime as ort
 
 import ailia
 
@@ -140,8 +139,8 @@ def recognize_from_video():
 def main():
     # model files check and download
     check_and_download_models(WEIGHT_PATH_YOLO, MODEL_PATH_YOLO, REMOTE_PATH_YOLO)
-    #check_and_download_models(WEIGHT_PATH_POSE2D, MODEL_PATH_POSE2D, REMOTE_PATH_POSE)
-    #check_and_download_models(WEIGHT_PATH_POSE3D, MODEL_PATH_POSE3D, REMOTE_PATH_POSE)
+    check_and_download_models(WEIGHT_PATH_POSE2D, MODEL_PATH_POSE2D, REMOTE_PATH_POSE)
+    check_and_download_models(WEIGHT_PATH_POSE3D, MODEL_PATH_POSE3D, REMOTE_PATH_POSE)
 
     if args.video is not None:
         # video mode
