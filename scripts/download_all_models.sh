@@ -185,6 +185,7 @@ cd ../../object_detection/picodet; python3 picodet.py ${OPTION}
 cd ../../object_detection/yolact; python3 yolact.py ${OPTION}
 cd ../../object_detection/fastest-det; python3 fastest-det.py ${OPTION}
 cd ../../object_detection/dab-detr; python3 dab-detr.py ${OPTION}
+cd ../../object_detection/poly_yolo; python3 poly_yolo.py ${OPTION}
 cd ../../object_detection_3d/3d_bbox; python3 3d_bbox.py ${OPTION}
 cd ../../object_detection_3d/3d-object-detection.pytorch; python3 3d-object-detection.pytorch.py ${OPTION}
 cd ../../object_detection_3d/mediapipe_objectron; python3 mediapipe_objectron.py ${OPTION}
@@ -205,6 +206,7 @@ cd ../../pose_estimation/blazepose; python3 blazepose.py ${OPTION}
 cd ../../pose_estimation/efficientpose; python3 efficientpose.py ${OPTION}
 cd ../../pose_estimation/movenet; python3 movenet.py -d ${OPTION}
 cd ../../pose_estimation/animalpose; python3 animalpose.py -d ${OPTION}
+cd ../../pose_estimation/mediapipe_holistic; python3 mediapipe_holistic.py ${OPTION}
 cd ../../pose_estimation_3d/3d-pose-baseline; python3 3d-pose-baseline.py ${OPTION}
 cd ../../pose_estimation_3d/lightweight-human-pose-estimation-3d; python3 lightweight-human-pose-estimation-3d.py ${OPTION}
 cd ../../pose_estimation_3d/blazepose-fullbody; python3 blazepose-fullbody.py ${OPTION}
