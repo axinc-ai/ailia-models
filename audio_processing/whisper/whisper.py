@@ -1,4 +1,3 @@
-import os
 import sys
 import time
 
@@ -6,18 +5,20 @@ import numpy as np
 import tqdm
 
 import ailia
-import ailia.audio
 
 # import original modules
 sys.path.append('../../util')
 from utils import get_base_parser, update_parser, get_savepath  # noqa
 from model_utils import check_and_download_models  # noqa
+from math_utils import softmax
 # logger
 from logging import getLogger  # noqa
 
-from audio_utils import SAMPLE_RATE, HOP_LENGTH, N_FRAMES
+from audio_utils import SAMPLE_RATE, HOP_LENGTH, CHUNK_LENGTH, N_FRAMES
 from audio_utils import load_audio, log_mel_spectrogram, pad_or_trim
-from decode_utils import SuppressBlank
+from tokenizer import get_tokenizer
+from decode_utils import BeamSearchDecoder
+from decode_utils import SuppressBlank, SuppressTokens, ApplyTimestampRules
 
 logger = getLogger(__name__)
 
@@ -90,6 +91,30 @@ def get_initial_tokens(tokenizer, options):
     return tuple(tokens)
 
 
+def get_suppress_tokens(tokenizer, options):
+    suppress_tokens = options["suppress_tokens"]
+
+    if isinstance(suppress_tokens, str):
+        suppress_tokens = [int(t) for t in suppress_tokens.split(",")]
+
+    if -1 in suppress_tokens:
+        suppress_tokens = [t for t in suppress_tokens if t >= 0]
+        suppress_tokens.extend(tokenizer.non_speech_tokens)
+    elif suppress_tokens is None or len(suppress_tokens) == 0:
+        suppress_tokens = []  # interpret empty string as an empty list
+    else:
+        assert isinstance(suppress_tokens, list), "suppress_tokens must be a list"
+
+    suppress_tokens.extend(
+        [tokenizer.sot, tokenizer.sot_prev, tokenizer.sot_lm]
+    )
+    if tokenizer.no_speech is not None:
+        # no-speech probability is collected separately
+        suppress_tokens.append(tokenizer.no_speech)
+
+    return tuple(sorted(set(suppress_tokens)))
+
+
 # ======================
 # Main functions
 # ======================
@@ -124,24 +149,39 @@ decode_options = {}
 
 def decode(enc_net, dec_net, mel, options):
     # decoder = None
-    tokenizer = None
+    language = options.get("language") or "en"
+    language = "Japanese"
+    is_multilingual = n_vocab == 51865
+    tokenizer = get_tokenizer(is_multilingual, language=language, task='transcribe')
+
     n_group = options.get("beam_size") or options.get("best_of") or 1
     n_ctx = n_text_ctx
     sample_len = options.get("sample_len") or n_text_ctx // 2
 
     initial_tokens = get_initial_tokens(tokenizer, options)
     sample_begin = len(initial_tokens)
-    # sot_index = 0
+    sot_index = initial_tokens.index(tokenizer.sot)
 
     # logit filters: applies various rules to suppress or penalize certain tokens
     logit_filters = []
     if options.get("suppress_blank"):
         logit_filters.append(SuppressBlank(tokenizer, sample_begin))
+    if options.get("suppress_tokens"):
+        logit_filters.append(SuppressTokens(get_suppress_tokens(tokenizer, options)))
+    if not options.get("without_timestamps"):
+        precision = CHUNK_LENGTH / n_audio_ctx  # usually 0.02 seconds
+        max_initial_timestamp_index = None
+        max_initial_timestamp = options.get("max_initial_timestamp")
+        if max_initial_timestamp:
+            max_initial_timestamp_index = round(max_initial_timestamp / precision)
+        logit_filters.append(
+            ApplyTimestampRules(tokenizer, sample_begin, max_initial_timestamp_index)
+        )
 
     # decoder: implements how to select the next tokens, given the autoregressive distribution
     if options.get("beam_size") is not None:
         decoder = BeamSearchDecoder(
-            options.get("beam_size"), tokenizer.eot, options.patience
+            options.get("beam_size"), tokenizer.eot, options.get("patience")
         )
     else:
         decoder = GreedyDecoder(options.temperature, tokenizer.eot)
@@ -177,15 +217,15 @@ def decode(enc_net, dec_net, mel, options):
             tokens = tokens[:, -1:]
 
         logits = inference_logits(dec_net, tokens, audio_features, offset)
-        print(logits)
-        print(logits.shape)
+        print("logits---1", logits)
+        print("logits---1", logits.shape)
         if i >= 2:
             1 / 0
         offset += tokens.shape[-1]  # less 1500
 
-        # if i == 0 and tokenizer.no_speech is not None:  # save no_speech_probs
-        #     probs_at_sot = logits[:, sot_index].float().softmax(dim=-1)
-        #     no_speech_probs = probs_at_sot[:, tokenizer.no_speech].tolist()
+        if i == 0 and tokenizer.no_speech is not None:  # save no_speech_probs
+            probs_at_sot = softmax(logits[:, sot_index], axis=-1)
+            no_speech_probs = probs_at_sot[:, tokenizer.no_speech].tolist()
 
         # now we need to consider the logits at the last token only
         logits = logits[:, -1]
@@ -193,6 +233,8 @@ def decode(enc_net, dec_net, mel, options):
         # apply the logit filters, e.g. for suppressing or applying penalty to
         for logit_filter in logit_filters:
             logit_filter.apply(logits, tokens)
+        print("logits---2", logits)
+        print("logits---2", logits.shape)
 
         # expand the tokens tensor with the selected next tokens
         tokens, completed = decoder.update(tokens, logits, sum_logprobs)
