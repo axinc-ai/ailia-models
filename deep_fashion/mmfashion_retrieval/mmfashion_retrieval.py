@@ -76,7 +76,7 @@ def show_retrieved_images(query_feat, gallery_embeds, gallery_imgs, topk, filena
     query_dist = {}
     for img in gallery_imgs:
         cosine_dist = cosine(
-            gallery_embeds[img].reshape(1, -1), query_feat.reshape(1, -1))
+            gallery_embeds[img].flatten(), query_feat.flatten())
         query_dist[img] = cosine_dist
 
     order = sorted(query_dist.items(), key=lambda x: x[1])

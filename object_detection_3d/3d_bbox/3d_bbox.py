@@ -94,7 +94,7 @@ args = update_parser(parser)
 # Main functions
 # ======================
 def recognize_from_image():
-    averages = ClassAverages.ClassAverages()
+    averages = ClassAverages()
     angle_bins = generate_bins(2)
 
     env_id = args.env_id
@@ -179,7 +179,7 @@ def recognize_from_image():
 
 def recognize_from_video():
     # net initialize
-    averages = ClassAverages.ClassAverages()
+    averages = ClassAverages()
     angle_bins = generate_bins(2)
 
     env_id = args.env_id
