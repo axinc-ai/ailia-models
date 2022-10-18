@@ -74,11 +74,11 @@ def gen_trimap_from_segmap_e2e(segmap):
 
 
 def generate_composite_img(img, alpha_channel):
-    b_channel, g_channel, r_channel = cv2.split(img)
-    b_channel = b_channel * alpha_channel
-    g_channel = g_channel * alpha_channel
-    r_channel = r_channel * alpha_channel
-    alpha_channel = (alpha_channel * 255).astype(b_channel.dtype)
+    r_channel, g_channel, b_channel = cv2.split(img)
+    b_channel = (b_channel * alpha_channel).astype(np.uint8)
+    g_channel = (g_channel * alpha_channel).astype(np.uint8)
+    r_channel = (r_channel * alpha_channel).astype(np.uint8)
+    alpha_channel = (alpha_channel * 255).astype(np.uint8)
     img_BGRA = cv2.merge((b_channel, g_channel, r_channel, alpha_channel))
 
     return img_BGRA
@@ -201,7 +201,7 @@ def recognize_from_image(net):
 
         # prepare input data
         img = load_image(image_path)
-        img = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
+        img = cv2.cvtColor(img, cv2.COLOR_BGRA2RGB)
 
         # inference
         logger.info('Start inference...')
