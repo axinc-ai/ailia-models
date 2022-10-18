@@ -120,7 +120,6 @@ def get_suppress_tokens(tokenizer, options):
 # ======================
 
 def get_audio_features(enc_net, mel):
-    mel = mel.astype('float16')
     if not args.onnx:
         output = enc_net.predict([mel])
     else:
@@ -130,18 +129,35 @@ def get_audio_features(enc_net, mel):
     return audio_features
 
 
-def inference_logits(dec_net, tokens, audio_features, offset):
+def inference_logits(dec_net, tokens, audio_features, initial_token_length, kv_cache=None):
+    n_group = tokens.shape[0]
+    if kv_cache is None:
+        kv_cache = np.zeros((24, n_group, initial_token_length, 768))
+        offset = 0
+    else:
+        offset = kv_cache.shape[2]
+        _kv_cache = np.zeros((24, n_group, offset + 1, 768))
+        _kv_cache[:, :, :-1, :] = kv_cache
+        kv_cache = _kv_cache
+
+    if tokens.shape[-1] > initial_token_length:
+        # only need to use the last token except in the first forward pass
+        tokens = tokens[:, -1:]
+
     offset = np.array(offset)
 
-    print("> decoder", offset, tokens.shape, audio_features.shape)
+    print("> decoder", tokens.shape, audio_features.shape, kv_cache.shape, offset)
     if not args.onnx:
-        output = dec_net.predict([tokens, audio_features, offset])
+        output = dec_net.predict([tokens, audio_features, kv_cache, offset])
     else:
-        output = dec_net.run(None, {'x': tokens, 'xa': audio_features, 'inp': offset})
-    logits = output[0]
-    print("< decoder", logits.shape)
+        kv_cache = kv_cache.astype(np.float32)
+        output = dec_net.run(None, {
+            'tokens': tokens, 'audio_features': audio_features,
+            'kv_cache': kv_cache, 'offset': offset})
+    logits, kv_cache = output
+    print("< decoder", logits.shape, kv_cache.shape)
 
-    return logits
+    return logits, kv_cache
 
 
 decode_options = {}
@@ -210,18 +226,21 @@ def decode(enc_net, dec_net, mel, options):
     sum_logprobs = np.zeros(n_batch)
     no_speech_probs = [np.nan] * n_batch
     initial_token_length = len(initial_tokens)
+    kv_cache = None
     offset = 0
     for i in range(sample_len):
-        if tokens.shape[-1] > initial_token_length:
-            # only need to use the last token except in the first forward pass
-            tokens = tokens[:, -1:]
+        print("tokens---", tokens.shape)
 
-        logits = inference_logits(dec_net, tokens, audio_features, offset)
+        print(">>>", tokens)
+        print(">>>", tokens.shape)
+        print(">>>", audio_features)
+        print(">>>", audio_features.shape)
+        print(">>>", offset)
+        logits, kv_cache = inference_logits(dec_net, tokens, audio_features, initial_token_length, kv_cache)
         print("logits---1", logits)
         print("logits---1", logits.shape)
-        if i >= 2:
+        if i >= 10:
             1 / 0
-        offset += tokens.shape[-1]  # less 1500
 
         if i == 0 and tokenizer.no_speech is not None:  # save no_speech_probs
             probs_at_sot = softmax(logits[:, sot_index], axis=-1)

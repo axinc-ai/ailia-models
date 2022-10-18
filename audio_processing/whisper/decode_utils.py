@@ -1,7 +1,5 @@
 import numpy as np
-from scipy.special import logsumexp
-
-from math_utils import softmax
+from scipy.special import log_softmax, logsumexp
 
 
 class BeamSearchDecoder:
@@ -25,7 +23,7 @@ class BeamSearchDecoder:
         if self.finished_sequences is None:  # for the first update
             self.finished_sequences = [{} for _ in range(n_audio)]
 
-        logprobs = np.log(softmax(logits, axis=-1))
+        logprobs = log_softmax(logits, axis=-1)
         next_tokens, source_indices, finished_sequences = [], [], []
         for i in range(n_audio):
             scores, sources, finished = {}, {}, {}
@@ -43,8 +41,8 @@ class BeamSearchDecoder:
                     sequence = tuple(prefix + [token])
                     scores[sequence] = new_logprob
                     sources[sequence] = idx
-            print("scores---", scores)
-            print("sources---", sources)
+            # print("scores---", scores)
+            # print("sources---", sources)
 
             # STEP 2: rank the candidates and keep the top beam_size sequences for each audio
             saved = 0
@@ -61,7 +59,7 @@ class BeamSearchDecoder:
                         break
 
             finished_sequences.append(finished)
-        print("finished_sequences---", finished_sequences)
+        # print("finished_sequences---", finished_sequences)
 
         tokens = np.array(next_tokens)
         # self.inference.rearrange_kv_cache(source_indices)
@@ -78,8 +76,8 @@ class BeamSearchDecoder:
         completed = all(
             len(sequences) >= self.max_candidates for sequences in self.finished_sequences
         )
-        print("tokens---", tokens)
-        print("completed---", completed)
+        # print("tokens---", tokens)
+        # print("completed---", completed)
         return tokens, completed
 
     def finalize(self, preceding_tokens, sum_logprobs):
@@ -150,7 +148,7 @@ class ApplyTimestampRules:
             logits[:, last_allowed + 1:] = -np.inf
 
         # if sum of probability over timestamps is above any other token, sample timestamp
-        logprobs = np.log(softmax(logits, axis=-1))
+        logprobs = log_softmax(logits, axis=-1)
         for k in range(tokens.shape[0]):
             timestamp_logprob = logsumexp(logprobs[k, self.tokenizer.timestamp_begin:], axis=-1)
             max_text_token_logprob = np.max(logprobs[k, : self.tokenizer.timestamp_begin])
