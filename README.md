@@ -227,6 +227,7 @@ The collection of pre-trained, state-of-the-art AI models.
 | [<img src="image_manipulation/deblur_gan/output.png" width=128px>](image_manipulation/deblur_gan/) | [deblur_gan](/image_manipulation/deblur_gan/) | [DeblurGAN](https://github.com/KupynOrest/DeblurGAN) | Pytorch | 1.2.6 and later |
 | [<img src="image_manipulation/invertible_denoising_network/output.png" width=128px>](image_manipulation/invertible_denoising_network/) | [invertible_denoising_network](/image_manipulation/invertible_denoising_network/) | [Invertible Image Denoising](https://github.com/Yang-Liu1082/InvDN) | Pytorch | 1.2.8 and later |
 | [<img src="image_manipulation/dfm/output.png" width=128px>](image_manipulation/dfm/) | [dfm](/image_manipulation/dfm/) | [Deep Feature Matching](https://github.com/ufukefe/DFM) | Pytorch | 1.2.6 and later |
+| [<img src="image_manipulation/dfe/out_A_B0.png" width=128px>](image_manipulation/dfe/) | [dfe](/image_manipulation/dfe/) | [pytorch-deepFEPE](https://github.com/eric-yyjau/pytorch-deepFEPE) | Pytorch | 1.2.6 and later |
 
 ## Image segmentation
 
