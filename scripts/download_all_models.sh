@@ -26,6 +26,7 @@ cd ../../background_ramoval/background_matting_v2; python3 background_matting_v2
 cd ../../background_ramoval/cascade_psp; python3 cascade_psp.py ${OPTION}
 cd ../../background_ramoval/rembg; python3 rembg.py ${OPTION}
 cd ../../background_ramoval/dis_seg; python3 dis_seg.py ${OPTION}
+cd ../../background_ramoval/gfm; python3 gfm.py ${OPTION}
 cd ../../crowd_counting/crowdcount-cascaded-mtl; python3 crowdcount-cascaded-mtl.py ${OPTION}
 cd ../../crowd_counting/c-3-framework; python3 c-3-framework.py ${OPTION}
 cd ../../diffusion/latent-diffusion-txt2img python3 latent-diffusion-txt2img.py ${OPTION}
@@ -142,6 +143,7 @@ cd ../../image_segmentation/dense_prediction_transformers; python3 dense_predict
 cd ../../image_segmentation/paddleseg; python3 paddleseg.py ${OPTION}
 cd ../../image_segmentation/pp_liteseg; python3 pp_liteseg.py ${OPTION}
 cd ../../image_segmentation/suim; python3 suim.py ${OPTION}
+cd ../../image_segmentation/group_vit; python3 group_vit.py ${OPTION}
 cd ../../line_segment_detection/mlsd; python3 mlsd.py ${OPTION}
 cd ../../line_segment_detection/dexined; python3 dexined.py ${OPTION}
 cd ../../low_light_image_enhancement/agllnet; python3 agllnet.py ${OPTION}
@@ -184,6 +186,7 @@ cd ../../object_detection/picodet; python3 picodet.py ${OPTION}
 cd ../../object_detection/yolact; python3 yolact.py ${OPTION}
 cd ../../object_detection/fastest-det; python3 fastest-det.py ${OPTION}
 cd ../../object_detection/dab-detr; python3 dab-detr.py ${OPTION}
+cd ../../object_detection/poly_yolo; python3 poly_yolo.py ${OPTION}
 cd ../../object_detection_3d/3d_bbox; python3 3d_bbox.py ${OPTION}
 cd ../../object_detection_3d/3d-object-detection.pytorch; python3 3d-object-detection.pytorch.py ${OPTION}
 cd ../../object_detection_3d/mediapipe_objectron; python3 mediapipe_objectron.py ${OPTION}
@@ -204,6 +207,7 @@ cd ../../pose_estimation/blazepose; python3 blazepose.py ${OPTION}
 cd ../../pose_estimation/efficientpose; python3 efficientpose.py ${OPTION}
 cd ../../pose_estimation/movenet; python3 movenet.py -d ${OPTION}
 cd ../../pose_estimation/animalpose; python3 animalpose.py -d ${OPTION}
+cd ../../pose_estimation/mediapipe_holistic; python3 mediapipe_holistic.py ${OPTION}
 cd ../../pose_estimation_3d/3d-pose-baseline; python3 3d-pose-baseline.py ${OPTION}
 cd ../../pose_estimation_3d/lightweight-human-pose-estimation-3d; python3 lightweight-human-pose-estimation-3d.py ${OPTION}
 cd ../../pose_estimation_3d/blazepose-fullbody; python3 blazepose-fullbody.py ${OPTION}

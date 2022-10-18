@@ -1,0 +1,13 @@
+car
+person
+pole
+traffic sign
+motorcycle
+bicycle
+rider
+ego vehicle
+trailer
+traffic light
+truck
+bus
+caravan

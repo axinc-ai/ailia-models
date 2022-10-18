@@ -51,6 +51,8 @@ pip3 install numpy
 sudo apt install nvidia-jetpack
 ```
 
+* Note that Jetson Orin require ailia 1.2.13 or above. Please contact us if you would like to use an early build of ailia 1.2.13.
+
 ### For Raspberry Pi
 
 ```
@@ -136,7 +138,7 @@ python3 yolov3-tiny.py -v 0
 
 ## Launcher
 
-You can display a list of models and select them with the mouse by using the command below.
+You can use a GUI and select the model from the list using the command below. (Press 'Q' to quit each AI model app)
 
 ```
 python3 launcher.py
