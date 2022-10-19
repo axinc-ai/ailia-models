@@ -82,12 +82,12 @@ class BeamSearchDecoder:
 
     def finalize(self, preceding_tokens, sum_logprobs):
         # collect all finished sequences, including patience, and add unfinished ones if not enough
-        sum_logprobs = sum_logprobs.cpu()
+        sum_logprobs = sum_logprobs
         for i, sequences in enumerate(self.finished_sequences):
             if len(sequences) < self.beam_size:  # when not enough sequences are finished
                 for j in list(np.argsort(sum_logprobs[i]))[::-1]:
                     sequence = preceding_tokens[i, j].tolist() + [self.eot]
-                    sequences[tuple(sequence)] = sum_logprobs[i][j].item()
+                    sequences[tuple(sequence)] = sum_logprobs[i][j]
                     if len(sequences) >= self.beam_size:
                         break
 

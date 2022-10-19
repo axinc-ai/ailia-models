@@ -146,7 +146,6 @@ def inference_logits(dec_net, tokens, audio_features, initial_token_length, kv_c
 
     offset = np.array(offset)
 
-    print("> decoder", tokens.shape, audio_features.shape, kv_cache.shape, offset)
     if not args.onnx:
         output = dec_net.predict([tokens, audio_features, kv_cache, offset])
     else:
@@ -155,7 +154,6 @@ def inference_logits(dec_net, tokens, audio_features, initial_token_length, kv_c
             'tokens': tokens, 'audio_features': audio_features,
             'kv_cache': kv_cache, 'offset': offset})
     logits, kv_cache = output
-    print("< decoder", logits.shape, kv_cache.shape)
 
     return logits, kv_cache
 
@@ -229,18 +227,8 @@ def decode(enc_net, dec_net, mel, options):
     kv_cache = None
     offset = 0
     for i in range(sample_len):
-        print("tokens---", tokens.shape)
-
-        print(">>>", tokens)
-        print(">>>", tokens.shape)
-        print(">>>", audio_features)
-        print(">>>", audio_features.shape)
-        print(">>>", offset)
+        print(f"step: {i}", flush=True)
         logits, kv_cache = inference_logits(dec_net, tokens, audio_features, initial_token_length, kv_cache)
-        print("logits---1", logits)
-        print("logits---1", logits.shape)
-        if i >= 10:
-            1 / 0
 
         if i == 0 and tokenizer.no_speech is not None:  # save no_speech_probs
             probs_at_sot = softmax(logits[:, sot_index], axis=-1)
@@ -252,8 +240,6 @@ def decode(enc_net, dec_net, mel, options):
         # apply the logit filters, e.g. for suppressing or applying penalty to
         for logit_filter in logit_filters:
             logit_filter.apply(logits, tokens)
-        print("logits---2", logits)
-        print("logits---2", logits.shape)
 
         # expand the tokens tensor with the selected next tokens
         tokens, completed = decoder.update(tokens, logits, sum_logprobs)
@@ -268,6 +254,8 @@ def decode(enc_net, dec_net, mel, options):
 
     tokens = tokens.reshape(n_audio, n_group, -1)
     sum_logprobs = sum_logprobs.reshape(n_audio, n_group)
+    
+    return
 
     # get the final candidates for each group, and slice between the first sampled token and EOT
     tokens, sum_logprobs = decoder.finalize(tokens, sum_logprobs)
@@ -360,7 +348,7 @@ def predict(wav, enc_net, dec_net):
 
     num_frames = mel.shape[-1]
     previous_seek_value = seek
-    with tqdm.tqdm(total=num_frames, unit='frames') as pbar:
+    with tqdm.tqdm(total=num_frames, unit='frames', disable=True) as pbar:
         while seek < num_frames:
             timestamp_offset = float(seek * HOP_LENGTH / SAMPLE_RATE)
             segment = pad_or_trim(mel[:, :, seek:], N_FRAMES)
@@ -368,6 +356,7 @@ def predict(wav, enc_net, dec_net):
 
             decode_options["prompt"] = all_tokens[prompt_reset_since:]
             result = decode_with_fallback(enc_net, dec_net, segment)
+            return
             result = result[0]
             tokens = np.array(result.tokens)
 
@@ -408,9 +397,9 @@ def recognize_from_audio(enc_net, dec_net):
         else:
             output = predict(wav, enc_net, dec_net)
 
-        # plot result
-        savepath = get_savepath(args.savepath, image_path, ext='.txt')
-        logger.info(f'saved at : {savepath}')
+        # # plot result
+        # savepath = get_savepath(args.savepath, audio_path, ext='.txt')
+        # logger.info(f'saved at : {savepath}')
 
     logger.info('Script finished successfully.')
 
