@@ -58,6 +58,7 @@ The collection of pre-trained, state-of-the-art AI models.
 | [<img src="background_removal/cascade_psp/output.png" width=128px>](background_removal/cascade_psp/) | [cascade_psp](/background_removal/cascade_psp/) | [CascadePSP](https://github.com/hkchengrex/CascadePSP) | Pytorch | 1.2.9 and later |
 | [<img src="background_removal/rembg/output.png" width=128px>](background_removal/rembg/) | [rembg](/background_removal/rembg/) | [Rembg](https://github.com/danielgatis/rembg) | Pytorch | 1.2.4 and later |
 | [<img src="background_removal/dis_seg/output.jpg" width=128px>](background_removal/dis_seg/) | [dis_seg](/background_removal/dis_seg/) | [Highly Accurate Dichotomous Image Segmentation](https://github.com/xuebinqin/DIS) | Pytorch | 1.2.10 and later |
+| [<img src="background_removal/gfm/output.png" width=128px>](background_removal/gfm/) | [gfm](/background_removal/gfm/) | [Bridging Composite and Real: Towards End-to-end Deep Image Matting](https://github.com/JizhiziLi/GFM) | Pytorch | 1.2.10 and later |
 
 ## Crowd counting
 
@@ -226,6 +227,7 @@ The collection of pre-trained, state-of-the-art AI models.
 | [<img src="image_manipulation/deblur_gan/output.png" width=128px>](image_manipulation/deblur_gan/) | [deblur_gan](/image_manipulation/deblur_gan/) | [DeblurGAN](https://github.com/KupynOrest/DeblurGAN) | Pytorch | 1.2.6 and later |
 | [<img src="image_manipulation/invertible_denoising_network/output.png" width=128px>](image_manipulation/invertible_denoising_network/) | [invertible_denoising_network](/image_manipulation/invertible_denoising_network/) | [Invertible Image Denoising](https://github.com/Yang-Liu1082/InvDN) | Pytorch | 1.2.8 and later |
 | [<img src="image_manipulation/dfm/output.png" width=128px>](image_manipulation/dfm/) | [dfm](/image_manipulation/dfm/) | [Deep Feature Matching](https://github.com/ufukefe/DFM) | Pytorch | 1.2.6 and later |
+| [<img src="image_manipulation/dfe/out_A_B0.png" width=128px>](image_manipulation/dfe/) | [dfe](/image_manipulation/dfe/) | [Deep Fundamental Matrix Estimation](https://github.com/isl-org/DFE) | Pytorch | 1.2.6 and later |
 
 ## Image segmentation
 
@@ -245,7 +247,7 @@ The collection of pre-trained, state-of-the-art AI models.
 | [<img src="image_segmentation/paddleseg/output.png" width=128px>](image_segmentation/paddleseg/) | [paddleseg](/image_segmentation/paddleseg/) | [PaddleSeg](https://github.com/PaddlePaddle/PaddleSeg/tree/release/2.3/contrib/CityscapesSOTA) | Pytorch | 1.2.7 and later | [JP](https://medium.com/axinc/paddleseg-%E9%9A%8E%E5%B1%A4%E7%9A%84%E3%81%AA%E3%82%A2%E3%83%86%E3%83%B3%E3%82%B7%E3%83%A7%E3%83%B3%E3%82%92%E4%BD%BF%E7%94%A8%E3%81%97%E3%81%9F%E9%AB%98%E7%B2%BE%E5%BA%A6%E3%81%AA%E3%82%BB%E3%82%B0%E3%83%A1%E3%83%B3%E3%83%86%E3%83%BC%E3%82%B7%E3%83%A7%E3%83%B3%E3%83%A2%E3%83%87%E3%83%AB-acc89bf50423) |
 | [<img src="image_segmentation/pp_liteseg/output.png" width=128px>](image_segmentation/pp_liteseg/) | [pp_liteseg](/image_segmentation/pp_liteseg/) | [PP-LiteSeg](https://github.com/PaddlePaddle/PaddleSeg/tree/develop/configs/pp_liteseg) | Pytorch | 1.2.10 and later |  |
 | [<img src="image_segmentation/suim/output.jpg" width=128px>](image_segmentation/suim/) | [suim](/image_segmentation/suim/) | [SUIM](https://github.com/IRVLab/SUIM) | Keras | 1.2.6 and later |  |
-
+| [<img src="image_segmentation/group_vit/output.png" width=128px>](image_segmentation/group_vit/) | [group_vit](/image_segmentation/group_vit/) | [GroupViT](https://github.com/NVlabs/GroupViT) | Pytorch | 1.2.10 and later |  |
 
 ## Line segment detection
 
@@ -312,6 +314,7 @@ The collection of pre-trained, state-of-the-art AI models.
 | [<img src="object_detection/yolact/output.png" width=128px>](object_detection/yolact/) | [yolact](/object_detection/yolact/) | [You Only Look At CoefficienTs](https://github.com/dbolya/yolact) | Pytorch | 1.2.6 and later | |
 | [<img src="object_detection/fastest-det/output.png" width=128px>](object_detection/fastest-det/) | [fastest-det](/object_detection/fastest-det/) | [FastestDet](https://github.com/dog-qiuqiu/FastestDet) | Pytorch | 1.2.5 and later | |
 | [<img src="object_detection/dab-detr/output.jpg" width=128px>](object_detection/dab-detr/) | [dab-detr](/object_detection/dab-detr/) | [DAB-DETR](https://github.com/IDEA-opensource/DAB-DETR) | Pytorch | 1.2.12 and later | |
+| [<img src="object_detection/poly_yolo/output.jpg" width=128px>](object_detection/poly_yolo/) | [poly_yolo](/object_detection/poly_yolo/) | [Poly YOLO](https://gitlab.com/irafm-ai/poly-yolo/) | Keras | 1.2.6 and later | |
 
 ## Object detection 3d
 
