@@ -1,5 +1,6 @@
 import sys
 import time
+from collections import namedtuple
 
 import numpy as np
 import tqdm
@@ -17,7 +18,7 @@ from logging import getLogger  # noqa
 from audio_utils import SAMPLE_RATE, HOP_LENGTH, CHUNK_LENGTH, N_FRAMES
 from audio_utils import load_audio, log_mel_spectrogram, pad_or_trim
 from tokenizer import get_tokenizer
-from decode_utils import BeamSearchDecoder
+from decode_utils import MaximumLikelihoodRanker, BeamSearchDecoder
 from decode_utils import SuppressBlank, SuppressTokens, ApplyTimestampRules
 
 logger = getLogger(__name__)
@@ -30,7 +31,7 @@ WEIGHT_COND_STAGE_PATH = 'xxx.onnx'
 MODEL_COND_STAGE_PATH = 'xxx.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/whisper/'
 
-WAV_PATH = 'demo.png'
+WAV_PATH = 'demo.wav'
 SAVE_TEXT_PATH = 'output.txt'
 
 n_mels = 80
@@ -52,6 +53,18 @@ parser = get_base_parser(
     'Whisper', WAV_PATH, SAVE_TEXT_PATH, input_ftype='audio'
 )
 parser.add_argument(
+    '-m', '--model_type', default='small', choices=('small',),
+    help='model type'
+)
+parser.add_argument(
+    "--beam_size", type=int, default=5,
+    help="number of beams in beam search, only applicable when temperature is zero"
+)
+parser.add_argument(
+    "--logprob_threshold", type=float, default=-1.0,
+    help="if the average log probability is lower than this value, treat the decoding as failed"
+)
+parser.add_argument(
     '--onnx',
     action='store_true',
     help='execute onnxruntime version.'
@@ -62,6 +75,28 @@ args = update_parser(parser)
 # ======================
 # Secondaty Functions
 # ======================
+
+def is_multilingual():
+    return n_vocab == 51865
+
+
+def format_timestamp(seconds: float, always_include_hours: bool = False):
+    assert seconds >= 0, "non-negative timestamp expected"
+    milliseconds = round(seconds * 1000.0)
+
+    hours = milliseconds // 3_600_000
+    milliseconds -= hours * 3_600_000
+
+    minutes = milliseconds // 60_000
+    milliseconds -= minutes * 60_000
+
+    seconds = milliseconds // 1_000
+    milliseconds -= seconds * 1_000
+
+    hours_marker = f"{hours}:" if always_include_hours or hours > 0 else ""
+
+    return f"{hours_marker}{minutes:02d}:{seconds:02d}.{milliseconds:03d}"
+
 
 def get_initial_tokens(tokenizer, options):
     # sot_sequence = tokenizer.sot_sequence
@@ -115,6 +150,24 @@ def get_suppress_tokens(tokenizer, options):
     return tuple(sorted(set(suppress_tokens)))
 
 
+def new_kv_cache(n_group, length):
+    model_type = args.model_type
+    if model_type == "tiny.en" or model_type == "tiny":
+        size = [8, n_group, length, 384]
+    elif model_type == "base.en" or model_type == "base":
+        size = [12, n_group, length, 512]
+    elif model_type == "small.en" or model_type == "small":
+        size = [24, n_group, length, 768]
+    elif model_type == "medium.en" or model_type == "medium":
+        size = [48, n_group, length, 1024]
+    elif model_type == "large":
+        size = [64, n_group, length, 1280]
+    else:
+        raise ValueError(f"Unsupported model type: {model_type}")
+
+    return np.zeros(size, dtype=np.float32)
+
+
 # ======================
 # Main functions
 # ======================
@@ -129,14 +182,14 @@ def get_audio_features(enc_net, mel):
     return audio_features
 
 
-def inference_logits(dec_net, tokens, audio_features, initial_token_length, kv_cache=None):
+def inference_logits(dec_net, tokens, audio_features, kv_cache, initial_token_length):
     n_group = tokens.shape[0]
     if kv_cache is None:
-        kv_cache = np.zeros((24, n_group, initial_token_length, 768))
+        kv_cache = new_kv_cache(n_group, initial_token_length)
         offset = 0
     else:
         offset = kv_cache.shape[2]
-        _kv_cache = np.zeros((24, n_group, offset + 1, 768))
+        _kv_cache = new_kv_cache(n_group, offset + 1)
         _kv_cache[:, :, :-1, :] = kv_cache
         kv_cache = _kv_cache
 
@@ -144,7 +197,8 @@ def inference_logits(dec_net, tokens, audio_features, initial_token_length, kv_c
         # only need to use the last token except in the first forward pass
         tokens = tokens[:, -1:]
 
-    offset = np.array(offset)
+    tokens = tokens.astype(np.int64)
+    offset = np.array(offset, dtype=np.int64)
 
     if not args.onnx:
         output = dec_net.predict([tokens, audio_features, kv_cache, offset])
@@ -158,15 +212,14 @@ def inference_logits(dec_net, tokens, audio_features, initial_token_length, kv_c
     return logits, kv_cache
 
 
-decode_options = {}
-
-
 def decode(enc_net, dec_net, mel, options):
-    # decoder = None
+    single = mel.ndim == 2
+    if single:
+        mel = mel.unsqueeze(0)
+
     language = options.get("language") or "en"
     language = "Japanese"
-    is_multilingual = n_vocab == 51865
-    tokenizer = get_tokenizer(is_multilingual, language=language, task='transcribe')
+    tokenizer = get_tokenizer(is_multilingual(), language=language, task='transcribe')
 
     n_group = options.get("beam_size") or options.get("best_of") or 1
     n_ctx = n_text_ctx
@@ -192,6 +245,9 @@ def decode(enc_net, dec_net, mel, options):
             ApplyTimestampRules(tokenizer, sample_begin, max_initial_timestamp_index)
         )
 
+    # sequence ranker: implements how to rank a group of sampled sequences
+    sequence_ranker = MaximumLikelihoodRanker(options.get("length_penalty"))
+
     # decoder: implements how to select the next tokens, given the autoregressive distribution
     if options.get("beam_size") is not None:
         decoder = BeamSearchDecoder(
@@ -213,22 +269,26 @@ def decode(enc_net, dec_net, mel, options):
     #         DecodingResult(audio_features=features, language=language, language_probs=probs)
     #         for features, language, probs in zip(audio_features, languages, language_probs)
     #     ]
+    languages = ['Japanese']
 
     # repeat the audio & text tensors by the group size, for beam search or best-of-n sampling
-    # audio_features = audio_features.repeat_interleave(n_group, dim=0)
     audio_features = np.repeat(audio_features, n_group, axis=0)
     tokens = np.repeat(tokens, n_group, axis=0)
 
-    # sampling loop
     n_batch = tokens.shape[0]
     sum_logprobs = np.zeros(n_batch)
     no_speech_probs = [np.nan] * n_batch
     initial_token_length = len(initial_tokens)
     kv_cache = None
-    offset = 0
+
+    # sampling loop
     for i in range(sample_len):
         print(f"step: {i}", flush=True)
-        logits, kv_cache = inference_logits(dec_net, tokens, audio_features, initial_token_length, kv_cache)
+        logits, kv_cache = inference_logits(dec_net, tokens, audio_features, kv_cache, initial_token_length)
+        # print("logits---1", logits)
+        # print("logits---1", logits.shape)
+        # if i >= 10:
+        #     1 / 0
 
         if i == 0 and tokenizer.no_speech is not None:  # save no_speech_probs
             probs_at_sot = softmax(logits[:, sot_index], axis=-1)
@@ -241,8 +301,14 @@ def decode(enc_net, dec_net, mel, options):
         for logit_filter in logit_filters:
             logit_filter.apply(logits, tokens)
 
+        # print("logits---2", logits)
+        # print("logits---2", logits.shape)
+
+        def rearrange_kv_cache(source_indices):
+            kv_cache[...] = kv_cache[:, source_indices]
+
         # expand the tokens tensor with the selected next tokens
-        tokens, completed = decoder.update(tokens, logits, sum_logprobs)
+        tokens, completed = decoder.update(tokens, logits, sum_logprobs, rearrange_kv_cache)
 
         if completed or tokens.shape[-1] > n_ctx:
             break
@@ -254,39 +320,42 @@ def decode(enc_net, dec_net, mel, options):
 
     tokens = tokens.reshape(n_audio, n_group, -1)
     sum_logprobs = sum_logprobs.reshape(n_audio, n_group)
-    
-    return
 
     # get the final candidates for each group, and slice between the first sampled token and EOT
     tokens, sum_logprobs = decoder.finalize(tokens, sum_logprobs)
-    tokens: List[List[Tensor]] = [
-        [t[self.sample_begin: (t == tokenizer.eot).nonzero()[0, 0]] for t in s] for s in tokens
-    ]
+    tokens = [[
+        t[sample_begin: np.nonzero(t == tokenizer.eot)[0][0]] for t in s
+    ] for s in tokens]
 
     # select the top-ranked sample in each group
-    selected = self.sequence_ranker.rank(tokens, sum_logprobs)
-    tokens: List[List[int]] = [t[i].tolist() for i, t in zip(selected, tokens)]
-    texts: List[str] = [tokenizer.decode(t).strip() for t in tokens]
+    selected = sequence_ranker.rank(tokens, sum_logprobs)
+    tokens = [t[i].tolist() for i, t in zip(selected, tokens)]
+    texts = [tokenizer.decode(t).strip() for t in tokens]
 
-    sum_logprobs: List[float] = [lp[i] for i, lp in zip(selected, sum_logprobs)]
-    avg_logprobs: List[float] = [lp / (len(t) + 1) for t, lp in zip(tokens, sum_logprobs)]
+    sum_logprobs = [lp[i] for i, lp in zip(selected, sum_logprobs)]
+    avg_logprobs = [lp / (len(t) + 1) for t, lp in zip(tokens, sum_logprobs)]
 
     fields = (texts, languages, tokens, audio_features, avg_logprobs, no_speech_probs)
     if len(set(map(len, fields))) != 1:
         raise RuntimeError(f"inconsistent result lengths: {list(map(len, fields))}")
 
+    DecodingResult = namedtuple('DecodingResult', [
+        'audio_features', 'language', 'language_probs',
+        'tokens', 'text', 'avg_logprob', 'no_speech_prob',
+        'temperature',
+    ])
+
     result = [
         DecodingResult(
             audio_features=features,
             language=language,
+            language_probs=None,
             tokens=tokens,
             text=text,
             avg_logprob=avg_logprob,
             no_speech_prob=no_speech_prob,
-            temperature=self.options.temperature,
-            compression_ratio=compression_ratio(text),
-        )
-        for text, language, tokens, features, avg_logprob, no_speech_prob in zip(*fields)
+            temperature=options.get("temperature"),
+        ) for text, language, tokens, features, avg_logprob, no_speech_prob in zip(*fields)
     ]
 
     if single:
@@ -295,7 +364,9 @@ def decode(enc_net, dec_net, mel, options):
     return result
 
 
-def decode_with_fallback(enc_net, dec_net, segment):
+def decode_with_fallback(enc_net, dec_net, segment, decode_options):
+    logprob_threshold = args.logprob_threshold
+
     # temperatures = [temperature] if isinstance(temperature, (int, float)) else temperature
     temperatures = (0.0, 0.2, 0.4, 0.6000000000000001, 0.8, 1.0)
     kwargs = {**decode_options}
@@ -311,43 +382,73 @@ def decode_with_fallback(enc_net, dec_net, segment):
     kwargs.pop("beam_size", None)  # no beam search for t > 0
     kwargs.pop("patience", None)  # no patience for t > 0
     kwargs["best_of"] = best_of  # enable best_of for t > 0
-    # for t in temperatures[1:]:
-    #     needs_fallback = [
-    #         compression_ratio_threshold is not None
-    #         and result.compression_ratio > compression_ratio_threshold
-    #         or logprob_threshold is not None
-    #         and result.avg_logprob < logprob_threshold
-    #         for result in results
-    #     ]
-    #     if any(needs_fallback):
-    #         options = DecodingOptions(**kwargs, temperature=t)
-    #         retries = model.decode(segment[needs_fallback], options)
-    #         for retry_index, original_index in enumerate(np.nonzero(needs_fallback)[0]):
-    #             results[original_index] = retries[retry_index]
+    for t in temperatures[1:]:
+        needs_fallback = [
+            result.avg_logprob < logprob_threshold for result in results
+        ]
+        if any(needs_fallback):
+            options = {"temperature": t, **kwargs}
+            retries = decode(enc_net, dec_net, segment[needs_fallback], options)
+            for retry_index, original_index in enumerate(np.nonzero(needs_fallback)[0]):
+                results[original_index] = retries[retry_index]
 
     return results
 
 
 def predict(wav, enc_net, dec_net):
+    no_speech_threshold = 0.6
+    logprob_threshold = args.logprob_threshold
+
+    decode_options = {
+        'task': 'transcribe', 'language': 'Japanese', 'best_of': 5,
+        'beam_size': args.beam_size, 'patience': None,
+        'length_penalty': None, 'suppress_tokens': '-1', 'fp16': True, 'prompt': []
+    }
+
     mel = log_mel_spectrogram(wav)
     mel = np.expand_dims(mel, axis=0)
-
-    # language = "Japanese"
-    # task = "transcribe"
-    # tokenizer = get_tokenizer(model.is_multilingual, language=language, task=task)
+    language = "Japanese"
+    task = decode_options.get("task", "transcribe")
+    tokenizer = get_tokenizer(is_multilingual(), language=language, task=task)
 
     seek = 0
+    input_stride = N_FRAMES // n_audio_ctx  # mel frames per output token: 2
+    time_precision = (
+            input_stride * HOP_LENGTH / SAMPLE_RATE
+    )  # time per output token: 0.02 (seconds)
     all_tokens = []
     all_segments = []
     prompt_reset_since = 0
 
-    decode_options.update({
-        'task': 'transcribe', 'language': 'Japanese', 'best_of': 5, 'beam_size': 5, 'patience': None,
-        'length_penalty': None, 'suppress_tokens': '-1', 'fp16': True, 'prompt': []
-    })
+    initial_prompt = decode_options.pop("initial_prompt", None) or []
+    if initial_prompt:
+        initial_prompt = tokenizer.encode(" " + initial_prompt.strip())
+        all_tokens.extend(initial_prompt)
+
+    def add_segment(
+            start, end, text_tokens, result):
+        text = tokenizer.decode([token for token in text_tokens if token < tokenizer.eot])
+        if len(text.strip()) == 0:  # skip empty text output
+            return
+
+        all_segments.append({
+            "id": len(all_segments),
+            "seek": seek,
+            "start": start,
+            "end": end,
+            "text": text,
+            "tokens": result.tokens,
+            "temperature": result.temperature,
+            "avg_logprob": result.avg_logprob,
+            # "compression_ratio": result.compression_ratio,
+            "no_speech_prob": result.no_speech_prob,
+        })
+        logger.info(f"[{format_timestamp(start)} --> {format_timestamp(end)}] {text}")
 
     num_frames = mel.shape[-1]
     previous_seek_value = seek
+
+    # show the progress bar when verbose is False (otherwise the transcribed text will be printed)
     with tqdm.tqdm(total=num_frames, unit='frames', disable=True) as pbar:
         while seek < num_frames:
             timestamp_offset = float(seek * HOP_LENGTH / SAMPLE_RATE)
@@ -355,18 +456,73 @@ def predict(wav, enc_net, dec_net):
             segment_duration = segment.shape[-1] * HOP_LENGTH / SAMPLE_RATE
 
             decode_options["prompt"] = all_tokens[prompt_reset_since:]
-            result = decode_with_fallback(enc_net, dec_net, segment)
-            return
+            result = decode_with_fallback(enc_net, dec_net, segment, decode_options)
             result = result[0]
             tokens = np.array(result.tokens)
+
+            if no_speech_threshold is not None:
+                # no voice activity check
+                should_skip = result.no_speech_prob > no_speech_threshold
+                if logprob_threshold is not None and result.avg_logprob > logprob_threshold:
+                    # don't skip if the logprob is high enough, despite the no_speech_prob
+                    should_skip = False
+
+                if should_skip:
+                    seek += segment.shape[-1]  # fast-forward to the next segment boundary
+                    continue
+
+            timestamp_tokens = tokens >= tokenizer.timestamp_begin
+            consecutive = np.where(timestamp_tokens[:-1] & timestamp_tokens[1:])[0] + 1
+            if len(consecutive) > 0:  # if the output contains two consecutive timestamp tokens
+                last_slice = 0
+                for current_slice in consecutive:
+                    sliced_tokens = tokens[last_slice:current_slice]
+                    start_timestamp_position = (
+                            sliced_tokens[0] - tokenizer.timestamp_begin
+                    )
+                    end_timestamp_position = (
+                            sliced_tokens[-1] - tokenizer.timestamp_begin
+                    )
+                    add_segment(
+                        start=timestamp_offset + start_timestamp_position * time_precision,
+                        end=timestamp_offset + end_timestamp_position * time_precision,
+                        text_tokens=sliced_tokens[1:-1],
+                        result=result,
+                    )
+                    last_slice = current_slice
+                last_timestamp_position = (
+                        tokens[last_slice - 1] - tokenizer.timestamp_begin
+                )
+                seek += last_timestamp_position * input_stride
+                all_tokens.extend(tokens[: last_slice + 1].tolist())
+            else:
+                duration = segment_duration
+                timestamps = tokens[np.nonzero(timestamp_tokens)[0]]
+                if len(timestamps) > 0:
+                    # no consecutive timestamps but it has a timestamp; use the last one.
+                    # single timestamp at the end means no speech after the last timestamp.
+                    last_timestamp_position = timestamps[-1] - tokenizer.timestamp_begin
+                    duration = last_timestamp_position * time_precision
+
+                add_segment(
+                    start=timestamp_offset,
+                    end=timestamp_offset + duration,
+                    text_tokens=tokens,
+                    result=result,
+                )
+                seek += segment.shape[-1]
+                all_tokens.extend(tokens.tolist())
 
             # update progress bar
             pbar.update(min(num_frames, seek) - previous_seek_value)
             previous_seek_value = seek
 
-            break
-
-    return
+    d = dict(
+        text=tokenizer.decode(all_tokens[len(initial_prompt):]),
+        segments=all_segments,
+        language=language
+    )
+    return d
 
 
 def recognize_from_audio(enc_net, dec_net):
@@ -397,7 +553,9 @@ def recognize_from_audio(enc_net, dec_net):
         else:
             output = predict(wav, enc_net, dec_net)
 
-        # # plot result
+        print(output)
+
+        # # output result
         # savepath = get_savepath(args.savepath, audio_path, ext='.txt')
         # logger.info(f'saved at : {savepath}')
 

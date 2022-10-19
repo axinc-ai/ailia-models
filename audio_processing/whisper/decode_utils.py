@@ -2,6 +2,33 @@ import numpy as np
 from scipy.special import log_softmax, logsumexp
 
 
+class MaximumLikelihoodRanker:
+    """
+    Select the sample with the highest log probabilities, penalized using either
+    a simple length normalization or Google NMT paper's length penalty
+    """
+
+    def __init__(self, length_penalty):
+        self.length_penalty = length_penalty
+
+    def rank(self, tokens, sum_logprobs):
+        def scores(logprobs, lengths):
+            result = []
+            for logprob, length in zip(logprobs, lengths):
+                if self.length_penalty is None:
+                    penalty = length
+                else:
+                    # from the Google NMT paper
+                    penalty = ((5 + length) / 6) ** self.length_penalty
+                result.append(logprob / penalty)
+            return result
+
+        # get the sequence with the highest score
+        lengths = [[len(t) for t in s] for s in tokens]
+
+        return [np.argmax(scores(p, l)) for p, l in zip(sum_logprobs, lengths)]
+
+
 class BeamSearchDecoder:
     def __init__(self, beam_size: int, eot: int, patience=None):
         self.beam_size = beam_size
@@ -15,7 +42,7 @@ class BeamSearchDecoder:
     def reset(self):
         self.finished_sequences = None
 
-    def update(self, tokens, logits, sum_logprobs):
+    def update(self, tokens, logits, sum_logprobs, rearrange_kv_cache):
         if tokens.shape[0] % self.beam_size != 0:
             raise ValueError(f"{tokens.shape}[0] % {self.beam_size} != 0")
 
@@ -41,8 +68,6 @@ class BeamSearchDecoder:
                     sequence = tuple(prefix + [token])
                     scores[sequence] = new_logprob
                     sources[sequence] = idx
-            # print("scores---", scores)
-            # print("sources---", sources)
 
             # STEP 2: rank the candidates and keep the top beam_size sequences for each audio
             saved = 0
@@ -59,10 +84,9 @@ class BeamSearchDecoder:
                         break
 
             finished_sequences.append(finished)
-        # print("finished_sequences---", finished_sequences)
 
         tokens = np.array(next_tokens)
-        # self.inference.rearrange_kv_cache(source_indices)
+        rearrange_kv_cache(source_indices)
 
         # add newly finished sequences to self.finished_sequences
         assert len(self.finished_sequences) == len(finished_sequences)
@@ -76,13 +100,10 @@ class BeamSearchDecoder:
         completed = all(
             len(sequences) >= self.max_candidates for sequences in self.finished_sequences
         )
-        # print("tokens---", tokens)
-        # print("completed---", completed)
         return tokens, completed
 
     def finalize(self, preceding_tokens, sum_logprobs):
         # collect all finished sequences, including patience, and add unfinished ones if not enough
-        sum_logprobs = sum_logprobs
         for i, sequences in enumerate(self.finished_sequences):
             if len(sequences) < self.beam_size:  # when not enough sequences are finished
                 for j in list(np.argsort(sum_logprobs[i]))[::-1]:
