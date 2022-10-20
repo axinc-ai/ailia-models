@@ -18,7 +18,7 @@ from logging import getLogger  # noqa
 from audio_utils import SAMPLE_RATE, HOP_LENGTH, CHUNK_LENGTH, N_FRAMES
 from audio_utils import load_audio, log_mel_spectrogram, pad_or_trim
 from tokenizer import get_tokenizer
-from decode_utils import MaximumLikelihoodRanker, BeamSearchDecoder
+from decode_utils import MaximumLikelihoodRanker, GreedyDecoder, BeamSearchDecoder
 from decode_utils import SuppressBlank, SuppressTokens, ApplyTimestampRules
 
 logger = getLogger(__name__)
@@ -27,23 +27,26 @@ logger = getLogger(__name__)
 # Parameters
 # ======================
 
-WEIGHT_COND_STAGE_PATH = 'xxx.onnx'
-MODEL_COND_STAGE_PATH = 'xxx.onnx.prototxt'
+WEIGHT_ENC_TINY_PATH = "encoder_tiny.onnx"
+MODEL_ENC_TINY_PATH = "encoder_tiny.onnx.prototxt"
+WEIGHT_DEC_TINY_PATH = "decoder_tiny.onnx"
+MODEL_DEC_TINY_PATH = "decoder_tiny.onnx.prototxt"
+WEIGHT_ENC_BASE_PATH = "encoder_base.onnx"
+MODEL_ENC_BASE_PATH = "encoder_base.onnx.prototxt"
+WEIGHT_DEC_BASE_PATH = "decoder_base.onnx"
+MODEL_DEC_BASE_PATH = "decoder_base.onnx.prototxt"
+WEIGHT_ENC_SMALL_PATH = "encoder_small.onnx"
+MODEL_ENC_SMALL_PATH = "encoder_small.onnx.prototxt"
+WEIGHT_DEC_SMALL_PATH = "decoder_small.onnx"
+MODEL_DEC_SMALL_PATH = "decoder_small.onnx.prototxt"
+WEIGHT_ENC_MEDIUM_PATH = "encoder_medium.onnx"
+MODEL_ENC_MEDIUM_PATH = "encoder_medium.onnx.prototxt"
+WEIGHT_DEC_MEDIUM_PATH = "decoder_medium.onnx"
+MODEL_DEC_MEDIUM_PATH = "decoder_medium.onnx.prototxt"
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/whisper/'
 
 WAV_PATH = 'demo.wav'
 SAVE_TEXT_PATH = 'output.txt'
-
-n_mels = 80
-n_audio_ctx = 1500
-n_audio_state = 768
-n_audio_head = 12
-n_audio_layer = 12
-n_vocab = 51865
-n_text_ctx = 448
-n_text_state = 768
-n_text_head = 12
-n_text_layer = 12
 
 # ======================
 # Arguemnt Parser Config
@@ -53,7 +56,7 @@ parser = get_base_parser(
     'Whisper', WAV_PATH, SAVE_TEXT_PATH, input_ftype='audio'
 )
 parser.add_argument(
-    '-m', '--model_type', default='small', choices=('small',),
+    '-m', '--model_type', default='small', choices=('tiny', 'base', 'small', 'medium'),
     help='model type'
 )
 parser.add_argument(
@@ -71,13 +74,26 @@ parser.add_argument(
 )
 args = update_parser(parser)
 
+ModelDimensions = namedtuple('ModelDimensions', [
+    'n_mels', 'n_audio_ctx', 'n_audio_state', 'n_audio_head', 'n_audio_layer',
+    'n_vocab', 'n_text_ctx', 'n_text_state', 'n_text_head', 'n_text_layer',
+])
+
+dims_dict = {
+    'tiny': ModelDimensions(80, 1500, 384, 6, 4, 51865, 448, 384, 6, 4),
+    'base': ModelDimensions(80, 1500, 512, 8, 6, 51865, 448, 512, 8, 6),
+    'small': ModelDimensions(80, 1500, 768, 12, 12, 51865, 448, 768, 12, 12),
+    'medium': ModelDimensions(80, 1500, 1024, 16, 24, 51865, 448, 1024, 16, 24),
+}
+dims = dims_dict[args.model_type]
+
 
 # ======================
 # Secondaty Functions
 # ======================
 
 def is_multilingual():
-    return n_vocab == 51865
+    return dims.n_vocab == 51865
 
 
 def format_timestamp(seconds: float, always_include_hours: bool = False):
@@ -101,8 +117,8 @@ def format_timestamp(seconds: float, always_include_hours: bool = False):
 def get_initial_tokens(tokenizer, options):
     # sot_sequence = tokenizer.sot_sequence
     sot_sequence = [50258, 50266, 50359]
-    sample_len = options.get("sample_len") or n_text_ctx // 2
-    n_ctx = n_text_ctx
+    sample_len = options.get("sample_len") or dims.n_text_ctx // 2
+    n_ctx = dims.n_text_ctx
 
     tokens = list(sot_sequence)
     prefix = options.get("prefix", None)
@@ -222,8 +238,8 @@ def decode(enc_net, dec_net, mel, options):
     tokenizer = get_tokenizer(is_multilingual(), language=language, task='transcribe')
 
     n_group = options.get("beam_size") or options.get("best_of") or 1
-    n_ctx = n_text_ctx
-    sample_len = options.get("sample_len") or n_text_ctx // 2
+    n_ctx = dims.n_text_ctx
+    sample_len = options.get("sample_len") or dims.n_text_ctx // 2
 
     initial_tokens = get_initial_tokens(tokenizer, options)
     sample_begin = len(initial_tokens)
@@ -236,7 +252,7 @@ def decode(enc_net, dec_net, mel, options):
     if options.get("suppress_tokens"):
         logit_filters.append(SuppressTokens(get_suppress_tokens(tokenizer, options)))
     if not options.get("without_timestamps"):
-        precision = CHUNK_LENGTH / n_audio_ctx  # usually 0.02 seconds
+        precision = CHUNK_LENGTH / dims.n_audio_ctx  # usually 0.02 seconds
         max_initial_timestamp_index = None
         max_initial_timestamp = options.get("max_initial_timestamp")
         if max_initial_timestamp:
@@ -254,9 +270,9 @@ def decode(enc_net, dec_net, mel, options):
             options.get("beam_size"), tokenizer.eot, options.get("patience")
         )
     else:
-        decoder = GreedyDecoder(options.temperature, tokenizer.eot)
+        decoder = GreedyDecoder(options.get("temperature"), tokenizer.eot)
 
-    # decoder.reset()
+    decoder.reset()
     n_audio = mel.shape[0]
 
     audio_features = get_audio_features(enc_net, mel)
@@ -285,10 +301,6 @@ def decode(enc_net, dec_net, mel, options):
     for i in range(sample_len):
         print(f"step: {i}", flush=True)
         logits, kv_cache = inference_logits(dec_net, tokens, audio_features, kv_cache, initial_token_length)
-        # print("logits---1", logits)
-        # print("logits---1", logits.shape)
-        # if i >= 10:
-        #     1 / 0
 
         if i == 0 and tokenizer.no_speech is not None:  # save no_speech_probs
             probs_at_sot = softmax(logits[:, sot_index], axis=-1)
@@ -300,9 +312,6 @@ def decode(enc_net, dec_net, mel, options):
         # apply the logit filters, e.g. for suppressing or applying penalty to
         for logit_filter in logit_filters:
             logit_filter.apply(logits, tokens)
-
-        # print("logits---2", logits)
-        # print("logits---2", logits.shape)
 
         def rearrange_kv_cache(source_indices):
             kv_cache[...] = kv_cache[:, source_indices]
@@ -412,7 +421,7 @@ def predict(wav, enc_net, dec_net):
     tokenizer = get_tokenizer(is_multilingual(), language=language, task=task)
 
     seek = 0
-    input_stride = N_FRAMES // n_audio_ctx  # mel frames per output token: 2
+    input_stride = N_FRAMES // dims.n_audio_ctx  # mel frames per output token: 2
     time_precision = (
             input_stride * HOP_LENGTH / SAMPLE_RATE
     )  # time per output token: 0.02 (seconds)
@@ -563,23 +572,40 @@ def recognize_from_audio(enc_net, dec_net):
 
 
 def main():
-    WEIGHT_ENC_SMALL_PATH = "encoder_small.onnx"
-    MODEL_ENC_SMALL_PATH = "encoder_small.onnx.prototxt"
-    WEIGHT_DEC_SMALL_PATH = "decoder_small.onnx"
-    MODEL_DEC_SMALL_PATH = "decoder_small.onnx.prototxt"
-    check_and_download_models(WEIGHT_ENC_SMALL_PATH, MODEL_ENC_SMALL_PATH, REMOTE_PATH)
-    check_and_download_models(WEIGHT_DEC_SMALL_PATH, MODEL_DEC_SMALL_PATH, REMOTE_PATH)
+    model_dic = {
+        'tiny': {
+            'enc': (WEIGHT_ENC_TINY_PATH, MODEL_ENC_TINY_PATH),
+            'dec': (WEIGHT_DEC_TINY_PATH, MODEL_DEC_TINY_PATH),
+        },
+        'base': {
+            'enc': (WEIGHT_ENC_BASE_PATH, MODEL_ENC_BASE_PATH),
+            'dec': (WEIGHT_DEC_BASE_PATH, MODEL_DEC_BASE_PATH),
+        },
+        'small': {
+            'enc': (WEIGHT_ENC_SMALL_PATH, MODEL_ENC_SMALL_PATH),
+            'dec': (WEIGHT_DEC_SMALL_PATH, MODEL_DEC_SMALL_PATH),
+        },
+        'medium': {
+            'enc': (WEIGHT_ENC_MEDIUM_PATH, MODEL_ENC_MEDIUM_PATH),
+            'dec': (WEIGHT_DEC_MEDIUM_PATH, MODEL_DEC_MEDIUM_PATH),
+        },
+    }
+    model_info = model_dic[args.model_type]
+    WEIGHT_ENC_PATH, MODEL_ENC_PATH = model_info['enc']
+    WEIGHT_DEC_PATH, MODEL_DEC_PATH = model_info['dec']
+    check_and_download_models(WEIGHT_ENC_PATH, MODEL_ENC_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_DEC_PATH, MODEL_DEC_PATH, REMOTE_PATH)
 
     env_id = args.env_id
 
     # initialize
     if not args.onnx:
-        enc_net = ailia.Net(MODEL_ENC_SMALL_PATH, WEIGHT_ENC_SMALL_PATH, env_id=env_id)
-        dec_net = ailia.Net(MODEL_DEC_SMALL_PATH, WEIGHT_DEC_SMALL_PATH, env_id=env_id)
+        enc_net = ailia.Net(MODEL_ENC_PATH, WEIGHT_ENC_PATH, env_id=env_id)
+        dec_net = ailia.Net(MODEL_DEC_PATH, WEIGHT_DEC_PATH, env_id=env_id)
     else:
         import onnxruntime
-        enc_net = onnxruntime.InferenceSession(WEIGHT_ENC_SMALL_PATH)
-        dec_net = onnxruntime.InferenceSession(WEIGHT_DEC_SMALL_PATH)
+        enc_net = onnxruntime.InferenceSession(WEIGHT_ENC_PATH)
+        dec_net = onnxruntime.InferenceSession(WEIGHT_DEC_PATH)
 
     recognize_from_audio(enc_net, dec_net)
 

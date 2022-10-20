@@ -1,6 +1,8 @@
 import numpy as np
 from scipy.special import log_softmax, logsumexp
 
+from math_utils import softmax
+
 
 class MaximumLikelihoodRanker:
     """
@@ -27,6 +29,40 @@ class MaximumLikelihoodRanker:
         lengths = [[len(t) for t in s] for s in tokens]
 
         return [np.argmax(scores(p, l)) for p, l in zip(sum_logprobs, lengths)]
+
+
+class GreedyDecoder:
+    def __init__(self, temperature, eot):
+        self.temperature = temperature
+        self.eot = eot
+
+    def reset(self):
+        pass
+
+    def update(self, tokens, logits, sum_logprobs, rearrange_kv_cache):
+        temperature = self.temperature
+        if temperature == 0:
+            next_tokens = np.argmax(logits, axis=-1)
+        else:
+            x = logits / temperature
+            probs = softmax(x - logsumexp(x, axis=1).reshape(-1, 1), axis=1)
+            next_tokens = np.array([np.random.choice(len(p), p=p) for p in probs])
+
+        logprobs = log_softmax(logits, axis=-1)
+        current_logprobs = logprobs[np.arange(logprobs.shape[0]), next_tokens]
+        sum_logprobs += current_logprobs * (tokens[:, -1] != self.eot)
+
+        next_tokens[tokens[:, -1] == self.eot] = self.eot
+        tokens = np.concatenate([tokens, next_tokens[:, None]], axis=-1)
+
+        completed = all(tokens[:, -1] == self.eot)
+
+        return tokens, completed
+
+    def finalize(self, tokens, sum_logprobs):
+        # make sure each sequence has at least one EOT token at the end
+        tokens = np.pad(tokens, [(0, 0), (0, 0), (0, 1)], constant_values=self.eot)
+        return tokens, sum_logprobs.tolist()
 
 
 class BeamSearchDecoder:
