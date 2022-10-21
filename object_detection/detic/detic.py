@@ -36,13 +36,21 @@ WEIGHT_R50_LVIS_PATH = 'Detic_C2_R50_640_4x_lvis.onnx'
 MODEL_R50_LVIS_PATH = 'Detic_C2_R50_640_4x_lvis.onnx.prototxt'
 WEIGHT_R50_IN21K_PATH = 'Detic_C2_R50_640_4x_in21k.onnx'
 MODEL_R50_IN21K_PATH = 'Detic_C2_R50_640_4x_in21k.onnx.prototxt'
+WEIGHT_SWINB_LVIS_OP16_PATH = 'Detic_C2_SwinB_896_4x_IN-21K+COCO_lvis_op16.onnx'
+MODEL_SWINB_LVIS_OP16_PATH = 'Detic_C2_SwinB_896_4x_IN-21K+COCO_lvis_op16.onnx.prototxt'
+WEIGHT_SWINB_IN21K_OP16_PATH = 'Detic_C2_SwinB_896_4x_IN-21K+COCO_in21k_op16.onnx'
+MODEL_SWINB_IN21K_OP16_PATH = 'Detic_C2_SwinB_896_4x_IN-21K+COCO_in21k_op16.onnx.prototxt'
+WEIGHT_R50_LVIS_OP16_PATH = 'Detic_C2_R50_640_4x_lvis_op16.onnx'
+MODEL_R50_LVIS_OP16_PATH = 'Detic_C2_R50_640_4x_lvis_op16.onnx.prototxt'
+WEIGHT_R50_IN21K_OP16_PATH = 'Detic_C2_R50_640_4x_in21k_op16.onnx'
+MODEL_R50_IN21K_OP16_PATH = 'Detic_C2_R50_640_4x_in21k_op16.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/detic/'
 
 IMAGE_PATH = 'desk.jpg'
 SAVE_IMAGE_PATH = 'output.png'
 
 IMAGE_SIZE = 800
-IMAGE_MAX_SIZE = 800 #tempolary limit to 800px (original : 1333)
+IMAGE_MAX_SIZE = 800  # tempolary limit to 800px (original : 1333)
 
 # ======================
 # Arguemnt Parser Config
@@ -62,6 +70,11 @@ parser.add_argument(
 parser.add_argument(
     '-vc', '--vocabulary', default='lvis', choices=('lvis', 'in21k'),
     help='vocabulary'
+)
+parser.add_argument(
+    '--opset16',
+    action='store_true',
+    help='Use the opset16 model. In that case, grid_sampler runs inside the model.'
 )
 parser.add_argument(
     '--onnx',
@@ -327,19 +340,34 @@ def predict(net, img):
     im_h, im_w = img.shape[:2]
     img = preprocess(img)
     pred_hw = img.shape[-2:]
+    im_hw = np.array([im_h, im_w])
 
     # feedforward
-    if not args.onnx:
-        output = net.predict([img])
+    if args.opset16:
+        if not args.onnx:
+            output = net.predict([img, im_hw])
+        else:
+            output = net.run(None, {'img': img, 'im_hw': im_hw})
     else:
-        output = net.run(None, {'img': img})
+        if not args.onnx:
+            output = net.predict([img])
+        else:
+            output = net.run(None, {'img': img})
 
     pred_boxes, scores, pred_classes, pred_masks = output
 
-    pred = post_processing(
-        pred_boxes, scores, pred_classes, pred_masks,
-        (im_h, im_w), pred_hw
-    )
+    if not args.opset16:
+        pred = post_processing(
+            pred_boxes, scores, pred_classes, pred_masks,
+            (im_h, im_w), pred_hw
+        )
+    else:
+        pred = {
+            'pred_boxes': pred_boxes,
+            'scores': scores,
+            'pred_classes': pred_classes,
+            'pred_masks': pred_masks,
+        }
 
     return pred
 
@@ -398,7 +426,7 @@ def recognize_from_video(net):
         writer = get_writer(args.savepath, f_h, f_w)
     else:
         writer = None
-    
+
     frame_shown = False
     while True:
         ret, frame = capture.read()
@@ -419,7 +447,7 @@ def recognize_from_video(net):
 
         # save results
         if writer is not None:
-            res_img = cv2.resize(res_img, (f_w,f_h))
+            res_img = cv2.resize(res_img, (f_w, f_h))
             writer.write(res_img.astype(np.uint8))
 
     capture.release()
@@ -431,12 +459,20 @@ def recognize_from_video(net):
 
 
 def main():
-    dic_model = {
-        ('SwinB_896_4x', 'lvis'): (WEIGHT_SWINB_LVIS_PATH, MODEL_SWINB_LVIS_PATH),
-        ('SwinB_896_4x', 'in21k'): (WEIGHT_SWINB_IN21K_PATH, MODEL_SWINB_IN21K_PATH),
-        ('R50_640_4x', 'lvis'): (WEIGHT_R50_LVIS_PATH, MODEL_R50_LVIS_PATH),
-        ('R50_640_4x', 'in21k'): (WEIGHT_R50_IN21K_PATH, MODEL_R50_IN21K_PATH),
-    }
+    if args.opset16:
+        dic_model = {
+            ('SwinB_896_4x', 'lvis'): (WEIGHT_SWINB_LVIS_OP16_PATH, MODEL_SWINB_LVIS_OP16_PATH),
+            ('SwinB_896_4x', 'in21k'): (WEIGHT_SWINB_IN21K_OP16_PATH, MODEL_SWINB_IN21K_OP16_PATH),
+            ('R50_640_4x', 'lvis'): (WEIGHT_R50_LVIS_OP16_PATH, MODEL_R50_LVIS_OP16_PATH),
+            ('R50_640_4x', 'in21k'): (WEIGHT_R50_IN21K_OP16_PATH, MODEL_R50_IN21K_OP16_PATH),
+        }
+    else:
+        dic_model = {
+            ('SwinB_896_4x', 'lvis'): (WEIGHT_SWINB_LVIS_PATH, MODEL_SWINB_LVIS_PATH),
+            ('SwinB_896_4x', 'in21k'): (WEIGHT_SWINB_IN21K_PATH, MODEL_SWINB_IN21K_PATH),
+            ('R50_640_4x', 'lvis'): (WEIGHT_R50_LVIS_PATH, MODEL_R50_LVIS_PATH),
+            ('R50_640_4x', 'in21k'): (WEIGHT_R50_IN21K_PATH, MODEL_R50_IN21K_PATH),
+        }
     key = (args.model_type, args.vocabulary)
     WEIGHT_PATH, MODEL_PATH = dic_model[key]
 
