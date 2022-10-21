@@ -1,11 +1,75 @@
 import cv2
 import copy
+import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 
-from lib.preprocess import h36m_coco_format
-from lib.hrnet.gen_kpts import gen_video_kpts as hrnet_pose
-from lib.camera import *
+from lib.gen_kpts import gen_video_kpts as hrnet_pose
+
+
+h36m_coco_order = [9, 11, 14, 12, 15, 13, 16, 4, 1, 5, 2, 6, 3]
+coco_order = [0, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
+spple_keypoints = [10, 8, 0, 7]
+
+
+def coco_h36m(keypoints):
+    temporal = keypoints.shape[0]
+    keypoints_h36m = np.zeros_like(keypoints, dtype=np.float32)
+    htps_keypoints = np.zeros((temporal, 4, 2), dtype=np.float32)
+
+    # htps_keypoints: head, thorax, pelvis, spine
+    htps_keypoints[:, 0, 0] = np.mean(keypoints[:, 1:5, 0], axis=1, dtype=np.float32)
+    htps_keypoints[:, 0, 1] = np.sum(keypoints[:, 1:3, 1], axis=1, dtype=np.float32) - keypoints[:, 0, 1]
+    htps_keypoints[:, 1, :] = np.mean(keypoints[:, 5:7, :], axis=1, dtype=np.float32)
+    htps_keypoints[:, 1, :] += (keypoints[:, 0, :] - htps_keypoints[:, 1, :]) / 3
+
+    htps_keypoints[:, 2, :] = np.mean(keypoints[:, 11:13, :], axis=1, dtype=np.float32)
+    htps_keypoints[:, 3, :] = np.mean(keypoints[:, [5, 6, 11, 12], :], axis=1, dtype=np.float32)
+
+    keypoints_h36m[:, spple_keypoints, :] = htps_keypoints
+    keypoints_h36m[:, h36m_coco_order, :] = keypoints[:, coco_order, :]
+
+    keypoints_h36m[:, 9, :] -= (keypoints_h36m[:, 9, :] - np.mean(keypoints[:, 5:7, :], axis=1, dtype=np.float32)) / 4
+    keypoints_h36m[:, 7, 0] += 2 * (
+                keypoints_h36m[:, 7, 0] - np.mean(keypoints_h36m[:, [0, 8], 0], axis=1, dtype=np.float32))
+    keypoints_h36m[:, 8, 1] -= (np.mean(keypoints[:, 1:3, 1], axis=1, dtype=np.float32) - keypoints[:, 0, 1]) * 2 / 3
+
+    valid_frames = np.where(np.sum(keypoints_h36m.reshape(-1, 34), axis=1) != 0)[0]
+
+    return keypoints_h36m, valid_frames
+
+
+def h36m_coco_format(keypoints, scores):
+    assert len(keypoints.shape) == 4 and len(scores.shape) == 3
+
+    h36m_kpts = []
+    h36m_scores = []
+    valid_frames = []
+
+    for i in range(keypoints.shape[0]):
+        kpts = keypoints[i]
+        score = scores[i]
+
+        new_score = np.zeros_like(score, dtype=np.float32)
+
+        if np.sum(kpts) != 0.:
+            kpts, valid_frame = coco_h36m(kpts)
+            h36m_kpts.append(kpts)
+            valid_frames.append(valid_frame)
+
+            new_score[:, h36m_coco_order] = score[:, coco_order]
+            new_score[:, 0] = np.mean(score[:, [11, 12]], axis=1, dtype=np.float32)
+            new_score[:, 8] = np.mean(score[:, [5, 6]], axis=1, dtype=np.float32)
+            new_score[:, 7] = np.mean(new_score[:, [0, 8]], axis=1, dtype=np.float32)
+            new_score[:, 10] = np.mean(score[:, [1, 2, 3, 4]], axis=1, dtype=np.float32)
+
+            h36m_scores.append(new_score)
+
+    h36m_kpts = np.asarray(h36m_kpts, dtype=np.float32)
+    h36m_scores = np.asarray(h36m_scores, dtype=np.float32)
+
+    return h36m_kpts
+
 
 def show2Dpose(kps, img):
     connections = [[0, 1], [1, 2], [2, 3], [0, 4], [4, 5],
@@ -65,13 +129,6 @@ def get_pose2D(human_model, pose_model, img):
         return keypoints
     else:
         return None
-
-
-def showimage(ax, img):
-    ax.set_xticks([])
-    ax.set_yticks([])
-    plt.axis('off')
-    ax.imshow(img)
 
 
 def get_pose3D(model, img, keypoints, fig=None):
@@ -150,5 +207,31 @@ def detect(img, human_model, pose_model2d, pose_model3d, fig=None):
     else:
         image_pose2d, fig_pose3d = get_pose3D(pose_model3d, img, keypoints, fig)
         return image_pose2d, fig_pose3d, True
+
+
+def normalize_screen_coordinates(X, w, h):
+    assert X.shape[-1] == 2
+    return X / w * 2 - [1, h / w]
+
+
+def camera_to_world(X, R, t):
+    return wrap(qrot, np.tile(R, (*X.shape[:-1], 1)), X) + t
+
+
+def wrap(func, *args, unsqueeze=False):
+    args = list(args)
+    result = func(*args)
+    return result
+
+
+def qrot(q, v):
+    assert q.shape[-1] == 4
+    assert v.shape[-1] == 3
+    assert q.shape[:-1] == v.shape[:-1]
+
+    qvec = q[..., 1:]
+    uv = np.cross(qvec, v, axis=len(q.shape) - 1)
+    uuv = np.cross(qvec, uv, axis=len(q.shape) - 1)
+    return (v + 2 * (q[..., :1] * uv + uuv))
 
 

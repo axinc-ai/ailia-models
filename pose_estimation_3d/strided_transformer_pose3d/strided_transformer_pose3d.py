@@ -5,7 +5,6 @@ import cv2
 import matplotlib
 from PIL import Image
 import time
-import onnxruntime as ort
 
 import ailia
 
@@ -64,7 +63,16 @@ args = update_parser(parser)
 # ======================
 def recognize_from_image():
     env_id = args.env_id
-    net_yolo = ailia.Net(MODEL_PATH_YOLO, WEIGHT_PATH_YOLO, env_id=env_id)
+    net_yolo = ailia.Detector(
+        MODEL_PATH_YOLO,
+        WEIGHT_PATH_YOLO,
+        80,
+        format=ailia.NETWORK_IMAGE_FORMAT_BGR,
+        channel=ailia.NETWORK_IMAGE_CHANNEL_FIRST,
+        range=ailia.NETWORK_IMAGE_RANGE_U_INT8,
+        algorithm=ailia.DETECTOR_ALGORITHM_YOLOX,
+        env_id=env_id)
+
     net_pose2d = ailia.Net(MODEL_PATH_POSE2D, WEIGHT_PATH_POSE2D, env_id=env_id)
     net_pose3d = ailia.Net(MODEL_PATH_POSE3D, WEIGHT_PATH_POSE3D, env_id=env_id)
 
@@ -140,8 +148,8 @@ def recognize_from_video():
 def main():
     # model files check and download
     check_and_download_models(WEIGHT_PATH_YOLO, MODEL_PATH_YOLO, REMOTE_PATH_YOLO)
-    #check_and_download_models(WEIGHT_PATH_POSE2D, MODEL_PATH_POSE2D, REMOTE_PATH_POSE)
-    #check_and_download_models(WEIGHT_PATH_POSE3D, MODEL_PATH_POSE3D, REMOTE_PATH_POSE)
+    check_and_download_models(WEIGHT_PATH_POSE2D, MODEL_PATH_POSE2D, REMOTE_PATH_POSE)
+    check_and_download_models(WEIGHT_PATH_POSE3D, MODEL_PATH_POSE3D, REMOTE_PATH_POSE)
 
     if args.video is not None:
         # video mode
