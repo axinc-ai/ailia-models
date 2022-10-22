@@ -17,7 +17,7 @@ from logging import getLogger  # noqa
 
 from audio_utils import SAMPLE_RATE, HOP_LENGTH, CHUNK_LENGTH, N_FRAMES
 from audio_utils import load_audio, log_mel_spectrogram, pad_or_trim
-from tokenizer import get_tokenizer
+from tokenizer import LANGUAGES, TO_LANGUAGE_CODE, get_tokenizer
 from decode_utils import MaximumLikelihoodRanker, GreedyDecoder, BeamSearchDecoder
 from decode_utils import SuppressBlank, SuppressTokens, ApplyTimestampRules
 
@@ -60,13 +60,39 @@ parser.add_argument(
     help='model type'
 )
 parser.add_argument(
+    "--language", type=str, default=None,
+    choices=sorted(LANGUAGES.keys()) + sorted([k.title() for k in TO_LANGUAGE_CODE.keys()]),
+    help="language spoken in the audio, specify None to perform language detection")
+parser.add_argument(
+    "--temperature", type=float, default=0, help="temperature to use for sampling")
+parser.add_argument(
+    "--best_of", type=float, default=5,
+    help="number of candidates when sampling with non-zero temperature")
+parser.add_argument(
     "--beam_size", type=int, default=5,
-    help="number of beams in beam search, only applicable when temperature is zero"
-)
+    help="number of beams in beam search, only applicable when temperature is zero")
+parser.add_argument(
+    "--patience", type=float, default=None,
+    help="optional patience value to use in beam decoding,"
+         " as in https://arxiv.org/abs/2204.05424, the default (1.0) is equivalent to conventional beam search")
+parser.add_argument(
+    "--length_penalty", type=float, default=None,
+    help="optional token length penalty coefficient (alpha)"
+         " as in https://arxiv.org/abs/1609.08144, uses simple lengt normalization by default")
+parser.add_argument(
+    "--suppress_tokens", type=str, default="-1",
+    help="comma-separated list of token ids to suppress during sampling;"
+         " '-1' will suppress most special characters except common punctuations")
+parser.add_argument(
+    "--temperature_increment_on_fallback", type=float, default=0.2,
+    help="temperature to increase when falling back when the decoding fails to meet either of the thresholds below")
 parser.add_argument(
     "--logprob_threshold", type=float, default=-1.0,
-    help="if the average log probability is lower than this value, treat the decoding as failed"
-)
+    help="if the average log probability is lower than this value, treat the decoding as failed")
+parser.add_argument(
+    "--no_speech_threshold", type=float, default=0.6,
+    help="if the probability of the <|nospeech|> token is higher than this value"
+         " AND the decoding has failed due to `logprob_threshold`, consider the segment as silence")
 parser.add_argument(
     '--onnx',
     action='store_true',
@@ -198,8 +224,9 @@ def get_audio_features(enc_net, mel):
     return audio_features
 
 
-def inference_logits(dec_net, tokens, audio_features, kv_cache, initial_token_length):
+def inference_logits(dec_net, tokens, audio_features, kv_cache=None, initial_token_length=None):
     n_group = tokens.shape[0]
+    initial_token_length = initial_token_length if initial_token_length else tokens.shape[-1]
     if kv_cache is None:
         kv_cache = new_kv_cache(n_group, initial_token_length)
         offset = 0
@@ -228,13 +255,59 @@ def inference_logits(dec_net, tokens, audio_features, kv_cache, initial_token_le
     return logits, kv_cache
 
 
+def detect_language(enc_net, dec_net, mel, tokenizer=None):
+    """
+    Detect the spoken language in the audio, and return them as list of strings, along with the ids
+    of the most probable language tokens and the probability distribution over all language tokens.
+    This is performed outside the main decode loop in order to not interfere with kv-caching.
+    """
+    if tokenizer is None:
+        tokenizer = get_tokenizer(is_multilingual())
+    if tokenizer.language is None or tokenizer.language_token not in tokenizer.sot_sequence:
+        raise ValueError(f"This model doesn't have language tokens so it can't perform lang id")
+
+    single = mel.ndim == 2
+    if single:
+        mel = np.expand_dims(mel, axis=0)
+
+    # skip encoder forward pass if already-encoded audio features were given
+    if mel.shape[-2:] != (dims.n_audio_ctx, dims.n_audio_state):
+        mel = get_audio_features(enc_net, mel)
+
+    # forward pass using a single token, startoftranscript
+    n_audio = mel.shape[0]
+    x = np.array([[tokenizer.sot]] * n_audio)  # [n_audio, 1]
+
+    output, _ = inference_logits(dec_net, x, mel)
+    logits = output[:, 0]
+
+    # collect detected languages; suppress all non-language tokens
+    mask = np.ones(logits.shape[-1], dtype=np.bool)
+    mask[list(tokenizer.all_language_tokens)] = False
+    logits[:, mask] = -np.inf
+    language_tokens = np.argmax(logits, axis=-1)
+    language_token_probs = softmax(logits, axis=-1)
+    language_probs = [
+        {
+            c: language_token_probs[i, j].item()
+            for j, c in zip(tokenizer.all_language_tokens, tokenizer.all_language_codes)
+        }
+        for i in range(n_audio)
+    ]
+
+    if single:
+        language_tokens = language_tokens[0]
+        language_probs = language_probs[0]
+
+    return language_tokens, language_probs
+
+
 def decode(enc_net, dec_net, mel, options):
     single = mel.ndim == 2
     if single:
         mel = mel.unsqueeze(0)
 
     language = options.get("language") or "en"
-    language = "Japanese"
     tokenizer = get_tokenizer(is_multilingual(), language=language, task='transcribe')
 
     n_group = options.get("beam_size") or options.get("best_of") or 1
@@ -277,15 +350,7 @@ def decode(enc_net, dec_net, mel, options):
 
     audio_features = get_audio_features(enc_net, mel)
     tokens = np.repeat(np.array([initial_tokens]), n_audio, axis=-1)
-
-    # # detect language if requested, overwriting the language token
-    # languages, language_probs = detect_language(audio_features, tokens)
-    # if self.options.task == "lang_id":
-    #     return [
-    #         DecodingResult(audio_features=features, language=language, language_probs=probs)
-    #         for features, language, probs in zip(audio_features, languages, language_probs)
-    #     ]
-    languages = ['Japanese']
+    languages = [language] * audio_features.shape[0]
 
     # repeat the audio & text tensors by the group size, for beam search or best-of-n sampling
     audio_features = np.repeat(audio_features, n_group, axis=0)
@@ -299,7 +364,7 @@ def decode(enc_net, dec_net, mel, options):
 
     # sampling loop
     for i in range(sample_len):
-        print(f"step: {i}", flush=True)
+        # print(f"step: {i}", flush=True)
         logits, kv_cache = inference_logits(dec_net, tokens, audio_features, kv_cache, initial_token_length)
 
         if i == 0 and tokenizer.no_speech is not None:  # save no_speech_probs
@@ -374,10 +439,11 @@ def decode(enc_net, dec_net, mel, options):
 
 
 def decode_with_fallback(enc_net, dec_net, segment, decode_options):
-    logprob_threshold = args.logprob_threshold
+    logprob_threshold = decode_options.get('logprob_threshold', -1.0)
+    temperature = decode_options.get('temperature', 0)
 
-    # temperatures = [temperature] if isinstance(temperature, (int, float)) else temperature
-    temperatures = (0.0, 0.2, 0.4, 0.6000000000000001, 0.8, 1.0)
+    temperatures = [temperature] if isinstance(temperature, (int, float)) else temperature
+
     kwargs = {**decode_options}
     t = temperatures[0]
     if t == 0:
@@ -404,19 +470,36 @@ def decode_with_fallback(enc_net, dec_net, segment, decode_options):
     return results
 
 
-def predict(wav, enc_net, dec_net):
-    no_speech_threshold = 0.6
+def predict(wav, enc_net, dec_net, immediate=False):
+    language = args.language
+    temperature = args.temperature
+    temperature_increment_on_fallback = args.temperature_increment_on_fallback
     logprob_threshold = args.logprob_threshold
+    no_speech_threshold = args.no_speech_threshold
+
+    if temperature_increment_on_fallback is not None:
+        temperature = tuple(np.arange(temperature, 1.0 + 1e-6, temperature_increment_on_fallback))
+    else:
+        temperature = [temperature]
 
     decode_options = {
-        'task': 'transcribe', 'language': 'Japanese', 'best_of': 5,
-        'beam_size': args.beam_size, 'patience': None,
-        'length_penalty': None, 'suppress_tokens': '-1', 'fp16': True, 'prompt': []
+        'task': 'transcribe', 'language': language,
+        'temperature': temperature, 'best_of': args.best_of,
+        'beam_size': args.beam_size, 'patience': args.patience,
+        'length_penalty': args.length_penalty, 'suppress_tokens': args.suppress_tokens,
+        'logprob_threshold': logprob_threshold,
+        'prompt': []
     }
 
     mel = log_mel_spectrogram(wav)
+
+    if language is None:
+        segment = pad_or_trim(mel, N_FRAMES)
+        _, probs = detect_language(enc_net, dec_net, segment)
+        decode_options["language"] = language = max(probs, key=probs.get)
+        logger.info(f"Detected language: {LANGUAGES[decode_options['language']].title()}")
+
     mel = np.expand_dims(mel, axis=0)
-    language = "Japanese"
     task = decode_options.get("task", "transcribe")
     tokenizer = get_tokenizer(is_multilingual(), language=language, task=task)
 
@@ -428,11 +511,6 @@ def predict(wav, enc_net, dec_net):
     all_tokens = []
     all_segments = []
     prompt_reset_since = 0
-
-    initial_prompt = decode_options.pop("initial_prompt", None) or []
-    if initial_prompt:
-        initial_prompt = tokenizer.encode(" " + initial_prompt.strip())
-        all_tokens.extend(initial_prompt)
 
     def add_segment(
             start, end, text_tokens, result):
@@ -452,7 +530,8 @@ def predict(wav, enc_net, dec_net):
             # "compression_ratio": result.compression_ratio,
             "no_speech_prob": result.no_speech_prob,
         })
-        logger.info(f"[{format_timestamp(start)} --> {format_timestamp(end)}] {text}")
+        if immediate:
+            logger.info(f"[{format_timestamp(start)} --> {format_timestamp(end)}] {text}")
 
     num_frames = mel.shape[-1]
     previous_seek_value = seek
@@ -527,7 +606,7 @@ def predict(wav, enc_net, dec_net):
             previous_seek_value = seek
 
     d = dict(
-        text=tokenizer.decode(all_tokens[len(initial_prompt):]),
+        text=tokenizer.decode(all_tokens),
         segments=all_segments,
         language=language
     )
@@ -562,11 +641,9 @@ def recognize_from_audio(enc_net, dec_net):
         else:
             output = predict(wav, enc_net, dec_net)
 
-        print(output)
-
-        # # output result
-        # savepath = get_savepath(args.savepath, audio_path, ext='.txt')
-        # logger.info(f'saved at : {savepath}')
+        # output result
+        for res in output['segments']:
+            logger.info(f"[{format_timestamp(res['start'])} --> {format_timestamp(res['end'])}] {res['text']}")
 
     logger.info('Script finished successfully.')
 
