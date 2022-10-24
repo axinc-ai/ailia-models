@@ -1,6 +1,10 @@
 import numpy as np
 import librosa
-import ffmpeg
+
+flg_ffmpeg = False
+
+if flg_ffmpeg:
+    import ffmpeg
 
 # hard-coded audio hyperparameters
 SAMPLE_RATE = 16000
@@ -13,14 +17,21 @@ N_FRAMES = (N_SAMPLES // HOP_LENGTH)  # 3000: number of frames in a mel spectrog
 
 
 def load_audio(file: str, sr: int = SAMPLE_RATE):
-    out, _ = (
-        ffmpeg.input(file, threads=0)
-        .output("-", format="s16le", acodec="pcm_s16le", ac=1, ar=sr)
-        .run(cmd="ffmpeg", capture_stdout=True, capture_stderr=True)
-    )
-    out = np.frombuffer(out, np.int16).flatten().astype(np.float32) / 32768.0
+    if flg_ffmpeg:
+        out, _ = (
+            ffmpeg.input(file, threads=0)
+                .output("-", format="s16le", acodec="pcm_s16le", ac=1, ar=sr)
+                .run(cmd="ffmpeg", capture_stdout=True, capture_stderr=True)
+        )
+        wav = np.frombuffer(out, np.int16).flatten().astype(np.float32) / 32768.0
+    else:
+        # prepare input data
+        wav, source_sr = librosa.load(file, sr=None)
+        # Resample the wav if needed
+        if source_sr is not None and source_sr != sr:
+            wav = librosa.resample(wav, source_sr, sr)
 
-    return out
+    return wav
 
 
 def pad_or_trim(array, length=N_SAMPLES, axis=-1):

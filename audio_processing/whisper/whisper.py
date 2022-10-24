@@ -3,7 +3,6 @@ import time
 from collections import namedtuple
 
 import numpy as np
-import tqdm
 
 import ailia
 
@@ -45,7 +44,7 @@ WEIGHT_DEC_MEDIUM_PATH = "decoder_medium.onnx"
 MODEL_DEC_MEDIUM_PATH = "decoder_medium.onnx.prototxt"
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/whisper/'
 
-WAV_PATH = 'demo.wav'
+WAV_PATH = 'demo.mp3'
 SAVE_TEXT_PATH = 'output.txt'
 
 # ======================
@@ -141,8 +140,7 @@ def format_timestamp(seconds: float, always_include_hours: bool = False):
 
 
 def get_initial_tokens(tokenizer, options):
-    # sot_sequence = tokenizer.sot_sequence
-    sot_sequence = [50258, 50266, 50359]
+    sot_sequence = tokenizer.sot_sequence
     sample_len = options.get("sample_len") or dims.n_text_ctx // 2
     n_ctx = dims.n_text_ctx
 
@@ -282,7 +280,7 @@ def detect_language(enc_net, dec_net, mel, tokenizer=None):
     logits = output[:, 0]
 
     # collect detected languages; suppress all non-language tokens
-    mask = np.ones(logits.shape[-1], dtype=np.bool)
+    mask = np.ones(logits.shape[-1], dtype=bool)
     mask[list(tokenizer.all_language_tokens)] = False
     logits[:, mask] = -np.inf
     language_tokens = np.argmax(logits, axis=-1)
@@ -451,7 +449,7 @@ def decode_with_fallback(enc_net, dec_net, segment, decode_options):
     else:
         best_of = kwargs.get("best_of", None)
 
-    options = {"temperature": t, **kwargs}
+    options = {**kwargs, "temperature": t}
     results = decode(enc_net, dec_net, segment, options)
 
     kwargs.pop("beam_size", None)  # no beam search for t > 0
@@ -462,7 +460,7 @@ def decode_with_fallback(enc_net, dec_net, segment, decode_options):
             result.avg_logprob < logprob_threshold for result in results
         ]
         if any(needs_fallback):
-            options = {"temperature": t, **kwargs}
+            options = {**kwargs, "temperature": t}
             retries = decode(enc_net, dec_net, segment[needs_fallback], options)
             for retry_index, original_index in enumerate(np.nonzero(needs_fallback)[0]):
                 results[original_index] = retries[retry_index]
@@ -536,74 +534,80 @@ def predict(wav, enc_net, dec_net, immediate=False):
     num_frames = mel.shape[-1]
     previous_seek_value = seek
 
+    try:
+        import tqdm
+        pbar = tqdm.tqdm(total=num_frames, unit='frames', disable=immediate is not False)
+    except ImportError:
+        pbar = None
+
     # show the progress bar when verbose is False (otherwise the transcribed text will be printed)
-    with tqdm.tqdm(total=num_frames, unit='frames', disable=True) as pbar:
-        while seek < num_frames:
-            timestamp_offset = float(seek * HOP_LENGTH / SAMPLE_RATE)
-            segment = pad_or_trim(mel[:, :, seek:], N_FRAMES)
-            segment_duration = segment.shape[-1] * HOP_LENGTH / SAMPLE_RATE
+    while seek < num_frames:
+        timestamp_offset = float(seek * HOP_LENGTH / SAMPLE_RATE)
+        segment = pad_or_trim(mel[:, :, seek:], N_FRAMES)
+        segment_duration = segment.shape[-1] * HOP_LENGTH / SAMPLE_RATE
 
-            decode_options["prompt"] = all_tokens[prompt_reset_since:]
-            result = decode_with_fallback(enc_net, dec_net, segment, decode_options)
-            result = result[0]
-            tokens = np.array(result.tokens)
+        decode_options["prompt"] = all_tokens[prompt_reset_since:]
+        result = decode_with_fallback(enc_net, dec_net, segment, decode_options)
+        result = result[0]
+        tokens = np.array(result.tokens)
 
-            if no_speech_threshold is not None:
-                # no voice activity check
-                should_skip = result.no_speech_prob > no_speech_threshold
-                if logprob_threshold is not None and result.avg_logprob > logprob_threshold:
-                    # don't skip if the logprob is high enough, despite the no_speech_prob
-                    should_skip = False
+        if no_speech_threshold is not None:
+            # no voice activity check
+            should_skip = result.no_speech_prob > no_speech_threshold
+            if logprob_threshold is not None and result.avg_logprob > logprob_threshold:
+                # don't skip if the logprob is high enough, despite the no_speech_prob
+                should_skip = False
 
-                if should_skip:
-                    seek += segment.shape[-1]  # fast-forward to the next segment boundary
-                    continue
+            if should_skip:
+                seek += segment.shape[-1]  # fast-forward to the next segment boundary
+                continue
 
-            timestamp_tokens = tokens >= tokenizer.timestamp_begin
-            consecutive = np.where(timestamp_tokens[:-1] & timestamp_tokens[1:])[0] + 1
-            if len(consecutive) > 0:  # if the output contains two consecutive timestamp tokens
-                last_slice = 0
-                for current_slice in consecutive:
-                    sliced_tokens = tokens[last_slice:current_slice]
-                    start_timestamp_position = (
-                            sliced_tokens[0] - tokenizer.timestamp_begin
-                    )
-                    end_timestamp_position = (
-                            sliced_tokens[-1] - tokenizer.timestamp_begin
-                    )
-                    add_segment(
-                        start=timestamp_offset + start_timestamp_position * time_precision,
-                        end=timestamp_offset + end_timestamp_position * time_precision,
-                        text_tokens=sliced_tokens[1:-1],
-                        result=result,
-                    )
-                    last_slice = current_slice
-                last_timestamp_position = (
-                        tokens[last_slice - 1] - tokenizer.timestamp_begin
+        timestamp_tokens = tokens >= tokenizer.timestamp_begin
+        consecutive = np.where(timestamp_tokens[:-1] & timestamp_tokens[1:])[0] + 1
+        if len(consecutive) > 0:  # if the output contains two consecutive timestamp tokens
+            last_slice = 0
+            for current_slice in consecutive:
+                sliced_tokens = tokens[last_slice:current_slice]
+                start_timestamp_position = (
+                        sliced_tokens[0] - tokenizer.timestamp_begin
                 )
-                seek += last_timestamp_position * input_stride
-                all_tokens.extend(tokens[: last_slice + 1].tolist())
-            else:
-                duration = segment_duration
-                timestamps = tokens[np.nonzero(timestamp_tokens)[0]]
-                if len(timestamps) > 0:
-                    # no consecutive timestamps but it has a timestamp; use the last one.
-                    # single timestamp at the end means no speech after the last timestamp.
-                    last_timestamp_position = timestamps[-1] - tokenizer.timestamp_begin
-                    duration = last_timestamp_position * time_precision
-
+                end_timestamp_position = (
+                        sliced_tokens[-1] - tokenizer.timestamp_begin
+                )
                 add_segment(
-                    start=timestamp_offset,
-                    end=timestamp_offset + duration,
-                    text_tokens=tokens,
+                    start=timestamp_offset + start_timestamp_position * time_precision,
+                    end=timestamp_offset + end_timestamp_position * time_precision,
+                    text_tokens=sliced_tokens[1:-1],
                     result=result,
                 )
-                seek += segment.shape[-1]
-                all_tokens.extend(tokens.tolist())
+                last_slice = current_slice
+            last_timestamp_position = (
+                    tokens[last_slice - 1] - tokenizer.timestamp_begin
+            )
+            seek += last_timestamp_position * input_stride
+            all_tokens.extend(tokens[: last_slice + 1].tolist())
+        else:
+            duration = segment_duration
+            timestamps = tokens[np.nonzero(timestamp_tokens)[0]]
+            if len(timestamps) > 0:
+                # no consecutive timestamps but it has a timestamp; use the last one.
+                # single timestamp at the end means no speech after the last timestamp.
+                last_timestamp_position = timestamps[-1] - tokenizer.timestamp_begin
+                duration = last_timestamp_position * time_precision
 
+            add_segment(
+                start=timestamp_offset,
+                end=timestamp_offset + duration,
+                text_tokens=tokens,
+                result=result,
+            )
+            seek += segment.shape[-1]
+            all_tokens.extend(tokens.tolist())
+
+        if pbar is not None:
             # update progress bar
             pbar.update(min(num_frames, seek) - previous_seek_value)
-            previous_seek_value = seek
+        previous_seek_value = seek
 
     d = dict(
         text=tokenizer.decode(all_tokens),
@@ -614,6 +618,8 @@ def predict(wav, enc_net, dec_net, immediate=False):
 
 
 def recognize_from_audio(enc_net, dec_net):
+    immediate = True
+
     # input audio loop
     for audio_path in args.input:
         logger.info(audio_path)
@@ -628,7 +634,7 @@ def recognize_from_audio(enc_net, dec_net):
             total_time_estimation = 0
             for i in range(args.benchmark_count):
                 start = int(round(time.time() * 1000))
-                output = predict(wav, enc_net, dec_net)
+                output = predict(wav, enc_net, dec_net, immediate=immediate)
                 end = int(round(time.time() * 1000))
                 estimation_time = (end - start)
 
@@ -639,11 +645,12 @@ def recognize_from_audio(enc_net, dec_net):
 
             logger.info(f'\taverage time estimation {total_time_estimation / (args.benchmark_count - 1)} ms')
         else:
-            output = predict(wav, enc_net, dec_net)
+            output = predict(wav, enc_net, dec_net, immediate=immediate)
 
-        # output result
-        for res in output['segments']:
-            logger.info(f"[{format_timestamp(res['start'])} --> {format_timestamp(res['end'])}] {res['text']}")
+        if not immediate:
+            # output result
+            for res in output['segments']:
+                logger.info(f"[{format_timestamp(res['start'])} --> {format_timestamp(res['end'])}] {res['text']}")
 
     logger.info('Script finished successfully.')
 
