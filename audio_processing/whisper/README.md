@@ -13,6 +13,14 @@ Recognized speech text
 He hoped there would be stew for dinner, turnips and carrots and bruised potatoes and fat mutton pieces to be ladled out in thick, peppered, flour-fattened sauce.
 ```
 
+## Requirements
+
+This model requires additional module.
+```
+pip3 install librosa
+pip3 install transformers
+```
+
 ## Usage
 Automatically downloads the onnx and prototxt files on the first run.
 It is necessary to be connected to the Internet while downloading.
