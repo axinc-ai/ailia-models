@@ -40,6 +40,17 @@ By adding the `--model_type` option, you can specify model type which is selecte
 $ python3 whisper.py --model_type small
 ```
 
+If you specify the `-V` option, it will be in input mode from the microphone.
+
+```bash
+$ python3 whisper.py -V
+```
+
+1. speak into the microphone when "Please speak something."
+2. end the recording after about 0.1 second of silence and do voice recognition
+3. return to 1 again after displaying the forecast results
+4. type ``Ctrl+c`` if you want to exit
+
 ## Reference
 
 - [Whisper](https://github.com/openai/whisper)

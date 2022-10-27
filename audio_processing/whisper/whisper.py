@@ -1,6 +1,9 @@
 import sys
 import time
 from collections import namedtuple
+import threading
+import multiprocessing as mp
+import queue
 
 import numpy as np
 
@@ -53,6 +56,10 @@ SAVE_TEXT_PATH = 'output.txt'
 
 parser = get_base_parser(
     'Whisper', WAV_PATH, SAVE_TEXT_PATH, input_ftype='audio'
+)
+parser.add_argument(
+    '-V', action='store_true',
+    help='use microphone input',
 )
 parser.add_argument(
     '-m', '--model_type', default='small', choices=('tiny', 'base', 'small', 'medium'),
@@ -213,6 +220,7 @@ def new_kv_cache(n_group, length):
 # ======================
 
 def get_audio_features(enc_net, mel):
+    mel = mel.astype(np.float32)
     if not args.onnx:
         output = enc_net.predict([mel])
     else:
@@ -655,6 +663,123 @@ def recognize_from_audio(enc_net, dec_net):
     logger.info('Script finished successfully.')
 
 
+def recognize_from_microphone(enc_net, dec_net, params):
+    p = params['p']
+    que = params['que']
+    ready = params['ready']
+    pause = params['pause']
+    fin = params['fin']
+
+    try:
+        # キャプチャスレッド起動待ち
+        while True:
+            if ready.wait(timeout=0.1):
+                break
+
+        cout = True
+        while p.is_alive():
+            try:
+                if cout:
+                    logger.info("Please speak something")
+                    cout = False
+                wav = que.get(timeout=0.1)
+                logger.info("captured! len: %s" % (wav.shape[0] / SAMPLE_RATE))
+
+                # pause.set()   # マイク入力を一時停止
+            except queue.Empty:
+                continue
+
+            # inference
+            logger.info('Translating...')
+            output = predict(wav, enc_net, dec_net, immediate=False)
+
+            text = '\n'.join(res['text'] for res in output['segments'])
+            logger.info(f'predict sentence:\n{text}\n')
+            cout = True
+            pause.clear()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        fin.set()
+
+    logger.info('script finished successfully.')
+
+
+def capture_microphone(que, ready, pause, fin):
+    import soundcard as sc
+
+    THRES_SPEECH_POW = 0.001
+    THRES_SILENCE_POW = 0.0001
+    INTERVAL = SAMPLE_RATE * 3
+    INTERVAL_MIN = SAMPLE_RATE * 1.5
+    BUFFER_MAX = SAMPLE_RATE * 10
+    v = np.ones(100) / 100
+    try:
+        ready.set()
+
+        def send(audio, n):
+            if INTERVAL_MIN < n:
+                que.put_nowait(audio[:n])
+
+        # start recording
+        speaker = False
+        mic_id = str(sc.default_speaker().name) if speaker else str(sc.default_microphone().name)
+        buf = np.array([], dtype=np.float32)
+        with sc.get_microphone(id=mic_id, include_loopback=speaker).recorder(
+                samplerate=SAMPLE_RATE, channels=1) as mic:
+            while not fin.is_set():
+                if pause.is_set():
+                    buf = buf[:0]
+                    time.sleep(0.1)
+                    continue
+
+                audio = mic.record(INTERVAL)
+                audio = audio.reshape(-1)
+                square = audio ** 2
+                if np.max(square) >= THRES_SPEECH_POW:
+                    sys.stdout.write(".")
+                    sys.stdout.flush()
+
+                    # 平準化
+                    conv = np.convolve(square, v, 'valid')
+                    conv = np.pad(conv, (0, len(v) - 1), mode='edge')
+                    # 0.1s刻みで0.5s区間をチェック
+                    s = SAMPLE_RATE // 10
+                    x = [(min(i + s * 5, INTERVAL), np.any(conv[i:i + s * 5] >= THRES_SILENCE_POW))
+                         for i in range(0, INTERVAL - 5 * s + 1, s)]
+
+                    # Speech section
+                    speech = [a[0] for a in x if a[1]]
+                    if speech:
+                        if len(buf) == 0 and 1 < len(speech):
+                            i = speech[0] - s
+                            audio = audio[i:]
+                        i = speech[-1]
+                        audio = audio[:i]
+                    else:
+                        i = 0
+
+                    buf = np.concatenate([buf, audio])
+                    if i < INTERVAL:
+                        send(buf, len(buf))
+                        buf = buf[:0]
+                    elif BUFFER_MAX < len(buf):
+                        i = np.argmin(buf[::-1])
+                        i = len(buf) - i
+                        if 0 < i:
+                            send(buf, i)
+                            buf = buf[i:]
+                        else:
+                            send(buf, len(buf))
+                            buf = buf[:0]
+                elif 0 < len(buf):
+                    send(buf, len(buf))
+                    buf = buf[:0]
+            pass
+    except KeyboardInterrupt:
+        pass
+
+
 def main():
     model_dic = {
         'tiny': {
@@ -680,6 +805,28 @@ def main():
     check_and_download_models(WEIGHT_ENC_PATH, MODEL_ENC_PATH, REMOTE_PATH)
     check_and_download_models(WEIGHT_DEC_PATH, MODEL_DEC_PATH, REMOTE_PATH)
 
+    params = None
+    if args.V:
+        # in microphone input mode, start thread before load the model.
+        que = mp.Queue(maxsize=2)
+        ready = mp.Event()
+        pause = mp.Event()
+        fin = mp.Event()
+        thread = False
+
+        if thread:
+            p = threading.Thread(target=capture_microphone, args=(que, ready, pause, fin), daemon=True)
+        else:
+            p = mp.Process(target=capture_microphone, args=(que, ready, pause, fin), daemon=True)
+        p.start()
+        params = dict(
+            p=p,
+            que=que,
+            ready=ready,
+            pause=pause,
+            fin=fin,
+        )
+
     env_id = args.env_id
 
     # initialize
@@ -691,7 +838,11 @@ def main():
         enc_net = onnxruntime.InferenceSession(WEIGHT_ENC_PATH)
         dec_net = onnxruntime.InferenceSession(WEIGHT_DEC_PATH)
 
-    recognize_from_audio(enc_net, dec_net)
+    if args.V:
+        # microphone input mode
+        recognize_from_microphone(enc_net, dec_net, params)
+    else:
+        recognize_from_audio(enc_net, dec_net)
 
 
 if __name__ == '__main__':
