@@ -50,6 +50,13 @@ WAV_PATH = 'demo.mp3'
 SAVE_TEXT_PATH = 'output.txt'
 
 # ======================
+# Workaround
+# ======================
+
+# ailia SDK 1.2.13のAILIA UNSETTLED SHAPEの抑制、1.2.14では不要になる予定
+WORK_AROUND_FOR_AILIA_SDK_1_2_13 = True
+
+# ======================
 # Arguemnt Parser Config
 # ======================
 
@@ -102,6 +109,11 @@ parser.add_argument(
     '--onnx',
     action='store_true',
     help='execute onnxruntime version.'
+)
+parser.add_argument(
+    '--debug',
+    action='store_true',
+    help='display progress.'
 )
 args = update_parser(parser)
 
@@ -249,6 +261,9 @@ def inference_logits(dec_net, tokens, audio_features, kv_cache=None, initial_tok
     offset = np.array(offset, dtype=np.int64)
 
     if not args.onnx:
+        if WORK_AROUND_FOR_AILIA_SDK_1_2_13:
+            global WEIGHT_DEC_PATH, MODEL_DEC_PATH
+            dec_net = ailia.Net(MODEL_DEC_PATH, WEIGHT_DEC_PATH, env_id=args.env_id)
         output = dec_net.predict([tokens, audio_features, kv_cache, offset])
     else:
         kv_cache = kv_cache.astype(np.float32)
@@ -369,7 +384,8 @@ def decode(enc_net, dec_net, mel, options):
 
     # sampling loop
     for i in range(sample_len):
-        # print(f"step: {i}", flush=True)
+        if args.debug:
+            print(f"step: {i} / {sample_len}", flush=True)
         logits, kv_cache = inference_logits(dec_net, tokens, audio_features, kv_cache, initial_token_length)
 
         if i == 0 and tokenizer.no_speech is not None:  # save no_speech_probs
@@ -699,6 +715,7 @@ def recognize_from_microphone(enc_net, dec_net, mic_info):
 
 
 def main():
+    global WEIGHT_DEC_PATH, MODEL_DEC_PATH
     model_dic = {
         'tiny': {
             'enc': (WEIGHT_ENC_TINY_PATH, MODEL_ENC_TINY_PATH),
