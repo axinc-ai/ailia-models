@@ -29,26 +29,17 @@ def capture_microphone(que, ready, pause, fin, sample_rate, speaker=False):
         p = pyaudio.PyAudio()
 
         CHUNK = 1024
-        FORMAT = pyaudio.paInt16
-        CHANNELS = 1
-        RECODING_SAMPING_RATE = 48000
-        THRESHOLD = 0.02
 
         stream = p.open(
-            format=FORMAT,
-            channels=CHANNELS,
-            rate=RECODING_SAMPING_RATE,
+            format=pyaudio.paInt16,
+            channels=1,
+            rate=sample_rate,
             input=True,
             frames_per_buffer=CHUNK,
         )
 
         stream.start_stream()
-        #mic_id = str(sc.default_speaker().name) if speaker else str(sc.default_microphone().name)
         buf = np.array([], dtype=np.float32)
-        #print(mic_id,speaker)
-        #with sc.get_microphone(id=mic_id, include_loopback=speaker).recorder(
-        #        samplerate=sample_rate, channels=1) as mic:
-        #with sc.default_microphone().recorder(samplerate=sample_rate) as mic:
         if True:
             while not fin.is_set():
                 if pause.is_set():
@@ -56,13 +47,9 @@ def capture_microphone(que, ready, pause, fin, sample_rate, speaker=False):
                     time.sleep(0.1)
                     continue
 
-                #audio = mic.record(INTERVAL)
                 audio = np.frombuffer(stream.read(INTERVAL), dtype=np.int16) / 32768.0
-
-                #print(audio)
                 audio = audio.reshape(-1)
                 square = audio ** 2
-                #print(np.max(square))
                 if np.max(square) >= THRES_SPEECH_POW:
                     sys.stdout.write(".")
                     sys.stdout.flush()
