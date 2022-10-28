@@ -47,7 +47,7 @@ $ python3 whisper.py -V
 ```
 
 1. speak into the microphone when "Please speak something."
-2. end the recording after about 0.1 second of silence and do voice recognition
+2. end the recording after about 0.5 second of silence and do voice recognition
 3. return to 1 again after displaying the forecast results
 4. type ``Ctrl+c`` if you want to exit
 
