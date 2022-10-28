@@ -19,6 +19,7 @@ This model requires additional module.
 ```
 pip3 install librosa
 pip3 install transformers
+pip3 install soundcard  # for microphone input mode
 ```
 
 ## Usage
