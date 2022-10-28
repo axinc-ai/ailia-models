@@ -13,6 +13,7 @@ import ailia
 sys.path.append('../../util')
 from utils import get_base_parser, update_parser, get_savepath  # noqa
 from model_utils import check_and_download_models  # noqa
+from microphone_utils import start_microphone_input  # noqa
 from math_utils import softmax
 # logger
 from logging import getLogger  # noqa
@@ -663,19 +664,13 @@ def recognize_from_audio(enc_net, dec_net):
     logger.info('Script finished successfully.')
 
 
-def recognize_from_microphone(enc_net, dec_net, params):
-    p = params['p']
-    que = params['que']
-    ready = params['ready']
-    pause = params['pause']
-    fin = params['fin']
+def recognize_from_microphone(enc_net, dec_net, mic_info):
+    p = mic_info['p']
+    que = mic_info['que']
+    pause = mic_info['pause']
+    fin = mic_info['fin']
 
     try:
-        # キャプチャスレッド起動待ち
-        while True:
-            if ready.wait(timeout=0.1):
-                break
-
         cout = True
         while p.is_alive():
             try:
@@ -705,81 +700,6 @@ def recognize_from_microphone(enc_net, dec_net, params):
     logger.info('script finished successfully.')
 
 
-def capture_microphone(que, ready, pause, fin):
-    import soundcard as sc
-
-    THRES_SPEECH_POW = 0.001
-    THRES_SILENCE_POW = 0.0001
-    INTERVAL = SAMPLE_RATE * 3
-    INTERVAL_MIN = SAMPLE_RATE * 1.5
-    BUFFER_MAX = SAMPLE_RATE * 10
-    v = np.ones(100) / 100
-    try:
-        ready.set()
-
-        def send(audio, n):
-            if INTERVAL_MIN < n:
-                que.put_nowait(audio[:n])
-
-        # start recording
-        speaker = False
-        mic_id = str(sc.default_speaker().name) if speaker else str(sc.default_microphone().name)
-        buf = np.array([], dtype=np.float32)
-        with sc.get_microphone(id=mic_id, include_loopback=speaker).recorder(
-                samplerate=SAMPLE_RATE, channels=1) as mic:
-            while not fin.is_set():
-                if pause.is_set():
-                    buf = buf[:0]
-                    time.sleep(0.1)
-                    continue
-
-                audio = mic.record(INTERVAL)
-                audio = audio.reshape(-1)
-                square = audio ** 2
-                if np.max(square) >= THRES_SPEECH_POW:
-                    sys.stdout.write(".")
-                    sys.stdout.flush()
-
-                    # 平準化
-                    conv = np.convolve(square, v, 'valid')
-                    conv = np.pad(conv, (0, len(v) - 1), mode='edge')
-                    # 0.1s刻みで0.5s区間をチェック
-                    s = SAMPLE_RATE // 10
-                    x = [(min(i + s * 5, INTERVAL), np.any(conv[i:i + s * 5] >= THRES_SILENCE_POW))
-                         for i in range(0, INTERVAL - 5 * s + 1, s)]
-
-                    # Speech section
-                    speech = [a[0] for a in x if a[1]]
-                    if speech:
-                        if len(buf) == 0 and 1 < len(speech):
-                            i = speech[0] - s
-                            audio = audio[i:]
-                        i = speech[-1]
-                        audio = audio[:i]
-                    else:
-                        i = 0
-
-                    buf = np.concatenate([buf, audio])
-                    if i < INTERVAL:
-                        send(buf, len(buf))
-                        buf = buf[:0]
-                    elif BUFFER_MAX < len(buf):
-                        i = np.argmin(buf[::-1])
-                        i = len(buf) - i
-                        if 0 < i:
-                            send(buf, i)
-                            buf = buf[i:]
-                        else:
-                            send(buf, len(buf))
-                            buf = buf[:0]
-                elif 0 < len(buf):
-                    send(buf, len(buf))
-                    buf = buf[:0]
-            pass
-    except KeyboardInterrupt:
-        pass
-
-
 def main():
     model_dic = {
         'tiny': {
@@ -805,27 +725,10 @@ def main():
     check_and_download_models(WEIGHT_ENC_PATH, MODEL_ENC_PATH, REMOTE_PATH)
     check_and_download_models(WEIGHT_DEC_PATH, MODEL_DEC_PATH, REMOTE_PATH)
 
-    params = None
+    mic_info = None
     if args.V:
         # in microphone input mode, start thread before load the model.
-        que = mp.Queue(maxsize=2)
-        ready = mp.Event()
-        pause = mp.Event()
-        fin = mp.Event()
-        thread = False
-
-        if thread:
-            p = threading.Thread(target=capture_microphone, args=(que, ready, pause, fin), daemon=True)
-        else:
-            p = mp.Process(target=capture_microphone, args=(que, ready, pause, fin), daemon=True)
-        p.start()
-        params = dict(
-            p=p,
-            que=que,
-            ready=ready,
-            pause=pause,
-            fin=fin,
-        )
+        mic_info = start_microphone_input(SAMPLE_RATE, speaker=False)
 
     env_id = args.env_id
 
@@ -840,7 +743,7 @@ def main():
 
     if args.V:
         # microphone input mode
-        recognize_from_microphone(enc_net, dec_net, params)
+        recognize_from_microphone(enc_net, dec_net, mic_info)
     else:
         recognize_from_audio(enc_net, dec_net)
 
