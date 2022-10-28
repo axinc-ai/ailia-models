@@ -1,8 +1,6 @@
 import sys
 import time
 from collections import namedtuple
-import threading
-import multiprocessing as mp
 import queue
 
 import numpy as np
