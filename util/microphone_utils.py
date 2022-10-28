@@ -10,8 +10,8 @@ logger = getLogger(__name__)
 
 
 def capture_microphone(que, ready, pause, fin, sample_rate, speaker=False):
-    import soundcard as sc
-
+    import pyaudio
+    
     THRES_SPEECH_POW = 0.001
     THRES_SILENCE_POW = 0.0001
     INTERVAL = sample_rate * 3
@@ -26,19 +26,43 @@ def capture_microphone(que, ready, pause, fin, sample_rate, speaker=False):
                 que.put_nowait(audio[:n])
 
         # start recording
-        mic_id = str(sc.default_speaker().name) if speaker else str(sc.default_microphone().name)
+        p = pyaudio.PyAudio()
+
+        CHUNK = 1024
+        FORMAT = pyaudio.paInt16
+        CHANNELS = 1
+        RECODING_SAMPING_RATE = 48000
+        THRESHOLD = 0.02
+
+        stream = p.open(
+            format=FORMAT,
+            channels=CHANNELS,
+            rate=RECODING_SAMPING_RATE,
+            input=True,
+            frames_per_buffer=CHUNK,
+        )
+
+        stream.start_stream()
+        #mic_id = str(sc.default_speaker().name) if speaker else str(sc.default_microphone().name)
         buf = np.array([], dtype=np.float32)
-        with sc.get_microphone(id=mic_id, include_loopback=speaker).recorder(
-                samplerate=sample_rate, channels=1) as mic:
+        #print(mic_id,speaker)
+        #with sc.get_microphone(id=mic_id, include_loopback=speaker).recorder(
+        #        samplerate=sample_rate, channels=1) as mic:
+        #with sc.default_microphone().recorder(samplerate=sample_rate) as mic:
+        if True:
             while not fin.is_set():
                 if pause.is_set():
                     buf = buf[:0]
                     time.sleep(0.1)
                     continue
 
-                audio = mic.record(INTERVAL)
+                #audio = mic.record(INTERVAL)
+                audio = np.frombuffer(stream.read(INTERVAL), dtype=np.int16) / 32768.0
+
+                #print(audio)
                 audio = audio.reshape(-1)
                 square = audio ** 2
+                #print(np.max(square))
                 if np.max(square) >= THRES_SPEECH_POW:
                     sys.stdout.write(".")
                     sys.stdout.flush()
@@ -82,8 +106,13 @@ def capture_microphone(que, ready, pause, fin, sample_rate, speaker=False):
     except KeyboardInterrupt:
         pass
     except Exception as e:
+        raise e
         logger.error(e)
 
+    stream.stop_stream()
+    stream.close()
+    p.terminate()
+    
 
 def start_microphone_input(sample_rate, speaker=False, thread=False, queue_size=2):
     que = mp.Queue(maxsize=queue_size)

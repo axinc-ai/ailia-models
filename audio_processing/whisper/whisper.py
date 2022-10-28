@@ -56,6 +56,9 @@ SAVE_TEXT_PATH = 'output.txt'
 # ailia SDK 1.2.13のAILIA UNSETTLED SHAPEの抑制、1.2.14では不要になる予定
 WORK_AROUND_FOR_AILIA_SDK_1_2_13 = True
 
+# M1 mac can not capture 16000Hz audio
+MIC_SAMPLE_RATE = 44100
+
 # ======================
 # Arguemnt Parser Config
 # ======================
@@ -692,6 +695,8 @@ def recognize_from_microphone(enc_net, dec_net, mic_info):
                     logger.info("Please speak something")
                     cout = False
                 wav = que.get(timeout=0.1)
+                import librosa
+                wav = librosa.resample(wav, MIC_SAMPLE_RATE, SAMPLE_RATE)
                 logger.info("captured! len: %s" % (wav.shape[0] / SAMPLE_RATE))
 
                 # pause.set()   # マイク入力を一時停止
@@ -743,7 +748,7 @@ def main():
     mic_info = None
     if args.V:
         # in microphone input mode, start thread before load the model.
-        mic_info = start_microphone_input(SAMPLE_RATE, speaker=False)
+        mic_info = start_microphone_input(MIC_SAMPLE_RATE, speaker=False)
 
     env_id = args.env_id
 
