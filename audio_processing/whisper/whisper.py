@@ -209,7 +209,7 @@ def get_suppress_tokens(tokenizer, options):
     return tuple(sorted(set(suppress_tokens)))
 
 
-def new_kv_cache(n_group, length):
+def new_kv_cache(n_group, length=226):
     model_type = args.model_type
     if model_type == "tiny.en" or model_type == "tiny":
         size = [8, n_group, length, 384]
@@ -246,12 +246,14 @@ def inference_logits(dec_net, tokens, audio_features, kv_cache=None, initial_tok
     n_group = tokens.shape[0]
     initial_token_length = initial_token_length if initial_token_length else tokens.shape[-1]
     if kv_cache is None:
-        kv_cache = new_kv_cache(n_group, initial_token_length)
+        kv_cache = new_kv_cache(n_group)
         offset = 0
+        length = initial_token_length
     else:
         offset = kv_cache.shape[2]
-        _kv_cache = new_kv_cache(n_group, offset + 1)
-        _kv_cache[:, :, :-1, :] = kv_cache
+        length = offset + 1
+        _kv_cache = new_kv_cache(n_group)
+        _kv_cache[:, :, :offset, :] = kv_cache
         kv_cache = _kv_cache
 
     if tokens.shape[-1] > initial_token_length:
@@ -278,7 +280,7 @@ def inference_logits(dec_net, tokens, audio_features, kv_cache=None, initial_tok
             'kv_cache': kv_cache, 'offset': offset})
     logits, kv_cache = output
 
-    return logits, kv_cache
+    return logits, kv_cache[:, :, :length, :]
 
 
 def detect_language(enc_net, dec_net, mel, tokenizer=None):
