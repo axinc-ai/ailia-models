@@ -55,6 +55,7 @@ SAVE_TEXT_PATH = 'output.txt'
 
 # ailia SDK 1.2.13のAILIA UNSETTLED SHAPEの抑制、1.2.14では不要になる予定
 WORK_AROUND_FOR_AILIA_SDK_1_2_13 = True
+SAVE_SHAPE = ()
 
 # ======================
 # Arguemnt Parser Config
@@ -262,8 +263,13 @@ def inference_logits(dec_net, tokens, audio_features, kv_cache=None, initial_tok
 
     if not args.onnx:
         if WORK_AROUND_FOR_AILIA_SDK_1_2_13:
-            global WEIGHT_DEC_PATH, MODEL_DEC_PATH
-            dec_net = ailia.Net(MODEL_DEC_PATH, WEIGHT_DEC_PATH, env_id=args.env_id)
+            global WEIGHT_DEC_PATH, MODEL_DEC_PATH, SAVE_SHAPE
+
+            shape = (tokens.shape, audio_features.shape)
+            if SAVE_SHAPE != shape:
+                dec_net = ailia.Net(MODEL_DEC_PATH, WEIGHT_DEC_PATH, env_id=args.env_id)
+            SAVE_SHAPE = shape
+
         output = dec_net.predict([tokens, audio_features, kv_cache, offset])
     else:
         kv_cache = kv_cache.astype(np.float32)
