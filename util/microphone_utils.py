@@ -8,6 +8,8 @@ import numpy as np
 
 logger = getLogger(__name__)
 
+M1_SAMPLE_RATE = 48000
+
 
 def capture_microphone(que, ready, pause, fin, sample_rate, sc=False, speaker=False):
     if sc:
@@ -16,7 +18,8 @@ def capture_microphone(que, ready, pause, fin, sample_rate, sc=False, speaker=Fa
         import pyaudio
         import librosa
 
-    SAMPLE_RATE = 48000 if sc is False else sample_rate
+    # M1 macだとpyaudioが48000Hzしか取得できない
+    SAMPLE_RATE = M1_SAMPLE_RATE if sc is False else sample_rate
     THRES_SPEECH_POW = 0.001
     THRES_SILENCE_POW = 0.0001
     INTERVAL = SAMPLE_RATE * 3

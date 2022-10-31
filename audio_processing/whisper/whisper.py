@@ -56,11 +56,6 @@ SAVE_TEXT_PATH = 'output.txt'
 # ailia SDK 1.2.13のAILIA UNSETTLED SHAPEの抑制、1.2.14では不要になる予定
 WORK_AROUND_FOR_AILIA_SDK_1_2_13 = True
 
-# M1 macだと48000Hzしか取得できない
-MIC_SAMPLE_RATE = 48000
-
-# M1 macだとSoundCardは正常に音声取得できないので、Pyaudioを使用
-
 # ======================
 # Arguemnt Parser Config
 # ======================
