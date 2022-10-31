@@ -20,8 +20,8 @@ def load_audio(file: str, sr: int = SAMPLE_RATE):
     if flg_ffmpeg:
         out, _ = (
             ffmpeg.input(file, threads=0)
-                .output("-", format="s16le", acodec="pcm_s16le", ac=1, ar=sr)
-                .run(cmd="ffmpeg", capture_stdout=True, capture_stderr=True)
+            .output("-", format="s16le", acodec="pcm_s16le", ac=1, ar=sr)
+            .run(cmd="ffmpeg", capture_stdout=True, capture_stderr=True)
         )
         wav = np.frombuffer(out, np.int16).flatten().astype(np.float32) / 32768.0
     else:
@@ -29,7 +29,7 @@ def load_audio(file: str, sr: int = SAMPLE_RATE):
         wav, source_sr = librosa.load(file, sr=None)
         # Resample the wav if needed
         if source_sr is not None and source_sr != sr:
-            wav = librosa.resample(wav, source_sr, sr)
+            wav = librosa.resample(wav, orig_sr=source_sr, target_sr=sr)
 
     return wav
 
