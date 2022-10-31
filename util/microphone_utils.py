@@ -26,7 +26,7 @@ def capture_microphone(que, ready, pause, fin, sample_rate, sc=False, speaker=Fa
     def send(audio, n):
         if INTERVAL_MIN < n:
             if sc is False and SAMPLE_RATE != sample_rate:
-                audio = librosa.resample(audio, SAMPLE_RATE, sample_rate)
+                audio = librosa.resample(audio, orig_sr=SAMPLE_RATE, target_sr=sample_rate)
             que.put_nowait(audio[:n])
 
     def read(src):
