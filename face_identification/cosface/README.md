@@ -7,11 +7,6 @@
 ### Reference
  - https://github.com/MuggleWang/CosFace_pytorch
 
-### ONNX Model
- - Original Trained Model: https://storage.googleapis.com/ailia-models/cosface/ACC99.28.pth
- - ONNX format: v4
- - Opset version ai.onnx: v9
-
 ### Sample Code
   - cosface.py  # Output similarity from two face images
   - requirements.txt # Dependencies
