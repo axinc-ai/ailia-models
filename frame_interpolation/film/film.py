@@ -1,5 +1,6 @@
 import sys
 import os
+import shutil
 import time
 
 import numpy as np
@@ -30,6 +31,8 @@ REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/film/'
 IMAGE_PATH = 'photos'
 SAVE_IMAGE_PATH = 'output.png'
 
+NM_EXT = os.path.splitext(SAVE_IMAGE_PATH)
+
 # ======================
 # Arguemnt Parser Config
 # ======================
@@ -40,6 +43,11 @@ parser = get_base_parser(
 parser.add_argument(
     '-i2', '--input2', metavar='IMAGE2', default=None,
     help='The second input image path.'
+)
+parser.add_argument(
+    '-it', '--interpolate-times', type=int, default=1,
+    help='The number of times to run recursive midpoint interpolation. '
+         'The number of output frames will be 2^times_to_interpolate-1.'
 )
 parser.add_argument(
     '--onnx',
@@ -103,9 +111,24 @@ def predict(net, img1, img2):
     return image
 
 
+def recursive_interpolate(net, img1, img2, num_recursions, no=0, offset=0):
+    if 0 < num_recursions:
+        mid_img = predict(net, img1, img2)
+
+        save_file = "%s_%03d%s" % (NM_EXT[0], offset + (no + 1) * (2 ** (num_recursions - 1)), NM_EXT[1])
+        save_path = get_savepath(args.savepath, save_file, post_fix='', ext='.png')
+        logger.info(f'saved at : {save_path}')
+        cv2.imwrite(save_path, img1)
+
+        recursive_interpolate(net, img1, mid_img, num_recursions - 1, no=no * 2, offset=offset)
+        recursive_interpolate(net, mid_img, img2, num_recursions - 1, no=no * 2 + 2, offset=offset)
+
+
 def recognize_from_image(net):
-    # Load images
     inputs = args.input
+    times_to_interpolate = args.interpolate_times
+
+    # Load images
     n_input = len(inputs)
     if n_input == 1 and args.input2:
         inputs.extend([args.input2])
@@ -114,7 +137,8 @@ def recognize_from_image(net):
         logger.error("Specified input must be at least two or more images")
         sys.exit(-1)
 
-    for no, image_paths in enumerate(zip(inputs, inputs[1:])):
+    no = 0
+    for image_paths in zip(inputs, inputs[1:]):
         logger.info(image_paths)
 
         # prepare input data
@@ -138,14 +162,20 @@ def recognize_from_image(net):
                     total_time_estimation = total_time_estimation + estimation_time
 
             logger.info(f'\taverage time estimation {total_time_estimation / (args.benchmark_count - 1)} ms')
-        else:
-            out_img = predict(net, img1, img2)
 
-        nm_ext = os.path.splitext(SAVE_IMAGE_PATH)
-        save_file = "%s_%s%s" % (nm_ext[0], no, nm_ext[1])
-        save_path = get_savepath(args.savepath, save_file, post_fix='', ext='.png')
-        logger.info(f'saved at : {save_path}')
-        cv2.imwrite(save_path, out_img)
+            save_file = "%s_%s%s" % (NM_EXT[0], no, NM_EXT[1])
+            save_path = get_savepath(args.savepath, save_file, post_fix='', ext='.png')
+            logger.info(f'saved at : {save_path}')
+            cv2.imwrite(save_path, out_img)
+        else:
+            recursive_interpolate(net, img1, img2, times_to_interpolate, offset=no)
+            no += 2 ** times_to_interpolate
+            if image_paths[-1] != inputs[-1]:
+                save_file = "%s_%03d%s" % (NM_EXT[0], no, NM_EXT[1])
+                save_path = get_savepath(args.savepath, save_file, post_fix='', ext='.png')
+                logger.info(f'copy {image_paths[-1]} -> {save_path}')
+                shutil.copy(image_paths[-1], save_path)
+                no += 1
 
     logger.info('Script finished successfully.')
 
