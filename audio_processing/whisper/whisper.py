@@ -1,7 +1,7 @@
+import queue
 import sys
 import time
 from collections import namedtuple
-import queue
 
 import numpy as np
 
@@ -9,18 +9,19 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath  # noqa
-from model_utils import check_and_download_models  # noqa
-from microphone_utils import start_microphone_input  # noqa
-from math_utils import softmax
 # logger
 from logging import getLogger  # noqa
 
-from audio_utils import SAMPLE_RATE, HOP_LENGTH, CHUNK_LENGTH, N_FRAMES
-from audio_utils import load_audio, log_mel_spectrogram, pad_or_trim
+from audio_utils import (CHUNK_LENGTH, HOP_LENGTH, N_FRAMES, SAMPLE_RATE,
+                         load_audio, log_mel_spectrogram, pad_or_trim)
+from decode_utils import (ApplyTimestampRules, BeamSearchDecoder,
+                          GreedyDecoder, MaximumLikelihoodRanker,
+                          SuppressBlank, SuppressTokens)
+from math_utils import softmax
+from microphone_utils import start_microphone_input  # noqa
+from model_utils import check_and_download_models  # noqa
 from tokenizer import LANGUAGES, TO_LANGUAGE_CODE, get_tokenizer
-from decode_utils import MaximumLikelihoodRanker, GreedyDecoder, BeamSearchDecoder
-from decode_utils import SuppressBlank, SuppressTokens, ApplyTimestampRules
+from utils import get_base_parser, get_savepath, update_parser  # noqa
 
 logger = getLogger(__name__)
 
@@ -46,7 +47,7 @@ WEIGHT_DEC_MEDIUM_PATH = "decoder_medium.onnx"
 MODEL_DEC_MEDIUM_PATH = "decoder_medium.onnx.prototxt"
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/whisper/'
 
-WAV_PATH = 'demo.mp3'
+WAV_PATH = 'demo.wav'
 SAVE_TEXT_PATH = 'output.txt'
 
 # ======================
