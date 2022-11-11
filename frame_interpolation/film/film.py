@@ -98,17 +98,17 @@ def predict(net, img1, img2):
     else:
         output = net.run(None, {'time': batch_dt[..., np.newaxis], 'x0': x0, 'x1': x1})
 
-    image = output[24]
+    mid_img = output[24]
 
-    image = np.clip(image[0] * 255, 0, 255)
-    image = (image + 0.5).astype(np.uint8)
-    image = image[:, :, ::-1]  # RGB -> BGR
+    mid_img = np.clip(mid_img[0] * 255, 0, 255)
+    mid_img = (mid_img + 0.5).astype(np.uint8)
+    mid_img = mid_img[:, :, ::-1]  # RGB -> BGR
 
     pad_h, pad_w = pad_hw
     if pad_h or pad_w:
-        image = image[pad_h:pad_h + h, pad_w:pad_w + w, ...]
+        mid_img = mid_img[pad_h:pad_h + h, pad_w:pad_w + w, ...]
 
-    return image
+    return mid_img
 
 
 def recursive_interpolate(net, img1, img2, num_recursions, no=0, offset=0):
@@ -118,7 +118,7 @@ def recursive_interpolate(net, img1, img2, num_recursions, no=0, offset=0):
         save_file = "%s_%03d%s" % (NM_EXT[0], offset + (no + 1) * (2 ** (num_recursions - 1)), NM_EXT[1])
         save_path = get_savepath(args.savepath, save_file, post_fix='', ext='.png')
         logger.info(f'saved at : {save_path}')
-        cv2.imwrite(save_path, img1)
+        cv2.imwrite(save_path, mid_img)
 
         recursive_interpolate(net, img1, mid_img, num_recursions - 1, no=no * 2, offset=offset)
         recursive_interpolate(net, mid_img, img2, num_recursions - 1, no=no * 2 + 2, offset=offset)
@@ -169,6 +169,7 @@ def recognize_from_image(net):
             cv2.imwrite(save_path, out_img)
         else:
             recursive_interpolate(net, img1, img2, times_to_interpolate, offset=no)
+
             no += 2 ** times_to_interpolate
             if image_paths[-1] != inputs[-1]:
                 save_file = "%s_%03d%s" % (NM_EXT[0], no, NM_EXT[1])
