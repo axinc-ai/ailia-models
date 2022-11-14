@@ -81,11 +81,23 @@ def recognize_from_image():
         input_image, padding_ratio = movenet_utils.crop_and_padding(image,IMAGE_SIZE)
         input_image = np.expand_dims(input_image, axis=0)
             
-        if args.onnx:
-            ort_inputs = { model.get_inputs()[0].name : input_image.astype(np.float32)}
-            keypoint_with_scores = model.run(None,ort_inputs)[0]
+        if args.benchmark:
+            logger.info('BENCHMARK mode')
+            total_time = 0
+            for i in range(args.benchmark_count):
+                start = int(round(time.time() * 1000))
+                keypoint_with_scores = model.run( input_image.astype(np.float32) )[0]
+                end = int(round(time.time() * 1000))
+                if i != 0:
+                    total_time = total_time + (end - start)
+                logger.info(f'\tailia processing time {end - start} ms')
+            logger.info(f'\taverage time {total_time / (args.benchmark_count-1)} ms')
         else:
-            keypoint_with_scores = model.run( input_image.astype(np.float32) )[0]
+            if args.onnx:
+                ort_inputs = { model.get_inputs()[0].name : input_image.astype(np.float32)}
+                keypoint_with_scores = model.run(None,ort_inputs)[0]
+            else:
+                keypoint_with_scores = model.run( input_image.astype(np.float32) )[0]
 
         # convert xy ratio for original image
         if image.shape[0] > image.shape[1]:

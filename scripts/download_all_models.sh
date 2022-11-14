@@ -26,6 +26,7 @@ cd ../../background_ramoval/background_matting_v2; python3 background_matting_v2
 cd ../../background_ramoval/cascade_psp; python3 cascade_psp.py ${OPTION}
 cd ../../background_ramoval/rembg; python3 rembg.py ${OPTION}
 cd ../../background_ramoval/dis_seg; python3 dis_seg.py ${OPTION}
+cd ../../background_ramoval/gfm; python3 gfm.py ${OPTION}
 cd ../../crowd_counting/crowdcount-cascaded-mtl; python3 crowdcount-cascaded-mtl.py ${OPTION}
 cd ../../crowd_counting/c-3-framework; python3 c-3-framework.py ${OPTION}
 cd ../../diffusion/latent-diffusion-txt2img python3 latent-diffusion-txt2img.py ${OPTION}
@@ -46,6 +47,8 @@ cd ../../depth_estimation/fcrn-depthprediction; python3 fcrn-depthprediction.py 
 cd ../../depth_estimation/fast-depth; python3 fast-depth.py ${OPTION}
 cd ../../depth_estimation/lap-depth; python3 lap-depth.py ${OPTION}
 cd ../../depth_estimation/hitnet; python3 hitnet.py ${OPTION}
+cd ../../depth_estimation/crestereo; python3 crestereo.py ${OPTION}
+cd ../../depth_estimation/mobilestereonet; python3 mobilestereonet.py ${OPTION}
 cd ../../face_detection/blazeface; python3 blazeface.py ${OPTION}
 cd ../../face_detection/dbface; python3 dbface.py ${OPTION}
 cd ../../face_detection/face-mask-detection; python3 face-mask-detection.py ${OPTION}
@@ -74,6 +77,7 @@ cd ../../face_recognition/ax_facial_features; python3 ax_facial_features.py ${OP
 cd ../../face_recognition/6d_repnet; python3 6d_repnet.py ${OPTION}
 cd ../../frame_interpolation/flavr; python3 flavr.py ${OPTION}
 cd ../../frame_interpolation/cain; python3 cain.py ${OPTION}
+cd ../../frame_interpolation/film; python3 film.py ${OPTION}
 cd ../../generative_adversarial_networks/council-GAN; python3 council-gan.py --glasses ${OPTION}
 cd ../../generative_adversarial_networks/council-GAN; python3 council-gan.py --m2f ${OPTION}
 cd ../../generative_adversarial_networks/council-GAN; python3 council-gan.py --anime ${OPTION}
@@ -128,6 +132,8 @@ cd ../../image_manipulation/deep_white_balance; python3 deep_white_balance.py ${
 cd ../../image_manipulation/deblur_gan; python3 deblur_gan.py ${OPTION}
 cd ../../image_manipulation/invertible_denoising_network; python3 invertible_denoising_network.py ${OPTION}
 cd ../../image_manipulation/dfm; python3 dfm.py ${OPTION}
+cd ../../image_manipulation/dehamer; python3 dehamer.py ${OPTION}
+cd ../../image_manipulation/dfe; python3 dfe.py ${OPTION}
 cd ../../image_segmentation/deeplabv3; python3 deeplabv3.py ${OPTION}
 cd ../../image_segmentation/hair_segmentation; python3 hair_segmentation.py ${OPTION}
 cd ../../image_segmentation/hrnet_segmentation; python3 hrnet_segmentation.py ${OPTION}
@@ -142,6 +148,7 @@ cd ../../image_segmentation/dense_prediction_transformers; python3 dense_predict
 cd ../../image_segmentation/paddleseg; python3 paddleseg.py ${OPTION}
 cd ../../image_segmentation/pp_liteseg; python3 pp_liteseg.py ${OPTION}
 cd ../../image_segmentation/suim; python3 suim.py ${OPTION}
+cd ../../image_segmentation/group_vit; python3 group_vit.py ${OPTION}
 cd ../../line_segment_detection/mlsd; python3 mlsd.py ${OPTION}
 cd ../../line_segment_detection/dexined; python3 dexined.py ${OPTION}
 cd ../../low_light_image_enhancement/agllnet; python3 agllnet.py ${OPTION}
@@ -184,6 +191,8 @@ cd ../../object_detection/picodet; python3 picodet.py ${OPTION}
 cd ../../object_detection/yolact; python3 yolact.py ${OPTION}
 cd ../../object_detection/fastest-det; python3 fastest-det.py ${OPTION}
 cd ../../object_detection/dab-detr; python3 dab-detr.py ${OPTION}
+cd ../../object_detection/glip; python3 glip.py ${OPTION}
+cd ../../object_detection/poly_yolo; python3 poly_yolo.py ${OPTION}
 cd ../../object_detection_3d/3d_bbox; python3 3d_bbox.py ${OPTION}
 cd ../../object_detection_3d/3d-object-detection.pytorch; python3 3d-object-detection.pytorch.py ${OPTION}
 cd ../../object_detection_3d/mediapipe_objectron; python3 mediapipe_objectron.py ${OPTION}
