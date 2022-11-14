@@ -66,13 +66,16 @@ def preprocess(img):
 
     pad_h = pad_w = 0
     if h % align != 0 or w % align != 0:
-        pad_h = align - h % align
-        pad_w = align - w % align
+        pad_h = (align - h % align) % align
+        pad_w = (align - w % align) % align
 
-        pad_img = np.zeros(h + align - pad_h, w + align - pad_w, 3)
+        pad_img = np.zeros(shape=(h + pad_h, w + pad_w, 3))
         pad_h = pad_h // 2
         pad_w = pad_w // 2
-        pad_img[pad_h:pad_h + h, pad_w:pad_w + w, 3] = img
+        pad_img[pad_h:pad_h + h, pad_w:pad_w + w, :] = img
+        #for x in range(0, pad_w):
+        #    pad_img[:, x, :] = pad_img[:, pad_w, :]
+        #    pad_img[:, pad_w + w + x, :] = pad_img[:, pad_w + w - 1, :]
         img = pad_img
 
     img = img / 255
@@ -208,7 +211,7 @@ def recognize_from_video(net):
     try:
         import tqdm
         if 0 < video_length:
-            it = iter(tqdm(range(video_length)))
+            it = iter(tqdm.tqdm(range(video_length)))
             next(it)
     except ImportError:
         pass
