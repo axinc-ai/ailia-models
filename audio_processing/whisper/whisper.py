@@ -2,6 +2,7 @@ import queue
 import sys
 import time
 from collections import namedtuple
+import platform
 
 import numpy as np
 
@@ -45,7 +46,8 @@ WEIGHT_ENC_MEDIUM_PATH = "encoder_medium.onnx"
 MODEL_ENC_MEDIUM_PATH = "encoder_medium.onnx.prototxt"
 WEIGHT_DEC_MEDIUM_PATH = "decoder_medium.onnx"
 MODEL_DEC_MEDIUM_PATH = "decoder_medium.onnx.prototxt"
-REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/whisper/'
+REMOTE_PATH_ENC = 'https://storage.googleapis.com/ailia-models/whisper/'
+REMOTE_PATH_DEC = 'https://storage.googleapis.com/ailia-models/whisper/fix_kv_cache/'
 
 WAV_PATH = 'demo.wav'
 SAVE_TEXT_PATH = 'output.txt'
@@ -746,8 +748,8 @@ def main():
     model_info = model_dic[args.model_type]
     WEIGHT_ENC_PATH, MODEL_ENC_PATH = model_info['enc']
     WEIGHT_DEC_PATH, MODEL_DEC_PATH = model_info['dec']
-    check_and_download_models(WEIGHT_ENC_PATH, MODEL_ENC_PATH, REMOTE_PATH)
-    check_and_download_models(WEIGHT_DEC_PATH, MODEL_DEC_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_ENC_PATH, MODEL_ENC_PATH, REMOTE_PATH_ENC)
+    check_and_download_models(WEIGHT_DEC_PATH, MODEL_DEC_PATH, REMOTE_PATH_DEC)
 
     mic_info = None
     if args.V:
@@ -755,6 +757,11 @@ def main():
         mic_info = start_microphone_input(SAMPLE_RATE, sc=False, speaker=False)
 
     env_id = args.env_id
+
+    pf = platform.system()
+    if pf == "Darwin":
+        logger.info("This model not optimized for gpu. So we will use BLAS (env_id = 1).")
+        env_id = 1
 
     # initialize
     if not args.onnx:
