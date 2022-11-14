@@ -124,6 +124,11 @@ parser.add_argument(
     action='store_true',
     help='display progress.'
 )
+parser.add_argument(
+    '--profile',
+    action='store_true',
+    help='display profile.'
+)
 args = update_parser(parser)
 
 ModelDimensions = namedtuple('ModelDimensions', [
@@ -411,8 +416,12 @@ def decode(enc_net, dec_net, mel, options):
     # sampling loop
     for i in range(sample_len):
         if args.debug:
-            print(f"step: {i} / {sample_len}", flush=True)
+            start = int(round(time.time() * 1000))
         logits, kv_cache = inference_logits(dec_net, tokens, audio_features, kv_cache, initial_token_length)
+        if args.debug:
+            end = int(round(time.time() * 1000))
+            estimation_time = (end - start)
+            logger.info(f"step: {i} / {sample_len} {estimation_time} ms")
 
         if i == 0 and tokenizer.no_speech is not None:  # save no_speech_probs
             probs_at_sot = softmax(logits[:, sot_index], axis=-1)
@@ -796,11 +805,17 @@ def main():
         enc_net = onnxruntime.InferenceSession(WEIGHT_ENC_PATH)
         dec_net = onnxruntime.InferenceSession(WEIGHT_DEC_PATH)
 
+    if args.profile:
+        dec_net.set_profile_mode(True)
+
     if args.V:
         # microphone input mode
         recognize_from_microphone(enc_net, dec_net, mic_info)
     else:
         recognize_from_audio(enc_net, dec_net)
+
+    if args.profile:
+        print(dec_net.get_summary())
 
 
 if __name__ == '__main__':
