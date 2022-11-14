@@ -764,12 +764,16 @@ def main():
 
     WEIGHT_ENC_PATH, MODEL_ENC_PATH = model_info['enc']
     WEIGHT_DEC_PATH, MODEL_DEC_PATH = model_info['dec']
+
+    REMOTE_PATH_DEC = REMOTE_PATH
     if args.fix_kv_cache:
         WEIGHT_DEC_PATH = "fix_kv_cache/" + WEIGHT_DEC_PATH
         MODEL_DEC_PATH = "fix_kv_cache/" + MODEL_DEC_PATH
+        REMOTE_PATH_DEC = REMOTE_PATH + "fix_kv_cache/"
         os.makedirs("fix_kv_cache", exist_ok=True)
+
     check_and_download_models(WEIGHT_ENC_PATH, MODEL_ENC_PATH, REMOTE_PATH)
-    check_and_download_models(WEIGHT_DEC_PATH, MODEL_DEC_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_DEC_PATH, MODEL_DEC_PATH, REMOTE_PATH_DEC)
 
     mic_info = None
     if args.V:
