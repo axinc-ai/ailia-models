@@ -2,6 +2,8 @@ import queue
 import sys
 import time
 from collections import namedtuple
+import platform
+import os
 
 import numpy as np
 
@@ -113,9 +115,19 @@ parser.add_argument(
     help='execute onnxruntime version.'
 )
 parser.add_argument(
+    '--fix_kv_cache',
+    action='store_true',
+    help='execute fix_kv_cache version.'
+)
+parser.add_argument(
     '--debug',
     action='store_true',
     help='display progress.'
+)
+parser.add_argument(
+    '--profile',
+    action='store_true',
+    help='display profile.'
 )
 args = update_parser(parser)
 
@@ -210,7 +222,7 @@ def get_suppress_tokens(tokenizer, options):
     return tuple(sorted(set(suppress_tokens)))
 
 
-def new_kv_cache(n_group, length):
+def new_kv_cache(n_group, length=226):
     model_type = args.model_type
     if model_type == "tiny.en" or model_type == "tiny":
         size = [8, n_group, length, 384]
@@ -247,12 +259,21 @@ def inference_logits(dec_net, tokens, audio_features, kv_cache=None, initial_tok
     n_group = tokens.shape[0]
     initial_token_length = initial_token_length if initial_token_length else tokens.shape[-1]
     if kv_cache is None:
-        kv_cache = new_kv_cache(n_group, initial_token_length)
+        if args.fix_kv_cache:
+            kv_cache = new_kv_cache(n_group)
+        else:
+            kv_cache = new_kv_cache(n_group, initial_token_length)
         offset = 0
+        length = initial_token_length
     else:
         offset = kv_cache.shape[2]
-        _kv_cache = new_kv_cache(n_group, offset + 1)
-        _kv_cache[:, :, :-1, :] = kv_cache
+        if args.fix_kv_cache:
+            length = offset + 1
+            _kv_cache = new_kv_cache(n_group)
+            _kv_cache[:, :, :offset, :] = kv_cache
+        else:
+            _kv_cache = new_kv_cache(n_group, offset + 1)
+            _kv_cache[:, :, :-1, :] = kv_cache
         kv_cache = _kv_cache
 
     if tokens.shape[-1] > initial_token_length:
@@ -267,7 +288,7 @@ def inference_logits(dec_net, tokens, audio_features, kv_cache=None, initial_tok
             global WEIGHT_DEC_PATH, MODEL_DEC_PATH, SAVE_SHAPE
 
             shape = (tokens.shape, audio_features.shape)
-            if SAVE_SHAPE != shape:
+            if SAVE_SHAPE != shape or not args.fix_kv_cache:
                 dec_net = ailia.Net(MODEL_DEC_PATH, WEIGHT_DEC_PATH, env_id=args.env_id)
             SAVE_SHAPE = shape
 
@@ -279,7 +300,10 @@ def inference_logits(dec_net, tokens, audio_features, kv_cache=None, initial_tok
             'kv_cache': kv_cache, 'offset': offset})
     logits, kv_cache = output
 
-    return logits, kv_cache
+    if args.fix_kv_cache:
+        return logits, kv_cache[:, :, :length, :]
+    else:
+        return logits, kv_cache
 
 
 def detect_language(enc_net, dec_net, mel, tokenizer=None):
@@ -392,8 +416,12 @@ def decode(enc_net, dec_net, mel, options):
     # sampling loop
     for i in range(sample_len):
         if args.debug:
-            print(f"step: {i} / {sample_len}", flush=True)
+            start = int(round(time.time() * 1000))
         logits, kv_cache = inference_logits(dec_net, tokens, audio_features, kv_cache, initial_token_length)
+        if args.debug:
+            end = int(round(time.time() * 1000))
+            estimation_time = (end - start)
+            logger.info(f"step: {i} / {sample_len} {estimation_time} ms")
 
         if i == 0 and tokenizer.no_speech is not None:  # save no_speech_probs
             probs_at_sot = softmax(logits[:, sot_index], axis=-1)
@@ -742,10 +770,19 @@ def main():
         },
     }
     model_info = model_dic[args.model_type]
+
     WEIGHT_ENC_PATH, MODEL_ENC_PATH = model_info['enc']
     WEIGHT_DEC_PATH, MODEL_DEC_PATH = model_info['dec']
+
+    REMOTE_PATH_DEC = REMOTE_PATH
+    if args.fix_kv_cache:
+        WEIGHT_DEC_PATH = "fix_kv_cache/" + WEIGHT_DEC_PATH
+        MODEL_DEC_PATH = "fix_kv_cache/" + MODEL_DEC_PATH
+        REMOTE_PATH_DEC = REMOTE_PATH + "fix_kv_cache/"
+        os.makedirs("fix_kv_cache", exist_ok=True)
+
     check_and_download_models(WEIGHT_ENC_PATH, MODEL_ENC_PATH, REMOTE_PATH)
-    check_and_download_models(WEIGHT_DEC_PATH, MODEL_DEC_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_DEC_PATH, MODEL_DEC_PATH, REMOTE_PATH_DEC)
 
     mic_info = None
     if args.V:
@@ -753,6 +790,11 @@ def main():
         mic_info = start_microphone_input(SAMPLE_RATE, sc=False, speaker=False)
 
     env_id = args.env_id
+
+    pf = platform.system()
+    if pf == "Darwin":
+        logger.info("This model not optimized for gpu. So we will use BLAS (env_id = 1).")
+        env_id = 1
 
     # initialize
     if not args.onnx:
@@ -763,11 +805,17 @@ def main():
         enc_net = onnxruntime.InferenceSession(WEIGHT_ENC_PATH)
         dec_net = onnxruntime.InferenceSession(WEIGHT_DEC_PATH)
 
+    if args.profile:
+        dec_net.set_profile_mode(True)
+
     if args.V:
         # microphone input mode
         recognize_from_microphone(enc_net, dec_net, mic_info)
     else:
         recognize_from_audio(enc_net, dec_net)
+
+    if args.profile:
+        print(dec_net.get_summary())
 
 
 if __name__ == '__main__':
