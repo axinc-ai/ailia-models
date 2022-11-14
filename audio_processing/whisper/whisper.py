@@ -3,6 +3,7 @@ import sys
 import time
 from collections import namedtuple
 import platform
+import os
 
 import numpy as np
 
@@ -46,8 +47,7 @@ WEIGHT_ENC_MEDIUM_PATH = "encoder_medium.onnx"
 MODEL_ENC_MEDIUM_PATH = "encoder_medium.onnx.prototxt"
 WEIGHT_DEC_MEDIUM_PATH = "decoder_medium.onnx"
 MODEL_DEC_MEDIUM_PATH = "decoder_medium.onnx.prototxt"
-REMOTE_PATH_ENC = 'https://storage.googleapis.com/ailia-models/whisper/'
-REMOTE_PATH_DEC = 'https://storage.googleapis.com/ailia-models/whisper/fix_kv_cache/'
+REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/whisper/'
 
 WAV_PATH = 'demo.wav'
 SAVE_TEXT_PATH = 'output.txt'
@@ -113,6 +113,11 @@ parser.add_argument(
     '--onnx',
     action='store_true',
     help='execute onnxruntime version.'
+)
+parser.add_argument(
+    '--fix_kv_cache',
+    action='store_true',
+    help='execute fix_kv_cache version.'
 )
 parser.add_argument(
     '--debug',
@@ -249,14 +254,21 @@ def inference_logits(dec_net, tokens, audio_features, kv_cache=None, initial_tok
     n_group = tokens.shape[0]
     initial_token_length = initial_token_length if initial_token_length else tokens.shape[-1]
     if kv_cache is None:
-        kv_cache = new_kv_cache(n_group)
+        if args.fix_kv_cache:
+            kv_cache = new_kv_cache(n_group)
+        else:
+            kv_cache = new_kv_cache(n_group, initial_token_length)
         offset = 0
         length = initial_token_length
     else:
         offset = kv_cache.shape[2]
-        length = offset + 1
-        _kv_cache = new_kv_cache(n_group)
-        _kv_cache[:, :, :offset, :] = kv_cache
+        if args.fix_kv_cache:
+            length = offset + 1
+            _kv_cache = new_kv_cache(n_group)
+            _kv_cache[:, :, :offset, :] = kv_cache
+        else:
+            _kv_cache = new_kv_cache(n_group, offset + 1)
+            _kv_cache[:, :, :-1, :] = kv_cache
         kv_cache = _kv_cache
 
     if tokens.shape[-1] > initial_token_length:
@@ -283,7 +295,10 @@ def inference_logits(dec_net, tokens, audio_features, kv_cache=None, initial_tok
             'kv_cache': kv_cache, 'offset': offset})
     logits, kv_cache = output
 
-    return logits, kv_cache[:, :, :length, :]
+    if args.fix_kv_cache:
+        return logits, kv_cache[:, :, :length, :]
+    else:
+        return logits, kv_cache
 
 
 def detect_language(enc_net, dec_net, mel, tokenizer=None):
@@ -746,10 +761,15 @@ def main():
         },
     }
     model_info = model_dic[args.model_type]
+
     WEIGHT_ENC_PATH, MODEL_ENC_PATH = model_info['enc']
     WEIGHT_DEC_PATH, MODEL_DEC_PATH = model_info['dec']
-    check_and_download_models(WEIGHT_ENC_PATH, MODEL_ENC_PATH, REMOTE_PATH_ENC)
-    check_and_download_models(WEIGHT_DEC_PATH, MODEL_DEC_PATH, REMOTE_PATH_DEC)
+    if args.fix_kv_cache:
+        WEIGHT_DEC_PATH = "fix_kv_cache/" + WEIGHT_DEC_PATH
+        MODEL_DEC_PATH = "fix_kv_cache/" + MODEL_DEC_PATH
+        os.makedirs("fix_kv_cache", exist_ok=True)
+    check_and_download_models(WEIGHT_ENC_PATH, MODEL_ENC_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_DEC_PATH, MODEL_DEC_PATH, REMOTE_PATH)
 
     mic_info = None
     if args.V:
