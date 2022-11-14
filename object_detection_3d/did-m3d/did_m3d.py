@@ -29,7 +29,7 @@ SAVE_IMAGE_PATH = 'output.png'
 # ======================
 # Arguemnt Parser Config
 # ======================
-parser = get_base_parser('Depth estimation model', IMAGE_PATH, SAVE_IMAGE_PATH)
+parser = get_base_parser('did m3d model', IMAGE_PATH, SAVE_IMAGE_PATH)
 
 parser.add_argument('--config', type=str, default='kitti.yaml')
 parser.add_argument('--calib_path', type=str, default='000005.txt')
@@ -109,7 +109,7 @@ def didm3d_from_image():
 
 def main():
     # model files check and download
-    #check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
 
     # image mode
     didm3d_from_image()
