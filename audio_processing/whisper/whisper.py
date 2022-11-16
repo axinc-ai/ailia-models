@@ -72,7 +72,7 @@ parser.add_argument(
     help='use microphone input',
 )
 parser.add_argument(
-    '-m', '--model_type', default='small', choices=('tiny', 'base', 'small', 'medium'),
+    '-m', '--model_type', default='base', choices=('tiny', 'base', 'small', 'medium'),
     help='model type'
 )
 parser.add_argument(
