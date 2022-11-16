@@ -302,8 +302,8 @@ def inference_logits(dec_net, tokens, audio_features, kv_cache=None, initial_tok
         if REQUIRE_CONSTANT_SHAPE_BETWEEN_INFERENCE:
             global WEIGHT_DEC_PATH, MODEL_DEC_PATH, SAVE_SHAPE
 
-            shape = (tokens.shape, audio_features.shape)
-            if SAVE_SHAPE != shape or args.dynamic_kv_cache:
+            shape = (tokens.shape, audio_features.shape, kv_cache.shape)
+            if SAVE_SHAPE != shape:
                 dec_net = ailia.Net(MODEL_DEC_PATH, WEIGHT_DEC_PATH, env_id=args.env_id)
             SAVE_SHAPE = shape
 
