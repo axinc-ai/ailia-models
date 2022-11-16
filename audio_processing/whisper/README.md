@@ -1,4 +1,4 @@
-# Whisper
+# Whisper : Robust Speech Recognition via Large-Scale Weak Supervision
 
 ## Input
 
@@ -36,7 +36,7 @@ If you want to specify the audio, put the file path after the `--input` option.
 $ python3 whisper.py --input AUDIO_FILE
 ```
 
-By adding the `--model_type` option, you can specify model type which is selected from "tiny", "base", "small", "medium". (default is small)
+By adding the `--model_type` option, you can specify model type which is selected from "tiny", "base", "small", "medium". (default is base)
 ```bash
 $ python3 whisper.py --model_type small
 ```
@@ -68,10 +68,16 @@ ONNX opset=11
 ## Netron
 
 [encoder_tiny.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/whisper/encoder_tiny.onnx.prototxt)  
-[decoder_tiny.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/whisper/decoder_tiny.onnx.prototxt)  
 [encoder_base.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/whisper/encoder_base.onnx.prototxt)  
-[decoder_base.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/whisper/decoder_base.onnx.prototxt)  
 [encoder_small.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/whisper/encoder_small.onnx.prototxt)  
-[decoder_small.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/whisper/decoder_small.onnx.prototxt)  
 [encoder_medium.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/whisper/encoder_medium.onnx.prototxt)  
+
+[decoder_tiny.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/whisper/decoder_tiny.onnx.prototxt)  
+[decoder_base.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/whisper/decoder_base.onnx.prototxt)  
+[decoder_small.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/whisper/decoder_small.onnx.prototxt)  
 [decoder_medium.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/whisper/decoder_medium.onnx.prototxt)
+
+[decoder_tiny_fix_kv_cache.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/whisper/decoder_tiny_fix_kv_cache.onnx.prototxt)  
+[decoder_base_fix_kv_cache.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/whisper/decoder_base_fix_kv_cache.onnx.prototxt)  
+[decoder_small_fix_kv_cache.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/whisper/decoder_small_fix_kv_cache.onnx.prototxt)  
+[decoder_medium_fix_kv_cache.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/whisper/decoder_medium_fix_kv_cache.onnx.prototxt)

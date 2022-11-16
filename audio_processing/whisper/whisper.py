@@ -31,24 +31,6 @@ logger = getLogger(__name__)
 # Parameters
 # ======================
 
-WEIGHT_ENC_TINY_PATH = "encoder_tiny.onnx"
-MODEL_ENC_TINY_PATH = "encoder_tiny.onnx.prototxt"
-WEIGHT_DEC_TINY_PATH = "decoder_tiny.onnx"
-MODEL_DEC_TINY_PATH = "decoder_tiny.onnx.prototxt"
-WEIGHT_ENC_BASE_PATH = "encoder_base.onnx"
-MODEL_ENC_BASE_PATH = "encoder_base.onnx.prototxt"
-WEIGHT_DEC_BASE_PATH = "decoder_base.onnx"
-MODEL_DEC_BASE_PATH = "decoder_base.onnx.prototxt"
-WEIGHT_ENC_SMALL_PATH = "encoder_small.onnx"
-MODEL_ENC_SMALL_PATH = "encoder_small.onnx.prototxt"
-WEIGHT_DEC_SMALL_PATH = "decoder_small.onnx"
-MODEL_DEC_SMALL_PATH = "decoder_small.onnx.prototxt"
-WEIGHT_ENC_MEDIUM_PATH = "encoder_medium.onnx"
-MODEL_ENC_MEDIUM_PATH = "encoder_medium.onnx.prototxt"
-WEIGHT_DEC_MEDIUM_PATH = "decoder_medium.onnx"
-MODEL_DEC_MEDIUM_PATH = "decoder_medium.onnx.prototxt"
-REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/whisper/'
-
 WAV_PATH = 'demo.wav'
 SAVE_TEXT_PATH = 'output.txt'
 
@@ -56,8 +38,7 @@ SAVE_TEXT_PATH = 'output.txt'
 # Workaround
 # ======================
 
-# ailia SDK 1.2.13のAILIA UNSETTLED SHAPEの抑制、1.2.14では不要になる予定
-WORK_AROUND_FOR_AILIA_SDK_1_2_13 = True
+REQUIRE_CONSTANT_SHAPE_BETWEEN_INFERENCE = True # ailia SDK 1.2.13のAILIA UNSETTLED SHAPEの抑制、1.2.14では不要になる予定
 SAVE_SHAPE = ()
 
 # ======================
@@ -115,9 +96,9 @@ parser.add_argument(
     help='execute onnxruntime version.'
 )
 parser.add_argument(
-    '--fix_kv_cache',
+    '--dynamic_kv_cache',
     action='store_true',
-    help='execute fix_kv_cache version.'
+    help='execute dynamic kv_cache version.'
 )
 parser.add_argument(
     '--debug',
@@ -144,6 +125,40 @@ dims_dict = {
 }
 dims = dims_dict[args.model_type]
 
+# ======================
+# Models
+# ======================
+
+if not args.dynamic_kv_cache:
+    # 高速化のためKV_CACHEのサイズを最大サイズで固定化したバージョン
+    WEIGHT_DEC_TINY_PATH = "decoder_tiny_fix_kv_cache.onnx"
+    MODEL_DEC_TINY_PATH = "decoder_tiny_fix_kv_cache.onnx.prototxt"
+    WEIGHT_DEC_BASE_PATH = "decoder_base_fix_kv_cache.onnx"
+    MODEL_DEC_BASE_PATH = "decoder_base_fix_kv_cache.onnx.prototxt"
+    WEIGHT_DEC_SMALL_PATH = "decoder_small_fix_kv_cache.onnx"
+    MODEL_DEC_SMALL_PATH = "decoder_small_fix_kv_cache.onnx.prototxt"
+    WEIGHT_DEC_MEDIUM_PATH = "decoder_medium_fix_kv_cache.onnx"
+    MODEL_DEC_MEDIUM_PATH = "decoder_medium_fix_kv_cache.onnx.prototxt"
+else:
+    # KV_CACHEが推論ごとに変化するバージョン
+    WEIGHT_DEC_TINY_PATH = "decoder_tiny.onnx"
+    MODEL_DEC_TINY_PATH = "decoder_tiny.onnx.prototxt"
+    WEIGHT_DEC_BASE_PATH = "decoder_base.onnx"
+    MODEL_DEC_BASE_PATH = "decoder_base.onnx.prototxt"
+    WEIGHT_DEC_SMALL_PATH = "decoder_small.onnx"
+    MODEL_DEC_SMALL_PATH = "decoder_small.onnx.prototxt"
+    WEIGHT_DEC_MEDIUM_PATH = "decoder_medium.onnx"
+    MODEL_DEC_MEDIUM_PATH = "decoder_medium.onnx.prototxt"
+
+WEIGHT_ENC_TINY_PATH = "encoder_tiny.onnx"
+MODEL_ENC_TINY_PATH = "encoder_tiny.onnx.prototxt"
+WEIGHT_ENC_BASE_PATH = "encoder_base.onnx"
+MODEL_ENC_BASE_PATH = "encoder_base.onnx.prototxt"
+WEIGHT_ENC_SMALL_PATH = "encoder_small.onnx"
+MODEL_ENC_SMALL_PATH = "encoder_small.onnx.prototxt"
+WEIGHT_ENC_MEDIUM_PATH = "encoder_medium.onnx"
+MODEL_ENC_MEDIUM_PATH = "encoder_medium.onnx.prototxt"
+REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/whisper/'
 
 # ======================
 # Secondaty Functions
@@ -259,7 +274,7 @@ def inference_logits(dec_net, tokens, audio_features, kv_cache=None, initial_tok
     n_group = tokens.shape[0]
     initial_token_length = initial_token_length if initial_token_length else tokens.shape[-1]
     if kv_cache is None:
-        if args.fix_kv_cache:
+        if not args.dynamic_kv_cache:
             kv_cache = new_kv_cache(n_group)
         else:
             kv_cache = new_kv_cache(n_group, initial_token_length)
@@ -267,7 +282,7 @@ def inference_logits(dec_net, tokens, audio_features, kv_cache=None, initial_tok
         length = initial_token_length
     else:
         offset = kv_cache.shape[2]
-        if args.fix_kv_cache:
+        if not args.dynamic_kv_cache:
             length = offset + 1
             _kv_cache = new_kv_cache(n_group)
             _kv_cache[:, :, :offset, :] = kv_cache
@@ -284,11 +299,11 @@ def inference_logits(dec_net, tokens, audio_features, kv_cache=None, initial_tok
     offset = np.array(offset, dtype=np.int64)
 
     if not args.onnx:
-        if WORK_AROUND_FOR_AILIA_SDK_1_2_13:
+        if REQUIRE_CONSTANT_SHAPE_BETWEEN_INFERENCE:
             global WEIGHT_DEC_PATH, MODEL_DEC_PATH, SAVE_SHAPE
 
             shape = (tokens.shape, audio_features.shape)
-            if SAVE_SHAPE != shape or not args.fix_kv_cache:
+            if SAVE_SHAPE != shape or args.dynamic_kv_cache:
                 dec_net = ailia.Net(MODEL_DEC_PATH, WEIGHT_DEC_PATH, env_id=args.env_id)
             SAVE_SHAPE = shape
 
@@ -300,7 +315,7 @@ def inference_logits(dec_net, tokens, audio_features, kv_cache=None, initial_tok
             'kv_cache': kv_cache, 'offset': offset})
     logits, kv_cache = output
 
-    if args.fix_kv_cache:
+    if not args.dynamic_kv_cache:
         return logits, kv_cache[:, :, :length, :]
     else:
         return logits, kv_cache
@@ -773,16 +788,8 @@ def main():
 
     WEIGHT_ENC_PATH, MODEL_ENC_PATH = model_info['enc']
     WEIGHT_DEC_PATH, MODEL_DEC_PATH = model_info['dec']
-
-    REMOTE_PATH_DEC = REMOTE_PATH
-    if args.fix_kv_cache:
-        WEIGHT_DEC_PATH = "fix_kv_cache/" + WEIGHT_DEC_PATH
-        MODEL_DEC_PATH = "fix_kv_cache/" + MODEL_DEC_PATH
-        REMOTE_PATH_DEC = REMOTE_PATH + "fix_kv_cache/"
-        os.makedirs("fix_kv_cache", exist_ok=True)
-
     check_and_download_models(WEIGHT_ENC_PATH, MODEL_ENC_PATH, REMOTE_PATH)
-    check_and_download_models(WEIGHT_DEC_PATH, MODEL_DEC_PATH, REMOTE_PATH_DEC)
+    check_and_download_models(WEIGHT_DEC_PATH, MODEL_DEC_PATH, REMOTE_PATH)
 
     mic_info = None
     if args.V:
@@ -793,7 +800,7 @@ def main():
 
     pf = platform.system()
     if pf == "Darwin":
-        logger.info("This model not optimized for gpu. So we will use BLAS (env_id = 1).")
+        logger.info("This model not optimized for macOS GPU currently. So we will use BLAS (env_id = 1).")
         env_id = 1
 
     # initialize
