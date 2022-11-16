@@ -798,8 +798,11 @@ def main():
 
     # initialize
     if not args.onnx:
-        enc_net = ailia.Net(MODEL_ENC_PATH, WEIGHT_ENC_PATH, env_id=env_id)
-        dec_net = ailia.Net(MODEL_DEC_PATH, WEIGHT_DEC_PATH, env_id=env_id)
+        memory_mode = ailia.get_memory_mode(
+            reduce_constant=True, ignore_input_with_initializer=True,
+            reduce_interstage=False, reuse_interstage=True)
+        enc_net = ailia.Net(MODEL_ENC_PATH, WEIGHT_ENC_PATH, env_id=env_id, memory_mode=memory_mode)
+        dec_net = ailia.Net(MODEL_DEC_PATH, WEIGHT_DEC_PATH, env_id=env_id, memory_mode=memory_mode)
     else:
         import onnxruntime
         enc_net = onnxruntime.InferenceSession(WEIGHT_ENC_PATH)
