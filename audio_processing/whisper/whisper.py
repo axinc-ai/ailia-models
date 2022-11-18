@@ -237,7 +237,7 @@ def get_suppress_tokens(tokenizer, options):
     return tuple(sorted(set(suppress_tokens)))
 
 
-def new_kv_cache(n_group, length=226):
+def new_kv_cache(n_group, length=451):
     model_type = args.model_type
     if model_type == "tiny.en" or model_type == "tiny":
         size = [8, n_group, length, 384]
