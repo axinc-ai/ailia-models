@@ -43,6 +43,7 @@ The collection of pre-trained, state-of-the-art AI models.
 | [transformer-cnn-emotion-recognition](/audio_processing/transformer-cnn-emotion-recognition/) | [Combining Spatial and Temporal Feature Representions of Speech Emotion by Parallelizing CNNs and Transformer-Encoders](https://github.com/IliaZenkov/transformer-cnn-emotion-recognition)  | Pytorch | 1.2.5 and later |
 | [auto_speech](/audio_processing/auto_speech/) | [AutoSpeech: Neural Architecture Search for Speaker Recognition](https://github.com/VITA-Group/AutoSpeech)  | Pytorch | 1.2.5 and later | [EN](https://medium.com/axinc-ai/autospeech-speech-based-person-identification-model-f01822f6d8e5) [JP](https://medium.com/axinc/autospeech-%E9%9F%B3%E5%A3%B0%E3%81%AB%E3%82%88%E3%82%8B%E5%80%8B%E4%BA%BA%E8%AD%98%E5%88%A5%E3%83%A2%E3%83%87%E3%83%AB-267a00f26a4a) |
 | [voicefilter](/audio_processing/voicefilter/) | [VoiceFilter](https://github.com/mindslab-ai/voicefilter)  | Pytorch | 1.2.7 and later | [JP](https://medium.com/axinc/voicefilter-%E4%BB%BB%E6%84%8F%E3%81%AE%E4%BA%BA%E7%89%A9%E3%81%AE%E5%A3%B0%E3%82%92%E6%8A%BD%E5%87%BA%E3%81%A7%E3%81%8D%E3%82%8B%E9%9F%B3%E5%A3%B0%E5%88%86%E9%9B%A2%E3%83%A2%E3%83%87%E3%83%AB-d5b88a8549d9) |
+| [whisper](/audio_processing/whisper/) | [Whisper](https://github.com/openai/whisper) | Pytorch | 1.2.10 and later | |
 
 ## Background removal
 
