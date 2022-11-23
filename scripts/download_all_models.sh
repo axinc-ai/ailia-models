@@ -15,6 +15,7 @@ cd ../../audio_processing/unet_source_separation/; python3 unet_source_separatio
 cd ../../audio_processing/transformer-cnn-emotion-recognition/; python3 transformer-cnn-emotion-recognition.py ${OPTION}
 cd ../../audio_processing/auto_speech/; python3 auto_speech.py ${OPTION}
 cd ../../audio_processing/voicefilter/; python3 voicefilter.py ${OPTION}
+cd ../../audio_processing/whisper/; python3 whisper.py ${OPTION}
 cd ../../background_ramoval/deep-image-matting; python3 deep-image-matting.py ${OPTION}
 cd ../../background_ramoval/u2net; python3 u2net.py ${OPTION}
 cd ../../background_ramoval/u2net; python3 u2net.py -a small ${OPTION}
