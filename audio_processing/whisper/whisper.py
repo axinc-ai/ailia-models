@@ -800,8 +800,10 @@ def main():
 
     pf = platform.system()
     if pf == "Darwin":
-        logger.info("This model not optimized for macOS GPU currently. So we will use BLAS (env_id = 1).")
-        env_id = 1
+        logger.info("This model not optimized for macOS GPU currently. So we will use CPU (env_id = 0).")
+        env_id = 0
+    else:
+        logger.info("This model uses a lot of memory. If an error occurs during execution, specify -e 0 and execute on the CPU.")
 
     # initialize
     if not args.onnx:
