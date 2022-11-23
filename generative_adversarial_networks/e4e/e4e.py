@@ -1,9 +1,9 @@
 import sys
+import os
 import time
 
 import numpy as np
 import cv2
-from PIL import Image
 
 import ailia
 
@@ -27,10 +27,26 @@ WEIGHT_FFHQ_ENC_PATH = "ffhq_encoder.onnx"
 MODEL_FFHQ_ENC_PATH = "ffhq_encoder.onnx.prototxt"
 WEIGHT_FFHQ_DEC_PATH = "ffhq_decoder.onnx"
 MODEL_FFHQ_DEC_PATH = "ffhq_decoder.onnx.prototxt"
+WEIGHT_CAR_ENC_PATH = "cars_encoder.onnx"
+MODEL_CAR_ENC_PATH = "cars_encoder.onnx.prototxt"
+WEIGHT_CAR_DEC_PATH = "cars_decoder.onnx"
+MODEL_CAR_DEC_PATH = "cars_decoder.onnx.prototxt"
+WEIGHT_HORSE_ENC_PATH = "horse_encoder.onnx"
+MODEL_HORSE_ENC_PATH = "horse_encoder.onnx.prototxt"
+WEIGHT_HORSE_DEC_PATH = "horse_decoder.onnx"
+MODEL_HORSE_DEC_PATH = "horse_decoder.onnx.prototxt"
+WEIGHT_CHURCH_ENC_PATH = "church_encoder.onnx"
+MODEL_CHURCH_ENC_PATH = "church_encoder.onnx.prototxt"
+WEIGHT_CHURCH_DEC_PATH = "church_decoder.onnx"
+MODEL_CHURCH_DEC_PATH = "church_decoder.onnx.prototxt"
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/e4e/'
 
 IMAGE_PATH = 'demo.png'
 SAVE_IMAGE_PATH = 'output.png'
+
+p = os.path.os.path.dirname(os.path.abspath(__file__))
+FFHQ_PCA = os.path.join(p, 'editings/ganspace_pca/ffhq_pca.npy')
+CARS_PCA = os.path.join(p, 'editings/ganspace_pca/cars_pca.npy')
 
 # ======================
 # Arguemnt Parser Config
@@ -38,6 +54,10 @@ SAVE_IMAGE_PATH = 'output.png'
 
 parser = get_base_parser(
     'Encoder for StyleGAN Image Manipulation', IMAGE_PATH, SAVE_IMAGE_PATH
+)
+parser.add_argument(
+    '-m', '--model_type', default='ffhq', choices=('ffhq', 'car', 'horse', 'church'),
+    help='model type'
 )
 parser.add_argument(
     '--age_factor', default=None, type=int,
@@ -84,44 +104,38 @@ parser.add_argument(
     help='GANSpace: lipstick: The larger the value, the darker the color.'
 )
 parser.add_argument(
+    '--car_view1', default=None, type=int,
+    help='GANSpace: Viewpoint I'
+)
+parser.add_argument(
+    '--car_view2', default=None, type=int,
+    help='GANSpace: Viewpoint II'
+)
+parser.add_argument(
+    '--car_cube', default=None, type=int,
+    help='GANSpace: Cube'
+)
+parser.add_argument(
+    '--car_color', default=None, type=int,
+    help='GANSpace: Color'
+)
+parser.add_argument(
+    '--car_grass', default=None, type=int,
+    help='GANSpace: Grass'
+)
+parser.add_argument(
     '--onnx',
     action='store_true',
     help='execute onnxruntime version.'
 )
 args = update_parser(parser)
 
+model_type = args.model_type
+
 
 # ======================
-# Main functions
+# Secondaty Functions
 # ======================
-
-def preprocess(img):
-    img = img[:, :, ::-1]  # BGR -> RGB
-
-    ow = oh = 256
-    # img = cv2.resize(img, (ow, oh), interpolation=cv2.INTER_LINEAR)
-    img = np.array(Image.fromarray(img).resize((ow, oh), Image.Resampling.BILINEAR))
-    img = normalize_image(img, normalize_type='127.5')
-
-    img = img.transpose(2, 0, 1)  # HWC -> CHW
-    img = np.expand_dims(img, axis=0)
-    img = img.astype(np.float32)
-
-    return img
-
-
-def post_processing(pred):
-    img = pred[0]
-    img = img.transpose(1, 2, 0)  # CHW -> HWC
-    img = img[:, :, ::-1]  # RGB -> BGR
-
-    img = (img + 1) / 2
-    img = np.clip(img, 0, 1)
-    img = img * 255
-    img = img.astype(np.uint8)
-
-    return img
-
 
 def apply_interfacegan(latent, direction, factor=1, factor_range=None):
     edit_latents = []
@@ -160,19 +174,7 @@ def apply_ganspace(latents, pca, edit_directions):
     return edit_latents
 
 
-def predict(models, img):
-    net_enc = models["enc"]
-    net_dec = models["dec"]
-
-    img = preprocess(img)
-
-    # feedforward
-    if not args.onnx:
-        output = net_enc.predict([img])
-    else:
-        output = net_enc.run(None, {'x': img})
-    latents = output[0]
-
+def edit_ffhq(latents, models):
     age_factor = args.age_factor
     age_range = args.age_range
     smile_factor = args.smile_factor
@@ -185,6 +187,7 @@ def predict(models, img):
     white_hair = args.white_hair
     lipstick = args.lipstick
 
+    edit_latents = [latents]
     if age_factor or age_range:
         interfacegan_direction = models['interfacegan_direction'] = \
             models.get('interfacegan_direction', np.load("editings/interfacegan_directions/age.npy"))
@@ -208,7 +211,7 @@ def predict(models, img):
             edit_latents = apply_interfacegan(latents, interfacegan_direction, factor=pose_factor)
     elif eye_openness or smile or trimmed_beard or white_hair or lipstick:
         ganspace_pca = models['ganspace_pca'] = \
-            models.get('ganspace_pca', np.load("editings/ganspace_pca/ffhq_pca.npy", allow_pickle=True).item())
+            models.get('ganspace_pca', np.load(FFHQ_PCA, allow_pickle=True).item())
 
         directions = {
             'eye_openness': (54, 7, 8, eye_openness),
@@ -219,8 +222,87 @@ def predict(models, img):
         }
         directions = [v for k, v in directions.items() if v[3]]
         edit_latents = apply_ganspace(latents, ganspace_pca, directions)
+
+    return edit_latents
+
+
+def edit_cars(latents, models):
+    car_view1 = args.car_view1
+    car_view2 = args.car_view2
+    car_cube = args.car_cube
+    car_color = args.car_color
+    car_grass = args.car_grass
+
+    edit_latents = [latents]
+    if car_view1 or car_view2 or car_cube or car_color or car_grass:
+        ganspace_pca = models['ganspace_pca'] = \
+            models.get('ganspace_pca', np.load(CARS_PCA, allow_pickle=True).item())
+
+        directions = {
+            "viewpoint_1": (0, 0, 5, car_view1),
+            "viewpoint_2": (0, 0, 5, car_view2),
+            "cube": (16, 3, 6, car_cube),
+            "color": (22, 9, 11, car_color),
+            "grass": (41, 9, 11, car_grass),
+        }
+        directions = [v for k, v in directions.items() if v[3]]
+        edit_latents = apply_ganspace(latents, ganspace_pca, directions)
+
+    return edit_latents
+
+
+# ======================
+# Main functions
+# ======================
+
+def preprocess(img):
+    img = img[:, :, ::-1]  # BGR -> RGB
+
+    ow = oh = 256
+    if model_type == 'car':
+        oh = 192
+
+    img = cv2.resize(img, (ow, oh), interpolation=cv2.INTER_LINEAR)
+    img = normalize_image(img, normalize_type='127.5')
+
+    img = img.transpose(2, 0, 1)  # HWC -> CHW
+    img = np.expand_dims(img, axis=0)
+    img = img.astype(np.float32)
+
+    return img
+
+
+def post_processing(pred):
+    img = pred[0]
+    img = img.transpose(1, 2, 0)  # CHW -> HWC
+    img = img[:, :, ::-1]  # RGB -> BGR
+
+    img = (img + 1) / 2
+    img = np.clip(img, 0, 1)
+    img = img * 255
+    img = img.astype(np.uint8)
+
+    return img
+
+
+def predict(models, img):
+    net_enc = models["enc"]
+    net_dec = models["dec"]
+
+    img = preprocess(img)
+
+    # feedforward
+    if not args.onnx:
+        output = net_enc.predict([img])
     else:
-        edit_latents = [latents]
+        output = net_enc.run(None, {'x': img})
+    latents = output[0]
+
+    edit_latents = [latents]
+    if model_type == 'ffhq':
+        edit_latents = edit_ffhq(latents, models)
+    elif model_type == 'car':
+        edit_latents = edit_cars(latents, models)
 
     preds = []
     for latent in edit_latents:
@@ -229,6 +311,10 @@ def predict(models, img):
         else:
             output = net_dec.run(None, {'latent': latent})
         pred = output[0]
+
+        if model_type == 'car':
+            pred = pred[:, :, 64:448, :]  # 512x512 -> 384x512
+
         preds.append(pred)
 
     imgs = [post_processing(pred) for pred in preds]
@@ -316,10 +402,28 @@ def recognize_from_video(models):
 
 
 def main():
-    WEIGHT_ENC_PATH = WEIGHT_FFHQ_ENC_PATH
-    MODEL_ENC_PATH = MODEL_FFHQ_ENC_PATH
-    WEIGHT_DEC_PATH = WEIGHT_FFHQ_DEC_PATH
-    MODEL_DEC_PATH = MODEL_FFHQ_DEC_PATH
+    dic_model = {
+        'ffhq': {
+            'enc': (WEIGHT_FFHQ_ENC_PATH, MODEL_FFHQ_ENC_PATH),
+            'dec': (WEIGHT_FFHQ_DEC_PATH, MODEL_FFHQ_DEC_PATH)
+        },
+        'car': {
+            'enc': (WEIGHT_CAR_ENC_PATH, MODEL_CAR_ENC_PATH),
+            'dec': (WEIGHT_CAR_DEC_PATH, MODEL_CAR_DEC_PATH)
+        },
+        'horse': {
+            'enc': (WEIGHT_HORSE_ENC_PATH, MODEL_HORSE_ENC_PATH),
+            'dec': (WEIGHT_HORSE_DEC_PATH, MODEL_HORSE_DEC_PATH)
+        },
+        'church': {
+            'enc': (WEIGHT_CHURCH_ENC_PATH, MODEL_CHURCH_ENC_PATH),
+            'dec': (WEIGHT_CHURCH_DEC_PATH, MODEL_CHURCH_DEC_PATH)
+        },
+    }
+    info = dic_model[model_type]
+    WEIGHT_ENC_PATH, MODEL_ENC_PATH = info['enc']
+    WEIGHT_DEC_PATH, MODEL_DEC_PATH = info['dec']
+
     # model files check and download
     check_and_download_models(WEIGHT_ENC_PATH, MODEL_ENC_PATH, REMOTE_PATH)
     check_and_download_models(WEIGHT_DEC_PATH, MODEL_DEC_PATH, REMOTE_PATH)
