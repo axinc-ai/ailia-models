@@ -48,6 +48,22 @@ parser.add_argument(
     help='InterFaceGAN: age-range'
 )
 parser.add_argument(
+    '--smile_factor', default=None, type=int,
+    help='InterFaceGAN: smile-factor'
+)
+parser.add_argument(
+    '--smile_range', default=None, type=int, nargs='+',
+    help='InterFaceGAN: smile-range'
+)
+parser.add_argument(
+    '--pose_factor', default=None, type=int,
+    help='InterFaceGAN: pose-factor'
+)
+parser.add_argument(
+    '--pose_range', default=None, type=int, nargs='+',
+    help='InterFaceGAN: pose-range'
+)
+parser.add_argument(
     '--eye_openness', default=None, type=int,
     help='GANSpace: eye_openness: The larger the value, the more closes.'
 )
@@ -65,7 +81,7 @@ parser.add_argument(
 )
 parser.add_argument(
     '--lipstick', default=None, type=int,
-    help='GANSpace: lipstick'
+    help='GANSpace: lipstick: The larger the value, the darker the color.'
 )
 parser.add_argument(
     '--onnx',
@@ -159,6 +175,10 @@ def predict(models, img):
 
     age_factor = args.age_factor
     age_range = args.age_range
+    smile_factor = args.smile_factor
+    smile_range = args.smile_range
+    pose_factor = args.pose_factor
+    pose_range = args.pose_range
     eye_openness = args.eye_openness
     smile = args.smile
     trimmed_beard = args.trimmed_beard
@@ -168,11 +188,24 @@ def predict(models, img):
     if age_factor or age_range:
         interfacegan_direction = models['interfacegan_direction'] = \
             models.get('interfacegan_direction', np.load("editings/interfacegan_directions/age.npy"))
-
         if age_range:
             edit_latents = apply_interfacegan(latents, interfacegan_direction, factor_range=age_range)
         else:
             edit_latents = apply_interfacegan(latents, interfacegan_direction, factor=age_factor)
+    elif smile_factor or smile_range:
+        interfacegan_direction = models['interfacegan_direction'] = \
+            models.get('interfacegan_direction', np.load("editings/interfacegan_directions/smile.npy"))
+        if smile_range:
+            edit_latents = apply_interfacegan(latents, interfacegan_direction, factor_range=smile_range)
+        else:
+            edit_latents = apply_interfacegan(latents, interfacegan_direction, factor=smile_factor)
+    elif pose_factor or pose_range:
+        interfacegan_direction = models['interfacegan_direction'] = \
+            models.get('interfacegan_direction', np.load("editings/interfacegan_directions/pose.npy"))
+        if pose_range:
+            edit_latents = apply_interfacegan(latents, interfacegan_direction, factor_range=pose_range)
+        else:
+            edit_latents = apply_interfacegan(latents, interfacegan_direction, factor=pose_factor)
     elif eye_openness or smile or trimmed_beard or white_hair or lipstick:
         ganspace_pca = models['ganspace_pca'] = \
             models.get('ganspace_pca', np.load("editings/ganspace_pca/ffhq_pca.npy", allow_pickle=True).item())
