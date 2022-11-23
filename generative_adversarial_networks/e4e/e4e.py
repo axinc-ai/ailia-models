@@ -4,6 +4,7 @@ import time
 
 import numpy as np
 import cv2
+from tqdm import tqdm
 
 import ailia
 
@@ -122,6 +123,22 @@ parser.add_argument(
 parser.add_argument(
     '--car_grass', default=None, type=int,
     help='GANSpace: Grass'
+)
+parser.add_argument(
+    '--indices', default=None, type=str, nargs='+',
+    help='SeFa: indices'
+)
+parser.add_argument(
+    '--start_distance', default=0, type=float,
+    help='SeFa: start_distance'
+)
+parser.add_argument(
+    '--end_distance', default=15, type=float,
+    help='SeFa: end_distance'
+)
+parser.add_argument(
+    '--step', default=3, type=int,
+    help='SeFa: step'
 )
 parser.add_argument(
     '--onnx',
@@ -251,6 +268,76 @@ def edit_cars(latents, models):
     return edit_latents
 
 
+def apply_sefa(
+        net, latents, indices=[2, 3, 4, 5],
+        semantics=1, start_distance=-15.0, end_distance=15.0, num_samples=1, step=11):
+    layers, boundaries, values = factorize_weight(net, indices)
+    codes = latents  # (1,18,512)
+
+    # Generate visualization pages.
+    distances = np.linspace(start_distance, end_distance, step)
+    num_sam = num_samples
+    num_sem = semantics
+
+    edited_latents = []
+    for sem_id in tqdm(range(num_sem), desc='Semantic ', leave=False):
+        boundary = boundaries[sem_id:sem_id + 1]
+        for sam_id in tqdm(range(num_sam), desc='Sample ', leave=False):
+            code = codes[sam_id:sam_id + 1]
+            for col_id, d in enumerate(distances, start=1):
+                edit_latent = code.copy()
+                edit_latent[:, layers, :] += boundary * d
+                edited_latents.append(edit_latent)
+
+    return edited_latents
+
+
+def factorize_weight(net, layers='all'):
+    name = [
+        "onnx::Gemm_3698",
+        "onnx::Gemm_3758",
+        "onnx::Gemm_3831",
+        "onnx::Gemm_3934",
+        "onnx::Gemm_4007",
+        "onnx::Gemm_4095",
+        "onnx::Gemm_4168",
+        "onnx::Gemm_4256",
+        "onnx::Gemm_4329",
+        "onnx::Gemm_4417",
+        "onnx::Gemm_4490",
+        "onnx::Gemm_4578",
+        "onnx::Gemm_4651",
+        "onnx::Gemm_4739",
+        "onnx::Gemm_4812",
+        "onnx::Gemm_4900",
+        "onnx::Gemm_4973",
+    ]
+    net.predict([np.zeros((1, 16, 512))])
+
+    log_size = 10
+    num_layers = (log_size - 2) * 2 + 1
+
+    weights = []
+    if layers == 'all' or 0 in layers:
+        weight = net.get_blob_data(name[0]) / np.sqrt(512)
+        weights.append(weight.T)
+
+    if layers == 'all':
+        layers = range(num_layers - 1)
+    else:
+        layers = [l - 1 for l in layers if l != 0]
+
+    for idx in layers:
+        weight = net.get_blob_data(name[idx + 1]) / np.sqrt(512)
+        weights.append(weight.T)
+
+    weight = np.concatenate(weights, axis=1).astype(np.float32)
+    weight = weight / np.linalg.norm(weight, axis=0, keepdims=True)
+    eigen_values, eigen_vectors = np.linalg.eig(weight.dot(weight.T))
+
+    return layers, eigen_vectors.T, eigen_values
+
+
 # ======================
 # Main functions
 # ======================
@@ -298,8 +385,21 @@ def predict(models, img):
         output = net_enc.run(None, {'x': img})
     latents = output[0]
 
+    indices = args.indices
+    start_distance = args.start_distance
+    end_distance = args.end_distance
+    step = args.step
+
     edit_latents = [latents]
-    if model_type == 'ffhq':
+    if indices:
+        indices = indices[0] \
+            if len(indices) == 1 and isinstance(indices[0], str) \
+            else [int(i) for i in indices]
+
+        edit_latents = apply_sefa(
+            net_dec, latents, indices=indices,
+            start_distance=start_distance, end_distance=end_distance, step=step)
+    elif model_type == 'ffhq':
         edit_latents = edit_ffhq(latents, models)
     elif model_type == 'car':
         edit_latents = edit_cars(latents, models)
