@@ -66,7 +66,7 @@ parser.add_argument(
     "--best_of", type=float, default=5,
     help="number of candidates when sampling with non-zero temperature")
 parser.add_argument(
-    "--beam_size", type=int, default=5,
+    "--beam_size", type=int, default=3,
     help="number of beams in beam search, only applicable when temperature is zero")
 parser.add_argument(
     "--patience", type=float, default=None,
