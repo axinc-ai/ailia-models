@@ -796,12 +796,10 @@ def main():
         # in microphone input mode, start thread before load the model.
         mic_info = start_microphone_input(SAMPLE_RATE, sc=False, speaker=False)
 
-    env_id = args.env_id
-
     pf = platform.system()
     if pf == "Darwin":
-        logger.info("This model not optimized for macOS GPU currently. So we will use CPU (env_id = 0).")
-        env_id = 0
+        logger.info("This model not optimized for macOS GPU currently. So we will use BLAS (env_id = 1).")
+        args.env_id = 1
     else:
         logger.info("This model uses a lot of memory. If an error occurs during execution, specify -e 0 and execute on the CPU.")
 
@@ -810,8 +808,8 @@ def main():
         memory_mode = ailia.get_memory_mode(
             reduce_constant=True, ignore_input_with_initializer=True,
             reduce_interstage=False, reuse_interstage=True)
-        enc_net = ailia.Net(MODEL_ENC_PATH, WEIGHT_ENC_PATH, env_id=env_id, memory_mode=memory_mode)
-        dec_net = ailia.Net(MODEL_DEC_PATH, WEIGHT_DEC_PATH, env_id=env_id, memory_mode=memory_mode)
+        enc_net = ailia.Net(MODEL_ENC_PATH, WEIGHT_ENC_PATH, env_id=args.env_id, memory_mode=memory_mode)
+        dec_net = ailia.Net(MODEL_DEC_PATH, WEIGHT_DEC_PATH, env_id=args.env_id, memory_mode=memory_mode)
     else:
         import onnxruntime
         enc_net = onnxruntime.InferenceSession(WEIGHT_ENC_PATH)
