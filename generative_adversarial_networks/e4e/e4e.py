@@ -295,79 +295,79 @@ def apply_sefa(
 def factorize_weight(net, layers='all'):
     if model_type == 'ffhq':
         nodes = [
-            "onnx::Gemm_3698",  # /conv1/conv/modulation
-            "onnx::Gemm_3758",  # /convs.0/conv/modulation
-            "onnx::Gemm_3831",  # /convs.1/conv/modulation
-            "onnx::Gemm_3934",  # /convs.2/conv/modulation
-            "onnx::Gemm_4007",  # /convs.3/conv/modulation
-            "onnx::Gemm_4095",  # /convs.4/conv/modulation
-            "onnx::Gemm_4168",  # /convs.5/conv/modulation
-            "onnx::Gemm_4256",  # /convs.6/conv/modulation
-            "onnx::Gemm_4329",  # /convs.7/conv/modulation
-            "onnx::Gemm_4417",  # /convs.8/conv/modulation
-            "onnx::Gemm_4490",  # /convs.9/conv/modulation
-            "onnx::Gemm_4578",  # /convs.10/conv/modulation
-            "onnx::Gemm_4651",  # /convs.11/conv/modulation
-            "onnx::Gemm_4739",  # /convs.12/conv/modulation
-            "onnx::Gemm_4812",  # /convs.13/conv/modulation
-            "onnx::Gemm_4900",  # /convs.14/conv/modulation
-            "onnx::Gemm_4973",  # /convs.15/conv/modulation
+            "onnx::Gemm_3698",  # /conv1/conv/modulation.weight
+            "onnx::Gemm_3758",  # /convs.0/conv/modulation.weight
+            "onnx::Gemm_3831",  # /convs.1/conv/modulation.weight
+            "onnx::Gemm_3934",  # /convs.2/conv/modulation.weight
+            "onnx::Gemm_4007",  # /convs.3/conv/modulation.weight
+            "onnx::Gemm_4095",  # /convs.4/conv/modulation.weight
+            "onnx::Gemm_4168",  # /convs.5/conv/modulation.weight
+            "onnx::Gemm_4256",  # /convs.6/conv/modulation.weight
+            "onnx::Gemm_4329",  # /convs.7/conv/modulation.weight
+            "onnx::Gemm_4417",  # /convs.8/conv/modulation.weight
+            "onnx::Gemm_4490",  # /convs.9/conv/modulation.weight
+            "onnx::Gemm_4578",  # /convs.10/conv/modulation.weight
+            "onnx::Gemm_4651",  # /convs.11/conv/modulation.weight
+            "onnx::Gemm_4739",  # /convs.12/conv/modulation.weight
+            "onnx::Gemm_4812",  # /convs.13/conv/modulation.weight
+            "onnx::Gemm_4900",  # /convs.14/conv/modulation.weight
+            "onnx::Gemm_4973",  # /convs.15/conv/modulation.weight
         ]
         depth = 16
         log_size = 10
     elif model_type == 'car':
         nodes = [
-            "onnx::Gemm_3254",  # /conv1/conv/modulation
-            "onnx::Gemm_3314",  # /convs.0/conv/modulation
-            "onnx::Gemm_3387",  # /convs.1/conv/modulation
-            "onnx::Gemm_3490",  # /convs.2/conv/modulation
-            "onnx::Gemm_3563",  # /convs.3/conv/modulation
-            "onnx::Gemm_3651",  # /convs.4/conv/modulation
-            "onnx::Gemm_3724",  # /convs.5/conv/modulation
-            "onnx::Gemm_3812",  # /convs.6/conv/modulation
-            "onnx::Gemm_3885",  # /convs.7/conv/modulation
-            "onnx::Gemm_3973",  # /convs.8/conv/modulation
-            "onnx::Gemm_4046",  # /convs.9/conv/modulation
-            "onnx::Gemm_4134",  # /convs.10/conv/modulation
-            "onnx::Gemm_4207",  # /convs.11/conv/modulation
-            "onnx::Gemm_4295",  # /convs.12/conv/modulation
-            "onnx::Gemm_4368",  # /convs.13/conv/modulation
+            "onnx::Gemm_3254",  # /conv1/conv/modulation.weight
+            "onnx::Gemm_3314",  # /convs.0/conv/modulation.weight
+            "onnx::Gemm_3387",  # /convs.1/conv/modulation.weight
+            "onnx::Gemm_3490",  # /convs.2/conv/modulation.weight
+            "onnx::Gemm_3563",  # /convs.3/conv/modulation.weight
+            "onnx::Gemm_3651",  # /convs.4/conv/modulation.weight
+            "onnx::Gemm_3724",  # /convs.5/conv/modulation.weight
+            "onnx::Gemm_3812",  # /convs.6/conv/modulation.weight
+            "onnx::Gemm_3885",  # /convs.7/conv/modulation.weight
+            "onnx::Gemm_3973",  # /convs.8/conv/modulation.weight
+            "onnx::Gemm_4046",  # /convs.9/conv/modulation.weight
+            "onnx::Gemm_4134",  # /convs.10/conv/modulation.weight
+            "onnx::Gemm_4207",  # /convs.11/conv/modulation.weight
+            "onnx::Gemm_4295",  # /convs.12/conv/modulation.weight
+            "onnx::Gemm_4368",  # /convs.13/conv/modulation.weight
         ]
         depth = 16
         log_size = 9
     elif model_type == 'horse':
         nodes = [
-            "onnx::Gemm_2810",  # /conv1/conv/modulation
-            "onnx::Gemm_2870",  # /convs.0/conv/modulation
-            "onnx::Gemm_2943",  # /convs.1/conv/modulation
-            "onnx::Gemm_3046",  # /convs.2/conv/modulation
-            "onnx::Gemm_3119",  # /convs.3/conv/modulation
-            "onnx::Gemm_3207",  # /convs.4/conv/modulation
-            "onnx::Gemm_3280",  # /convs.5/conv/modulation
-            "onnx::Gemm_3368",  # /convs.6/conv/modulation
-            "onnx::Gemm_3441",  # /convs.7/conv/modulation
-            "onnx::Gemm_3529",  # /convs.8/conv/modulation
-            "onnx::Gemm_3602",  # /convs.9/conv/modulation
-            "onnx::Gemm_3690",  # /convs.10/conv/modulation
-            "onnx::Gemm_3763",  # /convs.11/conv/modulation
+            "onnx::Gemm_2810",  # /conv1/conv/modulation.weight
+            "onnx::Gemm_2870",  # /convs.0/conv/modulation.weight
+            "onnx::Gemm_2943",  # /convs.1/conv/modulation.weight
+            "onnx::Gemm_3046",  # /convs.2/conv/modulation.weight
+            "onnx::Gemm_3119",  # /convs.3/conv/modulation.weight
+            "onnx::Gemm_3207",  # /convs.4/conv/modulation.weight
+            "onnx::Gemm_3280",  # /convs.5/conv/modulation.weight
+            "onnx::Gemm_3368",  # /convs.6/conv/modulation.weight
+            "onnx::Gemm_3441",  # /convs.7/conv/modulation.weight
+            "onnx::Gemm_3529",  # /convs.8/conv/modulation.weight
+            "onnx::Gemm_3602",  # /convs.9/conv/modulation.weight
+            "onnx::Gemm_3690",  # /convs.10/conv/modulation.weight
+            "onnx::Gemm_3763",  # /convs.11/conv/modulation.weight
         ]
         depth = 14
         log_size = 8
     elif model_type == 'church':
         nodes = [
-            "onnx::Gemm_2810",  # /conv1/conv/modulation
-            "onnx::Gemm_2870",  # /convs.0/conv/modulation
-            "onnx::Gemm_2943",  # /convs.1/conv/modulation
-            "onnx::Gemm_3046",  # /convs.2/conv/modulation
-            "onnx::Gemm_3119",  # /convs.3/conv/modulation
-            "onnx::Gemm_3207",  # /convs.4/conv/modulation
-            "onnx::Gemm_3280",  # /convs.5/conv/modulation
-            "onnx::Gemm_3368",  # /convs.6/conv/modulation
-            "onnx::Gemm_3441",  # /convs.7/conv/modulation
-            "onnx::Gemm_3529",  # /convs.8/conv/modulation
-            "onnx::Gemm_3602",  # /convs.9/conv/modulation
-            "onnx::Gemm_3690",  # /convs.10/conv/modulation
-            "onnx::Gemm_3763",  # /convs.11/conv/modulation
+            "onnx::Gemm_2810",  # /conv1/conv/modulation.weight
+            "onnx::Gemm_2870",  # /convs.0/conv/modulation.weight
+            "onnx::Gemm_2943",  # /convs.1/conv/modulation.weight
+            "onnx::Gemm_3046",  # /convs.2/conv/modulation.weight
+            "onnx::Gemm_3119",  # /convs.3/conv/modulation.weight
+            "onnx::Gemm_3207",  # /convs.4/conv/modulation.weight
+            "onnx::Gemm_3280",  # /convs.5/conv/modulation.weight
+            "onnx::Gemm_3368",  # /convs.6/conv/modulation.weight
+            "onnx::Gemm_3441",  # /convs.7/conv/modulation.weight
+            "onnx::Gemm_3529",  # /convs.8/conv/modulation.weight
+            "onnx::Gemm_3602",  # /convs.9/conv/modulation.weight
+            "onnx::Gemm_3690",  # /convs.10/conv/modulation.weight
+            "onnx::Gemm_3763",  # /convs.11/conv/modulation.weight
         ]
         depth = 14
         log_size = 8
