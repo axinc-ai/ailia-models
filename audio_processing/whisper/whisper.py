@@ -39,7 +39,8 @@ SAVE_TEXT_PATH = 'output.txt'
 # ======================
 
 REQUIRE_CONSTANT_SHAPE_BETWEEN_INFERENCE = True # ailia SDK 1.2.13のAILIA UNSETTLED SHAPEの抑制、1.2.14では不要になる予定
-SAVE_SHAPE = ()
+SAVE_ENC_SHAPE = ()
+SAVE_DEC_SHAPE = ()
 
 # ======================
 # Arguemnt Parser Config
@@ -263,6 +264,12 @@ def new_kv_cache(n_group, length=451):
 def get_audio_features(enc_net, mel):
     mel = mel.astype(np.float32)
     if not args.onnx:
+        if REQUIRE_CONSTANT_SHAPE_BETWEEN_INFERENCE:
+            global WEIGHT_ENC_PATH, MODEL_ENC_PATH, SAVE_ENC_SHAPE
+            shape = (mel.shape)
+            if SAVE_ENC_SHAPE != shape:
+                enc_net = ailia.Net(MODEL_ENC_PATH, WEIGHT_ENC_PATH, env_id=args.env_id)
+            SAVE_ENC_SHAPE = shape
         output = enc_net.predict([mel])
     else:
         output = enc_net.run(None, {'mel': mel})
@@ -301,12 +308,12 @@ def inference_logits(dec_net, tokens, audio_features, kv_cache=None, initial_tok
 
     if not args.onnx:
         if REQUIRE_CONSTANT_SHAPE_BETWEEN_INFERENCE:
-            global WEIGHT_DEC_PATH, MODEL_DEC_PATH, SAVE_SHAPE
+            global WEIGHT_DEC_PATH, MODEL_DEC_PATH, SAVE_DEC_SHAPE
 
             shape = (tokens.shape, audio_features.shape, kv_cache.shape)
-            if SAVE_SHAPE != shape:
+            if SAVE_DEC_SHAPE != shape:
                 dec_net = ailia.Net(MODEL_DEC_PATH, WEIGHT_DEC_PATH, env_id=args.env_id)
-            SAVE_SHAPE = shape
+            SAVE_DEC_SHAPE = shape
 
         output = dec_net.predict([tokens, audio_features, kv_cache, offset])
     else:
@@ -542,7 +549,7 @@ def decode_with_fallback(enc_net, dec_net, segment, decode_options):
     return results
 
 
-def predict(wav, enc_net, dec_net, immediate=False):
+def predict(wav, enc_net, dec_net, immediate=False, microphone=False):
     language = args.language
     temperature = args.temperature
     temperature_increment_on_fallback = args.temperature_increment_on_fallback
@@ -610,7 +617,10 @@ def predict(wav, enc_net, dec_net, immediate=False):
 
     try:
         import tqdm
-        pbar = tqdm.tqdm(total=num_frames, unit='frames', disable=immediate is not False)
+        if microphone:
+            pbar = None
+        else:
+            pbar = tqdm.tqdm(total=num_frames, unit='frames', disable=immediate is not False)
     except ImportError:
         pbar = None
 
@@ -708,7 +718,7 @@ def recognize_from_audio(enc_net, dec_net):
             total_time_estimation = 0
             for i in range(args.benchmark_count):
                 start = int(round(time.time() * 1000))
-                output = predict(wav, enc_net, dec_net, immediate=immediate)
+                output = predict(wav, enc_net, dec_net, immediate=immediate, microphone=False)
                 end = int(round(time.time() * 1000))
                 estimation_time = (end - start)
 
@@ -751,7 +761,7 @@ def recognize_from_microphone(enc_net, dec_net, mic_info):
 
             # inference
             logger.info('Translating...')
-            output = predict(wav, enc_net, dec_net, immediate=False)
+            output = predict(wav, enc_net, dec_net, immediate=False, microphone=True)
 
             text = '\n'.join(res['text'] for res in output['segments'])
             logger.info(f'predict sentence:\n{text}\n')
@@ -766,7 +776,7 @@ def recognize_from_microphone(enc_net, dec_net, mic_info):
 
 
 def main():
-    global WEIGHT_DEC_PATH, MODEL_DEC_PATH
+    global WEIGHT_DEC_PATH, MODEL_DEC_PATH, WEIGHT_ENC_PATH, MODEL_ENC_PATH
     model_dic = {
         'tiny': {
             'enc': (WEIGHT_ENC_TINY_PATH, MODEL_ENC_TINY_PATH),
