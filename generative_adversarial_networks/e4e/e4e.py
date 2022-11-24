@@ -1,3 +1,4 @@
+import shutil
 import sys
 import os
 import time
@@ -42,7 +43,7 @@ WEIGHT_CHURCH_DEC_PATH = "church_decoder.onnx"
 MODEL_CHURCH_DEC_PATH = "church_decoder.onnx.prototxt"
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/e4e/'
 
-IMAGE_PATH = 'demo.png'
+IMAGE_PATH = 'demo.jpg'
 SAVE_IMAGE_PATH = 'output.png'
 
 p = os.path.os.path.dirname(os.path.abspath(__file__))
@@ -55,6 +56,10 @@ CARS_PCA = os.path.join(p, 'editings/ganspace_pca/cars_pca.npy')
 
 parser = get_base_parser(
     'Encoder for StyleGAN Image Manipulation', IMAGE_PATH, SAVE_IMAGE_PATH
+)
+parser.add_argument(
+    '--aligned', action='store_true',
+    help='Input is aligned faces.'
 )
 parser.add_argument(
     '-m', '--model_type', default='ffhq', choices=('ffhq', 'car', 'horse', 'church'),
@@ -400,8 +405,22 @@ def factorize_weight(net, layers='all'):
 # Main functions
 # ======================
 
+def run_alignment(img):
+    from dlib_align import align_face
+    img = align_face(img)
+
+    return img
+
+
 def preprocess(img):
     img = img[:, :, ::-1]  # BGR -> RGB
+
+    if model_type == 'ffhq' and not args.aligned:
+        aligned = run_alignment(img)
+        if aligned is None:
+            logger.warning("face not detected.")
+        else:
+            img = aligned
 
     ow = oh = 256
     if model_type == 'car':
@@ -518,47 +537,6 @@ def recognize_from_image(models):
     logger.info('Script finished successfully.')
 
 
-def recognize_from_video(models):
-    video_file = args.video if args.video else args.input[0]
-    capture = get_capture(video_file)
-    assert capture.isOpened(), 'Cannot capture source'
-
-    # create video writer if savepath is specified as video format
-    if args.savepath != SAVE_IMAGE_PATH:
-        f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
-        writer = get_writer(args.savepath, f_h, f_w)
-    else:
-        writer = None
-
-    frame_shown = False
-    while True:
-        ret, frame = capture.read()
-        if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
-            break
-        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
-            break
-
-        # inference
-        img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        restored_img = predict(models, img)
-
-        # show
-        cv2.imshow('frame', restored_img)
-        frame_shown = True
-
-        # save results
-        if writer is not None:
-            writer.write(restored_img)
-
-    capture.release()
-    cv2.destroyAllWindows()
-    if writer is not None:
-        writer.release()
-
-    logger.info('Script finished successfully.')
-
-
 def main():
     dic_model = {
         'ffhq': {
@@ -586,6 +564,25 @@ def main():
     check_and_download_models(WEIGHT_ENC_PATH, MODEL_ENC_PATH, REMOTE_PATH)
     check_and_download_models(WEIGHT_DEC_PATH, MODEL_DEC_PATH, REMOTE_PATH)
 
+    if model_type == 'ffhq' and not args.aligned:
+        from dlib_align import DLIB_FILE, REMOTE_DLIB_PATH
+        from model_utils import urlretrieve, progress_print
+        import shutil, bz2
+
+        if not os.path.exists(DLIB_FILE):
+            bz2_file = DLIB_FILE + '.bz2'
+            if not os.path.exists(bz2_file):
+                logger.info(f'Downloading dlib model file... (save path: {bz2_file})')
+                urlretrieve(
+                    REMOTE_DLIB_PATH + os.path.basename(bz2_file),
+                    bz2_file,
+                    progress_print,
+                )
+                logger.info('\n')
+            with bz2.open(bz2_file, 'rb') as f, open(DLIB_FILE, 'wb') as fw:
+                shutil.copyfileobj(f, fw)
+        logger.info('dlib model file are prepared!')
+
     env_id = args.env_id
 
     # initialize
@@ -602,10 +599,7 @@ def main():
         "dec": net_dec,
     }
 
-    if args.video is not None:
-        recognize_from_video(models)
-    else:
-        recognize_from_image(models)
+    recognize_from_image(models)
 
 
 if __name__ == '__main__':
