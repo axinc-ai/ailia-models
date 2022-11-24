@@ -54,7 +54,7 @@ parser.add_argument(
     help='use microphone input',
 )
 parser.add_argument(
-    '-m', '--model_type', default='base',   # modifled for ailia models, official whisper specifies small
+    '-m', '--model_type', default='small',
     choices=('tiny', 'base', 'small', 'medium'),
     help='model type'
 )
