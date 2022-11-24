@@ -53,7 +53,8 @@ parser.add_argument(
     help='use microphone input',
 )
 parser.add_argument(
-    '-m', '--model_type', default='base', choices=('tiny', 'base', 'small', 'medium'),
+    '-m', '--model_type', default='base',   # modifled for ailia models, official whisper specifies small
+    choices=('tiny', 'base', 'small', 'medium'),
     help='model type'
 )
 parser.add_argument(
@@ -66,8 +67,8 @@ parser.add_argument(
     "--best_of", type=float, default=5,
     help="number of candidates when sampling with non-zero temperature")
 parser.add_argument(
-    "--beam_size", type=int, default=3,
-    help="number of beams in beam search, only applicable when temperature is zero")
+    "--beam_size", type=int, default=None, # modified for ailia models, official whisper specifies 5
+    help="number of beams in beam search, only applicable when temperature is zero, None means use greedy search")
 parser.add_argument(
     "--patience", type=float, default=None,
     help="optional patience value to use in beam decoding,"
