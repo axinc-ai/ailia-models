@@ -48,7 +48,6 @@ class AiliaTokenizer:
     timestamp_begin = None
 
     def build_tokenizer(self, vocab_path, tokenizer_name, task, language):
-        print("language", language)
         self.language = language
 
         # load vocab
