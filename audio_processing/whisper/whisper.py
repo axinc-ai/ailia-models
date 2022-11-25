@@ -22,7 +22,7 @@ from decode_utils import (ApplyTimestampRules, BeamSearchDecoder,
 from math_utils import softmax
 from microphone_utils import start_microphone_input  # noqa
 from model_utils import check_and_download_models  # noqa
-from tokenizer import LANGUAGES, TO_LANGUAGE_CODE, get_tokenizer
+from languages import LANGUAGES, TO_LANGUAGE_CODE
 from utils import get_base_parser, get_savepath, update_parser  # noqa
 
 logger = getLogger(__name__)
@@ -112,7 +112,17 @@ parser.add_argument(
     action='store_true',
     help='display profile.'
 )
+parser.add_argument(
+    '--ailia_tokenizer',
+    action='store_true',
+    help='use ailia tokenizer.'
+)
 args = update_parser(parser)
+
+if args.ailia_tokenizer:
+    from ailia_tokenizer import get_tokenizer
+else:
+    from tokenizer import get_tokenizer
 
 ModelDimensions = namedtuple('ModelDimensions', [
     'n_mels', 'n_audio_ctx', 'n_audio_state', 'n_audio_head', 'n_audio_layer',
