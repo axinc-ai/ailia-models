@@ -23,6 +23,7 @@ from math_utils import softmax
 from microphone_utils import start_microphone_input  # noqa
 from model_utils import check_and_download_models  # noqa
 from tokenizer import LANGUAGES, TO_LANGUAGE_CODE, get_tokenizer
+from ailia_tokenizer import AiliaTokenizer
 from utils import get_base_parser, get_savepath, update_parser  # noqa
 
 logger = getLogger(__name__)
@@ -593,6 +594,11 @@ def predict(wav, enc_net, dec_net, immediate=False, microphone=False):
 
     def add_segment(
             start, end, text_tokens, result):
+
+        ailia_tokenizer = AiliaTokenizer()
+        ailia_tokenizer.open('assets/multilingual/vocab.json')
+        print(ailia_tokenizer.decode([token for token in text_tokens if token < tokenizer.eot]))
+
         text = tokenizer.decode([token for token in text_tokens if token < tokenizer.eot])
         if len(text.strip()) == 0:  # skip empty text output
             return
