@@ -604,10 +604,6 @@ def predict(wav, enc_net, dec_net, immediate=False, microphone=False):
     def add_segment(
             start, end, text_tokens, result):
 
-        ailia_tokenizer = AiliaTokenizer()
-        ailia_tokenizer.open('assets/multilingual/vocab.json')
-        print(ailia_tokenizer.decode([token for token in text_tokens if token < tokenizer.eot]))
-
         text = tokenizer.decode([token for token in text_tokens if token < tokenizer.eot])
         if len(text.strip()) == 0:  # skip empty text output
             return
