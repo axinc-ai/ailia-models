@@ -20,7 +20,7 @@
 
 - GANSpace
 
-  Editing the car domain and the face domain taken from the the official GANSpace.
+  Editing the car domain and the face domain, taken from the the official GANSpace.
   
   ○ ffhq
   <img src="example/ffhq_edit.png">
@@ -78,7 +78,7 @@ $ python3 encoder4editing.py --age_range -5 5
 ```
 
 The editings for the facial domain,  
-sush as `--eye_openness`, `--smile`, `--trimmed_beard`, `--white_hair`, `--lipstick` options.
+such as `--eye_openness`, `--smile`, `--trimmed_beard`, `--white_hair`, `--lipstick` options.
 ```bash
 $ python3 encoder4editing.py --eye_openness 20 --smile -20 --trimmed_beard 20 --white_hair -24 --lipstick 20
 ```
