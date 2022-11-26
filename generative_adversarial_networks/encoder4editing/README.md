@@ -14,23 +14,23 @@
 
 - InterFaceGAN
 
-  age, smile and pose directions for the FFHQ StyleGAN Generator.
+  The age, smile and pose directions for the FFHQ StyleGAN Generator.
 
   <img src="example/age_edit.png">  
 
 - GANSpace
 
-  editings for the cars domain, as well as several examples for the facial domain taken from the official GANSpace repository.
+  Editing the car domain and the face domain taken from the the official GANSpace.
   
-  - ffhq
+  ○ ffhq
   <img src="example/ffhq_edit.png">
   
-  - cars
+  ○ cars
   <img src="example/car_edit.png">  
 
 - SeFa
 
-  apply to the selected editing parameters.
+  Apply to the selected edit parameters.
   <img src="example/ffhq_sefa.png">
 
 ## Requirements
@@ -60,9 +60,38 @@ By adding the `--model_type` option, you can specify model type which is selecte
 $ python3 encoder4editing.py --model_type ffhq
 ```
 
-By adding the `--model_type` option, you can specify model type which is selected from "ffhq", "car", "horse", "church". (default is ffhq)
+If the input image is aligned, specify the `--aligned` option.  
+In this case the dlib module is not needed.
 ```bash
-$ python3 encoder4editing.py --model_type ffhq
+$ python3 encoder4editing.py --aligned
+```
+
+Edit age, simile, pose by specifying 
+`--age_factor`, `--age_range`, `--smile_factor`, `--smile_range`, `--pose_factor`, `--pose_range` parameters.
+
+```bash
+$ python3 encoder4editing.py --age_factor -3
+```
+
+```bash
+$ python3 encoder4editing.py --age_range -5 5
+```
+
+The editings for the facial domain,  
+sush as `--eye_openness`, `--smile`, `--trimmed_beard`, `--white_hair`, `--lipstick` options.
+```bash
+$ python3 encoder4editing.py --eye_openness 20 --smile -20 --trimmed_beard 20 --white_hair -24 --lipstick 20
+```
+
+The editings for the cars domain,  
+such as `--car_view1`, `--car_view2`, `--car_cube`, `--car_color`, `--car_grass` options.
+```bash
+$ python3 encoder4editing.py -i example/car_img.jpg --model_type car --car_view1 2 --car_view2 -2 --car_cube 25 --car_color -8 --car_grass -18
+```
+
+Specify the using index, start/end distance and step, to set the edit parameters.
+```bash
+$ python3 encoder4editing.py --indices 2 3 4 5 --start_distance 0.0 --end_distance 15.0 --step 3
 ```
 
 ## Reference
