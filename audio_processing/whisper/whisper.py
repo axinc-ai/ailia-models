@@ -841,13 +841,17 @@ def main():
             reduce_interstage=False, reuse_interstage=True)
         enc_net = ailia.Net(MODEL_ENC_PATH, WEIGHT_ENC_PATH, env_id=args.env_id, memory_mode=memory_mode)
         dec_net = ailia.Net(MODEL_DEC_PATH, WEIGHT_DEC_PATH, env_id=args.env_id, memory_mode=memory_mode)
+        if args.profile:
+            dec_net.set_profile_mode(True)
     else:
         import onnxruntime
         enc_net = onnxruntime.InferenceSession(WEIGHT_ENC_PATH)
-        dec_net = onnxruntime.InferenceSession(WEIGHT_DEC_PATH)
-
-    if args.profile:
-        dec_net.set_profile_mode(True)
+        if args.profile:
+            options = onnxruntime.SessionOptions()
+            options.enable_profiling = True
+            dec_net = onnxruntime.InferenceSession(WEIGHT_DEC_PATH, options)
+        else:
+            dec_net = onnxruntime.InferenceSession(WEIGHT_DEC_PATH)
 
     if args.V:
         # microphone input mode
@@ -856,8 +860,11 @@ def main():
         recognize_from_audio(enc_net, dec_net)
 
     if args.profile:
-        print(dec_net.get_summary())
-
+        if args.onnx:
+            prof_file = dec_net.end_profiling()
+            print(prof_file)
+        else:
+            print(dec_net.get_summary())
 
 if __name__ == '__main__':
     main()
