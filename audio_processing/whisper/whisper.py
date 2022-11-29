@@ -36,7 +36,7 @@ SAVE_TEXT_PATH = 'output.txt'
 # Workaround
 # ======================
 
-REQUIRE_CONSTANT_SHAPE_BETWEEN_INFERENCE = True # ailia SDK 1.2.13のAILIA UNSETTLED SHAPEの抑制、1.2.14では不要になる予定
+REQUIRE_CONSTANT_SHAPE_BETWEEN_INFERENCE = False # ailia SDK 1.2.13のAILIA UNSETTLED SHAPEの抑制、1.2.14では不要になる予定
 SAVE_ENC_SHAPE = ()
 SAVE_DEC_SHAPE = ()
 
@@ -298,7 +298,7 @@ def get_audio_features(enc_net, mel):
     return audio_features
 
 
-def inference_logits(dec_net, tokens, audio_features, kv_cache=None, initial_token_length=None):
+def inference_logits(dec_net, tokens, audio_features, kv_cache=None, initial_token_length=None, update_audio_features=True):
     n_group = tokens.shape[0]
     initial_token_length = initial_token_length if initial_token_length else tokens.shape[-1]
     if kv_cache is None:
@@ -333,9 +333,13 @@ def inference_logits(dec_net, tokens, audio_features, kv_cache=None, initial_tok
             shape = (tokens.shape, audio_features.shape, kv_cache.shape)
             if SAVE_DEC_SHAPE != shape:
                 dec_net = ailia.Net(MODEL_DEC_PATH, WEIGHT_DEC_PATH, env_id=args.env_id)
+            update_audio_features = True
             SAVE_DEC_SHAPE = shape
-
-        output = dec_net.predict([tokens, audio_features, kv_cache, offset])
+        if update_audio_features:
+            dec_net.set_input_blob_data(audio_features, "audio_features")
+        output = dec_net.run({
+            'tokens': tokens,
+            'kv_cache': kv_cache, 'offset': offset})
     else:
         kv_cache = kv_cache.astype(np.float32)
         output = dec_net.run(None, {
@@ -460,7 +464,7 @@ def decode(enc_net, dec_net, mel, options):
     for i in range(sample_len):
         if args.debug:
             start = int(round(time.time() * 1000))
-        logits, kv_cache = inference_logits(dec_net, tokens, audio_features, kv_cache, initial_token_length)
+        logits, kv_cache = inference_logits(dec_net, tokens, audio_features, kv_cache, initial_token_length, i == 0)
         if args.debug:
             end = int(round(time.time() * 1000))
             estimation_time = (end - start)
