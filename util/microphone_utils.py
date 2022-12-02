@@ -46,7 +46,7 @@ def capture_microphone(que, ready, pause, fin, sample_rate, sc=False, speaker=Fa
             if sc:
                 audio = src.record(INTERVAL)
             else:
-                audio = np.frombuffer(src.read(INTERVAL), dtype=np.int16) / 32768.0
+                audio = np.frombuffer(src.read(INTERVAL, exception_on_overflow=False), dtype=np.int16) / 32768.0
 
             audio = audio.reshape(-1)
             square = audio ** 2

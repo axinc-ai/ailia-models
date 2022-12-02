@@ -14,15 +14,13 @@ sys.path.append('../../util')
 # logger
 from logging import getLogger  # noqa
 
-from audio_utils import (CHUNK_LENGTH, HOP_LENGTH, N_FRAMES, SAMPLE_RATE,
-                         load_audio, log_mel_spectrogram, pad_or_trim)
 from decode_utils import (ApplyTimestampRules, BeamSearchDecoder,
                           GreedyDecoder, MaximumLikelihoodRanker,
                           SuppressBlank, SuppressTokens)
 from math_utils import softmax
 from microphone_utils import start_microphone_input  # noqa
 from model_utils import check_and_download_models  # noqa
-from tokenizer import LANGUAGES, TO_LANGUAGE_CODE, get_tokenizer
+from languages import LANGUAGES, TO_LANGUAGE_CODE
 from utils import get_base_parser, get_savepath, update_parser  # noqa
 
 logger = getLogger(__name__)
@@ -39,7 +37,12 @@ SAVE_TEXT_PATH = 'output.txt'
 # ======================
 
 REQUIRE_CONSTANT_SHAPE_BETWEEN_INFERENCE = True # ailia SDK 1.2.13のAILIA UNSETTLED SHAPEの抑制、1.2.14では不要になる予定
-SAVE_SHAPE = ()
+SAVE_ENC_SHAPE = ()
+SAVE_DEC_SHAPE = ()
+
+memory_mode = ailia.get_memory_mode(
+    reduce_constant=True, ignore_input_with_initializer=True,
+    reduce_interstage=False, reuse_interstage=True)
 
 # ======================
 # Arguemnt Parser Config
@@ -53,7 +56,8 @@ parser.add_argument(
     help='use microphone input',
 )
 parser.add_argument(
-    '-m', '--model_type', default='base', choices=('tiny', 'base', 'small', 'medium'),
+    '-m', '--model_type', default='small',
+    choices=('tiny', 'base', 'small', 'medium'),
     help='model type'
 )
 parser.add_argument(
@@ -66,8 +70,8 @@ parser.add_argument(
     "--best_of", type=float, default=5,
     help="number of candidates when sampling with non-zero temperature")
 parser.add_argument(
-    "--beam_size", type=int, default=3,
-    help="number of beams in beam search, only applicable when temperature is zero")
+    "--beam_size", type=int, default=None, # modified for ailia models, official whisper specifies 5
+    help="number of beams in beam search, only applicable when temperature is zero, None means use greedy search")
 parser.add_argument(
     "--patience", type=float, default=None,
     help="optional patience value to use in beam decoding,"
@@ -110,7 +114,29 @@ parser.add_argument(
     action='store_true',
     help='display profile.'
 )
+parser.add_argument(
+    '--ailia_audio',
+    action='store_true',
+    help='use ailia audio.'
+)
+parser.add_argument(
+    '--ailia_tokenizer',
+    action='store_true',
+    help='use ailia tokenizer.'
+)
 args = update_parser(parser)
+
+if args.ailia_audio:
+    from ailia_audio_utils import (CHUNK_LENGTH, HOP_LENGTH, N_FRAMES, SAMPLE_RATE,
+                            load_audio, log_mel_spectrogram, pad_or_trim)
+else:
+    from audio_utils import (CHUNK_LENGTH, HOP_LENGTH, N_FRAMES, SAMPLE_RATE,
+                            load_audio, log_mel_spectrogram, pad_or_trim)
+
+if args.ailia_tokenizer:
+    from ailia_tokenizer import get_tokenizer
+else:
+    from tokenizer import get_tokenizer
 
 ModelDimensions = namedtuple('ModelDimensions', [
     'n_mels', 'n_audio_ctx', 'n_audio_state', 'n_audio_head', 'n_audio_layer',
@@ -262,6 +288,12 @@ def new_kv_cache(n_group, length=451):
 def get_audio_features(enc_net, mel):
     mel = mel.astype(np.float32)
     if not args.onnx:
+        if REQUIRE_CONSTANT_SHAPE_BETWEEN_INFERENCE:
+            global WEIGHT_ENC_PATH, MODEL_ENC_PATH, SAVE_ENC_SHAPE
+            shape = (mel.shape)
+            if SAVE_ENC_SHAPE != shape:
+                enc_net = ailia.Net(MODEL_ENC_PATH, WEIGHT_ENC_PATH, env_id=args.env_id, memory_mode=memory_mode)
+            SAVE_ENC_SHAPE = shape
         output = enc_net.predict([mel])
     else:
         output = enc_net.run(None, {'mel': mel})
@@ -300,12 +332,12 @@ def inference_logits(dec_net, tokens, audio_features, kv_cache=None, initial_tok
 
     if not args.onnx:
         if REQUIRE_CONSTANT_SHAPE_BETWEEN_INFERENCE:
-            global WEIGHT_DEC_PATH, MODEL_DEC_PATH, SAVE_SHAPE
+            global WEIGHT_DEC_PATH, MODEL_DEC_PATH, SAVE_DEC_SHAPE
 
             shape = (tokens.shape, audio_features.shape, kv_cache.shape)
-            if SAVE_SHAPE != shape:
-                dec_net = ailia.Net(MODEL_DEC_PATH, WEIGHT_DEC_PATH, env_id=args.env_id)
-            SAVE_SHAPE = shape
+            if SAVE_DEC_SHAPE != shape:
+                dec_net = ailia.Net(MODEL_DEC_PATH, WEIGHT_DEC_PATH, env_id=args.env_id, memory_mode=memory_mode)
+            SAVE_DEC_SHAPE = shape
 
         output = dec_net.predict([tokens, audio_features, kv_cache, offset])
     else:
@@ -541,7 +573,7 @@ def decode_with_fallback(enc_net, dec_net, segment, decode_options):
     return results
 
 
-def predict(wav, enc_net, dec_net, immediate=False):
+def predict(wav, enc_net, dec_net, immediate=False, microphone=False):
     language = args.language
     temperature = args.temperature
     temperature_increment_on_fallback = args.temperature_increment_on_fallback
@@ -609,7 +641,10 @@ def predict(wav, enc_net, dec_net, immediate=False):
 
     try:
         import tqdm
-        pbar = tqdm.tqdm(total=num_frames, unit='frames', disable=immediate is not False)
+        if microphone:
+            pbar = None
+        else:
+            pbar = tqdm.tqdm(total=num_frames, unit='frames', disable=immediate is not False)
     except ImportError:
         pbar = None
 
@@ -707,7 +742,7 @@ def recognize_from_audio(enc_net, dec_net):
             total_time_estimation = 0
             for i in range(args.benchmark_count):
                 start = int(round(time.time() * 1000))
-                output = predict(wav, enc_net, dec_net, immediate=immediate)
+                output = predict(wav, enc_net, dec_net, immediate=immediate, microphone=False)
                 end = int(round(time.time() * 1000))
                 estimation_time = (end - start)
 
@@ -750,7 +785,7 @@ def recognize_from_microphone(enc_net, dec_net, mic_info):
 
             # inference
             logger.info('Translating...')
-            output = predict(wav, enc_net, dec_net, immediate=False)
+            output = predict(wav, enc_net, dec_net, immediate=False, microphone=True)
 
             text = '\n'.join(res['text'] for res in output['segments'])
             logger.info(f'predict sentence:\n{text}\n')
@@ -765,7 +800,7 @@ def recognize_from_microphone(enc_net, dec_net, mic_info):
 
 
 def main():
-    global WEIGHT_DEC_PATH, MODEL_DEC_PATH
+    global WEIGHT_DEC_PATH, MODEL_DEC_PATH, WEIGHT_ENC_PATH, MODEL_ENC_PATH
     model_dic = {
         'tiny': {
             'enc': (WEIGHT_ENC_TINY_PATH, MODEL_ENC_TINY_PATH),
@@ -805,18 +840,19 @@ def main():
 
     # initialize
     if not args.onnx:
-        memory_mode = ailia.get_memory_mode(
-            reduce_constant=True, ignore_input_with_initializer=True,
-            reduce_interstage=False, reuse_interstage=True)
         enc_net = ailia.Net(MODEL_ENC_PATH, WEIGHT_ENC_PATH, env_id=args.env_id, memory_mode=memory_mode)
         dec_net = ailia.Net(MODEL_DEC_PATH, WEIGHT_DEC_PATH, env_id=args.env_id, memory_mode=memory_mode)
+        if args.profile:
+            dec_net.set_profile_mode(True)
     else:
         import onnxruntime
         enc_net = onnxruntime.InferenceSession(WEIGHT_ENC_PATH)
-        dec_net = onnxruntime.InferenceSession(WEIGHT_DEC_PATH)
-
-    if args.profile:
-        dec_net.set_profile_mode(True)
+        if args.profile:
+            options = onnxruntime.SessionOptions()
+            options.enable_profiling = True
+            dec_net = onnxruntime.InferenceSession(WEIGHT_DEC_PATH, options)
+        else:
+            dec_net = onnxruntime.InferenceSession(WEIGHT_DEC_PATH)
 
     if args.V:
         # microphone input mode
@@ -825,8 +861,11 @@ def main():
         recognize_from_audio(enc_net, dec_net)
 
     if args.profile:
-        print(dec_net.get_summary())
-
+        if args.onnx:
+            prof_file = dec_net.end_profiling()
+            print(prof_file)
+        else:
+            print(dec_net.get_summary())
 
 if __name__ == '__main__':
     main()
