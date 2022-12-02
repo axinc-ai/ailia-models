@@ -59,10 +59,10 @@ ONNX opset=14
 
 ## Netron
 
-[posenet_50.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/posenet/posenet_50.prototxt)
+[posenet_50.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/posenet/posenet_50.onnx.prototxt)
 
-[posenet_75.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/posenet/posenet_75.prototxt)
+[posenet_75.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/posenet/posenet_75.onnx.prototxt)
 
-[posenet_100.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/posenet/posenet_100.prototxt)
+[posenet_100.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/posenet/posenet_100.onnx.prototxt)
 
-[posenet_101.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/posenet/posenet_101.prototxt)
+[posenet_101.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/posenet/posenet_101.onnx.prototxt)

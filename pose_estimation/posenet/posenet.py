@@ -44,7 +44,7 @@ parser = get_base_parser(
 )
 parser.add_argument(
     '-t', '--threshold', type=float, default=THRESHOLD_DEFAULT,
-    help='The detection threshold. (require ailia SDK 1.2.5 and later)'
+    help='The detection threshold.'
 )
 
 parser.add_argument('-a','--arch', type=int, default=101,
@@ -169,14 +169,12 @@ def recognize_from_video(model):
 
 def main():
     # model files check and download
-
-
-    MODEL_PATH  = 'posenet_' + str(args.arch) + '.prototxt'
+    MODEL_PATH  = 'posenet_' + str(args.arch) + '.onnx.prototxt'
     WEIGHT_PATH = 'posenet_' + str(args.arch) + '.onnx'
-    #check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
 
     # net initialize
-    model = ailia.Net(None,WEIGHT_PATH)
+    model = ailia.Net(MODEL_PATH,WEIGHT_PATH)
     if args.video is not None:
         # video mode
         recognize_from_video(model)
