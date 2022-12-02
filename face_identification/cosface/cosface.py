@@ -17,11 +17,11 @@ logger = getLogger(__name__)
 # ======================
 # PARAMETERS
 # ======================
-MODEL_LISTS = [
-    'cosface_sphere20_opset10'
-]
 
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/cosface/"
+WEIGHT_PATH = 'cosface_sphere20_opset10.onnx'
+MODEL_PATH = 'cosface_sphere20_opset10.onnx.prototxt'
+
 IMG_PATH_1 = 'image_id.jpg'
 IMG_PATH_2 = 'image_target.jpg'
 
@@ -40,15 +40,8 @@ parser.add_argument(
     '-i', '--inputs', metavar='IMAGE', nargs=2, default='',
     help='Two image paths for calculating the face match.'
 )
-parser.add_argument(
-    '-a', '--arch', metavar='ARCH',
-    default='CosFace_sphere20_opset10', choices=MODEL_LISTS,
-    help='Supported model: ' + ' | '.join(MODEL_LISTS)
-)
 
 args = update_parser(parser)
-
-WEIGHT_PATH = args.arch + '.onnx'
 
 
 def preprocessing(img_path):
@@ -89,7 +82,7 @@ def cosFace(id_img_path, query_img_path):
 
 def main():
     # Check and download CosFace model
-    check_and_download_models(WEIGHT_PATH, None, REMOTE_PATH)
+    check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
 
     # Specify default images when there is no inputs
     if len(args.inputs) == 0:
