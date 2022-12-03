@@ -13,7 +13,7 @@ import ailia
 sys.path.append('../../util')
 from utils import get_base_parser, update_parser, get_savepath  # noqa
 from model_utils import check_and_download_models  # noqa
-from detector_utils import load_image  # noqa
+from math_utils import softmax
 # logger
 from logging import getLogger  # noqa
 
@@ -48,10 +48,6 @@ args = update_parser(parser, check_input_type=False)
 
 
 # ======================
-# Secondaty Functions
-# ======================
-
-# ======================
 # Main functions
 # ======================
 
@@ -67,9 +63,11 @@ def preprocess(tokenizer, sequence):
 
 def post_processing(classifier, output):
     output = classifier["weight"] @ output
-    output = output + classifier["bias"]
+    logits = output + classifier["bias"]
 
-    return output
+    scores = softmax(logits)
+
+    return scores
 
 
 def predict(model_info, sequence):
@@ -91,9 +89,9 @@ def predict(model_info, sequence):
 
     last_hidden_state, pooled_output = output
 
-    logits = post_processing(classifier, pooled_output[0])
+    scores = post_processing(classifier, pooled_output[0])
 
-    return logits
+    return scores
 
 
 def recognize_from_text(model_info):
@@ -109,7 +107,7 @@ def recognize_from_text(model_info):
         total_time_estimation = 0
         for i in range(args.benchmark_count):
             start = int(round(time.time() * 1000))
-            logits = predict(model_info, sequence)
+            scores = predict(model_info, sequence)
             end = int(round(time.time() * 1000))
             estimation_time = (end - start)
 
@@ -120,12 +118,17 @@ def recognize_from_text(model_info):
 
         logger.info(f'\taverage time estimation {total_time_estimation / (args.benchmark_count - 1)} ms')
     else:
-        logits = predict(model_info, sequence)
+        scores = predict(model_info, sequence)
 
-    # # plot result
-    # savepath = get_savepath(args.savepath, image_path, ext='.png')
-    # logger.info(f'saved at : {savepath}')
-    # cv2.imwrite(savepath, res_img)
+    id2label = {
+        0: 'ポジティブ',
+        1: 'ネガティブ'
+    }
+    i = np.argmax(scores)
+    label = id2label[i]
+    score = scores[i]
+
+    logger.info(f'{label} : {score}')
 
     logger.info('Script finished successfully.')
 
@@ -135,7 +138,7 @@ def main():
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
 
     # initialize
-    tokenizer = AutoTokenizer.from_pretrained("daigo/bert-base-japanese-sentiment")
+    tokenizer = AutoTokenizer.from_pretrained("tokenizer")
 
     if not args.onnx:
         net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
