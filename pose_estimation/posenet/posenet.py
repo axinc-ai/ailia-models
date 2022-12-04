@@ -32,7 +32,7 @@ IMAGE_WIDTH = 640
 
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/posenet/'
 
-THRESHOLD_DEFAULT = 0.3
+THRESHOLD_DEFAULT = 0.25
 
 MODEL_LISTS = ['50','75','100','101']
 
@@ -57,15 +57,16 @@ args = update_parser(parser)
 def keypoint_draw(image_path,draw_image, pose_scores, keypoint_scores, keypoint_coords):
     draw_image = draw_skel_and_kp(
         draw_image, pose_scores, keypoint_scores, keypoint_coords,
-        min_pose_score=0.25, min_part_score=0.25)
+        min_pose_score=args.threshold, min_part_score=args.threshold)
 
-    print("\nResults for image: %s" % image_path)
-    for pi in range(len(pose_scores)):
-        if pose_scores[pi] == 0.:
-            break
-        print('Pose #%d, score = %f' % (pi, pose_scores[pi]))
-        for ki, (s, c) in enumerate(zip(keypoint_scores[pi, :], keypoint_coords[pi, :, :])):
-            print('Keypoint %s, score = %f, coord = %s' % (PART_NAMES[ki], s, c))
+    if False:
+        print("\nResults for image: %s" % image_path)
+        for pi in range(len(pose_scores)):
+            if pose_scores[pi] == 0.:
+                break
+            print('Pose #%d, score = %f' % (pi, pose_scores[pi]))
+            for ki, (s, c) in enumerate(zip(keypoint_scores[pi, :], keypoint_coords[pi, :, :])):
+                print('Keypoint %s, score = %f, coord = %s' % (PART_NAMES[ki], s, c))
     return draw_image
 
 
