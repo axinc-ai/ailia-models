@@ -1,4 +1,4 @@
-# View Adaptive Neural Networks (VA) for Skeleton-based Human Action Recognition
+# Hugging Face - daigo/bert-base-japanese-sentiment
 
 ## Input
 
