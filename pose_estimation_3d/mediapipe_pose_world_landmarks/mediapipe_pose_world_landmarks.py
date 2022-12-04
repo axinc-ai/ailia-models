@@ -354,6 +354,10 @@ def recognize_from_image(net, det_net):
 
         landmarks, world_landmarks = output
 
+        if len(landmarks) == 0:
+            logger.info('pose not detected.')
+            continue
+
         logger.info(
             f'Nose coordinates: ('
             f'{landmarks[0].x * image_width}, '
@@ -398,7 +402,9 @@ def recognize_from_video(net, det_net):
         landmarks, world_landmarks = output
 
         # plot result
-        draw_landmarks(frame, landmarks)
+        if 0 < len(landmarks):
+            draw_landmarks(frame, landmarks)
+
         cv2.imshow('frame', frame)
         frame_shown = True
 
