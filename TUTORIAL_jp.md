@@ -9,7 +9,7 @@
 
 ## ailia SDKのインストール
 
-- [ailia SDK無償評価版のダウンロード](https://ailia.jp/trial)
+- [ailia SDK無償評価版のダウンロード](https://axinc.jp/trial/)
 
 - ダウンロードしたailia SDKのzipファイルを展開
 
