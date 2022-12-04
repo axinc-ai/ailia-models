@@ -225,7 +225,10 @@ def main():
     # initialize
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
 
-    recognize_from_image(net)
+    if args.video:
+        logger.error('This model not support video mode.')
+    else:
+        recognize_from_image(net)
 
 
 if __name__ == '__main__':

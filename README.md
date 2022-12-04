@@ -232,6 +232,7 @@ The collection of pre-trained, state-of-the-art AI models.
 | [<img src="image_manipulation/dfm/output.png" width=128px>](image_manipulation/dfm/) | [dfm](/image_manipulation/dfm/) | [Deep Feature Matching](https://github.com/ufukefe/DFM) | Pytorch | 1.2.6 and later |
 | [<img src="image_manipulation/dfe/out_A_B0.png" width=128px>](image_manipulation/dfe/) | [dfe](/image_manipulation/dfe/) | [Deep Fundamental Matrix Estimation](https://github.com/isl-org/DFE) | Pytorch | 1.2.6 and later |
 | [<img src="image_manipulation/dehamer/output.png" width=128px>](image_manipulation/dehamer/) | [dehamer](/image_manipulation/dehamer/) | [Image Dehazing Transformer with Transmission-Aware 3D Position Embedding](https://github.com/Li-Chongyi/Dehamer) | Pytorch | 1.2.13 and later |
+| [<img src="image_manipulation/pytorch-superpoint/output_warping_correspondence.png" width=128px>](image_manipulation/pytorch-superpoint/) | [pytorch-superpoint](/image_manipulation/pytorch-superpoint/) | [pytorch-superpoint : Self-Supervised Interest Point Detection and Description](https://github.com/eric-yyjau/pytorch-superpoint) | Pytorch | 1.2.6 and later |
 
 ## Image segmentation
 
