@@ -41,7 +41,7 @@ WEIGHT_CHURCH_ENC_PATH = "church_encoder.onnx"
 MODEL_CHURCH_ENC_PATH = "church_encoder.onnx.prototxt"
 WEIGHT_CHURCH_DEC_PATH = "church_decoder.onnx"
 MODEL_CHURCH_DEC_PATH = "church_decoder.onnx.prototxt"
-REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/e4e/'
+REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/encoder4editing/'
 
 IMAGE_PATH = 'demo.jpg'
 SAVE_IMAGE_PATH = 'output.png'
