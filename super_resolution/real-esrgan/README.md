@@ -29,7 +29,7 @@ For the sample image,
 $ python3 real_esrgan.py
 ```
 
-You can also use an anime-specific super-resolution model by adding the -m RealESRGAN_anime option.
+You can also use an anime-specific super-resolution model by adding the -m RealESRGAN_anime or RealESRGAN_anime_v3 option.
 
 ```bash
 $ python3 real_esrgan.py -m RealESRGAN_anime -i input_anime.jpg -s output_anime.jpg
@@ -37,10 +37,9 @@ $ python3 real_esrgan.py -m RealESRGAN_anime -i input_anime.jpg -s output_anime.
 
 If you want to specify the input image, put the image path after the `--input` option.  
 You can use `--savepath` option to change the name of the output file to save.
-( You can change the model by specifying `--model`)
 
 ```bash
-$ python3 real-esrgan.py --input IMAGE_PATH --savepath SAVE_IMAGE_PATH --model RealESRGAN_anime_v3
+$ python3 real-esrgan.py --input IMAGE_PATH --savepath SAVE_IMAGE_PATH
 ```
 
 By adding the `--video` option, you can input the video.   
@@ -68,4 +67,4 @@ ONNX opset = 12
 
 [RealESRGAN.opt.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/real-esrgan/RealESRGAN.opt.onnx.prototxt)
 
-[realesr-animevideov3.opt.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/real-esrgan/realesr-animevideov3.opt.onnx.prototxt)
+[RealESRGAN_anime_v3.opt.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/real-esrgan/RealESRGAN_anime_v3.opt.onnx.prototxt)

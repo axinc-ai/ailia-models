@@ -15,7 +15,7 @@ from utils import get_base_parser, get_savepath, update_parser  # noqa: E402
 from webcamera_utils import get_capture, get_writer  # noqa: E402
 
 from real_esrgan_utils import RealESRGAN
-from real_esrgan_utils_v3 import RealESRGANer
+from real_esrgan_utils_v3 import RealESRGANv3
 
 logger = getLogger(__name__)
 
@@ -49,7 +49,7 @@ MODEL_PATH = args.model + '.opt.onnx.prototxt'
 WEIGHT_PATH = args.model + '.opt.onnx'
 
 if args.model == "RealESRGAN_anime_v3":
-    RealESRGAN = RealESRGANer
+    RealESRGAN = RealESRGANv3
 else:
     RealESRGAN = RealESRGAN
 

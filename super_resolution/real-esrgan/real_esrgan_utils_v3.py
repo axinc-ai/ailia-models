@@ -3,7 +3,7 @@ import numpy as np
 import os
 
 
-class RealESRGANer():
+class RealESRGANv3():
     def __init__(self,
                  model,
                  scale=4,
