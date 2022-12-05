@@ -15,6 +15,7 @@ from utils import get_base_parser, get_savepath, update_parser  # noqa: E402
 from webcamera_utils import get_capture, get_writer  # noqa: E402
 
 from real_esrgan_utils import RealESRGAN
+from real_esrgan_utils_v3 import RealESRGANv3
 
 logger = getLogger(__name__)
 
@@ -38,7 +39,7 @@ parser = get_base_parser(
 parser.add_argument(
     '-m', '--model', metavar='MODEL_NAME',
     default='RealESRGAN',
-    help='[RealESRGAN, RealESRGAN_anime]'
+    help='[RealESRGAN, RealESRGAN_anime, RealESRGAN_anime_v3]'
 )
 
 
@@ -46,6 +47,11 @@ args = update_parser(parser)
 
 MODEL_PATH = args.model + '.opt.onnx.prototxt'
 WEIGHT_PATH = args.model + '.opt.onnx'
+
+if args.model == "RealESRGAN_anime_v3":
+    RealESRGAN = RealESRGANv3
+else:
+    RealESRGAN = RealESRGAN
 
 
 def enhance_image():
