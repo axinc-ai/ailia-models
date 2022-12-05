@@ -271,9 +271,12 @@ def recognize_from_video(video, detector, pp_net):
     else:
         writer = None
 
+    frame_shown = False
     while True:
         ret, frame = capture.read()
         if cv2.waitKey(1) & 0xFF == ord('q') or not ret:
+            break
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
             break
 
         x = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
@@ -282,6 +285,7 @@ def recognize_from_video(video, detector, pp_net):
             detect_object, frame, CATEGORY, segm_masks=seg_masks
         )
         cv2.imshow('frame', res_img)
+        frame_shown = True
 
         # save results
         if writer is not None:

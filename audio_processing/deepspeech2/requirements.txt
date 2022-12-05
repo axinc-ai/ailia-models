@@ -6,13 +6,13 @@ chardet==3.0.4
 decorator==4.4.2
 future==0.18.2
 idna==2.10
-joblib==0.17.0
+joblib==1.2.0
 librosa==0.8.0
 llvmlite==0.34.0
 numba==0.51.2
-numpy==1.21.0
+numpy==1.22.0
 packaging==20.4
-Pillow==9.0.0
+Pillow==9.3.0
 pooch==1.2.0
 PyAudio==0.2.11
 pycparser==2.20

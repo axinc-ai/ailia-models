@@ -265,9 +265,13 @@ def recognize_from_video(det_net, reg_net):
     sct_config = IOUTrackerConfig()
     sct_config = asdict(sct_config)
     tracker = IOUTracker(**sct_config)
+    
+    frame_shown = False
     while (True):
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
             break
 
         # inference
@@ -291,6 +295,7 @@ def recognize_from_video(det_net, reg_net):
 
         frame = draw_detections(frame, reg_detections, boxes, ids, rgb=False)
         cv2.imshow('frame', frame)
+        frame_shown = True
 
         # save results
         if writer is not None:

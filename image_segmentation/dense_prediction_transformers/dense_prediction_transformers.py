@@ -148,11 +148,14 @@ def recognize_from_video(net):
     else:
         writer = None
 
+    frame_shown = False
     while(True):
         ret, img_raw = capture.read()
 
         # press q to end video capture
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
             break
 
         img_raw = cv2.cvtColor(img_raw, cv2.COLOR_BGR2RGB) / 255.0
@@ -178,6 +181,7 @@ def recognize_from_video(net):
             out = cv2.cvtColor(out, cv2.COLOR_RGB2BGR) 
 
         cv2.imshow('frame', out)
+        frame_shown = True
 
         # save results
         if writer is not None:
@@ -190,20 +194,21 @@ def recognize_from_video(net):
     logger.info('Script finished successfully.')
 
 def main():
+    mem_mode = ailia.get_memory_mode(reduce_constant=True, reuse_interstage=True)
     if args.task == 'monodepth':
         check_and_download_models(WEIGHT_MONODEPTH_PATH, MODEL_MONODEPTH_PATH, REMOTE_PATH)
         if args.onnx:
             import onnxruntime
             net = onnxruntime.InferenceSession(WEIGHT_MONODEPTH_PATH)
         else:
-            net = ailia.Net(MODEL_MONODEPTH_PATH, WEIGHT_MONODEPTH_PATH, env_id=args.env_id)
+            net = ailia.Net(MODEL_MONODEPTH_PATH, WEIGHT_MONODEPTH_PATH, env_id=args.env_id, memory_mode=mem_mode)
     elif args.task == 'segmentation':
         check_and_download_models(WEIGHT_SEGMENTATION_PATH, MODEL_SEGMENTATION_PATH, REMOTE_PATH)
         if args.onnx:
             import onnxruntime
             net = onnxruntime.InferenceSession(WEIGHT_SEGMENTATION_PATH)
         else:
-            net = ailia.Net(MODEL_SEGMENTATION_PATH, WEIGHT_SEGMENTATION_PATH, env_id=args.env_id)
+            net = ailia.Net(MODEL_SEGMENTATION_PATH, WEIGHT_SEGMENTATION_PATH, env_id=args.env_id, memory_mode=mem_mode)
 
     if args.video is not None:
         # video mode

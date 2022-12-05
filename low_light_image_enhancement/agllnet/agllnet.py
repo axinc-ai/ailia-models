@@ -1,19 +1,21 @@
-import sys, os
+import os
+import sys
 import time
+
+import ailia
 import cv2
 import numpy as np
 
-import ailia
-
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
-from model_utils import check_and_download_models  # noqa: E402
+# logger
+from logging import getLogger  # noqa: E402
 
 import webcamera_utils  # noqa: E402
+from image_utils import imread  # noqa: E402
+from model_utils import check_and_download_models  # noqa: E402
+from utils import get_base_parser, get_savepath, update_parser  # noqa: E402
 
-# logger
-from logging import getLogger   # noqa: E402
 logger = getLogger(__name__)
 
 
@@ -46,14 +48,15 @@ args = update_parser(parser)
 def recognize_from_image():
     # net initialize
     env_id = args.env_id
-    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+    mem_mode = ailia.get_memory_mode(reduce_constant=True, reduce_interstage=True)
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id, memory_mode=mem_mode)
 
     # input image loop
     for image_path in args.input:
         # prepare input data
         logger.info(image_path)
 
-        img = cv2.imread(image_path) / 255.
+        img = imread(image_path) / 255.
         H = img.shape[0]
         W = img.shape[1]
         img = cv2.resize(img, (HEIGHT_SIZE, WIDTH_SIZE), interpolation=cv2.INTER_LANCZOS4)
@@ -87,7 +90,8 @@ def recognize_from_image():
 def recognize_from_video():
     # net initialize
     env_id = args.env_id
-    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+    mem_mode = ailia.get_memory_mode(reduce_constant=True, reduce_interstage=True)
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id, memory_mode=mem_mode)
 
     capture = webcamera_utils.get_capture(args.video)
 
@@ -102,9 +106,12 @@ def recognize_from_video():
     else:
         writer = None
 
+    frame_shown = False
     while (True):
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
             break
 
         input = cv2.resize(frame, (HEIGHT_SIZE, WIDTH_SIZE), interpolation=cv2.INTER_LANCZOS4) / 255.
@@ -121,6 +128,7 @@ def recognize_from_video():
         output = (enhance * 255.).astype(np.uint8)
 
         cv2.imshow('frame', output)
+        frame_shown = True
 
         # save results
         if writer is not None:

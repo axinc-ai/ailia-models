@@ -240,6 +240,8 @@ def recognize_from_file(input, pose, net):
             cv2.imshow("ST-GCN", image)
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
+            if cv2.getWindowProperty('ST-GCN', cv2.WND_PROP_VISIBLE) == 0:
+                break
 
 
 def recognize_realtime(video, pose, net):
@@ -250,11 +252,14 @@ def recognize_realtime(video, pose, net):
     # start recognition
     start_time = time.time()
     frame_index = 0
+    frame_shown = False
     while True:
         tic = time.time()
 
         ret, frame = capture.read()
         if cv2.waitKey(1) & 0xFF == ord('q') or not ret:
+            break
+        if frame_shown and cv2.getWindowProperty('ST-GCN', cv2.WND_PROP_VISIBLE) == 0:
             break
 
         source_H, source_W, _ = frame.shape
@@ -324,6 +329,7 @@ def recognize_realtime(video, pose, net):
             cv2.imwrite("output/ST-GCN-%08d.png" % frame_index, image)
         else:
             cv2.imshow('ST-GCN', image)
+            frame_shown = True
 
     capture.release()
     cv2.destroyAllWindows()

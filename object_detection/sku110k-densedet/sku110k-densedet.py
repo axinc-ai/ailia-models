@@ -189,9 +189,12 @@ def recognize_from_video(net):
     else:
         writer = None
 
+    frame_shown = False
     while True:
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
             break
 
         # inference
@@ -202,6 +205,7 @@ def recognize_from_video(net):
 
         # show
         cv2.imshow('frame', res_img)
+        frame_shown = True
 
         # save results
         if writer is not None:
@@ -224,7 +228,7 @@ def main():
     # initialize
     if not args.onnx:
         logger.info("This model requires 10GB or more memory.")
-        memory_mode=ailia.get_memory_mode(reduce_constant=True, ignore_input_with_initializer=True, reduce_interstage=False, reuse_interstage=True)
+        memory_mode=ailia.get_memory_mode(reduce_constant=True, ignore_input_with_initializer=True, reduce_interstage=True, reuse_interstage=False)
         net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id, memory_mode=memory_mode)
     else:
         import onnxruntime

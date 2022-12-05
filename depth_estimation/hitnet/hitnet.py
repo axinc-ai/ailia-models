@@ -1,22 +1,24 @@
+import glob
 import sys
 import time
-import numpy as np
-import glob
-import cv2
 
-import onnxruntime
 import ailia
+import cv2
+import numpy as np
+import onnxruntime
 
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
-from model_utils import check_and_download_models  # noqa: E402
-import webcamera_utils  # noqa: E402
-
 # logger
-from logging import getLogger   # noqa: E402
+from logging import getLogger  # noqa: E402
+
+import webcamera_utils  # noqa: E402
+from image_utils import imread  # noqa: E402
+from model_utils import check_and_download_models  # noqa: E402
+from utils import get_base_parser, get_savepath, update_parser  # noqa: E402
+
 logger = getLogger(__name__)
 
-from utils_hitnet import draw_disparity, draw_depth, CameraConfig
+from utils_hitnet import CameraConfig, draw_depth, draw_disparity
 
 camera_config =  CameraConfig(0.546, 1000)
 max_distance = 30
@@ -84,8 +86,8 @@ def preprocessing(left_img,right_img,input_shape):
 def recognize_from_image(net):
     
     # read left and right images
-    left_img = cv2.imread(args.left)
-    right_img = cv2.imread(args.right)
+    left_img = imread(args.left)
+    right_img = imread(args.right)
 
     # get model info
     if args.onnx:
@@ -131,13 +133,17 @@ def recognize_from_video(net):
         input_shape = net.get_inputs()[0].shape
     else:
         input_shape = net.get_input_shape()
+    
+    if not left_images or not right_images:
+        logger.error("This model requires stereo images")
+        return
 
     cv2.namedWindow("Estimated depth", cv2.WINDOW_NORMAL)
     for left_path, right_path in zip(left_images, right_images):
 
         # Read frame from the video
-        left_img = cv2.imread(left_path)
-        right_img = cv2.imread(right_path)
+        left_img = imread(left_path)
+        right_img = imread(right_path)
 
         # preprocessing
         input_tensor = preprocessing(left_img,right_img,input_shape)
@@ -160,8 +166,10 @@ def recognize_from_video(net):
 
         # Press key q to stop
         if cv2.waitKey(1) == ord('q'):
-            cv2.destroyAllWindows()
             break
+        if cv2.getWindowProperty('Estimated depth', cv2.WND_PROP_VISIBLE) == 0:
+            break
+
     
     cv2.destroyAllWindows()
     logger.info('Script finished successfully.')

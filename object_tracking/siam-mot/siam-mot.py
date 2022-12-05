@@ -69,6 +69,11 @@ parser.add_argument(
     action='store_true',
     help='execute onnxruntime version.'
 )
+parser.add_argument(
+    '--gui',
+    action='store_true',
+    help='Display preview in GUI.'
+)
 args = update_parser(parser)
 
 
@@ -339,9 +344,12 @@ def recognize_from_video(rpn, box, tracker, feat_ext):
     else:
         writer = None
 
+    frame_shown = False
     while True:
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
             break
 
         # inference
@@ -351,7 +359,11 @@ def recognize_from_video(rpn, box, tracker, feat_ext):
         res_img = frame_vis_generator(frame, boxes)
 
         # show
-        cv2.imshow('frame', res_img)
+        if args.gui or args.video:
+            cv2.imshow('frame', res_img)
+            frame_shown = True
+        else:
+            print("Tracking ids",boxes[2])
 
         # save results
         if writer is not None:
