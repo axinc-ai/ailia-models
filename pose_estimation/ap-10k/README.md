@@ -4,7 +4,7 @@
 
 ![Input](input.jpg)
 
-(Image from https://github.com/AlexTheBad/AP-10K)
+(Image from AP-10K dataset 000000030718.jpg https://github.com/AlexTheBad/AP-10K)
 
 Shape : (1, 3, 256, 256)
 
