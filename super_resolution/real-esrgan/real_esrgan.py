@@ -38,20 +38,19 @@ parser = get_base_parser(
 )
 parser.add_argument(
     '-m', '--model', metavar='MODEL_NAME',
-    default='RealESRGAN_anime_v3',
+    default='RealESRGAN_anime',
     help='[RealESRGAN, RealESRGAN_anime, RealESRGAN_anime_v3]'
 )
 
 
 args = update_parser(parser)
 
+MODEL_PATH = args.model + '.opt.onnx.prototxt'
+WEIGHT_PATH = args.model + '.opt.onnx'
+
 if args.model == "RealESRGAN_anime_v3":
-    MODEL_PATH = 'realesr-animevideov3.opt.onnx.prototxt'
-    WEIGHT_PATH = 'realesr-animevideov3.opt.onnx'
     RealESRGAN = RealESRGANer
 else:
-    MODEL_PATH = args.model + '.opt.onnx.prototxt'
-    WEIGHT_PATH = args.model + '.opt.onnx'
     RealESRGAN = RealESRGAN
 
 

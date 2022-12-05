@@ -2,7 +2,9 @@
 
 ## Input
 
-![Input](input_anime.jpg)
+![Input](input.jpg)
+
+(Image from https://github.com/xinntao/Real-ESRGAN/tree/master/inputs/ADE_val_00000114.jpg)
 
 ![Input](input_anime.jpg)
 
