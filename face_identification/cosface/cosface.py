@@ -7,8 +7,7 @@ from model_utils import check_and_download_models
 import numpy as np
 import ailia
 from PIL import Image
-from torchvision.transforms import functional as F
-import torchvision.transforms as transforms
+
 
 # logger
 from logging import getLogger   # noqa: E402
@@ -46,15 +45,20 @@ args = update_parser(parser)
 
 def preprocessing(img_path):
     with open(img_path, 'rb') as f:
+        # Image[H, W, C]
         original_img = Image.open(f).convert('RGB').resize((96, 112), Image.Resampling.LANCZOS)
 
-    transform = transforms.Compose([
-        transforms.ToTensor(),  # range [0, 255] -> [0.0,1.0]
-        transforms.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5))  # range [0.0, 1.0] -> [-1.0,1.0]
-    ])
+    # Range [0, 255] -> [0.0,1.0]
+    img_01 = np.array(original_img) / 255
+    img_01 = img_01.transpose(-1, 0, 1)  # to Image[C, H, W]
 
-    img, img_flipped = transform(original_img), transform(F.hflip(original_img))
-    img, img_flipped = img.unsqueeze(0).numpy(), img_flipped.unsqueeze(0).numpy()
+    # range [0.0, 1.0] -> [-1.0,1.0]
+    MEAN = np.array([0.5, 0.5, 0.5])  # RGB
+    STD = np.array([0.5, 0.5, 0.5])   # RGB
+    img = (img_01 - MEAN[:, None, None]) / STD[:, None, None]  # Normalize
+    img_flipped = np.flip(img, axis=2)  # Horizontally flip
+
+    img, img_flipped = np.expand_dims(img, axis=0), np.expand_dims(img_flipped, axis=0)
     return {'original': img, 'flipped': img_flipped}
 
 
@@ -71,7 +75,7 @@ def cosFace(id_img_path, query_img_path):
     img2 = preprocessing(query_img_path)
 
     # Inference ( extract feature )
-    model = ailia.Net(weight=WEIGHT_PATH, env_id=args.env_id)
+    model = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
     f1 = extractDeepFeature(img1, model)
     f2 = extractDeepFeature(img2, model)
 
