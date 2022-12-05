@@ -1,12 +1,6 @@
 import cv2
-import math
 import numpy as np
 import os
-import queue
-import threading
-
-
-ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
 class RealESRGANer():
