@@ -23,7 +23,7 @@ logger = getLogger(__name__)
 # ======================
 # Parameters
 # ======================
-INPUT_IMAGE_PATH = 'input_anime.jpg'
+INPUT_IMAGE_PATH = 'input.jpg'
 SAVE_IMAGE_PATH = 'output.jpg'
 
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/real-esrgan/'
@@ -38,7 +38,7 @@ parser = get_base_parser(
 )
 parser.add_argument(
     '-m', '--model', metavar='MODEL_NAME',
-    default='RealESRGAN_anime',
+    default='RealESRGAN',
     help='[RealESRGAN, RealESRGAN_anime, RealESRGAN_anime_v3]'
 )
 
