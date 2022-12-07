@@ -17,9 +17,14 @@ He hoped there would be stew for dinner, turnips and carrots and bruised potatoe
 
 This model requires additional module.
 ```
+pip3 install soundfile
+pip3 install pyaudio  # for microphone input mode
+```
+
+If you use `--disable_ailia_audio` and `--disable_ailia_tokenizer` option, this model requires additional module.
+```
 pip3 install librosa
 pip3 install transformers
-pip3 install soundcard  # for microphone input mode
 ```
 
 ## Usage
