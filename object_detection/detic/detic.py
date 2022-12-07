@@ -341,6 +341,7 @@ def predict(net, img):
     img = preprocess(img)
     pred_hw = img.shape[-2:]
     im_hw = np.array([im_h, im_w]).astype(np.int64)
+    #img[:] = 0 # test for grid sampler
 
     # feedforward
     if args.opset16:
