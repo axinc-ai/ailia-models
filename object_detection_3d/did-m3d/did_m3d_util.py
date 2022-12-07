@@ -167,11 +167,10 @@ class KITTI():
         assert os.path.exists(calib_file)
         return Calibration(calib_file)
 
-    #def __getitem__(self, item):
-    def __getitem__(self, img_file,calib_file):
+    def __getitem__(self, img,calib_file):
         #  ============================   get inputs   ===========================
-
-        img = self.get_image(img_file)
+        
+        img = Image.fromarray(img)
         img_size = np.array(img.size)
 
         # data augmentation for image
@@ -267,7 +266,7 @@ def decode_detections(dets, info, calibs, cls_mean_size, threshold, problist=Non
 
 
 
-class Tester(object):
+class Detect(object):
     def __init__(self, net, cfg_dataset,th= 0.3):
 
         self.th = th
@@ -277,10 +276,10 @@ class Tester(object):
         self.class_name = self.kitti.class_name
         self.net = net
 
-    def test(self,img_file,calib_file):
+    def run(self,img,calib_file):
 
         results = {}
-        inputs, calibs, coord_ranges, _, info = self.kitti.__getitem__(img_file,calib_file)
+        inputs, calibs, coord_ranges, _, info = self.kitti.__getitem__(img,calib_file)
 
         dets = self.net.run((np.array([inputs]),np.array([coord_ranges]),np.array([calibs])))[0]
 
@@ -296,26 +295,25 @@ class Tester(object):
                                  threshold = self.th
                                  )
 
-        self.save_results(results)
+        results = self.save_results(results)
 
-        return results
+        return results 
 
     def save_results(self, results):
         img_id = 0
-        out_path = "output_tmp.txt"
+        output = ""
 
-        f = open(out_path, 'w')
         for i in range(len(results[img_id])):
             class_name = self.class_name[int(results[img_id][i][0])]
-            f.write('{} 0.0 0'.format(class_name))
+            output += '{} 0.0 0'.format(class_name) 
             for j in range(1, len(results[img_id][i])):
-                f.write(' {:.2f}'.format(results[img_id][i][j]))
-            f.write('\n')
-        f.close()
+                output += ' {:.2f}'.format(results[img_id][i][j])
+            output += '\n'
+        return output
 
 def get_objects_from_label(label_file):
-    with open(label_file, 'r') as f:
-        lines = f.readlines()
+    lines = label_file.split("\n")
+    lines = lines[0:len(lines)-1]
     objects = [Object3d(line) for line in lines]
     return objects
 

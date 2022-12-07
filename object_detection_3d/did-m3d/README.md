@@ -38,6 +38,11 @@ If you want to specify directory or directly file path, put the path after the `
 $ python3 did_m3d.py --input IMAGE_PATH --calib_path CALIB_PATH
 ```
 
+By adding the `--video` option, you can input the video.   
+If you pass `0` as an argument to VIDEO_PATH, you can use the webcam input instead of the video file.
+```bash
+$ python3 egonet.py --video VIDEO_PATH
+```
 
 
 ## Reference
