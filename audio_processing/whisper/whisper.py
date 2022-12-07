@@ -115,9 +115,9 @@ parser.add_argument(
     help='display profile.'
 )
 parser.add_argument(
-    '--disable_ailia_audio',
+    '--ailia_audio',
     action='store_true',
-    help='disable ailia audio.'
+    help='use ailia audio.'
 )
 parser.add_argument(
     '--disable_ailia_tokenizer',
@@ -126,7 +126,7 @@ parser.add_argument(
 )
 args = update_parser(parser)
 
-if not args.disable_ailia_audio:
+if args.ailia_audio:
     from ailia_audio_utils import (CHUNK_LENGTH, HOP_LENGTH, N_FRAMES, SAMPLE_RATE,
                             load_audio, log_mel_spectrogram, pad_or_trim)
 else:
