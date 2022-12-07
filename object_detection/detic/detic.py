@@ -340,7 +340,7 @@ def predict(net, img):
     im_h, im_w = img.shape[:2]
     img = preprocess(img)
     pred_hw = img.shape[-2:]
-    im_hw = np.array([im_h, im_w])
+    im_hw = np.array([im_h, im_w]).astype(np.int64)
 
     # feedforward
     if args.opset16:
