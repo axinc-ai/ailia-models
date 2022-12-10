@@ -36,14 +36,14 @@ If you pass `0` as an argument to VIDEO_PATH, you can use the webcam input inste
 $ python3 posenet.py --video VIDEO_PATH
 ```
 
-Also you can set detection threshold by adding the `--threshold` option.
-Default value is 0.3.
+Also you can set detection threshold by adding the `--threshold-pose` and `--threshold-part` option.
+Default threshold-pose value is 0.15 , threshold-pose value 0.1.
 
 ```bash
-$ python3 posenet.py --threshold 0.2
+$ python3 posenet.py --threshold-pose 0.15 --threshold-pose 0.1
 ```
 
-You can select a pretrained model by specifying -a mb1-ssd or -a mb2-ssd-lite(default).
+You can select a pretrained model by specifying -a 50, 75 ,100 or 101(default).
 
 ## Reference
 

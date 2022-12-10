@@ -139,21 +139,13 @@ def pool2d(A, kernel_size, stride, padding=0, pool_mode='max'):
 
 def build_part_with_score(score_threshold, local_max_radius, scores):
     lmd = 2 * local_max_radius + 1
+
     max_vals = np.array([pool2d(channel, lmd, 1,1) for channel in np.array(scores)])
 
-    max_loc = (scores == max_vals) & (scores >= score_threshold)
+    max_loc   = (scores == max_vals)   & (scores >= score_threshold)
+    max_loc_idx = np.argwhere(max_loc)
 
-    max_loc_idx = []
-    i = 0
-    for loc in max_loc:
-        nonzero_loc = np.nonzero(loc)
-        if len(nonzero_loc[0]) > 0:
-            loc_idx = np.stack(nonzero_loc,1)[0]
-            max_loc_idx.append(np.hstack(([i],loc_idx)))
-            i+=1
-    max_loc_idx = np.array(max_loc_idx)
-
-    scores_vec = (scores[max_loc])[:i]
+    scores_vec = (scores[max_loc])
 
     sort_idx = np.argsort(-scores_vec)
     return scores_vec[sort_idx], max_loc_idx[sort_idx]

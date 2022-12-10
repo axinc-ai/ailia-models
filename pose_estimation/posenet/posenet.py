@@ -27,12 +27,15 @@ from posenet_util import *
 # ======================
 IMAGE_PATH = 'input.jpg'
 SAVE_IMAGE_PATH = 'output.png'
-IMAGE_HEIGHT = 480
-IMAGE_WIDTH = 640 
+
+IMAGE_HEIGHT = 720
+IMAGE_WIDTH = 1280
 
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/posenet/'
 
-THRESHOLD_DEFAULT = 0.25
+THRESHOLD_POSE_DEFAULT = 0.15
+THRESHOLD_PART_DEFAULT = 0.15
+SCALE_DEFAULT = 0.7125
 
 MODEL_LISTS = ['50','75','100','101']
 
@@ -43,21 +46,29 @@ parser = get_base_parser(
     'Fast and accurate human pose 2D-estimation.', IMAGE_PATH, SAVE_IMAGE_PATH,
 )
 parser.add_argument(
-    '-t', '--threshold', type=float, default=THRESHOLD_DEFAULT,
-    help='The detection threshold.'
+    '-t', '--threshold-pose', type=float, default=THRESHOLD_POSE_DEFAULT,
+    help='The detection pose threshold.'
 )
+parser.add_argument(
+    '--threshold-part', type=float, default=THRESHOLD_PART_DEFAULT,
+    help='The detection part threshold.'
+)
+
 
 parser.add_argument('-a','--arch', type=int, default=101,
     help='model layer number lists: ' + ' | '.join(MODEL_LISTS)
 )
 
+parser.add_argument(
+    '--scale-factor', type=float, default=SCALE_DEFAULT,
+)
 
 args = update_parser(parser)
 
 def keypoint_draw(image_path,draw_image, pose_scores, keypoint_scores, keypoint_coords):
     draw_image = draw_skel_and_kp(
         draw_image, pose_scores, keypoint_scores, keypoint_coords,
-        min_pose_score=args.threshold, min_part_score=args.threshold)
+        min_pose_score=args.threshold_pose, min_part_score=args.threshold_part)
 
     if False:
         print("\nResults for image: %s" % image_path)
@@ -74,7 +85,7 @@ def detect(model,img):
     output_stride = 16
     
 
-    input_image, draw_image, output_scale = process_input(img,scale_factor=1, output_stride=output_stride)
+    input_image, draw_image, output_scale = process_input(img,args.scale_factor, output_stride=output_stride)
 
     heatmaps_result, offsets_result, displacement_fwd_result, displacement_bwd_result = model.run(input_image)
 
@@ -85,7 +96,7 @@ def detect(model,img):
         displacement_bwd_result.squeeze(0),
         output_stride=output_stride,
         max_pose_detections=10,
-        min_pose_score=args.threshold)
+        min_pose_score=args.threshold_pose)
 
     keypoint_coords *= output_scale
     return draw_image, pose_scores, keypoint_scores, keypoint_coords,
@@ -155,6 +166,7 @@ def recognize_from_video(model):
         # postprocessing
         draw_image = keypoint_draw(None,input_data, pose_scores, keypoint_scores, keypoint_coords)
         cv2.imshow('frame', draw_image)
+
         frame_shown = True
 
         # save results
