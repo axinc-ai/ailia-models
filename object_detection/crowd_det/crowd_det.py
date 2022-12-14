@@ -22,10 +22,12 @@ logger = getLogger(__name__)
 # Parameters
 # ======================
 
-WEIGHT_PATH = 'rcnn_fpn_baseline_mge.onnx'
-MODEL_PATH = 'rcnn_fpn_baseline_mge.onnx.prototxt'
-WEIGHT_XXX_PATH = 'xxx.onnx'
-MODEL_XXX_PATH = 'xxx.onnx.prototxt'
+WEIGHT_FPN_BASE_PATH = 'rcnn_fpn_baseline_mge.onnx'
+MODEL_FPN_BASE_PATH = 'rcnn_fpn_baseline_mge.onnx.prototxt'
+WEIGHT_EMD_SIMPLE_PATH = 'rcnn_emd_simple_mge.onnx'
+MODEL_EMD_SIMPLE_PATH = 'rcnn_emd_simple_mge.onnx.prototxt'
+WEIGHT_EMD_REFINE_PATH = 'rcnn_emd_refine_mge.onnx'
+MODEL_EMD_REFINE_PATH = 'rcnn_emd_refine_mge.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/crowd_det/'
 
 IMAGE_PATH = 'demo.jpg'
@@ -39,7 +41,8 @@ parser = get_base_parser(
     'Detection in Crowded Scenes', IMAGE_PATH, SAVE_IMAGE_PATH
 )
 parser.add_argument(
-    '-m', '--model_type', default='xxx', choices=('xxx', 'XXX'),
+    '-m', '--model_type', default='rcnn_fpn_baseline',
+    choices=('rcnn_fpn_baseline', 'rcnn_emd_simple', 'rcnn_emd_refine'),
     help='model type'
 )
 parser.add_argument(
@@ -56,6 +59,59 @@ parser.add_argument(
     help='execute onnxruntime version.'
 )
 args = update_parser(parser)
+
+
+# ======================
+# Secondaty Functions
+# ======================
+
+def set_cpu_nms(dets, thresh):
+    """Pure Python NMS baseline."""
+
+    def _overlap(det_boxes, basement, others):
+        eps = 1e-8
+        x1_basement, y1_basement, x2_basement, y2_basement \
+            = det_boxes[basement, 0], det_boxes[basement, 1], \
+              det_boxes[basement, 2], det_boxes[basement, 3]
+        x1_others, y1_others, x2_others, y2_others \
+            = det_boxes[others, 0], det_boxes[others, 1], \
+              det_boxes[others, 2], det_boxes[others, 3]
+        areas_basement = (x2_basement - x1_basement) * (y2_basement - y1_basement)
+        areas_others = (x2_others - x1_others) * (y2_others - y1_others)
+        xx1 = np.maximum(x1_basement, x1_others)
+        yy1 = np.maximum(y1_basement, y1_others)
+        xx2 = np.minimum(x2_basement, x2_others)
+        yy2 = np.minimum(y2_basement, y2_others)
+        w = np.maximum(0.0, xx2 - xx1)
+        h = np.maximum(0.0, yy2 - yy1)
+        inter = w * h
+        ovr = inter / (areas_basement + areas_others - inter + eps)
+        return ovr
+
+    scores = dets[:, 4]
+    order = np.argsort(-scores)
+    dets = dets[order]
+
+    numbers = dets[:, -1]
+    keep = np.ones(len(dets)) == 1
+    ruler = np.arange(len(dets))
+    while ruler.size > 0:
+        basement = ruler[0]
+        ruler = ruler[1:]
+        num = numbers[basement]
+        # calculate the body overlap
+        overlap = _overlap(dets[:, :4], basement, ruler)
+        indices = np.where(overlap > thresh)[0]
+        loc = np.where(numbers[ruler][indices] == num)[0]
+        # the mask won't change in the step
+        mask = keep[ruler[indices][loc]]
+        keep[ruler[indices]] = False
+        keep[ruler[indices][loc][mask]] = True
+        ruler[~keep[ruler]] = -1
+        ruler = ruler[ruler > 0]
+
+    keep = keep[np.argsort(order)]
+    return keep
 
 
 # ======================
@@ -84,13 +140,29 @@ def preprocess(img):
 
 
 def post_processing(pred_boxes):
-    pred_cls_threshold = args.threshold
+    pred_cls_threshold = 0.01
+    visual_thresh = args.threshold
     nms_thres = args.iou_threshold
 
-    pred_boxes = pred_boxes.reshape(-1, 6)
-    keep = pred_boxes[:, 4] > pred_cls_threshold
-    pred_boxes = pred_boxes[keep]
-    keep = nms_boxes(pred_boxes, pred_boxes[:, 4], nms_thres)
+    if args.model_type in ('rcnn_emd_simple', 'rcnn_emd_refine'):
+        top_k = pred_boxes.shape[-1] // 6
+        n = pred_boxes.shape[0]
+
+        pred_boxes = pred_boxes.reshape(-1, 6)
+        idents = np.tile(np.arange(n)[:, None], (1, top_k)).reshape(-1, 1)
+        pred_boxes = np.hstack((pred_boxes, idents))
+        keep = pred_boxes[:, 4] > pred_cls_threshold
+        pred_boxes = pred_boxes[keep]
+        keep = set_cpu_nms(pred_boxes, nms_thres)
+        pred_boxes = pred_boxes[keep]
+    else:
+        pred_boxes = pred_boxes.reshape(-1, 6)
+        keep = pred_boxes[:, 4] > pred_cls_threshold
+        pred_boxes = pred_boxes[keep]
+        keep = nms_boxes(pred_boxes, pred_boxes[:, 4], nms_thres)
+        pred_boxes = pred_boxes[keep]
+
+    keep = pred_boxes[:, 4] > visual_thresh
     pred_boxes = pred_boxes[keep]
 
     return pred_boxes
@@ -121,13 +193,6 @@ def predict(net, img):
     _, _, oh, ow = img.shape
     im_info = np.array([[oh, ow, scale, im_h, im_w, 0]])
 
-    # img = np.load("image1.npy")
-    # im_info = np.load("im_info1.npy")
-    # print(img)
-    # print(img.shape)
-    # print(im_info)
-    # print(im_info.shape)
-
     # feedforward
     if not args.onnx:
         output = net.predict([img, im_info])
@@ -135,12 +200,9 @@ def predict(net, img):
         output = net.run(None, {'img': img, 'im_info': im_info})
 
     pred_boxes = output[0]
-
     pred_boxes = post_processing(pred_boxes)
     pred_boxes[:, :4] /= scale
     pred_boxes[:, 2:4] -= pred_boxes[:, :2]
-    print(pred_boxes)
-    print(pred_boxes.shape)
 
     return pred_boxes
 
@@ -207,7 +269,7 @@ def recognize_from_video(net):
             break
 
         # inference
-        img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        img = frame
         pred = predict(net, img)
 
         # plot result
@@ -233,14 +295,14 @@ def recognize_from_video(net):
 
 def main():
     dic_model = {
-        'xxx': (WEIGHT_PATH, MODEL_PATH),
-        'XXX': (WEIGHT_XXX_PATH, MODEL_XXX_PATH),
+        'rcnn_fpn_baseline': (WEIGHT_FPN_BASE_PATH, MODEL_FPN_BASE_PATH),
+        'rcnn_emd_simple': (WEIGHT_EMD_SIMPLE_PATH, MODEL_EMD_SIMPLE_PATH),
+        'rcnn_emd_refine': (WEIGHT_EMD_REFINE_PATH, MODEL_EMD_REFINE_PATH),
     }
-    # weight_path, model_path = dic_model[args.model_type]
-    weight_path, model_path = dic_model['xxx']
+    weight_path, model_path = dic_model[args.model_type]
 
     # model files check and download
-    check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
+    check_and_download_models(weight_path, model_path, REMOTE_PATH)
 
     env_id = args.env_id
 
