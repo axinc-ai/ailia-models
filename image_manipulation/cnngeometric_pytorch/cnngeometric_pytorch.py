@@ -21,8 +21,6 @@ logger = getLogger(__name__)
 
 # for cnngeometric_pytorch
 from skimage import io
-import torch
-from torch.autograd import Variable
 from cnngeometric_pytorch_utils import homography_mat_from_4_pts, compose_H_matrices, compose_aff_matrices, compose_tps, GeometricTnf
 
 
@@ -79,13 +77,10 @@ def preprocess_img(image):
     image = np.expand_dims(image.transpose((2,0,1)),0)
     image = image.astype(np.float32)
 
-    image = torch.Tensor(image)
-    image_var = Variable(image,requires_grad=False)
     # Resize image using bilinear sampling with identity affine tnf
-    affineTnf = GeometricTnf(geometric_model='affine', out_h=240, out_w=240, use_cuda = False)
-    image = affineTnf(image_var)
+    affineTnf = GeometricTnf(geometric_model='affine', out_h=240, out_w=240)
+    image = affineTnf(image)
 
-    image = image.to('cpu').detach().numpy().copy()
     image /= 255.0
     image = image[0, :, :, :]
     mean, std = [0.485, 0.456, 0.406], [0.229, 0.224, 0.225]
@@ -101,59 +96,50 @@ def preprocess_img(image):
 # ======================
 def inference_one_pair(source_image, target_image, net_1, net_2):
     if args.model_1 == 'streetview_affine':
-        geoTnf = GeometricTnf(geometric_model='affine', use_cuda=torch.cuda.is_available())
+        geoTnf = GeometricTnf(geometric_model='affine')
     elif args.model_1 == 'streetview_hom':
-        geoTnf = GeometricTnf(geometric_model='hom', use_cuda=torch.cuda.is_available())
+        geoTnf = GeometricTnf(geometric_model='hom')
     elif args.model_1 == 'streetview_tps':
-        geoTnf = GeometricTnf(geometric_model='tps', use_cuda=torch.cuda.is_available())
+        geoTnf = GeometricTnf(geometric_model='tps')
 
     # eval model multistage
     for it in range(args.num_of_iters):
         # First iteration
         if it==0:
             theta = net_1.predict([source_image, target_image])[0]
-            theta = torch.from_numpy(theta.astype(np.float32)).clone()
             if args.model_1=='streetview_hom':
                 theta = homography_mat_from_4_pts(theta)
             continue
 
         # Compute warped image
         warped_image = None
-        warped_image = geoTnf(torch.from_numpy(source_image.astype(np.float32)).clone(),
-                              theta)
+        warped_image = geoTnf(source_image.astype(np.float32), theta)
 
         # Re-estimate tranformation
-        warped_image = warped_image.to('cpu').detach().numpy().copy()
         theta_iter = net_1.predict([warped_image, target_image])[0]
-        theta_iter = torch.from_numpy(theta_iter.astype(np.float32)).clone()
 
         # update accumultated transformation
         if args.model_1 == 'streetview_hom':
-            theta = compose_H_matrices(theta,homography_mat_from_4_pts(theta_iter))
+            theta = compose_H_matrices(theta, homography_mat_from_4_pts(theta_iter))
         elif args.model_1 == 'streetview_affine':
-            theta = compose_aff_matrices(theta,theta_iter)
+            theta = compose_aff_matrices(theta, theta_iter)
         elif args.model_1 == 'streetview_tps':
-            theta = compose_tps(theta,theta_iter)
+            theta = compose_tps(theta, theta_iter)
 
     # warp one last time using final transformation
-    source_image = torch.from_numpy(source_image.astype(np.float32)).clone()
-    warped_image = None
     warped_image = geoTnf(source_image, theta)
 
     # two stages
     if net_2 is not None:
         if args.model_2 == 'streetview_affine':
-            geoTnf_2 = GeometricTnf(geometric_model='affine', use_cuda=torch.cuda.is_available())
+            geoTnf_2 = GeometricTnf(geometric_model='affine')
         elif args.model_2 == 'streetview_hom':
-            geoTnf_2 = GeometricTnf(geometric_model='hom', use_cuda=torch.cuda.is_available())
+            geoTnf_2 = GeometricTnf(geometric_model='hom')
         elif args.model_2 == 'streetview_tps':
-            geoTnf_2 = GeometricTnf(geometric_model='tps', use_cuda=torch.cuda.is_available())
+            geoTnf_2 = GeometricTnf(geometric_model='tps')
 
         theta_1, warped_image_1 = theta, warped_image
-        warped_image_1 = warped_image_1.to('cpu').detach().numpy().copy()
         theta_2 = net_2.predict([warped_image_1, target_image])[0]
-        theta_2 = torch.from_numpy(theta_2.astype(np.float32)).clone()
-        warped_image_1 = torch.from_numpy(warped_image_1.astype(np.float32)).clone()
 
         if args.model_2 == 'streetview_hom':
             theta_2 = homography_mat_from_4_pts(theta_2)
@@ -161,7 +147,6 @@ def inference_one_pair(source_image, target_image, net_1, net_2):
         warped_image = geoTnf_2(warped_image_1, theta_2)
 
     warped_image = warped_image[0]
-    warped_image = warped_image.to('cpu').detach().numpy().copy()
 
     return warped_image
 
