@@ -253,6 +253,8 @@ def format_timestamp(seconds: float, always_include_hours: bool = False):
 
 def get_initial_tokens(tokenizer, options):
     sot_sequence = tokenizer.sot_sequence
+    if options.get("without_timestamps"):
+        sot_sequence = sot_sequence + [tokenizer.no_timestamps]
     sample_len = options.get("sample_len") or dims.n_text_ctx // 2
     n_ctx = dims.n_text_ctx
 
@@ -630,7 +632,8 @@ def predict(wav, enc_net, dec_net, immediate=False, microphone=False):
         'beam_size': args.beam_size, 'patience': args.patience,
         'length_penalty': args.length_penalty, 'suppress_tokens': args.suppress_tokens,
         'logprob_threshold': logprob_threshold,
-        'prompt': []
+        'prompt': [],
+        'without_timestamps': args.without_timestamps
     }
 
     mel = log_mel_spectrogram(wav)
