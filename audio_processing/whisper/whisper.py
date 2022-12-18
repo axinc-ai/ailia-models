@@ -31,6 +31,7 @@ logger = getLogger(__name__)
 
 WAV_PATH = 'demo.wav'
 SAVE_TEXT_PATH = 'output.txt'
+DEFAULT_CHUNK_LENGTH = 30
 
 # ======================
 # Workaround
@@ -125,8 +126,14 @@ parser.add_argument(
     help='disable ailia tokenizer.'
 )
 parser.add_argument(
-    "--chunk_length", type=int, default=30,
-    help="number of seconds of segment")
+    "--chunk_length", type=int, default=DEFAULT_CHUNK_LENGTH,
+    help="number of seconds of segment"
+)
+parser.add_argument(
+    '--without_timestamps',
+    action='store_true',
+    help='disable timestamps for modify chunk length.'
+)
 args = update_parser(parser)
 
 if args.ailia_audio:
@@ -165,7 +172,7 @@ N_AUDIO_CTX = N_FRAMES // 2 # 1500: number of context from audio encoder
 
 if not args.dynamic_kv_cache:
     # 高速化のためKV_CACHEのサイズを最大サイズで固定化したバージョン
-    if args.chunk_length == 30:
+    if args.chunk_length == DEFAULT_CHUNK_LENGTH:
         WEIGHT_DEC_TINY_PATH = "decoder_tiny_fix_kv_cache.onnx"
         MODEL_DEC_TINY_PATH = "decoder_tiny_fix_kv_cache.onnx.prototxt"
         WEIGHT_DEC_BASE_PATH = "decoder_base_fix_kv_cache.onnx"
@@ -185,7 +192,7 @@ if not args.dynamic_kv_cache:
         MODEL_DEC_MEDIUM_PATH = "decoder_medium_fix_kv_cache_dynamic_chunk.onnx.prototxt"
 else:
     # KV_CACHEが推論ごとに変化するバージョン
-    if args.chunk_length == 30:
+    if args.chunk_length == DEFAULT_CHUNK_LENGTH:
         WEIGHT_DEC_TINY_PATH = "decoder_tiny.onnx"
         MODEL_DEC_TINY_PATH = "decoder_tiny.onnx.prototxt"
         WEIGHT_DEC_BASE_PATH = "decoder_base.onnx"
@@ -197,7 +204,7 @@ else:
     else:
         raise "only supports chunk length 30"
 
-if args.chunk_length == 30:
+if args.chunk_length == DEFAULT_CHUNK_LENGTH:
     WEIGHT_ENC_TINY_PATH = "encoder_tiny.onnx"
     MODEL_ENC_TINY_PATH = "encoder_tiny.onnx.prototxt"
     WEIGHT_ENC_BASE_PATH = "encoder_base.onnx"
