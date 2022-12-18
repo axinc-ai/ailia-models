@@ -124,13 +124,16 @@ parser.add_argument(
     action='store_true',
     help='disable ailia tokenizer.'
 )
+parser.add_argument(
+    "--chunk_length", type=int, default=30,
+    help="number of seconds of segment")
 args = update_parser(parser)
 
 if args.ailia_audio:
-    from ailia_audio_utils import (CHUNK_LENGTH, HOP_LENGTH, N_FRAMES, SAMPLE_RATE,
+    from ailia_audio_utils import (HOP_LENGTH, SAMPLE_RATE,
                             load_audio, log_mel_spectrogram, pad_or_trim)
 else:
-    from audio_utils import (CHUNK_LENGTH, HOP_LENGTH, N_FRAMES, SAMPLE_RATE,
+    from audio_utils import (HOP_LENGTH, SAMPLE_RATE,
                             load_audio, log_mel_spectrogram, pad_or_trim)
 
 if not args.disable_ailia_tokenizer:
@@ -139,17 +142,22 @@ else:
     from tokenizer import get_tokenizer
 
 ModelDimensions = namedtuple('ModelDimensions', [
-    'n_mels', 'n_audio_ctx', 'n_audio_state', 'n_audio_head', 'n_audio_layer',
+    'n_mels', 'n_audio_state', 'n_audio_head', 'n_audio_layer',
     'n_vocab', 'n_text_ctx', 'n_text_state', 'n_text_head', 'n_text_layer',
 ])
 
 dims_dict = {
-    'tiny': ModelDimensions(80, 1500, 384, 6, 4, 51865, 448, 384, 6, 4),
-    'base': ModelDimensions(80, 1500, 512, 8, 6, 51865, 448, 512, 8, 6),
-    'small': ModelDimensions(80, 1500, 768, 12, 12, 51865, 448, 768, 12, 12),
-    'medium': ModelDimensions(80, 1500, 1024, 16, 24, 51865, 448, 1024, 16, 24),
+    'tiny': ModelDimensions(80, 384, 6, 4, 51865, 448, 384, 6, 4),
+    'base': ModelDimensions(80, 512, 8, 6, 51865, 448, 512, 8, 6),
+    'small': ModelDimensions(80, 768, 12, 12, 51865, 448, 768, 12, 12),
+    'medium': ModelDimensions(80, 1024, 16, 24, 51865, 448, 1024, 16, 24),
 }
 dims = dims_dict[args.model_type]
+
+CHUNK_LENGTH = args.chunk_length # 30: number of sec in a chunk
+N_SAMPLES = CHUNK_LENGTH * SAMPLE_RATE  # 480000: number of samples in a chunk
+N_FRAMES = (N_SAMPLES // HOP_LENGTH)  # 3000: number of frames in a mel spectrogram input
+N_AUDIO_CTX = N_FRAMES // 2 # 1500: number of context from audio encoder
 
 # ======================
 # Models
@@ -157,24 +165,37 @@ dims = dims_dict[args.model_type]
 
 if not args.dynamic_kv_cache:
     # 高速化のためKV_CACHEのサイズを最大サイズで固定化したバージョン
-    WEIGHT_DEC_TINY_PATH = "decoder_tiny_fix_kv_cache.onnx"
-    MODEL_DEC_TINY_PATH = "decoder_tiny_fix_kv_cache.onnx.prototxt"
-    WEIGHT_DEC_BASE_PATH = "decoder_base_fix_kv_cache.onnx"
-    MODEL_DEC_BASE_PATH = "decoder_base_fix_kv_cache.onnx.prototxt"
-    WEIGHT_DEC_SMALL_PATH = "decoder_small_fix_kv_cache.onnx"
-    MODEL_DEC_SMALL_PATH = "decoder_small_fix_kv_cache.onnx.prototxt"
-    WEIGHT_DEC_MEDIUM_PATH = "decoder_medium_fix_kv_cache.onnx"
-    MODEL_DEC_MEDIUM_PATH = "decoder_medium_fix_kv_cache.onnx.prototxt"
+    if args.chunk_length == 30:
+        WEIGHT_DEC_TINY_PATH = "decoder_tiny_fix_kv_cache.onnx"
+        MODEL_DEC_TINY_PATH = "decoder_tiny_fix_kv_cache.onnx.prototxt"
+        WEIGHT_DEC_BASE_PATH = "decoder_base_fix_kv_cache.onnx"
+        MODEL_DEC_BASE_PATH = "decoder_base_fix_kv_cache.onnx.prototxt"
+        WEIGHT_DEC_SMALL_PATH = "decoder_small_fix_kv_cache.onnx"
+        MODEL_DEC_SMALL_PATH = "decoder_small_fix_kv_cache.onnx.prototxt"
+        WEIGHT_DEC_MEDIUM_PATH = "decoder_medium_fix_kv_cache.onnx"
+        MODEL_DEC_MEDIUM_PATH = "decoder_medium_fix_kv_cache.onnx.prototxt"
+    else:
+        WEIGHT_DEC_TINY_PATH = "decoder_tiny_fix_kv_cache_dynamic_chunk.onnx"
+        MODEL_DEC_TINY_PATH = "decoder_tiny_fix_kv_cache_dynamic_chunk.onnx.prototxt"
+        WEIGHT_DEC_BASE_PATH = "decoder_base_fix_kv_cache_dynamic_chunk.onnx"
+        MODEL_DEC_BASE_PATH = "decoder_base_fix_kv_cache_dynamic_chunk.onnx.prototxt"
+        WEIGHT_DEC_SMALL_PATH = "decoder_small_fix_kv_cache_dynamic_chunk.onnx"
+        MODEL_DEC_SMALL_PATH = "decoder_small_fix_kv_cache_dynamic_chunk.onnx.prototxt"
+        WEIGHT_DEC_MEDIUM_PATH = "decoder_medium_fix_kv_cache_dynamic_chunk.onnx"
+        MODEL_DEC_MEDIUM_PATH = "decoder_medium_fix_kv_cache_dynamic_chunk.onnx.prototxt"
 else:
     # KV_CACHEが推論ごとに変化するバージョン
-    WEIGHT_DEC_TINY_PATH = "decoder_tiny.onnx"
-    MODEL_DEC_TINY_PATH = "decoder_tiny.onnx.prototxt"
-    WEIGHT_DEC_BASE_PATH = "decoder_base.onnx"
-    MODEL_DEC_BASE_PATH = "decoder_base.onnx.prototxt"
-    WEIGHT_DEC_SMALL_PATH = "decoder_small.onnx"
-    MODEL_DEC_SMALL_PATH = "decoder_small.onnx.prototxt"
-    WEIGHT_DEC_MEDIUM_PATH = "decoder_medium.onnx"
-    MODEL_DEC_MEDIUM_PATH = "decoder_medium.onnx.prototxt"
+    if args.chunk_length == 30:
+        WEIGHT_DEC_TINY_PATH = "decoder_tiny.onnx"
+        MODEL_DEC_TINY_PATH = "decoder_tiny.onnx.prototxt"
+        WEIGHT_DEC_BASE_PATH = "decoder_base.onnx"
+        MODEL_DEC_BASE_PATH = "decoder_base.onnx.prototxt"
+        WEIGHT_DEC_SMALL_PATH = "decoder_small.onnx"
+        MODEL_DEC_SMALL_PATH = "decoder_small.onnx.prototxt"
+        WEIGHT_DEC_MEDIUM_PATH = "decoder_medium.onnx"
+        MODEL_DEC_MEDIUM_PATH = "decoder_medium.onnx.prototxt"
+    else:
+        raise "only supports chunk length 30"
 
 WEIGHT_ENC_TINY_PATH = "encoder_tiny.onnx"
 MODEL_ENC_TINY_PATH = "encoder_tiny.onnx.prototxt"
@@ -369,7 +390,7 @@ def detect_language(enc_net, dec_net, mel, tokenizer=None):
         mel = np.expand_dims(mel, axis=0)
 
     # skip encoder forward pass if already-encoded audio features were given
-    if mel.shape[-2:] != (dims.n_audio_ctx, dims.n_audio_state):
+    if mel.shape[-2:] != (N_AUDIO_CTX, dims.n_audio_state):
         mel = get_audio_features(enc_net, mel)
 
     # forward pass using a single token, startoftranscript
@@ -423,7 +444,7 @@ def decode(enc_net, dec_net, mel, options):
     if options.get("suppress_tokens"):
         logit_filters.append(SuppressTokens(get_suppress_tokens(tokenizer, options)))
     if not options.get("without_timestamps"):
-        precision = CHUNK_LENGTH / dims.n_audio_ctx  # usually 0.02 seconds
+        precision = CHUNK_LENGTH / N_AUDIO_CTX  # usually 0.02 seconds
         max_initial_timestamp_index = None
         max_initial_timestamp = options.get("max_initial_timestamp")
         if max_initial_timestamp:
@@ -607,7 +628,7 @@ def predict(wav, enc_net, dec_net, immediate=False, microphone=False):
     tokenizer = get_tokenizer(is_multilingual(), language=language, task=task)
 
     seek = 0
-    input_stride = N_FRAMES // dims.n_audio_ctx  # mel frames per output token: 2
+    input_stride = N_FRAMES // N_AUDIO_CTX  # mel frames per output token: 2
     time_precision = (
             input_stride * HOP_LENGTH / SAMPLE_RATE
     )  # time per output token: 0.02 (seconds)

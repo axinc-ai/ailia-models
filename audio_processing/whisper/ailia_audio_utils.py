@@ -7,9 +7,6 @@ SAMPLE_RATE = 16000
 N_FFT = 400
 N_MELS = 80
 HOP_LENGTH = 160
-CHUNK_LENGTH = 30
-N_SAMPLES = CHUNK_LENGTH * SAMPLE_RATE  # 480000: number of samples in a chunk
-N_FRAMES = (N_SAMPLES // HOP_LENGTH)  # 3000: number of frames in a mel spectrogram input
 
 
 def load_audio(file: str, sr: int = SAMPLE_RATE):
@@ -24,7 +21,7 @@ def load_audio(file: str, sr: int = SAMPLE_RATE):
     return wav
 
 
-def pad_or_trim(array, length=N_SAMPLES, axis=-1):
+def pad_or_trim(array, length, axis=-1):
     """
     Pad or trim the audio array to N_SAMPLES, as expected by the encoder.
     """
