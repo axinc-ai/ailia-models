@@ -197,14 +197,25 @@ else:
     else:
         raise "only supports chunk length 30"
 
-WEIGHT_ENC_TINY_PATH = "encoder_tiny.onnx"
-MODEL_ENC_TINY_PATH = "encoder_tiny.onnx.prototxt"
-WEIGHT_ENC_BASE_PATH = "encoder_base.onnx"
-MODEL_ENC_BASE_PATH = "encoder_base.onnx.prototxt"
-WEIGHT_ENC_SMALL_PATH = "encoder_small.onnx"
-MODEL_ENC_SMALL_PATH = "encoder_small.onnx.prototxt"
-WEIGHT_ENC_MEDIUM_PATH = "encoder_medium.onnx"
-MODEL_ENC_MEDIUM_PATH = "encoder_medium.onnx.prototxt"
+if args.chunk_length == 30:
+    WEIGHT_ENC_TINY_PATH = "encoder_tiny.onnx"
+    MODEL_ENC_TINY_PATH = "encoder_tiny.onnx.prototxt"
+    WEIGHT_ENC_BASE_PATH = "encoder_base.onnx"
+    MODEL_ENC_BASE_PATH = "encoder_base.onnx.prototxt"
+    WEIGHT_ENC_SMALL_PATH = "encoder_small.onnx"
+    MODEL_ENC_SMALL_PATH = "encoder_small.onnx.prototxt"
+    WEIGHT_ENC_MEDIUM_PATH = "encoder_medium.onnx"
+    MODEL_ENC_MEDIUM_PATH = "encoder_medium.onnx.prototxt"
+else:
+    WEIGHT_ENC_TINY_PATH = "encoder_tiny_dynamic_chunk.onnx"
+    MODEL_ENC_TINY_PATH = "encoder_tiny_dynamic_chunk.onnx.prototxt"
+    WEIGHT_ENC_BASE_PATH = "encoder_base_dynamic_chunk.onnx"
+    MODEL_ENC_BASE_PATH = "encoder_base_dynamic_chunk.onnx.prototxt"
+    WEIGHT_ENC_SMALL_PATH = "encoder_small_dynamic_chunk.onnx"
+    MODEL_ENC_SMALL_PATH = "encoder_small_dynamic_chunk.onnx.prototxt"
+    WEIGHT_ENC_MEDIUM_PATH = "encoder_medium_dynamic_chunk.onnx"
+    MODEL_ENC_MEDIUM_PATH = "encoder_medium_dynamic_chunk.onnx.prototxt"
+
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/whisper/'
 
 # ======================
