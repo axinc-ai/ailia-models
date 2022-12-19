@@ -32,22 +32,40 @@ IMAGE_PATH = 'input.jpg'
 THRESHOLD = 0.3
 SLEEP_TIME = 0  # for video mode
 
+MODEL_LISTS = ['resnet50','mixer','vit','mobilenet']
+
 # ======================
 # Arguemnt Parser Config
 # ======================
 parser = get_base_parser(
     'imagenet21k', IMAGE_PATH, None
 )
+
 parser.add_argument(
     '-th', '--threshold',
     default=THRESHOLD, type=float,
     help='classifier threshold for imagenet21k. (default: '+str(THRESHOLD)+')'
 )
 
+parser.add_argument('-a','--arch', type=str, default="vit",
+    help='model layer number lists: ' + ' | '.join(MODEL_LISTS)
+)
+
 args = update_parser(parser)
 
-WEIGHT_PATH = "imagenet21k.onnx"
-MODEL_PATH = "imagenet21k.onnx.prototxt"
+WEIGHT_PATH = ""
+MODEL_PATH = ""
+
+if args.arch == "vit":
+    model_name = "vit_base_patch16_224_miil_in21k"
+elif args.arch == "mixer":
+    model_name = "mixer_b16_224_miil_in21k"
+elif args.arch == "resnet50":
+    model_name = "resnet50"
+elif args.arch == "mobilenet":
+    model_name = "mobilenetv3_large_100"
+MODEL_PATH  = model_name + '.onnx.prototxt'
+WEIGHT_PATH = model_name + '.onnx'
 
 def post_process(logits):
     labels = []
@@ -72,7 +90,7 @@ def post_process(logits):
             top_class_description = semantic_softmax_processor.class_description[top_class_name]
             labels.append(top_class_description)
             probs.append(top1_prob)
-            idx.append(top1_id)
+            idx.append(top_class_number)
     return np.array([idx,labels, probs])
 
 def plot_results(input_image,results, top_k=MAX_CLASS_COUNT, logging=True):
@@ -81,11 +99,15 @@ def plot_results(input_image,results, top_k=MAX_CLASS_COUNT, logging=True):
     w = RECT_WIDTH
     h = RECT_HEIGHT
 
-    results =np.sort(results)
-    idx    = results[0][::-1]
-    labels = results[1][::-1]
-    probs  = results[2][::-1] * 100
+    sort_idx    = [i[0] for i in results[2]]
+    sort_idx = np.argsort(sort_idx)[::-1]
+ 
+    idx    = results[0][sort_idx]
+    labels = results[1][sort_idx]
+    probs  = results[2][sort_idx] * 100
     top_k = len(idx)
+
+
 
     if logging:
         print('==============================================================')
@@ -94,7 +116,7 @@ def plot_results(input_image,results, top_k=MAX_CLASS_COUNT, logging=True):
     for i in range(top_k):
         if logging:
             print(f'+ idx={i}')
-            print(f'  category={idx[i][0]}['
+            print(f'  category={idx[i]}['
                   f'{labels[i]} ]')
             print(f'  prob={probs[i][0]}')
 
@@ -125,17 +147,19 @@ def plot_results(input_image,results, top_k=MAX_CLASS_COUNT, logging=True):
 
 
 def print_results(results, top_k=MAX_CLASS_COUNT):
-    results =np.sort(results)
-    idx    = results[0][::-1]
-    labels = results[1][::-1]
-    probs  = results[2][::-1] * 100
+    sort_idx    = [i[0] for i in results[2]]
+    sort_idx = np.argsort(sort_idx)[::-1]
+ 
+    idx    = results[0][sort_idx]
+    labels = results[1][sort_idx]
+    probs  = results[2][sort_idx] * 100
     top_k = len(idx)
 
     print('==============================================================')
     print(f'class_count={top_k}')
     for i in range(top_k):
         print(f'+ idx={i}')
-        print(f'  category={idx[i][0]}['
+        print(f'  category={idx[i]}['
               f'{labels[i]} ]')
         print(f'  prob={probs[i][0]}')
 
@@ -152,9 +176,16 @@ def recognize_from_image():
         # prepare input data
         logger.info(image_path)
         input_data = imread(image_path)
+        input_data = cv2.cvtColor(input_data,cv2.COLOR_BGR2RGB)
         input_data = cv2.resize(input_data,(256,256))
-        input_data = input_data[15:241,15:241]
-        input_data = normalize_image(input_data,normalize_type='ImageNet')
+        input_data = input_data[16:240,16:240]
+
+        mean = np.array([0,0,0])
+        std = np.array([1,1,1])
+        input_data = input_data / 255.0
+        for i in range(3):
+            input_data[:, :, i] = (input_data[:, :, i] - mean[i]) / std[i]
+
         input_data = input_data.transpose((2,0,1))
         input_data = np.expand_dims(input_data,0)
 
@@ -168,9 +199,8 @@ def recognize_from_image():
                 end = int(round(time.time() * 1000))
                 logger.info(f'\tailia processing time {end - start} ms')
         else:
-            logits = net.run(input_data)[0]
+            logits = net.run(input_data.astype(np.float32))[0]
 
-        # show results
         result = post_process(logits)
         print_results(result)
         frame =imread(image_path)
@@ -234,6 +264,7 @@ def recognize_from_video():
 
 
 def main():
+
     # model files check and download
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
     if args.video is not None:

@@ -1,4 +1,4 @@
-# InceptionV4
+# Imagenet21K
 
 ## Input
 
@@ -9,19 +9,32 @@ Range: [0.0, 255.0]
 
 ## Output
 ```
-class_count=4
+class_count=8
 + idx=0
-  category=717[instrument ]
-  prob=59.333587646484375
-+ idx=1
-  category=509[device ]
-  prob=44.046539306640625
-+ idx=2
-  category=160[clock ]
-  prob=42.2644157409668
-+ idx=3
   category=6[artifact ]
-  prob=39.8267822265625
+  prob=83.32571411132812
++ idx=1
+  category=3682[device ]
+  prob=81.23466491699219
++ idx=2
+  category=3375[clock ]
+  prob=79.72785186767578
++ idx=3
+  category=6598[timepiece ]
+  prob=69.04891967773438
++ idx=4
+  category=4591[instrument ]
+  prob=63.67098617553711
++ idx=5
+  category=4957[measuring_instrument ]
+  prob=63.452571868896484
++ idx=6
+  category=2462[alarm_clock ]
+  prob=54.95254898071289
++ idx=7
+  category=4306[grandfather_clock ]
+  prob=37.9827995300293
+
 ```
 
 ## Usage
@@ -44,6 +57,8 @@ If you pass `0` as an argument to VIDEO_PATH, you can use the webcam input inste
 $ python3 imagenet21k.py --video VIDEO_PATH
 ```
 
+You can select a pretrained model by specifying -a mixer, resnet50 ,mobilenet or vit(default).
+
 ## Reference
 
 [ImageNet21K](https://github.com/Alibaba-MIIL/ImageNet21K)
@@ -58,4 +73,10 @@ pytorch
 
 ## Netron
 
-[imagenet21k.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/imagenet21k/imagenet21k.onnx.prototxt)
+[mobilenetv3_large_100.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/imagenet21k/mobilenetv3_large_100.onnx.prototxt)
+
+[mixer_b16_224_miil_in21k.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/imagenet21k/mixer_b16_224_miil_in21k.onnx.prototxt)
+
+[resnet50.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/imagenet21k/resnet50.onnx.prototxt)
+
+[vit_base_patch16_224_miil_in21k](https://netron.app/?url=https://storage.googleapis.com/ailia-models/imagenet21k/vit_base_patch16_224_miil_in21k)
