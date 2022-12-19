@@ -22,17 +22,48 @@ class AffineGridGen():
         self.out_ch = out_ch
 
     def __call__(self, theta):
-        b=theta.shape[0]
+        b = theta.shape[0]
         if not theta.shape==(b,2,3):
             theta = theta.reshape(-1,2,3)
         batch_size = theta.shape[0]
+        size = (batch_size, self.out_ch, self.out_h, self.out_w)
 
-        import torch
-        import torch.nn.functional as F
-        theta = torch.tensor(theta)
-        out_size = torch.Size((batch_size, self.out_ch, self.out_h, self.out_w))
-        out = F.affine_grid(theta, out_size) # torch.nn.functional
-        out = out.to('cpu').detach().numpy().copy()
+        #use_pytorch = True
+        use_pytorch = False
+        if not use_pytorch:
+            # Patch of torch.nn.functional.affine_grid()
+            # See below if you want to get original code.
+            # https://github.com/pytorch/pytorch/issues/30563
+            def affine_grid(theta, size, align_corners=False):
+                N, C, H, W = size
+                grid = create_grid(N, C, H, W)
+                grid = grid.reshape(N, H * W, 3) @ theta.swapaxes(1, 2)
+                grid = grid.reshape(N, H, W, 2)
+                return grid
+
+            def create_grid(N, C, H, W):
+                grid = np.empty([N, H, W, 3], dtype='float32')
+                # grid[..., 0] is equal to grid.select(-1, 0) in pytorch
+                grid[..., 0] = np.copy(linspace_from_neg_one(W))
+                grid[..., 1] = np.copy(np.expand_dims(linspace_from_neg_one(H), axis=-1))
+                grid[..., 2] = np.full(grid[..., 2].shape, 1)
+                return grid
+                
+            def linspace_from_neg_one(num_steps, dtype='float32'):
+                r = np.linspace(-1, 1, num_steps, dtype=dtype)
+                r = r * (num_steps - 1) / num_steps
+                return r
+
+            out = affine_grid(theta, size)
+            
+        else:
+            import torch
+            import torch.nn.functional as F
+
+            theta = torch.tensor(theta)
+            out_size = torch.Size(size)
+            out = F.affine_grid(theta, out_size) # torch.nn.functional
+            out = out.to('cpu').detach().numpy().copy()
 
         return out
 
