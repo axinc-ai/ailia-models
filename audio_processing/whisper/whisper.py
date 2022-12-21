@@ -120,9 +120,9 @@ parser.add_argument(
     help='use ailia audio.'
 )
 parser.add_argument(
-    '--ailia_tokenizer',
+    '--disable_ailia_tokenizer',
     action='store_true',
-    help='use ailia tokenizer.'
+    help='disable ailia tokenizer.'
 )
 args = update_parser(parser)
 
@@ -133,7 +133,7 @@ else:
     from audio_utils import (CHUNK_LENGTH, HOP_LENGTH, N_FRAMES, SAMPLE_RATE,
                             load_audio, log_mel_spectrogram, pad_or_trim)
 
-if args.ailia_tokenizer:
+if not args.disable_ailia_tokenizer:
     from ailia_tokenizer import get_tokenizer
 else:
     from tokenizer import get_tokenizer
