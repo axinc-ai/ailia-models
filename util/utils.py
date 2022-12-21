@@ -63,7 +63,7 @@ def get_base_parser(
         conflict_handler='resolve',  # allow to overwrite default argument
     )
     parser.add_argument(
-        '-i', '--input', metavar='IMAGE/VIDEO', default=default_input,
+        '-i', '--input', nargs='*', metavar='IMAGE/VIDEO', default=default_input,
         help=('The default (model-dependent) input data (image / video) path. '
               'If a directory name is specified, the model will be run for '
               'the files inside. File type is specified by --ftype argument')
