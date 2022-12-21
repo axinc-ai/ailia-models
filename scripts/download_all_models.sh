@@ -218,6 +218,7 @@ cd ../../pose_estimation/movenet; python3 movenet.py -d ${OPTION}
 cd ../../pose_estimation/animalpose; python3 animalpose.py -d ${OPTION}
 cd ../../pose_estimation/mediapipe_holistic; python3 mediapipe_holistic.py ${OPTION}
 cd ../../pose_estimation/ap-10k; python3 ap-10k.py ${OPTION}
+cd ../../pose_estimation/posenet; python3 posenet.py ${OPTION}
 cd ../../pose_estimation_3d/3d-pose-baseline; python3 3d-pose-baseline.py ${OPTION}
 cd ../../pose_estimation_3d/lightweight-human-pose-estimation-3d; python3 lightweight-human-pose-estimation-3d.py ${OPTION}
 cd ../../pose_estimation_3d/blazepose-fullbody; python3 blazepose-fullbody.py ${OPTION}
