@@ -89,6 +89,7 @@ cd ../../generative_adversarial_networks/sam; python3 sam.py ${OPTION}
 cd ../../generative_adversarial_networks/psgan; python3 psgan.py ${OPTION}
 cd ../../generative_adversarial_networks/gfpgan; python3 gfpgan.py ${OPTION}
 cd ../../generative_adversarial_networks/sber-swap; python3 sber-swap.py ${OPTION}
+cd ../../generative_adversarial_networks/encoder4editing; python3 encoder4editing.py ${OPTION}
 cd ../../hand_detection/yolov3-hand; python3 yolov3-hand.py ${OPTION}
 cd ../../hand_detection/hand_detection_pytorch python3 hand_detection_pytorch.py ${OPTION}
 cd ../../hand_detection/blazepalm; python3 blazepalm.py ${OPTION}
@@ -135,6 +136,7 @@ cd ../../image_manipulation/invertible_denoising_network; python3 invertible_den
 cd ../../image_manipulation/dfm; python3 dfm.py ${OPTION}
 cd ../../image_manipulation/dehamer; python3 dehamer.py ${OPTION}
 cd ../../image_manipulation/dfe; python3 dfe.py ${OPTION}
+cd ../../image_manipulation/pytorch-superpoint; python3 pytorch_superpoint.py ${OPTION}
 cd ../../image_segmentation/deeplabv3; python3 deeplabv3.py ${OPTION}
 cd ../../image_segmentation/hair_segmentation; python3 hair_segmentation.py ${OPTION}
 cd ../../image_segmentation/hrnet_segmentation; python3 hrnet_segmentation.py ${OPTION}
@@ -215,6 +217,7 @@ cd ../../pose_estimation/efficientpose; python3 efficientpose.py ${OPTION}
 cd ../../pose_estimation/movenet; python3 movenet.py -d ${OPTION}
 cd ../../pose_estimation/animalpose; python3 animalpose.py -d ${OPTION}
 cd ../../pose_estimation/mediapipe_holistic; python3 mediapipe_holistic.py ${OPTION}
+cd ../../pose_estimation/ap-10k; python3 ap-10k.py ${OPTION}
 cd ../../pose_estimation/posenet; python3 posenet.py ${OPTION}
 cd ../../pose_estimation_3d/3d-pose-baseline; python3 3d-pose-baseline.py ${OPTION}
 cd ../../pose_estimation_3d/lightweight-human-pose-estimation-3d; python3 lightweight-human-pose-estimation-3d.py ${OPTION}
