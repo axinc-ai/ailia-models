@@ -22,8 +22,16 @@ logger = getLogger(__name__)
 # Parameters
 # ======================
 
+WEIGHT_ResNet50_320_PATH = 'COCO_ResNet50_320x320.onnx'
+MODEL_ResNet50_320_PATH = 'COCO_ResNet50_320x320.onnx.prototxt'
 WEIGHT_ResNet101_512_PATH = 'COCO_ResNet101_512x512.onnx'
 MODEL_ResNet101_512_PATH = 'COCO_ResNet101_512x512.onnx.prototxt'
+WEIGHT_ResNet152_448_PATH = 'COCO_ResNet152_448x448.onnx'
+MODEL_ResNet152_448_PATH = 'COCO_ResNet152_448x448.onnx.prototxt'
+WEIGHT_MobleNetV2_320_PATH = 'COCO_MobileNetV2_320x320.onnx'
+MODEL_MobleNetV2_320_PATH = 'COCO_MobileNetV2_320x320.onnx.prototxt'
+WEIGHT_MobleNetV2_448_PATH = 'COCO_MobileNetV2_448x512.onnx'
+MODEL_MobleNetV2_448_PATH = 'COCO_MobileNetV2_448x512.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/e2pose/'
 
 IMAGE_PATH = 'demo.png'
@@ -59,7 +67,8 @@ parser.add_argument(
     help='object confidence threshold'
 )
 parser.add_argument(
-    '-m', '--model_type', default='xxx', choices=('xxx', 'XXX'),
+    '-m', '--model_type', default='resnet101',
+    choices=('resnet50', 'resnet101', 'resnet152', 'mobilenet_320', 'mobilenet_448'),
     help='model type'
 )
 parser.add_argument(
@@ -68,6 +77,8 @@ parser.add_argument(
     help='execute onnxruntime version.'
 )
 args = update_parser(parser)
+
+model_type = args.model_type
 
 
 # ======================
@@ -141,8 +152,14 @@ def predict(net, img):
     h, w, _ = img.shape
     img = img[:, :, ::-1]  # BGR -> RGB
 
-    # shape = (IMAGE_HEIGHT, IMAGE_WIDTH)
-    shape = (512, 512)
+    dic_shape = {
+        'resnet50': (320, 320),
+        'resnet101': (512, 512),
+        'resnet152': (448, 448),
+        'mobilenet_320': (320, 320),
+        'mobilenet_448': (448, 512),
+    }
+    shape = dic_shape[model_type]
     img = preprocess(img, shape)
 
     # feedforward
@@ -242,10 +259,13 @@ def recognize_from_video(net):
 
 def main():
     dic_model = {
+        'resnet50': (WEIGHT_ResNet50_320_PATH, MODEL_ResNet50_320_PATH),
         'resnet101': (WEIGHT_ResNet101_512_PATH, MODEL_ResNet101_512_PATH),
+        'resnet152': (WEIGHT_ResNet152_448_PATH, MODEL_ResNet152_448_PATH),
+        'mobilenet_320': (WEIGHT_MobleNetV2_320_PATH, MODEL_MobleNetV2_320_PATH),
+        'mobilenet_448': (WEIGHT_MobleNetV2_448_PATH, MODEL_MobleNetV2_448_PATH),
     }
-    # weight_path, model_path = dic_model[args.model_type]
-    weight_path, model_path = dic_model['resnet101']
+    weight_path, model_path = dic_model[model_type]
 
     # model files check and download
     check_and_download_models(weight_path, model_path, REMOTE_PATH)
