@@ -585,6 +585,9 @@ def main():
 
     env_id = args.env_id
 
+    logger.info("This model not optimized for GPU currently. So we will use CPU.")
+    env_id = 0
+
     # initialize
     if not args.onnx:
         net_enc = ailia.Net(MODEL_ENC_PATH, WEIGHT_ENC_PATH, env_id=env_id)
