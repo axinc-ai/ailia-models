@@ -34,7 +34,7 @@ WEIGHT_MobleNetV2_448_PATH = 'COCO_MobileNetV2_448x512.onnx'
 MODEL_MobleNetV2_448_PATH = 'COCO_MobileNetV2_448x512.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/e2pose/'
 
-IMAGE_PATH = 'demo.png'
+IMAGE_PATH = 'input.jpg'
 SAVE_IMAGE_PATH = 'output.png'
 
 THRESHOLD = 0.5

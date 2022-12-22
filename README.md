@@ -368,6 +368,7 @@ The collection of pre-trained, state-of-the-art AI models.
 | [<img src="pose_estimation/animalpose/output.png" width=128px>](pose_estimation/animalpose/) |[animalpose](/pose_estimation/animalpose/) | [MMPose - 2D animal pose estimation](https://github.com/open-mmlab/mmpose) | Pytorch | 1.2.7 and later | [EN](https://medium.com/axinc-ai/animalpose-pose-esimation-for-animals-700603e0dbae) [JP](https://medium.com/axinc/animalpose-%E5%8B%95%E7%89%A9%E3%81%AE%E9%AA%A8%E6%A0%BC%E6%A4%9C%E5%87%BA%E3%83%A2%E3%83%87%E3%83%AB-f7f667c0e69d) |
 | [<img src="pose_estimation/mediapipe_holistic/output.png" width=128px>](pose_estimation/mediapipe_holistic/) |[mediapipe_holistic](/pose_estimation/mediapipe_holistic/) | [MediaPipe Holistic](https://google.github.io/mediapipe/solutions/holistic.html) | TensorFlow | 1.2.9 and later | |
 | [<img src="pose_estimation/ap-10k/output.png" width=128px>](pose_estimation/ap-10k/) |[ap-10k](/pose_estimation/ap-10k/) | [AP-10K](https://github.com/AlexTheBad/AP-10K)  | Pytorch | 1.2.4 and later | |
+| [<img src="pose_estimation/e2pose/output.png" width=128px>](pose_estimation/e2pose/) |[e2pose](/pose_estimation/e2pose/) | [E2pose](https://github.com/AISIN-TRC/E2Pose)  | Tensorflow | 1.2.4 and later | |
 
 ## Pose estimation 3d
 
