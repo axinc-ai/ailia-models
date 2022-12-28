@@ -51,7 +51,7 @@ class AiliaTokenizer:
         self.language = language
 
         # load vocab
-        json_open = open(vocab_path, 'r')
+        json_open = open(vocab_path, 'r', encoding='utf-8')
         json_load = json.load(json_open)
         for key in json_load.keys():
             self.vocab[json_load[key]] = key
