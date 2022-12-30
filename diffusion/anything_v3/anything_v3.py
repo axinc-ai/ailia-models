@@ -12,7 +12,7 @@ import random
 # import original modules
 sys.path.append('../../util')
 from utils import get_base_parser, update_parser, get_savepath  # noqa
-from model_utils import check_and_download_models  # noqa
+from model_utils import check_and_download_models, urlretrieve, progress_print  # noqa
 # logger
 from logging import getLogger  # noqa
 
@@ -34,6 +34,8 @@ WEIGHT_VAE_ENCODER_PATH = 'vae_encoder.onnx'
 MODEL_VAE_ENCODER_PATH = 'vae_encoder.onnx.prototxt'
 WEIGHT_VAE_DECODER_PATH = 'vae_decoder.onnx'
 MODEL_VAE_DECODER_PATH = 'vae_decoder.onnx.prototxt'
+
+REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/anything_v3/'
 
 SAVE_IMAGE_PATH = 'output.png'
 
@@ -68,18 +70,27 @@ def recognize_from_text(pipe):
     os.makedirs(output_dir, exist_ok=True)
     output_name = '{}_{}.png'.format(prompt.replace(" ", "-"), random.randint(10000, 99999))
     output_path = os.path.join(output_dir, output_name)
-    logger.info(output_path)
 
     logger.info('Start inference...')
 
     image = pipe(prompt).images[0]
     image.save(output_path)
+    logger.info(f'saved at : {output_path}')
 
     logger.info('Script finished successfully.')
 
 
 def main():
-    #check_and_download_models()
+    check_and_download_models(WEIGHT_UNET_PATH, MODEL_UNET_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_SAFETY_CHECKER_PATH, MODEL_SAFETY_CHECKER_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_TEXT_ENCODER_PATH, MODEL_TEXT_ENCODER_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_VAE_ENCODER_PATH, MODEL_VAE_ENCODER_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_VAE_DECODER_PATH, MODEL_VAE_DECODER_PATH, REMOTE_PATH)
+
+    if not os.path.exists(WEIGHT_PB_UNET_PATH):
+        logger.info('Downloading weights.pb...')
+        urlretrieve(REMOTE_PATH, WEIGHT_PB_UNET_PATH, progress_print)
+    logger.info('weights.pb is prepared!')
 
     env_id = args.env_id
 
