@@ -1,6 +1,7 @@
 import sys
 import time
 import struct
+from enum import Enum
 
 import numpy as np
 import cv2
@@ -14,7 +15,7 @@ from model_utils import check_and_download_models  # noqa
 # logger
 from logging import getLogger  # noqa
 
-from v2v_util import voxelize, evaluate_keypoints
+from v2v_util import CUBIC_SIZE, voxelize, evaluate_keypoints
 
 logger = getLogger(__name__)
 
@@ -27,6 +28,7 @@ MODEL_PATH = "msra-subject3-epoch15.onnx.prototxt"
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/v2v-posenet/'
 
 DEFAULT_DEPTH = 'cvpr15_MSRAHandGestureDB/P3/1/000000_depth.bin'
+SAVE_IMAGE_PATH = 'output.png'
 
 IMG_WIDTH = 320
 IMG_HEIGHT = 240
@@ -37,10 +39,14 @@ MAX_DEPTH = 700
 # ======================
 
 parser = get_base_parser(
-    'V2V-PoseNet', None, None
+    'V2V-PoseNet', DEFAULT_DEPTH, SAVE_IMAGE_PATH
 )
 parser.add_argument(
     '--input', '-i', default=DEFAULT_DEPTH
+)
+parser.add_argument(
+    '--gt', '-gt', action='store_true',
+    help='draw ground truth keypoints.'
 )
 parser.add_argument(
     '--onnx',
@@ -54,8 +60,8 @@ args = update_parser(parser, check_input_type=False)
 # Secondaty Functions
 # ======================
 
-def load_depthmap(filename):
-    with open(filename, mode='rb') as f:
+def load_depthmap(file_path):
+    with open(file_path, mode='rb') as f:
         data = f.read()
         _, _, left, top, right, bottom = struct.unpack('I' * 6, data[:6 * 4])
         num_pixel = (right - left) * (bottom - top)
@@ -67,6 +73,56 @@ def load_depthmap(filename):
         depth_image[depth_image == 0] = MAX_DEPTH
 
         return depth_image
+
+
+def load_center(file_path):
+    a = file_path.replace('\\', '/').split('/')
+    mid, fd, name = a[-3:]
+
+    with open('resource/center_info.csv') as f:
+        a = f.readlines()
+    a = [x for x in a if x.startswith('%s/%s,' % (mid, fd))]
+    _, mode, b, e = a[0].strip().split(',')
+    b = int(b)
+
+    ref_pt_file = 'resource/center_%s_3_refined.txt' % mode
+    with open(ref_pt_file) as f:
+        ref_pt_str = [x.rstrip() for x in f]
+
+    i = int(name.split('_')[0])
+    i = b + i
+    refpoint = ref_pt_str[i]
+    refpoint = [float(p) for p in refpoint.split()]
+
+    return refpoint
+
+
+def get_gt_keypoints(file_path):
+    a = file_path.replace('\\', '/').split('/')
+    mid, fd, name = a[-3:]
+
+    with open('resource/center_info.csv') as f:
+        a = f.readlines()
+    a = [x for x in a if x.startswith('%s/%s,' % (mid, fd))]
+    _, mode, b, e = a[0].strip().split(',')
+    b = int(b)
+
+    a = file_path.replace('\\', '/').rsplit('/', 1)
+    a[-1] = 'joint.txt'
+    annot_file = '/'.join(a)
+    with open(annot_file) as f:
+        lines = [line.rstrip() for line in f]
+
+    i = int(name.split('_')[0])
+    i = b + i + 1
+    splitted = lines[i].split()
+    joints_world = np.zeros((21, 3))
+    for jid in range(21):
+        joints_world[jid, 0] = float(splitted[jid * 3])
+        joints_world[jid, 1] = float(splitted[jid * 3 + 1])
+        joints_world[jid, 2] = -float(splitted[jid * 3 + 2])
+
+    return joints_world
 
 
 def pixel2world(x, y, z, img_width, img_height, fx, fy):
@@ -82,6 +138,51 @@ def depthmap2points(image, fx, fy):
     points = np.zeros((h, w, 3), dtype=np.float32)
     points[:, :, 0], points[:, :, 1], points[:, :, 2] = pixel2world(x, y, image, w, h, fx, fy)
     return points
+
+
+def normalize_img(img, premax, com, cube):
+    img[img == premax] = com[2] + (cube[2] / 2.)
+    img[img == 0] = com[2] + (cube[2] / 2.)
+    img[img >= com[2] + (cube[2] / 2.)] = com[2] + (cube[2] / 2.)
+    img[img <= com[2] - (cube[2] / 2.)] = com[2] - (cube[2] / 2.)
+    img -= com[2]
+    img /= (cube[2] / 2.)
+
+    return img
+
+
+class Color(Enum):
+    RED = (0, 0, 255)
+    GREEN = (75, 255, 66)
+    BLUE = (255, 0, 0)
+    YELLOW = (17, 240, 244)  # (204, 153, 17) #
+    PURPLE = (255, 255, 0)
+    CYAN = (255, 0, 255)
+    BROWN = (204, 153, 17)
+
+
+def draw_pose(img, pose):
+    colors = [
+        Color.RED, Color.RED, Color.RED, Color.RED, Color.GREEN, Color.GREEN, Color.GREEN, Color.GREEN,
+        Color.BLUE, Color.BLUE, Color.BLUE, Color.BLUE, Color.YELLOW, Color.YELLOW, Color.YELLOW, Color.YELLOW,
+        Color.PURPLE, Color.PURPLE, Color.PURPLE, Color.PURPLE]
+    colors_joint = [
+        Color.CYAN, Color.RED, Color.RED, Color.RED, Color.RED, Color.GREEN, Color.GREEN, Color.GREEN,
+        Color.GREEN,
+        Color.BLUE, Color.BLUE, Color.BLUE, Color.BLUE, Color.YELLOW, Color.YELLOW, Color.YELLOW, Color.YELLOW,
+        Color.PURPLE, Color.PURPLE, Color.PURPLE, Color.PURPLE]
+    sketch_setting = [
+        (0, 1), (1, 2), (2, 3), (3, 4), (0, 5), (5, 6), (6, 7), (7, 8),
+        (0, 9), (9, 10), (10, 11), (11, 12), (0, 13), (13, 14), (14, 15), (15, 16),
+        (0, 17), (17, 18), (18, 19), (19, 20)]
+
+    for i, pt in enumerate(pose):
+        cv2.circle(img, (int(pt[0]), int(pt[1])), 2, colors_joint[i].value, thickness=-1)
+    for i, (x, y) in enumerate(sketch_setting):
+        cv2.line(img, (int(pose[x, 0]), int(pose[x, 1])),
+                 (int(pose[y, 0]), int(pose[y, 1])), colors[i].value, 1)
+
+    return img
 
 
 # ======================
@@ -105,7 +206,7 @@ def predict(net, points, refpoint):
     heatmaps = output[0]
     keypoints = evaluate_keypoints(heatmaps, refpoint)
 
-    return keypoints
+    return keypoints[0]
 
 
 def recognize_from_points(net):
@@ -115,10 +216,18 @@ def recognize_from_points(net):
 
         # prepare input data
         depthmap = load_depthmap(file_path)
+        try:
+            refpoint = load_center(file_path)
+        except (FileNotFoundError, IndexError):
+            logger.error("No found reference")
+            continue
+
+        gt_keypoints = get_gt_keypoints(file_path) if args.gt else None
+
         fx = fy = 241.42
         points = depthmap2points(depthmap, fx, fy)
         points = points.reshape((-1, 3))
-        refpoint = [-22.2752, -66.7133, 320.7968]
+        logger.info('refpoint: %s' % refpoint)
 
         # inference
         logger.info('Start inference...')
@@ -127,7 +236,7 @@ def recognize_from_points(net):
             total_time_estimation = 0
             for i in range(args.benchmark_count):
                 start = int(round(time.time() * 1000))
-                pred = predict(net, points, refpoint)
+                keypoints = predict(net, points, refpoint)
                 end = int(round(time.time() * 1000))
                 estimation_time = (end - start)
 
@@ -138,14 +247,23 @@ def recognize_from_points(net):
 
             logger.info(f'\taverage time estimation {total_time_estimation / (args.benchmark_count - 1)} ms')
         else:
-            pred = predict(net, points, refpoint)
+            keypoints = predict(net, points, refpoint)
 
-        # res_img = draw_keypoints(img, pred)
-        #
-        # # plot result
-        # savepath = get_savepath(args.savepath, file_path, ext='.png')
-        # logger.info(f'saved at : {savepath}')
-        # cv2.imwrite(savepath, res_img)
+        img = normalize_img(
+            depthmap, MAX_DEPTH, refpoint,
+            [CUBIC_SIZE, CUBIC_SIZE, CUBIC_SIZE])
+        img = (img + 1) / 2 * 255
+        img = cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)
+
+        keypoints = gt_keypoints if gt_keypoints is not None else keypoints
+        keypoints[:, 0] += IMG_WIDTH // 2
+        keypoints[:, 1] = IMG_HEIGHT // 2 - keypoints[:, 1]
+        res_img = draw_pose(img, keypoints)
+
+        # plot result
+        savepath = get_savepath(args.savepath, file_path, ext='.png')
+        logger.info(f'saved at : {savepath}')
+        cv2.imwrite(savepath, res_img)
 
     logger.info('Script finished successfully.')
 
