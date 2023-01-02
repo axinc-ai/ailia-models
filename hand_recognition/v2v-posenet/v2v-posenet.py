@@ -27,7 +27,7 @@ WEIGHT_PATH = "msra-subject3-epoch15.onnx"
 MODEL_PATH = "msra-subject3-epoch15.onnx.prototxt"
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/v2v-posenet/'
 
-DEFAULT_DEPTH = 'cvpr15_MSRAHandGestureDB/P3/1/000000_depth.bin'
+DEFAULT_DEPTH = 'msra_dataset/P3/1/000000_depth.bin'
 SAVE_IMAGE_PATH = 'output.png'
 
 IMG_WIDTH = 320
@@ -79,13 +79,13 @@ def load_center(file_path):
     a = file_path.replace('\\', '/').split('/')
     mid, fd, name = a[-3:]
 
-    with open('resource/center_info.csv') as f:
+    with open('msra_dataset/center_summary.csv') as f:
         a = f.readlines()
     a = [x for x in a if x.startswith('%s/%s,' % (mid, fd))]
     _, mode, b, e = a[0].strip().split(',')
     b = int(b)
 
-    ref_pt_file = 'resource/center_%s_3_refined.txt' % mode
+    ref_pt_file = 'msra_dataset/center_%s_3_refined.txt' % mode
     with open(ref_pt_file) as f:
         ref_pt_str = [x.rstrip() for x in f]
 
@@ -101,7 +101,7 @@ def get_gt_keypoints(file_path):
     a = file_path.replace('\\', '/').split('/')
     mid, fd, name = a[-3:]
 
-    with open('resource/center_info.csv') as f:
+    with open('msra_dataset/center_summary.csv') as f:
         a = f.readlines()
     a = [x for x in a if x.startswith('%s/%s,' % (mid, fd))]
     _, mode, b, e = a[0].strip().split(',')
