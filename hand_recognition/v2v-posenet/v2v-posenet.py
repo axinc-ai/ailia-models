@@ -132,12 +132,26 @@ def pixel2world(x, y, z, img_width, img_height, fx, fy):
     return w_x, w_y, w_z
 
 
+def world2pixel(x, y, z, img_width, img_height, fx, fy):
+    p_x = x * fx / z + img_width / 2
+    p_y = img_height / 2 - y * fy / z
+
+    return p_x, p_y
+
+
 def depthmap2points(image, fx, fy):
     h, w = image.shape
     x, y = np.meshgrid(np.arange(w) + 1, np.arange(h) + 1)
     points = np.zeros((h, w, 3), dtype=np.float32)
     points[:, :, 0], points[:, :, 1], points[:, :, 2] = pixel2world(x, y, image, w, h, fx, fy)
     return points
+
+
+def points2pixels(points, img_width, img_height, fx, fy):
+    pixels = np.zeros((points.shape[0], 2))
+    pixels[:, 0], pixels[:, 1] = \
+        world2pixel(points[:, 0], points[:, 1], points[:, 2], img_width, img_height, fx, fy)
+    return pixels
 
 
 def normalize_img(img, premax, com, cube):
@@ -152,35 +166,36 @@ def normalize_img(img, premax, com, cube):
 
 
 class Color(Enum):
+    WHITE = (255, 255, 255)
     RED = (0, 0, 255)
-    GREEN = (75, 255, 66)
+    GREEN = (84, 130, 52)
     BLUE = (255, 0, 0)
-    YELLOW = (17, 240, 244)  # (204, 153, 17) #
-    PURPLE = (255, 255, 0)
+    YELLOW = (17, 240, 244)
     CYAN = (255, 0, 255)
-    BROWN = (204, 153, 17)
 
 
 def draw_pose(img, pose):
     colors = [
-        Color.RED, Color.RED, Color.RED, Color.RED, Color.GREEN, Color.GREEN, Color.GREEN, Color.GREEN,
-        Color.BLUE, Color.BLUE, Color.BLUE, Color.BLUE, Color.YELLOW, Color.YELLOW, Color.YELLOW, Color.YELLOW,
-        Color.PURPLE, Color.PURPLE, Color.PURPLE, Color.PURPLE]
+        Color.WHITE, Color.GREEN, Color.GREEN, Color.GREEN, Color.WHITE, Color.BLUE, Color.BLUE, Color.BLUE,
+        Color.WHITE, Color.CYAN, Color.CYAN, Color.CYAN, Color.WHITE, Color.YELLOW, Color.YELLOW, Color.YELLOW,
+        Color.WHITE, Color.RED, Color.RED, Color.RED]
     colors_joint = [
-        Color.CYAN, Color.RED, Color.RED, Color.RED, Color.RED, Color.GREEN, Color.GREEN, Color.GREEN,
-        Color.GREEN,
-        Color.BLUE, Color.BLUE, Color.BLUE, Color.BLUE, Color.YELLOW, Color.YELLOW, Color.YELLOW, Color.YELLOW,
-        Color.PURPLE, Color.PURPLE, Color.PURPLE, Color.PURPLE]
+        Color.WHITE, Color.GREEN, Color.GREEN, Color.GREEN, Color.GREEN,
+        Color.BLUE, Color.BLUE, Color.BLUE, Color.BLUE,
+        Color.CYAN, Color.CYAN, Color.CYAN, Color.CYAN,
+        Color.YELLOW, Color.YELLOW, Color.YELLOW, Color.YELLOW,
+        Color.RED, Color.RED, Color.RED, Color.RED]
     sketch_setting = [
         (0, 1), (1, 2), (2, 3), (3, 4), (0, 5), (5, 6), (6, 7), (7, 8),
         (0, 9), (9, 10), (10, 11), (11, 12), (0, 13), (13, 14), (14, 15), (15, 16),
         (0, 17), (17, 18), (18, 19), (19, 20)]
 
-    for i, pt in enumerate(pose):
-        cv2.circle(img, (int(pt[0]), int(pt[1])), 2, colors_joint[i].value, thickness=-1)
     for i, (x, y) in enumerate(sketch_setting):
         cv2.line(img, (int(pose[x, 0]), int(pose[x, 1])),
                  (int(pose[y, 0]), int(pose[y, 1])), colors[i].value, 1)
+    for i, pt in enumerate(pose):
+        radius = 5 if i in (0,) else 3 if i in (4, 8, 12, 16, 20) else 4
+        cv2.circle(img, (int(pt[0]), int(pt[1])), radius, colors_joint[i].value, thickness=-1)
 
     return img
 
@@ -252,12 +267,11 @@ def recognize_from_points(net):
         img = normalize_img(
             depthmap, MAX_DEPTH, refpoint,
             [CUBIC_SIZE, CUBIC_SIZE, CUBIC_SIZE])
-        img = (img + 1) / 2 * 255
+        img = (1 - (img + 1) / 2) * 255
         img = cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)
 
         keypoints = gt_keypoints if gt_keypoints is not None else keypoints
-        keypoints[:, 0] += IMG_WIDTH // 2
-        keypoints[:, 1] = IMG_HEIGHT // 2 - keypoints[:, 1]
+        keypoints = points2pixels(keypoints, IMG_WIDTH, IMG_HEIGHT, fx, fy)
         res_img = draw_pose(img, keypoints)
 
         # plot result
