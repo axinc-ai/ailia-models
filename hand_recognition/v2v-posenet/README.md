@@ -9,9 +9,11 @@
 ## Output
 
 - inference
+
 ![Output](output.png)
 
 - ground-truth
+
 ![Output](output_gt.png)
 
 ## Usage
