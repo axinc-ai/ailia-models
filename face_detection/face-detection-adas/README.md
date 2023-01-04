@@ -13,7 +13,7 @@ Range: [0, 255]
 
 ## Output
 
-![output_image](output.png)
+<img src="output.png" width="320px">
 
 ## Usage
 
