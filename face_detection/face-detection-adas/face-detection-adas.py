@@ -1,6 +1,5 @@
 import sys
 import time
-from distutils.util import strtobool
 
 import numpy as np
 import cv2
@@ -11,7 +10,8 @@ import ailia
 sys.path.append('../../util')
 from utils import get_base_parser, update_parser, get_savepath  # noqa
 from model_utils import check_and_download_models  # noqa
-from detector_utils import load_image  # noqa
+from nms_utils import nms_boxes  # noqa
+from detector_utils import load_image, plot_results  # noqa
 from webcamera_utils import get_capture, get_writer  # noqa
 # logger
 from logging import getLogger  # noqa
@@ -32,8 +32,8 @@ SAVE_IMAGE_PATH = 'output.png'
 IMAGE_HEIGHT = 384
 IMAGE_WIDTH = 672
 
-THRESHOLD = 0.3
-IOU = 0.3
+THRESHOLD = 0.5
+IOU = 0.5
 
 # ======================
 # Arguemnt Parser Config
@@ -62,16 +62,23 @@ args = update_parser(parser)
 # Secondaty Functions
 # ======================
 
-def draw_bbox(img, dets):
-    conf_thres = args.threshold
+def convert_to_detector_object(bboxes, scores, im_w, im_h):
+    detector_object = []
+    for i in range(len(bboxes)):
+        (x1, y1, x2, y2) = bboxes[i]
+        score = scores[i]
 
-    for bbox in dets:
-        if bbox[4] > conf_thres:
-            cv2.rectangle(
-                img, (int(bbox[0]), int(bbox[1])),
-                (int(bbox[2]), int(bbox[3])), (255, 0, 0), 7)
+        r = ailia.DetectorObject(
+            category="",
+            prob=score,
+            x=x1 / im_w,
+            y=y1 / im_h,
+            w=(x2 - x1) / im_w,
+            h=(y2 - y1) / im_h,
+        )
+        detector_object.append(r)
 
-    return img
+    return detector_object
 
 
 # ======================
@@ -88,73 +95,45 @@ def preprocess(img):
     return img
 
 
-def decode_bbox(im_h, im_w, mbox_loc, mbox_conf, prior_box):
-    mbox_loc = mbox_loc[0]
-    mbox_conf = mbox_conf[0]
-    print("mbox_loc---", mbox_loc)
-    print("mbox_loc---", mbox_loc.shape)
-    print("mbox_conf---", mbox_conf)
-    print("mbox_conf---", mbox_conf.shape)
-    print("prior_box---", prior_box)
-    print("prior_box---", prior_box.shape)
+def decode_bbox(mbox_loc, mbox_priorbox, variances):
+    mbox_loc = mbox_loc.reshape(-1, 4)
+    mbox_priorbox = mbox_priorbox.reshape(-1, 4)
+    variances = variances.reshape(-1, 4)
 
-    score_th = 0.5
-    nms_th = 0.5
-    num_boxes = len(mbox_loc) // 4
+    prior_width = mbox_priorbox[:, 2] - mbox_priorbox[:, 0]
+    prior_height = mbox_priorbox[:, 3] - mbox_priorbox[:, 1]
+    prior_center_x = 0.5 * (mbox_priorbox[:, 2] + mbox_priorbox[:, 0])
+    prior_center_y = 0.5 * (mbox_priorbox[:, 3] + mbox_priorbox[:, 1])
 
-    bbox_list = []
-    score_list = []
-    for index in range(num_boxes):
-        score = mbox_conf[index * 2 + 0]
-        if score < score_th:
-            continue
+    decode_bbox_center_x = mbox_loc[:, 0] * prior_width * variances[:, 0]
+    decode_bbox_center_x += prior_center_x
+    decode_bbox_center_y = mbox_loc[:, 1] * prior_height * variances[:, 1]
+    decode_bbox_center_y += prior_center_y
+    decode_bbox_width = np.exp(mbox_loc[:, 2] * variances[:, 2])
+    decode_bbox_width *= prior_width
+    decode_bbox_height = np.exp(mbox_loc[:, 3] * variances[:, 3])
+    decode_bbox_height *= prior_height
 
-        prior_x0 = prior_box[0][index * 4 + 0]
-        prior_y0 = prior_box[0][index * 4 + 1]
-        prior_x1 = prior_box[0][index * 4 + 2]
-        prior_y1 = prior_box[0][index * 4 + 3]
-        prior_cx = (prior_x0 + prior_x1) / 2.0
-        prior_cy = (prior_y0 + prior_y1) / 2.0
-        prior_w = prior_x1 - prior_x0
-        prior_h = prior_y1 - prior_y0
+    decode_bbox_xmin = decode_bbox_center_x - 0.5 * decode_bbox_width
+    decode_bbox_ymin = decode_bbox_center_y - 0.5 * decode_bbox_height
+    decode_bbox_xmax = decode_bbox_center_x + 0.5 * decode_bbox_width
+    decode_bbox_ymax = decode_bbox_center_y + 0.5 * decode_bbox_height
 
-        box_cx = mbox_loc[index * 4 + 0]
-        box_cy = mbox_loc[index * 4 + 1]
-        box_w = mbox_loc[index * 4 + 2]
-        box_h = mbox_loc[index * 4 + 3]
+    bboxes = np.concatenate((
+        decode_bbox_xmin[:, None],
+        decode_bbox_ymin[:, None],
+        decode_bbox_xmax[:, None],
+        decode_bbox_ymax[:, None]), axis=-1)
 
-        prior_variance = [0.1, 0.1, 0.2, 0.2]
-        cx = prior_variance[0] * box_cx * prior_w + prior_cx
-        cy = prior_variance[1] * box_cy * prior_h + prior_cy
-        w = np.exp((box_w * prior_variance[2])) * prior_w
-        h = np.exp((box_h * prior_variance[3])) * prior_h
+    # bboxes = np.minimum(np.maximum(bboxes, 0.0), 1.0)
 
-        bbox_list.append([
-            int((cx - (w / 2.0)) * im_w),
-            int((cy - (h / 2.0)) * im_h),
-            int((cx - (w / 2.0)) * im_w) + int(w * im_w),
-            int((cy - (h / 2.0)) * im_h) + int(h * im_h),
-        ])
-        score_list.append(float(score))
-
-    # nms
-    keep_index = cv2.dnn.NMSBoxes(
-        bbox_list,
-        score_list,
-        score_threshold=score_th,
-        nms_threshold=nms_th,
-        # top_k=200,
-    )
-    nms_bbox_list = []
-    nms_score_list = []
-    for index in keep_index:
-        nms_bbox_list.append(bbox_list[index])
-        nms_score_list.append(score_list[index])
-
-    return nms_bbox_list, nms_score_list
+    return bboxes
 
 
 def predict(model_info, img):
+    score_th = args.threshold
+    nms_th = args.iou
+
     im_h, im_w, _ = img.shape
 
     net = model_info['net']
@@ -169,10 +148,20 @@ def predict(model_info, img):
         output = net.run(None, {'data': img})
     mbox_loc, mbox_conf = output
 
-    bboxes, scores = decode_bbox(im_h, im_w, mbox_loc, mbox_conf, prior_box)
+    bboxes = decode_bbox(mbox_loc[0], prior_box[0], prior_box[1])
 
-    # print(bboxes)
-    # print(scores)
+    mbox_conf = mbox_conf[0].reshape(-1, 2)
+    cls_idx = 1
+    i = mbox_conf[:, cls_idx] >= score_th
+    bboxes = bboxes[i]
+    scores = mbox_conf[i][:, 1]
+
+    bboxes[:, [0, 2]] = bboxes[:, [0, 2]] * im_w
+    bboxes[:, [1, 3]] = bboxes[:, [1, 3]] * im_h
+
+    i = nms_boxes(bboxes, scores, nms_th)
+    bboxes = bboxes[i].astype(int)
+    scores = scores[i]
 
     return (bboxes, scores)
 
@@ -193,7 +182,7 @@ def recognize_from_image(model_info):
             total_time_estimation = 0
             for i in range(args.benchmark_count):
                 start = int(round(time.time() * 1000))
-                dets = predict(model_info, img)
+                pred = predict(model_info, img)
                 end = int(round(time.time() * 1000))
                 estimation_time = (end - start)
 
@@ -204,19 +193,13 @@ def recognize_from_image(model_info):
 
             logger.info(f'\taverage time estimation {total_time_estimation / (args.benchmark_count - 1)} ms')
         else:
-            dets = predict(model_info, img)
+            pred = predict(model_info, img)
 
-        # Draw bbox and score
-        bboxes, scores = dets
-        res_img = img
-        for bbox, score in zip(bboxes, scores):
-            cv2.putText(res_img, '{:.3f}'.format(score), (bbox[0], bbox[1]),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 0, 0), 1,
-                        cv2.LINE_AA)
-            cv2.rectangle(res_img, (bbox[0], bbox[1]), (bbox[2], bbox[3]),
-                          (255, 0, 0))
+        (bboxes, scores) = pred
 
-        # res_img = draw_bbox(img, dets)
+        # plot result
+        detect_object = convert_to_detector_object(bboxes, scores, img.shape[1], img.shape[0])
+        res_img = plot_results(detect_object, img)
 
         # plot result
         savepath = get_savepath(args.savepath, image_path, ext='.png')
@@ -248,10 +231,13 @@ def recognize_from_video(model_info):
             break
 
         # inference
-        dets = predict(model_info, frame)
+        img = frame
+        pred = predict(model_info, img)
+        (bboxes, scores) = pred
 
         # plot result
-        res_img = draw_bbox(frame, dets)
+        detect_object = convert_to_detector_object(bboxes, scores, img.shape[1], img.shape[0])
+        res_img = plot_results(detect_object, img)
 
         # show
         cv2.imshow('frame', res_img)
