@@ -28,6 +28,7 @@ REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/face-detection-adas/'
 
 IMAGE_PATH = 'input.png'
 SAVE_IMAGE_PATH = 'output.png'
+PRIORBOX_PATH = 'mbox_priorbox.npy'
 
 IMAGE_HEIGHT = 384
 IMAGE_WIDTH = 672
@@ -267,7 +268,7 @@ def main():
         import onnxruntime
         net = onnxruntime.InferenceSession(WEIGHT_PATH)
 
-    prior_box = np.squeeze(np.load('mbox_priorbox.npy'))
+    prior_box = np.squeeze(np.load(PRIORBOX_PATH))
 
     model_info = {
         'net': net,
