@@ -91,14 +91,17 @@ def preprocess(img):
 def decode_bbox(im_h, im_w, mbox_loc, mbox_conf, prior_box):
     mbox_loc = mbox_loc[0]
     mbox_conf = mbox_conf[0]
+    print("mbox_loc---", mbox_loc)
     print("mbox_loc---", mbox_loc.shape)
+    print("mbox_conf---", mbox_conf)
     print("mbox_conf---", mbox_conf.shape)
+    print("prior_box---", prior_box)
     print("prior_box---", prior_box.shape)
 
     score_th = 0.5
+    nms_th = 0.5
     num_boxes = len(mbox_loc) // 4
 
-    # bbox decode
     bbox_list = []
     score_list = []
     for index in range(num_boxes):
@@ -134,8 +137,21 @@ def decode_bbox(im_h, im_w, mbox_loc, mbox_conf, prior_box):
         ])
         score_list.append(float(score))
 
-    print(bbox_list[:20])
-    print(score_list[:20])
+    # nms
+    keep_index = cv2.dnn.NMSBoxes(
+        bbox_list,
+        score_list,
+        score_threshold=score_th,
+        nms_threshold=nms_th,
+        # top_k=200,
+    )
+    nms_bbox_list = []
+    nms_score_list = []
+    for index in keep_index:
+        nms_bbox_list.append(bbox_list[index])
+        nms_score_list.append(score_list[index])
+
+    return nms_bbox_list, nms_score_list
 
 
 def predict(model_info, img):
@@ -153,9 +169,12 @@ def predict(model_info, img):
         output = net.run(None, {'data': img})
     mbox_loc, mbox_conf = output
 
-    decode_bbox(im_h, im_w, mbox_loc, mbox_conf, prior_box)
+    bboxes, scores = decode_bbox(im_h, im_w, mbox_loc, mbox_conf, prior_box)
 
-    return
+    # print(bboxes)
+    # print(scores)
+
+    return (bboxes, scores)
 
 
 def recognize_from_image(model_info):
@@ -187,12 +206,22 @@ def recognize_from_image(model_info):
         else:
             dets = predict(model_info, img)
 
+        # Draw bbox and score
+        bboxes, scores = dets
+        res_img = img
+        for bbox, score in zip(bboxes, scores):
+            cv2.putText(res_img, '{:.3f}'.format(score), (bbox[0], bbox[1]),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 0, 0), 1,
+                        cv2.LINE_AA)
+            cv2.rectangle(res_img, (bbox[0], bbox[1]), (bbox[2], bbox[3]),
+                          (255, 0, 0))
+
         # res_img = draw_bbox(img, dets)
-        #
-        # # plot result
-        # savepath = get_savepath(args.savepath, image_path, ext='.png')
-        # logger.info(f'saved at : {savepath}')
-        # cv2.imwrite(savepath, res_img)
+
+        # plot result
+        savepath = get_savepath(args.savepath, image_path, ext='.png')
+        logger.info(f'saved at : {savepath}')
+        cv2.imwrite(savepath, res_img)
 
     logger.info('Script finished successfully.')
 
@@ -252,7 +281,7 @@ def main():
         import onnxruntime
         net = onnxruntime.InferenceSession(WEIGHT_PATH)
 
-    prior_box = np.squeeze(np.load('prior_box.npy'))
+    prior_box = np.squeeze(np.load('mbox_priorbox.npy'))
 
     model_info = {
         'net': net,
