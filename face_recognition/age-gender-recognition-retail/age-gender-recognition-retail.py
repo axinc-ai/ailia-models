@@ -1,21 +1,23 @@
 import sys
+import os
 import time
+from logging import getLogger
 
 import ailia
 import cv2
 import numpy as np
 
 sys.path.append('../../util')
-# logger
-from logging import getLogger  # noqa: E402
+import webcamera_utils  # noqa
+from image_utils import imread, load_image  # noqa
+from model_utils import check_and_download_models  # noqa
+from utils import get_base_parser, get_savepath, update_parser  # noqa
 
-import webcamera_utils  # noqa: E402
-from image_utils import imread, load_image  # noqa: E402
-from model_utils import check_and_download_models  # noqa: E402
-from utils import get_base_parser, get_savepath, update_parser  # noqa: E402
+_this = os.path.dirname(os.path.abspath(__file__))
+top_path = os.path.dirname(os.path.dirname(_this))
 
-sys.path.append('../../face_detection/blazeface')
-from blazeface_utils import compute_blazeface, crop_blazeface  # noqa: E402
+sys.path.append(os.path.join(top_path, 'face_detection/blazeface'))
+from blazeface_utils import crop_blazeface  # noqa
 
 logger = getLogger(__name__)
 
@@ -27,11 +29,14 @@ WEIGHT_PATH = 'age-gender-recognition-retail-0013.onnx'
 MODEL_PATH = 'age-gender-recognition-retail-0013.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/age-gender-recognition-retail/'
 
-FACE_WEIGHT_PATH = 'blazefaceback.onnx'
-FACE_MODEL_PATH = 'blazefaceback.onnx.prototxt'
-FACE_REMOTE_PATH = "https://storage.googleapis.com/ailia-models/blazeface/"
-FACE_IMAGE_HEIGHT = 256
-FACE_IMAGE_WIDTH = 256
+BLAZEFACE_WEIGHT_PATH = 'blazefaceback.onnx'
+BLAZEFACE_MODEL_PATH = 'blazefaceback.onnx.prototxt'
+BLAZEFACE_REMOTE_PATH = "https://storage.googleapis.com/ailia-models/blazeface/"
+FACE_DETECTION_ADAS_WEIGHT_PATH = 'face-detection-adas-0001.onnx'
+FACE_DETECTION_ADAS_MODEL_PATH = 'face-detection-adas-0001.onnx.prototxt'
+FACE_DETECTION_ADAS_REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/face-detection-adas/'
+FACE_DETECTION_ADAS_PRIORBOX_PATH = 'mbox_priorbox.npy'
+
 FACE_MIN_SCORE_THRESH = 0.5
 
 IMAGE_PATH = 'demo.jpg'
@@ -47,30 +52,168 @@ parser = get_base_parser(
     'age-gender-recognition', IMAGE_PATH, SAVE_IMAGE_PATH,
 )
 parser.add_argument(
-    '-d', '--detection',
-    action='store_true',
+    '-d', '--detector', default=None, type=str,
+    choices=('blazeface', 'face-detection-adas'),
     help='Use face detection.'
 )
 args = update_parser(parser)
+
+detection = args.detector if args.detector else 'blazeface' if args.video else None
+
+
+# ======================
+# Secondaty Functions
+# ======================
+
+def setup_detector(net):
+    if detection == 'blazeface':
+        from blazeface_utils import compute_blazeface  # noqa
+
+        def _detector(img):
+            detections = compute_blazeface(
+                net,
+                img,
+                anchor_path=os.path.join(top_path, 'face_detection/blazeface/anchorsback.npy'),
+                back=True,
+                min_score_thresh=FACE_MIN_SCORE_THRESH
+            )
+
+            # adjust face rectangle
+            detect_object = []
+            for d in detections:
+                margin = 1.5
+                r = ailia.DetectorObject(
+                    category=d.category,
+                    prob=d.prob,
+                    x=d.x - d.w * (margin - 1.0) / 2,
+                    y=d.y - d.h * (margin - 1.0) / 2 - d.h * margin / 8,
+                    w=d.w * margin,
+                    h=d.h * margin,
+                )
+                detect_object.append(r)
+
+            return detect_object
+
+        detector = _detector
+    else:
+        sys.path.append(os.path.join(top_path, 'face_detection/face-detection-adas'))
+        from face_detection_adas_mod import mod  # noqa
+
+        prior_box = np.squeeze(np.load(os.path.join(
+            top_path, 'face_detection/face-detection-adas', mod.PRIORBOX_PATH)))
+
+        model_info = {
+            'net': net,
+            'prior_box': prior_box,
+        }
+
+        def _detector(img):
+            im_h, im_w, _ = img.shape
+            pred = mod.predict(model_info, img)
+            (bboxes, scores) = pred
+
+            enlarge = 1.2
+            detect_object = []
+            for i in range(len(bboxes)):
+                (x1, y1, x2, y2) = bboxes[i]
+                w, h = (x2 - x1), (y2 - y1)
+                cx, cy = x1 + w / 2, y1 + h / 2
+                w = h = max(w, h) * enlarge
+                score = scores[i]
+
+                r = ailia.DetectorObject(
+                    category=0,
+                    prob=score,
+                    x=(cx - w / 2) / im_w,
+                    y=(cy - h / 2) / im_h,
+                    w=w / im_w,
+                    h=h / im_h,
+                )
+                detect_object.append(r)
+
+            return detect_object
+
+        detector = _detector
+
+    return detector
 
 
 # ======================
 # Main functions
 # ======================
 
+def recognize_image(net, detector, image):
+    # detect face
+    detections = detector(image)
+
+    # estimate age and gender
+    for obj in detections:
+        # get detected face
+        margin = 1.0
+        crop_img, top_left, bottom_right = crop_blazeface(
+            obj, margin, image
+        )
+        if crop_img.shape[0] <= 0 or crop_img.shape[1] <= 0:
+            continue
+
+        img = cv2.resize(crop_img, (IMAGE_SIZE, IMAGE_SIZE))
+        img = np.expand_dims(img, axis=0)  # 次元合せ
+
+        # inference
+        output = net.predict([img])
+        prob, age_conv3 = output
+        prob = prob[0][0][0]
+        age_conv3 = age_conv3[0][0][0][0]
+
+        i = np.argmax(prob)
+        gender = 'Female' if i == 0 else 'Male'
+        age = round(age_conv3 * 100)
+
+        # display label
+        LABEL_WIDTH = bottom_right[1] - top_left[1]
+        LABEL_HEIGHT = 20
+        if gender == "Male":
+            color = (255, 128, 128)
+        else:
+            color = (128, 128, 255)
+        cv2.rectangle(image, top_left, bottom_right, color, thickness=2)
+        cv2.rectangle(
+            image,
+            top_left,
+            (top_left[0] + LABEL_WIDTH, top_left[1] + LABEL_HEIGHT),
+            color,
+            thickness=-1,
+        )
+
+        text_position = (top_left[0], top_left[1] + LABEL_HEIGHT // 2)
+        color = (0, 0, 0)
+        fontScale = 0.5
+        cv2.putText(
+            image,
+            "{} {}".format(gender, age),
+            text_position,
+            cv2.FONT_HERSHEY_SIMPLEX,
+            fontScale,
+            color,
+            1,
+        )
+
+    return image
+
+
 def recognize_from_image(net, detector):
-    # prepare input data
     # input image loop
     for image_path in args.input:
         # prepare input data
         logger.info(image_path)
 
-        if args.detection:
-            frame = imread(image_path)
-            recognize_from_frame(net, detector, frame)
+        if detection is not None:
+            image = imread(image_path)
+            image = recognize_image(net, detector, image)
+
             savepath = get_savepath(args.savepath, image_path)
             logger.info(f'saved at : {savepath}')
-            cv2.imwrite(savepath, frame)
+            cv2.imwrite(savepath, image)
             continue
 
         img = load_image(
@@ -110,84 +253,6 @@ def recognize_from_image(net, detector):
     logger.info('Script finished successfully.')
 
 
-def recognize_from_frame(net, detector, frame):
-    # detect face
-    detections = compute_blazeface(
-        detector,
-        frame,
-        anchor_path='../../face_detection/blazeface/anchorsback.npy',
-        back=True,
-        min_score_thresh=FACE_MIN_SCORE_THRESH
-    )
-
-    # adjust face rectangle
-    new_detections = []
-    for detection in detections:
-        margin = 1.5
-        r = ailia.DetectorObject(
-            category=detection.category,
-            prob=detection.prob,
-            x=detection.x-detection.w*(margin-1.0)/2,
-            y=detection.y-detection.h*(margin-1.0)/2-detection.h*margin/8,
-            w=detection.w*margin,
-            h=detection.h*margin,
-        )
-        new_detections.append(r)
-    detections = new_detections
-
-    # estimate age and gender
-    for obj in detections:
-        # get detected face
-        margin = 1.0
-        crop_img, top_left, bottom_right = crop_blazeface(
-            obj, margin, frame
-        )
-        if crop_img.shape[0] <= 0 or crop_img.shape[1] <= 0:
-            continue
-
-        img = cv2.resize(crop_img, (IMAGE_SIZE, IMAGE_SIZE))
-        img = np.expand_dims(img, axis=0)  # 次元合せ
-
-        # inference
-        output = net.predict([img])
-        prob, age_conv3 = output
-        prob = prob[0][0][0]
-        age_conv3 = age_conv3[0][0][0][0]
-
-        i = np.argmax(prob)
-        gender = 'Female' if i == 0 else 'Male'
-        age = round(age_conv3 * 100)
-
-        # display label
-        LABEL_WIDTH = bottom_right[1] - top_left[1]
-        LABEL_HEIGHT = 20
-        if gender=="Male":
-            color = (255, 128, 128)
-        else:
-            color = (128, 128, 255)
-        cv2.rectangle(frame, top_left, bottom_right, color, thickness=2)
-        cv2.rectangle(
-            frame,
-            top_left,
-            (top_left[0] + LABEL_WIDTH, top_left[1] + LABEL_HEIGHT),
-            color,
-            thickness=-1,
-        )
-
-        text_position = (top_left[0], top_left[1] + LABEL_HEIGHT // 2)
-        color = (0, 0, 0)
-        fontScale = 0.5
-        cv2.putText(
-            frame,
-            "{} {}".format(gender, age),
-            text_position,
-            cv2.FONT_HERSHEY_SIMPLEX,
-            fontScale,
-            color,
-            1,
-        )
-
-
 def recognize_from_video(net, detector):
     capture = webcamera_utils.get_capture(args.video)
 
@@ -200,14 +265,14 @@ def recognize_from_video(net, detector):
         writer = None
 
     frame_shown = False
-    while (True):
+    while True:
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
         if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
             break
 
-        recognize_from_frame(net, detector, frame)
+        frame = recognize_image(net, detector, frame)
 
         # show result
         cv2.imshow('frame', frame)
@@ -231,10 +296,20 @@ def main():
     check_and_download_models(
         WEIGHT_PATH, MODEL_PATH, REMOTE_PATH
     )
-    if args.video or args.detection:
+
+    det_weight_path = det_model_path = None
+    if detection:
         logger.info('=== face detection model ===')
+        det_path = {
+            'blazeface': (
+                BLAZEFACE_WEIGHT_PATH, BLAZEFACE_MODEL_PATH, BLAZEFACE_REMOTE_PATH),
+            'face-detection-adas': (
+                FACE_DETECTION_ADAS_WEIGHT_PATH, FACE_DETECTION_ADAS_MODEL_PATH,
+                FACE_DETECTION_ADAS_REMOTE_PATH),
+        }[detection]
+        det_weight_path, det_model_path, remote_path = det_path
         check_and_download_models(
-            FACE_WEIGHT_PATH, FACE_MODEL_PATH, FACE_REMOTE_PATH
+            det_weight_path, det_model_path, remote_path
         )
 
     # load model
@@ -245,8 +320,9 @@ def main():
         MODEL_PATH, WEIGHT_PATH, env_id=env_id
     )
     detector = None
-    if args.video or args.detection:
-        detector = ailia.Net(FACE_MODEL_PATH, FACE_WEIGHT_PATH, env_id=env_id)
+    if det_weight_path:
+        detector = ailia.Net(det_model_path, det_weight_path, env_id=env_id)
+        detector = setup_detector(detector)
 
     # image mode
     if args.video is not None:
