@@ -171,6 +171,9 @@ def update_parser(parser, check_input_type=True, large_model=False):
         args.ftype = 'video'
         args.input = None # force video mode
 
+    if len(args.input) == 1:
+        args.input = args.input[0] # support folder input
+
     if args.input is None:
         # TODO: args.video, args.input is vague...
         # input is None --> video mode maybe?
