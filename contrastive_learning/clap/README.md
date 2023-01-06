@@ -1,27 +1,29 @@
 # CLAP
 
+Contrastive Language-Audio Pretraining, known as CLAP. Referring to the CLIP architecture, similarly, the CLAP architecture is as follows.
+
 ## Input
 
 Audio file
 ```
-Wav file from 無料効果音で遊ぼう！ https://taira-komori.jpn.org/
-
-Default input: https://taira-komori.jpn.org/sound/event01/clapping_short.mp3
+24965__www-bonson-ca__bigdogbarking-02.wav
+Attribution 3.0 Unported (CC BY 3.0)
+https://freesound.org/people/www.bonson.ca/sounds/24965/
 ```
 ## Output
 
 Output the cosine similarity between the pre-prepared text embedding and the input audio file embedding. The higher a value of cosine similality is, the closer given text and given audio are in meaning.
 ```
 ===== cosine similality between text and audio =====
-cossim=0.5369, word=applause applaud clap
-cossim=0.4102, word=The crowd is clapping.
-cossim=0.2225, word=I love the contrastive learning
-cossim=0.2296, word=bell
-cossim=0.0060, word=soccer
-cossim=0.0296, word=open the door.
-cossim=0.5568, word=applause
-cossim=-0.0241, word=dog
-cossim=-0.0661, word=dog barking
+cossim=0.1514, word=applause applaud clap
+cossim=0.2942, word=The crowd is clapping.
+cossim=0.0391, word=I love the contrastive learning
+cossim=0.0755, word=bell
+cossim=-0.0926, word=soccer
+cossim=0.0309, word=open the door.
+cossim=0.0849, word=applause
+cossim=0.4183, word=dog
+cossim=0.3819, word=dog barking
   ```
 
 ## Usage
