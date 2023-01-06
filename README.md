@@ -325,6 +325,7 @@ The collection of pre-trained, state-of-the-art AI models.
 | [<img src="object_detection/dab-detr/output.jpg" width=128px>](object_detection/dab-detr/) | [dab-detr](/object_detection/dab-detr/) | [DAB-DETR](https://github.com/IDEA-opensource/DAB-DETR) | Pytorch | 1.2.12 and later | |
 | [<img src="object_detection/poly_yolo/output.jpg" width=128px>](object_detection/poly_yolo/) | [poly_yolo](/object_detection/poly_yolo/) | [Poly YOLO](https://gitlab.com/irafm-ai/poly-yolo/) | Keras | 1.2.6 and later | |
 | [<img src="object_detection/glip/output.png" width=128px>](object_detection/glip/) | [glip](/object_detection/glip/) | [GLIP](https://github.com/microsoft/GLIP) | Pytorch | 1.2.13 and later | |
+| [<img src="object_detection/crowd_det/output.png" width=128px>](object_detection/crowd_det/) | [crowd_det](/object_detection/crowd_det/) | [Detection in Crowded Scenes](https://github.com/Purkialo/CrowdDet) | Pytorch | 1.2.13 and later | |
 
 ## Object detection 3d
 
