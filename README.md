@@ -333,7 +333,7 @@ The collection of pre-trained, state-of-the-art AI models.
 | [<img src="object_detection_3d/mediapipe_objectron/output.png" width=128px>](object_detection_3d/mediapipe_objectron/) | [mediapipe_objectron](/object_detection_3d/mediapipe_objectron/) | [MediaPipe Objectron](https://github.com/google/mediapipe) | TensorFlow Lite | 1.2.5 and later | |
 | [<img src="object_detection_3d/egonet/output.png" width=128px>](object_detection_3d/egonet/) |[egonet](/object_detection_3d/egonet/) | [EgoNet](https://github.com/Nicholasli1995/EgoNet) | Pytorch | 1.2.9 and later | |
 | [<img src="object_detection_3d/d4lcn/output.png" width=128px>](object_detection_3d/d4lcn/) |[d4lcn](/object_detection_3d/d4lcn/) | [D4LCN](https://github.com/dingmyu/D4LCN) | Pytorch | 1.2.9 and later | |
-
+ 
 ## Object tracking
 
 | | Model | Reference | Exported From | Supported Ailia Version | Blog |
