@@ -175,7 +175,7 @@ def convert_to_detector_object(preds, im_w, im_h):
         score = float(preds[i, 4])
 
         r = ailia.DetectorObject(
-            category="",
+            category="person",
             prob=score,
             x=x1 / im_w,
             y=y1 / im_h,
