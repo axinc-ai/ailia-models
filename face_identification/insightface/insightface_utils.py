@@ -6,6 +6,8 @@ import cv2
 import numpy as np
 from skimage import transform as trans
 
+import matplotlib.pyplot as plt
+
 src1 = np.array([[51.642, 50.115], [57.617, 49.990], [35.740, 69.007],
                  [51.157, 89.050], [57.025, 89.702]],
                 dtype=np.float32)
@@ -185,8 +187,9 @@ def draw_detection(img, detections, names):
     h, w = img.shape[0], img.shape[1]
 
     for i, face in enumerate(detections):
-        color = (random.randint(0, 256), random.randint(0, 128),
-                 random.randint(0, 256))  # generate a random color
+        colormap = plt.get_cmap('Dark2')
+        color = colormap(i % colormap.N)
+        color = (color[0] * 256, color[1] * 256, color[2] * 256)
 
         xy = (int(w * face.x), int(h * face.y))
         xy2 = (int(w * (face.x + face.w)), int(h * (face.y + face.h)))
