@@ -20,7 +20,7 @@ from logging import getLogger  # noqa: E402
 import webcamera_utils  # noqa: E402
 from image_utils import imread  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
-from utils import get_base_parser, update_parser  # noqa: E402
+from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 
 logger = getLogger(__name__)
 
@@ -1198,7 +1198,8 @@ def recognize_from_image(config, text_sys):
                                     drop_score=config['drop_score'],
                                     font_path=config['vis_font_path'],
                                     bbox_padding=config['rec_bbox_padding'])
-        cv2.imwrite(args.savepath, draw_img[:, :, ::-1])
+        savepath = get_savepath(args.savepath, img_path)
+        cv2.imwrite(savepath, draw_img[:, :, ::-1])
 
     logger.info('finished process and write result to %s!' % args.savepath)
 

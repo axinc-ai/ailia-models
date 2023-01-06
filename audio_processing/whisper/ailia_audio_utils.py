@@ -15,6 +15,9 @@ N_FRAMES = (N_SAMPLES // HOP_LENGTH)  # 3000: number of frames in a mel spectrog
 def load_audio(file: str, sr: int = SAMPLE_RATE):
     # prepare input data
     wav, source_sr = sf.read(file)
+    # convert to mono
+    if len(wav.shape) >= 2 and wav.shape[1] == 2:
+        wav = np.mean(wav, axis=1)
     # Resample the wav if needed
     if source_sr is not None and source_sr != sr:
         wav = ailia.audio.resample(wav, org_sr=source_sr, target_sr=sr)

@@ -263,13 +263,25 @@ def recognize_from_image(filename, det_model, rec_model, ga_model):
 
     faces = face_identification(faces, ident_feats)
 
-    # plot result
+    # plot and save result
     res_img = draw_detection(img, faces, ident_names)
-
-    # plot result
     savepath = get_savepath(args.savepath, filename)
     logger.info(f'saved at : {savepath}')
     cv2.imwrite(savepath, res_img)
+
+    # print result
+    for i, face in enumerate(faces):
+        print(f'Detected face: {i}')
+        if face.category is not None:
+            print(f'- name: {ident_names[face.category]}')
+        else:
+            print(f'- name: ?')
+        print(f'- cosin_metric: {face.cosin_metric}')
+        print(f'- prob: {face.prob}')
+        print(f'- pos: ({face.x}, {face.y})')
+        print(f'- size: ({face.w}, {face.h})')
+        print(f'- age: {face.age}')
+        print(f'- gender: {face.gender}')
 
 
 def recognize_from_video(video, det_model, rec_model, ga_model):
