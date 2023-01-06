@@ -1,5 +1,7 @@
 # V2V-PoseNet
 
+Voxel-to-Voxel Prediction Network for Accurate 3D Hand and Human Pose Estimation from a Single Depth Map.
+
 ## Input
 
 ![Input](demo.png)
