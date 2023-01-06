@@ -63,7 +63,7 @@ def get_base_parser(
         conflict_handler='resolve',  # allow to overwrite default argument
     )
     parser.add_argument(
-        '-i', '--input', metavar='IMAGE/VIDEO', default=default_input,
+        '-i', '--input', nargs='*', metavar='IMAGE/VIDEO', default=default_input,
         help=('The default (model-dependent) input data (image / video) path. '
               'If a directory name is specified, the model will be run for '
               'the files inside. File type is specified by --ftype argument')
@@ -170,6 +170,9 @@ def update_parser(parser, check_input_type=True, large_model=False):
     if args.video is not None:
         args.ftype = 'video'
         args.input = None # force video mode
+
+    if isinstance(args.input, list) and len(args.input) == 1:
+        args.input = args.input[0] # support folder input
 
     if args.input is None:
         # TODO: args.video, args.input is vague...
