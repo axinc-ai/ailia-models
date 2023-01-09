@@ -38,7 +38,7 @@ IMAGE_WIDTH = 1200
 # ======================
 
 parser = get_base_parser(
-    'NDLOCR用テキスト認識モジュール', IMAGE_PATH, None
+    'NDL OCR', IMAGE_PATH, None
 )
 parser.add_argument(
     '--vert',
