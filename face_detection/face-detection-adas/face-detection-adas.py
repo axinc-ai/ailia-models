@@ -12,6 +12,7 @@ from utils import get_base_parser, update_parser, get_savepath  # noqa
 from model_utils import check_and_download_models  # noqa
 from nms_utils import nms_boxes  # noqa
 from detector_utils import load_image, plot_results  # noqa
+from detector_utils import letterbox_convert, reverse_letterbox  # noqa: E402
 from webcamera_utils import get_capture, get_writer  # noqa
 # logger
 from logging import getLogger  # noqa
@@ -87,7 +88,8 @@ def convert_to_detector_object(bboxes, scores, im_w, im_h):
 # ======================
 
 def preprocess(img):
-    img = cv2.resize(img, (IMAGE_WIDTH, IMAGE_HEIGHT), interpolation=cv2.INTER_LINEAR)
+    #img = cv2.resize(img, (IMAGE_WIDTH, IMAGE_HEIGHT), interpolation=cv2.INTER_LINEAR)
+    img = letterbox_convert(img, (IMAGE_HEIGHT, IMAGE_WIDTH))
 
     img = img.transpose(2, 0, 1)  # HWC -> CHW
     img = np.expand_dims(img, axis=0)
@@ -140,13 +142,13 @@ def predict(model_info, img):
     net = model_info['net']
     prior_box = model_info['prior_box']
 
-    img = preprocess(img)
+    preprocess_img = preprocess(img)
 
     # feedforward
     if not args.onnx:
-        output = net.predict([img])
+        output = net.predict([preprocess_img])
     else:
-        output = net.run(None, {'data': img})
+        output = net.run(None, {'data': preprocess_img})
     mbox_loc, mbox_conf = output
 
     bboxes = decode_bbox(mbox_loc[0], prior_box[0], prior_box[1])
@@ -164,7 +166,10 @@ def predict(model_info, img):
     bboxes = bboxes[i].astype(int)
     scores = scores[i]
 
-    return (bboxes, scores)
+    detect_object = convert_to_detector_object(bboxes, scores, img.shape[1], img.shape[0])
+    detect_object = reverse_letterbox(detect_object, img, (IMAGE_HEIGHT, IMAGE_WIDTH))
+
+    return detect_object
 
 
 def recognize_from_image(model_info):
@@ -196,10 +201,8 @@ def recognize_from_image(model_info):
         else:
             pred = predict(model_info, img)
 
-        (bboxes, scores) = pred
-
         # plot result
-        detect_object = convert_to_detector_object(bboxes, scores, img.shape[1], img.shape[0])
+        detect_object = pred
         res_img = plot_results(detect_object, img)
 
         # plot result
@@ -234,10 +237,9 @@ def recognize_from_video(model_info):
         # inference
         img = frame
         pred = predict(model_info, img)
-        (bboxes, scores) = pred
 
         # plot result
-        detect_object = convert_to_detector_object(bboxes, scores, img.shape[1], img.shape[0])
+        detect_object = pred
         res_img = plot_results(detect_object, img)
 
         # show

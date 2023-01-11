@@ -109,25 +109,18 @@ def setup_detector(net):
 
         def _detector(img):
             im_h, im_w, _ = img.shape
-            pred = mod.predict(model_info, img)
-            (bboxes, scores) = pred
+            detections = mod.predict(model_info, img)
 
             enlarge = 1.2
             detect_object = []
-            for i in range(len(bboxes)):
-                (x1, y1, x2, y2) = bboxes[i]
-                w, h = (x2 - x1), (y2 - y1)
-                cx, cy = x1 + w / 2, y1 + h / 2
-                w = h = max(w, h) * enlarge
-                score = scores[i]
-
+            for d in detections:
                 r = ailia.DetectorObject(
-                    category=0,
-                    prob=score,
-                    x=(cx - w / 2) / im_w,
-                    y=(cy - h / 2) / im_h,
-                    w=w / im_w,
-                    h=h / im_h,
+                    category=d.category,
+                    prob=d.prob,
+                    x=d.x - d.w * (enlarge - 1.0) / 2,
+                    y=d.y - d.h * (enlarge - 1.0) / 2,
+                    w=d.w * enlarge,
+                    h=d.h * enlarge,
                 )
                 detect_object.append(r)
 
