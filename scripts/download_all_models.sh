@@ -59,6 +59,7 @@ cd ../../face_detection/yolov1-face; python3 yolov1-face.py ${OPTION}
 cd ../../face_detection/yolov3-face; python3 yolov3-face.py ${OPTION}
 cd ../../face_detection/retinaface; python3 retinaface.py ${OPTION}
 cd ../../face_detection/anime-face-detector; python3 anime-face-detector.py ${OPTION}
+cd ../../face_detection/face-detection-adas; python3 face-detection-adas.py ${OPTION}
 cd ../../face_identification/arcface; python3 arcface.py ${OPTION}
 cd ../../face_identification/insightface; python3 insightface.py ${OPTION}
 cd ../../face_identification/vggface2; python3 vggface2.py ${OPTION}
@@ -199,6 +200,7 @@ cd ../../object_detection/fastest-det; python3 fastest-det.py ${OPTION}
 cd ../../object_detection/dab-detr; python3 dab-detr.py ${OPTION}
 cd ../../object_detection/glip; python3 glip.py ${OPTION}
 cd ../../object_detection/poly_yolo; python3 poly_yolo.py ${OPTION}
+cd ../../object_detection/crowd_det; python3 crowd_det.py ${OPTION}
 cd ../../object_detection_3d/3d_bbox; python3 3d_bbox.py ${OPTION}
 cd ../../object_detection_3d/3d-object-detection.pytorch; python3 3d-object-detection.pytorch.py ${OPTION}
 cd ../../object_detection_3d/mediapipe_objectron; python3 mediapipe_objectron.py ${OPTION}
@@ -257,6 +259,7 @@ cd ../../text_recognition/deep-text-recognition-benchmark; python3 deep-text-rec
 cd ../../text_recognition/crnn.pytorch; python3 crnn.pytorch.py ${OPTION}
 cd ../../text_recognition/paddleocr; python3 paddleocr.py ${OPTION}
 cd ../../text_recognition/easyocr; python3 easyocr.py ${OPTION}
+cd ../../text_recognition/ndlocr_text_recognition; python3 ndlocr_text_recognition.py ${OPTION}
 cd ../../vehicle_recognition/vehicle-attributes-recognition-barrier; python3 vehicle-attributes-recognition-barrier.py ${OPTION}
 cd ../../vehicle_recognition/vehicle-license-plate-detection-barrier; python3 vehicle-license-plate-detection-barrier.py ${OPTION}
 #cd ../../commercial_model/acculus-pose; python3 acculus-hand.py ${OPTION}
