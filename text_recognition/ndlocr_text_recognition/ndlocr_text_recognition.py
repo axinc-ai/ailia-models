@@ -1,7 +1,6 @@
 import sys
 import time
 import math
-from functools import lru_cache
 from logging import getLogger
 
 import numpy as np
@@ -57,7 +56,6 @@ args = update_parser(parser)
 # Secondaty Functions
 # ======================
 
-@lru_cache
 def get_char_list():
     with open(CHAR_FILE_PATH) as f:
         char_list = f.read()
