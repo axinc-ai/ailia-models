@@ -375,6 +375,7 @@ The collection of pre-trained, state-of-the-art AI models.
 | [<img src="pose_estimation/mediapipe_holistic/output.png" width=128px>](pose_estimation/mediapipe_holistic/) |[mediapipe_holistic](/pose_estimation/mediapipe_holistic/) | [MediaPipe Holistic](https://google.github.io/mediapipe/solutions/holistic.html) | TensorFlow | 1.2.9 and later | |
 | [<img src="pose_estimation/ap-10k/output.png" width=128px>](pose_estimation/ap-10k/) |[ap-10k](/pose_estimation/ap-10k/) | [AP-10K](https://github.com/AlexTheBad/AP-10K)  | Pytorch | 1.2.4 and later | |
 | [<img src="pose_estimation/posenet/output.png" width=128px>](pose_estimation/posenet/) |[posenet](/pose_estimation/posenet/) | [PoseNet Pytorch](https://github.com/rwightman/posenet-pytorch) | Pytorch | 1.2.10 and later | |
+| [<img src="pose_estimation/e2pose/output.png" width=128px>](pose_estimation/e2pose/) |[e2pose](/pose_estimation/e2pose/) | [E2Pose](https://github.com/AISIN-TRC/E2Pose)  | Tensorflow | 1.2.5 and later | |
 
 ## Pose estimation 3d
 
