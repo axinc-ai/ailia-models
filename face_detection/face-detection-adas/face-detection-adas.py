@@ -88,7 +88,7 @@ def convert_to_detector_object(bboxes, scores, im_w, im_h):
 # ======================
 
 def preprocess(img):
-    #img = cv2.resize(img, (IMAGE_WIDTH, IMAGE_HEIGHT), interpolation=cv2.INTER_LINEAR)
+    # img = cv2.resize(img, (IMAGE_WIDTH, IMAGE_HEIGHT), interpolation=cv2.INTER_LINEAR)
     img = letterbox_convert(img, (IMAGE_HEIGHT, IMAGE_WIDTH))
 
     img = img.transpose(2, 0, 1)  # HWC -> CHW
@@ -137,8 +137,6 @@ def predict(model_info, img):
     score_th = args.threshold
     nms_th = args.iou
 
-    im_h, im_w, _ = img.shape
-
     net = model_info['net']
     prior_box = model_info['prior_box']
 
@@ -159,14 +157,14 @@ def predict(model_info, img):
     bboxes = bboxes[i]
     scores = mbox_conf[i][:, 1]
 
-    bboxes[:, [0, 2]] = bboxes[:, [0, 2]] * im_w
-    bboxes[:, [1, 3]] = bboxes[:, [1, 3]] * im_h
+    bboxes[:, [0, 2]] = bboxes[:, [0, 2]] * IMAGE_HEIGHT
+    bboxes[:, [1, 3]] = bboxes[:, [1, 3]] * IMAGE_WIDTH
 
     i = nms_boxes(bboxes, scores, nms_th)
     bboxes = bboxes[i].astype(int)
     scores = scores[i]
 
-    detect_object = convert_to_detector_object(bboxes, scores, img.shape[1], img.shape[0])
+    detect_object = convert_to_detector_object(bboxes, scores, IMAGE_HEIGHT, IMAGE_WIDTH)
     detect_object = reverse_letterbox(detect_object, img, (IMAGE_HEIGHT, IMAGE_WIDTH))
 
     return detect_object
