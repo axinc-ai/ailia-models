@@ -230,6 +230,11 @@ def main():
     check_and_download_models(WEIGHT_STREETVIEW_HOM_PATH, MODEL_STREETVIEW_HOM_PATH, REMOTE_PATH)
     check_and_download_models(WEIGHT_STREETVIEW_TPS_PATH, MODEL_STREETVIEW_TPS_PATH, REMOTE_PATH)
 
+    # disable FP16
+    if "FP16" in ailia.get_environment(args.env_id).props or sys.platform == 'Darwin':
+        logger.warning('This model do not work on FP16. So use CPU mode.')
+        args.env_id = 0
+
     # net initialize
     if args.model_1 == 'streetview_affine':
         net_1 = ailia.Net(MODEL_STREETVIEW_AFFINE_PATH, WEIGHT_STREETVIEW_AFFINE_PATH, env_id=args.env_id)
