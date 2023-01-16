@@ -42,6 +42,11 @@ By adding the `--detector` option, you can add person detector model for multi p
 $ python3 mediapipe_holistic.py --detector
 ```
 
+By adding the `--scale` option, you can resize input image for better viewing of the output.
+```bash
+$ python3 mediapipe_holistic.py --scale 4
+```
+
 ## Reference
 
 - [MediaPipe](https://github.com/google/mediapipe)

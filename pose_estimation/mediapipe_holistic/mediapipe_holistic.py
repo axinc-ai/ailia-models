@@ -98,6 +98,16 @@ parser.add_argument(
     action='store_true',
     help='Perform person detection as preprocessing.'
 )
+parser.add_argument(
+    '--detector',
+    action='store_true',
+    help='Perform person detection as preprocessing.'
+)
+parser.add_argument(
+    '--scale',
+    default=None, type=int,
+    help='Enlarge the input image for better viewing of the output.'
+)
 args = update_parser(parser)
 
 
@@ -418,6 +428,8 @@ def recognize_from_image(models):
         logger.info(image_path)
 
         img = load_image(image_path)
+        if args.scale:
+            img = cv2.resize(img, (img.shape[1] * args.scale, img.shape[0] * args.scale))
         img = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
         image_height, image_width, _ = img.shape
 
@@ -484,6 +496,9 @@ def recognize_from_video(models):
     if args.savepath != SAVE_IMAGE_PATH:
         f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
         f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
+        if args.scale:
+            f_h = f_h * args.scale
+            f_w = f_w * args.scale
         writer = webcamera_utils.get_writer(args.savepath, f_h, f_w)
     else:
         writer = None
@@ -491,6 +506,8 @@ def recognize_from_video(models):
     frame_shown = False
     while True:
         ret, frame = capture.read()
+        if args.scale:
+            frame = cv2.resize(frame, (frame.shape[1] * args.scale, frame.shape[0] * args.scale))
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
         if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
