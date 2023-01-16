@@ -512,12 +512,14 @@ def recognize_from_video(models):
     frame_cnt = 0
     while True:
         ret, frame = capture.read()
-        if args.scale:
-            frame = cv2.resize(frame, (frame.shape[1] * args.scale, frame.shape[0] * args.scale))
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
         if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
             break
+
+        # frame resize
+        if args.scale:
+            frame = cv2.resize(frame, (frame.shape[1] * args.scale, frame.shape[0] * args.scale))
 
         # frame skip
         if args.frame_skip:
