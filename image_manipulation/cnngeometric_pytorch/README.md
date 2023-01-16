@@ -1,5 +1,7 @@
 # CNNGeometric PyTorch implementation
 
+Convolutional neural network architecture for geometric matching
+
 ## Input
 
 Source input image    
