@@ -55,11 +55,20 @@ WEIGHT_HAND_LANDMARK_PATH = 'hand_landmark_full.onnx'
 MODEL_HAND_LANDMARK_PATH = 'hand_landmark_full.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/mediapipe_holistic/'
 
+# detection model
+WEIGHT_YOLOX_PATH = 'yolox_s.opt.onnx'
+MODEL_YOLOX_PATH = 'yolox_s.opt.onnx.prototxt'
+REMOTE_YOLOX_PATH = 'https://storage.googleapis.com/ailia-models/yolox/'
+
 IMAGE_PATH = 'demo.jpg'
 SAVE_IMAGE_PATH = 'output.png'
 
 POSE_DET_SIZE = 224
 POSE_LMK_SIZE = 256
+
+DETECTION_THRESHOLD = 0.4
+DETECTION_IOU = 0.45
+DETECTION_SIZE = 640
 
 # ======================
 # Argument Parser Config
@@ -83,6 +92,11 @@ parser.add_argument(
     '--onnx',
     action='store_true',
     help='execute onnxruntime version.'
+)
+parser.add_argument(
+    '--detector',
+    action='store_true',
+    help='Perform person detection as preprocessing.'
 )
 args = update_parser(parser)
 
@@ -236,10 +250,47 @@ def refine_landmark_from_heatmap(landmarks, heatmap):
 
 
 # ======================
-# Main functions
+# Core functions
 # ======================
 
 def pose_estimate(models, img):
+    # Multi person
+    if args.detector:
+        det_net = models["det_net"]
+        det_net.set_input_shape(DETECTION_SIZE, DETECTION_SIZE)
+        det_net.compute(img, DETECTION_THRESHOLD, DETECTION_IOU)
+        count = det_net.get_object_count()
+        h, w = img.shape[:2]
+
+        pose_img = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
+        h, w = img.shape[0], img.shape[1]
+        count = det_net.get_object_count()
+        pose_detections = []
+        for idx in range(count):
+            obj = det_net.get_object(idx)
+            top_left = (int(w*obj.x), int(h*obj.y))
+            bottom_right = (int(w*(obj.x+obj.w)), int(h*(obj.y+obj.h)))
+            CATEGORY_PERSON = 0
+            if obj.category != CATEGORY_PERSON:
+                continue
+            px1 = max(0, top_left[0])
+            px2 = min(bottom_right[0], w - 1)
+            py1 = max(0, top_left[1])
+            py2 = min(bottom_right[1], h - 1)
+            crop_img = pose_img[py1:py2, px1:px2, :]
+            pose_landmarks, pose_world_landmarks, left_hand_landmarks, right_hand_landmarks, face_landmarks = pose_estimate_one_person(models, crop_img)
+            detect = (pose_landmarks, pose_world_landmarks, left_hand_landmarks,right_hand_landmarks, face_landmarks, px1, py1)
+            pose_detections.append(detect)
+        return pose_detections
+    
+    # Single person
+    pose_detections = []
+    pose_landmarks, pose_world_landmarks, left_hand_landmarks, right_hand_landmarks, face_landmarks = pose_estimate_one_person(models, img)
+    detect = (pose_landmarks, pose_world_landmarks, left_hand_landmarks,right_hand_landmarks, face_landmarks, 0, 0)
+    pose_detections.append(detect)
+    return pose_detections
+
+def pose_estimate_one_person(models, img):
     im_h, im_w = img.shape[:2]
     img = img[:, :, ::-1]  # BGR -> RGB
 
@@ -355,6 +406,10 @@ def pose_estimate(models, img):
         face_landmarks
 
 
+# ======================
+# Main functions
+# ======================
+
 def recognize_from_image(models):
     # input image loop
     for image_path in args.input:
@@ -373,7 +428,7 @@ def recognize_from_image(models):
             for i in range(args.benchmark_count):
                 # Pose estimation
                 start = int(round(time.time() * 1000))
-                output = pose_estimate(models, img)
+                outputs = pose_estimate(models, img)
                 end = int(round(time.time() * 1000))
                 estimation_time = (end - start)
 
@@ -385,30 +440,32 @@ def recognize_from_image(models):
             logger.info(f'\taverage time estimation {total_time_estimation / (args.benchmark_count - 1)} ms')
         else:
             # inference
-            output = pose_estimate(models, img)
+            outputs = pose_estimate(models, img)
 
-        pose_landmarks, pose_world_landmarks, \
-        left_hand_landmarks, right_hand_landmarks, \
-        face_landmarks = output
-        
-        if len(pose_landmarks) == 0:
-            logger.info('pose not detected.')
-            continue
+        # display result
+        for output in outputs:
+            pose_landmarks, pose_world_landmarks, \
+            left_hand_landmarks, right_hand_landmarks, \
+            face_landmarks, offset_x, offset_y = output
+            
+            if len(pose_landmarks) == 0:
+                logger.info('pose not detected.')
+                continue
 
-        logger.info(
-            f'Nose coordinates: ('
-            f'{pose_landmarks[0].x * image_width}, '
-            f'{pose_landmarks[0].y * image_height})'
-        )
+            logger.info(
+                f'Nose coordinates: ('
+                f'{pose_landmarks[0].x * image_width}, '
+                f'{pose_landmarks[0].y * image_height})'
+            )
 
-        # plot result
-        draw_landmarks(img, pose_landmarks)
-        draw_face_landmarks(img, face_landmarks)
-        draw_hand_landmarks(img, left_hand_landmarks)
-        draw_hand_landmarks(img, right_hand_landmarks)
+            # plot result
+            draw_landmarks(img, pose_landmarks)
+            draw_face_landmarks(img, face_landmarks)
+            draw_hand_landmarks(img, left_hand_landmarks)
+            draw_hand_landmarks(img, right_hand_landmarks)
 
-        if args.world_landmark:
-            plot_landmarks(pose_world_landmarks)
+            if args.world_landmark:
+                plot_landmarks(pose_world_landmarks)
 
         # save results
         savepath = get_savepath(args.savepath, image_path)
@@ -438,17 +495,20 @@ def recognize_from_video(models):
             break
 
         # inference
-        output = pose_estimate(models, frame)
-        pose_landmarks, pose_world_landmarks, \
-        left_hand_landmarks, right_hand_landmarks, \
-        face_landmarks = output
+        outputs = pose_estimate(models, frame)
 
-        # plot result
-        if 0 < len(pose_landmarks):
-            draw_landmarks(frame, pose_landmarks)
-            draw_face_landmarks(frame, face_landmarks)
-            draw_hand_landmarks(frame, left_hand_landmarks)
-            draw_hand_landmarks(frame, right_hand_landmarks)
+        # display result
+        for output in outputs:
+            pose_landmarks, pose_world_landmarks, \
+            left_hand_landmarks, right_hand_landmarks, \
+            face_landmarks, offset_x, offset_y = output
+
+            # plot result
+            if 0 < len(pose_landmarks):
+                draw_landmarks(frame, pose_landmarks)
+                draw_face_landmarks(frame, face_landmarks)
+                draw_hand_landmarks(frame, left_hand_landmarks)
+                draw_hand_landmarks(frame, right_hand_landmarks)
 
         cv2.imshow('frame', frame)
         frame_shown = True
@@ -482,6 +542,9 @@ def main():
     ## hand model
     check_and_download_models(WEIGHT_HAND_DETECTOR_PATH, MODEL_HAND_DETECTOR_PATH, REMOTE_PATH)
     check_and_download_models(WEIGHT_HAND_LANDMARK_PATH, MODEL_HAND_LANDMARK_PATH, REMOTE_PATH)
+    # detection model
+    if args.detector:
+        check_and_download_models(WEIGHT_YOLOX_PATH, MODEL_YOLOX_PATH, REMOTE_YOLOX_PATH)
 
     env_id = args.env_id
 
@@ -504,6 +567,19 @@ def main():
         face_detection.onnx = True
         hand_detection.onnx = True
 
+    det_net = None
+    if args.detector:
+        det_net = ailia.Detector(
+            MODEL_YOLOX_PATH,
+            WEIGHT_YOLOX_PATH,
+            80,
+            format=ailia.NETWORK_IMAGE_FORMAT_BGR,
+            channel=ailia.NETWORK_IMAGE_CHANNEL_FIRST,
+            range=ailia.NETWORK_IMAGE_RANGE_U_INT8,
+            algorithm=ailia.DETECTOR_ALGORITHM_YOLOX,
+            env_id=env_id,
+        )
+
     models = {
         'pose_det': pose_det,
         'pose_lmk': pose_lmk,
@@ -511,6 +587,7 @@ def main():
         'face_lmk': face_lmk,
         'hand_det': hand_det,
         'hand_lmk': hand_lmk,
+        'det_net': det_net
     }
 
     if args.video is not None:
