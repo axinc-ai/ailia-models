@@ -108,6 +108,11 @@ parser.add_argument(
     default=None, type=int,
     help='Enlarge the input image for better viewing of the output.'
 )
+parser.add_argument(
+    '--frame_skip',
+    default=None, type=int,
+    help='Skip the frames of input video.'
+)
 args = update_parser(parser)
 
 
@@ -504,6 +509,7 @@ def recognize_from_video(models):
         writer = None
 
     frame_shown = False
+    frame_cnt = 0
     while True:
         ret, frame = capture.read()
         if args.scale:
@@ -512,6 +518,13 @@ def recognize_from_video(models):
             break
         if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
             break
+
+        # frame skip
+        if args.frame_skip:
+            if frame_cnt % args.frame_skip != 0:
+                frame_cnt = frame_cnt + 1
+                continue
+        frame_cnt = frame_cnt + 1
 
         # inference
         outputs = pose_estimate(models, frame)

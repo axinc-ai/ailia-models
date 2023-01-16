@@ -47,6 +47,11 @@ By adding the `--scale` option, you can resize input image for better viewing of
 $ python3 mediapipe_holistic.py --scale 4
 ```
 
+By adding the `--frame_skip` option, you can skip frames of input video for improve the performance.
+```bash
+$ python3 mediapipe_holistic.py --frame_skip 4
+```
+
 ## Reference
 
 - [MediaPipe](https://github.com/google/mediapipe)
