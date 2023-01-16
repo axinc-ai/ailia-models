@@ -247,11 +247,11 @@ def drawbbox(image, bbox, color=None, thickness=2, textcolor=(0, 0, 0), landmark
     w = r - x + 1
     h = b - y + 1
 
-    cv2.rectangle(image, (x, y, r-x+1, b-y+1), color, thickness, 16)
+    cv2.rectangle(image, (x, y), (r+1, b+1), color, thickness, 16)
 
     border = thickness / 2
     pos = (x + 3, y - 5)
-    cv2.rectangle(image, intv(x - border, y - 21, w + thickness, 21), color, -1, 16)
+    cv2.rectangle(image, intv(x - border, y - 21), intv(x - border + w + thickness, y), color, -1, 16)
     cv2.putText(image, text, pos, 0, 0.5, textcolor, 1, 16)
 
     if bbox.haslandmark:
