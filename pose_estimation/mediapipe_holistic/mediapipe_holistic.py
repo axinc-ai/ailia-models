@@ -68,7 +68,6 @@ POSE_LMK_SIZE = 256
 
 DETECTION_THRESHOLD = 0.4
 DETECTION_IOU = 0.45
-DETECTION_SIZE = 640
 
 # ======================
 # Argument Parser Config
@@ -112,6 +111,11 @@ parser.add_argument(
     '--frame_skip',
     default=None, type=int,
     help='Skip the frames of input video.'
+)
+parser.add_argument(
+    '-dw', '--detection_width',
+    default=640, type=int,
+    help='The detection width and height for yolo. (default: auto)'
 )
 args = update_parser(parser)
 
@@ -274,11 +278,9 @@ def pose_estimate(models, img):
     # Multi person
     if args.detector:
         det_net = models["det_net"]
-        det_net.set_input_shape(DETECTION_SIZE, DETECTION_SIZE)
         det_net.compute(img, DETECTION_THRESHOLD, DETECTION_IOU)
         count = det_net.get_object_count()
 
-        pose_img = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
         h, w = img.shape[0], img.shape[1]
         count = det_net.get_object_count()
         pose_detections = []
@@ -293,7 +295,7 @@ def pose_estimate(models, img):
             px2 = min(bottom_right[0], w)
             py1 = max(0, top_left[1])
             py2 = min(bottom_right[1], h)
-            crop_img = pose_img[py1:py2, px1:px2, :]
+            crop_img = img[py1:py2, px1:px2, :]
             pose_landmarks, pose_world_landmarks, left_hand_landmarks, right_hand_landmarks, face_landmarks = pose_estimate_one_person(models, crop_img)
             detect = (pose_landmarks, pose_world_landmarks, left_hand_landmarks,right_hand_landmarks, face_landmarks, px1, py1, px2, py2)
             pose_detections.append(detect)
@@ -614,6 +616,7 @@ def main():
             algorithm=ailia.DETECTOR_ALGORITHM_YOLOX,
             env_id=env_id,
         )
+        det_net.set_input_shape(args.detection_width, args.detection_width)
 
     models = {
         'pose_det': pose_det,
