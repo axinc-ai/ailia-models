@@ -55,11 +55,19 @@ WEIGHT_HAND_LANDMARK_PATH = 'hand_landmark_full.onnx'
 MODEL_HAND_LANDMARK_PATH = 'hand_landmark_full.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/mediapipe_holistic/'
 
+# detection model
+WEIGHT_YOLOX_PATH = 'yolox_s.opt.onnx'
+MODEL_YOLOX_PATH = 'yolox_s.opt.onnx.prototxt'
+REMOTE_YOLOX_PATH = 'https://storage.googleapis.com/ailia-models/yolox/'
+
 IMAGE_PATH = 'demo.jpg'
 SAVE_IMAGE_PATH = 'output.png'
 
 POSE_DET_SIZE = 224
 POSE_LMK_SIZE = 256
+
+DETECTION_THRESHOLD = 0.4
+DETECTION_IOU = 0.45
 
 # ======================
 # Argument Parser Config
@@ -70,6 +78,8 @@ parser = get_base_parser(
     IMAGE_PATH,
     SAVE_IMAGE_PATH,
 )
+
+# Normal options
 parser.add_argument(
     '-m', '--model', metavar='ARCH',
     default='full', choices=MODEL_LIST,
@@ -83,6 +93,35 @@ parser.add_argument(
     '--onnx',
     action='store_true',
     help='execute onnxruntime version.'
+)
+
+# Multi persom options
+parser.add_argument(
+    '--detector',
+    action='store_true',
+    help='Perform person detection as preprocessing.'
+)
+parser.add_argument(
+    '--detection_width',
+    default=640, type=int,
+    help='The detection width and height for yolo. (default: auto)'
+)
+
+# Pre and Post processing options
+parser.add_argument(
+    '--crop',
+    action='store_true',
+    help='Crop detected person as postprocessing.'
+)
+parser.add_argument(
+    '--scale',
+    default=None, type=int,
+    help='Enlarge the input image for better viewing of the output.'
+)
+parser.add_argument(
+    '--frame_skip',
+    default=None, type=int,
+    help='Skip the frames of input video.'
 )
 args = update_parser(parser)
 
@@ -236,10 +275,46 @@ def refine_landmark_from_heatmap(landmarks, heatmap):
 
 
 # ======================
-# Main functions
+# Core functions
 # ======================
 
 def pose_estimate(models, img):
+    h, w = img.shape[:2]
+
+    # Multi person
+    if args.detector:
+        det_net = models["det_net"]
+        det_net.compute(img, DETECTION_THRESHOLD, DETECTION_IOU)
+        count = det_net.get_object_count()
+
+        h, w = img.shape[0], img.shape[1]
+        count = det_net.get_object_count()
+        pose_detections = []
+        for idx in range(count):
+            obj = det_net.get_object(idx)
+            top_left = (int(w*obj.x), int(h*obj.y))
+            bottom_right = (int(w*(obj.x+obj.w)), int(h*(obj.y+obj.h)))
+            CATEGORY_PERSON = 0
+            if obj.category != CATEGORY_PERSON:
+                continue
+            px1 = max(0, top_left[0])
+            px2 = min(bottom_right[0], w)
+            py1 = max(0, top_left[1])
+            py2 = min(bottom_right[1], h)
+            crop_img = img[py1:py2, px1:px2, :]
+            pose_landmarks, pose_world_landmarks, left_hand_landmarks, right_hand_landmarks, face_landmarks = pose_estimate_one_person(models, crop_img)
+            detect = (pose_landmarks, pose_world_landmarks, left_hand_landmarks,right_hand_landmarks, face_landmarks, px1, py1, px2, py2)
+            pose_detections.append(detect)
+        return pose_detections
+    
+    # Single person
+    pose_detections = []
+    pose_landmarks, pose_world_landmarks, left_hand_landmarks, right_hand_landmarks, face_landmarks = pose_estimate_one_person(models, img)
+    detect = (pose_landmarks, pose_world_landmarks, left_hand_landmarks,right_hand_landmarks, face_landmarks, 0, 0, w, h)
+    pose_detections.append(detect)
+    return pose_detections
+
+def pose_estimate_one_person(models, img):
     im_h, im_w = img.shape[:2]
     img = img[:, :, ::-1]  # BGR -> RGB
 
@@ -355,6 +430,10 @@ def pose_estimate(models, img):
         face_landmarks
 
 
+# ======================
+# Main functions
+# ======================
+
 def recognize_from_image(models):
     # input image loop
     for image_path in args.input:
@@ -362,6 +441,8 @@ def recognize_from_image(models):
         logger.info(image_path)
 
         img = load_image(image_path)
+        if args.scale:
+            img = cv2.resize(img, (img.shape[1] * args.scale, img.shape[0] * args.scale))
         img = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
         image_height, image_width, _ = img.shape
 
@@ -373,7 +454,7 @@ def recognize_from_image(models):
             for i in range(args.benchmark_count):
                 # Pose estimation
                 start = int(round(time.time() * 1000))
-                output = pose_estimate(models, img)
+                outputs = pose_estimate(models, img)
                 end = int(round(time.time() * 1000))
                 estimation_time = (end - start)
 
@@ -385,30 +466,33 @@ def recognize_from_image(models):
             logger.info(f'\taverage time estimation {total_time_estimation / (args.benchmark_count - 1)} ms')
         else:
             # inference
-            output = pose_estimate(models, img)
+            outputs = pose_estimate(models, img)
 
-        pose_landmarks, pose_world_landmarks, \
-        left_hand_landmarks, right_hand_landmarks, \
-        face_landmarks = output
-        
-        if len(pose_landmarks) == 0:
-            logger.info('pose not detected.')
-            continue
+        # display result
+        for output in outputs:
+            pose_landmarks, pose_world_landmarks, \
+            left_hand_landmarks, right_hand_landmarks, \
+            face_landmarks, x1, y1, x2, y2 = output
+            
+            if len(pose_landmarks) == 0:
+                logger.info('pose not detected.')
+                continue
 
-        logger.info(
-            f'Nose coordinates: ('
-            f'{pose_landmarks[0].x * image_width}, '
-            f'{pose_landmarks[0].y * image_height})'
-        )
+            logger.info(
+                f'Nose coordinates: ('
+                f'{pose_landmarks[0].x * image_width}, '
+                f'{pose_landmarks[0].y * image_height})'
+            )
 
-        # plot result
-        draw_landmarks(img, pose_landmarks)
-        draw_face_landmarks(img, face_landmarks)
-        draw_hand_landmarks(img, left_hand_landmarks)
-        draw_hand_landmarks(img, right_hand_landmarks)
+            # plot result
+            ref_img = img[y1:y2, x1:x2, :] # reference
+            draw_landmarks(ref_img, pose_landmarks)
+            draw_face_landmarks(ref_img, face_landmarks)
+            draw_hand_landmarks(ref_img, left_hand_landmarks)
+            draw_hand_landmarks(ref_img, right_hand_landmarks)
 
-        if args.world_landmark:
-            plot_landmarks(pose_world_landmarks)
+            if args.world_landmark:
+                plot_landmarks(pose_world_landmarks)
 
         # save results
         savepath = get_savepath(args.savepath, image_path)
@@ -421,15 +505,10 @@ def recognize_from_image(models):
 def recognize_from_video(models):
     capture = webcamera_utils.get_capture(args.video)
 
-    # create video writer if savepath is specified as video format
-    if args.savepath != SAVE_IMAGE_PATH:
-        f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
-        writer = webcamera_utils.get_writer(args.savepath, f_h, f_w)
-    else:
-        writer = None
-
     frame_shown = False
+    frame_cnt = 0
+    writer = None
+
     while True:
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
@@ -437,25 +516,71 @@ def recognize_from_video(models):
         if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
             break
 
+        # frame resize
+        if args.scale:
+            frame = cv2.resize(frame, (frame.shape[1] * args.scale, frame.shape[0] * args.scale))
+
+        # frame skip
+        if args.frame_skip:
+            if frame_cnt % args.frame_skip != 0:
+                frame_cnt = frame_cnt + 1
+                continue
+
         # inference
-        output = pose_estimate(models, frame)
-        pose_landmarks, pose_world_landmarks, \
-        left_hand_landmarks, right_hand_landmarks, \
-        face_landmarks = output
+        outputs = pose_estimate(models, frame)
 
-        # plot result
-        if 0 < len(pose_landmarks):
-            draw_landmarks(frame, pose_landmarks)
-            draw_face_landmarks(frame, face_landmarks)
-            draw_hand_landmarks(frame, left_hand_landmarks)
-            draw_hand_landmarks(frame, right_hand_landmarks)
+        # crop region
+        if frame_cnt == 0:
+            crop_x1, crop_x2 = frame.shape[1], 0
+            crop_y1, crop_y2 = frame.shape[0], 0
 
+        # display result
+        for output in outputs:
+            pose_landmarks, pose_world_landmarks, \
+            left_hand_landmarks, right_hand_landmarks, \
+            face_landmarks, x1, y1, x2, y2 = output
+
+            # calc crop region
+            if frame_cnt == 0:
+                margin = int(max(x2 - x1, y2 - y1) / 2)
+                crop_x1 = min(crop_x1, max(0, x1 - margin))
+                crop_x2 = max(crop_x2, min(frame.shape[1], x2 + margin))
+                crop_y1 = min(crop_y1, max(0, y1 - margin))
+                crop_y2 = max(crop_y2, min(frame.shape[0], y2 + margin))
+
+            # plot result
+            if 0 < len(pose_landmarks):
+                ref_img = frame[y1:y2, x1:x2, :] # reference
+                draw_landmarks(ref_img, pose_landmarks)
+                draw_face_landmarks(ref_img, face_landmarks)
+                draw_hand_landmarks(ref_img, left_hand_landmarks)
+                draw_hand_landmarks(ref_img, right_hand_landmarks)
+
+        # crop
+        if args.crop:
+            frame = frame[crop_y1:crop_y2, crop_x1:crop_x2, :]
+
+        # display
         cv2.imshow('frame', frame)
-        frame_shown = True
 
-        # save results
+        # create video writer if savepath is specified as video format
+        if args.savepath != SAVE_IMAGE_PATH:
+            if frame_cnt == 0:
+                f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
+                f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
+                if args.scale:
+                    f_h = f_h * args.scale
+                    f_w = f_w * args.scale
+                if args.crop:
+                    f_h = crop_y2 - crop_y1
+                    f_w = crop_x2 - crop_x1
+                writer = webcamera_utils.get_writer(args.savepath, f_h, f_w)
         if writer is not None:
             writer.write(frame)
+
+        # process
+        frame_shown = True
+        frame_cnt = frame_cnt + 1
 
     capture.release()
     cv2.destroyAllWindows()
@@ -482,6 +607,9 @@ def main():
     ## hand model
     check_and_download_models(WEIGHT_HAND_DETECTOR_PATH, MODEL_HAND_DETECTOR_PATH, REMOTE_PATH)
     check_and_download_models(WEIGHT_HAND_LANDMARK_PATH, MODEL_HAND_LANDMARK_PATH, REMOTE_PATH)
+    # detection model
+    if args.detector:
+        check_and_download_models(WEIGHT_YOLOX_PATH, MODEL_YOLOX_PATH, REMOTE_YOLOX_PATH)
 
     env_id = args.env_id
 
@@ -504,6 +632,20 @@ def main():
         face_detection.onnx = True
         hand_detection.onnx = True
 
+    det_net = None
+    if args.detector:
+        det_net = ailia.Detector(
+            MODEL_YOLOX_PATH,
+            WEIGHT_YOLOX_PATH,
+            80,
+            format=ailia.NETWORK_IMAGE_FORMAT_BGR,
+            channel=ailia.NETWORK_IMAGE_CHANNEL_FIRST,
+            range=ailia.NETWORK_IMAGE_RANGE_U_INT8,
+            algorithm=ailia.DETECTOR_ALGORITHM_YOLOX,
+            env_id=env_id,
+        )
+        det_net.set_input_shape(args.detection_width, args.detection_width)
+
     models = {
         'pose_det': pose_det,
         'pose_lmk': pose_lmk,
@@ -511,6 +653,7 @@ def main():
         'face_lmk': face_lmk,
         'hand_det': hand_det,
         'hand_lmk': hand_lmk,
+        'det_net': det_net
     }
 
     if args.video is not None:

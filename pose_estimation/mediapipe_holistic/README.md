@@ -37,6 +37,21 @@ By adding the `--model` option, you can specify pose model type which is selecte
 $ python3 mediapipe_holistic.py --model heavy
 ```
 
+By adding the `--detector` option, you can add person detector model for multi person recognition.
+```bash
+$ python3 mediapipe_holistic.py --detector
+```
+
+By adding the `--scale` option, you can resize input image for better viewing of the output.
+```bash
+$ python3 mediapipe_holistic.py --scale 4
+```
+
+By adding the `--frame_skip` option, you can skip frames of input video for improve the performance.
+```bash
+$ python3 mediapipe_holistic.py --frame_skip 4
+```
+
 ## Reference
 
 - [MediaPipe](https://github.com/google/mediapipe)
