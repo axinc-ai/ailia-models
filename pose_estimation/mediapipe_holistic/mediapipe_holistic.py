@@ -78,6 +78,8 @@ parser = get_base_parser(
     IMAGE_PATH,
     SAVE_IMAGE_PATH,
 )
+
+# Normal options
 parser.add_argument(
     '-m', '--model', metavar='ARCH',
     default='full', choices=MODEL_LIST,
@@ -92,15 +94,24 @@ parser.add_argument(
     action='store_true',
     help='execute onnxruntime version.'
 )
+
+# Multi persom options
 parser.add_argument(
     '--detector',
     action='store_true',
     help='Perform person detection as preprocessing.'
 )
 parser.add_argument(
-    '--detector',
+    '--detection_width',
+    default=640, type=int,
+    help='The detection width and height for yolo. (default: auto)'
+)
+
+# Pre and Post processing options
+parser.add_argument(
+    '--crop',
     action='store_true',
-    help='Perform person detection as preprocessing.'
+    help='Crop detected person as postprocessing.'
 )
 parser.add_argument(
     '--scale',
@@ -111,11 +122,6 @@ parser.add_argument(
     '--frame_skip',
     default=None, type=int,
     help='Skip the frames of input video.'
-)
-parser.add_argument(
-    '-dw', '--detection_width',
-    default=640, type=int,
-    help='The detection width and height for yolo. (default: auto)'
 )
 args = update_parser(parser)
 
@@ -499,19 +505,10 @@ def recognize_from_image(models):
 def recognize_from_video(models):
     capture = webcamera_utils.get_capture(args.video)
 
-    # create video writer if savepath is specified as video format
-    if args.savepath != SAVE_IMAGE_PATH:
-        f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
-        if args.scale:
-            f_h = f_h * args.scale
-            f_w = f_w * args.scale
-        writer = webcamera_utils.get_writer(args.savepath, f_h, f_w)
-    else:
-        writer = None
-
     frame_shown = False
     frame_cnt = 0
+    writer = None
+
     while True:
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
@@ -528,16 +525,28 @@ def recognize_from_video(models):
             if frame_cnt % args.frame_skip != 0:
                 frame_cnt = frame_cnt + 1
                 continue
-        frame_cnt = frame_cnt + 1
 
         # inference
         outputs = pose_estimate(models, frame)
+
+        # crop region
+        if frame_cnt == 0:
+            crop_x1, crop_x2 = frame.shape[1], 0
+            crop_y1, crop_y2 = frame.shape[0], 0
 
         # display result
         for output in outputs:
             pose_landmarks, pose_world_landmarks, \
             left_hand_landmarks, right_hand_landmarks, \
             face_landmarks, x1, y1, x2, y2 = output
+
+            # calc crop region
+            if frame_cnt == 0:
+                margin = int(max(x2 - x1, y2 - y1) / 2)
+                crop_x1 = min(crop_x1, max(0, x1 - margin))
+                crop_x2 = max(crop_x2, min(frame.shape[1], x2 + margin))
+                crop_y1 = min(crop_y1, max(0, y1 - margin))
+                crop_y2 = max(crop_y2, min(frame.shape[0], y2 + margin))
 
             # plot result
             if 0 < len(pose_landmarks):
@@ -547,12 +556,31 @@ def recognize_from_video(models):
                 draw_hand_landmarks(ref_img, left_hand_landmarks)
                 draw_hand_landmarks(ref_img, right_hand_landmarks)
 
-        cv2.imshow('frame', frame)
-        frame_shown = True
+        # crop
+        if args.crop:
+            frame = frame[crop_y1:crop_y2, crop_x1:crop_x2, :]
 
-        # save results
+        # display
+        cv2.imshow('frame', frame)
+
+        # create video writer if savepath is specified as video format
+        if args.savepath != SAVE_IMAGE_PATH:
+            if frame_cnt == 0:
+                f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
+                f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
+                if args.scale:
+                    f_h = f_h * args.scale
+                    f_w = f_w * args.scale
+                if args.crop:
+                    f_h = crop_y2 - crop_y1
+                    f_w = crop_x2 - crop_x1
+                writer = webcamera_utils.get_writer(args.savepath, f_h, f_w)
         if writer is not None:
             writer.write(frame)
+
+        # process
+        frame_shown = True
+        frame_cnt = frame_cnt + 1
 
     capture.release()
     cv2.destroyAllWindows()
