@@ -254,13 +254,14 @@ def refine_landmark_from_heatmap(landmarks, heatmap):
 # ======================
 
 def pose_estimate(models, img):
+    h, w = img.shape[:2]
+
     # Multi person
     if args.detector:
         det_net = models["det_net"]
         det_net.set_input_shape(DETECTION_SIZE, DETECTION_SIZE)
         det_net.compute(img, DETECTION_THRESHOLD, DETECTION_IOU)
         count = det_net.get_object_count()
-        h, w = img.shape[:2]
 
         pose_img = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
         h, w = img.shape[0], img.shape[1]
@@ -274,19 +275,19 @@ def pose_estimate(models, img):
             if obj.category != CATEGORY_PERSON:
                 continue
             px1 = max(0, top_left[0])
-            px2 = min(bottom_right[0], w - 1)
+            px2 = min(bottom_right[0], w)
             py1 = max(0, top_left[1])
-            py2 = min(bottom_right[1], h - 1)
+            py2 = min(bottom_right[1], h)
             crop_img = pose_img[py1:py2, px1:px2, :]
             pose_landmarks, pose_world_landmarks, left_hand_landmarks, right_hand_landmarks, face_landmarks = pose_estimate_one_person(models, crop_img)
-            detect = (pose_landmarks, pose_world_landmarks, left_hand_landmarks,right_hand_landmarks, face_landmarks, px1, py1)
+            detect = (pose_landmarks, pose_world_landmarks, left_hand_landmarks,right_hand_landmarks, face_landmarks, px1, py1, px2, py2)
             pose_detections.append(detect)
         return pose_detections
     
     # Single person
     pose_detections = []
     pose_landmarks, pose_world_landmarks, left_hand_landmarks, right_hand_landmarks, face_landmarks = pose_estimate_one_person(models, img)
-    detect = (pose_landmarks, pose_world_landmarks, left_hand_landmarks,right_hand_landmarks, face_landmarks, 0, 0)
+    detect = (pose_landmarks, pose_world_landmarks, left_hand_landmarks,right_hand_landmarks, face_landmarks, 0, 0, w, h)
     pose_detections.append(detect)
     return pose_detections
 
@@ -446,7 +447,7 @@ def recognize_from_image(models):
         for output in outputs:
             pose_landmarks, pose_world_landmarks, \
             left_hand_landmarks, right_hand_landmarks, \
-            face_landmarks, offset_x, offset_y = output
+            face_landmarks, x1, y1, x2, y2 = output
             
             if len(pose_landmarks) == 0:
                 logger.info('pose not detected.')
@@ -459,10 +460,11 @@ def recognize_from_image(models):
             )
 
             # plot result
-            draw_landmarks(img, pose_landmarks)
-            draw_face_landmarks(img, face_landmarks)
-            draw_hand_landmarks(img, left_hand_landmarks)
-            draw_hand_landmarks(img, right_hand_landmarks)
+            ref_img = img[y1:y2, x1:x2, :] # reference
+            draw_landmarks(ref_img, pose_landmarks)
+            draw_face_landmarks(ref_img, face_landmarks)
+            draw_hand_landmarks(ref_img, left_hand_landmarks)
+            draw_hand_landmarks(ref_img, right_hand_landmarks)
 
             if args.world_landmark:
                 plot_landmarks(pose_world_landmarks)
@@ -501,14 +503,15 @@ def recognize_from_video(models):
         for output in outputs:
             pose_landmarks, pose_world_landmarks, \
             left_hand_landmarks, right_hand_landmarks, \
-            face_landmarks, offset_x, offset_y = output
+            face_landmarks, x1, y1, x2, y2 = output
 
             # plot result
             if 0 < len(pose_landmarks):
-                draw_landmarks(frame, pose_landmarks)
-                draw_face_landmarks(frame, face_landmarks)
-                draw_hand_landmarks(frame, left_hand_landmarks)
-                draw_hand_landmarks(frame, right_hand_landmarks)
+                ref_img = frame[y1:y2, x1:x2, :] # reference
+                draw_landmarks(ref_img, pose_landmarks)
+                draw_face_landmarks(ref_img, face_landmarks)
+                draw_hand_landmarks(ref_img, left_hand_landmarks)
+                draw_hand_landmarks(ref_img, right_hand_landmarks)
 
         cv2.imshow('frame', frame)
         frame_shown = True
