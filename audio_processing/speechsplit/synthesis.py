@@ -11,9 +11,9 @@ import librosa
 from hparams import hparams
 from wavenet_vocoder import builder
 
-torch.set_num_threads(4)
-use_cuda = torch.cuda.is_available()
-device = torch.device("cuda" if use_cuda else "cpu")
+#torch.set_num_threads(4)
+#use_cuda = torch.cuda.is_available()
+#device = torch.device("cuda" if use_cuda else "cpu")
 
 
 def build_model():
@@ -59,8 +59,8 @@ def wavegen(model, c=None, tqdm=tqdm):
     initial_input = torch.zeros(1, 1, 1).fill_(0.0)
 
     # Transform data to GPU
-    initial_input = initial_input.to(device)
-    c = None if c is None else c.to(device)
+    #initial_input = initial_input.to(device)
+    #c = None if c is None else c.to(device)
 
     with torch.no_grad():
         y_hat = model.incremental_forward(
