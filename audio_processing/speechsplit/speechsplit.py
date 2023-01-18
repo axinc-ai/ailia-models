@@ -15,7 +15,6 @@ from model_utils import check_and_download_models  # noqa: E402
 from logging import getLogger   # noqa: E402
 logger = getLogger(__name__)
 
-import torch
 from scipy import signal
 from pysptk import sptk
 import soundfile as sf
@@ -162,44 +161,32 @@ def audio_recognition(net_converter, net_generator):
     emb_org = sbmt_i[1]
     x_org, f0_org, len_org, uid_org = sbmt_i[2] 
     uttr_org_pad, len_org_pad = pad_seq_to_2(x_org[np.newaxis,:,:], 192)
-    uttr_org_pad = torch.from_numpy(uttr_org_pad)
     f0_org_pad = np.pad(f0_org, (0, 192-len_org), 'constant', constant_values=(0, 0))
     f0_org_quantized = quantize_f0_numpy(f0_org_pad)[0]
     f0_org_onehot = f0_org_quantized[np.newaxis, :, :]
-    f0_org_onehot = torch.from_numpy(f0_org_onehot)
-    uttr_f0_org = torch.cat((uttr_org_pad, f0_org_onehot), dim=-1)
+    uttr_f0_org = np.concatenate([uttr_org_pad, f0_org_onehot], axis=-1)
 
     sbmt_j = metadata[1]
     emb_trg = sbmt_j[1]
     x_trg, f0_trg, len_trg, uid_trg = sbmt_j[2]        
     uttr_trg_pad, len_trg_pad = pad_seq_to_2(x_trg[np.newaxis,:,:], 192)
-    uttr_trg_pad = torch.from_numpy(uttr_trg_pad)
     f0_trg_pad = np.pad(f0_trg, (0, 192-len_trg), 'constant', constant_values=(0, 0))
     f0_trg_quantized = quantize_f0_numpy(f0_trg_pad)[0]
     f0_trg_onehot = f0_trg_quantized[np.newaxis, :, :]
-    f0_trg_onehot = torch.from_numpy(f0_trg_onehot)
 
     ### START OF f0_converter ###
-    uttr_org_pad = uttr_org_pad.to('cpu').detach().numpy().copy()
-    f0_trg_onehot = f0_trg_onehot.to('cpu').detach().numpy().copy()
     f0_pred = net_converter.predict([uttr_org_pad, f0_trg_onehot])[0]
-    uttr_org_pad = torch.from_numpy(uttr_org_pad)
-    f0_trg_onehot = torch.from_numpy(f0_trg_onehot)
-    f0_pred = torch.from_numpy(f0_pred)
-    f0_pred_quantized = f0_pred.argmax(dim=-1).squeeze(0)
-    f0_con_onehot = torch.zeros((1, 192, 257))
-    f0_con_onehot[0, torch.arange(192), f0_pred_quantized] = 1
+    f0_pred_quantized = np.argmax(f0_pred, axis=-1)
+    f0_pred_quantized = f0_pred_quantized.squeeze(0)
+    f0_con_onehot = np.zeros((1, 192, 257))
+    f0_con_onehot[0, np.arange(192), f0_pred_quantized] = 1
     ### END OF f0_converter ###
 
-    uttr_f0_trg = torch.cat((uttr_org_pad, f0_con_onehot), dim=-1) 
+    uttr_f0_trg = np.concatenate([uttr_org_pad, f0_con_onehot], axis=-1) 
 
     ### START OF generator ###
     conditions = ['R', 'F', 'U', 'RF', 'RU', 'FU', 'RFU']
     spect_vc = []
-    uttr_f0_org = uttr_f0_org.to('cpu').detach().numpy().copy()
-    uttr_f0_trg = uttr_f0_trg.to('cpu').detach().numpy().copy()
-    uttr_org_pad = uttr_org_pad.to('cpu').detach().numpy().copy()
-    uttr_trg_pad = uttr_trg_pad.to('cpu').detach().numpy().copy()
 
     for condition in conditions:
         if condition == 'R':
@@ -222,30 +209,26 @@ def audio_recognition(net_converter, net_generator):
         else:
             uttr_trg = x_identic_val[0, :len_org, :]
                 
-        spect_vc.append( ('{}_{}_{}_{}'.format(sbmt_i[0], sbmt_j[0], uid_org, condition), uttr_trg ) ) 
+        spect_vc.append( (condition, uttr_trg ) ) 
     ### END OF generator ###
 
     # spectrogram to waveform
     if not args.use_ailia_wavenet_vocoder:
         import os
         import soundfile
-        from synthesis import build_model
-        from synthesis import wavegen
+        from synthesis import build_model, load_checkpoint, wavegen
 
         if not os.path.exists('results'):
             os.makedirs('results')
 
         model = build_model()
-        checkpoint = torch.load("checkpoint_step001000000_ema.pth", map_location='cpu')
-        model.load_state_dict(checkpoint["state_dict"])
+        model = load_checkpoint(model, "checkpoint_step001000000_ema.pth")
 
         for spect in spect_vc:
-            name = spect[0]
+            cond = spect[0]
             c = spect[1]
-            print(name)
-            print(c.shape)
             waveform = wavegen(model, c=c)   
-            soundfile.write('results/'+name+'.wav', waveform, samplerate=16000)
+            soundfile.write('results/output_{}.wav'.format(cond), waveform, samplerate=16000)
     else:
         print('Not implemented.')
 

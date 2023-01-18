@@ -11,13 +11,8 @@ import librosa
 from hparams import hparams
 from wavenet_vocoder import builder
 
-#torch.set_num_threads(4)
-#use_cuda = torch.cuda.is_available()
-#device = torch.device("cuda" if use_cuda else "cpu")
-
 
 def build_model():
-    
     model = getattr(builder, hparams.builder)(
         out_channels=hparams.out_channels,
         layers=hparams.layers,
@@ -37,6 +32,12 @@ def build_model():
         scalar_input=True,
         legacy=hparams.legacy,
     )
+    return model
+
+
+def load_checkpoint(model, checkpoint):
+    cp = torch.load(checkpoint, map_location='cpu')
+    model.load_state_dict(cp["state_dict"])
     return model
 
 
