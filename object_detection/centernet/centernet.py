@@ -116,7 +116,7 @@ def detect_objects(org_img, net):
 
     for det in dets:
         # Make sure bboxes are not out of bounds
-        xmin, ymin, xmax, ymax = det[:4].astype(np.int)
+        xmin, ymin, xmax, ymax = det[:4].astype(int)
         xmin = max(0, xmin)
         ymin = max(0, ymin)
         xmax = min(org_img.shape[1], xmax)

@@ -341,7 +341,7 @@ def _get_preds_from_hm(hm):
     )
     idx += 1
     preds = idx.reshape(idx.shape[0], idx.shape[1], 1)
-    preds = np.tile(preds, (1, 1, 2)).astype(np.float)
+    preds = np.tile(preds, (1, 1, 2)).astype(float)
     preds[..., 0] = (preds[..., 0] - 1) % hm.shape[3] + 1
     preds[..., 1] = np.floor((preds[..., 1] - 1) / (hm.shape[2])) + 1
 
@@ -355,7 +355,7 @@ def _get_preds_from_hm(hm):
                         hm_[pY, pX + 1] - hm_[pY, pX - 1],
                         hm_[pY + 1, pX] - hm_[pY - 1, pX],
                     ]
-                ).astype(np.float)
+                ).astype(float)
                 preds[i, j] = preds[i, j] + (np.sign(diff) * 0.25)
 
     preds += -0.5
@@ -405,4 +405,4 @@ def _transform(point, center, scale, resolution, invert=False):
     if invert:
         t = np.linalg.inv(t)
     new_point = (np.dot(t, _pt))[0:2]
-    return new_point.astype(np.int)
+    return new_point.astype(int)
