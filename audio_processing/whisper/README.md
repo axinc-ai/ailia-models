@@ -93,7 +93,6 @@ ONNX opset=11
 [decoder_tiny_fix_kv_cache.opt.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/whisper/decoder_tiny_fix_kv_cache.opt.onnx.prototxt)  
 [decoder_base_fix_kv_cache.opt.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/whisper/decoder_base_fix_kv_cache.opt.onnx.prototxt)  
 [decoder_small_fix_kv_cache.opt.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/whisper/decoder_small_fix_kv_cache.opt.onnx.prototxt)  
-[decoder_medium_fix_kv_cache.opt.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/whisper/decoder_medium_fix_kv_cache.opt.onnx.prototxt)
 
 ### Dynamic shape models
 

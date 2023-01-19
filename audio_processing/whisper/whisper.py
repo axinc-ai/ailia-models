@@ -172,8 +172,8 @@ if not args.dynamic_kv_cache:
     MODEL_DEC_BASE_PATH = "decoder_base_fix_kv_cache"+ OPT +".onnx.prototxt"
     WEIGHT_DEC_SMALL_PATH = "decoder_small_fix_kv_cache"+ OPT +".onnx"
     MODEL_DEC_SMALL_PATH = "decoder_small_fix_kv_cache"+ OPT +".onnx.prototxt"
-    WEIGHT_DEC_MEDIUM_PATH = "decoder_medium_fix_kv_cache"+ OPT +".onnx"
-    MODEL_DEC_MEDIUM_PATH = "decoder_medium_fix_kv_cache"+ OPT +".onnx.prototxt"
+    WEIGHT_DEC_MEDIUM_PATH = "decoder_medium_fix_kv_cache.onnx" # optimizer out of memory
+    MODEL_DEC_MEDIUM_PATH = "decoder_medium_fix_kv_cache.onnx.prototxt"
 else:
     # KV_CACHEが推論ごとに変化するバージョン
     WEIGHT_DEC_TINY_PATH = "decoder_tiny.onnx"
