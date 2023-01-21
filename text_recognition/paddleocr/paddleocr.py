@@ -750,10 +750,7 @@ class TextDetector(object):
                     'order': 'hwc'
                 }
             }
-            postprocess_params["unclip_ratio"] = 1.5
             postprocess_params["use_dilation"] = False
-            postprocess_params["score_mode"] = "fast"
-            postprocess_params["box_type"] = "quad"
 
         self.preprocess_op = create_operators(pre_process_list)
         self.postprocess_op = build_post_process(postprocess_params)
