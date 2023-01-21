@@ -34,6 +34,8 @@ warnings.simplefilter("ignore", DeprecationWarning)
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/paddle_ocr/'
 
 WEIGHT_PATH_DET_CHN = 'chi_eng_num_sym_server_det_org.onnx'
+WEIGHT_PATH_DET_R50_ICDAR15 = 'det_r50_db++_icdar15_infer.onnx'
+WEIGHT_PATH_DET_R50_TDTR = 'det_r50_db++_td_tr_infer.onnx'
 
 WEIGHT_PATH_CLS_CHN = 'chi_eng_num_sym_mobile_cls_org.onnx'
 
@@ -100,14 +102,22 @@ parser.add_argument(
           'Please set a positive integer.'
           'Generally set to a multiple of 32, such as 960.')
 )
+parser.add_argument(
+    '-d', '--det_model', default='db_res18', choices=('db_res18', 'r50_icdar15', 'r50_trtd'),
+    help='det model type'
+)
 args = update_parser(parser)
+
+det_model = args.det_model
 
 
 # ======================
 # Utils
 # ======================
+
 def get_default_config():
     dc = {}
+
     # params for text detector
     dc['det_algorithm'] = 'DB'
     dc['det_model_path'] = WEIGHT_PATH_DET_CHN
@@ -153,10 +163,11 @@ def get_default_config():
     return dc
 
 
-def set_config(dc, weight_path_det,
+def set_config(dc, weight_path_det, det_algorithm,
                weight_path_rec, dict_path_rec, weight_path_cls):
     # params for text detector
     dc['det_model_path'] = weight_path_det
+    dc['det_algorithm'] = det_algorithm
 
     # params for text recognizer
     dc['rec_model_path'] = weight_path_rec
@@ -179,7 +190,7 @@ def transform(data, ops=None):
     return data
 
 
-def create_operators(op_param_list, global_config=None):
+def create_operators(op_param_list):
     """
     create operators based on the config
     Args:
@@ -188,31 +199,33 @@ def create_operators(op_param_list, global_config=None):
     assert isinstance(op_param_list, list), ('operator config should be a list')
     ops = []
     for operator in op_param_list:
-        assert isinstance(operator,
-                          dict) and len(operator) == 1, "yaml format error"
+        assert isinstance(operator, dict) \
+               and len(operator) == 1, "yaml format error"
         op_name = list(operator)[0]
         param = {} if operator[op_name] is None else operator[op_name]
-        if global_config is not None:
-            param.update(global_config)
         op = eval(op_name)(**param)
         ops.append(op)
+
     return ops
 
 
-def build_post_process(config, global_config=None):
+def build_post_process(config):
     support_dict = [
         'DBPostProcess', 'CTCLabelDecode', 'ClsPostProcess'
     ]
 
     config = copy.deepcopy(config)
     module_name = config.pop('name')
-    if global_config is not None:
-        config.update(global_config)
     assert module_name in support_dict, Exception(
         'post process only support {}'.format(support_dict))
     module_class = eval(module_name)(**config)
+
     return module_class
 
+
+# ======================
+# Operators
+# ======================
 
 class DetResizeForTest(object):
     def __init__(self, **kwargs):
@@ -342,13 +355,7 @@ class NormalizeImage(object):
 
     def __call__(self, data):
         img = data['image']
-        if isinstance(img, Image.Image):
-            img = np.array(img)
-
-        assert isinstance(img,
-                          np.ndarray), "invalid input 'img' in NormalizeImage"
-        data['image'] = (
-            img.astype('float32') * self.scale - self.mean) / self.std
+        data['image'] = (img.astype('float32') * self.scale - self.mean) / self.std
         return data
 
 
@@ -361,8 +368,6 @@ class ToCHWImage(object):
 
     def __call__(self, data):
         img = data['image']
-        if isinstance(img, Image.Image):
-            img = np.array(img)
         data['image'] = img.transpose((2, 0, 1))
         return data
 
@@ -538,10 +543,10 @@ class DBPostProcess(object):
     def box_score_fast(self, bitmap, _box):
         h, w = bitmap.shape[:2]
         box = _box.copy()
-        xmin = np.clip(np.floor(box[:, 0].min()).astype(np.int), 0, w - 1)
-        xmax = np.clip(np.ceil(box[:, 0].max()).astype(np.int), 0, w - 1)
-        ymin = np.clip(np.floor(box[:, 1].min()).astype(np.int), 0, h - 1)
-        ymax = np.clip(np.ceil(box[:, 1].max()).astype(np.int), 0, h - 1)
+        xmin = np.clip(np.floor(box[:, 0].min()).astype(int), 0, w - 1)
+        xmax = np.clip(np.ceil(box[:, 0].max()).astype(int), 0, w - 1)
+        ymin = np.clip(np.floor(box[:, 1].min()).astype(int), 0, h - 1)
+        ymax = np.clip(np.ceil(box[:, 1].max()).astype(int), 0, h - 1)
 
         mask = np.zeros((ymax - ymin + 1, xmax - xmin + 1), dtype=np.uint8)
         box[:, 0] = box[:, 0] - xmin
@@ -693,48 +698,68 @@ class ClsPostProcess(object):
         return decode_out, label
 
 
-class TextDetector():
+# ======================
+# Main functions
+# ======================
+
+class TextDetector(object):
     def __init__(self, config, env_id):
-        OCR_CFG = config
-        self.config = copy.deepcopy(OCR_CFG)
+        self.config = copy.deepcopy(config)
         self.env_id = env_id
-        self.det_algorithm = OCR_CFG['det_algorithm']
+        self.det_algorithm = config['det_algorithm']
 
-        pre_process_list = [{
-            'DetResizeForTest': {
-                'limit_side_len': OCR_CFG['det_limit_side_len'],
-                'limit_type': OCR_CFG['det_limit_type']
+        pre_process_list = [
+            {
+                'DetResizeForTest': {
+                    'limit_side_len': config['det_limit_side_len'],
+                    'limit_type': config['det_limit_type']
+                }
+            },
+            {
+                'NormalizeImage': {
+                    'std': [0.229, 0.224, 0.225],
+                    'mean': [0.485, 0.456, 0.406],
+                    'scale': '1./255.',
+                    'order': 'hwc'
+                }
+            },
+            {
+                'ToCHWImage': None
+            },
+            {
+                'KeepKeys': {
+                    'keep_keys': ['image', 'shape']
+                }
             }
-        }, {
-            'NormalizeImage': {
-                'std': [0.229, 0.224, 0.225],
-                'mean': [0.485, 0.456, 0.406],
-                'scale': '1./255.',
-                'order': 'hwc'
-            }
-        }, {
-            'ToCHWImage': None
-        }, {
-            'KeepKeys': {
-                'keep_keys': ['image', 'shape']
-            }
-        }]
+        ]
 
-        postprocess_params = {}
-        if self.det_algorithm == "DB":
-            postprocess_params['name'] = 'DBPostProcess'
-            postprocess_params["thresh"] = OCR_CFG['det_db_thresh']
-            postprocess_params["box_thresh"] = OCR_CFG['det_db_box_thresh']
-            postprocess_params["max_candidates"] = 1000
-            postprocess_params["unclip_ratio"] = OCR_CFG['det_db_unclip_ratio']
-            postprocess_params["use_dilation"] = True
-        else:
-            logger.error("unknown det_algorithm:{}".format(self.det_algorithm))
-            sys.exit(0)
+        postprocess_params = {
+            'name': 'DBPostProcess',
+            "thresh": config['det_db_thresh'],
+            "box_thresh": config['det_db_box_thresh'],
+            "max_candidates": 1000,
+            "unclip_ratio": config['det_db_unclip_ratio'],
+            "use_dilation": True
+        }
+        if self.det_algorithm == "DB++":
+            pre_process_list[1] = {
+                'NormalizeImage': {
+                    'std': [1.0, 1.0, 1.0],
+                    'mean': [0.48109378172549, 0.45752457890196, 0.40787054090196],
+                    'scale': '1./255.',
+                    'order': 'hwc'
+                }
+            }
+            postprocess_params["unclip_ratio"] = 1.5
+            postprocess_params["use_dilation"] = False
+            postprocess_params["score_mode"] = "fast"
+            postprocess_params["box_type"] = "quad"
 
         self.preprocess_op = create_operators(pre_process_list)
         self.postprocess_op = build_post_process(postprocess_params)
-        self.net = None
+        self.net = ailia.Net(self.config['det_model_path'] + '.prototxt',
+                             self.config['det_model_path'], env_id=self.env_id)
+        self.called = False
 
     def order_points_clockwise(self, pts):
         """
@@ -783,35 +808,32 @@ class TextDetector():
     def __call__(self, img):
         ori_im = img.copy()
         data = {'image': img}
+
         data = transform(data, self.preprocess_op)
         img, shape_list = data
-        if img is None:
-            return None, 0
         img = np.expand_dims(img, axis=0)
         shape_list = np.expand_dims(shape_list, axis=0)
         img = img.copy()
         starttime = time.time()
 
         # net initialize, Text Detection
-        if self.net==None or self.net.get_input_shape()!=img.shape:
-            self.net = ailia.Net(self.config['det_model_path']+'.prototxt',
+        if self.called and self.net.get_input_shape() != img.shape:
+            self.net = ailia.Net(self.config['det_model_path'] + '.prototxt',
                                  self.config['det_model_path'], env_id=self.env_id)
         outputs = self.net.predict(img)
+        self.called = True
 
-        preds = {}
-        if self.det_algorithm == 'DB':
-            preds['maps'] = outputs
-        else:
-            raise NotImplementedError
+        preds = {'maps': outputs}
 
         post_result = self.postprocess_op(preds, shape_list)
         dt_boxes = post_result[0]['points']
         dt_boxes = self.filter_tag_det_res(dt_boxes, ori_im.shape)
         elapse = time.time() - starttime
+
         return dt_boxes, elapse
 
 
-class TextClassifier():
+class TextClassifier(object):
     def __init__(self, config, env_id):
         OCR_CFG = config
         self.cfg = OCR_CFG
@@ -989,15 +1011,14 @@ class TextRecognizer():
 
 class TextSystem(object):
     def __init__(self, config, env_id):
-        OCR_CFG = config
-        self.cfg = OCR_CFG
+        self.cfg = config
 
-        self.text_detector = TextDetector(OCR_CFG, env_id)
-        self.text_recognizer = TextRecognizer(OCR_CFG, env_id)
-        self.use_angle_cls = OCR_CFG['use_angle_cls']
-        self.drop_score = OCR_CFG['drop_score']
+        self.text_detector = TextDetector(config, env_id)
+        self.text_recognizer = TextRecognizer(config, env_id)
+        self.use_angle_cls = config['use_angle_cls']
+        self.drop_score = config['drop_score']
         if self.use_angle_cls:
-            self.text_classifier = TextClassifier(OCR_CFG, env_id)
+            self.text_classifier = TextClassifier(config, env_id)
 
     def get_rotate_crop_image(self, img, points):
         '''
@@ -1260,7 +1281,12 @@ def main():
     config['det_limit_side_len'] = args.det_limit_side_len
     config['det_limit_type'] = args.det_limit_type
 
-    weight_path_det = WEIGHT_PATH_DET_CHN
+    det_info = {
+        'db_res18': (WEIGHT_PATH_DET_CHN, 'DB'),
+        'r50_icdar15': (WEIGHT_PATH_DET_R50_ICDAR15, 'DB++'),
+        'r50_trtd': (WEIGHT_PATH_DET_R50_TDTR, 'DB++'),
+    }
+    weight_path_det, det_algorithm = det_info[det_model]
     weight_path_cls = WEIGHT_PATH_CLS_CHN
     weight_path_rec = dict_path_rec = None
 
@@ -1296,7 +1322,8 @@ def main():
         logger.error('Unknown language: %s' % args.language)
         sys.exit(-1)
 
-    config = set_config(config, weight_path_det,
+    config = set_config(config,
+                        weight_path_det, det_algorithm,
                         weight_path_rec, dict_path_rec,
                         weight_path_cls)
 
