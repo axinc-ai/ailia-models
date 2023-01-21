@@ -264,7 +264,7 @@ class DetResizeForTest(object):
         ratio_h = float(resize_h) / ori_h
         ratio_w = float(resize_w) / ori_w
         img = cv2.resize(img, (int(resize_w), int(resize_h)))
-        # return img, np.array([ori_h, ori_w])
+
         return img, [ratio_h, ratio_w]
 
     def resize_image_type0(self, img):
@@ -310,7 +310,7 @@ class DetResizeForTest(object):
             sys.exit(0)
         ratio_h = resize_h / float(h)
         ratio_w = resize_w / float(w)
-        # return img, np.array([h, w])
+
         return img, [ratio_h, ratio_w]
 
     def resize_image_type2(self, img):
@@ -400,8 +400,8 @@ class DBPostProcess(object):
         self.max_candidates = max_candidates
         self.unclip_ratio = unclip_ratio
         self.min_size = 3
-        self.dilation_kernel = None if not use_dilation else np.array(
-            [[1, 1], [1, 1]])
+        self.dilation_kernel = None if not use_dilation \
+            else np.array([[1, 1], [1, 1]])
 
     def boxes_from_bitmap(self, pred, _bitmap, dest_width, dest_height):
         '''
@@ -443,8 +443,9 @@ class DBPostProcess(object):
                 np.round(box[:, 0] / width * dest_width), 0, dest_width)
             box[:, 1] = np.clip(
                 np.round(box[:, 1] / height * dest_height), 0, dest_height)
-            boxes.append(box.astype(np.int16))
+            boxes.append(box.astype(int))
             scores.append(score)
+
         return np.array(boxes, dtype=np.int16), scores
 
     def xyrotate(self, coord_xy, angle, center_xy):
@@ -461,14 +462,14 @@ class DBPostProcess(object):
             coord_x_tmp -= center_xy[0]
             coord_y_tmp -= center_xy[1]
             # exec rotation
-            coord_xy_tmp        = np.array([coord_x_tmp, coord_y_tmp])[:, np.newaxis]
-            rotation_matrix_tmp = np.array([[np.cos(-angle/180*np.pi), 
-                                            -np.sin(-angle/180*np.pi)], 
-                                            [np.sin(-angle/180*np.pi), 
-                                            np.cos(-angle/180*np.pi)]])
-            coord_xy_tmp        = rotation_matrix_tmp @ coord_xy_tmp
+            coord_xy_tmp = np.array([coord_x_tmp, coord_y_tmp])[:, np.newaxis]
+            rotation_matrix_tmp = np.array([
+                [np.cos(-angle / 180 * np.pi), -np.sin(-angle / 180 * np.pi)],
+                [np.sin(-angle / 180 * np.pi), np.cos(-angle / 180 * np.pi)]
+            ])
+            coord_xy_tmp = rotation_matrix_tmp @ coord_xy_tmp
             # re-slide to suit center of rotation
-            coord_xy_tmp     = coord_xy_tmp.reshape(-1)
+            coord_xy_tmp = coord_xy_tmp.reshape(-1)
             coord_xy_tmp[0] += center_xy[0]
             coord_xy_tmp[1] += center_xy[1]
             # stock
@@ -478,10 +479,10 @@ class DBPostProcess(object):
 
     def unclip(self, box):
         unclip_ratio = self.unclip_ratio
-        poly_area = (np.sqrt(np.sum((box[0, :] - box[1, :])**2)) * 
-                     np.sqrt(np.sum((box[0, :] - box[3, :])**2)))
-        poly_length = (np.sqrt(np.sum((box[0, :] - box[1, :])**2)) + 
-                       np.sqrt(np.sum((box[0, :] - box[3, :])**2))) * 2
+        poly_area = (np.sqrt(np.sum((box[0, :] - box[1, :]) ** 2)) *
+                     np.sqrt(np.sum((box[0, :] - box[3, :]) ** 2)))
+        poly_length = (np.sqrt(np.sum((box[0, :] - box[1, :]) ** 2)) +
+                       np.sqrt(np.sum((box[0, :] - box[3, :]) ** 2))) * 2
         distance = poly_area * unclip_ratio / poly_length
         # calc angle between upper side of bbox with x axis
         u = box[1] - box[0]
@@ -492,14 +493,14 @@ class DBPostProcess(object):
         c = i / n
         angle = np.rad2deg(np.arccos(np.clip(c, -1.0, 1.0)))
         # exec coordinates rotation 
-        box_ = self.xyrotate(coord_xy=box, angle=angle, 
+        box_ = self.xyrotate(coord_xy=box, angle=angle,
                              center_xy=np.mean(box, axis=0))
         # calculate circle coordinates
         pitch = 10
-        x_upper = np.cos(np.arange(1, 0, (-1/pitch)) * np.pi) * distance
-        y_upper = -np.sqrt(distance**2 - x_upper**2)
-        x_lower = np.cos(np.arange(0, 1, (1/pitch)) * np.pi) * distance
-        y_lower = np.sqrt(distance**2 - x_lower**2)
+        x_upper = np.cos(np.arange(1, 0, (-1 / pitch)) * np.pi) * distance
+        y_upper = -np.sqrt(distance ** 2 - x_upper ** 2)
+        x_lower = np.cos(np.arange(0, 1, (1 / pitch)) * np.pi) * distance
+        y_lower = np.sqrt(distance ** 2 - x_lower ** 2)
         x = np.concatenate([x_upper, x_lower])
         y = np.concatenate([y_upper, y_lower])
         circle = np.concatenate([x[:, np.newaxis], y[:, np.newaxis]], axis=1)
@@ -509,10 +510,10 @@ class DBPostProcess(object):
             expanded.append(circle + box_tmp)
         expanded = np.array(expanded).reshape(-1, 2)
         # narrow down circle coordinates to outside 
-        expanded = expanded[[25, 26, 27, 28, 29, 30, 50, 51, 52, 53, 54, 55, 
-                             75, 76, 77, 78, 79, 60,  0,  1,  2,  3,  4,  5]]
+        expanded = expanded[[25, 26, 27, 28, 29, 30, 50, 51, 52, 53, 54, 55,
+                             75, 76, 77, 78, 79, 60, 0, 1, 2, 3, 4, 5]]
         # exec coordinates re-rotation 
-        expanded = self.xyrotate(coord_xy=expanded, angle=-angle, 
+        expanded = self.xyrotate(coord_xy=expanded, angle=-angle,
                                  center_xy=np.mean(box_, axis=0))
         expanded = np.round(expanded).astype(np.int64)
         return expanded
@@ -568,8 +569,8 @@ class DBPostProcess(object):
                     self.dilation_kernel)
             else:
                 mask = segmentation[batch_index]
-            boxes, scores = self.boxes_from_bitmap(pred[batch_index], mask,
-                                                   src_w, src_h)
+            boxes, scores = self.boxes_from_bitmap(
+                pred[batch_index], mask, src_w, src_h)
 
             boxes_batch.append({'points': boxes})
         return boxes_batch
@@ -632,15 +633,15 @@ class BaseRecLabelDecode(object):
                     continue
                 if is_remove_duplicate:
                     # only for predict
-                    if idx > 0 and text_index[batch_idx][idx - 1] == text_index[
-                            batch_idx][idx]:
+                    if idx > 0 and text_index[batch_idx][idx - 1] == \
+                            text_index[batch_idx][idx]:
                         continue
                 # print('int(text_index[batch_idx][idx]) =', 
                 #        int(text_index[batch_idx][idx]))
                 # print('self.character[int(text_index[batch_idx][idx])] =', 
                 #        self.character[int(text_index[batch_idx][idx])])
-                char_list.append(self.character[int(text_index[batch_idx][
-                    idx])])
+                char_list.append(
+                    self.character[int(text_index[batch_idx][idx])])
                 if text_prob is not None:
                     conf_list.append(text_prob[batch_idx][idx])
                 else:
@@ -664,8 +665,8 @@ class CTCLabelDecode(BaseRecLabelDecode):
                  character_type='ch',
                  use_space_char=False,
                  **kwargs):
-        super(CTCLabelDecode, self).__init__(character_dict_path,
-                                             character_type, use_space_char)
+        super(CTCLabelDecode, self).__init__(
+            character_dict_path, character_type, use_space_char)
 
     def __call__(self, preds, label=None, *args, **kwargs):
         preds_idx = preds.argmax(axis=2)
@@ -897,10 +898,9 @@ class TextClassifier(object):
             norm_img_batch = norm_img_batch.copy()
             starttime = time.time()
 
-
             # net initialize, Detection Boxes Rectify
-            if self.net==None or self.net.get_input_shape()!=norm_img_batch.shape:
-                self.net = ailia.Net(self.cfg['cls_model_path']+'.prototxt',
+            if self.net is None or self.net.get_input_shape() != norm_img_batch.shape:
+                self.net = ailia.Net(self.cfg['cls_model_path'] + '.prototxt',
                                      self.cfg['cls_model_path'], env_id=self.env_id)
             self.net.set_input_shape(norm_img_batch.shape)
             prob_out = self.net.predict(norm_img_batch)
@@ -916,7 +916,7 @@ class TextClassifier(object):
         return img_list, cls_res, elapse
 
 
-class TextRecognizer():
+class TextRecognizer(object):
     def __init__(self, config, env_id):
         OCR_CFG = config
         self.config = OCR_CFG
@@ -994,8 +994,8 @@ class TextRecognizer():
             starttime = time.time()
 
             # net initialize, Text Recognition
-            if self.net==None or self.net.get_input_shape()!=norm_img_batch.shape:
-                self.net = ailia.Net(self.config['rec_model_path']+'.prototxt',
+            if self.net == None or self.net.get_input_shape() != norm_img_batch.shape:
+                self.net = ailia.Net(self.config['rec_model_path'] + '.prototxt',
                                      self.config['rec_model_path'], env_id=self.env_id)
             preds = self.net.predict(norm_img_batch)
 
@@ -1066,7 +1066,7 @@ class TextSystem(object):
             dt_boxes = np.array(dt_boxes)
             height_vec = dt_boxes[:, 2, :] - dt_boxes[:, 1, :]
             width_vec = dt_boxes[:, 3, :] - dt_boxes[:, 0, :]
-            if (np.sum(height_vec**2) > np.sum(width_vec**2)):
+            if (np.sum(height_vec ** 2) > np.sum(width_vec ** 2)):
                 height_vec = width_vec
             padding_vec_tmp = height_vec * ratio_padding
             padding_vec = padding_vec_tmp.copy()
@@ -1098,6 +1098,7 @@ class TextSystem(object):
             if score >= self.drop_score:
                 filter_boxes.append(box)
                 filter_rec_res.append(rec_reuslt)
+
         return filter_boxes, filter_rec_res
 
 
@@ -1150,8 +1151,8 @@ def draw_ocr_box_txt(image,
                 box[2][1], box[3][0], box[3][1]
             ],
             outline=color)
-        box_height = math.sqrt((box[0][0] - box[3][0])**2 + (box[0][1] - box[3][1])**2)
-        box_width = math.sqrt((box[0][0] - box[1][0])**2 + (box[0][1] - box[1][1])**2)
+        box_height = math.sqrt((box[0][0] - box[3][0]) ** 2 + (box[0][1] - box[3][1]) ** 2)
+        box_width = math.sqrt((box[0][0] - box[1][0]) ** 2 + (box[0][1] - box[1][1]) ** 2)
         if box_height > 2 * box_width:
             font_size = max(int(box_width * 0.9 * (1 - bbox_padding)), 10)
             font = ImageFont.truetype(font_path, font_size, encoding="utf-8")
@@ -1181,10 +1182,10 @@ def adjust_half_and_full(txts):
         for i_char in range(1, len(txt_tmp)):
             char_tmp = txt_tmp[i_char]
             if (char_tmp == '-'):
-                res = unicodedata.east_asian_width(txt_tmp[i_char-1])
+                res = unicodedata.east_asian_width(txt_tmp[i_char - 1])
                 if (res == 'W'):
-                    txt_tmp = txt_tmp.replace('%s-' % txt_tmp[i_char-1], 
-                                              '%sー' % txt_tmp[i_char-1])
+                    txt_tmp = txt_tmp.replace(
+                        '%s-' % txt_tmp[i_char - 1], '%sー' % txt_tmp[i_char - 1])
                     flg_replace = True
         if flg_replace:
             txts[i_txt] = txt_tmp
@@ -1192,7 +1193,6 @@ def adjust_half_and_full(txts):
 
 
 def recognize_from_image(config, text_sys):
-
     for img_path in args.input:
         # read image
         img = imread(img_path)
@@ -1208,10 +1208,11 @@ def recognize_from_image(config, text_sys):
         # adjust halfwidth and fullwidth forms
         txts = adjust_half_and_full(txts)
 
-        draw_img = draw_ocr_box_txt(image, boxes, txts, scores,
-                                    drop_score=config['drop_score'],
-                                    font_path=config['vis_font_path'],
-                                    bbox_padding=config['rec_bbox_padding'])
+        draw_img = draw_ocr_box_txt(
+            image, boxes, txts, scores,
+            drop_score=config['drop_score'],
+            font_path=config['vis_font_path'],
+            bbox_padding=config['rec_bbox_padding'])
         savepath = get_savepath(args.savepath, img_path)
         cv2.imwrite(savepath, draw_img[:, :, ::-1])
 
@@ -1240,7 +1241,7 @@ def recognize_from_video(config, text_sys):
             break
         if frame_shown and cv2.getWindowProperty('exec PaddleOCR', cv2.WND_PROP_VISIBLE) == 0:
             break
-        
+
         # exec ocr
         dt_boxes, rec_res = text_sys(img)
 
@@ -1249,9 +1250,10 @@ def recognize_from_video(config, text_sys):
         txts = [rec_res[i][0] for i in range(len(rec_res))]
         scores = [rec_res[i][1] for i in range(len(rec_res))]
 
-        draw_img = draw_ocr_box_txt(image, boxes, txts, scores,
-                                    drop_score=config['drop_score'],
-                                    font_path=config['vis_font_path'])
+        draw_img = draw_ocr_box_txt(
+            image, boxes, txts, scores,
+            drop_score=config['drop_score'],
+            font_path=config['vis_font_path'])
         # display
         cv2.imshow('exec PaddleOCR', draw_img[:, :, ::-1])
         frame_shown = True
