@@ -6,17 +6,17 @@ import math
 import sys
 import time
 import unicodedata
+# logger
+from logging import getLogger
 
-import ailia
 import cv2
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
+import ailia
+
 # import original modules
 sys.path.append('../../util')
-# logger
-from logging import getLogger  # noqa: E402
-
 import webcamera_utils  # noqa: E402
 from image_utils import imread  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
@@ -61,10 +61,8 @@ DICT_PATH_REC_FRE_MBL = './dict/fre_eng_num_sym_org.txt'
 WEIGHT_PATH_REC_KOR_MBL = 'kor_eng_num_sym_mobile_rec_org.onnx'
 DICT_PATH_REC_KOR_MBL = './dict/kor_eng_num_sym_org.txt'
 
-
 IMAGE_OR_VIDEO_PATH = 'input.jpg'
 SAVE_IMAGE_OR_VIDEO_PATH = 'output.png'
-
 
 # ======================
 # Arguemnt Parser Config
@@ -75,7 +73,7 @@ parser = get_base_parser(
     SAVE_IMAGE_OR_VIDEO_PATH,
 )
 parser.add_argument(
-    '-c', '--case', type=str, default='mobile',
+    '-c', '--case', default='mobile', choices=('mobile', 'server'),
     help=('You can choose the following model size.'
           '  - mobile : fast and light but low accuracy'
           '  - server : high accuracy but slow and heavy')
@@ -344,7 +342,6 @@ class NormalizeImage(object):
 
     def __call__(self, data):
         img = data['image']
-        from PIL import Image
         if isinstance(img, Image.Image):
             img = np.array(img)
 
@@ -364,7 +361,6 @@ class ToCHWImage(object):
 
     def __call__(self, data):
         img = data['image']
-        from PIL import Image
         if isinstance(img, Image.Image):
             img = np.array(img)
         data['image'] = img.transpose((2, 0, 1))
@@ -906,7 +902,7 @@ class TextRecognizer():
         OCR_CFG = config
         self.config = OCR_CFG
         self.env_id = env_id
- 
+
         self.limited_max_width = OCR_CFG['limited_max_width']
         self.limited_min_width = OCR_CFG['limited_min_width']
 
@@ -1218,7 +1214,7 @@ def recognize_from_video(config, text_sys):
 
     # frame read and exec segmentation
     frame_shown = False
-    while(True):
+    while (True):
         # frame read
         ret, img = video_capture.read()
 
@@ -1263,47 +1259,53 @@ def main():
     config = get_default_config()
     config['det_limit_side_len'] = args.det_limit_side_len
     config['det_limit_type'] = args.det_limit_type
+
+    weight_path_det = WEIGHT_PATH_DET_CHN
+    weight_path_cls = WEIGHT_PATH_CLS_CHN
+    weight_path_rec = dict_path_rec = None
+
     lang_tmp = args.language.lower()
-    if (lang_tmp == 'japanese') | (lang_tmp == 'jpn') | (lang_tmp == 'jp'):
-        if (args.case == 'mobile'):
-            config = set_config(config, WEIGHT_PATH_DET_CHN, WEIGHT_PATH_REC_JPN_MBL,
-                                        DICT_PATH_REC_JPN_MBL, WEIGHT_PATH_CLS_CHN)
-        elif (args.case == 'server'):
-            config = set_config(config, WEIGHT_PATH_DET_CHN, WEIGHT_PATH_REC_JPN_SVR,
-                                        DICT_PATH_REC_JPN_SVR, WEIGHT_PATH_CLS_CHN)
-    elif (lang_tmp == 'english') | (lang_tmp == 'eng') | (lang_tmp == 'en'):
-        if (args.case == 'mobile'):
-            config = set_config(config, WEIGHT_PATH_DET_CHN, WEIGHT_PATH_REC_ENG_MBL,
-                                        DICT_PATH_REC_ENG_MBL, WEIGHT_PATH_CLS_CHN)
-    elif (lang_tmp == 'chinese') | (lang_tmp == 'chi') | (lang_tmp == 'ch'):
-        if (args.case == 'mobile'):
-            config = set_config(config, WEIGHT_PATH_DET_CHN, WEIGHT_PATH_REC_CHN_MBL,
-                                        DICT_PATH_REC_CHN_MBL, WEIGHT_PATH_CLS_CHN)
-        elif (args.case == 'server'):
-            config = set_config(config, WEIGHT_PATH_DET_CHN, WEIGHT_PATH_REC_CHN_SVR,
-                                        DICT_PATH_REC_CHN_SVR, WEIGHT_PATH_CLS_CHN)
-    elif (lang_tmp == 'german') | (lang_tmp == 'ger') | (lang_tmp == 'ge'):
-        if (args.case == 'mobile'):
-            config = set_config(config, WEIGHT_PATH_DET_CHN, WEIGHT_PATH_REC_GER_MBL,
-                                        DICT_PATH_REC_GER_MBL, WEIGHT_PATH_CLS_CHN)
-    elif (lang_tmp == 'french') | (lang_tmp == 'fre') | (lang_tmp == 'fr'):
-        if (args.case == 'mobile'):
-            config = set_config(config, WEIGHT_PATH_DET_CHN, WEIGHT_PATH_REC_FRE_MBL,
-                                        DICT_PATH_REC_FRE_MBL, WEIGHT_PATH_CLS_CHN)
-    elif (lang_tmp == 'korean') | (lang_tmp == 'kor') | (lang_tmp == 'ko'):
-        if (args.case == 'mobile'):
-            config = set_config(config, WEIGHT_PATH_DET_CHN, WEIGHT_PATH_REC_KOR_MBL,
-                                        DICT_PATH_REC_KOR_MBL, WEIGHT_PATH_CLS_CHN)
+    if lang_tmp in ('japanese', 'jpn', 'jp'):
+        if args.case == 'mobile':
+            weight_path_rec = WEIGHT_PATH_REC_JPN_MBL
+            dict_path_rec = DICT_PATH_REC_JPN_MBL
+        elif args.case == 'server':
+            weight_path_rec = WEIGHT_PATH_REC_JPN_SVR
+            dict_path_rec = DICT_PATH_REC_JPN_SVR
+    elif lang_tmp in ('english', 'eng', 'en'):
+        if args.case == 'mobile':
+            weight_path_rec = WEIGHT_PATH_REC_ENG_MBL
+            dict_path_rec = DICT_PATH_REC_ENG_MBL
+    elif lang_tmp in ('chinese', 'chi', 'ch'):
+        if args.case == 'mobile':
+            weight_path_rec = WEIGHT_PATH_REC_CHN_MBL
+            dict_path_rec = DICT_PATH_REC_CHN_MBL
+        elif args.case == 'server':
+            weight_path_rec = WEIGHT_PATH_REC_CHN_SVR
+            dict_path_rec = DICT_PATH_REC_CHN_SVR
+    elif lang_tmp in ('german', 'ger', 'ge'):
+        weight_path_rec = WEIGHT_PATH_REC_GER_MBL
+        dict_path_rec = DICT_PATH_REC_GER_MBL
+    elif lang_tmp in ('french', 'fre', 'fr'):
+        weight_path_rec = WEIGHT_PATH_REC_FRE_MBL
+        dict_path_rec = DICT_PATH_REC_FRE_MBL
+    elif lang_tmp in ('korean', 'kor', 'ko'):
+        weight_path_rec = WEIGHT_PATH_REC_KOR_MBL
+        dict_path_rec = DICT_PATH_REC_KOR_MBL
+    else:
+        logger.error('Unknown language: %s' % args.language)
+        sys.exit(-1)
+
+    config = set_config(config, weight_path_det,
+                        weight_path_rec, dict_path_rec,
+                        weight_path_cls)
 
     # model files check and download
-    weight_path_det = config['det_model_path']
-    model_path_det = config['det_model_path'] + '.prototxt'
+    model_path_det = weight_path_det + '.prototxt'
     check_and_download_models(weight_path_det, model_path_det, REMOTE_PATH)
-    weight_path_cls = config['cls_model_path']
-    model_path_cls = config['cls_model_path'] + '.prototxt'
+    model_path_cls = weight_path_cls + '.prototxt'
     check_and_download_models(weight_path_cls, model_path_cls, REMOTE_PATH)
-    weight_path_rec = config['rec_model_path']
-    model_path_rec = config['rec_model_path'] + '.prototxt'
+    model_path_rec = weight_path_rec + '.prototxt'
     check_and_download_models(weight_path_rec, model_path_rec, REMOTE_PATH)
 
     # build ocr class
