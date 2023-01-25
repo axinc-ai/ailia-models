@@ -20,15 +20,17 @@ logger = getLogger(__name__)
 # Parameters
 # ======================
 
-WEIGHT_PATH = 'clip_nsfw.onnx'
-MODEL_PATH = 'clip_nsfw.onnx.prototxt'
+WEIGHT_VITL14_PATH = 'clip_bin_nsfw.onnx'
+MODEL_VITL14_PATH = 'clip_bin_nsfw.onnx.prototxt'
+WEIGHT_VITB32_PATH = 'clip_nsfw_b32.onnx'
+MODEL_VITB32_PATH = 'clip_nsfw_b32.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/clip-based-nsfw-detector/'
 
-WEIGHT_PATH_CLIP_VITL14_IMAGE = 'ViT-L14-encode_image.onnx'
-MODEL_PATH_CLIP_VITL14_IMAGE = 'ViT-L14-encode_image.onnx.prototxt'
-WEIGHT_PATH_CLIP_VITB32_IMAGE = 'ViT-B32-encode_image.onnx'
-MODEL_PATH_CLIP_VITB32_IMAGE = 'ViT-B32-encode_image.onnx.prototxt'
-REMOTE_PATH_CLIP = 'https://storage.googleapis.com/ailia-models/clip/'
+WEIGHT_CLIP_VITL14_IMAGE_PATH = 'ViT-L14-encode_image.onnx'
+MODEL_CLIP_VITL14_IMAGE_PATH = 'ViT-L14-encode_image.onnx.prototxt'
+WEIGHT_CLIP_VITB32_IMAGE_PATH = 'ViT-B32-encode_image.onnx'
+MODEL_CLIP_VITB32_IMAGE_PATH = 'ViT-B32-encode_image.onnx.prototxt'
+REMOTE_CLIP_PATH = 'https://storage.googleapis.com/ailia-models/clip/'
 
 IMAGE_PATH = '_vyr_6097Sexy-Push-Up-Bikini-Brasilianisch-Bunt-2.jpg'
 
@@ -40,6 +42,10 @@ IMAGE_SIZE = 224
 
 parser = get_base_parser(
     'CLIP-based-NSFW-Detector', IMAGE_PATH, None
+)
+parser.add_argument(
+    '-m', '--model_type', default='ViTB32', choices=('ViTB32', 'ViTL14'),
+    help='model type'
 )
 parser.add_argument(
     '--onnx',
@@ -107,8 +113,6 @@ def predict(net_nsfw, net_image, img):
     image_feature = output[0]
 
     emb = np.asarray(normalized(image_feature))
-    print("emb---", emb)
-    print("emb---", emb.shape)
 
     # feedforward
     emb = emb.astype(np.float64)
@@ -156,23 +160,29 @@ def recognize_from_image(net_nsfw, net_image):
 
 
 def main():
+    dic_model = {
+        'ViTB32': (
+            (WEIGHT_CLIP_VITB32_IMAGE_PATH, MODEL_CLIP_VITB32_IMAGE_PATH),
+            (WEIGHT_VITB32_PATH, MODEL_VITB32_PATH)),
+        'ViTL14': (
+            (WEIGHT_CLIP_VITL14_IMAGE_PATH, MODEL_CLIP_VITL14_IMAGE_PATH),
+            (WEIGHT_VITL14_PATH, MODEL_VITL14_PATH)),
+    }
+    (clip_weigth, clip_model), (nsfw_weigth, nsfw_model) = dic_model[args.model_type]
+
     # model files check and download
-    clip_weigth = WEIGHT_PATH_CLIP_VITL14_IMAGE
-    clip_model = MODEL_PATH_CLIP_VITL14_IMAGE
-    # clip_weigth = WEIGHT_PATH_CLIP_VITB32_IMAGE
-    # clip_model = MODEL_PATH_CLIP_VITB32_IMAGE
-    check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
-    check_and_download_models(clip_weigth, clip_model, REMOTE_PATH_CLIP)
+    check_and_download_models(nsfw_weigth, nsfw_model, REMOTE_PATH)
+    check_and_download_models(clip_weigth, clip_model, REMOTE_CLIP_PATH)
 
     env_id = args.env_id
 
     # initialize
     if not args.onnx:
-        net_nsfw = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+        net_nsfw = ailia.Net(nsfw_model, nsfw_weigth, env_id=env_id)
         net_image = ailia.Net(clip_model, clip_weigth, env_id=env_id)
     else:
         import onnxruntime
-        net_nsfw = onnxruntime.InferenceSession(WEIGHT_PATH)
+        net_nsfw = onnxruntime.InferenceSession(nsfw_weigth)
         net_image = onnxruntime.InferenceSession(clip_weigth)
 
     recognize_from_image(net_nsfw, net_image)
