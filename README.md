@@ -409,6 +409,12 @@ The collection of pre-trained, state-of-the-art AI models.
 |:-----------|------------:|:------------:|:------------:|:------------:|:------------:|
 | [<img src="rotation_prediction/rotnet/output.png" width=256px>](rotation_prediction/rotnet/) |[rotnet](/rotation_prediction/rotnet) | [CNNs for predicting the rotation angle of an image to correct its orientation](https://github.com/d4nst/RotNet) | Keras | 1.2.1 and later |
 
+## Safety checker
+
+| | Model | Reference | Exported From | Supported Ailia Version | Blog |
+|:-----------|------------:|:------------:|:------------:|:------------:|:------------:|
+| [<img src="safety_checker/clip-based-nsfw-detector/_vyr_6097Sexy-Push-Up-Bikini-Brasilianisch-Bunt-2.jpg" width=128px>](safety_checker/clip-based-nsfw-detector/) | [clip-based-nsfw-detector](/safety_checker/clip-based-nsfw-detector/) | [CLIP-based-NSFW-Detector](https://github.com/LAION-AI/CLIP-based-NSFW-Detector)| Keras | 1.2.1 and later ||
+
 ## Style transfer
 
 | | Model | Reference | Exported From | Supported Ailia Version | Blog |
