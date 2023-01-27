@@ -67,3 +67,5 @@ ONNX opset = 11
 [yolox_darknet.opt.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/yolox/yolox_darknet.opt.onnx.prototxt)
 
 [yolox_x.opt.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/yolox/yolox_x.opt.onnx.prototxt)
+
+[yolox_tiny_quantized.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/yolox/yolox_tiny_quantized.onnx.prototxt)
