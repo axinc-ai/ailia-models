@@ -101,11 +101,23 @@ parser.add_argument(
     default=-1, type=int,
     help='The detection height and height for yolo. (default: auto)'
 )
+parser.add_argument(
+    '-qt', '--quantize',
+    action='store_true',
+    help='Use quantized model (require ONNX Runtime).'
+)
+
 args = update_parser(parser)
 
 MODEL_NAME = args.model_name
 WEIGHT_PATH = MODEL_NAME + ".opt.onnx"
 MODEL_PATH = MODEL_NAME + ".opt.onnx.prototxt"
+
+if args.quantize:
+    import onnxruntime
+    MODEL_NAME = "yolox_tiny"
+    WEIGHT_PATH = MODEL_NAME + "_quantized.onnx"
+    MODEL_PATH = None
 
 HEIGHT = MODEL_PARAMS[MODEL_NAME]['input_shape'][0]
 WIDTH = MODEL_PARAMS[MODEL_NAME]['input_shape'][1]
@@ -128,7 +140,11 @@ def recognize_from_image(detector):
                 detector.compute(raw_img, args.threshold, args.iou)
                 return None
             else:
-                return detector.run(img[None, :, :, :])
+                if args.quantize:
+                    input_name = detector.get_inputs()[0].name
+                    return detector.run([], {input_name:img[None, :, :, :]})
+                else:
+                    return detector.run(img[None, :, :, :])
 
         # inference
         logger.info('Start inference...')
@@ -242,12 +258,16 @@ def main():
         if args.detection_width!=-1 or args.detection_height!=-1:
             detector.set_input_shape(args.detection_width,args.detection_height)
     else:
-        detector = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
-        if args.detection_width!=-1 or args.detection_height!=-1:
-            global WIDTH,HEIGHT
-            WIDTH=args.detection_width
-            HEIGHT=args.detection_height
-            detector.set_input_shape((1,3,HEIGHT,WIDTH))
+        if args.quantize:
+            detector = onnxruntime.InferenceSession(WEIGHT_PATH)
+        else:
+
+            detector = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+            if args.detection_width!=-1 or args.detection_height!=-1:
+                global WIDTH,HEIGHT
+                WIDTH=args.detection_width
+                HEIGHT=args.detection_height
+                detector.set_input_shape((1,3,HEIGHT,WIDTH))
 
     if args.video is not None:
         # video mode
