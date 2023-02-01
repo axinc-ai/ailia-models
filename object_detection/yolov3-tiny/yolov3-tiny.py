@@ -199,7 +199,7 @@ def recognize_from_image(detector):
         # write prediction
         if args.write_prediction:
             pred_file = '%s.txt' % savepath.rsplit('.', 1)[0]
-            write_predictions(pred_file, detector, img, COCO_CATEGORY)
+            write_predictions(pred_file, detections, img, COCO_CATEGORY)
 
     if args.profile:
         print(detector.get_summary())
@@ -237,7 +237,7 @@ def recognize_from_video(detector):
         else:
             detector.compute(img, args.threshold, args.iou)
             detections = detector
-        res_img = plot_results(detector, frame, COCO_CATEGORY, False)
+        res_img = plot_results(detections, frame, COCO_CATEGORY, False)
         cv2.imshow('frame', res_img)
         frame_shown = True
 
