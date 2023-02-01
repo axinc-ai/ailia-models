@@ -35,7 +35,9 @@ MODEL_PARAMS = {'yolox_nano': {'input_shape': [416, 416]},
                 'yolox_m': {'input_shape': [640, 640]},
                 'yolox_l': {'input_shape': [640, 640]},
                 'yolox_darknet': {'input_shape': [640, 640]},
-                'yolox_x': {'input_shape': [640, 640]}}
+                'yolox_x': {'input_shape': [640, 640]},
+                'yolox_tiny_int8_per_tensor': {'input_shape': [416, 416]},
+                'yolox_tiny_int8_per_channel': {'input_shape': [416, 416]}}
 
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/yolox/'
 
@@ -101,11 +103,6 @@ parser.add_argument(
     default=-1, type=int,
     help='The detection height and height for yolo. (default: auto)'
 )
-parser.add_argument(
-    '-qt', '--quantize',
-    action='store_true',
-    help='Use quantized model (require ONNX Runtime).'
-)
 
 args = update_parser(parser)
 
@@ -113,11 +110,10 @@ MODEL_NAME = args.model_name
 WEIGHT_PATH = MODEL_NAME + ".opt.onnx"
 MODEL_PATH = MODEL_NAME + ".opt.onnx.prototxt"
 
-if args.quantize:
+QUANTIZED = False
+if "int8" in MODEL_NAME:
     import onnxruntime
-    MODEL_NAME = "yolox_tiny"
-    WEIGHT_PATH = MODEL_NAME + "_quantized.onnx"
-    MODEL_PATH = None
+    QUANTIZED = True
 
 HEIGHT = MODEL_PARAMS[MODEL_NAME]['input_shape'][0]
 WIDTH = MODEL_PARAMS[MODEL_NAME]['input_shape'][1]
@@ -140,7 +136,7 @@ def recognize_from_image(detector):
                 detector.compute(raw_img, args.threshold, args.iou)
                 return None
             else:
-                if args.quantize:
+                if QUANTIZED:
                     input_name = detector.get_inputs()[0].name
                     return detector.run([], {input_name:img[None, :, :, :]})
                 else:
@@ -258,7 +254,7 @@ def main():
         if args.detection_width!=-1 or args.detection_height!=-1:
             detector.set_input_shape(args.detection_width,args.detection_height)
     else:
-        if args.quantize:
+        if QUANTIZED:
             detector = onnxruntime.InferenceSession(WEIGHT_PATH)
         else:
 

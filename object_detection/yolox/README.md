@@ -68,4 +68,6 @@ ONNX opset = 11
 
 [yolox_x.opt.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/yolox/yolox_x.opt.onnx.prototxt)
 
-[yolox_tiny_quantized.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/yolox/yolox_tiny_quantized.onnx.prototxt)
+[yolox_tiny_int8_per_tensor.opt.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/yolox/yolox_tiny_int8_per_tensor.opt.onnx.prototxt)
+
+[yolox_tiny_int8_per_channel.opt.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/yolox/yolox_tiny_int8_per_channel.opt.onnx.prototxt)
