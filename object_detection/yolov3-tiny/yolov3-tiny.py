@@ -78,18 +78,23 @@ parser.add_argument(
     help='The detection height and height for yolo. (default: 416)'
 )
 parser.add_argument(
+    '--onnx',
+    action='store_true',
+    help='Use onnx runtime.'
+)
+parser.add_argument(
     '--quantize',
     action='store_true',
     help='Use quantized model.'
 )
 args = update_parser(parser)
 
-if args.quantize:
+if args.onnx or args.quantize:
     import onnxruntime
+
+if args.quantize:
     WEIGHT_PATH = 'yolov3-tiny_int8_per_tensor.opt.onnx'
     MODEL_PATH = 'yolov3-tiny_int8_per_tensor.opt.onnx.prototxt'
-    #WEIGHT_PATH = 'yolov3-tiny.opt.onnx'
-    #MODEL_PATH = 'yolov3-tiny.opt.onnx.prototxt'
 else:
     WEIGHT_PATH = 'yolov3-tiny.opt.onnx'
     MODEL_PATH = 'yolov3-tiny.opt.onnx.prototxt'
@@ -107,14 +112,14 @@ def letterbox_image(image, size):
     nh = int(ih*scale)
 
     image = cv2.resize(image, (nw,nh))
-    new_image = np.zeros((size[0], size[1], 3))
-    new_image[0:nh,0:nw,0:3] = image[0:nh,0:nw,0:3]
+    new_image = np.zeros((w, h, 3))
+    new_image[(h-nh)//2:(h-nh)//2+nh,(w-nw)//2:(w-nw)//2+nw,0:3] = image[0:nh,0:nw,0:3]
     new_image = new_image[:,:,::-1] # bgr to rgb
-    return new_image, nw, nh
+    return new_image, nw, nh, (w - nw)//2, (h - nh) //2
 
 def detect_quantized_model(detector, image):
     model_image_size = [args.detection_width, args.detection_height]
-    boxed_image, nw, nh = letterbox_image(image, model_image_size)
+    boxed_image, nw, nh, ow, oh = letterbox_image(image, model_image_size)
 
     image_data = np.array(boxed_image, dtype='float32')
     image_data /= 255.
@@ -139,10 +144,10 @@ def detect_quantized_model(detector, image):
         box = out_boxes[i]
         score = out_scores[i]
         top, left, bottom, right = box
-        top = top / nh
-        left = left / nw
-        bottom = bottom / nh
-        right = right / nw
+        top = (top - oh) / nh
+        left = (left - ow) / nw
+        bottom = (bottom - oh) / nh
+        right = (right - ow) / nw
 
         obj = ailia.DetectorObject(
             category=c,
@@ -173,7 +178,7 @@ def recognize_from_image(detector):
             total_time = 0
             for i in range(args.benchmark_count):
                 start = int(round(time.time() * 1000))
-                if args.quantize:
+                if args.quantize or args.onnx:
                     detections = detect_quantized_model(detector, img)
                 else:
                     detector.compute(img, args.threshold, args.iou)
@@ -184,7 +189,7 @@ def recognize_from_image(detector):
                 logger.info(f'\tailia processing time {end - start} ms')
             logger.info(f'\taverage time {total_time / (args.benchmark_count-1)} ms')
         else:
-            if args.quantize:
+            if args.quantize or args.onnx:
                 detections = detect_quantized_model(detector, img)
             else:
                 detector.compute(img, args.threshold, args.iou)
@@ -232,7 +237,7 @@ def recognize_from_video(detector):
             break
 
         img = cv2.cvtColor(frame, cv2.COLOR_BGR2BGRA)
-        if args.quantize:
+        if args.quantize or args.onnx:
             detections = detect_quantized_model(detector, img)
         else:
             detector.compute(img, args.threshold, args.iou)
@@ -264,7 +269,7 @@ def main():
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
 
     # net initialize
-    if args.quantize:
+    if args.quantize or args.onnx:
         detector = onnxruntime.InferenceSession(WEIGHT_PATH)
     else:
         detector = ailia.Detector(
