@@ -108,7 +108,7 @@ def ailia_to_openpose(person):
     pose_keypoints = np.zeros((18, 3))
     for i, key in enumerate(POSE_KEY):
         p = person.points[key]
-        pose_keypoints[i, :] = [p.x, p.y, p.score]
+        pose_keypoints[i, :] = [p.x, p.y, float(p.score)]
     return pose_keypoints
 
 # ======================
