@@ -2,11 +2,8 @@ from logging import getLogger
 from typing import Any, Dict, List, NamedTuple, Tuple, Union
 
 import numpy as np
-from scipy.special import log_softmax
 
 logger = getLogger(__name__)
-
-onnx = True
 
 
 class Hypothesis(NamedTuple):
@@ -26,16 +23,12 @@ class Hypothesis(NamedTuple):
         )._asdict()
 
 
-class ScorerInterface:
-    pass
-
-
 class BeamSearch(object):
     """Beam search implementation."""
 
     def __init__(
             self,
-            scorers: Dict[str, ScorerInterface],
+            scorers: Dict[str, Any],
             weights: Dict[str, float],
             beam_size: int,
             vocab_size: int,
@@ -46,27 +39,16 @@ class BeamSearch(object):
             pre_beam_score_key: str = None,
             hyp_primer: List[int] = None,
     ):
-        super().__init__()
         # set scorers
         self.weights = weights
         self.scorers = dict()
         self.full_scorers = dict()
         self.part_scorers = dict()
 
-        # for k, v in scorers.items():
-        #     w = weights.get(k, 0)
-        #     if w == 0 or v is None:
-        #         continue
-        #     assert isinstance(
-        #         v, ScorerInterface
-        #     ), f"{k} ({type(v)}) does not implement ScorerInterface"
-        #     self.scorers[k] = v
-        #     if isinstance(v, PartialScorerInterface):
-        #         self.part_scorers[k] = v
-        #     else:
-        #         self.full_scorers[k] = v
-        #     if isinstance(v, torch.nn.Module):
-        #         self.nn_dict[k] = v
+        for k, v in scorers.items():
+            self.scorers[k] = v
+
+        self.full_scorers['lm'] = self.scorers['lm']
 
         # set configurations
         self.sos = sos
@@ -76,10 +58,6 @@ class BeamSearch(object):
         self.pre_beam_size = int(pre_beam_ratio * beam_size)
         self.beam_size = beam_size
         self.n_vocab = vocab_size
-        if (pre_beam_score_key is not None
-                and pre_beam_score_key != "full"
-                and pre_beam_score_key not in self.full_scorers):
-            raise KeyError(f"{pre_beam_score_key} is not found in {self.full_scorers}")
         self.pre_beam_score_key = pre_beam_score_key
         self.do_pre_beam = (
                 self.pre_beam_score_key is not None
@@ -148,15 +126,20 @@ class BatchBeamSearch(BeamSearch):
         """Score new hypothesis by `self.full_scorers`.
         Args:
             hyp (Hypothesis): Hypothesis with prefix tokens to score
-            x (torch.Tensor): Corresponding input feature
+            x: Corresponding input feature
         Returns:
-            Tuple[Dict[str, torch.Tensor], Dict[str, Any]]: Tuple of
+            Tuple[Dict[str, numpy.ndarray], Dict[str, Any]]: Tuple of
                 score dict of `hyp` that has string keys of `self.full_scorers`
                 and tensor score values of shape: `(self.n_vocab,)`,
                 and state dict that has string keys
                 and state values of `self.full_scorers`
         """
-        pass
+        scores = dict()
+        states = dict()
+        for k, d in self.full_scorers.items():
+            scores[k], states[k] = d.batch_score(hyp.yseq, hyp.states[k], x)
+
+        return scores, states
 
     def search(self, running_hyps: BatchHypothesis, x) -> BatchHypothesis:
         """Search new tokens for running hypotheses and encoded speech x.
@@ -172,6 +155,72 @@ class BatchBeamSearch(BeamSearch):
         weighted_scores = np.zeros(
             (n_batch, self.n_vocab)
         )
+        scores, states = self.score_full(running_hyps, np.broadcast_to(x, (n_batch,) + x.shape))
+        print(scores)
+        print(states)
+        1 / 0
+        for k in self.full_scorers:
+            print("full_scorers>>>", k, self.weights[k])
+            weighted_scores += self.weights[k] * scores[k]
+        # partial scoring
+        if self.do_pre_beam:
+            pre_beam_scores = (
+                weighted_scores
+                if self.pre_beam_score_key == "full"
+                else scores[self.pre_beam_score_key]
+            )
+            part_ids = torch.topk(pre_beam_scores, self.pre_beam_size, dim=-1)[1]
+        # NOTE(takaaki-hori): Unlike BeamSearch, we assume that score_partial returns
+        # full-size score matrices, which has non-zero scores for part_ids and zeros
+        # for others.
+        part_scores, part_states = self.score_partial(running_hyps, part_ids, x)
+        for k in self.part_scorers:
+            print("part_scorers>>>", k, self.weights[k])
+            weighted_scores += self.weights[k] * part_scores[k]
+        # add previous hyp scores
+        weighted_scores += running_hyps.score.to(
+            dtype=x.dtype, device=x.device
+        ).unsqueeze(1)
+
+        # TODO(karita): do not use list. use batch instead
+        # see also https://github.com/espnet/espnet/pull/1402#discussion_r354561029
+        # update hyps
+        best_hyps = []
+        prev_hyps = self.unbatchfy(running_hyps)
+        for (
+                full_prev_hyp_id,
+                full_new_token_id,
+                part_prev_hyp_id,
+                part_new_token_id,
+        ) in zip(*self.batch_beam(weighted_scores, part_ids)):
+            prev_hyp = prev_hyps[full_prev_hyp_id]
+            best_hyps.append(
+                Hypothesis(
+                    score=weighted_scores[full_prev_hyp_id, full_new_token_id],
+                    yseq=self.append_token(prev_hyp.yseq, full_new_token_id),
+                    scores=self.merge_scores(
+                        prev_hyp.scores,
+                        {k: v[full_prev_hyp_id] for k, v in scores.items()},
+                        full_new_token_id,
+                        {k: v[part_prev_hyp_id] for k, v in part_scores.items()},
+                        part_new_token_id,
+                    ),
+                    states=self.merge_states(
+                        {
+                            k: self.full_scorers[k].select_state(v, full_prev_hyp_id)
+                            for k, v in states.items()
+                        },
+                        {
+                            k: self.part_scorers[k].select_state(
+                                v, part_prev_hyp_id, part_new_token_id
+                            )
+                            for k, v in part_states.items()
+                        },
+                        part_new_token_id,
+                    ),
+                )
+            )
+        return self.batchfy(best_hyps)
 
     def forward(
             self, x, maxlenratio=0.0, minlenratio=0.0):
@@ -184,3 +233,14 @@ class BatchBeamSearch(BeamSearch):
         for i in range(maxlen):
             logger.debug("position " + str(i))
             best = self.search(running_hyps, x)
+            # post process of one iteration
+            running_hyps = self.post_process(i, maxlen, maxlenratio, best, ended_hyps)
+            # end detection
+            if maxlenratio == 0.0 and end_detect([h.asdict() for h in ended_hyps], i):
+                logger.info(f"end detected at {i}")
+                break
+            if len(running_hyps) == 0:
+                logger.info("no hypothesis. Finish decoding.")
+                break
+            else:
+                logger.debug(f"remained hypotheses: {len(running_hyps)}")
