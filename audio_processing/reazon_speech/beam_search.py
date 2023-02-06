@@ -41,13 +41,11 @@ class BeamSearch(object):
     ):
         # set scorers
         self.weights = weights
-        self.scorers = dict()
+        self.scorers = scorers
         self.full_scorers = dict()
         self.part_scorers = dict()
 
-        for k, v in scorers.items():
-            self.scorers[k] = v
-
+        self.full_scorers['decoder'] = self.scorers['decoder']
         self.full_scorers['lm'] = self.scorers['lm']
 
         # set configurations
@@ -156,11 +154,7 @@ class BatchBeamSearch(BeamSearch):
             (n_batch, self.n_vocab)
         )
         scores, states = self.score_full(running_hyps, np.broadcast_to(x, (n_batch,) + x.shape))
-        print(scores)
-        print(states)
-        1 / 0
         for k in self.full_scorers:
-            print("full_scorers>>>", k, self.weights[k])
             weighted_scores += self.weights[k] * scores[k]
         # partial scoring
         if self.do_pre_beam:

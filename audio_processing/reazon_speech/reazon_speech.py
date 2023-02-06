@@ -15,6 +15,7 @@ from detector_utils import load_image  # noqa
 from webcamera_utils import get_capture, get_writer  # noqa
 
 from beam_search import BatchBeamSearch
+from transformer_decoder import TransformerDecoder
 from seq_rnn_lm import SequentialRNNLM
 
 logger = getLogger(__name__)
@@ -148,10 +149,15 @@ def main():
     token_list = config['token_list']
 
     import onnxruntime
+    decoder = onnxruntime.InferenceSession("transform_decoder.onnx")
+    decoder = TransformerDecoder(
+        decoder=decoder,
+        num_blocks=6)
     lm_net = onnxruntime.InferenceSession("seq_rnn_lm.onnx")
     lm = SequentialRNNLM(lm_net)
 
     scorers = {
+        'decoder': decoder,
         'lm': lm,
     }
     beam_search = BatchBeamSearch(
