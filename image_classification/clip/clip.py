@@ -32,6 +32,10 @@ WEIGHT_VITB32_IMAGE_PATH = 'ViT-B32-encode_image.onnx'
 MODEL_VITB32_IMAGE_PATH = 'ViT-B32-encode_image.onnx.prototxt'
 WEIGHT_VITB32_TEXT_PATH = 'ViT-B32-encode_text.onnx'
 MODEL_VITB32_TEXT_PATH = 'ViT-B32-encode_text.onnx.prototxt'
+WEIGHT_VITL14_IMAGE_PATH = 'ViT-L14-encode_image.onnx'
+MODEL_VITL14_IMAGE_PATH = 'ViT-L14-encode_image.onnx.prototxt'
+WEIGHT_VITL14_TEXT_PATH = 'ViT-L14-encode_text.onnx'
+MODEL_VITL14_TEXT_PATH = 'ViT-L14-encode_text.onnx.prototxt'
 WEIGHT_RN50_IMAGE_PATH = 'RN50-encode_image.onnx'
 MODEL_RN50_IMAGE_PATH = 'RN50-encode_image.onnx.prototxt'
 WEIGHT_RN50_TEXT_PATH = 'RN50-encode_text.onnx'
@@ -60,7 +64,7 @@ parser.add_argument(
     help='description file'
 )
 parser.add_argument(
-    '-m', '--model_type', default='ViTB32', choices=('ViTB32', 'RN50'),
+    '-m', '--model_type', default='ViTB32', choices=('ViTB32', 'ViTL14', 'RN50'),
     help='model type'
 )
 parser.add_argument(
@@ -208,7 +212,7 @@ def recognize_from_image(net_image, net_text):
             pred = predict(net_image, img, text_feature)
 
         # show results
-        pred = np.expand_dims(pred,axis=0)
+        pred = np.expand_dims(pred, axis=0)
         print_results(pred, text_inputs)
 
     logger.info('Script finished successfully.')
@@ -235,7 +239,7 @@ def recognize_from_video(net_image, net_text):
         writer = None
 
     frame_shown = False
-    while(True):
+    while (True):
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
@@ -243,10 +247,10 @@ def recognize_from_video(net_image, net_text):
             break
 
         img = frame
-        
+
         pred = predict(net_image, img, text_feature)
 
-        plot_results(frame, np.expand_dims(pred,axis=0), text_inputs)
+        plot_results(frame, np.expand_dims(pred, axis=0), text_inputs)
 
         cv2.imshow('frame', frame)
         frame_shown = True
@@ -268,6 +272,9 @@ def main():
         'ViTB32': (
             (WEIGHT_VITB32_IMAGE_PATH, MODEL_VITB32_IMAGE_PATH),
             (WEIGHT_VITB32_TEXT_PATH, MODEL_VITB32_TEXT_PATH)),
+        'ViTL14': (
+            (WEIGHT_VITL14_IMAGE_PATH, MODEL_VITL14_IMAGE_PATH),
+            (WEIGHT_VITL14_TEXT_PATH, MODEL_VITL14_TEXT_PATH)),
         'RN50': (
             (WEIGHT_RN50_IMAGE_PATH, MODEL_RN50_IMAGE_PATH),
             (WEIGHT_RN50_TEXT_PATH, MODEL_RN50_TEXT_PATH)),
@@ -301,6 +308,7 @@ def main():
     else:
         # image mode
         recognize_from_image(net_image, net_text)
+
 
 if __name__ == '__main__':
     main()
