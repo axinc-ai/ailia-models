@@ -47,6 +47,7 @@ class BeamSearch(object):
 
         self.full_scorers['decoder'] = self.scorers['decoder']
         self.full_scorers['lm'] = self.scorers['lm']
+        self.part_scorers['ctc'] = self.scorers['ctc']
 
         # set configurations
         self.sos = sos
@@ -108,6 +109,7 @@ class BatchBeamSearch(BeamSearch):
         """
         init_states = {'decoder': None, 'ctc': None, 'lm': None}
         init_scores = {'decoder': 0.0, 'ctc': 0.0, 'lm': 0.0}
+        init_states['ctc'] = self.scorers['ctc'].batch_init_state(x)
 
         primer = [self.sos]
         return self.batchfy([
@@ -139,6 +141,16 @@ class BatchBeamSearch(BeamSearch):
 
         return scores, states
 
+    def score_partial(
+            self, hyp: BatchHypothesis, ids, x) -> Tuple[Dict[str, np.ndarray], Dict[str, Any]]:
+        scores = dict()
+        states = dict()
+        for k, d in self.part_scorers.items():
+            scores[k], states[k] = d.batch_score_partial(
+                hyp.yseq, ids, hyp.states[k], x
+            )
+        return scores, states
+
     def search(self, running_hyps: BatchHypothesis, x) -> BatchHypothesis:
         """Search new tokens for running hypotheses and encoded speech x.
         Args:
@@ -163,18 +175,18 @@ class BatchBeamSearch(BeamSearch):
                 if self.pre_beam_score_key == "full"
                 else scores[self.pre_beam_score_key]
             )
-            part_ids = torch.topk(pre_beam_scores, self.pre_beam_size, dim=-1)[1]
+            # topk
+            part_ids = np.argsort(-pre_beam_scores, axis=-1)
+            part_ids = part_ids[..., :self.pre_beam_size]
+
         # NOTE(takaaki-hori): Unlike BeamSearch, we assume that score_partial returns
         # full-size score matrices, which has non-zero scores for part_ids and zeros
         # for others.
         part_scores, part_states = self.score_partial(running_hyps, part_ids, x)
         for k in self.part_scorers:
-            print("part_scorers>>>", k, self.weights[k])
             weighted_scores += self.weights[k] * part_scores[k]
         # add previous hyp scores
-        weighted_scores += running_hyps.score.to(
-            dtype=x.dtype, device=x.device
-        ).unsqueeze(1)
+        weighted_scores += np.expand_dims(running_hyps.score, axis=1)
 
         # TODO(karita): do not use list. use batch instead
         # see also https://github.com/espnet/espnet/pull/1402#discussion_r354561029

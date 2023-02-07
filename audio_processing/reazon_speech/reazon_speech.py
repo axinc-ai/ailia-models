@@ -17,6 +17,7 @@ from webcamera_utils import get_capture, get_writer  # noqa
 from beam_search import BatchBeamSearch
 from transformer_decoder import TransformerDecoder
 from seq_rnn_lm import SequentialRNNLM
+from ctc_prefix_score import CTCPrefixScorer
 
 logger = getLogger(__name__)
 
@@ -155,10 +156,13 @@ def main():
         num_blocks=6)
     lm_net = onnxruntime.InferenceSession("seq_rnn_lm.onnx")
     lm = SequentialRNNLM(lm_net)
+    ctc = onnxruntime.InferenceSession("ctc.onnx")
+    ctc = CTCPrefixScorer(ctc, eos)
 
     scorers = {
         'decoder': decoder,
         'lm': lm,
+        'ctc': ctc,
     }
     beam_search = BatchBeamSearch(
         beam_size=beam_size,
