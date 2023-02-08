@@ -64,6 +64,134 @@ class BeamSearch(object):
                 and len(self.part_scorers) > 0
         )
 
+    def init_hyp(self, x) -> List[Hypothesis]:
+        """Get an initial hypothesis data.
+        Args:
+            x: The encoder output feature
+        Returns:
+            Hypothesis: The initial hypothesis.
+        """
+        pass
+
+    @staticmethod
+    def append_token(xs: np.ndarray, x: int) -> np.ndarray:
+        """Append new token to prefix tokens.
+        Args:
+            xs (np.ndarray): The prefix token
+            x (int): The new token to append
+        Returns:
+            np.ndarray: New tensor contains: xs + [x] with xs.dtype and xs.device
+        """
+        x = np.array([x])
+        return np.concatenate((xs, x))
+
+    @staticmethod
+    def merge_scores(
+            prev_scores: Dict[str, float],
+            next_full_scores: Dict[str, np.ndarray],
+            full_idx: int,
+            next_part_scores: Dict[str, np.ndarray],
+            part_idx: int,
+    ) -> Dict[str, np.ndarray]:
+        """Merge scores for new hypothesis.
+        Args:
+            prev_scores (Dict[str, float]):
+                The previous hypothesis scores by `self.scorers`
+            next_full_scores (Dict[str, np.ndarray]): scores by `self.full_scorers`
+            full_idx (int): The next token id for `next_full_scores`
+            next_part_scores (Dict[str, np.ndarray]):
+                scores of partial tokens by `self.part_scorers`
+            part_idx (int): The new token id for `next_part_scores`
+        Returns:
+            Dict[str, np.ndarray]: The new score dict.
+                Its keys are names of `self.full_scorers` and `self.part_scorers`.
+                Its values are scalar tensors by the scorers.
+        """
+        new_scores = dict()
+        for k, v in next_full_scores.items():
+            new_scores[k] = prev_scores[k] + v[full_idx]
+        for k, v in next_part_scores.items():
+            new_scores[k] = prev_scores[k] + v[part_idx]
+        return new_scores
+
+    def merge_states(self, states, part_states, part_idx: int) -> Any:
+        """Merge states for new hypothesis.
+        Args:
+            states: states of `self.full_scorers`
+            part_states: states of `self.part_scorers`
+            part_idx (int): The new token id for `part_scores`
+        Returns:
+            Dict[str, np.ndarray]: The new score dict.
+                Its keys are names of `self.full_scorers` and `self.part_scorers`.
+                Its values are states of the scorers.
+        """
+        new_states = dict()
+        for k, v in states.items():
+            new_states[k] = v
+        for k, d in self.part_scorers.items():
+            new_states[k] = d.select_state(part_states[k], part_idx)
+        return new_states
+
+    def search(
+            self, running_hyps: List[Hypothesis], x) -> List[Hypothesis]:
+        """Search new tokens for running hypotheses and encoded speech x.
+        Args:
+            running_hyps (List[Hypothesis]): Running hypotheses on beam
+            x: Encoded speech feature (T, D)
+        Returns:
+            List[Hypotheses]: Best sorted hypotheses
+        """
+        pass
+
+    def forward(
+            self, x, maxlenratio=0.0, minlenratio=0.0):
+        maxlen = x.shape[0]
+        minlen = int(minlenratio * x.shape[0])
+
+        # main loop of prefix search
+        running_hyps = self.init_hyp(x)
+        ended_hyps = []
+        for i in range(maxlen):
+            logger.debug("position " + str(i))
+            best = self.search(running_hyps, x)
+            print("b---", len(best))
+            print("b---", best.yseq)
+            print("b---", best.score)
+            print("b---", best.length)
+            # print("b---", best.scores)
+            # print("b---", best.states)
+
+            # post process of one iteration
+            running_hyps = self.post_process(i, maxlen, maxlenratio, best, ended_hyps)
+            # end detection
+            if maxlenratio == 0.0 and end_detect([h.asdict() for h in ended_hyps], i):
+                logger.info(f"end detected at {i}")
+                break
+            if len(running_hyps) == 0:
+                logger.info("no hypothesis. Finish decoding.")
+                break
+            else:
+                logger.debug(f"remained hypotheses: {len(running_hyps)}")
+
+    def post_process(
+            self,
+            i: int,
+            maxlen: int,
+            maxlenratio: float,
+            running_hyps: List[Hypothesis],
+            ended_hyps: List[Hypothesis]) -> List[Hypothesis]:
+        """Perform post-processing of beam search iterations.
+        Args:
+            i (int): The length of hypothesis tokens.
+            maxlen (int): The maximum length of tokens in beam search.
+            maxlenratio (int): The maximum length ratio in beam search.
+            running_hyps (List[Hypothesis]): The running hypotheses in beam search.
+            ended_hyps (List[Hypothesis]): The ended hypotheses in beam search.
+        Returns:
+            List[Hypothesis]: The new running hypotheses.
+        """
+        pass
+
 
 class BatchHypothesis(NamedTuple):
     """Batchfied/Vectorized hypothesis data type."""
@@ -88,7 +216,7 @@ class BatchBeamSearch(BeamSearch):
         # pad_sequence
         lens = np.array([h.yseq.shape for h in hyps])
         shape = np.concatenate([[len(hyps), max(lens[:, 0])], lens[0, 1:]])
-        yseq = np.ones(shape) * self.eos
+        yseq = np.ones(shape, dtype=int) * self.eos
         for i, h in enumerate(hyps):
             yseq[i, :h.yseq.shape[0], ...] = h.yseq
 
@@ -99,6 +227,43 @@ class BatchBeamSearch(BeamSearch):
             scores={k: np.array([h.scores[k] for h in hyps]) for k in self.scorers},
             states={k: [h.states[k] for h in hyps] for k in self.scorers},
         )
+
+    def _batch_select(self, hyps: BatchHypothesis, ids: List[int]) -> BatchHypothesis:
+        return BatchHypothesis(
+            yseq=hyps.yseq[ids],
+            score=hyps.score[ids],
+            length=hyps.length[ids],
+            scores={k: v[ids] for k, v in hyps.scores.items()},
+            states={
+                k: [self.scorers[k].select_state(v, i) for i in ids]
+                for k, v in hyps.states.items()
+            },
+        )
+
+    def _select(self, hyps: BatchHypothesis, i: int) -> Hypothesis:
+        return Hypothesis(
+            yseq=hyps.yseq[i, : hyps.length[i]],
+            score=hyps.score[i],
+            scores={k: v[i] for k, v in hyps.scores.items()},
+            states={
+                k: self.scorers[k].select_state(v, i) for k, v in hyps.states.items()
+            },
+        )
+
+    def unbatchfy(self, batch_hyps: BatchHypothesis) -> List[Hypothesis]:
+        """Revert batch to list."""
+        return [
+            Hypothesis(
+                yseq=batch_hyps.yseq[i][: batch_hyps.length[i]],
+                score=batch_hyps.score[i],
+                scores={k: batch_hyps.scores[k][i] for k in self.scorers},
+                states={
+                    k: v.select_state(batch_hyps.states[k], i)
+                    for k, v in self.scorers.items()
+                },
+            )
+            for i in range(len(batch_hyps.length))
+        ]
 
     def init_hyp(self, x) -> BatchHypothesis:
         """Get an initial hypothesis data.
@@ -120,6 +285,29 @@ class BatchBeamSearch(BeamSearch):
                 yseq=np.array(primer),
             )
         ])
+
+    def batch_beam(
+            self, weighted_scores, ids) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        """Batch-compute topk full token ids and partial token ids.
+        Args:
+            weighted_scores: The weighted sum scores for each tokens.
+                Its shape is `(n_beam, self.vocab_size)`.
+            ids: The partial token ids to compute topk.
+                Its shape is `(n_beam, self.pre_beam_size)`.
+        Returns:
+            Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+                The topk full (prev_hyp, new_token) ids
+                and partial (prev_hyp, new_token) ids.
+                Their shapes are all `(self.beam_size,)`
+        """
+        top_ids = np.argsort(-weighted_scores.reshape(-1))[:self.beam_size]
+        # Because of the flatten above, `top_ids` is organized as:
+        # [hyp1 * V + token1, hyp2 * V + token2, ..., hypK * V + tokenK],
+        # where V is `self.n_vocab` and K is `self.beam_size`
+        prev_hyp_ids = top_ids // self.n_vocab
+        new_token_ids = top_ids % self.n_vocab
+
+        return prev_hyp_ids, new_token_ids, prev_hyp_ids, new_token_ids
 
     def score_full(
             self, hyp: BatchHypothesis, x) -> Tuple[Dict[str, np.ndarray], Dict[str, Any]]:
@@ -151,11 +339,29 @@ class BatchBeamSearch(BeamSearch):
             )
         return scores, states
 
+    def merge_states(self, states, part_states, part_idx: int) -> Any:
+        """Merge states for new hypothesis.
+        Args:
+            states: states of `self.full_scorers`
+            part_states: states of `self.part_scorers`
+            part_idx (int): The new token id for `part_scores`
+        Returns:
+            Dict[str, torch.Tensor]: The new score dict.
+                Its keys are names of `self.full_scorers` and `self.part_scorers`.
+                Its values are states of the scorers.
+        """
+        new_states = dict()
+        for k, v in states.items():
+            new_states[k] = v
+        for k, v in part_states.items():
+            new_states[k] = v
+        return new_states
+
     def search(self, running_hyps: BatchHypothesis, x) -> BatchHypothesis:
         """Search new tokens for running hypotheses and encoded speech x.
         Args:
             running_hyps (BatchHypothesis): Running hypotheses on beam
-            x (torch.Tensor): Encoded speech feature (T, D)
+            x (np.ndarray): Encoded speech feature (T, D)
         Returns:
             BatchHypothesis: Best sorted hypotheses
         """
@@ -188,17 +394,10 @@ class BatchBeamSearch(BeamSearch):
         # add previous hyp scores
         weighted_scores += np.expand_dims(running_hyps.score, axis=1)
 
-        # TODO(karita): do not use list. use batch instead
-        # see also https://github.com/espnet/espnet/pull/1402#discussion_r354561029
-        # update hyps
         best_hyps = []
         prev_hyps = self.unbatchfy(running_hyps)
-        for (
-                full_prev_hyp_id,
-                full_new_token_id,
-                part_prev_hyp_id,
-                part_new_token_id,
-        ) in zip(*self.batch_beam(weighted_scores, part_ids)):
+        for full_prev_hyp_id, full_new_token_id, part_prev_hyp_id, part_new_token_id \
+                in zip(*self.batch_beam(weighted_scores, part_ids)):
             prev_hyp = prev_hyps[full_prev_hyp_id]
             best_hyps.append(
                 Hypothesis(
@@ -226,27 +425,50 @@ class BatchBeamSearch(BeamSearch):
                     ),
                 )
             )
+
         return self.batchfy(best_hyps)
 
-    def forward(
-            self, x, maxlenratio=0.0, minlenratio=0.0):
-        maxlen = x.shape[0]
-        minlen = int(minlenratio * x.shape[0])
+    def post_process(
+            self,
+            i: int,
+            maxlen: int,
+            maxlenratio: float,
+            running_hyps: BatchHypothesis,
+            ended_hyps: List[Hypothesis]) -> BatchHypothesis:
+        """Perform post-processing of beam search iterations.
+        Returns:
+            BatchHypothesis: The new running hypotheses.
+        """
+        n_batch = running_hyps.yseq.shape[0]
+        logger.debug(f"the number of running hypothes: {n_batch}")
+        if self.token_list is not None:
+            logger.debug(
+                "best hypo: " + "".join([
+                    self.token_list[x]
+                    for x in running_hyps.yseq[0, 1: running_hyps.length[0]]
+                ])
+            )
 
-        # main loop of prefix search
-        running_hyps = self.init_hyp(x)
-        ended_hyps = []
-        for i in range(maxlen):
-            logger.debug("position " + str(i))
-            best = self.search(running_hyps, x)
-            # post process of one iteration
-            running_hyps = self.post_process(i, maxlen, maxlenratio, best, ended_hyps)
-            # end detection
-            if maxlenratio == 0.0 and end_detect([h.asdict() for h in ended_hyps], i):
-                logger.info(f"end detected at {i}")
-                break
-            if len(running_hyps) == 0:
-                logger.info("no hypothesis. Finish decoding.")
-                break
-            else:
-                logger.debug(f"remained hypotheses: {len(running_hyps)}")
+        # add eos in the final loop to avoid that there are no ended hyps
+        if i == maxlen - 1:
+            logger.info("adding <eos> in the last position in the loop")
+            yseq_eos = np.concatenate(
+                (
+                    running_hyps.yseq,
+                    np.ones((n_batch, 1), dtype=int) * self.eos
+                ),
+                axis=1,
+            )
+            running_hyps.yseq.resize(yseq_eos)
+            running_hyps.yseq[:] = yseq_eos
+            running_hyps.length[:] = yseq_eos.shape[1]
+
+        # add ended hypotheses to a final list, and removed them from current hypotheses
+        # (this will be a probmlem, number of hyps < beam)
+        is_eos = (running_hyps.yseq[np.arange(n_batch), running_hyps.length - 1] == self.eos)
+        for b in np.nonzero(is_eos)[0]:
+            hyp = self._select(running_hyps, b)
+            ended_hyps.append(hyp)
+        remained_ids = np.nonzero(is_eos == 0)[0]
+
+        return self._batch_select(running_hyps, remained_ids)

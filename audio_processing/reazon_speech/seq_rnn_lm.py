@@ -12,6 +12,17 @@ class SequentialRNNLM(object):
         self.net = net
         self.nhid = 2024
 
+    def select_state(self, state, i: int, new_id: int = None):
+        """Select state with relative ids in the main beam search.
+        Args:
+            state: Decoder state for prefix tokens
+            i (int): Index to select a state in the main beam search
+            new_id (int): New label index to select a state if necessary
+        Returns:
+            state: pruned state
+        """
+        return None if state is None else state[i]
+
     def batch_score(
             self, ys, states, xs):
         if states[0] is None:
