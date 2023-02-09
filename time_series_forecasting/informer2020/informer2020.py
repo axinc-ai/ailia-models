@@ -2,13 +2,10 @@ import os
 import sys
 import ailia
 import numpy as np
-import time
 
 # import original modules
 sys.path.append('../../util')
-from image_utils import load_image, get_image_shape  # noqa: E402
-from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
-import webcamera_utils  # noqa: E402
+from utils import get_base_parser, update_parser  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 
 # logger
@@ -17,8 +14,6 @@ logger = getLogger(__name__)
 
 from informer2020_utils import Dataset_Pred
 import matplotlib.pyplot as plt
-from torch.utils.data import DataLoader
-import torch
 
 
 # ======================
@@ -72,9 +67,6 @@ args = update_parser(parser)
 def _get_data():
     timeenc = 0 if args.embed!='timeF' else 1
 
-    shuffle_flag = False; 
-    drop_last = False; 
-    batch_size = 1; 
     freq=args.detail_freq
 
     data_set = Dataset_Pred(
@@ -90,36 +82,30 @@ def _get_data():
         cols=args.cols
     )
 
-    data_loader = DataLoader(
-        data_set,
-        batch_size=batch_size,
-        shuffle=shuffle_flag,
-        num_workers=args.num_workers,
-        drop_last=drop_last)
+    batch_x, batch_y, batch_x_mark, batch_y_mark = data_set[0]
 
-    return data_loader
+    batch_x = batch_x[np.newaxis, :, :]
+    batch_y = batch_y[np.newaxis, :, :]
+    batch_x_mark = batch_x_mark[np.newaxis, :, :]
+    batch_y_mark = batch_y_mark[np.newaxis, :, :]
+
+    return [[batch_x, batch_y, batch_x_mark, batch_y_mark]]
 
 
 def _process_one_batch(net, batch_x, batch_y, batch_x_mark, batch_y_mark):
-    batch_x = batch_x.float()
-    batch_y = batch_y.float()
-
-    batch_x_mark = batch_x_mark.float()
-    batch_y_mark = batch_y_mark.float()
+    batch_x = batch_x.astype(np.float32)
+    batch_y = batch_y.astype(np.float32)
+    batch_x_mark = batch_x_mark.astype(np.float32)
+    batch_y_mark = batch_y_mark.astype(np.float32)
 
     # decoder input
     if args.padding==0:
-        dec_inp = torch.zeros([batch_y.shape[0], args.pred_len, batch_y.shape[-1]]).float()
+        dec_inp = np.zeros([batch_y.shape[0], args.pred_len, batch_y.shape[-1]]).astype(np.float32)
     elif args.padding==1:
-        dec_inp = torch.ones([batch_y.shape[0], args.pred_len, batch_y.shape[-1]]).float()
-    dec_inp = torch.cat([batch_y[:,:args.label_len,:], dec_inp], dim=1).float()
+        dec_inp = np.ones([batch_y.shape[0], args.pred_len, batch_y.shape[-1]]).astype(np.float32)
+    dec_inp = np.concatenate([batch_y[:,:args.label_len,:], dec_inp], axis=1).astype(np.float32)
     
     # encoder - decoder
-    batch_x = batch_x.to('cpu').detach().numpy().copy()
-    batch_x_mark = batch_x_mark.to('cpu').detach().numpy().copy()
-    dec_inp = dec_inp.to('cpu').detach().numpy().copy()
-    batch_y_mark = batch_y_mark.to('cpu').detach().numpy().copy()
-
     # dummy concatenation for batched input
     batch_x = np.concatenate([batch_x, batch_x], axis=0)
     batch_x_mark = np.concatenate([batch_x_mark, batch_x_mark], axis=0)
@@ -146,7 +132,7 @@ def _process_one_batch(net, batch_x, batch_y, batch_x_mark, batch_y_mark):
             }
         )[0]
 
-    outputs = torch.from_numpy(outputs[0, :, :])
+    outputs = outputs[0, :, :]
 
     f_dim = -1 if args.features=='MS' else 0
     batch_y = batch_y[:,-args.pred_len:,f_dim:]
@@ -170,8 +156,8 @@ def time_series_forecasting(net):
             batch_x_mark, 
             batch_y_mark
         )
-        preds.append(pred.detach().cpu().numpy())
-        trues.append(true.detach().cpu().numpy())
+        preds.append(pred)
+        trues.append(true)
 
     preds = np.array(preds)
     trues = np.array(trues)

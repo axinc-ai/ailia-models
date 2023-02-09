@@ -6,10 +6,6 @@ from pandas.tseries.frequencies import to_offset
 
 from typing import List
 
-import torch
-from torch.utils.data import Dataset
-
-
 class StandardScaler():
     def __init__(self):
         self.mean = 0.
@@ -20,11 +16,11 @@ class StandardScaler():
         self.std = data.std(0)
 
     def transform(self, data):
-        mean = torch.from_numpy(self.mean).type_as(data).to(data.device) if torch.is_tensor(data) else self.mean
-        std = torch.from_numpy(self.std).type_as(data).to(data.device) if torch.is_tensor(data) else self.std
+        mean = self.mean
+        std = self.std
         return (data - mean) / std
 
-class Dataset_Pred(Dataset):
+class Dataset_Pred():
     def __init__(self, root_path, flag='pred', size=None, 
                  features='S', data_path='ETTh1.csv', 
                  target='OT', scale=True, inverse=False, timeenc=0, freq='15min', cols=None):
@@ -66,14 +62,9 @@ class Dataset_Pred(Dataset):
             cols = list(df_raw.columns); cols.remove(self.target); cols.remove('date')
         df_raw = df_raw[['date']+cols+[self.target]]
         
-        # 通常
+        # read data used in prediction part only
         border1 = len(df_raw)-self.seq_len
         border2 = len(df_raw)
-
-        # 検証用(1)
-        #print('TODO: 検証用')
-        #border1 = 0
-        #border2 = self.seq_len+self.label_len
         
         if self.features=='M' or self.features=='MS':
             cols_data = df_raw.columns[1:]
@@ -118,7 +109,7 @@ class Dataset_Pred(Dataset):
         seq_y_mark = self.data_stamp[r_begin:r_end]
 
         return seq_x, seq_y, seq_x_mark, seq_y_mark
-    
+
     def __len__(self):
         return len(self.data_x) - self.seq_len + 1
 
