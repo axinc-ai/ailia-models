@@ -1,15 +1,14 @@
 import os
 import numpy as np
 import pandas as pd
-
-import torch
-from torch.utils.data import Dataset, DataLoader
-# from sklearn.preprocessing import StandardScaler
+from pandas.tseries import offsets
+from pandas.tseries.frequencies import to_offset
 
 from typing import List
 
-from pandas.tseries import offsets
-from pandas.tseries.frequencies import to_offset
+import torch
+from torch.utils.data import Dataset
+
 
 class StandardScaler():
     def __init__(self):
@@ -24,14 +23,6 @@ class StandardScaler():
         mean = torch.from_numpy(self.mean).type_as(data).to(data.device) if torch.is_tensor(data) else self.mean
         std = torch.from_numpy(self.std).type_as(data).to(data.device) if torch.is_tensor(data) else self.std
         return (data - mean) / std
-
-    def inverse_transform(self, data):
-        mean = torch.from_numpy(self.mean).type_as(data).to(data.device) if torch.is_tensor(data) else self.mean
-        std = torch.from_numpy(self.std).type_as(data).to(data.device) if torch.is_tensor(data) else self.std
-        if data.size(-1) != mean.size(-1):
-            mean = mean[-1:]
-            std = std[-1:]
-        return (data * std) + mean
 
 class Dataset_Pred(Dataset):
     def __init__(self, root_path, flag='pred', size=None, 
@@ -121,21 +112,15 @@ class Dataset_Pred(Dataset):
         if self.inverse:
             seq_y = self.data_x[r_begin:r_begin+self.label_len]
         else:
-            # TODO:
             #seq_y = self.data_y[r_begin:r_end]
             seq_y = self.data_y[r_begin:r_begin+self.label_len]
         seq_x_mark = self.data_stamp[s_begin:s_end]
         seq_y_mark = self.data_stamp[r_begin:r_end]
 
-        #print(seq_y.shape)
-
         return seq_x, seq_y, seq_x_mark, seq_y_mark
     
     def __len__(self):
         return len(self.data_x) - self.seq_len + 1
-
-    def inverse_transform(self, data):
-        return self.scaler.inverse_transform(data)
 
 class TimeFeature:
     def __init__(self):

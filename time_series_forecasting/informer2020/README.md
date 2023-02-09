@@ -37,6 +37,10 @@ $ python3 informer2020.py --model [MODEL_TYPE]
 You can specify dataset which had been used to train model by using `--data` option. 
 Available datasets are `ETTh1` and `ETTm1`. (default is `ETTh1`.)
 
+```
+$ python3 informer2020.py --data [DATASET_TYPE]
+```
+
 ## Reference
 
 - [Informer: Beyond Efficient Transformer for Long Sequence Time-Series Forecasting (AAAI'21 Best Paper)](https://github.com/zhouhaoyi/Informer2020)

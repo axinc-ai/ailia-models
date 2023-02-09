@@ -16,11 +16,9 @@ from logging import getLogger   # noqa: E402
 logger = getLogger(__name__)
 
 from informer2020_utils import Dataset_Pred
+import matplotlib.pyplot as plt
 from torch.utils.data import DataLoader
 import torch
-import matplotlib.pyplot as plt
-import seaborn as sns
-import onnxruntime
 
 
 # ======================
@@ -28,7 +26,7 @@ import onnxruntime
 # ======================
 
 DATA_PATH = 'input.csv'
-SAVE_DATA_PATH = 'output.csv'
+SAVE_DATA_PATH = 'output.npy'
 
 INFORMER_ETTH1_WEIGHT_PATH = 'informer_ETTh1.onnx'
 INFORMER_ETTH1_MODEL_PATH  = 'informer_ETTh1.onnx.prototxt'
@@ -99,10 +97,10 @@ def _get_data():
         num_workers=args.num_workers,
         drop_last=drop_last)
 
-    return data_set, data_loader
+    return data_loader
 
 
-def _process_one_batch(net, dataset_object, batch_x, batch_y, batch_x_mark, batch_y_mark):
+def _process_one_batch(net, batch_x, batch_y, batch_x_mark, batch_y_mark):
     batch_x = batch_x.float()
     batch_y = batch_y.float()
 
@@ -117,20 +115,6 @@ def _process_one_batch(net, dataset_object, batch_x, batch_y, batch_x_mark, batc
     dec_inp = torch.cat([batch_y[:,:args.label_len,:], dec_inp], dim=1).float()
     
     # encoder - decoder
-    """
-    if self.args.use_amp:
-        with torch.cuda.amp.autocast():
-            if self.args.output_attention:
-                outputs = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)[0]
-            else:
-                outputs = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)
-    else:
-        if self.args.output_attention:
-            outputs = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)[0]
-        else:
-            outputs = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)
-    """
-
     batch_x = batch_x.to('cpu').detach().numpy().copy()
     batch_x_mark = batch_x_mark.to('cpu').detach().numpy().copy()
     dec_inp = dec_inp.to('cpu').detach().numpy().copy()
@@ -164,8 +148,6 @@ def _process_one_batch(net, dataset_object, batch_x, batch_y, batch_x_mark, batc
 
     outputs = torch.from_numpy(outputs[0, :, :])
 
-    if args.inverse:
-        outputs = dataset_object.inverse_transform(outputs)
     f_dim = -1 if args.features=='MS' else 0
     batch_y = batch_y[:,-args.pred_len:,f_dim:]
 
@@ -174,22 +156,15 @@ def _process_one_batch(net, dataset_object, batch_x, batch_y, batch_x_mark, batc
 
 def time_series_forecasting(net):
     ### prepare dataset ###
-    pred_data, pred_loader = _get_data()
+    pred_loader = _get_data()
 
     ### predict ###  
     preds = []
     trues = []
     
     for i, (batch_x,batch_y,batch_x_mark,batch_y_mark) in enumerate(pred_loader):
-        """
-            batch_x.shape = data_x[index : index+seq_len]
-            batch_y.shape = data_y[index+seq_len-label_len : index+seq_len+pred_len]
-            true.shape    = data_y[index+seq_len : index+seq_len+pred_len]
-            batch_x[-args.label_len:] is equal to batch_y[:args.label_len]
-        """
         pred, true = _process_one_batch(
             net, 
-            pred_data, 
             batch_x, 
             batch_y, 
             batch_x_mark, 
@@ -205,7 +180,7 @@ def time_series_forecasting(net):
     trues = trues.reshape(-1, trues.shape[-2], trues.shape[-1])
     
     ### save result ###
-    np.save('real_prediction.npy', preds)
+    np.save(args.savepath, preds)
     
     ### visualize ###
     # draw OT prediction
@@ -274,6 +249,7 @@ def main():
     if not args.onnx:
         net = ailia.Net(model_path, weight_path, env_id=-1)
     else:
+        import onnxruntime
         net = onnxruntime.InferenceSession(weight_path)
     
     # forecasting
