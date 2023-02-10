@@ -79,7 +79,7 @@ class CTCPrefixScore(object):
 
         # select input dimensions for scoring
         if self.scoring_num > 0:
-            scoring_idmap = np.ones((n_bh, self.odim)) * -1
+            scoring_idmap = np.ones((n_bh, self.odim), dtype=int) * -1
             snum = self.scoring_num
             if self.idx_bh is None or n_bh > len(self.idx_bh):
                 self.idx_bh = np.arange(n_bh).reshape(-1, 1)

@@ -19,45 +19,19 @@ def subsequent_mask(size):
 
 class BaseTransformerDecoder(object):
     """Base class of Transfomer decoder module.
-
-    Args:
-        vocab_size: output dim
-        encoder_output_size: dimension of attention
-        attention_heads: the number of heads of multi head attention
-        linear_units: the number of units of position-wise feed forward
-        num_blocks: the number of decoder blocks
-        dropout_rate: dropout rate
-        self_attention_dropout_rate: dropout rate for attention
-        input_layer: input layer type
-        use_output_layer: whether to use output layer
-        pos_enc_class: PositionalEncoding or ScaledPositionalEncoding
-        normalize_before: whether to use layer_norm before the first block
-        concat_after: whether to concat attention layer's input and output
-            if True, additional linear will be applied.
-            i.e. x -> x + linear(concat(x, att(x)))
-            if False, no additional linear will be applied.
-            i.e. x -> x + att(x)
     """
 
     def __init__(
             self,
             decoder,
-            # vocab_size: int,
             num_blocks: int = 6,
-            # encoder_output_size: int,
-            # dropout_rate: float = 0.1,
-            # positional_dropout_rate: float = 0.1,
-            # input_layer: str = "embed",
-            # use_output_layer: bool = True,
-            # pos_enc_class=PositionalEncoding,
-            # normalize_before: bool = True,
     ):
         self.decoder = decoder
         self.num_blocks = num_blocks
 
     def select_state(self, state, i: int, new_id: int = None):
         """Select state with relative ids in the main beam search.
-        Args:
+        Args
             state: Decoder state for prefix tokens
             i (int): Index to select a state in the main beam search
             new_id (int): New label index to select a state if necessary
@@ -98,7 +72,6 @@ class BaseTransformerDecoder(object):
         ys_mask = np.expand_dims(subsequent_mask(ys.shape[-1]), axis=0)
 
         # feedforward
-        ys = ys[:, -1:].astype(int)
         if not onnx:
             output = self.decoder.predict([ys, ys_mask, xs, *batch_state])
         else:
@@ -120,31 +93,9 @@ class TransformerDecoder(BaseTransformerDecoder):
     def __init__(
             self,
             decoder,
-            # vocab_size: int,
-            # encoder_output_size: int,
-            # attention_heads: int = 4,
-            # linear_units: int = 2048,
             num_blocks: int = 6,
-            # dropout_rate: float = 0.1,
-            # positional_dropout_rate: float = 0.1,
-            # self_attention_dropout_rate: float = 0.0,
-            # src_attention_dropout_rate: float = 0.0,
-            # input_layer: str = "embed",
-            # use_output_layer: bool = True,
-            # pos_enc_class=PositionalEncoding,
-            # normalize_before: bool = True,
-            # concat_after: bool = False,
-            # layer_drop_rate: float = 0.0,
     ):
         super().__init__(
             decoder=decoder,
-            # vocab_size=vocab_size,
             num_blocks=num_blocks,
-            # encoder_output_size=encoder_output_size,
-            # dropout_rate=dropout_rate,
-            # positional_dropout_rate=positional_dropout_rate,
-            # input_layer=input_layer,
-            # use_output_layer=use_output_layer,
-            # pos_enc_class=pos_enc_class,
-            # normalize_before=normalize_before,
         )

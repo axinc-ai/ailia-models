@@ -2,6 +2,7 @@ from logging import getLogger
 from typing import Any, Dict, List, NamedTuple, Tuple, Union
 
 import numpy as np
+import six
 
 logger = getLogger(__name__)
 
@@ -23,6 +24,37 @@ class Hypothesis(NamedTuple):
         )._asdict()
 
 
+def end_detect(ended_hyps, i, M=3, D_end=np.log(1 * np.exp(-10))):
+    """End detection.
+    described in Eq. (50) of S. Watanabe et al
+    "Hybrid CTC/Attention Architecture for End-to-End Speech Recognition"
+    :param ended_hyps:
+    :param i:
+    :param M:
+    :param D_end:
+    :return:
+    """
+    if len(ended_hyps) == 0:
+        return False
+    count = 0
+    best_hyp = sorted(ended_hyps, key=lambda x: x["score"], reverse=True)[0]
+    for m in six.moves.range(M):
+        # get ended_hyps with their length is i - m
+        hyp_length = i - m
+        hyps_same_length = [x for x in ended_hyps if len(x["yseq"]) == hyp_length]
+        if len(hyps_same_length) > 0:
+            best_hyp_same_length = sorted(
+                hyps_same_length, key=lambda x: x["score"], reverse=True
+            )[0]
+            if best_hyp_same_length["score"] - best_hyp["score"] < D_end:
+                count += 1
+
+    if count == M:
+        return True
+    else:
+        return False
+
+
 class BeamSearch(object):
     """Beam search implementation."""
 
@@ -36,9 +68,7 @@ class BeamSearch(object):
             eos: int,
             token_list: List[str] = None,
             pre_beam_ratio: float = 1.5,
-            pre_beam_score_key: str = None,
-            hyp_primer: List[int] = None,
-    ):
+            pre_beam_score_key: str = None):
         # set scorers
         self.weights = weights
         self.scorers = scorers
@@ -91,8 +121,7 @@ class BeamSearch(object):
             next_full_scores: Dict[str, np.ndarray],
             full_idx: int,
             next_part_scores: Dict[str, np.ndarray],
-            part_idx: int,
-    ) -> Dict[str, np.ndarray]:
+            part_idx: int) -> Dict[str, np.ndarray]:
         """Merge scores for new hypothesis.
         Args:
             prev_scores (Dict[str, float]):
@@ -114,7 +143,7 @@ class BeamSearch(object):
             new_scores[k] = prev_scores[k] + v[part_idx]
         return new_scores
 
-    def merge_states(self, states, part_states, part_idx: int) -> Any:
+    def merge_states(self, states, part_states, part_idx: int):
         """Merge states for new hypothesis.
         Args:
             states: states of `self.full_scorers`
@@ -147,6 +176,9 @@ class BeamSearch(object):
             self, x, maxlenratio=0.0, minlenratio=0.0):
         maxlen = x.shape[0]
         minlen = int(minlenratio * x.shape[0])
+        logger.info("decoder input length: " + str(x.shape[0]))
+        logger.info("max output length: " + str(maxlen))
+        logger.info("min output length: " + str(minlen))
 
         # main loop of prefix search
         running_hyps = self.init_hyp(x)
@@ -154,12 +186,6 @@ class BeamSearch(object):
         for i in range(maxlen):
             logger.debug("position " + str(i))
             best = self.search(running_hyps, x)
-            print("b---", len(best))
-            print("b---", best.yseq)
-            print("b---", best.score)
-            print("b---", best.length)
-            # print("b---", best.scores)
-            # print("b---", best.states)
 
             # post process of one iteration
             running_hyps = self.post_process(i, maxlen, maxlenratio, best, ended_hyps)
@@ -172,6 +198,43 @@ class BeamSearch(object):
                 break
             else:
                 logger.debug(f"remained hypotheses: {len(running_hyps)}")
+
+        nbest_hyps = sorted(ended_hyps, key=lambda x: x.score, reverse=True)
+        # check the number of hypotheses reaching to eos
+        if len(nbest_hyps) == 0:
+            logger.warning(
+                "there is no N-best results, perform recognition "
+                "again with smaller minlenratio."
+            )
+            return (
+                []
+                if minlenratio < 0.1
+                else self.forward(x, maxlenratio, max(0.0, minlenratio - 0.1))
+            )
+
+        # report the best result
+        best = nbest_hyps[0]
+        for k, v in best.scores.items():
+            logger.info(
+                f"{v:6.2f} * {self.weights[k]:3} = {v * self.weights[k]:6.2f} for {k}"
+            )
+        logger.info(f"total log probability: {best.score:.2f}")
+        logger.info(f"normalized log probability: {best.score / len(best.yseq):.2f}")
+        logger.info(f"total number of ended hypotheses: {len(nbest_hyps)}")
+        # logger.info("best hypo: " + "".join([self.token_list[x] for x in best.yseq[1:-1]]))
+
+        if best.yseq[1:-1].shape[0] == x.shape[0]:
+            logger.warning(
+                "best hypo length: {} == max output length: {}".format(
+                    best.yseq[1:-1].shape[0], maxlen
+                )
+            )
+            logger.warning(
+                "decoding may be stopped by the max output length limitation, "
+                "please consider to increase the maxlenratio."
+            )
+
+        return nbest_hyps
 
     def post_process(
             self,
@@ -339,7 +402,7 @@ class BatchBeamSearch(BeamSearch):
             )
         return scores, states
 
-    def merge_states(self, states, part_states, part_idx: int) -> Any:
+    def merge_states(self, states, part_states, part_idx: int):
         """Merge states for new hypothesis.
         Args:
             states: states of `self.full_scorers`
