@@ -139,12 +139,7 @@ def recognize_from_video(model):
     capture = webcamera_utils.get_capture(args.video)
     # create video writer if savepath is specified as video format
     if args.savepath != SAVE_IMAGE_PATH:
-        f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
-        save_h, save_w = webcamera_utils.calc_adjust_fsize(
-            f_h, f_w, IMAGE_HEIGHT, IMAGE_WIDTH
-        )
-        writer = webcamera_utils.get_writer(args.savepath, save_h, save_w)
+        writer = webcamera_utils.get_writer(args.savepath, IMAGE_HEIGHT, IMAGE_WIDTH)
     else:
         writer = None
     
@@ -164,7 +159,7 @@ def recognize_from_video(model):
         _, pose_scores, keypoint_scores, keypoint_coords= detect(model,input_data)
 
         # postprocessing
-        draw_image = keypoint_draw(None,input_data, pose_scores, keypoint_scores, keypoint_coords)
+        draw_image = keypoint_draw(None, input_data, pose_scores, keypoint_scores, keypoint_coords)
         cv2.imshow('frame', draw_image)
 
         frame_shown = True
