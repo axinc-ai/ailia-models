@@ -4,7 +4,6 @@ import time
 import ailia
 import cv2
 import numpy as np
-import onnxruntime
 import skimage
 
 import movenet_utils
