@@ -15,6 +15,8 @@ from image_utils import imread, load_image  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from utils import get_base_parser, update_parser  # noqa: E402
 
+import yolox
+
 logger = getLogger(__name__)
 
 # ======================
@@ -29,8 +31,7 @@ SLEEP_TIME = 0  # for video mode
 # ======================
 # Arguemnt Parser Config
 # ======================
-parser = get_base_parser(
-    'person-attributes-recognition-crossroad model', IMAGE_PATH, None
+parser = get_base_parser( 'person-attributes-recognition-crossroad model', IMAGE_PATH, None
 )
 parser.add_argument(
     '-m', '--model', default='0230', choices=['0230','0234']
@@ -40,10 +41,28 @@ args = update_parser(parser)
 WEIGHT_PATH = "person-attributes-recognition-crossroad-{}.onnx".format(args.model)
 MODEL_PATH = "person-attributes-recognition-crossroad-{}.onnx.prototxt".format(args.model)
 
+YOLOX_REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/yolox/'
+
+YOLOX_MODEL_NAME = "yolox_s"
+YOLOX_WEIGHT_PATH = YOLOX_MODEL_NAME + ".opt.onnx"
+YOLOX_MODEL_PATH  = YOLOX_MODEL_NAME + ".opt.onnx.prototxt"
+YOLOX_SCORE_THR = 0.4
+YOLOX_NMS_THR = 0.45
+
+
+
+
 MAX_CLASS_COUNT = 7
 RECT_WIDTH = 640
 RECT_HEIGHT = 20
 RECT_MARGIN = 2
+
+def hsv_to_rgb(h, s, v):
+    bgr = cv2.cvtColor(
+        np.array([[[h, s, v]]], dtype=np.uint8), cv2.COLOR_HSV2BGR)[0][0]
+    return (int(bgr[0]), int(bgr[1]), int(bgr[2]), 255)
+
+
 def plot_results(input_image, classifier, labels, top_k=MAX_CLASS_COUNT, logging=True):
     x = RECT_MARGIN
     y = RECT_MARGIN
@@ -98,7 +117,7 @@ def print_results(classifier, labels, top_k=MAX_CLASS_COUNT):
 # ======================
 # Main functions
 # ======================
-def recognize_from_image(net):
+def recognize_from_image(yolox_model,net):
 
     # input image loop
     for image_path in args.input:
@@ -106,6 +125,8 @@ def recognize_from_image(net):
         logger.info(image_path)
 
         raw_data = imread(image_path)
+        raw_data = yolox.yolox(raw_data,yolox_model,YOLOX_NMS_THR,YOLOX_SCORE_THR) 
+
         input_data = raw_data.copy()
         if args.model == '0230':
             pass
@@ -136,7 +157,7 @@ def recognize_from_image(net):
     logger.info('Script finished successfully.')
 
 
-def recognize_from_video(net):
+def recognize_from_video(yolox_model,net):
 
     capture = webcamera_utils.get_capture(args.video)
 
@@ -158,6 +179,7 @@ def recognize_from_video(net):
 
         # prepare input data
         input_data = frame
+        input_data = yolox.yolox(input_data,yolox_model,YOLOX_NMS_THR,YOLOX_SCORE_THR) 
         if args.model == '0230':
             pass
         else:
@@ -195,16 +217,18 @@ def recognize_from_video(net):
 def main():
     # model files check and download
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
+    check_and_download_models(YOLOX_WEIGHT_PATH, YOLOX_MODEL_PATH, YOLOX_REMOTE_PATH)
 
     # net initialize
     net = ailia.Net(None, WEIGHT_PATH, env_id=args.env_id)
+    yolox = ailia.Net(None, YOLOX_WEIGHT_PATH, env_id=args.env_id)
 
     if args.video is not None:
         # video mode
-        recognize_from_video(net)
+        recognize_from_video(yolox,net)
     else:
         # image mode
-        recognize_from_image(net)
+        recognize_from_image(yolox,net)
 
 
 if __name__ == '__main__':
