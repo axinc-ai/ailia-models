@@ -27,14 +27,14 @@ logger = getLogger(__name__)
 # Parameters
 # ======================
 
-WEIGHT_ENC_PATH = 'espnet-v1-encoder.onnx'
-MODEL_ENC_PATH = 'espnet-v1-encoder.onnx.prototxt'
-WEIGHT_DEC_PATH = 'espnet-v1-decoder.onnx'
-MODEL_DEC_PATH = 'espnet-v1-decoder.onnx.prototxt'
-WEIGHT_LM_PATH = 'espnet-v1-lm.onnx'
-MODEL_LM_PATH = 'espnet-v1-lm.onnx.prototxt'
-WEIGHT_CTC_PATH = 'espnet-v1-ctc.onnx'
-MODEL_CTC_PATH = 'espnet-v1-ctc.onnx.prototxt'
+WEIGHT_ENC_PATH = 'reazonspeech-espnet-v1-encoder.onnx'
+MODEL_ENC_PATH = 'reazonspeech-espnet-v1-encoder.onnx.prototxt'
+WEIGHT_DEC_PATH = 'reazonspeech-espnet-v1-decoder.onnx'
+MODEL_DEC_PATH = 'reazonspeech-espnet-v1-decoder.onnx.prototxt'
+WEIGHT_LM_PATH = 'reazonspeech-espnet-v1-lm.onnx'
+MODEL_LM_PATH = 'reazonspeech-espnet-v1-lm.onnx.prototxt'
+WEIGHT_CTC_PATH = 'reazonspeech-espnet-v1-ctc.onnx'
+MODEL_CTC_PATH = 'reazonspeech-espnet-v1-ctc.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/reason_speech/'
 
 WAV_PATH = 'speech-001.wav'
