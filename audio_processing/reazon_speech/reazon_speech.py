@@ -47,6 +47,30 @@ SAVE_TEXT_PATH = 'output.txt'
 parser = get_base_parser(
     'ReazonSpeech', WAV_PATH, SAVE_TEXT_PATH, input_ftype='audio'
 )
+parser.add_argument('--beam_size', type=int, default=20, help="Beam size")
+parser.add_argument('--nbest', type=int, default=1, help="Output N-best hypotheses")
+parser.add_argument('--penalty', type=float, default=0.0, help="Insertion penalty")
+parser.add_argument(
+    "--maxlenratio", type=float, default=0.0,
+    help="Input length ratio to obtain max output length. "
+         "If maxlenratio=0.0 (default), it uses a end-detect "
+         "function "
+         "to automatically find maximum hypothesis lengths."
+         "If maxlenratio<0.0, its absolute value is interpreted"
+         "as a constant max output length",
+)
+parser.add_argument(
+    "--minlenratio", type=float, default=0.0,
+    help="Input length ratio to obtain min output length",
+)
+parser.add_argument(
+    "--ctc_weight",
+    type=float,
+    default=0.5,
+    help="CTC weight in joint decoding",
+)
+parser.add_argument("--lm_weight", type=float, default=1.0, help="RNNLM weight")
+parser.add_argument("--ngram_weight", type=float, default=0.9, help="ngram weight")
 parser.add_argument(
     '--onnx',
     action='store_true',
@@ -85,13 +109,14 @@ class CharTokenizer(object):
 # ======================
 
 def decode(mod, enc):
-    nbest = 1
+    nbest = args.nbest
+    maxlenratio = args.maxlenratio
+    minlenratio = args.minlenratio
 
     beam_search = mod['beam_search']
     token_list = mod['token_list']
     tokenizer = mod['tokenizer']
 
-    maxlenratio = minlenratio = 0.0
     nbest_hyps = beam_search.forward(
         x=enc, maxlenratio=maxlenratio, minlenratio=minlenratio
     )
@@ -193,8 +218,16 @@ def main():
     with open('config.yaml') as file:
         config = yaml.safe_load(file)
 
-    beam_size = 20
-    weights = {'decoder': 0.5, 'ctc': 0.5, 'lm': 1.0, 'ngram': 0.9, 'length_bonus': 0.0}
+    beam_size = args.beam_size
+    ctc_weight = args.ctc_weight
+    lm_weight = args.lm_weight
+    ngram_weight = args.ngram_weight
+    penalty = args.penalty
+
+    weights = {
+        'decoder': 1.0 - ctc_weight, 'ctc': ctc_weight,
+        'lm': lm_weight, 'ngram': ngram_weight, 'length_bonus': penalty
+    }
     sos = eos = 2601
     token_list = config['token_list']
 
