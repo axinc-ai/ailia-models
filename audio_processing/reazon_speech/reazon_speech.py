@@ -199,6 +199,9 @@ def recognize_from_audio(mod):
 def main():
     # model files check and download
     check_and_download_models(WEIGHT_ENC_PATH, MODEL_ENC_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_DEC_PATH, MODEL_DEC_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_LM_PATH, MODEL_LM_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_CTC_PATH, MODEL_CTC_PATH, REMOTE_PATH)
 
     env_id = args.env_id
 
