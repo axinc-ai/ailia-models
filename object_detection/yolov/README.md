@@ -12,6 +12,8 @@ Ailia input shape: (1, 3, 576, 576)
 
 ![Output](output.jpg)
 
+This model cannot detect person. (Label list : https://image-net.org/challenges/LSVRC/2015/browse-vid-synsets.php)
+
 ## Usage
 
 Automatically downloads the onnx and prototxt files on the first run. It is necessary to be connected to the Internet
