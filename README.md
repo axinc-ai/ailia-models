@@ -113,6 +113,7 @@ The collection of pre-trained, state-of-the-art AI models.
 | [<img src="face_detection/retinaface/selfie_output.png" width=128px>](face_detection/retinaface/)| [retinaface](face_detection/retinaface/) | [RetinaFace: Single-stage Dense Face Localisation in the Wild.](https://github.com/biubug6/Pytorch_Retinaface) | Pytorch | 1.2.5 and later |
 | [<img src="face_detection/anime-face-detector/output.png" width=128px>](face_detection/anime-face-detector/)| [anime-face-detector](face_detection/anime-face-detector/) | [Anime Face Detector](https://github.com/hysts/anime-face-detector) | Pytorch | 1.2.6 and later |
 | [<img src="face_detection/face-detection-adas/output.png" width=128px>](face_detection/face-detection-adas/)| [face-detection-adas](face_detection/face-detection-adas/) | [face-detection-adas-0001](https://github.com/openvinotoolkit/open_model_zoo/tree/master/models/intel/face-detection-adas-0001) | OpenVINO | 1.2.5 and later |
+| [<img src="face_detection/mtcnn/output.jpg" width=128px>](face_detection/mtcnn/)| [mtcnn](face_detection/mtcnn/) | [mtcnn](https://github.com/ipazc/mtcnn) | Keras | 1.2.10 and later |
 
 ## Face identification
 

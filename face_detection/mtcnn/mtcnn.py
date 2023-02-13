@@ -22,13 +22,13 @@ logger = getLogger(__name__)
 # Parameters
 # ======================
 WEIGHT_PATH1 = 'pnet.onnx'
-MODEL_PATH1 = 'pnet.prototxt'
+MODEL_PATH1 = 'pnet.onnx.prototxt'
 
 WEIGHT_PATH2 = 'rnet.onnx'
-MODEL_PATH2 = 'rnet.prototxt'
+MODEL_PATH2 = 'rnet.onnx.prototxt'
 
 WEIGHT_PATH3 = 'onet.onnx'
-MODEL_PATH3 = 'onet.prototxt'
+MODEL_PATH3 = 'onet.onnx.prototxt'
 
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/mtcnn/'
 
@@ -163,9 +163,9 @@ def recognize_from_video():
 
 def main():
     # model files check and download
-    #check_and_download_models(WEIGHT_PATH1, MODEL_PATH1, REMOTE_PATH)
-    #check_and_download_models(WEIGHT_PATH2, MODEL_PATH2, REMOTE_PATH)
-    #check_and_download_models(WEIGHT_PATH3, MODEL_PATH3, REMOTE_PATH)
+    check_and_download_models(WEIGHT_PATH1, MODEL_PATH1, REMOTE_PATH)
+    check_and_download_models(WEIGHT_PATH2, MODEL_PATH2, REMOTE_PATH)
+    check_and_download_models(WEIGHT_PATH3, MODEL_PATH3, REMOTE_PATH)
 
     if args.video is not None:
         # video mode
