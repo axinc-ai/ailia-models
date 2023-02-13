@@ -6,7 +6,7 @@
 
 (Image from https://github.com/open-mmlab/mmfashion/blob/master/demo/imgs/01_4_full.jpg)
 
-Ailia input shape: (1, 3, 576, 576)
+Ailia input shape: (1, 160, 80, 3)
 
 ## Output
 
