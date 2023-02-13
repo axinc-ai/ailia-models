@@ -78,6 +78,7 @@ The collection of pre-trained, state-of-the-art AI models.
 |[<img src="deep_fashion/mmfashion_tryon/output.png" width=128px>](deep_fashion/mmfashion_tryon/) | [mmfashion_tryon](/deep_fashion/mmfashion_tryon/) | [MMFashion virtual try-on](https://github.com/open-mmlab/mmfashion) | Pytorch | 1.2.8 and later |
 |[<img src="deep_fashion/mmfashion_retrieval/output.png" width=128px>](deep_fashion/mmfashion_retrieval/) | [mmfashion_retrieval](/deep_fashion/mmfashion_retrieval/) | [MMFashion In-Shop Clothes Retrieval](https://github.com/open-mmlab/mmfashion) | Pytorch | 1.2.5 and later |
 |[<img src="deep_fashion/fashionai-key-points-detection/output_blouse.png" width=128px>](deep_fashion/fashionai-key-points-detection/) | [fashionai-key-points-detection](/deep_fashion/fashionai-key-points-detection/) | [A Pytorch Implementation of Cascaded Pyramid Network for FashionAI Key Points Detection](https://github.com/gathierry/FashionAI-KeyPointsDetectionOfApparel) | Pytorch | 1.2.5 and later |
+|[<img src="deep_fashion/person-attributes-recognition-crossroad/output.jpg" width=128px>](deep_fashion/person-attributes-recognition-crossroad/) | [person-attributes-recognition-crossroad](/deep_fashion/person-attributes-recognition-crossroad/) | [person-attributes-recognition-crossroad-0230](https://github.com/openvinotoolkit/open_model_zoo/tree/master/models/intel/person-attributes-recognition-crossroad-0230) | Pytorch | 1.2.10 and later |
 
 ## Depth estimation
 
