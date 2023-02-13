@@ -195,7 +195,7 @@ def convert_to_ailia_detector_object(preds, w, h):
     i = 0
     detector_object = []
     for j in range(len(preds[i]['rois'])):
-        (x1, y1, x2, y2) = preds[i]['rois'][j].astype(np.int)
+        (x1, y1, x2, y2) = preds[i]['rois'][j].astype(int)
         obj = preds[i]['class_ids'][j]
         score = float(preds[i]['scores'][j])
 

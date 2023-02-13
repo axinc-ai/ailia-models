@@ -201,7 +201,7 @@ class DmPost(object):
         else:
             self.imgputText(img, f'speed: {speed}', pos, lt, tf)
 
-        vt = vectors[vectors[:, 0] != -2].astype(np.int)  # Filter t
+        vt = vectors[vectors[:, 0] != -2].astype(int)  # Filter t
         if vector is not None:
             self.imgplotVectors(img, vt)
 
@@ -225,7 +225,7 @@ class DmPost(object):
                     c_fileorder = int(crossout[index, 2])
                     if (c_fileorder - self.old_fileorder) < self.frame_thresh:  # 10
                         print('\nxxx', c_fileorder, self.old_fileorder, self.frame_thresh)
-                        vto = self.old_vectors[self.old_vectors[:, 0] != -2].astype(np.int)
+                        vto = self.old_vectors[self.old_vectors[:, 0] != -2].astype(int)
                         new_vt = np.concatenate((vto, vt), axis=0)
                         self.imgplotVectors(img, new_vt)
                         vectors[:new_vt.shape[0], :] = new_vt

@@ -43,6 +43,7 @@ cd ../../deep_fashion/fashionai-key-points-detection; python3 fashionai-key-poin
 cd ../../deep_fashion/mmfashion; python3 mmfashion.py ${OPTION}
 cd ../../deep_fashion/mmfashion_tryon; python3 mmfashion_tryon.py ${OPTION}
 cd ../../deep_fashion/mmfashion_retrieval; python3 mmfashion_retrieval.py ${OPTION}
+cd ../../deep_fashion/person-attributes-recognition-crossroad; python3 person-attributes-recognition-crossroad.py ${OPTION}
 cd ../../depth_estimation/midas; python3 midas.py ${OPTION}
 cd ../../depth_estimation/monodepth2; python3 monodepth2.py ${OPTION}
 cd ../../depth_estimation/fcrn-depthprediction; python3 fcrn-depthprediction.py ${OPTION}
@@ -141,6 +142,7 @@ cd ../../image_manipulation/dfm; python3 dfm.py ${OPTION}
 cd ../../image_manipulation/dehamer; python3 dehamer.py ${OPTION}
 cd ../../image_manipulation/dfe; python3 dfe.py ${OPTION}
 cd ../../image_manipulation/pytorch-superpoint; python3 pytorch_superpoint.py ${OPTION}
+cd ../../image_manipulation/cnngeometric_pytorch; python3 cnngeometric_pytorch.py ${OPTION}
 cd ../../image_segmentation/deeplabv3; python3 deeplabv3.py ${OPTION}
 cd ../../image_segmentation/hair_segmentation; python3 hair_segmentation.py ${OPTION}
 cd ../../image_segmentation/hrnet_segmentation; python3 hrnet_segmentation.py ${OPTION}
