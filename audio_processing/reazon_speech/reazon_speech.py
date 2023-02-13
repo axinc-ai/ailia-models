@@ -170,6 +170,12 @@ def recognize_from_audio(mod):
         # prepare input data
         speech, rate = librosa.load(audio_path, sr=16000)
 
+        # max 30 sec
+        max_len = 16000 * 30
+        if speech.shape[0] >= max_len:
+            speech = speech[0:max_len]
+            logger.warning('Cut to 30 seconds of maximum recognition seconds.')
+
         # inference
         logger.info('Start inference...')
         if args.benchmark:
