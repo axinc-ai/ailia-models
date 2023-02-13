@@ -106,7 +106,7 @@ def preprocess(img, resize):
 
 
 def post_processing(img_shape, all_boxes, all_scores, indices):
-    indices = indices.astype(np.int)
+    indices = indices.astype(int)
 
     bboxes = []
     for idx_ in indices[0]:

@@ -255,7 +255,7 @@ class MotionTracker:
         depth_uncertainty = depth_uncertainty[inds]
 
         if pure_det:
-            valids = np.ones((bboxes.shape[0]), dtype=np.bool)
+            valids = np.ones((bboxes.shape[0]), dtype=bool)
             ids = np.arange(
                 self.num_tracklets,
                 self.num_tracklets + bboxes.shape[0],

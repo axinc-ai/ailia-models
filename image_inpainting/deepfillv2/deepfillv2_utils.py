@@ -25,8 +25,8 @@ def np_free_form_mask(maxVertex, maxLength, maxBrushWidth, maxAngle, h, w):
         nextY = startY + length * np.cos(angle)
         nextX = startX + length * np.sin(angle)
 
-        nextY = np.maximum(np.minimum(nextY, h - 1), 0).astype(np.int)
-        nextX = np.maximum(np.minimum(nextX, w - 1), 0).astype(np.int)
+        nextY = np.maximum(np.minimum(nextY, h - 1), 0).astype(int)
+        nextX = np.maximum(np.minimum(nextX, w - 1), 0).astype(int)
 
         cv2.line(mask, (startY, startX), (nextY, nextX), 1, brushWidth)
         cv2.circle(mask, (startY, startX), brushWidth // 2, 2)

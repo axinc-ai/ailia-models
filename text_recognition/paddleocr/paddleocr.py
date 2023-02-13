@@ -6,21 +6,21 @@ import math
 import sys
 import time
 import unicodedata
+# logger
+from logging import getLogger
 
-import ailia
 import cv2
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
+import ailia
+
 # import original modules
 sys.path.append('../../util')
-# logger
-from logging import getLogger  # noqa: E402
-
 import webcamera_utils  # noqa: E402
 from image_utils import imread  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
-from utils import get_base_parser, update_parser  # noqa: E402
+from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 
 logger = getLogger(__name__)
 
@@ -34,6 +34,8 @@ warnings.simplefilter("ignore", DeprecationWarning)
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/paddle_ocr/'
 
 WEIGHT_PATH_DET_CHN = 'chi_eng_num_sym_server_det_org.onnx'
+WEIGHT_PATH_DET_R50_ICDAR15 = 'det_r50_db++_icdar15_infer.onnx'
+WEIGHT_PATH_DET_R50_TDTR = 'det_r50_db++_td_tr_infer.onnx'
 
 WEIGHT_PATH_CLS_CHN = 'chi_eng_num_sym_mobile_cls_org.onnx'
 
@@ -61,10 +63,8 @@ DICT_PATH_REC_FRE_MBL = './dict/fre_eng_num_sym_org.txt'
 WEIGHT_PATH_REC_KOR_MBL = 'kor_eng_num_sym_mobile_rec_org.onnx'
 DICT_PATH_REC_KOR_MBL = './dict/kor_eng_num_sym_org.txt'
 
-
 IMAGE_OR_VIDEO_PATH = 'input.jpg'
 SAVE_IMAGE_OR_VIDEO_PATH = 'output.png'
-
 
 # ======================
 # Arguemnt Parser Config
@@ -75,7 +75,7 @@ parser = get_base_parser(
     SAVE_IMAGE_OR_VIDEO_PATH,
 )
 parser.add_argument(
-    '-c', '--case', type=str, default='mobile',
+    '-c', '--case', default='mobile', choices=('mobile', 'server'),
     help=('You can choose the following model size.'
           '  - mobile : fast and light but low accuracy'
           '  - server : high accuracy but slow and heavy')
@@ -102,14 +102,22 @@ parser.add_argument(
           'Please set a positive integer.'
           'Generally set to a multiple of 32, such as 960.')
 )
+parser.add_argument(
+    '-d', '--det_model', default='db_res18', choices=('db_res18', 'r50_icdar15', 'r50_trtd'),
+    help='det model type'
+)
 args = update_parser(parser)
+
+det_model = args.det_model
 
 
 # ======================
 # Utils
 # ======================
+
 def get_default_config():
     dc = {}
+
     # params for text detector
     dc['det_algorithm'] = 'DB'
     dc['det_model_path'] = WEIGHT_PATH_DET_CHN
@@ -155,10 +163,11 @@ def get_default_config():
     return dc
 
 
-def set_config(dc, weight_path_det,
+def set_config(dc, weight_path_det, det_algorithm,
                weight_path_rec, dict_path_rec, weight_path_cls):
     # params for text detector
     dc['det_model_path'] = weight_path_det
+    dc['det_algorithm'] = det_algorithm
 
     # params for text recognizer
     dc['rec_model_path'] = weight_path_rec
@@ -181,7 +190,7 @@ def transform(data, ops=None):
     return data
 
 
-def create_operators(op_param_list, global_config=None):
+def create_operators(op_param_list):
     """
     create operators based on the config
     Args:
@@ -190,31 +199,33 @@ def create_operators(op_param_list, global_config=None):
     assert isinstance(op_param_list, list), ('operator config should be a list')
     ops = []
     for operator in op_param_list:
-        assert isinstance(operator,
-                          dict) and len(operator) == 1, "yaml format error"
+        assert isinstance(operator, dict) \
+               and len(operator) == 1, "yaml format error"
         op_name = list(operator)[0]
         param = {} if operator[op_name] is None else operator[op_name]
-        if global_config is not None:
-            param.update(global_config)
         op = eval(op_name)(**param)
         ops.append(op)
+
     return ops
 
 
-def build_post_process(config, global_config=None):
+def build_post_process(config):
     support_dict = [
         'DBPostProcess', 'CTCLabelDecode', 'ClsPostProcess'
     ]
 
     config = copy.deepcopy(config)
     module_name = config.pop('name')
-    if global_config is not None:
-        config.update(global_config)
     assert module_name in support_dict, Exception(
         'post process only support {}'.format(support_dict))
     module_class = eval(module_name)(**config)
+
     return module_class
 
+
+# ======================
+# Operators
+# ======================
 
 class DetResizeForTest(object):
     def __init__(self, **kwargs):
@@ -253,7 +264,7 @@ class DetResizeForTest(object):
         ratio_h = float(resize_h) / ori_h
         ratio_w = float(resize_w) / ori_w
         img = cv2.resize(img, (int(resize_w), int(resize_h)))
-        # return img, np.array([ori_h, ori_w])
+
         return img, [ratio_h, ratio_w]
 
     def resize_image_type0(self, img):
@@ -299,7 +310,7 @@ class DetResizeForTest(object):
             sys.exit(0)
         ratio_h = resize_h / float(h)
         ratio_w = resize_w / float(w)
-        # return img, np.array([h, w])
+
         return img, [ratio_h, ratio_w]
 
     def resize_image_type2(self, img):
@@ -344,14 +355,7 @@ class NormalizeImage(object):
 
     def __call__(self, data):
         img = data['image']
-        from PIL import Image
-        if isinstance(img, Image.Image):
-            img = np.array(img)
-
-        assert isinstance(img,
-                          np.ndarray), "invalid input 'img' in NormalizeImage"
-        data['image'] = (
-            img.astype('float32') * self.scale - self.mean) / self.std
+        data['image'] = (img.astype('float32') * self.scale - self.mean) / self.std
         return data
 
 
@@ -364,9 +368,6 @@ class ToCHWImage(object):
 
     def __call__(self, data):
         img = data['image']
-        from PIL import Image
-        if isinstance(img, Image.Image):
-            img = np.array(img)
         data['image'] = img.transpose((2, 0, 1))
         return data
 
@@ -399,8 +400,8 @@ class DBPostProcess(object):
         self.max_candidates = max_candidates
         self.unclip_ratio = unclip_ratio
         self.min_size = 3
-        self.dilation_kernel = None if not use_dilation else np.array(
-            [[1, 1], [1, 1]])
+        self.dilation_kernel = None if not use_dilation \
+            else np.array([[1, 1], [1, 1]])
 
     def boxes_from_bitmap(self, pred, _bitmap, dest_width, dest_height):
         '''
@@ -442,8 +443,9 @@ class DBPostProcess(object):
                 np.round(box[:, 0] / width * dest_width), 0, dest_width)
             box[:, 1] = np.clip(
                 np.round(box[:, 1] / height * dest_height), 0, dest_height)
-            boxes.append(box.astype(np.int16))
+            boxes.append(box.astype(int))
             scores.append(score)
+
         return np.array(boxes, dtype=np.int16), scores
 
     def xyrotate(self, coord_xy, angle, center_xy):
@@ -460,14 +462,14 @@ class DBPostProcess(object):
             coord_x_tmp -= center_xy[0]
             coord_y_tmp -= center_xy[1]
             # exec rotation
-            coord_xy_tmp        = np.array([coord_x_tmp, coord_y_tmp])[:, np.newaxis]
-            rotation_matrix_tmp = np.array([[np.cos(-angle/180*np.pi), 
-                                            -np.sin(-angle/180*np.pi)], 
-                                            [np.sin(-angle/180*np.pi), 
-                                            np.cos(-angle/180*np.pi)]])
-            coord_xy_tmp        = rotation_matrix_tmp @ coord_xy_tmp
+            coord_xy_tmp = np.array([coord_x_tmp, coord_y_tmp])[:, np.newaxis]
+            rotation_matrix_tmp = np.array([
+                [np.cos(-angle / 180 * np.pi), -np.sin(-angle / 180 * np.pi)],
+                [np.sin(-angle / 180 * np.pi), np.cos(-angle / 180 * np.pi)]
+            ])
+            coord_xy_tmp = rotation_matrix_tmp @ coord_xy_tmp
             # re-slide to suit center of rotation
-            coord_xy_tmp     = coord_xy_tmp.reshape(-1)
+            coord_xy_tmp = coord_xy_tmp.reshape(-1)
             coord_xy_tmp[0] += center_xy[0]
             coord_xy_tmp[1] += center_xy[1]
             # stock
@@ -477,10 +479,10 @@ class DBPostProcess(object):
 
     def unclip(self, box):
         unclip_ratio = self.unclip_ratio
-        poly_area = (np.sqrt(np.sum((box[0, :] - box[1, :])**2)) * 
-                     np.sqrt(np.sum((box[0, :] - box[3, :])**2)))
-        poly_length = (np.sqrt(np.sum((box[0, :] - box[1, :])**2)) + 
-                       np.sqrt(np.sum((box[0, :] - box[3, :])**2))) * 2
+        poly_area = (np.sqrt(np.sum((box[0, :] - box[1, :]) ** 2)) *
+                     np.sqrt(np.sum((box[0, :] - box[3, :]) ** 2)))
+        poly_length = (np.sqrt(np.sum((box[0, :] - box[1, :]) ** 2)) +
+                       np.sqrt(np.sum((box[0, :] - box[3, :]) ** 2))) * 2
         distance = poly_area * unclip_ratio / poly_length
         # calc angle between upper side of bbox with x axis
         u = box[1] - box[0]
@@ -491,14 +493,14 @@ class DBPostProcess(object):
         c = i / n
         angle = np.rad2deg(np.arccos(np.clip(c, -1.0, 1.0)))
         # exec coordinates rotation 
-        box_ = self.xyrotate(coord_xy=box, angle=angle, 
+        box_ = self.xyrotate(coord_xy=box, angle=angle,
                              center_xy=np.mean(box, axis=0))
         # calculate circle coordinates
         pitch = 10
-        x_upper = np.cos(np.arange(1, 0, (-1/pitch)) * np.pi) * distance
-        y_upper = -np.sqrt(distance**2 - x_upper**2)
-        x_lower = np.cos(np.arange(0, 1, (1/pitch)) * np.pi) * distance
-        y_lower = np.sqrt(distance**2 - x_lower**2)
+        x_upper = np.cos(np.arange(1, 0, (-1 / pitch)) * np.pi) * distance
+        y_upper = -np.sqrt(distance ** 2 - x_upper ** 2)
+        x_lower = np.cos(np.arange(0, 1, (1 / pitch)) * np.pi) * distance
+        y_lower = np.sqrt(distance ** 2 - x_lower ** 2)
         x = np.concatenate([x_upper, x_lower])
         y = np.concatenate([y_upper, y_lower])
         circle = np.concatenate([x[:, np.newaxis], y[:, np.newaxis]], axis=1)
@@ -508,10 +510,10 @@ class DBPostProcess(object):
             expanded.append(circle + box_tmp)
         expanded = np.array(expanded).reshape(-1, 2)
         # narrow down circle coordinates to outside 
-        expanded = expanded[[25, 26, 27, 28, 29, 30, 50, 51, 52, 53, 54, 55, 
-                             75, 76, 77, 78, 79, 60,  0,  1,  2,  3,  4,  5]]
+        expanded = expanded[[25, 26, 27, 28, 29, 30, 50, 51, 52, 53, 54, 55,
+                             75, 76, 77, 78, 79, 60, 0, 1, 2, 3, 4, 5]]
         # exec coordinates re-rotation 
-        expanded = self.xyrotate(coord_xy=expanded, angle=-angle, 
+        expanded = self.xyrotate(coord_xy=expanded, angle=-angle,
                                  center_xy=np.mean(box_, axis=0))
         expanded = np.round(expanded).astype(np.int64)
         return expanded
@@ -542,10 +544,10 @@ class DBPostProcess(object):
     def box_score_fast(self, bitmap, _box):
         h, w = bitmap.shape[:2]
         box = _box.copy()
-        xmin = np.clip(np.floor(box[:, 0].min()).astype(np.int), 0, w - 1)
-        xmax = np.clip(np.ceil(box[:, 0].max()).astype(np.int), 0, w - 1)
-        ymin = np.clip(np.floor(box[:, 1].min()).astype(np.int), 0, h - 1)
-        ymax = np.clip(np.ceil(box[:, 1].max()).astype(np.int), 0, h - 1)
+        xmin = np.clip(np.floor(box[:, 0].min()).astype(int), 0, w - 1)
+        xmax = np.clip(np.ceil(box[:, 0].max()).astype(int), 0, w - 1)
+        ymin = np.clip(np.floor(box[:, 1].min()).astype(int), 0, h - 1)
+        ymax = np.clip(np.ceil(box[:, 1].max()).astype(int), 0, h - 1)
 
         mask = np.zeros((ymax - ymin + 1, xmax - xmin + 1), dtype=np.uint8)
         box[:, 0] = box[:, 0] - xmin
@@ -567,8 +569,8 @@ class DBPostProcess(object):
                     self.dilation_kernel)
             else:
                 mask = segmentation[batch_index]
-            boxes, scores = self.boxes_from_bitmap(pred[batch_index], mask,
-                                                   src_w, src_h)
+            boxes, scores = self.boxes_from_bitmap(
+                pred[batch_index], mask, src_w, src_h)
 
             boxes_batch.append({'points': boxes})
         return boxes_batch
@@ -631,15 +633,15 @@ class BaseRecLabelDecode(object):
                     continue
                 if is_remove_duplicate:
                     # only for predict
-                    if idx > 0 and text_index[batch_idx][idx - 1] == text_index[
-                            batch_idx][idx]:
+                    if idx > 0 and text_index[batch_idx][idx - 1] == \
+                            text_index[batch_idx][idx]:
                         continue
                 # print('int(text_index[batch_idx][idx]) =', 
                 #        int(text_index[batch_idx][idx]))
                 # print('self.character[int(text_index[batch_idx][idx])] =', 
                 #        self.character[int(text_index[batch_idx][idx])])
-                char_list.append(self.character[int(text_index[batch_idx][
-                    idx])])
+                char_list.append(
+                    self.character[int(text_index[batch_idx][idx])])
                 if text_prob is not None:
                     conf_list.append(text_prob[batch_idx][idx])
                 else:
@@ -663,8 +665,8 @@ class CTCLabelDecode(BaseRecLabelDecode):
                  character_type='ch',
                  use_space_char=False,
                  **kwargs):
-        super(CTCLabelDecode, self).__init__(character_dict_path,
-                                             character_type, use_space_char)
+        super(CTCLabelDecode, self).__init__(
+            character_dict_path, character_type, use_space_char)
 
     def __call__(self, preds, label=None, *args, **kwargs):
         preds_idx = preds.argmax(axis=2)
@@ -697,48 +699,65 @@ class ClsPostProcess(object):
         return decode_out, label
 
 
-class TextDetector():
+# ======================
+# Main functions
+# ======================
+
+class TextDetector(object):
     def __init__(self, config, env_id):
-        OCR_CFG = config
-        self.config = copy.deepcopy(OCR_CFG)
+        self.config = copy.deepcopy(config)
         self.env_id = env_id
-        self.det_algorithm = OCR_CFG['det_algorithm']
+        self.det_algorithm = config['det_algorithm']
 
-        pre_process_list = [{
-            'DetResizeForTest': {
-                'limit_side_len': OCR_CFG['det_limit_side_len'],
-                'limit_type': OCR_CFG['det_limit_type']
+        pre_process_list = [
+            {
+                'DetResizeForTest': {
+                    'limit_side_len': config['det_limit_side_len'],
+                    'limit_type': config['det_limit_type']
+                }
+            },
+            {
+                'NormalizeImage': {
+                    'std': [0.229, 0.224, 0.225],
+                    'mean': [0.485, 0.456, 0.406],
+                    'scale': '1./255.',
+                    'order': 'hwc'
+                }
+            },
+            {
+                'ToCHWImage': None
+            },
+            {
+                'KeepKeys': {
+                    'keep_keys': ['image', 'shape']
+                }
             }
-        }, {
-            'NormalizeImage': {
-                'std': [0.229, 0.224, 0.225],
-                'mean': [0.485, 0.456, 0.406],
-                'scale': '1./255.',
-                'order': 'hwc'
-            }
-        }, {
-            'ToCHWImage': None
-        }, {
-            'KeepKeys': {
-                'keep_keys': ['image', 'shape']
-            }
-        }]
+        ]
 
-        postprocess_params = {}
-        if self.det_algorithm == "DB":
-            postprocess_params['name'] = 'DBPostProcess'
-            postprocess_params["thresh"] = OCR_CFG['det_db_thresh']
-            postprocess_params["box_thresh"] = OCR_CFG['det_db_box_thresh']
-            postprocess_params["max_candidates"] = 1000
-            postprocess_params["unclip_ratio"] = OCR_CFG['det_db_unclip_ratio']
-            postprocess_params["use_dilation"] = True
-        else:
-            logger.error("unknown det_algorithm:{}".format(self.det_algorithm))
-            sys.exit(0)
+        postprocess_params = {
+            'name': 'DBPostProcess',
+            "thresh": config['det_db_thresh'],
+            "box_thresh": config['det_db_box_thresh'],
+            "max_candidates": 1000,
+            "unclip_ratio": config['det_db_unclip_ratio'],
+            "use_dilation": True
+        }
+        if self.det_algorithm == "DB++":
+            pre_process_list[1] = {
+                'NormalizeImage': {
+                    'std': [1.0, 1.0, 1.0],
+                    'mean': [0.48109378172549, 0.45752457890196, 0.40787054090196],
+                    'scale': '1./255.',
+                    'order': 'hwc'
+                }
+            }
+            postprocess_params["use_dilation"] = False
 
         self.preprocess_op = create_operators(pre_process_list)
         self.postprocess_op = build_post_process(postprocess_params)
-        self.net = None
+        self.net = ailia.Net(self.config['det_model_path'] + '.prototxt',
+                             self.config['det_model_path'], env_id=self.env_id)
+        self.called = False
 
     def order_points_clockwise(self, pts):
         """
@@ -787,35 +806,32 @@ class TextDetector():
     def __call__(self, img):
         ori_im = img.copy()
         data = {'image': img}
+
         data = transform(data, self.preprocess_op)
         img, shape_list = data
-        if img is None:
-            return None, 0
         img = np.expand_dims(img, axis=0)
         shape_list = np.expand_dims(shape_list, axis=0)
         img = img.copy()
         starttime = time.time()
 
         # net initialize, Text Detection
-        if self.net==None or self.net.get_input_shape()!=img.shape:
-            self.net = ailia.Net(self.config['det_model_path']+'.prototxt',
+        if self.called and self.net.get_input_shape() != img.shape:
+            self.net = ailia.Net(self.config['det_model_path'] + '.prototxt',
                                  self.config['det_model_path'], env_id=self.env_id)
         outputs = self.net.predict(img)
+        self.called = True
 
-        preds = {}
-        if self.det_algorithm == 'DB':
-            preds['maps'] = outputs
-        else:
-            raise NotImplementedError
+        preds = {'maps': outputs}
 
         post_result = self.postprocess_op(preds, shape_list)
         dt_boxes = post_result[0]['points']
         dt_boxes = self.filter_tag_det_res(dt_boxes, ori_im.shape)
         elapse = time.time() - starttime
+
         return dt_boxes, elapse
 
 
-class TextClassifier():
+class TextClassifier(object):
     def __init__(self, config, env_id):
         OCR_CFG = config
         self.cfg = OCR_CFG
@@ -829,7 +845,9 @@ class TextClassifier():
             "label_list": OCR_CFG['label_list'],
         }
         self.postprocess_op = build_post_process(postprocess_params)
-        self.net = None
+        self.net = ailia.Net(self.cfg['cls_model_path'] + '.prototxt',
+                             self.cfg['cls_model_path'], env_id=self.env_id)
+        self.called = False
 
     def resize_norm_img(self, img):
         imgC, imgH, imgW = self.cls_image_shape
@@ -882,13 +900,13 @@ class TextClassifier():
             norm_img_batch = norm_img_batch.copy()
             starttime = time.time()
 
-
             # net initialize, Detection Boxes Rectify
-            if self.net==None or self.net.get_input_shape()!=norm_img_batch.shape:
-                self.net = ailia.Net(self.cfg['cls_model_path']+'.prototxt',
+            if self.called and self.net.get_input_shape() != norm_img_batch.shape:
+                self.net = ailia.Net(self.cfg['cls_model_path'] + '.prototxt',
                                      self.cfg['cls_model_path'], env_id=self.env_id)
             self.net.set_input_shape(norm_img_batch.shape)
             prob_out = self.net.predict(norm_img_batch)
+            self.called = True
 
             cls_result = self.postprocess_op(prob_out)
             elapse += time.time() - starttime
@@ -898,15 +916,16 @@ class TextClassifier():
                 if '180' in label and score > self.cls_thresh:
                     img_list[indices[beg_img_no + rno]] = cv2.rotate(
                         img_list[indices[beg_img_no + rno]], 1)
+
         return img_list, cls_res, elapse
 
 
-class TextRecognizer():
+class TextRecognizer(object):
     def __init__(self, config, env_id):
         OCR_CFG = config
         self.config = OCR_CFG
         self.env_id = env_id
- 
+
         self.limited_max_width = OCR_CFG['limited_max_width']
         self.limited_min_width = OCR_CFG['limited_min_width']
 
@@ -921,7 +940,9 @@ class TextRecognizer():
             "use_space_char": OCR_CFG['use_space_char']
         }
         self.postprocess_op = build_post_process(postprocess_params)
-        self.net = None
+        self.net = ailia.Net(self.config['rec_model_path'] + '.prototxt',
+                             self.config['rec_model_path'], env_id=self.env_id)
+        self.called = False
 
     def resize_norm_img(self, img, max_wh_ratio):
         imgC, imgH, imgW = self.rec_image_shape
@@ -979,10 +1000,11 @@ class TextRecognizer():
             starttime = time.time()
 
             # net initialize, Text Recognition
-            if self.net==None or self.net.get_input_shape()!=norm_img_batch.shape:
-                self.net = ailia.Net(self.config['rec_model_path']+'.prototxt',
+            if self.called and self.net.get_input_shape() != norm_img_batch.shape:
+                self.net = ailia.Net(self.config['rec_model_path'] + '.prototxt',
                                      self.config['rec_model_path'], env_id=self.env_id)
             preds = self.net.predict(norm_img_batch)
+            self.called = True
 
             rec_result = self.postprocess_op(preds)
             for rno in range(len(rec_result)):
@@ -993,15 +1015,14 @@ class TextRecognizer():
 
 class TextSystem(object):
     def __init__(self, config, env_id):
-        OCR_CFG = config
-        self.cfg = OCR_CFG
+        self.cfg = config
 
-        self.text_detector = TextDetector(OCR_CFG, env_id)
-        self.text_recognizer = TextRecognizer(OCR_CFG, env_id)
-        self.use_angle_cls = OCR_CFG['use_angle_cls']
-        self.drop_score = OCR_CFG['drop_score']
+        self.text_detector = TextDetector(config, env_id)
+        self.text_recognizer = TextRecognizer(config, env_id)
+        self.use_angle_cls = config['use_angle_cls']
+        self.drop_score = config['drop_score']
         if self.use_angle_cls:
-            self.text_classifier = TextClassifier(OCR_CFG, env_id)
+            self.text_classifier = TextClassifier(config, env_id)
 
     def get_rotate_crop_image(self, img, points):
         '''
@@ -1052,7 +1073,7 @@ class TextSystem(object):
             dt_boxes = np.array(dt_boxes)
             height_vec = dt_boxes[:, 2, :] - dt_boxes[:, 1, :]
             width_vec = dt_boxes[:, 3, :] - dt_boxes[:, 0, :]
-            if (np.sum(height_vec**2) > np.sum(width_vec**2)):
+            if (np.sum(height_vec ** 2) > np.sum(width_vec ** 2)):
                 height_vec = width_vec
             padding_vec_tmp = height_vec * ratio_padding
             padding_vec = padding_vec_tmp.copy()
@@ -1084,6 +1105,7 @@ class TextSystem(object):
             if score >= self.drop_score:
                 filter_boxes.append(box)
                 filter_rec_res.append(rec_reuslt)
+
         return filter_boxes, filter_rec_res
 
 
@@ -1136,8 +1158,8 @@ def draw_ocr_box_txt(image,
                 box[2][1], box[3][0], box[3][1]
             ],
             outline=color)
-        box_height = math.sqrt((box[0][0] - box[3][0])**2 + (box[0][1] - box[3][1])**2)
-        box_width = math.sqrt((box[0][0] - box[1][0])**2 + (box[0][1] - box[1][1])**2)
+        box_height = math.sqrt((box[0][0] - box[3][0]) ** 2 + (box[0][1] - box[3][1]) ** 2)
+        box_width = math.sqrt((box[0][0] - box[1][0]) ** 2 + (box[0][1] - box[1][1]) ** 2)
         if box_height > 2 * box_width:
             font_size = max(int(box_width * 0.9 * (1 - bbox_padding)), 10)
             font = ImageFont.truetype(font_path, font_size, encoding="utf-8")
@@ -1167,10 +1189,10 @@ def adjust_half_and_full(txts):
         for i_char in range(1, len(txt_tmp)):
             char_tmp = txt_tmp[i_char]
             if (char_tmp == '-'):
-                res = unicodedata.east_asian_width(txt_tmp[i_char-1])
+                res = unicodedata.east_asian_width(txt_tmp[i_char - 1])
                 if (res == 'W'):
-                    txt_tmp = txt_tmp.replace('%s-' % txt_tmp[i_char-1], 
-                                              '%sー' % txt_tmp[i_char-1])
+                    txt_tmp = txt_tmp.replace(
+                        '%s-' % txt_tmp[i_char - 1], '%sー' % txt_tmp[i_char - 1])
                     flg_replace = True
         if flg_replace:
             txts[i_txt] = txt_tmp
@@ -1178,7 +1200,6 @@ def adjust_half_and_full(txts):
 
 
 def recognize_from_image(config, text_sys):
-
     for img_path in args.input:
         # read image
         img = imread(img_path)
@@ -1194,11 +1215,13 @@ def recognize_from_image(config, text_sys):
         # adjust halfwidth and fullwidth forms
         txts = adjust_half_and_full(txts)
 
-        draw_img = draw_ocr_box_txt(image, boxes, txts, scores,
-                                    drop_score=config['drop_score'],
-                                    font_path=config['vis_font_path'],
-                                    bbox_padding=config['rec_bbox_padding'])
-        cv2.imwrite(args.savepath, draw_img[:, :, ::-1])
+        draw_img = draw_ocr_box_txt(
+            image, boxes, txts, scores,
+            drop_score=config['drop_score'],
+            font_path=config['vis_font_path'],
+            bbox_padding=config['rec_bbox_padding'])
+        savepath = get_savepath(args.savepath, img_path)
+        cv2.imwrite(savepath, draw_img[:, :, ::-1])
 
     logger.info('finished process and write result to %s!' % args.savepath)
 
@@ -1217,7 +1240,7 @@ def recognize_from_video(config, text_sys):
 
     # frame read and exec segmentation
     frame_shown = False
-    while(True):
+    while (True):
         # frame read
         ret, img = video_capture.read()
 
@@ -1225,7 +1248,7 @@ def recognize_from_video(config, text_sys):
             break
         if frame_shown and cv2.getWindowProperty('exec PaddleOCR', cv2.WND_PROP_VISIBLE) == 0:
             break
-        
+
         # exec ocr
         dt_boxes, rec_res = text_sys(img)
 
@@ -1234,9 +1257,10 @@ def recognize_from_video(config, text_sys):
         txts = [rec_res[i][0] for i in range(len(rec_res))]
         scores = [rec_res[i][1] for i in range(len(rec_res))]
 
-        draw_img = draw_ocr_box_txt(image, boxes, txts, scores,
-                                    drop_score=config['drop_score'],
-                                    font_path=config['vis_font_path'])
+        draw_img = draw_ocr_box_txt(
+            image, boxes, txts, scores,
+            drop_score=config['drop_score'],
+            font_path=config['vis_font_path'])
         # display
         cv2.imshow('exec PaddleOCR', draw_img[:, :, ::-1])
         frame_shown = True
@@ -1262,47 +1286,59 @@ def main():
     config = get_default_config()
     config['det_limit_side_len'] = args.det_limit_side_len
     config['det_limit_type'] = args.det_limit_type
+
+    det_info = {
+        'db_res18': (WEIGHT_PATH_DET_CHN, 'DB'),
+        'r50_icdar15': (WEIGHT_PATH_DET_R50_ICDAR15, 'DB++'),
+        'r50_trtd': (WEIGHT_PATH_DET_R50_TDTR, 'DB++'),
+    }
+    weight_path_det, det_algorithm = det_info[det_model]
+    weight_path_cls = WEIGHT_PATH_CLS_CHN
+    weight_path_rec = dict_path_rec = None
+
     lang_tmp = args.language.lower()
-    if (lang_tmp == 'japanese') | (lang_tmp == 'jpn') | (lang_tmp == 'jp'):
-        if (args.case == 'mobile'):
-            config = set_config(config, WEIGHT_PATH_DET_CHN, WEIGHT_PATH_REC_JPN_MBL,
-                                        DICT_PATH_REC_JPN_MBL, WEIGHT_PATH_CLS_CHN)
-        elif (args.case == 'server'):
-            config = set_config(config, WEIGHT_PATH_DET_CHN, WEIGHT_PATH_REC_JPN_SVR,
-                                        DICT_PATH_REC_JPN_SVR, WEIGHT_PATH_CLS_CHN)
-    elif (lang_tmp == 'english') | (lang_tmp == 'eng') | (lang_tmp == 'en'):
-        if (args.case == 'mobile'):
-            config = set_config(config, WEIGHT_PATH_DET_CHN, WEIGHT_PATH_REC_ENG_MBL,
-                                        DICT_PATH_REC_ENG_MBL, WEIGHT_PATH_CLS_CHN)
-    elif (lang_tmp == 'chinese') | (lang_tmp == 'chi') | (lang_tmp == 'ch'):
-        if (args.case == 'mobile'):
-            config = set_config(config, WEIGHT_PATH_DET_CHN, WEIGHT_PATH_REC_CHN_MBL,
-                                        DICT_PATH_REC_CHN_MBL, WEIGHT_PATH_CLS_CHN)
-        elif (args.case == 'server'):
-            config = set_config(config, WEIGHT_PATH_DET_CHN, WEIGHT_PATH_REC_CHN_SVR,
-                                        DICT_PATH_REC_CHN_SVR, WEIGHT_PATH_CLS_CHN)
-    elif (lang_tmp == 'german') | (lang_tmp == 'ger') | (lang_tmp == 'ge'):
-        if (args.case == 'mobile'):
-            config = set_config(config, WEIGHT_PATH_DET_CHN, WEIGHT_PATH_REC_GER_MBL,
-                                        DICT_PATH_REC_GER_MBL, WEIGHT_PATH_CLS_CHN)
-    elif (lang_tmp == 'french') | (lang_tmp == 'fre') | (lang_tmp == 'fr'):
-        if (args.case == 'mobile'):
-            config = set_config(config, WEIGHT_PATH_DET_CHN, WEIGHT_PATH_REC_FRE_MBL,
-                                        DICT_PATH_REC_FRE_MBL, WEIGHT_PATH_CLS_CHN)
-    elif (lang_tmp == 'korean') | (lang_tmp == 'kor') | (lang_tmp == 'ko'):
-        if (args.case == 'mobile'):
-            config = set_config(config, WEIGHT_PATH_DET_CHN, WEIGHT_PATH_REC_KOR_MBL,
-                                        DICT_PATH_REC_KOR_MBL, WEIGHT_PATH_CLS_CHN)
+    if lang_tmp in ('japanese', 'jpn', 'jp'):
+        if args.case == 'mobile':
+            weight_path_rec = WEIGHT_PATH_REC_JPN_MBL
+            dict_path_rec = DICT_PATH_REC_JPN_MBL
+        elif args.case == 'server':
+            weight_path_rec = WEIGHT_PATH_REC_JPN_SVR
+            dict_path_rec = DICT_PATH_REC_JPN_SVR
+    elif lang_tmp in ('english', 'eng', 'en'):
+        if args.case == 'mobile':
+            weight_path_rec = WEIGHT_PATH_REC_ENG_MBL
+            dict_path_rec = DICT_PATH_REC_ENG_MBL
+    elif lang_tmp in ('chinese', 'chi', 'ch'):
+        if args.case == 'mobile':
+            weight_path_rec = WEIGHT_PATH_REC_CHN_MBL
+            dict_path_rec = DICT_PATH_REC_CHN_MBL
+        elif args.case == 'server':
+            weight_path_rec = WEIGHT_PATH_REC_CHN_SVR
+            dict_path_rec = DICT_PATH_REC_CHN_SVR
+    elif lang_tmp in ('german', 'ger', 'ge'):
+        weight_path_rec = WEIGHT_PATH_REC_GER_MBL
+        dict_path_rec = DICT_PATH_REC_GER_MBL
+    elif lang_tmp in ('french', 'fre', 'fr'):
+        weight_path_rec = WEIGHT_PATH_REC_FRE_MBL
+        dict_path_rec = DICT_PATH_REC_FRE_MBL
+    elif lang_tmp in ('korean', 'kor', 'ko'):
+        weight_path_rec = WEIGHT_PATH_REC_KOR_MBL
+        dict_path_rec = DICT_PATH_REC_KOR_MBL
+    else:
+        logger.error('Unknown language: %s' % args.language)
+        sys.exit(-1)
+
+    config = set_config(config,
+                        weight_path_det, det_algorithm,
+                        weight_path_rec, dict_path_rec,
+                        weight_path_cls)
 
     # model files check and download
-    weight_path_det = config['det_model_path']
-    model_path_det = config['det_model_path'] + '.prototxt'
+    model_path_det = weight_path_det + '.prototxt'
     check_and_download_models(weight_path_det, model_path_det, REMOTE_PATH)
-    weight_path_cls = config['cls_model_path']
-    model_path_cls = config['cls_model_path'] + '.prototxt'
+    model_path_cls = weight_path_cls + '.prototxt'
     check_and_download_models(weight_path_cls, model_path_cls, REMOTE_PATH)
-    weight_path_rec = config['rec_model_path']
-    model_path_rec = config['rec_model_path'] + '.prototxt'
+    model_path_rec = weight_path_rec + '.prototxt'
     check_and_download_models(weight_path_rec, model_path_rec, REMOTE_PATH)
 
     # build ocr class
