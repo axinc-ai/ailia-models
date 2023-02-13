@@ -237,8 +237,8 @@ def audio_recognition(net_converter, net_generator):
 
 def main():
     # model files check and download
-    #check_and_download_models(WEIGHT_PATH_CONVERTER, MODEL_PATH_CONVERTER, REMOTE_PATH)
-    #check_and_download_models(WEIGHT_PATH_GENERATOR, MODEL_PATH_GENERATOR, REMOTE_PATH)
+    check_and_download_models(WEIGHT_PATH_CONVERTER, MODEL_PATH_CONVERTER, REMOTE_PATH)
+    check_and_download_models(WEIGHT_PATH_GENERATOR, MODEL_PATH_GENERATOR, REMOTE_PATH)
 
     env_id = args.env_id
 

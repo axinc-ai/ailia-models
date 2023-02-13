@@ -13,6 +13,12 @@ Converted audio file (.wav file)
 
 
 ## Requirements
+This model requires pysptk for pre processing.
+
+```
+pip3 install pysptk
+```
+
 This model uses wavenet_vocoder as external model. If you use wavenet_vocoder as it is original, you have to install additional module as below and download `checkpoint_step001000000_ema.pth` from https://github.com/auspicious3000/autovc. See detail in https://github.com/r9y9/wavenet_vocoder.
 ```
 pip3 install torch==1.12.0
