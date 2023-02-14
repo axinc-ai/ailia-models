@@ -89,7 +89,7 @@ def preprocess(img, input_is_bgr=False):
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
     # normalize image
-    input_data = (img.astype(np.float) - MEAN)
+    input_data = (img.astype(float) - MEAN)
     input_data = input_data.transpose((2, 0, 1))
     input_data = input_data[np.newaxis, :, :, :]
     return input_data

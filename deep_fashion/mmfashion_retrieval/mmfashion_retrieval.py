@@ -2,8 +2,6 @@ import sys
 import time
 import os
 
-import onnx
-import onnxruntime
 import cv2
 import matplotlib.pyplot as plt
 from scipy.spatial.distance import cosine

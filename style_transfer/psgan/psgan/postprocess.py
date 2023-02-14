@@ -15,9 +15,9 @@ class PostProcess:
 
         height, width = source.shape[:2]
         small_source = cv2.resize(source, (self.img_size, self.img_size))
-        laplacian_diff = source.astype(np.float) - cv2.resize(
+        laplacian_diff = source.astype(float) - cv2.resize(
             small_source, (width, height)
-        ).astype(np.float)
+        ).astype(float)
         result = (
             (cv2.resize(result, (width, height)) + laplacian_diff)
             .round()

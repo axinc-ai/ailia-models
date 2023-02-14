@@ -106,7 +106,7 @@ def ious(atlbrs, btlbrs):
 
     :rtype ious np.ndarray
     """
-    ious = np.zeros((len(atlbrs), len(btlbrs)), dtype=np.float)
+    ious = np.zeros((len(atlbrs), len(btlbrs)), dtype=float)
     if ious.size == 0:
         return ious
 

@@ -9,7 +9,7 @@ If you want to use ailia from other languages(C++/C#(Unity)/JNI/Kotlin) see the 
 
 ## Install ailia SDK
 
-- [Download a free evaluation version of ailia SDK](https://ailia.jp/en/trial)
+- [Download a free evaluation version of ailia SDK](https://axinc.jp/en/trial/)
 - Unzip ailia SDK
 - Run the following command
 

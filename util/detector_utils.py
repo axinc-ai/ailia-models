@@ -77,8 +77,8 @@ def reverse_letterbox(detections, img, det_shape):
     if det_shape != None:
         scale = np.max((h / det_shape[0], w / det_shape[1]))
         start = (det_shape[0:2] - np.array(img.shape[0:2]) / scale) // 2
-        pad_x = start[1]*scale
-        pad_y = start[0]*scale
+        pad_x = start[1] * scale
+        pad_y = start[0] * scale
 
     new_detections = []
     for detection in detections:
@@ -86,17 +86,17 @@ def reverse_letterbox(detections, img, det_shape):
         r = ailia.DetectorObject(
             category=detection.category,
             prob=detection.prob,
-            x=(detection.x*(w+pad_x*2) - pad_x)/w,
-            y=(detection.y*(h+pad_y*2) - pad_y)/h,
-            w=(detection.w*(w+pad_x*2))/w,
-            h=(detection.h*(h+pad_y*2))/h,
+            x=(detection.x * (w + pad_x * 2) - pad_x) / w,
+            y=(detection.y * (h + pad_y * 2) - pad_y) / h,
+            w=(detection.w * (w + pad_x * 2)) / w,
+            h=(detection.h * (h + pad_y * 2)) / h,
         )
         new_detections.append(r)
 
     return new_detections
 
 
-def plot_results(detector, img, category, segm_masks=None, logging=True):
+def plot_results(detector, img, category=None, segm_masks=None, logging=True):
     """
     :param detector: ailia.Detector, or list of ailia.DetectorObject
     :param img: ndarray data of image
@@ -120,7 +120,9 @@ def plot_results(detector, img, category, segm_masks=None, logging=True):
         if logging:
             print(f'+ idx={idx}')
             print(
-                f'  category={obj.category}[ {category[obj.category]} ]'
+                f'  category={obj.category}[ {category[int(obj.category)]} ]'
+                if not isinstance(obj.category, str) and category is not None
+                else f'  category=[ {obj.category} ]'
             )
             print(f'  prob={obj.prob}')
             print(f'  x={obj.x}')
@@ -128,13 +130,16 @@ def plot_results(detector, img, category, segm_masks=None, logging=True):
             print(f'  w={obj.w}')
             print(f'  h={obj.h}')
 
-        color = hsv_to_rgb(256 * obj.category / (len(category) + 1), 255, 255)
+        if isinstance(obj.category, int) and category is not None:
+            color = hsv_to_rgb(256 * obj.category / (len(category) + 1), 255, 255)
+        else:
+            color = hsv_to_rgb(256 * idx / (len(detector) + 1), 255, 255)
         colors.append(color)
 
     # draw segmentation area
     if segm_masks:
         for idx in range(count):
-            mask = np.repeat(np.expand_dims(segm_masks[idx], 2), 3, 2).astype(np.bool)
+            mask = np.repeat(np.expand_dims(segm_masks[idx], 2), 3, 2).astype(bool)
             color = colors[idx][:3]
             fill = np.repeat(np.repeat([[color]], img.shape[0], 0), img.shape[1], 1)
             img[:, :, :3][mask] = img[:, :, :3][mask] * 0.7 + fill[mask] * 0.3
@@ -153,7 +158,10 @@ def plot_results(detector, img, category, segm_masks=None, logging=True):
         obj = detector.get_object(idx) if hasattr(detector, 'get_object') else detector[idx]
         fontScale = w / 2048
 
-        text = category[obj.category] + " " + str(int(obj.prob*100)/100)
+        text = category[int(obj.category)] \
+            if not isinstance(obj.category, str) and category is not None \
+            else obj.category
+        text = "{} {}".format(text, int(obj.prob * 100) / 100)
         textsize = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, fontScale, 1)[0]
         tw = textsize[0]
         th = textsize[1]
@@ -186,7 +194,7 @@ def plot_results(detector, img, category, segm_masks=None, logging=True):
         color = colors[idx]
         cv2.rectangle(img, top_left, bottom_right, color, thickness=-1)
 
-        text_color = (255,255,255,255)
+        text_color = (255, 255, 255, 255)
         cv2.putText(
             img,
             text,

@@ -41,7 +41,7 @@ def decode_image(
     #
     pixel_mask = pixel_scores >= pixel_conf_threshold
     link_mask = link_scores >= link_conf_threshold
-    done_mask = np.zeros(pixel_mask.shape, np.bool)
+    done_mask = np.zeros(pixel_mask.shape, bool)
     result_mask = np.zeros(pixel_mask.shape, np.int32)
     points = list(zip(*np.where(pixel_mask)))
     h, w = np.shape(pixel_mask)
