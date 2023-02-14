@@ -302,9 +302,9 @@ The collection of pre-trained, state-of-the-art AI models.
 
 ## NSFW detector
 
-| | Model | Reference | Exported From | Supported Ailia Version | Blog |
-|:-----------|------------:|:------------:|:------------:|:------------:|:------------:|
-| [<img src="nsfw_detector/clip-based-nsfw-detector/_vyr_6097Sexy-Push-Up-Bikini-Brasilianisch-Bunt-2.jpg" width=128px>](nsfw_detector/clip-based-nsfw-detector/) | [clip-based-nsfw-detector](/nsfw_detector/clip-based-nsfw-detector/) | [CLIP-based-NSFW-Detector](https://github.com/LAION-AI/CLIP-based-NSFW-Detector)| Keras | 1.2.10 and later ||
+| Model | Reference | Exported From | Supported Ailia Version | Blog |
+|------------:|:------------:|:------------:|:------------:|:------------:|
+| [clip-based-nsfw-detector](/nsfw_detector/clip-based-nsfw-detector/) | [CLIP-based-NSFW-Detector](https://github.com/LAION-AI/CLIP-based-NSFW-Detector)| Keras | 1.2.10 and later ||
 
 ## [Object detection](/object_detection/)
 
