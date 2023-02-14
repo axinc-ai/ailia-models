@@ -120,11 +120,9 @@ cd ../../image_classification/resnet18; python3 resnet18.py ${OPTION}
 cd ../../image_classification/mlp_mixer; python3 mlp_mixer.py ${OPTION}
 cd ../../image_classification/alexnet; python3 alexnet.py ${OPTION}
 cd ../../image_classification/clip; python3 clip.py ${OPTION}
-cd ../../image_classification/landmarks_classifier_asia; python3 landmarks_classifier_asia.py ${OPTION}
 cd ../../image_classification/weather-prediction-from-image; python3 weather-prediction-from-image.py ${OPTION}
 cd ../../image_classification/convnext; python3 convnext.py ${OPTION}
 cd ../../image_classification/swin-transformer; python3 swin_transformer.py ${OPTION}
-cd ../../image_classification/places365; python3 places365.py ${OPTION}
 cd ../../image_classification/mobileone; python3 mobileone.py ${OPTION}
 cd ../../image_inpainting/3d-photo-inpainting; python3 3d-photo-inpainting.py ${OPTION}
 cd ../../image_inpainting/inpainting_gmcnn; python3 inpainting_gmcnn.py ${OPTION}
@@ -159,6 +157,8 @@ cd ../../image_segmentation/paddleseg; python3 paddleseg.py ${OPTION}
 cd ../../image_segmentation/pp_liteseg; python3 pp_liteseg.py ${OPTION}
 cd ../../image_segmentation/suim; python3 suim.py ${OPTION}
 cd ../../image_segmentation/group_vit; python3 group_vit.py ${OPTION}
+cd ../../landmark_classification/landmarks_classifier_asia; python3 landmarks_classifier_asia.py ${OPTION}
+cd ../../landmark_classification/places365; python3 places365.py ${OPTION}
 cd ../../line_segment_detection/mlsd; python3 mlsd.py ${OPTION}
 cd ../../line_segment_detection/dexined; python3 dexined.py ${OPTION}
 cd ../../low_light_image_enhancement/agllnet; python3 agllnet.py ${OPTION}
