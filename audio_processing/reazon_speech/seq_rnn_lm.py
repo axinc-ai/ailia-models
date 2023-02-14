@@ -1,7 +1,7 @@
 import numpy as np
 from scipy.special import log_softmax
 
-onnx = True
+onnx = False
 
 
 class SequentialRNNLM(object):

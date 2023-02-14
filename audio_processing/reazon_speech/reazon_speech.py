@@ -17,6 +17,9 @@ from detector_utils import load_image  # noqa
 from webcamera_utils import get_capture, get_writer  # noqa
 
 from beam_search import BatchBeamSearch
+import transformer_decoder
+import seq_rnn_lm
+import ctc_prefix_score
 from transformer_decoder import TransformerDecoder
 from seq_rnn_lm import SequentialRNNLM
 from ctc_prefix_score import CTCPrefixScorer
@@ -223,6 +226,10 @@ def main():
         decoder = onnxruntime.InferenceSession(WEIGHT_DEC_PATH)
         lm_net = onnxruntime.InferenceSession(WEIGHT_LM_PATH)
         ctc = onnxruntime.InferenceSession(WEIGHT_CTC_PATH)
+        
+        transformer_decoder.onnx = True
+        seq_rnn_lm.onnx = True
+        ctc_prefix_score.onnx = True
 
     with open('config.yaml') as file:
         config = yaml.safe_load(file)

@@ -1,6 +1,6 @@
 import numpy as np
 
-onnx = True
+onnx = False
 
 
 def subsequent_mask(size):

@@ -1,7 +1,7 @@
 import numpy as np
 from scipy.special import logsumexp
 
-onnx = True
+onnx = False
 
 
 class CTCPrefixScore(object):
