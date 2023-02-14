@@ -2,10 +2,13 @@
 
 ## Input
 
-![Input](_vyr_6097Sexy-Push-Up-Bikini-Brasilianisch-Bunt-2.jpg)
+Please download `_vyr_6097Sexy-Push-Up-Bikini-Brasilianisch-Bunt-2.jpg` from below url.
 
-(Image
-from https://www.damenmode-quelle.de/fotky421/fotos/_vyr_6097Sexy-Push-Up-Bikini-Brasilianisch-Bunt-2.jpg)
+https://www.damenmode-quelle.de/fotky421/fotos/_vyr_6097Sexy-Push-Up-Bikini-Brasilianisch-Bunt-2.jpg
+
+This image is used in the official demo.
+
+https://colab.research.google.com/drive/19Acr4grlk5oQws7BHTqNIK-80XGw2u8Z?usp=sharing
 
 ## Output
 
