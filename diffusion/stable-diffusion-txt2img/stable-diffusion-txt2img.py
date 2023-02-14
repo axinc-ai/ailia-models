@@ -516,7 +516,7 @@ def main():
         logger.info("This model requires 10GB or more memory.")
         memory_mode = ailia.get_memory_mode(
             reduce_constant=True, ignore_input_with_initializer=True,
-            reduce_interstage=False, reuse_interstage=False)
+            reduce_interstage=False, reuse_interstage=True)
         diffusion_emb = ailia.Net \
             (MODEL_DFSN_EMB_PATH, WEIGHT_DFSN_EMB_PATH, env_id=env_id, memory_mode=memory_mode)
         diffusion_mid = ailia.Net(
