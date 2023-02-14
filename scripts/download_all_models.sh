@@ -242,7 +242,7 @@ cd ../../road_detection/ultra-fast-lane-detection; python3 ultra-fast-lane-detec
 cd ../../road_detection/yolop; python3 yolop.py ${OPTION}
 cd ../../road_detection/hybridnets; python3 hybridnets.py ${OPTION}
 cd ../../rotation_prediction/rotnet; python3 rotnet.py ${OPTION}
-cd ../../safety_checker/clip-based-nsfw-detector; python3 clip-based-nsfw-detector.py ${OPTION}
+cd ../../nsfw_detector/clip-based-nsfw-detector; python3 clip-based-nsfw-detector.py ${OPTION}
 cd ../../style_transfer/adain; python3 adain.py ${OPTION}
 cd ../../style_transfer/beauty_gan; python3 beauty_gan.py ${OPTION}
 cd ../../style_transfer/animeganv2; python3 animeganv2.py ${OPTION}

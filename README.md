@@ -293,6 +293,12 @@ The collection of pre-trained, state-of-the-art AI models.
 |:-----------|------------:|:------------:|:------------:|:------------:|:------------:|
 | [<img src="neural_rendering/nerf/output.png" width=128px>](neural_rendering/nerf/) | [nerf](/neural_rendering/nerf/) | [NeRF: Neural Radiance Fields](https://github.com/bmild/nerf) | Tensorflow | 1.2.10 and later | [EN](https://medium.com/axinc-ai/nerf-machine-learning-model-to-generate-and-render-3d-models-from-multiple-viewpoint-images-599631dc2075) [JP](https://medium.com/axinc/nerf-%E8%A4%87%E6%95%B0%E3%81%AE%E8%A6%96%E7%82%B9%E3%81%AE%E7%94%BB%E5%83%8F%E3%81%8B%E3%82%893d%E3%83%A2%E3%83%87%E3%83%AB%E3%82%92%E7%94%9F%E6%88%90%E3%81%97%E3%81%A6%E3%83%AC%E3%83%B3%E3%83%80%E3%83%AA%E3%83%B3%E3%82%B0%E3%81%99%E3%82%8B%E6%A9%9F%E6%A2%B0%E5%AD%A6%E7%BF%92%E3%83%A2%E3%83%87%E3%83%AB-2d6bee7ff22f) |
 
+## NSFW detector
+
+| | Model | Reference | Exported From | Supported Ailia Version | Blog |
+|:-----------|------------:|:------------:|:------------:|:------------:|:------------:|
+| [<img src="nsfw_detector/clip-based-nsfw-detector/_vyr_6097Sexy-Push-Up-Bikini-Brasilianisch-Bunt-2.jpg" width=128px>](nsfw_detector/clip-based-nsfw-detector/) | [clip-based-nsfw-detector](/nsfw_detector/clip-based-nsfw-detector/) | [CLIP-based-NSFW-Detector](https://github.com/LAION-AI/CLIP-based-NSFW-Detector)| Keras | 1.2.10 and later ||
+
 ## [Object detection](/object_detection/)
 
 | | Model | Reference | Exported From | Supported Ailia Version | Blog |
@@ -408,12 +414,6 @@ The collection of pre-trained, state-of-the-art AI models.
 | | Model | Reference | Exported From | Supported Ailia Version | Blog |
 |:-----------|------------:|:------------:|:------------:|:------------:|:------------:|
 | [<img src="rotation_prediction/rotnet/output.png" width=256px>](rotation_prediction/rotnet/) |[rotnet](/rotation_prediction/rotnet) | [CNNs for predicting the rotation angle of an image to correct its orientation](https://github.com/d4nst/RotNet) | Keras | 1.2.1 and later |
-
-## Safety checker
-
-| | Model | Reference | Exported From | Supported Ailia Version | Blog |
-|:-----------|------------:|:------------:|:------------:|:------------:|:------------:|
-| [<img src="safety_checker/clip-based-nsfw-detector/_vyr_6097Sexy-Push-Up-Bikini-Brasilianisch-Bunt-2.jpg" width=128px>](safety_checker/clip-based-nsfw-detector/) | [clip-based-nsfw-detector](/safety_checker/clip-based-nsfw-detector/) | [CLIP-based-NSFW-Detector](https://github.com/LAION-AI/CLIP-based-NSFW-Detector)| Keras | 1.2.10 and later ||
 
 ## Style transfer
 
