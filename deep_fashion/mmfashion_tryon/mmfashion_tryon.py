@@ -462,7 +462,10 @@ def recognize_from_video(GMM_net, TOM_net, det_net, pose_net, seg_net):
         writer = None
 
     # prepare cloth image
-    image_path = args_input
+    if type(args_input) == list:
+        image_path = args_input[0]
+    else:
+        image_path = args_input
     img = load_image(image_path)
     img = cv2.cvtColor(img, cv2.COLOR_BGRA2RGB)
     img = cv2.resize(

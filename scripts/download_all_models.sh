@@ -43,6 +43,7 @@ cd ../../deep_fashion/fashionai-key-points-detection; python3 fashionai-key-poin
 cd ../../deep_fashion/mmfashion; python3 mmfashion.py ${OPTION}
 cd ../../deep_fashion/mmfashion_tryon; python3 mmfashion_tryon.py ${OPTION}
 cd ../../deep_fashion/mmfashion_retrieval; python3 mmfashion_retrieval.py ${OPTION}
+cd ../../deep_fashion/person-attributes-recognition-crossroad; python3 person-attributes-recognition-crossroad.py ${OPTION}
 cd ../../depth_estimation/midas; python3 midas.py ${OPTION}
 cd ../../depth_estimation/monodepth2; python3 monodepth2.py ${OPTION}
 cd ../../depth_estimation/fcrn-depthprediction; python3 fcrn-depthprediction.py ${OPTION}
@@ -60,6 +61,7 @@ cd ../../face_detection/yolov3-face; python3 yolov3-face.py ${OPTION}
 cd ../../face_detection/retinaface; python3 retinaface.py ${OPTION}
 cd ../../face_detection/anime-face-detector; python3 anime-face-detector.py ${OPTION}
 cd ../../face_detection/face-detection-adas; python3 face-detection-adas.py ${OPTION}
+cd ../../face_detection/mtcnn; python3 mtcnn.py ${OPTION}
 cd ../../face_identification/arcface; python3 arcface.py ${OPTION}
 cd ../../face_identification/insightface; python3 insightface.py ${OPTION}
 cd ../../face_identification/vggface2; python3 vggface2.py ${OPTION}
@@ -187,6 +189,7 @@ cd ../../object_detection/yolov6; python3 yolov6.py ${OPTION}
 cd ../../object_detection/yolov7; python3 yolov7.py ${OPTION}
 cd ../../object_detection/yolox; python3 yolox.py ${OPTION}
 cd ../../object_detection/yolox-ti-lite; python3 yolox-ti-lite.py ${OPTION}
+cd ../../object_detection/yolov; python3 yolov.py ${OPTION}
 cd ../../object_detection/pedestrian_detection; python3 pedestrian_detection.py ${OPTION}
 cd ../../object_detection/efficientdet; python3 efficientdet.py ${OPTION}
 cd ../../object_detection/nanodet; python3 nanodet.py ${OPTION}
