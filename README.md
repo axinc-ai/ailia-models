@@ -61,6 +61,7 @@ The collection of pre-trained, state-of-the-art AI models.
 | [<img src="background_removal/rembg/output.png" width=128px>](background_removal/rembg/) | [rembg](/background_removal/rembg/) | [Rembg](https://github.com/danielgatis/rembg) | Pytorch | 1.2.4 and later |
 | [<img src="background_removal/dis_seg/output.jpg" width=128px>](background_removal/dis_seg/) | [dis_seg](/background_removal/dis_seg/) | [Highly Accurate Dichotomous Image Segmentation](https://github.com/xuebinqin/DIS) | Pytorch | 1.2.10 and later |
 | [<img src="background_removal/gfm/output.png" width=128px>](background_removal/gfm/) | [gfm](/background_removal/gfm/) | [Bridging Composite and Real: Towards End-to-end Deep Image Matting](https://github.com/JizhiziLi/GFM) | Pytorch | 1.2.10 and later |
+| [<img src="background_removal/anime-segmentation/output.png" width=128px>](background_removal/anime-segmentation/) | [anime-segmentation](/background_removal/anime-segmentation/) | [Anime Segmentation](https://github.com/SkyTNT/anime-segmentation) | Pytorch | 1.2.10 and later |
 
 ## Crowd counting
 
