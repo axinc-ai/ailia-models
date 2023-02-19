@@ -318,7 +318,7 @@ def get_audio_features(enc_net, mel):
             global WEIGHT_ENC_PATH, MODEL_ENC_PATH, SAVE_ENC_SHAPE
             shape = (mel.shape)
             if SAVE_ENC_SHAPE != shape:
-                enc_net = ailia.Net(MODEL_ENC_PATH, WEIGHT_ENC_PATH, env_id=args.env_id, memory_mode=memory_mode)
+                enc_net = ailia.Net(MODEL_ENC_PATH, WEIGHT_ENC_PATH, env_id=args.env_id, memory_mode=args.memory_mode)
             SAVE_ENC_SHAPE = shape
         output = enc_net.predict([mel])
     else:
@@ -370,7 +370,7 @@ def inference_logits(dec_net, tokens, audio_features, kv_cache=None, initial_tok
 
             shape = (tokens.shape, audio_features.shape, kv_cache.shape)
             if SAVE_DEC_SHAPE != shape:
-                dec_net = ailia.Net(MODEL_DEC_PATH, WEIGHT_DEC_PATH, env_id=args.env_id, memory_mode=memory_mode)
+                dec_net = ailia.Net(MODEL_DEC_PATH, WEIGHT_DEC_PATH, env_id=args.env_id, memory_mode=args.memory_mode)
             SAVE_DEC_SHAPE = shape
 
             output = dec_net.predict([tokens, audio_features, kv_cache, offset])
