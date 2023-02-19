@@ -134,6 +134,11 @@ parser.add_argument(
     action='store_true',
     help='use normal model (default : opt model).'
 )
+parser.add_argument(
+    '--task', default='transcribe',
+    choices=('transcribe', 'translate'),
+    help='task type'
+)
 args = update_parser(parser)
 
 if args.ailia_audio:
@@ -420,7 +425,7 @@ def decode(enc_net, dec_net, mel, options):
         mel = mel.unsqueeze(0)
 
     language = options.get("language") or "en"
-    tokenizer = get_tokenizer(is_multilingual(), language=language, task='transcribe')
+    tokenizer = get_tokenizer(is_multilingual(), language=language, task=args.task)
 
     n_group = options.get("beam_size") or options.get("best_of") or 1
     n_ctx = dims.n_text_ctx
@@ -600,7 +605,7 @@ def predict(wav, enc_net, dec_net, immediate=False, microphone=False):
         temperature = [temperature]
 
     decode_options = {
-        'task': 'transcribe', 'language': language,
+        'task': args.task, 'language': language,
         'temperature': temperature, 'best_of': args.best_of,
         'beam_size': args.beam_size, 'patience': args.patience,
         'length_penalty': args.length_penalty, 'suppress_tokens': args.suppress_tokens,
@@ -617,7 +622,7 @@ def predict(wav, enc_net, dec_net, immediate=False, microphone=False):
         logger.info(f"Detected language: {LANGUAGES[decode_options['language']].title()}")
 
     mel = np.expand_dims(mel, axis=0)
-    task = decode_options.get("task", "transcribe")
+    task = decode_options.get("task", args.task)
     tokenizer = get_tokenizer(is_multilingual(), language=language, task=task)
 
     seek = 0
