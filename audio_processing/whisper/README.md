@@ -48,7 +48,7 @@ $ python3 whisper.py --model_type small
 By giving the `--task translate` option, you can translate it into English.
 
 ```bash
-$ python3 whisper.py --translate
+$ python3 whisper.py --task translate
 ```
 
 If you specify the `-V` option, it will be in input mode from the microphone.
