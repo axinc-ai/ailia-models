@@ -1,7 +1,5 @@
-import os
 import sys
 import time
-import math
 
 import cv2
 import numpy as np
@@ -14,7 +12,8 @@ from utils import get_base_parser, update_parser, get_savepath  # noqa
 from model_utils import check_and_download_models  # noqa
 from image_utils import normalize_image  # noqa
 from detector_utils import plot_results, write_predictions, load_image  # noqa
-import webcamera_utils  # noqa
+from nms_utils import batched_nms
+from webcamera_utils import get_capture, get_writer  # noqa
 
 # logger
 from logging import getLogger  # noqa
@@ -47,9 +46,10 @@ COCO_CATEGORY = [
     "oven", "toaster", "sink", "refrigerator", "book", "clock", "vase",
     "scissors", "teddy bear", "hair drier", "toothbrush"
 ]
-THRESHOLD = 0.4
-IOU = 0.45
-DETECTION_SIZE = 416
+
+THRESHOLD = 0.25
+IOU = 0.7
+DETECTION_SIZE = 640
 
 # ======================
 # Arguemnt Parser Config
@@ -59,12 +59,12 @@ parser = get_base_parser('Ultralytics YOLOv8', IMAGE_PATH, SAVE_IMAGE_PATH)
 parser.add_argument(
     '-th', '--threshold',
     default=THRESHOLD, type=float,
-    help='The detection threshold for yolo. (default: ' + str(THRESHOLD) + ')'
+    help='The detection threshold for yolo.'
 )
 parser.add_argument(
     '-iou', '--iou',
     default=IOU, type=float,
-    help='The detection iou for yolo. (default: ' + str(IOU) + ')'
+    help='The detection iou for yolo.'
 )
 parser.add_argument(
     '-w', '--write_prediction',
@@ -72,14 +72,9 @@ parser.add_argument(
     help='Flag to output the prediction file.'
 )
 parser.add_argument(
-    '-dw', '--detection_width',
+    '-ds', '--detection_size',
     default=DETECTION_SIZE, type=int,
-    help='The detection width and height for yolo. (default: 416)'
-)
-parser.add_argument(
-    '-dh', '--detection_height',
-    default=DETECTION_SIZE, type=int,
-    help='The detection height and height for yolo. (default: 416)'
+    help='The detection width and height for yolo.'
 )
 parser.add_argument(
     '--onnx',
@@ -90,20 +85,59 @@ args = update_parser(parser)
 
 
 # ======================
+# Secondaty Functions
+# ======================
+
+def xywh2xyxy(x):
+    y = np.copy(x)
+    y[..., 0] = x[..., 0] - x[..., 2] / 2  # top left x
+    y[..., 1] = x[..., 1] - x[..., 3] / 2  # top left y
+    y[..., 2] = x[..., 0] + x[..., 2] / 2  # bottom right x
+    y[..., 3] = x[..., 1] + x[..., 3] / 2  # bottom right y
+
+    return y
+
+
+def scale_boxes(img1_shape, boxes, img0_shape):
+    """
+    Rescales bounding boxes (in the format of xyxy) from the shape of the image they were originally specified in
+    (img1_shape) to the shape of a different image (img0_shape).
+
+    Args:
+      img1_shape (tuple): The shape of the image that the bounding boxes are for, in the format of (height, width).
+      boxes (numpy.ndarray): the bounding boxes of the objects in the image, in the format of (x1, y1, x2, y2)
+      img0_shape (tuple): the shape of the target image, in the format of (height, width).
+    Returns:
+      boxes (numpy.ndarray): The scaled bounding boxes, in the format of (x1, y1, x2, y2)
+    """
+    gain = min(img1_shape[0] / img0_shape[0], img1_shape[1] / img0_shape[1])  # gain  = old / new
+    pad = (img1_shape[1] - img0_shape[1] * gain) / 2, (img1_shape[0] - img0_shape[0] * gain) / 2  # wh padding
+
+    boxes[..., [0, 2]] -= pad[0]  # x padding
+    boxes[..., [1, 3]] -= pad[1]  # y padding
+    boxes[..., :4] /= gain
+
+    boxes[..., [0, 2]] = boxes[..., [0, 2]].clip(0, img0_shape[1])  # x1, x2
+    boxes[..., [1, 3]] = boxes[..., [1, 3]].clip(0, img0_shape[0])  # y1, y2
+
+    return boxes
+
+
+# ======================
 # Main functions
 # ======================
 
 def preprocess(img):
     im_h, im_w, _ = img.shape
+    size = args.detection_size
 
-    size = 640
     r = min(size / im_h, size / im_w)
     oh, ow = int(round(im_h * r)), int(round(im_w * r))
     if ow != im_w or oh != im_h:
         img = cv2.resize(img, (ow, oh), interpolation=cv2.INTER_LINEAR)
 
     dh, dw = size - oh, size - ow
-    if 0 and True:
+    if True:
         stride = 32
         dw, dh = np.mod(dw, stride), np.mod(dh, stride)  # wh padding
     # divide padding into 2 sides
@@ -125,15 +159,74 @@ def preprocess(img):
     return img
 
 
-def post_processing(preds):
-    conf_thres = 0.25
+def post_processing(preds, img, orig_shape):
+    conf_thres = args.threshold
+    iou_thres = args.iou
+
     xc = np.max(preds[:, 4:], axis=1) > conf_thres
 
+    none_out = np.zeros((0, 6))
+
     x = preds[0].T[xc[0]]  # confidence
+    if not x.shape[0]:
+        return none_out
+
+    box, cls = np.split(x, [4], axis=1)
+    box = xywh2xyxy(box)  # center_x, center_y, width, height) to (x1, y1, x2, y2)
+
+    j = np.argmax(cls, axis=1)
+    conf = cls[np.arange(len(cls)), j]
+
+    x = np.concatenate((box, conf.reshape(-1, 1), j.reshape(-1, 1)), axis=1)
+
+    # Check shape
+    n = x.shape[0]  # number of boxes
+    if not n:  # no boxes
+        return none_out
+
+    # sort by confidence and remove excess boxes
+    max_nms = 30000
+    x = x[np.argsort(-x[:, 4])[:max_nms]]
+
+    c = x[:, 5]
+    boxes, scores = x[:, :4], x[:, 4]  # boxes, scores
+
+    # Batched NMS
+    i = batched_nms(boxes, scores, c, iou_thres)
+
+    max_det = 300
+    i = i[:max_det]  # limit detections
+    preds = x[i]
+
+    preds[:, :4] = np.round(scale_boxes(img.shape[2:], preds[:, :4], orig_shape))
+
+    return preds
+
+
+def convert_to_detector_object(preds, im_w, im_h):
+    detector_object = []
+    for i in range(len(preds)):
+        (x1, y1, x2, y2) = preds[i, :4]
+        score = float(preds[i, 4])
+        cls = int(preds[i, 5])
+
+        r = ailia.DetectorObject(
+            category=COCO_CATEGORY[cls],
+            prob=score,
+            x=x1 / im_w,
+            y=y1 / im_h,
+            w=(x2 - x1) / im_w,
+            h=(y2 - y1) / im_h,
+        )
+        detector_object.append(r)
+
+    return detector_object
 
 
 def predict(net, img):
     img = img[:, :, ::-1]  # BGR -> RGB
+    orig_shape = img.shape
+
     img = preprocess(img)
 
     # feedforward
@@ -143,7 +236,7 @@ def predict(net, img):
         output = net.run(None, {'images': img})
     preds = output[0]
 
-    pred = post_processing(preds)
+    preds = post_processing(preds, img, orig_shape)
 
     return preds
 
@@ -164,25 +257,27 @@ def recognize_from_image(net):
             total_time = 0
             for i in range(args.benchmark_count):
                 start = int(round(time.time() * 1000))
-                predict(net, img)
+                preds = predict(net, img)
                 end = int(round(time.time() * 1000))
                 if i != 0:
                     total_time = total_time + (end - start)
                 logger.info(f'\tailia processing time {end - start} ms')
             logger.info(f'\taverage time {total_time / (args.benchmark_count - 1)} ms')
         else:
-            predict(net, img)
+            preds = predict(net, img)
 
-        # # plot result
-        # res_img = plot_results(detector, img, COCO_CATEGORY)
-        # savepath = get_savepath(args.savepath, image_path)
-        # logger.info(f'saved at : {savepath}')
-        # cv2.imwrite(savepath, res_img)
-        #
-        # # write prediction
-        # if args.write_prediction:
-        #     pred_file = '%s.txt' % savepath.rsplit('.', 1)[0]
-        #     write_predictions(pred_file, detector, img, COCO_CATEGORY)
+        # plot result
+        detect_object = convert_to_detector_object(preds, img.shape[1], img.shape[0])
+        res_img = plot_results(detect_object, img)
+
+        savepath = get_savepath(args.savepath, image_path, ext='.png')
+        logger.info(f'saved at : {savepath}')
+        cv2.imwrite(savepath, res_img)
+
+        # write prediction
+        if args.write_prediction:
+            pred_file = '%s.txt' % savepath.rsplit('.', 1)[0]
+            write_predictions(pred_file, detect_object, img, COCO_CATEGORY)
 
     logger.info('Script finished successfully.')
 
@@ -209,10 +304,11 @@ def recognize_from_video(net):
             break
 
         # inference
-        out = predict(net, frame)
+        preds = predict(net, frame)
 
-        # # plot result
-        # res_img = draw_bbox(frame, out)
+        # plot result
+        detect_object = convert_to_detector_object(preds, frame.shape[1], frame.shape[0])
+        res_img = plot_results(detect_object, frame)
 
         # show
         cv2.imshow('frame', res_img)
@@ -243,7 +339,7 @@ def main():
         net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
     else:
         import onnxruntime
-        cuda = True
+        cuda = 0 < ailia.get_gpu_environment_id()
         providers = ['CUDAExecutionProvider', 'CPUExecutionProvider'] if cuda else ['CPUExecutionProvider']
         net = onnxruntime.InferenceSession(WEIGHT_PATH, providers=providers)
 
