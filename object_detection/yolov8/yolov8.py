@@ -26,6 +26,14 @@ logger = getLogger(__name__)
 
 WEIGHT_YOLOV8N_PATH = 'yolov8n.onnx'
 MODEL_YOLOV8N_PATH = 'yolov8n.onnx.prototxt'
+WEIGHT_YOLOV8S_PATH = 'yolov8s.onnx'
+MODEL_YOLOV8S_PATH = 'yolov8s.onnx.prototxt'
+WEIGHT_YOLOV8M_PATH = 'yolov8m.onnx'
+MODEL_YOLOV8M_PATH = 'yolov8m.onnx.prototxt'
+WEIGHT_YOLOV8L_PATH = 'yolov8l.onnx'
+MODEL_YOLOV8L_PATH = 'yolov8l.onnx.prototxt'
+WEIGHT_YOLOV8X_PATH = 'yolov8x.onnx'
+MODEL_YOLOV8X_PATH = 'yolov8x.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/yolov8/'
 
 IMAGE_PATH = 'demo.jpg'
@@ -75,6 +83,11 @@ parser.add_argument(
     '-ds', '--detection_size',
     default=DETECTION_SIZE, type=int,
     help='The detection width and height for yolo.'
+)
+parser.add_argument(
+    '-m', '--model_type', default='v8n',
+    choices=('v8n', 'v8s', 'v8m', 'v8l', 'v8x'),
+    help='model type'
 )
 parser.add_argument(
     '--onnx',
@@ -328,8 +341,14 @@ def recognize_from_video(net):
 
 
 def main():
-    WEIGHT_PATH = WEIGHT_YOLOV8N_PATH
-    MODEL_PATH = MODEL_YOLOV8N_PATH
+    dic_model = {
+        'v8n': (WEIGHT_YOLOV8N_PATH, MODEL_YOLOV8N_PATH),
+        'v8s': (WEIGHT_YOLOV8S_PATH, MODEL_YOLOV8S_PATH),
+        'v8m': (WEIGHT_YOLOV8M_PATH, MODEL_YOLOV8M_PATH),
+        'v8l': (WEIGHT_YOLOV8L_PATH, MODEL_YOLOV8L_PATH),
+        'v8x': (WEIGHT_YOLOV8X_PATH, MODEL_YOLOV8X_PATH),
+    }
+    WEIGHT_PATH, MODEL_PATH = dic_model[args.model_type]
 
     # model files check and download
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
