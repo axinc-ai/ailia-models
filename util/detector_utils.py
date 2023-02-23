@@ -137,9 +137,9 @@ def plot_results(detector, img, category=None, segm_masks=None, logging=True):
         colors.append(color)
 
     # draw segmentation area
-    if segm_masks:
+    if segm_masks is not None and 0 < len(segm_masks):
         for idx in range(count):
-            mask = np.repeat(np.expand_dims(segm_masks[idx], 2), 3, 2).astype(bool)
+            mask = np.repeat(np.expand_dims(segm_masks[idx], 2), 3, axis=2).astype(bool)
             color = colors[idx][:3]
             fill = np.repeat(np.repeat([[color]], img.shape[0], 0), img.shape[1], 1)
             img[:, :, :3][mask] = img[:, :, :3][mask] * 0.7 + fill[mask] * 0.3
