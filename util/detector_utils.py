@@ -215,7 +215,10 @@ def write_predictions(file_name, detector, img=None, category=None):
     with open(file_name, 'w') as f:
         for idx in range(count):
             obj = detector.get_object(idx) if hasattr(detector, 'get_object') else detector[idx]
-            label = category[obj.category] if category else obj.category
+            label = category[int(obj.category)] \
+                if not isinstance(obj.category, str) and category is not None \
+                else obj.category
+
             f.write('%s %f %d %d %d %d\n' % (
                 label.replace(' ', '_'),
                 obj.prob,
