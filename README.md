@@ -259,6 +259,7 @@ The collection of pre-trained, state-of-the-art AI models.
 | [<img src="image_segmentation/pp_liteseg/output.png" width=128px>](image_segmentation/pp_liteseg/) | [pp_liteseg](/image_segmentation/pp_liteseg/) | [PP-LiteSeg](https://github.com/PaddlePaddle/PaddleSeg/tree/develop/configs/pp_liteseg) | Pytorch | 1.2.10 and later |  |
 | [<img src="image_segmentation/suim/output.jpg" width=128px>](image_segmentation/suim/) | [suim](/image_segmentation/suim/) | [SUIM](https://github.com/IRVLab/SUIM) | Keras | 1.2.6 and later |  |
 | [<img src="image_segmentation/group_vit/output.png" width=128px>](image_segmentation/group_vit/) | [group_vit](/image_segmentation/group_vit/) | [GroupViT](https://github.com/NVlabs/GroupViT) | Pytorch | 1.2.10 and later |  |
+| [<img src="image_segmentation/yolov8-seg/output.png" width=128px>](image_segmentation/yolov8-seg/) | [yolov8-seg](/image_segmentation/yolov8-seg/) | [YOLOv8](https://github.com/ultralytics/ultralytics) | Pytorch | 1.2.10 and later |  |
 
 ## Landmark classification
 
