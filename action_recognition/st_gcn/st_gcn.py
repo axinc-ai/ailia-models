@@ -154,6 +154,8 @@ def recognize_offline(input, pose, net):
         ret, frame = capture.read()
         if frame is None:
             break
+        if video_length <= frame_index:
+            break
 
         source_H, source_W, _ = frame.shape
         img = cv2.resize(
@@ -177,8 +179,6 @@ def recognize_offline(input, pose, net):
             img = cv2.cvtColor(img, cv2.COLOR_BGR2BGRA)
             pose.compute(img)
             count = pose.get_object_count()
-            if count == 0:
-                continue
 
             pose_keypoints = np.zeros((count, 18, 3))
             # pose_keypoints.shape : (num_person, num_joint, 3)
