@@ -4,7 +4,7 @@
 
 ![Input](input.jpg)
 
-This image is a part of input.mp4 and input.mp4 is available in [ISSIA-CNR Soccer dataset](https://drive.google.com/file/d/1Pj6syLRShNQWQaunJmAZttUw2jDh8L_f/view)
+This image is a part of input.mp4 and input.mp4 was created from the video in [ISSIA-CNR Soccer dataset](https://drive.google.com/file/d/1Pj6syLRShNQWQaunJmAZttUw2jDh8L_f/view)
 
 ## Output
 
@@ -39,6 +39,16 @@ If you pass `0` as an argument to VIDEO_PATH, you can use the webcam input inste
 
 ```bash
 $ python3 footandball.py --video VIDEO_PATH
+```
+
+You can customize detection threshold settings by adding `--player_threshold` and `--ball_threshold` options. The default threshold is 0.7 in both.
+
+```bash
+$ python3 footandball.py --player_threshold PLAYER_THRESHOLD
+```
+
+```bash
+$ python3 footandball.py --ball_threshold BALL_THRESHOLD
 ```
 
 ## Reference
