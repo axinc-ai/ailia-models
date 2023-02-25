@@ -10,17 +10,8 @@ import torch.nn.functional as F
 import torchvision.transforms as transforms
 
 
-# Size of the ball bbox in pixels (fixed as we detect only ball center)
-BALL_BBOX_SIZE = 40
-
-
-player_threshold = 0.7 #TODO:
-ball_threshold = 0.7 #TODO:
-
-
 PLAYER_LABEL = 2
 BALL_LABEL = 1
-
 
 NORMALIZATION_MEAN = [0.485, 0.456, 0.406]
 NORMALIZATION_STD = [0.229, 0.224, 0.225]
@@ -139,26 +130,39 @@ def numpy2tensor(image):
     return image2tensor(pil_image)
 
 
-def detect_from_map(confidence_map, downscale_factor, max_detections, bbox_map=None):
+def detect_from_map(confidence_map, downscale_factor, max_detections, bbox_map=None, ball_bbox_size=40):
+    # Size of the ball bbox in pixels (fixed as we detect only ball center)
+    BALL_BBOX_SIZE = ball_bbox_size
+
     # downscale_factor: downscaling factor of the confidence map versus an original image
 
     # Confidence map is [B, C=2, H, W] tensor, where C=0 is background and C=1 is an object
     confidence_map = nms(confidence_map)[:, 1]
     # confidence_map is (B, H, W) tensor
     batch_size, h, w = confidence_map.shape[0], confidence_map.shape[1], confidence_map.shape[2]
-    confidence_map = torch.from_numpy(confidence_map)
-    confidence_map = confidence_map.view(batch_size, -1)
+    confidence_map = np.reshape(confidence_map, [batch_size, -1])
 
-    values, indices = torch.sort(confidence_map, dim=-1, descending=True)
-    if max_detections < indices.size(1):
+    values = np.sort(confidence_map, axis=-1)
+    values = values.squeeze()
+    values = values[::-1]
+    values = values[np.newaxis, :]
+    values = values.copy()
+    indices = np.argsort(confidence_map)
+    indices = indices.squeeze()
+    indices = indices[::-1]
+    indices = indices[np.newaxis, :]
+    indices = indices.copy()
+
+    if max_detections < indices.shape[1]:
         indices = indices[:, :max_detections]
 
     # Compute indexes of cells with detected object and convert to pixel coordinates
     xc = indices % w
-    xc = xc.float() * downscale_factor + (downscale_factor - 1.) / 2.
+    xc = xc.astype(np.float32) * downscale_factor + (downscale_factor - 1.) / 2.
 
-    yc = torch.div(indices, w, rounding_mode='trunc')
-    yc = yc.float() * downscale_factor + (downscale_factor - 1.) / 2.
+    yc = np.divide(indices, w)
+    yc = yc.astype(np.int64)
+    yc = yc.astype(np.float32) * downscale_factor + (downscale_factor - 1.) / 2.
 
     # Bounding boxes are encoded as a relative position of the centre (with respect to the cell centre)
     # and it's width and height in normalized coordinates (where 1 is the width/height of the player
@@ -168,8 +172,7 @@ def detect_from_map(confidence_map, downscale_factor, max_detections, bbox_map=N
 
     if bbox_map is not None:
         # bbox_map is (B, C=4, H, W) tensor
-        bbox_map = torch.from_numpy(bbox_map)
-        bbox_map = bbox_map.view(batch_size, 4, -1)
+        bbox_map = np.reshape(bbox_map, [batch_size, 4, -1])
         # bbox_map is (B, C=4, H*W) tensor
         # Convert from relative to absolute (in pixel) values
         bbox_map[:, 0] *= w * downscale_factor
@@ -178,16 +181,17 @@ def detect_from_map(confidence_map, downscale_factor, max_detections, bbox_map=N
         bbox_map[:, 3] *= h * downscale_factor
     else:
         # For the ball bbox map is not given. Create fixed-size bboxes
-        batch_size, h, w = confidence_map.size(0), confidence_map.size(-2), confidence_map.size(-1)
-        bbox_map = torch.zeros((batch_size, 4, h * w), dtype=torch.float).to(confidence_map.device)
+        batch_size, h, w = confidence_map.shape[0], confidence_map.shape[-2], confidence_map.shape[-1]
+        bbox_map = np.zeros((batch_size, 4, h * w)).astype(np.float32)
         bbox_map[:, [2, 3]] = BALL_BBOX_SIZE
 
     # Resultant detections (batch_size, max_detections, bbox),
     # where bbox = (x1, y1, x2, y2, confidence) in pixel coordinates
-    detections = torch.zeros((batch_size, max_detections, 5), dtype=float).to(confidence_map.device)
+    detections = np.zeros((batch_size, max_detections, 5)).astype(np.float32)
 
     for n in range(batch_size):
         temp = bbox_map[n, :, indices[n]]
+        temp = temp.T
         # temp is (4, n_detections) tensor, with bbox details in pixel units (dx, dy, w, h)
         # where dx, dy is a displacement of the box center relative to the cell center
 
@@ -201,10 +205,11 @@ def detect_from_map(confidence_map, downscale_factor, max_detections, bbox_map=N
         detections[n, :, 3] = by + 0.5 * temp[3]  # y2
         detections[n, :, 4] = values[n, :max_detections]
 
-    return detections, values
+    return detections
 
 
-def detect(player_feature_map, player_bbox, ball_feature_map):
+def detect(player_feature_map, player_bbox, ball_feature_map, 
+           player_threshold=0.7, ball_threshold=0.7, ball_bbox_size=40):
     # Downsampling factor for ball and player feature maps
     ball_downsampling_factor = 4
     player_downsampling_factor = 16
@@ -212,13 +217,14 @@ def detect(player_feature_map, player_bbox, ball_feature_map):
     max_player_detections = 100
     max_ball_detections = 100
 
-
     # downscale_factor: downscaling factor of the confidence map versus an original image
-    player_detections, player_values = detect_from_map(player_feature_map, player_downsampling_factor,
-                                                max_player_detections, player_bbox)
+    player_detections = detect_from_map(player_feature_map, player_downsampling_factor,
+                                                max_player_detections, 
+                                                player_bbox)
 
-    ball_detections, ball_values = detect_from_map(ball_feature_map, ball_downsampling_factor,
-                                            max_ball_detections)
+    ball_detections = detect_from_map(ball_feature_map, ball_downsampling_factor,
+                                            max_ball_detections,
+                                            ball_bbox_size=ball_bbox_size)
 
     # Iterate over batch elements and prepare a list with detection results
     output = []
@@ -232,17 +238,17 @@ def detect(player_feature_map, player_bbox, ball_feature_map):
     player_det = player_det[player_det[..., 4] >= player_threshold]
     player_boxes = player_det[..., 0:4]
     player_scores = player_det[..., 4]
-    player_labels = torch.tensor([PLAYER_LABEL], dtype=torch.int64)
-    player_labels = player_labels.repeat(player_det.size(0))
+    player_labels = np.array([PLAYER_LABEL])
+    player_labels = np.tile(player_labels, player_det.shape[0])
     ball_det = ball_det[ball_det[..., 4] >= ball_threshold]
     ball_boxes = ball_det[..., 0:4]
     ball_scores = ball_det[..., 4]
-    ball_labels = torch.tensor([BALL_LABEL], dtype=torch.int64)
-    ball_labels = ball_labels.repeat(ball_det.size(0))
+    ball_labels = np.array([BALL_LABEL])
+    ball_labels = np.tile(ball_labels, ball_labels.shape[0])
 
-    boxes = torch.cat([player_boxes, ball_boxes], dim=0)
-    scores = torch.cat([player_scores, ball_scores], dim=0)
-    labels = torch.cat([player_labels, ball_labels], dim=0)
+    boxes = np.concatenate([player_boxes, ball_boxes], axis=0)
+    scores = np.concatenate([player_scores, ball_scores], axis=0)
+    labels = np.concatenate([player_labels, ball_labels], axis=0)
 
     temp = {'boxes': boxes, 'labels': labels, 'scores': scores}
     output.append(temp)
