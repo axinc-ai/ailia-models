@@ -10,17 +10,15 @@ import ailia
 sys.path.append('../../util')
 from utils import get_base_parser, update_parser, get_savepath
 from model_utils import check_and_download_models
-from detector_utils import load_image, plot_results
-from math_utils import sigmoid
-from nms_utils import batched_nms
+from detector_utils import load_image
 from webcamera_utils import get_capture, get_writer
 # logger
 from logging import getLogger
 
 logger = getLogger(__name__)
 
-import tqdm
 from footandball_utils import *
+
 
 # ======================
 # Parameters
@@ -32,12 +30,6 @@ REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/footandball/'
 
 IMAGE_PATH = 'input.jpg'
 SAVE_IMAGE_PATH = 'output.png'
-
-IMAGE_HEIGHT = 352
-IMAGE_WIDTH = 352
-
-THRESHOLD = 0.65
-IOU = 0.45
 
 
 # ======================
@@ -52,7 +44,23 @@ parser.add_argument(
     action='store_true',
     help='execute onnxruntime version.'
 )
+parser.add_argument(
+    '-pth', '--player_threshold',
+    default=0.7, type=float,
+    help='player confidence threshold'
+)
+parser.add_argument(
+    '-bth', '--ball_threshold',
+    default=0.7, type=float,
+    help='ball confidence threshold'
+)
+#parser.add_argument(
+#    '-bbs', '--ball_bbox_size',
+#    default=40, type=int,
+#    help='size of ball binding box'
+#)
 args = update_parser(parser)
+args.ball_bbox_size = 40
 
 
 # ======================
@@ -62,13 +70,12 @@ args = update_parser(parser)
 def draw_bboxes(image, detections):
     font = cv2.FONT_HERSHEY_SIMPLEX
     for box, label, score in zip(detections['boxes'], detections['labels'], detections['scores']):
-        #print(box.shape, label, score)
-
         if label == PLAYER_LABEL:
             x1, y1, x2, y2 = box
             color = (255, 0, 0)
             cv2.rectangle(image, (int(x1), int(y1)), (int(x2), int(y2)), color, 2)
-            cv2.putText(image, '{:0.2f}'.format(score), (int(x1), max(0, int(y1)-10)), font, 1, color, 2)
+            cv2.putText(image, '{:0.2f}'.format(score), (int(x1), max(0, int(y1)-10)), 
+                        font, 1, color, 2)
 
         elif label == BALL_LABEL:
             x1, y1, x2, y2 = box
@@ -77,100 +84,10 @@ def draw_bboxes(image, detections):
             color = (0, 0, 255)
             radius = 25
             cv2.circle(image, (int(x), int(y)), radius, color, 2)
-            cv2.putText(image, '{:0.2f}'.format(score), (max(0, int(x - radius)), max(0, (y - radius - 10))), font, 1,
-                        color, 2)
+            cv2.putText(image, '{:0.2f}'.format(score), (max(0, int(x - radius)), max(0, (y - radius - 10))), 
+                        font, 1, color, 2)
 
     return image
-
-
-def preprocess(img):
-    im_h, im_w, _ = img.shape
-
-    img = cv2.resize(img, (IMAGE_WIDTH, IMAGE_HEIGHT), interpolation=cv2.INTER_LINEAR)
-
-    img = img / 255
-    img = img.transpose(2, 0, 1)  # HWC -> CHW
-    img = np.expand_dims(img, axis=0)
-    img = img.astype(np.float32)
-
-    return img
-
-
-def post_processing(preds, img_size):
-    im_h, im_w = img_size
-    conf_thresh = args.threshold
-    nms_thresh = args.iou
-
-    total_bboxes = []
-    # Convert the feature map to the coordinates of the detection box
-    N, C, H, W = preds.shape
-    bboxes = np.zeros((N, H, W, 6))
-    pred = preds.transpose(0, 2, 3, 1)
-    # front-background classification branch
-    pobj = np.expand_dims(pred[:, :, :, 0], axis=-1)
-    # detection box regression branch
-    preg = pred[:, :, :, 1:5]
-    # target class classification branch
-    pcls = pred[:, :, :, 5:]
-
-    # detection box confidence
-    bboxes[..., 4] = (np.squeeze(pobj, axis=-1) ** 0.6) * (np.max(pcls, axis=-1) ** 0.4)
-    bboxes[..., 5] = np.argmax(pcls, axis=-1)
-
-    # The coordinates of the detection frame
-    gx, gy = np.meshgrid(np.arange(W), np.arange(H))
-    bw, bh = sigmoid(preg[..., 2]), sigmoid(preg[..., 3])
-    bcx = (np.tanh(preg[..., 0]) + gx) / W
-    bcy = (np.tanh(preg[..., 1]) + gy) / H
-
-    # cx,cy,w,h = > x1,y1,x2,y1
-    x1, y1 = bcx - 0.5 * bw, bcy - 0.5 * bh
-    x2, y2 = bcx + 0.5 * bw, bcy + 0.5 * bh
-
-    bboxes[..., 0], bboxes[..., 1] = x1, y1
-    bboxes[..., 2], bboxes[..., 3] = x2, y2
-    bboxes = bboxes.reshape(N, H * W, 6)
-    total_bboxes.append(bboxes)
-
-    batch_bboxes = np.concatenate(total_bboxes, axis=1)
-
-    # Perform NMS processing on the detection frame
-    detections = []
-    for p in batch_bboxes:
-        output, temp = [], []
-        b, s, c = [], [], []
-        # Threshold filtering
-        t = p[:, 4] > conf_thresh
-        pb = p[t]
-        for bbox in pb:
-            obj_score = bbox[4]
-            category = bbox[5]
-            x1, y1 = bbox[0], bbox[1]
-            x2, y2 = bbox[2], bbox[3]
-            s.append([obj_score])
-            c.append([category])
-            b.append([x1 * im_w, y1 * im_h, x2 * im_w, y2 * im_h])
-            temp.append([x1, y1, x2, y2, obj_score, category])
-        # Torchvision NMS
-        if len(b) > 0:
-            b = np.array(b)
-            c = np.squeeze(np.array(c))
-            s = np.squeeze(np.array(s))
-            keep = batched_nms(b, s, c, nms_thresh)
-            for i in keep:
-                x1, y1, x2, y2, score, category = temp[i]
-                r = ailia.DetectorObject(
-                    category=int(category),
-                    prob=score,
-                    x=x1,
-                    y=y1,
-                    w=(x2 - x1),
-                    h=(y2 - y1),
-                )
-                output.append(r)
-        detections.append(output)
-
-    return detections[0]
 
 
 def predict(net, img):
@@ -191,7 +108,10 @@ def predict(net, img):
         })
 
     player_feature_map, player_bbox, ball_feature_map = output[0], output[1], output[2]
-    output = detect(player_feature_map, player_bbox, ball_feature_map)
+    output = detect(player_feature_map, player_bbox, ball_feature_map,
+                    player_threshold=args.player_threshold, 
+                    ball_threshold=args.ball_threshold, 
+                    ball_bbox_size=args.ball_bbox_size)
     output = output[0]
 
     return output
@@ -257,7 +177,7 @@ def recognize_from_video(net):
     while True:
         i += 1
         if i%50==0:
-            logger.info('{} frames have been processed.')
+            logger.info('{} frames have been processed.'.format(i))
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
