@@ -1,13 +1,7 @@
-from torchvision import transforms
-from PIL import Image
 import numpy as np
 import cv2
-
+from PIL import Image
 from typing import Tuple
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-import torchvision.transforms as transforms
 
 
 PLAYER_LABEL = 2
@@ -16,20 +10,20 @@ BALL_LABEL = 1
 NORMALIZATION_MEAN = [0.485, 0.456, 0.406]
 NORMALIZATION_STD = [0.229, 0.224, 0.225]
 
-normalize_trans = transforms.Compose([transforms.ToTensor(),
-                                      transforms.Normalize(NORMALIZATION_MEAN, NORMALIZATION_STD)])
 
-
-def _get_nms_kernel2d(kx: int, ky: int) -> torch.Tensor:
+def _get_nms_kernel2d(kx: int, ky: int):
     """Utility function, which returns neigh2channels conv kernel"""
     numel: int = ky * kx
     center: int = numel // 2
-    weight = torch.eye(numel)
+    
+    weight = np.eye(numel)
     weight[center, center] = 0
-    return weight.view(numel, 1, ky, kx)
+    weight = np.reshape(weight, [numel, 1, ky, kx])
+
+    return weight
 
 
-class NonMaximaSuppression2d(nn.Module):
+class NonMaximaSuppression2d():
     r"""Applies non maxima suppression to filter.
     """
 
@@ -50,19 +44,19 @@ class NonMaximaSuppression2d(nn.Module):
         ky, kx = kernel_size     # we assume a cubic kernel
         return pad(ky), pad(ky), pad(kx), pad(kx)
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(self, x):
         assert len(x.shape) == 4, x.shape
         B, CH, H, W = x.shape
         # find local maximum values
 
-        padded = F.pad(
-            torch.from_numpy(x), 
-            list(self.padding)[::-1], 
-            mode='replicate'
+        padding = list(self.padding)[::-1]
+        padded = np.pad(
+            x,
+            ((0, 0), (0, 0), (padding[0], padding[1]), (padding[2], padding[3])),
+            'edge'
         )
 
-        karnel = self.kernel.repeat(CH, 1, 1, 1)
-
+        karnel = np.tile(self.kernel, (CH, 1, 1, 1))
         weight = karnel
 
         #max_non_center = F.conv2d(padded, weight, stride=1, groups=CH)
@@ -105,13 +99,13 @@ class NonMaximaSuppression2d(nn.Module):
                 y += bias[:, None, None]
             return y
         
-        max_non_center = torch.from_numpy(conv2d(padded, weight, stride=1, groups=CH))
-        max_non_center = max_non_center.view(B, CH, -1, H, W).max(dim=2)[0]
+        max_non_center = conv2d(padded, weight, stride=1, groups=CH)
+        max_non_center = np.reshape(max_non_center, [B, CH, -1, H, W])
+        max_non_center = np.amax(max_non_center, axis=2)
 
-        x = torch.from_numpy(x)
         mask = x > max_non_center
-        out_x = x * (mask.to(x.dtype))
-        return out_x.to('cpu').detach().numpy().copy()
+        out_x = x * mask
+        return out_x
 
 
 nms_kernel_size = (3, 3)
@@ -119,8 +113,13 @@ nms = NonMaximaSuppression2d(nms_kernel_size)
 
 
 def image2tensor(image):
-    # Convert PIL Image to the tensor (with normalization)
-    return normalize_trans(image)
+    # Convert PIL Image to the ndarray (with normalization)
+    image = np.array(image)
+    image = image / 255
+    image = (image - NORMALIZATION_MEAN) / NORMALIZATION_STD
+    image = image.astype(np.float32)
+    image = np.transpose(image, (2, 0, 1))
+    return image
 
 
 def numpy2tensor(image):
@@ -137,7 +136,7 @@ def detect_from_map(confidence_map, downscale_factor, max_detections, bbox_map=N
     # downscale_factor: downscaling factor of the confidence map versus an original image
 
     # Confidence map is [B, C=2, H, W] tensor, where C=0 is background and C=1 is an object
-    confidence_map = nms(confidence_map)[:, 1]
+    confidence_map = nms.forward(confidence_map)[:, 1]
     # confidence_map is (B, H, W) tensor
     batch_size, h, w = confidence_map.shape[0], confidence_map.shape[1], confidence_map.shape[2]
     confidence_map = np.reshape(confidence_map, [batch_size, -1])

@@ -92,8 +92,7 @@ def draw_bboxes(image, detections):
 
 def predict(net, img):
     img = numpy2tensor(img)
-    img = img.unsqueeze(dim=0)
-    img = img.to('cpu').detach().numpy().copy()
+    img = img[np.newaxis, :, :, :]
 
     # feedforward
     if args.onnx is None:
