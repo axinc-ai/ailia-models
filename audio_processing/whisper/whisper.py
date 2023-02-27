@@ -143,6 +143,11 @@ parser.add_argument(
     '--memory_mode', default=default_memory_mode, type=int,
     help='memory mode'
 )
+parser.add_argument(
+    '--debug_reshape',
+    action='store_true',
+    help='debug reshape error.'
+)
 args = update_parser(parser)
 
 if args.ailia_audio:
@@ -533,6 +538,10 @@ def decode(enc_net, dec_net, mel, options):
         # expand the tokens tensor with the selected next tokens
         tokens, completed = decoder.update(tokens, logits, sum_logprobs, rearrange_kv_cache)
 
+        # debug for reshape error
+        if args.debug_reshape:
+            completed = False
+
         if completed or tokens.shape[-1] > n_ctx:
             break
 
@@ -699,6 +708,12 @@ def predict(wav, enc_net, dec_net, immediate=False, microphone=False):
         timestamp_offset = float(seek * HOP_LENGTH / SAMPLE_RATE)
         segment = pad_or_trim(mel[:, :, seek:], N_FRAMES)
         segment_duration = segment.shape[-1] * HOP_LENGTH / SAMPLE_RATE
+
+        if args.debug_reshape:
+            language = None
+            _, probs = detect_language(enc_net, dec_net, segment[0,:,:])
+            decode_options["language"] = language = max(probs, key=probs.get)
+            logger.info(f"Detected language: {LANGUAGES[decode_options['language']].title()}")
 
         decode_options["prompt"] = all_tokens[prompt_reset_since:]
         result = decode_with_fallback(enc_net, dec_net, segment, decode_options)
