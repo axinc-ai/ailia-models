@@ -46,4 +46,4 @@ ONNX opset = 11
 
 ### Netron
 
-[isnetits.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/anime-segmentation/isnetits.onnx.prototxt)
+[isnetis.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/anime-segmentation/isnetis.onnx.prototxt)
