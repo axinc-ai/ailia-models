@@ -29,7 +29,6 @@ cd ../../background_ramoval/cascade_psp; python3 cascade_psp.py ${OPTION}
 cd ../../background_ramoval/rembg; python3 rembg.py ${OPTION}
 cd ../../background_ramoval/dis_seg; python3 dis_seg.py ${OPTION}
 cd ../../background_ramoval/gfm; python3 gfm.py ${OPTION}
-cd ../../background_ramoval/anime-segmentation; python3 anime-segmentation.py ${OPTION}
 cd ../../crowd_counting/crowdcount-cascaded-mtl; python3 crowdcount-cascaded-mtl.py ${OPTION}
 cd ../../crowd_counting/c-3-framework; python3 c-3-framework.py ${OPTION}
 cd ../../diffusion/latent-diffusion-txt2img python3 latent-diffusion-txt2img.py ${OPTION}
@@ -158,6 +157,7 @@ cd ../../image_segmentation/paddleseg; python3 paddleseg.py ${OPTION}
 cd ../../image_segmentation/pp_liteseg; python3 pp_liteseg.py ${OPTION}
 cd ../../image_segmentation/suim; python3 suim.py ${OPTION}
 cd ../../image_segmentation/group_vit; python3 group_vit.py ${OPTION}
+cd ../../image_segmentation/anime-segmentation; python3 anime-segmentation.py ${OPTION}
 cd ../../landmark_classification/landmarks_classifier_asia; python3 landmarks_classifier_asia.py ${OPTION}
 cd ../../landmark_classification/places365; python3 places365.py ${OPTION}
 cd ../../line_segment_detection/mlsd; python3 mlsd.py ${OPTION}
