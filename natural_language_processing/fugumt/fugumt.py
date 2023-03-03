@@ -15,6 +15,8 @@ from image_utils import normalize_image  # noqa
 from detector_utils import load_image  # noqa
 from webcamera_utils import get_capture, get_writer  # noqa
 
+from beam_search import BeamSearchScorer
+
 logger = getLogger(__name__)
 
 # ======================
@@ -58,6 +60,16 @@ def logits_processor(input_ids, scores):
             scores[:, i] = 0
 
     return scores
+
+
+def reorder_cache(past, beam_idx):
+    reordered_past = []
+    for i in range(6):
+        # cached cross_attention states don't have to be reordered -> they are always the same
+        layer_past = past[i * 4:(i + 1) * 4]
+        reordered_past.extend((np.take(past_state, beam_idx, axis=0) for past_state in layer_past[:2]))
+        reordered_past.extend(layer_past[2:])
+    return reordered_past
 
 
 # ======================
@@ -104,24 +116,37 @@ def forward(net, input_ids, attention_mask, decoder_input_ids, past_key_values):
             'past_key_values.5.encoder.key': past_key_values[22],
             'past_key_values.5.encoder.value': past_key_values[23],
         })
-    logits, *past_key_values = output
+    logits, *past_key_values, _ = output
 
     return logits, past_key_values
 
 
-def beam_search(net):
+def beam_search(input_ids, net):
     batch_size = 1
     num_beams = 12
+    max_length = 512
 
-    pad_token_id = 32000
+    decoder_start_token_id = pad_token_id = 32000
+    eos_token_id = 0
 
-    input_ids = np.array([[183, 30, 15, 11126, 4, 0]] * 12, dtype=int)
-    attention_mask = np.array([[1, 1, 1, 1, 1, 1]] * 12, dtype=int)
+    # prepare beam search scorer
+    length_penalty = 1.0
+    early_stopping = False
+    num_return_sequences = 1
+    beam_scorer = BeamSearchScorer(
+        batch_size=1,
+        num_beams=num_beams,
+        length_penalty=length_penalty,
+        do_early_stopping=early_stopping,
+        num_beam_hyps_to_keep=num_return_sequences,
+    )
 
-    decoder_input_ids = np.ones((12, 1), dtype=int) * 32000
-    past_key_values = [np.zeros((12, 8, 0, 64), dtype=np.float32)] * 24
+    input_ids = np.array([input_ids] * num_beams, dtype=int)
+    attention_mask = np.array([[1, 1, 1, 1, 1, 1]] * num_beams, dtype=int)
+    decoder_input_ids = np.ones((num_beams, 1), dtype=int) * decoder_start_token_id
+    past_key_values = [np.zeros((num_beams, 8, 0, 64), dtype=np.float32)] * 24
 
-    batch_beam_size, cur_len = input_ids.shape
+    batch_beam_size, cur_len = decoder_input_ids.shape
 
     # initialise score of first beam with 0 and the rest with -1e9. This makes sure that only tokens
     # of the first beam are considered to avoid sampling the exact same tokens across all beams.
@@ -134,15 +159,16 @@ def beam_search(net):
         print("-----------", i)
         i += 1
         logits, past_key_values = forward(
-            net, input_ids, attention_mask, decoder_input_ids, past_key_values
+            net, input_ids, attention_mask, decoder_input_ids[:, -1:], past_key_values
         )
         print("logits---", logits)
         print("logits---", logits.shape)
+        print()
 
         next_token_logits = logits[:, -1, :]
         next_token_logits[:, pad_token_id] = float("-inf")
         next_token_scores = log_softmax(next_token_logits, axis=-1)
-        next_token_scores_processed = logits_processor(input_ids, next_token_scores)
+        next_token_scores_processed = logits_processor(decoder_input_ids, next_token_scores)
 
         next_token_scores = \
             next_token_scores_processed \
@@ -158,16 +184,39 @@ def beam_search(net):
 
         next_indices = next_tokens.astype(int) // vocab_size
         next_tokens = next_tokens % vocab_size
-        print(next_indices)
-        print(next_tokens)
+
+        # stateless
+        beam_outputs = beam_scorer.process(
+            decoder_input_ids,
+            next_token_scores,
+            next_tokens,
+            next_indices,
+            pad_token_id=pad_token_id,
+            eos_token_id=eos_token_id,
+            beam_indices=None,
+        )
+        beam_scores = beam_outputs["next_beam_scores"]
+        beam_next_tokens = beam_outputs["next_beam_tokens"]
+        beam_idx = beam_outputs["next_beam_indices"]
+
+        decoder_input_ids = np.concatenate([
+            decoder_input_ids[beam_idx, :], np.expand_dims(beam_next_tokens, axis=-1)
+        ], axis=-1)
+
+        past_key_values = reorder_cache(past_key_values, beam_idx)
 
         cur_len = cur_len + 1
-        break
+
+        if beam_scorer.is_done or decoder_input_ids.shape[-1] > max_length:
+            break
+
+    return
 
 
 def predict(net, input):
-    beam_search(net)
+    input_ids = [183, 30, 15, 11126, 4, 0]
 
+    beam_search(input_ids, net)
     return
 
 
