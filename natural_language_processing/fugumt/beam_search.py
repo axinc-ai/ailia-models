@@ -1,4 +1,4 @@
-from typing import List, Optional, Tuple, Union
+from typing import List, Optional, Union
 
 import numpy as np
 
@@ -53,13 +53,10 @@ class BeamHypotheses:
 class BeamSearchScorer(object):
     r"""
     [`BeamScorer`] implementing standard beam search decoding.
-
     Adapted in part from [Facebook's XLM beam search
     code](https://github.com/facebookresearch/XLM/blob/9e6f6814d17be4fe5b15f2e6c43eb2b2d76daeb4/src/model/transformer.py#L529).
-
     Reference for the diverse beam search algorithm and implementation [Ashwin Kalyan's DBS
     implementation](https://github.com/ashwinkalyan/dbs/blob/master/dbs/beam_utils.lua)
-
     Args:
         batch_size (`int`):
             Batch Size of `input_ids` for which standard beam search decoding is run in parallel.
@@ -163,7 +160,7 @@ class BeamSearchScorer(object):
                         beam_index = None
 
                     beam_hyp.add(
-                        input_ids[batch_beam_idx].clone(),
+                        input_ids[batch_beam_idx].copy(),
                         next_score.item(),
                         beam_indices=beam_index,
                     )
@@ -225,10 +222,10 @@ class BeamSearchScorer(object):
                 beam_hyp.add(final_tokens, final_score, beam_indices=beam_index)
 
         # select the best hypotheses
-        sent_lengths = input_ids.new(batch_size * self.num_beam_hyps_to_keep)
+        sent_lengths = np.zeros(batch_size * self.num_beam_hyps_to_keep, dtype=int)
         best = []
         best_indices = []
-        best_scores = torch.zeros(batch_size * self.num_beam_hyps_to_keep, device=self.device, dtype=torch.float32)
+        best_scores = np.zeros(batch_size * self.num_beam_hyps_to_keep)
 
         # retrieve best hypotheses
         for i, beam_hyp in enumerate(self._beam_hyps):
@@ -249,38 +246,36 @@ class BeamSearchScorer(object):
                 best_scores[i * self.num_beam_hyps_to_keep + j] = best_score
 
         # prepare for adding eos
-        sent_lengths_max = sent_lengths.max().item() + 1
+        sent_lengths_max = np.max(sent_lengths) + 1
         sent_max_len = min(sent_lengths_max, max_length) if max_length is not None else sent_lengths_max
-        decoded: torch.LongTensor = input_ids.new(batch_size * self.num_beam_hyps_to_keep, sent_max_len)
+        decoded = np.zeros((batch_size * self.num_beam_hyps_to_keep, sent_max_len), dtype=int)
 
-        if len(best_indices) > 0 and best_indices[0] is not None:
-            indices: torch.LongTensor = input_ids.new(batch_size * self.num_beam_hyps_to_keep, sent_max_len)
+        if 0 < len(best_indices) and best_indices[0] is not None:
+            indices = np.zeros((batch_size * self.num_beam_hyps_to_keep, sent_max_len))
         else:
             indices = None
 
         # shorter batches are padded if needed
         if sent_lengths.min().item() != sent_lengths.max().item():
             assert pad_token_id is not None, "`pad_token_id` has to be defined"
-            decoded.fill_(pad_token_id)
+            decoded[...] = pad_token_id
 
         if indices is not None:
-            indices.fill_(-1)
+            indices[...] = -1
 
         # fill with hypotheses and eos_token_id if the latter fits in
         for i, (hypo, best_idx) in enumerate(zip(best, best_indices)):
             decoded[i, : sent_lengths[i]] = hypo
 
             if indices is not None:
-                indices[i, : len(best_idx)] = torch.tensor(best_idx)
+                indices[i, : len(best_idx)] = np.array(best_idx)
 
             if sent_lengths[i] < sent_max_len:
                 # inserting only the first eos_token_id
                 decoded[i, sent_lengths[i]] = eos_token_id[0]
 
-        return UserDict(
-            {
-                "sequences": decoded,
-                "sequence_scores": best_scores,
-                "beam_indices": indices,
-            }
-        )
+        return {
+            "sequences": decoded,
+            "sequence_scores": best_scores,
+            "beam_indices": indices,
+        }
