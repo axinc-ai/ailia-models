@@ -5,6 +5,7 @@ from logging import getLogger
 
 import numpy as np
 import cv2
+from PIL import Image
 from matplotlib import cm
 
 import ailia
@@ -13,6 +14,7 @@ import ailia
 sys.path.append('../../util')
 from utils import get_base_parser, update_parser  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
+from image_utils import normalize_image  # noqa
 from webcamera_utils import get_capture, get_writer  # noqa: E402
 
 # from bytetrack_utils import multiclass_nms
@@ -144,30 +146,51 @@ def frame_vis_generator(frame, bboxes, ids):
 # Main functions
 # ======================
 
+detection_mat = np.load("MOT17-02-FRCNN.npy")
+frame_idx = 302
+
+
+def preprocess(img):
+    h, w = (256, 128)
+
+    img = img[:, :, ::-1]  # BGR -> RGB
+    img = np.array(Image.fromarray(img).resize((w, h), Image.Resampling.BILINEAR))
+
+    img = img.transpose(2, 0, 1)  # HWC -> CHW
+    img = np.expand_dims(img, axis=0)
+    img = img.astype(np.float32)
+
+    return img
+
+
 def predict(mod, img):
     detector = mod["detector"]
-    net = mod["net"]
+    frid_net = mod["frid_net"]
 
-    dets = detector(img)
+    # dets = detector(img)
 
-    crop_img = [img[d[1]:d[3], d[0]:d[2], :] for d in dets.astype(int)]
-    for i, img in enumerate(crop_img):
-        cv2.imwrite("kekka%02d.png" % i, img)
+    frame_indices = detection_mat[:, 0].astype(int)
+    mask = frame_indices == frame_idx
+    dets = detection_mat[mask]
+    dets = dets[:, 2:7]
 
-    1 / 0
+    bbox, confidence = dets[:, :4], dets[:, 4]
+
+    # crop_imgs = [img[d[1]:d[3], d[0]:d[2], :] for d in dets.astype(int)]
+    crop_imgs = [img[d[1]:d[1] + d[3], d[0]:d[0] + d[2], :] for d in dets.astype(int)]
+    imgs = []
+    for i, img in enumerate(crop_imgs):
+        # cv2.imwrite("kekka%02d.png" % i, img)
+        img = preprocess(img)
+        imgs.append(img)
+
+    batch = np.concatenate(imgs, axis=0)
 
     # feedforward
-    output = net.predict([img])
-    output = output[0]
+    output = frid_net.predict([batch])
+    feature = output[0]
 
-    # For yolox, retrieve only the person class
-    output = output[..., :6]
-
-    score_thre = args.score_thre
-    nms_thre = args.nms_thre
-    dets = postprocess(output, ratio, img_size, nms_thre=nms_thre, score_thre=score_thre)
-
-    return dets
+    return bbox, confidence, feature
 
 
 def benchmarking(net):
@@ -199,13 +222,13 @@ def recognize_from_video(mod):
     capture = get_capture(video_file)
     assert capture.isOpened(), 'Cannot capture source'
 
-    # # create video writer if savepath is specified as video format
-    # f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    # f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
-    # if args.savepath is not None:
-    #     writer = get_writer(args.savepath, f_h, f_w)
-    # else:
-    #     writer = None
+    # create video writer if savepath is specified as video format
+    f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
+    if args.savepath is not None:
+        writer = get_writer(args.savepath, f_h, f_w)
+    else:
+        writer = None
 
     tracker = None
 
@@ -216,26 +239,34 @@ def recognize_from_video(mod):
         #     break
         # if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
         #     break
-        frame = cv2.imread("input.jpg")
+        # frame = cv2.imread("input.jpg")
 
+        global frame_idx
+        if frame_idx > 320:
+            break
+
+        p = "img1/000%03d.jpg" % frame_idx
+        frame = cv2.imread(p)
         # inference
-        output = predict(mod, frame)
+        bbox, confidence, feature = predict(mod, frame)
+        frame_idx += 1
 
         # run tracking
-        online_targets = tracker.update(output)
+        # online_targets = tracker.update(output)
         online_tlwhs = []
         online_ids = []
         online_scores = []
-        for t in online_targets:
-            tlwh = t.tlwh
-            tid = t.track_id
-            vertical = tlwh[2] / tlwh[3] > 1.6
-            if tlwh[2] * tlwh[3] > min_box_area and not vertical:
-                online_tlwhs.append(tlwh)
-                online_ids.append(tid)
-                online_scores.append(t.score)
+        # for t in online_targets:
+        #     tlwh = t.tlwh
+        #     tid = t.track_id
+        #     vertical = tlwh[2] / tlwh[3] > 1.6
+        #     if tlwh[2] * tlwh[3] > min_box_area and not vertical:
+        #         online_tlwhs.append(tlwh)
+        #         online_ids.append(tid)
+        #         online_scores.append(t.score)
 
-        res_img = frame_vis_generator(frame, online_tlwhs, online_ids)
+        # res_img = frame_vis_generator(frame, online_tlwhs, online_ids)
+        res_img = frame
 
         # show
         if args.gui or args.video:
@@ -244,9 +275,9 @@ def recognize_from_video(mod):
         else:
             print("Online ids", online_ids)
 
-        # # save results
-        # if writer is not None:
-        #     writer.write(res_img.astype(np.uint8))
+        # save results
+        if writer is not None:
+            writer.write(res_img.astype(np.uint8))
 
     capture.release()
     cv2.destroyAllWindows()
@@ -277,15 +308,16 @@ def main():
     env_id = args.env_id
 
     # initialize
-    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+    frid_net = ailia.Net(MODEL_FRID_PATH, WEIGHT_FRID_PATH, env_id=env_id)
 
-    mem_mode = ailia.get_memory_mode(reduce_constant=True, reuse_interstage=True)
-    det_net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id, memory_mode=mem_mode)
-    detector = setup_detector(det_net)
+    # mem_mode = ailia.get_memory_mode(reduce_constant=True, reuse_interstage=True)
+    # det_net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id, memory_mode=mem_mode)
+    # detector = setup_detector(det_net)
+    detector = None
 
     mod = {
         "detector": detector,
-        "net": net,
+        "frid_net": frid_net,
     }
 
     if args.benchmark:
