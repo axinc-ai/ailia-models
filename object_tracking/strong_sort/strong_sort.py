@@ -1,5 +1,7 @@
 import sys
+import os
 import time
+from logging import getLogger
 
 import numpy as np
 import cv2
@@ -9,20 +11,26 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser
+from utils import get_base_parser, update_parser  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
-from image_utils import normalize_image  # noqa: E402C
 from webcamera_utils import get_capture, get_writer  # noqa: E402
-# logger
-from logging import getLogger  # noqa: E402
+
+# from bytetrack_utils import multiclass_nms
+# from tracker.byte_tracker import BYTETracker
+
+_this = os.path.dirname(os.path.abspath(__file__))
+top_path = os.path.dirname(os.path.dirname(_this))
 
 logger = getLogger(__name__)
-
-from bytetrack_utils import multiclass_nms
 
 # ======================
 # Parameters
 # ======================
+
+WEIGHT_FRID_PATH = 'duke_bot_S50.onnx'
+MODEL_FRID_PATH = 'duke_bot_S50.onnx.prototxt'
+REMOTE_FRID_PATH = \
+    'https://storage.googleapis.com/ailia-models/strong_sort/'
 
 WEIGHT_MOT17_X_PATH = 'bytetrack_x_mot17.onnx'
 MODEL_MOT17_X_PATH = 'bytetrack_x_mot17.onnx.prototxt'
@@ -32,7 +40,7 @@ WEIGHT_MOT17_TINY_PATH = 'bytetrack_tiny_mot17.onnx'
 MODEL_MOT17_TINY_PATH = 'bytetrack_tiny_mot17.onnx.prototxt'
 WEIGHT_MOT20_X_PATH = 'bytetrack_x_mot20.onnx'
 MODEL_MOT20_X_PATH = 'bytetrack_x_mot20.onnx.prototxt'
-REMOTE_PATH = \
+REMOTE_BYTRK_PATH = \
     'https://storage.googleapis.com/ailia-models/bytetrack/'
 
 WEIGHT_YOLOX_S_PATH = 'yolox_s.opt.onnx'
@@ -44,25 +52,12 @@ REMOTE_YOLOX_PATH = \
 
 VIDEO_PATH = 'demo.mp4'
 
-IMAGE_MOT17_X_HEIGHT = 800
-IMAGE_MOT17_X_WIDTH = 1440
-IMAGE_MOT17_S_HEIGHT = 608
-IMAGE_MOT17_S_WIDTH = 1088
-IMAGE_MOT17_TINY_HEIGHT = 416
-IMAGE_MOT17_TINY_WIDTH = 416
-IMAGE_MOT20_X_HEIGHT = 896
-IMAGE_MOT20_X_WIDTH = 1600
-IMAGE_YOLOX_S_HEIGHT = 640
-IMAGE_YOLOX_S_WIDTH = 640
-IMAGE_YOLOX_TINY_HEIGHT = 416
-IMAGE_YOLOX_TINY_WIDTH = 416
-
 # ======================
 # Arguemnt Parser Config
 # ======================
 
 parser = get_base_parser(
-    'ByteTrack', VIDEO_PATH, None
+    'StrongSORT', VIDEO_PATH, None
 )
 parser.add_argument(
     "--score_thre", type=float, default=0.1,
@@ -93,6 +88,21 @@ args = update_parser(parser)
 # ======================
 # Secondaty Functions
 # ======================
+
+def setup_detector(net):
+    sys.path.append(os.path.join(top_path, 'object_tracking/bytetrack'))
+    from bytetrack_mod import mod, set_args  # noqa
+
+    set_args(args)
+
+    def _detector(img):
+        dets = mod.predict(net, img)
+        return dets
+
+    detector = _detector
+
+    return detector
+
 
 def get_colors(n, colormap="gist_ncar"):
     # Get n color samples from the colormap, derived from: https://stackoverflow.com/a/25730396/583620
@@ -134,87 +144,17 @@ def frame_vis_generator(frame, bboxes, ids):
 # Main functions
 # ======================
 
-def preprocess(img, img_size, normalize=True):
-    h, w = img_size
-    im_h, im_w, _ = img.shape
+def predict(mod, img):
+    detector = mod["detector"]
+    net = mod["net"]
 
-    r = min(h / im_h, w / im_w)
-    oh, ow = int(im_h * r), int(im_w * r)
+    dets = detector(img)
 
-    resized_img = cv2.resize(
-        img,
-        (ow, oh),
-        interpolation=cv2.INTER_LINEAR,
-    )
+    crop_img = [img[d[1]:d[3], d[0]:d[2], :] for d in dets.astype(int)]
+    for i, img in enumerate(crop_img):
+        cv2.imwrite("kekka%02d.png" % i, img)
 
-    img = np.ones((h, w, 3)) * 114.0
-    img[: oh, : ow] = resized_img
-
-    if normalize:
-        img = img[:, :, ::-1]  # BGR -> RGB
-        img = normalize_image(img, 'ImageNet')
-
-    img = img.transpose((2, 0, 1))
-    img = np.expand_dims(img, axis=0)
-    img = img.astype(np.float32)
-
-    return img, r
-
-
-def postprocess(output, ratio, img_size, p6=False, nms_thre=0.7, score_thre=0.1):
-    grids = []
-    expanded_strides = []
-
-    if not p6:
-        strides = [8, 16, 32]
-    else:
-        strides = [8, 16, 32, 64]
-
-    hsizes = [img_size[0] // stride for stride in strides]
-    wsizes = [img_size[1] // stride for stride in strides]
-
-    for hsize, wsize, stride in zip(hsizes, wsizes, strides):
-        xv, yv = np.meshgrid(np.arange(wsize), np.arange(hsize))
-        grid = np.stack((xv, yv), 2).reshape(1, -1, 2)
-        grids.append(grid)
-        shape = grid.shape[:2]
-        expanded_strides.append(np.full((*shape, 1), stride))
-
-    grids = np.concatenate(grids, 1)
-    expanded_strides = np.concatenate(expanded_strides, 1)
-    output[..., :2] = (output[..., :2] + grids) * expanded_strides
-    output[..., 2:4] = np.exp(output[..., 2:4]) * expanded_strides
-
-    predictions = output[0]
-
-    boxes = predictions[:, :4]
-    scores = predictions[:, 4:5] * predictions[:, 5:]
-
-    boxes_xyxy = np.ones_like(boxes)
-    boxes_xyxy[:, 0] = boxes[:, 0] - boxes[:, 2] / 2.
-    boxes_xyxy[:, 1] = boxes[:, 1] - boxes[:, 3] / 2.
-    boxes_xyxy[:, 2] = boxes[:, 0] + boxes[:, 2] / 2.
-    boxes_xyxy[:, 3] = boxes[:, 1] + boxes[:, 3] / 2.
-    boxes_xyxy /= ratio
-
-    dets = multiclass_nms(boxes_xyxy, scores, nms_thr=nms_thre, score_thr=score_thre)
-
-    return dets[:, :-1] if dets is not None else np.zeros((0, 5))
-
-
-def predict(net, img):
-    dic_model = {
-        'mot17_x': (IMAGE_MOT17_X_HEIGHT, IMAGE_MOT17_X_WIDTH),
-        'mot17_s': (IMAGE_MOT17_S_HEIGHT, IMAGE_MOT17_S_WIDTH),
-        'mot17_tiny': (IMAGE_MOT17_TINY_HEIGHT, IMAGE_MOT17_TINY_WIDTH),
-        'mot20_x': (IMAGE_MOT20_X_HEIGHT, IMAGE_MOT20_X_WIDTH),
-        'yolox_s': (IMAGE_YOLOX_S_HEIGHT, IMAGE_YOLOX_S_WIDTH),
-        'yolox_tiny': (IMAGE_YOLOX_TINY_HEIGHT, IMAGE_YOLOX_TINY_WIDTH),
-    }
-    model_type = args.model_type
-    img_size = dic_model[model_type]
-
-    img, ratio = preprocess(img, img_size, normalize=model_type.startswith('mot'))
+    1 / 0
 
     # feedforward
     output = net.predict([img])
@@ -254,40 +194,32 @@ def benchmarking(net):
     logger.info(f'\taverage time estimation {total_time_estimation / (args.benchmark_count - 1)} ms')
 
 
-def recognize_from_video(net):
-    min_box_area = args.min_box_area
-    mot20 = args.model_type == 'mot20'
-
+def recognize_from_video(mod):
     video_file = args.video if args.video else args.input[0]
     capture = get_capture(video_file)
     assert capture.isOpened(), 'Cannot capture source'
 
-    # create video writer if savepath is specified as video format
-    f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
-    if args.savepath != None:
-        logger.warning(
-            'currently, video results cannot be output correctly...'
-        )
-        writer = get_writer(args.savepath, f_h, f_w)
-    else:
-        writer = None
+    # # create video writer if savepath is specified as video format
+    # f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    # f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
+    # if args.savepath is not None:
+    #     writer = get_writer(args.savepath, f_h, f_w)
+    # else:
+    #     writer = None
 
-    tracker = BYTETracker(
-        track_thresh=args.track_thresh, track_buffer=args.track_buffer,
-        match_thresh=args.match_thresh, frame_rate=30,
-        mot20=mot20)
+    tracker = None
 
     frame_shown = False
     while True:
-        ret, frame = capture.read()
-        if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
-            break
-        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
-            break
+        # ret, frame = capture.read()
+        # if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+        #     break
+        # if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
+        #     break
+        frame = cv2.imread("input.jpg")
 
         # inference
-        output = predict(net, frame)
+        output = predict(mod, frame)
 
         # run tracking
         online_targets = tracker.update(output)
@@ -312,9 +244,9 @@ def recognize_from_video(net):
         else:
             print("Online ids", online_ids)
 
-        # save results
-        if writer is not None:
-            writer.write(res_img.astype(np.uint8))
+        # # save results
+        # if writer is not None:
+        #     writer.write(res_img.astype(np.uint8))
 
     capture.release()
     cv2.destroyAllWindows()
@@ -334,26 +266,33 @@ def main():
         'yolox_tiny': (WEIGHT_YOLOX_TINY_PATH, MODEL_YOLOX_TINY_PATH),
     }
     model_type = args.model_type
-    weight_path, model_path = dic_model[model_type]
+    WEIGHT_PATH, MODEL_PATH = dic_model[model_type]
 
     # model files check and download
+    check_and_download_models(WEIGHT_FRID_PATH, MODEL_FRID_PATH, REMOTE_FRID_PATH)
     check_and_download_models(
-        weight_path, model_path,
-        REMOTE_PATH if model_type.startswith('mot') else REMOTE_YOLOX_PATH)
+        WEIGHT_PATH, MODEL_PATH,
+        REMOTE_BYTRK_PATH if model_type.startswith('mot') else REMOTE_YOLOX_PATH)
 
     env_id = args.env_id
 
     # initialize
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+
     mem_mode = ailia.get_memory_mode(reduce_constant=True, reuse_interstage=True)
-    net = ailia.Net(model_path, weight_path, env_id=env_id, memory_mode=mem_mode)
+    det_net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id, memory_mode=mem_mode)
+    detector = setup_detector(det_net)
+
+    mod = {
+        "detector": detector,
+        "net": net,
+    }
 
     if args.benchmark:
-        benchmarking(net)
+        benchmarking(mod)
     else:
-        recognize_from_video(net)
+        recognize_from_video(mod)
 
 
 if __name__ == '__main__':
-    from tracker.byte_tracker import BYTETracker
-
     main()
