@@ -1,6 +1,7 @@
 import sys
 import os
 import time
+import json
 from logging import getLogger
 
 import numpy as np
@@ -17,8 +18,9 @@ from model_utils import check_and_download_models  # noqa: E402
 from image_utils import normalize_image  # noqa
 from webcamera_utils import get_capture, get_writer  # noqa: E402
 
-# from bytetrack_utils import multiclass_nms
-# from tracker.byte_tracker import BYTETracker
+from deep_sort import nn_matching
+from deep_sort.detection import Detection
+from deep_sort.tracker import Tracker
 
 _this = os.path.dirname(os.path.abspath(__file__))
 top_path = os.path.dirname(os.path.dirname(_this))
@@ -147,7 +149,7 @@ def frame_vis_generator(frame, bboxes, ids):
 # ======================
 
 detection_mat = np.load("MOT17-02-FRCNN.npy")
-frame_idx = 302
+frame_idx = 0
 
 
 def preprocess(img):
@@ -174,7 +176,7 @@ def predict(mod, img):
     dets = detection_mat[mask]
     dets = dets[:, 2:7]
 
-    bbox, confidence = dets[:, :4], dets[:, 4]
+    bboxes, confidences = dets[:, :4], dets[:, 4]
 
     # crop_imgs = [img[d[1]:d[3], d[0]:d[2], :] for d in dets.astype(int)]
     crop_imgs = [img[d[1]:d[1] + d[3], d[0]:d[0] + d[2], :] for d in dets.astype(int)]
@@ -188,9 +190,9 @@ def predict(mod, img):
 
     # feedforward
     output = frid_net.predict([batch])
-    feature = output[0]
+    features = output[0]
 
-    return bbox, confidence, feature
+    return bboxes, confidences, features
 
 
 def benchmarking(net):
@@ -230,7 +232,11 @@ def recognize_from_video(mod):
     else:
         writer = None
 
-    tracker = None
+    tracker = mod["tracker"]
+    ecc = mod["ecc"]
+
+    global frame_idx
+    frame_idx = 302
 
     frame_shown = False
     while True:
@@ -241,15 +247,23 @@ def recognize_from_video(mod):
         #     break
         # frame = cv2.imread("input.jpg")
 
-        global frame_idx
         if frame_idx > 320:
             break
 
         p = "img1/000%03d.jpg" % frame_idx
         frame = cv2.imread(p)
         # inference
-        bbox, confidence, feature = predict(mod, frame)
+        bboxes, confidences, features = predict(mod, frame)
+
+        detections = []
+        for bbox, confidence, feature in zip(bboxes, confidences, features):
+            detections.append(Detection(bbox, confidence, feature))
+
+        tracker.camera_update(ecc, frame_idx)
         frame_idx += 1
+
+        tracker.predict()
+        tracker.update(detections)
 
         # run tracking
         # online_targets = tracker.update(output)
@@ -305,6 +319,11 @@ def main():
         WEIGHT_PATH, MODEL_PATH,
         REMOTE_BYTRK_PATH if model_type.startswith('mot') else REMOTE_YOLOX_PATH)
 
+    path_ECC = "MOT17_ECC_val.json"
+    with open(path_ECC) as f:
+        ecc = json.load(f)
+        ecc = ecc["MOT17-02-FRCNN"]
+
     env_id = args.env_id
 
     # initialize
@@ -315,9 +334,20 @@ def main():
     # detector = setup_detector(det_net)
     detector = None
 
+    max_cosine_distance = 0.45
+    nn_budget = 1
+    metric = nn_matching.NearestNeighborDistanceMetric(
+        'cosine',
+        max_cosine_distance,
+        nn_budget
+    )
+    tracker = Tracker(metric)
+
     mod = {
         "detector": detector,
         "frid_net": frid_net,
+        "tracker": tracker,
+        "ecc": ecc,
     }
 
     if args.benchmark:
