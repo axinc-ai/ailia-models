@@ -106,7 +106,7 @@ def point_nms(heat, kernel=2):
     """
     # kernel must be 2
     hmax = np.expand_dims(pool2d(heat.squeeze(), kernel, 1, 1), (0, 1))
-    keep = (hmax[:, :, :-1, :-1] == heat).astype(np.float)
+    keep = (hmax[:, :, :-1, :-1] == heat).astype(float)
     return heat * keep
 
 def matrix_nms(cate_labels, seg_masks, sum_masks, cate_scores, sigma=2.0, kernel='gaussian'):
