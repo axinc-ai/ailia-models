@@ -1,6 +1,8 @@
 import numpy as np
 import scipy.linalg
 
+NSA = True
+
 """
 Table for the 0.95 quantile of the chi-square distribution with N degrees of
 freedom (contains values for N=1, ..., 9). Taken from MATLAB/Octave's chi2inv
@@ -144,7 +146,7 @@ class KalmanFilter(object):
             1e-1,
             self._std_weight_position * mean[3]]
 
-        if opt.NSA:
+        if NSA:
             std = [(1 - confidence) * x for x in std]
 
         innovation_cov = np.diag(np.square(std))

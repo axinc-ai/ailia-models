@@ -2,6 +2,9 @@ import numpy as np
 
 from .kalman_filter import KalmanFilter
 
+EMA = True
+EMA_alpha = 0.9
+
 
 class TrackState:
     """
@@ -163,8 +166,8 @@ class Track:
             detection.confidence)
 
         feature = detection.feature / np.linalg.norm(detection.feature)
-        if opt.EMA:
-            smooth_feat = opt.EMA_alpha * self.features[-1] + (1 - opt.EMA_alpha) * feature
+        if EMA:
+            smooth_feat = EMA_alpha * self.features[-1] + (1 - EMA_alpha) * feature
             smooth_feat /= np.linalg.norm(smooth_feat)
             self.features = [smooth_feat]
         else:

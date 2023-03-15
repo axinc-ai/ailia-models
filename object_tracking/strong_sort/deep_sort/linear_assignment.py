@@ -3,6 +3,10 @@ from scipy.optimize import linear_sum_assignment as linear_assignment
 
 from . import kalman_filter
 
+woC = True
+MC = True
+MC_lambda = 0.98
+
 INFTY_COST = 1e+5
 
 
@@ -57,11 +61,10 @@ def min_cost_matching(
     cost_matrix_ = cost_matrix.copy()
 
     indices = linear_assignment(cost_matrix_)
+    indices = np.concatenate([x.reshape(-1, 1) for x in indices], axis=1)
 
     matches, unmatched_tracks, unmatched_detections = [], [], []
     for col, detection_idx in enumerate(detection_indices):
-        # print("col---", col)
-        # print("indices---", indices[:, 1])
         if col not in indices[:, 1]:
             unmatched_detections.append(detection_idx)
     for row, track_idx in enumerate(track_indices):
@@ -124,7 +127,7 @@ def matching_cascade(
 
     unmatched_detections = detection_indices
     matches = []
-    if opt.woC:
+    if woC:
         track_indices_l = [
             k for k in track_indices
             # if tracks[k].time_since_update == 1 + level
@@ -198,7 +201,7 @@ def gate_cost_matrix(
         track = tracks[track_idx]
         gating_distance = track.kf.gating_distance(track.mean, track.covariance, measurements, only_position)
         cost_matrix[row, gating_distance > gating_threshold] = gated_cost
-        if opt.MC:
-            cost_matrix[row] = opt.MC_lambda * cost_matrix[row] + (1 - opt.MC_lambda) * gating_distance
+        if MC:
+            cost_matrix[row] = MC_lambda * cost_matrix[row] + (1 - MC_lambda) * gating_distance
 
     return cost_matrix

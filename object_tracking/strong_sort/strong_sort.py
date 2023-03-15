@@ -192,6 +192,11 @@ def predict(mod, img):
     output = frid_net.predict([batch])
     features = output[0]
 
+    ind = np.argsort(-confidences)
+    bboxes = bboxes[ind]
+    confidences = confidences[ind]
+    features = features[ind]
+
     return bboxes, confidences, features
 
 
@@ -246,9 +251,10 @@ def recognize_from_video(mod):
         # if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
         #     break
         # frame = cv2.imread("input.jpg")
-
         if frame_idx > 320:
             break
+
+        print("Processing frame %05d" % frame_idx)
 
         p = "img1/000%03d.jpg" % frame_idx
         frame = cv2.imread(p)

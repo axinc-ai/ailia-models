@@ -1,8 +1,10 @@
 import numpy as np
 
 from . import linear_assignment
-# from . import iou_matching
-# from .track import Track
+from . import iou_matching
+from .track import Track
+
+EMA = True
 
 
 class Tracker:
@@ -84,7 +86,8 @@ class Tracker:
                 continue
             features += track.features
             targets += [track.track_id for _ in track.features]
-
+            if not EMA:
+                track.features = []
         self.metric.partial_fit(
             np.asarray(features), np.asarray(targets), active_targets)
 
