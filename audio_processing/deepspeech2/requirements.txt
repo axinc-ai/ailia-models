@@ -4,7 +4,7 @@ certifi==2022.12.7
 cffi==1.14.3
 chardet==3.0.4
 decorator==4.4.2
-future==0.18.2
+future==0.18.3
 idna==2.10
 joblib==1.2.0
 librosa==0.8.0
