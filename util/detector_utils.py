@@ -137,9 +137,9 @@ def plot_results(detector, img, category=None, segm_masks=None, logging=True):
         colors.append(color)
 
     # draw segmentation area
-    if segm_masks:
+    if segm_masks is not None and 0 < len(segm_masks):
         for idx in range(count):
-            mask = np.repeat(np.expand_dims(segm_masks[idx], 2), 3, 2).astype(np.bool)
+            mask = np.repeat(np.expand_dims(segm_masks[idx], 2), 3, axis=2).astype(bool)
             color = colors[idx][:3]
             fill = np.repeat(np.repeat([[color]], img.shape[0], 0), img.shape[1], 1)
             img[:, :, :3][mask] = img[:, :, :3][mask] * 0.7 + fill[mask] * 0.3
@@ -215,7 +215,10 @@ def write_predictions(file_name, detector, img=None, category=None):
     with open(file_name, 'w') as f:
         for idx in range(count):
             obj = detector.get_object(idx) if hasattr(detector, 'get_object') else detector[idx]
-            label = category[obj.category] if category else obj.category
+            label = category[int(obj.category)] \
+                if not isinstance(obj.category, str) and category is not None \
+                else obj.category
+
             f.write('%s %f %d %d %d %d\n' % (
                 label.replace(' ', '_'),
                 obj.prob,
