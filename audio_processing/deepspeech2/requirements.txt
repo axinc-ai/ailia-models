@@ -24,6 +24,6 @@ scipy==1.5.3
 six==1.15.0
 SoundFile==0.10.3.post1
 threadpoolctl==2.1.0
-torch==1.6.0
+torch==1.13.1
 torchvision==0.7.0
 urllib3==1.26.5
