@@ -411,7 +411,7 @@ def main():
         logger.info("This model requires 10GB or more memory.")
         memory_mode = ailia.get_memory_mode(
             reduce_constant=True, ignore_input_with_initializer=True,
-            reduce_interstage=False, reuse_interstage=False)
+            reduce_interstage=False, reuse_interstage=True)
         transformer_emb = ailia.Net(
             MODEL_TRANS_EMB_PATH, WEIGHT_TRANS_EMB_PATH, env_id=env_id, memory_mode=memory_mode)
         transformer_attn = ailia.Net(

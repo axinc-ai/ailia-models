@@ -142,6 +142,7 @@ The collection of pre-trained, state-of-the-art AI models.
 | [<img src="face_recognition/face-anti-spoofing/output.png" width=128px>](face_recognition/face-anti-spoofing/) | [face-anti-spoofing](/face_recognition/face-anti-spoofing/) | [Lightweight Face Anti Spoofing](https://github.com/kprokofi/light-weight-face-anti-spoofing) | Pytorch | 1.2.5 and later | [EN](https://medium.com/axinc-ai/faceantispoofing-a-machine-learning-model-to-determine-if-a-face-is-real-b6c30f12abb6) [JP](https://medium.com/axinc/faceantispoofing-%E6%9C%AC%E7%89%A9%E3%81%AE%E9%A1%94%E3%81%8B%E3%81%A9%E3%81%86%E3%81%8B%E3%82%92%E5%88%A4%E5%AE%9A%E3%81%99%E3%82%8B%E6%A9%9F%E6%A2%B0%E5%AD%A6%E7%BF%92%E3%83%A2%E3%83%87%E3%83%AB-c7092c1dde43) |
 | [<img src="face_recognition/ax_facial_features/man-with-beard.jpg" width=128px>](face_recognition/ax_facial_features) | [ax_facial_features](/face_recognition/ax_facial_features/)| ax Facial Features | Pytorch | 1.2.5 and later |[EN](https://medium.com/axinc-ai/ax-facial-features-eyelids-eyelashes-and-facial-hair-classification-9b3b12f1d6a1) |
 | [<img src="face_recognition/6d_repnet/output.png" width=128px>](face_recognition/6d_repnet/) | [6d_repnet](/face_recognition/6d_repnet/) | [6D Rotation Representation for Unconstrained Head Pose Estimation (Pytorch)](https://github.com/thohemp/6DRepNet) | Pytorch | 1.2.6 and later |
+| [<img src="face_recognition/hsemotion/lenna.png">](face_recognition/hsemotion/) | [hsemotion](/face_recognition/hsemotion/) | [HSEmotion (High-Speed face Emotion recognition) library](https://github.com/HSE-asavchenko/face-emotion-recognition) | Pytorch | 1.2.5 and later |
 
 ## Frame Interpolation
 
@@ -259,6 +260,7 @@ The collection of pre-trained, state-of-the-art AI models.
 | [<img src="image_segmentation/pp_liteseg/output.png" width=128px>](image_segmentation/pp_liteseg/) | [pp_liteseg](/image_segmentation/pp_liteseg/) | [PP-LiteSeg](https://github.com/PaddlePaddle/PaddleSeg/tree/develop/configs/pp_liteseg) | Pytorch | 1.2.10 and later |  |
 | [<img src="image_segmentation/suim/output.jpg" width=128px>](image_segmentation/suim/) | [suim](/image_segmentation/suim/) | [SUIM](https://github.com/IRVLab/SUIM) | Keras | 1.2.6 and later |  |
 | [<img src="image_segmentation/group_vit/output.png" width=128px>](image_segmentation/group_vit/) | [group_vit](/image_segmentation/group_vit/) | [GroupViT](https://github.com/NVlabs/GroupViT) | Pytorch | 1.2.10 and later |  |
+| [<img src="image_segmentation/anime-segmentation/output.png" width=128px>](image_segmentation/anime-segmentation/) | [anime-segmentation](/image_segmentation/anime-segmentation/) | [Anime Segmentation](https://github.com/SkyTNT/anime-segmentation) | Pytorch | 1.2.9 and later |
 
 ## Landmark classification
 

@@ -81,6 +81,7 @@ cd ../../face_recognition/ferplus; python3 ferplus.py ${OPTION}
 cd ../../face_recognition/face-anti-spoofing; python3 face-anti-spoofing.py ${OPTION}
 cd ../../face_recognition/ax_facial_features; python3 ax_facial_features.py ${OPTION}
 cd ../../face_recognition/6d_repnet; python3 6d_repnet.py ${OPTION}
+cd ../../face_recognition/hsemotion; python3 hsemotion.py ${OPTION}
 cd ../../frame_interpolation/flavr; python3 flavr.py ${OPTION}
 cd ../../frame_interpolation/cain; python3 cain.py ${OPTION}
 cd ../../frame_interpolation/film; python3 film.py ${OPTION}
@@ -157,6 +158,7 @@ cd ../../image_segmentation/paddleseg; python3 paddleseg.py ${OPTION}
 cd ../../image_segmentation/pp_liteseg; python3 pp_liteseg.py ${OPTION}
 cd ../../image_segmentation/suim; python3 suim.py ${OPTION}
 cd ../../image_segmentation/group_vit; python3 group_vit.py ${OPTION}
+cd ../../image_segmentation/anime-segmentation; python3 anime-segmentation.py ${OPTION}
 cd ../../landmark_classification/landmarks_classifier_asia; python3 landmarks_classifier_asia.py ${OPTION}
 cd ../../landmark_classification/places365; python3 places365.py ${OPTION}
 cd ../../line_segment_detection/mlsd; python3 mlsd.py ${OPTION}
