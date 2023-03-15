@@ -103,8 +103,8 @@ def recognize_from_image():
         debugger.add_img(img)
         debugger.add_point_2d(pred, (255, 0, 0))
         debugger.add_point_3d(pred_3d, 'b')
-        debugger.show_all_imgs(pause=False)
         if args.gui:
+            debugger.show_all_imgs(pause=False)
             debugger.show_3d()
 
         savepath_3d = pathlib.PurePath(savepath)
