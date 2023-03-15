@@ -1,6 +1,7 @@
 import argparse
 import os
 import sys
+import time
 
 import ailia
 import cv2
@@ -233,7 +234,16 @@ def recognize_from_video(args, models, model_params):
         ret, frame = capture.read()
         frames.append(frame)
 
-    scores = predict(models, args.text_inputs, frames, num_segments)[0]
+    logger.info('Start inference...')
+    if args.benchmark:
+        logger.info('BENCHMARK mode')
+        for i in range(args.benchmark_count):
+            start = int(round(time.time() * 1000))
+            scores = predict(models, args.text_inputs, frames, num_segments)[0]
+            end = int(round(time.time() * 1000))
+            logger.info(f'\tailia processing time {end - start} ms')
+    else:
+        scores = predict(models, args.text_inputs, frames, num_segments)[0]
     print_results(scores, args.text_inputs, logger)
 
     capture.release()

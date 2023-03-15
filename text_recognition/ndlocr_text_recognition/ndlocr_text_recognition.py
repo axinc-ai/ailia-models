@@ -57,7 +57,7 @@ args = update_parser(parser)
 # ======================
 
 def get_char_list():
-    with open(CHAR_FILE_PATH) as f:
+    with open(CHAR_FILE_PATH, encoding='utf-8') as f:
         char_list = f.read()
     char_list = '〓' + char_list.replace("\n", "")
     char_list = ['[CTCblank]'] + list(char_list)

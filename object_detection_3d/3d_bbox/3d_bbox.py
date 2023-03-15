@@ -88,6 +88,13 @@ def plot_regressed_3d_bbox(img, cam_to_img, box_2d, dimensions, alpha, theta_ray
 # Arguemnt Parser Config
 # ======================
 parser = get_base_parser('3d_bbox model', IMAGE_PATH, SAVE_IMAGE_PATH)
+
+parser.add_argument(
+    '--gui',
+    action='store_true',
+    help='Display preview in GUI.'
+)
+
 args = update_parser(parser)
 
 # ======================
@@ -168,13 +175,14 @@ def recognize_from_image():
             alpha -= np.pi
 
             plot_regressed_3d_bbox(img, proj_matrix, box_2d, dim, alpha, theta_ray)
-            cv2.imshow('3D detections', img)
+            if args.gui:
+                cv2.imshow('3D detections', img)
 
         savepath = get_savepath(args.savepath, image_path)
         logger.info(f'saved at : {savepath}')
         cv2.imwrite(savepath, img)
 
-    if cv2.waitKey(0) != 32:  # space bar
+    if args.gui and cv2.waitKey(0) != 32:  # space bar
         exit()
 
 def recognize_from_video():
@@ -259,7 +267,8 @@ def recognize_from_video():
 
             location = plot_regressed_3d_bbox(img, proj_matrix, box_2d, dim, alpha, theta_ray)
 
-            cv2.imshow('3D detections', img)
+            if args.gui:
+                cv2.imshow('3D detections', img)
             frame_shown = True
 
         # save results
