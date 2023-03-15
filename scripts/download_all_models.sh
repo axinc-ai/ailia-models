@@ -173,6 +173,7 @@ cd ../../natural_language_processing/bert_tweets_sentiment; python3 bert_tweets_
 cd ../../natural_language_processing/bert_zero_shot_classification; python3 bert_zero_shot_classification.py ${OPTION}
 cd ../../natural_language_processing/gpt2; python3 gpt2.py ${OPTION}
 cd ../../natural_language_processing/rinna_gpt2; python3 rinna_gpt2.py ${OPTION}
+cd ../../natural_language_processing/presumm; python3 presumm.py ${OPTION}
 cd ../../neural_rendering/nerf; python3 nerf.py ${OPTION}
 cd ../../object_detection/centernet; python3 centernet.py ${OPTION}
 cd ../../object_detection/m2det; python3 m2det.py ${OPTION}
