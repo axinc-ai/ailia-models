@@ -52,9 +52,9 @@ class Tracker:
         for track in self.tracks:
             track.predict()
 
-    def camera_update(self, ecc, frame):
+    def camera_update(self, ecc):
         for track in self.tracks:
-            track.camera_update(ecc, frame)
+            track.camera_update(ecc)
 
     def update(self, detections):
         """Perform measurement update and track management.

@@ -130,20 +130,17 @@ class Track:
         self.time_since_update += 1
 
     @staticmethod
-    def get_matrix(dict_frame_matrix, frame):
+    def get_matrix(ecc):
         eye = np.eye(3)
-        matrix = dict_frame_matrix[frame]
-        dist = np.linalg.norm(eye - matrix)
+        dist = np.linalg.norm(eye - ecc)
         if dist < 100:
-            return matrix
+            return ecc
         else:
             return eye
 
-    def camera_update(self, ecc, frame):
-        dict_frame_matrix = ecc
-        frame = str(int(frame))
-        if frame in dict_frame_matrix:
-            matrix = self.get_matrix(dict_frame_matrix, frame)
+    def camera_update(self, ecc):
+        if ecc is not None:
+            matrix = self.get_matrix(ecc)
             x1, y1, x2, y2 = self.to_tlbr()
             x1_, y1_, _ = matrix @ np.array([x1, y1, 1]).T
             x2_, y2_, _ = matrix @ np.array([x2, y2, 1]).T
