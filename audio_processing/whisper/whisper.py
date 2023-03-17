@@ -205,7 +205,7 @@ WEIGHT_ENC_BASE_PATH = "encoder_base"+ OPT +".onnx"
 MODEL_ENC_BASE_PATH = "encoder_base"+ OPT +".onnx.prototxt"
 WEIGHT_ENC_SMALL_PATH = "encoder_small"+ OPT +".onnx"
 MODEL_ENC_SMALL_PATH = "encoder_small"+ OPT +".onnx.prototxt"
-WEIGHT_ENC_MEDIUM_PATH = "encoder_medium."+ OPT +"onnx"
+WEIGHT_ENC_MEDIUM_PATH = "encoder_medium"+ OPT +".onnx"
 MODEL_ENC_MEDIUM_PATH = "encoder_medium"+ OPT +".onnx.prototxt"
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/whisper/'
 
