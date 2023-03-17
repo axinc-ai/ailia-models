@@ -1,0 +1,20 @@
+{
+  "cls_token": "[CLS]",
+  "do_lower_case": false,
+  "do_subword_tokenize": true,
+  "do_word_tokenize": true,
+  "jumanpp_kwargs": null,
+  "mask_token": "[MASK]",
+  "max_len": 512,
+  "mecab_kwargs": null,
+  "name_or_path": "daigo/bert-base-japanese-sentiment",
+  "never_split": null,
+  "pad_token": "[PAD]",
+  "sep_token": "[SEP]",
+  "special_tokens_map_file": "/home/ooe/.cache/huggingface/hub/models--daigo--bert-base-japanese-sentiment/snapshots/51ac2d2c0a5645d77ca26078fc5f02c349fbb93d/special_tokens_map.json",
+  "subword_tokenizer_type": "wordpiece",
+  "sudachi_kwargs": null,
+  "tokenizer_class": "BertJapaneseTokenizer",
+  "unk_token": "[UNK]",
+  "word_tokenizer_type": "mecab"
+}
