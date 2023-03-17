@@ -143,6 +143,10 @@ parser.add_argument(
     '--memory_mode', default=default_memory_mode, type=int,
     help='memory mode'
 )
+parser.add_argument(
+    '--prompt', default='prompt',
+    help='prompt for word vocabulary'
+)
 args = update_parser(parser)
 
 if args.ailia_audio:
@@ -253,11 +257,19 @@ def get_initial_tokens(tokenizer, options):
             prefix_tokens = prefix_tokens[-max_prefix_len:]
         tokens = tokens + prefix_tokens
 
-    if prompt:
-        prompt_tokens = (
-            tokenizer.encode(" " + prompt.strip()) if isinstance(prompt, str) else prompt
-        )
-        tokens = [tokenizer.sot_prev] + prompt_tokens[-(n_ctx // 2 - 1):] + tokens
+    if prompt or args.prompt:
+        if args.prompt:
+            prompt_arg_tokens = (
+                tokenizer.encode(args.prompt)
+            )
+            prompt_tokens = prompt
+            prev_prompt_len = (n_ctx // 2 - 1) - len(prompt_arg_tokens)
+            tokens = [tokenizer.sot_prev] + prompt_arg_tokens + prompt_tokens[-prev_prompt_len:] + tokens
+        else:
+            prompt_tokens = (
+                tokenizer.encode(" " + prompt.strip()) if isinstance(prompt, str) else prompt
+            )
+            tokens = [tokenizer.sot_prev] + prompt_tokens[-(n_ctx // 2 - 1):] + tokens
 
     return tuple(tokens)
 
