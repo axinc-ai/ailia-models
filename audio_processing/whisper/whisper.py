@@ -257,7 +257,7 @@ def get_initial_tokens(tokenizer, options):
             prefix_tokens = prefix_tokens[-max_prefix_len:]
         tokens = tokens + prefix_tokens
 
-    if prompt:
+    if prompt or args.prompt:
         if args.prompt:
             prompt_arg_tokens = (
                 tokenizer.encode(args.prompt)
