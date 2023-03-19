@@ -64,7 +64,7 @@ parser = get_base_parser(
     'StrongSORT', VIDEO_PATH, None
 )
 parser.add_argument(
-    "--score_thre", type=float, default=0.8,
+    "--score_thre", type=float, default=0.6,
     help="Score threshould to filter the result.",
 )
 parser.add_argument(
@@ -82,7 +82,6 @@ parser.add_argument(
     help='Display preview in GUI.'
 )
 # tracking args
-parser.add_argument("--match_thresh", type=float, default=0.8, help="matching threshold for tracking")
 parser.add_argument('--min-box-area', type=float, default=10, help='filter out tiny boxes')
 args = update_parser(parser)
 
@@ -231,7 +230,7 @@ def benchmarking(net):
 
 
 def recognize_from_video(mod):
-    min_box_area = 0
+    min_box_area = args.min_box_area
 
     video_file = args.video if args.video else args.input[0]
     capture = get_capture(video_file)
@@ -274,6 +273,8 @@ def recognize_from_video(mod):
         online_tlwhs = []
         online_ids = []
         for t in tracker.tracks:
+            if not t.is_confirmed() or t.time_since_update > 0:
+                continue
             tlwh = t.to_tlwh()
             tid = t.track_id
             vertical = tlwh[2] / tlwh[3] > 1.6
