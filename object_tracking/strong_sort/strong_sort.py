@@ -21,6 +21,7 @@ from ecc import ECC
 from deep_sort import nn_matching
 from deep_sort.detection import Detection
 from deep_sort.tracker import Tracker
+from AppFreeLink import AFLink
 
 _this = os.path.dirname(os.path.abspath(__file__))
 top_path = os.path.dirname(os.path.dirname(_this))
@@ -245,7 +246,11 @@ def recognize_from_video(mod):
         writer = None
 
     tracker = mod["tracker"]
+    linker = mod["linker"]
 
+    track = []
+
+    frame_idx = 1
     prev_frame = None
     frame_shown = False
     while True:
@@ -265,6 +270,7 @@ def recognize_from_video(mod):
         ecc = compute_ecc(prev_frame, frame) if prev_frame is not None else None
         tracker.camera_update(ecc)
 
+        frame_idx += 1
         prev_frame = frame
 
         # run tracking
@@ -273,10 +279,14 @@ def recognize_from_video(mod):
         online_tlwhs = []
         online_ids = []
         for t in tracker.tracks:
-            if not t.is_confirmed() or t.time_since_update > 0:
+            if not t.is_confirmed() or t.time_since_update > 1:
                 continue
             tlwh = t.to_tlwh()
             tid = t.track_id
+            track.append([frame_idx, tid, tlwh[0], tlwh[1], tlwh[2], tlwh[3]])
+
+            if t.time_since_update > 0:
+                continue
             vertical = tlwh[2] / tlwh[3] > 1.6
             if tlwh[2] * tlwh[3] > min_box_area and not vertical:
                 online_tlwhs.append(tlwh)
@@ -299,6 +309,9 @@ def recognize_from_video(mod):
     cv2.destroyAllWindows()
     if writer is not None:
         writer.release()
+
+    track = np.array(track)
+    linker.link(track)
 
     logger.info('Script finished successfully.')
 
@@ -324,6 +337,7 @@ def main():
     env_id = args.env_id
 
     # initialize
+    aflink = ailia.Net("AFLink_epoch20.onnx.prototxt", "AFLink_epoch20.onnx", env_id=env_id)
     frid_net = ailia.Net(MODEL_FRID_PATH, WEIGHT_FRID_PATH, env_id=env_id)
 
     mem_mode = ailia.get_memory_mode(reduce_constant=True, reuse_interstage=True)
@@ -339,10 +353,18 @@ def main():
     )
     tracker = Tracker(metric)
 
+    linker = AFLink(
+        model=aflink,
+        thrT=(0, 30),  # (-10, 30) for CenterTrack, FairMOT, TransTrack.
+        thrS=75,
+        thrP=0.05  # 0.10 for CenterTrack, FairMOT, TransTrack.
+    )
+
     mod = {
         "detector": detector,
         "frid_net": frid_net,
         "tracker": tracker,
+        "linker": linker,
     }
 
     if args.benchmark:
