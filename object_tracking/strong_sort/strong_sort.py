@@ -12,7 +12,7 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser  # noqa: E402
+from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from image_utils import normalize_image  # noqa
 from webcamera_utils import get_capture, get_writer  # noqa: E402
@@ -22,6 +22,7 @@ from deep_sort import nn_matching
 from deep_sort.detection import Detection
 from deep_sort.tracker import Tracker
 from AppFreeLink import AFLink
+from GSI import GSInterpolation
 
 _this = os.path.dirname(os.path.abspath(__file__))
 top_path = os.path.dirname(os.path.dirname(_this))
@@ -56,6 +57,7 @@ REMOTE_YOLOX_PATH = \
     'https://storage.googleapis.com/ailia-models/yolox/'
 
 VIDEO_PATH = 'demo.mp4'
+SAVE_TEXT_PATH = 'output.txt'
 
 # ======================
 # Arguemnt Parser Config
@@ -71,6 +73,14 @@ parser.add_argument(
 parser.add_argument(
     "--nms_thre", type=float, default=0.7,
     help="NMS threshould.",
+)
+parser.add_argument(
+    '--AFLink', action='store_true',
+    help='Appearance-Free Link'
+)
+parser.add_argument(
+    '--GSI', action='store_true',
+    help='Gaussian-smoothed Interpolation'
 )
 parser.add_argument(
     '-m', '--model_type', default='mot17_x',
@@ -283,7 +293,7 @@ def recognize_from_video(mod):
                 continue
             tlwh = t.to_tlwh()
             tid = t.track_id
-            track.append([frame_idx, tid, tlwh[0], tlwh[1], tlwh[2], tlwh[3]])
+            track.append([frame_idx, tid, tlwh[0], tlwh[1], tlwh[2], tlwh[3], 1, -1, -1, -1])
 
             if t.time_since_update > 0:
                 continue
@@ -311,7 +321,23 @@ def recognize_from_video(mod):
         writer.release()
 
     track = np.array(track)
-    linker.link(track)
+
+    if args.AFLink:
+        track = linker.link(track)
+
+    if args.GSI:
+        track = GSInterpolation(
+            track,
+            interval=20,
+            tau=10
+        )
+
+    # save result
+    savepath = get_savepath(
+        args.savepath if args.savepath else SAVE_TEXT_PATH,
+        "video-%s" % args.video if args.video else args.input[0], ext='.txt')
+    logger.info(f'saved at : {savepath}')
+    np.savetxt(savepath, track, fmt='%d,%d,%.2f,%.2f,%.2f,%.2f,%.2f,%d,%d,%d')
 
     logger.info('Script finished successfully.')
 
