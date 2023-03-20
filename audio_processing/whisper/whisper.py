@@ -144,7 +144,7 @@ parser.add_argument(
     help='memory mode'
 )
 parser.add_argument(
-    '--prompt', default='prompt',
+    '--prompt', default=None,
     help='prompt for word vocabulary'
 )
 args = update_parser(parser)
