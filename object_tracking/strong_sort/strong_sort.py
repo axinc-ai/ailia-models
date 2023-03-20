@@ -33,6 +33,8 @@ logger = getLogger(__name__)
 # Parameters
 # ======================
 
+WEIGHT_AFLINK_PATH = 'AFLink_epoch20.onnx'
+MODEL_AFLINK_PATH = 'AFLink_epoch20.onnx.prototxt'
 WEIGHT_FRID_PATH = 'duke_bot_S50.onnx'
 MODEL_FRID_PATH = 'duke_bot_S50.onnx.prototxt'
 REMOTE_FRID_PATH = \
@@ -186,13 +188,14 @@ def predict(mod, img):
     dets[:, 2] -= dets[:, 0]
     dets[:, 3] -= dets[:, 1]
 
-    bboxes, confidences = dets[:, :4].astype(int), dets[:, 4]
-    mask = (0 < bboxes[:, 2]) & (0 < bboxes[:, 3])
+    bboxes, confidences = dets[:, :4], dets[:, 4]
+    align = bboxes.astype(int)
+    mask = (0 < align[:, 2]) & (0 < align[:, 3])
     bboxes = bboxes[mask]
     confidences = confidences[mask]
 
     crop_imgs = [
-        img[max(d[1], 0):d[1] + d[3], max(d[0], 0):d[0] + d[2], :] for d in bboxes
+        img[max(d[1], 0):d[1] + d[3], max(d[0], 0):d[0] + d[2], :] for d in align
     ]
     imgs = []
     for i, img in enumerate(crop_imgs):
@@ -280,9 +283,6 @@ def recognize_from_video(mod):
         ecc = compute_ecc(prev_frame, frame) if prev_frame is not None else None
         tracker.camera_update(ecc)
 
-        frame_idx += 1
-        prev_frame = frame
-
         # run tracking
         tracker.predict()
         tracker.update(detections)
@@ -301,6 +301,9 @@ def recognize_from_video(mod):
             if tlwh[2] * tlwh[3] > min_box_area and not vertical:
                 online_tlwhs.append(tlwh)
                 online_ids.append(tid)
+
+        frame_idx += 1
+        prev_frame = frame
 
         res_img = frame_vis_generator(frame, online_tlwhs, online_ids)
 
@@ -356,6 +359,8 @@ def main():
 
     # model files check and download
     check_and_download_models(WEIGHT_FRID_PATH, MODEL_FRID_PATH, REMOTE_FRID_PATH)
+    if args.AFLink:
+        check_and_download_models(WEIGHT_AFLINK_PATH, MODEL_AFLINK_PATH, REMOTE_FRID_PATH)
     check_and_download_models(
         WEIGHT_PATH, MODEL_PATH,
         REMOTE_BYTRK_PATH if model_type.startswith('mot') else REMOTE_YOLOX_PATH)
@@ -363,7 +368,9 @@ def main():
     env_id = args.env_id
 
     # initialize
-    aflink = ailia.Net("AFLink_epoch20.onnx.prototxt", "AFLink_epoch20.onnx", env_id=env_id)
+    linker = None
+    if args.AFLink:
+        linker = ailia.Net(MODEL_AFLINK_PATH, WEIGHT_AFLINK_PATH, env_id=env_id)
     frid_net = ailia.Net(MODEL_FRID_PATH, WEIGHT_FRID_PATH, env_id=env_id)
 
     mem_mode = ailia.get_memory_mode(reduce_constant=True, reuse_interstage=True)
@@ -380,7 +387,7 @@ def main():
     tracker = Tracker(metric)
 
     linker = AFLink(
-        model=aflink,
+        model=linker,
         thrT=(0, 30),  # (-10, 30) for CenterTrack, FairMOT, TransTrack.
         thrS=75,
         thrP=0.05  # 0.10 for CenterTrack, FairMOT, TransTrack.
