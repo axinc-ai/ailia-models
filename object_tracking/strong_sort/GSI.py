@@ -57,7 +57,7 @@ def GaussianSmooth(input_, tau):
         output_.extend([
             [t[i, 0], id_, xx[i], yy[i], ww[i], hh[i], 1, -1, -1, -1] for i in range(len(t))
         ])
-    return output_
+    return np.array(output_)
 
 
 # GSI

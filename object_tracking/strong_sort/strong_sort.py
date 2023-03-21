@@ -303,7 +303,7 @@ def recognize_from_video(mod):
                 online_ids.append(tid)
 
         frame_idx += 1
-        prev_frame = frame
+        prev_frame = np.copy(frame)
 
         res_img = frame_vis_generator(frame, online_tlwhs, online_ids)
 
