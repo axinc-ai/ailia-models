@@ -189,18 +189,23 @@ def predict(mod, img):
     dets[:, 3] -= dets[:, 1]
 
     bboxes, confidences = dets[:, :4], dets[:, 4]
-    align = bboxes.astype(int)
-    mask = (0 < align[:, 2]) & (0 < align[:, 3])
-    bboxes = bboxes[mask]
-    confidences = confidences[mask]
 
+    im = Image.fromarray(img)
     crop_imgs = [
-        img[max(d[1], 0):d[1] + d[3], max(d[0], 0):d[0] + d[2], :] for d in align
+        np.array(im.crop((b[0], b[1], b[0] + b[2], b[1] + b[3]))) for b in dets[:, :4]
     ]
+
+    mask = [True] * len(crop_imgs)
     imgs = []
     for i, img in enumerate(crop_imgs):
+        if img.shape[0] == 0 or img.shape[1] == 0:
+            mask[i] = False
+            continue
         img = preprocess(img)
         imgs.append(img)
+
+    bboxes = bboxes[mask]
+    confidences = confidences[mask]
 
     if len(imgs) == 0:
         return np.zeros((0, 0)), np.zeros((0, 0)), np.zeros((0, 0))
