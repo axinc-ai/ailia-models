@@ -10,6 +10,13 @@
 
 ![Output](output.png)
 
+## Requirements
+This model requires additional module for GSI.
+
+```
+pip3 install scikit-learn==0.19.2
+```
+
 ## Usage
 This sample code uses the same model as bytetrack for object detection.
 
