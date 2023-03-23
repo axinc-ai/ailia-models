@@ -217,6 +217,7 @@ cd ../../object_tracking/abd_net; python3 abd_net.py ${OPTION}
 cd ../../object_tracking/siam-mot; python3 siam-mot.py ${OPTION}
 cd ../../object_tracking/bytetrack; python3 bytetrack.py ${OPTION}
 cd ../../object_tracking/qd-3dt; python3 qd-3dt.py ${OPTION}
+cd ../../object_tracking/strong_sort; python3 strong_sort.py ${OPTION}
 cd ../../optical_flow_estimation/raft; python3 raft.py ${OPTION}
 cd ../../point_segmentation/pointnet_pytorch python3 pointnet_pytorch.py ${OPTION}
 cd ../../pose_estimation/lightweight-human-pose-estimation; python3 lightweight-human-pose-estimation.py ${OPTION}
