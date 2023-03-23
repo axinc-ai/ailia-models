@@ -108,7 +108,8 @@ def recognize_one_audio(input_path):
 
     if args.ailia_audio:
         wav_data,sr = sf.read(input_path)
-        wav_data = ailia.audio.resample(wav_data,sr,SAMPLE_RATE)
+        wav_data = np.transpose(wav_data, (1,0))
+        wav_data = ailia.audio.resample(wav_data,sr,SAMPLE_RATE)[0]
     else:
         wav_data = librosa.load(input_path, sr=SAMPLE_RATE)[0]
 
