@@ -140,6 +140,15 @@ num_colors = 50
 vis_colors = get_colors(num_colors)
 
 
+def rectangle(image, x, y, w, h):
+    color = (0, 255, 117)
+    thickness = 2
+
+    pt1 = int(x), int(y)
+    pt2 = int(x + w), int(y + h)
+    cv2.rectangle(image, pt1, pt2, color, thickness)
+
+
 def frame_vis_generator(frame, bboxes, ids):
     for i, entity_id in enumerate(ids):
         color = vis_colors[int(entity_id) % num_colors]
@@ -288,16 +297,19 @@ def recognize_from_video(mod):
         ecc = compute_ecc(prev_frame, frame) if prev_frame is not None else None
         tracker.camera_update(ecc)
 
+        prev_frame = np.copy(frame)
+
         # run tracking
         tracker.predict()
         tracker.update(detections)
         online_tlwhs = []
         online_ids = []
         for t in tracker.tracks:
-            if not t.is_confirmed() or t.time_since_update > 1:
-                continue
             tlwh = t.to_tlwh()
             tid = t.track_id
+            if not t.is_confirmed() or t.time_since_update > 1:
+                rectangle(frame, tlwh[0], tlwh[1], tlwh[2], tlwh[3])
+                continue
             track.append([frame_idx, tid, tlwh[0], tlwh[1], tlwh[2], tlwh[3], 1, -1, -1, -1])
 
             if t.time_since_update > 0:
@@ -308,7 +320,6 @@ def recognize_from_video(mod):
                 online_ids.append(tid)
 
         frame_idx += 1
-        prev_frame = np.copy(frame)
 
         res_img = frame_vis_generator(frame, online_tlwhs, online_ids)
 
@@ -328,12 +339,15 @@ def recognize_from_video(mod):
     if writer is not None:
         writer.release()
 
-    track = np.array(track)
+    if 0 < len(track):
+        track = np.array(track)
+    else:
+        track = np.zeros((0, 10))
 
-    if args.AFLink:
+    if args.AFLink and 0 < len(track):
         track = linker.link(track)
 
-    if args.GSI:
+    if args.GSI and 0 < len(track):
         track = GSInterpolation(
             track,
             interval=20,
