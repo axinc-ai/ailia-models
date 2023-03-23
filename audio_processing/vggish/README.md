@@ -1,4 +1,4 @@
-# vggish
+# vggish : a feature embedding frontend for audio classification
 
 ## Input
 
