@@ -11,10 +11,22 @@ sys.path.append('../../util')
 from utils import get_base_parser, update_parser  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 
+from kaldifeat import compute_fbank_feats
+
 # logger
 from logging import getLogger  # noqa: E402
 
 logger = getLogger(__name__)
+
+use_torch = True
+
+try:
+    import torch
+    import torchaudio.compliance.kaldi as kaldi
+except ImportError:
+    if use_torch:
+        logger.warning("The torchaudio is not installed, use another means.")
+    use_torch = False
 
 # ======================
 # Parameters
@@ -24,15 +36,7 @@ WEIGHT_VOX_PATH = 'voxceleb_resnet34.onnx'
 MODEL_VOX_PATH = 'voxceleb_resnet34.onnx.prototxt'
 WEIGHT_CNC_PATH = 'cnceleb_resnet34.onnx'
 MODEL_CNC_PATH = 'cnceleb_resnet34.onnx.prototxt'
-REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/we_speaker/'
-
-# Audio
-SAMPLING_RATE = 16000
-
-# Mel-filterbank
-WINDOW_LENGTH = 25  # In milliseconds
-WINDOW_STEP = 10  # In milliseconds
-N_FFT = 512
+REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/wespeaker/'
 
 THRESHOLD = 0.7
 
@@ -55,6 +59,14 @@ parser.add_argument(
     '-th', '--threshold',
     default=THRESHOLD, type=float,
     help='The similar threshold for verification.'
+)
+parser.add_argument(
+    '-en', '--english', action='store_true',
+    help='Language is English.'
+)
+parser.add_argument(
+    '-cn', '--chinese', action='store_true',
+    help='Language is Chinese.'
 )
 parser.add_argument(
     '--onnx',
@@ -96,30 +108,33 @@ def cosine_score(emb1, emb2):
 def extract_fbank_features(
         waveform: np.ndarray, sample_rate, cmn=True) -> np.ndarray:
     """
-    Get mel-filter bank features using TorchAudio. Note that TorchAudio requires 16-bit signed integers as inputs
-    and hence the waveform should not be normalized before feature extraction.
+    the waveform should not be normalized before feature extraction.
     """
-    import torch
-    import torchaudio.compliance.kaldi as kaldi
-
-    waveform = waveform * (1 << 15)  # Kaldi compliance: 16-bit signed integers
-    waveform = torch.from_numpy(waveform).unsqueeze(0)
     num_mel_bins = 80
     frame_length = 25
     frame_shift = 10
     dither = 0.0
-    mat = kaldi.fbank(
-        waveform,
-        num_mel_bins=num_mel_bins,
-        frame_length=frame_length,
-        frame_shift=frame_shift,
-        dither=dither,
-        sample_frequency=sample_rate,
-        window_type='hamming',
-        use_energy=False)
-    feats = mat.numpy()
-    print("feats---1", feats)
-    print("feats---1", feats.shape)
+    waveform = (waveform * (1 << 15))  # 16-bit signed integers
+    if use_torch:
+        waveform = torch.from_numpy(waveform).unsqueeze(0)
+        mat = kaldi.fbank(
+            waveform,
+            num_mel_bins=num_mel_bins,
+            frame_length=frame_length,
+            frame_shift=frame_shift,
+            dither=dither,
+            sample_frequency=sample_rate,
+            window_type='hamming',
+            use_energy=False)
+        feats = mat.numpy()
+    else:
+        feats = compute_fbank_feats(
+            waveform,
+            dither=dither,
+            frame_length=frame_length,
+            frame_shift=frame_shift,
+            num_mel_bins=num_mel_bins,
+        )
 
     if cmn:
         # CMN, without CVN
@@ -132,6 +147,7 @@ def predict(waveform, net, sample_rate):
     # initial preprocesses
     feats = extract_fbank_features(waveform, sample_rate)
     feats = np.expand_dims(feats, axis=0)
+    feats = feats.astype(np.float32)
 
     # feedforward
     if not args.onnx:
@@ -144,7 +160,7 @@ def predict(waveform, net, sample_rate):
 
 
 def speaker_verification(net):
-    input1 = args.input1 or args.input[0]
+    input1 = args.input1 or (args.input[0] if args.input else None)
     input2 = args.input2
     threshold = args.threshold
 
@@ -186,10 +202,8 @@ def main():
     # model files check and download
     check_and_download_models(WEIGHT_VOX_PATH, MODEL_VOX_PATH, REMOTE_PATH)
     check_and_download_models(WEIGHT_CNC_PATH, MODEL_CNC_PATH, REMOTE_PATH)
-    # MODEL_PATH = MODEL_VOX_PATH
-    # WEIGHT_PATH = WEIGHT_VOX_PATH
-    MODEL_PATH = MODEL_CNC_PATH
-    WEIGHT_PATH = WEIGHT_CNC_PATH
+    MODEL_PATH, WEIGHT_PATH = (MODEL_VOX_PATH, WEIGHT_VOX_PATH) \
+        if args.english or not args.chinese else (MODEL_CNC_PATH, WEIGHT_CNC_PATH)
 
     env_id = args.env_id
 
