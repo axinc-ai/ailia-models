@@ -27,7 +27,7 @@ MODEL_16s_PATH = 'pytorch_fcn16s.onnx.prototxt'
 WEIGHT_16s_PATH = 'pytorch_fcn16s.onnx'
 MODEL_32s_PATH = 'pytorch_fcn32s.onnx.prototxt'
 WEIGHT_32s_PATH = 'pytorch_fcn32s.onnx'
-REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/'
+REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/pytorch_fcn/'
 
 IMAGE_PATH = 'image.jpg'
 SAVE_IMAGE_PATH = 'result.jpg'
@@ -113,18 +113,18 @@ def segment_image(img, net):
 # Main functions
 # ======================
 def recognize(net):
-    # load image
-    logger.info(IMAGE_PATH)
-    img = load_image(IMAGE_PATH)
+    image_path = args.input[0]
+    logger.info(image_path)
+    img = load_image(image_path)
     logger.debug(f'input image shape: {img.shape}')
 
     # inference
     logger.info('Start inference...')
     out = segment_image(img, net)
 
-    logger.info(f'save at : ./result.jpg')
-    cv2.imwrite('./result.jpg', out)
-
+    savepath = get_savepath(args.savepath, image_path)
+    logger.info(f'save at : {savepath}')
+    cv2.imwrite(savepath, out)
     logger.info('Script finished successfully.')
 
 def main():
@@ -133,10 +133,12 @@ def main():
         MODEL_LIST[1]: (WEIGHT_16s_PATH, MODEL_16s_PATH),
         MODEL_LIST[2]: (WEIGHT_32s_PATH, MODEL_32s_PATH)
     }
-    WEIGHT_PATH, MODEL_PATH = info[args.model_type]
+    weight_path, model_path = info[args.model_type]
+    check_and_download_models(weight_path, model_path, REMOTE_PATH)
+    
     logger.info('model type : ' + args.model_type)
     mem_mode = ailia.get_memory_mode(reduce_constant=True, reuse_interstage=True)
-    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, memory_mode=mem_mode)
+    net = ailia.Net(model_path, weight_path, memory_mode=mem_mode)
 
     recognize(net)
 
