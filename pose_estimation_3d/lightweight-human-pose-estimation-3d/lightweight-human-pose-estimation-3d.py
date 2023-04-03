@@ -78,12 +78,6 @@ def main():
     check_file_existance(FILE_PATH)
 
     # prepare input data
-    canvas_3d = np.zeros((720, 1280, 3), dtype=np.uint8)
-    plotter = Plotter3d(canvas_3d.shape[:2])
-    canvas_3d_window_name = 'Canvas3D'
-    cv2.namedWindow(canvas_3d_window_name)
-    cv2.setMouseCallback(canvas_3d_window_name, Plotter3d.mouse_callback)
-
     with open(FILE_PATH, 'r') as f:
         extrinsics = json.load(f)
 
@@ -96,6 +90,13 @@ def main():
     else:
         frame_provider = VideoReader(args.video)
         is_video = True
+
+    canvas_3d = np.zeros((720, 1280, 3), dtype=np.uint8)
+    canvas_3d_window_name = 'Canvas3D'
+    plotter = Plotter3d(canvas_3d.shape[:2])
+    if is_video or args.rotate3d:
+        cv2.namedWindow(canvas_3d_window_name)
+        cv2.setMouseCallback(canvas_3d_window_name, Plotter3d.mouse_callback)
 
     fx = -1
     delay = 1
@@ -221,36 +222,37 @@ def main():
             logger.info(f'saved at : {savepath}')
             cv2.imwrite(savepath, frame)
 
-        key = cv2.waitKey(delay)
-        if key == esc_code or key == q_code:
-            break
-        if cv2.getWindowProperty('ICV 3D Human Pose Estimation', cv2.WND_PROP_VISIBLE) == 0:
-            break
-        if cv2.getWindowProperty(canvas_3d_window_name, cv2.WND_PROP_VISIBLE) == 0:
-            break
-        if key == p_code:
-            if delay == 1:
-                delay = 0
-            else:
-                delay = 1
-
-        if delay == 0 and args.rotate3d:
-            key = 0
-            while (key != p_code
-                   and key != esc_code
-                   and key != q_code
-                   and key != space_code):
-                plotter.plot(canvas_3d, poses_3d, edges)
-                cv2.imshow(canvas_3d_window_name, canvas_3d)
-                key = cv2.waitKey(33)
-                if cv2.getWindowProperty(canvas_3d_window_name, cv2.WND_PROP_VISIBLE) == 0:
-                    break
+        if is_video or args.rotate3d:
+            key = cv2.waitKey(delay)
             if key == esc_code or key == q_code:
                 break
-            elif cv2.getWindowProperty(canvas_3d_window_name, cv2.WND_PROP_VISIBLE) == 0:
+            if cv2.getWindowProperty('ICV 3D Human Pose Estimation', cv2.WND_PROP_VISIBLE) == 0:
                 break
-            else:
-                delay = 1
+            if cv2.getWindowProperty(canvas_3d_window_name, cv2.WND_PROP_VISIBLE) == 0:
+                break
+            if key == p_code:
+                if delay == 1:
+                    delay = 0
+                else:
+                    delay = 1
+
+            if delay == 0 and args.rotate3d:
+                key = 0
+                while (key != p_code
+                       and key != esc_code
+                       and key != q_code
+                       and key != space_code):
+                    plotter.plot(canvas_3d, poses_3d, edges)
+                    cv2.imshow(canvas_3d_window_name, canvas_3d)
+                    key = cv2.waitKey(33)
+                    if cv2.getWindowProperty(canvas_3d_window_name, cv2.WND_PROP_VISIBLE) == 0:
+                        break
+                if key == esc_code or key == q_code:
+                    break
+                elif cv2.getWindowProperty(canvas_3d_window_name, cv2.WND_PROP_VISIBLE) == 0:
+                    break
+                else:
+                    delay = 1
 
     if writer is not None:
         writer.release()

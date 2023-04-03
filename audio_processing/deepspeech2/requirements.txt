@@ -1,10 +1,10 @@
 appdirs==1.4.4
 audioread==2.1.9
-certifi==2020.6.20
+certifi==2022.12.7
 cffi==1.14.3
 chardet==3.0.4
 decorator==4.4.2
-future==0.18.2
+future==0.18.3
 idna==2.10
 joblib==1.2.0
 librosa==0.8.0
@@ -24,6 +24,6 @@ scipy==1.5.3
 six==1.15.0
 SoundFile==0.10.3.post1
 threadpoolctl==2.1.0
-torch==1.6.0
+torch==1.13.1
 torchvision==0.7.0
 urllib3==1.26.5

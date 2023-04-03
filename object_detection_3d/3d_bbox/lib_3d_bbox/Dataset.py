@@ -287,7 +287,7 @@ class DetectedObject:
     def format_img(self, img, box_2d):
 
         # Should this happen? or does normalize take care of it. YOLO doesnt like
-        # img=img.astype(np.float) / 255
+        # img=img.astype(float) / 255
 
         # torch transforms
         normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
