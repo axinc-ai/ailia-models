@@ -12,6 +12,7 @@ import onnxruntime as rt
 sys.path.append('../../util')
 from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
+from image_utils import imread
 
 # logger
 from logging import getLogger   # noqa: E402
@@ -54,7 +55,7 @@ args = update_parser(parser)
 # Utils
 # ======================
 def load_image(input_path):
-    return np.array(Image.open(input_path))
+    return imread(input_path)
 
 def preprocess(img):
     img = cv2.resize(
