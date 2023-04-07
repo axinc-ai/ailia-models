@@ -1,4 +1,12 @@
-# Leveraging BERT for Extractive Text Summarization on Lectures
+# Leveraging BERT for Extractive Text Summarization on Lectures for Japanese
+
+Get a feature vector for each sentence with Japanese BERT from the text. Cluster the feature vectors. Display the cluster center points as a summary.
+
+### Requirements
+
+```
+pip3 install spacy
+```
 
 ### Input
 A text file with a new line for each sentence.
@@ -11,7 +19,7 @@ Top `NUM_PREDICTS` extracted summary statements.
 Automatically downloads the onnx and prototxt files on the first run.
 It is necessary to be connected to the Internet while downloading.
 
-For the sample text file,
+For the sample japanese text file,
 ```bash
 $ python3 bert_sum_ext.py
 ```
