@@ -8,3 +8,5 @@ unidic-lite
 fugashi
 ipadic
 datasets
+spacy[ja]
+scikit-learn
