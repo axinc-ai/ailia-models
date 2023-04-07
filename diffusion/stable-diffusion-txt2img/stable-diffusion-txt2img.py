@@ -53,7 +53,7 @@ parser.add_argument(
     help="sample this often",
 )
 parser.add_argument(
-    "--n_samples", type=int, default=3,
+    "--n_samples", type=int, default=1,
     help="how many samples to produce for the given prompt",
 )
 parser.add_argument(
@@ -94,6 +94,13 @@ parser.add_argument(
     help='execute onnxruntime version.'
 )
 args = update_parser(parser, check_input_type=False)
+
+
+# ======================
+# Options
+# ======================
+
+FIX_CONSTANT_CONTEXT = True
 
 
 # ======================
@@ -194,29 +201,48 @@ def plms_sampling(
 
     b = shape[0]
     old_eps = []
+
+    if args.benchmark:
+        logger.info('BENCHMARK mode')
+        total_time_estimation = 0
+
     for i, step in enumerate(iterator):
         index = total_steps - i - 1
         ts = np.full((b,), step, dtype=np.int64)
         ts_next = np.full((b,), time_range[min(i + 1, len(time_range) - 1)], dtype=np.int64)
 
+        if args.benchmark:
+            start = int(round(time.time() * 1000))
+
         outs = p_sample_plms(
             models,
             img, cond, ts,
+            update_context=(i==0),
             index=index,
             unconditional_guidance_scale=unconditional_guidance_scale,
             unconditional_conditioning=unconditional_conditioning,
             old_eps=old_eps, t_next=ts_next,
         )
+
+        if args.benchmark:
+            end = int(round(time.time() * 1000))
+            estimation_time = (end - start)
+            logger.info(f'\tailia processing estimation time {estimation_time} ms')
+            total_time_estimation = total_time_estimation + estimation_time
+
         img, pred_x0, e_t = outs
         old_eps.append(e_t)
         if len(old_eps) >= 4:
             old_eps.pop(0)
 
+    if args.benchmark:
+        logger.info(f'\ttotal time estimation {total_time_estimation} ms')
+
     return img
 
 
 def p_sample_plms(
-        models, x, c, t, index,
+        models, x, c, t, update_context, index,
         temperature=1.,
         unconditional_guidance_scale=1.,
         unconditional_conditioning=None,
@@ -227,7 +253,7 @@ def p_sample_plms(
         x_in = np.concatenate([x] * 2)
         t_in = np.concatenate([t] * 2)
         c_in = np.concatenate([unconditional_conditioning, c])
-        x_recon = apply_model(models, x_in, t_in, c_in)
+        x_recon = apply_model(models, x_in, t_in, c_in, update_context)
         e_t_uncond, e_t = np.split(x_recon, 2)
 
         e_t = e_t_uncond + unconditional_guidance_scale * (e_t - e_t_uncond)
@@ -324,7 +350,7 @@ def p_sample_ddim(
     t_in = np.concatenate([t] * 2)
     c_in = np.concatenate([unconditional_conditioning, c])
 
-    x_recon = apply_model(models, x_in, t_in, c_in)
+    x_recon = apply_model(models, x_in, t_in, c_in, True)
     e_t_uncond, e_t = np.split(x_recon, 2)
 
     e_t = e_t_uncond + unconditional_guidance_scale * (e_t - e_t_uncond)
@@ -354,20 +380,30 @@ def p_sample_ddim(
 
 
 # ddpm
-def apply_model(models, x, t, cc):
+def apply_model(models, x, t, cc, update_context):
     diffusion_emb = models["diffusion_emb"]
     diffusion_mid = models["diffusion_mid"]
     diffusion_out = models["diffusion_out"]
 
     x = x.astype(np.float16)
     if not args.onnx:
-        output = diffusion_emb.predict([x, t, cc])
+        if not FIX_CONSTANT_CONTEXT or update_context:
+            output = diffusion_emb.predict([x, t, cc])
+        else:
+            output = diffusion_emb.run({'x': x, 'timesteps': t})
     else:
         output = diffusion_emb.run(None, {'x': x, 'timesteps': t, 'context': cc})
     h, emb, *hs = output
 
     if not args.onnx:
-        output = diffusion_mid.predict([h, emb, cc, *hs[6:]])
+        if not FIX_CONSTANT_CONTEXT or update_context:
+            output = diffusion_mid.predict([h, emb, cc, *hs[6:]])
+        else:
+            output = diffusion_mid.run({
+                'h': h, 'emb': emb,
+                'h6': hs[6], 'h7': hs[7], 'h8': hs[8],
+                'h9': hs[9], 'h10': hs[10], 'h11': hs[11],
+            })
     else:
         output = diffusion_mid.run(None, {
             'h': h, 'emb': emb, 'context': cc,
@@ -377,7 +413,14 @@ def apply_model(models, x, t, cc):
     h = output[0]
 
     if not args.onnx:
-        output = diffusion_out.predict([h, emb, cc, *hs[:6]])
+        if not FIX_CONSTANT_CONTEXT or update_context:
+            output = diffusion_out.predict([h, emb, cc, *hs[:6]])
+        else:
+            output = diffusion_out.run({
+                'h': h, 'emb': emb,
+                'h0': hs[0], 'h1': hs[1], 'h2': hs[2],
+                'h3': hs[3], 'h4': hs[4], 'h5': hs[5],
+            })
     else:
         output = diffusion_out.run(None, {
             'h': h, 'emb': emb, 'context': cc,
@@ -466,24 +509,7 @@ def recognize_from_text(models):
     all_samples = []
     for i in range(n_iter):
         logger.info("iteration: %s" % (i + 1))
-
-        if args.benchmark:
-            logger.info('BENCHMARK mode')
-            total_time_estimation = 0
-            for i in range(args.benchmark_count):
-                start = int(round(time.time() * 1000))
-                x_samples = predict(models, cond_stage_model, prompt, uc)
-                end = int(round(time.time() * 1000))
-                estimation_time = (end - start)
-
-                # Logging
-                logger.info(f'\tailia processing estimation time {estimation_time} ms')
-                if i != 0:
-                    total_time_estimation = total_time_estimation + estimation_time
-
-            logger.info(f'\taverage time estimation {total_time_estimation / (args.benchmark_count - 1)} ms')
-        else:
-            x_samples = predict(models, cond_stage_model, prompt, uc)
+        x_samples = predict(models, cond_stage_model, prompt, uc)
 
         for img in x_samples:
             sample_file = os.path.join(sample_path, f"{base_count:04}.png")
@@ -513,6 +539,11 @@ def main():
 
     # initialize
     if not args.onnx:
+        # disable FP16
+        if "FP16" in ailia.get_environment(args.env_id).props:
+            logger.warning('This model do not work on FP16. So use CPU mode.')
+            env_id = 0
+
         logger.info("This model requires 10GB or more memory.")
         memory_mode = ailia.get_memory_mode(
             reduce_constant=True, ignore_input_with_initializer=True,
