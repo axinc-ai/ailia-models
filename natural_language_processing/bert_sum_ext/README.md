@@ -5,13 +5,23 @@ Get a feature vector for each sentence with Japanese BERT from the text. Cluster
 ### Requirements
 
 ```
-pip3 install spacy
+pip3 install spacy sudachipy sudachidict_core
 ```
 
 ### Input
 A text file with a new line for each sentence.
 
+[sample.txt](sample.txt)
+
 ### Output
+
+```
+基盤モデルの概要
+基盤モデル（Foundation Model）とは、大量のデータから学習することで、高い汎化性能を獲得したAIのことです。
+特に、基盤モデルはデータセットが巨大であるため、ConvolutionよりもVision Transformerを使用する方が性能が高くなっています。
+当面、エッジでの計算リソースの関係で、基盤モデルの活用は限定的になる可能性もありますが、計算リソースはハードウェアの進化と共に、増加していくため、どこかのタイミングで基盤モデルが席巻するものと考えられます。
+```
+
 Top `NUM_PREDICTS` extracted summary statements.  
 `NUM_PREDICTS` is defined in `bert_sum_ext.py`
 
