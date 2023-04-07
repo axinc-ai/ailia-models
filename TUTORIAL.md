@@ -43,6 +43,7 @@ sudo apt install python3-matplotlib
 sudo apt install python3-scipy
 pip3 install cython
 pip3 install numpy
+pip3 install pillow
 ```
 
 [OpenCV for python3 is pre-installed on Jetson.](https://forums.developer.nvidia.com/t/install-opencv-for-python3-in-jetson-nano/74042/3) You only need to run this command if you get a cv2 import error.

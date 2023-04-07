@@ -58,7 +58,7 @@ def read_wave(path):
     wav, source_sr = librosa.load(path, sr=None)
     # Resample the wav if needed
     if source_sr is not None and source_sr != SAMPLING_RATE:
-        wav = librosa.resample(wav, source_sr, SAMPLING_RATE)
+        wav = librosa.resample(wav, orig_sr=source_sr, target_sr=SAMPLING_RATE)
 
     return wav
 

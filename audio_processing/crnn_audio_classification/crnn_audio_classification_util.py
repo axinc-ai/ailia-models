@@ -1,5 +1,5 @@
 import torch
-from torchaudio.transforms import Spectrogram, MelSpectrogram, ComplexNorm
+from torchaudio.transforms import Spectrogram, MelSpectrogram
 
 
 class MelspectrogramStretch(object):
@@ -26,9 +26,6 @@ class MelspectrogramStretch(object):
             n_mels=num_mels
         )
 
-        # Normalization (pot spec processing)
-        self.complex_norm = ComplexNorm(power=2.)
-
     def forward(self, data):
         tsf = AudioTransforms()
         sig_t, sr, _ = tsf.apply(data, None)
@@ -46,7 +43,7 @@ class MelspectrogramStretch(object):
         # x -> (fft_length//2+1,bins,channel)
 
         # print(x.shape)  #torch.Size([1, 1, 1025, 173, 2])
-        x = self.complex_norm(x)
+        x = x.abs().pow(2.) # ComplexNorm(power=2.)
         # print(x.shape)  #torch.Size([1, 1, 1025, 173])
         x = self.mst.mel_scale(x)
         # print(x.shape)  #torch.Size([1, 1, 128, 173])
