@@ -2,6 +2,7 @@ import os
 import sys
 import time
 import math
+import numpy as np
 
 import cv2
 
@@ -22,8 +23,6 @@ logger = getLogger(__name__)
 # ======================
 # Parameters
 # ======================
-WEIGHT_PATH = 'yolov3-tiny.opt.onnx'
-MODEL_PATH = 'yolov3-tiny.opt.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/yolov3-tiny/'
 
 IMAGE_PATH = 'input.jpg'
@@ -78,31 +77,93 @@ parser.add_argument(
     default=DETECTION_SIZE, type=int,
     help='The detection height and height for yolo. (default: 416)'
 )
+parser.add_argument(
+    '--onnx',
+    action='store_true',
+    help='Use onnx runtime.'
+)
+parser.add_argument(
+    '--quantize',
+    action='store_true',
+    help='Use quantized model.'
+)
 args = update_parser(parser)
 
+if args.onnx or args.quantize:
+    import onnxruntime
+
+if args.quantize:
+    WEIGHT_PATH = 'yolov3-tiny_int8_per_tensor.opt.onnx'
+    MODEL_PATH = 'yolov3-tiny_int8_per_tensor.opt.onnx.prototxt'
+else:
+    WEIGHT_PATH = 'yolov3-tiny.opt.onnx'
+    MODEL_PATH = 'yolov3-tiny.opt.onnx.prototxt'
+
+# ======================
+# Quantized model functions
+# ======================
+
+def letterbox_image(image, size):
+    '''resize image with unchanged aspect ratio using padding'''
+    ih, iw, c = image.shape
+    w, h = size
+    scale = min(w/iw, h/ih)
+    nw = int(iw*scale)
+    nh = int(ih*scale)
+
+    image = cv2.resize(image, (nw,nh))
+    new_image = np.zeros((w, h, 3))
+    new_image[(h-nh)//2:(h-nh)//2+nh,(w-nw)//2:(w-nw)//2+nw,0:3] = image[0:nh,0:nw,0:3]
+    new_image = new_image[:,:,::-1] # bgr to rgb
+    return new_image, nw, nh, (w - nw)//2, (h - nh) //2
+
+def detect_quantized_model(detector, image):
+    model_image_size = [args.detection_width, args.detection_height]
+    boxed_image, nw, nh, ow, oh = letterbox_image(image, model_image_size)
+
+    image_data = np.array(boxed_image, dtype='float32')
+    image_data /= 255.
+    image_data = np.transpose(image_data, [2, 0, 1])
+
+    image_data = np.expand_dims(image_data, 0)  # Add batch dimension.
+    feed_f = dict(zip(['input_1', 'image_shape', 'iou_threshold', 'layer.score_threshold'],
+                        (image_data, np.array([args.detection_height, args.detection_width],dtype='float32').reshape(1, 2),
+                        np.array([args.iou], dtype='float32').reshape(1),
+                        np.array([args.threshold], dtype='float32').reshape(1))))
+    all_boxes, all_scores, indices = detector.run(None, input_feed=feed_f)
+
+    out_boxes, out_scores, out_classes = [], [], []
+    for idx_ in indices:
+        out_classes.append(idx_[1])
+        out_scores.append(all_scores[tuple(idx_)])
+        idx_1 = (idx_[0], idx_[2])
+        out_boxes.append(all_boxes[idx_1])
+
+    detections = []
+    for i, c in reversed(list(enumerate(out_classes))):
+        box = out_boxes[i]
+        score = out_scores[i]
+        top, left, bottom, right = box
+        top = (top - oh) / nh
+        left = (left - ow) / nw
+        bottom = (bottom - oh) / nh
+        right = (right - ow) / nw
+
+        obj = ailia.DetectorObject(
+            category=c,
+            prob=score,
+            x=left,
+            y=top,
+            w=right - left,
+            h=bottom - top)
+        detections.append(obj)
+
+    return detections
 
 # ======================
 # Main functions
 # ======================
-def recognize_from_image():
-    # net initialize
-    detector = ailia.Detector(
-        MODEL_PATH,
-        WEIGHT_PATH,
-        len(COCO_CATEGORY),
-        format=ailia.NETWORK_IMAGE_FORMAT_RGB,
-        channel=ailia.NETWORK_IMAGE_CHANNEL_FIRST,
-        range=ailia.NETWORK_IMAGE_RANGE_U_FP32,
-        algorithm=ailia.DETECTOR_ALGORITHM_YOLOV3,
-        env_id=args.env_id,
-    )
-    if args.detection_width != DETECTION_SIZE or args.detection_height != DETECTION_SIZE:
-        detector.set_input_shape(
-            args.detection_width, args.detection_height
-        )
-    if args.profile:
-        detector.set_profile_mode(True)
-
+def recognize_from_image(detector):
     # input image loop
     for image_path in args.input:
         # prepare input data
@@ -117,17 +178,25 @@ def recognize_from_image():
             total_time = 0
             for i in range(args.benchmark_count):
                 start = int(round(time.time() * 1000))
-                detector.compute(img, args.threshold, args.iou)
+                if args.quantize or args.onnx:
+                    detections = detect_quantized_model(detector, img)
+                else:
+                    detector.compute(img, args.threshold, args.iou)
+                    detections = detector
                 end = int(round(time.time() * 1000))
                 if i != 0:
                     total_time = total_time + (end - start)
                 logger.info(f'\tailia processing time {end - start} ms')
             logger.info(f'\taverage time {total_time / (args.benchmark_count-1)} ms')
         else:
-            detector.compute(img, args.threshold, args.iou)
+            if args.quantize or args.onnx:
+                detections = detect_quantized_model(detector, img)
+            else:
+                detector.compute(img, args.threshold, args.iou)
+                detections = detector
 
         # plot result
-        res_img = plot_results(detector, img, COCO_CATEGORY)
+        res_img = plot_results(detections, img, COCO_CATEGORY)
         savepath = get_savepath(args.savepath, image_path)
         logger.info(f'saved at : {savepath}')
         cv2.imwrite(savepath, res_img)
@@ -135,7 +204,7 @@ def recognize_from_image():
         # write prediction
         if args.write_prediction:
             pred_file = '%s.txt' % savepath.rsplit('.', 1)[0]
-            write_predictions(pred_file, detector, img, COCO_CATEGORY)
+            write_predictions(pred_file, detections, img, COCO_CATEGORY)
 
     if args.profile:
         print(detector.get_summary())
@@ -143,23 +212,7 @@ def recognize_from_image():
     logger.info('Script finished successfully.')
 
 
-def recognize_from_video():
-    # net initialize
-    detector = ailia.Detector(
-        MODEL_PATH,
-        WEIGHT_PATH,
-        len(COCO_CATEGORY),
-        format=ailia.NETWORK_IMAGE_FORMAT_RGB,
-        channel=ailia.NETWORK_IMAGE_CHANNEL_FIRST,
-        range=ailia.NETWORK_IMAGE_RANGE_U_FP32,
-        algorithm=ailia.DETECTOR_ALGORITHM_YOLOV3,
-        env_id=args.env_id,
-    )
-    if args.detection_width != DETECTION_SIZE or args.detection_height != DETECTION_SIZE:
-        detector.set_input_shape(
-            args.detection_width, args.detection_height
-        )
-
+def recognize_from_video(detector):
     capture = webcamera_utils.get_capture(args.video)
 
     # create video writer if savepath is specified as video format
@@ -184,8 +237,12 @@ def recognize_from_video():
             break
 
         img = cv2.cvtColor(frame, cv2.COLOR_BGR2BGRA)
-        detector.compute(img, args.threshold, args.iou)
-        res_img = plot_results(detector, frame, COCO_CATEGORY, False)
+        if args.quantize or args.onnx:
+            detections = detect_quantized_model(detector, img)
+        else:
+            detector.compute(img, args.threshold, args.iou)
+            detections = detector
+        res_img = plot_results(detections, frame, COCO_CATEGORY, False)
         cv2.imshow('frame', res_img)
         frame_shown = True
 
@@ -197,7 +254,7 @@ def recognize_from_video():
         if args.write_prediction:
             savepath = get_savepath(args.savepath, video_name, post_fix = '_%s' % (str(frame_count).zfill(frame_digit) + '_res'), ext='.png')
             pred_file = '%s.txt' % savepath.rsplit('.', 1)[0]
-            write_predictions(pred_file, detector, frame, COCO_CATEGORY)
+            write_predictions(pred_file, detections, frame, COCO_CATEGORY)
             frame_count += 1
 
     capture.release()
@@ -211,12 +268,33 @@ def main():
     # model files check and download
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
 
+    # net initialize
+    if args.quantize or args.onnx:
+        detector = onnxruntime.InferenceSession(WEIGHT_PATH)
+    else:
+        detector = ailia.Detector(
+            MODEL_PATH,
+            WEIGHT_PATH,
+            len(COCO_CATEGORY),
+            format=ailia.NETWORK_IMAGE_FORMAT_RGB,
+            channel=ailia.NETWORK_IMAGE_CHANNEL_FIRST,
+            range=ailia.NETWORK_IMAGE_RANGE_U_FP32,
+            algorithm=ailia.DETECTOR_ALGORITHM_YOLOV3,
+            env_id=args.env_id,
+        )
+        if args.detection_width != DETECTION_SIZE or args.detection_height != DETECTION_SIZE:
+            detector.set_input_shape(
+                args.detection_width, args.detection_height
+            )
+        if args.profile:
+            detector.set_profile_mode(True)
+
     if args.video is not None:
         # video mode
-        recognize_from_video()
+        recognize_from_video(detector)
     else:
         # image mode
-        recognize_from_image()
+        recognize_from_image(detector)
 
 
 if __name__ == '__main__':

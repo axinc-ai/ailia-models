@@ -54,3 +54,5 @@ ONNX opset=10
 ## Netron
 
 [yolov3-tiny.opt.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/yolov3-tiny/yolov3-tiny.opt.onnx.prototxt)
+
+[yolov3-tiny_int8_per_tensor.opt.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/yolov3-tiny/yolov3-tiny_int8_per_tensor.opt.onnx.prototxt)
