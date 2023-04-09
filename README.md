@@ -12,7 +12,7 @@ The collection of pre-trained, state-of-the-art AI models.
 
 [ailia MODELS tutorial 日本語版](TUTORIAL_jp.md)
 
-# Supported models (272 models as of 2023/05/07)
+# Supported models (272 models as of 2023/04/07)
 
 ## Action recognition
 
