@@ -189,6 +189,9 @@ def recognize_from_video(net):
         # draw
         frame = draw_bboxes(frame, detections)
 
+        # show
+        cv2.imshow("frame", frame)
+
         # save results
         if writer is not None:
             res_img = frame
