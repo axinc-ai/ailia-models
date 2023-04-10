@@ -210,6 +210,7 @@ cd ../../object_detection/dab-detr; python3 dab-detr.py ${OPTION}
 cd ../../object_detection/glip; python3 glip.py ${OPTION}
 cd ../../object_detection/poly_yolo; python3 poly_yolo.py ${OPTION}
 cd ../../object_detection/crowd_det; python3 crowd_det.py ${OPTION}
+cd ../../object_detection/footandball; python3 footandball.py ${OPTION}
 cd ../../object_detection_3d/3d_bbox; python3 3d_bbox.py ${OPTION}
 cd ../../object_detection_3d/3d-object-detection.pytorch; python3 3d-object-detection.pytorch.py ${OPTION}
 cd ../../object_detection_3d/mediapipe_objectron; python3 mediapipe_objectron.py ${OPTION}
