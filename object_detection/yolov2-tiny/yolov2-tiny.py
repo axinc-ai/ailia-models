@@ -232,7 +232,7 @@ def recognize_from_video():
         if args.detector:
             img = cv2.cvtColor(frame, cv2.COLOR_BGR2BGRA)
             detector.compute(img, THRESHOLD, IOU)
-            res_img = plot_results(detector, frame, CATEGORY, False)
+            res_img = plot_results(detector, frame, CATEGORY, logging = False)
         else:
             img_PIL = Image.fromarray(frame)
             img = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
