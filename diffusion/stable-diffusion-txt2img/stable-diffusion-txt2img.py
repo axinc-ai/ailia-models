@@ -5,7 +5,7 @@ import time
 import numpy as np
 import cv2
 
-from transformers import BertTokenizerFast
+from transformers import CLIPTokenizer, CLIPTextModel
 
 import ailia
 
@@ -24,10 +24,6 @@ logger = getLogger(__name__)
 # Parameters
 # ======================
 
-WEIGHT_TRANS_EMB_PATH = 'transformer_emb.onnx'
-MODEL_TRANS_EMB_PATH = 'transformer_emb.onnx.prototxt'
-WEIGHT_TRANS_ATTN_PATH = 'transformer_attn.onnx'
-MODEL_TRANS_ATTN_PATH = 'transformer_attn.onnx.prototxt'
 WEIGHT_DFSN_EMB_PATH = 'diffusion_emb.onnx'
 MODEL_DFSN_EMB_PATH = 'diffusion_emb.onnx.prototxt'
 WEIGHT_DFSN_MID_PATH = 'diffusion_mid.onnx'
@@ -36,7 +32,7 @@ WEIGHT_DFSN_OUT_PATH = 'diffusion_out.onnx'
 MODEL_DFSN_OUT_PATH = 'diffusion_out.onnx.prototxt'
 WEIGHT_AUTO_ENC_PATH = 'autoencoder.onnx'
 MODEL_AUTO_ENC_PATH = 'autoencoder.onnx.prototxt'
-REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/latent-diffusion-txt2img/'
+REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/stable-diffusion-txt2img/'
 
 SAVE_IMAGE_PATH = 'output.png'
 
@@ -45,11 +41,11 @@ SAVE_IMAGE_PATH = 'output.png'
 # ======================
 
 parser = get_base_parser(
-    'Latent Diffusion', None, SAVE_IMAGE_PATH
+    'Stable Diffusion', None, SAVE_IMAGE_PATH
 )
 parser.add_argument(
     "-i", "--input", metavar="TEXT", type=str,
-    default="a painting of a virus monster playing guitar",
+    default="a photograph of an astronaut riding a horse",
     help="the prompt to render"
 )
 parser.add_argument(
@@ -57,7 +53,7 @@ parser.add_argument(
     help="sample this often",
 )
 parser.add_argument(
-    "--n_samples", type=int, default=4,
+    "--n_samples", type=int, default=1,
     help="how many samples to produce for the given prompt",
 )
 parser.add_argument(
@@ -69,19 +65,27 @@ parser.add_argument(
     help="ddim eta (eta=0.0 corresponds to deterministic sampling)",
 )
 parser.add_argument(
-    "--H", metavar="height", type=int, default=256,
+    "--H", metavar="height", type=int, default=512,
     help="image height, in pixel space",
 )
 parser.add_argument(
-    "--W", metavar="width", type=int, default=256,
+    "--W", metavar="width", type=int, default=512,
     help="image width, in pixel space",
 )
 parser.add_argument(
-    "--scale", type=float, default=5.0,
+    "--C", type=int, default=4,
+    help="latent channels",
+)
+parser.add_argument(
+    "--f", type=int, default=8,
+    help="downsampling factor",
+)
+parser.add_argument(
+    "--scale", type=float, default=7.5,
     help="unconditional guidance scale: eps = eps(x, empty) + scale * (eps(x, cond) - eps(x, empty))",
 )
 parser.add_argument(
-    "--seed", type=int, default=None,
+    "--seed", type=int, default=1001,
     help="random seed",
 )
 parser.add_argument(
@@ -90,6 +94,13 @@ parser.add_argument(
     help='execute onnxruntime version.'
 )
 args = update_parser(parser, check_input_type=False)
+
+
+# ======================
+# Options
+# ======================
+
+FIX_CONSTANT_CONTEXT = True
 
 
 # ======================
@@ -143,45 +154,160 @@ ddim_sqrt_one_minus_alphas = np.sqrt(1. - ddim_alphas)
 
 
 # encoder
-class BERTEmbedder:
-    """ Uses a pretrained BERT tokenizer by huggingface. Vocab size: 30522 (?)"""
+class FrozenCLIPEmbedder:
+    """Uses the CLIP transformer encoder for text (from Hugging Face)"""
 
-    def __init__(self, transformer_emb, transformer_attn, max_length=77):
-        self.tokenizer = BertTokenizerFast.from_pretrained("bert-base-uncased")
+    def __init__(self, version="openai/clip-vit-large-patch14", max_length=77):
+        self.tokenizer = CLIPTokenizer.from_pretrained(version)
+        self.transformer = CLIPTextModel.from_pretrained(version)
         self.max_length = max_length
-
-        self.transformer_emb = transformer_emb
-        self.transformer_attn = transformer_attn
 
     def encode(self, text):
         batch_encoding = self.tokenizer(
             text, truncation=True, max_length=self.max_length, return_length=True,
             return_overflowing_tokens=False, padding="max_length", return_tensors="pt")
         tokens = batch_encoding["input_ids"]
-        tokens = tokens.numpy()
+        outputs = self.transformer(input_ids=tokens)
 
-        if not args.onnx:
-            output = self.transformer_emb.predict([tokens])
-        else:
-            output = self.transformer_emb.run(None, {'x': tokens})
-        x = output[0]
-
-        if not args.onnx:
-            output = self.transformer_attn.predict([x])
-        else:
-            output = self.transformer_attn.run(None, {'x': x})
-        z = output[0]
-
+        z = outputs.last_hidden_state
+        z = z.detach().numpy()
         return z
 
 
+# plms
+def plms_sampling(
+        models,
+        cond, shape,
+        unconditional_guidance_scale=1.0,
+        unconditional_conditioning=None):
+    img = np.random.randn(shape[0] * shape[1] * shape[2] * shape[3]).reshape(shape)
+
+    timesteps = ddim_timesteps
+    time_range = np.flip(timesteps)
+    total_steps = timesteps.shape[0]
+
+    logger.info(f"Running PLMS Sampling with {total_steps} timesteps")
+
+    try:
+        from tqdm import tqdm
+        iterator = tqdm(time_range, desc='PLMS Sampler', total=total_steps)
+    except ModuleNotFoundError:
+        def iter_func(a):
+            for i, x in enumerate(a):
+                print("PLMS Sampler: %s/%s" % (i + 1, len(a)))
+                yield x
+
+        iterator = iter_func(time_range)
+
+    b = shape[0]
+    old_eps = []
+
+    if args.benchmark:
+        logger.info('BENCHMARK mode')
+        total_time_estimation = 0
+
+    for i, step in enumerate(iterator):
+        index = total_steps - i - 1
+        ts = np.full((b,), step, dtype=np.int64)
+        ts_next = np.full((b,), time_range[min(i + 1, len(time_range) - 1)], dtype=np.int64)
+
+        if args.benchmark:
+            start = int(round(time.time() * 1000))
+
+        outs = p_sample_plms(
+            models,
+            img, cond, ts,
+            update_context=(i==0),
+            index=index,
+            unconditional_guidance_scale=unconditional_guidance_scale,
+            unconditional_conditioning=unconditional_conditioning,
+            old_eps=old_eps, t_next=ts_next,
+        )
+
+        if args.benchmark:
+            end = int(round(time.time() * 1000))
+            estimation_time = (end - start)
+            logger.info(f'\tailia processing estimation time {estimation_time} ms')
+            total_time_estimation = total_time_estimation + estimation_time
+
+        img, pred_x0, e_t = outs
+        old_eps.append(e_t)
+        if len(old_eps) >= 4:
+            old_eps.pop(0)
+
+    if args.benchmark:
+        logger.info(f'\ttotal time estimation {total_time_estimation} ms')
+
+    return img
+
+
+def p_sample_plms(
+        models, x, c, t, update_context, index,
+        temperature=1.,
+        unconditional_guidance_scale=1.,
+        unconditional_conditioning=None,
+        old_eps=None, t_next=None):
+    b, *_ = x.shape
+
+    def get_model_output(x, t):
+        x_in = np.concatenate([x] * 2)
+        t_in = np.concatenate([t] * 2)
+        c_in = np.concatenate([unconditional_conditioning, c])
+        x_recon = apply_model(models, x_in, t_in, c_in, update_context)
+        e_t_uncond, e_t = np.split(x_recon, 2)
+
+        e_t = e_t_uncond + unconditional_guidance_scale * (e_t - e_t_uncond)
+        return e_t
+
+    def get_x_prev_and_pred_x0(e_t, index):
+        alphas = ddim_alphas
+        alphas_prev = ddim_alphas_prev
+        sqrt_one_minus_alphas = ddim_sqrt_one_minus_alphas
+        sigmas = ddim_sigmas
+
+        # select parameters corresponding to the currently considered timestep
+        a_t = np.full((b, 1, 1, 1), alphas[index])
+        a_prev = np.full((b, 1, 1, 1), alphas_prev[index])
+        sigma_t = np.full((b, 1, 1, 1), sigmas[index])
+        sqrt_one_minus_at = np.full((b, 1, 1, 1), sqrt_one_minus_alphas[index])
+
+        # current prediction for x_0
+        pred_x0 = (x - sqrt_one_minus_at * e_t) / np.sqrt(a_t)
+        # direction pointing to x_t
+        dir_xt = np.sqrt(1. - a_prev - sigma_t ** 2) * e_t
+        noise = sigma_t * np.random.randn(x.size).reshape(x.shape) * temperature
+        x_prev = np.sqrt(a_prev) * pred_x0 + dir_xt + noise
+
+        return x_prev, pred_x0
+
+    e_t = get_model_output(x, t)
+    if len(old_eps) == 0:
+        # Pseudo Improved Euler (2nd order)
+        x_prev, pred_x0 = get_x_prev_and_pred_x0(e_t, index)
+        e_t_next = get_model_output(x_prev, t_next)
+        e_t_prime = (e_t + e_t_next) / 2
+    elif len(old_eps) == 1:
+        # 2nd order Pseudo Linear Multistep (Adams-Bashforth)
+        e_t_prime = (3 * e_t - old_eps[-1]) / 2
+    elif len(old_eps) == 2:
+        # 3nd order Pseudo Linear Multistep (Adams-Bashforth)
+        e_t_prime = (23 * e_t - 16 * old_eps[-1] + 5 * old_eps[-2]) / 12
+    elif len(old_eps) >= 3:
+        # 4nd order Pseudo Linear Multistep (Adams-Bashforth)
+        e_t_prime = (55 * e_t - 59 * old_eps[-1] + 37 * old_eps[-2] - 9 * old_eps[-3]) / 24
+
+    x_prev, pred_x0 = get_x_prev_and_pred_x0(e_t_prime, index)
+
+    return x_prev, pred_x0, e_t
+
+
+# ddim
 def ddim_sampling(
         models,
         cond, shape,
         unconditional_guidance_scale=1.0,
         unconditional_conditioning=None):
     img = np.random.randn(shape[0] * shape[1] * shape[2] * shape[3]).reshape(shape)
-    img = img.astype(np.float32)
 
     timesteps = ddim_timesteps
     time_range = np.flip(timesteps)
@@ -211,12 +337,10 @@ def ddim_sampling(
             unconditional_guidance_scale=unconditional_guidance_scale,
             unconditional_conditioning=unconditional_conditioning,
         )
-        img = img.astype(np.float32)
 
     return img
 
 
-# ddim
 def p_sample_ddim(
         models, x, c, t, index,
         temperature=1.,
@@ -226,7 +350,7 @@ def p_sample_ddim(
     t_in = np.concatenate([t] * 2)
     c_in = np.concatenate([unconditional_conditioning, c])
 
-    x_recon = apply_model(models, x_in, t_in, c_in)
+    x_recon = apply_model(models, x_in, t_in, c_in, True)
     e_t_uncond, e_t = np.split(x_recon, 2)
 
     e_t = e_t_uncond + unconditional_guidance_scale * (e_t - e_t_uncond)
@@ -256,19 +380,30 @@ def p_sample_ddim(
 
 
 # ddpm
-def apply_model(models, x, t, cc):
+def apply_model(models, x, t, cc, update_context):
     diffusion_emb = models["diffusion_emb"]
     diffusion_mid = models["diffusion_mid"]
     diffusion_out = models["diffusion_out"]
 
+    x = x.astype(np.float16)
     if not args.onnx:
-        output = diffusion_emb.predict([x, t, cc])
+        if not FIX_CONSTANT_CONTEXT or update_context:
+            output = diffusion_emb.predict([x, t, cc])
+        else:
+            output = diffusion_emb.run({'x': x, 'timesteps': t})
     else:
         output = diffusion_emb.run(None, {'x': x, 'timesteps': t, 'context': cc})
     h, emb, *hs = output
 
     if not args.onnx:
-        output = diffusion_mid.predict([h, emb, cc, *hs[6:]])
+        if not FIX_CONSTANT_CONTEXT or update_context:
+            output = diffusion_mid.predict([h, emb, cc, *hs[6:]])
+        else:
+            output = diffusion_mid.run({
+                'h': h, 'emb': emb,
+                'h6': hs[6], 'h7': hs[7], 'h8': hs[8],
+                'h9': hs[9], 'h10': hs[10], 'h11': hs[11],
+            })
     else:
         output = diffusion_mid.run(None, {
             'h': h, 'emb': emb, 'context': cc,
@@ -278,7 +413,14 @@ def apply_model(models, x, t, cc):
     h = output[0]
 
     if not args.onnx:
-        output = diffusion_out.predict([h, emb, cc, *hs[:6]])
+        if not FIX_CONSTANT_CONTEXT or update_context:
+            output = diffusion_out.predict([h, emb, cc, *hs[:6]])
+        else:
+            output = diffusion_out.run({
+                'h': h, 'emb': emb,
+                'h0': hs[0], 'h1': hs[1], 'h2': hs[2],
+                'h3': hs[3], 'h4': hs[4], 'h5': hs[5],
+            })
     else:
         output = diffusion_out.run(None, {
             'h': h, 'emb': emb, 'context': cc,
@@ -294,6 +436,7 @@ def apply_model(models, x, t, cc):
 def decode_first_stage(models, z):
     scale_factor = 0.18215
     z = z / scale_factor
+    z = z.astype(np.float32)
 
     autoencoder = models['autoencoder']
     if not args.onnx:
@@ -312,16 +455,25 @@ def predict(
     scale = args.scale
     H = args.H
     W = args.W
+    C = args.C
+    factor = args.f
 
     c = cond_stage_model.encode([prompt] * n_samples)
-    shape = [n_samples, 4, H // 8, W // 8]
+    shape = [n_samples, C, H // factor, W // factor]
 
-    samples = ddim_sampling(
-        models, c, shape,
-        unconditional_guidance_scale=scale,
-        unconditional_conditioning=uc)
+    plms = True
+    if plms:
+        samples_ddim = plms_sampling(
+            models, c, shape,
+            unconditional_guidance_scale=scale,
+            unconditional_conditioning=uc)
+    else:
+        samples_ddim = ddim_sampling(
+            models, c, shape,
+            unconditional_guidance_scale=scale,
+            unconditional_conditioning=uc)
 
-    x_samples_ddim = decode_first_stage(models, samples)
+    x_samples_ddim = decode_first_stage(models, samples_ddim)
     x_samples_ddim = np.clip((x_samples_ddim + 1.0) / 2.0, a_min=0.0, a_max=1.0)
 
     x_samples = []
@@ -340,9 +492,7 @@ def recognize_from_text(models):
     n_samples = args.n_samples
     scale = args.scale
 
-    transformer_emb = models['transformer_emb']
-    transformer_attn = models['transformer_attn']
-    cond_stage_model = BERTEmbedder(transformer_emb, transformer_attn)
+    cond_stage_model = FrozenCLIPEmbedder()
 
     prompt = args.input if isinstance(args.input, str) else args.input[0]
     logger.info("prompt: %s" % prompt)
@@ -359,24 +509,7 @@ def recognize_from_text(models):
     all_samples = []
     for i in range(n_iter):
         logger.info("iteration: %s" % (i + 1))
-
-        if args.benchmark:
-            logger.info('BENCHMARK mode')
-            total_time_estimation = 0
-            for i in range(args.benchmark_count):
-                start = int(round(time.time() * 1000))
-                x_samples = predict(models, cond_stage_model, prompt, uc)
-                end = int(round(time.time() * 1000))
-                estimation_time = (end - start)
-
-                # Logging
-                logger.info(f'\tailia processing estimation time {estimation_time} ms')
-                if i != 0:
-                    total_time_estimation = total_time_estimation + estimation_time
-
-            logger.info(f'\taverage time estimation {total_time_estimation / (args.benchmark_count - 1)} ms')
-        else:
-            x_samples = predict(models, cond_stage_model, prompt, uc)
+        x_samples = predict(models, cond_stage_model, prompt, uc)
 
         for img in x_samples:
             sample_file = os.path.join(sample_path, f"{base_count:04}.png")
@@ -397,8 +530,6 @@ def recognize_from_text(models):
 
 
 def main():
-    check_and_download_models(WEIGHT_TRANS_EMB_PATH, MODEL_TRANS_EMB_PATH, REMOTE_PATH)
-    check_and_download_models(WEIGHT_TRANS_ATTN_PATH, MODEL_TRANS_ATTN_PATH, REMOTE_PATH)
     check_and_download_models(WEIGHT_DFSN_EMB_PATH, MODEL_DFSN_EMB_PATH, REMOTE_PATH)
     check_and_download_models(WEIGHT_DFSN_MID_PATH, MODEL_DFSN_MID_PATH, REMOTE_PATH)
     check_and_download_models(WEIGHT_DFSN_OUT_PATH, MODEL_DFSN_OUT_PATH, REMOTE_PATH)
@@ -408,14 +539,15 @@ def main():
 
     # initialize
     if not args.onnx:
+        # disable FP16
+        if "FP16" in ailia.get_environment(args.env_id).props:
+            logger.warning('This model do not work on FP16. So use CPU mode.')
+            env_id = 0
+
         logger.info("This model requires 10GB or more memory.")
         memory_mode = ailia.get_memory_mode(
             reduce_constant=True, ignore_input_with_initializer=True,
             reduce_interstage=False, reuse_interstage=True)
-        transformer_emb = ailia.Net(
-            MODEL_TRANS_EMB_PATH, WEIGHT_TRANS_EMB_PATH, env_id=env_id, memory_mode=memory_mode)
-        transformer_attn = ailia.Net(
-            MODEL_TRANS_ATTN_PATH, WEIGHT_TRANS_ATTN_PATH, env_id=env_id, memory_mode=memory_mode)
         diffusion_emb = ailia.Net \
             (MODEL_DFSN_EMB_PATH, WEIGHT_DFSN_EMB_PATH, env_id=env_id, memory_mode=memory_mode)
         diffusion_mid = ailia.Net(
@@ -426,8 +558,6 @@ def main():
             MODEL_AUTO_ENC_PATH, WEIGHT_AUTO_ENC_PATH, env_id=env_id, memory_mode=memory_mode)
     else:
         import onnxruntime
-        transformer_emb = onnxruntime.InferenceSession(WEIGHT_TRANS_EMB_PATH)
-        transformer_attn = onnxruntime.InferenceSession(WEIGHT_TRANS_ATTN_PATH)
         diffusion_emb = onnxruntime.InferenceSession(WEIGHT_DFSN_EMB_PATH)
         diffusion_mid = onnxruntime.InferenceSession(WEIGHT_DFSN_MID_PATH)
         diffusion_out = onnxruntime.InferenceSession(WEIGHT_DFSN_OUT_PATH)
@@ -438,8 +568,6 @@ def main():
         np.random.seed(seed)
 
     models = dict(
-        transformer_emb=transformer_emb,
-        transformer_attn=transformer_attn,
         diffusion_emb=diffusion_emb,
         diffusion_mid=diffusion_mid,
         diffusion_out=diffusion_out,
