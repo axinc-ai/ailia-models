@@ -12,7 +12,8 @@ The collection of pre-trained, state-of-the-art AI models.
 
 [ailia MODELS tutorial 日本語版](TUTORIAL_jp.md)
 
-# Supported models
+# Supported models 
+272 models as of 2023/04/07
 
 ## Action recognition
 
@@ -100,6 +101,7 @@ The collection of pre-trained, state-of-the-art AI models.
 | [<img src="diffusion/latent-diffusion-txt2img/output.png" width=128px>](diffusion/latent-diffusion-txt2img/) | [latent-diffusion-txt2img](/diffusion/latent-diffusion-txt2img/) | [Latent Diffusion - txt2img](https://github.com/CompVis/latent-diffusion) | Pytorch | 1.2.10 and later |
 | [<img src="diffusion/latent-diffusion-inpainting/output.png" width=128px>](diffusion/latent-diffusion-inpainting/) | [latent-diffusion-inpainting](/diffusion/latent-diffusion-inpainting/) | [Latent Diffusion - inpainting](https://github.com/CompVis/latent-diffusion) | Pytorch | 1.2.10 and later |
 | [<img src="diffusion/latent-diffusion-superresolution/output.png" width=128px>](diffusion/latent-diffusion-superresolution/) | [latent-diffusion-superresolution](/diffusion/latent-diffusion-superresolution/) | [Latent Diffusion - Super-resolution](https://github.com/CompVis/latent-diffusion) | Pytorch | 1.2.10 and later |
+| [<img src="diffusion/stable-diffusion-txt2img/output.png" width=128px>](diffusion/stable-diffusion-txt2img/) | [stable-diffusion-txt2img](/diffusion/stable-diffusion-txt2img/) | [Stable Diffusion](https://github.com/CompVis/stable-diffusion) | Pytorch | 1.2.14 and later |
 
 ## Face detection
 
@@ -296,6 +298,7 @@ The collection of pre-trained, state-of-the-art AI models.
 |[gpt2](/natural_language_processing/gpt2) | [GPT-2](https://github.com/onnx/models/blob/master/text/machine_comprehension/gpt-2/README.md) | Pytorch | 1.2.7 and later |
 |[rinna_gpt2](/natural_language_processing/rinna_gpt2) | [japanese-pretrained-models](https://github.com/rinnakk/japanese-pretrained-models)   | Pytorch | 1.2.7 and later |
 |[fugumt-en-ja](/natural_language_processing/fugumt-en-ja) | [Fugu-Machine Translator](https://github.com/s-taka/fugumt)   | Pytorch | 1.2.9 and later |
+|[bert_sum_ext](/natural_language_processing/bert_sum_ext) | [BERTSUMEXT](https://github.com/dmmiller612/bert-extractive-summarizer)   | Pytorch | 1.2.7 and later |
 
 ## Neural Rendering
 

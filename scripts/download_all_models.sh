@@ -31,9 +31,10 @@ cd ../../background_ramoval/dis_seg; python3 dis_seg.py ${OPTION}
 cd ../../background_ramoval/gfm; python3 gfm.py ${OPTION}
 cd ../../crowd_counting/crowdcount-cascaded-mtl; python3 crowdcount-cascaded-mtl.py ${OPTION}
 cd ../../crowd_counting/c-3-framework; python3 c-3-framework.py ${OPTION}
-cd ../../diffusion/latent-diffusion-txt2img python3 latent-diffusion-txt2img.py ${OPTION}
+cd ../../diffusion/latent-diffusion-txt2img; python3 latent-diffusion-txt2img.py ${OPTION}
 cd ../../diffusion/latent-diffusion-superresolution; python3 latent-diffusion-superresolution.py ${OPTION}
-cd ../../diffusion/latent-diffusion-inpainting python3 latent-diffusion-inpainting.py ${OPTION}
+cd ../../diffusion/latent-diffusion-inpainting; python3 latent-diffusion-inpainting.py ${OPTION}
+cd ../../diffusion/stable-diffusion-txt2img; python3 stable-diffusion-txt2img.py ${OPTION}
 cd ../../deep_fashion/clothing-detection; python3 clothing-detection.py ${OPTION}
 cd ../../deep_fashion/fashionai-key-points-detection; python3 fashionai-key-points-detection.py -c blouse ${OPTION}
 cd ../../deep_fashion/fashionai-key-points-detection; python3 fashionai-key-points-detection.py -c dress ${OPTION}
@@ -175,6 +176,7 @@ cd ../../natural_language_processing/bert_zero_shot_classification; python3 bert
 cd ../../natural_language_processing/gpt2; python3 gpt2.py ${OPTION}
 cd ../../natural_language_processing/rinna_gpt2; python3 rinna_gpt2.py ${OPTION}
 cd ../../natural_language_processing/fugumt-en-ja; python3 fugumt-en-ja.py ${OPTION}
+cd ../../natural_language_processing/bert_sum_ext; python3 bert_sum_ext.py ${OPTION}
 cd ../../neural_rendering/nerf; python3 nerf.py ${OPTION}
 cd ../../object_detection/centernet; python3 centernet.py ${OPTION}
 cd ../../object_detection/m2det; python3 m2det.py ${OPTION}

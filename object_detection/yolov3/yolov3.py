@@ -185,7 +185,7 @@ def recognize_from_video():
 
         img = cv2.cvtColor(frame, cv2.COLOR_BGR2BGRA)
         detector.compute(img, args.threshold, args.iou)
-        res_img = plot_results(detector, frame, COCO_CATEGORY, False)
+        res_img = plot_results(detector, frame, COCO_CATEGORY, logging = False)
         cv2.imshow('frame', res_img)
         frame_shown = True
 

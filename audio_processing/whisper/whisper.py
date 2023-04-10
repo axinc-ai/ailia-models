@@ -7,8 +7,6 @@ import os
 
 import numpy as np
 
-import ailia
-
 # import original modules
 sys.path.append('../../util')
 # logger
@@ -32,22 +30,6 @@ logger = getLogger(__name__)
 WAV_PATH = 'demo.wav'
 SAVE_TEXT_PATH = 'output.txt'
 
-# ======================
-# Workaround
-# ======================
-
-# ailia SDK 1.2.13のAILIA UNSETTLED SHAPEの抑制、1.2.14では不要
-version = ailia.get_version().split(".")
-AILIA_VERSION_MAJOR = int(version[0])
-AILIA_VERSION_MINOR = int(version[1])
-AILIA_VERSION_REVISION = int(version[2])
-REQUIRE_CONSTANT_SHAPE_BETWEEN_INFERENCE = (AILIA_VERSION_MAJOR<=1 and AILIA_VERSION_MINOR<=2 and AILIA_VERSION_REVISION<14)
-SAVE_ENC_SHAPE = ()
-SAVE_DEC_SHAPE = ()
-
-default_memory_mode = ailia.get_memory_mode(
-    reduce_constant=True, ignore_input_with_initializer=True,
-    reduce_interstage=False, reuse_interstage=True)
 
 # ======================
 # Arguemnt Parser Config
@@ -140,7 +122,7 @@ parser.add_argument(
     help='task type'
 )
 parser.add_argument(
-    '--memory_mode', default=default_memory_mode, type=int,
+    '--memory_mode', default=-1, type=int,
     help='memory mode'
 )
 parser.add_argument(
@@ -173,6 +155,27 @@ dims_dict = {
     'medium': ModelDimensions(80, 1500, 1024, 16, 24, 51865, 448, 1024, 16, 24),
 }
 dims = dims_dict[args.model_type]
+
+# ======================
+# Workaround
+# ======================
+
+if not args.onnx:
+    import ailia
+
+    # ailia SDK 1.2.13のAILIA UNSETTLED SHAPEの抑制、1.2.14では不要
+    version = ailia.get_version().split(".")
+    AILIA_VERSION_MAJOR = int(version[0])
+    AILIA_VERSION_MINOR = int(version[1])
+    AILIA_VERSION_REVISION = int(version[2])
+    REQUIRE_CONSTANT_SHAPE_BETWEEN_INFERENCE = (AILIA_VERSION_MAJOR<=1 and AILIA_VERSION_MINOR<=2 and AILIA_VERSION_REVISION<14)
+    SAVE_ENC_SHAPE = ()
+    SAVE_DEC_SHAPE = ()
+
+    if args.memory_mode == -1:
+        args.memory_mode = ailia.get_memory_mode(
+            reduce_constant=True, ignore_input_with_initializer=True,
+            reduce_interstage=False, reuse_interstage=True)
 
 # ======================
 # Models
