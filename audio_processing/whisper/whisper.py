@@ -19,7 +19,7 @@ from math_utils import softmax
 from microphone_utils import start_microphone_input  # noqa
 from model_utils import check_and_download_models  # noqa
 from languages import LANGUAGES, TO_LANGUAGE_CODE
-from utils import get_base_parser, get_savepath, update_parser  # noqa
+from arg_utils import get_base_parser, get_savepath, update_parser  # noqa
 
 logger = getLogger(__name__)
 
