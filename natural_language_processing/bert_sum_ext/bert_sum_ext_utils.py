@@ -1,5 +1,4 @@
 import numpy as np
-from spacy.lang.ja import Japanese
 
 
 def tokenize(tokenizer, text):
