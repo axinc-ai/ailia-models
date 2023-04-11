@@ -2,14 +2,9 @@
 
 Get a feature vector for each sentence with Japanese BERT from the text. Cluster the feature vectors. Display the cluster center points as a summary.
 
-### Requirements
-
-```
-pip3 install spacy sudachipy sudachidict_core
-```
 
 ### Input
-A text file with a new line for each sentence.
+A Japanese text file.
 
 [sample.txt](sample.txt)
 
