@@ -1,9 +1,9 @@
-from utils_6d_repnet.functions import RetinaFaceOnnx
+from arg_utils_6d_repnet.functions import RetinaFaceOnnx
 import os
 import sys
 import numpy as np
 import cv2
-from utils_6d_repnet import utils
+from arg_utils_6d_repnet import utils
 import matplotlib
 from PIL import Image
 import time
@@ -21,7 +21,7 @@ import webcamera_utils
 from detector_utils import plot_results, reverse_letterbox
 from image_utils import imread  # noqa: E402
 from model_utils import check_and_download_models
-from utils import get_base_parser, get_savepath, update_parser
+from arg_utils import get_base_parser, get_savepath, update_parser
 
 logger = getLogger(__name__)
 

@@ -17,7 +17,7 @@ from PIL import Image, ImageTk
 
 sys.path.append('./util')
 from image_utils import imread  # noqa: E402
-from utils import get_base_parser, update_parser  # noqa: E402
+from arg_utils import get_base_parser, update_parser  # noqa: E402
 
 # ======================
 # Arguemnt Parser Config
