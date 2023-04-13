@@ -240,33 +240,44 @@ def p_sample_ddim(
 
 # diffusion_model
 def apply_model(models, x_noisy, t, cond):
+    control_net = models["control_net"]
     diffusion_emb = models["diffusion_emb"]
     diffusion_mid = models["diffusion_mid"]
     diffusion_out = models["diffusion_out"]
 
+    hint = np.concatenate(cond['c_concat'], axis=1)
     cond_txt = np.concatenate(cond['c_crossattn'], axis=1)
 
     if not args.onnx:
-        output = diffusion_emb.predict([x, t, cc])
+        output = control_net.predict([x_noisy, hint, t, cond_txt])
     else:
-        output = diffusion_emb.run(None, {'x': x, 'timesteps': t, 'context': cc})
-    h, emb, *hs = output
+        output = control_net.run(None, {'x': x_noisy, 'hint': hint, 'timesteps': t, 'context': cond_txt})
+    control = output
 
     if not args.onnx:
-        output = diffusion_mid.predict([h, emb, cc, *hs[6:]])
+        output = diffusion_emb.predict([x_noisy, t, cond_txt])
+    else:
+        output = diffusion_emb.run(None, {'x': x_noisy, 'timesteps': t, 'context': cond_txt})
+    h, emb, *hs = output
+
+    hs = [(x + v).astype(np.float16) for x, v in zip([*hs, h], control)]
+    h = hs.pop()
+
+    if not args.onnx:
+        output = diffusion_mid.predict([h, emb, cond_txt, *hs[6:]])
     else:
         output = diffusion_mid.run(None, {
-            'h': h, 'emb': emb, 'context': cc,
+            'h': h, 'emb': emb, 'context': cond_txt,
             'h6': hs[6], 'h7': hs[7], 'h8': hs[8],
             'h9': hs[9], 'h10': hs[10], 'h11': hs[11],
         })
     h = output[0]
 
     if not args.onnx:
-        output = diffusion_out.predict([h, emb, cc, *hs[:6]])
+        output = diffusion_out.predict([h, emb, cond_txt, *hs[:6]])
     else:
         output = diffusion_out.run(None, {
-            'h': h, 'emb': emb, 'context': cc,
+            'h': h, 'emb': emb, 'context': cond_txt,
             'h0': hs[0], 'h1': hs[1], 'h2': hs[2],
             'h3': hs[3], 'h4': hs[4], 'h5': hs[5],
         })
@@ -408,8 +419,10 @@ def main():
         memory_mode = ailia.get_memory_mode(
             reduce_constant=True, ignore_input_with_initializer=True,
             reduce_interstage=False, reuse_interstage=True)
-        diffusion_emb = ailia.Net \
-            (MODEL_DFSN_EMB_PATH, WEIGHT_DFSN_EMB_PATH, env_id=env_id, memory_mode=memory_mode)
+        control_net = ailia.Net(
+            "control_net.onnx.prototxt", "control_net.onnx", env_id=env_id, memory_mode=memory_mode)
+        diffusion_emb = ailia.Net(
+            MODEL_DFSN_EMB_PATH, WEIGHT_DFSN_EMB_PATH, env_id=env_id, memory_mode=memory_mode)
         diffusion_mid = ailia.Net(
             MODEL_DFSN_MID_PATH, WEIGHT_DFSN_MID_PATH, env_id=env_id, memory_mode=memory_mode)
         diffusion_out = ailia.Net(
@@ -418,6 +431,7 @@ def main():
             MODEL_AUTO_ENC_PATH, WEIGHT_AUTO_ENC_PATH, env_id=env_id, memory_mode=memory_mode)
     else:
         import onnxruntime
+        control_net = onnxruntime.InferenceSession("control_net.onnx")
         diffusion_emb = onnxruntime.InferenceSession(WEIGHT_DFSN_EMB_PATH)
         diffusion_mid = onnxruntime.InferenceSession(WEIGHT_DFSN_MID_PATH)
         diffusion_out = onnxruntime.InferenceSession(WEIGHT_DFSN_OUT_PATH)
@@ -428,6 +442,7 @@ def main():
         np.random.seed(seed)
 
     models = dict(
+        control_net=control_net,
         diffusion_emb=diffusion_emb,
         diffusion_mid=diffusion_mid,
         diffusion_out=diffusion_out,
