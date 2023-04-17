@@ -164,8 +164,7 @@ def ddim_sampling(
         cond, shape,
         unconditional_guidance_scale=1.0,
         unconditional_conditioning=None):
-    # img = np.random.randn(shape[0] * shape[1] * shape[2] * shape[3]).reshape(shape)
-    img = np.load("img.npy")
+    img = np.random.randn(shape[0] * shape[1] * shape[2] * shape[3]).reshape(shape)
     img = img.astype(np.float32)
 
     timesteps = ddim_timesteps
@@ -213,6 +212,8 @@ def p_sample_ddim(
         model_t = apply_model(models, x, t, c)
         model_uncond = apply_model(models, x, t, unconditional_conditioning)
         model_output = model_uncond + unconditional_guidance_scale * (model_t - model_uncond)
+
+    e_t = model_output
 
     alphas = ddim_alphas
     alphas_prev = ddim_alphas_prev
@@ -331,16 +332,10 @@ def predict(
         unconditional_guidance_scale=scale,
         unconditional_conditioning=un_cond)
 
-    x_samples_ddim = decode_first_stage(models, samples)
-    x_samples_ddim = np.clip((x_samples_ddim + 1.0) / 2.0, a_min=0.0, a_max=1.0)
-
-    x_samples = []
-    for x_sample in x_samples_ddim:
-        x_sample = x_sample.transpose(1, 2, 0)  # CHW -> HWC
-        x_sample = x_sample * 255
-        img = x_sample.astype(np.uint8)
-        img = img[:, :, ::-1]  # RGB -> BGR
-        x_samples.append(img)
+    x_samples = decode_first_stage(models, samples)
+    x_samples = np.clip(x_samples * 127.5 + 127.5, a_min=0, a_max=255)
+    x_samples = x_samples.transpose(0, 2, 3, 1).astype(np.uint8)  # CHW -> HWC
+    x_samples = [x[:, :, ::-1] for x in x_samples]  # RGB -> BGR
 
     return x_samples
 
@@ -358,10 +353,6 @@ def recognize_from_image_text(models):
     logger.info("prompt: %s" % prompt)
 
     img = None
-
-    # sample_path = os.path.join('outputs', prompt.replace(" ", "-"))
-    # os.makedirs(sample_path, exist_ok=True)
-    # base_count = len(os.listdir(sample_path))
 
     logger.info('Start inference...')
 
@@ -386,11 +377,6 @@ def recognize_from_image_text(models):
             logger.info(f'\taverage time estimation {total_time_estimation / (args.benchmark_count - 1)} ms')
         else:
             x_samples = predict(models, img, prompt, a_prompt, n_prompt)
-
-        # for img in x_samples:
-        #     sample_file = os.path.join(sample_path, f"{base_count:04}.png")
-        #     cv2.imwrite(sample_file, img)
-        #     base_count += 1
 
         x_samples = np.concatenate(x_samples, axis=1)
         all_samples.append(x_samples)
