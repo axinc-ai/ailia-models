@@ -37,6 +37,7 @@ args = update_parser(parser)
 input_index = 0
 output_index = 0
 result_index = 0
+model_index = 0
 slider_index = 50
 
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/padim/'
@@ -77,6 +78,15 @@ def result_changed(event):
     else:
         result_index = 0   
     load_detail(result_list[result_index])
+
+def model_changed(event):
+    global model_index
+    selection = event.widget.curselection()
+    if selection:
+        model_index = selection[0]
+    else:
+        model_index = 0   
+    load_detail(model_list[model_index])
 
 def slider_changed(event):
     global scale, slider_index
@@ -134,12 +144,16 @@ def get_image_resize():
         image_resize = 256
     return image_resize
 
+def get_model():
+    global model_index
+    return get_model_list()[model_index]
+
 def train_button_clicked():
     global train_folder
     print("begin training")
 
     # model files check and download
-    weight_path, model_path, params = get_params("resnet18")
+    weight_path, model_path, params = get_params(get_model())
     check_and_download_models(weight_path, model_path, REMOTE_PATH)
 
     # create net instance
@@ -177,9 +191,10 @@ def test_button_clicked():
             score_cache = {}
     score_cache["keep_aspect"] = get_keep_aspect()
     score_cache["image_resize"] = get_image_resize()
+    score_cache["model"] = get_model()
 
     # model files check and download
-    weight_path, model_path, params = get_params("resnet18")
+    weight_path, model_path, params = get_params(get_model())
     check_and_download_models(weight_path, model_path, REMOTE_PATH)
 
     # create net instance
@@ -421,6 +436,9 @@ def get_test_file_list():
 def get_result_file_list():
     return []
 
+def get_model_list():
+    return ["resnet18", "wide_resnet50_2"]
+
 # ======================
 # GUI
 # ======================
@@ -428,11 +446,12 @@ def get_result_file_list():
 canvas_item = None
 
 def main():
-    global train_list, test_list, result_list
+    global train_list, test_list, result_list, model_list
     global listsResult, ListboxResult
     global canvas, scale
     global inputFile, listsInput, input_list, ListboxInput
     global outputFile, listsOutput, output_list, ListboxOutput
+    global listsModel, ListboxModel
     global valueKeepAspect, valueCenterCrop
 
     # rootメインウィンドウの設定
@@ -448,23 +467,28 @@ def main():
     train_list = get_training_file_list()
     test_list = get_test_file_list()
     result_list = get_result_file_list()
+    model_list = get_model_list()
 
     listsInput = tk.StringVar(value=train_list)
     listsOutput = tk.StringVar(value=test_list)
     listsResult = tk.StringVar(value=result_list)
+    listsModel = tk.StringVar(value=model_list)
 
     # 各種ウィジェットの作成
     ListboxInput = tk.Listbox(frame, listvariable=listsInput, width=20, height=12, selectmode="single", exportselection=False)
     ListboxOutput = tk.Listbox(frame, listvariable=listsOutput, width=20, height=12, selectmode="single", exportselection=False)
     ListboxResult = tk.Listbox(frame, listvariable=listsResult, width=20, height=12, selectmode="single", exportselection=False)
+    ListboxModel = tk.Listbox(frame, listvariable=listsModel, width=20, height=3, selectmode="single", exportselection=False)
 
     ListboxInput.bind("<<ListboxSelect>>", input_changed)
     ListboxOutput.bind("<<ListboxSelect>>", output_changed)
     ListboxResult.bind("<<ListboxSelect>>", result_changed)
+    ListboxModel.bind("<<ListboxSelect>>", model_changed)
 
     ListboxInput.select_set(input_index)
     ListboxOutput.select_set(output_index)
     ListboxResult.select_set(result_index)
+    ListboxModel.select_set(model_index)
 
     textRun = tk.StringVar(frame)
     textRun.set("Train")
@@ -505,6 +529,9 @@ def main():
     textCheckbox = tk.StringVar(frame)
     textCheckbox.set("Train settings")
 
+    textModel = tk.StringVar(frame)
+    textModel.set("Feature extractor model")
+
     textTestSettings = tk.StringVar(frame)
     textTestSettings.set("Test settings")
 
@@ -524,6 +551,7 @@ def main():
     labelResult = tk.Label(frame, textvariable=textResult)
     labelModelDetail = tk.Label(frame, textvariable=textModelDetail)
     labelCheckbox = tk.Label(frame, textvariable=textCheckbox)
+    labelModel = tk.Label(frame, textvariable=textModel)
     labelTestSettings = tk.Label(frame, textvariable=textTestSettings)
     labelSlider = tk.Label(frame, textvariable=textSlider)
 
@@ -579,6 +607,9 @@ def main():
     labelCheckbox.grid(row=8, column=3, sticky=tk.NW)
     chkKeepAspect.grid(row=9, column=3,  sticky=tk.NW)
     chkCenterCrop.grid(row=10, column=3,  sticky=tk.NW)
+
+    labelModel.grid(row=11, column=3, sticky=tk.NW)
+    ListboxModel.grid(row=12, column=3, sticky=tk.NW, rowspan=4)
 
     labelTestSettings.grid(row=8, column=4, sticky=tk.NW, columnspan=3)
     labelSlider.grid(row=9, column=4, sticky=tk.NW, columnspan=3)
