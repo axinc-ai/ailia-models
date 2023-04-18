@@ -68,7 +68,7 @@ def output_changed(event):
         output_index = selection[0]
     else:
         output_index = 0   
-    load_detail(test_list[output_index], False)
+    load_detail(test_list[output_index], True)
 
 def result_changed(event):
     global result_index
