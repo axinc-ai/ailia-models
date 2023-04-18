@@ -26,6 +26,10 @@ logger = getLogger(__name__)
 # Parameters
 # ======================
 
+WEIGHT_PATH = 'control_net.onnx'
+MODEL_PATH = 'control_net.onnx.prototxt'
+REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/control_net/'
+
 WEIGHT_DFSN_EMB_PATH = 'diffusion_emb.onnx'
 MODEL_DFSN_EMB_PATH = 'diffusion_emb.onnx.prototxt'
 WEIGHT_DFSN_MID_PATH = 'diffusion_mid.onnx'
@@ -34,7 +38,7 @@ WEIGHT_DFSN_OUT_PATH = 'diffusion_out.onnx'
 MODEL_DFSN_OUT_PATH = 'diffusion_out.onnx.prototxt'
 WEIGHT_AUTO_ENC_PATH = 'autoencoder.onnx'
 MODEL_AUTO_ENC_PATH = 'autoencoder.onnx.prototxt'
-REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/latent-diffusion-txt2img/'
+REMOTE_SDF_PATH = 'https://storage.googleapis.com/ailia-models/stable-diffusion-txt2img/'
 
 IMAGE_PATH = 'bird.png'
 SAVE_IMAGE_PATH = 'output.png'
@@ -414,10 +418,11 @@ def recognize_from_image_text(models):
 
 
 def main():
-    check_and_download_models(WEIGHT_DFSN_EMB_PATH, MODEL_DFSN_EMB_PATH, REMOTE_PATH)
-    check_and_download_models(WEIGHT_DFSN_MID_PATH, MODEL_DFSN_MID_PATH, REMOTE_PATH)
-    check_and_download_models(WEIGHT_DFSN_OUT_PATH, MODEL_DFSN_OUT_PATH, REMOTE_PATH)
-    check_and_download_models(WEIGHT_AUTO_ENC_PATH, MODEL_AUTO_ENC_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_DFSN_EMB_PATH, MODEL_DFSN_EMB_PATH, REMOTE_SDF_PATH)
+    check_and_download_models(WEIGHT_DFSN_MID_PATH, MODEL_DFSN_MID_PATH, REMOTE_SDF_PATH)
+    check_and_download_models(WEIGHT_DFSN_OUT_PATH, MODEL_DFSN_OUT_PATH, REMOTE_SDF_PATH)
+    check_and_download_models(WEIGHT_AUTO_ENC_PATH, MODEL_AUTO_ENC_PATH, REMOTE_SDF_PATH)
 
     env_id = args.env_id
 
@@ -428,7 +433,7 @@ def main():
             reduce_constant=True, ignore_input_with_initializer=True,
             reduce_interstage=False, reuse_interstage=True)
         control_net = ailia.Net(
-            "control_net.onnx.prototxt", "control_net.onnx", env_id=env_id, memory_mode=memory_mode)
+            MODEL_PATH, WEIGHT_PATH, env_id=env_id, memory_mode=memory_mode)
         diffusion_emb = ailia.Net(
             MODEL_DFSN_EMB_PATH, WEIGHT_DFSN_EMB_PATH, env_id=env_id, memory_mode=memory_mode)
         diffusion_mid = ailia.Net(
@@ -439,7 +444,7 @@ def main():
             MODEL_AUTO_ENC_PATH, WEIGHT_AUTO_ENC_PATH, env_id=env_id, memory_mode=memory_mode)
     else:
         import onnxruntime
-        control_net = onnxruntime.InferenceSession("control_net.onnx")
+        control_net = onnxruntime.InferenceSession(WEIGHT_PATH)
         diffusion_emb = onnxruntime.InferenceSession(WEIGHT_DFSN_EMB_PATH)
         diffusion_mid = onnxruntime.InferenceSession(WEIGHT_DFSN_MID_PATH)
         diffusion_out = onnxruntime.InferenceSession(WEIGHT_DFSN_OUT_PATH)
