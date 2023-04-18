@@ -325,10 +325,16 @@ def infer(net, params, train_outputs, img, crop_size):
     return dist_tmp
 
 
-def normalize_scores(score_map, crop_size):
+def normalize_scores(score_map, crop_size, roi_img = None):
     N = len(score_map)
     score_map = np.vstack(score_map)
     score_map = score_map.reshape(N, crop_size, crop_size)
+
+    if not(roi_img is None):
+        roi_img [roi_img <= 0.5] = 0.0
+        roi_img [roi_img > 0.5] = 1.0
+        for i in range(N):
+            score_map[i, :, :] *= roi_img[0, 0, :, :]
 
     # Normalization
     max_score = score_map.max()
