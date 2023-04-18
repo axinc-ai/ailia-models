@@ -49,7 +49,7 @@ test_roi = None
 score_cache = {}
 
 # ======================
-# Environment
+# List box cursor changed
 # ======================
 
 def input_changed(event):
@@ -90,6 +90,46 @@ def model_changed(event):
 def slider_changed(event):
     global scale, slider_index
     slider_index = scale.get()
+
+# ======================
+# List box double click
+# ======================
+
+def open_file_by_os(filepath):
+    import subprocess, os, platform
+    if platform.system() == 'Darwin':       # macOS
+        subprocess.call(('open', filepath))
+    elif platform.system() == 'Windows':    # Windows
+        os.startfile(filepath)
+    else:                                   # linux variants
+        subprocess.call(('xdg-open', filepath))
+
+def input_double_click(event):
+    global input_index
+    selection = event.widget.curselection()
+    if selection:
+        input_index = selection[0]
+    else:
+        input_index = 0   
+    open_file_by_os(train_list[input_index])
+
+def output_double_click(event):
+    global output_index
+    selection = event.widget.curselection()
+    if selection:
+        output_index = selection[0]
+    else:
+        output_index = 0   
+    open_file_by_os(test_list[output_index])
+
+def result_double_click(event):
+    global result_index
+    selection = event.widget.curselection()
+    if selection:
+        result_index = selection[0]
+    else:
+        result_index = 0
+    open_file_by_os(result_list[result_index])
 
 # ======================
 # Change file
@@ -531,6 +571,10 @@ def main():
     ListboxOutput.bind("<<ListboxSelect>>", output_changed)
     ListboxResult.bind("<<ListboxSelect>>", result_changed)
     ListboxModel.bind("<<ListboxSelect>>", model_changed)
+
+    ListboxInput.bind("<Double-Button-1>", input_double_click)
+    ListboxOutput.bind("<Double-Button-1>", output_double_click)
+    ListboxResult.bind("<Double-Button-1>", result_double_click)
 
     ListboxInput.select_set(input_index)
     ListboxOutput.select_set(output_index)
