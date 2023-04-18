@@ -338,6 +338,13 @@ def test_from_video(net, params, train_outputs, threshold):
 train_folder = "train"
 test_folder = None
 
+def to_file_name(list):
+    new_list = []
+    for file in list:
+        l = file.split("/")
+        new_list.append(l[len(l) - 1])
+    return new_list
+
 def train_file_dialog():
     global listsInput, ListboxInput, input_index
     global train_folder
@@ -362,7 +369,7 @@ def train_folder_dialog():
     if len(file_name) != 0:
         train_folder = file_name
         train_list = get_training_file_list()
-        listsInput.set(train_list)
+        listsInput.set(to_file_name(train_list))
         train_index = 0
         ListboxInput.select_set(0)
         if len(train_list)>=1:
@@ -413,7 +420,7 @@ def test_folder_dialog():
                 test_list.remove(file)
                 test_roi = file
                 load_roi_image(test_roi)
-        listsOutput.set(test_list)
+        listsOutput.set(to_file_name(test_list))
         test_index = 0
         ListboxOutput.select_set(0)
         load_detail(test_list[0], False)
@@ -515,10 +522,10 @@ def main():
     listsModel = tk.StringVar(value=model_list)
 
     # 各種ウィジェットの作成
-    ListboxInput = tk.Listbox(frame, listvariable=listsInput, width=20, height=12, selectmode="single", exportselection=False)
-    ListboxOutput = tk.Listbox(frame, listvariable=listsOutput, width=20, height=12, selectmode="single", exportselection=False)
-    ListboxResult = tk.Listbox(frame, listvariable=listsResult, width=20, height=12, selectmode="single", exportselection=False)
-    ListboxModel = tk.Listbox(frame, listvariable=listsModel, width=20, height=6, selectmode="single", exportselection=False)
+    ListboxInput = tk.Listbox(frame, listvariable=listsInput, width=20, height=12, selectmode=tk.BROWSE, exportselection=False)
+    ListboxOutput = tk.Listbox(frame, listvariable=listsOutput, width=20, height=12, selectmode=tk.BROWSE, exportselection=False)
+    ListboxResult = tk.Listbox(frame, listvariable=listsResult, width=20, height=12, selectmode=tk.BROWSE, exportselection=False)
+    ListboxModel = tk.Listbox(frame, listvariable=listsModel, width=20, height=6, selectmode=tk.BROWSE, exportselection=False)
 
     ListboxInput.bind("<<ListboxSelect>>", input_changed)
     ListboxOutput.bind("<<ListboxSelect>>", output_changed)
@@ -642,7 +649,7 @@ def main():
     buttonTestVideo.grid(row=7, column=1, sticky=tk.NW)
     buttonTestCamera.grid(row=8, column=1, sticky=tk.NW)
     labelRoi.grid(row=9, column=1, sticky=tk.NW, columnspan=1)
-    canvas_roi.grid(row=10, column=1, sticky=tk.NW, rowspan=1, columnspan=1)
+    canvas_roi.grid(row=10, column=1, sticky=tk.NW, rowspan=4, columnspan=1)
 
     labelResult.grid(row=0, column=2, sticky=tk.NW)
     ListboxResult.grid(row=1, column=2, sticky=tk.NW, rowspan=4)
