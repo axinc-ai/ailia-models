@@ -13,9 +13,11 @@ import ailia
 sys.path.append('../../util')
 from arg_utils import get_base_parser, update_parser, get_savepath  # noqa
 from model_utils import check_and_download_models  # noqa
+from detector_utils import load_image  # noqa
 # logger
 from logging import getLogger  # noqa
 
+from annotator.canny import CannyDetector
 from constants import alphas_cumprod
 
 logger = getLogger(__name__)
@@ -34,6 +36,7 @@ WEIGHT_AUTO_ENC_PATH = 'autoencoder.onnx'
 MODEL_AUTO_ENC_PATH = 'autoencoder.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/latent-diffusion-txt2img/'
 
+IMAGE_PATH = 'bird.png'
 SAVE_IMAGE_PATH = 'output.png'
 
 # ======================
@@ -41,16 +44,23 @@ SAVE_IMAGE_PATH = 'output.png'
 # ======================
 
 parser = get_base_parser(
-    'ControlNet', None, SAVE_IMAGE_PATH
+    'ControlNet', IMAGE_PATH, SAVE_IMAGE_PATH
 )
 parser.add_argument(
-    "-i", "--input", metavar="TEXT", type=str,
-    default="a painting of a virus monster playing guitar",
+    "-p", "--prompt", metavar="TEXT", type=str,
+    default="bird",
     help="the prompt to render"
 )
 parser.add_argument(
-    "--n_iter", type=int, default=1,
-    help="sample this often",
+    "--a_prompt", metavar="TEXT", type=str,
+    default="best quality, extremely detailed",
+    help="Added Prompt"
+)
+parser.add_argument(
+    "--n_prompt", metavar="TEXT", type=str,
+    default="longbody, lowres, bad anatomy, bad hands, missing fingers,"
+            " extra digit, fewer digits, cropped, worst quality, low quality",
+    help="Negative Prompt"
 )
 parser.add_argument(
     "--n_samples", type=int, default=1,
@@ -65,12 +75,8 @@ parser.add_argument(
     help="ddim eta (eta=0.0 corresponds to deterministic sampling)",
 )
 parser.add_argument(
-    "--H", metavar="height", type=int, default=256,
-    help="image height, in pixel space",
-)
-parser.add_argument(
-    "--W", metavar="width", type=int, default=256,
-    help="image width, in pixel space",
+    "--image_resolution", type=int, default=512,
+    help="Image Resolution, in pixel space",
 )
 parser.add_argument(
     "--scale", type=float, default=9.0,
@@ -85,7 +91,7 @@ parser.add_argument(
     action='store_true',
     help='execute onnxruntime version.'
 )
-args = update_parser(parser, check_input_type=False)
+args = update_parser(parser)
 
 
 # ======================
@@ -302,19 +308,41 @@ def decode_first_stage(models, z):
     return dec
 
 
+def preprocess(img):
+    image_resolution = args.image_resolution
+    im_h, im_w, _ = img.shape
+
+    k = image_resolution / min(im_h, im_w)
+    ow, oh = im_w * k, im_h * k
+    oh = int(np.round(oh / 64.0)) * 64
+    ow = int(np.round(ow / 64.0)) * 64
+    img = cv2.resize(img, (ow, oh), interpolation=cv2.INTER_LANCZOS4 if k > 1 else cv2.INTER_AREA)
+
+    return img
+
+
 def predict(
-        models,
-        img,
+        models, img,
         prompt, a_prompt, n_prompt):
     num_samples = args.n_samples
     scale = args.scale
+
     guess_mode = False
+    low_threshold = 100
+    high_threshold = 200
 
-    # H = args.H
-    # W = args.W
-    H, W, C = 768, 512, 3
+    img = img[:, :, ::-1]  # BGR -> RGB
+    img = preprocess(img)
+    H, W, _ = img.shape
 
-    control = np.load("control.npy")
+    apply_canny = CannyDetector()
+    detected_map = apply_canny(img, low_threshold, high_threshold)
+    detected_map = detected_map[:, :, None]
+    detected_map = np.repeat(detected_map, 3, axis=2)
+    control = np.stack([
+        detected_map for _ in range(num_samples)
+    ], axis=0).astype(np.float32) / 255
+    control = control.transpose((0, 3, 1, 2))  # HWC -> CHW
 
     cond_stage_model = FrozenCLIPEmbedder()
     cond = {
@@ -334,59 +362,53 @@ def predict(
 
     x_samples = decode_first_stage(models, samples)
     x_samples = np.clip(x_samples * 127.5 + 127.5, a_min=0, a_max=255)
-    x_samples = x_samples.transpose(0, 2, 3, 1).astype(np.uint8)  # CHW -> HWC
+    x_samples = x_samples.transpose((0, 2, 3, 1)).astype(np.uint8)  # CHW -> HWC
     x_samples = [x[:, :, ::-1] for x in x_samples]  # RGB -> BGR
 
-    return x_samples
+    return [255 - detected_map] + x_samples
 
 
 def recognize_from_image_text(models):
-    n_iter = 1 if args.benchmark else args.n_iter
-    n_samples = args.n_samples
-    scale = args.scale
+    prompt = args.prompt
+    a_prompt = args.a_prompt
+    n_prompt = args.n_prompt
+    image_path = args.input[0]
 
-    prompt = "bird"
-    a_prompt = "best quality, extremely detailed"
-    n_prompt = "longbody, lowres, bad anatomy, bad hands, missing fingers, extra digit, fewer digits, cropped, worst quality, low quality"
-
-    # prompt = args.input if isinstance(args.input, str) else args.input[0]
+    logger.info("image_path: %s" % image_path)
     logger.info("prompt: %s" % prompt)
+    logger.info("a_prompt: %s" % a_prompt)
+    logger.info("n_prompt: %s" % n_prompt)
 
-    img = None
+    # prepare input data
+    img = load_image(image_path)
+    img = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
 
     logger.info('Start inference...')
 
-    all_samples = []
-    for i in range(n_iter):
-        logger.info("iteration: %s" % (i + 1))
-
-        if args.benchmark:
-            logger.info('BENCHMARK mode')
-            total_time_estimation = 0
-            for i in range(args.benchmark_count):
-                start = int(round(time.time() * 1000))
-                x_samples = predict(models, img, prompt, a_prompt, n_prompt)
-                end = int(round(time.time() * 1000))
-                estimation_time = (end - start)
-
-                # Logging
-                logger.info(f'\tailia processing estimation time {estimation_time} ms')
-                if i != 0:
-                    total_time_estimation = total_time_estimation + estimation_time
-
-            logger.info(f'\taverage time estimation {total_time_estimation / (args.benchmark_count - 1)} ms')
-        else:
+    if args.benchmark:
+        logger.info('BENCHMARK mode')
+        total_time_estimation = 0
+        for i in range(args.benchmark_count):
+            start = int(round(time.time() * 1000))
             x_samples = predict(models, img, prompt, a_prompt, n_prompt)
+            end = int(round(time.time() * 1000))
+            estimation_time = (end - start)
 
-        x_samples = np.concatenate(x_samples, axis=1)
-        all_samples.append(x_samples)
+            # Logging
+            logger.info(f'\tailia processing estimation time {estimation_time} ms')
+            if i != 0:
+                total_time_estimation = total_time_estimation + estimation_time
 
-    grid_img = np.concatenate(all_samples, axis=0)
+        logger.info(f'\taverage time estimation {total_time_estimation / (args.benchmark_count - 1)} ms')
+    else:
+        x_samples = predict(models, img, prompt, a_prompt, n_prompt)
+
+    x_samples = np.concatenate(x_samples, axis=1)
 
     # plot result
     savepath = get_savepath(args.savepath, "", ext='.png')
     logger.info(f'saved at : {savepath}')
-    cv2.imwrite(savepath, grid_img)
+    cv2.imwrite(savepath, x_samples)
 
     logger.info('Script finished successfully.')
 
