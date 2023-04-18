@@ -139,21 +139,29 @@ def get_keep_aspect():
 
 def get_image_resize():
     global valueCenterCrop
-    image_resize = 224
+    image_resize = get_image_crop_size()
     if valueCenterCrop.get():
-        image_resize = 256
+        return get_image_crop_size() + (256 - 224)
     return image_resize
+
+def get_image_crop_size():
+    global model_index
+    return get_model_resolution_list()[model_index]
 
 def get_model():
     global model_index
     return get_model_list()[model_index]
+
+def get_model_id():
+    global model_index
+    return get_model_id_list()[model_index]
 
 def train_button_clicked():
     global train_folder
     print("begin training")
 
     # model files check and download
-    weight_path, model_path, params = get_params(get_model())
+    weight_path, model_path, params = get_params(get_model_id())
     check_and_download_models(weight_path, model_path, REMOTE_PATH)
 
     # create net instance
@@ -168,7 +176,7 @@ def train_button_clicked():
     aug = False
     aug_num = 0
     seed = 1024
-    train_outputs = training(net, params, get_image_resize(), get_keep_aspect(), batch_size, train_dir, aug, aug_num, seed, logger)
+    train_outputs = training(net, params, get_image_resize(), get_image_crop_size(), get_keep_aspect(), batch_size, train_dir, aug, aug_num, seed, logger)
 
     # save learned distribution
     train_feat_file = "train.pkl"
@@ -179,6 +187,7 @@ def train_button_clicked():
         pickle.dump(train_outputs, f)
     logger.info('saved.')
 
+    global score_cache
     score_cache = {}
 
 def test_button_clicked():
@@ -187,14 +196,14 @@ def test_button_clicked():
     print("begin test")
 
     if "keep_aspect" in score_cache:
-        if score_cache["keep_aspect"] != get_keep_aspect() or score_cache["image_resize"] != get_image_resize():
+        if score_cache["keep_aspect"] != get_keep_aspect() or score_cache["image_resize"] != get_image_resize() or score_cache["model"] != get_model():
             score_cache = {}
     score_cache["keep_aspect"] = get_keep_aspect()
     score_cache["image_resize"] = get_image_resize()
     score_cache["model"] = get_model()
 
     # model files check and download
-    weight_path, model_path, params = get_params(get_model())
+    weight_path, model_path, params = get_params(get_model_id())
     check_and_download_models(weight_path, model_path, REMOTE_PATH)
 
     # create net instance
@@ -223,18 +232,18 @@ def test_from_folder(net, params, train_outputs, threshold):
         image_path = test_list[i_img]
         img = load_image(image_path)
         img = cv2.cvtColor(img, cv2.COLOR_BGRA2RGB)
-        img = preprocess(img, get_image_resize(), keep_aspect=get_keep_aspect())
+        img = preprocess(img, get_image_resize(), keep_aspect=get_keep_aspect(), crop_size=get_image_crop_size())
 
         test_imgs.append(img[0])
         if image_path in score_cache:
             dist_tmp = score_cache[image_path].copy()
         else:
-            dist_tmp = infer(net, params, train_outputs, img)
+            dist_tmp = infer(net, params, train_outputs, img, get_image_crop_size())
             score_cache[image_path] = dist_tmp.copy()
         score_map.append(dist_tmp)
 
-    scores = normalize_scores(score_map)
-    anormal_scores = calculate_anormal_scores(score_map)
+    scores = normalize_scores(score_map, get_image_crop_size())
+    anormal_scores = calculate_anormal_scores(score_map, get_image_crop_size())
 
     # Plot gt image
     os.makedirs("result", exist_ok=True)
@@ -243,7 +252,7 @@ def test_from_folder(net, params, train_outputs, threshold):
     for i in range(0, scores.shape[0]):
         img = denormalization(test_imgs[i])
         heat_map, mask, vis_img = visualize(img, scores[i], threshold)
-        frame = pack_visualize(heat_map, mask, vis_img, scores)
+        frame = pack_visualize(heat_map, mask, vis_img, scores, get_image_crop_size())
         dirname, path = os.path.split(test_list[i])
         output_path = "result/"+path
         cv2.imwrite(output_path, frame)       
@@ -262,8 +271,8 @@ def test_from_video(net, params, train_outputs, threshold):
         video_path = test_list[output_index].split(":")[1]
 
     capture = webcamera_utils.get_capture(video_path)
-    f_h = int(IMAGE_SIZE)
-    f_w = int(IMAGE_SIZE) * 3
+    f_h = int(get_image_crop_size())
+    f_w = int(get_image_crop_size()) * 3
     writer = webcamera_utils.get_writer(result_path, f_h, f_w)
 
     score_map = []
@@ -279,13 +288,13 @@ def test_from_video(net, params, train_outputs, threshold):
         img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         img = preprocess(img, get_image_resize(), keep_aspect=get_keep_aspect())
 
-        dist_tmp = infer(net, params, train_outputs, img)
+        dist_tmp = infer(net, params, train_outputs, img, get_image_crop_size())
 
         score_map.append(dist_tmp)
         scores = normalize_scores(score_map)    # min max is calculated dynamically, please set fixed min max value from calibration data for production
 
         heat_map, mask, vis_img = visualize(denormalization(img[0]), scores[len(scores)-1], threshold)
-        frame = pack_visualize(heat_map, mask, vis_img, scores)
+        frame = pack_visualize(heat_map, mask, vis_img, scores, get_image_crop_size())
 
         cv2.imshow('frame', frame)
         frame_shown = True
@@ -437,7 +446,13 @@ def get_result_file_list():
     return []
 
 def get_model_list():
-    return ["resnet18", "wide_resnet50_2"]
+    return ["resnet18 (224)", "resnet18 (512)", "wide_resnet50_2 (224)"]
+
+def get_model_id_list():
+    return ["resnet18", "resnet18", "wide_resnet50_2"]
+
+def get_model_resolution_list():
+    return [224, 512, 224]
 
 # ======================
 # GUI

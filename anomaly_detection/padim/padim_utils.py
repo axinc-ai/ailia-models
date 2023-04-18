@@ -17,8 +17,6 @@ from sklearn.metrics import precision_recall_curve
 from skimage import morphology
 from skimage.segmentation import mark_boundaries
 
-IMAGE_SIZE = 224
-
 WEIGHT_RESNET18_PATH = 'resnet18.onnx'
 MODEL_RESNET18_PATH = 'resnet18.onnx.prototxt'
 WEIGHT_WIDE_RESNET50_2_PATH = 'wide_resnet50_2.onnx'
@@ -59,9 +57,8 @@ def embedding_concat(x, y):
     return a
 
 
-def preprocess(img, size, mask=False, keep_aspect = True):
+def preprocess(img, size, crop_size, mask=False, keep_aspect = True):
     h, w = img.shape[:2]
-    crop_size = IMAGE_SIZE
 
     # resize
     if keep_aspect:
@@ -92,9 +89,8 @@ def preprocess(img, size, mask=False, keep_aspect = True):
     return img
 
 
-def preprocess_aug(img, size, mask=False, keep_aspect = True, angle_range=[-10, 10], return_refs=False):
+def preprocess_aug(img, size, crop_size, mask=False, keep_aspect = True, angle_range=[-10, 10], return_refs=False):
     h, w = img.shape[:2]
-    crop_size = IMAGE_SIZE
 
     # resize
     if keep_aspect:
@@ -174,7 +170,7 @@ def capture_training_frames_from_video(train_dir):
     return train_imgs
 
 
-def training(net, params, size, keep_aspect, batch_size, train_dir, aug, aug_num, seed, logger):
+def training(net, params, size, crop_size, keep_aspect, batch_size, train_dir, aug, aug_num, seed, logger):
     # set seed
     random.seed(seed)
     idx = random.sample(range(0, params["t_d"]), params["d"])
@@ -220,9 +216,9 @@ def training(net, params, size, keep_aspect, batch_size, train_dir, aug, aug_num
                 else:
                     img = cv2.cvtColor(image_path, cv2.COLOR_BGR2RGB)
                 if not aug:
-                    img = preprocess(img, size, keep_aspect=keep_aspect)
+                    img = preprocess(img, size, crop_size, keep_aspect=keep_aspect)
                 else:
-                    img = preprocess_aug(img, size, keep_aspect=keep_aspect)
+                    img = preprocess_aug(img, size, crop_size, keep_aspect=keep_aspect)
                 imgs.append(img)
 
             # countup N
@@ -281,7 +277,7 @@ def training(net, params, size, keep_aspect, batch_size, train_dir, aug, aug_num
     train_outputs = [mean, cov, cov_inv, idx]
     return train_outputs
 
-def infer(net, params, train_outputs, img):
+def infer(net, params, train_outputs, img, crop_size):
     # prepare input data
     imgs = []
     imgs.append(img)
@@ -320,7 +316,7 @@ def infer(net, params, train_outputs, img):
     # upsample
     dist_tmp = dist_tmp.reshape(H, W)
     dist_tmp = np.array(Image.fromarray(dist_tmp).resize(
-            (IMAGE_SIZE, IMAGE_SIZE), resample=Image.BILINEAR)
+            (crop_size, crop_size), resample=Image.BILINEAR)
         )
 
     # apply gaussian smoothing on the score map
@@ -329,10 +325,10 @@ def infer(net, params, train_outputs, img):
     return dist_tmp
 
 
-def normalize_scores(score_map):
+def normalize_scores(score_map, crop_size):
     N = len(score_map)
     score_map = np.vstack(score_map)
-    score_map = score_map.reshape(N, IMAGE_SIZE, IMAGE_SIZE)
+    score_map = score_map.reshape(N, crop_size, crop_size)
 
     # Normalization
     max_score = score_map.max()
@@ -341,10 +337,10 @@ def normalize_scores(score_map):
 
     return scores
 
-def calculate_anormal_scores(score_map):
+def calculate_anormal_scores(score_map, crop_size):
     N = len(score_map)
     score_map = np.vstack(score_map)
-    score_map = score_map.reshape(N, IMAGE_SIZE, IMAGE_SIZE)
+    score_map = score_map.reshape(N, crop_size, crop_size)
 
     # Calculated anormal score
     anormal_scores = np.zeros((score_map.shape[0]))
@@ -406,7 +402,7 @@ def visualize(img, score, threshold):
     return heat_map, mask, vis_img
 
 
-def pack_visualize(heat_map, mask, vis_img, scores):
+def pack_visualize(heat_map, mask, vis_img, scores, crop_size):
     vis_img = (vis_img * 255).astype(np.uint8)
     vis_img = cv2.cvtColor(vis_img, cv2.COLOR_RGB2BGR)
 
@@ -417,9 +413,9 @@ def pack_visualize(heat_map, mask, vis_img, scores):
     heat_map = (heat_map * 255).astype(np.uint8)
     heat_map = cv2.applyColorMap(heat_map, cv2.COLORMAP_JET)
 
-    frame = np.zeros((IMAGE_SIZE, IMAGE_SIZE * 3, 3), dtype=np.uint8)
-    frame[:,0:IMAGE_SIZE,:] = heat_map
-    frame[:,IMAGE_SIZE:IMAGE_SIZE*2,:] = mask
-    frame[:,IMAGE_SIZE*2:IMAGE_SIZE*3,:] = vis_img
+    frame = np.zeros((crop_size, crop_size * 3, 3), dtype=np.uint8)
+    frame[:,0:crop_size,:] = heat_map
+    frame[:,crop_size:crop_size*2,:] = mask
+    frame[:,crop_size*2:crop_size*3,:] = vis_img
 
     return frame

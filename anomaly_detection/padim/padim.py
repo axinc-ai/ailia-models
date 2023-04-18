@@ -36,6 +36,7 @@ REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/padim/'
 IMAGE_PATH = './bottle_000.png'
 SAVE_IMAGE_PATH = './output.png'
 IMAGE_RESIZE = 256
+IMAGE_SIZE = 224
 KEEP_ASPECT = True
 
 # ======================
@@ -154,7 +155,7 @@ def plot_fig(file_list, test_imgs, scores, anormal_scores, gt_imgs, threshold, s
 
 def train_from_image_or_video(net, params):
     # training
-    train_outputs = training(net, params, IMAGE_RESIZE, KEEP_ASPECT, int(args.batch_size), args.train_dir, args.aug, args.aug_num, args.seed, logger)
+    train_outputs = training(net, params, IMAGE_RESIZE, IMAGE_SIZE, KEEP_ASPECT, int(args.batch_size), args.train_dir, args.aug, args.aug_num, args.seed, logger)
 
     # save learned distribution
     if args.feat:
@@ -198,13 +199,13 @@ def decide_threshold_from_gt_image(net, params, train_outputs, gt_imgs):
         image_path = args.input[i_img]
         img = load_image(image_path)
         img = cv2.cvtColor(img, cv2.COLOR_BGRA2RGB)
-        img = preprocess(img, IMAGE_RESIZE, keep_aspect=KEEP_ASPECT)
+        img = preprocess(img, IMAGE_RESIZE, keep_aspect=KEEP_ASPECT, crop_size = IMAGE_SIZE)
 
-        dist_tmp = infer(net, params, train_outputs, img)
+        dist_tmp = infer(net, params, train_outputs, img, IMAGE_SIZE)
 
         score_map.append(dist_tmp)
 
-    scores = normalize_scores(score_map)
+    scores = normalize_scores(score_map, IMAGE_SIZE)
 
     threshold = decide_threshold(scores, gt_imgs)
 
@@ -233,19 +234,19 @@ def infer_from_image(net, params, train_outputs, threshold, gt_imgs):
             total_time = 0
             for i in range(args.benchmark_count):
                 start = int(round(time.time() * 1000))
-                dist_tmp = infer(net, params, train_outputs, img)
+                dist_tmp = infer(net, params, train_outputs, img, IMAGE_SIZE)
                 end = int(round(time.time() * 1000))
                 logger.info(f'\tailia processing time {end - start} ms')
                 if i != 0:
                     total_time = total_time + (end - start)
             logger.info(f'\taverage time {total_time / (args.benchmark_count - 1)} ms')
         else:
-            dist_tmp = infer(net, params, train_outputs, img)
+            dist_tmp = infer(net, params, train_outputs, img, IMAGE_SIZE)
 
         score_map.append(dist_tmp)
 
-    scores = normalize_scores(score_map)
-    anormal_scores = calculate_anormal_scores(score_map)
+    scores = normalize_scores(score_map, IMAGE_SIZE)
+    anormal_scores = calculate_anormal_scores(score_map, IMAGE_SIZE)
 
     # Plot gt image
     plot_fig(args.input, test_imgs, scores, anormal_scores, gt_imgs, threshold, args.savepath)
@@ -279,7 +280,7 @@ def infer_from_video(net, params, train_outputs, threshold):
         scores = normalize_scores(score_map)    # min max is calculated dynamically, please set fixed min max value from calibration data for production
 
         heat_map, mask, vis_img = visualize(denormalization(img[0]), scores[len(scores)-1], threshold)
-        frame = pack_visualize(heat_map, mask, vis_img, scores)
+        frame = pack_visualize(heat_map, mask, vis_img, scores, IMAGE_SIZE)
 
         cv2.imshow('frame', frame)
         frame_shown = True
