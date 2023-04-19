@@ -265,6 +265,7 @@ def apply_model(models, x_noisy, t, cond):
         output = control_net.run(None, {'x': x_noisy, 'hint': hint, 'timesteps': t, 'context': cond_txt})
     control = output
 
+    x_noisy = x_noisy.astype(np.float16)
     if not args.onnx:
         output = diffusion_emb.predict([x_noisy, t, cond_txt])
     else:
