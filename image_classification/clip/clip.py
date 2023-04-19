@@ -105,11 +105,12 @@ def tokenize(texts, context_length=77, truncate=False):
 
 def preprocess(img):
     h, w = (IMAGE_SIZE, IMAGE_SIZE)
-    im_h, im_w, _ = img.shape
+    im_h, im_w, channels = img.shape
 
     # resize
     scale = h / min(im_h, im_w)
     ow, oh = int(im_w * scale), int(im_h * scale)
+
     if ow != im_w or oh != im_h:
         img = np.array(Image.fromarray(img).resize((ow, oh), Image.BICUBIC))
 
@@ -121,6 +122,14 @@ def preprocess(img):
         y = (oh - h) // 2
         img = img[y:y + h, :, :]
 
+    # to square
+    to_square = True
+    if to_square:
+        img_pad = np.zeros((h, w, channels))
+        img_pad[0:oh,0:ow,:] = img
+        img = img_pad
+
+    # to rgb
     img = img[:, :, ::-1]  # BGR -> RBG
     img = img / 255
 
@@ -291,7 +300,6 @@ def main():
 
     # initialize
     if not args.onnx:
-        logger.info("This model requires 10GB or more memory.")
         memory_mode = ailia.get_memory_mode(
             reduce_constant=True, ignore_input_with_initializer=True,
             reduce_interstage=False, reuse_interstage=False)
