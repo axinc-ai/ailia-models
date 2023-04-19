@@ -904,13 +904,15 @@ def main():
             dec_net.set_profile_mode(True)
     else:
         import onnxruntime
-        enc_net = onnxruntime.InferenceSession(WEIGHT_ENC_PATH, providers=['CUDAExecutionProvider'])
+        providers = ["CPUExecutionProvider"]
+        #providers = ["CUDAExecutionProvider"]
+        enc_net = onnxruntime.InferenceSession(WEIGHT_ENC_PATH, providers=providers)
         if args.profile:
             options = onnxruntime.SessionOptions()
             options.enable_profiling = True
-            dec_net = onnxruntime.InferenceSession(WEIGHT_DEC_PATH, options, providers=['CUDAExecutionProvider'])
+            dec_net = onnxruntime.InferenceSession(WEIGHT_DEC_PATH, options, providers=providers)
         else:
-            dec_net = onnxruntime.InferenceSession(WEIGHT_DEC_PATH, providers=['CUDAExecutionProvider'])
+            dec_net = onnxruntime.InferenceSession(WEIGHT_DEC_PATH, providers=providers)
 
     if args.V:
         # microphone input mode
