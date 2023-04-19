@@ -123,7 +123,6 @@ def preprocess(img):
         y = (oh - h) // 2
         img = img[y:y + h, :, :]
 
-    # to rgb
     img = img[:, :, ::-1]  # BGR -> RBG
     img = img / 255
 
