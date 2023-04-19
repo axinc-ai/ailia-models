@@ -1,18 +1,20 @@
 import numpy as np
-#from scipy.special import log_softmax, logsumexp
-
 from math_utils import softmax
 
-def log_softmax(x, axis=-1):
-    c = x.max()
-    logsumexp = np.log(np.exp(x - c).sum())
-    return x - c - logsumexp
+USE_SCIPY = True
+if USE_SCIPY:
+    from scipy.special import log_softmax, logsumexp
+else:
+    def log_softmax(x, axis=-1):
+        c = x.max()
+        logsumexp = np.log(np.exp(x - c).sum())
+        return x - c - logsumexp
 
-def logsumexp(ns, axis=-1):
-    max = np.max(ns)
-    ds = ns - max
-    sumOfExp = np.exp(ds).sum()
-    return max + np.log(sumOfExp)
+    def logsumexp(ns, axis=-1):
+        max = np.max(ns)
+        ds = ns - max
+        sumOfExp = np.exp(ds).sum()
+        return max + np.log(sumOfExp)
 
 class MaximumLikelihoodRanker:
     """

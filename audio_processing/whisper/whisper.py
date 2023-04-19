@@ -381,9 +381,9 @@ def inference_logits(dec_net, tokens, audio_features, kv_cache=None, initial_tok
 
     if not args.onnx:
         if offset == 0:
-            logits = np.zeros((1,initial_token_length,51865), dtype=np.float32, order='C')
+            logits = np.zeros((n_group, initial_token_length, dims.n_vocab), dtype=np.float32, order='C')
         else:
-            logits = np.zeros((1,1,51865), dtype=np.float32, order='C')
+            logits = np.zeros((n_group, 1, dims.n_vocab), dtype=np.float32, order='C')
         output = [logits, kv_cache] # static allocatin to reduce data copy
         if REQUIRE_CONSTANT_SHAPE_BETWEEN_INFERENCE:
             global WEIGHT_DEC_PATH, MODEL_DEC_PATH, SAVE_DEC_SHAPE
