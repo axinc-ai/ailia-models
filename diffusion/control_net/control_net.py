@@ -1,4 +1,3 @@
-import os
 import sys
 import time
 
@@ -17,7 +16,9 @@ from detector_utils import load_image  # noqa
 # logger
 from logging import getLogger  # noqa
 
+import annotator.comm
 from annotator.canny import CannyDetector
+from annotator.mlsd import MLSDdetector
 from constants import alphas_cumprod
 
 logger = getLogger(__name__)
@@ -28,6 +29,8 @@ logger = getLogger(__name__)
 
 WEIGHT_PATH = 'control_net.onnx'
 MODEL_PATH = 'control_net.onnx.prototxt'
+WEIGHT_MLSD_PATH = 'mlsd_large.onnx'
+MODEL_MLSD_PATH = 'mlsd_large.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/control_net/'
 
 WEIGHT_DFSN_EMB_PATH = 'diffusion_emb.onnx'
@@ -89,6 +92,10 @@ parser.add_argument(
 parser.add_argument(
     "--seed", type=int, default=None,
     help="random seed",
+)
+parser.add_argument(
+    '-m', '--model_type', default='canny', choices=('canny', 'mlsd'),
+    help='model type'
 )
 parser.add_argument(
     '--onnx',
@@ -298,6 +305,15 @@ def apply_model(models, x_noisy, t, cond):
     return out
 
 
+def setup_detector(det_model, net):
+    if det_model == "canny":
+        detector = CannyDetector()
+    elif det_model == "mlsd":
+        detector = MLSDdetector()
+
+    return detector
+
+
 # decoder
 def decode_first_stage(models, z):
     scale_factor = 0.18215
@@ -333,15 +349,13 @@ def predict(
     scale = args.scale
 
     guess_mode = False
-    low_threshold = 100
-    high_threshold = 200
 
     img = img[:, :, ::-1]  # BGR -> RGB
     img = preprocess(img)
     H, W, _ = img.shape
 
-    apply_canny = CannyDetector()
-    detected_map = apply_canny(img, low_threshold, high_threshold)
+    detector = models["detector"]
+    detected_map = detector(img)
     detected_map = detected_map[:, :, None]
     detected_map = np.repeat(detected_map, 3, axis=2)
     control = np.stack([
@@ -370,7 +384,7 @@ def predict(
     x_samples = x_samples.transpose((0, 2, 3, 1)).astype(np.uint8)  # CHW -> HWC
     x_samples = [x[:, :, ::-1] for x in x_samples]  # RGB -> BGR
 
-    return [255 - detected_map] + x_samples
+    return [detector.map2img(detected_map)] + x_samples
 
 
 def recognize_from_image_text(models):
@@ -450,12 +464,25 @@ def main():
         diffusion_mid = onnxruntime.InferenceSession(WEIGHT_DFSN_MID_PATH)
         diffusion_out = onnxruntime.InferenceSession(WEIGHT_DFSN_OUT_PATH)
         autoencoder = onnxruntime.InferenceSession(WEIGHT_AUTO_ENC_PATH)
+        annotator.comm.onnx = True
+
+    det_model = args.model_type
+    det_net = None
+    if det_net == "mlsd":
+        if not args.onnx:
+            autoencoder = ailia.Net(
+                MODEL_MLSD_PATH, WEIGHT_MLSD_PATH, env_id=env_id, memory_mode=memory_mode)
+        else:
+            det_net = onnxruntime.InferenceSession(WEIGHT_MLSD_PATH)
+
+    detector = setup_detector(det_model, det_net)
 
     seed = args.seed
     if seed is not None:
         np.random.seed(seed)
 
     models = dict(
+        detector=detector,
         control_net=control_net,
         diffusion_emb=diffusion_emb,
         diffusion_mid=diffusion_mid,
