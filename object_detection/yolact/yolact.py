@@ -11,7 +11,7 @@ from yolact_util import COLORS,FastBaseTransform ,cfg, postprocess,Detect
 
 import ailia
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath
+from arg_utils import get_base_parser, update_parser, get_savepath
 from model_utils import check_and_download_models  # noqa: E402
 import webcamera_utils  # noqa: E402
 from image_utils import imread  # noqa: E402

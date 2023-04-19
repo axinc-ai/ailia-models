@@ -2,11 +2,11 @@ import time
 import sys
 from transformers import AutoTokenizer
 
-from utils_gpt2 import *
+from arg_utils_gpt2 import *
 import ailia
 
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser  # noqa: E402
+from arg_utils import get_base_parser, update_parser  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 
 # logger

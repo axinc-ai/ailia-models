@@ -14,7 +14,7 @@ import webcamera_utils  # noqa: E402
 from blazeface_utils import compute_blazeface, crop_blazeface  # noqa: E402
 from image_utils import imread  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
-from utils import get_base_parser, update_parser  # noqa: E402
+from arg_utils import get_base_parser, update_parser  # noqa: E402
 
 logger = getLogger(__name__)
 

@@ -14,7 +14,7 @@ sys.path.append('../restyle-encoder') #import align_crop.py
 sys.path.append('../../util')
 sys.path.append('../../style_transfer') # import setup for face alignement (psgan)
 sys.path.append('../../style_transfer/psgan') # import preprocess for face alignement (psgan)
-from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
+from arg_utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from image_utils import load_image  # noqa: E402
 import webcamera_utils  # noqa: E402

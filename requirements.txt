@@ -12,3 +12,6 @@ filterpy
 fvcore
 ftfy
 webcolors
+pymatting
+dlib
+lap

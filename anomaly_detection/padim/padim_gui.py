@@ -23,7 +23,7 @@ import tkinter.filedialog
 import log_init
 from logging import getLogger  # noqa: E402
 
-from utils import get_base_parser, update_parser  # noqa: E402
+from arg_utils import get_base_parser, update_parser  # noqa: E402
 
 logger = getLogger(__name__)
 

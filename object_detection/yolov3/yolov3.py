@@ -9,7 +9,7 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
+from arg_utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from detector_utils import plot_results, write_predictions, load_image  # noqa: E402
 import webcamera_utils  # noqa: E402
@@ -185,7 +185,7 @@ def recognize_from_video():
 
         img = cv2.cvtColor(frame, cv2.COLOR_BGR2BGRA)
         detector.compute(img, args.threshold, args.iou)
-        res_img = plot_results(detector, frame, COCO_CATEGORY, False)
+        res_img = plot_results(detector, frame, COCO_CATEGORY, logging = False)
         cv2.imshow('frame', res_img)
         frame_shown = True
 

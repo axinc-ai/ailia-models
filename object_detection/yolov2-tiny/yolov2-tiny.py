@@ -14,7 +14,7 @@ import webcamera_utils  # noqa: E402
 from detector_utils import load_image, plot_results  # noqa: E402
 from image_utils import imread  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
-from utils import get_base_parser, get_savepath, update_parser  # noqa: E402
+from arg_utils import get_base_parser, get_savepath, update_parser  # noqa: E402
 
 logger = getLogger(__name__)
 
@@ -232,7 +232,7 @@ def recognize_from_video():
         if args.detector:
             img = cv2.cvtColor(frame, cv2.COLOR_BGR2BGRA)
             detector.compute(img, THRESHOLD, IOU)
-            res_img = plot_results(detector, frame, CATEGORY, False)
+            res_img = plot_results(detector, frame, CATEGORY, logging = False)
         else:
             img_PIL = Image.fromarray(frame)
             img = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
