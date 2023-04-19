@@ -110,8 +110,6 @@ def preprocess(img):
     # resize
     scale = h / min(im_h, im_w)
     ow, oh = round(im_w * scale), round(im_h * scale)
-    print(ow,oh)
-
     if ow != im_w or oh != im_h:
         img = np.array(Image.fromarray(img).resize((ow, oh), Image.BICUBIC))
 
