@@ -316,7 +316,7 @@ def new_kv_cache(n_group, length=451):
     else:
         raise ValueError(f"Unsupported model type: {model_type}")
 
-    return np.zeros(size, dtype=np.float32)
+    return np.zeros(size, dtype=np.float32, order='C')
 
 
 # ======================
@@ -380,6 +380,11 @@ def inference_logits(dec_net, tokens, audio_features, kv_cache=None, initial_tok
         start = int(round(time.time() * 1000))
 
     if not args.onnx:
+        if offset == 0:
+            logits = np.zeros((1,initial_token_length,51865), dtype=np.float32, order='C')
+        else:
+            logits = np.zeros((1,1,51865), dtype=np.float32, order='C')
+        output = [logits, kv_cache] # static allocatin to reduce data copy
         if REQUIRE_CONSTANT_SHAPE_BETWEEN_INFERENCE:
             global WEIGHT_DEC_PATH, MODEL_DEC_PATH, SAVE_DEC_SHAPE
 
@@ -388,24 +393,23 @@ def inference_logits(dec_net, tokens, audio_features, kv_cache=None, initial_tok
                 dec_net = ailia.Net(MODEL_DEC_PATH, WEIGHT_DEC_PATH, env_id=args.env_id, memory_mode=args.memory_mode)
             SAVE_DEC_SHAPE = shape
 
-            output = dec_net.predict([tokens, audio_features, kv_cache, offset])
+            dec_net.predict([tokens, audio_features, kv_cache, offset], output = output)
         else:
             if constant_audio_feature:
-                output = dec_net.predict({"tokens":tokens, "kv_cache":kv_cache, "offset":offset})
+                dec_net.predict({"tokens":tokens, "kv_cache":kv_cache, "offset":offset}, output = output)
             else:
-                output = dec_net.predict([tokens, audio_features, kv_cache, offset])
+                dec_net.predict([tokens, audio_features, kv_cache, offset], output = output)
     else:
         kv_cache = kv_cache.astype(np.float32)
         output = dec_net.run(None, {
             'tokens': tokens, 'audio_features': audio_features,
             'kv_cache': kv_cache, 'offset': offset})
+        logits, kv_cache = output
 
     if args.benchmark:
         end = int(round(time.time() * 1000))
         estimation_time = (end - start)
         logger.info(f'\tdecoder processing time {estimation_time} ms')
-
-    logits, kv_cache = output
 
     if not args.dynamic_kv_cache:
         return logits, kv_cache[:, :, :length, :]
