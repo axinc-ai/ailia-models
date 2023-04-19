@@ -889,7 +889,7 @@ def main():
         if args.profile:
             options = onnxruntime.SessionOptions()
             options.enable_profiling = True
-            dec_net = onnxruntime.InferenceSession(WEIGHT_DEC_PATH, options)
+            dec_net = onnxruntime.InferenceSession(WEIGHT_DEC_PATH, options, providers=['CUDAExecutionProvider'])
         else:
             dec_net = onnxruntime.InferenceSession(WEIGHT_DEC_PATH, providers=['CUDAExecutionProvider'])
 
