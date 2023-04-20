@@ -86,7 +86,7 @@ def postprocess(embeddings):
 
 def main():
     # model files check and download
-    check_and_download_models(WEIGHT_PATH, None, None)
+    check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
 
     # initialize
     model = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
