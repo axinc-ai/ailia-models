@@ -182,7 +182,7 @@ def load_gt_imgs(gt_type_dir):
             if os.path.exists(gt_fpath):
                 gt_img = load_image(gt_fpath)
                 gt_img = cv2.cvtColor(gt_img, cv2.COLOR_BGRA2RGB)
-                gt_img = preprocess(gt_img, IMAGE_RESIZE, mask=True, keep_aspect=KEEP_ASPECT)
+                gt_img = preprocess(gt_img, IMAGE_RESIZE, mask=True, keep_aspect=KEEP_ASPECT, crop_size = IMAGE_SIZE)
                 if gt_img is not None:
                     gt_img = gt_img[0, [0]]
                 else:
