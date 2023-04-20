@@ -225,7 +225,7 @@ def infer_from_image(net, params, train_outputs, threshold, gt_imgs):
         image_path = args.input[i_img]
         img = load_image(image_path)
         img = cv2.cvtColor(img, cv2.COLOR_BGRA2RGB)
-        img = preprocess(img, IMAGE_RESIZE, keep_aspect=KEEP_ASPECT)
+        img = preprocess(img, IMAGE_RESIZE, keep_aspect=KEEP_ASPECT, crop_size = IMAGE_SIZE)
 
         test_imgs.append(img[0])
 
