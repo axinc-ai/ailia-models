@@ -67,6 +67,7 @@ cd ../../face_identification/arcface; python3 arcface.py ${OPTION}
 cd ../../face_identification/insightface; python3 insightface.py ${OPTION}
 cd ../../face_identification/vggface2; python3 vggface2.py ${OPTION}
 cd ../../face_identification/cosface; python3 cosface.py ${OPTION}
+cd ../../face_identification/facenet_pytorch; python3 facenet_pytorch.py ${OPTION}
 cd ../../face_recognition/face_alignment; python3 face_alignment.py ${OPTION}
 cd ../../face_recognition/face_alignment; python3 face_alignment.py --active_3d ${OPTION}
 cd ../../face_recognition/face_classification; python3 face_classification.py ${OPTION}
