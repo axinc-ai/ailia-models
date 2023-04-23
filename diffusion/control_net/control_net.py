@@ -1,4 +1,3 @@
-import os
 import sys
 import time
 
@@ -17,7 +16,9 @@ from detector_utils import load_image  # noqa
 # logger
 from logging import getLogger  # noqa
 
+import annotator.common
 from annotator.canny import CannyDetector
+from annotator.openpose import OpenposeDetector
 from constants import alphas_cumprod
 
 logger = getLogger(__name__)
@@ -26,8 +27,14 @@ logger = getLogger(__name__)
 # Parameters
 # ======================
 
-WEIGHT_PATH = 'control_net.onnx'
-MODEL_PATH = 'control_net.onnx.prototxt'
+WEIGHT_CANNY_PATH = 'control_net_canny.onnx'
+MODEL_CANNY_PATH = 'control_net_canny.onnx.prototxt'
+WEIGHT_POSE_PATH = 'control_net_pose.onnx'
+MODEL_POSE_PATH = 'control_net_pose.onnx.prototxt'
+WEIGHT_POSE_BODY_PATH = 'pose_body.onnx'
+MODEL_POSE_BODY_PATH = 'pose_body.onnx.prototxt'
+WEIGHT_POSE_HAND_PATH = 'pose_hand.onnx'
+MODEL_POSE_HAND_PATH = 'pose_hand.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/control_net/'
 
 WEIGHT_DFSN_EMB_PATH = 'diffusion_emb.onnx'
@@ -91,6 +98,10 @@ parser.add_argument(
     help="random seed",
 )
 parser.add_argument(
+    '-m', '--model_type', default='canny', choices=('canny', 'pose'),
+    help='Select annotator model.'
+)
+parser.add_argument(
     '--onnx',
     action='store_true',
     help='execute onnxruntime version.'
@@ -121,6 +132,25 @@ def make_ddim_sampling_parameters(alphacums, ddim_timesteps, eta):
     sigmas = eta * np.sqrt((1 - alphas_prev) / (1 - alphas) * (1 - alphas / alphas_prev))
 
     return sigmas, alphas, alphas_prev
+
+
+def HWC3(x):
+    assert x.dtype == np.uint8
+    if x.ndim == 2:
+        x = x[:, :, None]
+    assert x.ndim == 3
+    H, W, C = x.shape
+    assert C == 1 or C == 3 or C == 4
+    if C == 3:
+        return x
+    if C == 1:
+        return np.concatenate([x, x, x], axis=2)
+    if C == 4:
+        color = x[:, :, 0:3].astype(np.float32)
+        alpha = x[:, :, 3:4].astype(np.float32) / 255.0
+        y = color * alpha + 255.0 * (1.0 - alpha)
+        y = y.clip(0, 255).astype(np.uint8)
+        return y
 
 
 # ======================
@@ -298,6 +328,15 @@ def apply_model(models, x_noisy, t, cond):
     return out
 
 
+def setup_detector(det_model, net, ext_net):
+    if det_model == "canny":
+        detector = CannyDetector()
+    elif det_model == "pose":
+        detector = OpenposeDetector(net, ext_net)
+
+    return detector
+
+
 # decoder
 def decode_first_stage(models, z):
     scale_factor = 0.18215
@@ -313,8 +352,7 @@ def decode_first_stage(models, z):
     return dec
 
 
-def preprocess(img):
-    image_resolution = args.image_resolution
+def preprocess(img, image_resolution):
     im_h, im_w, _ = img.shape
 
     k = image_resolution / min(im_h, im_w)
@@ -329,21 +367,20 @@ def preprocess(img):
 def predict(
         models, img,
         prompt, a_prompt, n_prompt):
+    detect_resolution = 512
+    image_resolution = args.image_resolution
     num_samples = args.n_samples
     scale = args.scale
 
     guess_mode = False
-    low_threshold = 100
-    high_threshold = 200
 
-    img = img[:, :, ::-1]  # BGR -> RGB
-    img = preprocess(img)
-    H, W, _ = img.shape
+    H, W, _ = preprocess(img, image_resolution).shape
 
-    apply_canny = CannyDetector()
-    detected_map = apply_canny(img, low_threshold, high_threshold)
-    detected_map = detected_map[:, :, None]
-    detected_map = np.repeat(detected_map, 3, axis=2)
+    img = preprocess(img, detect_resolution)  # BGR
+    detector = models["detector"]
+    detected_map = detector(img)
+    detected_map = HWC3(detected_map)
+    detected_map = cv2.resize(detected_map, (W, H), interpolation=cv2.INTER_NEAREST)
     control = np.stack([
         detected_map for _ in range(num_samples)
     ], axis=0).astype(np.float32) / 255
@@ -370,7 +407,7 @@ def predict(
     x_samples = x_samples.transpose((0, 2, 3, 1)).astype(np.uint8)  # CHW -> HWC
     x_samples = [x[:, :, ::-1] for x in x_samples]  # RGB -> BGR
 
-    return [255 - detected_map] + x_samples
+    return [detector.map2img(detected_map)] + x_samples
 
 
 def recognize_from_image_text(models):
@@ -419,6 +456,11 @@ def recognize_from_image_text(models):
 
 
 def main():
+    dic_model = {
+        'canny': (WEIGHT_CANNY_PATH, MODEL_CANNY_PATH),
+        'pose': (WEIGHT_POSE_PATH, MODEL_POSE_PATH),
+    }
+    WEIGHT_PATH, MODEL_PATH = dic_model[args.model_type]
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
     check_and_download_models(WEIGHT_DFSN_EMB_PATH, MODEL_DFSN_EMB_PATH, REMOTE_SDF_PATH)
     check_and_download_models(WEIGHT_DFSN_MID_PATH, MODEL_DFSN_MID_PATH, REMOTE_SDF_PATH)
@@ -450,12 +492,29 @@ def main():
         diffusion_mid = onnxruntime.InferenceSession(WEIGHT_DFSN_MID_PATH)
         diffusion_out = onnxruntime.InferenceSession(WEIGHT_DFSN_OUT_PATH)
         autoencoder = onnxruntime.InferenceSession(WEIGHT_AUTO_ENC_PATH)
+        annotator.common.onnx = True
+
+    det_model = args.model_type
+    det_net = None
+    ext_net = None
+    if det_model == "pose":
+        if not args.onnx:
+            det_net = ailia.Net(
+                MODEL_POSE_BODY_PATH, WEIGHT_POSE_BODY_PATH, env_id=env_id, memory_mode=memory_mode)
+            ext_net = ailia.Net(
+                MODEL_POSE_HAND_PATH, WEIGHT_POSE_HAND_PATH, env_id=env_id, memory_mode=memory_mode)
+        else:
+            det_net = onnxruntime.InferenceSession(WEIGHT_POSE_BODY_PATH)
+            ext_net = onnxruntime.InferenceSession(WEIGHT_POSE_HAND_PATH)
+
+    detector = setup_detector(det_model, det_net, ext_net)
 
     seed = args.seed
     if seed is not None:
         np.random.seed(seed)
 
     models = dict(
+        detector=detector,
         control_net=control_net,
         diffusion_emb=diffusion_emb,
         diffusion_mid=diffusion_mid,
