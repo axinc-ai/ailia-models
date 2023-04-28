@@ -312,7 +312,7 @@ def new_kv_cache(n_group, length=451):
         size = [12, n_group, length, 512]
     elif model_type == "small.en" or model_type == "small":
         size = [24, n_group, length, 768]
-    elif model_type == "medium.en" or model_type == "medium":
+    elif model_type == "medium.en" or model_type == "medium" or model_type == "medium_medical":
         size = [48, n_group, length, 1024]
     elif model_type == "large":
         size = [64, n_group, length, 1280]
