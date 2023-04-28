@@ -44,7 +44,7 @@ parser.add_argument(
 )
 parser.add_argument(
     '-m', '--model_type', default='small',
-    choices=('tiny', 'base', 'small', 'medium'),
+    choices=('tiny', 'base', 'small', 'medium', 'medium_medical'),
     help='model type'
 )
 parser.add_argument(
@@ -153,6 +153,7 @@ dims_dict = {
     'base': ModelDimensions(80, 1500, 512, 8, 6, 51865, 448, 512, 8, 6),
     'small': ModelDimensions(80, 1500, 768, 12, 12, 51865, 448, 768, 12, 12),
     'medium': ModelDimensions(80, 1500, 1024, 16, 24, 51865, 448, 1024, 16, 24),
+    'medium_medical': ModelDimensions(80, 1500, 1024, 16, 24, 51865, 448, 1024, 16, 24),
 }
 dims = dims_dict[args.model_type]
 
@@ -195,6 +196,8 @@ if not args.dynamic_kv_cache:
     MODEL_DEC_SMALL_PATH = "decoder_small_fix_kv_cache"+ OPT +".onnx.prototxt"
     WEIGHT_DEC_MEDIUM_PATH = "decoder_medium_fix_kv_cache"+ OPT +".onnx"
     MODEL_DEC_MEDIUM_PATH = "decoder_medium_fix_kv_cache"+ OPT +".onnx.prototxt"
+    WEIGHT_DEC_MEDIUM_MEDICAL_PATH = "decoder_medium_medical_fix_kv_cache"+ OPT +".onnx"
+    MODEL_DEC_MEDIUM_MEDICAL_PATH = "decoder_medium_medical_fix_kv_cache"+ OPT +".onnx.prototxt"
 else:
     # KV_CACHEが推論ごとに変化するバージョン
     WEIGHT_DEC_TINY_PATH = "decoder_tiny.onnx"
@@ -875,6 +878,10 @@ def main():
         'medium': {
             'enc': (WEIGHT_ENC_MEDIUM_PATH, MODEL_ENC_MEDIUM_PATH),
             'dec': (WEIGHT_DEC_MEDIUM_PATH, MODEL_DEC_MEDIUM_PATH),
+        },
+        'medium_medical': {
+            'enc': (WEIGHT_ENC_MEDIUM_PATH, MODEL_ENC_MEDIUM_PATH),
+            'dec': (WEIGHT_DEC_MEDIUM_MEDICAL_PATH, MODEL_DEC_MEDIUM_MEDICAL_PATH),
         },
     }
     model_info = model_dic[args.model_type]
