@@ -52,7 +52,7 @@ WEIGHT_AUTO_ENC_PATH = 'autoencoder.onnx'
 MODEL_AUTO_ENC_PATH = 'autoencoder.onnx.prototxt'
 REMOTE_SDF_PATH = 'https://storage.googleapis.com/ailia-models/stable-diffusion-txt2img/'
 
-IMAGE_PATH = 'bird.png'
+IMAGE_PATH = 'examples/bird.png'
 SAVE_IMAGE_PATH = 'output.png'
 
 # ======================
