@@ -414,16 +414,16 @@ def npmax(array):
 
 
 class OpenposeDetector:
-    def __init__(self, body_net, hand_net):
+    def __init__(self, body_net, hand_net=None):
         self.body_net = body_net
         self.hand_net = hand_net
 
-    def __call__(self, img, hand=False):
+    def __call__(self, img):
         candidate, subset = body_estimation(self.body_net, img)
         canvas = np.zeros_like(img)
         canvas = draw_bodypose(canvas, candidate, subset)
 
-        if hand:
+        if self.hand_net:
             hands_list = hand_detect(candidate, subset, img)
 
             all_hand_peaks = []

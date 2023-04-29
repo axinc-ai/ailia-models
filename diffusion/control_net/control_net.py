@@ -107,6 +107,10 @@ parser.add_argument(
     help='Select annotator model.'
 )
 parser.add_argument(
+    '--hand_detect', action='store_true',
+    help='Using hand models in human poses.'
+)
+parser.add_argument(
     '--onnx',
     action='store_true',
     help='execute onnxruntime version.'
@@ -475,6 +479,15 @@ def main():
     check_and_download_models(WEIGHT_DFSN_OUT_PATH, MODEL_DFSN_OUT_PATH, REMOTE_SDF_PATH)
     check_and_download_models(WEIGHT_AUTO_ENC_PATH, MODEL_AUTO_ENC_PATH, REMOTE_SDF_PATH)
 
+    det_model = args.model_type
+
+    if det_model == "pose":
+        check_and_download_models(WEIGHT_POSE_BODY_PATH, MODEL_POSE_BODY_PATH, REMOTE_SDF_PATH)
+        if args.hand_detect:
+            check_and_download_models(WEIGHT_POSE_HAND_PATH, MODEL_POSE_HAND_PATH, REMOTE_SDF_PATH)
+    elif det_model == "seg":
+        check_and_download_models(WEIGHT_SEG_UNIF_PATH, MODEL_SEG_UNIF_PATH, REMOTE_SDF_PATH)
+
     env_id = args.env_id
 
     # initialize
@@ -502,18 +515,19 @@ def main():
         autoencoder = onnxruntime.InferenceSession(WEIGHT_AUTO_ENC_PATH)
         annotator.common.onnx = True
 
-    det_model = args.model_type
     det_net = None
     ext_net = None
     if det_model == "pose":
         if not args.onnx:
             det_net = ailia.Net(
                 MODEL_POSE_BODY_PATH, WEIGHT_POSE_BODY_PATH, env_id=env_id, memory_mode=memory_mode)
-            ext_net = ailia.Net(
-                MODEL_POSE_HAND_PATH, WEIGHT_POSE_HAND_PATH, env_id=env_id, memory_mode=memory_mode)
+            if args.hand_detect:
+                ext_net = ailia.Net(
+                    MODEL_POSE_HAND_PATH, WEIGHT_POSE_HAND_PATH, env_id=env_id, memory_mode=memory_mode)
         else:
             det_net = onnxruntime.InferenceSession(WEIGHT_POSE_BODY_PATH)
-            ext_net = onnxruntime.InferenceSession(WEIGHT_POSE_HAND_PATH)
+            if args.hand_detect:
+                ext_net = onnxruntime.InferenceSession(WEIGHT_POSE_HAND_PATH)
     elif det_model == "seg":
         if not args.onnx:
             det_net = ailia.Net(
