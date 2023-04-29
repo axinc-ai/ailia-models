@@ -19,6 +19,7 @@ from logging import getLogger  # noqa
 import annotator.common
 from annotator.canny import CannyDetector
 from annotator.openpose import OpenposeDetector
+from annotator.uniformer import UniformerDetector
 from constants import alphas_cumprod
 
 logger = getLogger(__name__)
@@ -31,10 +32,14 @@ WEIGHT_CANNY_PATH = 'control_net_canny.onnx'
 MODEL_CANNY_PATH = 'control_net_canny.onnx.prototxt'
 WEIGHT_POSE_PATH = 'control_net_pose.onnx'
 MODEL_POSE_PATH = 'control_net_pose.onnx.prototxt'
+WEIGHT_SEG_PATH = 'control_net_seg.onnx'
+MODEL_SEG_PATH = 'control_net_seg.onnx.prototxt'
 WEIGHT_POSE_BODY_PATH = 'pose_body.onnx'
 MODEL_POSE_BODY_PATH = 'pose_body.onnx.prototxt'
 WEIGHT_POSE_HAND_PATH = 'pose_hand.onnx'
 MODEL_POSE_HAND_PATH = 'pose_hand.onnx.prototxt'
+WEIGHT_SEG_UNIF_PATH = 'upernet_global_small.onnx'
+MODEL_SEG_UNIF_PATH = 'upernet_global_small.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/control_net/'
 
 WEIGHT_DFSN_EMB_PATH = 'diffusion_emb.onnx'
@@ -98,7 +103,7 @@ parser.add_argument(
     help="random seed",
 )
 parser.add_argument(
-    '-m', '--model_type', default='canny', choices=('canny', 'pose'),
+    '-m', '--model_type', default='canny', choices=('canny', 'pose', 'seg'),
     help='Select annotator model.'
 )
 parser.add_argument(
@@ -333,6 +338,8 @@ def setup_detector(det_model, net, ext_net):
         detector = CannyDetector()
     elif det_model == "pose":
         detector = OpenposeDetector(net, ext_net)
+    elif det_model == "seg":
+        detector = UniformerDetector(net)
 
     return detector
 
@@ -459,6 +466,7 @@ def main():
     dic_model = {
         'canny': (WEIGHT_CANNY_PATH, MODEL_CANNY_PATH),
         'pose': (WEIGHT_POSE_PATH, MODEL_POSE_PATH),
+        'seg': (WEIGHT_SEG_PATH, MODEL_SEG_PATH),
     }
     WEIGHT_PATH, MODEL_PATH = dic_model[args.model_type]
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
@@ -506,6 +514,12 @@ def main():
         else:
             det_net = onnxruntime.InferenceSession(WEIGHT_POSE_BODY_PATH)
             ext_net = onnxruntime.InferenceSession(WEIGHT_POSE_HAND_PATH)
+    elif det_model == "seg":
+        if not args.onnx:
+            det_net = ailia.Net(
+                MODEL_SEG_UNIF_PATH, WEIGHT_SEG_UNIF_PATH, env_id=env_id, memory_mode=memory_mode)
+        else:
+            det_net = onnxruntime.InferenceSession(WEIGHT_SEG_UNIF_PATH)
 
     detector = setup_detector(det_model, det_net, ext_net)
 
