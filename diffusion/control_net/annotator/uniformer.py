@@ -8,8 +8,16 @@ from . import common
 
 def inference_segmentor(net, img):
     size = 768
+    im_h, im_w = img.shape[:2]
 
-    img = cv2.resize(img, (size, size), interpolation=cv2.INTER_LINEAR)
+    long_edge = max(im_h, im_w)
+    scale = long_edge / size
+    oh, ow = int(im_h / scale + 0.5), int(im_w / scale + 0.5)
+
+    img = cv2.resize(img, (ow, oh), interpolation=cv2.INTER_LINEAR)
+    pad_h, pad_w = size - oh, size - ow
+    img = cv2.copyMakeBorder(img, 0, pad_h, 0, pad_w, cv2.BORDER_REPLICATE)
+
     img = normalize_image(img, normalize_type='ImageNet')
     img = img.transpose(2, 0, 1)  # HWC -> CHW
     img = np.expand_dims(img, axis=0)
@@ -21,7 +29,10 @@ def inference_segmentor(net, img):
         output = net.run(None, {'img': img})
     result = output[0]
 
-    return result[0]
+    result = result[0]
+    result = result[:, :oh, :ow]
+
+    return result
 
 
 def get_palette():
@@ -69,7 +80,6 @@ def get_palette():
 
 
 def show_result_pyplot(
-        img,
         result,
         palette=None):
     """Draw `result` over `img`.
@@ -104,8 +114,11 @@ class UniformerDetector:
         self.net = net
 
     def __call__(self, img):
+        im_h, im_w = img.shape[:2]
         result = inference_segmentor(self.net, img)
-        res_img = show_result_pyplot(img, result, get_palette())
+        res_img = show_result_pyplot(result, get_palette())
+
+        res_img = cv2.resize(res_img, (im_w, im_h), interpolation=cv2.INTER_NEAREST)
 
         return res_img  # RGB
 
