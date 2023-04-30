@@ -50,7 +50,6 @@ WEIGHT_DFSN_OUT_PATH = 'diffusion_out.onnx'
 MODEL_DFSN_OUT_PATH = 'diffusion_out.onnx.prototxt'
 WEIGHT_AUTO_ENC_PATH = 'autoencoder.onnx'
 MODEL_AUTO_ENC_PATH = 'autoencoder.onnx.prototxt'
-REMOTE_SDF_PATH = 'https://storage.googleapis.com/ailia-models/stable-diffusion-txt2img/'
 
 IMAGE_PATH = 'examples/bird.png'
 SAVE_IMAGE_PATH = 'output.png'
@@ -474,10 +473,10 @@ def main():
     }
     WEIGHT_PATH, MODEL_PATH = dic_model[args.model_type]
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
-    check_and_download_models(WEIGHT_DFSN_EMB_PATH, MODEL_DFSN_EMB_PATH, REMOTE_SDF_PATH)
-    check_and_download_models(WEIGHT_DFSN_MID_PATH, MODEL_DFSN_MID_PATH, REMOTE_SDF_PATH)
-    check_and_download_models(WEIGHT_DFSN_OUT_PATH, MODEL_DFSN_OUT_PATH, REMOTE_SDF_PATH)
-    check_and_download_models(WEIGHT_AUTO_ENC_PATH, MODEL_AUTO_ENC_PATH, REMOTE_SDF_PATH)
+    check_and_download_models(WEIGHT_DFSN_EMB_PATH, MODEL_DFSN_EMB_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_DFSN_MID_PATH, MODEL_DFSN_MID_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_DFSN_OUT_PATH, MODEL_DFSN_OUT_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_AUTO_ENC_PATH, MODEL_AUTO_ENC_PATH, REMOTE_PATH)
 
     det_model = args.model_type
 
