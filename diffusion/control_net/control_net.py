@@ -303,14 +303,14 @@ def apply_model(models, x_noisy, t, cond):
         output = control_net.run(None, {'x': x_noisy, 'hint': hint, 'timesteps': t, 'context': cond_txt})
     control = output
 
-    x_noisy = x_noisy.astype(np.float16)
+    x_noisy = x_noisy.astype(np.float32)
     if not args.onnx:
         output = diffusion_emb.predict([x_noisy, t, cond_txt])
     else:
         output = diffusion_emb.run(None, {'x': x_noisy, 'timesteps': t, 'context': cond_txt})
     h, emb, *hs = output
 
-    hs = [(x + v).astype(np.float16) for x, v in zip([*hs, h], control)]
+    hs = [(x + v).astype(np.float32) for x, v in zip([*hs, h], control)]
     h = hs.pop()
 
     if not args.onnx:
