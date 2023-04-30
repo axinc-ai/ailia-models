@@ -482,11 +482,11 @@ def main():
     det_model = args.model_type
 
     if det_model == "pose":
-        check_and_download_models(WEIGHT_POSE_BODY_PATH, MODEL_POSE_BODY_PATH, REMOTE_SDF_PATH)
+        check_and_download_models(WEIGHT_POSE_BODY_PATH, MODEL_POSE_BODY_PATH, REMOTE_PATH)
         if args.hand_detect:
-            check_and_download_models(WEIGHT_POSE_HAND_PATH, MODEL_POSE_HAND_PATH, REMOTE_SDF_PATH)
+            check_and_download_models(WEIGHT_POSE_HAND_PATH, MODEL_POSE_HAND_PATH, REMOTE_PATH)
     elif det_model == "seg":
-        check_and_download_models(WEIGHT_SEG_UNIF_PATH, MODEL_SEG_UNIF_PATH, REMOTE_SDF_PATH)
+        check_and_download_models(WEIGHT_SEG_UNIF_PATH, MODEL_SEG_UNIF_PATH, REMOTE_PATH)
 
     env_id = args.env_id
 
