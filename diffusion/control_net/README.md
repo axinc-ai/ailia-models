@@ -52,7 +52,7 @@ For the sample image,
 $ python3 control_net.py
 ```
 
-This will save each sample individually as well as a grid of size `--n_iter` x `--n_samples` option values.
+This will save each sample individually as well as a grid of size `--n_samples` option values.
 
 If you want to specify the input image, put the image path after the --input option.
 You can use `--savepath` option to change the name of the output file to save.
