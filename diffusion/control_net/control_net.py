@@ -191,9 +191,13 @@ class FrozenCLIPEmbedder:
     """Uses the CLIP transformer encoder for text (from Hugging Face)"""
 
     def __init__(self, version="openai/clip-vit-large-patch14", max_length=77):
+        from transformers import logging
+
         self.tokenizer = CLIPTokenizer.from_pretrained(version)
         self.transformer = CLIPTextModel.from_pretrained(version)
         self.max_length = max_length
+
+        logging.set_verbosity_error()
 
     def encode(self, text):
         batch_encoding = self.tokenizer(
