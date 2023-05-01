@@ -103,7 +103,7 @@ ONNX opset=12
 [control_net_canny.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/control_net/control_net_canny.onnx.prototxt)  
 [control_net_pose.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/control_net/control_net_pose.onnx.prototxt)  
 [control_net_seg.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/control_net/control_net_seg.onnx.prototxt)  
-[pose_body.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/control_net/pose_body.onnx.prototxt)
-[pose_hand.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/control_net/pose_hand.onnx.prototxt)
+[pose_body.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/control_net/pose_body.onnx.prototxt)  
+[pose_hand.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/control_net/pose_hand.onnx.prototxt)  
 [upernet_global_small.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/control_net/upernet_global_small.onnx.prototxt)
 
