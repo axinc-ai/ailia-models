@@ -200,8 +200,12 @@ def predict(models, img, pos_points, neg_points=None, box=None):
         output = sam_net.run(None, input)
     masks, iou_predictions, low_res_logits = output
     masks = masks > 0
+    
+    masks = masks[0]
+    scores = iou_predictions[0]
+    logits = low_res_logits[0]
 
-    return masks[0], iou_predictions[0]
+    return masks, scores
 
 
 def recognize_from_image(models):
@@ -251,7 +255,10 @@ def recognize_from_image(models):
         else:
             output = predict(models, img, pos_points, neg_points, box)
 
-        mask, score = output
+        masks, scores = output
+        i = np.argmax(scores)
+        mask = masks[i, :, :]
+        score = scores[i]
 
         coord = []
         label = []
