@@ -31,7 +31,6 @@ MODEL_ENC_PATH = 'image_encoder.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/segment-anything/'
 
 IMAGE_PATH = 'truck.jpg'
-# IMAGE_PATH = 'demo.png'
 SAVE_IMAGE_PATH = 'output.png'
 
 POINT1 = [500, 375]
@@ -47,13 +46,16 @@ parser = get_base_parser(
     'Segment Anything', IMAGE_PATH, SAVE_IMAGE_PATH
 )
 parser.add_argument(
-    '-p', '--pos', action='append', type=int, nargs=2,
+    '-p', '--pos', action='append', type=int, metavar="X", nargs=2,
     help='Positive coordinate specified by x,y.'
 )
 parser.add_argument(
-    '--neg', action='append', type=int, nargs=2,
+    '--neg', action='append', type=int, metavar="X", nargs=2,
     help='Negative coordinate specified by x,y.'
 )
+parser.add_argument(
+    '--box', type=int, metavar="X", nargs=4,
+    help='Box coordinate specified by x1,y1,x2,y2.'
 )
 parser.add_argument(
     '--onnx', action='store_true',
@@ -116,6 +118,16 @@ def show_points(coords, labels, img):
     return img
 
 
+def show_box(box, img):
+    cv2.rectangle(
+        img, box[0], box[1], color=(2, 118, 2),
+        thickness=3,
+        lineType=cv2.LINE_4,
+        shift=0)
+
+    return img
+
+
 # ======================
 # Main functions
 # ======================
@@ -139,7 +151,7 @@ def preprocess(img):
     return img
 
 
-def predict(models, img, pos_points, neg_points):
+def predict(models, img, pos_points, neg_points=None, box=None):
     img = img[:, :, ::-1]  # BGR -> RGB
     im_h, im_w = img.shape[:2]
     img = preprocess(img)
@@ -160,6 +172,10 @@ def predict(models, img, pos_points, neg_points):
     if neg_points:
         coord.append(np.array(neg_points))
         label.append(np.zeros(len(neg_points)))
+    if box is not None:
+        coord.append(box)
+        label.append(np.array([2, 3]))
+
     coord = np.concatenate(coord, axis=0)[None, :, :]
     label = np.concatenate(label, axis=0)[None, :].astype(np.float32)
     coord = apply_coords(coord, im_h, im_w).astype(np.float32)
@@ -191,17 +207,21 @@ def predict(models, img, pos_points, neg_points):
 def recognize_from_image(models):
     pos_points = args.pos
     neg_points = args.neg
+    box = args.box
 
     if pos_points is None:
-        if neg_points is None:
+        if neg_points is None and box is None:
             pos_points = [POINT1]
         else:
             pos_points = []
     if neg_points is None:
         neg_points = []
+    if box is not None:
+        box = np.array(box).reshape(2, 2)
 
     logger.info(f"Positive coordinate: {pos_points}")
     logger.info(f"Negative coordinate: {neg_points}")
+    logger.info(f"Box coordinate: \n{box}")
 
     # input image loop
     for image_path in args.input:
@@ -218,7 +238,7 @@ def recognize_from_image(models):
             total_time_estimation = 0
             for i in range(args.benchmark_count):
                 start = int(round(time.time() * 1000))
-                output = predict(models, img, pos_points, neg_points)
+                output = predict(models, img, pos_points, neg_points, box)
                 end = int(round(time.time() * 1000))
                 estimation_time = (end - start)
 
@@ -229,7 +249,7 @@ def recognize_from_image(models):
 
             logger.info(f'\taverage time estimation {total_time_estimation / (args.benchmark_count - 1)} ms')
         else:
-            output = predict(models, img, pos_points, neg_points)
+            output = predict(models, img, pos_points, neg_points, box)
 
         mask, score = output
 
@@ -237,15 +257,18 @@ def recognize_from_image(models):
         label = []
         if pos_points:
             coord.append(np.array(pos_points))
-            label.append(np.zeros(len(pos_points)))
+            label.append(np.ones(len(pos_points)))
         if neg_points:
             coord.append(np.array(neg_points))
             label.append(np.zeros(len(neg_points)))
-        coord = np.concatenate(coord, axis=0)
-        label = np.concatenate(label, axis=0)
 
         res_img = show_mask(mask, img)
-        res_img = show_points(coord, label, res_img)
+        if coord:
+            coord = np.concatenate(coord, axis=0)
+            label = np.concatenate(label, axis=0)
+            res_img = show_points(coord, label, res_img)
+        if box is not None:
+            res_img = show_box(box, res_img)
 
         # plot result
         savepath = get_savepath(args.savepath, image_path, ext='.png')
