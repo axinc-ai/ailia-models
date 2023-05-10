@@ -309,7 +309,7 @@ def test_from_folder(net, params, train_outputs, threshold):
     result_list = []
     for i in range(0, scores.shape[0]):
         img = denormalization(test_imgs[i])
-        heat_map, mask, vis_img = visualize(img, scores[i], threshold)
+        heat_map, mask, vis_img = visualize(img, scores[i], threshold, roi_img)
         frame = pack_visualize(heat_map, mask, vis_img, scores, get_image_crop_size())
         dirname, path = os.path.split(test_list[i])
         output_path = "result/"+path

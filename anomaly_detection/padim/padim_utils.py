@@ -396,13 +396,16 @@ def denormalization(x):
     return x
 
 
-def visualize(img, score, threshold):
+def visualize(img, score, threshold, roi_img = None):
     heat_map = score * 255
-    mask = score
+    mask = score.copy()
     mask[mask > threshold] = 1
     mask[mask <= threshold] = 0
-    kernel = morphology.disk(4)
-    mask = morphology.opening(mask, kernel)
+    if not (roi_img is None):
+        mask = mask.copy()
+    else:
+        kernel = morphology.disk(4)
+        mask = morphology.opening(mask, kernel)
     mask *= 255
     vis_img = mark_boundaries(img, mask, color=(1, 0, 0), mode='thick')  
     return heat_map, mask, vis_img
