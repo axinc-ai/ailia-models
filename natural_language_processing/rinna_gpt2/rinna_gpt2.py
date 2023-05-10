@@ -4,7 +4,7 @@ import os
 from transformers import T5Tokenizer
 import numpy
 
-from arg_utils_rinna_gpt2 import *
+from utils_rinna_gpt2 import *
 import ailia
 
 sys.path.append('../../util')

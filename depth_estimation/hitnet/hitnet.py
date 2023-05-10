@@ -18,7 +18,7 @@ from arg_utils import get_base_parser, get_savepath, update_parser  # noqa: E402
 
 logger = getLogger(__name__)
 
-from arg_utils_hitnet import CameraConfig, draw_depth, draw_disparity
+from utils_hitnet import CameraConfig, draw_depth, draw_disparity
 
 camera_config =  CameraConfig(0.546, 1000)
 max_distance = 30

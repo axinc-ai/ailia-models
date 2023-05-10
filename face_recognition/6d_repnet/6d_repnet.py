@@ -1,9 +1,9 @@
-from arg_utils_6d_repnet.functions import RetinaFaceOnnx
+from utils_6d_repnet.functions import RetinaFaceOnnx
 import os
 import sys
 import numpy as np
 import cv2
-from arg_utils_6d_repnet import utils
+from utils_6d_repnet import utils
 import matplotlib
 from PIL import Image
 import time
