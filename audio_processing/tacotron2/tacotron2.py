@@ -55,6 +55,10 @@ parser.add_argument(
     '--japanese', action='store_true',
     help='use japanese model'
 )
+parser.add_argument(
+    '--profile', action='store_true',
+    help='use profile model'
+)
 args = update_parser(parser, check_input_type=False)
 
 WEIGHT_PATH_DECODER_ITER = 'tsukuyomi_decoder_iter.onnx'
@@ -168,6 +172,8 @@ def sigmoid(x):
 
 def test_inference(texts, encoder, decoder_iter, postnet):
     #print("Running Tacotron2 Encoder")
+    if args.benchmark:
+        start = int(round(time.time() * 1000))
     sequences, sequence_lengths = prepare_input_sequence(texts)
     if args_onnx:
         encoder_inputs = {encoder.get_inputs()[0].name: sequences,
@@ -178,6 +184,10 @@ def test_inference(texts, encoder, decoder_iter, postnet):
                           sequence_lengths]
         encoder_outs = encoder.run(encoder_inputs)
     memory, processed_memory, lens = encoder_outs
+    if args.benchmark:
+        end = int(round(time.time() * 1000))
+        estimation_time = (end - start)
+        logger.info(f'\tencoder processing time {estimation_time} ms')
 
     #print("Running Tacotron2 Decoder")
     mel_lengths = np.zeros([memory.shape[0]], dtype=np.int32)
@@ -193,6 +203,8 @@ def test_inference(texts, encoder, decoder_iter, postnet):
      mask) = init_decoder_inputs(memory, processed_memory, sequence_lengths)
 
     while True:
+        if args.benchmark:
+            start = int(round(time.time() * 1000))
         if args_onnx:
             decoder_inputs = {decoder_iter.get_inputs()[0].name: decoder_input,
                             decoder_iter.get_inputs()[1].name: attention_hidden,
@@ -226,6 +238,10 @@ def test_inference(texts, encoder, decoder_iter, postnet):
         decoder_hidden, decoder_cell,
         attention_weights, attention_weights_cum,
         attention_context) = decoder_outs
+        if args.benchmark and mel_lengths < 2:
+            end = int(round(time.time() * 1000))
+            estimation_time = (end - start)
+            logger.info(f'\tdecoder processing time {estimation_time} ms')
 
         # Generated one mel_output (80, 1) from one decode
 
@@ -253,12 +269,20 @@ def test_inference(texts, encoder, decoder_iter, postnet):
         decoder_input = mel_output
 
     #print("Running Tacotron2 PostNet")
+    if args.benchmark:
+        start = int(round(time.time() * 1000))
+
     if args_onnx:
         postnet_inputs = {postnet.get_inputs()[0].name: mel_outputs}
         mel_outputs_postnet = postnet.run(None, postnet_inputs)[0]
     else:
         postnet_inputs = [mel_outputs]
         mel_outputs_postnet = postnet.run(postnet_inputs)[0]
+
+    if args.benchmark:
+        end = int(round(time.time() * 1000))
+        estimation_time = (end - start)
+        logger.info(f'\tpostnet processing time {estimation_time} ms')
 
     return mel_outputs_postnet
 
@@ -277,6 +301,9 @@ def generate_voice(decoder_iter, encoder, postnet, waveglow):
 
     #print("Running Tacotron2 Waveglow")
 
+    if args.benchmark:
+        start = int(round(time.time() * 1000))
+
     if args_onnx:
         waveglow_inputs = {waveglow.get_inputs()[0].name: mel_outputs_postnet,
                         waveglow.get_inputs()[1].name: z}
@@ -284,6 +311,11 @@ def generate_voice(decoder_iter, encoder, postnet, waveglow):
     else:
         waveglow_inputs = [mel_outputs_postnet, z]
         audio = waveglow.run(waveglow_inputs)[0]
+
+    if args.benchmark:
+        end = int(round(time.time() * 1000))
+        estimation_time = (end - start)
+        logger.info(f'\twavegrow processing time {estimation_time} ms')
 
     # export to audio
     savepath = args.savepath
@@ -312,9 +344,23 @@ def main():
         encoder = ailia.Net(stream = MODEL_PATH_ENCODER, weight = WEIGHT_PATH_ENCODER, memory_mode = memory_mode, env_id = args.env_id)
         postnet = ailia.Net(stream = MODEL_PATH_POSTNET, weight = WEIGHT_PATH_POSTNET, memory_mode = memory_mode, env_id = args.env_id)
         waveglow = ailia.Net(stream = MODEL_PATH_WAVEGLOW, weight = WEIGHT_PATH_WAVEGLOW, memory_mode = memory_mode, env_id = args.env_id)
+        if args.profile:
+            decoder_iter.set_profile_mode(True)
+            encoder.set_profile_mode(True)
+            postnet.set_profile_mode(True)
+            waveglow.set_profile_mode(True)
 
     generate_voice(decoder_iter, encoder, postnet, waveglow)
 
+    if args.profile:
+        print("decoder_iter : ")
+        print(decoder_iter.get_summary())
+        print("encoder : ")
+        print(encoder.get_summary())
+        print("postnet : ")
+        print(postnet.get_summary())
+        print("waveglow : ")
+        print(waveglow.get_summary())
 
 if __name__ == '__main__':
     main()
