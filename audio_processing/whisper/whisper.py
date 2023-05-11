@@ -129,6 +129,11 @@ parser.add_argument(
     '--prompt', default=None,
     help='prompt for word vocabulary'
 )
+parser.add_argument(
+    '--intermediate',
+    action='store_true',
+    help='display intermediate state.'
+)
 args = update_parser(parser)
 
 if args.ailia_audio:
@@ -554,6 +559,10 @@ def decode(enc_net, dec_net, mel, options):
 
         if completed or tokens.shape[-1] > n_ctx:
             break
+            
+        if args.intermediate:
+            texts = [tokenizer.decode(t[len(initial_tokens):]).strip() for t in tokens]
+            print(texts[0][-32:]+ "\n\u001B[2A")
 
     # reshape the tensors to have (n_audio, n_group) as the first two dimensions
     audio_features = audio_features[:: n_group]
