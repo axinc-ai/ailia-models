@@ -299,6 +299,7 @@ The collection of pre-trained, state-of-the-art AI models.
 |[rinna_gpt2](/natural_language_processing/rinna_gpt2) | [japanese-pretrained-models](https://github.com/rinnakk/japanese-pretrained-models)   | Pytorch | 1.2.7 and later |
 |[fugumt-en-ja](/natural_language_processing/fugumt-en-ja) | [Fugu-Machine Translator](https://github.com/s-taka/fugumt)   | Pytorch | 1.2.9 and later |
 |[bert_sum_ext](/natural_language_processing/bert_sum_ext) | [BERTSUMEXT](https://github.com/dmmiller612/bert-extractive-summarizer)   | Pytorch | 1.2.7 and later |
+|[sentence_transformers_japanese](/natural_language_processing/sentence_transformers_japanese) | [sentence transformers](https://huggingface.co/sentence-transformers/paraphrase-multilingual-mpnet-base-v2) | Pytorch | 1.2.7 and later |
 
 ## Neural Rendering
 
