@@ -9,7 +9,7 @@ PDF file.
 The sentence closest to the input prompt.
 
 ## Requirements
-This model requires additional module.
+This model requires additional module if you want to load pdf file.
 
 ```
 pip3 install pdfminer.six
@@ -25,9 +25,16 @@ For the sample pdf,
 $ python3 sentence_transformer_japanese.py
 ```
 
-If you want to specify the pdf file, put the file path after the `--file` option.  
+If you want to specify the text or pdf file, put the file path after the `-i` option.  
 ```bash
-$ python3 sentence_transformer_japanese.py --file PDF_FILE_PATH
+$ python3 sentence_transformer_japanese.py -i FILE_PATH
+```
+
+## Example
+
+```
+User (press q to exit): nnapiの速度
+Text: 実際、弊社でもSnapdragon 8+ Gen1とyolox_tinyにおいて、CPU（float）に比べてNNAPI NPU（int8）で15倍高速に動作することを確認しています。 (Similarity:0.592)
 ```
 
 ## Reference

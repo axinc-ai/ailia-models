@@ -1,10 +1,11 @@
 import sys
 import time
+import platform
+
 from logging import getLogger
 
 import ailia
 import numpy as np
-from pdfminer.high_level import extract_text
 from transformers import AutoTokenizer
 
 # import local modules
@@ -25,7 +26,7 @@ WEIGHT_PATH = WEIGHT_NAME + '.onnx'
 MODEL_PATH = WEIGHT_PATH + '.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/sentence-transformers-japanese/'
 
-SAMPLE_PDF_PATH = 'sample.pdf'
+SAMPLE_PDF_PATH = 'sample.txt'
 MIN_LENGTH = 5
 
 
@@ -35,19 +36,20 @@ MIN_LENGTH = 5
 parser = get_base_parser(
     'sentence transformers japanese', SAMPLE_PDF_PATH, None 
 )
-parser.add_argument(
-    '-f', '--file', type=str,
-    default=SAMPLE_PDF_PATH,
-    help='Specify the path of pdf file.'
-)
 args = update_parser(parser)
 
 
 # ======================
 # Utils
 # ======================
-def preprocess(pdf_path):
-    text = extract_text(pdf_path)
+def preprocess(file_path):
+    if ".pdf" in file_path:
+        from pdfminer.high_level import extract_text
+        text = extract_text(file_path)
+    else:
+        f = open(file_path, "r")
+        text = f.read()
+        f.close()
     sents = text.replace('\n', '').split('。')
     sents = [s.strip()+'。' for s in sents if len(s.strip()) > MIN_LENGTH]
     return sents
@@ -89,13 +91,17 @@ def main():
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
 
     # initialize
+    if "FP16" in ailia.get_environment(args.env_id).props or platform.system() == 'Darwin':
+        logger.warning('This model do not work on FP16. So use CPU mode.')
+        args.env_id = 0
     model = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
     tokenizer = AutoTokenizer.from_pretrained('sentence-transformers/' + WEIGHT_NAME)
 
     # extract pdf sentences to list
-    sentences = preprocess(args.file)
+    sentences = preprocess(args.input[0])
 
     # inference
+    logger.info("Generating embeddings...")
     if args.benchmark:
         logger.info('BENCHMARK mode')
         for i in range(5):
@@ -119,7 +125,7 @@ def main():
 
         idx, sim = closest_sentence(pdf_emb, prompt_emb)
 
-        print(f'PDF: {sentences[idx]}(Similarity:{sim:.3f})')
+        print(f'Text: {sentences[idx]} (Similarity:{sim:.3f})')
 
         prompt = input('User (press q to exit): ')
 
