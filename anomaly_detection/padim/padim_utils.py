@@ -401,9 +401,7 @@ def visualize(img, score, threshold, roi_img = None):
     mask = score.copy()
     mask[mask > threshold] = 1
     mask[mask <= threshold] = 0
-    if not (roi_img is None):
-        mask = mask.copy()
-    else:
+    if roi_img is None:
         kernel = morphology.disk(4)
         mask = morphology.opening(mask, kernel)
     mask *= 255
