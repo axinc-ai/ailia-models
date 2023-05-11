@@ -1,4 +1,5 @@
 import sys
+import os
 import time
 from copy import deepcopy
 from collections import OrderedDict
@@ -13,7 +14,7 @@ import ailia
 # import original modules
 sys.path.append('../../util')
 from arg_utils import get_base_parser, update_parser, get_savepath  # noqa
-from model_utils import check_and_download_models  # noqa
+from model_utils import urlretrieve, progress_print, check_and_download_models  # noqa
 from image_utils import normalize_image  # noqa
 from detector_utils import load_image  # noqa
 from webcamera_utils import get_capture, get_writer  # noqa
@@ -24,17 +25,26 @@ logger = getLogger(__name__)
 # Parameters
 # ======================
 
-WEIGHT_PATH = 'sam_vit_h_4b8939.onnx'
-MODEL_PATH = 'sam_vit_h_4b8939.onnx.prototxt'
-WEIGHT_ENC_PATH = 'image_encoder.onnx'
-MODEL_ENC_PATH = 'image_encoder.onnx.prototxt'
+WEIGHT_SAM_H_PATH = 'sam_h_4b8939.onnx'
+MODEL_SAM_H_PATH = 'sam_h_4b8939.onnx.prototxt'
+WEIGHT_SAM_L_PATH = 'sam_l_0b3195.onnx'
+MODEL_SAM_L_PATH = 'sam_l_0b3195.onnx.prototxt'
+WEIGHT_SAM_B_PATH = 'sam_b_01ec64.onnx'
+MODEL_SAM_B_PATH = 'sam_b_01ec64.onnx.prototxt'
+WEIGHT_VIT_H_PATH = 'vit_h_4b8939.onnx'
+WEIGHT_VIT_H_PB_PATH = 'vit_h_4b8939_weights.pb'
+MODEL_VIT_H_PATH = 'vit_h_4b8939.onnx.prototxt'
+WEIGHT_VIT_L_PATH = 'vit_l_0b3195.onnx'
+MODEL_VIT_L_PATH = 'vit_l_0b3195.onnx.prototxt'
+WEIGHT_VIT_B_PATH = 'vit_b_01ec64.onnx'
+MODEL_VIT_B_PATH = 'vit_b_01ec64.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/segment-anything/'
 
 IMAGE_PATH = 'truck.jpg'
 SAVE_IMAGE_PATH = 'output.png'
 
-POINT1 = [500, 375]
-POINT2 = [1125, 625]
+POINT1 = (500, 375)
+POINT2 = (1125, 625)
 
 TARGET_LENGTH = 1024
 
@@ -56,6 +66,14 @@ parser.add_argument(
 parser.add_argument(
     '--box', type=int, metavar="X", nargs=4,
     help='Box coordinate specified by x1,y1,x2,y2.'
+)
+parser.add_argument(
+    '--idx', type=int, choices=(0, 1, 2, 3),
+    help='Select mask index.'
+)
+parser.add_argument(
+    '-m', '--model_type', default='sam_h', choices=('sam_h', 'sam_l', 'sam_b'),
+    help='Select model.'
 )
 parser.add_argument(
     '--onnx', action='store_true',
@@ -151,6 +169,14 @@ def preprocess(img):
     return img
 
 
+def postprocess_score(iou_preds, num_points):
+    num_mask_tokens = 4
+    score_reweight = np.array([1000] + [0] * (num_mask_tokens - 1))
+    score = iou_preds + (num_points - 2.5) * score_reweight
+
+    return score
+
+
 def predict(models, img, pos_points, neg_points=None, box=None):
     img = img[:, :, ::-1]  # BGR -> RGB
     im_h, im_w = img.shape[:2]
@@ -200,9 +226,9 @@ def predict(models, img, pos_points, neg_points=None, box=None):
         output = sam_net.run(None, input)
     masks, iou_predictions, low_res_logits = output
     masks = masks > 0
-    
+
     masks = masks[0]
-    scores = iou_predictions[0]
+    scores = postprocess_score(iou_predictions[0], coord.shape[1])
     logits = low_res_logits[0]
 
     return masks, scores
@@ -212,6 +238,7 @@ def recognize_from_image(models):
     pos_points = args.pos
     neg_points = args.neg
     box = args.box
+    sel_idx = args.idx
 
     if pos_points is None:
         if neg_points is None and box is None:
@@ -223,9 +250,10 @@ def recognize_from_image(models):
     if box is not None:
         box = np.array(box).reshape(2, 2)
 
+    lf = '\n'
     logger.info(f"Positive coordinate: {pos_points}")
     logger.info(f"Negative coordinate: {neg_points}")
-    logger.info(f"Box coordinate: \n{box}")
+    logger.info(f"Box coordinate: {lf if box is not None else ''}{box}")
 
     # input image loop
     for image_path in args.input:
@@ -256,7 +284,12 @@ def recognize_from_image(models):
             output = predict(models, img, pos_points, neg_points, box)
 
         masks, scores = output
-        i = np.argmax(scores)
+        logger.info(f'scores : {", ".join(["(%d) %.2f" % (i, s * 100) for i, s in enumerate(scores)])}')
+
+        if sel_idx:
+            i = sel_idx
+        else:
+            i = np.argmax(scores)
         mask = masks[i, :, :]
         score = scores[i]
 
@@ -286,22 +319,43 @@ def recognize_from_image(models):
 
 
 def main():
+    model_type = args.model_type
+    dic_model = {
+        'sam_h': (
+            (WEIGHT_SAM_H_PATH, MODEL_SAM_H_PATH),
+            (WEIGHT_VIT_H_PATH, MODEL_VIT_H_PATH)),
+        'sam_l': (
+            (WEIGHT_SAM_L_PATH, MODEL_SAM_L_PATH),
+            (WEIGHT_VIT_L_PATH, MODEL_VIT_L_PATH)),
+        'sam_b': (
+            (WEIGHT_SAM_B_PATH, MODEL_SAM_B_PATH),
+            (WEIGHT_VIT_B_PATH, MODEL_VIT_B_PATH)),
+    }
+    (WEIGHT_SAM_PATH, MODEL_SAM_PATH), (WEIGHT_VIT_PATH, MODEL_VIT_PATH) = dic_model[model_type]
+
     # model files check and download
-    check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
-    check_and_download_models(WEIGHT_ENC_PATH, MODEL_ENC_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_SAM_PATH, MODEL_SAM_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_VIT_PATH, MODEL_VIT_PATH, REMOTE_PATH)
+    if model_type == "sam_h" and not os.path.exists(WEIGHT_VIT_H_PB_PATH):
+        urlretrieve(
+            REMOTE_PATH + WEIGHT_VIT_H_PB_PATH,
+            WEIGHT_VIT_H_PB_PATH,
+            progress_print,
+        )
 
     env_id = args.env_id
 
     # initialize
     if not args.onnx:
-        sam_net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
-        img_enc = ailia.Net(MODEL_ENC_PATH, WEIGHT_ENC_PATH, env_id=env_id)
+        sam_net = ailia.Net(MODEL_SAM_PATH, WEIGHT_SAM_PATH, env_id=env_id)
+        img_enc = ailia.Net(MODEL_VIT_PATH, WEIGHT_VIT_PATH, env_id=env_id)
     else:
         import onnxruntime
+
         cuda = 0 < ailia.get_gpu_environment_id()
         providers = ['CUDAExecutionProvider', 'CPUExecutionProvider'] if cuda else ['CPUExecutionProvider']
-        sam_net = onnxruntime.InferenceSession(WEIGHT_PATH, providers=providers)
-        img_enc = onnxruntime.InferenceSession(WEIGHT_ENC_PATH, providers=providers)
+        sam_net = onnxruntime.InferenceSession(WEIGHT_SAM_PATH, providers=providers)
+        img_enc = onnxruntime.InferenceSession(WEIGHT_VIT_PATH, providers=providers)
 
     models = dict(
         sam_net=sam_net,
