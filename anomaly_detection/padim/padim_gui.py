@@ -344,12 +344,13 @@ def test_from_video(net, params, train_outputs, threshold):
             break
 
         img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        img = preprocess(img, get_image_resize(), keep_aspect=get_keep_aspect())
+        img = preprocess(img, get_image_resize(), keep_aspect=get_keep_aspect(), crop_size=get_image_crop_size())
 
         dist_tmp = infer(net, params, train_outputs, img, get_image_crop_size())
 
         score_map.append(dist_tmp)
-        scores = normalize_scores(score_map)    # min max is calculated dynamically, please set fixed min max value from calibration data for production
+        roi_img = None
+        scores = normalize_scores(score_map, get_image_crop_size(), roi_img)    # min max is calculated dynamically, please set fixed min max value from calibration data for production
 
         heat_map, mask, vis_img = visualize(denormalization(img[0]), scores[len(scores)-1], threshold)
         frame = pack_visualize(heat_map, mask, vis_img, scores, get_image_crop_size())
