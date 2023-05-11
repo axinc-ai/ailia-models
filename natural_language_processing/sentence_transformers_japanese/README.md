@@ -2,7 +2,7 @@
 
 ## Input
 
-PDF file.
+TEXT or PDF file.
 
 ## Output
 
@@ -20,7 +20,7 @@ pip3 install pdfminer.six
 Automatically downloads the onnx and prototxt files on the first run.
 It is necessary to be connected to the Internet while downloading.
 
-For the sample pdf,
+For the sample text,
 ```bash
 $ python3 sentence_transformer_japanese.py
 ```
