@@ -456,11 +456,6 @@ def test_folder_dialog():
     if len(file_name) != 0:
         test_folder = file_name
         test_list = get_test_file_list()
-        for file in test_list:
-            if "roi.png" in file:
-                test_list.remove(file)
-                test_roi = file
-                load_roi_image(test_roi)
         listsOutput.set(to_file_name(test_list))
         test_index = 0
         ListboxOutput.select_set(0)
@@ -479,6 +474,25 @@ def test_camera_dialog():
     ListboxOutput.select_set(0)
     load_detail(test_list[0], False)
     test_type = "videp"
+
+def test_roi_dialog():
+    global listsOutput, ListboxOutput, output_index
+    global test_folder
+    global test_list
+    global test_type
+    fTyp = [("Image File", "*")]
+    iDir = os.path.abspath(os.path.dirname(__file__))
+    file_name = tk.filedialog.askopenfilename(filetypes=fTyp, initialdir=iDir)
+    if len(file_name) != 0:
+        test_roi = file_name
+        load_roi_image(test_roi)
+
+def save_dialog():
+    iDir = os.path.abspath(os.path.dirname(__file__))
+    file_name = tk.filedialog.askdirectory(initialdir=iDir)
+    if len(file_name) != 0:
+        ret = shutil.copytree('result', file_name, dirs_exist_ok = True)
+        print("Copy success to " + file_name)
 
 def get_camera_list():
     index = 0
@@ -619,7 +633,10 @@ def main():
     textModelDetail.set("Preview")
 
     textRoi = tk.StringVar(frame)
-    textRoi.set("ROI (roi.png)")
+    textRoi.set("ROI")
+
+    textTestRoi = tk.StringVar(frame)
+    textTestRoi.set("Open roi image")
 
     textCheckbox = tk.StringVar(frame)
     textCheckbox.set("Train settings")
@@ -632,6 +649,9 @@ def main():
 
     textSlider = tk.StringVar(frame)
     textSlider.set("threshold")
+
+    textSave = tk.StringVar(frame)
+    textSave.set("Save images")
 
     valueKeepAspect = tkinter.BooleanVar()
     valueKeepAspect.set(True)
@@ -661,6 +681,9 @@ def main():
     buttonTestFolder = tk.Button(frame, textvariable=textTestFolder, command=test_folder_dialog, width=14)
     buttonTestVideo = tk.Button(frame, textvariable=textTestVideo, command=test_file_dialog, width=14)
     buttonTestCamera = tk.Button(frame, textvariable=textTestCamera, command=test_camera_dialog, width=14)
+    buttonTestRoi = tk.Button(frame, textvariable=textTestRoi, command=test_roi_dialog, width=14)
+
+    buttonSave = tk.Button(frame, textvariable=textSave, command=save_dialog, width=14)
 
     canvas = tk.Canvas(frame, bg="black", width=CANVAS_W, height=CANVAS_H)
     canvas.place(x=0, y=0)
@@ -695,9 +718,11 @@ def main():
     buttonTestCamera.grid(row=8, column=1, sticky=tk.NW)
     labelRoi.grid(row=9, column=1, sticky=tk.NW, columnspan=1)
     canvas_roi.grid(row=10, column=1, sticky=tk.NW, rowspan=4, columnspan=1)
+    buttonTestRoi.grid(row=15, column=1, sticky=tk.NW)
 
     labelResult.grid(row=0, column=2, sticky=tk.NW)
     ListboxResult.grid(row=1, column=2, sticky=tk.NW, rowspan=4)
+    buttonSave.grid(row=6, column=2, sticky=tk.NW)
 
     labelModelDetail.grid(row=0, column=3, sticky=tk.NW, columnspan=3)
     canvas.grid(row=1, column=3, sticky=tk.NW, rowspan=4, columnspan=3)
