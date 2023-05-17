@@ -476,10 +476,7 @@ def test_camera_dialog():
     test_type = "videp"
 
 def test_roi_dialog():
-    global listsOutput, ListboxOutput, output_index
-    global test_folder
-    global test_list
-    global test_type
+    global test_roi
     fTyp = [("Image File", "*")]
     iDir = os.path.abspath(os.path.dirname(__file__))
     file_name = tk.filedialog.askopenfilename(filetypes=fTyp, initialdir=iDir)
