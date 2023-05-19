@@ -253,16 +253,16 @@ def draw_predictions(img, predictions):
         font = cv2.FONT_HERSHEY_SIMPLEX
         height_ratio = (y1 - y0) / np.sqrt(height * width)
         font_scale = (
-                np.clip((height_ratio - 0.02) / 0.08 + 1, 1.2, 2) * 0.5)
-        font_thickness = 1
+                np.clip((height_ratio - 0.02) / 0.08 + 1, 1.2, 2) * 0.5) * 4
+        font_thickness = 2
         text_size, _ = cv2.getTextSize(text, font, font_scale, font_thickness)
         text_w, text_h = text_size
-        cv2.rectangle(img, text_pos, (int(x + text_w * 0.6), y + text_h), (0, 0, 0), -1)
+        cv2.rectangle(img, text_pos, (int(x + text_w * 0.6), y + text_h), color, -1)
         cv2.putText(
             img, text, (x, y + text_h - 5),
             fontFace=font,
             fontScale=font_scale * 0.6,
-            color=color_text,
+            color=(0,0,0),
             thickness=font_thickness,
             lineType=cv2.LINE_AA)
 

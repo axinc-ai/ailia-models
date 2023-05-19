@@ -194,15 +194,15 @@ def plot_results(detector, img, category=None, segm_masks=None, logging=True):
         color = colors[idx]
         cv2.rectangle(img, top_left, bottom_right, color, thickness=-1)
 
-        text_color = (255, 255, 255, 255)
+        text_color = (0, 0, 0, 255)
         cv2.putText(
             img,
             text,
             (top_left[0], top_left[1] + th),
             cv2.FONT_HERSHEY_SIMPLEX,
-            fontScale,
+            fontScale * 0.9,
             text_color,
-            1
+            2
         )
     return img
 
