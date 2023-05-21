@@ -30,8 +30,16 @@ WEIGHT_DFSN_MID_PATH = 'diffusion_mid.onnx'
 MODEL_DFSN_MID_PATH = 'diffusion_mid.onnx.prototxt'
 WEIGHT_DFSN_OUT_PATH = 'diffusion_out.onnx'
 MODEL_DFSN_OUT_PATH = 'diffusion_out.onnx.prototxt'
+WEIGHT_BASIL_MIX_EMB_PATH = 'basil_mix_emb.onnx'
+MODEL_BASIL_MIX_EMB_PATH = 'basil_mix_emb.onnx.prototxt'
+WEIGHT_BASIL_MIX_MID_PATH = 'basil_mix_mid.onnx'
+MODEL_BASIL_MIX_MID_PATH = 'basil_mix_mid.onnx.prototxt'
+WEIGHT_BASIL_MIX_OUT_PATH = 'basil_mix_out.onnx'
+MODEL_BASIL_MIX_OUT_PATH = 'basil_mix_out.onnx.prototxt'
 WEIGHT_AUTO_ENC_PATH = 'autoencoder.onnx'
 MODEL_AUTO_ENC_PATH = 'autoencoder.onnx.prototxt'
+WEIGHT_VAE_FT_MSE_PATH = 'vae-ft-mse-840000.onnx'
+MODEL_VAE_FT_MSE_PATH = 'vae-ft-mse-840000.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/stable-diffusion-txt2img/'
 
 SAVE_IMAGE_PATH = 'output.png'
@@ -89,12 +97,18 @@ parser.add_argument(
     help="random seed",
 )
 parser.add_argument(
-    '--onnx',
-    action='store_true',
+    '--sd', default='default', choices=('default', 'basil_mix'),
+    help='execute onnxruntime version.'
+)
+parser.add_argument(
+    '--vae', default='default', choices=('default', 'ft-mse'),
+    help='execute onnxruntime version.'
+)
+parser.add_argument(
+    '--onnx', action='store_true',
     help='execute onnxruntime version.'
 )
 args = update_parser(parser, check_input_type=False)
-
 
 # ======================
 # Options
@@ -158,6 +172,9 @@ class FrozenCLIPEmbedder:
     """Uses the CLIP transformer encoder for text (from Hugging Face)"""
 
     def __init__(self, version="openai/clip-vit-large-patch14", max_length=77):
+        import logging
+        logging.getLogger("transformers.modeling_utils").setLevel(logging.ERROR)
+
         self.tokenizer = CLIPTokenizer.from_pretrained(version)
         self.transformer = CLIPTextModel.from_pretrained(version)
         self.max_length = max_length
@@ -217,7 +234,7 @@ def plms_sampling(
         outs = p_sample_plms(
             models,
             img, cond, ts,
-            update_context=(i==0),
+            update_context=(i == 0),
             index=index,
             unconditional_guidance_scale=unconditional_guidance_scale,
             unconditional_conditioning=unconditional_conditioning,
@@ -385,13 +402,15 @@ def apply_model(models, x, t, cc, update_context):
     diffusion_mid = models["diffusion_mid"]
     diffusion_out = models["diffusion_out"]
 
-    x = x.astype(np.float16)
+    x = x.astype(np.float32)
     if not args.onnx:
         if not FIX_CONSTANT_CONTEXT or update_context:
             output = diffusion_emb.predict([x, t, cc])
         else:
             output = diffusion_emb.run({'x': x, 'timesteps': t})
     else:
+        if "float16" in diffusion_emb.get_inputs()[0].type:
+            x = x.astype(np.float16)
         output = diffusion_emb.run(None, {'x': x, 'timesteps': t, 'context': cc})
     h, emb, *hs = output
 
@@ -442,6 +461,8 @@ def decode_first_stage(models, z):
     if not args.onnx:
         output = autoencoder.predict([z])
     else:
+        if "float16" in autoencoder.get_inputs()[0].type:
+            z = z.astype(np.float16)
         output = autoencoder.run(None, {'input': z})
     dec = output[0]
 
@@ -530,10 +551,28 @@ def recognize_from_text(models):
 
 
 def main():
-    check_and_download_models(WEIGHT_DFSN_EMB_PATH, MODEL_DFSN_EMB_PATH, REMOTE_PATH)
-    check_and_download_models(WEIGHT_DFSN_MID_PATH, MODEL_DFSN_MID_PATH, REMOTE_PATH)
-    check_and_download_models(WEIGHT_DFSN_OUT_PATH, MODEL_DFSN_OUT_PATH, REMOTE_PATH)
-    check_and_download_models(WEIGHT_AUTO_ENC_PATH, MODEL_AUTO_ENC_PATH, REMOTE_PATH)
+    dic_sd = {
+        'default': (
+            (WEIGHT_DFSN_EMB_PATH, MODEL_DFSN_EMB_PATH),
+            (WEIGHT_DFSN_MID_PATH, MODEL_DFSN_MID_PATH),
+            (WEIGHT_DFSN_OUT_PATH, MODEL_DFSN_OUT_PATH)),
+        'basil_mix': (
+            (WEIGHT_BASIL_MIX_EMB_PATH, MODEL_BASIL_MIX_EMB_PATH),
+            (WEIGHT_BASIL_MIX_MID_PATH, MODEL_BASIL_MIX_MID_PATH),
+            (WEIGHT_BASIL_MIX_OUT_PATH, MODEL_BASIL_MIX_OUT_PATH)),
+    }
+    dic_vae = {
+        'default': (WEIGHT_AUTO_ENC_PATH, MODEL_AUTO_ENC_PATH),
+        'ft-mse': (WEIGHT_VAE_FT_MSE_PATH, MODEL_VAE_FT_MSE_PATH),
+    }
+    (WEIGHT_SD_EMB_PATH, MODEL_SD_EMB_PATH), \
+    (WEIGHT_SD_MID_PATH, MODEL_SD_MID_PATH), \
+    (WEIGHT_SD_OUT_PATH, MODEL_SD_OUT_PATH) = dic_sd[args.sd]
+    WEIGHT_VAE_PATH, MODEL_VAE_PATH = dic_vae[args.vae]
+    check_and_download_models(WEIGHT_SD_EMB_PATH, MODEL_SD_EMB_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_SD_MID_PATH, MODEL_SD_MID_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_SD_OUT_PATH, MODEL_SD_OUT_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_VAE_PATH, MODEL_VAE_PATH, REMOTE_PATH)
 
     env_id = args.env_id
 
@@ -549,19 +588,19 @@ def main():
             reduce_constant=True, ignore_input_with_initializer=True,
             reduce_interstage=False, reuse_interstage=True)
         diffusion_emb = ailia.Net \
-            (MODEL_DFSN_EMB_PATH, WEIGHT_DFSN_EMB_PATH, env_id=env_id, memory_mode=memory_mode)
+            (MODEL_SD_EMB_PATH, WEIGHT_SD_EMB_PATH, env_id=env_id, memory_mode=memory_mode)
         diffusion_mid = ailia.Net(
-            MODEL_DFSN_MID_PATH, WEIGHT_DFSN_MID_PATH, env_id=env_id, memory_mode=memory_mode)
+            MODEL_SD_MID_PATH, WEIGHT_SD_MID_PATH, env_id=env_id, memory_mode=memory_mode)
         diffusion_out = ailia.Net(
-            MODEL_DFSN_OUT_PATH, WEIGHT_DFSN_OUT_PATH, env_id=env_id, memory_mode=memory_mode)
+            MODEL_SD_OUT_PATH, WEIGHT_SD_OUT_PATH, env_id=env_id, memory_mode=memory_mode)
         autoencoder = ailia.Net(
-            MODEL_AUTO_ENC_PATH, WEIGHT_AUTO_ENC_PATH, env_id=env_id, memory_mode=memory_mode)
+            MODEL_VAE_PATH, WEIGHT_VAE_PATH, env_id=env_id, memory_mode=memory_mode)
     else:
         import onnxruntime
-        diffusion_emb = onnxruntime.InferenceSession(WEIGHT_DFSN_EMB_PATH)
-        diffusion_mid = onnxruntime.InferenceSession(WEIGHT_DFSN_MID_PATH)
-        diffusion_out = onnxruntime.InferenceSession(WEIGHT_DFSN_OUT_PATH)
-        autoencoder = onnxruntime.InferenceSession(WEIGHT_AUTO_ENC_PATH)
+        diffusion_emb = onnxruntime.InferenceSession(WEIGHT_SD_EMB_PATH)
+        diffusion_mid = onnxruntime.InferenceSession(WEIGHT_SD_MID_PATH)
+        diffusion_out = onnxruntime.InferenceSession(WEIGHT_SD_OUT_PATH)
+        autoencoder = onnxruntime.InferenceSession(WEIGHT_VAE_PATH)
 
     seed = args.seed
     if seed is not None:
