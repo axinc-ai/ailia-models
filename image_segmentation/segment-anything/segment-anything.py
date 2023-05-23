@@ -347,8 +347,12 @@ def main():
 
     # initialize
     if not args.onnx:
-        sam_net = ailia.Net(MODEL_SAM_PATH, WEIGHT_SAM_PATH, env_id=env_id)
-        img_enc = ailia.Net(MODEL_VIT_PATH, WEIGHT_VIT_PATH, env_id=env_id)
+        memory_mode = ailia.get_memory_mode(
+            reduce_constant=True, ignore_input_with_initializer=True,
+            reduce_interstage=False, reuse_interstage=True)
+
+        sam_net = ailia.Net(MODEL_SAM_PATH, WEIGHT_SAM_PATH, env_id=env_id, memory_mode=memory_mode)
+        img_enc = ailia.Net(MODEL_VIT_PATH, WEIGHT_VIT_PATH, env_id=env_id, memory_mode=memory_mode)
     else:
         import onnxruntime
 
