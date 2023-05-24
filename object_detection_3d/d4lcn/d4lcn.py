@@ -18,7 +18,7 @@ from detector_utils import load_image  # noqa
 from image_utils import imread  # noqa: E402
 from model_utils import check_and_download_models  # noqa
 from nms_utils import nms_boxes  # noqa
-from utils import get_base_parser, get_savepath, update_parser  # noqa
+from arg_utils import get_base_parser, get_savepath, update_parser  # noqa
 
 from d4lcn_utils import (bbox_transform_inv, convertAlpha2Rot,
                          convertRot2Alpha, hill_climb)
