@@ -9,7 +9,7 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
+from arg_utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from detector_utils import load_image  # noqa: E402C
 from classifier_utils import plot_results, print_results  # noqa: E402
@@ -109,7 +109,7 @@ def preprocess(img):
 
     # resize
     scale = h / min(im_h, im_w)
-    ow, oh = int(im_w * scale), int(im_h * scale)
+    ow, oh = round(im_w * scale), round(im_h * scale)
     if ow != im_w or oh != im_h:
         img = np.array(Image.fromarray(img).resize((ow, oh), Image.BICUBIC))
 
@@ -291,7 +291,6 @@ def main():
 
     # initialize
     if not args.onnx:
-        logger.info("This model requires 10GB or more memory.")
         memory_mode = ailia.get_memory_mode(
             reduce_constant=True, ignore_input_with_initializer=True,
             reduce_interstage=False, reuse_interstage=False)
