@@ -157,15 +157,23 @@ def predict(net, img, text_feature):
 
 
 def predict_text_feature(net, text):
-    text = tokenize(text)
+    text_tokens = tokenize(text)
 
     # feedforward
-    if not args.onnx:
-        output = net.predict([text])
-    else:
-        output = net.run(None, {'text': text})
+    text_feature = []
+    batch_size_limit = 16
 
-    text_feature = output[0]
+    for i in range(0, text_tokens.shape[0], batch_size_limit):
+        batch_size = min(batch_size_limit, text_tokens.shape[0] - i)
+        logger.info("Embedding " + str(i) + " to " + str(i+batch_size))
+        if not args.onnx:
+            output = net.predict([text_tokens[i:i+batch_size,:]])
+        else:
+            output = net.run(None, {'text': text_tokens[i:i+batch_size,:]})
+        text_feature.append(output[0])
+
+    text_feature = np.concatenate(text_feature)
+    print(text_feature.shape)
 
     text_feature = text_feature / np.linalg.norm(text_feature, ord=2, axis=-1, keepdims=True)
 
