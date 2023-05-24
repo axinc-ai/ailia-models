@@ -173,7 +173,6 @@ def predict_text_feature(net, text):
         text_feature.append(output[0])
 
     text_feature = np.concatenate(text_feature)
-    print(text_feature.shape)
 
     text_feature = text_feature / np.linalg.norm(text_feature, ord=2, axis=-1, keepdims=True)
 
