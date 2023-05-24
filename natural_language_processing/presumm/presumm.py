@@ -9,7 +9,7 @@ import ailia # noqa: E402
 # import original modules
 sys.path.append('../../util')
 from model_utils import check_and_download_models # noqa: E402
-from utils import get_base_parser, update_parser  # noqa: E402
+from arg_utils import get_base_parser, update_parser  # noqa: E402
 
 # logger
 from logging import getLogger # noqa: E402
@@ -86,7 +86,7 @@ def postprocess(text, predict):
 
 def main():
     # model files check and download
-    #check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
 
     # Load text from file and pre-process
     tokenizer = BertTokenizer.from_pretrained(VOCAB_PATH, do_lower_case=True)
