@@ -10,7 +10,7 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser
+from arg_utils import get_base_parser, update_parser
 from model_utils import check_and_download_models  # noqa: E402
 from image_utils import normalize_image  # noqa: E402C
 from math_utils import softmax  # noqa: E402C

@@ -17,7 +17,7 @@ from PIL import Image, ImageTk
 
 sys.path.append('./util')
 from image_utils import imread  # noqa: E402
-from utils import get_base_parser, update_parser  # noqa: E402
+from arg_utils import get_base_parser, update_parser  # noqa: E402
 
 # ======================
 # Arguemnt Parser Config
@@ -112,7 +112,7 @@ def input_changed(event):
         input_index = selection[0]
     else:
         input_index = 0   
-    print("input",input_index)
+    #print("input",input_index)
 
 def get_output_list():
     return ["Display:0"]
@@ -124,7 +124,7 @@ def output_changed(event):
         output_index = selection[0]
     else:
         output_index = 0   
-    print("output",output_index)
+    #print("output",output_index)
 
 def get_env_list():
     env_list = []
@@ -139,7 +139,7 @@ def environment_changed(event):
         env_index = selection[0]
     else:
         env_index = 0
-    print("env",env_index)
+    #print("env",env_index)
 
 # ======================
 # Change model
@@ -353,10 +353,10 @@ def main():
     listEnvironment =tk.StringVar(value=env_list)
 
     # 各種ウィジェットの作成
-    ListboxModel = tk.Listbox(frame, listvariable=lists, width=40, height=30, selectmode="single", exportselection=False)
-    ListboxInput = tk.Listbox(frame, listvariable=listsInput, width=40, height=4, selectmode="single", exportselection=False)
-    ListboxOutput = tk.Listbox(frame, listvariable=listsOutput, width=40, height=4, selectmode="single", exportselection=False)
-    ListboxEnvironment = tk.Listbox(frame, listvariable=listEnvironment, width=40, height=4, selectmode="single", exportselection=False)
+    ListboxModel = tk.Listbox(frame, listvariable=lists, width=40, height=30, selectmode=tk.BROWSE, exportselection=False)
+    ListboxInput = tk.Listbox(frame, listvariable=listsInput, width=40, height=4, selectmode=tk.BROWSE, exportselection=False)
+    ListboxOutput = tk.Listbox(frame, listvariable=listsOutput, width=40, height=4, selectmode=tk.BROWSE, exportselection=False)
+    ListboxEnvironment = tk.Listbox(frame, listvariable=listEnvironment, width=40, height=4, selectmode=tk.BROWSE, exportselection=False)
 
     ListboxModel.bind("<<ListboxSelect>>", model_changed)
     ListboxInput.bind("<<ListboxSelect>>", input_changed)

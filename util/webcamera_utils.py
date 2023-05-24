@@ -4,7 +4,7 @@ import sys
 import numpy as np
 import cv2
 
-from utils import check_file_existance
+from arg_utils import check_file_existance
 from image_utils import normalize_image
 
 from logging import getLogger
