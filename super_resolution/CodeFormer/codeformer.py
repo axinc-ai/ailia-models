@@ -7,7 +7,7 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
+from arg_utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from image_utils import imread  # noqa: E402
 import webcamera_utils  # noqa: E402
@@ -60,8 +60,8 @@ MODEL_PATH_FACE_PARSE = 'face_parse.onnx.prototxt'
 WEIGHT_PATH_RETINALFACE_RESNET = 'retinaface_resnet50.onnx'
 MODEL_PATH_RETINALFACE_RESNET = 'retinaface_resnet50.onnx.prototxt'
 
-WEIGHT_PATH_RETINALFACE_MOBILE = 'retinaface_mobile0.25onnx'
-MODEL_PATH_RETINALFACE_MOBILE = 'retinaface_mobile0.25codeformer.onnx.prototxt'
+WEIGHT_PATH_RETINALFACE_MOBILE = 'retinaface_mobile0.25.onnx'
+MODEL_PATH_RETINALFACE_MOBILE = 'retinaface_mobile0.25.onnx.prototxt'
 
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/codeformer/'
 

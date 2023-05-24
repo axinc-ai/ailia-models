@@ -1,4 +1,4 @@
-# codeformer
+# codeformer : Towards Robust Blind Face Restoration with Codebook Lookup Transformer
 
 ## Input
 
@@ -48,7 +48,7 @@ $ python3 codeformer.py --video VIDEO_PATH
 
 ## Reference
 
-[Revisiting RCAN: Improved Training for Image Super-Resolution](https://github.com/zudi-lin/codeformer)
+[Towards Robust Blind Face Restoration with Codebook Lookup Transformer](https://github.com/sczhou/CodeFormer)
 
 ## Framework
 
