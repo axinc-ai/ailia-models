@@ -9,6 +9,8 @@
 <legend>angelina_jolie.jpg 　　　bradley_cooper.jpg　　　bradley_cooper_mirror.jpg</legend>
 </figure>
 
+(Image from https://github.com/timesler/facenet-pytorch/tree/master/data/test_images)
+
 ## Output
 
 A similarity of each pair of images.
