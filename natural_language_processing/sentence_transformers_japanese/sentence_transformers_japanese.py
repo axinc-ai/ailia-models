@@ -36,6 +36,10 @@ MIN_LENGTH = 5
 parser = get_base_parser(
     'sentence transformers japanese', SAMPLE_PDF_PATH, None 
 )
+parser.add_argument(
+    '-p', '--prompt', metavar='PROMPT', default=None,
+    help='Specify input prompt. If not specified, script runs interactively.'
+)
 args = update_parser(parser)
 
 
@@ -115,6 +119,18 @@ def main():
 
     # create comparable embeddings
     pdf_emb = postprocess(features, attn_mask)
+
+    # check prompt from command line argument
+    prompt = args.prompt
+    if prompt is not None:
+        out = predict(model, tokenizer, prompt)
+        prompt_emb = postprocess(*out)
+
+        idx, sim = closest_sentence(pdf_emb, prompt_emb)
+
+        print(f'Prompt: {prompt}')
+        print(f'Text: {sentences[idx]} (Similarity:{sim:.3f})')
+        return
 
     # application
     prompt = input('User (press q to exit): ')
