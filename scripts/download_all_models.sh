@@ -17,6 +17,7 @@ cd ../../audio_processing/auto_speech/; python3 auto_speech.py ${OPTION}
 cd ../../audio_processing/voicefilter/; python3 voicefilter.py ${OPTION}
 cd ../../audio_processing/whisper/; python3 whisper.py ${OPTION}
 cd ../../audio_processing/clap/; python3 clap.py ${OPTION}
+cd ../../audio_processing/wespeaker/; python3 wespeaker.py ${OPTION}
 cd ../../background_ramoval/deep-image-matting; python3 deep-image-matting.py ${OPTION}
 cd ../../background_ramoval/u2net; python3 u2net.py ${OPTION}
 cd ../../background_ramoval/u2net; python3 u2net.py -a small ${OPTION}
@@ -178,6 +179,8 @@ cd ../../natural_language_processing/gpt2; python3 gpt2.py ${OPTION}
 cd ../../natural_language_processing/rinna_gpt2; python3 rinna_gpt2.py ${OPTION}
 cd ../../natural_language_processing/fugumt-en-ja; python3 fugumt-en-ja.py ${OPTION}
 cd ../../natural_language_processing/bert_sum_ext; python3 bert_sum_ext.py ${OPTION}
+cd ../../natural_language_processing/sentence_transformers_japanese; python3 sentence_transformers_japanese.py ${OPTION}
+cd ../../natural_language_processing/presumm; python3 presumm.py ${OPTION}
 cd ../../neural_rendering/nerf; python3 nerf.py ${OPTION}
 cd ../../object_detection/centernet; python3 centernet.py ${OPTION}
 cd ../../object_detection/m2det; python3 m2det.py ${OPTION}
