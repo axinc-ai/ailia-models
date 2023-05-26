@@ -1,6 +1,7 @@
 import os
 import sys
 import time
+from functools import partial
 
 import numpy as np
 import cv2
@@ -17,6 +18,8 @@ from model_utils import check_and_download_models  # noqa
 from logging import getLogger  # noqa
 
 from constants import alphas_cumprod
+import k_diffusion
+from k_diffusion import sample as kdiffusion_sampling, sample_dpmpp_2m
 
 logger = getLogger(__name__)
 
@@ -65,7 +68,7 @@ parser.add_argument(
     help="how many samples to produce for the given prompt",
 )
 parser.add_argument(
-    "--ddim_steps", type=int, default=50,
+    "--steps", type=int, default=50,
     help="number of ddim sampling steps",
 )
 parser.add_argument(
@@ -149,7 +152,7 @@ def make_ddim_sampling_parameters(alphacums, ddim_timesteps, eta):
 """
 ddim_timesteps
 """
-ddim_num_steps = args.ddim_steps
+ddim_num_steps = args.steps
 ddpm_num_timesteps = 1000
 ddim_timesteps = make_ddim_timesteps(
     ddim_num_steps, ddpm_num_timesteps)
@@ -194,11 +197,11 @@ class FrozenCLIPEmbedder:
 # plms
 def plms_sampling(
         models,
-        cond, shape,
+        x, conditioning,
         unconditional_guidance_scale=1.0,
-        unconditional_conditioning=None):
-    img = np.random.randn(shape[0] * shape[1] * shape[2] * shape[3]).reshape(shape)
-
+        unconditional_conditioning=None,
+        **kwargs):
+    img = x
     timesteps = ddim_timesteps
     time_range = np.flip(timesteps)
     total_steps = timesteps.shape[0]
@@ -216,7 +219,7 @@ def plms_sampling(
 
         iterator = iter_func(time_range)
 
-    b = shape[0]
+    b = x.shape[0]
     old_eps = []
 
     if args.benchmark:
@@ -233,7 +236,7 @@ def plms_sampling(
 
         outs = p_sample_plms(
             models,
-            img, cond, ts,
+            img, conditioning, ts,
             update_context=(i == 0),
             index=index,
             unconditional_guidance_scale=unconditional_guidance_scale,
@@ -321,11 +324,11 @@ def p_sample_plms(
 # ddim
 def ddim_sampling(
         models,
-        cond, shape,
+        x, conditioning,
         unconditional_guidance_scale=1.0,
-        unconditional_conditioning=None):
-    img = np.random.randn(shape[0] * shape[1] * shape[2] * shape[3]).reshape(shape)
-
+        unconditional_conditioning=None,
+        **kwargs):
+    img = x
     timesteps = ddim_timesteps
     time_range = np.flip(timesteps)
     total_steps = timesteps.shape[0]
@@ -343,13 +346,15 @@ def ddim_sampling(
 
         iterator = iter_func(time_range)
 
+    b = x.shape[0]
+
     for i, step in enumerate(iterator):
         index = total_steps - i - 1
-        ts = np.full((shape[0],), step, dtype=np.int64)
+        ts = np.full((b,), step, dtype=np.int64)
 
         img, pred_x0 = p_sample_ddim(
             models,
-            img, cond, ts,
+            img, conditioning, ts,
             index=index,
             unconditional_guidance_scale=unconditional_guidance_scale,
             unconditional_conditioning=unconditional_conditioning,
@@ -362,7 +367,8 @@ def p_sample_ddim(
         models, x, c, t, index,
         temperature=1.,
         unconditional_guidance_scale=1.,
-        unconditional_conditioning=None):
+        unconditional_conditioning=None,
+        **kwargs):
     x_in = np.concatenate([x] * 2)
     t_in = np.concatenate([t] * 2)
     c_in = np.concatenate([unconditional_conditioning, c])
@@ -397,7 +403,7 @@ def p_sample_ddim(
 
 
 # ddpm
-def apply_model(models, x, t, cc, update_context):
+def apply_model(models, x, t, cc, update_context=True):
     diffusion_emb = models["diffusion_emb"]
     diffusion_mid = models["diffusion_mid"]
     diffusion_out = models["diffusion_out"]
@@ -451,6 +457,9 @@ def apply_model(models, x, t, cc, update_context):
     return out
 
 
+k_diffusion.apply_model = apply_model
+
+
 # decoder
 def decode_first_stage(models, z):
     scale_factor = 0.18215
@@ -473,6 +482,7 @@ def predict(
         models, cond_stage_model,
         prompt, uc):
     n_samples = args.n_samples
+    steps = args.steps
     scale = args.scale
     H = args.H
     W = args.W
@@ -481,31 +491,34 @@ def predict(
 
     c = cond_stage_model.encode([prompt] * n_samples)
     shape = [n_samples, C, H // factor, W // factor]
+    x = np.random.randn(shape[0] * shape[1] * shape[2] * shape[3]).reshape(shape)
 
-    plms = True
-    if plms:
-        samples_ddim = plms_sampling(
-            models, c, shape,
-            unconditional_guidance_scale=scale,
-            unconditional_conditioning=uc)
-    else:
-        samples_ddim = ddim_sampling(
-            models, c, shape,
-            unconditional_guidance_scale=scale,
-            unconditional_conditioning=uc)
+    sampler = "PLMS"
+    sampling_info = {
+        "PLMS": plms_sampling,
+        "DDIM": ddim_sampling,
+        "DPM++ 2M Kerras": partial(kdiffusion_sampling, sampling_func=sample_dpmpp_2m),
+    }
+    sampling = sampling_info[sampler]
 
-    x_samples_ddim = decode_first_stage(models, samples_ddim)
-    x_samples_ddim = np.clip((x_samples_ddim + 1.0) / 2.0, a_min=0.0, a_max=1.0)
+    samples = sampling(
+        models, x, c,
+        unconditional_conditioning=uc,
+        unconditional_guidance_scale=scale,
+        steps=steps)
 
-    x_samples = []
-    for x_sample in x_samples_ddim:
+    x_samples = decode_first_stage(models, samples)
+    x_samples = np.clip((x_samples + 1.0) / 2.0, a_min=0.0, a_max=1.0)
+
+    results = []
+    for x_sample in x_samples:
         x_sample = x_sample.transpose(1, 2, 0)  # CHW -> HWC
         x_sample = x_sample * 255
         img = x_sample.astype(np.uint8)
         img = img[:, :, ::-1]  # RGB -> BGR
-        x_samples.append(img)
+        results.append(img)
 
-    return x_samples
+    return results
 
 
 def recognize_from_text(models):
