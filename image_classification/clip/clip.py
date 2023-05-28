@@ -148,6 +148,9 @@ def predict(net, img, text_feature):
 
     image_feature = image_feature / np.linalg.norm(image_feature, ord=2, axis=-1, keepdims=True)
 
+    logger.info("Save embedding " + str(image_feature.shape))
+    np.save("image.npy", image_feature)
+
     logit_scale = 100
     logits_per_image = (image_feature * logit_scale).dot(text_feature.T)
 
@@ -161,7 +164,7 @@ def predict_text_feature(net, text):
 
     # feedforward
     text_feature = []
-    batch_size_limit = 16
+    batch_size_limit = 1
 
     for i in range(0, text_tokens.shape[0], batch_size_limit):
         batch_size = min(batch_size_limit, text_tokens.shape[0] - i)
@@ -171,6 +174,8 @@ def predict_text_feature(net, text):
         else:
             output = net.run(None, {'text': text_tokens[i:i+batch_size,:]})
         text_feature.append(output[0])
+        logger.info("Save embedding " + str(output[0].shape))
+        np.save(""+text[i]+".npy", output[0])
 
     text_feature = np.concatenate(text_feature)
 
