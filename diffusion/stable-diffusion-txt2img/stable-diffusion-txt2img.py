@@ -93,7 +93,8 @@ parser.add_argument(
 )
 parser.add_argument(
     "--scale", type=float, default=7.5,
-    help="unconditional guidance scale: eps = eps(x, empty) + scale * (eps(x, cond) - eps(x, empty))",
+    help="Classifier Free Guidance Scale"
+         " - how strongly the image should conform to prompt - lower values produce more creative results",
 )
 parser.add_argument(
     "--seed", type=int, default=1001,
@@ -198,8 +199,8 @@ class FrozenCLIPEmbedder:
 def plms_sampling(
         models,
         x, conditioning,
-        unconditional_guidance_scale=1.0,
         unconditional_conditioning=None,
+        cfg_scale=1.0,
         **kwargs):
     img = x
     timesteps = ddim_timesteps
@@ -239,7 +240,7 @@ def plms_sampling(
             img, conditioning, ts,
             update_context=(i == 0),
             index=index,
-            unconditional_guidance_scale=unconditional_guidance_scale,
+            cfg_scale=cfg_scale,
             unconditional_conditioning=unconditional_conditioning,
             old_eps=old_eps, t_next=ts_next,
         )
@@ -264,8 +265,8 @@ def plms_sampling(
 def p_sample_plms(
         models, x, c, t, update_context, index,
         temperature=1.,
-        unconditional_guidance_scale=1.,
         unconditional_conditioning=None,
+        cfg_scale=1.,
         old_eps=None, t_next=None):
     b, *_ = x.shape
 
@@ -276,7 +277,7 @@ def p_sample_plms(
         x_recon = apply_model(models, x_in, t_in, c_in, update_context)
         e_t_uncond, e_t = np.split(x_recon, 2)
 
-        e_t = e_t_uncond + unconditional_guidance_scale * (e_t - e_t_uncond)
+        e_t = e_t_uncond + cfg_scale * (e_t - e_t_uncond)
         return e_t
 
     def get_x_prev_and_pred_x0(e_t, index):
@@ -325,8 +326,8 @@ def p_sample_plms(
 def ddim_sampling(
         models,
         x, conditioning,
-        unconditional_guidance_scale=1.0,
         unconditional_conditioning=None,
+        cfg_scale=1.0,
         **kwargs):
     img = x
     timesteps = ddim_timesteps
@@ -356,7 +357,7 @@ def ddim_sampling(
             models,
             img, conditioning, ts,
             index=index,
-            unconditional_guidance_scale=unconditional_guidance_scale,
+            cfg_scale=cfg_scale,
             unconditional_conditioning=unconditional_conditioning,
         )
 
@@ -366,8 +367,8 @@ def ddim_sampling(
 def p_sample_ddim(
         models, x, c, t, index,
         temperature=1.,
-        unconditional_guidance_scale=1.,
         unconditional_conditioning=None,
+        cfg_scale=1.,
         **kwargs):
     x_in = np.concatenate([x] * 2)
     t_in = np.concatenate([t] * 2)
@@ -376,7 +377,7 @@ def p_sample_ddim(
     x_recon = apply_model(models, x_in, t_in, c_in, True)
     e_t_uncond, e_t = np.split(x_recon, 2)
 
-    e_t = e_t_uncond + unconditional_guidance_scale * (e_t - e_t_uncond)
+    e_t = e_t_uncond + cfg_scale * (e_t - e_t_uncond)
 
     alphas = ddim_alphas
     alphas_prev = ddim_alphas_prev
@@ -483,7 +484,7 @@ def predict(
         prompt, uc):
     n_samples = args.n_samples
     steps = args.steps
-    scale = args.scale
+    cfg_scale = args.scale
     H = args.H
     W = args.W
     C = args.C
@@ -504,7 +505,7 @@ def predict(
     samples = sampling(
         models, x, c,
         unconditional_conditioning=uc,
-        unconditional_guidance_scale=scale,
+        cfg_scale=cfg_scale,
         steps=steps)
 
     x_samples = decode_first_stage(models, samples)
