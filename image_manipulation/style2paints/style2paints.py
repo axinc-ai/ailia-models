@@ -16,7 +16,7 @@ from logging import getLogger  # noqa: E402
 from detector_utils import load_image  # noqa: E402C
 from image_utils import imread  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
-from utils import get_base_parser, get_savepath, update_parser  # noqa: E402
+from arg_utils import get_base_parser, get_savepath, update_parser  # noqa: E402
 
 from style2paints_utils import *
 
