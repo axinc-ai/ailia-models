@@ -10,7 +10,7 @@ from glob import glob
 
 # import local modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser # noqa: E402
+from arg_utils import get_base_parser, update_parser # noqa: E402
 from image_utils import imread
 from model_utils import check_and_download_models # noqa: E402
 from mtcnn_utils import MTCNN

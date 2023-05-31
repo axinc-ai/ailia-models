@@ -5,17 +5,19 @@
 <figure>
 <img src="data\angelina_jolie.jpg" width="150">
 <img src="data\bradley_cooper.jpg" width="150">
-<img src="data\bradley_cooper_mirror.jpg" width="150">
-<legend>angelina_jolie.jpg 　　　bradley_cooper.jpg　　　bradley_cooper_mirror.jpg</legend>
+<img src="data\kate_siegel.jpg" width="150">
+<legend>angelina_jolie.jpg 　　　bradley_cooper.jpg　　　kate_siegel.jpg</legend>
 </figure>
+
+(Image from https://github.com/timesler/facenet-pytorch/tree/master/data/test_images)
 
 ## Output
 
 A similarity of each pair of images.
 ```
-[Same face: False] Similarity of ('angelina_jolie.jpg', 'bradley_cooper_mirror.jpg') is 1.277.
-[Same face: False] Similarity of ('angelina_jolie.jpg', 'bradley_cooper.jpg') is 1.251.
-[Same face: True] Similarity of ('bradley_cooper_mirror.jpg', 'bradley_cooper.jpg') is 0.322.
+Similarity of ('angelina_jolie.jpg', 'kate_siegel.jpg') is 0.891.
+Similarity of ('angelina_jolie.jpg', 'bradley_cooper.jpg') is 1.446.
+Similarity of ('kate_siegel.jpg', 'bradley_cooper.jpg') is 1.302.
 ```
 
 ## Usage
