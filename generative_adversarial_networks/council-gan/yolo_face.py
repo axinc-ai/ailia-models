@@ -1,7 +1,7 @@
 import numpy as np
 
 import ailia 
-from utils import check_file_existance  # noqa: E402
+from arg_utils import check_file_existance  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 
 
