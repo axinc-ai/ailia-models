@@ -39,54 +39,43 @@ def get_scalings(sigma):
     return c_out, c_in
 
 
-def get_eps(models, x_noisy, t, cond):
-    # x_noisy = np.load("x_noisy.npy")
-    x_recon = apply_model(models, x_noisy, t, cond)
-    return x_recon
-
-
-def inner_model(models, input, sigma, cond):
+def get_eps(models, input, sigma, cond):
     def append_dims(x, target_dims):
         """Appends dimensions to the end of a tensor until it has target_dims dimensions."""
         dims_to_append = target_dims - x.ndim
         return x[(...,) + (None,) * dims_to_append]
 
     c_out, c_in = [append_dims(x, input.ndim) for x in get_scalings(sigma)]
-    eps = get_eps(models, input * c_in, sigma_to_t(sigma), cond)
+    eps = apply_model(models, input * c_in, sigma_to_t(sigma), cond)
 
     return input + eps * c_out
 
 
 def CFGDenoiser(
         models, x, sigma, uncond, cond, cond_scale, s_min_uncond, image_cond):
-    denoiser_params = CFGDenoiserParams(
-        x_in, image_cond_in, sigma_in, state.sampling_step, state.sampling_steps,
-        tensor, uncond)
-    cfg_denoiser_callback(denoiser_params)
-    x_in = denoiser_params.x
-    image_cond_in = denoiser_params.image_cond
-    sigma_in = denoiser_params.sigma
-    tensor = denoiser_params.text_cond
-    uncond = denoiser_params.text_uncond
-    skip_uncond = False
+    batch_size = 1
+    tensor = np.expand_dims(cond, axis=0)
 
-    x_out = torch.zeros_like(x_in)
-    batch_size = batch_size * 2 if shared.batch_cond_uncond else batch_size
+    x_in = np.concatenate([x, x])
+    sigma_in = np.concatenate([sigma, sigma])
+
+    x_out = np.zeros_like(x_in)
+    batch_size = batch_size * 2
     for batch_offset in range(0, tensor.shape[0], batch_size):
         a = batch_offset
         b = min(a + batch_size, tensor.shape[0])
+        c_crossattn = tensor[a:b]
 
-        if not is_edit_model:
-            c_crossattn = [tensor[a:b]]
-        else:
-            c_crossattn = torch.cat([tensor[a:b]], uncond)
+        x_out[a:b] = get_eps(models, x_in[a:b], sigma_in[a:b], cond=c_crossattn[0])
 
-        # x_out[a:b] = self.inner_model(x_in[a:b], sigma_in[a:b], cond=make_condition_dict(c_crossattn, image_cond_in[a:b]))
-        r = inner_model(models, x_in[a:b], sigma_in[a:b], cond=make_condition_dict(c_crossattn, image_cond_in[a:b]))
-        print("r---", r)
-        print("r---", r.shape)
-        1 / 0
-        x_out[a:b] = r
+    x_out[-uncond.shape[0]:] = get_eps(
+        models, x_in[-uncond.shape[0]:], sigma_in[-uncond.shape[0]:], cond=uncond)
+
+    denoised_uncond = x_out[-uncond.shape[0]:]
+    denoised = np.copy(denoised_uncond)
+    denoised[0] += (x_out[0] - denoised_uncond[0]) * cond_scale
+
+    return denoised
 
 
 def sample(
@@ -94,7 +83,7 @@ def sample(
         unconditional_conditioning,
         sampling_func, steps=20, cfg_scale=1.0,
         **kwargs):
-    image_conditioning = None
+    image_conditioning = np.zeros((1, 5, 1, 1))
     s_min_uncond = 0
 
     sigmas = get_sigmas(steps)
@@ -121,13 +110,10 @@ def sample_dpmpp_2m(models, x, sigmas, extra_args=None):
     s_in = np.array([1] * x.shape[0])
     sigma_fn = lambda t: np.exp(-t)
     t_fn = lambda sigma: -np.log(sigma)
-    old_denoised = None
 
+    old_denoised = None
     for i in trange(len(sigmas) - 1):
         denoised = CFGDenoiser(models, x, sigmas[i] * s_in, **extra_args)
-        print("denoised---", denoised)
-        print("denoised---", denoised.shape)
-        1 / 0
 
         t, t_next = t_fn(sigmas[i]), t_fn(sigmas[i + 1])
         h = t_next - t

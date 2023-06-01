@@ -69,8 +69,7 @@ parser.add_argument(
 )
 parser.add_argument(
     "--steps", type=int, default=50,
-    help="How many times to improve the generated image iteratively;"
-         " higher values take longer; very low values can produce bad results",
+    help="number of ddim sampling steps",
 )
 parser.add_argument(
     "--ddim_eta", type=float, default=0.0,
