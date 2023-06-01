@@ -33,7 +33,7 @@ def sigma_to_t(sigma):
 
 
 def get_scalings(sigma):
-    sigma_data = 0
+    sigma_data = 1.0
     c_out = -sigma
     c_in = 1 / (sigma ** 2 + sigma_data ** 2) ** 0.5
     return c_out, c_in
@@ -118,12 +118,12 @@ def sample_dpmpp_2m(models, x, sigmas, extra_args=None):
         t, t_next = t_fn(sigmas[i]), t_fn(sigmas[i + 1])
         h = t_next - t
         if old_denoised is None or sigmas[i + 1] == 0:
-            x = (sigma_fn(t_next) / sigma_fn(t)) * x - (-h).expm1() * denoised
+            x = (sigma_fn(t_next) / sigma_fn(t)) * x - np.expm1(-h) * denoised
         else:
             h_last = t - t_fn(sigmas[i - 1])
             r = h_last / h
             denoised_d = (1 + 1 / (2 * r)) * denoised - (1 / (2 * r)) * old_denoised
-            x = (sigma_fn(t_next) / sigma_fn(t)) * x - (-h).expm1() * denoised_d
+            x = (sigma_fn(t_next) / sigma_fn(t)) * x - np.expm1(-h) * denoised_d
         old_denoised = denoised
 
     return x
