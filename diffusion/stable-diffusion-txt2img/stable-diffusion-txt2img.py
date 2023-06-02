@@ -102,11 +102,15 @@ parser.add_argument(
 )
 parser.add_argument(
     '--sd', default='default', choices=('default', 'basil_mix'),
-    help='execute onnxruntime version.'
+    help='Stable Diffusion checkpoint'
 )
 parser.add_argument(
     '--vae', default='default', choices=('default', 'ft-mse'),
-    help='execute onnxruntime version.'
+    help='SD VAE'
+)
+parser.add_argument(
+    '--sampler', default='PLMS', choices=('PLMS', 'DDIM', 'DPM++ 2M Kerras'),
+    help='Which algorithm to use to produce the image.'
 )
 parser.add_argument(
     '--onnx', action='store_true',
@@ -485,6 +489,7 @@ def predict(
     n_samples = args.n_samples
     steps = args.steps
     cfg_scale = args.scale
+    sampler = args.sampler
     H = args.H
     W = args.W
     C = args.C
@@ -494,11 +499,10 @@ def predict(
     shape = [n_samples, C, H // factor, W // factor]
     x = np.random.randn(shape[0] * shape[1] * shape[2] * shape[3]).reshape(shape)
 
-    sampler = "PLMS"
     sampling_info = {
         "PLMS": plms_sampling,
         "DDIM": ddim_sampling,
-        "DPM++ 2M Kerras": partial(kdiffusion_sampling, sampling_func=sample_dpmpp_2m),
+        "DPM++ 2M Kerras": partial(kdiffusion_sampling, sampler=sample_dpmpp_2m),
     }
     sampling = sampling_info[sampler]
 

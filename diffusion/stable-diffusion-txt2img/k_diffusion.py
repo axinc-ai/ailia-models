@@ -1,8 +1,11 @@
+import warnings
+
 import numpy as np
 from tqdm.auto import trange
 
 from constants import log_sigmas
 
+# be rewritten later
 apply_model = lambda models, x, t, cc: None
 
 
@@ -18,7 +21,6 @@ def get_sigmas_karras(n, sigma_min, sigma_max, rho=7.):
 
 def get_sigmas(steps):
     sigma_min, sigma_max = 0.0312652550637722, 14.611639022827148
-
     sigmas = get_sigmas_karras(
         n=steps, sigma_min=sigma_min, sigma_max=sigma_max)
 
@@ -52,7 +54,7 @@ def get_eps(models, input, sigma, cond):
 
 
 def CFGDenoiser(
-        models, x, sigma, uncond, cond, cond_scale, s_min_uncond, image_cond):
+        models, x, sigma, uncond, cond, cond_scale):
     batch_size = 1
     tensor = np.expand_dims(cond, axis=0)
 
@@ -81,11 +83,8 @@ def CFGDenoiser(
 def sample(
         models, x, conditioning,
         unconditional_conditioning,
-        sampling_func, steps=20, cfg_scale=1.0,
+        sampler, steps=20, cfg_scale=1.0,
         **kwargs):
-    image_conditioning = np.zeros((1, 5, 1, 1))
-    s_min_uncond = 0
-
     sigmas = get_sigmas(steps)
 
     x = x * sigmas[0]
@@ -93,12 +92,10 @@ def sample(
     extra_params_kwargs = {}
     extra_params_kwargs['sigmas'] = sigmas
 
-    samples = sampling_func(models, x, extra_args={
+    samples = sampler(models, x, extra_args={
         'cond': conditioning,
-        'image_cond': image_conditioning,
         'uncond': unconditional_conditioning,
         'cond_scale': cfg_scale,
-        's_min_uncond': s_min_uncond
     }, **extra_params_kwargs)
 
     return samples
@@ -106,24 +103,27 @@ def sample(
 
 def sample_dpmpp_2m(models, x, sigmas, extra_args=None):
     """DPM-Solver++(2M)."""
-    extra_args = {} if extra_args is None else extra_args
-    s_in = np.array([1] * x.shape[0])
-    sigma_fn = lambda t: np.exp(-t)
-    t_fn = lambda sigma: -np.log(sigma)
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore')
 
-    old_denoised = None
-    for i in trange(len(sigmas) - 1):
-        denoised = CFGDenoiser(models, x, sigmas[i] * s_in, **extra_args)
+        extra_args = {} if extra_args is None else extra_args
+        s_in = np.array([1] * x.shape[0])
+        sigma_fn = lambda t: np.exp(-t)
+        t_fn = lambda sigma: -np.log(sigma)
 
-        t, t_next = t_fn(sigmas[i]), t_fn(sigmas[i + 1])
-        h = t_next - t
-        if old_denoised is None or sigmas[i + 1] == 0:
-            x = (sigma_fn(t_next) / sigma_fn(t)) * x - np.expm1(-h) * denoised
-        else:
-            h_last = t - t_fn(sigmas[i - 1])
-            r = h_last / h
-            denoised_d = (1 + 1 / (2 * r)) * denoised - (1 / (2 * r)) * old_denoised
-            x = (sigma_fn(t_next) / sigma_fn(t)) * x - np.expm1(-h) * denoised_d
-        old_denoised = denoised
+        old_denoised = None
+        for i in trange(len(sigmas) - 1):
+            denoised = CFGDenoiser(models, x, sigmas[i] * s_in, **extra_args)
+
+            t, t_next = t_fn(sigmas[i]), t_fn(sigmas[i + 1])
+            h = t_next - t
+            if old_denoised is None or sigmas[i + 1] == 0:
+                x = (sigma_fn(t_next) / sigma_fn(t)) * x - np.expm1(-h) * denoised
+            else:
+                h_last = t - t_fn(sigmas[i - 1])
+                r = h_last / h
+                denoised_d = (1 + 1 / (2 * r)) * denoised - (1 / (2 * r)) * old_denoised
+                x = (sigma_fn(t_next) / sigma_fn(t)) * x - np.expm1(-h) * denoised_d
+            old_denoised = denoised
 
     return x
