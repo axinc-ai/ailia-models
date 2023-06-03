@@ -7,6 +7,16 @@ import librosa
 import soundfile as sf
 
 import ailia
+import torch # temporary
+torch.set_num_threads(1)
+from pprint import pprint
+
+from utils_vad import (get_speech_timestamps,
+                       save_audio,
+                       read_audio,
+                       VADIterator,
+                       collect_chunks,
+                       OnnxWrapper)
 
 # import original modules
 sys.path.append('../../util')
@@ -36,12 +46,12 @@ SAMPLING_RATE = 16000
 # ======================
 
 parser = get_base_parser(
-    'VoiceFilter', WAVE_PATH, SAVE_PATH, input_ftype='audio'
+    'Silero VAD', WAVE_PATH, SAVE_PATH, input_ftype='audio'
 )
 parser.add_argument(
-    '-r', '--reference_file',
-    default="ref-voice.wav", type=str,
-    help='path of reference wav file'
+    '--onnx',
+    action='store_true',
+    help='execute onnxruntime version.'
 )
 args = update_parser(parser)
 
@@ -49,71 +59,19 @@ args = update_parser(parser)
 # Logic
 # ======================
 
-
-
-
-
-dependencies = ['torch', 'torchaudio']
-import torch
-import json
-import os
-from utils_vad import (get_speech_timestamps,
-                       save_audio,
-                       read_audio,
-                       VADIterator,
-                       collect_chunks,
-                       OnnxWrapper)
-
-def silero_vad(onnx=False, force_onnx_cpu=False):
-    model = OnnxWrapper('silero_vad.onnx', force_onnx_cpu)
-    utils = (get_speech_timestamps,
-             save_audio,
-             read_audio,
-             VADIterator,
-             collect_chunks)
-
-    return model, utils
-
-def audio_recognition():
-  SAMPLING_RATE = 16000
-
-  import torch
-  torch.set_num_threads(1)
-
-  #from IPython.display import Audio
-  from pprint import pprint
-
-  # %%
-  USE_ONNX = True # change this to True if you want to test onnx model
-    
-  model, utils = silero_vad(onnx = True)
-
-  (get_speech_timestamps,
-  save_audio,
-  read_audio,
-  VADIterator,
-  collect_chunks) = utils
-
+def audio_recognition(model):
   # **Speech timestapms from full audio**
 
-  # %%
   wav = read_audio('en_example.wav', sampling_rate=SAMPLING_RATE)
   # get speech timestamps from full audio file
   speech_timestamps = get_speech_timestamps(wav, model, sampling_rate=SAMPLING_RATE)
   pprint(speech_timestamps)
 
-  # %%
   # merge all speech chunks to one audio
   save_audio('only_speech.wav',
             collect_chunks(speech_timestamps, wav), sampling_rate=SAMPLING_RATE) 
-  #Audio('only_speech.wav')
 
-  # %% [markdown]
-  # ## Stream imitation example
-
-  # %%
   ## using VADIterator class
-
   vad_iterator = VADIterator(model)
   wav = read_audio(f'en_example.wav', sampling_rate=SAMPLING_RATE)
 
@@ -127,9 +85,7 @@ def audio_recognition():
           print(speech_dict, end=' ')
   vad_iterator.reset_states() # reset model states after each audio
 
-  # %%
   ## just probabilities
-
   wav = read_audio('en_example.wav', sampling_rate=SAMPLING_RATE)
   speech_probs = []
   window_size_samples = 1536
@@ -148,22 +104,17 @@ def audio_recognition():
 # Main
 # ======================
 
-
-
-
-
-
-
 def main():
     # model files check and download
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
 
-    #env_id = args.env_id
+    if not args.onnx:
+        env_id = args.env_id
+        model = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+    else:
+        model = OnnxWrapper('silero_vad.onnx')
 
-    #net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
-    #embedder = ailia.Net(MODEL_EMB_PATH, WEIGHT_EMB_PATH, env_id=env_id)
-
-    audio_recognition()
+    audio_recognition(model)
 
 
 if __name__ == '__main__':
