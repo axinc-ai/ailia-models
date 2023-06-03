@@ -7,8 +7,6 @@ import librosa
 import soundfile as sf
 
 import ailia
-import torch # temporary
-torch.set_num_threads(1)
 from pprint import pprint
 
 from utils_vad import (get_speech_timestamps,
@@ -110,9 +108,14 @@ def main():
 
     if not args.onnx:
         env_id = args.env_id
-        model = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+        session = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
     else:
-        model = OnnxWrapper('silero_vad.onnx')
+        import onnxruntime
+        session = onnxruntime.InferenceSession(WEIGHT_PATH)
+
+    model = OnnxWrapper('silero_vad.onnx')
+    model.session = session
+    model.ailia = not args.onnx
 
     audio_recognition(model)
 

@@ -3,26 +3,12 @@ import torchaudio
 from typing import Callable, List
 import torch.nn.functional as F
 import warnings
-
-languages = ['ru', 'en', 'de', 'es']
+import numpy as np
 
 
 class OnnxWrapper():
 
-    def __init__(self, path, force_onnx_cpu=False):
-        import numpy as np
-        global np
-        import onnxruntime
-
-        opts = onnxruntime.SessionOptions()
-        opts.inter_op_num_threads = 1
-        opts.intra_op_num_threads = 1
-
-        if force_onnx_cpu and 'CPUExecutionProvider' in onnxruntime.get_available_providers():
-            self.session = onnxruntime.InferenceSession(path, providers=['CPUExecutionProvider'], sess_options=opts)
-        else:
-            self.session = onnxruntime.InferenceSession(path, sess_options=opts)
-
+    def __init__(self, path):
         self.reset_states()
         self.sample_rates = [8000, 16000]
 
@@ -65,7 +51,10 @@ class OnnxWrapper():
 
         if sr in [8000, 16000]:
             ort_inputs = {'input': x.numpy(), 'h': self._h, 'c': self._c, 'sr': np.array(sr, dtype='int64')}
-            ort_outs = self.session.run(None, ort_inputs)
+            if self.ailia:
+                ort_outs = self.session.run(ort_inputs)
+            else:
+                ort_outs = self.session.run(None, ort_inputs)
             out, self._h, self._c = ort_outs
         else:
             raise ValueError()
