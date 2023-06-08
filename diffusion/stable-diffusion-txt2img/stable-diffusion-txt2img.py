@@ -60,6 +60,11 @@ parser.add_argument(
     help="the prompt to render"
 )
 parser.add_argument(
+    "--n_prompt", metavar="TEXT", type=str,
+    default="",
+    help="the negative prompt"
+)
+parser.add_argument(
     "--n_iter", type=int, default=1,
     help="sample this often",
 )
@@ -484,8 +489,8 @@ def decode_first_stage(models, z):
 
 
 def predict(
-        models, cond_stage_model,
-        prompt, uc):
+        models,
+        c, uc):
     n_samples = args.n_samples
     steps = args.steps
     cfg_scale = args.scale
@@ -495,7 +500,6 @@ def predict(
     C = args.C
     factor = args.f
 
-    c = cond_stage_model.encode([prompt] * n_samples)
     shape = [n_samples, C, H // factor, W // factor]
     x = np.random.randn(shape[0] * shape[1] * shape[2] * shape[3]).reshape(shape)
 
@@ -534,21 +538,25 @@ def recognize_from_text(models):
     cond_stage_model = FrozenCLIPEmbedder()
 
     prompt = args.input if isinstance(args.input, str) else args.input[0]
+    n_prompt = args.n_prompt
     logger.info("prompt: %s" % prompt)
+    if n_prompt:
+        logger.info("negative prompt: %s" % n_prompt)
 
     sample_path = os.path.join('outputs', prompt.replace(" ", "-"))
     os.makedirs(sample_path, exist_ok=True)
     base_count = len(os.listdir(sample_path))
 
     logger.info('Start inference...')
+    c = cond_stage_model.encode([prompt] * n_samples)
     uc = None
     if scale != 1.0:
-        uc = cond_stage_model.encode([""] * n_samples)
+        uc = cond_stage_model.encode([n_prompt] * n_samples)
 
     all_samples = []
     for i in range(n_iter):
         logger.info("iteration: %s" % (i + 1))
-        x_samples = predict(models, cond_stage_model, prompt, uc)
+        x_samples = predict(models, c, uc)
 
         for img in x_samples:
             sample_file = os.path.join(sample_path, f"{base_count:04}.png")
