@@ -2,7 +2,7 @@ import time
 import sys
 from transformers import AutoTokenizer
 
-from arg_utils_gpt2 import *
+from utils_gpt2 import *
 import ailia
 
 sys.path.append('../../util')
