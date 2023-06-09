@@ -1,6 +1,7 @@
 ﻿import time
 import sys
 import argparse
+import re
 
 import numpy as np
 import soundfile as sf
@@ -24,18 +25,7 @@ logger = getLogger(__name__)
 # ======================
 
 SAVE_WAV_PATH = 'output.wav'
-
-WEIGHT_PATH_DECODER_ITER = 'decoder_iter.onnx'
-MODEL_PATH_DECODER_ITER  = 'decoder_iter.onnx.prototxt'
-WEIGHT_PATH_ENCODER = 'encoder.onnx'
-MODEL_PATH_ENCODER  = 'encoder.onnx.prototxt'
-WEIGHT_PATH_POSTNET = 'postnet.onnx'
-MODEL_PATH_POSTNET  = 'postnet.onnx.prototxt'
-
-WEIGHT_PATH_WAVEGLOW = 'waveglow.onnx'
-MODEL_PATH_WAVEGLOW  = 'waveglow.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/tacotron2/'
-
 
 # ======================
 # Arguemnt Parser Config
@@ -52,8 +42,9 @@ parser.add_argument(
     help='use onnx runtime'
 )
 parser.add_argument(
-    '--japanese', action='store_true',
-    help='use japanese model'
+    '-m', '--model',
+    default='nvidia',
+    help='[nvidia, tsukuyomi]'
 )
 parser.add_argument(
     '--profile', action='store_true',
@@ -61,41 +52,92 @@ parser.add_argument(
 )
 args = update_parser(parser, check_input_type=False)
 
-WEIGHT_PATH_DECODER_ITER = 'tsukuyomi_decoder_iter.onnx'
-WEIGHT_PATH_ENCODER = 'tsukuyomi_encoder.onnx'
-WEIGHT_PATH_POSTNET = 'tsukuyomi_postnet.onnx'
+if args.model == "nvidia":
+    WEIGHT_PATH_DECODER_ITER = 'decoder_iter.onnx'
+    WEIGHT_PATH_ENCODER = 'encoder.onnx'
+    WEIGHT_PATH_POSTNET = 'postnet.onnx'
+    WEIGHT_PATH_WAVEGLOW = 'waveglow.onnx'
+elif args.model == "tsukuyomi":
+    WEIGHT_PATH_DECODER_ITER = 'tsukuyomi_accent_decoder_iter.onnx'
+    WEIGHT_PATH_ENCODER = 'tsukuyomi_accent_encoder.onnx'
+    WEIGHT_PATH_POSTNET = 'tsukuyomi_accent_postnet.onnx'
+    WEIGHT_PATH_WAVEGLOW = 'tsukuyomi_accent_waveglow.onnx'
+else:
+    logger.error("unknown model")
+    sys.exit()
+
+MODEL_PATH_DECODER_ITER = WEIGHT_PATH_DECODER_ITER+'.prototxt'
+MODEL_PATH_ENCODER =  WEIGHT_PATH_ENCODER+'.prototxt'
+MODEL_PATH_POSTNET =  WEIGHT_PATH_POSTNET+'.prototxt'
+MODEL_PATH_WAVEGLOW =  WEIGHT_PATH_WAVEGLOW+'.prototxt'
+
+# ======================
+# G2P
+# ======================
+
+def get_numeric_feature(regex, s):
+    match = re.search(regex, s)
+    if match is None:
+        return -50
+    return int(match.group(1))
+
+def g2p_with_accent(text):
+    import pyopenjtalk
+    labels = pyopenjtalk.extract_fullcontext(text)
+    words = []
+    N = len(labels)
+    for n in range(N):
+        lab_curr = labels[n]
+        p3 = re.search(r"\-(.*?)\+", lab_curr).group(1)
+        if p3 in "AEIOU":
+            p3 = p3.lower()
+        if p3 == "sil":
+            if n == 0:
+                continue
+            elif n == N - 1:
+                e3 = get_numeric_feature(r"!(\d+)_", lab_curr)
+                if e3 == 0:
+                    words.append(".")
+                elif e3 == 1:
+                    words.append("?")
+            continue
+        elif p3 == "pau":
+            words.append(",")
+            continue
+        else:
+            words.append(p3)
+        a1 = get_numeric_feature(r"/A:([0-9\-]+)\+", lab_curr)
+        a2 = get_numeric_feature(r"\+(\d+)\+", lab_curr)
+        a3 = get_numeric_feature(r"\+(\d+)/", lab_curr)
+        f1 = get_numeric_feature(r"/F:(\d+)_", lab_curr)
+        a2_next = get_numeric_feature(r"\+(\d+)\+", labels[n + 1])
+        if a3 == 1 and a2_next == 1:
+            words.append(":")
+        elif a1 == 0 and a2_next == a2 + 1 and a2 != f1:
+            words.append(")")
+        elif a2 == 1 and a2_next == 2:
+            words.append("(")
+    return "".join(words)
 
 # ======================
 # Parameters
 # ======================
 
-args_onnx = args.onnx
-
-if args_onnx:
+if args.onnx:
     import onnxruntime
-    print("Use onnx runtime.")
 else:
     import ailia
-    print("Use ailia.")
 
-if args.japanese:
-    model_name ="tsukuyomi"
+if args.input:
+    text = args.input
 else:
-    model_name ="nvidia"
-
-if model_name == "nvidia":
-    if args.input:
-        text = args.input
-    else:
+    if args.model == "nvidia":
         text = "hello world. we will introduce new AI engine ailia. ailia is high speed inference engine."
-else:
-    text ="こんにちは。今日は新しいAIエンジンであるアイリアSDKを紹介します。アイリアSDKは高速なAI推論エンジンです。"
-    import pyopenjtalk
-    text = pyopenjtalk.g2p(text, kana=False)
-    text = text.replace('pau',',')
-    text = text.replace(' ','')
-    text = text + '.'
+    elif args.model == "tsukuyomi":
+        text ="こんにちは。今日は新しいAIエンジンであるアイリアSDKを紹介します。アイリアSDKは高速なAI推論エンジンです。"
 
+if args.model == "tsukuyomi":
+    text = g2p_with_accent(text)
 
 sampling_rate = 22050
 
@@ -175,7 +217,7 @@ def test_inference(texts, encoder, decoder_iter, postnet):
     if args.benchmark:
         start = int(round(time.time() * 1000))
     sequences, sequence_lengths = prepare_input_sequence(texts)
-    if args_onnx:
+    if args.onnx:
         encoder_inputs = {encoder.get_inputs()[0].name: sequences,
                         encoder.get_inputs()[1].name: sequence_lengths}
         encoder_outs = encoder.run(None, encoder_inputs)
@@ -205,7 +247,7 @@ def test_inference(texts, encoder, decoder_iter, postnet):
     while True:
         if args.benchmark:
             start = int(round(time.time() * 1000))
-        if args_onnx:
+        if args.onnx:
             decoder_inputs = {decoder_iter.get_inputs()[0].name: decoder_input,
                             decoder_iter.get_inputs()[1].name: attention_hidden,
                             decoder_iter.get_inputs()[2].name: attention_cell,
@@ -272,7 +314,7 @@ def test_inference(texts, encoder, decoder_iter, postnet):
     if args.benchmark:
         start = int(round(time.time() * 1000))
 
-    if args_onnx:
+    if args.onnx:
         postnet_inputs = {postnet.get_inputs()[0].name: mel_outputs}
         mel_outputs_postnet = postnet.run(None, postnet_inputs)[0]
     else:
@@ -288,7 +330,7 @@ def test_inference(texts, encoder, decoder_iter, postnet):
 
 def generate_voice(decoder_iter, encoder, postnet, waveglow):
     # onnx
-    logger.info("Input text : ", text)
+    logger.info("Input text : " + text)
 
     texts = [text]
 
@@ -304,7 +346,7 @@ def generate_voice(decoder_iter, encoder, postnet, waveglow):
     if args.benchmark:
         start = int(round(time.time() * 1000))
 
-    if args_onnx:
+    if args.onnx:
         waveglow_inputs = {waveglow.get_inputs()[0].name: mel_outputs_postnet,
                         waveglow.get_inputs()[1].name: z}
         audio = waveglow.run(None, waveglow_inputs)[0]
@@ -333,7 +375,7 @@ def main():
 
     #env_id = args.env_id
 
-    if args_onnx:
+    if args.onnx:
         decoder_iter = onnxruntime.InferenceSession(WEIGHT_PATH_DECODER_ITER)
         encoder = onnxruntime.InferenceSession(WEIGHT_PATH_ENCODER)
         postnet = onnxruntime.InferenceSession(WEIGHT_PATH_POSTNET)
