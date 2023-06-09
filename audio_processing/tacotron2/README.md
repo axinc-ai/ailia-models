@@ -26,7 +26,10 @@ python3 tacotron2.py --input "Hello world." --savepath SAVE_WAV_PATH
 Recognizing Japanese requires converting the text into phonemes. Conversion to phonemes requires openjtalk.
 
 ```
+# for macOS, Linux
 pip3 install pyopenjtalk
+# for Windows
+pip3 install pyopenjtalk-prebuilt
 ```
 
 Run.
