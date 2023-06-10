@@ -24,8 +24,9 @@ MODEL_LISTS = [
     'bert-base-cased',
     'bert-base-uncased',
     'bert-base-japanese-whole-word-masking',
+    'bert-base-japanese-whole-word-masking-re-export', #検証用
     'bert-base-japanese-char-whole-word-masking',
-    'bert-base-japanese-char-v3'
+    'bert-base-japanese-char-v3',
 ]
 
 NUM_PREDICT = 5
