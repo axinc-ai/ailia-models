@@ -110,7 +110,7 @@ parser.add_argument(
     help='Stable Diffusion checkpoint'
 )
 parser.add_argument(
-    '--vae', default='default', choices=('default', 'ft-mse'),
+    '--vae', default='default', choices=('default', 'vae-ft-mse'),
     help='SD VAE'
 )
 parser.add_argument(
@@ -589,7 +589,7 @@ def main():
     }
     dic_vae = {
         'default': (WEIGHT_AUTO_ENC_PATH, MODEL_AUTO_ENC_PATH),
-        'ft-mse': (WEIGHT_VAE_FT_MSE_PATH, MODEL_VAE_FT_MSE_PATH),
+        'vae-ft-mse': (WEIGHT_VAE_FT_MSE_PATH, MODEL_VAE_FT_MSE_PATH),
     }
     (WEIGHT_SD_EMB_PATH, MODEL_SD_EMB_PATH), \
     (WEIGHT_SD_MID_PATH, MODEL_SD_MID_PATH), \
