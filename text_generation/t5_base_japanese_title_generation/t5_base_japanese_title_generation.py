@@ -8,6 +8,7 @@ import unicodedata
 from transformers import T5Tokenizer
 from onnxt5 import GenerativeT5
 sys.path.append('../../util')
+from arg_utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 
 # logger
 logger = logging.getLogger(__name__)
@@ -95,18 +96,17 @@ def preprocess_body(text: str) -> str:
 """
 parse args
 """
-parser = argparse.ArgumentParser(
+parser = get_base_parser(
     description="T5 base Japanese title generation",
-)
-parser.add_argument(
-    '-i', '--input', metavar='INPUT', default=INPUT_PATH,
-    help="Path to input text file"
+    default_input=INPUT_PATH,
+    default_save=OUTPUT_PATH,
+    input_ftype="text",
 )
 parser.add_argument(
     '-o', '--onnx', action='store_true',
     help="Option to use onnxrutime to run or not."
 )
-args = parser.parse_args()
+args = update_parser(parser)
 
 def main(args):
     # download onnx and prototxt
@@ -128,14 +128,20 @@ def main(args):
         # generated = torch.tensor(tokenizer(prompt)['input_ids'])[:MAX_SOURCE_LENGTH - 1].unsqueeze(0)
         # model = GenerativeT5(encoder_sess, decoder_sess, tokenizer, onnx=True)
 
-    # load text file
-    with open(args.input, "r") as f:
-        body = f.read()
+    for input_path in args.input:
+        # load input file
+        with open(input_path, "r") as fi:
+            body = fi.read()
 
-    # pre process
-    body_preprocessed = preprocess_body(body)
-    most_plausible_title, _ = model(body_preprocessed, 21, temperature=0.)
-    print(most_plausible_title)
+        # pre process
+        body_preprocessed = preprocess_body(body)
+
+        # execute prediction
+        most_plausible_title, _ = model(body_preprocessed, 21, temperature=0.)
+        logger.info("title: %s", most_plausible_title)
+        save_path = get_savepath(args.savepath, input_path)
+        with open(save_path, "a") as fo:
+            fo.write(most_plausible_title)
 
 
 if __name__ == '__main__':
