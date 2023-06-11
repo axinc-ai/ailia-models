@@ -5,7 +5,6 @@ import re
 import sys
 import unicodedata
 
-import ailia
 from transformers import T5Tokenizer
 from onnxt5 import GenerativeT5
 sys.path.append('../../util')
@@ -13,16 +12,19 @@ sys.path.append('../../util')
 # logger
 logger = logging.getLogger(__name__)
 
-parser = argparse.ArgumentParser(description="T5 base Japanese title generation")
-parser.add_argument(
-    '-o', '--onnx', action='store_true',
-    help="Option to use onnxrutime to run or not."
-)
 """
 params
 """
-MODEL_NAME = "sonoisa/t5-base-japanese-title-generation"
-ONNX_DIR = "/Users/t-ibayashi/Workspace/axinc/workspace/t5-base-japanese-title-generation/onnx"
+
+INPUT_PATH = "./input.txt"
+OUTPUT_PATH = "./output.txt"
+
+HUGGING_FACE_MODEL_PATH = "sonoisa/t5-base-japanese-title-generation"
+ENCODER_ONNX_PATH = "./t5-base-japanese-title-generation-encoder.onnx"
+ENCODER_PROTOTXT_PATH = "./t5-base-japanese-title-generation-encoder.onnx.prototxt"
+DECODER_ONNX_PATH = "./t5-base-japanese-title-generation-decoder-with-lm-head.onnx"
+DECODER_PROTOTXT_PATH = "./t5-base-japanese-title-generation-decoder-with-lm-head.onnx.prototxt"
+
 MAX_SOURCE_LENGTH = 512
 
 """
@@ -90,47 +92,45 @@ def normalize_text(text: str) -> str:
 def preprocess_body(text: str) -> str:
     return normalize_text(text.replace("\n", " "))
 
-def main():
-    body = """
-    これはLEGOとRaspberry Piで実用的なスマートロックを作り上げる物語です。
-    スマートロック・システムの全体構成は下図のようになります。図中右上にある塊が、全部LEGOで作られたスマートロックです。
+"""
+parse args
+"""
+parser = argparse.ArgumentParser(
+    description="T5 base Japanese title generation",
+)
+parser.add_argument(
+    '-i', '--input', metavar='INPUT', default=INPUT_PATH,
+    help="Path to input text file"
+)
+parser.add_argument(
+    '-o', '--onnx', action='store_true',
+    help="Option to use onnxrutime to run or not."
+)
+args = parser.parse_args()
 
-    特徴は、3Dプリンタ不要で、LEGOという比較的誰でも扱えるもので作られたハードウェアであるところ、見た目の野暮ったさと機能のスマートさを兼ね備え、エンジニア心をくすぐるポイント満載なところです。
-    なお、LEGO (レゴ)、LEGO Boost (ブースト) は LEGO Group (レゴグループ) の登録商標であり、この文書はレゴグループやその日本法人と一切関係はありません。
-
-    次のようなシチュエーションを経験したことはありませんか？
-
-    - 外出先にて、「そういや、鍵、閉めてきたかな？記憶がない…（ソワソワ）」
-    - 朝の通勤にて、駅に到着してみたら「あ、鍵閉め忘れた。戻るか…」
-    - 料理中に「あ、鍵閉め忘れた！でも、いま手が離せない。」
-    - 玄関先で「手は買い物で一杯。ポケットから鍵を出すのが大変。」
-    - 職場にて、夕方「そろそろ子供は家に帰ってきたかな？」
-    - 玄関にて「今日は傘いるかな？」
-
-    今回作るスマートロックは、次の機能でこれらを解決に導きます。
-
-    - 鍵の閉め忘れをSlackに通知してくれる。iPhoneで施錠状態を確認できる。
-    - 何処ででもiPhoneから施錠できる。
-    - 「Hey Siri 鍵閉めて（鍵開けて）」で施錠/開錠できる。
-    - 鍵の開閉イベントがiPhoneに通知され、帰宅が分かる。
-    - LEDの色で天気予報（傘の必要性）を教えてくれる（ただし、時間の都合で今回は説明省略）。
-
-    欲しくなりましたでしょうか？
-
-    以下、ムービー多めで機能の詳細と作り方について解説していきます。ハードウェアもソフトウェアもオープンソースとして公開します。
-    """
-    args = parser.parse_args()
+def main(args):
+    # download onnx and prototxt
+    # TODO
 
     # load model
-    tokenizer = T5Tokenizer.from_pretrained(MODEL_NAME, is_fast=True)
-
+    tokenizer = T5Tokenizer.from_pretrained(HUGGING_FACE_MODEL_PATH, is_fast=True)
     if args.onnx:
         from onnxruntime import InferenceSession
-        encoder_sess = InferenceSession(os.path.join(ONNX_DIR, "t5-base-japanese-title-generation-encoder.onnx"))
-        decoder_sess = InferenceSession(os.path.join(ONNX_DIR, "t5-base-japanese-title-generation-decoder-with-lm-head.onnx"))
+        encoder_sess = InferenceSession(ENCODER_ONNX_PATH)
+        decoder_sess = InferenceSession(DECODER_ONNX_PATH)
         model = GenerativeT5(encoder_sess, decoder_sess, tokenizer, onnx=True)
     else:
-        raise Exception("Only onnx runtime is supported")
+        raise Exception("Only onnx runtime mode is supported. Please specify -o option to use onnx runtime.")
+        # import ailia
+        # import torch
+        # encoder_sess = ailia.Net(ENCODER_PROTOTXT_PATH, ENCODER_ONNX_PATH)
+        # decoder_sess = ailia.Net(DECODER_PROTOTXT_PATH, DECODER_ONNX_PATH)
+        # generated = torch.tensor(tokenizer(prompt)['input_ids'])[:MAX_SOURCE_LENGTH - 1].unsqueeze(0)
+        # model = GenerativeT5(encoder_sess, decoder_sess, tokenizer, onnx=True)
+
+    # load text file
+    with open(args.input, "r") as f:
+        body = f.read()
 
     # pre process
     body_preprocessed = preprocess_body(body)
@@ -139,4 +139,4 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    main(args)
