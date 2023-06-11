@@ -37,14 +37,15 @@ You can use `--savepath` option to change the name of the output file to save.
 $ python3 stable-diffusion-txt2img.py --input TEXT --savepath SAVE_IMAGE_PATH
 ```
 
-Quality, sampling speed and diversity are best controlled via the `--scale`, `--ddim_steps` and `--ddim_eta` options.
+Quality, sampling speed and diversity are best controlled via the `--scale`, `--steps` and `--ddim_eta` options.
 Higher values of scale produce better samples at the cost of a reduced output diversity.
 
-Furthermore, increasing `--ddim_steps` generally also gives higher quality samples, but returns are diminishing for values > 250. Fast sampling (i.e. low values of `--ddim_steps`) while retaining good quality can be achieved by using `--ddim_eta` 0.0.
+Furthermore, increasing `--steps` generally also gives higher quality samples, but returns are diminishing for values > 250. Fast sampling (i.e. low values of `--steps`) while retaining good quality can be achieved by using `--ddim_eta` 0.0.
 
 ## Reference
 
 - [Stable Diffusion](https://github.com/CompVis/stable-diffusion)
+- [k-diffusion](https://github.com/crowsonkb/k-diffusion)
 
 ## Framework
 
