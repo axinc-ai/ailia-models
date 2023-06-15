@@ -30,7 +30,7 @@ logger = getLogger(__name__)
 # ======================
 
 WEIGHT_PATH = 'silero_vad.onnx'
-MODEL_PATH = None#'silero_vad.onnx.onnx.prototxt'
+MODEL_PATH = 'silero_vad.onnx.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/silero-vad/'
 
 WAVE_PATH = "en_example.wav"

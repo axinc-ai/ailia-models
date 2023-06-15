@@ -1,4 +1,4 @@
-# Silero VAD
+# Silero VAD : pre-trained enterprise-grade Voice Activity Detecto
 
 ## Input
 
@@ -32,4 +32,4 @@ ONNX opset=11
 
 ## Netron
 
-[silero_vad.onnx](https://netron.app/?url=https://storage.googleapis.com/ailia-models/silero-vad/silero_vad.onnx)  
+[silero_vad.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/silero-vad/silero_vad.onnx.prototxt)  
