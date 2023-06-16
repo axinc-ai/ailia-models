@@ -65,23 +65,6 @@ class OnnxWrapper():
         out = torch.tensor(out)
         return out
 
-    def audio_forward(self, x, sr: int, num_samples: int = 512):
-        outs = []
-        x, sr = self._validate_input(x, sr)
-
-        if x.shape[1] % num_samples:
-            pad_num = num_samples - (x.shape[1] % num_samples)
-            x = torch.nn.functional.pad(x, (0, pad_num), 'constant', value=0.0)
-
-        self.reset_states(x.shape[0])
-        for i in range(0, x.shape[1], num_samples):
-            wavs_batch = x[:, i:i+num_samples]
-            out_chunk = self.__call__(wavs_batch, sr)
-            outs.append(out_chunk)
-
-        stacked = torch.cat(outs, dim=1)
-        return stacked.cpu()
-
 
 def read_audio(path: str,
                sampling_rate: int = 16000):

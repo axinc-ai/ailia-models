@@ -30,7 +30,7 @@ logger = getLogger(__name__)
 # ======================
 
 WEIGHT_PATH = 'silero_vad.onnx'
-MODEL_PATH = 'silero_vad.onnx.onnx.prototxt'
+MODEL_PATH = 'silero_vad.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/silero-vad/'
 
 WAVE_PATH = "en_example.wav"
@@ -63,7 +63,8 @@ def audio_recognition(model):
   wav = read_audio('en_example.wav', sampling_rate=SAMPLING_RATE)
   # get speech timestamps from full audio file
   speech_timestamps = get_speech_timestamps(wav, model, sampling_rate=SAMPLING_RATE)
-  pprint(speech_timestamps)
+  logger.info("Speech timestamp")
+  logger.info(speech_timestamps)
 
   # merge all speech chunks to one audio
   save_audio('only_speech.wav',
@@ -73,6 +74,7 @@ def audio_recognition(model):
   vad_iterator = VADIterator(model)
   wav = read_audio(f'en_example.wav', sampling_rate=SAMPLING_RATE)
 
+  logger.info("VADIterator")
   window_size_samples = 1536 # number of samples in a single audio chunk
   for i in range(0, len(wav), window_size_samples):
       chunk = wav[i: i+ window_size_samples]
@@ -80,10 +82,11 @@ def audio_recognition(model):
         break
       speech_dict = vad_iterator(chunk, return_seconds=True)
       if speech_dict:
-          print(speech_dict, end=' ')
+          logger.info(speech_dict)
   vad_iterator.reset_states() # reset model states after each audio
 
   ## just probabilities
+  logger.info("Speech Probablities")
   wav = read_audio('en_example.wav', sampling_rate=SAMPLING_RATE)
   speech_probs = []
   window_size_samples = 1536
@@ -95,7 +98,9 @@ def audio_recognition(model):
       speech_probs.append(speech_prob)
   vad_iterator.reset_states() # reset model states after each audio
 
-  print(speech_probs[:10]) # first 10 chunks predicts
+  logger.info(speech_probs[:10]) # first 10 chunks predicts
+
+  logger.info("Script finish successfully.")
 
 
 # ======================
