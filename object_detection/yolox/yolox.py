@@ -20,7 +20,7 @@ from detector_utils import (load_image, plot_results, reverse_letterbox,
                             write_predictions)
 from image_utils import imread  # noqa: E402
 from model_utils import check_and_download_models
-from utils import get_base_parser, get_savepath, update_parser
+from arg_utils import get_base_parser, get_savepath, update_parser
 
 logger = getLogger(__name__)
 
@@ -254,7 +254,11 @@ def main():
         recognize_from_video(detector)
     else:
         # image mode
+        if args.profile:
+            detector.set_profile_mode(True)
         recognize_from_image(detector)
+        if args.profile:
+            print(detector.get_summary())
 
 
 if __name__ == '__main__':

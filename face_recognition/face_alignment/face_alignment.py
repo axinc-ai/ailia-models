@@ -15,7 +15,7 @@ sys.path.append('../../util')
 import webcamera_utils  # noqa: E402
 from image_utils import imread, load_image  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
-from utils import get_base_parser, get_savepath, update_parser  # noqa: E402
+from arg_utils import get_base_parser, get_savepath, update_parser  # noqa: E402
 
 sys.path.append('../../face_detection/blazeface')
 # logger
@@ -201,7 +201,7 @@ def transform(point, center, scale, resolution, invert=False):
     if invert:
         t = np.linalg.inv(t)
     new_point = (np.dot(t, _pt))[0:2]
-    return new_point.astype(np.int)
+    return new_point.astype(int)
 
 
 def get_preds_from_hm(hm):
@@ -226,7 +226,7 @@ def get_preds_from_hm(hm):
     )
     idx += 1
     preds = idx.reshape(idx.shape[0], idx.shape[1], 1)
-    preds = np.tile(preds, (1, 1, 2)).astype(np.float)
+    preds = np.tile(preds, (1, 1, 2)).astype(float)
     preds[..., 0] = (preds[..., 0] - 1) % hm.shape[3] + 1
     preds[..., 1] = np.floor((preds[..., 1] - 1) / (hm.shape[2])) + 1
 
@@ -237,7 +237,7 @@ def get_preds_from_hm(hm):
             if pX > 0 and pX < 63 and pY > 0 and pY < 63:
                 diff = np.array(
                     [hm_[pY, pX + 1] - hm_[pY, pX - 1],
-                     hm_[pY + 1, pX] - hm_[pY - 1, pX]]).astype(np.float)
+                     hm_[pY + 1, pX] - hm_[pY - 1, pX]]).astype(float)
                 preds[i, j] = preds[i, j] + (np.sign(diff) * 0.25)
 
     preds += -0.5

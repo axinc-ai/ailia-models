@@ -9,7 +9,7 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
+from arg_utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from detector_utils import load_image, plot_results  # noqa: E402
 from nms_utils import bb_intersection_over_union  # noqa: E402
@@ -195,7 +195,7 @@ def convert_to_ailia_detector_object(preds, w, h):
     i = 0
     detector_object = []
     for j in range(len(preds[i]['rois'])):
-        (x1, y1, x2, y2) = preds[i]['rois'][j].astype(np.int)
+        (x1, y1, x2, y2) = preds[i]['rois'][j].astype(int)
         obj = preds[i]['class_ids'][j]
         score = float(preds[i]['scores'][j])
 

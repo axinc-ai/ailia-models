@@ -29,7 +29,7 @@ For the sample image,
 $ python3 real_esrgan.py
 ```
 
-You can also use an anime-specific super-resolution model by adding the -m RealESRGAN_anime option.
+You can also use an anime-specific super-resolution model by adding the -m RealESRGAN_anime or RealESRGAN_anime_v3 option.
 
 ```bash
 $ python3 real_esrgan.py -m RealESRGAN_anime -i input_anime.jpg -s output_anime.jpg
@@ -53,6 +53,8 @@ $ python3 real_esrgan.py --video VIDEO_PATH
 
 [Real-ESRGAN](https://github.com/xinntao/Real-ESRGAN)
 
+[Anime Video Models](https://github.com/xinntao/Real-ESRGAN/blob/master/docs/anime_video_model.md)
+
 ## Framework
 
 Pytorch
@@ -64,3 +66,5 @@ ONNX opset = 12
 ## Netron
 
 [RealESRGAN.opt.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/real-esrgan/RealESRGAN.opt.onnx.prototxt)
+
+[RealESRGAN_anime_v3.opt.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/real-esrgan/RealESRGAN_anime_v3.opt.onnx.prototxt)

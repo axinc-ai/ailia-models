@@ -154,7 +154,7 @@ class VID:
 
     def getImgIdsFromVidId(self, videoId):
         img_infos = self.videoToImgs[videoId]
-        ids = list(np.zeros([len(img_infos)], dtype=np.int))
+        ids = list(np.zeros([len(img_infos)], dtype=int))
         for img_info in img_infos:
             ids[img_info['index']] = img_info['id']
         return ids

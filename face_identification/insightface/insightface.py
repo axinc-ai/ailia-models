@@ -12,7 +12,7 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
+from arg_utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from detector_utils import load_image  # noqa: E402
 import webcamera_utils  # noqa: E402
@@ -263,13 +263,25 @@ def recognize_from_image(filename, det_model, rec_model, ga_model):
 
     faces = face_identification(faces, ident_feats)
 
-    # plot result
+    # plot and save result
     res_img = draw_detection(img, faces, ident_names)
-
-    # plot result
     savepath = get_savepath(args.savepath, filename)
     logger.info(f'saved at : {savepath}')
     cv2.imwrite(savepath, res_img)
+
+    # print result
+    for i, face in enumerate(faces):
+        print(f'Detected face: {i}')
+        if face.category is not None:
+            print(f'- name: {ident_names[face.category]}')
+        else:
+            print(f'- name: ?')
+        print(f'- cosin_metric: {face.cosin_metric}')
+        print(f'- prob: {face.prob}')
+        print(f'- pos: ({face.x}, {face.y})')
+        print(f'- size: ({face.w}, {face.h})')
+        print(f'- age: {face.age}')
+        print(f'- gender: {face.gender}')
 
 
 def recognize_from_video(video, det_model, rec_model, ga_model):

@@ -26,7 +26,7 @@ from logging import getLogger  # noqa: E402
 import webcamera_utils  # noqa: E402
 from image_utils import imread  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
-from utils import get_base_parser, get_savepath, update_parser  # noqa: E402
+from arg_utils import get_base_parser, get_savepath, update_parser  # noqa: E402
 
 logger = getLogger(__name__)
 
@@ -527,7 +527,7 @@ def recognize_from_image(img_path, net_maskrcnn, net_root, net_pose):
         bbox_list = maskrcnn_to_image(image=image, net_maskrcnn=net_maskrcnn)
         bbox_list[:, 2] = bbox_list[:, 2] - bbox_list[:, 0]
         bbox_list[:, 3] = bbox_list[:, 3] - bbox_list[:, 1]
-        # print('bbox_list =\n', (bbox_list).astype(np.int))
+        # print('bbox_list =\n', (bbox_list).astype(int))
 
         # exec posenet
         vis_img = posenet_to_image(original_img=original_img, bbox_list=bbox_list, 
