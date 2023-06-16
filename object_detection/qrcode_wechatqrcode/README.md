@@ -43,6 +43,12 @@ If you pass `0` as an argument to VIDEO_PATH, you can use the webcam input inste
 $ python3 qrcode_wechatqrcode.py --video VIDEO_PATH
 ```
 
+By adding the `--decode_qrcode` option, you can decode the qrcode using zbar.
+
+```bash
+$ python3 qrcode_wechatqrcode.py --decode_qrcode
+```
+
 ## Reference
 
 [qrcode_wechatqrcode](https://github.com/opencv/opencv_zoo/tree/4fb591053ba1201c07c68929cc324787d5afaa6c/models/qrcode_wechatqrcode)

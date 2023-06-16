@@ -3,7 +3,6 @@ from math import sqrt
 import cv2 
 import sys
 import time
-import pyzbar.pyzbar as zbar
 import numpy as np
 
 import ailia
@@ -52,18 +51,26 @@ parser.add_argument(
     action='store_true',
     help='Flag to output the prediction file.'
 )
+parser.add_argument(
+    '--decode_qrcode',
+    action='store_true',
+    help='Decode qrcode using zbar.'  
+)
 args = update_parser(parser)
 
+if args.decode_qrcode:
+    import pyzbar.pyzbar as zbar
+
 DETECT_MODEL_NAME = args.detect_model_name
-DETECT_WEIGHT_PATH = DETECT_MODEL_NAME + ".caffemodel"
-DETECT_MODEL_PATH = DETECT_MODEL_NAME + ".prototxt"
+DETECT_WEIGHT_PATH = "detect" + ".caffemodel"
+DETECT_MODEL_PATH = "detect" + ".prototxt"
 
 DETECT_HEIGHT = MODEL_PARAMS[DETECT_MODEL_NAME]['input_shape'][0]
 DETECT_WIDTH = MODEL_PARAMS[DETECT_MODEL_NAME]['input_shape'][1]
 
 SR_MODEL_NAME = args.sr_model_name
-SR_WEIGHT_PATH = SR_MODEL_NAME + ".caffemodel"
-SR_MODEL_PATH = SR_MODEL_NAME + ".prototxt"
+SR_WEIGHT_PATH = "sr" + ".caffemodel"
+SR_MODEL_PATH = "sr" + ".prototxt"
 
 SR_HEIGHT = MODEL_PARAMS[SR_MODEL_NAME]['input_shape'][0]
 SR_WIDTH = MODEL_PARAMS[SR_MODEL_NAME]['input_shape'][1]
@@ -114,9 +121,12 @@ def decode(raw_img, detections, sr):
         scales = get_scale_list(cw, ch)
         for scale in scales:
             scaled_img = scale_image(cropped, scale, sr)
-            qr = zbar.decode(scaled_img)
-            if len(qr) > 0:
-                text = qr[0].data.decode()
+            text = None
+            if args.decode_qrcode:
+                qr = zbar.decode(scaled_img)
+                if len(qr) > 0:
+                    text = qr[0].data.decode()
+            if not args.decode_qrcode or text:
                 obj = {
                     'left': d.x,
                     'top': d.y,
@@ -134,7 +144,7 @@ def visualize(raw_img, decoded):
 
     for d in decoded:
         cv2.putText(result_img, d['text'], (d['left'], d['bottom']), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), thickness=2)
-        cv2.rectangle(result_img, (d['left'], d['top']), (d['right'], d['bottom']), (255, 0, 0))
+        cv2.rectangle(result_img, (d['left'], d['top']), (d['right'], d['bottom']), (0, 0, 255), thickness=3)
 
     return result_img
 
@@ -216,8 +226,8 @@ def recognize_from_video(detection, sr):
 
 def main():
     # model files check and download
-    # check_and_download_models(DETECT_WEIGHT_PATH, DETECT_MODEL_PATH, REMOTE_PATH)
-    # check_and_download_models(SR_WEIGHT_PATH, SR_MODEL_PATH, REMOTE_PATH)
+    check_and_download_models(DETECT_WEIGHT_PATH, DETECT_MODEL_PATH, REMOTE_PATH)
+    check_and_download_models(SR_WEIGHT_PATH, SR_MODEL_PATH, REMOTE_PATH)
 
     env_id = args.env_id
     detection = ailia.Net(DETECT_MODEL_PATH, DETECT_WEIGHT_PATH, env_id=env_id)
