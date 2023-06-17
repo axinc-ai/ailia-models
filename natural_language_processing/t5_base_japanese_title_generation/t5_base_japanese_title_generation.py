@@ -3,8 +3,7 @@ import re
 import sys
 import unicodedata
 
-from onnxt5 import GenerativeT5
-from transformers import T5Tokenizer, T5ForConditionalGeneration
+from transformers import T5Tokenizer
 import torch
 import torch.nn.functional as F
 from tqdm import trange
@@ -70,7 +69,11 @@ def top_k_top_p_filtering(logits, top_k=0, top_p=0.0, filter_value=-float("Inf")
 """
 model wrapper
 """
-class Model(torch.nn.Module):
+class T5Model(torch.nn.Module):
+    """
+    This class is based on `GenerativeT5` from `models` in `onnxt5`.
+    Modified by Takumi Ibayashi.
+    """
     def __init__(self, encoder, decoder_with_lm_head, tokenizer):
         super().__init__()
         self.encoder = encoder
@@ -78,7 +81,7 @@ class Model(torch.nn.Module):
         self.tokenizer = tokenizer
 
     def forward(
-        self, prompt: str, max_length: int, temperature:float=1.0, repetition_penalty:float=1.0, max_context_length: int=512, top_k:int=50, top_p:int=0,
+        self, prompt: str, max_length: int, temperature:float=1.0, repetition_penalty:float=1.0, top_k:int=50, top_p:int=0, max_context_length: int=512, 
     ):
         """
         Generate a text output given a prompt using the model.
@@ -231,7 +234,7 @@ def main(args):
         from onnxruntime import InferenceSession
         encoder_sess = InferenceSession(ENCODER_ONNX_PATH)
         decoder_sess = InferenceSession(DECODER_ONNX_PATH)
-        model = Model(encoder_sess, decoder_sess, tokenizer)
+        model = T5Model(encoder_sess, decoder_sess, tokenizer)
     else:
         raise Exception("Only onnx runtime mode is supported. Please specify -o option to use onnx runtime.")
         # import ailia
