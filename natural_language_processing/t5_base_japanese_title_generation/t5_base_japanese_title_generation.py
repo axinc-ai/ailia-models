@@ -17,7 +17,6 @@ logger = logging.getLogger(__name__)
 """
 params
 """
-
 HUGGING_FACE_MODEL_PATH = "sonoisa/t5-base-japanese-title-generation"
 ENCODER_ONNX_PATH = "./t5-base-japanese-title-generation-encoder.onnx"
 ENCODER_PROTOTXT_PATH = "./t5-base-japanese-title-generation-encoder.onnx.prototxt"
@@ -94,6 +93,8 @@ class T5Model(torch.nn.Module):
                 text generation. A higher temperature value results in more random output. 
                 If the temperature is very small, it will approach greedy decoding. 
                 Defaults to 1.0.
+            top_k (int, optional): parameter for top k filtering algorithm
+            top_p (int, optional): parameter for top p filtering algorithm
             repetition_penalty (float, optional): This increases the model's likelihood 
                 to generate diverse output by discouraging it from repeating the same 
                 token. Defaults to 1.0.
