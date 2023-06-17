@@ -1,12 +1,13 @@
-import argparse
 import logging
-import os
 import re
 import sys
 import unicodedata
 
-from transformers import T5Tokenizer
 from onnxt5 import GenerativeT5
+from transformers import T5Tokenizer, T5ForConditionalGeneration
+import torch
+import torch.nn.functional as F
+from tqdm import trange
 sys.path.append('../../util')
 from arg_utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa
@@ -17,9 +18,8 @@ logger = logging.getLogger(__name__)
 """
 params
 """
-
-INPUT_PATH = "./input.txt"
-OUTPUT_PATH = "./output.txt"
+DEFAULT_INPUT_PATH = "./input.txt"
+DEFAULT_OUTPUT_PATH = "./output.txt"
 
 HUGGING_FACE_MODEL_PATH = "sonoisa/t5-base-japanese-title-generation"
 ENCODER_ONNX_PATH = "./t5-base-japanese-title-generation-encoder.onnx"
@@ -28,6 +28,54 @@ DECODER_ONNX_PATH = "./t5-base-japanese-title-generation-decoder-with-lm-head.on
 DECODER_PROTOTXT_PATH = "./t5-base-japanese-title-generation-decoder-with-lm-head.onnx.prototxt"
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/t5_base_japanese_title_generation/"
 MAX_SOURCE_LENGTH = 512
+
+"""
+model wrapper
+"""
+class Model(torch.nn.Module):
+    def __init__(self, encoder, decoder_with_lm_head, tokenizer):
+        super().__init__()
+        self.encoder = encoder
+        self.decoder_with_lm_head = decoder_with_lm_head
+        self.tokenizer = tokenizer
+
+    def forward(
+        self, prompt: str, max_length: int, temperature:float=1.0, repetition_penalty:float=1.0, max_context_length: int=512
+    ):
+        with torch.no_grad():
+            new_tokens = torch.tensor(())
+            new_logits = []
+
+            # generate tokens with tokenizer
+            token = torch.tensor(self.tokenizer(prompt)['input_ids'])[:max_context_length - 1].unsqueeze(0)
+
+            # encode tokens
+            encoder_outputs_prompt = self.encoder.run(None, {"input_ids": token.cpu().numpy()})[0]
+
+            # reset token
+            token = torch.zeros((1,1), dtype=torch.long)
+            for _ in trange(max_length):
+                # decode tokens
+                outputs = torch.tensor(
+                    self.decoder_with_lm_head.run(
+                        None,
+                        {"input_ids": token.cpu().numpy(),"encoder_hidden_states": encoder_outputs_prompt},
+                    )[0][0]
+                )
+                next_token_logits = outputs[-1, :] / (temperature if temperature > 0 else 1.0)
+
+                if int(next_token_logits.argmax()) == 1:
+                    break
+                new_logits.append(next_token_logits)
+                for _ in set(token.view(-1).tolist()):
+                    next_token_logits[_] /= repetition_penalty
+
+                # greedy sampling: always choose the most probable token
+                next_token = torch.argmax(next_token_logits).unsqueeze(0)
+
+                token = torch.cat((token, next_token.unsqueeze(0)), dim=1)
+                new_tokens = torch.cat((new_tokens, next_token), 0)
+            return self.tokenizer.decode(new_tokens), new_logits
 
 """
 pre process functions
@@ -99,8 +147,8 @@ parse args
 """
 parser = get_base_parser(
     description="T5 base Japanese title generation",
-    default_input=INPUT_PATH,
-    default_save=OUTPUT_PATH,
+    default_input=DEFAULT_INPUT_PATH,
+    default_save=DEFAULT_OUTPUT_PATH,
     input_ftype="text",
 )
 parser.add_argument(
@@ -114,15 +162,13 @@ def main(args):
     check_and_download_models(ENCODER_ONNX_PATH, ENCODER_PROTOTXT_PATH, REMOTE_PATH)
     check_and_download_models(DECODER_ONNX_PATH, DECODER_PROTOTXT_PATH, REMOTE_PATH)
 
-    import pdb
-    pdb.set_trace()
     # load model
     tokenizer = T5Tokenizer.from_pretrained(HUGGING_FACE_MODEL_PATH, is_fast=True)
     if args.onnx:
         from onnxruntime import InferenceSession
         encoder_sess = InferenceSession(ENCODER_ONNX_PATH)
         decoder_sess = InferenceSession(DECODER_ONNX_PATH)
-        model = GenerativeT5(encoder_sess, decoder_sess, tokenizer, onnx=True)
+        model = Model(encoder_sess, decoder_sess, tokenizer)
     else:
         raise Exception("Only onnx runtime mode is supported. Please specify -o option to use onnx runtime.")
         # import ailia
@@ -141,7 +187,7 @@ def main(args):
         body_preprocessed = preprocess_body(body)
 
         # execute prediction
-        most_plausible_title, _ = model(body_preprocessed, 21, temperature=0.)
+        most_plausible_title, _ = model(body_preprocessed, 21, temperature=0.0)
         logger.info("title: %s", most_plausible_title)
         save_path = get_savepath(args.savepath, input_path)
         with open(save_path, "a") as fo:
