@@ -42,6 +42,23 @@ class Model(torch.nn.Module):
     def forward(
         self, prompt: str, max_length: int, temperature:float=1.0, repetition_penalty:float=1.0, max_context_length: int=512
     ):
+        """
+        Generate a text output given a prompt using the model.
+
+        Args:
+            prompt (str): The initial text input to the model, which it uses as a 
+                starting point to generate the subsequent text.
+            max_length (int): The maximum length of the text to be generated.
+            temperature (float, optional): This controls the randomness in the model's 
+                text generation. A higher temperature value results in more random output. 
+                If the temperature is very small, it will approach greedy decoding. 
+                Defaults to 1.0.
+            repetition_penalty (float, optional): This increases the model's likelihood 
+                to generate diverse output by discouraging it from repeating the same 
+                token. Defaults to 1.0.
+            max_context_length (int, optional): The maximum length of the context to be 
+                used in generation. Defaults to 512.
+        """
         with torch.no_grad():
             new_tokens = torch.tensor(())
             new_logits = []
@@ -64,8 +81,10 @@ class Model(torch.nn.Module):
                 )
                 next_token_logits = outputs[-1, :] / (temperature if temperature > 0 else 1.0)
 
+                # `1` means end of sentence. (EOS token)
                 if int(next_token_logits.argmax()) == 1:
                     break
+
                 new_logits.append(next_token_logits)
                 for _ in set(token.view(-1).tolist()):
                     next_token_logits[_] /= repetition_penalty
