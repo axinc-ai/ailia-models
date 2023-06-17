@@ -18,8 +18,6 @@ logger = logging.getLogger(__name__)
 """
 params
 """
-DEFAULT_INPUT_PATH = "./input.txt"
-DEFAULT_OUTPUT_PATH = "./output.txt"
 
 HUGGING_FACE_MODEL_PATH = "sonoisa/t5-base-japanese-title-generation"
 ENCODER_ONNX_PATH = "./t5-base-japanese-title-generation-encoder.onnx"
@@ -27,7 +25,47 @@ ENCODER_PROTOTXT_PATH = "./t5-base-japanese-title-generation-encoder.onnx.protot
 DECODER_ONNX_PATH = "./t5-base-japanese-title-generation-decoder-with-lm-head.onnx"
 DECODER_PROTOTXT_PATH = "./t5-base-japanese-title-generation-decoder-with-lm-head.onnx.prototxt"
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/t5_base_japanese_title_generation/"
+
 MAX_SOURCE_LENGTH = 512
+DEFAULT_INPUT_PATH = "./input.txt"
+DEFAULT_OUTPUT_PATH = "./output.txt"
+
+
+"""
+top k top p filtering algorithm
+"""
+def top_k_top_p_filtering(logits, top_k=0, top_p=0.0, filter_value=-float("Inf")):
+    """ Filter a distribution of logits using top-k and/or nucleus (top-p) filtering
+        Function created by Thomas Wolf of the huggingface team
+        Args:
+            logits: logits distribution shape (vocabulary size)
+            top_k > 0: keep only top k tokens with highest probability (top-k filtering).
+            top_p > 0.0: keep the top tokens with cumulative probability >= top_p (nucleus filtering).
+                Nucleus filtering is described in Holtzman et al. (http://arxiv.org/abs/1904.09751)
+        From: https://gist.github.com/thomwolf/1a5a29f6962089e871b94cbd09daf317
+    """
+    assert (
+        logits.dim() == 1
+    )  # batch size 1 for now - could be updated for more but the code would be less clear
+    top_k = min(top_k, logits.size(-1))  # Safety check
+    if top_k > 0:
+        # Remove all tokens with a probability less than the last token of the top-k
+        indices_to_remove = logits < torch.topk(logits, top_k)[0][..., -1, None]
+        logits[indices_to_remove] = filter_value
+
+    if top_p > 0.0:
+        sorted_logits, sorted_indices = torch.sort(logits, descending=True)
+        cumulative_probs = torch.cumsum(F.softmax(sorted_logits, dim=-1), dim=-1)
+
+        # Remove tokens with cumulative probability above the threshold
+        sorted_indices_to_remove = cumulative_probs > top_p
+        # Shift the indices to the right to keep also the first token above the threshold
+        sorted_indices_to_remove[..., 1:] = sorted_indices_to_remove[..., :-1].clone()
+        sorted_indices_to_remove[..., 0] = 0
+
+        indices_to_remove = sorted_indices[sorted_indices_to_remove]
+        logits[indices_to_remove] = filter_value
+    return logits
 
 """
 model wrapper
@@ -40,7 +78,7 @@ class Model(torch.nn.Module):
         self.tokenizer = tokenizer
 
     def forward(
-        self, prompt: str, max_length: int, temperature:float=1.0, repetition_penalty:float=1.0, max_context_length: int=512
+        self, prompt: str, max_length: int, temperature:float=1.0, repetition_penalty:float=1.0, max_context_length: int=512, top_k:int=50, top_p:int=0,
     ):
         """
         Generate a text output given a prompt using the model.
@@ -89,8 +127,14 @@ class Model(torch.nn.Module):
                 for _ in set(token.view(-1).tolist()):
                     next_token_logits[_] /= repetition_penalty
 
-                # greedy sampling: always choose the most probable token
-                next_token = torch.argmax(next_token_logits).unsqueeze(0)
+                # select next token
+                if temperature == 0:
+                    # greedy sampling: this methods always choose the most probable token.
+                    next_token = torch.argmax(next_token_logits).unsqueeze(0)
+                else:
+                    # Top-k and top-p filtering: this methods enhance text diversity and creativity.
+                    filtered_logits = top_k_top_p_filtering(next_token_logits, top_k=top_k, top_p=top_p)
+                    next_token = torch.multinomial(F.softmax(filtered_logits, dim=-1), num_samples=1)
 
                 token = torch.cat((token, next_token.unsqueeze(0)), dim=1)
                 new_tokens = torch.cat((new_tokens, next_token), 0)
@@ -206,7 +250,7 @@ def main(args):
         body_preprocessed = preprocess_body(body)
 
         # execute prediction
-        most_plausible_title, _ = model(body_preprocessed, 21, temperature=0.0)
+        most_plausible_title, _ = model(body_preprocessed, 21, temperature=1.0, top_k=50, top_p=0.3)
         logger.info("title: %s", most_plausible_title)
         save_path = get_savepath(args.savepath, input_path)
         with open(save_path, "a") as fo:
