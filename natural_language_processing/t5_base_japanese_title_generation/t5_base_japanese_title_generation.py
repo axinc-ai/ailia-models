@@ -9,6 +9,7 @@ from transformers import T5Tokenizer
 from onnxt5 import GenerativeT5
 sys.path.append('../../util')
 from arg_utils import get_base_parser, update_parser, get_savepath  # noqa: E402
+from model_utils import check_and_download_models  # noqa
 
 # logger
 logger = logging.getLogger(__name__)
@@ -25,7 +26,7 @@ ENCODER_ONNX_PATH = "./t5-base-japanese-title-generation-encoder.onnx"
 ENCODER_PROTOTXT_PATH = "./t5-base-japanese-title-generation-encoder.onnx.prototxt"
 DECODER_ONNX_PATH = "./t5-base-japanese-title-generation-decoder-with-lm-head.onnx"
 DECODER_PROTOTXT_PATH = "./t5-base-japanese-title-generation-decoder-with-lm-head.onnx.prototxt"
-
+REMOTE_PATH = "https://storage.googleapis.com/ailia-models/t5_base_japanese_title_generation/"
 MAX_SOURCE_LENGTH = 512
 
 """
@@ -110,8 +111,11 @@ args = update_parser(parser)
 
 def main(args):
     # download onnx and prototxt
-    # TODO
+    check_and_download_models(ENCODER_ONNX_PATH, ENCODER_PROTOTXT_PATH, REMOTE_PATH)
+    check_and_download_models(DECODER_ONNX_PATH, DECODER_PROTOTXT_PATH, REMOTE_PATH)
 
+    import pdb
+    pdb.set_trace()
     # load model
     tokenizer = T5Tokenizer.from_pretrained(HUGGING_FACE_MODEL_PATH, is_fast=True)
     if args.onnx:
