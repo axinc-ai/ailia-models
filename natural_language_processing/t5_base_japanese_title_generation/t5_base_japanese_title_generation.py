@@ -109,18 +109,28 @@ class T5Model(torch.nn.Module):
             token = torch.tensor(self.tokenizer(prompt)['input_ids'])[:max_context_length - 1].unsqueeze(0)
 
             # encode tokens
-            encoder_outputs_prompt = self.encoder.run(None, {"input_ids": token.cpu().numpy()})[0]
+            if args.onnx:
+                encoder_outputs_prompt = self.encoder.run(None, {"input_ids": token.cpu().numpy()})[0]
+            else:
+                encoder_outputs_prompt = self.encoder.run({"input_ids": token.cpu().numpy()})[0]
 
             # reset token
             token = torch.zeros((1,1), dtype=torch.long)
             for _ in trange(max_length):
                 # decode tokens
-                outputs = torch.tensor(
-                    self.decoder_with_lm_head.run(
-                        None,
-                        {"input_ids": token.cpu().numpy(),"encoder_hidden_states": encoder_outputs_prompt},
-                    )[0][0]
-                )
+                if args.onnx:
+                    outputs = torch.tensor(
+                        self.decoder_with_lm_head.run(
+                            None,
+                            {"input_ids": token.cpu().numpy(),"encoder_hidden_states": encoder_outputs_prompt},
+                        )[0][0]
+                    )
+                else:
+                    outputs = torch.tensor(
+                        self.decoder_with_lm_head.run(
+                            {"input_ids": token.cpu().numpy(),"encoder_hidden_states": encoder_outputs_prompt},
+                        )[0][0]
+                    )
                 next_token_logits = outputs[-1, :] / (temperature if temperature > 0 else 1.0)
 
                 # `1` means end of sentence. (EOS token)
@@ -237,13 +247,11 @@ def main(args):
         decoder_sess = InferenceSession(DECODER_ONNX_PATH)
         model = T5Model(encoder_sess, decoder_sess, tokenizer)
     else:
-        raise Exception("Only onnx runtime mode is supported. Please specify -o option to use onnx runtime.")
-        # import ailia
-        # import torch
-        # encoder_sess = ailia.Net(ENCODER_PROTOTXT_PATH, ENCODER_ONNX_PATH)
-        # decoder_sess = ailia.Net(DECODER_PROTOTXT_PATH, DECODER_ONNX_PATH)
-        # generated = torch.tensor(tokenizer(prompt)['input_ids'])[:MAX_SOURCE_LENGTH - 1].unsqueeze(0)
-        # model = GenerativeT5(encoder_sess, decoder_sess, tokenizer, onnx=True)
+        import ailia
+        import torch
+        encoder_sess = ailia.Net(ENCODER_PROTOTXT_PATH, ENCODER_ONNX_PATH)
+        decoder_sess = ailia.Net(DECODER_PROTOTXT_PATH, DECODER_ONNX_PATH)
+        model = T5Model(encoder_sess, decoder_sess, tokenizer)
 
     for input_path in args.input:
         # load input file
