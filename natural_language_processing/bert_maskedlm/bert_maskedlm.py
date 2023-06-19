@@ -24,14 +24,14 @@ MODEL_LISTS = [
     'bert-base-cased',
     'bert-base-uncased',
     'bert-base-japanese-whole-word-masking',
-    'bert-base-japanese-whole-word-masking-re-export', #検証用
     'bert-base-japanese-char-whole-word-masking',
+    'bert-base-japanese-v3',
     'bert-base-japanese-char-v3',
 ]
 
 NUM_PREDICT = 5
 
-SENTENCE = '私[MASK]お金で動く。'
+SENTENCE = '私は[MASK]で動く。'
 
 
 parser = get_base_parser('bert masklm sample.', None, None)
@@ -67,18 +67,26 @@ def main():
 
     if args.arch == 'bert-base-cased' or args.arch == 'bert-base-uncased':
         tokenizer = BertTokenizer.from_pretrained(args.arch)
+    elif args.arch == 'bert-base-japanese-whole-word-masking':
+        tokenizer = BertJapaneseTokenizer.from_pretrained(
+            'cl-tohoku/bert-base-japanese-whole-word-masking'
+        )
     elif args.arch == 'bert-base-japanese-char-whole-word-masking':
         tokenizer = BertJapaneseTokenizer.from_pretrained(
             'cl-tohoku/bert-base-japanese-char-whole-word-masking'
+        )
+    elif args.arch == 'bert-base-japanese-v3':
+        tokenizer = BertJapaneseTokenizer.from_pretrained(
+            'cl-tohoku/bert-base-japanese-v3'
         )
     elif args.arch == 'bert-base-japanese-char-v3':
         tokenizer = BertJapaneseTokenizer.from_pretrained(
             'cl-tohoku/bert-base-japanese-char-v3'
         )
     else:
-        tokenizer = BertJapaneseTokenizer.from_pretrained(
-            'cl-tohoku/bert-base-japanese-whole-word-masking'
-        )
+        logger.error("unknown arch")
+        return
+
     text = args.input
     logger.info("Input text : "+text)
 
