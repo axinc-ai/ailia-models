@@ -120,9 +120,6 @@ def main():
         #     "./", "vae_decoder.onnx",
         #     {'provider': 'CPUExecutionProvider', 'sess_options': None}
         # )
-        # pndm_scheduler = df.schedulers.scheduling_pndm.PNDMScheduler.from_pretrained(
-        #     "./scheduler"
-        # )
         # feature_extractor = transformers.CLIPImageProcessor.from_pretrained(
         #     "./feature_extractor"
         # )
@@ -135,13 +132,25 @@ def main():
             "./tokenizer"
         )
 
+    scheduler = df.schedulers.DPMSolverMultistepScheduler.from_config({
+        "num_train_timesteps": 1000,
+        "beta_start": 0.00085,
+        "beta_end": 0.012,
+        "beta_schedule": "scaled_linear",
+        "trained_betas": None,
+        "skip_prk_steps": True,
+        "set_alpha_to_one": False,
+        "prediction_type": "epsilon",
+        "steps_offset": 1,
+    })
+
     pipe = df.StableDiffusion(
         # vae_encoder=vae_encoder,
         # vae_decoder=vae_decoder,
         text_encoder=text_encoder,
         tokenizer=tokenizer,
         unet=net,
-        # scheduler=pndm_scheduler,
+        scheduler=scheduler,
         # safety_checker=safety_checker,
         # feature_extractor=feature_extractor,
         # requires_safety_checker=True

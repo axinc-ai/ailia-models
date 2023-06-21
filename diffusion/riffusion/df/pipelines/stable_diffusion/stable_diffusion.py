@@ -33,7 +33,7 @@ class StableDiffusion:
             text_encoder,
             tokenizer,
             unet,
-            # scheduler: Union[DDIMScheduler],
+            scheduler,
             use_onnx: bool = False,
     ):
         super().__init__()
@@ -43,7 +43,7 @@ class StableDiffusion:
         self.text_encoder = text_encoder
         self.tokenizer = tokenizer
         self.unet = unet
-        # self.scheduler = scheduler
+        self.scheduler = scheduler
         self.use_onnx = use_onnx
 
     def _encode_prompt(
