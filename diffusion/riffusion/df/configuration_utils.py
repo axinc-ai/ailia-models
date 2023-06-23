@@ -23,14 +23,75 @@ from collections import OrderedDict
 from typing import Any, Dict
 
 
+class FrozenDict(OrderedDict):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        for key, value in self.items():
+            setattr(self, key, value)
+
+        self.__frozen = True
+
+
 class ConfigMixin:
     def register_to_config(self, **kwargs):
-        self._internal_dict = OrderedDict(kwargs)
+        if not hasattr(self, "_internal_dict"):
+            internal_dict = kwargs
+        else:
+            internal_dict = {**self._internal_dict, **kwargs}
+
+        self._internal_dict = FrozenDict(internal_dict)
 
     @classmethod
-    def from_config(cls, config_dict):
-        model = cls(**config_dict)
+    def from_config(cls, config_dict, **kwargs):
+        init_dict, _, hidden_dict = cls.extract_init_dict(config_dict, **kwargs)
+
+        # Return model and optionally state and/or unused_kwargs
+        model = cls(**init_dict)
+
+        # make sure to also save config parameters that might be used for compatible classes
+        model.register_to_config(**hidden_dict)
+
         return model
+
+    @staticmethod
+    def _get_init_keys(cls):
+        return set(dict(inspect.signature(cls.__init__).parameters).keys())
+
+    @classmethod
+    def extract_init_dict(cls, config_dict, **kwargs):
+        # 0. Copy origin config dict
+        original_dict = dict(config_dict.items())
+
+        # 1. Retrieve expected config attributes from __init__ signature
+        expected_keys = cls._get_init_keys(cls)
+        expected_keys.remove("self")
+
+        # remove private attributes
+        config_dict = {k: v for k, v in config_dict.items() if not k.startswith("_")}
+
+        # 3. Create keyword arguments that will be passed to __init__ from expected keyword arguments
+        init_dict = {}
+        for key in expected_keys:
+            # if config param is passed to kwarg and is present in config dict
+            # it should overwrite existing config dict key
+            if key in kwargs and key in config_dict:
+                config_dict[key] = kwargs.pop(key)
+
+            if key in kwargs:
+                # overwrite key
+                init_dict[key] = kwargs.pop(key)
+            elif key in config_dict:
+                # use value from config dict
+                init_dict[key] = config_dict.pop(key)
+
+        # 6. Define unused keyword arguments
+        unused_kwargs = {**config_dict, **kwargs}
+
+        # 7. Define "hidden" config parameters that were saved for compatible classes
+        hidden_config_dict = {k: v for k, v in original_dict.items() if k not in init_dict}
+
+        return init_dict, unused_kwargs, hidden_config_dict
 
     @property
     def config(self) -> Dict[str, Any]:

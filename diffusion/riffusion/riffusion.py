@@ -116,10 +116,7 @@ def main():
         providers = ['CUDAExecutionProvider', 'CPUExecutionProvider'] if cuda else ['CPUExecutionProvider']
 
         net = onnxruntime.InferenceSession("unet.onnx", providers=providers)
-        # vae_decoder = OnnxRuntimeModel.from_pretrained(
-        #     "./", "vae_decoder.onnx",
-        #     {'provider': 'CPUExecutionProvider', 'sess_options': None}
-        # )
+        vae_decoder = onnxruntime.InferenceSession("vae_decoder.onnx", providers=providers)
         # feature_extractor = transformers.CLIPImageProcessor.from_pretrained(
         #     "./feature_extractor"
         # )
@@ -146,7 +143,7 @@ def main():
 
     pipe = df.StableDiffusion(
         # vae_encoder=vae_encoder,
-        # vae_decoder=vae_decoder,
+        vae_decoder=vae_decoder,
         text_encoder=text_encoder,
         tokenizer=tokenizer,
         unet=net,

@@ -29,7 +29,7 @@ class StableDiffusion:
     def __init__(
             self,
             # vae_encoder: OnnxRuntimeModel,
-            # vae_decoder: OnnxRuntimeModel,
+            vae_decoder,
             text_encoder,
             tokenizer,
             unet,
@@ -39,7 +39,7 @@ class StableDiffusion:
         super().__init__()
 
         # self.vae_encoder = vae_encoder
-        # self.vae_decoder = vae_decoder
+        self.vae_decoder = vae_decoder
         self.text_encoder = text_encoder
         self.tokenizer = tokenizer
         self.unet = unet
@@ -172,11 +172,13 @@ class StableDiffusion:
             do_classifier_free_guidance,
             negative_prompt,
         )
+        prompt_embeds = np.load("prompt_embeds.npy").astype(np.float32)
 
         # get the initial random noise unless the user supplied it
         latents_dtype = prompt_embeds.dtype
         latents_shape = (batch_size * num_images_per_prompt, 4, height // 8, width // 8)
         latents = np.random.randn(*latents_shape).astype(latents_dtype)
+        latents = np.load("latents.npy").astype(latents_dtype)
 
         # set timesteps
         self.scheduler.set_timesteps(num_inference_steps)
@@ -192,23 +194,22 @@ class StableDiffusion:
         if accepts_eta:
             extra_step_kwargs["eta"] = eta
 
-        timestep_dtype = next(
-            (input.type for input in self.unet.model.get_inputs() if input.name == "timestep"), "tensor(float)"
-        )
-        timestep_dtype = ORT_TO_NP_TYPE[timestep_dtype]
-
+        # Denoising loop
         for i, t in enumerate(self.progress_bar(self.scheduler.timesteps)):
-            # break
-
             # expand the latents if we are doing classifier free guidance
             latent_model_input = np.concatenate([latents] * 2) if do_classifier_free_guidance else latents
-            latent_model_input = self.scheduler.scale_model_input(torch.from_numpy(latent_model_input), t)
-            latent_model_input = latent_model_input.cpu().numpy()
+            latent_model_input = self.scheduler.scale_model_input(latent_model_input, t)
+            timestep = np.array([t], dtype=np.float32)
 
             # predict the noise residual
-            timestep = np.array([t], dtype=timestep_dtype)
-            noise_pred = self.unet(sample=latent_model_input, timestep=timestep, encoder_hidden_states=prompt_embeds)
-            noise_pred = noise_pred[0]
+            if not self.use_onnx:
+                output = self.unet.predict([latent_model_input, timestep, prompt_embeds])
+            else:
+                output = self.unet.run(None, {
+                    'sample': latent_model_input,
+                    'timestep': timestep,
+                    'encoder_hidden_states': prompt_embeds})
+            noise_pred = output[0]
 
             # perform guidance
             if do_classifier_free_guidance:
@@ -216,18 +217,31 @@ class StableDiffusion:
                 noise_pred = noise_pred_uncond + guidance_scale * (noise_pred_text - noise_pred_uncond)
 
             # compute the previous noisy sample x_t -> x_t-1
-            scheduler_output = self.scheduler.step(
-                torch.from_numpy(noise_pred), t, torch.from_numpy(latents), **extra_step_kwargs
+            latents = self.scheduler.step(
+                noise_pred, t, latents, **extra_step_kwargs
             )
-            latents = scheduler_output.prev_sample.numpy()
 
         latents = 1 / 0.18215 * latents
         # it seems likes there is a strange result for using half-precision vae decoder if batchsize>1
-        image = np.concatenate(
-            [self.vae_decoder(latent_sample=latents[i: i + 1])[0] for i in range(latents.shape[0])]
-        )
+        outputs = []
+        for i in range(latents.shape[0]):
+            latent_sample = latents[i: i + 1]
+            if not self.use_onnx:
+                output = self.vae_decoder.predict([latent_model_input, timestep, prompt_embeds])
+            else:
+                output = self.vae_decoder.run(None, {'latent_sample': latent_sample})
+            outputs.append(output[0])
+        image = np.concatenate(outputs)
 
         image = np.clip(image / 2 + 0.5, 0, 1)
         image = image.transpose((0, 2, 3, 1))
 
         return image
+
+    def progress_bar(self, iterable=None, total=None):
+        from tqdm.auto import tqdm
+
+        if iterable is not None:
+            return tqdm(iterable)
+        elif total is not None:
+            return tqdm(total=total)

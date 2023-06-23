@@ -15,7 +15,6 @@
 from typing import List, Optional, Union
 
 import numpy as np
-import torch
 
 from ..configuration_utils import ConfigMixin, register_to_config
 
@@ -42,23 +41,23 @@ class DPMSolverMultistepScheduler(ConfigMixin):
             variance_type: Optional[str] = None,
     ):
         if trained_betas is not None:
-            self.betas = torch.tensor(trained_betas, dtype=torch.float32)
+            self.betas = np.array(trained_betas, dtype=np.float)
         elif beta_schedule == "linear":
-            self.betas = torch.linspace(beta_start, beta_end, num_train_timesteps, dtype=torch.float32)
+            self.betas = np.linspace(beta_start, beta_end, num_train_timesteps, dtype=np.float)
         elif beta_schedule == "scaled_linear":
             # this schedule is very specific to the latent diffusion model.
             self.betas = (
-                    torch.linspace(beta_start ** 0.5, beta_end ** 0.5, num_train_timesteps, dtype=torch.float32) ** 2
+                    np.linspace(beta_start ** 0.5, beta_end ** 0.5, num_train_timesteps, dtype=np.float) ** 2
             )
         else:
             raise NotImplementedError(f"{beta_schedule} does is not implemented for {self.__class__}")
 
         self.alphas = 1.0 - self.betas
-        self.alphas_cumprod = torch.cumprod(self.alphas, dim=0)
+        self.alphas_cumprod = np.cumprod(self.alphas, axis=0)
         # Currently we only support VP-type noise schedule
-        self.alpha_t = torch.sqrt(self.alphas_cumprod)
-        self.sigma_t = torch.sqrt(1 - self.alphas_cumprod)
-        self.lambda_t = torch.log(self.alpha_t) - torch.log(self.sigma_t)
+        self.alpha_t = np.sqrt(self.alphas_cumprod)
+        self.sigma_t = np.sqrt(1 - self.alphas_cumprod)
+        self.lambda_t = np.log(self.alpha_t) - np.log(self.sigma_t)
 
         # standard deviation of the initial noise distribution
         self.init_noise_sigma = 1.0
@@ -78,8 +77,8 @@ class DPMSolverMultistepScheduler(ConfigMixin):
 
         # setable values
         self.num_inference_steps = None
-        timesteps = np.linspace(0, num_train_timesteps - 1, num_train_timesteps, dtype=np.float32)[::-1].copy()
-        self.timesteps = torch.from_numpy(timesteps)
+        timesteps = np.linspace(0, num_train_timesteps - 1, num_train_timesteps, dtype=np.float32)[::-1]
+        self.timesteps = timesteps
         self.model_outputs = [None] * solver_order
         self.lower_order_nums = 0
         self.use_karras_sigmas = use_karras_sigmas
@@ -91,12 +90,10 @@ class DPMSolverMultistepScheduler(ConfigMixin):
         Args:
             num_inference_steps (`int`):
                 the number of diffusion steps used when generating samples with a pre-trained model.
-            device (`str` or `torch.device`, optional):
-                the device to which the timesteps should be moved to. If `None`, the timesteps are not moved.
         """
         # Clipping the minimum of all lambda(t) for numerical stability.
         # This is critical for cosine (squaredcos_cap_v2) noise schedule.
-        clipped_idx = torch.searchsorted(torch.flip(self.lambda_t, [0]), self.config.lambda_min_clipped)
+        clipped_idx = np.searchsorted(np.flip(self.lambda_t, axis=0), self.config.lambda_min_clipped)
         timesteps = (
             np.linspace(0, self.config.num_train_timesteps - 1 - clipped_idx, num_inference_steps + 1)
                 .round()[::-1][:-1]
@@ -116,17 +113,15 @@ class DPMSolverMultistepScheduler(ConfigMixin):
         _, unique_indices = np.unique(timesteps, return_index=True)
         timesteps = timesteps[np.sort(unique_indices)]
 
-        self.timesteps = torch.from_numpy(timesteps).to(device)
-
+        self.timesteps = timesteps
         self.num_inference_steps = len(timesteps)
-
         self.model_outputs = [
                                  None,
                              ] * self.config.solver_order
         self.lower_order_nums = 0
 
     # Copied from diffusers.schedulers.scheduling_ddpm.DDPMScheduler._threshold_sample
-    def _threshold_sample(self, sample: torch.FloatTensor) -> torch.FloatTensor:
+    def _threshold_sample(self, sample: np.ndarray) -> np.ndarray:
         """
         "Dynamic thresholding: At each sampling step we set s to a certain percentile absolute pixel value in xt0 (the
         prediction of x_0 at timestep t), and if s > 1, then we threshold xt0 to the range [-s, s] and then divide by
@@ -139,24 +134,24 @@ class DPMSolverMultistepScheduler(ConfigMixin):
         dtype = sample.dtype
         batch_size, channels, height, width = sample.shape
 
-        if dtype not in (torch.float32, torch.float64):
-            sample = sample.float()  # upcast for quantile calculation, and clamp not implemented for cpu half
+        if dtype not in (np.float, np.float64):
+            sample = sample.astype(np.float)  # upcast for quantile calculation, and clamp not implemented for cpu half
 
         # Flatten sample for doing quantile calculation along each image
         sample = sample.reshape(batch_size, channels * height * width)
 
-        abs_sample = sample.abs()  # "a certain percentile absolute pixel value"
+        abs_sample = np.abs(sample)  # "a certain percentile absolute pixel value"
 
-        s = torch.quantile(abs_sample, self.config.dynamic_thresholding_ratio, dim=1)
-        s = torch.clamp(
-            s, min=1, max=self.config.sample_max_value
+        s = np.quantile(abs_sample, self.config.dynamic_thresholding_ratio, axis=1)
+        s = np.clip(
+            s, a_min=1, a_max=self.config.sample_max_value
         )  # When clamped to min=1, equivalent to standard clipping to [-1, 1]
 
-        s = s.unsqueeze(1)  # (batch_size, 1) because clamp will broadcast along dim=0
-        sample = torch.clamp(sample, -s, s) / s  # "we threshold xt0 to the range [-s, s] and then divide by s"
+        s = np.expand_dims(s, axis=1)  # (batch_size, 1) because clamp will broadcast along dim=0
+        sample = np.clip(sample, -s, s) / s  # "we threshold xt0 to the range [-s, s] and then divide by s"
 
         sample = sample.reshape(batch_size, channels, height, width)
-        sample = sample.to(dtype)
+        sample = sample.astype(dtype)
 
         return sample
 
@@ -185,7 +180,7 @@ class DPMSolverMultistepScheduler(ConfigMixin):
         return t
 
     # Copied from diffusers.schedulers.scheduling_euler_discrete.EulerDiscreteScheduler._convert_to_karras
-    def _convert_to_karras(self, in_sigmas: torch.FloatTensor, num_inference_steps) -> torch.FloatTensor:
+    def _convert_to_karras(self, in_sigmas: np.ndarray, num_inference_steps) -> np.ndarray:
         """Constructs the noise schedule of Karras et al. (2022)."""
 
         sigma_min: float = in_sigmas[-1].item()
@@ -199,8 +194,8 @@ class DPMSolverMultistepScheduler(ConfigMixin):
         return sigmas
 
     def convert_model_output(
-            self, model_output: torch.FloatTensor, timestep: int, sample: torch.FloatTensor
-    ) -> torch.FloatTensor:
+            self, model_output: np.ndarray, timestep: int, sample: np.ndarray
+    ) -> np.ndarray:
         """
         Convert the model output to the corresponding type that the algorithm (DPM-Solver / DPM-Solver++) needs.
 
@@ -212,13 +207,13 @@ class DPMSolverMultistepScheduler(ConfigMixin):
         DPM-Solver++ for both noise prediction model and data prediction model.
 
         Args:
-            model_output (`torch.FloatTensor`): direct output from learned diffusion model.
+            model_output (`np.ndarray`): direct output from learned diffusion model.
             timestep (`int`): current discrete timestep in the diffusion chain.
-            sample (`torch.FloatTensor`):
+            sample (`np.ndarray`):
                 current instance of sample being created by diffusion process.
 
         Returns:
-            `torch.FloatTensor`: the converted model output.
+            `np.ndarray`: the converted model output.
         """
 
         # DPM-Solver++ needs to solve an integral of the data prediction model.
@@ -275,72 +270,72 @@ class DPMSolverMultistepScheduler(ConfigMixin):
 
     def dpm_solver_first_order_update(
             self,
-            model_output: torch.FloatTensor,
+            model_output: np.ndarray,
             timestep: int,
             prev_timestep: int,
-            sample: torch.FloatTensor,
-            noise: Optional[torch.FloatTensor] = None,
-    ) -> torch.FloatTensor:
+            sample: np.ndarray,
+            noise: Optional[np.ndarray] = None,
+    ) -> np.ndarray:
         """
         One step for the first-order DPM-Solver (equivalent to DDIM).
 
         See https://arxiv.org/abs/2206.00927 for the detailed derivation.
 
         Args:
-            model_output (`torch.FloatTensor`): direct output from learned diffusion model.
+            model_output (`np.ndarray`): direct output from learned diffusion model.
             timestep (`int`): current discrete timestep in the diffusion chain.
             prev_timestep (`int`): previous discrete timestep in the diffusion chain.
-            sample (`torch.FloatTensor`):
+            sample (`np.ndarray`):
                 current instance of sample being created by diffusion process.
 
         Returns:
-            `torch.FloatTensor`: the sample tensor at the previous timestep.
+            `np.ndarray`: the sample tensor at the previous timestep.
         """
         lambda_t, lambda_s = self.lambda_t[prev_timestep], self.lambda_t[timestep]
         alpha_t, alpha_s = self.alpha_t[prev_timestep], self.alpha_t[timestep]
         sigma_t, sigma_s = self.sigma_t[prev_timestep], self.sigma_t[timestep]
         h = lambda_t - lambda_s
         if self.config.algorithm_type == "dpmsolver++":
-            x_t = (sigma_t / sigma_s) * sample - (alpha_t * (torch.exp(-h) - 1.0)) * model_output
+            x_t = (sigma_t / sigma_s) * sample - (alpha_t * (np.exp(-h) - 1.0)) * model_output
         elif self.config.algorithm_type == "dpmsolver":
-            x_t = (alpha_t / alpha_s) * sample - (sigma_t * (torch.exp(h) - 1.0)) * model_output
+            x_t = (alpha_t / alpha_s) * sample - (sigma_t * (np.exp(h) - 1.0)) * model_output
         elif self.config.algorithm_type == "sde-dpmsolver++":
             assert noise is not None
             x_t = (
-                    (sigma_t / sigma_s * torch.exp(-h)) * sample
-                    + (alpha_t * (1 - torch.exp(-2.0 * h))) * model_output
-                    + sigma_t * torch.sqrt(1.0 - torch.exp(-2 * h)) * noise
+                    (sigma_t / sigma_s * np.exp(-h)) * sample
+                    + (alpha_t * (1 - np.exp(-2.0 * h))) * model_output
+                    + sigma_t * np.sqrt(1.0 - np.exp(-2 * h)) * noise
             )
         elif self.config.algorithm_type == "sde-dpmsolver":
             assert noise is not None
             x_t = (
                     (alpha_t / alpha_s) * sample
-                    - 2.0 * (sigma_t * (torch.exp(h) - 1.0)) * model_output
-                    + sigma_t * torch.sqrt(torch.exp(2 * h) - 1.0) * noise
+                    - 2.0 * (sigma_t * (np.exp(h) - 1.0)) * model_output
+                    + sigma_t * np.sqrt(np.exp(2 * h) - 1.0) * noise
             )
         return x_t
 
     def multistep_dpm_solver_second_order_update(
             self,
-            model_output_list: List[torch.FloatTensor],
+            model_output_list: List[np.ndarray],
             timestep_list: List[int],
             prev_timestep: int,
-            sample: torch.FloatTensor,
-            noise: Optional[torch.FloatTensor] = None,
-    ) -> torch.FloatTensor:
+            sample: np.ndarray,
+            noise: Optional[np.ndarray] = None,
+    ) -> np.ndarray:
         """
         One step for the second-order multistep DPM-Solver.
 
         Args:
-            model_output_list (`List[torch.FloatTensor]`):
+            model_output_list (`List[np.ndarray]`):
                 direct outputs from learned diffusion model at current and latter timesteps.
             timestep (`int`): current and latter discrete timestep in the diffusion chain.
             prev_timestep (`int`): previous discrete timestep in the diffusion chain.
-            sample (`torch.FloatTensor`):
+            sample (`np.ndarray`):
                 current instance of sample being created by diffusion process.
 
         Returns:
-            `torch.FloatTensor`: the sample tensor at the previous timestep.
+            `np.ndarray`: the sample tensor at the previous timestep.
         """
         t, s0, s1 = prev_timestep, timestep_list[-1], timestep_list[-2]
         m0, m1 = model_output_list[-1], model_output_list[-2]
@@ -355,83 +350,83 @@ class DPMSolverMultistepScheduler(ConfigMixin):
             if self.config.solver_type == "midpoint":
                 x_t = (
                         (sigma_t / sigma_s0) * sample
-                        - (alpha_t * (torch.exp(-h) - 1.0)) * D0
-                        - 0.5 * (alpha_t * (torch.exp(-h) - 1.0)) * D1
+                        - (alpha_t * (np.exp(-h) - 1.0)) * D0
+                        - 0.5 * (alpha_t * (np.exp(-h) - 1.0)) * D1
                 )
             elif self.config.solver_type == "heun":
                 x_t = (
                         (sigma_t / sigma_s0) * sample
-                        - (alpha_t * (torch.exp(-h) - 1.0)) * D0
-                        + (alpha_t * ((torch.exp(-h) - 1.0) / h + 1.0)) * D1
+                        - (alpha_t * (np.exp(-h) - 1.0)) * D0
+                        + (alpha_t * ((np.exp(-h) - 1.0) / h + 1.0)) * D1
                 )
         elif self.config.algorithm_type == "dpmsolver":
             # See https://arxiv.org/abs/2206.00927 for detailed derivations
             if self.config.solver_type == "midpoint":
                 x_t = (
                         (alpha_t / alpha_s0) * sample
-                        - (sigma_t * (torch.exp(h) - 1.0)) * D0
-                        - 0.5 * (sigma_t * (torch.exp(h) - 1.0)) * D1
+                        - (sigma_t * (np.exp(h) - 1.0)) * D0
+                        - 0.5 * (sigma_t * (np.exp(h) - 1.0)) * D1
                 )
             elif self.config.solver_type == "heun":
                 x_t = (
                         (alpha_t / alpha_s0) * sample
-                        - (sigma_t * (torch.exp(h) - 1.0)) * D0
-                        - (sigma_t * ((torch.exp(h) - 1.0) / h - 1.0)) * D1
+                        - (sigma_t * (np.exp(h) - 1.0)) * D0
+                        - (sigma_t * ((np.exp(h) - 1.0) / h - 1.0)) * D1
                 )
         elif self.config.algorithm_type == "sde-dpmsolver++":
             assert noise is not None
             if self.config.solver_type == "midpoint":
                 x_t = (
-                        (sigma_t / sigma_s0 * torch.exp(-h)) * sample
-                        + (alpha_t * (1 - torch.exp(-2.0 * h))) * D0
-                        + 0.5 * (alpha_t * (1 - torch.exp(-2.0 * h))) * D1
-                        + sigma_t * torch.sqrt(1.0 - torch.exp(-2 * h)) * noise
+                        (sigma_t / sigma_s0 * np.exp(-h)) * sample
+                        + (alpha_t * (1 - np.exp(-2.0 * h))) * D0
+                        + 0.5 * (alpha_t * (1 - np.exp(-2.0 * h))) * D1
+                        + sigma_t * np.sqrt(1.0 - np.exp(-2 * h)) * noise
                 )
             elif self.config.solver_type == "heun":
                 x_t = (
-                        (sigma_t / sigma_s0 * torch.exp(-h)) * sample
-                        + (alpha_t * (1 - torch.exp(-2.0 * h))) * D0
-                        + (alpha_t * ((1.0 - torch.exp(-2.0 * h)) / (-2.0 * h) + 1.0)) * D1
-                        + sigma_t * torch.sqrt(1.0 - torch.exp(-2 * h)) * noise
+                        (sigma_t / sigma_s0 * np.exp(-h)) * sample
+                        + (alpha_t * (1 - np.exp(-2.0 * h))) * D0
+                        + (alpha_t * ((1.0 - np.exp(-2.0 * h)) / (-2.0 * h) + 1.0)) * D1
+                        + sigma_t * np.sqrt(1.0 - np.exp(-2 * h)) * noise
                 )
         elif self.config.algorithm_type == "sde-dpmsolver":
             assert noise is not None
             if self.config.solver_type == "midpoint":
                 x_t = (
                         (alpha_t / alpha_s0) * sample
-                        - 2.0 * (sigma_t * (torch.exp(h) - 1.0)) * D0
-                        - (sigma_t * (torch.exp(h) - 1.0)) * D1
-                        + sigma_t * torch.sqrt(torch.exp(2 * h) - 1.0) * noise
+                        - 2.0 * (sigma_t * (np.exp(h) - 1.0)) * D0
+                        - (sigma_t * (np.exp(h) - 1.0)) * D1
+                        + sigma_t * np.sqrt(np.exp(2 * h) - 1.0) * noise
                 )
             elif self.config.solver_type == "heun":
                 x_t = (
                         (alpha_t / alpha_s0) * sample
-                        - 2.0 * (sigma_t * (torch.exp(h) - 1.0)) * D0
-                        - 2.0 * (sigma_t * ((torch.exp(h) - 1.0) / h - 1.0)) * D1
-                        + sigma_t * torch.sqrt(torch.exp(2 * h) - 1.0) * noise
+                        - 2.0 * (sigma_t * (np.exp(h) - 1.0)) * D0
+                        - 2.0 * (sigma_t * ((np.exp(h) - 1.0) / h - 1.0)) * D1
+                        + sigma_t * np.sqrt(np.exp(2 * h) - 1.0) * noise
                 )
         return x_t
 
     def multistep_dpm_solver_third_order_update(
             self,
-            model_output_list: List[torch.FloatTensor],
+            model_output_list: List[np.ndarray],
             timestep_list: List[int],
             prev_timestep: int,
-            sample: torch.FloatTensor,
-    ) -> torch.FloatTensor:
+            sample: np.ndarray,
+    ) -> np.ndarray:
         """
         One step for the third-order multistep DPM-Solver.
 
         Args:
-            model_output_list (`List[torch.FloatTensor]`):
+            model_output_list (`List[np.ndarray]`):
                 direct outputs from learned diffusion model at current and latter timesteps.
             timestep (`int`): current and latter discrete timestep in the diffusion chain.
             prev_timestep (`int`): previous discrete timestep in the diffusion chain.
-            sample (`torch.FloatTensor`):
+            sample (`np.ndarray`):
                 current instance of sample being created by diffusion process.
 
         Returns:
-            `torch.FloatTensor`: the sample tensor at the previous timestep.
+            `np.ndarray`: the sample tensor at the previous timestep.
         """
         t, s0, s1, s2 = prev_timestep, timestep_list[-1], timestep_list[-2], timestep_list[-3]
         m0, m1, m2 = model_output_list[-1], model_output_list[-2], model_output_list[-3]
@@ -453,60 +448,53 @@ class DPMSolverMultistepScheduler(ConfigMixin):
             # See https://arxiv.org/abs/2206.00927 for detailed derivations
             x_t = (
                     (sigma_t / sigma_s0) * sample
-                    - (alpha_t * (torch.exp(-h) - 1.0)) * D0
-                    + (alpha_t * ((torch.exp(-h) - 1.0) / h + 1.0)) * D1
-                    - (alpha_t * ((torch.exp(-h) - 1.0 + h) / h ** 2 - 0.5)) * D2
+                    - (alpha_t * (np.exp(-h) - 1.0)) * D0
+                    + (alpha_t * ((np.exp(-h) - 1.0) / h + 1.0)) * D1
+                    - (alpha_t * ((np.exp(-h) - 1.0 + h) / h ** 2 - 0.5)) * D2
             )
         elif self.config.algorithm_type == "dpmsolver":
             # See https://arxiv.org/abs/2206.00927 for detailed derivations
             x_t = (
                     (alpha_t / alpha_s0) * sample
-                    - (sigma_t * (torch.exp(h) - 1.0)) * D0
-                    - (sigma_t * ((torch.exp(h) - 1.0) / h - 1.0)) * D1
-                    - (sigma_t * ((torch.exp(h) - 1.0 - h) / h ** 2 - 0.5)) * D2
+                    - (sigma_t * (np.exp(h) - 1.0)) * D0
+                    - (sigma_t * ((np.exp(h) - 1.0) / h - 1.0)) * D1
+                    - (sigma_t * ((np.exp(h) - 1.0 - h) / h ** 2 - 0.5)) * D2
             )
         return x_t
 
     def step(
             self,
-            model_output: torch.FloatTensor,
+            model_output: np.ndarray,
             timestep: int,
-            sample: torch.FloatTensor,
-            generator=None
+            sample: np.ndarray,
     ):
         """
         Step function propagating the sample with the multistep DPM-Solver.
 
         Args:
-            model_output (`torch.FloatTensor`): direct output from learned diffusion model.
+            model_output (`np.ndarray`): direct output from learned diffusion model.
             timestep (`int`): current discrete timestep in the diffusion chain.
-            sample (`torch.FloatTensor`):
+            sample (`np.ndarray`):
                 current instance of sample being created by diffusion process.
-            return_dict (`bool`): option for returning tuple rather than SchedulerOutput class
-
-        Returns:
-            [`~scheduling_utils.SchedulerOutput`] or `tuple`: [`~scheduling_utils.SchedulerOutput`] if `return_dict` is
-            True, otherwise a `tuple`. When returning a tuple, the first element is the sample tensor.
-
         """
         if self.num_inference_steps is None:
             raise ValueError(
                 "Number of inference steps is 'None', you need to run 'set_timesteps' after creating the scheduler"
             )
 
-        if isinstance(timestep, torch.Tensor):
-            timestep = timestep.to(self.timesteps.device)
-        step_index = (self.timesteps == timestep).nonzero()
+        step_index = (self.timesteps == timestep).nonzero()[0]
         if len(step_index) == 0:
             step_index = len(self.timesteps) - 1
         else:
             step_index = step_index.item()
         prev_timestep = 0 if step_index == len(self.timesteps) - 1 else self.timesteps[step_index + 1]
         lower_order_final = (
-                (step_index == len(self.timesteps) - 1) and self.config.lower_order_final and len(self.timesteps) < 15
+                (step_index == len(self.timesteps) - 1)
+                and self.config.lower_order_final and len(self.timesteps) < 15
         )
         lower_order_second = (
-                (step_index == len(self.timesteps) - 2) and self.config.lower_order_final and len(self.timesteps) < 15
+                (step_index == len(self.timesteps) - 2)
+                and self.config.lower_order_final and len(self.timesteps) < 15
         )
 
         model_output = self.convert_model_output(model_output, timestep, sample)
@@ -515,9 +503,8 @@ class DPMSolverMultistepScheduler(ConfigMixin):
         self.model_outputs[-1] = model_output
 
         if self.config.algorithm_type in ["sde-dpmsolver", "sde-dpmsolver++"]:
-            noise = randn_tensor(
-                model_output.shape, generator=generator, device=model_output.device, dtype=model_output.dtype
-            )
+            n = np.prod(model_output.shape)
+            noise = np.random.randn(n, dtype=model_output.dtype).reshape(model_output.shape)
         else:
             noise = None
 
@@ -541,42 +528,18 @@ class DPMSolverMultistepScheduler(ConfigMixin):
 
         return prev_sample
 
-    def scale_model_input(self, sample: torch.FloatTensor, *args, **kwargs) -> torch.FloatTensor:
+    def scale_model_input(self, sample: np.ndarray, *args, **kwargs) -> np.ndarray:
         """
         Ensures interchangeability with schedulers that need to scale the denoising model input depending on the
         current timestep.
 
         Args:
-            sample (`torch.FloatTensor`): input sample
+            sample (`np.ndarray`): input sample
 
         Returns:
-            `torch.FloatTensor`: scaled input sample
+            `np.ndarray`: scaled input sample
         """
         return sample
-
-    # Copied from diffusers.schedulers.scheduling_ddpm.DDPMScheduler.add_noise
-    def add_noise(
-            self,
-            original_samples: torch.FloatTensor,
-            noise: torch.FloatTensor,
-            timesteps: torch.IntTensor,
-    ) -> torch.FloatTensor:
-        # Make sure alphas_cumprod and timestep have same device and dtype as original_samples
-        alphas_cumprod = self.alphas_cumprod.to(device=original_samples.device, dtype=original_samples.dtype)
-        timesteps = timesteps.to(original_samples.device)
-
-        sqrt_alpha_prod = alphas_cumprod[timesteps] ** 0.5
-        sqrt_alpha_prod = sqrt_alpha_prod.flatten()
-        while len(sqrt_alpha_prod.shape) < len(original_samples.shape):
-            sqrt_alpha_prod = sqrt_alpha_prod.unsqueeze(-1)
-
-        sqrt_one_minus_alpha_prod = (1 - alphas_cumprod[timesteps]) ** 0.5
-        sqrt_one_minus_alpha_prod = sqrt_one_minus_alpha_prod.flatten()
-        while len(sqrt_one_minus_alpha_prod.shape) < len(original_samples.shape):
-            sqrt_one_minus_alpha_prod = sqrt_one_minus_alpha_prod.unsqueeze(-1)
-
-        noisy_samples = sqrt_alpha_prod * original_samples + sqrt_one_minus_alpha_prod * noise
-        return noisy_samples
 
     def __len__(self):
         return self.config.num_train_timesteps
