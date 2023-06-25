@@ -2,6 +2,7 @@ import logging
 import re
 import sys
 import unicodedata
+import time
 
 from transformers import T5Tokenizer
 import numpy as np
@@ -256,20 +257,31 @@ def main(args):
         decoder_sess = ailia.Net(DECODER_PROTOTXT_PATH, DECODER_ONNX_PATH)
         model = T5Model(encoder_sess, decoder_sess, tokenizer)
 
-    for input_path in args.input:
-        # load input file
-        with open(input_path, "r") as fi:
+    if args.benchmark:
+        logger.info('BENCHMARK mode')
+        with open(args.input[0], "r") as fi:
             body = fi.read()
-
-        # pre process
         body_preprocessed = preprocess_body(body)
+        for c in range(5):
+            start = int(round(time.time() * 1000))
+            _, _ = model.estimate(body_preprocessed, 21, temperature=1.0, top_k=50, top_p=0.3)
+            end = int(round(time.time() * 1000))
+            logger.info("\tailia processing time {} ms".format(end-start))
+    else:
+        for input_path in args.input:
+            # load input file
+            with open(input_path, "r") as fi:
+                body = fi.read()
 
-        # execute prediction
-        most_plausible_title, _ = model.estimate(body_preprocessed, 21, temperature=1.0, top_k=50, top_p=0.3)
-        logger.info("title: %s", most_plausible_title)
-        save_path = get_savepath(args.savepath, input_path)
-        with open(save_path, "a") as fo:
-            fo.write(most_plausible_title)
+            # pre process
+            body_preprocessed = preprocess_body(body)
+
+            # execute prediction
+            most_plausible_title, _ = model.estimate(body_preprocessed, 21, temperature=1.0, top_k=50, top_p=0.3)
+            logger.info("title: %s", most_plausible_title)
+            save_path = get_savepath(args.savepath, input_path)
+            with open(save_path, "a") as fo:
+                fo.write(most_plausible_title)
 
 
 if __name__ == '__main__':
