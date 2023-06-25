@@ -34,6 +34,7 @@ def softmax_np(x: np.ndarray):
 
 """
 top k top p filtering algorithm
+Modified by Takumi Ibayashi.
 """
 def top_k_top_p_filtering(logits: np.ndarray, top_k:int=0, top_p:float=0.0, filter_value:float=-float("Inf")):
     """
