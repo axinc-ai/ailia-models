@@ -1303,10 +1303,8 @@ def recognize_from_pdf(config, text_sys):
     from reportlab.pdfbase.ttfonts import TTFont
     pdfmetrics.registerFont(TTFont("japanese_font", "NotoSansJP-Medium.ttf"))
     
-    input_pdf_path = Path("./input.pdf")
+    input_pdf_path = Path(args.pdf)
     pages = convert_from_path(str(input_pdf_path), 150, poppler_path='/usr/local/Cellar/poppler/23.06.0/bin/')
-
-    output_pdf_path = Path("./output.pdf")
 
     existing_pdf = PdfReader(open("input.pdf", 'rb'), strict=False)
     output = PdfWriter()
@@ -1339,8 +1337,8 @@ def recognize_from_pdf(config, text_sys):
             drop_score=config['drop_score'],
             font_path=config['vis_font_path'],
             bbox_padding=config['rec_bbox_padding'])
-        savepath = get_savepath(args.savepath, img_path)
-        cv2.imwrite(savepath, draw_img[:, :, ::-1])
+        #savepath = get_savepath(args.savepath, img_path)
+        #cv2.imwrite(savepath, draw_img[:, :, ::-1])
 
         # read one page
         page = existing_pdf.pages[i]
@@ -1407,7 +1405,7 @@ def recognize_from_pdf(config, text_sys):
         output.add_page(page)
         #break
 
-    output_name = "output.pdf"
+    output_name = args.savepath
     output_stream = open(output_name, 'wb')
     output.write(output_stream)
     output_stream.close()
