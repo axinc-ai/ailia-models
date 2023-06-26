@@ -106,6 +106,10 @@ parser.add_argument(
     '-d', '--det_model', default='db_res18', choices=('db_res18', 'r50_icdar15', 'r50_trtd'),
     help='det model type'
 )
+parser.add_argument(
+    '-p', '--pdf', default=None,
+    help='pdf file path'
+)
 args = update_parser(parser)
 
 det_model = args.det_model
@@ -1276,6 +1280,146 @@ def recognize_from_video(config, text_sys):
         logger.info('finished process and write result to %s!' % args.savepath)
 
 
+def recognize_from_pdf(config, text_sys):
+    # python3 paddleocr.py --pdf input.pdf -c server
+
+    # writer
+    # pip3 install pypdf2 reportlab
+    from PyPDF2 import PdfWriter, PdfReader, Transformation
+    from io import BytesIO
+    from reportlab.pdfgen import canvas
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.units import mm
+
+    # reader
+    # brew install poppler, pip3 install pdf2image
+    import pdf2image
+    from pathlib import Path
+    from pdf2image import convert_from_path
+    
+    # set font
+    # https://fonts.google.com/noto/specimen/Noto+Sans+JP
+    from reportlab.pdfbase import pdfmetrics
+    from reportlab.pdfbase.ttfonts import TTFont
+    pdfmetrics.registerFont(TTFont("japanese_font", "NotoSansJP-Medium.ttf"))
+    
+    input_pdf_path = Path("./input.pdf")
+    pages = convert_from_path(str(input_pdf_path), 150, poppler_path='/usr/local/Cellar/poppler/23.06.0/bin/')
+
+    output_pdf_path = Path("./output.pdf")
+
+    existing_pdf = PdfReader(open("input.pdf", 'rb'), strict=False)
+    output = PdfWriter()
+    output_txt_only = PdfWriter()
+
+    image_dir = Path("./")
+    for i, page in enumerate(pages):
+        file_name = input_pdf_path.stem + "_{:02d}".format(i + 1) + ".jpeg"
+        img_path = image_dir / file_name
+        page.save(str(img_path), "JPEG")
+
+        # read image
+        img = imread(img_path)
+
+        # exec ocr
+        dt_boxes, rec_res = text_sys(img)
+
+        image = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+        boxes = dt_boxes
+        txts = [rec_res[i][0] for i in range(len(rec_res))]
+        scores = [rec_res[i][1] for i in range(len(rec_res))]
+
+        # adjust halfwidth and fullwidth forms
+        txts = adjust_half_and_full(txts)
+
+        #print(img.shape)
+
+        draw_img = draw_ocr_box_txt(
+            image, boxes, txts, scores,
+            drop_score=config['drop_score'],
+            font_path=config['vis_font_path'],
+            bbox_padding=config['rec_bbox_padding'])
+        savepath = get_savepath(args.savepath, img_path)
+        cv2.imwrite(savepath, draw_img[:, :, ::-1])
+
+        # read one page
+        page = existing_pdf.pages[i]
+        # １pts = 1/72 インチ = 0.3528mm
+        pts_to_mm = 0.3528
+
+        # write text to pdf
+        buffer = BytesIO()
+        buffer2 = BytesIO()
+
+        rotaion_angle = existing_pdf.pages[i].get('/Rotate')
+        if rotaion_angle == 90 or rotaion_angle == 270:
+            pagesize = (int(page.mediabox[3])*pts_to_mm * mm, int(page.mediabox[2])*pts_to_mm * mm)
+        else:
+            pagesize = (int(page.mediabox[2])*pts_to_mm * mm, int(page.mediabox[3])*pts_to_mm * mm)
+
+        p = canvas.Canvas(buffer, pagesize=pagesize)
+        p.setFillColor((0,0,0), alpha=0.0)
+
+        p2 = canvas.Canvas(buffer2, pagesize=pagesize)
+        p2.setFillColor((0,0,0), alpha=1.0)
+
+        #print(pagesize, img.shape)
+
+        for j in range(0, len(txts)):
+            #print(boxes[j])
+            x, y = int(pagesize[0]*pts_to_mm * boxes[j][0][0] / img.shape[1]), int(pagesize[1]*pts_to_mm * (1.0 - boxes[j][0][1] / img.shape[0]))
+            #print(x,y,txts[j])
+            target_x, target_y = x*mm, y*mm #左下が(0,0)
+            #p.setFillColorRGB(1,0,0) #choose your font colour
+            font_size = pagesize[1] * (boxes[j][2][1] - boxes[j][0][1]) / img.shape[0]
+            p.setFont("japanese_font", font_size) #choose your font type and font size
+            p2.setFont("japanese_font", font_size) #choose your font type and font size
+            p.drawString(target_x, target_y - font_size, txts[j])
+            p2.drawString(target_x, target_y - font_size, txts[j])
+
+        p.showPage()
+        p.save()
+
+        p2.showPage()
+        p2.save()
+
+        buffer.seek(0)
+        buffer2.seek(0)
+
+        new_pdf = PdfReader(buffer)
+        new_pdf2 = PdfReader(buffer2)
+
+        over2 = new_pdf2.pages[0]
+        output_txt_only.add_page(over2)
+
+        over0 = new_pdf.pages[0]
+        over0.add_transformation(Transformation().translate(-int(over0.mediabox.width/2), -int(over0.mediabox.height/2)).rotate(int(rotaion_angle)).translate(int(page.mediabox.width/2), int(page.mediabox.height/2)))
+
+        if rotaion_angle == 90 or rotaion_angle == 270:
+            # add_transformation not update cropbox
+            over0.cropbox[0] = 0
+            over0.cropbox[1] = 0
+            over0.cropbox[2] = over0.mediabox.height
+            over0.cropbox[3] = over0.mediabox.width
+
+        page.merge_page(over0)
+ 
+        output.add_page(page)
+        #break
+
+    output_name = "output.pdf"
+    output_stream = open(output_name, 'wb')
+    output.write(output_stream)
+    output_stream.close()
+
+    output_name = "output_txt_only.pdf"
+    output_stream = open(output_name, 'wb')
+    output_txt_only.write(output_stream)
+    output_stream.close()
+
+    logger.info('finished process and write result to %s!' % args.savepath)
+
+
 def main():
     # This model requires fuge gpu memory so fallback to cpu mode
     env_id = args.env_id
@@ -1344,18 +1488,19 @@ def main():
     # build ocr class
     text_sys = TextSystem(config, env_id)
 
-    if args.video is not None:
+    if args.pdf is not None:
+        recognize_from_pdf(config, text_sys)
+    elif args.video is not None:
         recognize_from_video(config, text_sys)
-    else:
-        if args.benchmark:
-            logger.info('BENCHMARK mode')
-            for i in range(args.benchmark_count):
-                start = int(round(time.time() * 1000))
-                recognize_from_image(config, text_sys)
-                end = int(round(time.time() * 1000))
-                logger.info(f'\tailia processing time {end - start} ms')
-        else:
+    elif args.benchmark:
+        logger.info('BENCHMARK mode')
+        for i in range(args.benchmark_count):
+            start = int(round(time.time() * 1000))
             recognize_from_image(config, text_sys)
+            end = int(round(time.time() * 1000))
+            logger.info(f'\tailia processing time {end - start} ms')
+    else:
+        recognize_from_image(config, text_sys)
 
 
 if __name__ == '__main__':
