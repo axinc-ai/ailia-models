@@ -4,6 +4,9 @@ import time
 
 import numpy as np
 import cv2
+import pydub
+import torch
+import torchaudio
 import transformers
 
 import ailia
@@ -63,6 +66,186 @@ args = update_parser(parser, check_input_type=False)
 # Main functions
 # ======================
 
+class SpectrogramConverter:
+    """
+    Convert between audio segments and spectrogram tensors using torchaudio.
+
+    In this class a "spectrogram" is defined as a (batch, time, frequency) tensor with float values
+    that represent the amplitude of the frequency at that time bucket (in the frequency domain).
+    Frequencies are given in the perceptul Mel scale defined by the params. A more specific term
+    used in some functions is "mel amplitudes".
+
+    The spectrogram computed from `spectrogram_from_audio` is complex valued, but it only
+    returns the amplitude, because the phase is chaotic and hard to learn. The function
+    `audio_from_spectrogram` is an approximate inverse of `spectrogram_from_audio`, which
+    approximates the phase information using the Griffin-Lim algorithm.
+
+    Each channel in the audio is treated independently, and the spectrogram has a batch dimension
+    equal to the number of channels in the input audio segment.
+
+    Both the Griffin Lim algorithm and the Mel scaling process are lossy.
+
+    For more information, see https://pytorch.org/audio/stable/transforms.html
+    """
+
+    def __init__(self, params):
+        self.p = params
+
+        # https://pytorch.org/audio/stable/generated/torchaudio.transforms.Spectrogram.html
+        self.spectrogram_func = torchaudio.transforms.Spectrogram(
+            n_fft=params["n_fft"],
+            hop_length=params["hop_length"],
+            win_length=params["win_length"],
+            pad=0,
+            window_fn=torch.hann_window,
+            power=None,
+            normalized=False,
+            wkwargs=None,
+            center=True,
+            pad_mode="reflect",
+            onesided=True,
+        )
+
+        # https://pytorch.org/audio/stable/generated/torchaudio.transforms.MelScale.html
+        self.mel_scaler = torchaudio.transforms.MelScale(
+            n_mels=params["num_frequencies"],
+            sample_rate=params["sample_rate"],
+            f_min=params["min_frequency"],
+            f_max=params["max_frequency"],
+            n_stft=params["n_fft"] // 2 + 1,
+            norm=params["mel_scale_norm"],
+            mel_scale=params["mel_scale_type"],
+        )
+
+    def spectrogram_from_audio(
+            self,
+            audio: pydub.AudioSegment,
+    ) -> np.ndarray:
+        """
+        Compute a spectrogram from an audio segment.
+
+        Args:
+            audio: Audio segment which must match the sample rate of the params
+
+        Returns:
+            spectrogram: (channel, frequency, time)
+        """
+        assert int(audio.frame_rate) == self.p.sample_rate, "Audio sample rate must match params"
+
+        # Get the samples as a numpy array in (batch, samples) shape
+        waveform = np.array([c.get_array_of_samples() for c in audio.split_to_mono()])
+
+        # Convert to floats if necessary
+        if waveform.dtype != np.float32:
+            waveform = waveform.astype(np.float32)
+
+        waveform_tensor = torch.from_numpy(waveform).to(self.device)
+        amplitudes_mel = self.mel_amplitudes_from_waveform(waveform_tensor)
+        return amplitudes_mel.cpu().numpy()
+
+    def mel_amplitudes_from_waveform(
+            self,
+            waveform: torch.Tensor,
+    ) -> torch.Tensor:
+        """
+        Torch-only function to compute Mel-scale amplitudes from a waveform.
+
+        Args:
+            waveform: (batch, samples)
+
+        Returns:
+            amplitudes_mel: (batch, frequency, time)
+        """
+        # Compute the complex-valued spectrogram
+        spectrogram_complex = self.spectrogram_func(waveform)
+
+        # Take the magnitude
+        amplitudes = torch.abs(spectrogram_complex)
+
+        # Convert to mel scale
+        return self.mel_scaler(amplitudes)
+
+
+def spectrogram_from_image(
+        image: np.ndarray,
+        power: float = 0.25,
+        stereo: bool = False,
+        max_value: float = 30e6,
+) -> np.ndarray:
+    """
+    Compute a spectrogram magnitude array from a spectrogram image.
+
+    This is the inverse of image_from_spectrogram, except for discretization error from
+    quantizing to uint8.
+
+    Args:
+        image: (frequency, time, channels)
+        power: The power curve applied to the spectrogram
+        stereo: Whether the spectrogram encodes stereo data
+        max_value: The max value of the original spectrogram. In practice doesn't matter.
+
+    Returns:
+        spectrogram: (channels, frequency, time)
+    """
+
+    # Flip Y
+    image = image[::-1, :, :]
+
+    # Munge channels into a numpy array of (channels, frequency, time)
+    data = image.transpose(2, 0, 1)
+    if stereo:
+        # Take the G and B channels as done in image_from_spectrogram
+        data = data[[1, 2], :, :]
+    else:
+        data = data[0:1, :, :]
+
+    # Convert to floats
+    data = data.astype(np.float32)
+
+    # Invert
+    data = 255 - data
+
+    # Rescale to 0-1
+    data = data / 255
+
+    # Reverse the power curve
+    data = np.power(data, 1 / power)
+
+    # Rescale to max value
+    data = data * max_value
+
+    return data
+
+
+def audio_from_spectrogram_image(
+        converter,
+        image,
+        apply_filters: bool = True,
+        max_value: float = 30e6,
+):
+    """
+    Reconstruct an audio segment from a spectrogram image.
+
+    Args:
+        image: Spectrogram image (in pillow format)
+        apply_filters: Apply post-processing to improve the reconstructed audio
+        max_value: Scaled max amplitude of the spectrogram. Shouldn't matter.
+    """
+    spectrogram = spectrogram_from_image(
+        image,
+        max_value=max_value,
+        power=converter.p["power_for_image"],
+        stereo=converter.p["stereo"],
+    )
+
+    segment = converter.audio_from_spectrogram(
+        spectrogram,
+        apply_filters=apply_filters,
+    )
+
+    return segment
+
+
 def recognize_from_text(pipe):
     # prompt = args.input if isinstance(args.input, str) else args.input[0]
     prompt = "jazzy rapping from paris"
@@ -76,7 +259,7 @@ def recognize_from_text(pipe):
 
     logger.info('Start inference...')
 
-    output = pipe.forward(
+    image = pipe.forward(
         prompt=prompt,
         num_inference_steps=num_inference_steps,
         guidance_scale=guidance,
@@ -84,11 +267,26 @@ def recognize_from_text(pipe):
         width=width,
         height=512,
     )
-    image = output.images[0]
+    image = (image[0] * 255).astype(np.uint8)
+
+    converter = SpectrogramConverter(params=dict(
+        n_fft=17640,
+        hop_length=441,
+        win_length=4410,
+        power_for_image=0.25,
+        num_frequencies=512,
+        sample_rate=44100,
+        min_frequency=0,
+        max_frequency=10000,
+        mel_scale_norm=None,
+        mel_scale_type="htk",
+        stereo=False,
+    ))
+    segment = audio_from_spectrogram_image(converter, image)
 
     savepath = get_savepath(args.savepath, "", ext='.png')
     logger.info(f'saved at : {savepath}')
-    image.save(savepath)
+    cv2.imwrite(savepath, image)
 
     logger.info('Script finished successfully.')
 
@@ -117,18 +315,11 @@ def main():
 
         net = onnxruntime.InferenceSession("unet.onnx", providers=providers)
         vae_decoder = onnxruntime.InferenceSession("vae_decoder.onnx", providers=providers)
-        # feature_extractor = transformers.CLIPImageProcessor.from_pretrained(
-        #     "./feature_extractor"
-        # )
         text_encoder = onnxruntime.InferenceSession("text_encoder.onnx", providers=providers)
-        # vae_encoder = OnnxRuntimeModel.from_pretrained(
-        #     "./", "vae_encoder.onnx",
-        #     {'provider': 'CPUExecutionProvider', 'sess_options': None}
-        # )
-        tokenizer = transformers.CLIPTokenizer.from_pretrained(
-            "./tokenizer"
-        )
 
+    tokenizer = transformers.CLIPTokenizer.from_pretrained(
+        "./tokenizer"
+    )
     scheduler = df.schedulers.DPMSolverMultistepScheduler.from_config({
         "num_train_timesteps": 1000,
         "beta_start": 0.00085,

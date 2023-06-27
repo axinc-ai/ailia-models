@@ -221,13 +221,13 @@ class StableDiffusion:
                 noise_pred, t, latents, **extra_step_kwargs
             )
 
-        latents = 1 / 0.18215 * latents
+        latents = latents / 0.18215
         # it seems likes there is a strange result for using half-precision vae decoder if batchsize>1
         outputs = []
         for i in range(latents.shape[0]):
             latent_sample = latents[i: i + 1]
             if not self.use_onnx:
-                output = self.vae_decoder.predict([latent_model_input, timestep, prompt_embeds])
+                output = self.vae_decoder.predict([latent_model_input])
             else:
                 output = self.vae_decoder.run(None, {'latent_sample': latent_sample})
             outputs.append(output[0])
