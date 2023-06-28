@@ -1,9 +1,11 @@
 import os
 import sys
 import time
+import io
 
 import numpy as np
 import cv2
+from scipy.io import wavfile
 import pydub
 import torch
 import torchaudio
@@ -63,6 +65,54 @@ args = update_parser(parser, check_input_type=False)
 
 
 # ======================
+# Secondaty Functions
+# ======================
+
+def audio_from_waveform(
+        samples: np.ndarray, sample_rate: int, normalize: bool = False) -> pydub.AudioSegment:
+    """
+    Convert a numpy array of samples of a waveform to an audio segment.
+
+    Args:
+        samples: (channels, samples) array
+    """
+    # Normalize volume to fit in int16
+    if normalize:
+        samples *= np.iinfo(np.int16).max / np.max(np.abs(samples))
+
+    # Transpose and convert to int16
+    samples = samples.transpose(1, 0)
+    samples = samples.astype(np.int16)
+
+    # Write to the bytes of a WAV file
+    wav_bytes = io.BytesIO()
+    wavfile.write(wav_bytes, sample_rate, samples)
+    wav_bytes.seek(0)
+
+    # Read into pydub
+    return pydub.AudioSegment.from_wav(wav_bytes)
+
+
+def audio_filters(segment: pydub.AudioSegment) -> pydub.AudioSegment:
+    """
+    Apply post-processing filters to the audio segment to compress it and
+    keep at a -10 dBFS level.
+    """
+    # TODO(hayk): Come up with a principled strategy for these filters and experiment end-to-end.
+    # TODO(hayk): Is this going to make audio unbalanced between sequential clips?
+
+    desired_db = -12
+    segment = segment.apply_gain(desired_db - segment.dBFS)
+
+    segment = pydub.effects.normalize(
+        segment,
+        headroom=0.1,
+    )
+
+    return segment
+
+
+# ======================
 # Main functions
 # ======================
 
@@ -91,87 +141,122 @@ class SpectrogramConverter:
     def __init__(self, params):
         self.p = params
 
-        # https://pytorch.org/audio/stable/generated/torchaudio.transforms.Spectrogram.html
-        self.spectrogram_func = torchaudio.transforms.Spectrogram(
+        # # https://pytorch.org/audio/stable/generated/torchaudio.transforms.Spectrogram.html
+        # self.spectrogram_func = torchaudio.transforms.Spectrogram(
+        #     n_fft=params["n_fft"],
+        #     hop_length=params["hop_length"],
+        #     win_length=params["win_length"],
+        #     pad=0,
+        #     window_fn=torch.hann_window,
+        #     power=None,
+        #     normalized=False,
+        #     wkwargs=None,
+        #     center=True,
+        #     pad_mode="reflect",
+        #     onesided=True,
+        # )
+
+        # https://pytorch.org/audio/stable/generated/torchaudio.transforms.GriffinLim.html
+        self.inverse_spectrogram_func = torchaudio.transforms.GriffinLim(
             n_fft=params["n_fft"],
-            hop_length=params["hop_length"],
+            n_iter=params["num_griffin_lim_iters"],
             win_length=params["win_length"],
-            pad=0,
+            hop_length=params["hop_length"],
             window_fn=torch.hann_window,
-            power=None,
-            normalized=False,
+            power=1.0,
             wkwargs=None,
-            center=True,
-            pad_mode="reflect",
-            onesided=True,
+            momentum=0.99,
+            length=None,
+            rand_init=True,
         )
 
-        # https://pytorch.org/audio/stable/generated/torchaudio.transforms.MelScale.html
-        self.mel_scaler = torchaudio.transforms.MelScale(
+        # # https://pytorch.org/audio/stable/generated/torchaudio.transforms.MelScale.html
+        # self.mel_scaler = torchaudio.transforms.MelScale(
+        #     n_mels=params["num_frequencies"],
+        #     sample_rate=params["sample_rate"],
+        #     f_min=params["min_frequency"],
+        #     f_max=params["max_frequency"],
+        #     n_stft=params["n_fft"] // 2 + 1,
+        #     norm=params["mel_scale_norm"],
+        #     mel_scale=params["mel_scale_type"],
+        # )
+
+        # https://pytorch.org/audio/stable/generated/torchaudio.transforms.InverseMelScale.html
+        self.inverse_mel_scaler = torchaudio.transforms.InverseMelScale(
+            n_stft=params["n_fft"] // 2 + 1,
             n_mels=params["num_frequencies"],
             sample_rate=params["sample_rate"],
             f_min=params["min_frequency"],
             f_max=params["max_frequency"],
-            n_stft=params["n_fft"] // 2 + 1,
+            max_iter=params["max_mel_iters"],
+            tolerance_loss=1e-5,
+            tolerance_change=1e-8,
+            sgdargs=None,
             norm=params["mel_scale_norm"],
             mel_scale=params["mel_scale_type"],
         )
 
-    def spectrogram_from_audio(
+    def audio_from_spectrogram(
             self,
-            audio: pydub.AudioSegment,
-    ) -> np.ndarray:
+            spectrogram: np.ndarray,
+            apply_filters: bool = True,
+    ) -> pydub.AudioSegment:
         """
-        Compute a spectrogram from an audio segment.
+        Reconstruct an audio segment from a spectrogram.
 
         Args:
-            audio: Audio segment which must match the sample rate of the params
+            spectrogram: (batch, frequency, time)
+            apply_filters: Post-process with normalization and compression
 
         Returns:
-            spectrogram: (channel, frequency, time)
+            audio: Audio segment with channels equal to the batch dimension
         """
-        assert int(audio.frame_rate) == self.p.sample_rate, "Audio sample rate must match params"
+        # Move to device
+        amplitudes_mel = torch.from_numpy(spectrogram)
 
-        # Get the samples as a numpy array in (batch, samples) shape
-        waveform = np.array([c.get_array_of_samples() for c in audio.split_to_mono()])
+        # Reconstruct the waveform
+        waveform = self.waveform_from_mel_amplitudes(amplitudes_mel)
 
-        # Convert to floats if necessary
-        if waveform.dtype != np.float32:
-            waveform = waveform.astype(np.float32)
+        # Convert to audio segment
+        segment = audio_from_waveform(
+            samples=waveform.cpu().numpy(),
+            sample_rate=self.p["sample_rate"],
+            # Normalize the waveform to the range [-1, 1]
+            normalize=True,
+        )
 
-        waveform_tensor = torch.from_numpy(waveform).to(self.device)
-        amplitudes_mel = self.mel_amplitudes_from_waveform(waveform_tensor)
-        return amplitudes_mel.cpu().numpy()
+        # Optionally apply post-processing filters
+        if apply_filters:
+            segment = audio_filters(segment)
 
-    def mel_amplitudes_from_waveform(
+        return segment
+
+    def waveform_from_mel_amplitudes(
             self,
-            waveform: torch.Tensor,
+            amplitudes_mel: torch.Tensor,
     ) -> torch.Tensor:
         """
-        Torch-only function to compute Mel-scale amplitudes from a waveform.
+        Torch-only function to approximately reconstruct a waveform from Mel-scale amplitudes.
 
         Args:
-            waveform: (batch, samples)
+            amplitudes_mel: (batch, frequency, time)
 
         Returns:
-            amplitudes_mel: (batch, frequency, time)
+            waveform: (batch, samples)
         """
-        # Compute the complex-valued spectrogram
-        spectrogram_complex = self.spectrogram_func(waveform)
+        # Convert from mel scale to linear
+        amplitudes_linear = self.inverse_mel_scaler(amplitudes_mel)
 
-        # Take the magnitude
-        amplitudes = torch.abs(spectrogram_complex)
-
-        # Convert to mel scale
-        return self.mel_scaler(amplitudes)
+        # Run the approximate algorithm to compute the phase and recover the waveform
+        waveform = self.inverse_spectrogram_func(amplitudes_linear)
+        return waveform
 
 
 def spectrogram_from_image(
         image: np.ndarray,
         power: float = 0.25,
         stereo: bool = False,
-        max_value: float = 30e6,
-) -> np.ndarray:
+        max_value: float = 30e6) -> np.ndarray:
     """
     Compute a spectrogram magnitude array from a spectrogram image.
 
@@ -221,8 +306,7 @@ def audio_from_spectrogram_image(
         converter,
         image,
         apply_filters: bool = True,
-        max_value: float = 30e6,
-):
+        max_value: float = 30e6):
     """
     Reconstruct an audio segment from a spectrogram image.
 
@@ -273,13 +357,15 @@ def recognize_from_text(pipe):
         n_fft=17640,
         hop_length=441,
         win_length=4410,
-        power_for_image=0.25,
         num_frequencies=512,
         sample_rate=44100,
         min_frequency=0,
         max_frequency=10000,
+        max_mel_iters=200,
         mel_scale_norm=None,
         mel_scale_type="htk",
+        num_griffin_lim_iters=32,
+        power_for_image=0.25,
         stereo=False,
     ))
     segment = audio_from_spectrogram_image(converter, image)
@@ -287,6 +373,10 @@ def recognize_from_text(pipe):
     savepath = get_savepath(args.savepath, "", ext='.png')
     logger.info(f'saved at : {savepath}')
     cv2.imwrite(savepath, image)
+
+    savepath = get_savepath("output.wav", "", ext='.wav')
+    logger.info(f'saved at : {savepath}')
+    segment.export(savepath, format="wav")
 
     logger.info('Script finished successfully.')
 

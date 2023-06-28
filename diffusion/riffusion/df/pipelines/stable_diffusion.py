@@ -17,10 +17,6 @@ from typing import Callable, List, Optional, Union
 from logging import getLogger
 
 import numpy as np
-import torch
-
-# from ...schedulers import PNDMScheduler
-
 
 logger = getLogger(__name__)
 
