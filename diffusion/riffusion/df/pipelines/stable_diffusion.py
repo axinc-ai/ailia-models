@@ -168,13 +168,11 @@ class StableDiffusion:
             do_classifier_free_guidance,
             negative_prompt,
         )
-        prompt_embeds = np.load("prompt_embeds.npy").astype(np.float32)
 
         # get the initial random noise unless the user supplied it
         latents_dtype = prompt_embeds.dtype
         latents_shape = (batch_size * num_images_per_prompt, 4, height // 8, width // 8)
         latents = np.random.randn(*latents_shape).astype(latents_dtype)
-        latents = np.load("latents.npy").astype(latents_dtype)
 
         # set timesteps
         self.scheduler.set_timesteps(num_inference_steps)

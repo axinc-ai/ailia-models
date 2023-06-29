@@ -1,15 +1,14 @@
 import os
 import sys
-import time
 import io
 
 import numpy as np
 import cv2
-from scipy.io import wavfile
-import pydub
+
 import torch
 import torchaudio
 import transformers
+import soundfile as sf
 
 import ailia
 
@@ -29,32 +28,36 @@ logger = getLogger(__name__)
 # ======================
 
 WEIGHT_UNET_PATH = 'unet.onnx'
-WEIGHT_PB_UNET_PATH = 'weights.pb'
+WEIGHT_UNET_PB_PATH = 'unet_weights.pb'
 MODEL_UNET_PATH = 'unet.onnx.prototxt'
-WEIGHT_SAFETY_CHECKER_PATH = 'safety_checker.onnx'
-MODEL_SAFETY_CHECKER_PATH = 'safety_checker.onnx.prototxt'
 WEIGHT_TEXT_ENCODER_PATH = 'text_encoder.onnx'
 MODEL_TEXT_ENCODER_PATH = 'text_encoder.onnx.prototxt'
-WEIGHT_VAE_ENCODER_PATH = 'vae_encoder.onnx'
-MODEL_VAE_ENCODER_PATH = 'vae_encoder.onnx.prototxt'
 WEIGHT_VAE_DECODER_PATH = 'vae_decoder.onnx'
 MODEL_VAE_DECODER_PATH = 'vae_decoder.onnx.prototxt'
 
-REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/anything_v3/'
+REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/riffusion/'
 
-SAVE_IMAGE_PATH = 'output.png'
+SAVE_WAV_PATH = 'output.wav'
 
 # ======================
 # Arguemnt Parser Config
 # ======================
 
 parser = get_base_parser(
-    'Riffusion', None, SAVE_IMAGE_PATH
+    'Riffusion', None, SAVE_WAV_PATH
 )
 parser.add_argument(
     "-i", "--input", metavar="TEXT", type=str,
-    default="pikachu",
+    default="jazzy rapping from paris",
     help="the prompt to render"
+)
+parser.add_argument(
+    "--seed", type=int, default=42,
+    help="random seed",
+)
+parser.add_argument(
+    "--width", type=int, default=512,
+    help="width",
 )
 parser.add_argument(
     '--onnx',
@@ -68,38 +71,14 @@ args = update_parser(parser, check_input_type=False)
 # Secondaty Functions
 # ======================
 
-def audio_from_waveform(
-        samples: np.ndarray, sample_rate: int, normalize: bool = False) -> pydub.AudioSegment:
-    """
-    Convert a numpy array of samples of a waveform to an audio segment.
-
-    Args:
-        samples: (channels, samples) array
-    """
-    # Normalize volume to fit in int16
-    if normalize:
-        samples *= np.iinfo(np.int16).max / np.max(np.abs(samples))
-
-    # Transpose and convert to int16
-    samples = samples.transpose(1, 0)
-    samples = samples.astype(np.int16)
-
-    # Write to the bytes of a WAV file
-    wav_bytes = io.BytesIO()
-    wavfile.write(wav_bytes, sample_rate, samples)
-    wav_bytes.seek(0)
-
-    # Read into pydub
-    return pydub.AudioSegment.from_wav(wav_bytes)
-
-
-def audio_filters(segment: pydub.AudioSegment) -> pydub.AudioSegment:
+def audio_filters(segment):
     """
     Apply post-processing filters to the audio segment to compress it and
     keep at a -10 dBFS level.
     """
     # TODO(hayk): Come up with a principled strategy for these filters and experiment end-to-end.
     # TODO(hayk): Is this going to make audio unbalanced between sequential clips?
+    import pydub
 
     desired_db = -12
     segment = segment.apply_gain(desired_db - segment.dBFS)
@@ -141,21 +120,6 @@ class SpectrogramConverter:
     def __init__(self, params):
         self.p = params
 
-        # # https://pytorch.org/audio/stable/generated/torchaudio.transforms.Spectrogram.html
-        # self.spectrogram_func = torchaudio.transforms.Spectrogram(
-        #     n_fft=params["n_fft"],
-        #     hop_length=params["hop_length"],
-        #     win_length=params["win_length"],
-        #     pad=0,
-        #     window_fn=torch.hann_window,
-        #     power=None,
-        #     normalized=False,
-        #     wkwargs=None,
-        #     center=True,
-        #     pad_mode="reflect",
-        #     onesided=True,
-        # )
-
         # https://pytorch.org/audio/stable/generated/torchaudio.transforms.GriffinLim.html
         self.inverse_spectrogram_func = torchaudio.transforms.GriffinLim(
             n_fft=params["n_fft"],
@@ -169,17 +133,6 @@ class SpectrogramConverter:
             length=None,
             rand_init=True,
         )
-
-        # # https://pytorch.org/audio/stable/generated/torchaudio.transforms.MelScale.html
-        # self.mel_scaler = torchaudio.transforms.MelScale(
-        #     n_mels=params["num_frequencies"],
-        #     sample_rate=params["sample_rate"],
-        #     f_min=params["min_frequency"],
-        #     f_max=params["max_frequency"],
-        #     n_stft=params["n_fft"] // 2 + 1,
-        #     norm=params["mel_scale_norm"],
-        #     mel_scale=params["mel_scale_type"],
-        # )
 
         # https://pytorch.org/audio/stable/generated/torchaudio.transforms.InverseMelScale.html
         self.inverse_mel_scaler = torchaudio.transforms.InverseMelScale(
@@ -198,43 +151,34 @@ class SpectrogramConverter:
 
     def audio_from_spectrogram(
             self,
-            spectrogram: np.ndarray,
-            apply_filters: bool = True,
-    ) -> pydub.AudioSegment:
+            spectrogram: np.ndarray):
         """
         Reconstruct an audio segment from a spectrogram.
 
         Args:
             spectrogram: (batch, frequency, time)
-            apply_filters: Post-process with normalization and compression
-
-        Returns:
-            audio: Audio segment with channels equal to the batch dimension
         """
         # Move to device
         amplitudes_mel = torch.from_numpy(spectrogram)
 
         # Reconstruct the waveform
         waveform = self.waveform_from_mel_amplitudes(amplitudes_mel)
+        waveform = waveform.cpu().numpy()
 
-        # Convert to audio segment
-        segment = audio_from_waveform(
-            samples=waveform.cpu().numpy(),
-            sample_rate=self.p["sample_rate"],
-            # Normalize the waveform to the range [-1, 1]
-            normalize=True,
-        )
+        # Normalize volume to fit in int16
+        normalize = True
+        if normalize:
+            waveform *= np.iinfo(np.int16).max / np.max(np.abs(waveform))
 
-        # Optionally apply post-processing filters
-        if apply_filters:
-            segment = audio_filters(segment)
+        # Transpose and convert to int16
+        samples = waveform.transpose(1, 0)
+        samples = samples.astype(np.int16)
 
-        return segment
+        return samples
 
     def waveform_from_mel_amplitudes(
             self,
-            amplitudes_mel: torch.Tensor,
-    ) -> torch.Tensor:
+            amplitudes_mel: torch.Tensor):
         """
         Torch-only function to approximately reconstruct a waveform from Mel-scale amplitudes.
 
@@ -305,7 +249,6 @@ def spectrogram_from_image(
 def audio_from_spectrogram_image(
         converter,
         image,
-        apply_filters: bool = True,
         max_value: float = 30e6):
     """
     Reconstruct an audio segment from a spectrogram image.
@@ -322,22 +265,17 @@ def audio_from_spectrogram_image(
         stereo=converter.p["stereo"],
     )
 
-    segment = converter.audio_from_spectrogram(
-        spectrogram,
-        apply_filters=apply_filters,
-    )
+    samples = converter.audio_from_spectrogram(spectrogram)
 
-    return segment
+    return samples
 
 
 def recognize_from_text(pipe):
-    # prompt = args.input if isinstance(args.input, str) else args.input[0]
-    prompt = "jazzy rapping from paris"
+    prompt = args.input if isinstance(args.input, str) else args.input[0]
     negative_prompt = ""
-    num_clips = 1
     num_inference_steps = 30
     guidance = 7.0
-    width = 512
+    width = args.width
     seed = 42
     logger.info("prompt: %s" % prompt)
 
@@ -353,12 +291,13 @@ def recognize_from_text(pipe):
     )
     image = (image[0] * 255).astype(np.uint8)
 
+    sample_rate = 44100
     converter = SpectrogramConverter(params=dict(
         n_fft=17640,
         hop_length=441,
         win_length=4410,
         num_frequencies=512,
-        sample_rate=44100,
+        sample_rate=sample_rate,
         min_frequency=0,
         max_frequency=10000,
         max_mel_iters=200,
@@ -368,44 +307,72 @@ def recognize_from_text(pipe):
         power_for_image=0.25,
         stereo=False,
     ))
-    segment = audio_from_spectrogram_image(converter, image)
 
-    savepath = get_savepath(args.savepath, "", ext='.png')
-    logger.info(f'saved at : {savepath}')
-    cv2.imwrite(savepath, image)
+    audio_savepath = get_savepath(args.savepath, "", ext='.wav')
+    p, _ = os.path.splitext(audio_savepath)
+    img_savepath = p + ".png"
+    logger.info(f'saved at : {img_savepath}')
+    cv2.imwrite(img_savepath, image)
 
-    savepath = get_savepath("output.wav", "", ext='.wav')
-    logger.info(f'saved at : {savepath}')
-    segment.export(savepath, format="wav")
+    samples = audio_from_spectrogram_image(converter, image)
+    try:
+        from scipy.io import wavfile
+        import pydub
+
+        # Write to the bytes of a WAV file
+        wav_bytes = io.BytesIO()
+        wavfile.write(wav_bytes, sample_rate, samples)
+        wav_bytes.seek(0)
+
+        # Read into pydub
+        segment = pydub.AudioSegment.from_wav(wav_bytes)
+
+        # Optionally apply post-processing filters
+        apply_filters = True
+        if apply_filters:
+            segment = audio_filters(segment)
+
+        logger.info(f'saved at : {audio_savepath}')
+        segment.export(audio_savepath, format="wav")
+
+    except ModuleNotFoundError:
+        logger.info(f'saved at : {audio_savepath}')
+        sf.write(audio_savepath, samples, sample_rate, 'PCM_16', format='WAV')
 
     logger.info('Script finished successfully.')
 
 
 def main():
-    # check_and_download_models(WEIGHT_UNET_PATH, MODEL_UNET_PATH, REMOTE_PATH)
-    # check_and_download_models(WEIGHT_SAFETY_CHECKER_PATH, MODEL_SAFETY_CHECKER_PATH, REMOTE_PATH)
-    # check_and_download_models(WEIGHT_TEXT_ENCODER_PATH, MODEL_TEXT_ENCODER_PATH, REMOTE_PATH)
-    # check_and_download_models(WEIGHT_VAE_ENCODER_PATH, MODEL_VAE_ENCODER_PATH, REMOTE_PATH)
-    # check_and_download_models(WEIGHT_VAE_DECODER_PATH, MODEL_VAE_DECODER_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_UNET_PATH, MODEL_UNET_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_TEXT_ENCODER_PATH, MODEL_TEXT_ENCODER_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_VAE_DECODER_PATH, MODEL_VAE_DECODER_PATH, REMOTE_PATH)
 
-    if not os.path.exists(WEIGHT_PB_UNET_PATH):
-        logger.info('Downloading weights.pb...')
-        urlretrieve(REMOTE_PATH, WEIGHT_PB_UNET_PATH, progress_print)
-    logger.info('weights.pb is prepared!')
+    if not os.path.exists(WEIGHT_UNET_PB_PATH):
+        urlretrieve(
+            REMOTE_PATH + WEIGHT_UNET_PB_PATH,
+            WEIGHT_UNET_PB_PATH,
+            progress_print,
+        )
+
+    seed = args.seed
+    if seed is not None:
+        np.random.seed(seed)
 
     env_id = args.env_id
 
     # initialize
     if not args.onnx:
-        pass
+        net = ailia.Net(MODEL_UNET_PATH, WEIGHT_UNET_PATH, env_id=env_id)
+        text_encoder = ailia.Net(MODEL_TEXT_ENCODER_PATH, WEIGHT_TEXT_ENCODER_PATH, env_id=env_id)
+        vae_decoder = ailia.Net(MODEL_VAE_DECODER_PATH, WEIGHT_VAE_DECODER_PATH, env_id=env_id)
     else:
         import onnxruntime
         cuda = 0 < ailia.get_gpu_environment_id()
         providers = ['CUDAExecutionProvider', 'CPUExecutionProvider'] if cuda else ['CPUExecutionProvider']
 
-        net = onnxruntime.InferenceSession("unet.onnx", providers=providers)
-        vae_decoder = onnxruntime.InferenceSession("vae_decoder.onnx", providers=providers)
-        text_encoder = onnxruntime.InferenceSession("text_encoder.onnx", providers=providers)
+        net = onnxruntime.InferenceSession(WEIGHT_UNET_PATH, providers=providers)
+        text_encoder = onnxruntime.InferenceSession(WEIGHT_TEXT_ENCODER_PATH, providers=providers)
+        vae_decoder = onnxruntime.InferenceSession(WEIGHT_VAE_DECODER_PATH, providers=providers)
 
     tokenizer = transformers.CLIPTokenizer.from_pretrained(
         "./tokenizer"
@@ -423,15 +390,11 @@ def main():
     })
 
     pipe = df.StableDiffusion(
-        # vae_encoder=vae_encoder,
         vae_decoder=vae_decoder,
         text_encoder=text_encoder,
         tokenizer=tokenizer,
         unet=net,
         scheduler=scheduler,
-        # safety_checker=safety_checker,
-        # feature_extractor=feature_extractor,
-        # requires_safety_checker=True
         use_onnx=args.onnx,
     )
 
