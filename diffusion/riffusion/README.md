@@ -11,8 +11,9 @@ jazzy rapping from paris
 
 ## Output
 
-![Output](output.png)
+https://github.com/axinc-ai/ailia-models/assets/29946532/cedefebe-895e-4431-81ee-fa03fde09753
 
+![Output](output.png)
 
 ## Requirements
 This model requires additional module.
