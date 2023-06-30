@@ -276,7 +276,6 @@ def recognize_from_text(pipe):
     num_inference_steps = 30
     guidance = 7.0
     width = args.width
-    seed = 42
     logger.info("prompt: %s" % prompt)
 
     logger.info('Start inference...')
