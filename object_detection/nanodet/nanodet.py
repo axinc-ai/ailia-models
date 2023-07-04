@@ -14,7 +14,7 @@ sys.path.append('../../util')
 from logging import getLogger
 
 import webcamera_utils
-from detector_utils import plot_results, reverse_letterbox
+from detector_utils import plot_results, reverse_letterbox, write_predictions
 from image_utils import imread  # noqa: E402
 from model_utils import check_and_download_models
 from arg_utils import get_base_parser, get_savepath, update_parser
@@ -66,7 +66,11 @@ parser.add_argument(
     help='[nanodet-EfficientNet-Lite0_320, nanodet-EfficientNet-Lite1_416, nanodet-EfficientNet-Lite2_512'
          'nanodet_m, nanodet_m_416, nanodet_t, nanodet-RepVGG-A0_416]'
 )
-
+parser.add_argument(
+    '-w', '--write_json',
+    action='store_true',
+    help='Flag to output results to json file.'
+)
 args = update_parser(parser)
 
 MODEL_NAME = args.model_name
@@ -131,6 +135,11 @@ def recognize_from_image():
         savepath = get_savepath(args.savepath, image_path)
         logger.info(f'saved at : {savepath}')
         cv2.imwrite(savepath, res_img)
+
+        # write prediction
+        if args.write_json:
+            pred_file = '%s.json' % savepath.rsplit('.', 1)[0]
+            write_predictions(pred_file, detect_object, raw_img, category=COCO_CATEGORY, file_type='json')
 
     logger.info('Script finished successfully.')
 

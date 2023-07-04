@@ -55,9 +55,9 @@ OPSET_LISTS = ['10', '11']
 # ======================
 parser = get_base_parser('CenterNet model', IMAGE_PATH, SAVE_IMAGE_PATH)
 parser.add_argument(
-    '-w', '--write_prediction',
+    '-w', '--write_json',
     action='store_true',
-    help='Flag to output the prediction file.'
+    help='Flag to output results to json file.'
 )
 parser.add_argument(
     '-o', '--opset', metavar='OPSET',
@@ -186,9 +186,9 @@ def recognize_from_image(filename, detector):
     cv2.imwrite(savepath, im2show)
 
     # write prediction
-    if args.write_prediction:
-        pred_file = '%s.txt' % savepath.rsplit('.', 1)[0]
-        write_predictions(pred_file, ary, img, category=COCO_CATEGORY)
+    if args.write_json:
+        pred_file = '%s.json' % savepath.rsplit('.', 1)[0]
+        write_predictions(pred_file, ary, img, category=COCO_CATEGORY, file_type='json')
 
     if args.profile:
         print(detector.get_summary())

@@ -11,7 +11,7 @@ import ailia
 sys.path.append('../../util')
 from arg_utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
-from detector_utils import load_image, plot_results  # noqa: E402
+from detector_utils import load_image, plot_results, write_predictions  # noqa: E402
 from nms_utils import bb_intersection_over_union  # noqa: E402
 from webcamera_utils import get_capture  # noqa: E402
 
@@ -92,6 +92,11 @@ parser.add_argument(
     '--onnx',
     action='store_true',
     help='execute onnxruntime version.'
+)
+parser.add_argument(
+    '-w', '--write_json',
+    action='store_true',
+    help='Flag to output results to json file.'
 )
 args = update_parser(parser)
 
@@ -291,6 +296,11 @@ def recognize_from_image(image_path, net):
     savepath = get_savepath(args.savepath, image_path)
     logger.info(f'saved at : {savepath}')
     cv2.imwrite(savepath, img)
+
+    # write prediction
+    if args.write_json:
+        pred_file = '%s.json' % savepath.rsplit('.', 1)[0]
+        write_predictions(pred_file, detect_object, img, category=obj_list, file_type='json')
 
     if args.profile:
         print(net.get_summary())

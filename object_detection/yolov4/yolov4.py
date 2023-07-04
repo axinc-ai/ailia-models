@@ -69,9 +69,9 @@ parser.add_argument(
     help='The detection iou for yolo. (default: '+str(IOU)+')'
 )
 parser.add_argument(
-    '-w', '--write_prediction',
+    '-w', '--write_json',
     action='store_true',
-    help='Flag to output the prediction file.'
+    help='Flag to output results to json file.'
 )
 parser.add_argument(
     '-dw', '--detection_width', metavar='DETECTION_WIDTH',
@@ -160,9 +160,9 @@ def recognize_from_image(detector):
         cv2.imwrite(savepath, res_img)
 
         # write prediction
-        if args.write_prediction:
-            pred_file = '%s.txt' % savepath.rsplit('.', 1)[0]
-            write_predictions(pred_file, detect_object, org_img, COCO_CATEGORY)
+        if args.write_json:
+            pred_file = '%s.json' % savepath.rsplit('.', 1)[0]
+            write_predictions(pred_file, detect_object, org_img, COCO_CATEGORY, file_type='json')
 
     if args.profile:
         print(detector.get_summary())
@@ -181,7 +181,7 @@ def recognize_from_video(detector):
     else:
         writer = None
 
-    if args.write_prediction:
+    if args.write_json:
         frame_count = 0
         frame_digit = int(math.log10(capture.get(cv2.CAP_PROP_FRAME_COUNT)) + 1)
         video_name = os.path.splitext(os.path.basename(args.video))[0]
@@ -221,10 +221,10 @@ def recognize_from_video(detector):
             writer.write(res_img)
         
         # write prediction
-        if args.write_prediction:
+        if args.write_json:
             savepath = get_savepath(args.savepath, video_name, post_fix = '_%s' % (str(frame_count).zfill(frame_digit) + '_res'), ext='.png')
-            pred_file = '%s.txt' % savepath.rsplit('.', 1)[0]
-            write_predictions(pred_file, detect_object, frame, COCO_CATEGORY)
+            pred_file = '%s.json' % savepath.rsplit('.', 1)[0]
+            write_predictions(pred_file, detect_object, frame, COCO_CATEGORY, file_type='json')
             frame_count += 1
 
     capture.release()

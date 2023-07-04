@@ -10,7 +10,7 @@ import ailia
 sys.path.append('../../util')
 from arg_utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
-from detector_utils import plot_results, load_image  # noqa: E402
+from detector_utils import plot_results, load_image, write_predictions  # noqa: E402
 import webcamera_utils  # noqa: E402
 
 # logger
@@ -55,6 +55,11 @@ KEEP_PER_CLASS = 10
 # Arguemnt Parser Config
 # ======================
 parser = get_base_parser('m2det model', IMAGE_PATH, SAVE_IMAGE_PATH)
+parser.add_argument(
+    '-w', '--write_json',
+    action='store_true',
+    help='Flag to output results to json file.'
+)
 args = update_parser(parser)
 
 
@@ -216,6 +221,11 @@ def recognize_from_image(filename, detector):
     savepath = get_savepath(args.savepath, filename)
     logger.info(f'saved at : {savepath}')
     cv2.imwrite(savepath, img)
+
+    # write prediction
+    if args.write_json:
+        pred_file = '%s.json' % savepath.rsplit('.', 1)[0]
+        write_predictions(pred_file, detect_object, img, category=COCO_CATEGORY, file_type='json')
 
     if args.profile:
         print(detector.get_summary())
