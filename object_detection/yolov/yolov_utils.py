@@ -1,5 +1,6 @@
 import cv2
 import numpy as np
+import json
 import ailia
 
 def preproc(img, input_size, swap=(2, 0, 1)):
@@ -83,3 +84,24 @@ def vis(img, boxes, scores, cls_ids, conf=0.5, class_names=None,t_size = 0.4):
     return result
 
 
+def save_result_json(json_path, output, ratio, conf=0.5, class_names=None, t_size=0.4):
+    result = []
+
+    boxes = output[:, 0:4]
+    boxes /= ratio
+    scores = output[:, 4] * output[:, 5]
+    cls_ids = output[:, 6]
+
+    for i in range(len(boxes)):
+        box = boxes[i]
+        cls_id = int(cls_ids[i])
+        score = scores[i]
+        if score < conf:
+            continue
+        result.append({
+            'category': class_names[cls_id] if class_names is not None else cls_id,
+            'prob': float(score),
+            'box': box.tolist()
+        })
+    with open(json_path, 'w') as f:
+        json.dump(result, f, indent=2)
