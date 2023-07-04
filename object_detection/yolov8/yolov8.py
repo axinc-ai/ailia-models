@@ -75,9 +75,9 @@ parser.add_argument(
     help='The detection iou for yolo.'
 )
 parser.add_argument(
-    '-w', '--write_prediction',
+    '-w', '--write_json',
     action='store_true',
-    help='Flag to output the prediction file.'
+    help='Flag to output results to json file.'
 )
 parser.add_argument(
     '-ds', '--detection_size',
@@ -288,9 +288,9 @@ def recognize_from_image(net):
         cv2.imwrite(savepath, res_img)
 
         # write prediction
-        if args.write_prediction:
-            pred_file = '%s.txt' % savepath.rsplit('.', 1)[0]
-            write_predictions(pred_file, detect_object, img, COCO_CATEGORY)
+        if args.write_json:
+            json_file = '%s.json' % savepath.rsplit('.', 1)[0]
+            write_predictions(json_file, detect_object, img, COCO_CATEGORY, file_type='json')
 
     logger.info('Script finished successfully.')
 
