@@ -29,6 +29,22 @@ DEFAULT_INPUT_PATH = "./input.txt"
 DEFAULT_OUTPUT_PATH = "./output.txt"
 
 
+"""
+parse args
+"""
+parser = get_base_parser(
+    description="T5 base Japanese title generation",
+    default_input=DEFAULT_INPUT_PATH,
+    default_save=DEFAULT_OUTPUT_PATH,
+    input_ftype="text",
+)
+parser.add_argument(
+    '-o', '--onnx', action='store_true',
+    help="Option to use onnxrutime to run or not."
+)
+args = update_parser(parser)
+
+
 def softmax_np(x: np.ndarray):
     e_x = np.exp(x - np.max(x))  # subtract max to stabilize
     return e_x / e_x.sum(axis=0)
@@ -223,21 +239,6 @@ def normalize_text(text: str) -> str:
 
 def preprocess_body(text: str) -> str:
     return normalize_text(text.replace("\n", " "))
-
-"""
-parse args
-"""
-parser = get_base_parser(
-    description="T5 base Japanese title generation",
-    default_input=DEFAULT_INPUT_PATH,
-    default_save=DEFAULT_OUTPUT_PATH,
-    input_ftype="text",
-)
-parser.add_argument(
-    '-o', '--onnx', action='store_true',
-    help="Option to use onnxrutime to run or not."
-)
-args = update_parser(parser)
 
 def main(args):
     # download onnx and prototxt
