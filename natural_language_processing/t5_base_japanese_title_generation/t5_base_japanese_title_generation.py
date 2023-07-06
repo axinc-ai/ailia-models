@@ -281,7 +281,7 @@ def main(args):
             most_plausible_title, _ = model.estimate(body_preprocessed, 21, temperature=1.0, top_k=50, top_p=0.3)
             logger.info("title: %s", most_plausible_title)
             save_path = get_savepath(args.savepath, input_path)
-            with open(save_path, "a") as fo:
+            with open(save_path, "w") as fo:
                 fo.write(most_plausible_title)
 
 
