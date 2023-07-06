@@ -286,7 +286,10 @@ def main():
     # initialize
     logger.info('initializing model...')
     if not args.onnx:
-        net = ailia.Net(model_path, weight_path, env_id=args.env_id)
+        memory_mode = ailia.get_memory_mode(
+            reduce_constant=True, ignore_input_with_initializer=True,
+            reduce_interstage=False, reuse_interstage=True)
+        net = ailia.Net(model_path, weight_path, env_id=args.env_id, memory_mode=memory_mode)
     else:
         import onnxruntime
         net = onnxruntime.InferenceSession(weight_path)
