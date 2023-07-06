@@ -2,12 +2,15 @@
 
 ## Input
 
-TEXT file.
+[TEXT file.](input.txt)
 
 ## Output
 
 The title appropriate to the input prompt.
 
+```
+aiの認識力は飛躍的に向上!大量のデータから学習された基盤モデル
+```
 
 ## Usage
 
@@ -27,6 +30,7 @@ $ python3 t5_base_japanese_title_generation.py -i FILE_PATH
 ## Reference
 
 - [t5-japanese](https://github.com/sonoisa/t5-japanese)
+- [onnxt5](https://github.com/abelriboulot/onnxt5)
 
 ### Framework
 PyTorch
