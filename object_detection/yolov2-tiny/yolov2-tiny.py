@@ -86,9 +86,12 @@ parser.add_argument(
     metavar='DATASET', default='coco'
 )
 parser.add_argument(
-    '-w', '--write_json',
-    action='store_true',
-    help='Flag to output results to json file.'
+    '-w', '--write_prediction',
+    nargs='?',
+    const='txt',
+    choices=['txt', 'json'],
+    type=str,
+    help='Output results to txt or json file.'
 )
 args = update_parser(parser)
 
@@ -172,9 +175,10 @@ def recognize_from_image():
             cv2.imwrite(savepath, res_img)
 
             # write prediction
-            if args.write_json:
-                pred_file = '%s.json' % savepath.rsplit('.', 1)[0]
-                write_predictions(pred_file, detector, img, category=CATEGORY, file_type='json')
+            if args.write_prediction is not None:
+                ext = args.write_prediction
+                pred_file = "%s.%s" % (savepath.rsplit('.', 1)[0], ext)
+                write_predictions(pred_file, detector, img, category=CATEGORY, file_type=ext)
 
             if args.profile:
                 print(detector.get_summary())
@@ -188,10 +192,11 @@ def recognize_from_image():
                 logger.info(f'saved at : {savepath}')
                 cv2.imwrite(savepath, res_img)
 
-                 # write prediction
-                if args.write_json:
-                    pred_file = '%s.json' % savepath.rsplit('.', 1)[0]
-                    write_predictions(pred_file, detector, img, category=CATEGORY, file_type='json')
+                # write prediction
+                if args.write_prediction is not None:
+                    ext = args.write_prediction
+                    pred_file = "%s.%s" % (savepath.rsplit('.', 1)[0], ext)
+                    write_predictions(pred_file, detector, img, category=CATEGORY, file_type=ext)
 
                 if args.profile:
                     print(detector.get_summary())

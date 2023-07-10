@@ -94,9 +94,12 @@ parser.add_argument(
     help='execute onnxruntime version.'
 )
 parser.add_argument(
-    '-w', '--write_json',
-    action='store_true',
-    help='Flag to output results to json file.'
+    '-w', '--write_prediction',
+    nargs='?',
+    const='txt',
+    choices=['txt', 'json'],
+    type=str,
+    help='Output results to txt or json file.'
 )
 args = update_parser(parser)
 
@@ -298,9 +301,10 @@ def recognize_from_image(image_path, net):
     cv2.imwrite(savepath, img)
 
     # write prediction
-    if args.write_json:
-        pred_file = '%s.json' % savepath.rsplit('.', 1)[0]
-        write_predictions(pred_file, detect_object, img, category=obj_list, file_type='json')
+    if args.write_prediction is not None:
+        ext = args.write_prediction
+        pred_file = "%s.%s" % (savepath.rsplit('.', 1)[0], ext)
+        write_predictions(pred_file, detect_object, img, category=obj_list, file_type=ext)
 
     if args.profile:
         print(net.get_summary())

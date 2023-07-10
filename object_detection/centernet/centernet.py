@@ -55,9 +55,12 @@ OPSET_LISTS = ['10', '11']
 # ======================
 parser = get_base_parser('CenterNet model', IMAGE_PATH, SAVE_IMAGE_PATH)
 parser.add_argument(
-    '-w', '--write_json',
-    action='store_true',
-    help='Flag to output results to json file.'
+    '-w', '--write_prediction',
+    nargs='?',
+    const='txt',
+    choices=['txt', 'json'],
+    type=str,
+    help='Output results to txt or json file.'
 )
 parser.add_argument(
     '-o', '--opset', metavar='OPSET',
@@ -186,9 +189,10 @@ def recognize_from_image(filename, detector):
     cv2.imwrite(savepath, im2show)
 
     # write prediction
-    if args.write_json:
-        pred_file = '%s.json' % savepath.rsplit('.', 1)[0]
-        write_predictions(pred_file, ary, img, category=COCO_CATEGORY, file_type='json')
+    if args.write_prediction is not None:
+        ext = args.write_prediction
+        pred_file = "%s.%s" % (savepath.rsplit('.', 1)[0], ext)
+        write_predictions(pred_file, ary, img, category=COCO_CATEGORY, file_type=ext)
 
     if args.profile:
         print(detector.get_summary())
@@ -208,7 +212,7 @@ def recognize_from_video(video, detector):
     else:
         writer = None
 
-    if args.write_prediction:
+    if args.write_prediction is not None:
         frame_count = 0
         frame_digit = int(math.log10(capture.get(cv2.CAP_PROP_FRAME_COUNT)) + 1)
         video_name = os.path.splitext(os.path.basename(args.video))[0]
@@ -241,10 +245,11 @@ def recognize_from_video(video, detector):
             writer.write(img)
 
         # write prediction
-        if args.write_prediction:
+        if args.write_prediction is not None:
             savepath = get_savepath(args.savepath, video_name, post_fix = '_%s' % (str(frame_count).zfill(frame_digit) + '_res'), ext='.png')
-            pred_file = '%s.txt' % savepath.rsplit('.', 1)[0]
-            write_predictions(pred_file, ary, img, COCO_CATEGORY)
+            ext = args.write_prediction
+            pred_file = "%s.%s" % (savepath.rsplit('.', 1)[0], ext)
+            write_predictions(pred_file, ary, img, category=COCO_CATEGORY, file_type=ext)
             frame_count += 1
 
     capture.release()

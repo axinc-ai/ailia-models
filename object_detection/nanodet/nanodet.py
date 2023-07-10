@@ -67,9 +67,12 @@ parser.add_argument(
          'nanodet_m, nanodet_m_416, nanodet_t, nanodet-RepVGG-A0_416]'
 )
 parser.add_argument(
-    '-w', '--write_json',
-    action='store_true',
-    help='Flag to output results to json file.'
+    '-w', '--write_prediction',
+    nargs='?',
+    const='txt',
+    choices=['txt', 'json'],
+    type=str,
+    help='Output results to txt or json file.'
 )
 args = update_parser(parser)
 
@@ -137,9 +140,10 @@ def recognize_from_image():
         cv2.imwrite(savepath, res_img)
 
         # write prediction
-        if args.write_json:
-            pred_file = '%s.json' % savepath.rsplit('.', 1)[0]
-            write_predictions(pred_file, detect_object, raw_img, category=COCO_CATEGORY, file_type='json')
+        if args.write_prediction is not None:
+            ext = args.write_prediction
+            pred_file = "%s.%s" % (savepath.rsplit('.', 1)[0], ext)
+            write_predictions(pred_file, detect_object, raw_img, category=COCO_CATEGORY, file_type=ext)
 
     logger.info('Script finished successfully.')
 
