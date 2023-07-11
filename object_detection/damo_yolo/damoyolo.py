@@ -152,7 +152,6 @@ class Infer():
         image_np = np.asarray(image.tensors)
         output = self.model.run(image_np)
         bboxes, scores, cls_inds = self.postprocess(output, image, ratio=ratio)
-
         return bboxes, scores, cls_inds
 
 # ======================
@@ -190,8 +189,23 @@ def recognize_from_image(detector):
         else:
             bboxes, scores, cls_inds = infer_engine.forward(raw_img)
 
+        detections = []
+        h,w ,_= raw_img.shape
+
+        bboxes = xyxy2xywh(bboxes)
+        for box, score , ind in zip(bboxes,scores,cls_inds):
+            r = ailia.DetectorObject(
+                category=ind-1,
+                prob=score,
+                x=box[0]/w,
+                y=box[1]/h,
+                w=box[2]/w,
+                h=box[3]/h,
+            )
+            detections.append(r)
+
         raw_img = cv2.cvtColor(raw_img, cv2.COLOR_RGB2BGR)
-        res_img = vis(raw_img, bboxes, scores, cls_inds, args.threshold, COCO_CATEGORY)
+        res_img = plot_results(detections, raw_img, COCO_CATEGORY)
 
         # plot result
         savepath = get_savepath(args.savepath, image_path)
@@ -201,7 +215,7 @@ def recognize_from_image(detector):
         # write prediction
         if args.write_prediction:
             pred_file = '%s.txt' % savepath.rsplit('.', 1)[0]
-            write_predictions(pred_file, detect_object, raw_img, COCO_CATEGORY)
+            write_predictions(pred_file, detections, raw_img, COCO_CATEGORY)
 
     logger.info('Script finished successfully.')
 
@@ -236,8 +250,24 @@ def recognize_from_video(detector):
 
         raw_img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         bboxes, scores, cls_inds = infer_engine.forward(raw_img)
+
+        h,w ,_= raw_img.shape
+        detections = []
+        bboxes = xyxy2xywh(bboxes)
+
+        for box, score , ind in zip(bboxes,scores,cls_inds):
+            r = ailia.DetectorObject(
+                category=ind-1,
+                prob=score,
+                x=box[0]/w,
+                y=box[1]/h,
+                w=box[2]/w,
+                h=box[3]/h,
+            )
+            detections.append(r)
+
         raw_img = cv2.cvtColor(raw_img, cv2.COLOR_RGB2BGR)
-        res_img = vis(raw_img, bboxes, scores, cls_inds, args.threshold, COCO_CATEGORY)
+        res_img = plot_results(detections, raw_img, COCO_CATEGORY)
  
         cv2.imshow('frame', res_img)
         frame_shown = True
@@ -250,7 +280,7 @@ def recognize_from_video(detector):
         if args.write_prediction:
             savepath = get_savepath(args.savepath, video_name, post_fix = '_%s' % (str(frame_count).zfill(frame_digit) + '_res'), ext='.png')
             pred_file = '%s.txt' % savepath.rsplit('.', 1)[0]
-            write_predictions(pred_file, detect_object, frame, COCO_CATEGORY)
+            write_predictions(pred_file, detections, frame, COCO_CATEGORY)
             frame_count += 1
 
     capture.release()
