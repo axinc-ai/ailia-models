@@ -181,7 +181,9 @@ def get_capture(video):
 
     except ValueError:
         # if file path is given, open video file
-        if check_file_existance(video):
+        if "rtsp://" in video:
+            capture = cv2.VideoCapture(video)
+        elif check_file_existance(video):
             capture = cv2.VideoCapture(video)
 
     return capture
