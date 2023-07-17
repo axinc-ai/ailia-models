@@ -15,6 +15,7 @@ from arg_utils import get_base_parser, update_parser, get_savepath  # noqa
 from model_utils import check_and_download_models  # noqa
 from image_utils import normalize_image  # noqa
 from detector_utils import load_image  # noqa
+from math_utils import softmax  # noqa
 from webcamera_utils import get_capture, get_writer  # noqa
 
 logger = getLogger(__name__)
@@ -75,8 +76,6 @@ def generate_text_semantic(
         models,
         text,
         temp=0.7,
-        top_k=None,
-        top_p=None,
         silent=False,
         min_eos_p=0.2,
         max_gen_duration_s=None,
@@ -137,27 +136,14 @@ def generate_text_semantic(
 
         relevant_logits = logits[0, 0, :SEMANTIC_VOCAB_SIZE]
         if allow_early_stop:
-            relevant_logits = torch.hstack(
+            relevant_logits = np.hstack(
                 (relevant_logits, logits[0, 0, [SEMANTIC_PAD_TOKEN]])  # eos
             )
-        if top_p is not None:
-            # faster to convert to numpy
-            original_device = relevant_logits.device
-            relevant_logits = relevant_logits.detach().cpu().type(torch.float32).numpy()
-            sorted_indices = np.argsort(relevant_logits)[::-1]
-            sorted_logits = relevant_logits[sorted_indices]
-            cumulative_probs = np.cumsum(softmax(sorted_logits))
-            sorted_indices_to_remove = cumulative_probs > top_p
-            sorted_indices_to_remove[1:] = sorted_indices_to_remove[:-1].copy()
-            sorted_indices_to_remove[0] = False
-            relevant_logits[sorted_indices[sorted_indices_to_remove]] = -np.inf
-            relevant_logits = torch.from_numpy(relevant_logits)
-            relevant_logits = relevant_logits.to(original_device)
-        if top_k is not None:
-            v, _ = torch.topk(relevant_logits, min(top_k, relevant_logits.size(-1)))
-            relevant_logits[relevant_logits < v[-1]] = -float("Inf")
-        probs = F.softmax(relevant_logits / temp, dim=-1)
-        item_next = torch.multinomial(probs, num_samples=1).to(torch.int32)
+
+        probs = softmax(relevant_logits / temp, axis=-1)
+        item_next = np.random.multinomial(1, probs[:-1])
+        item_next = np.argsort(-item_next)[:1]
+
         if allow_early_stop and (
                 item_next == SEMANTIC_VOCAB_SIZE
                 or (min_eos_p is not None and probs[-1] >= min_eos_p)
