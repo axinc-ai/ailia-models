@@ -81,6 +81,9 @@ def compute(net,face_helper,img):
             print('Grayscale input: True')
         face_helper.cropped_faces = [img]
     else:
+        print("ss",img.shape)
+        img = cv2.resize(img, (512, 512), interpolation=cv2.INTER_LINEAR)
+        print("aaa",img.shape)
         face_helper.read_image(img)
         # get face landmarks for each face
         num_det_faces = face_helper.get_face_landmarks_5(
@@ -140,6 +143,8 @@ def recognize_from_image(net):
 
         # preprocessing
         img = imread(image_path)
+        #541,542
+        #img = cv2.resize(img,(541,542))
 
         # inference
         logger.info('Start inference...')
@@ -147,7 +152,6 @@ def recognize_from_image(net):
             logger.info('BENCHMARK mode')
             for i in range(5):
                 start = int(round(time.time() * 1000))
-                preds_ailia = net.predict(img)
                 output_img = compute(net,face_helper,img)
                 end = int(round(time.time() * 1000))
                 logger.info(f'\tailia processing time {end - start} ms')
@@ -196,9 +200,9 @@ def recognize_from_video(net):
 
         # resize with keep aspect
         frame,resized_img = webcamera_utils.adjust_frame_size(frame, IMAGE_HEIGHT, IMAGE_WIDTH)
+        print("frame",frame.shape,resized_img.shape)
 
-
-        out_img = compute(net,face_helper,img)
+        out_img = compute(net,face_helper,frame)
         cv2.imshow('output', out_img)
         frame_shown = True
 

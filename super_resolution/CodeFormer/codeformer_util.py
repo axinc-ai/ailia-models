@@ -564,6 +564,13 @@ class RetinaFace():
         tmp = [width, height, width, height, width, height, width, height, width, height]
         self.scale1 = np.array(tmp)
 
+        print(self.model_name)
+        print(inputs[0].shape)
+        inputs = inputs[0].transpose((1,2,0))
+        inputs = cv2.resize(inputs, (641, 640), interpolation=cv2.INTER_LINEAR)
+        inputs = inputs.transpose((2,1,0))
+        inputs = np.expand_dims(inputs,0)
+        print(inputs.shape)
         out = self.net.run(inputs)
 
         loc       = out[0]
