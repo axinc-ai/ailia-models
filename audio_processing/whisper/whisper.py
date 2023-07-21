@@ -187,8 +187,10 @@ if not args.onnx:
 # ======================
 
 OPT = ".opt"
+OPT2 = ".opt2"
 if args.normal:
     OPT = ""
+    OPT2 = ""
 
 if not args.dynamic_kv_cache:
     # 高速化のためKV_CACHEのサイズを最大サイズで固定化したバージョン
@@ -196,8 +198,8 @@ if not args.dynamic_kv_cache:
     MODEL_DEC_TINY_PATH = "decoder_tiny_fix_kv_cache"+ OPT +".onnx.prototxt"
     WEIGHT_DEC_BASE_PATH = "decoder_base_fix_kv_cache"+ OPT +".onnx"
     MODEL_DEC_BASE_PATH = "decoder_base_fix_kv_cache"+ OPT +".onnx.prototxt"
-    WEIGHT_DEC_SMALL_PATH = "decoder_small_fix_kv_cache"+ OPT +".onnx"
-    MODEL_DEC_SMALL_PATH = "decoder_small_fix_kv_cache"+ OPT +".onnx.prototxt"
+    WEIGHT_DEC_SMALL_PATH = "decoder_small_fix_kv_cache"+ OPT2 +".onnx"
+    MODEL_DEC_SMALL_PATH = "decoder_small_fix_kv_cache"+ OPT2 +".onnx.prototxt"
     WEIGHT_DEC_MEDIUM_PATH = "decoder_medium_fix_kv_cache"+ OPT +".onnx"
     MODEL_DEC_MEDIUM_PATH = "decoder_medium_fix_kv_cache"+ OPT +".onnx.prototxt"
 else:
