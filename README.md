@@ -355,6 +355,7 @@ The collection of pre-trained, state-of-the-art AI models.
 | [<img src="object_detection/glip/output.png" width=128px>](object_detection/glip/) | [glip](/object_detection/glip/) | [GLIP](https://github.com/microsoft/GLIP) | Pytorch | 1.2.13 and later | |
 | [<img src="object_detection/crowd_det/output.png" width=128px>](object_detection/crowd_det/) | [crowd_det](/object_detection/crowd_det/) | [Detection in Crowded Scenes](https://github.com/Purkialo/CrowdDet) | Pytorch | 1.2.13 and later | |
 | [<img src="object_detection/footandball/output.png" width=128px>](object_detection/footandball/) | [footandball](/object_detection/footandball/) | [FootAndBall: Integrated player and ball detector](https://github.com/jac99/FootAndBall) | Pytorch | 1.2.0 and later | |
+| [<img src="object_detection/qrcode_wechatqrcode/output.jpg" width=128px>](object_detection/qrcode_wechatqrcode/) | [qrcode_wechatqrcode](/object_detection/qrcode_wechatqrcode/) | [qrcode_wechatqrcode](https://github.com/opencv/opencv_zoo/tree/4fb591053ba1201c07c68929cc324787d5afaa6c/models/qrcode_wechatqrcode) | Caffe | 1.2.15 and later | |
 
 ## Object detection 3d
 
