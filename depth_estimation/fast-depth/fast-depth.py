@@ -11,7 +11,7 @@ import fast_depth_utils
 
 # Import original modules.
 sys.path.append("../../util")
-from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
+from arg_utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # NOQA: E402
 from webcamera_utils import get_capture, cut_max_square  # NOQA: E402
 

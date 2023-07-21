@@ -9,7 +9,7 @@ import numpy as np
 import ailia
 
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath
+from arg_utils import get_base_parser, update_parser, get_savepath
 from model_utils import check_and_download_models
 from image_utils import normalize_image
 from detector_utils import load_image

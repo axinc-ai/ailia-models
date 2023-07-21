@@ -17,6 +17,7 @@ cd ../../audio_processing/auto_speech/; python3 auto_speech.py ${OPTION}
 cd ../../audio_processing/voicefilter/; python3 voicefilter.py ${OPTION}
 cd ../../audio_processing/whisper/; python3 whisper.py ${OPTION}
 cd ../../audio_processing/clap/; python3 clap.py ${OPTION}
+cd ../../audio_processing/wespeaker/; python3 wespeaker.py ${OPTION}
 cd ../../background_ramoval/deep-image-matting; python3 deep-image-matting.py ${OPTION}
 cd ../../background_ramoval/u2net; python3 u2net.py ${OPTION}
 cd ../../background_ramoval/u2net; python3 u2net.py -a small ${OPTION}
@@ -86,9 +87,9 @@ cd ../../face_recognition/hsemotion; python3 hsemotion.py ${OPTION}
 cd ../../frame_interpolation/flavr; python3 flavr.py ${OPTION}
 cd ../../frame_interpolation/cain; python3 cain.py ${OPTION}
 cd ../../frame_interpolation/film; python3 film.py ${OPTION}
-cd ../../generative_adversarial_networks/council-GAN; python3 council-gan.py --glasses ${OPTION}
-cd ../../generative_adversarial_networks/council-GAN; python3 council-gan.py --m2f ${OPTION}
-cd ../../generative_adversarial_networks/council-GAN; python3 council-gan.py --anime ${OPTION}
+cd ../../generative_adversarial_networks/council-gan; python3 council-gan.py --glasses ${OPTION}
+cd ../../generative_adversarial_networks/council-gan; python3 council-gan.py --m2f ${OPTION}
+cd ../../generative_adversarial_networks/council-gan; python3 council-gan.py --anime ${OPTION}
 cd ../../generative_adversarial_networks/pytorch-gan; python3 pytorch-gan.py -m celeb ${OPTION}
 cd ../../generative_adversarial_networks/pytorch-gan; python3 pytorch-gan.py -m anime ${OPTION}
 cd ../../generative_adversarial_networks/restyle-encoder; python3 restyle-encoder.py ${OPTION}
@@ -177,6 +178,9 @@ cd ../../natural_language_processing/gpt2; python3 gpt2.py ${OPTION}
 cd ../../natural_language_processing/rinna_gpt2; python3 rinna_gpt2.py ${OPTION}
 cd ../../natural_language_processing/fugumt-en-ja; python3 fugumt-en-ja.py ${OPTION}
 cd ../../natural_language_processing/bert_sum_ext; python3 bert_sum_ext.py ${OPTION}
+cd ../../natural_language_processing/sentence_transformers_japanese; python3 sentence_transformers_japanese.py ${OPTION}
+cd ../../natural_language_processing/presumm; python3 presumm.py ${OPTION}
+cd ../../natural_language_processing/t5_base_japanese_title_generation; python3 t5_base_japanese_title_generation.py ${OPTION}
 cd ../../neural_rendering/nerf; python3 nerf.py ${OPTION}
 cd ../../object_detection/centernet; python3 centernet.py ${OPTION}
 cd ../../object_detection/m2det; python3 m2det.py ${OPTION}
@@ -192,6 +196,8 @@ cd ../../object_detection/yolov4-tiny; python3 yolov4-tiny.py ${OPTION}
 cd ../../object_detection/yolov5; python3 yolov5.py ${OPTION}
 cd ../../object_detection/yolov6; python3 yolov6.py ${OPTION}
 cd ../../object_detection/yolov7; python3 yolov7.py ${OPTION}
+cd ../../object_detection/yolov8; python3 yolov8.py ${OPTION}
+cd ../../object_detection/yolov8-seg; python3 yolov8-seg.py ${OPTION}
 cd ../../object_detection/yolox; python3 yolox.py ${OPTION}
 cd ../../object_detection/yolox-ti-lite; python3 yolox-ti-lite.py ${OPTION}
 cd ../../object_detection/yolov; python3 yolov.py ${OPTION}
@@ -210,6 +216,7 @@ cd ../../object_detection/dab-detr; python3 dab-detr.py ${OPTION}
 cd ../../object_detection/glip; python3 glip.py ${OPTION}
 cd ../../object_detection/poly_yolo; python3 poly_yolo.py ${OPTION}
 cd ../../object_detection/crowd_det; python3 crowd_det.py ${OPTION}
+cd ../../object_detection/footandball; python3 footandball.py ${OPTION}
 cd ../../object_detection_3d/3d_bbox; python3 3d_bbox.py ${OPTION}
 cd ../../object_detection_3d/3d-object-detection.pytorch; python3 3d-object-detection.pytorch.py ${OPTION}
 cd ../../object_detection_3d/mediapipe_objectron; python3 mediapipe_objectron.py ${OPTION}

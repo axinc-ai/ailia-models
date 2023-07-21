@@ -4,7 +4,7 @@ import sys
 import numpy as np
 import cv2
 
-from utils import check_file_existance
+from arg_utils import check_file_existance
 from image_utils import normalize_image
 
 from logging import getLogger
@@ -181,7 +181,9 @@ def get_capture(video):
 
     except ValueError:
         # if file path is given, open video file
-        if check_file_existance(video):
+        if "rtsp://" in video:
+            capture = cv2.VideoCapture(video)
+        elif check_file_existance(video):
             capture = cv2.VideoCapture(video)
 
     return capture

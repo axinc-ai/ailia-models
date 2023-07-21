@@ -9,7 +9,7 @@ import time
 # import original modules
 sys.path.append('../../util')
 from image_utils import load_image, get_image_shape  # noqa: E402
-from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
+from arg_utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 import webcamera_utils  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 
@@ -69,7 +69,10 @@ def inference(net,input_data):
 def recognize_from_image():
 
     # net initialize
-    net = ailia.Net(None, WEIGHT_PATH)
+    memory_mode = ailia.get_memory_mode(
+        reduce_constant=True, ignore_input_with_initializer=True,
+        reduce_interstage=False, reuse_interstage=True)
+    net = ailia.Net(None, WEIGHT_PATH, env_id=args.env_id, memory_mode=memory_mode)
     #logger.info(IMAGE_PATH)
 
     for image_path in args.input:
@@ -104,7 +107,10 @@ def recognize_from_image():
 
 def recognize_from_video():
     # net initialize
-    net = ailia.Net(None, WEIGHT_PATH)
+    memory_mode = ailia.get_memory_mode(
+        reduce_constant=True, ignore_input_with_initializer=True,
+        reduce_interstage=False, reuse_interstage=True)
+    net = ailia.Net(None, WEIGHT_PATH, env_id=args.env_id, memory_mode=memory_mode)
 
     capture = webcamera_utils.get_capture(args.video)
 
