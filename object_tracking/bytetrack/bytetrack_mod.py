@@ -1,7 +1,7 @@
 import sys
 from importlib import import_module
 
-import utils
+import arg_utils
 
 mod = None
 
@@ -16,12 +16,12 @@ def dummy_parser(parser, *args):
 
 
 argv = sys.argv
-update_parser = utils.update_parser
+update_parser = arg_utils.update_parser
 try:
     sys.argv = sys.argv[:1]
-    utils.update_parser = dummy_parser
+    arg_utils.update_parser = dummy_parser
 
     mod = import_module("bytetrack")
 finally:
     sys.argv = argv
-    utils.update_parser = update_parser
+    arg_utils.update_parser = update_parser
