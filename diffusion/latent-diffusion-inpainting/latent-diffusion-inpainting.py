@@ -204,10 +204,17 @@ def apply_model(models, x, t, cond):
 
     xc = np.concatenate([x, cond], axis=1)
     if not args.onnx:
+        print("xc", xc.shape)
+
+        start = int(round(time.time() * 1000))
         output = diffusion_model.predict([xc, t])
+        end = int(round(time.time() * 1000))
+        estimation_time = (end - start)
+        logger.info(f'\tailia processing estimation time {estimation_time} ms')
     else:
         output = diffusion_model.run(None, {'xc': xc, 't': t})
     x_recon = output[0]
+    print("x_recon", x_recon.shape)
 
     return x_recon
 
@@ -218,26 +225,39 @@ def decode_first_stage(models, z):
     z = z / scale_factor
 
     autoencoder = models['autoencoder']
+    print("z", z.shape)
     if not args.onnx:
+        start = int(round(time.time() * 1000))
         output = autoencoder.predict([z])
+        end = int(round(time.time() * 1000))
+        estimation_time = (end - start)
+        logger.info(f'\tailia processing estimation time {estimation_time} ms')
     else:
         output = autoencoder.run(None, {'z': z})
     dec = output[0]
+    print("dec", dec.shape)
 
     return dec
 
 
 def predict(models, img, mask):
     img = img[:, :, ::-1]  # BGR -> RGB
+    print("Img", img.shape)
     _mask = mask
     img, mask, masked_image = preprocess(img, mask)
 
     cond_stage_model = models['cond_stage_model']
     if not args.onnx:
+        print("masked_image", masked_image.shape)
+        start = int(round(time.time() * 1000))
         output = cond_stage_model.predict([masked_image])
+        end = int(round(time.time() * 1000))
+        estimation_time = (end - start)
+        logger.info(f'\tailia processing estimation time {estimation_time} ms')
     else:
         output = cond_stage_model.run(None, {'masked_image': masked_image})
     c = output[0]
+    print("c", c.shape)
 
     cc = cv2.resize(_mask, c.shape[-2:])
     cc = np.where(cc < 128, -1, 1)

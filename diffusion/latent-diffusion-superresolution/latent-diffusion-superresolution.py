@@ -223,16 +223,23 @@ def decode_first_stage(models, z):
 
     first_stage_decode = models['first_stage_decode']
     outputs = []
+    print("first stage ",z.shape[-1])
     for i in range(z.shape[-1]):
         x = z[:, :, :, :, i]
         if not args.onnx:
+            print(x.shape)
+            start = int(round(time.time() * 1000))
             output = first_stage_decode.predict([x])
+            end = int(round(time.time() * 1000))
+            estimation_time = (end - start)
+            logger.info(f'\tailia processing estimation time {estimation_time} ms')
         else:
             output = first_stage_decode.run(None, {'x': x})
         outputs.append(output[0])
 
     o = np.stack(outputs, axis=-1)  # # (bn, nc, ks[0], ks[1], L)
     o = o * weighting
+    print(o.shape)
 
     # Reverse reshape to img shape
     o = o.reshape((o.shape[0], -1, o.shape[-1]))  # (bn, nc * ks[0] * ks[1], L)
@@ -252,9 +259,14 @@ def apply_model(models, x_noisy, t, cond):
 
     bs, nc, h, w = x_noisy.shape
 
+    print("x_noisy", x_noisy.shape)
+
     fold, unfold, weighting = get_fold_unfold(x_noisy, ks, stride)
 
     z, o_shape, _ = unfold(x_noisy)  # (bn, nc * prod(**ks), L)
+
+    print("unfold", z.shape)
+
     # Reshape to img shape
     z = z.reshape((bs, -1, ks[0], ks[1], z.shape[-1]))  # (bn, nc, ks[0], ks[1], L )
     z_list = [z[:, :, :, :, i] for i in range(z.shape[-1])]
@@ -266,19 +278,26 @@ def apply_model(models, x_noisy, t, cond):
     # apply model by loop over crops
     diffusion_model = models["diffusion_model"]
     outputs = []
+    print("apply_model", z.shape[-1])
     for i in range(z.shape[-1]):
         x = z_list[i]
         cond = cond_list[i]
         xc = np.concatenate([x, cond], axis=1)
         xc = xc.astype(np.float32)
         if not args.onnx:
+            print(x.shape)
+            start = int(round(time.time() * 1000))
             output = diffusion_model.predict([xc, t])
+            end = int(round(time.time() * 1000))
+            estimation_time = (end - start)
+            logger.info(f'\tailia processing estimation time {estimation_time} ms')
         else:
             output = diffusion_model.run(None, {'xc': xc, 't': t})
         outputs.append(output[0])
 
     o = np.stack(outputs, axis=-1)
     o = o * weighting
+    print(o.shape)
 
     # Reverse reshape to img shape
     o = o.reshape((o.shape[0], -1, o.shape[-1]))  # (bn, nc * ks[0] * ks[1], L)
@@ -293,6 +312,8 @@ def predict(models, img):
     img = img[:, :, ::-1]  # BGR -> RGB
 
     _, c = preprocess(img)
+
+    print(c.shape)
 
     samples = ddim_sampling(models, c)
 
