@@ -205,6 +205,8 @@ def plms_sampling(
     if args.benchmark:
         logger.info('BENCHMARK mode')
         total_time_estimation = 0
+    
+    print("total_steps", total_steps)
 
     for i, step in enumerate(iterator):
         index = total_steps - i - 1
@@ -312,6 +314,7 @@ def ddim_sampling(
     timesteps = ddim_timesteps
     time_range = np.flip(timesteps)
     total_steps = timesteps.shape[0]
+    print("total_steps", total_steps)
 
     logger.info(f"Running DDIM Sampling with {total_steps} timesteps")
 
@@ -387,15 +390,22 @@ def apply_model(models, x, t, cc, update_context):
 
     x = x.astype(np.float16)
     if not args.onnx:
+        start = int(round(time.time() * 1000))
+        print("x", x.shape, "t", t.shape, "cc", cc.shape)
         if not FIX_CONSTANT_CONTEXT or update_context:
             output = diffusion_emb.predict([x, t, cc])
         else:
             output = diffusion_emb.run({'x': x, 'timesteps': t})
+        end = int(round(time.time() * 1000))
+        estimation_time = (end - start)
+        logger.info(f'\tailia processing estimation time {estimation_time} ms')
     else:
         output = diffusion_emb.run(None, {'x': x, 'timesteps': t, 'context': cc})
     h, emb, *hs = output
-
+    print("h", h.shape, "emb", emb.shape)
+    
     if not args.onnx:
+        start = int(round(time.time() * 1000))
         if not FIX_CONSTANT_CONTEXT or update_context:
             output = diffusion_mid.predict([h, emb, cc, *hs[6:]])
         else:
@@ -404,6 +414,9 @@ def apply_model(models, x, t, cc, update_context):
                 'h6': hs[6], 'h7': hs[7], 'h8': hs[8],
                 'h9': hs[9], 'h10': hs[10], 'h11': hs[11],
             })
+        end = int(round(time.time() * 1000))
+        estimation_time = (end - start)
+        logger.info(f'\tailia processing estimation time {estimation_time} ms')
     else:
         output = diffusion_mid.run(None, {
             'h': h, 'emb': emb, 'context': cc,
@@ -411,8 +424,10 @@ def apply_model(models, x, t, cc, update_context):
             'h9': hs[9], 'h10': hs[10], 'h11': hs[11],
         })
     h = output[0]
-
+    print("h", h.shape)
+    
     if not args.onnx:
+        start = int(round(time.time() * 1000))
         if not FIX_CONSTANT_CONTEXT or update_context:
             output = diffusion_out.predict([h, emb, cc, *hs[:6]])
         else:
@@ -421,6 +436,9 @@ def apply_model(models, x, t, cc, update_context):
                 'h0': hs[0], 'h1': hs[1], 'h2': hs[2],
                 'h3': hs[3], 'h4': hs[4], 'h5': hs[5],
             })
+        end = int(round(time.time() * 1000))
+        estimation_time = (end - start)
+        logger.info(f'\tailia processing estimation time {estimation_time} ms')
     else:
         output = diffusion_out.run(None, {
             'h': h, 'emb': emb, 'context': cc,
@@ -428,7 +446,8 @@ def apply_model(models, x, t, cc, update_context):
             'h3': hs[3], 'h4': hs[4], 'h5': hs[5],
         })
     out = output[0]
-
+    print("out", out.shape)
+    
     return out
 
 
@@ -438,12 +457,22 @@ def decode_first_stage(models, z):
     z = z / scale_factor
     z = z.astype(np.float32)
 
+    start = int(round(time.time() * 1000))
+
+    print("z", z.shape)
+
     autoencoder = models['autoencoder']
     if not args.onnx:
         output = autoencoder.predict([z])
     else:
         output = autoencoder.run(None, {'input': z})
     dec = output[0]
+
+    print("dec", dec.shape)
+
+    end = int(round(time.time() * 1000))
+    estimation_time = (end - start)
+    logger.info(f'\tailia processing estimation time {estimation_time} ms')
 
     return dec
 
@@ -461,7 +490,7 @@ def predict(
     c = cond_stage_model.encode([prompt] * n_samples)
     shape = [n_samples, C, H // factor, W // factor]
 
-    plms = True
+    plms = False
     if plms:
         samples_ddim = plms_sampling(
             models, c, shape,
