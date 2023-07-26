@@ -142,7 +142,15 @@ def vc(
 
     # feedforward
     if not args.onnx:
-        output = hubert.predict([feats, padding_mask])
+        print("predict")
+        print(feats.shape)
+        print(padding_mask.shape)
+        for i in range(2):
+            start = int(round(time.time() * 1000))
+            output = hubert.predict([feats, padding_mask])
+            end = int(round(time.time() * 1000))
+            logger.info(f'\thubert processing time {end - start} ms')
+        print(output[0].shape)
     else:
         output = hubert.run(None, {'source': feats, 'padding_mask': padding_mask})
     feats = output[0]
@@ -174,7 +182,17 @@ def vc(
     # feedforward
     rnd = np.random.randn(1, 192, p_len[0]).astype(np.float32) * 0.66666  # 噪声（加入随机因子）
     if not args.onnx:
-        output = net_g.predict([feats, p_len, sid, rnd])
+        print("predict")
+        print(feats.shape)
+        print(p_len.shape)
+        print(sid.shape)
+        print(rnd.shape)
+        for i in range(2):
+            start = int(round(time.time() * 1000))
+            output = net_g.predict([feats, p_len, sid, rnd])
+            end = int(round(time.time() * 1000))
+            logger.info(f'\tvc processing time {end - start} ms')
+        print(output[0].shape)
     else:
         output = net_g.run(None, {
             'phone': feats, 'phone_lengths': p_len, 'ds': sid, 'rnd': rnd
@@ -306,6 +324,8 @@ def main():
     if not args.onnx:
         hubert = ailia.Net(MODEL_HUBERT_PATH, WEIGHT_HUBERT_PATH, env_id=env_id)
         net_g = ailia.Net(MODEL_AISO_HOWATTO_PATH, WEIGHT_AISO_HOWATTO_PATH, env_id=env_id)
+        hubert.set_profile_mode(True)
+        net_g.set_profile_mode(True)
     else:
         import onnxruntime
         providers = ["CPUExecutionProvider", "CUDAExecutionProvider"]
@@ -318,6 +338,9 @@ def main():
     }
 
     recognize_from_audio(models)
+
+    print(hubert.get_summary())
+    print(net_g.get_summary())
 
 
 if __name__ == '__main__':
