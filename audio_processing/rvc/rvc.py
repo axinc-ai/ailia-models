@@ -320,6 +320,9 @@ def recognize_from_audio(models):
 def main():
     env_id = args.env_id
 
+    check_and_download_models(WEIGHT_HUBERT_PATH, MODEL_HUBERT_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_AISO_HOWATTO_PATH, MODEL_AISO_HOWATTO_PATH, REMOTE_PATH)
+
     # initialize
     if not args.onnx:
         hubert = ailia.Net(MODEL_HUBERT_PATH, WEIGHT_HUBERT_PATH, env_id=env_id)
