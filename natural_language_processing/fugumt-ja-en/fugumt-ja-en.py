@@ -184,7 +184,7 @@ class MarianMT:
                 past_key_values,
             )
         except Exception:
-            # HACK: If all past_key_values is not returned, there will be an exception, so retry without using the cache.
+            # HACK: If all past_key_values is not returned, there will be an exception, so retry without cache.
             decoder_output = _decode_without_cache(
                 self,
                 attention_mask,
