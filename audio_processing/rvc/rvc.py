@@ -140,19 +140,49 @@ def vc(
     feats = audio0.reshape(1, -1).astype(np.float32)
     padding_mask = np.zeros(feats.shape, dtype=bool)
 
+    rms1 = librosa.feature.rms(
+        y=audio0, frame_length=16000 // 2 * 2, hop_length=16000 // 2
+    )  # 每半秒一个点
+
+    import math
+    rms2 = []
+    i = 0
+    while i < len(audio0):
+        sum = 0
+        for j in range(16000 // 2 * 2):
+            if i + j - 16000 // 2 >= 0 and i + j - 16000 // 2 < len(audio0):
+                sum = sum + audio0[i + j - 16000 // 2] * audio0[i + j - 16000 // 2]
+        i = i + 16000 //2
+        rms2.append(math.sqrt(sum / (16000 // 2 * 2)))
+
+    print("rms1", rms1)
+    print("recalc rms1", rms2)
+
+
     # feedforward
     if not args.onnx:
         print("predict")
-        print(feats.shape)
-        print(padding_mask.shape)
-        for i in range(2):
+        print("hubert input", feats.shape)
+        print("hubert padding_mask", padding_mask.shape)
+        for i in range(1):
             start = int(round(time.time() * 1000))
             output = hubert.predict([feats, padding_mask])
+            #for i in range(0,hubert.get_blob_count()):
+            #    try:
+            #        name = hubert.get_blob_name(i)
+            #        shape = hubert.get_blob_shape(i)
+            #        data = hubert.get_blob_data(i)
+            #        print("Idx", i, name, shape, data)
+            #    except:
+            #        continue
             end = int(round(time.time() * 1000))
             logger.info(f'\thubert processing time {end - start} ms')
-        print(output[0].shape)
+        print("hubert output",output[0].shape)
     else:
+        print("hubert input", feats.shape)
+        print("hubert padding_mask", padding_mask.shape)
         output = hubert.run(None, {'source': feats, 'padding_mask': padding_mask})
+        print("hubert output",output[0].shape)
     feats = output[0]
 
     if isinstance(index, type(None)) is False \
@@ -171,8 +201,22 @@ def vc(
         )
 
     feats = torch.from_numpy(feats)
-    feats = F.interpolate(feats.permute(0, 2, 1), scale_factor=2).permute(0, 2, 1)
-    feats = feats.numpy()
+    print("interpolate in", feats.shape)
+    # old way
+    interp_feats = F.interpolate(feats.permute(0, 2, 1), scale_factor=2).permute(0, 2, 1)
+    interp_feats = interp_feats.numpy()
+    #feats = interp_feats
+
+    # new way
+    new_feats = np.zeros((feats.shape[0], feats.shape[1]*2, feats.shape[2]))
+    for i in range(feats.shape[1]):
+        new_feats[:,i*2+0,:] = feats[:,i,:]
+        new_feats[:,i*2+1,:] = feats[:,i,:]
+    feats = new_feats
+    print("diff", (interp_feats - feats).mean())
+
+    # shape
+    print("interpolate out", feats.shape)
 
     p_len = audio0.shape[0] // vc_param.window
     if feats.shape[1] < p_len:
@@ -183,16 +227,16 @@ def vc(
     rnd = np.random.randn(1, 192, p_len[0]).astype(np.float32) * 0.66666  # 噪声（加入随机因子）
     if not args.onnx:
         print("predict")
-        print(feats.shape)
-        print(p_len.shape)
-        print(sid.shape)
-        print(rnd.shape)
-        for i in range(2):
+        print("feats", feats.shape)
+        print("p_len", p_len.shape, p_len)
+        print("sid", sid.shape, sid)
+        print("rnd", rnd.shape)
+        for i in range(1):
             start = int(round(time.time() * 1000))
             output = net_g.predict([feats, p_len, sid, rnd])
             end = int(round(time.time() * 1000))
             logger.info(f'\tvc processing time {end - start} ms')
-        print(output[0].shape)
+        print("output", output[0].shape)
     else:
         output = net_g.run(None, {
             'phone': feats, 'phone_lengths': p_len, 'ds': sid, 'rnd': rnd
@@ -206,6 +250,8 @@ bh, ah = signal.butter(N=5, Wn=48, btype="high", fs=16000)
 
 
 def predict(audio, models, tgt_sr):
+    audio = np.pad(audio, (0, 7), mode="reflect")
+
     audio_max = np.abs(audio).max() / 0.95
     if audio_max > 1:
         audio /= audio_max
@@ -218,7 +264,12 @@ def predict(audio, models, tgt_sr):
     vc_param = VCParam(tgt_sr)
 
     index = big_npy = None
-    audio = signal.filtfilt(bh, ah, audio)
+    #audio = signal.filtfilt(bh, ah, audio)
+    print("vc_param.window", vc_param.window)
+    print("vc_param.t_max", vc_param.t_max)
+    print("vc_param.t_pad", vc_param.t_pad)
+    print("vc_param.t_pad2", vc_param.t_pad2)
+    print("vc_param.t_pad_tgt", vc_param.t_pad_tgt)
     audio_pad = np.pad(audio, (vc_param.window // 2, vc_param.window // 2), mode="reflect")
 
     opt_ts = []
@@ -238,7 +289,10 @@ def predict(audio, models, tgt_sr):
     s = 0
     audio_opt = []
     t = None
+    print("opt_ts", opt_ts)
+    print("audio shape", audio.shape)
     audio_pad = np.pad(audio, (vc_param.t_pad, vc_param.t_pad), mode="reflect")
+    print("audio_pad shape", audio_pad.shape)
 
     sid = np.array([sid], dtype=int)
     for t in opt_ts:
@@ -325,8 +379,8 @@ def main():
 
     # initialize
     if not args.onnx:
-        hubert = ailia.Net(MODEL_HUBERT_PATH, WEIGHT_HUBERT_PATH, env_id=env_id)
-        net_g = ailia.Net(MODEL_AISO_HOWATTO_PATH, WEIGHT_AISO_HOWATTO_PATH, env_id=env_id)
+        hubert = ailia.Net(MODEL_HUBERT_PATH, WEIGHT_HUBERT_PATH, env_id=env_id)#, memory_mode=11)
+        net_g = ailia.Net(MODEL_AISO_HOWATTO_PATH, WEIGHT_AISO_HOWATTO_PATH, env_id=env_id)#, memory_mode=11)
         hubert.set_profile_mode(True)
         net_g.set_profile_mode(True)
     else:
@@ -342,8 +396,8 @@ def main():
 
     recognize_from_audio(models)
 
-    print(hubert.get_summary())
-    print(net_g.get_summary())
+    #print(hubert.get_summary())
+    #print(net_g.get_summary())
 
 
 if __name__ == '__main__':
