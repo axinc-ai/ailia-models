@@ -14,7 +14,6 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
-from math_utils import softmax
 from microphone_utils import start_microphone_input  # noqa
 from model_utils import check_and_download_models  # noqa
 from arg_utils import get_base_parser, get_savepath, update_parser  # noqa
@@ -42,20 +41,42 @@ parser = get_base_parser(
     'Retrieval-based-Voice-Conversion', WAV_PATH, SAVE_TEXT_PATH, input_ftype='audio'
 )
 parser.add_argument(
+    '--tgt_sr', metavar="SR", type=int, default=40000,
+    help='VC model sampling rate.',
+)
+parser.add_argument(
+    '--f0', type=int, default=0, choices=(0, 1),
+    help='f0 flag of VC model.',
+)
+parser.add_argument(
     '--sid', type=int, default=0,
     help='Select Speaker/Singer ID',
 )
 parser.add_argument(
-    '--index_rate', type=float, default=0.75,
+    '--vc_transform', metavar="N", type=int, default=0,
+    help='Transpose (number of semitones, raise by an octave: 12, lower by an octave: -12)',
+)
+parser.add_argument(
+    '--f0_method', default="pm", choices=("pm",),
+    help='Select the pitch extraction algorithm',
+)
+parser.add_argument(
+    '--index_rate', metavar="RATIO", type=float, default=0.75,
     help='Search feature ratio. (controls accent strength, too high has artifacting)',
 )
 parser.add_argument(
-    '--resample_sr', type=int, default=0,
+    '--resample_sr', metavar="SR", type=int, default=0,
     help='Resample the output audio. Set to 0 for no resampling.',
 )
 parser.add_argument(
-    '--rms_mix_rate', type=float, default=0.25,
+    '--rms_mix_rate', metavar="RATE", type=float, default=0.25,
     help='Adjust the volume envelope scaling.',
+)
+parser.add_argument(
+    '--protect', metavar="N", type=float, default=0.33,
+    help='Protect voiceless consonants and breath sounds'
+         ' to prevent artifacts such as tearing in electronic music.'
+         ' Set to 0.5 to disable',
 )
 parser.add_argument(
     '-V', action='store_true',
@@ -128,15 +149,77 @@ def change_rms(data1, sr1, data2, sr2, rate):  # 1是输入音频，2是输出�
 # Main functions
 # ======================
 
+
+def get_f0(
+        vc_param,
+        x,
+        p_len,
+        f0_up_key,
+        f0_method,
+        inp_f0=None):
+    time_step = vc_param.window / vc_param.sr * 1000
+    f0_min = 50
+    f0_max = 1100
+    f0_mel_min = 1127 * np.log(1 + f0_min / 700)
+    f0_mel_max = 1127 * np.log(1 + f0_max / 700)
+
+    if f0_method == "pm":
+        import parselmouth
+
+        f0 = (
+            parselmouth.Sound(x, vc_param.sr).to_pitch_ac(
+                time_step=time_step / 1000,
+                voicing_threshold=0.6,
+                pitch_floor=f0_min,
+                pitch_ceiling=f0_max,
+            ).selected_array["frequency"]
+        )
+        pad_size = (p_len - len(f0) + 1) // 2
+        if pad_size > 0 or p_len - len(f0) - pad_size > 0:
+            f0 = np.pad(
+                f0, [[pad_size, p_len - len(f0) - pad_size]], mode="constant"
+            )
+    else:
+        raise ValueError("f0_method: %s" % f0_method)
+
+    f0 *= pow(2, f0_up_key / 12)
+
+    tf0 = vc_param.sr // vc_param.window  # 每秒f0点数
+    if inp_f0 is not None:
+        delta_t = np.round(
+            (inp_f0[:, 0].max() - inp_f0[:, 0].min()) * tf0 + 1
+        ).astype("int16")
+        replace_f0 = np.interp(
+            list(range(delta_t)), inp_f0[:, 0] * 100, inp_f0[:, 1]
+        )
+        shape = f0[vc_param.x_pad * tf0: vc_param.x_pad * tf0 + len(replace_f0)].shape[0]
+        f0[vc_param.x_pad * tf0: vc_param.x_pad * tf0 + len(replace_f0)] = \
+            replace_f0[:shape]
+
+    f0bak = f0.copy()
+    f0_mel = 1127 * np.log(1 + f0 / 700)
+    f0_mel[f0_mel > 0] = \
+        (f0_mel[f0_mel > 0] - f0_mel_min) * 254 \
+        / (f0_mel_max - f0_mel_min) + 1
+    f0_mel[f0_mel <= 1] = 1
+    f0_mel[f0_mel > 255] = 255
+    f0_coarse = np.rint(f0_mel).astype(int)
+
+    return f0_coarse, f0bak  # 1-0
+
+
 def vc(
         hubert,
         net_g,
         sid,
         audio0,
+        pitch,
+        pitchf,
         vc_param,
         index,
         big_npy,
-        index_rate):
+        index_rate,
+        protect):
     feats = audio0.reshape(1, -1).astype(np.float32)
     padding_mask = np.zeros(feats.shape, dtype=bool)
 
@@ -146,6 +229,9 @@ def vc(
     else:
         output = hubert.run(None, {'source': feats, 'padding_mask': padding_mask})
     feats = output[0]
+
+    if protect < 0.5 and pitch is not None and pitchf is not None:
+        feats0 = np.copy(feats)
 
     if isinstance(index, type(None)) is False \
             and isinstance(big_npy, type(None)) is False \
@@ -165,20 +251,47 @@ def vc(
     feats = torch.from_numpy(feats)
     feats = F.interpolate(feats.permute(0, 2, 1), scale_factor=2).permute(0, 2, 1)
     feats = feats.numpy()
+    if protect < 0.5 and pitch is not None and pitchf is not None:
+        feats0 = torch.from_numpy(feats0)
+        feats0 = F.interpolate(feats0.permute(0, 2, 1), scale_factor=2).permute(
+            0, 2, 1
+        )
+        feats0 = feats0.numpy()
 
     p_len = audio0.shape[0] // vc_param.window
     if feats.shape[1] < p_len:
         p_len = feats.shape[1]
+        if pitch is not None and pitchf is not None:
+            pitch = pitch[:, :p_len]
+            pitchf = pitchf[:, :p_len]
+
+    if protect < 0.5 and pitch is not None and pitchf is not None:
+        pitchff = np.copy(pitchf)
+        pitchff[pitchf > 0] = 1
+        pitchff[pitchf < 1] = protect
+        pitchff = np.expand_dims(pitchff, axis=-1)
+        feats = feats * pitchff + feats0 * (1 - pitchff)
+
     p_len = np.array([p_len], dtype=int)
 
     # feedforward
     rnd = np.random.randn(1, 192, p_len[0]).astype(np.float32) * 0.66666  # 噪声（加入随机因子）
-    if not args.onnx:
-        output = net_g.predict([feats, p_len, sid, rnd])
+    if pitch is not None and pitchf is not None:
+        if not args.onnx:
+            output = net_g.predict([feats, p_len, pitch, pitchf, sid, rnd])
+        else:
+            output = net_g.run(None, {
+                'phone': feats, 'phone_lengths': p_len,
+                'pitch': pitch, 'pitchf': pitchf,
+                'ds': sid, 'rnd': rnd
+            })
     else:
-        output = net_g.run(None, {
-            'phone': feats, 'phone_lengths': p_len, 'ds': sid, 'rnd': rnd
-        })
+        if not args.onnx:
+            output = net_g.predict([feats, p_len, sid, rnd])
+        else:
+            output = net_g.run(None, {
+                'phone': feats, 'phone_lengths': p_len, 'ds': sid, 'rnd': rnd
+            })
     audio1 = output[0][0, 0]
 
     return audio1
@@ -187,7 +300,7 @@ def vc(
 bh, ah = signal.butter(N=5, Wn=48, btype="high", fs=16000)
 
 
-def predict(audio, models, tgt_sr):
+def predict(audio, models, tgt_sr=40000, if_f0=0):
     audio_max = np.abs(audio).max() / 0.95
     if audio_max > 1:
         audio /= audio_max
@@ -196,6 +309,10 @@ def predict(audio, models, tgt_sr):
     index_rate = args.index_rate
     resample_sr = args.resample_sr
     rms_mix_rate = args.rms_mix_rate
+    protect = args.protect
+    f0_up_key = args.vc_transform
+    f0_method = args.f0_method
+    inp_f0 = None
 
     vc_param = VCParam(tgt_sr)
 
@@ -221,6 +338,23 @@ def predict(audio, models, tgt_sr):
     audio_opt = []
     t = None
     audio_pad = np.pad(audio, (vc_param.t_pad, vc_param.t_pad), mode="reflect")
+    p_len = audio_pad.shape[0] // vc_param.window
+
+    pitch, pitchf = None, None
+    if if_f0 == 1:
+        pitch, pitchf = get_f0(
+            vc_param,
+            audio_pad,
+            p_len,
+            f0_up_key,
+            f0_method,
+            inp_f0,
+        )
+        pitch = pitch[:p_len]
+        pitchf = pitchf[:p_len]
+        pitch = np.expand_dims(pitch, axis=0)
+        pitchf = np.expand_dims(pitchf, axis=0)
+        pitchf = pitchf.astype(np.float32)
 
     sid = np.array([sid], dtype=int)
     for t in opt_ts:
@@ -230,10 +364,15 @@ def predict(audio, models, tgt_sr):
             models["net_g"],
             sid,
             audio_pad[s: t + vc_param.t_pad2 + vc_param.window],
+            pitch[:, s // vc_param.window: (t + vc_param.t_pad2) // vc_param.window]
+            if if_f0 == 1 else None,
+            pitchf[:, s // vc_param.window: (t + vc_param.t_pad2) // vc_param.window]
+            if if_f0 == 1 else None,
             vc_param,
             index,
             big_npy,
             index_rate,
+            protect,
         )
         audio_opt.append(audio1[vc_param.t_pad_tgt: -vc_param.t_pad_tgt])
         s = t
@@ -242,10 +381,15 @@ def predict(audio, models, tgt_sr):
         models["net_g"],
         sid,
         audio_pad[t:],
+        (pitch[:, t // vc_param.window:] if t is not None else pitch)
+        if if_f0 == 1 else None,
+        (pitchf[:, t // vc_param.window:] if t is not None else pitchf)
+        if if_f0 == 1 else None,
         vc_param,
         index,
         big_npy,
         index_rate,
+        protect,
     )
     audio_opt.append(audio1[vc_param.t_pad_tgt: -vc_param.t_pad_tgt])
     audio_opt = np.concatenate(audio_opt)
@@ -270,7 +414,8 @@ def predict(audio, models, tgt_sr):
 
 def recognize_from_audio(models):
     # Depend on voice model
-    tgt_sr = 40000
+    tgt_sr = args.tgt_sr
+    if_f0 = args.f0
 
     # input audio loop
     for audio_path in args.input:
@@ -284,12 +429,12 @@ def recognize_from_audio(models):
         if args.benchmark:
             logger.info('BENCHMARK mode')
             start = int(round(time.time() * 1000))
-            output, sr = predict(audio, models, tgt_sr)
+            output, sr = predict(audio, models, tgt_sr, if_f0)
             end = int(round(time.time() * 1000))
             estimation_time = (end - start)
             logger.info(f'\ttotal processing time {estimation_time} ms')
         else:
-            output, sr = predict(audio, models, tgt_sr)
+            output, sr = predict(audio, models, tgt_sr, if_f0)
 
         # save result
         savepath = get_savepath(args.savepath, audio_path, ext='.wav')
