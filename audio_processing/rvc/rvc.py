@@ -6,7 +6,6 @@ import numpy as np
 import scipy.signal as signal
 import torch
 import torch.nn.functional as F
-import ffmpeg
 import librosa
 import soundfile as sf
 
@@ -17,6 +16,11 @@ sys.path.append('../../util')
 from microphone_utils import start_microphone_input  # noqa
 from model_utils import check_and_download_models  # noqa
 from arg_utils import get_base_parser, get_savepath, update_parser  # noqa
+
+flg_ffmpeg = False
+
+if flg_ffmpeg:
+    import ffmpeg
 
 logger = getLogger(__name__)
 
@@ -29,6 +33,8 @@ MODEL_HUBERT_PATH = "hubert_base.onnx.prototxt"
 WEIGHT_AISO_HOWATTO_PATH = "AISO-HOWATTO.onnx"
 MODEL_AISO_HOWATTO_PATH = "AISO-HOWATTO.onnx.prototxt"
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/rvc/'
+
+SAMPLE_RATE = 16000
 
 WAV_PATH = 'demo.wav'
 SAVE_TEXT_PATH = 'output.txt'
@@ -109,18 +115,25 @@ class VCParam(object):
 # Secondaty Functions
 # ======================
 
-def load_audio(file, sr):
-    try:
+
+def load_audio(file: str, sr: int = SAMPLE_RATE):
+    if flg_ffmpeg:
         # https://github.com/openai/whisper/blob/main/whisper/audio.py#L26
         # This launches a subprocess to decode audio while down-mixing and resampling as necessary.
         # Requires the ffmpeg CLI and `ffmpeg-python` package to be installed.
         out, _ = ffmpeg.input(file, threads=0) \
             .output("-", format="f32le", acodec="pcm_f32le", ac=1, ar=sr) \
             .run(cmd=["ffmpeg", "-nostdin"], capture_stdout=True, capture_stderr=True)
-    except Exception as e:
-        raise RuntimeError(f"Failed to load audio: {e}")
 
-    return np.frombuffer(out, np.float32).flatten()
+        audio = np.frombuffer(out, np.float32).flatten()
+    else:
+        # prepare input data
+        audio, source_sr = librosa.load(file, sr=None)
+        # Resample the wav if needed
+        if source_sr is not None and source_sr != sr:
+            audio = librosa.resample(audio, orig_sr=source_sr, target_sr=sr)
+
+    return audio
 
 
 def change_rms(data1, sr1, data2, sr2, rate):  # 1是输入音频，2是输出音频,rate是2的占比
@@ -422,7 +435,7 @@ def recognize_from_audio(models):
         logger.info(audio_path)
 
         # prepare input data
-        audio = load_audio(audio_path, 16000)
+        audio = load_audio(audio_path, SAMPLE_RATE)
 
         # inference
         logger.info('Start inference...')
