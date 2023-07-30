@@ -4,8 +4,7 @@ from logging import getLogger
 
 import numpy as np
 import scipy.signal as signal
-import torch
-import torch.nn.functional as F
+from PIL import Image
 import librosa
 import soundfile as sf
 
@@ -141,19 +140,16 @@ def change_rms(data1, sr1, data2, sr2, rate):  # 1是输入音频，2是输出�
         y=data1, frame_length=sr1 // 2 * 2, hop_length=sr1 // 2
     )  # 每半秒一个点
     rms2 = librosa.feature.rms(y=data2, frame_length=sr2 // 2 * 2, hop_length=sr2 // 2)
-    rms1 = torch.from_numpy(rms1)
-    rms1 = F.interpolate(
-        rms1.unsqueeze(0), size=data2.shape[0], mode="linear"
-    ).squeeze()
-    rms2 = torch.from_numpy(rms2)
-    rms2 = F.interpolate(
-        rms2.unsqueeze(0), size=data2.shape[0], mode="linear"
-    ).squeeze()
-    rms2 = torch.max(rms2, torch.zeros_like(rms2) + 1e-6)
-    data2 *= (
-            torch.pow(rms1, torch.tensor(1 - rate))
-            * torch.pow(rms2, torch.tensor(rate - 1))
-    ).numpy()
+
+    rms1 = np.array(Image.fromarray(rms1).resize((data2.shape[0], 1), Image.Resampling.BILINEAR))
+    rms1 = rms1.flatten()
+    rms2 = np.array(Image.fromarray(rms2).resize((data2.shape[0], 1), Image.Resampling.BILINEAR))
+    rms2 = rms2.flatten()
+
+    r = np.zeros(rms2.shape) + 1e-6
+    rms2 = np.where(rms2 > r, rms2, r)
+
+    data2 *= np.power(rms1, 1 - rate) * np.power(rms2, rate - 1)
 
     return data2
 
@@ -261,15 +257,20 @@ def vc(
                 + (1 - index_rate) * feats
         )
 
-    feats = torch.from_numpy(feats)
-    feats = F.interpolate(feats.permute(0, 2, 1), scale_factor=2).permute(0, 2, 1)
-    feats = feats.numpy()
+    # interpolate
+    new_feats = np.zeros((feats.shape[0], feats.shape[1] * 2, feats.shape[2]), dtype=np.float32)
+    for i in range(feats.shape[1]):
+        new_feats[:, i * 2 + 0, :] = feats[:, i, :]
+        new_feats[:, i * 2 + 1, :] = feats[:, i, :]
+    feats = new_feats
+
     if protect < 0.5 and pitch is not None and pitchf is not None:
-        feats0 = torch.from_numpy(feats0)
-        feats0 = F.interpolate(feats0.permute(0, 2, 1), scale_factor=2).permute(
-            0, 2, 1
-        )
-        feats0 = feats0.numpy()
+        # interpolate
+        new_feats = np.zeros((feats0.shape[0], feats0.shape[1] * 2, feats0.shape[2]), dtype=np.float32)
+        for i in range(feats0.shape[1]):
+            new_feats[:, i * 2 + 0, :] = feats0[:, i, :]
+            new_feats[:, i * 2 + 1, :] = feats0[:, i, :]
+        feats0 = new_feats
 
     p_len = audio0.shape[0] // vc_param.window
     if feats.shape[1] < p_len:
