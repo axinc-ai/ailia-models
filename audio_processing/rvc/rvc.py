@@ -29,8 +29,8 @@ logger = getLogger(__name__)
 
 WEIGHT_HUBERT_PATH = "hubert_base.onnx"
 MODEL_HUBERT_PATH = "hubert_base.onnx.prototxt"
-WEIGHT_AISO_HOWATTO_PATH = "AISO-HOWATTO.onnx"
-MODEL_AISO_HOWATTO_PATH = "AISO-HOWATTO.onnx.prototxt"
+WEIGHT_VC_PATH = "AISO-HOWATTO.onnx"
+MODEL_VC_PATH = "AISO-HOWATTO.onnx.prototxt"
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/rvc/'
 
 SAMPLE_RATE = 16000
@@ -84,8 +84,8 @@ parser.add_argument(
          ' Set to 0.5 to disable',
 )
 parser.add_argument(
-    '-V', action='store_true',
-    help='use microphone input',
+    '-m', '--model_file', default=WEIGHT_VC_PATH,
+    help='specify .onnx file'
 )
 parser.add_argument(
     '--onnx',
@@ -459,17 +459,22 @@ def recognize_from_audio(models):
 
 
 def main():
+    WEIGHT_VC_PATH = args.model_file
+    MODEL_VC_PATH = WEIGHT_VC_PATH.replace(".onnx", ".onnx.prototxt")
+    check_and_download_models(WEIGHT_HUBERT_PATH, MODEL_HUBERT_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_VC_PATH, MODEL_VC_PATH, REMOTE_PATH)
+
     env_id = args.env_id
 
     # initialize
     if not args.onnx:
         hubert = ailia.Net(MODEL_HUBERT_PATH, WEIGHT_HUBERT_PATH, env_id=env_id)
-        net_g = ailia.Net(MODEL_AISO_HOWATTO_PATH, WEIGHT_AISO_HOWATTO_PATH, env_id=env_id)
+        net_g = ailia.Net(MODEL_VC_PATH, WEIGHT_VC_PATH, env_id=env_id)
     else:
         import onnxruntime
         providers = ["CPUExecutionProvider", "CUDAExecutionProvider"]
         hubert = onnxruntime.InferenceSession(WEIGHT_HUBERT_PATH, providers=providers)
-        net_g = onnxruntime.InferenceSession(WEIGHT_AISO_HOWATTO_PATH, providers=providers)
+        net_g = onnxruntime.InferenceSession(WEIGHT_VC_PATH, providers=providers)
 
     models = {
         "hubert": hubert,
