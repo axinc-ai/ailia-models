@@ -4,11 +4,14 @@
 
 Audio file
 
+https://github.com/axinc-ai/ailia-models/assets/29946532/689bba85-b894-4645-bd2a-8abf928733db
 (Audio from https://github.com/ohashi3399/RVC-demo)
 
 ## Output
 
 Audio file
+
+https://github.com/axinc-ai/ailia-models/assets/29946532/5c036243-a93b-4627-acf0-90bdb911daee
 
 ## Requirements
 
