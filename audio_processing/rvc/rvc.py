@@ -35,15 +35,15 @@ REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/rvc/'
 
 SAMPLE_RATE = 16000
 
-WAV_PATH = 'demo.wav'
-SAVE_TEXT_PATH = 'output.txt'
+WAV_PATH = 'booth.wav'
+SAVE_WAV_PATH = 'output.wav'
 
 # ======================
 # Arguemnt Parser Config
 # ======================
 
 parser = get_base_parser(
-    'Retrieval-based-Voice-Conversion', WAV_PATH, SAVE_TEXT_PATH, input_ftype='audio'
+    'Retrieval-based-Voice-Conversion', WAV_PATH, SAVE_WAV_PATH, input_ftype='audio'
 )
 parser.add_argument(
     '--tgt_sr', metavar="SR", type=int, default=40000,
