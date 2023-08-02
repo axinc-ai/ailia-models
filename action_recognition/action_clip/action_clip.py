@@ -52,6 +52,10 @@ parser.add_argument(
     '-m', '--model_type', default='vit-32-8f', choices=('vit-32-8f'),
     help='model type'
 )
+parser.add_argument(
+    '--seed', default=None, type=int,
+    help='random seed'
+)
 args = update_parser(parser)
 
 
@@ -282,4 +286,6 @@ def main():
 
 
 if __name__ == '__main__':
+    if args.seed != None:
+        np.random.seed(args.seed)
     main()
