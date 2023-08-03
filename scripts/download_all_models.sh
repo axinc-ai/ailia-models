@@ -18,6 +18,8 @@ cd ../../audio_processing/voicefilter/; python3 voicefilter.py ${OPTION}
 cd ../../audio_processing/whisper/; python3 whisper.py ${OPTION}
 cd ../../audio_processing/clap/; python3 clap.py ${OPTION}
 cd ../../audio_processing/wespeaker/; python3 wespeaker.py ${OPTION}
+cd ../../audio_processing/tacotron2/; python3 tacotron2.py ${OPTION}
+cd ../../audio_processing/silero-vad/; python3 silero-vad.py ${OPTION}
 cd ../../background_ramoval/deep-image-matting; python3 deep-image-matting.py ${OPTION}
 cd ../../background_ramoval/u2net; python3 u2net.py ${OPTION}
 cd ../../background_ramoval/u2net; python3 u2net.py -a small ${OPTION}
@@ -217,6 +219,7 @@ cd ../../object_detection/glip; python3 glip.py ${OPTION}
 cd ../../object_detection/poly_yolo; python3 poly_yolo.py ${OPTION}
 cd ../../object_detection/crowd_det; python3 crowd_det.py ${OPTION}
 cd ../../object_detection/footandball; python3 footandball.py ${OPTION}
+cd ../../object_detection/qrcode_wechatqrode; python3 qrcode_wechatqrode.py ${OPTION}
 cd ../../object_detection_3d/3d_bbox; python3 3d_bbox.py ${OPTION}
 cd ../../object_detection_3d/3d-object-detection.pytorch; python3 3d-object-detection.pytorch.py ${OPTION}
 cd ../../object_detection_3d/mediapipe_objectron; python3 mediapipe_objectron.py ${OPTION}
@@ -228,6 +231,7 @@ cd ../../object_tracking/abd_net; python3 abd_net.py ${OPTION}
 cd ../../object_tracking/siam-mot; python3 siam-mot.py ${OPTION}
 cd ../../object_tracking/bytetrack; python3 bytetrack.py ${OPTION}
 cd ../../object_tracking/qd-3dt; python3 qd-3dt.py ${OPTION}
+cd ../../object_tracking/strong_sort; python3 strong_sort.py ${OPTION}
 cd ../../optical_flow_estimation/raft; python3 raft.py ${OPTION}
 cd ../../point_segmentation/pointnet_pytorch python3 pointnet_pytorch.py ${OPTION}
 cd ../../pose_estimation/lightweight-human-pose-estimation; python3 lightweight-human-pose-estimation.py ${OPTION}
