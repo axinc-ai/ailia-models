@@ -34,6 +34,10 @@ WEIGHT_AUTO_ENC_PATH = 'autoencoder.onnx'
 MODEL_AUTO_ENC_PATH = 'autoencoder.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/stable-diffusion-txt2img/'
 
+WEIGHT_VITL14_TEXT_PATH = 'ViT-L14-encode_text.onnx'
+MODEL_VITL14_TEXT_PATH = 'ViT-L14-encode_text.onnx.prototxt'
+CLIP_REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/clip/'
+
 SAVE_IMAGE_PATH = 'output.png'
 
 # ======================
@@ -92,6 +96,11 @@ parser.add_argument(
     '--onnx',
     action='store_true',
     help='execute onnxruntime version.'
+)
+parser.add_argument(
+    '--onnx_clip',
+    action='store_true',
+    help='use onnx version of clip.'
 )
 args = update_parser(parser, check_input_type=False)
 
@@ -157,9 +166,10 @@ ddim_sqrt_one_minus_alphas = np.sqrt(1. - ddim_alphas)
 class FrozenCLIPEmbedder:
     """Uses the CLIP transformer encoder for text (from Hugging Face)"""
 
-    def __init__(self, version="openai/clip-vit-large-patch14", max_length=77):
+    def __init__(self, version="openai/clip-vit-large-patch14", max_length=77, onnx=None):
         self.tokenizer = CLIPTokenizer.from_pretrained(version)
         self.transformer = CLIPTextModel.from_pretrained(version)
+        self.onnx = onnx
         self.max_length = max_length
 
     def encode(self, text):
@@ -167,10 +177,13 @@ class FrozenCLIPEmbedder:
             text, truncation=True, max_length=self.max_length, return_length=True,
             return_overflowing_tokens=False, padding="max_length", return_tensors="pt")
         tokens = batch_encoding["input_ids"]
-        outputs = self.transformer(input_ids=tokens)
-
-        z = outputs.last_hidden_state
-        z = z.detach().numpy()
+        if self.onnx != None:
+            z = self.onnx.predict(tokens.numpy())
+            z = self.onnx.get_blob_data(self.onnx.find_blob_index_by_name("/ln_final/Add_1_output_0")) # get hidden state
+        else:
+            outputs = self.transformer(input_ids=tokens)
+            z = outputs.last_hidden_state
+            z = z.detach().numpy()
         return z
 
 
@@ -492,7 +505,7 @@ def recognize_from_text(models):
     n_samples = args.n_samples
     scale = args.scale
 
-    cond_stage_model = FrozenCLIPEmbedder()
+    cond_stage_model = FrozenCLIPEmbedder(onnx = models["clip"])
 
     prompt = args.input if isinstance(args.input, str) else args.input[0]
     logger.info("prompt: %s" % prompt)
@@ -535,6 +548,9 @@ def main():
     check_and_download_models(WEIGHT_DFSN_OUT_PATH, MODEL_DFSN_OUT_PATH, REMOTE_PATH)
     check_and_download_models(WEIGHT_AUTO_ENC_PATH, MODEL_AUTO_ENC_PATH, REMOTE_PATH)
 
+    if args.onnx_clip:
+        check_and_download_models(WEIGHT_VITL14_TEXT_PATH, MODEL_VITL14_TEXT_PATH, CLIP_REMOTE_PATH)
+
     env_id = args.env_id
 
     # initialize
@@ -548,20 +564,27 @@ def main():
         memory_mode = ailia.get_memory_mode(
             reduce_constant=True, ignore_input_with_initializer=True,
             reduce_interstage=False, reuse_interstage=True)
-        diffusion_emb = ailia.Net \
-            (MODEL_DFSN_EMB_PATH, WEIGHT_DFSN_EMB_PATH, env_id=env_id, memory_mode=memory_mode)
+        diffusion_emb = ailia.Net(
+            MODEL_DFSN_EMB_PATH, WEIGHT_DFSN_EMB_PATH, env_id=env_id, memory_mode=memory_mode)
         diffusion_mid = ailia.Net(
             MODEL_DFSN_MID_PATH, WEIGHT_DFSN_MID_PATH, env_id=env_id, memory_mode=memory_mode)
         diffusion_out = ailia.Net(
             MODEL_DFSN_OUT_PATH, WEIGHT_DFSN_OUT_PATH, env_id=env_id, memory_mode=memory_mode)
         autoencoder = ailia.Net(
             MODEL_AUTO_ENC_PATH, WEIGHT_AUTO_ENC_PATH, env_id=env_id, memory_mode=memory_mode)
+
+        if args.onnx_clip:
+            clip = ailia.Net(
+                MODEL_VITL14_TEXT_PATH, WEIGHT_VITL14_TEXT_PATH, env_id=env_id) # require hidden state, so use normal memory mode
+        else:
+            clip = None
     else:
         import onnxruntime
         diffusion_emb = onnxruntime.InferenceSession(WEIGHT_DFSN_EMB_PATH)
         diffusion_mid = onnxruntime.InferenceSession(WEIGHT_DFSN_MID_PATH)
         diffusion_out = onnxruntime.InferenceSession(WEIGHT_DFSN_OUT_PATH)
         autoencoder = onnxruntime.InferenceSession(WEIGHT_AUTO_ENC_PATH)
+        clip = None
 
     seed = args.seed
     if seed is not None:
@@ -572,6 +595,7 @@ def main():
         diffusion_mid=diffusion_mid,
         diffusion_out=diffusion_out,
         autoencoder=autoencoder,
+        clip = clip
     )
     recognize_from_text(models)
 
