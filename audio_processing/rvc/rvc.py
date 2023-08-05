@@ -7,6 +7,7 @@ import scipy.signal as signal
 from PIL import Image
 import librosa
 import soundfile as sf
+import faiss
 
 import ailia
 
@@ -58,16 +59,24 @@ parser.add_argument(
     help='Select Speaker/Singer ID',
 )
 parser.add_argument(
-    '--vc_transform', metavar="N", type=int, default=0,
+    '--f0_up_key', metavar="N", type=int, default=0,
     help='Transpose (number of semitones, raise by an octave: 12, lower by an octave: -12)',
 )
 parser.add_argument(
-    '--f0_method', default="pm", choices=("pm",),
+    '--f0_method', default="pm", choices=("pm", "harvest"),
     help='Select the pitch extraction algorithm',
+)
+parser.add_argument(
+    '--file_index', metavar="FILE", type=str, default=None,
+    help='Path to the feature index file.',
 )
 parser.add_argument(
     '--index_rate', metavar="RATIO", type=float, default=0.75,
     help='Search feature ratio. (controls accent strength, too high has artifacting)',
+)
+parser.add_argument(
+    '--filter_radius', metavar="N", type=int, default=3,
+    help='If >=3: apply median filtering to the harvested pitch results. The value can reduce breathiness.',
 )
 parser.add_argument(
     '--resample_sr', metavar="SR", type=int, default=0,
@@ -165,6 +174,7 @@ def get_f0(
         p_len,
         f0_up_key,
         f0_method,
+        filter_radius,
         inp_f0=None):
     time_step = vc_param.window / vc_param.sr * 1000
     f0_min = 50
@@ -188,6 +198,23 @@ def get_f0(
             f0 = np.pad(
                 f0, [[pad_size, p_len - len(f0) - pad_size]], mode="constant"
             )
+    elif f0_method == "harvest":
+        import pyworld
+
+        audio = x.astype(np.double)
+        fs = vc_param.sr
+        frame_period = 10
+        f0, t = pyworld.harvest(
+            audio,
+            fs=fs,
+            f0_ceil=f0_max,
+            f0_floor=f0_min,
+            frame_period=frame_period,
+        )
+        f0 = pyworld.stonemask(audio, f0, t, fs)
+
+        if filter_radius > 2:
+            f0 = signal.medfilt(f0, 3)
     else:
         raise ValueError("f0_method: %s" % f0_method)
 
@@ -320,17 +347,26 @@ def predict(audio, models, tgt_sr=40000, if_f0=0):
         audio /= audio_max
 
     sid = args.sid
+    file_index = args.file_index
     index_rate = args.index_rate
     resample_sr = args.resample_sr
     rms_mix_rate = args.rms_mix_rate
     protect = args.protect
-    f0_up_key = args.vc_transform
+    f0_up_key = args.f0_up_key
     f0_method = args.f0_method
+    filter_radius = args.filter_radius
     inp_f0 = None
 
     vc_param = VCParam(tgt_sr)
 
     index = big_npy = None
+    if file_index and index_rate > 0:
+        try:
+            index = faiss.read_index(file_index)
+            big_npy = index.reconstruct_n(0, index.ntotal)
+        except Exception as e:
+            logger.exception(e)
+
     audio = signal.filtfilt(bh, ah, audio)
     audio_pad = np.pad(audio, (vc_param.window // 2, vc_param.window // 2), mode="reflect")
 
@@ -362,6 +398,7 @@ def predict(audio, models, tgt_sr=40000, if_f0=0):
             p_len,
             f0_up_key,
             f0_method,
+            filter_radius,
             inp_f0,
         )
         pitch = pitch[:p_len]

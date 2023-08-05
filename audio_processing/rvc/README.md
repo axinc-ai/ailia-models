@@ -20,6 +20,7 @@ This model requires additional module.
 ```
 pip3 install librosa
 pip3 install soundfile
+pip3 install faiss-cpu==1.7.3
 ```
 
 ## Usage
