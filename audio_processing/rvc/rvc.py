@@ -271,7 +271,7 @@ def vc(
 
     if isinstance(index, type(None)) is False \
             and isinstance(big_npy, type(None)) is False \
-            and index_rate != 0:
+            and index_rate > 0:
         x = feats[0]
 
         score, ix = index.search(x, k=8)
