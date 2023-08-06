@@ -7,7 +7,6 @@ import scipy.signal as signal
 from PIL import Image
 import librosa
 import soundfile as sf
-import faiss
 
 import ailia
 
@@ -361,6 +360,7 @@ def predict(audio, models, tgt_sr=40000, if_f0=0):
 
     index = big_npy = None
     if file_index and index_rate > 0:
+        import faiss
         try:
             index = faiss.read_index(file_index)
             big_npy = index.reconstruct_n(0, index.ntotal)
