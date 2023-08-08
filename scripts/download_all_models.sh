@@ -20,6 +20,7 @@ cd ../../audio_processing/clap/; python3 clap.py ${OPTION}
 cd ../../audio_processing/wespeaker/; python3 wespeaker.py ${OPTION}
 cd ../../audio_processing/tacotron2/; python3 tacotron2.py ${OPTION}
 cd ../../audio_processing/silero-vad/; python3 silero-vad.py ${OPTION}
+cd ../../audio_processing/rvc/; python3 rvc.py ${OPTION}
 cd ../../background_ramoval/deep-image-matting; python3 deep-image-matting.py ${OPTION}
 cd ../../background_ramoval/u2net; python3 u2net.py ${OPTION}
 cd ../../background_ramoval/u2net; python3 u2net.py -a small ${OPTION}
