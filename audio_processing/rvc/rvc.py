@@ -62,7 +62,7 @@ parser.add_argument(
     help='Transpose (number of semitones, raise by an octave: 12, lower by an octave: -12)',
 )
 parser.add_argument(
-    '--f0_method', default="pm", choices=("pm", "harvest"),
+    '--f0_method', default="pm", choices=("pm", "harvest", "crepe"),
     help='Select the pitch extraction algorithm',
 )
 parser.add_argument(
@@ -122,7 +122,6 @@ class VCParam(object):
 # Secondaty Functions
 # ======================
 
-
 def load_audio(file: str, sr: int = SAMPLE_RATE):
     if flg_ffmpeg:
         # https://github.com/openai/whisper/blob/main/whisper/audio.py#L26
@@ -165,7 +164,6 @@ def change_rms(data1, sr1, data2, sr2, rate):  # 1是输入音频，2是输出�
 # ======================
 # Main functions
 # ======================
-
 
 def get_f0(
         vc_param,
@@ -214,6 +212,26 @@ def get_f0(
 
         if filter_radius > 2:
             f0 = signal.medfilt(f0, 3)
+    elif f0_method == "crepe":
+        from mod_crepe import predict, filter
+        x = np.load("xxx.npy")
+
+        # Pick a batch size that doesn't cause memory errors on your gpu
+        batch_size = 512
+        audio = np.copy(x)[None]
+        f0, pd = predict(
+            audio,
+            vc_param.sr,
+            vc_param.window,
+            f0_min,
+            f0_max,
+            batch_size=batch_size,
+            return_periodicity=True,
+        )
+        pd = filter.median(pd, 3)
+        f0 = filter.mean(f0, 3)
+        f0[pd < 0.1] = 0
+        f0 = f0[0]
     else:
         raise ValueError("f0_method: %s" % f0_method)
 
