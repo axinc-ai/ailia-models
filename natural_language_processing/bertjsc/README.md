@@ -10,7 +10,7 @@ A dictionary of corrected tokens with score
 Set the `SENTENCE` as an argument.
 
 ```bash
-$ python3 bertjsc.py --input 日本語校正しま.
+$ python3 bertjsc.py --input 日本語を校正しま.
 ...
  INFO arg_utils.py (13) : Start!
  INFO arg_utils.py (163) : env_id: 1
