@@ -1,8 +1,15 @@
 import functools
 
 import numpy as np
+import scipy
+import librosa
 
+import ailia
 from functional import im2col
+from math_utils import softmax
+
+WEIGHT_CREPE_PATH = "crepe.onnx"
+MODEL_CREPE_PATH = "crepe.onnx.prototxt"
 
 CENTS_PER_BIN = 20  # cents
 MAX_FMAX = 2006.  # hz
@@ -11,6 +18,23 @@ SAMPLE_RATE = 16000  # hz
 WINDOW_SIZE = 1024  # samples
 UNVOICED = np.nan
 
+
+def load_model(env_id=0, flg_onnx=False):
+    # initialize
+    if not flg_onnx:
+        model = ailia.Net(MODEL_CREPE_PATH, WEIGHT_CREPE_PATH, env_id=env_id)
+    else:
+        import onnxruntime
+        providers = ["CPUExecutionProvider", "CUDAExecutionProvider"]
+        model = onnxruntime.InferenceSession(WEIGHT_CREPE_PATH, providers=providers)
+
+    infer.flg_onnx = flg_onnx
+    infer.model = model
+
+
+###############################################################################
+# Probability sequence decoding methods
+###############################################################################
 
 def viterbi(logits):
     """Sample observations using viterbi decoding"""
@@ -22,23 +46,20 @@ def viterbi(logits):
         viterbi.transition = transition
 
     # Normalize logits
-    with torch.no_grad():
-        probs = torch.nn.functional.softmax(logits, dim=1)
-
-    # Convert to numpy
-    sequences = probs.cpu().numpy()
+    sequences = softmax(logits, axis=1)
 
     # Perform viterbi decoding
     bins = np.array([
         librosa.sequence.viterbi(sequence, viterbi.transition).astype(np.int64)
         for sequence in sequences])
 
-    # Convert to pytorch
-    bins = torch.tensor(bins, device=probs.device)
-
     # Convert to frequency in Hz
-    return bins, torchcrepe.convert.bins_to_frequency(bins)
+    return bins, bins_to_frequency(bins)
 
+
+###############################################################################
+# Crepe pitch prediction
+###############################################################################
 
 def predict(
         audio,
@@ -88,23 +109,16 @@ def predict(
 
     for frames in generator:
         # Infer independent probabilities for each pitch bin
-        probabilities = infer(frames, model)
+        probabilities = infer(frames)
 
         # shape=(batch, 360, time / hop_length)
         probabilities = probabilities.reshape(
-            audio.size(0), -1, PITCH_BINS).transpose(1, 2)
+            audio.shape[0], -1, PITCH_BINS).transpose(0, 2, 1)
 
         # Convert probabilities to F0 and periodicity
         result = postprocess(
             probabilities, fmin, fmax,
-            decoder, return_harmonicity, return_periodicity)
-
-        # Place on same device as audio to allow very long inputs
-        if isinstance(result, tuple):
-            result = (result[0].to(audio.device),
-                      result[1].to(audio.device))
-        else:
-            result = result.to(audio.device)
+            decoder, return_periodicity)
 
         results.append(result)
 
@@ -115,6 +129,26 @@ def predict(
 
     # Concatenate
     return torch.cat(results, 1)
+
+
+###############################################################################
+# Components for step-by-step prediction
+###############################################################################
+
+def infer(frame):
+    if not hasattr(infer, 'model'):
+        load_model()
+
+    flg_onnx = infer.flg_onnx
+    model = infer.model
+
+    # feedforward
+    if not flg_onnx:
+        output = model.predict([frame])
+    else:
+        output = model.run(None, {'input': frame})
+
+    return output[0]
 
 
 def postprocess(
@@ -141,13 +175,10 @@ def postprocess(
         pitch (torch.tensor [shape=(1, 1 + int(time // hop_length))])
         periodicity (torch.tensor [shape=(1, 1 + int(time // hop_length))])
     """
-    # Sampling is non-differentiable, so remove from graph
-    probabilities = probabilities.detach()
 
     # Convert frequency range to pitch bin range
-    minidx = torchcrepe.convert.frequency_to_bins(torch.tensor(fmin))
-    maxidx = torchcrepe.convert.frequency_to_bins(
-        torch.tensor(fmax), torch.ceil)
+    minidx = frequency_to_bins(np.array(fmin))
+    maxidx = frequency_to_bins(np.array(fmax), np.ceil)
 
     # Remove frequencies outside of allowable range
     probabilities[:, :minidx] = -float('inf')
@@ -241,3 +272,73 @@ def preprocess(
         frames /= np.where(std > 1e-10, std, 1e-10)
 
         yield frames
+
+
+###############################################################################
+# Pitch unit conversions
+###############################################################################
+
+def bins_to_cents(bins):
+    """Converts pitch bins to cents"""
+    cents = CENTS_PER_BIN * bins + 1997.3794084376191
+
+    # Trade quantization error for noise
+    return dither(cents)
+
+
+def bins_to_frequency(bins):
+    """Converts pitch bins to frequency in Hz"""
+    return cents_to_frequency(bins_to_cents(bins))
+
+
+def cents_to_bins(cents, quantize_fn=np.floor):
+    """Converts cents to pitch bins"""
+    bins = (cents - 1997.3794084376191) / CENTS_PER_BIN
+    return quantize_fn(bins).astype(int)
+
+
+def cents_to_frequency(cents):
+    """Converts cents to frequency in Hz"""
+    return 10 * 2 ** (cents / 1200)
+
+
+def frequency_to_bins(frequency, quantize_fn=np.floor):
+    """Convert frequency in Hz to pitch bins"""
+    return cents_to_bins(frequency_to_cents(frequency), quantize_fn)
+
+
+def frequency_to_cents(frequency):
+    """Convert frequency in Hz to cents"""
+    return 1200 * np.log2(frequency / 10.)
+
+
+###############################################################################
+# Utilities
+###############################################################################
+
+def periodicity(probabilities, bins):
+    """Computes the periodicity from the network output and pitch bins"""
+    # shape=(batch * time / hop_length, 360)
+    probs_stacked = probabilities.transpose(0, 2, 1).reshape(-1, PITCH_BINS)
+
+    # shape=(batch * time / hop_length, 1)
+    bins_stacked = bins.reshape(-1, 1).astype(np.int64)
+
+    # Use maximum logit over pitch bins as periodicity
+    # periodicity = probs_stacked.gather(1, bins_stacked)
+    periodicity = np.zeros(bins_stacked.shape)
+    for i in range(bins_stacked.shape[0]):
+        periodicity[i] = probs_stacked[i, bins_stacked[i]]
+
+    # shape=(batch, time / hop_length)
+    return periodicity.reshape(probabilities.shape[0], probabilities.shape[2])
+
+
+def dither(cents):
+    """Dither the predicted pitch in cents to remove quantization error"""
+    noise = scipy.stats.triang.rvs(
+        c=0.5,
+        loc=-CENTS_PER_BIN,
+        scale=2 * CENTS_PER_BIN,
+        size=cents.shape)
+    return cents + noise

@@ -213,13 +213,12 @@ def get_f0(
         if filter_radius > 2:
             f0 = signal.medfilt(f0, 3)
     elif f0_method == "crepe":
-        from mod_crepe import predict, filter
-        x = np.load("xxx.npy")
+        import mod_crepe
 
         # Pick a batch size that doesn't cause memory errors on your gpu
         batch_size = 512
         audio = np.copy(x)[None]
-        f0, pd = predict(
+        f0, pd = mod_crepe.predict(
             audio,
             vc_param.sr,
             vc_param.window,
@@ -228,8 +227,8 @@ def get_f0(
             batch_size=batch_size,
             return_periodicity=True,
         )
-        pd = filter.median(pd, 3)
-        f0 = filter.mean(f0, 3)
+        pd = mod_crepe.median(pd, 3)
+        f0 = mod_crepe.mean(f0, 3)
         f0[pd < 0.1] = 0
         f0 = f0[0]
     else:
@@ -519,6 +518,10 @@ def main():
     check_and_download_models(WEIGHT_HUBERT_PATH, MODEL_HUBERT_PATH, REMOTE_PATH)
     check_and_download_models(WEIGHT_VC_PATH, MODEL_VC_PATH, REMOTE_PATH)
 
+    if args.f0 == 1 and args.f0_method == "crepe":
+        from mod_crepe import WEIGHT_CREPE_PATH, MODEL_CREPE_PATH
+        check_and_download_models(WEIGHT_CREPE_PATH, MODEL_CREPE_PATH, REMOTE_PATH)
+
     env_id = args.env_id
 
     # initialize
@@ -530,6 +533,10 @@ def main():
         providers = ["CPUExecutionProvider", "CUDAExecutionProvider"]
         hubert = onnxruntime.InferenceSession(WEIGHT_HUBERT_PATH, providers=providers)
         net_g = onnxruntime.InferenceSession(WEIGHT_VC_PATH, providers=providers)
+
+    if args.f0 == 1 and args.f0_method == "crepe":
+        import mod_crepe
+        mod_crepe.load_model(env_id, args.onnx)
 
     models = {
         "hubert": hubert,
