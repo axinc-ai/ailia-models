@@ -174,6 +174,7 @@ cd ../../natural_language_processing/bert_question_answering; python3 bert_quest
 cd ../../natural_language_processing/bert_sentiment_analysis; python3 bert_sentiment_analysis.py ${OPTION}
 cd ../../natural_language_processing/bert_tweets_sentiment; python3 bert_tweets_sentiment.py ${OPTION}
 cd ../../natural_language_processing/bert_zero_shot_classification; python3 bert_zero_shot_classification.py ${OPTION}
+cd ../../natural_language_processing/bertjsc; python3 bertjsc.py ${OPTION}
 cd ../../natural_language_processing/gpt2; python3 gpt2.py ${OPTION}
 cd ../../natural_language_processing/rinna_gpt2; python3 rinna_gpt2.py ${OPTION}
 cd ../../natural_language_processing/fugumt-en-ja; python3 fugumt-en-ja.py ${OPTION}
