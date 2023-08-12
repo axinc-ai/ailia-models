@@ -74,7 +74,7 @@ def predict(
     """Performs pitch estimation
 
     Arguments
-        audio (torch.tensor [shape=(1, time)])
+        audio (np.ndarray [shape=(1, time)])
             The audio signal
         sample_rate (int)
             The sampling rate in Hz
@@ -96,8 +96,8 @@ def predict(
             Whether to zero-pad the audio
 
     Returns
-        pitch (torch.tensor [shape=(1, 1 + int(time // hop_length))])
-        (Optional) periodicity (torch.tensor
+        pitch (np.ndarray [shape=(1, 1 + int(time // hop_length))])
+        (Optional) periodicity (np.ndarray
                                 [shape=(1, 1 + int(time // hop_length))])
     """
 
@@ -125,10 +125,10 @@ def predict(
     # Split pitch and periodicity
     if return_periodicity:
         pitch, periodicity = zip(*results)
-        return torch.cat(pitch, 1), torch.cat(periodicity, 1)
+        return np.concatenate(pitch, axis=1), np.concatenate(periodicity, axis=1)
 
     # Concatenate
-    return torch.cat(results, 1)
+    return np.concatenate(results, axis=1)
 
 
 ###############################################################################
@@ -160,7 +160,7 @@ def postprocess(
     """Convert model output to F0 and periodicity
 
     Arguments
-        probabilities (torch.tensor [shape=(1, 360, time / hop_length)])
+        probabilities (np.ndarray [shape=(1, 360, time / hop_length)])
             The probabilities for each pitch bin inferred by the network
         fmin (float)
             The minimum allowable frequency in Hz
@@ -172,8 +172,8 @@ def postprocess(
             Whether to also return the network confidence
 
     Returns
-        pitch (torch.tensor [shape=(1, 1 + int(time // hop_length))])
-        periodicity (torch.tensor [shape=(1, 1 + int(time // hop_length))])
+        pitch (np.ndarray [shape=(1, 1 + int(time // hop_length))])
+        periodicity (np.ndarray [shape=(1, 1 + int(time // hop_length))])
     """
 
     # Convert frequency range to pitch bin range
@@ -258,6 +258,7 @@ def preprocess(
 
         # Chunk
         frames, *_ = unfold(audio[:, None, None, start:end])
+        frames = frames.astype(np.float32)
 
         # shape=(1 + int(time / hop_length, 1024)
         frames = frames[None].transpose(0, 2, 1).reshape(-1, WINDOW_SIZE)
@@ -342,3 +343,129 @@ def dither(cents):
         scale=2 * CENTS_PER_BIN,
         size=cents.shape)
     return cents + noise
+
+
+###############################################################################
+# Sequence filters
+###############################################################################
+
+def mean(signals, win_length=9):
+    """Averave filtering for signals containing nan values
+
+    Arguments
+        signals (np.ndarray (shape=(batch, time)))
+            The signals to filter
+        win_length
+            The size of the analysis window
+
+    Returns
+        filtered (np.ndarray (shape=(batch, time)))
+    """
+
+    assert signals.ndim == 2, "Input tensor must have 2 dimensions (batch_size, width)"
+    signals = np.expand_dims(signals, axis=1)
+
+    # Apply the mask by setting masked elements to zero, or make NaNs zero
+    mask = ~np.isnan(signals)
+    masked_x = np.where(mask, signals, np.zeros(signals.shape))
+
+    # Create a ones kernel with the same number of channels as the input tensor
+    ones_kernel = np.ones((signals.shape[1], 1, win_length))
+
+    import torch
+    from torch.nn import functional as F
+
+    masked_x = torch.from_numpy(masked_x).float()
+    mask = torch.from_numpy(mask).float()
+    ones_kernel = torch.from_numpy(ones_kernel).float()
+
+    # Perform sum pooling
+    sum_pooled = F.conv1d(
+        masked_x,
+        ones_kernel,
+        stride=1,
+        padding=win_length // 2,
+    )
+    # Count the non-masked (valid) elements in each pooling window
+    valid_count = F.conv1d(
+        mask,
+        ones_kernel,
+        stride=1,
+        padding=win_length // 2,
+    )
+    sum_pooled = np.asarray(sum_pooled)
+    valid_count = np.asarray(valid_count)
+
+    valid_count = np.clip(valid_count, 1, None)  # Avoid division by zero
+
+    # Perform masked average pooling
+    avg_pooled = sum_pooled / valid_count
+
+    # Fill zero values with NaNs
+    avg_pooled[avg_pooled == 0] = float("nan")
+
+    return np.squeeze(avg_pooled, axis=1)
+
+
+def median(signals, win_length):
+    """Median filtering for signals containing nan values
+
+    Arguments
+        signals (np.ndarray (shape=(batch, time)))
+            The signals to filter
+        win_length
+            The size of the analysis window
+
+    Returns
+        filtered (np.ndarray (shape=(batch, time)))
+    """
+
+    assert signals.ndim == 2, "Input tensor must have 2 dimensions (batch_size, width)"
+    signals = np.expand_dims(signals, axis=1)
+
+    mask = ~np.isnan(signals)
+    masked_x = np.where(mask, signals, np.zeros(signals.shape))
+    padding = win_length // 2
+
+    shape = masked_x.shape
+
+    x = np.pad(masked_x, ((0, 0), (0, 0), (padding, padding)), mode="reflect")
+    mask = np.pad(
+        mask.astype(np.float32), ((0, 0), (0, 0), (padding, padding)),
+        mode="constant", constant_values=0)
+
+    _x = np.zeros(shape + (win_length,))
+    _msk = np.zeros(shape + (win_length,))
+    for i in range(shape[-1]):
+        _x[:, :, i] = x[:, :, i:i + win_length]
+        _msk[:, :, i] = mask[:, :, i:i + win_length]
+    x = _x
+    mask = _msk
+
+    x = x.reshape(x.shape[:3] + (-1,))
+    mask = mask.reshape(mask.shape[:3] + (-1,))
+
+    # Combine the mask with the input tensor
+    x_masked = np.where(mask.astype(bool), x.astype(np.float32), float("inf"))
+
+    # Sort the masked tensor along the last dimension
+    x_sorted = np.sort(x_masked, axis=-1)
+
+    # Compute the count of non-masked (valid) values
+    valid_count = np.sum(mask, axis=-1)
+
+    # Calculate the index of the median value for each pooling window
+    median_idx = np.clip((valid_count - 1) // 2, 0, None)
+
+    # Gather the median values using the calculated indices
+    # median_pooled = x_sorted.gather(-1, median_idx.unsqueeze(-1).long()).squeeze(-1)
+    median_idx = median_idx.astype(int)
+    median_pooled = [
+        x_sorted[:, :, [i], median_idx[0, 0, i]] for i in range(median_idx.shape[-1])
+    ]
+    median_pooled = np.concatenate(median_pooled, axis=-1)
+
+    # Fill infinite values with NaNs
+    median_pooled[np.isinf(median_pooled)] = float("nan")
+
+    return np.squeeze(median_pooled, axis=1)
