@@ -37,6 +37,14 @@ def load_model(env_id=0, flg_onnx=False):
 # Probability sequence decoding methods
 ###############################################################################
 
+def argmax(logits):
+    """Sample observations by taking the argmax"""
+    import torch
+    bins = torch.from_numpy(logits).argmax(dim=1).numpy()
+
+    # Convert to frequency in Hz
+    return bins, bins_to_frequency(bins)
+
 def viterbi(logits):
     """Sample observations using viterbi decoding"""
     # Create viterbi transition matrix
@@ -68,7 +76,7 @@ def predict(
         hop_length=None,
         fmin=50.,
         fmax=MAX_FMAX,
-        decoder=viterbi,
+        decoder=argmax,
         return_periodicity=False,
         batch_size=None,
         pad=True):
