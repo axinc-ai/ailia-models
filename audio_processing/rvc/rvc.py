@@ -528,6 +528,9 @@ def main():
     if not args.onnx:
         hubert = ailia.Net(MODEL_HUBERT_PATH, WEIGHT_HUBERT_PATH, env_id=env_id)
         net_g = ailia.Net(MODEL_VC_PATH, WEIGHT_VC_PATH, env_id=env_id)
+        if args.profile:
+            hubert.set_profile_mode(True)
+            net_g.set_profile_mode(True)
     else:
         import onnxruntime
         providers = ["CPUExecutionProvider", "CUDAExecutionProvider"]
@@ -536,7 +539,11 @@ def main():
 
     if args.f0 == 1 and args.f0_method == "crepe":
         import mod_crepe
-        mod_crepe.load_model(env_id, args.onnx)
+        f0_model = mod_crepe.load_model(env_id, args.onnx)
+        if args.profile:
+            f0_model.set_profile_mode(True)
+    else:
+        f0_model = None
 
     models = {
         "hubert": hubert,
@@ -544,6 +551,18 @@ def main():
     }
 
     recognize_from_audio(models)
+
+    if args.profile and not args.onnx:
+        print("--- profile hubert")
+        print(hubert.get_summary())
+        print("")
+        print("--- profile net_g")
+        print(net_g.get_summary())
+        print("")
+        if f0_model != None:
+            print("--- profile f0_model")
+            print(f0_model.get_summary())
+            print("")
 
 
 if __name__ == '__main__':

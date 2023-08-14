@@ -30,6 +30,7 @@ def load_model(env_id=0, flg_onnx=False):
 
     infer.flg_onnx = flg_onnx
     infer.model = model
+    return model
 
 
 ###############################################################################
