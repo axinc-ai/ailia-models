@@ -216,7 +216,7 @@ def get_f0(
         import mod_crepe
 
         # unit test
-        debug = False
+        debug = True
         if debug:
             import math
             batch_size = 512
