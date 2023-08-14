@@ -296,9 +296,12 @@ def preprocess(
 def bins_to_cents(bins):
     """Converts pitch bins to cents"""
     cents = CENTS_PER_BIN * bins + 1997.3794084376191
+    print("cents", cents)
+    dither_cents = dither(cents)
+    print("dither_cents", dither_cents)
 
     # Trade quantization error for noise
-    return dither(cents)
+    return dither_cents
 
 
 def bins_to_frequency(bins):
@@ -314,7 +317,9 @@ def cents_to_bins(cents, quantize_fn=np.floor):
 
 def cents_to_frequency(cents):
     """Converts cents to frequency in Hz"""
-    return 10 * 2 ** (cents / 1200)
+    freq = 10 * 2 ** (cents / 1200)
+    print("freq", freq)
+    return freq
 
 
 def frequency_to_bins(frequency, quantize_fn=np.floor):
