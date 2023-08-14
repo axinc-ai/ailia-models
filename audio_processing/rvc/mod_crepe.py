@@ -41,6 +41,7 @@ def argmax(logits):
     """Sample observations by taking the argmax"""
     import torch
     bins = torch.from_numpy(logits).argmax(dim=1).numpy()
+    print("bins", bins)
 
     # Convert to frequency in Hz
     return bins, bins_to_frequency(bins)
@@ -118,8 +119,12 @@ def predict(
 
     for frames in generator:
         # Infer independent probabilities for each pitch bin
+        print("Frames.shape", frames.shape)
+        print("Frames", frames)
         probabilities = infer(frames)
 
+        print("Probabilities.shape", probabilities.shape)
+        print("Probabilities", probabilities)
         # shape=(batch, 360, time / hop_length)
         probabilities = probabilities.reshape(
             audio.shape[0], -1, PITCH_BINS).transpose(0, 2, 1)
