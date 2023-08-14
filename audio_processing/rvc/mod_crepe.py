@@ -37,6 +37,8 @@ def load_model(env_id=0, flg_onnx=False):
 # Probability sequence decoding methods
 ###############################################################################
 
+# https://github.com/maxrmorrison/torchcrepe/blob/master/torchcrepe/decode.py
+
 def argmax(logits):
     """Sample observations by taking the argmax"""
     import torch
@@ -45,6 +47,44 @@ def argmax(logits):
 
     # Convert to frequency in Hz
     return bins, bins_to_frequency(bins)
+
+def weighted_argmax(logits):
+    """Sample observations using weighted sum near the argmax"""
+    # Find center of analysis window
+    import torch
+    logits = torch.from_numpy(logits)
+    bins = logits.argmax(dim=1)
+
+    # Find bounds of analysis window
+    start = torch.max(torch.tensor(0, device=logits.device), bins - 4)
+    end = torch.min(torch.tensor(logits.size(1), device=logits.device), bins + 5)
+
+    # Mask out everything outside of window
+    for batch in range(logits.size(0)):
+        for time in range(logits.size(2)):
+            logits[batch, :start[batch, time], time] = -float('inf')
+            logits[batch, end[batch, time]:, time] = -float('inf')
+
+    # Construct weights
+    if not hasattr(weighted_argmax, 'weights'):
+        weights = bins_to_cents(torch.arange(360))
+        weighted_argmax.weights = weights[None, :, None]
+
+    # Ensure devices are the same (no-op if they are)
+    weighted_argmax.weights = weighted_argmax.weights.to(logits.device)
+
+    # Convert to probabilities
+    with torch.no_grad():
+        probs = torch.sigmoid(logits)
+
+    # Apply weights
+    cents = (weighted_argmax.weights * probs).sum(dim=1) / probs.sum(dim=1)
+
+    bins = bins.numpy()
+    cents = cents.numpy()
+
+    # Convert to frequency in Hz
+    return bins, cents_to_frequency(cents)
 
 def viterbi(logits):
     """Sample observations using viterbi decoding"""
@@ -77,7 +117,7 @@ def predict(
         hop_length=None,
         fmin=50.,
         fmax=MAX_FMAX,
-        decoder=argmax,
+        decoder=viterbi,
         return_periodicity=False,
         batch_size=None,
         pad=True):
