@@ -66,3 +66,4 @@ ONNX opset=14
 
 [hubert_base.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/rvc/hubert_base.onnx.prototxt)  
 [AISO-HOWATTO.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/rvc/AISO-HOWATTO.onnx.prototxt)
+[crepe.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/rvc/crepe.onnx.prototxt)
