@@ -215,6 +215,35 @@ def get_f0(
     elif f0_method == "crepe":
         import mod_crepe
 
+        # unit test
+        import math
+        batch_size = 512
+        window_size = 1024
+        sample_rate = 16000
+        audio = np.zeros((1, window_size * 2))
+        print("Audio shape : ", audio.shape)
+        for i in range(0, window_size * 2):
+            audio[0, i] = math.sin(math.pi * 2 * 1000 * i / sample_rate)
+        f0, pd = mod_crepe.predict(
+            audio,
+            vc_param.sr,
+            vc_param.window,
+            f0_min,
+            f0_max,
+            batch_size=batch_size,
+            return_periodicity=True,
+        )
+        print("pd : ", pd)
+        print("f0 : ", f0)
+        pd = mod_crepe.median(pd, 3)
+        f0 = mod_crepe.mean(f0, 3)
+        print("median pd : ", pd)
+        print("mean f0 : ", f0)
+        f0[pd < 0.1] = 0
+        f0 = f0[0]
+        print("final f0 : ", f0)
+        sys.exit(1)
+
         # Pick a batch size that doesn't cause memory errors on your gpu
         batch_size = 512
         audio = np.copy(x)[None]
