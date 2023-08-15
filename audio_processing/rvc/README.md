@@ -43,6 +43,12 @@ By adding the `--model_file` option, you can specify vc model file.
 $ python3 rvc.py --model_file AISO-HOWATTO.onnx
 ```
 
+Specify the f0 option to infer a model that uses f0.
+
+```bash $ 
+python3 rvc.py -i booth.wav -m Rinne.onnx --f0_method crepe --f0 1 --f0_up_key 11 --tgt_sr 48000 --file_index Rinne.index --index_rate 0.75
+```
+
 ## Reference
 
 - [Retrieval-based-Voice-Conversion-WebUI](https://github.com/RVC-Project/Retrieval-based-Voice-Conversion-WebUI)
@@ -60,3 +66,4 @@ ONNX opset=14
 
 [hubert_base.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/rvc/hubert_base.onnx.prototxt)  
 [AISO-HOWATTO.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/rvc/AISO-HOWATTO.onnx.prototxt)
+[crepe.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/rvc/crepe.onnx.prototxt)

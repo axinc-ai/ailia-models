@@ -62,7 +62,7 @@ parser.add_argument(
     help='Transpose (number of semitones, raise by an octave: 12, lower by an octave: -12)',
 )
 parser.add_argument(
-    '--f0_method', default="pm", choices=("pm", "harvest"),
+    '--f0_method', default="pm", choices=("pm", "harvest", "crepe"),
     help='Select the pitch extraction algorithm',
 )
 parser.add_argument(
@@ -122,7 +122,6 @@ class VCParam(object):
 # Secondaty Functions
 # ======================
 
-
 def load_audio(file: str, sr: int = SAMPLE_RATE):
     if flg_ffmpeg:
         # https://github.com/openai/whisper/blob/main/whisper/audio.py#L26
@@ -165,7 +164,6 @@ def change_rms(data1, sr1, data2, sr2, rate):  # 1是输入音频，2是输出�
 # ======================
 # Main functions
 # ======================
-
 
 def get_f0(
         vc_param,
@@ -214,6 +212,25 @@ def get_f0(
 
         if filter_radius > 2:
             f0 = signal.medfilt(f0, 3)
+    elif f0_method == "crepe":
+        import mod_crepe
+
+        # Pick a batch size that doesn't cause memory errors on your gpu
+        batch_size = 512
+        audio = np.copy(x)[None]
+        f0, pd = mod_crepe.predict(
+            audio,
+            vc_param.sr,
+            vc_param.window,
+            f0_min,
+            f0_max,
+            batch_size=batch_size,
+            return_periodicity=True,
+        )
+        pd = mod_crepe.median(pd, 3)
+        f0 = mod_crepe.mean(f0, 3)
+        f0[pd < 0.1] = 0
+        f0 = f0[0]
     else:
         raise ValueError("f0_method: %s" % f0_method)
 
@@ -501,17 +518,32 @@ def main():
     check_and_download_models(WEIGHT_HUBERT_PATH, MODEL_HUBERT_PATH, REMOTE_PATH)
     check_and_download_models(WEIGHT_VC_PATH, MODEL_VC_PATH, REMOTE_PATH)
 
+    if args.f0 == 1 and args.f0_method == "crepe":
+        from mod_crepe import WEIGHT_CREPE_PATH, MODEL_CREPE_PATH
+        check_and_download_models(WEIGHT_CREPE_PATH, MODEL_CREPE_PATH, REMOTE_PATH)
+
     env_id = args.env_id
 
     # initialize
     if not args.onnx:
         hubert = ailia.Net(MODEL_HUBERT_PATH, WEIGHT_HUBERT_PATH, env_id=env_id)
         net_g = ailia.Net(MODEL_VC_PATH, WEIGHT_VC_PATH, env_id=env_id)
+        if args.profile:
+            hubert.set_profile_mode(True)
+            net_g.set_profile_mode(True)
     else:
         import onnxruntime
         providers = ["CPUExecutionProvider", "CUDAExecutionProvider"]
         hubert = onnxruntime.InferenceSession(WEIGHT_HUBERT_PATH, providers=providers)
         net_g = onnxruntime.InferenceSession(WEIGHT_VC_PATH, providers=providers)
+
+    if args.f0 == 1 and args.f0_method == "crepe":
+        import mod_crepe
+        f0_model = mod_crepe.load_model(env_id, args.onnx)
+        if args.profile:
+            f0_model.set_profile_mode(True)
+    else:
+        f0_model = None
 
     models = {
         "hubert": hubert,
@@ -519,6 +551,18 @@ def main():
     }
 
     recognize_from_audio(models)
+
+    if args.profile and not args.onnx:
+        print("--- profile hubert")
+        print(hubert.get_summary())
+        print("")
+        print("--- profile net_g")
+        print(net_g.get_summary())
+        print("")
+        if f0_model != None:
+            print("--- profile f0_model")
+            print(f0_model.get_summary())
+            print("")
 
 
 if __name__ == '__main__':
