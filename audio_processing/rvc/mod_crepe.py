@@ -11,6 +11,9 @@ from math_utils import softmax
 WEIGHT_CREPE_PATH = "crepe.onnx"
 MODEL_CREPE_PATH = "crepe.onnx.prototxt"
 
+WEIGHT_CREPE_TINY_PATH = "crepe_tiny.onnx"
+MODEL_CREPE_TINY_PATH = "crepe_tiny.onnx.prototxt"
+
 CENTS_PER_BIN = 20  # cents
 MAX_FMAX = 2006.  # hz
 PITCH_BINS = 360
@@ -19,14 +22,20 @@ WINDOW_SIZE = 1024  # samples
 UNVOICED = np.nan
 
 
-def load_model(env_id=0, flg_onnx=False):
+def load_model(env_id=0, flg_onnx=False, tiny=False):
     # initialize
+    if tiny:
+        model_path = MODEL_CREPE_TINY_PATH
+        weight_path = WEIGHT_CREPE_TINY_PATH
+    else:
+        model_path = MODEL_CREPE_PATH
+        weight_path = WEIGHT_CREPE_PATH
     if not flg_onnx:
-        model = ailia.Net(MODEL_CREPE_PATH, WEIGHT_CREPE_PATH, env_id=env_id)
+        model = ailia.Net(model_path, weight_path, env_id=env_id)
     else:
         import onnxruntime
         providers = ["CPUExecutionProvider", "CUDAExecutionProvider"]
-        model = onnxruntime.InferenceSession(WEIGHT_CREPE_PATH, providers=providers)
+        model = onnxruntime.InferenceSession(weight_path, providers=providers)
 
     infer.flg_onnx = flg_onnx
     infer.model = model

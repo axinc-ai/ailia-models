@@ -43,7 +43,13 @@ By adding the `--model_file` option, you can specify vc model file.
 $ python3 rvc.py --model_file AISO-HOWATTO.onnx
 ```
 
-Specify the f0 option to infer a model that uses f0.
+Specify the f0 option to infer a model that uses f0. You can choice `crepe` or `crepe_tiny` for f0_method.
+
+```bash $ 
+python3 rvc.py -i booth.wav -m Rinne.onnx --f0_method crepe_tiny --f0 1 --f0_up_key 11 --tgt_sr 48000
+```
+
+By adding the `--file_index` option, you can specify faiss feature file.
 
 ```bash $ 
 python3 rvc.py -i booth.wav -m Rinne.onnx --f0_method crepe --f0 1 --f0_up_key 11 --tgt_sr 48000 --file_index Rinne.index --index_rate 0.75
