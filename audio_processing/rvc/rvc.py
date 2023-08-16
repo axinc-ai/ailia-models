@@ -62,7 +62,7 @@ parser.add_argument(
     help='Transpose (number of semitones, raise by an octave: 12, lower by an octave: -12)',
 )
 parser.add_argument(
-    '--f0_method', default="pm", choices=("pm", "harvest", "crepe"),
+    '--f0_method', default="pm", choices=("pm", "harvest", "crepe", "crepe_tiny"),
     help='Select the pitch extraction algorithm',
 )
 parser.add_argument(
@@ -212,7 +212,7 @@ def get_f0(
 
         if filter_radius > 2:
             f0 = signal.medfilt(f0, 3)
-    elif f0_method == "crepe":
+    elif f0_method == "crepe" or f0_method == "crepe_tiny":
         import mod_crepe
 
         # Pick a batch size that doesn't cause memory errors on your gpu
@@ -537,9 +537,9 @@ def main():
         hubert = onnxruntime.InferenceSession(WEIGHT_HUBERT_PATH, providers=providers)
         net_g = onnxruntime.InferenceSession(WEIGHT_VC_PATH, providers=providers)
 
-    if args.f0 == 1 and args.f0_method == "crepe":
+    if args.f0 == 1 and (args.f0_method == "crepe" or args.f0_method == "crepe_tiny"):
         import mod_crepe
-        f0_model = mod_crepe.load_model(env_id, args.onnx)
+        f0_model = mod_crepe.load_model(env_id, args.onnx, args.f0_method == "crepe_tiny")
         if args.profile:
             f0_model.set_profile_mode(True)
     else:
