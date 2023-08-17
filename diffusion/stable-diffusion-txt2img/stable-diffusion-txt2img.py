@@ -24,6 +24,9 @@ logger = getLogger(__name__)
 # Parameters
 # ======================
 
+SINGLE_MODEL = True
+
+# Multi model (v1_4)
 WEIGHT_DFSN_EMB_PATH = 'diffusion_emb.onnx'
 MODEL_DFSN_EMB_PATH = 'diffusion_emb.onnx.prototxt'
 WEIGHT_DFSN_MID_PATH = 'diffusion_mid.onnx'
@@ -32,6 +35,13 @@ WEIGHT_DFSN_OUT_PATH = 'diffusion_out.onnx'
 MODEL_DFSN_OUT_PATH = 'diffusion_out.onnx.prototxt'
 WEIGHT_AUTO_ENC_PATH = 'autoencoder.onnx'
 MODEL_AUTO_ENC_PATH = 'autoencoder.onnx.prototxt'
+
+# Single model (re-export v1_4)
+WEIGHT_DFSN_V1_4_PATH = 'diffusion_v1_4.opt.onnx'
+MODEL_DFSN_V1_4_PATH = 'diffusion_v1_4.opt.onnx.prototxt'
+WEIGHT_AUTO_ENC_V1_4_PATH = 'autoencoder_v1_4.opt.onnx'
+MODEL_AUTO_ENC_V1_4_PATH = 'autoencoder_v1_4.opt.onnx.prototxt'
+
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/stable-diffusion-txt2img/'
 
 WEIGHT_VITL14_TEXT_PATH = 'ViT-L14-encode_text.onnx'
@@ -399,6 +409,17 @@ def apply_model(models, x, t, cc, update_context):
     diffusion_out = models["diffusion_out"]
 
     x = x.astype(np.float16)
+
+    if SINGLE_MODEL:
+        if not args.onnx:
+            if not FIX_CONSTANT_CONTEXT or update_context:
+                output = diffusion_emb.predict([x, t, cc])
+            else:
+                output = diffusion_emb.run({'x': x, 'timesteps': t})
+        else:
+            output = diffusion_emb.run(None, {'x': x, 'timesteps': t, 'context': cc})
+        return output[0]
+
     if not args.onnx:
         if not FIX_CONSTANT_CONTEXT or update_context:
             output = diffusion_emb.predict([x, t, cc])
@@ -474,7 +495,7 @@ def predict(
     c = cond_stage_model.encode([prompt] * n_samples)
     shape = [n_samples, C, H // factor, W // factor]
 
-    plms = True
+    plms = False
     if plms:
         samples_ddim = plms_sampling(
             models, c, shape,
@@ -543,10 +564,14 @@ def recognize_from_text(models):
 
 
 def main():
-    check_and_download_models(WEIGHT_DFSN_EMB_PATH, MODEL_DFSN_EMB_PATH, REMOTE_PATH)
-    check_and_download_models(WEIGHT_DFSN_MID_PATH, MODEL_DFSN_MID_PATH, REMOTE_PATH)
-    check_and_download_models(WEIGHT_DFSN_OUT_PATH, MODEL_DFSN_OUT_PATH, REMOTE_PATH)
-    check_and_download_models(WEIGHT_AUTO_ENC_PATH, MODEL_AUTO_ENC_PATH, REMOTE_PATH)
+    if SINGLE_MODEL:
+        check_and_download_models(WEIGHT_DFSN_V1_4_PATH, MODEL_DFSN_V1_4_PATH, REMOTE_PATH)
+        check_and_download_models(WEIGHT_AUTO_ENC_V1_4_PATH, MODEL_AUTO_ENC_V1_4_PATH, REMOTE_PATH)
+    else:
+        check_and_download_models(WEIGHT_DFSN_EMB_PATH, MODEL_DFSN_EMB_PATH, REMOTE_PATH)
+        check_and_download_models(WEIGHT_DFSN_MID_PATH, MODEL_DFSN_MID_PATH, REMOTE_PATH)
+        check_and_download_models(WEIGHT_DFSN_OUT_PATH, MODEL_DFSN_OUT_PATH, REMOTE_PATH)
+        check_and_download_models(WEIGHT_AUTO_ENC_PATH, MODEL_AUTO_ENC_PATH, REMOTE_PATH)
 
     if args.onnx_clip:
         check_and_download_models(WEIGHT_VITL14_TEXT_PATH, MODEL_VITL14_TEXT_PATH, CLIP_REMOTE_PATH)
@@ -564,14 +589,22 @@ def main():
         memory_mode = ailia.get_memory_mode(
             reduce_constant=True, ignore_input_with_initializer=True,
             reduce_interstage=False, reuse_interstage=True)
-        diffusion_emb = ailia.Net(
-            MODEL_DFSN_EMB_PATH, WEIGHT_DFSN_EMB_PATH, env_id=env_id, memory_mode=memory_mode)
-        diffusion_mid = ailia.Net(
-            MODEL_DFSN_MID_PATH, WEIGHT_DFSN_MID_PATH, env_id=env_id, memory_mode=memory_mode)
-        diffusion_out = ailia.Net(
-            MODEL_DFSN_OUT_PATH, WEIGHT_DFSN_OUT_PATH, env_id=env_id, memory_mode=memory_mode)
-        autoencoder = ailia.Net(
-            MODEL_AUTO_ENC_PATH, WEIGHT_AUTO_ENC_PATH, env_id=env_id, memory_mode=memory_mode)
+        if SINGLE_MODEL:
+            diffusion_emb = ailia.Net(
+                MODEL_DFSN_V1_4_PATH, WEIGHT_DFSN_V1_4_PATH, env_id=env_id, memory_mode=memory_mode)
+            diffusion_mid = None
+            diffusion_out = None
+            autoencoder = ailia.Net(
+                MODEL_AUTO_ENC_V1_4_PATH, WEIGHT_AUTO_ENC_V1_4_PATH, env_id=env_id, memory_mode=memory_mode)
+        else:
+            diffusion_emb = ailia.Net(
+                MODEL_DFSN_EMB_PATH, WEIGHT_DFSN_EMB_PATH, env_id=env_id, memory_mode=memory_mode)
+            diffusion_mid = ailia.Net(
+                MODEL_DFSN_MID_PATH, WEIGHT_DFSN_MID_PATH, env_id=env_id, memory_mode=memory_mode)
+            diffusion_out = ailia.Net(
+                MODEL_DFSN_OUT_PATH, WEIGHT_DFSN_OUT_PATH, env_id=env_id, memory_mode=memory_mode)
+            autoencoder = ailia.Net(
+                MODEL_AUTO_ENC_PATH, WEIGHT_AUTO_ENC_PATH, env_id=env_id, memory_mode=memory_mode)
 
         if args.onnx_clip:
             clip = ailia.Net(
@@ -580,10 +613,16 @@ def main():
             clip = None
     else:
         import onnxruntime
-        diffusion_emb = onnxruntime.InferenceSession(WEIGHT_DFSN_EMB_PATH)
-        diffusion_mid = onnxruntime.InferenceSession(WEIGHT_DFSN_MID_PATH)
-        diffusion_out = onnxruntime.InferenceSession(WEIGHT_DFSN_OUT_PATH)
-        autoencoder = onnxruntime.InferenceSession(WEIGHT_AUTO_ENC_PATH)
+        if SINGLE_MODEL:
+            diffusion_emb = onnxruntime.InferenceSession(WEIGHT_DFSN_V1_4_PATH)
+            diffusion_mid = None
+            diffusion_out = None
+            autoencoder = onnxruntime.InferenceSession(WEIGHT_AUTO_ENC_V1_4_PATH)
+        else:
+            diffusion_emb = onnxruntime.InferenceSession(WEIGHT_DFSN_EMB_PATH)
+            diffusion_mid = onnxruntime.InferenceSession(WEIGHT_DFSN_MID_PATH)
+            diffusion_out = onnxruntime.InferenceSession(WEIGHT_DFSN_OUT_PATH)
+            autoencoder = onnxruntime.InferenceSession(WEIGHT_AUTO_ENC_PATH)
         clip = None
 
     seed = args.seed
