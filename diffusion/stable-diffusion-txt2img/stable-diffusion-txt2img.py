@@ -27,24 +27,37 @@ logger = getLogger(__name__)
 # Parameters
 # ======================
 
+# Legacy multi model (v1_4)
 WEIGHT_DFSN_EMB_PATH = 'diffusion_emb.onnx'
 MODEL_DFSN_EMB_PATH = 'diffusion_emb.onnx.prototxt'
 WEIGHT_DFSN_MID_PATH = 'diffusion_mid.onnx'
 MODEL_DFSN_MID_PATH = 'diffusion_mid.onnx.prototxt'
 WEIGHT_DFSN_OUT_PATH = 'diffusion_out.onnx'
 MODEL_DFSN_OUT_PATH = 'diffusion_out.onnx.prototxt'
+
 WEIGHT_BASIL_MIX_EMB_PATH = 'basil_mix_emb.onnx'
 MODEL_BASIL_MIX_EMB_PATH = 'basil_mix_emb.onnx.prototxt'
 WEIGHT_BASIL_MIX_MID_PATH = 'basil_mix_mid.onnx'
 MODEL_BASIL_MIX_MID_PATH = 'basil_mix_mid.onnx.prototxt'
 WEIGHT_BASIL_MIX_OUT_PATH = 'basil_mix_out.onnx'
 MODEL_BASIL_MIX_OUT_PATH = 'basil_mix_out.onnx.prototxt'
+
+# New one model (v1_4)
+WEIGHT_DFSN_PATH = 'diffusion.opt.onnx'
+MODEL_DFSN_PATH = 'diffusion.opt.onnx.prototxt'
+WEIGHT_BASIL_MIX_PATH = 'basil_mix.opt.onnx'
+MODEL_BASIL_MIX_PATH = 'basil_mix.opt.onnx.prototxt'
+
+# Auto encoder
 WEIGHT_AUTO_ENC_PATH = 'autoencoder.onnx'
 MODEL_AUTO_ENC_PATH = 'autoencoder.onnx.prototxt'
+
 WEIGHT_VAE_FT_MSE_PATH = 'vae-ft-mse-840000.onnx'
 MODEL_VAE_FT_MSE_PATH = 'vae-ft-mse-840000.onnx.prototxt'
+
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/stable-diffusion-txt2img/'
 
+# Clip model
 WEIGHT_VITL14_TEXT_PATH = 'ViT-L14-encode_text.onnx'
 MODEL_VITL14_TEXT_PATH = 'ViT-L14-encode_text.onnx.prototxt'
 CLIP_REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/clip/'
@@ -129,6 +142,11 @@ parser.add_argument(
     '--onnx_clip',
     action='store_true',
     help='use onnx version of clip.'
+)
+parser.add_argument(
+    '--legacy',
+    action='store_true',
+    help='execute legacy multi model version.'
 )
 args = update_parser(parser, check_input_type=False)
 
@@ -242,10 +260,6 @@ def plms_sampling(
     b = x.shape[0]
     old_eps = []
 
-    if args.benchmark:
-        logger.info('BENCHMARK mode')
-        total_time_estimation = 0
-
     for i, step in enumerate(iterator):
         index = total_steps - i - 1
         ts = np.full((b,), step, dtype=np.int64)
@@ -268,15 +282,11 @@ def plms_sampling(
             end = int(round(time.time() * 1000))
             estimation_time = (end - start)
             logger.info(f'\tailia processing estimation time {estimation_time} ms')
-            total_time_estimation = total_time_estimation + estimation_time
 
         img, pred_x0, e_t = outs
         old_eps.append(e_t)
         if len(old_eps) >= 4:
             old_eps.pop(0)
-
-    if args.benchmark:
-        logger.info(f'\ttotal time estimation {total_time_estimation} ms')
 
     return img
 
@@ -369,6 +379,9 @@ def ddim_sampling(
     b = x.shape[0]
 
     for i, step in enumerate(iterator):
+        if args.benchmark:
+            start = int(round(time.time() * 1000))
+
         index = total_steps - i - 1
         ts = np.full((b,), step, dtype=np.int64)
 
@@ -379,6 +392,11 @@ def ddim_sampling(
             cfg_scale=cfg_scale,
             unconditional_conditioning=unconditional_conditioning,
         )
+
+        if args.benchmark:
+            end = int(round(time.time() * 1000))
+            estimation_time = (end - start)
+            logger.info(f'\tailia processing estimation time {estimation_time} ms')
 
     return img
 
@@ -429,6 +447,17 @@ def apply_model(models, x, t, cc, update_context=True):
     diffusion_out = models["diffusion_out"]
 
     x = x.astype(np.float32)
+
+    if not args.legacy:
+        if not args.onnx:
+            if not FIX_CONSTANT_CONTEXT or update_context:
+                output = diffusion_emb.predict([x, t, cc])
+            else:
+                output = diffusion_emb.run({'x': x, 'timesteps': t})
+        else:
+            output = diffusion_emb.run(None, {'x': x, 'timesteps': t, 'context': cc})
+        return output[0]
+
     if not args.onnx:
         if not FIX_CONSTANT_CONTEXT or update_context:
             output = diffusion_emb.predict([x, t, cc])
@@ -526,7 +555,16 @@ def predict(
         cfg_scale=cfg_scale,
         steps=steps)
 
+    if args.benchmark:
+        start = int(round(time.time() * 1000))
+
     x_samples = decode_first_stage(models, samples)
+
+    if args.benchmark:
+        end = int(round(time.time() * 1000))
+        estimation_time = (end - start)
+        logger.info(f'\tailia processing estimation time {estimation_time} ms')
+
     x_samples = np.clip((x_samples + 1.0) / 2.0, a_min=0.0, a_max=1.0)
 
     results = []
@@ -558,6 +596,10 @@ def recognize_from_text(models):
     base_count = len(os.listdir(sample_path))
 
     logger.info('Start inference...')
+    if args.benchmark:
+        logger.info('BENCHMARK mode')
+        start = int(round(time.time() * 1000))
+
     c = cond_stage_model.encode([prompt] * n_samples)
     uc = None
     if scale != 1.0:
@@ -578,6 +620,11 @@ def recognize_from_text(models):
 
     grid_img = np.concatenate(all_samples, axis=0)
 
+    if args.benchmark:
+        end = int(round(time.time() * 1000))
+        estimation_time = (end - start)
+        logger.info(f'\ttotal time estimation {estimation_time} ms')
+
     # plot result
     savepath = get_savepath(args.savepath, "", ext='.png')
     logger.info(f'saved at : {savepath}')
@@ -587,16 +634,28 @@ def recognize_from_text(models):
 
 
 def main():
-    dic_sd = {
-        'default': (
-            (WEIGHT_DFSN_EMB_PATH, MODEL_DFSN_EMB_PATH),
-            (WEIGHT_DFSN_MID_PATH, MODEL_DFSN_MID_PATH),
-            (WEIGHT_DFSN_OUT_PATH, MODEL_DFSN_OUT_PATH)),
-        'basil_mix': (
-            (WEIGHT_BASIL_MIX_EMB_PATH, MODEL_BASIL_MIX_EMB_PATH),
-            (WEIGHT_BASIL_MIX_MID_PATH, MODEL_BASIL_MIX_MID_PATH),
-            (WEIGHT_BASIL_MIX_OUT_PATH, MODEL_BASIL_MIX_OUT_PATH)),
-    }
+    if not args.legacy:
+        dic_sd = {
+            'default': (
+                (WEIGHT_DFSN_PATH, MODEL_DFSN_PATH),
+                (None, None),
+                (None, None)),
+            'basil_mix': (
+                (WEIGHT_BASIL_MIX_PATH, MODEL_BASIL_MIX_PATH),
+                (None, None),
+                (None, None)),
+        }
+    else:
+        dic_sd = {
+            'default': (
+                (WEIGHT_DFSN_EMB_PATH, MODEL_DFSN_EMB_PATH),
+                (WEIGHT_DFSN_MID_PATH, MODEL_DFSN_MID_PATH),
+                (WEIGHT_DFSN_OUT_PATH, MODEL_DFSN_OUT_PATH)),
+            'basil_mix': (
+                (WEIGHT_BASIL_MIX_EMB_PATH, MODEL_BASIL_MIX_EMB_PATH),
+                (WEIGHT_BASIL_MIX_MID_PATH, MODEL_BASIL_MIX_MID_PATH),
+                (WEIGHT_BASIL_MIX_OUT_PATH, MODEL_BASIL_MIX_OUT_PATH)),
+        }
     dic_vae = {
         'default': (WEIGHT_AUTO_ENC_PATH, MODEL_AUTO_ENC_PATH),
         'vae-ft-mse': (WEIGHT_VAE_FT_MSE_PATH, MODEL_VAE_FT_MSE_PATH),
@@ -606,8 +665,9 @@ def main():
     (WEIGHT_SD_OUT_PATH, MODEL_SD_OUT_PATH) = dic_sd[args.sd]
     WEIGHT_VAE_PATH, MODEL_VAE_PATH = dic_vae[args.vae]
     check_and_download_models(WEIGHT_SD_EMB_PATH, MODEL_SD_EMB_PATH, REMOTE_PATH)
-    check_and_download_models(WEIGHT_SD_MID_PATH, MODEL_SD_MID_PATH, REMOTE_PATH)
-    check_and_download_models(WEIGHT_SD_OUT_PATH, MODEL_SD_OUT_PATH, REMOTE_PATH)
+    if args.legacy:
+        check_and_download_models(WEIGHT_SD_MID_PATH, MODEL_SD_MID_PATH, REMOTE_PATH)
+        check_and_download_models(WEIGHT_SD_OUT_PATH, MODEL_SD_OUT_PATH, REMOTE_PATH)
     check_and_download_models(WEIGHT_VAE_PATH, MODEL_VAE_PATH, REMOTE_PATH)
 
     if args.onnx_clip:
@@ -616,34 +676,37 @@ def main():
     env_id = args.env_id
 
     # initialize
-    if not args.onnx:
-        # disable FP16
-        #if "FP16" in ailia.get_environment(args.env_id).props:
-        #    logger.warning('This model do not work on FP16. So use CPU mode.')
-        #    env_id = 0
+    diffusion_emb = None
+    diffusion_mid = None
+    diffusion_out = None
+    autoencoder = None
 
+    if not args.onnx:
         logger.info("This model requires 10GB or more memory.")
         memory_mode = ailia.get_memory_mode(
             reduce_constant=True, ignore_input_with_initializer=True,
             reduce_interstage=False, reuse_interstage=True)
         diffusion_emb = ailia.Net(
             MODEL_SD_EMB_PATH, WEIGHT_SD_EMB_PATH, env_id=env_id, memory_mode=memory_mode)
-        diffusion_mid = ailia.Net(
-            MODEL_SD_MID_PATH, WEIGHT_SD_MID_PATH, env_id=env_id, memory_mode=memory_mode)
-        diffusion_out = ailia.Net(
-            MODEL_SD_OUT_PATH, WEIGHT_SD_OUT_PATH, env_id=env_id, memory_mode=memory_mode)
+        if args.legacy:
+            diffusion_mid = ailia.Net(
+                MODEL_SD_MID_PATH, WEIGHT_SD_MID_PATH, env_id=env_id, memory_mode=memory_mode)
+            diffusion_out = ailia.Net(
+                MODEL_SD_OUT_PATH, WEIGHT_SD_OUT_PATH, env_id=env_id, memory_mode=memory_mode)
         autoencoder = ailia.Net(
             MODEL_VAE_PATH, WEIGHT_VAE_PATH, env_id=env_id, memory_mode=memory_mode)
         if args.onnx_clip:
+            env_id_cpu = -1 # clip without low memory mode only work on cpu
             clip = ailia.Net(
-                MODEL_VITL14_TEXT_PATH, WEIGHT_VITL14_TEXT_PATH, env_id=env_id) # require hidden state, so use normal memory mode
+                MODEL_VITL14_TEXT_PATH, WEIGHT_VITL14_TEXT_PATH, env_id=env_id_cpu) # require hidden state, so use normal memory mode
         else:
             clip = None
     else:
         import onnxruntime
         diffusion_emb = onnxruntime.InferenceSession(WEIGHT_SD_EMB_PATH)
-        diffusion_mid = onnxruntime.InferenceSession(WEIGHT_SD_MID_PATH)
-        diffusion_out = onnxruntime.InferenceSession(WEIGHT_SD_OUT_PATH)
+        if args.legacy:
+            diffusion_mid = onnxruntime.InferenceSession(WEIGHT_SD_MID_PATH)
+            diffusion_out = onnxruntime.InferenceSession(WEIGHT_SD_OUT_PATH)
         autoencoder = onnxruntime.InferenceSession(WEIGHT_VAE_PATH)
         clip = None
 
