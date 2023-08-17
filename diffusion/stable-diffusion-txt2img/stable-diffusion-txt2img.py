@@ -618,16 +618,16 @@ def main():
     # initialize
     if not args.onnx:
         # disable FP16
-        if "FP16" in ailia.get_environment(args.env_id).props:
-            logger.warning('This model do not work on FP16. So use CPU mode.')
-            env_id = 0
+        #if "FP16" in ailia.get_environment(args.env_id).props:
+        #    logger.warning('This model do not work on FP16. So use CPU mode.')
+        #    env_id = 0
 
         logger.info("This model requires 10GB or more memory.")
         memory_mode = ailia.get_memory_mode(
             reduce_constant=True, ignore_input_with_initializer=True,
             reduce_interstage=False, reuse_interstage=True)
         diffusion_emb = ailia.Net(
-            MODEL_DFSN_EMB_PATH, WEIGHT_DFSN_EMB_PATH, env_id=env_id, memory_mode=memory_mode)
+            MODEL_SD_EMB_PATH, WEIGHT_SD_EMB_PATH, env_id=env_id, memory_mode=memory_mode)
         diffusion_mid = ailia.Net(
             MODEL_SD_MID_PATH, WEIGHT_SD_MID_PATH, env_id=env_id, memory_mode=memory_mode)
         diffusion_out = ailia.Net(
