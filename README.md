@@ -106,7 +106,7 @@ The collection of pre-trained, state-of-the-art AI models.
 | [<img src="diffusion/latent-diffusion-inpainting/output.png" width=128px>](diffusion/latent-diffusion-inpainting/) | [latent-diffusion-inpainting](/diffusion/latent-diffusion-inpainting/) | [Latent Diffusion - inpainting](https://github.com/CompVis/latent-diffusion) | Pytorch | 1.2.10 and later |
 | [<img src="diffusion/latent-diffusion-superresolution/output.png" width=128px>](diffusion/latent-diffusion-superresolution/) | [latent-diffusion-superresolution](/diffusion/latent-diffusion-superresolution/) | [Latent Diffusion - Super-resolution](https://github.com/CompVis/latent-diffusion) | Pytorch | 1.2.10 and later |
 | [<img src="diffusion/stable-diffusion-txt2img/output.png" width=128px>](diffusion/stable-diffusion-txt2img/) | [stable-diffusion-txt2img](/diffusion/stable-diffusion-txt2img/) | [Stable Diffusion](https://github.com/CompVis/stable-diffusion) | Pytorch | 1.2.14 and later |
-| [<img src="diffusion/contol_net/output.png" width=128px>](diffusion/stable-diffusion-txt2img/) | [contol_net](/diffusion/contol_net/) | [ControlNet](https://github.com/lllyasviel/ControlNet) | Pytorch | 1.2.14 and later |
+| [<img src="diffusion/control_net/examples/output_pose1.png" width=128px>](diffusion/control_net/) | [control_net](/diffusion/contol_net/) | [ControlNet](https://github.com/lllyasviel/ControlNet) | Pytorch | 1.2.14 and later |
 
 ## Face detection
 
