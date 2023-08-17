@@ -24,7 +24,7 @@ logger = getLogger(__name__)
 # Parameters
 # ======================
 
-# Multi model (v1_4)
+# Legacy model (v1_4)
 WEIGHT_DFSN_EMB_PATH = 'diffusion_emb.onnx'
 MODEL_DFSN_EMB_PATH = 'diffusion_emb.onnx.prototxt'
 WEIGHT_DFSN_MID_PATH = 'diffusion_mid.onnx'
@@ -34,7 +34,7 @@ MODEL_DFSN_OUT_PATH = 'diffusion_out.onnx.prototxt'
 WEIGHT_AUTO_ENC_PATH = 'autoencoder.onnx'
 MODEL_AUTO_ENC_PATH = 'autoencoder.onnx.prototxt'
 
-# Single model (re-export v1_4)
+# Re-export model (v1_4)
 WEIGHT_DFSN_V1_4_PATH = 'diffusion_v1_4.opt.onnx'
 MODEL_DFSN_V1_4_PATH = 'diffusion_v1_4.opt.onnx.prototxt'
 WEIGHT_AUTO_ENC_V1_4_PATH = 'autoencoder_v1_4.opt.onnx'
@@ -111,9 +111,9 @@ parser.add_argument(
     help='use onnx version of clip.'
 )
 parser.add_argument(
-    '--single_model',
+    '--legacy',
     action='store_true',
-    help='execute single model version.'
+    help='execute legacy multi model version.'
 )
 parser.add_argument(
     '--ddim',
@@ -418,7 +418,7 @@ def apply_model(models, x, t, cc, update_context):
 
     x = x.astype(np.float16)
 
-    if args.single_model:
+    if not args.legacy:
         if not args.onnx:
             if not FIX_CONSTANT_CONTEXT or update_context:
                 output = diffusion_emb.predict([x, t, cc])
@@ -590,7 +590,7 @@ def recognize_from_text(models):
 
 
 def main():
-    if args.single_model:
+    if not args.legacy:
         check_and_download_models(WEIGHT_DFSN_V1_4_PATH, MODEL_DFSN_V1_4_PATH, REMOTE_PATH)
         check_and_download_models(WEIGHT_AUTO_ENC_V1_4_PATH, MODEL_AUTO_ENC_V1_4_PATH, REMOTE_PATH)
     else:
@@ -610,7 +610,7 @@ def main():
         memory_mode = ailia.get_memory_mode(
             reduce_constant=True, ignore_input_with_initializer=True,
             reduce_interstage=False, reuse_interstage=True)
-        if args.single_model:
+        if not args.legacy:
             diffusion_emb = ailia.Net(
                 MODEL_DFSN_V1_4_PATH, WEIGHT_DFSN_V1_4_PATH, env_id=env_id, memory_mode=memory_mode)
             diffusion_mid = None
@@ -634,7 +634,7 @@ def main():
             clip = None
     else:
         import onnxruntime
-        if args.single_model:
+        if not args.legacy:
             diffusion_emb = onnxruntime.InferenceSession(WEIGHT_DFSN_V1_4_PATH)
             diffusion_mid = None
             diffusion_out = None
