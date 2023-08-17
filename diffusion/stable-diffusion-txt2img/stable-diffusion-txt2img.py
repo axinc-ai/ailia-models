@@ -42,7 +42,7 @@ MODEL_BASIL_MIX_MID_PATH = 'basil_mix_mid.onnx.prototxt'
 WEIGHT_BASIL_MIX_OUT_PATH = 'basil_mix_out.onnx'
 MODEL_BASIL_MIX_OUT_PATH = 'basil_mix_out.onnx.prototxt'
 
-# One model (v1_4)
+# New one model (v1_4)
 WEIGHT_DFSN_PATH = 'diffusion.opt.onnx'
 MODEL_DFSN_PATH = 'diffusion.opt.onnx.prototxt'
 WEIGHT_BASIL_MIX_PATH = 'basil_mix.opt.onnx'
@@ -147,11 +147,6 @@ parser.add_argument(
     '--legacy',
     action='store_true',
     help='execute legacy multi model version.'
-)
-parser.add_argument(
-    '--ddim',
-    action='store_true',
-    help='execute ddim mode.'
 )
 args = update_parser(parser, check_input_type=False)
 
