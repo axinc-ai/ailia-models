@@ -39,6 +39,7 @@ cd ../../diffusion/latent-diffusion-txt2img; python3 latent-diffusion-txt2img.py
 cd ../../diffusion/latent-diffusion-superresolution; python3 latent-diffusion-superresolution.py ${OPTION}
 cd ../../diffusion/latent-diffusion-inpainting; python3 latent-diffusion-inpainting.py ${OPTION}
 cd ../../diffusion/stable-diffusion-txt2img; python3 stable-diffusion-txt2img.py ${OPTION}
+cd ../../diffusion/control_net python3 control_net.py ${OPTION}
 cd ../../deep_fashion/clothing-detection; python3 clothing-detection.py ${OPTION}
 cd ../../deep_fashion/fashionai-key-points-detection; python3 fashionai-key-points-detection.py -c blouse ${OPTION}
 cd ../../deep_fashion/fashionai-key-points-detection; python3 fashionai-key-points-detection.py -c dress ${OPTION}

@@ -388,6 +388,7 @@ def ddim_sampling(
         img, pred_x0 = p_sample_ddim(
             models,
             img, conditioning, ts,
+            update_context=(i == 0),
             index=index,
             cfg_scale=cfg_scale,
             unconditional_conditioning=unconditional_conditioning,
@@ -402,7 +403,7 @@ def ddim_sampling(
 
 
 def p_sample_ddim(
-        models, x, c, t, index,
+        models, x, c, t, update_context, index,
         temperature=1.,
         unconditional_conditioning=None,
         cfg_scale=1.,
@@ -411,7 +412,7 @@ def p_sample_ddim(
     t_in = np.concatenate([t] * 2)
     c_in = np.concatenate([unconditional_conditioning, c])
 
-    x_recon = apply_model(models, x_in, t_in, c_in, True)
+    x_recon = apply_model(models, x_in, t_in, c_in, update_context)
     e_t_uncond, e_t = np.split(x_recon, 2)
 
     e_t = e_t_uncond + cfg_scale * (e_t - e_t_uncond)
