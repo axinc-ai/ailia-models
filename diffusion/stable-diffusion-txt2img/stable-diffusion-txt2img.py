@@ -233,10 +233,6 @@ def plms_sampling(
     b = shape[0]
     old_eps = []
 
-    if args.benchmark:
-        logger.info('BENCHMARK mode')
-        total_time_estimation = 0
-
     for i, step in enumerate(iterator):
         index = total_steps - i - 1
         ts = np.full((b,), step, dtype=np.int64)
@@ -259,15 +255,11 @@ def plms_sampling(
             end = int(round(time.time() * 1000))
             estimation_time = (end - start)
             logger.info(f'\tailia processing estimation time {estimation_time} ms')
-            total_time_estimation = total_time_estimation + estimation_time
 
         img, pred_x0, e_t = outs
         old_eps.append(e_t)
         if len(old_eps) >= 4:
             old_eps.pop(0)
-
-    if args.benchmark:
-        logger.info(f'\ttotal time estimation {total_time_estimation} ms')
 
     return img
 
@@ -357,10 +349,6 @@ def ddim_sampling(
 
         iterator = iter_func(time_range)
 
-    if args.benchmark:
-        logger.info('BENCHMARK mode')
-        total_time_estimation = 0
-
     for i, step in enumerate(iterator):
         if args.benchmark:
             start = int(round(time.time() * 1000))
@@ -380,10 +368,6 @@ def ddim_sampling(
             end = int(round(time.time() * 1000))
             estimation_time = (end - start)
             logger.info(f'\tailia processing estimation time {estimation_time} ms')
-            total_time_estimation = total_time_estimation + estimation_time
-
-    if args.benchmark:
-        logger.info(f'\ttotal time estimation {total_time_estimation} ms')
 
     return img
 
@@ -531,7 +515,16 @@ def predict(
             unconditional_guidance_scale=scale,
             unconditional_conditioning=uc)
 
+    if args.benchmark:
+        start = int(round(time.time() * 1000))
+
     x_samples_ddim = decode_first_stage(models, samples_ddim)
+
+    if args.benchmark:
+        end = int(round(time.time() * 1000))
+        estimation_time = (end - start)
+        logger.info(f'\tailia processing estimation time {estimation_time} ms')
+
     x_samples_ddim = np.clip((x_samples_ddim + 1.0) / 2.0, a_min=0.0, a_max=1.0)
 
     x_samples = []
@@ -560,6 +553,10 @@ def recognize_from_text(models):
     base_count = len(os.listdir(sample_path))
 
     logger.info('Start inference...')
+    if args.benchmark:
+        logger.info('BENCHMARK mode')
+        start = int(round(time.time() * 1000))
+
     uc = None
     if scale != 1.0:
         uc = cond_stage_model.encode([""] * n_samples)
@@ -578,6 +575,11 @@ def recognize_from_text(models):
         all_samples.append(x_samples)
 
     grid_img = np.concatenate(all_samples, axis=0)
+
+    if args.benchmark:
+        end = int(round(time.time() * 1000))
+        estimation_time = (end - start)
+        logger.info(f'\ttotal time estimation {estimation_time} ms')
 
     # plot result
     savepath = get_savepath(args.savepath, "", ext='.png')
