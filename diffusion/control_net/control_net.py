@@ -50,7 +50,7 @@ WEIGHT_DFSN_OUT_PATH = 'diffusion_out.onnx'
 MODEL_DFSN_OUT_PATH = 'diffusion_out.onnx.prototxt'
 WEIGHT_AUTO_ENC_PATH = 'autoencoder.onnx'
 MODEL_AUTO_ENC_PATH = 'autoencoder.onnx.prototxt'
-REMOTE_PATH_SD = 'https://storage.googleapis.com/ailia-models/stable_diffusion/'
+REMOTE_PATH_SD = 'https://storage.googleapis.com/ailia-models/stable-diffusion-txt2img/'
 
 IMAGE_PATH = 'examples/bird.png'
 SAVE_IMAGE_PATH = 'output.png'
