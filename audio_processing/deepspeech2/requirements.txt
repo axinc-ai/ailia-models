@@ -1,6 +1,6 @@
 appdirs==1.4.4
 audioread==2.1.9
-certifi==2022.12.7
+certifi==2023.7.22
 cffi==1.14.3
 chardet==3.0.4
 decorator==4.4.2
@@ -17,10 +17,10 @@ pooch==1.2.0
 PyAudio==0.2.11
 pycparser==2.20
 pyparsing==2.4.7
-requests==2.24.0
+requests==2.31.0
 resampy==0.2.2
 scikit-learn==0.23.2
-scipy==1.5.3
+scipy==1.10.0
 six==1.15.0
 SoundFile==0.10.3.post1
 threadpoolctl==2.1.0
