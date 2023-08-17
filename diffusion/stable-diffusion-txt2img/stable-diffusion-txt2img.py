@@ -606,11 +606,6 @@ def main():
 
     # initialize
     if not args.onnx:
-        # disable FP16
-        if "FP16" in ailia.get_environment(args.env_id).props:
-            logger.warning('This model do not work on FP16. So use CPU mode.')
-            env_id = 0
-
         logger.info("This model requires 10GB or more memory.")
         memory_mode = ailia.get_memory_mode(
             reduce_constant=True, ignore_input_with_initializer=True,
