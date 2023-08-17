@@ -27,15 +27,13 @@ logger = getLogger(__name__)
 # Parameters
 # ======================
 
-# Legacy model (v1_4)
+# Legacy multi model (v1_4)
 WEIGHT_DFSN_EMB_PATH = 'diffusion_emb.onnx'
 MODEL_DFSN_EMB_PATH = 'diffusion_emb.onnx.prototxt'
 WEIGHT_DFSN_MID_PATH = 'diffusion_mid.onnx'
 MODEL_DFSN_MID_PATH = 'diffusion_mid.onnx.prototxt'
 WEIGHT_DFSN_OUT_PATH = 'diffusion_out.onnx'
 MODEL_DFSN_OUT_PATH = 'diffusion_out.onnx.prototxt'
-WEIGHT_AUTO_ENC_PATH = 'autoencoder.onnx'
-MODEL_AUTO_ENC_PATH = 'autoencoder.onnx.prototxt'
 
 WEIGHT_BASIL_MIX_EMB_PATH = 'basil_mix_emb.onnx'
 MODEL_BASIL_MIX_EMB_PATH = 'basil_mix_emb.onnx.prototxt'
@@ -43,14 +41,19 @@ WEIGHT_BASIL_MIX_MID_PATH = 'basil_mix_mid.onnx'
 MODEL_BASIL_MIX_MID_PATH = 'basil_mix_mid.onnx.prototxt'
 WEIGHT_BASIL_MIX_OUT_PATH = 'basil_mix_out.onnx'
 MODEL_BASIL_MIX_OUT_PATH = 'basil_mix_out.onnx.prototxt'
-WEIGHT_VAE_FT_MSE_PATH = 'vae-ft-mse-840000.onnx'
-MODEL_VAE_FT_MSE_PATH = 'vae-ft-mse-840000.onnx.prototxt'
 
-# Re-export model (v1_4)
+# One model (v1_4)
 WEIGHT_DFSN_PATH = 'diffusion.opt.onnx'
 MODEL_DFSN_PATH = 'diffusion.opt.onnx.prototxt'
 WEIGHT_BASIL_MIX_PATH = 'basil_mix.opt.onnx'
 MODEL_BASIL_MIX_PATH = 'basil_mix.opt.onnx.prototxt'
+
+# Auto encoder
+WEIGHT_AUTO_ENC_PATH = 'autoencoder.onnx'
+MODEL_AUTO_ENC_PATH = 'autoencoder.onnx.prototxt'
+
+WEIGHT_VAE_FT_MSE_PATH = 'vae-ft-mse-840000.onnx'
+MODEL_VAE_FT_MSE_PATH = 'vae-ft-mse-840000.onnx.prototxt'
 
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/stable-diffusion-txt2img/'
 
