@@ -696,8 +696,9 @@ def main():
         autoencoder = ailia.Net(
             MODEL_VAE_PATH, WEIGHT_VAE_PATH, env_id=env_id, memory_mode=memory_mode)
         if args.onnx_clip:
+            env_id_cpu = -1 # clip without low memory mode only work on cpu
             clip = ailia.Net(
-                MODEL_VITL14_TEXT_PATH, WEIGHT_VITL14_TEXT_PATH, env_id=env_id) # require hidden state, so use normal memory mode
+                MODEL_VITL14_TEXT_PATH, WEIGHT_VITL14_TEXT_PATH, env_id=env_id_cpu) # require hidden state, so use normal memory mode
         else:
             clip = None
     else:
