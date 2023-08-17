@@ -24,8 +24,6 @@ logger = getLogger(__name__)
 # Parameters
 # ======================
 
-SINGLE_MODEL = True
-
 # Multi model (v1_4)
 WEIGHT_DFSN_EMB_PATH = 'diffusion_emb.onnx'
 MODEL_DFSN_EMB_PATH = 'diffusion_emb.onnx.prototxt'
@@ -111,6 +109,16 @@ parser.add_argument(
     '--onnx_clip',
     action='store_true',
     help='use onnx version of clip.'
+)
+parser.add_argument(
+    '--single_model',
+    action='store_true',
+    help='execute single model version.'
+)
+parser.add_argument(
+    '--ddim',
+    action='store_true',
+    help='execute ddim mode.'
 )
 args = update_parser(parser, check_input_type=False)
 
@@ -349,7 +357,14 @@ def ddim_sampling(
 
         iterator = iter_func(time_range)
 
+    if args.benchmark:
+        logger.info('BENCHMARK mode')
+        total_time_estimation = 0
+
     for i, step in enumerate(iterator):
+        if args.benchmark:
+            start = int(round(time.time() * 1000))
+
         index = total_steps - i - 1
         ts = np.full((shape[0],), step, dtype=np.int64)
 
@@ -360,6 +375,15 @@ def ddim_sampling(
             unconditional_guidance_scale=unconditional_guidance_scale,
             unconditional_conditioning=unconditional_conditioning,
         )
+
+        if args.benchmark:
+            end = int(round(time.time() * 1000))
+            estimation_time = (end - start)
+            logger.info(f'\tailia processing estimation time {estimation_time} ms')
+            total_time_estimation = total_time_estimation + estimation_time
+
+    if args.benchmark:
+        logger.info(f'\ttotal time estimation {total_time_estimation} ms')
 
     return img
 
@@ -410,7 +434,7 @@ def apply_model(models, x, t, cc, update_context):
 
     x = x.astype(np.float16)
 
-    if SINGLE_MODEL:
+    if args.single_model:
         if not args.onnx:
             if not FIX_CONSTANT_CONTEXT or update_context:
                 output = diffusion_emb.predict([x, t, cc])
@@ -495,7 +519,7 @@ def predict(
     c = cond_stage_model.encode([prompt] * n_samples)
     shape = [n_samples, C, H // factor, W // factor]
 
-    plms = False
+    plms = not args.ddim
     if plms:
         samples_ddim = plms_sampling(
             models, c, shape,
@@ -564,7 +588,7 @@ def recognize_from_text(models):
 
 
 def main():
-    if SINGLE_MODEL:
+    if args.single_model:
         check_and_download_models(WEIGHT_DFSN_V1_4_PATH, MODEL_DFSN_V1_4_PATH, REMOTE_PATH)
         check_and_download_models(WEIGHT_AUTO_ENC_V1_4_PATH, MODEL_AUTO_ENC_V1_4_PATH, REMOTE_PATH)
     else:
@@ -589,7 +613,7 @@ def main():
         memory_mode = ailia.get_memory_mode(
             reduce_constant=True, ignore_input_with_initializer=True,
             reduce_interstage=False, reuse_interstage=True)
-        if SINGLE_MODEL:
+        if args.single_model:
             diffusion_emb = ailia.Net(
                 MODEL_DFSN_V1_4_PATH, WEIGHT_DFSN_V1_4_PATH, env_id=env_id, memory_mode=memory_mode)
             diffusion_mid = None
@@ -613,7 +637,7 @@ def main():
             clip = None
     else:
         import onnxruntime
-        if SINGLE_MODEL:
+        if args.single_model:
             diffusion_emb = onnxruntime.InferenceSession(WEIGHT_DFSN_V1_4_PATH)
             diffusion_mid = None
             diffusion_out = None
