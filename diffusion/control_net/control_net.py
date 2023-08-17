@@ -119,6 +119,13 @@ args = update_parser(parser)
 
 
 # ======================
+# Options
+# ======================
+
+FIX_CONSTANT_CONTEXT = True
+
+
+# ======================
 # Secondaty Functions
 # ======================
 
@@ -241,13 +248,23 @@ def ddim_sampling(
         index = total_steps - i - 1
         ts = np.full((shape[0],), step, dtype=np.int64)
 
+        if args.benchmark:
+            start = int(round(time.time() * 1000))
+
         img, pred_x0 = p_sample_ddim(
             models,
             img, cond, ts,
             index=index,
             unconditional_guidance_scale=unconditional_guidance_scale,
             unconditional_conditioning=unconditional_conditioning,
+            update_context=(i == 0)
         )
+
+        if args.benchmark:
+            end = int(round(time.time() * 1000))
+            estimation_time = (end - start)
+            logger.info(f'\tailia processing estimation time {estimation_time} ms')
+
         img = img.astype(np.float32)
 
     return img
@@ -258,12 +275,13 @@ def p_sample_ddim(
         models, x, c, t, index,
         temperature=1.,
         unconditional_guidance_scale=1.,
-        unconditional_conditioning=None):
+        unconditional_conditioning=None,
+        update_context=True):
     if unconditional_guidance_scale == 1.:
-        model_output = apply_model(models, x, t, c)
+        model_output = apply_model(models, x, t, c, update_context)
     else:
-        model_t = apply_model(models, x, t, c)
-        model_uncond = apply_model(models, x, t, unconditional_conditioning)
+        model_t = apply_model(models, x, t, c, update_context)
+        model_uncond = apply_model(models, x, t, unconditional_conditioning, update_context)
         model_output = model_uncond + unconditional_guidance_scale * (model_t - model_uncond)
 
     e_t = model_output
@@ -293,7 +311,7 @@ def p_sample_ddim(
 
 
 # diffusion_model
-def apply_model(models, x_noisy, t, cond):
+def apply_model(models, x_noisy, t, cond, update_context=True):
     control_net = models["control_net"]
     diffusion_emb = models["diffusion_emb"]
     diffusion_mid = models["diffusion_mid"]
@@ -303,14 +321,20 @@ def apply_model(models, x_noisy, t, cond):
     cond_txt = np.concatenate(cond['c_crossattn'], axis=1)
 
     if not args.onnx:
-        output = control_net.predict([x_noisy, hint, t, cond_txt])
+        if not FIX_CONSTANT_CONTEXT or update_context:
+            output = control_net.predict([x_noisy, hint, t, cond_txt])
+        else:
+            output = control_net.predict([x_noisy, hint, t])
     else:
         output = control_net.run(None, {'x': x_noisy, 'hint': hint, 'timesteps': t, 'context': cond_txt})
     control = output
 
     x_noisy = x_noisy.astype(np.float32)
     if not args.onnx:
-        output = diffusion_emb.predict([x_noisy, t, cond_txt])
+        if not FIX_CONSTANT_CONTEXT or update_context:
+            output = diffusion_emb.predict([x_noisy, t, cond_txt])
+        else:
+            output = diffusion_emb.predict([x_noisy, t])
     else:
         output = diffusion_emb.run(None, {'x': x_noisy, 'timesteps': t, 'context': cond_txt})
     h, emb, *hs = output
@@ -319,7 +343,14 @@ def apply_model(models, x_noisy, t, cond):
     h = hs.pop()
 
     if not args.onnx:
-        output = diffusion_mid.predict([h, emb, cond_txt, *hs[6:]])
+        if not FIX_CONSTANT_CONTEXT or update_context:
+            output = diffusion_mid.predict([h, emb, cond_txt, *hs[6:]])
+        else:
+            output = diffusion_mid.run({
+                'h': h, 'emb': emb,
+                'h6': hs[6], 'h7': hs[7], 'h8': hs[8],
+                'h9': hs[9], 'h10': hs[10], 'h11': hs[11],
+            })
     else:
         output = diffusion_mid.run(None, {
             'h': h, 'emb': emb, 'context': cond_txt,
@@ -329,7 +360,14 @@ def apply_model(models, x_noisy, t, cond):
     h = output[0]
 
     if not args.onnx:
-        output = diffusion_out.predict([h, emb, cond_txt, *hs[:6]])
+        if not FIX_CONSTANT_CONTEXT or update_context:
+            output = diffusion_out.predict([h, emb, cond_txt, *hs[:6]])
+        else:
+            output = diffusion_out.run({
+                'h': h, 'emb': emb,
+                'h0': hs[0], 'h1': hs[1], 'h2': hs[2],
+                'h3': hs[3], 'h4': hs[4], 'h5': hs[5],
+            })
     else:
         output = diffusion_out.run(None, {
             'h': h, 'emb': emb, 'context': cond_txt,
@@ -417,7 +455,16 @@ def predict(
         unconditional_guidance_scale=scale,
         unconditional_conditioning=un_cond)
 
+    if args.benchmark:
+        start = int(round(time.time() * 1000))
+
     x_samples = decode_first_stage(models, samples)
+
+    if args.benchmark:
+        end = int(round(time.time() * 1000))
+        estimation_time = (end - start)
+        logger.info(f'\tailia processing estimation time {estimation_time} ms')
+
     x_samples = np.clip(x_samples * 127.5 + 127.5, a_min=0, a_max=255)
     x_samples = x_samples.transpose((0, 2, 3, 1)).astype(np.uint8)  # CHW -> HWC
     x_samples = [x[:, :, ::-1] for x in x_samples]  # RGB -> BGR
@@ -444,23 +491,15 @@ def recognize_from_image_text(models):
 
     if args.benchmark:
         logger.info('BENCHMARK mode')
-        total_time_estimation = 0
-        for i in range(args.benchmark_count):
-            start = int(round(time.time() * 1000))
-            x_samples = predict(models, img, prompt, a_prompt, n_prompt)
-            end = int(round(time.time() * 1000))
-            estimation_time = (end - start)
+        start = int(round(time.time() * 1000))
 
-            # Logging
-            logger.info(f'\tailia processing estimation time {estimation_time} ms')
-            if i != 0:
-                total_time_estimation = total_time_estimation + estimation_time
-
-        logger.info(f'\taverage time estimation {total_time_estimation / (args.benchmark_count - 1)} ms')
-    else:
-        x_samples = predict(models, img, prompt, a_prompt, n_prompt)
-
+    x_samples = predict(models, img, prompt, a_prompt, n_prompt)
     x_samples = np.concatenate(x_samples, axis=1)
+
+    if args.benchmark:
+        end = int(round(time.time() * 1000))
+        estimation_time = (end - start)
+        logger.info(f'\ttotal time estimation {estimation_time} ms')
 
     # plot result
     savepath = get_savepath(args.savepath, "", ext='.png')
