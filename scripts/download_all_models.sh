@@ -177,6 +177,7 @@ cd ../../natural_language_processing/bert_zero_shot_classification; python3 bert
 cd ../../natural_language_processing/gpt2; python3 gpt2.py ${OPTION}
 cd ../../natural_language_processing/rinna_gpt2; python3 rinna_gpt2.py ${OPTION}
 cd ../../natural_language_processing/fugumt-en-ja; python3 fugumt-en-ja.py ${OPTION}
+cd ../../natural_language_processing/fugumt-ja-en; python3 fugumt-en-ja.py ${OPTION}
 cd ../../natural_language_processing/bert_sum_ext; python3 bert_sum_ext.py ${OPTION}
 cd ../../natural_language_processing/sentence_transformers_japanese; python3 sentence_transformers_japanese.py ${OPTION}
 cd ../../natural_language_processing/presumm; python3 presumm.py ${OPTION}
