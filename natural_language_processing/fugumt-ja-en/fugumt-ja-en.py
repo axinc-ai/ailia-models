@@ -1,33 +1,28 @@
 import sys
 import time
-from typing import Union, Tuple
+from typing import Tuple
 from logging import getLogger
 
 import numpy as np
 from transformers import MarianTokenizer
-import onnxruntime
-from optimum.onnxruntime import ORTModelForCausalLM
-import ailia
-
-
-ORTModelForCausalLM.from_pretrained
 
 # import original modules
 sys.path.append('../../util')
 from arg_utils import get_base_parser, update_parser, get_savepath  # noqa
 from model_utils import check_and_download_models  # noqa
 
+import ailia
+
 logger = getLogger(__name__)
 
 # ======================
 # Parameters
 # ======================
-HUGGING_FACE_PATH = 'staka/fugumt-ja-en'
 ENCODER_ONNX_PATH  = 'encoder_model.onnx'
 ENCODER_PROTOTXT_PATH = 'encoder_model.onnx.prototxt'
 DECODER_ONNX_PATH  = 'decoder_model_merged.onnx'
 DECODER_PROTOTXT_PATH = 'decoder_model_merged.onnx.prototxt'
-# REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/fugumt/'
+REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/fugumt'
 
 # ======================
 # Arguemnt Parser Config
@@ -48,7 +43,6 @@ parser.add_argument(
     help='execute onnxruntime version.'
 )
 args = update_parser(parser, check_input_type=False)
-args.onnx = True
 
 # ======================
 # Model wrapper
@@ -57,14 +51,10 @@ class MarianMT:
     def __init__(
         self,
         tokenizer: MarianTokenizer,
-        encoder: Union[ailia.Net, onnxruntime.InferenceSession],
-        decoder: Union[ailia.Net, onnxruntime.InferenceSession],
+        encoder: ailia.Net,
+        decoder: ailia.Net,
         args,
     ) -> None:
-        if type(encoder) not in [ailia.Net, onnxruntime.InferenceSession]:
-            raise Exception(f"encoder type {type(encoder)} is not supported")
-        if type(decoder) not in [ailia.Net, onnxruntime.InferenceSession]:
-            raise Exception(f"decoder type {type(decoder)} is not supported")
         self.tokenizer = tokenizer
         self.encoder = encoder
         self.decoder = decoder
@@ -88,93 +78,173 @@ class MarianMT:
         Returns:
             Tuppe[np.ndarray, np.ndarray]: logits and new past_key_values
         """
+        def _encode(
+            self,
+            input_ids: np.ndarray,
+            attention_mask: np.ndarray,
+        ):
+            if args.onnx:
+                return self.encoder.run(
+                    None,
+                    {
+                        'input_ids': input_ids,
+                        'attention_mask': attention_mask,
+                    },
+                )
+            else:
+                return self.encoder.predict(
+                    [
+                        input_ids,
+                        attention_mask,
+                    ]
+                )
+        
         def _decode_with_cache(
             self,
             attention_mask: np.ndarray,
             decoder_input_ids: np.ndarray,
             past_key_values: np.ndarray,
         ):
-            return self.decoder.run(
-                None,
-                {
-                    'input_ids': decoder_input_ids[:, -1:], # only input last token
-                    'encoder_attention_mask': attention_mask,
-                    'encoder_hidden_states': encoder_output[0],
-                    'use_cache_branch': np.array([True]),
-                    'past_key_values.0.decoder.key': past_key_values[0],
-                    'past_key_values.0.decoder.value': past_key_values[1],
-                    'past_key_values.0.encoder.key': past_key_values[2],
-                    'past_key_values.0.encoder.value': past_key_values[3],
-                    'past_key_values.1.decoder.key': past_key_values[4],
-                    'past_key_values.1.decoder.value': past_key_values[5],
-                    'past_key_values.1.encoder.key': past_key_values[6],
-                    'past_key_values.1.encoder.value': past_key_values[7],
-                    'past_key_values.2.decoder.key': past_key_values[8],
-                    'past_key_values.2.decoder.value': past_key_values[9],
-                    'past_key_values.2.encoder.key': past_key_values[10],
-                    'past_key_values.2.encoder.value': past_key_values[11],
-                    'past_key_values.3.decoder.key': past_key_values[12],
-                    'past_key_values.3.decoder.value': past_key_values[13],
-                    'past_key_values.3.encoder.key': past_key_values[14],
-                    'past_key_values.3.encoder.value': past_key_values[15],
-                    'past_key_values.4.decoder.key': past_key_values[16],
-                    'past_key_values.4.decoder.value': past_key_values[17],
-                    'past_key_values.4.encoder.key': past_key_values[18],
-                    'past_key_values.4.encoder.value': past_key_values[19],
-                    'past_key_values.5.decoder.key': past_key_values[20],
-                    'past_key_values.5.decoder.value': past_key_values[21],
-                    'past_key_values.5.encoder.key': past_key_values[22],
-                    'past_key_values.5.encoder.value': past_key_values[23],
-                }
-            )
+            if args.onnx:
+                return self.decoder.run(
+                    None,
+                    {
+                        'encoder_attention_mask': attention_mask,
+                        'input_ids': decoder_input_ids[:, -1:], # only input last token
+                        'encoder_hidden_states': encoder_output[0],
+                        'past_key_values.0.decoder.key': past_key_values[0],
+                        'past_key_values.0.decoder.value': past_key_values[1],
+                        'past_key_values.0.encoder.key': past_key_values[2],
+                        'past_key_values.0.encoder.value': past_key_values[3],
+                        'past_key_values.1.decoder.key': past_key_values[4],
+                        'past_key_values.1.decoder.value': past_key_values[5],
+                        'past_key_values.1.encoder.key': past_key_values[6],
+                        'past_key_values.1.encoder.value': past_key_values[7],
+                        'past_key_values.2.decoder.key': past_key_values[8],
+                        'past_key_values.2.decoder.value': past_key_values[9],
+                        'past_key_values.2.encoder.key': past_key_values[10],
+                        'past_key_values.2.encoder.value': past_key_values[11],
+                        'past_key_values.3.decoder.key': past_key_values[12],
+                        'past_key_values.3.decoder.value': past_key_values[13],
+                        'past_key_values.3.encoder.key': past_key_values[14],
+                        'past_key_values.3.encoder.value': past_key_values[15],
+                        'past_key_values.4.decoder.key': past_key_values[16],
+                        'past_key_values.4.decoder.value': past_key_values[17],
+                        'past_key_values.4.encoder.key': past_key_values[18],
+                        'past_key_values.4.encoder.value': past_key_values[19],
+                        'past_key_values.5.decoder.key': past_key_values[20],
+                        'past_key_values.5.decoder.value': past_key_values[21],
+                        'past_key_values.5.encoder.key': past_key_values[22],
+                        'past_key_values.5.encoder.value': past_key_values[23],
+                        'use_cache_branch': np.array([True]),
+                    }
+                )
+            else:
+                return self.decoder.predict([
+                    attention_mask,
+                    decoder_input_ids[:, -1:], # only input last token
+                    encoder_output[0],
+                    past_key_values[0],
+                    past_key_values[1],
+                    past_key_values[2],
+                    past_key_values[3],
+                    past_key_values[4],
+                    past_key_values[5],
+                    past_key_values[6],
+                    past_key_values[7],
+                    past_key_values[8],
+                    past_key_values[9],
+                    past_key_values[10],
+                    past_key_values[11],
+                    past_key_values[12],
+                    past_key_values[13],
+                    past_key_values[14],
+                    past_key_values[15],
+                    past_key_values[16],
+                    past_key_values[17],
+                    past_key_values[18],
+                    past_key_values[19],
+                    past_key_values[20],
+                    past_key_values[21],
+                    past_key_values[22],
+                    past_key_values[23],
+                    np.array([True]),
+                ])
+
         def _decode_without_cache(
             self,
             attention_mask: np.ndarray,
             decoder_input_ids: np.ndarray,
             past_key_values: np.ndarray,
         ):
-            return self.decoder.run(
-                None,
-                {
-                    'input_ids': decoder_input_ids, # only input last token
-                    'encoder_attention_mask': attention_mask,
-                    'encoder_hidden_states': encoder_output[0],
-                    'use_cache_branch': np.array([False]),
-                    'past_key_values.0.decoder.key': past_key_values[0],
-                    'past_key_values.0.decoder.value': past_key_values[1],
-                    'past_key_values.0.encoder.key': past_key_values[2],
-                    'past_key_values.0.encoder.value': past_key_values[3],
-                    'past_key_values.1.decoder.key': past_key_values[4],
-                    'past_key_values.1.decoder.value': past_key_values[5],
-                    'past_key_values.1.encoder.key': past_key_values[6],
-                    'past_key_values.1.encoder.value': past_key_values[7],
-                    'past_key_values.2.decoder.key': past_key_values[8],
-                    'past_key_values.2.decoder.value': past_key_values[9],
-                    'past_key_values.2.encoder.key': past_key_values[10],
-                    'past_key_values.2.encoder.value': past_key_values[11],
-                    'past_key_values.3.decoder.key': past_key_values[12],
-                    'past_key_values.3.decoder.value': past_key_values[13],
-                    'past_key_values.3.encoder.key': past_key_values[14],
-                    'past_key_values.3.encoder.value': past_key_values[15],
-                    'past_key_values.4.decoder.key': past_key_values[16],
-                    'past_key_values.4.decoder.value': past_key_values[17],
-                    'past_key_values.4.encoder.key': past_key_values[18],
-                    'past_key_values.4.encoder.value': past_key_values[19],
-                    'past_key_values.5.decoder.key': past_key_values[20],
-                    'past_key_values.5.decoder.value': past_key_values[21],
-                    'past_key_values.5.encoder.key': past_key_values[22],
-                    'past_key_values.5.encoder.value': past_key_values[23],
-                }
-            )
-        # execute encoder
-        encoder_output = self.encoder.run(
-            None,
-            {
-                'input_ids': input_ids,
-                'attention_mask': attention_mask,
-            },
-        )
+            if args.onnx:
+                return self.decoder.run(
+                    None,
+                    {
+                        'encoder_attention_mask': attention_mask,
+                        'input_ids': decoder_input_ids,
+                        'encoder_hidden_states': encoder_output[0],
+                        'past_key_values.0.decoder.key': past_key_values[0],
+                        'past_key_values.0.decoder.value': past_key_values[1],
+                        'past_key_values.0.encoder.key': past_key_values[2],
+                        'past_key_values.0.encoder.value': past_key_values[3],
+                        'past_key_values.1.decoder.key': past_key_values[4],
+                        'past_key_values.1.decoder.value': past_key_values[5],
+                        'past_key_values.1.encoder.key': past_key_values[6],
+                        'past_key_values.1.encoder.value': past_key_values[7],
+                        'past_key_values.2.decoder.key': past_key_values[8],
+                        'past_key_values.2.decoder.value': past_key_values[9],
+                        'past_key_values.2.encoder.key': past_key_values[10],
+                        'past_key_values.2.encoder.value': past_key_values[11],
+                        'past_key_values.3.decoder.key': past_key_values[12],
+                        'past_key_values.3.decoder.value': past_key_values[13],
+                        'past_key_values.3.encoder.key': past_key_values[14],
+                        'past_key_values.3.encoder.value': past_key_values[15],
+                        'past_key_values.4.decoder.key': past_key_values[16],
+                        'past_key_values.4.decoder.value': past_key_values[17],
+                        'past_key_values.4.encoder.key': past_key_values[18],
+                        'past_key_values.4.encoder.value': past_key_values[19],
+                        'past_key_values.5.decoder.key': past_key_values[20],
+                        'past_key_values.5.decoder.value': past_key_values[21],
+                        'past_key_values.5.encoder.key': past_key_values[22],
+                        'past_key_values.5.encoder.value': past_key_values[23],
+                        'use_cache_branch': np.array([False]),
+                    }
+                )
+            else:
+                return self.decoder.predict([
+                    attention_mask,
+                    decoder_input_ids,
+                    encoder_output[0],
+                    past_key_values[0],
+                    past_key_values[1],
+                    past_key_values[2],
+                    past_key_values[3],
+                    past_key_values[4],
+                    past_key_values[5],
+                    past_key_values[6],
+                    past_key_values[7],
+                    past_key_values[8],
+                    past_key_values[9],
+                    past_key_values[10],
+                    past_key_values[11],
+                    past_key_values[12],
+                    past_key_values[13],
+                    past_key_values[14],
+                    past_key_values[15],
+                    past_key_values[16],
+                    past_key_values[17],
+                    past_key_values[18],
+                    past_key_values[19],
+                    past_key_values[20],
+                    past_key_values[21],
+                    past_key_values[22],
+                    past_key_values[23],
+                    np.array([False]),
+                ])
 
+        # execute encoder
+        encoder_output = _encode(self, input_ids, attention_mask)
         # execute decoder
         try:
             decoder_output = _decode_with_cache(
@@ -183,7 +253,7 @@ class MarianMT:
                 decoder_input_ids,
                 past_key_values,
             )
-        except Exception:
+        except Exception as e:
             # HACK: If all past_key_values is not returned, there will be an exception, so retry without cache.
             decoder_output = _decode_without_cache(
                 self,
@@ -244,7 +314,9 @@ class MarianMT:
                 break
         return decoder_input_ids
    
-    def _logits_processor(self, input_ids, scores):
+    def _logits_processor(self, input_ids: np.ndarray, scores: np.ndarray):
+        # This function enforces the specified token as the last generated token when `max_length` is reached.
+        # Reference: https://github.com/huggingface/transformers/blob/1982dd3b15867c46e1c20645901b0de469fd935f/src/transformers/generation/logits_process.py#L1187-L1188
         max_length = 512
         eos_token_id = [0]
 
@@ -254,20 +326,22 @@ class MarianMT:
             scores[:, [i for i in range(num_tokens) if i not in eos_token_id]] = -float("inf")
             for i in eos_token_id:
                 scores[:, i] = 0
-        
         return scores
 
 def main():
     # model files check and download
+    check_and_download_models(ENCODER_ONNX_PATH, ENCODER_PROTOTXT_PATH, REMOTE_PATH)
+    check_and_download_models(DECODER_ONNX_PATH, DECODER_PROTOTXT_PATH, REMOTE_PATH)
+
     tokenizer = MarianTokenizer.from_pretrained("tokenizer")
 
     if not args.onnx:
-        env_id = args.env_id
-        encoder = ailia.Net(ENCODER_ONNX_PATH, ENCODER_PROTOTXT_PATH, env_id=env_id)
-        decoder = ailia.Net(DECODER_ONNX_PATH, DECODER_PROTOTXT_PATH, env_id=env_id)
+        # encoder = ailia.Net(stream=ENCODER_PROTOTXT_PATH, weight=ENCODER_ONNX_PATH)
+        # decoder = ailia.Net(stream=DECODER_PROTOTXT_PATH, weight=DECODER_ONNX_PATH)
+        raise Exception("not supported yet")
     else:
-        cuda = 0 < ailia.get_gpu_environment_id()
-        providers = ['CUDAExecutionProvider', 'CPUExecutionProvider'] if cuda else ['CPUExecutionProvider']
+        import onnxruntime
+        providers = ['CPUExecutionProvider']
         encoder = onnxruntime.InferenceSession(ENCODER_ONNX_PATH, providers=providers)
         decoder = onnxruntime.InferenceSession(DECODER_ONNX_PATH, providers=providers)
 
