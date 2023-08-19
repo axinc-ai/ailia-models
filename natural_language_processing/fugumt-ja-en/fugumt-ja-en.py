@@ -8,7 +8,7 @@ from transformers import MarianTokenizer
 
 # import original modules
 sys.path.append('../../util')
-from arg_utils import get_base_parser, update_parser, get_savepath  # noqa
+from arg_utils import get_base_parser, update_parser  # noqa
 from model_utils import check_and_download_models  # noqa
 
 import ailia
@@ -344,7 +344,6 @@ def main():
         providers = ['CPUExecutionProvider']
         encoder = onnxruntime.InferenceSession(ENCODER_ONNX_PATH, providers=providers)
         decoder = onnxruntime.InferenceSession(DECODER_ONNX_PATH, providers=providers)
-
     input_text = args.input
     logger.info("input_text: %s" % input_text)
 
