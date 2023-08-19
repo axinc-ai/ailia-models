@@ -259,9 +259,7 @@ class MarianMT:
 
 def main():
     # model files check and download
-    # check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
-    tokenizer = MarianTokenizer.from_pretrained(HUGGING_FACE_PATH)
-    env_id = args.env_id
+    tokenizer = MarianTokenizer.from_pretrained("tokenizer")
 
     if not args.onnx:
         env_id = args.env_id
