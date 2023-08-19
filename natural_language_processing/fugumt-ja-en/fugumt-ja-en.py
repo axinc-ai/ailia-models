@@ -348,12 +348,23 @@ def main():
     input_text = args.input
     logger.info("input_text: %s" % input_text)
 
+    model = MarianMT(tokenizer, encoder, decoder, args)
     # inference
     logger.info('Start inference...')
-    model = MarianMT(tokenizer, encoder, decoder, args)
 
     if args.benchmark:
-        raise Exception("not supported yet")
+        logger.info('BENCHMARK mode')
+        total_time_estimation = 0
+        for i in range(args.benchmark_count):
+            start = int(round(time.time() * 1000))
+            output = model.recognize_from_text(input_text)
+            end = int(round(time.time() * 1000))
+            estimation_time = (end - start)
+            # Logging
+            logger.info(f'\tailia processing estimation time {estimation_time} ms')
+            if i != 0:
+                total_time_estimation = total_time_estimation + estimation_time
+        logger.info(f'\taverage time estimation {total_time_estimation / (args.benchmark_count - 1)} ms')
     else:
         output = model.recognize_from_text(input_text)
 
@@ -362,8 +373,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
-
-
-
-
