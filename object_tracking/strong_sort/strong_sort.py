@@ -171,6 +171,8 @@ def compute_ecc(src_img, dst_img):
     warp_matrix, src_aligned = ECC(
         src_img, dst_img, warp_mode=cv2.MOTION_EUCLIDEAN, eps=1e-5,
         max_iter=100, scale=0.1, align=False)
+    if warp_matrix is None:
+        return None
     [a, b] = warp_matrix
     warp_matrix = np.array([a, b, [0, 0, 1]])
     return warp_matrix.tolist()
