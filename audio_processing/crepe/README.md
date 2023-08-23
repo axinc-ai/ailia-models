@@ -4,15 +4,19 @@
 
 Audio file
 
-https://github.com/axinc-ai/ailia-models/assets/29946532/689bba85-b894-4645-bd2a-8abf928733db
-
-(Audio from https://github.com/ohashi3399/RVC-demo)
+(Audio from https://github.com/maxrmorrison/torchcrepe/blob/master/tests/assets/test.wav)
 
 ## Output
 
 Pitch (F0) per 10ms
 
-![output](output.png)
+full model
+
+![output_full](output_full.png)
+
+tiny model
+
+![output_tiny](output_tiny.png)
 
 ## Requirements
 
@@ -40,6 +44,12 @@ Specify the f0 option to infer a model that uses f0. You can choice `crepe` or `
 
 ```bash $ 
 python3 crepe.py --f0_method crepe_tiny
+```
+
+Specify the `--evaluate` option, you can be compared with the f0 using pyworld.
+
+```bash $ 
+python3 crepe.py --f0_method crepe_tiny --evaluate
 ```
 
 ## Reference

@@ -36,7 +36,7 @@ REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/rvc/'
 
 SAMPLE_RATE = 16000
 
-WAV_PATH = 'booth.wav'
+WAV_PATH = 'test.wav'
 FIG_PATH = "output.png"
 
 # ======================
@@ -47,13 +47,18 @@ parser = get_base_parser(
     'Crepe', WAV_PATH, FIG_PATH, input_ftype='audio'
 )
 parser.add_argument(
-    '--f0_method', default="crepe_tiny", choices=("pm", "harvest", "crepe", "crepe_tiny"),
+    '--f0_method', default="crepe_tiny", choices=("crepe", "crepe_tiny"),
     help='Select the pitch extraction algorithm',
 )
 parser.add_argument(
     '--onnx',
     action='store_true',
     help='execute onnxruntime version.'
+)
+parser.add_argument(
+    '--evaluate',
+    action='store_true',
+    help='evaluate with harvest.'
 )
 args = update_parser(parser)
 
@@ -93,29 +98,10 @@ def get_f0(
         p_len,
 ):
     sr = SAMPLE_RATE
-    time_step = window / sr * 1000
     f0_min = 50
     f0_max = 1100
-    f0_mel_min = 1127 * np.log(1 + f0_min / 700)
-    f0_mel_max = 1127 * np.log(1 + f0_max / 700)
 
-    if f0_method == "pm":
-        import parselmouth
-
-        f0 = (
-            parselmouth.Sound(x, vc_param.sr).to_pitch_ac(
-                time_step=time_step / 1000,
-                voicing_threshold=0.6,
-                pitch_floor=f0_min,
-                pitch_ceiling=f0_max,
-            ).selected_array["frequency"]
-        )
-        pad_size = (p_len - len(f0) + 1) // 2
-        if pad_size > 0 or p_len - len(f0) - pad_size > 0:
-            f0 = np.pad(
-                f0, [[pad_size, p_len - len(f0) - pad_size]], mode="constant"
-            )
-    elif f0_method == "harvest":
+    if f0_method == "harvest":
         import pyworld
 
         audio = x.astype(np.double)
@@ -158,7 +144,7 @@ def get_f0(
     return f0
 
 
-def predict(audio, models):
+def predict(audio, model, f0_method):
     audio_max = np.abs(audio).max() / 0.95
     if audio_max > 1:
         audio /= audio_max
@@ -167,7 +153,7 @@ def predict(audio, models):
     p_len = audio.shape[0] // window
 
     pitch = get_f0(
-        args.f0_method,
+        f0_method,
         window,
         audio,
         p_len,
@@ -190,17 +176,34 @@ def recognize_from_audio(models):
         if args.benchmark:
             logger.info('BENCHMARK mode')
             start = int(round(time.time() * 1000))
-            output = predict(audio, models)
+            output = predict(audio, models, args.f0_method)
             end = int(round(time.time() * 1000))
             estimation_time = (end - start)
             logger.info(f'\ttotal processing time {estimation_time} ms')
         else:
-            output = predict(audio, models)
+            output = predict(audio, models, args.f0_method)
         
+        # reference data
+        if args.evaluate:
+            harvest = predict(audio, models, "harvest")
+
         # plot
-        x = np.linspace(0, 1, output.shape[0])
+        x = np.linspace(0, audio.shape[0] / SAMPLE_RATE, output.shape[0])
         y = output
-        plt.plot(x, y, label="f0 (hz)")
+
+        fig = plt.figure()
+        ax = fig.add_subplot()
+
+        y = output
+        ax.plot(x, y, label=args.f0_method)
+
+        if args.evaluate:
+            y = harvest
+            ax.plot(x, y, label="harvest", linestyle = "dashed")
+
+        ax.set_xlabel("sec")
+        ax.set_ylabel("f0 (hz)")
+
         plt.legend()
         
         # save result
