@@ -12,6 +12,7 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
+sys.path.append('../crepe')
 from microphone_utils import start_microphone_input  # noqa
 from model_utils import check_and_download_models  # noqa
 from arg_utils import get_base_parser, get_savepath, update_parser  # noqa
@@ -518,9 +519,12 @@ def main():
     check_and_download_models(WEIGHT_HUBERT_PATH, MODEL_HUBERT_PATH, REMOTE_PATH)
     check_and_download_models(WEIGHT_VC_PATH, MODEL_VC_PATH, REMOTE_PATH)
 
-    if args.f0 == 1 and args.f0_method == "crepe":
-        from mod_crepe import WEIGHT_CREPE_PATH, MODEL_CREPE_PATH
-        check_and_download_models(WEIGHT_CREPE_PATH, MODEL_CREPE_PATH, REMOTE_PATH)
+    if args.f0 == 1 and (args.f0_method == "crepe" or  args.f0_method == "crepe_tiny"):
+        from mod_crepe import WEIGHT_CREPE_PATH, MODEL_CREPE_PATH, WEIGHT_CREPE_TINY_PATH, MODEL_CREPE_TINY_PATH
+        if args.f0_method == "crepe_tiny":
+            check_and_download_models(WEIGHT_CREPE_TINY_PATH, MODEL_CREPE_TINY_PATH, REMOTE_PATH)
+        else:
+            check_and_download_models(WEIGHT_CREPE_PATH, MODEL_CREPE_PATH, REMOTE_PATH)
 
     env_id = args.env_id
 
