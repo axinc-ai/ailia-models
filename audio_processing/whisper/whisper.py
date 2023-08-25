@@ -405,7 +405,7 @@ def inference_logits(dec_net, tokens, audio_features, kv_cache=None, initial_tok
 
             dec_net.predict([tokens, audio_features, kv_cache, offset], output = output)
         else:
-            if is_init_kv_cache or not COPY_BLOB_DATA_ENABLE:
+            if is_init_kv_cache or not COPY_BLOB_DATA_ENABLE or args.dynamic_kv_cache:
                 if constant_audio_feature:
                     dec_net.predict({"tokens":tokens, "kv_cache":kv_cache, "offset":offset}, output = output)
                 else:
