@@ -22,7 +22,7 @@ ENCODER_ONNX_PATH  = 'encoder_model.onnx'
 ENCODER_PROTOTXT_PATH = 'encoder_model.onnx.prototxt'
 DECODER_ONNX_PATH  = 'decoder_model_merged.onnx'
 DECODER_PROTOTXT_PATH = 'decoder_model_merged.onnx.prototxt'
-REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/fugumt'
+REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/fugumt/'
 
 # ======================
 # Arguemnt Parser Config
@@ -336,9 +336,8 @@ def main():
     tokenizer = MarianTokenizer.from_pretrained("tokenizer")
 
     if not args.onnx:
-        # encoder = ailia.Net(stream=ENCODER_PROTOTXT_PATH, weight=ENCODER_ONNX_PATH)
-        # decoder = ailia.Net(stream=DECODER_PROTOTXT_PATH, weight=DECODER_ONNX_PATH)
-        raise Exception("not supported yet")
+        encoder = ailia.Net(stream=ENCODER_PROTOTXT_PATH, weight=ENCODER_ONNX_PATH)
+        decoder = ailia.Net(stream=DECODER_PROTOTXT_PATH, weight=DECODER_ONNX_PATH)
     else:
         import onnxruntime
         providers = ['CPUExecutionProvider']
