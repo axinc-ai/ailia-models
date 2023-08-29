@@ -146,12 +146,12 @@ def update_parser(parser, check_input_type=True, large_model=False):
             if args.env_id == ailia.get_gpu_environment_id() and ailia.get_environment(args.env_id).props == "LOWPOWER":
                 args.env_id = 0 # cpu
                 logger.warning('This model requires fuge gpu memory so fallback to cpu mode')
-        
+
         if args.env_list:
             for idx in range(count) :
                 env = ailia.get_environment(idx)
                 logger.info("  env[" + str(idx) + "]=" + str(env))
-        
+
         if args.env_id == ailia.ENVIRONMENT_AUTO:
             args.env_id = ailia.get_gpu_environment_id()
             if args.env_id == ailia.ENVIRONMENT_AUTO:
@@ -159,7 +159,7 @@ def update_parser(parser, check_input_type=True, large_model=False):
                 args.env_id = 0
             else:
                 logger.info('env_id updated to ' + str(args.env_id) + '(from get_gpu_environment_id())')
-        
+
         logger.info(f'env_id: {args.env_id}')
 
         env = ailia.get_environment(args.env_id)
@@ -250,4 +250,8 @@ def get_savepath(arg_path, src_path, prefix='', post_fix='_res', ext=None):
         new_path = os.path.join(
             arg_path, prefix + src_base + post_fix + new_ext
         )
+
+    # 3. Create (recursively) the output directory
+    dirname = os.path.dirname(new_path)
+    os.makedirs(dirname, exist_ok=True)
     return new_path
