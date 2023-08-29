@@ -253,5 +253,6 @@ def get_savepath(arg_path, src_path, prefix='', post_fix='_res', ext=None):
 
     # 3. Create (recursively) the output directory
     dirname = os.path.dirname(new_path)
-    os.makedirs(dirname, exist_ok=True)
+    if dirname != "":
+        os.makedirs(dirname, exist_ok=True)
     return new_path
