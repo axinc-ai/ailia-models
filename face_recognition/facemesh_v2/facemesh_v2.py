@@ -17,6 +17,7 @@ from detector_utils import load_image  # noqa
 from webcamera_utils import get_capture, get_writer  # noqa
 
 import draw_utils
+from detection_utils import face_detection
 
 logger = getLogger(__name__)
 
@@ -26,8 +27,8 @@ logger = getLogger(__name__)
 
 WEIGHT_PATH = 'face_landmarks_detector.onnx'
 MODEL_PATH = 'face_landmarks_detector.onnx.prototxt'
-WEIGHT_XXX_PATH = 'xxx.onnx'
-MODEL_XXX_PATH = 'xxx.onnx.prototxt'
+WEIGHT_DET_PATH = 'face_detector.onnx'
+MODEL_DET_PATH = 'face_detector.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/facemesh_v2/'
 
 IMAGE_PATH = 'demo.jpg'
@@ -198,6 +199,29 @@ def post_processing(input_tensors):
 
 
 def predict(net, img):
+    import onnxruntime
+    cuda = 0 < ailia.get_gpu_environment_id()
+    providers = ['CUDAExecutionProvider', 'CPUExecutionProvider'] if cuda else ['CPUExecutionProvider']
+    det_net = onnxruntime.InferenceSession(WEIGHT_DET_PATH, providers=providers)
+
+    img = cv2.imread("kekka_0.png")
+    img = normalize_image(img, normalize_type='127.5')
+    img = np.expand_dims(img, axis=0)
+    img = img.astype(np.float32)
+
+    # feedforward
+    if not args.onnx:
+        output = det_net.predict([img])
+    else:
+        output = det_net.run(None, {'input': img})
+    detections, scores = output
+    print(detections)
+    print(detections.shape)
+
+    box, score = face_detection(detections, scores)
+    if len(box) == 0:
+        return [], []
+
     # shape = (IMAGE_HEIGHT, IMAGE_WIDTH)
     img = preprocess(img)
 
