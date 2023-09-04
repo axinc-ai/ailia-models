@@ -117,10 +117,40 @@ def decode_boxes(raw_boxes, anchors):
     return boxes
 
 
+def weighted_nms(boxes, scores):
+    scale = IMAGE_SIZE
+    min_suppression_threshold = 0.5
+
+    px_boxes = np.zeros((len(boxes), 4))
+    px_boxes[:, :4] = boxes[:, :4] * scale
+
+    packed_idx = packed_nms(px_boxes, scores, min_suppression_threshold)
+
+    out_boxes = []
+    out_scores = []
+    for idx in packed_idx:
+        total_score = np.sum(scores[idx])
+
+        candidates = boxes[idx]
+        candidates = candidates * scores[idx].reshape(-1, 1)
+        weighted_detection = np.sum(candidates, axis=0) / total_score
+
+        out_boxes.append(weighted_detection)
+        out_scores.append(np.max(scores[idx]))
+
+    if len(out_boxes) == 0:
+        return [], []
+
+    out_boxes = np.vstack(out_boxes)
+    out_scores = np.array(out_scores)
+
+    return out_boxes, out_scores
+
+
 anchors = get_anchor()
 
 
-def face_detection(detections, scores, pad):
+def face_detection(detections, scores):
     boxes = decode_boxes(detections[0], anchors)
     scores = np.clip(scores[0, :, 0], -100, 100)
     scores = sigmoid(scores)
