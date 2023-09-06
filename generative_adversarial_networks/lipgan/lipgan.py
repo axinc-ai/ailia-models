@@ -317,7 +317,7 @@ def main():
 	#    MODEL_PATH,
 	#    REMOTE_PATH,
 	#)
-	ailia_net = ailia.Net(weight="lipgan.onnx", env_id = 2)
+	ailia_net = ailia.Net(weight=WEIGHT_PATH, env_id = 2)
 
 	blazeface = None
 	if not args.use_dlib:
