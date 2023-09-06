@@ -36,7 +36,7 @@ DLIB_WEIGHT_PATH = "mmod_human_face_detector.dat"
 INPUT_IMAGE_PATH = "input.png"
 INPUT_AUDIO_PATH = "input.wav"
 
-SAVE_IMAGE_PATH = "./"
+SAVE_IMAGE_PATH = "result.mp4"
 
 IMG_SIZE = 96
 
@@ -61,6 +61,11 @@ parser.add_argument(
 	action="store_true",
 	help="Use dlib models for inference.",
 )
+parser.add_argument(
+	"--merge_audio",
+	action="store_true",
+	help="Merge audio file to video. Require ffmpeg.",
+)
 args = update_parser(parser)
 
 # ======================
@@ -74,7 +79,6 @@ FACE_DETECTOR_IMAGE_WIDTH = 128
 def detect_face(images, blazeface): # image is rgb order
 	results = []
 	for image in images:
-		print(image.shape)
 		data = np.array(image)
 		data = cv2.resize(
 			data, (FACE_DETECTOR_IMAGE_WIDTH, FACE_DETECTOR_IMAGE_HEIGHT)
@@ -240,11 +244,10 @@ def recognize(static, ailia_net, blazeface):
 
 			if len(full_frames) * (1./fps) >= max_sec: break
 
-		print ("Number of frames available for inference: "+str(len(full_frames)))
+		#print ("Number of frames available for inference: "+str(len(full_frames)))
 
 	wav = audio.load_wav(args.audio, 16000)
 	mel = audio.melspectrogram(wav)
-	print(mel.shape)
 
 	if np.isnan(mel.reshape(-1)).sum() > 0:
 		raise ValueError('Mel contains nan!')
@@ -258,7 +261,7 @@ def recognize(static, ailia_net, blazeface):
 		mel_chunks.append(mel[:, start_idx : start_idx + mel_step_size])
 		i += 1
 
-	print("Length of mel chunks: {}".format(len(mel_chunks)))
+	#print("Length of mel chunks: {}".format(len(mel_chunks)))
 
 	batch_size = lipgan_batch_size
 	gen = datagen(full_frames.copy(), mel_chunks, static, blazeface)
@@ -267,7 +270,7 @@ def recognize(static, ailia_net, blazeface):
 											total=int(np.ceil(float(len(mel_chunks))/batch_size)))):
 		if i == 0:
 			frame_h, frame_w = full_frames[0].shape[:-1]
-			out = cv2.VideoWriter(path.join(args.savepath, 'result.mp4'), 
+			out = cv2.VideoWriter(args.savepath, 
 									cv2.VideoWriter_fourcc(*'mp4v'), fps, (frame_w, frame_h))
 
 		# expect
@@ -291,9 +294,9 @@ def recognize(static, ailia_net, blazeface):
 
 	out.release()
 
-	command = 'ffmpeg -i {} -i {} -strict -2 -q:v 1 {}'.format(args.audio, path.join(args.savepath, 'result.mp4'), 
-														path.join(args.savepath, 'result_voice.mp4'))
-	subprocess.call(command, shell=True)
+	if args.merge_audio:
+		command = 'ffmpeg -i {} -i {} -strict -2 -q:v 1 {}'.format(args.audio, args.savepath, args.savepath + '_audio.mp4')
+		subprocess.call(command, shell=True)
 
 def main():
 	# Check model files and download
@@ -312,6 +315,12 @@ def main():
 			FACE_DETECTOR_REMOTE_PATH,
 		)
 		blazeface = ailia.Net(FACE_DETECTOR_MODEL_PATH, FACE_DETECTOR_WEIGHT_PATH, env_id = args.env_id)
+	else:
+		check_and_download_models(
+			DLIB_WEIGHT_PATH,
+			None,
+			FACE_DETECTOR_REMOTE_PATH,
+		)
 
 	static = args.video is None
 
