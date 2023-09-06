@@ -3,6 +3,7 @@ import numpy as np
 import cv2, argparse, audio
 import dlib, subprocess
 from tqdm import tqdm
+import ailia
 
 # Import original modules
 import sys
@@ -10,6 +11,9 @@ sys.path.append("../../util")
 from arg_utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # NOQA: E402
 from webcamera_utils import adjust_frame_size, get_capture, cut_max_square  # NOQA: E402
+
+sys.path.append("../../face_detection")
+from blazeface import blazeface_utils as but
 
 # Logger
 from logging import getLogger  # noqa: E402
@@ -59,7 +63,42 @@ parser.add_argument(
 )
 args = update_parser(parser)
 
+# ======================
+# BlazeFace
+# ======================
 
+FACE_DETECTOR_IMAGE_HEIGHT = 128
+FACE_DETECTOR_IMAGE_WIDTH = 128
+
+
+def detect_face(images, blazeface): # image is rgb order
+	results = []
+	for image in images:
+		print(image.shape)
+		data = np.array(image)
+		data = cv2.resize(
+			data, (FACE_DETECTOR_IMAGE_WIDTH, FACE_DETECTOR_IMAGE_HEIGHT)
+		)
+		data = data / 127.5 - 1.0
+		data = data.transpose((2, 0, 1))  # channel first
+		data = data[np.newaxis, :, :, :].astype(
+			np.float32
+		)  # (batch_size, channel, h, w)
+
+		preds_ailia = blazeface.predict([data])
+
+		# postprocessing
+		detected = but.postprocess(
+			preds_ailia,
+			anchor_path= "../../face_detection/blazeface/anchors.npy",
+		)[0][0]
+		ymin = int(detected[0] * image.shape[0])
+		xmin = int(detected[1] * image.shape[1])
+		ymax = int(detected[2] * image.shape[0])
+		xmax = int(detected[3] * image.shape[1])
+		results.append([xmin, ymin, xmax - xmin, ymax - ymin])
+	return [results]
+	
 # ======================
 # Functions
 # ======================
@@ -79,8 +118,6 @@ face_det_batch_size = 64
 # Single GPU batch size for LipGAN
 lipgan_batch_size = 256
 
-import ailia
-ailia_net = ailia.Net(weight="lipgan.onnx", env_id = 2)
 
 def rect_to_bb(d):
 	x = d.rect.left()
@@ -89,32 +126,39 @@ def rect_to_bb(d):
 	h = d.rect.bottom() - y
 	return (x, y, w, h)
 
-def calcMaxArea(rects):
+def calcMaxArea(rects, blazeface):
 	max_cords = (-1,-1,-1,-1)
 	max_area = 0
 	max_rect = None
 	for i in range(len(rects)):
 		cur_rect = rects[i]
-		(x,y,w,h) = rect_to_bb(cur_rect)
+		if blazeface == None:
+			(x,y,w,h) = rect_to_bb(cur_rect)
+		else:
+			(x,y,w,h) = (cur_rect[0], cur_rect[1], cur_rect[2], cur_rect[3])
 		if w*h > max_area:
 			max_area = w*h
 			max_cords = (x,y,w,h)
 			max_rect = cur_rect	
 	return max_cords, max_rect
 	
-def face_detect(images):
-	detector = dlib.cnn_face_detection_model_v1(DLIB_WEIGHT_PATH)
+def face_detect(images, blazeface):
+	if blazeface == None:
+		detector = dlib.cnn_face_detection_model_v1(DLIB_WEIGHT_PATH)
 
 	batch_size = face_det_batch_size
 
 	predictions = []
 	for i in tqdm(range(0, len(images), batch_size)):
-		predictions.extend(detector(images[i:i + batch_size]))
-	
+		if blazeface == None:
+			predictions.extend(detector(images[i:i + batch_size]))
+		else:
+			predictions.extend(detect_face(images[i:i + batch_size], blazeface))
+
 	results = []
 	pady1, pady2, padx1, padx2 = pads
 	for rects, image in zip(predictions, images):
-		(x, y, w, h), max_rect = calcMaxArea(rects)
+		(x, y, w, h), max_rect = calcMaxArea(rects, blazeface)
 		if x == -1:
 			results.append([None, (-1,-1,-1,-1), False])
 			continue
@@ -126,16 +170,17 @@ def face_detect(images):
 
 		results.append([face, (y1, y2, x1, x2), True])
 	
-	del detector # make sure to clear GPU memory for LipGAN inference
+	if blazeface == None:
+		del detector # make sure to clear GPU memory for LipGAN inference
 	return results 
 
-def datagen(frames, mels, static):
+def datagen(frames, mels, static, blazeface):
 	img_batch, mel_batch, frame_batch, coords_batch = [], [], [], []
 
 	if not static:
-		face_det_results = face_detect([f[...,::-1] for f in frames]) # BGR2RGB for CNN face detection
+		face_det_results = face_detect([f[...,::-1] for f in frames], blazeface) # BGR2RGB for CNN face detection
 	else:
-		face_det_results = face_detect([frames[0][...,::-1]])
+		face_det_results = face_detect([frames[0][...,::-1]], blazeface)
 
 	for i, m in enumerate(mels):
 		idx = 0 if static else i%len(frames)
@@ -178,7 +223,7 @@ def datagen(frames, mels, static):
 mel_step_size = 27
 mel_idx_multiplier = 80./fps
 
-def recognize(static):
+def recognize(static, ailia_net, blazeface):
 	if static:
 		full_frames = [cv2.imread(args.input[0])]
 	else:
@@ -216,7 +261,7 @@ def recognize(static):
 	print("Length of mel chunks: {}".format(len(mel_chunks)))
 
 	batch_size = lipgan_batch_size
-	gen = datagen(full_frames.copy(), mel_chunks, static)
+	gen = datagen(full_frames.copy(), mel_chunks, static, blazeface)
 
 	for i, (img_batch, mel_batch, frames, coords) in enumerate(tqdm(gen, 
 											total=int(np.ceil(float(len(mel_chunks))/batch_size)))):
@@ -257,26 +302,20 @@ def main():
 	#    MODEL_PATH,
 	#    REMOTE_PATH,
 	#)
-	#if not args.use_dlib:
-	#    check_and_download_models(
-	#        FACE_ALIGNMENT_WEIGHT_PATH,
-	#        FACE_ALIGNMENT_MODEL_PATH,
-	#        FACE_ALIGNMENT_REMOTE_PATH,
-	#    )
-	#    check_and_download_models(
-	#        FACE_DETECTOR_WEIGHT_PATH,
-	#        FACE_DETECTOR_MODEL_PATH,
-	#        FACE_DETECTOR_REMOTE_PATH,
-	#    )
+	ailia_net = ailia.Net(weight="lipgan.onnx", env_id = 2)
+
+	blazeface = None
+	if not args.use_dlib:
+		check_and_download_models(
+			FACE_DETECTOR_WEIGHT_PATH,
+			FACE_DETECTOR_MODEL_PATH,
+			FACE_DETECTOR_REMOTE_PATH,
+		)
+		blazeface = ailia.Net(FACE_DETECTOR_MODEL_PATH, FACE_DETECTOR_WEIGHT_PATH, env_id = args.env_id)
 
 	static = args.video is None
 
-	if args.video is not None:
-		# Video mode
-		recognize(static)
-	else:
-		# Image mode
-		recognize(static)
+	recognize(static, ailia_net, blazeface)
 
 
 if __name__ == "__main__":
