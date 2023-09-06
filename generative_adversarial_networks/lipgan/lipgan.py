@@ -2,8 +2,8 @@ from os import listdir, path
 import numpy as np
 import cv2, argparse, audio
 import dlib, subprocess
-from tqdm import tqdm
 import ailia
+import time
 
 # Import original modules
 import sys
@@ -153,7 +153,7 @@ def face_detect(images, blazeface):
 	batch_size = face_det_batch_size
 
 	predictions = []
-	for i in tqdm(range(0, len(images), batch_size)):
+	for i in range(0, len(images), batch_size):
 		if blazeface == None:
 			predictions.extend(detector(images[i:i + batch_size]))
 		else:
@@ -266,8 +266,7 @@ def recognize(static, ailia_net, blazeface):
 	batch_size = lipgan_batch_size
 	gen = datagen(full_frames.copy(), mel_chunks, static, blazeface)
 
-	for i, (img_batch, mel_batch, frames, coords) in enumerate(tqdm(gen, 
-											total=int(np.ceil(float(len(mel_chunks))/batch_size)))):
+	for i, (img_batch, mel_batch, frames, coords) in enumerate(gen):
 		if i == 0:
 			frame_h, frame_w = full_frames[0].shape[:-1]
 			out = cv2.VideoWriter(args.savepath, 
@@ -276,20 +275,33 @@ def recognize(static, ailia_net, blazeface):
 		# expect
 		# normal : bx96x96x6, bx12x35x1
 		# mel : bx96x96x6, bx80x27x1
-		#import time
-		#start = int(round(time.time() * 1000))
+		if args.benchmark:
+			start = int(round(time.time() * 1000))
 		#print(img_batch.shape)
 		#print(mel_batch.shape)
 		pred = ailia_net.run([mel_batch, img_batch])[0]
-		#end = int(round(time.time() * 1000))
-		#print(f'\tailia processing time {end - start} ms')
+		if args.benchmark:
+			end = int(round(time.time() * 1000))
+			print(f'\tailia processing time {end - start} ms')
 		pred = pred * 255
 		
 		for p, f, c in zip(pred, frames, coords):
 			y1, y2, x1, x2 = c
 			p = cv2.resize(p, (x2 - x1, y2 - y1))
 
-			f[y1:y2, x1:x2] = p
+			blend_boundary = True
+			if blend_boundary:
+				alpha = np.zeros((p.shape[0], p.shape[1], 1))
+				rx = alpha.shape[1] // 16
+				ry = alpha.shape[0] // 16
+				for y in range(alpha.shape[0]):
+					for x in range(alpha.shape[1]):
+						dx = min(min(x, alpha.shape[1] - 1 - x) / rx, 1)
+						dy = min(min(y, alpha.shape[0] - 1 - y) / ry, 1)
+						alpha[y, x, 0] = min(dx, dy)
+				#cv2.imwrite("output.png", (alpha * 255).astype(np.uint8))
+
+			f[y1:y2, x1:x2] = f[y1:y2, x1:x2] * (1 - alpha) + p * alpha
 			out.write(f)
 
 	out.release()
