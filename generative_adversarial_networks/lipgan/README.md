@@ -36,6 +36,10 @@ By adding the `--use_dlib` option, you can use original version of face alignmen
 
 By adding the `--merge_audio` option, you can merge output video and input audio using ffmpeg.
 
+By adding the `--ailia_audio` option, you can use ailia audio library for melspectrum conversion.
+
+By adding the `--realesrgan` option, you can use super resoltuion for geneerated face image.
+
 ## Reference
 
 - [LipGAN](https://github.com/Rudrabha/LipGAN)
