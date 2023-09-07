@@ -12,6 +12,7 @@ sys.path.append("../../util")
 from arg_utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # NOQA: E402
 from webcamera_utils import adjust_frame_size, get_capture, cut_max_square  # NOQA: E402
+from image_utils import imread  # noqa: E402
 
 sys.path.append("../../face_detection")
 from blazeface import blazeface_utils as but
@@ -75,14 +76,13 @@ parser.add_argument(
 args = update_parser(parser)
 
 # ======================
-# BlazeFace
+# Face Detection
 # ======================
 
-FACE_DETECTOR_IMAGE_HEIGHT = 128
-FACE_DETECTOR_IMAGE_WIDTH = 128
+def detect_face_using_blazeface(images, blazeface): # image is rgb order
+	FACE_DETECTOR_IMAGE_HEIGHT = 128
+	FACE_DETECTOR_IMAGE_WIDTH = 128
 
-
-def detect_face(images, blazeface): # image is rgb order
 	results = []
 	for image in images:
 		data = np.array(image)
@@ -109,26 +109,6 @@ def detect_face(images, blazeface): # image is rgb order
 		results.append([xmin, ymin, xmax - xmin, ymax - ymin])
 	return [results]
 	
-# ======================
-# Functions
-# ======================
-
-# If video, until how many seconds of the clip to use for inference?
-max_sec = 240.
-
-# FPS of input video, ignore if image
-fps = 25
-
-# Padding (top, bottom, left, right)
-pads = [0, 0, 0, 0]
-
-# Single GPU batch size for face detection
-face_det_batch_size = 64
-
-# Single GPU batch size for LipGAN
-lipgan_batch_size = 256
-
-
 def rect_to_bb(d):
 	x = d.rect.left()
 	y = d.rect.top()
@@ -163,7 +143,7 @@ def face_detect(images, blazeface):
 		if blazeface == None:
 			predictions.extend(detector(images[i:i + batch_size]))
 		else:
-			predictions.extend(detect_face(images[i:i + batch_size], blazeface))
+			predictions.extend(detect_face_using_blazeface(images[i:i + batch_size], blazeface))
 
 	results = []
 	pady1, pady2, padx1, padx2 = pads
@@ -184,74 +164,40 @@ def face_detect(images, blazeface):
 		del detector # make sure to clear GPU memory for LipGAN inference
 	return results 
 
-def datagen(frames, mels, static, blazeface):
-	img_batch, mel_batch, frame_batch, coords_batch = [], [], [], []
 
-	if not static:
-		face_det_results = face_detect([f[...,::-1] for f in frames], blazeface) # BGR2RGB for CNN face detection
-	else:
-		face_det_results = face_detect([frames[0][...,::-1]], blazeface)
+# ======================
+# Functions
+# ======================
 
-	for i, m in enumerate(mels):
-		idx = 0 if static else i%len(frames)
-		frame_to_save = frames[idx].copy()
-		face, coords, valid_frame = face_det_results[idx].copy()
-		if not valid_frame:
-			print ("Face not detected, skipping frame {}".format(i))
-			continue
+# If video, until how many seconds of the clip to use for inference?
+max_sec = 240.
 
-		face = cv2.resize(face, (IMG_SIZE, IMG_SIZE))
+# FPS of input video, ignore if image
+fps = 25
 
-		img_batch.append(face)
-		mel_batch.append(m)
-		frame_batch.append(frame_to_save)
-		coords_batch.append(coords)
+# Padding (top, bottom, left, right)
+pads = [0, 0, 0, 0]
 
-		if len(img_batch) >= lipgan_batch_size:
-			img_batch, mel_batch = np.asarray(img_batch), np.asarray(mel_batch)
+# Single GPU batch size for face detection
+face_det_batch_size = 1
 
-			img_masked = img_batch.copy()
-			img_masked[:, IMG_SIZE//2:] = 0
+# Single GPU batch size for LipGAN
+lipgan_batch_size = 1
 
-			img_batch = np.concatenate((img_batch, img_masked), axis=3) / 255.
-			mel_batch = np.reshape(mel_batch, [len(mel_batch), mel_batch.shape[1], mel_batch.shape[2], 1])
-
-			yield img_batch, mel_batch, frame_batch, coords_batch
-			img_batch, mel_batch, frame_batch, coords_batch = [], [], [], []
-
-	if len(img_batch) > 0:
-		img_batch, mel_batch = np.asarray(img_batch), np.asarray(mel_batch)
-
-		img_masked = img_batch.copy()
-		img_masked[:, IMG_SIZE//2:] = 0
-
-		img_batch = np.concatenate((img_batch, img_masked), axis=3) / 255.
-		mel_batch = np.reshape(mel_batch, [len(mel_batch), mel_batch.shape[1], mel_batch.shape[2], 1])
-
-		yield img_batch, mel_batch, frame_batch, coords_batch
-
+# Parameters
 mel_step_size = 27
 mel_idx_multiplier = 80./fps
 
+def center_crop(image):
+	center = image.shape
+	w = min(center[0], center[1])
+	h = w
+	x = center[1]/2 - w/2
+	y = center[0]/2 - h/2
+	return image[int(y):int(y+h), int(x):int(x+w)]
+
 def recognize(static, ailia_net, blazeface):
-	if static:
-		full_frames = [cv2.imread(args.input[0])]
-	else:
-		video_stream = cv2.VideoCapture(args.video)
-		
-		full_frames = []
-		while 1:
-			still_reading, frame = video_stream.read()
-			if not still_reading:
-				video_stream.release()
-				break
-			full_frames.append(frame)
-			if len(full_frames) % 2000 == 0: print(len(full_frames))
-
-			if len(full_frames) * (1./fps) >= max_sec: break
-
-		#print ("Number of frames available for inference: "+str(len(full_frames)))
-
+	# prepare input audio
 	wav = librosa.load(args.audio, sr=16000)[0]
 	mel = audio.melspectrogram(wav, args.ailia_audio)
 
@@ -266,49 +212,94 @@ def recognize(static, ailia_net, blazeface):
 			break
 		mel_chunks.append(mel[:, start_idx : start_idx + mel_step_size])
 		i += 1
+	
+	# process video
+	if static:
+		full_frames = [imread(args.input[0])]
+	else:
+		video_stream = get_capture(args.video)
 
-	#print("Length of mel chunks: {}".format(len(mel_chunks)))
+	frame_shown = False
+	for i in range(len(mel_chunks)):
+		if static:
+			frames = full_frames
+			ret = True
+		else:
+			ret, frame = video_stream.read()
+			frame = center_crop(frame)
+			frames = [frame]
+			full_frames = frames
 
-	batch_size = lipgan_batch_size
-	gen = datagen(full_frames.copy(), mel_chunks, static, blazeface)
+		if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+			break
+		if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
+			break
 
-	for i, (img_batch, mel_batch, frames, coords) in enumerate(gen):
+		img_batch, mel_batch, frame_batch, coords_batch = [], [], [], []
+
+		#if not static:
+		#	face_det_results = face_detect([f[...,::-1] for f in frames], blazeface) # BGR2RGB for CNN face detection
+		#else:
+		face_det_results = face_detect([frames[0][...,::-1]], blazeface) # BGR2RGB for CNN face detection
+
+		idx = 0 if static else i%len(frames)
+		frame_to_save = frames[idx].copy()
+		face, coords, valid_frame = face_det_results[idx].copy()
+		if not valid_frame:
+			print ("Face not detected, skipping frame {}".format(i))
+			continue
+
+		face = cv2.resize(face, (IMG_SIZE, IMG_SIZE))
+
+		img_batch.append(face)
+		mel_batch.append(mel_chunks[i])
+		frame_batch.append(frame_to_save)
+		coords_batch.append(coords)
+
+		img_batch, mel_batch = np.asarray(img_batch), np.asarray(mel_batch)
+
+		img_masked = img_batch.copy()
+		img_masked[:, IMG_SIZE//2:] = 0
+
+		img_batch = np.concatenate((img_batch, img_masked), axis=3) / 255.
+		mel_batch = np.reshape(mel_batch, [len(mel_batch), mel_batch.shape[1], mel_batch.shape[2], 1])
+
 		if i == 0:
 			frame_h, frame_w = full_frames[0].shape[:-1]
 			out = cv2.VideoWriter(args.savepath, 
 									cv2.VideoWriter_fourcc(*'mp4v'), fps, (frame_w, frame_h))
 
-		# expect
-		# normal : bx96x96x6, bx12x35x1
-		# mel : bx96x96x6, bx80x27x1
 		if args.benchmark:
 			start = int(round(time.time() * 1000))
-		#print(img_batch.shape)
-		#print(mel_batch.shape)
 		pred = ailia_net.run([mel_batch, img_batch])[0]
 		if args.benchmark:
 			end = int(round(time.time() * 1000))
 			print(f'\tailia processing time {end - start} ms')
 		pred = pred * 255
 		
-		for p, f, c in zip(pred, frames, coords):
-			y1, y2, x1, x2 = c
-			p = cv2.resize(p, (x2 - x1, y2 - y1))
+		p = pred[0]
+		y1, y2, x1, x2 = coords
+		p = cv2.resize(p, (x2 - x1, y2 - y1))
 
-			blend_boundary = True
-			if blend_boundary:
-				alpha = np.zeros((p.shape[0], p.shape[1], 1))
-				rx = alpha.shape[1] // 16
-				ry = alpha.shape[0] // 16
-				for y in range(alpha.shape[0]):
-					for x in range(alpha.shape[1]):
-						dx = min(min(x, alpha.shape[1] - 1 - x) / rx, 1)
-						dy = min(min(y, alpha.shape[0] - 1 - y) / ry, 1)
-						alpha[y, x, 0] = min(dx, dy)
-				#cv2.imwrite("output.png", (alpha * 255).astype(np.uint8))
+		blend_boundary = True
+		if blend_boundary:
+			alpha = np.zeros((p.shape[0], p.shape[1], 1))
+			rx = alpha.shape[1] // 16
+			ry = alpha.shape[0] // 16
+			for y in range(alpha.shape[0]):
+				for x in range(alpha.shape[1]):
+					dx = min(min(x, alpha.shape[1] - 1 - x) / rx, 1)
+					dy = min(min(y, alpha.shape[0] - 1 - y) / ry, 1)
+					alpha[y, x, 0] = min(dx, dy)
+			#cv2.imwrite("output.png", (alpha * 255).astype(np.uint8))
 
-			f[y1:y2, x1:x2] = f[y1:y2, x1:x2] * (1 - alpha) + p * alpha
-			out.write(f)
+		f = frames[0].copy()
+		f[y1:y2, x1:x2] = f[y1:y2, x1:x2] * (1 - alpha) + p * alpha
+		out.write(f)
+
+		cv2.imshow("frame", f)
+		frame_shown = True
+
 
 	out.release()
 
@@ -319,11 +310,11 @@ def recognize(static, ailia_net, blazeface):
 def main():
 	# Check model files and download
 	check_and_download_models(
-	    WEIGHT_PATH,
-	    MODEL_PATH,
-	    REMOTE_PATH,
+		WEIGHT_PATH,
+		MODEL_PATH,
+		REMOTE_PATH,
 	)
-	ailia_net = ailia.Net(weight=WEIGHT_PATH, env_id = 2)
+	ailia_net = ailia.Net(weight=WEIGHT_PATH, env_id = args.env_id)
 
 	blazeface = None
 	if not args.use_dlib:
