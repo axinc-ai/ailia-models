@@ -67,6 +67,11 @@ parser.add_argument(
 	action="store_true",
 	help="Merge audio file to video. Require ffmpeg.",
 )
+parser.add_argument(
+	"--ailia_audio",
+	action="store_true",
+	help="Use ailia audio.",
+)
 args = update_parser(parser)
 
 # ======================
@@ -248,7 +253,7 @@ def recognize(static, ailia_net, blazeface):
 		#print ("Number of frames available for inference: "+str(len(full_frames)))
 
 	wav = librosa.load(args.audio, sr=16000)[0]
-	mel = audio.melspectrogram(wav)
+	mel = audio.melspectrogram(wav, args.ailia_audio)
 
 	if np.isnan(mel.reshape(-1)).sum() > 0:
 		raise ValueError('Mel contains nan!')

@@ -1,8 +1,6 @@
 import librosa
-import librosa.filters
 import numpy as np
 from scipy import signal
-from scipy.io import wavfile
 
 min_level_db = -100
 ref_level_db = 20
@@ -14,8 +12,6 @@ sample_rate = 16000
 num_mels = 80
 fmin = 55
 fmax = 7600
-
-ailia_audio = False
 
 def preemphasis(wav):
     # new_wav[t] = 1 * wav[t] - 0.97 * wav[t-1]
@@ -30,7 +26,7 @@ def _normalize(S):
     return np.clip((2 * max_abs_value) * ((S - min_level_db) / (-min_level_db)) - max_abs_value,
                     -max_abs_value, max_abs_value)
 
-def melspectrogram(wav):
+def melspectrogram(wav, ailia_audio):
     wav = preemphasis(wav)
     if ailia_audio:
         import ailia.audio
