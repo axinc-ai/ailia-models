@@ -20,9 +20,10 @@ $ python3 lipgan.py
 ```
 
 If you want to specify the input image, put the image path after the `--input` option.  
+If you want to specify the input audio, put the audio path after the `--audio` option.  
 You can use `--savepath` option to change the name of the output file to save.
 ```bash
-$ python3 lipgan.py --input IMAGE_PATH --savepath SAVE_IMAGE_PATH 
+$ python3 lipgan.py --input IMAGE_PATH --audio AUDIO_PATH --savepath SAVE_VIDEO_PATH 
 ```
 
 By adding the `--video` option, you can input the video.   

@@ -4,6 +4,7 @@ import cv2, argparse, audio
 import dlib, subprocess
 import ailia
 import time
+import librosa
 
 # Import original modules
 import sys
@@ -246,7 +247,7 @@ def recognize(static, ailia_net, blazeface):
 
 		#print ("Number of frames available for inference: "+str(len(full_frames)))
 
-	wav = audio.load_wav(args.audio, 16000)
+	wav = librosa.load(args.audio, sr=16000)[0]
 	mel = audio.melspectrogram(wav)
 
 	if np.isnan(mel.reshape(-1)).sum() > 0:
