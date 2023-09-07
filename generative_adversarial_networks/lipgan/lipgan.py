@@ -33,10 +33,10 @@ FACE_DETECTOR_REMOTE_PATH = "https://storage.googleapis.com/ailia-models/blazefa
 
 DLIB_WEIGHT_PATH = "mmod_human_face_detector.dat"
 
-INPUT_IMAGE_PATH = "input.png"
+INPUT_IMAGE_PATH = "input.jpg"
 INPUT_AUDIO_PATH = "input.wav"
 
-SAVE_IMAGE_PATH = "result.mp4"
+SAVE_IMAGE_PATH = "output.mp4"
 
 IMG_SIZE = 96
 
@@ -312,11 +312,11 @@ def recognize(static, ailia_net, blazeface):
 
 def main():
 	# Check model files and download
-	#check_and_download_models(
-	#    WEIGHT_PATH,
-	#    MODEL_PATH,
-	#    REMOTE_PATH,
-	#)
+	check_and_download_models(
+	    WEIGHT_PATH,
+	    MODEL_PATH,
+	    REMOTE_PATH,
+	)
 	ailia_net = ailia.Net(weight=WEIGHT_PATH, env_id = 2)
 
 	blazeface = None
