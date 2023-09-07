@@ -204,57 +204,18 @@ def center_crop(image):
 	y = center[0]/2 - h/2
 	return image[int(y):int(y+h), int(x):int(x+w)]
 
-def infer(frame, mel_chunk, ailia_net, blazeface, realesrgan):
-	img_batch, mel_batch, frame_batch, coords_batch = [], [], [], []
+def super_resolution(p, realesrgan):
+	img = p / 255
+	img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+	img = np.transpose(img, (2, 0, 1))
+	img = np.expand_dims(img, 0)
+	output_img = realesrgan.run(img)[0]
+	output_img = np.squeeze(output_img)
+	output_img = np.clip(output_img, 0, 1)
+	p = np.transpose(output_img[[2, 1, 0], :, :], (1, 2, 0)) * 255
+	return p
 
-	face_det_results = face_detect([frame[...,::-1]], blazeface) # BGR2RGB for CNN face detection
-
-	frame_to_save = frame.copy()
-	face, coords, valid_frame = face_det_results[0].copy()
-	if not valid_frame:
-		print ("Face not detected, skipping frame {}".format(i))
-		return frame
-
-	face = cv2.resize(face, (IMG_SIZE, IMG_SIZE))
-
-	img_batch.append(face)
-	mel_batch.append(mel_chunk)
-	frame_batch.append(frame_to_save)
-	coords_batch.append(coords)
-
-	img_batch, mel_batch = np.asarray(img_batch), np.asarray(mel_batch)
-
-	img_masked = img_batch.copy()
-	img_masked[:, IMG_SIZE//2:] = 0
-
-	img_batch = np.concatenate((img_batch, img_masked), axis=3) / 255.
-	mel_batch = np.reshape(mel_batch, [len(mel_batch), mel_batch.shape[1], mel_batch.shape[2], 1])
-
-	if args.benchmark:
-		start = int(round(time.time() * 1000))
-	pred = ailia_net.run([mel_batch, img_batch])[0]
-	if args.benchmark:
-		end = int(round(time.time() * 1000))
-		print(f'\tailia lipgan processing time {end - start} ms')
-	pred = pred * 255
-	
-	p = pred[0]
-
-	if args.realesrgan:
-		if args.benchmark:
-			start = int(round(time.time() * 1000))
-		img = p / 255
-		img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-		img = np.transpose(img, (2, 0, 1))
-		img = np.expand_dims(img, 0)
-		output_img = realesrgan.run(img)[0]
-		output_img = np.squeeze(output_img)
-		output_img = np.clip(output_img, 0, 1)
-		p = np.transpose(output_img[[2, 1, 0], :, :], (1, 2, 0)) * 255
-		if args.benchmark:
-			end = int(round(time.time() * 1000))
-			print(f'\tailia realesrgan processing time {end - start} ms')
-
+def composite(frame, p, coords):
 	y1, y2, x1, x2 = coords
 	p = cv2.resize(p, (x2 - x1, y2 - y1))
 
@@ -272,6 +233,45 @@ def infer(frame, mel_chunk, ailia_net, blazeface, realesrgan):
 
 	f = frame.copy()
 	f[y1:y2, x1:x2] = f[y1:y2, x1:x2] * (1 - alpha) + p * alpha
+	return f
+
+def infer(frame, mel_chunk, ailia_net, blazeface, realesrgan):
+	face_det_results = face_detect([frame[...,::-1]], blazeface) # BGR2RGB for CNN face detection
+
+	face, coords, valid_frame = face_det_results[0].copy()
+	if not valid_frame:
+		print ("Face not detected, skipping frame {}".format(i))
+		return frame
+
+	face = cv2.resize(face, (IMG_SIZE, IMG_SIZE))
+
+	img_batch, mel_batch = np.asarray([face]), np.asarray([mel_chunk])
+
+	img_masked = img_batch.copy()
+	img_masked[:, IMG_SIZE//2:] = 0
+
+	img_batch = np.concatenate((img_batch, img_masked), axis=3) / 255.
+	mel_batch = np.reshape(mel_batch, [len(mel_batch), mel_batch.shape[1], mel_batch.shape[2], 1])
+
+	if args.benchmark:
+		start = int(round(time.time() * 1000))
+	pred = ailia_net.run([mel_batch, img_batch])[0]
+	if args.benchmark:
+		end = int(round(time.time() * 1000))
+		print(f'\tailia lipgan processing time {end - start} ms')
+	pred = pred * 255
+	p = pred[0]
+
+	if args.realesrgan:
+		if args.benchmark:
+			start = int(round(time.time() * 1000))
+		img = super_resolution(p, realesrgan)
+		if args.benchmark:
+			end = int(round(time.time() * 1000))
+			print(f'\tailia realesrgan processing time {end - start} ms')
+
+	f = composite(frame, p, coords)
+
 	return f
 
 def recognize(static, ailia_net, blazeface, realesrgan):
@@ -325,7 +325,6 @@ def recognize(static, ailia_net, blazeface, realesrgan):
 
 		cv2.imshow("frame", f)
 		frame_shown = True
-
 
 	out.release()
 
