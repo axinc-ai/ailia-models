@@ -34,6 +34,8 @@ REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/facemesh_v2/'
 IMAGE_PATH = 'demo.jpg'
 SAVE_IMAGE_PATH = 'output.png'
 
+IMAGE_DET_SIZE = 128
+
 # ======================
 # Arguemnt Parser Config
 # ======================
@@ -135,6 +137,77 @@ def draw_landmarks(
 # Main functions
 # ======================
 
+
+def warp_perspective(
+        img,
+        center_x, center_y,
+        rect_width, rect_height,
+        rotation,
+        dst_width, dst_height):
+    im_h, im_w, _ = img.shape
+
+    dst_aspect_ratio = dst_height / dst_width
+    roi_aspect_ratio = rect_height / rect_width
+    if dst_aspect_ratio > roi_aspect_ratio:
+        rect_height = rect_width * dst_aspect_ratio
+    else:
+        rect_width = rect_height / dst_aspect_ratio
+
+    a = rect_width
+    b = rect_height
+    c = math.cos(rotation)
+    d = math.sin(rotation)
+    e = center_x
+    f = center_y
+    g = 1 / im_w
+    h = 1 / im_h
+
+    project_mat = [
+        [a * c * g, -b * d * g, 0.0, (-0.5 * a * c + 0.5 * b * d + e) * g],
+        [a * d * h, b * c * h, 0.0, (-0.5 * b * c - 0.5 * a * d + f) * h],
+        [0.0, 0.0, a * g, 0.0],
+        [0.0, 0.0, 0.0, 1.0],
+    ]
+
+    rotated_rect = (
+        (center_x, center_y),
+        (rect_width, rect_height),
+        rotation * 180. / math.pi
+    )
+    pts1 = cv2.boxPoints(rotated_rect)
+
+    pts2 = np.float32([[0, dst_height], [0, 0], [dst_width, 0], [dst_width, dst_height]])
+    M = cv2.getPerspectiveTransform(pts1, pts2)
+    img = cv2.warpPerspective(
+        img, M, (dst_width, dst_height), flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT)
+
+    return img, project_mat
+
+
+def preprocess_det(img):
+    im_h, im_w, _ = img.shape
+    img = img[:, :, ::-1]  # BGR -> RGB
+
+    """
+    resize & padding
+    """
+    dst_width = dst_height = IMAGE_DET_SIZE
+    img, matrix = warp_perspective(
+        img,
+        0.5 * im_w, 0.5 * im_h,
+        im_w, im_h, 0,
+        dst_width, dst_height)
+
+    """
+    normalize & reshape
+    """
+    img = normalize_image(img, normalize_type='127.5')
+    img = np.expand_dims(img, axis=0)
+    img = img.astype(np.float32)
+
+    return img, matrix
+
+
 def preprocess(img):
     im_h, im_w, _ = img.shape
 
@@ -198,25 +271,22 @@ def post_processing(input_tensors):
     return norm_landmarks
 
 
-def predict(net, img):
-    import onnxruntime
-    cuda = 0 < ailia.get_gpu_environment_id()
-    providers = ['CUDAExecutionProvider', 'CPUExecutionProvider'] if cuda else ['CPUExecutionProvider']
-    det_net = onnxruntime.InferenceSession(WEIGHT_DET_PATH, providers=providers)
+def predict(models, img):
+    input, matrix = preprocess_det(img)
 
-    img = cv2.imread("kekka_0.png")
-    img = normalize_image(img, normalize_type='127.5')
-    img = np.expand_dims(img, axis=0)
-    img = img.astype(np.float32)
+    # input = cv2.imread("kekka_0.png")
+    # input = normalize_image(img, normalize_type='127.5')
+    # input = np.expand_dims(img, axis=0)
+    # input = img.astype(np.float32)
+
+    det_net = models['det_net']
 
     # feedforward
     if not args.onnx:
-        output = det_net.predict([img])
+        output = det_net.predict([input])
     else:
-        output = det_net.run(None, {'input': img})
+        output = det_net.run(None, {'input': input})
     detections, scores = output
-    print(detections)
-    print(detections.shape)
 
     box, score = face_detection(detections, scores)
     if len(box) == 0:
@@ -224,6 +294,8 @@ def predict(net, img):
 
     # shape = (IMAGE_HEIGHT, IMAGE_WIDTH)
     img = preprocess(img)
+
+    net = models['net']
 
     # feedforward
     if not args.onnx:
@@ -240,7 +312,7 @@ def predict(net, img):
     return landmarks
 
 
-def recognize_from_image(net):
+def recognize_from_image(models):
     # input image loop
     for image_path in args.input:
         logger.info(image_path)
@@ -256,7 +328,7 @@ def recognize_from_image(net):
             total_time_estimation = 0
             for i in range(args.benchmark_count):
                 start = int(round(time.time() * 1000))
-                detection_result = predict(net, img)
+                detection_result = predict(models, img)
                 end = int(round(time.time() * 1000))
                 estimation_time = (end - start)
 
@@ -267,7 +339,7 @@ def recognize_from_image(net):
 
             logger.info(f'\taverage time estimation {total_time_estimation / (args.benchmark_count - 1)} ms')
         else:
-            detection_result = predict(net, img)
+            detection_result = predict(models, img)
 
         res_img = draw_result(img, detection_result)
 
@@ -287,13 +359,20 @@ def main():
     # initialize
     if not args.onnx:
         net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+        det_net = ailia.Net(MODEL_DET_PATH, WEIGHT_DET_PATH, env_id=env_id)
     else:
         import onnxruntime
         cuda = 0 < ailia.get_gpu_environment_id()
         providers = ['CUDAExecutionProvider', 'CPUExecutionProvider'] if cuda else ['CPUExecutionProvider']
         net = onnxruntime.InferenceSession(WEIGHT_PATH, providers=providers)
+        det_net = onnxruntime.InferenceSession(WEIGHT_DET_PATH, providers=providers)
 
-    recognize_from_image(net)
+    models = {
+        "net": net,
+        "det_net": det_net,
+    }
+
+    recognize_from_image(models)
 
 
 if __name__ == '__main__':
