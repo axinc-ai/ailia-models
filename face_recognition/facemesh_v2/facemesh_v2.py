@@ -1,6 +1,7 @@
 import sys
 import time
 import math
+from collections import namedtuple
 from logging import getLogger
 
 import numpy as np
@@ -18,6 +19,7 @@ from webcamera_utils import get_capture, get_writer  # noqa
 
 import draw_utils
 from detection_utils import face_detection
+from detection_utils import IMAGE_SIZE as IMAGE_DET_SIZE
 
 logger = getLogger(__name__)
 
@@ -34,7 +36,10 @@ REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/facemesh_v2/'
 IMAGE_PATH = 'demo.jpg'
 SAVE_IMAGE_PATH = 'output.png'
 
-IMAGE_DET_SIZE = 128
+IMAGE_SIZE = 256
+NUM_LANDMARKS = 478
+
+ROI = namedtuple('ROI', ['x_center', 'y_center', 'width', 'height', 'rotation'])
 
 # ======================
 # Arguemnt Parser Config
@@ -139,26 +144,27 @@ def draw_landmarks(
 
 
 def warp_perspective(
-        img,
-        center_x, center_y,
-        rect_width, rect_height,
-        rotation,
+        img, roi: ROI,
         dst_width, dst_height):
     im_h, im_w, _ = img.shape
 
     dst_aspect_ratio = dst_height / dst_width
-    roi_aspect_ratio = rect_height / rect_width
+    roi_aspect_ratio = roi.height / roi.width
     if dst_aspect_ratio > roi_aspect_ratio:
-        rect_height = rect_width * dst_aspect_ratio
+        new_height = roi.width * dst_aspect_ratio
+        new_width = roi.width
     else:
-        rect_width = rect_height / dst_aspect_ratio
+        new_width = roi.height / dst_aspect_ratio
+        new_height = roi.height
 
-    a = rect_width
-    b = rect_height
-    c = math.cos(rotation)
-    d = math.sin(rotation)
-    e = center_x
-    f = center_y
+    roi = ROI(roi.x_center, roi.y_center, new_width, new_height, roi.rotation)
+
+    a = roi.width
+    b = roi.height
+    c = math.cos(roi.rotation)
+    d = math.sin(roi.rotation)
+    e = roi.x_center
+    f = roi.y_center
     g = 1 / im_w
     h = 1 / im_h
 
@@ -170,9 +176,9 @@ def warp_perspective(
     ]
 
     rotated_rect = (
-        (center_x, center_y),
-        (rect_width, rect_height),
-        rotation * 180. / math.pi
+        (roi.x_center, roi.y_center),
+        (roi.width, roi.height),
+        roi.rotation * 180. / math.pi
     )
     pts1 = cv2.boxPoints(rotated_rect)
 
@@ -181,21 +187,19 @@ def warp_perspective(
     img = cv2.warpPerspective(
         img, M, (dst_width, dst_height), flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT)
 
-    return img, project_mat
+    return img, project_mat, roi
 
 
 def preprocess_det(img):
     im_h, im_w, _ = img.shape
-    img = img[:, :, ::-1]  # BGR -> RGB
 
     """
     resize & padding
     """
+    roi = ROI(0.5 * im_w, 0.5 * im_h, im_w, im_h, 0)
     dst_width = dst_height = IMAGE_DET_SIZE
-    img, matrix = warp_perspective(
-        img,
-        0.5 * im_w, 0.5 * im_h,
-        im_w, im_h, 0,
+    img, matrix, roi = warp_perspective(
+        img, roi,
         dst_width, dst_height)
 
     """
@@ -208,36 +212,26 @@ def preprocess_det(img):
     return img, matrix
 
 
-def preprocess(img):
+def preprocess(img, roi):
     im_h, im_w, _ = img.shape
 
-    # # adaptive_resize
-    # scale = h / min(im_h, im_w)
-    # ow, oh = int(im_w * scale), int(im_h * scale)
-    # if ow != im_w or oh != im_h:
-    #     img = cv2.resize(img, (ow, oh), interpolation=cv2.INTER_LINEAR)
-    #
-    # img = np.array(Image.fromarray(img).resize((ow, oh), Image.Resampling.BILINEAR))
-    #
-    # # center_crop
-    # if ow > w:
-    #     x = (ow - w) // 2
-    #     img = img[:, x:x + w, :]
-    # if oh > h:
-    #     y = (oh - h) // 2
-    #     img = img[y:y + h, :, :]
-
-    img = cv2.imread("kekka_1.png")
+    """
+    resize & padding
+    """
+    dst_width = dst_height = IMAGE_SIZE
+    img, _, roi = warp_perspective(
+        img, roi,
+        dst_width, dst_height)
 
     img = normalize_image(img, normalize_type='255')
     img = np.expand_dims(img, axis=0)
     img = img.astype(np.float32)
 
-    return img
+    return img, roi
 
 
-def post_processing(input_tensors):
-    num_landmarks = 478
+def post_processing(input_tensors, roi):
+    num_landmarks = NUM_LANDMARKS
     num_dimensions = 3
 
     input_tensors = input_tensors.reshape(-1)
@@ -249,12 +243,11 @@ def post_processing(input_tensors):
 
     norm_landmarks = output_landmarks / 256
 
-    width = 0.429052
-    height = 0.343577
-    x_center = 0.489064
-    y_center = 0.227319
-    angle = 0.00830413
-
+    width = roi.width
+    height = roi.height
+    x_center = roi.x_center
+    y_center = roi.y_center
+    angle = roi.rotation
     for landmark in norm_landmarks:
         x = landmark[0] - 0.5
         y = landmark[1] - 0.5
@@ -272,42 +265,63 @@ def post_processing(input_tensors):
 
 
 def predict(models, img):
+    im_h, im_w, _ = img.shape
+    img = img[:, :, ::-1]  # BGR -> RGB
+
     input, matrix = preprocess_det(img)
 
-    # input = cv2.imread("kekka_0.png")
-    # input = normalize_image(img, normalize_type='127.5')
-    # input = np.expand_dims(img, axis=0)
-    # input = img.astype(np.float32)
-
-    det_net = models['det_net']
-
     # feedforward
+    det_net = models['det_net']
     if not args.onnx:
         output = det_net.predict([input])
     else:
         output = det_net.run(None, {'input': input})
     detections, scores = output
 
-    box, score = face_detection(detections, scores)
-    if len(box) == 0:
-        return [], []
+    boxes, scores = face_detection(detections, scores, matrix)
+    if len(boxes) == 0:
+        return np.zeros((0, NUM_LANDMARKS, 3))
 
-    # shape = (IMAGE_HEIGHT, IMAGE_WIDTH)
-    img = preprocess(img)
+    landmarks_list = []
+    for box in boxes:
+        # DetectionsToRectsCalculator
+        rect_width = box[2] - box[0]
+        rect_height = box[3] - box[1]
+        center_x = (box[0] + box[2]) / 2
+        center_y = (box[1] + box[3]) / 2
 
-    net = models['net']
+        x0, y0 = box[4] * im_w, box[5] * im_h
+        x1, y1 = box[6] * im_w, box[7] * im_h
+        angle = 0 - math.atan2(-(y1 - y0), x1 - x0)
+        angle = angle - 2 * math.pi * math.floor((angle - (-math.pi)) / (2 * math.pi));
 
-    # feedforward
-    if not args.onnx:
-        output = net.predict([img])
-    else:
-        output = net.run(None, {'input_12': img})
-    landmark_tensors, presence_flag_tensors, _ = output
+        # RectTransformationCalculator
+        scale_x = scale_y = 1.5
+        rect_width = rect_width * scale_x
+        rect_height = rect_height * scale_y
 
-    landmarks = post_processing(landmark_tensors)
+        roi = ROI(
+            center_x * im_w, center_y * im_h,
+            rect_width * im_w, rect_height * im_h,
+            angle)
+        img, roi = preprocess(img, roi)
 
-    print(landmarks)
-    print(landmarks.shape)
+        # feedforward
+        net = models['net']
+        if not args.onnx:
+            output = net.predict([img])
+        else:
+            output = net.run(None, {'input_12': img})
+        landmark_tensors, presence_flag_tensors, _ = output
+
+        roi = ROI(
+            roi.x_center / im_w, roi.y_center / im_h,
+            roi.width / im_w, roi.height / im_h,
+            angle)
+        landmarks = post_processing(landmark_tensors, roi)
+        landmarks_list.append(landmarks)
+
+    landmarks = np.stack(landmarks_list, axis=0)
 
     return landmarks
 
@@ -341,7 +355,9 @@ def recognize_from_image(models):
         else:
             detection_result = predict(models, img)
 
-        res_img = draw_result(img, detection_result)
+        res_img = img
+        for detection in detection_result:
+            res_img = draw_result(res_img, detection)
 
         # plot result
         savepath = get_savepath(args.savepath, image_path, ext='.png')

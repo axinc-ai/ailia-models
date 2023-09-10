@@ -150,7 +150,7 @@ def weighted_nms(boxes, scores):
 anchors = get_anchor()
 
 
-def face_detection(detections, scores):
+def face_detection(detections, scores, project_mat):
     boxes = decode_boxes(detections[0], anchors)
     scores = np.clip(scores[0, :, 0], -100, 100)
     scores = sigmoid(scores)
@@ -163,19 +163,27 @@ def face_detection(detections, scores):
     # Performs non-max suppression to remove excessive detections.
     boxes, scores = weighted_nms(boxes, scores)
 
-    if len(boxes) == 0:
-        return [], []
+    def project_fn(x, y):
+        return (
+            x * project_mat[0][0] + y * project_mat[0][1] + project_mat[0][3],
+            x * project_mat[1][0] + y * project_mat[1][1] + project_mat[1][3]
+        )
 
-    # Adjusts detection locations (already normalized to [0.f, 1.f]) on the
-    # letterboxed image (after image transformation with the FIT scale mode)
-    pad_h, pad_w = pad
-    if 0 < pad_w:
-        boxes[:, [0, 2, 4, 6, 8, 10]] = (boxes[:, [0, 2, 4, 6, 8, 10]] - pad_w) / (1.0 - pad_w * 2)
-    if 0 < pad_h:
-        boxes[:, [1, 3, 5, 7, 9, 11]] = (boxes[:, [1, 3, 5, 7, 9, 11]] - pad_h) / (1.0 - pad_h * 2)
+    # DetectionProjectionCalculator
+    for box in boxes:
+        xmin, ymin, xmax, ymax = box[:4]
+        ps = [
+            project_fn(*p) for p in [
+                [xmin, ymin], [xmax, ymin], [xmax, ymax], [xmin, ymax]
+            ]
+        ]
 
-    # Gets the very first detection
-    box = boxes[0]
-    score = scores[0]
+        left_top = min(p[0] for p in ps), min(p[1] for p in ps)
+        right_bottom = max(p[0] for p in ps), max(p[1] for p in ps)
+        box[[0, 1]] = left_top
+        box[[2, 3]] = right_bottom
+        for i in range(6):
+            kx, ky = 4 + i * 2, 4 + i * 2 + 1
+            box[[kx, ky]] = project_fn(box[kx], box[ky])
 
-    return box, score
+    return boxes, scores
