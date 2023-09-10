@@ -1,12 +1,11 @@
 from typing import Mapping, Tuple
 from collections import namedtuple
+import math
+
+import numpy as np
+import cv2
 
 DrawingSpec = namedtuple('DrawingSpec', ['color', 'thickness'])
-
-WHITE_COLOR = (224, 224, 224)
-GRAY_COLOR = (128, 128, 128)
-RED_COLOR = (0, 0, 255)
-GREEN_COLOR = (48, 255, 48)
 
 FACEMESH_LIPS = frozenset([
     (61, 146), (146, 91), (91, 181), (181, 84), (84, 17),
@@ -503,6 +502,11 @@ FACEMESH_TESSELATION = frozenset([
     (361, 401), (401, 288), (288, 361), (265, 372), (372, 353), (353, 265),
     (390, 339), (339, 249), (249, 390), (339, 448), (448, 255), (255, 339)])
 
+WHITE_COLOR = (224, 224, 224)
+GRAY_COLOR = (128, 128, 128)
+RED_COLOR = (0, 0, 255)
+GREEN_COLOR = (48, 255, 48)
+
 THICKNESS_TESSELATION = 1
 THICKNESS_CONTOURS = 2
 
@@ -559,3 +563,57 @@ def get_iris_connections_style() \
         face_mesh_iris_connections_style[connection] = right_spec
 
     return face_mesh_iris_connections_style
+
+
+def _normalized_to_pixel_coordinates(
+        normalized_x: float, normalized_y: float,
+        image_width: int, image_height: int):
+    """Converts normalized value pair to pixel coordinates."""
+
+    # Checks if the float value is between 0 and 1.
+    def is_valid_normalized_value(value: float) -> bool:
+        return (value > 0 or math.isclose(0, value)) \
+               and (value < 1 or math.isclose(1, value))
+
+    if not (is_valid_normalized_value(normalized_x)
+            and is_valid_normalized_value(normalized_y)):
+        return None
+    x_px = min(math.floor(normalized_x * image_width), image_width - 1)
+    y_px = min(math.floor(normalized_y * image_height), image_height - 1)
+
+    return x_px, y_px
+
+
+def draw_landmarks(
+        image: np.ndarray,
+        landmark_list,
+        connections=None,
+        connection_drawing_spec=None):
+    # if not landmark_list:
+    #     return
+
+    image_rows, image_cols, _ = image.shape
+
+    idx_to_coordinates = {}
+    for idx, landmark in enumerate(landmark_list):
+        x, y = landmark[:2]
+        landmark_px = _normalized_to_pixel_coordinates(
+            x, y, image_cols, image_rows)
+        if landmark_px:
+            idx_to_coordinates[idx] = landmark_px
+
+    if connections:
+        # Draws the connections if the start and end landmarks are both visible.
+        for connection in connections:
+            start_idx = connection[0]
+            end_idx = connection[1]
+
+            if start_idx in idx_to_coordinates and end_idx in idx_to_coordinates:
+                drawing_spec = connection_drawing_spec[connection] \
+                    if isinstance(connection_drawing_spec, dict) \
+                    else connection_drawing_spec
+                cv2.line(
+                    image,
+                    idx_to_coordinates[start_idx],
+                    idx_to_coordinates[end_idx],
+                    drawing_spec.color, drawing_spec.thickness)

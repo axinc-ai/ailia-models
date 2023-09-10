@@ -63,79 +63,25 @@ args = update_parser(parser)
 def draw_result(img, face_landmarks):
     # Draw the face landmarks.
 
-    draw_landmarks(
+    draw_utils.draw_landmarks(
         image=img,
         landmark_list=face_landmarks,
         connections=draw_utils.FACEMESH_TESSELATION,
         connection_drawing_spec=draw_utils.get_tesselation_style())
 
-    draw_landmarks(
+    draw_utils.draw_landmarks(
         image=img,
         landmark_list=face_landmarks,
         connections=draw_utils.FACEMESH_CONTOURS,
         connection_drawing_spec=draw_utils.get_contours_style())
 
-    draw_landmarks(
+    draw_utils.draw_landmarks(
         image=img,
         landmark_list=face_landmarks,
         connections=draw_utils.FACEMESH_IRISES,
         connection_drawing_spec=draw_utils.get_iris_connections_style())
 
     return img
-
-
-def normalized_to_pixel_coordinates(
-        normalized_x: float, normalized_y: float,
-        image_width: int, image_height: int):
-    """Converts normalized value pair to pixel coordinates."""
-
-    # Checks if the float value is between 0 and 1.
-    def is_valid_normalized_value(value: float) -> bool:
-        return (value > 0 or math.isclose(0, value)) \
-               and (value < 1 or math.isclose(1, value))
-
-    if not (is_valid_normalized_value(normalized_x)
-            and is_valid_normalized_value(normalized_y)):
-        return None
-    x_px = min(math.floor(normalized_x * image_width), image_width - 1)
-    y_px = min(math.floor(normalized_y * image_height), image_height - 1)
-
-    return x_px, y_px
-
-
-def draw_landmarks(
-        image: np.ndarray,
-        landmark_list,
-        connections=None,
-        connection_drawing_spec=None):
-    # if not landmark_list:
-    #     return
-
-    image_rows, image_cols, _ = image.shape
-
-    idx_to_coordinates = {}
-    for idx, landmark in enumerate(landmark_list):
-        x, y = landmark[:2]
-        landmark_px = normalized_to_pixel_coordinates(
-            x, y, image_cols, image_rows)
-        if landmark_px:
-            idx_to_coordinates[idx] = landmark_px
-
-    if connections:
-        # Draws the connections if the start and end landmarks are both visible.
-        for connection in connections:
-            start_idx = connection[0]
-            end_idx = connection[1]
-
-            if start_idx in idx_to_coordinates and end_idx in idx_to_coordinates:
-                drawing_spec = connection_drawing_spec[connection] \
-                    if isinstance(connection_drawing_spec, dict) \
-                    else connection_drawing_spec
-                cv2.line(
-                    image,
-                    idx_to_coordinates[start_idx],
-                    idx_to_coordinates[end_idx],
-                    drawing_spec.color, drawing_spec.thickness)
 
 
 # ======================
