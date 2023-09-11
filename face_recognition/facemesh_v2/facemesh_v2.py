@@ -95,22 +95,27 @@ def draw_result(img, face_landmarks):
 # Main functions
 # ======================
 
-
 def warp_perspective(
         img, roi: ROI,
-        dst_width, dst_height):
+        dst_width, dst_height,
+        keep_aspect_ratio=True):
     im_h, im_w, _ = img.shape
 
-    dst_aspect_ratio = dst_height / dst_width
-    roi_aspect_ratio = roi.height / roi.width
-    if dst_aspect_ratio > roi_aspect_ratio:
-        new_height = roi.width * dst_aspect_ratio
-        new_width = roi.width
-    else:
-        new_width = roi.height / dst_aspect_ratio
-        new_height = roi.height
+    v_pad = h_pad = 0
+    if keep_aspect_ratio:
+        dst_aspect_ratio = dst_height / dst_width
+        roi_aspect_ratio = roi.height / roi.width
 
-    roi = ROI(roi.x_center, roi.y_center, new_width, new_height, roi.rotation)
+        if dst_aspect_ratio > roi_aspect_ratio:
+            new_height = roi.width * dst_aspect_ratio
+            new_width = roi.width
+            v_pad = (1 - roi_aspect_ratio / dst_aspect_ratio) / 2
+        else:
+            new_width = roi.height / dst_aspect_ratio
+            new_height = roi.height
+            h_pad = (1 - dst_aspect_ratio / roi_aspect_ratio) / 2
+
+        roi = ROI(roi.x_center, roi.y_center, new_width, new_height, roi.rotation)
 
     a = roi.width
     b = roi.height
@@ -140,7 +145,7 @@ def warp_perspective(
     img = cv2.warpPerspective(
         img, M, (dst_width, dst_height), flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT)
 
-    return img, project_mat, roi
+    return img, project_mat, roi, (h_pad, v_pad)
 
 
 def preprocess_det(img):
@@ -151,7 +156,7 @@ def preprocess_det(img):
     """
     roi = ROI(0.5 * im_w, 0.5 * im_h, im_w, im_h, 0)
     dst_width = dst_height = IMAGE_DET_SIZE
-    img, matrix, roi = warp_perspective(
+    img, matrix, *_ = warp_perspective(
         img, roi,
         dst_width, dst_height)
 
@@ -172,18 +177,19 @@ def preprocess(img, roi):
     resize & padding
     """
     dst_width = dst_height = IMAGE_SIZE
-    img, _, roi = warp_perspective(
+    img, _, roi, pad = warp_perspective(
         img, roi,
-        dst_width, dst_height)
+        dst_width, dst_height,
+        keep_aspect_ratio=False)
 
     img = normalize_image(img, normalize_type='255')
     img = np.expand_dims(img, axis=0)
     img = img.astype(np.float32)
 
-    return img, roi
+    return img, roi, pad
 
 
-def post_processing(input_tensors, roi):
+def post_processing(input_tensors, roi, pad):
     num_landmarks = NUM_LANDMARKS
     num_dimensions = 3
 
@@ -197,7 +203,16 @@ def post_processing(input_tensors, roi):
     norm_landmarks = output_landmarks / 256
 
     # LandmarkLetterboxRemovalCalculator
-    pass
+    h_pad, v_pad = pad
+    left = h_pad
+    top = v_pad
+    left_and_right = h_pad * 2
+    top_and_bottom = v_pad * 2
+    for landmark in norm_landmarks:
+        new_x = (landmark[0] - left) / (1 - left_and_right)
+        new_y = (landmark[1] - top) / (1 - top_and_bottom)
+        new_z = landmark[2] / (1 - left_and_right)  # Scale Z coordinate as X.
+        landmark[:3] = (new_x, new_y, new_z)
 
     # LandmarkProjectionCalculator
     width = roi.width
@@ -261,7 +276,7 @@ def predict(models, img):
             center_x * im_w, center_y * im_h,
             rect_width * im_w, rect_height * im_h,
             angle)
-        img, roi = preprocess(img, roi)
+        img, roi, pad = preprocess(img, roi)
 
         # feedforward
         net = models['net']
@@ -275,7 +290,7 @@ def predict(models, img):
             roi.x_center / im_w, roi.y_center / im_h,
             roi.width / im_w, roi.height / im_h,
             angle)
-        landmarks = post_processing(landmark_tensors, norm_rect)
+        landmarks = post_processing(landmark_tensors, norm_rect, pad)
         landmarks_list.append(landmarks)
 
     landmarks = np.stack(landmarks_list, axis=0)
