@@ -20,6 +20,7 @@ from webcamera_utils import get_capture, get_writer  # noqa
 import draw_utils
 from detection_utils import face_detection
 from detection_utils import IMAGE_SIZE as IMAGE_DET_SIZE
+from blendshape import face_blendshapes, plot_face_blendshapes_bar_graph
 
 logger = getLogger(__name__)
 
@@ -31,6 +32,8 @@ WEIGHT_PATH = 'face_landmarks_detector.onnx'
 MODEL_PATH = 'face_landmarks_detector.onnx.prototxt'
 WEIGHT_DET_PATH = 'face_detector.onnx'
 MODEL_DET_PATH = 'face_detector.onnx.prototxt'
+WEIGHT_BLENDSHAPE_PATH = 'face_blendshapes.onnx'
+MODEL_BLENDSHAPE_PATH = 'face_blendshapes.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/facemesh_v2/'
 
 IMAGE_PATH = 'demo.jpg'
@@ -47,6 +50,10 @@ ROI = namedtuple('ROI', ['x_center', 'y_center', 'width', 'height', 'rotation'])
 
 parser = get_base_parser(
     'FaceMesh-V2', IMAGE_PATH, SAVE_IMAGE_PATH
+)
+parser.add_argument(
+    '--blendshape', action="store_true",
+    help="visualize the face blendshapes categories using a bar graph."
 )
 parser.add_argument(
     '--onnx',
@@ -180,8 +187,8 @@ def post_processing(input_tensors, roi):
     num_landmarks = NUM_LANDMARKS
     num_dimensions = 3
 
+    # TensorsToFaceLandmarksGraph
     input_tensors = input_tensors.reshape(-1)
-
     output_landmarks = np.zeros((num_landmarks, num_dimensions))
     for i in range(num_landmarks):
         offset = i * num_dimensions
@@ -189,6 +196,10 @@ def post_processing(input_tensors, roi):
 
     norm_landmarks = output_landmarks / 256
 
+    # LandmarkLetterboxRemovalCalculator
+    pass
+
+    # LandmarkProjectionCalculator
     width = roi.width
     height = roi.height
     x_center = roi.x_center
@@ -260,11 +271,11 @@ def predict(models, img):
             output = net.run(None, {'input_12': img})
         landmark_tensors, presence_flag_tensors, _ = output
 
-        roi = ROI(
+        norm_rect = ROI(
             roi.x_center / im_w, roi.y_center / im_h,
             roi.width / im_w, roi.height / im_h,
             angle)
-        landmarks = post_processing(landmark_tensors, roi)
+        landmarks = post_processing(landmark_tensors, norm_rect)
         landmarks_list.append(landmarks)
 
     landmarks = np.stack(landmarks_list, axis=0)
@@ -310,28 +321,47 @@ def recognize_from_image(models):
         logger.info(f'saved at : {savepath}')
         cv2.imwrite(savepath, res_img)
 
+        if args.blendshape:
+            bls_net = models['blendshape']
+            score = face_blendshapes(bls_net, detection_result[0], img.shape[:2])
+            img = plot_face_blendshapes_bar_graph(score)
+
+            cv2.imwrite("bar_graph.png", img)
+
     logger.info('Script finished successfully.')
 
 
 def main():
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_DET_PATH, MODEL_DET_PATH, REMOTE_PATH)
+    if args.blendshape:
+        check_and_download_models(WEIGHT_BLENDSHAPE_PATH, MODEL_BLENDSHAPE_PATH, REMOTE_PATH)
+
+        import blendshape
+        blendshape.onnx = True
 
     env_id = args.env_id
 
     # initialize
+    bls_net = None
     if not args.onnx:
         net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
         det_net = ailia.Net(MODEL_DET_PATH, WEIGHT_DET_PATH, env_id=env_id)
+        if args.blendshape:
+            bls_net = ailia.Net(MODEL_BLENDSHAPE_PATH, WEIGHT_BLENDSHAPE_PATH, env_id=env_id)
     else:
         import onnxruntime
         cuda = 0 < ailia.get_gpu_environment_id()
         providers = ['CUDAExecutionProvider', 'CPUExecutionProvider'] if cuda else ['CPUExecutionProvider']
         net = onnxruntime.InferenceSession(WEIGHT_PATH, providers=providers)
         det_net = onnxruntime.InferenceSession(WEIGHT_DET_PATH, providers=providers)
+        if args.blendshape:
+            bls_net = onnxruntime.InferenceSession(WEIGHT_BLENDSHAPE_PATH, providers=providers)
 
     models = {
         "net": net,
         "det_net": det_net,
+        "blendshape": bls_net,
     }
 
     recognize_from_image(models)
