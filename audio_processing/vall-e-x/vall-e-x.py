@@ -29,9 +29,10 @@ logger = getLogger(__name__)
 # ======================
 # Parameters
 # ======================
-
-WEIGHT_DECODER_PATH = "ar_decoder.opt.onnx"
-MODEL_DECODER_PATH = "ar_decoder.opt.onnx.prototxt"
+#"nar_decoder.onnx"
+#"nar_predict_layers.onnx"
+WEIGHT_DECODER_PATH = "ar_decoder.onnx"
+MODEL_DECODER_PATH = None#"ar_decoder.opt.onnx.prototxt"
 WEIGHT_ENCODEC_PATH = "encodec.onnx"
 MODEL_ENCODEC_PATH = "encodec.onnx.prototxt"
 WEIGHT_VOCOS_PATH = "vocos.opt.onnx"
@@ -84,13 +85,14 @@ if args.input:
 else:
     text ="こんにちは。今日は新しいAIエンジンであるアイリアSDKを紹介します。アイリアSDKは高速なAI推論エンジンです。"
 
-sampling_rate = 22050
+sampling_rate = 24000
 
 def generate_voice(decoder, encodec, audio_embedding, vocos):
     # onnx
     logger.info("Input text : " + text)
 
     output = generate_audio(text, prompt=None, language='auto', accent='no-accent')
+    print(output.shape)
 
     #mel_outputs_postnet = test_inference(texts, encoder, decoder_iter, postnet)
 
@@ -118,9 +120,9 @@ def generate_voice(decoder, encodec, audio_embedding, vocos):
     #    logger.info(f'\twavegrow processing time {estimation_time} ms')
 
     # export to audio
-    #savepath = args.savepath
-    #logger.info(f'saved at : {savepath}')
-    #sf.write(savepath, audio[0].astype(np.float32), sampling_rate)
+    savepath = args.savepath
+    logger.info(f'saved at : {savepath}')
+    sf.write(savepath, output[0].astype(np.float32), sampling_rate)
     #logger.info('Script finished successfully.')
 
 
