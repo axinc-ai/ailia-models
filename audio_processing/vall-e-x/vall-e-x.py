@@ -16,6 +16,9 @@ from microphone_utils import start_microphone_input  # noqa
 from model_utils import check_and_download_models  # noqa
 from arg_utils import get_base_parser, get_savepath, update_parser  # noqa
 
+# import vall-e-x
+from generation import generate_audio
+
 flg_ffmpeg = False
 
 if flg_ffmpeg:
@@ -87,7 +90,7 @@ def generate_voice(decoder, encodec, audio_embedding, vocos):
     # onnx
     logger.info("Input text : " + text)
 
-    texts = [text]
+    output = generate_audio(text, prompt=None, language='auto', accent='no-accent')
 
     #mel_outputs_postnet = test_inference(texts, encoder, decoder_iter, postnet)
 
