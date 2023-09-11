@@ -346,6 +346,48 @@ def recognize_from_image(models):
     logger.info('Script finished successfully.')
 
 
+def recognize_from_video(models):
+    capture = get_capture(args.video)
+
+    # create video writer if savepath is specified as video format
+    if args.savepath != SAVE_IMAGE_PATH:
+        f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
+        writer = get_writer(args.savepath, f_h, f_w)
+    else:
+        writer = None
+
+    frame_shown = False
+    while True:
+        ret, frame = capture.read()
+        if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
+            break
+
+        detection_result = predict(models, frame)
+
+        visual_img = frame
+        for detection in detection_result:
+            visual_img = draw_result(visual_img, detection)
+
+        cv2.imshow('frame', visual_img)
+        frame_shown = True
+
+        # save results
+        if writer is not None:
+            writer.write(frame)
+
+    capture.release()
+    if writer is not None:
+        writer.release()
+    cv2.destroyAllWindows()
+    if writer is not None:
+        writer.release()
+
+    logger.info('Script finished successfully.')
+
+
 def main():
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
     check_and_download_models(WEIGHT_DET_PATH, MODEL_DET_PATH, REMOTE_PATH)
@@ -379,7 +421,10 @@ def main():
         "blendshape": bls_net,
     }
 
-    recognize_from_image(models)
+    if args.video is not None:
+        recognize_from_video(models)
+    else:
+        recognize_from_image(models)
 
 
 if __name__ == '__main__':
