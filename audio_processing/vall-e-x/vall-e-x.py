@@ -83,7 +83,7 @@ else:
 if args.input:
     text = args.input
 else:
-    text ="こんにちは。今日は新しいAIエンジンであるアイリアSDKを紹介します。アイリアSDKは高速なAI推論エンジンです。"
+    text ="音声合成のテストを行なっています。"
 
 sampling_rate = 24000
 
@@ -122,9 +122,11 @@ def generate_voice(decoder, encodec, audio_embedding, vocos):
     # export to audio
     savepath = args.savepath
     logger.info(f'saved at : {savepath}')
-    sf.write(savepath, output[0].astype(np.float32), sampling_rate)
+    sf.write(savepath, output.astype(np.float32), sampling_rate)
     #logger.info('Script finished successfully.')
 
+    from scipy.io.wavfile import write as write_wav
+    write_wav("vallex_generation.wav", sampling_rate, output)
 
 def main():
     # model files check and download

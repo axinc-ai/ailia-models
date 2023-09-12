@@ -316,11 +316,9 @@ class VALLE():
                     prompts[..., j]
                 )
 
-            for i, (embedding_layer) in enumerate(
-                zip(
-                    self.nar_audio_embeddings[1:],
-                )
-            ):
+            for i in range(0, self.num_quantizers - 1):
+                embedding_layer = self.nar_audio_embeddings[1+i]
+                
                 y_pos = self.nar_audio_prenet(y_emb)
                 y_pos = self.nar_audio_position(y_pos)
                 xy_pos = torch.concat([x, y_pos], dim=1)
@@ -345,6 +343,8 @@ class VALLE():
                 logits = torch.from_numpy(logits)
                 if benchmark:
                     print(f'ailia processing time {end - start} ms')
+                
+                print(logits.shape)
 
                 samples = torch.argmax(logits, dim=-1)
                 codes.append(samples)
@@ -436,10 +436,10 @@ def export_vocos_head(x): # for onnx
 
 def export_vocos_istft(x, y): # for onnx
     S = (x + 1j * y)
-    n_fft = vocos.head.istft.n_fft # 1280
-    hop_length = vocos.head.istft.hop_length # 320
-    win_length = vocos.head.istft.win_length # 1280
-    window = vocos.head.istft.window
+    n_fft = 1280
+    hop_length = 320
+    win_length = 1280
+    window = torch.hann_window(win_length)
     print("istft settings", n_fft, hop_length, win_length, window)
     audio = torch.istft(S, n_fft, hop_length, win_length, window, center=True)
     return audio
