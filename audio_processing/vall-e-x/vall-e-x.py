@@ -91,33 +91,17 @@ def generate_voice(decoder, encodec, audio_embedding, vocos):
     # onnx
     logger.info("Input text : " + text)
 
-    output = generate_audio(text, prompt=None, language='auto', accent='no-accent')
+    if args.benchmark:
+        start = int(round(time.time() * 1000))
+
+    #output = generate_audio(text, prompt=None, language='auto', accent='no-accent')
+    output = generate_audio(text, prompt=None, language='auto', accent='日本語')
     print(output.shape)
 
-    #mel_outputs_postnet = test_inference(texts, encoder, decoder_iter, postnet)
-
-    #stride = 256 # value from waveglow upsample
-    #n_group = 8
-    #z_size2 = (mel_outputs_postnet.shape[2]*stride)//n_group
-    #z = np.random.randn(1, n_group, z_size2).astype(np.float32)
-
-    #print("Running Tacotron2 Waveglow")
-
-    #if args.benchmark:
-    #    start = int(round(time.time() * 1000))
-
-    #if args.onnx:
-    #    waveglow_inputs = {waveglow.get_inputs()[0].name: mel_outputs_postnet,
-    #                    waveglow.get_inputs()[1].name: z}
-    #    audio = waveglow.run(None, waveglow_inputs)[0]
-    #else:
-    #    waveglow_inputs = [mel_outputs_postnet, z]
-    #    audio = waveglow.run(waveglow_inputs)[0]
-
-    #if args.benchmark:
-    #    end = int(round(time.time() * 1000))
-    #    estimation_time = (end - start)
-    #    logger.info(f'\twavegrow processing time {estimation_time} ms')
+    if args.benchmark:
+        end = int(round(time.time() * 1000))
+        estimation_time = (end - start)
+        logger.info(f'\twavegrow processing time {estimation_time} ms')
 
     # export to audio
     savepath = args.savepath
@@ -144,10 +128,10 @@ def main():
         vocos = onnxruntime.InferenceSession(WEIGHT_VOCOS_PATH)
     else:
         memory_mode = ailia.get_memory_mode(reduce_constant=True, ignore_input_with_initializer=True, reduce_interstage=False, reuse_interstage=True)
-        decoder = ailia.Net(stream = MODEL_DECODER_PATH, weight = WEIGHT_DECODER_PATH, memory_mode = memory_mode, env_id = args.env_id)
-        encodec = ailia.Net(stream = MODEL_ENCODEC_PATH, weight = WEIGHT_ENCODEC_PATH, memory_mode = memory_mode, env_id = args.env_id)
-        audio_embedding = ailia.Net(stream = MODEL_AUDIO_EMBEDDING_PATH, weight = WEIGHT_AUDIO_EMBEDDING_PATH, memory_mode = memory_mode, env_id = args.env_id)
-        vocos = ailia.Net(stream = MODEL_VOCOS_PATH, weight = WEIGHT_VOCOS_PATH, memory_mode = memory_mode, env_id = args.env_id)
+        decoder = None#ailia.Net(stream = MODEL_DECODER_PATH, weight = WEIGHT_DECODER_PATH, memory_mode = memory_mode, env_id = args.env_id)
+        encodec = None#ailia.Net(stream = MODEL_ENCODEC_PATH, weight = WEIGHT_ENCODEC_PATH, memory_mode = memory_mode, env_id = args.env_id)
+        audio_embedding = None#ailia.Net(stream = MODEL_AUDIO_EMBEDDING_PATH, weight = WEIGHT_AUDIO_EMBEDDING_PATH, memory_mode = memory_mode, env_id = args.env_id)
+        vocos = None#ailia.Net(stream = MODEL_VOCOS_PATH, weight = WEIGHT_VOCOS_PATH, memory_mode = memory_mode, env_id = args.env_id)
         if args.profile:
             decoder.set_profile_mode(True)
             encodec.set_profile_mode(True)

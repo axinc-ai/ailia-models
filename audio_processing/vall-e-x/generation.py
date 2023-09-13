@@ -22,14 +22,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 import numpy as np
-from data.tokenizer import (
-    AudioTokenizer,
-    tokenize_audio,
-)
 from data.collation import get_text_token_collater
-from models.vallex import VALLE
 from utils.g2p import PhonemeBpeTokenizer
-from utils.sentence_cutter import split_text_into_sentences
 
 from macros import *
 
@@ -43,12 +37,7 @@ text_tokenizer = PhonemeBpeTokenizer(tokenizer_path="./utils/g2p/bpe_69.json")
 text_collater = get_text_token_collater()
 
 
-from data.input_strategies import PromptedFeatures
 from modules.embedding import TokenEmbedding, SinePositionalEmbedding
-from modules.transformer import (
-    TransformerEncoder,
-    TransformerEncoderLayer,
-)
 from typing import Dict, Iterator, List, Tuple, Union
 
 class VALLE():
@@ -98,6 +87,12 @@ class VALLE():
         self.num_quantizers = NUM_QUANTIZERS
         self.prefix_mode = PREFIX_MODE
         assert self.num_quantizers >= 1
+        self.nar_stage_embeddings = nn.ModuleList(
+            [
+                TokenEmbedding(nar_d_model, 1)
+                for i in range(self.num_quantizers - 1)
+            ]
+        )
         if self.num_quantizers > 1:
             self.nar_audio_embeddings = nn.ModuleList(
                 [TokenEmbedding(nar_d_model, NUM_AUDIO_TOKENS + 1)]
@@ -107,11 +102,12 @@ class VALLE():
                 ]
             )  # W_a
 
-    def audio_embedding(self, y):
-        y_emb = self.ar_audio_embedding(y)
-        y_emb = self.ar_audio_prenet(y_emb)
-        y_pos = self.ar_audio_position(y_emb)
-        return y_pos
+        self.ar_text_embedding.load_onnx("ar_text_embedding.onnx")
+        self.nar_text_embedding.load_onnx("nar_text_embedding.onnx")
+        for i in range(len(self.nar_audio_embeddings)):
+            self.nar_audio_embeddings[i].load_onnx("nar_audio_embeddings_"+str(i)+".onnx")
+        self.ar_language_embedding.load_onnx("ar_language_embedding.onnx")
+        self.nar_language_embedding.load_onnx("nar_language_embedding.onnx")
 
     def inference(
         self,
@@ -176,7 +172,7 @@ class VALLE():
         x_attn_mask = torch.zeros((x_len, x_len), dtype=torch.bool)
 
         max_len = 1024 # TBD
-        kv_cache = torch.zeros((12, 2, 1, 16, max_len, 64))
+        #kv_cache = torch.zeros((12, 2, 1, 16, max_len, 64))
         kv_cache_numpy = np.zeros((12, 2, 1, 16, max_len, 64))
         offset = 0
         # torch.Size([1, 16, n, 64])が12レイヤー * 2ノード分ある
@@ -192,6 +188,7 @@ class VALLE():
             y_pos = torch.from_numpy(y_pos)
             if benchmark:
                 print(f'ailia processing time {end - start} ms')
+            print("audio_embedding", y_pos.shape)
 
             xy_pos = torch.concat([x, y_pos], dim=1)
 
@@ -228,7 +225,7 @@ class VALLE():
             end = int(round(time.time() * 1000))
             logits = torch.from_numpy(logits)
             if benchmark:
-                print(f'ailia processing time {end - start} ms')
+                print(f'ailia processing time {end - start} ms offset {offset}')
 
             offset = offset + xy_pos.shape[-2]
 
@@ -323,7 +320,7 @@ class VALLE():
                 y_pos = self.nar_audio_position(y_pos)
                 xy_pos = torch.concat([x, y_pos], dim=1)
 
-                print("Impot nar_decoder from onnx")
+                print("Impot nar_decoder from onnx "+str(i))
                 if i == 0:
                     nar_decoder = ailia.Net(weight="nar_decoder.onnx", env_id = 1, memory_mode = 11)
                 offset_tensor = np.zeros((1))
@@ -418,22 +415,6 @@ def topk_sampling(logits, top_k=10, top_p=1.0, temperature=1.0):
     token = torch.multinomial(F.softmax(logits, dim=-1), num_samples=1)
     return token
 
-def export_vocos_head(x): # for onnx
-    #print("linear weight", vocos.head.out.weight.shape) # torch.Size([1282, 384])
-    x = vocos.head.out(x).transpose(1, 2)
-    mag, p = x.chunk(2, dim=1)
-    mag = torch.exp(mag)
-    mag = torch.clip(mag, max=1e2)  # safeguard to prevent excessively large magnitudes
-    # wrapping happens here. These two lines produce real and imaginary value
-    x = torch.cos(p)
-    y = torch.sin(p)
-    # recalculating phase here does not produce anything new
-    # only costs time
-    # phase = torch.atan2(y, x)
-    # S = mag * torch.exp(phase * 1j)
-    # better directly produce the complex value 
-    return mag, x, y
-
 def export_vocos_istft(x, y): # for onnx
     S = (x + 1j * y)
     n_fft = 1280
@@ -443,12 +424,6 @@ def export_vocos_istft(x, y): # for onnx
     print("istft settings", n_fft, hop_length, win_length, window)
     audio = torch.istft(S, n_fft, hop_length, win_length, window, center=True)
     return audio
-
-def export_vocos(frames):
-    features = vocos.codes_to_features(frames)
-    x = vocos.backbone(features)
-    mag, x, y = export_vocos_head(x)
-    return mag * x, mag * y
 
 
 @torch.no_grad()
@@ -519,8 +494,9 @@ def generate_audio(text, prompt=None, language='auto', accent='no-accent'):
     end = int(round(time.time() * 1000))
     x = torch.from_numpy(x)
     y = torch.from_numpy(y)
-    #if benchmark:
-    #    print(f'ailia processing time {end - start} ms')
+    benchmark = True
+    if benchmark:
+        print(f'ailia processing time {end - start} ms')
     samples = export_vocos_istft(x, y)
 
     return samples.squeeze().cpu().numpy()
