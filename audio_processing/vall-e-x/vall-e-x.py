@@ -16,8 +16,7 @@ from microphone_utils import start_microphone_input  # noqa
 from model_utils import check_and_download_models  # noqa
 from arg_utils import get_base_parser, get_savepath, update_parser  # noqa
 
-# import vall-e-x
-from generation import generate_audio
+from utils.generation import generate_audio
 
 flg_ffmpeg = False
 
@@ -103,8 +102,13 @@ def generate_voice(decoder, encodec, audio_embedding, vocos):
     if args.benchmark:
         start = int(round(time.time() * 1000))
 
-    output = generate_audio(text, prompt=None, language='auto', accent='no-accent')
-    #output = generate_audio(text, prompt=None, language='auto', accent='日本語')
+    model_name = "jsut"
+
+    if model_name != None:
+        from utils.prompt_making import make_prompt
+        make_prompt(name=model_name, audio_prompt_path="BASIC5000_0001.wav", transcript="水をマレーシアから買わなくてはならないのです") # Disable whisper
+
+    output = generate_audio(text, prompt=model_name, language='auto', accent='no-accent')
     print(output.shape)
 
     if args.benchmark:

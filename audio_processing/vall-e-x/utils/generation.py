@@ -33,7 +33,7 @@ vocos = None
 text_tokenizer = PhonemeBpeTokenizer(tokenizer_path="./utils/g2p/bpe_69.json")
 text_collater = get_text_token_collater()
 
-from vallex import VALLE
+from models.vallex import VALLE
 
 
 def export_vocos_istft(x, y): # for onnx
