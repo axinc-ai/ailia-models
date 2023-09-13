@@ -30,8 +30,8 @@ class TokenEmbedding(nn.Module):
         y = torch.from_numpy(y)
         return y
 
-    def load_onnx(self, onnx_path):
-        self.net = ailia.Net(weight=onnx_path, env_id = 1, memory_mode = 11)
+    def load_onnx(self, net):
+        self.net = net
 
 class SinePositionalEmbedding(nn.Module):
     def __init__(

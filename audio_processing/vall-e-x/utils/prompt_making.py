@@ -20,7 +20,7 @@ text_collater = get_text_token_collater()
 
 codec = AudioTokenizer()
 
-def make_prompt(name, audio_prompt_path, transcript=None):
+def make_prompt(name, audio_prompt_path, transcript=None, models=None):
     global model, text_collater, text_tokenizer, codec
     wav_pr, sr = torchaudio.load(audio_prompt_path)
     # check length

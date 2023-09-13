@@ -28,25 +28,40 @@ logger = getLogger(__name__)
 # ======================
 # Parameters
 # ======================
-#"nar_decoder.onnx"
-#"nar_predict_layers.onnx"
+WEIGHT_NAR_DECODER_PATH = "nar_decoder.onnx"
+WEIGHT_NAR_PREDICT_LAYERS_PATH = "nar_predict_layers.onnx"
+WEIGHT_AR_AUDIO_EMBEDDING_PATH = "ar_audio_embedding.onnx"
+WEIGHT_AR_LANGUAGE_EMBEDDING_PATH = "ar_language_embedding.onnx"
+WEIGHT_AR_TEXT_EMBEDDING_PATH = "ar_text_embedding.onnx"
+WEIGHT_NAR_AUDIO_EMBEDDING_BASE_PATH = "nar_audio_embeddings_[layer_no].onnx"
+WEIGHT_NAR_LANGUAGE_EMBEDDING_PATH = "nar_language_embedding.onnx"
+WEIGHT_NAR_TEXT_EMBEDDING_PATH = "nar_text_embedding.onnx"
+WEIGHT_DECODER_PATH = "ar_decoder.onnx"
+WEIGHT_ENCODEC_PATH = "encodec.onnx"
+WEIGHT_VOCOS_PATH = "vocos.onnx"
+WEIGHT_AUDIO_EMBEDDING_PATH = "audio_embedding.onnx"
 
-#"ar_audio_embedding.onnx"
-#"ar_language_embedding.onnx"
-#"ar_text_embedding.onnx"
-
-#"nar_audio_embeddings_0-7.onnx"
-#"nar_language_embedding.onnx"
-#"nar_text_embedding.onnx"
-
-WEIGHT_DECODER_PATH = "./onnx/ar_decoder.onnx"
-MODEL_DECODER_PATH = "./onnx/ar_decoder.onnx.prototxt"
-WEIGHT_ENCODEC_PATH = "./onnx/encodec.onnx"
-MODEL_ENCODEC_PATH = "./onnx/encodec.onnx.prototxt"
-WEIGHT_VOCOS_PATH = "./onnx/vocos.onnx"
-MODEL_VOCOS_PATH = "./onnx/vocos.onnx.prototxt"
-WEIGHT_AUDIO_EMBEDDING_PATH = "./onnx/audio_embedding.onnx"
-MODEL_AUDIO_EMBEDDING_PATH = "./onnx/audio_embedding.onnx.prototxt"
+ALL_MODELS = [
+    WEIGHT_NAR_DECODER_PATH,
+    WEIGHT_NAR_PREDICT_LAYERS_PATH,
+    WEIGHT_AR_AUDIO_EMBEDDING_PATH,
+    WEIGHT_AR_LANGUAGE_EMBEDDING_PATH,
+    WEIGHT_AR_TEXT_EMBEDDING_PATH,
+    WEIGHT_NAR_AUDIO_EMBEDDING_BASE_PATH.replace("[layer_no]","0"),
+    WEIGHT_NAR_AUDIO_EMBEDDING_BASE_PATH.replace("[layer_no]","1"),
+    WEIGHT_NAR_AUDIO_EMBEDDING_BASE_PATH.replace("[layer_no]","2"),
+    WEIGHT_NAR_AUDIO_EMBEDDING_BASE_PATH.replace("[layer_no]","3"),
+    WEIGHT_NAR_AUDIO_EMBEDDING_BASE_PATH.replace("[layer_no]","4"),
+    WEIGHT_NAR_AUDIO_EMBEDDING_BASE_PATH.replace("[layer_no]","5"),
+    WEIGHT_NAR_AUDIO_EMBEDDING_BASE_PATH.replace("[layer_no]","6"),
+    WEIGHT_NAR_AUDIO_EMBEDDING_BASE_PATH.replace("[layer_no]","7"),
+    WEIGHT_NAR_LANGUAGE_EMBEDDING_PATH,
+    WEIGHT_NAR_TEXT_EMBEDDING_PATH,
+    WEIGHT_DECODER_PATH,
+    WEIGHT_ENCODEC_PATH,
+    WEIGHT_VOCOS_PATH,
+    WEIGHT_AUDIO_EMBEDDING_PATH
+]
 
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/vall-e-x/'
 
@@ -95,7 +110,7 @@ else:
 
 sampling_rate = 24000
 
-def generate_voice(decoder, encodec, audio_embedding, vocos):
+def generate_voice(models):
     # onnx
     logger.info("Input text : " + text)
 
@@ -106,9 +121,9 @@ def generate_voice(decoder, encodec, audio_embedding, vocos):
 
     if model_name != None:
         from utils.prompt_making import make_prompt
-        make_prompt(name=model_name, audio_prompt_path="BASIC5000_0001.wav", transcript="水をマレーシアから買わなくてはならないのです") # Disable whisper
+        make_prompt(name=model_name, audio_prompt_path="BASIC5000_0001.wav", transcript="水をマレーシアから買わなくてはならないのです", models=models) # Disable whisper
 
-    output = generate_audio(text, prompt=model_name, language='auto', accent='no-accent')
+    output = generate_audio(text, prompt=model_name, language='auto', accent='no-accent', benchmark=args.benchmark, models=models)
     print(output.shape)
 
     if args.benchmark:
@@ -127,41 +142,30 @@ def generate_voice(decoder, encodec, audio_embedding, vocos):
 
 def main():
     # model files check and download
-    check_and_download_models(WEIGHT_DECODER_PATH, MODEL_DECODER_PATH, REMOTE_PATH)
-    check_and_download_models(WEIGHT_ENCODEC_PATH, MODEL_ENCODEC_PATH, REMOTE_PATH)
-    check_and_download_models(WEIGHT_AUDIO_EMBEDDING_PATH, MODEL_AUDIO_EMBEDDING_PATH, REMOTE_PATH)
-    check_and_download_models(WEIGHT_VOCOS_PATH, MODEL_VOCOS_PATH, REMOTE_PATH)
+    for model in ALL_MODELS:
+        check_and_download_models("./onnx/"+model, "./onnx/"+model+".prototxt", REMOTE_PATH)
 
     #env_id = args.env_id
 
+    models = {}
     if args.onnx:
-        decoder = onnxruntime.InferenceSession(WEIGHT_DECODER_PATH)
-        encodec = onnxruntime.InferenceSession(WEIGHT_ENCODEC_PATH)
-        audio_embedding = onnxruntime.InferenceSession(WEIGHT_AUDIO_EMBEDDING_PATH)
-        vocos = onnxruntime.InferenceSession(WEIGHT_VOCOS_PATH)
+        for model in ALL_MODELS:
+            net = onnxruntime.InferenceSession( "./onnx"+model)
+            models[model] = net
     else:
         memory_mode = ailia.get_memory_mode(reduce_constant=True, ignore_input_with_initializer=True, reduce_interstage=False, reuse_interstage=True)
-        decoder = None#ailia.Net(stream = MODEL_DECODER_PATH, weight = WEIGHT_DECODER_PATH, memory_mode = memory_mode, env_id = args.env_id)
-        encodec = None#ailia.Net(stream = MODEL_ENCODEC_PATH, weight = WEIGHT_ENCODEC_PATH, memory_mode = memory_mode, env_id = args.env_id)
-        audio_embedding = None#ailia.Net(stream = MODEL_AUDIO_EMBEDDING_PATH, weight = WEIGHT_AUDIO_EMBEDDING_PATH, memory_mode = memory_mode, env_id = args.env_id)
-        vocos = None#ailia.Net(stream = MODEL_VOCOS_PATH, weight = WEIGHT_VOCOS_PATH, memory_mode = memory_mode, env_id = args.env_id)
-        if args.profile:
-            decoder.set_profile_mode(True)
-            encodec.set_profile_mode(True)
-            audio_embedding.set_profile_mode(True)
-            vocos.set_profile_mode(True)
+        for model in ALL_MODELS:
+            net = ailia.Net(stream = "./onnx/"+model + ".prototxt", weight = "./onnx/"+model, memory_mode = memory_mode, env_id = args.env_id)
+            if args.profile:
+               net.set_profile_mode(True)
+            models[model] = net
 
-    generate_voice(decoder, encodec, audio_embedding, vocos)
+    generate_voice(models)
 
     if args.profile:
-        print("decoder : ")
-        print(decoder.get_summary())
-        print("encodec : ")
-        print(encodec.get_summary())
-        print("audio_embedding : ")
-        print(audio_embedding.get_summary())
-        print("vocos : ")
-        print(vocos.get_summary())
+        for model in ALL_MODELS:
+            print(model)
+            print(models[model].get_summary())
 
 if __name__ == '__main__':
     main()

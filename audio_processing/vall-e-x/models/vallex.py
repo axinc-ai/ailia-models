@@ -14,6 +14,7 @@ from macros import *
 class VALLE():
     def __init__(
         self,
+        models
     ):
         self.language_ID = {
             'en': 0,
@@ -75,12 +76,13 @@ class VALLE():
                 ]
             )  # W_a
 
-        self.ar_text_embedding.load_onnx("onnx/ar_text_embedding.onnx")
-        self.nar_text_embedding.load_onnx("onnx/nar_text_embedding.onnx")
+        self.ar_text_embedding.load_onnx(models["ar_text_embedding.onnx"])
+        self.nar_text_embedding.load_onnx(models["nar_text_embedding.onnx"])
         for i in range(len(self.nar_audio_embeddings)):
-            self.nar_audio_embeddings[i].load_onnx("onnx/nar_audio_embeddings_"+str(i)+".onnx")
-        self.ar_language_embedding.load_onnx("onnx/ar_language_embedding.onnx")
-        self.nar_language_embedding.load_onnx("onnx/nar_language_embedding.onnx")
+            self.nar_audio_embeddings[i].load_onnx(models["nar_audio_embeddings_"+str(i)+".onnx"])
+        self.ar_language_embedding.load_onnx(models["ar_language_embedding.onnx"])
+        self.nar_language_embedding.load_onnx(models["nar_language_embedding.onnx"])
+        self.models = models
 
     def inference(
         self,

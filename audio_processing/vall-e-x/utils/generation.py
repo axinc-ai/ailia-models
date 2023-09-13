@@ -44,7 +44,7 @@ def vocos_istft(x, y): # for onnx
 
 
 @torch.no_grad()
-def generate_audio(text, prompt=None, language='auto', accent='no-accent', benchmark = False):
+def generate_audio(text, prompt=None, language='auto', accent='no-accent', benchmark = False, models = None):
     global model, vocos, text_tokenizer, text_collater
     text = text.replace("\n", "").strip(" ")
     # detect language
@@ -89,7 +89,7 @@ def generate_audio(text, prompt=None, language='auto', accent='no-accent', bench
     text_tokens_lens += enroll_x_lens
     # accent control
     lang = lang if accent == "no-accent" else token2lang[langdropdown2token[accent]]
-    model = VALLE()
+    model = VALLE(models)
     encoded_frames = model.inference(
         text_tokens,
         text_tokens_lens,
