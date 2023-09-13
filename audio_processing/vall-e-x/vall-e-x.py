@@ -31,6 +31,15 @@ logger = getLogger(__name__)
 # ======================
 #"nar_decoder.onnx"
 #"nar_predict_layers.onnx"
+
+#"ar_audio_embedding.onnx"
+#"ar_language_embedding.onnx"
+#"ar_text_embedding.onnx"
+
+#"nar_audio_embeddings_0-7.onnx"
+#"nar_language_embedding.onnx"
+#"nar_text_embedding.onnx"
+
 WEIGHT_DECODER_PATH = "ar_decoder.onnx"
 MODEL_DECODER_PATH = None#"ar_decoder.opt.onnx.prototxt"
 WEIGHT_ENCODEC_PATH = "encodec.onnx"
@@ -94,8 +103,8 @@ def generate_voice(decoder, encodec, audio_embedding, vocos):
     if args.benchmark:
         start = int(round(time.time() * 1000))
 
-    #output = generate_audio(text, prompt=None, language='auto', accent='no-accent')
-    output = generate_audio(text, prompt=None, language='auto', accent='日本語')
+    output = generate_audio(text, prompt=None, language='auto', accent='no-accent')
+    #output = generate_audio(text, prompt=None, language='auto', accent='日本語')
     print(output.shape)
 
     if args.benchmark:
