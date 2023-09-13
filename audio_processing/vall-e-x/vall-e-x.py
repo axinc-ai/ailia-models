@@ -150,7 +150,7 @@ def main():
     models = {}
     if args.onnx:
         for model in ALL_MODELS:
-            net = onnxruntime.InferenceSession( "./onnx"+model)
+            net = onnxruntime.InferenceSession( "./onnx/"+model)
             models[model] = net
     else:
         memory_mode = ailia.get_memory_mode(reduce_constant=True, ignore_input_with_initializer=True, reduce_interstage=False, reuse_interstage=True)
