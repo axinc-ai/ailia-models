@@ -35,24 +35,28 @@ class VALLE():
             dropout=0.1,
             scale=False,
             alpha=True,
+            alpha_parameter=2.0744
         )
         self.ar_audio_position = SinePositionalEmbedding(
             N_DIM,
             dropout=0.1,
             scale=False,
             alpha=True,
+            alpha_parameter=2.3490
         )
         self.nar_text_position = SinePositionalEmbedding(
             nar_d_model,
             dropout=0.0,
             scale=False,
             alpha=False,
+            alpha_parameter=1.0
         )
         self.nar_audio_position = SinePositionalEmbedding(
             nar_d_model,
             dropout=0.1,
             scale=False,
             alpha=False,
+            alpha_parameter=1.0
         )
         self.ar_audio_prepend_bos = True
         self.num_quantizers = NUM_QUANTIZERS
@@ -90,7 +94,7 @@ class VALLE():
         temperature: float = 1.0,
         prompt_language: str = None,
         text_language: str = None,
-        benchmark = True
+        benchmark = False
     ) -> torch.Tensor:
         """
         Args:
@@ -143,15 +147,13 @@ class VALLE():
         x_attn_mask = torch.zeros((x_len, x_len), dtype=torch.bool)
 
         max_len = 1024 # TBD
-        #kv_cache = torch.zeros((12, 2, 1, 16, max_len, 64))
-        kv_cache_numpy = np.zeros((12, 2, 1, 16, max_len, 64))
+        kv_cache_numpy = np.zeros((12, 2, 1, 16, max_len, 64))   # torch.Size([1, 16, n, 64])が12レイヤー * 2ノード分ある
         offset = 0
-        # torch.Size([1, 16, n, 64])が12レイヤー * 2ノード分ある
-
+       
         use_kv_caching = True
         while True:
             if offset == 0:
-                print("Impot audio_embedding from onnx")
+                #print("Impot audio_embedding from onnx")
                 anet = ailia.Net(weight="audio_embedding.onnx", env_id = 1, memory_mode = 11)
             start = int(round(time.time() * 1000))
             y_pos = anet.run([y.numpy()])[0]
@@ -159,8 +161,7 @@ class VALLE():
             y_pos = torch.from_numpy(y_pos)
             if benchmark:
                 print(f'ailia processing time {end - start} ms')
-            print("audio_embedding", y_pos.shape)
-
+            
             xy_pos = torch.concat([x, y_pos], dim=1)
 
             y_len = y.shape[1]
@@ -180,14 +181,13 @@ class VALLE():
                 [x_attn_mask_pad, y_attn_mask], dim=0
             ).to(y.device)
 
-
             if use_kv_caching and offset>=1:#kv_cache is not None:
                 xy_pos = xy_pos[:, [-1]] # 前回のトークンは1つ
             else:
                 pass # initial prompt
 
             if offset == 0:
-                print("Impot ar_decoder from onnx")
+                #print("Impot ar_decoder from onnx")
                 net = ailia.Net(weight="ar_decoder.onnx", env_id = 1, memory_mode = 11)
             offset_tensor = np.zeros((1))
             offset_tensor[0] = offset
@@ -254,71 +254,44 @@ class VALLE():
         x = self.nar_text_prenet(x)
         x = self.nar_text_position(x)
 
-        if self.prefix_mode == 0:
-            for i, (predict_layer, embedding_layer) in enumerate(
-                zip(
-                    self.nar_predict_layers,
-                    self.nar_audio_embeddings[1:],
-                )
-            ):
-                y_pos = self.nar_audio_prenet(y_emb)
-                y_pos = self.nar_audio_position(y_pos)
-                xy_pos = torch.concat([x, y_pos], dim=1)
+        for j in range(1, self.num_quantizers):
+            y_emb[:, :prefix_len] += self.nar_audio_embeddings[j](
+                prompts[..., j]
+            )
 
-                xy_dec, _ = self.nar_decoder(
-                    (xy_pos, self.nar_stage_embeddings[i].weight)
-                )
-                logits = predict_layer(xy_dec[:, text_len + prefix_len :])
+        for i in range(0, self.num_quantizers - 1):
+            embedding_layer = self.nar_audio_embeddings[1+i]
+            
+            y_pos = self.nar_audio_prenet(y_emb)
+            y_pos = self.nar_audio_position(y_pos)
+            xy_pos = torch.concat([x, y_pos], dim=1)
 
-                samples = torch.argmax(logits, dim=-1)
-                codes.append(samples)
+            #print("Impot nar_decoder from onnx "+str(i))
+            if i == 0:
+                nar_decoder = ailia.Net(weight="nar_decoder.onnx", env_id = 1, memory_mode = 11)
+            offset_tensor = np.zeros((1))
+            offset_tensor[0] = i
+            print(xy_pos.shape, offset_tensor.shape)
+            xy_dec = nar_decoder.run([xy_pos.numpy(), offset_tensor])[0]
+            end = int(round(time.time() * 1000))
+            xy_dec = torch.from_numpy(xy_dec)
+            if benchmark:
+                print(f'ailia processing time {end - start} ms')
 
-                if i < self.num_quantizers - 2:
-                    y_emb[:, :prefix_len] += embedding_layer(
-                        prompts[..., i + 1]
-                    )
-                    y_emb[:, prefix_len:] += embedding_layer(samples)
-        else:
-            for j in range(1, self.num_quantizers):
-                y_emb[:, :prefix_len] += self.nar_audio_embeddings[j](
-                    prompts[..., j]
-                )
+            #print("Impot nar_predict_layers from onnx")
+            if i == 0:
+                nar_predict = ailia.Net(weight="nar_predict_layers.onnx", env_id = 1, memory_mode = 11)
+            logits = nar_predict.run([xy_dec[:, text_len + prefix_len :].numpy(), offset_tensor])[0]
+            end = int(round(time.time() * 1000))
+            logits = torch.from_numpy(logits)
+            if benchmark:
+                print(f'ailia processing time {end - start} ms')
+            
+            samples = torch.argmax(logits, dim=-1)
+            codes.append(samples)
 
-            for i in range(0, self.num_quantizers - 1):
-                embedding_layer = self.nar_audio_embeddings[1+i]
-                
-                y_pos = self.nar_audio_prenet(y_emb)
-                y_pos = self.nar_audio_position(y_pos)
-                xy_pos = torch.concat([x, y_pos], dim=1)
-
-                print("Impot nar_decoder from onnx "+str(i))
-                if i == 0:
-                    nar_decoder = ailia.Net(weight="nar_decoder.onnx", env_id = 1, memory_mode = 11)
-                offset_tensor = np.zeros((1))
-                offset_tensor[0] = i
-                print(xy_pos.shape, offset_tensor.shape)
-                xy_dec = nar_decoder.run([xy_pos.numpy(), offset_tensor])[0]
-                end = int(round(time.time() * 1000))
-                xy_dec = torch.from_numpy(xy_dec)
-                if benchmark:
-                    print(f'ailia processing time {end - start} ms')
-
-                print("Impot nar_predict_layers from onnx")
-                if i == 0:
-                    nar_predict = ailia.Net(weight="nar_predict_layers.onnx", env_id = 1, memory_mode = 11)
-                logits = nar_predict.run([xy_dec[:, text_len + prefix_len :].numpy(), offset_tensor])[0]
-                end = int(round(time.time() * 1000))
-                logits = torch.from_numpy(logits)
-                if benchmark:
-                    print(f'ailia processing time {end - start} ms')
-                
-                print(logits.shape)
-
-                samples = torch.argmax(logits, dim=-1)
-                codes.append(samples)
-
-                if i < self.num_quantizers - 2:
-                    y_emb[:, prefix_len:] += embedding_layer(samples)
+            if i < self.num_quantizers - 2:
+                y_emb[:, prefix_len:] += embedding_layer(samples)
 
         assert len(codes) == self.num_quantizers
         return torch.stack(codes, dim=-1)

@@ -28,28 +28,10 @@ class TokenEmbedding(nn.Module):
     ):
         super().__init__()
 
-        self.vocab_size = vocab_size
-        self.dim_model = dim_model
-
-        self.dropout = torch.nn.Dropout(p=dropout)
-        self.word_embeddings = nn.Embedding(self.vocab_size, self.dim_model)
-
-    @property
-    def weight(self) -> torch.Tensor:
-        return self.word_embeddings.weight
-
-    def embedding(self, index: int) -> torch.Tensor:
-        return self.word_embeddings.weight[index : index + 1]
-
     def forward(self, x: torch.Tensor):
         y = self.net.run([x.numpy()])[0]
         y = torch.from_numpy(y)
         return y
-
-        #X = self.word_embeddings(x)
-        #X = self.dropout(X)
-
-        #return X
 
     def load_onnx(self, onnx_path):
         self.net = ailia.Net(weight=onnx_path, env_id = 1, memory_mode = 11)
@@ -61,11 +43,12 @@ class SinePositionalEmbedding(nn.Module):
         dropout: float = 0.0,
         scale: bool = False,
         alpha: bool = False,
+        alpha_parameter: float =1.0
     ):
         super().__init__()
         self.dim_model = dim_model
         self.x_scale = math.sqrt(dim_model) if scale else 1.0
-        self.alpha = nn.Parameter(torch.ones(1), requires_grad=alpha)
+        self.alpha = nn.Parameter(torch.tensor([alpha_parameter]), requires_grad=alpha)
         self.dropout = torch.nn.Dropout(p=dropout)
 
         self.reverse = False

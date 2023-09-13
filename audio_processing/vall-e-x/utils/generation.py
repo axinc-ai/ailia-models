@@ -26,17 +26,13 @@ from macros import *
 
 model = None
 
-codec = None
-
-vocos = None
-
 text_tokenizer = PhonemeBpeTokenizer(tokenizer_path="./utils/g2p/bpe_69.json")
 text_collater = get_text_token_collater()
 
 from models.vallex import VALLE
 
 
-def export_vocos_istft(x, y): # for onnx
+def vocos_istft(x, y): # for onnx
     S = (x + 1j * y)
     n_fft = 1280
     hop_length = 320
@@ -48,8 +44,8 @@ def export_vocos_istft(x, y): # for onnx
 
 
 @torch.no_grad()
-def generate_audio(text, prompt=None, language='auto', accent='no-accent'):
-    global model, codec, vocos, text_tokenizer, text_collater
+def generate_audio(text, prompt=None, language='auto', accent='no-accent', benchmark = False):
+    global model, vocos, text_tokenizer, text_collater
     text = text.replace("\n", "").strip(" ")
     # detect language
     if language == "auto":
@@ -102,23 +98,24 @@ def generate_audio(text, prompt=None, language='auto', accent='no-accent'):
         top_k=-100,
         temperature=1,
         prompt_language=lang_pr,
-        text_language=langs if accent == "no-accent" else lang
+        text_language=langs if accent == "no-accent" else lang,
+        benchmark=benchmark
     )
 
     # Decode with Vocos
     frames = encoded_frames.permute(2,0,1)
 
-    print("Impot vocos from onnx")
+    #print("Impot vocos from onnx")
     vnet = ailia.Net(weight="vocos.onnx", env_id = 1, memory_mode = 11)
-    start = int(round(time.time() * 1000))
+    if benchmark:
+        start = int(round(time.time() * 1000))
     x, y = vnet.run([frames.numpy()])
     end = int(round(time.time() * 1000))
     x = torch.from_numpy(x)
     y = torch.from_numpy(y)
-    benchmark = True
     if benchmark:
         print(f'ailia processing time {end - start} ms')
-    samples = export_vocos_istft(x, y)
+    samples = vocos_istft(x, y)
 
     return samples.squeeze().cpu().numpy()
 
