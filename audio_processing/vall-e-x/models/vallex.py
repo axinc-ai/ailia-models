@@ -1,4 +1,4 @@
-﻿from embedding import TokenEmbedding, SinePositionalEmbedding
+﻿from modules.embedding import TokenEmbedding, SinePositionalEmbedding
 from typing import Dict, Iterator, List, Tuple, Union
 
 import torch
