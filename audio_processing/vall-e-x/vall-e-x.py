@@ -39,14 +39,14 @@ logger = getLogger(__name__)
 #"nar_language_embedding.onnx"
 #"nar_text_embedding.onnx"
 
-WEIGHT_DECODER_PATH = "ar_decoder.onnx"
-MODEL_DECODER_PATH = None#"ar_decoder.opt.onnx.prototxt"
-WEIGHT_ENCODEC_PATH = "encodec.onnx"
-MODEL_ENCODEC_PATH = "encodec.onnx.prototxt"
-WEIGHT_VOCOS_PATH = "vocos.opt.onnx"
-MODEL_VOCOS_PATH = "vocos.opt.onnx.prototxt"
-WEIGHT_AUDIO_EMBEDDING_PATH = "audio_embedding.onnx"
-MODEL_AUDIO_EMBEDDING_PATH = "audio_embedding.onnx.prototxt"
+WEIGHT_DECODER_PATH = "./onnx/ar_decoder.onnx"
+MODEL_DECODER_PATH = "./onnx/ar_decoder.onnx.prototxt"
+WEIGHT_ENCODEC_PATH = "./onnx/encodec.onnx"
+MODEL_ENCODEC_PATH = "./onnx/encodec.onnx.prototxt"
+WEIGHT_VOCOS_PATH = "./onnx/vocos.onnx"
+MODEL_VOCOS_PATH = "./onnx/vocos.onnx.prototxt"
+WEIGHT_AUDIO_EMBEDDING_PATH = "./onnx/audio_embedding.onnx"
+MODEL_AUDIO_EMBEDDING_PATH = "./onnx/audio_embedding.onnx.prototxt"
 
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/vall-e-x/'
 

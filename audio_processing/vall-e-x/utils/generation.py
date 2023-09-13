@@ -106,7 +106,7 @@ def generate_audio(text, prompt=None, language='auto', accent='no-accent', bench
     frames = encoded_frames.permute(2,0,1)
 
     #print("Impot vocos from onnx")
-    vnet = ailia.Net(weight="vocos.onnx", env_id = 1, memory_mode = 11)
+    vnet = ailia.Net(weight="onnx/vocos.onnx", env_id = 1, memory_mode = 11)
     if benchmark:
         start = int(round(time.time() * 1000))
     x, y = vnet.run([frames.numpy()])

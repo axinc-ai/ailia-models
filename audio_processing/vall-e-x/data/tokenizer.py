@@ -30,7 +30,7 @@ class AudioTokenizer:
     ) -> None:
         self.sample_rate = 24000
         self.channels = 1
-        self.vnet = ailia.Net(weight="encodec.onnx", env_id = 1, memory_mode = 11)
+        self.vnet = ailia.Net(weight="onnx/encodec.onnx", env_id = 1, memory_mode = 11)
         
 
     def encode(self, wav: torch.Tensor) -> torch.Tensor:

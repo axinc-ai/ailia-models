@@ -75,12 +75,12 @@ class VALLE():
                 ]
             )  # W_a
 
-        self.ar_text_embedding.load_onnx("ar_text_embedding.onnx")
-        self.nar_text_embedding.load_onnx("nar_text_embedding.onnx")
+        self.ar_text_embedding.load_onnx("onnx/ar_text_embedding.onnx")
+        self.nar_text_embedding.load_onnx("onnx/nar_text_embedding.onnx")
         for i in range(len(self.nar_audio_embeddings)):
-            self.nar_audio_embeddings[i].load_onnx("nar_audio_embeddings_"+str(i)+".onnx")
-        self.ar_language_embedding.load_onnx("ar_language_embedding.onnx")
-        self.nar_language_embedding.load_onnx("nar_language_embedding.onnx")
+            self.nar_audio_embeddings[i].load_onnx("onnx/nar_audio_embeddings_"+str(i)+".onnx")
+        self.ar_language_embedding.load_onnx("onnx/ar_language_embedding.onnx")
+        self.nar_language_embedding.load_onnx("onnx/nar_language_embedding.onnx")
 
     def inference(
         self,
@@ -152,7 +152,7 @@ class VALLE():
         while True:
             if offset == 0:
                 #print("Impot audio_embedding from onnx")
-                anet = ailia.Net(weight="audio_embedding.onnx", env_id = 1, memory_mode = 11)
+                anet = ailia.Net(weight="onnx/audio_embedding.onnx", env_id = 1, memory_mode = 11)
             start = int(round(time.time() * 1000))
             y_pos = anet.run([y.numpy()])[0]
             end = int(round(time.time() * 1000))
@@ -186,7 +186,7 @@ class VALLE():
 
             if offset == 0:
                 #print("Impot ar_decoder from onnx")
-                net = ailia.Net(weight="ar_decoder.onnx", env_id = 1, memory_mode = 11)
+                net = ailia.Net(weight="onnx/ar_decoder.onnx", env_id = 1, memory_mode = 11)
             offset_tensor = np.zeros((1))
             offset_tensor[0] = offset
             start = int(round(time.time() * 1000))
@@ -253,7 +253,7 @@ class VALLE():
 
             #print("Impot nar_decoder from onnx "+str(i))
             if i == 0:
-                nar_decoder = ailia.Net(weight="nar_decoder.onnx", env_id = 1, memory_mode = 11)
+                nar_decoder = ailia.Net(weight="onnx/nar_decoder.onnx", env_id = 1, memory_mode = 11)
             offset_tensor = np.zeros((1))
             offset_tensor[0] = i
             #print(xy_pos.shape, offset_tensor.shape)
@@ -265,7 +265,7 @@ class VALLE():
 
             #print("Impot nar_predict_layers from onnx")
             if i == 0:
-                nar_predict = ailia.Net(weight="nar_predict_layers.onnx", env_id = 1, memory_mode = 11)
+                nar_predict = ailia.Net(weight="onnx/nar_predict_layers.onnx", env_id = 1, memory_mode = 11)
             logits = nar_predict.run([xy_dec[:, text_len + prefix_len :].numpy(), offset_tensor])[0]
             end = int(round(time.time() * 1000))
             logits = torch.from_numpy(logits)
