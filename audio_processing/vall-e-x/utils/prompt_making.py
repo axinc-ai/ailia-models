@@ -3,7 +3,6 @@ import torch
 import torchaudio
 import logging
 import langid
-import whisper
 langid.set_languages(['en', 'zh', 'ja'])
 
 import numpy as np
@@ -24,34 +23,6 @@ if torch.cuda.is_available():
     device = torch.device("cuda", 0)
 
 codec = AudioTokenizer(device)
-
-if not os.path.exists("./whisper/"): os.mkdir("./whisper/")
-whisper_model = None
-
-@torch.no_grad()
-def transcribe_one(model, audio_path):
-    # load audio and pad/trim it to fit 30 seconds
-    audio = whisper.load_audio(audio_path)
-    audio = whisper.pad_or_trim(audio)
-
-    # make log-Mel spectrogram and move to the same device as the model
-    mel = whisper.log_mel_spectrogram(audio).to(model.device)
-
-    # detect the spoken language
-    _, probs = model.detect_language(mel)
-    print(f"Detected language: {max(probs, key=probs.get)}")
-    lang = max(probs, key=probs.get)
-    # decode the audio
-    options = whisper.DecodingOptions(temperature=1.0, best_of=5, fp16=False if device == torch.device("cpu") else True, sample_len=150)
-    result = whisper.decode(model, mel, options)
-
-    # print the recognized text
-    print(result.text)
-
-    text_pr = result.text
-    if text_pr.strip(" ")[-1] not in "?!.,。，？！。、":
-        text_pr += "."
-    return lang, text_pr
 
 def make_prompt(name, audio_prompt_path, transcript=None):
     global model, text_collater, text_tokenizer, codec
@@ -94,23 +65,9 @@ def make_transcript(name, wav, sr, transcript=None):
     if wav.ndim == 1:
         wav = wav.unsqueeze(0)
     assert wav.ndim and wav.size(0) == 1
-    if transcript is None or transcript == "":
-        logging.info("Transcript not given, using Whisper...")
-        global whisper_model
-        if whisper_model is None:
-            whisper_model = whisper.load_model("medium", download_root=os.path.join(os.getcwd(), "whisper"))
-        whisper_model.to(device)
-        torchaudio.save(f"./prompts/{name}.wav", wav, sr)
-        lang, text = transcribe_one(whisper_model, f"./prompts/{name}.wav")
-        lang_token = lang2token[lang]
-        text = lang_token + text + lang_token
-        os.remove(f"./prompts/{name}.wav")
-        whisper_model.cpu()
-    else:
-        text = transcript
-        lang, _ = langid.classify(text)
-        lang_token = lang2token[lang]
-        text = lang_token + text + lang_token
-
+    text = transcript
+    lang, _ = langid.classify(text)
+    lang_token = lang2token[lang]
+    text = lang_token + text + lang_token
     torch.cuda.empty_cache()
     return text, lang
