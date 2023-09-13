@@ -26,8 +26,7 @@ class AudioTokenizer:
     """EnCodec audio."""
 
     def __init__(
-        self,
-        device: Any = None,
+        self
     ) -> None:
         self.sample_rate = 24000
         self.channels = 1

@@ -1,5 +1,5 @@
 ﻿from modules.embedding import TokenEmbedding, SinePositionalEmbedding
-from typing import Dict, Iterator, List, Tuple, Union
+from typing import List
 
 import torch
 import torch.nn as nn
@@ -22,10 +22,10 @@ class VALLE():
         }
         nar_scale_factor = 1.0
         nar_d_model = int(N_DIM * nar_scale_factor)
-        self.ar_text_embedding = TokenEmbedding(N_DIM, NUM_TEXT_TOKENS)  # W_x
-        self.nar_text_embedding = TokenEmbedding(nar_d_model, NUM_TEXT_TOKENS)
-        self.ar_language_embedding = TokenEmbedding(N_DIM, len(self.language_ID))
-        self.nar_language_embedding = TokenEmbedding(N_DIM, len(self.language_ID))
+        self.ar_text_embedding = TokenEmbedding()
+        self.nar_text_embedding = TokenEmbedding()
+        self.ar_language_embedding = TokenEmbedding()
+        self.nar_language_embedding = TokenEmbedding()
         self.nar_text_prenet = nn.Identity()
         self.nar_audio_prenet = nn.Identity()
         self.ar_text_prenet = nn.Identity()
@@ -60,19 +60,17 @@ class VALLE():
         )
         self.ar_audio_prepend_bos = True
         self.num_quantizers = NUM_QUANTIZERS
-        self.prefix_mode = PREFIX_MODE
-        assert self.num_quantizers >= 1
         self.nar_stage_embeddings = nn.ModuleList(
             [
-                TokenEmbedding(nar_d_model, 1)
+                TokenEmbedding()
                 for i in range(self.num_quantizers - 1)
             ]
         )
         if self.num_quantizers > 1:
             self.nar_audio_embeddings = nn.ModuleList(
-                [TokenEmbedding(nar_d_model, NUM_AUDIO_TOKENS + 1)]
+                [TokenEmbedding()]
                 + [
-                    TokenEmbedding(nar_d_model, NUM_AUDIO_TOKENS)
+                    TokenEmbedding()
                     for i in range(self.num_quantizers - 1)
                 ]
             )  # W_a
@@ -229,19 +227,6 @@ class VALLE():
             y[:, int(self.ar_audio_prepend_bos) :]
         )
 
-        if self.prefix_mode in [2, 4]:  # Exclude enrolled_phonemes
-            enrolled_len = enroll_x_lens.max().item()
-            # SOS + Synthesis Text + EOS
-            text = torch.concat(
-                [
-                    text[:, :1],
-                    text[:, enrolled_len - 1 :],
-                ],
-                dim=1,
-            )
-            text_len = text_len - (enrolled_len - 2)
-            assert text.shape[0] == 1
-
         x = self.nar_text_embedding(text)
         # Add language embedding
         prompt_language_id = torch.LongTensor(np.array([self.language_ID[prompt_language]])).to(x.device)
@@ -271,7 +256,7 @@ class VALLE():
                 nar_decoder = ailia.Net(weight="nar_decoder.onnx", env_id = 1, memory_mode = 11)
             offset_tensor = np.zeros((1))
             offset_tensor[0] = i
-            print(xy_pos.shape, offset_tensor.shape)
+            #print(xy_pos.shape, offset_tensor.shape)
             xy_dec = nar_decoder.run([xy_pos.numpy(), offset_tensor])[0]
             end = int(round(time.time() * 1000))
             xy_dec = torch.from_numpy(xy_dec)

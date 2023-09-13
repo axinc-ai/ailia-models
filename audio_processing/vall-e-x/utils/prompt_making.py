@@ -18,11 +18,7 @@ from macros import *
 text_tokenizer = PhonemeBpeTokenizer(tokenizer_path="./utils/g2p/bpe_69.json")
 text_collater = get_text_token_collater()
 
-device = torch.device("cpu")
-if torch.cuda.is_available():
-    device = torch.device("cuda", 0)
-
-codec = AudioTokenizer(device)
+codec = AudioTokenizer()
 
 def make_prompt(name, audio_prompt_path, transcript=None):
     global model, text_collater, text_tokenizer, codec

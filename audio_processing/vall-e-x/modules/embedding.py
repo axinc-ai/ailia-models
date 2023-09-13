@@ -21,10 +21,7 @@ import ailia
 
 class TokenEmbedding(nn.Module):
     def __init__(
-        self,
-        dim_model: int,
-        vocab_size: int,
-        dropout: float = 0.0,
+        self
     ):
         super().__init__()
 
@@ -51,7 +48,6 @@ class SinePositionalEmbedding(nn.Module):
         self.alpha = nn.Parameter(torch.tensor([alpha_parameter]), requires_grad=alpha)
         self.dropout = torch.nn.Dropout(p=dropout)
 
-        self.reverse = False
         self.pe = None
         self.extend_pe(torch.tensor(0.0).expand(1, 4000))
 
@@ -63,14 +59,9 @@ class SinePositionalEmbedding(nn.Module):
                     self.pe = self.pe.to(dtype=x.dtype, device=x.device)
                 return
         pe = torch.zeros(x.size(1), self.dim_model)
-        if self.reverse:
-            position = torch.arange(
-                x.size(1) - 1, -1, -1.0, dtype=torch.float32
-            ).unsqueeze(1)
-        else:
-            position = torch.arange(
-                0, x.size(1), dtype=torch.float32
-            ).unsqueeze(1)
+        position = torch.arange(
+            0, x.size(1), dtype=torch.float32
+        ).unsqueeze(1)
         div_term = torch.exp(
             torch.arange(0, self.dim_model, 2, dtype=torch.float32)
             * -(math.log(10000.0) / self.dim_model)
