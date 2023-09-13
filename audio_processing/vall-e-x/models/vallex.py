@@ -152,9 +152,7 @@ class VALLE():
        
         use_kv_caching = True
         while True:
-            if offset == 0:
-                #print("Impot audio_embedding from onnx")
-                anet = ailia.Net(weight="onnx/audio_embedding.onnx", env_id = 1, memory_mode = 11)
+            anet = self.models["audio_embedding.onnx"]
             start = int(round(time.time() * 1000))
             y_pos = anet.run([y.numpy()])[0]
             end = int(round(time.time() * 1000))
@@ -186,9 +184,7 @@ class VALLE():
             else:
                 pass # initial prompt
 
-            if offset == 0:
-                #print("Impot ar_decoder from onnx")
-                net = ailia.Net(weight="onnx/ar_decoder.onnx", env_id = 1, memory_mode = 11)
+            net = self.models["ar_decoder.onnx"]
             offset_tensor = np.zeros((1))
             offset_tensor[0] = offset
             start = int(round(time.time() * 1000))
@@ -254,22 +250,27 @@ class VALLE():
             xy_pos = torch.concat([x, y_pos], dim=1)
 
             #print("Impot nar_decoder from onnx "+str(i))
-            if i == 0:
-                nar_decoder = ailia.Net(weight="onnx/nar_decoder.onnx", env_id = 1, memory_mode = 11)
+            nar_decoder = self.models["nar_decoder.onnx"]
             offset_tensor = np.zeros((1))
             offset_tensor[0] = i
             #print(xy_pos.shape, offset_tensor.shape)
+            if benchmark:
+                start = int(round(time.time() * 1000))
             xy_dec = nar_decoder.run([xy_pos.numpy(), offset_tensor])[0]
-            end = int(round(time.time() * 1000))
+            if benchmark:
+                end = int(round(time.time() * 1000))
             xy_dec = torch.from_numpy(xy_dec)
             if benchmark:
                 print(f'ailia processing time {end - start} ms')
 
             #print("Impot nar_predict_layers from onnx")
             if i == 0:
-                nar_predict = ailia.Net(weight="onnx/nar_predict_layers.onnx", env_id = 1, memory_mode = 11)
+                nar_predict = self.models["nar_predict_layers.onnx"]
+            if benchmark:
+                start = int(round(time.time() * 1000))
             logits = nar_predict.run([xy_dec[:, text_len + prefix_len :].numpy(), offset_tensor])[0]
-            end = int(round(time.time() * 1000))
+            if benchmark:
+                end = int(round(time.time() * 1000))
             logits = torch.from_numpy(logits)
             if benchmark:
                 print(f'ailia processing time {end - start} ms')

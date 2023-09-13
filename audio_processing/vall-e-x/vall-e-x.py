@@ -145,8 +145,6 @@ def main():
     for model in ALL_MODELS:
         check_and_download_models("./onnx/"+model, "./onnx/"+model+".prototxt", REMOTE_PATH)
 
-    #env_id = args.env_id
-
     models = {}
     if args.onnx:
         for model in ALL_MODELS:
@@ -164,8 +162,9 @@ def main():
 
     if args.profile:
         for model in ALL_MODELS:
-            print(model)
-            print(models[model].get_summary())
+            if model == "ar_decoder.onnx":
+                print(model)
+                print(models[model].get_summary())
 
 if __name__ == '__main__':
     main()
