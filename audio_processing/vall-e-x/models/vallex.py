@@ -149,7 +149,7 @@ class VALLE():
         x_attn_mask = torch.zeros((x_len, x_len), dtype=torch.bool)
 
         max_len = 1024 # TBD
-        kv_cache_numpy = np.zeros((12 * 2, 1, 16, max_len, 64), dtype=np.float32)   # torch.Size([1, 16, n, 64])が12レイヤー * 2ノード分ある
+        kv_cache_numpy = np.zeros((12 * 2, 16, max_len, 64), dtype=np.float32)   # torch.Size([1, 16, n, 64])が12レイヤー * 2ノード分ある
         offset = 0
        
         use_kv_caching = True
@@ -186,10 +186,10 @@ class VALLE():
             else:
                 pass # initial prompt
             
-            if "ar_decoder.opt.onnx" in self.models:
-                net = self.models["ar_decoder.opt.onnx"]
+            if "ar_decoder2.opt.onnx" in self.models:
+                net = self.models["ar_decoder2.opt.onnx"]
             else:
-                net = self.models["ar_decoder.onnx"]
+                net = self.models["ar_decoder2.onnx"]
             offset_tensor = np.array(offset, dtype=np.int64) # constant type (shape = ())
             start = int(round(time.time() * 1000))
             if ort:

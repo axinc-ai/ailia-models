@@ -78,9 +78,9 @@ WEIGHT_NAR_AUDIO_EMBEDDING_BASE_PATH = "nar_audio_embeddings_[layer_no].onnx"
 WEIGHT_NAR_LANGUAGE_EMBEDDING_PATH = "nar_language_embedding.onnx"
 WEIGHT_NAR_TEXT_EMBEDDING_PATH = "nar_text_embedding.onnx"
 if args.normal:
-    WEIGHT_DECODER_PATH = "ar_decoder.onnx"
+    WEIGHT_DECODER_PATH = "ar_decoder2.onnx"
 else:
-    WEIGHT_DECODER_PATH = "ar_decoder.opt.onnx"
+    WEIGHT_DECODER_PATH = "ar_decoder2.opt.onnx"
 WEIGHT_ENCODEC_PATH = "encodec.onnx"
 WEIGHT_VOCOS_PATH = "vocos.onnx"
 WEIGHT_AUDIO_EMBEDDING_PATH = "audio_embedding.onnx"
@@ -175,7 +175,7 @@ def main():
 
     if args.onnx:
         for model in ALL_MODELS:
-            if model == "ar_decoder.onnx" or model == "ar_decoder.opt.onnx":
+            if model == "ar_decoder2.onnx" or model == "ar_decoder2.opt.onnx":
                 net = onnxruntime.InferenceSession( "./onnx/"+model, providers=['CUDAExecutionProvider', 'CPUExecutionProvider'])
                 models[model] = net
 
@@ -183,7 +183,7 @@ def main():
 
     if args.profile and not args.onnx:
         for model in ALL_MODELS:
-            if model == "ar_decoder.onnx" or model == "ar_decoder.opt.onnx":
+            if model == "ar_decoder2.onnx" or model == "ar_decoder2.opt.onnx":
                 print(model)
                 print(models[model].get_summary())
 
