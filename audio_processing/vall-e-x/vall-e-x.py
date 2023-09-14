@@ -2,6 +2,7 @@ import sys
 import time
 from logging import getLogger
 import os
+#os.environ["CUDA_VISIBLE_DEVICES"]=""
 
 import numpy as np
 import soundfile as sf
@@ -21,6 +22,53 @@ logger = getLogger(__name__)
 # ======================
 # Parameters
 # ======================
+
+REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/vall-e-x/'
+
+SAMPLE_RATE = 16000
+
+# ======================
+# PARAMETERS
+# ======================
+
+SAVE_WAV_PATH = 'output.wav'
+
+# ======================
+# Arguemnt Parser Config
+# ======================
+
+parser = get_base_parser( 'VALL-E-X', None, SAVE_WAV_PATH)
+# overwrite
+parser.add_argument(
+    '--input', '-i', metavar='TEXT', default=None,
+    help='input text'
+)
+parser.add_argument(
+    '--audio', '-a', default=None,
+    help='input audio context'
+)
+parser.add_argument(
+    '--transcript', '-t', default=None,
+    help='input audio transcript'
+)
+parser.add_argument(
+    '--onnx', action='store_true',
+    help='use onnx runtime'
+)
+parser.add_argument(
+    '--normal', action='store_true',
+    help='use normal model'
+)
+parser.add_argument(
+    '--profile', action='store_true',
+    help='use profile model'
+)
+args = update_parser(parser, check_input_type=False)
+
+# ======================
+# Models
+# ======================
+
 WEIGHT_NAR_DECODER_PATH = "nar_decoder.onnx"
 WEIGHT_NAR_PREDICT_LAYERS_PATH = "nar_predict_layers.onnx"
 WEIGHT_AR_AUDIO_EMBEDDING_PATH = "ar_audio_embedding.onnx"
@@ -29,7 +77,10 @@ WEIGHT_AR_TEXT_EMBEDDING_PATH = "ar_text_embedding.onnx"
 WEIGHT_NAR_AUDIO_EMBEDDING_BASE_PATH = "nar_audio_embeddings_[layer_no].onnx"
 WEIGHT_NAR_LANGUAGE_EMBEDDING_PATH = "nar_language_embedding.onnx"
 WEIGHT_NAR_TEXT_EMBEDDING_PATH = "nar_text_embedding.onnx"
-WEIGHT_DECODER_PATH = "ar_decoder.opt.onnx"
+if args.normal:
+    WEIGHT_DECODER_PATH = "ar_decoder.onnx"
+else:
+    WEIGHT_DECODER_PATH = "ar_decoder.opt.onnx"
 WEIGHT_ENCODEC_PATH = "encodec.onnx"
 WEIGHT_VOCOS_PATH = "vocos.onnx"
 WEIGHT_AUDIO_EMBEDDING_PATH = "audio_embedding.onnx"
@@ -56,37 +107,6 @@ ALL_MODELS = [
     WEIGHT_AUDIO_EMBEDDING_PATH
 ]
 
-REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/vall-e-x/'
-
-SAMPLE_RATE = 16000
-
-# ======================
-# PARAMETERS
-# ======================
-
-SAVE_WAV_PATH = 'output.wav'
-
-# ======================
-# Arguemnt Parser Config
-# ======================
-
-parser = get_base_parser( 'VALL-E-X', None, SAVE_WAV_PATH)
-# overwrite
-parser.add_argument(
-    '--input', '-i', metavar='TEXT', default=None,
-    help='input text'
-)
-parser.add_argument(
-    '--onnx', action='store_true',
-    help='use onnx runtime'
-)
-parser.add_argument(
-    '--profile', action='store_true',
-    help='use profile model'
-)
-args = update_parser(parser, check_input_type=False)
-
-
 # ======================
 # Parameters
 # ======================
@@ -110,14 +130,18 @@ def generate_voice(models):
     if args.benchmark:
         start = int(round(time.time() * 1000))
 
-    model_name = "jsut"
+    model_name = None
 
-    if model_name != None:
+    if args.audio != None:
+        model_name = "jsut"
+        #args.audio = "BASIC5000_0001.wav"
+        #args.transcript = "水をマレーシアから買わなくてはならないのです"
+
         os.makedirs("customs", exist_ok=True)
         from utils.prompt_making import make_prompt
-        make_prompt(name=model_name, audio_prompt_path="BASIC5000_0001.wav", transcript="水をマレーシアから買わなくてはならないのです", models=models) # Disable whisper
+        make_prompt(name=model_name, audio_prompt_path=args.audio, transcript=args.transcript, models=models) # Disable whisper
 
-    output = generate_audio(text, prompt=model_name, language='auto', accent='no-accent', benchmark=args.benchmark, models=models)
+    output = generate_audio(text, prompt=model_name, language='auto', accent='no-accent', benchmark=args.benchmark, models=models, ort=args.onnx)
     print(output.shape)
 
     if args.benchmark:
@@ -141,23 +165,25 @@ def main():
         check_and_download_models("./onnx/"+model, "./onnx/"+model+".prototxt", REMOTE_PATH)
 
     models = {}
+
+    memory_mode = ailia.get_memory_mode(reduce_constant=True, ignore_input_with_initializer=True, reduce_interstage=False, reuse_interstage=True)
+    for model in ALL_MODELS:
+        net = ailia.Net(stream = "./onnx/"+model + ".prototxt", weight = "./onnx/"+model, memory_mode = memory_mode, env_id = args.env_id)
+        if args.profile:
+            net.set_profile_mode(True)
+        models[model] = net
+
     if args.onnx:
         for model in ALL_MODELS:
-            net = onnxruntime.InferenceSession( "./onnx/"+model)
-            models[model] = net
-    else:
-        memory_mode = ailia.get_memory_mode(reduce_constant=True, ignore_input_with_initializer=True, reduce_interstage=False, reuse_interstage=True)
-        for model in ALL_MODELS:
-            net = ailia.Net(stream = "./onnx/"+model + ".prototxt", weight = "./onnx/"+model, memory_mode = memory_mode, env_id = args.env_id)
-            if args.profile:
-               net.set_profile_mode(True)
-            models[model] = net
+            if model == "ar_decoder.onnx" or model == "ar_decoder.opt.onnx":
+                net = onnxruntime.InferenceSession( "./onnx/"+model, providers=['CUDAExecutionProvider', 'CPUExecutionProvider'])
+                models[model] = net
 
     generate_voice(models)
 
-    if args.profile:
+    if args.profile and not args.onnx:
         for model in ALL_MODELS:
-            if model == "ar_decoder.onnx":
+            if model == "ar_decoder.onnx" or model == "ar_decoder.opt.onnx":
                 print(model)
                 print(models[model].get_summary())
 

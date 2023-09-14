@@ -1,7 +1,6 @@
 # coding: utf-8
 import os
 import torch
-from vocos import Vocos
 import logging
 import langid
 langid.set_languages(['en', 'zh', 'ja'])
@@ -44,7 +43,7 @@ def vocos_istft(x, y): # for onnx
 
 
 @torch.no_grad()
-def generate_audio(text, prompt=None, language='auto', accent='no-accent', benchmark = False, models = None):
+def generate_audio(text, prompt=None, language='auto', accent='no-accent', benchmark = False, models = None, ort = False):
     global model, vocos, text_tokenizer, text_collater
     text = text.replace("\n", "").strip(" ")
     # detect language
@@ -99,7 +98,8 @@ def generate_audio(text, prompt=None, language='auto', accent='no-accent', bench
         temperature=1,
         prompt_language=lang_pr,
         text_language=langs if accent == "no-accent" else lang,
-        benchmark=benchmark
+        benchmark=benchmark,
+        ort=ort
     )
 
     # Decode with Vocos

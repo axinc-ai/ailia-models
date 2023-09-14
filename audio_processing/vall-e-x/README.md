@@ -7,6 +7,13 @@
 ### Output
 The Voice file is output as .wav which path is defined as `SAVE_WAV_PATH` in `vall-e-x.py`.  
 
+### Requirements
+This model requires pyopenjtalk for g2p.
+
+```
+pip3 install -r requirements.txt
+```
+
 ### Usage
 Automatically downloads the onnx and prototxt files on the first run. It is necessary to be connected to the Internet while downloading.
 
@@ -22,21 +29,10 @@ You can use --savepath option to change the name of the output file to save.
 python3 vall-e-x.py --input "Hello world." --savepath SAVE_WAV_PATH
 ```
 
-### For Japanese
-
-Recognizing Japanese requires converting the text into phonemes. Conversion to phonemes requires openjtalk.
+Run with audio prompt.
 
 ```
-# for macOS, Linux
-pip3 install pyopenjtalk
-# for Windows
-pip3 install pyopenjtalk-prebuilt
-```
-
-Run.
-
-```
-python3 vall-e-x.py -i "こんにちは。"
+python3 vall-e-x.py -i "こんにちは。" --audio BASIC5000_0001.wav --transcript "水をマレーシアから買わなくてはならないのです"
 ```
 
 ### Reference

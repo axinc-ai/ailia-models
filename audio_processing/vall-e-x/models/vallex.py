@@ -94,7 +94,8 @@ class VALLE():
         temperature: float = 1.0,
         prompt_language: str = None,
         text_language: str = None,
-        benchmark = False
+        benchmark = False,
+        ort = False
     ) -> torch.Tensor:
         """
         Args:
@@ -123,6 +124,7 @@ class VALLE():
         text = x
         x = self.ar_text_embedding(text)
         # Add language embedding
+        print(x.device)
         prompt_language_id = torch.LongTensor(np.array([self.language_ID[prompt_language]])).to(x.device)
         if isinstance(text_language, str):
             text_language_id = torch.LongTensor(np.array([self.language_ID[text_language]])).to(x.device)
@@ -183,17 +185,23 @@ class VALLE():
                 xy_pos = xy_pos[:, [-1]] # 前回のトークンは1つ
             else:
                 pass # initial prompt
-
-            net = self.models["ar_decoder.opt.onnx"]
+            
+            if "ar_decoder.opt.onnx" in self.models:
+                net = self.models["ar_decoder.opt.onnx"]
+            else:
+                net = self.models["ar_decoder.onnx"]
             offset_tensor = np.array(offset, dtype=np.int64) # constant type (shape = ())
             start = int(round(time.time() * 1000))
-            if offset == 0:
-                logits, kv_cache_numpy = net.run({"xy_pos":xy_pos.numpy(), "mask":xy_attn_mask.numpy(), "past_kv":kv_cache_numpy, "offset":offset_tensor})
+            if ort:
+                logits, kv_cache_numpy = net.run(None, {"xy_pos":xy_pos.numpy(), "mask":xy_attn_mask.numpy(), "past_kv":kv_cache_numpy, "offset":offset_tensor})
             else:
-                logits = np.zeros((1, 1025), dtype=np.float32, order='C')
-                output = [logits]
-                net.copy_blob_data(net.find_blob_index_by_name("past_kv"), net.find_blob_index_by_name("kv_cache"), None)
-                net.run({"xy_pos":xy_pos.numpy(), "mask":xy_attn_mask.numpy(), "offset":offset_tensor}, output = output)
+                if offset == 0:
+                    logits, kv_cache_numpy = net.run({"xy_pos":xy_pos.numpy(), "mask":xy_attn_mask.numpy(), "past_kv":kv_cache_numpy, "offset":offset_tensor})
+                else:
+                    logits = np.zeros((1, 1025), dtype=np.float32, order='C')
+                    output = [logits]
+                    net.copy_blob_data(net.find_blob_index_by_name("past_kv"), net.find_blob_index_by_name("kv_cache"), None)
+                    net.run({"xy_pos":xy_pos.numpy(), "mask":xy_attn_mask.numpy(), "offset":offset_tensor}, output = output)
             end = int(round(time.time() * 1000))
             logits = torch.from_numpy(logits)
             if benchmark:
