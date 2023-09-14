@@ -147,7 +147,7 @@ class VALLE():
         x_attn_mask = torch.zeros((x_len, x_len), dtype=torch.bool)
 
         max_len = 1024 # TBD
-        kv_cache_numpy = np.zeros((12, 2, 1, 16, max_len, 64))   # torch.Size([1, 16, n, 64])が12レイヤー * 2ノード分ある
+        kv_cache_numpy = np.zeros((12 * 2, 1, 16, max_len, 64), dtype=np.float32)   # torch.Size([1, 16, n, 64])が12レイヤー * 2ノード分ある
         offset = 0
        
         use_kv_caching = True
@@ -185,10 +185,15 @@ class VALLE():
                 pass # initial prompt
 
             net = self.models["ar_decoder.onnx"]
-            offset_tensor = np.zeros((1))
-            offset_tensor[0] = offset
+            offset_tensor = np.array(offset, dtype=np.int64) # constant type (shape = ())
             start = int(round(time.time() * 1000))
-            logits, kv_cache_numpy = net.run([xy_pos.numpy(), xy_attn_mask.numpy(), kv_cache_numpy, offset_tensor])
+            if offset == 0:
+                logits, kv_cache_numpy = net.run({"xy_pos":xy_pos.numpy(), "mask":xy_attn_mask.numpy(), "past_kv":kv_cache_numpy, "offset":offset_tensor})
+            else:
+                logits = np.zeros((1, 1025), dtype=np.float32, order='C')
+                output = [logits]
+                net.copy_blob_data(net.find_blob_index_by_name("past_kv"), net.find_blob_index_by_name("kv_cache"), None)
+                net.run({"xy_pos":xy_pos.numpy(), "mask":xy_attn_mask.numpy(), "offset":offset_tensor}, output = output)
             end = int(round(time.time() * 1000))
             logits = torch.from_numpy(logits)
             if benchmark:
