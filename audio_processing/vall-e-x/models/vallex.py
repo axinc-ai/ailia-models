@@ -184,7 +184,7 @@ class VALLE():
             else:
                 pass # initial prompt
 
-            net = self.models["ar_decoder.onnx"]
+            net = self.models["ar_decoder.opt.onnx"]
             offset_tensor = np.array(offset, dtype=np.int64) # constant type (shape = ())
             start = int(round(time.time() * 1000))
             if offset == 0:

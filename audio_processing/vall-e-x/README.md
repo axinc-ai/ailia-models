@@ -66,6 +66,7 @@ ONNX opset = 15
 - [nar_language_embedding.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/vall-e-x/nar_language_embedding.onnx.prototxt)
 - [nar_text_embedding.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/vall-e-x/nar_text_embedding.onnx.prototxt)
 - [ar_decoder.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/vall-e-x/ar_decoder.onnx.prototxt)
+- [ar_decoder.opt.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/vall-e-x/ar_decoder.opt.onnx.prototxt)
 - [encodec.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/vall-e-x/encodec.onnx.prototxt)
 - [vocos.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/vall-e-x/vocos.onnx.prototxt)
 - [audio_embedding.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/vall-e-x/audio_embedding.onnx.prototxt)
