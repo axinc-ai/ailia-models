@@ -113,6 +113,7 @@ def generate_voice(models):
     model_name = "jsut"
 
     if model_name != None:
+        os.makedirs("customs", exist_ok=True)
         from utils.prompt_making import make_prompt
         make_prompt(name=model_name, audio_prompt_path="BASIC5000_0001.wav", transcript="水をマレーシアから買わなくてはならないのです", models=models) # Disable whisper
 
