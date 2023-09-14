@@ -1,11 +1,9 @@
 import sys
 import time
 from logging import getLogger
+import os
 
 import numpy as np
-import scipy.signal as signal
-from PIL import Image
-import librosa
 import soundfile as sf
 
 import ailia
@@ -17,11 +15,6 @@ from model_utils import check_and_download_models  # noqa
 from arg_utils import get_base_parser, get_savepath, update_parser  # noqa
 
 from utils.generation import generate_audio
-
-flg_ffmpeg = False
-
-if flg_ffmpeg:
-    import ffmpeg
 
 logger = getLogger(__name__)
 
@@ -142,6 +135,7 @@ def generate_voice(models):
 
 def main():
     # model files check and download
+    os.makedirs("onnx", exist_ok=True)
     for model in ALL_MODELS:
         check_and_download_models("./onnx/"+model, "./onnx/"+model+".prototxt", REMOTE_PATH)
 
