@@ -147,7 +147,7 @@ def generate_voice(models):
     if args.benchmark:
         end = int(round(time.time() * 1000))
         estimation_time = (end - start)
-        logger.info(f'\twavegrow processing time {estimation_time} ms')
+        logger.info(f'\ntotal processing time {estimation_time} ms')
 
     # export to audio
     savepath = args.savepath
