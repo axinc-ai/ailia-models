@@ -141,7 +141,8 @@ def generate_text_semantic(
             )
 
         probs = softmax(relevant_logits / temp, axis=-1)
-        item_next = np.random.multinomial(1, probs[:-1])
+        probs = probs / sum(probs)
+        item_next = np.random.multinomial(1, probs)
         item_next = np.argsort(-item_next)[:1]
 
         if allow_early_stop and (
