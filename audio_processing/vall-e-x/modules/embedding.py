@@ -12,58 +12,46 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import math
-
-import torch
-import torch.nn as nn
-
 import ailia
 import numpy as np
 
-class TokenEmbedding(nn.Module):
+class TokenEmbedding():
     def __init__(
         self
     ):
         super().__init__()
 
-    def forward(self, x: torch.Tensor):
-        y = self.net.run([x.numpy()])[0]
-        y = torch.from_numpy(y)
+    def forward(self, x):
+        y = self.net.run([x])[0]
         return y
 
     def load_onnx(self, net):
         self.net = net
 
-class TokenEmbeddingLayers(nn.Module):
+class TokenEmbeddingLayers():
     def __init__(
         self
     ):
         super().__init__()
 
-    def forward(self, x: torch.Tensor, layer_id):
+    def forward(self, x, layer_id):
         layer_id = np.array(layer_id, dtype=np.int64) # constant type (shape = ())
-        y = self.net.run([x.numpy(), layer_id])[0]
-        y = torch.from_numpy(y)
+        y = self.net.run([x, layer_id])[0]
         return y
     
     def load_onnx(self, net):
         self.net = net
 
-class SinePositionalEmbedding(nn.Module):
+class SinePositionalEmbedding():
     def __init__(
         self,
-        dim_model: int,
-        dropout: float = 0.0,
-        scale: bool = False,
-        alpha: bool = False,
         alpha_parameter: float =1.0
     ):
         super().__init__()
-        self.alpha = nn.Parameter(torch.tensor([alpha_parameter]), requires_grad=alpha)
+        self.alpha = np.array([alpha_parameter])
 
-    def forward(self, x: torch.Tensor):
-        y = self.net.run([x.numpy(), self.alpha.numpy()])[0]
-        y = torch.from_numpy(y)
+    def forward(self, x):
+        y = self.net.run([x, self.alpha])[0]
         return y
     
     def load_onnx(self, net):

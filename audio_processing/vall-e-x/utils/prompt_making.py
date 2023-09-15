@@ -1,5 +1,4 @@
 import os
-import torch
 import logging
 import langid
 langid.set_languages(['en', 'zh', 'ja'])
@@ -46,5 +45,4 @@ def make_transcript(transcript):
     lang, _ = langid.classify(text)
     lang_token = lang2token[lang]
     text = lang_token + text + lang_token
-    torch.cuda.empty_cache()
     return text, lang
