@@ -69,21 +69,23 @@ args = update_parser(parser, check_input_type=False)
 # Models
 # ======================
 
-WEIGHT_NAR_DECODER_PATH = "nar_decoder.onnx"
 WEIGHT_NAR_PREDICT_LAYERS_PATH = "nar_predict_layers.onnx"
 WEIGHT_AR_AUDIO_EMBEDDING_PATH = "ar_audio_embedding.onnx"
 WEIGHT_AR_LANGUAGE_EMBEDDING_PATH = "ar_language_embedding.onnx"
 WEIGHT_AR_TEXT_EMBEDDING_PATH = "ar_text_embedding.onnx"
-WEIGHT_NAR_AUDIO_EMBEDDING_BASE_PATH = "nar_audio_embeddings_[layer_no].onnx"
+WEIGHT_NAR_AUDIO_EMBEDDING_LAYERS_PATH = "nar_audio_embedding_layers.onnx"
+WEIGHT_NAR_AUDIO_EMBEDDING_PATH = "nar_audio_embedding.onnx"
 WEIGHT_NAR_LANGUAGE_EMBEDDING_PATH = "nar_language_embedding.onnx"
 WEIGHT_NAR_TEXT_EMBEDDING_PATH = "nar_text_embedding.onnx"
 if args.normal:
-    WEIGHT_DECODER_PATH = "ar_decoder2.onnx"
+    WEIGHT_DECODER_PATH = "ar_decoder.onnx"
+    WEIGHT_NAR_DECODER_PATH = "nar_decoder.onnx"
 else:
-    WEIGHT_DECODER_PATH = "ar_decoder2.opt.onnx"
+    WEIGHT_DECODER_PATH = "ar_decoder.opt.onnx"
+    WEIGHT_NAR_DECODER_PATH = "nar_decoder.opt.onnx"
 WEIGHT_ENCODEC_PATH = "encodec.onnx"
 WEIGHT_VOCOS_PATH = "vocos.onnx"
-WEIGHT_AUDIO_EMBEDDING_PATH = "audio_embedding.onnx"
+WEIGHT_POSITION_EMBEDDING_PATH = "position_embedding.onnx"
 
 ALL_MODELS = [
     WEIGHT_NAR_DECODER_PATH,
@@ -91,20 +93,14 @@ ALL_MODELS = [
     WEIGHT_AR_AUDIO_EMBEDDING_PATH,
     WEIGHT_AR_LANGUAGE_EMBEDDING_PATH,
     WEIGHT_AR_TEXT_EMBEDDING_PATH,
-    WEIGHT_NAR_AUDIO_EMBEDDING_BASE_PATH.replace("[layer_no]","0"),
-    WEIGHT_NAR_AUDIO_EMBEDDING_BASE_PATH.replace("[layer_no]","1"),
-    WEIGHT_NAR_AUDIO_EMBEDDING_BASE_PATH.replace("[layer_no]","2"),
-    WEIGHT_NAR_AUDIO_EMBEDDING_BASE_PATH.replace("[layer_no]","3"),
-    WEIGHT_NAR_AUDIO_EMBEDDING_BASE_PATH.replace("[layer_no]","4"),
-    WEIGHT_NAR_AUDIO_EMBEDDING_BASE_PATH.replace("[layer_no]","5"),
-    WEIGHT_NAR_AUDIO_EMBEDDING_BASE_PATH.replace("[layer_no]","6"),
-    WEIGHT_NAR_AUDIO_EMBEDDING_BASE_PATH.replace("[layer_no]","7"),
+    WEIGHT_NAR_AUDIO_EMBEDDING_PATH,
+    WEIGHT_NAR_AUDIO_EMBEDDING_LAYERS_PATH,
     WEIGHT_NAR_LANGUAGE_EMBEDDING_PATH,
     WEIGHT_NAR_TEXT_EMBEDDING_PATH,
     WEIGHT_DECODER_PATH,
     WEIGHT_ENCODEC_PATH,
     WEIGHT_VOCOS_PATH,
-    WEIGHT_AUDIO_EMBEDDING_PATH
+    WEIGHT_POSITION_EMBEDDING_PATH
 ]
 
 # ======================
@@ -175,7 +171,7 @@ def main():
 
     if args.onnx:
         for model in ALL_MODELS:
-            if model == "ar_decoder2.onnx" or model == "ar_decoder2.opt.onnx":
+            if model == "ar_decoder.onnx" or model == "ar_decoder.opt.onnx":
                 net = onnxruntime.InferenceSession( "./onnx/"+model, providers=['CUDAExecutionProvider', 'CPUExecutionProvider'])
                 models[model] = net
 
@@ -183,7 +179,7 @@ def main():
 
     if args.profile and not args.onnx:
         for model in ALL_MODELS:
-            if model == "ar_decoder2.onnx" or model == "ar_decoder2.opt.onnx":
+            if model == "ar_decoder.onnx" or model == "ar_decoder.opt.onnx":
                 print(model)
                 print(models[model].get_summary())
 

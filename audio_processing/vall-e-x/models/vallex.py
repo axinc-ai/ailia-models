@@ -1,4 +1,4 @@
-﻿from modules.embedding import TokenEmbedding, SinePositionalEmbedding
+﻿from modules.embedding import TokenEmbedding, TokenEmbeddingLayers, SinePositionalEmbedding
 from typing import List
 
 import torch
@@ -23,10 +23,12 @@ class VALLE():
         }
         nar_scale_factor = 1.0
         nar_d_model = int(N_DIM * nar_scale_factor)
+        self.ar_audio_embedding = TokenEmbedding()
         self.ar_text_embedding = TokenEmbedding()
         self.nar_text_embedding = TokenEmbedding()
         self.ar_language_embedding = TokenEmbedding()
         self.nar_language_embedding = TokenEmbedding()
+        self.nar_audio_embedding_layers = TokenEmbeddingLayers()
         self.nar_text_prenet = nn.Identity()
         self.nar_audio_prenet = nn.Identity()
         self.ar_text_prenet = nn.Identity()
@@ -76,13 +78,26 @@ class VALLE():
                 ]
             )  # W_a
 
+        self.ar_audio_embedding.load_onnx(models["ar_audio_embedding.onnx"])
         self.ar_text_embedding.load_onnx(models["ar_text_embedding.onnx"])
         self.nar_text_embedding.load_onnx(models["nar_text_embedding.onnx"])
-        for i in range(len(self.nar_audio_embeddings)):
-            self.nar_audio_embeddings[i].load_onnx(models["nar_audio_embeddings_"+str(i)+".onnx"])
+        self.nar_audio_embeddings[0].load_onnx(models["nar_audio_embedding.onnx"])
+        self.nar_audio_embedding_layers.load_onnx(models["nar_audio_embedding_layers.onnx"])
         self.ar_language_embedding.load_onnx(models["ar_language_embedding.onnx"])
         self.nar_language_embedding.load_onnx(models["nar_language_embedding.onnx"])
+
+        self.ar_text_position.load_onnx(models["position_embedding.onnx"])
+        self.ar_audio_position.load_onnx(models["position_embedding.onnx"])
+        self.nar_text_position.load_onnx(models["position_embedding.onnx"])
+        self.nar_audio_position.load_onnx(models["position_embedding.onnx"])
+
         self.models = models
+
+    def audio_embedding(self, y):
+        y_emb = self.ar_audio_embedding(y)
+        y_emb = self.ar_audio_prenet(y_emb)
+        y_pos = self.ar_audio_position(y_emb)
+        return y_pos
 
     def inference(
         self,
@@ -154,14 +169,8 @@ class VALLE():
        
         use_kv_caching = True
         while True:
-            anet = self.models["audio_embedding.onnx"]
-            start = int(round(time.time() * 1000))
-            y_pos = anet.run([y.numpy()])[0]
-            end = int(round(time.time() * 1000))
-            y_pos = torch.from_numpy(y_pos)
-            if benchmark:
-                print(f'ailia processing time {end - start} ms')
-            
+            y_pos = self.audio_embedding(y)
+           
             xy_pos = torch.concat([x, y_pos], dim=1)
 
             y_len = y.shape[1]
@@ -186,10 +195,10 @@ class VALLE():
             else:
                 pass # initial prompt
             
-            if "ar_decoder2.opt.onnx" in self.models:
-                net = self.models["ar_decoder2.opt.onnx"]
+            if "ar_decoder.opt.onnx" in self.models:
+                net = self.models["ar_decoder.opt.onnx"]
             else:
-                net = self.models["ar_decoder2.onnx"]
+                net = self.models["ar_decoder.onnx"]
             offset_tensor = np.array(offset, dtype=np.int64) # constant type (shape = ())
             start = int(round(time.time() * 1000))
             if ort:
@@ -251,21 +260,22 @@ class VALLE():
         x = self.nar_text_position(x)
 
         for j in range(1, self.num_quantizers):
-            y_emb[:, :prefix_len] += self.nar_audio_embeddings[j](
-                prompts[..., j]
-            )
+            if prefix_len > 0:
+                y_emb[:, :prefix_len] += self.nar_audio_embedding_layers(
+                    prompts[..., j], j - 1
+                )
 
         for i in range(0, self.num_quantizers - 1):
-            embedding_layer = self.nar_audio_embeddings[1+i]
-            
             y_pos = self.nar_audio_prenet(y_emb)
             y_pos = self.nar_audio_position(y_pos)
             xy_pos = torch.concat([x, y_pos], dim=1)
 
             #print("Impot nar_decoder from onnx "+str(i))
-            nar_decoder = self.models["nar_decoder.onnx"]
-            offset_tensor = np.zeros((1))
-            offset_tensor[0] = i
+            if "nar_decoder.opt.onnx" in self.models:
+                nar_decoder = self.models["nar_decoder.opt.onnx"]
+            else:
+                nar_decoder = self.models["nar_decoder.onnx"]
+            offset_tensor = np.array(i, dtype=np.int64) # constant type (shape = ())
             #print(xy_pos.shape, offset_tensor.shape)
             if benchmark:
                 start = int(round(time.time() * 1000))
@@ -292,7 +302,7 @@ class VALLE():
             codes.append(samples)
 
             if i < self.num_quantizers - 2:
-                y_emb[:, prefix_len:] += embedding_layer(samples)
+                y_emb[:, prefix_len:] += self.nar_audio_embedding_layers(samples, i)
 
         assert len(codes) == self.num_quantizers
         return torch.stack(codes, dim=-1)

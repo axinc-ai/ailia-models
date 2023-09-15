@@ -18,6 +18,7 @@ import torch
 import torch.nn as nn
 
 import ailia
+import numpy as np
 
 class TokenEmbedding(nn.Module):
     def __init__(
@@ -33,6 +34,21 @@ class TokenEmbedding(nn.Module):
     def load_onnx(self, net):
         self.net = net
 
+class TokenEmbeddingLayers(nn.Module):
+    def __init__(
+        self
+    ):
+        super().__init__()
+
+    def forward(self, x: torch.Tensor, layer_id):
+        layer_id = np.array(layer_id, dtype=np.int64) # constant type (shape = ())
+        y = self.net.run([x.numpy(), layer_id])[0]
+        y = torch.from_numpy(y)
+        return y
+    
+    def load_onnx(self, net):
+        self.net = net
+
 class SinePositionalEmbedding(nn.Module):
     def __init__(
         self,
@@ -43,36 +59,12 @@ class SinePositionalEmbedding(nn.Module):
         alpha_parameter: float =1.0
     ):
         super().__init__()
-        self.dim_model = dim_model
-        self.x_scale = math.sqrt(dim_model) if scale else 1.0
         self.alpha = nn.Parameter(torch.tensor([alpha_parameter]), requires_grad=alpha)
-        self.dropout = torch.nn.Dropout(p=dropout)
 
-        self.pe = None
-        self.extend_pe(torch.tensor(0.0).expand(1, 4000))
-
-    def extend_pe(self, x):
-        """Reset the positional encodings."""
-        if self.pe is not None:
-            if self.pe.size(1) >= x.size(1):
-                if self.pe.dtype != x.dtype or self.pe.device != x.device:
-                    self.pe = self.pe.to(dtype=x.dtype, device=x.device)
-                return
-        pe = torch.zeros(x.size(1), self.dim_model)
-        position = torch.arange(
-            0, x.size(1), dtype=torch.float32
-        ).unsqueeze(1)
-        div_term = torch.exp(
-            torch.arange(0, self.dim_model, 2, dtype=torch.float32)
-            * -(math.log(10000.0) / self.dim_model)
-        )
-        pe[:, 0::2] = torch.sin(position * div_term)
-        pe[:, 1::2] = torch.cos(position * div_term)
-        pe = pe.unsqueeze(0)
-        self.pe = pe.to(device=x.device, dtype=x.dtype).detach()
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        self.extend_pe(x)
-        output = x.unsqueeze(-1) if x.ndim == 2 else x
-        output = output * self.x_scale + self.alpha * self.pe[:, : x.size(1)]
-        return self.dropout(output)
+    def forward(self, x: torch.Tensor):
+        y = self.net.run([x.numpy(), self.alpha.numpy()])[0]
+        y = torch.from_numpy(y)
+        return y
+    
+    def load_onnx(self, net):
+        self.net = net
