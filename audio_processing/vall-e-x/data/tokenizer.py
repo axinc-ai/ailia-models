@@ -19,7 +19,6 @@ import ailia
 import numpy as np
 import torch
 import torchaudio
-from encodec.utils import convert_audio
 
 
 class AudioTokenizer:
@@ -45,12 +44,23 @@ class AudioTokenizer:
 
 def tokenize_audio(tokenizer: AudioTokenizer, audio):
     # Load and pre-process the audio waveform
-    if isinstance(audio, str):
-        wav, sr = torchaudio.load(audio)
-    else:
-        wav, sr = audio
-    wav = convert_audio(wav, sr, tokenizer.sample_rate, tokenizer.channels)
+    #if isinstance(audio, str):
+    #    wav, sr = torchaudio.load(audio)
+    #else:
+    #    wav, sr = audio
+    #wav = convert_audio(wav, sr, tokenizer.sample_rate, tokenizer.channels)
+    #print(wav.shape)
+    #wav = wav.unsqueeze(0)
+    #print(wav.shape)
+
+    import librosa
+    wav, sr = librosa.load(audio, sr=tokenizer.sample_rate, mono=True)
+    wav = torch.tensor(wav) # range = 0 - 1
     wav = wav.unsqueeze(0)
+    wav = wav.unsqueeze(0)
+
+    if wav.size(-1) / sr > 15:
+        raise ValueError(f"Prompt too long, expect length below 15 seconds, got {wav.size(-1) / sr} seconds.")
 
     # Extract discrete codes from EnCodec
     with torch.no_grad():

@@ -21,17 +21,17 @@ text_collater = get_text_token_collater()
 codec = AudioTokenizer()
 
 def make_prompt(name, audio_prompt_path, transcript=None, models=None):
-    global model, text_collater, text_tokenizer, codec
-    wav_pr, sr = torchaudio.load(audio_prompt_path)
+    #global model, text_collater, text_tokenizer, codec
+    #wav_pr, sr = torchaudio.load(audio_prompt_path)
     # check length
-    if wav_pr.size(-1) / sr > 15:
-        raise ValueError(f"Prompt too long, expect length below 15 seconds, got {wav_pr / sr} seconds.")
-    if wav_pr.size(0) == 2:
-        wav_pr = wav_pr.mean(0, keepdim=True)
-    text_pr, lang_pr = make_transcript(name, wav_pr, sr, transcript)
+    #if wav_pr.size(-1) / sr > 15:
+    #    raise ValueError(f"Prompt too long, expect length below 15 seconds, got {wav_pr / sr} seconds.")
+    #if wav_pr.size(0) == 2:
+    #    wav_pr = wav_pr.mean(0, keepdim=True)
+    text_pr, lang_pr = make_transcript(transcript)
 
     # tokenize audio
-    encoded_frames = tokenize_audio(codec, (wav_pr, sr))
+    encoded_frames = tokenize_audio(codec, audio_prompt_path)#(wav_pr, sr))
     audio_tokens = encoded_frames[0][0].transpose(2, 1).cpu().numpy()
 
     # tokenize text
@@ -50,17 +50,7 @@ def make_prompt(name, audio_prompt_path, transcript=None, models=None):
     logging.info(f"Successful. Prompt saved to {save_path}")
 
 
-def make_transcript(name, wav, sr, transcript=None):
-
-    if not isinstance(wav, torch.FloatTensor):
-        wav = torch.tensor(wav)
-    if wav.abs().max() > 1:
-        wav /= wav.abs().max()
-    if wav.size(-1) == 2:
-        wav = wav.mean(-1, keepdim=False)
-    if wav.ndim == 1:
-        wav = wav.unsqueeze(0)
-    assert wav.ndim and wav.size(0) == 1
+def make_transcript(transcript):
     text = transcript
     lang, _ = langid.classify(text)
     lang_token = lang2token[lang]

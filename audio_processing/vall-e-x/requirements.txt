@@ -20,4 +20,3 @@ gradio
 nltk
 sudachipy
 sudachidict_core
-encodec
