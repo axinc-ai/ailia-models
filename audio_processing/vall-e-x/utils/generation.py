@@ -94,8 +94,6 @@ def generate_audio(text, prompt=None, language='auto', accent='no-accent', bench
         text_tokens_lens,
         audio_prompts,
         enroll_x_lens=enroll_x_lens,
-        top_k=-100,
-        temperature=1,
         prompt_language=lang_pr,
         text_language=langs if accent == "no-accent" else lang,
         benchmark=benchmark,
