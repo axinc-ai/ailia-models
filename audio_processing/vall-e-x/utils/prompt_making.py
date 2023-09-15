@@ -8,13 +8,11 @@ from data.tokenizer import (
     AudioTokenizer,
     tokenize_audio,
 )
-from data.collation import get_text_token_collater
 from utils.g2p import PhonemeBpeTokenizer
 
 from macros import *
 
 text_tokenizer = PhonemeBpeTokenizer(tokenizer_path="./utils/g2p/bpe_69.json")
-text_collater = get_text_token_collater()
 
 def make_prompt(name, audio_prompt_path, transcript=None, models=None):
     codec = AudioTokenizer(models["encodec.onnx"])
@@ -26,11 +24,7 @@ def make_prompt(name, audio_prompt_path, transcript=None, models=None):
 
     # tokenize text
     phonemes, langs = text_tokenizer.tokenize(text=f"{text_pr}".strip())
-    text_tokens, enroll_x_lens = text_collater(
-        [
-            phonemes
-        ]
-    )
+    text_tokens = [phonemes]
 
     message = f"Detected language: {lang_pr}\n Detected text {text_pr}\n"
 

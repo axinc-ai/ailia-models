@@ -98,7 +98,6 @@ class VALLE():
         text = x
         x = torch.tensor(self.ar_text_embedding.forward(text.numpy()))
         # Add language embedding
-        print(x.device)
         prompt_language_id = torch.LongTensor(np.array([self.language_ID[prompt_language]])).to(x.device)
         if isinstance(text_language, str):
             text_language_id = torch.LongTensor(np.array([self.language_ID[text_language]])).to(x.device)

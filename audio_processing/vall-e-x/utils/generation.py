@@ -8,17 +8,16 @@ langid.set_languages(['en', 'zh', 'ja'])
 import ailia
 import time
 
-import pathlib
-import platform
-if platform.system().lower() == 'windows':
-    temp = pathlib.PosixPath
-    pathlib.PosixPath = pathlib.WindowsPath
-else:
-    temp = pathlib.WindowsPath
-    pathlib.WindowsPath = pathlib.PosixPath
+#import pathlib
+#import platform
+#if platform.system().lower() == 'windows':
+#    temp = pathlib.PosixPath
+#    pathlib.PosixPath = pathlib.WindowsPath
+#else:
+#    temp = pathlib.WindowsPath
+#    pathlib.WindowsPath = pathlib.PosixPath
 
 import numpy as np
-from data.collation import get_text_token_collater
 from utils.g2p import PhonemeBpeTokenizer
 
 from macros import *
@@ -26,7 +25,6 @@ from macros import *
 model = None
 
 text_tokenizer = PhonemeBpeTokenizer(tokenizer_path="./utils/g2p/bpe_69.json")
-text_collater = get_text_token_collater()
 
 from models.vallex import VALLE
 
@@ -79,11 +77,9 @@ def generate_audio(text, prompt=None, language='auto', accent='no-accent', bench
     enroll_x_lens = text_prompts.shape[-1]
     logging.info(f"synthesize text: {text}")
     phone_tokens, langs = text_tokenizer.tokenize(text=f"_{text}".strip())
-    text_tokens, text_tokens_lens = text_collater(
-        [
-            phone_tokens
-        ]
-    )
+    text_tokens = torch.tensor([phone_tokens])
+    text_tokens_lens = torch.tensor([len(phone_tokens)])
+
     text_tokens = torch.cat([text_prompts, text_tokens], dim=-1)
     text_tokens_lens += enroll_x_lens
     # accent control

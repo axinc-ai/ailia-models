@@ -32,7 +32,7 @@ python3 vall-e-x.py --input "Hello world." --savepath SAVE_WAV_PATH
 Run with audio prompt.
 
 ```
-python3 vall-e-x.py -i "音声合成のテストを行なっています。" --audio BASIC5000_0001.wav --transcript "水をマレーシアから買わなくてはならないのです"
+python3 vall-e-x.py -i "音声合成のテストを行なっています。" --audio BASIC5000_0001.wav --transcript "水をマレーシアから買わなくてはならないのです" -e 1 -b
 ```
 
 ### Reference
