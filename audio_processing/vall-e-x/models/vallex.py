@@ -27,10 +27,6 @@ class VALLE():
         self.ar_language_embedding = TokenEmbedding()
         self.nar_language_embedding = TokenEmbedding()
         self.nar_audio_embedding_layers = TokenEmbeddingLayers()
-        self.nar_text_prenet = nn.Identity()
-        self.nar_audio_prenet = nn.Identity()
-        self.ar_text_prenet = nn.Identity()
-        self.ar_audio_prenet = nn.Identity()
         self.ar_text_position = SinePositionalEmbedding(
             alpha_parameter=2.0744
         )
@@ -65,7 +61,6 @@ class VALLE():
 
     def audio_embedding(self, y):
         y_emb = torch.tensor(self.ar_audio_embedding.forward(y.numpy()))
-        y_emb = self.ar_audio_prenet(y_emb)
         y_pos = torch.tensor(self.ar_audio_position.forward(y_emb.numpy()))
         return y_pos
 
@@ -111,7 +106,6 @@ class VALLE():
             text_language_id = torch.LongTensor(np.array([self.language_ID[tl] for tl in text_language])).to(x.device)
         x[:, :enroll_x_lens, :] += torch.tensor(self.ar_language_embedding.forward(prompt_language_id.numpy()))
         x[:, enroll_x_lens:, :] += torch.tensor(self.ar_language_embedding.forward(text_language_id.numpy()))
-        x = self.ar_text_prenet(x)
         x = torch.tensor(self.ar_text_position.forward(x.numpy()))
 
         text_len = x_lens.max()
@@ -220,7 +214,6 @@ class VALLE():
             text_language_id = torch.LongTensor(np.array([self.language_ID[tl] for tl in text_language])).to(x.device)
         x[:, :enroll_x_lens, :] += torch.tensor(self.nar_language_embedding.forward(prompt_language_id.numpy()))
         x[:, enroll_x_lens:, :] += torch.tensor(self.nar_language_embedding.forward(text_language_id.numpy()))
-        x = self.nar_text_prenet(x)
         x = torch.tensor(self.nar_text_position.forward(x.numpy()))
 
         for j in range(1, self.num_quantizers):
@@ -230,8 +223,7 @@ class VALLE():
                 ))
 
         for i in range(0, self.num_quantizers - 1):
-            y_pos = self.nar_audio_prenet(y_emb)
-            y_pos = torch.tensor(self.nar_audio_position.forward(y_pos.numpy()))
+            y_pos = torch.tensor(self.nar_audio_position.forward(y_emb.numpy()))
             xy_pos = torch.concat([x, y_pos], dim=1)
 
             #print("Impot nar_decoder from onnx "+str(i))
