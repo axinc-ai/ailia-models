@@ -2,7 +2,6 @@ import sys
 import time
 from logging import getLogger
 import os
-#os.environ["CUDA_VISIBLE_DEVICES"]=""
 
 import numpy as np
 import soundfile as sf
@@ -156,6 +155,9 @@ def main():
     os.makedirs("onnx", exist_ok=True)
     for model in ALL_MODELS:
         check_and_download_models("./onnx/"+model, "./onnx/"+model+".prototxt", REMOTE_PATH)
+
+    if ("MPS" in ailia.get_environment(args.env_id).name):
+        logger.warning('This model is slow on MPS. Please try to use -e 1.')
 
     models = {}
 
