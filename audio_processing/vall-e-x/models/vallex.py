@@ -64,12 +64,30 @@ class VALLE():
         y_pos = self.ar_audio_position.forward(y_emb)
         return y_pos
 
+    def attn_mask(self, x_len, y_len):
+        # x is text_prompt + text_tokens
+        # y is audio_prompt + ar_decoder output
+        x_attn_mask_pad = np.zeros((x_len, x_len + y_len), dtype=np.bool)
+        x_attn_mask_pad[:,x_len:x_len + y_len] = True # Output read all input tokens
+
+        y_attn_mask = np.zeros((y_len, x_len + y_len), dtype=np.bool)
+        for i in range(y_len):
+            for j in range(y_len):
+                if i < j:
+                    y_attn_mask[i, x_len + j] = True # Output only read previous output
+        
+        xy_attn_mask = np.concatenate(
+            [x_attn_mask_pad, y_attn_mask], axis=0
+        ) # shape is (x_len + y_len, x_len + y_len)
+
+        return xy_attn_mask
+
     def inference(
         self,
-        x,
-        x_lens,
-        y,
-        enroll_x_lens,
+        x, # text_tokens (text_prompt + text_tokens)
+        x_lens, # len text_tokens
+        y, # audio_prompts
+        enroll_x_lens, # len text_prompt
         prompt_language: str = None,
         text_language: str = None,
         benchmark = False,
@@ -110,13 +128,14 @@ class VALLE():
         prefix_len = y.shape[1]
 
         # AR Decoder
-        y = torch.tensor(prompts[..., 0])
+        y = prompts[..., 0]
         if self.ar_audio_prepend_bos:
-            y = F.pad(y, (1, 0), value=NUM_AUDIO_TOKENS + 1)
-        y = y.numpy()
+            # Append BOS symbol to front of y
+            bos = np.zeros((1, 1))
+            bos[0, 0] = NUM_AUDIO_TOKENS + 1
+            y = np.concatenate([bos, y], axis = -1)
 
         x_len = x_lens.max()
-        x_attn_mask = torch.zeros((x_len, x_len), dtype=torch.bool)
 
         max_len = 1024 # TBD
         kv_cache_numpy = np.zeros((12 * 2, 16, max_len, 64), dtype=np.float32)   # torch.Size([1, 16, n, 64])が12レイヤー * 2ノード分ある
@@ -127,23 +146,9 @@ class VALLE():
             y_pos = self.audio_embedding(y)
            
             xy_pos = np.concatenate([x, y_pos], axis=1)
-
             y_len = y.shape[1]
-            x_attn_mask_pad = F.pad(
-                x_attn_mask,
-                (0, y_len),
-                value=True,
-            )
-            y_attn_mask = F.pad(
-                torch.triu(
-                    torch.ones(y_len, y_len, dtype=torch.bool), diagonal=1
-                ),
-                (x_len, 0),
-                value=False,
-            )
-            xy_attn_mask = np.concatenate(
-                [x_attn_mask_pad.numpy(), y_attn_mask.numpy()], axis=0
-            )
+
+            xy_attn_mask = self.attn_mask(x_len, y_len)
 
             if use_kv_caching and offset>=1:#kv_cache is not None:
                 xy_pos = xy_pos[:, [-1]] # 前回のトークンは1つ

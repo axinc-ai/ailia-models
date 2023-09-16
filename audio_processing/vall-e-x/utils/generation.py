@@ -8,15 +8,6 @@ langid.set_languages(['en', 'zh', 'ja'])
 import ailia
 import time
 
-#import pathlib
-#import platform
-#if platform.system().lower() == 'windows':
-#    temp = pathlib.PosixPath
-#    pathlib.PosixPath = pathlib.WindowsPath
-#else:
-#    temp = pathlib.WindowsPath
-#    pathlib.WindowsPath = pathlib.PosixPath
-
 import numpy as np
 from utils.g2p import PhonemeBpeTokenizer
 
