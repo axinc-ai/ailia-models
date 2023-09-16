@@ -60,21 +60,21 @@ class VALLE():
         self.models = models
 
     def audio_embedding(self, y):
-        y_emb = torch.tensor(self.ar_audio_embedding.forward(y.numpy()))
-        y_pos = torch.tensor(self.ar_audio_position.forward(y_emb.numpy()))
+        y_emb = self.ar_audio_embedding.forward(y)
+        y_pos = self.ar_audio_position.forward(y_emb)
         return y_pos
 
     def inference(
         self,
-        x: torch.Tensor,
-        x_lens: torch.Tensor,
-        y: torch.Tensor,
-        enroll_x_lens: torch.Tensor,
+        x,
+        x_lens,
+        y,
+        enroll_x_lens,
         prompt_language: str = None,
         text_language: str = None,
         benchmark = False,
         ort = False
-    ) -> torch.Tensor:
+    ):
         """
         Args:
           x:
@@ -92,30 +92,28 @@ class VALLE():
         assert y.ndim == 3, y.shape
         assert y.shape[0] == 1, y.shape
 
-        assert torch.all(x_lens > 0)
-
         # NOTE: x has been padded in TextTokenCollater
         text = x
-        x = torch.tensor(self.ar_text_embedding.forward(text.numpy()))
+        x = self.ar_text_embedding.forward(text)
         # Add language embedding
-        prompt_language_id = torch.LongTensor(np.array([self.language_ID[prompt_language]])).to(x.device)
+        prompt_language_id = np.array([self.language_ID[prompt_language]])
         if isinstance(text_language, str):
-            text_language_id = torch.LongTensor(np.array([self.language_ID[text_language]])).to(x.device)
+            text_language_id = np.array([self.language_ID[text_language]])
         elif isinstance(text_language, List):
-            text_language_id = torch.LongTensor(np.array([self.language_ID[tl] for tl in text_language])).to(x.device)
-        x[:, :enroll_x_lens, :] += torch.tensor(self.ar_language_embedding.forward(prompt_language_id.numpy()))
-        x[:, enroll_x_lens:, :] += torch.tensor(self.ar_language_embedding.forward(text_language_id.numpy()))
-        x = torch.tensor(self.ar_text_position.forward(x.numpy()))
+            text_language_id = np.array([self.language_ID[tl] for tl in text_language])
+        x[:, :enroll_x_lens, :] += self.ar_language_embedding.forward(prompt_language_id)
+        x[:, enroll_x_lens:, :] += self.ar_language_embedding.forward(text_language_id)
+        x = self.ar_text_position.forward(x)
 
         text_len = x_lens.max()
         prompts = y
         prefix_len = y.shape[1]
 
         # AR Decoder
-        # TODO: Managing decoder steps avoid repetitive computation
-        y = prompts[..., 0]
+        y = torch.tensor(prompts[..., 0])
         if self.ar_audio_prepend_bos:
             y = F.pad(y, (1, 0), value=NUM_AUDIO_TOKENS + 1)
+        y = y.numpy()
 
         x_len = x_lens.max()
         x_attn_mask = torch.zeros((x_len, x_len), dtype=torch.bool)
@@ -128,7 +126,7 @@ class VALLE():
         while True:
             y_pos = self.audio_embedding(y)
            
-            xy_pos = torch.concat([x, y_pos], dim=1)
+            xy_pos = np.concatenate([x, y_pos], axis=1)
 
             y_len = y.shape[1]
             x_attn_mask_pad = F.pad(
@@ -143,9 +141,9 @@ class VALLE():
                 (x_len, 0),
                 value=False,
             )
-            xy_attn_mask = torch.concat(
-                [x_attn_mask_pad, y_attn_mask], dim=0
-            ).to(y.device)
+            xy_attn_mask = np.concatenate(
+                [x_attn_mask_pad.numpy(), y_attn_mask.numpy()], axis=0
+            )
 
             if use_kv_caching and offset>=1:#kv_cache is not None:
                 xy_pos = xy_pos[:, [-1]] # 前回のトークンは1つ
@@ -159,29 +157,27 @@ class VALLE():
             offset_tensor = np.array(offset, dtype=np.int64) # constant type (shape = ())
             start = int(round(time.time() * 1000))
             if ort:
-                logits, kv_cache_numpy = net.run(None, {"xy_pos":xy_pos.numpy(), "mask":xy_attn_mask.numpy(), "past_kv":kv_cache_numpy, "offset":offset_tensor})
+                logits, kv_cache_numpy = net.run(None, {"xy_pos":xy_pos, "mask":xy_attn_mask, "past_kv":kv_cache_numpy, "offset":offset_tensor})
             else:
                 if offset == 0:
-                    logits, kv_cache_numpy = net.run({"xy_pos":xy_pos.numpy(), "mask":xy_attn_mask.numpy(), "past_kv":kv_cache_numpy, "offset":offset_tensor})
+                    logits, kv_cache_numpy = net.run({"xy_pos":xy_pos, "mask":xy_attn_mask, "past_kv":kv_cache_numpy, "offset":offset_tensor})
                 else:
                     logits = np.zeros((1, 1025), dtype=np.float32, order='C')
                     output = [logits]
                     net.copy_blob_data(net.find_blob_index_by_name("past_kv"), net.find_blob_index_by_name("kv_cache"), None)
-                    net.run({"xy_pos":xy_pos.numpy(), "mask":xy_attn_mask.numpy(), "offset":offset_tensor}, output = output)
+                    net.run({"xy_pos":xy_pos, "mask":xy_attn_mask, "offset":offset_tensor}, output = output)
             end = int(round(time.time() * 1000))
-            logits = torch.from_numpy(logits)
             if benchmark:
                 print(f'ailia processing time {end - start} ms offset {offset}')
 
             offset = offset + xy_pos.shape[-2]
 
-            #logits = self.ar_predict_layer(xy_dec[:, -1]) # require export
             samples = topk_sampling(
                 logits
             )
 
             if (
-                torch.argmax(logits, dim=-1)[0] == NUM_AUDIO_TOKENS
+                np.argmax(logits, axis=-1)[0] == NUM_AUDIO_TOKENS
                 or samples[0, 0] == NUM_AUDIO_TOKENS
                 or (y.shape[1] - prompts.shape[1]) > x_lens.max() * 16
             ):
@@ -193,76 +189,70 @@ class VALLE():
                 print(f"VALL-E EOS [{prompts.shape[1]} -> {y.shape[1]}]")
                 break
 
-            y = torch.concat([y, samples], dim=1)
+            y = np.concatenate([y, samples], axis=1)
 
         codes = [y[:, prefix_len + int(self.ar_audio_prepend_bos) :]]
-        if self.num_quantizers == 1:
-            return torch.stack(codes, dim=-1)
 
         # Non-AR Decoders
-        y_emb = torch.tensor(self.nar_audio_embedding.forward(
-            y[:, int(self.ar_audio_prepend_bos) :].numpy()
-        ))
+        y_emb = self.nar_audio_embedding.forward(
+            y[:, int(self.ar_audio_prepend_bos) :]
+        )
 
-        x = torch.tensor(self.nar_text_embedding.forward(text.numpy()))
+        x = self.nar_text_embedding.forward(text)
         # Add language embedding
-        prompt_language_id = torch.LongTensor(np.array([self.language_ID[prompt_language]])).to(x.device)
+        prompt_language_id = np.array([self.language_ID[prompt_language]])
         if isinstance(text_language, str):
-            text_language_id = torch.LongTensor(np.array([self.language_ID[text_language]])).to(x.device)
+            text_language_id = np.array([self.language_ID[text_language]])
         elif isinstance(text_language, List):
-            text_language_id = torch.LongTensor(np.array([self.language_ID[tl] for tl in text_language])).to(x.device)
-        x[:, :enroll_x_lens, :] += torch.tensor(self.nar_language_embedding.forward(prompt_language_id.numpy()))
-        x[:, enroll_x_lens:, :] += torch.tensor(self.nar_language_embedding.forward(text_language_id.numpy()))
-        x = torch.tensor(self.nar_text_position.forward(x.numpy()))
+            text_language_id = np.array([self.language_ID[tl] for tl in text_language])
+        x[:, :enroll_x_lens, :] += self.nar_language_embedding.forward(prompt_language_id)
+        x[:, enroll_x_lens:, :] += self.nar_language_embedding.forward(text_language_id)
+        x = self.nar_text_position.forward(x)
 
         for j in range(1, self.num_quantizers):
             if prefix_len > 0:
-                y_emb[:, :prefix_len] += torch.tensor(self.nar_audio_embedding_layers.forward(
-                    prompts[..., j].numpy(), j - 1
-                ))
+                y_emb[:, :prefix_len] += self.nar_audio_embedding_layers.forward(
+                    prompts[..., j], j - 1
+                )
 
         for i in range(0, self.num_quantizers - 1):
-            y_pos = torch.tensor(self.nar_audio_position.forward(y_emb.numpy()))
-            xy_pos = torch.concat([x, y_pos], dim=1)
+            y_pos = self.nar_audio_position.forward(y_emb)
+            xy_pos = np.concatenate([x, y_pos], axis=1)
 
-            #print("Impot nar_decoder from onnx "+str(i))
             if "nar_decoder.opt.onnx" in self.models:
                 nar_decoder = self.models["nar_decoder.opt.onnx"]
             else:
                 nar_decoder = self.models["nar_decoder.onnx"]
             offset_tensor = np.array(i, dtype=np.int64) # constant type (shape = ())
-            #print(xy_pos.shape, offset_tensor.shape)
             if benchmark:
                 start = int(round(time.time() * 1000))
-            xy_dec = nar_decoder.run([xy_pos.numpy(), offset_tensor])[0]
+            xy_dec = nar_decoder.run([xy_pos, offset_tensor])[0]
             if benchmark:
                 end = int(round(time.time() * 1000))
-            xy_dec = torch.from_numpy(xy_dec)
             if benchmark:
                 print(f'ailia processing time {end - start} ms')
 
-            #print("Impot nar_predict_layers from onnx")
             if i == 0:
                 nar_predict = self.models["nar_predict_layers.onnx"]
             if benchmark:
                 start = int(round(time.time() * 1000))
-            logits = nar_predict.run([xy_dec[:, text_len + prefix_len :].numpy(), offset_tensor])[0]
+            logits = nar_predict.run([xy_dec[:, text_len + prefix_len :], offset_tensor])[0]
             if benchmark:
                 end = int(round(time.time() * 1000))
-            logits = torch.from_numpy(logits)
             if benchmark:
                 print(f'ailia processing time {end - start} ms')
             
-            samples = torch.argmax(logits, dim=-1)
+            samples = np.argmax(logits, axis=-1)
             codes.append(samples)
 
             if i < self.num_quantizers - 2:
-                y_emb[:, prefix_len:] += torch.tensor(self.nar_audio_embedding_layers.forward(samples.numpy(), i))
+                y_emb[:, prefix_len:] += self.nar_audio_embedding_layers.forward(samples, i)
 
         assert len(codes) == self.num_quantizers
-        return torch.stack(codes, dim=-1)
+        return np.stack(codes, axis=-1)
 
 
 def topk_sampling(logits):
+    logits = torch.tensor(logits)
     token = torch.multinomial(F.softmax(logits, dim=-1), num_samples=1)
-    return token
+    return token.numpy()

@@ -138,7 +138,7 @@ def generate_voice(models):
         make_prompt(name=model_name, audio_prompt_path=args.audio, transcript=args.transcript, models=models) # Disable whisper
 
     output = generate_audio(text, prompt=model_name, language='auto', accent='no-accent', benchmark=args.benchmark, models=models, ort=args.onnx)
-    print(output.shape)
+    #print(output.shape)
 
     if args.benchmark:
         end = int(round(time.time() * 1000))

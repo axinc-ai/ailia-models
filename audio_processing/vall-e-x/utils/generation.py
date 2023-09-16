@@ -35,7 +35,7 @@ def vocos_istft(x, y): # for onnx
     hop_length = 320
     win_length = 1280
     window = torch.hann_window(win_length)
-    print("istft settings", n_fft, hop_length, win_length, window)
+    #print("istft settings", n_fft, hop_length, win_length, window)
     audio = torch.istft(S, n_fft, hop_length, win_length, window, center=True)
     return audio
 
@@ -67,20 +67,20 @@ def generate_audio(text, prompt=None, language='auto', accent='no-accent', bench
         lang_pr = code2lang[int(lang_pr)]
 
         # numpy to tensor
-        audio_prompts = torch.tensor(audio_prompts).type(torch.int32)
-        text_prompts = torch.tensor(text_prompts).type(torch.int32)
+        audio_prompts = audio_prompts
+        text_prompts = text_prompts
     else:
-        audio_prompts = torch.zeros([1, 0, NUM_QUANTIZERS]).type(torch.int32)
-        text_prompts = torch.zeros([1, 0]).type(torch.int32)
+        audio_prompts = np.zeros((1, 0, NUM_QUANTIZERS))
+        text_prompts = np.zeros((1, 0))
         lang_pr = lang if lang != 'mix' else 'en'
 
     enroll_x_lens = text_prompts.shape[-1]
     logging.info(f"synthesize text: {text}")
     phone_tokens, langs = text_tokenizer.tokenize(text=f"_{text}".strip())
-    text_tokens = torch.tensor([phone_tokens])
-    text_tokens_lens = torch.tensor([len(phone_tokens)])
+    text_tokens = np.array([phone_tokens])
+    text_tokens_lens = np.array([len(phone_tokens)])
 
-    text_tokens = torch.cat([text_prompts, text_tokens], dim=-1)
+    text_tokens = np.concatenate([text_prompts, text_tokens], axis=-1)
     text_tokens_lens += enroll_x_lens
     # accent control
     lang = lang if accent == "no-accent" else token2lang[langdropdown2token[accent]]
@@ -97,6 +97,7 @@ def generate_audio(text, prompt=None, language='auto', accent='no-accent', bench
     )
 
     # Decode with Vocos
+    encoded_frames = torch.tensor(encoded_frames)
     frames = encoded_frames.permute(2,0,1)
 
     #print("Impot vocos from onnx")
