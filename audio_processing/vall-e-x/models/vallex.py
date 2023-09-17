@@ -1,10 +1,6 @@
 ﻿from modules.embedding import TokenEmbedding, TokenEmbeddingLayers, SinePositionalEmbedding
 from typing import List
 
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-
 import numpy as np
 import ailia
 import time
@@ -256,8 +252,25 @@ class VALLE():
         assert len(codes) == self.num_quantizers
         return np.stack(codes, axis=-1)
 
+def softmax(x):
+    u = np.sum(np.exp(x))
+    u = np.exp(x)/u
+    return u
 
 def topk_sampling(logits):
-    logits = torch.tensor(logits)
-    token = torch.multinomial(F.softmax(logits, dim=-1), num_samples=1)
-    return token.numpy()
+    numpy_sampling = False
+    if not numpy_sampling:
+        import torch
+        import torch.nn.functional as F
+        logits = torch.tensor(logits)
+        token = torch.multinomial(F.softmax(logits, dim=-1), num_samples=1)
+        return token.numpy()
+    else:
+        output = np.zeros((logits.shape[0], 1))
+        for i in range(logits.shape[0]):
+            u = softmax(logits[i])
+            u = u.astype(np.float64)
+            u = u / np.sum(u) # sum to 1 for multinomial (https://github.com/numpy/numpy/issues/11847)
+            counts = np.random.multinomial(1, u, size=1)
+            output[i] = np.argmax(counts)
+        return output

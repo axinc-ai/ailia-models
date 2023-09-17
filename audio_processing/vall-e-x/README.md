@@ -39,7 +39,7 @@ python3 vall-e-x.py -i "音声合成のテストを行なっています。" --a
 [VALL-E-X](https://github.com/Plachtaa/VALL-E-X)
 
 ### Framework
-PyTorch
+PyTorch 2.2.0.dev20230910
 
 ### Model Format
 ONNX opset = 15

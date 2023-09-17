@@ -1,11 +1,12 @@
 # coding: utf-8
 import os
-import torch
 import logging
 import langid
 langid.set_languages(['en', 'zh', 'ja'])
 
 import ailia
+import ailia.audio
+
 import time
 
 import numpy as np
@@ -21,17 +22,28 @@ from models.vallex import VALLE
 
 
 def vocos_istft(x, y): # for onnx
-    S = (x + 1j * y)
     n_fft = 1280
     hop_length = 320
     win_length = 1280
-    window = torch.hann_window(win_length)
-    #print("istft settings", n_fft, hop_length, win_length, window)
-    audio = torch.istft(S, n_fft, hop_length, win_length, window, center=True)
+
+    ailia_audio = True
+
+    if not ailia_audio:
+        import torch
+        x = torch.from_numpy(x)
+        y = torch.from_numpy(y)
+        S = (x + 1j * y)
+        window = torch.hann_window(win_length)
+        audio = torch.istft(S, n_fft, hop_length, win_length, window, center=True)
+        audio = audio.squeeze().cpu().numpy()
+    else:
+        S = (x + 1j * y)
+        audio = ailia.audio.inverse_spectrogram(S, hop_n=hop_length, win_n=win_length, win_type="hann", norm_type="torch")
+        audio = np.real(audio).squeeze()
+
     return audio
 
 
-@torch.no_grad()
 def generate_audio(text, prompt=None, language='auto', accent='no-accent', benchmark = False, models = None, ort = False):
     global model, vocos, text_tokenizer, text_collater
     text = text.replace("\n", "").strip(" ")
@@ -88,20 +100,17 @@ def generate_audio(text, prompt=None, language='auto', accent='no-accent', bench
     )
 
     # Decode with Vocos
-    encoded_frames = torch.tensor(encoded_frames)
-    frames = encoded_frames.permute(2,0,1)
+    frames = encoded_frames.transpose((2,0,1))
 
     #print("Impot vocos from onnx")
-    vnet = ailia.Net(weight="onnx/vocos.onnx", env_id = 1, memory_mode = 11)
+    vnet = models["vocos.onnx"]
     if benchmark:
         start = int(round(time.time() * 1000))
-    x, y = vnet.run([frames.numpy()])
-    end = int(round(time.time() * 1000))
-    x = torch.from_numpy(x)
-    y = torch.from_numpy(y)
+    x, y = vnet.run([frames])
     if benchmark:
+        end = int(round(time.time() * 1000))
         print(f'ailia processing time {end - start} ms')
     samples = vocos_istft(x, y)
 
-    return samples.squeeze().cpu().numpy()
+    return samples
 
