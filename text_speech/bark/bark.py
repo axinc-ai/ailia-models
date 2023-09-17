@@ -18,6 +18,8 @@ from detector_utils import load_image  # noqa
 from math_utils import softmax  # noqa
 from webcamera_utils import get_capture, get_writer  # noqa
 
+from generation_utils import generate_coarse
+
 logger = getLogger(__name__)
 
 # ======================
@@ -30,6 +32,7 @@ REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/bark/'
 
 SAVE_WAV_PATH = 'output.wav'
 
+SEMANTIC_RATE_HZ = 49.9
 SEMANTIC_VOCAB_SIZE = 10_000
 
 TEXT_ENCODING_OFFSET = 10_048
@@ -141,8 +144,7 @@ def generate_text_semantic(
             )
 
         probs = softmax(relevant_logits / temp, axis=-1)
-        probs = probs / sum(probs)
-        item_next = np.random.multinomial(1, probs)
+        item_next = np.random.multinomial(1, probs / sum(probs))
         item_next = np.argsort(-item_next)[:1]
 
         if allow_early_stop and (
@@ -152,20 +154,22 @@ def generate_text_semantic(
             # eos found, so break
             pbar.update(n - pbar_state)
             break
-        x = torch.cat((x, item_next[None]), dim=1)
+
+        x = np.concatenate((x, item_next[None]), axis=1)
         tot_generated_duration_s += 1 / SEMANTIC_RATE_HZ
-        if max_gen_duration_s is not None and tot_generated_duration_s > max_gen_duration_s:
+        if max_gen_duration_s is not None \
+                and tot_generated_duration_s > max_gen_duration_s:
             pbar.update(n - pbar_state)
             break
         if n == n_tot_steps - 1:
             pbar.update(n - pbar_state)
             break
-        del logits, relevant_logits, probs, item_next
 
         if n > pbar_state:
             if n > pbar.total:
                 pbar.total = n
             pbar.update(n - pbar_state)
+
         pbar_state = n
 
     pbar.total = n
@@ -178,6 +182,7 @@ def generate_text_semantic(
 
 def semantic_to_waveform(
         semantic_tokens: np.ndarray,
+        history_prompt=None,
         temp: float = 0.7,
         silent: bool = False,
         output_full: bool = False):
@@ -185,6 +190,7 @@ def semantic_to_waveform(
 
     Args:
         semantic_tokens: semantic token output from `text_to_semantic`
+        history_prompt: history choice for audio cloning
         temp: generation temperature (1.0 more diverse, 0.0 more conservative)
         silent: disable progress bar
         output_full: return full generation to be used as a history prompt
@@ -192,7 +198,6 @@ def semantic_to_waveform(
     Returns:
         numpy audio array at sample frequency 24khz
     """
-    history_prompt = None
     coarse_tokens = generate_coarse(
         semantic_tokens,
         history_prompt=history_prompt,
