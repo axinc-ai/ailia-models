@@ -1,22 +1,13 @@
-soundfile
-numpy
-torch
-torchvision
-torchaudio
 tokenizers
 langid
-wget
 unidecode
 pyopenjtalk-prebuilt
-pypinyin
-inflect
-cn2an
-jieba
-eng_to_ipa
-openai-whisper
-phonemizer==3.2.0
-matplotlib
-gradio
-nltk
-sudachipy
-sudachidict_core
+#pypinyin # for chinese
+#inflect # for english
+#cn2an # for chinese
+#jieba # for chinese
+#eng_to_ipa # for english
+#phonemizer==3.2.0
+#nltk
+#sudachipy
+#sudachidict_core
