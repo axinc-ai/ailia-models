@@ -64,8 +64,8 @@ def generate_audio(text, prompt=None, language='auto', accent='no-accent', bench
         if not os.path.exists(prompt_path):
             raise ValueError(f"Cannot find prompt {prompt}")
         prompt_data = np.load(prompt_path)
-        audio_prompts = prompt_data['audio_tokens']
-        text_prompts = prompt_data['text_tokens']
+        audio_prompts = prompt_data['audio_tokens'].astype(np.int64)
+        text_prompts = prompt_data['text_tokens'].astype(np.int64)
         lang_pr = prompt_data['lang_code']
         lang_pr = code2lang[int(lang_pr)]
 
@@ -73,22 +73,24 @@ def generate_audio(text, prompt=None, language='auto', accent='no-accent', bench
         audio_prompts = audio_prompts
         text_prompts = text_prompts
     else:
-        audio_prompts = np.zeros((1, 0, NUM_QUANTIZERS))
-        text_prompts = np.zeros((1, 0))
+        audio_prompts = np.zeros((1, 0, NUM_QUANTIZERS), dtype=np.int64)
+        text_prompts = np.zeros((1, 0), dtype=np.int64)
         lang_pr = lang if lang != 'mix' else 'en'
 
     enroll_x_lens = text_prompts.shape[-1]
     logger.info(f"synthesize text: {text}")
     phone_tokens, langs, phonemes = text_tokenizer.tokenize(text=f"_{text}".strip())
     logger.info(f"synthesize phonemes: {phonemes}")
-    text_tokens = np.array([phone_tokens])
-    text_tokens_lens = np.array([len(phone_tokens)])
+    text_tokens = np.array([phone_tokens], dtype=np.int64)
+    text_tokens_lens = np.array([len(phone_tokens)], dtype=np.int64)
 
     text_tokens = np.concatenate([text_prompts, text_tokens], axis=-1)
     text_tokens_lens += enroll_x_lens
+    text_tokens = text_tokens.astype(np.int64)
+
     # accent control
     lang = lang if accent == "no-accent" else token2lang[langdropdown2token[accent]]
-    model = VALLE(models)
+    model = VALLE(models, ort=ort)
     encoded_frames = model.inference(
         text_tokens,
         text_tokens_lens,
@@ -109,7 +111,10 @@ def generate_audio(text, prompt=None, language='auto', accent='no-accent', bench
     vnet = models["vocos.onnx"]
     if benchmark:
         start = int(round(time.time() * 1000))
-    x, y = vnet.run([frames])
+    if ort:
+        x, y = vnet.run(None, {"frames":frames})
+    else:
+        x, y = vnet.run([frames])
     if benchmark:
         end = int(round(time.time() * 1000))
         print(f'ailia processing time {end - start} ms')

@@ -17,12 +17,16 @@ import numpy as np
 
 class TokenEmbedding():
     def __init__(
-        self
+        self,
+        ort = False
     ):
-        super().__init__()
+        self.ort = ort
 
     def forward(self, x):
-        y = self.net.run([x])[0]
+        if self.ort:
+            y = self.net.run(None, {"x":x})[0]
+        else:
+            y = self.net.run([x])[0]
         return y
 
     def load_onnx(self, net):
@@ -30,13 +34,17 @@ class TokenEmbedding():
 
 class TokenEmbeddingLayers():
     def __init__(
-        self
+        self,
+        ort = False
     ):
-        super().__init__()
+        self.ort = ort
 
     def forward(self, x, layer_id):
         layer_id = np.array(layer_id, dtype=np.int64) # constant type (shape = ())
-        y = self.net.run([x, layer_id])[0]
+        if self.ort:
+            y = self.net.run(None, {"x":x, "onnx::Gather_1":layer_id})[0]
+        else:
+            y = self.net.run([x, layer_id])[0]
         return y
     
     def load_onnx(self, net):
@@ -45,13 +53,17 @@ class TokenEmbeddingLayers():
 class SinePositionalEmbedding():
     def __init__(
         self,
-        alpha_parameter: float =1.0
+        ort = False,
+        alpha_parameter: float = 1.0
     ):
-        super().__init__()
-        self.alpha = np.array([alpha_parameter])
+        self.ort = ort
+        self.alpha = np.array([alpha_parameter], dtype=np.float32)
 
     def forward(self, x):
-        y = self.net.run([x, self.alpha])[0]
+        if self.ort:
+            y = self.net.run(None, {"x":x, "alpha":self.alpha})[0]
+        else:
+            y = self.net.run([x, self.alpha])[0]
         return y
     
     def load_onnx(self, net):
