@@ -62,6 +62,10 @@ parser.add_argument(
     '--profile', action='store_true',
     help='use profile model'
 )
+parser.add_argument(
+    '--top_k', '-top_k', default=100,
+    help='top_k filtering for output token sampling. official value is -100 (top_k is disabled). ailia modified this value for stability.'
+)
 args = update_parser(parser, check_input_type=False)
 
 # ======================
@@ -136,7 +140,7 @@ def generate_voice(models):
         from utils.prompt_making import make_prompt
         make_prompt(name=model_name, audio_prompt_path=args.audio, transcript=args.transcript, models=models) # Disable whisper
 
-    output = generate_audio(text, prompt=model_name, language='auto', accent='no-accent', benchmark=args.benchmark, models=models, ort=args.onnx)
+    output = generate_audio(text, prompt=model_name, language='auto', accent='no-accent', benchmark=args.benchmark, models=models, ort=args.onnx, logger = logger, top_k = args.top_k)
     #print(output.shape)
 
     if args.benchmark:

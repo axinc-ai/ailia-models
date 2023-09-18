@@ -44,7 +44,7 @@ def vocos_istft(x, y): # for onnx
     return audio
 
 
-def generate_audio(text, prompt=None, language='auto', accent='no-accent', benchmark = False, models = None, ort = False):
+def generate_audio(text, prompt=None, language='auto', accent='no-accent', benchmark = False, models = None, ort = False, logger = None, top_k = -100):
     global model, vocos, text_tokenizer, text_collater
     text = text.replace("\n", "").strip(" ")
     # detect language
@@ -78,7 +78,7 @@ def generate_audio(text, prompt=None, language='auto', accent='no-accent', bench
         lang_pr = lang if lang != 'mix' else 'en'
 
     enroll_x_lens = text_prompts.shape[-1]
-    logging.info(f"synthesize text: {text}")
+    logger.info(f"synthesize text: {text}")
     phone_tokens, langs = text_tokenizer.tokenize(text=f"_{text}".strip())
     text_tokens = np.array([phone_tokens])
     text_tokens_lens = np.array([len(phone_tokens)])
@@ -95,8 +95,10 @@ def generate_audio(text, prompt=None, language='auto', accent='no-accent', bench
         enroll_x_lens=enroll_x_lens,
         prompt_language=lang_pr,
         text_language=langs if accent == "no-accent" else lang,
+        top_k=top_k,
         benchmark=benchmark,
-        ort=ort
+        ort=ort,
+        logger=logger
     )
 
     # Decode with Vocos

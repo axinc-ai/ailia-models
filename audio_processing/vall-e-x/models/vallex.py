@@ -84,10 +84,12 @@ class VALLE():
         x_lens, # len text_tokens
         y, # audio_prompts
         enroll_x_lens, # len text_prompt
+        top_k = -100, # top k filtering
         prompt_language: str = None,
         text_language: str = None,
         benchmark = False,
-        ort = False
+        ort = False,
+        logger = None
     ):
         """
         Args:
@@ -169,12 +171,13 @@ class VALLE():
                     net.run({"xy_pos":xy_pos, "mask":xy_attn_mask, "offset":offset_tensor}, output = output)
             end = int(round(time.time() * 1000))
             if benchmark:
-                print(f'ailia processing time {end - start} ms offset {offset}')
+                logger.info(f'ailia processing time {end - start} ms')
 
             offset = offset + xy_pos.shape[-2]
 
             samples = topk_sampling(
-                logits
+                logits,
+                top_k
             )
 
             if (
@@ -187,7 +190,7 @@ class VALLE():
                         "well trained model shouldn't reach here."
                     )
 
-                print(f"VALL-E EOS [{prompts.shape[1]} -> {y.shape[1]}]")
+                logger.info(f"VALL-E EOS [{prompts.shape[1]} -> {y.shape[1]}]")
                 break
 
             y = np.concatenate([y, samples], axis=1)
@@ -231,7 +234,7 @@ class VALLE():
             if benchmark:
                 end = int(round(time.time() * 1000))
             if benchmark:
-                print(f'ailia processing time {end - start} ms')
+                logger.info(f'ailia processing time {end - start} ms')
 
             if i == 0:
                 nar_predict = self.models["nar_predict_layers.onnx"]
@@ -241,7 +244,7 @@ class VALLE():
             if benchmark:
                 end = int(round(time.time() * 1000))
             if benchmark:
-                print(f'ailia processing time {end - start} ms')
+                logger.info(f'ailia processing time {end - start} ms')
             
             samples = np.argmax(logits, axis=-1)
             codes.append(samples)
@@ -257,7 +260,30 @@ def softmax(x):
     u = np.exp(x)/u
     return u
 
-def topk_sampling(logits):
+def top_k_filtering(
+    logits, top_k=0, filter_value=-float("Inf"), min_tokens_to_keep=1
+):
+    if top_k > 0:
+        top_k = min(
+            max(top_k, min_tokens_to_keep), logits.shape[-1]
+        )
+
+        #import torch
+        #indices_to_remove_torch= torch.tensor(logits) < torch.topk(torch.tensor(logits), top_k)[0][..., -1, None]
+        #logits[indices_to_remove_torch] = filter_value
+
+        indices = np.argsort(logits, axis=-1)[:, 0:-top_k]
+        for i in range(indices.shape[0]):
+            for j in range(indices.shape[1]):
+                #if (logits[i, indices[i,j]] != filter_value): # verify with reference
+                #    print("mismatch", logits[i, indices[i,j]] ,filter_value)
+                logits[i, indices[i,j]] = filter_value
+
+    return logits
+
+def topk_sampling(logits, top_k = -100):
+    logits = top_k_filtering(logits, top_k)
+
     numpy_sampling = False
     if not numpy_sampling:
         import torch
