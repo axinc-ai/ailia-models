@@ -22,6 +22,7 @@ cd ../../audio_processing/tacotron2/; python3 tacotron2.py ${OPTION}
 cd ../../audio_processing/silero-vad/; python3 silero-vad.py ${OPTION}
 cd ../../audio_processing/rvc/; python3 rvc.py ${OPTION}
 cd ../../audio_processing/crepe/; python3 crepe.py ${OPTION}
+cd ../../audio_processing/vall-e-x/; python3 vall-e-x.py ${OPTION}
 cd ../../background_ramoval/deep-image-matting; python3 deep-image-matting.py ${OPTION}
 cd ../../background_ramoval/u2net; python3 u2net.py ${OPTION}
 cd ../../background_ramoval/u2net; python3 u2net.py -a small ${OPTION}
@@ -103,6 +104,7 @@ cd ../../generative_adversarial_networks/psgan; python3 psgan.py ${OPTION}
 cd ../../generative_adversarial_networks/gfpgan; python3 gfpgan.py ${OPTION}
 cd ../../generative_adversarial_networks/sber-swap; python3 sber-swap.py ${OPTION}
 cd ../../generative_adversarial_networks/encoder4editing; python3 encoder4editing.py ${OPTION}
+cd ../../generative_adversarial_networks/lipgan; python3 lipgan.py ${OPTION}
 cd ../../hand_detection/yolov3-hand; python3 yolov3-hand.py ${OPTION}
 cd ../../hand_detection/hand_detection_pytorch python3 hand_detection_pytorch.py ${OPTION}
 cd ../../hand_detection/blazepalm; python3 blazepalm.py ${OPTION}
