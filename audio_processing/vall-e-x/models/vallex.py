@@ -284,7 +284,7 @@ def top_k_filtering(
 def topk_sampling(logits, top_k = -100):
     logits = top_k_filtering(logits, top_k)
 
-    numpy_sampling = False
+    numpy_sampling = True
     if not numpy_sampling:
         import torch
         import torch.nn.functional as F
