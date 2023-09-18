@@ -10,35 +10,40 @@ from macros import *
 class VALLE():
     def __init__(
         self,
-        models
+        models,
+        ort = None
     ):
         self.language_ID = {
             'en': 0,
             'zh': 1,
             'ja': 2,
         }
-        self.ar_audio_embedding = TokenEmbedding()
-        self.ar_text_embedding = TokenEmbedding()
-        self.nar_text_embedding = TokenEmbedding()
-        self.ar_language_embedding = TokenEmbedding()
-        self.nar_language_embedding = TokenEmbedding()
-        self.nar_audio_embedding_layers = TokenEmbeddingLayers()
+        self.ar_audio_embedding = TokenEmbedding(ort=ort)
+        self.ar_text_embedding = TokenEmbedding(ort=ort)
+        self.nar_text_embedding = TokenEmbedding(ort=ort)
+        self.ar_language_embedding = TokenEmbedding(ort=ort)
+        self.nar_language_embedding = TokenEmbedding(ort=ort)
+        self.nar_audio_embedding_layers = TokenEmbeddingLayers(ort=ort)
         self.ar_text_position = SinePositionalEmbedding(
-            alpha_parameter=2.0744
+            alpha_parameter=2.0744,
+            ort=ort
         )
         self.ar_audio_position = SinePositionalEmbedding(
-            alpha_parameter=2.3490
+            alpha_parameter=2.3490,
+            ort=ort
         )
         self.nar_text_position = SinePositionalEmbedding(
-            alpha_parameter=1.0
+            alpha_parameter=1.0,
+            ort=ort
         )
         self.nar_audio_position = SinePositionalEmbedding(
-            alpha_parameter=1.0
+            alpha_parameter=1.0,
+            ort=ort
         )
         self.ar_audio_prepend_bos = True
         self.num_quantizers = NUM_QUANTIZERS
         if self.num_quantizers > 1:
-            self.nar_audio_embedding = TokenEmbedding()
+            self.nar_audio_embedding = TokenEmbedding(ort=ort)
 
         self.ar_audio_embedding.load_onnx(models["ar_audio_embedding.onnx"])
         self.ar_text_embedding.load_onnx(models["ar_text_embedding.onnx"])
@@ -112,11 +117,11 @@ class VALLE():
         text = x
         x = self.ar_text_embedding.forward(text)
         # Add language embedding
-        prompt_language_id = np.array([self.language_ID[prompt_language]])
+        prompt_language_id = np.array([[self.language_ID[prompt_language]]], dtype=np.int64)
         if isinstance(text_language, str):
-            text_language_id = np.array([self.language_ID[text_language]])
+            text_language_id = np.array([[self.language_ID[text_language]]], dtype=np.int64)
         elif isinstance(text_language, List):
-            text_language_id = np.array([self.language_ID[tl] for tl in text_language])
+            text_language_id = np.array([[self.language_ID[tl] for tl in text_language]], dtype=np.int64)
         x[:, :enroll_x_lens, :] += self.ar_language_embedding.forward(prompt_language_id)
         x[:, enroll_x_lens:, :] += self.ar_language_embedding.forward(text_language_id)
         x = self.ar_text_position.forward(x)
@@ -129,7 +134,7 @@ class VALLE():
         y = prompts[..., 0]
         if self.ar_audio_prepend_bos:
             # Append BOS symbol to front of y
-            bos = np.zeros((1, 1))
+            bos = np.zeros((1, 1), dtype=np.int64)
             bos[0, 0] = NUM_AUDIO_TOKENS + 1
             y = np.concatenate([bos, y], axis = -1)
 
@@ -204,11 +209,11 @@ class VALLE():
 
         x = self.nar_text_embedding.forward(text)
         # Add language embedding
-        prompt_language_id = np.array([self.language_ID[prompt_language]])
+        prompt_language_id = np.array([[self.language_ID[prompt_language]]], dtype=np.int64)
         if isinstance(text_language, str):
-            text_language_id = np.array([self.language_ID[text_language]])
+            text_language_id = np.array([[self.language_ID[text_language]]], dtype=np.int64)
         elif isinstance(text_language, List):
-            text_language_id = np.array([self.language_ID[tl] for tl in text_language])
+            text_language_id = np.array([[self.language_ID[tl] for tl in text_language]], dtype=np.int64)
         x[:, :enroll_x_lens, :] += self.nar_language_embedding.forward(prompt_language_id)
         x[:, enroll_x_lens:, :] += self.nar_language_embedding.forward(text_language_id)
         x = self.nar_text_position.forward(x)
@@ -230,7 +235,10 @@ class VALLE():
             offset_tensor = np.array(i, dtype=np.int64) # constant type (shape = ())
             if benchmark:
                 start = int(round(time.time() * 1000))
-            xy_dec = nar_decoder.run([xy_pos, offset_tensor])[0]
+            if ort:
+                xy_dec = nar_decoder.run(None, {"xy_pos":xy_pos, "i":offset_tensor})[0]
+            else:
+                xy_dec = nar_decoder.run([xy_pos, offset_tensor])[0]
             if benchmark:
                 end = int(round(time.time() * 1000))
             if benchmark:
@@ -240,7 +248,10 @@ class VALLE():
                 nar_predict = self.models["nar_predict_layers.onnx"]
             if benchmark:
                 start = int(round(time.time() * 1000))
-            logits = nar_predict.run([xy_dec[:, text_len + prefix_len :], offset_tensor])[0]
+            if ort:
+                logits = nar_predict.run(None, {"xy_pos":xy_dec[:, text_len + prefix_len :], "i":offset_tensor})[0]
+            else:
+                logits = nar_predict.run([xy_dec[:, text_len + prefix_len :], offset_tensor])[0]
             if benchmark:
                 end = int(round(time.time() * 1000))
             if benchmark:
@@ -284,7 +295,7 @@ def top_k_filtering(
 def topk_sampling(logits, top_k = -100):
     logits = top_k_filtering(logits, top_k)
 
-    numpy_sampling = False
+    numpy_sampling = True
     if not numpy_sampling:
         import torch
         import torch.nn.functional as F
@@ -292,7 +303,7 @@ def topk_sampling(logits, top_k = -100):
         token = torch.multinomial(F.softmax(logits, dim=-1), num_samples=1)
         return token.numpy()
     else:
-        output = np.zeros((logits.shape[0], 1))
+        output = np.zeros((logits.shape[0], 1), np.int64)
         for i in range(logits.shape[0]):
             u = softmax(logits[i])
             u = u.astype(np.float64)

@@ -14,8 +14,8 @@ from macros import *
 
 text_tokenizer = PhonemeBpeTokenizer(tokenizer_path="./utils/g2p/bpe_69.json")
 
-def make_prompt(name, audio_prompt_path, transcript=None, models=None):
-    codec = AudioTokenizer(models["encodec.onnx"])
+def make_prompt(name, audio_prompt_path, transcript=None, models=None, ort=False):
+    codec = AudioTokenizer(models["encodec.onnx"], ort=ort)
     text_pr, lang_pr = make_transcript(transcript)
 
     # tokenize audio

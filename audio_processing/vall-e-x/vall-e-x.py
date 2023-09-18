@@ -138,7 +138,7 @@ def generate_voice(models):
 
         os.makedirs("customs", exist_ok=True)
         from utils.prompt_making import make_prompt
-        make_prompt(name=model_name, audio_prompt_path=args.audio, transcript=args.transcript, models=models) # Disable whisper
+        make_prompt(name=model_name, audio_prompt_path=args.audio, transcript=args.transcript, models=models, ort=args.onnx)
 
     output = generate_audio(text, prompt=model_name, language='auto', accent='no-accent', benchmark=args.benchmark, models=models, ort=args.onnx, logger = logger, top_k = args.top_k)
     #print(output.shape)
@@ -146,7 +146,7 @@ def generate_voice(models):
     if args.benchmark:
         end = int(round(time.time() * 1000))
         estimation_time = (end - start)
-        logger.info(f'\ntotal processing time {estimation_time} ms')
+        logger.info(f'total processing time {estimation_time} ms')
 
     # export to audio
     savepath = args.savepath
@@ -165,18 +165,17 @@ def main():
 
     models = {}
 
-    memory_mode = ailia.get_memory_mode(reduce_constant=True, ignore_input_with_initializer=True, reduce_interstage=False, reuse_interstage=True)
-    for model in ALL_MODELS:
-        net = ailia.Net(stream = "./onnx/"+model + ".prototxt", weight = "./onnx/"+model, memory_mode = memory_mode, env_id = args.env_id)
-        if args.profile:
-            net.set_profile_mode(True)
-        models[model] = net
-
     if args.onnx:
         for model in ALL_MODELS:
-            if model == "ar_decoder.onnx" or model == "ar_decoder.opt.onnx":
-                net = onnxruntime.InferenceSession( "./onnx/"+model, providers=['CUDAExecutionProvider', 'CPUExecutionProvider'])
-                models[model] = net
+            net = onnxruntime.InferenceSession( "./onnx/"+model, providers=['CUDAExecutionProvider', 'CPUExecutionProvider'])
+            models[model] = net
+    else:
+        memory_mode = ailia.get_memory_mode(reduce_constant=True, ignore_input_with_initializer=True, reduce_interstage=False, reuse_interstage=True)
+        for model in ALL_MODELS:
+            net = ailia.Net(stream = "./onnx/"+model + ".prototxt", weight = "./onnx/"+model, memory_mode = memory_mode, env_id = args.env_id)
+            if args.profile:
+                net.set_profile_mode(True)
+            models[model] = net
 
     generate_voice(models)
 
