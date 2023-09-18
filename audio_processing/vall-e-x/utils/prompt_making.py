@@ -23,8 +23,8 @@ def make_prompt(name, audio_prompt_path, transcript=None, models=None):
     audio_tokens = np.transpose(encoded_frames[0][0], axes = (0, 2, 1))
 
     # tokenize text
-    phonemes, langs = text_tokenizer.tokenize(text=f"{text_pr}".strip())
-    text_tokens = [phonemes]
+    phone, langs, phonemes = text_tokenizer.tokenize(text=f"{text_pr}".strip())
+    text_tokens = [phone]
 
     message = f"Detected language: {lang_pr}\n Detected text {text_pr}\n"
 

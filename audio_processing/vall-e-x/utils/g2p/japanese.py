@@ -108,11 +108,11 @@ def get_real_hatsuon(text):
 
 
 def japanese_to_ipa2(text):
-    print("G2P Input", text)
+    #print("G2P Input", text)
     text = japanese_to_romaji_with_accent(text).replace('...', '…')
     text = get_real_sokuon(text)
     text = get_real_hatsuon(text)
     for regex, replacement in _romaji_to_ipa2:
         text = re.sub(regex, replacement, text)
-    print("G2P Output", text)
+    #print("G2P Output", text)
     return text

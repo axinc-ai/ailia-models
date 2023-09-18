@@ -16,7 +16,7 @@ class PhonemeBpeTokenizer:
     assert(len(phoneme_tokens) == len(langs))
     if not len(phoneme_tokens):
       raise ValueError("Empty text is given")
-    return phoneme_tokens, langs
+    return phoneme_tokens, langs, phonemes
 
 def _clean_text(text, cleaner_names):
   for name in cleaner_names:

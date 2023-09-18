@@ -79,7 +79,8 @@ def generate_audio(text, prompt=None, language='auto', accent='no-accent', bench
 
     enroll_x_lens = text_prompts.shape[-1]
     logger.info(f"synthesize text: {text}")
-    phone_tokens, langs = text_tokenizer.tokenize(text=f"_{text}".strip())
+    phone_tokens, langs, phonemes = text_tokenizer.tokenize(text=f"_{text}".strip())
+    logger.info(f"synthesize phonemes: {phonemes}")
     text_tokens = np.array([phone_tokens])
     text_tokens_lens = np.array([len(phone_tokens)])
 
