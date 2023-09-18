@@ -117,7 +117,7 @@ def generate_audio(text, prompt=None, language='auto', accent='no-accent', bench
         x, y = vnet.run([frames])
     if benchmark:
         end = int(round(time.time() * 1000))
-        print(f'ailia processing time {end - start} ms')
+        logger.info(f'ailia processing time {end - start} ms')
     samples = vocos_istft(x, y)
 
     return samples
