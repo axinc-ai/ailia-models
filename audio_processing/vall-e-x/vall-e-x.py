@@ -138,7 +138,7 @@ def generate_voice(models):
 
         os.makedirs("customs", exist_ok=True)
         from utils.prompt_making import make_prompt
-        make_prompt(name=model_name, audio_prompt_path=args.audio, transcript=args.transcript, models=models) # Disable whisper
+        make_prompt(name=model_name, audio_prompt_path=args.audio, transcript=args.transcript, models=models, ort=args.onnx)
 
     output = generate_audio(text, prompt=model_name, language='auto', accent='no-accent', benchmark=args.benchmark, models=models, ort=args.onnx, logger = logger, top_k = args.top_k)
     #print(output.shape)

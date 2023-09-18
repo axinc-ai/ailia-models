@@ -24,15 +24,20 @@ class AudioTokenizer:
 
     def __init__(
         self,
-        net
+        net,
+        ort = False
     ) -> None:
         self.sample_rate = 24000
         self.channels = 1
         self.net = net
+        self.ort = ort
         
 
     def encode(self, wav):
-        encoded_frames = self.net.run([wav])[0]
+        if self.ort:
+            encoded_frames = self.net.run(None, {"wav":wav})[0]
+        else:
+            encoded_frames = self.net.run([wav])[0]
         encoded_frames = [[encoded_frames]]
         return encoded_frames
 
