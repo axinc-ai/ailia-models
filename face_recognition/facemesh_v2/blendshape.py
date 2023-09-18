@@ -112,7 +112,7 @@ def plot_face_blendshapes_bar_graph(face_blendshapes):
     return img
 
 
-def face_blendshapes(net, landmarks, image_size):
+def face_blendshapes(net, landmarks, image_size, onnx):
     landmarks = landmarks[LandmarksSubsetIdxs]
 
     h, w = image_size

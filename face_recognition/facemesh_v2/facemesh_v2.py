@@ -336,9 +336,9 @@ def recognize_from_image(models):
         logger.info(f'saved at : {savepath}')
         cv2.imwrite(savepath, res_img)
 
-        if args.blendshape:
+        if args.blendshape and len(detection_result) > 0:
             bls_net = models['blendshape']
-            score = face_blendshapes(bls_net, detection_result[0], img.shape[:2])
+            score = face_blendshapes(bls_net, detection_result[0], img.shape[:2], args.onnx)
             img = plot_face_blendshapes_bar_graph(score)
 
             cv2.imwrite("bar_graph.png", img)
@@ -372,6 +372,13 @@ def recognize_from_video(models):
             visual_img = draw_result(visual_img, detection)
 
         cv2.imshow('frame', visual_img)
+
+        if args.blendshape and len(detection_result) > 0:
+            bls_net = models['blendshape']
+            score = face_blendshapes(bls_net, detection_result[0], frame.shape[:2], args.onnx)
+            img = plot_face_blendshapes_bar_graph(score)
+            cv2.imshow("bar_graph", img)
+
         frame_shown = True
 
         # save results
