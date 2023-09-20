@@ -1,9 +1,7 @@
 import sys
 import time
-import re
 from logging import getLogger
 
-import tqdm
 import numpy as np
 from transformers import BertTokenizer
 
@@ -18,7 +16,12 @@ from detector_utils import load_image  # noqa
 from math_utils import softmax  # noqa
 from webcamera_utils import get_capture, get_writer  # noqa
 
-from generation_utils import generate_coarse
+import generation_utils
+from generation_utils import (
+    generate_text_semantic,
+    generate_coarse, generate_fine,
+    codec_decode
+)
 
 logger = getLogger(__name__)
 
@@ -26,19 +29,18 @@ logger = getLogger(__name__)
 # Parameters
 # ======================
 
-WEIGHT_PATH = 'xxx.onnx'
-MODEL_PATH = 'xxx.onnx.prototxt'
+WEIGHT_TEXT_PATH = 'text.onnx'
+MODEL_TEXT_PATH = 'text.onnx.prototxt'
+WEIGHT_COARSE_PATH = 'coarse.onnx'
+MODEL_COARSE_PATH = 'coarse.onnx.prototxt'
+WEIGHT_FINE_PATH = 'fine.onnx'
+MODEL_FINE_PATH = 'fine.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/bark/'
 
 SAVE_WAV_PATH = 'output.wav'
 
 SEMANTIC_RATE_HZ = 49.9
 SEMANTIC_VOCAB_SIZE = 10_000
-
-TEXT_ENCODING_OFFSET = 10_048
-SEMANTIC_PAD_TOKEN = 10_000
-TEXT_PAD_TOKEN = 129_595
-SEMANTIC_INFER_TOKEN = 129_599
 
 # ======================
 # Arguemnt Parser Config
@@ -67,120 +69,13 @@ args = update_parser(parser, check_input_type=False)
 # Secondaty Functions
 # ======================
 
-def normalize_whitespace(text):
-    return re.sub(r"\s+", " ", text).strip()
-
 
 # ======================
 # Main functions
 # ======================
 
-def generate_text_semantic(
-        models,
-        text,
-        temp=0.7,
-        silent=False,
-        min_eos_p=0.2,
-        max_gen_duration_s=None,
-        allow_early_stop=True):
-    """Generate semantic tokens from text."""
-    text = normalize_whitespace(text)
-    assert len(text.strip()) > 0
-
-    tokenizer = models["tokenizer"]
-    encoded_text = np.array(tokenizer.encode(text, add_special_tokens=False))
-    encoded_text = encoded_text + TEXT_ENCODING_OFFSET
-
-    if len(encoded_text) > 256:
-        p = round((len(encoded_text) - 256) / len(encoded_text) * 100, 1)
-        logger.warning(f"warning, text too long, lopping of last {p}%")
-        encoded_text = encoded_text[:256]
-
-    encoded_text = np.pad(
-        encoded_text,
-        (0, 256 - len(encoded_text)),
-        constant_values=TEXT_PAD_TOKEN,
-        mode="constant",
-    )
-
-    semantic_history = np.array([SEMANTIC_PAD_TOKEN] * 256)
-    x = np.hstack([
-        encoded_text, semantic_history, np.array([SEMANTIC_INFER_TOKEN])
-    ]).astype(np.int64)
-    x = np.expand_dims(x, axis=0)
-    assert x.shape[1] == 256 + 256 + 1
-
-    net = models["net"]
-    offset = 0
-    kv_cache = np.zeros((48, 16, 1024, 64), dtype=np.float32)
-
-    pbar_state = 0
-    tot_generated_duration_s = 0
-    n_tot_steps = 768
-    pbar = tqdm.tqdm(disable=silent, total=n_tot_steps)
-    for n in range(n_tot_steps):
-        if n == 0:
-            x_input = x
-        else:
-            x_input = x[:, [-1]]
-            offset = offset + 1
-
-        # feedforward
-        if not args.onnx:
-            output = net.predict([
-                x_input, kv_cache, np.array(offset, dtype=np.int64)
-            ])
-        else:
-            output = net.run(None, {
-                'x_input': x_input, 'past_kv': kv_cache,
-                'offset': np.array(offset, dtype=np.int64)
-            })
-        logits, kv_cache = output
-
-        relevant_logits = logits[0, 0, :SEMANTIC_VOCAB_SIZE]
-        if allow_early_stop:
-            relevant_logits = np.hstack(
-                (relevant_logits, logits[0, 0, [SEMANTIC_PAD_TOKEN]])  # eos
-            )
-
-        probs = softmax(relevant_logits / temp, axis=-1)
-        item_next = np.random.multinomial(1, probs / sum(probs))
-        item_next = np.argsort(-item_next)[:1]
-
-        if allow_early_stop and (
-                item_next == SEMANTIC_VOCAB_SIZE
-                or (min_eos_p is not None and probs[-1] >= min_eos_p)
-        ):
-            # eos found, so break
-            pbar.update(n - pbar_state)
-            break
-
-        x = np.concatenate((x, item_next[None]), axis=1)
-        tot_generated_duration_s += 1 / SEMANTIC_RATE_HZ
-        if max_gen_duration_s is not None \
-                and tot_generated_duration_s > max_gen_duration_s:
-            pbar.update(n - pbar_state)
-            break
-        if n == n_tot_steps - 1:
-            pbar.update(n - pbar_state)
-            break
-
-        if n > pbar_state:
-            if n > pbar.total:
-                pbar.total = n
-            pbar.update(n - pbar_state)
-
-        pbar_state = n
-
-    pbar.total = n
-    pbar.refresh()
-    pbar.close()
-    out = x.squeeze()[256 + 256 + 1:]
-
-    return out
-
-
 def semantic_to_waveform(
+        models,
         semantic_tokens: np.ndarray,
         history_prompt=None,
         temp: float = 0.7,
@@ -199,14 +94,14 @@ def semantic_to_waveform(
         numpy audio array at sample frequency 24khz
     """
     coarse_tokens = generate_coarse(
+        models,
         semantic_tokens,
         history_prompt=history_prompt,
         temp=temp,
-        silent=silent,
-        use_kv_caching=True
     )
     print("generate_fine---")
     fine_tokens = generate_fine(
+        models,
         coarse_tokens,
         history_prompt=history_prompt,
         temp=0.5,
@@ -250,6 +145,7 @@ def generate_audio(
         silent=silent,
     )
     out = semantic_to_waveform(
+        models,
         x_semantic,
         temp=waveform_temp,
         silent=silent,
@@ -281,18 +177,23 @@ def main():
 
     # initialize
     if not args.onnx:
-        net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+        net = ailia.Net(MODEL_TEXT_PATH, WEIGHT_TEXT_PATH, env_id=env_id)
+        coarse = ailia.Net(MODEL_COARSE_PATH, WEIGHT_COARSE_PATH, env_id=env_id)
     else:
         import onnxruntime
         cuda = 0 < ailia.get_gpu_environment_id()
         providers = ['CUDAExecutionProvider', 'CPUExecutionProvider'] if cuda else ['CPUExecutionProvider']
-        net = onnxruntime.InferenceSession(WEIGHT_PATH, providers=providers)
+        net = onnxruntime.InferenceSession(WEIGHT_TEXT_PATH, providers=providers)
+        coarse = onnxruntime.InferenceSession(WEIGHT_COARSE_PATH, providers=providers)
+
+        generation_utils.onnx = True
 
     tokenizer = BertTokenizer.from_pretrained("bert-base-multilingual-cased")
 
     models = {
         "net": net,
         "tokenizer": tokenizer,
+        "coarse": coarse,
     }
 
     # generate
