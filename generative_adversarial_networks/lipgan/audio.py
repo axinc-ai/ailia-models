@@ -30,11 +30,12 @@ def melspectrogram(wav, ailia_audio):
     wav = preemphasis(wav)
     if ailia_audio:
         import ailia.audio
-        D = ailia.audio.mel_spectrogram(wav, sample_rate = sample_rate, fft_n = n_fft, hop_n = hop_size, win_type ="hann", center_mode = 1, power = 1.0, mel_n = num_mels)
+        D = ailia.audio.mel_spectrogram(wav, sample_rate = sample_rate, fft_n = n_fft, hop_n = hop_size, win_type ="hann", center_mode = 1, power = 1.0,
+                                        fft_norm_type = 0, f_min=fmin, f_max=fmax, mel_n = num_mels, mel_norm=1, htk=False)
     else:
-        D = librosa.stft(y=wav, n_fft=n_fft, hop_length=hop_size, win_length=win_size)
+        D = librosa.stft(y=wav, n_fft=n_fft, hop_length=hop_size, win_length=win_size) # default args : window="hann", center=True, pad_mode="reflect"
         D = np.abs(D)
-        _mel_basis = librosa.filters.mel(sample_rate, n_fft, n_mels=num_mels, fmin=fmin, fmax=fmax)
+        _mel_basis = librosa.filters.mel(sample_rate, n_fft, n_mels=num_mels, fmin=fmin, fmax=fmax) # default atgs : htk=False, norm="slaney"
         D = np.dot(_mel_basis, D)
     S = _amp_to_db(D) - ref_level_db
     return _normalize(S)
