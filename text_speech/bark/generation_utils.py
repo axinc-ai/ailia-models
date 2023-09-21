@@ -317,8 +317,7 @@ def generate_fine(
         models,
         x_coarse_gen,
         history_prompt=None,
-        temp=0.5,
-        silent=True):
+        temp=0.5):
     """Generate full audio codes from coarse audio codes."""
     if history_prompt is not None:
         history_prompt = _load_history_prompt(history_prompt)
@@ -327,7 +326,7 @@ def generate_fine(
         x_fine_history = None
     n_coarse = x_coarse_gen.shape[0]
 
-    model = models["fine"]
+    net = models["fine"]
 
     # make input arr
     in_arr = np.vstack(
@@ -362,33 +361,45 @@ def generate_fine(
     # we can be lazy about fractional loop and just keep overwriting codebooks
     n_loops = np.max([0, int(np.ceil((x_coarse_gen.shape[1] - (1024 - n_history)) / 512))]) + 1
 
-    in_arr = torch.tensor(in_arr.T)
-    for n in tqdm.tqdm(range(n_loops), disable=silent):
+    in_arr = in_arr.T
+    for n in tqdm.tqdm(range(n_loops)):
         start_idx = np.min([n * 512, in_arr.shape[0] - 1024])
         start_fill_idx = np.min([n_history + n * 512, in_arr.shape[0] - 512])
         rel_start_fill_idx = start_fill_idx - start_idx
         in_buffer = in_arr[start_idx: start_idx + 1024, :][None]
         for nn in range(n_coarse, N_FINE_CODEBOOKS):
-            logits = model(nn, in_buffer)
+            # feedforward
+            if not onnx:
+                output = net.predict([
+                    np.array(nn), in_buffer
+                ])
+            else:
+                output = net.run(None, {
+                    'pred_idx': np.array(nn), 'idx': in_buffer,
+                })
+            logits = output[0]
+
             if temp is None:
                 relevant_logits = logits[0, rel_start_fill_idx:, :CODEBOOK_SIZE]
-                codebook_preds = torch.argmax(relevant_logits, -1)
+                codebook_preds = np.argmax(relevant_logits, axis=-1)
             else:
                 relevant_logits = logits[0, :, :CODEBOOK_SIZE] / temp
-                probs = F.softmax(relevant_logits, dim=-1)
-                codebook_preds = torch.multinomial(
-                    probs[rel_start_fill_idx:1024], num_samples=1
-                ).reshape(-1)
-            codebook_preds = codebook_preds.to(torch.int32)
+                probs = softmax(relevant_logits, axis=-1).astype(np.float64)
+                a = [
+                    np.random.multinomial(1, p / sum(p))
+                    for p in probs[rel_start_fill_idx:1024]
+                ]
+                codebook_preds = np.array([np.argsort(-x)[0] for x in a])
+            codebook_preds = codebook_preds.astype(int)
             in_buffer[0, rel_start_fill_idx:, nn] = codebook_preds
-            del logits, codebook_preds
+
         # transfer over info into model_in and convert to numpy
         for nn in range(n_coarse, N_FINE_CODEBOOKS):
             in_arr[
             start_fill_idx: start_fill_idx + (1024 - rel_start_fill_idx), nn
             ] = in_buffer[0, rel_start_fill_idx:, nn]
-        del in_buffer
-    gen_fine_arr = in_arr.detach().cpu().numpy().squeeze().T
+
+    gen_fine_arr = in_arr.squeeze().T
 
     gen_fine_arr = gen_fine_arr[:, n_history:]
     if n_remove_from_end > 0:

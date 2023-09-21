@@ -99,15 +99,15 @@ def semantic_to_waveform(
         history_prompt=history_prompt,
         temp=temp,
     )
-    print("generate_fine---")
     fine_tokens = generate_fine(
         models,
         coarse_tokens,
         history_prompt=history_prompt,
         temp=0.5,
     )
-    print("codec_decode---")
     audio_arr = codec_decode(fine_tokens)
+    audio_arr = codec_decode(models, fine_tokens)
+
     if output_full:
         full_generation = {
             "semantic_prompt": semantic_tokens,
@@ -179,12 +179,14 @@ def main():
     if not args.onnx:
         net = ailia.Net(MODEL_TEXT_PATH, WEIGHT_TEXT_PATH, env_id=env_id)
         coarse = ailia.Net(MODEL_COARSE_PATH, WEIGHT_COARSE_PATH, env_id=env_id)
+        fine = ailia.Net(MODEL_FINE_PATH, WEIGHT_FINE_PATH, env_id=env_id)
     else:
         import onnxruntime
         cuda = 0 < ailia.get_gpu_environment_id()
         providers = ['CUDAExecutionProvider', 'CPUExecutionProvider'] if cuda else ['CPUExecutionProvider']
         net = onnxruntime.InferenceSession(WEIGHT_TEXT_PATH, providers=providers)
         coarse = onnxruntime.InferenceSession(WEIGHT_COARSE_PATH, providers=providers)
+        fine = onnxruntime.InferenceSession(WEIGHT_FINE_PATH, providers=providers)
 
         generation_utils.onnx = True
 
@@ -194,6 +196,7 @@ def main():
         "net": net,
         "tokenizer": tokenizer,
         "coarse": coarse,
+        "fine": fine,
     }
 
     # generate
