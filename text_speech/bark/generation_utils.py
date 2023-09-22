@@ -328,6 +328,11 @@ def generate_fine(
 
     net = models["fine"]
 
+    use_torch = False
+    if hasattr(net, "parameters"):
+        device = next(net.parameters()).device
+        use_torch = True
+
     # make input arr
     in_arr = np.vstack(
         [
@@ -369,15 +374,20 @@ def generate_fine(
         in_buffer = in_arr[start_idx: start_idx + 1024, :][None]
         for nn in range(n_coarse, N_FINE_CODEBOOKS):
             # feedforward
-            if not onnx:
-                output = net.predict([
-                    np.array(nn), in_buffer
-                ])
+            if use_torch:
+                import torch
+                logits = net(nn, torch.tensor(in_buffer).to(device))
+                logits = logits.detach().cpu().numpy()
             else:
-                output = net.run(None, {
-                    'pred_idx': np.array(nn), 'idx': in_buffer,
-                })
-            logits = output[0]
+                if not onnx:
+                    output = net.predict([
+                        np.array(nn), in_buffer
+                    ])
+                else:
+                    output = net.run(None, {
+                        'pred_idx': np.array(nn), 'idx': in_buffer,
+                    })
+                logits = output[0]
 
             if temp is None:
                 relevant_logits = logits[0, rel_start_fill_idx:, :CODEBOOK_SIZE]

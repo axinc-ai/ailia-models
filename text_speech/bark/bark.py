@@ -2,6 +2,8 @@ import sys
 import time
 from logging import getLogger
 
+use_torch = True
+
 import numpy as np
 import torch
 from transformers import BertTokenizer
@@ -13,7 +15,7 @@ import ailia
 # import original modules
 sys.path.append('../../util')
 from arg_utils import get_base_parser, update_parser, get_savepath  # noqa
-from model_utils import check_and_download_models  # noqa
+from model_utils import check_and_download_models, check_and_download_file  # noqa
 from image_utils import normalize_image  # noqa
 from detector_utils import load_image  # noqa
 from math_utils import softmax  # noqa
@@ -39,6 +41,7 @@ WEIGHT_COARSE_PATH = 'coarse.onnx'
 MODEL_COARSE_PATH = 'coarse.onnx.prototxt'
 WEIGHT_FINE_PATH = 'fine.onnx'
 MODEL_FINE_PATH = 'fine.onnx.prototxt'
+MODEL_FINE_PT_PATH = 'net_fine.pth'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/bark/'
 
 SAVE_WAV_PATH = 'output.wav'
@@ -181,24 +184,34 @@ def recognize_from_text(models):
 
 
 def main():
+    check_and_download_models(WEIGHT_TEXT_PATH, MODEL_TEXT_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_COARSE_PATH, MODEL_COARSE_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_FINE_PATH, MODEL_FINE_PATH, REMOTE_PATH)
+    check_and_download_file(MODEL_FINE_PT_PATH, REMOTE_PATH)
+
     env_id = args.env_id
 
     # initialize
     if not args.onnx:
         net = ailia.Net(MODEL_TEXT_PATH, WEIGHT_TEXT_PATH, env_id=env_id)
         net_coarse = ailia.Net(MODEL_COARSE_PATH, WEIGHT_COARSE_PATH, env_id=env_id)
-        net_fine = ailia.Net(MODEL_FINE_PATH, WEIGHT_FINE_PATH, env_id=env_id)
+        if not use_torch:
+            net_fine = ailia.Net(MODEL_FINE_PATH, WEIGHT_FINE_PATH, env_id=env_id)
     else:
         import onnxruntime
         cuda = 0 < ailia.get_gpu_environment_id()
         providers = ['CUDAExecutionProvider', 'CPUExecutionProvider'] if cuda else ['CPUExecutionProvider']
         net = onnxruntime.InferenceSession(WEIGHT_TEXT_PATH, providers=providers)
         net_coarse = onnxruntime.InferenceSession(WEIGHT_COARSE_PATH, providers=providers)
-        net_fine = onnxruntime.InferenceSession(WEIGHT_FINE_PATH, providers=providers)
+        if not use_torch:
+            net_fine = onnxruntime.InferenceSession(WEIGHT_FINE_PATH, providers=providers)
 
         generation_utils.onnx = True
 
     tokenizer = BertTokenizer.from_pretrained("bert-base-multilingual-cased")
+
+    if use_torch:
+        net_fine = torch.load(MODEL_FINE_PT_PATH, map_location=torch.device('cpu'))
 
     net_encodec = EncodecModel.encodec_model_24khz()
     net_encodec.set_target_bandwidth(6.0)
@@ -206,6 +219,8 @@ def main():
 
     if env_id > 0 and torch.cuda.is_available():
         net_encodec = net_encodec.to("cuda")
+        if use_torch:
+            net_fine = net_fine.to("cuda")
 
     models = {
         "net": net,
