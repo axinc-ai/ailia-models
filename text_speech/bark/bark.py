@@ -3,7 +3,10 @@ import time
 from logging import getLogger
 
 import numpy as np
+import torch
 from transformers import BertTokenizer
+from scipy.io.wavfile import write as write_wav
+from encodec import EncodecModel
 
 import ailia
 
@@ -18,9 +21,10 @@ from webcamera_utils import get_capture, get_writer  # noqa
 
 import generation_utils
 from generation_utils import (
+    SAMPLE_RATE,
     generate_text_semantic,
     generate_coarse, generate_fine,
-    codec_decode
+    codec_decode,
 )
 
 logger = getLogger(__name__)
@@ -105,7 +109,6 @@ def semantic_to_waveform(
         history_prompt=history_prompt,
         temp=0.5,
     )
-    audio_arr = codec_decode(fine_tokens)
     audio_arr = codec_decode(models, fine_tokens)
 
     if output_full:
@@ -167,7 +170,12 @@ def recognize_from_text(models):
 
     logger.info('Start inference...')
 
-    audio_array = generate_audio(models, text_prompt)
+    generated_audio = generate_audio(models, text_prompt)
+
+    # plot result
+    savepath = get_savepath(args.savepath, None, ext='.wav')
+    logger.info(f'saved at : {savepath}')
+    write_wav(savepath, SAMPLE_RATE, generated_audio)
 
     logger.info('Script finished successfully.')
 
@@ -178,25 +186,33 @@ def main():
     # initialize
     if not args.onnx:
         net = ailia.Net(MODEL_TEXT_PATH, WEIGHT_TEXT_PATH, env_id=env_id)
-        coarse = ailia.Net(MODEL_COARSE_PATH, WEIGHT_COARSE_PATH, env_id=env_id)
-        fine = ailia.Net(MODEL_FINE_PATH, WEIGHT_FINE_PATH, env_id=env_id)
+        net_coarse = ailia.Net(MODEL_COARSE_PATH, WEIGHT_COARSE_PATH, env_id=env_id)
+        net_fine = ailia.Net(MODEL_FINE_PATH, WEIGHT_FINE_PATH, env_id=env_id)
     else:
         import onnxruntime
         cuda = 0 < ailia.get_gpu_environment_id()
         providers = ['CUDAExecutionProvider', 'CPUExecutionProvider'] if cuda else ['CPUExecutionProvider']
         net = onnxruntime.InferenceSession(WEIGHT_TEXT_PATH, providers=providers)
-        coarse = onnxruntime.InferenceSession(WEIGHT_COARSE_PATH, providers=providers)
-        fine = onnxruntime.InferenceSession(WEIGHT_FINE_PATH, providers=providers)
+        net_coarse = onnxruntime.InferenceSession(WEIGHT_COARSE_PATH, providers=providers)
+        net_fine = onnxruntime.InferenceSession(WEIGHT_FINE_PATH, providers=providers)
 
         generation_utils.onnx = True
 
     tokenizer = BertTokenizer.from_pretrained("bert-base-multilingual-cased")
 
+    net_encodec = EncodecModel.encodec_model_24khz()
+    net_encodec.set_target_bandwidth(6.0)
+    net_encodec.eval()
+
+    if env_id > 0 and torch.cuda.is_available():
+        net_encodec = net_encodec.to("cuda")
+
     models = {
         "net": net,
         "tokenizer": tokenizer,
-        "coarse": coarse,
-        "fine": fine,
+        "coarse": net_coarse,
+        "fine": net_fine,
+        "codec": net_encodec,
     }
 
     # generate

@@ -408,24 +408,18 @@ def generate_fine(
     return gen_fine_arr
 
 
-def codec_decode(fine_tokens):
+def codec_decode(models, fine_tokens):
     """Turn quantized audio codes into audio array using encodec."""
-    # load models if not yet exist
-    global models
-    global models_devices
-    if "codec" not in models:
-        preload_models()
-    model = models["codec"]
-    if OFFLOAD_CPU:
-        model.to(models_devices["codec"])
-    device = next(model.parameters()).device
-    arr = torch.from_numpy(fine_tokens)[None]
-    arr = arr.to(device)
-    arr = arr.transpose(0, 1)
-    emb = model.quantizer.decode(arr)
-    out = model.decoder(emb)
+    net = models["codec"]
+    device = next(net.parameters()).device
+
+    arr = fine_tokens[None]
+    arr = arr.transpose(1, 0, 2)
+
+    import torch
+    arr = torch.from_numpy(arr).to(device)
+    emb = net.quantizer.decode(arr)
+    out = net.decoder(emb)
     audio_arr = out.detach().cpu().numpy().squeeze()
-    del arr, emb, out
-    if OFFLOAD_CPU:
-        model.to("cpu")
+
     return audio_arr
