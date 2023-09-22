@@ -84,9 +84,7 @@ args = update_parser(parser, check_input_type=False)
 def semantic_to_waveform(
         models,
         semantic_tokens: np.ndarray,
-        history_prompt=None,
         temp: float = 0.7,
-        silent: bool = False,
         output_full: bool = False):
     """Generate audio array from semantic input.
 
@@ -103,13 +101,11 @@ def semantic_to_waveform(
     coarse_tokens = generate_coarse(
         models,
         semantic_tokens,
-        history_prompt=history_prompt,
         temp=temp,
     )
     fine_tokens = generate_fine(
         models,
         coarse_tokens,
-        history_prompt=history_prompt,
         temp=0.5,
     )
     audio_arr = codec_decode(models, fine_tokens)

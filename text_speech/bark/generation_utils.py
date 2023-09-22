@@ -65,27 +65,6 @@ def _normalize_whitespace(text):
     return re.sub(r"\s+", " ", text).strip()
 
 
-def _load_history_prompt(history_prompt_input):
-    if isinstance(history_prompt_input, str) and history_prompt_input.endswith(".npz"):
-        history_prompt = np.load(history_prompt_input)
-    elif isinstance(history_prompt_input, str):
-        # make sure this works on non-ubuntu
-        history_prompt_input = os.path.join(*history_prompt_input.split("/"))
-        if history_prompt_input not in ALLOWED_PROMPTS:
-            raise ValueError("history prompt not found")
-        history_prompt = np.load(
-            os.path.join(this_path, "assets", "prompts", f"{history_prompt_input}.npz")
-        )
-    elif isinstance(history_prompt_input, dict):
-        assert ("semantic_prompt" in history_prompt_input)
-        assert ("coarse_prompt" in history_prompt_input)
-        assert ("fine_prompt" in history_prompt_input)
-        history_prompt = history_prompt_input
-    else:
-        raise ValueError("history prompt format unrecognized")
-    return history_prompt
-
-
 def _flatten_codebooks(arr, offset_size=CODEBOOK_SIZE):
     arr = arr.copy()
     if offset_size is not None:
@@ -201,7 +180,6 @@ def generate_text_semantic(
 def generate_coarse(
         models,
         x_semantic,
-        history_prompt=None,
         temp=0.7,
         max_coarse_history=630,  # min 60 (faster), max 630 (more context)
         sliding_window_len=60):
@@ -209,27 +187,8 @@ def generate_coarse(
     semantic_to_coarse_ratio = COARSE_RATE_HZ / SEMANTIC_RATE_HZ * N_COARSE_CODEBOOKS
     max_semantic_history = int(np.floor(max_coarse_history / semantic_to_coarse_ratio))
 
-    if history_prompt is not None:
-        history_prompt = _load_history_prompt(history_prompt)
-        x_semantic_history = history_prompt["semantic_prompt"]
-        x_coarse_history = history_prompt["coarse_prompt"]
-        x_coarse_history = _flatten_codebooks(x_coarse_history) + SEMANTIC_VOCAB_SIZE
-        # trim histories correctly
-        n_semantic_hist_provided = np.min(
-            [
-                max_semantic_history,
-                len(x_semantic_history) - len(x_semantic_history) % 2,
-                int(np.floor(len(x_coarse_history) / semantic_to_coarse_ratio)),
-            ]
-        )
-        n_coarse_hist_provided = int(round(n_semantic_hist_provided * semantic_to_coarse_ratio))
-        x_semantic_history = x_semantic_history[-n_semantic_hist_provided:].astype(np.int32)
-        x_coarse_history = x_coarse_history[-n_coarse_hist_provided:].astype(np.int32)
-        # TODO: bit of a hack for time alignment (sounds better)
-        x_coarse_history = x_coarse_history[:-2]
-    else:
-        x_semantic_history = np.array([], dtype=np.int32)
-        x_coarse_history = np.array([], dtype=np.int32)
+    x_semantic_history = np.array([], dtype=np.int32)
+    x_coarse_history = np.array([], dtype=np.int32)
 
     net = models["coarse"]
 
@@ -316,14 +275,9 @@ def generate_coarse(
 def generate_fine(
         models,
         x_coarse_gen,
-        history_prompt=None,
         temp=0.5):
     """Generate full audio codes from coarse audio codes."""
-    if history_prompt is not None:
-        history_prompt = _load_history_prompt(history_prompt)
-        x_fine_history = history_prompt["fine_prompt"]
-    else:
-        x_fine_history = None
+    x_fine_history = None
     n_coarse = x_coarse_gen.shape[0]
 
     net = models["fine"]
