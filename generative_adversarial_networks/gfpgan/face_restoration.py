@@ -4,12 +4,13 @@ import numpy as np
 import cv2
 
 from nms_utils import nms_boxes
+from math import ceil
 
 
 def get_anchor(image_size):
-    feature_maps = [[144, 98], [72, 49], [36, 25]]
     min_sizes = [[16, 32], [64, 128], [256, 512]]
     steps = [8, 16, 32]
+    feature_maps = [[ceil(image_size[0]/step), ceil(image_size[1]/step)] for step in steps]
 
     anchors = []
     for k, f in enumerate(feature_maps):
