@@ -32,7 +32,8 @@ def progress_print(block_count, block_size, total_size):
     total_size_kb = total_size / 1024
     print(f'[{bar} {percentage:.2f}% ( {total_size_kb:.0f}KB )]', end='\r')
 
-def urlretrieve(remote_path,weight_path,progress_print):
+
+def urlretrieve(remote_path, weight_path, progress_print):
     try:
         #raise ssl.SSLError # test
         urllib.request.urlretrieve(
@@ -48,6 +49,7 @@ def urlretrieve(remote_path,weight_path,progress_print):
             weight_path,
             progress_print,
         )
+
 
 def check_and_download_models(weight_path, model_path, remote_path):
     """
@@ -82,3 +84,23 @@ def check_and_download_models(weight_path, model_path, remote_path):
         )
         logger.info('\n')
     logger.info('ONNX file and Prototxt file are prepared!')
+
+
+def check_and_download_file(file_path, remote_path):
+    """
+    Check if the file exists,
+    and if necessary, download the files to the given path.
+
+    Parameters
+    ----------
+    file_path: string
+        The path of file.
+    remote_path: string
+        The url where the file is saved.
+        ex. "https://storage.googleapis.com/ailia-models/mobilenetv2/"
+    """
+
+    if not os.path.exists(file_path):
+        logger.info('Downloading %s...' % file_path)
+        urlretrieve(remote_path, file_path, progress_print)
+    logger.info('%s is prepared!' % file_path)
