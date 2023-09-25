@@ -25,6 +25,7 @@ SAVE_IMAGE_PATH = 'output.png'
 
 IMAGE_HEIGHT = 256
 IMAGE_WIDTH = 256
+
 # ======================
 # Argument Parser Config
 # ======================
@@ -62,13 +63,10 @@ REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/hat/'
 class HATModel():
     def __init__(self,net):
         self.net = net
+
     def pre_process(self,image):
-        #image = cv2.imread('/data/ax/hat/butterfly.png').transpose((2,0,1)) / 255
         image = np.expand_dims(image, 0)
-        #window_size = self.opt['network_g']['window_size']
         window_size = 16
-        #self.scale = self.opt.get('scale', 1)
-        #self.scale = 2
         self.scale = args.scale
         self.mod_pad_h, self.mod_pad_w = 0, 0
         _, _, h, w = image.shape
@@ -79,10 +77,7 @@ class HATModel():
         self.img = np.pad(image, (self.mod_pad_w, self.mod_pad_h), mode='reflect')
 
     def process(self):
-        #memory_mode=ailia.get_memory_mode(True,True,True,False)
-        #net = ailia.Net(None,WEIGHT_PATH,env_id=args.env_id,memory_mode=memory_mode)
         self.output = np.array(self.net.run(self.img)[0])
-        #self.output = np.load("ailia.npy")[0] 
 
     def post_process(self):
         _, _, h, w = self.output.shape
@@ -118,9 +113,6 @@ def tensor2img(tensor, rgb2bgr=True, out_type=np.uint8, min_max=(0, 1)):
 
 
 def recognize_from_image(net):
-
-    memory_mode=ailia.get_memory_mode(True,True,True,False)
-    net = ailia.Net(None,WEIGHT_PATH,env_id=args.env_id,memory_mode=memory_mode)
     hat = HATModel(net)
 
     for image_path in args.input:
@@ -158,9 +150,6 @@ def recognize_from_image(net):
     logger.info('Script finished successfully.')
 
 def recognize_from_video(net):
-
-    memory_mode=ailia.get_memory_mode(True,True,True,False)
-    net = ailia.Net(None,WEIGHT_PATH,env_id=args.env_id,memory_mode=memory_mode)
     hat = HATModel(net)
  
     capture = webcamera_utils.get_capture(args.video)
@@ -217,7 +206,7 @@ def main():
     # net initialize
     env_id = args.env_id
     memory_mode = ailia.get_memory_mode(reduce_constant=True, reduce_interstage=True)
-    net = ailia.Net(None, WEIGHT_PATH, env_id=env_id, memory_mode=memory_mode)
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id, memory_mode=memory_mode)
     logger.info('Model: ' + WEIGHT_PATH[:-5])
     logger.info('Scale: ' + str(args.scale))
     
@@ -226,7 +215,6 @@ def main():
         recognize_from_video(net)
     else:
         # image mode
-        net = None
         recognize_from_image(net)
 
 
