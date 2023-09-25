@@ -12,7 +12,7 @@ But I also have other interests such as playing tic tac toe.
 
 ## Output
 
-output.wav
+https://github.com/axinc-ai/ailia-models/assets/29946532/f7f13d36-1e2b-4821-be4f-0927d250a893
 
 ## Requirements
 
