@@ -62,7 +62,7 @@ parser.add_argument(
     Hello, my name is Suno. And, uh — and I like pizza. [laughs] 
     But I also have other interests such as playing tic tac toe.
     """,
-    help="the prompt to render"
+    help="The text to speach"
 )
 parser.add_argument(
     '--onnx',
