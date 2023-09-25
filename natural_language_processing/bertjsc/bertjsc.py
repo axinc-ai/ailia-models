@@ -69,15 +69,17 @@ def predict(model, input_text):
     
     output = net.predict(model_inputs)[0][0]
     output_ids = np.argmax(output, axis=-1)
-    return make_pred_dict(output_ids, output, tokenizer)
+    return make_pred_dict(enc['input_ids'], output_ids, output, tokenizer)
 
-def make_pred_dict(ids, logits, tokenizer):
+def make_pred_dict(input_ids, output_ids, logits, tokenizer):
     scores = softmax(logits, axis=-1)
     pred_dict={}
     for i in range(1,logits.shape[0]-1):#Loop over every token except [CLS], [SEP]
         pred_dict[i] = {
-            'score': scores[i,ids[i]],
-            'token': handle_subwords(tokenizer.convert_ids_to_tokens(int(ids[i])))
+            'score': scores[i,output_ids[i]],
+            'token':  handle_subwords(tokenizer.convert_ids_to_tokens(int(input_ids[i]))),
+            'correct': handle_subwords(tokenizer.convert_ids_to_tokens(int(output_ids[i]))),
+
         }
     return pred_dict
 
