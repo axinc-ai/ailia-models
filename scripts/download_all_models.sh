@@ -145,6 +145,7 @@ cd ../../image_manipulation/dehamer; python3 dehamer.py ${OPTION}
 cd ../../image_manipulation/dfe; python3 dfe.py ${OPTION}
 cd ../../image_manipulation/pytorch-superpoint; python3 pytorch_superpoint.py ${OPTION}
 cd ../../image_manipulation/cnngeometric_pytorch; python3 cnngeometric_pytorch.py ${OPTION}
+cd ../../image_manipulation/lightglue; python3 lightglue.py ${OPTION}
 cd ../../image_segmentation/deeplabv3; python3 deeplabv3.py ${OPTION}
 cd ../../image_segmentation/hair_segmentation; python3 hair_segmentation.py ${OPTION}
 cd ../../image_segmentation/hrnet_segmentation; python3 hrnet_segmentation.py ${OPTION}
