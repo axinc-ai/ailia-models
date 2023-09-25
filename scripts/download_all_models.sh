@@ -18,6 +18,11 @@ cd ../../audio_processing/voicefilter/; python3 voicefilter.py ${OPTION}
 cd ../../audio_processing/whisper/; python3 whisper.py ${OPTION}
 cd ../../audio_processing/clap/; python3 clap.py ${OPTION}
 cd ../../audio_processing/wespeaker/; python3 wespeaker.py ${OPTION}
+cd ../../audio_processing/tacotron2/; python3 tacotron2.py ${OPTION}
+cd ../../audio_processing/silero-vad/; python3 silero-vad.py ${OPTION}
+cd ../../audio_processing/rvc/; python3 rvc.py ${OPTION}
+cd ../../audio_processing/crepe/; python3 crepe.py ${OPTION}
+cd ../../audio_processing/vall-e-x/; python3 vall-e-x.py ${OPTION}
 cd ../../background_ramoval/deep-image-matting; python3 deep-image-matting.py ${OPTION}
 cd ../../background_ramoval/u2net; python3 u2net.py ${OPTION}
 cd ../../background_ramoval/u2net; python3 u2net.py -a small ${OPTION}
@@ -36,6 +41,7 @@ cd ../../diffusion/latent-diffusion-txt2img; python3 latent-diffusion-txt2img.py
 cd ../../diffusion/latent-diffusion-superresolution; python3 latent-diffusion-superresolution.py ${OPTION}
 cd ../../diffusion/latent-diffusion-inpainting; python3 latent-diffusion-inpainting.py ${OPTION}
 cd ../../diffusion/stable-diffusion-txt2img; python3 stable-diffusion-txt2img.py ${OPTION}
+cd ../../diffusion/control_net python3 control_net.py ${OPTION}
 cd ../../deep_fashion/clothing-detection; python3 clothing-detection.py ${OPTION}
 cd ../../deep_fashion/fashionai-key-points-detection; python3 fashionai-key-points-detection.py -c blouse ${OPTION}
 cd ../../deep_fashion/fashionai-key-points-detection; python3 fashionai-key-points-detection.py -c dress ${OPTION}
@@ -87,6 +93,7 @@ cd ../../face_recognition/hsemotion; python3 hsemotion.py ${OPTION}
 cd ../../frame_interpolation/flavr; python3 flavr.py ${OPTION}
 cd ../../frame_interpolation/cain; python3 cain.py ${OPTION}
 cd ../../frame_interpolation/film; python3 film.py ${OPTION}
+cd ../../face_recognition/facemesh_v2; python3 facemesh_v2.py ${OPTION}
 cd ../../generative_adversarial_networks/council-gan; python3 council-gan.py --glasses ${OPTION}
 cd ../../generative_adversarial_networks/council-gan; python3 council-gan.py --m2f ${OPTION}
 cd ../../generative_adversarial_networks/council-gan; python3 council-gan.py --anime ${OPTION}
@@ -98,6 +105,7 @@ cd ../../generative_adversarial_networks/psgan; python3 psgan.py ${OPTION}
 cd ../../generative_adversarial_networks/gfpgan; python3 gfpgan.py ${OPTION}
 cd ../../generative_adversarial_networks/sber-swap; python3 sber-swap.py ${OPTION}
 cd ../../generative_adversarial_networks/encoder4editing; python3 encoder4editing.py ${OPTION}
+cd ../../generative_adversarial_networks/lipgan; python3 lipgan.py ${OPTION}
 cd ../../hand_detection/yolov3-hand; python3 yolov3-hand.py ${OPTION}
 cd ../../hand_detection/hand_detection_pytorch python3 hand_detection_pytorch.py ${OPTION}
 cd ../../hand_detection/blazepalm; python3 blazepalm.py ${OPTION}
@@ -218,6 +226,7 @@ cd ../../object_detection/glip; python3 glip.py ${OPTION}
 cd ../../object_detection/poly_yolo; python3 poly_yolo.py ${OPTION}
 cd ../../object_detection/crowd_det; python3 crowd_det.py ${OPTION}
 cd ../../object_detection/footandball; python3 footandball.py ${OPTION}
+cd ../../object_detection/qrcode_wechatqrode; python3 qrcode_wechatqrode.py ${OPTION}
 cd ../../object_detection_3d/3d_bbox; python3 3d_bbox.py ${OPTION}
 cd ../../object_detection_3d/3d-object-detection.pytorch; python3 3d-object-detection.pytorch.py ${OPTION}
 cd ../../object_detection_3d/mediapipe_objectron; python3 mediapipe_objectron.py ${OPTION}
@@ -229,6 +238,7 @@ cd ../../object_tracking/abd_net; python3 abd_net.py ${OPTION}
 cd ../../object_tracking/siam-mot; python3 siam-mot.py ${OPTION}
 cd ../../object_tracking/bytetrack; python3 bytetrack.py ${OPTION}
 cd ../../object_tracking/qd-3dt; python3 qd-3dt.py ${OPTION}
+cd ../../object_tracking/strong_sort; python3 strong_sort.py ${OPTION}
 cd ../../optical_flow_estimation/raft; python3 raft.py ${OPTION}
 cd ../../point_segmentation/pointnet_pytorch python3 pointnet_pytorch.py ${OPTION}
 cd ../../pose_estimation/lightweight-human-pose-estimation; python3 lightweight-human-pose-estimation.py ${OPTION}
