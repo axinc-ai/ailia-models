@@ -22,6 +22,7 @@ cd ../../audio_processing/tacotron2/; python3 tacotron2.py ${OPTION}
 cd ../../audio_processing/silero-vad/; python3 silero-vad.py ${OPTION}
 cd ../../audio_processing/rvc/; python3 rvc.py ${OPTION}
 cd ../../audio_processing/crepe/; python3 crepe.py ${OPTION}
+cd ../../audio_processing/vall-e-x/; python3 vall-e-x.py ${OPTION}
 cd ../../background_ramoval/deep-image-matting; python3 deep-image-matting.py ${OPTION}
 cd ../../background_ramoval/u2net; python3 u2net.py ${OPTION}
 cd ../../background_ramoval/u2net; python3 u2net.py -a small ${OPTION}
@@ -92,6 +93,7 @@ cd ../../face_recognition/hsemotion; python3 hsemotion.py ${OPTION}
 cd ../../frame_interpolation/flavr; python3 flavr.py ${OPTION}
 cd ../../frame_interpolation/cain; python3 cain.py ${OPTION}
 cd ../../frame_interpolation/film; python3 film.py ${OPTION}
+cd ../../face_recognition/facemesh_v2; python3 facemesh_v2.py ${OPTION}
 cd ../../generative_adversarial_networks/council-gan; python3 council-gan.py --glasses ${OPTION}
 cd ../../generative_adversarial_networks/council-gan; python3 council-gan.py --m2f ${OPTION}
 cd ../../generative_adversarial_networks/council-gan; python3 council-gan.py --anime ${OPTION}
@@ -180,6 +182,7 @@ cd ../../natural_language_processing/bert_question_answering; python3 bert_quest
 cd ../../natural_language_processing/bert_sentiment_analysis; python3 bert_sentiment_analysis.py ${OPTION}
 cd ../../natural_language_processing/bert_tweets_sentiment; python3 bert_tweets_sentiment.py ${OPTION}
 cd ../../natural_language_processing/bert_zero_shot_classification; python3 bert_zero_shot_classification.py ${OPTION}
+cd ../../natural_language_processing/bertjsc; python3 bertjsc.py ${OPTION}
 cd ../../natural_language_processing/gpt2; python3 gpt2.py ${OPTION}
 cd ../../natural_language_processing/rinna_gpt2; python3 rinna_gpt2.py ${OPTION}
 cd ../../natural_language_processing/fugumt-en-ja; python3 fugumt-en-ja.py ${OPTION}

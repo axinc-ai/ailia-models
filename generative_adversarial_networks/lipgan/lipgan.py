@@ -227,9 +227,10 @@ def composite(frame, p, coords):
 		for y in range(alpha.shape[0]):
 			for x in range(alpha.shape[1]):
 				dx = min(min(x, alpha.shape[1] - 1 - x) / rx, 1)
-				dy = min(min(y, alpha.shape[0] - 1 - y) / ry, 1)
+				dy = max(min(min(y - alpha.shape[0] // 2, alpha.shape[0] - 1 - y) / ry, 1), 0)
 				alpha[y, x, 0] = min(dx, dy)
-		#cv2.imwrite("output.png", (alpha * 255).astype(np.uint8))
+		if args.debug:
+			cv2.imwrite("alpha.png", (alpha * 255).astype(np.uint8))
 
 	f = frame.copy()
 	f[y1:y2, x1:x2] = f[y1:y2, x1:x2] * (1 - alpha) + p * alpha
@@ -250,6 +251,11 @@ def infer(frame, mel_chunk, ailia_net, blazeface, realesrgan):
 	img_masked = img_batch.copy()
 	img_masked[:, IMG_SIZE//2:] = 0
 
+	if args.debug:
+		output = np.zeros((96, 96 * 3, 3))
+		output[0:96, 0:96, :] = img_batch[0]
+		output[0:96, 96:96*2, :] = img_masked[0]
+
 	img_batch = np.concatenate((img_batch, img_masked), axis=3) / 255.
 	mel_batch = np.reshape(mel_batch, [len(mel_batch), mel_batch.shape[1], mel_batch.shape[2], 1])
 
@@ -262,6 +268,11 @@ def infer(frame, mel_chunk, ailia_net, blazeface, realesrgan):
 	pred = pred * 255
 	p = pred[0]
 
+	if args.debug:
+		output[0:96, 96*2:96*3, :] = p
+		cv2.imshow("output", output.astype(np.uint8))
+		cv2.imwrite("temp.jpg", output.astype(np.uint8))
+	
 	if args.realesrgan:
 		if args.benchmark:
 			start = int(round(time.time() * 1000))
