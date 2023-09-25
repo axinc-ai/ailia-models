@@ -19,31 +19,7 @@ COARSE_RATE_HZ = 75
 
 SAMPLE_RATE = 24_000
 
-SUPPORTED_LANGS = [
-    ("English", "en"),
-    ("German", "de"),
-    ("Spanish", "es"),
-    ("French", "fr"),
-    ("Hindi", "hi"),
-    ("Italian", "it"),
-    ("Japanese", "ja"),
-    ("Korean", "ko"),
-    ("Polish", "pl"),
-    ("Portuguese", "pt"),
-    ("Russian", "ru"),
-    ("Turkish", "tr"),
-    ("Chinese", "zh"),
-]
-
-ALLOWED_PROMPTS = {"announcer"}
-for _, lang in SUPPORTED_LANGS:
-    for prefix in ("", f"v2{os.path.sep}"):
-        for n in range(10):
-            ALLOWED_PROMPTS.add(f"{prefix}{lang}_speaker_{n}")
-
 logger = logging.getLogger(__name__)
-
-this_path = os.path.dirname(os.path.abspath(__file__))
 
 onnx = False
 
@@ -181,6 +157,7 @@ def generate_coarse(
         models,
         x_semantic,
         temp=0.7,
+        silent=False,
         max_coarse_history=630,  # min 60 (faster), max 630 (more context)
         sliding_window_len=60):
     """Generate coarse audio codes from semantic tokens."""
@@ -207,7 +184,7 @@ def generate_coarse(
     x_coarse_in = x_coarse[None]
     n_window_steps = int(np.ceil(n_steps / sliding_window_len))
     n_step = 0
-    for _ in tqdm.tqdm(range(n_window_steps), total=n_window_steps):
+    for _ in tqdm.tqdm(range(n_window_steps), total=n_window_steps, disable=silent):
         semantic_idx = base_semantic_idx + int(round(n_step / semantic_to_coarse_ratio))
         # pad from right side
         x_in = x_semantic_in[:, np.max([0, semantic_idx - max_semantic_history]):]
@@ -275,7 +252,8 @@ def generate_coarse(
 def generate_fine(
         models,
         x_coarse_gen,
-        temp=0.5):
+        temp=0.5,
+        silent=False):
     """Generate full audio codes from coarse audio codes."""
     x_fine_history = None
     n_coarse = x_coarse_gen.shape[0]
@@ -321,7 +299,7 @@ def generate_fine(
     n_loops = np.max([0, int(np.ceil((x_coarse_gen.shape[1] - (1024 - n_history)) / 512))]) + 1
 
     in_arr = in_arr.T
-    for n in tqdm.tqdm(range(n_loops)):
+    for n in tqdm.tqdm(range(n_loops), disable=silent):
         start_idx = np.min([n * 512, in_arr.shape[0] - 1024])
         start_fill_idx = np.min([n_history + n * 512, in_arr.shape[0] - 512])
         rel_start_fill_idx = start_fill_idx - start_idx

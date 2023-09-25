@@ -73,11 +73,6 @@ args = update_parser(parser, check_input_type=False)
 
 
 # ======================
-# Secondaty Functions
-# ======================
-
-
-# ======================
 # Main functions
 # ======================
 
@@ -85,6 +80,7 @@ def semantic_to_waveform(
         models,
         semantic_tokens: np.ndarray,
         temp: float = 0.7,
+        silent: bool = False,
         output_full: bool = False):
     """Generate audio array from semantic input.
 
@@ -102,11 +98,13 @@ def semantic_to_waveform(
         models,
         semantic_tokens,
         temp=temp,
+        silent=silent,
     )
     fine_tokens = generate_fine(
         models,
         coarse_tokens,
         temp=0.5,
+        silent=silent,
     )
     audio_arr = codec_decode(models, fine_tokens)
 
