@@ -279,6 +279,7 @@ cd ../../super_resolution/edsr; python3 edsr.py ${OPTION}
 cd ../../super_resolution/real-esrgan; python3 real-esrgan.py ${OPTION}
 cd ../../super_resolution/rcan-it; python3 rcan-it.py ${OPTION}
 cd ../../super_resolution/swinir; python3 swinir.py ${OPTION}
+cd ../../super_resolution/hat; python3 hat.py ${OPTION}
 cd ../../text_detection/craft_pytorch; python3 craft_pytorch.py ${OPTION}
 cd ../../text_detection/pixel_link; python3 pixel_link.py ${OPTION}
 cd ../../text_detection/east; python3 east.py ${OPTION}
