@@ -29,7 +29,7 @@ MODEL_PATH = "superpoint.onnx.prototxt"
 LIGHTGLUE_WEIGHT_PATH = "superpoint_lightglue.onnx"
 LIGHTGLUE_MODEL_PATH = "superpoint_lightglue.onnx.prototxt"
 
-REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/LightGlue/'
+REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/lightglue/'
 
 IMAGE_A_PATH = 'img_A.png'
 IMAGE_B_PATH = 'img_B.png'
@@ -73,7 +73,7 @@ def infer(
     img_paths: List[str],
     extractor_type: str,
     img_size=512,
-    env_id=None
+    runner=None
 ):
     # Handle args
     img0_path = img_paths[0]
@@ -104,15 +104,7 @@ def infer(
             f"Unsupported feature extractor type: {extractor_type}."
         )
 
-    # Load ONNX models
-
-    runner = LightGlueRunner(
-
-        extractor_path="superpoint.onnx",
-        lightglue_path="superpoint_lightglue.onnx",
-        env_id = args.env_id
-    )
-# Run inference
+    # Run inference
     m_kpts0, m_kpts1 = runner.run(image0, image1, scales0, scales1)
 
     # Visualisation
@@ -123,7 +115,7 @@ def infer(
     )
     plot_matches(m_kpts0, m_kpts1, color="lime", lw=0.2)
 
-def recognize_from_image():
+def recognize_from_image(runner):
 
     # input image loop
     for image_path1 ,image_path2 in zip(args.input, [args.input2]):
@@ -135,7 +127,7 @@ def recognize_from_image():
             total_time_estimation = 0
             for i in range(args.benchmark_count):
                 start = int(round(time.time() * 1000))
-                output = infer([image_path1,image_path2], args.extractor_type,args.img_size,args.env_id)
+                output = infer([image_path1,image_path2], args.extractor_type, args.img_size, runner)
                 end = int(round(time.time() * 1000))
                 estimation_time = (end - start)
 
@@ -146,7 +138,7 @@ def recognize_from_image():
 
             logger.info(f'\taverage time estimation {total_time_estimation / (args.benchmark_count - 1)} ms')
         else:
-            output = infer([image_path1,image_path2], args.extractor_type,args.img_size,args.env_id)
+            output = infer([image_path1,image_path2], args.extractor_type, args.img_size, runner)
 
         # plot result
         savepath = get_savepath(args.savepath, image_path1, ext='.png')
@@ -158,10 +150,25 @@ def recognize_from_image():
 
 def main():
     # model files check and download
-    #check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
-    #check_and_download_models(LIGHTGLUE_WEIGHT_PATH, LIGHTGLUE_MODEL_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
+    check_and_download_models(LIGHTGLUE_WEIGHT_PATH, LIGHTGLUE_MODEL_PATH, REMOTE_PATH)
 
-    recognize_from_image()
+    # disable FP16
+    env_id = args.env_id
+    if "FP16" in ailia.get_environment(args.env_id).props or sys.platform == 'Darwin':
+        logger.warning('This model do not work on FP16. So use CPU mode.')
+        env_id = 0
+
+    # Load ONNX models
+
+    runner = LightGlueRunner(
+
+        extractor_path="superpoint.onnx",
+        lightglue_path="superpoint_lightglue.onnx",
+        env_id = env_id
+    )
+
+    recognize_from_image(runner)
 
 if __name__ == '__main__':
     main()
