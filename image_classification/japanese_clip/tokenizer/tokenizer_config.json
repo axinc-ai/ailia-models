@@ -1,0 +1,17 @@
+{
+  "additional_special_tokens": [],
+  "bos_token": "<s>",
+  "cls_token": "[CLS]",
+  "do_lower_case": true,
+  "eos_token": "</s>",
+  "extra_ids": 0,
+  "mask_token": "[MASK]",
+  "model_max_length": 1000000000000000019884624838656,
+  "name_or_path": "rinna/japanese-roberta-base",
+  "pad_token": "[PAD]",
+  "sep_token": "[SEP]",
+  "sp_model_kwargs": {},
+  "special_tokens_map_file": "/home/ooe/.cache/huggingface/hub/models--rinna--japanese-roberta-base/snapshots/80adab4b7cc7e4d44468ccb9c77d1b130d23cfb4/special_tokens_map.json",
+  "tokenizer_class": "T5Tokenizer",
+  "unk_token": "<unk>"
+}
