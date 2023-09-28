@@ -17,14 +17,13 @@ logger = logging.getLogger(__name__)
 """
 params
 """
-HUGGING_FACE_MODEL_PATH = "sonoisa/t5-base-japanese-title-generation"
-ENCODER_ONNX_PATH = "./t5_whisper_medical-encoder.onnx"
-ENCODER_PROTOTXT_PATH = None
-DECODER_ONNX_PATH = "./t5_whisper_medical-decoder-with-lm-head.onnx"
-DECODER_PROTOTXT_PATH = None
-REMOTE_PATH = "https://storage.googleapis.com/ailia-models/t5_base_japanese_title_generation/"
+ENCODER_ONNX_PATH = "t5_whisper_medical-encoder.obf.onnx"
+ENCODER_PROTOTXT_PATH = "t5_whisper_medical-encoder.onnx.prototxt"
+DECODER_ONNX_PATH = "t5_whisper_medical-decoder-with-lm-head.obf.onnx"
+DECODER_PROTOTXT_PATH = "t5_whisper_medical-decoder-with-lm-head.onnx.prototxt"
+REMOTE_PATH = "https://storage.googleapis.com/ailia-models/t5_whisper_medical/"
 
-MAX_SOURCE_LENGTH = 512
+MAX_SOURCE_LENGTH = 384
 DEFAULT_INPUT_PATH = "./input.txt"
 DEFAULT_OUTPUT_PATH = "./output.txt"
 
@@ -33,7 +32,7 @@ DEFAULT_OUTPUT_PATH = "./output.txt"
 parse args
 """
 parser = get_base_parser(
-    description="T5 base Japanese title generation",
+    description="T5 whisper medical error correction",
     default_input=DEFAULT_INPUT_PATH,
     default_save=DEFAULT_OUTPUT_PATH,
     input_ftype="text",
