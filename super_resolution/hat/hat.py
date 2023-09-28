@@ -207,7 +207,7 @@ def main():
     env_id = args.env_id
     if "FP16" in ailia.get_environment(args.env_id).props or sys.platform == 'Darwin':
         logger.warning('This model do not work on FP16. So use CPU mode.')
-        args.env_id = 0
+        env_id = 0
 
     # net initialize
     memory_mode = ailia.get_memory_mode(reduce_constant=True, reduce_interstage=True)
