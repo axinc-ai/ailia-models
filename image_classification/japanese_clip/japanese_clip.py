@@ -101,12 +101,7 @@ def get_text_features(models, text):
         output = net.run(None, {
             'input_ids': input_ids, 'attention_mask': attention_mask
         })
-    last_hidden_state, _ = output
-
-    text_projection = models['text_projection']
-
-    pooled_output = last_hidden_state[:, 0, :]
-    text_features = pooled_output @ text_projection.T
+    text_features = output[0]
 
     return text_features
 
