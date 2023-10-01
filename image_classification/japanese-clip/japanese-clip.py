@@ -31,6 +31,7 @@ MODEL_IMAGE_PATH = 'CLIP-ViT-B16-image.onnx.prototxt'
 WEIGHT_TEXT_PATH = 'CLIP-ViT-B16-text.onnx'
 MODEL_TEXT_PATH = 'CLIP-ViT-B16-text.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/japanese_clip/'
+REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/japanese-clip/'
 
 IMAGE_PATH = 'dog.jpeg'
 SAVE_IMAGE_PATH = 'output.png'
@@ -267,13 +268,11 @@ def main():
         net_text = onnxruntime.InferenceSession(WEIGHT_TEXT_PATH)
 
     tokenizer = T5Tokenizer.from_pretrained("tokenizer")
-    text_projection = np.load("text_projection.npy")
 
     models = {
         "tokenizer": tokenizer,
         "image": net_image,
         "text": net_text,
-        "text_projection": text_projection,
     }
 
     if args.video is not None:
