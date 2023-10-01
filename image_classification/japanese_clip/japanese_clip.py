@@ -90,24 +90,25 @@ def get_text_features(models, text):
     tokenizer = models['tokenizer']
     encodings = tokenize(tokenizer, text)
 
+    input_ids = encodings['input_ids']
+    attention_mask = encodings['attention_mask']
+
     # feedforward
-    text_feature = []
-    batch_size_limit = 16
+    net = models['text']
+    if not args.onnx:
+        output = net.predict([input_ids, attention_mask])
+    else:
+        output = net.run(None, {
+            'input_ids': input_ids, 'attention_mask': attention_mask
+        })
+    last_hidden_state, _ = output
 
-    for i in range(0, text_tokens.shape[0], batch_size_limit):
-        batch_size = min(batch_size_limit, text_tokens.shape[0] - i)
-        logger.info("Embedding " + str(i) + " to " + str(i + batch_size))
-        if not args.onnx:
-            output = net.predict([text_tokens[i:i + batch_size, :]])
-        else:
-            output = net.run(None, {'text': text_tokens[i:i + batch_size, :]})
-        text_feature.append(output[0])
+    text_projection = models['text_projection']
 
-    text_feature = np.concatenate(text_feature)
+    pooled_output = last_hidden_state[:, 0, :]
+    text_features = pooled_output @ text_projection.T
 
-    text_feature = text_feature / np.linalg.norm(text_feature, ord=2, axis=-1, keepdims=True)
-
-    return text_feature
+    return text_features
 
 
 def preprocess(img):
@@ -118,7 +119,7 @@ def preprocess(img):
     scale = h / min(im_h, im_w)
     ow, oh = round(im_w * scale), round(im_h * scale)
     if ow != im_w or oh != im_h:
-        img = np.array(Image.fromarray(img).resize((ow, oh), Image.BICUBIC))
+        img = np.array(Image.fromarray(img).resize((ow, oh), Image.BILINEAR))
 
     # center_crop
     if ow > w:
@@ -150,17 +151,14 @@ def predict(net, img, text_feature):
         output = net.predict([img])
     else:
         output = net.run(None, {'image': img})
-
-    image_feature = output[0]
-
-    image_feature = image_feature / np.linalg.norm(image_feature, ord=2, axis=-1, keepdims=True)
+    image_features = output[0]
 
     logit_scale = 100
-    logits_per_image = (image_feature * logit_scale).dot(text_feature.T)
+    logits_per_image = (image_features * logit_scale).dot(text_feature.T)
 
-    pred = softmax(logits_per_image, axis=1)
+    text_probs = softmax(logits_per_image, axis=1)
 
-    return pred[0]
+    return text_probs[0]
 
 
 def recognize_from_image(models):
@@ -168,7 +166,9 @@ def recognize_from_image(models):
     if text_inputs is None:
         text_inputs = ["犬", "猫", "象"]
 
-    text_feature = get_text_features(models, text_inputs)
+    text_features = get_text_features(models, text_inputs)
+
+    net_image = models['image']
 
     # input image loop
     for image_path in args.input:
@@ -185,7 +185,7 @@ def recognize_from_image(models):
             total_time_estimation = 0
             for i in range(args.benchmark_count):
                 start = int(round(time.time() * 1000))
-                pred = predict(net_image, img, text_feature)
+                pred = predict(net_image, img, text_features)
                 end = int(round(time.time() * 1000))
                 estimation_time = (end - start)
 
@@ -196,7 +196,7 @@ def recognize_from_image(models):
 
             logger.info(f'\taverage time estimation {total_time_estimation / (args.benchmark_count - 1)} ms')
         else:
-            pred = predict(net_image, img, text_feature)
+            pred = predict(net_image, img, text_features)
 
         # show results
         pred = np.expand_dims(pred, axis=0)
@@ -210,7 +210,7 @@ def recognize_from_video(models):
     if text_inputs is None:
         text_inputs = ["犬", "猫", "象"]
 
-    text_feature = get_text_features(models, text_inputs)
+    text_features = get_text_features(models, text_inputs)
 
     capture = webcamera_utils.get_capture(args.video)
     # create video writer if savepath is specified as video format
@@ -220,6 +220,8 @@ def recognize_from_video(models):
         writer = webcamera_utils.get_writer(args.savepath, f_h, f_w)
     else:
         writer = None
+
+    net_image = models['image']
 
     frame_shown = False
     while (True):
@@ -231,7 +233,7 @@ def recognize_from_video(models):
 
         img = frame
 
-        pred = predict(net_image, img, text_feature)
+        pred = predict(net_image, img, text_features)
 
         plot_results(frame, np.expand_dims(pred, axis=0), text_inputs)
 
@@ -276,7 +278,7 @@ def main():
         "tokenizer": tokenizer,
         "image": net_image,
         "text": net_text,
-        "projection": text_projection,
+        "text_projection": text_projection,
     }
 
     if args.video is not None:
