@@ -26,11 +26,14 @@ logger = getLogger(__name__)
 # Parameters
 # ======================
 
-WEIGHT_IMAGE_PATH = 'CLIP-ViT-B16-image.onnx'
-MODEL_IMAGE_PATH = 'CLIP-ViT-B16-image.onnx.prototxt'
-WEIGHT_TEXT_PATH = 'CLIP-ViT-B16-text.onnx'
-MODEL_TEXT_PATH = 'CLIP-ViT-B16-text.onnx.prototxt'
-REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/japanese_clip/'
+WEIGHT_CLIP_IMAGE_PATH = 'CLIP-ViT-B16-image.onnx'
+MODEL_CLIP_IMAGE_PATH = 'CLIP-ViT-B16-image.onnx.prototxt'
+WEIGHT_CLIP_TEXT_PATH = 'CLIP-ViT-B16-text.onnx'
+MODEL_CLIP_TEXT_PATH = 'CLIP-ViT-B16-text.onnx.prototxt'
+WEIGHT_CLOOB_IMAGE_PATH = 'CLOOB-ViT-B16-image.onnx'
+MODEL_CLOOB_IMAGE_PATH = 'CLOOB-ViT-B16-image.onnx.prototxt'
+WEIGHT_CLOOB_TEXT_PATH = 'CLOOB-ViT-B16-text.onnx'
+MODEL_CLOOB_TEXT_PATH = 'CLOOB-ViT-B16-text.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/japanese-clip/'
 
 IMAGE_PATH = 'dog.jpeg'
@@ -49,6 +52,10 @@ parser.add_argument(
     '-t', '--text', dest='text_inputs', type=str,
     action='append',
     help='Input text. (can be specified multiple times)'
+)
+parser.add_argument(
+    '-m', '--model_type', default='clip', choices=('clip', 'cloob'),
+    help='model type'
 )
 parser.add_argument(
     '--onnx',
@@ -249,6 +256,16 @@ def recognize_from_video(models):
 
 
 def main():
+    dic_model = {
+        'clip': (
+            (WEIGHT_CLIP_IMAGE_PATH, MODEL_CLIP_IMAGE_PATH),
+            (WEIGHT_CLIP_TEXT_PATH, MODEL_CLIP_TEXT_PATH)),
+        'cloob': (
+            (WEIGHT_CLOOB_IMAGE_PATH, MODEL_CLOOB_IMAGE_PATH),
+            (WEIGHT_CLOOB_TEXT_PATH, MODEL_CLOOB_TEXT_PATH)),
+    }
+    (WEIGHT_IMAGE_PATH, MODEL_IMAGE_PATH), (WEIGHT_TEXT_PATH, MODEL_TEXT_PATH) = dic_model[args.model_type]
+
     # model files check and download
     check_and_download_models(WEIGHT_IMAGE_PATH, MODEL_IMAGE_PATH, REMOTE_PATH)
     check_and_download_models(WEIGHT_TEXT_PATH, MODEL_TEXT_PATH, REMOTE_PATH)
