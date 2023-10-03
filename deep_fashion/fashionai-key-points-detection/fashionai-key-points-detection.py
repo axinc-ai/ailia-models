@@ -9,7 +9,7 @@ import ailia
 # import original modules
 from fashionai_key_points_detection_utils import decode_np, draw_keypoints
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
+from arg_utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from detector_utils import load_image  # noqa: E402
 from webcamera_utils import get_capture  # noqa: E402
@@ -197,9 +197,12 @@ def recognize_from_image(filename, net):
 def recognize_from_video(video, net):
     capture = get_capture(video)
 
+    frame_shown = False
     while (True):
         ret, frame = capture.read()
         if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
             break
         if not ret:
             continue
@@ -209,6 +212,7 @@ def recognize_from_video(video, net):
 
         # show
         cv2.imshow('frame', res_img)
+        frame_shown = True
 
     capture.release()
     cv2.destroyAllWindows()

@@ -13,7 +13,7 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
+from arg_utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 import webcamera_utils  # noqa: E402
 
@@ -25,8 +25,6 @@ logger = getLogger(__name__)
 # ======================
 # Parameters
 # ======================
-WEIGHT_PATH = 'mask_rcnn_R_50_FPN_1x.onnx'
-MODEL_PATH = 'mask_rcnn_R_50_FPN_1x.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/mask_rcnn/'
 
 IMAGE_PATH = 'demo.jpg'
@@ -43,8 +41,20 @@ parser = get_base_parser(
     IMAGE_PATH,
     SAVE_IMAGE_PATH,
 )
+parser.add_argument(
+    '-n', '--normal',
+    action='store_true',
+    help='By default, the optimized model is used, but with this option, ' +
+    'you can switch to the normal (not optimized) model'
+)
 args = update_parser(parser, large_model=True)
 
+if args.normal:
+    WEIGHT_PATH = 'mask_rcnn_R_50_FPN_1x.onnx'
+    MODEL_PATH = 'mask_rcnn_R_50_FPN_1x.onnx.prototxt'
+else:
+    WEIGHT_PATH = 'mask_rcnn_R_50_FPN_1x.opt.onnx'
+    MODEL_PATH = 'mask_rcnn_R_50_FPN_1x.opt.onnx.prototxt'
 
 # ======================
 # Utils

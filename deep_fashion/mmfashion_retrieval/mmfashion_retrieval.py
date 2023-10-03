@@ -2,8 +2,6 @@ import sys
 import time
 import os
 
-import onnx
-import onnxruntime
 import cv2
 import matplotlib.pyplot as plt
 from scipy.spatial.distance import cosine
@@ -12,7 +10,7 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
+from arg_utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from detector_utils import load_image  # noqa: E402
 import webcamera_utils  # noqa: E402
@@ -76,7 +74,7 @@ def show_retrieved_images(query_feat, gallery_embeds, gallery_imgs, topk, filena
     query_dist = {}
     for img in gallery_imgs:
         cosine_dist = cosine(
-            gallery_embeds[img].reshape(1, -1), query_feat.reshape(1, -1))
+            gallery_embeds[img].flatten(), query_feat.flatten())
         query_dist[img] = cosine_dist
 
     order = sorted(query_dist.items(), key=lambda x: x[1])
@@ -151,7 +149,7 @@ def recognize_from_video(filename, net):
         ret, frame = capture.read()
         if cv2.waitKey(1) & 0xFF == ord('q') or not ret:
             break
-
+            
         x = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         x = preprocess(x)
         preds_ailia = net.predict(x)

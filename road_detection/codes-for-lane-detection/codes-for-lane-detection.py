@@ -1,21 +1,23 @@
-import numpy as np
-import time
 import os
 import sys
-import cv2
-
-from codes_for_lane_detection_utils import crop_and_resize, preprocess, postprocess
+import time
 
 import ailia
+import cv2
+import numpy as np
+
+from codes_for_lane_detection_utils import (crop_and_resize, postprocess,
+                                            preprocess)
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath
-from model_utils import check_and_download_models
-import webcamera_utils
-
 # logger
 from logging import getLogger
+
+import webcamera_utils
+from image_utils import imread  # noqa: E402
+from model_utils import check_and_download_models
+from arg_utils import get_base_parser, get_savepath, update_parser
 
 logger = getLogger(__name__)
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
@@ -78,7 +80,7 @@ def recognize_from_image(net):
     for image_path in args.input:
         # prepare input data
         logger.debug(f'input image: {image_path}')
-        raw_img = cv2.imread(image_path)
+        raw_img = imread(image_path)
         logger.debug(f'input image shape: {raw_img.shape}')
 
         img = crop_and_resize(raw_img,WIDTH,HEIGHT,args.arch,args.resize)
@@ -120,10 +122,13 @@ def recognize_from_video(net):
 
     output_buffer = np.zeros((HEIGHT*2,WIDTH,3))
     output_buffer = output_buffer.astype(np.uint8)
-
+    
+    frame_shown = False
     while (True):
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+        if frame_shown and cv2.getWindowProperty('output', cv2.WND_PROP_VISIBLE) == 0:
             break
     
         resized_img = crop_and_resize(frame,WIDTH,HEIGHT,args.arch,args.resize)
@@ -140,6 +145,7 @@ def recognize_from_video(net):
         output_buffer[HEIGHT:HEIGHT*2,0:WIDTH,:] = out_img
 
         cv2.imshow('output', output_buffer)
+        frame_shown = True
 
         # save results
         if writer is not None:

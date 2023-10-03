@@ -9,7 +9,7 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser  # noqa: E402
+from arg_utils import get_base_parser, update_parser  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 import webcamera_utils  # noqa: E402
 
@@ -113,15 +113,19 @@ def recognize_from_video(net):
     #     writer = webcamera_utils.get_writer(args.savepath, f_h, f_w)
     # else:
     #     writer = None
-
+    
+    frame_shown = False
     while(True):
         ret, image = capture.read()
         # press q to end video capture
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
+            break
 
         logger.info('============================================')
         cv2.imshow('frame', image)
+        frame_shown = True
         image = Image.fromarray(np.uint8(image)).convert('L')
         image = pre_process(image)
         preds = predict(net, image)

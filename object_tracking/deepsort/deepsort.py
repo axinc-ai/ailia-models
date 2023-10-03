@@ -11,7 +11,7 @@ from deepsort_utils import *
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser  # noqa: E402
+from arg_utils import get_base_parser, update_parser  # noqa: E402
 from image_utils import normalize_image  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from detector_utils import load_image  # noqa: E402
@@ -132,10 +132,13 @@ def recognize_from_video():
         writer = None
 
     logger.info('Start Inference...')
+    frame_shown = False
     while(True):
         idx_frame += 1
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
             break
 
         # In order to use ailia.Detector, the input should have 4 channels.
@@ -203,7 +206,7 @@ def recognize_from_video():
             box = track.to_tlwh()
             x1, y1, x2, y2 = tlwh_to_xyxy(box, h, w)
             track_id = track.track_id
-            outputs.append(np.array([x1, y1, x2, y2, track_id], dtype=np.int))
+            outputs.append(np.array([x1, y1, x2, y2, track_id], dtype=int))
         if len(outputs) > 0:
             outputs = np.stack(outputs, axis=0)
 
@@ -220,6 +223,7 @@ def recognize_from_video():
             results.append((idx_frame - 1, bbox_tlwh, identities))
 
         cv2.imshow('frame', frame)
+        frame_shown = True
 
         if writer is not None:
             writer.write(frame)

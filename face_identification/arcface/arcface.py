@@ -8,7 +8,7 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser  # noqa: E402
+from arg_utils import get_base_parser, update_parser  # noqa: E402
 import webcamera_utils  # noqa: E402
 from image_utils import load_image  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
@@ -492,9 +492,12 @@ def compare_video():
         )
 
     # inference loop
+    frame_shown = False
     while(True):
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+        if frame_shown and cv2.getWindowProperty('arcface', cv2.WND_PROP_VISIBLE) == 0:
             break
 
         # get frame size
@@ -515,6 +518,7 @@ def compare_video():
 
         # show
         cv2.imshow('arcface', ui)
+        frame_shown = True
 
         if writer is not None:
             writer.write(ui)

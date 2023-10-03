@@ -1,22 +1,23 @@
+import argparse
+import codecs
 import sys
 import time
-import codecs
-import argparse
-import numpy
-
-import cv2
 
 import ailia
+import cv2
+import numpy
+
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
+import string
+# logger
+from logging import getLogger  # noqa: E402
+
+from image_utils import imread  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
+from arg_utils import get_base_parser, get_savepath, update_parser  # noqa: E402
 from webcamera_utils import adjust_frame_size, get_capture  # noqa: E402
 
-import string
-
-# logger
-from logging import getLogger   # noqa: E402
 logger = getLogger(__name__)
 
 # ======================
@@ -101,7 +102,7 @@ def recognize_one_image(image_path,session):
     batch_size = 1
 
     # load image
-    input_img = cv2.imread(image_path)
+    input_img = imread(image_path)
     input_img = preprocess_image(input_img)
     input_img = numpy.expand_dims(input_img, axis=0)
     input_img = numpy.expand_dims(input_img, axis=0)

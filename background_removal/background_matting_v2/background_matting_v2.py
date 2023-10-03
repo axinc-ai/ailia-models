@@ -8,7 +8,7 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
+from arg_utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from detector_utils import load_image  # noqa: E402
 import webcamera_utils  # noqa: E402
@@ -174,9 +174,12 @@ def recognize_from_video(net):
     # prepare background image
     bgr_img = bgr_image((f_h, f_w))
 
+    frame_shown = False
     while True:
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
             break
 
         # inference
@@ -188,6 +191,7 @@ def recognize_from_video(net):
         res_img = cv2.cvtColor(res_img, cv2.COLOR_RGB2BGR)
 
         cv2.imshow('frame', res_img)
+        frame_shown = True
 
         # save results
         if writer is not None:

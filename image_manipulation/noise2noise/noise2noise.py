@@ -8,7 +8,7 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
+from arg_utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from image_utils import load_image  # noqa: E402
 import webcamera_utils  # noqa: E402
@@ -124,9 +124,12 @@ def recognize_from_video():
     else:
         writer = None
 
+    frame_shown = False
     while(True):
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
             break
 
         _, resized_image = webcamera_utils.adjust_frame_size(
@@ -151,6 +154,7 @@ def recognize_from_video():
         # postprocessing
         output_img = preds_ailia[0].transpose(1, 2, 0)
         cv2.imshow('frame', output_img)
+        frame_shown = True
 
         # # save results
         # if writer is not None:

@@ -53,7 +53,7 @@ ONNX opset = 10
 
 ## Framework
 
-Chainer 6.3.0
+Chainer 6.3.0, Pytorch
 
 ## Netron
 

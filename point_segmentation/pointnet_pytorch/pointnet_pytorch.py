@@ -8,7 +8,7 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
+from arg_utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 
 # logger
@@ -87,6 +87,11 @@ parser.add_argument(
         'rocket', 'skateboard', 'table'
     ),
     help='choice class'
+)
+parser.add_argument(
+    '--gui',
+    action='store_true',
+    help='Operate the detection result with GUI'
 )
 args = update_parser(parser)
 
@@ -189,7 +194,9 @@ def recognize_from_points(filename, net_seg, net_cls):
     logger.info(f'saved at : {savepath}')
 
     plt.savefig(savepath, dpi=120)
-    plt.show()
+    if args.gui:
+        plt.show()
+        
     logger.info('Script finished successfully.')
 
 

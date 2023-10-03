@@ -9,7 +9,7 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
+from arg_utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 import webcamera_utils  # noqa: E402
 
@@ -127,13 +127,17 @@ def recognize_from_video(net):
     else:
         writer = None
 
+    frame_shown = False
     while(True):
         ret, img = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
+            break
 
         out = segment_image(img, net)
         cv2.imshow('frame', out)
+        frame_shown = True
 
         # save results
         if writer is not None:
@@ -151,7 +155,8 @@ def main():
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
 
     # model initialize
-    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
+    mem_mode = ailia.get_memory_mode(reduce_constant=True, reuse_interstage=True)
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id, memory_mode=mem_mode)
 
     if args.video is not None:
         # video mode

@@ -1,23 +1,24 @@
+import math
+import pathlib
 import sys
 import time
-import math
-
-import cv2
-import numpy as np
-import h5py
-import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
 
 import ailia
+import cv2
+import h5py
+import matplotlib.pyplot as plt
+import numpy as np
+from mpl_toolkits.mplot3d import Axes3D
 
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
-from image_utils import load_image  # noqa: E402
-from model_utils import check_and_download_models  # noqa: E402
-import webcamera_utils  # noqa: E402
-
 # logger
-from logging import getLogger   # noqa: E402
+from logging import getLogger  # noqa: E402
+
+import webcamera_utils  # noqa: E402
+from image_utils import imread, load_image  # noqa: E402
+from model_utils import check_and_download_models  # noqa: E402
+from arg_utils import get_base_parser, get_savepath, update_parser  # noqa: E402
+
 logger = getLogger(__name__)
 
 
@@ -43,6 +44,11 @@ parser.add_argument(
     action='store_true',
     help='By default, the optimized model is used, but with this option, ' +
     'you can switch to the normal (not optimized) model'
+)
+parser.add_argument(
+    '--gui',
+    action='store_true',
+    help='Operate the detection result with GUI'
 )
 args = update_parser(parser)
 
@@ -437,7 +443,7 @@ def recognize_from_image():
     for image_path in args.input:
         # prepare input data
         logger.info(image_path)
-        src_img = cv2.imread(image_path)
+        src_img = imread(image_path)
         input_image = load_image(
             image_path,
             (IMAGE_HEIGHT, IMAGE_WIDTH),
@@ -464,12 +470,16 @@ def recognize_from_image():
         savepath = get_savepath(args.savepath, image_path)
         logger.info(f'saved at : {savepath}')
         cv2.imwrite(savepath, src_img)
-    logger.info('Script finished successfully.')
 
-    # display 3d pose
-    plt.show()
-    # fig = plt.figure()
-    # fig.savefig("output_3dpose.png")
+        # display 3d pose
+        savepath_3d = pathlib.PurePath(savepath)
+        savepath_3d = savepath_3d.stem+"_3dpose"+savepath_3d.suffix
+        logger.info(f'saved at : {savepath_3d}')
+        plt.savefig(savepath_3d, dpi=120)
+        if args.gui:
+            plt.show()
+
+    logger.info('Script finished successfully.')
 
 
 def recognize_from_video():
@@ -494,10 +504,13 @@ def recognize_from_video():
         writer = webcamera_utils.get_writer(args.savepath, f_h, f_w)
     else:
         writer = None
-
+    
+    frame_shown = False
     while(True):
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
             break
 
         input_image, input_data = webcamera_utils.adjust_frame_size(
@@ -511,6 +524,7 @@ def recognize_from_video():
         # postprocessing
         display_result(input_image, pose, baseline)
         cv2.imshow('frame', input_image)
+        frame_shown = True
 
         # display 3d pose
         plt.pause(0.01)

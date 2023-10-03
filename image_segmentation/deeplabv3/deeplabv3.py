@@ -1,23 +1,24 @@
-import time
 import sys
-
-import cv2
-import numpy as np
-from matplotlib import pyplot as plt
-from matplotlib import gridspec
+import time
 
 import ailia
+import cv2
+import numpy as np
+from matplotlib import gridspec
+from matplotlib import pyplot as plt
+
 from deeplab_utils import *
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
-from model_utils import check_and_download_models  # noqa: E402
-from image_utils import load_image  # noqa: E402
-import webcamera_utils  # noqa: E402
-
 # logger
-from logging import getLogger   # noqa: E402
+from logging import getLogger  # noqa: E402
+
+import webcamera_utils  # noqa: E402
+from image_utils import imread, load_image  # noqa: E402
+from model_utils import check_and_download_models  # noqa: E402
+from arg_utils import get_base_parser, get_savepath, update_parser  # noqa: E402
+
 logger = getLogger(__name__)
 
 
@@ -114,7 +115,7 @@ def segment_from_image():
         # cv2.imwrite('seg_test.png', seg_image)
 
         # save org_img, segmentation-map, segmentation-overlay
-        org_img = cv2.cvtColor(cv2.imread(image_path), cv2.COLOR_BGR2RGB)
+        org_img = cv2.cvtColor(imread(image_path), cv2.COLOR_BGR2RGB)
         org_img = cv2.resize(org_img, (seg_image.shape[1], seg_image.shape[0]))
 
         plt.figure(figsize=(15, 5))
@@ -174,9 +175,12 @@ def segment_from_video():
     else:
         writer = None
 
+    frame_shown = False
     while(True):
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
             break
 
         input_image, input_data = webcamera_utils.preprocess_frame(
@@ -200,6 +204,7 @@ def segment_from_video():
         )
 
         cv2.imshow('frame', seg_image)
+        frame_shown = True
 
         # save results
         if writer is not None:

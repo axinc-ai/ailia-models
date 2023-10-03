@@ -1,20 +1,22 @@
 import sys
 import time
 
-import numpy as np
-import cv2
-
 import ailia
+import cv2
+import numpy as np
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
-from model_utils import check_and_download_models  # noqa: E402
-import webcamera_utils  # noqa: E402
-from u2net_utils import load_image, transform, save_result, norm  # noqa: E402
-
 # logger
-from logging import getLogger   # noqa: E402
+from logging import getLogger  # noqa: E402
+
+import webcamera_utils  # noqa: E402
+from image_utils import imread  # noqa: E402
+from model_utils import check_and_download_models  # noqa: E402
+from arg_utils import get_base_parser, get_savepath, update_parser  # noqa: E402
+
+from u2net_utils import load_image, norm, save_result, transform  # noqa: E402
+
 logger = getLogger(__name__)
 
 
@@ -116,7 +118,7 @@ def recognize_from_image(net):
 
         # composite
         if args.composite:
-            image = cv2.imread(image_path)
+            image = imread(image_path)
             image = cv2.cvtColor(image, cv2.COLOR_BGR2BGRA)
             image[:, :, 3] = cv2.resize(pred, (w, h)) * 255
             cv2.imwrite(savepath, image)
@@ -138,10 +140,13 @@ def recognize_from_video(net):
         writer = webcamera_utils.get_writer(args.savepath, f_h, f_w) # composite
     else:
         writer = None
-
+    
+    frame_shown = False
     while(True):
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
             break
 
         if args.rgb and image.shape[2] == 3:
@@ -165,6 +170,7 @@ def recognize_from_video(net):
             pred = cv2.cvtColor(pred, cv2.COLOR_RGB2BGR)
 
         cv2.imshow('frame', pred)
+        frame_shown = True
 
         # save results
         if writer is not None:

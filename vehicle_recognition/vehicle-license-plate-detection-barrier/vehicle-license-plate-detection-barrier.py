@@ -10,7 +10,7 @@ import numpy as np
 import ailia
 
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
+from arg_utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from detector_utils import load_image  # noqa: E402C
 import webcamera_utils  # noqa: E402
@@ -191,9 +191,13 @@ def recognize_from_video(net):
         writer = None
 
     palette = get_palette(100)
+    
+    frame_shown = False
     while (True):
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
             break
 
         frame, resized_img = webcamera_utils.adjust_frame_size(frame, IMAGE_SIZE, IMAGE_SIZE)
@@ -203,6 +207,7 @@ def recognize_from_video(net):
 
         frame = draw_detections(frame, detections, palette, threshold)
         cv2.imshow('frame', frame)
+        frame_shown = True
 
         # save results
         if writer is not None:

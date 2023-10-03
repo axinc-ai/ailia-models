@@ -271,7 +271,7 @@ class TrackHead(object):
         active_ids = self.track_pool.get_active_ids()
 
         ids = target.ids.tolist()
-        idxs = np.zeros((len(ids),), dtype=np.bool)
+        idxs = np.zeros((len(ids),), dtype=bool)
         for _i, _id in enumerate(ids):
             if _id in active_ids:
                 idxs[_i] = True

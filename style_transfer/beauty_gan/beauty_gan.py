@@ -9,7 +9,7 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
+from arg_utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from image_utils import normalize_image  # noqa: E402
 from detector_utils import load_image  # noqa: E402
@@ -209,9 +209,12 @@ def recognize_from_video(net, face_net):
     img_B_style = cv2.cvtColor(cv2.resize(img_B,(f_w//4,f_h//4)),cv2.COLOR_RGB2BGR) 
     img_B, _ = preprocess(img_B)
 
+    frame_shown = False
     while True:
         ret, frame = capture.read()
         if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
             break
         if not ret:
             continue
@@ -238,6 +241,7 @@ def recognize_from_video(net, face_net):
 
         # show
         cv2.imshow('frame', res_img)
+        frame_shown = True
 
     capture.release()
     cv2.destroyAllWindows()
