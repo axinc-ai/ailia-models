@@ -72,8 +72,6 @@ LandmarksSubsetIdxs = [
     466, 468, 469, 470, 471, 472, 473, 474, 475, 476, 477
 ]
 
-onnx = False
-
 
 def plot_to_npy(fig):
     buf = BytesIO()
