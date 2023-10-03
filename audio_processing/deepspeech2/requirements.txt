@@ -26,4 +26,4 @@ SoundFile==0.10.3.post1
 threadpoolctl==2.1.0
 torch==1.13.1
 torchvision==0.7.0
-urllib3==1.26.5
+urllib3==1.26.17
