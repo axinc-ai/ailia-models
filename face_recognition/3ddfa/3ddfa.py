@@ -2,6 +2,7 @@ import sys
 import time
 from itertools import product as product
 from math import ceil
+import pickle
 from logging import getLogger
 
 import numpy as np
@@ -12,13 +13,14 @@ import ailia
 # import original modules
 sys.path.append('../../util')
 from arg_utils import get_base_parser, update_parser, get_savepath  # noqa
-from model_utils import check_and_download_models  # noqa
+from model_utils import check_and_download_models, check_and_download_file  # noqa
 from image_utils import normalize_image  # noqa
 from detector_utils import load_image  # noqa
 from webcamera_utils import get_capture, get_writer  # noqa
+from nms_utils import nms_boxes
 
 from box_utils import decode
-from nms_utils import nms_boxes
+from tddfa_utils import parse_param, similar_transform
 
 logger = getLogger(__name__)
 
@@ -30,15 +32,20 @@ WEIGHT_PATH = 'mb1_120x120.onnx'
 MODEL_PATH = 'mb1_120x120.onnx.prototxt'
 WEIGHT_DET_PATH = 'FaceBoxesProd.onnx'
 MODEL_DET_PATH = 'FaceBoxesProd.onnx.prototxt'
+WEIGHT_BFM_PATH = 'bfm_noneck_v3.onnx'
+MODEL_BFM_PATH = 'bfm_noneck_v3.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/3ddfa/'
 
 IMAGE_PATH = 'emma.jpg'
 SAVE_IMAGE_PATH = 'output.png'
 
-THRESHOLD = 0.4
-IOU = 0.45
-IMAGE_HEIGHT = 720
-IMAGE_WIDTH = 1080
+PKL_PARAM = 'param_mean_std_62d_120x120.pkl'
+BFM_PARAM = 'bfm_noneck_v3.npy'
+
+IMG_SIZE = 120
+
+DET_MAX_HEIGHT = 720
+DET_MAX_WIDTH = 1080
 
 # ======================
 # Arguemnt Parser Config
@@ -46,25 +53,6 @@ IMAGE_WIDTH = 1080
 
 parser = get_base_parser(
     '3DDFA_V2', IMAGE_PATH, SAVE_IMAGE_PATH
-)
-parser.add_argument(
-    '-d', '--detection',
-    action='store_true',
-    help='Use object detection.'
-)
-parser.add_argument(
-    '-th', '--threshold',
-    default=THRESHOLD, type=float,
-    help='object confidence threshold'
-)
-parser.add_argument(
-    '-iou', '--iou',
-    default=IOU, type=float,
-    help='IOU threshold for NMS'
-)
-parser.add_argument(
-    '-m', '--model_type', default='xxx', choices=('xxx', 'XXX'),
-    help='model type'
 )
 parser.add_argument(
     '--onnx',
@@ -122,8 +110,20 @@ class PriorBox(object):
         return output
 
 
-# def draw_bbox(img, bboxes):
-#     return img
+def parse_roi_box_from_bbox(bbox):
+    left, top, right, bottom = bbox[:4]
+    old_size = (right - left + bottom - top) / 2
+    center_x = right - (right - left) / 2.0
+    center_y = bottom - (bottom - top) / 2.0 + old_size * 0.14
+    size = int(old_size * 1.58)
+
+    roi_box = [0] * 4
+    roi_box[0] = center_x - size / 2
+    roi_box[1] = center_y - size / 2
+    roi_box[2] = roi_box[0] + size
+    roi_box[3] = roi_box[1] + size
+
+    return roi_box
 
 
 # ======================
@@ -133,10 +133,10 @@ class PriorBox(object):
 def det_preprocess(img):
     h, w, _ = img.shape
 
-    if h > IMAGE_HEIGHT:
-        scale = IMAGE_HEIGHT / h
-    if w * scale > IMAGE_WIDTH:
-        scale *= IMAGE_WIDTH / (w * scale)
+    if h > DET_MAX_HEIGHT:
+        scale = DET_MAX_HEIGHT / h
+    if w * scale > DET_MAX_WIDTH:
+        scale *= DET_MAX_WIDTH / (w * scale)
 
     h_s = int(scale * h)
     w_s = int(scale * w)
@@ -210,6 +210,82 @@ def face_detect(models, img):
     return dets
 
 
+def preprocess(img, roi_box):
+    h, w, _ = img.shape
+
+    sx, sy, ex, ey = [int(round(_)) for _ in roi_box]
+    dh, dw = ey - sy, ex - sx
+
+    crop_img = np.zeros((dh, dw, 3), dtype=np.uint8)
+    if sx < 0:
+        sx, dsx = 0, -sx
+    else:
+        dsx = 0
+
+    if ex > w:
+        ex, dex = w, dw - (ex - w)
+    else:
+        dex = dw
+
+    if sy < 0:
+        sy, dsy = 0, -sy
+    else:
+        dsy = 0
+
+    if ey > h:
+        ey, dey = h, dh - (ey - h)
+    else:
+        dey = dh
+
+    crop_img[dsy:dey, dsx:dex] = img[sy:ey, sx:ex]
+
+    img = cv2.resize(crop_img, dsize=(IMG_SIZE, IMG_SIZE), interpolation=cv2.INTER_LINEAR)
+    img = (img - 127.5) / 128.
+
+    img = img.transpose(2, 0, 1)  # HWC -> CHW
+    img = np.expand_dims(img, axis=0)
+    img = img.astype(np.float32)
+
+    return img
+
+
+def recon_vers(models, param_lst, roi_box_lst, dense_flag=False):
+    size = IMG_SIZE
+
+    net = models["bfm"]
+
+    bfm_param = models["bfm_param"]
+    u_base = bfm_param["u_base"]
+    w_shp_base = bfm_param["w_shp_base"]
+    w_exp_base = bfm_param["w_exp_base"]
+
+    ver_lst = []
+    for param, roi_box in zip(param_lst, roi_box_lst):
+        R, offset, alpha_shp, alpha_exp = parse_param(param)
+
+        if dense_flag:
+            # feedforward
+            if not args.onnx:
+                output = net.predict([R, offset, alpha_shp, alpha_exp])
+            else:
+                output = net.run(None, {
+                    'R': R, 'offset': offset, 'alpha_shp': alpha_shp, 'alpha_exp': alpha_exp
+                })
+            pts3d = output[0]
+            pts3d = similar_transform(pts3d, roi_box, size)
+        else:
+            pts3d = R @ (u_base + w_shp_base @ alpha_shp + w_exp_base @ alpha_exp). \
+                reshape(3, -1, order='F') + offset
+            pts3d = similar_transform(pts3d, roi_box, size)
+
+        ver_lst.append(pts3d)
+
+    return ver_lst
+
+
+param_mean_std = pickle.load(open(PKL_PARAM, 'rb'))
+
+
 def predict(models, img):
     dets = face_detect(models, img)
 
@@ -219,6 +295,37 @@ def predict(models, img):
         return
 
     logger.info(f'Detect {n} faces')
+
+    net = models["net"]
+    img_orig = img
+
+    param_mean = param_mean_std.get('mean')
+    param_std = param_mean_std.get('std')
+
+    # Crop image, forward to get the param
+    param_lst = []
+    roi_box_lst = []
+    for bbox in dets:
+        roi_box = parse_roi_box_from_bbox(bbox)
+
+        roi_box_lst.append(roi_box)
+        img = preprocess(img_orig, roi_box)
+
+        # feedforward
+        if not args.onnx:
+            output = net.predict([img])
+        else:
+            output = net.run(None, {'input': img})
+        param = output[0]
+
+        param = param.flatten().astype(np.float32)
+        param = param * param_std + param_mean  # re-scale
+        param_lst.append(param)
+
+    # mode = '2d_sparse'
+    mode = 'pose'
+    dense_flag = mode in ('2d_dense', '3d', 'depth', 'pncc', 'uv_tex', 'ply', 'obj')
+    ver_lst = recon_vers(models, param_lst, roi_box_lst, dense_flag=dense_flag)
 
 
 def recognize_from_image(models):
@@ -310,6 +417,8 @@ def main():
     # model files check and download
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
     check_and_download_models(WEIGHT_DET_PATH, MODEL_DET_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_BFM_PATH, MODEL_BFM_PATH, REMOTE_PATH)
+    check_and_download_file(BFM_PARAM, REMOTE_PATH)
 
     env_id = args.env_id
 
@@ -317,16 +426,22 @@ def main():
     if not args.onnx:
         net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
         det_net = ailia.Net(MODEL_DET_PATH, WEIGHT_DET_PATH, env_id=env_id)
+        bfm_net = ailia.Net(MODEL_BFM_PATH, WEIGHT_BFM_PATH, env_id=env_id)
     else:
         import onnxruntime
         cuda = 0 < ailia.get_gpu_environment_id()
         providers = ['CUDAExecutionProvider', 'CPUExecutionProvider'] if cuda else ['CPUExecutionProvider']
         net = onnxruntime.InferenceSession(WEIGHT_PATH, providers=providers)
         det_net = onnxruntime.InferenceSession(WEIGHT_DET_PATH, providers=providers)
+        bfm_net = onnxruntime.InferenceSession(WEIGHT_BFM_PATH, providers=providers)
+
+    bfm_param = np.load(BFM_PARAM, allow_pickle=True).item()
 
     models = {
         "net": net,
         "det": det_net,
+        "bfm": bfm_net,
+        "bfm_param": bfm_param,
     }
 
     if args.video is not None:
