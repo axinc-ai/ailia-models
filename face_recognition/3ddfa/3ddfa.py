@@ -21,6 +21,7 @@ from nms_utils import nms_boxes
 
 from box_utils import decode
 from tddfa_utils import parse_param, similar_transform
+from draw_utils import draw_landmarks, viz_pose
 
 logger = getLogger(__name__)
 
@@ -53,6 +54,11 @@ DET_MAX_WIDTH = 1080
 
 parser = get_base_parser(
     '3DDFA_V2', IMAGE_PATH, SAVE_IMAGE_PATH
+)
+parser.add_argument(
+    '-m', '--mode', default='2d_sparse',
+    choices=('2d_sparse', '2d_dense', 'pose'),
+    help='execute onnxruntime version.'
 )
 parser.add_argument(
     '--onnx',
@@ -124,6 +130,19 @@ def parse_roi_box_from_bbox(bbox):
     roi_box[3] = roi_box[1] + size
 
     return roi_box
+
+
+def draw_result(img, param_lst, ver_lst):
+    mode = args.mode
+
+    if mode == '2d_sparse':
+        img = draw_landmarks(img, ver_lst, dense_flag=False)
+    elif mode == '2d_dense':
+        img = draw_landmarks(img, ver_lst, dense_flag=True)
+    elif mode == 'pose':
+        viz_pose(img, param_lst, ver_lst)
+
+    return img
 
 
 # ======================
@@ -287,12 +306,14 @@ param_mean_std = pickle.load(open(PKL_PARAM, 'rb'))
 
 
 def predict(models, img):
+    mode = args.mode
+
     dets = face_detect(models, img)
 
     n = len(dets)
     if n == 0:
-        logger.info(f'No face detected, exit')
-        return
+        logger.info(f'No face detected')
+        return []
 
     logger.info(f'Detect {n} faces')
 
@@ -322,10 +343,10 @@ def predict(models, img):
         param = param * param_std + param_mean  # re-scale
         param_lst.append(param)
 
-    # mode = '2d_sparse'
-    mode = 'pose'
     dense_flag = mode in ('2d_dense', '3d', 'depth', 'pncc', 'uv_tex', 'ply', 'obj')
     ver_lst = recon_vers(models, param_lst, roi_box_lst, dense_flag=dense_flag)
+
+    return param_lst, ver_lst
 
 
 def recognize_from_image(models):
@@ -344,7 +365,7 @@ def recognize_from_image(models):
             total_time_estimation = 0
             for i in range(args.benchmark_count):
                 start = int(round(time.time() * 1000))
-                out = predict(models, img)
+                output = predict(models, img)
                 end = int(round(time.time() * 1000))
                 estimation_time = (end - start)
 
@@ -355,10 +376,10 @@ def recognize_from_image(models):
 
             logger.info(f'\taverage time estimation {total_time_estimation / (args.benchmark_count - 1)} ms')
         else:
-            out = predict(models, img)
+            output = predict(models, img)
 
-        # res_img = draw_bbox(out)
-        res_img = img
+        param_lst, ver_lst = output
+        res_img = draw_result(img, param_lst, ver_lst)
 
         # plot result
         savepath = get_savepath(args.savepath, image_path, ext='.png')
