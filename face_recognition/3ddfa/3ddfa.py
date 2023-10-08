@@ -21,7 +21,7 @@ from nms_utils import nms_boxes
 
 from box_utils import decode
 from tddfa_utils import parse_param, similar_transform
-from draw_utils import draw_landmarks, viz_pose
+from draw_utils import draw_landmarks, render, viz_pose
 
 logger = getLogger(__name__)
 
@@ -42,6 +42,7 @@ SAVE_IMAGE_PATH = 'output.png'
 
 PKL_PARAM = 'param_mean_std_62d_120x120.pkl'
 BFM_PARAM = 'bfm_noneck_v3.npy'
+PKL_BFM_TRI = 'tri.pkl'
 
 IMG_SIZE = 120
 
@@ -57,7 +58,7 @@ parser = get_base_parser(
 )
 parser.add_argument(
     '-m', '--mode', default='2d_sparse',
-    choices=('2d_sparse', '2d_dense', 'pose'),
+    choices=('2d_sparse', '2d_dense', '3d', 'pose'),
     help='execute onnxruntime version.'
 )
 parser.add_argument(
@@ -139,8 +140,15 @@ def draw_result(img, param_lst, ver_lst):
         img = draw_landmarks(img, ver_lst, dense_flag=False)
     elif mode == '2d_dense':
         img = draw_landmarks(img, ver_lst, dense_flag=True)
+    elif mode == '3d':
+        if not hasattr(draw_result, 'tri'):
+            tri = pickle.load(open(PKL_BFM_TRI, 'rb'))
+            tri = tri.T.astype(np.int32)
+            draw_result.tri = tri
+        tri = draw_result.tri
+        img = render(img, ver_lst, tri, alpha=0.6)
     elif mode == 'pose':
-        viz_pose(img, param_lst, ver_lst)
+        img = viz_pose(img, param_lst, ver_lst)
 
     return img
 
@@ -302,9 +310,6 @@ def recon_vers(models, param_lst, roi_box_lst, dense_flag=False):
     return ver_lst
 
 
-param_mean_std = pickle.load(open(PKL_PARAM, 'rb'))
-
-
 def predict(models, img):
     mode = args.mode
 
@@ -320,8 +325,12 @@ def predict(models, img):
     net = models["net"]
     img_orig = img
 
-    param_mean = param_mean_std.get('mean')
-    param_std = param_mean_std.get('std')
+    if not hasattr(predict, 'mean_std'):
+        predict.mean_std = pickle.load(open(PKL_PARAM, 'rb'))
+
+    mean_std = predict.mean_std
+    param_mean = mean_std.get('mean')
+    param_std = mean_std.get('std')
 
     # Crop image, forward to get the param
     param_lst = []

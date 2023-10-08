@@ -1,5 +1,7 @@
+import os
 from io import BytesIO
 from math import cos, atan2, asin, sqrt
+import ctypes
 
 import cv2
 import numpy as np
@@ -195,3 +197,68 @@ def viz_pose(img, param_lst, ver_lst):
         print(f'yaw: {pose[0]:.1f}, pitch: {pose[1]:.1f}, roll: {pose[2]:.1f}')
 
     return img
+
+
+"""
+render
+"""
+
+
+class TrianglesMeshRender:
+    def __init__(
+            self,
+            light=(0, 0, 5),
+            direction=(0.6, 0.6, 0.6),
+            ambient=(0.3, 0.3, 0.3)
+    ):
+        clibs = "asset/render.so"
+        if not os.path.exists(clibs):
+            raise Exception(
+                f'{clibs} not found, please build it first, by run '
+                f'"gcc -shared -Wall -O3 render.c -o render.so -fPIC" in asset directory')
+
+        self._clibs = ctypes.CDLL(clibs)
+
+        self._light = np.array(light, dtype=np.float32)
+        self._light = np.ctypeslib.as_ctypes(self._light)
+
+        self._direction = np.array(direction, dtype=np.float32)
+        self._direction = np.ctypeslib.as_ctypes(self._direction)
+
+        self._ambient = np.array(ambient, dtype=np.float32)
+        self._ambient = np.ctypeslib.as_ctypes(self._ambient)
+
+    def __call__(self, vertices, triangles, bg):
+        tri_nums = triangles.shape[0]
+        ver_nums = vertices.shape[0]
+        bg_shape = bg.shape
+
+        triangles = np.ctypeslib.as_ctypes(3 * triangles)  # Attention
+        vertices = np.ctypeslib.as_ctypes(vertices.copy(order='C'))
+        bg = np.ctypeslib.as_ctypes(bg)
+        self._clibs._render(
+            triangles, tri_nums,
+            self._light, self._direction, self._ambient,
+            vertices, ver_nums,
+            bg, bg_shape[0], bg_shape[1]
+        )
+
+
+def render(img, ver_lst, tri, alpha=0.6, with_bg_flag=True):
+    if with_bg_flag:
+        overlap = img.copy()
+    else:
+        overlap = np.zeros_like(img)
+
+    render_app = TrianglesMeshRender()
+
+    for ver_ in ver_lst:
+        ver = np.ascontiguousarray(ver_.T)  # transpose
+        render_app(ver, tri, bg=overlap)
+
+    if with_bg_flag:
+        res = cv2.addWeighted(img, 1 - alpha, overlap, alpha, 0)
+    else:
+        res = overlap
+
+    return res
