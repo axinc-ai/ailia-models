@@ -421,10 +421,11 @@ def recognize_from_video(net):
 
         # inference
         img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        out = predict(net, img)
+        output = predict(net, img)
+        param_lst, ver_lst = output
 
         # plot result
-        res_img = draw_bbox(frame, out)
+        res_img = draw_result(frame, param_lst, ver_lst)
 
         # show
         cv2.imshow('frame', res_img)
