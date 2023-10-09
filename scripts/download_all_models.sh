@@ -90,10 +90,11 @@ cd ../../face_recognition/face-anti-spoofing; python3 face-anti-spoofing.py ${OP
 cd ../../face_recognition/ax_facial_features; python3 ax_facial_features.py ${OPTION}
 cd ../../face_recognition/6d_repnet; python3 6d_repnet.py ${OPTION}
 cd ../../face_recognition/hsemotion; python3 hsemotion.py ${OPTION}
+cd ../../face_recognition/facemesh_v2; python3 facemesh_v2.py ${OPTION}
+cd ../../face_recognition/3ddfa; python3 3ddfa$.py ${OPTION}
 cd ../../frame_interpolation/flavr; python3 flavr.py ${OPTION}
 cd ../../frame_interpolation/cain; python3 cain.py ${OPTION}
 cd ../../frame_interpolation/film; python3 film.py ${OPTION}
-cd ../../face_recognition/facemesh_v2; python3 facemesh_v2.py ${OPTION}
 cd ../../generative_adversarial_networks/council-gan; python3 council-gan.py --glasses ${OPTION}
 cd ../../generative_adversarial_networks/council-gan; python3 council-gan.py --m2f ${OPTION}
 cd ../../generative_adversarial_networks/council-gan; python3 council-gan.py --anime ${OPTION}
