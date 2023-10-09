@@ -6,16 +6,16 @@
 
 (Image from https://github.com/cleardusk/3DDFA_V2/blob/master/examples/inputs/emma.jpg)
 
+## Output
+
+![Output](output.png)
+
 ## Setup
 
 Build the the faster mesh render. (for 3d drawing)
 ```bash
 sh ./build.sh
 ```
-
-## Output
-
-![Output](output.png)
 
 ## Usage
 Automatically downloads the onnx and prototxt files on the first run.
