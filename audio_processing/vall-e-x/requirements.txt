@@ -2,6 +2,8 @@ tokenizers
 langid
 unidecode
 pyopenjtalk-prebuilt
+librosa
+soundfile
 pypinyin # for chinese
 inflect # for english
 cn2an # for chinese
