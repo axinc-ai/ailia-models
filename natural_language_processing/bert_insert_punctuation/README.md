@@ -4,8 +4,8 @@
 A `SENTENCE` without punctuation.
 
 ### output
-A text with punctuations inserted.
-(with argument -sc: A dictionary of predicted punctuations with score)
+without argument $-sc$: A text with punctuations inserted.
+with argument $-sc$: A dictionary of predicted punctuations with score.
 
 ### Usage
 Set the `SENTENCE` as an argument.
