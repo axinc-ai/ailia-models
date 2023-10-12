@@ -173,7 +173,7 @@ def recognize_from_video():
             iou_threshold=IOU
         )
 
-        res_img = plot_results(detections, frame, FACE_CATEGORY, False)
+        res_img = plot_results(detections, frame, FACE_CATEGORY, logging=False)
         cv2.imshow('frame', res_img)
         frame_shown = True
 

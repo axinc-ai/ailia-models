@@ -294,7 +294,7 @@ def recognize_from_video():
         img = cv2.cvtColor(frame, cv2.COLOR_BGR2BGRA)
         detector.compute(img, THRESHOLD, IOU)
         pose_detections = pose_estimation(detector, pose, img)
-        res_img = plot_results(detector, pose, frame, COCO_CATEGORY, pose_detections, False)
+        res_img = plot_results(detector, pose, frame, COCO_CATEGORY, pose_detections, logging=False)
         cv2.imshow('frame', res_img)
         frame_shown = True
         # save results
