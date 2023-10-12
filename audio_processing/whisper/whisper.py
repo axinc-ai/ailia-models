@@ -3,7 +3,6 @@ import sys
 import time
 from collections import namedtuple
 import platform
-import os
 
 import numpy as np
 
@@ -12,12 +11,13 @@ sys.path.append('../../util')
 # logger
 from logging import getLogger  # noqa
 
-from decode_utils import (ApplyTimestampRules, BeamSearchDecoder,
-                          GreedyDecoder, MaximumLikelihoodRanker,
-                          SuppressBlank, SuppressTokens)
+from decode_utils import (
+    ApplyTimestampRules, BeamSearchDecoder,
+    GreedyDecoder, MaximumLikelihoodRanker,
+    SuppressBlank, SuppressTokens)
 from math_utils import softmax
 from microphone_utils import start_microphone_input  # noqa
-from model_utils import check_and_download_models  # noqa
+from model_utils import check_and_download_models, check_and_download_file  # noqa
 from languages import LANGUAGES, TO_LANGUAGE_CODE
 from arg_utils import get_base_parser, get_savepath, update_parser  # noqa
 
@@ -29,7 +29,6 @@ logger = getLogger(__name__)
 
 WAV_PATH = 'demo.wav'
 SAVE_TEXT_PATH = 'output.txt'
-
 
 # ======================
 # Arguemnt Parser Config
@@ -44,7 +43,7 @@ parser.add_argument(
 )
 parser.add_argument(
     '-m', '--model_type', default='small',
-    choices=('tiny', 'base', 'small', 'medium'),
+    choices=('tiny', 'base', 'small', 'medium', 'large'),
     help='model type'
 )
 parser.add_argument(
@@ -57,7 +56,7 @@ parser.add_argument(
     "--best_of", type=float, default=5,
     help="number of candidates when sampling with non-zero temperature")
 parser.add_argument(
-    "--beam_size", type=int, default=None, # modified for ailia models, official whisper specifies 5
+    "--beam_size", type=int, default=None,  # modified for ailia models, official whisper specifies 5
     help="number of beams in beam search, only applicable when temperature is zero, None means use greedy search")
 parser.add_argument(
     "--patience", type=float, default=None,
@@ -137,11 +136,13 @@ parser.add_argument(
 args = update_parser(parser)
 
 if args.ailia_audio:
-    from ailia_audio_utils import (CHUNK_LENGTH, HOP_LENGTH, N_FRAMES, SAMPLE_RATE,
-                            load_audio, log_mel_spectrogram, pad_or_trim)
+    from ailia_audio_utils import (
+        CHUNK_LENGTH, HOP_LENGTH, N_FRAMES, SAMPLE_RATE,
+        load_audio, log_mel_spectrogram, pad_or_trim)
 else:
-    from audio_utils import (CHUNK_LENGTH, HOP_LENGTH, N_FRAMES, SAMPLE_RATE,
-                            load_audio, log_mel_spectrogram, pad_or_trim)
+    from audio_utils import (
+        CHUNK_LENGTH, HOP_LENGTH, N_FRAMES, SAMPLE_RATE,
+        load_audio, log_mel_spectrogram, pad_or_trim)
 
 if not args.disable_ailia_tokenizer:
     from ailia_tokenizer import get_tokenizer
@@ -158,6 +159,7 @@ dims_dict = {
     'base': ModelDimensions(80, 1500, 512, 8, 6, 51865, 448, 512, 8, 6),
     'small': ModelDimensions(80, 1500, 768, 12, 12, 51865, 448, 768, 12, 12),
     'medium': ModelDimensions(80, 1500, 1024, 16, 24, 51865, 448, 1024, 16, 24),
+    'large': ModelDimensions(80, 1500, 1280, 20, 32, 51865, 448, 1280, 20, 32),
 }
 dims = dims_dict[args.model_type]
 
@@ -173,8 +175,9 @@ if not args.onnx:
     AILIA_VERSION_MAJOR = int(version[0])
     AILIA_VERSION_MINOR = int(version[1])
     AILIA_VERSION_REVISION = int(version[2])
-    REQUIRE_CONSTANT_SHAPE_BETWEEN_INFERENCE = (AILIA_VERSION_MAJOR<=1 and AILIA_VERSION_MINOR<=2 and AILIA_VERSION_REVISION<14)
-    COPY_BLOB_DATA_ENABLE = (AILIA_VERSION_MAJOR<=1 and AILIA_VERSION_MINOR<=2 and AILIA_VERSION_REVISION>=15)
+    REQUIRE_CONSTANT_SHAPE_BETWEEN_INFERENCE = (
+            AILIA_VERSION_MAJOR <= 1 and AILIA_VERSION_MINOR <= 2 and AILIA_VERSION_REVISION < 14)
+    COPY_BLOB_DATA_ENABLE = (AILIA_VERSION_MAJOR <= 1 and AILIA_VERSION_MINOR <= 2 and AILIA_VERSION_REVISION >= 15)
     SAVE_ENC_SHAPE = ()
     SAVE_DEC_SHAPE = ()
 
@@ -195,14 +198,16 @@ if args.normal:
 
 if not args.dynamic_kv_cache:
     # 高速化のためKV_CACHEのサイズを最大サイズで固定化したバージョン
-    WEIGHT_DEC_TINY_PATH = "decoder_tiny_fix_kv_cache"+ OPT2 +".onnx"
-    MODEL_DEC_TINY_PATH = "decoder_tiny_fix_kv_cache"+ OPT2 +".onnx.prototxt"
-    WEIGHT_DEC_BASE_PATH = "decoder_base_fix_kv_cache"+ OPT2 +".onnx"
-    MODEL_DEC_BASE_PATH = "decoder_base_fix_kv_cache"+ OPT2 +".onnx.prototxt"
-    WEIGHT_DEC_SMALL_PATH = "decoder_small_fix_kv_cache"+ OPT2 +".onnx"
-    MODEL_DEC_SMALL_PATH = "decoder_small_fix_kv_cache"+ OPT2 +".onnx.prototxt"
-    WEIGHT_DEC_MEDIUM_PATH = "decoder_medium_fix_kv_cache"+ OPT2 +".onnx"
-    MODEL_DEC_MEDIUM_PATH = "decoder_medium_fix_kv_cache"+ OPT2 +".onnx.prototxt"
+    WEIGHT_DEC_TINY_PATH = "decoder_tiny_fix_kv_cache" + OPT2 + ".onnx"
+    MODEL_DEC_TINY_PATH = "decoder_tiny_fix_kv_cache" + OPT2 + ".onnx.prototxt"
+    WEIGHT_DEC_BASE_PATH = "decoder_base_fix_kv_cache" + OPT2 + ".onnx"
+    MODEL_DEC_BASE_PATH = "decoder_base_fix_kv_cache" + OPT2 + ".onnx.prototxt"
+    WEIGHT_DEC_SMALL_PATH = "decoder_small_fix_kv_cache" + OPT2 + ".onnx"
+    MODEL_DEC_SMALL_PATH = "decoder_small_fix_kv_cache" + OPT2 + ".onnx.prototxt"
+    WEIGHT_DEC_MEDIUM_PATH = "decoder_medium_fix_kv_cache" + OPT2 + ".onnx"
+    MODEL_DEC_MEDIUM_PATH = "decoder_medium_fix_kv_cache" + OPT2 + ".onnx.prototxt"
+    WEIGHT_DEC_LARGE_PATH = "decoder_large_fix_kv_cache" + OPT2 + ".onnx"
+    MODEL_DEC_LARGE_PATH = "decoder_large_fix_kv_cache" + OPT2 + ".onnx.prototxt"
 else:
     # KV_CACHEが推論ごとに変化するバージョン
     WEIGHT_DEC_TINY_PATH = "decoder_tiny.onnx"
@@ -213,16 +218,24 @@ else:
     MODEL_DEC_SMALL_PATH = "decoder_small.onnx.prototxt"
     WEIGHT_DEC_MEDIUM_PATH = "decoder_medium.onnx"
     MODEL_DEC_MEDIUM_PATH = "decoder_medium.onnx.prototxt"
+    WEIGHT_DEC_LARGE_PATH = "decoder_large.onnx"
+    MODEL_DEC_LARGE_PATH = "decoder_large.onnx.prototxt"
 
-WEIGHT_ENC_TINY_PATH = "encoder_tiny"+ OPT +".onnx"
-MODEL_ENC_TINY_PATH = "encoder_tiny"+ OPT +".onnx.prototxt"
-WEIGHT_ENC_BASE_PATH = "encoder_base"+ OPT +".onnx"
-MODEL_ENC_BASE_PATH = "encoder_base"+ OPT +".onnx.prototxt"
-WEIGHT_ENC_SMALL_PATH = "encoder_small"+ OPT +".onnx"
-MODEL_ENC_SMALL_PATH = "encoder_small"+ OPT +".onnx.prototxt"
-WEIGHT_ENC_MEDIUM_PATH = "encoder_medium"+ OPT +".onnx"
-MODEL_ENC_MEDIUM_PATH = "encoder_medium"+ OPT +".onnx.prototxt"
+WEIGHT_ENC_TINY_PATH = "encoder_tiny" + OPT + ".onnx"
+MODEL_ENC_TINY_PATH = "encoder_tiny" + OPT + ".onnx.prototxt"
+WEIGHT_ENC_BASE_PATH = "encoder_base" + OPT + ".onnx"
+MODEL_ENC_BASE_PATH = "encoder_base" + OPT + ".onnx.prototxt"
+WEIGHT_ENC_SMALL_PATH = "encoder_small" + OPT + ".onnx"
+MODEL_ENC_SMALL_PATH = "encoder_small" + OPT + ".onnx.prototxt"
+WEIGHT_ENC_MEDIUM_PATH = "encoder_medium" + OPT + ".onnx"
+MODEL_ENC_MEDIUM_PATH = "encoder_medium" + OPT + ".onnx.prototxt"
+WEIGHT_ENC_LARGE_PATH = "encoder_large" + OPT + ".onnx"
+MODEL_ENC_LARGE_PATH = "encoder_large" + OPT + ".onnx.prototxt"
+WEIGTH_ENC_LARGE_PB_PATH = "encoder_large_weights.pb"
+WEIGHT_DEC_LARGE_PB_PATH = "decoder_large_weights.pb"
+WEIGHT_DEC_LARGE_FIX_KV_CACHE_PB_PATH = "decoder_large_fix_kv_cache_weights.pb"
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/whisper/'
+
 
 # ======================
 # Secondaty Functions
@@ -356,7 +369,10 @@ def get_audio_features(enc_net, mel):
     return audio_features
 
 
-def inference_logits(dec_net, tokens, audio_features, kv_cache=None, initial_token_length=None, constant_audio_feature = False):
+def inference_logits(
+        dec_net, tokens, audio_features,
+        kv_cache=None, initial_token_length=None,
+        constant_audio_feature=False):
     n_group = tokens.shape[0]
     initial_token_length = initial_token_length if initial_token_length else tokens.shape[-1]
     is_init_kv_cache = False
@@ -394,29 +410,35 @@ def inference_logits(dec_net, tokens, audio_features, kv_cache=None, initial_tok
             logits = np.zeros((n_group, initial_token_length, dims.n_vocab), dtype=np.float32, order='C')
         else:
             logits = np.zeros((n_group, 1, dims.n_vocab), dtype=np.float32, order='C')
-        output = [logits, kv_cache] # static allocatin to reduce data copy
+        output = [logits, kv_cache]  # static allocatin to reduce data copy
         if REQUIRE_CONSTANT_SHAPE_BETWEEN_INFERENCE:
             global WEIGHT_DEC_PATH, MODEL_DEC_PATH, SAVE_DEC_SHAPE
 
             shape = (tokens.shape, audio_features.shape, kv_cache.shape)
             if SAVE_DEC_SHAPE != shape:
-                dec_net = ailia.Net(MODEL_DEC_PATH, WEIGHT_DEC_PATH, env_id=args.env_id, memory_mode=args.memory_mode)
+                dec_net = ailia.Net(
+                    MODEL_DEC_PATH, WEIGHT_DEC_PATH,
+                    env_id=args.env_id, memory_mode=args.memory_mode)
             SAVE_DEC_SHAPE = shape
 
-            dec_net.predict([tokens, audio_features, kv_cache, offset], output = output)
+            dec_net.predict([tokens, audio_features, kv_cache, offset], output=output)
         else:
             if is_init_kv_cache or not COPY_BLOB_DATA_ENABLE or args.dynamic_kv_cache:
                 if constant_audio_feature:
-                    dec_net.predict({"tokens":tokens, "kv_cache":kv_cache, "offset":offset}, output = output)
+                    dec_net.predict({
+                        "tokens": tokens, "kv_cache": kv_cache, "offset": offset},
+                        output=output)
                 else:
-                    dec_net.predict([tokens, audio_features, kv_cache, offset], output = output)
+                    dec_net.predict([tokens, audio_features, kv_cache, offset], output=output)
             else:
                 dec_net.copy_blob_data("kv_cache", "output_kv_cache", None)
                 output = [logits]
                 if constant_audio_feature:
-                    dec_net.predict({"tokens":tokens, "offset":offset}, output = output)
+                    dec_net.predict({"tokens": tokens, "offset": offset}, output=output)
                 else:
-                    dec_net.predict({"tokens":tokens, "audio_features": audio_features, "offset":offset}, output = output)
+                    dec_net.predict({
+                        "tokens": tokens, "audio_features": audio_features, "offset": offset},
+                        output=output)
     else:
         kv_cache = kv_cache.astype(np.float32)
         output = dec_net.run(None, {
@@ -547,7 +569,9 @@ def decode(enc_net, dec_net, mel, options):
         if args.debug:
             start = int(round(time.time() * 1000))
         constant_audio_feature = (i >= 2)
-        logits, kv_cache = inference_logits(dec_net, tokens, audio_features, kv_cache, initial_token_length, constant_audio_feature)
+        logits, kv_cache = inference_logits(
+            dec_net, tokens, audio_features, kv_cache, initial_token_length,
+            constant_audio_feature)
         if args.debug:
             end = int(round(time.time() * 1000))
             estimation_time = (end - start)
@@ -572,10 +596,10 @@ def decode(enc_net, dec_net, mel, options):
 
         if completed or tokens.shape[-1] > n_ctx:
             break
-            
+
         if args.intermediate:
             texts = [tokenizer.decode(t[len(initial_tokens):]).strip() for t in tokens]
-            print(texts[0][-32:]+ "\n\u001B[2A")
+            print(texts[0][-32:] + "\n\u001B[2A")
 
     # reshape the tensors to have (n_audio, n_group) as the first two dimensions
     audio_features = audio_features[:: n_group]
@@ -898,6 +922,10 @@ def main():
             'enc': (WEIGHT_ENC_MEDIUM_PATH, MODEL_ENC_MEDIUM_PATH),
             'dec': (WEIGHT_DEC_MEDIUM_PATH, MODEL_DEC_MEDIUM_PATH),
         },
+        'large': {
+            'enc': (WEIGHT_ENC_LARGE_PATH, MODEL_ENC_LARGE_PATH),
+            'dec': (WEIGHT_DEC_LARGE_PATH, MODEL_DEC_LARGE_PATH),
+        },
     }
     model_info = model_dic[args.model_type]
 
@@ -905,6 +933,12 @@ def main():
     WEIGHT_DEC_PATH, MODEL_DEC_PATH = model_info['dec']
     check_and_download_models(WEIGHT_ENC_PATH, MODEL_ENC_PATH, REMOTE_PATH)
     check_and_download_models(WEIGHT_DEC_PATH, MODEL_DEC_PATH, REMOTE_PATH)
+    if args.model_type == 'large':
+        check_and_download_file(WEIGTH_ENC_LARGE_PB_PATH, REMOTE_PATH)
+        if args.dynamic_kv_cache:
+            check_and_download_file(WEIGHT_DEC_LARGE_PB_PATH, REMOTE_PATH)
+        else:
+            check_and_download_file(WEIGHT_DEC_LARGE_FIX_KV_CACHE_PB_PATH, REMOTE_PATH)
 
     mic_info = None
     if args.V:
@@ -913,21 +947,29 @@ def main():
 
     pf = platform.system()
     if pf == "Darwin":
-        logger.info("This model not optimized for macOS GPU currently. So we will use BLAS (env_id = 1).")
+        logger.info(
+            "This model not optimized for macOS GPU currently."
+            " So we will use BLAS (env_id = 1).")
         args.env_id = 1
     else:
-        logger.info("This model uses a lot of memory. If an error occurs during execution, specify -e 0 and execute on the CPU.")
+        logger.info(
+            "This model uses a lot of memory."
+            " If an error occurs during execution, specify -e 0 and execute on the CPU.")
 
     # initialize
     if not args.onnx:
-        enc_net = ailia.Net(MODEL_ENC_PATH, WEIGHT_ENC_PATH, env_id=args.env_id, memory_mode=args.memory_mode)
-        dec_net = ailia.Net(MODEL_DEC_PATH, WEIGHT_DEC_PATH, env_id=args.env_id, memory_mode=args.memory_mode)
+        enc_net = ailia.Net(
+            MODEL_ENC_PATH, WEIGHT_ENC_PATH,
+            env_id=args.env_id, memory_mode=args.memory_mode)
+        dec_net = ailia.Net(
+            MODEL_DEC_PATH, WEIGHT_DEC_PATH,
+            env_id=args.env_id, memory_mode=args.memory_mode)
         if args.profile:
             dec_net.set_profile_mode(True)
     else:
         import onnxruntime
         providers = ["CPUExecutionProvider"]
-        #providers = ["CUDAExecutionProvider"]
+        # providers = ["CUDAExecutionProvider"]
         enc_net = onnxruntime.InferenceSession(WEIGHT_ENC_PATH, providers=providers)
         if args.profile:
             options = onnxruntime.SessionOptions()
@@ -948,6 +990,7 @@ def main():
             print(prof_file)
         else:
             print(dec_net.get_summary())
+
 
 if __name__ == '__main__':
     main()
