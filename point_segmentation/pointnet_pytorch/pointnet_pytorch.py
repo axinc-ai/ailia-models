@@ -2,6 +2,7 @@ import sys
 import time
 
 import numpy as np
+import matplotlib
 import matplotlib.pyplot as plt
 
 import ailia
@@ -162,7 +163,10 @@ def recognize_from_points(filename, net_seg, net_cls):
         pred_seg = predict_seg(point, net_seg)
         pred_cls = predict_cls(point, net_cls)
 
-    cmap = plt.cm.get_cmap("hsv", 10)
+    if hasattr(matplotlib, "colormaps"):
+        cmap = matplotlib.colormaps["hsv"].resampled(10)
+    else:
+        cmap = plt.cm.get_cmap("hsv", 10)
     cmap = np.array([cmap(i) for i in range(10)])[:, :3]
     pred_color = cmap[pred_seg, :]
 
