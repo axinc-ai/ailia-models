@@ -177,7 +177,7 @@ def recognize_from_points(filename, net_seg, net_cls):
     X = point[:, 0]
     Y = point[:, 1]
     Z = point[:, 2]
-    ax.scatter(X, Y, Z, color=pred_color)
+    ax.scatter(X, Y, Z, c=pred_color)
 
     # adjust plot scale
     max_range = np.array([X.max() - X.min(), Y.max() - Y.min(), Z.max() - Z.min()]).max() * 0.5
