@@ -42,6 +42,10 @@ parser.add_argument(
     '-o', '--onnx', action='store_true',
     help="Option to use onnxrutime to run or not."
 )
+parser.add_argument(
+    "--seed", type=int, default=None,
+    help="random seed",
+)
 args = update_parser(parser)
 
 
@@ -241,6 +245,9 @@ def preprocess_body(text: str) -> str:
     return normalize_text(text.replace("\n", " "))
 
 def main(args):
+    if args.seed is not None:
+        np.random.seed(args.seed)
+
     # download onnx and prototxt
     check_and_download_models(ENCODER_ONNX_PATH, ENCODER_PROTOTXT_PATH, REMOTE_PATH)
     check_and_download_models(DECODER_ONNX_PATH, DECODER_PROTOTXT_PATH, REMOTE_PATH)
