@@ -51,7 +51,7 @@ def preprocess(file_path):
         from pdfminer.high_level import extract_text
         text = extract_text(file_path)
     else:
-        f = open(file_path, "r")
+        f = open(file_path, "r", encoding="utf-8")
         text = f.read()
         f.close()
     sents = text.replace('\n', '').split('。')
