@@ -31,7 +31,8 @@ logger = getLogger(__name__)
 # Parameters
 # ======================
 
-REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/patchcore/'
+# REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/patchcore/'
+REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/padim/'
 IMAGE_PATH = './bottle_000.png'
 SAVE_IMAGE_PATH = './output.png'
 IMAGE_RESIZE = 256
@@ -43,7 +44,7 @@ KEEP_ASPECT = True
 
 parser = get_base_parser('PatchCore model', IMAGE_PATH, SAVE_IMAGE_PATH)
 parser.add_argument(
-    '-a', '--arch', default='resnet18', choices=('resnet18', 'wide_resnet50_2'),
+    '-a', '--arch', default='wide_resnet50_2', choices=('resnet18', 'wide_resnet50_2'),
     help='arch model.'
 )
 parser.add_argument(
@@ -63,10 +64,6 @@ parser.add_argument(
     help='directory of the ground truth mask files.'
 )
 parser.add_argument(
-    '--seed', type=int, default=1024,
-    help='random seed'
-)
-parser.add_argument(
     '-th', '--threshold', type=float, default=None,
     help='threshold'
 )
@@ -77,6 +74,10 @@ parser.add_argument(
 parser.add_argument(
     '-an', '--aug_num', type=int, default=5,
     help='specify the amplification number of augmentation.'
+)
+parser.add_argument(
+    "-c", "--coreset_sampling_ratio", type=float, default=0.001,
+    help="specify the coreset sampling ratio",
 )
 args = update_parser(parser)
 
@@ -153,7 +154,7 @@ def plot_fig(file_list, test_imgs, scores, anormal_scores, gt_imgs, threshold, s
 
 def train_from_image_or_video(net, params):
     # training
-    train_outputs = training(net, params, IMAGE_RESIZE, KEEP_ASPECT, int(args.batch_size), args.train_dir, args.aug, args.aug_num, args.seed, logger)
+    train_outputs = training(net, params, IMAGE_RESIZE, KEEP_ASPECT, int(args.batch_size), args.train_dir, args.aug, args.aug_num, args.coreset_sampling_ratio, logger)
 
     if args.feat:
         train_feat_file = args.feat
@@ -327,6 +328,7 @@ def train_and_infer(net, params):
 
 def main():
     # model files check and download
+    logger.info("HOGE")
     weight_path, model_path, params = get_params(args.arch)
     check_and_download_models(weight_path, model_path, REMOTE_PATH)
 
@@ -339,4 +341,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
