@@ -2,11 +2,13 @@ tokenizers
 langid
 unidecode
 pyopenjtalk-prebuilt
-#pypinyin # for chinese
-#inflect # for english
-#cn2an # for chinese
-#jieba # for chinese
-#eng_to_ipa # for english
+SoundFile
+librosa
+pypinyin # for chinese
+inflect # for english
+cn2an # for chinese
+jieba # for chinese
+eng_to_ipa # for english
 #phonemizer==3.2.0
 #nltk
 #sudachipy
