@@ -1,5 +1,6 @@
 import numpy as np
 import cv2
+import json
 
 FACE_BOTTOM_OUTLINE = np.arange(0, 5)
 LEFT_EYEBROW = np.arange(5, 8)
@@ -19,11 +20,11 @@ MOUTH_OUTLINE_LIST = [MOUTH_OUTLINE]
 
 # (indices, BGR color, is_closed)
 CONTOURS = [
-    (FACE_OUTLINE_LIST, (0, 170, 255), False),
-    (LEFT_EYE_LIST, (50, 220, 255), False),
-    (RIGHT_EYE_LIST, (50, 220, 255), False),
-    (NOSE_LIST, (255, 30, 30), False),
-    (MOUTH_OUTLINE_LIST, (255, 30, 30), True),
+    (FACE_OUTLINE_LIST, (0, 170, 255), False, "face_outline"),
+    (LEFT_EYE_LIST, (50, 220, 255), False, "left_eye"),
+    (RIGHT_EYE_LIST, (50, 220, 255), False, "right_eye"),
+    (NOSE_LIST, (255, 30, 30), False, "nose"),
+    (MOUTH_OUTLINE_LIST, (255, 30, 30), True, "mouth_outline"),
 ]
 
 
@@ -67,7 +68,7 @@ def draw_polyline(image, pts, color, closed, lt, skip_contour_with_low_score,
 
 def visualize_contour(image, pts, lt, skip_contour_with_low_score,
                       score_threshold):
-    for indices_list, color, closed in CONTOURS:
+    for indices_list, color, closed, name in CONTOURS:
         for indices in indices_list:
             draw_polyline(image, pts[indices], color, closed, lt,
                           skip_contour_with_low_score, score_threshold)
@@ -98,3 +99,30 @@ def visualize(
         visualize_landmarks(image, pred_pts, lt, landmark_score_threshold)
 
     return image
+
+
+def save_json(
+        json_file,
+        keypoints,
+        bboxes):
+    results = []
+    for pred_pts, bbox in zip(keypoints, bboxes):
+        r = {}
+        bbox, score = bbox[:4].tolist(), float(bbox[4])
+        r['bbox'] = bbox
+        r['score'] = score
+
+        r['contours'] = {}
+        for indices_list, color, closed, name in CONTOURS:
+            c = []
+            for indices in indices_list:
+                cc = []
+                for pts in pred_pts[indices]:
+                    cc.append({'pos': pts[:2].tolist(), 'score': float(pts[2])})
+                c.append(cc)
+            r['contours'][name] = c
+
+        results.append(r)
+
+    with open(json_file, 'w') as f:
+        json.dump(results, f, indent=2)

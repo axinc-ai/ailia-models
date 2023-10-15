@@ -3,6 +3,7 @@ import time
 
 import numpy as np
 import matplotlib.pyplot as plt
+import json
 
 import ailia
 
@@ -93,6 +94,16 @@ parser.add_argument(
     action='store_true',
     help='Operate the detection result with GUI'
 )
+parser.add_argument(
+    '-w', '--write_json',
+    action='store_true',
+    help='Flag to output results to json file'
+)
+parser.add_argument(
+    '--seed',
+    type=int,
+    help='Speciry seed value to randomize order of input points'
+)
 args = update_parser(parser)
 
 
@@ -102,6 +113,8 @@ args = update_parser(parser)
 
 def load_data(point_file, npoints=2500):
     point_set = np.loadtxt(point_file).astype(np.float32)
+    if args.seed is not None:
+        np.random.seed(args.seed)
     choice = np.random.choice(len(point_set), npoints, replace=True)
     point_set = point_set[choice, :]
 
@@ -197,6 +210,14 @@ def recognize_from_points(filename, net_seg, net_cls):
     if args.gui:
         plt.show()
         
+    if args.write_json:
+        results = {'class': str(pred_cls), 'points': []}
+        for i in range(point.shape[0]):
+            results['points'].append({'pos': point[i].tolist(), 'seg': int(pred_seg[i])})
+        json_file = '%s.json' % savepath.rsplit('.', 1)[0]
+        with open(json_file, 'w') as f:
+            json.dump(results, f, indent=2)
+
     logger.info('Script finished successfully.')
 
 
