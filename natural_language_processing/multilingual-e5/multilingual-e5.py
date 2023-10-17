@@ -10,7 +10,7 @@ import ailia
 # import original modules
 sys.path.append('../../util')
 from arg_utils import get_base_parser, update_parser, get_savepath  # noqa
-from model_utils import check_and_download_models  # noqa
+from model_utils import check_and_download_models, check_and_download_file  # noqa
 from image_utils import normalize_image  # noqa
 from detector_utils import load_image  # noqa
 from webcamera_utils import get_capture, get_writer  # noqa
@@ -21,10 +21,11 @@ logger = getLogger(__name__)
 # Parameters
 # ======================
 
-WEIGHT_PATH = 'xxx.onnx'
-MODEL_PATH = 'xxx.onnx.prototxt'
-WEIGHT_XXX_PATH = 'xxx.onnx'
-MODEL_XXX_PATH = 'xxx.onnx.prototxt'
+WEIGHT_BASE_PATH = 'multilingual-e5-base.onnx'
+MODEL_BASE_PATH = 'multilingual-e5-base.onnx.prototxt'
+WEIGHT_LARGE_PATH = 'multilingual-e5-large.onnx'
+MODEL_LARGE_PATH = 'multilingual-e5-large.onnx.prototxt'
+WEIGHT_LARGE_PB_PATH = 'multilingual-e5-large_weights.pb'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/multilingual-e5/'
 
 SENTENCE_PATH = 'sample.txt'
@@ -169,16 +170,16 @@ def recognize_from_sentence(models):
 
 
 def main():
-    # dic_model = {
-    #     'base': (WEIGHT_PATH, MODEL_PATH),
-    #     'large': (WEIGHT_XXX_PATH, MODEL_XXX_PATH),
-    # }
-    # WEIGHT_PATH, MODEL_PATH = dic_model[args.model_type]
-    WEIGHT_PATH = "multilingual-e5-base.onnx"
-    MODEL_PATH = "multilingual-e5-base.onnx.prototxt"
+    dic_model = {
+        'base': (WEIGHT_BASE_PATH, MODEL_BASE_PATH),
+        'large': (WEIGHT_LARGE_PATH, MODEL_LARGE_PATH),
+    }
+    WEIGHT_PATH, MODEL_PATH = dic_model[args.model_type]
 
     # model files check and download
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
+    if args.model_type == 'large':
+        check_and_download_file(WEIGHT_LARGE_PB_PATH, REMOTE_PATH)
 
     env_id = args.env_id
 
