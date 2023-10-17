@@ -74,9 +74,24 @@ def read_sentences(file_path):
 def average_pool(
         last_hidden_states,
         attention_mask):
-    last_hidden = last_hidden_states.masked_fill(~attention_mask[..., None].bool(), 0.0)
+    mask_expand = ~np.expand_dims(attention_mask, -1).astype(bool)
+    mask_expand = np.broadcast_to(mask_expand, last_hidden_states.shape)
+    last_hidden = np.ma.array(
+        last_hidden_states,
+        mask=mask_expand,
+    ).filled(0.0)
 
-    return last_hidden.sum(dim=1) / attention_mask.sum(dim=1)[..., None]
+    return last_hidden.sum(axis=1) / attention_mask.sum(axis=1)[..., None]
+
+
+def closest_sentence(embs, q_emb):
+    norm_embs = embs / np.linalg.norm(embs, axis=1, keepdims=True)
+    norm_q_emb = q_emb / np.linalg.norm(q_emb)
+
+    cos_sim = np.sum(norm_embs * norm_q_emb, axis=1)
+    idx, sim = np.argmax(cos_sim), np.max(cos_sim)
+
+    return idx, sim
 
 
 # ======================
@@ -92,24 +107,29 @@ def predict(models, sentences):
         max_length=512, padding=True, truncation=True,
         return_tensors='np')
 
+    input_ids = batch_dict['input_ids']
+    attention_mask = batch_dict['attention_mask']
+
     net = models['net']
 
     # feedforward
     if not args.onnx:
-        output = net.predict([batch_dict['input_ids'], batch_dict['attention_mask']])
+        output = net.predict([input_ids, attention_mask])
     else:
         output = net.run(None, {
-            "input_ids": batch_dict["input_ids"],
-            "attention_mask": batch_dict["attention_mask"]
+            "input_ids": input_ids,
+            "attention_mask": attention_mask
         })
     last_hidden_state = output[0]
 
-    embeddings = average_pool(last_hidden_state, batch_dict['attention_mask'])
+    embeddings = average_pool(last_hidden_state, attention_mask)
 
     return embeddings
 
 
 def recognize_from_sentence(models):
+    prompt = args.prompt
+
     # extract sentences to list
     sentences = read_sentences(args.input[0])
 
@@ -119,14 +139,33 @@ def recognize_from_sentence(models):
         logger.info('BENCHMARK mode')
         for i in range(5):
             start = int(round(time.time() * 1000))
-            features, attn_mask = predict(models, sentences)
+            embs = predict(models, sentences)
             end = int(round(time.time() * 1000))
             logger.info(f'\tailia processing time {end - start} ms')
         exit()
     else:
-        features, attn_mask = predict(models, sentences)
+        embs = predict(models, sentences)
 
-    logger.info('Script finished successfully.')
+    # check prompt from command line argument
+    if prompt is not None:
+        prompt_emb = predict(models, [prompt])
+
+        idx, sim = closest_sentence(embs, prompt_emb)
+
+        print(f'Prompt: {prompt}')
+        print(f'Text: {sentences[idx]} (Similarity:{sim:.3f})')
+        return
+
+    # application
+    prompt = input('User (press q to exit): ')
+    while prompt not in ('q', 'ｑ'):
+        prompt_emb = predict(models, [prompt])
+
+        idx, sim = closest_sentence(embs, prompt_emb)
+
+        print(f'Text: {sentences[idx]} (Similarity:{sim:.3f})')
+
+        prompt = input('User (press q to exit): ')
 
 
 def main():
