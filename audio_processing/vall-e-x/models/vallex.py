@@ -68,10 +68,10 @@ class VALLE():
     def attn_mask(self, x_len, y_len):
         # x is text_prompt + text_tokens
         # y is audio_prompt + ar_decoder output
-        x_attn_mask_pad = np.zeros((x_len, x_len + y_len), dtype=np.bool)
+        x_attn_mask_pad = np.zeros((x_len, x_len + y_len), dtype=bool)
         x_attn_mask_pad[:,x_len:x_len + y_len] = True # Output read all input tokens
 
-        y_attn_mask = np.zeros((y_len, x_len + y_len), dtype=np.bool)
+        y_attn_mask = np.zeros((y_len, x_len + y_len), dtype=bool)
         for i in range(y_len):
             for j in range(y_len):
                 if i < j:
