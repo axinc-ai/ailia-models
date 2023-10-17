@@ -4,6 +4,7 @@ import math
 import numpy as np
 import cv2
 import matplotlib.pyplot as plt
+import json
 
 from scipy.spatial.transform import Rotation
 
@@ -514,3 +515,24 @@ def plot_3d_objects(prediction, target, pose_vecs_gt, record, color, ax=None):
             hspace=0, wspace=0)
 
     return fig, ax
+
+
+def save_result_json(json_path, record):
+    results = []
+    for k in record.keys():
+        r = {}
+        if isinstance(record[k], list):
+            v = record[k]
+            if len(v) == 0:
+                r[k] = []
+                continue
+            if isinstance(v[0], (list, dict)):
+                r[k] = v
+            else:
+                r[k] = [x.tolist() for x in v]
+        else:
+            r[k] = record[k].tolist()
+        results.append(r)
+
+    with open(json_path, 'w') as f:
+        json.dump(results, f, indent=2)

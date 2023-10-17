@@ -6,6 +6,7 @@ import scipy.io as sio
 import cv2
 import math
 from math import cos, sin
+import json
 
 
 def transform(img, mean, std):
@@ -220,3 +221,15 @@ def get_R(x, y, z):
 
     R = Rz.dot(Ry.dot(Rx))
     return R
+
+
+def save_json_result(json_path, results):
+    output = []
+    for r in results:
+        output.append({
+            'yaw': r['yaw'].tolist(),
+            'pitch': r['pitch'].tolist(),
+            'roll': r['roll'].tolist(),
+        })
+    with open(json_path, 'w') as f:
+        json.dump(output, f, indent=2)

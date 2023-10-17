@@ -39,6 +39,11 @@ parser = get_base_parser(
     IMAGE_PATH,
     SAVE_IMAGE_PATH,
 )
+parser.add_argument(
+    '-w', '--write_json',
+    action='store_true',
+    help='Flag to output results to json file.'
+)
 args = update_parser(parser)
 
 
@@ -71,10 +76,12 @@ def recognize_from_image():
         else:
             y, _ = net.predict({'input.1': x})
 
-        img = craft_pytorch_utils.post_process(y, image, ratio_w, ratio_h)
+        json_path = '%s.json' % args.savepath.rsplit('.', 1)[0] if args.write_json else None
+        img = craft_pytorch_utils.post_process(y, image, ratio_w, ratio_h, json_path)
         savepath = get_savepath(args.savepath, image_path)
         logger.info(f'saved at : {savepath}')
         cv2.imwrite(savepath, img)
+
     logger.info('Script finished successfully.')
 
 

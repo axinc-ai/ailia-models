@@ -14,7 +14,7 @@ from model_utils import check_and_download_models  # noqa: E402
 from detector_utils import plot_results, load_image  # noqa: E402C
 from webcamera_utils import get_capture  # noqa: E402
 
-from pixel_link_utils import decode_batch, mask_to_bboxes, draw_bbox
+from pixel_link_utils import decode_batch, mask_to_bboxes, draw_bbox, save_bboxes_to_json
 
 # logger
 from logging import getLogger   # noqa: E402
@@ -37,6 +37,11 @@ SAVE_IMAGE_PATH = 'output.png'
 # ======================
 
 parser = get_base_parser('Pixel-Link model', IMAGE_PATH, SAVE_IMAGE_PATH)
+parser.add_argument(
+    '-w', '--write_json',
+    action='store_true',
+    help='Flag to output results to json file.'
+)
 args = update_parser(parser)
 
 
@@ -97,6 +102,11 @@ def recognize_from_image(filenames, net):
         savepath = get_savepath(args.savepath, filename)
         logger.info(f'saved at : {savepath}')
         cv2.imwrite(savepath, res_img)
+
+        if args.write_json:
+            json_file = '%s.json' % savepath.rsplit('.', 1)[0]
+            save_bboxes_to_json(json_file, bboxes)
+
     logger.info('Script finished successfully.')
 
 
