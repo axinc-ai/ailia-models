@@ -102,5 +102,5 @@ def check_and_download_file(file_path, remote_path):
 
     if not os.path.exists(file_path):
         logger.info('Downloading %s...' % file_path)
-        urlretrieve(remote_path, file_path, progress_print)
+        urlretrieve(remote_path + os.path.basename(file_path), file_path, progress_print)
     logger.info('%s is prepared!' % file_path)
