@@ -239,7 +239,7 @@ def predict(models, img, pos_points, neg_points=None, box=None):
     if args.profile:
         end = int(round(time.time() * 1000))
         estimation_time = (end - start)
-        logger.info(f'img_enc processing estimation time {estimation_time} ms')
+        logger.info(f'sam_net processing estimation time {estimation_time} ms')
 
     masks, iou_predictions, low_res_logits = output
     masks = masks > 0
