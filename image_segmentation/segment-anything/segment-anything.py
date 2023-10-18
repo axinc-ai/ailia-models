@@ -183,12 +183,20 @@ def predict(models, img, pos_points, neg_points=None, box=None):
     img = preprocess(img)
 
     # feedforward
+    if args.profile:
+        start = int(round(time.time() * 1000))
+
     img_enc = models["img_enc"]
     if not args.onnx:
         output = img_enc.predict([img])
     else:
         output = img_enc.run(None, {'img': img})
     image_embedding = output[0]
+
+    if args.profile:
+        end = int(round(time.time() * 1000))
+        estimation_time = (end - start)
+        logger.info(f'img_enc processing estimation time {estimation_time} ms')
 
     coord = []
     label = []
@@ -219,11 +227,20 @@ def predict(models, img, pos_points, neg_points=None, box=None):
     ])
 
     # feedforward
+    if args.profile:
+        start = int(round(time.time() * 1000))
+
     sam_net = models["sam_net"]
     if not args.onnx:
         output = sam_net.predict(list(input.values()))
     else:
         output = sam_net.run(None, input)
+
+    if args.profile:
+        end = int(round(time.time() * 1000))
+        estimation_time = (end - start)
+        logger.info(f'img_enc processing estimation time {estimation_time} ms')
+
     masks, iou_predictions, low_res_logits = output
     masks = masks > 0
 
@@ -353,6 +370,10 @@ def main():
 
         sam_net = ailia.Net(MODEL_SAM_PATH, WEIGHT_SAM_PATH, env_id=env_id, memory_mode=memory_mode)
         img_enc = ailia.Net(MODEL_VIT_PATH, WEIGHT_VIT_PATH, env_id=env_id, memory_mode=memory_mode)
+
+        if args.profile:
+            sam_net.set_profile_mode(True)
+            img_enc.set_profile_mode(True)
     else:
         import onnxruntime
 
@@ -367,6 +388,13 @@ def main():
     )
     recognize_from_image(models)
 
+    if args.profile and not args.onnx:
+        print("--- profile sam_net")
+        print(sam_net.get_summary())
+        print("")
+        print("--- profile img_enc")
+        print(img_enc.get_summary())
+        print("")
 
 if __name__ == '__main__':
     main()
