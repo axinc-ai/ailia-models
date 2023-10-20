@@ -3,6 +3,7 @@ import time
 
 import cv2
 import numpy as np
+import json
 
 import ailia
 
@@ -71,6 +72,11 @@ parser.add_argument(
     '-n', '--num_detect',
     default=-1, type=int,
     help='The number of objects to detect.'
+)
+parser.add_argument(
+    '-w', '--write_json',
+    action='store_true',
+    help='Flag to output results to json file.'
 )
 args = update_parser(parser)
 
@@ -222,6 +228,24 @@ def draw_detections(img, reg_detections, det_detections, ids=None, rgb=True):
     return img
 
 
+def save_result_json(json_path, reg_detections, det_detections, ids=None):
+    results = []
+
+    for det_out, reg_out, _id in zip(
+            det_detections, reg_detections, ids if ids else ['ID x'] * len(reg_detections)):
+        kp = reg_out[0]
+        label = reg_out[1]
+
+        results.append({
+            "det": det_out.tolist(),
+            "kp": kp.tolist(),
+            "label": label
+        })
+
+    with open(json_path, 'w') as f:
+        json.dump(results, f, indent=2)
+
+
 # ======================
 # Main functions
 # ======================
@@ -319,6 +343,10 @@ def recognize_from_image(det_net, reg_net, labels):
         savepath = get_savepath(args.savepath, image_path, ext='.png')
         logger.info(f'saved at : {savepath}')
         cv2.imwrite(savepath, res_img)
+
+        if args.write_json:
+            json_file = '%s.json' % savepath.rsplit('.', 1)[0]
+            save_result_json(json_file, reg_detections, det_detections)
 
     logger.info('Script finished successfully.')
 
