@@ -22,7 +22,7 @@ logger = getLogger(__name__)
 
 WEIGHT_PATH = 'bert_insert_punctuation.onnx'
 MODEL_PATH = 'bert_insert_punctuation.onnx.prototxt'
-REMOTE_PATH = None
+REMOTE_PATH = "https://storage.googleapis.com/ailia-models/bert_insert_punctuation/"
 
 LABEL_TO_TEXT = ['','、','。','？','！','・']
 
