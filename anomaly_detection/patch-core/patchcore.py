@@ -15,6 +15,7 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
+from image_utils import normalize_image  # noqa: E402
 from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from detector_utils import load_image  # noqa: E402
@@ -78,6 +79,10 @@ parser.add_argument(
 parser.add_argument(
     "-c", "--coreset_sampling_ratio", type=float, default=0.001,
     help="specify the coreset sampling ratio",
+)
+parser.add_argument(
+    "-n", "--n_neighbors", type=int, default=9,
+    help="the number of neighbors",
 )
 args = update_parser(parser)
 
@@ -304,6 +309,9 @@ def train_and_infer(net, params):
     else:
         train_outputs = train_from_image_or_video(net, params)
 
+        with open("embedding_coreset.pkl", "wb") as f:
+            pickle.dump(train_outputs, f)
+
     if args.threshold is None:
         if args.video:
             threshold = 0.5
@@ -329,7 +337,7 @@ def train_and_infer(net, params):
 def main():
     # model files check and download
     logger.info("HOGE")
-    weight_path, model_path, params = get_params(args.arch)
+    weight_path, model_path, params = get_params(args.arch, args.n_neighbors)
     check_and_download_models(weight_path, model_path, REMOTE_PATH)
 
     # create net instance

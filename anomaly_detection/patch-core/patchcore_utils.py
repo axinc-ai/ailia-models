@@ -1,4 +1,5 @@
 from itertools import product
+from scipy.ndimage import gaussian_filter
 from typing import Dict, Any, List
 import numpy as np
 import os
@@ -28,6 +29,19 @@ WEIGHT_RESNET18_PATH = 'resnet18.onnx'
 MODEL_RESNET18_PATH = 'resnet18.onnx.prototxt'
 WEIGHT_WIDE_RESNET50_2_PATH = 'wide_resnet50_2.onnx'
 MODEL_WIDE_RESNET50_2_PATH = 'wide_resnet50_2.onnx.prototxt'
+
+
+def normalize_scores(score_map):
+    N = len(score_map)
+    score_map = np.vstack(score_map)
+    score_map = score_map.reshape(N, IMAGE_SIZE, IMAGE_SIZE)
+
+    # Normalization
+    max_score = score_map.max()
+    min_score = score_map.min()
+    scores = (score_map - min_score) / (max_score - min_score)
+
+    return scores
 
 
 def distance_matrix(x, y=None, p=2):  # pairwise distance of vectors
@@ -242,13 +256,13 @@ def training(
     print('initial embedding size : ', embedding_vectors.shape) #  (245760, 1536)
     print('final embedding size : ', embedding_coreset.shape)
 
-    # faiss
     index = faiss.IndexFlatL2(embedding_coreset.shape[1])
-    index.add(embedding_coreset)
-    faiss.write_index(self.index, os.path.join(self.embedding_dir_path,'index.faiss'))
+    index.add(embedding_coreset) 
+    faiss.write_index(index, 'embeddings/index.faiss')
+    return embedding_coreset
 
 
-def get_params(arch):
+def get_params(arch, n_neighbors):
     # model settings
     info = {
         "resnet18": (
@@ -265,7 +279,78 @@ def get_params(arch):
         "feat_names": feat_names,
         "t_d": t_d,
         "d": d,
+        "n_neighbors": n_neighbors,
     }
 
     return weight_path, model_path, params
 
+
+def normalize_inverse(img):
+    img[0, :, :] = (img[0, :, :] + 0.485 / 0.229) / (1 / 0.229)
+    img[1, :, :] = (img[1, :, :] + 0.456 / 0.224) / (1 / 0.224)
+    img[2, :, :] = (img[2, :, :] + 0.406 / 0.255) / (1 / 0.255)
+    img *= 255
+    return img
+
+
+def min_max_norm(image):
+    a_min, a_max = image.min(), image.max()
+    return (image-a_min)/(a_max - a_min)
+
+
+def heatmap_on_image(heatmap, image):
+    if heatmap.shape != image.shape:
+        heatmap = cv2.resize(heatmap, (image.shape[0], image.shape[1]))
+    out = np.float32(heatmap)/255 + np.float32(image)/255
+    out = out / np.max(out)
+    return np.uint8(255 * out)
+
+
+def cvt2heatmap(gray):
+    heatmap = cv2.applyColorMap(np.uint8(gray), cv2.COLORMAP_JET)
+    return heatmap
+
+
+
+def infer(net, params, embedding_coreset, img):
+    height, width = img.shape[-2:]
+    _ = net.predict([img])
+    test_outputs = OrderedDict([
+        ("layer2", []), ("layer3", [])
+    ])
+    for key, name in zip(test_outputs.keys(), params["feat_names"]):
+        test_outputs[key].append(net.get_blob_data(name))
+    for k, v in test_outputs.items():
+        test_outputs[k] = v[0]
+
+    embedding_vectors = postprocess(test_outputs)
+
+    index = faiss.read_index("embeddings/index.faiss")
+    embedding_test = np.array(reshape_embedding(embedding_vectors))
+    score_patches, _ = index.search(embedding_test , k=params["n_neighbors"])
+
+    anomaly_map = score_patches[:,0].reshape((56,56))
+    N_b = score_patches[np.argmax(score_patches[:,0])]
+    w = (1 - (np.max(np.exp(N_b))/np.sum(np.exp(N_b))))
+    score = w*max(score_patches[:,0]) # Image-level score
+
+    anomaly_map_resized = cv2.resize(anomaly_map, (width, height))
+    anomaly_map_resized_blur = gaussian_filter(anomaly_map_resized, sigma=4)
+    pred_px_lvl = anomaly_map_resized_blur.ravel()
+    pred_img_lvl = score
+
+    save_anomaly_map(anomaly_map_resized_blur, img[0].transpose(1, 2, 0))
+
+
+def save_anomaly_map(anomaly_map, input_img):
+    if anomaly_map.shape != input_img.shape:
+        anomaly_map = cv2.resize(anomaly_map, (input_img.shape[0], input_img.shape[1]))
+
+    print(f"{anomaly_map.shape=}")
+    anomaly_map_norm = min_max_norm(anomaly_map)
+    anomaly_map_norm_hm = cvt2heatmap(anomaly_map_norm*255)
+
+    # anomaly map on image
+    heatmap = cvt2heatmap(anomaly_map_norm*255)
+    hm_on_img = heatmap_on_image(heatmap, input_img)
+    cv2.imwrite("heatmap.png", hm_on_img)
