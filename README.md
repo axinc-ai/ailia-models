@@ -16,9 +16,9 @@ The collection of pre-trained, state-of-the-art AI models.
 295 models as of Octorber 23rd, 2023
 
 # Latest update
-2023.10.20 Add bert_insert_punctuation
-2023.10.19 Add multilingual-e5
-2023.10.08 Add japanese-clip
+- 2023.10.20 Add bert_insert_punctuation
+- 2023.10.19 Add multilingual-e5
+- 2023.10.08 Add japanese-clip
 More information in our [Wiki](/ailia-models/wiki)
 
 ## Action recognition
