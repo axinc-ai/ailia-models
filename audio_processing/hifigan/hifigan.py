@@ -31,7 +31,7 @@ logger = getLogger(__name__)
 SAVE_WAV_PATH = 'output.wav'
 INPUT_WAV_PATH="tests/test2.wav"
 INPUT_NP_PATH="tests/test.npy"
-REMOTE_PATH = ''
+REMOTE_PATH = "https://storage.googleapis.com/ailia-models/hifigan/"
 
 
 # ======================
