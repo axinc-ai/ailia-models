@@ -26,6 +26,7 @@ logger = getLogger(__name__)
 
 SAVE_WAV_PATH = 'output.wav'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/tacotron2/'
+REMOTE_PATH_HIFH = "https://storage.googleapis.com/ailia-models/hifigan/"
 
 # ======================
 # Arguemnt Parser Config
@@ -417,7 +418,10 @@ def main():
     check_and_download_models(WEIGHT_PATH_DECODER_ITER, MODEL_PATH_DECODER_ITER, REMOTE_PATH)
     check_and_download_models(WEIGHT_PATH_ENCODER, MODEL_PATH_ENCODER, REMOTE_PATH)
     check_and_download_models(WEIGHT_PATH_POSTNET, MODEL_PATH_POSTNET, REMOTE_PATH)
-    check_and_download_models(WEIGHT_PATH_WAVEGLOW, MODEL_PATH_WAVEGLOW, REMOTE_PATH)
+    if args.model != 'hifi':
+        check_and_download_models(WEIGHT_PATH_WAVEGLOW, MODEL_PATH_WAVEGLOW, REMOTE_PATH)
+    else:
+        check_and_download_models(WEIGHT_PATH_WAVEGLOW, MODEL_PATH_WAVEGLOW, REMOTE_PATH_HIFH)
 
     #env_id = args.env_id
 
