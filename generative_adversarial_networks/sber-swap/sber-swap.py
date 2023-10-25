@@ -71,7 +71,7 @@ parser.add_argument(
 parser.add_argument(
     '--use_sr',
     action='store_true',
-    help='use pix2pix model.'
+    help='True for super resolution on swap image'
 )
 parser.add_argument(
     '--onnx',
@@ -341,7 +341,10 @@ def main():
         net_G = ailia.Net(MODEL_G_PATH, WEIGHT_G_PATH, env_id=env_id)
         net_lmk = ailia.Net(MODEL_LANDMARK_PATH, WEIGHT_LANDMARK_PATH, env_id=env_id)
         if args.use_sr:
-            net_pix2pix = ailia.Net(MODEL_PIX2PIX_PATH, WEIGHT_PIX2PIX_PATH, env_id=env_id)
+            pix2pix_env_id = env_id
+            if "FP16" in ailia.get_environment(args.env_id).props:  # disable FP16
+                pix2pix_env_id = 0
+            net_pix2pix = ailia.Net(MODEL_PIX2PIX_PATH, WEIGHT_PIX2PIX_PATH, env_id=pix2pix_env_id)
         else:
             net_pix2pix = None
     else:
