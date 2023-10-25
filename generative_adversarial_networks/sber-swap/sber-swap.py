@@ -167,13 +167,10 @@ def predict(net_iface, net_G, src_embeds, tar_img):
 
 def face_enhancement(net_pix2pix, output):
     final_img, crop_img, M = output
-    print(final_img.shape)
-    print(final_img)
     final_img = cv2.resize(final_img, (256, 256))
     final_img = final_img[:, :, ::-1]
     final_img = final_img.astype(np.float32)
     final_img = final_img / 255.0
-    print(final_img)
     final_img = np.expand_dims(final_img, axis = 0)
     final_img = np.transpose(final_img, (0, 3, 1, 2))
     final_img = net_pix2pix.predict(final_img)
@@ -182,7 +179,6 @@ def face_enhancement(net_pix2pix, output):
     final_img = final_img.astype(np.uint8)
     final_img = np.transpose(final_img, (0, 2, 3, 1))
     final_img = final_img[0, :, :, ::-1]
-    print(final_img.shape)
     final_img = cv2.resize(final_img, (CROP_SIZE, CROP_SIZE))
     return final_img, crop_img, M 
 
