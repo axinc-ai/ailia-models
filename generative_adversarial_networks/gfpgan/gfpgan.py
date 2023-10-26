@@ -26,8 +26,8 @@ logger = getLogger(__name__)
 # Parameters
 # ======================
 
-WEIGHT_PATH = 'GFPGANv1.3.onnx'
-MODEL_PATH = 'GFPGANv1.3.onnx.prototxt'
+WEIGHT_PATH = 'GFPGANv1.4.onnx'
+MODEL_PATH = 'GFPGANv1.4.onnx.prototxt'
 WEIGHT_DET_PATH = "retinaface_resnet50.onnx"
 MODEL_DET_PATH = "retinaface_resnet50.onnx.prototxt"
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/gfpgan/'
