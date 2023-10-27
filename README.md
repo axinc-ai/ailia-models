@@ -13,12 +13,12 @@ The collection of pre-trained, state-of-the-art AI models.
 [ailia MODELS tutorial 日本語版](TUTORIAL_jp.md)
 
 # Supported models 
-295 models as of Octorber 23rd, 2023
+296 models as of Octorber 27, 2023
 
 # Latest update
+- 2023.10.25 Add use_sr option to sber-swap
+- 2023.10.24 Add hifigan
 - 2023.10.20 Add bert_insert_punctuation
-- 2023.10.19 Add multilingual-e5
-- 2023.10.08 Add japanese-clip
 - More information in our [Wiki](https://github.com/axinc-ai/ailia-models/wiki)
 
 ## Action recognition
