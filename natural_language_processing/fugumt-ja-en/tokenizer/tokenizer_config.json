@@ -1,12 +1,11 @@
 {
+  "clean_up_tokenization_spaces": true,
   "eos_token": "</s>",
   "model_max_length": 512,
-  "name_or_path": "staka/fugumt-ja-en",
   "pad_token": "<pad>",
   "separate_vocabs": false,
   "source_lang": "ja",
   "sp_model_kwargs": {},
-  "special_tokens_map_file": "~/.cache/huggingface/hub/models--staka--fugumt-ja-en/snapshots/118baa5719d05d2f813e93230371620b235096e9/special_tokens_map.json",
   "target_lang": "en",
   "tokenizer_class": "MarianTokenizer",
   "unk_token": "<unk>"
