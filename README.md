@@ -263,7 +263,7 @@ The collection of pre-trained, state-of-the-art AI models.
 | [<img src="image_manipulation/pytorch-superpoint/output_warping_correspondence.png" width=128px>](image_manipulation/pytorch-superpoint/) | [pytorch-superpoint](/image_manipulation/pytorch-superpoint/) | [pytorch-superpoint : Self-Supervised Interest Point Detection and Description](https://github.com/eric-yyjau/pytorch-superpoint) | Pytorch | 1.2.6 and later |
 | [<img src="image_manipulation/cnngeometric_pytorch/output_demo.png" width=128px>](image_manipulation/cnngeometric_pytorch/) | [cnngeometric_pytorch](/image_manipulation/cnngeometric_pytorch/) | [CNNGeometric PyTorch implementation](https://github.com/ignacio-rocco/cnngeometric_pytorch) | Pytorch | 1.2.7 and later |
 | [<img src="image_manipulation/lightglue/output.png" width=128px>](image_manipulation/lightglue/) | [lightglue](/image_manipulation/lightglue/) | [LightGlue-ONNX](https://github.com/fabio-sim/LightGlue-ONNX) | Pytorch | 1.2.15 and later |
-| [<img src="image_manipulation/docshadow/output.png" width=128px>](image_manipulation/docshadow/) | [docshadow](/image_manipulation/docshadow/) | [DocShadow-ONNX-TensorRT](https://github.com/fabio-sim/DocShadow-ONNX-TensorRT) | Pytorch | 1.2.15 and later |
+| [<img src="image_manipulation/docshadow/output.png" width=128px>](image_manipulation/docshadow/) | [docshadow](/image_manipulation/docshadow/) | [DocShadow-ONNX-TensorRT](https://github.com/fabio-sim/DocShadow-ONNX-TensorRT) | Pytorch | 1.2.10 and later |
 
 ## Image segmentation
 
