@@ -1,5 +1,6 @@
 import numpy as np
 import cv2
+import json
 
 color_palette = [(136, 112, 246),
                  (49, 136, 219),
@@ -93,3 +94,15 @@ def draw_keypoints(image, keypoints, gt_keypoints=None):
                 overlay = cv2.putText(overlay, str(k), (gtx, gty), font, font_scale, color2, thick, cv2.LINE_AA)
     image = cv2.addWeighted(overlay, alpha, image, 1 - alpha, 0)
     return image
+
+
+def save_json(json_path, keypoints):
+    results = []
+
+    for kpt in keypoints:
+        x, y, v = kpt.tolist()
+        if v > 0:
+            results.append({'x': x, 'y': y, 'v': v})
+
+    with open(json_path, 'w') as f:
+        json.dump(results, f, indent=2)

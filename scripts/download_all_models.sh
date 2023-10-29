@@ -22,6 +22,8 @@ cd ../../audio_processing/tacotron2/; python3 tacotron2.py ${OPTION}
 cd ../../audio_processing/silero-vad/; python3 silero-vad.py ${OPTION}
 cd ../../audio_processing/rvc/; python3 rvc.py ${OPTION}
 cd ../../audio_processing/crepe/; python3 crepe.py ${OPTION}
+cd ../../audio_processing/vall-e-x/; python3 vall-e-x.py ${OPTION}
+cd ../../audio_processing/hifigan/; python3 hifigan.py ${OPTION}
 cd ../../background_ramoval/deep-image-matting; python3 deep-image-matting.py ${OPTION}
 cd ../../background_ramoval/u2net; python3 u2net.py ${OPTION}
 cd ../../background_ramoval/u2net; python3 u2net.py -a small ${OPTION}
@@ -92,6 +94,7 @@ cd ../../face_recognition/hsemotion; python3 hsemotion.py ${OPTION}
 cd ../../frame_interpolation/flavr; python3 flavr.py ${OPTION}
 cd ../../frame_interpolation/cain; python3 cain.py ${OPTION}
 cd ../../frame_interpolation/film; python3 film.py ${OPTION}
+cd ../../face_recognition/facemesh_v2; python3 facemesh_v2.py ${OPTION}
 cd ../../generative_adversarial_networks/council-gan; python3 council-gan.py --glasses ${OPTION}
 cd ../../generative_adversarial_networks/council-gan; python3 council-gan.py --m2f ${OPTION}
 cd ../../generative_adversarial_networks/council-gan; python3 council-gan.py --anime ${OPTION}
@@ -103,6 +106,7 @@ cd ../../generative_adversarial_networks/psgan; python3 psgan.py ${OPTION}
 cd ../../generative_adversarial_networks/gfpgan; python3 gfpgan.py ${OPTION}
 cd ../../generative_adversarial_networks/sber-swap; python3 sber-swap.py ${OPTION}
 cd ../../generative_adversarial_networks/encoder4editing; python3 encoder4editing.py ${OPTION}
+cd ../../generative_adversarial_networks/lipgan; python3 lipgan.py ${OPTION}
 cd ../../hand_detection/yolov3-hand; python3 yolov3-hand.py ${OPTION}
 cd ../../hand_detection/hand_detection_pytorch python3 hand_detection_pytorch.py ${OPTION}
 cd ../../hand_detection/blazepalm; python3 blazepalm.py ${OPTION}
@@ -128,6 +132,7 @@ cd ../../image_classification/resnet18; python3 resnet18.py ${OPTION}
 cd ../../image_classification/mlp_mixer; python3 mlp_mixer.py ${OPTION}
 cd ../../image_classification/alexnet; python3 alexnet.py ${OPTION}
 cd ../../image_classification/clip; python3 clip.py ${OPTION}
+cd ../../image_classification/japanese-clip; python3 japanese-clip.py ${OPTION}
 cd ../../image_classification/weather-prediction-from-image; python3 weather-prediction-from-image.py ${OPTION}
 cd ../../image_classification/convnext; python3 convnext.py ${OPTION}
 cd ../../image_classification/swin-transformer; python3 swin_transformer.py ${OPTION}
@@ -150,6 +155,7 @@ cd ../../image_manipulation/dehamer; python3 dehamer.py ${OPTION}
 cd ../../image_manipulation/dfe; python3 dfe.py ${OPTION}
 cd ../../image_manipulation/pytorch-superpoint; python3 pytorch_superpoint.py ${OPTION}
 cd ../../image_manipulation/cnngeometric_pytorch; python3 cnngeometric_pytorch.py ${OPTION}
+cd ../../image_manipulation/lightglue; python3 lightglue.py ${OPTION}
 cd ../../image_segmentation/deeplabv3; python3 deeplabv3.py ${OPTION}
 cd ../../image_segmentation/hair_segmentation; python3 hair_segmentation.py ${OPTION}
 cd ../../image_segmentation/hrnet_segmentation; python3 hrnet_segmentation.py ${OPTION}
@@ -172,6 +178,7 @@ cd ../../line_segment_detection/mlsd; python3 mlsd.py ${OPTION}
 cd ../../line_segment_detection/dexined; python3 dexined.py ${OPTION}
 cd ../../low_light_image_enhancement/agllnet; python3 agllnet.py ${OPTION}
 cd ../../natural_language_processing/bert; python3 bert.py ${OPTION}
+cd ../../natural_language_processing/bert_insert_punctuation; python3 bert_insert_punctuation.py ${OPTION}
 cd ../../natural_language_processing/bert_tweets_sentiment; python3 bert_tweets_sentiment.py ${OPTION}
 cd ../../natural_language_processing/bert_maskedlm; python3 bert_maskedlm.py ${OPTION}
 cd ../../natural_language_processing/bert_ner; python3 bert_ner.py ${OPTION}
@@ -179,6 +186,7 @@ cd ../../natural_language_processing/bert_question_answering; python3 bert_quest
 cd ../../natural_language_processing/bert_sentiment_analysis; python3 bert_sentiment_analysis.py ${OPTION}
 cd ../../natural_language_processing/bert_tweets_sentiment; python3 bert_tweets_sentiment.py ${OPTION}
 cd ../../natural_language_processing/bert_zero_shot_classification; python3 bert_zero_shot_classification.py ${OPTION}
+cd ../../natural_language_processing/bertjsc; python3 bertjsc.py ${OPTION}
 cd ../../natural_language_processing/gpt2; python3 gpt2.py ${OPTION}
 cd ../../natural_language_processing/rinna_gpt2; python3 rinna_gpt2.py ${OPTION}
 cd ../../natural_language_processing/fugumt-en-ja; python3 fugumt-en-ja.py ${OPTION}
@@ -187,6 +195,7 @@ cd ../../natural_language_processing/bert_sum_ext; python3 bert_sum_ext.py ${OPT
 cd ../../natural_language_processing/sentence_transformers_japanese; python3 sentence_transformers_japanese.py ${OPTION}
 cd ../../natural_language_processing/presumm; python3 presumm.py ${OPTION}
 cd ../../natural_language_processing/t5_base_japanese_title_generation; python3 t5_base_japanese_title_generation.py ${OPTION}
+cd ../../natural_language_processing/multilingual-e5; python3 multilingual-e5.py ${OPTION}
 cd ../../neural_rendering/nerf; python3 nerf.py ${OPTION}
 cd ../../object_detection/centernet; python3 centernet.py ${OPTION}
 cd ../../object_detection/m2det; python3 m2det.py ${OPTION}
@@ -276,6 +285,7 @@ cd ../../super_resolution/edsr; python3 edsr.py ${OPTION}
 cd ../../super_resolution/real-esrgan; python3 real-esrgan.py ${OPTION}
 cd ../../super_resolution/rcan-it; python3 rcan-it.py ${OPTION}
 cd ../../super_resolution/swinir; python3 swinir.py ${OPTION}
+cd ../../super_resolution/hat; python3 hat.py ${OPTION}
 cd ../../text_detection/craft_pytorch; python3 craft_pytorch.py ${OPTION}
 cd ../../text_detection/pixel_link; python3 pixel_link.py ${OPTION}
 cd ../../text_detection/east; python3 east.py ${OPTION}

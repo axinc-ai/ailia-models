@@ -78,7 +78,10 @@ def ECC(src, dst, warp_mode=cv2.MOTION_EUCLIDEAN, eps=1e-5,
     criteria = (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, max_iter, eps)
 
     # Run the ECC algorithm. The results are stored in warp_matrix.
-    (cc, warp_matrix) = cv2.findTransformECC(src_r, dst_r, warp_matrix, warp_mode, criteria, None, 1)
+    try:
+        (cc, warp_matrix) = cv2.findTransformECC(src_r, dst_r, warp_matrix, warp_mode, criteria, None, 1)
+    except cv2.error:
+        return None, None
 
     if scale is not None:
         warp_matrix[0, 2] = warp_matrix[0, 2] / scale[0]
