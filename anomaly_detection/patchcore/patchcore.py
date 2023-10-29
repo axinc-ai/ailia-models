@@ -192,6 +192,10 @@ def plot_fig(
 
 
 def train_from_image_or_video(net: ailia.wrapper.Net, params: Dict[str, Any]):
+    if not os.path.exists(args.train_dir):
+        logger.error("Train folder doesn't exist")
+        return
+
     # training
     train_outputs = training(
         net,
@@ -397,6 +401,10 @@ def train_and_infer(net: ailia.wrapper.Net, params: Dict[str, Any]):
             logger.info('Please set threshold manually for video mdoe')
         else:
             gt_type_dir = args.gt_dir if args.gt_dir else None
+            if gt_type_dir is None or not os.path.exists(gt_type_dir):
+                logger.error("Ground truth folder doesn't exist")
+                return
+
             gt_imgs = load_gt_imgs(gt_type_dir)
 
             threshold = decide_threshold_from_gt_image(net, params, embedding_coreset, gt_imgs)
