@@ -20,7 +20,7 @@ from logging import getLogger  # noqa: E402
 
 from image_utils import imread, normalize_image  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
-from utils import get_base_parser, get_savepath, update_parser  # noqa: E402
+from arg_utils import get_base_parser, get_savepath, update_parser  # noqa: E402
 from webcamera_utils import (calc_adjust_fsize, get_capture,  # noqa: E402
                              get_writer, preprocess_frame)
 
@@ -103,8 +103,8 @@ def recognize_from_image():
         debugger.add_img(img)
         debugger.add_point_2d(pred, (255, 0, 0))
         debugger.add_point_3d(pred_3d, 'b')
-        debugger.show_all_imgs(pause=False)
         if args.gui:
+            debugger.show_all_imgs(pause=False)
             debugger.show_3d()
 
         savepath_3d = pathlib.PurePath(savepath)

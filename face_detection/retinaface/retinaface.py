@@ -16,7 +16,7 @@ from logging import getLogger  # noqa: E402
 import webcamera_utils  # noqa: E402
 from image_utils import imread, load_image  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
-from utils import get_base_parser, get_savepath, update_parser  # noqa: E402
+from arg_utils import get_base_parser, get_savepath, update_parser  # noqa: E402
 
 logger = getLogger(__name__)
 
@@ -51,6 +51,11 @@ parser.add_argument(
     '-r', '--rescale', metavar='RESCALE', type=float,
     default=1,
     help='scale down the original image size to prevent memory overflow, otherwise original size is used'
+)
+parser.add_argument(
+    '-w', '--write_json',
+    action='store_true',
+    help='Flag to output results to json file.'
 )
 args = update_parser(parser)
 
@@ -163,6 +168,10 @@ def recognize_from_image():
         savepath = get_savepath(args.savepath, image_path)
         logger.info(f'saved at : {savepath}')
         rut.plot_detections(org_img, detections, vis_thres=VIS_THRES, save_image_path=savepath)
+
+        if args.write_json:
+            json_file = '%s.json' % savepath.rsplit('.', 1)[0]
+            rut.save_json(json_file, detections, VIS_THRES)
 
     logger.info('Script finished successfully.')
 

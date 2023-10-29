@@ -10,7 +10,7 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
+from arg_utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from webcamera_utils import get_capture, get_writer, \
     calc_adjust_fsize ,preprocess_frame # noqa: E402
@@ -55,7 +55,7 @@ def recognize_from_image():
 
         # prepare input data
         img = Image.open(image_path)
-        img = img.resize([IMAGE_WIDTH,IMAGE_HEIGHT], Image.ANTIALIAS)
+        img = img.resize([IMAGE_WIDTH,IMAGE_HEIGHT], Image.LANCZOS)
         img = np.array(img).astype('float32')
         img = np.expand_dims(np.asarray(img), axis=0)
         img = img[:,:,:,0:3]

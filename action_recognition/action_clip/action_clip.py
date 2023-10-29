@@ -1,6 +1,7 @@
 import argparse
 import os
 import sys
+import time
 
 import ailia
 import cv2
@@ -14,7 +15,7 @@ from logging import getLogger  # noqa: E402
 from image_utils import imread, load_image  # noqa: E402
 from math_utils import softmax
 from model_utils import check_and_download_models  # noqa: E402
-from utils import get_base_parser, get_savepath, update_parser  # noqa: E402
+from arg_utils import get_base_parser, get_savepath, update_parser  # noqa: E402
 from webcamera_utils import get_capture, get_writer  # noqa: E402
 
 logger = getLogger(__name__)
@@ -50,6 +51,10 @@ parser.add_argument(
 parser.add_argument(
     '-m', '--model_type', default='vit-32-8f', choices=('vit-32-8f'),
     help='model type'
+)
+parser.add_argument(
+    '--seed', default=None, type=int,
+    help='random seed'
 )
 args = update_parser(parser)
 
@@ -233,7 +238,16 @@ def recognize_from_video(args, models, model_params):
         ret, frame = capture.read()
         frames.append(frame)
 
-    scores = predict(models, args.text_inputs, frames, num_segments)[0]
+    logger.info('Start inference...')
+    if args.benchmark:
+        logger.info('BENCHMARK mode')
+        for i in range(args.benchmark_count):
+            start = int(round(time.time() * 1000))
+            scores = predict(models, args.text_inputs, frames, num_segments)[0]
+            end = int(round(time.time() * 1000))
+            logger.info(f'\tailia processing time {end - start} ms')
+    else:
+        scores = predict(models, args.text_inputs, frames, num_segments)[0]
     print_results(scores, args.text_inputs, logger)
 
     capture.release()
@@ -272,4 +286,6 @@ def main():
 
 
 if __name__ == '__main__':
+    if args.seed != None:
+        np.random.seed(args.seed)
     main()

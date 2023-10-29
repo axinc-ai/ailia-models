@@ -8,7 +8,7 @@ from transformers import BertTokenizer, BertJapaneseTokenizer
 import ailia
 
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser  # noqa: E402
+from arg_utils import get_base_parser, update_parser  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 
 # logger
@@ -23,7 +23,10 @@ logger = getLogger(__name__)
 MODEL_LISTS = [
     'bert-base-cased',
     'bert-base-uncased',
-    'bert-base-japanese-whole-word-masking'
+    'bert-base-japanese-whole-word-masking',
+    'bert-base-japanese-char-whole-word-masking',
+    'bert-base-japanese-v3',
+    'bert-base-japanese-char-v3',
 ]
 
 NUM_PREDICT = 5
@@ -64,10 +67,26 @@ def main():
 
     if args.arch == 'bert-base-cased' or args.arch == 'bert-base-uncased':
         tokenizer = BertTokenizer.from_pretrained(args.arch)
-    else:
+    elif args.arch == 'bert-base-japanese-whole-word-masking':
         tokenizer = BertJapaneseTokenizer.from_pretrained(
-            'cl-tohoku/'+'bert-base-japanese-whole-word-masking'
+            'cl-tohoku/bert-base-japanese-whole-word-masking'
         )
+    elif args.arch == 'bert-base-japanese-char-whole-word-masking':
+        tokenizer = BertJapaneseTokenizer.from_pretrained(
+            'cl-tohoku/bert-base-japanese-char-whole-word-masking'
+        )
+    elif args.arch == 'bert-base-japanese-v3':
+        tokenizer = BertJapaneseTokenizer.from_pretrained(
+            'cl-tohoku/bert-base-japanese-v3'
+        )
+    elif args.arch == 'bert-base-japanese-char-v3':
+        tokenizer = BertJapaneseTokenizer.from_pretrained(
+            'cl-tohoku/bert-base-japanese-char-v3'
+        )
+    else:
+        logger.error("unknown arch")
+        return
+
     text = args.input
     logger.info("Input text : "+text)
 
