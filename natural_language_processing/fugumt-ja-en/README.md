@@ -1,19 +1,21 @@
-# FuguMT  (en-ja)
+# FuguMT (ja-en)
+
 
 ## Input
 
-Text (English) to translate
+Text (Japanese) to translate
+
 
 - Example
 ```
-This is a cat.
+これは猫です
 ```
 
 ## Output
 
 Translated (Japanese) text
 ```
-translation_text: これは猫です。
+translation_text: this is a cat
 ```
 
 ## Requirements
@@ -30,17 +32,17 @@ It is necessary to be connected to the Internet while downloading.
 
 For the sample text,
 ```bash
-$ python3 fugumt-en-ja.py
+$ python3 fugumt-ja-en.py
 ```
 
 If you want to specify the input text, put the text after the `--input` option.
 ```bash
-$ python3 fugumt-en-ja.py --input TEXT
+$ python3 fugumt-ja-en.py --input TEXT
 ```
 
 ## Reference
 
-- [Hugging Face - staka/fugumt-en-ja](https://huggingface.co/staka/fugumt-en-ja)
+- [Hugging Face - staka/fugumt-en-ja](https://huggingface.co/staka/fugumt-ja-en)
 - [Fugu-Machine Translator](https://github.com/s-taka/fugumt)
 
 ## Framework
@@ -53,4 +55,5 @@ ONNX opset=11
 
 ## Netron
 
-[seq2seq-lm-with-past.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/fugumt-en-ja/seq2seq-lm-with-past.onnx.prototxt)
+[encoder_model.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/fugumt/encoder_model.onnx.prototxt)
+[decoder_model.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/fugumt/decoder_model.onnx.prototxt)
