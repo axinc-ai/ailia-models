@@ -30,7 +30,6 @@ logger = getLogger(__name__)
 # Parameters
 # ======================
 
-# REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/patchcore/'
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/padim/"
 INFER_TEST_IMAGE_PATH = "./bottle_000.png"
 SAVE_INFER_TEST_IMAGE_PATH = "./output.png"
