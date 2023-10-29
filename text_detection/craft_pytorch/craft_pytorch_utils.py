@@ -3,6 +3,7 @@ import math
 import numpy as np
 import cv2
 from skimage import io
+import json
 
 
 def load_image(img_file):
@@ -30,7 +31,7 @@ def pre_process(image):
     return x, ratio_w, ratio_h
 
 
-def post_process(y, image, ratio_w, ratio_h):
+def post_process(y, image, ratio_w, ratio_h, json_path=None):
     score_text = y[0, :, :, 0]
     score_link = y[0, :, :, 1]
     boxes, polys = get_det_boxes(
@@ -46,6 +47,9 @@ def post_process(y, image, ratio_w, ratio_h):
     for k in range(len(polys)):
         if polys[k] is None:
             polys[k] = boxes[k]
+
+    if json_path is not None:
+        save_result_json(json_path, polys)
 
     return save_result(image[:, :, ::-1], polys)
 
@@ -406,3 +410,15 @@ def save_result(img, boxes):
         # ptColor = (0, 255, 255)
 
     return img
+
+
+def save_result_json(json_path, boxes):
+    results = []
+    for box in boxes:
+        points = []
+        for point in box:
+            points.append(float(point[0]))
+            points.append(float(point[1]))
+        results.append(points)
+    with open(json_path, 'w') as f:
+        json.dump({"boxes": results}, f, indent=2)

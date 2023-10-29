@@ -53,6 +53,10 @@ parser.add_argument(
     '--rotate3d', action='store_true', default=False,
     help='allowing 3D canvas rotation while on pause',
 )
+parser.add_argument(
+    '--put_fps', action='store_true', default=False,
+    help='put FPS on result image',
+)
 args = update_parser(parser)
 
 
@@ -212,8 +216,9 @@ def main():
             mean_time = current_time
         else:
             mean_time = mean_time * 0.95 + current_time * 0.05
-        cv2.putText(frame, 'FPS: {}'.format(int(1 / mean_time * 10) / 10),
-                    (40, 80), cv2.FONT_HERSHEY_COMPLEX, 1, (0, 0, 255))
+        if args.put_fps:
+            cv2.putText(frame, 'FPS: {}'.format(int(1 / mean_time * 10) / 10),
+                        (40, 80), cv2.FONT_HERSHEY_COMPLEX, 1, (0, 0, 255))
 
         if is_video:
             cv2.imshow('ICV 3D Human Pose Estimation', frame)
