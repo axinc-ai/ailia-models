@@ -8,7 +8,7 @@ cd ../../action_recognition/va-cnn; python3 va-cnn.py ${OPTION}
 cd ../../action_recognition/driver-action-recognition-adas; python3 driver-action-recognition-adas.py ${OPTION}
 cd ../../anomaly_detection/padim; python3 padim.py ${OPTION}
 cd ../../anomaly_detection/spade-pytorch; python3 spade-pytorch.py ${OPTION}
-cd ../../anomaly_detection/patch-core; python3 patchcore.py ${OPTION}
+cd ../../anomaly_detection/patchcore; python3 patchcore.py ${OPTION}
 cd ../../audio_processing/crnn_audio_classification; python3 crnn_audio_classification.py ${OPTION}
 cd ../../audio_processing/deepspeech2; python3 deepspeech2.py ${OPTION}
 cd ../../audio_processing/pytorch-dc-tts/; python3 pytorch-dc-tts.py ${OPTION}
