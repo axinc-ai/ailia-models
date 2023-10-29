@@ -66,6 +66,10 @@ parser.add_argument(
     '--top_k', '-top_k', default=100,
     help='top_k filtering for output token sampling. official value is -100 (top_k is disabled). ailia modified this value for stability.'
 )
+parser.add_argument(
+    '--seed', type=int, default=1023,
+    help='random seed'
+)
 args = update_parser(parser, check_input_type=False)
 
 # ======================
@@ -119,6 +123,9 @@ if args.input:
     text = args.input
 else:
     text ="音声合成のテストを行なっています。"
+
+if args.seed:
+    np.random.seed(args.seed)
 
 sampling_rate = 24000
 
