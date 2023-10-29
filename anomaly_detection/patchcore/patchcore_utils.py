@@ -355,6 +355,7 @@ def training(
 
     index = faiss.IndexFlatL2(embedding_coreset.shape[1])
     index.add(embedding_coreset)
+    os.makedirs("embeddings/", exist_ok=True)
     faiss.write_index(index, "embeddings/index.faiss")
     return embedding_coreset
 
