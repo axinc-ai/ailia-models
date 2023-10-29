@@ -42,6 +42,10 @@ parser.add_argument(
     '-o', '--onnx', action='store_true',
     help="Option to use onnxrutime to run or not."
 )
+parser.add_argument(
+    "--seed", type=int, default=None,
+    help="random seed",
+)
 args = update_parser(parser)
 
 
@@ -241,6 +245,9 @@ def preprocess_body(text: str) -> str:
     return normalize_text(text.replace("\n", " "))
 
 def main(args):
+    if args.seed is not None:
+        np.random.seed(args.seed)
+
     # download onnx and prototxt
     check_and_download_models(ENCODER_ONNX_PATH, ENCODER_PROTOTXT_PATH, REMOTE_PATH)
     check_and_download_models(DECODER_ONNX_PATH, DECODER_PROTOTXT_PATH, REMOTE_PATH)
@@ -271,7 +278,7 @@ def main(args):
     else:
         for input_path in args.input:
             # load input file
-            with open(input_path, "r") as fi:
+            with open(input_path, "r", encoding="utf-8") as fi:
                 body = fi.read()
 
             # pre process
@@ -281,7 +288,7 @@ def main(args):
             most_plausible_title, _ = model.estimate(body_preprocessed, 21, temperature=1.0, top_k=50, top_p=0.3)
             logger.info("title: %s", most_plausible_title)
             save_path = get_savepath(args.savepath, input_path)
-            with open(save_path, "w") as fo:
+            with open(save_path, "w", encoding="utf-8") as fo:
                 fo.write(most_plausible_title)
 
 

@@ -350,10 +350,11 @@ def recognize_from_video(models):
     capture = get_capture(args.video)
 
     # create video writer if savepath is specified as video format
+    f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
+
     if args.savepath != SAVE_IMAGE_PATH:
-        f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
-        writer = get_writer(args.savepath, f_h, f_w)
+        writer = get_writer(args.savepath, f_h, f_w + f_h)
     else:
         writer = None
 
@@ -371,19 +372,25 @@ def recognize_from_video(models):
         for detection in detection_result:
             visual_img = draw_result(visual_img, detection)
 
-        cv2.imshow('frame', visual_img)
-
         if args.blendshape and len(detection_result) > 0:
             bls_net = models['blendshape']
             score = face_blendshapes(bls_net, detection_result[0], frame.shape[:2], args.onnx)
-            img = plot_face_blendshapes_bar_graph(score)
-            cv2.imshow("bar_graph", img)
+            bar_img = plot_face_blendshapes_bar_graph(score)
+            bar_img = cv2.resize(bar_img, (f_h, f_h))
+
+            packed_img = np.zeros((f_h, f_w + f_h, 3), dtype=np.uint8)
+            packed_img[:,0:f_w,:] = visual_img
+            packed_img[:,f_w:f_w+f_h,:] = bar_img[:,:,0:3]
+
+            visual_img = packed_img
+
+        cv2.imshow('frame', visual_img)
 
         frame_shown = True
 
         # save results
         if writer is not None:
-            writer.write(frame)
+            writer.write(visual_img)
 
     capture.release()
     if writer is not None:
@@ -400,9 +407,6 @@ def main():
     check_and_download_models(WEIGHT_DET_PATH, MODEL_DET_PATH, REMOTE_PATH)
     if args.blendshape:
         check_and_download_models(WEIGHT_BLENDSHAPE_PATH, MODEL_BLENDSHAPE_PATH, REMOTE_PATH)
-
-        import blendshape
-        blendshape.onnx = True
 
     env_id = args.env_id
 

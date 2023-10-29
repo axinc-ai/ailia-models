@@ -5,6 +5,7 @@ from collections import namedtuple
 import colorsys
 
 import cv2
+import json
 import numpy as np
 
 import ailia
@@ -48,6 +49,11 @@ parser.add_argument(
     '-th', '--threshold',
     default=THRESHOLD, type=float,
     help='The detection threshold for detection.'
+)
+parser.add_argument(
+    '-w', '--write_json',
+    action='store_true',
+    help='Flag to output results to json file.'
 )
 args = update_parser(parser)
 
@@ -105,6 +111,23 @@ def draw_detections(frame, detections, palette, threshold):
                 (xmin, ymin - 7), cv2.FONT_HERSHEY_COMPLEX, 0.6, color, 1)
 
     return frame
+
+
+def save_result_json(file_name, frame, detections, threshold):
+    h, w = frame.shape[:2]
+    results = []
+    for detection in detections:
+        if detection.score > threshold:
+            results.append({
+                'class_id': detection.id,
+                'score': float(detection.score),
+                'xmin': float(detection.xmin),
+                'ymin': float(detection.ymin),
+                'xmax': float(detection.xmax),
+                'ymax': float(detection.ymax)
+            })
+    with open(file_name, 'w') as f:
+        json.dump(results, f, indent=2)
 
 
 # ======================
@@ -173,6 +196,11 @@ def recognize_from_image(net):
         savepath = get_savepath(args.savepath, image_path, ext='.png')
         logger.info(f'saved at : {savepath}')
         cv2.imwrite(savepath, res_img)
+
+        # write results
+        if args.write_json:
+            json_file = '%s.json' % savepath.rsplit('.', 1)[0]
+            save_result_json(json_file, img, detections, threshold)
 
     logger.info('Script finished successfully.')
 
