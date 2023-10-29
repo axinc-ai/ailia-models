@@ -56,4 +56,4 @@ ONNX opset=11
 ## Netron
 
 [encoder_model.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/fugumt/encoder_model.onnx.prototxt)
-[decoder_model_merged.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/fugumt/decoder_model_merged.onnx.prototxt)
+[decoder_model.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/fugumt/decoder_model.onnx.prototxt)
