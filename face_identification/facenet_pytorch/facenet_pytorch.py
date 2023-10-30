@@ -15,9 +15,7 @@ from image_utils import imread
 from model_utils import check_and_download_models # noqa: E402
 from mtcnn_utils import MTCNN
 
-
 logger = getLogger(__name__)
-
 
 # ======================
 # Arguemnt Parser Config
@@ -53,8 +51,15 @@ FACENET_WEIGHT_PATH = args.weight + '.onnx'
 FACENET_MODEL_PATH = FACENET_WEIGHT_PATH + '.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/facenet-pytorch/'
 
-THRESHOLD = 1.0
-
+# ======================
+# Utils
+# ======================
+def attach_label(sim_matrix, labels):
+    matrix = [[''] + labels]
+    matrix.extend(sim_matrix)
+    for i in range(1, len(matrix)):
+        matrix[i] = [labels[i-1]] + matrix[i]
+    return np.array(matrix)
 
 # ======================
 # Main Functions
@@ -64,7 +69,7 @@ def preprocess(mtcnn, img_dir):
     filenames = []
     imgs = []
 
-    for fp in glob(files_path):
+    for fp in sorted(glob(files_path)):
         img = imread(fp)
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
@@ -73,7 +78,7 @@ def preprocess(mtcnn, img_dir):
         crop_img = crop_img.transpose(2, 0, 1)[None]
 
         imgs.append(crop_img)
-        filenames.append(fp.split(os.sep)[-1])
+        filenames.append(fp.split(os.sep)[-1].split('.')[0])
 
     return imgs, filenames
 
@@ -84,20 +89,7 @@ def predict(model, inputs):
 
 
 def postprocess(embeddings):
-    pair_ids = []
-    distances = []
-    is_same = []
-
-    for i in range(len(embeddings)):
-        for j in range(i):
-            pair_ids.append((j, i))
-
-            dist = np.linalg.norm(embeddings[i]-embeddings[j])
-            distances.append(dist)
-
-            is_same.append(dist < THRESHOLD)
-
-    return pair_ids, distances, is_same
+    return [[np.linalg.norm(e1 - e2) for e2 in embeddings] for e1 in embeddings]
 
 
 def main():
@@ -133,13 +125,11 @@ def main():
         embeddings = predict(facenet, imgs)
 
     # calucate distances
-    pair_ids, distances, is_same = postprocess(embeddings)
+    sim_matrix = postprocess(embeddings)
 
     # results
-    for pair, dist, is_same in zip(pair_ids, distances, is_same):
-        fn1, fn2 = filenames[pair[0]], filenames[pair[1]]
-        logger.info(f'Similarity of {fn1, fn2} is {dist:.3f}.')
-
+    np.set_printoptions(linewidth=1000)
+    logger.info('Similarity: \n' + np.array2string(attach_label(sim_matrix, filenames)))
 
 if __name__ == '__main__':
     main()

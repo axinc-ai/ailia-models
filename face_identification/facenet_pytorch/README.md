@@ -7,6 +7,9 @@
 <img src="data\bradley_cooper.jpg" width="150">
 <img src="data\kate_siegel.jpg" width="150">
 <legend>angelina_jolie.jpg 　　　bradley_cooper.jpg　　　kate_siegel.jpg</legend>
+<img src="data\paul_rudd.jpg" width="150">
+<img src="data\shea_whigham.jpg" width="150">
+<legend>paul_rudd.jpg 　　　 　　shea_whigham.jpg</legend>
 </figure>
 
 (Image from https://github.com/timesler/facenet-pytorch/tree/master/data/test_images)
@@ -15,9 +18,12 @@
 
 A similarity of each pair of images.
 ```
-Similarity of ('angelina_jolie.jpg', 'kate_siegel.jpg') is 0.891.
-Similarity of ('angelina_jolie.jpg', 'bradley_cooper.jpg') is 1.446.
-Similarity of ('kate_siegel.jpg', 'bradley_cooper.jpg') is 1.302.
+[['' 'angelina_jolie' 'bradley_cooper' 'kate_siegel' 'paul_rudd' 'shea_whigham']
+ ['angelina_jolie' '0.0' '1.4458625' '0.89089304' '1.445407' '1.3876879']
+ ['bradley_cooper' '1.4458625' '0.0' '1.3021401' '1.0183644' '1.0345106']
+ ['kate_siegel' '0.89089304' '1.3021401' '0.0' '1.4002758' '1.3784742']
+ ['paul_rudd' '1.445407' '1.0183644' '1.4002758' '0.0' '1.0893339']
+ ['shea_whigham' '1.3876879' '1.0345106' '1.3784742' '1.0893339' '0.0']]
 ```
 
 ## Usage
