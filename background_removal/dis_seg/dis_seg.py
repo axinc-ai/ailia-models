@@ -25,7 +25,6 @@ IMAGE_PATH = 'input.jpg'
 SAVE_IMAGE_PATH = 'output.jpg'
 IMAGE_SIZE = 1024
 
-
 # ======================
 # Arguemnt Parser Config
 # ======================
@@ -36,13 +35,19 @@ parser.add_argument(
     '--img-size', type=int, default=IMAGE_SIZE,
     help='hyperparameter, input image size of the net'
 )
+parser.add_argument(
+    '-n', '--normal',
+    action='store_true',
+    help='By default, the optimized model is used, but with this option, ' +
+    'you can switch to the normal (not optimized) model'
+)
 args = update_parser(parser)
 
 
 # ======================
 # Parameters 2
 # ======================
-WEIGHT_PATH = 'dis.onnx'
+WEIGHT_PATH = 'isnet-general-use.onnx' if not args.normal else 'dis.onnx'
 MODEL_PATH = WEIGHT_PATH + '.prototxt'
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/dis/"
 
