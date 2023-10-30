@@ -10,6 +10,7 @@ import cv2
 from PIL import Image
 
 import ailia
+import copy
 
 # import original modules
 sys.path.append('../../util')
@@ -45,6 +46,7 @@ SAVE_IMAGE_PATH = 'output.png'
 
 POINT1 = (500, 375)
 POINT2 = (1125, 625)
+global area_img
 
 TARGET_LENGTH = 1024
 
@@ -79,6 +81,10 @@ parser.add_argument(
     '--onnx', action='store_true',
     help='execute onnxruntime version.'
 )
+parser.add_argument(
+    '--gui', action='store_true',
+    help='Open mouse click GUI.'
+)
 args = update_parser(parser)
 
 
@@ -108,6 +114,7 @@ def apply_coords(coords, h, w):
 
 
 def show_mask(mask, img):
+    global area_img
     color = np.array([255, 144, 30])
     color = color.reshape(1, 1, -1)
 
@@ -116,6 +123,7 @@ def show_mask(mask, img):
 
     mask_image = mask * color
     img = (img * ~mask) + (img * mask) * 0.6 + mask_image * 0.4
+    area_img = copy.deepcopy(mask_image)
 
     return img
 
@@ -252,6 +260,7 @@ def predict(models, img, pos_points, neg_points=None, box=None):
 
 
 def recognize_from_image(models):
+    global savepath
     pos_points = args.pos
     neg_points = args.neg
     box = args.box
@@ -334,8 +343,34 @@ def recognize_from_image(models):
 
     logger.info('Script finished successfully.')
 
+def printCoor(event,x,y,flags,param):
+    global area_img, img, savepath, img_path
+    if event == cv2.EVENT_LBUTTONDOWN:
+        img = cv2.imread(img_path)
+        if((area_img[y - 1][x - 1]) == np.array([255, 144, 30])).all():
+            # for idy, yx in enumerate(area_img):
+            #     for idx, xx in enumerate(yx):
+            #         if (xx == np.array([255, 144, 30])).all():
+            #             cv2.rectangle(img, (idx - 1, idy - 1), (idx, idy), (0, 255, 0), -1)
+            # cv2.imshow('Mouse click GUI', img2)
+            img = cv2.imread(savepath)
+
+def showMouseClickGUI(imgPath):
+    global img, savepath, img_path
+    img = cv2.imread(imgPath)
+    #画像のウインドウに名前をつけ、コールバック関数をセット
+    cv2.namedWindow('Mouse click GUI')
+    cv2.setMouseCallback('Mouse click GUI', printCoor)
+    
+    while(1):
+        cv2.imshow('Mouse click GUI', img)
+        #ESCキーでブレーク
+        if cv2.waitKey(20) & 0xFF == 27 or not cv2.getWindowProperty('Mouse click GUI', cv2.WND_PROP_VISIBLE):
+            break
+    cv2.destroyAllWindows()
 
 def main():
+    global img_path
     model_type = args.model_type
     dic_model = {
         'sam_h': (
@@ -387,6 +422,10 @@ def main():
         img_enc=img_enc,
     )
     recognize_from_image(models)
+    if args.gui:
+        for image_path in args.input:
+            img_path = copy.deepcopy(image_path)
+            showMouseClickGUI(img_path)
 
     if args.profile and not args.onnx:
         print("--- profile sam_net")
