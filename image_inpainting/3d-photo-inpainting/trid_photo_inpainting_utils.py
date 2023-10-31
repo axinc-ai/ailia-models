@@ -134,11 +134,11 @@ def filter_irrelevant_edge_new(
                                         np.array([[1, 1, 1], [1, 1, 1], [1, 1, 1]]), iterations=1)
     dilate_cross_self_edge = cv2.dilate((self_edge + comp_edge).astype(np.uint8),
                                         np.array([[0, 1, 0], [1, 1, 1], [0, 1, 0]]).astype(np.uint8), iterations=1)
-    edge_ids = np.unique(other_edges_with_id * context + (-1) * (1 - context)).astype(np.int)
+    edge_ids = np.unique(other_edges_with_id * context + (-1) * (1 - context)).astype(int)
     end_depth_maps = np.zeros_like(self_edge)
-    self_edge_ids = np.sort(np.unique(other_edges_with_id[self_edge > 0]).astype(np.int))
+    self_edge_ids = np.sort(np.unique(other_edges_with_id[self_edge > 0]).astype(int))
     self_edge_ids = self_edge_ids[1:] if self_edge_ids.shape[0] > 0 and self_edge_ids[0] == -1 else self_edge_ids
-    self_comp_ids = np.sort(np.unique(other_edges_with_id[comp_edge > 0]).astype(np.int))
+    self_comp_ids = np.sort(np.unique(other_edges_with_id[comp_edge > 0]).astype(int))
     self_comp_ids = self_comp_ids[1:] if self_comp_ids.shape[0] > 0 and self_comp_ids[0] == -1 else self_comp_ids
     edge_ids = edge_ids[1:] if edge_ids[0] == -1 else edge_ids
     other_edges_info = []
@@ -822,8 +822,8 @@ def refine_color_around_edge(
     for edge_id, edge_cc in enumerate(edge_ccs):
         if len(edge_cc) == 0:
             continue
-        near_maps = np.zeros((H, W)).astype(np.bool)
-        far_maps = np.zeros((H, W)).astype(np.bool)
+        near_maps = np.zeros((H, W)).astype(bool)
+        far_maps = np.zeros((H, W)).astype(bool)
         tmp_far_nodes = set()
         far_nodes = set()
         near_nodes = set()
@@ -1439,7 +1439,7 @@ def extrapolate(
     edge_output = edge_forward_3P(
         depth_edge_model, t_mask, t_context, t_rgb, t_disp, t_edge)
 
-    output_raw_edge = (edge_output > config['ext_edge_threshold']).astype(np.float) * t_mask + t_edge
+    output_raw_edge = (edge_output > config['ext_edge_threshold']).astype(float) * t_mask + t_edge
     output_raw_edge = output_raw_edge.squeeze()
 
     mesh = netx.Graph()
@@ -1644,9 +1644,9 @@ def extrapolate(
     fpath_ids = fpath_ids[1:] if fpath_ids.shape[0] > 0 and fpath_ids[0] == -1 else []
     fpath_real_id_map = np.zeros_like(global_fpath_map) - 1
     for fpath_id in fpath_ids:
-        fpath_real_id = np.unique(((global_fpath_map == fpath_id).astype(np.int) * (other_edge_with_id + 1)) - 1)
+        fpath_real_id = np.unique(((global_fpath_map == fpath_id).astype(int) * (other_edge_with_id + 1)) - 1)
         fpath_real_id = fpath_real_id[1:] if fpath_real_id.shape[0] > 0 and fpath_real_id[0] == -1 else []
-        fpath_real_id = fpath_real_id.astype(np.int)
+        fpath_real_id = fpath_real_id.astype(int)
         fpath_real_id = np.bincount(fpath_real_id).argmax()
         fpath_real_id_map[global_fpath_map == fpath_id] = fpath_real_id
     nxs, nys = np.where((fpath_map > -1))
@@ -2379,7 +2379,7 @@ def reassign_floating_island(mesh, info_on_pix, image, depth):
     _, label_lost_map = cv2.connectedComponents(lost_map.astype(np.uint8), connectivity=4)
     mask = np.zeros((H, W))
     mask[bord_up:bord_down, bord_left:bord_right] = 1
-    label_lost_map = (label_lost_map * mask).astype(np.int)
+    label_lost_map = (label_lost_map * mask).astype(int)
 
     for i in range(1, label_lost_map.max() + 1):
         lost_xs, lost_ys = np.where(label_lost_map == i)
@@ -3090,8 +3090,8 @@ def context_and_holes(
     forbidden_len = 3
     forbidden_map = np.ones((mesh.graph['H'] - forbidden_len, mesh.graph['W'] - forbidden_len))
     forbidden_map = np.pad(forbidden_map, ((forbidden_len, forbidden_len), (forbidden_len, forbidden_len)),
-                           mode='constant').astype(np.bool)
-    cur_tmp_mask_map = np.zeros_like(forbidden_map).astype(np.bool)
+                           mode='constant').astype(bool)
+    cur_tmp_mask_map = np.zeros_like(forbidden_map).astype(bool)
     passive_background = 10 if 10 is not None else background_thickness
     passive_context = 1 if 1 is not None else context_thickness
 
@@ -3110,7 +3110,7 @@ def context_and_holes(
                 tmp_mask_nodes = copy.deepcopy(mask_ccs[edge_id])
                 tmp_intersect_nodes = []
                 tmp_intersect_context_nodes = []
-                mask_map = np.zeros((mesh.graph['H'], mesh.graph['W']), dtype=np.bool)
+                mask_map = np.zeros((mesh.graph['H'], mesh.graph['W']), dtype=bool)
                 context_depth = np.zeros((mesh.graph['H'], mesh.graph['W']))
                 comp_cnt_depth = np.zeros((mesh.graph['H'], mesh.graph['W']))
                 connect_map = np.zeros((mesh.graph['H'], mesh.graph['W']))
@@ -3137,20 +3137,20 @@ def context_and_holes(
                                 connect_map[xx[0], xx[1]] = xx[2]
                 tmp_context_nodes = [*context_ccs[edge_id]]
                 tmp_erode.append([*context_ccs[edge_id]])
-                context_map = np.zeros((mesh.graph['H'], mesh.graph['W']), dtype=np.bool)
+                context_map = np.zeros((mesh.graph['H'], mesh.graph['W']), dtype=bool)
                 for node in tmp_context_nodes:
                     context_map[node[0], node[1]] = True
                     context_depth[node[0], node[1]] = node[2]
                 context_map[mask_map == True] = False
                 tmp_intouched_nodes = [*intouched_ccs[edge_id]]
-                intouched_map = np.zeros((mesh.graph['H'], mesh.graph['W']), dtype=np.bool)
+                intouched_map = np.zeros((mesh.graph['H'], mesh.graph['W']), dtype=bool)
                 for node in tmp_intouched_nodes: intouched_map[node[0], node[1]] = True
                 intouched_map[mask_map == True] = False
                 tmp_redundant_nodes = set()
                 tmp_noncont_nodes = set()
-                noncont_map = np.zeros((mesh.graph['H'], mesh.graph['W']), dtype=np.bool)
-                intersect_map = np.zeros((mesh.graph['H'], mesh.graph['W']), dtype=np.bool)
-                intersect_context_map = np.zeros((mesh.graph['H'], mesh.graph['W']), dtype=np.bool)
+                noncont_map = np.zeros((mesh.graph['H'], mesh.graph['W']), dtype=bool)
+                intersect_map = np.zeros((mesh.graph['H'], mesh.graph['W']), dtype=bool)
+                intersect_context_map = np.zeros((mesh.graph['H'], mesh.graph['W']), dtype=bool)
             if i > passive_background and inpaint_iter == 0:
                 new_tmp_intersect_nodes = None
                 new_tmp_intersect_nodes = []
@@ -3448,9 +3448,9 @@ def context_and_holes(
                     tmp_context_nodes = copy.deepcopy(ecnt_cc)
                     tmp_invalid_context_nodes = copy.deepcopy(invalid_extend_edge_ccs[ecnt_id])
                     tmp_mask_nodes = copy.deepcopy(accomp_extend_context_ccs[ecnt_id])
-                    tmp_context_map = np.zeros((mesh.graph['H'], mesh.graph['W'])).astype(np.bool)
-                    tmp_mask_map = np.zeros((mesh.graph['H'], mesh.graph['W'])).astype(np.bool)
-                    tmp_invalid_context_map = np.zeros((mesh.graph['H'], mesh.graph['W'])).astype(np.bool)
+                    tmp_context_map = np.zeros((mesh.graph['H'], mesh.graph['W'])).astype(bool)
+                    tmp_mask_map = np.zeros((mesh.graph['H'], mesh.graph['W'])).astype(bool)
+                    tmp_invalid_context_map = np.zeros((mesh.graph['H'], mesh.graph['W'])).astype(bool)
                     for node in tmp_mask_nodes:
                         tmp_mask_map[node[0], node[1]] = True
                     for node in context_ccs[ecnt_id]:
@@ -3622,7 +3622,7 @@ def DL_inpaint_edge(
                 tensor_edge_dict['edge'])
 
             tensor_edge_dict['output'] = \
-                (depth_edge_output > config['ext_edge_threshold']).astype(np.float) \
+                (depth_edge_output > config['ext_edge_threshold']).astype(float) \
                 * tensor_edge_dict['mask'] + tensor_edge_dict['edge']
         else:
             tensor_edge_dict['output'] = tensor_edge_dict['edge']
@@ -3632,7 +3632,7 @@ def DL_inpaint_edge(
         edge_dict['output'][union_size['x_min']:union_size['x_max'], union_size['y_min']:union_size['y_max']] = \
             patch_edge_dict['output']
         if require_depth_edge(patch_edge_dict['edge'], patch_edge_dict['mask']) and inpaint_iter == 0:
-            if ((depth_edge_output > config['ext_edge_threshold']).astype(np.float) * tensor_edge_dict[
+            if ((depth_edge_output > config['ext_edge_threshold']).astype(float) * tensor_edge_dict[
                 'mask']).max() > 0:
                 try:
                     edge_dict['fpath_map'], edge_dict['npath_map'], break_flag, npaths, fpaths, invalid_edge_id = \
@@ -3654,7 +3654,7 @@ def DL_inpaint_edge(
                             tensor_input_edge)
 
                         depth_edge_output = \
-                            (depth_edge_output > config['ext_edge_threshold']).astype(np.float) * \
+                            (depth_edge_output > config['ext_edge_threshold']).astype(float) * \
                             tensor_edge_dict['mask'] + tensor_edge_dict['edge']
                         depth_edge_output = depth_edge_output.squeeze()
                         full_depth_edge_output = np.zeros((mesh.graph['H'], mesh.graph['W']))
@@ -3852,8 +3852,8 @@ def DL_inpaint_edge(
                 None,
                 fx=frac, fy=frac,
                 interpolation=cv2.INTER_AREA).transpose(2, 0, 1)[None, :]
-            resize_rgb_dict['mask'] = (resize_mark[:, 0:1] > 0).astype(np.float)
-            resize_rgb_dict['context'] = (np.abs(resize_mark[:, 1:2]-1) < 0.1).astype(np.float)
+            resize_rgb_dict['mask'] = (resize_mark[:, 0:1] > 0).astype(float)
+            resize_rgb_dict['context'] = (np.abs(resize_mark[:, 1:2]-1) < 0.1).astype(float)
             resize_rgb_dict['context'][resize_rgb_dict['mask'] > 0] = 0
             resize_rgb_dict['rgb'] = cv2.resize(
                 resize_rgb_dict['rgb'].transpose(0, 2, 3, 1)[0],
@@ -3866,7 +3866,7 @@ def DL_inpaint_edge(
                 None,
                 fx=frac, fy=frac,
                 interpolation=cv2.INTER_AREA)[None, None, :]
-            resize_rgb_dict['edge'] = (resize_rgb_dict['edge'] > 0).astype(np.float) * 0
+            resize_rgb_dict['edge'] = (resize_rgb_dict['edge'] > 0).astype(float) * 0
             resize_rgb_dict['edge'] = resize_rgb_dict['edge'] * (resize_rgb_dict['context'] + resize_rgb_dict['mask'])
         rgb_input_feat = np.concatenate((resize_rgb_dict['rgb'], resize_rgb_dict['edge']), axis=1)
         rgb_input_feat[:, 3] = 1 - rgb_input_feat[:, 3]

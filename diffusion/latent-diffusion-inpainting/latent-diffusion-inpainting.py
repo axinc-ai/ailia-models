@@ -10,7 +10,7 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath  # noqa
+from arg_utils import get_base_parser, update_parser, get_savepath  # noqa
 from model_utils import check_and_download_models  # noqa
 from detector_utils import load_image  # noqa
 # logger
@@ -323,7 +323,7 @@ def main():
         logger.info("This model requires 10GB or more memory.")
         memory_mode = ailia.get_memory_mode(
             reduce_constant=True, ignore_input_with_initializer=True,
-            reduce_interstage=False, reuse_interstage=False)
+            reduce_interstage=False, reuse_interstage=True)
         cond_stage_model = ailia.Net(
             MODEL_COND_STAGE_PATH, WEIGHT_COND_STAGE_PATH, env_id=env_id, memory_mode=memory_mode)
         diffusion_model = ailia.Net(

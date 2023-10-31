@@ -7,8 +7,6 @@ import os
 
 import numpy as np
 
-import ailia
-
 # import original modules
 sys.path.append('../../util')
 # logger
@@ -21,7 +19,7 @@ from math_utils import softmax
 from microphone_utils import start_microphone_input  # noqa
 from model_utils import check_and_download_models  # noqa
 from languages import LANGUAGES, TO_LANGUAGE_CODE
-from utils import get_base_parser, get_savepath, update_parser  # noqa
+from arg_utils import get_base_parser, get_savepath, update_parser  # noqa
 
 logger = getLogger(__name__)
 
@@ -32,17 +30,6 @@ logger = getLogger(__name__)
 WAV_PATH = 'demo.wav'
 SAVE_TEXT_PATH = 'output.txt'
 
-# ======================
-# Workaround
-# ======================
-
-REQUIRE_CONSTANT_SHAPE_BETWEEN_INFERENCE = True # ailia SDK 1.2.13のAILIA UNSETTLED SHAPEの抑制、1.2.14では不要になる予定
-SAVE_ENC_SHAPE = ()
-SAVE_DEC_SHAPE = ()
-
-memory_mode = ailia.get_memory_mode(
-    reduce_constant=True, ignore_input_with_initializer=True,
-    reduce_interstage=False, reuse_interstage=True)
 
 # ======================
 # Arguemnt Parser Config
@@ -124,6 +111,29 @@ parser.add_argument(
     action='store_true',
     help='disable ailia tokenizer.'
 )
+parser.add_argument(
+    '--normal',
+    action='store_true',
+    help='use normal model (default : opt model).'
+)
+parser.add_argument(
+    '--task', default='transcribe',
+    choices=('transcribe', 'translate'),
+    help='task type'
+)
+parser.add_argument(
+    '--memory_mode', default=-1, type=int,
+    help='memory mode'
+)
+parser.add_argument(
+    '--prompt', default=None,
+    help='prompt for word vocabulary'
+)
+parser.add_argument(
+    '--intermediate',
+    action='store_true',
+    help='display intermediate state.'
+)
 args = update_parser(parser)
 
 if args.ailia_audio:
@@ -152,19 +162,47 @@ dims_dict = {
 dims = dims_dict[args.model_type]
 
 # ======================
+# Workaround
+# ======================
+
+if not args.onnx:
+    import ailia
+
+    # ailia SDK 1.2.13のAILIA UNSETTLED SHAPEの抑制、1.2.14では不要
+    version = ailia.get_version().split(".")
+    AILIA_VERSION_MAJOR = int(version[0])
+    AILIA_VERSION_MINOR = int(version[1])
+    AILIA_VERSION_REVISION = int(version[2])
+    REQUIRE_CONSTANT_SHAPE_BETWEEN_INFERENCE = (AILIA_VERSION_MAJOR<=1 and AILIA_VERSION_MINOR<=2 and AILIA_VERSION_REVISION<14)
+    COPY_BLOB_DATA_ENABLE = (AILIA_VERSION_MAJOR<=1 and AILIA_VERSION_MINOR<=2 and AILIA_VERSION_REVISION>=15)
+    SAVE_ENC_SHAPE = ()
+    SAVE_DEC_SHAPE = ()
+
+    if args.memory_mode == -1:
+        args.memory_mode = ailia.get_memory_mode(
+            reduce_constant=True, ignore_input_with_initializer=True,
+            reduce_interstage=False, reuse_interstage=True)
+
+# ======================
 # Models
 # ======================
 
+OPT = ".opt"
+OPT2 = ".opt2"
+if args.normal:
+    OPT = ""
+    OPT2 = ""
+
 if not args.dynamic_kv_cache:
     # 高速化のためKV_CACHEのサイズを最大サイズで固定化したバージョン
-    WEIGHT_DEC_TINY_PATH = "decoder_tiny_fix_kv_cache.onnx"
-    MODEL_DEC_TINY_PATH = "decoder_tiny_fix_kv_cache.onnx.prototxt"
-    WEIGHT_DEC_BASE_PATH = "decoder_base_fix_kv_cache.onnx"
-    MODEL_DEC_BASE_PATH = "decoder_base_fix_kv_cache.onnx.prototxt"
-    WEIGHT_DEC_SMALL_PATH = "decoder_small_fix_kv_cache.onnx"
-    MODEL_DEC_SMALL_PATH = "decoder_small_fix_kv_cache.onnx.prototxt"
-    WEIGHT_DEC_MEDIUM_PATH = "decoder_medium_fix_kv_cache.onnx"
-    MODEL_DEC_MEDIUM_PATH = "decoder_medium_fix_kv_cache.onnx.prototxt"
+    WEIGHT_DEC_TINY_PATH = "decoder_tiny_fix_kv_cache"+ OPT2 +".onnx"
+    MODEL_DEC_TINY_PATH = "decoder_tiny_fix_kv_cache"+ OPT2 +".onnx.prototxt"
+    WEIGHT_DEC_BASE_PATH = "decoder_base_fix_kv_cache"+ OPT2 +".onnx"
+    MODEL_DEC_BASE_PATH = "decoder_base_fix_kv_cache"+ OPT2 +".onnx.prototxt"
+    WEIGHT_DEC_SMALL_PATH = "decoder_small_fix_kv_cache"+ OPT2 +".onnx"
+    MODEL_DEC_SMALL_PATH = "decoder_small_fix_kv_cache"+ OPT2 +".onnx.prototxt"
+    WEIGHT_DEC_MEDIUM_PATH = "decoder_medium_fix_kv_cache"+ OPT2 +".onnx"
+    MODEL_DEC_MEDIUM_PATH = "decoder_medium_fix_kv_cache"+ OPT2 +".onnx.prototxt"
 else:
     # KV_CACHEが推論ごとに変化するバージョン
     WEIGHT_DEC_TINY_PATH = "decoder_tiny.onnx"
@@ -176,14 +214,14 @@ else:
     WEIGHT_DEC_MEDIUM_PATH = "decoder_medium.onnx"
     MODEL_DEC_MEDIUM_PATH = "decoder_medium.onnx.prototxt"
 
-WEIGHT_ENC_TINY_PATH = "encoder_tiny.onnx"
-MODEL_ENC_TINY_PATH = "encoder_tiny.onnx.prototxt"
-WEIGHT_ENC_BASE_PATH = "encoder_base.onnx"
-MODEL_ENC_BASE_PATH = "encoder_base.onnx.prototxt"
-WEIGHT_ENC_SMALL_PATH = "encoder_small.onnx"
-MODEL_ENC_SMALL_PATH = "encoder_small.onnx.prototxt"
-WEIGHT_ENC_MEDIUM_PATH = "encoder_medium.onnx"
-MODEL_ENC_MEDIUM_PATH = "encoder_medium.onnx.prototxt"
+WEIGHT_ENC_TINY_PATH = "encoder_tiny"+ OPT +".onnx"
+MODEL_ENC_TINY_PATH = "encoder_tiny"+ OPT +".onnx.prototxt"
+WEIGHT_ENC_BASE_PATH = "encoder_base"+ OPT +".onnx"
+MODEL_ENC_BASE_PATH = "encoder_base"+ OPT +".onnx.prototxt"
+WEIGHT_ENC_SMALL_PATH = "encoder_small"+ OPT +".onnx"
+MODEL_ENC_SMALL_PATH = "encoder_small"+ OPT +".onnx.prototxt"
+WEIGHT_ENC_MEDIUM_PATH = "encoder_medium"+ OPT +".onnx"
+MODEL_ENC_MEDIUM_PATH = "encoder_medium"+ OPT +".onnx.prototxt"
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/whisper/'
 
 # ======================
@@ -230,11 +268,19 @@ def get_initial_tokens(tokenizer, options):
             prefix_tokens = prefix_tokens[-max_prefix_len:]
         tokens = tokens + prefix_tokens
 
-    if prompt:
-        prompt_tokens = (
-            tokenizer.encode(" " + prompt.strip()) if isinstance(prompt, str) else prompt
-        )
-        tokens = [tokenizer.sot_prev] + prompt_tokens[-(n_ctx // 2 - 1):] + tokens
+    if prompt or args.prompt:
+        if args.prompt:
+            prompt_arg_tokens = (
+                tokenizer.encode(args.prompt)
+            )
+            prompt_tokens = prompt
+            prev_prompt_len = (n_ctx // 2 - 1) - len(prompt_arg_tokens)
+            tokens = [tokenizer.sot_prev] + prompt_arg_tokens + prompt_tokens[-prev_prompt_len:] + tokens
+        else:
+            prompt_tokens = (
+                tokenizer.encode(" " + prompt.strip()) if isinstance(prompt, str) else prompt
+            )
+            tokens = [tokenizer.sot_prev] + prompt_tokens[-(n_ctx // 2 - 1):] + tokens
 
     return tuple(tokens)
 
@@ -278,7 +324,7 @@ def new_kv_cache(n_group, length=451):
     else:
         raise ValueError(f"Unsupported model type: {model_type}")
 
-    return np.zeros(size, dtype=np.float32)
+    return np.zeros(size, dtype=np.float32, order='C')
 
 
 # ======================
@@ -286,25 +332,34 @@ def new_kv_cache(n_group, length=451):
 # ======================
 
 def get_audio_features(enc_net, mel):
+    if args.benchmark:
+        start = int(round(time.time() * 1000))
+
     mel = mel.astype(np.float32)
     if not args.onnx:
         if REQUIRE_CONSTANT_SHAPE_BETWEEN_INFERENCE:
             global WEIGHT_ENC_PATH, MODEL_ENC_PATH, SAVE_ENC_SHAPE
             shape = (mel.shape)
             if SAVE_ENC_SHAPE != shape:
-                enc_net = ailia.Net(MODEL_ENC_PATH, WEIGHT_ENC_PATH, env_id=args.env_id, memory_mode=memory_mode)
+                enc_net = ailia.Net(MODEL_ENC_PATH, WEIGHT_ENC_PATH, env_id=args.env_id, memory_mode=args.memory_mode)
             SAVE_ENC_SHAPE = shape
         output = enc_net.predict([mel])
     else:
         output = enc_net.run(None, {'mel': mel})
     audio_features = output[0]
 
+    if args.benchmark:
+        end = int(round(time.time() * 1000))
+        estimation_time = (end - start)
+        logger.info(f'\tencoder processing time {estimation_time} ms')
+
     return audio_features
 
 
-def inference_logits(dec_net, tokens, audio_features, kv_cache=None, initial_token_length=None):
+def inference_logits(dec_net, tokens, audio_features, kv_cache=None, initial_token_length=None, constant_audio_feature = False):
     n_group = tokens.shape[0]
     initial_token_length = initial_token_length if initial_token_length else tokens.shape[-1]
+    is_init_kv_cache = False
     if kv_cache is None:
         if not args.dynamic_kv_cache:
             kv_cache = new_kv_cache(n_group)
@@ -312,6 +367,7 @@ def inference_logits(dec_net, tokens, audio_features, kv_cache=None, initial_tok
             kv_cache = new_kv_cache(n_group, initial_token_length)
         offset = 0
         length = initial_token_length
+        is_init_kv_cache = True
     else:
         offset = kv_cache.shape[2]
         if not args.dynamic_kv_cache:
@@ -330,22 +386,48 @@ def inference_logits(dec_net, tokens, audio_features, kv_cache=None, initial_tok
     tokens = tokens.astype(np.int64)
     offset = np.array(offset, dtype=np.int64)
 
+    if args.benchmark:
+        start = int(round(time.time() * 1000))
+
     if not args.onnx:
+        if offset == 0:
+            logits = np.zeros((n_group, initial_token_length, dims.n_vocab), dtype=np.float32, order='C')
+        else:
+            logits = np.zeros((n_group, 1, dims.n_vocab), dtype=np.float32, order='C')
+        output = [logits, kv_cache] # static allocatin to reduce data copy
         if REQUIRE_CONSTANT_SHAPE_BETWEEN_INFERENCE:
             global WEIGHT_DEC_PATH, MODEL_DEC_PATH, SAVE_DEC_SHAPE
 
             shape = (tokens.shape, audio_features.shape, kv_cache.shape)
             if SAVE_DEC_SHAPE != shape:
-                dec_net = ailia.Net(MODEL_DEC_PATH, WEIGHT_DEC_PATH, env_id=args.env_id, memory_mode=memory_mode)
+                dec_net = ailia.Net(MODEL_DEC_PATH, WEIGHT_DEC_PATH, env_id=args.env_id, memory_mode=args.memory_mode)
             SAVE_DEC_SHAPE = shape
 
-        output = dec_net.predict([tokens, audio_features, kv_cache, offset])
+            dec_net.predict([tokens, audio_features, kv_cache, offset], output = output)
+        else:
+            if is_init_kv_cache or not COPY_BLOB_DATA_ENABLE or args.dynamic_kv_cache:
+                if constant_audio_feature:
+                    dec_net.predict({"tokens":tokens, "kv_cache":kv_cache, "offset":offset}, output = output)
+                else:
+                    dec_net.predict([tokens, audio_features, kv_cache, offset], output = output)
+            else:
+                dec_net.copy_blob_data("kv_cache", "output_kv_cache", None)
+                output = [logits]
+                if constant_audio_feature:
+                    dec_net.predict({"tokens":tokens, "offset":offset}, output = output)
+                else:
+                    dec_net.predict({"tokens":tokens, "audio_features": audio_features, "offset":offset}, output = output)
     else:
         kv_cache = kv_cache.astype(np.float32)
         output = dec_net.run(None, {
             'tokens': tokens, 'audio_features': audio_features,
             'kv_cache': kv_cache, 'offset': offset})
-    logits, kv_cache = output
+        logits, kv_cache = output
+
+    if args.benchmark:
+        end = int(round(time.time() * 1000))
+        estimation_time = (end - start)
+        logger.info(f'\tdecoder processing time {estimation_time} ms')
 
     if not args.dynamic_kv_cache:
         return logits, kv_cache[:, :, :length, :]
@@ -406,7 +488,7 @@ def decode(enc_net, dec_net, mel, options):
         mel = mel.unsqueeze(0)
 
     language = options.get("language") or "en"
-    tokenizer = get_tokenizer(is_multilingual(), language=language, task='transcribe')
+    tokenizer = get_tokenizer(is_multilingual(), language=language, task=args.task)
 
     n_group = options.get("beam_size") or options.get("best_of") or 1
     n_ctx = dims.n_text_ctx
@@ -464,7 +546,8 @@ def decode(enc_net, dec_net, mel, options):
     for i in range(sample_len):
         if args.debug:
             start = int(round(time.time() * 1000))
-        logits, kv_cache = inference_logits(dec_net, tokens, audio_features, kv_cache, initial_token_length)
+        constant_audio_feature = (i >= 2)
+        logits, kv_cache = inference_logits(dec_net, tokens, audio_features, kv_cache, initial_token_length, constant_audio_feature)
         if args.debug:
             end = int(round(time.time() * 1000))
             estimation_time = (end - start)
@@ -489,6 +572,10 @@ def decode(enc_net, dec_net, mel, options):
 
         if completed or tokens.shape[-1] > n_ctx:
             break
+            
+        if args.intermediate:
+            texts = [tokenizer.decode(t[len(initial_tokens):]).strip() for t in tokens]
+            print(texts[0][-32:]+ "\n\u001B[2A")
 
     # reshape the tensors to have (n_audio, n_group) as the first two dimensions
     audio_features = audio_features[:: n_group]
@@ -586,7 +673,7 @@ def predict(wav, enc_net, dec_net, immediate=False, microphone=False):
         temperature = [temperature]
 
     decode_options = {
-        'task': 'transcribe', 'language': language,
+        'task': args.task, 'language': language,
         'temperature': temperature, 'best_of': args.best_of,
         'beam_size': args.beam_size, 'patience': args.patience,
         'length_penalty': args.length_penalty, 'suppress_tokens': args.suppress_tokens,
@@ -603,7 +690,7 @@ def predict(wav, enc_net, dec_net, immediate=False, microphone=False):
         logger.info(f"Detected language: {LANGUAGES[decode_options['language']].title()}")
 
     mel = np.expand_dims(mel, axis=0)
-    task = decode_options.get("task", "transcribe")
+    task = decode_options.get("task", args.task)
     tokenizer = get_tokenizer(is_multilingual(), language=language, task=task)
 
     seek = 0
@@ -740,18 +827,11 @@ def recognize_from_audio(enc_net, dec_net):
         if args.benchmark:
             logger.info('BENCHMARK mode')
             total_time_estimation = 0
-            for i in range(args.benchmark_count):
-                start = int(round(time.time() * 1000))
-                output = predict(wav, enc_net, dec_net, immediate=immediate, microphone=False)
-                end = int(round(time.time() * 1000))
-                estimation_time = (end - start)
-
-                # Logging
-                logger.info(f'\tailia processing estimation time {estimation_time} ms')
-                if i != 0:
-                    total_time_estimation = total_time_estimation + estimation_time
-
-            logger.info(f'\taverage time estimation {total_time_estimation / (args.benchmark_count - 1)} ms')
+            start = int(round(time.time() * 1000))
+            output = predict(wav, enc_net, dec_net, immediate=immediate, microphone=False)
+            end = int(round(time.time() * 1000))
+            estimation_time = (end - start)
+            logger.info(f'\ttotal processing time {estimation_time} ms')
         else:
             output = predict(wav, enc_net, dec_net, immediate=immediate)
 
@@ -840,19 +920,21 @@ def main():
 
     # initialize
     if not args.onnx:
-        enc_net = ailia.Net(MODEL_ENC_PATH, WEIGHT_ENC_PATH, env_id=args.env_id, memory_mode=memory_mode)
-        dec_net = ailia.Net(MODEL_DEC_PATH, WEIGHT_DEC_PATH, env_id=args.env_id, memory_mode=memory_mode)
+        enc_net = ailia.Net(MODEL_ENC_PATH, WEIGHT_ENC_PATH, env_id=args.env_id, memory_mode=args.memory_mode)
+        dec_net = ailia.Net(MODEL_DEC_PATH, WEIGHT_DEC_PATH, env_id=args.env_id, memory_mode=args.memory_mode)
         if args.profile:
             dec_net.set_profile_mode(True)
     else:
         import onnxruntime
-        enc_net = onnxruntime.InferenceSession(WEIGHT_ENC_PATH)
+        providers = ["CPUExecutionProvider"]
+        #providers = ["CUDAExecutionProvider"]
+        enc_net = onnxruntime.InferenceSession(WEIGHT_ENC_PATH, providers=providers)
         if args.profile:
             options = onnxruntime.SessionOptions()
             options.enable_profiling = True
-            dec_net = onnxruntime.InferenceSession(WEIGHT_DEC_PATH, options)
+            dec_net = onnxruntime.InferenceSession(WEIGHT_DEC_PATH, options, providers=providers)
         else:
-            dec_net = onnxruntime.InferenceSession(WEIGHT_DEC_PATH)
+            dec_net = onnxruntime.InferenceSession(WEIGHT_DEC_PATH, providers=providers)
 
     if args.V:
         # microphone input mode

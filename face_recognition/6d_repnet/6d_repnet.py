@@ -21,7 +21,7 @@ import webcamera_utils
 from detector_utils import plot_results, reverse_letterbox
 from image_utils import imread  # noqa: E402
 from model_utils import check_and_download_models
-from utils import get_base_parser, get_savepath, update_parser
+from arg_utils import get_base_parser, get_savepath, update_parser
 
 logger = getLogger(__name__)
 
@@ -55,6 +55,11 @@ WIDTH = 224
 # Arguemnt Parser Config
 # ======================
 parser = get_base_parser('6DRepNet model', IMAGE_PATH, SAVE_IMAGE_PATH)
+parser.add_argument(
+    '-w', '--write_json',
+    action='store_true',
+    help='Flag to output results to json file.'
+)
 args = update_parser(parser)
 
 # ======================
@@ -70,6 +75,7 @@ def recognize_from_image():
     for image_path in args.input:
         # prepare input data
         logger.debug(f'input image: {image_path}')
+        results = []
         raw_img = cv2.imread(image_path)
         resize_img = cv2.resize(raw_img, dsize=(640, 480))
         resize_img = np.array(resize_img)
@@ -115,6 +121,7 @@ def recognize_from_image():
             p_pred_deg = euler[:, 0]
             y_pred_deg = euler[:, 1]
             r_pred_deg = euler[:, 2]
+            results.append({'yaw': y_pred_deg, 'pitch': p_pred_deg, 'roll': r_pred_deg})
 
             utils.plot_pose_cube(resize_img, y_pred_deg, p_pred_deg, r_pred_deg, x_min + int(.5 * (
                     x_max - x_min)), y_min + int(.5 * (y_max - y_min)), size=bbox_width)
@@ -124,6 +131,10 @@ def recognize_from_image():
         logger.info(f'saved at : {savepath}')
         resize_img = cv2.cvtColor(resize_img, cv2.COLOR_BGR2RGB)
         Image.fromarray(resize_img).save(savepath)
+
+        if args.write_json:
+            json_file = '%s.json' % savepath.rsplit('.', 1)[0]
+            utils.save_json_result(json_file, results)
 
     logger.info('Script finished successfully.')
 

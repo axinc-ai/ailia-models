@@ -10,7 +10,7 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath
+from arg_utils import get_base_parser, update_parser, get_savepath
 from model_utils import check_and_download_models
 from detector_utils import load_image, reverse_letterbox, plot_results, write_predictions
 import webcamera_utils
@@ -81,7 +81,10 @@ def recognize_from_image():
     if args.onnx:
         session = onnxruntime.InferenceSession(WEIGHT_PATH)
     else:
-        session = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id = args.env_id)
+        memory_mode = ailia.get_memory_mode(
+            reduce_constant=True, ignore_input_with_initializer=True,
+            reduce_interstage=False, reuse_interstage=True)
+        session = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id = args.env_id, memory_mode=memory_mode)
 
     # input image loop
     for image_path in args.input:
@@ -127,7 +130,10 @@ def recognize_from_video():
     if args.onnx:
         session = onnxruntime.InferenceSession(WEIGHT_PATH)
     else:
-        session = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id = args.env_id)
+        memory_mode = ailia.get_memory_mode(
+            reduce_constant=True, ignore_input_with_initializer=True,
+            reduce_interstage=False, reuse_interstage=True)
+        session = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id = args.env_id, memory_mode=memory_mode)
 
     capture = webcamera_utils.get_capture(args.video)
 

@@ -10,7 +10,7 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
+from arg_utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from detector_utils import plot_results, write_predictions  # noqa: E402
 from detector_utils import load_image, letterbox_convert, reverse_letterbox  # noqa: E402
@@ -70,8 +70,11 @@ parser.add_argument(
 )
 parser.add_argument(
     '-w', '--write_prediction',
-    action='store_true',
-    help='Flag to output the prediction file.'
+    nargs='?',
+    const='txt',
+    choices=['txt', 'json'],
+    type=str,
+    help='Output results to txt or json file.'
 )
 parser.add_argument(
     '-dw', '--detection_width', metavar='DETECTION_WIDTH',
@@ -160,9 +163,11 @@ def recognize_from_image(detector):
         cv2.imwrite(savepath, res_img)
 
         # write prediction
-        if args.write_prediction:
-            pred_file = '%s.txt' % savepath.rsplit('.', 1)[0]
-            write_predictions(pred_file, detect_object, org_img, COCO_CATEGORY)
+        if args.write_prediction is not None:
+            ext = args.write_prediction
+            pred_file = "%s.%s" % (savepath.rsplit('.', 1)[0], ext)
+            write_predictions(pred_file, detector if args.detector else detect_object, org_img, category=COCO_CATEGORY, file_type=ext)
+
 
     if args.profile:
         print(detector.get_summary())
@@ -181,7 +186,7 @@ def recognize_from_video(detector):
     else:
         writer = None
 
-    if args.write_prediction:
+    if args.write_prediction is not None:
         frame_count = 0
         frame_digit = int(math.log10(capture.get(cv2.CAP_PROP_FRAME_COUNT)) + 1)
         video_name = os.path.splitext(os.path.basename(args.video))[0]
@@ -221,10 +226,11 @@ def recognize_from_video(detector):
             writer.write(res_img)
         
         # write prediction
-        if args.write_prediction:
+        if args.write_prediction is not None:
             savepath = get_savepath(args.savepath, video_name, post_fix = '_%s' % (str(frame_count).zfill(frame_digit) + '_res'), ext='.png')
-            pred_file = '%s.txt' % savepath.rsplit('.', 1)[0]
-            write_predictions(pred_file, detect_object, frame, COCO_CATEGORY)
+            ext = args.write_prediction
+            pred_file = "%s.%s" % (savepath.rsplit('.', 1)[0], ext)
+            write_predictions(pred_file, detector if args.detector else detect_object, frame, category=COCO_CATEGORY, file_type=ext)
             frame_count += 1
 
     capture.release()

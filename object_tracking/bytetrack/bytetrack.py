@@ -9,7 +9,7 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser
+from arg_utils import get_base_parser, update_parser
 from model_utils import check_and_download_models  # noqa: E402
 from image_utils import normalize_image  # noqa: E402C
 from webcamera_utils import get_capture, get_writer  # noqa: E402
@@ -19,7 +19,6 @@ from logging import getLogger  # noqa: E402
 logger = getLogger(__name__)
 
 from bytetrack_utils import multiclass_nms
-from tracker.byte_tracker import BYTETracker
 
 # ======================
 # Parameters
@@ -311,7 +310,7 @@ def recognize_from_video(net):
             cv2.imshow('frame', res_img)
             frame_shown = True
         else:
-            print("Online ids",online_ids)
+            print("Online ids", online_ids)
 
         # save results
         if writer is not None:
@@ -355,4 +354,6 @@ def main():
 
 
 if __name__ == '__main__':
+    from tracker.byte_tracker import BYTETracker
+
     main()

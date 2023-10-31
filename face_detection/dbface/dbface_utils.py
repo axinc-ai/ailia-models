@@ -4,6 +4,7 @@ import random
 
 import cv2
 import numpy as np
+import json
 
 
 class BBox:
@@ -350,7 +351,19 @@ def max_pool2d(A, kernel_size, stride, padding):
 
 
 def get_topk_score_indices(hm_pool, hm, k):
-    ary = ((hm_pool == hm).astype(np.bool) * hm).reshape(-1)
+    ary = ((hm_pool == hm).astype(bool) * hm).reshape(-1)
     indices = ary.argsort()[::-1][:k]
     scores = ary[indices]
     return scores, indices
+
+
+def save_json(json_path, objs):
+    with open(json_path, 'w') as f:
+        json.dump(
+            [{
+                'x': obj.x, 'y': obj.y, 'r': obj.r, 'b': obj.b,
+                'width': obj.width, 'height': obj.height,
+                'landmark': obj.landmark
+            } for obj in objs],
+            f, indent=2
+        )

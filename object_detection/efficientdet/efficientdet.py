@@ -9,9 +9,9 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
+from arg_utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
-from detector_utils import load_image, plot_results  # noqa: E402
+from detector_utils import load_image, plot_results, write_predictions  # noqa: E402
 from nms_utils import bb_intersection_over_union  # noqa: E402
 from webcamera_utils import get_capture  # noqa: E402
 
@@ -92,6 +92,14 @@ parser.add_argument(
     '--onnx',
     action='store_true',
     help='execute onnxruntime version.'
+)
+parser.add_argument(
+    '-w', '--write_prediction',
+    nargs='?',
+    const='txt',
+    choices=['txt', 'json'],
+    type=str,
+    help='Output results to txt or json file.'
 )
 args = update_parser(parser)
 
@@ -195,7 +203,7 @@ def convert_to_ailia_detector_object(preds, w, h):
     i = 0
     detector_object = []
     for j in range(len(preds[i]['rois'])):
-        (x1, y1, x2, y2) = preds[i]['rois'][j].astype(np.int)
+        (x1, y1, x2, y2) = preds[i]['rois'][j].astype(int)
         obj = preds[i]['class_ids'][j]
         score = float(preds[i]['scores'][j])
 
@@ -291,6 +299,12 @@ def recognize_from_image(image_path, net):
     savepath = get_savepath(args.savepath, image_path)
     logger.info(f'saved at : {savepath}')
     cv2.imwrite(savepath, img)
+
+    # write prediction
+    if args.write_prediction is not None:
+        ext = args.write_prediction
+        pred_file = "%s.%s" % (savepath.rsplit('.', 1)[0], ext)
+        write_predictions(pred_file, detect_object, img, category=obj_list, file_type=ext)
 
     if args.profile:
         print(net.get_summary())

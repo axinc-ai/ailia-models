@@ -11,7 +11,7 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser  # noqa: E402
+from arg_utils import get_base_parser, update_parser  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from image_utils import normalize_image  # noqa: E402
 from webcamera_utils import get_capture  # noqa: E402
@@ -420,6 +420,10 @@ def main():
 
     num_person = args.num_person
 
+    memory_mode = ailia.get_memory_mode(
+        reduce_constant=True, ignore_input_with_initializer=True,
+        reduce_interstage=False, reuse_interstage=True)
+
     # net initialize
     detector = ailia.Detector(
         MODEL_YOLOV3_PATH,
@@ -430,11 +434,12 @@ def main():
         range=ailia.NETWORK_IMAGE_RANGE_U_FP32,
         algorithm=ailia.DETECTOR_ALGORITHM_YOLOV3,
         env_id=args.env_id,
+        memory_mode=memory_mode,
     )
-    pose_net = ailia.Net(MODEL_POSE_PATH, WEIGHT_POSE_PATH, env_id=args.env_id)
+    pose_net = ailia.Net(MODEL_POSE_PATH, WEIGHT_POSE_PATH, env_id=args.env_id, memory_mode=memory_mode)
 
     if not args.onnx:
-        net = ailia.Net(MODEL_27FRAME_17JOINT_PATH, WEIGHT_27FRAME_17JOINT_PATH, env_id=args.env_id)
+        net = ailia.Net(MODEL_27FRAME_17JOINT_PATH, WEIGHT_27FRAME_17JOINT_PATH, env_id=args.env_id, memory_mode=memory_mode)
     else:
         import onnxruntime
         net = onnxruntime.InferenceSession(WEIGHT_27FRAME_17JOINT_PATH)
