@@ -361,6 +361,7 @@ def predict_on_click(event,x,y,flags,param):
                 if (xx == np.array([255, 144, 30])).all():
                     cv2.rectangle(img, (idx - 1, idy - 1), (idx, idy), (0, 255, 0), -1)
 
+
 def show_GUI(imgPath):
     global img, img_path
     img = cv2.imread(imgPath)
@@ -374,6 +375,7 @@ def show_GUI(imgPath):
         if cv2.waitKey(20) & 0xFF == 27 or not cv2.getWindowProperty('Mouse click GUI', cv2.WND_PROP_VISIBLE):
             break
     cv2.destroyAllWindows()
+
 
 def main():
     global img_path, models
