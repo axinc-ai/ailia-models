@@ -167,10 +167,7 @@ def print_results(results, top_k=MAX_CLASS_COUNT):
 # ======================
 # Main functions
 # ======================
-def recognize_from_image():
-    # net initialize
-    net = ailia.Net(None, WEIGHT_PATH, env_id=args.env_id)
-
+def recognize_from_image(net):
     # input image loop
     for image_path in args.input:
         # prepare input data
@@ -208,10 +205,7 @@ def recognize_from_image():
     logger.info('Script finished successfully.')
 
 
-def recognize_from_video():
-    # net initialize
-    net = ailia.Net(None, WEIGHT_PATH, env_id=args.env_id)
-
+def recognize_from_video(net):
     capture = webcamera_utils.get_capture(args.video)
 
     # create video writer if savepath is specified as video format
@@ -267,12 +261,20 @@ def main():
 
     # model files check and download
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
+
+    if "FP16" in ailia.get_environment(args.env_id).props or platform.system() == 'Darwin':
+        logger.warning('This model do not work on FP16. So use CPU mode.')
+        args.env_id = 0
+
+    # net initialize
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
+
     if args.video is not None:
         # video mode
-        recognize_from_video()
+        recognize_from_video(net)
     else:
         # image mode
-        recognize_from_image()
+        recognize_from_image(net)
 
 
 if __name__ == '__main__':

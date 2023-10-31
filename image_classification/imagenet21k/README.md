@@ -4,37 +4,35 @@
 
 ![Input](input.jpg)
 
+(Image from https://github.com/pytorch/hub/raw/master/images/dog.jpg)
+
 Ailia input shape: (1,3,299,299)
 Range: [0.0, 255.0]
 
 ## Output
 ```
-class_count=8
+class_count=7
 + idx=0
-  category=6[artifact ]
-  prob=83.32571411132812
+  category=1531[spitz ]
+  prob=84.49806213378906
 + idx=1
-  category=3682[device ]
-  prob=81.23466491699219
+  category=1386[dog ]
+  prob=81.74344635009766
 + idx=2
-  category=3375[clock ]
-  prob=79.72785186767578
+  category=155[domestic_animal ]
+  prob=81.34649658203125
 + idx=3
-  category=6598[timepiece ]
-  prob=69.04891967773438
+  category=3[animal ]
+  prob=81.01296997070312
 + idx=4
-  category=4591[instrument ]
-  prob=63.67098617553711
+  category=1532[Samoyed ]
+  prob=59.17914581298828
 + idx=5
-  category=4957[measuring_instrument ]
-  prob=63.452571868896484
+  category=1385[bitch ]
+  prob=38.642704010009766
 + idx=6
-  category=2462[alarm_clock ]
-  prob=54.95254898071289
-+ idx=7
-  category=4306[grandfather_clock ]
-  prob=37.9827995300293
-
+  category=1384[canine ]
+  prob=37.53316879272461
 ```
 
 ## Usage
