@@ -184,7 +184,7 @@ def postprocess_score(iou_preds, num_points):
     return score
 
 
-def predict(models, img, pos_points, neg_points=None, box=None):
+def predict_img_enc(models, img):
     img = img[:, :, ::-1]  # BGR -> RGB
     im_h, im_w = img.shape[:2]
     img = preprocess(img)
@@ -205,6 +205,10 @@ def predict(models, img, pos_points, neg_points=None, box=None):
         estimation_time = (end - start)
         logger.info(f'img_enc processing estimation time {estimation_time} ms')
 
+    return image_embedding, im_h, im_w
+
+
+def predict_sam_net(models, image_embedding, im_h, im_w, pos_points, neg_points=None, box=None):   
     coord = []
     label = []
     if pos_points:
@@ -259,11 +263,8 @@ def predict(models, img, pos_points, neg_points=None, box=None):
 
 
 def recognize_from_image(models, pos_points, neg_points):
-    global savepath
-    # pos_points = args.pos
-    # neg_points = args.neg
+    global img_path, img_enc_output
     box = args.box
-    sel_idx = args.idx
 
     if pos_points is None:
         if neg_points is None and box is None:
@@ -282,20 +283,28 @@ def recognize_from_image(models, pos_points, neg_points):
 
     # input image loop
     for image_path in args.input:
+        img_path = copy.deepcopy(image_path)
         logger.info(image_path)
 
         # prepare input data
         img = load_image(image_path)
         img = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
+        img_enc_output = predict_img_enc(models, img)
 
         # inference
         logger.info('Start inference...')
-        if args.benchmark:
+        recognize(image_path, img, models, img_enc_output, pos_points, neg_points, box)
+
+
+def recognize(image_path, img, models, img_enc_output, pos_points, neg_points=None, box=None):
+    image_embedding, im_h, im_w = img_enc_output
+    sel_idx = args.idx
+    if args.benchmark:
             logger.info('BENCHMARK mode')
             total_time_estimation = 0
             for i in range(args.benchmark_count):
                 start = int(round(time.time() * 1000))
-                output = predict(models, img, pos_points, neg_points, box)
+                output = predict_sam_net(models, image_embedding, im_h, im_w, pos_points, neg_points, box)
                 end = int(round(time.time() * 1000))
                 estimation_time = (end - start)
 
@@ -305,61 +314,59 @@ def recognize_from_image(models, pos_points, neg_points):
                     total_time_estimation = total_time_estimation + estimation_time
 
             logger.info(f'\taverage time estimation {total_time_estimation / (args.benchmark_count - 1)} ms')
-        else:
-            output = predict(models, img, pos_points, neg_points, box)
+    else:
+        output = predict_sam_net(models, image_embedding, im_h, im_w, pos_points, neg_points, box)
 
-        masks, scores = output
-        logger.info(f'scores : {", ".join(["(%d) %.2f" % (i, s * 100) for i, s in enumerate(scores)])}')
+    masks, scores = output
+    logger.info(f'scores : {", ".join(["(%d) %.2f" % (i, s * 100) for i, s in enumerate(scores)])}')
 
-        if sel_idx:
-            i = sel_idx
-        else:
-            i = np.argmax(scores)
-        mask = masks[i, :, :]
-        score = scores[i]
+    if sel_idx:
+        i = sel_idx
+    else:
+        i = np.argmax(scores)
+    mask = masks[i, :, :]
+    score = scores[i]
 
-        coord = []
-        label = []
-        if pos_points:
-            coord.append(np.array(pos_points))
-            label.append(np.ones(len(pos_points)))
-        if neg_points:
-            coord.append(np.array(neg_points))
-            label.append(np.zeros(len(neg_points)))
+    coord = []
+    label = []
+    if pos_points:
+        coord.append(np.array(pos_points))
+        label.append(np.ones(len(pos_points)))
+    if neg_points:
+        coord.append(np.array(neg_points))
+        label.append(np.zeros(len(neg_points)))
 
-        res_img = show_mask(mask, img)
-        if coord:
-            coord = np.concatenate(coord, axis=0)
-            label = np.concatenate(label, axis=0)
-            res_img = show_points(coord, label, res_img)
-        if box is not None:
-            res_img = show_box(box, res_img)
+    res_img = show_mask(mask, img)
+    if coord:
+        coord = np.concatenate(coord, axis=0)
+        label = np.concatenate(label, axis=0)
+        res_img = show_points(coord, label, res_img)
+    if box is not None:
+        res_img = show_box(box, res_img)
 
-        # plot result
-        savepath = get_savepath(args.savepath, image_path, ext='.png')
-        logger.info(f'saved at : {savepath}')
-        cv2.imwrite(savepath, res_img)
+    # plot result
+    savepath = get_savepath(args.savepath, image_path, ext='.png')
+    logger.info(f'saved at : {savepath}')
+    cv2.imwrite(savepath, res_img)
 
-    logger.info('Script finished successfully.')
 
-def printCoor(event,x,y,flags,param):
-    global area_img, img, img_path, models
+def predict_on_click(event,x,y,flags,param):
+    global area_img, img, img_path, models, img_enc_output
     if event == cv2.EVENT_LBUTTONDOWN:
         img = cv2.imread(img_path)
         pos_points = [(x - 1, y - 1)]
-        recognize_from_image(models, pos_points, args.neg)
-        # if((area_img[y - 1][x - 1]) == np.array([255, 144, 30])).all():
+        recognize(img_path, img, models, img_enc_output, pos_points, args.neg, args.box)
         for idy, yx in enumerate(area_img):
             for idx, xx in enumerate(yx):
                 if (xx == np.array([255, 144, 30])).all():
                     cv2.rectangle(img, (idx - 1, idy - 1), (idx, idy), (0, 255, 0), -1)
 
-def showMouseClickGUI(imgPath):
+def show_GUI(imgPath):
     global img, img_path
     img = cv2.imread(imgPath)
     #画像のウインドウに名前をつけ、コールバック関数をセット
     cv2.namedWindow('Mouse click GUI')
-    cv2.setMouseCallback('Mouse click GUI', printCoor)
+    cv2.setMouseCallback('Mouse click GUI', predict_on_click)
     
     while(1):
         cv2.imshow('Mouse click GUI', img)
@@ -424,7 +431,7 @@ def main():
     if args.gui:
         for image_path in args.input:
             img_path = copy.deepcopy(image_path)
-            showMouseClickGUI(img_path)
+            show_GUI(img_path)
 
     if args.profile and not args.onnx:
         print("--- profile sam_net")
