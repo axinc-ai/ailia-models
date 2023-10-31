@@ -258,10 +258,10 @@ def predict(models, img, pos_points, neg_points=None, box=None):
     return masks, scores
 
 
-def recognize_from_image(models):
+def recognize_from_image(models, pos_points, neg_points):
     global savepath
-    pos_points = args.pos
-    neg_points = args.neg
+    # pos_points = args.pos
+    # neg_points = args.neg
     box = args.box
     sel_idx = args.idx
 
@@ -343,14 +343,16 @@ def recognize_from_image(models):
     logger.info('Script finished successfully.')
 
 def printCoor(event,x,y,flags,param):
-    global area_img, img, img_path
+    global area_img, img, img_path, models
     if event == cv2.EVENT_LBUTTONDOWN:
         img = cv2.imread(img_path)
-        if((area_img[y - 1][x - 1]) == np.array([255, 144, 30])).all():
-            for idy, yx in enumerate(area_img):
-                for idx, xx in enumerate(yx):
-                    if (xx == np.array([255, 144, 30])).all():
-                        cv2.rectangle(img, (idx - 1, idy - 1), (idx, idy), (0, 255, 0), -1)
+        pos_points = [(x - 1, y - 1)]
+        recognize_from_image(models, pos_points, args.neg)
+        # if((area_img[y - 1][x - 1]) == np.array([255, 144, 30])).all():
+        for idy, yx in enumerate(area_img):
+            for idx, xx in enumerate(yx):
+                if (xx == np.array([255, 144, 30])).all():
+                    cv2.rectangle(img, (idx - 1, idy - 1), (idx, idy), (0, 255, 0), -1)
 
 def showMouseClickGUI(imgPath):
     global img, img_path
@@ -367,7 +369,7 @@ def showMouseClickGUI(imgPath):
     cv2.destroyAllWindows()
 
 def main():
-    global img_path
+    global img_path, models
     model_type = args.model_type
     dic_model = {
         'sam_h': (
@@ -418,7 +420,7 @@ def main():
         sam_net=sam_net,
         img_enc=img_enc,
     )
-    recognize_from_image(models)
+    recognize_from_image(models, args.pos, args.neg)
     if args.gui:
         for image_path in args.input:
             img_path = copy.deepcopy(image_path)
