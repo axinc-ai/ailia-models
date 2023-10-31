@@ -46,7 +46,6 @@ SAVE_IMAGE_PATH = 'output.png'
 
 POINT1 = (500, 375)
 POINT2 = (1125, 625)
-global area_img
 
 TARGET_LENGTH = 1024
 
@@ -344,19 +343,17 @@ def recognize_from_image(models):
     logger.info('Script finished successfully.')
 
 def printCoor(event,x,y,flags,param):
-    global area_img, img, savepath, img_path
+    global area_img, img, img_path
     if event == cv2.EVENT_LBUTTONDOWN:
         img = cv2.imread(img_path)
         if((area_img[y - 1][x - 1]) == np.array([255, 144, 30])).all():
-            # for idy, yx in enumerate(area_img):
-            #     for idx, xx in enumerate(yx):
-            #         if (xx == np.array([255, 144, 30])).all():
-            #             cv2.rectangle(img, (idx - 1, idy - 1), (idx, idy), (0, 255, 0), -1)
-            # cv2.imshow('Mouse click GUI', img2)
-            img = cv2.imread(savepath)
+            for idy, yx in enumerate(area_img):
+                for idx, xx in enumerate(yx):
+                    if (xx == np.array([255, 144, 30])).all():
+                        cv2.rectangle(img, (idx - 1, idy - 1), (idx, idy), (0, 255, 0), -1)
 
 def showMouseClickGUI(imgPath):
-    global img, savepath, img_path
+    global img, img_path
     img = cv2.imread(imgPath)
     #画像のウインドウに名前をつけ、コールバック関数をセット
     cv2.namedWindow('Mouse click GUI')
