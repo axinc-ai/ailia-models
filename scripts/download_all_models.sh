@@ -139,6 +139,7 @@ cd ../../image_classification/weather-prediction-from-image; python3 weather-pre
 cd ../../image_classification/convnext; python3 convnext.py ${OPTION}
 cd ../../image_classification/swin-transformer; python3 swin_transformer.py ${OPTION}
 cd ../../image_classification/mobileone; python3 mobileone.py ${OPTION}
+cd ../../image_classification/imagenet21k; python3 imagenet21k.py ${OPTION}
 cd ../../image_inpainting/3d-photo-inpainting; python3 3d-photo-inpainting.py ${OPTION}
 cd ../../image_inpainting/inpainting_gmcnn; python3 inpainting_gmcnn.py ${OPTION}
 cd ../../image_inpainting/pytorch-inpainting-with-partial-conv; python3 pytorch-inpainting-with-partial-conv.py ${OPTION}
