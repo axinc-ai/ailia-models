@@ -1,0 +1,12 @@
+{
+  "clean_up_tokenization_spaces": true,
+  "eos_token": "</s>",
+  "model_max_length": 512,
+  "pad_token": "<pad>",
+  "separate_vocabs": false,
+  "source_lang": "ja",
+  "sp_model_kwargs": {},
+  "target_lang": "en",
+  "tokenizer_class": "MarianTokenizer",
+  "unk_token": "<unk>"
+}

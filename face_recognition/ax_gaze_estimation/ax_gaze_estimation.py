@@ -5,6 +5,7 @@ from contextlib import contextmanager
 import ailia
 import cv2
 import numpy as np
+import json
 
 import ax_gaze_estimation_utils as gut
 
@@ -70,6 +71,11 @@ parser.add_argument(
     action='store_true',
     help='With this option, a lite version of the head pose model is used ' +
     '(only valid when --include-head-pose is specified).'
+)
+parser.add_argument(
+    '-w', '--write_json',
+    action='store_true',
+    help='Flag to output results to json file.'
 )
 args = update_parser(parser)
 
@@ -311,7 +317,7 @@ class GazeEstimator:
 
         return img_draw
 
-    def predict_and_draw(self, img, draw_iris=False, draw_head_pose=False):
+    def predict_and_draw(self, img, draw_iris=False, draw_head_pose=False, results=None):
         """Predict and draw the gaze(s) and landmarks (and head pose(s)).
 
         Convenient method for predicting the gaze(s) and landmarks (and head
@@ -330,13 +336,33 @@ class GazeEstimator:
             Whether to draw the iris landmarks or not.
         draw_head_pose : bool, optional
             Whether to draw the head pose(s) or not.
+        results: list, optional
+            Result values stored to this list.
         """
+        if results is not None:
+            results.clear()
         img_draw = img.copy()
         preds = self.predict(img, gazes_only=False)
         if preds[0] is not None:
             img_draw = self.draw(img, *preds, draw_iris=draw_iris,
                                  draw_head_pose=draw_head_pose)
+            if results is not None:
+                results.append({
+                    'gazes': preds[0],
+                    'gaze_centers': preds[1],
+                    'eyes_iris': preds[2],
+                    'head_poses': preds[3],
+                    'roi_centers': preds[4]
+                })
         return img_draw
+
+
+def save_result_json(json_path, results):
+    output = []
+    for r in results:
+        output.append({k: v.tolist() for k, v in r.items() if v is not None})
+    with open(json_path, 'w') as f:
+        json.dump(output, f, indent=2)
 
 
 # ======================
@@ -347,6 +373,7 @@ def recognize_from_image():
 
     # input image loop
     for image_path in args.input:
+        results = []
         logger.info(image_path)
         src_img = imread(image_path)
 
@@ -356,15 +383,20 @@ def recognize_from_image():
             logger.info('BENCHMARK mode')
             for _ in range(5):
                 start = int(round(time.time() * 1000))
-                img_draw = estimator.predict_and_draw(src_img, args.draw_iris, args.draw_head_pose)
+                img_draw = estimator.predict_and_draw(src_img, args.draw_iris, args.draw_head_pose, results)
                 end = int(round(time.time() * 1000))
                 logger.info(f'\tailia processing time {end - start} ms')
         else:
-            img_draw = estimator.predict_and_draw(src_img, args.draw_iris, args.draw_head_pose)
+            img_draw = estimator.predict_and_draw(src_img, args.draw_iris, args.draw_head_pose, results)
 
         savepath = get_savepath(args.savepath, image_path)
         logger.info(f'saved at : {savepath}')
         cv2.imwrite(savepath, img_draw)
+
+        if args.write_json:
+            json_file = '%s.json' % savepath.rsplit('.', 1)[0]
+            save_result_json(json_file, results)
+
     logger.info('Script finished successfully.')
 
 
