@@ -183,7 +183,6 @@ cd ../../line_segment_detection/dexined; python3 dexined.py ${OPTION}
 cd ../../low_light_image_enhancement/agllnet; python3 agllnet.py ${OPTION}
 cd ../../natural_language_processing/bert; python3 bert.py ${OPTION}
 cd ../../natural_language_processing/bert_insert_punctuation; python3 bert_insert_punctuation.py ${OPTION}
-cd ../../natural_language_processing/bert_tweets_sentiment; python3 bert_tweets_sentiment.py ${OPTION}
 cd ../../natural_language_processing/bert_maskedlm; python3 bert_maskedlm.py ${OPTION}
 cd ../../natural_language_processing/bert_ner; python3 bert_ner.py ${OPTION}
 cd ../../natural_language_processing/bert_question_answering; python3 bert_question_answering.py ${OPTION}
@@ -200,6 +199,7 @@ cd ../../natural_language_processing/sentence_transformers_japanese; python3 sen
 cd ../../natural_language_processing/presumm; python3 presumm.py ${OPTION}
 cd ../../natural_language_processing/t5_base_japanese_title_generation; python3 t5_base_japanese_title_generation.py ${OPTION}
 cd ../../natural_language_processing/multilingual-e5; python3 multilingual-e5.py ${OPTION}
+cd ../../natural_language_processing/t5_whisper_medical; python3 t5_whisper_medical.py ${OPTION}
 cd ../../neural_rendering/nerf; python3 nerf.py ${OPTION}
 cd ../../object_detection/centernet; python3 centernet.py ${OPTION}
 cd ../../object_detection/m2det; python3 m2det.py ${OPTION}
