@@ -44,7 +44,7 @@ parser.add_argument(
 )
 parser.add_argument(
     '-m', '--model_type', default='small',
-    choices=('tiny', 'base', 'small', 'medium', 'medium.medical'),
+    choices=('tiny', 'base', 'small', 'medium'),
     help='model type'
 )
 parser.add_argument(
@@ -129,6 +129,11 @@ parser.add_argument(
     '--prompt', default=None,
     help='prompt for word vocabulary'
 )
+parser.add_argument(
+    '--intermediate',
+    action='store_true',
+    help='display intermediate state.'
+)
 args = update_parser(parser)
 
 if args.ailia_audio:
@@ -153,7 +158,6 @@ dims_dict = {
     'base': ModelDimensions(80, 1500, 512, 8, 6, 51865, 448, 512, 8, 6),
     'small': ModelDimensions(80, 1500, 768, 12, 12, 51865, 448, 768, 12, 12),
     'medium': ModelDimensions(80, 1500, 1024, 16, 24, 51865, 448, 1024, 16, 24),
-    'medium.medical': ModelDimensions(80, 1500, 1024, 16, 24, 51865, 448, 1024, 16, 24),
 }
 dims = dims_dict[args.model_type]
 
@@ -170,6 +174,7 @@ if not args.onnx:
     AILIA_VERSION_MINOR = int(version[1])
     AILIA_VERSION_REVISION = int(version[2])
     REQUIRE_CONSTANT_SHAPE_BETWEEN_INFERENCE = (AILIA_VERSION_MAJOR<=1 and AILIA_VERSION_MINOR<=2 and AILIA_VERSION_REVISION<14)
+    COPY_BLOB_DATA_ENABLE = (AILIA_VERSION_MAJOR<=1 and AILIA_VERSION_MINOR<=2 and AILIA_VERSION_REVISION>=15)
     SAVE_ENC_SHAPE = ()
     SAVE_DEC_SHAPE = ()
 
@@ -183,21 +188,21 @@ if not args.onnx:
 # ======================
 
 OPT = ".opt"
+OPT2 = ".opt2"
 if args.normal:
     OPT = ""
+    OPT2 = ""
 
 if not args.dynamic_kv_cache:
     # 高速化のためKV_CACHEのサイズを最大サイズで固定化したバージョン
-    WEIGHT_DEC_TINY_PATH = "decoder_tiny_fix_kv_cache"+ OPT +".onnx"
-    MODEL_DEC_TINY_PATH = "decoder_tiny_fix_kv_cache"+ OPT +".onnx.prototxt"
-    WEIGHT_DEC_BASE_PATH = "decoder_base_fix_kv_cache"+ OPT +".onnx"
-    MODEL_DEC_BASE_PATH = "decoder_base_fix_kv_cache"+ OPT +".onnx.prototxt"
-    WEIGHT_DEC_SMALL_PATH = "decoder_small_fix_kv_cache"+ OPT +".onnx"
-    MODEL_DEC_SMALL_PATH = "decoder_small_fix_kv_cache"+ OPT +".onnx.prototxt"
-    WEIGHT_DEC_MEDIUM_PATH = "decoder_medium_fix_kv_cache"+ OPT +".onnx"
-    MODEL_DEC_MEDIUM_PATH = "decoder_medium_fix_kv_cache"+ OPT +".onnx.prototxt"
-    WEIGHT_DEC_MEDIUM_MEDICAL_PATH = "decoder_medium_medical_fix_kv_cache.10169"+ OPT +".onnx"
-    MODEL_DEC_MEDIUM_MEDICAL_PATH = "decoder_medium_medical_fix_kv_cache.10169"+ OPT +".onnx.prototxt"
+    WEIGHT_DEC_TINY_PATH = "decoder_tiny_fix_kv_cache"+ OPT2 +".onnx"
+    MODEL_DEC_TINY_PATH = "decoder_tiny_fix_kv_cache"+ OPT2 +".onnx.prototxt"
+    WEIGHT_DEC_BASE_PATH = "decoder_base_fix_kv_cache"+ OPT2 +".onnx"
+    MODEL_DEC_BASE_PATH = "decoder_base_fix_kv_cache"+ OPT2 +".onnx.prototxt"
+    WEIGHT_DEC_SMALL_PATH = "decoder_small_fix_kv_cache"+ OPT2 +".onnx"
+    MODEL_DEC_SMALL_PATH = "decoder_small_fix_kv_cache"+ OPT2 +".onnx.prototxt"
+    WEIGHT_DEC_MEDIUM_PATH = "decoder_medium_fix_kv_cache"+ OPT2 +".onnx"
+    MODEL_DEC_MEDIUM_PATH = "decoder_medium_fix_kv_cache"+ OPT2 +".onnx.prototxt"
 else:
     # KV_CACHEが推論ごとに変化するバージョン
     WEIGHT_DEC_TINY_PATH = "decoder_tiny.onnx"
@@ -208,8 +213,6 @@ else:
     MODEL_DEC_SMALL_PATH = "decoder_small.onnx.prototxt"
     WEIGHT_DEC_MEDIUM_PATH = "decoder_medium.onnx"
     MODEL_DEC_MEDIUM_PATH = "decoder_medium.onnx.prototxt"
-    WEIGHT_DEC_MEDIUM_MEDICAL_PATH = None
-    MODEL_DEC_MEDIUM_MEDICAL_PATH = None
 
 WEIGHT_ENC_TINY_PATH = "encoder_tiny"+ OPT +".onnx"
 MODEL_ENC_TINY_PATH = "encoder_tiny"+ OPT +".onnx.prototxt"
@@ -314,7 +317,7 @@ def new_kv_cache(n_group, length=451):
         size = [12, n_group, length, 512]
     elif model_type == "small.en" or model_type == "small":
         size = [24, n_group, length, 768]
-    elif model_type == "medium.en" or model_type == "medium" or model_type == "medium.medical":
+    elif model_type == "medium.en" or model_type == "medium":
         size = [48, n_group, length, 1024]
     elif model_type == "large":
         size = [64, n_group, length, 1280]
@@ -356,6 +359,7 @@ def get_audio_features(enc_net, mel):
 def inference_logits(dec_net, tokens, audio_features, kv_cache=None, initial_token_length=None, constant_audio_feature = False):
     n_group = tokens.shape[0]
     initial_token_length = initial_token_length if initial_token_length else tokens.shape[-1]
+    is_init_kv_cache = False
     if kv_cache is None:
         if not args.dynamic_kv_cache:
             kv_cache = new_kv_cache(n_group)
@@ -363,6 +367,7 @@ def inference_logits(dec_net, tokens, audio_features, kv_cache=None, initial_tok
             kv_cache = new_kv_cache(n_group, initial_token_length)
         offset = 0
         length = initial_token_length
+        is_init_kv_cache = True
     else:
         offset = kv_cache.shape[2]
         if not args.dynamic_kv_cache:
@@ -400,10 +405,18 @@ def inference_logits(dec_net, tokens, audio_features, kv_cache=None, initial_tok
 
             dec_net.predict([tokens, audio_features, kv_cache, offset], output = output)
         else:
-            if constant_audio_feature:
-                dec_net.predict({"tokens":tokens, "kv_cache":kv_cache, "offset":offset}, output = output)
+            if is_init_kv_cache or not COPY_BLOB_DATA_ENABLE or args.dynamic_kv_cache:
+                if constant_audio_feature:
+                    dec_net.predict({"tokens":tokens, "kv_cache":kv_cache, "offset":offset}, output = output)
+                else:
+                    dec_net.predict([tokens, audio_features, kv_cache, offset], output = output)
             else:
-                dec_net.predict([tokens, audio_features, kv_cache, offset], output = output)
+                dec_net.copy_blob_data("kv_cache", "output_kv_cache", None)
+                output = [logits]
+                if constant_audio_feature:
+                    dec_net.predict({"tokens":tokens, "offset":offset}, output = output)
+                else:
+                    dec_net.predict({"tokens":tokens, "audio_features": audio_features, "offset":offset}, output = output)
     else:
         kv_cache = kv_cache.astype(np.float32)
         output = dec_net.run(None, {
@@ -559,6 +572,10 @@ def decode(enc_net, dec_net, mel, options):
 
         if completed or tokens.shape[-1] > n_ctx:
             break
+            
+        if args.intermediate:
+            texts = [tokenizer.decode(t[len(initial_tokens):]).strip() for t in tokens]
+            print(texts[0][-32:]+ "\n\u001B[2A")
 
     # reshape the tensors to have (n_audio, n_group) as the first two dimensions
     audio_features = audio_features[:: n_group]
@@ -880,10 +897,6 @@ def main():
         'medium': {
             'enc': (WEIGHT_ENC_MEDIUM_PATH, MODEL_ENC_MEDIUM_PATH),
             'dec': (WEIGHT_DEC_MEDIUM_PATH, MODEL_DEC_MEDIUM_PATH),
-        },
-        'medium.medical': {
-            'enc': (WEIGHT_ENC_MEDIUM_PATH, MODEL_ENC_MEDIUM_PATH),
-            'dec': (WEIGHT_DEC_MEDIUM_MEDICAL_PATH, MODEL_DEC_MEDIUM_MEDICAL_PATH),
         },
     }
     model_info = model_dic[args.model_type]

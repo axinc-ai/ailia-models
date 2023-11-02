@@ -216,6 +216,7 @@ def recognize_from_video(models):
         # inference
         img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         restored_img = predict(models, img)
+        restored_img = cv2.cvtColor(restored_img, cv2.COLOR_RGB2BGR)
 
         # show
         cv2.imshow('frame', restored_img)
