@@ -13,7 +13,13 @@ The collection of pre-trained, state-of-the-art AI models.
 [ailia MODELS tutorial 日本語版](TUTORIAL_jp.md)
 
 # Supported models 
-273 models as of 2023/04/10
+296 models as of Octorber 27, 2023
+
+# Latest update
+- 2023.10.25 Add use_sr option to sber-swap
+- 2023.10.24 Add hifigan
+- 2023.10.20 Add bert_insert_punctuation
+- More information in our [Wiki](https://github.com/axinc-ai/ailia-models/wiki)
 
 ## Action recognition
 
@@ -32,6 +38,7 @@ The collection of pre-trained, state-of-the-art AI models.
 |:-----------|------------:|:------------:|:------------:|:------------:|:------------:|
 | [<img src="anomaly_detection/padim/output.png" width=128px>](anomaly_detection/padim/) | [padim](/anomaly_detection/padim/) | [PaDiM-Anomaly-Detection-Localization-master](https://github.com/xiahaifeng1995/PaDiM-Anomaly-Detection-Localization-master) | Pytorch | 1.2.6 and later | [EN](https://medium.com/axinc-ai/padim-a-machine-learning-model-for-detecting-defective-products-without-retraining-5daa6f203377) [JP](https://medium.com/axinc/padim-%E5%86%8D%E5%AD%A6%E7%BF%92%E4%B8%8D%E8%A6%81%E3%81%A7%E4%B8%8D%E8%89%AF%E5%93%81%E6%A4%9C%E7%9F%A5%E3%82%92%E8%A1%8C%E3%81%86%E6%A9%9F%E6%A2%B0%E5%AD%A6%E7%BF%92%E3%83%A2%E3%83%87%E3%83%AB-69add653fbd3) |
 | [<img src="anomaly_detection/spade-pytorch/output.png" width=128px>](anomaly_detection/spade-pytorch/) | [spade-pytorch](/anomaly_detection/spade-pytorch/) | [Sub-Image Anomaly Detection with Deep Pyramid Correspondences](https://github.com/byungjae89/SPADE-pytorch) | Pytorch | 1.2.6 and later | |
+| [<img src="anomaly_detection/patchcore/output.png" width=128px>](anomaly_detection/patchcore/) | [patchcore](/anomaly_detection/patchcore/) | [PatchCore_anomaly_detection](https://github.com/hcw-00/PatchCore_anomaly_detection) | Pytorch | 1.2.6 and later | |
 
 ## Audio processing
 
@@ -52,6 +59,8 @@ The collection of pre-trained, state-of-the-art AI models.
 | [rvc](/audio_processing/rvc/) | [Retrieval-based-Voice-Conversion-WebUI](https://github.com/RVC-Project/Retrieval-based-Voice-Conversion-WebUI) | Pytorch | 1.2.12 and later | [JP](https://medium.com/axinc/rvc-ai%E3%82%92%E4%BD%BF%E7%94%A8%E3%81%97%E3%81%9F%E3%83%9C%E3%82%A4%E3%82%B9%E3%83%81%E3%82%A7%E3%83%B3%E3%82%B8%E3%83%A3%E3%83%BC-64a813c7a0c4) |
 | [crepe](/audio_processing/crepe/) | [torchcrepe](https://github.com/maxrmorrison/torchcrepe) | Pytorch | 1.2.10 and later | [JP](https://medium.com/axinc/crepe-%E9%AB%98%E7%B2%BE%E5%BA%A6%E3%81%AA%E3%83%94%E3%83%83%E3%83%81%E6%8E%A8%E5%AE%9A%E3%82%92%E8%A1%8C%E3%81%86%E6%A9%9F%E6%A2%B0%E5%AD%A6%E7%BF%92%E3%83%A2%E3%83%87%E3%83%AB-dfb09b5e1f6b) |
 | [vall-e-x](/audio_processing/vall-e-x/) | [VALL-E-X](https://github.com/Plachtaa/VALL-E-X) | Pytorch | 1.2.15 and later |  |
+| [hifigan](/audio_processing/hifigan/) | [HiFi-GAN](https://github.com/jik876/hifi-gan) | Pytorch | 1.2.9 and later |  |
+
 
 ## Background removal
 
@@ -152,7 +161,8 @@ The collection of pre-trained, state-of-the-art AI models.
 | [<img src="face_recognition/ax_facial_features/man-with-beard.jpg" width=128px>](face_recognition/ax_facial_features) | [ax_facial_features](/face_recognition/ax_facial_features/)| ax Facial Features | Pytorch | 1.2.5 and later |[EN](https://medium.com/axinc-ai/ax-facial-features-eyelids-eyelashes-and-facial-hair-classification-9b3b12f1d6a1) |
 | [<img src="face_recognition/6d_repnet/output.png" width=128px>](face_recognition/6d_repnet/) | [6d_repnet](/face_recognition/6d_repnet/) | [6D Rotation Representation for Unconstrained Head Pose Estimation (Pytorch)](https://github.com/thohemp/6DRepNet) | Pytorch | 1.2.6 and later |
 | [<img src="face_recognition/hsemotion/lenna.png">](face_recognition/hsemotion/) | [hsemotion](/face_recognition/hsemotion/) | [HSEmotion (High-Speed face Emotion recognition) library](https://github.com/HSE-asavchenko/face-emotion-recognition) | Pytorch | 1.2.5 and later |
-| [<img src="face_recognition/facemesh_v2/output.png" width=128px>](face_recognition/facemesh_v2/) | [facemesh_v2](/face_recognition/facemesh_v2/) | [MediaPipe Face landmark detection](https://developers.google.com/mediapipe/solutions/vision/face_landmarker) | Pytorch | 1.2.9 and later | |
+| [<img src="face_recognition/facemesh_v2/output.png" width=128px>](face_recognition/facemesh_v2/) | [facemesh_v2](/face_recognition/facemesh_v2/) | [MediaPipe Face landmark detection](https://developers.google.com/mediapipe/solutions/vision/face_landmarker) | Pytorch | 1.2.9 and later | [JP](https://medium.com/axinc/facemeshv2-blendshape%E3%82%82%E8%A8%88%E7%AE%97%E5%8F%AF%E8%83%BD%E3%81%AA%E9%A1%94%E3%81%AE%E3%82%AD%E3%83%BC%E3%83%9D%E3%82%A4%E3%83%B3%E3%83%88%E6%A4%9C%E5%87%BA%E3%83%A2%E3%83%87%E3%83%AB-3198898dccdd) |
+| [<img src="face_recognition/3ddfa/output.png" width=128px>](face_recognition/3ddfa/) | [3ddfa](/face_recognition/3ddfa/) | [Towards Fast, Accurate and Stable 3D Dense Face Alignment](https://github.com/cleardusk/3DDFA_V2) | Pytorch | 1.2.10 and later | |
 
 ## Frame Interpolation
 
@@ -173,7 +183,7 @@ The collection of pre-trained, state-of-the-art AI models.
 | [<img src="generative_adversarial_networks/gfpgan/out_03.png" width=128px>](generative_adversarial_networks/gfpgan/) | [gfpgan](/generative_adversarial_networks/gfpgan)| [GFP-GAN: Towards Real-World Blind Face Restoration with Generative Facial Prior](https://github.com/TencentARC/GFPGAN)| Pytorch | 1.2.10 and later |
 | [<img src="generative_adversarial_networks/sber-swap/output.png" width=128px>](generative_adversarial_networks/sber-swap/) | [sber-swap](/generative_adversarial_networks/sber-swap/) | [SberSwap](https://github.com/ai-forever/sber-swap) | Pytorch | 1.2.12 and later | |
 | [<img src="generative_adversarial_networks/encoder4editing/output.png" width=128px>](generative_adversarial_networks/encoder4editing/) | [encoder4editing](/generative_adversarial_networks/encoder4editing/) | [Designing an Encoder for StyleGAN Image Manipulation](https://github.com/omertov/encoder4editing) | Pytorch | 1.2.10 and later | |
-| [<img src="generative_adversarial_networks/lipgan/input.jpg" width=128px>](generative_adversarial_networks/lipgan/) | [lipgan](/generative_adversarial_networks/lipgan/) | [LipGAN](https://github.com/Rudrabha/LipGAN) | Keras | 1.2.15 and later | |
+| [<img src="generative_adversarial_networks/lipgan/input.jpg" width=128px>](generative_adversarial_networks/lipgan/) | [lipgan](/generative_adversarial_networks/lipgan/) | [LipGAN](https://github.com/Rudrabha/LipGAN) | Keras | 1.2.15 and later | [JP](https://medium.com/axinc/lipgan-%E3%83%AA%E3%83%83%E3%83%97%E3%82%B7%E3%83%B3%E3%82%AF%E5%8B%95%E7%94%BB%E3%82%92%E7%94%9F%E6%88%90%E3%81%99%E3%82%8B%E6%A9%9F%E6%A2%B0%E5%AD%A6%E7%BF%92%E3%83%A2%E3%83%87%E3%83%AB-57511508eaff) |
 
 ## Hand detection
 
@@ -219,10 +229,12 @@ The collection of pre-trained, state-of-the-art AI models.
 | [<img src="image_classification/mlp_mixer/input.jpg" width=128px>](image_classification/mlp_mixer/)| [mlp_mixer](/image_classification/mlp_mixer/)|[MLP-Mixer](https://github.com/jeonsworld/MLP-Mixer-Pytorch)|Pytorch| 1.2.9 and later | |
 | [<img src="image_classification/alexnet/clock.jpg" width=128px>](image_classification/alexnet/) | [alexnet](/image_classification/alexnet/)|[AlexNet PyTorch](https://pytorch.org/hub/pytorch_vision_alexnet/)|Pytorch| 1.2.5 and later | |
 | [<img src="image_classification/clip/chelsea.png" width=128px>](image_classification/clip/) | [clip](/image_classification/clip/)|[CLIP](https://github.com/openai/CLIP) | Pytorch | 1.2.9 and later | [EN](https://medium.com/axinc-ai/clip-learning-transferable-visual-models-from-natural-language-supervision-4508b3f0ea46) [JP](https://medium.com/axinc/clip-%E8%B6%85%E5%A4%A7%E8%A6%8F%E6%A8%A1%E3%83%87%E3%83%BC%E3%82%BF%E3%82%BB%E3%83%83%E3%83%88%E3%81%A7%E4%BA%8B%E5%89%8D%E5%AD%A6%E7%BF%92%E3%81%95%E3%82%8C-%E5%86%8D%E5%AD%A6%E7%BF%92%E3%81%AA%E3%81%97%E3%81%A7%E4%BB%BB%E6%84%8F%E3%81%AE%E7%89%A9%E4%BD%93%E3%82%92%E8%AD%98%E5%88%A5%E3%81%A7%E3%81%8D%E3%82%8B%E7%89%A9%E4%BD%93%E8%AD%98%E5%88%A5%E3%83%A2%E3%83%87%E3%83%AB-2ebc5c1666f) |
+| [<img src="image_classification/japanese-clip/dog.jpeg" width=128px>](image_classification/japanese-clip/) | [japanese-clip](/image_classification/japanese-clip/)|[Japanese-CLIP](https://github.com/rinnakk/japanese-clip) | Pytorch | 1.2.15 and later | |
 | [<img src="image_classification/weather-prediction-from-image/output.png" width=128px>](image_classification/weather-prediction-from-image/) | [weather-prediction-from-image](/image_classification/weather-prediction-from-image/)|[Weather Prediction From Image - (Warmth Of Image)](https://github.com/berkgulay/weather-prediction-from-image) | Keras | 1.2.5 and later | |
 | [<img src="image_classification/swin-transformer/input.jpg" width=128px>](image_classification/swin-transformer/) | [swin-transformer](/image_classification/swin-transformer/)|[Swin Transformer](https://github.com/microsoft/Swin-Transformer) | Pytorch | 1.2.6 and later | |
 | [<img src="image_classification/convnext/input_imagenet.jpg" width=128px>](image_classification/convnext/) | [convnext](/image_classification/convnext/)|[A PyTorch implementation of ConvNeXt](https://github.com/facebookresearch/ConvNeXt) | Pytorch | 1.2.5 and later | |
 | [<img src="image_classification/mobileone/clock.jpg" width=128px>](image_classification/mobileone/) | [mobileone](/image_classification/mobileone/)|[A PyTorch implementation of MobileOne](https://github.com/apple/ml-mobileone) | Pytorch | 1.2.1 and later | |
+| [<img src="image_classification/imagenet21k/input.jpg" width=128px>](image_classification/imagenet21k/) | [imagenet21k](/image_classification/imagenet21k/) | [ImageNet21K](https://github.com/Alibaba-MIIL/ImageNet21K) | Pytorch | 1.2.11 and later | |
 
 ## Image inpainting
 
@@ -252,6 +264,7 @@ The collection of pre-trained, state-of-the-art AI models.
 | [<img src="image_manipulation/pytorch-superpoint/output_warping_correspondence.png" width=128px>](image_manipulation/pytorch-superpoint/) | [pytorch-superpoint](/image_manipulation/pytorch-superpoint/) | [pytorch-superpoint : Self-Supervised Interest Point Detection and Description](https://github.com/eric-yyjau/pytorch-superpoint) | Pytorch | 1.2.6 and later |
 | [<img src="image_manipulation/cnngeometric_pytorch/output_demo.png" width=128px>](image_manipulation/cnngeometric_pytorch/) | [cnngeometric_pytorch](/image_manipulation/cnngeometric_pytorch/) | [CNNGeometric PyTorch implementation](https://github.com/ignacio-rocco/cnngeometric_pytorch) | Pytorch | 1.2.7 and later |
 | [<img src="image_manipulation/lightglue/output.png" width=128px>](image_manipulation/lightglue/) | [lightglue](/image_manipulation/lightglue/) | [LightGlue-ONNX](https://github.com/fabio-sim/LightGlue-ONNX) | Pytorch | 1.2.15 and later |
+| [<img src="image_manipulation/docshadow/output.png" width=128px>](image_manipulation/docshadow/) | [docshadow](/image_manipulation/docshadow/) | [DocShadow-ONNX-TensorRT](https://github.com/fabio-sim/DocShadow-ONNX-TensorRT) | Pytorch | 1.2.10 and later |
 
 ## Image segmentation
 
@@ -308,11 +321,14 @@ The collection of pre-trained, state-of-the-art AI models.
 |[gpt2](/natural_language_processing/gpt2) | [GPT-2](https://github.com/onnx/models/blob/master/text/machine_comprehension/gpt-2/README.md) | Pytorch | 1.2.7 and later |
 |[rinna_gpt2](/natural_language_processing/rinna_gpt2) | [japanese-pretrained-models](https://github.com/rinnakk/japanese-pretrained-models)   | Pytorch | 1.2.7 and later |
 |[fugumt-en-ja](/natural_language_processing/fugumt-en-ja) | [Fugu-Machine Translator](https://github.com/s-taka/fugumt)   | Pytorch | 1.2.9 and later | [JP](https://medium.com/axinc/fugumt-%E8%8B%B1%E8%AA%9E%E3%81%8B%E3%82%89%E6%97%A5%E6%9C%AC%E8%AA%9E%E3%81%B8%E3%81%AE%E7%BF%BB%E8%A8%B3%E3%82%92%E8%A1%8C%E3%81%86%E6%A9%9F%E6%A2%B0%E5%AD%A6%E7%BF%92%E3%83%A2%E3%83%87%E3%83%AB-46b839c1b4ae) |
+|[fugumt-ja-en](/natural_language_processing/fugumt-ja-en) | [Fugu-Machine Translator](https://github.com/s-taka/fugumt)   | Pytorch | 1.2.10 abd later |
 |[bert_sum_ext](/natural_language_processing/bert_sum_ext) | [BERTSUMEXT](https://github.com/dmmiller612/bert-extractive-summarizer)   | Pytorch | 1.2.7 and later |
 |[sentence_transformers_japanese](/natural_language_processing/sentence_transformers_japanese) | [sentence transformers](https://huggingface.co/sentence-transformers/paraphrase-multilingual-mpnet-base-v2) | Pytorch | 1.2.7 and later | [JP](https://medium.com/axinc/sentencetransformer-%E3%83%86%E3%82%AD%E3%82%B9%E3%83%88%E3%81%8B%E3%82%89embedding%E3%82%92%E5%8F%96%E5%BE%97%E3%81%99%E3%82%8B%E8%A8%80%E8%AA%9E%E5%87%A6%E7%90%86%E3%83%A2%E3%83%87%E3%83%AB-b7d2a9bb2c31) |
 |[presumm](/natural_language_processing/presumm) | [PreSumm](https://github.com/nlpyang/PreSumm)   | Pytorch | 1.2.8 and later|
 |[t5_base_japanese_title_generation](/natural_language_processing/t5_base_japanese_title_generation) | [t5-japanese](https://github.com/sonoisa/t5-japanese) | Pytorch | 1.2.13 and later | [JP](https://medium.com/axinc/t5-%E3%83%86%E3%82%AD%E3%82%B9%E3%83%88%E3%81%8B%E3%82%89%E3%83%86%E3%82%AD%E3%82%B9%E3%83%88%E3%82%92%E7%94%9F%E6%88%90%E3%81%99%E3%82%8B%E6%A9%9F%E6%A2%B0%E5%AD%A6%E7%BF%92%E3%83%A2%E3%83%87%E3%83%AB-602830bdc5b4) |
 |[bertjsc](/natural_language_processing/bertjsc) | [bertjsc](https://github.com/er-ri/bertjsc) | Pytorch | 1.2.15 and later |
+|[multilingual-e5](/natural_language_processing/multilingual-e5) | [multilingual-e5-base](https://huggingface.co/intfloat/multilingual-e5-base) | Pytorch | 1.2.15 and later | [JP](https://medium.com/axinc/multilingual-e5-%E5%A4%9A%E8%A8%80%E8%AA%9E%E3%81%AE%E3%83%86%E3%82%AD%E3%82%B9%E3%83%88%E3%82%92embedding%E3%81%99%E3%82%8B%E6%A9%9F%E6%A2%B0%E5%AD%A6%E7%BF%92%E3%83%A2%E3%83%87%E3%83%AB-71f1dec7c4f0) |
+|[bert_insert_punctuation](/natural_language_processing/bert_insert_punctuation) | [bert-japanese](https://github.com/cl-tohoku/bert-japanese) | Pytorch | 1.2.15 and later |
 |[t5_whisper_medical](/natural_language_processing/t5_whisper_medical) | error correction of medical terms using t5 | Pytorch | 1.2.13 and later | |
 
 ## Neural Rendering

@@ -429,7 +429,7 @@ def get_locations(
 
     h0, w0 = template_fmap.shape[-2:]
     assert (h0 == w0)
-    border = np.int(np.floor(h0 / 2))
+    border = int(np.floor(h0 / 2))
     st_end_idx = int(border * up_scale)
     delta_x = delta_x[:, st_end_idx:-st_end_idx]
     delta_y = delta_y[:, st_end_idx:-st_end_idx]

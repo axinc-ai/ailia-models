@@ -8,6 +8,7 @@ import ailia
 import cv2
 import matplotlib.pyplot as plt
 import numpy as np
+import json
 
 # import original modules
 sys.path.append('../../util')
@@ -54,6 +55,11 @@ parser.add_argument(
 parser.add_argument(
     '--depth_path', type=str, default=None,
     help='the depth file (depth maps for image) or stored directory path.'
+)
+parser.add_argument(
+    '-w', '--write_json',
+    action='store_true',
+    help='Flag to output results to json file.'
 )
 args = update_parser(parser)
 
@@ -113,6 +119,7 @@ def pred_str(aboxes, p2):
     p2_inv = np.linalg.inv(p2)
 
     results = []
+    results_for_json = []
     for boxind in range(0, min(nms_topN, aboxes.shape[0])):
         box = aboxes[boxind, :]
         score = box[4]
@@ -166,8 +173,16 @@ def pred_str(aboxes, p2):
             '{:.6f} {:.6f} {:.6f} {:.6f} {:.6f} {:.6f} {:.6f} {:.6f}'.format(
                 cls, alpha, x1, y1, x2, y2, h3d, w3d, l3d, x3d, y3d, z3d, ry3d, score))
 
+        results_for_json.append({
+            'class': cls,
+            'alpha': alpha,
+            'box_2d': np.array([x1, y1, x2, y2]).tolist(),
+            'box_3d': np.array([h3d, w3d, l3d, x3d, y3d, z3d, ry3d]).tolist(),
+            'score': score
+        })
+
     pred_str = '\n'.join(results)
-    return pred_str
+    return pred_str, json.dumps(results_for_json, indent=2)
 
 
 def draw_results(img, kpts_2d):
@@ -448,8 +463,7 @@ def recognize_from_image(net):
         else:
             aboxes = predict(net, img, depth)
 
-        results_str = pred_str(aboxes, p2)
-        logger.info(results_str)
+        results_str, results_str_json = pred_str(aboxes, p2)
 
         buf = StringIO(results_str)
         anns = read_annot(buf)
@@ -461,6 +475,11 @@ def recognize_from_image(net):
         fig.savefig(save_path, dpi=100, bbox_inches='tight', pad_inches=0)
         plt.close()
         logger.info(f'saved at : {save_path}')
+
+        if args.write_json:
+            json_file = '%s.json' % save_path.rsplit('.', 1)[0]
+            with open(json_file, 'w') as f:
+                f.write(results_str_json)
 
     logger.info('Script finished successfully.')
 
