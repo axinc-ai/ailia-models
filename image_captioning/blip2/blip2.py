@@ -5,6 +5,8 @@ from logging import getLogger
 
 import numpy as np
 import cv2
+from PIL import Image
+from transformers import AutoTokenizer
 
 # import original modules
 sys.path.append('../../util')
@@ -21,11 +23,13 @@ logger = getLogger(__name__)
 # ======================
 WEIGHT_PATH = 'blip2-opt-2.7b.onnx'
 MODEL_PATH = 'blip2-opt-2.7b.onnx.prototxt'
-WEIGHT_XXX_PATH = 'xxx.onnx'
-MODEL_XXX_PATH = 'xxx.onnx.prototxt'
+WEIGHT_VIS_PATH = 'vision_model.onnx'
+MODEL_VIS_PATH = 'vision_model.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/blip2/'
 
 IMAGE_PATH = 'merlion.png'
+
+IMG_SIZE = 224
 
 # ======================
 # Arguemnt Parser Config
@@ -45,6 +49,25 @@ args = update_parser(parser, check_input_type=False)
 # ======================
 # Main functions
 # ======================
+
+def preprocess(img):
+    im_h, im_w, _ = img.shape
+    h = w = IMG_SIZE
+
+    img = np.array(Image.fromarray(img).resize((w, h), Image.Resampling.BICUBIC))
+
+    img = img / 255
+
+    image_mean = (0.48145466, 0.4578275, 0.40821073)
+    image_std = (0.26862954, 0.26130258, 0.27577711)
+    img = (img - image_mean) / image_std
+
+    img = img.transpose(2, 0, 1)  # HWC -> CHW
+    img = np.expand_dims(img, axis=0)
+    img = img.astype(np.float16)
+
+    return img
+
 
 def decode(
         net,
@@ -209,30 +232,25 @@ def stopping_criteria(
     return is_done
 
 
-def greedy_search(net, model_inputs: dict):
+def greedy_search(net, inputs_embeds):
+    bos_token_id = 2
     eos_token_id = np.array([50118])
 
-    inputs_embeds = np.load("inputs_embeds.npy").astype(np.float16)
-    input_ids = np.load("input_ids.npy").astype(int)
-    attention_mask = np.load("attention_mask.npy").astype(int)
+    shape = inputs_embeds.shape[:2]
+    batch_size = shape[0]
 
-    past_key_values = [np.zeros((1, 32, 0, 80), dtype=np.float16)] * 64
+    input_ids = np.ones((batch_size, 1), dtype=int) * bos_token_id
+    attention_mask = np.ones(shape, dtype=int)
+    past_key_values = [np.zeros((batch_size, shape[1] - 1, 0, 80), dtype=np.float16)] * 64
 
     # keep track of which sequences are already finished
     unfinished_sequences = np.ones(input_ids.shape[0], dtype=int)
 
     this_peer_finished = False  # used by synced_gpus only
     while True:
-        print("inputs_embeds---", inputs_embeds.shape)
-        print("input_ids---", input_ids)
-        print("attention_mask---", attention_mask.shape)
-        print("past_key_values---1", past_key_values[0].shape)
         logits, past_key_values = decode(
-            net, inputs_embeds, input_ids[:, -1:], attention_mask, past_key_values
+            net, inputs_embeds, input_ids[:, 1:][:, -1:], attention_mask, past_key_values
         )
-        print("logits---", logits)
-        # print("past_key_values---2", past_key_values[0])
-        # print("past_key_values---2", past_key_values[0].shape)
 
         next_tokens_scores = logits[:, -1, :]
 
@@ -264,18 +282,32 @@ def greedy_search(net, model_inputs: dict):
         if this_peer_finished:
             break
 
-
-def predict(net, img):
-    # shape = (IMAGE_HEIGHT, IMAGE_WIDTH)
-    # img = preprocess(img, shape)
-
-    model_inputs = {}
-    greedy_search(net, model_inputs)
-
-    return
+    return input_ids
 
 
-def recognize_from_image(net):
+def predict(models, img):
+    img = img[:, :, ::-1]  # BGR -> RGB
+
+    img = preprocess(img)
+
+    net = models['vis']
+    if not args.onnx:
+        output = net.predict([img])
+    else:
+        output = net.run(None, {'pixel_values': img})
+    embeds = output[0]
+
+    net = models['net']
+    generated_ids = greedy_search(net, embeds)
+
+    tokenizer = models['tokenizer']
+    generated_text = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
+    generated_text = generated_text[0].strip()
+
+    return generated_text
+
+
+def recognize_from_image(models):
     # input image loop
     for image_path in args.input:
         logger.info(image_path)
@@ -291,7 +323,7 @@ def recognize_from_image(net):
             total_time_estimation = 0
             for i in range(args.benchmark_count):
                 start = int(round(time.time() * 1000))
-                out = predict(net, img)
+                generated_text = predict(models, img)
                 end = int(round(time.time() * 1000))
                 estimation_time = (end - start)
 
@@ -302,7 +334,10 @@ def recognize_from_image(net):
 
             logger.info(f'\taverage time estimation {total_time_estimation / (args.benchmark_count - 1)} ms')
         else:
-            out = predict(net, img)
+            generated_text = predict(models, img)
+
+    logger.info('### Caption ### ')
+    logger.info(generated_text)
 
     logger.info('Script finished successfully.')
 
@@ -310,19 +345,30 @@ def recognize_from_image(net):
 def main():
     # model files check and download
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_VIS_PATH, MODEL_VIS_PATH, REMOTE_PATH)
 
     env_id = args.env_id
 
     # initialize
     if not args.onnx:
         net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+        vis_net = ailia.Net(MODEL_VIS_PATH, WEIGHT_VIS_PATH, env_id=env_id)
     else:
         import onnxruntime
         cuda = 0 < ailia.get_gpu_environment_id()
         providers = ['CUDAExecutionProvider', 'CPUExecutionProvider'] if cuda else ['CPUExecutionProvider']
         net = onnxruntime.InferenceSession(WEIGHT_PATH, providers=providers)
+        vis_net = onnxruntime.InferenceSession(WEIGHT_VIS_PATH, providers=providers)
 
-    recognize_from_image(net)
+    tokenizer = AutoTokenizer.from_pretrained("tokenizer")
+
+    models = {
+        'net': net,
+        'vis': vis_net,
+        'tokenizer': tokenizer,
+    }
+
+    recognize_from_image(models)
 
 
 if __name__ == '__main__':
