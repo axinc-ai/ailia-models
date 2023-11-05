@@ -11,7 +11,7 @@ from transformers import AutoTokenizer
 # import original modules
 sys.path.append('../../util')
 from arg_utils import get_base_parser, update_parser  # noqa
-from model_utils import check_and_download_models  # noqa
+from model_utils import check_and_download_models, check_and_download_file  # noqa
 from detector_utils import load_image  # noqa
 
 import ailia
@@ -22,8 +22,10 @@ logger = getLogger(__name__)
 # Parameters
 # ======================
 WEIGHT_PATH = 'blip2-opt-2.7b.onnx'
+WEIGHT_PB_PATH = 'blip2-opt-2.7b_weights.pb'
 MODEL_PATH = 'blip2-opt-2.7b.onnx.prototxt'
 WEIGHT_VIS_PATH = 'vision_model.onnx'
+WEIGHT_VIS_PB_PATH = 'vision_model_weights.pb'
 MODEL_VIS_PATH = 'vision_model.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/blip2/'
 
@@ -346,6 +348,8 @@ def main():
     # model files check and download
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
     check_and_download_models(WEIGHT_VIS_PATH, MODEL_VIS_PATH, REMOTE_PATH)
+    check_and_download_file(WEIGHT_PB_PATH, REMOTE_PATH)
+    check_and_download_file(WEIGHT_VIS_PB_PATH, REMOTE_PATH)
 
     env_id = args.env_id
 
