@@ -45,11 +45,7 @@ cd ../../diffusion/latent-diffusion-inpainting; python3 latent-diffusion-inpaint
 cd ../../diffusion/stable-diffusion-txt2img; python3 stable-diffusion-txt2img.py ${OPTION}
 cd ../../diffusion/control_net python3 control_net.py ${OPTION}
 cd ../../deep_fashion/clothing-detection; python3 clothing-detection.py ${OPTION}
-cd ../../deep_fashion/fashionai-key-points-detection; python3 fashionai-key-points-detection.py -c blouse ${OPTION}
-cd ../../deep_fashion/fashionai-key-points-detection; python3 fashionai-key-points-detection.py -c dress ${OPTION}
-cd ../../deep_fashion/fashionai-key-points-detection; python3 fashionai-key-points-detection.py -c outwear ${OPTION}
-cd ../../deep_fashion/fashionai-key-points-detection; python3 fashionai-key-points-detection.py -c skirt ${OPTION}
-cd ../../deep_fashion/fashionai-key-points-detection; python3 fashionai-key-points-detection.py -c trousers ${OPTION}
+cd ../../deep_fashion/fashionai-key-points-detection; python3 fashionai-key-points-detection.py ${OPTION}
 cd ../../deep_fashion/mmfashion; python3 mmfashion.py ${OPTION}
 cd ../../deep_fashion/mmfashion_tryon; python3 mmfashion_tryon.py ${OPTION}
 cd ../../deep_fashion/mmfashion_retrieval; python3 mmfashion_retrieval.py ${OPTION}
@@ -65,7 +61,6 @@ cd ../../depth_estimation/mobilestereonet; python3 mobilestereonet.py ${OPTION}
 cd ../../face_detection/blazeface; python3 blazeface.py ${OPTION}
 cd ../../face_detection/dbface; python3 dbface.py ${OPTION}
 cd ../../face_detection/face-mask-detection; python3 face-mask-detection.py ${OPTION}
-cd ../../face_detection/face-mask-detection; python3 face-mask-detection.py -a mb2-ssd ${OPTION}
 cd ../../face_detection/yolov1-face; python3 yolov1-face.py ${OPTION}
 cd ../../face_detection/yolov3-face; python3 yolov3-face.py ${OPTION}
 cd ../../face_detection/retinaface; python3 retinaface.py ${OPTION}
@@ -77,7 +72,6 @@ cd ../../face_identification/insightface; python3 insightface.py ${OPTION}
 cd ../../face_identification/vggface2; python3 vggface2.py ${OPTION}
 cd ../../face_identification/cosface; python3 cosface.py ${OPTION}
 cd ../../face_recognition/face_alignment; python3 face_alignment.py ${OPTION}
-cd ../../face_recognition/face_alignment; python3 face_alignment.py --active_3d ${OPTION}
 cd ../../face_recognition/face_classification; python3 face_classification.py ${OPTION}
 cd ../../face_recognition/facial_feature; python3 facial_feature.py ${OPTION}
 cd ../../face_recognition/gazeml; python3 gazeml.py ${OPTION}
@@ -97,11 +91,8 @@ cd ../../face_recognition/3ddfa; python3 3ddfa$.py ${OPTION}
 cd ../../frame_interpolation/flavr; python3 flavr.py ${OPTION}
 cd ../../frame_interpolation/cain; python3 cain.py ${OPTION}
 cd ../../frame_interpolation/film; python3 film.py ${OPTION}
-cd ../../generative_adversarial_networks/council-gan; python3 council-gan.py --glasses ${OPTION}
-cd ../../generative_adversarial_networks/council-gan; python3 council-gan.py --m2f ${OPTION}
-cd ../../generative_adversarial_networks/council-gan; python3 council-gan.py --anime ${OPTION}
-cd ../../generative_adversarial_networks/pytorch-gan; python3 pytorch-gan.py -m celeb ${OPTION}
-cd ../../generative_adversarial_networks/pytorch-gan; python3 pytorch-gan.py -m anime ${OPTION}
+cd ../../generative_adversarial_networks/council-gan; python3 council-gan.py ${OPTION}
+cd ../../generative_adversarial_networks/pytorch-gan; python3 pytorch-gan.py ${OPTION}
 cd ../../generative_adversarial_networks/restyle-encoder; python3 restyle-encoder.py ${OPTION}
 cd ../../generative_adversarial_networks/sam; python3 sam.py ${OPTION}
 cd ../../generative_adversarial_networks/psgan; python3 psgan.py ${OPTION}
@@ -118,6 +109,7 @@ cd ../../hand_recognition/minimal-hand; python3 minimal-hand.py ${OPTION}
 cd ../../hand_recognition/v2v-posenet; python3 v2v-posenet.py ${OPTION}
 cd ../../image_captioning/illustration2vec; python3 illustration2vec.py ${OPTION}
 cd ../../image_captioning/image_captioning_pytorch; python3 image_captioning_pytorch.py ${OPTION}
+cd ../../image_captioning/blip2; python3 blip2.py ${OPTION}
 cd ../../image_classification/efficientnet; python3 efficientnet.py ${OPTION}
 cd ../../image_classification/googlenet; python3 googlenet.py ${OPTION}
 cd ../../image_classification/inceptionv3; python3 inceptionv3.py ${OPTION}
@@ -176,6 +168,7 @@ cd ../../image_segmentation/pp_liteseg; python3 pp_liteseg.py ${OPTION}
 cd ../../image_segmentation/suim; python3 suim.py ${OPTION}
 cd ../../image_segmentation/group_vit; python3 group_vit.py ${OPTION}
 cd ../../image_segmentation/anime-segmentation; python3 anime-segmentation.py ${OPTION}
+cd ../../image_segmentation/segment-anything; python3 segment-anything.py ${OPTION}
 cd ../../landmark_classification/landmarks_classifier_asia; python3 landmarks_classifier_asia.py ${OPTION}
 cd ../../landmark_classification/places365; python3 places365.py ${OPTION}
 cd ../../line_segment_detection/mlsd; python3 mlsd.py ${OPTION}
@@ -301,6 +294,3 @@ cd ../../text_recognition/easyocr; python3 easyocr.py ${OPTION}
 cd ../../text_recognition/ndlocr_text_recognition; python3 ndlocr_text_recognition.py ${OPTION}
 cd ../../vehicle_recognition/vehicle-attributes-recognition-barrier; python3 vehicle-attributes-recognition-barrier.py ${OPTION}
 cd ../../vehicle_recognition/vehicle-license-plate-detection-barrier; python3 vehicle-license-plate-detection-barrier.py ${OPTION}
-#cd ../../commercial_model/acculus-pose; python3 acculus-hand.py ${OPTION}
-#cd ../../commercial_model/acculus-pose; python3 acculus-pose.py ${OPTION}
-#cd ../../commercial_model/acculus-pose; python3 acculus-up-pose.py ${OPTION}
