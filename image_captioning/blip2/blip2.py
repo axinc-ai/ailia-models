@@ -351,12 +351,22 @@ def main():
     check_and_download_file(WEIGHT_PB_PATH, REMOTE_PATH)
     check_and_download_file(WEIGHT_VIS_PB_PATH, REMOTE_PATH)
 
+    # disable FP16
     env_id = args.env_id
+    if "FP16" in ailia.get_environment(env_id).props or sys.platform == 'Darwin':
+        logger.warning('This model do not work on FP16. So use CPU mode.')
+        env_id = 0
 
     # initialize
     if not args.onnx:
-        net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
-        vis_net = ailia.Net(MODEL_VIS_PATH, WEIGHT_VIS_PATH, env_id=env_id)
+        memory_mode = ailia.get_memory_mode(
+            reduce_constant=True, ignore_input_with_initializer=True,
+            reduce_interstage=False, reuse_interstage=True)
+        net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id, memory_mode=memory_mode)
+        vis_net = ailia.Net(MODEL_VIS_PATH, WEIGHT_VIS_PATH, env_id=env_id, memory_mode=memory_mode)
+        if args.profile:
+            net.set_profile_mode(True)
+            vis_net.set_profile_mode(True)
     else:
         import onnxruntime
         cuda = 0 < ailia.get_gpu_environment_id()
@@ -373,6 +383,13 @@ def main():
     }
 
     recognize_from_image(models)
+
+    if args.profile and not args.onnx:
+        print("--- profile net")
+        print(net.get_summary())
+        print("")
+        print("--- profile vis_net")
+        print(vis_net.get_summary())
 
 
 if __name__ == '__main__':
