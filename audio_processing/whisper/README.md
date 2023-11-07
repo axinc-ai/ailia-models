@@ -83,11 +83,13 @@ ONNX opset=11
 [encoder_base.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/whisper/encoder_base.onnx.prototxt)  
 [encoder_small.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/whisper/encoder_small.onnx.prototxt)  
 [encoder_medium.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/whisper/encoder_medium.onnx.prototxt)  
+[encoder_large.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/whisper/encoder_large.onnx.prototxt)  
 
 [decoder_tiny_fix_kv_cache.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/whisper/decoder_tiny_fix_kv_cache.onnx.prototxt)  
 [decoder_base_fix_kv_cache.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/whisper/decoder_base_fix_kv_cache.onnx.prototxt)  
 [decoder_small_fix_kv_cache.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/whisper/decoder_small_fix_kv_cache.onnx.prototxt)  
 [decoder_medium_fix_kv_cache.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/whisper/decoder_medium_fix_kv_cache.onnx.prototxt)
+[decoder_large_fix_kv_cache.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/whisper/decoder_large_fix_kv_cache.onnx.prototxt)
 
 ### Optimized models
 
@@ -113,4 +115,5 @@ ONNX opset=11
 [decoder_tiny.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/whisper/decoder_tiny.onnx.prototxt)  
 [decoder_base.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/whisper/decoder_base.onnx.prototxt)  
 [decoder_small.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/whisper/decoder_small.onnx.prototxt)  
-[decoder_medium.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/whisper/decoder_medium.onnx.prototxt)
+[decoder_medium.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/whisper/decoder_medium.onnx.prototxt)  
+[decoder_large.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/whisper/decoder_large.onnx.prototxt)
