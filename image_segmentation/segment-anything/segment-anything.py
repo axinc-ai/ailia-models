@@ -84,6 +84,10 @@ parser.add_argument(
     '--gui', action='store_true',
     help='Open mouse click GUI.'
 )
+parser.add_argument(
+    '--show_all_masks', action='store_true',
+    help='show all masks.'
+)
 args = update_parser(parser)
 
 
@@ -112,9 +116,8 @@ def apply_coords(coords, h, w):
     return coords
 
 
-def show_mask(mask, img):
+def show_mask(mask, img, color = np.array([255, 144, 30])):
     global area_img
-    color = np.array([255, 144, 30])
     color = color.reshape(1, 1, -1)
 
     h, w = mask.shape[-2:]
@@ -336,7 +339,17 @@ def recognize(image_path, img, models, img_enc_output, pos_points, neg_points=No
         coord.append(np.array(neg_points))
         label.append(np.zeros(len(neg_points)))
 
-    res_img = show_mask(mask, img)
+    if args.show_all_masks:
+        res_img = img
+        for i in range(masks.shape[0]):
+            print(scores[i])
+            if scores[i] >= 0.5:
+                bgr = cv2.cvtColor(
+                        np.array([[[256 * i / (masks.shape[0] + 1), 255, 255]]], dtype=np.uint8), cv2.COLOR_HSV2BGR)[0][0]
+                color = np.array([int(bgr[0]), int(bgr[1]), int(bgr[2])])
+                res_img = show_mask(masks[i, :, :], res_img, color)
+    else:
+        res_img = show_mask(mask, img)
     if coord:
         coord = np.concatenate(coord, axis=0)
         label = np.concatenate(label, axis=0)
