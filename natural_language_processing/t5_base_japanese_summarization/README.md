@@ -5,7 +5,7 @@ Abstract summarization model made by fine-tuning [sonoisa/t5-base-japanese-title
 ## Input
 
 [TEXT file.](./input.txt)
-This text was adapted from a wikipedia page of Kohukuji temple.
+This text was adapted from the wikipedia page of Honfukuji temple.
 
 ## Output
 
