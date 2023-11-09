@@ -40,4 +40,8 @@ ONNX opset=12
 
 ## Netron
 
-- [t5_base_japanese_summarization]() **insert remote path here**
+### encoder
+[t5_base_japanese_summarization_enc.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/t5_base_japanese_summarization/t5_base_japanese_summarization_enc.onnx.prototxt)
+
+### decoder
+[t5_base_japanese_summarization_dec.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/t5_base_japanese_summarization/t5_base_japanese_summarization_dec.onnx.prototxt)

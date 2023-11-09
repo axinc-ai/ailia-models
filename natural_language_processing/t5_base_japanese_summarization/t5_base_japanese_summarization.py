@@ -25,7 +25,7 @@ ENCODER_MODEL_PATH = 't5_base_japanese_summarization_enc.onnx.prototxt'
 DECODER_WEIGHT_PATH = 't5_base_japanese_summarization_dec.onnx'
 DECODER_MODEL_PATH = 't5_base_japanese_summarization_dec.onnx.prototxt'
 
-REMOTE_PATH = None
+REMOTE_PATH = "https://storage.googleapis.com/ailia-models/t5_base_japanese_summarization/"
 
 # ======================
 # Arguemnt Parser Config
