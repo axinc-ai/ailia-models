@@ -43,4 +43,4 @@ ONNX opset = 13
 
 [Elyza LLama model](LICENSE_LLama)
 
-- [decoder_model.onnx.prototxt]()
+- [decoder_model.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/elyza-japanese-llama-2-7b/decoder_model.onnx.prototxt)

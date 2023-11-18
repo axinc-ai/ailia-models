@@ -10,7 +10,7 @@ import ailia
 
 sys.path.append("../../util")
 from arg_utils import get_base_parser, update_parser  # noqa: E402
-from model_utils import check_and_download_models  # noqa: E402
+from model_utils import check_and_download_models, check_and_download_file  # noqa: E402
 
 # logger
 from logging import getLogger   # noqa: E402
@@ -21,6 +21,7 @@ logger = getLogger(__name__)
 # ======================
 WEIGHT_PATH = "decoder_model.onnx"
 MODEL_PATH = "decoder_model.onnx.prototxt"
+WEIGHT_PB_PATH = "decoder_model.onnx_data"
 tokenizer_path= "elyza/ELYZA-japanese-Llama-2-7b-instruct"
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/elyza-japanese-llama-2-7b/"
 SAVE_PATH="output.txt"
@@ -60,6 +61,9 @@ args = update_parser(parser, check_input_type=False)
 # Main function
 # ======================
 def main():
+    check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
+    check_and_download_file(WEIGHT_PB_PATH, REMOTE_PATH)
+
     if args.onnx:
         import onnxruntime
         
