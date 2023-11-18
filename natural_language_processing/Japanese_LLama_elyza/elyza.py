@@ -22,7 +22,7 @@ logger = getLogger(__name__)
 WEIGHT_PATH = "decoder_model.onnx"
 MODEL_PATH = "decoder_model.onnx.prototxt"
 tokenizer_path= "elyza/ELYZA-japanese-Llama-2-7b-instruct"
-REMOTE_PATH = ""
+REMOTE_PATH = "https://storage.googleapis.com/ailia-models/elyza-japanese-llama-2-7b/"
 SAVE_PATH="output.txt"
 
 
