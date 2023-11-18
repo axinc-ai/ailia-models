@@ -4,6 +4,7 @@ import os
 from transformers import  AutoTokenizer
 from utils_elyza import *
 import numpy
+import platform
 
 #from utils_rinna_gpt2 import *
 import ailia
@@ -64,11 +65,13 @@ def main():
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
     check_and_download_file(WEIGHT_PB_PATH, REMOTE_PATH)
 
+    pf = platform.system()
+    if pf == "Darwin":
+        logger.info("This model not optimized for macOS GPU currently. So we will use BLAS (env_id = 1).")
+        args.env_id = 1
+
     if args.onnx:
         import onnxruntime
-        
-
-        
         # Create ONNX Runtime session with GPU as the execution provider
         options = onnxruntime.SessionOptions()
         options.graph_optimization_level = onnxruntime.GraphOptimizationLevel.ORT_ENABLE_ALL
@@ -77,11 +80,9 @@ def main():
         # Specify the execution provider (CUDAExecutionProvider for GPU)
         providers = ["CUDAExecutionProvider"] if "CUDAExecutionProvider" in onnxruntime.get_available_providers() else ["CPUExecutionProvider"]
         ailia_model = onnxruntime.InferenceSession(WEIGHT_PATH, providers=providers, sess_options=options)
-
-        
     else:
-        
-        ailia_model = ailia.Net(MODEL_PATH, WEIGHT_PATH)
+        memory_mode = ailia.get_memory_mode(True, True, False, True)
+        ailia_model = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id, memory_mode=memory_mode)
         
     tokenizer = AutoTokenizer.from_pretrained(tokenizer_path)
     #Generate prompt
