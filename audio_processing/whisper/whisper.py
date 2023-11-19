@@ -3,14 +3,12 @@ import sys
 import time
 from collections import namedtuple
 import platform
+from logging import getLogger
 
 import numpy as np
 
 # import original modules
 sys.path.append('../../util')
-# logger
-from logging import getLogger  # noqa
-
 from decode_utils import (
     ApplyTimestampRules, BeamSearchDecoder,
     GreedyDecoder, MaximumLikelihoodRanker,
@@ -43,7 +41,7 @@ parser.add_argument(
 )
 parser.add_argument(
     '-m', '--model_type', default='small',
-    choices=('tiny', 'base', 'small', 'medium', 'large'),
+    choices=('tiny', 'base', 'small', 'medium', 'large', 'large-v3'),
     help='model type'
 )
 parser.add_argument(
@@ -137,12 +135,14 @@ args = update_parser(parser)
 
 if args.ailia_audio:
     from ailia_audio_utils import (
-        CHUNK_LENGTH, HOP_LENGTH, N_FRAMES, SAMPLE_RATE,
-        load_audio, log_mel_spectrogram, pad_or_trim)
+        CHUNK_LENGTH, HOP_LENGTH, N_FRAMES, N_SAMPLES, SAMPLE_RATE,
+        load_audio, log_mel_spectrogram, pad_or_trim
+    )
 else:
     from audio_utils import (
-        CHUNK_LENGTH, HOP_LENGTH, N_FRAMES, SAMPLE_RATE,
-        load_audio, log_mel_spectrogram, pad_or_trim)
+        CHUNK_LENGTH, HOP_LENGTH, N_FRAMES, N_SAMPLES, SAMPLE_RATE,
+        load_audio, log_mel_spectrogram, pad_or_trim
+    )
 
 if not args.disable_ailia_tokenizer:
     from ailia_tokenizer import get_tokenizer
@@ -160,6 +160,7 @@ dims_dict = {
     'small': ModelDimensions(80, 1500, 768, 12, 12, 51865, 448, 768, 12, 12),
     'medium': ModelDimensions(80, 1500, 1024, 16, 24, 51865, 448, 1024, 16, 24),
     'large': ModelDimensions(80, 1500, 1280, 20, 32, 51865, 448, 1280, 20, 32),
+    'large-v3': ModelDimensions(128, 1500, 1280, 20, 32, 51866, 448, 1280, 20, 32),
 }
 dims = dims_dict[args.model_type]
 
@@ -208,6 +209,8 @@ if not args.dynamic_kv_cache:
     MODEL_DEC_MEDIUM_PATH = "decoder_medium_fix_kv_cache" + OPT2 + ".onnx.prototxt"
     WEIGHT_DEC_LARGE_PATH = "decoder_large_fix_kv_cache.onnx"
     MODEL_DEC_LARGE_PATH = "decoder_large_fix_kv_cache.onnx.prototxt"
+    WEIGHT_DEC_LARGE_V3_PATH = "decoder_large_v3_fix_kv_cache.onnx"
+    MODEL_DEC_LARGE_V3_PATH = "decoder_large_v3_fix_kv_cache.onnx.prototxt"
 else:
     # KV_CACHEが推論ごとに変化するバージョン
     WEIGHT_DEC_TINY_PATH = "decoder_tiny.onnx"
@@ -220,6 +223,8 @@ else:
     MODEL_DEC_MEDIUM_PATH = "decoder_medium.onnx.prototxt"
     WEIGHT_DEC_LARGE_PATH = "decoder_large.onnx"
     MODEL_DEC_LARGE_PATH = "decoder_large.onnx.prototxt"
+    WEIGHT_DEC_LARGE_V3_PATH = "decoder_large_v3.onnx"
+    MODEL_DEC_LARGE_V3_PATH = "decoder_large_v3.onnx.prototxt"
 
 WEIGHT_ENC_TINY_PATH = "encoder_tiny" + OPT + ".onnx"
 MODEL_ENC_TINY_PATH = "encoder_tiny" + OPT + ".onnx.prototxt"
@@ -231,9 +236,16 @@ WEIGHT_ENC_MEDIUM_PATH = "encoder_medium" + OPT + ".onnx"
 MODEL_ENC_MEDIUM_PATH = "encoder_medium" + OPT + ".onnx.prototxt"
 WEIGHT_ENC_LARGE_PATH = "encoder_large.onnx"
 MODEL_ENC_LARGE_PATH = "encoder_large.onnx.prototxt"
+WEIGHT_ENC_LARGE_V3_PATH = "encoder_large_v3.onnx"
+MODEL_ENC_LARGE_V3_PATH = "encoder_large_v3.onnx.prototxt"
+
 WEIGTH_ENC_LARGE_PB_PATH = "encoder_large_weights.pb"
 WEIGHT_DEC_LARGE_PB_PATH = "decoder_large_weights.pb"
 WEIGHT_DEC_LARGE_FIX_KV_CACHE_PB_PATH = "decoder_large_fix_kv_cache_weights.pb"
+WEIGTH_ENC_LARGE_V3_PB_PATH = "encoder_large_v3_weights.pb"
+WEIGHT_DEC_LARGE_V3_PB_PATH = "decoder_large_v3_weights.pb"
+WEIGHT_DEC_LARGE_V3_FIX_KV_CACHE_PB_PATH = "decoder_large_v3_fix_kv_cache_weights.pb"
+
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/whisper/'
 
 
@@ -242,7 +254,11 @@ REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/whisper/'
 # ======================
 
 def is_multilingual():
-    return dims.n_vocab == 51865
+    return dims.n_vocab >= 51865
+
+
+def num_languages():
+    return dims.n_vocab - 51765 - int(is_multilingual())
 
 
 def format_timestamp(seconds: float, always_include_hours: bool = False):
@@ -332,7 +348,7 @@ def new_kv_cache(n_group, length=451):
         size = [24, n_group, length, 768]
     elif model_type == "medium.en" or model_type == "medium":
         size = [48, n_group, length, 1024]
-    elif model_type == "large":
+    elif model_type in ("large", "large-v3"):
         size = [64, n_group, length, 1280]
     else:
         raise ValueError(f"Unsupported model type: {model_type}")
@@ -464,7 +480,9 @@ def detect_language(enc_net, dec_net, mel, tokenizer=None):
     This is performed outside the main decode loop in order to not interfere with kv-caching.
     """
     if tokenizer is None:
-        tokenizer = get_tokenizer(is_multilingual())
+        tokenizer = get_tokenizer(
+            is_multilingual(), num_languages=num_languages()
+        )
     if tokenizer.language is None or tokenizer.language_token not in tokenizer.sot_sequence:
         raise ValueError(f"This model doesn't have language tokens so it can't perform lang id")
 
@@ -504,13 +522,25 @@ def detect_language(enc_net, dec_net, mel, tokenizer=None):
     return language_tokens, language_probs
 
 
+DecodingResult = namedtuple('DecodingResult', [
+    'audio_features', 'language', 'language_probs',
+    'tokens', 'text', 'avg_logprob', 'no_speech_prob',
+    'temperature',
+])
+
+
 def decode(enc_net, dec_net, mel, options):
     single = mel.ndim == 2
     if single:
         mel = mel.unsqueeze(0)
 
     language = options.get("language") or "en"
-    tokenizer = get_tokenizer(is_multilingual(), language=language, task=args.task)
+    tokenizer = get_tokenizer(
+        is_multilingual(),
+        num_languages=num_languages(),
+        language=language,
+        task=args.task
+    )
 
     n_group = options.get("beam_size") or options.get("best_of") or 1
     n_ctx = dims.n_text_ctx
@@ -627,12 +657,6 @@ def decode(enc_net, dec_net, mel, options):
     if len(set(map(len, fields))) != 1:
         raise RuntimeError(f"inconsistent result lengths: {list(map(len, fields))}")
 
-    DecodingResult = namedtuple('DecodingResult', [
-        'audio_features', 'language', 'language_probs',
-        'tokens', 'text', 'avg_logprob', 'no_speech_prob',
-        'temperature',
-    ])
-
     result = [
         DecodingResult(
             audio_features=features,
@@ -705,7 +729,8 @@ def predict(wav, enc_net, dec_net, immediate=False, microphone=False):
         'prompt': []
     }
 
-    mel = log_mel_spectrogram(wav)
+    mel = log_mel_spectrogram(wav, dims.n_mels, padding=N_SAMPLES)
+    content_frames = mel.shape[-1] - N_FRAMES
 
     if language is None:
         segment = pad_or_trim(mel, N_FRAMES)
@@ -715,7 +740,12 @@ def predict(wav, enc_net, dec_net, immediate=False, microphone=False):
 
     mel = np.expand_dims(mel, axis=0)
     task = decode_options.get("task", args.task)
-    tokenizer = get_tokenizer(is_multilingual(), language=language, task=task)
+    tokenizer = get_tokenizer(
+        is_multilingual(),
+        num_languages=num_languages(),
+        language=language,
+        task=task
+    )
 
     seek = 0
     input_stride = N_FRAMES // dims.n_audio_ctx  # mel frames per output token: 2
@@ -726,107 +756,146 @@ def predict(wav, enc_net, dec_net, immediate=False, microphone=False):
     all_segments = []
     prompt_reset_since = 0
 
-    def add_segment(
-            start, end, text_tokens, result):
-        text = tokenizer.decode([token for token in text_tokens if token < tokenizer.eot])
-        if len(text.strip()) == 0:  # skip empty text output
-            return
-
-        all_segments.append({
-            "id": len(all_segments),
+    def new_segment(
+            *, start: float, end: float, tokens, result: DecodingResult
+    ):
+        tokens = tokens.tolist()
+        text_tokens = [token for token in tokens if token < tokenizer.eot]
+        return {
             "seek": seek,
             "start": start,
             "end": end,
-            "text": text,
-            "tokens": result.tokens,
+            "text": tokenizer.decode(text_tokens),
+            "tokens": tokens,
             "temperature": result.temperature,
             "avg_logprob": result.avg_logprob,
-            # "compression_ratio": result.compression_ratio,
             "no_speech_prob": result.no_speech_prob,
-        })
-        if immediate:
-            logger.info(f"[{format_timestamp(start)} --> {format_timestamp(end)}] {text}")
-
-    num_frames = mel.shape[-1]
-    previous_seek_value = seek
+        }
 
     try:
         import tqdm
         if microphone:
             pbar = None
         else:
-            pbar = tqdm.tqdm(total=num_frames, unit='frames', disable=immediate is not False)
+            pbar = tqdm.tqdm(total=content_frames, unit='frames', disable=immediate is not False)
     except ImportError:
         pbar = None
 
     # show the progress bar when verbose is False (otherwise the transcribed text will be printed)
-    while seek < num_frames:
-        timestamp_offset = float(seek * HOP_LENGTH / SAMPLE_RATE)
-        segment = pad_or_trim(mel[:, :, seek:], N_FRAMES)
-        segment_duration = segment.shape[-1] * HOP_LENGTH / SAMPLE_RATE
+    while seek < content_frames:
+        time_offset = float(seek * HOP_LENGTH / SAMPLE_RATE)
+        mel_segment = mel[:, :, seek: seek + N_FRAMES]
+        segment_size = min(N_FRAMES, content_frames - seek)
+        segment_duration = segment_size * HOP_LENGTH / SAMPLE_RATE
+        mel_segment = pad_or_trim(mel_segment, N_FRAMES)
 
         decode_options["prompt"] = all_tokens[prompt_reset_since:]
-        result = decode_with_fallback(enc_net, dec_net, segment, decode_options)
+        result = decode_with_fallback(enc_net, dec_net, mel_segment, decode_options)
         result = result[0]
         tokens = np.array(result.tokens)
 
         if no_speech_threshold is not None:
             # no voice activity check
             should_skip = result.no_speech_prob > no_speech_threshold
-            if logprob_threshold is not None and result.avg_logprob > logprob_threshold:
+            if logprob_threshold is not None \
+                    and result.avg_logprob > logprob_threshold:
                 # don't skip if the logprob is high enough, despite the no_speech_prob
                 should_skip = False
 
             if should_skip:
-                seek += segment.shape[-1]  # fast-forward to the next segment boundary
+                seek += segment_size  # fast-forward to the next segment boundary
                 continue
 
+        previous_seek = seek
+        current_segments = []
+
         timestamp_tokens = tokens >= tokenizer.timestamp_begin
+        single_timestamp_ending = timestamp_tokens[-2:].tolist() == [False, True]
+
         consecutive = np.where(timestamp_tokens[:-1] & timestamp_tokens[1:])[0] + 1
-        if len(consecutive) > 0:  # if the output contains two consecutive timestamp tokens
+        if len(consecutive) > 0:
+            # if the output contains two consecutive timestamp tokens
+            slices = consecutive.tolist()
+            if single_timestamp_ending:
+                slices.append(len(tokens))
+
             last_slice = 0
-            for current_slice in consecutive:
+            for current_slice in slices:
                 sliced_tokens = tokens[last_slice:current_slice]
-                start_timestamp_position = (
-                        sliced_tokens[0] - tokenizer.timestamp_begin
+                start_timestamp_pos = (
+                        sliced_tokens[0].item() - tokenizer.timestamp_begin
                 )
-                end_timestamp_position = (
-                        sliced_tokens[-1] - tokenizer.timestamp_begin
+                end_timestamp_pos = (
+                        sliced_tokens[-1].item() - tokenizer.timestamp_begin
                 )
-                add_segment(
-                    start=timestamp_offset + start_timestamp_position * time_precision,
-                    end=timestamp_offset + end_timestamp_position * time_precision,
-                    text_tokens=sliced_tokens[1:-1],
-                    result=result,
+                current_segments.append(
+                    new_segment(
+                        start=time_offset + start_timestamp_pos * time_precision,
+                        end=time_offset + end_timestamp_pos * time_precision,
+                        tokens=sliced_tokens,
+                        result=result,
+                    )
                 )
                 last_slice = current_slice
-            last_timestamp_position = (
-                    tokens[last_slice - 1] - tokenizer.timestamp_begin
-            )
-            seek += last_timestamp_position * input_stride
-            all_tokens.extend(tokens[: last_slice + 1].tolist())
+
+            if single_timestamp_ending:
+                # single timestamp at the end means no speech after the last timestamp.
+                seek += segment_size
+            else:
+                # otherwise, ignore the unfinished segment and seek to the last timestamp
+                last_timestamp_pos = (
+                        tokens[last_slice - 1].item() - tokenizer.timestamp_begin
+                )
+                seek += last_timestamp_pos * input_stride
         else:
             duration = segment_duration
-            timestamps = tokens[np.nonzero(timestamp_tokens)[0]]
-            if len(timestamps) > 0:
+            timestamps = tokens[np.ravel(timestamp_tokens.nonzero())]
+            if len(timestamps) > 0 \
+                    and timestamps[-1].item() != tokenizer.timestamp_begin:
                 # no consecutive timestamps but it has a timestamp; use the last one.
-                # single timestamp at the end means no speech after the last timestamp.
-                last_timestamp_position = timestamps[-1] - tokenizer.timestamp_begin
-                duration = last_timestamp_position * time_precision
+                last_timestamp_pos = \
+                    timestamps[-1].item() - tokenizer.timestamp_begin
+                duration = last_timestamp_pos * time_precision
 
-            add_segment(
-                start=timestamp_offset,
-                end=timestamp_offset + duration,
-                text_tokens=tokens,
-                result=result,
+            current_segments.append(
+                new_segment(
+                    start=time_offset,
+                    end=time_offset + duration,
+                    tokens=tokens,
+                    result=result,
+                )
             )
-            seek += segment.shape[-1]
-            all_tokens.extend(tokens.tolist())
+            seek += segment_size
+
+        if immediate:
+            for segment in current_segments:
+                start, end, text = segment["start"], segment["end"], segment["text"]
+                line = f"[{format_timestamp(start)} --> {format_timestamp(end)}] {text}"
+                print(line)
+
+        # if a segment is instantaneous or does not contain text, clear it
+        for i, segment in enumerate(current_segments):
+            if segment["start"] == segment["end"] or segment["text"].strip() == "":
+                segment["text"] = ""
+                segment["tokens"] = []
+                segment["words"] = []
+
+        all_segments.extend([
+            {"id": i, **segment} for i, segment in enumerate(
+                current_segments, start=len(all_segments)
+            )
+        ])
+        all_tokens.extend(
+            [token for segment in current_segments for token in segment["tokens"]]
+        )
+
+        if result.temperature > 0.5:
+            # do not feed the prompt tokens if a high temperature was used
+            prompt_reset_since = len(all_tokens)
 
         if pbar is not None:
             # update progress bar
-            pbar.update(min(num_frames, seek) - previous_seek_value)
-        previous_seek_value = seek
+            pbar.update(min(content_frames, seek) - previous_seek)
 
     d = dict(
         text=tokenizer.decode(all_tokens),
@@ -926,6 +995,10 @@ def main():
             'enc': (WEIGHT_ENC_LARGE_PATH, MODEL_ENC_LARGE_PATH),
             'dec': (WEIGHT_DEC_LARGE_PATH, MODEL_DEC_LARGE_PATH),
         },
+        'large-v3': {
+            'enc': (WEIGHT_ENC_LARGE_V3_PATH, MODEL_ENC_LARGE_V3_PATH),
+            'dec': (WEIGHT_DEC_LARGE_V3_PATH, MODEL_DEC_LARGE_V3_PATH),
+        },
     }
     model_info = model_dic[args.model_type]
 
@@ -939,6 +1012,12 @@ def main():
             check_and_download_file(WEIGHT_DEC_LARGE_PB_PATH, REMOTE_PATH)
         else:
             check_and_download_file(WEIGHT_DEC_LARGE_FIX_KV_CACHE_PB_PATH, REMOTE_PATH)
+    elif args.model_type == 'large-v3':
+        check_and_download_file(WEIGTH_ENC_LARGE_V3_PB_PATH, REMOTE_PATH)
+        if args.dynamic_kv_cache:
+            check_and_download_file(WEIGHT_DEC_LARGE_V3_PB_PATH, REMOTE_PATH)
+        else:
+            check_and_download_file(WEIGHT_DEC_LARGE_V3_FIX_KV_CACHE_PB_PATH, REMOTE_PATH)
 
     mic_info = None
     if args.V:
