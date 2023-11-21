@@ -193,6 +193,7 @@ cd ../../natural_language_processing/presumm; python3 presumm.py ${OPTION}
 cd ../../natural_language_processing/t5_base_japanese_title_generation; python3 t5_base_japanese_title_generation.py ${OPTION}
 cd ../../natural_language_processing/multilingual-e5; python3 multilingual-e5.py ${OPTION}
 cd ../../natural_language_processing/t5_whisper_medical; python3 t5_whisper_medical.py ${OPTION}
+cd ../../natural_language_processing/t5_base_japanese_summarization; python3 t5_base_japanese_summarization.py ${OPTION}
 cd ../../neural_rendering/nerf; python3 nerf.py ${OPTION}
 cd ../../object_detection/centernet; python3 centernet.py ${OPTION}
 cd ../../object_detection/m2det; python3 m2det.py ${OPTION}
