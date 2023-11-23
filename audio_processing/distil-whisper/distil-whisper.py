@@ -113,15 +113,13 @@ def preprocess(wav):
 
 def decode(
         net,
-        inputs_embeds: np.ndarray,
+        encoder_hidden_states: np.ndarray,
         input_ids: np.ndarray,
-        attention_mask: np.ndarray,
         past_key_values: List[np.ndarray]):
     if not args.onnx:
         decoder_output = net.predict([
-            attention_mask,
             input_ids,
-            inputs_embeds,
+            encoder_hidden_states,
             past_key_values[0],
             past_key_values[1],
             past_key_values[2],
@@ -130,133 +128,20 @@ def decode(
             past_key_values[5],
             past_key_values[6],
             past_key_values[7],
-            past_key_values[8],
-            past_key_values[9],
-            past_key_values[10],
-            past_key_values[11],
-            past_key_values[12],
-            past_key_values[13],
-            past_key_values[14],
-            past_key_values[15],
-            past_key_values[16],
-            past_key_values[17],
-            past_key_values[18],
-            past_key_values[19],
-            past_key_values[20],
-            past_key_values[21],
-            past_key_values[22],
-            past_key_values[23],
-            past_key_values[24],
-            past_key_values[25],
-            past_key_values[26],
-            past_key_values[27],
-            past_key_values[28],
-            past_key_values[29],
-            past_key_values[30],
-            past_key_values[31],
-            past_key_values[32],
-            past_key_values[33],
-            past_key_values[34],
-            past_key_values[35],
-            past_key_values[36],
-            past_key_values[37],
-            past_key_values[38],
-            past_key_values[39],
-            past_key_values[40],
-            past_key_values[41],
-            past_key_values[42],
-            past_key_values[43],
-            past_key_values[44],
-            past_key_values[45],
-            past_key_values[46],
-            past_key_values[47],
-            past_key_values[48],
-            past_key_values[49],
-            past_key_values[50],
-            past_key_values[51],
-            past_key_values[52],
-            past_key_values[53],
-            past_key_values[54],
-            past_key_values[55],
-            past_key_values[56],
-            past_key_values[57],
-            past_key_values[58],
-            past_key_values[59],
-            past_key_values[60],
-            past_key_values[61],
-            past_key_values[62],
-            past_key_values[63],
         ])
     else:
         decoder_output = net.run(
             None, {
-                'attention_mask': attention_mask,
                 'input_ids': input_ids,
-                'inputs_embeds': inputs_embeds,
-                'past_key_values_0_key': past_key_values[0],
-                'past_key_values_0_value': past_key_values[1],
-                'past_key_values_1_key': past_key_values[2],
-                'past_key_values_1_value': past_key_values[3],
-                'past_key_values_2_key': past_key_values[4],
-                'past_key_values_2_value': past_key_values[5],
-                'past_key_values_3_key': past_key_values[6],
-                'past_key_values_3_value': past_key_values[7],
-                'past_key_values_4_key': past_key_values[8],
-                'past_key_values_4_value': past_key_values[9],
-                'past_key_values_5_key': past_key_values[10],
-                'past_key_values_5_value': past_key_values[11],
-                'past_key_values_6_key': past_key_values[12],
-                'past_key_values_6_value': past_key_values[13],
-                'past_key_values_7_key': past_key_values[14],
-                'past_key_values_7_value': past_key_values[15],
-                'past_key_values_8_key': past_key_values[16],
-                'past_key_values_8_value': past_key_values[17],
-                'past_key_values_9_key': past_key_values[18],
-                'past_key_values_9_value': past_key_values[19],
-                'past_key_values_10_key': past_key_values[20],
-                'past_key_values_10_value': past_key_values[21],
-                'past_key_values_11_key': past_key_values[22],
-                'past_key_values_11_value': past_key_values[23],
-                'past_key_values_12_key': past_key_values[24],
-                'past_key_values_12_value': past_key_values[25],
-                'past_key_values_13_key': past_key_values[26],
-                'past_key_values_13_value': past_key_values[27],
-                'past_key_values_14_key': past_key_values[28],
-                'past_key_values_14_value': past_key_values[29],
-                'past_key_values_15_key': past_key_values[30],
-                'past_key_values_15_value': past_key_values[31],
-                'past_key_values_16_key': past_key_values[32],
-                'past_key_values_16_value': past_key_values[33],
-                'past_key_values_17_key': past_key_values[34],
-                'past_key_values_17_value': past_key_values[35],
-                'past_key_values_18_key': past_key_values[36],
-                'past_key_values_18_value': past_key_values[37],
-                'past_key_values_19_key': past_key_values[38],
-                'past_key_values_19_value': past_key_values[39],
-                'past_key_values_20_key': past_key_values[40],
-                'past_key_values_20_value': past_key_values[41],
-                'past_key_values_21_key': past_key_values[42],
-                'past_key_values_21_value': past_key_values[43],
-                'past_key_values_22_key': past_key_values[44],
-                'past_key_values_22_value': past_key_values[45],
-                'past_key_values_23_key': past_key_values[46],
-                'past_key_values_23_value': past_key_values[47],
-                'past_key_values_24_key': past_key_values[48],
-                'past_key_values_24_value': past_key_values[49],
-                'past_key_values_25_key': past_key_values[50],
-                'past_key_values_25_value': past_key_values[51],
-                'past_key_values_26_key': past_key_values[52],
-                'past_key_values_26_value': past_key_values[53],
-                'past_key_values_27_key': past_key_values[54],
-                'past_key_values_27_value': past_key_values[55],
-                'past_key_values_28_key': past_key_values[56],
-                'past_key_values_28_value': past_key_values[57],
-                'past_key_values_29_key': past_key_values[58],
-                'past_key_values_29_value': past_key_values[59],
-                'past_key_values_30_key': past_key_values[60],
-                'past_key_values_30_value': past_key_values[61],
-                'past_key_values_31_key': past_key_values[62],
-                'past_key_values_31_value': past_key_values[63],
+                'encoder_hidden_states': encoder_hidden_states,
+                'past_key_values.0.decoder.key': past_key_values[0],
+                'past_key_values.0.decoder.value': past_key_values[1],
+                'past_key_values.0.encoder.key': past_key_values[2],
+                'past_key_values.0.encoder.value': past_key_values[3],
+                'past_key_values.1.decoder.key': past_key_values[4],
+                'past_key_values.1.decoder.value': past_key_values[5],
+                'past_key_values.1.encoder.key': past_key_values[6],
+                'past_key_values.1.encoder.value': past_key_values[7],
             }
         )
 
@@ -267,23 +152,36 @@ def decode(
 
 def stopping_criteria(
         input_ids: np.array) -> bool:
-    max_length = 21
+    max_length = 129
 
     cur_len = input_ids.shape[-1]
     is_done = cur_len >= max_length
     return is_done
 
 
-def greedy_search(net, last_hidden_state):
-    # bos_token_id = 2
-    # eos_token_id = np.array([50118])
+def greedy_search(net, encoder_hidden_states):
+    decoder_start_token_id = 50258
+    eos_token_id = np.array([50257])
+    pad_token_id = 50257
 
-    shape = inputs_embeds.shape[:2]
+    suppress_tokens = [
+        1, 2, 7, 8, 9, 10, 14, 25, 26, 27, 28, 29, 31, 58, 59, 60, 61, 62, 63, 90, 91, 92, 93,
+        359, 503, 522, 542, 873, 893, 902, 918, 922, 931, 1350, 1853, 1982, 2460, 2627,
+        3246, 3253, 3268, 3536, 3846, 3961, 4183, 4667, 6585, 6647, 7273, 9061, 9383,
+        10428, 10929, 11938, 12033, 12331, 12562, 13793, 14157, 14635, 15265, 15618, 16553,
+        16604, 18362, 18956, 20075, 21675, 22520, 26130, 26161, 26435, 28279, 29464, 31650,
+        32302, 32470, 36865, 42863, 47425, 49870, 50254, 50258, 50360, 50361, 50362
+    ]
+    begin_index = 4
+    begin_suppress_tokens = [220, 50257]
+    force_token_map = {1: 50259, 2: 50359, 3: 50363}
+
+    shape = encoder_hidden_states.shape[:-1]
     batch_size = shape[0]
 
-    input_ids = np.ones((batch_size, 1), dtype=int) * bos_token_id
-    attention_mask = np.ones(shape, dtype=int)
-    past_key_values = [np.zeros((batch_size, shape[1] - 1, 0, 80), dtype=np.float16)] * 64
+    # input_ids = np.ones(shape, dtype=int) * -100
+    input_ids = np.ones((batch_size, 1), dtype=int) * decoder_start_token_id
+    past_key_values = [np.zeros((batch_size, 20, 0, 64), dtype=np.float16)] * 8
 
     # keep track of which sequences are already finished
     unfinished_sequences = np.ones(input_ids.shape[0], dtype=int)
@@ -291,25 +189,34 @@ def greedy_search(net, last_hidden_state):
     this_peer_finished = False  # used by synced_gpus only
     while True:
         logits, past_key_values = decode(
-            net, inputs_embeds, input_ids[:, 1:][:, -1:], attention_mask, past_key_values
+            net, encoder_hidden_states, input_ids[:, -1:], past_key_values
         )
-
         next_tokens_scores = logits[:, -1, :]
+
+        # SuppressTokensLogitsProcessor
+        next_tokens_scores[:, suppress_tokens] = -float("inf")
+        # SuppressTokensAtBeginLogitsProcessor
+        if input_ids.shape[1] == begin_index:
+            next_tokens_scores[:, begin_suppress_tokens] = -float("inf")
+        # ForceTokensLogitsProcessor
+        generation_idx = input_ids.shape[-1]
+        current_token = force_token_map.get(generation_idx, None)
+        if current_token is not None:
+            next_tokens_scores[:, :] = -float("inf")
+            next_tokens_scores[:, current_token] = 0
 
         # argmax
         next_tokens = np.argmax(next_tokens_scores, axis=-1)
 
+        # finished sentences should have their next token be a padding token
+        next_tokens = next_tokens * unfinished_sequences + pad_token_id * (1 - unfinished_sequences)
+
         # update generated ids, model inputs, and length for next step
         input_ids = np.concatenate([input_ids, next_tokens[:, None]], axis=-1)
-        attention_mask = np.concatenate(
-            [attention_mask, np.ones((attention_mask.shape[0], 1), dtype=int)],
-            axis=-1
-        )
-        inputs_embeds = inputs_embeds[:, :0, :]
 
         # if eos_token was found in one sentence, set sentence to finished
         unfinished_sequences = unfinished_sequences * np.prod(
-            np.tile(next_tokens, (eos_token_id.shape[0], 1)) < eos_token_id[:, None],
+            np.tile(next_tokens, (eos_token_id.shape[0], 1)) != eos_token_id[:, None],
             axis=0
         )
 
@@ -336,9 +243,10 @@ def predict(models, wav):
     else:
         output = net.run(None, {'input_features': input_features})
     last_hidden_state = output[0]
+    last_hidden_state = last_hidden_state.astype(np.float16)
 
-    # net = models['dec']
-    # generated_ids = greedy_search(net, last_hidden_state)
+    net = models['dec']
+    tokens = greedy_search(net, last_hidden_state)
 
     # tokenizer = models['tokenizer']
     # generated_text = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
