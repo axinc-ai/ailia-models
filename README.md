@@ -13,12 +13,14 @@ The collection of pre-trained, state-of-the-art AI models.
 [ailia MODELS tutorial 日本語版](TUTORIAL_jp.md)
 
 # Supported models 
-296 models as of Octorber 27, 2023
+302 models as of November 14, 2023
 
 # Latest update
-- 2023.10.25 Add use_sr option to sber-swap
-- 2023.10.24 Add hifigan
-- 2023.10.20 Add bert_insert_punctuation
+- 023.11.14 Add GFPGAN v1.4
+- 2023.11.09 Add t5_base_japanese_summarization
+- 2023.11.02 Add t5_whisper_medical
+- 2023.10.31 Add imagenet21k, Update weight of dis_seg
+- 2023.10.29 Add fugumt-ja-en, patchcore, 3ddfa, docshadow
 - More information in our [Wiki](https://github.com/axinc-ai/ailia-models/wiki)
 
 ## Action recognition
