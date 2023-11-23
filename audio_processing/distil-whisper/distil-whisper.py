@@ -4,7 +4,7 @@ from typing import List
 from logging import getLogger
 
 import numpy as np
-from transformers import AutoTokenizer
+from transformers import WhisperTokenizer
 import soundfile as sf
 
 # import original modules
@@ -248,11 +248,18 @@ def predict(models, wav):
     net = models['dec']
     tokens = greedy_search(net, last_hidden_state)
 
-    # tokenizer = models['tokenizer']
-    # generated_text = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
-    # generated_text = generated_text[0].strip()
-    #
-    # return generated_text
+    tokenizer = models['tokenizer']
+
+    time_precision = 0.02
+    model_outputs = [{"tokens": tokens}]
+    text, optional = tokenizer._decode_asr(
+        model_outputs,
+        return_timestamps=None,
+        return_language=None,
+        time_precision=time_precision)
+    text = text.strip()
+
+    return text
 
 
 def recognize_from_image(models):
@@ -283,7 +290,7 @@ def recognize_from_image(models):
         else:
             text = predict(models, wav)
 
-    # logger.info(text)
+    logger.info(text)
 
     logger.info('Script finished successfully.')
 
@@ -307,12 +314,12 @@ def main():
         enc_net = onnxruntime.InferenceSession(WEIGHT_ENC_PATH, providers=providers)
         dec_net = onnxruntime.InferenceSession(WEIGHT_DEC_PATH, providers=providers)
 
-    # tokenizer = AutoTokenizer.from_pretrained("tokenizer")
+    tokenizer = WhisperTokenizer.from_pretrained("tokenizer")
 
     models = {
         'enc': enc_net,
         'dec': dec_net,
-        # 'tokenizer': tokenizer,
+        'tokenizer': tokenizer,
     }
 
     recognize_from_image(models)
