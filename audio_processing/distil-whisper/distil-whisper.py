@@ -23,11 +23,11 @@ logger = getLogger(__name__)
 # Parameters
 # ======================
 
-WEIGHT_ENC_PATH = 'encoder_model.onnx'
-WEIGHT_ENC_PB_PATH = 'encoder_model_weights.pb'
-MODEL_ENC_PATH = 'encoder_model.onnx.prototxt'
-WEIGHT_DEC_PATH = 'decoder_model.onnx'
-MODEL_DEC_PATH = 'decoder_model.onnx.prototxt'
+WEIGHT_ENC_PATH = 'distil-large-v2_encoder.onnx'
+WEIGHT_ENC_PB_PATH = 'distil-large-v2_encoder_weights.pb'
+MODEL_ENC_PATH = 'distil-large-v2_encoder.onnx.prototxt'
+WEIGHT_DEC_PATH = 'distil-large-v2_decoder.onnx'
+MODEL_DEC_PATH = 'distil-large-v2_decoder.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/distil-whisper/'
 
 WAV_PATH = 'demo.wav'
@@ -51,14 +51,8 @@ args = update_parser(parser, check_input_type=False)
 
 
 # ======================
-# Secondaty Functions
-# ======================
-
-
-# ======================
 # Main functions
 # ======================
-
 
 def preprocess(wav):
     wav = np.asarray([wav]).T
@@ -249,7 +243,6 @@ def predict(models, wav):
     tokens = greedy_search(net, last_hidden_state)
 
     tokenizer = models['tokenizer']
-
     time_precision = 0.02
     model_outputs = [{"tokens": tokens}]
     text, optional = tokenizer._decode_asr(
