@@ -50,5 +50,5 @@ ONNX opset=11
 
 ## Netron
 
-[distil-large-v2_encoder.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/whisper/distil-large-v2_encoder.onnx.prototxt)  
-[distil-large-v2_decoder.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/whisper/distil-large-v2_decoder.onnx.prototxt)  
+[distil-large-v2_encoder.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/distil-whisper/distil-large-v2_encoder.onnx.prototxt)  
+[distil-large-v2_decoder.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/distil-whisper/distil-large-v2_decoder.onnx.prototxt)  
