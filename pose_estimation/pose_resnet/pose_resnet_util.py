@@ -148,8 +148,8 @@ def compute(net, original_img, offset_x, offset_y, scale_x, scale_y):
     scale = np.array([1, 1], dtype=np.float32)
 
     # BGR format
-    mean = [0.485, 0.456, 0.406]
-    std = [0.229, 0.224, 0.225]
+    mean = [0.406, 0.456, 0.485]
+    std = [0.225, 0.224, 0.229]
     input_data = (input_data/255.0 - mean) / std
     input_data = input_data[np.newaxis, :, :, :].transpose((0, 3, 1, 2))
 
