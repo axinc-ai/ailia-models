@@ -269,7 +269,7 @@ def greedy_search(net, inputs_embeds):
 
         # if eos_token was found in one sentence, set sentence to finished
         unfinished_sequences = unfinished_sequences * np.prod(
-            np.tile(next_tokens, (eos_token_id.shape[0], 1)) < eos_token_id[:, None],
+            np.tile(next_tokens, (eos_token_id.shape[0], 1)) != eos_token_id[:, None],
             axis=0
         )
 
