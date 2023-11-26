@@ -9,7 +9,6 @@ if flg_ffmpeg:
 # hard-coded audio hyperparameters
 SAMPLE_RATE = 16000
 N_FFT = 400
-N_MELS = 80
 HOP_LENGTH = 160
 CHUNK_LENGTH = 30
 N_SAMPLES = CHUNK_LENGTH * SAMPLE_RATE  # 480000: number of samples in a chunk
@@ -49,7 +48,7 @@ def pad_or_trim(array, length=N_SAMPLES, axis=-1):
     return array
 
 
-def mel_filters(n_mels=N_MELS):
+def mel_filters(n_mels: int):
     """
     the mel filterbank matrix for projecting STFT into a Mel spectrogram.
     """
@@ -58,7 +57,7 @@ def mel_filters(n_mels=N_MELS):
     return filters
 
 
-def log_mel_spectrogram(audio, n_mels=N_MELS):
+def log_mel_spectrogram(audio, n_mels: int = 80, padding: int = 0):
     """
     Compute the log-Mel spectrogram of
 
@@ -67,11 +66,15 @@ def log_mel_spectrogram(audio, n_mels=N_MELS):
     audio: np.ndarray
     n_mels: int
         The number of Mel-frequency filters, only 80 is supported
+    padding: int
+        Number of zero samples to pad to the right
 
     Returns
     -------
     A Tensor that contains the Mel spectrogram, shape = (80, n_frames)
     """
+    if padding > 0:
+        audio = np.pad(audio, (0, padding))
     stft = librosa.stft(
         y=audio, n_fft=N_FFT,
         hop_length=HOP_LENGTH,
