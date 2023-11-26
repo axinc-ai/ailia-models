@@ -43,6 +43,10 @@ parser = get_base_parser(
     'Distil-Whisper', WAV_PATH, SAVE_TEXT_PATH, input_ftype='audio'
 )
 parser.add_argument(
+    '--memory_mode', default=-1, type=int,
+    help='memory mode'
+)
+parser.add_argument(
     '--onnx',
     action='store_true',
     help='execute onnxruntime version.'
@@ -110,6 +114,9 @@ def decode(
         encoder_hidden_states: np.ndarray,
         input_ids: np.ndarray,
         past_key_values: List[np.ndarray]):
+    if args.benchmark:
+        start = int(round(time.time() * 1000))
+
     if not args.onnx:
         decoder_output = net.predict([
             input_ids,
@@ -138,6 +145,11 @@ def decode(
                 'past_key_values.1.encoder.value': past_key_values[7],
             }
         )
+
+    if args.benchmark:
+        end = int(round(time.time() * 1000))
+        estimation_time = (end - start)
+        logger.info(f'\tdecoder processing time {estimation_time} ms')
 
     logits, new_past_key_values = decoder_output[0], decoder_output[1:]
 
@@ -231,13 +243,21 @@ def greedy_search(net, encoder_hidden_states):
 def predict(models, wav):
     input_features = preprocess(wav)
 
+    if args.benchmark:
+        start = int(round(time.time() * 1000))
+
     net = models['enc']
     if not args.onnx:
-        output = net.predict([input_features])
+        output = net.run(np.expand_dims(input_features[0], axis = 0))
     else:
         output = net.run(None, {'input_features': input_features})
     last_hidden_state = output[0]
     last_hidden_state = last_hidden_state.astype(np.float16)
+
+    if args.benchmark:
+        end = int(round(time.time() * 1000))
+        estimation_time = (end - start)
+        logger.info(f'\tencoder processing time {estimation_time} ms')
 
     net = models['dec']
     tokens = greedy_search(net, last_hidden_state)
@@ -255,7 +275,7 @@ def predict(models, wav):
     return text
 
 
-def recognize_from_image(models):
+def recognize_from_audio(models):
     # input image loop
     for audio_path in args.input:
         logger.info(audio_path)
@@ -265,23 +285,16 @@ def recognize_from_image(models):
 
         # inference
         logger.info('Start inference...')
+
         if args.benchmark:
-            logger.info('BENCHMARK mode')
-            total_time_estimation = 0
-            for i in range(args.benchmark_count):
-                start = int(round(time.time() * 1000))
-                text = predict(models, wav)
-                end = int(round(time.time() * 1000))
-                estimation_time = (end - start)
+            start = int(round(time.time() * 1000))
 
-                # Logging
-                logger.info(f'\tailia processing estimation time {estimation_time} ms')
-                if i != 0:
-                    total_time_estimation = total_time_estimation + estimation_time
+        text = predict(models, wav)
 
-            logger.info(f'\taverage time estimation {total_time_estimation / (args.benchmark_count - 1)} ms')
-        else:
-            text = predict(models, wav)
+        if args.benchmark:
+            end = int(round(time.time() * 1000))
+            estimation_time = (end - start)
+            logger.info(f'\ttotal processing time {estimation_time} ms')
 
     logger.info(text)
 
@@ -298,8 +311,14 @@ def main():
 
     # initialize
     if not args.onnx:
-        enc_net = ailia.Net(MODEL_ENC_PATH, WEIGHT_ENC_PATH, env_id=env_id)
-        dec_net = ailia.Net(MODEL_DEC_PATH, WEIGHT_DEC_PATH, env_id=env_id)
+        if args.memory_mode == -1:
+            memory_mode = ailia.get_memory_mode(
+                reduce_constant=True, ignore_input_with_initializer=True,
+                reduce_interstage=False, reuse_interstage=True)
+        else:
+            memory_mode = args.memory_mode
+        enc_net = ailia.Net(MODEL_ENC_PATH, WEIGHT_ENC_PATH, env_id=env_id, memory_mode=memory_mode)
+        dec_net = ailia.Net(MODEL_DEC_PATH, WEIGHT_DEC_PATH, env_id=env_id, memory_mode=memory_mode)
     else:
         import onnxruntime
         cuda = 0 < ailia.get_gpu_environment_id()
@@ -315,7 +334,7 @@ def main():
         'tokenizer': tokenizer,
     }
 
-    recognize_from_image(models)
+    recognize_from_audio(models)
 
 
 if __name__ == '__main__':
