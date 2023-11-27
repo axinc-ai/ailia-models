@@ -276,7 +276,8 @@ def summarize(model):
     else:
         #prediction = predict(model, input_text)
         out, _ = model.estimate(input_text, max_length = 512, top_p = 0.93, repetition_penalty=1.5)
-        logger.info(f'summarization of input text: {out}')
+        logger.info('summarization of input text:')
+        logger.info(f'{out}')
 
         # save output        
         if args.savepath is not None:
