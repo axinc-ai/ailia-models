@@ -56,7 +56,15 @@ parser.add_argument(
     help="Option to use onnxrutime to run or not."
 )
 
+parser.add_argument(
+    '--seed', type=int,
+    help='random seed'
+)
+
 args = update_parser(parser, check_input_type=False)
+
+if args.seed:
+    np.random.seed(args.seed)
 
 # ======================
 # Helper functions
