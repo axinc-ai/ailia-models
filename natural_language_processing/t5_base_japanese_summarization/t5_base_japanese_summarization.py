@@ -56,7 +56,15 @@ parser.add_argument(
     help="Option to use onnxrutime to run or not."
 )
 
+parser.add_argument(
+    '--seed', type=int,
+    help='random seed'
+)
+
 args = update_parser(parser, check_input_type=False)
+
+if args.seed:
+    np.random.seed(args.seed)
 
 # ======================
 # Helper functions
@@ -268,7 +276,8 @@ def summarize(model):
     else:
         #prediction = predict(model, input_text)
         out, _ = model.estimate(input_text, max_length = 512, top_p = 0.93, repetition_penalty=1.5)
-        logger.info(f'summarization of input text: {out}')
+        logger.info('summarization of input text:')
+        logger.info(f'{out}')
 
         # save output        
         if args.savepath is not None:

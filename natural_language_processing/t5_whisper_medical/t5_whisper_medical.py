@@ -282,7 +282,7 @@ def main(args):
             logger.info("%s", most_plausible_title)
             save_path = get_savepath(args.savepath, input_path)
             with open(save_path, "w") as fo:
-                fo.write(most_plausible_title)
+                fo.write(most_plausible_title + "\n")
 
 
 if __name__ == '__main__':

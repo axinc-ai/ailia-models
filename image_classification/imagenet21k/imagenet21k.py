@@ -1,3 +1,4 @@
+import platform
 import sys
 import time
 import numpy as np
@@ -91,7 +92,7 @@ def post_process(logits):
             labels.append(top_class_description)
             probs.append(top1_prob)
             idx.append(top_class_number)
-    return np.array([idx,labels, probs])
+    return [np.array(idx), np.array(labels), np.array(probs)]
 
 def plot_results(input_image,results, top_k=MAX_CLASS_COUNT, logging=True):
     x = RECT_MARGIN
