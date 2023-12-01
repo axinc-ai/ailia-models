@@ -117,6 +117,26 @@ apt install fonts-ipaexfont
 
 <br/>
 
+## PDF support (macOS only)
+
+By adding the PDF option, it is possible to embed OCR'd text into a PDF with only images.
+
+To use this function, pypdf2 is required.
+
+```
+pip3 install pypdf2 reportlab
+brew install poppler
+pip3 install pdf2image
+```
+
+Download font from https://fonts.google.com/noto/specimen/Noto+Sans+JP and place to `NotoSansJP-Medium.ttf`.
+
+Here are some examples of how to use the command.
+
+```
+python3 paddleocr.py --pdf input.pdf -s output.pdf -c server
+```
+
 ## Reference
 
 [PaddleOCR : Awesome multilingual OCR toolkits based on PaddlePaddle](https://github.com/PaddlePaddle/PaddleOCR)

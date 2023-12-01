@@ -1332,7 +1332,8 @@ def recognize_from_pdf(config, text_sys):
     pdfmetrics.registerFont(TTFont("japanese_font", "NotoSansJP-Medium.ttf"))
     
     input_pdf_path = Path(args.pdf)
-    pages = convert_from_path(str(input_pdf_path), 150, poppler_path='/usr/local/Cellar/poppler/23.06.0/bin/')
+    poppler_path = '/usr/local/Cellar/poppler/23.06.0/bin/'
+    pages = convert_from_path(str(input_pdf_path), 150, poppler_path=poppler_path)
 
     existing_pdf = PdfReader(open("input.pdf", 'rb'), strict=False)
     output = PdfWriter()
