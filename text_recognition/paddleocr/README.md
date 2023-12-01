@@ -129,7 +129,7 @@ brew install poppler
 pip3 install pdf2image
 ```
 
-Download font from https://fonts.google.com/noto/specimen/Noto+Sans+JP and place to `NotoSansJP-Medium.ttf`.
+Download font from https://fonts.google.com/noto/specimen/Noto+Sans+JP and place `NotoSansJP-Medium.ttf` to current folder.
 
 Here are some examples of how to use the command.
 
