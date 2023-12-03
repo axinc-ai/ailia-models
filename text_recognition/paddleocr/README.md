@@ -131,10 +131,10 @@ pip3 install pdf2image
 
 Download font from https://fonts.google.com/noto/specimen/Noto+Sans+JP and place `NotoSansJP-Medium.ttf` to current folder.
 
-Here are some examples of how to use the command.
+Here are some examples of how to use the command. Please specify the path of the installed poppler.
 
 ```
-python3 paddleocr.py --pdf input.pdf -s output.pdf -c server
+python3 paddleocr.py --pdf input.pdf -s output.pdf -c server --poppler_path '/usr/local/Cellar/poppler/23.06.0/bin/'
 ```
 
 ## Reference

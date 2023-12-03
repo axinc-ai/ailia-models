@@ -112,6 +112,10 @@ parser.add_argument(
     help='pdf file path'
 )
 parser.add_argument(
+    '-pl', '--poppler_path', default='/usr/local/Cellar/poppler/23.06.0/bin/',
+    help='poppler install path'
+)
+parser.add_argument(
     '-w', '--write_results',
     action='store_true',
     help='Flag to output results to file.'
@@ -1329,13 +1333,16 @@ def recognize_from_pdf(config, text_sys):
     # https://fonts.google.com/noto/specimen/Noto+Sans+JP
     from reportlab.pdfbase import pdfmetrics
     from reportlab.pdfbase.ttfonts import TTFont
+    if not os.path.isfile("NotoSansJP-Medium.ttf"):
+        logger.error("NotoSansJP-Medium.ttf not found. Please put NotoSansJP-Medium.ttf to current directory.")
+        return
     pdfmetrics.registerFont(TTFont("japanese_font", "NotoSansJP-Medium.ttf"))
     
     input_pdf_path = Path(args.pdf)
-    poppler_path = '/usr/local/Cellar/poppler/23.06.0/bin/'
+    poppler_path = args.poppler_path
     pages = convert_from_path(str(input_pdf_path), 150, poppler_path=poppler_path)
 
-    existing_pdf = PdfReader(open("input.pdf", 'rb'), strict=False)
+    existing_pdf = PdfReader(open(input_pdf_path, 'rb'), strict=False)
     output = PdfWriter()
     output_txt_only = PdfWriter()
 
