@@ -43,6 +43,10 @@ parser = get_base_parser(
     'Distil-Whisper', WAV_PATH, SAVE_TEXT_PATH, input_ftype='audio'
 )
 parser.add_argument(
+    '--chunk_length', type=int, default=None,
+    help='the chunk size for chunking.'
+)
+parser.add_argument(
     '--memory_mode', default=-1, type=int,
     help='memory mode'
 )
@@ -291,7 +295,7 @@ def predict(models, wav, chunk_length_s=0):
         if args.benchmark:
             start = int(round(time.time() * 1000))
 
-        input_features = item["input_features"]
+        input_features = item.pop("input_features")
 
         net = models['enc']
         if not args.onnx:
@@ -309,7 +313,17 @@ def predict(models, wav, chunk_length_s=0):
         net = models['dec']
         tokens = greedy_search(net, last_hidden_state)
 
-        model_outputs.append({"tokens": tokens})
+        item["tokens"] = tokens
+
+        if "stride" in item:
+            chunk_len, stride_left, stride_right = item["stride"]
+            # Go back in seconds
+            chunk_len /= SAMPLE_RATE
+            stride_left /= SAMPLE_RATE
+            stride_right /= SAMPLE_RATE
+            item["stride"] = chunk_len, stride_left, stride_right
+
+        model_outputs.append(item)
 
     tokenizer = models['tokenizer']
     time_precision = 0.02
@@ -324,6 +338,8 @@ def predict(models, wav, chunk_length_s=0):
 
 
 def recognize_from_audio(models):
+    chunk_length_s = args.chunk_length
+
     # input image loop
     for audio_path in args.input:
         logger.info(audio_path)
@@ -337,7 +353,7 @@ def recognize_from_audio(models):
         if args.benchmark:
             start = int(round(time.time() * 1000))
 
-        text = predict(models, wav)
+        text = predict(models, wav, chunk_length_s=chunk_length_s)
 
         if args.benchmark:
             end = int(round(time.time() * 1000))
