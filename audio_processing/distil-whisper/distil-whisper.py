@@ -43,6 +43,10 @@ parser = get_base_parser(
     'Distil-Whisper', WAV_PATH, SAVE_TEXT_PATH, input_ftype='audio'
 )
 parser.add_argument(
+    '--chunk_length', type=int, default=None,
+    help='the chunk size for chunking.'
+)
+parser.add_argument(
     '--memory_mode', default=-1, type=int,
     help='memory mode'
 )
@@ -55,28 +59,27 @@ args = update_parser(parser, check_input_type=False)
 
 
 # ======================
-# Main functions
+# Secondaty Functions
 # ======================
 
-def preprocess(wav):
-    wav = np.asarray([wav]).T
+def feature_extractor(raw_speech):
+    raw_speech = np.asarray([raw_speech]).T
 
     max_length = 480000
-    wav = wav[:max_length]
+    raw_speech = raw_speech[:max_length]
 
-    if len(wav) < max_length:
-        difference = max_length - len(wav)
-        wav = np.pad(
-            wav, ((0, difference), (0, 0)), "constant",
+    if len(raw_speech) < max_length:
+        difference = max_length - len(raw_speech)
+        raw_speech = np.pad(
+            raw_speech, ((0, difference), (0, 0)), "constant",
         )
 
-    wav = np.expand_dims(wav, axis=0)
-    wav = wav.transpose(2, 0, 1)
+    raw_speech = np.expand_dims(raw_speech, axis=0)
+    raw_speech = raw_speech.transpose(2, 0, 1)
 
     n_fft = 400
     hop_length = 160
     feature_size = 80
-    sampling_rate = 16000
 
     if not hasattr(preprocess, 'mel_filters'):
         preprocess.mel_filters = \
@@ -85,13 +88,13 @@ def preprocess(wav):
                 num_mel_filters=feature_size,
                 min_frequency=0.0,
                 max_frequency=8000.0,
-                sampling_rate=sampling_rate,
+                sampling_rate=SAMPLE_RATE,
                 norm="slaney",
                 mel_scale="slaney",
             )
 
     features = []
-    for i, waveform in enumerate(wav[0]):
+    for i, waveform in enumerate(raw_speech[0]):
         log_spec = spectrogram(
             waveform,
             window_function(n_fft, "hann"),
@@ -106,7 +109,51 @@ def preprocess(wav):
 
         features.append(log_spec)
 
+    features = np.array(features, dtype=np.float32)
+
     return features
+
+
+def chunk_iter(inputs, chunk_len, stride_left, stride_right):
+    inputs_len = inputs.shape[0]
+    step = chunk_len - stride_left - stride_right
+    for chunk_start_idx in range(0, inputs_len, step):
+        chunk_end_idx = chunk_start_idx + chunk_len
+        chunk = inputs[chunk_start_idx:chunk_end_idx]
+        features = feature_extractor(chunk)
+
+        _stride_left = 0 if chunk_start_idx == 0 else stride_left
+        # all right strides must be full, otherwise it is the last item
+        is_last = chunk_end_idx > inputs_len if stride_right > 0 else chunk_end_idx >= inputs_len
+        _stride_right = 0 if is_last else stride_right
+
+        chunk_len = chunk.shape[0]
+        stride = (chunk_len, _stride_left, _stride_right)
+
+        if chunk.shape[0] > _stride_left:
+            yield {"input_features": features, "stride": stride}
+        if is_last:
+            break
+
+
+# ======================
+# Main functions
+# ======================
+
+def preprocess(inputs, chunk_length_s=0):
+    if chunk_length_s:
+        stride_length_s = chunk_length_s / 6
+
+        chunk_len = chunk_length_s * SAMPLE_RATE
+        stride_left = stride_right = int(round(stride_length_s * SAMPLE_RATE))
+
+        for item in chunk_iter(
+                inputs, chunk_len, stride_left, stride_right,
+        ):
+            yield item
+    else:
+        features = feature_extractor(inputs)
+        yield {"input_features": features}
 
 
 def decode(
@@ -240,31 +287,46 @@ def greedy_search(net, encoder_hidden_states):
     return input_ids
 
 
-def predict(models, wav):
-    input_features = preprocess(wav)
+def predict(models, wav, chunk_length_s=0):
+    processed = preprocess(wav, chunk_length_s)
 
-    if args.benchmark:
-        start = int(round(time.time() * 1000))
+    model_outputs = []
+    for item in processed:
+        if args.benchmark:
+            start = int(round(time.time() * 1000))
 
-    net = models['enc']
-    if not args.onnx:
-        output = net.run(np.expand_dims(input_features[0], axis = 0))
-    else:
-        output = net.run(None, {'input_features': input_features})
-    last_hidden_state = output[0]
-    last_hidden_state = last_hidden_state.astype(np.float16)
+        input_features = item.pop("input_features")
 
-    if args.benchmark:
-        end = int(round(time.time() * 1000))
-        estimation_time = (end - start)
-        logger.info(f'\tencoder processing time {estimation_time} ms')
+        net = models['enc']
+        if not args.onnx:
+            output = net.run(input_features)
+        else:
+            output = net.run(None, {'input_features': input_features})
+        last_hidden_state = output[0]
+        last_hidden_state = last_hidden_state.astype(np.float16)
 
-    net = models['dec']
-    tokens = greedy_search(net, last_hidden_state)
+        if args.benchmark:
+            end = int(round(time.time() * 1000))
+            estimation_time = (end - start)
+            logger.info(f'\tencoder processing time {estimation_time} ms')
+
+        net = models['dec']
+        tokens = greedy_search(net, last_hidden_state)
+
+        item["tokens"] = tokens
+
+        if "stride" in item:
+            chunk_len, stride_left, stride_right = item["stride"]
+            # Go back in seconds
+            chunk_len /= SAMPLE_RATE
+            stride_left /= SAMPLE_RATE
+            stride_right /= SAMPLE_RATE
+            item["stride"] = chunk_len, stride_left, stride_right
+
+        model_outputs.append(item)
 
     tokenizer = models['tokenizer']
     time_precision = 0.02
-    model_outputs = [{"tokens": tokens}]
     text, optional = tokenizer._decode_asr(
         model_outputs,
         return_timestamps=None,
@@ -276,6 +338,8 @@ def predict(models, wav):
 
 
 def recognize_from_audio(models):
+    chunk_length_s = args.chunk_length
+
     # input image loop
     for audio_path in args.input:
         logger.info(audio_path)
@@ -289,7 +353,7 @@ def recognize_from_audio(models):
         if args.benchmark:
             start = int(round(time.time() * 1000))
 
-        text = predict(models, wav)
+        text = predict(models, wav, chunk_length_s=chunk_length_s)
 
         if args.benchmark:
             end = int(round(time.time() * 1000))
