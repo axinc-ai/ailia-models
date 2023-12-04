@@ -62,7 +62,7 @@ The collection of pre-trained, state-of-the-art AI models.
 | [crepe](/audio_processing/crepe/) | [torchcrepe](https://github.com/maxrmorrison/torchcrepe) | Pytorch | 1.2.10 and later | [JP](https://medium.com/axinc/crepe-%E9%AB%98%E7%B2%BE%E5%BA%A6%E3%81%AA%E3%83%94%E3%83%83%E3%83%81%E6%8E%A8%E5%AE%9A%E3%82%92%E8%A1%8C%E3%81%86%E6%A9%9F%E6%A2%B0%E5%AD%A6%E7%BF%92%E3%83%A2%E3%83%87%E3%83%AB-dfb09b5e1f6b) |
 | [vall-e-x](/audio_processing/vall-e-x/) | [VALL-E-X](https://github.com/Plachtaa/VALL-E-X) | Pytorch | 1.2.15 and later |  |
 | [hifigan](/audio_processing/hifigan/) | [HiFi-GAN](https://github.com/jik876/hifi-gan) | Pytorch | 1.2.9 and later |  |
-| [distli-whisper](/audio_processing/distli-whisper/) | [Hugging Face - Distil-Whisper](https://github.com/huggingface/distil-whisper) | Pytorch | 1.2.16 and later | |
+| [distil-whisper](/audio_processing/distil-whisper/) | [Hugging Face - Distil-Whisper](https://github.com/huggingface/distil-whisper) | Pytorch | 1.2.16 and later | |
 
 
 ## Background removal
