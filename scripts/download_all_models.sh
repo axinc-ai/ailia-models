@@ -25,6 +25,7 @@ cd ../../audio_processing/rvc/; python3 rvc.py ${OPTION}
 cd ../../audio_processing/crepe/; python3 crepe.py ${OPTION}
 cd ../../audio_processing/vall-e-x/; python3 vall-e-x.py ${OPTION}
 cd ../../audio_processing/hifigan/; python3 hifigan.py ${OPTION}
+cd ../../audio_processing/distli-whisper/; python3 distli-whisper.py ${OPTION}
 cd ../../background_ramoval/deep-image-matting; python3 deep-image-matting.py ${OPTION}
 cd ../../background_ramoval/u2net; python3 u2net.py ${OPTION}
 cd ../../background_ramoval/u2net; python3 u2net.py -a small ${OPTION}
