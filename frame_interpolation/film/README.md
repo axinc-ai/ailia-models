@@ -57,4 +57,4 @@ ONNX opset=12
 
 ## Netron
 
-[film_net.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/film/film.onnx.prototxt)  
+[film_net.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/film/film_net.onnx.prototxt)  
