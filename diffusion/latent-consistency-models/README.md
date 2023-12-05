@@ -61,6 +61,6 @@ ONNX opset=14
 
 ## Netron
 
-[text_encoder.onnx.prototxt](https://storage.googleapis.com/ailia-models/latent-consistency-models/text_encoder.onnx.prototxt)  
-[unet.onnx.prototxt](https://storage.googleapis.com/ailia-models/latent-consistency-models/unet.onnx.prototxt)  
-[vae_encoder.onnx.prototxt](https://storage.googleapis.com/ailia-models/latent-consistency-models/vae_encoder.onnx.prototxt)  
+[text_encoder.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/latent-consistency-models/text_encoder.onnx.prototxt)  
+[unet.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/latent-consistency-models/unet.onnx.prototxt)  
+[vae_encoder.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/latent-consistency-models/vae_encoder.onnx.prototxt)  
