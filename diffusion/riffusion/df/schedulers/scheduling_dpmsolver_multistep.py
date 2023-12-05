@@ -41,13 +41,13 @@ class DPMSolverMultistepScheduler(ConfigMixin):
             variance_type: Optional[str] = None,
     ):
         if trained_betas is not None:
-            self.betas = np.array(trained_betas, dtype=np.float)
+            self.betas = np.array(trained_betas, dtype=np.float64)
         elif beta_schedule == "linear":
-            self.betas = np.linspace(beta_start, beta_end, num_train_timesteps, dtype=np.float)
+            self.betas = np.linspace(beta_start, beta_end, num_train_timesteps, dtype=np.float64)
         elif beta_schedule == "scaled_linear":
             # this schedule is very specific to the latent diffusion model.
             self.betas = (
-                    np.linspace(beta_start ** 0.5, beta_end ** 0.5, num_train_timesteps, dtype=np.float) ** 2
+                    np.linspace(beta_start ** 0.5, beta_end ** 0.5, num_train_timesteps, dtype=np.float64) ** 2
             )
         else:
             raise NotImplementedError(f"{beta_schedule} does is not implemented for {self.__class__}")
