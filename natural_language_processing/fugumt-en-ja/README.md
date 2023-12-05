@@ -1,4 +1,4 @@
-# FuguMT
+# FuguMT  (en-ja)
 
 ## Input
 

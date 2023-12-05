@@ -8,7 +8,7 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath  # noqa
+from arg_utils import get_base_parser, update_parser, get_savepath  # noqa
 from model_utils import check_and_download_models  # noqa
 from image_utils import normalize_image  # noqa
 from detector_utils import load_image  # noqa
@@ -26,8 +26,6 @@ logger = getLogger(__name__)
 # Parameters
 # ======================
 
-WEIGHT_PATH = 'GFPGANv1.3.onnx'
-MODEL_PATH = 'GFPGANv1.3.onnx.prototxt'
 WEIGHT_DET_PATH = "retinaface_resnet50.onnx"
 MODEL_DET_PATH = "retinaface_resnet50.onnx.prototxt"
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/gfpgan/'
@@ -62,7 +60,20 @@ parser.add_argument(
     '--realesrgan', action='store_true',
     help='Use realesrgan module.'
 )
+parser.add_argument(
+    '-m', '--model_name',
+    default='v1.3',
+    help=['v1.3', 'v1.4']
+)
 args = update_parser(parser)
+
+
+# ======================
+# Model selection
+# ======================
+
+WEIGHT_PATH = 'GFPGAN'+args.model_name+'.onnx'
+MODEL_PATH = 'GFPGAN'+args.model_name+'.onnx.prototxt'
 
 
 # ======================
@@ -216,6 +227,7 @@ def recognize_from_video(models):
         # inference
         img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         restored_img = predict(models, img)
+        restored_img = cv2.cvtColor(restored_img, cv2.COLOR_RGB2BGR)
 
         # show
         cv2.imshow('frame', restored_img)

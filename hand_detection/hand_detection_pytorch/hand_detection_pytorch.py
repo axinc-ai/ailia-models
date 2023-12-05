@@ -3,6 +3,7 @@ import time
 
 import ailia
 import cv2
+import json
 
 import hand_detection_pytorch_utils
 
@@ -14,7 +15,7 @@ from logging import getLogger  # noqa: E402
 import webcamera_utils  # noqa: E402
 from image_utils import imread  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
-from utils import get_base_parser, get_savepath, update_parser  # noqa: E402
+from arg_utils import get_base_parser, get_savepath, update_parser  # noqa: E402
 
 logger = getLogger(__name__)
 
@@ -41,7 +42,23 @@ parser = get_base_parser(
     IMAGE_PATH,
     SAVE_IMAGE_PATH,
 )
+parser.add_argument(
+    '-w', '--write_json',
+    action='store_true',
+    help='Flag to output results to json file.'
+)
 args = update_parser(parser)
+
+
+def save_result_json(json_path, dets):
+    results = []
+    for i in range(dets.shape[0]):
+        xyxy = dets[i][0:4].tolist()
+        results.append({
+            'x1': xyxy[0], 'y1': xyxy[1], 'x2': xyxy[2], 'y2': xyxy[3]
+        })
+    with open(json_path, 'w') as f:
+        json.dump(results, f, indent=2)
 
 
 # ======================
@@ -86,6 +103,11 @@ def recognize_from_image():
         savepath = get_savepath(args.savepath, image_path)
         logger.info(f'saved at : {savepath}')
         cv2.imwrite(savepath, to_show)
+
+        if args.write_json:
+            json_file = '%s.json' % savepath.rsplit('.', 1)[0]
+            save_result_json(json_file, dets)
+
     logger.info('Script finished successfully.')
 
 

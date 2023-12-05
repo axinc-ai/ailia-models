@@ -10,9 +10,9 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
+from arg_utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
-from detector_utils import plot_results, load_image  # noqa: E402
+from detector_utils import plot_results, load_image, write_predictions  # noqa: E402
 from webcamera_utils import get_capture, get_writer,\
     calc_adjust_fsize  # noqa: E402
 
@@ -70,6 +70,11 @@ parser.add_argument(
     '-dw', '--detection_width',
     default=DETECTION_WIDTH,
     help='The detection width and height for yolo. (default: 416)'
+)
+parser.add_argument(
+    '-w', '--write_json',
+    action='store_true',
+    help='Flag to output results to json file.'
 )
 args = update_parser(parser)
 
@@ -175,10 +180,14 @@ def recognize_from_image(filename, detector):
 
     # plot result
     res_img = plot_results(detect_object, img, category)
-    # cv2.imwrite(args.savepath, res_img)
     savepath = get_savepath(args.savepath, filename)
     logger.info(f'saved at : {savepath}')
     cv2.imwrite(savepath, res_img)
+
+    # write prediction
+    if args.write_json:
+        json_file = '%s.json' % savepath.rsplit('.', 1)[0]
+        write_predictions(json_file, detect_object, img, category=category, file_type='json')
 
 
 def recognize_from_video(video, detector):
@@ -186,16 +195,9 @@ def recognize_from_video(video, detector):
 
     # create video writer if savepath is specified as video format
     if args.savepath != SAVE_IMAGE_PATH:
-        ailia_input_w = detector.get_input_shape()[3]
-        ailia_input_h = detector.get_input_shape()[2]
-
         f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
         f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
-        save_h, save_w = calc_adjust_fsize(
-            f_h, f_w, ailia_input_h, ailia_input_w
-        )
-        # save_w * 2: we stack source frame and estimated heatmap
-        writer = get_writer(args.savepath, save_h, save_w * 2)
+        writer = get_writer(args.savepath, f_h, f_w)
     else:
         writer = None
 

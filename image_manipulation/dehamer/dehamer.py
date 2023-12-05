@@ -9,7 +9,7 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath  # noqa
+from arg_utils import get_base_parser, update_parser, get_savepath  # noqa
 from model_utils import check_and_download_models  # noqa
 from image_utils import normalize_image  # noqa
 from detector_utils import load_image  # noqa
@@ -224,11 +224,10 @@ def main():
 
     # initialize
     if not args.onnx:
-        # memory_mode = ailia.get_memory_mode(
-        # reduce_constant=True, ignore_input_with_initializer=True,
-        # reduce_interstage=False, reuse_interstage=True)
-        # net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id, memory_mode=memory_mode)
-        net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
+        memory_mode = ailia.get_memory_mode(
+            reduce_constant=True, ignore_input_with_initializer=True,
+            reduce_interstage=False, reuse_interstage=True)
+        net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id, memory_mode=memory_mode)
     else:
         import onnxruntime
         net = onnxruntime.InferenceSession(WEIGHT_PATH)

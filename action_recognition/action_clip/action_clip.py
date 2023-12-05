@@ -15,7 +15,7 @@ from logging import getLogger  # noqa: E402
 from image_utils import imread, load_image  # noqa: E402
 from math_utils import softmax
 from model_utils import check_and_download_models  # noqa: E402
-from utils import get_base_parser, get_savepath, update_parser  # noqa: E402
+from arg_utils import get_base_parser, get_savepath, update_parser  # noqa: E402
 from webcamera_utils import get_capture, get_writer  # noqa: E402
 
 logger = getLogger(__name__)
@@ -51,6 +51,10 @@ parser.add_argument(
 parser.add_argument(
     '-m', '--model_type', default='vit-32-8f', choices=('vit-32-8f'),
     help='model type'
+)
+parser.add_argument(
+    '--seed', default=None, type=int,
+    help='random seed'
 )
 args = update_parser(parser)
 
@@ -282,4 +286,6 @@ def main():
 
 
 if __name__ == '__main__':
+    if args.seed != None:
+        np.random.seed(args.seed)
     main()

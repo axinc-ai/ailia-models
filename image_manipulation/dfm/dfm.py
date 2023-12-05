@@ -5,12 +5,13 @@ import io
 import numpy as np
 import cv2
 import matplotlib.pyplot as plt
+import json
 
 import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath  # noqa
+from arg_utils import get_base_parser, update_parser, get_savepath  # noqa
 from model_utils import check_and_download_models  # noqa
 from image_utils import normalize_image  # noqa
 from detector_utils import load_image  # noqa
@@ -46,6 +47,11 @@ parser.add_argument(
 parser.add_argument(
     '-kp', '--draw-keypoints', action='store_true',
     help='Save keypoints result.'
+)
+parser.add_argument(
+    '-w', '--write_json',
+    action='store_true',
+    help='Flag to output results to json file.'
 )
 args = update_parser(parser)
 
@@ -276,6 +282,15 @@ def plot_keypoints(img, pts):
     return img
 
 
+def save_result_json(json_path, keypoints0, keypoints1):
+    matches = []
+    for i, (x1, y1) in enumerate(keypoints0):
+        x2, y2 = keypoints1[i]
+        matches.append({'x1': x1, 'y1': y1, 'x2': x2, 'y2': y2})
+    with open(json_path, 'w') as f:
+        json.dump({'matches': matches}, f, indent=2)
+
+
 # ======================
 # Main functions
 # ======================
@@ -445,6 +460,10 @@ def recognize_from_image(net):
         savepath = get_savepath(args.savepath, image_path, ext='.png')
         logger.info(f'saved at : {savepath}')
         cv2.imwrite(savepath, res_img)
+
+        if args.write_json:
+            json_file = '%s.json' % savepath.rsplit('.', 1)[0]
+            save_result_json(json_file, keypoints0, keypoints1)
 
     logger.info('Script finished successfully.')
 

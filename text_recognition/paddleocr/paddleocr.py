@@ -12,6 +12,7 @@ from logging import getLogger
 import cv2
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
+import json
 
 import ailia
 
@@ -20,7 +21,7 @@ sys.path.append('../../util')
 import webcamera_utils  # noqa: E402
 from image_utils import imread  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
-from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
+from arg_utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 
 logger = getLogger(__name__)
 
@@ -105,6 +106,11 @@ parser.add_argument(
 parser.add_argument(
     '-d', '--det_model', default='db_res18', choices=('db_res18', 'r50_icdar15', 'r50_trtd'),
     help='det model type'
+)
+parser.add_argument(
+    '-w', '--write_results',
+    action='store_true',
+    help='Flag to output results to file.'
 )
 args = update_parser(parser)
 
@@ -1181,6 +1187,23 @@ def draw_ocr_box_txt(image,
     return np.array(img_show)
 
 
+def output_result_json(file_name, image, boxes, txts, scores=None):
+    h, w = image.height, image.width
+    results = []
+    for idx, (box, txt) in enumerate(zip(boxes, txts)):
+        score = scores[idx] if scores is not None else None
+        box_corner_xy = [
+            float(box[0][0]), float(box[0][1]), float(box[1][0]), float(box[1][1]),
+            float(box[2][0]), float(box[2][1]), float(box[3][0]), float(box[3][1])
+        ]
+        if score is not None:
+            results.append({'box': box_corner_xy, 'txt': txt, 'score': score})
+        else:
+            results.append({'box': box_corner_xy, 'txt': txt})
+    with open(file_name, 'w', encoding='utf-8') as f:
+        json.dump(results, f, indent=2, ensure_ascii=False)
+
+
 def adjust_half_and_full(txts):
     # loop of txts
     for i_txt in range(len(txts)):
@@ -1222,6 +1245,11 @@ def recognize_from_image(config, text_sys):
             bbox_padding=config['rec_bbox_padding'])
         savepath = get_savepath(args.savepath, img_path)
         cv2.imwrite(savepath, draw_img[:, :, ::-1])
+
+        # write results
+        if args.write_results:
+            json_file = '%s.json' % savepath.rsplit('.', 1)[0]
+            output_result_json(json_file, image, boxes, txts, scores=None)
 
     logger.info('finished process and write result to %s!' % args.savepath)
 
