@@ -21,7 +21,7 @@ LANGUAGES = {
     "hi": "hindi",
     "fi": "finnish",
     "vi": "vietnamese",
-    "iw": "hebrew",
+    "he": "hebrew",
     "uk": "ukrainian",
     "el": "greek",
     "ms": "malay",
@@ -100,6 +100,7 @@ LANGUAGES = {
     "ba": "bashkir",
     "jw": "javanese",
     "su": "sundanese",
+    "yue": "cantonese",
 }
 
 # language code lookup by name, with a few language aliases
@@ -116,4 +117,5 @@ TO_LANGUAGE_CODE = {
     "moldovan": "ro",
     "sinhalese": "si",
     "castilian": "es",
+    "mandarin": "zh",
 }
