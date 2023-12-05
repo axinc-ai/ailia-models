@@ -55,8 +55,7 @@ args = update_parser(parser)
 WEIGHT_PATH = args.arch + '.onnx'
 MODEL_PATH =  args.arch + '.onnx.prototxt'
 
-BLUR_IMAGE_WIDTH = 896
-BLUR_IMAGE_HEIGHT = 504
+BLUR_IMAGE_MIN_WIDTH = 384
 
 
 # ======================
@@ -88,7 +87,11 @@ def tensor2img(tensor, rgb2bgr=True, out_type=np.uint8, min_max=(0, 1)):
 
 def preprocess(img):
     if args.arch in BLUR_LISTS:
-        img = cv2.resize(img, (BLUR_IMAGE_WIDTH, BLUR_IMAGE_HEIGHT))
+        if img.shape[0] < BLUR_IMAGE_MIN_WIDTH or img.shape[1] < BLUR_IMAGE_MIN_WIDTH:
+            if img.shape[0] < img.shape[1]:
+                img = cv2.resize(img, ((int)(img.shape[1] / img.shape[0] * BLUR_IMAGE_MIN_WIDTH), BLUR_IMAGE_MIN_WIDTH))
+            else:
+                img = cv2.resize(img, (BLUR_IMAGE_MIN_WIDTH, (int)(img.shape[0] / img.shape[1] * BLUR_IMAGE_MIN_WIDTH)))
 
     imgs = img.astype(np.float32) /255.0
     
