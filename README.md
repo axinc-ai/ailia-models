@@ -13,12 +13,14 @@ The collection of pre-trained, state-of-the-art AI models.
 [ailia MODELS tutorial 日本語版](TUTORIAL_jp.md)
 
 # Supported models 
-296 models as of Octorber 27, 2023
+302 models as of November 14, 2023
 
 # Latest update
-- 2023.10.25 Add use_sr option to sber-swap
-- 2023.10.24 Add hifigan
-- 2023.10.20 Add bert_insert_punctuation
+- 023.11.14 Add GFPGAN v1.4
+- 2023.11.09 Add t5_base_japanese_summarization
+- 2023.11.02 Add t5_whisper_medical
+- 2023.10.31 Add imagenet21k, Update weight of dis_seg
+- 2023.10.29 Add fugumt-ja-en, patchcore, 3ddfa, docshadow
 - More information in our [Wiki](https://github.com/axinc-ai/ailia-models/wiki)
 
 ## Action recognition
@@ -60,6 +62,7 @@ The collection of pre-trained, state-of-the-art AI models.
 | [crepe](/audio_processing/crepe/) | [torchcrepe](https://github.com/maxrmorrison/torchcrepe) | Pytorch | 1.2.10 and later | [JP](https://medium.com/axinc/crepe-%E9%AB%98%E7%B2%BE%E5%BA%A6%E3%81%AA%E3%83%94%E3%83%83%E3%83%81%E6%8E%A8%E5%AE%9A%E3%82%92%E8%A1%8C%E3%81%86%E6%A9%9F%E6%A2%B0%E5%AD%A6%E7%BF%92%E3%83%A2%E3%83%87%E3%83%AB-dfb09b5e1f6b) |
 | [vall-e-x](/audio_processing/vall-e-x/) | [VALL-E-X](https://github.com/Plachtaa/VALL-E-X) | Pytorch | 1.2.15 and later |  |
 | [hifigan](/audio_processing/hifigan/) | [HiFi-GAN](https://github.com/jik876/hifi-gan) | Pytorch | 1.2.9 and later |  |
+| [distil-whisper](/audio_processing/distil-whisper/) | [Hugging Face - Distil-Whisper](https://github.com/huggingface/distil-whisper) | Pytorch | 1.2.16 and later | |
 
 
 ## Background removal
@@ -142,6 +145,7 @@ The collection of pre-trained, state-of-the-art AI models.
 | [<img src="face_identification/arcface/correct_pair_1.jpg" width=128px>](face_identification/arcface/)|[arcface](/face_identification/arcface) | [pytorch implement of arcface](https://github.com/ronghuaiyang/arcface-pytorch) | Pytorch | 1.2.1 and later | [EN](https://medium.com/axinc-ai/arcface-a-machine-learning-model-for-face-recognition-5f743cdac6fa) [JP](https://medium.com/axinc/arcface-%E9%A1%94%E8%AA%8D%E8%A8%BC%E3%82%92%E8%A1%8C%E3%81%86%E6%A9%9F%E6%A2%B0%E5%AD%A6%E7%BF%92%E3%83%A2%E3%83%87%E3%83%AB-cbb0e127bd0a) |
 | [<img src="face_identification/insightface/output.png" width=128px>](face_identification/insightface/)|[insightface](/face_identification/insightface) | [InsightFace: 2D and 3D Face Analysis Project](https://github.com/deepinsight/insightface) | Pytorch | 1.2.5 and later | |
 | [<img src="face_identification/cosface/image_id.jpg" width=128px>](face_identification/cosface/) |[cosface](/face_identification/cosface) | [Pytorch implementation of CosFace](https://github.com/MuggleWang/CosFace_pytorch) | Pytorch | 1.2.10 and later | |
+| [<img src="face_identification/facenet_pytorch/data/angelina_jolie.jpg" width=128px>](face_identification/facenet_pytorch/) |[facenet_pytorch](/face_identification/facenet_pytorch) | [Face Recognition Using Pytorch](https://github.com/timesler/facenet-pytorch) | Pytorch | 1.2.6 and later | |
 
 ## Face recognition
 
@@ -209,6 +213,7 @@ The collection of pre-trained, state-of-the-art AI models.
 |:-----------|------------:|:------------:|:------------:|:------------:|:------------:|
 | [<img src="image_captioning/illustration2vec/input.jpg" width=128px>](image_captioning/illustration2vec/) | [illustration2vec](/image_captioning/illustration2vec/)|[Illustration2Vec](https://github.com/rezoo/illustration2vec) | Caffe | 1.2.2 and later |
 | [<img src="image_captioning/image_captioning_pytorch/demo.jpg" width=128px>](image_captioning/image_captioning_pytorch/) | [image_captioning_pytorch](/image_captioning/image_captioning_pytorch/)|[Image Captioning pytorch](https://github.com/ruotianluo/ImageCaptioning.pytorch) | Pytorch | 1.2.5 and later | [EN](https://medium.com/axinc-ai/image-captioning-pytorch-a-machine-learning-model-for-describing-images-d27562b6f15b) [JP](https://medium.com/axinc/image-captioning-pytorch-%E7%94%BB%E5%83%8F%E3%82%92%E8%AA%AC%E6%98%8E%E3%81%99%E3%82%8B%E6%A9%9F%E6%A2%B0%E5%AD%A6%E7%BF%92%E3%83%A2%E3%83%87%E3%83%AB-e690982af19) |
+| [<img src="image_captioning/blip2/merlion.png" width=128px>](image_captioning/blip2/) | [blip2](/image_captioning/blip2/)|[Hugging Face - BLIP-2](https://huggingface.co/spaces/Salesforce/BLIP2) | Pytorch | 1.2.16 and later |
 
 ## Image classification
 
@@ -235,6 +240,7 @@ The collection of pre-trained, state-of-the-art AI models.
 | [<img src="image_classification/swin-transformer/input.jpg" width=128px>](image_classification/swin-transformer/) | [swin-transformer](/image_classification/swin-transformer/)|[Swin Transformer](https://github.com/microsoft/Swin-Transformer) | Pytorch | 1.2.6 and later | |
 | [<img src="image_classification/convnext/input_imagenet.jpg" width=128px>](image_classification/convnext/) | [convnext](/image_classification/convnext/)|[A PyTorch implementation of ConvNeXt](https://github.com/facebookresearch/ConvNeXt) | Pytorch | 1.2.5 and later | |
 | [<img src="image_classification/mobileone/clock.jpg" width=128px>](image_classification/mobileone/) | [mobileone](/image_classification/mobileone/)|[A PyTorch implementation of MobileOne](https://github.com/apple/ml-mobileone) | Pytorch | 1.2.1 and later | |
+| [<img src="image_classification/imagenet21k/input.jpg" width=128px>](image_classification/imagenet21k/) | [imagenet21k](/image_classification/imagenet21k/) | [ImageNet21K](https://github.com/Alibaba-MIIL/ImageNet21K) | Pytorch | 1.2.11 and later | |
 
 ## Image inpainting
 
@@ -286,6 +292,7 @@ The collection of pre-trained, state-of-the-art AI models.
 | [<img src="image_segmentation/suim/output.jpg" width=128px>](image_segmentation/suim/) | [suim](/image_segmentation/suim/) | [SUIM](https://github.com/IRVLab/SUIM) | Keras | 1.2.6 and later |  |
 | [<img src="image_segmentation/group_vit/output.png" width=128px>](image_segmentation/group_vit/) | [group_vit](/image_segmentation/group_vit/) | [GroupViT](https://github.com/NVlabs/GroupViT) | Pytorch | 1.2.10 and later |  |
 | [<img src="image_segmentation/anime-segmentation/output.png" width=128px>](image_segmentation/anime-segmentation/) | [anime-segmentation](/image_segmentation/anime-segmentation/) | [Anime Segmentation](https://github.com/SkyTNT/anime-segmentation) | Pytorch | 1.2.9 and later |
+| [<img src="image_segmentation/segment-anything/example/output1.png" width=128px>](image_segmentation/segment-anything/) | [segment-anything](/image_segmentation/segment-anything/) | [Segment Anything](https://github.com/facebookresearch/segment-anything) | Pytorch | 1.2.16 and later |
 
 ## Landmark classification
 
@@ -329,6 +336,8 @@ The collection of pre-trained, state-of-the-art AI models.
 |[bertjsc](/natural_language_processing/bertjsc) | [bertjsc](https://github.com/er-ri/bertjsc) | Pytorch | 1.2.15 and later |
 |[multilingual-e5](/natural_language_processing/multilingual-e5) | [multilingual-e5-base](https://huggingface.co/intfloat/multilingual-e5-base) | Pytorch | 1.2.15 and later | [JP](https://medium.com/axinc/multilingual-e5-%E5%A4%9A%E8%A8%80%E8%AA%9E%E3%81%AE%E3%83%86%E3%82%AD%E3%82%B9%E3%83%88%E3%82%92embedding%E3%81%99%E3%82%8B%E6%A9%9F%E6%A2%B0%E5%AD%A6%E7%BF%92%E3%83%A2%E3%83%87%E3%83%AB-71f1dec7c4f0) |
 |[bert_insert_punctuation](/natural_language_processing/bert_insert_punctuation) | [bert-japanese](https://github.com/cl-tohoku/bert-japanese) | Pytorch | 1.2.15 and later |
+|[t5_whisper_medical](/natural_language_processing/t5_whisper_medical) | error correction of medical terms using t5 | Pytorch | 1.2.13 and later | |
+|[t5_base_summarization](/natural_language_processing/t5_base_japanese_summarization) | [t5-japanese](https://github.com/sonoisa/t5-japanese) | Pytorch | 1.2.13 and later |
 
 ## Neural Rendering
 
@@ -404,6 +413,7 @@ The collection of pre-trained, state-of-the-art AI models.
 | [<img src="object_tracking/bytetrack/output.png" width=128px>](object_tracking/bytetrack/) | [bytetrack](/object_tracking/bytetrack/) | [ByteTrack](https://github.com/ifzhang/ByteTrack) | Pytorch | 1.2.5 and later | [EN](https://medium.com/axinc-ai/bytetrack-tracking-model-that-also-considers-low-accuracy-bounding-boxes-17f5ed70e00c) [JP](https://medium.com/axinc/bytetrack-%E4%BD%8E%E3%81%84%E7%A2%BA%E5%BA%A6%E3%81%AEboundingbox%E3%82%82%E8%80%83%E6%85%AE%E3%81%99%E3%82%8B%E3%83%88%E3%83%A9%E3%83%83%E3%82%AD%E3%83%B3%E3%82%B0%E3%83%A2%E3%83%87%E3%83%AB-244b994d5afb)　|
 | [<img src="object_tracking/qd-3dt/example/out_00000000.png" width=128px>](object_tracking/qd-3dt/) | [qd-3dt](/object_tracking/qd-3dt/) | [Monocular Quasi-Dense 3D Object Tracking](https://github.com/SysCV/qd-3dt) | Pytorch | 1.2.11 and later |　|
 | [<img src="object_tracking/strong_sort/output.png" width=128px>](object_tracking/strong_sort/) | [strong_sort](/object_tracking/strong_sort/) | [StrongSORT](https://github.com/dyhBUPT/StrongSORT) | Pytorch | 1.2.15 and later |　|
+| [<img src="object_tracking/centroids-reid/output.png" width=128px>](object_tracking/centroids-reid/) | [centroids-reid](/object_tracking/centroids-reid/) | [On the Unreasonable Effectiveness of Centroids in Image Retrieval](https://github.com/mikwieczorek/centroids-reidh) | Pytorch | 1.2.9 and later |　|
 
 ## Optical Flow Estimation
 
