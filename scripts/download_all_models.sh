@@ -45,6 +45,7 @@ cd ../../diffusion/latent-diffusion-superresolution; python3 latent-diffusion-su
 cd ../../diffusion/latent-diffusion-inpainting; python3 latent-diffusion-inpainting.py ${OPTION}
 cd ../../diffusion/stable-diffusion-txt2img; python3 stable-diffusion-txt2img.py ${OPTION}
 cd ../../diffusion/control_net python3 control_net.py ${OPTION}
+cd ../../diffusion/daclip-sde; python3 daclipsde.py ${OPTION}
 cd ../../deep_fashion/clothing-detection; python3 clothing-detection.py ${OPTION}
 cd ../../deep_fashion/fashionai-key-points-detection; python3 fashionai-key-points-detection.py ${OPTION}
 cd ../../deep_fashion/mmfashion; python3 mmfashion.py ${OPTION}
@@ -155,7 +156,6 @@ cd ../../image_manipulation/cnngeometric_pytorch; python3 cnngeometric_pytorch.p
 cd ../../image_manipulation/lightglue; python3 lightglue.py ${OPTION}
 cd ../../image_manipulation/docshadow; python3 docshadow.py ${OPTION}
 cd ../../image_restoration/nafnet; python3 nafnet.py ${OPTION}
-cd ../../image_restoration/daclip-sde; python3 daclipsde.py ${OPTION}
 cd ../../image_segmentation/deeplabv3; python3 deeplabv3.py ${OPTION}
 cd ../../image_segmentation/hair_segmentation; python3 hair_segmentation.py ${OPTION}
 cd ../../image_segmentation/hrnet_segmentation; python3 hrnet_segmentation.py ${OPTION}

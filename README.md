@@ -121,6 +121,7 @@ The collection of pre-trained, state-of-the-art AI models.
 | [<img src="diffusion/latent-diffusion-superresolution/output.png" width=128px>](diffusion/latent-diffusion-superresolution/) | [latent-diffusion-superresolution](/diffusion/latent-diffusion-superresolution/) | [Latent Diffusion - Super-resolution](https://github.com/CompVis/latent-diffusion) | Pytorch | 1.2.10 and later |
 | [<img src="diffusion/stable-diffusion-txt2img/output.png" width=128px>](diffusion/stable-diffusion-txt2img/) | [stable-diffusion-txt2img](/diffusion/stable-diffusion-txt2img/) | [Stable Diffusion](https://github.com/CompVis/stable-diffusion) | Pytorch | 1.2.14 and later | [JP](https://medium.com/axinc/stablediffusion-%E3%83%86%E3%82%AD%E3%82%B9%E3%83%88%E3%81%8B%E3%82%89%E7%94%BB%E5%83%8F%E3%82%92%E7%94%9F%E6%88%90%E3%81%99%E3%82%8B%E6%A9%9F%E6%A2%B0%E5%AD%A6%E7%BF%92%E3%83%A2%E3%83%87%E3%83%AB-aa3676787a09) |
 | [<img src="diffusion/control_net/examples/output_pose1.png" width=128px>](diffusion/control_net/) | [control_net](/diffusion/control_net/) | [ControlNet](https://github.com/lllyasviel/ControlNet) | Pytorch | 1.2.15 and later |
+| [<img src="diffusion/daclip-sde/output.png" width=128px>](diffusion/daclip-sde/) | [DA-CLIP](/diffusion/daclip-sde/) | [DA-CLIP](https://github.com/Algolzw/daclip-uir) | Pytorch | 1.2.16 and later |
 
 ## Face detection
 
@@ -276,7 +277,6 @@ The collection of pre-trained, state-of-the-art AI models.
 | | Model | Reference | Exported From | Supported Ailia Version | Blog |
 |:-----------|------------:|:------------:|:------------:|:------------:|:------------:|
 | [<img src="image_restoration/nafnet/noise_output.png" width=128px>](image_restoration/nafnet/) | [nafnet](/image_restoration/nafnet/) | [NAFNet: Nonlinear Activation Free Network for Image Restoration](https://github.com/megvii-research/nafnet) | Pytorch | 1.2.10 and later |
-| [<img src="image_restoration/daclip-sde/output.png" width=128px>](image_restoration/daclip-sde/) | [DA-CLIP](/image_restoration/daclip-sde/) | [DA-CLIP](https://github.com/Algolzw/daclip-uir) | Pytorch | 1.2.16 and later |
 
 ## Image segmentation
 
