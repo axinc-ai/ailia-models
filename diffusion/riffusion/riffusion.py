@@ -141,10 +141,10 @@ class SpectrogramConverter:
             sample_rate=params["sample_rate"],
             f_min=params["min_frequency"],
             f_max=params["max_frequency"],
-            max_iter=params["max_mel_iters"],
-            tolerance_loss=1e-5,
-            tolerance_change=1e-8,
-            sgdargs=None,
+            #max_iter=params["max_mel_iters"], # removed from latest torch audio
+            #tolerance_loss=1e-5,
+            #tolerance_change=1e-8,
+            #sgdargs=None,
             norm=params["mel_scale_norm"],
             mel_scale=params["mel_scale_type"],
         )
