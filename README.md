@@ -270,6 +270,7 @@ The collection of pre-trained, state-of-the-art AI models.
 | [<img src="image_manipulation/cnngeometric_pytorch/output_demo.png" width=128px>](image_manipulation/cnngeometric_pytorch/) | [cnngeometric_pytorch](/image_manipulation/cnngeometric_pytorch/) | [CNNGeometric PyTorch implementation](https://github.com/ignacio-rocco/cnngeometric_pytorch) | Pytorch | 1.2.7 and later |
 | [<img src="image_manipulation/lightglue/output.png" width=128px>](image_manipulation/lightglue/) | [lightglue](/image_manipulation/lightglue/) | [LightGlue-ONNX](https://github.com/fabio-sim/LightGlue-ONNX) | Pytorch | 1.2.15 and later |
 | [<img src="image_manipulation/docshadow/output.png" width=128px>](image_manipulation/docshadow/) | [docshadow](/image_manipulation/docshadow/) | [DocShadow-ONNX-TensorRT](https://github.com/fabio-sim/DocShadow-ONNX-TensorRT) | Pytorch | 1.2.10 and later |
+| [<img src="image_manipulation/nafnet/noise_output.png" width=128px>](image_manipulation/nafnet/) | [nafnet](/image_manipulation/nafnet/) | [NAFNet: Nonlinear Activation Free Network for Image Restoration](https://github.com/megvii-research/nafnet) | Pytorch | 1.2.10 and later |
 
 ## Image segmentation
 
