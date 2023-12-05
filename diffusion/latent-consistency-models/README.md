@@ -6,7 +6,7 @@ Text to render
 
 - Example
 ```
-"a virus monster is playing guitar, oil on canvas"
+"portrait photo of a girl, photograph, highly detailed face, depth of field, moody light, Tokyo, golden hour, style by Dan Winters, Russell James, Steve McCurry, centered, extremely detailed, Nikon D850, award winning photography"
 ```
 
 ## Output
