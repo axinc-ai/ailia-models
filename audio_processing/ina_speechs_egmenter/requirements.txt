@@ -1,4 +1,4 @@
 soundfile
 scipy
 skimage
-pyannote
+pyannote.algorithms

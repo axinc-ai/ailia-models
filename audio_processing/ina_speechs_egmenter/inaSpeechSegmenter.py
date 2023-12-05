@@ -43,7 +43,7 @@ SMN_AUDIO_MODEL_PATH  = "inaSpeechSegmenter_smn.onnx.prototxt"
 
 GENDER_AUDIO_WEIGHT_PATH = "inaSpeechSegmenter_gender.onnx"
 GENDER_AUDIO_MODEL_PATH  = "inaSpeechSegmenter_gender.onnx.prototxt"
-REMOTE_PATH = "https://storage.googleapis.com/ailia-models/inaSpeechSegmenter/"
+REMOTE_PATH = "https://storage.googleapis.com/ailia-models/ina_speech_segmenter/"
 
 
 
