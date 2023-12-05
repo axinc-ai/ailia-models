@@ -1,4 +1,4 @@
-# Riffusion
+# Riffusion : Stable diffusion for real-time music generation
 
 ## Input
 
