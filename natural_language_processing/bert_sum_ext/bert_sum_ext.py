@@ -78,7 +78,7 @@ def main():
     model = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
     tokenizer = AutoTokenizer.from_pretrained('./bert/')
 
-    with open(args.file) as f:
+    with open(args.file, encoding="utf-8") as f:
         body = f.read()
     
     logger.info(f'Input file : {args.file}')

@@ -2,6 +2,7 @@ import glob
 import os
 import sys
 import time
+import json
 
 import ailia
 import cv2
@@ -44,6 +45,11 @@ DB_STD = [0.2886383, 0.27408165, 0.27809834]
 # ======================
 parser = get_base_parser(
     'LSTR', IMAGE_PATH, SAVE_IMAGE_PATH,
+)
+parser.add_argument(
+    '-w', '--write_json',
+    action='store_true',
+    help='Flag to output results to json file.'
 )
 args = update_parser(parser)
 
@@ -138,6 +144,21 @@ def draw_annotation(pred, img):
     return img
 
 
+def save_result_json(json_path, img, pred):
+    img_h, img_w, _ = img.shape
+    results = []
+    pred = pred[pred[:, 0].astype(int) == 1]
+    for lane in pred:
+        conf, lower, upper = lane[0], lane[1], lane[2]
+        lane = lane[3:]  # remove conf, upper, lower
+        results.append({
+            "k''": lane[0], "f''": lane[1], "m''": lane[2], "n'": lane[3], "b''": lane[4], "b'''": lane[5],
+            "alpha": lower * img_h, "beta": upper * img_w, "conf": conf
+        })
+    with open(json_path, 'w') as f:
+        json.dump(results, f, indent=2)
+
+
 def recognize_from_image(net, orig_target_sizes):
     # input image loop
     for image_path in args.input:
@@ -151,6 +172,10 @@ def recognize_from_image(net, orig_target_sizes):
         savepath = get_savepath(args.savepath, image_path)
         logger.info(f'saved at : {savepath}')
         cv2.imwrite(savepath, preds)
+
+        if args.write_json:
+            json_file = '%s.json' % savepath.rsplit('.', 1)[0]
+            save_result_json(json_file, image, results[0])
 
     logger.info('Script finished successfully.')
 

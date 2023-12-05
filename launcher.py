@@ -289,6 +289,54 @@ def stop_button_clicked():
         proc.kill()
         proc=None
 
+# ======================
+# IP Camera
+# ======================
+
+camerasWindow = None
+
+def input_camera_dialog():
+    global camerasWindow
+
+    if camerasWindow != None and camerasWindow.winfo_exists():
+        return
+
+    camerasWindow = tk.Toplevel()
+    camerasWindow.title("IP Camera Settings")
+    camerasWindow.geometry("300x300")
+
+    frame = ttk.Frame(camerasWindow)
+    frame.pack(padx=10,pady=10)
+
+    textOptions = tk.StringVar(frame)
+    textOptions.set("IP camera address (rtsp://*)")
+    labelOptions = tk.Label(frame, textvariable=textOptions)
+    labelOptions.grid(row=0, column=0, sticky=tk.NW)
+
+    global cameraEntry
+    cameraEntry = tkinter.Entry(frame, width=20)
+    cameraEntry.insert(tkinter.END, "")
+    cameraEntry.grid(row=1, column=0, sticky=tk.NW, rowspan=1)
+
+    setCamerasSettingsText = tk.StringVar(frame)
+    setCamerasSettingsText.set("OK")
+    buttonSetCamerasSettings = tk.Button(frame, textvariable=setCamerasSettingsText, command=input_camera_dialog_close, width=14)
+    buttonSetCamerasSettings.grid(row=4, column=0, sticky=tk.NW)
+
+def input_camera_dialog_close():
+    global cameraEntry
+    global listsInput, ListboxInput, input_index
+    ip_camera = cameraEntry.get()
+    if ip_camera != "":
+        input_list.append(ip_camera)
+        listsInput.set(input_list)
+        ListboxInput.select_clear(input_index)
+        input_index = len(input_list)-1
+        ListboxInput.select_set(input_index)
+
+    global camerasWindow
+    camerasWindow.destroy()
+    camerasWindow = None
 
 # ======================
 # Select file
@@ -384,6 +432,9 @@ def main():
     textInputFile = tk.StringVar(frame)
     textInputFile.set("Add input file")
 
+    textInputCamera = tk.StringVar(frame)
+    textInputCamera.set("Add ip camera")
+
     textOutputFile = tk.StringVar(frame)
     textOutputFile.set("Add output file")
 
@@ -412,6 +463,7 @@ def main():
     buttonRun = tk.Button(frame, textvariable=textRun, command=run_button_clicked, width=14)
     buttonStop = tk.Button(frame, textvariable=textStop, command=stop_button_clicked, width=14)
     buttonInputFile = tk.Button(frame, textvariable=textInputFile, command=input_file_dialog, width=14)
+    buttonInputCamera = tk.Button(frame, textvariable=textInputCamera, command=input_camera_dialog, width=14)
     buttonOutputFile = tk.Button(frame, textvariable=textOutputFile, command=output_file_dialog, width=14)
 
     canvas = tk.Canvas(frame, bg="black", width=320, height=240)
@@ -430,11 +482,12 @@ def main():
     scrollbar.grid(row=1, column=1, sticky=(tk.N, tk.S), rowspan=12)
 
     labelModelDetail.grid(row=0, column=2, sticky=tk.NW)
-    canvas.grid(row=1, column=2, sticky=tk.NW, rowspan=4)
+    canvas.grid(row=1, column=2, sticky=tk.NW, rowspan=4, columnspan=2)
 
     labelInput.grid(row=5, column=2, sticky=tk.NW, columnspan=2)
     ListboxInput.grid(row=6, column=2, sticky=tk.NW, columnspan=2)
     buttonInputFile.grid(row=7, column=2, sticky=tk.NW)
+    buttonInputCamera.grid(row=7, column=3, sticky=tk.NW)
 
     labelOutput.grid(row=8, column=2, sticky=tk.NW)
     ListboxOutput.grid(row=9, column=2, sticky=tk.NW, columnspan=2)
