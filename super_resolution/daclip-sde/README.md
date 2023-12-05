@@ -1,4 +1,4 @@
-# daclip-sde
+# daclip-sde : Controlling Vision-Language Models for Universal Image Restoration
 
 ## Input
 
