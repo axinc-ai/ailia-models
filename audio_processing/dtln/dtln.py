@@ -20,14 +20,14 @@ logger = getLogger(__name__)
 # ======================
 
 WEIGHT1_PATH = "dtln1.onnx"
-MODEL1_PATH = "dtln.onnx.prototxt"
+MODEL1_PATH = "dtln1.onnx.prototxt"
 WEIGHT2_PATH = "dtln2.onnx"
 MODEL2_PATH = "dtln2.onnx.prototxt"
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/dtln/'
 
 SAMPLE_RATE = 16000
 
-WAV_PATH = 'input.wav'
+WAV_PATH = '1221-135766-0000.wav'
 SAVE_WAV_PATH = 'output.wav'
 
 # ======================
