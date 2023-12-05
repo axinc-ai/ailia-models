@@ -73,6 +73,7 @@ cd ../../face_identification/arcface; python3 arcface.py ${OPTION}
 cd ../../face_identification/insightface; python3 insightface.py ${OPTION}
 cd ../../face_identification/vggface2; python3 vggface2.py ${OPTION}
 cd ../../face_identification/cosface; python3 cosface.py ${OPTION}
+cd ../../face_identification/facenet_pytorch; python3 facenet_pytorch.py ${OPTION}
 cd ../../face_recognition/face_alignment; python3 face_alignment.py ${OPTION}
 cd ../../face_recognition/face_classification; python3 face_classification.py ${OPTION}
 cd ../../face_recognition/facial_feature; python3 facial_feature.py ${OPTION}
@@ -154,6 +155,7 @@ cd ../../image_manipulation/pytorch-superpoint; python3 pytorch_superpoint.py ${
 cd ../../image_manipulation/cnngeometric_pytorch; python3 cnngeometric_pytorch.py ${OPTION}
 cd ../../image_manipulation/lightglue; python3 lightglue.py ${OPTION}
 cd ../../image_manipulation/docshadow; python3 docshadow.py ${OPTION}
+cd ../../image_manipulation/nafnet; python3 nafnet.py ${OPTION}
 cd ../../image_segmentation/deeplabv3; python3 deeplabv3.py ${OPTION}
 cd ../../image_segmentation/hair_segmentation; python3 hair_segmentation.py ${OPTION}
 cd ../../image_segmentation/hrnet_segmentation; python3 hrnet_segmentation.py ${OPTION}
@@ -238,6 +240,7 @@ cd ../../object_detection_3d/3d-object-detection.pytorch; python3 3d-object-dete
 cd ../../object_detection_3d/mediapipe_objectron; python3 mediapipe_objectron.py ${OPTION}
 cd ../../object_detection_3d/egonet; python3 egonet.py ${OPTION}
 cd ../../object_detection_3d/d4lcn; python3 d4lcn.py ${OPTION}
+cd ../../object_tracking/centroids-reid; python3 centroids-reid.py ${OPTION}
 cd ../../object_tracking/deepsort; python3 deepsort.py ${OPTION}
 cd ../../object_tracking/person_reid_baseline_pytorch; python3 person_reid_baseline_pytorch.py ${OPTION}
 cd ../../object_tracking/abd_net; python3 abd_net.py ${OPTION}
