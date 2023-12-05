@@ -84,25 +84,15 @@ def clip_transform(np_image, resolution=224):
 
 
 
-def recognize_from_image():
-
-    if args.onnx:
-        daclip = onnxruntime.InferenceSession(DACLIP_WEIGHT_PATH)
-        IR = onnxruntime.InferenceSession(IR_WEIGHT_PATH)
-    else:
-        daclip = ailia.Net(None,DACLIP_WEIGHT_PATH)
-        IR = ailia.Net(None,IR_WEIGHT_PATH)
-
+def recognize_from_image(daclip, IR):
     sde = util.IRSDE(net=IR,onnx=args.onnx,max_sigma=max_sigma, T=T, eps=eps,)
 
     model = util.DenoisingModel()
-
 
     for image_path in args.input:
         # prepare input data
         logger.info('Input image: ' + image_path)
         
-
         # preprocessing
         img = imread(image_path)
         if img.ndim == 2:
@@ -112,7 +102,6 @@ def recognize_from_image():
             img = np.concatenate([img] * 3, 2)
 
         img = img / 255.
-
 
         def compute(image):
             img4clip = np.expand_dims(clip_transform(image),0).astype(np.float32)
@@ -132,7 +121,6 @@ def recognize_from_image():
             noisy_tensor = sde.noise_state(LQ_tensor)
             model.feed_data(noisy_tensor, LQ_tensor, text_context=degra_context, image_context=image_context)
             model.run(sde)
-
 
         # inference
         logger.info('Start inference...')
@@ -158,15 +146,7 @@ def recognize_from_image():
         
     logger.info('Script finished successfully.')
 
-def recognize_from_video():
-
-    if args.onnx:
-        daclip = onnxruntime.InferenceSession(DACLIP_WEIGHT_PATH)
-        IR = onnxruntime.InferenceSession(IR_WEIGHT_PATH)
-    else:
-        daclip = ailia.Net(None,DACLIP_WEIGHT_PATH)
-        IR = ailia.Net(None,IR_WEIGHT_PATH)
-
+def recognize_from_video(daclip, IR):
     sde = util.IRSDE(net=IR,onnx=args.onnx,max_sigma=max_sigma, T=T, eps=eps,)
 
     model = util.DenoisingModel()
@@ -249,12 +229,19 @@ def main():
     check_and_download_models(IR_WEIGHT_PATH, IR_MODEL_PATH, REMOTE_PATH)
     check_and_download_models(DACLIP_WEIGHT_PATH, DACLIP_MODEL_PATH, REMOTE_PATH)
 
+    if args.onnx:
+        daclip = onnxruntime.InferenceSession(DACLIP_WEIGHT_PATH)
+        IR = onnxruntime.InferenceSession(IR_WEIGHT_PATH)
+    else:
+        daclip = ailia.Net(DACLIP_MODEL_PATH, DACLIP_WEIGHT_PATH, args.env_id)
+        IR = ailia.Net(IR_MODEL_PATH, IR_WEIGHT_PATH, args.env_id)
+
     if args.video is not None:
         # video mode
-        recognize_from_video()
+        recognize_from_video(daclip, IR)
     else:
         # image mode
-        recognize_from_image()
+        recognize_from_image(daclip, IR)
 
 
 if __name__ == '__main__':
