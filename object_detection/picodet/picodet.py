@@ -86,6 +86,14 @@ parser.add_argument(
     choices=('s-320', 's-416', 'm-416', 'l-640'),
     help='model type'
 )
+parser.add_argument(
+    '-w', '--write_prediction',
+    nargs='?',
+    const='txt',
+    choices=['txt', 'json'],
+    type=str,
+    help='Output results to txt or json file.'
+)
 args = update_parser(parser)
 
 
@@ -227,9 +235,10 @@ def recognize_from_image(net):
         cv2.imwrite(savepath, res_img)
 
         # write prediction
-        if args.write_prediction:
-            pred_file = '%s.txt' % savepath.rsplit('.', 1)[0]
-            write_predictions(pred_file, detect_object, img, COCO_CATEGORY)
+        if args.write_prediction is not None:
+            ext = args.write_prediction
+            pred_file = "%s.%s" % (savepath.rsplit('.', 1)[0], ext)
+            write_predictions(pred_file, detect_object, img, category=COCO_CATEGORY, file_type=ext)
 
     logger.info('Script finished successfully.')
 

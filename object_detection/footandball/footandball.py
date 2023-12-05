@@ -95,8 +95,8 @@ def predict(net, img):
     img = img[np.newaxis, :, :, :]
 
     # feedforward
-    if args.onnx is None:
-        output = net.predict(img)
+    if not args.onnx:
+        output = net.run(img)
     else:
         output = net.run([
             net.get_outputs()[0].name,
@@ -213,11 +213,11 @@ def main():
     env_id = args.env_id
 
     # initialize
-    if args.onnx is None:
+    if not args.onnx:
         net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
     else:
         import onnxruntime
-        net = onnxruntime.InferenceSession(WEIGHT_PATH)
+        net = onnxruntime.InferenceSession(WEIGHT_PATH, providers = ["CPUExecutionProvider", "CUDAExecutionProvider"])
 
     if args.video is not None:
         recognize_from_video(net)

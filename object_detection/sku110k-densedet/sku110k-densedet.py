@@ -3,6 +3,7 @@ import time
 
 import numpy as np
 import cv2
+import json
 
 import ailia
 
@@ -52,6 +53,11 @@ parser.add_argument(
     action='store_true',
     help='execute onnxruntime version.'
 )
+parser.add_argument(
+    '-w', '--write_json',
+    action='store_true',
+    help='Flag to output results to json file.'
+)
 args = update_parser(parser)
 
 
@@ -74,6 +80,18 @@ def draw_bbox(
             cv2.FONT_HERSHEY_COMPLEX, font_scale, color)
 
     return img
+
+
+def save_result_json(json_path, img, bboxes):
+    res = []
+    for bbox in bboxes:
+        res.append({
+            'val': float(bbox[-1]),
+            'x1': float(bbox[0]), 'y1': float(bbox[1]),
+            'x2': float(bbox[2]), 'y2': float(bbox[3])
+        })
+    with open(json_path, 'w') as f:
+        json.dump(res, f, indent=2)
 
 
 # ======================
@@ -169,6 +187,11 @@ def recognize_from_image(net):
         savepath = get_savepath(args.savepath, image_path, ext='.png')
         logger.info(f'saved at : {savepath}')
         cv2.imwrite(savepath, res_img)
+
+        # write prediction
+        if args.write_json:
+            pred_file = '%s.json' % savepath.rsplit('.', 1)[0]
+            save_result_json(pred_file, img, bboxes)
 
     logger.info('Script finished successfully.')
 

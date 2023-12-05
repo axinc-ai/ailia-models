@@ -3,8 +3,7 @@ import sys
 
 import numpy as np
 
-#sys.path.append('../../util')
-sys.path.append('../../git/ailia-models/util/')
+sys.path.append('../../util')
 from arg_utils import get_base_parser, update_parser  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from arg_utils import *  # noqa: E402

@@ -295,7 +295,7 @@ class PreProcess:
         np_image = np.array(image).astype(np.float32)
         mask = self.face_parse.parse(cv2.resize(np_image, (512, 512)))
         # obtain face parsing result
-        # image = image.resize((512, 512), Image.ANTIALIAS)
+        # image = image.resize((512, 512), Image.LANCZOS)
         mask = np.array(
             Image.fromarray(mask).resize(
                 (self.img_size, self.img_size), resample=Image.NEAREST
@@ -304,7 +304,7 @@ class PreProcess:
         mask = np.expand_dims(mask, (0, 1))
 
         mask, diff = self.process(mask, lms)
-        image = image.resize((self.img_size, self.img_size), Image.ANTIALIAS)
+        image = image.resize((self.img_size, self.img_size), Image.LANCZOS)
         image = np.array(image).transpose((2, 0, 1)) / 255
         means = np.expand_dims([0.5, 0.5, 0.5], (1, 2))
         stds = np.expand_dims([0.5, 0.5, 0.5], (1, 2))
