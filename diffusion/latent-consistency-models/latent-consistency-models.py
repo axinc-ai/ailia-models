@@ -36,7 +36,7 @@ WEIGHT_VAE_DECODER_PATH = "vae_decoder.onnx"
 MODEL_VAE_DECODER_PATH =   "vae_decoder.onnx.prototxt" 
 
 local_clip_tokenizer_path = "tokenizer"
-REMOTE_PATH = ""
+REMOTE_PATH = "https://storage.googleapis.com/ailia-models/latent-consistency-models/"
 SAVE_IMAGE_PATH="Output/"
 
 
