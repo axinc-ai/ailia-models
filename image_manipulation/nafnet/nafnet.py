@@ -55,13 +55,15 @@ args = update_parser(parser)
 WEIGHT_PATH = args.arch + '.onnx'
 MODEL_PATH =  args.arch + '.onnx.prototxt'
 
+BLUR_IMAGE_WIDTH = 896
+BLUR_IMAGE_HEIGHT = 504
+
+
 # ======================
 # Main functions
 # ====================== 
 
 def tensor2img(tensor, rgb2bgr=True, out_type=np.uint8, min_max=(0, 1)):
-
-    result = []
     _tensor = tensor.clip(min_max[0],min_max[1])
     _tensor = (_tensor - min_max[0]) / (min_max[1] - min_max[0])
     n_dim = _tensor.ndim
@@ -82,13 +84,12 @@ def tensor2img(tensor, rgb2bgr=True, out_type=np.uint8, min_max=(0, 1)):
         # Unlike MATLAB, numpy.unit8() WILL NOT round by default.
         img_np = (img_np * 255.0).round()
     img_np = img_np.astype(out_type)
-    result.append(img_np)
-
-    if len(result) == 1:
-        result = result[0]
-    return result
+    return img_np
 
 def preprocess(img):
+    if args.arch in BLUR_LISTS:
+        img = cv2.resize(img, (BLUR_IMAGE_WIDTH, BLUR_IMAGE_HEIGHT))
+
     imgs = img.astype(np.float32) /255.0
     
     imgs = cv2.cvtColor(imgs, cv2.COLOR_BGR2RGB)
@@ -98,18 +99,14 @@ def preprocess(img):
 
 def recognize_from_image(net):
     for image_path in args.input:
-
-        IMAGE_HEIGHT, IMAGE_WIDTH = get_image_shape(image_path)
-
         input_data = imread(image_path)
- 
         input_data = preprocess(input_data)
 
         # inference
         logger.info('Start inference...')
         if args.benchmark:
             logger.info('BENCHMARK mode')
-            for i in range(5):
+            for i in range(args.benchmark_count):
                 start = int(round(time.time() * 1000))
                 sr = net.run(input_data)
                 end = int(round(time.time() * 1000))
@@ -117,11 +114,13 @@ def recognize_from_image(net):
         else:
             sr = net.run(input_data)
 
-        sr = tensor2img(np.array(sr)[0][0])
+        # tensor to image
+        sr = tensor2img(sr[0][0])
 
         ## postprocessing
-        #logger.info(f'saved at : {savepath}')
-        cv2.imwrite(args.savepath, sr)
+        savepath = get_savepath(args.savepath, image_path)
+        logger.info(f'saved at : {savepath}')
+        cv2.imwrite(savepath, sr)
     logger.info('Script finished successfully.')
 
 
@@ -149,15 +148,12 @@ def recognize_from_video(net):
             break
             
         ## Preprocessing
-
         frame = preprocess(frame)
+
         # Inference
         sr = net.run(frame)
 
-        sr = np.array(sr)
-        sr = tensor2img(sr[0][0])
-
-        output_img = sr.astype(np.uint8)
+        output_img = tensor2img(sr[0][0])
 
         # Postprocessing
         cv2.imshow('frame', output_img)
@@ -180,8 +176,14 @@ def main():
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
     
     # net initialize
+    env_id = args.env_id
+    if args.arch in BLUR_LISTS:
+        if "FP16" in ailia.get_environment(env_id).props:
+            logger.warning('This model do not work on FP16. So use CPU mode.')
+            env_id = 0
+
     memory_mode=ailia.get_memory_mode(True,True,False,True)
-    net = ailia.Net(None, WEIGHT_PATH,memory_mode=memory_mode,env_id=args.env_id)
+    net = ailia.Net(None, WEIGHT_PATH,memory_mode=memory_mode,env_id=env_id)
 
     if args.video is not None:
         # video mode
