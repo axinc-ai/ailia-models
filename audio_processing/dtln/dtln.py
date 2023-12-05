@@ -137,14 +137,8 @@ def predict(audio,models):
         time_array.append(time.time()-start_time)
     return out_file
 
-def recognize_from_audio():
+def recognize_from_audio(models):
 
-    if args.onnx:
-        models = [onnxruntime.InferenceSession(WEIGHT1_PATH),
-                  onnxruntime.InferenceSession(WEIGHT2_PATH)]
-    else:
-        models = [ailia.Net(None,WEIGHT1_PATH),
-                  ailia.Net(None,WEIGHT2_PATH)]
     inp_shape = [(1, 1, 257) ,(1, 2, 128, 2)]
     model_input_names_1 = ['input_2', 'input_3']
 
@@ -204,8 +198,15 @@ def main():
 
     env_id = args.env_id
 
+    if args.onnx:
+        models = [onnxruntime.InferenceSession(WEIGHT1_PATH),
+                  onnxruntime.InferenceSession(WEIGHT2_PATH)]
+    else:
+        models = [ailia.Net(MODEL1_PATH,WEIGHT1_PATH, env_id = env_id),
+                  ailia.Net(MODEL2_PATH,WEIGHT2_PATH, env_id = env_id)]
+
     # initialize
-    recognize_from_audio()
+    recognize_from_audio(models)
 
 
 if __name__ == '__main__':
