@@ -96,13 +96,7 @@ def preprocess(img):
     imgs = np.expand_dims(imgs, 0)
     return imgs
 
-def recognize_from_image():
-
-    # net initialize
-    memory_mode=ailia.get_memory_mode(True,True,True,False)
-    net = ailia.Net(None, WEIGHT_PATH,memory_mode=memory_mode)
-    #logger.info(IMAGE_PATH)
-
+def recognize_from_image(net):
     for image_path in args.input:
 
         IMAGE_HEIGHT, IMAGE_WIDTH = get_image_shape(image_path)
@@ -131,11 +125,7 @@ def recognize_from_image():
     logger.info('Script finished successfully.')
 
 
-def recognize_from_video():
-    # net initialize
-    memory_mode=ailia.get_memory_mode(True,True,True,False)
-    net = ailia.Net(None, WEIGHT_PATH,memory_mode=memory_mode)
-
+def recognize_from_video(net):
     capture = webcamera_utils.get_capture(args.video)
 
     # create video writer if savepath is specified as video format
@@ -189,12 +179,16 @@ def main():
     # model files check and download
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
     
+    # net initialize
+    memory_mode=ailia.get_memory_mode(True,True,False,True)
+    net = ailia.Net(None, WEIGHT_PATH,memory_mode=memory_mode,env_id=args.env_id)
+
     if args.video is not None:
         # video mode
-        recognize_from_video()
+        recognize_from_video(net)
     else:
         # image mode
-        recognize_from_image()
+        recognize_from_image(net)
 
 
 if __name__ == '__main__':
