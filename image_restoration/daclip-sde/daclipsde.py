@@ -120,7 +120,7 @@ def recognize_from_image(daclip, IR):
 
             noisy_tensor = sde.noise_state(LQ_tensor)
             model.feed_data(noisy_tensor, LQ_tensor, text_context=degra_context, image_context=image_context)
-            model.run(sde)
+            model.run(sde, logger=logger)
 
         # inference
         logger.info('Start inference...')
@@ -183,7 +183,6 @@ def recognize_from_video(daclip, IR):
 
     frame_shown = False
     while (True): 
-        print("read")
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break

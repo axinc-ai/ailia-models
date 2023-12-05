@@ -111,11 +111,13 @@ class IRSDE(SDE):
         return self.get_score_from_noise(noise, t)
 
 
-    def reverse_sde(self, xt, T=-1, save_states=False, save_dir='sde_state', **kwargs):
+    def reverse_sde(self, xt, T=-1, logger=None, save_states=False, save_dir='sde_state', **kwargs):
         T = self.sample_T if T < 0 else T
         x = xt
 
         for t in reversed(range(1, T + 1)):
+            if logger:
+                logger.info("Step " + str(T - t) + "/" + str(T))
             score = self.score_fn(x,
                                   self.mu,
                                   t,
@@ -167,10 +169,10 @@ class DenoisingModel():
         self.text_context = text_context
         self.image_context = image_context
 
-    def run(self, sde=None, save_states=False):
+    def run(self, sde=None, logger=None, save_states=False):
         sde.set_mu(self.condition)
 
-        self.output = sde.reverse_sde(self.state, save_states=save_states, text_context=self.text_context, image_context=self.image_context)
+        self.output = sde.reverse_sde(self.state, logger=logger, save_states=save_states, text_context=self.text_context, image_context=self.image_context)
 
     def get_current_visuals(self, need_GT=True):
         out_dict = OrderedDict()
