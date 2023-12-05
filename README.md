@@ -273,6 +273,12 @@ The collection of pre-trained, state-of-the-art AI models.
 | [<img src="image_manipulation/lightglue/output.png" width=128px>](image_manipulation/lightglue/) | [lightglue](/image_manipulation/lightglue/) | [LightGlue-ONNX](https://github.com/fabio-sim/LightGlue-ONNX) | Pytorch | 1.2.15 and later |
 | [<img src="image_manipulation/docshadow/output.png" width=128px>](image_manipulation/docshadow/) | [docshadow](/image_manipulation/docshadow/) | [DocShadow-ONNX-TensorRT](https://github.com/fabio-sim/DocShadow-ONNX-TensorRT) | Pytorch | 1.2.10 and later |
 
+## Image restoration
+
+| | Model | Reference | Exported From | Supported Ailia Version | Blog |
+|:-----------|------------:|:------------:|:------------:|:------------:|:------------:|
+| [<img src="image_restoration/nafnet/noise_output.png" width=128px>](image_restoration/nafnet/) | [nafnet](/image_restoration/nafnet/) | [NAFNet: Nonlinear Activation Free Network for Image Restoration](https://github.com/megvii-research/nafnet) | Pytorch | 1.2.10 and later |
+
 ## Image segmentation
 
 | | Model | Reference | Exported From | Supported Ailia Version | Blog |
