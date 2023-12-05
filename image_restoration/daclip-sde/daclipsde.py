@@ -110,7 +110,7 @@ def recognize_from_image(daclip, IR):
                 first_input_name = daclip.get_inputs()[0].name
                 image_context, degra_context = daclip.run([],{first_input_name:img4clip})
             else:
-                image_context, degra_context = daclip.run(img4clip)[0]
+                image_context, degra_context = daclip.run(img4clip)
 
             image_context = image_context.astype(np.float32)
             degra_context = degra_context.astype(np.float32)
