@@ -2,23 +2,30 @@
 
 ## Input
 
-**Mixed audio file**
+* **Mixed audio file**
+
 Audio file in wav format with mixed sources. [input.wav](./input.wav)
+
+https://github.com/axinc-ai/ailia-models/assets/53651931/4b761212-a1c7-46dc-b598-a08e4c5ab7ff
+
 This audio file was adapted from the [official audiosep implementation](https://github.com/Audio-AGI/AudioSep)
 
-**Text condition**
+* **Text condition**
+
 Text description of the sound source you want to separate.
 
 ## Output
 
-**Audio file**
-* Separated audio source according to the text query.
-* Saves to ```./output.wav``` by default but it can be specified with the ```--path``` option 
+* **Audio file**
+
+Separated audio source according to the text query.
+
+Saves to ```./output.wav``` by default but it can be specified with the ```--path``` option 
 
 ## Usage
 Internet connection is required when running the script for the first time, as the model files will be automatically downloaded.
 
-Separate the sound described by the language query.
+Running this script will separate sound sources from the original input audio file, according to the language query.
 
 #### Example1: Extract sound of thunder
 ```bash
@@ -41,6 +48,8 @@ https://github.com/axinc-ai/ailia-models/assets/53651931/7710b6c9-49dc-4d2a-8489
 ## Framework
 
 Pytorch
+
+
 
 
 
