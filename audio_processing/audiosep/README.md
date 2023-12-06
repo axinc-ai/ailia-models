@@ -23,12 +23,13 @@ Separate the sound described by the language query.
 ```bash
 $ python3 audiosep.py -i "thunder" -p input.wav -s output_thunder.wav
 ```
-
+https://github.com/axinc-ai/ailia-models/assets/53651931/d0d016dd-a808-4eb6-a4b5-9791f8f1bd2f
 
 #### Example2: Extract sound of waterdrops
 ```bash
 $ python3 audiosep.py -i "water drops" -p input.wav -s output_waterdrops.wav
 ```
+https://github.com/axinc-ai/ailia-models/assets/53651931/7710b6c9-49dc-4d2a-8489-ccbf7fb45591
 
 ```.wav``` file containing the sound source separated from the original mixture will be created in both cases.
 
@@ -40,6 +41,9 @@ $ python3 audiosep.py -i "water drops" -p input.wav -s output_waterdrops.wav
 
 Pytorch
 
+
+
+
 ## Model Format
 
 ONNX opset=11
@@ -48,3 +52,6 @@ ONNX opset=11
 
 [text_encoder.onnx.prototxt]()
 [resunet.onnx.prototxt]()
+
+
+
