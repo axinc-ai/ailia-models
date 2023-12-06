@@ -44,8 +44,8 @@ parser.add_argument(
 
 parser.add_argument(
     "-i", "--input", metavar="TEXT", type=str,
-    default="thunder",
-    help="Query text."
+    default="water drops",
+    help="Text query."
 )
 
 args = update_parser(parser, check_input_type=False)
@@ -56,7 +56,7 @@ args = update_parser(parser, check_input_type=False)
 
 """
 Functions below are taken from https://github.com/Audio-AGI/AudioSep, which was released under MIT license.
-Modified to be run on numpy arrays instead of torch tensors
+Modified to be run with numpy arrays instead of torch tensors
 """
 
 def spectrogram_phase(input, eps=0.):
@@ -130,9 +130,6 @@ def feature_maps_to_wav(
         #norm = (np.real(phase)**2 + np.imag(phase)**2)**0.5
         mask_cos = np.real(phase)
         mask_sin = np.imag(phase)
-        #mask_cos = np.real(phase) / norm
-        #mask_sin = np.imag(phase) / norm
-        # mask_cos, mask_sin: (batch_size, target_sources_num, output_channels, time_steps, freq_bins)
 
         # Y = |Y|cos∠Y + j|Y|sin∠Y
         #   = |Y|cos(∠X + ∠M) + j|Y|sin(∠X + ∠M)
@@ -167,7 +164,6 @@ def feature_maps_to_wav(
         out_real = out_real.reshape(shape)
         out_imag = out_imag.reshape(shape)
 
-        # ISTFT.
         x = librosa.istft(
              (out_real +  1j * out_imag)[0,0].astype('complex64').transpose((1,0)),
              n_fft = 2048,
@@ -177,65 +173,8 @@ def feature_maps_to_wav(
              center = True,
              length = audio_length,
             )
-        # (batch_size * target_sources_num * output_channels, segments_num)
-
-        # Reshape.
-        #waveform = x.reshape(
-        #    batch_size, 1, audio_length
-        #)
-        # (batch_size, target_sources_num * output_channels, segments_num)
 
         return x
-
-def chunk_inference(self, input_dict):
-    chunk_config = {
-                'NL': 1.0,
-                'NC': 3.0,
-                'NR': 1.0,
-                'RATE': 32000
-            }
-    
-    mixtures = input_dict['mixture']
-    conditions = input_dict['condition']
-    film_dict = self.film(
-        conditions=conditions,
-    )
-
-    NL = int(chunk_config['NL'] * chunk_config['RATE'])
-    NC = int(chunk_config['NC'] * chunk_config['RATE'])
-    NR = int(chunk_config['NR'] * chunk_config['RATE'])
-    L = mixtures.shape[2]
-    
-    out_np = np.zeros([1, L])
-    WINDOW = NL + NC + NR
-    current_idx = 0
-
-    while current_idx + WINDOW < L:
-        chunk_in = mixtures[:, :, current_idx:current_idx + WINDOW]
-        chunk_out = self.base(
-            mixtures=chunk_in, 
-            film_dict=film_dict,
-        )['waveform']
-        
-        chunk_out_np = chunk_out.squeeze(0).cpu().data.numpy()
-        if current_idx == 0:
-            out_np[:, current_idx:current_idx+WINDOW-NR] = \
-                chunk_out_np[:, :-NR] if NR != 0 else chunk_out_np
-        else:
-            out_np[:, current_idx+NL:current_idx+WINDOW-NR] = \
-                chunk_out_np[:, NL:-NR] if NR != 0 else chunk_out_np[:, NL:]
-        current_idx += NC
-        if current_idx < L:
-            chunk_in = mixtures[:, :, current_idx:current_idx + WINDOW]
-            chunk_out = self.base(
-                mixtures=chunk_in, 
-                film_dict=film_dict,
-            )['waveform']
-            chunk_out_np = chunk_out.squeeze(0).cpu().data.numpy()
-            seg_len = chunk_out_np.shape[1]
-            out_np[:, current_idx + NL:current_idx + seg_len] = \
-                chunk_out_np[:, NL:]
-    return out_np
 
 # ======================
 # Main functions
@@ -243,7 +182,6 @@ def chunk_inference(self, input_dict):
 
 def inference(model, input_text, input_wav):
     # tokenize
-    #input_wav = input_wav[:,:,:256000]
     tokenizer = model['tokenizer']
     text_prompt_tkn = dict(tokenizer(input_text, return_tensors = 'np', padding = True))
     text_prompt_tkn = (text_prompt_tkn['input_ids'], text_prompt_tkn['attention_mask'])
@@ -290,7 +228,11 @@ def split_audio(model):
         output = inference(model, input_text, input_wav)
 
     # save output
-    scipy.io.wavfile.write(args.savepath, 32000, np.round(output * 32767).astype(np.int16))
+    if args.savepath is None:
+        sp = 'output.wav'
+    else:
+        sp = args.savepath
+    scipy.io.wavfile.write(sp, 32000, np.round(output * 32767).astype(np.int16))
 
     logger.info(f"Separated audio has been saved to ")
 
@@ -299,8 +241,8 @@ def split_audio(model):
 
 def main():
     # model files check and download
-    #check_and_download_models(QUERY_WEIGHT_PATH, QUERY_MODEL_PATH, REMOTE_PATH)
-    #check_and_download_models(SEPNET_WEIGHT_PATH, SEPNET_MODEL_PATH, REMOTE_PATH)
+    check_and_download_models(QUERY_WEIGHT_PATH, QUERY_MODEL_PATH, REMOTE_PATH)
+    check_and_download_models(SEPNET_WEIGHT_PATH, SEPNET_MODEL_PATH, REMOTE_PATH)
 
     env_id = args.env_id
 

@@ -12,7 +12,8 @@ Text description of the sound source you want to separate.
 ## Output
 
 **Audio file**
-* Separated audio according to the text query
+* Separated audio source according to the text query.
+* Saves to ```./output.wav``` by default but it can be specified with the ```--path``` option 
 
 ## Usage
 Internet connection is required when running the script for the first time, as the model files will be automatically downloaded.
