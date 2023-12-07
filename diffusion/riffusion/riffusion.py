@@ -361,9 +361,12 @@ def main():
 
     # initialize
     if not args.onnx:
-        net = ailia.Net(MODEL_UNET_PATH, WEIGHT_UNET_PATH, env_id=env_id)
-        text_encoder = ailia.Net(MODEL_TEXT_ENCODER_PATH, WEIGHT_TEXT_ENCODER_PATH, env_id=env_id)
-        vae_decoder = ailia.Net(MODEL_VAE_DECODER_PATH, WEIGHT_VAE_DECODER_PATH, env_id=env_id)
+        memory_mode = ailia.get_memory_mode(
+                reduce_constant=True, ignore_input_with_initializer=True,
+                reduce_interstage=False, reuse_interstage=True)
+        net = ailia.Net(MODEL_UNET_PATH, WEIGHT_UNET_PATH, env_id=env_id, memory_mode=memory_mode)
+        text_encoder = ailia.Net(MODEL_TEXT_ENCODER_PATH, WEIGHT_TEXT_ENCODER_PATH, env_id=env_id, memory_mode=memory_mode)
+        vae_decoder = ailia.Net(MODEL_VAE_DECODER_PATH, WEIGHT_VAE_DECODER_PATH, env_id=env_id, memory_mode=memory_mode)
     else:
         import onnxruntime
         cuda = 0 < ailia.get_gpu_environment_id()
