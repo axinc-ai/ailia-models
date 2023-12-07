@@ -221,7 +221,7 @@ class StableDiffusion:
         for i in range(latents.shape[0]):
             latent_sample = latents[i: i + 1]
             if not self.use_onnx:
-                output = self.vae_decoder.predict([latent_model_input])
+                output = self.vae_decoder.predict([latent_sample])
             else:
                 output = self.vae_decoder.run(None, {'latent_sample': latent_sample})
             outputs.append(output[0])
