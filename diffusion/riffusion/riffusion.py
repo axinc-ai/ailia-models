@@ -359,6 +359,10 @@ def main():
 
     env_id = args.env_id
 
+    # warning FP16
+    if "FP16" in ailia.get_environment(args.env_id).props:
+        logger.warning('FP32 is recommended for this model.')
+    
     # initialize
     if not args.onnx:
         memory_mode = ailia.get_memory_mode(
