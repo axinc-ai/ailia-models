@@ -2882,7 +2882,10 @@ def remove_dangling(mesh, edge_ccs, edge_mesh, info_on_pix, image, depth, config
             info_on_pix[(hx, hy)][0]['depth'] = new_depth
             info_on_pix[(hx, hy)][0]['disp'] = 1. / new_depth
             new_node = (hx, hy, new_depth)
-            mesh = refresh_node(single_edge_node, mesh.node[single_edge_node], new_node, dict(), mesh)
+            if netx.__name__ == "networkx":
+                mesh = refresh_node(single_edge_node, mesh._node[single_edge_node], new_node, dict(), mesh)
+            else:
+                mesh = refresh_node(single_edge_node, mesh.node[single_edge_node], new_node, dict(), mesh)
             edge_ccs[edge_cc_id] = set([new_node])
             for ne in largest_cc:
                 mesh.add_edge(new_node, ne)
