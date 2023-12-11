@@ -73,6 +73,11 @@ parser.add_argument(
     help=('If this option is specified, the model is set to determine '
           'if the person in two images is the same person or not.')
 )
+parser.add_argument(
+    '--gui',
+    action='store_true',
+    help='Display preview in GUI.'
+)
 args = update_parser(parser)
 
 
@@ -222,8 +227,14 @@ def recognize_from_video():
 
             results.append((idx_frame - 1, bbox_tlwh, identities))
 
-        cv2.imshow('frame', frame)
-        frame_shown = True
+        if args.gui:
+            cv2.imshow('frame', frame)
+            frame_shown = True
+        else:
+            if len(outputs) > 0:
+                print("Tracking ids", outputs[:, -1])
+            else:
+                print("Tracking ids []")
 
         if writer is not None:
             writer.write(frame)
