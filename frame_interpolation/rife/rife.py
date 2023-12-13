@@ -117,10 +117,10 @@ def predict(net, img1, img2):
 
     mid_img = output[0]
 
-    mid_img = np.clip(mid_img[0] * 255, 0, 255)
+    mid_img = mid_img[0].transpose(1, 2, 0)  # CHW -> HWC
+    mid_img = np.clip(mid_img * 255, 0, 255)
     mid_img = (mid_img + 0.5).astype(np.uint8)
     mid_img = mid_img[:, :, ::-1]  # RGB -> BGR
-
     mid_img = mid_img[:h, :w, ...]
 
     return mid_img
