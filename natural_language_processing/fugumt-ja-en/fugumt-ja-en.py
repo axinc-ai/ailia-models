@@ -279,7 +279,7 @@ def main():
                 output = output.replace(",", " ")
                 output_text = output_text + output + ","
             logger.info(output_text)
-            f.write(output_text)
+            f.write(output_text+"\n")
         f.close()
         logger.info('Script finished successfully.')
         return
