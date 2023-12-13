@@ -37,6 +37,11 @@ parser.add_argument(
     help="Input text."
 )
 parser.add_argument(
+    "-c", "--csv", metavar="TEXT", type=str,
+    default=None,
+    help="Input csv file."
+)
+parser.add_argument(
     '--onnx',
     action='store_true',
     help='execute onnxruntime version.'
@@ -251,11 +256,35 @@ def main():
         encoder = onnxruntime.InferenceSession(ENCODER_ONNX_PATH, providers=providers)
         decoder = onnxruntime.InferenceSession(DECODER_ONNX_PATH, providers=providers)
     input_text = args.input
-    logger.info("input_text: %s" % input_text)
 
     model = MarianMT(tokenizer, encoder, decoder, args)
     # inference
     logger.info('Start inference...')
+
+    if args.csv:
+        f = open(args.csv, "r")
+        lines = f.readlines()
+        f.close()
+
+        if args.savepath is None:
+            logger.error('Save path must be set.')
+            return
+
+        f = open(args.savepath, "w")
+        for line in lines:
+            text = line.split(",")
+            output_text = ""
+            for t in text:
+                output = model.recognize_from_text(t)
+                output = output.replace(",", " ")
+                output_text = output_text + output + ","
+            logger.info(output_text)
+            f.write(output_text)
+        f.close()
+        logger.info('Script finished successfully.')
+        return
+
+    logger.info("input_text: %s" % input_text)
 
     if args.benchmark:
         logger.info('BENCHMARK mode')
