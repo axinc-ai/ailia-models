@@ -40,6 +40,11 @@ If you want to specify the input text, put the text after the `--input` option.
 $ python3 fugumt-ja-en.py --input TEXT
 ```
 
+If you want to specify the input csv file, put the text after the `--csv` option.
+```bash
+$ python3 fugumt-ja-en.py --csv INPUT_FILE --savepath OUTPUT_FILE
+```
+
 ## Reference
 
 - [Hugging Face - staka/fugumt-en-ja](https://huggingface.co/staka/fugumt-ja-en)
