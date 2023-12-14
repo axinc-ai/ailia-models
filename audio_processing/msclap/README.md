@@ -3,6 +3,7 @@
 ## Input
 
 **audio file**
+
 Audio file in wav format to use as the model's input. 
 Default file name is [input.wav](./input.wav)
 (source: https://freesound.org/people/InspectorJ/sounds/456440/)
@@ -10,6 +11,7 @@ Default file name is [input.wav](./input.wav)
 
 
 **text file**
+
 A text file containing sentences separated by new lines.
 Default file name is [captions.txt](./captions.txt)
 
@@ -58,8 +60,11 @@ ONNX opset=11
 ## Netron
 
 [caption_model_2023.onnx.prototxt]()
+
 [audio_model_2023.onnx.prototxt]()
+
 [caption_model_2022.onnx.prototxt]()
+
 [audio_model_2022.onnx.prototxt]()
 
 
