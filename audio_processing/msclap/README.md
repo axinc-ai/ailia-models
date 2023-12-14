@@ -18,6 +18,7 @@ Default file name is [captions.txt](./captions.txt)
 ## Output
 
 **Cosine similarities**
+
 Cosine similarity between the input audio and the sentences in the text file.
 
 ## Usage
