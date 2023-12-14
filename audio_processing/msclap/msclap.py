@@ -37,15 +37,6 @@ AUDIO_MODEL_PATH_2022 = 'msclap_2022_audio.onnx.prototxt'
 
 REMOTE_PATH = None
 
-CAPTIONS = [
-    'A dog barking.',
-    'Birds chirping.',
-    'Car passing by.',
-    'Wind blowing.',
-    'Water flowing.',
-    'People talking.'
-]
-
 # ======================
 # Arguemnt Parser Config
 # ======================
@@ -193,29 +184,29 @@ def estimate_best_caption(model):
 
 
 def main():
-    ## model files check and download
-    #check_and_download_models(
-    #    CAPTION_WEIGHT_PATH,
-    #    CAPTION_MODEL_PATH,
-    #    REMOTE_PATH
-    #)
-    #check_and_download_models(
-    #    AUDIO_WEIGHT_PATH,
-    #    AUDIO_MODEL_PATH,
-    #    REMOTE_PATH
-    #)
+    # model files check and download
+    check_and_download_models(
+        CAPTION_WEIGHT_PATH_2023,
+        CAPTION_MODEL_PATH_2023,
+        REMOTE_PATH
+    )
+    check_and_download_models(
+        AUDIO_WEIGHT_PATH_2022,
+        AUDIO_MODEL_PATH_2022,
+        REMOTE_PATH
+    )
 
     env_id = args.env_id
 
     # initialize
     if args.version == '2023':
-        caption_model = ailia.Net(None, CAPTION_WEIGHT_PATH_2023, env_id=env_id)
-        audio_model = ailia.Net(None, AUDIO_WEIGHT_PATH_2023, env_id=env_id)
+        caption_model = ailia.Net(CAPTION_MODEL_PATH_2023, CAPTION_WEIGHT_PATH_2023, env_id=env_id)
+        audio_model = ailia.Net(AUDIO_MODEL_PATH_2023, AUDIO_WEIGHT_PATH_2023, env_id=env_id)
         tokenizer = AutoTokenizer.from_pretrained('gpt2')
         tokenizer.add_special_tokens({'pad_token': '!'})
     elif args.version == '2022':
-        caption_model = ailia.Net(None, CAPTION_WEIGHT_PATH_2022, env_id=env_id)
-        audio_model = ailia.Net(None, AUDIO_WEIGHT_PATH_2022, env_id=env_id)
+        caption_model = ailia.Net(CAPTION_MODEL_PATH_2022, CAPTION_WEIGHT_PATH_2022, env_id=env_id)
+        audio_model = ailia.Net(AUDIO_MODEL_PATH_2022, AUDIO_WEIGHT_PATH_2022, env_id=env_id)
         tokenizer = AutoTokenizer.from_pretrained('bert-base-uncased')
 
     model = {
