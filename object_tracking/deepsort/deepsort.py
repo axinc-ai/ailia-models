@@ -65,7 +65,7 @@ NN_BUDGET = 100
 # ======================
 # Arguemnt Parser Config
 # ======================
-parser = get_base_parser('Deep SORT', None, None)
+parser = get_base_parser('Deep SORT', VIDEO_PATH, None)
 parser.add_argument(
     '-p', '--pairimage', metavar='IMAGE',
     nargs=2,
@@ -124,7 +124,8 @@ def recognize_from_video():
         n_init=3
     )
 
-    capture = webcamera_utils.get_capture(args.video)
+    video_file = args.video if args.video else args.input[0]
+    capture = webcamera_utils.get_capture(video_file)
 
     # create video writer
     if args.savepath is not None:
@@ -227,7 +228,7 @@ def recognize_from_video():
 
             results.append((idx_frame - 1, bbox_tlwh, identities))
 
-        if args.gui:
+        if args.gui or args.video:
             cv2.imshow('frame', frame)
             frame_shown = True
         else:
