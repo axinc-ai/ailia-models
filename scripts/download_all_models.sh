@@ -95,6 +95,7 @@ cd ../../face_recognition/3ddfa; python3 3ddfa$.py ${OPTION}
 cd ../../frame_interpolation/flavr; python3 flavr.py ${OPTION}
 cd ../../frame_interpolation/cain; python3 cain.py ${OPTION}
 cd ../../frame_interpolation/film; python3 film.py ${OPTION}
+cd ../../frame_interpolation/rife; python3 rife.py ${OPTION}
 cd ../../generative_adversarial_networks/council-gan; python3 council-gan.py ${OPTION}
 cd ../../generative_adversarial_networks/pytorch-gan; python3 pytorch-gan.py ${OPTION}
 cd ../../generative_adversarial_networks/restyle-encoder; python3 restyle-encoder.py ${OPTION}
