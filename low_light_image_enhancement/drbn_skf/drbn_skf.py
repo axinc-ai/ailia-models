@@ -117,6 +117,9 @@ def recognize_from_video(weight_path, model_path):
         output = (enhance * 255.).astype(np.uint8)
         concat = np.hstack((frame, output))
         cv2.imshow("left: original, right: result", concat)
+
+        if writer is not None:
+            writer.write(output)
     
     if not writer is None:
         writer.release()
