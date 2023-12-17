@@ -23,13 +23,11 @@ logger = getLogger(__name__)
 # Parameters
 # ======================
 
-WEIGHT_2X_PATH = 'RIFE_HDv3_2X.onnx'
-MODEL_2X_PATH = 'RIFE_HDv3_2X.onnx.prototxt'
-WEIGHT_4X_PATH = 'RIFE_HDv3_4X.onnx'
-MODEL_4X_PATH = 'RIFE_HDv3_4X.onnx.prototxt'
+WEIGHT_PATH = 'RIFE_HDv3.onnx'
+MODEL_PATH = 'RIFE_HDv3.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/rife/'
 
-IMAGE_PATH = 'photos'
+IMAGE_PATH = 'imgs'
 SAVE_IMAGE_PATH = 'output.png'
 
 NAME_EXT = os.path.splitext(SAVE_IMAGE_PATH)
@@ -46,8 +44,8 @@ parser.add_argument(
     help='The second input image path.'
 )
 parser.add_argument(
-    '-m', '--model_type', default='2x', choices=('2x', '4x'),
-    help='model type'
+    '--exp', type=int, default=1,
+    help='exp'
 )
 parser.add_argument(
     '--onnx',
@@ -132,8 +130,8 @@ def make_inference(net, img1, img2, n):
     if n == 1:
         return [mid_img]
 
-    first_half = make_inference(img1, mid_img, n=n // 2)
-    second_half = make_inference(mid_img, img2, n=n // 2)
+    first_half = make_inference(net, img1, mid_img, n=n // 2)
+    second_half = make_inference(net, mid_img, img2, n=n // 2)
     if n % 2:
         return [*first_half, mid_img, *second_half]
     else:
@@ -142,7 +140,7 @@ def make_inference(net, img1, img2, n):
 
 def recognize_from_image(net):
     inputs = args.input
-
+    exp = args.exp
     copy_img = True
 
     # Load images
@@ -170,7 +168,7 @@ def recognize_from_image(net):
             total_time_estimation = 0
             for i in range(args.benchmark_count):
                 start = int(round(time.time() * 1000))
-                out_img = predict(net, img1, img2)
+                mid_img = predict(net, img1, img2)
                 end = int(round(time.time() * 1000))
                 estimation_time = (end - start)
 
@@ -181,12 +179,10 @@ def recognize_from_image(net):
 
             logger.info(f'\taverage time estimation {total_time_estimation / (args.benchmark_count - 1)} ms')
 
-            save_file = "%s_%s%s" % (NAME_EXT[0], no, NAME_EXT[1])
-            save_path = get_savepath(args.savepath, save_file, post_fix='', ext='.png')
-            logger.info(f'saved at : {save_path}')
-            cv2.imwrite(save_path, out_img)
+            copy_img = False
+            no = img_save(no, mid_img=mid_img)
         else:
-            output = make_inference(net, img1, img2, 1)
+            output = make_inference(net, img1, img2, 2 ** exp - 1)
 
             if copy_img:
                 no = img_save(no, img_path=image_paths[0])
@@ -278,12 +274,6 @@ def recognize_from_video(net):
 
 
 def main():
-    model_dic = {
-        '2x': (WEIGHT_2X_PATH, MODEL_2X_PATH),
-        '4x': (WEIGHT_4X_PATH, MODEL_4X_PATH),
-    }
-    WEIGHT_PATH, MODEL_PATH = model_dic[args.model_type]
-
     # model files check and download
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
 
