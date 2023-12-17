@@ -9,7 +9,12 @@ Ailia input shape: (1, 3, 400, 600)
 
 ## Output
 ### V1
+![Output1](output1.png)
+
+
 ### V2
+![Output2](output2.png)
+
 
 ## Usege
 Automaticaly downloads the onnx and prototxt files on the first run. 
