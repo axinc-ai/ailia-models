@@ -145,7 +145,7 @@ def update_parser(parser, check_input_type=True, large_model=False):
         if large_model:
             if args.env_id == ailia.get_gpu_environment_id() and ailia.get_environment(args.env_id).props == "LOWPOWER":
                 args.env_id = 0 # cpu
-                logger.warning('This model requires fuge gpu memory so fallback to cpu mode')
+                logger.warning('This model requires huge gpu memory so fallback to cpu mode')
 
         if args.env_list:
             for idx in range(count) :

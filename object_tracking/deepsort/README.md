@@ -5,6 +5,7 @@
 ### Input
 - DeepSORT original mode:
   - The sample input video is `TownCentreXVID.avi` from http://www.robots.ox.ac.uk/~lav/Research/Projects/2009bbenfold_headpose/project.html
+  - Another sample input video is `sample.mp4` from https://vimeo.com/60139361
 
 - compare image mode: If two input images have the same person or not ?
   - Our detector, yolo, detects the person and resizes the cropped image automatically, 
