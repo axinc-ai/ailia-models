@@ -10,7 +10,7 @@ import ailia
 # import original modules
 sys.path.append("../../util")
 from arg_utils import get_base_parser, update_parser, get_savepath  # noqa
-from model_utils import check_and_download_models  # noqa
+from model_utils import check_and_download_models, check_and_download_file  # noqa
 # logger
 from logging import getLogger  # noqa
 logger = getLogger(__name__)
@@ -31,6 +31,7 @@ MODEL_TEXT_ENCODER_PATH = "text_encoder.onnx.prototxt"
 # unet
 WEIGHT_UNET_PATH = "unet.onnx"
 MODEL_UNET_PATH = "unet.onnx.prototxt"
+DATA_UNET_PATH = "model.onnx_data"
 # vae encoder
 WEIGHT_VAE_DECODER_PATH = "vae_decoder.onnx"
 MODEL_VAE_DECODER_PATH =   "vae_decoder.onnx.prototxt" 
@@ -281,6 +282,8 @@ def main():
     check_and_download_models(WEIGHT_TEXT_ENCODER_PATH, MODEL_TEXT_ENCODER_PATH, REMOTE_PATH)
     check_and_download_models(WEIGHT_UNET_PATH, MODEL_UNET_PATH, REMOTE_PATH)
     check_and_download_models(WEIGHT_VAE_DECODER_PATH, MODEL_VAE_DECODER_PATH, REMOTE_PATH)
+    check_and_download_file(DATA_UNET_PATH, REMOTE_PATH)
+
     pf = platform.system()
     if pf == "Darwin":
         logger.info("This model not optimized for macOS GPU currently. So we will use BLAS (env_id = 1).")
