@@ -13,9 +13,10 @@ The collection of pre-trained, state-of-the-art AI models.
 [ailia MODELS tutorial 日本語版](TUTORIAL_jp.md)
 
 # Supported models 
-300 models as of December 5th, 2023
+301 models as of December 9th, 2023
 
 # Latest update
+- 2023.12.09 Add riffusion
 - 2023.12.05 Add facenet-pytorch, centroids-reid, nafnet, daclip-sde
 - 2023.12.04 Add distil-whisper
 - 2023.11.24 Add Segment Anything, BLIP2, Whisper Large V2 and V3 (ailia SDK 1.2.16)
