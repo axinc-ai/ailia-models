@@ -12,7 +12,7 @@ from logging import getLogger  # noqa: E402
 import webcamera_utils  # noqa: E402
 from image_utils import imread  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
-from utils import get_base_parser, get_savepath, update_parser  # noqa: E402
+from utils import get_base_parser, update_parser  # noqa: E402
 
 logger = getLogger(__name__)
 
@@ -91,7 +91,7 @@ def recognize_from_video(weight_path, model_path):
         logger.warning(
             "currently, video results cannot be output correctry..."
         )
-        writer = webcamera_utils.get_writer(args.savepath, f_h, f_w, rgb=False)
+        writer = webcamera_utils.get_writer(args.savepath, f_h, f_w, rgb=True)
     else:
         writer = None
     
