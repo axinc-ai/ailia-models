@@ -1,5 +1,3 @@
-import os
-from re import escape
 import sys
 import time
 
@@ -8,9 +6,7 @@ import ailia
 import cv2
 import numpy as np
 
-# import original modules
 sys.path.append('../../util')
-# logger
 from logging import getLogger  # noqa: E402
 
 import webcamera_utils  # noqa: E402
