@@ -328,6 +328,11 @@ def main():
         #if args.img2img is True:
         #    vae_encoder_model = onnxruntime.InferenceSession(WEIGHT_VAE_ENCODER_PATH, providers=providers, sess_options=options)
 
+    if args.profile and not args.onnx:
+        unet.set_profile_mode(True)
+        vae_decoder_model.set_profile_mode(True)
+        text_encoder.set_profile_mode(True)
+
     seed = args.seed
     if seed is not None:
         np.random.seed(seed)
@@ -357,7 +362,10 @@ def main():
         
         generate_image(models=models)
     
-    
+    if args.profile and not args.onnx:
+        print(text_encoder.get_summary())
+        print(vae_decoder_model.get_summary())
+        print(unet.get_summary())
 
 
 if __name__ == "__main__":
