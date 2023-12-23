@@ -53,6 +53,6 @@ PyTorch 2.1.2
 ONNX opset = 17
 
 ## Netron
-[drbn_skf_lol_v1.onnx.prototxt]()
+[drbn_skf_lol_v1.onnx.prototxt](https://storage.googleapis.com/ailia-models/drbn_skf/drbn_slf_lol_v1.onnx.prototxt)
 
-[drbn_skf_lol_v2.onnx.prototxt]()
+[drbn_skf_lol_v2.onnx.prototxt](https://storage.googleapis.com/ailia-models/drbn_skf/drbn_slf_lol_v2.onnx.prototxt)
