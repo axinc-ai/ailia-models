@@ -34,6 +34,7 @@ parser.add_argument(
     "--version",
     default=1,
     type=int,
+    choices=[1, 2],
     help="DRBN SKF version (select 1 or 2)",
 )
 args = update_parser(parser)
@@ -56,17 +57,18 @@ def recognize_from_image(weight_path, model_path):
         img = rearrange(img, "1 h w c -> 1 c h w")
         logger.info(f"input image shape: {img.shape}")
         logger.info("Start inference ...")
+
         if args.benchmark:
             logger.info("BENCHMARK mode")
-            for i in range(5):
+            for _ in range(5):
                 start = int(round(time.time() * 1000))
                 pred = net.run(img)[0]
                 end = int(round(time.time() * 1000))
                 logger.info(f"\tailia processing time {end - start} ms")
         else:
             pred = net.run(img)[0]
-    
             pred = rearrange(pred, "1 c h w -> h w c")
+
         enhance = cv2.resize(pred, (W, H), interpolation=cv2.INTER_LANCZOS4)
         enhance = np.clip(enhance, 0.0, 1.0)
         output = (enhance * 255.).astype(np.uint8)
@@ -96,6 +98,7 @@ def recognize_from_video(weight_path, model_path):
         writer = None
     
     frame_shown = False
+
     while True:
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xff == ord("q")) or not ret:
@@ -117,6 +120,7 @@ def recognize_from_video(weight_path, model_path):
         if writer is not None:
             writer.write(output)
     
+    capture.release()
     if not writer is None:
         writer.release()
 
@@ -125,7 +129,7 @@ def main():
     version = args.version
     weight_path= WEIGHT_PATH.replace("lol", f"lol_v{version}")
     model_path= MODEL_PATH.replace("lol", f"lol_v{version}")
-    # check_and_download_models(weight_path, model_path, REMOTE_PATH)
+    check_and_download_models(weight_path, model_path, REMOTE_PATH)
 
     if args.video is None:
         recognize_from_image(weight_path, model_path)
