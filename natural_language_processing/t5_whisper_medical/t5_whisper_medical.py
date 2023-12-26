@@ -260,7 +260,7 @@ def main(args):
 
     if args.benchmark:
         logger.info('BENCHMARK mode')
-        with open(args.input[0], "r") as fi:
+        with open(args.input[0], "r", encoding="utf-8") as fi:
             body = fi.read()
         body_preprocessed = preprocess_body(body)
         for c in range(5):
@@ -271,7 +271,7 @@ def main(args):
     else:
         for input_path in args.input:
             # load input file
-            with open(input_path, "r") as fi:
+            with open(input_path, "r", encoding="utf-8") as fi:
                 body = fi.read()
 
             # pre process
@@ -281,7 +281,7 @@ def main(args):
             most_plausible_title, _ = model.estimate(body_preprocessed, 384, temperature=0.0, top_k=50, top_p=0)
             logger.info("%s", most_plausible_title)
             save_path = get_savepath(args.savepath, input_path)
-            with open(save_path, "w") as fo:
+            with open(save_path, "w", encoding="utf-8") as fo:
                 fo.write(most_plausible_title + "\n")
 
 

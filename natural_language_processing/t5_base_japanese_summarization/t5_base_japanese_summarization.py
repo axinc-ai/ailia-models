@@ -250,7 +250,7 @@ def summarize(model):
     input_text = args.input
     input_path = args.file
     if input_text is None:
-        input_text = open(input_path).read()
+        input_text = open(input_path, "r", encoding="utf-8").read()
 
     logger.info("input_text: %s" % input_text)
 
