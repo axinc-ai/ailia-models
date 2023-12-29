@@ -12,7 +12,7 @@ sys.path.append('../../util')
 from arg_utils import get_base_parser, update_parser, get_savepath  # noqa
 from model_utils import check_and_download_models  # noqa
 
-from kiss_fft import Complex, opus_fft_alloc_twiddles
+from kiss_fft import Complex, opus_fft_alloc_twiddles, opus_fft
 
 logger = getLogger(__name__)
 
@@ -125,9 +125,9 @@ def forward_transform(out, in_data):
 
     for i in range(WINDOW_SIZE):
         x[i].r = in_data[i]
-        x[i].i = 0;
+        x[i].i = 0
 
-    opus_fft(common.kfft, x, y, 0)
+    opus_fft(common.kfft, x, y)
     for i in range(FREQ_SIZE):
         out[i] = y[i]
 
