@@ -13,6 +13,7 @@ from arg_utils import get_base_parser, update_parser, get_savepath  # noqa
 from model_utils import check_and_download_models  # noqa
 
 from kiss_fft import Complex, opus_fft_alloc_twiddles, opus_fft
+from pitch import pitch_downsample
 
 logger = getLogger(__name__)
 
@@ -132,6 +133,27 @@ def forward_transform(out, in_data):
         out[i] = y[i]
 
 
+def compute_band_energy(bandE, X):
+    eband5ms = [
+        0, 1, 2, 3, 4, 5, 6, 7, 8, 10, 12, 14, 16, 20, 24, 28, 34, 40, 48, 60, 78, 100
+    ]
+
+    _sum = [0] * NB_BANDS
+    for i in range(NB_BANDS - 1):
+        band_size = (eband5ms[i + 1] - eband5ms[i]) << FRAME_SIZE_SHIFT
+        for j in range(band_size):
+            frac = j / band_size
+            tmp = X[(eband5ms[i] << FRAME_SIZE_SHIFT) + j].r ** 2
+            tmp += X[(eband5ms[i] << FRAME_SIZE_SHIFT) + j].i ** 2
+            _sum[i] += (1 - frac) * tmp
+            _sum[i + 1] += frac * tmp
+
+    _sum[0] *= 2
+    _sum[NB_BANDS - 1] *= 2
+    for i in range(NB_BANDS):
+        bandE[i] = _sum[i]
+
+
 def apply_window(x):
     check_init()
 
@@ -140,7 +162,7 @@ def apply_window(x):
         x[WINDOW_SIZE - 1 - i] *= common.half_window[i]
 
 
-def frame_analysis(st, X, in_data):
+def frame_analysis(st, X, Ex, in_data):
     x = np.zeros(WINDOW_SIZE)
     x[:FRAME_SIZE] = st.analysis_mem
     x[FRAME_SIZE:] = in_data
@@ -149,14 +171,20 @@ def frame_analysis(st, X, in_data):
     apply_window(x)
     forward_transform(X, x)
 
-    # compute_band_energy(Ex, X)
+    compute_band_energy(Ex, X)
 
 
-def compute_frame_features(st, X, P, x):
+def compute_frame_features(st, X, P, Exp, x):
     E = 0
     Ly = np.zeros(NB_BANDS)
+    pitch_buf = np.zeros(PITCH_BUF_SIZE >> 1)
 
-    frame_analysis(st, X, x)
+    frame_analysis(st, X, Exp, x)
+
+    st.pitch_buf[:PITCH_BUF_SIZE - FRAME_SIZE] = st.pitch_buf[FRAME_SIZE:]
+    st.pitch_buf[PITCH_BUF_SIZE - FRAME_SIZE:] = x
+    pre = [st.pitch_buf]
+    pitch_downsample(pre, pitch_buf, PITCH_BUF_SIZE, 1)
 
     features = np.zeros(NB_FEATURES)
     pitch_index = 375
@@ -204,13 +232,14 @@ def biquad(y, mem, x, b, a, N):
 def rnnoise_process_frame(net, st, in_data):
     X = [Complex() for _ in range(FREQ_SIZE)]
     P = [Complex() for _ in range(WINDOW_SIZE)]
+    Exp = np.zeros(NB_BANDS)
 
     x = np.zeros(FRAME_SIZE)
 
     a_hp = (-1.99599, 0.99600)
     b_hp = (-2., 1.)
     biquad(x, st.mem_hp_x, in_data, b_hp, a_hp, FRAME_SIZE)
-    compute_frame_features(st, X, P, x)
+    compute_frame_features(st, X, P, Exp, x)
 
 
 def recognize_from_audio(net):
