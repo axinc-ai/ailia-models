@@ -13,7 +13,7 @@ from arg_utils import get_base_parser, update_parser, get_savepath  # noqa
 from model_utils import check_and_download_models  # noqa
 
 from kiss_fft import Complex, opus_fft_alloc_twiddles, opus_fft
-from pitch import pitch_downsample
+from pitch import pitch_downsample, pitch_search, remove_doubling
 
 logger = getLogger(__name__)
 
@@ -27,6 +27,7 @@ REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/rnnoise/'
 
 AUDIO_PATH = 'babble_15dB.wav'
 
+PITCH_MIN_PERIOD = 60
 PITCH_MAX_PERIOD = 768
 PITCH_FRAME_SIZE = 960
 PITCH_BUF_SIZE = PITCH_MAX_PERIOD + PITCH_FRAME_SIZE
@@ -185,15 +186,20 @@ def compute_frame_features(st, X, P, Exp, x):
     st.pitch_buf[PITCH_BUF_SIZE - FRAME_SIZE:] = x
     pre = [st.pitch_buf]
     pitch_downsample(pre, pitch_buf, PITCH_BUF_SIZE, 1)
+    pitch_index = pitch_search(
+        pitch_buf[PITCH_MAX_PERIOD >> 1:], pitch_buf, PITCH_FRAME_SIZE,
+        PITCH_MAX_PERIOD - 3 * PITCH_MIN_PERIOD)
+    pitch_index = PITCH_MAX_PERIOD - pitch_index
+
+    p_pitch_index = [pitch_index]
+    gain = remove_doubling(
+        pitch_buf, PITCH_MAX_PERIOD, PITCH_MIN_PERIOD,
+        PITCH_FRAME_SIZE, p_pitch_index, st.last_period, st.last_gain)
+    st.last_period = pitch_index = p_pitch_index[0]
+    st.last_gain = gain
+    return
 
     features = np.zeros(NB_FEATURES)
-    pitch_index = 375
-
-    # pitch_search(
-    #     pitch_buf + (PITCH_MAX_PERIOD >> 1), pitch_buf, PITCH_FRAME_SIZE,
-    #     PITCH_MAX_PERIOD - 3 * PITCH_MIN_PERIOD, & pitch_index)
-    # pitch_index = PITCH_MAX_PERIOD - pitch_index
-
     features[NB_BANDS + 2 * NB_DELTA_CEPS] -= 1.3
     features[NB_BANDS + 2 * NB_DELTA_CEPS + 1] -= 0.9
     features[NB_BANDS + 3 * NB_DELTA_CEPS] = .01 * (pitch_index - 300)
