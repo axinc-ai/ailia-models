@@ -344,7 +344,7 @@ def remove_doubling(x, maxperiod, minperiod, N, T0_, prev_period, prev_gain):
     g = g0 = compute_pitch_gain(xy, xx, yy)
     # Look for any pitch at T/k
     for k in range(2, 15 + 1):
-        T1 = (2 * T0 + k) / (2 * k)
+        T1 = (2 * T0 + k) // (2 * k)
         if T1 < minperiod:
             break
         # Look for another strong correlation at T1b
@@ -354,7 +354,7 @@ def remove_doubling(x, maxperiod, minperiod, N, T0_, prev_period, prev_gain):
             else:
                 T1b = T0 + T1
         else:
-            T1b = (2 * second_check[k] * T0 + k) / (2 * k);
+            T1b = (2 * second_check[k] * T0 + k) // (2 * k);
 
         xy, xy2 = dual_inner_prod(x, x0[maxperiod - T1:], x0[maxperiod - T1b:], N)
         xy = .5 * (xy + xy2)

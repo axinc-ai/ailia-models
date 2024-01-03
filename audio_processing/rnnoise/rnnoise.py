@@ -85,6 +85,59 @@ class DenoiseState:
     lastg = np.zeros(NB_BANDS)
 
 
+def compute_band_energy(bandE, X):
+    eband5ms = [
+        0, 1, 2, 3, 4, 5, 6, 7, 8, 10, 12, 14, 16, 20, 24, 28, 34, 40, 48, 60, 78, 100
+    ]
+
+    _sum = [0] * NB_BANDS
+    for i in range(NB_BANDS - 1):
+        band_size = (eband5ms[i + 1] - eband5ms[i]) << FRAME_SIZE_SHIFT
+        for j in range(band_size):
+            frac = j / band_size
+            tmp = X[(eband5ms[i] << FRAME_SIZE_SHIFT) + j].r ** 2
+            tmp += X[(eband5ms[i] << FRAME_SIZE_SHIFT) + j].i ** 2
+            _sum[i] += (1 - frac) * tmp
+            _sum[i + 1] += frac * tmp
+
+    _sum[0] *= 2
+    _sum[NB_BANDS - 1] *= 2
+    for i in range(NB_BANDS):
+        bandE[i] = _sum[i]
+
+
+eband5ms = [
+    0, 1, 2, 3, 4, 5, 6, 7, 8, 10, 12, 14, 16, 20, 24, 28, 34, 40, 48, 60, 78, 100
+]
+
+
+def compute_band_corr(bandE, X, P):
+    _sum = [0] * NB_BANDS
+
+    for i in range(NB_BANDS - 1):
+        band_size = (eband5ms[i + 1] - eband5ms[i]) << FRAME_SIZE_SHIFT
+        for j in range(band_size):
+            frac = j / band_size
+            tmp = X[(eband5ms[i] << FRAME_SIZE_SHIFT) + j].r * P[(eband5ms[i] << FRAME_SIZE_SHIFT) + j].r
+            tmp += X[(eband5ms[i] << FRAME_SIZE_SHIFT) + j].i * P[(eband5ms[i] << FRAME_SIZE_SHIFT) + j].i
+            _sum[i] += (1 - frac) * tmp
+            _sum[i + 1] += frac * tmp
+
+    _sum[0] *= 2
+    _sum[NB_BANDS - 1] *= 2
+    for i in range(NB_BANDS):
+        bandE[i] = _sum[i]
+
+
+def interp_band_gain(g, bandE):
+    g[...] = 0
+    for i in range(NB_BANDS - 1):
+        band_size = (eband5ms[i + 1] - eband5ms[i]) << FRAME_SIZE_SHIFT
+        for j in range(band_size):
+            frac = j / band_size
+            g[(eband5ms[i] << FRAME_SIZE_SHIFT) + j] = (1 - frac) * bandE[i] + frac * bandE[i + 1]
+
+
 def check_init():
     if common.init:
         return
@@ -106,15 +159,14 @@ def check_init():
     common.init = True
 
 
-def dct(in_data):
+def dct(out, in_data):
     check_init()
 
-    out = []
     for i in range(NB_BANDS):
         _sum = 0
         for j in range(NB_BANDS):
             _sum += in_data[j] * common.dct_table[j * NB_BANDS + i]
-        out.append(_sum * math.sqrt(2. / 22))
+        out[i] = _sum * math.sqrt(2. / 22)
 
     return out
 
@@ -134,25 +186,24 @@ def forward_transform(out, in_data):
         out[i] = y[i]
 
 
-def compute_band_energy(bandE, X):
-    eband5ms = [
-        0, 1, 2, 3, 4, 5, 6, 7, 8, 10, 12, 14, 16, 20, 24, 28, 34, 40, 48, 60, 78, 100
-    ]
+def inverse_transform(out, in_data):
+    check_init()
 
-    _sum = [0] * NB_BANDS
-    for i in range(NB_BANDS - 1):
-        band_size = (eband5ms[i + 1] - eband5ms[i]) << FRAME_SIZE_SHIFT
-        for j in range(band_size):
-            frac = j / band_size
-            tmp = X[(eband5ms[i] << FRAME_SIZE_SHIFT) + j].r ** 2
-            tmp += X[(eband5ms[i] << FRAME_SIZE_SHIFT) + j].i ** 2
-            _sum[i] += (1 - frac) * tmp
-            _sum[i + 1] += frac * tmp
+    x = [Complex() for _ in range(WINDOW_SIZE)]
+    y = [Complex() for _ in range(WINDOW_SIZE)]
 
-    _sum[0] *= 2
-    _sum[NB_BANDS - 1] *= 2
-    for i in range(NB_BANDS):
-        bandE[i] = _sum[i]
+    for i in range(FREQ_SIZE):
+        x[i] = in_data[i]
+    for i in range(i + 1, WINDOW_SIZE):
+        x[i].r = x[WINDOW_SIZE - i].r
+        x[i].i = -x[WINDOW_SIZE - i].i
+
+    opus_fft(common.kfft, x, y)
+
+    # output in reverse order for IFFT.
+    out[0] = WINDOW_SIZE * y[0].r
+    for i in range(1, WINDOW_SIZE):
+        out[i] = WINDOW_SIZE * y[WINDOW_SIZE - i].r
 
 
 def apply_window(x):
@@ -175,12 +226,15 @@ def frame_analysis(st, X, Ex, in_data):
     compute_band_energy(Ex, X)
 
 
-def compute_frame_features(st, X, P, Exp, x):
+def compute_frame_features(st, X, P, Ex, Ep, Exp, features, x):
     E = 0
+    spec_variability = 0
     Ly = np.zeros(NB_BANDS)
+    p = np.zeros(WINDOW_SIZE)
     pitch_buf = np.zeros(PITCH_BUF_SIZE >> 1)
+    tmp = np.zeros(NB_BANDS)
 
-    frame_analysis(st, X, Exp, x)
+    frame_analysis(st, X, Ex, x)
 
     st.pitch_buf[:PITCH_BUF_SIZE - FRAME_SIZE] = st.pitch_buf[FRAME_SIZE:]
     st.pitch_buf[PITCH_BUF_SIZE - FRAME_SIZE:] = x
@@ -197,9 +251,19 @@ def compute_frame_features(st, X, P, Exp, x):
         PITCH_FRAME_SIZE, p_pitch_index, st.last_period, st.last_gain)
     st.last_period = pitch_index = p_pitch_index[0]
     st.last_gain = gain
-    return
 
-    features = np.zeros(NB_FEATURES)
+    for i in range(WINDOW_SIZE):
+        p[i] = st.pitch_buf[PITCH_BUF_SIZE - WINDOW_SIZE - pitch_index + i]
+    apply_window(p)
+    forward_transform(P, p)
+    compute_band_energy(Ep, P)
+    compute_band_corr(Exp, X, P)
+    for i in range(NB_BANDS):
+        Exp[i] = Exp[i] / math.sqrt(.001 + Ex[i] * Ep[i])
+    dct(tmp, Exp)
+
+    for i in range(NB_DELTA_CEPS):
+        features[NB_BANDS + 2 * NB_DELTA_CEPS + i] = tmp[i]
     features[NB_BANDS + 2 * NB_DELTA_CEPS] -= 1.3
     features[NB_BANDS + 2 * NB_DELTA_CEPS + 1] -= 0.9
     features[NB_BANDS + 3 * NB_DELTA_CEPS] = .01 * (pitch_index - 300)
@@ -208,17 +272,62 @@ def compute_frame_features(st, X, P, Exp, x):
     follow = -2
     for i in range(NB_BANDS):
         Ly[i] = math.log10(1e-2 + Ex[i])
-        Ly[i] = MAX16(logMax - 7, MAX16(follow - 1.5, Ly[i]))
-        logMax = MAX16(logMax, Ly[i])
-        follow = MAX16(follow - 1.5, Ly[i])
+        Ly[i] = max(logMax - 7, max(follow - 1.5, Ly[i]))
+        logMax = max(logMax, Ly[i])
+        follow = max(follow - 1.5, Ly[i])
         E += Ex[i]
 
     if E < 0.04:
         # If there's no audio, avoid messing up the state.
-        RNN_CLEAR(features, NB_FEATURES)
+        features[...] = 0
         return 1
 
     dct(features, Ly)
+
+    features[0] -= 12
+    features[1] -= 4
+    ceps_0 = st.cepstral_mem[st.memid]
+    ceps_1 = st.cepstral_mem[CEPS_MEM + st.memid - 1] \
+        if st.memid < 1 else st.cepstral_mem[st.memid - 1]
+    ceps_2 = st.cepstral_mem[CEPS_MEM + st.memid - 2] \
+        if st.memid < 2 else st.cepstral_mem[st.memid - 2]
+    for i in range(NB_BANDS):
+        ceps_0[i] = features[i]
+    st.memid += 1
+
+    for i in range(NB_DELTA_CEPS):
+        features[i] = ceps_0[i] + ceps_1[i] + ceps_2[i]
+        features[NB_BANDS + i] = ceps_0[i] - ceps_2[i]
+        features[NB_BANDS + NB_DELTA_CEPS + i] = ceps_0[i] - 2 * ceps_1[i] + ceps_2[i]
+
+    # Spectral variability features.
+    if st.memid == CEPS_MEM:
+        st.memid = 0
+
+    for i in range(CEPS_MEM):
+        mindist = 1e15
+        for j in range(CEPS_MEM):
+            dist = 0.
+            for k in range(NB_BANDS):
+                tmp = st.cepstral_mem[i][k] - st.cepstral_mem[j][k]
+                dist += tmp * tmp
+            if j != i:
+                mindist = min(mindist, dist)
+
+        spec_variability += mindist
+
+    features[NB_BANDS + 3 * NB_DELTA_CEPS + 1] = spec_variability / CEPS_MEM - 2.1
+
+    return E < 0.1
+
+
+def frame_synthesis(st, out, y):
+    x = np.zeros(WINDOW_SIZE)
+    inverse_transform(x, y);
+    apply_window(x)
+    for i in range(FRAME_SIZE):
+        out[i] = x[i] + st.synthesis_mem[i]
+    st.synthesis_mem[...] = x[FRAME_SIZE:]
 
 
 def biquad(y, mem, x, b, a, N):
@@ -230,22 +339,82 @@ def biquad(y, mem, x, b, a, N):
         y[i] = yi
 
 
+def pitch_filter(X, P, Ex, Ep, Exp, g):
+    r = np.zeros(NB_BANDS)
+    rf = np.zeros(FREQ_SIZE)
+
+    for i in range(NB_BANDS):
+        if Exp[i] > g[i]:
+            r[i] = 1
+        else:
+            r[i] = Exp[i] ** 2 * (1 - g[i] ** 2) / (.001 + (g[i] ** 2) * (1 - Exp[i] ** 2))
+        r[i] = math.sqrt(min(1, max(0, r[i])))
+        r[i] *= math.sqrt(Ex[i] / (1e-8 + Ep[i]))
+
+    interp_band_gain(rf, r)
+    for i in range(FREQ_SIZE):
+        X[i].r += rf[i] * P[i].r
+        X[i].i += rf[i] * P[i].i
+
+    newE = np.zeros(NB_BANDS)
+    compute_band_energy(newE, X)
+    norm = np.zeros(NB_BANDS)
+    normf = np.zeros(FREQ_SIZE)
+    for i in range(NB_BANDS):
+        norm[i] = math.sqrt(Ex[i] / (1e-8 + newE[i]))
+
+    interp_band_gain(normf, norm)
+    for i in range(FREQ_SIZE):
+        X[i].r *= normf[i]
+        X[i].i *= normf[i]
+
+
 # ======================
 # Main functions
 # ======================
 
 
-def rnnoise_process_frame(net, st, in_data):
+def rnnoise_process_frame(net, st, out, in_data):
     X = [Complex() for _ in range(FREQ_SIZE)]
     P = [Complex() for _ in range(WINDOW_SIZE)]
-    Exp = np.zeros(NB_BANDS)
-
     x = np.zeros(FRAME_SIZE)
+    Ex = np.zeros(NB_BANDS)
+    Ep = np.zeros(NB_BANDS)
+    Exp = np.zeros(NB_BANDS)
+    features = np.zeros(NB_FEATURES)
+    gf = np.ones(FREQ_SIZE)
 
     a_hp = (-1.99599, 0.99600)
     b_hp = (-2., 1.)
     biquad(x, st.mem_hp_x, in_data, b_hp, a_hp, FRAME_SIZE)
-    compute_frame_features(st, X, P, Exp, x)
+    silence = compute_frame_features(st, X, P, Ex, Ep, Exp, features, x)
+
+    if not silence:
+        # compute_rnn(net, g, & vad_prob, features)
+        x = [
+                features
+            ] * 100
+        x = np.array(x, dtype=np.float32)
+        x = np.expand_dims(x, axis=0)
+        # feedforward
+        if not args.onnx:
+            output = net.predict([x])
+        else:
+            output = net.run(None, {'main_input:0': x})
+        gains, vad_prob = output
+
+        pitch_filter(X, P, Ex, Ep, Exp, gains)
+        for i in range(NB_BANDS):
+            alpha = .6
+            gains[i] = max(gains[i], alpha * st.lastg[i])
+            st.lastg[i] = gains[i]
+        interp_band_gain(gf, gains)
+
+        for i in range(FREQ_SIZE):
+            X[i].r *= gf[i]
+            X[i].i *= gf[i]
+
+    frame_synthesis(st, out, X)
 
 
 def recognize_from_audio(net):
@@ -260,7 +429,7 @@ def recognize_from_audio(net):
             break
         x = [struct.unpack("<h", buf[i * 2:i * 2 + 2])[0] for i in range(len(buf) // 2)]
 
-        rnnoise_process_frame(net, st, x)
+        rnnoise_process_frame(net, st, x, x)
 
 
 def main():
