@@ -13,7 +13,7 @@
 <br/>
 
 ## usage
-Automatically downloads the onnx and prototxt files on the first run.
+Automatically downloads the onnx and prototxt files on the first run.  
 It is necessary to be connected to the Internet while downloading.
 
 For the sample image,
@@ -59,5 +59,5 @@ ONNX opset = 18
 
 ## Netron
 
-[mivolo.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/mivolo/mivolo.onnx.prototxt)
+[mivolo.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/mivolo/mivolo.onnx.prototxt)  
 [yolov8x_person_face.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/mivolo/yolov8x_person_face.onnx.prototxt)
