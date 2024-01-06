@@ -19,9 +19,9 @@ It is necessary to be connected to the Internet while downloading.
 For the sample image,
 ``` bash
 $ python mivolo.py --onnx
-(ex on CPU)  $ python mivolo.py --onnx -e 0
-(ex on BLAS) $ python mivolo.py --onnx -e 1
-(ex on GPU)  $ python mivolo.py --onnx -e 2
+(ex on CPU)  $ python3 mivolo.py --onnx -e 0
+(ex on BLAS) $ python3 mivolo.py --onnx -e 1
+(ex on GPU)  $ python3 mivolo.py --onnx -e 2
 ```
 
 If you want to specify the input image, put the image path after the `--input` option.  
@@ -53,7 +53,7 @@ Pytorch
 <br/>
 
 ## Model Format
-ONNX opset = 18
+ONNX opset = 11
 
 <br/>
 

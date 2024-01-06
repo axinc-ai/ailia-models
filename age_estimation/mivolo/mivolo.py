@@ -43,10 +43,6 @@ parser = get_base_parser(
     SAVE_IMAGE_OR_VIDEO_PATH,
 )
 parser.add_argument(
-    '-o', '--onnx', action='store_true',
-    help="Option to use onnxrutime to run or not."
-)
-parser.add_argument(
     '-ng', '--no_gender', action='store_true',
     help="Options to prevent gender prediction."
 )
@@ -65,7 +61,7 @@ REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/mivolo/'
 SLEEP_TIME = 0  # for web cam mode
 # for yolov8 and non-maximum-supression
 THRESH_YOLOV8 = 0.4
-THRESH_IOU = 0.5
+THRESH_IOU = 0.6
 # for gender and age estimation
 IMAGENET_DEFAULT_MEAN = (0.485, 0.456, 0.406)
 IMAGENET_DEFAULT_STD = (0.229, 0.224, 0.225)
@@ -350,17 +346,11 @@ def recognize_from_image(net_yolov8, net_mivolo):
             logger.info('BENCHMARK mode')
             for i in range(args.benchmark_count):
                 start = int(round(time.time() * 1000))
-                if args.onnx:
-                    output_yolov8 = net_yolov8.run(None, {net_yolov8.get_inputs()[0].name: input_data})
-                else:
-                    output_yolov8 = net_yolov8.run(input_data)
+                output_yolov8 = net_yolov8.run(input_data)
                 end = int(round(time.time() * 1000))
                 logger.info(f'\tailia processing time {end - start} ms')
         else:
-            if args.onnx:
-                output_yolov8 = net_yolov8.run(None, {net_yolov8.get_inputs()[0].name: input_data})
-            else:
-                output_yolov8 = net_yolov8.run(input_data)
+            output_yolov8 = net_yolov8.run(input_data)
         output_yolov8 = output_yolov8[0][0].T
 
         # apply threshold
@@ -417,17 +407,11 @@ def recognize_from_image(net_yolov8, net_mivolo):
                 logger.info('BENCHMARK mode')
                 for i in range(args.benchmark_count):
                     start = int(round(time.time() * 1000))
-                    if args.onnx:
-                        output_mivolo = net_mivolo.run(None, {net_mivolo.get_inputs()[0].name: input_data})
-                    else:
-                        output_mivolo = net_mivolo.run(input_data)
+                    output_mivolo = net_mivolo.run(input_data)
                     end = int(round(time.time() * 1000))
                     logger.info(f'\tailia processing time {end - start} ms')
             else:
-                if args.onnx:
-                    output_mivolo = net_mivolo.run(None, {net_mivolo.get_inputs()[0].name: input_data})
-                else:
-                    output_mivolo = net_mivolo.run(input_data)
+                output_mivolo = net_mivolo.run(input_data)
             output_mivolo = output_mivolo[0][0]
 
             label = ''
@@ -497,17 +481,11 @@ def recognize_from_video(net_yolov8, net_mivolo, tracker_face, tracker_person):
             logger.info('BENCHMARK mode')
             for i in range(args.benchmark_count):
                 start = int(round(time.time() * 1000))
-                if args.onnx:
-                    output_yolov8 = net_yolov8.run(None, {net_yolov8.get_inputs()[0].name: input_data})
-                else:
-                    output_yolov8 = net_yolov8.run(input_data)
+                output_yolov8 = net_yolov8.run(input_data)
                 end = int(round(time.time() * 1000))
                 logger.info(f'\tailia processing time {end - start} ms')
         else:
-            if args.onnx:
-                output_yolov8 = net_yolov8.run(None, {net_yolov8.get_inputs()[0].name: input_data})
-            else:
-                output_yolov8 = net_yolov8.run(input_data)
+            output_yolov8 = net_yolov8.run(input_data)
         output_yolov8 = output_yolov8[0][0].T
 
         # apply threshold
@@ -568,17 +546,11 @@ def recognize_from_video(net_yolov8, net_mivolo, tracker_face, tracker_person):
                 logger.info('BENCHMARK mode')
                 for i in range(args.benchmark_count):
                     start = int(round(time.time() * 1000))
-                    if args.onnx:
-                        output_mivolo = net_mivolo.run(None, {net_mivolo.get_inputs()[0].name: input_data})
-                    else:
-                        output_mivolo = net_mivolo.run(input_data)
+                    output_mivolo = net_mivolo.run(input_data)
                     end = int(round(time.time() * 1000))
                     logger.info(f'\tailia processing time {end - start} ms')
             else:
-                if args.onnx:
-                    output_mivolo = net_mivolo.run(None, {net_mivolo.get_inputs()[0].name: input_data})
-                else:
-                    output_mivolo = net_mivolo.run(input_data)
+                output_mivolo = net_mivolo.run(input_data)
             output_mivolo = output_mivolo[0][0]
 
             label = ''
@@ -640,14 +612,9 @@ def main():
     check_and_download_models(WEIGHT_MIVOLO_PATH, MODEL_MIVOLO_PATH, REMOTE_PATH)
 
     # net initialize
-    if args.onnx:
-        import onnxruntime
-        net_yolov8 = onnxruntime.InferenceSession(WEIGHT_YOLOV8_PATH)
-        net_mivolo = onnxruntime.InferenceSession(WEIGHT_MIVOLO_PATH)
-    else:
-        logger.info(f'env_id: {args.env_id}')
-        net_yolov8 = ailia.Net(MODEL_YOLOV8_PATH, WEIGHT_YOLOV8_PATH, env_id=args.env_id)
-        net_mivolo = ailia.Net(MODEL_MIVOLO_PATH, WEIGHT_MIVOLO_PATH, env_id=args.env_id)
+    logger.info(f'env_id: {args.env_id}')
+    net_yolov8 = ailia.Net(MODEL_YOLOV8_PATH, WEIGHT_YOLOV8_PATH, env_id=args.env_id)
+    net_mivolo = ailia.Net(MODEL_MIVOLO_PATH, WEIGHT_MIVOLO_PATH, env_id=args.env_id)
 
     tracker_face = BYTETracker(track_thresh=TRACK_THRESH, track_buffer=TRACK_BUFFER,
                                match_thresh=MATCH_THRESH, frame_rate=FRAME_RATE, mot20=MOT20)
