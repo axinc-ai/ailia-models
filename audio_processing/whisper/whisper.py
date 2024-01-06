@@ -178,7 +178,8 @@ if not args.onnx:
     AILIA_VERSION_REVISION = int(version[2])
     REQUIRE_CONSTANT_SHAPE_BETWEEN_INFERENCE = (
             AILIA_VERSION_MAJOR <= 1 and AILIA_VERSION_MINOR <= 2 and AILIA_VERSION_REVISION < 14)
-    COPY_BLOB_DATA_ENABLE = (AILIA_VERSION_MAJOR <= 1 and AILIA_VERSION_MINOR <= 2 and AILIA_VERSION_REVISION >= 15)
+    COPY_BLOB_DATA_ENABLE = (AILIA_VERSION_MAJOR >= 1 and AILIA_VERSION_MINOR >= 2 and AILIA_VERSION_REVISION >= 15)
+    LAYER_NORM_ENABLE = (AILIA_VERSION_MAJOR >= 1 and AILIA_VERSION_MINOR >= 2 and AILIA_VERSION_REVISION >= 16)
     SAVE_ENC_SHAPE = ()
     SAVE_DEC_SHAPE = ()
 
@@ -191,8 +192,15 @@ if not args.onnx:
 # Models
 # ======================
 
+# opt : mean variance normalization (opset 11)
+# opt2 : fuse scatterND (opset 11)
+# opt3 : layer normalization (opset 17)
+
 OPT = ".opt"
 OPT2 = ".opt2"
+if LAYER_NORM_ENABLE:
+    OPT = ".opt3"
+    OPT2 = ".opt3"
 if args.normal:
     OPT = ""
     OPT2 = ""
