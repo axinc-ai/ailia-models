@@ -187,6 +187,8 @@ if not args.onnx:
         args.memory_mode = ailia.get_memory_mode(
             reduce_constant=True, ignore_input_with_initializer=True,
             reduce_interstage=False, reuse_interstage=True)
+else:
+    LAYER_NORM_ENABLE = False
 
 # ======================
 # Models
