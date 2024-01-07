@@ -1,9 +1,11 @@
 import sys
-import time
 import math
+import wave
+import struct
 from logging import getLogger
 
 import numpy as np
+from tqdm import tqdm
 
 import ailia
 
@@ -26,6 +28,7 @@ MODEL_PATH = 'rnn_model.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/rnnoise/'
 
 AUDIO_PATH = 'babble_15dB.wav'
+OUTPUT_PATH = 'denoised.wav'
 
 PITCH_MIN_PERIOD = 60
 PITCH_MAX_PERIOD = 768
@@ -47,7 +50,7 @@ FREQ_SIZE = FRAME_SIZE + 1
 # ======================
 
 parser = get_base_parser(
-    'rnnoise', AUDIO_PATH, None
+    'rnnoise', AUDIO_PATH, OUTPUT_PATH
 )
 parser.add_argument(
     '--onnx',
@@ -60,7 +63,6 @@ args = update_parser(parser)
 # ======================
 # Secondaty Functions
 # ======================
-
 
 class CommonState:
     init = False
@@ -82,7 +84,6 @@ class DenoiseState:
     last_gain = 0.0
     last_period = 0
     mem_hp_x = np.zeros(2)
-    lastg = np.zeros(NB_BANDS)
 
 
 def compute_band_energy(bandE, X):
@@ -323,7 +324,7 @@ def compute_frame_features(st, X, P, Ex, Ep, Exp, features, x):
 
 def frame_synthesis(st, out, y):
     x = np.zeros(WINDOW_SIZE)
-    inverse_transform(x, y);
+    inverse_transform(x, y)
     apply_window(x)
     for i in range(FRAME_SIZE):
         out[i] = x[i] + st.synthesis_mem[i]
@@ -373,8 +374,7 @@ def pitch_filter(X, P, Ex, Ep, Exp, g):
 # Main functions
 # ======================
 
-
-def rnnoise_process_frame(net, st, out, in_data):
+def preprocess(st, data):
     X = [Complex() for _ in range(FREQ_SIZE)]
     P = [Complex() for _ in range(WINDOW_SIZE)]
     x = np.zeros(FRAME_SIZE)
@@ -382,54 +382,121 @@ def rnnoise_process_frame(net, st, out, in_data):
     Ep = np.zeros(NB_BANDS)
     Exp = np.zeros(NB_BANDS)
     features = np.zeros(NB_FEATURES)
-    gf = np.ones(FREQ_SIZE)
 
     a_hp = (-1.99599, 0.99600)
     b_hp = (-2., 1.)
-    biquad(x, st.mem_hp_x, in_data, b_hp, a_hp, FRAME_SIZE)
-    silence = compute_frame_features(st, X, P, Ex, Ep, Exp, features, x)
+    biquad(x, st.mem_hp_x, data, b_hp, a_hp, FRAME_SIZE)
+    compute_frame_features(st, X, P, Ex, Ep, Exp, features, x)
 
-    if not silence:
-        # compute_rnn(net, g, & vad_prob, features)
-        x = [
-                features
-            ] * 100
-        x = np.array(x, dtype=np.float32)
-        x = np.expand_dims(x, axis=0)
-        # feedforward
-        if not args.onnx:
-            output = net.predict([x])
-        else:
-            output = net.run(None, {'main_input:0': x})
-        gains, vad_prob = output
+    return X, P, Ex, Ep, Exp, features
 
-        pitch_filter(X, P, Ex, Ep, Exp, gains)
-        for i in range(NB_BANDS):
-            alpha = .6
-            gains[i] = max(gains[i], alpha * st.lastg[i])
-            st.lastg[i] = gains[i]
-        interp_band_gain(gf, gains)
+
+def postprocess(st, pp, gains, vad_prob):
+    outputs = []
+    for p, g, prob in zip(pp, gains, vad_prob):
+        X = p["X"]
+        P = p["P"]
+        Ex = p["Ex"]
+        Ep = p["Ep"]
+        Exp = p["Exp"]
+        gf = np.ones(FREQ_SIZE)
+        pitch_filter(X, P, Ex, Ep, Exp, g)
+        interp_band_gain(gf, g)
 
         for i in range(FREQ_SIZE):
             X[i].r *= gf[i]
             X[i].i *= gf[i]
 
-    frame_synthesis(st, out, X)
+        out = np.zeros(FRAME_SIZE)
+        frame_synthesis(st, out, X)
+
+        outputs.append(out)
+
+    return outputs
+
+
+def rnnoise_process_frame(net, x):
+    x = np.array(x, dtype=np.float32)
+    if x.shape[0] < 100:
+        x = np.concatenate([
+            x,
+            np.zeros((100 - x.shape[0], NB_FEATURES), dtype=np.float32)
+        ])
+
+    x = np.expand_dims(x, axis=0)
+
+    # feedforward
+    if not args.onnx:
+        output = net.predict([x])
+    else:
+        output = net.run(None, {'main_input:0': x})
+    gains, vad_prob = output
+
+    return gains[0], vad_prob[0]
 
 
 def recognize_from_audio(net):
-    import wave
-    import struct
-    wf = wave.open("babble_15dB.wav", "rb")
+    wav_path = args.input[0]
+    logger.info(wav_path)
 
+    logger.info('Start inference...')
+    wf = wave.open(wav_path, "rb")
+
+    save_path = get_savepath(args.savepath, wav_path, ext='.wav')
+    wf_out = wave.open(save_path, "wb")
+    wf_out.setnchannels(1)
+    wf_out.setsampwidth(16 // 8)
+    wf_out.setframerate(48000)
+
+    pp = []
     st = DenoiseState()
+    bar = tqdm(total=wf.getnframes())
     while True:
         buf = wf.readframes(FRAME_SIZE)
         if not buf:
             break
-        x = [struct.unpack("<h", buf[i * 2:i * 2 + 2])[0] for i in range(len(buf) // 2)]
+        data = np.frombuffer(buf, dtype=np.int16)
 
-        rnnoise_process_frame(net, st, x, x)
+        X, P, Ex, Ep, Exp, feat = preprocess(st, data)
+        pp.append(dict(
+            X=X,
+            P=P,
+            Ex=Ex,
+            Ep=Ep,
+            Exp=Exp,
+            feat=feat
+        ))
+
+        if len(pp) == 100:
+            x = [p["feat"] for p in pp]
+            gains, vad_prob = rnnoise_process_frame(net, x)
+            outputs = postprocess(st, pp, gains, vad_prob)
+            pp.clear()
+
+            for out in outputs:
+                out = np.array(out, dtype=int)
+                out = np.clip(out, (-0x7fff - 1), 0x7fff)
+                out = struct.pack("h" * len(out), *out)
+                wf_out.writeframes(out)
+
+        bar.update(len(data))
+
+    if 0 < len(pp):
+        x = [p["feat"] for p in pp]
+        gains, vad_prob = rnnoise_process_frame(net, x)
+        outputs = postprocess(st, pp, gains, vad_prob)
+
+        for out in outputs:
+            out = np.array(out, dtype=int)
+            out = np.clip(out, (-0x7fff - 1), 0x7fff)
+            out = struct.pack("h" * len(out), *out)
+            wf_out.writeframes(out)
+
+    bar.close()
+    wf_out.close()
+    logger.info(f'saved at : {save_path}')
+
+    logger.info('Script finished successfully.')
 
 
 def main():

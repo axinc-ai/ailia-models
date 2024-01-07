@@ -70,10 +70,10 @@ def _celt_autocorr(x, ac, window, overlap, lag, n):
     """
 
     fastN = n - lag
-    xx = [0] * n
     if overlap == 0:
         xptr = x
     else:
+        xx = [0] * n
         for i in range(n):
             xx[i] = x[i]
         for i in range(overlap):
