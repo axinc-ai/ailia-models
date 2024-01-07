@@ -631,12 +631,11 @@ def recognize_from_image():
             logger.info('BENCHMARK mode')
             for i in range(args.benchmark_count):
                 start = int(round(time.time() * 1000))
-                cmap = cnet.run(image1)[0]
+                net, up_mask, delta_flow = update_block.run([net, inp, corr, flow])
                 end = int(round(time.time() * 1000))
                 logger.info(f'\tailia processing time {end - start} ms')
         else:
-            cmap = cnet.run(image1)[0]
-        net, up_mask, delta_flow = update_block.run([net, inp, corr, flow])
+            net, up_mask, delta_flow = update_block.run([net, inp, corr, flow])
 
         # F(t+1) = F(t) + \Delta(t)
         coords1 = coords1 + delta_flow
