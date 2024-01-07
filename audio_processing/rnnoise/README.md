@@ -22,7 +22,7 @@ https://github.com/axinc-ai/ailia-models/assets/29946532/21eaf44d-bffd-428a-9637
 Automatically downloads the onnx and prototxt files on the first run.
 It is necessary to be connected to the Internet while downloading.
 
-For the sample image,
+For the sample wav,
 ```bash
 $ python3 rnnoise.py
 ```
