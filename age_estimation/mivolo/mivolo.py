@@ -119,7 +119,7 @@ def nms(bbox, thresh_iou=0.5):  # bbox:xyxys
     area = (bbox[:, 2] - bbox[:, 0]) * (bbox[:, 3] - bbox[:, 1])
     idx_sort = np.argsort(bbox[:, 4])
     i_watch = -1
-    while(len(idx_sort) >= (1 - i_watch)):
+    while (len(idx_sort) >= (1 - i_watch)):
         i_max_score = idx_sort[i_watch]
         idx_else = idx_sort[:i_watch]
         iou = calc_iou_1xN(bbox[i_max_score], bbox[idx_else], area[i_max_score], area[idx_else])
@@ -453,7 +453,6 @@ def recognize_from_image(net_yolov8, net_mivolo):
 def recognize_from_video(net_yolov8, net_mivolo, tracker_face, tracker_person):
     # capture video
     capture = webcamera_utils.get_capture(args.video)
-    num_frame = int(capture.get(cv2.CAP_PROP_FRAME_COUNT))
     height = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
     width = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
     fps = capture.get(cv2.CAP_PROP_FPS)
@@ -464,14 +463,14 @@ def recognize_from_video(net_yolov8, net_mivolo, tracker_face, tracker_person):
         writer = None
 
     frame_shown = False
-    for _ in range(num_frame):
+    while True:
         # read frame
         ret, frame = capture.read()
-        frame = frame[:, :, ::-1].copy()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
         if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
             break
+        frame = frame[..., ::-1].copy()
 
         # preprocessing
         input_data = prep_input(frame, width=IMAGE_WIDTH_YOLOV8, height=IMAGE_HEIGHT_YOLOV8)
