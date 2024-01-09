@@ -605,6 +605,7 @@ def decode(enc_net, dec_net, mel, options):
     kv_cache = None
 
     # sampling loop
+    print("Start tokens", tokens)
     for i in range(sample_len):
         if args.debug:
             start = int(round(time.time() * 1000))
@@ -682,6 +683,10 @@ def decode(enc_net, dec_net, mel, options):
 
     if single:
         result = result[0]
+
+    print("End tokens", tokens)
+    for text, language, tokens, features, avg_logprob, no_speech_prob in zip(*fields):
+        print("no_speech_prob", no_speech_prob, "avg_logprob", avg_logprob)
 
     return result
 
