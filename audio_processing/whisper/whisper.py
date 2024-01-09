@@ -689,33 +689,48 @@ def decode(enc_net, dec_net, mel, options):
 def decode_with_fallback(enc_net, dec_net, segment, decode_options):
     logprob_threshold = decode_options.get('logprob_threshold', -1.0)
     temperature = decode_options.get('temperature', 0)
+    no_speech_threshold = decode_options.get('no_speech_threshold', 0)
+    compression_ratio_threshold = None
 
-    temperatures = [temperature] if isinstance(temperature, (int, float)) else temperature
+    temperatures = (
+        [temperature] if isinstance(temperature, (int, float)) else temperature
+    )
+    decode_result = None
 
-    kwargs = {**decode_options}
-    t = temperatures[0]
-    if t == 0:
-        best_of = kwargs.pop("best_of", None)
-    else:
-        best_of = kwargs.get("best_of", None)
+    for t in temperatures:
+        kwargs = {**decode_options}
+        if t > 0:
+            # disable beam_size and patience when t > 0
+            kwargs.pop("beam_size", None)
+            kwargs.pop("patience", None)
+            print("temperature", t)
+        else:
+            # disable best_of when t == 0
+            kwargs.pop("best_of", None)
 
-    options = {**kwargs, "temperature": t}
-    results = decode(enc_net, dec_net, segment, options)
+        options = {**kwargs, "temperature": t}
+        decode_result = decode(enc_net, dec_net, segment, options)[0]
 
-    kwargs.pop("beam_size", None)  # no beam search for t > 0
-    kwargs.pop("patience", None)  # no patience for t > 0
-    kwargs["best_of"] = best_of  # enable best_of for t > 0
-    for t in temperatures[1:]:
-        needs_fallback = [
-            result.avg_logprob < logprob_threshold for result in results
-        ]
-        if any(needs_fallback):
-            options = {**kwargs, "temperature": t}
-            retries = decode(enc_net, dec_net, segment[needs_fallback], options)
-            for retry_index, original_index in enumerate(np.nonzero(needs_fallback)[0]):
-                results[original_index] = retries[retry_index]
+        needs_fallback = False
+        if (
+            compression_ratio_threshold is not None
+            and decode_result.compression_ratio > compression_ratio_threshold
+        ):
+            needs_fallback = True  # too repetitive
+        if (
+            logprob_threshold is not None
+            and decode_result.avg_logprob < logprob_threshold
+        ):
+            needs_fallback = True  # average log probability is too low
+        if (
+            no_speech_threshold is not None
+            and decode_result.no_speech_prob > no_speech_threshold
+        ):
+            needs_fallback = False  # silence
+        if not needs_fallback:
+            break
 
-    return results
+    return [decode_result]
 
 
 def predict(wav, enc_net, dec_net, immediate=False, microphone=False):
@@ -736,7 +751,8 @@ def predict(wav, enc_net, dec_net, immediate=False, microphone=False):
         'beam_size': args.beam_size, 'patience': args.patience,
         'length_penalty': args.length_penalty, 'suppress_tokens': args.suppress_tokens,
         'logprob_threshold': logprob_threshold,
-        'prompt': []
+        'prompt': [],
+        "no_speech_threshold": args.no_speech_threshold, "suppress_blank": True
     }
 
     mel = log_mel_spectrogram(wav, dims.n_mels, padding=N_SAMPLES)
