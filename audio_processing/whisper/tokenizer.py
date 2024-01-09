@@ -155,58 +155,6 @@ class Tokenizer:
 
         return tuple(sorted(result))
 
-    def split_to_word_tokens(self, tokens: List[int]):
-        if self.language in {"zh", "ja", "th", "lo", "my", "yue"}:
-            # These languages don't typically use spaces, so it is difficult to split words
-            # without morpheme analysis. Here, we instead split words at any
-            # position where the tokens are decoded as valid unicode points
-            return self.split_tokens_on_unicode(tokens)
-
-        return self.split_tokens_on_spaces(tokens)
-
-    def split_tokens_on_unicode(self, tokens: List[int]):
-        decoded_full = self.decode_with_timestamps(tokens)
-        replacement_char = "\ufffd"
-
-        words = []
-        word_tokens = []
-        current_tokens = []
-        unicode_offset = 0
-
-        for token in tokens:
-            current_tokens.append(token)
-            decoded = self.decode_with_timestamps(current_tokens)
-
-            if (
-                replacement_char not in decoded
-                or decoded_full[unicode_offset + decoded.index(replacement_char)]
-                == replacement_char
-            ):
-                words.append(decoded)
-                word_tokens.append(current_tokens)
-                current_tokens = []
-                unicode_offset += len(decoded)
-
-        return words, word_tokens
-
-    def split_tokens_on_spaces(self, tokens: List[int]):
-        subwords, subword_tokens_list = self.split_tokens_on_unicode(tokens)
-        words = []
-        word_tokens = []
-
-        for subword, subword_tokens in zip(subwords, subword_tokens_list):
-            special = subword_tokens[0] >= self.eot
-            with_space = subword.startswith(" ")
-            punctuation = subword.strip() in string.punctuation
-            if special or with_space or punctuation or len(words) == 0:
-                words.append(subword)
-                word_tokens.append(subword_tokens)
-            else:
-                words[-1] = words[-1] + subword
-                word_tokens[-1].extend(subword_tokens)
-
-        return words, word_tokens
-
 
 @lru_cache(maxsize=None)
 def get_encoding(name: str = "gpt2", num_languages: int = 99):
