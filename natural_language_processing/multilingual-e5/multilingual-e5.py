@@ -63,7 +63,7 @@ def read_sentences(file_path):
         from pdfminer.high_level import extract_text
         text = extract_text(file_path)
     else:
-        with open(file_path, "r") as f:
+        with open(file_path, "r", encoding="utf-8") as f:
             text = f.read()
 
     sents = text.replace('\n', '').split('。')
