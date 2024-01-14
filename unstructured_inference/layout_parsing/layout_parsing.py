@@ -2,11 +2,10 @@ import sys
 
 import ailia
 
-sys.path.append('../../util')
+sys.path.append("../../util")
 from logging import getLogger  # noqa: E402
 
-from arg_utils import (get_base_parser, get_savepath,  # noqa: E402
-                       update_parser)
+from arg_utils import get_base_parser, get_savepath, update_parser  # noqa: E402
 from layout_parsing_utils import pdf_to_images
 from model_utils import check_and_download_models  # noqa: E402
 

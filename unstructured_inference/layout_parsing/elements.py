@@ -84,7 +84,9 @@ class Rectangle:
             return False
         return intersections(self, other)[0, 1]
 
-    def is_in(self, other: Rectangle, error_margin: Optional[Union[int, float]] = None) -> bool:
+    def is_in(
+        self, other: Rectangle, error_margin: Optional[Union[int, float]] = None
+    ) -> bool:
         """Checks whether this rectangle is contained within another rectangle."""
         padded_other = other.pad(error_margin) if error_margin is not None else other
         return all(
@@ -103,7 +105,12 @@ class Rectangle:
     @property
     def coordinates(self):
         """Gets coordinates of the rectangle"""
-        return ((self.x1, self.y1), (self.x1, self.y2), (self.x2, self.y2), (self.x2, self.y1))
+        return (
+            (self.x1, self.y1),
+            (self.x1, self.y2),
+            (self.x2, self.y2),
+            (self.x2, self.y1),
+        )
 
     def intersection(self, other: Rectangle) -> Optional[Rectangle]:
         """Gives the rectangle that is the intersection of two rectangles, or None if the
@@ -141,7 +148,9 @@ class Rectangle:
         min_area = min(self.area, other.area)
         return safe_division(intersection_area, min_area)
 
-    def is_almost_subregion_of(self, other: Rectangle, subregion_threshold: float = 0.75) -> bool:
+    def is_almost_subregion_of(
+        self, other: Rectangle, subregion_threshold: float = 0.75
+    ) -> bool:
         """Returns whether this region is almost a subregion of other. This is determined by
         comparing the intersection area over self area to some threshold, and checking whether self
         is the smaller rectangle."""
