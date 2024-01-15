@@ -7,6 +7,7 @@ import numpy as np
 import cv2
 from PIL import Image
 from tqdm import tqdm
+from transformers import CLIPTokenizer
 
 import ailia
 
@@ -28,6 +29,10 @@ logger = getLogger(__name__)
 
 WEIGHT_UNET_PATH = 'unet.onnx'
 MODEL_UNET_PATH = 'unet.onnx.prototxt'
+WEIGHT_TEXT_ENCODER_PATH = 'text_encoder.onnx'
+MODEL_TEXT_ENCODER_PATH = 'text_encoder.onnx.prototxt'
+WEIGHT_VAE_ENCODER_PATH = 'vae_encoder.onnx'
+MODEL_VAE_ENCODER_PATH = 'vae_encoder.onnx.prototxt'
 WEIGHT_VAE_DECODER_PATH = 'vae_decoder.onnx'
 MODEL_VAE_DECODER_PATH = 'vae_decoder.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/marigold/'
@@ -82,12 +87,62 @@ def preprocess(img):
     return img
 
 
+def encode_rgb(vae_encoder, rgb_in):
+    # encode
+    if not args.onnx:
+        output = vae_encoder.predict([rgb_in])
+    else:
+        output = vae_encoder.run(None, {
+            'sample': rgb_in
+        })
+    mean = output[0]
+
+    # scale latent
+    rgb_latent_scale_factor = 0.18215
+    rgb_latent = mean * rgb_latent_scale_factor
+
+    return rgb_latent
+
+
 def single_infer(
         models,
         rgb_in,
         num_inference_steps):
     scheduler = models["scheduler"]
-    timesteps = scheduler.set_timesteps(num_inference_steps)
+    scheduler.set_timesteps(num_inference_steps)
+    timesteps = scheduler.timesteps  # [T]
+
+    # Encode image
+    vae_encoder = models["vae_encoder"]
+    rgb_latent = encode_rgb(vae_encoder, rgb_in)
+
+    if not hasattr(single_infer, "empty_text_embed"):
+        prompt = ""
+        tokenizer = models["tokenizer"]
+        text_inputs = tokenizer(
+            prompt,
+            padding="do_not_pad",
+            max_length=tokenizer.model_max_length,
+            truncation=True,
+            return_tensors="np",
+        )
+        text_input_ids = text_inputs.input_ids.astype(np.int32)
+
+        text_encoder = models["text_encoder"]
+        if not args.onnx:
+            output = text_encoder.predict([text_input_ids])
+        else:
+            output = text_encoder.run(None, {
+                'input_ids': text_input_ids
+            })
+        last_hidden_state = output[0]
+        single_infer.empty_text_embed = last_hidden_state
+
+    empty_text_embed = single_infer.empty_text_embed
+    batch_empty_text_embed = np.repeat(empty_text_embed, rgb_latent.shape[0], axis=0)
+
+    print(batch_empty_text_embed)
+    print(batch_empty_text_embed.shape)
 
 
 def post_processing(output):
@@ -169,13 +224,19 @@ def main():
     # initialize
     if not args.onnx:
         unet = ailia.Net(MODEL_UNET_PATH, WEIGHT_UNET_PATH, env_id=env_id)
+        text_encoder = ailia.Net(MODEL_TEXT_ENCODER_PATH, WEIGHT_TEXT_ENCODER_PATH, env_id=env_id)
+        vae_encoder = ailia.Net(MODEL_VAE_ENCODER_PATH, WEIGHT_VAE_ENCODER_PATH, env_id=env_id)
         vae_decoder = ailia.Net(MODEL_VAE_DECODER_PATH, WEIGHT_VAE_DECODER_PATH, env_id=env_id)
     else:
         import onnxruntime
         cuda = 0 < ailia.get_gpu_environment_id()
         providers = ['CUDAExecutionProvider', 'CPUExecutionProvider'] if cuda else ['CPUExecutionProvider']
         unet = onnxruntime.InferenceSession(WEIGHT_UNET_PATH, providers=providers)
+        text_encoder = onnxruntime.InferenceSession(WEIGHT_TEXT_ENCODER_PATH, providers=providers)
+        vae_encoder = onnxruntime.InferenceSession(WEIGHT_VAE_ENCODER_PATH, providers=providers)
         vae_decoder = onnxruntime.InferenceSession(WEIGHT_VAE_DECODER_PATH, providers=providers)
+
+    tokenizer = CLIPTokenizer.from_pretrained("tokenizer")
 
     scheduler = df.schedulers.DDIMScheduler.from_config({
         "prediction_type": "v_prediction",
@@ -218,7 +279,10 @@ def main():
 
     models = {
         "unet": unet,
+        "text_encoder": text_encoder,
+        "vae_encoder": vae_encoder,
         "vae_decoder": vae_decoder,
+        "tokenizer": tokenizer,
         "scheduler": scheduler,
     }
 
