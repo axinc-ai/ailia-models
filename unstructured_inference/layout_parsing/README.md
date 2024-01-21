@@ -29,6 +29,7 @@ $ python lauout_parsing.py --savepath <image folder> --input xxx.pdf --detector
 PyTorch
 
 ## Model format
+ONNX opset = 11
 
 ## Netron
 - [layout_parsing_yolox.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/layout-parsing/layoyt_parsing_yolox.onnx.prototxt)
