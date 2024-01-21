@@ -6,10 +6,8 @@ import cv2
 sys.path.append("../../util")
 from logging import getLogger  # noqa: E402
 
-from arg_utils import (get_base_parser, get_savepath,  # noqa: E402
-                       update_parser)
-from detector_utils import (load_image, plot_results, reverse_letterbox,
-                            write_predictions)
+from arg_utils import get_base_parser, update_parser
+from detector_utils import plot_results, reverse_letterbox
 from model_utils import check_and_download_models  # noqa: E402
 
 from layout_parsing_utils import pdf_to_images, preprocess
@@ -18,8 +16,8 @@ from yolox import YOLOX_LABEL_MAP
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/unstructured-inference/layout-parsing"
 PDF_PATH = "sample.pdf"
 SAVE_IMAGE_PATH = ""
-WEIGHT_PATH = "yolox.onnx"
-MODEL_PATH = "yolox.onnx.prototxt"
+WEIGHT_PATH = "layout_parsing_yolox.onnx"
+MODEL_PATH = WEIGHT_PATH + ".prototxt"
 INPUT_SHAPE = (1024, 768)
 SCORE_THR = 0.25
 NMS_THR = 0.1
@@ -87,15 +85,14 @@ def infer(detector: ailia.Detector):
 
         if args.detector:
             res_img = plot_results(detector, img_orig, YOLOX_LABEL_MAP)
-            cv2.imwrite(image_name.replace(".ppm", "_draw.jpg"), res_img)
             detect_object = detector
         else:
-            predictions = postprocess(output[0], (HEIGHT, WIDTH))[0]
+            predictions = postprocess(output[0], INPUT_SHAPE)[0]
             detect_object = predictions_to_object(predictions, img_orig, ratio, args.iou, args.threshold)
             detect_object = reverse_letterbox(detect_object, img_orig, (img_orig.shape[0], img_orig.shape[1]))
             res_img = plot_results(detect_object, img_orig, YOLOX_LABEL_MAP)
 
-
+        cv2.imwrite(image_name.replace(".ppm", "_parsed.jpg"), res_img)
 
 
 if __name__ == "__main__":
@@ -103,10 +100,8 @@ if __name__ == "__main__":
     # check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
     env_id = args.env_id
     detector = ailia.Detector(
-        "layout_parsing_yolox.onnx.prototxt",
-        "layout_parsing_yolox.onnx",
-        # MODEL_PATH,
-        # WEIGHT_PATH,
+        MODEL_PATH,
+        WEIGHT_PATH,
         len(YOLOX_LABEL_MAP),
         format=ailia.NETWORK_IMAGE_FORMAT_BGR,
         channel=ailia.NETWORK_IMAGE_CHANNEL_FIRST,
