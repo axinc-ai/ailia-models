@@ -2,7 +2,7 @@
 ## Input
 Input is a PDF file which you want to parse layout. sample.pdf is a sample pdf.
 
-![Input](input.jpg)
+![Input](input.ppm)
 
 ## Output
 Outputs are images with bounding boxes.
