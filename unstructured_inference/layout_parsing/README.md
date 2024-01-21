@@ -22,6 +22,11 @@ If you want to specify input pdf,
 $ python lauout_parsing.py --savepath <image folder> --input xxx.pdf --detector
 ```
 
+And, if you want to parse layout of image,
+```
+$ python lauout_parsing.py --savepath <image folder> --input xxx.jpg -fi --detector
+```
+
 ## Reference
 - [Original repository](https://github.com/Unstructured-IO/unstructured-inference/tree/main)
 
