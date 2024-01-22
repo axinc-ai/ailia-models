@@ -116,6 +116,11 @@ def single_infer(
     vae_encoder = models["vae_encoder"]
     rgb_latent = encode_rgb(vae_encoder, rgb_in)
 
+    # Initial depth map (noise)
+    depth_latent = np.random.randn(
+        rgb_latent.size,
+    ).reshape(rgb_latent.shape)  # [B, 4, h, w]
+
     if not hasattr(single_infer, "empty_text_embed"):
         prompt = ""
         tokenizer = models["tokenizer"]
@@ -141,8 +146,31 @@ def single_infer(
     empty_text_embed = single_infer.empty_text_embed
     batch_empty_text_embed = np.repeat(empty_text_embed, rgb_latent.shape[0], axis=0)
 
-    print(batch_empty_text_embed)
-    print(batch_empty_text_embed.shape)
+    net = models["unet"]
+
+    pbar = tqdm(
+        enumerate(timesteps),
+        total=len(timesteps),
+        leave=False,
+        desc=" " * 4 + "Diffusion denoising",
+    )
+    for i, t in pbar:
+        t = np.array([t], dtype=np.float32)
+        unet_input = np.concatenate(
+            [rgb_latent, depth_latent], axis=1
+        )
+
+        if not args.onnx:
+            output = net.predict([unet_input, t, batch_empty_text_embed])
+        else:
+            output = net.run(None, {
+                'sample': unet_input, 'timestep': t,
+                'encoder_hidden_states': batch_empty_text_embed
+            })
+        noise_pred = output[0]
+
+        # compute the previous noisy sample x_t -> x_t-1
+        depth_latent = scheduler.step(noise_pred, t.item(), depth_latent)
 
 
 def post_processing(output):
