@@ -1,4 +1,4 @@
-# Vision Transformer
+# MiVOLO: Multi-input Transformer for Age and Gender Estimation
 
 ## input
 ![input image](input.jpg)
