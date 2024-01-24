@@ -1,6 +1,7 @@
 import sys
 import time
 import math
+import itertools
 from logging import getLogger
 
 import numpy as np
@@ -8,6 +9,7 @@ import cv2
 from PIL import Image
 from tqdm import tqdm
 from transformers import CLIPTokenizer
+from scipy.optimize import minimize
 
 import ailia
 
@@ -155,26 +157,144 @@ def single_infer(
         desc=" " * 4 + "Diffusion denoising",
     )
     for i, t in pbar:
-        t = np.array([t], dtype=np.float32)
+        timestep = np.array([t], dtype=np.float32)
         unet_input = np.concatenate(
             [rgb_latent, depth_latent], axis=1
         )
 
         if not args.onnx:
-            output = net.predict([unet_input, t, batch_empty_text_embed])
+            output = net.predict([unet_input, timestep, batch_empty_text_embed])
         else:
             output = net.run(None, {
-                'sample': unet_input, 'timestep': t,
+                'sample': unet_input, 'timestep': timestep,
                 'encoder_hidden_states': batch_empty_text_embed
             })
         noise_pred = output[0]
 
         # compute the previous noisy sample x_t -> x_t-1
-        depth_latent = scheduler.step(noise_pred, t.item(), depth_latent)
+        depth_latent = scheduler.step(noise_pred, t, depth_latent)
+
+    depth_latent_scale_factor = 0.18215
+    depth_latent = depth_latent / depth_latent_scale_factor
+
+    vae_decoder = models["vae_decoder"]
+    if not args.onnx:
+        output = vae_decoder.predict([depth_latent])
+    else:
+        output = vae_decoder.run(None, {
+            'latent_sample': depth_latent
+        })
+    stacked = output[0]
+    depth = np.mean(stacked, axis=1, keepdims=True)
+
+    # clip prediction
+    depth = np.clip(depth, -1.0, 1.0)
+    # shift to [0, 1]
+    depth = (depth + 1.0) / 2.0
+
+    return depth
 
 
-def post_processing(output):
-    return None
+def ensemble_depths(
+        input_images: np.ndarray,
+        regularizer_strength: float = 0.02,
+        max_iter: int = 2,
+        tol: float = 1e-3,
+        reduction: str = "median"):
+    """
+    To ensemble multiple affine-invariant depth images (up to scale and shift),
+        by aligning estimating the scale and shift
+    """
+    original_input = np.copy(input_images)
+    n_img = input_images.shape[0]
+
+    # init guess
+    _min = np.min(input_images.reshape((n_img, -1)), axis=1)
+    _max = np.max(input_images.reshape((n_img, -1)), axis=1)
+    s_init = 1.0 / (_max - _min).reshape((-1, 1, 1))
+    t_init = (-1 * s_init.flatten() * _min.flatten()).reshape((-1, 1, 1))
+    x = np.concatenate([s_init, t_init]).reshape(-1)
+
+    def inter_distances(tensors: np.ndarray):
+        """
+        To calculate the distance between each two depth maps.
+        """
+        distances = []
+        for i, j in itertools.combinations(np.arange(tensors.shape[0]), 2):
+            arr1 = tensors[i: i + 1]
+            arr2 = tensors[j: j + 1]
+            distances.append(arr1 - arr2)
+        dist = np.concatenate(distances, axis=0)
+        return dist
+
+    # objective function
+    def closure(x):
+        l = len(x)
+        s = x[: l // 2]
+        t = x[l // 2:]
+
+        transformed_arrays = input_images * s.reshape((-1, 1, 1)) + t.reshape((-1, 1, 1))
+        dists = inter_distances(transformed_arrays)
+        sqrt_dist = np.sqrt(np.mean(dists ** 2))
+
+        if "mean" == reduction:
+            pred = np.mean(transformed_arrays, axis=0)
+        elif "median" == reduction:
+            if transformed_arrays.shape[0] % 2 == 0:
+                pad = np.ones(transformed_arrays.shape[1:]) * -math.inf
+                pad = np.expand_dims(pad, axis=0)
+                transformed_arrays = np.concatenate([pad, transformed_arrays], axis=0)
+            pred = np.median(transformed_arrays, axis=0)
+        else:
+            raise ValueError
+
+        near_err = np.sqrt((0 - np.min(pred)) ** 2)
+        far_err = np.sqrt((1 - np.max(pred)) ** 2)
+
+        err = sqrt_dist + (near_err + far_err) * regularizer_strength
+        err = err.astype(np.float32)
+        return err
+
+    res = minimize(
+        closure, x, method="BFGS", tol=tol, options={"maxiter": max_iter, "disp": False}
+    )
+    x = res.x
+    l = len(x)
+    s = x[: l // 2]
+    t = x[l // 2:]
+
+    # Prediction
+    transformed_arrays = original_input * s.reshape(-1, 1, 1) + t.reshape(-1, 1, 1)
+    if "mean" == reduction:
+        aligned_images = np.mean(transformed_arrays, axis=0)
+        std = np.std(transformed_arrays, axis=0)
+        uncertainty = std
+    elif "median" == reduction:
+        if transformed_arrays.shape[0] % 2 == 0:
+            pad = np.ones(transformed_arrays.shape[1:]) * -math.inf
+            pad = np.expand_dims(pad, axis=0)
+            x = np.concatenate([pad, transformed_arrays], axis=0)
+            aligned_images = np.median(x, axis=0)
+        else:
+            aligned_images = np.median(transformed_arrays, axis=0)
+        # MAD (median absolute deviation) as uncertainty indicator
+        abs_dev = np.abs(transformed_arrays - aligned_images)
+        if abs_dev.shape[0] % 2 == 0:
+            pad = np.ones(abs_dev.shape[1:]) * -math.inf
+            pad = np.expand_dims(pad, axis=0)
+            abs_dev = np.concatenate([pad, abs_dev], axis=0)
+        mad = np.median(abs_dev, axis=0)
+        uncertainty = mad
+    else:
+        raise ValueError(f"Unknown reduction method: {reduction}")
+
+    # Scale and shift to [0, 1]
+    _min = np.min(aligned_images)
+    _max = np.max(aligned_images)
+    aligned_images = (aligned_images - _min) / (_max - _min)
+    uncertainty /= _max - _min
+
+    return aligned_images, uncertainty
 
 
 def predict(models, img):
@@ -191,6 +311,7 @@ def predict(models, img):
     bar = tqdm(
         total=cnt, desc=" " * 2 + "Inference batches", leave=False
     )
+    depth_pred_ls = []
     for i in range(cnt):
         batched_img = imgs[i * bs:(i + 1) * bs]
         depth_pred_raw = single_infer(
@@ -198,12 +319,31 @@ def predict(models, img):
             rgb_in=batched_img,
             num_inference_steps=denoising_steps,
         )
+        depth_pred_ls.append(depth_pred_raw)
 
         bar.update(1)
 
-    # pred = post_processing(output)
+    depth_preds = np.concatenate(depth_pred_ls, axis=0)
+    depth_preds = np.squeeze(depth_preds)
 
-    return
+    if ensemble_size > 1:
+        depth_pred, _ = ensemble_depths(depth_preds)
+    else:
+        depth_pred = depth_preds
+
+    # Scale prediction to [0, 1]
+    min_d = np.min(depth_pred)
+    max_d = np.max(depth_pred)
+    depth_pred = (depth_pred - min_d) / (max_d - min_d)
+
+    pred_img = Image.fromarray(depth_pred)
+    pred_img = pred_img.resize(input_size)
+    depth_pred = np.asarray(pred_img)
+
+    # Clip output range
+    depth_pred = np.clip(depth_pred, 0, 1)
+
+    return depth_pred
 
 
 def recognize_from_image(models):
@@ -277,33 +417,6 @@ def main():
         "beta_end": 0.012,
         "num_train_timesteps": 1000,
     })
-
-    # unet_input = np.load("unet_input.npy")
-    # batch_empty_text_embed = np.load("batch_empty_text_embed.npy")
-    # t = np.array([901], dtype=np.float32)
-    #
-    # print("1---", unet_input)
-    # print("1---", unet_input.shape)
-    # print("2---", t)
-    # print("2---", t.shape)
-    # print("3---", batch_empty_text_embed)
-    # print("3---", batch_empty_text_embed.shape)
-    # output = unet.run(None, {
-    #     'sample': unet_input, 'timestep': t, 'encoder_hidden_states': batch_empty_text_embed
-    # })
-    # noise_pred = output[0]
-    # print("4---", noise_pred)
-    # print("4---", noise_pred.shape)
-
-    # depth_latent = np.load("depth_latent.npy")
-    # print("5---", depth_latent)
-    # print("5---", depth_latent.shape)
-    # output = vae_decoder.run(None, {
-    #     'latent_sample': depth_latent
-    # })
-    # stacked = output[0]
-    # print("6---", stacked)
-    # print("6---", stacked.shape)
 
     models = {
         "unet": unet,
