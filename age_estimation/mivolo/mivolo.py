@@ -610,6 +610,11 @@ def main():
     check_and_download_models(WEIGHT_YOLOV8_PATH, MODEL_YOLOV8_PATH, REMOTE_PATH)
     check_and_download_models(WEIGHT_MIVOLO_PATH, MODEL_MIVOLO_PATH, REMOTE_PATH)
 
+    # disable FP16
+    if "FP16" in ailia.get_environment(args.env_id).props or sys.platform == 'Darwin':
+        logger.warning('This model do not work on FP16. So use CPU mode.')
+        args.env_id = 0
+
     # net initialize
     logger.info(f'env_id: {args.env_id}')
     net_yolov8 = ailia.Net(MODEL_YOLOV8_PATH, WEIGHT_YOLOV8_PATH, env_id=args.env_id)
