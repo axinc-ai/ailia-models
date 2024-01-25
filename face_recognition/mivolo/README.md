@@ -18,25 +18,25 @@ It is necessary to be connected to the Internet while downloading.
 
 For the sample image,
 ``` bash
-$ python mivolo.py --onnx
-(ex on CPU)  $ python3 mivolo.py --onnx -e 0
-(ex on BLAS) $ python3 mivolo.py --onnx -e 1
-(ex on GPU)  $ python3 mivolo.py --onnx -e 2
+$ python mivolo.py
+(ex on CPU)  $ python3 mivolo.py -e 0
+(ex on BLAS) $ python3 mivolo.py -e 1
+(ex on GPU)  $ python3 mivolo.py -e 2
 ```
 
 If you want to specify the input image, put the image path after the `--input` option.  
 You can use `--savepath` option to change the name of the output file to save.
 ```bash
-$ python3 mivolo.py --onnx --input IMAGE_PATH --savepath SAVE_IMAGE_PATH
-$ python3 mivolo.py --onnx -i IMAGE_PATH -s SAVE_IMAGE_PATH
-(ex) $ python3 mivolo.py --onnx --input input.jpg --savepath output.png
+$ python3 mivolo.py --input IMAGE_PATH --savepath SAVE_IMAGE_PATH
+$ python3 mivolo.py -i IMAGE_PATH -s SAVE_IMAGE_PATH
+(ex) $ python3 mivolo.py --input input.jpg --savepath output.png
 ```
 
 By adding the `--video` option, you can input the video.
 ```bash
-$ python3 mivolo.py --onnx --video VIDEO_PATH --savepath SAVE_VIDEO_PATH
-$ python3 mivolo.py --onnx -v VIDEO_PATH -s SAVE_VIDEO_PATH
-(ex) $ python3 mivolo.py --onnx --video input.mp4 --savepath output.mp4
+$ python3 mivolo.py --video VIDEO_PATH --savepath SAVE_VIDEO_PATH
+$ python3 mivolo.py -v VIDEO_PATH -s SAVE_VIDEO_PATH
+(ex) $ python3 mivolo.py --video input.mp4 --savepath output.mp4
 ```
 
 <br/>
