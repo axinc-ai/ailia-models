@@ -91,7 +91,8 @@ cd ../../face_recognition/ax_facial_features; python3 ax_facial_features.py ${OP
 cd ../../face_recognition/6d_repnet; python3 6d_repnet.py ${OPTION}
 cd ../../face_recognition/hsemotion; python3 hsemotion.py ${OPTION}
 cd ../../face_recognition/facemesh_v2; python3 facemesh_v2.py ${OPTION}
-cd ../../face_recognition/3ddfa; python3 3ddfa$.py ${OPTION}
+cd ../../face_recognition/3ddfa; python3 3ddfa.py ${OPTION}
+cd ../../face_recognition/mivolo; python3 mivolo.py ${OPTION}
 cd ../../frame_interpolation/flavr; python3 flavr.py ${OPTION}
 cd ../../frame_interpolation/cain; python3 cain.py ${OPTION}
 cd ../../frame_interpolation/film; python3 film.py ${OPTION}
