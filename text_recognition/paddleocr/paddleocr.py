@@ -67,6 +67,8 @@ DICT_PATH_REC_KOR_MBL = './dict/kor_eng_num_sym_org.txt'
 IMAGE_OR_VIDEO_PATH = 'input.jpg'
 SAVE_IMAGE_OR_VIDEO_PATH = 'output.png'
 
+REOPEN_REQUIRE_IF_SHAPE_CHANED = True # Require for ailia SDK <= 1.2.16
+
 # ======================
 # Arguemnt Parser Config
 # ======================
@@ -821,6 +823,9 @@ class TextDetector(object):
         starttime = time.time()
 
         # net initialize, Text Detection
+        if self.called and self.net.get_input_shape() != img.shape and REOPEN_REQUIRE_IF_SHAPE_CHANED:
+            self.net = ailia.Net(self.config['det_model_path'] + '.prototxt',
+                                 self.config['det_model_path'], env_id=self.env_id)
         outputs = self.net.predict(img)
         self.called = True
 
@@ -904,6 +909,9 @@ class TextClassifier(object):
             starttime = time.time()
 
             # net initialize, Detection Boxes Rectify
+            if self.called and self.net.get_input_shape() != norm_img_batch.shape and REOPEN_REQUIRE_IF_SHAPE_CHANED:
+                self.net = ailia.Net(self.cfg['cls_model_path'] + '.prototxt',
+                                     self.cfg['cls_model_path'], env_id=self.env_id)
             self.net.set_input_shape(norm_img_batch.shape)
             prob_out = self.net.predict(norm_img_batch)
             self.called = True
@@ -1000,6 +1008,9 @@ class TextRecognizer(object):
             starttime = time.time()
 
             # net initialize, Text Recognition
+            if self.called and self.net.get_input_shape() != norm_img_batch.shape and REOPEN_REQUIRE_IF_SHAPE_CHANED:
+                self.net = ailia.Net(self.config['rec_model_path'] + '.prototxt',
+                                     self.config['rec_model_path'], env_id=self.env_id)
             preds = self.net.predict(norm_img_batch)
             self.called = True
 
