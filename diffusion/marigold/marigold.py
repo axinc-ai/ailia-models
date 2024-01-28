@@ -1,4 +1,5 @@
 import sys
+import os
 import time
 import math
 import itertools
@@ -7,6 +8,7 @@ from logging import getLogger
 import numpy as np
 import cv2
 from PIL import Image
+import matplotlib
 from tqdm import tqdm
 from transformers import CLIPTokenizer
 from scipy.optimize import minimize
@@ -50,6 +52,22 @@ parser = get_base_parser(
     'Marigold', IMAGE_PATH, SAVE_IMAGE_PATH
 )
 parser.add_argument(
+    "--denoise_steps", type=int, default=10,
+    help="Diffusion denoising steps, more stepts results in higher accuracy but slower inference speed.",
+)
+parser.add_argument(
+    "--ensemble_size", type=int, default=1,
+    help="Number of predictions to be ensembled, more inference gives better results but runs slower.",
+)
+parser.add_argument(
+    "--batch_size", type=int, default=0,
+    help="Inference batch size. Default: 0 (will be set automatically).",
+)
+parser.add_argument(
+    "--seed", type=int, default=None,
+    help="Random seed."
+)
+parser.add_argument(
     '--onnx',
     action='store_true',
     help='execute onnxruntime version.'
@@ -61,8 +79,25 @@ args = update_parser(parser)
 # Secondaty Functions
 # ======================
 
-# def draw_bbox(img, bboxes):
-#     return img
+def colorize_depth_maps(
+        depth_map, min_depth, max_depth, cmap="Spectral"):
+    """
+    Colorize depth maps.
+    """
+    depth = depth_map.copy().squeeze()
+    # reshape to [ (B,) H, W ]
+    if depth.ndim < 3:
+        depth = depth[np.newaxis, :, :]
+
+    # colorize
+    cm = matplotlib.colormaps[cmap]
+    depth = ((depth - min_depth) / (max_depth - min_depth)).clip(0, 1)
+    img_colored_np = cm(depth, bytes=False)[:, :, :, 0:3]  # value from 0 to 1
+    img_colored_np = np.rollaxis(img_colored_np, 3, 1)
+
+    img_colored = img_colored_np
+
+    return img_colored
 
 
 # ======================
@@ -78,7 +113,7 @@ def preprocess(img):
     )
     ow = int(im_w * downscale_factor)
     oh = int(im_h * downscale_factor)
-    img = np.array(Image.fromarray(img).resize((ow, oh), Image.Resampling.BILINEAR))
+    img = np.array(Image.fromarray(img).resize((ow, oh), Image.Resampling.BICUBIC))
 
     img = normalize_image(img, normalize_type='255')
 
@@ -121,7 +156,7 @@ def single_infer(
     # Initial depth map (noise)
     depth_latent = np.random.randn(
         rgb_latent.size,
-    ).reshape(rgb_latent.shape)  # [B, 4, h, w]
+    ).reshape(rgb_latent.shape).astype(np.float32)
 
     if not hasattr(single_infer, "empty_text_embed"):
         prompt = ""
@@ -161,6 +196,7 @@ def single_infer(
         unet_input = np.concatenate(
             [rgb_latent, depth_latent], axis=1
         )
+        unet_input = unet_input.astype(np.float32)
 
         if not args.onnx:
             output = net.predict([unet_input, timestep, batch_empty_text_embed])
@@ -299,13 +335,20 @@ def ensemble_depths(
 
 def predict(models, img):
     img = img[..., ::-1]  # BGR -> RGB
+    h, w, _ = img.shape
+
+    ensemble_size = args.ensemble_size
+    denoising_steps = args.denoise_steps
+    batch_size = args.batch_size
+
     img = preprocess(img)
 
-    ensemble_size = 10
     imgs = np.stack([img] * ensemble_size)
 
-    bs = ensemble_size // 2
-    denoising_steps = 10
+    if batch_size > 0:
+        bs = batch_size
+    else:
+        bs = math.ceil(ensemble_size / 2)
 
     cnt = int(math.ceil(ensemble_size / bs))
     bar = tqdm(
@@ -337,7 +380,7 @@ def predict(models, img):
     depth_pred = (depth_pred - min_d) / (max_d - min_d)
 
     pred_img = Image.fromarray(depth_pred)
-    pred_img = pred_img.resize(input_size)
+    pred_img = pred_img.resize((w, h))
     depth_pred = np.asarray(pred_img)
 
     # Clip output range
@@ -362,7 +405,7 @@ def recognize_from_image(models):
             total_time_estimation = 0
             for i in range(args.benchmark_count):
                 start = int(round(time.time() * 1000))
-                out = predict(models, img)
+                depth_pred = predict(models, img)
                 end = int(round(time.time() * 1000))
                 estimation_time = (end - start)
 
@@ -373,28 +416,52 @@ def recognize_from_image(models):
 
             logger.info(f'\taverage time estimation {total_time_estimation / (args.benchmark_count - 1)} ms')
         else:
-            out = predict(models, img)
+            depth_pred = predict(models, img)
 
-        # res_img = draw_bbox(out)
-        res_img = img
+        res_img = (depth_pred * 65535.0).astype(np.uint16)
 
         # plot result
         savepath = get_savepath(args.savepath, image_path, ext='.png')
         logger.info(f'saved at : {savepath}')
         cv2.imwrite(savepath, res_img)
 
+        # Colorize
+        depth_colored = colorize_depth_maps(
+            depth_pred, 0, 1, cmap="Spectral",
+        ).squeeze()  # [3, H, W], value in (0, 1)
+        depth_colored = (depth_colored * 255).astype(np.uint8)
+        depth_colored_img = depth_colored.transpose(1, 2, 0)  # CHW -> HWC
+        depth_colored_img = depth_colored_img[:, :, ::-1]  # RGB -> BGR
+
+        ex = os.path.splitext(savepath)
+        savepath = "".join((ex[0] + "_colorize", ex[1]))
+        logger.info(f'saved at : {savepath}')
+        cv2.imwrite(savepath, depth_colored_img)
+
     logger.info('Script finished successfully.')
 
 
 def main():
     env_id = args.env_id
+    seed = args.seed
 
     # initialize
     if not args.onnx:
-        unet = ailia.Net(MODEL_UNET_PATH, WEIGHT_UNET_PATH, env_id=env_id)
-        text_encoder = ailia.Net(MODEL_TEXT_ENCODER_PATH, WEIGHT_TEXT_ENCODER_PATH, env_id=env_id)
-        vae_encoder = ailia.Net(MODEL_VAE_ENCODER_PATH, WEIGHT_VAE_ENCODER_PATH, env_id=env_id)
-        vae_decoder = ailia.Net(MODEL_VAE_DECODER_PATH, WEIGHT_VAE_DECODER_PATH, env_id=env_id)
+        memory_mode = ailia.get_memory_mode(
+            reduce_constant=True, ignore_input_with_initializer=True,
+            reduce_interstage=False, reuse_interstage=True)
+        unet = ailia.Net(
+            MODEL_UNET_PATH, WEIGHT_UNET_PATH,
+            env_id=env_id, memory_mode=memory_mode)
+        text_encoder = ailia.Net(
+            MODEL_TEXT_ENCODER_PATH, WEIGHT_TEXT_ENCODER_PATH,
+            env_id=env_id, memory_mode=memory_mode)
+        vae_encoder = ailia.Net(
+            MODEL_VAE_ENCODER_PATH, WEIGHT_VAE_ENCODER_PATH,
+            env_id=env_id, memory_mode=memory_mode)
+        vae_decoder = ailia.Net(
+            MODEL_VAE_DECODER_PATH, WEIGHT_VAE_DECODER_PATH,
+            env_id=env_id, memory_mode=memory_mode)
     else:
         import onnxruntime
         cuda = 0 < ailia.get_gpu_environment_id()
@@ -426,6 +493,10 @@ def main():
         "tokenizer": tokenizer,
         "scheduler": scheduler,
     }
+
+    if seed is None:
+        seed = int(time.time())
+    np.random.seed(seed)
 
     recognize_from_image(models)
 
