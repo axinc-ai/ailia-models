@@ -34,9 +34,9 @@ It is necessary to be connected to the Internet while downloading.
 For the sample image,
 ``` bash
 $ python raft.py
-(ex on CPU)  $ python raft.py -e 0
-(ex on BLAS) $ python raft.py -e 1
-(ex on GPU)  $ python raft.py -e 2
+(ex on CPU)  $ python3 raft.py -e 0
+(ex on BLAS) $ python3 raft.py -e 1
+(ex on GPU)  $ python3 raft.py -e 2
 ```
 
 If you want to specify the input images, put the two images path after the `--inputs` option.
