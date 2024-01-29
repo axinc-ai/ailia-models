@@ -4,6 +4,8 @@ Input is a PDF file which you want to parse layout. sample.pdf is a sample pdf.
 
 ![Input](input.jpg)
 
+(Image from https://github.com/Unstructured-IO/unstructured-inference/blob/main/sample-docs/layout-parser-paper.pdf)
+
 ## Output
 Outputs are images with bounding boxes.
 
@@ -28,7 +30,7 @@ $ python lauout_parsing.py --savepath <image folder> --input xxx.pdf -fp
 ```
 
 ## Reference
-- [Original repository](https://github.com/Unstructured-IO/unstructured-inference/tree/main)
+- [unstructured-inference](https://github.com/Unstructured-IO/unstructured-inference/tree/main)
 
 ## Framework
 PyTorch
