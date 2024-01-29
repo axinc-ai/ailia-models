@@ -201,6 +201,7 @@ class ApplyTimestampRules:
 
         # timestamps have to appear in pairs, except directly before EOT; mask logits accordingly
         for k in range(tokens.shape[0]):
+            sampled_tokens = tokens[k, self.sample_begin :]
             seq = [t for t in tokens[k, self.sample_begin:].tolist()]
             last_was_timestamp = len(seq) >= 1 and seq[-1] >= self.tokenizer.timestamp_begin
             penultimate_was_timestamp = len(seq) < 2 or seq[-2] >= self.tokenizer.timestamp_begin
@@ -211,10 +212,26 @@ class ApplyTimestampRules:
                 else:  # cannot be normal text tokens
                     logits[k, : self.tokenizer.eot] = -np.inf
 
-        # apply the `max_initial_timestamp` option
-        if tokens.shape[1] == self.sample_begin and self.max_initial_timestamp_index is not None:
-            last_allowed = self.tokenizer.timestamp_begin + self.max_initial_timestamp_index
-            logits[:, last_allowed + 1:] = -np.inf
+            timestamps = sampled_tokens[
+                np.greater_equal(sampled_tokens, self.tokenizer.timestamp_begin)
+            ]
+            if timestamps.size > 0:
+                # timestamps shouldn't decrease; forbid timestamp tokens smaller than the last
+                # also force each segment to have a nonzero length, to prevent infinite looping
+                if last_was_timestamp and not penultimate_was_timestamp:
+                    timestamp_last = timestamps[-1]
+                else:
+                    timestamp_last = timestamps[-1] + 1
+                logits[k, self.tokenizer.timestamp_begin : timestamp_last] = -np.inf
+
+        if tokens.shape[1] == self.sample_begin:
+            # suppress generating non-timestamp tokens at the beginning
+            logits[:, : self.tokenizer.timestamp_begin] = -np.inf
+
+            # apply the `max_initial_timestamp` option
+            if self.max_initial_timestamp_index is not None:
+                last_allowed = self.tokenizer.timestamp_begin + self.max_initial_timestamp_index
+                logits[:, last_allowed + 1:] = -np.inf
 
         # if sum of probability over timestamps is above any other token, sample timestamp
         logprobs = log_softmax(logits, axis=-1)
