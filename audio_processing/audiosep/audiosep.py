@@ -26,7 +26,7 @@ SEPNET_WEIGHT_PATH = 'test_resunet.onnx'
 QUERY_MODEL_PATH = 'audiosep_text.onnx.prototxt'
 SEPNET_MODEL_PATH = 'audiosep_resunet.onnx.prototxt'
 
-REMOTE_PATH = None
+REMOTE_PATH = "https://storage.googleapis.com/ailia-models/audiosep/"
 
 # ======================
 # Arguemnt Parser Config
