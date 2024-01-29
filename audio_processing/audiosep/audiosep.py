@@ -21,7 +21,7 @@ logger = getLogger(__name__)
 # ======================
 
 QUERY_WEIGHT_PATH = 'audiosep_text.onnx'
-SEPNET_WEIGHT_PATH = 'test_resunet.onnx'
+SEPNET_WEIGHT_PATH = 'audiosep_resunet.onnx'
 
 QUERY_MODEL_PATH = 'audiosep_text.onnx.prototxt'
 SEPNET_MODEL_PATH = 'audiosep_resunet.onnx.prototxt'
