@@ -14,17 +14,17 @@ Automatically downloads the onnx and prototxt files on the first run. It is nece
 
 For sample pdf, 
 ```
-$ python layout_parsing.py --savepath <image folder> --detector
-```
-
-If you want to specify input pdf, 
-```
-$ python lauout_parsing.py --savepath <image folder> --input xxx.pdf --detector
+$ python layout_parsing.py --savepath <image folder>
 ```
 
 And, if you want to parse layout of image,
 ```
-$ python lauout_parsing.py --savepath <image folder> --input xxx.jpg -fi --detector
+$ python lauout_parsing.py --savepath <image folder> --input xxx.jpg
+```
+
+If you want to specify input pdf, 
+```
+$ python lauout_parsing.py --savepath <image folder> --input xxx.pdf -fp
 ```
 
 ## Reference

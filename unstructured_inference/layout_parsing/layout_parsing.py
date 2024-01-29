@@ -16,6 +16,7 @@ from layout_parsing_utils import pdf_to_images, preprocess
 from yolox import YOLOX_LABEL_MAP
 
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/unstructured-inference/"
+IMAGE_PATH = "input.jpg"
 PDF_PATH = "sample.pdf"
 SAVE_IMAGE_PATH = ""
 WEIGHT_PATH = "layout_parsing_yolox.onnx"
@@ -27,20 +28,15 @@ NMS_THR = 0.1
 logger = getLogger(__name__)
 
 
-parser = get_base_parser('Layout parsing', PDF_PATH, SAVE_IMAGE_PATH)
+parser = get_base_parser('Layout parsing', IMAGE_PATH, SAVE_IMAGE_PATH)
 parser.add_argument(
     "-i", "--input",
     type=str,
     help="input file name",
-    default=PDF_PATH,
+    default=IMAGE_PATH,
 )
 parser.add_argument(
     "-d", "--dpi", default=200, type=int, help="dpi"
-)
-parser.add_argument(
-    '-dt', '--detector',
-    action='store_true',
-    help='Use detector API (require ailia SDK 1.2.9).'
 )
 parser.add_argument(
     '-th', '--threshold',
@@ -53,9 +49,9 @@ parser.add_argument(
     help='The detection iou for yolo. (default: '+str(NMS_THR)+')'
 )
 parser.add_argument(
-    "-fi", "--from_image",
+    "-fp", "--from_pdf",
     action="store_true",
-    help="set this option when target file is image",
+    help="set this option when target file is pdf",
 )
 args = update_parser(parser)
 
@@ -90,14 +86,8 @@ def infer_from_pdf(detector: ailia.Detector):
         else:
             output = compute()
 
-        if args.detector:
-            res_img = plot_results(detector, img_orig, YOLOX_LABEL_MAP)
-            detect_object = detector
-        else:
-            predictions = postprocess(output[0], INPUT_SHAPE)[0]
-            detect_object = predictions_to_object(predictions, img_orig, ratio, args.iou, args.threshold)
-            detect_object = reverse_letterbox(detect_object, img_orig, (img_orig.shape[0], img_orig.shape[1]))
-            res_img = plot_results(detect_object, img_orig, YOLOX_LABEL_MAP)
+        res_img = plot_results(detector, img_orig, YOLOX_LABEL_MAP)
+        detect_object = detector
 
         cv2.imwrite(image_name.replace(".ppm", "_parsed.jpg"), res_img)
 
@@ -108,11 +98,8 @@ def infer_from_image(detector: ailia.Detector):
     img_processed, ratio = preprocess(img_orig, INPUT_SHAPE)
 
     def compute():
-        if args.detector:
-            detector.compute(img_orig, args.threshold, args.iou)
-            return None
-        else:
-            return detector.run(img_processed)
+        detector.compute(img_orig, args.threshold, args.iou)
+        return None
 
     logger.info("Start: inference...")
     if args.benchmark:
@@ -130,14 +117,8 @@ def infer_from_image(detector: ailia.Detector):
     else:
         output = compute()
     
-    if args.detector:
-        res_img = plot_results(detector, img_orig, YOLOX_LABEL_MAP)
-        detector_object = detector
-    else:
-        predictions = postprocess(output[0]. INPUT_SHAPE)[0]
-        detect_object = predictions_to_object(predictions, img_orig, ratio, args.iou, args.threshold)
-        detect_object = reverse_letterbox(detect_object, img_orig, (img_orig.shape[0], img_orig.shape[1]))
-        res_img = plot_results(detect_object, img_orig, YOLOX_LABEL_MAP)
+    res_img = plot_results(detector, img_orig, YOLOX_LABEL_MAP)
+    detector_object = detector
 
     extension = os.path.splitext(image_filename)[1]
     output_filename = image_filename.replace(extension, "_parsed.jpg")
@@ -158,7 +139,7 @@ if __name__ == "__main__":
         algorithm=ailia.DETECTOR_ALGORITHM_YOLOX,
         env_id=env_id,
     )
-    if args.from_image:
-        infer_from_image(detector)
-    else:
+    if args.from_pdf:
         infer_from_pdf(detector)
+    else:
+        infer_from_image(detector)
