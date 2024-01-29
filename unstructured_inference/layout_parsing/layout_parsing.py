@@ -15,7 +15,7 @@ from model_utils import check_and_download_models  # noqa: E402
 from layout_parsing_utils import pdf_to_images, preprocess
 from yolox import YOLOX_LABEL_MAP
 
-REMOTE_PATH = "https://storage.googleapis.com/ailia-models/unstructured-inference/layout-parsing"
+REMOTE_PATH = "https://storage.googleapis.com/ailia-models/unstructured-inference/"
 PDF_PATH = "sample.pdf"
 SAVE_IMAGE_PATH = ""
 WEIGHT_PATH = "layout_parsing_yolox.onnx"
@@ -146,8 +146,7 @@ def infer_from_image(detector: ailia.Detector):
     
 
 if __name__ == "__main__":
-    # weight_path, model_path, params = get_params()
-    # check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
     env_id = args.env_id
     detector = ailia.Detector(
         MODEL_PATH,
