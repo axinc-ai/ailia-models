@@ -1,5 +1,6 @@
 import sys
 import time
+import math
 from logging import getLogger
 
 import scipy
@@ -21,7 +22,7 @@ logger = getLogger(__name__)
 # ======================
 
 QUERY_WEIGHT_PATH = 'audiosep_text.onnx'
-SEPNET_WEIGHT_PATH = 'audiosep_resunet.onnx'
+SEPNET_WEIGHT_PATH = 'resunet_model.onnx'
 
 QUERY_MODEL_PATH = 'audiosep_text.onnx.prototxt'
 SEPNET_MODEL_PATH = 'audiosep_resunet.onnx.prototxt'
@@ -58,6 +59,15 @@ args = update_parser(parser, check_input_type=False)
 Functions below are taken from https://github.com/Audio-AGI/AudioSep, which was released under MIT license.
 Modified to be run with numpy arrays instead of torch tensors
 """
+def preprocess_mag(mag):
+    #batch normalize self.bn0 = nn.BatchNorm2d(window_size // 2 + 1, momentum=momentum)
+    mag = np.transpose(mag, (0,3,2,1))
+    mag = (mag - np.mean(mag, axis=(2,3), keepdims=True)) / (np.std(mag, axis=(2,3), keepdims=True) + 1e-5)
+    mag = np.transpose(mag, (0,3,2,1))
+    p = math.ceil(mag.shape[2] / 2**5) * 2**5 - mag.shape[2]
+    mag = np.pad(mag, ((0,0),(0,0),(0,p),(0,0)))
+    mag = mag[:,:,:,0:mag.shape[-1]-1]
+    return mag
 
 def spectrogram_phase(input, eps=0.):
     D = librosa.stft(
@@ -188,14 +198,21 @@ def inference(model, input_text, input_wav):
 
     # prepare audio input
     mag, cosin, sinin = wav_to_spectrogram(input_wav)
+    orig_len = mag.shape[-1]
     mag = mag.transpose((0,2,1))[None]
     cosin = cosin.transpose((0,2,1))[None]
     sinin = sinin.transpose((0,2,1))[None]
 
+    # preprocess
+    mag_in = preprocess_mag(mag)
+
     # inference
     query = model['querynet'].predict(text_prompt_tkn)[0]
 
-    output = model['sepnet'].predict((query, mag))[0]
+    output = model['sepnet'].predict((query, mag_in))[0]
+
+    # postprocess
+    output = output[:,:,:orig_len,:]# trim to original length
 
     output_wav = feature_maps_to_wav(output, mag, sinin, cosin, input_wav.shape[-1])
 
@@ -241,8 +258,8 @@ def split_audio(model):
 
 def main():
     # model files check and download
-    check_and_download_models(QUERY_WEIGHT_PATH, QUERY_MODEL_PATH, REMOTE_PATH)
-    check_and_download_models(SEPNET_WEIGHT_PATH, SEPNET_MODEL_PATH, REMOTE_PATH)
+    #check_and_download_models(QUERY_WEIGHT_PATH, QUERY_MODEL_PATH, REMOTE_PATH)
+    #check_and_download_models(SEPNET_WEIGHT_PATH, SEPNET_MODEL_PATH, REMOTE_PATH)
 
     env_id = args.env_id
 
