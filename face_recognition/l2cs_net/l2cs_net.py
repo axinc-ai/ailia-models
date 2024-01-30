@@ -37,7 +37,7 @@ MODEL_PATH_FACE = "retinaface_resnet50.onnx.prototxt"
 WEIGHT_PATH_L2CS = "l2cs.onnx"
 MODEL_PATH_L2CS = "l2cs.onnx.prototxt"
 
-IMAGE_PATH = 'input.png'
+IMAGE_PATH = 'selfie.png'
 SAVE_IMAGE_PATH = 'output.png'
 
 # Default input size
