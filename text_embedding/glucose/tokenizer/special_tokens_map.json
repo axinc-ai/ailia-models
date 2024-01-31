@@ -1,0 +1,87 @@
+{
+  "additional_special_tokens": [
+    {
+      "content": "<ent>",
+      "lstrip": false,
+      "normalized": true,
+      "rstrip": false,
+      "single_word": false
+    },
+    {
+      "content": "<ent2>",
+      "lstrip": false,
+      "normalized": true,
+      "rstrip": false,
+      "single_word": false
+    },
+    {
+      "content": "<ent>",
+      "lstrip": false,
+      "normalized": true,
+      "rstrip": false,
+      "single_word": false
+    },
+    {
+      "content": "<ent2>",
+      "lstrip": false,
+      "normalized": true,
+      "rstrip": false,
+      "single_word": false
+    },
+    {
+      "content": "<ent>",
+      "lstrip": false,
+      "normalized": true,
+      "rstrip": false,
+      "single_word": false
+    },
+    {
+      "content": "<ent2>",
+      "lstrip": false,
+      "normalized": true,
+      "rstrip": false,
+      "single_word": false
+    },
+    {
+      "content": "<ent>",
+      "lstrip": false,
+      "normalized": false,
+      "rstrip": false,
+      "single_word": false
+    },
+    {
+      "content": "<ent2>",
+      "lstrip": false,
+      "normalized": false,
+      "rstrip": false,
+      "single_word": false
+    },
+    {
+      "content": "<ent>",
+      "lstrip": false,
+      "normalized": true,
+      "rstrip": false,
+      "single_word": false
+    },
+    {
+      "content": "<ent2>",
+      "lstrip": false,
+      "normalized": true,
+      "rstrip": false,
+      "single_word": false
+    }
+  ],
+  "bos_token": "<s>",
+  "cls_token": "<s>",
+  "eos_token": "</s>",
+  "mask_token": {
+    "content": "<mask>",
+    "lstrip": true,
+    "normalized": true,
+    "rstrip": false,
+    "single_word": false
+  },
+  "pad_token": "<pad>",
+  "sep_token": "</s>",
+  "unk_token": "<unk>"
+}

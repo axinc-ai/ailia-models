@@ -1,0 +1,108 @@
+{
+  "added_tokens_decoder": {
+    "0": {
+      "content": "<s>",
+      "lstrip": false,
+      "normalized": false,
+      "rstrip": false,
+      "single_word": false,
+      "special": true
+    },
+    "1": {
+      "content": "<pad>",
+      "lstrip": false,
+      "normalized": false,
+      "rstrip": false,
+      "single_word": false,
+      "special": true
+    },
+    "2": {
+      "content": "</s>",
+      "lstrip": false,
+      "normalized": false,
+      "rstrip": false,
+      "single_word": false,
+      "special": true
+    },
+    "3": {
+      "content": "<unk>",
+      "lstrip": false,
+      "normalized": false,
+      "rstrip": false,
+      "single_word": false,
+      "special": true
+    },
+    "32769": {
+      "content": "<mask>",
+      "lstrip": true,
+      "normalized": true,
+      "rstrip": false,
+      "single_word": false,
+      "special": true
+    },
+    "32770": {
+      "content": "<ent>",
+      "lstrip": false,
+      "normalized": true,
+      "rstrip": false,
+      "single_word": false,
+      "special": true
+    },
+    "32771": {
+      "content": "<ent2>",
+      "lstrip": false,
+      "normalized": true,
+      "rstrip": false,
+      "single_word": false,
+      "special": true
+    }
+  },
+  "additional_special_tokens": [
+    "<ent>",
+    "<ent2>",
+    "<ent>",
+    "<ent2>",
+    "<ent>",
+    "<ent2>",
+    "<ent>",
+    "<ent2>",
+    "<ent>",
+    "<ent2>"
+  ],
+  "bos_token": "<s>",
+  "clean_up_tokenization_spaces": true,
+  "cls_token": "<s>",
+  "entity_mask2_token": "[MASK2]",
+  "entity_mask_token": "[MASK]",
+  "entity_pad_token": "[PAD]",
+  "entity_token_1": {
+    "__type": "AddedToken",
+    "content": "<ent>",
+    "lstrip": false,
+    "normalized": true,
+    "rstrip": false,
+    "single_word": false,
+    "special": false
+  },
+  "entity_token_2": {
+    "__type": "AddedToken",
+    "content": "<ent2>",
+    "lstrip": false,
+    "normalized": true,
+    "rstrip": false,
+    "single_word": false,
+    "special": false
+  },
+  "entity_unk_token": "[UNK]",
+  "eos_token": "</s>",
+  "mask_token": "<mask>",
+  "max_entity_length": 32,
+  "max_mention_length": 30,
+  "model_max_length": 512,
+  "pad_token": "<pad>",
+  "sep_token": "</s>",
+  "sp_model_kwargs": {},
+  "task": null,
+  "tokenizer_class": "MLukeTokenizer",
+  "unk_token": "<unk>"
+}
