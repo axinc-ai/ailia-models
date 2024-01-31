@@ -20,7 +20,7 @@ Top similar
 
 ## Requirements
 
-This model requires additional module if you want to load pdf file.
+This model requires additional module.
 
 ```
 pip3 install transformers
