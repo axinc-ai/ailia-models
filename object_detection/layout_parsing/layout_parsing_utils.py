@@ -1,8 +1,9 @@
 from typing import List, Optional
 
+import os
+import sys
 import cv2
 import numpy as np
-import pdf2image
 
 
 def pdf_to_images(
@@ -11,6 +12,16 @@ def pdf_to_images(
     paths_only: bool = True,
     output_folder: Optional[str] = None,
 ) -> List[str]:
+    import pdf2image
+
+    if output_folder is not None:
+        if not os.path.exists(output_folder):
+            os.makedirs(output_folder)
+        else:
+            if not os.path.isdir(output_folder):
+                print("Failed to create output folder")
+                sys.exit(1)
+
     if output_folder is not None:
         image_paths = pdf2image.convert_from_path(
             pdf_filename,
