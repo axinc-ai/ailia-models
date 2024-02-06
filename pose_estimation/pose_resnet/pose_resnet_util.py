@@ -138,6 +138,7 @@ def compute(net, original_img, offset_x, offset_y, scale_x, scale_y):
     IMAGE_HEIGHT = shape[2]
 
     src_img = cv2.resize(original_img, (IMAGE_WIDTH, IMAGE_HEIGHT))
+    #cv2.imwrite("crop.png", src_img)
 
     w = src_img.shape[1]
     h = src_img.shape[0]

@@ -145,11 +145,8 @@ def pose_estimation(detector, pose, img):
         crop_img, px1, py1, px2, py2, scale_x, scale_y = keep_aspect(
             top_left, bottom_right, pose_img, shape
         )
-        cv2.imwrite("crop.png", crop_img)
         offset_x = px1/pose_img.shape[1]
         offset_y = py1/pose_img.shape[0]
-        #scale_x = crop_img.shape[1]/img.shape[1]
-        #scale_y = crop_img.shape[0]/img.shape[0]
         detections = compute(
             pose, crop_img, offset_x, offset_y, scale_x, scale_y
         )
