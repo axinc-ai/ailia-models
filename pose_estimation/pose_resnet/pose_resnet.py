@@ -141,14 +141,15 @@ def pose_estimation(detector, pose, img):
         if obj.category != CATEGORY_PERSON:
             pose_detections.append(None)
             continue
-        px1, py1, px2, py2 = keep_aspect(
-            top_left, bottom_right, pose_img, pose
+        shape = pose.get_input_shape()
+        crop_img, px1, py1, px2, py2, scale_x, scale_y = keep_aspect(
+            top_left, bottom_right, pose_img, shape
         )
-        crop_img = pose_img[py1:py2, px1:px2, :]
-        offset_x = px1/img.shape[1]
-        offset_y = py1/img.shape[0]
-        scale_x = crop_img.shape[1]/img.shape[1]
-        scale_y = crop_img.shape[0]/img.shape[0]
+        cv2.imwrite("crop.png", crop_img)
+        offset_x = px1/pose_img.shape[1]
+        offset_y = py1/pose_img.shape[0]
+        #scale_x = crop_img.shape[1]/img.shape[1]
+        #scale_y = crop_img.shape[0]/img.shape[0]
         detections = compute(
             pose, crop_img, offset_x, offset_y, scale_x, scale_y
         )
@@ -197,8 +198,9 @@ def plot_results(detector, pose, img, category, pose_detections, logging=True):
             continue
 
         # pose detection
-        px1, py1, px2, py2 = keep_aspect(
-            top_left, bottom_right, img, pose
+        shape = pose.get_input_shape()
+        crop_img, px1, py1, px2, py2, scale_x, scale_y  = keep_aspect(
+            top_left, bottom_right, img, shape
         )
         detections = pose_detections[idx]
         cv2.rectangle(img, (px1, py1), (px2, py2), color, 1)

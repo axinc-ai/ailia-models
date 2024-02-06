@@ -229,33 +229,48 @@ def compute(net, original_img, offset_x, offset_y, scale_x, scale_y):
     return r
 
 
-def keep_aspect(top_left, bottom_right, pose_img, pose):
-    py1 = max(0, top_left[1])
-    py2 = min(pose_img.shape[0], bottom_right[1])
-    px1 = max(0, top_left[0])
-    px2 = min(pose_img.shape[1], bottom_right[0])
+def keep_aspect(top_left, bottom_right, pose_img, input_size):
+    # get center and size
+    cx = int(top_left[0] + bottom_right[0]) // 2
+    cy = int(top_left[1] + bottom_right[1]) // 2
+    w = int(bottom_right[0] - top_left[0])
+    h = int(bottom_right[1] - top_left[1])
 
-    shape = pose.get_input_shape()
-    aspect = shape[2]/shape[3]
-    ow = (px2-px1)
-    oh = (py2-py1)
-    oaspect = oh/ow
-    if aspect <= oaspect:
-        w = oh/aspect
-        px1 = px1 - (w-ow)/2
-        px2 = px1 + w
+    # expect width and height
+    ew = int(input_size[3])
+    eh = int(input_size[2])
+    iw = int(pose_img.shape[1])
+    ih = int(pose_img.shape[0])
+
+    # decide crop size with pad
+    if w / ew < h / eh:
+        aspect = ew / eh
+        w = int(h * aspect)
+        h = int(h)
     else:
-        h = ow*aspect
-        py1 = py1 - (h-oh)/2
-        py2 = py1 + h
+        aspect = eh / ew
+        w = int(w)
+        h = int(w * aspect)
 
-    px1 = int(px1)
-    px2 = int(px2)
-    py1 = int(py1)
-    py2 = int(py2)
+    # decide crop position
+    px1 = int(cx - w // 2)
+    px2 = int(cx + w // 2)
+    py1 = int(cy - h // 2)
+    py2 = int(cy + h // 2)
 
-    py1 = max(0, py1)
-    py2 = min(pose_img.shape[0], py2)
-    px1 = max(0, px1)
-    px2 = min(pose_img.shape[1], px2)
-    return px1, py1, px2, py2
+    # decide pad size
+    pad_l = max(0, -px1)
+    pad_r = max(0, px2 - iw)
+    pad_t = max(0, -py1)
+    pad_b = max(0, py2 - ih)
+
+    # pad and crop and resize
+    input_image = cv2.copyMakeBorder(pose_img, pad_t, pad_b, pad_l, pad_r, cv2.BORDER_CONSTANT, (0,0,0))
+    input_image = input_image[py1 + pad_t:py2 + pad_t, px1 + pad_l:px2 + pad_l, :]
+    input_image = cv2.resize(input_image, (ew, eh), interpolation = cv2.INTER_AREA)
+
+    # size ratio of input image space
+    scale_x = w / iw
+    scale_y = h / ih
+    
+    return input_image, px1, py1, px2, py2, scale_x, scale_y
