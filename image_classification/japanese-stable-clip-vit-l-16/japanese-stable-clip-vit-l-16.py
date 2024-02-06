@@ -14,6 +14,7 @@ import ailia
 sys.path.append('../../util')
 from arg_utils import get_base_parser, update_parser, get_savepath  # noqa
 from model_utils import check_and_download_models  # noqa
+from image_utils import normalize_image  # noqa
 from detector_utils import load_image  # noqa
 from classifier_utils import plot_results, print_results  # noqa
 from math_utils import softmax  # noqa
@@ -122,29 +123,37 @@ def get_text_features(models, text):
 
 
 def preprocess(img):
-    h, w = (IMAGE_SIZE, IMAGE_SIZE)
+    img = img[:, :, ::-1]  # BGR -> RBG
     im_h, im_w, _ = img.shape
 
     # resize
-    scale = h / min(im_h, im_w)
-    ow, oh = round(im_w * scale), round(im_h * scale)
+    short, long = (im_w, im_h) if im_w <= im_h else (im_h, im_w)
+    new_short, new_long = IMAGE_SIZE, (IMAGE_SIZE * long) // short
+    ow, oh = (new_short, new_long) if im_w <= im_h else (new_long, new_short)
     if ow != im_w or oh != im_h:
         img = np.array(Image.fromarray(img).resize((ow, oh), Image.Resampling.BICUBIC))
 
     # center_crop
-    if ow > w:
-        x = (ow - w) // 2
-        img = img[:, x:x + w, :]
-    if oh > h:
-        y = (oh - h) // 2
-        img = img[y:y + h, :, :]
+    # In case size is odd, (image_shape[0] + size[0]) // 2 won't give the proper result.
+    top = (oh - IMAGE_SIZE) // 2
+    bottom = top + IMAGE_SIZE
+    # In case size is odd, (image_shape[1] + size[1]) // 2 won't give the proper result.
+    left = (ow - IMAGE_SIZE) // 2
+    right = left + IMAGE_SIZE
+    if top >= 0 and bottom <= oh and left >= 0 and right <= ow:
+        img = img[top:bottom, left:right, :]
+    else:
+        # If the image is too small, pad it with zeros
+        pad_h = max(IMAGE_SIZE, oh)
+        pad_w = max(IMAGE_SIZE, ow)
+        pad_img = np.zeros((pad_h, pad_w, 3))
 
-    img = img[:, :, ::-1]  # BGR -> RBG
-    img = img / 255
+        top_pad = (pad_h - oh) // 2
+        left_pad = (pad_w - ow) // 2
+        pad_img[top_pad:top_pad + oh, left_pad:left_pad + ow, :] = img
+        img = pad_img
 
-    mean = np.array((0.48145466, 0.4578275, 0.40821073))
-    std = np.array((0.26862954, 0.26130258, 0.27577711))
-    img = (img - mean) / std
+    img = normalize_image(img, normalize_type='127.5')
 
     img = img.transpose(2, 0, 1)  # HWC -> CHW
     img = np.expand_dims(img, axis=0)
