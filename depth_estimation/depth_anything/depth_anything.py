@@ -54,6 +54,12 @@ parser.add_argument(
     help='model type. vits, vitb, vitl'
 )
 
+
+parser.add_argument(
+    '-g', '--grey', action='store_true',
+    help="Save image as single channel(greyscale)"
+)
+
 args = update_parser(parser)
 
 # ======================
@@ -83,7 +89,11 @@ class get_depth_anything_ts():
 
 def plot_image(image, depth, savepath=None):
 
-    plt.imshow(depth[:,:,::-1])
+    if args.grey:
+        plt.imshow(depth, cmap='inferno')
+    else:
+        plt.imshow(depth[:,:,::-1])
+        
     plt.show()
     if savepath is not None:
         logger.info(f'saving result to {savepath}')
@@ -101,8 +111,9 @@ def update_frame(image, depth, frame):
 def post_process(depth, h, w):
     depth = cv2.resize(depth[0,0], dsize=(w, h), interpolation=cv2.INTER_LINEAR)
     depth = (depth - depth.min()) / (depth.max() - depth.min()) * 255.0
-    depth = depth.astype(np.uint8)
-    depth = cv2.applyColorMap(depth, cv2.COLORMAP_INFERNO)
+    if not args.grey:
+        depth = depth.astype(np.uint8)
+        depth = cv2.applyColorMap(depth, cv2.COLORMAP_INFERNO)
     return depth
 
 # ======================

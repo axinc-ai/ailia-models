@@ -14,7 +14,8 @@ The script will perform a monocular depth estimation on the input media.
 
 ![result](output.png)
 
-Estimated relative depth, scaled to fit in the 0~255 range.
+Estimated relative depth with inferno colormap(without option ```-g```),
+or single channel grey scale image(with option ```-g```).
 
 Saves to ```./output.png``` by default but it can be specified with the ```-s``` option 
 
@@ -24,7 +25,7 @@ as it will download the necessary model files.
 
 Running this script will estimate the relative depth of the input image/video.
 The results will be shown in a separate window(when inferencing on image and video), 
-or saved as a single channel image(when inferencing on image).
+or saved as an image(when inferencing on image).
 
 #### Example 1: Inference on prepared demo image.
 ```bash
