@@ -39,7 +39,7 @@ MODEL_PATH_L = "depth_anything_vitl14.onnx.prototxt"
 REMOTE_PATH = None
 
 DEFAULT_INPUT_PATH = 'demo1.png'
-DEFAULT_SAVE_PATH = 'demo_result.png'
+DEFAULT_SAVE_PATH = 'output.png'
 
 # ======================
 # Arguemnt Parser Config
@@ -82,7 +82,8 @@ class get_depth_anything_ts():
         return image
 
 def plot_image(image, depth, savepath=None):
-    plt.imshow(depth)
+
+    plt.imshow(depth[:,:,::-1])
     plt.show()
     if savepath is not None:
         logger.info(f'saving result to {savepath}')
@@ -101,6 +102,7 @@ def post_process(depth, h, w):
     depth = cv2.resize(depth[0,0], dsize=(w, h), interpolation=cv2.INTER_LINEAR)
     depth = (depth - depth.min()) / (depth.max() - depth.min()) * 255.0
     depth = depth.astype(np.uint8)
+    depth = cv2.applyColorMap(depth, cv2.COLORMAP_INFERNO)
     return depth
 
 # ======================
@@ -118,6 +120,8 @@ def recognize_from_image(model):
 
         
         image = da_transform({'image':org_img})['image'][None]
+        if org_img.shape[0] > org_img.shape[1]:
+            image = image.transpose((0, 1, 3, 2))
         if args.benchmark and not (args.video is not None):
             logger.info('BENCHMARK mode')
             for i in range(5):
@@ -127,6 +131,8 @@ def recognize_from_image(model):
                 logger.info(f'\tailia processing time {end - start} ms')
         else:
             depth = model.predict(image)
+        if org_img.shape[0] > org_img.shape[1]:
+            depth = depth.transpose((0, 1, 3, 2))
         depth = post_process(depth, org_img.shape[0], org_img.shape[1])
 
         # visualize
