@@ -1,10 +1,10 @@
 import sys
 import time
 
-from einops import rearrange
 import ailia
 import cv2
 import numpy as np
+from einops import rearrange
 
 sys.path.append('../../util')
 from logging import getLogger  # noqa: E402
@@ -19,7 +19,7 @@ logger = getLogger(__name__)
 WEIGHT_PATH = "drbn_skf_lol.onnx"
 MODEL_PATH = "drbn_skf_lol.onnx.prototxt"
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/drbn_skf/'
-IMAGE_PATH = 'input.png'
+IMAGE_PATH = '1.png'
 SAVE_IMAGE_PATH = 'output.png'
 HEIGHT_SIZE = 400
 WIDTH_SIZE = 600
@@ -51,10 +51,14 @@ def recognize_from_image(weight_path, model_path):
     for image_path in args.input:
         logger.info(image_path)
         img = imread(image_path) / 255.
+        img = img[..., ::-1]
         H, W = img.shape[:2]
         img = cv2.resize(img, (WIDTH_SIZE, HEIGHT_SIZE), interpolation=cv2.INTER_LANCZOS4)
         img = img[np.newaxis, :]
         img = rearrange(img, "1 h w c -> 1 c h w")
+        print(f"{img=}")
+        print(f"{img.max()=}")
+        print(f"{img.min()=}")
         logger.info(f"input image shape: {img.shape}")
         logger.info("Start inference ...")
 
@@ -69,13 +73,19 @@ def recognize_from_image(weight_path, model_path):
             pred = net.run(img)[0]
             pred = rearrange(pred, "1 c h w -> h w c")
 
-        enhance = cv2.resize(pred, (W, H), interpolation=cv2.INTER_LANCZOS4)
-        enhance = np.clip(enhance, 0.0, 1.0)
-        output = (enhance * 255.).astype(np.uint8)
+        # enhance = cv2.resize(pred, (W, H), interpolation=cv2.INTER_LANCZOS4)
+        enhance = pred * 255.0
+        enhance = np.clip(enhance, 0, 255)
+        enhance = enhance.astype(np.uint8)
+        enhance = cv2.resize(enhance, (W, H), interpolation=cv2.INTER_LINEAR)
+        # enhance = cv2.resize(pred, (W, H), interpolation=cv2.INTER_LINEAR)
+        # enhance = enhance * 255.0
+        # enhance = np.clip(enhance, 0, 255)
+        # enhance = enhance.astype(np.uint8)
         
         # save result
         logger.info(f"saved at : {args.savepath}")
-        cv2.imwrite(args.savepath, output)
+        cv2.imwrite(args.savepath, enhance)
 
     logger.info("Script finished successfully.")
 
@@ -112,9 +122,10 @@ def recognize_from_video(weight_path, model_path):
         pred = net.run(img)[0]
         pred = rearrange(pred, "1 c h w -> h w c")
         enhance = cv2.resize(pred, (f_w, f_h), interpolation=cv2.INTER_LANCZOS4)
-        enhance = np.clip(enhance, 0.0, 1.0)
-        output = (enhance * 255.).astype(np.uint8)
-        concat = np.hstack((frame, output))
+        enhance = enhance * 255.0
+        enhance = np.clip(enhance, 0, 255)
+        enhance = enhance.astype(np.uint8)
+        concat = np.hstack((frame, enhance))
         cv2.imshow("left: original, right: result", concat)
 
         if writer is not None:
