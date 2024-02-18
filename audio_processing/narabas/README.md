@@ -46,3 +46,17 @@ To specify input wav file,
 ```bash
 python3 narabas.py --input <input wav file>
 ```
+
+## Reference
+[narabas](https://github.com/darashi/narabas)
+
+## Framework
+
+Pytorch
+
+## Model Format
+
+ONNX opset=11
+
+## Netron
+[narabas-v0.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/audio_processing/narabas/narabas-vo.onnx.prototxt)
