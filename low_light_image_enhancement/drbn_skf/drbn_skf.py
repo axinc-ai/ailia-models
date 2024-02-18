@@ -71,7 +71,6 @@ def recognize_from_image(weight_path, model_path):
         logger.info(image_path)
         img = imread(image_path) / 255.
         img = img[..., ::-1]
-        H, W = img.shape[:2]
         img = cv2.resize(img, (WIDTH_SIZE, HEIGHT_SIZE), interpolation=cv2.INTER_LANCZOS4)
         img = img[np.newaxis, :]
         img = rearrange(img, "1 h w c -> 1 c h w")
@@ -121,25 +120,31 @@ def recognize_from_video(weight_path, model_path):
     else:
         writer = None
     
-    frame_shown = False
 
     while True:
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xff == ord("q")) or not ret:
             break
-        if frame_shown and cv2.getWindowProperty("frame", cv2.WND_PROP_VISIBLE) == 0:
+        if cv2.getWindowProperty("frame", cv2.WND_PROP_VISIBLE) == 0:
             break
 
-        img = cv2.resize(frame, (WIDTH_SIZE, HEIGHT_SIZE), interpolation=cv2.INTER_LANCZOS4) / 255.
+        img = frame / 255.
+        img = img[..., ::-1]
+        img = cv2.resize(img, (WIDTH_SIZE, HEIGHT_SIZE), interpolation=cv2.INTER_LANCZOS4)
         img = img[np.newaxis, :]
         img = rearrange(img, "1 h w c -> 1 c h w")
-        pred = net.run(img)[0]
+        img = img.astype(np.float32)
+
+        if args.onnx:
+            pred = net.run(["5674"], {"x.1": img})[0]
+        else:
+            pred = net.run(img)[0]
+
         pred = rearrange(pred, "1 c h w -> h w c")
-        enhance = cv2.resize(pred, (f_w, f_h), interpolation=cv2.INTER_LANCZOS4)
-        enhance = enhance * 255.0
-        enhance = np.clip(enhance, 0, 255)
-        enhance = enhance.astype(np.uint8)
-        concat = np.hstack((frame, enhance))
+        pred = pred[..., ::-1]
+        pred_postprocess = postprocess(pred * 255.0)
+
+        concat = np.hstack((frame, pred))
         cv2.imshow("left: original, right: result", concat)
 
         if writer is not None:
