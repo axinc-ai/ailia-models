@@ -62,15 +62,15 @@ def create_instance(weight_path, model_path, ):
 
 
 def execute_session(session, wav):
+    wav_np = wav.numpy()
     if not args.onnx:
-        wav = wav.numpy()
-        result = session.run(wav)[0]
+        result = session.run(wav_np)[0]
         a, b = result.shape[1:]
         result = result.reshape((1, 1, a, b))
     else:
         result = session.run(
             ["output"],
-            {"input": wav.numpy()}
+            {"input": wav_np}
         )
 
     return result
