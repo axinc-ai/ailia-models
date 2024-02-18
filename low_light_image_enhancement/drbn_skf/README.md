@@ -3,7 +3,7 @@
 ## Input
 ![Input](input.png)
 
-(Image from https://github.com/yu-li/AGLLNet/blob/main/input/5047.png)
+(Image from LOL v1 dataset https://daooshee.github.io/BMVC2018website/)
 
 Ailia input shape: (1, 3, 400, 600)
 
