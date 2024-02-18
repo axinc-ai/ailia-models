@@ -4,6 +4,7 @@ import time
 import ailia
 import cv2
 import numpy as np
+import onnxruntime
 from einops import rearrange
 
 sys.path.append('../../util')
@@ -23,6 +24,7 @@ IMAGE_PATH = '1.png'
 SAVE_IMAGE_PATH = 'output.png'
 HEIGHT_SIZE = 400
 WIDTH_SIZE = 600
+RGB_RANGE = 255
 
 parser = get_base_parser(
     "DRBN_SKF",
@@ -37,16 +39,33 @@ parser.add_argument(
     choices=[1, 2],
     help="DRBN SKF version (select 1 or 2)",
 )
+parser.add_argument(
+    "--onnx",
+    action="store_true",
+    help="use onnxruntime",
+)
 args = update_parser(parser)
 
 def get_model(model_path, weight_path, env_id, mem_mode):
     return ailia.Net(model_path, weight_path, env_id=env_id, memory_mode=mem_mode)
 
 
+def postprocess(pred):
+    pixel_range = 255 / RGB_RANGE
+    out = pred * pixel_range
+    out = out.clip(0, 255)
+    out = np.floor(out + 0.5)
+    return out
+
+
 def recognize_from_image(weight_path, model_path):
     env_id = args.env_id
     mem_mode = ailia.get_memory_mode(reduce_constant=True, reduce_interstage=True)
-    net = get_model(model_path, weight_path, env_id, mem_mode)
+
+    if args.onnx:
+        net = onnxruntime.InferenceSession(weight_path)
+    else:
+        net = get_model(model_path, weight_path, env_id, mem_mode)
 
     for image_path in args.input:
         logger.info(image_path)
@@ -56,9 +75,6 @@ def recognize_from_image(weight_path, model_path):
         img = cv2.resize(img, (WIDTH_SIZE, HEIGHT_SIZE), interpolation=cv2.INTER_LANCZOS4)
         img = img[np.newaxis, :]
         img = rearrange(img, "1 h w c -> 1 c h w")
-        print(f"{img=}")
-        print(f"{img.max()=}")
-        print(f"{img.min()=}")
         logger.info(f"input image shape: {img.shape}")
         logger.info("Start inference ...")
 
@@ -70,22 +86,20 @@ def recognize_from_image(weight_path, model_path):
                 end = int(round(time.time() * 1000))
                 logger.info(f"\tailia processing time {end - start} ms")
         else:
-            pred = net.run(img)[0]
-            pred = rearrange(pred, "1 c h w -> h w c")
+            img = img.astype(np.float32)
 
-        # enhance = cv2.resize(pred, (W, H), interpolation=cv2.INTER_LANCZOS4)
-        enhance = pred * 255.0
-        enhance = np.clip(enhance, 0, 255)
-        enhance = enhance.astype(np.uint8)
-        enhance = cv2.resize(enhance, (W, H), interpolation=cv2.INTER_LINEAR)
-        # enhance = cv2.resize(pred, (W, H), interpolation=cv2.INTER_LINEAR)
-        # enhance = enhance * 255.0
-        # enhance = np.clip(enhance, 0, 255)
-        # enhance = enhance.astype(np.uint8)
-        
+            if args.onnx:
+                pred = net.run(["5674"], {"x.1": img})[0]
+            else:
+                pred = net.run(img)[0]
+
+            pred = rearrange(pred, "1 c h w -> h w c")
+            pred = pred[..., ::-1]
+
+        pred_postprocess = postprocess(pred * 255.0)
         # save result
         logger.info(f"saved at : {args.savepath}")
-        cv2.imwrite(args.savepath, enhance)
+        cv2.imwrite(args.savepath, pred_postprocess)
 
     logger.info("Script finished successfully.")
 
