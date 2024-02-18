@@ -42,6 +42,11 @@ DRBN SKF has version 1 and version 2. You can specify version to use `--version`
 $ python3 drbn_skf.py --version VERSION
 ```
 
+To use onnxruntime, set --onnx option.
+```bash
+$ python3 drbn_skf.py --onnx
+```
+
 ## Reference
 [DRBN SKF](https://github.com/langmanbusi/Semantic-Aware-Low-Light-Image-Enhancement/tree/main/DRBN_SKF)
 
