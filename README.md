@@ -246,6 +246,7 @@ The collection of pre-trained, state-of-the-art AI models.
 | [<img src="image_classification/convnext/input_imagenet.jpg" width=128px>](image_classification/convnext/) | [convnext](/image_classification/convnext/)|[A PyTorch implementation of ConvNeXt](https://github.com/facebookresearch/ConvNeXt) | Pytorch | 1.2.5 and later | |
 | [<img src="image_classification/mobileone/clock.jpg" width=128px>](image_classification/mobileone/) | [mobileone](/image_classification/mobileone/)|[A PyTorch implementation of MobileOne](https://github.com/apple/ml-mobileone) | Pytorch | 1.2.1 and later | |
 | [<img src="image_classification/imagenet21k/input.jpg" width=128px>](image_classification/imagenet21k/) | [imagenet21k](/image_classification/imagenet21k/) | [ImageNet21K](https://github.com/Alibaba-MIIL/ImageNet21K) | Pytorch | 1.2.11 and later | |
+| [<img src="image_classification/volo/input.jpg" width=128px>](image_classification/volo/) | [volo](/image_classification/volo/) | [VOLO: Vision Outlooker for Visual Recognition](https://github.com/sail-sg/volo) | Pytorch | 2.2.0 and later | |
 
 ## Image inpainting
 
