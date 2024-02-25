@@ -1,8 +1,9 @@
-import queue
 import sys
 import time
 from collections import namedtuple
 import platform
+import queue
+import zlib
 from logging import getLogger
 
 import numpy as np
@@ -71,6 +72,9 @@ parser.add_argument(
 parser.add_argument(
     "--temperature_increment_on_fallback", type=float, default=0.2,
     help="temperature to increase when falling back when the decoding fails to meet either of the thresholds below")
+parser.add_argument(
+    "--compression_ratio_threshold", type=float, default=2.4,
+    help="if the gzip compression ratio is higher than this value, treat the decoding as failed")
 parser.add_argument(
     "--logprob_threshold", type=float, default=-1.0,
     help="if the average log probability is lower than this value, treat the decoding as failed")
@@ -364,6 +368,10 @@ def new_kv_cache(n_group, length=451):
         raise ValueError(f"Unsupported model type: {model_type}")
 
     return np.zeros(size, dtype=np.float32, order='C')
+
+
+def compression_ratio(text) -> float:
+    return len(text) / len(zlib.compress(text.encode("utf-8")))
 
 
 # ======================
@@ -689,8 +697,8 @@ def decode(enc_net, dec_net, mel, options):
 def decode_with_fallback(enc_net, dec_net, segment, decode_options):
     logprob_threshold = decode_options.get('logprob_threshold', -1.0)
     temperature = decode_options.get('temperature', 0)
-    no_speech_threshold = decode_options.get('no_speech_threshold', 0)
-    compression_ratio_threshold = None
+    no_speech_threshold = decode_options.get('no_speech_threshold', 0.6)
+    compression_ratio_threshold = decode_options.get('compression_ratio_threshold', 2.4)
 
     temperatures = (
         [temperature] if isinstance(temperature, (int, float)) else temperature
@@ -714,7 +722,7 @@ def decode_with_fallback(enc_net, dec_net, segment, decode_options):
         needs_fallback = False
         if (
             compression_ratio_threshold is not None
-            and decode_result.compression_ratio > compression_ratio_threshold
+            and compression_ratio(decode_result.text) > compression_ratio_threshold
         ):
             needs_fallback = True  # too repetitive
         if (
@@ -737,6 +745,7 @@ def predict(wav, enc_net, dec_net, immediate=False, microphone=False):
     language = args.language
     temperature = args.temperature
     temperature_increment_on_fallback = args.temperature_increment_on_fallback
+    compression_ratio_threshold = args.compression_ratio_threshold
     logprob_threshold = args.logprob_threshold
     no_speech_threshold = args.no_speech_threshold
 
@@ -750,9 +759,11 @@ def predict(wav, enc_net, dec_net, immediate=False, microphone=False):
         'temperature': temperature, 'best_of': args.best_of,
         'beam_size': args.beam_size, 'patience': args.patience,
         'length_penalty': args.length_penalty, 'suppress_tokens': args.suppress_tokens,
+        'compression_ratio_threshold': compression_ratio_threshold,
         'logprob_threshold': logprob_threshold,
+        "no_speech_threshold": args.no_speech_threshold,
+        "suppress_blank": True,
         'prompt': [],
-        "no_speech_threshold": args.no_speech_threshold, "suppress_blank": True
     }
 
     mel = log_mel_spectrogram(wav, dims.n_mels, padding=N_SAMPLES)
