@@ -24,7 +24,10 @@ Face = namedtuple('Face',
 
 
 def read_static_image(image_path):
-    return cv2.imread(image_path)
+    if isinstance(image_path, str):
+        return cv2.imread(image_path)
+    else:
+        return image_path  # already data
 
 def read_static_images(image_paths):
     frames = []

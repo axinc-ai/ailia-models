@@ -83,7 +83,7 @@ def process_frame(inputs, reference_face_distance, nets, face_detector_score):
 
     return target_vision_frame
 
-def process_image(source_paths, target_path, output_path, reference_face_distance, nets, face_detector_score):
+def process_image(source_paths, target_path, reference_face_distance, nets, face_detector_score):
     reference_faces = get_reference_faces()
     source_frames = read_static_images(source_paths)
     source_face = get_average_face(source_frames, nets, face_detector_score)
@@ -94,7 +94,7 @@ def process_image(source_paths, target_path, output_path, reference_face_distanc
                                 reference_face_distance,
                                 nets,
                                 face_detector_score)
-    write_image(output_path, result_frame)
+    return result_frame
 
 def post_process():
     clear_static_faces()
