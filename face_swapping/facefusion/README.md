@@ -1,4 +1,4 @@
-# Facefusion
+# FaceFusion
 
 ## Inputs
 
@@ -17,6 +17,15 @@
 ## Output
 
 [<img src="output.png" width=512px>](output.png)
+
+## Requirements
+
+This model requires additional module.
+
+```bash
+# Install onnx https://pypi.org/project/onnx/
+pip3 install onnx
+```
 
 ## Usage
 Automatically downloads the onnx and prototxt files on the first run.
@@ -46,7 +55,7 @@ $ python3 facefusion.py --video VIDEO_PATH
 
 ## Reference
 
-- [Facefusion](https://github.com/facefusion/facefusion)
+- [FaceFusion](https://github.com/facefusion/facefusion)
 
 ## Framework
 

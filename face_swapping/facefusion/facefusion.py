@@ -2,7 +2,6 @@ import cv2
 import sys
 import time
 import onnx
-import shutil
 import numpy as np
 from onnx import numpy_helper
 
