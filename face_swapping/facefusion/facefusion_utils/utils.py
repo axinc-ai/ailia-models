@@ -20,9 +20,7 @@ Face = namedtuple('Face',
                    'landmark',
                    'score',
                    'embedding',
-                   'normed_embedding',
-                   'gender',
-                   'age'])
+                   'normed_embedding'])
 
 
 def read_static_image(image_path):

@@ -15,8 +15,6 @@ def prepare_detect_frame(temp_vision_frame, face_detector_size):
     return detect_vision_frame
 
 def detect_with_yoloface(vision_frame, face_detector, face_detector_size, min_score, is_onnx):
-    # face_detector = get_face_analyser().get('face_detector')
-    # face_detector = onnxruntime.InferenceSession('yoloface_8n.onnx', providers = ['CPUExecutionProvider'])
     face_detector_width, face_detector_height = unpack_resolution(face_detector_size)
     temp_vision_frame = resize_frame_resolution(vision_frame, face_detector_width, face_detector_height)
     ratio_height = vision_frame.shape[0] / temp_vision_frame.shape[0]
@@ -53,8 +51,6 @@ def detect_with_yoloface(vision_frame, face_detector, face_detector_size, min_sc
     return bounding_box_list, face_landmark5_list, score_list
 
 def detect_face_landmark_68(temp_vision_frame, face_landmarker, bounding_box, is_onnx):
-    # face_landmarker = get_face_analyser().get('face_landmarker')
-    # face_landmarker = onnxruntime.InferenceSession('2dfan4.onnx', providers = ['CPUExecutionProvider'])
     scale = 195 / np.subtract(bounding_box[2:], bounding_box[:2]).max()
     translation = (256 - np.add(bounding_box[2:], bounding_box[:2]) * scale) * 0.5
     crop_vision_frame, affine_matrix = warp_face_by_translation(temp_vision_frame, translation, scale, (256, 256))
@@ -74,8 +70,6 @@ def detect_face_landmark_68(temp_vision_frame, face_landmarker, bounding_box, is
     return face_landmark_68
 
 def calc_embedding(temp_vision_frame, face_recognizer, face_landmark_5, is_onnx):
-    # face_recognizer = get_face_analyser().get('face_recognizer')
-    # face_recognizer = onnxruntime.InferenceSession('arcface_w600k_r50.onnx', providers = ['CPUExecutionProvider'])
     crop_vision_frame, _ = warp_face_by_face_landmark_5(temp_vision_frame, face_landmark_5, 'arcface_112_v2', (112, 112))
     crop_vision_frame = crop_vision_frame / 127.5 - 1
     crop_vision_frame = crop_vision_frame[:, :, ::-1].transpose(2, 0, 1).astype(np.float32)
@@ -91,27 +85,6 @@ def calc_embedding(temp_vision_frame, face_recognizer, face_landmark_5, is_onnx)
     embedding = embedding.ravel()
     normed_embedding = embedding / np.linalg.norm(embedding)
     return embedding, normed_embedding
-
-def detect_gender_age(temp_vision_frame, gender_age, bounding_box, is_onnx):
-    # gender_age = get_face_analyser().get('gender_age')
-    # gender_age = onnxruntime.InferenceSession('gender_age.onnx', providers = ['CPUExecutionProvider'])
-    bounding_box = bounding_box.reshape(2, -1)
-    scale = 64 / np.subtract(*bounding_box[::-1]).max()
-    translation = 48 - bounding_box.sum(axis = 0) * scale * 0.5
-    crop_vision_frame, _ = warp_face_by_translation(temp_vision_frame, translation, scale, (96, 96))
-    crop_vision_frame = crop_vision_frame[:, :, ::-1].transpose(2, 0, 1).astype(np.float32)
-    crop_vision_frame = np.expand_dims(crop_vision_frame, axis = 0)
-
-    if is_onnx:
-        prediction = gender_age.run(None, {
-            gender_age.get_inputs()[0].name: crop_vision_frame
-        })[0][0]
-    else:
-        prediction = gender_age.predict([crop_vision_frame])[0][0]
-
-    gender = int(np.argmax(prediction[:2]))
-    age = int(np.round(prediction[2] * 100))
-    return gender, age
 
 def create_faces(vision_frame, nets, bounding_box_list, face_landmark5_list, score_list, min_score):
     faces = []
@@ -131,15 +104,12 @@ def create_faces(vision_frame, nets, bounding_box_list, face_landmark5_list, sco
             }
             score = score_list[index]
             embedding, normed_embedding = calc_embedding(vision_frame, nets['face_recognizer'], landmark['5/68'], nets['is_onnx'])
-            gender, age = detect_gender_age(vision_frame, nets['gender_age'], bounding_box, nets['is_onnx'])
             faces.append(Face(
                 bounding_box = bounding_box,
                 landmark = landmark,
                 score = score,
                 embedding = embedding,
-                normed_embedding = normed_embedding,
-                gender = gender,
-                age = age
+                normed_embedding = normed_embedding
             ))
     return faces
 
@@ -206,17 +176,15 @@ def get_average_face(vision_frames, position=0):
             landmark = first_face.landmark,
             score = first_face.score,
             embedding = np.mean(embedding_list, axis = 0),
-            normed_embedding = np.mean(normed_embedding_list, axis = 0),
-            gender = first_face.gender,
-            age = first_face.age
+            normed_embedding = np.mean(normed_embedding_list, axis = 0)
         )
     return average_face
 
-def compare_faces(face : Face, reference_face : Face, face_distance : float) -> bool:
+def compare_faces(face, reference_face, face_distance):
     current_face_distance = calc_face_distance(face, reference_face)
     return current_face_distance < face_distance
 
-def calc_face_distance(face : Face, reference_face : Face) -> float:
+def calc_face_distance(face, reference_face):
     if hasattr(face, 'normed_embedding') and hasattr(reference_face, 'normed_embedding'):
         return 1 - np.dot(face.normed_embedding, reference_face.normed_embedding)
     return 0

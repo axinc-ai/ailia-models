@@ -25,9 +25,6 @@ MODEL_FACE_LANDMARKER_PATH = '2dfan4.onnx.prototxt'
 WEIGHT_FACE_RECOGNIZER_PATH = 'arcface_w600k_r50.onnx'
 MODEL_FACE_RECOGNIZER_PATH = 'arcface_w600k_r50.onnx.prototxt'
 
-WEIGHT_GENDER_AGE_PATH = 'gender_age.onnx'
-MODEL_GENDER_AGE_PATH = 'gender_age.onnx.prototxt'
-
 WEIGHT_FACE_SWAPPER_PATH = 'inswapper_128.onnx'
 MODEL_FACE_SWAPPER_PATH = 'inswapper_128.onnx.prototxt'
 
@@ -68,8 +65,7 @@ def main():
         'face_detector': (WEIGHT_FACE_DETECTOR_PATH, MODEL_FACE_DETECTOR_PATH),
         'face_landmarker': (WEIGHT_FACE_LANDMARKER_PATH, MODEL_FACE_LANDMARKER_PATH),
         'face_recognizer': (WEIGHT_FACE_RECOGNIZER_PATH, MODEL_FACE_RECOGNIZER_PATH),
-        'gender_age': (WEIGHT_GENDER_AGE_PATH, MODEL_GENDER_AGE_PATH),
-        'face_swapper': (WEIGHT_FACE_SWAPPER_PATH, MODEL_FACE_SWAPPER_PATH),
+        'face_swapper': (WEIGHT_FACE_SWAPPER_PATH, MODEL_FACE_SWAPPER_PATH)
     }
 
     if False:
@@ -90,7 +86,7 @@ def main():
     target_img_path = '/Users/nathan/Documents/images/docomo_megatest/0002.jpg'
     conditional_append_reference_faces(source_img_paths, target_img_path, nets)
 
-    output_img_path = '/Users/nathan/Desktop/trash/facefusion/output.jpg'
+    output_img_path = '/Users/nathan/Desktop/trash/facefusion/output_no_gender_age.jpg'
     process_image(source_img_paths, target_img_path, output_img_path, nets)
 
 
