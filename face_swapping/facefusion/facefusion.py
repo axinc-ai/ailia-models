@@ -9,7 +9,6 @@ from facefusion_utils.utils import read_static_images, read_static_image
 from facefusion_utils.face_store import append_reference_face
 from facefusion_utils.face_swapper import pre_process, get_reference_frame, post_process
 from facefusion_utils.face_swapper import process_image as _process_image
-from facefusion_utils.ffmpeg import compress_image
 
 
 # ======================
@@ -53,11 +52,8 @@ def conditional_append_reference_faces(source_img_paths, target_img_path, nets):
 
 def process_image(source_img_paths, target_img_path, output_img_path, nets):
     shutil.copy2(target_img_path, output_img_path)
-    # process frame
     _process_image(source_img_paths, output_img_path, output_img_path, REFERENCE_FACE_DISTANCE, nets, FACE_DETECTOR_SCORE)
     post_process()
-    # compress image
-    compress_image(output_img_path, OUTPUT_IMAGE_QUALITY)
 
 
 def main():
@@ -86,7 +82,7 @@ def main():
     target_img_path = '/Users/nathan/Documents/images/docomo_megatest/0002.jpg'
     conditional_append_reference_faces(source_img_paths, target_img_path, nets)
 
-    output_img_path = '/Users/nathan/Desktop/trash/facefusion/output_no_gender_age.jpg'
+    output_img_path = '/Users/nathan/Desktop/trash/facefusion/output_no_compression.jpg'
     process_image(source_img_paths, target_img_path, output_img_path, nets)
 
 
