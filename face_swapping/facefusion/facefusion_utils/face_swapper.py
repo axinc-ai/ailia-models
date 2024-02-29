@@ -27,18 +27,15 @@ def prepare_source_embedding(source_face, model_matrix):
 
 def apply_swap(source_face, crop_vision_frame, nets):
     frame_processor = nets['face_swapper']
-    frame_processor_inputs = {}
-
-    for frame_processor_input in frame_processor.get_inputs():
-        if frame_processor_input.name == 'source':
-            frame_processor_inputs[frame_processor_input.name] = prepare_source_embedding(source_face, nets['model_matrix'])
-        if frame_processor_input.name == 'target':
-            frame_processor_inputs[frame_processor_input.name] = crop_vision_frame
+    frame_processor_inputs = {
+        'source': prepare_source_embedding(source_face, nets['model_matrix']),
+        'target': crop_vision_frame
+    }
 
     if nets['is_onnx']:
         crop_vision_frame = frame_processor.run(None, frame_processor_inputs)[0][0]
     else:
-        crop_vision_frame = frame_processor.predict([frame_processor_inputs])[0][0]
+        crop_vision_frame = frame_processor.predict(frame_processor_inputs)[0][0]
 
     return crop_vision_frame
 
@@ -89,7 +86,7 @@ def process_frame(inputs, reference_face_distance, nets, face_detector_score):
 def process_image(source_paths, target_path, output_path, reference_face_distance, nets, face_detector_score):
     reference_faces = get_reference_faces()
     source_frames = read_static_images(source_paths)
-    source_face = get_average_face(source_frames)
+    source_face = get_average_face(source_frames, nets, face_detector_score)
     target_vision_frame = read_static_image(target_path)
     result_frame = process_frame({'reference_faces': reference_faces,
                                     'source_face': source_face,

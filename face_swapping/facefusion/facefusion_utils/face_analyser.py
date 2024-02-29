@@ -5,6 +5,11 @@ from .face_store import get_static_faces, set_static_faces
 from .utils import unpack_resolution, resize_frame_resolution, warp_face_by_translation, get_first, \
     warp_face_by_face_landmark_5, apply_nms, convert_face_landmark_68_to_5, Face, FACE_DETECTOR_SIZE
 
+# logger
+from logging import getLogger  # noqa
+
+logger = getLogger(__name__)
+
 
 def prepare_detect_frame(temp_vision_frame, face_detector_size):
     face_detector_width, face_detector_height = unpack_resolution(face_detector_size)
@@ -61,7 +66,7 @@ def detect_face_landmark_68(temp_vision_frame, face_landmarker, bounding_box, is
             face_landmarker.get_inputs()[0].name: [ crop_vision_frame ]
         })[0]
     else:
-        face_landmark_68 = face_landmarker.predict(None, [crop_vision_frame])[0]
+        face_landmark_68 = face_landmarker.predict([np.expand_dims(crop_vision_frame, axis=0)])[0]
 
     face_landmark_68 = face_landmark_68[:, :, :2][0] / 64
     face_landmark_68 = face_landmark_68.reshape(1, -1, 2) * 256
@@ -144,7 +149,8 @@ def get_many_faces(vision_frame, nets, min_score):
             if faces:
                 set_static_faces(vision_frame, faces)
         faces = sort_by_order(faces, 'left-right')
-    except (AttributeError, ValueError):
+    except (AttributeError, ValueError) as e:
+        logger.error(e)
         pass
     return faces
 
@@ -157,14 +163,14 @@ def get_one_face(vision_frame, nets, min_score=0.5, position=0):
             return many_faces[-1]
     return None
 
-def get_average_face(vision_frames, position=0):
+def get_average_face(vision_frames, nets, face_detector_score, position=0):
     average_face = None
     faces = []
     embedding_list = []
     normed_embedding_list = []
 
     for vision_frame in vision_frames:
-        face = get_one_face(vision_frame, position)
+        face = get_one_face(vision_frame, nets, face_detector_score, position)
         if face:
             faces.append(face)
             embedding_list.append(face.embedding)

@@ -38,7 +38,7 @@ def get_model_matrix(model_path):
 
 def conditional_append_reference_faces(source_img_paths, target_img_path, nets):
     source_frames = read_static_images(source_img_paths)
-    source_face = get_average_face(source_frames)
+    source_face = get_average_face(source_frames, nets, FACE_DETECTOR_SCORE)
 
     reference_frame = read_static_image(target_img_path)
     reference_face = get_one_face(reference_frame, nets, FACE_DETECTOR_SCORE)
