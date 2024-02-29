@@ -63,7 +63,7 @@ The collection of pre-trained, state-of-the-art AI models.
 | [vall-e-x](/audio_processing/vall-e-x/) | [VALL-E-X](https://github.com/Plachtaa/VALL-E-X) | Pytorch | 1.2.15 and later |  |
 | [hifigan](/audio_processing/hifigan/) | [HiFi-GAN](https://github.com/jik876/hifi-gan) | Pytorch | 1.2.9 and later |  |
 | [distil-whisper](/audio_processing/distil-whisper/) | [Hugging Face - Distil-Whisper](https://github.com/huggingface/distil-whisper) | Pytorch | 1.2.16 and later | |
-
+| [ina_speech_segmenter](/audio_processing/ina_speech_segmenter/) | [inaSpeechSegmenter](https://github.com/ina-foss/inaSpeechSegmenter) | Pytorch | 1.2.15 and later | |
 
 ## Background removal
 

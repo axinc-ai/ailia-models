@@ -1,0 +1,4 @@
+soundfile
+scipy
+skimage
+pyannote.algorithms
