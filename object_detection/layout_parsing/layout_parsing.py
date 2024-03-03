@@ -64,11 +64,8 @@ def infer_from_pdf(detector: ailia.Detector):
         img_processed, ratio = preprocess(img_orig, INPUT_SHAPE)
 
         def compute():
-            if args.detector:
-                detector.compute(img_orig, args.threshold, args.iou)
-                return None
-            else:
-                return detector.run(img_processed)
+            detector.compute(img_orig, args.threshold, args.iou)
+            return None
 
         # inference
         logger.info('Start inference...')
