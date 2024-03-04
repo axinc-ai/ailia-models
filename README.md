@@ -13,14 +13,13 @@ The collection of pre-trained, state-of-the-art AI models.
 [ailia MODELS tutorial 日本語版](TUTORIAL_jp.md)
 
 # Supported models
-304 models as of December 9th, 2023
+307 models as of March 4th, 2024
 
 # Latest update
+- 2024.03.04 Add Japanese Stable CLIP, msclap, glucose
+- 2024.03.03 Add yolov9 (Unification of line feed code to LF)
 - 2024.01.29 Add rife, layout_parsing
 - 2024.01.27 Add mivolo
-- 2023.12.09 Add riffusion
-- 2023.12.05 Add facenet-pytorch, centroids-reid, nafnet, daclip-sde
-- 2023.12.04 Add distil-whisper
 - More information in our [Wiki](https://github.com/axinc-ai/ailia-models/wiki)
 
 ## Action recognition
