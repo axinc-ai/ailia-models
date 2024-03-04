@@ -9,7 +9,7 @@ import dbface_utils
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
+from arg_utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from detector_utils import load_image  # noqa: E402
 import webcamera_utils  # noqa: E402
@@ -36,6 +36,11 @@ IOU = 0.45
 # Arguemnt Parser Config
 # ======================
 parser = get_base_parser('DBFace model', IMAGE_PATH, SAVE_IMAGE_PATH)
+parser.add_argument(
+    '-w', '--write_json',
+    action='store_true',
+    help='Flag to output results to json file.'
+)
 args = update_parser(parser)
 
 
@@ -140,6 +145,11 @@ def recognize_from_image(filename):
     savepath = get_savepath(args.savepath, filename)
     logger.info(f'saved at : {savepath}')
     cv2.imwrite(savepath, img)
+
+    if args.write_json:
+        json_file = '%s.json' % savepath.rsplit('.', 1)[0]
+        dbface_utils.save_json(json_file, objs)
+
     logger.info('Script finished successfully.')
 
 
@@ -156,16 +166,20 @@ def recognize_from_video(video):
     else:
         writer = None
 
+    frame_shown = False
     while(True):
         ret, img = capture.read()
         # press q to end video capture
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
             break
 
         objs = detect_objects(img, detector)
         for obj in objs:
             dbface_utils.drawbbox(img, obj)
         cv2.imshow('frame', img)
+        frame_shown = True
 
         # save results
         if writer is not None:

@@ -1,22 +1,22 @@
 import sys
 import time
 
-import numpy as np
-import cv2
-
 import ailia
+import cv2
+import numpy as np
+
 import blazeface_utils as but
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
-from model_utils import check_and_download_models  # noqa: E402
-from image_utils import normalize_image  # noqa: E402C
-from detector_utils import load_image  # noqa: E402C
-import webcamera_utils  # noqa: E402
-
 # logger
 from logging import getLogger  # noqa: E402
+
+import webcamera_utils  # noqa: E402
+from detector_utils import load_image  # noqa: E402C
+from image_utils import imread, normalize_image  # noqa: E402C
+from model_utils import check_and_download_models  # noqa: E402
+from arg_utils import get_base_parser, get_savepath, update_parser  # noqa: E402
 
 logger = getLogger(__name__)
 
@@ -50,6 +50,11 @@ parser = get_base_parser(
     SAVE_IMAGE_PATH,
 )
 parser.add_argument('-bk', '--back', action='store_true')
+parser.add_argument(
+    '-w', '--write_json',
+    action='store_true',
+    help='Flag to output results to json file.'
+)
 args = update_parser(parser)
 
 
@@ -97,7 +102,7 @@ def recognize_from_image(net):
     for image_path in args.input:
         # prepare input data
         logger.info(image_path)
-        org_img = cv2.imread(image_path, cv2.IMREAD_COLOR)
+        org_img = imread(image_path, cv2.IMREAD_COLOR)
 
         input_data = load_image(image_path)
         input_data = cv2.cvtColor(input_data, cv2.COLOR_BGRA2RGB)
@@ -138,6 +143,10 @@ def recognize_from_image(net):
         for detection in detections:
             but.plot_detections(org_img, detection, save_image_path=savepath)
 
+        if args.write_json:
+            json_file = '%s.json' % savepath.rsplit('.', 1)[0]
+            but.save_json(json_file, org_img, detections)
+
     logger.info('Script finished successfully.')
 
 
@@ -161,9 +170,12 @@ def recognize_from_video(net):
     else:
         writer = None
 
+    frame_shown = False
     while (True):
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
             break
 
         input_image, input_data = webcamera_utils.preprocess_frame(
@@ -188,6 +200,7 @@ def recognize_from_video(net):
         input_image = input_image[(dh - sh) // 2:(dh - sh) // 2 + sh, (dw - sw) // 2:(dw - sw) // 2 + sw, :]
 
         cv2.imshow('frame', input_image)
+        frame_shown = True
 
         # save results
         if writer is not None:

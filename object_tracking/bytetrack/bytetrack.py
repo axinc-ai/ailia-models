@@ -9,7 +9,7 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser
+from arg_utils import get_base_parser, update_parser
 from model_utils import check_and_download_models  # noqa: E402
 from image_utils import normalize_image  # noqa: E402C
 from webcamera_utils import get_capture, get_writer  # noqa: E402
@@ -19,7 +19,6 @@ from logging import getLogger  # noqa: E402
 logger = getLogger(__name__)
 
 from bytetrack_utils import multiclass_nms
-from tracker.byte_tracker import BYTETracker
 
 # ======================
 # Parameters
@@ -77,6 +76,11 @@ parser.add_argument(
     '-m', '--model_type', default='mot17_x',
     choices=('mot17_x', 'mot20_x', 'mot17_s', 'mot17_tiny', 'yolox_s', 'yolox_tiny'),
     help='model type'
+)
+parser.add_argument(
+    '--gui',
+    action='store_true',
+    help='Display preview in GUI.'
 )
 # tracking args
 parser.add_argument("--track_thresh", type=float, default=0.5, help="tracking confidence threshold")
@@ -274,9 +278,12 @@ def recognize_from_video(net):
         match_thresh=args.match_thresh, frame_rate=30,
         mot20=mot20)
 
+    frame_shown = False
     while True:
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
             break
 
         # inference
@@ -299,7 +306,11 @@ def recognize_from_video(net):
         res_img = frame_vis_generator(frame, online_tlwhs, online_ids)
 
         # show
-        cv2.imshow('frame', res_img)
+        if args.gui or args.video:
+            cv2.imshow('frame', res_img)
+            frame_shown = True
+        else:
+            print("Online ids", online_ids)
 
         # save results
         if writer is not None:
@@ -333,7 +344,8 @@ def main():
     env_id = args.env_id
 
     # initialize
-    net = ailia.Net(model_path, weight_path, env_id=env_id)
+    mem_mode = ailia.get_memory_mode(reduce_constant=True, reuse_interstage=True)
+    net = ailia.Net(model_path, weight_path, env_id=env_id, memory_mode=mem_mode)
 
     if args.benchmark:
         benchmarking(net)
@@ -342,4 +354,6 @@ def main():
 
 
 if __name__ == '__main__':
+    from tracker.byte_tracker import BYTETracker
+
     main()

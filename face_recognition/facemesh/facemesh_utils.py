@@ -4,10 +4,6 @@ from scipy.special import expit
 
 
 num_coords = 16
-x_scale = 128.0
-y_scale = 128.0
-h_scale = 128.0
-w_scale = 128.0
 min_score_thresh = 0.75
 min_suppression_threshold = 0.3
 num_keypoints = 6
@@ -60,11 +56,22 @@ def resize_pad(img):
     return img1, img2, scale, pad
 
 
-def decode_boxes(raw_boxes, anchors):
+def decode_boxes(raw_boxes, anchors, back):
     """Converts the predictions into actual coordinates using
     the anchor boxes. Processes the entire batch at once.
     """
     boxes = np.zeros_like(raw_boxes)
+
+    if back:
+        x_scale = 256.0
+        y_scale = 256.0
+        h_scale = 256.0
+        w_scale = 256.0
+    else:
+        x_scale = 128.0
+        y_scale = 128.0
+        h_scale = 128.0
+        w_scale = 128.0
 
     x_center = raw_boxes[..., 0] / x_scale * anchors[:, 2] + anchors[:, 0]
     y_center = raw_boxes[..., 1] / y_scale * anchors[:, 3] + anchors[:, 1]
@@ -87,7 +94,7 @@ def decode_boxes(raw_boxes, anchors):
     return boxes
 
 
-def raw_output_to_detections(raw_box, raw_score, anchors):
+def raw_output_to_detections(raw_box, raw_score, anchors, back):
     """The output of the neural network is an array of shape (b, 896, 16)
     containing the bounding box regressor predictions, as well as an array
     of shape (b, 896, 1) with the classification confidences.
@@ -100,7 +107,7 @@ def raw_output_to_detections(raw_box, raw_score, anchors):
     mediapipe/calculators/tflite/tflite_tensors_to_detections_calculator.cc
     mediapipe/calculators/tflite/tflite_tensors_to_detections_calculator.proto
     """
-    detection_boxes = decode_boxes(raw_box, anchors)
+    detection_boxes = decode_boxes(raw_box, anchors, back)
 
     thresh = 100.0
     raw_score = raw_score.clip(-thresh, thresh)
@@ -276,7 +283,7 @@ def denormalize_detections(detections, scale, pad):
     return detections
 
 
-def detector_postprocess(preds_ailia, anchor_path='anchors.npy'):
+def detector_postprocess(preds_ailia, anchor_path='anchors.npy', back=False):
     """
     Process detection predictions from ailia and return filtered detections
     """
@@ -286,7 +293,7 @@ def detector_postprocess(preds_ailia, anchor_path='anchors.npy'):
     anchors = np.load(anchor_path).astype("float32")
 
     # Postprocess the raw predictions:
-    detections = raw_output_to_detections(raw_box, raw_score, anchors)
+    detections = raw_output_to_detections(raw_box, raw_score, anchors, back)
 
     # Non-maximum suppression to remove overlapping detections:
     filtered_detections = []

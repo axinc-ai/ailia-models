@@ -1,15 +1,19 @@
 """Utils for monoDepth.
 """
-import sys
 import re
-import numpy as np
-import cv2
-import torch
+import sys
 
+import cv2
+import numpy as np
+import torch
 from PIL import Image
 
+sys.path.append('../../../util')
+
+from image_utils import imread  # noqa: E402
 
 from .pallete import get_mask_pallete
+
 
 def read_pfm(path):
     """Read pfm file.
@@ -108,7 +112,7 @@ def read_image(path):
     Returns:
         array: RGB image (0-1)
     """
-    img = cv2.imread(path)
+    img = imread(path)
 
     if img.ndim == 2:
         img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)

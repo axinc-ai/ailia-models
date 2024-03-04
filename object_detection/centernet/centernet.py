@@ -13,7 +13,7 @@ from centernet_utils import preprocess, postprocess
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
+from arg_utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from detector_utils import plot_results, load_image, write_predictions  # noqa: E402
 import webcamera_utils  # noqa: E402
@@ -56,8 +56,11 @@ OPSET_LISTS = ['10', '11']
 parser = get_base_parser('CenterNet model', IMAGE_PATH, SAVE_IMAGE_PATH)
 parser.add_argument(
     '-w', '--write_prediction',
-    action='store_true',
-    help='Flag to output the prediction file.'
+    nargs='?',
+    const='txt',
+    choices=['txt', 'json'],
+    type=str,
+    help='Output results to txt or json file.'
 )
 parser.add_argument(
     '-o', '--opset', metavar='OPSET',
@@ -116,7 +119,7 @@ def detect_objects(org_img, net):
 
     for det in dets:
         # Make sure bboxes are not out of bounds
-        xmin, ymin, xmax, ymax = det[:4].astype(np.int)
+        xmin, ymin, xmax, ymax = det[:4].astype(int)
         xmin = max(0, xmin)
         ymin = max(0, ymin)
         xmax = min(org_img.shape[1], xmax)
@@ -186,9 +189,10 @@ def recognize_from_image(filename, detector):
     cv2.imwrite(savepath, im2show)
 
     # write prediction
-    if args.write_prediction:
-        pred_file = '%s.txt' % savepath.rsplit('.', 1)[0]
-        write_predictions(pred_file, ary, img, category=COCO_CATEGORY)
+    if args.write_prediction is not None:
+        ext = args.write_prediction
+        pred_file = "%s.%s" % (savepath.rsplit('.', 1)[0], ext)
+        write_predictions(pred_file, ary, img, category=COCO_CATEGORY, file_type=ext)
 
     if args.profile:
         print(detector.get_summary())
@@ -208,16 +212,19 @@ def recognize_from_video(video, detector):
     else:
         writer = None
 
-    if args.write_prediction:
+    if args.write_prediction is not None:
         frame_count = 0
         frame_digit = int(math.log10(capture.get(cv2.CAP_PROP_FRAME_COUNT)) + 1)
         video_name = os.path.splitext(os.path.basename(args.video))[0]
 
+    frame_shown = False
     while(True):
         ret, img = capture.read()
 
         # press q to end video capture
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
             break
 
         boxes, scores, cls_inds = detect_objects(img, detector)
@@ -231,16 +238,18 @@ def recognize_from_video(video, detector):
 
         img = plot_results(ary, img, COCO_CATEGORY)
         cv2.imshow('frame', img)
+        frame_shown = True
 
         # save results
         if writer is not None:
             writer.write(img)
 
         # write prediction
-        if args.write_prediction:
+        if args.write_prediction is not None:
             savepath = get_savepath(args.savepath, video_name, post_fix = '_%s' % (str(frame_count).zfill(frame_digit) + '_res'), ext='.png')
-            pred_file = '%s.txt' % savepath.rsplit('.', 1)[0]
-            write_predictions(pred_file, ary, img, COCO_CATEGORY)
+            ext = args.write_prediction
+            pred_file = "%s.%s" % (savepath.rsplit('.', 1)[0], ext)
+            write_predictions(pred_file, ary, img, category=COCO_CATEGORY, file_type=ext)
             frame_count += 1
 
     capture.release()

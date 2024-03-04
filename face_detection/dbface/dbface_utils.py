@@ -1,8 +1,11 @@
-import cv2
-import random
-import numpy as np
 import math
 import os
+import random
+
+import cv2
+import numpy as np
+import json
+
 
 class BBox:
 
@@ -245,11 +248,11 @@ def drawbbox(image, bbox, color=None, thickness=2, textcolor=(0, 0, 0), landmark
     w = r - x + 1
     h = b - y + 1
 
-    cv2.rectangle(image, (x, y, r-x+1, b-y+1), color, thickness, 16)
+    cv2.rectangle(image, (x, y), (r+1, b+1), color, thickness, 16)
 
     border = thickness / 2
     pos = (x + 3, y - 5)
-    cv2.rectangle(image, intv(x - border, y - 21, w + thickness, 21), color, -1, 16)
+    cv2.rectangle(image, intv(x - border, y - 21), intv(x - border + w + thickness, y), color, -1, 16)
     cv2.putText(image, text, pos, 0, 0.5, textcolor, 1, 16)
 
     if bbox.haslandmark:
@@ -348,7 +351,19 @@ def max_pool2d(A, kernel_size, stride, padding):
 
 
 def get_topk_score_indices(hm_pool, hm, k):
-    ary = ((hm_pool == hm).astype(np.bool) * hm).reshape(-1)
+    ary = ((hm_pool == hm).astype(bool) * hm).reshape(-1)
     indices = ary.argsort()[::-1][:k]
     scores = ary[indices]
     return scores, indices
+
+
+def save_json(json_path, objs):
+    with open(json_path, 'w') as f:
+        json.dump(
+            [{
+                'x': obj.x, 'y': obj.y, 'r': obj.r, 'b': obj.b,
+                'width': obj.width, 'height': obj.height,
+                'landmark': obj.landmark
+            } for obj in objs],
+            f, indent=2
+        )
