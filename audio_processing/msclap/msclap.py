@@ -208,6 +208,11 @@ def main():
 
     env_id = args.env_id
 
+    # disable FP16
+    if "FP16" in ailia.get_environment(args.env_id).props or sys.platform == 'Darwin':
+        logger.warning('This model do not work on FP16. So use CPU mode.')
+        env_id = 0
+
     # initialize
     if args.version == '2023':
         caption_model = ailia.Net(CAPTION_MODEL_PATH_2023, CAPTION_WEIGHT_PATH_2023, env_id=env_id)
