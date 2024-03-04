@@ -48,7 +48,7 @@ args = update_parser(parser)
 
 def create_instance(weight_path, model_path, ):
     if not args.onnx:
-        logger.info("User ailia")
+        logger.info("Use ailia SDK")
         env_id = args.env_id
         logger.info(f"{env_id: {env_id}}")
         memory_mode = ailia.get_memory_mode(reuse_interstage=True)
@@ -130,6 +130,11 @@ def infer(net: Union[ailia.Net, onnxruntime.InferenceSession]):
 
 
 if __name__ == "__main__":
+    # disable FP16
+    if "FP16" in ailia.get_environment(args.env_id).props or sys.platform == 'Darwin':
+        logger.warning('This model do not work on FP16. So use CPU mode.')
+        args.env_id = 0
+
     check_and_download_models(NARABAS_WEIGHT_PASS, NARABAS_MODEL_PATH, REMOTE_PATH)
     net = create_instance(NARABAS_WEIGHT_PASS, NARABAS_MODEL_PATH)
     infer(net)
