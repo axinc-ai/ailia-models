@@ -177,6 +177,7 @@ cd ../../image_segmentation/suim; python3 suim.py ${OPTION}
 cd ../../image_segmentation/group_vit; python3 group_vit.py ${OPTION}
 cd ../../image_segmentation/anime-segmentation; python3 anime-segmentation.py ${OPTION}
 cd ../../image_segmentation/segment-anything; python3 segment-anything.py ${OPTION}
+cd ../../image_segmentation/pytorch-fcn; python3 pytorch-fcn.py ${OPTION}
 cd ../../landmark_classification/landmarks_classifier_asia; python3 landmarks_classifier_asia.py ${OPTION}
 cd ../../landmark_classification/places365; python3 places365.py ${OPTION}
 cd ../../line_segment_detection/mlsd; python3 mlsd.py ${OPTION}
