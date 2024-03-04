@@ -1,6 +1,6 @@
-# Text Generation Using LLaMA
+# Text Generation Using LLaMA and RWKV
 
-## LLaMA
+## LLaMA (Weight size 26GB for FP32, 13GB for FP16)
 
 ### input
 A `SENTENCE`.
@@ -17,7 +17,13 @@ $ python3 llama.py -i "bonjour"
 Output :  bonjour
 ```
 
-##rwkv
+```bash
+$ python3 llama.py -i "bonjour" --fp16
+...
+Output :  bonjour
+```
+
+## RWKV (Weight size 920MB)
 
 ### input
 A `SENTENCE`.
@@ -42,7 +48,7 @@ The study, published in the journal Nature, found that the majority of
 ```
 
 ### Reference
-[LLaMA](https://github.com/tpoisonooo/llama.onnx)  
+[LLaMa/RWKV onnx](https://github.com/tpoisonooo/llama.onnx)  
 
 ### Framework
 pytorch 2.0.0
