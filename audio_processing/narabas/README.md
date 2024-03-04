@@ -2,7 +2,7 @@
 
 ## Input
 
-Wav file(sample file: `input.wav`)
+Wav file (sample file: `input.wav`) and phoneme from pyopenjtalk
 
 
 ## Output
