@@ -157,15 +157,22 @@ def predict(net, img, text_feature):
 
 
 def predict_text_feature(net, text):
-    text = tokenize(text)
+    text_tokens = tokenize(text)
 
     # feedforward
-    if not args.onnx:
-        output = net.predict([text])
-    else:
-        output = net.run(None, {'text': text})
+    text_feature = []
+    batch_size_limit = 16
 
-    text_feature = output[0]
+    for i in range(0, text_tokens.shape[0], batch_size_limit):
+        batch_size = min(batch_size_limit, text_tokens.shape[0] - i)
+        logger.info("Embedding " + str(i) + " to " + str(i+batch_size))
+        if not args.onnx:
+            output = net.predict([text_tokens[i:i+batch_size,:]])
+        else:
+            output = net.run(None, {'text': text_tokens[i:i+batch_size,:]})
+        text_feature.append(output[0])
+
+    text_feature = np.concatenate(text_feature)
 
     text_feature = text_feature / np.linalg.norm(text_feature, ord=2, axis=-1, keepdims=True)
 
@@ -288,6 +295,11 @@ def main():
     check_and_download_models(WEIGHT_TEXT_PATH, MODEL_TEXT_PATH, REMOTE_PATH)
 
     env_id = args.env_id
+
+    # disable FP16
+    if "FP16" in ailia.get_environment(args.env_id).props or sys.platform == 'Darwin':
+        logger.warning('This model do not work on FP16. So use CPU mode.')
+        args.env_id = 0
 
     # initialize
     if not args.onnx:

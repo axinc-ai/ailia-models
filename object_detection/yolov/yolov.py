@@ -15,8 +15,7 @@ from logging import getLogger
 
 import webcamera_utils
 from nms_utils import batched_nms
-from detector_utils import (load_image, plot_results, reverse_letterbox,
-                            write_predictions)
+from detector_utils import (load_image, plot_results, reverse_letterbox)
 from image_utils import imread  # noqa: E402
 from model_utils import check_and_download_models
 from arg_utils import get_base_parser, get_savepath, update_parser
@@ -51,9 +50,9 @@ parser.add_argument(
     help='[yolov_x,  yolov_l, yolov_l]'
 )
 parser.add_argument(
-    '-w', '--write_prediction',
+    '-w', '--write_json',
     action='store_true',
-    help='Flag to output the prediction file.'
+    help='Flag to output results to json file.'
 )
 parser.add_argument(
     '-th', '--threshold',
@@ -261,9 +260,9 @@ def recognize_from_image(detector):
         cv2.imwrite(savepath, res_img)
 
         # write prediction
-        if args.write_prediction:
-            pred_file = '%s.txt' % savepath.rsplit('.', 1)[0]
-            write_predictions(pred_file, detect_object, raw_img, COCO_CATEGORY)
+        if args.write_json:
+            json_file = '%s.json' % savepath.rsplit('.', 1)[0]
+            save_result_json(json_file, output, ratio, conf=args.threshold, class_names=VID_classes)
 
     logger.info('Script finished successfully.')
 
@@ -312,10 +311,10 @@ def recognize_from_video(detector):
             writer.write(res_img)
 
         # write prediction
-        if args.write_prediction:
+        if args.write_json:
             savepath = get_savepath(args.savepath, video_name, post_fix = '_%s' % (str(frame_count).zfill(frame_digit) + '_res'), ext='.png')
-            pred_file = '%s.txt' % savepath.rsplit('.', 1)[0]
-            write_predictions(pred_file, detect_object, frame, COCO_CATEGORY)
+            json_file = '%s.json' % savepath.rsplit('.', 1)[0]
+            save_result_json(json_file, outputs, ratio, conf=args.threshold, class_names=VID_classes)
             frame_count += 1
 
     capture.release()

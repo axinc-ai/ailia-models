@@ -100,14 +100,14 @@ else:
 # ======================
 def create_spectrogram(wav):
     if args.ailia_audio:
-        spectrogram = ailia.audio.create_spectrogram(
+        stft = ailia.audio.spectrogram(
             wav,
             fft_n=WIN_LENGTH,
             hop_n=HOP_LENGTH,
             win_n=WIN_LENGTH,
             win_type="hamming",
         )
-        spec_length = np.array(([spectrogram.shape[1]-1]))
+        stft, _ = ailia.audio.magphase(stft)
     else:
         stft = librosa.stft(
             wav,
@@ -117,13 +117,14 @@ def create_spectrogram(wav):
             window='hamming',
         )
         stft, _ = librosa.magphase(stft)
-        spectrogram = np.log1p(stft)
-        spec_length = np.array(([stft.shape[1]-1]))
 
-        mean = spectrogram.mean()
-        std = spectrogram.std()
-        spectrogram -= mean
-        spectrogram /= std
+    spectrogram = np.log1p(stft)
+    spec_length = np.array(([stft.shape[1]-1]))
+
+    mean = spectrogram.mean()
+    std = spectrogram.std()
+    spectrogram -= mean
+    spectrogram /= std
     
     spectrogram = np.log1p(spectrogram)
     spectrogram = spectrogram[np.newaxis, np.newaxis, :, :]

@@ -9,6 +9,7 @@ import json
 from languages import LANGUAGES, TO_LANGUAGE_CODE
 
 def get_tokenizer(multilingual: bool,
+        num_languages: int = 99,
         task: Optional[str] = None,  # Literal["transcribe", "translate", None]
         language: Optional[str] = None):
     if multilingual:
@@ -21,7 +22,7 @@ def get_tokenizer(multilingual: bool,
         language = None
 
     tokenizer = AiliaTokenizer()
-    tokenizer.build_tokenizer('assets/multilingual/vocab.json', 'assets/multilingual/merges.txt',tokenizer_name, task, language)
+    tokenizer.build_tokenizer('assets/multilingual/vocab.json', 'assets/multilingual/merges.txt',tokenizer_name, task, language, num_languages)
     return tokenizer
 
 # Uses some code from Apache licensed transformers
@@ -63,7 +64,7 @@ class AiliaTokenizer:
     transcribe = None
     timestamp_begin = None
 
-    def build_tokenizer(self, vocab_path, merges_path, tokenizer_name, task, language):
+    def build_tokenizer(self, vocab_path, merges_path, tokenizer_name, task, language, num_languages):
         self.language = language
 
         # load vocab
@@ -94,20 +95,20 @@ class AiliaTokenizer:
         self.sot  = 50257 + multilingal
         language_tokens = []
         i = self.sot + 1
-        for lang in LANGUAGES.keys():
+        for lang in list(LANGUAGES.keys())[:num_languages]:
             language_tokens.append(i)
             i = i + 1
-        self.translate = 50357 + multilingal
-        self.transcribe = 50358 + multilingal
-        self.sot_lm = 50359 + multilingal
-        self.sot_prev = 50360 + multilingal
-        self.no_speech = 50361 + multilingal
-        self.no_timestamps = 50362 + multilingal
-        self.timestamp_begin = 50363 + multilingal
+        self.translate = 50357 + (num_languages - 99) + multilingal
+        self.transcribe = 50358 + (num_languages - 99) + multilingal
+        self.sot_lm = 50359 + (num_languages - 99) + multilingal
+        self.sot_prev = 50360 + (num_languages - 99) + multilingal
+        self.no_speech = 50361 + (num_languages - 99) + multilingal
+        self.no_timestamps = 50362 + (num_languages - 99) + multilingal
+        self.timestamp_begin = 50363 + (num_languages - 99) + multilingal
 
         self.all_language_tokens_list = language_tokens
 
-        langs = tuple(LANGUAGES.keys())
+        langs = tuple(list(LANGUAGES.keys())[:num_languages])
         sot_sequence = [self.sot]
         if language is not None:
             sot_sequence.append(self.sot + 1 + langs.index(language))

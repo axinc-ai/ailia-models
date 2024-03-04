@@ -4,6 +4,7 @@ import yaml
 
 import numpy as np
 import cv2
+import json
 
 import ailia
 
@@ -65,6 +66,11 @@ parser.add_argument(
     '--control-line-setting', type=str,
     default='settings/cl_setting.yaml',
     help='control line setting'
+)
+parser.add_argument(
+    '-w', '--write_json',
+    action='store_true',
+    help='Flag to output results to json file.'
 )
 args = update_parser(parser)
 
@@ -194,6 +200,20 @@ def draw_result(img, pred):
             plot_one_box(xyxy, img, label=label, color=color, line_thickness=5)
 
     return img
+
+
+def save_result_json(json_path, pred):
+    plot_classes = args.plot_classes
+    results = []
+    if pred is not None:
+        for *xyxy, conf, class_id in pred:
+            class_name = names[int(class_id)]
+            if class_name in plot_classes:
+                results.append({
+                    'box': xyxy, 'class': class_name, 'conf': conf
+                })
+    with open(json_path, 'w') as f:
+        json.dump(results, f, indent=2)
 
 
 # ======================
@@ -330,6 +350,10 @@ def recognize_from_image(net):
         savepath = get_savepath(args.savepath, image_path, ext='.png')
         logger.info(f'saved at : {savepath}')
         cv2.imwrite(savepath, res_img)
+
+        if args.write_json:
+            json_file = '%s.json' % savepath.rsplit('.', 1)[0]
+            save_result_json(json_file, pred)
 
     logger.info('Script finished successfully.')
 

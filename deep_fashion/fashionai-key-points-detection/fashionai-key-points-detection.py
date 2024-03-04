@@ -7,7 +7,7 @@ import cv2
 import ailia
 
 # import original modules
-from fashionai_key_points_detection_utils import decode_np, draw_keypoints
+from fashionai_key_points_detection_utils import decode_np, draw_keypoints, save_json
 sys.path.append('../../util')
 from arg_utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
@@ -56,6 +56,11 @@ parser.add_argument(
     '-c', '--clothing-type', type=str, default='blouse',
     choices=('blouse', 'dress', 'outwear', 'skirt', 'trousers'),
     help='clothing type'
+)
+parser.add_argument(
+    '-w', '--write_json',
+    action='store_true',
+    help='Flag to output results to json file.'
 )
 args = update_parser(parser)
 
@@ -188,10 +193,13 @@ def recognize_from_image(filename, net):
     plot result
     """
     res_img = draw_keypoints(img, keypoints)
-    # cv2.imwrite(args.savepath, res_img)
     savepath = get_savepath(args.savepath, filename)
     logger.info(f'saved at : {savepath}')
     cv2.imwrite(savepath, res_img)
+
+    if args.write_json:
+        json_file = '%s.json' % savepath.rsplit('.', 1)[0]
+        save_json(json_file, keypoints)
 
 
 def recognize_from_video(video, net):

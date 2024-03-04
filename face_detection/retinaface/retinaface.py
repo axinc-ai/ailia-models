@@ -52,6 +52,11 @@ parser.add_argument(
     default=1,
     help='scale down the original image size to prevent memory overflow, otherwise original size is used'
 )
+parser.add_argument(
+    '-w', '--write_json',
+    action='store_true',
+    help='Flag to output results to json file.'
+)
 args = update_parser(parser)
 
 # ======================
@@ -163,6 +168,10 @@ def recognize_from_image():
         savepath = get_savepath(args.savepath, image_path)
         logger.info(f'saved at : {savepath}')
         rut.plot_detections(org_img, detections, vis_thres=VIS_THRES, save_image_path=savepath)
+
+        if args.write_json:
+            json_file = '%s.json' % savepath.rsplit('.', 1)[0]
+            rut.save_json(json_file, detections, VIS_THRES)
 
     logger.info('Script finished successfully.')
 

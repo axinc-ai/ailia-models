@@ -24,7 +24,7 @@ from egonet_utils import kpts2cs, cs2bbox
 from egonet_utils import modify_bbox, get_affine_transform, affine_transform_modified
 from egonet_utils import get_observation_angle_trans, get_observation_angle_proj
 from egonet_utils import get_6d_rep
-from egonet_utils import plot_2d_objects, plot_3d_objects
+from egonet_utils import plot_2d_objects, plot_3d_objects, save_result_json
 from instance_utils import csv_read_annot, get_2d_3d_pair
 
 logger = getLogger(__name__)
@@ -93,6 +93,11 @@ parser.add_argument(
 parser.add_argument(
     '--plot_3d', action='store_true',
     help='draw a 3d plot.'
+)
+parser.add_argument(
+    '-w', '--write_json',
+    action='store_true',
+    help='Flag to output results to json file.'
 )
 args = update_parser(parser)
 
@@ -573,6 +578,10 @@ def recognize_from_image(HC, LS, L):
         logger.info(f'saved at : {save_path}')
         fig.savefig(save_path, dpi=100, bbox_inches='tight', pad_inches=0)
         plt.close()
+
+        if args.write_json:
+            json_file = '%s.json' % save_path.rsplit('.', 1)[0]
+            save_result_json(json_file, record)
 
         if plot_3d:
             all_kpts_3d_pred = record['kpts_3d_pred'].reshape(len(record['kpts_3d_pred']), -1)

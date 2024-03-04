@@ -44,7 +44,7 @@ class ClusterFeatures:
         if self.algorithm == 'gmm':
             return GaussianMixture(n_components=k, random_state=self.random_state)
 
-        return KMeans(n_clusters=k, random_state=self.random_state)
+        return KMeans(n_clusters=k, random_state=self.random_state, n_init=10)
 
     def _get_centroids(self, model: Union[GaussianMixture, KMeans]) -> np.ndarray:
         """

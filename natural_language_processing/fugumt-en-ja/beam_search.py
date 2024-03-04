@@ -104,7 +104,7 @@ class BeamSearchScorer(object):
             )
             for _ in range(batch_size)
         ]
-        self._done = np.array([False for _ in range(batch_size)], dtype=np.bool)
+        self._done = np.array([False for _ in range(batch_size)], dtype=bool)
 
     @property
     def is_done(self) -> bool:
