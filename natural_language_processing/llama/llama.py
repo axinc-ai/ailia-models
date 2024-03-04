@@ -88,10 +88,10 @@ LLAMA_EMBED_MODEL_PATH  = "embed.onnx.prototxt"
 LLAMA_DECODER_WEIGHT_PATH = "decoder-merge-"
 LLAMA_DECODER_MODEL_PATH  = "decoder-merge-"
 
-RWKV_HEAD_WEIGHT_PATH = "head.onnx"
-RWKV_HEAD_MODEL_PATH = "head.onnx.prototxt"
-RWKV_EMBED_WEIGHT_PATH = "embed.onnx"
-RWKV_EMBED_MODEL_PATH  = "embed.onnx.prototxt"
+RWKV_HEAD_WEIGHT_PATH = "head_rwkv.onnx"
+RWKV_HEAD_MODEL_PATH = "head_rwkv.onnx.prototxt"
+RWKV_EMBED_WEIGHT_PATH = "embed_rwkv.onnx"
+RWKV_EMBED_MODEL_PATH  = "embed_rwkv.onnx.prototxt"
 
 RWKV_DECODER_WEIGHT_PATH = "mixing_"
 RWKV_DECODER_MODEL_PATH  = "mixing_"
@@ -428,7 +428,7 @@ if __name__ == "__main__":
     if args.model == "llama":
         fp16 = ""
         if args.fp16:
-            fp16 = "-fp16"
+            fp16 = "_fp16"
         for i in range(32):
             WEIGHT_PATH = LLAMA_DECODER_WEIGHT_PATH + str(i) + fp16 +".onnx"
             MODEL_PATH  = LLAMA_DECODER_WEIGHT_PATH + str(i) + fp16 +".onnx.prototxt"
@@ -437,7 +437,7 @@ if __name__ == "__main__":
     else:
         check_and_download_models(RWKV_HEAD_WEIGHT_PATH, RWKV_HEAD_MODEL_PATH, REMOTE_PATH)
         check_and_download_models(RWKV_EMBED_WEIGHT_PATH,RWKV_EMBED_MODEL_PATH, REMOTE_PATH)
-        for i in range(23):
+        for i in range(24):
             WEIGHT_PATH = RWKV_DECODER_WEIGHT_PATH + str(i) +"_rwkv.onnx"
             MODEL_PATH  = RWKV_DECODER_WEIGHT_PATH + str(i) +"_rwkv.onnx.prototxt"
             check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)

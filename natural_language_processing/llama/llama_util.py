@@ -20,7 +20,7 @@ class OrtWrapper:
         memory_mode = ailia.get_memory_mode(
             reduce_constant=True, ignore_input_with_initializer=True,
             reduce_interstage=False, reuse_interstage=True)
-        self.sess = ailia.Net(None, onnxfile, env_id = env_id, memory_mode = memory_mode)
+        self.sess = ailia.Net(onnxfile+".prototxt", onnxfile, env_id = env_id, memory_mode = memory_mode)
         #print(onnxfile)
 
     def forward(self, _inputs: dict):
