@@ -3,9 +3,7 @@ import time
 from logging import getLogger
 
 import random
-import pprint
 
-import scipy
 import librosa
 import numpy as np
 from transformers import AutoTokenizer
@@ -35,7 +33,7 @@ AUDIO_WEIGHT_PATH_2022 = 'msclap_2022_audio.onnx'
 CAPTION_MODEL_PATH_2022 = 'msclap_2022_caption.onnx.prototxt'
 AUDIO_MODEL_PATH_2022 = 'msclap_2022_audio.onnx.prototxt'
 
-REMOTE_PATH = None
+REMOTE_PATH = "https://storage.googleapis.com/ailia-models/msclap/"
 
 # ======================
 # Arguemnt Parser Config
@@ -185,16 +183,28 @@ def estimate_best_caption(model):
 
 def main():
     # model files check and download
-    check_and_download_models(
-        CAPTION_WEIGHT_PATH_2023,
-        CAPTION_MODEL_PATH_2023,
-        REMOTE_PATH
-    )
-    check_and_download_models(
-        AUDIO_WEIGHT_PATH_2022,
-        AUDIO_MODEL_PATH_2022,
-        REMOTE_PATH
-    )
+    if args.version == '2023':
+        check_and_download_models(
+            CAPTION_WEIGHT_PATH_2023,
+            CAPTION_MODEL_PATH_2023,
+            REMOTE_PATH
+        )
+        check_and_download_models(
+            AUDIO_WEIGHT_PATH_2023,
+            AUDIO_MODEL_PATH_2023,
+            REMOTE_PATH
+        )
+    elif args.version == '2022':
+        check_and_download_models(
+            CAPTION_WEIGHT_PATH_2022,
+            CAPTION_MODEL_PATH_2022,
+            REMOTE_PATH
+        )
+        check_and_download_models(
+            AUDIO_WEIGHT_PATH_2022,
+            AUDIO_MODEL_PATH_2022,
+            REMOTE_PATH
+        )
 
     env_id = args.env_id
 
