@@ -345,7 +345,6 @@ class RWKV_RNN():
 
 
 def llama_main():
-    logger.info("This model requires multiple input shape, so running on CPU")
     logger.info("Input : "+args.input)
     llama = Llama(onnxdir="./",
                   config={
@@ -370,7 +369,6 @@ def llama_main():
     logger.info('Script finished successfully.')
 
 def rwkv_main():
-    logger.info("This model requires multiple input shape, so running on CPU")
     logger.info("Input : "+args.input)
 
     tokenizer = tokenizers.Tokenizer.from_file("20B_tokenizer.json")
