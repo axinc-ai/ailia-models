@@ -41,8 +41,13 @@ parser.add_argument(
     default=MODEL_NAME,
     help='Model to use ("anime" or "celeb". Default is "anime").'
 )
+parser.add_argument(
+    '--seed', type=int, default=128,
+    help='random seed for input data'
+)
 args = update_parser(parser)
 
+np.random.seed(args.seed)
 
 if args.model == 'anime':
     logger.info('Generation using model "AnimeFace"')
