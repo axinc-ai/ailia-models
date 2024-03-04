@@ -407,7 +407,8 @@ def rwkv_main():
 
 
 if __name__ == "__main__":
-    logger.warning("This model requires too large memory. So if you got error, please use env_id = 0 or 1 (cpu)")
+    args.env_id = -1
+    logger.warning("This model requires too large memory. So we force use cpu.")
 
     if args.model == "llama":
         fp16 = ""
