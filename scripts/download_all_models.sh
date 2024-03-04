@@ -26,6 +26,7 @@ cd ../../audio_processing/crepe/; python3 crepe.py ${OPTION}
 cd ../../audio_processing/vall-e-x/; python3 vall-e-x.py ${OPTION}
 cd ../../audio_processing/hifigan/; python3 hifigan.py ${OPTION}
 cd ../../audio_processing/distil-whisper/; python3 distil-whisper.py ${OPTION}
+cd ../../audio_processing/msclap/; python3 msclap.py ${OPTION}
 cd ../../background_ramoval/deep-image-matting; python3 deep-image-matting.py ${OPTION}
 cd ../../background_ramoval/u2net; python3 u2net.py ${OPTION}
 cd ../../background_ramoval/u2net; python3 u2net.py -a small ${OPTION}
@@ -218,6 +219,7 @@ cd ../../object_detection/yolov6; python3 yolov6.py ${OPTION}
 cd ../../object_detection/yolov7; python3 yolov7.py ${OPTION}
 cd ../../object_detection/yolov8; python3 yolov8.py ${OPTION}
 cd ../../object_detection/yolov8-seg; python3 yolov8-seg.py ${OPTION}
+cd ../../object_detection/yolov9; python3 yolov9.py ${OPTION}
 cd ../../object_detection/yolox; python3 yolox.py ${OPTION}
 cd ../../object_detection/yolox-ti-lite; python3 yolox-ti-lite.py ${OPTION}
 cd ../../object_detection/yolov; python3 yolov.py ${OPTION}
