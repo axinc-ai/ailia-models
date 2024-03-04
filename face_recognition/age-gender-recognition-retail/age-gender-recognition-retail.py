@@ -11,7 +11,7 @@ sys.path.append('../../util')
 import webcamera_utils  # noqa
 from image_utils import imread, load_image  # noqa
 from model_utils import check_and_download_models  # noqa
-from utils import get_base_parser, get_savepath, update_parser  # noqa
+from arg_utils import get_base_parser, get_savepath, update_parser  # noqa
 
 _this = os.path.dirname(os.path.abspath(__file__))
 top_path = os.path.dirname(os.path.dirname(_this))

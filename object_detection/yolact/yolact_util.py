@@ -776,7 +776,7 @@ def nms(dets, thresh):
     order = scores.argsort()[::-1]
 
     ndets = dets.shape[0]
-    suppressed = np.zeros((ndets), dtype=np.int)
+    suppressed = np.zeros((ndets), dtype=int)
 
     for _i in range(ndets):
         i = order[_i]

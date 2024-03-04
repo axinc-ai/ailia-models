@@ -177,7 +177,7 @@ class Tokenize:
         sot_token = self.tokenizer.encoder['<|startoftext|>']
         eot_token = self.tokenizer.encoder['<|endoftext|>']
         all_tokens = [[sot_token] + self.tokenizer.encode(text) + [eot_token] for text in texts]
-        result = np.zeros((len(all_tokens), self.max_seq_len), dtype=np.long)
+        result = np.zeros((len(all_tokens), self.max_seq_len), dtype=int)
 
         for i, tokens in enumerate(all_tokens):
             if len(tokens) > self.max_seq_len:

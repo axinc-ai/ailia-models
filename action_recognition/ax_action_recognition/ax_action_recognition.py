@@ -24,8 +24,8 @@ from webcamera_utils import adjust_frame_size  # noqa: E402
 from image_utils import load_image  # noqa: E402
 from image_utils import normalize_image  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
-from utils import check_file_existance  # noqa: E402
-from utils import get_base_parser, update_parser  # noqa: E402
+from arg_utils import check_file_existance  # noqa: E402
+from arg_utils import get_base_parser, update_parser  # noqa: E402
 
 from ax_action_recognition_util import pose_postprocess,TIME_RANGE,get_detector_result_lw_human_pose,draw_boxes,softmax
 sys.path.append('../../pose_estimation/pose_resnet')
@@ -108,7 +108,7 @@ def ailia_to_openpose(person):
     pose_keypoints = np.zeros((18, 3))
     for i, key in enumerate(POSE_KEY):
         p = person.points[key]
-        pose_keypoints[i, :] = [p.x, p.y, p.score]
+        pose_keypoints[i, :] = [p.x, p.y, float(p.score)]
     return pose_keypoints
 
 # ======================
@@ -457,7 +457,7 @@ def recognize_from_video():
             box = track.to_tlwh()
             x1, y1, x2, y2 = tlwh_to_xyxy(box, h, w)
             track_id = track.track_id
-            outputs.append(np.array([x1, y1, x2, y2, track_id], dtype=np.int))
+            outputs.append(np.array([x1, y1, x2, y2, track_id], dtype=int))
         if len(outputs) > 0:
             outputs = np.stack(outputs, axis=0)
 

@@ -1,0 +1,6 @@
+This model summarizes the text.
+It computes a score for each sentence separated by a newline.
+The sentences are then extracted in order of highest score.
+In this program, the default number of sentences to be extracted is set to 3.
+If you want to change it, change NUM_PREDICT in the program.
+The delimiter can also be changed by SPLIT_CHAR.

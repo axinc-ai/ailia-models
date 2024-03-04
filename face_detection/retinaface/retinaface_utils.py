@@ -2,6 +2,7 @@ from itertools import product as product
 import numpy as np
 from math import ceil
 import cv2
+import json
 
 cfg_mnet = {
     'name': 'mobilenet0.25',
@@ -159,4 +160,26 @@ def plot_detections(img_raw, dets, vis_thres , save_image_path=None):
 
     if save_image_path is not None:
         # save image
-        cv2.imwrite(save_image_path, img_raw)        
+        cv2.imwrite(save_image_path, img_raw)
+
+
+def save_json(json_path, dets, vis_thres):
+    results = []
+
+    for d in dets:
+        prob = float(d[4])
+        if prob < vis_thres:
+            continue
+        bbox_xyxy = d[:4].tolist()
+        landms_orig = d[5:].tolist()
+        landms = []
+        for i in range(5):
+            landms.append((landms_orig[i * 2 + 0], landms_orig[i * 2 + 1]))
+        results.append({
+            'bbox_xyxy': bbox_xyxy,
+            'prob': prob,
+            'landmarks': landms
+        })
+
+    with open(json_path, 'w') as f:
+        json.dump(results, f, indent=2)
