@@ -422,9 +422,9 @@ def rwkv_main():
 
 if __name__ == "__main__":
     # model files check and download
-    check_and_download_models(LLMA_HEAD_WEIGHT_PATH, LLAMA_HEAD_MODEL_PATH, REMOTE_PATH)
-    check_and_download_models(LLMA_NORM_WEIGHT_PATH, LLAMA_NORM_MODEL_PATH, REMOTE_PATH)
-    check_and_download_models(LLMA_EMBED_WEIGHT_PATH,LLAMA_EMBED_MODEL_PATH, REMOTE_PATH)
+    check_and_download_models(LLAMA_HEAD_WEIGHT_PATH, LLAMA_HEAD_MODEL_PATH, REMOTE_PATH)
+    check_and_download_models(LLAMA_NORM_WEIGHT_PATH, LLAMA_NORM_MODEL_PATH, REMOTE_PATH)
+    check_and_download_models(LLAMA_EMBED_WEIGHT_PATH,LLAMA_EMBED_MODEL_PATH, REMOTE_PATH)
     if args.model == "llama":
         fp16 = ""
         if args.fp16:
