@@ -9,7 +9,7 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath  # noqa
+from arg_utils import get_base_parser, update_parser, get_savepath  # noqa
 from model_utils import check_and_download_models  # noqa
 from detector_utils import load_image  # noqa
 from image_utils import normalize_image  # noqa
@@ -40,6 +40,8 @@ WEIGHT_BACKBONE_PATH = 'arcface_backbone.onnx'
 MODEL_BACKBONE_PATH = 'arcface_backbone.onnx.prototxt'
 WEIGHT_LANDMARK_PATH = 'face_landmarks.onnx'
 MODEL_LANDMARK_PATH = 'face_landmarks.onnx.prototxt'
+WEIGHT_PIX2PIX_PATH = '10_net_G.onnx'
+MODEL_PIX2PIX_PATH = '10_net_G.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/sber-swap/'
 
 IMAGE_PATH = 'beckham.jpg'
@@ -65,6 +67,11 @@ parser.add_argument(
     '-iou', '--iou',
     default=IOU, type=float,
     help='IOU threshold for NMS'
+)
+parser.add_argument(
+    '--use_sr',
+    action='store_true',
+    help='True for super resolution on swap image'
 )
 parser.add_argument(
     '--onnx',
@@ -158,7 +165,25 @@ def predict(net_iface, net_G, src_embeds, tar_img):
     return final_img, crop_img, M
 
 
-def recognize_from_image(net_iface, net_back, net_G, net_lmk):
+def face_enhancement(net_pix2pix, output):
+    final_img, crop_img, M = output
+    final_img = cv2.resize(final_img, (256, 256))
+    final_img = final_img[:, :, ::-1]
+    final_img = final_img.astype(np.float32)
+    final_img = final_img / 255.0
+    final_img = np.expand_dims(final_img, axis = 0)
+    final_img = np.transpose(final_img, (0, 3, 1, 2))
+    final_img = net_pix2pix.predict(final_img)
+    final_img = final_img * 255
+    final_img = np.clip(final_img, 0, 255)
+    final_img = final_img.astype(np.uint8)
+    final_img = np.transpose(final_img, (0, 2, 3, 1))
+    final_img = final_img[0, :, :, ::-1]
+    final_img = cv2.resize(final_img, (CROP_SIZE, CROP_SIZE))
+    return final_img, crop_img, M 
+
+
+def recognize_from_image(net_iface, net_back, net_G, net_lmk, net_pix2pix):
     source_path = args.source
     logger.info('Source: {}'.format(source_path))
 
@@ -210,6 +235,9 @@ def recognize_from_image(net_iface, net_back, net_G, net_lmk):
         if output is None:
             logger.info("Target face not recognized.")
             continue
+            
+        if args.use_sr:
+            output = face_enhancement(net_pix2pix, output)
 
         res_img = get_final_img(output, tar_img, net_lmk)
 
@@ -221,7 +249,7 @@ def recognize_from_image(net_iface, net_back, net_G, net_lmk):
     logger.info('Script finished successfully.')
 
 
-def recognize_from_video(net_iface, net_back, net_G, net_lmk):
+def recognize_from_video(net_iface, net_back, net_G, net_lmk, net_pix2pix):
     video_file = args.video if args.video else args.input[0]
     capture = get_capture(video_file)
     assert capture.isOpened(), 'Cannot capture source'
@@ -265,6 +293,9 @@ def recognize_from_video(net_iface, net_back, net_G, net_lmk):
         # inference
         output = predict(net_iface, net_G, src_embeds, frame)
 
+        if args.use_sr:
+            output = face_enhancement(net_pix2pix, output)
+
         if output:
             # plot result
             res_img = get_final_img(output, frame, net_lmk)
@@ -297,6 +328,9 @@ def main():
     check_and_download_models(WEIGHT_BACKBONE_PATH, MODEL_BACKBONE_PATH, REMOTE_PATH)
     logger.info('Checking landmark model...')
     check_and_download_models(WEIGHT_LANDMARK_PATH, MODEL_LANDMARK_PATH, REMOTE_PATH)
+    if args.use_sr:
+        logger.info('Checking pix2pix model...')
+        check_and_download_models(WEIGHT_PIX2PIX_PATH, MODEL_PIX2PIX_PATH, REMOTE_PATH)
 
     env_id = args.env_id
 
@@ -306,12 +340,23 @@ def main():
         net_back = ailia.Net(MODEL_BACKBONE_PATH, WEIGHT_BACKBONE_PATH, env_id=env_id)
         net_G = ailia.Net(MODEL_G_PATH, WEIGHT_G_PATH, env_id=env_id)
         net_lmk = ailia.Net(MODEL_LANDMARK_PATH, WEIGHT_LANDMARK_PATH, env_id=env_id)
+        if args.use_sr:
+            pix2pix_env_id = env_id
+            if "FP16" in ailia.get_environment(args.env_id).props:  # disable FP16
+                pix2pix_env_id = 0
+            net_pix2pix = ailia.Net(MODEL_PIX2PIX_PATH, WEIGHT_PIX2PIX_PATH, env_id=pix2pix_env_id)
+        else:
+            net_pix2pix = None
     else:
         import onnxruntime
         net_iface = onnxruntime.InferenceSession(WEIGHT_ARCFACE_PATH)
         net_back = onnxruntime.InferenceSession(WEIGHT_BACKBONE_PATH)
         net_G = onnxruntime.InferenceSession(WEIGHT_G_PATH)
         net_lmk = onnxruntime.InferenceSession(WEIGHT_LANDMARK_PATH)
+        if args.use_sr:
+            net_pix2pix = onnxruntime.InferenceSession(WEIGHT_PIX2PIX_PATH)
+        else:
+            net_pix2pix = None
 
         face_detect_crop.onnx = True
         image_infer.onnx = True
@@ -320,9 +365,9 @@ def main():
     # net_lmk = setup_mxnet()
 
     if args.video is not None:
-        recognize_from_video(net_iface, net_back, net_G, net_lmk)
+        recognize_from_video(net_iface, net_back, net_G, net_lmk, net_pix2pix)
     else:
-        recognize_from_image(net_iface, net_back, net_G, net_lmk)
+        recognize_from_image(net_iface, net_back, net_G, net_lmk, net_pix2pix)
 
 
 if __name__ == '__main__':

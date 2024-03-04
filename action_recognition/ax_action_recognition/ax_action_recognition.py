@@ -24,8 +24,8 @@ from webcamera_utils import adjust_frame_size  # noqa: E402
 from image_utils import load_image  # noqa: E402
 from image_utils import normalize_image  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
-from utils import check_file_existance  # noqa: E402
-from utils import get_base_parser, update_parser  # noqa: E402
+from arg_utils import check_file_existance  # noqa: E402
+from arg_utils import get_base_parser, update_parser  # noqa: E402
 
 from ax_action_recognition_util import pose_postprocess,TIME_RANGE,get_detector_result_lw_human_pose,draw_boxes,softmax
 sys.path.append('../../pose_estimation/pose_resnet')

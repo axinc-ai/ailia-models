@@ -13,7 +13,7 @@ from logging import getLogger  # noqa: E402
 
 from image_utils import imread, load_image  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
-from utils import get_base_parser, get_savepath, update_parser  # noqa: E402
+from arg_utils import get_base_parser, get_savepath, update_parser  # noqa: E402
 from webcamera_utils import get_capture, get_writer  # noqa: E402
 
 logger = getLogger(__name__)
