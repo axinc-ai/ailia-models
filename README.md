@@ -169,6 +169,7 @@ The collection of pre-trained, state-of-the-art AI models.
 | [<img src="face_recognition/facemesh_v2/output.png" width=128px>](face_recognition/facemesh_v2/) | [facemesh_v2](/face_recognition/facemesh_v2/) | [MediaPipe Face landmark detection](https://developers.google.com/mediapipe/solutions/vision/face_landmarker) | Pytorch | 1.2.9 and later | [JP](https://medium.com/axinc/facemeshv2-blendshape%E3%82%82%E8%A8%88%E7%AE%97%E5%8F%AF%E8%83%BD%E3%81%AA%E9%A1%94%E3%81%AE%E3%82%AD%E3%83%BC%E3%83%9D%E3%82%A4%E3%83%B3%E3%83%88%E6%A4%9C%E5%87%BA%E3%83%A2%E3%83%87%E3%83%AB-3198898dccdd) |
 | [<img src="face_recognition/3ddfa/output.png" width=128px>](face_recognition/3ddfa/) | [3ddfa](/face_recognition/3ddfa/) | [Towards Fast, Accurate and Stable 3D Dense Face Alignment](https://github.com/cleardusk/3DDFA_V2) | Pytorch | 1.2.10 and later | |
 | [<img src="face_recognition/mivolo/output.png" width=128px>](face_recognition/mivolo/) | [mivolo](/face_recognition/mivolo/) | [MiVOLO: Multi-input Transformer for Age and Gender Estimation](https://github.com/WildChlamydia/MiVOLO) | Pytorch | 1.2.13 and later | |
+| [<img src="face_recognition/l2cs_net/output.png" width=128px>](face_recognition/l2cs_net/) | [L2CS_Net](/face_recognition/l2cs_net/) | [L2CS_Net](https://github.com/Ahmednull/L2CS-Net) | Pytorch | 1.2.9 and later | |
 
 ## Frame Interpolation
 
@@ -426,6 +427,7 @@ The collection of pre-trained, state-of-the-art AI models.
 | [<img src="object_tracking/qd-3dt/example/out_00000000.png" width=128px>](object_tracking/qd-3dt/) | [qd-3dt](/object_tracking/qd-3dt/) | [Monocular Quasi-Dense 3D Object Tracking](https://github.com/SysCV/qd-3dt) | Pytorch | 1.2.11 and later |　|
 | [<img src="object_tracking/strong_sort/output.png" width=128px>](object_tracking/strong_sort/) | [strong_sort](/object_tracking/strong_sort/) | [StrongSORT](https://github.com/dyhBUPT/StrongSORT) | Pytorch | 1.2.15 and later |　|
 | [<img src="object_tracking/centroids-reid/output.png" width=128px>](object_tracking/centroids-reid/) | [centroids-reid](/object_tracking/centroids-reid/) | [On the Unreasonable Effectiveness of Centroids in Image Retrieval](https://github.com/mikwieczorek/centroids-reidh) | Pytorch | 1.2.9 and later |　|
+| [<img src="object_tracking/deepsort_vehicle/01840_c40752s1_00280_01.jpg" width=128px>](object_tracking/deepsort_vehicle/) | [deepsort_vehicle](/object_tracking/deepsort_vehicle/) | [Multi-Camera Live Object Tracking](https://github.com/LeonLok/Multi-Camera-Live-Object-Tracking) | Pytorch | 1.2.9 and later |  |
 
 ## Optical Flow Estimation
 
@@ -526,6 +528,12 @@ The collection of pre-trained, state-of-the-art AI models.
 | [<img src="text_recognition/paddleocr/output.png" width=64px>](text_recognition/paddleocr/) |[paddleocr](/text_recognition/paddleocr/) | [PaddleOCR : Awesome multilingual OCR toolkits based on PaddlePaddle](https://github.com/PaddlePaddle/PaddleOCR) | Pytorch | 1.2.6 and later | [EN](https://medium.com/axinc-ai/paddleocr-the-latest-lightweight-ocr-system-a13171d7ea3e) [JP](https://medium.com/axinc/paddleocr-%E6%9C%80%E6%96%B0%E3%81%AE%E8%BB%BD%E9%87%8Focr%E3%82%B7%E3%82%B9%E3%83%86%E3%83%A0-8744205f3703) |
 | [<img src="text_recognition/easyocr/example/chinese.jpg" width=64px>](text_recognition/easyocr/) |[easyocr](/text_recognition/easyocr/) | [Ready-to-use OCR with 80+ supported languages](https://github.com/JaidedAI/EasyOCR) | Pytorch | 1.2.6 and later | |
 | [<img src="text_recognition/ndlocr_text_recognition/demo.png" width=64px>](text_recognition/ndlocr_text_recognition/) |[ndlocr_text_recognition](/text_recognition/ndlocr_text_recognition/) | [NDL OCR](https://github.com/ndl-lab/text_recognition) | Pytorch | 1.2.5 and later | |
+
+## Time-Series Forecasting
+
+| Model | Reference | Exported From | Supported Ailia Version | Blog |
+|------------:|:------------:|:------------:|:------------:|:------------:|
+| [informer2020](/time_series_forecasting/informer2020/) | [Informer: Beyond Efficient Transformer for Long Sequence Time-Series Forecasting (AAAI'21 Best Paper)](https://github.com/zhouhaoyi/Informer2020) | Pytorch | 1.2.10 and later ||
 
 ## Vehicle recognition
 
