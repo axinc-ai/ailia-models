@@ -19,8 +19,8 @@ from symbols import BOS, EOS, PAD, id_to_phoneme, phoneme_to_id
 
 logger = getLogger(__name__)
 
-WEIGHT_PATH = "narabas-v0.onnx"
-MODEL_PATH = "narabas-v0.onnx.prototxt"
+NARABAS_WEIGHT_PASS = "narabas-v0.onnx"
+NARABAS_MODEL_PATH = "narabas-v0.onnx.prototxt"
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/narabas/"
 AUDIO_PATH = "input.wav"
 HOP_LENGTH_SEC = 0.02
@@ -130,6 +130,6 @@ def infer(net: Union[ailia.Net, onnxruntime.InferenceSession]):
 
 
 if __name__ == "__main__":
-    # check_and_download_models(NARABAS_WEIGHT_PASS, NARABAS_MODEL_PATH, REMOTE_PATH)
-    net = create_instance(WEIGHT_PATH, MODEL_PATH)
+    check_and_download_models(NARABAS_WEIGHT_PASS, NARABAS_MODEL_PATH, REMOTE_PATH)
+    net = create_instance(NARABAS_WEIGHT_PASS, NARABAS_MODEL_PATH)
     infer(net)
