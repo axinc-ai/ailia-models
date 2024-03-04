@@ -219,6 +219,7 @@ cd ../../object_detection/yolov6; python3 yolov6.py ${OPTION}
 cd ../../object_detection/yolov7; python3 yolov7.py ${OPTION}
 cd ../../object_detection/yolov8; python3 yolov8.py ${OPTION}
 cd ../../object_detection/yolov8-seg; python3 yolov8-seg.py ${OPTION}
+cd ../../object_detection/yolov9; python3 yolov9.py ${OPTION}
 cd ../../object_detection/yolox; python3 yolox.py ${OPTION}
 cd ../../object_detection/yolox-ti-lite; python3 yolox-ti-lite.py ${OPTION}
 cd ../../object_detection/yolov; python3 yolov.py ${OPTION}
@@ -239,6 +240,7 @@ cd ../../object_detection/poly_yolo; python3 poly_yolo.py ${OPTION}
 cd ../../object_detection/crowd_det; python3 crowd_det.py ${OPTION}
 cd ../../object_detection/footandball; python3 footandball.py ${OPTION}
 cd ../../object_detection/qrcode_wechatqrode; python3 qrcode_wechatqrode.py ${OPTION}
+cd ../../object_detection/layout_parsing; python3 layout_parsing.py ${OPTION}
 cd ../../object_detection_3d/3d_bbox; python3 3d_bbox.py ${OPTION}
 cd ../../object_detection_3d/3d-object-detection.pytorch; python3 3d-object-detection.pytorch.py ${OPTION}
 cd ../../object_detection_3d/mediapipe_objectron; python3 mediapipe_objectron.py ${OPTION}
