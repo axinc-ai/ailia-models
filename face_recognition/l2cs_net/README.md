@@ -1,8 +1,8 @@
-# L2CS-Net
+# L2CS-Net : gaze estimation and tracking.
 
 ## Input
 
-![Input](input.png)
+![Input](selfie.png)
 
 Image credit: "Day 21 Occupy Wall Street October 6 2011 Shankbone 6" by david_shankbone is marked under CC PDM 1.0. To view the terms, visit https://creativecommons.org/publicdomain/mark/1.0/
 
