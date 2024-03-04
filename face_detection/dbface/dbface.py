@@ -36,6 +36,11 @@ IOU = 0.45
 # Arguemnt Parser Config
 # ======================
 parser = get_base_parser('DBFace model', IMAGE_PATH, SAVE_IMAGE_PATH)
+parser.add_argument(
+    '-w', '--write_json',
+    action='store_true',
+    help='Flag to output results to json file.'
+)
 args = update_parser(parser)
 
 
@@ -140,6 +145,11 @@ def recognize_from_image(filename):
     savepath = get_savepath(args.savepath, filename)
     logger.info(f'saved at : {savepath}')
     cv2.imwrite(savepath, img)
+
+    if args.write_json:
+        json_file = '%s.json' % savepath.rsplit('.', 1)[0]
+        dbface_utils.save_json(json_file, objs)
+
     logger.info('Script finished successfully.')
 
 

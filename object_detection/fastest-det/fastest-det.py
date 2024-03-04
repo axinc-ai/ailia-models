@@ -10,7 +10,7 @@ import ailia
 sys.path.append('../../util')
 from arg_utils import get_base_parser, update_parser, get_savepath
 from model_utils import check_and_download_models
-from detector_utils import load_image, plot_results
+from detector_utils import load_image, plot_results, write_predictions
 from math_utils import sigmoid
 from nms_utils import batched_nms
 from webcamera_utils import get_capture, get_writer
@@ -68,6 +68,14 @@ parser.add_argument(
     '-iou', '--iou',
     default=IOU, type=float,
     help='IOU threshold for NMS'
+)
+parser.add_argument(
+    '-w', '--write_prediction',
+    nargs='?',
+    const='txt',
+    choices=['txt', 'json'],
+    type=str,
+    help='Output results to txt or json file.'
 )
 args = update_parser(parser)
 
@@ -214,6 +222,12 @@ def recognize_from_image(net):
         savepath = get_savepath(args.savepath, image_path, ext='.png')
         logger.info(f'saved at : {savepath}')
         cv2.imwrite(savepath, res_img)
+
+        # write prediction
+        if args.write_prediction is not None:
+            ext = args.write_prediction
+            pred_file = "%s.%s" % (savepath.rsplit('.', 1)[0], ext)
+            write_predictions(pred_file, detect_objects, img, category=COCO_CATEGORY, file_type=ext)
 
     logger.info('Script finished successfully.')
 

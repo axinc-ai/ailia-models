@@ -19,7 +19,6 @@ from logging import getLogger  # noqa: E402
 logger = getLogger(__name__)
 
 from bytetrack_utils import multiclass_nms
-from tracker.byte_tracker import BYTETracker
 
 # ======================
 # Parameters
@@ -311,7 +310,7 @@ def recognize_from_video(net):
             cv2.imshow('frame', res_img)
             frame_shown = True
         else:
-            print("Online ids",online_ids)
+            print("Online ids", online_ids)
 
         # save results
         if writer is not None:
@@ -355,4 +354,6 @@ def main():
 
 
 if __name__ == '__main__':
+    from tracker.byte_tracker import BYTETracker
+
     main()

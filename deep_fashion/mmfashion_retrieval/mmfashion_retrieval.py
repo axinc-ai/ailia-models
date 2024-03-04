@@ -5,6 +5,7 @@ import os
 import cv2
 import matplotlib.pyplot as plt
 from scipy.spatial.distance import cosine
+import json
 
 import ailia
 
@@ -57,8 +58,14 @@ parser.add_argument(
     default=5, type=int,
     help='Retrieve the top k results'
 )
+parser.add_argument(
+    '-w', '--write_json',
+    action='store_true',
+    help='Flag to output results to json file.'
+)
 args = update_parser(parser)
 
+results_to_save = []
 
 # ======================
 # Utils
@@ -79,6 +86,11 @@ def show_retrieved_images(query_feat, gallery_embeds, gallery_imgs, topk, filena
 
     order = sorted(query_dist.items(), key=lambda x: x[1])
 
+    if args.video is None and args.write_json:
+        # copy results to save
+        global results_to_save
+        results_to_save = order
+
     logger.info('Retrieved Top%d Results' % topk)
     show_topk_retrieved_images(order[:topk], filename)
 
@@ -91,7 +103,7 @@ def show_topk_retrieved_images(retrieved_idxes, input_image):
     for retrieved_img, _ in retrieved_idxes:
         k+=1 
         filename = os.path.join(args.gallery, retrieved_img)
-        print(filename)
+        logger.info(filename)
         show_img(filename, fig, f'Top-{k-1} result', n, k) 
 
 def show_img(filename, fig, title, topk, idx):
@@ -133,6 +145,14 @@ def recognize_from_image(filename, net):
     savepath = get_savepath(args.savepath, filename)
     plt.savefig(savepath, bbox_inches='tight')
     logger.info(f'saved at : {savepath}')
+
+    if args.write_json:
+        json_file = '%s.json' % savepath.rsplit('.', 1)[0]
+        with open(json_file, 'w') as f:
+            json.dump([{
+                'filename': r[0],
+                'cosine': r[1]
+            } for r in results_to_save], f, indent=2)
 
 def recognize_from_video(filename, net):
     capture = webcamera_utils.get_capture(args.video)

@@ -3,6 +3,7 @@ import time
 
 import numpy as np
 import cv2
+import json
 
 import ailia
 
@@ -46,6 +47,11 @@ parser.add_argument(
     default=THRESHOLD, type=float,
     help='The detection threshold for yolo. (default: ' + str(THRESHOLD) + ')'
 )
+parser.add_argument(
+    '-w', '--write_json',
+    action='store_true',
+    help='Flag to output results to json file.'
+)
 args = update_parser(parser)
 
 
@@ -76,6 +82,21 @@ def draw_detections(img, bboxes):
             cv2.FONT_HERSHEY_SIMPLEX, size, color, text_thickness, cv2.LINE_AA)
 
     return img
+
+
+def save_result_json(json_path, img, bboxes):
+    h, w = img.shape[:2]
+    res = []
+    for bbox in bboxes:
+        box = bbox[:4]
+        det_score = 100.0 * bbox[4]
+        res.append({
+            'det': det_score,
+            'x1': box[0], 'y1': box[1],
+            'x2': box[2], 'y2': box[3]
+        })
+    with open(json_path, 'w') as f:
+        json.dump(res, f, indent=2)
 
 
 # ======================
@@ -169,6 +190,11 @@ def recognize_from_image(net):
         savepath = get_savepath(args.savepath, image_path, ext='.png')
         logger.info(f'saved at : {savepath}')
         cv2.imwrite(savepath, res_img)
+
+        # write prediction
+        if args.write_json:
+            pred_file = '%s.json' % savepath.rsplit('.', 1)[0]
+            save_result_json(pred_file, img, bboxes)
 
     logger.info('Script finished successfully.')
 

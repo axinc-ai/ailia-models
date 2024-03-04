@@ -37,14 +37,23 @@ You can use `--savepath` option to change the name of the output file to save.
 $ python3 stable-diffusion-txt2img.py --input TEXT --savepath SAVE_IMAGE_PATH
 ```
 
-Quality, sampling speed and diversity are best controlled via the `--scale`, `--ddim_steps` and `--ddim_eta` options.
+Quality, sampling speed and diversity are best controlled via the `--scale`, `--steps` and `--ddim_eta` options.
 Higher values of scale produce better samples at the cost of a reduced output diversity.
 
-Furthermore, increasing `--ddim_steps` generally also gives higher quality samples, but returns are diminishing for values > 250. Fast sampling (i.e. low values of `--ddim_steps`) while retaining good quality can be achieved by using `--ddim_eta` 0.0.
+Furthermore, increasing `--steps` generally also gives higher quality samples, but returns are diminishing for values > 250. Fast sampling (i.e. low values of `--steps`) while retaining good quality can be achieved by using `--ddim_eta` 0.0.
+
+## Change base model
+
+Uses StableDiffusion v1.4 by default. BasilMix and vae-ft-mse can also be used with the command below.
+
+```
+python3 stable-diffusion-txt2img.py --sd basil_mix --vae vae-ft-mse --sampler "DPM++ 2M Kerras" -i "masterpiece, best quality, ultra detailed, sketch, oil painting, 1 girl has silver long hair, eyelashes, jewelry eyes, twinklee eyes, glowing eyes, smile, office lady, tight skirt, looking at viewer, outdoor, street, night" --n_prompt "worst quality, low quality, bad anatomy, bad hands, missing arms, text error, missing fingers, jpeg artifacts, long neck, signature, watermark, blurry, fisheye lens, animal, deformed mutated disfigured, mutated hands, missing hands, extra hands, liquid hands, poorly drawn hands, mutated fingers, bad fingers, extra fingers, liquid fingers, poorly drawn fingers, bad legs, missing legs, extra legs, bad arms, extra arms, long torso, thick thighs, partial head, bad face, partial face, bad eyebrows" --steps 20
+```
 
 ## Reference
 
 - [Stable Diffusion](https://github.com/CompVis/stable-diffusion)
+- [k-diffusion](https://github.com/crowsonkb/k-diffusion)
 
 ## Framework
 
@@ -56,7 +65,18 @@ ONNX opset=12
 
 ## Netron
 
-[diffusion_emb.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/stable-diffusion-txt2img/diffusion_emb.onnx.prototxt)  
-[diffusion_mid.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/stable-diffusion-txt2img/diffusion_mid.onnx.prototxt)  
-[diffusion_out.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/stable-diffusion-txt2img/diffusion_out.onnx.prototxt)  
-[autoencoder.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/stable-diffusion-txt2img/autoencoder.onnx.prototxt)
+### Diffusion
+
+Legacy multi model
+
+- [diffusion_emb.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/stable-diffusion-txt2img/diffusion_emb.onnx.prototxt)  
+- [diffusion_mid.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/stable-diffusion-txt2img/diffusion_mid.onnx.prototxt)  
+- [diffusion_out.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/stable-diffusion-txt2img/diffusion_out.onnx.prototxt)  
+
+New one model
+
+- [diffusion.opt.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/stable-diffusion-txt2img/diffusion.opt.onnx.prototxt)  
+
+### AutoEncoder
+
+- [autoencoder.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/stable-diffusion-txt2img/autoencoder.onnx.prototxt)

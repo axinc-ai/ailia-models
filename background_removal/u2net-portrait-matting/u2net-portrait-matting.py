@@ -75,7 +75,7 @@ def preprocess(img):
 
     img = np.array(Image.fromarray(img).resize(
         (args.width, args.height),
-        resample=Image.ANTIALIAS))
+        resample=Image.LANCZOS))
 
     img = img / 255
     img = (img - mean) / std

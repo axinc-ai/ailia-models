@@ -1,7 +1,7 @@
 # ailia MODELS チュートリアル
 
 このチュートリアルでは、python言語からailiaを使用する方法について解説します。
-他の言語（C++/C#（Unity）/JNI/Kotlin）からailiaを使用したい場合は、このチュートリアルの一番下にあるリンクを参照してください。
+他の言語（C++/C#(Unity)/JNI/Kotlin/Rust/Flutter）からailiaを使用したい場合は、このチュートリアルの一番下にあるリンクを参照してください。
 
 ## 動作条件
 
@@ -205,6 +205,15 @@ python3 launcher.py
 - [ailia SDK Java(JNI) Tutorial (EN)](https://medium.com/axinc-ai/ailia-sdk-tutorial-jni-92b797725e08) [(日本語)](https://medium.com/axinc/ailia-sdk-%E3%83%81%E3%83%A5%E3%83%BC%E3%83%88%E3%83%AA%E3%82%A2%E3%83%AB-jni-7a11c1da08dc)
 - [API reference (EN)](https://axinc-ai.github.io/ailia-sdk/api/java/en/)
 - [Android Studio Sample Project](https://github.com/axinc-ai/ailia-android-studio)
-
+- 
 ### Kotlin
 -  [Android Studio Sample Project](https://github.com/axinc-ai/ailia-android-studio-kotlin)
+
+### Rust
+- [ailiaをRustから使用する](https://medium.com/axinc/ailia-%E3%82%92rust%E3%81%8B%E3%82%89%E4%BD%BF%E7%94%A8%E3%81%99%E3%82%8B-9ff51677a469)
+- [ailia models Rust](https://github.com/axinc-ai/ailia-models-rust)
+
+### Flutter
+- [ailia SDKを使用してFlutterでONNX形式のAIモデルを推論する](https://medium.com/axinc/ailia-sdk%E3%82%92%E4%BD%BF%E7%94%A8%E3%81%97%E3%81%A6flutter%E3%81%A7onnx%E5%BD%A2%E5%BC%8F%E3%81%AEai%E3%83%A2%E3%83%87%E3%83%AB%E6%8E%A8%E8%AB%96%E3%81%99%E3%82%8B-7c68509b296)
+- [ailia models Flutter](https://github.com/axinc-ai/ailia-flutter)
+

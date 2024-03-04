@@ -48,6 +48,11 @@ parser.add_argument(
     '-i2', '--input2', metavar='IMAGE2', default=IMAGE_B_PATH,
     help='Pair image path of input image.'
 )
+parser.add_argument(
+    '-w', '--write_json',
+    action='store_true',
+    help='Flag to output results to json file.'
+)
 args = update_parser(parser)
 
 
@@ -169,6 +174,9 @@ def visualization(data):
         plt.tight_layout()
         plt.savefig('output_warping_correspondence.png', bbox_inches='tight')
         plt.close('all')
+
+        if args.write_json:
+            save_result_json('output.json', result, matches[ran_idx])
 
     plotMatching = True
     if plotMatching:            

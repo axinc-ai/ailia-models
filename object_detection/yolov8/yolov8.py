@@ -76,8 +76,11 @@ parser.add_argument(
 )
 parser.add_argument(
     '-w', '--write_prediction',
-    action='store_true',
-    help='Flag to output the prediction file.'
+    nargs='?',
+    const='txt',
+    choices=['txt', 'json'],
+    type=str,
+    help='Output results to txt or json file.'
 )
 parser.add_argument(
     '-ds', '--detection_size',
@@ -288,9 +291,10 @@ def recognize_from_image(net):
         cv2.imwrite(savepath, res_img)
 
         # write prediction
-        if args.write_prediction:
-            pred_file = '%s.txt' % savepath.rsplit('.', 1)[0]
-            write_predictions(pred_file, detect_object, img, COCO_CATEGORY)
+        if args.write_prediction is not None:
+            ext = args.write_prediction
+            pred_file = "%s.%s" % (savepath.rsplit('.', 1)[0], ext)
+            write_predictions(pred_file, detect_object, img, category=COCO_CATEGORY, file_type=ext)
 
     logger.info('Script finished successfully.')
 
