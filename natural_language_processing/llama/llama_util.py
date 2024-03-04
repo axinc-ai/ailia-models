@@ -16,11 +16,12 @@ logger = getLogger(__name__)
 class OrtWrapper:
     def __init__(self, onnxfile: str, env_id: int):
         assert os.path.exists(onnxfile)
+        assert os.path.exists(onnxfile + ".prototxt")
         self.onnxfile = onnxfile
         memory_mode = ailia.get_memory_mode(
             reduce_constant=True, ignore_input_with_initializer=True,
             reduce_interstage=False, reuse_interstage=True)
-        self.sess = ailia.Net(onnxfile+".prototxt", onnxfile, env_id = env_id, memory_mode = memory_mode)
+        self.sess = ailia.Net(onnxfile + ".prototxt", onnxfile, env_id = env_id, memory_mode = memory_mode)
         #print(onnxfile)
 
     def forward(self, _inputs: dict):
@@ -176,7 +177,7 @@ def npmultinominal2D(x):
 
 
 class Decoder:
-    def __init__(self, pool: MemoryPoolSimple, onnxdir: str, nameformat: str, count: int = 32):
+    def __init__(self, pool: MemoryPoolSimple, onnxdir: str, nameformat: str, count: int = 32, is_fp16: bool = False):
 
         # reload tokenizer
         assert os.path.isdir(onnxdir)
@@ -186,9 +187,13 @@ class Decoder:
             filepath = os.path.join(onnxdir, nameformat.format(idx))
             self._pool.submit('decode{}'.format(idx),filepath)
 
-        self._pool.submit('embed', os.path.join(onnxdir, 'embed.onnx'))
-        self._pool.submit('norm', os.path.join(onnxdir, 'norm.onnx'))
-        self._pool.submit('head', os.path.join(onnxdir, 'head.onnx'))
+        fp16 = ""
+        if is_fp16:
+            fp16 = "_fp16"
+
+        self._pool.submit('embed', os.path.join(onnxdir, 'embed' + fp16 + '.onnx'))
+        self._pool.submit('norm', os.path.join(onnxdir, 'norm' + fp16 + '.onnx'))
+        self._pool.submit('head', os.path.join(onnxdir, 'head' + fp16 + '.onnx'))
 
     def decode(self, _inputs: dict, idx: int):
         key = 'decode{}'.format(idx)

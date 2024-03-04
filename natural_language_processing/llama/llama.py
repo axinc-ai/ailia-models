@@ -21,12 +21,7 @@ logger = getLogger(__name__)
 
 DEFAULT_TEXT = 'My name is Clara and I am'
 
-
 parser = get_base_parser('llama text generation', None, None)
-# overwrite
-
-#parser.add_argument('onnxdir', help='llama 7B onnx model directory.')
-
 
 parser.add_argument(
     '--input', '-i', default=DEFAULT_TEXT
@@ -72,33 +67,28 @@ parser.add_argument('--n_embd', type=int, default=1024, help='embedding length, 
  
 args = parser.parse_args()
 
-
 args = update_parser(parser, check_input_type=False)
+
 
 # ======================
 # PARAMETERS
 # ======================
-LLAMA_HEAD_WEIGHT_PATH = "head.onnx"
-LLAMA_HEAD_MODEL_PATH = "head.onnx.prototxt"
-LLAMA_NORM_WEIGHT_PATH = "norm.onnx"
-LLAMA_NORM_MODEL_PATH  = "norm.onnx.prototxt"
-LLAMA_EMBED_WEIGHT_PATH = "embed.onnx"
-LLAMA_EMBED_MODEL_PATH  = "embed.onnx.prototxt"
+
+LLAMA_HEAD_MODEL_PATH = "head"
+LLAMA_NORM_MODEL_PATH  = "norm"
+LLAMA_EMBED_MODEL_PATH  = "embed"
 
 LLAMA_DECODER_WEIGHT_PATH = "decoder-merge-"
 LLAMA_DECODER_MODEL_PATH  = "decoder-merge-"
 
-RWKV_HEAD_WEIGHT_PATH = "head_rwkv.onnx"
-RWKV_HEAD_MODEL_PATH = "head_rwkv.onnx.prototxt"
-RWKV_EMBED_WEIGHT_PATH = "embed_rwkv.onnx"
-RWKV_EMBED_MODEL_PATH  = "embed_rwkv.onnx.prototxt"
+RWKV_HEAD_MODEL_PATH = "head_rwkv"
+RWKV_EMBED_MODEL_PATH = "embed_rwkv"
 
 RWKV_DECODER_WEIGHT_PATH = "mixing_"
 RWKV_DECODER_MODEL_PATH  = "mixing_"
 
-
-
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/llama/"
+
 
 # ======================
 # Main function
@@ -118,7 +108,7 @@ class Llama:
 
         pool = MemoryPoolSimple(config['poolsize'], args.env_id)
         self.decoder = Decoder(pool, onnxdir, 'decoder-merge-{}.onnx',
-                               self.DECODER_COUNT)
+                               self.DECODER_COUNT, args.fp16)
         self.config = config
 
         # cache
@@ -417,29 +407,26 @@ def rwkv_main():
 
 
 if __name__ == "__main__":
-    # model files check and download
-    check_and_download_models(LLAMA_HEAD_WEIGHT_PATH, LLAMA_HEAD_MODEL_PATH, REMOTE_PATH)
-    check_and_download_models(LLAMA_NORM_WEIGHT_PATH, LLAMA_NORM_MODEL_PATH, REMOTE_PATH)
-    check_and_download_models(LLAMA_EMBED_WEIGHT_PATH,LLAMA_EMBED_MODEL_PATH, REMOTE_PATH)
-
-    args.env_id = -1
-    logger.warning("This model requires too large memory. So we force use cpu.")
+    logger.warning("This model requires too large memory. So if you got error, please use env_id = 0 or 1 (cpu)")
 
     if args.model == "llama":
         fp16 = ""
         if args.fp16:
             fp16 = "_fp16"
+        check_and_download_models(LLAMA_HEAD_MODEL_PATH + fp16 + ".onnx.prototxt", LLAMA_HEAD_MODEL_PATH + fp16 + ".onnx", REMOTE_PATH)
+        check_and_download_models(LLAMA_NORM_MODEL_PATH + fp16 + ".onnx.prototxt", LLAMA_NORM_MODEL_PATH + fp16 + ".onnx", REMOTE_PATH)
+        check_and_download_models(LLAMA_EMBED_MODEL_PATH + fp16 + ".onnx.prototxt", LLAMA_EMBED_MODEL_PATH + fp16 + ".onnx", REMOTE_PATH)
         for i in range(32):
-            WEIGHT_PATH = LLAMA_DECODER_WEIGHT_PATH + str(i) + fp16 +".onnx"
-            MODEL_PATH  = LLAMA_DECODER_WEIGHT_PATH + str(i) + fp16 +".onnx.prototxt"
+            WEIGHT_PATH = LLAMA_DECODER_WEIGHT_PATH + str(i) + fp16 + ".onnx"
+            MODEL_PATH  = LLAMA_DECODER_WEIGHT_PATH + str(i) + fp16 + ".onnx.prototxt"
             check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
         llama_main()
     else:
-        check_and_download_models(RWKV_HEAD_WEIGHT_PATH, RWKV_HEAD_MODEL_PATH, REMOTE_PATH)
-        check_and_download_models(RWKV_EMBED_WEIGHT_PATH,RWKV_EMBED_MODEL_PATH, REMOTE_PATH)
+        check_and_download_models(RWKV_HEAD_MODEL_PATH + ".onnx.prototxt", RWKV_HEAD_MODEL_PATH + ".onnx", REMOTE_PATH)
+        check_and_download_models(RWKV_EMBED_MODEL_PATH + ".onnx.prototxt",RWKV_EMBED_MODEL_PATH + ".onnx", REMOTE_PATH)
         for i in range(24):
-            WEIGHT_PATH = RWKV_DECODER_WEIGHT_PATH + str(i) +"_rwkv.onnx"
-            MODEL_PATH  = RWKV_DECODER_WEIGHT_PATH + str(i) +"_rwkv.onnx.prototxt"
+            WEIGHT_PATH = RWKV_DECODER_WEIGHT_PATH + str(i) + "_rwkv.onnx"
+            MODEL_PATH  = RWKV_DECODER_WEIGHT_PATH + str(i) + "_rwkv.onnx.prototxt"
             check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
         rwkv_main()
 
