@@ -11,6 +11,8 @@
   so the size of the input images are not specified.
   However, please note that at this stage, it is assumed that only one vehicle is in one image.  
 
+(Test image from DETRAC dataset)
+
 ## Output
 
 - Compare image mode:
