@@ -2,10 +2,8 @@ import os
 import sys
 import time
 import numpy as np
-import argparse
 
 import tokenizers
-import ailia 
 from llama_util import *
 
 sys.path.append('../../util')
@@ -118,7 +116,7 @@ class Llama:
         self.FINISH_TOKEN = 2
         self.tokenizer = Tokenizer(os.path.join(onnxdir, 'tokenizer.model'))
 
-        pool = MemoryPoolSimple(config['poolsize'])
+        pool = MemoryPoolSimple(config['poolsize'], args.env_id)
         self.decoder = Decoder(pool, onnxdir, 'decoder-merge-{}.onnx',
                                self.DECODER_COUNT)
         self.config = config
@@ -327,11 +325,11 @@ class Llama:
 class RWKV_RNN():
 
     def __init__(self, onnxdir: str, n_layer=24):
-        self.embed = OrtWrapper('embed_rwkv.onnx')
-        self.head = OrtWrapper('head_rwkv.onnx')
+        self.embed = OrtWrapper('embed_rwkv.onnx', env_id = args.env_id)
+        self.head = OrtWrapper('head_rwkv.onnx', env_id = args.env_id)
         self.backbone = []
         for i in range(n_layer):
-            self.backbone.append(OrtWrapper(os.path.join(onnxdir, 'mixing_{}_rwkv.onnx'.format(i))))
+            self.backbone.append(OrtWrapper(os.path.join(onnxdir, 'mixing_{}_rwkv.onnx'.format(i)), env_id = args.env_id))
 
     def forward(self, token, state):
         token = np.full((1), token, dtype=np.int32)
@@ -425,6 +423,10 @@ if __name__ == "__main__":
     check_and_download_models(LLAMA_HEAD_WEIGHT_PATH, LLAMA_HEAD_MODEL_PATH, REMOTE_PATH)
     check_and_download_models(LLAMA_NORM_WEIGHT_PATH, LLAMA_NORM_MODEL_PATH, REMOTE_PATH)
     check_and_download_models(LLAMA_EMBED_WEIGHT_PATH,LLAMA_EMBED_MODEL_PATH, REMOTE_PATH)
+
+    args.env_id = -1
+    logger.warning("This model requires too large memory. So we force use cpu.")
+
     if args.model == "llama":
         fp16 = ""
         if args.fp16:

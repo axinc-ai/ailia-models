@@ -1,9 +1,7 @@
 import numpy as np
-from loguru import logger
 from threading import Lock
 
 import os
-import sys
 import ailia
 import psutil
 import math
@@ -11,11 +9,18 @@ import math
 from sentencepiece import SentencePieceProcessor
 from typing import List
 
+# logger
+from logging import getLogger   # noqa: E402
+logger = getLogger(__name__)
+
 class OrtWrapper:
-    def __init__(self, onnxfile: str):
+    def __init__(self, onnxfile: str, env_id: int):
         assert os.path.exists(onnxfile)
         self.onnxfile = onnxfile
-        self.sess = ailia.Net(None,onnxfile)
+        memory_mode = ailia.get_memory_mode(
+            reduce_constant=True, ignore_input_with_initializer=True,
+            reduce_interstage=False, reuse_interstage=True)
+        self.sess = ailia.Net(None, onnxfile, env_id = env_id, memory_mode = memory_mode)
         #print(onnxfile)
 
     def forward(self, _inputs: dict):
@@ -27,15 +32,15 @@ class OrtWrapper:
 
         return output
     
-#@singleton
 class MemoryPoolSimple:
-    def __init__(self, maxGB):
+    def __init__(self, maxGB, env_id):
         if maxGB < 0:
             raise Exception('maxGB must > 0, get {}'.format(maxGB))
         
         self.max_size = maxGB * 1024 * 1024 * 1024
         self.wait_map = {}
         self.active_map = {}
+        self.env_id = env_id
 
     def submit(self, key: str, onnx_filepath: str):
         if not os.path.exists(onnx_filepath):
@@ -96,7 +101,7 @@ class MemoryPoolSimple:
             del self.active_map[biggest_k]
             used_size, biggest_k = self.used()
         
-        self.active_map[key] = OrtWrapper(onnx)
+        self.active_map[key] = OrtWrapper(onnx, env_id = self.env_id)
         return self.active_map[key]
 
 # refers to https://github.com/huggingface/transformers/blob/main/src/transformers/generation/logits_process.py 
