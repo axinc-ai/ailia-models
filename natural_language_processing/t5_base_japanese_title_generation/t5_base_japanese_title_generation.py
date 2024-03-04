@@ -267,7 +267,7 @@ def main(args):
 
     if args.benchmark:
         logger.info('BENCHMARK mode')
-        with open(args.input[0], "r") as fi:
+        with open(args.input[0], "r", encoding="utf-8") as fi:
             body = fi.read()
         body_preprocessed = preprocess_body(body)
         for c in range(5):

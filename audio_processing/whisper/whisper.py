@@ -1,8 +1,9 @@
-import queue
 import sys
 import time
 from collections import namedtuple
 import platform
+import queue
+import zlib
 from logging import getLogger
 
 import numpy as np
@@ -71,6 +72,9 @@ parser.add_argument(
 parser.add_argument(
     "--temperature_increment_on_fallback", type=float, default=0.2,
     help="temperature to increase when falling back when the decoding fails to meet either of the thresholds below")
+parser.add_argument(
+    "--compression_ratio_threshold", type=float, default=2.4,
+    help="if the gzip compression ratio is higher than this value, treat the decoding as failed")
 parser.add_argument(
     "--logprob_threshold", type=float, default=-1.0,
     help="if the average log probability is lower than this value, treat the decoding as failed")
@@ -178,7 +182,8 @@ if not args.onnx:
     AILIA_VERSION_REVISION = int(version[2])
     REQUIRE_CONSTANT_SHAPE_BETWEEN_INFERENCE = (
             AILIA_VERSION_MAJOR <= 1 and AILIA_VERSION_MINOR <= 2 and AILIA_VERSION_REVISION < 14)
-    COPY_BLOB_DATA_ENABLE = (AILIA_VERSION_MAJOR <= 1 and AILIA_VERSION_MINOR <= 2 and AILIA_VERSION_REVISION >= 15)
+    COPY_BLOB_DATA_ENABLE = not (AILIA_VERSION_MAJOR <= 1 and AILIA_VERSION_MINOR <= 2 and AILIA_VERSION_REVISION < 15)
+    LAYER_NORM_ENABLE = not (AILIA_VERSION_MAJOR <= 1 and AILIA_VERSION_MINOR <= 2 and AILIA_VERSION_REVISION < 16)
     SAVE_ENC_SHAPE = ()
     SAVE_DEC_SHAPE = ()
 
@@ -186,13 +191,22 @@ if not args.onnx:
         args.memory_mode = ailia.get_memory_mode(
             reduce_constant=True, ignore_input_with_initializer=True,
             reduce_interstage=False, reuse_interstage=True)
+else:
+    LAYER_NORM_ENABLE = False
 
 # ======================
 # Models
 # ======================
 
+# opt : mean variance normalization (opset 11)
+# opt2 : fuse scatterND (opset 11)
+# opt3 : layer normalization (opset 17)
+
 OPT = ".opt"
 OPT2 = ".opt2"
+if LAYER_NORM_ENABLE:
+    OPT = ".opt3"
+    OPT2 = ".opt3"
 if args.normal:
     OPT = ""
     OPT2 = ""
@@ -354,6 +368,10 @@ def new_kv_cache(n_group, length=451):
         raise ValueError(f"Unsupported model type: {model_type}")
 
     return np.zeros(size, dtype=np.float32, order='C')
+
+
+def compression_ratio(text) -> float:
+    return len(text) / len(zlib.compress(text.encode("utf-8")))
 
 
 # ======================
@@ -679,39 +697,55 @@ def decode(enc_net, dec_net, mel, options):
 def decode_with_fallback(enc_net, dec_net, segment, decode_options):
     logprob_threshold = decode_options.get('logprob_threshold', -1.0)
     temperature = decode_options.get('temperature', 0)
+    no_speech_threshold = decode_options.get('no_speech_threshold', 0.6)
+    compression_ratio_threshold = decode_options.get('compression_ratio_threshold', 2.4)
 
-    temperatures = [temperature] if isinstance(temperature, (int, float)) else temperature
+    temperatures = (
+        [temperature] if isinstance(temperature, (int, float)) else temperature
+    )
+    decode_result = None
 
-    kwargs = {**decode_options}
-    t = temperatures[0]
-    if t == 0:
-        best_of = kwargs.pop("best_of", None)
-    else:
-        best_of = kwargs.get("best_of", None)
+    for t in temperatures:
+        kwargs = {**decode_options}
+        if t > 0:
+            # disable beam_size and patience when t > 0
+            kwargs.pop("beam_size", None)
+            kwargs.pop("patience", None)
+            print("temperature", t)
+        else:
+            # disable best_of when t == 0
+            kwargs.pop("best_of", None)
 
-    options = {**kwargs, "temperature": t}
-    results = decode(enc_net, dec_net, segment, options)
+        options = {**kwargs, "temperature": t}
+        decode_result = decode(enc_net, dec_net, segment, options)[0]
 
-    kwargs.pop("beam_size", None)  # no beam search for t > 0
-    kwargs.pop("patience", None)  # no patience for t > 0
-    kwargs["best_of"] = best_of  # enable best_of for t > 0
-    for t in temperatures[1:]:
-        needs_fallback = [
-            result.avg_logprob < logprob_threshold for result in results
-        ]
-        if any(needs_fallback):
-            options = {**kwargs, "temperature": t}
-            retries = decode(enc_net, dec_net, segment[needs_fallback], options)
-            for retry_index, original_index in enumerate(np.nonzero(needs_fallback)[0]):
-                results[original_index] = retries[retry_index]
+        needs_fallback = False
+        if (
+            compression_ratio_threshold is not None
+            and compression_ratio(decode_result.text) > compression_ratio_threshold
+        ):
+            needs_fallback = True  # too repetitive
+        if (
+            logprob_threshold is not None
+            and decode_result.avg_logprob < logprob_threshold
+        ):
+            needs_fallback = True  # average log probability is too low
+        if (
+            no_speech_threshold is not None
+            and decode_result.no_speech_prob > no_speech_threshold
+        ):
+            needs_fallback = False  # silence
+        if not needs_fallback:
+            break
 
-    return results
+    return [decode_result]
 
 
 def predict(wav, enc_net, dec_net, immediate=False, microphone=False):
     language = args.language
     temperature = args.temperature
     temperature_increment_on_fallback = args.temperature_increment_on_fallback
+    compression_ratio_threshold = args.compression_ratio_threshold
     logprob_threshold = args.logprob_threshold
     no_speech_threshold = args.no_speech_threshold
 
@@ -725,8 +759,11 @@ def predict(wav, enc_net, dec_net, immediate=False, microphone=False):
         'temperature': temperature, 'best_of': args.best_of,
         'beam_size': args.beam_size, 'patience': args.patience,
         'length_penalty': args.length_penalty, 'suppress_tokens': args.suppress_tokens,
+        'compression_ratio_threshold': compression_ratio_threshold,
         'logprob_threshold': logprob_threshold,
-        'prompt': []
+        "no_speech_threshold": args.no_speech_threshold,
+        "suppress_blank": True,
+        'prompt': [],
     }
 
     mel = log_mel_spectrogram(wav, dims.n_mels, padding=N_SAMPLES)
