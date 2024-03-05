@@ -482,6 +482,7 @@ The collection of pre-trained, state-of-the-art AI models.
 | [<img src="road_detection/ultra-fast-lane-detection/output.jpg" width=128px>](road_detection/ultra-fast-lane-detection/) | [ultra-fast-lane-detection](/road_detection/ultra-fast-lane-detection/) | [Ultra-Fast-Lane-Detection](https://github.com/cfzd/Ultra-Fast-Lane-Detection) | Pytorch | 1.2.6 and later |
 | [<img src="road_detection/yolop/output.jpg" width=128px>](road_detection/yolop/) | [yolop](/road_detection/yolop/) | [YOLOP](https://github.com/hustvl/YOLOP) | Pytorch | 1.2.6 and later |
 | [<img src="road_detection/hybridnets/output.jpg" width=128px>](road_detection/hybridnets/) | [hybridnets](/road_detection/hybridnets/) | [HybridNets](https://github.com/datvuthanh/HybridNets) | Pytorch | 1.2.6 and later |
+| [<img src="road_detection/polylanenet/output.jpg" width=128px>](road_detection/polylanenet/) | [polylanenet](/road_detection/polylanenet/) | [PolyLaneNet](https://github.com/lucastabelini/PolyLaneNet) | Pytorch | 1.2.9 and later |
 
 ## Rotation prediction
 
