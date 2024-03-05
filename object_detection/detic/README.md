@@ -41,6 +41,11 @@ By adding the `--vocabulary` option, you can specify the model's vocabulary whic
 $ python3 detic.py --vocabulary lvis
 ```
 
+By adding the `--detection_width` option, you can specify the model's input width to increase inference speed
+```bash
+$ python3 detic.py --detection_width 320
+```
+
 ## Reference
 
 - [Detecting Twenty-thousand Classes using Image-level Supervision](https://github.com/facebookresearch/Detic)

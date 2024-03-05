@@ -67,8 +67,8 @@ def topk(scores, k=40):
     topk_inds = np.argpartition(scores, -k, axis=1)[:, -k:]
     topk_scores = scores[np.arange(scores.shape[0])[:, None], topk_inds]
 
-    topk_ys = (topk_inds / width).astype(np.int32).astype(np.float)
-    topk_xs = (topk_inds % width).astype(np.int32).astype(np.float)
+    topk_ys = (topk_inds / width).astype(np.int32).astype(float)
+    topk_xs = (topk_inds % width).astype(np.int32).astype(float)
 
     topk_scores = topk_scores.reshape((-1))
     topk_ind = np.argpartition(topk_scores, -k)[-k:]

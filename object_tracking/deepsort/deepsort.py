@@ -11,7 +11,7 @@ from deepsort_utils import *
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser  # noqa: E402
+from arg_utils import get_base_parser, update_parser  # noqa: E402
 from image_utils import normalize_image  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from detector_utils import load_image  # noqa: E402
@@ -65,13 +65,18 @@ NN_BUDGET = 100
 # ======================
 # Arguemnt Parser Config
 # ======================
-parser = get_base_parser('Deep SORT', None, None)
+parser = get_base_parser('Deep SORT', VIDEO_PATH, None)
 parser.add_argument(
     '-p', '--pairimage', metavar='IMAGE',
     nargs=2,
     default=[None, None],
     help=('If this option is specified, the model is set to determine '
           'if the person in two images is the same person or not.')
+)
+parser.add_argument(
+    '--gui',
+    action='store_true',
+    help='Display preview in GUI.'
 )
 args = update_parser(parser)
 
@@ -119,7 +124,8 @@ def recognize_from_video():
         n_init=3
     )
 
-    capture = webcamera_utils.get_capture(args.video)
+    video_file = args.video if args.video else args.input[0]
+    capture = webcamera_utils.get_capture(video_file)
 
     # create video writer
     if args.savepath is not None:
@@ -206,7 +212,7 @@ def recognize_from_video():
             box = track.to_tlwh()
             x1, y1, x2, y2 = tlwh_to_xyxy(box, h, w)
             track_id = track.track_id
-            outputs.append(np.array([x1, y1, x2, y2, track_id], dtype=np.int))
+            outputs.append(np.array([x1, y1, x2, y2, track_id], dtype=int))
         if len(outputs) > 0:
             outputs = np.stack(outputs, axis=0)
 
@@ -222,8 +228,14 @@ def recognize_from_video():
 
             results.append((idx_frame - 1, bbox_tlwh, identities))
 
-        cv2.imshow('frame', frame)
-        frame_shown = True
+        if args.gui or args.video:
+            cv2.imshow('frame', frame)
+            frame_shown = True
+        else:
+            if len(outputs) > 0:
+                print("Tracking ids", outputs[:, -1])
+            else:
+                print("Tracking ids []")
 
         if writer is not None:
             writer.write(frame)

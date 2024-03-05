@@ -9,7 +9,7 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser  # noqa: E402
+from arg_utils import get_base_parser, update_parser  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from image_utils import load_image  # noqa: E402
 import webcamera_utils  # noqa: E402
@@ -89,7 +89,7 @@ def preprocess(img, input_is_bgr=False):
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
     # normalize image
-    input_data = (img.astype(np.float) - MEAN)
+    input_data = (img.astype(float) - MEAN)
     input_data = input_data.transpose((2, 0, 1))
     input_data = input_data[np.newaxis, :, :, :]
     return input_data
