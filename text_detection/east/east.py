@@ -4,12 +4,13 @@ import argparse
 
 import numpy as np
 import cv2
+import json
 
 import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
+from arg_utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from detector_utils import load_image  # noqa: E402C
 from webcamera_utils import get_capture  # noqa: E402
@@ -41,6 +42,11 @@ parser = get_base_parser(
     'EAST: An Efficient and Accurate Scene Text Detector model',
     IMAGE_PATH,
     SAVE_IMAGE_PATH,
+)
+parser.add_argument(
+    '-w', '--write_json',
+    action='store_true',
+    help='Flag to output results to json file.'
 )
 args = update_parser(parser)
 
@@ -152,6 +158,18 @@ def draw_box(img, boxes):
     return img
 
 
+def save_result_json(json_path, boxes):
+    results = []
+    if boxes is not None:
+        for box in boxes:
+            box = sort_poly(box)
+            if np.linalg.norm(box[0] - box[1]) < 5 or np.linalg.norm(box[3] - box[0]) < 5:
+                continue
+            results.append(box.tolist())
+    with open(json_path, 'w') as f:
+        json.dump({"boxes": results}, f, indent=2)
+
+
 # ======================
 # Main functions
 # ======================
@@ -207,15 +225,22 @@ def recognize_from_image(filename, net):
         logger.info(f'saved at : {savepath}')
         cv2.imwrite(savepath, res_img)
 
+        if args.write_json:
+            json_file = '%s.json' % savepath.rsplit('.', 1)[0]
+            save_result_json(json_file, boxes)
+
     logger.info('Script finished successfully.')
 
 
 def recognize_from_video(video, net):
     capture = get_capture(video)
 
+    frame_shown = False
     while (True):
         ret, frame = capture.read()
         if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
             break
         if not ret:
             continue
@@ -227,6 +252,7 @@ def recognize_from_video(video, net):
 
         # show
         cv2.imshow('frame', res_img)
+        frame_shown = True
 
     capture.release()
     cv2.destroyAllWindows()

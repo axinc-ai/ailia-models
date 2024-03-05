@@ -1,0 +1,81 @@
+STABILITY AI JAPANESE STABLE CLIP COMMUNITY LICENSE AGREEMENT	
+
+“Affiliate” means any entity that controls, is controlled by, or is under common control with a party, where “control” means the ability to direct the management and policies of an entity or ownership of 50% or more of the outstanding shares of an entity.
+
+"Agreement" means the terms and conditions for use, reproduction, distribution and modification of the Software Products set forth herein.
+
+"Derivative Work(s)” means (a) any derivative work of the Software Products; and (b) any modifications to a Model, and any other model created which is based on or derived from the Model or the Model’s output. For clarity, Derivative Works do not include the output of any Model.
+
+“Documentation” means any specifications, manuals, documentation, and other written information provided by Stability AI related to the Models.
+
+“Licensee” or “you” means you, or your employer or any other person or entity (if you are entering into this Agreement on such person or entity’s behalf), of the age required under applicable laws, rules or regulations to provide legal consent and that has legal authority to bind your employer or such other person or entity if you are entering in this Agreement on their behalf.
+
+“Stability AI” or “we” means Stability AI Ltd. and its Affiliates.
+
+“Model(s)" means, collectively, Stability AI’s proprietary models and algorithms, including machine-learning models, trained model weights and other elements of the foregoing, made available under this Agreement.
+
+"Model Request" means a single request made to the Model for a response containing all the input for that particular response.
+
+“Non-Commercial Uses” means exercising any of the license rights granted herein for the purpose of research. Non-Commercial Uses will not include any production use of the Software Products.
+
+“Software Products” means Models and Documentation. 
+
+By downloading, using, or distributing any portion or element of the Software Products, you agree to be bound by this Agreement.
+
+1. License Rights and Limitations. 
+  a. Subject to your compliance with this Agreement and the Documentation, Stability AI grants you a non-exclusive, worldwide, non-transferable, non-sublicensable, revocable, royalty free and limited license under Stability AI’s intellectual property or other rights owned by Stability AI embodied in the Software Products to reproduce, distribute, and create Derivative Works of the Software Products. However, you may not enable third parties to use the Model(s) as part of your hosted service or via your APIs, whether you are adding substantial additional functionality thereto or not. Merely distributing the Models online without offering any related service (ex. by distributing the Models on HuggingFace) is not a violation of this subsection.
+  b.	Redistribution and Use
+    i.  If you distribute the Software Products or any Derivative Works thereof to a third party, the Software Products, Derivative Works, or any portion thereof respectively will remain subject to this Agreement and you must provide to such third party (A) a copy of this Agreement, and (B) a copy of the attribution notices contained within the NOTICE file included with the Software Product(s), excluding those notices that do not pertain to any part of your Derivative Work (if applicable). If you create a Derivative Work of a Software Product, you may add your own attribution notices to the NOTICE file included with the Software Product, provided that you clearly indicate which attributions apply to the Software Product, and you must state in the NOTICE file that you changed the Software Product and how it was modified. 
+    ii.  Your use of the Software Products under this Agreement must comply with applicable laws and regulations (including trade compliance laws and regulations) and are conditioned upon your compliance with the Documentation and this Agreement, including the Acceptable Use Policy (available at https://stability.ai/use-policy), which is hereby incorporated by reference into this Agreement.
+
+2. Additional Commercial Terms. Notwithstanding anything to the contrary in this Agreement, except for Non-Commercial Uses, if at any time:
+  a. The total number of monthly active users (each a natural person) in the last calendar month of all products and services made available by or for you and your Affiliates is greater than 100,000; or 
+  b. You and your Affiliates make more than a total of 1,000,000 Model Requests or images submitted as part of Model Requests through Software Products or Derivative Works in the last calendar month; 
+  you are not authorized to exercise any of the rights under this Agreement and you must request a commercial license from Stability AI (which Stability AI may grant to you in its sole discretion).
+
+3. 	  Disclaimer of Warranty. UNLESS REQUIRED BY APPLICABLE LAW, THE SOFTWARE PRODUCTS AND ANY OUTPUT AND RESULTS THEREFROM ARE PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED, INCLUDING, WITHOUT LIMITATION, ANY WARRANTIES OF TITLE, NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE. YOU ARE SOLELY RESPONSIBLE FOR DETERMINING THE APPROPRIATENESS OF USING OR REDISTRIBUTING THE SOFTWARE PRODUCTS AND ASSUME ANY RISKS ASSOCIATED WITH YOUR USE OF THE SOFTWARE PRODUCTS AND ANY OUTPUT AND RESULTS. 
+
+4.   Limitation of Liability. IN NO EVENT WILL STABILITY AI OR ITS AFFILIATES BE LIABLE UNDER ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, TORT, NEGLIGENCE, PRODUCTS LIABILITY, OR OTHERWISE, ARISING OUT OF THIS AGREEMENT, FOR ANY LOST PROFITS OR ANY INDIRECT, SPECIAL, CONSEQUENTIAL, INCIDENTAL, EXEMPLARY OR PUNITIVE DAMAGES, EVEN IF STABILITY AI OR ITS AFFILIATES HAVE BEEN ADVISED OF THE POSSIBILITY OF ANY OF THE FOREGOING. 
+
+5.   Intellectual Property.
+  a. No trademark licenses are granted under this Agreement, and in connection with the Software Products, neither Stability AI nor Licensee may use any name or mark owned by or associated with the other or any of its affiliates, except as required for reasonable and customary use in describing and redistributing the Software Products. 
+  b. Subject to Stability AI’s ownership of the Software Products and Derivative Works made by or for Stability AI, with respect to any Derivative Works of the Software Products that are made by you, as between you and Stability AI, you are and will be the owner of such Derivative Works. 
+  c. If you institute litigation or other proceedings against Stability AI (including a cross-claim or counterclaim in a lawsuit) alleging that the Software Products or associated outputs or results, or any portion of any of the foregoing, constitutes infringement of intellectual property or other rights owned or licensable by you, then any licenses granted to you under this Agreement shall terminate as of the date such litigation or claim is filed or instituted. You will indemnify and hold harmless Stability AI from and against any claim by any third party arising out of or related to your use or distribution of the Software Products in violation of this Agreement. 
+
+6.    Term and Termination. The term of this Agreement will commence upon your acceptance of this Agreement or access to the Software Products and will continue in full force and effect until terminated in accordance with the terms and conditions herein. Stability AI may terminate this Agreement if you are in breach of any term or condition of this Agreement. Upon termination of this Agreement, you shall delete and cease use of the Software Products. Sections 3 - 5 shall survive the termination of this Agreement. 
+
+
+—--------------------- 
+
+Acceptable Use Policy
+
+If you access, use, or distribute any Stability AI models, software, or other materials (“Stability Technology”) you agree to this Acceptable Use Policy (“Policy”). 
+
+We want everyone to use Stability Technology safely and responsibly. You agree you will not use, or allow others to use, Stability Technology:
+
+1. To violate the law or others’ rights (including intellectual property rights and the rights of data privacy and protection), nor will you promote, contribute to, encourage, facilitate, plan, incite, or further anyone else’s violation of the law or others’ rights;
+
+2. To commit, promote, contribute to, facilitate, encourage, plan, incite, or further any of the following:
+  a. Violence or terrorism;
+  b. Exploitation or harm to children, including the solicitation, creation, acquisition, or dissemination of child exploitative content; 
+  c. Human trafficking, exploitation, and sexual violence;
+  d. Harassment, abuse, threatening, stalking, or bullying of individuals or groups of individuals;
+  e. Discrimination in the provision of employment, employment benefits, credit, housing, other economic benefits, or other essential goods and services on the basis of race, color, caste, religion, sex (including pregnancy, sexual orientation, or gender identity), national origin, age, disability, or genetic information (including family medical history) except as may be required by applicable law (such as the provision of social security benefits solely to people who meet certain age requirements under the law);
+  f. Creation of malicious code, malware, computer viruses or any activity that could disable, overburden, interfere with or impair the proper working, integrity, operation or appearance of a website or computer system;
+
+3. For purposes of or for the performance of:
+  a. Fully automated decision-making, including profiling, with respect to an individual or group of individuals which produces legal effects concerning such individual(s) or similarly significantly affects such individual(s);
+  b. Systematic or automated scraping, mining, extraction, or harvesting of personally identifiable data, or similar activity, from the output of any Stability Technology except with respect to data that you have provided as input to the Stability Technology and which you are legally entitled to process, for so long as you retain such entitlement;
+  c. Development, improvement, or manufacture of any weapons of mass destruction (such as nuclear, chemical, or biologic weapons), weapons of war (such as missiles or landmines), or any gain of function-related activities with respect to any pathogens; 
+  d. Mission critical applications or systems where best industry practices require fail-safe controls or performance, including operation of nuclear facilities, aircraft navigation, electrical grids, communication systems, water treatment facilities, air traffic control, life support, weapons systems, or emergency locator or other emergency services; 
+
+4. To intentionally deceive or mislead others, including use of Stability Technology related to the following:
+  a. Generating, promoting, or furthering fraud or the creation or promotion of disinformation;
+  b. Generating, promoting, or furthering defamatory content, including the creation of defamatory statements, images, or other content;
+  c. Generating, promoting, or further distributing spam;
+  d. Impersonating another individual without consent, authorization, or legal right
+  e. Representing or misleading people into believing that the use of Stability Technology or outputs are human-generated;
+  f. Generating or facilitating false online engagement, including fake reviews and other means of fake online engagement;
+  g. Generating or facilitating large-scale political advertisements, propaganda, or influence campaigns;
+
+5. Fail to appropriately disclose to end users any known dangers of your AI system or misrepresent or mislead with respect to its abilities. 

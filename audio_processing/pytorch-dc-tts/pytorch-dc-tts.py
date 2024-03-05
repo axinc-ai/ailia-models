@@ -8,7 +8,7 @@ import ailia  # noqa: E402
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
+from arg_utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 
 # logger
@@ -121,6 +121,11 @@ def main():
     # model files check and download
     check_and_download_models(WEIGHT_PATH_T2M, MODEL_PATH_T2M, REMOTE_PATH_T2M)
     check_and_download_models(WEIGHT_PATH_SSRM, MODEL_PATH_SSRM, REMOTE_PATH_SSRM)
+
+    # disable FP16
+    if "FP16" in ailia.get_environment(args.env_id).props or sys.platform == 'Darwin':
+        logger.warning('This model do not work on FP16. So use CPU mode.')
+        args.env_id = 0
 
     generate_sentence(args.input)
 

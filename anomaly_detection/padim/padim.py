@@ -8,11 +8,6 @@ import pickle
 import numpy as np
 import cv2
 from PIL import Image
-from scipy.spatial.distance import mahalanobis
-from scipy.ndimage import gaussian_filter
-from sklearn.metrics import precision_recall_curve
-from skimage import morphology
-from skimage.segmentation import mark_boundaries
 import matplotlib
 import matplotlib.pyplot as plt
 
@@ -20,10 +15,10 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
+from arg_utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
-from image_utils import normalize_image  # noqa: E402
 from detector_utils import load_image  # noqa: E402
+import webcamera_utils  # noqa: E402
 
 # logger
 from logging import getLogger  # noqa: E402
@@ -36,16 +31,13 @@ logger = getLogger(__name__)
 # Parameters
 # ======================
 
-WEIGHT_RESNET18_PATH = 'resnet18.onnx'
-MODEL_RESNET18_PATH = 'resnet18.onnx.prototxt'
-WEIGHT_WIDE_RESNET50_2_PATH = 'wide_resnet50_2.onnx'
-MODEL_WIDE_RESNET50_2_PATH = 'wide_resnet50_2.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/padim/'
 
-IMAGE_PATH = 'bottle_000.png'
-SAVE_IMAGE_PATH = 'output.png'
+IMAGE_PATH = './bottle_000.png'
+SAVE_IMAGE_PATH = './output.png'
 IMAGE_RESIZE = 256
 IMAGE_SIZE = 224
+KEEP_ASPECT = True
 
 # ======================
 # Arguemnt Parser Config
@@ -80,6 +72,14 @@ parser.add_argument(
     '-th', '--threshold', type=float, default=None,
     help='threshold'
 )
+parser.add_argument(
+    '-ag', '--aug', action='store_true',
+    help='process with augmentation.'
+)
+parser.add_argument(
+    '-an', '--aug_num', type=int, default=5,
+    help='specify the amplification number of augmentation.'
+)
 args = update_parser(parser)
 
 
@@ -87,132 +87,8 @@ args = update_parser(parser)
 # Main functions
 # ======================
 
-def preprocess(img, mask=False):
-    h, w = img.shape[:2]
-    size = IMAGE_RESIZE
-    crop_size = IMAGE_SIZE
 
-    # resize
-    if h > w:
-        size = (size, int(size * h / w))
-    else:
-        size = (int(size * w / h), size)
-    img = np.array(Image.fromarray(img).resize(
-        size, resample=Image.ANTIALIAS if not mask else Image.NEAREST))
-
-    # center crop
-    h, w = img.shape[:2]
-    pad_h = (h - crop_size) // 2
-    pad_w = (w - crop_size) // 2
-    img = img[pad_h:pad_h + crop_size, pad_w:pad_w + crop_size, :]
-
-    # normalize
-    if not mask:
-        img = normalize_image(img.astype(np.float32), 'ImageNet')
-    else:
-        img = img / 255
-
-    img = img.transpose(2, 0, 1)  # HWC -> CHW
-    img = np.expand_dims(img, axis=0)
-
-    return img
-
-
-def postprocess(outputs):
-    # Embedding concat
-    embedding_vectors = outputs['layer1']
-    for layer_name in ['layer2', 'layer3']:
-        embedding_vectors = embedding_concat(embedding_vectors, outputs[layer_name])
-
-    return embedding_vectors
-
-
-def get_train_outputs(net, create_net, params):
-    if args.feat:
-        logger.info('loading train set feature from: %s' % args.feat)
-        with open(args.feat, 'rb') as f:
-            train_outputs = pickle.load(f)
-        logger.info('loaded.')
-        return train_outputs
-
-    batch_size = args.batch_size
-
-    train_dir = args.train_dir
-    train_imgs = sorted([
-        os.path.join(train_dir, f) for f in os.listdir(train_dir)
-        if f.endswith('.png') or f.endswith('.jpg') or f.endswith('.bmp')
-    ])
-    if len(train_imgs) == 0:
-        logger.error("train images not found in '%s'" % train_dir)
-        sys.exit(-1)
-
-    logger.info('extract train set features')
-
-    train_outputs = OrderedDict([
-        ('layer1', []), ('layer2', []), ('layer3', [])
-    ])
-    for i in range(0, len(train_imgs), batch_size):
-        # prepare input data
-        imgs = []
-        for image_path in train_imgs[i:i + batch_size]:
-            logger.info(image_path)
-            img = load_image(image_path)
-            img = cv2.cvtColor(img, cv2.COLOR_BGRA2RGB)
-            img = preprocess(img)
-            imgs.append(img)
-
-        imgs = np.vstack(imgs)
-
-        logger.debug(f'input images shape: {imgs.shape}')
-        if create_net:
-            net = create_net()
-        net.set_input_shape(imgs.shape)
-
-        _ = net.predict(imgs)
-
-        for key, name in zip(train_outputs.keys(), params["feat_names"]):
-            train_outputs[key].append(net.get_blob_data(name))
-
-    logger.info('postprocessing...')
-
-    for k, v in train_outputs.items():
-        train_outputs[k] = np.vstack(v)
-
-    embedding_vectors = postprocess(train_outputs)
-
-    # randomly select d dimension
-    idx = params['idx']
-    embedding_vectors = embedding_vectors[:, idx, :, :]
-
-    # calculate multivariate Gaussian distribution
-    B, C, H, W = embedding_vectors.shape
-    embedding_vectors = embedding_vectors.reshape(B, C, H * W)
-    mean = np.mean(embedding_vectors, axis=0)
-    cov = np.zeros((C, C, H * W), dtype=np.float32)
-    I = np.identity(C)
-    for i in range(H * W):
-        cov[:, :, i] = np.cov(embedding_vectors[:, :, i], rowvar=False) + 0.01 * I
-
-    train_outputs = [mean, cov]
-
-    # save learned distribution
-    train_feat_file = "%s.pkl" % os.path.basename(train_dir)
-    logger.info('saving train set feature to: %s ...' % train_feat_file)
-    with open(train_feat_file, 'wb') as f:
-        pickle.dump(train_outputs, f)
-    logger.info('saved.')
-
-    return train_outputs
-
-
-def denormalization(x):
-    mean = np.array([0.485, 0.456, 0.406])
-    std = np.array([0.229, 0.224, 0.225])
-    x = (((x.transpose(1, 2, 0) * std) + mean) * 255.).astype(np.uint8)
-    return x
-
-
-def plot_fig(file_list, test_imgs, scores, anormal_scores, gt_imgs, threshold, save_dir):
+def plot_fig(file_list, test_imgs, scores, anormal_scores, gt_imgs, threshold, savepath):
     num = len(file_list)
     vmax = scores.max() * 255.
     vmin = scores.min() * 255.
@@ -220,22 +96,18 @@ def plot_fig(file_list, test_imgs, scores, anormal_scores, gt_imgs, threshold, s
         image_path = file_list[i]
         img = test_imgs[i]
         img = denormalization(img)
-        gt = gt_imgs[i]
-        gt = gt.transpose(1, 2, 0).squeeze()
-        heat_map = scores[i] * 255
-        mask = scores[i]
-        mask[mask > threshold] = 1
-        mask[mask <= threshold] = 0
-        kernel = morphology.disk(4)
-        mask = morphology.opening(mask, kernel)
-        mask *= 255
-        vis_img = mark_boundaries(img, mask, color=(1, 0, 0), mode='thick')
+        if gt_imgs is not None:
+            gt = gt_imgs[i]
+            gt = gt.transpose(1, 2, 0).squeeze()
+        else:
+            gt = np.zeros((1,1,1))
+        heat_map, mask, vis_img = visualize(img, scores[i], threshold)
 
         fig_img, ax_img = plt.subplots(1, 5, figsize=(12, 3))
         fig_img.subplots_adjust(right=0.9)
 
-        fig_img.suptitle("Input : "+image_path+"  Anomaly score : "+str(anormal_scores[i]))
-        logger.info("Anomaly score : "+str(anormal_scores[i]))
+        fig_img.suptitle("Input : " + image_path + "  Anomaly score : " + str(anormal_scores[i]))
+        logger.info("Anomaly score : " + str(anormal_scores[i]))
 
         norm = matplotlib.colors.Normalize(vmin=vmin, vmax=vmax)
         for ax_i in ax_img:
@@ -269,177 +141,200 @@ def plot_fig(file_list, test_imgs, scores, anormal_scores, gt_imgs, threshold, s
         }
         cb.set_label('Anomaly Score', fontdict=font)
 
-        savepath = get_savepath(save_dir, image_path, ext='.png')
-        logger.info(f'saved at : {savepath}')
-        fig_img.savefig(savepath, dpi=100)
+        if ('.' in savepath.split('/')[-1]):
+            savepath_tmp = get_savepath(savepath, image_path, ext='.png')
+        else:
+            filename_tmp = image_path.split('/')[-1]
+            ext_tmp = '.' + filename_tmp.split('.')[-1]
+            filename_tmp = filename_tmp.replace(ext_tmp, '.png')
+            savepath_tmp = '%s/%s' % (savepath, filename_tmp)
+        logger.info(f'saved at : {savepath_tmp}')
+        fig_img.savefig(savepath_tmp, dpi=100)
         plt.close()
 
 
-def recognize_from_image(net, create_net, params):
-    batch_size = args.batch_size
+def train_from_image_or_video(net, params):
+    # training
+    train_outputs = training(net, params, IMAGE_RESIZE, IMAGE_SIZE, KEEP_ASPECT, int(args.batch_size), args.train_dir, args.aug, args.aug_num, args.seed, logger)
 
-    random.seed(args.seed)
-    idx = random.sample(range(0, params["t_d"]), params["d"])
+    # save learned distribution
+    if args.feat:
+        train_feat_file = args.feat
+    else:
+        train_dir = args.train_dir
+        train_feat_file = "%s.pkl" % os.path.basename(train_dir)
+    logger.info('saving train set feature to: %s ...' % train_feat_file)
+    with open(train_feat_file, 'wb') as f:
+        pickle.dump(train_outputs, f)
+    logger.info('saved.')
 
-    params["idx"] = idx
-    train_outputs = get_train_outputs(net, create_net, params)
+    return train_outputs
 
-    gt_type_dir = args.gt_dir if args.gt_dir else None
-    test_imgs = []
+
+def load_gt_imgs(gt_type_dir):
     gt_imgs = []
+    for i_img in range(0, len(args.input)):
+        image_path = args.input[i_img]
+        gt_img = None
+        if gt_type_dir:
+            fname = os.path.splitext(os.path.basename(image_path))[0]
+            gt_fpath = os.path.join(gt_type_dir, fname + '_mask.png')
+            if os.path.exists(gt_fpath):
+                gt_img = load_image(gt_fpath)
+                gt_img = cv2.cvtColor(gt_img, cv2.COLOR_BGRA2RGB)
+                gt_img = preprocess(gt_img, IMAGE_RESIZE, mask=True, keep_aspect=KEEP_ASPECT, crop_size = IMAGE_SIZE)
+                if gt_img is not None:
+                    gt_img = gt_img[0, [0]]
+                else:
+                    gt_img = np.zeros((1, IMAGE_SIZE, IMAGE_SIZE))
+        gt_imgs.append(gt_img)
+    return gt_imgs
 
-    # input image loop
-    test_outputs = OrderedDict([
-        ('layer1', []), ('layer2', []), ('layer3', [])
-    ])
-    for i in range(0, len(args.input), batch_size):
-        # prepare input data
-        imgs = []
-        for image_path in args.input[i:i + batch_size]:
-            logger.info(image_path)
-            img = load_image(image_path)
-            img = cv2.cvtColor(img, cv2.COLOR_BGRA2RGB)
-            img = preprocess(img)
-            imgs.append(img)
 
-            # ground truth
-            gt_img = None
-            if gt_type_dir:
-                fname = os.path.splitext(os.path.basename(image_path))[0]
-                gt_fpath = os.path.join(gt_type_dir, fname + '_mask.png')
-                if os.path.exists(gt_fpath):
-                    gt_img = load_image(gt_fpath)
-                    gt_img = cv2.cvtColor(gt_img, cv2.COLOR_BGRA2RGB)
-                    gt_img = preprocess(gt_img, mask=True)
-                    gt_img = np.mean(gt_img, axis=1, keepdims=True)
+def decide_threshold_from_gt_image(net, params, train_outputs, gt_imgs):
+    score_map = []
+    for i_img in range(0, len(args.input)):
+        logger.info('from (%s) ' % (args.input[i_img]))
 
-            gt_img = gt_img[0] if gt_img is not None else np.zeros((1, IMAGE_SIZE, IMAGE_SIZE))
+        image_path = args.input[i_img]
+        img = load_image(image_path)
+        img = cv2.cvtColor(img, cv2.COLOR_BGRA2RGB)
+        img = preprocess(img, IMAGE_RESIZE, keep_aspect=KEEP_ASPECT, crop_size = IMAGE_SIZE)
 
-            test_imgs.append(img[0])
-            gt_imgs.append(gt_img)
+        dist_tmp = infer(net, params, train_outputs, img, IMAGE_SIZE)
 
-        imgs = np.vstack(imgs)
+        score_map.append(dist_tmp)
 
-        logger.debug(f'input images shape: {imgs.shape}')
-        if create_net:
-            net = create_net()
-        net.set_input_shape(imgs.shape)
+    scores = normalize_scores(score_map, IMAGE_SIZE)
 
-        # inference
-        logger.info('Start inference...')
+    threshold = decide_threshold(scores, gt_imgs)
+
+    return threshold
+
+def infer_from_image(net, params, train_outputs, threshold, gt_imgs):
+    if len(args.input) == 0:
+        logger.error("Input file not found")
+        return
+
+    test_imgs = []
+
+    score_map = []
+    for i_img in range(0, len(args.input)):
+        logger.info('from (%s) ' % (args.input[i_img]))
+
+        image_path = args.input[i_img]
+        img = load_image(image_path)
+        img = cv2.cvtColor(img, cv2.COLOR_BGRA2RGB)
+        img = preprocess(img, IMAGE_RESIZE, keep_aspect=KEEP_ASPECT, crop_size = IMAGE_SIZE)
+
+        test_imgs.append(img[0])
+
         if args.benchmark:
             logger.info('BENCHMARK mode')
             total_time = 0
             for i in range(args.benchmark_count):
                 start = int(round(time.time() * 1000))
-                _ = net.predict(imgs)
+                dist_tmp = infer(net, params, train_outputs, img, IMAGE_SIZE)
                 end = int(round(time.time() * 1000))
                 logger.info(f'\tailia processing time {end - start} ms')
                 if i != 0:
                     total_time = total_time + (end - start)
             logger.info(f'\taverage time {total_time / (args.benchmark_count - 1)} ms')
         else:
-            _ = net.predict(imgs)
+            dist_tmp = infer(net, params, train_outputs, img, IMAGE_SIZE)
 
-        for key, name in zip(test_outputs.keys(), params["feat_names"]):
-            test_outputs[key].append(net.get_blob_data(name))
+        score_map.append(dist_tmp)
 
-    logger.info('postprocessing...')
+    scores = normalize_scores(score_map, IMAGE_SIZE)
+    anormal_scores = calculate_anormal_scores(score_map, IMAGE_SIZE)
 
-    for k, v in test_outputs.items():
-        test_outputs[k] = np.vstack(v)
-
-    embedding_vectors = postprocess(test_outputs)
-
-    # randomly select d dimension
-    embedding_vectors = embedding_vectors[:, idx, :, :]
-
-    # calculate distance matrix
-    B, C, H, W = embedding_vectors.shape
-    embedding_vectors = embedding_vectors.reshape(B, C, H * W)
-    dist_list = []
-    for i in range(H * W):
-        mean = train_outputs[0][:, i]
-        conv_inv = np.linalg.inv(train_outputs[1][:, :, i])
-        dist = [mahalanobis(sample[:, i], mean, conv_inv) for sample in embedding_vectors]
-        dist_list.append(dist)
-
-    dist_list = np.array(dist_list).transpose(1, 0).reshape(B, H, W)
-
-    # upsample
-    score_map = np.asarray([
-        np.array(Image.fromarray(s).resize(
-            (IMAGE_SIZE, IMAGE_SIZE), resample=Image.BILINEAR)
-        ) for s in dist_list
-    ])
-
-    # apply gaussian smoothing on the score map
-    for i in range(score_map.shape[0]):
-        score_map[i] = gaussian_filter(score_map[i], sigma=4)
-
-    # Normalization
-    max_score = score_map.max()
-    min_score = score_map.min()
-    scores = (score_map - min_score) / (max_score - min_score)
-
-    # Calculated anormal score
-    anormal_scores=np.zeros((score_map.shape[0]))
-    for i in range(score_map.shape[0]):
-        anormal_scores[i]=score_map[i].max()
-
-    if args.threshold is None:
-        # get optimal threshold
-        gt_mask = np.asarray(gt_imgs)
-        precision, recall, thresholds = precision_recall_curve(gt_mask.flatten(), scores.flatten())
-        a = 2 * precision * recall
-        b = precision + recall
-        f1 = np.divide(a, b, out=np.zeros_like(a), where=b != 0)
-        threshold = thresholds[np.argmax(f1)]
-        logger.info('Optimal threshold: %f' % threshold)
-    else:
-        threshold = args.threshold
-
+    # Plot gt image
     plot_fig(args.input, test_imgs, scores, anormal_scores, gt_imgs, threshold, args.savepath)
 
+
+def infer_from_video(net, params, train_outputs, threshold):
+    capture = webcamera_utils.get_capture(args.video)
+    if args.savepath != SAVE_IMAGE_PATH:
+        f_h = int(IMAGE_SIZE)
+        f_w = int(IMAGE_SIZE) * 3
+        writer = webcamera_utils.get_writer(args.savepath, f_h, f_w)
+    else:
+        writer = None
+
+    score_map = []
+
+    frame_shown = False
+    while(True):
+        ret, frame = capture.read()
+        if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
+            break
+
+        img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        img = preprocess(img, IMAGE_RESIZE, keep_aspect=KEEP_ASPECT)
+
+        dist_tmp = infer(net, params, train_outputs, img)
+
+        score_map.append(dist_tmp)
+        scores = normalize_scores(score_map)    # min max is calculated dynamically, please set fixed min max value from calibration data for production
+
+        heat_map, mask, vis_img = visualize(denormalization(img[0]), scores[len(scores)-1], threshold)
+        frame = pack_visualize(heat_map, mask, vis_img, scores, IMAGE_SIZE)
+
+        cv2.imshow('frame', frame)
+        frame_shown = True
+
+        if writer is not None:
+            writer.write(frame)
+
+    capture.release()
+    cv2.destroyAllWindows()
+    if writer is not None:
+        writer.release()
+
+
+def train_and_infer(net, params):
+    if args.feat:
+        logger.info('loading train set feature from: %s' % args.feat)
+        with open(args.feat, 'rb') as f:
+            train_outputs = pickle.load(f)
+        logger.info('loaded.')
+    else:
+        train_outputs = train_from_image_or_video(net, params)
+
+    if args.threshold is None:
+        if args.video:
+            threshold = 0.5
+            gt_imgs = None
+            logger.info('Please set threshold manually for video mdoe')
+        else:
+            gt_type_dir = args.gt_dir if args.gt_dir else None
+            gt_imgs = load_gt_imgs(gt_type_dir)
+
+            threshold = decide_threshold_from_gt_image(net, params, train_outputs, gt_imgs)
+            logger.info('Optimal threshold: %f' % threshold)
+    else:
+        threshold = args.threshold
+        gt_imgs = None
+
+    if args.video:
+        infer_from_video(net, params, train_outputs, threshold)
+    else:
+        infer_from_image(net, params, train_outputs, threshold, gt_imgs)
     logger.info('Script finished successfully.')
 
 
 def main():
-    info = {
-        "resnet18": (
-            WEIGHT_RESNET18_PATH, MODEL_RESNET18_PATH,
-            ("140", "156", "172"), 448, 100),
-        "wide_resnet50_2": (
-            WEIGHT_WIDE_RESNET50_2_PATH, MODEL_WIDE_RESNET50_2_PATH,
-            ("356", "398", "460"), 1792, 550),
-    }
     # model files check and download
-    weight_path, model_path, feat_names, t_d, d = info[args.arch]
+    weight_path, model_path, params = get_params(args.arch)
     check_and_download_models(weight_path, model_path, REMOTE_PATH)
 
-    params = {
-        "feat_names": feat_names,
-        "t_d": t_d,
-        "d": d,
-    }
-
-    def _create_net():
-        return ailia.Net(model_path, weight_path, env_id=args.env_id)
-
-    # net initialize
-    if True:
-        create_net = _create_net
-        net = None
-    else:
-        create_net = None
-        net = _create_net()
+    # create net instance
+    net = ailia.Net(model_path, weight_path, env_id=args.env_id)
 
     # check input
-    if len(args.input)==0:
-        logger.error("Input file not found")
-        return
-
-    recognize_from_image(net, create_net, params)
+    train_and_infer(net, params)
 
 
 if __name__ == '__main__':

@@ -7,7 +7,6 @@ sys.path.append(pwd + "/..")
 
 import ailia
 import cv2
-import dlib
 import numpy as np
 from PIL import Image
 
@@ -132,6 +131,7 @@ class PreProcess:
         face_alignment_path=None,
         face_detector_path=None,
         need_parser=True,
+        return_landmarks=False
     ):
         self.img_size = config.DATA.IMG_SIZE
 
@@ -171,17 +171,20 @@ class PreProcess:
                 self.input,
                 args.env_id,
             )
+        self.return_landmarks = return_landmarks
 
     def relative2absolute(self, lms):
         return lms * self.img_size
 
     def detect_landmark(self, image, face):
         if self.use_dlib:
+            import dlib
+            import faceutils.dlibutils as futils_dlib
             predictor = dlib.shape_predictor(
                 pwd + "/../faceutils/dlibutils/shape_predictor_68_face_landmarks.dat"
             )
             lms = (
-                futils.dlib.landmarks(predictor, image, face)
+                futils_dlib.landmarks(predictor, image, face)
                 * self.img_size
                 / image.width
             )
@@ -244,12 +247,13 @@ class PreProcess:
 
     def __call__(self, image: Image):
         if self.use_dlib:
-            face = futils.dlib.detect(image)
+            import faceutils.dlibutils as futils_dlib
+            face = futils_dlib.detect(image)
             if not face:
                 return None, None, None
             else:
                 face_on_image = face[0]
-                image, face, crop_face = futils.dlib.crop(
+                image, face, crop_face = futils_dlib.crop(
                     image,
                     face_on_image,
                     self.up_ratio,
@@ -283,10 +287,15 @@ class PreProcess:
                     self.down_ratio,
                     self.width_ratio,
                 )
+        
+        lms = self.detect_landmark(image, face)
+        if self.return_landmarks:
+            return lms
+
         np_image = np.array(image).astype(np.float32)
         mask = self.face_parse.parse(cv2.resize(np_image, (512, 512)))
         # obtain face parsing result
-        # image = image.resize((512, 512), Image.ANTIALIAS)
+        # image = image.resize((512, 512), Image.LANCZOS)
         mask = np.array(
             Image.fromarray(mask).resize(
                 (self.img_size, self.img_size), resample=Image.NEAREST
@@ -294,10 +303,8 @@ class PreProcess:
         )
         mask = np.expand_dims(mask, (0, 1))
 
-        lms = self.detect_landmark(image, face)
-
         mask, diff = self.process(mask, lms)
-        image = image.resize((self.img_size, self.img_size), Image.ANTIALIAS)
+        image = image.resize((self.img_size, self.img_size), Image.LANCZOS)
         image = np.array(image).transpose((2, 0, 1)) / 255
         means = np.expand_dims([0.5, 0.5, 0.5], (1, 2))
         stds = np.expand_dims([0.5, 0.5, 0.5], (1, 2))
@@ -334,7 +341,7 @@ def _get_preds_from_hm(hm):
     )
     idx += 1
     preds = idx.reshape(idx.shape[0], idx.shape[1], 1)
-    preds = np.tile(preds, (1, 1, 2)).astype(np.float)
+    preds = np.tile(preds, (1, 1, 2)).astype(float)
     preds[..., 0] = (preds[..., 0] - 1) % hm.shape[3] + 1
     preds[..., 1] = np.floor((preds[..., 1] - 1) / (hm.shape[2])) + 1
 
@@ -348,7 +355,7 @@ def _get_preds_from_hm(hm):
                         hm_[pY, pX + 1] - hm_[pY, pX - 1],
                         hm_[pY + 1, pX] - hm_[pY - 1, pX],
                     ]
-                ).astype(np.float)
+                ).astype(float)
                 preds[i, j] = preds[i, j] + (np.sign(diff) * 0.25)
 
     preds += -0.5
@@ -398,4 +405,4 @@ def _transform(point, center, scale, resolution, invert=False):
     if invert:
         t = np.linalg.inv(t)
     new_point = (np.dot(t, _pt))[0:2]
-    return new_point.astype(np.int)
+    return new_point.astype(int)

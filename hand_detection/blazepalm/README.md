@@ -15,9 +15,9 @@
 
 - ailia Predict API output:
   - Bounding boxes and keypoints
-    - Shape: (1, 896, 18)
+    - Shape: (1, 2944, 18)
   - Classification confidences
-    - Shape: (1, 896, 1)
+    - Shape: (1, 2944, 1)
 - With helper functions, filtered detections with keypoints can be obtained.
 
 ## Usage

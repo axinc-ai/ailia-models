@@ -7,7 +7,7 @@ import numpy as np
 import ailia
 
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
+from arg_utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from image_utils import normalize_image  # noqa: E402C
 from detector_utils import load_image  # noqa: E402C
@@ -37,9 +37,13 @@ WEIGHT_RESNET_152_PATH = 'res152_256x256.onnx'
 MODEL_RESNET_152_PATH = 'res152_256x256.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/animalpose/'
 
+DETECTION_MODEL_LIST = ['yolov3', 'yolox_m']
 WEIGHT_YOLOV3_PATH = 'yolov3.opt2.onnx'
 MODEL_YOLOV3_PATH = 'yolov3.opt2.onnx.prototxt'
 REMOTE_YOLOV3_PATH = 'https://storage.googleapis.com/ailia-models/yolov3/'
+WEIGHT_YOLOX_PATH = 'yolox_m.opt.onnx'
+MODEL_YOLOX_PATH = 'yolox_m.opt.onnx.prototxt'
+REMOTE_YOLOX_PATH = 'https://storage.googleapis.com/ailia-models/yolox/'
 
 IMAGE_PATH = 'input.jpg'
 SAVE_IMAGE_PATH = 'output.png'
@@ -62,6 +66,11 @@ parser.add_argument(
     '-m', '--model', metavar='ARCH',
     default='hrnet32', choices=MODEL_LIST,
     help='Set model architecture: ' + ' | '.join(MODEL_LIST)
+)
+parser.add_argument(
+    '-d', '--detection_model', metavar='ARCH',
+    default='yolov3', choices=DETECTION_MODEL_LIST,
+    help='Set model architecture: ' + ' | '.join(DETECTION_MODEL_LIST)
 )
 parser.add_argument(
     '-n', '--max_num', default=None, type=int,
@@ -336,9 +345,12 @@ def recognize_from_video(net, det_net):
     else:
         writer = None
 
+    frame_shown = False
     while (True):
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
             break
 
         # inference
@@ -349,6 +361,7 @@ def recognize_from_video(net, det_net):
         frame = vis_pose_result(frame, pose_results)
 
         cv2.imshow('frame', frame)
+        frame_shown = True
 
         # save results
         if writer is not None:
@@ -368,7 +381,11 @@ def main():
 
     if detector:
         logger.info('=== detector model ===')
-        check_and_download_models(WEIGHT_YOLOV3_PATH, MODEL_YOLOV3_PATH, REMOTE_YOLOV3_PATH)
+        if args.detection_model=="yolov3":
+            check_and_download_models(WEIGHT_YOLOV3_PATH, MODEL_YOLOV3_PATH, REMOTE_YOLOV3_PATH)
+        else:
+            check_and_download_models(WEIGHT_YOLOX_PATH, MODEL_YOLOX_PATH, REMOTE_YOLOX_PATH)
+    
     logger.info('=== animalpose model ===')
     info = {
         'hrnet32': (WEIGHT_HRNET_W32_PATH, MODEL_HRNET_W32_PATH),
@@ -380,22 +397,32 @@ def main():
     weight_path, model_path = info[args.model]
     check_and_download_models(weight_path, model_path, REMOTE_PATH)
 
-    # load model
-    env_id = ailia.get_gpu_environment_id()
-    logger.info(f'env_id: {env_id}')
+    env_id = args.env_id
 
     # initialize
     if detector:
-        det_net = ailia.Detector(
-            MODEL_YOLOV3_PATH,
-            WEIGHT_YOLOV3_PATH,
-            80,
-            format=ailia.NETWORK_IMAGE_FORMAT_RGB,
-            channel=ailia.NETWORK_IMAGE_CHANNEL_FIRST,
-            range=ailia.NETWORK_IMAGE_RANGE_U_FP32,
-            algorithm=ailia.DETECTOR_ALGORITHM_YOLOV3,
-            env_id=args.env_id,
-        )
+        if args.detection_model=="yolov3":
+            det_net = ailia.Detector(
+                MODEL_YOLOV3_PATH,
+                WEIGHT_YOLOV3_PATH,
+                80,
+                format=ailia.NETWORK_IMAGE_FORMAT_RGB,
+                channel=ailia.NETWORK_IMAGE_CHANNEL_FIRST,
+                range=ailia.NETWORK_IMAGE_RANGE_U_FP32,
+                algorithm=ailia.DETECTOR_ALGORITHM_YOLOV3,
+                env_id=env_id,
+            )
+        else:
+            det_net = ailia.Detector(
+                MODEL_YOLOX_PATH,
+                WEIGHT_YOLOX_PATH,
+                80,
+                format=ailia.NETWORK_IMAGE_FORMAT_BGR,
+                channel=ailia.NETWORK_IMAGE_CHANNEL_FIRST,
+                range=ailia.NETWORK_IMAGE_RANGE_U_INT8,
+                algorithm=ailia.DETECTOR_ALGORITHM_YOLOX,
+                env_id=env_id,
+            )
     else:
         det_net = None
     net = ailia.Net(model_path, weight_path, env_id=env_id)
