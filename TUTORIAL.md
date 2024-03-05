@@ -1,7 +1,7 @@
 # ailia MODELS tutorial
 
 In this tutorial we will explain how to use ailia from python language.
-If you want to use ailia from other languages(C++/C#(Unity)/JNI/Kotlin) see the link at the bottom of this tutorial.
+If you want to use ailia from other languages(C++/C#(Unity)/JNI/Kotlin/Rust/Flutter) see the link at the bottom of this tutorial.
 
 ## Requirements
 
@@ -9,7 +9,7 @@ If you want to use ailia from other languages(C++/C#(Unity)/JNI/Kotlin) see the 
 
 ## Install ailia SDK
 
-- [Download a free evaluation version of ailia SDK](https://ailia.jp/en/trial)
+- [Download a free evaluation version of ailia SDK](https://axinc.jp/en/trial/)
 - Unzip ailia SDK
 - Run the following command
 
@@ -43,6 +43,7 @@ sudo apt install python3-matplotlib
 sudo apt install python3-scipy
 pip3 install cython
 pip3 install numpy
+pip3 install pillow
 ```
 
 [OpenCV for python3 is pre-installed on Jetson.](https://forums.developer.nvidia.com/t/install-opencv-for-python3-in-jetson-nano/74042/3) You only need to run this command if you get a cv2 import error.
@@ -50,6 +51,8 @@ pip3 install numpy
 ```
 sudo apt install nvidia-jetpack
 ```
+
+* Note that Jetson Orin require ailia 1.2.13 or above. Please contact us if you would like to use an early build of ailia 1.2.13.
 
 ### For Raspberry Pi
 
@@ -136,7 +139,7 @@ python3 yolov3-tiny.py -v 0
 
 ## Launcher
 
-You can display a list of models and select them with the mouse by using the command below.
+You can use a GUI and select the model from the list using the command below. (Press 'Q' to quit each AI model app)
 
 ```
 python3 launcher.py
@@ -183,3 +186,9 @@ python3 launcher.py
 
 ### Kotlin
 -  [Android Studio Sample Project](https://github.com/axinc-ai/ailia-android-studio-kotlin)
+
+### Rust
+- [ailia models Rust](https://github.com/axinc-ai/ailia-models-rust)
+
+### Flutter
+- [ailia models Flutter](https://github.com/axinc-ai/ailia-flutter)

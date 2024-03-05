@@ -1,8 +1,4 @@
-import os
-import sys
-
 import numpy as np
-import cv2
 
 
 def bb_intersection_over_union(boxA, boxB):
@@ -97,3 +93,23 @@ def batched_nms(boxes, scores, labels, iou_thres):
     keep = keep[idxs]
 
     return keep
+
+
+def packed_nms(boxes, scores, iou_thres):
+    packed_idx = []
+    remained = np.argsort(-scores)
+    while 0 < len(remained):
+        idx = remained
+        i = idx[0]
+        candidates = [i]
+        remained = []
+        for j in idx[1:]:
+            similarity = bb_intersection_over_union(boxes[i], boxes[j])
+            if similarity > iou_thres:
+                candidates.append(j)
+            else:
+                remained.append(j)
+
+        packed_idx.append(candidates)
+
+    return packed_idx

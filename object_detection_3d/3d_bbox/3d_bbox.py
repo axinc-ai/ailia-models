@@ -10,6 +10,7 @@ import cv2
 import numpy as np
 from matplotlib import pyplot as plt
 from PIL import Image
+import json
 
 from lib_3d_bbox import ClassAverages
 from lib_3d_bbox.Dataset import *
@@ -26,7 +27,7 @@ from detector_utils import (load_image, plot_results,  # noqa: E402
                             write_predictions)
 from image_utils import imread  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
-from utils import get_base_parser, get_savepath, update_parser  # noqa: E402
+from arg_utils import get_base_parser, get_savepath, update_parser  # noqa: E402
 
 logger = getLogger(__name__)
 
@@ -88,13 +89,24 @@ def plot_regressed_3d_bbox(img, cam_to_img, box_2d, dimensions, alpha, theta_ray
 # Arguemnt Parser Config
 # ======================
 parser = get_base_parser('3d_bbox model', IMAGE_PATH, SAVE_IMAGE_PATH)
+
+parser.add_argument(
+    '--gui',
+    action='store_true',
+    help='Display preview in GUI.'
+)
+parser.add_argument(
+    '-w', '--write_json',
+    action='store_true',
+    help='Flag to output results to json file.'
+)
 args = update_parser(parser)
 
 # ======================
 # Main functions
 # ======================
 def recognize_from_image():
-    averages = ClassAverages.ClassAverages()
+    averages = ClassAverages()
     angle_bins = generate_bins(2)
 
     env_id = args.env_id
@@ -132,6 +144,8 @@ def recognize_from_image():
         else:
             detections = net_yolov3.run(yolo_img, THRESHOLD, IOU)
 
+        saved_results = []
+
         for detection in detections:
             detect_class = COCO_CATEGORY[detection[0]]
             xmin = int(detection[2][0] * img.shape[1])
@@ -157,6 +171,11 @@ def recognize_from_image():
             orient = orient[0, :, :]
             conf = conf[0, :]
             dim = dim[0, :]
+
+            saved_results.append({
+                'orient': orient.tolist(), 'conf': conf.tolist(), 'dim': dim.tolist()
+            })
+
             dim += averages.get_item(detected_class)
 
             argmax = np.argmax(conf)
@@ -168,18 +187,24 @@ def recognize_from_image():
             alpha -= np.pi
 
             plot_regressed_3d_bbox(img, proj_matrix, box_2d, dim, alpha, theta_ray)
-            cv2.imshow('3D detections', img)
+            if args.gui:
+                cv2.imshow('3D detections', img)
 
         savepath = get_savepath(args.savepath, image_path)
         logger.info(f'saved at : {savepath}')
         cv2.imwrite(savepath, img)
 
-    if cv2.waitKey(0) != 32:  # space bar
+        if args.write_json:
+            json_file = '%s.json' % savepath.rsplit('.', 1)[0]
+            with open(json_file, 'w') as f:
+                json.dump(saved_results, f, indent=2)
+
+    if args.gui and cv2.waitKey(0) != 32:  # space bar
         exit()
 
 def recognize_from_video():
     # net initialize
-    averages = ClassAverages.ClassAverages()
+    averages = ClassAverages()
     angle_bins = generate_bins(2)
 
     env_id = args.env_id
@@ -259,7 +284,8 @@ def recognize_from_video():
 
             location = plot_regressed_3d_bbox(img, proj_matrix, box_2d, dim, alpha, theta_ray)
 
-            cv2.imshow('3D detections', img)
+            if args.gui:
+                cv2.imshow('3D detections', img)
             frame_shown = True
 
         # save results

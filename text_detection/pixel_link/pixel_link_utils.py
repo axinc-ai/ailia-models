@@ -1,10 +1,12 @@
 import numpy as np
 import cv2
+import json
 
 __all__ = [
     'decode_batch',
     'mask_to_bboxes',
     'draw_bbox',
+    'save_bboxes_to_json',
 ]
 
 
@@ -41,7 +43,7 @@ def decode_image(
     #
     pixel_mask = pixel_scores >= pixel_conf_threshold
     link_mask = link_scores >= link_conf_threshold
-    done_mask = np.zeros(pixel_mask.shape, np.bool)
+    done_mask = np.zeros(pixel_mask.shape, bool)
     result_mask = np.zeros(pixel_mask.shape, np.int32)
     points = list(zip(*np.where(pixel_mask)))
     h, w = np.shape(pixel_mask)
@@ -179,3 +181,8 @@ def draw_bbox(img, bboxes):
         cnts = points_to_contours(points)
         cv2.drawContours(img, cnts, -1, COLOR_GREEN, thickness=3)
     return img
+
+def save_bboxes_to_json(json_path, bboxes):
+    b = [arr.tolist() for arr in bboxes]
+    with open(json_path, 'w') as f:
+        json.dump({"bboxes": b}, f, indent=2)

@@ -109,9 +109,9 @@ class Detect:
             out_logits = self.session.run([self.output_name1], {self.input_name1: img, self.input_name2: mask})[0]
             out_bbox = self.session.run([self.output_name2], {self.input_name1: img, self.input_name2: mask})[0]
         else:
-            outputs = self.session.run({img,  mask})
+            outputs = self.session.run([img,  mask])
             out_logits = outputs[0]
-            out_bbox = outpus[1]
+            out_bbox = outputs[1]
 
         postprocessors = PostProcess()
         results = postprocessors.forward((out_logits, out_bbox))[0]

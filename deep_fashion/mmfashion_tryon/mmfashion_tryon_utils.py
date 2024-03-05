@@ -81,10 +81,10 @@ def grid_sample(image, grid, padding_mode='zeros', align_corners=False):
                 # Get values of the image by provided x0,y0,x1,y1 by channel
                 for c in range(C):
                     # image, n, c, x, y, H, W
-                    x0 = x0.astype(np.int)
-                    y0 = y0.astype(np.int)
-                    x1 = x1.astype(np.int)
-                    y1 = y1.astype(np.int)
+                    x0 = x0.astype(int)
+                    y0 = y0.astype(int)
+                    x1 = x1.astype(int)
+                    y1 = y1.astype(int)
                     Ia = safe_get(image, n, c, x0, y0, H, W, padding_mode)
                     Ib = safe_get(image, n, c, x0, y1, H, W, padding_mode)
                     Ic = safe_get(image, n, c, x1, y0, H, W, padding_mode)

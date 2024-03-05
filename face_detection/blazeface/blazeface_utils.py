@@ -2,6 +2,7 @@ import sys
 
 import cv2
 import numpy as np
+import json
 import ailia
 
 sys.path.append('../../util')
@@ -9,6 +10,28 @@ from detector_utils import letterbox_convert, reverse_letterbox  # noqa: E402
 from math_utils import sigmoid  # noqa: E402
 
 DEFAULT_MIN_SCORE_THRESH = 0.75
+
+
+def save_json(json_path, img, detections):
+    img_w, img_h = img.shape[1], img.shape[0]
+    results = []
+
+    for detection in detections:
+        for i in range(detection.shape[0]):
+            r = {}
+            r['y1'] = float(detection[i, 0] * img_h)
+            r['x1'] = float(detection[i, 1] * img_w)
+            r['y2'] = float(detection[i, 2] * img_h)
+            r['x2'] = float(detection[i, 3] * img_w)
+            r['keypoints'] = []
+            for k in range(6):
+                kp_x = float(detection[i, 4 + k * 2 + 0] * img_w)
+                kp_y = float(detection[i, 4 + k * 2 + 1] * img_h)
+                r['keypoints'].append((kp_x, kp_y))
+            results.append(r)
+
+    with open(json_path, 'w') as f:
+        json.dump(results, f, indent=2)
 
 
 def plot_detections(

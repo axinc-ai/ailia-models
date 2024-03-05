@@ -2,25 +2,23 @@ import argparse
 import os
 import sys
 import time
-from pathlib import Path
-
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.append(BASE_DIR)
 
 import ailia
 import cv2
-import matplotlib.pyplot as plt
 import numpy as np
-from tqdm import tqdm
 
-from yolop_utils import (LoadImages, LoadStreams, letterbox_for_img,
-                         non_max_suppression)
+from yolop_utils import (letterbox_for_img, non_max_suppression)
 
 sys.path.append('../../util')
 import webcamera_utils  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from PIL import Image
-from utils import get_base_parser, get_savepath, update_parser
+from arg_utils import get_base_parser, get_savepath, update_parser
+from image_utils import imread  # noqa: E402
+
+# ======================
+# Parameters
+# ======================
 
 WEIGHT_PATH = 'yolop.onnx'
 MODEL_PATH  = 'yolop.onnx.prototxt'
@@ -33,6 +31,10 @@ logger = getLogger(__name__)
 
 IMAGE_PATH = 'input.jpg'
 SAVE_IMAGE_PATH = 'output.jpg'
+
+# ======================
+# Arguemnt Parser Config
+# ======================
 
 parser = get_base_parser('yolop model', IMAGE_PATH, SAVE_IMAGE_PATH)
 
@@ -53,13 +55,12 @@ parser.add_argument('--iou-thres',
     default=0.45, type=float,
     help='IOU threshold for NMS'
 )
-parser.add_argument('--save-dir',
-    default='inference/output',type=str, 
-    help='directory to save results'
-)
-
 args = update_parser(parser)
  
+# ======================
+# Main functions
+# ======================
+
 def resize_unscale(img, new_shape=(640, 640), color=114):
     shape = img.shape[:2]  # current shape [height, width]
     if isinstance(new_shape, int):
@@ -87,11 +88,6 @@ def resize_unscale(img, new_shape=(640, 640), color=114):
     return canvas, r, dw, dh, new_unpad_w, new_unpad_h  # (dw,dh)
 
 
-
-def create_figure():
-    fig, ax = plt.subplots(1, figsize=(12, 9), tight_layout=True)
-    return fig, ax
-
 def recognize_from_video():
     capture = webcamera_utils.get_capture(args.video)
     if args.savepath != SAVE_IMAGE_PATH:
@@ -106,35 +102,20 @@ def recognize_from_video():
 
     weight = args.model_name
     net = ailia.Net(None,weight)
-    fig, ax = create_figure()
+    frame_shown = False
     while(True):
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
+            break
 
-        s = np.stack([letterbox_for_img(x, args.img_size)[0].shape for x in frame], 0)  # shapes
-        rect = np.unique(s, axis=0).shape[0] == 1  # rect inference if all shapes equal
-        img0 = frame.copy()
-        h0, w0 = img0[0].shape[:2]
-        img, _, pad = letterbox_for_img(img0[0], args.img_size, auto=rect)
+        img_det = detect(net, frame)
+        cv2.imshow("frame", img_det)
+        frame_shown = True
 
-        # Stack
-        h, w = frame.shape[:2]
-        shapes = (h0, w0), ((h / h0, w / w0), pad)
-
-        # Convert
-        img = np.ascontiguousarray(frame)
-
-        img_det = img0
-
-        img_det = detect(net, img, img_det)
-        if img_det is None:
-            plt.imshow(frame)
-            plt.pause(.01)
-            continue
-        ax.clear()
-        plt.imshow(img_det)
-        plt.pause(.01)
+        if writer:
+            writer.write(img_det)
 
     capture.release()
     cv2.destroyAllWindows()
@@ -142,7 +123,21 @@ def recognize_from_video():
         writer.release()
     logger.info('Script finished successfully.')
 
-def detect(net, img, img_det):
+def detect(net, frame):
+    s = np.stack([letterbox_for_img(x, args.img_size)[0].shape for x in frame], 0)  # shapes
+    rect = np.unique(s, axis=0).shape[0] == 1  # rect inference if all shapes equal
+    img0 = frame.copy()
+    h0, w0 = img0[0].shape[:2]
+    img, _, pad = letterbox_for_img(img0[0], args.img_size, auto=rect)
+
+    # Stack
+    h, w = frame.shape[:2]
+    shapes = (h0, w0), ((h / h0, w / w0), pad)
+
+    # Convert
+    img = np.ascontiguousarray(frame)
+
+    img_det = img0
    
     img_bgr = img
     height, width, _ = img_bgr.shape
@@ -166,14 +161,29 @@ def detect(net, img, img_det):
 
     img = np.expand_dims(img, 0)  # (1, 3,640,640)
 
-    det_out, da_seg_out, ll_seg_out = net.run(img)
+
+    # inference
+    logger.info('Start inference...')
+    if args.benchmark:
+        logger.info('BENCHMARK mode')
+        total_time = 0
+        for i in range(args.benchmark_count):
+            start = int(round(time.time() * 1000))
+            det_out, da_seg_out, ll_seg_out = net.run(img)
+            end = int(round(time.time() * 1000))
+            if i != 0:
+                total_time = total_time + (end - start)
+            logger.info(f'\tailia processing time {end - start} ms')
+        logger.info(f'\taverage time {total_time / (args.benchmark_count-1)} ms')
+    else:
+        det_out, da_seg_out, ll_seg_out = net.run(img)
 
     boxes = non_max_suppression(det_out, conf_thres=args.conf_thres, iou_thres=args.iou_thres, agnostic=False)[0]
 
 
     if boxes.shape[0] == 0:
-        print("no bounding boxes detected.")
-        return
+        #print("no bounding boxes detected.")
+        return img_bgr
 
     # scale coords to original size.
     boxes[:, 0] -= dw
@@ -182,7 +192,7 @@ def detect(net, img, img_det):
     boxes[:, 3] -= dh
     boxes[:, :4] /= r
 
-    print(f"detect {boxes.shape[0]} bounding boxes.")
+    #print(f"detect {boxes.shape[0]} bounding boxes.")
 
     img_det = img_rgb[:, :, ::-1].copy()
     for i in range(boxes.shape[0]):
@@ -236,38 +246,17 @@ def detect(net, img, img_det):
 
 
 def recognize_from_image():
-
-    t0 = time.time()
-
-    vid_path, vid_writer = None, None
-
     weight = args.model_name
     net = ailia.Net(None,weight)
 
     for image_path in args.input:
-        dataset = LoadImages(image_path, img_size=args.img_size)
-        bs = len(dataset)  # batch_size
-        for i, (path, img, img_det, vid_cap,shapes) in tqdm(enumerate(dataset),total = len(dataset)):
+        img = imread(image_path, cv2.IMREAD_COLOR)
+        img_det = detect(net, img)
+        save_path = get_savepath(args.savepath, image_path)
+        logger.info(f'saved at : {save_path}')
+        cv2.imwrite(save_path, img_det)
 
-            img_det = detect(net, img, img_det)
-            save_path = get_savepath(args.save_dir,image_path)
-            if dataset.mode == 'images':
-                cv2.imwrite(save_path,img_det)
-
-            elif dataset.mode == 'video':
-                if vid_path != save_path:  # new video
-                    vid_path = save_path
-                    if isinstance(vid_writer, cv2.VideoWriter):
-                        vid_writer.release()  # release previous video writer
-
-                    fourcc = 'mp4v'  # output video codec
-                    fps = vid_cap.get(cv2.CAP_PROP_FPS)
-                    h,w,_=img_det.shape
-                    vid_writer = cv2.VideoWriter(save_path, cv2.VideoWriter_fourcc(*fourcc), fps, (w, h))
-                vid_writer.write(img_det)
-    
-    print('Results saved to %s' % Path(args.save_dir))
-    print('Done. (%.3fs)' % (time.time() - t0))
+    logger.info('Script finished successfully.')
 
 if __name__ == '__main__':
 
