@@ -1,14 +1,13 @@
-import os, sys
-import glob
-import time
+import sys
 import numpy as np
 import cv2
-from tqdm import tqdm
 import ailia
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
+from arg_utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
+from image_utils import imread  # noqa: E402
+import webcamera_utils
 # logger
 from logging import getLogger   # noqa: E402
 logger = getLogger(__name__)
@@ -21,8 +20,8 @@ WEIGHT_PATH = 'polylanenet.onnx'
 MODEL_PATH = 'polylanenet.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/polylanenet/'
 
-IMAGE_PATH = 'input'
-SAVE_IMAGE_PATH = 'output'
+IMAGE_PATH = 'input/image/1.jpg'
+SAVE_IMAGE_PATH = 'output/image/1.jpg'
 
 HEIGHT = 360
 WIDTH = 640
@@ -125,55 +124,67 @@ def predict(net, input):
     return output, image
 
 
-def main():
-    # model files check and download
-    check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
-
-    for i in ['./output', './output/image', './output/video']:
-        if not os.path.exists(i):
-            os.mkdir(i)
-
-    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
-
-    if args.input:
-        input = cv2.imread('{}'.format(args.input[0]))
+def recognize_from_image(net):
+    for image_path in args.input:
+        input = imread(image_path)
         output, image = predict(net, input)
         _, _, overlayed = draw_annotation(image, output)
 
         args.input[0] = args.input[0].replace('./input/image/', '')
         filename = '_'.join(args.input[0].split('/'))
 
-        cv2.imwrite('./output/image/{}'.format(filename), overlayed)
+        savepath = get_savepath(args.savepath, image_path)
+        logger.info(f'saved at : {savepath}')
+        cv2.imwrite(savepath, overlayed)
+
+    logger.info('Script finished successfully.')
+
+def recognize_from_video(net):
+    cap = cv2.VideoCapture(args.video)
+    if not cap.isOpened():
+        print('Video is not opened.')
+        exit()
+
+    if args.savepath != SAVE_IMAGE_PATH:
+        writer = webcamera_utils.get_writer(args.savepath, HEIGHT, WIDTH)
+    else:
+        writer = None
+
+    frame_shown = False
+
+    while True:
+        ret, frame = cap.read()
+        if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
+            break
+
+        output, image = predict(net, frame)
+        _, _, overlayed = draw_annotation(image, output)
+        cv2.imshow('frame', overlayed)
+        frame_shown = True
+
+        # save results
+        if writer is not None:
+            writer.write(overlayed)
+
+    cap.release()
+    cv2.destroyAllWindows()
+    if writer is not None:
+        writer.release()
+    logger.info('Script finished successfully.')
+
+def main():
+    # model files check and download
+    check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
+
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
+
+    if args.input:
+        recognize_from_image(net)
 
     elif args.video:
-        cap = cv2.VideoCapture(args.video)
-        if not cap.isOpened():
-            print('Video is not opened.')
-            exit()
-
-        args.video = args.video.replace('./input/video/', '')
-        filename = '_'.join(args.video.split('/'))
-
-        output_video = cv2.VideoWriter( # create video
-            './output/video/{}'.format(filename),
-            cv2.VideoWriter_fourcc('m','p','4', 'v'), #mp4フォーマット
-            float(30), #fps
-            (WIDTH, HEIGHT) #size
-        )
-
-        i = 1
-        pbar = tqdm(total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)))
-        while True:
-            pbar.update(i)
-            ret, frame = cap.read()
-            if not ret:
-                break
-            output, image = predict(net, frame)
-            _, _, overlayed = draw_annotation(image, output)
-            output_video.write(overlayed)
-        cap.release()
-        output_video.release()
-        print('Video saved as {}'.format(filename))
+        recognize_from_video(net)
 
 
 if __name__ == '__main__':
