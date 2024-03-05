@@ -4,12 +4,13 @@ import io
 
 import numpy as np
 import cv2
+import json
 
 import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath  # noqa
+from arg_utils import get_base_parser, update_parser, get_savepath  # noqa
 from model_utils import check_and_download_models  # noqa
 from image_utils import normalize_image  # noqa
 from webcamera_utils import get_capture, get_writer  # noqa
@@ -53,6 +54,11 @@ parser.add_argument(
 parser.add_argument(
     '-kp', '--draw-keypoints', action='store_true',
     help='Save keypoints result.'
+)
+parser.add_argument(
+    '-w', '--write_json',
+    action='store_true',
+    help='Flag to output results to json file.'
 )
 args = update_parser(parser)
 
@@ -106,6 +112,14 @@ def draw_epipolar(img1, img2, F, x1, x2):
     save2 = imgCAM2
 
     return save1, save2
+
+
+def save_result_json(json_file, x1, x2):
+    with open(json_file, 'w') as f:
+        json.dump({
+            'ptsCAM1': x1[0].tolist(),
+            'ptsCAM2': x2[0].tolist()
+        }, f, indent=2)
 
 
 def predict(pts, net_init, net_iter):
@@ -188,6 +202,9 @@ def recognize_from_image():
         # save
         cv2.imwrite('out_A_B{}.png'.format(i), out_img1)
         cv2.imwrite('out_B{}_A.png'.format(i), out_img2)
+
+        if args.write_json:
+            save_result_json('output.json', x1, x2)
 
     logger.info('Script finished successfully.')
 

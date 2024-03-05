@@ -8,7 +8,7 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
+from arg_utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from detector_utils import load_image  # noqa: E402
 import webcamera_utils  # noqa: E402
@@ -141,14 +141,12 @@ def pose_estimation(detector, pose, img):
         if obj.category != CATEGORY_PERSON:
             pose_detections.append(None)
             continue
-        px1, py1, px2, py2 = keep_aspect(
-            top_left, bottom_right, pose_img, pose
+        shape = pose.get_input_shape()
+        crop_img, px1, py1, px2, py2, scale_x, scale_y = keep_aspect(
+            top_left, bottom_right, pose_img, shape
         )
-        crop_img = pose_img[py1:py2, px1:px2, :]
-        offset_x = px1/img.shape[1]
-        offset_y = py1/img.shape[0]
-        scale_x = crop_img.shape[1]/img.shape[1]
-        scale_y = crop_img.shape[0]/img.shape[0]
+        offset_x = px1/pose_img.shape[1]
+        offset_y = py1/pose_img.shape[0]
         detections = compute(
             pose, crop_img, offset_x, offset_y, scale_x, scale_y
         )
@@ -197,8 +195,9 @@ def plot_results(detector, pose, img, category, pose_detections, logging=True):
             continue
 
         # pose detection
-        px1, py1, px2, py2 = keep_aspect(
-            top_left, bottom_right, img, pose
+        shape = pose.get_input_shape()
+        crop_img, px1, py1, px2, py2, scale_x, scale_y  = keep_aspect(
+            top_left, bottom_right, img, shape
         )
         detections = pose_detections[idx]
         cv2.rectangle(img, (px1, py1), (px2, py2), color, 1)
@@ -294,7 +293,7 @@ def recognize_from_video():
         img = cv2.cvtColor(frame, cv2.COLOR_BGR2BGRA)
         detector.compute(img, THRESHOLD, IOU)
         pose_detections = pose_estimation(detector, pose, img)
-        res_img = plot_results(detector, pose, frame, COCO_CATEGORY, pose_detections, False)
+        res_img = plot_results(detector, pose, frame, COCO_CATEGORY, pose_detections, logging=False)
         cv2.imshow('frame', res_img)
         frame_shown = True
         # save results

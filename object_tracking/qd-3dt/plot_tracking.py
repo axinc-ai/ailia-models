@@ -122,7 +122,11 @@ def fig2data(fig, size: tuple = None):
     # canvas.tostring_argb give pixmap in ARGB mode.
     buf = np.frombuffer(fig.canvas.tostring_argb(), dtype=np.uint8)
 
-    buf.shape = (h, w, 4)  # last dim: (alpha, r, g, b)
+    # workaround for macOS dpi issue
+    for dpi in range(1, 4):
+        if buf.shape[0] == h * w * dpi * dpi * 4:
+            buf.shape = (h * dpi, w * dpi, 4)  # last dim: (alpha, r, g, b)
+            break
 
     # Roll the ALPHA channel to have it in RGBA mode
     # buf = np.roll(buf, 3, axis=2)
