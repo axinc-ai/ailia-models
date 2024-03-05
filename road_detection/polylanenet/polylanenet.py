@@ -20,8 +20,8 @@ WEIGHT_PATH = 'polylanenet.onnx'
 MODEL_PATH = 'polylanenet.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/polylanenet/'
 
-IMAGE_PATH = 'input/image/1.jpg'
-SAVE_IMAGE_PATH = 'output/image/1.jpg'
+IMAGE_PATH = 'input.jpg'
+SAVE_IMAGE_PATH = 'output.jpg'
 
 HEIGHT = 360
 WIDTH = 640
