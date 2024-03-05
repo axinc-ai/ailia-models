@@ -472,6 +472,9 @@ The collection of pre-trained, state-of-the-art AI models.
 | [<img src="pose_estimation_3d/3dmppe_posenet/output_pose_2d.jpg" width=128px>](pose_estimation_3d/3dmppe_posenet/) |[3dmppe_posenet](/pose_estimation_3d/3dmppe_posenet/) | [PoseNet of "Camera Distance-aware Top-down Approach for 3D Multi-person Pose Estimation from a Single RGB Image"](https://github.com/mks0601/3DMPPE_POSENET_RELEASE) | Pytorch | 1.2.6 and later | |
 | [<img src="pose_estimation_3d/gast/img/output_040.png" width=128px>](pose_estimation_3d/gast/) |[gast](/pose_estimation_3d/gast/) | [A Graph Attention Spatio-temporal Convolutional Networks for 3D Human Pose Estimation in Video (GAST-Net)](https://github.com/fabro66/GAST-Net-3DPoseEstimation) | Pytorch | 1.2.7 and later | [EN](https://medium.com/axinc-ai/gast-a-machine-learning-model-that-predicts-a-3d-skeleton-from-a-2d-skeleton-44449d1ff78d) [JP](https://medium.com/axinc/gast-2d%E3%81%AE%E9%AA%A8%E6%A0%BC%E3%81%8B%E3%82%893d%E3%81%AE%E9%AA%A8%E6%A0%BC%E3%82%92%E4%BA%88%E6%B8%AC%E3%81%99%E3%82%8B%E6%A9%9F%E6%A2%B0%E5%AD%A6%E7%BF%92%E3%83%A2%E3%83%87%E3%83%AB-6c70fc4b3b3a) |
 | [<img src="pose_estimation_3d/mediapipe_pose_world_landmarks/output.png" width=128px>](pose_estimation_3d/mediapipe_pose_world_landmarks/) |[mediapipe_pose_world_landmarks](/pose_estimation_3d/mediapipe_pose_world_landmarks/) | [MediaPipe Pose real-world 3D coordinates](https://google.github.io/mediapipe/solutions/pose.html#pose_world_landmarks) | TensorFlow Lite | 1.2.10 and later | |
+| [<img src="pose_estimation_3d/strided_transformer_pose3d/output.png" width=128px>](pose_estimation_3d/strided_transformer_pose3d/) |[strided_transformer_pose3d](/pose_estimation_3d/strided_transformer_pose3d/) | [Exploiting Temporal Contexts with Strided Transformer for 3D Human Pose Estimation](https://github.com/Vegetebird/StridedTransformer-Pose3D) | Pytorch | 1.2.10 and later | |
+
+
 
 ## Road detection
 

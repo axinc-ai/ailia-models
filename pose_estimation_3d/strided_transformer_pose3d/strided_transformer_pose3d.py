@@ -3,8 +3,6 @@ import sys
 import numpy as np
 import cv2
 import matplotlib
-from PIL import Image
-import time
 
 import ailia
 
@@ -20,7 +18,7 @@ from detector_utils import (load_image, plot_results, reverse_letterbox,
                             write_predictions)
 from image_utils import imread  # noqa: E402
 from model_utils import check_and_download_models
-from utils import get_base_parser, get_savepath, update_parser
+from arg_utils import get_base_parser, get_savepath, update_parser
 
 from lib.run import *
 
