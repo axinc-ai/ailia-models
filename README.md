@@ -64,7 +64,7 @@ The collection of pre-trained, state-of-the-art AI models.
 | [distil-whisper](/audio_processing/distil-whisper/) | [Hugging Face - Distil-Whisper](https://github.com/huggingface/distil-whisper) | Pytorch | 1.2.16 and later | |
 | [microsoft clap](/audio_processing/msclap/) | [CLAP](https://github.com/microsoft/CLAP) | Pytorch | 1.2.11 and later | |
 | [narabas](/audio_processing/narabas/) | [narabas: Japanese phoneme forced alignment tool](https://github.com/darashi/narabas) | Pytorch | 1.2.11 and later | |
-| [rnnoise](/audio_processing/rnnoise/) | [rnnoise](https://github.com/xiph/rnnoise) | Keras | 1.2.XX and later | |
+| [rnnoise](/audio_processing/rnnoise/) | [rnnoise](https://github.com/xiph/rnnoise) | Keras | 1.2.15 and later | |
 
 ## Background removal
 
