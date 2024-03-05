@@ -1,30 +1,34 @@
 #ailia predict api sample
 
-import numpy as np
-import time
+import argparse
 import os
 import sys
-import cv2
-from PIL import Image
-from matplotlib import pyplot as plt
-import argparse
+import time
 
 import ailia
+import cv2
+import numpy as np
+from matplotlib import pyplot as plt
+from PIL import Image
+import json
 
-from lib_3d_bbox.Dataset import *
-from lib_3d_bbox.Plotting import *
 from lib_3d_bbox import ClassAverages
+from lib_3d_bbox.Dataset import *
 from lib_3d_bbox.Math import *
+from lib_3d_bbox.Plotting import *
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
-from model_utils import check_and_download_models  # noqa: E402
-from detector_utils import plot_results, write_predictions, load_image  # noqa: E402
-import webcamera_utils  # noqa: E402
-
 # logger
-from logging import getLogger   # noqa: E402
+from logging import getLogger  # noqa: E402
+
+import webcamera_utils  # noqa: E402
+from detector_utils import (load_image, plot_results,  # noqa: E402
+                            write_predictions)
+from image_utils import imread  # noqa: E402
+from model_utils import check_and_download_models  # noqa: E402
+from arg_utils import get_base_parser, get_savepath, update_parser  # noqa: E402
+
 logger = getLogger(__name__)
 
 os.environ['KMP_DUPLICATE_LIB_OK']='TRUE'
@@ -85,13 +89,24 @@ def plot_regressed_3d_bbox(img, cam_to_img, box_2d, dimensions, alpha, theta_ray
 # Arguemnt Parser Config
 # ======================
 parser = get_base_parser('3d_bbox model', IMAGE_PATH, SAVE_IMAGE_PATH)
+
+parser.add_argument(
+    '--gui',
+    action='store_true',
+    help='Display preview in GUI.'
+)
+parser.add_argument(
+    '-w', '--write_json',
+    action='store_true',
+    help='Flag to output results to json file.'
+)
 args = update_parser(parser)
 
 # ======================
 # Main functions
 # ======================
 def recognize_from_image():
-    averages = ClassAverages.ClassAverages()
+    averages = ClassAverages()
     angle_bins = generate_bins(2)
 
     env_id = args.env_id
@@ -112,7 +127,7 @@ def recognize_from_image():
     for image_path in args.input:
         # prepare input data
         logger.debug(f'input image: {image_path}')
-        img = cv2.imread(image_path)
+        img = imread(image_path)
         logger.debug(f'input image shape: {img.shape}')
         yolo_img = cv2.cvtColor(img, cv2.COLOR_BGR2BGRA)
         logger.debug(f'yolo input image shape: {yolo_img.shape}')
@@ -128,6 +143,8 @@ def recognize_from_image():
                 logger.info(f'\tailia processing time {end - start} ms')
         else:
             detections = net_yolov3.run(yolo_img, THRESHOLD, IOU)
+
+        saved_results = []
 
         for detection in detections:
             detect_class = COCO_CATEGORY[detection[0]]
@@ -154,6 +171,11 @@ def recognize_from_image():
             orient = orient[0, :, :]
             conf = conf[0, :]
             dim = dim[0, :]
+
+            saved_results.append({
+                'orient': orient.tolist(), 'conf': conf.tolist(), 'dim': dim.tolist()
+            })
+
             dim += averages.get_item(detected_class)
 
             argmax = np.argmax(conf)
@@ -165,18 +187,24 @@ def recognize_from_image():
             alpha -= np.pi
 
             plot_regressed_3d_bbox(img, proj_matrix, box_2d, dim, alpha, theta_ray)
-            cv2.imshow('3D detections', img)
+            if args.gui:
+                cv2.imshow('3D detections', img)
 
         savepath = get_savepath(args.savepath, image_path)
         logger.info(f'saved at : {savepath}')
         cv2.imwrite(savepath, img)
 
-    if cv2.waitKey(0) != 32:  # space bar
+        if args.write_json:
+            json_file = '%s.json' % savepath.rsplit('.', 1)[0]
+            with open(json_file, 'w') as f:
+                json.dump(saved_results, f, indent=2)
+
+    if args.gui and cv2.waitKey(0) != 32:  # space bar
         exit()
 
 def recognize_from_video():
     # net initialize
-    averages = ClassAverages.ClassAverages()
+    averages = ClassAverages()
     angle_bins = generate_bins(2)
 
     env_id = args.env_id
@@ -207,9 +235,12 @@ def recognize_from_video():
     else:
         writer = None
 
+    frame_shown = False
     while(True):
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+        if frame_shown and cv2.getWindowProperty('3D detections', cv2.WND_PROP_VISIBLE) == 0:
             break
 
         img = frame
@@ -253,7 +284,9 @@ def recognize_from_video():
 
             location = plot_regressed_3d_bbox(img, proj_matrix, box_2d, dim, alpha, theta_ray)
 
-            cv2.imshow('3D detections', img)
+            if args.gui:
+                cv2.imshow('3D detections', img)
+            frame_shown = True
 
         # save results
         if writer is not None:

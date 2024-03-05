@@ -9,11 +9,6 @@ Ailia input shape: (1, 3, 512, 736)
 
 ![Output](output.jpg)
 
-## Note
-
-All resources in this repository (code, models, demos, etc.) are released under the Creative Commons Attribution NonCommercial ShareAlike 4.0 license.
-The license will be changed to allow commercial use after our paper is accepted.
-
 ## Usage
 
 Automatically downloads the onnx and prototxt files on the first run. It is necessary to be connected to the Internet

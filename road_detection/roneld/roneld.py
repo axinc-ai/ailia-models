@@ -1,25 +1,27 @@
-import time
+import glob
 import os
 import sys
+import time
+
 import cv2
-import glob
 import numpy as np
 
 from roneld_utils import roneld_lane_detection
 
 sys.path.append('../../road_detection/codes-for-lane-detection')
-from codes_for_lane_detection_utils import crop_and_resize, preprocess, postprocess
-
 import ailia
+from codes_for_lane_detection_utils import (crop_and_resize, postprocess,
+                                            preprocess)
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath
-from model_utils import check_and_download_models
-import webcamera_utils
-
 # logger
 from logging import getLogger
+
+import webcamera_utils
+from image_utils import imread  # noqa: E402
+from model_utils import check_and_download_models
+from arg_utils import get_base_parser, get_savepath, update_parser
 
 logger = getLogger(__name__)
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
@@ -72,7 +74,7 @@ def recognize_from_image():
     # input image loop
     for image_path in args.input:
         # prepare input data
-        raw_img = cv2.imread(image_path)
+        raw_img = imread(image_path)
 
         # preprocess
         raw_img = crop_and_resize(raw_img,WIDTH,HEIGHT,args.arch,args.resize)
@@ -126,10 +128,13 @@ def recognize_from_video():
         writer = webcamera_utils.get_writer(args.savepath, HEIGHT, WIDTH)
     else:
         writer = None
-
+    
+    frame_shown = False
     while (True):
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
             break
 
         # preprocess
@@ -156,6 +161,7 @@ def recognize_from_video():
                                   image=frame)
 
         cv2.imshow('frame', frame)
+        frame_shown = True
 
         # save results
         if writer is not None:

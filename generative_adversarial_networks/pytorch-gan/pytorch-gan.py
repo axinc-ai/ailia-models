@@ -7,7 +7,7 @@ import cv2
 import ailia
 
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser  # noqa: E402
+from arg_utils import get_base_parser, update_parser  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from webcamera_utils import get_writer  # noqa: E402
 
@@ -41,8 +41,13 @@ parser.add_argument(
     default=MODEL_NAME,
     help='Model to use ("anime" or "celeb". Default is "anime").'
 )
+parser.add_argument(
+    '--seed', type=int, default=128,
+    help='random seed for input data'
+)
 args = update_parser(parser)
 
+np.random.seed(args.seed)
 
 if args.model == 'anime':
     logger.info('Generation using model "AnimeFace"')
@@ -108,8 +113,11 @@ def generate_video():
         writer = None
 
     # inference
+    frame_shown = False
     while(True):
         if (cv2.waitKey(1) & 0xFF == ord('q')):
+            break
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
             break
 
         # prepare input data
@@ -132,6 +140,7 @@ def generate_video():
 
         image = cv2.cvtColor(outp.astype(np.uint8), cv2.COLOR_RGB2BGR)
         cv2.imshow("frame", image)
+        frame_shown = True
 
         # save results
         if writer is not None:

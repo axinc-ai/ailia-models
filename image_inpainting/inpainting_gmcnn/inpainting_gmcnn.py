@@ -8,7 +8,7 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
+from arg_utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from detector_utils import load_image  # noqa: E402
 
@@ -125,7 +125,7 @@ def recognize_from_image(net, img_shape):
             total_time = 0
             for i in range(args.benchmark_count):
                 start = int(round(time.time() * 1000))
-                output = net.predict({'image': img, 'mask': mask})
+                output = net.predict({'import/Placeholder:0': img, 'import/Placeholder_1:0': mask})
                 end = int(round(time.time() * 1000))
                 logger.info(f'\tailia processing time {end - start} ms')
                 if i != 0:

@@ -54,7 +54,7 @@ def plot_pose_box(image, P, kpt, color=(0, 255, 0), line_width=2):
     point_3d.append((front_size, front_size, front_depth))
     point_3d.append((front_size, -front_size, front_depth))
     point_3d.append((-front_size, -front_size, front_depth))
-    point_3d = np.array(point_3d, dtype=np.float).reshape(-1, 3)
+    point_3d = np.array(point_3d, dtype=float).reshape(-1, 3)
 
     # Map to 2d image points
     point_3d_homo = np.hstack((point_3d, np.ones([point_3d.shape[0],1]))) #n x 4

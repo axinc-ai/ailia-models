@@ -1,23 +1,23 @@
-import numpy as np
-import time
 import os
 import sys
+import time
+
+import ailia
 import cv2
+import numpy as np
 from PIL import Image
 
 from mlsd_utils import pred_lines
 
-import ailia
-
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath
-from model_utils import check_and_download_models
-from image_utils import load_image
-import webcamera_utils
-
 # logger
 from logging import getLogger
+
+import webcamera_utils
+from image_utils import imread, load_image
+from model_utils import check_and_download_models
+from arg_utils import get_base_parser, get_savepath, update_parser
 
 logger = getLogger(__name__)
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
@@ -64,7 +64,7 @@ def recognize_from_image():
     for image_path in args.input:
         # prepare input data
         logger.info(image_path)
-        img_input = cv2.imread(image_path)
+        img_input = imread(image_path)
 
         # inference
         logger.info('Start inference...')
@@ -103,9 +103,12 @@ def recognize_from_video():
 
     logger.warning('Inference using CPU because model accuracy is low on GPU.')
 
+    frame_shown = False
     while(True):
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
             break
 
         img_input = np.array(frame)
@@ -113,6 +116,7 @@ def recognize_from_video():
         # inference
         preds_img = gradio_wrapper_for_LSD(img_input, net)
         cv2.imshow('frame', preds_img)
+        frame_shown = True
 
         # save results
         if writer is not None:

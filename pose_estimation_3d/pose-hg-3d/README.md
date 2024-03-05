@@ -12,6 +12,8 @@ Ailia input shape: (1, 3, 256, 192)
 
 ![Output](output.png)
 
+![Output](output_3dpose.png)
+
 ## Usage
 
 Automatically downloads the onnx and prototxt files on the first run.

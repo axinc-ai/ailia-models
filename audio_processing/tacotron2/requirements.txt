@@ -1,0 +1,4 @@
+unidecode
+soudfile
+librosa
+inflect

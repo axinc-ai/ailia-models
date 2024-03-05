@@ -9,7 +9,7 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser  # noqa: E402
+from arg_utils import get_base_parser, update_parser  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from image_utils import load_image  # noqa: E402
 import webcamera_utils  # noqa: E402
@@ -89,7 +89,7 @@ def preprocess(img, input_is_bgr=False):
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
     # normalize image
-    input_data = (img.astype(np.float) - MEAN)
+    input_data = (img.astype(float) - MEAN)
     input_data = input_data.transpose((2, 0, 1))
     input_data = input_data[np.newaxis, :, :, :]
     return input_data
@@ -160,9 +160,12 @@ def compare_videoframe_image():
     else:
         writer = None
 
+    frame_shown = True
     while(True):
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
             break
 
         _, resized_frame = webcamera_utils.adjust_frame_size(
@@ -184,6 +187,7 @@ def compare_videoframe_image():
         else:
             logger.info('Not same person')
         cv2.imshow('frame', resized_frame)
+        frame_shown = False
         time.sleep(SLEEP_TIME)
 
         # save results

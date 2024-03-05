@@ -1,7 +1,7 @@
 import numpy
 import functools
 import ailia
-from ailia.audio import spectrogram, mel_scale, complex_norm, get_fb_matrix
+from ailia.audio import spectrogram, mel_scale, complex_norm, get_fb_matrix, mel_spectrogram
 
 
 class MelspectrogramStretch(object):
@@ -27,17 +27,42 @@ class MelspectrogramStretch(object):
         # Normalization (pot spec processing)
         self.complex_norm = functools.partial(complex_norm,power=2.)
 
+        # Fused api
+        self.mel_spectrogram = functools.partial(mel_spectrogram, sample_rate=sample_rate,
+                        fft_n = fft_length,
+                        hop_n =hop_length,
+                        win_n = fft_length,
+                        win_type = 1,
+                        center_mode = 1,
+                        power = 2.,
+                        fft_norm_type = 0,
+                        f_min = 0.0,
+                        f_max = sample_rate/2,
+                        mel_n = num_mels,
+                        mel_norm = 0,
+                        htk = True)
+
     def forward(self, data):
         wav,_ = data
-        x = self.stft(wav)
-        print(x.shape)
-        # x -> (fft_length//2+1,channel)
 
-        # print(x.shape)  #([1025, 176, 2])
-        x = self.complex_norm(x)
-        # print(x.shape)  #([1025, 176])
-        x = self.msc(x)
-        # print(x.shape)  #([128, 176])
+        # Stereo to monoral
+        if len(wav.shape)>=2:
+            wav = numpy.mean(wav, axis=1)
+
+        if True:
+            # Fused API
+            x = self.mel_spectrogram(wav)
+        else:
+            # Independent API
+
+            x = self.stft(wav)
+            # x -> (fft_length//2+1,channel)
+
+            # print(x.shape)  #([1025, 176, 2])
+            x = self.complex_norm(x)
+            # print(x.shape)  #([1025, 176])
+            x = self.msc(x)
+            # print(x.shape)  #([128, 176])
 
         # Normalize melspectrogram
         # Independent mean, std per batch
