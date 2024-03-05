@@ -66,6 +66,7 @@ The collection of pre-trained, state-of-the-art AI models.
 | [microsoft clap](/audio_processing/msclap/) | [CLAP](https://github.com/microsoft/CLAP) | Pytorch | 1.2.11 and later | |
 | [narabas](/audio_processing/narabas/) | [narabas: Japanese phoneme forced alignment tool](https://github.com/darashi/narabas) | Pytorch | 1.2.11 and later | |
 | [rnnoise](/audio_processing/rnnoise/) | [rnnoise](https://github.com/xiph/rnnoise) | Keras | 1.2.15 and later | |
+| [audioset_tagging_cnn](/audio_processing/audioset_tagging_cnn/) | [PANNs: Large-Scale Pretrained Audio Neural Networks for Audio Pattern Recognition](https://github.com/qiuqiangkong/audioset_tagging_cnn) | Pytorch | 1.2.9 and later | |
 
 ## Background removal
 
