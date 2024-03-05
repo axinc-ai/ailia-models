@@ -1,7 +1,7 @@
 import sys
 
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser
+from arg_utils import get_base_parser, update_parser
 from model_utils import check_and_download_models
 
 import numpy as np

@@ -11,8 +11,8 @@ from st_gcn_util import naive_pose_tracker, render_video, render_image
 from st_gcn_labels import KINETICS_LABEL
 
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser  # noqa: E402
-from utils import check_file_existance  # noqa: E402
+from arg_utils import get_base_parser, update_parser  # noqa: E402
+from arg_utils import check_file_existance  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from webcamera_utils import get_capture, get_writer  # noqa: E402
 

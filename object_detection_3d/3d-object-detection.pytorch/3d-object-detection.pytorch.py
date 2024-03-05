@@ -4,11 +4,12 @@ from dataclasses import dataclass, asdict
 
 import cv2
 import numpy as np
+import json
 
 import ailia
 
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
+from arg_utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from detector_utils import plot_results, load_image  # noqa: E402C
 import webcamera_utils  # noqa: E402
@@ -78,6 +79,11 @@ parser.add_argument(
     action='store_true',
     help='execute onnxruntime version.'
 )
+parser.add_argument(
+    '-w', '--write_json',
+    action='store_true',
+    help='Flag to output results to json file.'
+)
 args = update_parser(parser)
 
 
@@ -132,6 +138,21 @@ def draw_detections(img, reg_detections, det_detections, ids=None, rgb=True):
             cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0))
 
     return img
+
+
+def save_result_json(json_path, reg_detections, det_detections, ids=None):
+    results = []
+
+    for det_out, reg_out, _id in zip(
+        det_detections, reg_detections, ids if ids else ['ID x'] * len(reg_detections)):
+        r = {}
+        r['left'], r['top'], r['right'], r['bottom'] = det_out.tolist()
+        r['keypoints'] = reg_out[0].tolist()
+        r['label'] = OBJECTRON_CLASSES[reg_out[1]]
+        results.append(r)
+
+    with open(json_path, 'w') as f:
+        json.dump(results, f, indent=2)
 
 
 def transform_kp(kp: np.array, crop_cords: tuple):
@@ -247,6 +268,10 @@ def recognize_from_image(det_net, reg_net):
         savepath = get_savepath(args.savepath, image_path, ext='.png')
         logger.info(f'saved at : {savepath}')
         cv2.imwrite(savepath, res_img)
+
+        if args.write_json:
+            json_file = '%s.json' % savepath.rsplit('.', 1)[0]
+            save_result_json(json_file, reg_detections, boxes)
 
     logger.info('Script finished successfully.')
 
