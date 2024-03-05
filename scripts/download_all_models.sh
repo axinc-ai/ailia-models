@@ -26,6 +26,10 @@ cd ../../audio_processing/crepe/; python3 crepe.py ${OPTION}
 cd ../../audio_processing/vall-e-x/; python3 vall-e-x.py ${OPTION}
 cd ../../audio_processing/hifigan/; python3 hifigan.py ${OPTION}
 cd ../../audio_processing/distil-whisper/; python3 distil-whisper.py ${OPTION}
+cd ../../audio_processing/msclap/; python3 msclap.py ${OPTION}
+cd ../../audio_processing/narabas/; python3 narabas.py ${OPTION}
+cd ../../audio_processing/rnnoise/; python3 rnnoise.py ${OPTION}
+cd ../../audio_processing/audioset_tagging_cnn/; python3 audioset_tagging_cnn.py ${OPTION}
 cd ../../background_ramoval/deep-image-matting; python3 deep-image-matting.py ${OPTION}
 cd ../../background_ramoval/u2net; python3 u2net.py ${OPTION}
 cd ../../background_ramoval/u2net; python3 u2net.py -a small ${OPTION}
@@ -91,8 +95,9 @@ cd ../../face_recognition/ax_facial_features; python3 ax_facial_features.py ${OP
 cd ../../face_recognition/6d_repnet; python3 6d_repnet.py ${OPTION}
 cd ../../face_recognition/hsemotion; python3 hsemotion.py ${OPTION}
 cd ../../face_recognition/facemesh_v2; python3 facemesh_v2.py ${OPTION}
-cd ../../face_recognition/3ddfa; python3 3ddfa.py ${OPTION}
+cd ../../face_recognition/3ddfa; python3 3ddfa$.py ${OPTION}
 cd ../../face_recognition/mivolo; python3 mivolo.py ${OPTION}
+cd ../../face_recognition/l2cs_net; python3 l2cs_net.py ${OPTION}
 cd ../../face_swapping/facefusion; python3 facefusion.py ${OPTION}
 cd ../../frame_interpolation/flavr; python3 flavr.py ${OPTION}
 cd ../../frame_interpolation/cain; python3 cain.py ${OPTION}
@@ -202,6 +207,7 @@ cd ../../natural_language_processing/t5_base_japanese_title_generation; python3 
 cd ../../natural_language_processing/multilingual-e5; python3 multilingual-e5.py ${OPTION}
 cd ../../natural_language_processing/t5_whisper_medical; python3 t5_whisper_medical.py ${OPTION}
 cd ../../natural_language_processing/t5_base_japanese_summarization; python3 t5_base_japanese_summarization.py ${OPTION}
+cd ../../natural_language_processing/glucose; python3 glucose.py ${OPTION}
 cd ../../neural_rendering/nerf; python3 nerf.py ${OPTION}
 cd ../../object_detection/centernet; python3 centernet.py ${OPTION}
 cd ../../object_detection/m2det; python3 m2det.py ${OPTION}
@@ -219,6 +225,7 @@ cd ../../object_detection/yolov6; python3 yolov6.py ${OPTION}
 cd ../../object_detection/yolov7; python3 yolov7.py ${OPTION}
 cd ../../object_detection/yolov8; python3 yolov8.py ${OPTION}
 cd ../../object_detection/yolov8-seg; python3 yolov8-seg.py ${OPTION}
+cd ../../object_detection/yolov9; python3 yolov9.py ${OPTION}
 cd ../../object_detection/yolox; python3 yolox.py ${OPTION}
 cd ../../object_detection/yolox-ti-lite; python3 yolox-ti-lite.py ${OPTION}
 cd ../../object_detection/yolov; python3 yolov.py ${OPTION}
@@ -253,6 +260,7 @@ cd ../../object_tracking/siam-mot; python3 siam-mot.py ${OPTION}
 cd ../../object_tracking/bytetrack; python3 bytetrack.py ${OPTION}
 cd ../../object_tracking/qd-3dt; python3 qd-3dt.py ${OPTION}
 cd ../../object_tracking/strong_sort; python3 strong_sort.py ${OPTION}
+cd ../../object_tracking/deepsort_vehicle; python3 deepsort_vehicle.py ${OPTION}
 cd ../../optical_flow_estimation/raft; python3 raft.py ${OPTION}
 cd ../../point_segmentation/pointnet_pytorch python3 pointnet_pytorch.py ${OPTION}
 cd ../../pose_estimation/lightweight-human-pose-estimation; python3 lightweight-human-pose-estimation.py ${OPTION}
@@ -281,6 +289,7 @@ cd ../../road_detection/lstr; python3 lstr.py ${OPTION}
 cd ../../road_detection/ultra-fast-lane-detection; python3 ultra-fast-lane-detection.py ${OPTION}
 cd ../../road_detection/yolop; python3 yolop.py ${OPTION}
 cd ../../road_detection/hybridnets; python3 hybridnets.py ${OPTION}
+cd ../../road_detection/polylanenet; python3 polylanenet.py ${OPTION}
 cd ../../rotation_prediction/rotnet; python3 rotnet.py ${OPTION}
 cd ../../nsfw_detector/clip-based-nsfw-detector; python3 clip-based-nsfw-detector.py ${OPTION}
 cd ../../style_transfer/adain; python3 adain.py ${OPTION}
@@ -303,5 +312,6 @@ cd ../../text_recognition/crnn.pytorch; python3 crnn.pytorch.py ${OPTION}
 cd ../../text_recognition/paddleocr; python3 paddleocr.py ${OPTION}
 cd ../../text_recognition/easyocr; python3 easyocr.py ${OPTION}
 cd ../../text_recognition/ndlocr_text_recognition; python3 ndlocr_text_recognition.py ${OPTION}
+cd ../../time_series_forecasting/informer2020; python3 informer2020.py ${OPTION}
 cd ../../vehicle_recognition/vehicle-attributes-recognition-barrier; python3 vehicle-attributes-recognition-barrier.py ${OPTION}
 cd ../../vehicle_recognition/vehicle-license-plate-detection-barrier; python3 vehicle-license-plate-detection-barrier.py ${OPTION}

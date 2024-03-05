@@ -13,14 +13,14 @@ The collection of pre-trained, state-of-the-art AI models.
 [ailia MODELS tutorial 日本語版](TUTORIAL_jp.md)
 
 # Supported models
-304 models as of December 9th, 2023
+312 models as of March 6th, 2024
 
 # Latest update
+- 2024.03.05 Add polylanenet, rnnoise
+- 2024.03.04 Add Japanese Stable CLIP, msclap, glucose, informer2020, l2cs_net, deepsort_vehicle, narabas
+- 2024.03.03 Add yolov9 (Unification of line feed code to LF)
 - 2024.01.29 Add rife, layout_parsing
 - 2024.01.27 Add mivolo
-- 2023.12.09 Add riffusion
-- 2023.12.05 Add facenet-pytorch, centroids-reid, nafnet, daclip-sde
-- 2023.12.04 Add distil-whisper
 - More information in our [Wiki](https://github.com/axinc-ai/ailia-models/wiki)
 
 ## Action recognition
@@ -63,7 +63,10 @@ The collection of pre-trained, state-of-the-art AI models.
 | [vall-e-x](/audio_processing/vall-e-x/) | [VALL-E-X](https://github.com/Plachtaa/VALL-E-X) | Pytorch | 1.2.15 and later |  |
 | [hifigan](/audio_processing/hifigan/) | [HiFi-GAN](https://github.com/jik876/hifi-gan) | Pytorch | 1.2.9 and later |  |
 | [distil-whisper](/audio_processing/distil-whisper/) | [Hugging Face - Distil-Whisper](https://github.com/huggingface/distil-whisper) | Pytorch | 1.2.16 and later | |
-
+| [microsoft clap](/audio_processing/msclap/) | [CLAP](https://github.com/microsoft/CLAP) | Pytorch | 1.2.11 and later | |
+| [narabas](/audio_processing/narabas/) | [narabas: Japanese phoneme forced alignment tool](https://github.com/darashi/narabas) | Pytorch | 1.2.11 and later | |
+| [rnnoise](/audio_processing/rnnoise/) | [rnnoise](https://github.com/xiph/rnnoise) | Keras | 1.2.15 and later | |
+| [audioset_tagging_cnn](/audio_processing/audioset_tagging_cnn/) | [PANNs: Large-Scale Pretrained Audio Neural Networks for Audio Pattern Recognition](https://github.com/qiuqiangkong/audioset_tagging_cnn) | Pytorch | 1.2.9 and later | |
 
 ## Background removal
 
@@ -170,6 +173,7 @@ The collection of pre-trained, state-of-the-art AI models.
 | [<img src="face_recognition/facemesh_v2/output.png" width=128px>](face_recognition/facemesh_v2/) | [facemesh_v2](/face_recognition/facemesh_v2/) | [MediaPipe Face landmark detection](https://developers.google.com/mediapipe/solutions/vision/face_landmarker) | Pytorch | 1.2.9 and later | [JP](https://medium.com/axinc/facemeshv2-blendshape%E3%82%82%E8%A8%88%E7%AE%97%E5%8F%AF%E8%83%BD%E3%81%AA%E9%A1%94%E3%81%AE%E3%82%AD%E3%83%BC%E3%83%9D%E3%82%A4%E3%83%B3%E3%83%88%E6%A4%9C%E5%87%BA%E3%83%A2%E3%83%87%E3%83%AB-3198898dccdd) |
 | [<img src="face_recognition/3ddfa/output.png" width=128px>](face_recognition/3ddfa/) | [3ddfa](/face_recognition/3ddfa/) | [Towards Fast, Accurate and Stable 3D Dense Face Alignment](https://github.com/cleardusk/3DDFA_V2) | Pytorch | 1.2.10 and later | |
 | [<img src="face_recognition/mivolo/output.png" width=128px>](face_recognition/mivolo/) | [mivolo](/face_recognition/mivolo/) | [MiVOLO: Multi-input Transformer for Age and Gender Estimation](https://github.com/WildChlamydia/MiVOLO) | Pytorch | 1.2.13 and later | |
+| [<img src="face_recognition/l2cs_net/output.png" width=128px>](face_recognition/l2cs_net/) | [L2CS_Net](/face_recognition/l2cs_net/) | [L2CS_Net](https://github.com/Ahmednull/L2CS-Net) | Pytorch | 1.2.9 and later | |
 
 ## Face swapping
 
@@ -251,6 +255,7 @@ The collection of pre-trained, state-of-the-art AI models.
 | [<img src="image_classification/convnext/input_imagenet.jpg" width=128px>](image_classification/convnext/) | [convnext](/image_classification/convnext/)|[A PyTorch implementation of ConvNeXt](https://github.com/facebookresearch/ConvNeXt) | Pytorch | 1.2.5 and later | |
 | [<img src="image_classification/mobileone/clock.jpg" width=128px>](image_classification/mobileone/) | [mobileone](/image_classification/mobileone/)|[A PyTorch implementation of MobileOne](https://github.com/apple/ml-mobileone) | Pytorch | 1.2.1 and later | |
 | [<img src="image_classification/imagenet21k/input.jpg" width=128px>](image_classification/imagenet21k/) | [imagenet21k](/image_classification/imagenet21k/) | [ImageNet21K](https://github.com/Alibaba-MIIL/ImageNet21K) | Pytorch | 1.2.11 and later | |
+| [<img src="image_classification/japanese-stable-clip-vit-l-16/dog.jpeg" width=128px>](image_classification/japanese-stable-clip-vit-l-16/) | [japanese-stable-clip-vit-l-16](/image_classification/japanese-stable-clip-vit-l-16/) | [japanese-stable-clip-vit-l-16](https://huggingface.co/stabilityai/japanese-stable-clip-vit-l-16/) | Pytorch | 1.2.11 and later | |
 
 ## Image inpainting
 
@@ -354,6 +359,7 @@ The collection of pre-trained, state-of-the-art AI models.
 |[bert_insert_punctuation](/natural_language_processing/bert_insert_punctuation) | [bert-japanese](https://github.com/cl-tohoku/bert-japanese) | Pytorch | 1.2.15 and later |
 |[t5_whisper_medical](/natural_language_processing/t5_whisper_medical) | error correction of medical terms using t5 | Pytorch | 1.2.13 and later | |
 |[t5_base_summarization](/natural_language_processing/t5_base_japanese_summarization) | [t5-japanese](https://github.com/sonoisa/t5-japanese) | Pytorch | 1.2.13 and later |
+|[glucose](/natural_language_processing/glucose) | [GLuCoSE (General Luke-based Contrastive Sentence Embedding)-base-Japanese](https://huggingface.co/pkshatech/GLuCoSE-base-ja) | Pytorch | 1.2.15 and later |
 
 ## Neural Rendering
 
@@ -383,6 +389,7 @@ The collection of pre-trained, state-of-the-art AI models.
 | [<img src="object_detection/yolov7/output.jpg" width=128px>](object_detection/yolov7/) | [yolov7](/object_detection/yolov7/) | [YOLOv7](https://github.com/WongKinYiu/yolov7) | Pytorch | 1.2.7 and later | |
 | [<img src="object_detection/yolov8/output.png" width=128px>](object_detection/yolov8/) | [yolov8](/object_detection/yolov8/) | [YOLOv8](https://github.com/ultralytics/ultralytics) | Pytorch | 1.2.14.1 and later | |
 | [<img src="object_detection/yolov8-seg/output.png" width=128px>](object_detection/yolov8-seg/) | [yolov8-seg](/object_detection/yolov8-seg/) | [YOLOv8](https://github.com/ultralytics/ultralytics) | Pytorch | 1.2.14.1 and later |  |
+| [<img src="object_detection/yolov9/output.png" width=128px>](object_detection/yolov9/) | [yolov9](/object_detection/yolov9/) | [YOLOv9](https://github.com/WongKinYiu/yolov9) | Pytorch | 1.2.10 and later |  |
 | [<img src="object_detection/yolor/output.jpg" width=128px>](object_detection/yolor/) | [yolor](/object_detection/yolor/) | [yolor](https://github.com/WongKinYiu/yolor/tree/paper) | Pytorch | 1.2.5 and later |
 | [<img src="object_detection/yolox/output.jpg" width=128px>](object_detection/yolox/) | [yolox](/object_detection/yolox/) | [YOLOX](https://github.com/Megvii-BaseDetection/YOLOX) | Pytorch | 1.2.6 and later | [EN](https://medium.com/axinc-ai/yolox-object-detection-model-exceeding-yolov5-d6cea6d3c4bc) [JP](https://medium.com/axinc/yolox-yolov5%E3%82%92%E8%B6%85%E3%81%88%E3%82%8B%E7%89%A9%E4%BD%93%E6%A4%9C%E5%87%BA%E3%83%A2%E3%83%87%E3%83%AB-e9706e15fef2) |
 | [<img src="object_detection/yolox-ti-lite/output.jpg" width=128px>](object_detection/yolox-ti-lite/) | [yolox-ti-lite](/object_detection/yolox-ti-lite/) | [edgeai-yolox](https://github.com/TexasInstruments/edgeai-yolox) | Pytorch | 1.2.9 and later | |
@@ -431,6 +438,7 @@ The collection of pre-trained, state-of-the-art AI models.
 | [<img src="object_tracking/qd-3dt/example/out_00000000.png" width=128px>](object_tracking/qd-3dt/) | [qd-3dt](/object_tracking/qd-3dt/) | [Monocular Quasi-Dense 3D Object Tracking](https://github.com/SysCV/qd-3dt) | Pytorch | 1.2.11 and later |　|
 | [<img src="object_tracking/strong_sort/output.png" width=128px>](object_tracking/strong_sort/) | [strong_sort](/object_tracking/strong_sort/) | [StrongSORT](https://github.com/dyhBUPT/StrongSORT) | Pytorch | 1.2.15 and later |　|
 | [<img src="object_tracking/centroids-reid/output.png" width=128px>](object_tracking/centroids-reid/) | [centroids-reid](/object_tracking/centroids-reid/) | [On the Unreasonable Effectiveness of Centroids in Image Retrieval](https://github.com/mikwieczorek/centroids-reidh) | Pytorch | 1.2.9 and later |　|
+| [<img src="object_tracking/deepsort_vehicle/01840_c40752s1_00280_01.jpg" width=128px>](object_tracking/deepsort_vehicle/) | [deepsort_vehicle](/object_tracking/deepsort_vehicle/) | [Multi-Camera Live Object Tracking](https://github.com/LeonLok/Multi-Camera-Live-Object-Tracking) | Pytorch | 1.2.9 and later |  |
 
 ## Optical Flow Estimation
 
@@ -484,6 +492,7 @@ The collection of pre-trained, state-of-the-art AI models.
 | [<img src="road_detection/ultra-fast-lane-detection/output.jpg" width=128px>](road_detection/ultra-fast-lane-detection/) | [ultra-fast-lane-detection](/road_detection/ultra-fast-lane-detection/) | [Ultra-Fast-Lane-Detection](https://github.com/cfzd/Ultra-Fast-Lane-Detection) | Pytorch | 1.2.6 and later |
 | [<img src="road_detection/yolop/output.jpg" width=128px>](road_detection/yolop/) | [yolop](/road_detection/yolop/) | [YOLOP](https://github.com/hustvl/YOLOP) | Pytorch | 1.2.6 and later |
 | [<img src="road_detection/hybridnets/output.jpg" width=128px>](road_detection/hybridnets/) | [hybridnets](/road_detection/hybridnets/) | [HybridNets](https://github.com/datvuthanh/HybridNets) | Pytorch | 1.2.6 and later |
+| [<img src="road_detection/polylanenet/output.jpg" width=128px>](road_detection/polylanenet/) | [polylanenet](/road_detection/polylanenet/) | [PolyLaneNet](https://github.com/lucastabelini/PolyLaneNet) | Pytorch | 1.2.9 and later |
 
 ## Rotation prediction
 
@@ -531,6 +540,12 @@ The collection of pre-trained, state-of-the-art AI models.
 | [<img src="text_recognition/paddleocr/output.png" width=64px>](text_recognition/paddleocr/) |[paddleocr](/text_recognition/paddleocr/) | [PaddleOCR : Awesome multilingual OCR toolkits based on PaddlePaddle](https://github.com/PaddlePaddle/PaddleOCR) | Pytorch | 1.2.6 and later | [EN](https://medium.com/axinc-ai/paddleocr-the-latest-lightweight-ocr-system-a13171d7ea3e) [JP](https://medium.com/axinc/paddleocr-%E6%9C%80%E6%96%B0%E3%81%AE%E8%BB%BD%E9%87%8Focr%E3%82%B7%E3%82%B9%E3%83%86%E3%83%A0-8744205f3703) |
 | [<img src="text_recognition/easyocr/example/chinese.jpg" width=64px>](text_recognition/easyocr/) |[easyocr](/text_recognition/easyocr/) | [Ready-to-use OCR with 80+ supported languages](https://github.com/JaidedAI/EasyOCR) | Pytorch | 1.2.6 and later | |
 | [<img src="text_recognition/ndlocr_text_recognition/demo.png" width=64px>](text_recognition/ndlocr_text_recognition/) |[ndlocr_text_recognition](/text_recognition/ndlocr_text_recognition/) | [NDL OCR](https://github.com/ndl-lab/text_recognition) | Pytorch | 1.2.5 and later | |
+
+## Time-Series Forecasting
+
+| Model | Reference | Exported From | Supported Ailia Version | Blog |
+|------------:|:------------:|:------------:|:------------:|:------------:|
+| [informer2020](/time_series_forecasting/informer2020/) | [Informer: Beyond Efficient Transformer for Long Sequence Time-Series Forecasting (AAAI'21 Best Paper)](https://github.com/zhouhaoyi/Informer2020) | Pytorch | 1.2.10 and later ||
 
 ## Vehicle recognition
 
