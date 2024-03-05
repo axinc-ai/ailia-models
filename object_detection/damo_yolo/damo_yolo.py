@@ -9,7 +9,7 @@ import numpy as np
 
 
 import ailia
-from damoyolo_util import *
+from damo_yolo_util import *
 sys.path.append('../../util')
 # logger
 from logging import getLogger
@@ -19,7 +19,7 @@ from detector_utils import (load_image, plot_results, reverse_letterbox,
                             write_predictions)
 from image_utils import imread  # noqa: E402
 from model_utils import check_and_download_models
-from utils import get_base_parser, get_savepath, update_parser
+from arg_utils import get_base_parser, get_savepath, update_parser
 
 logger = getLogger(__name__)
 
