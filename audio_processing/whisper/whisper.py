@@ -191,6 +191,8 @@ if not args.onnx:
         args.memory_mode = ailia.get_memory_mode(
             reduce_constant=True, ignore_input_with_initializer=True,
             reduce_interstage=False, reuse_interstage=True)
+    if (args.memory_mode & 16) != 0:
+        ailia.set_temporary_cache_path("./")
 else:
     LAYER_NORM_ENABLE = False
 
