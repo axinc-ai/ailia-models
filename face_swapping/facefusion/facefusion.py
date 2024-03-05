@@ -126,10 +126,6 @@ def recognize_from_image(nets):
     for target_image_path in args.input:
         logger.info(target_image_path)
 
-        # prepare input data
-        pre_process(args.source, nets, FACE_DETECTOR_SCORE)
-        conditional_append_reference_faces(args.source, target_image_path, nets)
-
         # inference
         logger.info('Start inference...')
         if args.benchmark:
@@ -137,13 +133,19 @@ def recognize_from_image(nets):
             total_time = 0
             for i in range(args.benchmark_count):
                 start = int(round(time.time() * 1000))
-                res_image = process_image(args.source, target_image_path, None, nets)
+                # prepare input data
+                pre_process(args.source, nets, FACE_DETECTOR_SCORE)
+                conditional_append_reference_faces(args.source, target_image_path, nets)
+                res_image = process_image(args.source, target_image_path, nets)
                 end = int(round(time.time() * 1000))
                 if i != 0:
                     total_time = total_time + (end - start)
                 logger.info(f'\tailia processing time {end - start} ms')
             logger.info(f'\taverage time {total_time / (args.benchmark_count - 1)} ms')
         else:
+            # prepare input data
+            pre_process(args.source, nets, FACE_DETECTOR_SCORE)
+            conditional_append_reference_faces(args.source, target_image_path, nets)
             res_image = process_image(args.source, target_image_path, nets)
 
         # save result
