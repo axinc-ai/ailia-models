@@ -11,7 +11,7 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath  # noqa
+from arg_utils import get_base_parser, update_parser, get_savepath  # noqa
 from model_utils import check_and_download_models  # noqa
 from detector_utils import load_image  # noqa
 from webcamera_utils import get_capture, get_writer  # noqa
@@ -49,9 +49,6 @@ REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/detic/'
 IMAGE_PATH = 'desk.jpg'
 SAVE_IMAGE_PATH = 'output.png'
 
-IMAGE_SIZE = 800
-IMAGE_MAX_SIZE = 800  # tempolary limit to 800px (original : 1333)
-
 # ======================
 # Arguemnt Parser Config
 # ======================
@@ -80,6 +77,11 @@ parser.add_argument(
     '--onnx',
     action='store_true',
     help='execute onnxruntime version.'
+)
+parser.add_argument(
+    '-dw', '--detection_width',
+    default=800, type=int,   # tempolary limit to 800px (original : 1333)
+    help='The detection width for detic. (default: 800)'
 )
 args = update_parser(parser)
 
@@ -276,8 +278,8 @@ def preprocess(img):
 
     img = img[:, :, ::-1]  # BGR -> RGB
 
-    size = IMAGE_SIZE
-    max_size = IMAGE_MAX_SIZE
+    size = args.detection_width
+    max_size = args.detection_width
     scale = size / min(im_h, im_w)
     if im_h < im_w:
         oh, ow = size, scale * im_w
@@ -340,7 +342,8 @@ def predict(net, img):
     im_h, im_w = img.shape[:2]
     img = preprocess(img)
     pred_hw = img.shape[-2:]
-    im_hw = np.array([im_h, im_w])
+    im_hw = np.array([im_h, im_w]).astype(np.int64)
+    #img[:] = 0 # test for grid sampler
 
     # feedforward
     if args.opset16:

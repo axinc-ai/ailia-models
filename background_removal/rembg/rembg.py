@@ -1,4 +1,5 @@
 import sys
+import time
 
 import numpy as np
 import cv2
@@ -13,7 +14,7 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath  # noqa
+from arg_utils import get_base_parser, update_parser, get_savepath  # noqa
 from model_utils import check_and_download_models  # noqa
 from detector_utils import load_image  # noqa
 from image_utils import normalize_image  # noqa
@@ -180,12 +181,24 @@ def recognize_from_image(net):
         img = load_image(image_path)
         img = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
 
-        # inference
-        mask = predict(net, img)
+        if args.benchmark:
+            logger.info('BENCHMARK mode')
+            total_time = 0
+            for i in range(args.benchmark_count):
+                start = int(round(time.time() * 1000))
+                mask = predict(net, img)
+                res_img = estimate_alpha(img, mask)
+                end = int(round(time.time() * 1000))
+                if i != 0:
+                    total_time = total_time + (end - start)
+                logger.info(f'\tailia processing time {end - start} ms')
+            logger.info(f'\taverage time {total_time / (args.benchmark_count-1)} ms')
+        else:            
+            # inference
+            mask = predict(net, img)
 
-        # refine alpha
-        # res_img = mask
-        res_img = estimate_alpha(img, mask)
+            # refine alpha
+            res_img = estimate_alpha(img, mask)
 
         if args.composite:
             img = cv2.cvtColor(img, cv2.COLOR_BGR2BGRA)

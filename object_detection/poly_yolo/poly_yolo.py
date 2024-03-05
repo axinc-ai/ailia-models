@@ -11,7 +11,7 @@ import ailia
 sys.path.append('../../util')
 # logger
 from logging import getLogger
-from utils import get_base_parser, get_savepath, update_parser
+from arg_utils import get_base_parser, get_savepath, update_parser
 
 import webcamera_utils
 from image_utils import imread  # noqa: E402

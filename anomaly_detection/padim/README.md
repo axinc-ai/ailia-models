@@ -26,6 +26,8 @@ In order to get the feature vector of the normal product, it is necessary to pre
 By default, normal files are got from the `train` directory.  
 For the sample image, first download [MVTec AD datasets](https://www.mvtec.com/company/research/datasets/mvtec-ad/) and place `bottle/train/good/*.png` files to the `train` directory.
 
+![Train](padim_train.png)
+
 For the sample image, train with `train` directory and test with `bottle_000.png`,
 ```bash
 $ python3 padim.py
