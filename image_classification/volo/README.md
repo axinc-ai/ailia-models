@@ -49,7 +49,7 @@ $ python3 volo.py --video VIDEO_PATH
 
 ## Model Format
 
-ONNX opset = 18
+ONNX opset = 11
 
 ## Framework
 
