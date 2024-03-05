@@ -10,7 +10,7 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath
+from arg_utils import get_base_parser, update_parser, get_savepath
 from model_utils import check_and_download_models
 
 

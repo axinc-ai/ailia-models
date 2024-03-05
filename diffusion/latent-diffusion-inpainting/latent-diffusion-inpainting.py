@@ -10,7 +10,7 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath  # noqa
+from arg_utils import get_base_parser, update_parser, get_savepath  # noqa
 from model_utils import check_and_download_models  # noqa
 from detector_utils import load_image  # noqa
 # logger
@@ -55,8 +55,13 @@ parser.add_argument(
     action='store_true',
     help='execute onnxruntime version.'
 )
+parser.add_argument(
+    '--seed', type=int, default=128,
+    help='random seed for input data and noise'
+)
 args = update_parser(parser)
 
+np.random.seed(args.seed)
 
 # ======================
 # Secondaty Functions
