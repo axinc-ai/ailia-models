@@ -36,13 +36,13 @@ For the sample image,
 $ python3 facefusion.py
 ```
 
-If you want to specify the input image, put the image path after the `--input` option.
+If you want to specify the input target image, put the image path after the `--input` option.
 You can use `--savepath` option to change the name of the output file to save.
 ```bash
 $ python3 facefusion.py --input TARGET_IMAGE_PATH --savepath SAVE_IMAGE_PATH
 ```
 
-If you want to specify the source image, put the image path after the `--source` option.
+If you want to specify the input source image, put the image path after the `--source` option.
 ```bash
 $ python3 facefusion.py --input TARGET_IMAGE_PATH --source SOURCE_IMAGE_PATH --savepath SAVE_IMAGE_PATH
 ```
@@ -51,6 +51,11 @@ By adding the `--video` option, you can input the video.
 If you pass `0` as an argument to VIDEO_PATH, you can use the webcam input instead of the video file.
 ```bash
 $ python3 facefusion.py --video VIDEO_PATH
+```
+
+By adding the `--skip_enhance` option, you can skip the face enhancement process (for a quicker inference but lesser quality).
+```bash
+$ python3 facefusion.py --skip_enhance
 ```
 
 ## Reference
@@ -63,7 +68,7 @@ ONNXRuntime
 
 ## Model Format
 
-ONNX opset=11 for `2dfan4.onnx`, `arcface_w600k_r50.onnx`, `inswapper_128.onnx`
+ONNX opset=11 for `2dfan4.onnx`, `arcface_w600k_r50.onnx`, `inswapper_128.onnx`, `gfpgan_1.4.onnx`
 
 ONNX opset=12 for `yoloface_8n.onnx`
 
@@ -73,3 +78,4 @@ ONNX opset=12 for `yoloface_8n.onnx`
 - [2dfan4.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/facefusion/2dfan4.onnx.prototxt)
 - [arcface_w600k_r50.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/facefusion/arcface_w600k_r50.onnx.prototxt)
 - [inswapper_128.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/facefusion/inswapper_128.onnx.prototxt)
+- [gfpgan_1.4.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/facefusion/gfpgan_1.4.onnx.prototxt)

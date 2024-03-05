@@ -2,6 +2,9 @@ from collections import namedtuple
 import cv2
 import numpy as np
 
+FACE_MASK_BLUR = 0.3
+FACE_MASK_PADDING = (0, 0, 0, 0)
+
 FACE_DETECTOR_SIZE = '640x640'
 
 TEMPLATES = {'arcface_112_v2': np.array([[ 0.34191607, 0.46157411 ],
@@ -13,7 +16,12 @@ TEMPLATES = {'arcface_112_v2': np.array([[ 0.34191607, 0.46157411 ],
                                          [ 0.63696719, 0.40235469 ],
                                          [ 0.50019687, 0.56044219 ],
                                          [ 0.38710391, 0.72160547 ],
-                                         [ 0.61507734, 0.72034453 ]])}
+                                         [ 0.61507734, 0.72034453 ]]),
+             'ffhq_512': np.array([[ 0.37691676, 0.46864664 ],
+                                   [ 0.62285697, 0.46912813 ],
+                                   [ 0.50123859, 0.61331904 ],
+                                   [ 0.39308822, 0.72541100 ],
+                                   [ 0.61150205, 0.72490465 ]])}
 
 Face = namedtuple('Face',
                   ['bounding_box',

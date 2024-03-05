@@ -19,8 +19,9 @@ from logging import getLogger  # noqa
 from facefusion_utils.face_analyser import get_one_face, get_average_face
 from facefusion_utils.utils import read_static_images, read_static_image, write_image
 from facefusion_utils.face_store import append_reference_face
-from facefusion_utils.face_swapper import pre_process, get_reference_frame, post_process
-from facefusion_utils.face_swapper import process_image as _process_image
+from facefusion_utils.face_swapper import pre_process, post_process
+from facefusion_utils.face_swapper import get_reference_frame as fs_get_reference_frame, process_image as fs_process_image
+from facefusion_utils.face_enhancer import get_reference_frame as fe_get_reference_frame, process_image as fe_process_image
 
 logger = getLogger(__name__)
 
@@ -36,6 +37,8 @@ WEIGHT_FACE_RECOGNIZER_PATH = 'arcface_w600k_r50.onnx'
 MODEL_FACE_RECOGNIZER_PATH = 'arcface_w600k_r50.onnx.prototxt'
 WEIGHT_FACE_SWAPPER_PATH = 'inswapper_128.onnx'
 MODEL_FACE_SWAPPER_PATH = 'inswapper_128.onnx.prototxt'
+WEIGHT_FACE_ENHANCER_PATH = 'gfpgan_1.4.onnx'
+MODEL_FACE_ENHANCER_PATH = 'gfpgan_1.4.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/facefusion/'
 
 TARGET_IMAGE_PATH = 'target.jpg'
@@ -57,22 +60,26 @@ parser.add_argument(
     help=('The source image(s) to swap the face from.')
 )
 parser.add_argument(
+    '--skip_enhance', action='store_true',
+    help='Whether to skip face enhancement using GFPGAN.'
+)
+parser.add_argument(
     '-th', '--threshold', type=float, default=FACE_DETECTOR_SCORE,
-    help='Face detector score threshold'
+    help='Face detector score threshold.'
 )
 parser.add_argument(
     '-dist', '--face_distance', type=float, default=REFERENCE_FACE_DISTANCE,
-    help='Face distance similarity score threshold'
+    help='Face distance similarity score threshold.'
 )
 parser.add_argument(
     '--onnx',
     action='store_true',
-    help='execute onnxruntime version.'
+    help='Execute onnxruntime version.'
 )
 args = update_parser(parser)
 
 # ======================
-# Secondaty Functions
+# Secondary functions
 # ======================
 
 def get_model_matrix(model_path):
@@ -87,14 +94,26 @@ def conditional_append_reference_faces(source_img_paths, target_img_path, nets):
     reference_face = get_one_face(reference_frame, nets, FACE_DETECTOR_SCORE)
     append_reference_face('origin', reference_face)
     if source_face and reference_face:
-        abstract_reference_frame = get_reference_frame(source_face, reference_face, reference_frame, nets)
+        abstract_reference_frame = fs_get_reference_frame(source_face, reference_face, reference_frame, nets)
         if np.any(abstract_reference_frame):
             reference_frame = abstract_reference_frame
             reference_face = get_one_face(reference_frame, nets, FACE_DETECTOR_SCORE)
             append_reference_face('face_swapper', reference_face)
 
+        if 'face_enhancer' in nets:
+            abstract_reference_frame = fe_get_reference_frame(source_face, reference_face, reference_frame, nets)
+            if np.any(abstract_reference_frame):
+                reference_frame = abstract_reference_frame
+                reference_face = get_one_face(reference_frame, nets, FACE_DETECTOR_SCORE)
+                append_reference_face('face_enhancer', reference_face)
+
+
 def process_image(source_img_paths, target_img_path, nets):
-    res_image = _process_image(source_img_paths, target_img_path, REFERENCE_FACE_DISTANCE, nets, FACE_DETECTOR_SCORE)
+    res_image = fs_process_image(source_img_paths, target_img_path, REFERENCE_FACE_DISTANCE, nets, FACE_DETECTOR_SCORE)
+
+    if 'face_enhancer' in nets:
+        res_image = fe_process_image(source_img_paths, res_image, REFERENCE_FACE_DISTANCE, nets, FACE_DETECTOR_SCORE)
+
     post_process()
     return res_image
 
@@ -185,6 +204,9 @@ def main():
         'face_recognizer': (WEIGHT_FACE_RECOGNIZER_PATH, MODEL_FACE_RECOGNIZER_PATH),
         'face_swapper': (WEIGHT_FACE_SWAPPER_PATH, MODEL_FACE_SWAPPER_PATH)
     }
+
+    if not args.skip_enhance:
+        dic_model['face_enhancer'] = (WEIGHT_FACE_ENHANCER_PATH, MODEL_FACE_ENHANCER_PATH)
 
     # model files check and download
     for weight_path, model_path in dic_model.values():

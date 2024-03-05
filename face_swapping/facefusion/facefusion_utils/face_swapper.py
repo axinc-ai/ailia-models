@@ -1,12 +1,10 @@
 import numpy as np
 
 from .face_analyser import get_one_face, get_average_face, find_similar_faces
-from .utils import read_static_images, read_static_image, write_image, warp_face_by_face_landmark_5, paste_back
+from .utils import read_static_images, read_static_image, warp_face_by_face_landmark_5, paste_back, \
+                    FACE_MASK_BLUR, FACE_MASK_PADDING
 from .face_masker import create_static_box_mask
 from .face_store import get_reference_faces, clear_reference_faces, clear_static_faces
-
-FACE_MASK_BLUR = 0.3
-FACE_MASK_PADDING = (0, 0, 0, 0)
 
 INSWAPPER_128_MODEL_MEAN = [0.0, 0.0, 0.0]
 INSWAPPER_128_MODEL_STD = [1.0, 1.0, 1.0]
