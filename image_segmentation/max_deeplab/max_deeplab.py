@@ -2,7 +2,6 @@ import sys
 import time
 import numpy as np
 import cv2
-import onnxruntime
 from scipy.special import softmax
 import scipy.stats
 from PIL import Image as pimg
@@ -14,7 +13,7 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
+from arg_utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 import webcamera_utils  # noqa: E402 noqa: E402
 
@@ -52,6 +51,7 @@ args = update_parser(parser)
 # ======================
 def recognize_from_image():
     if args.onnx == True:
+        import onnxruntime
         net = onnxruntime.InferenceSession(WEIGHT_PATH)
         input_name = net.get_inputs()[0].name
         output_name1 = net.get_outputs()[0].name
@@ -108,6 +108,7 @@ def recognize_from_image():
 
 def recognize_from_video():
     if args.onnx == True:
+        import onnxruntime
         net = onnxruntime.InferenceSession(WEIGHT_PATH)
         input_name = net.get_inputs()[0].name
         output_name1 = net.get_outputs()[0].name
