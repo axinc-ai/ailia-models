@@ -1,8 +1,9 @@
 import sys
 import time
+from dataclasses import dataclass
+from typing import List, Optional, Union
 from logging import getLogger
 
-import yaml
 import numpy as np
 import librosa
 
@@ -47,44 +48,127 @@ parser.add_argument(
 )
 args = update_parser(parser)
 
-
 # ======================
 # Secondaty Functions
 # ======================
+
+pred_rnn_layers = 2
+
+
+@dataclass
+class Hypothesis:
+    """Hypothesis class for beam search algorithms.
+    """
+
+    score: float
+    y_sequence: Union[List[int], np.ndarray]
+    dec_state: Optional[List[np.ndarray]] = None
+    timestep: Union[List[int], np.ndarray] = list
+    length: Union[int, np.ndarray] = 0
+
+
+def initialize_state(batch):
+    """
+    Initialize the state of the RNN layers.
+
+    Returns:
+        List of numpy.ndarray, each of shape [L, B, H], where
+            L = Number of RNN layers
+            B = Batch size
+            H = Hidden size of RNN.
+    """
+    pred_hidden = 640
+
+    state = [
+        np.zeros((pred_rnn_layers, batch, pred_hidden)),
+        np.zeros((pred_rnn_layers, batch, pred_hidden))
+    ]
+    return state
+
+
+def batch_select_state(batch_states, idx):
+    """Get decoder state from batch of states, for given id.
+
+    Args:
+        batch_states (list): batch of decoder states
+            ([L x (B, H)], [L x (B, H)])
+
+        idx (int): index to extract state from batch of states
+
+    Returns:
+        (tuple): decoder states for given id
+            ([L x (1, H)], [L x (1, H)])
+    """
+
+    if batch_states is not None:
+        state_list = []
+        for state_id in range(len(batch_states)):
+            states = [batch_states[state_id][layer][idx] for layer in range(pred_rnn_layers)]
+            state_list.append(states)
+        return state_list
+    else:
+        return None
+
+
+def align_length_sync_decoding(
+        h, encoded_lengths):
+    vocab_size = 3000
+    blank = 3000
+    index_incr = 0
+    beam_size = 4
+    alsd_max_target_length = 1.0
+
+    ids = list(range(vocab_size + 1))
+    ids.remove(blank)
+
+    # prepare the batched beam states
+    beam = min(beam_size, vocab_size)
+
+    h = h[0]  # [T, D]
+    h_length = int(encoded_lengths)
+    beam_state = initialize_state(
+        beam
+    )  # [L, B, H], [L, B, H] for LSTMS
+
+    u_max = int(alsd_max_target_length * h_length)
+
+    # Initialize first hypothesis for the beam (blank)
+    B = [
+        Hypothesis(
+            y_sequence=[blank],
+            score=0.0,
+            dec_state=batch_select_state(beam_state, 0),
+            timestep=[-1],
+            length=0,
+        )
+    ]
+
+    return 0
 
 
 # ======================
 # Main functions
 # ======================
 
-def decode(models, enc):
-    nbest = args.nbest
-    maxlenratio = args.maxlenratio
-    minlenratio = args.minlenratio
 
-    beam_search = mod['beam_search']
-    token_list = mod['token_list']
-    tokenizer = mod['tokenizer']
+def decode(models, encoder_output, encoded_lengths):
+    print(encoder_output, encoder_output.shape)
+    print(encoded_lengths)
+    encoder_output = encoder_output.transpose(0, 2, 1)  # (B, T, D)
 
-    nbest_hyps = beam_search.forward(
-        x=enc, maxlenratio=maxlenratio, minlenratio=minlenratio
-    )
+    for batch_idx in range(len(encoder_output)):
+        inseq = encoder_output[batch_idx: batch_idx + 1, : encoded_lengths[batch_idx], :]  # [1, T, D]
+        logitlen = encoded_lengths[batch_idx]
 
-    nbest_hyps = nbest_hyps[: nbest]
+        # Execute the specific search strategy
+        nbest_hyps = align_length_sync_decoding(
+            inseq, logitlen
+        )  # sorted list of hypothesis
+
+        # # Prepare the list of hypotheses
+        # nbest_hyps = pack_hypotheses(nbest_hyps)
 
     results = []
-    for hyp in nbest_hyps:
-        # remove sos/eos and get results
-        token_int = hyp.yseq[1:-1].tolist()
-
-        # remove blank symbol id, which is assumed to be 0
-        token_int = list(filter(lambda x: x != 0, token_int))
-
-        # Change integer-ids to tokens
-        token = [token_list[i] for i in token_int]
-
-        text = tokenizer.tokens2text(token)
-        results.append((text, token, token_int, hyp))
 
     return results
 
@@ -102,7 +186,7 @@ def predict(models, audio):
         output = net.run(None, {'input_signal': audio, 'input_signal_length': input_signal_length})
     encoded, encoded_length = output
 
-    results = decode(models, enc[0])
+    results = decode(models, encoded, encoded_length)
 
     return results
 
