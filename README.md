@@ -408,7 +408,7 @@ The collection of pre-trained, state-of-the-art AI models.
 | [<img src="object_detection/footandball/output.png" width=128px>](object_detection/footandball/) | [footandball](/object_detection/footandball/) | [FootAndBall: Integrated player and ball detector](https://github.com/jac99/FootAndBall) | Pytorch | 1.2.0 and later | |
 | [<img src="object_detection/qrcode_wechatqrcode/output.jpg" width=128px>](object_detection/qrcode_wechatqrcode/) | [qrcode_wechatqrcode](/object_detection/qrcode_wechatqrcode/) | [qrcode_wechatqrcode](https://github.com/opencv/opencv_zoo/tree/4fb591053ba1201c07c68929cc324787d5afaa6c/models/qrcode_wechatqrcode) | Caffe | 1.2.15 and later | |
 | [<img src="object_detection/layout_parsing/output.jpg" width=128px>](object_detection/layout_parsing/) |[layout_parsing](object_detection/layout_parsing/)  | [unstructured-inference](https://github.com/Unstructured-IO/unstructured-inference/tree/main) | Pytorch | 1.2.9 and later | |
-| [<img src="object_detection/damo_yolo/output.jpg" width=128px>](object_detection/damo_yolo/) | [damo_yolo](/object_detection/damo_yolo/) | [DAMO-YOLO](https://github.com/tinyvision/DAMO-YOLO) | Pytorch | 1.7 and later | |
+| [<img src="object_detection/damo_yolo/output.jpg" width=128px>](object_detection/damo_yolo/) | [damo_yolo](/object_detection/damo_yolo/) | [DAMO-YOLO](https://github.com/tinyvision/DAMO-YOLO) | Pytorch | 1.2.9 and later | |
 
 ## Object detection 3d
 
