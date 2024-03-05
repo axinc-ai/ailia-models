@@ -94,7 +94,15 @@ def recognize_from_image():
 
 def recognize_from_video():
     env_id = args.env_id
-    net_yolo = ailia.Net(MODEL_PATH_YOLO, WEIGHT_PATH_YOLO, env_id=env_id)
+    net_yolo = ailia.Detector(
+        MODEL_PATH_YOLO,
+        WEIGHT_PATH_YOLO,
+        80,
+        format=ailia.NETWORK_IMAGE_FORMAT_BGR,
+        channel=ailia.NETWORK_IMAGE_CHANNEL_FIRST,
+        range=ailia.NETWORK_IMAGE_RANGE_U_INT8,
+        algorithm=ailia.DETECTOR_ALGORITHM_YOLOX,
+        env_id=env_id) 
     net_pose2d = ailia.Net(MODEL_PATH_POSE2D, WEIGHT_PATH_POSE2D, env_id=env_id)
     net_pose3d = ailia.Net(MODEL_PATH_POSE3D, WEIGHT_PATH_POSE3D, env_id=env_id)
 
