@@ -1,6 +1,7 @@
 import numpy as np
 import librosa
 import ailia.audio
+from skimage.transform import resize
 
 
 def int16_to_float32(x):
@@ -132,11 +133,11 @@ def get_audio_features(sample, audio_data, max_len, data_truncating, data_fillin
                 mel_chunk_back = mel[idx_back:idx_back+chunk_frames, :]
 
                 # shrink the mel
-                # Output may differ between torchvision.transforms.Resize and numpy.resize.
+                # Output may differ between torchvision.transforms.Resize and skimage.transform.resize.
                 #mel_shrink_torch = torch.from_numpy(mel[None])
                 #mel_shrink_torch = torchvision.transforms.Resize(size=[chunk_frames, 64])(mel_shrink_torch)[0]
                 #mel_shrink_torch = mel_shrink_torch.to('cpu').detach().numpy().copy()
-                mel_shrink_numpy = np.resize(mel[None], (chunk_frames, 64))
+                mel_shrink_numpy = resize(mel, (chunk_frames, 64), preserve_range=True, anti_aliasing=True, mode='edge')
                 # logging.info(f"mel_shrink.shape: {mel_shrink.shape}")
 
                 # stack
