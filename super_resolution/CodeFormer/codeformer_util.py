@@ -10,6 +10,57 @@ import ailia
 import sys
 sys.path.append('../ailia-models/util')
 from nms_utils import *
+sys.path.append('../../face_detection/retinaface')
+import retinaface_utils as rut
+from retinaface_utils import PriorBox
+
+CONFIDENCE_THRES = 0.8
+NMS_THRES = 0.4
+TOP_K = 5000
+KEEP_TOP_K = 750
+
+
+def postprocessing(preds_ailia, input_data, cfg, dim):
+    IMAGE_WIDTH, IMAGE_HEIGHT = dim
+    scale = np.array([IMAGE_WIDTH, IMAGE_HEIGHT, IMAGE_WIDTH, IMAGE_HEIGHT])
+    loc, conf, landms = preds_ailia
+    priorbox = PriorBox(cfg, image_size=(IMAGE_HEIGHT, IMAGE_WIDTH))
+    priors = priorbox.forward()
+    boxes = rut.decode(np.squeeze(loc, axis=0), priors, cfg['variance'])
+    boxes = boxes * scale
+    scores = np.squeeze(conf, axis=0)[:, 1]
+    landms = rut.decode_landm(np.squeeze(landms, axis=0), priors, cfg['variance'])
+    scale1 = np.array([input_data.shape[3], input_data.shape[2], input_data.shape[3], input_data.shape[2],
+                            input_data.shape[3], input_data.shape[2], input_data.shape[3], input_data.shape[2],
+                            input_data.shape[3], input_data.shape[2]])
+    landms = landms * scale1
+
+    # ignore low scores
+    inds = np.where(scores > CONFIDENCE_THRES)[0]
+    boxes = boxes[inds]
+    landms = landms[inds]
+    scores = scores[inds]
+
+    # keep top-K before NMS
+    order = scores.argsort()[::-1][:TOP_K]
+    boxes = boxes[order]
+    landms = landms[order]
+    scores = scores[order]
+
+    # do NMS
+    dets = np.hstack((boxes, scores[:, np.newaxis])).astype(np.float32, copy=False)
+    keep = rut.py_cpu_nms(dets, NMS_THRES)
+    dets = dets[keep, :]
+    landms = landms[keep]
+
+    # keep top-K faster NMS
+    dets = dets[:KEEP_TOP_K, :]
+    landms = landms[:KEEP_TOP_K, :]
+
+    detections = np.concatenate((dets, landms), axis=1)
+    
+    return detections
+
 
 def img2tensor(imgs, bgr2rgb=True, float32=True):
 
@@ -107,7 +158,8 @@ class FaceRestoreHelper(object):
                  save_ext='png',
                  template_3points=False,
                  pad_blur=False,
-                 use_parse=False):
+                 use_parse=False,
+                 args=None):
         self.template_3points = template_3points  # improve robustness
         self.upscale_factor = int(upscale_factor)
         # the cropped face ratio based on the square face
@@ -145,14 +197,20 @@ class FaceRestoreHelper(object):
         self.restored_faces = []
         self.pad_input_imgs = []
 
-        # init face detection model
-        self.face_detector = init_detection_model(det_model, half=False, device='cpu')
 
         # init face parsing model
         self.use_parse = use_parse
 
+        # retinaface net initialize
+        if det_model == "retinaface_mobile0.25":
+            self.cfg = rut.cfg_mnet
+        elif det_model == "retinaface_resnet50":
+            self.cfg = rut.cfg_re50
 
-        self.net = ailia.Net(None,"face_parse.onnx")
+
+        mem_mode = ailia.get_memory_mode(reduce_constant=True, reuse_interstage=True)
+        self.net = ailia.Net(None,"face_parse.onnx",env_id=args.env_id, memory_mode=mem_mode)
+        self.retinaface = ailia.Net(None, det_model+".onnx",env_id=args.env_id, memory_mode=mem_mode)
 
     def set_upscale_factor(self, upscale_factor):
         self.upscale_factor = upscale_factor
@@ -196,8 +254,17 @@ class FaceRestoreHelper(object):
             interp = cv2.INTER_AREA if scale < 1 else cv2.INTER_LINEAR
             input_img = cv2.resize(self.input_img, (w, h), interpolation=interp)
 
-        bboxes = self.face_detector.detect_faces(input_img)
 
+        input_data = input_img
+
+        dim = (640,640)
+        img = input_data - (104, 117, 123)
+        input_data = img.transpose(2, 0, 1)
+        input_data.shape = (1,) + input_data.shape
+
+        preds_ailia = self.retinaface.predict([input_data])  
+        detections = postprocessing(preds_ailia, input_data, self.cfg, dim)
+        bboxes =  detections
 
         if bboxes is None or bboxes.shape[0] == 0:
             return 0
@@ -462,342 +529,3 @@ class FaceRestoreHelper(object):
                 upsample_img = inv_mask_border * img_color + (1 - inv_mask_border) * upsample_img
 
         return upsample_img
-
-
-def init_detection_model(model_name, half=False, device='cuda'):
-    if 'retinaface' in model_name:
-        model = init_retinaface_model(model_name, half, device)
-    else:
-        raise NotImplementedError(f'{model_name} is not implemented.')
-
-    return model
-
-
-def init_retinaface_model(model_name, half=False, device='cuda'):
-    if model_name == 'retinaface_resnet50':
-        model = RetinaFace(network_name='resnet50', half=half)
-    elif model_name == 'retinaface_mobile0.25':
-        model = RetinaFace(network_name='mobile0.25', half=half)
-    else:
-        raise NotImplementedError(f'{model_name} is not implemented.')
-
-    return model
-
-
-def generate_config(network_name):
-    
-    cfg_mnet = {
-        'name': 'mobilenet0.25',
-        'min_sizes': [[16, 32], [64, 128], [256, 512]],
-        'steps': [8, 16, 32],
-        'variance': [0.1, 0.2],
-        'clip': False,
-        'loc_weight': 2.0,
-        'gpu_train': True,
-        'batch_size': 32,
-        'ngpu': 1,
-        'epoch': 250,
-        'decay1': 190,
-        'decay2': 220,
-        'image_size': 640,
-        'return_layers': {
-            'stage1': 1,
-            'stage2': 2,
-            'stage3': 3
-        },
-        'in_channel': 32,
-        'out_channel': 64
-    }
-
-    cfg_re50 = {
-        'name': 'Resnet50',
-        'min_sizes': [[16, 32], [64, 128], [256, 512]],
-        'steps': [8, 16, 32],
-        'variance': [0.1, 0.2],
-        'clip': False,
-        'loc_weight': 2.0,
-        'gpu_train': True,
-        'batch_size': 24,
-        'ngpu': 4,
-        'epoch': 100,
-        'decay1': 70,
-        'decay2': 90,
-        'image_size': 840,
-        'return_layers': {
-            'layer2': 1,
-            'layer3': 2,
-            'layer4': 3
-        },
-        'in_channel': 256,
-        'out_channel': 256
-    }
-
-    if network_name == 'mobile0.25':
-        return cfg_mnet
-    elif network_name == 'resnet50':
-        return cfg_re50
-    else:
-        raise NotImplementedError(f'network_name={network_name}')
-
-
-class RetinaFace():
-
-    def __init__(self, network_name='resnet50', half=False, phase='test'):
-        self.network_name = network_name
-        super(RetinaFace, self).__init__()
-        self.half_inference = half
-        cfg = generate_config(network_name)
-
-        self.model_name = f'retinaface_{network_name}'
-        self.cfg = cfg
-        self.phase = phase
-        self.target_size, self.max_size = 1600, 2150
-        self.resize, self.scale, self.scale1 = 1., None, None
-
-        self.mean_tensor = np.array([[[[104.]], [[117.]], [[123.]]]])
-        self.net = ailia.Net(None,self.model_name+".onnx")
-
-    def __detect_faces(self, inputs):
-        # get scale
-        height, width = inputs.shape[2:]
-        self.scale = np.array([width, height, width, height])
-        tmp = [width, height, width, height, width, height, width, height, width, height]
-        self.scale1 = np.array(tmp)
-
-        print(self.model_name)
-        print(inputs[0].shape)
-        inputs = inputs[0].transpose((1,2,0))
-        inputs = cv2.resize(inputs, (641, 640), interpolation=cv2.INTER_LINEAR)
-        inputs = inputs.transpose((2,1,0))
-        inputs = np.expand_dims(inputs,0)
-        print(inputs.shape)
-        out = self.net.run(inputs)
-
-        loc       = out[0]
-        conf      = out[1]
-        landmarks = out[2] 
-
-        # get priorbox
-        priorbox = PriorBox(self.cfg, image_size=inputs.shape[2:])
-        priors = priorbox.forward()#.to(device)
-
-        return loc, conf, landmarks, priors
-
-    # single image detection
-    def transform(self, image, use_origin_size):
-        # convert to opencv format
-        image = image.astype(np.float32)
-
-        # testing scale
-        im_size_min = np.min(image.shape[0:2])
-        im_size_max = np.max(image.shape[0:2])
-        resize = float(self.target_size) / float(im_size_min)
-
-        # prevent bigger axis from being more than max_size
-        if np.round(resize * im_size_max) > self.max_size:
-            resize = float(self.max_size) / float(im_size_max)
-        resize = 1 if use_origin_size else resize
-
-        # resize
-        if resize != 1:
-            image = cv2.resize(image, None, None, fx=resize, fy=resize, interpolation=cv2.INTER_LINEAR)
-
-        # convert to torch.tensor format
-        # image -= (104, 117, 123)
-        image = image.transpose(2, 0, 1)
-        #image = torch.from_numpy(image).unsqueeze(0)
-        image = np.expand_dims(image,0)
-
-        return image, resize
-
-    def detect_faces(
-        self,
-        image,
-        conf_threshold=0.8,
-        nms_threshold=0.4,
-        use_origin_size=True,
-    ):
-        """
-        Params:
-            imgs: BGR image
-        """
-        image, self.resize = self.transform(image, use_origin_size)
-
-        image = image - self.mean_tensor
-
-        loc, conf, landmarks, priors = self.__detect_faces(image)
-
-        boxes = decode(loc.squeeze(0), priors, self.cfg['variance'])
-        boxes = boxes * self.scale / self.resize
-
-        scores = conf.squeeze(0)[:, 1]
-
-        landmarks = decode_landm(landmarks.squeeze(0), priors, self.cfg['variance'])
-        landmarks = landmarks * self.scale1 / self.resize
-
-        # ignore low scores
-        inds = np.where(scores > conf_threshold)[0]
-        boxes, landmarks, scores = boxes[inds], landmarks[inds], scores[inds]
-
-        # sort
-        order = scores.argsort()[::-1]
-        boxes, landmarks, scores = boxes[order], landmarks[order], scores[order]
-
-        # do NMS
-        bounding_boxes = np.hstack((boxes, scores[:, np.newaxis])).astype(np.float32, copy=False)
-        keep = py_cpu_nms(bounding_boxes, nms_threshold)
-        bounding_boxes, landmarks = bounding_boxes[keep, :], landmarks[keep]
-
-        return np.concatenate((bounding_boxes, landmarks), axis=1)
-
-class PriorBox(object):
-    def __init__(self, cfg, image_size=None, phase='train'):
-        super(PriorBox, self).__init__()
-        self.min_sizes = cfg['min_sizes']
-        self.steps = cfg['steps']
-        self.clip = cfg['clip']
-        self.image_size = image_size
-        self.feature_maps = [[ceil(self.image_size[0] / step), ceil(self.image_size[1] / step)] for step in self.steps]
-        self.name = 's'
-
-    def forward(self):
-        anchors = []
-        for k, f in enumerate(self.feature_maps):
-            min_sizes = self.min_sizes[k]
-            for i, j in product(range(f[0]), range(f[1])):
-                for min_size in min_sizes:
-                    s_kx = min_size / self.image_size[1]
-                    s_ky = min_size / self.image_size[0]
-                    dense_cx = [x * self.steps[k] / self.image_size[1] for x in [j + 0.5]]
-                    dense_cy = [y * self.steps[k] / self.image_size[0] for y in [i + 0.5]]
-                    for cy, cx in product(dense_cy, dense_cx):
-                        anchors += [cx, cy, s_kx, s_ky]
-
-        # back to torch land
-        output = np.array(anchors).reshape(-1, 4)
-        if self.clip:
-            output = np.clip(output,0,1)
-        return output
-
-
-def py_cpu_nms(dets, thresh):
-    keep = nms_boxes(dets[:,:4],dets[:,4], thresh)
-    return keep
-
-def point_form(boxes):
-    """ Convert prior_boxes to (xmin, ymin, xmax, ymax)
-    representation for comparison to point form ground truth data.
-    Args:
-        boxes: (tensor) center-size default boxes from priorbox layers.
-    Return:
-        boxes: (tensor) Converted xmin, ymin, xmax, ymax form of boxes.
-    """
-    return torch.cat(
-        (
-            boxes[:, :2] - boxes[:, 2:] / 2,  # xmin, ymin
-            boxes[:, :2] + boxes[:, 2:] / 2),
-        1)  # xmax, ymax
-
-
-def jaccard(box_a, box_b):
-    """Compute the jaccard overlap of two sets of boxes.  The jaccard overlap
-    is simply the intersection over union of two boxes.  Here we operate on
-    ground truth boxes and default boxes.
-    E.g.:
-        A ∩ B / A ∪ B = A ∩ B / (area(A) + area(B) - A ∩ B)
-    Args:
-        box_a: (tensor) Ground truth bounding boxes, Shape: [num_objects,4]
-        box_b: (tensor) Prior boxes from priorbox layers, Shape: [num_priors,4]
-    Return:
-        jaccard overlap: (tensor) Shape: [box_a.size(0), box_b.size(0)]
-    """
-    inter = intersect(box_a, box_b)
-    area_a = ((box_a[:, 2] - box_a[:, 0]) * (box_a[:, 3] - box_a[:, 1])).unsqueeze(1).expand_as(inter)  # [A,B]
-    area_b = ((box_b[:, 2] - box_b[:, 0]) * (box_b[:, 3] - box_b[:, 1])).unsqueeze(0).expand_as(inter)  # [A,B]
-    union = area_a + area_b - inter
-    return inter / union  # [A,B]
-
-
-def matrix_iou(a, b):
-    """
-    return iou of a and b, numpy version for data augenmentation
-    """
-    lt = np.maximum(a[:, np.newaxis, :2], b[:, :2])
-    rb = np.minimum(a[:, np.newaxis, 2:], b[:, 2:])
-
-    area_i = np.prod(rb - lt, axis=2) * (lt < rb).all(axis=2)
-    area_a = np.prod(a[:, 2:] - a[:, :2], axis=1)
-    area_b = np.prod(b[:, 2:] - b[:, :2], axis=1)
-    return area_i / (area_a[:, np.newaxis] + area_b - area_i)
-
-
-def matrix_iof(a, b):
-    """
-    return iof of a and b, numpy version for data augenmentation
-    """
-    lt = np.maximum(a[:, np.newaxis, :2], b[:, :2])
-    rb = np.minimum(a[:, np.newaxis, 2:], b[:, 2:])
-
-    area_i = np.prod(rb - lt, axis=2) * (lt < rb).all(axis=2)
-    area_a = np.prod(a[:, 2:] - a[:, :2], axis=1)
-    return area_i / np.maximum(area_a[:, np.newaxis], 1)
-
-
-def match(threshold, truths, priors, variances, labels, landms, loc_t, conf_t, landm_t, idx):
-    # jaccard index
-    overlaps = jaccard(truths, point_form(priors))
-    # (Bipartite Matching)
-    # [1,num_objects] best prior for each ground truth
-    best_prior_overlap, best_prior_idx = overlaps.max(1, keepdim=True)
-
-    # ignore hard gt
-    valid_gt_idx = best_prior_overlap[:, 0] >= 0.2
-    best_prior_idx_filter = best_prior_idx[valid_gt_idx, :]
-    if best_prior_idx_filter.shape[0] <= 0:
-        loc_t[idx] = 0
-        conf_t[idx] = 0
-        return
-
-    # [1,num_priors] best ground truth for each prior
-    best_truth_overlap, best_truth_idx = overlaps.max(0, keepdim=True)
-    best_truth_idx.squeeze_(0)
-    best_truth_overlap.squeeze_(0)
-    best_prior_idx.squeeze_(1)
-    best_prior_idx_filter.squeeze_(1)
-    best_prior_overlap.squeeze_(1)
-    best_truth_overlap.index_fill_(0, best_prior_idx_filter, 2)  # ensure best prior
-    # TODO refactor: index  best_prior_idx with long tensor
-    # ensure every gt matches with its prior of max overlap
-    for j in range(best_prior_idx.size(0)):  # 判别此anchor是预测哪一个boxes
-        best_truth_idx[best_prior_idx[j]] = j
-    matches = truths[best_truth_idx]  # Shape: [num_priors,4] 此处为每一个anchor对应的bbox取出来
-    conf = labels[best_truth_idx]  # Shape: [num_priors]      此处为每一个anchor对应的label取出来
-    conf[best_truth_overlap < threshold] = 0  # label as background   overlap<0.35的全部作为负样本
-    loc = encode(matches, priors, variances)
-
-    matches_landm = landms[best_truth_idx]
-    landm = encode_landm(matches_landm, priors, variances)
-    loc_t[idx] = loc  # [num_priors,4] encoded offsets to learn
-    conf_t[idx] = conf  # [num_priors] top class label for each prior
-    landm_t[idx] = landm
-
-# Adapted from https://github.com/Hakuyume/chainer-ssd
-def decode(loc, priors, variances):
-
-    boxes = np.concatenate((priors[:, :2] + loc[:, :2] * variances[0] * priors[:, 2:],
-                       priors[:, 2:] * np.exp(loc[:, 2:] * variances[1])), 1)
-    boxes[:, :2] -= boxes[:, 2:] / 2
-    boxes[:, 2:] += boxes[:, :2]
-    return boxes
-
-def decode_landm(pre, priors, variances):
-    tmp = (
-        priors[:, :2] + pre[:, :2]   * variances[0] * priors[:, 2:],
-        priors[:, :2] + pre[:, 2:4]  * variances[0] * priors[:, 2:],
-        priors[:, :2] + pre[:, 4:6]  * variances[0] * priors[:, 2:],
-        priors[:, :2] + pre[:, 6:8]  * variances[0] * priors[:, 2:],
-        priors[:, :2] + pre[:, 8:10] * variances[0] * priors[:, 2:],
-    )
-    landms = np.concatenate(tmp, axis=1)
-    return landms
-

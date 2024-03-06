@@ -37,7 +37,7 @@ parser.add_argument('-w', '--fidelity_weight', type=float, default=0.5,
 
 #parser.add_argument('--detection_model', type=str, default='retinaface_resnet50', 
 parser.add_argument('--arch', type=str, default='retinaface_resnet50', 
-        help='Face detector. Optional: retinaface_resnet50, retinaface_mobile0.25. \
+        help='Face detector. Optional: retinaface_resnet50, retinaface_mobile0.25 \
             Default: retinaface_resnet50')
 
 parser.add_argument('--has_aligned', action='store_true', help='Input are cropped and aligned faces. Default: False')
@@ -63,7 +63,8 @@ MODEL_PATH_RETINALFACE_RESNET = 'retinaface_resnet50.onnx.prototxt'
 WEIGHT_PATH_RETINALFACE_MOBILE = 'retinaface_mobile0.25.onnx'
 MODEL_PATH_RETINALFACE_MOBILE = 'retinaface_mobile0.25.onnx.prototxt'
 
-REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/codeformer/'
+CODEFORMER_REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/codeformer/'
+RETINAFACE_REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/retinaface/'
 
 
 # ======================
@@ -81,9 +82,7 @@ def compute(net,face_helper,img):
             print('Grayscale input: True')
         face_helper.cropped_faces = [img]
     else:
-        print("ss",img.shape)
         img = cv2.resize(img, (512, 512), interpolation=cv2.INTER_LINEAR)
-        print("aaa",img.shape)
         face_helper.read_image(img)
         # get face landmarks for each face
         num_det_faces = face_helper.get_face_landmarks_5(
@@ -135,7 +134,8 @@ def recognize_from_image(net):
         crop_ratio=(1, 1),
         det_model = args.arch,
         save_ext='png',
-        use_parse=True)
+        use_parse=True,
+        args=args)
  
     for image_path in args.input:
         # prepare input data
@@ -178,7 +178,8 @@ def recognize_from_video(net):
         crop_ratio=(1, 1),
         det_model = args.arch,
         save_ext='png',
-        use_parse=True)
+        use_parse=True,
+        args=args)
  
     # create video writer if savepath is specified as video format
     if args.savepath != SAVE_IMAGE_PATH:
@@ -200,7 +201,6 @@ def recognize_from_video(net):
 
         # resize with keep aspect
         frame,resized_img = webcamera_utils.adjust_frame_size(frame, IMAGE_HEIGHT, IMAGE_WIDTH)
-        print("frame",frame.shape,resized_img.shape)
 
         out_img = compute(net,face_helper,frame)
         cv2.imshow('output', out_img)
@@ -219,13 +219,14 @@ def recognize_from_video(net):
 
 def main():
     # model files check and download
-    check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
-    check_and_download_models(WEIGHT_PATH_FASE_PARSE, MODEL_PATH_FACE_PARSE, REMOTE_PATH)
-    check_and_download_models(WEIGHT_PATH_RETINALFACE_RESNET, MODEL_PATH_RETINALFACE_RESNET, REMOTE_PATH)
-    check_and_download_models(WEIGHT_PATH_RETINALFACE_MOBILE, MODEL_PATH_RETINALFACE_MOBILE, REMOTE_PATH)
+    check_and_download_models(WEIGHT_PATH, MODEL_PATH, CODEFORMER_REMOTE_PATH)
+    check_and_download_models(WEIGHT_PATH_FASE_PARSE, MODEL_PATH_FACE_PARSE, CODEFORMER_REMOTE_PATH)
+    check_and_download_models(WEIGHT_PATH_RETINALFACE_RESNET, MODEL_PATH_RETINALFACE_RESNET, RETINAFACE_REMOTE_PATH)
+    check_and_download_models(WEIGHT_PATH_RETINALFACE_MOBILE, MODEL_PATH_RETINALFACE_MOBILE, RETINAFACE_REMOTE_PATH)
 
     # net initialize
-    net = ailia.Net(None,WEIGHT_PATH)
+    mem_mode = ailia.get_memory_mode(reduce_constant=True, reuse_interstage=True)
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id, memory_mode=mem_mode)
     if args.video is not None:
         # video mode
         recognize_from_video(net)
