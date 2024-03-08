@@ -261,9 +261,12 @@ class OnnxStableDiffusionPipeline(DiffusionPipeline):
         if accepts_eta:
             extra_step_kwargs["eta"] = eta
 
-        timestep_dtype = next(
-            (input.type for input in self.unet.model.get_inputs() if input.name == "timestep"), "tensor(float)"
-        )
+        if self.unet.onnx:
+            timestep_dtype = next(
+                (input.type for input in self.unet.model.get_inputs() if input.name == "timestep"), "tensor(float)"
+            )
+        else:
+            timestep_dtype = "tensor(float)"
         timestep_dtype = ORT_TO_NP_TYPE[timestep_dtype]
 
         for i, t in enumerate(self.progress_bar(self.scheduler.timesteps)):

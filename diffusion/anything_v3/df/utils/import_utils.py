@@ -120,7 +120,7 @@ except importlib_metadata.PackageNotFoundError:
 _inflect_available = importlib.util.find_spec("inflect") is not None
 try:
     _inflect_version = importlib_metadata.version("inflect")
-    logger.debug(f"Successfully imported inflect version {_inflect_version}")
+    #logger.debug(f"Successfully imported inflect version {_inflect_version}")
 except importlib_metadata.PackageNotFoundError:
     _inflect_available = False
 

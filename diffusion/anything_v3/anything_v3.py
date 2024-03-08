@@ -6,12 +6,16 @@ import numpy as np
 import cv2
 
 import ailia
+import transformers
 
 import random
 
+import df
+from df import OnnxRuntimeModel
+
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath  # noqa
+from arg_utils import get_base_parser, update_parser, get_savepath  # noqa
 from model_utils import check_and_download_models, urlretrieve, progress_print  # noqa
 # logger
 from logging import getLogger  # noqa
@@ -95,43 +99,36 @@ def main():
     env_id = args.env_id
 
     # initialize
-    if not args.onnx:
-        logger.info("Ailia mode is not implemented.")
-        exit()
-    else:
-        import transformers
-        import df
-        from df import OnnxRuntimeModel
+    unet = OnnxRuntimeModel.from_pretrained(
+        "./", "unet.onnx", args.onnx, env_id,
+        {'provider': 'CPUExecutionProvider', 'sess_options': None}
+    )
+    safety_checker = OnnxRuntimeModel.from_pretrained(
+        "./", "safety_checker.onnx", args.onnx, env_id,
+        {'provider': 'CPUExecutionProvider', 'sess_options': None}
+    )
+    vae_decoder = OnnxRuntimeModel.from_pretrained(
+        "./", "vae_decoder.onnx", args.onnx, env_id,
+        {'provider': 'CPUExecutionProvider', 'sess_options': None}
+    )
+    text_encoder = OnnxRuntimeModel.from_pretrained(
+        "./", "text_encoder.onnx", args.onnx, env_id,
+        {'provider': 'CPUExecutionProvider', 'sess_options': None}
+    )
+    vae_encoder = OnnxRuntimeModel.from_pretrained(
+        "./", "vae_encoder.onnx", args.onnx, env_id,
+        {'provider': 'CPUExecutionProvider', 'sess_options': None}
+    )
 
-        unet = OnnxRuntimeModel.from_pretrained(
-            "./", "unet.onnx",
-            {'provider': 'CPUExecutionProvider', 'sess_options': None}
-        )
-        safety_checker = OnnxRuntimeModel.from_pretrained(
-            "./", "safety_checker.onnx",
-            {'provider': 'CPUExecutionProvider', 'sess_options': None}
-        )
-        vae_decoder = OnnxRuntimeModel.from_pretrained(
-            "./", "vae_decoder.onnx",
-            {'provider': 'CPUExecutionProvider', 'sess_options': None}
-        )
-        pndm_scheduler = df.schedulers.scheduling_pndm.PNDMScheduler.from_pretrained(
-            "./scheduler"
-        )
-        feature_extractor = transformers.CLIPImageProcessor.from_pretrained(
-            "./feature_extractor"
-        )
-        text_encoder = OnnxRuntimeModel.from_pretrained(
-            "./", "text_encoder.onnx",
-            {'provider': 'CPUExecutionProvider', 'sess_options': None}
-        )
-        vae_encoder = OnnxRuntimeModel.from_pretrained(
-            "./", "vae_encoder.onnx",
-            {'provider': 'CPUExecutionProvider', 'sess_options': None}
-        )
-        tokenizer = transformers.CLIPTokenizer.from_pretrained(
-            "./tokenizer"
-        )
+    pndm_scheduler = df.schedulers.scheduling_pndm.PNDMScheduler.from_pretrained(
+        "./scheduler"
+    )
+    feature_extractor = transformers.CLIPImageProcessor.from_pretrained(
+        "./feature_extractor"
+    )
+    tokenizer = transformers.CLIPTokenizer.from_pretrained(
+        "./tokenizer"
+    )
 
     # set pipeline
     use_transformers = True

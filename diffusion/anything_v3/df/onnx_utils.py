@@ -28,9 +28,6 @@ import numpy as np
 ONNX_WEIGHTS_NAME = "model.onnx"
 
 
-import onnxruntime as ort
-
-
 #logger = logging.get_logger(__name__)
 
 ORT_TO_NP_TYPE = {
@@ -50,18 +47,21 @@ ORT_TO_NP_TYPE = {
 
 
 class OnnxRuntimeModel:
-    def __init__(self, model=None, **kwargs):
+    def __init__(self, model=None, onnx=False, **kwargs):
         #logger.info("`diffusers.OnnxRuntimeModel` is experimental and might change in the future.")
         self.model = model
         self.model_save_dir = kwargs.get("model_save_dir", None)
+        self.onnx = onnx
         #self.latest_model_name = kwargs.get("latest_model_name", ONNX_WEIGHTS_NAME)
 
     def __call__(self, **kwargs):
         inputs = {k: np.array(v) for k, v in kwargs.items()}
+        if not self.onnx:
+            return self.model.run(inputs)
         return self.model.run(None, inputs)
 
     @staticmethod
-    def load_model(path: Union[str, Path], provider=None, sess_options=None):
+    def load_model(path: Union[str, Path], onnx=False, env_id=-1, provider=None, sess_options=None):
         """
         Loads an ONNX Inference session with an ExecutionProvider. Default provider is `CPUExecutionProvider`
 
@@ -71,69 +71,26 @@ class OnnxRuntimeModel:
             provider(`str`, *optional*):
                 Onnxruntime execution provider to use for loading the model, defaults to `CPUExecutionProvider`
         """
+        if not onnx:
+            import ailia
+            memory_mode = ailia.get_memory_mode(
+                reduce_constant=True, ignore_input_with_initializer=True,
+                reduce_interstage=False, reuse_interstage=True)
+            return ailia.Net(weight = path, env_id = env_id, memory_mode = memory_mode)
+
         if provider is None:
             #logger.info("No onnxruntime provider specified, using CPUExecutionProvider")
             provider = "CPUExecutionProvider"
 
+        import onnxruntime as ort
         return ort.InferenceSession(path, providers=[provider], sess_options=sess_options)
-
-    def _save_pretrained(self, save_directory: Union[str, Path], file_name: Optional[str] = None, **kwargs):
-        """
-        Save a model and its configuration file to a directory, so that it can be re-loaded using the
-        [`~optimum.onnxruntime.modeling_ort.ORTModel.from_pretrained`] class method. It will always save the
-        latest_model_name.
-
-        Arguments:
-            save_directory (`str` or `Path`):
-                Directory where to save the model file.
-            file_name(`str`, *optional*):
-                Overwrites the default model file name from `"model.onnx"` to `file_name`. This allows you to save the
-                model with a different name.
-        """
-        model_file_name = file_name if file_name is not None else ONNX_WEIGHTS_NAME
-
-        src_path = self.model_save_dir.joinpath(self.latest_model_name)
-        dst_path = Path(save_directory).joinpath(model_file_name)
-        try:
-            shutil.copyfile(src_path, dst_path)
-        except shutil.SameFileError:
-            pass
-
-        # copy external weights (for models >2GB)
-        src_path = self.model_save_dir.joinpath(ONNX_EXTERNAL_WEIGHTS_NAME)
-        if src_path.exists():
-            dst_path = Path(save_directory).joinpath(ONNX_EXTERNAL_WEIGHTS_NAME)
-            try:
-                shutil.copyfile(src_path, dst_path)
-            except shutil.SameFileError:
-                pass
-
-    def save_pretrained(
-        self,
-        save_directory: Union[str, os.PathLike],
-        **kwargs,
-    ):
-        """
-        Save a model to a directory, so that it can be re-loaded using the [`~OnnxModel.from_pretrained`] class
-        method.:
-
-        Arguments:
-            save_directory (`str` or `os.PathLike`):
-                Directory to which to save. Will be created if it doesn't exist.
-        """
-        if os.path.isfile(save_directory):
-            #logger.error(f"Provided path ({save_directory}) should be a directory, not a file")
-            return
-
-        os.makedirs(save_directory, exist_ok=True)
-
-        # saving model weights/files
-        self._save_pretrained(save_directory, **kwargs)
 
     @classmethod
     def _from_pretrained(
         cls,
         model_id: Union[str, Path],
+        onnx: bool = False,
+        env_id: int = -1,
         use_auth_token: Optional[Union[bool, str, None]] = None,
         revision: Optional[Union[str, None]] = None,
         force_download: bool = False,
@@ -171,7 +128,7 @@ class OnnxRuntimeModel:
         # load model from local directory
         if os.path.isdir(model_id):
             model = OnnxRuntimeModel.load_model(
-                os.path.join(model_id, model_file_name), provider=provider, sess_options=sess_options
+                os.path.join(model_id, model_file_name), onnx, env_id, provider=provider, sess_options=sess_options
             )
             kwargs["model_save_dir"] = Path(model_id)
         # load model from hub
@@ -191,13 +148,15 @@ class OnnxRuntimeModel:
             kwargs["latest_model_name"] = Path(model_cache_path).name
             model = OnnxRuntimeModel.load_model(model_cache_path, provider=provider, sess_options=sess_options)
             """
-        return cls(model=model, **kwargs)
+        return cls(model=model, onnx=onnx, **kwargs)
 
     @classmethod
     def from_pretrained(
         cls,
         model_id: Union[str, Path],
         file_name: Optional[str],
+        onnx: bool = False,
+        env_id: int = -1,
         force_download: bool = True,
         use_auth_token: Optional[str] = None,
         cache_dir: Optional[str] = None,
@@ -209,6 +168,8 @@ class OnnxRuntimeModel:
 
         return cls._from_pretrained(
             model_id=model_id,
+            onnx=onnx,
+            env_id=env_id,
             revision=revision,
             cache_dir=cache_dir,
             force_download=force_download,
