@@ -224,6 +224,24 @@ def batch_score_hypothesis(
     return batch_y, batch_states, lm_tokens
 
 
+def recombine_hypotheses(hypotheses: List[Hypothesis]) -> List[Hypothesis]:
+    """Recombine hypotheses with equivalent output sequence.
+    """
+    final = []
+
+    for hyp in hypotheses:
+        seq_final = [f.y_sequence for f in final if f.y_sequence]
+
+        if hyp.y_sequence in seq_final:
+            seq_pos = seq_final.index(hyp.y_sequence)
+
+            final[seq_pos].score = np.logaddexp(final[seq_pos].score, hyp.score)
+        else:
+            final.append(hyp)
+
+    return hypotheses
+
+
 def align_length_sync_decoding(
         models, h, encoded_lengths):
     ids = list(range(vocab_size + 1))
@@ -376,14 +394,62 @@ def align_length_sync_decoding(
             # This may cause next beam to be smaller than max beam size
             # Therefore larger beam sizes may be required for better decoding.
             B = sorted(A, key=lambda x: x.score, reverse=True)[:beam]
-            # B = recombine_hypotheses(B)
+            B = recombine_hypotheses(B)
 
         # If B_ is empty list, then we may be able to early exit
         elif len(batch_ids) == len(batch_removal_ids):
             # break early
             break
 
-    return 0
+    if final:
+        # Remove trailing empty list of alignments
+        return sorted(final, key=lambda x: x.score / len(x.y_sequence), reverse=True)
+    else:
+        # Remove trailing empty list of alignments
+        return B
+
+
+def pack_hypotheses(hypotheses: List[Hypothesis]) -> List[Hypothesis]:
+    for idx, hyp in enumerate(hypotheses):
+        hyp.y_sequence = np.array(hyp.y_sequence)
+
+        # Remove -1 from timestep
+        if hyp.timestep is not None and len(hyp.timestep) > 0 and hyp.timestep[0] == -1:
+            hyp.timestep = hyp.timestep[1:]
+
+    return hypotheses
+
+
+def decode_hypothesis(models, hyp):
+    """Decode ALSD beam search info into transcribe result
+    """
+    # NeMo prepends a blank token to y_sequence with ALSD.
+    # Trim that artifact token.
+    y_sequence = hyp.y_sequence.tolist()[1:]
+
+    tokenizer = models["tokenizer"]
+    text = tokenizer.ids_to_text(y_sequence)
+
+    subwords = []
+    for idx, (token_id, step) in enumerate(zip(y_sequence, hyp.timestep)):
+        subwords.append(Subword(
+            token_id=token_id,
+            token=model.tokenizer.ids_to_text([token_id]),
+            seconds=max(SECONDS_PER_STEP * (step - idx - 1) - PAD_SECONDS, 0)
+        ))
+
+    segments = []
+    start = 0
+    while start < len(subwords):
+        end = find_end_of_segment(subwords, start)
+        segments.append(Segment(
+            start_seconds=subwords[start].seconds,
+            end_seconds=subwords[end].seconds + SECONDS_PER_STEP,
+            text=model.tokenizer.ids_to_text(y_sequence[start:end + 1]),
+        ))
+        start = end + 1
+
+    return TranscribeResult(text, subwords, segments)
 
 
 # ======================
@@ -392,10 +458,9 @@ def align_length_sync_decoding(
 
 
 def decode(models, encoder_output, encoded_lengths):
-    print(encoder_output, encoder_output.shape)
-    print(encoded_lengths)
     encoder_output = encoder_output.transpose(0, 2, 1)  # (B, T, D)
 
+    hypotheses = []
     for batch_idx in range(len(encoder_output)):
         inseq = encoder_output[batch_idx: batch_idx + 1, : encoded_lengths[batch_idx], :]  # [1, T, D]
         logitlen = encoded_lengths[batch_idx]
@@ -405,12 +470,13 @@ def decode(models, encoder_output, encoded_lengths):
             models, inseq, logitlen
         )  # sorted list of hypothesis
 
-        # # Prepare the list of hypotheses
-        # nbest_hyps = pack_hypotheses(nbest_hyps)
+        # Prepare the list of hypotheses
+        nbest_hyps = pack_hypotheses(nbest_hyps)
 
-    results = []
+        best_hypothesis = nbest_hyps[0]
+        hypotheses.append(best_hypothesis)
 
-    return results
+    return hypotheses
 
 
 def predict(models, audio):
@@ -426,9 +492,9 @@ def predict(models, audio):
         output = net.run(None, {'input_signal': audio, 'input_signal_length': input_signal_length})
     encoded, encoded_length = output
 
-    results = decode(models, encoded, encoded_length)
+    hypotheses = decode(models, encoded, encoded_length)
 
-    return results
+    return hypotheses
 
 
 def recognize_from_audio(models):
@@ -446,7 +512,7 @@ def recognize_from_audio(models):
             total_time_estimation = 0
             for i in range(args.benchmark_count):
                 start = int(round(time.time() * 1000))
-                output = predict(models, audio)
+                hyp = predict(models, audio)
                 end = int(round(time.time() * 1000))
                 estimation_time = (end - start)
 
@@ -457,10 +523,10 @@ def recognize_from_audio(models):
 
             logger.info(f'\taverage time estimation {total_time_estimation / (args.benchmark_count - 1)} ms')
         else:
-            output = predict(models, audio)
+            hyp = predict(models, audio)
 
-        for res in output:
-            logger.info(f"{res[0]}")
+        ret = decode_hypothesis(models, hyp)
+        print(ret.text)
 
     logger.info('Script finished successfully.')
 
