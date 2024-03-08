@@ -52,7 +52,7 @@ parser = get_base_parser(
 )
 parser.add_argument(
     "-i", "--input", metavar="TEXT", type=str,
-    default="pikachu",
+    default="witch",
     help="the prompt to render"
 )
 parser.add_argument(
@@ -70,16 +70,13 @@ def recognize_from_text(pipe):
     prompt = args.input if isinstance(args.input, str) else args.input[0]
     logger.info("prompt: %s" % prompt)
 
-    output_dir = 'outputs'
-    os.makedirs(output_dir, exist_ok=True)
-    output_name = '{}_{}.png'.format(prompt.replace(" ", "-"), random.randint(10000, 99999))
-    output_path = os.path.join(output_dir, output_name)
-
     logger.info('Start inference...')
 
     image = pipe(prompt).images[0]
-    image.save(output_path)
-    logger.info(f'saved at : {output_path}')
+
+    savepath = get_savepath(args.savepath, "", ext='.png')
+    image.save(savepath)
+    logger.info(f'saved at : {savepath}')
 
     logger.info('Script finished successfully.')
 
