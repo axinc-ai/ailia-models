@@ -8,7 +8,7 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath  # noqa
+from arg_utils import get_base_parser, update_parser, get_savepath  # noqa
 from model_utils import check_and_download_models  # noqa
 from detector_utils import load_image, plot_results  # noqa
 from webcamera_utils import get_capture, get_writer  # noqa
@@ -308,7 +308,10 @@ def main():
 
     # initialize
     if not args.onnx:
-        net = ailia.Net(model_path, weight_path, env_id=env_id)
+        memory_mode = ailia.get_memory_mode(
+            reduce_constant=True, ignore_input_with_initializer=True,
+            reduce_interstage=False, reuse_interstage=True)
+        net = ailia.Net(model_path, weight_path, env_id=env_id, memory_mode=memory_mode)
     else:
         import onnxruntime
         net = onnxruntime.InferenceSession(weight_path)

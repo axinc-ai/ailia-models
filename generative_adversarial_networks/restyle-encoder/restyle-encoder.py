@@ -13,7 +13,7 @@ import ailia
 sys.path.append('../../util')
 sys.path.append('../../style_transfer') # import setup for face alignement (psgan)
 sys.path.append('../../style_transfer/psgan') # import preprocess for face alignement (psgan)
-from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
+from arg_utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from image_utils import load_image  # noqa: E402
 import webcamera_utils  # noqa: E402
@@ -365,12 +365,15 @@ def main():
             check(FACE_DETECTOR_WEIGHT_PATH)
         logger.info('Debug OK.')
     else:
+        memory_mode = ailia.get_memory_mode(
+            reduce_constant=True, ignore_input_with_initializer=True,
+            reduce_interstage=False, reuse_interstage=True)
         if args.video is not None:
             # net initialize
-            net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
-            face_pool_net = ailia.Net(FACE_POOL_MODEL_PATH, FACE_POOL_WEIGHT_PATH, env_id=args.env_id)
+            net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id, memory_mode=memory_mode)
+            face_pool_net = ailia.Net(FACE_POOL_MODEL_PATH, FACE_POOL_WEIGHT_PATH, env_id=args.env_id, memory_mode=memory_mode)
             if args.toonify:
-                toonify_net = ailia.Net(TOONIFY_MODEL_PATH, TOONIFY_WEIGHT_PATH, env_id=args.env_id)
+                toonify_net = ailia.Net(TOONIFY_MODEL_PATH, TOONIFY_WEIGHT_PATH, env_id=args.env_id, memory_mode=memory_mode)
             else: 
                 toonify_net = None
             # video mode
@@ -407,21 +410,21 @@ def main():
                 # net initialize
                 if args.benchmark:
                     start = int(round(time.time() * 1000))
-                    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
-                    face_pool_net = ailia.Net(FACE_POOL_MODEL_PATH, FACE_POOL_WEIGHT_PATH, env_id=args.env_id)
+                    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id, memory_mode=memory_mode)
+                    face_pool_net = ailia.Net(FACE_POOL_MODEL_PATH, FACE_POOL_WEIGHT_PATH, env_id=args.env_id, memory_mode=memory_mode)
                     # toonification task
                     if args.toonify:
-                        toonify_net = ailia.Net(TOONIFY_MODEL_PATH, TOONIFY_WEIGHT_PATH, env_id=args.env_id)
+                        toonify_net = ailia.Net(TOONIFY_MODEL_PATH, TOONIFY_WEIGHT_PATH, env_id=args.env_id, memory_mode=memory_mode)
                     else: 
                         toonify_net = None
                     end = int(round(time.time() * 1000))
                     logger.info(f'\tailia initializing time {end - start} ms')
                 else:
-                    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
-                    face_pool_net = ailia.Net(FACE_POOL_MODEL_PATH, FACE_POOL_WEIGHT_PATH, env_id=args.env_id)
+                    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id, memory_mode=memory_mode)
+                    face_pool_net = ailia.Net(FACE_POOL_MODEL_PATH, FACE_POOL_WEIGHT_PATH, env_id=args.env_id, memory_mode=memory_mode)
                     # toonification task
                     if args.toonify:
-                        toonify_net = ailia.Net(TOONIFY_MODEL_PATH, TOONIFY_WEIGHT_PATH, env_id=args.env_id)
+                        toonify_net = ailia.Net(TOONIFY_MODEL_PATH, TOONIFY_WEIGHT_PATH, env_id=args.env_id, memory_mode=memory_mode)
                     else: 
                         toonify_net = None
                 # input image loop

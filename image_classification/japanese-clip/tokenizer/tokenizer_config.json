@@ -1,0 +1,17 @@
+{
+  "additional_special_tokens": [],
+  "bos_token": "<s>",
+  "clean_up_tokenization_spaces": true,
+  "cls_token": "[CLS]",
+  "do_lower_case": true,
+  "eos_token": "</s>",
+  "extra_ids": 0,
+  "legacy": true,
+  "mask_token": "[MASK]",
+  "model_max_length": 1000000000000000019884624838656,
+  "pad_token": "[PAD]",
+  "sep_token": "[SEP]",
+  "sp_model_kwargs": {},
+  "tokenizer_class": "T5Tokenizer",
+  "unk_token": "<unk>"
+}
