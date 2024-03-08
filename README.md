@@ -518,7 +518,7 @@ The collection of pre-trained, state-of-the-art AI models.
 | [<img src="super_resolution/rcan-it/output.png" width=128px>](super_resolution/rcan-it/) | [rcan-it](/super_resolution/rcan-it/) | [Revisiting RCAN: Improved Training for Image Super-Resolution](https://github.com/zudi-lin/rcan-it) | Pytorch | 1.2.10 and later |
 | [<img src="super_resolution/swinir/output_classical.png" width=128px>](super_resolution/swinir/) | [swinir](/super_resolution/swinir/) | [SwinIR: Image Restoration Using Swin Transformer](https://github.com/JingyunLiang/SwinIR) | Pytorch | 1.2.12 and later |
 | [<img src="super_resolution/hat/output.png" width=128px>](super_resolution/hat/) | [Hat](/super_resolution/hat/) | [Hat](https://github.com/XPixelGroup/HAT) | Pytorch | 1.2.6 and later |
-| [<img src="super_resolution/codeformer/output.png" width=128px>](super_resolution/CodeFormer/) | [codeformer](/super_resolution/codeformer/) | [CodeFormer: Towards Robust Blind Face Restoration with Codebook Lookup Transformer](https://github.com/sczhou/CodeFormer) | Pytorch | 1.2.6 and later |
+| [<img src="super_resolution/codeformer/output.png" width=128px>](super_resolution/CodeFormer/) | [codeformer](/super_resolution/codeformer/) | [CodeFormer: Towards Robust Blind Face Restoration with Codebook Lookup Transformer](https://github.com/sczhou/CodeFormer) | Pytorch | 1.2.9 and later |
 
 ## Text detection
 
