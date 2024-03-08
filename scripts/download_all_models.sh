@@ -99,6 +99,7 @@ cd ../../face_recognition/facemesh_v2; python3 facemesh_v2.py ${OPTION}
 cd ../../face_recognition/3ddfa; python3 3ddfa$.py ${OPTION}
 cd ../../face_recognition/mivolo; python3 mivolo.py ${OPTION}
 cd ../../face_recognition/l2cs_net; python3 l2cs_net.py ${OPTION}
+cd ../../face_restoration/codeformer; python3 codeformer.py ${OPTION}
 cd ../../frame_interpolation/flavr; python3 flavr.py ${OPTION}
 cd ../../frame_interpolation/cain; python3 cain.py ${OPTION}
 cd ../../frame_interpolation/film; python3 film.py ${OPTION}
@@ -306,7 +307,6 @@ cd ../../super_resolution/real-esrgan; python3 real-esrgan.py ${OPTION}
 cd ../../super_resolution/rcan-it; python3 rcan-it.py ${OPTION}
 cd ../../super_resolution/swinir; python3 swinir.py ${OPTION}
 cd ../../super_resolution/hat; python3 hat.py ${OPTION}
-cd ../../super_resolution/CodeFormer; python3 codeformer.py ${OPTION}
 cd ../../text_detection/craft_pytorch; python3 craft_pytorch.py ${OPTION}
 cd ../../text_detection/pixel_link; python3 pixel_link.py ${OPTION}
 cd ../../text_detection/east; python3 east.py ${OPTION}
