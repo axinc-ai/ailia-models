@@ -1,9 +1,7 @@
 import cv2
 import sys
 import time
-import onnx
 import numpy as np
-from onnx import numpy_helper
 
 import ailia
 
@@ -40,6 +38,8 @@ MODEL_FACE_SWAPPER_PATH = 'inswapper_128.onnx.prototxt'
 WEIGHT_FACE_ENHANCER_PATH = 'gfpgan_1.4.onnx'
 MODEL_FACE_ENHANCER_PATH = 'gfpgan_1.4.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/facefusion/'
+
+MODEL_MATRIX_PATH = 'model_matrix.npy'
 
 TARGET_IMAGE_PATH = 'target.jpg'
 SOURCE_IMAGE_PATH = 'source.jpg'
@@ -82,9 +82,8 @@ args = update_parser(parser)
 # Secondary functions
 # ======================
 
-def get_model_matrix(model_path):
-    model = onnx.load(model_path)
-    return numpy_helper.to_array(model.graph.initializer[-1])
+def get_model_matrix(model_matrix_path):
+    return np.load(model_matrix_path)
 
 def conditional_append_reference_faces(source_img_paths, target_img_path, nets):
     source_frames = read_static_images(source_img_paths)
@@ -224,7 +223,7 @@ def main():
         nets = {k: onnxruntime.InferenceSession(v[0], providers=providers) for k, v in dic_model.items()}
 
     nets['is_onnx'] = args.onnx
-    nets['model_matrix'] = get_model_matrix(dic_model['face_swapper'][0])
+    nets['model_matrix'] = get_model_matrix(MODEL_MATRIX_PATH)
 
     if args.video is not None:
         # video mode
