@@ -13,9 +13,10 @@ The collection of pre-trained, state-of-the-art AI models.
 [ailia MODELS tutorial 日本語版](TUTORIAL_jp.md)
 
 # Supported models
-311 models as of March 5th, 2024
+318 models as of March 8th, 2024
 
 # Latest update
+- 2024.03.08 Add did_m3d, damo_yolo, deep-music-enhancer, tusimple-DUC
 - 2024.03.05 Add polylanenet, rnnoise
 - 2024.03.04 Add Japanese Stable CLIP, msclap, glucose, informer2020, l2cs_net, deepsort_vehicle, narabas
 - 2024.03.03 Add yolov9 (Unification of line feed code to LF)
