@@ -2,12 +2,14 @@ import os
 
 import numpy as np
 from typing import List, Optional, Tuple, Union
+import regex as re
 
 import json
 
 from languages import LANGUAGES, TO_LANGUAGE_CODE
 
 def get_tokenizer(multilingual: bool,
+        num_languages: int = 99,
         task: Optional[str] = None,  # Literal["transcribe", "translate", None]
         language: Optional[str] = None):
     if multilingual:
@@ -20,8 +22,23 @@ def get_tokenizer(multilingual: bool,
         language = None
 
     tokenizer = AiliaTokenizer()
-    tokenizer.build_tokenizer('assets/multilingual/vocab.json', tokenizer_name, task, language)
+    tokenizer.build_tokenizer('assets/multilingual/vocab.json', 'assets/multilingual/merges.txt',tokenizer_name, task, language, num_languages)
     return tokenizer
+
+# Uses some code from Apache licensed transformers
+# https://github.com/huggingface/transformers/blob/main/LICENSE
+
+def get_pairs(word):
+    """
+    Return set of symbol pairs in a word.
+    Word is represented as tuple of symbols (symbols being variable-length strings).
+    """
+    pairs = set()
+    prev_char = word[0]
+    for char in word[1:]:
+        pairs.add((prev_char, char))
+        prev_char = char
+    return pairs
 
 class AiliaTokenizer:
     # dictionary
@@ -47,11 +64,11 @@ class AiliaTokenizer:
     transcribe = None
     timestamp_begin = None
 
-    def build_tokenizer(self, vocab_path, tokenizer_name, task, language):
+    def build_tokenizer(self, vocab_path, merges_path, tokenizer_name, task, language, num_languages):
         self.language = language
 
         # load vocab
-        json_open = open(vocab_path, 'r')
+        json_open = open(vocab_path, 'r', encoding='utf-8')
         json_load = json.load(json_open)
         for key in json_load.keys():
             self.vocab[json_load[key]] = key
@@ -78,27 +95,34 @@ class AiliaTokenizer:
         self.sot  = 50257 + multilingal
         language_tokens = []
         i = self.sot + 1
-        for lang in LANGUAGES.keys():
+        for lang in list(LANGUAGES.keys())[:num_languages]:
             language_tokens.append(i)
             i = i + 1
-        self.translate = 50357 + multilingal
-        self.transcribe = 50358 + multilingal
-        self.sot_lm = 50359 + multilingal
-        self.sot_prev = 50360 + multilingal
-        self.no_speech = 50361 + multilingal
-        self.no_timestamps = 50362 + multilingal
-        self.timestamp_begin = 50363 + multilingal
+        self.translate = 50357 + (num_languages - 99) + multilingal
+        self.transcribe = 50358 + (num_languages - 99) + multilingal
+        self.sot_lm = 50359 + (num_languages - 99) + multilingal
+        self.sot_prev = 50360 + (num_languages - 99) + multilingal
+        self.no_speech = 50361 + (num_languages - 99) + multilingal
+        self.no_timestamps = 50362 + (num_languages - 99) + multilingal
+        self.timestamp_begin = 50363 + (num_languages - 99) + multilingal
 
         self.all_language_tokens_list = language_tokens
 
-        langs = tuple(LANGUAGES.keys())
+        langs = tuple(list(LANGUAGES.keys())[:num_languages])
         sot_sequence = [self.sot]
         if language is not None:
             sot_sequence.append(self.sot + 1 + langs.index(language))
         if task is not None:
             sot_sequence.append(self.transcribe if task == "transcribe" else self.translate)
         self.sot_sequence = sot_sequence
-        
+
+        # for encoder
+        with open(merges_path, encoding="utf-8") as merges_handle:
+            bpe_merges = merges_handle.read().split("\n")[1:-1]
+        bpe_merges = [tuple(merge.split()) for merge in bpe_merges]
+        self.bpe_ranks = dict(zip(bpe_merges, range(len(bpe_merges))))
+        self.cache = {}
+
     def bytes_to_unicode(self):
         """
         Returns list of utf-8 byte and a mapping to unicode strings. We specifically avoids mapping to whitespace/control
@@ -124,8 +148,71 @@ class AiliaTokenizer:
     def convert_tokens_to_string(self, tokens):
         """Converts a sequence of tokens (string) in a single string."""
         text = "".join(tokens)
-        text = bytearray([self.byte_decoder[c] for c in text]).decode("utf-8", errors="error")
+        text = bytearray([self.byte_decoder[c] for c in text]).decode("utf-8", errors="ignore")
         return text
+
+    def bpe(self, token):
+        if token in self.cache:
+            return self.cache[token]
+        word = tuple(token)
+        pairs = get_pairs(word)
+
+        if not pairs:
+            return token
+
+        while True:
+            bigram = min(pairs, key=lambda pair: self.bpe_ranks.get(pair, float("inf")))
+            if bigram not in self.bpe_ranks:
+                break
+            first, second = bigram
+            new_word = []
+            i = 0
+            while i < len(word):
+                try:
+                    j = word.index(first, i)
+                except ValueError:
+                    new_word.extend(word[i:])
+                    break
+                else:
+                    new_word.extend(word[i:j])
+                    i = j
+
+                if word[i] == first and i < len(word) - 1 and word[i + 1] == second:
+                    new_word.append(first + second)
+                    i += 2
+                else:
+                    new_word.append(word[i])
+                    i += 1
+            new_word = tuple(new_word)
+            word = new_word
+            if len(word) == 1:
+                break
+            else:
+                pairs = get_pairs(word)
+        word = " ".join(word)
+        self.cache[token] = word
+        return word
+
+    def tokenize(self, text):
+        """Tokenize a string."""
+        # Should have added re.IGNORECASE so BPE merges can happen for capitalized versions of contractions
+        pat = re.compile(r"""'s|'t|'re|'ve|'m|'ll|'d| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+""")
+        bpe_tokens = []
+        for token in re.findall(pat, text):
+            token = "".join(
+                self.byte_encoder[b] for b in token.encode("utf-8")
+            )  # Maps all our bytes to unicode strings, avoiding control tokens of the BPE (spaces in our case)
+            bpe_tokens.extend(bpe_token for bpe_token in self.bpe(token).split(" "))
+        return bpe_tokens
+
+    def encode(self, text):
+        tokenized = self.tokenize(text)
+        tokens = []
+        for token in tokenized:
+            for i in range(len(self.vocab)):
+                if self.vocab[i] == token:
+                    tokens.append(i)
+        return tokens
 
     def decode(self, tokens):
         tokens = [token for token in tokens if token < self.eot]

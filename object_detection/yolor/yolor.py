@@ -15,10 +15,10 @@ sys.path.append('../../util')
 from logging import getLogger
 
 import webcamera_utils
-from detector_utils import plot_results, reverse_letterbox
+from detector_utils import plot_results, reverse_letterbox, write_predictions
 from image_utils import imread  # noqa: E402
 from model_utils import check_and_download_models
-from utils import get_base_parser, get_savepath, update_parser
+from arg_utils import get_base_parser, get_savepath, update_parser
 
 logger = getLogger(__name__)
 
@@ -35,7 +35,14 @@ parser.add_argument(
     default='yolor_w6',
     help='yolor_p6, yolor_w6]'
 )
-
+parser.add_argument(
+    '-w', '--write_prediction',
+    nargs='?',
+    const='txt',
+    choices=['txt', 'json'],
+    type=str,
+    help='Output results to txt or json file.'
+)
 args = update_parser(parser)
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/yolor/'
 MODEL_NAME = args.model_name
@@ -103,6 +110,12 @@ def recognize_from_image():
         savepath = get_savepath(args.savepath, image_path)
         logger.info(f'saved at : {savepath}')
         cv2.imwrite(savepath, res_img)
+
+        # write prediction
+        if args.write_prediction is not None:
+            ext = args.write_prediction
+            pred_file = "%s.%s" % (savepath.rsplit('.', 1)[0], ext)
+            write_predictions(pred_file, detect_object, raw_img, category=COCO_CATEGORY, file_type=ext)
 
     logger.info('Script finished successfully.')
 
