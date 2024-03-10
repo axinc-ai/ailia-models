@@ -51,9 +51,7 @@ parser.add_argument(
 )
 args = update_parser(parser)
 
-# ======================
-# Secondaty Functions
-# ======================
+SAMPLERATE = 16000
 
 PAD_SECONDS = 0.5
 SECONDS_PER_STEP = 0.08
@@ -64,13 +62,15 @@ TOKEN_EOS = {'。', '?', '!'}
 TOKEN_COMMA = {'、', ','}
 TOKEN_PUNC = TOKEN_EOS | TOKEN_COMMA
 
-vocab_size = 3000
-blank_id = 3000
-index_incr = 0
-beam_size = 4
-alsd_max_target_length = 1.0
-pred_rnn_layers = 2
+VOCAB_SIZE = 3000
+BLANK_ID = 3000
+BEAM_SIZE = 4
+PRED_RNN_LAYERS = 2
 
+
+# ======================
+# Secondaty Functions
+# ======================
 
 @dataclass
 class TranscribeResult:
@@ -125,6 +125,21 @@ class Hypothesis:
     lm_state: Optional[Union[Dict[str, Any], List[Any]]] = None
 
 
+# ======================
+# Secondary Functions
+# ======================
+
+def audio_from_path(audio_path):
+    waveform, samplerate = librosa.load(audio_path, sr=None)
+
+    if samplerate != SAMPLERATE:
+        waveform = librosa.resample(waveform, orig_sr=samplerate, target_sr=SAMPLERATE)
+    if len(waveform.shape) > 1:
+        waveform = librosa.to_mono(waveform)
+
+    return waveform
+
+
 def initialize_state(batch):
     """
     Initialize the state of the RNN layers.
@@ -138,30 +153,27 @@ def initialize_state(batch):
     pred_hidden = 640
 
     state = [
-        np.zeros((pred_rnn_layers, batch, pred_hidden), dtype=np.float32),
-        np.zeros((pred_rnn_layers, batch, pred_hidden), dtype=np.float32)
+        np.zeros((PRED_RNN_LAYERS, batch, pred_hidden), dtype=np.float32),
+        np.zeros((PRED_RNN_LAYERS, batch, pred_hidden), dtype=np.float32)
     ]
     return state
 
 
-def batch_initialize_states(batch_states: List[np.ndarray], decoder_states: List[List[np.ndarray]]):
+def batch_initialize_states(decoder_states: List[List[np.ndarray]]):
     """
     Create batch of decoder states.
 
-   Args:
-       batch_states (list): batch of decoder states
-          ([L x (B, H)], [L x (B, H)])
+    Args:
+        decoder_states (list of list): list of decoder states
+            [B x ([L x (1, H)], [L x (1, H)])]
 
-       decoder_states (list of list): list of decoder states
-           [B x ([L x (1, H)], [L x (1, H)])]
-
-   Returns:
-       batch_states (tuple): batch of decoder states
-           ([L x (B, H)], [L x (B, H)])
+    Returns:
+        batch_states (tuple): batch of decoder states
+            ([L x (B, H)], [L x (B, H)])
    """
     # LSTM has 2 states
     new_states = [[] for _ in range(len(decoder_states[0]))]
-    for layer in range(pred_rnn_layers):
+    for layer in range(PRED_RNN_LAYERS):
         for state_id in range(len(decoder_states[0])):
             new_state_for_layer = np.stack([s[state_id][layer] for s in decoder_states])
             new_states[state_id].append(new_state_for_layer)
@@ -189,7 +201,7 @@ def batch_select_state(batch_states, idx):
     if batch_states is not None:
         state_list = []
         for state_id in range(len(batch_states)):
-            states = [batch_states[state_id][layer][idx] for layer in range(pred_rnn_layers)]
+            states = [batch_states[state_id][layer][idx] for layer in range(PRED_RNN_LAYERS)]
             state_list.append(states)
         return state_list
     else:
@@ -237,8 +249,7 @@ def batch_score_hypothesis(
 
         # convert list of tokens to np.ndarray, then reshape.
         tokens = np.array(tokens).reshape(batch, -1)
-        dec_states = initialize_state(tokens.shape[0])  # [L, B, H]
-        dec_states = batch_initialize_states(dec_states, [d_state for seq, d_state in process])
+        dec_states = batch_initialize_states([d_state for seq, d_state in process])
 
         net = models["decoder"]
         if not args.onnx:
@@ -263,7 +274,7 @@ def batch_score_hypothesis(
             j += 1
 
     # Set the incoming batch states with the new states obtained from `done`.
-    batch_states = batch_initialize_states(batch_states, [d_state for y_j, d_state in done])
+    batch_states = batch_initialize_states([d_state for y_j, d_state in done])
 
     # Create batch of all output scores
     # List[1, 1, H] -> [B, 1, H]
@@ -295,11 +306,11 @@ def recombine_hypotheses(hypotheses: List[Hypothesis]) -> List[Hypothesis]:
 
 def align_length_sync_decoding(
         models, h, encoded_lengths):
-    ids = list(range(vocab_size + 1))
-    ids.remove(blank_id)
+    ids = list(range(VOCAB_SIZE + 1))
+    ids.remove(BLANK_ID)
 
     # prepare the batched beam states
-    beam = min(beam_size, vocab_size)
+    beam = min(BEAM_SIZE, VOCAB_SIZE)
 
     h = h[0]  # [T, D]
     h_length = int(encoded_lengths)
@@ -307,12 +318,10 @@ def align_length_sync_decoding(
         beam
     )  # [L, B, H], [L, B, H] for LSTMS
 
-    u_max = int(alsd_max_target_length * h_length)
-
     # Initialize first hypothesis for the beam (blank)
     B = [
         Hypothesis(
-            y_sequence=[blank_id],
+            y_sequence=[BLANK_ID],
             score=0.0,
             dec_state=batch_select_state(beam_state, 0),
             timestep=[-1],
@@ -324,6 +333,7 @@ def align_length_sync_decoding(
     cache = {}
 
     # ALSD runs for T + U_max steps
+    u_max = h_length
     for i in range(h_length + u_max):
         # Update caches
         A = []
@@ -403,7 +413,7 @@ def align_length_sync_decoding(
                 # For all updated samples in the batch, add it as the blank token
                 # In this step, we dont add a token but simply update score
                 new_hyp = Hypothesis(
-                    score=(hyp.score + float(beam_logp[j, blank_id])),
+                    score=(hyp.score + float(beam_logp[j, BLANK_ID])),
                     y_sequence=hyp.y_sequence[:],
                     dec_state=hyp.dec_state,
                     lm_state=hyp.lm_state,
@@ -427,7 +437,7 @@ def align_length_sync_decoding(
 
                 # for each current hypothesis j
                 # extract the top token score and top token id for the jth hypothesis
-                for k in (beam_topk[j] + index_incr):
+                for k in beam_topk[j]:
                     # create new hypothesis and store in A
                     # Note: This loop does *not* include the blank token!
                     logp = beam_logp[:, ids][j][k]
@@ -531,7 +541,6 @@ def format_time(seconds):
 # Main functions
 # ======================
 
-
 def decode(models, encoder_output, encoded_lengths):
     encoder_output = encoder_output.transpose(0, 2, 1)  # (B, T, D)
 
@@ -578,7 +587,12 @@ def recognize_from_audio(models):
         logger.info(audio_path)
 
         # prepare input data
-        audio, rate = librosa.load(audio_path, sr=16000)
+        audio = audio_from_path(audio_path)
+        # Pad
+        audio = np.pad(
+            audio,
+            pad_width=int(PAD_SECONDS * SAMPLERATE),
+            mode='constant')
 
         # inference
         logger.info('Start inference...')
