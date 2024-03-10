@@ -16,6 +16,7 @@ logger = getLogger(__name__)
 
 from pyannote.audio import Pipeline
 from pyannote.core import Segment, Annotation
+from pyannote.audio.pipelines.speaker_diarization import SpeakerDiarization
 import json
 # import polars as pl
 import torch
@@ -62,17 +63,11 @@ def main(args):
     with open(config_yml, "r") as fp:
         config = yaml.load(fp, Loader=yaml.SafeLoader)
 
-    pipeline_name = config["pipeline"]["name"]
-    tokens = pipeline_name.split('.')
-    module_name = '.'.join(tokens[:-1])
-    class_name = tokens[-1]
-    Klass = getattr(import_module(module_name), class_name)
-    # Klass = SpeakerDiarization()
     params = config["pipeline"].get("params", {})
-    pipeline = Klass(**params)
+    # pipeline = Klass(**params)
+    pipeline = SpeakerDiarization(**params)
     if "params" in config:
         pipeline.instantiate(config["params"])
-    # pipeline = Pipeline.from_pretrained(YAML_PATH)
 
     # send pipeline to GPU (when available)
     if torch.cuda.is_available():
