@@ -28,7 +28,7 @@ class ImageProcessor:
 
     def generate(
         self,
-        input_path: str,
+        pic_path: str,
         preprocess: str,
         save_dir: str,
         input_size: int = 256,
@@ -36,16 +36,17 @@ class ImageProcessor:
         """
         generate coefficients for face model from image
         """
-        cropped_path   = os.path.join(save_dir, 'CropAndExtract_cropped.png')
-        coeff_path     = os.path.join(save_dir, 'CropAndExtract_coeff.mat')
-        landmarks_path = os.path.join(save_dir, 'landmarks.txt')
+        pic_name = os.path.splitext(os.path.split(pic_path)[-1])[0]
+        cropped_path   = os.path.join(save_dir, pic_name+'.png')
+        coeff_path     = os.path.join(save_dir, pic_name+'.mat') 
+        landmarks_path = os.path.join(save_dir, pic_name+'_landmarks.txt')
 
-        if not os.path.isfile(input_path):
-            raise ValueError('input_path must be a valid path to video/image file')
+        if not os.path.isfile(pic_path):
+            raise ValueError('pic_path must be a valid path to video/image file')
 
-        elif input_path.split('.')[-1] in ['jpg', 'png', 'jpeg']:
+        elif pic_path.split('.')[-1] in ['jpg', 'png', 'jpeg']:
             # loader for first frame
-            full_frames = [cv2.imread(input_path)]
+            full_frames = [cv2.imread(pic_path)]
         else:
             raise Exception("Not supported yet")
 

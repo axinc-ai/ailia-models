@@ -13,7 +13,7 @@ import onnxruntime
 AUDIO2EXP_PATH = "/home/t-ibayashi/Workspace/ax/ailia-models/image_animation/sad_talker/resources/audio2Exp.onnx"
 AUDIO2POSE_ENCODER_PATH = "/home/t-ibayashi/Workspace/ax/ailia-models/image_animation/sad_talker/resources/audio2Pose_audioEncoder.onnx"
 AUDIO2POSE_NETG_PATH = "/home/t-ibayashi/Workspace/ax/ailia-models/image_animation/sad_talker/resources/audio2Pose_netG.onnx"
-class params:
+class AudioProcessorParams:
     def __init__(self):
         self.sample_rate = 16000
         self.num_mels = 80
@@ -34,7 +34,7 @@ class params:
 
 class AudioProcessor:
     def __init__(self):
-        self.hp = params()
+        self.hp = AudioProcessorParams()
         self.mel_basis = None
 
         self.audio2exp_model = AudioToExp()
@@ -158,7 +158,7 @@ class AudioProcessor:
         ref_eyeblink_coeff_path: Optional[str]=None,
         still: bool=False,
     ) -> dict:
-        """execute prepcocess
+        """build input data for AudioProcessor
 
         Args:
             first_coeff_path (str):  Path to the first coeff file
@@ -241,7 +241,7 @@ class AudioProcessor:
         else:
             pose_pred = savgol_filter(np.array(pose_pred), 13, 2, axis=1)
 
-        coeffs_pred = np.concatenate([exp_pred, pose_pred], axis=-1)
+        coeffs_pred = np.concatenate([exp_pred, pose_pred], axis=-1)[0]
         if ref_pose_coeff_path is not None: 
             coeffs_pred = self._using_refpose(coeffs_pred, ref_pose_coeff_path)
         save_path = os.path.join(save_dir, '%s##%s.mat'%(batch['pic_name'], batch['audio_name']))
