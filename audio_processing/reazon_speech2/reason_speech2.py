@@ -14,7 +14,7 @@ import ailia
 # import original modules
 sys.path.append('../../util')
 from arg_utils import get_base_parser, update_parser, get_savepath  # noqa
-from model_utils import check_and_download_models  # noqa
+from model_utils import check_and_download_models, check_and_download_file  # noqa
 from image_utils import normalize_image  # noqa
 from detector_utils import load_image  # noqa
 from webcamera_utils import get_capture, get_writer  # noqa
@@ -32,6 +32,7 @@ MODEL_DEC_PATH = 'reazonspeech-nemo-v2_decoder.onnx.prototxt'
 WEIGHT_JNT_PATH = 'reazonspeech-nemo-v2_joint.onnx'
 MODEL_JNT_PATH = 'reazonspeech-nemo-v2_joint.onnx.prototxt'
 TOKENIZER_PATH = 'tokenizer/tokenizer.model'
+WEIGHT_ENC_PB_PATH = "reazonspeech-nemo-v2_encoder_weights.pb"
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/reason_speech2/'
 
 WAV_PATH = 'speech-001.wav'
@@ -628,6 +629,7 @@ def main():
     check_and_download_models(WEIGHT_ENC_PATH, MODEL_ENC_PATH, REMOTE_PATH)
     check_and_download_models(WEIGHT_DEC_PATH, MODEL_DEC_PATH, REMOTE_PATH)
     check_and_download_models(WEIGHT_JNT_PATH, MODEL_JNT_PATH, REMOTE_PATH)
+    check_and_download_file(WEIGHT_ENC_PB_PATH, REMOTE_PATH)
 
     env_id = args.env_id
 
