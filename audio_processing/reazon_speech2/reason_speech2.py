@@ -1,11 +1,12 @@
 import sys
 import time
 from dataclasses import dataclass
-from typing import List, Optional, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 from logging import getLogger
 
 import numpy as np
 import librosa
+import sentencepiece
 from scipy.special import log_softmax
 
 import ailia
@@ -30,6 +31,7 @@ WEIGHT_DEC_PATH = 'reazonspeech-nemo-v2_decoder.onnx'
 MODEL_DEC_PATH = 'reazonspeech-nemo-v2_decoder.onnx.prototxt'
 WEIGHT_JNT_PATH = 'reazonspeech-nemo-v2_joint.onnx'
 MODEL_JNT_PATH = 'reazonspeech-nemo-v2_joint.onnx.prototxt'
+TOKENIZER_PATH = 'tokenizer/tokenizer.model'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/reason_speech2/'
 
 WAV_PATH = 'speech-001.wav'
@@ -53,6 +55,15 @@ args = update_parser(parser)
 # Secondaty Functions
 # ======================
 
+PAD_SECONDS = 0.5
+SECONDS_PER_STEP = 0.08
+SUBWORDS_PER_SEGMENTS = 10
+PHONEMIC_BREAK = 0.5
+
+TOKEN_EOS = {'。', '?', '!'}
+TOKEN_COMMA = {'、', ','}
+TOKEN_PUNC = TOKEN_EOS | TOKEN_COMMA
+
 vocab_size = 3000
 blank_id = 3000
 index_incr = 0
@@ -62,8 +73,48 @@ pred_rnn_layers = 2
 
 
 @dataclass
+class TranscribeResult:
+    text: str
+    subwords: list
+    segments: list
+
+
+@dataclass
+class Subword:
+    """A subword with timestamp"""
+    # Currently Subword only has a single-point timestamp.
+    # Theoretically, we should be able to compute time ranges.
+    seconds: float
+    token_id: int
+    token: str
+
+
+@dataclass
+class Segment:
+    """A segment of transcription with timestamps"""
+    start_seconds: float
+    end_seconds: float
+    text: str
+
+
+@dataclass
 class Hypothesis:
     """Hypothesis class for beam search algorithms.
+
+    score: A float score obtained from an AbstractRNNTDecoder module's score_hypothesis method.
+
+    y_sequence: Either a sequence of integer ids pointing to some vocabulary, or a packed np.ndarray
+        behaving in the same manner. dtype must be torch.Long in the latter case.
+
+    dec_state: A list (or list of list) of LSTM-RNN decoder states. Can be None.
+
+    timestep: (Optional) A list of integer indices representing at which index in the decoding
+        process did the token appear. Should be of same length as the number of non-blank tokens.
+
+    length: Represents the length of the sequence (the original length without padding), otherwise
+        defaults to 0.
+
+    lm_state: (Unused) A dictionary state cache used by an external Language Model.
     """
 
     score: float
@@ -420,6 +471,22 @@ def pack_hypotheses(hypotheses: List[Hypothesis]) -> List[Hypothesis]:
     return hypotheses
 
 
+def find_end_of_segment(subwords, start):
+    """Heuristics to identify speech boundaries"""
+    length = len(subwords)
+    for idx in range(start, length):
+        if idx < length - 1:
+            cur = subwords[idx]
+            nex = subwords[idx + 1]
+            if nex.token not in TOKEN_PUNC:
+                if cur.token in TOKEN_EOS:
+                    break
+                elif idx - start >= SUBWORDS_PER_SEGMENTS:
+                    if cur.token in TOKEN_COMMA or nex.seconds - cur.seconds > PHONEMIC_BREAK:
+                        break
+    return idx
+
+
 def decode_hypothesis(models, hyp):
     """Decode ALSD beam search info into transcribe result
     """
@@ -428,13 +495,13 @@ def decode_hypothesis(models, hyp):
     y_sequence = hyp.y_sequence.tolist()[1:]
 
     tokenizer = models["tokenizer"]
-    text = tokenizer.ids_to_text(y_sequence)
+    text = tokenizer.decode_ids(y_sequence)
 
     subwords = []
     for idx, (token_id, step) in enumerate(zip(y_sequence, hyp.timestep)):
         subwords.append(Subword(
             token_id=token_id,
-            token=model.tokenizer.ids_to_text([token_id]),
+            token=tokenizer.decode_ids([token_id]),
             seconds=max(SECONDS_PER_STEP * (step - idx - 1) - PAD_SECONDS, 0)
         ))
 
@@ -445,11 +512,19 @@ def decode_hypothesis(models, hyp):
         segments.append(Segment(
             start_seconds=subwords[start].seconds,
             end_seconds=subwords[end].seconds + SECONDS_PER_STEP,
-            text=model.tokenizer.ids_to_text(y_sequence[start:end + 1]),
+            text=tokenizer.decode_ids(y_sequence[start:end + 1]),
         ))
         start = end + 1
 
     return TranscribeResult(text, subwords, segments)
+
+
+def format_time(seconds):
+    h = int(seconds / 3600)
+    m = int(seconds / 60) % 60
+    s = int(seconds % 60)
+    ms = int((seconds % 1) * 1000)
+    return "%02i:%02i:%02i.%03i" % (h, m, s, ms)
 
 
 # ======================
@@ -494,7 +569,7 @@ def predict(models, audio):
 
     hypotheses = decode(models, encoded, encoded_length)
 
-    return hypotheses
+    return hypotheses[0]
 
 
 def recognize_from_audio(models):
@@ -526,7 +601,10 @@ def recognize_from_audio(models):
             hyp = predict(models, audio)
 
         ret = decode_hypothesis(models, hyp)
-        print(ret.text)
+        for segment in ret.segments:
+            start = format_time(segment.start_seconds)
+            end = format_time(segment.end_seconds)
+            print("[%s --> %s] %s" % (start, end, segment.text))
 
     logger.info('Script finished successfully.')
 
@@ -550,7 +628,23 @@ def main():
         decoder = onnxruntime.InferenceSession(WEIGHT_DEC_PATH)
         joint = onnxruntime.InferenceSession(WEIGHT_JNT_PATH)
 
+    tokenizer = sentencepiece.SentencePieceProcessor()
+    tokenizer.load(TOKENIZER_PATH)
+
+    # vocabulary = {}
+    # for i in range(vocab_size):
+    #     piece = tokenizer.id_to_piece(i)
+    #     vocabulary[piece] = i + 1
+    #
+    # # wrapper method to get vocabulary conveniently
+    # def get_vocab():
+    #     return vocabulary
+    #
+    # tokenizer.vocab_size = len(vocabulary)
+    # tokenizer.get_vocab = get_vocab
+
     models = {
+        'tokenizer': tokenizer,
         'encoder': encoder,
         'decoder': decoder,
         'joint': joint,
