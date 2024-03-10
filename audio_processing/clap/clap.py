@@ -28,8 +28,12 @@ parser.add_argument(
     action='store_true',
     help='By default, the ailia SDK is used, but with this option, you can switch to using ONNX Runtime'
 )
+parser.add_argument(
+    '--ailia_audio',
+    action='store_true',
+    help='use ailia_audio instead librosa to get spectrogram feature'
+)
 args = update_parser(parser)
-
 
 # ======================
 # PARAMETERS
@@ -108,7 +112,8 @@ def infer_audio(net_audio, audio_src):
             'class_num': 527, 
             'model_type': 'HTSAT', 
             'model_name': 'tiny'
-        }
+        },
+        b_use_ailia=args.ailia_audio
     )
     input_dict = {
         'longer': [[True]], # Error occers when longer value is "False".
