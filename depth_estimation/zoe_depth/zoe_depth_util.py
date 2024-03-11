@@ -14,7 +14,7 @@ def get_params(arch):
 
 
 def preprocess(img_orig, input_size) -> Tuple[np.ndarray, np.ndarray]:
-    resized_img = cv2.resize(img_orig, input_size).astype(np.float32) 
+    resized_img = cv2.resize(img_orig, input_size).astype(np.float32)
     resized_img /= 255.0
     resized_img_reversed = resized_img[..., ::-1]
     resized_img = rearrange(resized_img, "h w c -> 1 c h w")
@@ -23,12 +23,12 @@ def preprocess(img_orig, input_size) -> Tuple[np.ndarray, np.ndarray]:
 
 
 def postprocess(
-    pred, 
+    pred,
     original_width: int,
     original_height: int,
     vmin: int | None = 0,
     vmax: int | None = 10,
-    cmap: str = "magma_r"
+    cmap: str = "magma_r",
 ) -> np.ndarray:
     invalid_mask = pred == -99
     mask = np.logical_not(invalid_mask)
@@ -46,7 +46,6 @@ def postprocess(
     img[invalid_mask] = (128, 128, 128, 256)
     img = cv2.resize(img, (original_width, original_height))
     return img
-
 
 
 def save(

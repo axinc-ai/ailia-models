@@ -2,10 +2,11 @@ import sys
 
 import ailia
 import cv2
+
 from zoe_depth_util import get_params, postprocess, preprocess, save
 
 # import original modules
-sys.path.append('../../util')
+sys.path.append("../../util")
 # logger
 from logging import getLogger  # noqa: E402
 
@@ -19,9 +20,9 @@ logger = getLogger(__name__)
 # Parameters
 # ======================
 
-REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/zoe_depth/'
+REMOTE_PATH = "https://storage.googleapis.com/ailia-models/zoe_depth/"
 
-IMAGE_PATH = './input.jpg'
+IMAGE_PATH = "./input.jpg"
 SAVE_IMAGE_PATH = "./output.png"
 
 MODEL_ARCHS = ("ZoeD_M12_K", "ZoeD_M12_N", "ZoeD_M12_NK")
@@ -35,16 +36,11 @@ INPUT_SIZE = {
 # Arguemnt Parser Config
 # ======================
 
-parser = get_base_parser('ZoeDepth model', IMAGE_PATH, SAVE_IMAGE_PATH)
+parser = get_base_parser("ZoeDepth model", IMAGE_PATH, SAVE_IMAGE_PATH)
 parser.add_argument(
-    '-a', '--arch', default='ZoeD_M12_K', choices=MODEL_ARCHS,
-    help='arch model.'
+    "-a", "--arch", default="ZoeD_M12_K", choices=MODEL_ARCHS, help="arch model."
 )
-parser.add_argument(
-    '--onnx',
-    action='store_true',
-    help='execute onnxruntime version.'
-)
+parser.add_argument("--onnx", action="store_true", help="execute onnxruntime version.")
 args = update_parser(parser)
 
 
@@ -85,10 +81,7 @@ def infer_from_image(net):
     input_image_file = args.input[0]
     img = cv2.imread(input_image_file)
     H, W = img.shape[:2]
-    resized_img, resized_img_reversed = preprocess(
-        img, INPUT_SIZE[arch]
-    )
-
+    resized_img, resized_img_reversed = preprocess(img, INPUT_SIZE[arch])
 
     logger.info("Start inference.")
     if args.onnx:
@@ -121,17 +114,16 @@ def infer_from_video(net):
     logger.info("Start inference.")
     logger.info("Finish inference.")
 
-
     frame_shown = False
-    while(True):
+    while True:
         ret, frame = capture.read()
-        if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+        if (cv2.waitKey(1) & 0xFF == ord("q")) or not ret:
             break
-        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
+        if frame_shown and cv2.getWindowProperty("frame", cv2.WND_PROP_VISIBLE) == 0:
             break
 
         resized_img, resized_img_reversed = preprocess(frame, INPUT_SIZE[arch])
-        
+
         if args.onnx:
             pred = infer_onnx(net, resized_img, resized_img_reversed)
         else:
@@ -143,7 +135,7 @@ def infer_from_video(net):
             original_height=H,
         )
 
-        cv2.imshow('frame', pred_postprocessed[..., ::-1])
+        cv2.imshow("frame", pred_postprocessed[..., ::-1])
         frame_shown = True
 
         if writer is not None:
@@ -163,6 +155,7 @@ def main():
     # create net instance
     if args.onnx:
         import onnxruntime
+
         net = onnxruntime.InferenceSession(weight_path)
     else:
         net = ailia.Net(model_path, weight_path, env_id=args.env_id)
@@ -174,5 +167,5 @@ def main():
         infer_from_image(net)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
