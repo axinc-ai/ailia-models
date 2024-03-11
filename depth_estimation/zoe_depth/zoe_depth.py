@@ -10,8 +10,7 @@ sys.path.append('../../util')
 from logging import getLogger  # noqa: E402
 
 import webcamera_utils  # noqa: E401
-from arg_utils import (get_base_parser, get_savepath,  # noqa: E402
-                       update_parser)
+from arg_utils import get_base_parser, update_parser  # noqa: E402
 from model_utils import check_and_download_models
 
 logger = getLogger(__name__)
