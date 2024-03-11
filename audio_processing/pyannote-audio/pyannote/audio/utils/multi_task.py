@@ -50,7 +50,7 @@ def map_with_specifications(
     -------
     output : (tuple of) `func` return value(s)
     """
-
+    
     if isinstance(specifications, Specifications):
         return func(*iterables, specifications=specifications)
 

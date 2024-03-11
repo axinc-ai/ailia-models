@@ -205,6 +205,7 @@ class Audio:
         """
 
         # downmix to mono
+        
         num_channels = waveform.shape[0]
         if num_channels > 1:
             if self.mono == "random":
@@ -287,7 +288,7 @@ class Audio:
         """
 
         file = self.validate_file(file)
-
+        
         if "waveform" in file:
             waveform = file["waveform"]
             sample_rate = file["sample_rate"]
@@ -298,12 +299,12 @@ class Audio:
             # rewind if needed
             if isinstance(file["audio"], IOBase):
                 file["audio"].seek(0)
-
+        
         channel = file.get("channel", None)
 
         if channel is not None:
             waveform = waveform[channel : channel + 1]
-
+        # breakpoint()
         return self.downmix_and_resample(waveform, sample_rate)
 
     def crop(

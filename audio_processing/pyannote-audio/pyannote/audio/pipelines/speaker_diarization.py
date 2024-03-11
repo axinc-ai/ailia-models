@@ -194,26 +194,26 @@ class SpeakerDiarization(SpeakerDiarizationMixin, Pipeline):
         
         self.clustering = Klustering.value(metric=metric)
 
-    @property
-    def segmentation_batch_size(self) -> int:
-        return self._segmentation.batch_size
+    # @property
+    # def segmentation_batch_size(self) -> int:
+        # return self._segmentation.batch_size
 
-    @segmentation_batch_size.setter
-    def segmentation_batch_size(self, batch_size: int):
-        self._segmentation.batch_size = batch_size
+    # @segmentation_batch_size.setter
+    # def segmentation_batch_size(self, batch_size: int):
+        # self._segmentation.batch_size = batch_size
 
-    def default_parameters(self):
-        raise NotImplementedError()
+    # def default_parameters(self):
+        # raise NotImplementedError()
 
-    def classes(self):
-        speaker = 0
-        while True:
-            yield f"SPEAKER_{speaker:02d}"
-            speaker += 1
+    # def classes(self):
+        # speaker = 0
+        # while True:
+            # yield f"SPEAKER_{speaker:02d}"
+            # speaker += 1
 
-    @property
-    def CACHED_SEGMENTATION(self):
-        return "training_cache/segmentation"
+    # @property
+    # def CACHED_SEGMENTATION(self):
+        # return "training_cache/segmentation"
 
     def get_segmentations(self, file, hook=None) -> SlidingWindowFeature:
         """Apply segmentation model
@@ -287,6 +287,7 @@ class SpeakerDiarization(SpeakerDiarizationMixin, Pipeline):
         num_chunks, num_frames, num_speakers = binary_segmentations.data.shape
 
         if exclude_overlap:
+            
             # minimum number of samples needed to extract an embedding
             # (a lower number of samples would result in an error)
             min_num_samples = self._embedding.min_num_samples
@@ -311,9 +312,7 @@ class SpeakerDiarization(SpeakerDiarizationMixin, Pipeline):
             )
         
         def iter_waveform_and_mask():
-            for (chunk, masks), (_, clean_masks) in zip(
-                binary_segmentations, clean_segmentations
-            ):
+            for (chunk, masks), (_, clean_masks) in zip(binary_segmentations, clean_segmentations):
                 # chunk: Segment(t, t + duration)
                 # masks: (num_frames, local_num_speakers) np.ndarray
 
@@ -346,6 +345,7 @@ class SpeakerDiarization(SpeakerDiarizationMixin, Pipeline):
             batch_size=self.embedding_batch_size,
             fillvalue=(None, None),
         )
+        
 
         batch_count = math.ceil(num_chunks * num_speakers / self.embedding_batch_size)
 
@@ -372,23 +372,24 @@ class SpeakerDiarization(SpeakerDiarizationMixin, Pipeline):
 
             if hook is not None:
                 hook("embeddings", embedding_batch, total=batch_count, completed=i)
-        
+        breakpoint()
         embedding_batches = np.vstack(embedding_batches)
 
         embeddings = rearrange(embedding_batches, "(c s) d -> c s d", c=num_chunks)
 
         # caching embeddings for subsequent trials
         # (see comments at the top of this method for more details)
-        if self.training:
-            if self._segmentation.specifications.powerset:
-                file["training_cache/embeddings"] = {
-                    "embeddings": embeddings,
-                }
-            else:
-                file["training_cache/embeddings"] = {
-                    "segmentation.threshold": self.segmentation.threshold,
-                    "embeddings": embeddings,
-                }
+        # breakpoint()
+        # if self.training:
+        #     if self._segmentation.specifications.powerset:
+        #         file["training_cache/embeddings"] = {
+        #             "embeddings": embeddings,
+        #         }
+        #     else:
+        #         file["training_cache/embeddings"] = {
+        #             "segmentation.threshold": self.segmentation.threshold,
+        #             "embeddings": embeddings,
+        #         }
 
         return embeddings
 

@@ -143,8 +143,9 @@ class SpeakerDiarizationMixin:
         count : SlidingWindowFeature
             (num_frames, 1)-shaped instantaneous speaker count
         """
-
+        
         trimmed = Inference.trim(binarized_segmentations, warm_up=warm_up)
+        
         count = Inference.aggregate(
             np.sum(trimmed, axis=-1, keepdims=True),
             frames,
@@ -152,6 +153,7 @@ class SpeakerDiarizationMixin:
             missing=0.0,
             skip_average=False,
         )
+        
         count.data = np.rint(count.data).astype(np.uint8)
 
         return count
