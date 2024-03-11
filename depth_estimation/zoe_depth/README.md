@@ -1,18 +1,18 @@
 # Zoe Depth
 
 ## Input
-<img src="./input.jpg" width="640" height="280">
+<img src="./input.jpg" width="640" height="480">
 
 ## Output
 - ZoeD_M12_N
 
-<img src="./output_n.png" width="640" height="280">
+<img src="./output_n.png" width="640" height="480">
 
 - ZoeD_M12_NK
-<img src="./output_nk.png" width="640" height="280">
+<img src="./output_nk.png" width="640" height="480">
 
 - ZoeD_M12_K
-<img src="./output_k.png" width="640" height="280">
+<img src="./output_k.png" width="640" height="480">
 
 
 ## Usage
