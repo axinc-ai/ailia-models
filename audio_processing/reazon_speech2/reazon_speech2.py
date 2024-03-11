@@ -33,7 +33,7 @@ WEIGHT_JNT_PATH = 'reazonspeech-nemo-v2_joint.onnx'
 MODEL_JNT_PATH = 'reazonspeech-nemo-v2_joint.onnx.prototxt'
 TOKENIZER_PATH = 'tokenizer/tokenizer.model'
 WEIGHT_ENC_PB_PATH = "reazonspeech-nemo-v2_encoder_weights.pb"
-REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/reason_speech2/'
+REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/reazon_speech2/'
 
 WAV_PATH = 'speech-001.wav'
 SAVE_TEXT_PATH = 'output.txt'

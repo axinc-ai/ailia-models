@@ -28,12 +28,12 @@ It is necessary to be connected to the Internet while downloading.
 
 For the sample wav,
 ```bash
-$ python3 reason_speech2.py
+$ python3 reazon_speech2.py
 ```
 
 If you want to specify the audio, put the file path after the `--input` option.
 ```bash
-$ python3 reason_speech2.py --input AUDIO_FILE
+$ python3 reazon_speech2.py --input AUDIO_FILE
 ```
 
 ## Reference
