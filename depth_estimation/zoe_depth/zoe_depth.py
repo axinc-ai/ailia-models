@@ -2,7 +2,6 @@ import sys
 
 import ailia
 import cv2
-
 from zoe_depth_util import get_params, postprocess, preprocess, save
 
 # import original modules
@@ -95,8 +94,7 @@ def infer_from_image(net):
         original_height=H,
     )
     logger.info(f"Saving depth image to {SAVE_IMAGE_PATH}.")
-    savepath = SAVE_IMAGE_PATH if args.savepath == SAVE_IMAGE_PATH else args.savepath
-    save(pred=pred_postprocessed, output_filename=savepath)
+    save(pred=pred_postprocessed, output_filename=args.savepath)
     logger.info("Finish inference.")
 
 
