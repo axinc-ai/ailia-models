@@ -1,6 +1,9 @@
+from typing import Tuple
+
 import cv2
 import matplotlib
 import numpy as np
+from einops import rearrange
 from PIL import Image
 
 
@@ -10,15 +13,23 @@ def get_params(arch):
     return weight_path, model_path
 
 
-def save(
-    pred: np.ndarray,
-    output_filename: str,
+def preprocess(img_orig, input_size) -> Tuple[np.ndarray, np.ndarray]:
+    resized_img = cv2.resize(img_orig, input_size).astype(np.float32) 
+    resized_img /= 255.0
+    resized_img_reversed = resized_img[..., ::-1]
+    resized_img = rearrange(resized_img, "h w c -> 1 c h w")
+    resized_img_reversed = rearrange(resized_img_reversed, "h w c -> 1 c h w")
+    return resized_img, resized_img_reversed
+
+
+def postprocess(
+    pred, 
     original_width: int,
     original_height: int,
     vmin: int | None = 0,
     vmax: int | None = 10,
-    cmap: str = "magma_r",
-):
+    cmap: str = "magma_r"
+) -> np.ndarray:
     invalid_mask = pred == -99
     mask = np.logical_not(invalid_mask)
 
@@ -31,8 +42,15 @@ def save(
     pred[invalid_mask] = np.nan
     cmapper = matplotlib.cm.get_cmap(cmap)
     pred = cmapper(pred, bytes=True)
-
     img = pred[...]
     img[invalid_mask] = (128, 128, 128, 256)
     img = cv2.resize(img, (original_width, original_height))
-    Image.fromarray(img).save(output_filename)
+    return img
+
+
+
+def save(
+    pred: np.ndarray,
+    output_filename: str,
+):
+    Image.fromarray(pred).save(output_filename)

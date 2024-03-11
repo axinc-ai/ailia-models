@@ -2,16 +2,14 @@ import sys
 
 import ailia
 import cv2
-import numpy as np
-from einops import rearrange
-from zoe_depth_util import get_params, save
+from zoe_depth_util import get_params, postprocess, preprocess, save
 
 # import original modules
 sys.path.append('../../util')
 # logger
 from logging import getLogger  # noqa: E402
 
-import webcamera_utils  # noqa: E402
+import webcamera_utils  # noqa: E401
 from arg_utils import (get_base_parser, get_savepath,  # noqa: E402
                        update_parser)
 from model_utils import check_and_download_models
@@ -51,6 +49,24 @@ parser.add_argument(
 args = update_parser(parser)
 
 
+def infer_onnx(net, image, image_reversed):
+    logger.info("Inference with ONNX.")
+    input_name = net.get_inputs()[0].name
+    if args.arch == "ZoeD_M12_NK":
+        output_name = net.get_outputs()[1].name
+    else:
+        output_name = net.get_outputs()[0].name
+
+    pred_not_reversed = net.run([output_name], {input_name: image})[0]
+    pred_reversed = net.run([output_name], {input_name: image_reversed})[0]
+    pred = 0.5 * (pred_not_reversed + pred_reversed)
+    pred = pred.squeeze()
+    return pred
+
+
+def infer_ailia(net, image, image_reversed):
+    logger.info("Inference with Ailia.")
+
 # ======================
 # Main functions
 # ======================
@@ -59,28 +75,80 @@ def infer_from_image(net):
     input_image_file = args.input[0]
     img = cv2.imread(input_image_file)
     H, W = img.shape[:2]
-    resized_img = cv2.resize(img, INPUT_SIZE[arch]).astype(np.float32) 
-    resized_img /= 255.0
-    resized_img_reversed = resized_img[..., ::-1]
-    resized_img = rearrange(resized_img, "h w c -> 1 c h w")
-    resized_img_reversed = rearrange(resized_img_reversed, "h w c -> 1 c h w")
+    resized_img, resized_img_reversed = preprocess(
+        img, INPUT_SIZE[arch]
+    )
 
 
+    logger.info("Start inference.")
     if args.onnx:
-        input_name = net.get_inputs()[0].name
-        output_name = net.get_outputs()[0].name
-        pred_not_reversed = net.run([output_name], {input_name: resized_img})[0]
-        pred_reversed = net.run([output_name], {input_name: resized_img_reversed})[0]
-        pred = 0.5 * (pred_not_reversed + pred_reversed)
-        pred = pred.squeeze()
+        pred = infer_onnx(net, resized_img, resized_img_reversed)
+    else:
+        pred = infer_ailia(net, resized_img, resized_img_reversed)
 
-    save(pred=pred, output_filename=SAVE_IMAGE_PATH, original_width=W, original_height=H)
+    pred_postprocessed = postprocess(
+        pred=pred,
+        original_width=W,
+        original_height=H,
+    )
+    logger.info(f"Saving depth image to {SAVE_IMAGE_PATH}.")
+    savepath = SAVE_IMAGE_PATH if args.savepath == SAVE_IMAGE_PATH else args.savepath
+    save(pred=pred_postprocessed, output_filename=savepath)
+    logger.info("Finish inference.")
+
+
+def infer_from_video(net):
+    arch = args.arch
+    capture = webcamera_utils.get_capture(args.video)
+    W = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
+    H = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
+
+    if args.savepath != SAVE_IMAGE_PATH:
+        writer = webcamera_utils.get_writer(args.savepath, H, W)
+    else:
+        writer = None
+
+    logger.info("Start inference.")
+    logger.info("Finish inference.")
+
+
+    frame_shown = False
+    while(True):
+        ret, frame = capture.read()
+        if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
+            break
+
+        resized_img, resized_img_reversed = preprocess(frame, INPUT_SIZE[arch])
+        
+        if args.onnx:
+            pred = infer_onnx(net, resized_img, resized_img_reversed)
+        else:
+            pred = infer_ailia(net, resized_img, resized_img_reversed)
+
+        pred_postprocessed = postprocess(
+            pred=pred,
+            original_width=W,
+            original_height=H,
+        )
+
+        cv2.imshow('frame', pred_postprocessed[..., ::-1])
+        frame_shown = True
+
+        if writer is not None:
+            writer.write(pred)
+
+    capture.release()
+    cv2.destroyAllWindows()
+    if writer is not None:
+        writer.release()
 
 
 def main():
     # model files check and download
     weight_path, model_path = get_params(args.arch)
-    # check_and_download_models(weight_path, model_path, REMOTE_PATH)
+    check_and_download_models(weight_path, model_path, REMOTE_PATH)
 
     # create net instance
     if args.onnx:
@@ -90,7 +158,10 @@ def main():
         net = ailia.Net(model_path, weight_path, env_id=args.env_id)
 
     # check input
-    infer_from_image(net)
+    if args.video:
+        infer_from_video(net)
+    else:
+        infer_from_image(net)
 
 
 if __name__ == '__main__':
