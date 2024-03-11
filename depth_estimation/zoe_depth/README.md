@@ -6,13 +6,13 @@
 ## Output
 - ZoeD_M12_N
 
-<img src="./output_n.jpg" width="640" height="280">
+<img src="./output_n.png" width="640" height="280">
 
 - ZoeD_M12_NK
-<img src="./output_nk.jpg" width="640" height="280">
+<img src="./output_nk.png" width="640" height="280">
 
 - ZoeD_M12_K
-<img src="./output_k.jpg" width="640" height="280">
+<img src="./output_k.png" width="640" height="280">
 
 
 ## Usage
