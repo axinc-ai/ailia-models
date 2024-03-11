@@ -65,6 +65,17 @@ def infer_onnx(net, image, image_reversed):
 
 def infer_ailia(net, image, image_reversed):
     logger.info("Inference with Ailia.")
+    if args.arch == "ZoeD_M12_NK":
+        pred_not_reversed = net.run(image)[1]
+        pred_reversed = net.run(image_reversed)[1]
+    else:
+        pred_not_reversed = net.run(image)[0]
+        pred_reversed = net.run(image_reversed)[0]
+
+    pred = 0.5 * (pred_not_reversed + pred_reversed)
+    pred = pred.squeeze()
+    return pred
+
 
 # ======================
 # Main functions
