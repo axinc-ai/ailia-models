@@ -3,6 +3,8 @@
 ## Input
 <img src="./input.jpg" width="640" height="480">
 
+(Image from NYU Depvh V2: https://drive.google.com/file/d/1AysroWpfISmm-yRFGBgFTrLy6FjQwvwP/view)
+
 ## Output
 - ZoeD_M12_N
 
