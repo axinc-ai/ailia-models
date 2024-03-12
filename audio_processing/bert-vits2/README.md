@@ -17,6 +17,8 @@ specifies the type of voice that will be used. JP characters' id is in the 196 t
 **style text(optional)  (```--style-text```)**
 
 the BERT features of this text will be mixed with the BERT features of the
+
+
 original input, forcibly stylizing the output speech.
 
 ## Output
@@ -35,6 +37,9 @@ Running this script in FP16 environments will result in an error due to the rang
 ```bash
 python3 bert-vits2.py --text 吾輩は猫である --emo 私は今とても嬉しいです -e 0
 ```
+The output of this script will be like this.
+
+https://github.com/axinc-ai/ailia-models/assets/53651931/57d9eb49-78eb-4eea-9cde-eb6fbf09ed96
 
 
 For more information about the arguments, try running ```python3 bert-vits2-jp.py --help```
