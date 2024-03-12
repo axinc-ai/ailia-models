@@ -44,8 +44,7 @@ else:
     import librosa
 
 # ======================
-# Parameters 2
-# ======================
+# Parameters 2 ======================
 WEIGHT_PATH = "vggish.onnx"
 MODEL_PATH = WEIGHT_PATH + ".prototxt"
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/vggish/"
@@ -97,7 +96,7 @@ def waveform_to_examples(data, sample_rate, return_tensor=True):
         hop_length=example_hop_length)
 
     if return_tensor:
-        log_mel_examples = log_mel_examples[:, None, :, :]
+        log_mel_examples = log_mel_examples[:, None, :, :].astype("float32")
     return log_mel_examples
 
 
@@ -108,12 +107,12 @@ def recognize_one_audio(input_path):
 
     if args.ailia_audio:
         wav_data,sr = sf.read(input_path)
-        wav_data = np.transpose(wav_data, (1,0))
-        wav_data = ailia.audio.resample(wav_data,sr,SAMPLE_RATE)[0]
+        wav_data = ailia.audio.resample(wav_data,sr,SAMPLE_RATE)
+        samples = wav_data 
+        samples = wav_data / 32768.0  # Convert to [-1.0, +1.0]
     else:
-        wav_data = librosa.load(input_path, sr=SAMPLE_RATE)[0]
+        samples = librosa.load(input_path, sr=SAMPLE_RATE)[0]
 
-    samples = wav_data / 32768.0  # Convert to [-1.0, +1.0]
     # apply preenphasis filter
     logger.info('Generating input feature...')
     mel = waveform_to_examples(samples, SAMPLE_RATE, True)
@@ -124,7 +123,6 @@ def recognize_one_audio(input_path):
     logger.info(f'env_id: {env_id}')
     memory_mode = ailia.get_memory_mode(reuse_interstage=True)
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id, memory_mode=memory_mode)
-    print("mel ",mel.shape)
 
     # inference
     logger.info('Start inference...')
@@ -142,9 +140,14 @@ def recognize_one_audio(input_path):
     savepath = get_savepath(args.savepath, input_path)
     logger.info(f'saved at : {savepath}')
 
+    torch_result = np.load("torch_result.npy")
+    error = (torch_result - np.array(result)[0]) ** 2
+    RMSE = np.sqrt(np.sum(error)/ np.prod(error.shape)) 
+    logger.info('RMSE from original model: '+str(RMSE) )
+
     np.save(savepath, result)
-    #sf.write(savepath, out_wav, DESIRED_SR)
-    
+
+
     logger.info('Saved separated signal. ')
     logger.info('Script finished successfully.')
 
