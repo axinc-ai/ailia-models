@@ -37,9 +37,9 @@ from pyannote.audio.core.io import AudioFile, Audio
 # from pyannote.audio.core.model import Specifications
 from pyannote.audio.core.task import Resolution, Specifications
 from pyannote.audio.utils.multi_task import map_with_specifications
-from pyannote.audio.utils.permutation import mae_cost_func, permutate
+# from pyannote.audio.utils.permutation import mae_cost_func, permutate
 from pyannote.audio.utils.powerset import Powerset
-from pyannote.audio.utils.reproducibility import fix_reproducibility
+# from pyannote.audio.utils.reproducibility import fix_reproducibility
 from functools import cached_property
 from dataclasses import dataclass
 
@@ -247,6 +247,7 @@ class Inference(BaseInference):
         # if self.use_onnx_model:
         
         outputs = self.forward_onnx(chunks.to(self.device))
+        # outputs = self.forward_onnx(chunks)
         breakpoint()
         # outputs = torch.from_numpy(outputs).clone()
         # else:
@@ -275,6 +276,7 @@ class Inference(BaseInference):
         # return np.random.randn(1, 1, self.audio.get_num_samples(self.specifications.duration))
 
         return torch.randn(size=(1, 1, self.audio.get_num_samples(self.specifications.duration)),device=self.device)
+        # return np.random.randn(size=(1, 1, self.audio.get_num_samples(self.specifications.duration)))
     
     @cached_property
     def example_output(self) -> Union[Output, Tuple[Output]]:
@@ -282,7 +284,6 @@ class Inference(BaseInference):
         example_input_array = self.get_example_input_array()
         
         with torch.inference_mode():
-            
             example_output = self.infer(example_input_array)
             
 
@@ -354,12 +355,9 @@ class Inference(BaseInference):
         )
 
         # prepare complete chunks
-        
+        breakpoint()
         if num_samples >= window_size:
-            chunks: torch.Tensor = rearrange(
-                waveform.unfold(1, window_size, step_size),
-                "channel chunk frame -> chunk channel frame",
-            )
+            chunks: torch.Tensor = rearrange(waveform.unfold(1, window_size, step_size),"channel chunk frame -> chunk channel frame",)
             num_chunks, _, _ = chunks.shape
         else:
             num_chunks = 0
@@ -501,7 +499,7 @@ class Inference(BaseInference):
 
         """
 
-        fix_reproducibility(self.device)
+        # fix_reproducibility(self.device)
 
         waveform, sample_rate = self.audio(file)
         # waveform, sample_rate = librosa.load(file['audio'], sr=16000)

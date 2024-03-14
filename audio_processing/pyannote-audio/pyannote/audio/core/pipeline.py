@@ -41,7 +41,7 @@ from pyannote.audio import Audio, __version__
 from pyannote.audio.core.inference import BaseInference
 from pyannote.audio.core.io import AudioFile
 # from pyannote.audio.core.model import CACHE_DIR, Model
-from pyannote.audio.utils.reproducibility import fix_reproducibility
+# from pyannote.audio.utils.reproducibility import fix_reproducibility
 # from pyannote.audio.utils.version import check_version
 
 PIPELINE_PARAMS_NAME = "config.yaml"
@@ -204,7 +204,7 @@ class Pipeline(_Pipeline):
 
         See pyannote.pipeline.Pipeline.__getattr__.
         """
-
+        
         if "_models" in self.__dict__:
             _models = self.__dict__["_models"]
             if name in _models:
@@ -299,7 +299,8 @@ class Pipeline(_Pipeline):
         raise NotImplementedError()
 
     def __call__(self, file: AudioFile, **kwargs):
-        fix_reproducibility(getattr(self, "device", torch.device("cpu")))
+        # breakpoint()
+        # fix_reproducibility(getattr(self, "device", torch.device("cpu")))
 
         if not self.instantiated:
             # instantiate with default parameters when available

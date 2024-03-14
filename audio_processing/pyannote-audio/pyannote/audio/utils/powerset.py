@@ -25,7 +25,7 @@
 # Alexis PLAQUET
 
 from functools import cached_property
-from itertools import combinations, permutations
+from itertools import combinations
 from typing import Dict, Tuple
 
 import scipy.special

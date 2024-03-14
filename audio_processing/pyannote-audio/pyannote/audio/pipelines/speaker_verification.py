@@ -32,11 +32,11 @@ import torchaudio
 import torchaudio.compliance.kaldi as kaldi
 from huggingface_hub import hf_hub_download
 from huggingface_hub.utils import RepositoryNotFoundError
-from torch.nn.utils.rnn import pad_sequence
+# from torch.nn.utils.rnn import pad_sequence
 
-from pyannote.audio import Inference, Pipeline
+# from pyannote.audio import Inference, Pipeline
 from pyannote.audio.core.inference import BaseInference
-from pyannote.audio.core.io import AudioFile
+# from pyannote.audio.core.io import AudioFile
 # from pyannote.audio.core.model import CACHE_DIR
 # from pyannote.audio.pipelines.utils import PipelineModel, get_model
 PipelineModel = Union[Text, Mapping]

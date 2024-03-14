@@ -30,7 +30,7 @@ from .diarization import SpeakerDiarizationMixin
     # get_inference,
     # get_model,
 # )
-from .oracle import oracle_segmentation
+# from .oracle import oracle_segmentation
 
 __all__ = [
     "SpeakerDiarizationMixin",

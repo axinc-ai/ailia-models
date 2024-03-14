@@ -36,9 +36,9 @@ from scipy.cluster.hierarchy import fcluster, linkage
 from scipy.optimize import linear_sum_assignment
 from scipy.spatial.distance import cdist
 
-from pyannote.audio.core.io import AudioFile
-from pyannote.audio.pipelines.utils import oracle_segmentation
-from pyannote.audio.utils.permutation import permutate
+# from pyannote.audio.core.io import AudioFile
+# from pyannote.audio.pipelines.utils import oracle_segmentation
+# from pyannote.audio.utils.permutation import permutate
 
 
 class BaseClustering(Pipeline):
@@ -471,91 +471,91 @@ class AgglomerativeClustering(BaseClustering):
         return clusters
 
 
-class OracleClustering(BaseClustering):
-    """Oracle clustering"""
+# class OracleClustering(BaseClustering):
+#     """Oracle clustering"""
 
-    def __call__(
-        self,
-        embeddings: Optional[np.ndarray] = None,
-        segmentations: Optional[SlidingWindowFeature] = None,
-        file: Optional[AudioFile] = None,
-        frames: Optional[SlidingWindow] = None,
-        **kwargs,
-    ) -> np.ndarray:
-        """Apply oracle clustering
+#     def __call__(
+#         self,
+#         embeddings: Optional[np.ndarray] = None,
+#         segmentations: Optional[SlidingWindowFeature] = None,
+#         file: Optional[AudioFile] = None,
+#         frames: Optional[SlidingWindow] = None,
+#         **kwargs,
+#     ) -> np.ndarray:
+#         """Apply oracle clustering
 
-        Parameters
-        ----------
-        embeddings : (num_chunks, num_speakers, dimension) array, optional
-            Sequence of embeddings. When provided, compute speaker centroids
-            based on these embeddings.
-        segmentations : (num_chunks, num_frames, num_speakers) array
-            Binary segmentations.
-        file : AudioFile
-        frames : SlidingWindow
+#         Parameters
+#         ----------
+#         embeddings : (num_chunks, num_speakers, dimension) array, optional
+#             Sequence of embeddings. When provided, compute speaker centroids
+#             based on these embeddings.
+#         segmentations : (num_chunks, num_frames, num_speakers) array
+#             Binary segmentations.
+#         file : AudioFile
+#         frames : SlidingWindow
 
-        Returns
-        -------
-        hard_clusters : (num_chunks, num_speakers) array
-            Hard cluster assignment (hard_clusters[c, s] = k means that sth speaker
-            of cth chunk is assigned to kth cluster)
-        soft_clusters : (num_chunks, num_speakers, num_clusters) array
-            Soft cluster assignment (the higher soft_clusters[c, s, k], the most likely
-            the sth speaker of cth chunk belongs to kth cluster)
-        centroids : (num_clusters, dimension), optional
-            Clusters centroids if `embeddings` is provided, None otherwise.
-        """
+#         Returns
+#         -------
+#         hard_clusters : (num_chunks, num_speakers) array
+#             Hard cluster assignment (hard_clusters[c, s] = k means that sth speaker
+#             of cth chunk is assigned to kth cluster)
+#         soft_clusters : (num_chunks, num_speakers, num_clusters) array
+#             Soft cluster assignment (the higher soft_clusters[c, s, k], the most likely
+#             the sth speaker of cth chunk belongs to kth cluster)
+#         centroids : (num_clusters, dimension), optional
+#             Clusters centroids if `embeddings` is provided, None otherwise.
+#         """
 
-        num_chunks, num_frames, num_speakers = segmentations.data.shape
-        window = segmentations.sliding_window
+#         num_chunks, num_frames, num_speakers = segmentations.data.shape
+#         window = segmentations.sliding_window
 
-        oracle_segmentations = oracle_segmentation(file, window, frames=frames)
-        #   shape: (num_chunks, num_frames, true_num_speakers)
+#         oracle_segmentations = oracle_segmentation(file, window, frames=frames)
+#         #   shape: (num_chunks, num_frames, true_num_speakers)
 
-        file["oracle_segmentations"] = oracle_segmentations
+#         file["oracle_segmentations"] = oracle_segmentations
 
-        _, oracle_num_frames, num_clusters = oracle_segmentations.data.shape
+#         _, oracle_num_frames, num_clusters = oracle_segmentations.data.shape
 
-        segmentations = segmentations.data[:, : min(num_frames, oracle_num_frames)]
-        oracle_segmentations = oracle_segmentations.data[
-            :, : min(num_frames, oracle_num_frames)
-        ]
+#         segmentations = segmentations.data[:, : min(num_frames, oracle_num_frames)]
+#         oracle_segmentations = oracle_segmentations.data[
+#             :, : min(num_frames, oracle_num_frames)
+#         ]
 
-        hard_clusters = -2 * np.ones((num_chunks, num_speakers), dtype=np.int8)
-        soft_clusters = np.zeros((num_chunks, num_speakers, num_clusters))
-        for c, (segmentation, oracle) in enumerate(
-            zip(segmentations, oracle_segmentations)
-        ):
-            _, (permutation, *_) = permutate(oracle[np.newaxis], segmentation)
-            for j, i in enumerate(permutation):
-                if i is None:
-                    continue
-                hard_clusters[c, i] = j
-                soft_clusters[c, i, j] = 1.0
+#         hard_clusters = -2 * np.ones((num_chunks, num_speakers), dtype=np.int8)
+#         soft_clusters = np.zeros((num_chunks, num_speakers, num_clusters))
+#         for c, (segmentation, oracle) in enumerate(
+#             zip(segmentations, oracle_segmentations)
+#         ):
+#             _, (permutation, *_) = permutate(oracle[np.newaxis], segmentation)
+#             for j, i in enumerate(permutation):
+#                 if i is None:
+#                     continue
+#                 hard_clusters[c, i] = j
+#                 soft_clusters[c, i, j] = 1.0
 
-        if embeddings is None:
-            return hard_clusters, soft_clusters, None
+#         if embeddings is None:
+#             return hard_clusters, soft_clusters, None
 
-        (
-            train_embeddings,
-            train_chunk_idx,
-            train_speaker_idx,
-        ) = self.filter_embeddings(
-            embeddings,
-            segmentations=segmentations,
-        )
+#         (
+#             train_embeddings,
+#             train_chunk_idx,
+#             train_speaker_idx,
+#         ) = self.filter_embeddings(
+#             embeddings,
+#             segmentations=segmentations,
+#         )
 
-        train_clusters = hard_clusters[train_chunk_idx, train_speaker_idx]
-        centroids = np.vstack(
-            [
-                np.mean(train_embeddings[train_clusters == k], axis=0)
-                for k in range(num_clusters)
-            ]
-        )
+#         train_clusters = hard_clusters[train_chunk_idx, train_speaker_idx]
+#         centroids = np.vstack(
+#             [
+#                 np.mean(train_embeddings[train_clusters == k], axis=0)
+#                 for k in range(num_clusters)
+#             ]
+#         )
 
-        return hard_clusters, soft_clusters, centroids
+#         return hard_clusters, soft_clusters, centroids
 
 
 class Clustering(Enum):
     AgglomerativeClustering = AgglomerativeClustering
-    OracleClustering = OracleClustering
+    # OracleClustering = OracleClustering

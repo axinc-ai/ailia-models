@@ -45,8 +45,8 @@ from pyannote.audio.core.io import AudioFile
 from pyannote.audio.pipelines.clustering import Clustering
 # from pyannote.audio.pipelines.speaker_verification import PretrainedSpeakerEmbedding
 from pyannote.audio.pipelines.speaker_verification import ONNXWeSpeakerPretrainedSpeakerEmbedding
-from pyannote.audio.pipelines.utils import (SpeakerDiarizationMixin)
-from pyannote.audio.utils.signal import binarize
+from pyannote.audio.pipelines.utils import SpeakerDiarizationMixin
+# from pyannote.audio.utils.signal import binarize
 
 AudioFile = Union[Text, Path, IOBase, Mapping]
 PipelineModel = Union[Text, Mapping]
