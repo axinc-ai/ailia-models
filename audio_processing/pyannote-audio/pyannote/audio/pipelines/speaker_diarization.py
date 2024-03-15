@@ -488,7 +488,7 @@ class SpeakerDiarization(SpeakerDiarizationMixin, Pipeline):
             speaker embedding for i-th speaker in diarization.labels().
             Only returned when `return_embeddings` is True.
         """
-        breakpoint()
+        
         # setup hook (e.g. for debugging purposes)
         hook = self.setup_hook(file, hook=hook)
         

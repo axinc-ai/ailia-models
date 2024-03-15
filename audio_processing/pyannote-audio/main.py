@@ -5,9 +5,9 @@ import sys
 import time 
 import numpy as np
 import librosa
-# import ailia
+import ailia
 
-breakpoint()
+
 # sys.path.append('./pyannote')   
 # from pyannote.core import Segment, Annotation
 from pyannote.audio.pipelines.speaker_diarization import SpeakerDiarization
@@ -18,12 +18,12 @@ import torch
 from pyannote.database.util import load_rttm
 from pyannote.metrics.diarization import DiarizationErrorRate
 import argparse    
-from importlib import import_module
+# from importlib import import_module
 
 sys.path.append('../../util')
 from arg_utils import get_base_parser, update_parser  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
-from importlib import import_module
+# from importlib import import_module
 from logging import getLogger  # noqa: E402
 logger = getLogger(__name__)
 
@@ -74,10 +74,10 @@ def main(args):
         pipeline.instantiate(config["params"])
 
     # send pipeline to GPU (when available)
-    if torch.cuda.is_available():
-        pipeline.to(torch.device("cuda"))
-    else:
-        pipeline.to(torch.device("cpu"))
+    # if torch.cuda.is_available():
+        # pipeline.to(torch.device("cuda"))
+    # else:
+        # pipeline.to(torch.device("cpu"))
     
     if args.embed:
         if args.num > 0:
