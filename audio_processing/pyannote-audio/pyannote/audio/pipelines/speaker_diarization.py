@@ -30,7 +30,7 @@ import warnings
 
 from typing import Callable, Optional, Text, Union, Mapping
 from pathlib import Path
-from io import IOBase
+# from io import IOBase
 
 import numpy as np
 # import torch
@@ -48,7 +48,7 @@ from pyannote.audio.pipelines.speaker_verification import ONNXWeSpeakerPretraine
 from pyannote.audio.pipelines.utils import (SpeakerDiarizationMixin)
 # from pyannote.audio.utils.signal import binarize
 
-AudioFile = Union[Text, Path, IOBase, Mapping]
+AudioFile = Union[Text, Path, Mapping]
 PipelineModel = Union[Text, Mapping]
 
 def batchify(iterable, batch_size: int = 32, fillvalue=None):
@@ -337,7 +337,7 @@ class SpeakerDiarization(SpeakerDiarizationMixin, Pipeline):
                         used_mask = mask
 
                     # yield waveform[None], torch.from_numpy(used_mask)[None]
-                    yield waveform.numpy(force=True)[None], used_mask[None]
+                    yield waveform[None], used_mask[None]
                     
                     # w: (1, 1, num_samples) torch.Tensor
                     # m: (1, num_frames) torch.Tensor

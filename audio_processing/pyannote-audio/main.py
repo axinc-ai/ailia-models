@@ -11,9 +11,9 @@ import ailia
 # sys.path.append('./pyannote')   
 # from pyannote.core import Segment, Annotation
 from pyannote.audio.pipelines.speaker_diarization import SpeakerDiarization
-import json
+# import json
 # import polars as pl
-import torch
+# import torch
 # from pyannote.core import Segment, notebook
 from pyannote.database.util import load_rttm
 from pyannote.metrics.diarization import DiarizationErrorRate

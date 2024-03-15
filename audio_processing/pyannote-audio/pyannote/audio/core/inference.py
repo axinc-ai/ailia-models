@@ -27,8 +27,8 @@ from typing import Callable, List, Optional, Text, Tuple, Union
 
 import numpy as np
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
+# import torch.nn as nn
+# import torch.nn.functional as F
 from einops import rearrange
 from pyannote.core import Segment, SlidingWindow, SlidingWindowFeature
 from pytorch_lightning.utilities.memory import is_oom_error
@@ -172,16 +172,16 @@ class Inference(BaseInference):
         for s in specifications:
             if s.powerset and not skip_conversion:
                 c = Powerset(len(s.classes), s.powerset_max_classes)
-            else:
-                c = nn.Identity()
+            # else:
+                # c = nn.Identity()
             # conversion.append(c.to(self.device))
             conversion.append(c)
         
         
         if isinstance(specifications, Specifications):
             self.conversion = conversion[0]
-        else:
-            self.conversion = nn.ModuleList(conversion)
+        # else:
+            # self.conversion = nn.ModuleList(conversion)
 
         # ~~~~ overlap-add aggregation ~~~~~
 
@@ -377,13 +377,12 @@ class Inference(BaseInference):
         
         if has_last_chunk:
             # pad last chunk with zeros
-            ###################################### あとで ###############################
-            last_chunk: torch.Tensor = waveform[:, num_chunks * step_size :]
+            waveform = waveform.numpy(force=True)
+            last_chunk: np.ndarray = waveform[:, num_chunks * step_size :]
             _, last_window_size = last_chunk.shape
             last_pad = window_size - last_window_size
-            last_chunk = F.pad(last_chunk, (0, last_pad))
-            last_chunk = last_chunk.numpy(force=True)
-            ###################################### あとで ###############################
+            # last_chunk = F.pad(last_chunk, (0, last_pad))
+            last_chunk = np.pad(last_chunk, ((0, 0), (0, last_pad)))
 
         def __empty_list(**kwargs):
             return list()
@@ -514,8 +513,8 @@ class Inference(BaseInference):
         # fix_reproducibility(self.device)
 
         waveform, sample_rate = self.audio(file)
-        waveform = waveform.numpy(force=True)
-        # waveform, sample_rate = librosa.load(file['audio'], sr=16000)
+        # waveform = waveform.numpy(force=True)
+        
         
         if self.window == "sliding":
             return self.slide(waveform, sample_rate, hook=hook)

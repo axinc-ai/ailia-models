@@ -28,8 +28,8 @@ from typing import Optional, Text, Union, Mapping
 import numpy as np
 import torch
 import torch.nn.functional as F
-import torchaudio
-import torchaudio.compliance.kaldi as kaldi
+# import torchaudio
+# import torchaudio.compliance.kaldi as kaldi
 
 # from huggingface_hub import hf_hub_download
 # from huggingface_hub.utils import RepositoryNotFoundError
@@ -554,7 +554,8 @@ class ONNXWeSpeakerPretrainedSpeakerEmbedding(BaseInference):
         """
         
         waveforms = waveforms * (1 << 15)
-        
+
+        ### ここで少しずれる ###
         features_numpy = np.stack([compute_fbank_feats(
             waveform=waveform[0],
             num_mel_bins=num_mel_bins,
@@ -565,7 +566,8 @@ class ONNXWeSpeakerPretrainedSpeakerEmbedding(BaseInference):
             window_type="hamming",
             use_energy=False,
         )for waveform in waveforms])
-        
+        ### ここで少しずれる ###
+
         features = features_numpy.astype(np.float32)
         
         # features = torch.stack(
