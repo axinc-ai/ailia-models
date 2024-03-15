@@ -122,7 +122,7 @@ class Powerset():
         # if soft:
             # powerset_probs = torch.exp(powerset)
         # else:
-        breakpoint()
+        
         powerset_probs = np.identity(self.num_powerset_classes)[np.argmax(powerset, axis=-1)]
 
         # powerset_probs = torch.nn.functional.one_hot(
@@ -139,7 +139,7 @@ class Powerset():
 
     def __call__(self, powerset: np.ndarray, soft: bool = False) -> np.ndarray:
         """Alias for `to_multilabel`"""
-        breakpoint()
+        
         return self.to_multilabel(powerset, soft=soft)
 
     # def to_powerset(self, multilabel: torch.Tensor) -> torch.Tensor:

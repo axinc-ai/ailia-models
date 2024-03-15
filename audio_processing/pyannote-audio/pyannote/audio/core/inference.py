@@ -100,7 +100,7 @@ class Inference(BaseInference):
         pre_aggregation_hook: Callable[[np.ndarray], np.ndarray] = None,
         skip_aggregation: bool = False,
         skip_conversion: bool = False,
-        device: torch.device = None,
+        # device: torch.device = None,
         batch_size: int = 32,
         use_auth_token: Union[Text, None] = None,
     ):
@@ -124,20 +124,20 @@ class Inference(BaseInference):
                 
         use_onnx_model = isinstance(model, onnxruntime.InferenceSession)
         self.use_onnx_model = use_onnx_model
-        if device is None:
-            device = torch.device("cpu")
-        self.device = device
+        # if device is None:
+            # device = torch.device("cpu")
+        # self.device = device
         self.model = model
 
-        
-        if use_onnx_model:
+        ###################################### あとで ###################################
+        if use_onnx_model:  
             # specifications = onnx.load(model_path)
             specifications = torch.load(model_path.replace(".onnx", ".pt"))
-        else:
-            self.model.eval()
-            self.model.to(self.device)
-
-            specifications = self.specifications
+        ###################################### あとで ###################################
+        # else:
+            # self.model.eval()
+            # self.model.to(self.device)
+            # specifications = self.specifications
 
         self.specifications = specifications
         self.audio = Audio(sample_rate=16000, mono="downmix")
@@ -188,7 +188,7 @@ class Inference(BaseInference):
         self.skip_aggregation = skip_aggregation
         self.pre_aggregation_hook = pre_aggregation_hook
 
-        breakpoint()
+        
         self.warm_up = next(iter(specifications)).warm_up
         # Use that many seconds on the left- and rightmost parts of each chunk
         # to warm up the model. While the model does process those left- and right-most
@@ -209,26 +209,26 @@ class Inference(BaseInference):
 
         self.batch_size = batch_size
 
-    def to(self, device: torch.device) -> "Inference":
-        """Send internal model to `device`"""
+    # def to(self, device: torch.device) -> "Inference":
+    #     """Send internal model to `device`"""
 
-        if not isinstance(device, torch.device):
-            raise TypeError(
-                f"`device` must be an instance of `torch.device`, got `{type(device).__name__}`"
-            )
-        if not self.use_onnx_model:
-            self.model.to(device)
-            # self.conversion.to(device)
-            self.device = device
-        return self
+    #     if not isinstance(device, torch.device):
+    #         raise TypeError(
+    #             f"`device` must be an instance of `torch.device`, got `{type(device).__name__}`"
+    #         )
+    #     if not self.use_onnx_model:
+    #         self.model.to(device)
+    #         # self.conversion.to(device)
+    #         self.device = device
+    #     return self
 
-    def forward_onnx(self, chunks: torch.Tensor) -> Union[np.ndarray, Tuple[np.ndarray]]:
-        # breakpoint()
-        chunks = chunks.numpy()
-        outputs = self.model.run(None, {"input": chunks})[0]
-        return outputs
+    # def forward_onnx(self, chunks: torch.Tensor) -> Union[np.ndarray, Tuple[np.ndarray]]:
+    #     # breakpoint()
+    #     chunks = chunks.numpy()
+    #     outputs = self.model.run(None, {"input": chunks})[0]
+    #     return outputs
     
-    def infer(self, chunks: torch.Tensor) -> Union[np.ndarray, Tuple[np.ndarray]]:
+    def infer(self, chunks: np.ndarray) -> Union[np.ndarray, Tuple[np.ndarray]]:
         """Forward pass
 
         Takes care of sending chunks to right device and outputs back to CPU
@@ -246,9 +246,11 @@ class Inference(BaseInference):
         
         # if self.use_onnx_model:
         
-        outputs = self.forward_onnx(chunks.to(self.device))
+        # outputs = self.forward_onnx(chunks.to(self.device))
         # outputs = self.forward_onnx(chunks)
-        breakpoint()
+        # chunks = chunks.numpy(force=True)
+        outputs = self.model.run(None, {"input": chunks})[0]
+        
         # outputs = torch.from_numpy(outputs).clone()
         # else:
         #     with torch.inference_mode():
@@ -271,28 +273,30 @@ class Inference(BaseInference):
         
         return map_with_specifications(self.specifications, __convert, outputs, self.conversion)
     
-    def get_example_input_array(self) -> torch.Tensor:
+    # def get_example_input_array(self) -> torch.Tensor:
         # breakpoint()
         # return np.random.randn(1, 1, self.audio.get_num_samples(self.specifications.duration))
 
-        return torch.randn(size=(1, 1, self.audio.get_num_samples(self.specifications.duration)),device=self.device)
+        # return torch.randn(size=(1, 1, self.audio.get_num_samples(self.specifications.duration)))
         # return np.random.randn(size=(1, 1, self.audio.get_num_samples(self.specifications.duration)))
     
     @cached_property
     def example_output(self) -> Union[Output, Tuple[Output]]:
         """Example output"""
-        example_input_array = self.get_example_input_array()
+        # example_input_array = self.get_example_input_array()
+        example_input_array = np.random.randn(1, 1, self.audio.get_num_samples(self.specifications.duration)).astype(np.float32)
         
-        with torch.inference_mode():
-            example_output = self.infer(example_input_array)
+        # with torch.inference_mode():
+        
+        example_outputs = self.infer(example_input_array)
             
 
         def __example_output(
-            example_output: torch.Tensor,
+            example_output: np.ndarray,
             specifications: Specifications = None,
         ) -> Output:
             _, num_frames, dimension = example_output.shape
-            breakpoint()
+            
             if specifications.resolution == Resolution.FRAME:
                 frame_duration = specifications.duration / num_frames
                 frames = SlidingWindow(step=frame_duration, duration=frame_duration)
@@ -306,12 +310,12 @@ class Inference(BaseInference):
             )
 
         return map_with_specifications(
-            self.specifications, __example_output, example_output
+            self.specifications, __example_output, example_outputs
         )
     
     def slide(
         self,
-        waveform: torch.Tensor,
+        waveform: np.ndarray,
         sample_rate: int,
         hook: Optional[Callable],
     ) -> Union[SlidingWindowFeature, Tuple[SlidingWindowFeature]]:
@@ -354,24 +358,32 @@ class Inference(BaseInference):
             self.example_output,
         )
 
+        
         # prepare complete chunks
-        breakpoint()
+        
         if num_samples >= window_size:
+            ###################################### あとで ###############################
+            waveform = torch.from_numpy(waveform)
             chunks: torch.Tensor = rearrange(waveform.unfold(1, window_size, step_size),"channel chunk frame -> chunk channel frame",)
+            chunks = chunks.numpy(force=True)
             num_chunks, _, _ = chunks.shape
+            ###################################### あとで ##############################
         else:
             num_chunks = 0
-
+        
         # prepare last incomplete chunk
         
         has_last_chunk = (num_samples < window_size) or (num_samples - window_size) % step_size > 0
         
         if has_last_chunk:
             # pad last chunk with zeros
+            ###################################### あとで ###############################
             last_chunk: torch.Tensor = waveform[:, num_chunks * step_size :]
             _, last_window_size = last_chunk.shape
             last_pad = window_size - last_window_size
             last_chunk = F.pad(last_chunk, (0, last_pad))
+            last_chunk = last_chunk.numpy(force=True)
+            ###################################### あとで ###############################
 
         def __empty_list(**kwargs):
             return list()
@@ -391,7 +403,7 @@ class Inference(BaseInference):
         # slide over audio chunks in batch
         for c in np.arange(0, num_chunks, self.batch_size):
             
-            batch: torch.Tensor = chunks[c : c + self.batch_size]
+            batch: np.ndarray = chunks[c : c + self.batch_size]
 
             batch_outputs: Union[np.ndarray, Tuple[np.ndarray]] = self.infer(batch)
 
@@ -502,8 +514,9 @@ class Inference(BaseInference):
         # fix_reproducibility(self.device)
 
         waveform, sample_rate = self.audio(file)
+        waveform = waveform.numpy(force=True)
         # waveform, sample_rate = librosa.load(file['audio'], sr=16000)
-        breakpoint()
+        
         if self.window == "sliding":
             return self.slide(waveform, sample_rate, hook=hook)
         

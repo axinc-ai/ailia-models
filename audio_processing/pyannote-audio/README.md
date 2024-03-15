@@ -1,4 +1,7 @@
-＊numpyからtorchへの変更はいまだに完了していません
+＊numpyからtorchへの変更中です，以下残りの変更すべきtorchの関数を載せます
+pyannote/audio/core/inference.py                   : torch.nn.functional.pad, torch.load, torchのunfold()
+pyannote/audio/core/io.py                          : torchaudio
+pyannote/audio/pipelines/speaker_verification.py   : torch.nn.functional.interpolate
 
 pyannote.audio(https://github.com/pyannote/pyannote-audio) からcloneし変更した後のファイル
 変更内容は主にpyannoteフォルダ内のファイルを変更

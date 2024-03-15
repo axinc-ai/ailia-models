@@ -20,9 +20,9 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-import warnings
+# import warnings
 from functools import cached_property
-from pathlib import Path
+# from pathlib import Path
 from typing import Optional, Text, Union, Mapping
 
 import numpy as np
@@ -30,10 +30,11 @@ import torch
 import torch.nn.functional as F
 import torchaudio
 import torchaudio.compliance.kaldi as kaldi
-from huggingface_hub import hf_hub_download
-from huggingface_hub.utils import RepositoryNotFoundError
-# from torch.nn.utils.rnn import pad_sequence
 
+# from huggingface_hub import hf_hub_download
+# from huggingface_hub.utils import RepositoryNotFoundError
+# from torch.nn.utils.rnn import pad_sequence
+from pyannote.audio.pipelines.utils.kaldifeat import compute_fbank_feats
 # from pyannote.audio import Inference, Pipeline
 from pyannote.audio.core.inference import BaseInference
 # from pyannote.audio.core.io import AudioFile
@@ -414,53 +415,30 @@ class ONNXWeSpeakerPretrainedSpeakerEmbedding(BaseInference):
     def __init__(
         self,
         embedding: Text = "hbredin/wespeaker-voxceleb-resnet34-LM",
-        device: Optional[torch.device] = None,
+        # device: Optional[torch.device] = None,
     ):
-        if not ONNX_IS_AVAILABLE:
-            raise ImportError(
-                f"'onnxruntime' must be installed to use '{embedding}' embeddings."
-            )
+        # if not ONNX_IS_AVAILABLE:
+            # raise ImportError(
+                # f"'onnxruntime' must be installed to use '{embedding}' embeddings."
+            # )
 
         super().__init__()
 
-        if not Path(embedding).exists():
-            try:
-                embedding = hf_hub_download(
-                    repo_id=embedding,
-                    filename="speaker-embedding.onnx",
-                )
-            except RepositoryNotFoundError:
-                raise ValueError(
-                    f"Could not find '{embedding}' on huggingface.co nor on local disk."
-                )
+        # if not Path(embedding).exists():
+            # try:
+                # embedding = hf_hub_download(
+                    # repo_id=embedding,
+                    # filename="speaker-embedding.onnx",
+                # )
+            # except RepositoryNotFoundError:
+                # raise ValueError(
+                    # f"Could not find '{embedding}' on huggingface.co nor on local disk."
+                # )
 
         self.embedding = embedding
+        
 
-        self.to(device or torch.device("cpu"))
-
-    def to(self, device: torch.device):
-        if not isinstance(device, torch.device):
-            raise TypeError(
-                f"`device` must be an instance of `torch.device`, got `{type(device).__name__}`"
-            )
-
-        if device.type == "cpu":
-            providers = ["CPUExecutionProvider"]
-        elif device.type == "cuda":
-            providers = [
-                (
-                    "CUDAExecutionProvider",
-                    {
-                        "cudnn_conv_algo_search": "DEFAULT",  # EXHAUSTIVE / HEURISTIC / DEFAULT
-                    },
-                )
-            ]
-        else:
-            warnings.warn(
-                f"Unsupported device type: {device.type}, falling back to CPU"
-            )
-            device = torch.device("cpu")
-            providers = ["CPUExecutionProvider"]
+        providers = ["CPUExecutionProvider", ("CUDAExecutionProvider",{"cudnn_conv_algo_search": "DEFAULT"})]
 
         sess_options = ort.SessionOptions()
         sess_options.inter_op_num_threads = 1
@@ -469,8 +447,43 @@ class ONNXWeSpeakerPretrainedSpeakerEmbedding(BaseInference):
             self.embedding, sess_options=sess_options, providers=providers
         )
 
-        self.device = device
-        return self
+        # self.device = device
+
+        # self.to(device or torch.device("cpu"))
+
+    # def to(self, device: torch.device):
+    #     # if not isinstance(device, torch.device):
+    #         # raise TypeError(
+    #             # f"`device` must be an instance of `torch.device`, got `{type(device).__name__}`"
+    #         # )
+
+    #     if device.type == "cpu":
+    #         providers = ["CPUExecutionProvider"]
+    #     elif device.type == "cuda":
+    #         providers = [
+    #             (
+    #                 "CUDAExecutionProvider",
+    #                 {
+    #                     "cudnn_conv_algo_search": "DEFAULT",  # EXHAUSTIVE / HEURISTIC / DEFAULT
+    #                 },
+    #             )
+    #         ]
+    #     else:
+    #         warnings.warn(
+    #             f"Unsupported device type: {device.type}, falling back to CPU"
+    #         )
+    #         device = torch.device("cpu")
+    #         providers = ["CPUExecutionProvider"]
+
+    #     sess_options = ort.SessionOptions()
+    #     sess_options.inter_op_num_threads = 1
+    #     sess_options.intra_op_num_threads = 1
+    #     self.session_ = ort.InferenceSession(
+    #         self.embedding, sess_options=sess_options, providers=providers
+    #     )
+
+    #     self.device = device
+    #     return self
 
     @cached_property
     def sample_rate(self) -> int:
@@ -478,10 +491,10 @@ class ONNXWeSpeakerPretrainedSpeakerEmbedding(BaseInference):
 
     @cached_property
     def dimension(self) -> int:
-        dummy_waveforms = torch.rand(1, 1, 16000)
+        dummy_waveforms = np.random.rand(1, 1, 16000)
         features = self.compute_fbank(dummy_waveforms)
         embeddings = self.session_.run(
-            output_names=["embs"], input_feed={"feats": features.numpy()}
+            output_names=["embs"], input_feed={"feats": features}
         )[0]
         _, dimension = embeddings.shape
         return dimension
@@ -496,7 +509,7 @@ class ONNXWeSpeakerPretrainedSpeakerEmbedding(BaseInference):
         middle = (lower + upper) // 2
         while lower + 1 < upper:
             try:
-                features = self.compute_fbank(torch.randn(1, 1, middle))
+                features = self.compute_fbank(np.random.randn(1, 1, middle))
 
             except AssertionError:
                 lower = middle
@@ -504,7 +517,7 @@ class ONNXWeSpeakerPretrainedSpeakerEmbedding(BaseInference):
                 continue
 
             embeddings = self.session_.run(
-                output_names=["embs"], input_feed={"feats": features.numpy()}
+                output_names=["embs"], input_feed={"feats": features}
             )[0]
 
             if np.any(np.isnan(embeddings)):
@@ -517,16 +530,16 @@ class ONNXWeSpeakerPretrainedSpeakerEmbedding(BaseInference):
 
     @cached_property
     def min_num_frames(self) -> int:
-        return self.compute_fbank(torch.randn(1, 1, self.min_num_samples)).shape[1]
+        return self.compute_fbank(np.random.randn(1, 1, self.min_num_samples)).shape[1]
 
     def compute_fbank(
         self,
-        waveforms: torch.Tensor,
+        waveforms: np.ndarray,
         num_mel_bins: int = 80,
         frame_length: int = 25,
         frame_shift: int = 10,
         dither: float = 0.0,
-    ) -> torch.Tensor:
+    ) -> np.ndarray:
         """Extract fbank features
 
         Parameters
@@ -539,28 +552,45 @@ class ONNXWeSpeakerPretrainedSpeakerEmbedding(BaseInference):
 
         Source: https://github.com/wenet-e2e/wespeaker/blob/45941e7cba2c3ea99e232d02bedf617fc71b0dad/wespeaker/bin/infer_onnx.py#L30C1-L50
         """
-
+        
         waveforms = waveforms * (1 << 15)
-        features = torch.stack(
-            [
-                kaldi.fbank(
-                    waveform,
-                    num_mel_bins=num_mel_bins,
-                    frame_length=frame_length,
-                    frame_shift=frame_shift,
-                    dither=dither,
-                    sample_frequency=self.sample_rate,
-                    window_type="hamming",
-                    use_energy=False,
-                )
-                for waveform in waveforms
-            ]
-        )
-
-        return features - torch.mean(features, dim=1, keepdim=True)
+        
+        features_numpy = np.stack([compute_fbank_feats(
+            waveform=waveform[0],
+            num_mel_bins=num_mel_bins,
+            frame_length=frame_length,
+            frame_shift=frame_shift,
+            dither=dither,
+            sample_frequency=self.sample_rate,
+            window_type="hamming",
+            use_energy=False,
+        )for waveform in waveforms])
+        
+        features = features_numpy.astype(np.float32)
+        
+        # features = torch.stack(
+        #     [
+        #         kaldi.fbank(
+        #             waveform,
+        #             num_mel_bins=num_mel_bins,
+        #             frame_length=frame_length,
+        #             frame_shift=frame_shift,
+        #             dither=dither,
+        #             sample_frequency=self.sample_rate,
+        #             window_type="hamming",
+        #             use_energy=False,
+        #         )
+        #         for waveform in waveforms
+        #     ]
+        # )   
+        
+        # features = torch.from_numpy(features_numpy).to(torch.float)
+        
+        # return features - torch.mean(features, dim=1, keepdim=True)
+        return features - np.mean(features, axis=1, keepdims=True)
 
     def __call__(
-        self, waveforms: torch.Tensor, masks: Optional[torch.Tensor] = None
+        self, waveforms: np.ndarray, masks: Optional[np.ndarray] = None
     ) -> np.ndarray:
         """
 
@@ -578,24 +608,27 @@ class ONNXWeSpeakerPretrainedSpeakerEmbedding(BaseInference):
 
         batch_size, num_channels, num_samples = waveforms.shape
         assert num_channels == 1
-
-        features = self.compute_fbank(waveforms.to(self.device))
+        
+        features = self.compute_fbank(waveforms)
         _, num_frames, _ = features.shape
+        
+        # if masks is None:
+        #     embeddings = self.session_.run(
+        #         output_names=["embs"], input_feed={"feats": features}
+        #     )[0]
 
-        if masks is None:
-            embeddings = self.session_.run(
-                output_names=["embs"], input_feed={"feats": features.numpy(force=True)}
-            )[0]
-
-            return embeddings
+        #     return embeddings
 
         batch_size_masks, _ = masks.shape
         assert batch_size == batch_size_masks
+        
 
-        imasks = F.interpolate(
-            masks.unsqueeze(dim=1), size=num_frames, mode="nearest"
-        ).squeeze(dim=1)
-
+        ###################################### あとで ###################################
+        masks_ = torch.from_numpy(masks)
+        imasks_ = F.interpolate(masks_.unsqueeze(dim=1), size=num_frames, mode="nearest").squeeze(dim=1)
+        # imasks = np.squeeze(F.interpolate(np.expand_dims(masks, axis=1),size=num_frames, mode="nearest"), axis=1)
+        imasks = imasks_.numpy(force=True)
+        ###################################### あとで ###################################
         imasks = imasks > 0.5
 
         embeddings = np.NAN * np.zeros((batch_size, self.dimension))
@@ -607,7 +640,7 @@ class ONNXWeSpeakerPretrainedSpeakerEmbedding(BaseInference):
 
             embeddings[f] = self.session_.run(
                 output_names=["embs"],
-                input_feed={"feats": masked_feature.numpy(force=True)[None]},
+                input_feed={"feats": masked_feature[None]},
             )[0][0]
 
         return embeddings
@@ -709,63 +742,63 @@ class ONNXWeSpeakerPretrainedSpeakerEmbedding(BaseInference):
 #         return embeddings.cpu().numpy()
 
 
-def PretrainedSpeakerEmbedding(
-    embedding: PipelineModel,
-    device: Optional[torch.device] = None,
-    use_auth_token: Union[Text, None] = None,
-):
-    """Pretrained speaker embedding
+# def PretrainedSpeakerEmbedding(
+#     embedding: PipelineModel,
+#     device: Optional[torch.device] = None,
+#     use_auth_token: Union[Text, None] = None,
+# ):
+#     """Pretrained speaker embedding
 
-    Parameters
-    ----------
-    embedding : Text
-        Can be a SpeechBrain (e.g. "speechbrain/spkrec-ecapa-voxceleb")
-        or a pyannote.audio model.
-    device : torch.device, optional
-        Device
-    use_auth_token : str, optional
-        When loading private huggingface.co models, set `use_auth_token`
-        to True or to a string containing your hugginface.co authentication
-        token that can be obtained by running `huggingface-cli login`
+#     Parameters
+#     ----------
+#     embedding : Text
+#         Can be a SpeechBrain (e.g. "speechbrain/spkrec-ecapa-voxceleb")
+#         or a pyannote.audio model.
+#     device : torch.device, optional
+#         Device
+#     use_auth_token : str, optional
+#         When loading private huggingface.co models, set `use_auth_token`
+#         to True or to a string containing your hugginface.co authentication
+#         token that can be obtained by running `huggingface-cli login`
 
-    Usage
-    -----
-    >>> get_embedding = PretrainedSpeakerEmbedding("pyannote/embedding")
-    >>> get_embedding = PretrainedSpeakerEmbedding("speechbrain/spkrec-ecapa-voxceleb")
-    >>> get_embedding = PretrainedSpeakerEmbedding("nvidia/speakerverification_en_titanet_large")
-    >>> assert waveforms.ndim == 3
-    >>> batch_size, num_channels, num_samples = waveforms.shape
-    >>> assert num_channels == 1
-    >>> embeddings = get_embedding(waveforms)
-    >>> assert embeddings.ndim == 2
-    >>> assert embeddings.shape[0] == batch_size
+#     Usage
+#     -----
+#     >>> get_embedding = PretrainedSpeakerEmbedding("pyannote/embedding")
+#     >>> get_embedding = PretrainedSpeakerEmbedding("speechbrain/spkrec-ecapa-voxceleb")
+#     >>> get_embedding = PretrainedSpeakerEmbedding("nvidia/speakerverification_en_titanet_large")
+#     >>> assert waveforms.ndim == 3
+#     >>> batch_size, num_channels, num_samples = waveforms.shape
+#     >>> assert num_channels == 1
+#     >>> embeddings = get_embedding(waveforms)
+#     >>> assert embeddings.ndim == 2
+#     >>> assert embeddings.shape[0] == batch_size
 
-    >>> assert masks.ndim == 1
-    >>> assert masks.shape[0] == batch_size
-    >>> embeddings = get_embedding(waveforms, masks=masks)
-    """
+#     >>> assert masks.ndim == 1
+#     >>> assert masks.shape[0] == batch_size
+#     >>> embeddings = get_embedding(waveforms, masks=masks)
+#     """
 
-    if isinstance(embedding, str) and "pyannote" in embedding:
-        return PyannoteAudioPretrainedSpeakerEmbedding(
-            embedding, device=device, use_auth_token=use_auth_token
-        )
+#     if isinstance(embedding, str) and "pyannote" in embedding:
+#         return PyannoteAudioPretrainedSpeakerEmbedding(
+#             embedding, device=device, use_auth_token=use_auth_token
+#         )
 
-    elif isinstance(embedding, str) and "speechbrain" in embedding:
-        return SpeechBrainPretrainedSpeakerEmbedding(
-            embedding, device=device, use_auth_token=use_auth_token
-        )
+#     elif isinstance(embedding, str) and "speechbrain" in embedding:
+#         return SpeechBrainPretrainedSpeakerEmbedding(
+#             embedding, device=device, use_auth_token=use_auth_token
+#         )
 
-    elif isinstance(embedding, str) and "nvidia" in embedding:
-        return NeMoPretrainedSpeakerEmbedding(embedding, device=device)
+#     elif isinstance(embedding, str) and "nvidia" in embedding:
+#         return NeMoPretrainedSpeakerEmbedding(embedding, device=device)
 
-    elif isinstance(embedding, str) and ("wespeaker" in embedding or "onnx" in embedding):
-        return ONNXWeSpeakerPretrainedSpeakerEmbedding(embedding, device=device)
+#     elif isinstance(embedding, str) and ("wespeaker" in embedding or "onnx" in embedding):
+#         return ONNXWeSpeakerPretrainedSpeakerEmbedding(embedding)
 
-    else:
-        # fallback to pyannote in case we are loading a local model
-        return PyannoteAudioPretrainedSpeakerEmbedding(
-            embedding, device=device, use_auth_token=use_auth_token
-        )
+#     else:
+#         # fallback to pyannote in case we are loading a local model
+#         return PyannoteAudioPretrainedSpeakerEmbedding(
+#             embedding, device=device, use_auth_token=use_auth_token
+#         )
 
 
 # class SpeakerEmbedding(Pipeline):
@@ -844,47 +877,47 @@ def PretrainedSpeakerEmbedding(
 #             return self.embedding_model_(waveform, weights=weights).cpu().numpy()
 
 
-def main(
-    protocol: str = "VoxCeleb.SpeakerVerification.VoxCeleb1",
-    subset: str = "test",
-    embedding: str = "pyannote/embedding",
-    segmentation: Optional[str] = None,
-):
-    import typer
-    from pyannote.database import FileFinder, get_protocol
-    from pyannote.metrics.binary_classification import det_curve
-    from scipy.spatial.distance import cdist
-    from tqdm import tqdm
+# def main(
+#     protocol: str = "VoxCeleb.SpeakerVerification.VoxCeleb1",
+#     subset: str = "test",
+#     embedding: str = "pyannote/embedding",
+#     segmentation: Optional[str] = None,
+# ):
+#     import typer
+#     from pyannote.database import FileFinder, get_protocol
+#     from pyannote.metrics.binary_classification import det_curve
+#     from scipy.spatial.distance import cdist
+#     from tqdm import tqdm
 
-    pipeline = SpeakerEmbedding(embedding=embedding, segmentation=segmentation)
+#     pipeline = SpeakerEmbedding(embedding=embedding, segmentation=segmentation)
 
-    protocol = get_protocol(protocol, preprocessors={"audio": FileFinder()})
+#     protocol = get_protocol(protocol, preprocessors={"audio": FileFinder()})
 
-    y_true, y_pred = [], []
+#     y_true, y_pred = [], []
 
-    emb = dict()
+#     emb = dict()
 
-    trials = getattr(protocol, f"{subset}_trial")()
+#     trials = getattr(protocol, f"{subset}_trial")()
 
-    for t, trial in enumerate(tqdm(trials)):
-        audio1 = trial["file1"]["audio"]
-        if audio1 not in emb:
-            emb[audio1] = pipeline(audio1)
+#     for t, trial in enumerate(tqdm(trials)):
+#         audio1 = trial["file1"]["audio"]
+#         if audio1 not in emb:
+#             emb[audio1] = pipeline(audio1)
 
-        audio2 = trial["file2"]["audio"]
-        if audio2 not in emb:
-            emb[audio2] = pipeline(audio2)
+#         audio2 = trial["file2"]["audio"]
+#         if audio2 not in emb:
+#             emb[audio2] = pipeline(audio2)
 
-        y_pred.append(cdist(emb[audio1], emb[audio2], metric="cosine")[0][0])
-        y_true.append(trial["reference"])
+#         y_pred.append(cdist(emb[audio1], emb[audio2], metric="cosine")[0][0])
+#         y_true.append(trial["reference"])
 
-    _, _, _, eer = det_curve(y_true, np.array(y_pred), distances=True)
-    typer.echo(
-        f"{protocol.name} | {subset} | {embedding} | {segmentation} | EER = {100 * eer:.3f}%"
-    )
+#     _, _, _, eer = det_curve(y_true, np.array(y_pred), distances=True)
+#     typer.echo(
+#         f"{protocol.name} | {subset} | {embedding} | {segmentation} | EER = {100 * eer:.3f}%"
+#     )
 
 
-if __name__ == "__main__":
-    import typer
+# if __name__ == "__main__":
+#     import typer
 
-    typer.run(main)
+#     typer.run(main)

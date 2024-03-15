@@ -28,7 +28,7 @@ from functools import partial
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Text, Union
 
-import torch
+# import torch
 import yaml
 # from huggingface_hub import hf_hub_download
 # from huggingface_hub.utils import RepositoryNotFoundError
@@ -330,25 +330,25 @@ class Pipeline(_Pipeline):
 
         return self.apply(file, **kwargs)
 
-    def to(self, device: torch.device):
-        """Send pipeline to `device`"""
+    # def to(self, device: torch.device):
+    #     """Send pipeline to `device`"""
 
-        if not isinstance(device, torch.device):
-            raise TypeError(
-                f"`device` must be an instance of `torch.device`, got `{type(device).__name__}`"
-            )
+    #     if not isinstance(device, torch.device):
+    #         raise TypeError(
+    #             f"`device` must be an instance of `torch.device`, got `{type(device).__name__}`"
+    #         )
 
-        # for _, pipe in self._pipelines.items():
-            # breakpoint()
-            # if hasattr(pipe, "to"):
-                # _ = pipe.to(device)
+    #     # for _, pipe in self._pipelines.items():
+    #         # breakpoint()
+    #         # if hasattr(pipe, "to"):
+    #             # _ = pipe.to(device)
 
-        for _, model in self._models.items():
-            _ = model.to(device)
+    #     for _, model in self._models.items():
+    #         _ = model.to(device)
 
-        for _, inference in self._inferences.items():
-            _ = inference.to(device)
+    #     for _, inference in self._inferences.items():
+    #         _ = inference.to(device)
 
-        self.device = device
+    #     self.device = device
 
-        return self
+    #     return self

@@ -99,22 +99,22 @@ class Audio:
 
     PRECISION = 0.001
 
-    @staticmethod
-    def power_normalize(waveform: Tensor) -> Tensor:
-        """Power-normalize waveform
+    # @staticmethod
+    # def power_normalize(waveform: Tensor) -> Tensor:
+    #     """Power-normalize waveform
 
-        Parameters
-        ----------
-        waveform : (..., time) Tensor
-            Waveform(s)
+    #     Parameters
+    #     ----------
+    #     waveform : (..., time) Tensor
+    #         Waveform(s)
 
-        Returns
-        -------
-        waveform: (..., time) Tensor
-            Power-normalized waveform(s)
-        """
-        rms = waveform.square().mean(dim=-1, keepdim=True).sqrt()
-        return waveform / (rms + 1e-8)
+    #     Returns
+    #     -------
+    #     waveform: (..., time) Tensor
+    #         Power-normalized waveform(s)
+    #     """
+    #     rms = waveform.square().mean(dim=-1, keepdim=True).sqrt()
+    #     return waveform / (rms + 1e-8)
 
     @staticmethod
     def validate_file(file: AudioFile) -> Mapping:
@@ -135,36 +135,38 @@ class Audio:
         ------
         ValueError if file format is not valid or file does not exist.
 
-        """
-
+        """ 
+        
+        
         if isinstance(file, Mapping):
             pass
+            
 
         elif isinstance(file, (str, Path)):
             file = {"audio": str(file), "uri": Path(file).stem}
+        
+        # elif isinstance(file, IOBase):
+            # return {"audio": file, "uri": "stream"}
 
-        elif isinstance(file, IOBase):
-            return {"audio": file, "uri": "stream"}
+        # else:
+            # raise ValueError(AudioFileDocString)
 
-        else:
-            raise ValueError(AudioFileDocString)
+        # if "waveform" in file:
+        #     waveform: Union[np.ndarray, Tensor] = file["waveform"]
+        #     if len(waveform.shape) != 2 or waveform.shape[0] > waveform.shape[1]:
+        #         raise ValueError(
+        #             "'waveform' must be provided as a (channel, time) torch Tensor."
+        #         )
 
-        if "waveform" in file:
-            waveform: Union[np.ndarray, Tensor] = file["waveform"]
-            if len(waveform.shape) != 2 or waveform.shape[0] > waveform.shape[1]:
-                raise ValueError(
-                    "'waveform' must be provided as a (channel, time) torch Tensor."
-                )
+        #     sample_rate: int = file.get("sample_rate", None)
+        #     if sample_rate is None:
+        #         raise ValueError(
+        #             "'waveform' must be provided with their 'sample_rate'."
+        #         )
 
-            sample_rate: int = file.get("sample_rate", None)
-            if sample_rate is None:
-                raise ValueError(
-                    "'waveform' must be provided with their 'sample_rate'."
-                )
+        #     file.setdefault("uri", "waveform")
 
-            file.setdefault("uri", "waveform")
-
-        elif "audio" in file:
+        if "audio" in file:
             if isinstance(file["audio"], IOBase):
                 return file
 
@@ -223,36 +225,36 @@ class Audio:
 
         return waveform, sample_rate
 
-    def get_duration(self, file: AudioFile) -> float:
-        """Get audio file duration in seconds
+    # def get_duration(self, file: AudioFile) -> float:
+    #     """Get audio file duration in seconds
 
-        Parameters
-        ----------
-        file : AudioFile
-            Audio file.
+    #     Parameters
+    #     ----------
+    #     file : AudioFile
+    #         Audio file.
 
-        Returns
-        -------
-        duration : float
-            Duration in seconds.
-        """
+    #     Returns
+    #     -------
+    #     duration : float
+    #         Duration in seconds.
+    #     """
 
-        file = self.validate_file(file)
+    #     file = self.validate_file(file)
 
-        if "waveform" in file:
-            frames = len(file["waveform"].T)
-            sample_rate = file["sample_rate"]
+    #     if "waveform" in file:
+    #         frames = len(file["waveform"].T)
+    #         sample_rate = file["sample_rate"]
 
-        else:
-            if "torchaudio.info" in file:
-                info = file["torchaudio.info"]
-            else:
-                info = get_torchaudio_info(file)
+    #     else:
+    #         if "torchaudio.info" in file:
+    #             info = file["torchaudio.info"]
+    #         else:
+    #             info = get_torchaudio_info(file)
 
-            frames = info.num_frames
-            sample_rate = info.sample_rate
+    #         frames = info.num_frames
+    #         sample_rate = info.sample_rate
 
-        return frames / sample_rate
+    #     return frames / sample_rate
 
     def get_num_samples(
         self, duration: float, sample_rate: Optional[int] = None
@@ -286,19 +288,20 @@ class Audio:
         --------
         AudioFile
         """
-
+        
         file = self.validate_file(file)
         
-        if "waveform" in file:
-            waveform = file["waveform"]
-            sample_rate = file["sample_rate"]
+        # if "waveform" in file:
+        #     waveform = file["waveform"]
+        #     sample_rate = file["sample_rate"]
 
-        elif "audio" in file:
-            waveform, sample_rate = torchaudio.load(file["audio"])
-
-            # rewind if needed
-            if isinstance(file["audio"], IOBase):
-                file["audio"].seek(0)
+        # elif "audio" in file:
+        
+        waveform, sample_rate = torchaudio.load(file["audio"])
+ 
+        # rewind if needed
+        # if isinstance(file["audio"], IOBase):
+            # file["audio"].seek(0)
         
         channel = file.get("channel", None)
 

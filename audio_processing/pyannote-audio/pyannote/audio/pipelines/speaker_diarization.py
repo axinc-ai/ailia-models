@@ -33,7 +33,7 @@ from pathlib import Path
 from io import IOBase
 
 import numpy as np
-import torch
+# import torch
 
 from einops import rearrange
 from pyannote.core import Annotation, SlidingWindow, SlidingWindowFeature
@@ -45,7 +45,7 @@ from pyannote.audio.core.io import AudioFile
 from pyannote.audio.pipelines.clustering import Clustering
 # from pyannote.audio.pipelines.speaker_verification import PretrainedSpeakerEmbedding
 from pyannote.audio.pipelines.speaker_verification import ONNXWeSpeakerPretrainedSpeakerEmbedding
-from pyannote.audio.pipelines.utils import SpeakerDiarizationMixin
+from pyannote.audio.pipelines.utils import (SpeakerDiarizationMixin)
 # from pyannote.audio.utils.signal import binarize
 
 AudioFile = Union[Text, Path, IOBase, Mapping]
@@ -336,7 +336,9 @@ class SpeakerDiarization(SpeakerDiarizationMixin, Pipeline):
                     else:
                         used_mask = mask
 
-                    yield waveform[None], torch.from_numpy(used_mask)[None]
+                    # yield waveform[None], torch.from_numpy(used_mask)[None]
+                    yield waveform.numpy(force=True)[None], used_mask[None]
+                    
                     # w: (1, 1, num_samples) torch.Tensor
                     # m: (1, num_frames) torch.Tensor
 
@@ -357,12 +359,14 @@ class SpeakerDiarization(SpeakerDiarizationMixin, Pipeline):
         for i, batch in enumerate(batches, 1):
             waveforms, masks = zip(*filter(lambda b: b[0] is not None, batch))
             
-            waveform_batch = torch.vstack(waveforms)
+            # waveform_batch = torch.vstack(waveforms)
+            waveform_batch = np.vstack(waveforms)
             # (batch_size, 1, num_samples) torch.Tensor
 
-            mask_batch = torch.vstack(masks)
+            # mask_batch = torch.vstack(masks)
+            mask_batch = np.vstack(masks)
             # (batch_size, num_frames) torch.Tensor
-
+            
             embedding_batch: np.ndarray = self._embedding(
                 waveform_batch, masks=mask_batch
             )
@@ -372,7 +376,7 @@ class SpeakerDiarization(SpeakerDiarizationMixin, Pipeline):
 
             if hook is not None:
                 hook("embeddings", embedding_batch, total=batch_count, completed=i)
-        breakpoint()
+        
         embedding_batches = np.vstack(embedding_batches)
 
         embeddings = rearrange(embedding_batches, "(c s) d -> c s d", c=num_chunks)
@@ -484,10 +488,10 @@ class SpeakerDiarization(SpeakerDiarizationMixin, Pipeline):
             speaker embedding for i-th speaker in diarization.labels().
             Only returned when `return_embeddings` is True.
         """
-
+        breakpoint()
         # setup hook (e.g. for debugging purposes)
         hook = self.setup_hook(file, hook=hook)
-        breakpoint()
+        
         num_speakers, min_speakers, max_speakers = self.set_num_speakers(
             num_speakers=num_speakers,
             min_speakers=min_speakers,
@@ -535,7 +539,7 @@ class SpeakerDiarization(SpeakerDiarizationMixin, Pipeline):
             exclude_overlap=self.embedding_exclude_overlap,
             hook=hook,
         )
-        breakpoint()
+        
         hook("embeddings", embeddings)
         #   shape: (num_chunks, local_num_speakers, dimension)
 
@@ -623,7 +627,7 @@ class SpeakerDiarization(SpeakerDiarizationMixin, Pipeline):
         # at this point, `diarization` speaker labels are strings (or mix of
         # strings and integers when reference is available and some hypothesis
         # speakers are not present in the reference)
-        breakpoint()
+        
         if not return_embeddings:
             return diarization
 
