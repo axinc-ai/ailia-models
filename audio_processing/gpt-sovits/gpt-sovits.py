@@ -1,3 +1,6 @@
+import sys
+sys.path.append('./GPT_SoVITS')
+
 from module.models_onnx import SynthesizerTrn, symbols
 from AR.models.t2s_lightning_module_onnx import Text2SemanticLightningModule
 import torch
@@ -220,7 +223,12 @@ class SSLModel(nn.Module):
         self.ssl = ssl_model
 
     def forward(self, ref_audio_16k):
-        return self.ssl.model(ref_audio_16k)["last_hidden_state"].transpose(1, 2)
+        import onnxruntime
+        sess = onnxruntime.InferenceSession("nahida_cnhubert.onnx", providers=["CPU"])
+        last_hidden_state = sess.run(None, {
+            "ref_audio_16k" : ref_audio_16k.detach().cpu().numpy()
+        })
+        return torch.from_numpy(last_hidden_state[0])
 
 
 def export(vits_path, gpt_path, project_name):
@@ -231,13 +239,20 @@ def export(vits_path, gpt_path, project_name):
     ssl = SSLModel()
 
     print("2")
-    ref_seq = torch.LongTensor([cleaned_text_to_sequence(['m', 'i', 'z', 'u', 'o', 'm', 'a', 'r', 'e', 'e', 'sh', 'i', 'a', 'k', 'a', 'r', 'a', 'k', 'a', 'w', 'a', 'n', 'a', 'k', 'U', 't', 'e', 'w', 'a', 'n', 'a', 'r', 'a', 'n', 'a', 'i', '.'])])
-    text_seq = torch.LongTensor([cleaned_text_to_sequence(['m', 'i', 'z', 'u', 'w', 'a', ',', 'i', 'r', 'i', 'm', 'a', 's', 'e', 'N', 'k', 'a', '?'])])
-    ref_bert = torch.randn((ref_seq.shape[1], 1024)).float()
-    text_bert = torch.randn((text_seq.shape[1], 1024)).float()
+
     ref_audio = torch.randn((1, 48000 * 5)).float()
 
-    ref_audio = torch.tensor([load_audio("JSUT.wav", 48000)]).float()
+    #ref_audio = torch.tensor([load_audio("JSUT.wav", 48000)]).float()
+    #ref_seq = torch.LongTensor([cleaned_text_to_sequence(['m', 'i', 'z', 'u', 'o', 'm', 'a', 'r', 'e', 'e', 'sh', 'i', 'a', 'k', 'a', 'r', 'a', 'k', 'a', 'w', 'a', 'n', 'a', 'k', 'U', 't', 'e', 'w', 'a', 'n', 'a', 'r', 'a', 'n', 'a', 'i', '.'])])
+
+    ref_audio = torch.tensor([load_audio("kyakuno.wav", 48000)]).float()
+    ref_seq = torch.LongTensor([cleaned_text_to_sequence(['a', 'a', 'r', 'u', 'b', 'u', 'i', 'sh', 'i', 'i', 'o', 'sh', 'i', 'y', 'o', 'o', 'sh', 'I', 't', 'a', 'b', 'o', 'i', 's', 'U', 'ch', 'e', 'N', 'j', 'a', 'a', 'o', 'ts', 'U', 'k', 'u', 'r', 'u', '.'])])
+
+    #text_seq = torch.LongTensor([cleaned_text_to_sequence(['m', 'i', 'z', 'u', 'w', 'a', ',', 'i', 'r', 'i', 'm', 'a', 's', 'e', 'N', 'k', 'a', '?'])])
+    text_seq = torch.LongTensor([cleaned_text_to_sequence(['ky', 'o', 'o', 'w', 'a', 'h', 'a', 'r', 'e', 'd', 'e', 'sh', 'o', 'o', 'k', 'a', '?'])])
+    ref_bert = torch.randn((ref_seq.shape[1], 1024)).float()
+    text_bert = torch.randn((text_seq.shape[1], 1024)).float()
+
     ref_audio_16k = torchaudio.functional.resample(ref_audio,48000,16000).float()
     ref_audio_sr = torchaudio.functional.resample(ref_audio,48000,vits.hps.data.sampling_rate).float()
 
