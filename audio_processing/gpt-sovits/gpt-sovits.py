@@ -231,6 +231,97 @@ class SSLModel(nn.Module):
         return torch.from_numpy(last_hidden_state[0])
 
 
+from text import cleaned_text_to_sequence
+from text.cleaner import clean_text
+
+def get_bert_feature(text, word2ph):
+    with torch.no_grad():
+        inputs = tokenizer(text, return_tensors="pt")
+        for i in inputs:
+            inputs[i] = inputs[i].to(device)
+        res = bert_model(**inputs, output_hidden_states=True)
+        res = torch.cat(res["hidden_states"][-3:-2], -1)[0].cpu()[1:-1]
+    assert len(word2ph) == len(text)
+    phone_level_feature = []
+    for i in range(len(word2ph)):
+        repeat_feature = res[i].repeat(word2ph[i], 1)
+        phone_level_feature.append(repeat_feature)
+    phone_level_feature = torch.cat(phone_level_feature, dim=0)
+    return phone_level_feature.T
+
+def clean_text_inf(text, language):
+    phones, word2ph, norm_text = clean_text(text, language)
+    print(phones)
+    phones = cleaned_text_to_sequence(phones)
+    return phones, word2ph, norm_text
+
+def get_bert_inf(phones, word2ph, norm_text, language):
+    language=language.replace("all_","")
+    if language == "zh":
+        bert = get_bert_feature(norm_text, word2ph)
+    else:
+        bert = torch.zeros(
+            (1024, len(phones)),
+            dtype=torch.float32,
+        )
+
+    return bert
+
+import LangSegment
+
+def get_phones_and_bert(text,language):
+    if language in {"en","all_zh","all_ja"}:
+        language = language.replace("all_","")
+        if language == "en":
+            LangSegment.setfilters(["en"])
+            formattext = " ".join(tmp["text"] for tmp in LangSegment.getTexts(text))
+        else:
+            # 因无法区别中日文汉字,以用户输入为准
+            formattext = text
+        while "  " in formattext:
+            formattext = formattext.replace("  ", " ")
+        phones, word2ph, norm_text = clean_text_inf(formattext, language)
+        if language == "zh":
+            bert = get_bert_feature(norm_text, word2ph)
+        else:
+            bert = torch.zeros(
+                (1024, len(phones)),
+                dtype=torch.float32,
+            )
+    elif language in {"zh", "ja","auto"}:
+        textlist=[]
+        langlist=[]
+        LangSegment.setfilters(["zh","ja","en"])
+        if language == "auto":
+            for tmp in LangSegment.getTexts(text):
+                langlist.append(tmp["lang"])
+                textlist.append(tmp["text"])
+        else:
+            for tmp in LangSegment.getTexts(text):
+                if tmp["lang"] == "en":
+                    langlist.append(tmp["lang"])
+                else:
+                    # 因无法区别中日文汉字,以用户输入为准
+                    langlist.append(language)
+                textlist.append(tmp["text"])
+        print(textlist)
+        print(langlist)
+        phones_list = []
+        bert_list = []
+        norm_text_list = []
+        for i in range(len(textlist)):
+            lang = langlist[i]
+            phones, word2ph, norm_text = clean_text_inf(textlist[i], lang)
+            bert = get_bert_inf(phones, word2ph, norm_text, lang)
+            phones_list.append(phones)
+            norm_text_list.append(norm_text)
+            bert_list.append(bert)
+        bert = torch.cat(bert_list, dim=1)
+        phones = sum(phones_list, [])
+        norm_text = ''.join(norm_text_list)
+
+    return phones,bert.to(dtype = torch.float32),norm_text
+
 def export(vits_path, gpt_path, project_name):
     print("1")
     vits = VitsModel(vits_path)
@@ -247,6 +338,9 @@ def export(vits_path, gpt_path, project_name):
 
     ref_audio = torch.tensor([load_audio("kyakuno.wav", 48000)]).float()
     ref_seq = torch.LongTensor([cleaned_text_to_sequence(['a', 'a', 'r', 'u', 'b', 'u', 'i', 'sh', 'i', 'i', 'o', 'sh', 'i', 'y', 'o', 'o', 'sh', 'I', 't', 'a', 'b', 'o', 'i', 's', 'U', 'ch', 'e', 'N', 'j', 'a', 'a', 'o', 'ts', 'U', 'k', 'u', 'r', 'u', '.'])])
+
+    phones1,bert1,norm_text1=get_phones_and_bert("RVCを使用したボイスチェンジャーを作る。", "all_ja")
+    print(phones1)
 
     #text_seq = torch.LongTensor([cleaned_text_to_sequence(['m', 'i', 'z', 'u', 'w', 'a', ',', 'i', 'r', 'i', 'm', 'a', 's', 'e', 'N', 'k', 'a', '?'])])
     text_seq = torch.LongTensor([cleaned_text_to_sequence(['ky', 'o', 'o', 'w', 'a', 'h', 'a', 'r', 'e', 'd', 'e', 'sh', 'o', 'o', 'k', 'a', '?'])])
