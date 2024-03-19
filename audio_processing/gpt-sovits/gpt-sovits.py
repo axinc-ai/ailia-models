@@ -1,23 +1,13 @@
 import sys
 sys.path.append('./GPT_SoVITS')
 
-from module.models_onnx import SynthesizerTrn, symbols
-from AR.models.t2s_lightning_module_onnx import Text2SemanticLightningModule
 import torch
 import torchaudio
 from torch import nn
-from feature_extractor import cnhubert
 import onnxruntime
 import LangSegment
 
 import os
-cnhubert_base_path = os.environ.get(
-    "cnhubert_base_path", "GPT_SoVITS/pretrained_models/chinese-hubert-base"
-)
-
-
-cnhubert.cnhubert_base_path=cnhubert_base_path
-ssl_model = cnhubert.get_model()
 from text import cleaned_text_to_sequence
 import soundfile
 from my_utils import load_audio
@@ -156,7 +146,6 @@ class GptSoVits(nn.Module):
 class SSLModel(nn.Module):
     def __init__(self):
         super().__init__()
-        self.ssl = ssl_model
 
     def forward(self, ref_audio_16k):
         sess = onnxruntime.InferenceSession("nahida_cnhubert.onnx", providers=["CPUExecutionProvider"])
@@ -269,6 +258,11 @@ def inference():
     #ref_seq = torch.LongTensor([cleaned_text_to_sequence(['a', 'a', 'r', 'u', 'b', 'u', 'i', 'sh', 'i', 'i', 'o', 'sh', 'i', 'y', 'o', 'o', 'sh', 'I', 't', 'a', 'b', 'o', 'i', 's', 'U', 'ch', 'e', 'N', 'j', 'a', 'a', 'o', 'ts', 'U', 'k', 'u', 'r', 'u', '.'])])
 
     #phones1,bert1,norm_text1=get_phones_and_bert("RVCを使用したボイスチェンジャーを作る。", "all_ja")
+    #print(phones1)
+
+    #水をマレーシアから買わなくてはならない。
+
+    #phones1,bert1,norm_text1=get_phones_and_bert("今日は晴れでしょうか。", "all_ja")
     #print(phones1)
 
     #text_seq = torch.LongTensor([cleaned_text_to_sequence(['m', 'i', 'z', 'u', 'w', 'a', ',', 'i', 'r', 'i', 'm', 'a', 's', 'e', 'N', 'k', 'a', '?'])])
