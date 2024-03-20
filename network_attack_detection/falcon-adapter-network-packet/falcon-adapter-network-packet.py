@@ -2,14 +2,15 @@ import sys
 import time
 import re
 import itertools
-import importlib
-import pickle
+import joblib
+import warnings
 from dataclasses import dataclass
 from logging import getLogger
 
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
+import nltk
 from nltk.corpus import stopwords
 from nltk.tokenize import sent_tokenize
 from nltk.stem import WordNetLemmatizer
@@ -276,21 +277,23 @@ def load_dataset(models):
     )
 
     scaler = models["scaler"]
-    similar.bert_vectors_all = scaler.transform(similar.bert_vectors_all)
-    for i in tqdm(
-        range(max_ngram), desc="Generating", postfix="N-gram Words and Embeddings"
-    ):
-        similar.bert_vectors_ngram[i] = scaler.transform(similar.bert_vectors_ngram[i])
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+
+        similar.bert_vectors_all = scaler.transform(similar.bert_vectors_all)
+        for i in tqdm(
+            range(max_ngram), desc="Generating", postfix="N-gram Words and Embeddings"
+        ):
+            similar.bert_vectors_ngram[i] = scaler.transform(
+                similar.bert_vectors_ngram[i]
+            )
 
 
 def find_similar_words(
     input_embedding,
     pos_to_exclude=[],
     max_output_words=10,
-    context_similarity_factor=0.25,
     output_filter_factor=0.5,
-    single_word_split=True,
-    uncased_lemmatization=True,
 ):
     input_context_words = []
 
@@ -307,7 +310,7 @@ def find_similar_words(
     output_dict = {}
     sorted_list = np.flip(np.argsort(cosine_sim))
     lemmatized_words = {
-        self.lemmatizer.lemmatize(token.lower())
+        custom_analyzer.lemmatizer.lemmatize(token.lower())
         for word in input_context_words
         for token in word.split()
     }
@@ -318,7 +321,8 @@ def find_similar_words(
         original_word = cosine_words[sorted_list[i]]
         pos_tags = [pos[1] for pos in nltk.pos_tag(original_word.split())]
         lemmatized_word = {
-            self.lemmatizer.lemmatize(token.lower()) for token in original_word.split()
+            custom_analyzer.lemmatizer.lemmatize(token.lower())
+            for token in original_word.split()
         }
         if len(
             lemmatized_words.intersection(lemmatized_word)
@@ -339,7 +343,8 @@ def find_similar_words(
                 output_dict[original_word] = cosine_sim[sorted_list[i]]
                 if len(output_dict.keys()) == max_output_words:
                     break
-    return output_dict
+
+    return output_dict, input_embedding
 
 
 # ======================
@@ -455,16 +460,10 @@ def predict(models, packet_hex):
     )
 
     total_tags = 10
-    context_similarity_factor = 10
-    uncased_lemmatization = True
-    single_word_split = False
     output_filter_factor = 1
     tags, emb = find_similar_words(
         input_embedding=(tag_names[cluster] + (embedding - cluster_centers[cluster])),
         max_output_words=total_tags,
-        context_similarity_factor=context_similarity_factor,
-        uncased_lemmatization=uncased_lemmatization,
-        single_word_split=single_word_split,
         output_filter_factor=output_filter_factor,
     )
 
@@ -523,17 +522,17 @@ def main():
         # encoder = onnxruntime.InferenceSession(WEIGHT_ENC_PATH)
         # decoder = onnxruntime.InferenceSession(WEIGHT_DEC_PATH)
         # joint = onnxruntime.InferenceSession(WEIGHT_JNT_PATH)
-        similar = onnxruntime.InferenceSession("similar.onnx")
+        net_similar = onnxruntime.InferenceSession("similar.onnx")
 
     tokenizer = AutoTokenizer.from_pretrained("tokenizer")
 
-    scaler = joblib.load("scaler.pkl")
+    scaler = joblib.load("SCALER.pkl")
     cluster_centers = np.load("KMEANS-CLUSTER-CENTERS.npy")
     tag_names = np.load("TAGS-NAMES-EMBEDDINGS.npy")
 
     models = {
         "tokenizer": tokenizer,
-        "similar": similar,
+        "similar": net_similar,
         "scaler": scaler,
         "cluster_centers": cluster_centers,
         "tag_names": tag_names,
