@@ -82,7 +82,7 @@ class T2SModel(nn.Module):
                 break
         y[0, -1] = 0
 
-        return y[:, -idx:].unsqueeze(0)
+        return y[:, -idx:-1].unsqueeze(0)
 
 
 
@@ -128,26 +128,42 @@ def inference():
     ref_audio = torch.tensor([load_audio("JSUT.wav", 48000)]).float()
     ref_phones = g2p("水をマレーシアから買わなくてはならない。")
 
+    #ref_audio = torch.tensor([load_audio("0-input.wav", 48000)]).float()
+    #ref_phones = g2p("僕の声をディープラーニングの力を借りてゆずきゆかりにするプロジェクト。")
+
     #ref_audio = torch.tensor([load_audio("kyakuno.wav", 48000)]).float()
     #ref_phones = g2p("RVCを使用したボイスチェンジャーを作る。")
 
     ref_seq = torch.LongTensor([cleaned_text_to_sequence(ref_phones)])
 
-    text_phones = g2p("今日は晴れでしょうか。")
+    text_phones = g2p("ゆずきゆかりが好きだ！")
+    print(text_phones)
     text_seq = torch.LongTensor([cleaned_text_to_sequence(text_phones)])
 
     # empty for ja or en
-    ref_bert = torch.randn((ref_seq.shape[1], 1024)).float()
-    text_bert = torch.randn((text_seq.shape[1], 1024)).float()
+    ref_bert = torch.zeros((ref_seq.shape[1], 1024)).float()
+    text_bert = torch.zeros((text_seq.shape[1], 1024)).float()
 
     ref_audio_16k = torchaudio.functional.resample(ref_audio,48000,16000).float()
-    vits_hps_data_sampling_rat = 32000
-    ref_audio_sr = torchaudio.functional.resample(ref_audio,48000,vits_hps_data_sampling_rat).float()
+    vits_hps_data_sampling_rate = 32000
+    ref_audio_sr = torchaudio.functional.resample(ref_audio,48000,vits_hps_data_sampling_rate).float()
 
+    import numpy as np
+    import librosa
+    zero_wav = np.zeros(
+        int(vits_hps_data_sampling_rate * 0.3),
+        dtype=np.float32,
+    )
+    wav16k, sr = librosa.load("JSUT.wav", sr=16000)
+    wav16k = torch.from_numpy(wav16k)
+    zero_wav_torch = torch.from_numpy(zero_wav)
+    wav16k = torch.cat([wav16k, zero_wav_torch]).unsqueeze(0)
+    ref_audio_16k = wav16k # hubertの入力のみpaddingする
+    
     ssl_content = ssl(ref_audio_16k).float()
     
     a = gpt_sovits(ref_seq, text_seq, ref_bert, text_bert, ref_audio_sr, ssl_content)
-    soundfile.write("out.wav", a.cpu().detach().numpy(), vits_hps_data_sampling_rat)
+    soundfile.write("out.wav", a.cpu().detach().numpy(), vits_hps_data_sampling_rate)
 
 if __name__ == "__main__":
     inference()
