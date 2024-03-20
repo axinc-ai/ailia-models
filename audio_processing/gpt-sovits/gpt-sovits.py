@@ -12,6 +12,7 @@ import soundfile
 
 import ffmpeg
 import numpy as np
+import librosa
 
 
 def load_audio(file, sr):
@@ -47,6 +48,11 @@ class T2SModel(nn.Module):
     def forward(self, ref_seq, text_seq, ref_bert, text_bert, ssl_content):
         early_stop_num = self.early_stop_num
 
+        top_k = torch.LongTensor([5])
+        top_p = torch.Tensor([1.0])
+        temperature = torch.Tensor([1.0])
+        repetition_penalty = torch.Tensor([1.35])
+
         EOS = 1024
 
         #[1,N] [1,N] [N, 1024] [N, 1024] [1, 768, N]
@@ -57,7 +63,7 @@ class T2SModel(nn.Module):
         prefix_len = prompts.shape[1]
 
         #[1,N,512] [1,N]
-        y, k, v, y_emb, x_example = self.sess_fsdec.run(None, {"x":x.detach().numpy(), "prompts":prompts.detach().numpy()})
+        y, k, v, y_emb, x_example = self.sess_fsdec.run(None, {"x":x.detach().numpy(), "prompts":prompts.detach().numpy(), "top_k":top_k.detach().numpy(), "top_p":top_p.detach().numpy(), "temperature":temperature.detach().numpy(), "repetition_penalty":repetition_penalty.detach().numpy()})
         y = torch.from_numpy(y)
         k = torch.from_numpy(k)
         v = torch.from_numpy(v)
@@ -67,7 +73,7 @@ class T2SModel(nn.Module):
         stop = False
         for idx in range(1, 1500):
             #[1, N] [N_layer, N, 1, 512] [N_layer, N, 1, 512] [1, N, 512] [1] [1, N, 512] [1, N]
-            y, k, v, y_emb, logits, samples = self.sess_sdec.run(None, {"iy":y.detach().numpy(), "ik":k.detach().numpy(), "iv":v.detach().numpy(), "iy_emb":y_emb.detach().numpy(), "ix_example":x_example.detach().numpy()})
+            y, k, v, y_emb, logits, samples = self.sess_sdec.run(None, {"iy":y.detach().numpy(), "ik":k.detach().numpy(), "iv":v.detach().numpy(), "iy_emb":y_emb.detach().numpy(), "ix_example":x_example.detach().numpy(), "top_k":top_k.detach().numpy(), "top_p":top_p.detach().numpy(), "temperature":temperature.detach().numpy(), "repetition_penalty":repetition_penalty.detach().numpy()})
             y = torch.from_numpy(y)
             k = torch.from_numpy(k)
             v = torch.from_numpy(v)
@@ -125,18 +131,22 @@ def inference():
 
     ref_audio = torch.randn((1, 48000 * 5)).float()
 
-    ref_audio = torch.tensor([load_audio("JSUT.wav", 48000)]).float()
-    ref_phones = g2p("水をマレーシアから買わなくてはならない。")
+    #input_audio = "JSUT.wav"
+    #input_audio = "0-input.wav"
+    #input_audio = "kyakuno.wav"
+    input_audio = "tsukuyomi.wav"
 
-    #ref_audio = torch.tensor([load_audio("0-input.wav", 48000)]).float()
+    #ref_phones = g2p("水をマレーシアから買わなくてはならない。")
     #ref_phones = g2p("僕の声をディープラーニングの力を借りてゆずきゆかりにするプロジェクト。")
-
-    #ref_audio = torch.tensor([load_audio("kyakuno.wav", 48000)]).float()
     #ref_phones = g2p("RVCを使用したボイスチェンジャーを作る。")
+    ref_phones = g2p("また、当時のように五大名王と呼ばれる 主要な名王の中央に配されることも多い")
+
+    ref_audio = torch.tensor([load_audio(input_audio, 48000)]).float()
 
     ref_seq = torch.LongTensor([cleaned_text_to_sequence(ref_phones)])
 
     text_phones = g2p("ゆずきゆかりが好きだ！")
+    text_phones = g2p("ax株式会社ではAIの実用化のためのFrameworkを開発しています。")
     print(text_phones)
     text_seq = torch.LongTensor([cleaned_text_to_sequence(text_phones)])
 
@@ -148,13 +158,11 @@ def inference():
     vits_hps_data_sampling_rate = 32000
     ref_audio_sr = torchaudio.functional.resample(ref_audio,48000,vits_hps_data_sampling_rate).float()
 
-    import numpy as np
-    import librosa
     zero_wav = np.zeros(
         int(vits_hps_data_sampling_rate * 0.3),
         dtype=np.float32,
     )
-    wav16k, sr = librosa.load("JSUT.wav", sr=16000)
+    wav16k, sr = librosa.load(input_audio, sr=16000)
     wav16k = torch.from_numpy(wav16k)
     zero_wav_torch = torch.from_numpy(zero_wav)
     wav16k = torch.cat([wav16k, zero_wav_torch]).unsqueeze(0)
