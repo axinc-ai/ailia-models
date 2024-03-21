@@ -24,7 +24,7 @@ python3 gpt-sovits.py
 Run with audio prompt.
 
 ```
-python3 gpt-sovits.py -i "音声合成のテストを行なっています。" --audio BASIC5000_0001.wav --transcript "水をマレーシアから買わなくてはならないのです" -e 1
+python3 gpt-sovits.py -i "音声合成のテストを行なっています。" --audio reference_audio_captured_by_ax.wav --transcript "水をマレーシアから買わなくてはならないのです" -e 1
 ```
 
 ### Reference

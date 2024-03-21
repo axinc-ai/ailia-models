@@ -47,7 +47,7 @@ REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/gpt-sovits/'
 parser = get_base_parser( 'GPT-SoVits', None, SAVE_WAV_PATH)
 # overwrite
 parser.add_argument(
-    '--input', '-i', metavar='TEXT', default="ax株式会社ではAIの実用化のためのフレームワークを開発しています。",
+    '--input', '-i', metavar='TEXT', default="ax株式会社ではAIの実用化のための技術を開発しています。",
     help='input text'
 )
 parser.add_argument(
