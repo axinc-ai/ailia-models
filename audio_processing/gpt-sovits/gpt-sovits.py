@@ -51,6 +51,10 @@ parser.add_argument(
     help='use onnx runtime'
 )
 parser.add_argument(
+    '--onnx_vits', action='store_true',
+    help='use onnx runtime for vits'
+)
+parser.add_argument(
     '--profile', action='store_true',
     help='use profile model'
 )
@@ -129,7 +133,7 @@ class GptSoVits():
     
     def forward(self, ref_seq, text_seq, ref_bert, text_bert, ref_audio, ssl_content):
         pred_semantic = self.t2s.forward(ref_seq, text_seq, ref_bert, text_bert, ssl_content)
-        if args.onnx:
+        if args.onnx or args.onnx_vits:
             audio1 = self.sess.run(None, {
                 "text_seq" : text_seq,
                 "pred_semantic" : pred_semantic, 
@@ -227,13 +231,18 @@ def main():
         t2s_encoder = ailia.Net(weight = WEIGHT_PATH_T2S_ENCODER, stream = MODEL_PATH_T2S_ENCODER, memory_mode = memory_mode, env_id = args.env_id)
         t2s_first_decoder = ailia.Net(weight = WEIGHT_PATH_T2S_FIRST_DECODER, stream = MODEL_PATH_T2S_FIRST_DECODER, memory_mode = memory_mode, env_id = args.env_id)
         t2s_stage_decoder = ailia.Net(weight = WEIGHT_PATH_T2S_STAGE_DECODER, stream = MODEL_PATH_T2S_STAGE_DECODER, memory_mode = memory_mode, env_id = args.env_id)
-        vits = ailia.Net(weight = WEIGHT_PATH_VITS, stream = MODEL_PATH_VITS, memory_mode = memory_mode, env_id = args.env_id)
+        if args.onnx_vits:
+            import onnxruntime
+            vits = onnxruntime.InferenceSession(WEIGHT_PATH_VITS) # stftの対応までの暫定
+        else:
+            vits = ailia.Net(weight = WEIGHT_PATH_VITS, stream = MODEL_PATH_VITS, memory_mode = memory_mode, env_id = args.env_id)
         if args.profile:
             ssl.set_profile_mode(True)
             t2s_encoder.set_profile_mode(True)
             t2s_first_decoder.set_profile_mode(True)
             t2s_stage_decoder.set_profile_mode(True)
-            vits.set_profile_mode(True)
+            if not args.onnx_vits:
+                vits.set_profile_mode(True)
 
     generate_voice(ssl, t2s_encoder, t2s_first_decoder, t2s_stage_decoder, vits)
 
@@ -246,8 +255,9 @@ def main():
         print(t2s_first_decoder.get_summary())
         print("t2s_stage_decoder : ")
         print(t2s_stage_decoder.get_summary())
-        print("vits : ")
-        print(vits.get_summary())
+        if not args.onnx_vits:
+            print("vits : ")
+            print(vits.get_summary())
 
 
 if __name__ == '__main__':
