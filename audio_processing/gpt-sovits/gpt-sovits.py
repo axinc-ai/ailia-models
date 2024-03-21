@@ -51,7 +51,7 @@ parser.add_argument(
     help='input text'
 )
 parser.add_argument(
-    '--audio', '-a', metavar='TEXT', default="BASIC5000_0001.wav",
+    '--audio', '-a', metavar='TEXT', default="reference_audio_captured_by_ax.wav",
     help='ref audio'
 )
 parser.add_argument(
