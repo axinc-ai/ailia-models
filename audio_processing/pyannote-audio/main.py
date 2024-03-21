@@ -1,29 +1,13 @@
 import yaml
-import os
-import pathlib
 import sys
-import time 
-import numpy as np
-import librosa
-import ailia
 
-
-# sys.path.append('./pyannote')   
-# from pyannote.core import Segment, Annotation
 from pyannote.audio.pipelines.speaker_diarization import SpeakerDiarization
-# import json
-# import polars as pl
-# import torch
-# from pyannote.core import Segment, notebook
 from pyannote.database.util import load_rttm
 from pyannote.metrics.diarization import DiarizationErrorRate
-import argparse    
-# from importlib import import_module
 
 sys.path.append('../../util')
 from arg_utils import get_base_parser, update_parser  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
-# from importlib import import_module
 from logging import getLogger  # noqa: E402
 logger = getLogger(__name__)
 
@@ -33,19 +17,44 @@ WEIGHT_SEGMENTATION_PATH = 'segmentation.onnx'
 WEIGHT_EMBEDDING_PATH = 'speaker-embedding.onnx'
 # MODEL_CNC_PATH = 'cnceleb_resnet34.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/pyannote-audio/'
-YAML_PATH = './model/config.yaml'
-import argparse    
-parser = argparse.ArgumentParser(description='引数')   
+YAML_PATH = 'config.yaml'
 
-parser.add_argument('--num','-num_speaker', default=0,help='話者数が決まっている場合', type=int)
-parser.add_argument('--max','-max_speaker', default=0,help='話者数の最大数が決まっている場合', type=int)
-parser.add_argument('--min','-min_speaker', default=0,help='話者数の最小数が決まっている場合', type=int)
-parser.add_argument('--file', default='./data/demo.wav',help='解析するデータファイルの場所') 
-parser.add_argument('--gfile', default='./data/demo_ground.rttm',help='解析するデータファイルの場所') 
-parser.add_argument('--embed', default=False,help='話者の埋め込みベクトルが必要な場合', type=bool) 
-args = parser.parse_args()   
+parser = get_base_parser(
+    'Pyannote-audio', None, None, input_ftype='audio'
+)
 
+parser.add_argument(
+    '--num','-num_speaker', default=0, 
+    help='話者数が決まっている場合', type=int
+)
+parser.add_argument(
+    '--max','-max_speaker', default=0,
+    help='話者数の最大数が決まっている場合', type=int
+)
+parser.add_argument(
+    '--min','-min_speaker', default=0,
+    help='話者数の最小数が決まっている場合', type=int
+)
+parser.add_argument(
+    '--file', default='./data/demo.wav',
+    help='解析するデータファイルの場所'
+) 
+parser.add_argument(
+    '--gfile', default='./data/demo_ground.rttm',
+    help='解析するデータファイルの場所'
+) 
+parser.add_argument(
+    '--embed', 
+    action='store_true',
+    help='話者の埋め込みベクトルが必要な場合', 
+) 
+parser.add_argument(
+    '--use_onnx', 
+    action='store_true',
+    help='execute onnxruntime version.'
+)
 
+args = update_parser(parser)
 
 def main(args):
     check_and_download_models(WEIGHT_SEGMENTATION_PATH, model_path=None,remote_path=REMOTE_PATH)
@@ -59,7 +68,7 @@ def main(args):
     with open(YAML_PATH, 'w') as f:
         yaml.dump(config, f)
 
-    # os.environ['HUGGINGFACE_HUB_CACHE'] = str(pathlib.Path("./tmp/assets").absolute())
+    
     audio_file = args.file
     
     checkpoint_path = YAML_PATH
@@ -68,16 +77,9 @@ def main(args):
         config = yaml.load(fp, Loader=yaml.SafeLoader)
 
     params = config["pipeline"].get("params", {})
-    # pipeline = Klass(**params)
-    pipeline = SpeakerDiarization(**params)
+    pipeline = SpeakerDiarization(**params, args=args)
     if "params" in config:
         pipeline.instantiate(config["params"])
-
-    # send pipeline to GPU (when available)
-    # if torch.cuda.is_available():
-        # pipeline.to(torch.device("cuda"))
-    # else:
-        # pipeline.to(torch.device("cpu"))
     
     if args.embed:
         if args.num > 0:
@@ -105,7 +107,7 @@ def main(args):
     metric = DiarizationErrorRate()
     result = metric(groundtruth, diarization, detailed=True)
     print(result)
-    breakpoint()
+    
 
 if __name__ == "__main__":
     main(args)

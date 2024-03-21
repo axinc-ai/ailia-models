@@ -19,29 +19,22 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
-import librosa
-import math
+
+
+import ailia
 import warnings
 from pathlib import Path
 from typing import Callable, List, Optional, Text, Tuple, Union
-
-import numpy as np
-import torch
-# import torch.nn as nn
-# import torch.nn.functional as F
-from einops import rearrange
-from pyannote.core import Segment, SlidingWindow, SlidingWindowFeature
-from pytorch_lightning.utilities.memory import is_oom_error
-
-from pyannote.audio.core.io import AudioFile, Audio
-# from pyannote.audio.core.model import Specifications
-from pyannote.audio.core.task import Resolution, Specifications
-from pyannote.audio.utils.multi_task import map_with_specifications
-# from pyannote.audio.utils.permutation import mae_cost_func, permutate
-from pyannote.audio.utils.powerset import Powerset
-# from pyannote.audio.utils.reproducibility import fix_reproducibility
 from functools import cached_property
 from dataclasses import dataclass
+import numpy as np
+
+from pyannote.core import Segment, SlidingWindow, SlidingWindowFeature
+from pyannote.audio.core.io import AudioFile, Audio
+from pyannote.audio.core.task import Resolution, Specifications, Problem
+from pyannote.audio.utils.multi_task import map_with_specifications
+from pyannote.audio.utils.powerset import Powerset
+
 
 import onnxruntime
 import onnx
@@ -100,45 +93,27 @@ class Inference(BaseInference):
         pre_aggregation_hook: Callable[[np.ndarray], np.ndarray] = None,
         skip_aggregation: bool = False,
         skip_conversion: bool = False,
-        # device: torch.device = None,
         batch_size: int = 32,
         use_auth_token: Union[Text, None] = None,
+        args = None,
     ):
         # ~~~~ model ~~~~~
         
-        # if isinstance(model, Model):
-            # pass            
-        # elif isinstance(model, Text):
-    # if model.endswith("onnx"):
-        print("use onnx model")
-        model_path = model
-        model = onnxruntime.InferenceSession(model, providers=['CUDAExecutionProvider', 'CPUExecutionProvider'])
-                # model = onnx.load(model)
-            # else:
-            #     model = Model.from_pretrained(
-            #     model,
-            #     map_location=device,
-            #     strict=False,
-            #     use_auth_token=use_auth_token,
-            # )
-                
-        use_onnx_model = isinstance(model, onnxruntime.InferenceSession)
-        self.use_onnx_model = use_onnx_model
-        # if device is None:
-            # device = torch.device("cpu")
-        # self.device = device
+
+        if args.use_onnx:
+            print("use onnx model")
+        
+            model = onnxruntime.InferenceSession(model, providers=['CUDAExecutionProvider', 'CPUExecutionProvider'])
+        else:
+            print("use ailia")
+
+            model = ailia.Net(None, weight=model, env_id=args.env_id)
+
         self.model = model
-
-        ###################################### あとで ###################################
-        if use_onnx_model:  
-            # specifications = onnx.load(model_path)
-            specifications = torch.load(model_path.replace(".onnx", ".pt"))
-        ###################################### あとで ###################################
-        # else:
-            # self.model.eval()
-            # self.model.to(self.device)
-            # specifications = self.specifications
-
+        self.args = args
+    
+        specifications = Specifications(problem=Problem.MONO_LABEL_CLASSIFICATION, resolution = Resolution.FRAME, classes=['speaker#1', 'speaker#2', 'speaker#3'])
+        
         self.specifications = specifications
         self.audio = Audio(sample_rate=16000, mono="downmix")
         # ~~~~ sliding window ~~~~~
@@ -172,16 +147,11 @@ class Inference(BaseInference):
         for s in specifications:
             if s.powerset and not skip_conversion:
                 c = Powerset(len(s.classes), s.powerset_max_classes)
-            # else:
-                # c = nn.Identity()
-            # conversion.append(c.to(self.device))
             conversion.append(c)
         
         
         if isinstance(specifications, Specifications):
             self.conversion = conversion[0]
-        # else:
-            # self.conversion = nn.ModuleList(conversion)
 
         # ~~~~ overlap-add aggregation ~~~~~
 
@@ -209,25 +179,6 @@ class Inference(BaseInference):
 
         self.batch_size = batch_size
 
-    # def to(self, device: torch.device) -> "Inference":
-    #     """Send internal model to `device`"""
-
-    #     if not isinstance(device, torch.device):
-    #         raise TypeError(
-    #             f"`device` must be an instance of `torch.device`, got `{type(device).__name__}`"
-    #         )
-    #     if not self.use_onnx_model:
-    #         self.model.to(device)
-    #         # self.conversion.to(device)
-    #         self.device = device
-    #     return self
-
-    # def forward_onnx(self, chunks: torch.Tensor) -> Union[np.ndarray, Tuple[np.ndarray]]:
-    #     # breakpoint()
-    #     chunks = chunks.numpy()
-    #     outputs = self.model.run(None, {"input": chunks})[0]
-    #     return outputs
-    
     def infer(self, chunks: np.ndarray) -> Union[np.ndarray, Tuple[np.ndarray]]:
         """Forward pass
 
@@ -244,53 +195,24 @@ class Inference(BaseInference):
             Model output.
         """
         
-        # if self.use_onnx_model:
+        if self.args.use_onnx:
+            outputs = self.model.run(None, {"input": chunks})[0]
+        else:
+            outputs = self.model.predict([chunks])[0]
         
-        # outputs = self.forward_onnx(chunks.to(self.device))
-        # outputs = self.forward_onnx(chunks)
-        # chunks = chunks.numpy(force=True)
-        outputs = self.model.run(None, {"input": chunks})[0]
-        
-        # outputs = torch.from_numpy(outputs).clone()
-        # else:
-        #     with torch.inference_mode():
-        #         try:
-        #             outputs = self.model(chunks.to(self.device))
-                    
-        #         except RuntimeError as exception:
-        #             if is_oom_error(exception):
-        #                 raise MemoryError(
-        #                     f"batch_size ({self.batch_size: d}) is probably too large. "
-        #                     f"Try with a smaller value until memory error disappears."
-        #                 )
-        #             else:
-        #                 raise exception
         
         def __convert(output: np.ndarray, conversion, **kwargs):
-            
-            # return conversion(output).cpu().numpy()
             return conversion(output)
         
         return map_with_specifications(self.specifications, __convert, outputs, self.conversion)
     
-    # def get_example_input_array(self) -> torch.Tensor:
-        # breakpoint()
-        # return np.random.randn(1, 1, self.audio.get_num_samples(self.specifications.duration))
-
-        # return torch.randn(size=(1, 1, self.audio.get_num_samples(self.specifications.duration)))
-        # return np.random.randn(size=(1, 1, self.audio.get_num_samples(self.specifications.duration)))
-    
     @cached_property
     def example_output(self) -> Union[Output, Tuple[Output]]:
         """Example output"""
-        # example_input_array = self.get_example_input_array()
         example_input_array = np.random.randn(1, 1, self.audio.get_num_samples(self.specifications.duration)).astype(np.float32)
-        
-        # with torch.inference_mode():
         
         example_outputs = self.infer(example_input_array)
             
-
         def __example_output(
             example_output: np.ndarray,
             specifications: Specifications = None,
@@ -360,14 +282,22 @@ class Inference(BaseInference):
 
         
         # prepare complete chunks
+        def unfold_numpy(waveform, window_size, step_size):
+            batch_size, waveform_size = waveform.shape
+            num_windows = (waveform_size - window_size) // step_size + 1
+            shape = (batch_size, num_windows, window_size)
+            strides = (
+                waveform.strides[0],
+                step_size * waveform.strides[1],
+                waveform.strides[1],
+            )
+            
+            return np.lib.stride_tricks.as_strided(waveform, shape=shape, strides=strides)
         
         if num_samples >= window_size:
-            ###################################### あとで ###############################
-            waveform = torch.from_numpy(waveform)
-            chunks: torch.Tensor = rearrange(waveform.unfold(1, window_size, step_size),"channel chunk frame -> chunk channel frame",)
-            chunks = chunks.numpy(force=True)
-            num_chunks, _, _ = chunks.shape
-            ###################################### あとで ##############################
+            chunks: np.ndarray = (unfold_numpy(waveform, window_size, step_size)).transpose(1, 0, 2)
+            num_chunks = chunks.shape[0]
+            
         else:
             num_chunks = 0
         
@@ -377,11 +307,9 @@ class Inference(BaseInference):
         
         if has_last_chunk:
             # pad last chunk with zeros
-            waveform = waveform.numpy(force=True)
             last_chunk: np.ndarray = waveform[:, num_chunks * step_size :]
             _, last_window_size = last_chunk.shape
             last_pad = window_size - last_window_size
-            # last_chunk = F.pad(last_chunk, (0, last_pad))
             last_chunk = np.pad(last_chunk, ((0, 0), (0, last_pad)))
 
         def __empty_list(**kwargs):
@@ -458,28 +386,6 @@ class Inference(BaseInference):
                 
                 return SlidingWindowFeature(outputs, frames)
 
-            # if self.pre_aggregation_hook is not None:
-            #     outputs = self.pre_aggregation_hook(outputs)
-
-            # aggregated = self.aggregate(
-            #     SlidingWindowFeature(
-            #         outputs,
-            #         SlidingWindow(start=0.0, duration=self.duration, step=self.step),
-            #     ),
-            #     frames=frames,
-            #     warm_up=self.warm_up,
-            #     hamming=True,
-            #     missing=0.0,
-            # )
-
-            # # remove padding that was added to last chunk
-            # if has_last_chunk:
-            #     aggregated.data = aggregated.crop(
-            #         Segment(0.0, num_samples / sample_rate), mode="loose"
-            #     )
-
-            # return aggregated
-
         return map_with_specifications(
             self.specifications, __aggregate, outputs, frames
         )
@@ -510,114 +416,11 @@ class Inference(BaseInference):
 
         """
 
-        # fix_reproducibility(self.device)
-
         waveform, sample_rate = self.audio(file)
-        # waveform = waveform.numpy(force=True)
-        
-        
+
         if self.window == "sliding":
             return self.slide(waveform, sample_rate, hook=hook)
-        
-
-        # outputs: Union[np.ndarray, Tuple[np.ndarray]] = self.infer(waveform[None])
-
-        # def __first_sample(outputs: np.ndarray, **kwargs) -> np.ndarray:
-        #     return outputs[0]
-
-        # return map_with_specifications(
-        #     self.specifications, __first_sample, outputs
-        # )
-
-    # def crop(
-    #     self,
-    #     file: AudioFile,
-    #     chunk: Union[Segment, List[Segment]],
-    #     duration: Optional[float] = None,
-    #     hook: Optional[Callable] = None,
-    # ) -> Union[
-    #     Tuple[Union[SlidingWindowFeature, np.ndarray]],
-    #     Union[SlidingWindowFeature, np.ndarray],
-    # ]:
-    #     """Run inference on a chunk or a list of chunks
-
-    #     Parameters
-    #     ----------
-    #     file : AudioFile
-    #         Audio file.
-    #     chunk : Segment or list of Segment
-    #         Apply model on this chunk. When a list of chunks is provided and
-    #         window is set to "sliding", this is equivalent to calling crop on
-    #         the smallest chunk that contains all chunks. In case window is set
-    #         to "whole", this is equivalent to concatenating each chunk into one
-    #         (artifical) chunk before processing it.
-    #     duration : float, optional
-    #         Enforce chunk duration (in seconds). This is a hack to avoid rounding
-    #         errors that may result in a different number of audio samples for two
-    #         chunks of the same duration.
-    #     hook : callable, optional
-    #         When a callable is provided, it is called everytime a batch is processed
-    #         with two keyword arguments:
-    #         - `completed`: the number of chunks that have been processed so far
-    #         - `total`: the total number of chunks
-
-    #     Returns
-    #     -------
-    #     output : (tuple of) SlidingWindowFeature or np.ndarray
-    #         Model output, as `SlidingWindowFeature` if `window` is set to "sliding"
-    #         and `np.ndarray` if is set to "whole".
-
-    #     Notes
-    #     -----
-    #     If model needs to be warmed up, remember to extend the requested chunk with the
-    #     corresponding amount of time so that it is actually warmed up when processing the
-    #     chunk of interest:
-    #     >>> chunk_of_interest = Segment(10, 15)
-    #     >>> extended_chunk = Segment(10 - warm_up, 15 + warm_up)
-    #     >>> inference.crop(file, extended_chunk).crop(chunk_of_interest, returns_data=False)
-    #     """
-
-    #     fix_reproducibility(self.device)
-
-    #     if self.window == "sliding":
-    #         if not isinstance(chunk, Segment):
-    #             start = min(c.start for c in chunk)
-    #             end = max(c.end for c in chunk)
-    #             chunk = Segment(start=start, end=end)
-
-    #         waveform, sample_rate = self.audio.crop(
-    #             file, chunk, duration=duration
-    #         )
-    #         outputs: Union[
-    #             SlidingWindowFeature, Tuple[SlidingWindowFeature]
-    #         ] = self.slide(waveform, sample_rate, hook=hook)
-
-    #         def __shift(output: SlidingWindowFeature, **kwargs) -> SlidingWindowFeature:
-    #             frames = output.sliding_window
-    #             shifted_frames = SlidingWindow(
-    #                 start=chunk.start, duration=frames.duration, step=frames.step
-    #             )
-    #             return SlidingWindowFeature(output.data, shifted_frames)
-
-    #         return map_with_specifications(self.specifications, __shift, outputs)
-
-    #     if isinstance(chunk, Segment):
-    #         waveform, sample_rate = self.audio.crop(
-    #             file, chunk, duration=duration
-    #         )
-    #     else:
-    #         waveform = torch.cat(
-    #             [self.audio.crop(file, c)[0] for c in chunk], dim=1
-    #         )
-
-    #     outputs: Union[np.ndarray, Tuple[np.ndarray]] = self.infer(waveform[None])
-
-    #     def __first_sample(outputs: np.ndarray, **kwargs) -> np.ndarray:
-    #         return outputs[0]
-
-    #     return map_with_specifications(
-    #         self.specifications, __first_sample, outputs
-    #     )
+ 
 
     @staticmethod
     def aggregate(
@@ -795,134 +598,3 @@ class Inference(BaseInference):
         )
 
         return SlidingWindowFeature(new_data, new_chunks)
-
-    # @staticmethod
-    # def stitch(
-    #     activations: SlidingWindowFeature,
-    #     frames: SlidingWindow = None,
-    #     lookahead: Optional[Tuple[int, int]] = None,
-    #     cost_func: Callable[[torch.Tensor, torch.Tensor], torch.Tensor] = None,
-    #     match_func: Callable[[np.ndarray, np.ndarray, float], bool] = None,
-    # ) -> SlidingWindowFeature:
-    #     """
-
-    #     Parameters
-    #     ----------
-    #     activations : SlidingWindowFeature
-    #         (num_chunks, num_frames, num_classes)-shaped scores.
-    #     frames : SlidingWindow, optional
-    #         Frames resolution. Defaults to estimate it automatically based on `activations`
-    #         shape and chunk size. Providing the exact frame resolution (when known) leads to better
-    #         temporal precision.
-    #     lookahead : (int, int) tuple
-    #         Number of past and future adjacent chunks to use for stitching.
-    #         Defaults to (k, k) with k = chunk_duration / chunk_step - 1
-    #     cost_func : callable
-    #         Cost function used to find the optimal mapping between two chunks.
-    #         Expects two (num_frames, num_classes) torch.tensor as input
-    #         and returns cost as a (num_classes, ) torch.tensor
-    #         Defaults to mean absolute error (utils.permutations.mae_cost_func)
-    #     match_func : callable
-    #         Function used to decide whether two speakers mapped by the optimal
-    #         mapping actually are a match.
-    #         Expects two (num_frames, ) np.ndarray and the cost (from cost_func)
-    #         and returns a boolean. Defaults to always returning True.
-    #     """
-
-    #     num_chunks, num_frames, num_classes = activations.data.shape
-
-    #     chunks: SlidingWindow = activations.sliding_window
-
-    #     if frames is None:
-    #         duration = step = chunks.duration / num_frames
-    #         frames = SlidingWindow(start=chunks.start, duration=duration, step=step)
-    #     else:
-    #         frames = SlidingWindow(
-    #             start=chunks.start,
-    #             duration=frames.duration,
-    #             step=frames.step,
-    #         )
-
-    #     max_lookahead = math.floor(chunks.duration / chunks.step - 1)
-    #     if lookahead is None:
-    #         lookahead = 2 * (max_lookahead,)
-
-    #     assert all(L <= max_lookahead for L in lookahead)
-
-    #     if cost_func is None:
-    #         cost_func = mae_cost_func
-
-    #     if match_func is None:
-
-    #         def always_match(this: np.ndarray, that: np.ndarray, cost: float):
-    #             return True
-
-    #         match_func = always_match
-
-    #     stitches = []
-    #     for C, (chunk, activation) in enumerate(activations):
-    #         local_stitch = np.NAN * np.zeros(
-    #             (sum(lookahead) + 1, num_frames, num_classes)
-    #         )
-
-    #         for c in range(
-    #             max(0, C - lookahead[0]), min(num_chunks, C + lookahead[1] + 1)
-    #         ):
-    #             # extract common temporal support
-    #             shift = round((C - c) * num_frames * chunks.step / chunks.duration)
-
-    #             if shift < 0:
-    #                 shift = -shift
-    #                 this_activations = activation[shift:]
-    #                 that_activations = activations[c, : num_frames - shift]
-    #             else:
-    #                 this_activations = activation[: num_frames - shift]
-    #                 that_activations = activations[c, shift:]
-
-    #             # find the optimal one-to-one mapping
-    #             _, (permutation,), (cost,) = permutate(
-    #                 this_activations[np.newaxis],
-    #                 that_activations,
-    #                 cost_func=cost_func,
-    #                 return_cost=True,
-    #             )
-
-    #             for this, that in enumerate(permutation):
-    #                 # only stitch under certain condiditions
-    #                 matching = (c == C) or (
-    #                     match_func(
-    #                         this_activations[:, this],
-    #                         that_activations[:, that],
-    #                         cost[this, that],
-    #                     )
-    #                 )
-
-    #                 if matching:
-    #                     local_stitch[c - C + lookahead[0], :, this] = activations[
-    #                         c, :, that
-    #                     ]
-
-    #                 # TODO: do not lookahead further once a mismatch is found
-
-    #         stitched_chunks = SlidingWindow(
-    #             start=chunk.start - lookahead[0] * chunks.step,
-    #             duration=chunks.duration,
-    #             step=chunks.step,
-    #         )
-
-    #         local_stitch = Inference.aggregate(
-    #             SlidingWindowFeature(local_stitch, stitched_chunks),
-    #             frames=frames,
-    #             hamming=True,
-    #         )
-
-    #         stitches.append(local_stitch.data)
-
-    #     stitches = np.stack(stitches)
-    #     stitched_chunks = SlidingWindow(
-    #         start=chunks.start - lookahead[0] * chunks.step,
-    #         duration=chunks.duration + sum(lookahead) * chunks.step,
-    #         step=chunks.step,
-    #     )
-
-    #     return SlidingWindowFeature(stitches, stitched_chunks)

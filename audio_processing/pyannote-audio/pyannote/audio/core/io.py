@@ -30,26 +30,16 @@ pyannote.audio relies on torchaudio for reading and resampling.
 import math
 import random
 import warnings
-# from io import IOBase
+
 from pathlib import Path
 from typing import Mapping, Optional, Text, Tuple, Union
 import numpy as np
 
-# import torch
-# import torch.nn.functional as F
-# import torchaudio
-# from torch import Tensor
-
 from pyannote.core import Segment
 
-# import librosa
 import ailia.audio
 import soundfile 
 
-
-# torchaudio.set_audio_backend("soundfile")
-
-# AudioFile = Union[Text, Path, IOBase, Mapping]
 AudioFile = Union[Text, Path, Mapping]
 
 AudioFileDocString = """
@@ -63,22 +53,6 @@ Audio files can be provided to the Audio class using different types:
 For last two options, an additional "channel" key can be provided as a zero-indexed
 integer to load a specific channel: {"audio": "stereo.wav", "channel": 0}
 """
-
-
-# def get_torchaudio_info(file: AudioFile):
-#     """Protocol preprocessor used to cache output of torchaudio.info
-
-#     This is useful to speed future random access to this file, e.g.
-#     in dataloaders using Audio.crop a lot....
-#     """
-
-#     info = torchaudio.info(file["audio"])
-
-#     # rewind if needed
-#     if isinstance(file["audio"], IOBase):
-#         file["audio"].seek(0)
-
-#     return info
 
 
 class Audio:
@@ -107,22 +81,6 @@ class Audio:
 
     PRECISION = 0.001
 
-    # @staticmethod
-    # def power_normalize(waveform: Tensor) -> Tensor:
-    #     """Power-normalize waveform
-
-    #     Parameters
-    #     ----------
-    #     waveform : (..., time) Tensor
-    #         Waveform(s)
-
-    #     Returns
-    #     -------
-    #     waveform: (..., time) Tensor
-    #         Power-normalized waveform(s)
-    #     """
-    #     rms = waveform.square().mean(dim=-1, keepdim=True).sqrt()
-    #     return waveform / (rms + 1e-8)
 
     @staticmethod
     def validate_file(file: AudioFile) -> Mapping:
@@ -220,18 +178,9 @@ class Audio:
                 channel = random.randint(0, num_channels - 1)
                 waveform = waveform[channel : channel + 1]
             elif self.mono == "downmix":
-                # waveform = waveform.mean(dim=0, keepdim=True)
                 waveform = np.mean(waveform, axis=0, keepdims=True)
 
-        
-        # resample
-        
-        # waveform_ = torch.from_numpy(waveform)
-        # if (self.sample_rate is not None) and (self.sample_rate != sample_rate):
-        #     waveform_ = torchaudio.functional.resample(
-        #         waveform_, sample_rate, self.sample_rate)
-        
-            # sample_rate = self.sample_rate
+
 
         ######## ここでずれる ##########
         if (self.sample_rate is not None) and (self.sample_rate != sample_rate):
@@ -242,36 +191,6 @@ class Audio:
         
         return waveform, sample_rate
 
-    # def get_duration(self, file: AudioFile) -> float:
-    #     """Get audio file duration in seconds
-
-    #     Parameters
-    #     ----------
-    #     file : AudioFile
-    #         Audio file.
-
-    #     Returns
-    #     -------
-    #     duration : float
-    #         Duration in seconds.
-    #     """
-
-    #     file = self.validate_file(file)
-
-        # if "waveform" in file:
-            # frames = len(file["waveform"].T)
-            # sample_rate = file["sample_rate"]
-
-    #     else:
-    #         if "torchaudio.info" in file:
-    #             info = file["torchaudio.info"]
-    #         else:
-    #             info = get_torchaudio_info(file)
-
-    #         frames = info.num_frames
-    #         sample_rate = info.sample_rate
-
-    #     return frames / sample_rate
 
     def get_num_samples(
         self, duration: float, sample_rate: Optional[int] = None
@@ -311,23 +230,15 @@ class Audio:
         if "waveform" in file:
             waveform = file["waveform"]
             sample_rate = file["sample_rate"]
-
-        # elif "audio" in file:
-        
-        # waveform, sample_rate = torchaudio.load(file["audio"])
-        
+                
         waveform, sample_rate = soundfile.read(file["audio"])
         waveform = waveform.T
-
-        # rewind if needed
-        # if isinstance(file["audio"], IOBase):
-            # file["audio"].seek(0)
         
         channel = file.get("channel", None)
 
         if channel is not None:
             waveform = waveform[channel : channel + 1]
-        # breakpoint()
+        
         return self.downmix_and_resample(waveform, sample_rate)
 
     def crop(
@@ -376,11 +287,8 @@ class Audio:
             sample_rate = info.sample_rate
 
         else:
-            # info = get_torchaudio_info(file)
             info = soundfile.read(file["audio"])
-            # frames = info.num_frames
             frames = info[0].shape[0]
-            # sample_rate = info.sample_rate
             sample_rate = info[1]
 
         channel = file.get("channel", None)
@@ -396,29 +304,6 @@ class Audio:
             end_frame = math.floor(segment.end * sample_rate)
             num_frames = end_frame - start_frame
 
-        # if mode == "raise":
-        #     if num_frames > frames:
-        #         raise ValueError(
-        #             f"requested fixed duration ({duration:6f}s, or {num_frames:d} frames) is longer "
-        #             f"than file duration ({frames / sample_rate:.6f}s, or {frames:d} frames)."
-        #         )
-
-        #     if end_frame > frames + math.ceil(self.PRECISION * sample_rate):
-        #         raise ValueError(
-        #             f"requested chunk [{segment.start:.6f}s, {segment.end:.6f}s] (frames #{start_frame:d} to #{end_frame:d}) "
-        #             f"lies outside of {file.get('uri', 'in-memory')} file bounds [0., {frames / sample_rate:.6f}s] ({frames:d} frames)."
-        #         )
-        #     else:
-        #         end_frame = min(end_frame, frames)
-        #         start_frame = end_frame - num_frames
-
-        #     if start_frame < 0:
-        #         raise ValueError(
-        #             f"requested chunk [{segment.start:.6f}s, {segment.end:.6f}s] (frames #{start_frame:d} to #{end_frame:d}) "
-        #             f"lies outside of {file.get('uri', 'in-memory')} file bounds [0, {frames / sample_rate:.6f}s] ({frames:d} frames)."
-        #         )
-
-        # elif mode == "pad":
         if mode == "pad":
             pad_start = -min(0, start_frame)
             pad_end = max(end_frame, frames) - frames
@@ -431,20 +316,10 @@ class Audio:
 
         else:
             try:
-                # data, _ = torchaudio.load(
-                    # file["audio"], frame_offset=start_frame, num_frames=num_frames
-                # )
                 data, _ = soundfile.read(file["audio"], start=start_frame, frames=num_frames)
                 data = data.T
-                # rewind if needed
-                # if isinstance(file["audio"], IOBase):
-                    # file["audio"].seek(0)
-
+                
             except RuntimeError:
-                # if isinstance(file["audio"], IOBase):
-                    # msg = "torchaudio failed to seek-and-read in file-like object."
-                    # raise RuntimeError(msg)
-
                 msg = (
                     f"torchaudio failed to seek-and-read in {file['audio']}: "
                     f"loading the whole file instead."
@@ -463,12 +338,8 @@ class Audio:
         if channel is not None:
             data = data[channel : channel + 1, :]
         
-        # data = torch.from_numpy(data)
-
-        # pad with zeros
         if mode == "pad":
-            # data = F.pad(data, (pad_start, pad_end))
             data = np.pad(data, ((0, 0), (pad_start, pad_end)))
-        # data = data.numpy(force=True)
+        
 
         return self.downmix_and_resample(data, sample_rate)

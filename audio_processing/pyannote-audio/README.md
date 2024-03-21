@@ -1,10 +1,5 @@
-＊numpyからtorchへの変更中です，以下残りの変更すべきtorchの関数を載せます
-pyannote/audio/core/inference.py                   : torch.nn.functional.pad, torch.load, torchのunfold()
-pyannote/audio/core/io.py                          : torchaudio
-pyannote/audio/pipelines/speaker_verification.py   : torch.nn.functional.interpolate
+使用法
 
-pyannote.audio(https://github.com/pyannote/pyannote-audio) からcloneし変更した後のファイル
-変更内容は主にpyannoteフォルダ内のファイルを変更
 ```
 pip install -r requirements.txt
 ```   
@@ -15,6 +10,8 @@ python main.py --num 4
 などで実行可能
 
 
+pyannote.audio(https://github.com/pyannote/pyannote-audio) からclone
+変更内容は主にpyannoteフォルダ内のファイルを変更
 
 Using `pyannote.audio` open-source toolkit in production?
 Make the most of it thanks to our [consulting services](https://herve.niderb.fr/consulting.html).
