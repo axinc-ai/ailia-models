@@ -1,3 +1,22 @@
+import time
+import sys
+import argparse
+import re
+
+import numpy as np
+import soundfile as sf
+
+import ailia  # noqa: E402
+
+# import original modules
+sys.path.append('../../util')
+from arg_utils import get_base_parser, update_parser, get_savepath  # noqa: E402
+from model_utils import check_and_download_models  # noqa: E402
+from scipy.io.wavfile import write
+# logger
+from logging import getLogger   # noqa: E402
+logger = getLogger(__name__)
+
 import torch
 import torchaudio
 from torch import nn
@@ -13,6 +32,54 @@ import soundfile
 import ffmpeg
 import numpy as np
 import librosa
+
+# ======================
+# PARAMETERS
+# ======================
+
+SAVE_WAV_PATH = 'output.wav'
+REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/gpt-sovits/'
+
+# ======================
+# Arguemnt Parser Config
+# ======================
+
+parser = get_base_parser( 'GPT-SoVits', None, SAVE_WAV_PATH)
+# overwrite
+parser.add_argument(
+    '--input', '-i', metavar='TEXT', default="ax株式会社ではAIの実用化のためのフレームワークを開発しています。",
+    help='input text'
+)
+parser.add_argument(
+    '--audio', '-a', metavar='TEXT', default="BASIC5000_0001.wav",
+    help='ref audio'
+)
+parser.add_argument(
+    '--transcript', '-t', metavar='TEXT', default="水をマレーシアから買わなくてはならない。",
+    help='ref text'
+)
+parser.add_argument(
+    '--onnx', action='store_true',
+    help='use onnx runtime'
+)
+parser.add_argument(
+    '--profile', action='store_true',
+    help='use profile model'
+)
+args = update_parser(parser, check_input_type=False)
+
+WEIGHT_PATH_SSL = 'nahida_cnhubert.onnx'
+WEIGHT_PATH_T2S_ENCODER = 'nahida_t2s_encoder.onnx'
+WEIGHT_PATH_T2S_FIRST_DECODER = 'nahida_t2s_fsdec.onnx'
+WEIGHT_PATH_T2S_STAGE_DECODER = 'nahida_t2s_sdec.onnx'
+WEIGHT_PATH_VITS = 'nahida_vits.onnx'
+
+MODEL_PATH_SSL = None#'nahida_cnhubert.onnx'
+MODEL_PATH_T2S_ENCODER = None#'nahida_t2s_encoder.onnx'
+MODEL_PATH_T2S_FIRST_DECODER = None#'nahida_t2s_fsdec.onnx'
+MODEL_PATH_T2S_STAGE_DECODER = None#'nahida_t2s_sdec.onnx'
+MODEL_PATH_VITS = None#'nahida_vits.onnx'
+
 
 
 def load_audio(file, sr):
@@ -35,15 +102,15 @@ def load_audio(file, sr):
 
 
 class T2SModel(nn.Module):
-    def __init__(self):
+    def __init__(self, sess_encoder, sess_fsdec, sess_sdec):
         super().__init__()
         self.hz = 50
         self.max_sec = 54
         self.top_k = 5
         self.early_stop_num = torch.LongTensor([self.hz * self.max_sec])
-        self.sess_encoder = onnxruntime.InferenceSession(f"nahida_t2s_encoder.onnx", providers=["CPUExecutionProvider"])
-        self.sess_fsdec = onnxruntime.InferenceSession(f"nahida_t2s_fsdec.onnx", providers=["CPUExecutionProvider"])
-        self.sess_sdec = onnxruntime.InferenceSession(f"nahida_t2s_sdec.onnx", providers=["CPUExecutionProvider"])
+        self.sess_encoder = sess_encoder
+        self.sess_fsdec = sess_fsdec
+        self.sess_sdec = sess_sdec
 
     def forward(self, ref_seq, text_seq, ref_bert, text_bert, ssl_content):
         early_stop_num = self.early_stop_num
@@ -95,10 +162,10 @@ class T2SModel(nn.Module):
 
 
 class GptSoVits(nn.Module):
-    def __init__(self, t2s):
+    def __init__(self, t2s, sess):
         super().__init__()
         self.t2s = t2s
-        self.sess = onnxruntime.InferenceSession("nahida_vits.onnx", providers=["CPUExecutionProvider"])
+        self.sess = sess
     
     def forward(self, ref_seq, text_seq, ref_bert, text_bert, ref_audio, ssl_content):
         pred_semantic = self.t2s(ref_seq, text_seq, ref_bert, text_bert, ssl_content)
@@ -112,9 +179,9 @@ class GptSoVits(nn.Module):
 
 
 class SSLModel(nn.Module):
-    def __init__(self):
+    def __init__(self, sess):
         super().__init__()
-        self.sess = onnxruntime.InferenceSession("nahida_cnhubert.onnx", providers=["CPUExecutionProvider"])
+        self.sess = sess
 
     def forward(self, ref_audio_16k):
         last_hidden_state = self.sess.run(None, {
@@ -123,30 +190,20 @@ class SSLModel(nn.Module):
         return torch.from_numpy(last_hidden_state[0])
 
 
-
-def inference():
-    gpt = T2SModel()
-    gpt_sovits = GptSoVits(gpt)
-    ssl = SSLModel()
+def generate_voice(ssl, t2s_encoder, t2s_first_decoder, t2s_stage_decoder, vits):
+    gpt = T2SModel(t2s_encoder, t2s_first_decoder, t2s_stage_decoder,)
+    gpt_sovits = GptSoVits(gpt, vits)
+    ssl = SSLModel(ssl)
 
     ref_audio = torch.randn((1, 48000 * 5)).float()
 
-    #input_audio = "JSUT.wav"
-    #input_audio = "0-input.wav"
-    #input_audio = "kyakuno.wav"
-    input_audio = "tsukuyomi.wav"
-
-    #ref_phones = g2p("水をマレーシアから買わなくてはならない。")
-    #ref_phones = g2p("僕の声をディープラーニングの力を借りてゆずきゆかりにするプロジェクト。")
-    #ref_phones = g2p("RVCを使用したボイスチェンジャーを作る。")
-    ref_phones = g2p("また、当時のように五大名王と呼ばれる 主要な名王の中央に配されることも多い")
-
+    input_audio = args.audio
+    ref_phones = g2p(args.transcript)
     ref_audio = torch.tensor([load_audio(input_audio, 48000)]).float()
 
     ref_seq = torch.LongTensor([cleaned_text_to_sequence(ref_phones)])
 
-    text_phones = g2p("ゆずきゆかりが好きだ！")
-    text_phones = g2p("ax株式会社ではAIの実用化のためのFrameworkを開発しています。")
+    text_phones = g2p(args.input)
     print(text_phones)
     text_seq = torch.LongTensor([cleaned_text_to_sequence(text_phones)])
 
@@ -169,10 +226,61 @@ def inference():
     ref_audio_16k = wav16k # hubertの入力のみpaddingする
     
     ssl_content = ssl(ref_audio_16k).float()
-    
-    a = gpt_sovits(ref_seq, text_seq, ref_bert, text_bert, ref_audio_sr, ssl_content)
-    soundfile.write("out.wav", a.cpu().detach().numpy(), vits_hps_data_sampling_rate)
 
-if __name__ == "__main__":
-    inference()
-    
+    a = gpt_sovits(ref_seq, text_seq, ref_bert, text_bert, ref_audio_sr, ssl_content)
+
+    savepath = args.savepath
+    logger.info(f'saved at : {savepath}')
+
+    soundfile.write(savepath, a.cpu().detach().numpy(), vits_hps_data_sampling_rate)
+
+    logger.info('Script finished successfully.')
+
+
+def main():
+    # model files check and download
+    check_and_download_models(WEIGHT_PATH_SSL, MODEL_PATH_SSL, WEIGHT_PATH_SSL)
+    check_and_download_models(WEIGHT_PATH_T2S_ENCODER, MODEL_PATH_T2S_ENCODER, REMOTE_PATH)
+    check_and_download_models(WEIGHT_PATH_T2S_FIRST_DECODER, MODEL_PATH_T2S_FIRST_DECODER, REMOTE_PATH)
+    check_and_download_models(WEIGHT_PATH_T2S_STAGE_DECODER, MODEL_PATH_T2S_STAGE_DECODER, REMOTE_PATH)
+    check_and_download_models(WEIGHT_PATH_VITS, MODEL_PATH_VITS, REMOTE_PATH)
+
+    #env_id = args.env_id
+
+    if args.onnx:
+        ssl = onnxruntime.InferenceSession(WEIGHT_PATH_SSL)
+        t2s_encoder = onnxruntime.InferenceSession(WEIGHT_PATH_T2S_ENCODER)
+        t2s_first_decoder = onnxruntime.InferenceSession(WEIGHT_PATH_T2S_FIRST_DECODER)
+        t2s_stage_decoder = onnxruntime.InferenceSession(WEIGHT_PATH_T2S_STAGE_DECODER)
+        vits = onnxruntime.InferenceSession(WEIGHT_PATH_VITS)
+    else:
+        memory_mode = ailia.get_memory_mode(reduce_constant=True, ignore_input_with_initializer=True, reduce_interstage=False, reuse_interstage=True)
+        ssl = ailia.Net(stream = WEIGHT_PATH_T2S_ENCODER, weight = MODEL_PATH_SSL, memory_mode = memory_mode, env_id = args.env_id)
+        t2s_encoder = ailia.Net(stream = WEIGHT_PATH_T2S_ENCODER, weight = MODEL_PATH_T2S_ENCODER, memory_mode = memory_mode, env_id = args.env_id)
+        t2s_first_decoder = ailia.Net(stream = WEIGHT_PATH_T2S_FIRST_DECODER, weight = MODEL_PATH_T2S_FIRST_DECODER, memory_mode = memory_mode, env_id = args.env_id)
+        t2s_stage_decoder = ailia.Net(stream = WEIGHT_PATH_T2S_STAGE_DECODER, weight = MODEL_PATH_T2S_STAGE_DECODER, memory_mode = memory_mode, env_id = args.env_id)
+        vits = ailia.Net(stream = WEIGHT_PATH_VITS, weight = MODEL_PATH_VITS, memory_mode = memory_mode, env_id = args.env_id)
+        if args.profile:
+            ssl.set_profile_mode(True)
+            t2s_encoder.set_profile_mode(True)
+            t2s_first_decoder.set_profile_mode(True)
+            t2s_stage_decoder.set_profile_mode(True)
+            vits.set_profile_mode(True)
+
+    generate_voice(ssl, t2s_encoder, t2s_first_decoder, t2s_stage_decoder, vits)
+
+    if args.profile:
+        print("ssl : ")
+        ssl(ssl.get_summary())
+        print("t2s_encoder : ")
+        print(t2s_encoder.get_summary())
+        print("t2s_first_decoder : ")
+        print(t2s_first_decoder.get_summary())
+        print("t2s_stage_decoder : ")
+        print(t2s_stage_decoder.get_summary())
+        print("vits : ")
+        print(vits.get_summary())
+
+
+if __name__ == '__main__':
+    main()
