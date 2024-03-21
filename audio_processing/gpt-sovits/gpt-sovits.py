@@ -97,24 +97,39 @@ class T2SModel():
 
         EOS = 1024
 
+        if args.benchmark:
+            start = int(round(time.time() * 1000))
         if args.onnx:
             x, prompts = self.sess_encoder.run(None, {"ref_seq":ref_seq, "text_seq":text_seq, "ref_bert":ref_bert, "text_bert":text_bert, "ssl_content":ssl_content})
         else:
             x, prompts = self.sess_encoder.run({"ref_seq":ref_seq, "text_seq":text_seq, "ref_bert":ref_bert, "text_bert":text_bert, "ssl_content":ssl_content})
+        if args.benchmark:
+            end = int(round(time.time() * 1000))
+            logger.info("\tsencoder processing time {} ms".format(end-start))
 
         prefix_len = prompts.shape[1]
 
+        if args.benchmark:
+            start = int(round(time.time() * 1000))
         if args.onnx:
             y, k, v, y_emb, x_example = self.sess_fsdec.run(None, {"x":x, "prompts":prompts, "top_k":top_k, "top_p":top_p, "temperature":temperature, "repetition_penalty":repetition_penalty})
         else:
             y, k, v, y_emb, x_example = self.sess_fsdec.run({"x":x, "prompts":prompts, "top_k":top_k, "top_p":top_p, "temperature":temperature, "repetition_penalty":repetition_penalty})
+        if args.benchmark:
+            end = int(round(time.time() * 1000))
+            logger.info("\tfsdec processing time {} ms".format(end-start))
 
         stop = False
         for idx in range(1, 1500):
+            if args.benchmark:
+                start = int(round(time.time() * 1000))
             if args.onnx:
                 y, k, v, y_emb, logits, samples = self.sess_sdec.run(None, {"iy":y, "ik":k, "iv":v, "iy_emb":y_emb, "ix_example":x_example, "top_k":top_k, "top_p":top_p, "temperature":temperature, "repetition_penalty":repetition_penalty})
             else:
                 y, k, v, y_emb, logits, samples = self.sess_sdec.run({"iy":y, "ik":k, "iv":v, "iy_emb":y_emb, "ix_example":x_example, "top_k":top_k, "top_p":top_p, "temperature":temperature, "repetition_penalty":repetition_penalty})
+            if args.benchmark:
+                end = int(round(time.time() * 1000))
+                logger.info("\tsdec processing time {} ms".format(end-start))
             if early_stop_num != -1 and (y.shape[1] - prefix_len) > early_stop_num:
                 stop = True
             if np.argmax(logits, axis=-1)[0] == EOS or samples[0, 0] == EOS:
@@ -133,6 +148,8 @@ class GptSoVits():
     
     def forward(self, ref_seq, text_seq, ref_bert, text_bert, ref_audio, ssl_content):
         pred_semantic = self.t2s.forward(ref_seq, text_seq, ref_bert, text_bert, ssl_content)
+        if args.benchmark:
+            start = int(round(time.time() * 1000))
         if args.onnx or args.onnx_vits:
             audio1 = self.sess.run(None, {
                 "text_seq" : text_seq,
@@ -145,6 +162,9 @@ class GptSoVits():
                 "pred_semantic" : pred_semantic, 
                 "ref_audio" : ref_audio
             })
+        if args.benchmark:
+            end = int(round(time.time() * 1000))
+            logger.info("\tvits processing time {} ms".format(end-start))
         return audio1[0]
 
 
@@ -153,6 +173,8 @@ class SSLModel():
         self.sess = sess
 
     def forward(self, ref_audio_16k):
+        if args.benchmark:
+            start = int(round(time.time() * 1000))
         if args.onnx:
             last_hidden_state = self.sess.run(None, {
                 "ref_audio_16k" : ref_audio_16k
@@ -161,6 +183,9 @@ class SSLModel():
             last_hidden_state = self.sess.run({
                 "ref_audio_16k" : ref_audio_16k
             })
+        if args.benchmark:
+            end = int(round(time.time() * 1000))
+            logger.info("\tssl processing time {} ms".format(end-start))
         return last_hidden_state[0]
 
 
