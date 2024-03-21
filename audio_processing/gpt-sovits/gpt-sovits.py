@@ -273,7 +273,7 @@ def main():
 
     if args.profile:
         print("ssl : ")
-        ssl(ssl.get_summary())
+        print(ssl.get_summary())
         print("t2s_encoder : ")
         print(t2s_encoder.get_summary())
         print("t2s_first_decoder : ")
