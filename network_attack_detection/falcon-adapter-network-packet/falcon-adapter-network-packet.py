@@ -28,6 +28,10 @@ sys.path.append("../../util")
 from arg_utils import get_base_parser, update_parser
 from model_utils import check_and_download_models, check_and_download_file
 
+nltk.download("stopwords")
+nltk.download("wordnet")
+nltk.download("averaged_perceptron_tagger")
+
 logger = getLogger(__name__)
 
 # ======================
@@ -73,7 +77,7 @@ parser = get_base_parser(
 )
 parser.add_argument("--hex", type=str, default=None, help="Input-HEX data.")
 parser.add_argument(
-    "--save_dataset", action="store_true", help="Save the generated dataset."
+    "--save_vector", action="store_true", help="Save the generated vector."
 )
 parser.add_argument("--onnx", action="store_true", help="execute onnxruntime version.")
 args = update_parser(parser)
@@ -558,13 +562,13 @@ def main():
     }
 
     if os.path.exists(BERT_VECTORS_ALL) and os.path.exists(BERT_WORDS_ALL):
-        logger.info("Loading dataset...")
+        logger.info("Loading vector...")
         similar.bert_vectors_all = np.load(BERT_VECTORS_ALL)
         similar.bert_words_all = np.load(BERT_WORDS_ALL)
     else:
         load_dataset(models, CORPUS_PATH)
-        if args.save_dataset:
-            logger.info("Saving dataset...")
+        if args.save_vector:
+            logger.info("Saving vector...")
             np.save(BERT_VECTORS_ALL, similar.bert_vectors_all)
             np.save(BERT_WORDS_ALL, similar.bert_words_all)
 
