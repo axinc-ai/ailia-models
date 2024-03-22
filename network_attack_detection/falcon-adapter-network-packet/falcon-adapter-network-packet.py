@@ -26,7 +26,7 @@ import ailia
 # import original modules
 sys.path.append("../../util")
 from arg_utils import get_base_parser, update_parser
-from model_utils import check_and_download_models
+from model_utils import check_and_download_models, check_and_download_file
 
 logger = getLogger(__name__)
 
@@ -40,7 +40,7 @@ REMOTE_PATH = (
     "https://storage.googleapis.com/ailia-models/falcon-adapter-network-packet/"
 )
 
-PACEKT_HEX_PATH = "packet_hex.txt"
+PACEKT_HEX_PATH = "input_hex.txt"
 
 SCALER_PKL = "SCALER.pkl"
 CLUSTER_CENTERS = "KMEANS-CLUSTER-CENTERS.npy"
@@ -532,6 +532,7 @@ def recognize_from_packet(models):
 def main():
     # model files check and download
     check_and_download_models(WEIGHT_SIMILAR_PATH, MODEL_SIMILAR_PATH, REMOTE_PATH)
+    check_and_download_file(CORPUS_PATH, REMOTE_PATH)
 
     env_id = args.env_id
 
