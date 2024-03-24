@@ -29,6 +29,7 @@ from arg_utils import get_base_parser, update_parser
 from model_utils import check_and_download_models, check_and_download_file
 
 nltk.download("stopwords")
+nltk.download('punkt')
 nltk.download("wordnet")
 nltk.download("averaged_perceptron_tagger")
 
