@@ -529,3 +529,14 @@ class FaceRestoreHelper(object):
                 upsample_img = inv_mask_border * img_color + (1 - inv_mask_border) * upsample_img
 
         return upsample_img
+
+    
+    def parameter_reinit(self):
+        self.all_landmarks_5 = []
+        self.det_faces = []
+        self.affine_matrices = []
+        self.inverse_affine_matrices = []
+        self.cropped_faces = []
+        self.restored_faces = []
+        self.pad_input_imgs = []
+

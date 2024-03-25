@@ -192,6 +192,7 @@ def recognize_from_video(net):
     frame_shown = False
     while (True):
         ret, frame = capture.read()
+        face_helper.parameter_reinit()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
         if frame_shown and cv2.getWindowProperty('output', cv2.WND_PROP_VISIBLE) == 0:
