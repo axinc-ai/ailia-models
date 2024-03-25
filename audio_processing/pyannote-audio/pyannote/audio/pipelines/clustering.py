@@ -313,6 +313,7 @@ class AgglomerativeClustering(BaseClustering):
 
         # minimum cluster size
         self.min_cluster_size = Integer(1, 20)
+        
 
     def cluster(
         self,
@@ -348,6 +349,7 @@ class AgglomerativeClustering(BaseClustering):
         min_cluster_size = min(
             self.min_cluster_size, max(1, round(0.1 * num_embeddings))
         )
+        breakpoint()
 
         # linkage function will complain when there is just one embedding to cluster
         if num_embeddings == 1:

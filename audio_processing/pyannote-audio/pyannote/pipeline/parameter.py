@@ -29,7 +29,7 @@
 
 
 from typing import Iterable, Any
-from optuna.trial import Trial
+# from optuna.trial import Trial
 
 from .pipeline import Pipeline
 from collections.abc import Mapping
@@ -56,8 +56,8 @@ class Categorical(Parameter):
         super().__init__()
         self.choices = list(choices)
 
-    def __call__(self, name: str, trial: Trial):
-        return trial.suggest_categorical(name, self.choices)
+    # def __call__(self, name: str, trial: Trial):
+        # return trial.suggest_categorical(name, self.choices)
 
 
 class DiscreteUniform(Parameter):
@@ -84,8 +84,8 @@ class DiscreteUniform(Parameter):
         self.high = float(high)
         self.q = float(q)
 
-    def __call__(self, name: str, trial: Trial):
-        return trial.suggest_discrete_uniform(name, self.low, self.high, self.q)
+    # def __call__(self, name: str, trial: Trial):
+        # return trial.suggest_discrete_uniform(name, self.low, self.high, self.q)
 
 
 class Integer(Parameter):
@@ -108,8 +108,8 @@ class Integer(Parameter):
         self.low = int(low)
         self.high = int(high)
 
-    def __call__(self, name: str, trial: Trial):
-        return trial.suggest_int(name, self.low, self.high)
+    # def __call__(self, name: str, trial: Trial):
+        # return trial.suggest_int(name, self.low, self.high)
 
 
 class LogUniform(Parameter):
@@ -132,8 +132,8 @@ class LogUniform(Parameter):
         self.low = float(low)
         self.high = float(high)
 
-    def __call__(self, name: str, trial: Trial):
-        return trial.suggest_loguniform(name, self.low, self.high)
+    # def __call__(self, name: str, trial: Trial):
+        # return trial.suggest_loguniform(name, self.low, self.high)
 
 
 class Uniform(Parameter):
@@ -156,8 +156,8 @@ class Uniform(Parameter):
         self.low = float(low)
         self.high = float(high)
 
-    def __call__(self, name: str, trial: Trial):
-        return trial.suggest_uniform(name, self.low, self.high)
+    # def __call__(self, name: str, trial: Trial):
+        # return trial.suggest_uniform(name, self.low, self.high)
 
 
 class Frozen(Parameter):
@@ -175,8 +175,8 @@ class Frozen(Parameter):
         super().__init__()
         self.value = value
 
-    def __call__(self, name: str, trial: Trial):
-        return self.value
+    # def __call__(self, name: str, trial: Trial):
+        # return self.value
 
 
 class ParamDict(Pipeline, Mapping):

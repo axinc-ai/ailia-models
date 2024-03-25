@@ -24,29 +24,29 @@ parser = get_base_parser(
 )
 
 parser.add_argument(
-    '--num','-num_speaker', default=0, 
-    help='話者数が決まっている場合', type=int
+    '--num', '-num_speaker', default=0, type=int,
+    help='If the number of speakers is fixed', 
 )
 parser.add_argument(
-    '--max','-max_speaker', default=0,
-    help='話者数の最大数が決まっている場合', type=int
+    '--max', '-max_speaker', default=0, type=int,
+    help='If the maximum number of speakers is fixed', 
 )
 parser.add_argument(
-    '--min','-min_speaker', default=0,
-    help='話者数の最小数が決まっている場合', type=int
+    '--min', '-min_speaker', default=0, type=int,
+    help='If the minimum number of speakers is fixed', 
 )
 parser.add_argument(
-    '--file', default='./data/demo.wav',
-    help='解析するデータファイルの場所'
+    '--insu', '-input_sample', default='./data/sample.wav',
+    help='Specify an input wav file'
 ) 
 parser.add_argument(
-    '--gfile', default='./data/demo_ground.rttm',
-    help='解析するデータファイルの場所'
+    '--gr', '-ground', default='./data/sample.rttm',
+    help='Specify a wav file as ground truth'
 ) 
 parser.add_argument(
     '--embed', 
     action='store_true',
-    help='話者の埋め込みベクトルが必要な場合', 
+    help='When you need embedding vector', 
 ) 
 parser.add_argument(
     '--use_onnx', 
@@ -69,8 +69,8 @@ def main(args):
         yaml.dump(config, f)
 
     
-    audio_file = args.file
-    
+    audio_file = args.insu
+
     checkpoint_path = YAML_PATH
     config_yml = checkpoint_path
     with open(config_yml, "r") as fp:
@@ -102,11 +102,11 @@ def main(args):
         else:
             diarization = pipeline(audio_file)
             
-    _, groundtruth = load_rttm(args.gfile).popitem()
-
+    _, groundtruth = load_rttm(args.gr).popitem()
     metric = DiarizationErrorRate()
-    result = metric(groundtruth, diarization, detailed=True)
-    print(result)
+    result = metric(groundtruth, diarization, detailed=False)
+    print(diarization)
+    print('Diarization error rate : ' + str(result))
     
 
 if __name__ == "__main__":

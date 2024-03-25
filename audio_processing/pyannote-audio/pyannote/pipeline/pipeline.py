@@ -28,18 +28,18 @@
 
 from typing import Optional, TextIO, Union, Dict, Any
 
-from pathlib import Path
+# from pathlib import Path
 from collections import OrderedDict
 from .typing import PipelineInput
 from .typing import PipelineOutput
-from .typing import Direction
-from filelock import FileLock
-import yaml
+# from .typing import Direction
+# from filelock import FileLock
+# import yaml
 import warnings
 
-from pyannote.core import Timeline
-from pyannote.core import Annotation
-from optuna.trial import Trial
+# from pyannote.core import Timeline
+# from pyannote.core import Annotation
+# from optuna.trial import Trial
 
 
 class Pipeline:
@@ -305,7 +305,7 @@ class Pipeline:
 
     def parameters(
         self,
-        trial: Optional[Trial] = None,
+        trial = None,
         frozen: Optional[bool] = False,
         instantiated: Optional[bool] = False,
     ) -> dict:
@@ -356,45 +356,45 @@ class Pipeline:
         """Instantiate root pipeline with current set of parameters"""
         pass
 
-    def freeze(self, params: dict) -> "Pipeline":
-        """Recursively freeze pipeline parameters
+    # def freeze(self, params: dict) -> "Pipeline":
+    #     """Recursively freeze pipeline parameters
 
-        Parameters
-        ----------
-        params : `dict`
-            Nested dictionary of parameters.
+    #     Parameters
+    #     ----------
+    #     params : `dict`
+    #         Nested dictionary of parameters.
 
-        Returns
-        -------
-        self : `Pipeline`
-            Pipeline.
-        """
+    #     Returns
+    #     -------
+    #     self : `Pipeline`
+    #         Pipeline.
+    #     """
 
-        # imported here to avoid circular imports
-        from .parameter import Frozen
+    #     # imported here to avoid circular imports
+    #     from .parameter import Frozen
 
-        for name, value in params.items():
+    #     for name, value in params.items():
 
-            # recursively freeze sub-pipelines parameters
-            if name in self._pipelines:
-                if not isinstance(value, dict):
-                    msg = (
-                        f"only parameters of '{name}' pipeline can "
-                        f"be frozen (not the whole pipeline)"
-                    )
-                    raise ValueError(msg)
-                self._pipelines[name].freeze(value)
-                continue
+    #         # recursively freeze sub-pipelines parameters
+    #         if name in self._pipelines:
+    #             if not isinstance(value, dict):
+    #                 msg = (
+    #                     f"only parameters of '{name}' pipeline can "
+    #                     f"be frozen (not the whole pipeline)"
+    #                 )
+    #                 raise ValueError(msg)
+    #             self._pipelines[name].freeze(value)
+    #             continue
 
-            # instantiate parameter value
-            if name in self._parameters:
-                setattr(self, name, Frozen(value))
-                continue
+    #         # instantiate parameter value
+    #         if name in self._parameters:
+    #             setattr(self, name, Frozen(value))
+    #             continue
 
-            msg = f"parameter '{name}' does not exist"
-            raise ValueError(msg)
+    #         msg = f"parameter '{name}' does not exist"
+    #         raise ValueError(msg)
 
-        return self
+    #     return self
 
     def instantiate(self, params: dict) -> "Pipeline":
         """Recursively instantiate all pipelines
@@ -454,169 +454,169 @@ class Pipeline:
         instantiated = set(self._flatten(self.parameters(instantiated=True)))
         return parameters == instantiated
 
-    def dump_params(
-        self,
-        params_yml: Path,
-        params: Optional[dict] = None,
-        loss: Optional[float] = None,
-    ) -> str:
-        """Dump parameters to disk
+    # def dump_params(
+    #     self,
+    #     params_yml: Path,
+    #     params: Optional[dict] = None,
+    #     loss: Optional[float] = None,
+    # ) -> str:
+    #     """Dump parameters to disk
 
-        Parameters
-        ----------
-        params_yml : `Path`
-            Path to YAML file.
-        params : `dict`, optional
-            Nested Parameters. Defaults to pipeline current parameters.
-        loss : `float`, optional
-            Loss value. Defaults to not write loss to file.
+    #     Parameters
+    #     ----------
+    #     params_yml : `Path`
+    #         Path to YAML file.
+    #     params : `dict`, optional
+    #         Nested Parameters. Defaults to pipeline current parameters.
+    #     loss : `float`, optional
+    #         Loss value. Defaults to not write loss to file.
 
-        Returns
-        -------
-        content : `str`
-            Content written in `param_yml`.
-        """
-        # use instantiated parameters when `params` is not provided
-        if params is None:
-            params = self.parameters(instantiated=True)
+    #     Returns
+    #     -------
+    #     content : `str`
+    #         Content written in `param_yml`.
+    #     """
+    #     # use instantiated parameters when `params` is not provided
+    #     if params is None:
+    #         params = self.parameters(instantiated=True)
 
-        content = {"params": params}
-        if loss is not None:
-            content["loss"] = loss
+    #     content = {"params": params}
+    #     if loss is not None:
+    #         content["loss"] = loss
 
-        # format as valid YAML
-        content_yml = yaml.dump(content, default_flow_style=False)
+    #     # format as valid YAML
+    #     content_yml = yaml.dump(content, default_flow_style=False)
 
-        # (safely) dump YAML content
-        with FileLock(params_yml.with_suffix(".lock")):
-            with open(params_yml, mode="w") as fp:
-                fp.write(content_yml)
+    #     # (safely) dump YAML content
+    #     with FileLock(params_yml.with_suffix(".lock")):
+    #         with open(params_yml, mode="w") as fp:
+    #             fp.write(content_yml)
 
-        return content_yml
+    #     return content_yml
 
-    def load_params(self, params_yml: Path) -> "Pipeline":
-        """Instantiate pipeline using parameters from disk
+    # def load_params(self, params_yml: Path) -> "Pipeline":
+    #     """Instantiate pipeline using parameters from disk
 
-        Parameters
-        ----------
-        param_yml : `Path`
-            Path to YAML file.
+    #     Parameters
+    #     ----------
+    #     param_yml : `Path`
+    #         Path to YAML file.
 
-        Returns
-        -------
-        self : `Pipeline`
-            Instantiated pipeline
+    #     Returns
+    #     -------
+    #     self : `Pipeline`
+    #         Instantiated pipeline
 
-        """
+    #     """
 
-        with open(params_yml, mode="r") as fp:
-            params = yaml.load(fp, Loader=yaml.SafeLoader)
-        return self.instantiate(params["params"])
+    #     with open(params_yml, mode="r") as fp:
+    #         params = yaml.load(fp, Loader=yaml.SafeLoader)
+    #     return self.instantiate(params["params"])
 
     def __call__(self, input: PipelineInput) -> PipelineOutput:
         """Apply pipeline on input and return its output"""
         raise NotImplementedError
 
-    def get_metric(self) -> "pyannote.metrics.base.BaseMetric":
-        """Return new metric (from pyannote.metrics)
+    # def get_metric(self) -> "pyannote.metrics.base.BaseMetric":
+    #     """Return new metric (from pyannote.metrics)
 
-        When this method is implemented, the returned metric is used as a
-        replacement for the loss method below.
+    #     When this method is implemented, the returned metric is used as a
+    #     replacement for the loss method below.
 
-        Returns
-        -------
-        metric : `pyannote.metrics.base.BaseMetric`
-        """
-        raise NotImplementedError()
+    #     Returns
+    #     -------
+    #     metric : `pyannote.metrics.base.BaseMetric`
+    #     """
+    #     raise NotImplementedError()
 
-    def get_direction(self) -> Direction:
-        return "minimize"
+    # def get_direction(self) -> Direction:
+    #     return "minimize"
 
-    def loss(self, input: PipelineInput, output: PipelineOutput) -> float:
-        """Compute loss for given input/output pair
+    # def loss(self, input: PipelineInput, output: PipelineOutput) -> float:
+    #     """Compute loss for given input/output pair
 
-        Parameters
-        ----------
-        input : object
-            Pipeline input.
-        output : object
-            Pipeline output
+    #     Parameters
+    #     ----------
+    #     input : object
+    #         Pipeline input.
+    #     output : object
+    #         Pipeline output
 
-        Returns
-        -------
-        loss : `float`
-            Loss value
-        """
-        raise NotImplementedError()
+    #     Returns
+    #     -------
+    #     loss : `float`
+    #         Loss value
+    #     """
+    #     raise NotImplementedError()
 
-    @property
-    def write_format(self):
-        return "rttm"
+    # @property
+    # def write_format(self):
+    #     return "rttm"
 
-    def write(self, file: TextIO, output: PipelineOutput):
-        """Write pipeline output to file
+    # def write(self, file: TextIO, output: PipelineOutput):
+    #     """Write pipeline output to file
 
-        Parameters
-        ----------
-        file : file object
-        output : object
-            Pipeline output
-        """
+    #     Parameters
+    #     ----------
+    #     file : file object
+    #     output : object
+    #         Pipeline output
+    #     """
 
-        return getattr(self, f"write_{self.write_format}")(file, output)
+    #     return getattr(self, f"write_{self.write_format}")(file, output)
 
-    def write_rttm(self, file: TextIO, output: Union[Timeline, Annotation]):
-        """Write pipeline output to "rttm" file
+    # def write_rttm(self, file: TextIO, output: Union[Timeline, Annotation]):
+    #     """Write pipeline output to "rttm" file
 
-        Parameters
-        ----------
-        file : file object
-        output : `pyannote.core.Timeline` or `pyannote.core.Annotation`
-            Pipeline output
-        """
+    #     Parameters
+    #     ----------
+    #     file : file object
+    #     output : `pyannote.core.Timeline` or `pyannote.core.Annotation`
+    #         Pipeline output
+    #     """
 
-        if isinstance(output, Timeline):
-            output = output.to_annotation(generator="string")
+    #     if isinstance(output, Timeline):
+    #         output = output.to_annotation(generator="string")
 
-        if isinstance(output, Annotation):
-            for s, t, l in output.itertracks(yield_label=True):
-                line = (
-                    f"SPEAKER {output.uri} 1 {s.start:.3f} {s.duration:.3f} "
-                    f"<NA> <NA> {l} <NA> <NA>\n"
-                )
-                file.write(line)
-            return
+    #     if isinstance(output, Annotation):
+    #         for s, t, l in output.itertracks(yield_label=True):
+    #             line = (
+    #                 f"SPEAKER {output.uri} 1 {s.start:.3f} {s.duration:.3f} "
+    #                 f"<NA> <NA> {l} <NA> <NA>\n"
+    #             )
+    #             file.write(line)
+    #         return
 
-        msg = (
-            f'Dumping {output.__class__.__name__} instances to "rttm" files '
-            f"is not supported."
-        )
-        raise NotImplementedError(msg)
+    #     msg = (
+    #         f'Dumping {output.__class__.__name__} instances to "rttm" files '
+    #         f"is not supported."
+    #     )
+    #     raise NotImplementedError(msg)
 
-    def write_txt(self, file: TextIO, output: Union[Timeline, Annotation]):
-        """Write pipeline output to "txt" file
+    # def write_txt(self, file: TextIO, output: Union[Timeline, Annotation]):
+    #     """Write pipeline output to "txt" file
 
-        Parameters
-        ----------
-        file : file object
-        output : `pyannote.core.Timeline` or `pyannote.core.Annotation`
-            Pipeline output
-        """
+    #     Parameters
+    #     ----------
+    #     file : file object
+    #     output : `pyannote.core.Timeline` or `pyannote.core.Annotation`
+    #         Pipeline output
+    #     """
 
-        if isinstance(output, Timeline):
-            for s in output:
-                line = f"{output.uri} {s.start:.3f} {s.end:.3f}\n"
-                file.write(line)
-            return
+    #     if isinstance(output, Timeline):
+    #         for s in output:
+    #             line = f"{output.uri} {s.start:.3f} {s.end:.3f}\n"
+    #             file.write(line)
+    #         return
 
-        if isinstance(output, Annotation):
-            for s, t, l in output.itertracks(yield_label=True):
-                line = f"{output.uri} {s.start:.3f} {s.end:.3f} {t} {l}\n"
-                file.write(line)
-            return
+    #     if isinstance(output, Annotation):
+    #         for s, t, l in output.itertracks(yield_label=True):
+    #             line = f"{output.uri} {s.start:.3f} {s.end:.3f} {t} {l}\n"
+    #             file.write(line)
+    #         return
 
-        msg = (
-            f'Dumping {output.__class__.__name__} instances to "txt" files '
-            f"is not supported."
-        )
-        raise NotImplementedError(msg)
+    #     msg = (
+    #         f'Dumping {output.__class__.__name__} instances to "txt" files '
+    #         f"is not supported."
+    #     )
+    #     raise NotImplementedError(msg)

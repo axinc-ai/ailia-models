@@ -114,7 +114,7 @@ class Audio:
 
         # else:
             # raise ValueError(AudioFileDocString)
-
+        
         if "waveform" in file:
             waveform: np.ndarray = file["waveform"]
             if len(waveform.shape) != 2 or waveform.shape[0] > waveform.shape[1]:
@@ -230,9 +230,13 @@ class Audio:
         if "waveform" in file:
             waveform = file["waveform"]
             sample_rate = file["sample_rate"]
-                
+        
         waveform, sample_rate = soundfile.read(file["audio"])
-        waveform = waveform.T
+
+        if waveform.ndim == 1:
+            waveform = np.expand_dims(waveform,axis=0)
+        else:
+            waveform = waveform.T
         
         channel = file.get("channel", None)
 
@@ -317,7 +321,10 @@ class Audio:
         else:
             try:
                 data, _ = soundfile.read(file["audio"], start=start_frame, frames=num_frames)
-                data = data.T
+                if data.ndim == 1:
+                    data = np.expand_dims(data, axis=0)
+                else:
+                    data = data.T
                 
             except RuntimeError:
                 msg = (

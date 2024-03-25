@@ -115,7 +115,6 @@ def extract_fbank_features(
     frame_shift = 10
     dither = 0.0
     waveform = (waveform * (1 << 15))  # 16-bit signed integers
-    
     if use_torch:
         waveform = torch.from_numpy(waveform).unsqueeze(0)
         mat = kaldi.fbank(

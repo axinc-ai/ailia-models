@@ -26,17 +26,17 @@
 # AUTHORS
 # Hervé BREDIN - http://herve.niderb.fr
 
-import yaml
-from pathlib import Path
+# import yaml
+# from pathlib import Path
 import warnings
 import pandas as pd
 from pyannote.core import Segment, Timeline, Annotation
-from .protocol.protocol import ProtocolFile
+# from .protocol.protocol import ProtocolFile
 
 from typing import Text
-from typing import Union
-from typing import Dict
-from typing import List
+# from typing import Union
+# from typing import Dict
+# from typing import List
 
 DatabaseName = Text
 PathTemplate = Text

@@ -34,6 +34,7 @@ PipelineModel = Union[Text, Mapping]
 
 try:
     import onnxruntime as ort
+    import onnx
 
     ONNX_IS_AVAILABLE = True
 except ImportError:
@@ -93,14 +94,13 @@ class ONNXWeSpeakerPretrainedSpeakerEmbedding(BaseInference):
         
         if args.use_onnx:
             print("use onnx runtime")
-
             providers = ["CPUExecutionProvider", ("CUDAExecutionProvider",{"cudnn_conv_algo_search": "DEFAULT"})]
 
             sess_options = ort.SessionOptions()
             sess_options.inter_op_num_threads = 1
             sess_options.intra_op_num_threads = 1
             self.session_ = ort.InferenceSession(
-                self.embedding, sess_options=sess_options, providers=providers
+                embedding, sess_options=sess_options, providers=providers
             )
         else:
             print("use ailia")

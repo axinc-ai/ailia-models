@@ -102,7 +102,6 @@ class Inference(BaseInference):
 
         if args.use_onnx:
             print("use onnx model")
-        
             model = onnxruntime.InferenceSession(model, providers=['CUDAExecutionProvider', 'CPUExecutionProvider'])
         else:
             print("use ailia")
@@ -194,8 +193,9 @@ class Inference(BaseInference):
         outputs : (tuple of) (batch_size, ...) np.ndarray
             Model output.
         """
-        
+        chunks = chunks.astype(np.float32)
         if self.args.use_onnx:
+            breakpoint()            
             outputs = self.model.run(None, {"input": chunks})[0]
         else:
             outputs = self.model.predict([chunks])[0]
@@ -264,6 +264,7 @@ class Inference(BaseInference):
 
         window_size: int = self.audio.get_num_samples(self.duration)
         step_size: int = round(self.step * sample_rate)
+        
         _, num_samples = waveform.shape
         
         def __frames(
@@ -329,9 +330,7 @@ class Inference(BaseInference):
         
         # slide over audio chunks in batch
         for c in np.arange(0, num_chunks, self.batch_size):
-            
             batch: np.ndarray = chunks[c : c + self.batch_size]
-
             batch_outputs: Union[np.ndarray, Tuple[np.ndarray]] = self.infer(batch)
 
             _ = map_with_specifications(
@@ -417,7 +416,7 @@ class Inference(BaseInference):
         """
 
         waveform, sample_rate = self.audio(file)
-
+        
         if self.window == "sliding":
             return self.slide(waveform, sample_rate, hook=hook)
  
