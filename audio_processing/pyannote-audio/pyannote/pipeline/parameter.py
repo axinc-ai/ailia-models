@@ -29,7 +29,6 @@
 
 
 from typing import Iterable, Any
-# from optuna.trial import Trial
 
 from .pipeline import Pipeline
 from collections.abc import Mapping

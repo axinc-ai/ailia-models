@@ -195,7 +195,6 @@ class Inference(BaseInference):
         """
         chunks = chunks.astype(np.float32)
         if self.args.use_onnx:
-            breakpoint()            
             outputs = self.model.run(None, {"input": chunks})[0]
         else:
             outputs = self.model.predict([chunks])[0]

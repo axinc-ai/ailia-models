@@ -26,17 +26,12 @@
 # AUTHORS
 # Hervé BREDIN - http://herve.niderb.fr
 
-# import yaml
-# from pathlib import Path
+
 import warnings
 import pandas as pd
 from pyannote.core import Segment, Timeline, Annotation
-# from .protocol.protocol import ProtocolFile
 
 from typing import Text
-# from typing import Union
-# from typing import Dict
-# from typing import List
 
 DatabaseName = Text
 PathTemplate = Text
@@ -179,7 +174,8 @@ def load_rttm(file_rttm, keep_type="SPEAKER"):
         file_rttm,
         names=names,
         dtype=dtype,
-        delim_whitespace=True,
+        # delim_whitespace=True,
+        sep='\s+',
         keep_default_na=True,
     )
 
@@ -213,7 +209,8 @@ def load_stm(file_stm):
     dtype = {"uri": str, "speaker": str, "start": float, "end": float}
     data = pd.read_csv(
         file_stm,
-        delim_whitespace=True,
+        # delim_whitespace=True,
+        sep='\s+',
         usecols=[0, 2, 3, 4],
         dtype=dtype,
         names=list(dtype),
@@ -250,7 +247,8 @@ def load_mdtm(file_mdtm):
         file_mdtm,
         names=names,
         dtype=dtype,
-        delim_whitespace=True,
+        # delim_whitespace=True,
+        sep='\s+',
         keep_default_na=False,
     )
 
@@ -281,7 +279,7 @@ def load_uem(file_uem):
 
     names = ["uri", "NA1", "start", "end"]
     dtype = {"uri": str, "start": float, "end": float}
-    data = pd.read_csv(file_uem, names=names, dtype=dtype, delim_whitespace=True)
+    data = pd.read_csv(file_uem, names=names, dtype=dtype, sep='\s+',)
 
     timelines = dict()
     for uri, parts in data.groupby("uri"):
@@ -306,7 +304,7 @@ def load_lab(path, uri: str = None) -> Annotation:
 
     names = ["start", "end", "label"]
     dtype = {"start": float, "end": float, "label": str}
-    data = pd.read_csv(path, names=names, dtype=dtype, delim_whitespace=True)
+    data = pd.read_csv(path, names=names, dtype=dtype, sep='\s+',)
 
     annotation = Annotation(uri=uri)
     for i, turn in data.iterrows():

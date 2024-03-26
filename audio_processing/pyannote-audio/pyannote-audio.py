@@ -1,7 +1,10 @@
 import yaml
 import sys
+import matplotlib.pyplot as plt
 
 from pyannote.audio.pipelines.speaker_diarization import SpeakerDiarization
+from pyannote.core import Segment, Annotation
+from pyannote.core.notebook import Notebook
 from pyannote.database.util import load_rttm
 from pyannote.metrics.diarization import DiarizationErrorRate
 
@@ -11,13 +14,13 @@ from model_utils import check_and_download_models  # noqa: E402
 from logging import getLogger  # noqa: E402
 logger = getLogger(__name__)
 
-
 WEIGHT_SEGMENTATION_PATH = 'segmentation.onnx'
 # MODEL_VOX_PATH = 'voxceleb_resnet34.onnx.prototxt'
 WEIGHT_EMBEDDING_PATH = 'speaker-embedding.onnx'
 # MODEL_CNC_PATH = 'cnceleb_resnet34.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/pyannote-audio/'
 YAML_PATH = 'config.yaml'
+OUT_PATH = 'output.png'
 
 parser = get_base_parser(
     'Pyannote-audio', None, None, input_ftype='audio'
@@ -36,25 +39,57 @@ parser.add_argument(
     help='If the minimum number of speakers is fixed', 
 )
 parser.add_argument(
-    '--insu', '-input_sample', default='./data/sample.wav',
+    '--i', '-input', default='./data/sample.wav',
     help='Specify an input wav file'
 ) 
 parser.add_argument(
-    '--gr', '-ground', default='./data/sample.rttm',
-    help='Specify a wav file as ground truth'
+    '--ig', '-ground', default='./data/sample.rttm',
+    help='Specify a wav file as ground truth. If you need diarization error rate, you need this file'
+)
+parser.add_argument(
+    '--o', '-output', default='output.png',
+    help='Specify an output file'
 ) 
+parser.add_argument(
+    '--og', '-output_ground', default='output_ground.png',
+    help='Specify an output ground truth file'
+) 
+parser.add_argument(
+    '--e', '-error',
+    action='store_true',
+    help='If you need diarization error rate'
+)
+parser.add_argument(
+    '--plt',
+    action='store_true',
+    help='If you want to visualize result'
+)
 parser.add_argument(
     '--embed', 
     action='store_true',
-    help='When you need embedding vector', 
+    help='If you need embedding vector', 
 ) 
 parser.add_argument(
     '--use_onnx', 
     action='store_true',
-    help='execute onnxruntime version.'
+    help='execute onnxruntime version'
 )
 
 args = update_parser(parser)
+
+def repr_annotation(args, annotation: Annotation, notebook:Notebook, ground:bool = False):
+    """Get `png` data for `annotation`"""
+    figsize = plt.rcParams["figure.figsize"]
+    plt.rcParams["figure.figsize"] = (notebook.width, 2)
+    fig, ax = plt.subplots()
+    notebook.plot_annotation(annotation, ax=ax)
+    if ground:
+        plt.savefig(args.og)
+    else:
+        plt.savefig(args.o)
+    plt.close(fig)
+    plt.rcParams["figure.figsize"] = figsize
+    return
 
 def main(args):
     check_and_download_models(WEIGHT_SEGMENTATION_PATH, model_path=None,remote_path=REMOTE_PATH)
@@ -68,9 +103,7 @@ def main(args):
     with open(YAML_PATH, 'w') as f:
         yaml.dump(config, f)
 
-    
-    audio_file = args.insu
-
+    audio_file = args.i
     checkpoint_path = YAML_PATH
     config_yml = checkpoint_path
     with open(config_yml, "r") as fp:
@@ -101,13 +134,37 @@ def main(args):
             diarization = pipeline(audio_file, min_speakers=args.min, max_speaker=args.max)
         else:
             diarization = pipeline(audio_file)
-            
-    _, groundtruth = load_rttm(args.gr).popitem()
-    metric = DiarizationErrorRate()
-    result = metric(groundtruth, diarization, detailed=False)
-    print(diarization)
-    print('Diarization error rate : ' + str(result))
     
+    if args.ig:
+        _, groundtruth = load_rttm(args.ig).popitem()
+        metric = DiarizationErrorRate()
+        result = metric(groundtruth, diarization, detailed=False)
+        
+        mapping = metric.optimal_mapping(groundtruth, diarization)
+        diarization = diarization.rename_labels(mapping=mapping)
+
+        print(diarization)
+        if args.e:
+            print(f'diarization error rate = {100 * result:.1f}%')
+
+        if args.plt:
+            EXCERPT = Segment(0, 30)
+            notebook = Notebook()
+            notebook.crop = EXCERPT
+            repr_annotation(args, diarization, notebook)
+            repr_annotation(args, groundtruth, notebook, ground=True)
+        return
+    
+    else:
+        print(diarization)
+
+        if args.plt:
+            EXCERPT = Segment(0, 30)
+            notebook = Notebook()
+            notebook.crop = EXCERPT
+            repr_annotation(args, diarization, notebook)
+        return 
+
 
 if __name__ == "__main__":
     main(args)

@@ -1548,5 +1548,4 @@ class Annotation:
             return None
 
         from .notebook import repr_annotation
-
         return repr_annotation(self)

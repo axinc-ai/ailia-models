@@ -12,6 +12,8 @@ input: data/demo.wav
 ## Output
 
 When and who spoke.
+![Output](output.png)
+
 ```
 [ 00:00:06.714 -->  00:00:07.003] A SPEAKER_02
 [ 00:00:07.003 -->  00:00:07.173] B SPEAKER_00
@@ -47,10 +49,28 @@ For the sample
 $ python pyannote-audio.py
 ```
 
-If you want to specify the audio, put the file path after the `--insu` pr `-input_sample` option.
+If you want to specify the audio, put the file path after the `--i` or `-input` option.
 
 ```bash
-$ python pyannote-audio.py --insu FILE_PATH
+$ python pyannote-audio.py --i FILE_PATH
+```
+
+If you want to specify the ground truth, put the file path after the `--ig` or `-input_ground` option.
+
+```bash
+$ python pyannote-audio.py --ig FILE_PATH
+```
+
+If you want to specify the output file, put the file path after the `--o` or `-output` option.
+
+```bash
+$ python pyannote-audio.py --o FILE_PATH
+```
+
+If you want to specify the output ground truth file, put the file path after the `--og` or `-output_ground` option.
+
+```bash
+$ python pyannote-audio.py --og FILE_PATH
 ```
 
 If you know the number of speakers, put the numper　`--num` or `-num_speaker` option.
@@ -68,6 +88,16 @@ If you know the minimum number of speakers, put the numper　`--min` or `-min_sp
 $ python pyannote-audio.py --min 2
 ```
 
+By giving the `--e` or `-error` option, you can get diarization error rate.
+```bash
+$ python pyannote-audio.py --use_onnx
+```
+
+By giving the `--plt` option, you can visualize results.
+```bash
+$ python pyannote-audio.py --use_onnx
+```
+
 By giving the `--use_onnx` option, you can use onnx.
 ```bash
 $ python pyannote-audio.py --use_onnx
@@ -81,8 +111,8 @@ $ python pyannote-audio.py --embed
 ## Reference
 
 - [Pyannte-audio](https://github.com/pyannote/pyannote-audio)
-- [Hugging Face - pyannote in speaker-deriazation](https://huggingface.co/pyannote/speaker-diarization-3.1)
-- [Hugging Face - hdbraib in wespeaker-voxceleb-resnet34-LM](https://huggingface.co/hbredin/wespeaker-voxceleb-resnet34-LM/tree/main)
+- [Hugging Face - pyannote in speaker-diariazation](https://huggingface.co/pyannote/speaker-diarization-3.1)
+- [Hugging Face - hdbrain in wespeaker-voxceleb-resnet34-LM](https://huggingface.co/hbredin/wespeaker-voxceleb-resnet34-LM/tree/main)
 - [KaldiFeat](https://github.com/yuyq96/kaldifeat)
 
 ## Framework

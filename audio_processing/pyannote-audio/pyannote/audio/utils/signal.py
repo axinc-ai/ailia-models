@@ -34,7 +34,6 @@ from functools import singledispatch
 from itertools import zip_longest
 from typing import Optional, Union
 
-import einops
 import numpy as np
 import scipy.signal
 from pyannote.core import Annotation, Segment, SlidingWindowFeature, Timeline
@@ -172,29 +171,25 @@ def binarize_swf(
 
     if scores.data.ndim == 2:
         num_frames, num_classes = scores.data.shape
-        data = einops.rearrange(scores.data, "f k -> k f", f=num_frames, k=num_classes)
+        data = scores.data.transpose()
         binarized = binarize(
             data, onset=onset, offset=offset, initial_state=initial_state
         )
         return SlidingWindowFeature(
             1.0
-            * einops.rearrange(binarized, "k f -> f k", f=num_frames, k=num_classes),
+            * binarized.transpose(),
             scores.sliding_window,
         )
 
     elif scores.data.ndim == 3:
         num_chunks, num_frames, num_classes = scores.data.shape
-        data = einops.rearrange(
-            scores.data, "c f k -> (c k) f", c=num_chunks, f=num_frames, k=num_classes
-        )
+        data = scores.data.reshape([-1, num_classes])
         binarized = binarize(
             data, onset=onset, offset=offset, initial_state=initial_state
         )
         return SlidingWindowFeature(
             1.0
-            * einops.rearrange(
-                binarized, "(c k) f -> c f k", c=num_chunks, f=num_frames, k=num_classes
-            ),
+            * binarized.reshape([num_chunks, num_frames, num_classes]),
             scores.sliding_window,
         )
 

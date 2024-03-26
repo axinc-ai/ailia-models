@@ -31,8 +31,8 @@ from typing import TypeVar
 PipelineInput = TypeVar("PipelineInput")
 PipelineOutput = TypeVar("PipelineOutput")
 
-try:
-    from typing import Literal
-except ImportError:
-    from typing_extensions import Literal
-Direction = Literal["minimize", "maximize"]
+# try:
+#     from typing import Literal
+# except ImportError:
+#     from typing_extensions import Literal
+# Direction = Literal["minimize", "maximize"]

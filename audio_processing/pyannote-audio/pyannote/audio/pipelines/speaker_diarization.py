@@ -31,7 +31,6 @@ import numpy as np
 
 from typing import Callable, Optional, Text, Union, Mapping
 from pathlib import Path
-from einops import rearrange
 
 from pyannote.core import Annotation, SlidingWindow, SlidingWindowFeature
 from pyannote.pipeline.parameter import ParamDict, Uniform
@@ -39,7 +38,7 @@ from pyannote.audio import Audio, Inference, Pipeline
 from pyannote.audio.core.io import AudioFile
 from pyannote.audio.pipelines.clustering import Clustering
 from pyannote.audio.pipelines.speaker_verification import ONNXWeSpeakerPretrainedSpeakerEmbedding
-from pyannote.audio.pipelines.utils import (SpeakerDiarizationMixin)
+from pyannote.audio.pipelines.utils import SpeakerDiarizationMixin
 
 AudioFile = Union[Text, Path, Mapping]
 PipelineModel = Union[Text, Mapping]
@@ -299,8 +298,7 @@ class SpeakerDiarization(SpeakerDiarizationMixin, Pipeline):
                 hook("embeddings", embedding_batch, total=batch_count, completed=i)
         
         embedding_batches = np.vstack(embedding_batches)
-
-        embeddings = rearrange(embedding_batches, "(c s) d -> c s d", c=num_chunks)
+        embeddings = embedding_batches.reshape([num_chunks, -1 , embedding_batches.shape[-1]])
 
         return embeddings
 
@@ -497,7 +495,7 @@ class SpeakerDiarization(SpeakerDiarizationMixin, Pipeline):
 
         # at this point, `diarization` speaker labels are integers
         # from 0 to `num_speakers - 1`, aligned with `centroids` rows.
-
+        
         if "annotation" in file and file["annotation"]:
             # when reference is available, use it to map hypothesized speakers
             # to reference speakers (this makes later error analysis easier
@@ -520,11 +518,10 @@ class SpeakerDiarization(SpeakerDiarizationMixin, Pipeline):
             }
 
         diarization = diarization.rename_labels(mapping=mapping)
-
         # at this point, `diarization` speaker labels are strings (or mix of
         # strings and integers when reference is available and some hypothesis
         # speakers are not present in the reference)
-        
+        breakpoint()
         if not return_embeddings:
             return diarization
 

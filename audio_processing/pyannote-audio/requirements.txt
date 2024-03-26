@@ -1,5 +1,3 @@
-einops >=0.6.0
-typing_extensions
 pyyaml
 onnx
 onnxruntime

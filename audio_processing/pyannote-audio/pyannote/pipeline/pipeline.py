@@ -28,18 +28,10 @@
 
 from typing import Optional, TextIO, Union, Dict, Any
 
-# from pathlib import Path
 from collections import OrderedDict
 from .typing import PipelineInput
 from .typing import PipelineOutput
-# from .typing import Direction
-# from filelock import FileLock
-# import yaml
 import warnings
-
-# from pyannote.core import Timeline
-# from pyannote.core import Annotation
-# from optuna.trial import Trial
 
 
 class Pipeline:

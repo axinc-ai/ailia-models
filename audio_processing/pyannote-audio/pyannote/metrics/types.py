@@ -1,6 +1,6 @@
-from typing import Dict, List
+from typing import Dict, List, Literal
 
-from typing_extensions import Literal
+# from typing_extensions import Literal
 
 MetricComponent = str
 CalibrationMethod = Literal["isotonic", "sigmoid"]

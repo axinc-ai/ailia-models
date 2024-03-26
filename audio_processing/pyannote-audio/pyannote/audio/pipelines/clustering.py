@@ -28,7 +28,6 @@ from enum import Enum
 from typing import Optional, Tuple
 
 import numpy as np
-from einops import rearrange
 from pyannote.core import SlidingWindow, SlidingWindowFeature
 from pyannote.pipeline import Pipeline
 from pyannote.pipeline.parameter import Categorical, Integer, Uniform
@@ -173,17 +172,12 @@ class BaseClustering(Pipeline):
             ]
         )
 
-        # compute distance between embeddings and clusters
-        e2k_distance = rearrange(
-            cdist(
-                rearrange(embeddings, "c s d -> (c s) d"),
-                centroids,
-                metric=self.metric,
-            ),
-            "(c s) k -> c s k",
-            c=num_chunks,
-            s=num_speakers,
-        )
+        e2k_distance = cdist(
+            embeddings.reshape([-1, dimension]),
+            centroids,
+            metric=self.metric
+        ).reshape([num_chunks, num_speakers, -1])
+        
         soft_clusters = 2 - e2k_distance
 
         # assign each embedding to the cluster with the most similar centroid
@@ -349,7 +343,7 @@ class AgglomerativeClustering(BaseClustering):
         min_cluster_size = min(
             self.min_cluster_size, max(1, round(0.1 * num_embeddings))
         )
-        breakpoint()
+        
 
         # linkage function will complain when there is just one embedding to cluster
         if num_embeddings == 1:

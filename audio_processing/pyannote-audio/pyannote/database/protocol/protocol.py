@@ -39,10 +39,10 @@ import threading
 import itertools
 from typing import Union, Dict, Iterator, Callable, Any, Text, Optional
 
-try:
-    from typing import Literal
-except ImportError:
-    from typing_extensions import Literal
+# try:
+from typing import Literal
+# except ImportError:
+    # from typing_extensions import Literal
 
 Subset = Literal["train", "development", "test"]
 LEGACY_SUBSET_MAPPING = {"train": "trn", "development": "dev", "test": "tst"}
