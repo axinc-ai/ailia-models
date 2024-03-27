@@ -245,11 +245,11 @@ if __name__ == "__main__":
     nets = {}
 
     for model_name, model_files in model_file_names.items():
-        # check_and_download_models(
-        #     model_files["weight"],
-        #     model_files["model"],
-        #     REMOTE_PATH,
-        # )
+        check_and_download_models(
+            model_files["weight"],
+            model_files["model"],
+            REMOTE_PATH,
+        )
 
         if args.onnx:
             net = onnxruntime.InferenceSession(model_files["weight"])
