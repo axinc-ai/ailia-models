@@ -3,12 +3,18 @@ from typing import Any, List
 
 import cv2
 import numpy as np
+
 from detection_utils import get_detection
 from face import Face
-from instant_id_utils import (draw_kps, get_model_file_names, load_image,
-                              preprocess)
-from landmark_utils import (P2sRt, estimate_affine_matrix_3d23d, load_mean_lmk,
-                            matrix2angle, trans_points, transform_landmark)
+from instant_id_utils import draw_kps, get_model_file_names, load_image, preprocess
+from landmark_utils import (
+    P2sRt,
+    estimate_affine_matrix_3d23d,
+    load_mean_lmk,
+    matrix2angle,
+    trans_points,
+    transform_landmark,
+)
 from pipe import get_pipe
 from recognition_utils import norm_crop
 
@@ -49,13 +55,7 @@ parser.add_argument(
     action="store_true",
     help="By default, the ailia SDK is used, but with this option, you can switch to using ONNX Runtime",
 )
-parser.add_argument(
-    "-p",
-    "--prompt",
-    help="prompt text",
-    required=True,
-    type=str
-)
+parser.add_argument("-p", "--prompt", help="prompt text", required=True, type=str)
 args = update_parser(parser, check_input_type=False)
 
 img = load_image(INPUT_IMAGE)
