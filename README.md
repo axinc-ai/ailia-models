@@ -177,6 +177,12 @@ The collection of pre-trained, state-of-the-art AI models.
 | [<img src="face_recognition/mivolo/output.png" width=128px>](face_recognition/mivolo/) | [mivolo](/face_recognition/mivolo/) | [MiVOLO: Multi-input Transformer for Age and Gender Estimation](https://github.com/WildChlamydia/MiVOLO) | Pytorch | 1.2.13 and later | |
 | [<img src="face_recognition/l2cs_net/output.png" width=128px>](face_recognition/l2cs_net/) | [L2CS_Net](/face_recognition/l2cs_net/) | [L2CS_Net](https://github.com/Ahmednull/L2CS-Net) | Pytorch | 1.2.9 and later | |
 
+## Face restoration
+
+| | Model | Reference | Exported From | Supported Ailia Version | Blog |
+|:-----------|------------:|:------------:|:------------:|:------------:|:------------:|
+| [<img src="face_restoration/codeformer/output.png" width=128px>](face_restoration/codeformer/) | [codeformer](/face_restoration/codeformer/) | [CodeFormer: Towards Robust Blind Face Restoration with Codebook Lookup Transformer](https://github.com/sczhou/CodeFormer) | Pytorch | 1.2.9 and later |
+
 ## Frame Interpolation
 
 | | Model | Reference | Exported From | Supported Ailia Version | Blog |
