@@ -49,6 +49,13 @@ parser.add_argument(
     action="store_true",
     help="By default, the ailia SDK is used, but with this option, you can switch to using ONNX Runtime",
 )
+parser.add_argument(
+    "-p",
+    "--prompt",
+    help="prompt text",
+    required=True,
+    type=str
+)
 args = update_parser(parser, check_input_type=False)
 
 img = load_image(INPUT_IMAGE)
@@ -220,14 +227,14 @@ def infer_from_image(nets: dict[str, Any]):
     pipe = get_pipe()
     pipe.set_ip_adapter_scale(ADAPTER_STRENGTH_RATIO)
     images = pipe(
-        "hoge",
+        args.prompt,
         image_embeds=face_emb,
         image=face_kps,
-        # controlnet_conditioning_scale=IDENTITYNET_STRENGTH_RATIO,
-        controlnet_conditioning_scale=0.8,
+        controlnet_conditioning_scale=IDENTITYNET_STRENGTH_RATIO,
         num_inference_steps=1,
         guidance_scale=0.0,
-    ).images
+    ).images[0]
+    images.save(args.savepath)
 
 
 if __name__ == "__main__":
