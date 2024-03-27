@@ -15,9 +15,9 @@ from logging import getLogger  # noqa: E402
 logger = getLogger(__name__)
 
 WEIGHT_SEGMENTATION_PATH = 'segmentation.onnx'
-# MODEL_VOX_PATH = 'voxceleb_resnet34.onnx.prototxt'
+MODEL_SEGMENTATION_PATH = 'segmentation.onnx.prototxt'
 WEIGHT_EMBEDDING_PATH = 'speaker-embedding.onnx'
-# MODEL_CNC_PATH = 'cnceleb_resnet34.onnx.prototxt'
+MODEL_EMBEDDING_PATH = 'speaker-embedding.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/pyannote-audio/'
 YAML_PATH = 'config.yaml'
 OUT_PATH = 'output.png'
@@ -92,8 +92,8 @@ def repr_annotation(args, annotation: Annotation, notebook:Notebook, ground:bool
     return
 
 def main(args):
-    check_and_download_models(WEIGHT_SEGMENTATION_PATH, model_path=None,remote_path=REMOTE_PATH)
-    check_and_download_models(WEIGHT_EMBEDDING_PATH, model_path=None,remote_path=REMOTE_PATH)
+    check_and_download_models(WEIGHT_SEGMENTATION_PATH, MODEL_SEGMENTATION_PATH, remote_path=REMOTE_PATH)
+    check_and_download_models(WEIGHT_EMBEDDING_PATH, MODEL_EMBEDDING_PATH, remote_path=REMOTE_PATH)
     
     with open(YAML_PATH, 'r') as yml:
         config = yaml.safe_load(yml)
@@ -106,11 +106,18 @@ def main(args):
     audio_file = args.i
     checkpoint_path = YAML_PATH
     config_yml = checkpoint_path
+
     with open(config_yml, "r") as fp:
         config = yaml.load(fp, Loader=yaml.SafeLoader)
 
     params = config["pipeline"].get("params", {})
-    pipeline = SpeakerDiarization(**params, args=args)
+    pipeline = SpeakerDiarization(
+        **params,
+        args=args, 
+        seg_path=MODEL_SEGMENTATION_PATH, 
+        emb_path=MODEL_EMBEDDING_PATH,
+    )
+
     if "params" in config:
         pipeline.instantiate(config["params"])
     

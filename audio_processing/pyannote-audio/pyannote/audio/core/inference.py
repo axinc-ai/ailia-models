@@ -96,16 +96,18 @@ class Inference(BaseInference):
         batch_size: int = 32,
         use_auth_token: Union[Text, None] = None,
         args = None,
+        seg_path = None,
     ):
         # ~~~~ model ~~~~~
         
 
         if args.use_onnx:
             print("use onnx model")
+            
             model = onnxruntime.InferenceSession(model, providers=['CUDAExecutionProvider', 'CPUExecutionProvider'])
         else:
             print("use ailia")
-
+            
             model = ailia.Net(None, weight=model, env_id=args.env_id)
 
         self.model = model

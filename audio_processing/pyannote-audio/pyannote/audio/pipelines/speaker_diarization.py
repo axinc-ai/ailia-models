@@ -117,6 +117,8 @@ class SpeakerDiarization(SpeakerDiarizationMixin, Pipeline):
         embedding_batch_size: int = 1,
         segmentation_batch_size: int = 1,
         args = None,
+        seg_path = None, 
+        emb_path = None,
         der_variant: dict = None,
         use_auth_token: Union[Text, None] = None,
     ):
@@ -139,6 +141,7 @@ class SpeakerDiarization(SpeakerDiarizationMixin, Pipeline):
             skip_aggregation=True,
             batch_size=segmentation_batch_size,
             args=args,
+            seg_path=seg_path
         )
         
         self._frames: SlidingWindow = self._segmentation.example_output.frames
@@ -147,7 +150,11 @@ class SpeakerDiarization(SpeakerDiarizationMixin, Pipeline):
             min_duration_off=Uniform(0.0, 1.0),
         )
         
-        self._embedding = ONNXWeSpeakerPretrainedSpeakerEmbedding(self.embedding, args=args)
+        self._embedding = ONNXWeSpeakerPretrainedSpeakerEmbedding(
+            self.embedding, 
+            args=args,
+            emb_path=emb_path
+        )
         self._audio = Audio(sample_rate=self._embedding.sample_rate, mono="downmix")
 
         metric = self._embedding.metric        
@@ -521,7 +528,6 @@ class SpeakerDiarization(SpeakerDiarizationMixin, Pipeline):
         # at this point, `diarization` speaker labels are strings (or mix of
         # strings and integers when reference is available and some hypothesis
         # speakers are not present in the reference)
-        breakpoint()
         if not return_embeddings:
             return diarization
 

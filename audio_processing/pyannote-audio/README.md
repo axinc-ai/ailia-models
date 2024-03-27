@@ -120,6 +120,6 @@ Onnxruntime
 ONNX opset=14,17
 
 ## Netron
-***
-作成中
-***
+
+[segmentation.onnx.prototxt](https://storage.googleapis.com/ailia-models/pyannote-audio/segmentation.onnx.prototxt)
+[speaker-embedding.onnx.prototxt](https://storage.googleapis.com/ailia-models/pyannote-audio/speaker-embedding.onnx.prototxt)

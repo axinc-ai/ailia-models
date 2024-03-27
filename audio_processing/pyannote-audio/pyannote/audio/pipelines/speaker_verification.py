@@ -71,6 +71,7 @@ class ONNXWeSpeakerPretrainedSpeakerEmbedding(BaseInference):
         embedding: Text = "hbredin/wespeaker-voxceleb-resnet34-LM",
         # device: Optional[torch.device] = None,
         args = None,
+        emb_path = None
     ):
         # if not ONNX_IS_AVAILABLE:
             # raise ImportError(
@@ -105,7 +106,7 @@ class ONNXWeSpeakerPretrainedSpeakerEmbedding(BaseInference):
         else:
             print("use ailia")
 
-            self.session_ = ailia.Net(None, weight=embedding, env_id=args.env_id)
+            self.session_ = ailia.Net(emb_path, weight=embedding, env_id=args.env_id)
         
         self.args = args
  
