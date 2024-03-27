@@ -79,7 +79,6 @@ def execute_detection(img: np.ndarray, detection_session):
         pass
 
 
-# TODO 微妙にembeddingの数値が違うのでチェック
 def execute_recognition(img: np.ndarray, faces: List[Face], recognition_session):
     for face in faces:
         aimg = norm_crop(img, landmark=face.kps, image_size=112)
