@@ -128,6 +128,7 @@ The collection of pre-trained, state-of-the-art AI models.
 | [<img src="diffusion/control_net/examples/output_pose1.png" width=128px>](diffusion/control_net/) | [control_net](/diffusion/control_net/) | [ControlNet](https://github.com/lllyasviel/ControlNet) | Pytorch | 1.2.15 and later |
 | [<img src="diffusion/daclip-sde/output.png" width=128px>](diffusion/daclip-sde/) | [DA-CLIP](/diffusion/daclip-sde/) | [DA-CLIP](https://github.com/Algolzw/daclip-uir) | Pytorch | 1.2.16 and later |
 | [<img src="diffusion/riffusion/output.png" width=128px>](diffusion/riffusion/) | [riffusion](/diffusion/riffusion/) | [Riffusion](https://github.com/riffusion/riffusion) | Pytorch | 1.2.16 and later |
+| [<img src="diffusion/instant_id/output_japanese.jpg" width=128px>](diffusion/instant_id/) | [instant_id](/diffusion/instant_id/) | [InstantId](https://github.com/InstantID/InstantID/tree/main) | Pytorch | 1.2.16 and later |
 
 ## Face detection
 
