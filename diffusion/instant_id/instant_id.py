@@ -5,6 +5,7 @@ import ailia
 import cv2
 import numpy as np
 from detection_utils import get_detection
+from download_model import download_model
 from face import Face
 from instant_id_utils import (draw_kps, get_model_file_names, load_image,
                               preprocess)
@@ -238,6 +239,7 @@ def infer_from_image(nets: dict[str, Any]):
 
 
 if __name__ == "__main__":
+    download_model()
     model_file_names = get_model_file_names()
 
     nets = {}
