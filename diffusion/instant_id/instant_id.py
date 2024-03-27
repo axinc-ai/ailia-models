@@ -1,20 +1,15 @@
 import sys
 from typing import Any, List
 
+import ailia
 import cv2
 import numpy as np
-
 from detection_utils import get_detection
 from face import Face
-from instant_id_utils import draw_kps, get_model_file_names, load_image, preprocess
-from landmark_utils import (
-    P2sRt,
-    estimate_affine_matrix_3d23d,
-    load_mean_lmk,
-    matrix2angle,
-    trans_points,
-    transform_landmark,
-)
+from instant_id_utils import (draw_kps, get_model_file_names, load_image,
+                              preprocess)
+from landmark_utils import (P2sRt, estimate_affine_matrix_3d23d, load_mean_lmk,
+                            matrix2angle, trans_points, transform_landmark)
 from pipe import get_pipe
 from recognition_utils import norm_crop
 
@@ -62,21 +57,22 @@ img = load_image(INPUT_IMAGE)
 
 
 def execute_detection(img: np.ndarray, detection_session):
+    input_size = tuple(img.shape[0:2][::-1])
+    blob = cv2.dnn.blobFromImage(
+        img,
+        1.0 / DETECTION_INPUT_STD,
+        input_size,
+        (DETECTION_INPUT_MEAN, DETECTION_INPUT_MEAN, DETECTION_INPUT_MEAN),
+        swapRB=True,
+    )
     if args.onnx:
         input_name = detection_session.get_inputs()[0].name
         output_names = [output.name for output in detection_session.get_outputs()]
-        input_size = tuple(img.shape[0:2][::-1])
-        blob = cv2.dnn.blobFromImage(
-            img,
-            1.0 / DETECTION_INPUT_STD,
-            input_size,
-            (DETECTION_INPUT_MEAN, DETECTION_INPUT_MEAN, DETECTION_INPUT_MEAN),
-            swapRB=True,
-        )
         net_outs = detection_session.run(output_names, {input_name: blob})
-        return net_outs
     else:
-        pass
+        net_outs = detection_session.run([blob])
+
+    return net_outs
 
 
 def execute_recognition(img: np.ndarray, faces: List[Face], recognition_session):
@@ -93,9 +89,10 @@ def execute_recognition(img: np.ndarray, faces: List[Face], recognition_session)
             input_name = recognition_session.get_inputs()[0].name
             output_name = recognition_session.get_outputs()[0].name
             net_out = recognition_session.run([output_name], {input_name: blob})[0]
-            face.embedding = net_out.flatten()
         else:
-            pass
+            net_out = recognition_session.run([blob])[0]
+
+        face.embedding = net_out.flatten()
 
 
 def execute_landmark(img: np.ndarray, faces: List[Face], landmark_session, taskname):
@@ -144,30 +141,31 @@ def execute_landmark(img: np.ndarray, faces: List[Face], landmark_session, taskn
             input_name = landmark_session.get_inputs()[0].name
             output_name = landmark_session.get_outputs()[0].name
             net_out = landmark_session.run([output_name], {input_name: blob})[0][0]
-            if net_out.shape[0] >= 3000:
-                net_out = net_out.reshape((-1, 3))
-            else:
-                net_out = net_out.reshape((-1, 2))
-            if lmk_num < net_out.shape[0]:
-                net_out = net_out[lmk_num * -1 :, :]
-
-            net_out[:, 0:2] += 1
-            net_out[:, 0:2] *= LANDMARK_INPUT_SIZE[0] // 2
-            if net_out.shape[1] == 3:
-                net_out[:, 2] *= LANDMARK_INPUT_SIZE[0] // 2
-
-            IM = cv2.invertAffineTransform(M)
-            net_out = trans_points(net_out, IM)
-            face[taskname] = net_out
-            if require_pose:
-                P = estimate_affine_matrix_3d23d(mean_lmk, net_out)
-                s, R, t = P2sRt(P)
-                rx, ry, rz = matrix2angle(R)
-                pose = np.array([rx, ry, rz], dtype=np.float32)
-                face["pose"] = pose  # pitch, yaw, roll
 
         else:
-            pass
+            net_out = landmark_session.run([blob])[0][0]
+
+        if net_out.shape[0] >= 3000:
+            net_out = net_out.reshape((-1, 3))
+        else:
+            net_out = net_out.reshape((-1, 2))
+        if lmk_num < net_out.shape[0]:
+            net_out = net_out[lmk_num * -1 :, :]
+
+        net_out[:, 0:2] += 1
+        net_out[:, 0:2] *= LANDMARK_INPUT_SIZE[0] // 2
+        if net_out.shape[1] == 3:
+            net_out[:, 2] *= LANDMARK_INPUT_SIZE[0] // 2
+
+        IM = cv2.invertAffineTransform(M)
+        net_out = trans_points(net_out, IM)
+        face[taskname] = net_out
+        if require_pose:
+            P = estimate_affine_matrix_3d23d(mean_lmk, net_out)
+            s, R, t = P2sRt(P)
+            rx, ry, rz = matrix2angle(R)
+            pose = np.array([rx, ry, rz], dtype=np.float32)
+            face["pose"] = pose  # pitch, yaw, roll
 
 
 def execute_genderage(img: np.ndarray, faces: List[Face], genderage_session):
@@ -193,10 +191,13 @@ def execute_genderage(img: np.ndarray, faces: List[Face], genderage_session):
             input_name = genderage_session.get_inputs()[0].name
             output_name = genderage_session.get_outputs()[0].name
             net_out = genderage_session.run([output_name], {input_name: blob})[0][0]
-            gender = np.argmax(net_out[:2])
-            age = int(np.round(net_out[2] * 100))
-            face["gender"] = gender
-            face["age"] = age
+        else:
+            net_out = genderage_session.run([blob])[0][0]
+
+        gender = np.argmax(net_out[:2])
+        age = int(np.round(net_out[2] * 100))
+        face["gender"] = gender
+        face["age"] = age
 
 
 def infer_from_image(nets: dict[str, Any]):
@@ -251,7 +252,7 @@ if __name__ == "__main__":
         if args.onnx:
             net = onnxruntime.InferenceSession(model_files["weight"])
         else:
-            net = None
+            net = ailia.Net(model_files["model"], model_files["weight"], env_id=args.env_id)
 
         nets[model_name] = net
 
