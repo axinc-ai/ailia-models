@@ -13,6 +13,7 @@ import ailia
 sys.path.append("../../util")
 from arg_utils import get_base_parser, update_parser
 from model_utils import check_and_download_models
+from math_utils import softmax
 
 
 logger = getLogger(__name__)
@@ -24,6 +25,33 @@ logger = getLogger(__name__)
 WEIGHT_PATH = "model.onnx"
 MODEL_PATH = "model.onnx.prototxt"
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/bert-network-packet-flow-header-payload/"
+
+LABELS = [
+    "Analysis",
+    "Backdoor",
+    "Bot",
+    "DDoS",
+    "DoS",
+    "DoS GoldenEye",
+    "DoS Hulk",
+    "DoS SlowHTTPTest",
+    "DoS Slowloris",
+    "Exploits",
+    "FTP Patator",
+    "Fuzzers",
+    "Generic",
+    "Heartbleed",
+    "Infiltration",
+    "Normal",
+    "Port Scan",
+    "Reconnaissance",
+    "SSH Patator",
+    "Shellcode",
+    "Web Attack - Brute Force",
+    "Web Attack - SQL Injection",
+    "Web Attack - XSS",
+    "Worms",
+]
 
 PACEKT_HEX_PATH = "input_hex.txt"
 
@@ -52,13 +80,68 @@ args = update_parser(parser)
 # ======================
 
 
+def preprocess(packet_hex):
+    packet_bytes = bytes.fromhex(packet_hex)
+    packet = Ether(packet_bytes)
+    if packet.firstlayer().name != "Ethernet":
+        packet = CookedLinux(packet_bytes)
+        if packet.firstlayer().name != "cooked linux":
+            raise ValueError(
+                f"{packet.firstlayer().name} frame not implemented. Ethernet and Cooked Linux are only supported."
+            )
+
+    if "IP" not in packet or "TCP" not in packet:
+        raise ValueError("Only TCP/IP packets are supported.")
+
+    forward_packets = 0
+    backward_packets = 0
+    bytes_transfered = len(packet)
+
+    # Extract relevant information for feature creation.
+    src_ip = packet["IP"].src
+    dst_ip = packet["IP"].dst
+    ip_length = len(packet["IP"])
+    ip_ttl = packet["IP"].ttl
+    ip_tos = packet["IP"].tos
+    src_port = packet["TCP"].sport
+    dst_port = packet["TCP"].dport
+    tcp_data_offset = packet["TCP"].dataofs
+    tcp_flags = packet["TCP"].flags
+
+    # Process payload content and create a feature string.
+    payload_bytes = bytes(packet["TCP"].payload)
+    payload_length = len(payload_bytes)
+    payload_decimal = [str(byte) for byte in payload_bytes]
+
+    final_data = [
+        forward_packets,
+        backward_packets,
+        bytes_transfered,
+        -1,
+        src_port,
+        dst_port,
+        ip_length,
+        payload_length,
+        ip_ttl,
+        ip_tos,
+        tcp_data_offset,
+        int(tcp_flags),
+        -1,
+    ] + payload_decimal
+
+    final_data = " ".join(str(s) for s in final_data)
+    return final_data
+
+
 def predict(models, packet_hex):
-    packet_hex = "34 23 17914 -1 58804 25 322 282 62 0 5 3 -1 101 107 70 115 97 49 70 68 86 87 74 75 97 72 82 83 82 109 116 70 10 83 50 108 85 87 107 120 112 83 72 78 84 83 107 120 71 101 69 108 74 101 107 78 105 101 72 112 114 98 109 74 66 90 88 78 86 99 87 57 78 83 87 86 81 83 87 116 54 98 69 104 85 83 51 90 110 84 110 100 119 10 83 88 86 69 100 72 66 111 98 72 90 116 84 85 108 117 85 69 100 72 98 48 53 76 101 88 74 68 99 110 112 68 81 87 57 68 98 72 70 113 90 110 82 66 83 50 100 119 83 87 86 80 82 51 74 84 87 85 120 76 10 83 71 90 120 85 109 90 85 83 109 53 86 87 88 78 68 87 71 112 76 90 71 82 107 81 109 116 76 100 108 78 119 97 87 78 85 84 108 112 107 83 108 104 121 90 87 86 72 90 70 112 74 97 109 108 80 85 109 78 68 10 84 110 100 97 99 51 90 120 89 48 116 76 101 109 86 68 101 85 112 87 97 72 66 71 98 51 108 52 90 48 53 116 89 110 104 81 84 107 108 73 84 71 116 79 10 13 10 45 45 95 57 48 54 50 57 56 52 55 55 52 51 54 55 56 52 53 48 55 56 55 56 53 51 51 45 45 13 10 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1"
+    final_format = preprocess(packet_hex)
 
     tokenizer = models["tokenizer"]
-    model_inputs = tokenizer(packet_hex, return_tensors="np")
+    model_inputs = tokenizer(final_format, return_tensors="np")
     input_ids = model_inputs["input_ids"]
     attention_mask = model_inputs["attention_mask"]
+    input_ids = input_ids[:, :512]
+    attention_mask = attention_mask[:, :512]
 
     net = models["net"]
 
@@ -71,7 +154,12 @@ def predict(models, packet_hex):
         )
     logits = output[0]
 
-    return (None,)
+    scores = softmax(logits[0])
+    i = np.argmax(scores)
+    label = LABELS[i]
+    score = scores[i]
+
+    return (label, score)
 
 
 def recognize_from_packet(models):
@@ -109,7 +197,7 @@ def recognize_from_packet(models):
         else:
             output = predict(models, packet_hex)
 
-    tags = output[0]
+    print(output)
 
     logger.info("Script finished successfully.")
 
