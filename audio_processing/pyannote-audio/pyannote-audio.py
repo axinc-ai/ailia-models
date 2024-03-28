@@ -2,11 +2,11 @@ import yaml
 import sys
 import matplotlib.pyplot as plt
 
-from pyannote.audio.pipelines.speaker_diarization import SpeakerDiarization
-from pyannote.core import Segment, Annotation
-from pyannote.core.notebook import Notebook
-from pyannote.database.util import load_rttm
-from pyannote.metrics.diarization import DiarizationErrorRate
+from pyannote_audio_utils.audio.pipelines.speaker_diarization import SpeakerDiarization
+from pyannote_audio_utils.core import Segment, Annotation
+from pyannote_audio_utils.core.notebook import Notebook
+from pyannote_audio_utils.database.util import load_rttm
+from pyannote_audio_utils.metrics.diarization import DiarizationErrorRate
 
 sys.path.append('../../util')
 from arg_utils import get_base_parser, update_parser  # noqa: E402
