@@ -102,10 +102,10 @@ class Inference(BaseInference):
         
 
         if args.use_onnx:
-            print("use onnx runtime")
+            #print("use onnx runtime")
             model = onnxruntime.InferenceSession(model, providers=['CUDAExecutionProvider', 'CPUExecutionProvider'])
         else:
-            print("use ailia")
+            #print("use ailia")
             model = ailia.Net(seg_path, weight=model, env_id=args.env_id)
 
         self.model = model

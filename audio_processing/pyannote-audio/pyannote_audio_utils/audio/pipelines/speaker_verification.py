@@ -94,7 +94,7 @@ class ONNXWeSpeakerPretrainedSpeakerEmbedding(BaseInference):
         self.embedding = embedding
         
         if args.use_onnx:
-            print("use onnx runtime")
+            #print("use onnx runtime")
             providers = ["CPUExecutionProvider", ("CUDAExecutionProvider",{"cudnn_conv_algo_search": "DEFAULT"})]
 
             sess_options = ort.SessionOptions()
@@ -104,7 +104,7 @@ class ONNXWeSpeakerPretrainedSpeakerEmbedding(BaseInference):
                 embedding, sess_options=sess_options, providers=providers
             )
         else:
-            print("use ailia")
+            #print("use ailia")
 
             self.session_ = ailia.Net(emb_path, weight=embedding, env_id=args.env_id)
         
