@@ -69,6 +69,7 @@ The collection of pre-trained, state-of-the-art AI models.
 | [rnnoise](/audio_processing/rnnoise/) | [rnnoise](https://github.com/xiph/rnnoise) | Keras | 1.2.15 and later | |
 | [audioset_tagging_cnn](/audio_processing/audioset_tagging_cnn/) | [PANNs: Large-Scale Pretrained Audio Neural Networks for Audio Pattern Recognition](https://github.com/qiuqiangkong/audioset_tagging_cnn) | Pytorch | 1.2.9 and later | |
 | [deep music enhancer](/audio_processing/deep-music-enhancer/) | [On Filter Generalization for Music Bandwidth Extension Using Deep Neural Networks](https://github.com/serkansulun/deep-music-enhancer) | Pytorch | 1.2.6 and later | |
+| [pyannote-audio](/audio_processing/pyannote-audio/) | [Pyannote-audio](https://github.com/pyannote/pyannote-audio) | Pytorch | 1.2.15 and later | |
 
 ## Background removal
 
