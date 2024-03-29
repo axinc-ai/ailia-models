@@ -116,7 +116,7 @@ $ python pyannote-audio.py --embed
 
 ## Reference
 
-- [Pyannte-audio](https://github.com/pyannote/pyannote-audio)
+- [Pyannote-audio](https://github.com/pyannote/pyannote-audio)
 - [Hugging Face - pyannote in speaker-diariazation](https://huggingface.co/pyannote/speaker-diarization-3.1)
 - [Hugging Face - hdbrain in wespeaker-voxceleb-resnet34-LM](https://huggingface.co/hbredin/wespeaker-voxceleb-resnet34-LM/tree/main)
 - [KaldiFeat](https://github.com/yuyq96/kaldifeat)
