@@ -23,7 +23,7 @@ YAML_PATH = 'config.yaml'
 OUT_PATH = 'output.png'
 
 parser = get_base_parser(
-    'Pyannote-audio', None, None, input_ftype='audio'
+    'Pyannote-audio', './data/sample.wav', None, input_ftype='audio'
 )
 
 parser.add_argument(
@@ -38,10 +38,6 @@ parser.add_argument(
     '--min', '-min_speaker', default=0, type=int,
     help='If the minimum number of speakers is fixed', 
 )
-parser.add_argument(
-    '--i', '-input', default='./data/sample.wav',
-    help='Specify an input wav file'
-) 
 parser.add_argument(
     '--ig', '-ground', default=None,
     help='Specify a wav file as ground truth. If you need diarization error rate, you need this file'
