@@ -43,7 +43,7 @@ parser.add_argument(
     help='Specify an input wav file'
 ) 
 parser.add_argument(
-    '--ig', '-ground', default='./data/sample.rttm',
+    '--ig', '-ground', default=None,
     help='Specify a wav file as ground truth. If you need diarization error rate, you need this file'
 )
 parser.add_argument(
@@ -103,7 +103,7 @@ def main(args):
     with open(YAML_PATH, 'w') as f:
         yaml.dump(config, f)
 
-    audio_file = args.i
+    audio_file = args.input[0]
     checkpoint_path = YAML_PATH
     config_yml = checkpoint_path
 

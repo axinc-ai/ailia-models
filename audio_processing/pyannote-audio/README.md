@@ -42,7 +42,17 @@ It is necessary to be connected to the Internet while downloading.
 
 For the sample
 ```bash
-$ python pyannote-audio.py
+$ python pyannote-audio.py -i ./data/sample.wav
+```
+
+For the sample with plot
+```bash
+$ python pyannote-audio.py -i ./data/sample.wav --plt
+```
+
+For the sample with verification
+```bash
+$ python pyannote-audio.py -i ./data/sample.wav -g ./data/sample.rttm
 ```
 
 If you want to specify the audio, put the file path after the `--i` or `-input` option.
