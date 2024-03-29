@@ -32,15 +32,6 @@ from pyannote_audio_utils.audio.core.inference import BaseInference
 
 PipelineModel = Union[Text, Mapping]
 
-try:
-    import onnxruntime as ort
-    import onnx
-
-    ONNX_IS_AVAILABLE = True
-except ImportError:
-    ONNX_IS_AVAILABLE = False
-
-
 class ONNXWeSpeakerPretrainedSpeakerEmbedding(BaseInference):
     """Pretrained WeSpeaker speaker embedding
 
@@ -93,7 +84,8 @@ class ONNXWeSpeakerPretrainedSpeakerEmbedding(BaseInference):
 
         self.embedding = embedding
         
-        if args.use_onnx:
+        if args.onnx:
+            import onnxruntime as ort
             #print("use onnx runtime")
             providers = ["CPUExecutionProvider", ("CUDAExecutionProvider",{"cudnn_conv_algo_search": "DEFAULT"})]
 
@@ -119,7 +111,7 @@ class ONNXWeSpeakerPretrainedSpeakerEmbedding(BaseInference):
         dummy_waveforms = np.random.rand(1, 1, 16000)
         features = self.compute_fbank(dummy_waveforms)
 
-        if self.args.use_onnx:
+        if self.args.onnx:
             embeddings = self.session_.run(output_names=["embs"], input_feed={"feats": features}
             )[0]
         else:
@@ -145,7 +137,7 @@ class ONNXWeSpeakerPretrainedSpeakerEmbedding(BaseInference):
                 middle = (lower + upper) // 2
                 continue
 
-            if self.args.use_onnx:
+            if self.args.onnx:
                 embeddings = self.session_.run(output_names=["embs"], input_feed={"feats": features})[0]
             else:
                 embeddings = self.session_.predict([features])[0]
@@ -248,7 +240,7 @@ class ONNXWeSpeakerPretrainedSpeakerEmbedding(BaseInference):
             if masked_feature.shape[0] < self.min_num_frames:
                 continue
             
-            if self.args.use_onnx:
+            if self.args.onnx:
                 embeddings[f] = self.session_.run(output_names=["embs"],input_feed={"feats": masked_feature[None]},)[0][0]
             else:
                 embeddings[f] = self.session_.predict([masked_feature[None]])[0][0]

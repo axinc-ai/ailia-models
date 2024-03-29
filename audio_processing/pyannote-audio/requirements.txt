@@ -1,6 +1,4 @@
 pyyaml
-onnx
-onnxruntime
 sortedcontainers
 pandas
 soundfile

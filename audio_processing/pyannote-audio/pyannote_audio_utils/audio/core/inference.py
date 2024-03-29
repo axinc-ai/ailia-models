@@ -36,9 +36,6 @@ from pyannote_audio_utils.audio.utils.multi_task import map_with_specifications
 from pyannote_audio_utils.audio.utils.powerset import Powerset
 
 
-import onnxruntime
-import onnx
-
 class BaseInference:
     pass
 
@@ -101,8 +98,9 @@ class Inference(BaseInference):
         # ~~~~ model ~~~~~
         
 
-        if args.use_onnx:
+        if args.onnx:
             #print("use onnx runtime")
+            import onnxruntime
             model = onnxruntime.InferenceSession(model, providers=['CUDAExecutionProvider', 'CPUExecutionProvider'])
         else:
             #print("use ailia")
@@ -194,7 +192,7 @@ class Inference(BaseInference):
             Model output.
         """
         chunks = chunks.astype(np.float32)
-        if self.args.use_onnx:
+        if self.args.onnx:
             outputs = self.model.run(None, {"input": chunks})[0]
         else:
             outputs = self.model.predict([chunks])[0]

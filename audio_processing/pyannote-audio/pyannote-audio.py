@@ -66,7 +66,7 @@ parser.add_argument(
     help='If you need embedding vector', 
 ) 
 parser.add_argument(
-    '--use_onnx', 
+    '--onnx', 
     action='store_true',
     help='execute onnxruntime version'
 )

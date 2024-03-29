@@ -123,7 +123,7 @@ $ python pyannote-audio.py --embed
 
 ## Framework
 
-Onnxruntime
+Pytorch
 
 ## Model Format
 
