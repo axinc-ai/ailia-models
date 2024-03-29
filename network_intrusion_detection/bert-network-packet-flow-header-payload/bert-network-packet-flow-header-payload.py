@@ -66,13 +66,9 @@ parser = get_base_parser(
     None,
 )
 parser.add_argument("--hex", type=str, default=None, help="Input-HEX data.")
+parser.add_argument("--ip", action="store_true", help="Use IP layer as payload.")
 parser.add_argument("--onnx", action="store_true", help="execute onnxruntime version.")
 args = update_parser(parser)
-
-
-# ======================
-# Secondaty Functions
-# ======================
 
 
 # ======================
@@ -95,7 +91,7 @@ def preprocess(packet_hex):
 
     forward_packets = 0
     backward_packets = 0
-    bytes_transfered = len(packet)
+    bytes_transfered = len(packet_bytes)
 
     # Extract relevant information for feature creation.
     src_ip = packet["IP"].src
@@ -109,7 +105,7 @@ def preprocess(packet_hex):
     tcp_flags = packet["TCP"].flags
 
     # Process payload content and create a feature string.
-    payload_bytes = bytes(packet["TCP"].payload)
+    payload_bytes = bytes(packet["IP"].payload if args.ip else packet["TCP"].payload)
     payload_length = len(payload_bytes)
     payload_decimal = [str(byte) for byte in payload_bytes]
 
@@ -137,11 +133,9 @@ def predict(models, packet_hex):
     final_format = preprocess(packet_hex)
 
     tokenizer = models["tokenizer"]
-    model_inputs = tokenizer(final_format, return_tensors="np")
+    model_inputs = tokenizer(final_format[:1024], return_tensors="np")
     input_ids = model_inputs["input_ids"]
     attention_mask = model_inputs["attention_mask"]
-    input_ids = input_ids[:, :512]
-    attention_mask = attention_mask[:, :512]
 
     net = models["net"]
 
@@ -155,11 +149,11 @@ def predict(models, packet_hex):
     logits = output[0]
 
     scores = softmax(logits[0])
-    i = np.argmax(scores)
-    label = LABELS[i]
-    score = scores[i]
+    idx = np.argsort(-scores)
+    labels = np.array(LABELS)[idx]
+    scores = scores[idx]
 
-    return (label, score)
+    return (labels, scores)
 
 
 def recognize_from_packet(models):
@@ -197,7 +191,10 @@ def recognize_from_packet(models):
         else:
             output = predict(models, packet_hex)
 
-    print(output)
+    top_k = 3
+    labels, socres = output
+    for label, score in list(zip(labels, socres))[:top_k]:
+        print(f"{label} : {score*100:.3f}")
 
     logger.info("Script finished successfully.")
 
