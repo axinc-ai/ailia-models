@@ -541,12 +541,16 @@ def main():
 
     env_id = args.env_id
 
+    # disable FP16
+    if "FP16" in ailia.get_environment(args.env_id).props or sys.platform == 'Darwin':
+        logger.warning('This model do not work on FP16. So use CPU mode.')
+        env_id = 0
+
     # initialize
     if not args.onnx:
         net_similar = ailia.Net(MODEL_SIMILAR_PATH, WEIGHT_SIMILAR_PATH, env_id=env_id)
     else:
         import onnxruntime
-
         net_similar = onnxruntime.InferenceSession(WEIGHT_SIMILAR_PATH)
 
     tokenizer = AutoTokenizer.from_pretrained("tokenizer")
