@@ -53,8 +53,13 @@ parser.add_argument(
     action='store_true',
     help='execute onnxruntime version.'
 )
+parser.add_argument(
+    '--seed', type=int, default=128,
+    help='random seed for input data and noise'
+)
 args = update_parser(parser)
 
+np.random.seed(args.seed)
 
 # ======================
 # Secondaty Functions

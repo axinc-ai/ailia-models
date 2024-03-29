@@ -13,5 +13,5 @@ fvcore
 ftfy
 webcolors
 pymatting
-dlib
+dlib==19.21.1
 lap
