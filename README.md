@@ -357,6 +357,12 @@ The collection of pre-trained, state-of-the-art AI models.
 |[t5_base_summarization](/natural_language_processing/t5_base_japanese_summarization) | [t5-japanese](https://github.com/sonoisa/t5-japanese) | Pytorch | 1.2.13 and later |
 |[glucose](/natural_language_processing/glucose) | [GLuCoSE (General Luke-based Contrastive Sentence Embedding)-base-Japanese](https://huggingface.co/pkshatech/GLuCoSE-base-ja) | Pytorch | 1.2.15 and later |
 
+## Network intrusion detection
+
+| Model | Reference | Exported From | Supported Ailia Version | Blog |
+|------------:|:------------:|:------------:|:------------:|:------------:|
+| [falcon-adapter-network-packet](/network_intrusion_detection/falcon-adapter-network-packet/) | [falcon-adapter-network-packet](https://huggingface.co/rdpahalavan/falcon-adapter-network-packet)| Pytorch | 1.2.10 and later | |
+
 ## Neural Rendering
 
 | | Model | Reference | Exported From | Supported Ailia Version | Blog |
