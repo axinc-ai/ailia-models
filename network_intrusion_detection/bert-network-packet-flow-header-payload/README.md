@@ -10,11 +10,25 @@
 
 ## Output
 
-- Top classes
+- Top classes for input_hex.txt
 ```
 Normal : 100.000
 DoS : 0.000
 SSH Patator : 0.000
+```
+
+- Top classes for input_exploit.txt with tcp payload
+```
+Reconnaissance : 99.884
+Exploits : 0.064
+DoS : 0.027
+```
+
+- Top classes for input_exploit.txt with ip payload (--ip option)
+```
+Exploits : 95.659
+DoS : 2.805
+Reconnaissance : 1.065
 ```
 
 ## Requirements
@@ -53,6 +67,7 @@ $ python3 bert-network-packet-flow-header-payload.py --ip
 ## Reference
 
 - [Hugging Face - bert-network-packet-flow-header-payload](https://huggingface.co/rdpahalavan/bert-network-packet-flow-header-payload)
+- [ESIR-S9 - AI Project : Network Traffic Analysis](https://github.com/TPs-ESIR-S9/PcapFileAnalysis/)
 
 ## Framework
 
