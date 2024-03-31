@@ -363,6 +363,7 @@ The collection of pre-trained, state-of-the-art AI models.
 
 | Model | Reference | Exported From | Supported Ailia Version | Blog |
 |------------:|:------------:|:------------:|:------------:|:------------:|
+| [bert-network-packet-flow-header-payload](/network_intrusion_detection/bert-network-packet-flow-header-payload/) | [bert-network-packet-flow-header-payload](https://huggingface.co/rdpahalavan/bert-network-packet-flow-header-payload)| Pytorch | 1.2.10 and later | |
 | [falcon-adapter-network-packet](/network_intrusion_detection/falcon-adapter-network-packet/) | [falcon-adapter-network-packet](https://huggingface.co/rdpahalavan/falcon-adapter-network-packet)| Pytorch | 1.2.10 and later | |
 
 ## Neural Rendering
