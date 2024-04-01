@@ -125,7 +125,6 @@ class PreProcess:
 
     def __init__(
         self,
-        config,
         args=None,
         face_parser_path=None,
         face_alignment_path=None,
@@ -133,24 +132,33 @@ class PreProcess:
         need_parser=True,
         return_landmarks=False
     ):
-        self.img_size = config.DATA.IMG_SIZE
+
+        DATA_IMG_SIZE = 256
+        PREPROCESS_UP_RATIO = 0.6 / 0.85  # delta_size / face_size
+        PREPROCESS_DOWN_RATIO = 0.2 / 0.85  # delta_size / face_size
+        PREPROCESS_WIDTH_RATIO = 0.2 / 0.85  # delta_size / face_size
+        PREPROCESS_LIP_CLASS = [7, 9]
+        PREPROCESS_FACE_CLASS = [1, 6]
+        PREPROCESS_LANDMARK_POINTS = 68
+
+        self.img_size = DATA_IMG_SIZE
 
         xs, ys = np.meshgrid(
             np.linspace(0, self.img_size - 1, self.img_size),
             np.linspace(0, self.img_size - 1, self.img_size),
         )
-        xs = xs[None].repeat(config.PREPROCESS.LANDMARK_POINTS, axis=0)
-        ys = ys[None].repeat(config.PREPROCESS.LANDMARK_POINTS, axis=0)
+        xs = xs[None].repeat(PREPROCESS_LANDMARK_POINTS, axis=0)
+        ys = ys[None].repeat(PREPROCESS_LANDMARK_POINTS, axis=0)
         self.fix = np.concatenate([ys, xs], axis=0)
         if need_parser:
             self.face_parse = futils.mask.FaceParser(
                 args=args, face_parser_path=face_parser_path
             )
-        self.up_ratio = config.PREPROCESS.UP_RATIO
-        self.down_ratio = config.PREPROCESS.DOWN_RATIO
-        self.width_ratio = config.PREPROCESS.WIDTH_RATIO
-        self.lip_class = config.PREPROCESS.LIP_CLASS
-        self.face_class = config.PREPROCESS.FACE_CLASS
+        self.up_ratio = PREPROCESS_UP_RATIO
+        self.down_ratio = PREPROCESS_DOWN_RATIO
+        self.width_ratio = PREPROCESS_WIDTH_RATIO
+        self.lip_class = PREPROCESS_LIP_CLASS
+        self.face_class = PREPROCESS_FACE_CLASS
         self.use_onnx = args.onnx
         self.use_dlib = args.use_dlib
         if not self.use_dlib:
