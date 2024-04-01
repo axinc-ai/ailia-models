@@ -1,4 +1,3 @@
-@@ -0,0 +1,78 @@
 # bert-network-packet-flow-header-payload
 
 ## Input
