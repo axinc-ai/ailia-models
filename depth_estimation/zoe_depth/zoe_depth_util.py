@@ -26,8 +26,8 @@ def postprocess(
     pred,
     original_width: int,
     original_height: int,
-    vmin: int | None = 0,
-    vmax: int | None = 10,
+    vmin: int = 0,
+    vmax: int = 10,
     cmap: str = "magma_r",
 ) -> np.ndarray:
     invalid_mask = pred == -99
