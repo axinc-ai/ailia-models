@@ -180,6 +180,13 @@ The collection of pre-trained, state-of-the-art AI models.
 | [<img src="face_recognition/mivolo/output.png" width=128px>](face_recognition/mivolo/) | [mivolo](/face_recognition/mivolo/) | [MiVOLO: Multi-input Transformer for Age and Gender Estimation](https://github.com/WildChlamydia/MiVOLO) | Pytorch | 1.2.13 and later | |
 | [<img src="face_recognition/l2cs_net/output.png" width=128px>](face_recognition/l2cs_net/) | [L2CS_Net](/face_recognition/l2cs_net/) | [L2CS_Net](https://github.com/Ahmednull/L2CS-Net) | Pytorch | 1.2.9 and later | |
 
+## Face swapping
+
+| | Model | Reference | Exported From | Supported Ailia Version | Blog |
+|:-----------|------------:|:------------:|:------------:|:------------:|:------------:|
+| [<img src="face_swapping/facefusion/output.png" width=128px>](face_swapping/facefusion/) | [facefusion](/face_swapping/facefusion/) | [FaceFusion](https://github.com/facefusion/facefusion) | ONNXRuntime | 1.2.10 and later |
+
+
 ## Frame Interpolation
 
 | | Model | Reference | Exported From | Supported Ailia Version | Blog |
