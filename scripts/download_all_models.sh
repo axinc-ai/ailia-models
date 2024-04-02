@@ -68,6 +68,7 @@ cd ../../depth_estimation/hitnet; python3 hitnet.py ${OPTION}
 cd ../../depth_estimation/crestereo; python3 crestereo.py ${OPTION}
 cd ../../depth_estimation/mobilestereonet; python3 mobilestereonet.py ${OPTION}
 cd ../../face_detection/blazeface; python3 blazeface.py ${OPTION}
+cd ../../face_detection/zoe_depth; python3 zoe_depth ${OPTION}
 cd ../../face_detection/dbface; python3 dbface.py ${OPTION}
 cd ../../face_detection/face-mask-detection; python3 face-mask-detection.py ${OPTION}
 cd ../../face_detection/yolov1-face; python3 yolov1-face.py ${OPTION}
