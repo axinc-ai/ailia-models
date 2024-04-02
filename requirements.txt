@@ -9,9 +9,8 @@ scikit-image>=0.17.2
 tqdm
 h5py
 filterpy
-fvcore
 ftfy
 webcolors
 pymatting
-dlib
+dlib==19.21.1
 lap
