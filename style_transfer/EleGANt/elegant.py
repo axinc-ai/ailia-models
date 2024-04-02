@@ -29,7 +29,7 @@ logger = getLogger(__name__)
 # ======================
 # Parameters
 # ======================
-ELEGANT_REMOTE_PATH = "https://storage.googleapis.com/ailia-models/EleGANt/"
+ELEGANT_REMOTE_PATH = "https://storage.googleapis.com/ailia-models/elegant/"
 ELEGANT_WEIGHT_PATH = "elegant.onnx"
 ELEGANT_MODEL_PATH = "elegant.onnx.prototxt"
 
