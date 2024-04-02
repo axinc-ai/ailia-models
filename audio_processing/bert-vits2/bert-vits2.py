@@ -73,14 +73,14 @@ PATHS = {
 }
 
 MODEL_PATHS = {
-    'enc': 'BertVits2.2PT_enc_p.prototxt.onnx',
-    'emb_g': 'BertVits2.2PT_emb.prototxt.onnx',
-    'dp': 'BertVits2.2PT_dp.prototxt.onnx',
-    'sdp': 'BertVits2.2PT_sdp.prototxt.onnx',
-    'flow': 'BertVits2.2PT_flow.prototxt.onnx',
-    'dec': 'BertVits2.2PT_dec.prototxt.onnx',
-    'clap': 'emo_clap.prototxt.onnx',
-    'bert': 'debertav2lc.prototxt.onnx'
+    'enc': 'BertVits2.2PT_enc_p.onnx.prototxt',
+    'emb_g': 'BertVits2.2PT_emb.onnx.prototxt',
+    'dp': 'BertVits2.2PT_dp.onnx.prototxt',
+    'sdp': 'BertVits2.2PT_sdp.onnx.prototxt',
+    'flow': 'BertVits2.2PT_flow.onnx.prototxt',
+    'dec': 'BertVits2.2PT_dec.onnx.prototxt',
+    'clap': 'emo_clap.onnx.prototxt',
+    'bert': 'debertav2lc.onnx.prototxt'
 }
 
 MODEL_NAMES = ['enc', 'emb_g', 'dp', 'sdp', 'flow', 'dec', 'clap', 'bert']
