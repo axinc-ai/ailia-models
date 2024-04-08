@@ -9,23 +9,11 @@ If you want to use ailia from other languages(C++/C#(Unity)/JNI/Kotlin/Rust/Flut
 
 ## Install ailia SDK
 
-- [Download a free evaluation version of ailia SDK](https://axinc.jp/en/trial/)
-- Unzip ailia SDK
-- Run the following command
-
 ```
-cd ailia_sdk/python
-python3 bootstrap.py
-pip3 install .
+pip3 install ailia
 ```
 
-- In the evaluation version, place the license file in the same folder as libailia.dll ([python_path]/site_packages/ailia) on Windows and in ~/Library/SHALO/ on Mac.
-
-- You can find the location of Python site-packages directory using the following command.
-
-```
-pip3 show ailia
-```
+The ailia SDK is a commercial library. Under certain conditions, it can be used free of charge; however, it is principally paid software. For details, please refer to https://ailia.ai/license/ .
 
 ## Install required libraries for Python
 
