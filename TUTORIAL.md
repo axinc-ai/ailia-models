@@ -13,7 +13,7 @@ If you want to use ailia from other languages(C++/C#(Unity)/JNI/Kotlin/Rust/Flut
 pip3 install ailia
 ```
 
-The ailia SDK is a commercial library. Under certain conditions, it can be used free of charge; however, it is principally paid software. For details, please refer to https://ailia.ai/license/ .
+The ailia SDK is a commercial library. Under certain conditions, it can be used free of charge; however, it is principally paid software. For details, please refer to https://ailia.ai/license/en/ .
 
 ## Install required libraries for Python
 
