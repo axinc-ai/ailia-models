@@ -13,9 +13,10 @@ The collection of pre-trained, state-of-the-art AI models.
 [ailia MODELS tutorial 日本語版](TUTORIAL_jp.md)
 
 # Supported models
-320 models as of March 29th, 2024
+321 models as of April 9th, 2024
 
 # Latest update
+- 2024.04.09 Add fuseformer
 - 2024.03.29 Add falcon-adapter-network-packet, pyannote-audio
 - 2024.03.08 Add did_m3d, damo_yolo, deep-music-enhancer, tusimple-DUC
 - 2024.03.05 Add polylanenet, rnnoise
