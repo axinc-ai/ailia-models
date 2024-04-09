@@ -9,37 +9,13 @@
 
 ## ailia SDKのインストール
 
-- [ailia SDK無償評価版のダウンロード](https://axinc.jp/trial/)
-
-- ダウンロードしたailia SDKのzipファイルを展開
-
 - 以下のコマンドを実行する（Windowsの場合はコマンドプロンプトやWindows PowerShell、macやLinuxではターミナルで実行）
 
-
 ```
-cd ailia_sdk/python
-python3 bootstrap.py
-pip3 install .
+pip3 install ailia
 ```
 
-- 評価版ではライセンスファイルをlibailia.dll (libailia.so)と同じ場所に置く必要があります
-
-- Windows/Linuxでは「[python_path]/site_packages/ailia」、macでは「~/Library/SHALO/」に置いてください
-
-- Pythonのsite-packagesディレクトリの位置は、以下のコマンドで確認できます
-
-
-```
-python3 -c "import site; print (site.getsitepackages())"
-```
-
-
-- 以下のコマンドでailiaが正しくインストールされたかを確認できます
-
-
-```
-pip3 show ailia
-```
+ailia SDKは商用ライブラリです。特定の条件下では、無償使用いただけますが、原則として有償ソフトウェアです。詳細は https://ailia.ai/license/ を参照してください。
 
 ## 必要なpythonライブラリのインストール
 
