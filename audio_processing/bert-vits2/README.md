@@ -28,6 +28,13 @@ original input, forcibly stylizing the output speech.
 Speech converted from text input. Output path can be specified using the argument ```--savepath```
 
 ## Usage
+
+before running the sample script, install the required packages
+```bash
+cd audio_processing/bert-vits2
+pip install -r requirements.txt
+```
+
 An Internet connection is required when running the script for the first time, as the model files will be downloaded automatically.
 
 Running the script will convert the input text to speech while also considering the meaning of it using the BERT feature extractor.

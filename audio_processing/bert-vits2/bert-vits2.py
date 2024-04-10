@@ -121,7 +121,7 @@ def get_bert_features(bert, tokenizer, text, word2ph, style_text=None, style_wei
 
     return phone_level_feature[None]
 
-def prepare_inputs(text, style_text, sid, emo, bert, tokenizer, clap, processor):
+def prepare_inputs(text, style_text, sid, emo, bert, tokenizer, clap, clap_tokenizer):
     text = text_normalize(text)
     phones, tones, word2ph = g2p(text, tokenizer)
     x, tones, lang_ids = cleaned_text_to_sequence(phones, tones,'JP')
@@ -141,7 +141,7 @@ def prepare_inputs(text, style_text, sid, emo, bert, tokenizer, clap, processor)
     lang_ids = np.array(lang_ids)[None]
     sid = np.array([sid])
 
-    emo_input = processor(text=emo, return_tensors="np")
+    emo_input = clap_tokenizer(emo, return_tensors="np")
     emo_embed = clap.predict({
         'input_ids': emo_input['input_ids'],
         'attention_mask': emo_input['attention_mask']
@@ -245,9 +245,9 @@ def infer(models):
         sid,
         emo,
         models['bert'],
-        models['tokenizer'],
+        models['bert_tokenizer'],
         models['clap'],
-        models['processor']
+        models['clap_tokenizer']
     )
     inputs = {
         "x": phones,
@@ -264,9 +264,9 @@ def infer(models):
 
 def main():
     # load models
-    tokenizer = AutoTokenizer.from_pretrained("ku-nlp/deberta-v2-large-japanese-char-wwm")
-    processor = ClapProcessor.from_pretrained("laion/clap-htsat-fused")
-    models = {'tokenizer': tokenizer,'processor': processor}
+    bert_tokenizer = AutoTokenizer.from_pretrained("ku-nlp/deberta-v2-large-japanese-char-wwm")
+    clap_tokenizer = AutoTokenizer.from_pretrained('laion/clap-htsat-fused')
+    models = {'bert_tokenizer': bert_tokenizer,'clap_tokenizer': clap_tokenizer}
 
     for m in MODEL_NAMES:
         check_and_download_models(
