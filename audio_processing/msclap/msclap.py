@@ -1,6 +1,7 @@
 import sys
 import time
 from logging import getLogger
+import json
 
 import random
 
@@ -59,6 +60,12 @@ parser.add_argument(
     "-v", "--version", type=str,
     default="2023",
     help="Version of the CLAP model (2022 or 2023)."
+)
+
+parser.add_argument(
+    '-w', '--write_json',
+    action='store_true',
+    help='Flag to output results to json file.'
 )
 
 args = update_parser(parser, check_input_type=False)
@@ -132,6 +139,15 @@ def print_sorted_dict(d):
     for k, v in sorted(d.items(), key=lambda x: x[1], reverse=True):
         pad = ' ' * (m_len - len(k) + 4)
         print(f'{pad + k}: {v}')
+
+def save_sorted_dict_as_json(d):
+    m_len = max([len(k) for k in d.keys()])
+    result = []
+    for k, v in sorted(d.items(), key=lambda x: x[1], reverse=True):
+        result.append({"caption": k, "similarity": float(v)})
+    with open('output.json', 'w', encoding='utf-8') as f:
+        json.dump(result, f, indent=2)
+
 # ======================
 # Main functions
 # ======================
@@ -177,6 +193,9 @@ def estimate_best_caption(model):
 
     print(f"Similarity: ")
     print_sorted_dict(dict(zip(input_text, output)))
+
+    if args.write_json:
+        save_sorted_dict_as_json(dict(zip(input_text, output)))
 
     logger.info('Script finished successfully.')
 
