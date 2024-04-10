@@ -8,21 +8,24 @@ The collection of pre-trained, state-of-the-art AI models.
 
 # How to use
 
+# NEW - ailia SDK can now be installed with "pip3 install ailia" ! 
+
 [ailia MODELS tutorial](TUTORIAL.md)
 
 [ailia MODELS tutorial 日本語版](TUTORIAL_jp.md)
 
 # Supported models
-320 models as of March 29th, 2024
+323 models as of April 8th, 2024
 
 # Latest update
+- 2024.04.08 ailia SDK can now be installed via pip.
+- 2024.04.02 Add zoe_depth, facefusion
+- 2024.04.01 Add pytorch-fcn (ailia SDK 1.3.0)
 - 2024.03.29 Add falcon-adapter-network-packet, pyannote-audio
 - 2024.03.08 Add did_m3d, damo_yolo, deep-music-enhancer, tusimple-DUC
 - 2024.03.05 Add polylanenet, rnnoise
 - 2024.03.04 Add Japanese Stable CLIP, msclap, glucose, informer2020, l2cs_net, deepsort_vehicle, narabas
 - 2024.03.03 Add yolov9 (Unification of line feed code to LF)
-- 2024.01.29 Add rife, layout_parsing
-- 2024.01.27 Add mivolo
 - More information in our [Wiki](https://github.com/axinc-ai/ailia-models/wiki)
 
 ## Action recognition
