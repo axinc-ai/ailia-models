@@ -22,7 +22,7 @@ logger = getLogger(__name__)
 # ======================
 
 WEIGHT_PATH = 'bert_ner_ja.onnx'
-MODEL_PATH = 'bert_ner_ja.onnx'
+MODEL_PATH = 'bert_ner_ja.onnx.prototxt'
 
 id2label = {
   0: "O",
@@ -148,14 +148,14 @@ def recognize(model):
 
 def main():
     # model files check and download
-    #check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
 
     model_name = "jurabi/bert-ner-japanese"
     tokenizer = AutoTokenizer.from_pretrained(model_name)
 
     env_id = args.env_id
 
-    bert = ailia.Net(None, WEIGHT_PATH, env_id = env_id)
+    bert = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id = env_id)
     # initialize
     model = {
         'bert':bert,
