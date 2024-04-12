@@ -1,13 +1,14 @@
 import sys
 import os
 import time
+import glob
 import inspect
 from logging import getLogger
 from typing import Callable, List, Dict, Optional, Union
 from dataclasses import dataclass
 
 import numpy as np
-import cv2
+import torch
 from PIL import Image
 from tqdm import tqdm
 from transformers import AutoProcessor, CLIPVisionModelWithProjection, CLIPTokenizer
@@ -19,10 +20,9 @@ import onnxruntime
 
 # import original modules
 sys.path.append('../../util')
-from arg_utils import get_base_parser, update_parser, get_savepath  # noqa
+from arg_utils import get_base_parser, update_parser # noqa
 from model_utils import check_and_download_models, check_and_download_file  # noqa
-from image_utils import normalize_image  # noqa
-from detector_utils import load_image  # noqa
+from params import EXTENSIONS
 
 from ootdiffusion_utils.openpose import OpenPose
 from ootdiffusion_utils.ootd_parsing import Parsing
@@ -78,8 +78,8 @@ MODEL_VAE_ENCODER_PATH = 'vae_encoder.onnx.prototxt'
 WEIGHT_VAE_DECODER_PATH = 'vae_decoder.onnx'
 MODEL_VAE_DECODER_PATH = 'vae_decoder.onnx.prototxt'
 
-WEIGHT_IMAGE_ENCODER_PATH = 'image_encoder.onnx'
-MODEL_IMAGE_ENCODER_PATH = 'image_encoder.onnx.prototxt'
+# WEIGHT_IMAGE_ENCODER_PATH = 'image_encoder.onnx'
+# MODEL_IMAGE_ENCODER_PATH = 'image_encoder.onnx.prototxt'
 
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/ootdiffusion/'
 
@@ -99,6 +99,10 @@ parser = get_base_parser(
     'OOTDiffusion', IMAGE_PATH, SAVE_IMAGE_PATH
 )
 parser.add_argument(
+    '-c', '--cloth', nargs='*', metavar='IMAGE/VIDEO', default=CLOTH_PATH,
+    help='Path to the cloth image (or folder of images).'
+)
+parser.add_argument(
     "--model_type", type=str, default="hd", choices=("hd", "dc"),
     help="Model type: 'hd' for half-body model, 'dc' for full-body model."
 )
@@ -111,9 +115,13 @@ parser.add_argument(
     help="Random seed."
 )
 parser.add_argument(
+    "--save_mask", action='store_true',
+    help="Save intermediate mask image."
+)
+parser.add_argument(
     '--onnx',
     action='store_true',
-    help='execute onnxruntime version.'
+    help='Execute onnxruntime version.'
 )
 args = update_parser(parser)
 
@@ -122,12 +130,32 @@ args = update_parser(parser)
 # Secondary Functions
 # ======================
 
+def generate_list_input_cloths(cloth_path):
+    if os.path.isdir(cloth_path):
+        # Directory Path --> generate list of inputs
+        files_grapped = []
+        in_dir = cloth_path
+        for extension in EXTENSIONS[args.ftype]:
+            files_grapped.extend(glob.glob(os.path.join(in_dir, extension)))
+        logger.info(f'{len(files_grapped)} {args.ftype} files found!')
+
+        cloth_path = sorted(files_grapped)
+    elif os.path.isfile(cloth_path):
+        cloth_path = [cloth_path]
+
+    return cloth_path
+
 @dataclass
 class OpenPoseModels:
     body_pose: ailia.Net | onnxruntime.InferenceSession | None
+    is_onnx: bool
 
     def release_body_pose(self):
-        self.body_pose.__del__()
+        if self.is_onnx:
+            del self.body_pose
+        else:
+            self.body_pose.__del__()
+
         self.body_pose = None
 
 @dataclass
@@ -136,20 +164,28 @@ class ParsingModels:
     upsample_atr: ailia.Net | onnxruntime.InferenceSession | None
     lip: ailia.Net | onnxruntime.InferenceSession | None
     upsample_lip: ailia.Net | onnxruntime.InferenceSession | None
+    is_onnx: bool
 
     def release_atr(self):
-        # del self.atr
-        self.atr.__del__()
-        self.atr = None
+        if self.is_onnx:
+            del self.atr
+            del self.upsample_atr
+        else:
+            self.atr.__del__()
+            self.upsample_atr.__del__()
 
-        self.upsample_atr.__del__()
+        self.atr = None
         self.upsample_atr = None
 
     def release_lip(self):
-        self.lip.__del__()
-        self.lip = None
+        if self.is_onnx:
+            del self.lip
+            del self.upsample_lip
+        else:
+            self.lip.__del__()
+            self.upsample_lip.__del__()
 
-        self.upsample_lip.__del__()
+        self.lip = None
         self.upsample_lip = None
 
 @dataclass
@@ -169,28 +205,55 @@ class OOTDiffusionModels:
     image_encoder: CLIPVisionModelWithProjection | None
     image_processor: VaeImageProcessor | None
 
+    # metadata
+    is_onnx: bool
+
     def release_text_encoder(self):
-        self.text_encoder.__del__()
+        if self.is_onnx:
+            del self.text_encoder
+        else:
+            self.text_encoder.__del__()
+
         self.text_encoder = None
 
     def release_vae_encoder(self):
-        self.vae_encoder.__del__()
+        if self.is_onnx:
+            del self.vae_encoder
+        else:
+            self.vae_encoder.__del__()
+
         self.vae_encoder = None
 
     def release_vae_decoder(self):
-        self.vae_decoder.__del__()
+        if self.is_onnx:
+            del self.vae_decoder
+        else:
+            self.vae_decoder.__del__()
+
         self.vae_decoder = None
 
     def release_unet_garm(self):
-        self.unet_garm.__del__()
+        if self.is_onnx:
+            del self.unet_garm
+        else:
+            self.unet_garm.__del__()
+
         self.unet_garm = None
 
     def release_unet_vton(self):
-        self.unet_vton.__del__()
+        if self.is_onnx:
+            del self.unet_vton
+        else:
+            self.unet_vton.__del__()
+
         self.unet_vton = None
 
     def release_interpolation(self):
-        self.interpolation.__del__()
+        if self.is_onnx:
+            del self.interpolation
+        else:
+            self.interpolation.__del__()
+
         self.interpolation = None
 
     def release_tokenizer(self):
@@ -952,12 +1015,15 @@ def predict(models, img):
 
 def recognize_from_image(openpose_pipeline, parsing_pipeline, ootd_pipeline):
     # input image loop
-    for image_path in args.input:
+    for image_path, cloth_path in zip(args.input, args.cloth):
         logger.info(image_path)
+        image_name = os.path.basename(image_path).split('.')[0]
 
         # prepare input data
-        cloth_img = Image.open(CLOTH_PATH).resize((768, 1024))
+        cloth_img = Image.open(cloth_path).resize((768, 1024))
         model_img = Image.open(image_path).resize((768, 1024))
+
+        # inference
         keypoints = openpose_pipeline(model_img.resize((384, 512)))
 
         model_parse, _ = parsing_pipeline(model_img.resize((384, 512)))
@@ -967,9 +1033,11 @@ def recognize_from_image(openpose_pipeline, parsing_pipeline, ootd_pipeline):
         mask_gray = mask_gray.resize((768, 1024), Image.NEAREST)
 
         masked_vton_img = Image.composite(mask_gray, model_img, mask)
-        savepath = get_savepath(args.savepath, 'mask', ext='.jpg')
-        logger.info(f'mask saved at : {savepath}')
-        masked_vton_img.save(savepath)
+
+        if args.save_mask:
+            savepath = os.path.join(os.path.dirname(args.savepath), f'{image_name}_mask.jpg')
+            logger.info(f'mask image saved at : {savepath}')
+            masked_vton_img.save(savepath)
 
         images = ootd_pipeline(
             model_type=args.model_type,
@@ -983,58 +1051,38 @@ def recognize_from_image(openpose_pipeline, parsing_pipeline, ootd_pipeline):
             image_scale=2.0,
         )
 
-        exit()
-
-        # inference
-        logger.info('Start inference...')
-        if args.benchmark:
-            logger.info('BENCHMARK mode')
-            total_time_estimation = 0
-            for i in range(args.benchmark_count):
-                start = int(round(time.time() * 1000))
-                depth_pred = predict(models, img)
-                end = int(round(time.time() * 1000))
-                estimation_time = (end - start)
-
-                # Logging
-                logger.info(f'\tailia processing estimation time {estimation_time} ms')
-                if i != 0:
-                    total_time_estimation = total_time_estimation + estimation_time
-
-            logger.info(f'\taverage time estimation {total_time_estimation / (args.benchmark_count - 1)} ms')
-        else:
-            depth_pred = predict(models, img)
-
-        res_img = (depth_pred * 65535.0).astype(np.uint16)
-
-        # plot result
-        savepath = get_savepath(args.savepath, image_path, ext='.png')
+        savepath = os.path.join(os.path.dirname(args.savepath), f'{image_name}_output.jpg')
         logger.info(f'saved at : {savepath}')
-        cv2.imwrite(savepath, res_img)
-
-        # Colorize
-        depth_colored = colorize_depth_maps(
-            depth_pred, 0, 1, cmap="Spectral",
-        ).squeeze()  # [3, H, W], value in (0, 1)
-        depth_colored = (depth_colored * 255).astype(np.uint8)
-        depth_colored_img = depth_colored.transpose(1, 2, 0)  # CHW -> HWC
-        depth_colored_img = depth_colored_img[:, :, ::-1]  # RGB -> BGR
-
-        ex = os.path.splitext(savepath)
-        savepath = "".join((ex[0] + "_colorize", ex[1]))
-        logger.info(f'saved at : {savepath}')
-        cv2.imwrite(savepath, depth_colored_img)
+        images[0].save(savepath)
 
     logger.info('Script finished successfully.')
 
 
 def main():
     # model files check and download
-    # check_and_download_models(WEIGHT_UNET_PATH, MODEL_UNET_PATH, REMOTE_PATH)
-    # check_and_download_file(WEIGHT_UNET_PB_PATH, REMOTE_PATH)
+    # check_and_download_models(WEIGHT_BODY_POSE_PATH, MODEL_BODY_POSE_PATH, REMOTE_PATH)
+    # check_and_download_models(WEIGHT_ATR_PATH, MODEL_ATR_PATH, REMOTE_PATH)
+    # check_and_download_models(WEIGHT_UPSAMPLE_ATR_PATH, MODEL_UPSAMPLE_ATR_PATH, REMOTE_PATH)
+    # check_and_download_models(WEIGHT_LIP_PATH, MODEL_LIP_PATH, REMOTE_PATH)
+    # check_and_download_models(WEIGHT_UPSAMPLE_LIP_PATH, MODEL_UPSAMPLE_LIP_PATH, REMOTE_PATH)
+    # check_and_download_models(WEIGHT_UNET_GARM_HD_PATH, MODEL_UNET_GARM_HD_PATH, REMOTE_PATH)
+    # check_and_download_file(WEIGHT_UNET_GARM_HD_PB_PATH, REMOTE_PATH)
+    # check_and_download_models(WEIGHT_UNET_GARM_DC_PATH, MODEL_UNET_GARM_DC_PATH, REMOTE_PATH)
+    # check_and_download_file(WEIGHT_UNET_GARM_DC_PB_PATH, REMOTE_PATH)
+    # check_and_download_models(WEIGHT_UNET_VTON_HD_PATH, MODEL_UNET_VTON_HD_PATH, REMOTE_PATH)
+    # check_and_download_file(WEIGHT_UNET_VTON_HD_PB_PATH, REMOTE_PATH)
+    # check_and_download_models(WEIGHT_UNET_VTON_DC_PATH, MODEL_UNET_VTON_DC_PATH, REMOTE_PATH)
+    # check_and_download_file(WEIGHT_UNET_VTON_DC_PB_PATH, REMOTE_PATH)
+    # check_and_download_models(WEIGHT_INTERPOLATION_PATH, MODEL_INTERPOLATION_PATH, REMOTE_PATH)
+    # check_and_download_models(WEIGHT_TEXT_ENCODER_PATH, MODEL_TEXT_ENCODER_PATH, REMOTE_PATH)
+    # check_and_download_models(WEIGHT_VAE_ENCODER_PATH, MODEL_VAE_ENCODER_PATH, REMOTE_PATH)
+    # check_and_download_models(WEIGHT_VAE_DECODER_PATH, MODEL_VAE_DECODER_PATH, REMOTE_PATH)
 
     env_id = args.env_id
     seed = args.seed
+
+    assert len(args.input) == len(args.cloth), \
+        f'Arguments --input and --cloth must have the same length, but found {len(args.input)} and {len(args.cloth)} images respectively.'
 
     # initialize
     if not args.onnx:
@@ -1097,10 +1145,10 @@ def main():
     vae_scale_factor = 8
     image_processor = VaeImageProcessor(vae_scale_factor=vae_scale_factor)
 
-    openpose_models = OpenPoseModels(body_pose)
+    openpose_models = OpenPoseModels(body_pose, args.onnx)
     openpose_pipeline = OpenPose(openpose_models, args.onnx)
 
-    parsing_models = ParsingModels(atr, upsample_atr, lip, upsample_lip)
+    parsing_models = ParsingModels(atr, upsample_atr, lip, upsample_lip, args.onnx)
     parsing_pipeline = Parsing(parsing_models, args.onnx)
 
     ootdiffusion_models = OOTDiffusionModels(text_encoder,
@@ -1113,7 +1161,8 @@ def main():
                                              scheduler,
                                              auto_processor,
                                              image_encoder,
-                                             image_processor)
+                                             image_processor,
+                                             args.onnx)
     ootd_pipeline = OOTDiffusion(ootdiffusion_models, vae_scale_factor, args.onnx)
 
     if seed is None:
@@ -1124,4 +1173,5 @@ def main():
 
 
 if __name__ == '__main__':
+    args.cloth = generate_list_input_cloths(args.cloth)
     main()

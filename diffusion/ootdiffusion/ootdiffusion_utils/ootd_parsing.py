@@ -154,7 +154,7 @@ class Parsing:
 
             if self.is_onnx:
                 output_lip = self.models.lip.run(None, {self.models.lip.get_inputs()[0].name: image})[0]
-                upsample_output_lip = self.models.upsample_lip.run(None, {self.models.upsample_atr.get_inputs()[0].name: output_lip})[0]
+                upsample_output_lip = self.models.upsample_lip.run(None, {self.models.upsample_lip.get_inputs()[0].name: output_lip})[0]
             else:
                 output_lip = self.models.lip.run(image)[0]
                 upsample_output_lip = self.models.upsample_lip.run(output_lip)[0]
