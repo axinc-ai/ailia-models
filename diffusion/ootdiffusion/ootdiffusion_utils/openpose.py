@@ -36,9 +36,11 @@ class Body(object):
             #     data = data.cuda()
             # data = data.permute([2, 0, 1]).unsqueeze(0).float()
             if self.is_onnx:
-                Mconv7_stage6_L1, Mconv7_stage6_L2 = self.model.run(None, {self.model.get_inputs()[0].name: data})
+                Mconv7_stage6_L1, Mconv7_stage6_L2 = self.model.body_pose.run(None, {self.model.body_pose.get_inputs()[0].name: data})
             else:
-                Mconv7_stage6_L1, Mconv7_stage6_L2 = self.model.run(data)
+                Mconv7_stage6_L1, Mconv7_stage6_L2 = self.model.body_pose.run(data)
+
+            self.model.release_body_pose()
 
             # Mconv7_stage6_L1 = Mconv7_stage6_L1.cpu().numpy()
             # Mconv7_stage6_L2 = Mconv7_stage6_L2.cpu().numpy()

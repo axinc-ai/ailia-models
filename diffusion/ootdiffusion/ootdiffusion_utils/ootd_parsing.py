@@ -91,10 +91,7 @@ class SimpleFolderDataset:
 
 class Parsing:
     def __init__(self, models, is_onnx):
-        self.atr_model = models['atr']
-        self.upsample_atr_model = models['upsample_atr']
-        self.lip_model = models['lip']
-        self.upsample_lip_model = models['upsample_lip']
+        self.models = models
         self.is_onnx = is_onnx
 
     def __call__(self, input_image):
@@ -113,11 +110,13 @@ class Parsing:
             h = meta['height']#.numpy()[0]
 
             if self.is_onnx:
-                output = self.atr_model.run(None, {self.atr_model.get_inputs()[0].name: image})[0]
-                upsample_output = self.upsample_atr_model.run(None, {self.upsample_atr_model.get_inputs()[0].name: output})[0]
+                output = self.models.atr.run(None, {self.models.atr.get_inputs()[0].name: image})[0]
+                upsample_output = self.models.upsample_atr.run(None, {self.models.upsample_atr.get_inputs()[0].name: output})[0]
             else:
-                output = self.atr_model.run(image)[0]
-                upsample_output = self.upsample_atr_model.run(output)[0]
+                output = self.models.atr.run(image)[0]
+                upsample_output = self.models.upsample_atr.run(output)[0]
+
+            self.models.release_atr()
 
             upsample_output = upsample_output.squeeze()
             # upsample_output = upsample_output.permute(1, 2, 0)  # CHW -> HWC
@@ -154,11 +153,13 @@ class Parsing:
             h = meta['height']#.numpy()[0]
 
             if self.is_onnx:
-                output_lip = self.lip_model.run(None, {self.lip_model.get_inputs()[0].name: image})[0]
-                upsample_output_lip = self.upsample_lip_model.run(None, {self.upsample_atr_model.get_inputs()[0].name: output_lip})[0]
+                output_lip = self.models.lip.run(None, {self.models.lip.get_inputs()[0].name: image})[0]
+                upsample_output_lip = self.models.upsample_lip.run(None, {self.models.upsample_atr.get_inputs()[0].name: output_lip})[0]
             else:
-                output_lip = self.lip_model.run(image)[0]
-                upsample_output_lip = self.upsample_lip_model.run(output_lip)[0]
+                output_lip = self.models.lip.run(image)[0]
+                upsample_output_lip = self.models.upsample_lip.run(output_lip)[0]
+
+            self.models.release_lip()
 
             upsample_output_lip = upsample_output_lip.squeeze()
             # upsample_output_lip = upsample_output_lip.permute(1, 2, 0)  # CHW -> HWC

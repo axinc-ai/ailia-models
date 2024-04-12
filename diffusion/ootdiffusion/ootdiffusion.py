@@ -3,16 +3,19 @@ import os
 import time
 import inspect
 from logging import getLogger
-from typing import Callable, List, Optional, Union
+from typing import Callable, List, Dict, Optional, Union
+from dataclasses import dataclass
 
 import numpy as np
 import cv2
 from PIL import Image
+from tqdm import tqdm
 from transformers import AutoProcessor, CLIPVisionModelWithProjection, CLIPTokenizer
 from diffusers import UniPCMultistepScheduler
 from diffusers.image_processor import PipelineImageInput, VaeImageProcessor
 
 import ailia
+import onnxruntime
 
 # import original modules
 sys.path.append('../../util')
@@ -119,12 +122,100 @@ args = update_parser(parser)
 # Secondary Functions
 # ======================
 
+@dataclass
+class OpenPoseModels:
+    body_pose: ailia.Net | onnxruntime.InferenceSession | None
+
+    def release_body_pose(self):
+        self.body_pose.__del__()
+        self.body_pose = None
+
+@dataclass
+class ParsingModels:
+    atr: ailia.Net | onnxruntime.InferenceSession | None
+    upsample_atr: ailia.Net | onnxruntime.InferenceSession | None
+    lip: ailia.Net | onnxruntime.InferenceSession | None
+    upsample_lip: ailia.Net | onnxruntime.InferenceSession | None
+
+    def release_atr(self):
+        # del self.atr
+        self.atr.__del__()
+        self.atr = None
+
+        self.upsample_atr.__del__()
+        self.upsample_atr = None
+
+    def release_lip(self):
+        self.lip.__del__()
+        self.lip = None
+
+        self.upsample_lip.__del__()
+        self.upsample_lip = None
+
+@dataclass
+class OOTDiffusionModels:
+    # ailia/ort models
+    text_encoder: ailia.Net | onnxruntime.InferenceSession | None
+    vae_encoder: ailia.Net | onnxruntime.InferenceSession | None
+    vae_decoder: ailia.Net | onnxruntime.InferenceSession | None
+    unet_garm: ailia.Net | onnxruntime.InferenceSession | None
+    unet_vton: ailia.Net | onnxruntime.InferenceSession | None
+    interpolation: ailia.Net | onnxruntime.InferenceSession | None
+
+    # transformers/diffusers models
+    tokenizer: CLIPTokenizer | None
+    scheduler: UniPCMultistepScheduler | None
+    auto_processor: AutoProcessor | None
+    image_encoder: CLIPVisionModelWithProjection | None
+    image_processor: VaeImageProcessor | None
+
+    def release_text_encoder(self):
+        self.text_encoder.__del__()
+        self.text_encoder = None
+
+    def release_vae_encoder(self):
+        self.vae_encoder.__del__()
+        self.vae_encoder = None
+
+    def release_vae_decoder(self):
+        self.vae_decoder.__del__()
+        self.vae_decoder = None
+
+    def release_unet_garm(self):
+        self.unet_garm.__del__()
+        self.unet_garm = None
+
+    def release_unet_vton(self):
+        self.unet_vton.__del__()
+        self.unet_vton = None
+
+    def release_interpolation(self):
+        self.interpolation.__del__()
+        self.interpolation = None
+
+    def release_tokenizer(self):
+        del self.tokenizer
+        self.tokenizer = None
+
+    def release_scheduler(self):
+        del self.scheduler
+        self.scheduler = None
+
+    def release_auto_processor(self):
+        del self.auto_processor
+        self.auto_processor = None
+
+    def release_image_encoder(self):
+        del self.image_encoder
+        self.image_encoder = None
+
+    def release_image_processor(self):
+        del self.image_processor
+        self.image_processor = None
+
 class OOTDiffusion:
-    def __init__(self, models, is_onnx):
-        self.vae_encoder = models['vae_encoder']
-        self.vae_decoder = models['vae_decoder']
-        self.unet_garm = models['unet_garm']
-        self.unet_vton = models['unet_vton']
+    def __init__(self, models, vae_scale_factor, is_onnx):
+        self.models = models
 
         # self.pipe = OotdPipeline.from_pretrained(
         #     MODEL_PATH,
@@ -139,23 +230,12 @@ class OOTDiffusion:
         #     # requires_safety_checker=False,
         # ).to(self.gpu_id)
 
-        self.scheduler = models['scheduler']
-
-        self.auto_processor = models['auto_processor']
-        self.image_encoder = models['image_encoder']
-
-        self.tokenizer = models['tokenizer']
-        self.text_encoder = models['text_encoder']
-
-        self.vae_scale_factor = 8
-        self.image_processor = VaeImageProcessor(vae_scale_factor=self.vae_scale_factor)
-
-        self.interpolation = models['interpolation']
-
+        self.vae_scale_factor = vae_scale_factor
+        self.vae_config_scaling_factor = 0.18215
         self.is_onnx = is_onnx
 
     def tokenize_captions(self, captions, max_length):
-        inputs = self.tokenizer(
+        inputs = self.models.tokenizer(
             captions, max_length=max_length, padding="max_length", truncation=True, return_tensors="np"
         )
         return inputs.input_ids.astype(np.int32)
@@ -239,31 +319,31 @@ class OOTDiffusion:
 
         if prompt_embeds is None:  # Skipped
             # get prompt text embeddings
-            text_inputs = self.tokenizer(
+            text_inputs = self.models.tokenizer(
                 prompt,
                 padding="max_length",
-                max_length=self.tokenizer.model_max_length,
+                max_length=self.models.tokenizer.model_max_length,
                 truncation=True,
                 return_tensors="np",
             )
             text_input_ids = text_inputs.input_ids
-            untruncated_ids = self.tokenizer(prompt, padding="longest", return_tensors="np").input_ids
+            untruncated_ids = self.models.tokenizer(prompt, padding="longest", return_tensors="np").input_ids
 
             if untruncated_ids.shape[-1] >= text_input_ids.shape[-1] and not np.array_equal(text_input_ids, untruncated_ids):
-                removed_text = self.tokenizer.batch_decode(
-                    untruncated_ids[:, self.tokenizer.model_max_length - 1 : -1]
+                removed_text = self.models.tokenizer.batch_decode(
+                    untruncated_ids[:, self.models.tokenizer.model_max_length - 1 : -1]
                 )
                 logger.warning(
                     f"The following part of your input was truncated because CLIP can only handle sequences up to \
-                    {self.tokenizer.model_max_length} tokens: {removed_text}"
+                    {self.models.tokenizer.model_max_length} tokens: {removed_text}"
                 )
 
-            if hasattr(self.text_encoder.config, "use_attention_mask") and self.text_encoder.config.use_attention_mask:
+            if hasattr(self.models.text_encoder.config, "use_attention_mask") and self.models.text_encoder.config.use_attention_mask:
                 attention_mask = text_inputs.attention_mask
             else:
                 attention_mask = None
 
-            prompt_embeds = self.text_encoder(input_ids=text_input_ids.astype(np.int32), attention_mask=attention_mask)[0]
+            prompt_embeds = self.models.text_encoder(input_ids=text_input_ids.astype(np.int32), attention_mask=attention_mask)[0]
 
         prompt_embeds = np.repeat(prompt_embeds, num_images_per_prompt, axis=0)
 
@@ -289,7 +369,7 @@ class OOTDiffusion:
                 uncond_tokens = negative_prompt
 
             max_length = prompt_embeds.shape[1]
-            uncond_input = self.tokenizer(
+            uncond_input = self.models.tokenizer(
                 uncond_tokens,
                 padding="max_length",
                 max_length=max_length,
@@ -328,16 +408,16 @@ class OOTDiffusion:
             if isinstance(generator, list):  # Skipped
                 # image_latents = [self.vae.encode(image[i : i + 1]).latent_dist.mode() for i in range(batch_size)]
                 if self.is_onnx:
-                    image_latents = [self.vae_encoder.run(None, {self.vae_encoder.get_inputs()[0].name: image[i : i + 1]})[0] for i in range(batch_size)]
+                    image_latents = [self.models.vae_encoder.run(None, {self.models.vae_encoder.get_inputs()[0].name: image[i : i + 1]})[0] for i in range(batch_size)]
                 else:
-                    image_latents = [self.vae_encoder.run(image[i : i + 1])[0] for i in range(batch_size)]
+                    image_latents = [self.models.vae_encoder.run(image[i : i + 1])[0] for i in range(batch_size)]
                 image_latents = np.concatenate(image_latents, axis=0)
             else:
                 # image_latents = self.vae.encode(image).latent_dist.mode()
                 if self.is_onnx:
-                    image_latents = self.vae_encoder.run(None, {self.vae_encoder.get_inputs()[0].name: image})[0]
+                    image_latents = self.models.vae_encoder.run(None, {self.models.vae_encoder.get_inputs()[0].name: image})[0]
                 else:
-                    image_latents = self.vae_encoder.run(image)[0]
+                    image_latents = self.models.vae_encoder.run(image)[0]
 
         if batch_size > image_latents.shape[0] and batch_size % image_latents.shape[0] == 0:
             additional_image_per_prompt = batch_size // image_latents.shape[0]
@@ -377,11 +457,11 @@ class OOTDiffusion:
                 # image_latents = [self.vae.encode(image[i : i + 1]).latent_dist.mode() for i in range(batch_size)]
                 # image_ori_latents = [self.vae.encode(image_ori[i : i + 1]).latent_dist.mode() for i in range(batch_size)]
                 if self.is_onnx:
-                    image_latents = [self.vae_encoder.run(None, {self.vae_encoder.get_inputs()[0].name: image[i : i + 1]})[0] for i in range(batch_size)]
-                    image_ori_latents = [self.vae_encoder.run(None, {self.vae_encoder.get_inputs()[0].name: image_ori[i : i + 1]})[0] for i in range(batch_size)]
+                    image_latents = [self.models.vae_encoder.run(None, {self.models.vae_encoder.get_inputs()[0].name: image[i : i + 1]})[0] for i in range(batch_size)]
+                    image_ori_latents = [self.models.vae_encoder.run(None, {self.models.vae_encoder.get_inputs()[0].name: image_ori[i : i + 1]})[0] for i in range(batch_size)]
                 else:
-                    image_latents = [self.vae_encoder.run(image[i : i + 1])[0] for i in range(batch_size)]
-                    image_ori_latents = [self.vae_encoder.run(image_ori[i : i + 1])[0] for i in range(batch_size)]
+                    image_latents = [self.models.vae_encoder.run(image[i : i + 1])[0] for i in range(batch_size)]
+                    image_ori_latents = [self.models.vae_encoder.run(image_ori[i : i + 1])[0] for i in range(batch_size)]
 
                 image_latents = np.concatenate(image_latents, axis=0)
                 image_ori_latents = np.concatenate(image_ori_latents, axis=0)
@@ -389,17 +469,17 @@ class OOTDiffusion:
                 # image_latents = self.vae.encode(image).latent_dist.mode()
                 # image_ori_latents = self.vae.encode(image_ori).latent_dist.mode()
                 if self.is_onnx:
-                    image_latents = self.vae_encoder.run(None, {self.vae_encoder.get_inputs()[0].name: image})[0]
-                    image_ori_latents = self.vae_encoder.run(None, {self.vae_encoder.get_inputs()[0].name: image_ori})[0]
+                    image_latents = self.models.vae_encoder.run(None, {self.models.vae_encoder.get_inputs()[0].name: image})[0]
+                    image_ori_latents = self.models.vae_encoder.run(None, {self.models.vae_encoder.get_inputs()[0].name: image_ori})[0]
                 else:
-                    image_latents = self.vae_encoder.run(image)[0]
-                    image_ori_latents = self.vae_encoder.run(image_ori)[0]
+                    image_latents = self.models.vae_encoder.run(image)[0]
+                    image_ori_latents = self.models.vae_encoder.run(image_ori)[0]
 
         if self.is_onnx:
-            mask = self.interpolation.run(None, {self.interpolation.get_inputs()[0].name: mask.astype(np.float32),
-                                                 self.interpolation.get_inputs()[1].name: np.array(image_latents.shape, dtype=np.int32)})[0]
+            mask = self.models.interpolation.run(None, {self.models.interpolation.get_inputs()[0].name: mask.astype(np.float32),
+                                                        self.models.interpolation.get_inputs()[1].name: np.array(image_latents.shape, dtype=np.int32)})[0]
         else:
-            mask = self.interpolation.run([mask.astype(np.float32), np.array(image_latents.shape, dtype=np.int32)])[0]
+            mask = self.models.interpolation.run([mask.astype(np.float32), np.array(image_latents.shape, dtype=np.int32)])[0]
 
         if batch_size > image_latents.shape[0] and batch_size % image_latents.shape[0] == 0:
             additional_image_per_prompt = batch_size // image_latents.shape[0]
@@ -434,7 +514,7 @@ class OOTDiffusion:
             latents = np.random.rand(*shape).astype(dtype)
 
         # scale the initial noise by the standard deviation required by the scheduler
-        latents = latents * self.scheduler.init_noise_sigma
+        latents = latents * self.models.scheduler.init_noise_sigma
         return latents
 
     def _prepare_extra_step_kwargs(self, generator, eta):
@@ -443,13 +523,13 @@ class OOTDiffusion:
         # eta corresponds to η in DDIM paper: https://arxiv.org/abs/2010.02502
         # and should be between [0, 1]
 
-        accepts_eta = "eta" in set(inspect.signature(self.scheduler.step).parameters.keys())
+        accepts_eta = "eta" in set(inspect.signature(self.models.scheduler.step).parameters.keys())
         extra_step_kwargs = {}
         if accepts_eta:
             extra_step_kwargs["eta"] = eta
 
         # check if the scheduler accepts generator
-        accepts_generator = "generator" in set(inspect.signature(self.scheduler.step).parameters.keys())
+        accepts_generator = "generator" in set(inspect.signature(self.models.scheduler.step).parameters.keys())
         if accepts_generator:
             extra_step_kwargs["generator"] = generator
         return extra_step_kwargs
@@ -475,8 +555,9 @@ class OOTDiffusion:
         negative_prompt_embeds: Optional[np.ndarray] = None, # default
         output_type: Optional[str] = "pil", # default
         return_dict: bool = True, # default
-        callback: Optional[Callable[[int, int, np.ndarray], None]] = None, # default
-        callback_steps: int = 1, # default
+        callback_on_step_end: Optional[Callable[[int, int, Dict], None]] = None,
+        callback_on_step_end_tensor_inputs: List[str] = ["latents"],
+        **kwargs
     ):
         r"""
         Function invoked when calling the pipeline for generation.
@@ -538,8 +619,8 @@ class OOTDiffusion:
             list of `bool`s denoting whether the corresponding generated image likely represents "not-safe-for-work"
             (nsfw) content, according to the `safety_checker`.
         """
-        callback = None
-        callback_steps = None
+        callback = kwargs.pop("callback", None)
+        callback_steps = kwargs.pop("callback", None)
 
         # 0. Check inputs
         print("Step 0")
@@ -583,6 +664,8 @@ class OOTDiffusion:
             prompt_embeds=prompt_embeds,
             negative_prompt_embeds=negative_prompt_embeds,
         )
+        self.models.release_text_encoder()
+        self.models.release_tokenizer()
 
         # get the initial random noise unless the user supplied it
         # latents_dtype = prompt_embeds.dtype
@@ -594,9 +677,9 @@ class OOTDiffusion:
 
         # 3. Preprocess image
         print("Step 3")
-        image_garm = self.image_processor.preprocess(image_garm)
-        image_vton = self.image_processor.preprocess(image_vton)
-        image_ori = self.image_processor.preprocess(image_ori)
+        image_garm = self.models.image_processor.preprocess(image_garm)
+        image_vton = self.models.image_processor.preprocess(image_vton)
+        image_ori = self.models.image_processor.preprocess(image_ori)
         mask = np.array(mask)
         mask[mask < 127] = 0
         mask[mask >= 127] = 255
@@ -607,8 +690,8 @@ class OOTDiffusion:
 
         # 4. set timesteps
         print("Step 4")
-        self.scheduler.set_timesteps(num_inference_steps)
-        timesteps = self.scheduler.timesteps
+        self.models.scheduler.set_timesteps(num_inference_steps)
+        timesteps = self.models.scheduler.timesteps
 
         # latents = latents * np.float64(self.scheduler.init_noise_sigma)
 
@@ -633,6 +716,9 @@ class OOTDiffusion:
             do_classifier_free_guidance,
             generator,
         )
+
+        self.models.release_vae_encoder()
+        self.models.release_interpolation()
 
         height, width = vton_latents.shape[-2:]
         height = height * self.vae_scale_factor
@@ -664,7 +750,7 @@ class OOTDiffusion:
 
         # 9. Denoising loop
         print("Step 9")
-        num_warmup_steps = len(timesteps) - num_inference_steps * self.scheduler.order
+        num_warmup_steps = len(timesteps) - num_inference_steps * self.models.scheduler.order
         self._num_timesteps = len(timesteps)
 
         # _, spatial_attn_outputs = self.unet_garm(
@@ -673,82 +759,126 @@ class OOTDiffusion:
         #     encoder_hidden_states=prompt_embeds,
         #     return_dict=False,
         # )
+        if self.is_onnx:
+            spatial_attn_outputs = self.models.unet_garm.run(None, {self.models.unet_garm.get_inputs()[0].name: garm_latents,
+                                                                    self.models.unet_garm.get_inputs()[1].name: np.array([0], dtype=np.int32),
+                                                                    self.models.unet_garm.get_inputs()[2].name: prompt_embeds})[1:]
+        else:
+            spatial_attn_outputs = self.models.unet_garm.run([garm_latents, np.array([0], dtype=np.int32), prompt_embeds])[1:]
 
-        print(garm_latents.shape, garm_latents.dtype)
-        print(prompt_embeds.shape, prompt_embeds.dtype)
+        self.models.release_unet_garm()
 
-        ########################################
-        # If uncomment below, the code freezes
-        ########################################
-        # if self.is_onnx:
-        #     _, spatial_attn_outputs = self.unet_garm.run(None, {self.unet_garm.get_inputs()[0].name: garm_latents,
-        #                                                         self.unet_garm.get_inputs()[1].name: np.array([0], dtype=np.float16),
-        #                                                         self.unet_garm.get_inputs()[2].name: prompt_embeds})
-        # else:
-        #     _, spatial_attn_outputs = self.unet_garm.run([garm_latents, np.array([0], dtype=np.float16), prompt_embeds])
-
-        # print(len(spatial_attn_outputs))
-        # for elem in spatial_attn_outputs:
-        #     print(elem.shape)
-        exit()
-
-        for i, t in enumerate(self.progress_bar(self.scheduler.timesteps)):
+        for i, t in enumerate(tqdm(timesteps)):
             # expand the latents if we are doing classifier free guidance
             latent_model_input = np.concatenate([latents] * 2) if do_classifier_free_guidance else latents
-            latent_model_input = self.scheduler.scale_model_input(torch.from_numpy(latent_model_input), t)
-            latent_model_input = latent_model_input.cpu().numpy()
+            # concat latents, image_latents in the channel dimension
+            # This code is useless so remove it in order to avoid PyTorch.
+            # Cf. https://github.com/huggingface/diffusers/blob/b69fd990ad8026f21893499ab396d969b62bb8cc/src/diffusers/schedulers/scheduling_unipc_multistep.py#L833
+            # scaled_latent_model_input = self.models.scheduler.scale_model_input(torch.from_numpy(latent_model_input), t).cpu().numpy()
+            latent_vton_model_input = np.concatenate([latent_model_input, vton_latents], axis=1)
+            # latent_vton_model_input = scaled_latent_model_input + vton_latents
+
+            spatial_attn_inputs = spatial_attn_outputs.copy()
 
             # predict the noise residual
-            timestep = np.array([t], dtype=timestep_dtype)
-            noise_pred = self.unet(sample=latent_model_input, timestep=timestep, encoder_hidden_states=prompt_embeds)
-            noise_pred = noise_pred[0]
+            if self.is_onnx:
+                onnx_inputs = {self.models.unet_vton.get_inputs()[i+1].name: spatial_attn_inputs[i] for i in range(len(spatial_attn_inputs))}
+                onnx_inputs[self.models.unet_vton.get_inputs()[0].name: latent_vton_model_input]
+                onnx_inputs[self.models.unet_vton.get_inputs()[17].name: np.array([t], dtype=np.int32)]
+                onnx_inputs[self.models.unet_vton.get_inputs()[18].name: prompt_embeds]
+                noise_pred = self.models.unet_vton.run(None, onnx_inputs)[0]
+            else:
+                noise_pred = self.models.unet_vton.run([latent_vton_model_input] + spatial_attn_inputs + [np.array([t], dtype=np.int32), prompt_embeds])[0]
+
+            print(noise_pred.shape)
+            exit()
+
+            # Hack:
+            # For karras style schedulers the model does classifer free guidance using the
+            # predicted_original_sample instead of the noise_pred. So we need to compute the
+            # predicted_original_sample here if we are using a karras style scheduler.
+            if scheduler_is_in_sigma_space:
+                # step_index = (self.models.scheduler.timesteps == t).nonzero()[0].item()
+                step_index = np.argwhere(self.models.scheduler.timesteps == t)[0]
+                sigma = self.scheduler.sigmas[step_index]
+                noise_pred = latent_model_input - sigma * noise_pred
 
             # perform guidance
             if do_classifier_free_guidance:
-                noise_pred_uncond, noise_pred_text = np.split(noise_pred, 2)
-                noise_pred = noise_pred_uncond + guidance_scale * (noise_pred_text - noise_pred_uncond)
+                noise_pred_text_image, noise_pred_text = np.split(noise_pred, 2)
+                noise_pred = noise_pred_text + image_guidance_scale * (noise_pred_text_image - noise_pred_text)
+
+            # Hack:
+            # For karras style schedulers the model does classifer free guidance using the
+            # predicted_original_sample instead of the noise_pred. But the scheduler.step function
+            # expects the noise_pred and computes the predicted_original_sample internally. So we
+            # need to overwrite the noise_pred here such that the value of the computed
+            # predicted_original_sample is correct.
+            if scheduler_is_in_sigma_space:
+                noise_pred = (noise_pred - latents) / (-sigma)
 
             # compute the previous noisy sample x_t -> x_t-1
-            scheduler_output = self.scheduler.step(
+            scheduler_output = self.models.scheduler.step(
                 torch.from_numpy(noise_pred), t, torch.from_numpy(latents), **extra_step_kwargs
             )
             latents = scheduler_output.prev_sample.numpy()
 
-            # call the callback, if provided
-            if callback is not None and i % callback_steps == 0:
-                step_idx = i // getattr(self.scheduler, "order", 1)
-                callback(step_idx, t, latents)
+            init_latents_proper = image_ori_latents * self.vae_config_scaling_factor
 
-        latents = 1 / 0.18215 * latents
-        # image = self.vae_decoder(latent_sample=latents)[0]
-        # it seems likes there is a strange result for using half-precision vae decoder if batchsize>1
-        image = np.concatenate(
-            [self.vae_decoder(latent_sample=latents[i : i + 1])[0] for i in range(latents.shape[0])]
-        )
-
-        image = np.clip(image / 2 + 0.5, 0, 1)
-        image = image.transpose((0, 2, 3, 1))
-
-        if self.safety_checker is not None:
-            safety_checker_input = self.feature_extractor(
-                self.numpy_to_pil(image), return_tensors="np"
-            ).pixel_values.astype(image.dtype)
-
-            images, has_nsfw_concept = [], []
-            for i in range(image.shape[0]):
-                image_i, has_nsfw_concept_i = self.safety_checker(
-                    clip_input=safety_checker_input[i : i + 1], images=image[i : i + 1]
+            # repainting
+            if i < len(timesteps) - 1:
+                noise_timestep = timesteps[i + 1]
+                init_latents_proper = self.models.scheduler.add_noise(
+                    init_latents_proper, noise, torch.tensor([noise_timestep])
                 )
-                images.append(image_i)
-                has_nsfw_concept.append(has_nsfw_concept_i[0])
-            image = np.concatenate(images)
+
+            latents = (1 - mask_latents) * init_latents_proper + mask_latents * latents
+
+            if callback_on_step_end is not None:
+                callback_kwargs = {}
+                for k in callback_on_step_end_tensor_inputs:
+                    callback_kwargs[k] = locals()[k]
+                callback_outputs = callback_on_step_end(self, i, t, callback_kwargs)
+
+                latents = callback_outputs.pop("latents", latents)
+                prompt_embeds = callback_outputs.pop("prompt_embeds", prompt_embeds)
+                negative_prompt_embeds = callback_outputs.pop("negative_prompt_embeds", negative_prompt_embeds)
+                vton_latents = callback_outputs.pop("vton_latents", vton_latents)
+
+            # call the callback, if provided
+            if i == len(timesteps) - 1 or ((i + 1) > num_warmup_steps and (i + 1) % self.models.scheduler.order == 0):
+                if callback is not None and i % callback_steps == 0:
+                    step_idx = i // getattr(self.models.scheduler, "order", 1)
+                    callback(step_idx, t, latents)
+
+        self.models.release_unet_vton()
+        self.models.release_scheduler()
+
+        # latents = 1 / 0.18215 * latents
+        # # image = self.vae_decoder(latent_sample=latents)[0]
+        # # it seems likes there is a strange result for using half-precision vae decoder if batchsize>1
+        # image = np.concatenate(
+        #     [self.vae_decoder(latent_sample=latents[i : i + 1])[0] for i in range(latents.shape[0])]
+        # )
+
+        # image = np.clip(image / 2 + 0.5, 0, 1)
+        # image = image.transpose((0, 2, 3, 1))
+
+        if not output_type == "latent":
+            if self.is_onnx:
+                image = self.models.vae_decoder.run(None, {self.models.vae_decoder.get_inputs()[0].name: latents / self.vae_config_scaling_factor})[0]
+            else:
+                image = self.models.vae_decoder.run(latents / self.vae_config_scaling_factor)[0]
         else:
-            has_nsfw_concept = None
+            image = latents
 
-        if output_type == "pil":
-            image = self.numpy_to_pil(image)
+        self.models.release_vae_decoder()
 
-        return (image, has_nsfw_concept)
+        do_denormalize = [True] * image.shape[0]
+        image = self.models.image_processor.postprocess(image, output_type=output_type, do_denormalize=do_denormalize)
+        self.models.release_image_processor()
+
+        return image
 
     def __call__(self,
                 model_type='hd',
@@ -759,15 +889,16 @@ class OOTDiffusion:
                 image_ori=None,
                 num_samples=1,
                 num_steps=20,
-                image_scale=1.0,
-                seed=-1,
+                image_scale=1.0
     ):
         #prompt_image = self.auto_processor(images=image_garm, return_tensors="pt").to(self.gpu_id)
-        prompt_image = self.auto_processor(images=image_garm, return_tensors="pt")
+        prompt_image = self.models.auto_processor(images=image_garm, return_tensors="pt")
+        self.models.release_auto_processor()
 
         # print(image_garm.size) # (768, 1024)
 
-        prompt_image = self.image_encoder(prompt_image.data['pixel_values']).image_embeds.detach().numpy()
+        prompt_image = self.models.image_encoder(prompt_image.data['pixel_values']).image_embeds.detach().numpy()
+        self.models.release_image_encoder()
         # if self.is_onnx:
         #     prompt_image = self.image_encoder.run(None, {self.image_encoder.get_inputs()[0].name: [],
         #                                                  self.image_encoder.get_inputs()[1].name: prompt_image.data['pixel_values'],
@@ -783,16 +914,16 @@ class OOTDiffusion:
         if model_type == 'hd':
             # prompt_embeds = self.text_encoder(self.tokenize_captions([""], 2).to(self.gpu_id))[0]
             if self.is_onnx:
-                prompt_embeds = self.text_encoder.run(None, {self.text_encoder.get_inputs()[0].name: self.tokenize_captions([""], 2)})[0]
+                prompt_embeds = self.models.text_encoder.run(None, {self.models.text_encoder.get_inputs()[0].name: self.tokenize_captions([""], 2)})[0]
             else:
-                prompt_embeds = self.text_encoder.run(self.tokenize_captions([""], 2))[0]
+                prompt_embeds = self.models.text_encoder.run(self.tokenize_captions([""], 2))[0]
             prompt_embeds[:, 1:] = prompt_image[:]
         elif model_type == 'dc':
             # prompt_embeds = self.text_encoder(self.tokenize_captions([category], 3).to(self.gpu_id))[0]
             if self.is_onnx:
-                prompt_embeds = self.text_encoder.run(None, {self.text_encoder.get_inputs()[0].name: self.tokenize_captions([category], 3)})[0]
+                prompt_embeds = self.models.text_encoder.run(None, {self.models.text_encoder.get_inputs()[0].name: self.tokenize_captions([category], 3)})[0]
             else:
-                prompt_embeds = self.text_encoder.run(self.tokenize_captions([category], 3))[0]
+                prompt_embeds = self.models.text_encoder.run(self.tokenize_captions([category], 3))[0]
             # prompt_embeds = torch.cat([prompt_embeds, prompt_image], dim=1)
             prompt_embeds = np.concatenate([prompt_embeds, prompt_image], axis=1)
         else:
@@ -805,9 +936,8 @@ class OOTDiffusion:
                     image_ori=image_ori,
                     num_inference_steps=num_steps,
                     image_guidance_scale=image_scale,
-                    num_images_per_prompt=num_samples,
-                    #generator=generator,
-        )#.images
+                    num_images_per_prompt=num_samples
+        )
 
         return images
 
@@ -820,11 +950,7 @@ def predict(models, img):
     pass
 
 
-def recognize_from_image(models):
-    openpose_model = OpenPose(models['body_pose'], models['is_onnx'])
-    parsing_model = Parsing(models, models['is_onnx'])
-    ootd_model = OOTDiffusion(models, models['is_onnx'])
-
+def recognize_from_image(openpose_pipeline, parsing_pipeline, ootd_pipeline):
     # input image loop
     for image_path in args.input:
         logger.info(image_path)
@@ -832,15 +958,9 @@ def recognize_from_image(models):
         # prepare input data
         cloth_img = Image.open(CLOTH_PATH).resize((768, 1024))
         model_img = Image.open(image_path).resize((768, 1024))
-        keypoints = openpose_model(model_img.resize((384, 512)))
-        del models['body_pose']
-        del openpose_model
-        model_parse, _ = parsing_model(model_img.resize((384, 512)))
-        del models['atr']
-        del models['upsample_atr']
-        del models['lip']
-        del models['upsample_lip']
-        del parsing_model
+        keypoints = openpose_pipeline(model_img.resize((384, 512)))
+
+        model_parse, _ = parsing_pipeline(model_img.resize((384, 512)))
 
         mask, mask_gray = get_mask_location(args.model_type, CATEGORY_DICT_UTILS[args.category], model_parse, keypoints)
         mask = mask.resize((768, 1024), Image.NEAREST)
@@ -851,7 +971,7 @@ def recognize_from_image(models):
         logger.info(f'mask saved at : {savepath}')
         masked_vton_img.save(savepath)
 
-        images = ootd_model(
+        images = ootd_pipeline(
             model_type=args.model_type,
             category=CATEGORY_DICT[args.category],
             image_garm=cloth_img,
@@ -861,7 +981,6 @@ def recognize_from_image(models):
             num_samples=1,
             num_steps=20,
             image_scale=2.0,
-            #seed=seed,
         )
 
         exit()
@@ -919,29 +1038,31 @@ def main():
 
     # initialize
     if not args.onnx:
-        body_pose = ailia.Net(None, WEIGHT_BODY_POSE_PATH, env_id=env_id, memory_mode=None)
-        atr = ailia.Net(None, WEIGHT_ATR_PATH, env_id=env_id, memory_mode=None)
-        upsample_atr = ailia.Net(None, WEIGHT_UPSAMPLE_ATR_PATH, env_id=env_id, memory_mode=None)
-        lip = ailia.Net(None, WEIGHT_LIP_PATH, env_id=env_id, memory_mode=None)
-        upsample_lip = ailia.Net(None, WEIGHT_UPSAMPLE_LIP_PATH, env_id=env_id, memory_mode=None)
-        interpolation = ailia.Net(None, WEIGHT_INTERPOLATION_PATH, env_id=env_id, memory_mode=None)
-        text_encoder = ailia.Net(None, WEIGHT_TEXT_ENCODER_PATH, env_id=env_id, memory_mode=None)
-        vae_encoder = ailia.Net(None, WEIGHT_VAE_ENCODER_PATH, env_id=env_id, memory_mode=None)
-        vae_decoder = ailia.Net(None, WEIGHT_VAE_DECODER_PATH, env_id=env_id, memory_mode=None)
+        memory_mode = ailia.get_memory_mode(reduce_constant=True,
+                                            ignore_input_with_initializer=True,
+                                            reduce_interstage=True,
+                                            reuse_interstage=True)
+        body_pose = ailia.Net(None, WEIGHT_BODY_POSE_PATH, env_id=env_id, memory_mode=memory_mode)
+        atr = ailia.Net(None, WEIGHT_ATR_PATH, env_id=env_id, memory_mode=memory_mode)
+        upsample_atr = ailia.Net(None, WEIGHT_UPSAMPLE_ATR_PATH, env_id=env_id, memory_mode=memory_mode)
+        lip = ailia.Net(None, WEIGHT_LIP_PATH, env_id=env_id, memory_mode=memory_mode)
+        upsample_lip = ailia.Net(None, WEIGHT_UPSAMPLE_LIP_PATH, env_id=env_id, memory_mode=memory_mode)
+        interpolation = ailia.Net(None, WEIGHT_INTERPOLATION_PATH, env_id=env_id, memory_mode=memory_mode)
+        text_encoder = ailia.Net(None, WEIGHT_TEXT_ENCODER_PATH, env_id=env_id, memory_mode=memory_mode)
+        vae_encoder = ailia.Net(None, WEIGHT_VAE_ENCODER_PATH, env_id=env_id, memory_mode=memory_mode)
+        vae_decoder = ailia.Net(None, WEIGHT_VAE_DECODER_PATH, env_id=env_id, memory_mode=memory_mode)
         # image_encoder = ailia.Net(None, WEIGHT_IMAGE_ENCODER_PATH, env_id=env_id, memory_mode=None)
         if args.model_type == 'hd':
-            unet_garm = ailia.Net(None, WEIGHT_UNET_GARM_HD_PATH, env_id=env_id, memory_mode=None)
-            unet_vton = ailia.Net(None, WEIGHT_UNET_VTON_HD_PATH, env_id=env_id, memory_mode=None)
+            unet_garm = ailia.Net(None, WEIGHT_UNET_GARM_HD_PATH, env_id=env_id, memory_mode=memory_mode)
+            unet_vton = ailia.Net(None, WEIGHT_UNET_VTON_HD_PATH, env_id=env_id, memory_mode=memory_mode)
         elif args.model_type == 'dc':
-            unet_garm = ailia.Net(None, WEIGHT_UNET_GARM_DC_PATH, env_id=env_id, memory_mode=None)
-            unet_vton = ailia.Net(None, WEIGHT_UNET_VTON_DC_PATH, env_id=env_id, memory_mode=None)
+            unet_garm = ailia.Net(None, WEIGHT_UNET_GARM_DC_PATH, env_id=env_id, memory_mode=memory_mode)
+            unet_vton = ailia.Net(None, WEIGHT_UNET_VTON_DC_PATH, env_id=env_id, memory_mode=memory_mode)
         else:
             print(f'Model "{args.model_type}" is not implemented.')
             exit(-1)
     else:
-        import onnxruntime
         cuda = 0 < ailia.get_gpu_environment_id()
-        cuda = False
         providers = ['CUDAExecutionProvider', 'CPUExecutionProvider'] if cuda else ['CPUExecutionProvider']
         body_pose = onnxruntime.InferenceSession(WEIGHT_BODY_POSE_PATH, providers=providers)
         atr = onnxruntime.InferenceSession(WEIGHT_ATR_PATH, providers=providers)
@@ -973,30 +1094,33 @@ def main():
     auto_processor = AutoProcessor.from_pretrained("processor")
     image_encoder = CLIPVisionModelWithProjection.from_pretrained("processor")#.to(self.gpu_id)
 
-    models = {
-        "body_pose": body_pose,
-        "atr": atr,
-        "upsample_atr": upsample_atr,
-        "lip": lip,
-        "upsample_lip": upsample_lip,
-        "interpolation": interpolation,
-        "vae_encoder": vae_encoder,
-        "vae_decoder": vae_decoder,
-        "unet_garm": unet_garm,
-        "unet_vton": unet_vton,
-        "text_encoder": text_encoder,
-        "image_encoder": image_encoder,
-        "tokenizer": tokenizer,
-        "scheduler": scheduler,
-        "auto_processor": auto_processor,
-        "is_onnx": args.onnx
-    }
+    vae_scale_factor = 8
+    image_processor = VaeImageProcessor(vae_scale_factor=vae_scale_factor)
+
+    openpose_models = OpenPoseModels(body_pose)
+    openpose_pipeline = OpenPose(openpose_models, args.onnx)
+
+    parsing_models = ParsingModels(atr, upsample_atr, lip, upsample_lip)
+    parsing_pipeline = Parsing(parsing_models, args.onnx)
+
+    ootdiffusion_models = OOTDiffusionModels(text_encoder,
+                                             vae_encoder,
+                                             vae_decoder,
+                                             unet_garm,
+                                             unet_vton,
+                                             interpolation,
+                                             tokenizer,
+                                             scheduler,
+                                             auto_processor,
+                                             image_encoder,
+                                             image_processor)
+    ootd_pipeline = OOTDiffusion(ootdiffusion_models, vae_scale_factor, args.onnx)
 
     if seed is None:
         seed = int(time.time())
     np.random.seed(seed)
 
-    recognize_from_image(models)
+    recognize_from_image(openpose_pipeline, parsing_pipeline, ootd_pipeline)
 
 
 if __name__ == '__main__':
