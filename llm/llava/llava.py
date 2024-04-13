@@ -149,16 +149,10 @@ def forward(net, input_ids, inputs_embeds, position_ids, past_key_values):
                 "past_key_values.15.encoder.value": past_key_values[31][1],
             },
         )
-
     logits = output[0]
-    # past_key_values = output[1:]
+    past_key_values = output[1:]
 
-    print("logit--", logits)
-    print("logit--", logits.shape)
-    # print(past_key_values[0])
-    # print(past_key_values[1])
-    # print(past_key_values[2])
-    # print(past_key_values[3])
+    return logits, past_key_values
 
 
 def prepare_inputs_labels_for_multimodal(
@@ -282,161 +276,58 @@ def prepare_inputs_labels_for_multimodal(
     return new_input_embeds
 
 
+def greedy_search(net, inputs_embeds, attention_mask):
+    bos_token_id = 1
+    # eos_token_id = np.array([50118])
+
+    shape = inputs_embeds.shape[:2]
+    batch_size = shape[0]
+
+    # _prepare_model_inputs
+    input_ids = np.ones((batch_size, 1), dtype=int) * bos_token_id
+    # prepare_inputs_for_generation
+    position_ids = np.cumsum(attention_mask, axis=-1) - 1
+    position_ids[attention_mask == 0] = 1
+    past_key_values = [
+        [
+            np.zeros((1, 32, 0, 128), dtype=np.float16),
+        ]
+        * 2
+    ] * 32
+
+    # position_ids = np.load("position_ids.npy")
+    # for i in range(32):
+    #     for j in range(2):
+    #         path = f"past_key_values_{i}_{j}.npy"
+    #         past_key_values[i][j] = np.load(path)
+
+    # # keep track of which sequences are already finished
+    # unfinished_sequences = np.ones(input_ids.shape[0], dtype=int)
+
+    this_peer_finished = False  # used by synced_gpus only
+    while True:
+        logits, past_key_values = forward(
+            net,
+            input_ids[:, 1:][:, -1:],
+            inputs_embeds,
+            position_ids,
+            past_key_values,
+        )
 def predict(models, img):
     # img = preprocess(img)
 
     input_ids = np.load("input_ids.npy")
     images = np.load("images.npy")
     image_sizes = [(1000, 667)]
-
     inputs_embeds = prepare_inputs_labels_for_multimodal(
         models,
         input_ids,
         images,
     )
-    # inputs_embeds = np.load("inputs_embeds.npy")
-    # position_ids = np.load("position_ids.npy")
-    past_key_values = [
-        [
-            np.zeros((1, 32, 0, 128), dtype=np.float16),
-            np.zeros((1, 32, 0, 128), dtype=np.float16),
-        ],
-        [
-            np.zeros((1, 32, 0, 128), dtype=np.float16),
-            np.zeros((1, 32, 0, 128), dtype=np.float16),
-        ],
-        [
-            np.zeros((1, 32, 0, 128), dtype=np.float16),
-            np.zeros((1, 32, 0, 128), dtype=np.float16),
-        ],
-        [
-            np.zeros((1, 32, 0, 128), dtype=np.float16),
-            np.zeros((1, 32, 0, 128), dtype=np.float16),
-        ],
-        [
-            np.zeros((1, 32, 0, 128), dtype=np.float16),
-            np.zeros((1, 32, 0, 128), dtype=np.float16),
-        ],
-        [
-            np.zeros((1, 32, 0, 128), dtype=np.float16),
-            np.zeros((1, 32, 0, 128), dtype=np.float16),
-        ],
-        [
-            np.zeros((1, 32, 0, 128), dtype=np.float16),
-            np.zeros((1, 32, 0, 128), dtype=np.float16),
-        ],
-        [
-            np.zeros((1, 32, 0, 128), dtype=np.float16),
-            np.zeros((1, 32, 0, 128), dtype=np.float16),
-        ],
-        [
-            np.zeros((1, 32, 0, 128), dtype=np.float16),
-            np.zeros((1, 32, 0, 128), dtype=np.float16),
-        ],
-        [
-            np.zeros((1, 32, 0, 128), dtype=np.float16),
-            np.zeros((1, 32, 0, 128), dtype=np.float16),
-        ],
-        [
-            np.zeros((1, 32, 0, 128), dtype=np.float16),
-            np.zeros((1, 32, 0, 128), dtype=np.float16),
-        ],
-        [
-            np.zeros((1, 32, 0, 128), dtype=np.float16),
-            np.zeros((1, 32, 0, 128), dtype=np.float16),
-        ],
-        [
-            np.zeros((1, 32, 0, 128), dtype=np.float16),
-            np.zeros((1, 32, 0, 128), dtype=np.float16),
-        ],
-        [
-            np.zeros((1, 32, 0, 128), dtype=np.float16),
-            np.zeros((1, 32, 0, 128), dtype=np.float16),
-        ],
-        [
-            np.zeros((1, 32, 0, 128), dtype=np.float16),
-            np.zeros((1, 32, 0, 128), dtype=np.float16),
-        ],
-        [
-            np.zeros((1, 32, 0, 128), dtype=np.float16),
-            np.zeros((1, 32, 0, 128), dtype=np.float16),
-        ],
-        [
-            np.zeros((1, 32, 0, 128), dtype=np.float16),
-            np.zeros((1, 32, 0, 128), dtype=np.float16),
-        ],
-        [
-            np.zeros((1, 32, 0, 128), dtype=np.float16),
-            np.zeros((1, 32, 0, 128), dtype=np.float16),
-        ],
-        [
-            np.zeros((1, 32, 0, 128), dtype=np.float16),
-            np.zeros((1, 32, 0, 128), dtype=np.float16),
-        ],
-        [
-            np.zeros((1, 32, 0, 128), dtype=np.float16),
-            np.zeros((1, 32, 0, 128), dtype=np.float16),
-        ],
-        [
-            np.zeros((1, 32, 0, 128), dtype=np.float16),
-            np.zeros((1, 32, 0, 128), dtype=np.float16),
-        ],
-        [
-            np.zeros((1, 32, 0, 128), dtype=np.float16),
-            np.zeros((1, 32, 0, 128), dtype=np.float16),
-        ],
-        [
-            np.zeros((1, 32, 0, 128), dtype=np.float16),
-            np.zeros((1, 32, 0, 128), dtype=np.float16),
-        ],
-        [
-            np.zeros((1, 32, 0, 128), dtype=np.float16),
-            np.zeros((1, 32, 0, 128), dtype=np.float16),
-        ],
-        [
-            np.zeros((1, 32, 0, 128), dtype=np.float16),
-            np.zeros((1, 32, 0, 128), dtype=np.float16),
-        ],
-        [
-            np.zeros((1, 32, 0, 128), dtype=np.float16),
-            np.zeros((1, 32, 0, 128), dtype=np.float16),
-        ],
-        [
-            np.zeros((1, 32, 0, 128), dtype=np.float16),
-            np.zeros((1, 32, 0, 128), dtype=np.float16),
-        ],
-        [
-            np.zeros((1, 32, 0, 128), dtype=np.float16),
-            np.zeros((1, 32, 0, 128), dtype=np.float16),
-        ],
-        [
-            np.zeros((1, 32, 0, 128), dtype=np.float16),
-            np.zeros((1, 32, 0, 128), dtype=np.float16),
-        ],
-        [
-            np.zeros((1, 32, 0, 128), dtype=np.float16),
-            np.zeros((1, 32, 0, 128), dtype=np.float16),
-        ],
-        [
-            np.zeros((1, 32, 0, 128), dtype=np.float16),
-            np.zeros((1, 32, 0, 128), dtype=np.float16),
-        ],
-        [
-            np.zeros((1, 32, 0, 128), dtype=np.float16),
-            np.zeros((1, 32, 0, 128), dtype=np.float16),
-        ],
-    ]
-    # for i in range(32):
-    #     for j in range(2):
-    #         path = f"past_key_values_{i}_{j}.npy"
-    #         past_key_values[i][j] = np.load(path)
+    attention_mask = np.ones(inputs_embeds.shape[:2], dtype=int)
 
     net = models["net"]
-
-    # print("input_ids---", input_ids.shape)
-    # print("inputs_embeds---", inputs_embeds.shape)
-    # print("position_ids---", position_ids.shape)
-    forward(net, input_ids, inputs_embeds, position_ids, past_key_values)
+    generated_ids = greedy_search(net, inputs_embeds, attention_mask)
 
     # pred = post_processing(output)
 
