@@ -83,70 +83,70 @@ def forward(net, input_ids, inputs_embeds, position_ids, past_key_values):
                 "input_ids": input_ids,
                 "inputs_embeds": inputs_embeds,
                 "position_ids": position_ids,
-                "past_key_values.0.decoder.key": past_key_values[0][0],
-                "past_key_values.0.decoder.value": past_key_values[0][1],
-                "past_key_values.0.encoder.key": past_key_values[1][0],
-                "past_key_values.0.encoder.value": past_key_values[1][1],
-                "past_key_values.1.decoder.key": past_key_values[2][0],
-                "past_key_values.1.decoder.value": past_key_values[2][1],
-                "past_key_values.1.encoder.key": past_key_values[3][0],
-                "past_key_values.1.encoder.value": past_key_values[3][1],
-                "past_key_values.2.decoder.key": past_key_values[4][0],
-                "past_key_values.2.decoder.value": past_key_values[4][1],
-                "past_key_values.2.encoder.key": past_key_values[5][0],
-                "past_key_values.2.encoder.value": past_key_values[5][1],
-                "past_key_values.3.decoder.key": past_key_values[6][0],
-                "past_key_values.3.decoder.value": past_key_values[6][1],
-                "past_key_values.3.encoder.key": past_key_values[7][0],
-                "past_key_values.3.encoder.value": past_key_values[7][1],
-                "past_key_values.4.decoder.key": past_key_values[8][0],
-                "past_key_values.4.decoder.value": past_key_values[8][1],
-                "past_key_values.4.encoder.key": past_key_values[9][0],
-                "past_key_values.4.encoder.value": past_key_values[9][1],
-                "past_key_values.5.decoder.key": past_key_values[10][0],
-                "past_key_values.5.decoder.value": past_key_values[10][1],
-                "past_key_values.5.encoder.key": past_key_values[11][0],
-                "past_key_values.5.encoder.value": past_key_values[11][1],
-                "past_key_values.6.decoder.key": past_key_values[12][0],
-                "past_key_values.6.decoder.value": past_key_values[12][1],
-                "past_key_values.6.encoder.key": past_key_values[13][0],
-                "past_key_values.6.encoder.value": past_key_values[13][1],
-                "past_key_values.7.decoder.key": past_key_values[14][0],
-                "past_key_values.7.decoder.value": past_key_values[14][1],
-                "past_key_values.7.encoder.key": past_key_values[15][0],
-                "past_key_values.7.encoder.value": past_key_values[15][1],
-                "past_key_values.8.decoder.key": past_key_values[16][0],
-                "past_key_values.8.decoder.value": past_key_values[16][1],
-                "past_key_values.8.encoder.key": past_key_values[17][0],
-                "past_key_values.8.encoder.value": past_key_values[17][1],
-                "past_key_values.9.decoder.key": past_key_values[18][0],
-                "past_key_values.9.decoder.value": past_key_values[18][1],
-                "past_key_values.9.encoder.key": past_key_values[19][0],
-                "past_key_values.9.encoder.value": past_key_values[19][1],
-                "past_key_values.10.decoder.key": past_key_values[20][0],
-                "past_key_values.10.decoder.value": past_key_values[20][1],
-                "past_key_values.10.encoder.key": past_key_values[21][0],
-                "past_key_values.10.encoder.value": past_key_values[21][1],
-                "past_key_values.11.decoder.key": past_key_values[22][0],
-                "past_key_values.11.decoder.value": past_key_values[22][1],
-                "past_key_values.11.encoder.key": past_key_values[23][0],
-                "past_key_values.11.encoder.value": past_key_values[23][1],
-                "past_key_values.12.decoder.key": past_key_values[24][0],
-                "past_key_values.12.decoder.value": past_key_values[24][1],
-                "past_key_values.12.encoder.key": past_key_values[25][0],
-                "past_key_values.12.encoder.value": past_key_values[25][1],
-                "past_key_values.13.decoder.key": past_key_values[26][0],
-                "past_key_values.13.decoder.value": past_key_values[26][1],
-                "past_key_values.13.encoder.key": past_key_values[27][0],
-                "past_key_values.13.encoder.value": past_key_values[27][1],
-                "past_key_values.14.decoder.key": past_key_values[28][0],
-                "past_key_values.14.decoder.value": past_key_values[28][1],
-                "past_key_values.14.encoder.key": past_key_values[29][0],
-                "past_key_values.14.encoder.value": past_key_values[29][1],
-                "past_key_values.15.decoder.key": past_key_values[30][0],
-                "past_key_values.15.decoder.value": past_key_values[30][1],
-                "past_key_values.15.encoder.key": past_key_values[31][0],
-                "past_key_values.15.encoder.value": past_key_values[31][1],
+                "past_key_values.0.decoder.key": past_key_values[0],
+                "past_key_values.0.decoder.value": past_key_values[1],
+                "past_key_values.0.encoder.key": past_key_values[2],
+                "past_key_values.0.encoder.value": past_key_values[3],
+                "past_key_values.1.decoder.key": past_key_values[4],
+                "past_key_values.1.decoder.value": past_key_values[5],
+                "past_key_values.1.encoder.key": past_key_values[6],
+                "past_key_values.1.encoder.value": past_key_values[7],
+                "past_key_values.2.decoder.key": past_key_values[8],
+                "past_key_values.2.decoder.value": past_key_values[9],
+                "past_key_values.2.encoder.key": past_key_values[10],
+                "past_key_values.2.encoder.value": past_key_values[11],
+                "past_key_values.3.decoder.key": past_key_values[12],
+                "past_key_values.3.decoder.value": past_key_values[13],
+                "past_key_values.3.encoder.key": past_key_values[14],
+                "past_key_values.3.encoder.value": past_key_values[15],
+                "past_key_values.4.decoder.key": past_key_values[16],
+                "past_key_values.4.decoder.value": past_key_values[17],
+                "past_key_values.4.encoder.key": past_key_values[18],
+                "past_key_values.4.encoder.value": past_key_values[19],
+                "past_key_values.5.decoder.key": past_key_values[20],
+                "past_key_values.5.decoder.value": past_key_values[21],
+                "past_key_values.5.encoder.key": past_key_values[22],
+                "past_key_values.5.encoder.value": past_key_values[23],
+                "past_key_values.6.decoder.key": past_key_values[24],
+                "past_key_values.6.decoder.value": past_key_values[25],
+                "past_key_values.6.encoder.key": past_key_values[26],
+                "past_key_values.6.encoder.value": past_key_values[27],
+                "past_key_values.7.decoder.key": past_key_values[28],
+                "past_key_values.7.decoder.value": past_key_values[29],
+                "past_key_values.7.encoder.key": past_key_values[30],
+                "past_key_values.7.encoder.value": past_key_values[31],
+                "past_key_values.8.decoder.key": past_key_values[32],
+                "past_key_values.8.decoder.value": past_key_values[33],
+                "past_key_values.8.encoder.key": past_key_values[34],
+                "past_key_values.8.encoder.value": past_key_values[35],
+                "past_key_values.9.decoder.key": past_key_values[36],
+                "past_key_values.9.decoder.value": past_key_values[27],
+                "past_key_values.9.encoder.key": past_key_values[38],
+                "past_key_values.9.encoder.value": past_key_values[39],
+                "past_key_values.10.decoder.key": past_key_values[40],
+                "past_key_values.10.decoder.value": past_key_values[41],
+                "past_key_values.10.encoder.key": past_key_values[42],
+                "past_key_values.10.encoder.value": past_key_values[43],
+                "past_key_values.11.decoder.key": past_key_values[44],
+                "past_key_values.11.decoder.value": past_key_values[45],
+                "past_key_values.11.encoder.key": past_key_values[46],
+                "past_key_values.11.encoder.value": past_key_values[47],
+                "past_key_values.12.decoder.key": past_key_values[48],
+                "past_key_values.12.decoder.value": past_key_values[49],
+                "past_key_values.12.encoder.key": past_key_values[50],
+                "past_key_values.12.encoder.value": past_key_values[51],
+                "past_key_values.13.decoder.key": past_key_values[52],
+                "past_key_values.13.decoder.value": past_key_values[53],
+                "past_key_values.13.encoder.key": past_key_values[54],
+                "past_key_values.13.encoder.value": past_key_values[55],
+                "past_key_values.14.decoder.key": past_key_values[56],
+                "past_key_values.14.decoder.value": past_key_values[57],
+                "past_key_values.14.encoder.key": past_key_values[58],
+                "past_key_values.14.encoder.value": past_key_values[59],
+                "past_key_values.15.decoder.key": past_key_values[60],
+                "past_key_values.15.decoder.value": past_key_values[61],
+                "past_key_values.15.encoder.key": past_key_values[62],
+                "past_key_values.15.encoder.value": past_key_values[63],
             },
         )
     logits = output[0]
@@ -276,24 +276,27 @@ def prepare_inputs_labels_for_multimodal(
     return new_input_embeds
 
 
+def stopping_criteria(input_ids: np.array) -> bool:
+    max_length = 513
+
+    cur_len = input_ids.shape[-1]
+    is_done = cur_len >= max_length
+    return is_done
+
+
 def greedy_search(net, inputs_embeds, attention_mask):
     bos_token_id = 1
-    # eos_token_id = np.array([50118])
+    pad_token_id = 0
+    eos_token_id = np.array([2])
 
     shape = inputs_embeds.shape[:2]
     batch_size = shape[0]
 
     # _prepare_model_inputs
     input_ids = np.ones((batch_size, 1), dtype=int) * bos_token_id
-    # prepare_inputs_for_generation
-    position_ids = np.cumsum(attention_mask, axis=-1) - 1
-    position_ids[attention_mask == 0] = 1
     past_key_values = [
-        [
-            np.zeros((1, 32, 0, 128), dtype=np.float16),
-        ]
-        * 2
-    ] * 32
+        np.zeros((1, 32, 0, 128), dtype=np.float16),
+    ] * (32 * 2)
 
     # position_ids = np.load("position_ids.npy")
     # for i in range(32):
@@ -301,11 +304,17 @@ def greedy_search(net, inputs_embeds, attention_mask):
     #         path = f"past_key_values_{i}_{j}.npy"
     #         past_key_values[i][j] = np.load(path)
 
-    # # keep track of which sequences are already finished
-    # unfinished_sequences = np.ones(input_ids.shape[0], dtype=int)
+    # keep track of which sequences are already finished
+    unfinished_sequences = np.ones(input_ids.shape[0], dtype=int)
 
     this_peer_finished = False  # used by synced_gpus only
     while True:
+        # prepare model inputs
+        position_ids = np.cumsum(attention_mask, axis=-1) - 1
+        position_ids[attention_mask == 0] = 1
+        if 0 < past_key_values[0].shape[2]:
+            position_ids = position_ids[:, -input_ids[:, 1:].shape[1] :]
+
         logits, past_key_values = forward(
             net,
             input_ids[:, 1:][:, -1:],
@@ -313,6 +322,44 @@ def greedy_search(net, inputs_embeds, attention_mask):
             position_ids,
             past_key_values,
         )
+
+        next_tokens_scores = logits[:, -1, :]
+
+        # argmax
+        next_tokens = np.argmax(next_tokens_scores, axis=-1)
+
+        # finished sentences should have their next token be a padding token
+        next_tokens = next_tokens * unfinished_sequences + pad_token_id * (
+            1 - unfinished_sequences
+        )
+
+        # update generated ids, model inputs, and length for next step
+        input_ids = np.concatenate([input_ids, next_tokens[:, None]], axis=-1)
+        attention_mask = np.concatenate(
+            [attention_mask, np.ones((attention_mask.shape[0], 1), dtype=int)], axis=-1
+        )
+        inputs_embeds = inputs_embeds[:, :0, :]
+
+        # if eos_token was found in one sentence, set sentence to finished
+        unfinished_sequences = unfinished_sequences * np.prod(
+            np.tile(next_tokens, (eos_token_id.shape[0], 1)) != eos_token_id[:, None],
+            axis=0,
+        )
+
+        # stop when each sentence is finished
+        if np.max(unfinished_sequences) == 0:
+            this_peer_finished = True
+
+        # stop if we exceed the maximum length
+        if stopping_criteria(input_ids):
+            this_peer_finished = True
+
+        if this_peer_finished:
+            break
+
+    return input_ids
+
+
 def predict(models, img):
     # img = preprocess(img)
 
