@@ -329,6 +329,7 @@ def main():
     check_and_download_models(WEIGHT_FUSEFORMER_PATH, MODEL_FUSEFORMER_PATH, REMOTE_PATH)
 
     # net initialize
+    start = int(round(time.time() * 1000))
     if args.onnx:
         import onnxruntime
         cuda = 0 < ailia.get_gpu_environment_id()
@@ -336,6 +337,10 @@ def main():
         net = onnxruntime.InferenceSession(WEIGHT_FUSEFORMER_PATH, providers=providers)
     else:
         net = ailia.Net(MODEL_FUSEFORMER_PATH, WEIGHT_FUSEFORMER_PATH, env_id=args.env_id)
+    end = int(round(time.time() * 1000))
+
+    if args.benchmark:
+        logger.info(f'\tLoaded models in {end - start} ms')
 
     recognize_from_frames(net)
 
