@@ -148,14 +148,9 @@ def generate_list_input_cloths(cloth_path):
 @dataclass
 class OpenPoseModels:
     body_pose: ailia.Net | onnxruntime.InferenceSession | None
-    is_onnx: bool
 
     def release_body_pose(self):
-        if self.is_onnx:
-            del self.body_pose
-        else:
-            self.body_pose.__del__()
-
+        del self.body_pose
         self.body_pose = None
 
 @dataclass
@@ -164,28 +159,19 @@ class ParsingModels:
     upsample_atr: ailia.Net | onnxruntime.InferenceSession | None
     lip: ailia.Net | onnxruntime.InferenceSession | None
     upsample_lip: ailia.Net | onnxruntime.InferenceSession | None
-    is_onnx: bool
 
     def release_atr(self):
-        if self.is_onnx:
-            del self.atr
-            del self.upsample_atr
-        else:
-            self.atr.__del__()
-            self.upsample_atr.__del__()
-
+        del self.atr
         self.atr = None
+
+        del self.upsample_atr
         self.upsample_atr = None
 
     def release_lip(self):
-        if self.is_onnx:
-            del self.lip
-            del self.upsample_lip
-        else:
-            self.lip.__del__()
-            self.upsample_lip.__del__()
-
+        del self.lip
         self.lip = None
+
+        del self.upsample_lip
         self.upsample_lip = None
 
 @dataclass
@@ -205,55 +191,28 @@ class OOTDiffusionModels:
     image_encoder: CLIPVisionModelWithProjection | None
     image_processor: VaeImageProcessor | None
 
-    # metadata
-    is_onnx: bool
-
     def release_text_encoder(self):
-        if self.is_onnx:
-            del self.text_encoder
-        else:
-            self.text_encoder.__del__()
-
+        del self.text_encoder
         self.text_encoder = None
 
     def release_vae_encoder(self):
-        if self.is_onnx:
-            del self.vae_encoder
-        else:
-            self.vae_encoder.__del__()
-
+        del self.vae_encoder
         self.vae_encoder = None
 
     def release_vae_decoder(self):
-        if self.is_onnx:
-            del self.vae_decoder
-        else:
-            self.vae_decoder.__del__()
-
+        del self.vae_decoder
         self.vae_decoder = None
 
     def release_unet_garm(self):
-        if self.is_onnx:
-            del self.unet_garm
-        else:
-            self.unet_garm.__del__()
-
+        del self.unet_garm
         self.unet_garm = None
 
     def release_unet_vton(self):
-        if self.is_onnx:
-            del self.unet_vton
-        else:
-            self.unet_vton.__del__()
-
+        del self.unet_vton
         self.unet_vton = None
 
     def release_interpolation(self):
-        if self.is_onnx:
-            del self.interpolation
-        else:
-            self.interpolation.__del__()
-
+        del self.interpolation
         self.interpolation = None
 
     def release_tokenizer(self):
@@ -811,6 +770,7 @@ class OOTDiffusion:
         # )
         # timestep_dtype = ORT_TO_NP_TYPE[timestep_dtype]
 
+        exit()
         # 9. Denoising loop
         print("Step 9")
         num_warmup_steps = len(timesteps) - num_inference_steps * self.models.scheduler.order
@@ -1145,10 +1105,17 @@ def main():
     vae_scale_factor = 8
     image_processor = VaeImageProcessor(vae_scale_factor=vae_scale_factor)
 
-    openpose_models = OpenPoseModels(body_pose, args.onnx)
+    openpose_models = OpenPoseModels(body_pose)
+    body_pose = None  # Python keeps a reference on this object even though it is not used later. We need to remove it so we can delete the model later.
     openpose_pipeline = OpenPose(openpose_models, args.onnx)
 
-    parsing_models = ParsingModels(atr, upsample_atr, lip, upsample_lip, args.onnx)
+    parsing_models = ParsingModels(atr, upsample_atr, lip, upsample_lip)
+    # Python keeps a reference on these objects even though it is not used later.
+    # We need to remove it so we can delete the models later.
+    atr = None
+    upsample_atr = None
+    lip = None
+    upsample_lip = None
     parsing_pipeline = Parsing(parsing_models, args.onnx)
 
     ootdiffusion_models = OOTDiffusionModels(text_encoder,
@@ -1161,8 +1128,15 @@ def main():
                                              scheduler,
                                              auto_processor,
                                              image_encoder,
-                                             image_processor,
-                                             args.onnx)
+                                             image_processor)
+    # Python keeps a reference on these objects even though it is not used later.
+    # We need to remove it so we can delete the models later.
+    text_encoder = None
+    vae_encoder = None
+    vae_decoder = None
+    unet_garm = None
+    unet_vton = None
+    interpolation = None
     ootd_pipeline = OOTDiffusion(ootdiffusion_models, vae_scale_factor, args.onnx)
 
     if seed is None:
