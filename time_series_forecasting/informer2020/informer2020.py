@@ -2,6 +2,7 @@ import os
 import sys
 import ailia
 import numpy as np
+import json
 
 # import original modules
 sys.path.append('../../util')
@@ -56,6 +57,11 @@ parser.add_argument(
 parser.add_argument(
     '--onnx', action='store_true',
     help='By default, the ailia SDK is used, but with this option, you can switch to using ONNX Runtime'
+)
+parser.add_argument(
+    '-w', '--write_json',
+    action='store_true',
+    help='Flag to output results to json file.'
 )
 args = update_parser(parser)
 
@@ -181,6 +187,16 @@ def time_series_forecasting(net):
     plt.plot(preds[0,:,0], label='Prediction')
     plt.legend()
     plt.savefig("vis_{}_{}_HUFL.png".format(args.model, args.data))
+
+    if args.write_json:
+        out_data = {
+            '{}_{}_OT_trues'.format(args.model, args.data): trues[0,:,-1].tolist(),
+            '{}_{}_OT_preds'.format(args.model, args.data): preds[0,:,-1].tolist(),
+            '{}_{}_HUFL_trues'.format(args.model, args.data): trues[0,:,0].tolist(),
+            '{}_{}_HUFL_preds'.format(args.model, args.data): preds[0,:,0].tolist()
+        }
+        with open('output.json', 'w', encoding='utf-8') as f:
+            json.dump(out_data, f, ensure_ascii=False, indent=2)
 
     logger.info('Script finished successfully.')
 
