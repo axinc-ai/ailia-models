@@ -9,13 +9,13 @@ from PIL import Image
 
 import ailia
 
+from transformers import AutoTokenizer
+
 # import original modules
 sys.path.append("../../util")
 from arg_utils import get_base_parser, update_parser, get_savepath  # noqa
 from model_utils import check_and_download_models  # noqa
-from image_utils import normalize_image  # noqa
 from detector_utils import load_image  # noqa
-from webcamera_utils import get_capture, get_writer  # noqa
 
 logger = getLogger(__name__)
 
@@ -62,6 +62,28 @@ args = update_parser(parser)
 # ======================
 # Main functions
 # ======================
+
+
+def tokenizer_image_token(tokenizer, prompt, image_token_index=IMAGE_TOKEN_INDEX):
+    prompt_chunks = [tokenizer(chunk).input_ids for chunk in prompt.split("<image>")]
+
+    def insert_separator(X, sep):
+        return [ele for sublist in zip(X, [sep] * len(X)) for ele in sublist][:-1]
+
+    input_ids = []
+    offset = 0
+    if (
+        len(prompt_chunks) > 0
+        and len(prompt_chunks[0]) > 0
+        and prompt_chunks[0][0] == tokenizer.bos_token_id
+    ):
+        offset = 1
+        input_ids.append(prompt_chunks[0][0])
+
+    for x in insert_separator(prompt_chunks, [image_token_index] * (offset + 1)):
+        input_ids.extend(x[offset:])
+
+    return np.array(input_ids)
 
 
 def preprocess(img):
@@ -312,12 +334,17 @@ def greedy_search(net, inputs_embeds, attention_mask):
         # prepare model inputs
         position_ids = np.cumsum(attention_mask, axis=-1) - 1
         position_ids[attention_mask == 0] = 1
+
         if 0 < past_key_values[0].shape[2]:
-            position_ids = position_ids[:, -input_ids[:, 1:].shape[1] :]
+            past_length = past_key_values[0].shape[2]
+            _input_ids = input_ids[:, -(attention_mask.shape[1] - past_length) :]
+            position_ids = position_ids[:, -_input_ids.shape[1] :]
+        else:
+            _input_ids = input_ids[:, 1:]
 
         logits, past_key_values = forward(
             net,
-            input_ids[:, 1:][:, -1:],
+            _input_ids,
             inputs_embeds,
             position_ids,
             past_key_values,
@@ -360,10 +387,12 @@ def greedy_search(net, inputs_embeds, attention_mask):
     return input_ids
 
 
-def predict(models, img):
-    # img = preprocess(img)
+def predict(models, prompt, img):
+    tokenizer = models["tokenizer"]
 
-    input_ids = np.load("input_ids.npy")
+    input_ids = tokenizer_image_token(tokenizer, prompt, IMAGE_TOKEN_INDEX)
+    input_ids = np.expand_dims(input_ids, axis=0)
+
     images = np.load("images.npy")
     image_sizes = [(1000, 667)]
     inputs_embeds = prepare_inputs_labels_for_multimodal(
@@ -376,12 +405,14 @@ def predict(models, img):
     net = models["net"]
     generated_ids = greedy_search(net, inputs_embeds, attention_mask)
 
-    # pred = post_processing(output)
-
-    return
+    return generated_ids
 
 
 def recognize_from_image(models):
+    prompt = """\
+A chat between a curious human and an artificial intelligence assistant. The assistant gives helpful, detailed, and polite answers to the human's questions. USER: <image>
+What are the things I should be cautious about when I visit here? ASSISTANT:"""
+
     # input image loop
     for image_path in args.input:
         logger.info(image_path)
@@ -397,7 +428,7 @@ def recognize_from_image(models):
             total_time_estimation = 0
             for i in range(args.benchmark_count):
                 start = int(round(time.time() * 1000))
-                out = predict(models, img)
+                output_ids = predict(models, prompt, img)
                 end = int(round(time.time() * 1000))
                 estimation_time = end - start
 
@@ -410,14 +441,14 @@ def recognize_from_image(models):
                 f"\taverage time estimation {total_time_estimation / (args.benchmark_count - 1)} ms"
             )
         else:
-            out = predict(models, img)
+            output_ids = predict(models, prompt, img)
 
-        # res_img = draw_bbox(out)
+        tokenizer = models["tokenizer"]
 
-        # # plot result
-        # savepath = get_savepath(args.savepath, image_path, ext=".png")
-        # logger.info(f"saved at : {savepath}")
-        # cv2.imwrite(savepath, res_img)
+        outputs = tokenizer.batch_decode(output_ids, skip_special_tokens=True)
+        outputs = outputs[0].strip()
+
+        print(outputs)
 
     logger.info("Script finished successfully.")
 
@@ -433,20 +464,17 @@ def main():
     else:
         import onnxruntime
 
-        # cuda = 0 < ailia.get_gpu_environment_id()
-        # providers = (
-        # ["CUDAExecutionProvider", "CPUExecutionProvider"]
-        # if cuda
-        # else ["CPUExecutionProvider"]
-        # )
-        # net = onnxruntime.InferenceSession(WEIGHT_PATH, providers=providers)
-        net = onnxruntime.InferenceSession(WEIGHT_PATH)
+        providers = ["CUDAExecutionProvider", "CPUExecutionProvider"]
+        net = onnxruntime.InferenceSession(WEIGHT_PATH, providers=providers)
         # net = onnxruntime.InferenceSession("onnx/xxx.onnx")
         encode_images = onnxruntime.InferenceSession("encode_images.onnx")
         embed_tokens = onnxruntime.InferenceSession("embed_tokens.onnx")
 
+    tokenizer = AutoTokenizer.from_pretrained("tokenizer")
+
     models = {
         "net": net,
+        "tokenizer": tokenizer,
         "encode_images": encode_images,
         "embed_tokens": embed_tokens,
     }
