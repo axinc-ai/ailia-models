@@ -770,7 +770,6 @@ class OOTDiffusion:
         # )
         # timestep_dtype = ORT_TO_NP_TYPE[timestep_dtype]
 
-        exit()
         # 9. Denoising loop
         print("Step 9")
         num_warmup_steps = len(timesteps) - num_inference_steps * self.models.scheduler.order
@@ -1046,10 +1045,7 @@ def main():
 
     # initialize
     if not args.onnx:
-        memory_mode = ailia.get_memory_mode(reduce_constant=True,
-                                            ignore_input_with_initializer=True,
-                                            reduce_interstage=True,
-                                            reuse_interstage=True)
+        memory_mode = ailia.get_memory_mode(True, True, True, True)
         body_pose = ailia.Net(None, WEIGHT_BODY_POSE_PATH, env_id=env_id, memory_mode=memory_mode)
         atr = ailia.Net(None, WEIGHT_ATR_PATH, env_id=env_id, memory_mode=memory_mode)
         upsample_atr = ailia.Net(None, WEIGHT_UPSAMPLE_ATR_PATH, env_id=env_id, memory_mode=memory_mode)
