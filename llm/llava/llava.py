@@ -13,13 +13,12 @@ from transformers import AutoTokenizer
 
 # import original modules
 sys.path.append("../../util")
-from arg_utils import get_base_parser, update_parser, get_savepath  # noqa
+from arg_utils import get_base_parser, update_parser  # noqa
 from model_utils import check_and_download_models  # noqa
 from detector_utils import load_image  # noqa
 
 logger = getLogger(__name__)
 
-# from sample_utils import decode_batch, mask_to_bboxes, draw_bbox
 
 # ======================
 # Parameters
@@ -27,10 +26,14 @@ logger = getLogger(__name__)
 
 WEIGHT_PATH = "llava-v1.5-7b.onnx"
 MODEL_PATH = "llava-v1.5-7b.onnx.prototxt"
+WEIGHT_ENC_PATH = "encode_images.onnx"
+MODEL_ENC_PATH = "encode_images.onnx.prototxt"
+WEIGHT_EMB_PATH = "embed_tokens.onnx"
+MODEL_EMB_PATH = "embed_tokens.onnx.prototxt"
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/llava/"
 
 IMAGE_PATH = "view.jpg"
-SAVE_IMAGE_PATH = "output.png"
+IMG_SIZE = 336
 
 # Model Constants
 IGNORE_INDEX = -100
@@ -46,7 +49,7 @@ IMAGE_PLACEHOLDER = "<image-placeholder>"
 # Arguemnt Parser Config
 # ======================
 
-parser = get_base_parser("LLaVA", IMAGE_PATH, SAVE_IMAGE_PATH)
+parser = get_base_parser("LLaVA", IMAGE_PATH, None)
 parser.add_argument("--onnx", action="store_true", help="execute onnxruntime version.")
 args = update_parser(parser)
 
@@ -86,12 +89,40 @@ def tokenizer_image_token(tokenizer, prompt, image_token_index=IMAGE_TOKEN_INDEX
     return np.array(input_ids)
 
 
-def preprocess(img):
+def image_processor(img):
+    mean = np.array([0.48145466, 0.4578275, 0.40821073])
+    std = np.array([0.26862954, 0.26130258, 0.27577711])
+
+    im_h, im_w, _ = img.shape
+    if im_w > im_h:
+        new_img = np.ones((im_w, im_w, 3), dtype=np.uint8)
+        new_img[:, :, :] = mean * 255
+        pad = (im_w - im_h) // 2
+        new_img[pad : pad + im_h, :] = img
+        img = new_img
+    else:
+        new_img = np.ones((im_h, im_h, 3), dtype=np.uint8)
+        new_img[:, :, :] = mean * 255
+        pad = (im_h - im_w) // 2
+        new_img[:, pad : pad + im_w] = img
+        img = new_img
+
+    # resize
+    img = np.array(
+        Image.fromarray(img).resize((IMG_SIZE, IMG_SIZE), Image.Resampling.BICUBIC)
+    )
+
+    # rescale
+    scale = 0.00392156862745098
+    img = img * scale
+    # normalize
+    img = (img - mean) / std
+
+    img = img.transpose(2, 0, 1)  # HWC -> CHW
+    img = np.expand_dims(img, axis=0)
+    img = img.astype(np.float16)
+
     return img
-
-
-def post_processing(output):
-    return None
 
 
 def forward(net, input_ids, inputs_embeds, position_ids, past_key_values):
@@ -388,17 +419,17 @@ def greedy_search(net, inputs_embeds, attention_mask):
 
 
 def predict(models, prompt, img):
-    tokenizer = models["tokenizer"]
+    img = img[:, :, ::-1]  # BGR -> RBG
 
+    tokenizer = models["tokenizer"]
     input_ids = tokenizer_image_token(tokenizer, prompt, IMAGE_TOKEN_INDEX)
     input_ids = np.expand_dims(input_ids, axis=0)
 
-    images = np.load("images.npy")
-    image_sizes = [(1000, 667)]
+    images_tensor = image_processor(img)
     inputs_embeds = prepare_inputs_labels_for_multimodal(
         models,
         input_ids,
-        images,
+        images_tensor,
     )
     attention_mask = np.ones(inputs_embeds.shape[:2], dtype=int)
 
@@ -456,19 +487,26 @@ What are the things I should be cautious about when I visit here? ASSISTANT:"""
 def main():
     # model files check and download
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_ENC_PATH, MODEL_ENC_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_EMB_PATH, MODEL_EMB_PATH, REMOTE_PATH)
     env_id = args.env_id
 
     # initialize
     if not args.onnx:
         net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+        encode_images = ailia.Net(MODEL_ENC_PATH, WEIGHT_ENC_PATH, env_id=env_id)
+        embed_tokens = ailia.Net(MODEL_EMB_PATH, WEIGHT_EMB_PATH, env_id=env_id)
     else:
         import onnxruntime
 
         providers = ["CUDAExecutionProvider", "CPUExecutionProvider"]
         net = onnxruntime.InferenceSession(WEIGHT_PATH, providers=providers)
-        # net = onnxruntime.InferenceSession("onnx/xxx.onnx")
-        encode_images = onnxruntime.InferenceSession("encode_images.onnx")
-        embed_tokens = onnxruntime.InferenceSession("embed_tokens.onnx")
+        encode_images = onnxruntime.InferenceSession(
+            WEIGHT_ENC_PATH, providers=providers
+        )
+        embed_tokens = onnxruntime.InferenceSession(
+            WEIGHT_EMB_PATH, providers=providers
+        )
 
     tokenizer = AutoTokenizer.from_pretrained("tokenizer")
 
