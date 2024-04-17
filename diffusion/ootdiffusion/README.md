@@ -53,7 +53,7 @@ WEIGHT_UNET_GARM_HD_PATH = 'unet_garm_hd.onnx'
 
 garm_latents = np.random.rand(2, 4, 128, 96).astype(np.float16)
 prompt_embeds = np.random.rand(2, 2, 768).astype(np.float16)
-timestep = np.array([0], dtype=np.float16)
+timestep = np.array([0], dtype=np.int32)
 
 
 # Using ailia SDK
