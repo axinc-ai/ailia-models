@@ -13,4 +13,4 @@ ftfy
 webcolors
 pymatting
 dlib==19.21.1
-lap
+lapx
