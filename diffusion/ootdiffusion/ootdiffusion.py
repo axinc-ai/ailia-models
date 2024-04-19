@@ -36,47 +36,47 @@ logger = getLogger(__name__)
 # ======================
 
 WEIGHT_BODY_POSE_PATH = 'body_pose.onnx'
-MODEL_BODY_POSE_PATH = 'body_pose.onnx.prototxt'
+MODEL_BODY_POSE_PATH = None #'body_pose.onnx.prototxt'
 
 WEIGHT_ATR_PATH = 'parsing_atr.onnx'
-MODEL_ATR_PATH = 'parsing_atr.onnx.prototxt'
+MODEL_ATR_PATH = None #'parsing_atr.onnx.prototxt'
 
 WEIGHT_UPSAMPLE_ATR_PATH = 'upsample_atr.onnx'
-MODEL_UPSAMPLE_ATR_PATH = 'upsample_atr.onnx.prototxt'
+MODEL_UPSAMPLE_ATR_PATH = None #'upsample_atr.onnx.prototxt'
 
 WEIGHT_LIP_PATH = 'parsing_lip.onnx'
-MODEL_LIP_PATH = 'parsing_lip.onnx.prototxt'
+MODEL_LIP_PATH = None #'parsing_lip.onnx.prototxt'
 
 WEIGHT_UPSAMPLE_LIP_PATH = 'upsample_lip.onnx'
-MODEL_UPSAMPLE_LIP_PATH = 'upsample_lip.onnx.prototxt'
+MODEL_UPSAMPLE_LIP_PATH = None #'upsample_lip.onnx.prototxt'
 
 WEIGHT_UNET_GARM_HD_PATH = 'unet_garm_hd.onnx'
 WEIGHT_UNET_GARM_HD_PB_PATH = 'unet_garm_hd_weights.pb'
-MODEL_UNET_GARM_HD_PATH = 'unet_garm_hd.onnx.prototxt'
+MODEL_UNET_GARM_HD_PATH = None #'unet_garm_hd.onnx.prototxt'
 
 WEIGHT_UNET_GARM_DC_PATH = 'unet_garm_dc.onnx'
 WEIGHT_UNET_GARM_DC_PB_PATH = 'unet_garm_dc_weights.pb'
-MODEL_UNET_GARM_DC_PATH = 'unet_garm_dc.onnx.prototxt'
+MODEL_UNET_GARM_DC_PATH = None #'unet_garm_dc.onnx.prototxt'
 
 WEIGHT_UNET_VTON_HD_PATH = 'unet_vton_hd.onnx'
 WEIGHT_UNET_VTON_HD_PB_PATH = 'unet_vton_hd_weights.pb'
-MODEL_UNET_VTON_HD_PATH = 'unet_vton_hd.onnx.prototxt'
+MODEL_UNET_VTON_HD_PATH = None #'unet_vton_hd.onnx.prototxt'
 
-WEIGHT_UNET_VTON_DC_PATH = 'unet_vton_hd.onnx'
-WEIGHT_UNET_VTON_DC_PB_PATH = 'unet_vton_hd_weights.pb'
-MODEL_UNET_VTON_DC_PATH = 'unet_vton_hd.onnx.prototxt'
+WEIGHT_UNET_VTON_DC_PATH = 'unet_vton_dc.onnx'
+WEIGHT_UNET_VTON_DC_PB_PATH = 'unet_vton_dc_weights.pb'
+MODEL_UNET_VTON_DC_PATH = None #'unet_vton_dc.onnx.prototxt'
 
 WEIGHT_INTERPOLATION_PATH = 'ootd_vton_hd_interpolate.onnx'
-MODEL_INTERPOLATION_PATH = 'ootd_vton_hd_interpolate.onnx.prototxt'
+MODEL_INTERPOLATION_PATH = None #'ootd_vton_hd_interpolate.onnx.prototxt'
 
 WEIGHT_TEXT_ENCODER_PATH = 'text_encoder.onnx'
-MODEL_TEXT_ENCODER_PATH = 'text_encoder.onnx.prototxt'
+MODEL_TEXT_ENCODER_PATH = None #'text_encoder.onnx.prototxt'
 
 WEIGHT_VAE_ENCODER_PATH = 'vae_encoder.onnx'
-MODEL_VAE_ENCODER_PATH = 'vae_encoder.onnx.prototxt'
+MODEL_VAE_ENCODER_PATH = None #'vae_encoder.onnx.prototxt'
 
 WEIGHT_VAE_DECODER_PATH = 'vae_decoder.onnx'
-MODEL_VAE_DECODER_PATH = 'vae_decoder.onnx.prototxt'
+MODEL_VAE_DECODER_PATH = None #'vae_decoder.onnx.prototxt'
 
 # WEIGHT_IMAGE_ENCODER_PATH = 'image_encoder.onnx'
 # MODEL_IMAGE_ENCODER_PATH = 'image_encoder.onnx.prototxt'
@@ -1019,23 +1019,23 @@ def recognize_from_image(openpose_pipeline, parsing_pipeline, ootd_pipeline):
 
 def main():
     # model files check and download
-    # check_and_download_models(WEIGHT_BODY_POSE_PATH, MODEL_BODY_POSE_PATH, REMOTE_PATH)
-    # check_and_download_models(WEIGHT_ATR_PATH, MODEL_ATR_PATH, REMOTE_PATH)
-    # check_and_download_models(WEIGHT_UPSAMPLE_ATR_PATH, MODEL_UPSAMPLE_ATR_PATH, REMOTE_PATH)
-    # check_and_download_models(WEIGHT_LIP_PATH, MODEL_LIP_PATH, REMOTE_PATH)
-    # check_and_download_models(WEIGHT_UPSAMPLE_LIP_PATH, MODEL_UPSAMPLE_LIP_PATH, REMOTE_PATH)
-    # check_and_download_models(WEIGHT_UNET_GARM_HD_PATH, MODEL_UNET_GARM_HD_PATH, REMOTE_PATH)
-    # check_and_download_file(WEIGHT_UNET_GARM_HD_PB_PATH, REMOTE_PATH)
-    # check_and_download_models(WEIGHT_UNET_GARM_DC_PATH, MODEL_UNET_GARM_DC_PATH, REMOTE_PATH)
-    # check_and_download_file(WEIGHT_UNET_GARM_DC_PB_PATH, REMOTE_PATH)
-    # check_and_download_models(WEIGHT_UNET_VTON_HD_PATH, MODEL_UNET_VTON_HD_PATH, REMOTE_PATH)
-    # check_and_download_file(WEIGHT_UNET_VTON_HD_PB_PATH, REMOTE_PATH)
-    # check_and_download_models(WEIGHT_UNET_VTON_DC_PATH, MODEL_UNET_VTON_DC_PATH, REMOTE_PATH)
-    # check_and_download_file(WEIGHT_UNET_VTON_DC_PB_PATH, REMOTE_PATH)
-    # check_and_download_models(WEIGHT_INTERPOLATION_PATH, MODEL_INTERPOLATION_PATH, REMOTE_PATH)
-    # check_and_download_models(WEIGHT_TEXT_ENCODER_PATH, MODEL_TEXT_ENCODER_PATH, REMOTE_PATH)
-    # check_and_download_models(WEIGHT_VAE_ENCODER_PATH, MODEL_VAE_ENCODER_PATH, REMOTE_PATH)
-    # check_and_download_models(WEIGHT_VAE_DECODER_PATH, MODEL_VAE_DECODER_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_BODY_POSE_PATH, MODEL_BODY_POSE_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_ATR_PATH, MODEL_ATR_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_UPSAMPLE_ATR_PATH, MODEL_UPSAMPLE_ATR_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_LIP_PATH, MODEL_LIP_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_UPSAMPLE_LIP_PATH, MODEL_UPSAMPLE_LIP_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_UNET_GARM_HD_PATH, MODEL_UNET_GARM_HD_PATH, REMOTE_PATH)
+    check_and_download_file(WEIGHT_UNET_GARM_HD_PB_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_UNET_GARM_DC_PATH, MODEL_UNET_GARM_DC_PATH, REMOTE_PATH)
+    check_and_download_file(WEIGHT_UNET_GARM_DC_PB_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_UNET_VTON_HD_PATH, MODEL_UNET_VTON_HD_PATH, REMOTE_PATH)
+    check_and_download_file(WEIGHT_UNET_VTON_HD_PB_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_UNET_VTON_DC_PATH, MODEL_UNET_VTON_DC_PATH, REMOTE_PATH)
+    check_and_download_file(WEIGHT_UNET_VTON_DC_PB_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_INTERPOLATION_PATH, MODEL_INTERPOLATION_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_TEXT_ENCODER_PATH, MODEL_TEXT_ENCODER_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_VAE_ENCODER_PATH, MODEL_VAE_ENCODER_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_VAE_DECODER_PATH, MODEL_VAE_DECODER_PATH, REMOTE_PATH)
 
     env_id = args.env_id
     seed = args.seed
