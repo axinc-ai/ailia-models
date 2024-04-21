@@ -50,6 +50,12 @@ IMAGE_PLACEHOLDER = "<image-placeholder>"
 # ======================
 
 parser = get_base_parser("LLaVA", IMAGE_PATH, None)
+parser.add_argument(
+    "-p",
+    "--prompt",
+    default="What are the things I should be cautious about when I visit here?",
+    help="prompt.",
+)
 parser.add_argument("--onnx", action="store_true", help="execute onnxruntime version.")
 args = update_parser(parser)
 
@@ -58,8 +64,22 @@ args = update_parser(parser)
 # Secondary Functions
 # ======================
 
-# def draw_bbox(img, bboxes):
-#     return img
+
+def get_prompt(qs):
+    system = "A chat between a curious human and an artificial intelligence assistant. The assistant gives helpful, detailed, and polite answers to the human's questions."
+    qs = DEFAULT_IMAGE_TOKEN + "\n" + qs
+
+    messages = [["USER", qs], ["ASSISTANT", None]]
+
+    seps = [" ", "</s>"]
+    ret = system + seps[0]
+    for i, (role, message) in enumerate(messages):
+        if message:
+            ret += role + ": " + message + seps[i % 2]
+        else:
+            ret += role + ":"
+
+    return ret
 
 
 # ======================
@@ -440,9 +460,10 @@ def predict(models, prompt, img):
 
 
 def recognize_from_image(models):
-    prompt = """\
-A chat between a curious human and an artificial intelligence assistant. The assistant gives helpful, detailed, and polite answers to the human's questions. USER: <image>
-What are the things I should be cautious about when I visit here? ASSISTANT:"""
+    prompt = args.prompt
+
+    print("prompt:", prompt)
+    prompt = get_prompt(prompt)
 
     # input image loop
     for image_path in args.input:
