@@ -30,8 +30,11 @@ logger = getLogger(__name__)
 # Parameters
 # ======================
 ELEGANT_REMOTE_PATH = "https://storage.googleapis.com/ailia-models/elegant/"
-ELEGANT_WEIGHT_PATH = "elegant.onnx"
-ELEGANT_MODEL_PATH = "elegant.onnx.prototxt"
+ELEGANT1_WEIGHT_PATH = "elegant1.onnx"
+ELEGANT1_MODEL_PATH = "elegant1.onnx.prototxt"
+
+ELEGANT2_WEIGHT_PATH = "elegant2.onnx"
+ELEGANT2_MODEL_PATH = "elegant2.onnx.prototxt"
 
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/psgan/"
 FACE_PARSER_WEIGHT_PATH = "face_parser.onnx"
@@ -189,11 +192,15 @@ def main():
         FACE_ALIGNMENT_REMOTE_PATH,
     )
     check_and_download_models(
-        ELEGANT_WEIGHT_PATH,
-        ELEGANT_MODEL_PATH,
+        ELEGANT1_WEIGHT_PATH,
+        ELEGANT1_MODEL_PATH,
         ELEGANT_REMOTE_PATH,
     )
-
+    check_and_download_models(
+        ELEGANT2_WEIGHT_PATH,
+        ELEGANT2_MODEL_PATH,
+        ELEGANT_REMOTE_PATH,
+    )
 
     if args.video is not None:
         # Video mode

@@ -25,13 +25,9 @@ class Inference:
         self.img_size = 256
         # TODO: can be a hyper-parameter
         self.eyeblur = {'margin': 12, 'blur_size':7}
-        self.onnx = args.onnx
-        if self.onnx:
-            import onnxruntime
-            self.session = onnxruntime.InferenceSession("elegant.onnx")
-        else:
-            import ailia
-            self.session = ailia.Net(None,"elegant.onnx")
+
+        self.session1 = ailia.Net(None,"elegant1.onnx")
+        self.session2 = ailia.Net(None,"elegant2.onnx")
 
     def prepare_input(self, *data_inputs):
         """
@@ -80,35 +76,27 @@ class Inference:
 
         source_input = self.prepare_input(*source_input)
         reference_input = self.prepare_input(*reference_input)
-        input_name ={}
+
+        elegant1_output= self.session1.run((np.array(source_input[0]),
+                          np.array(reference_input[0]),
+                          np.array(source_input[1]),
+                          np.array(reference_input[1]),
+                          np.array(source_input[2]),
+                          np.array(reference_input[2]),
+                          np.array(source_input[3]),
+                          np.array(reference_input[3]))
+        )
+
+        kernel = elegant1_output[17]
  
-        if self.onnx:
-            for i in range(8):
-                input_name[i] = self.session.get_inputs()[i].name
- 
-            results = self.session.run([], {
-                 input_name[0]: source_input[0]
-                ,input_name[1]: reference_input[0]
-                ,input_name[2]: source_input[1]
-                ,input_name[3]: reference_input[1]
-                ,input_name[4]: source_input[2]
-                ,input_name[5]: reference_input[2]
-                ,input_name[6]: source_input[3]
-                ,input_name[7]: reference_input[3]
-                })
-        else:
-            results = self.session.run(
-                 source_input[0]
-                ,reference_input[0]
-                ,source_input[1]
-                ,reference_input[1]
-                ,source_input[2]
-                ,reference_input[2]
-                ,source_input[3]
-                ,reference_input[3]
-                )
-        results=np.array(results)
-        result = results
+        kernel_inv = np.linalg.inv(kernel)
+
+        results = self.session2.run((*elegant1_output[0:6],
+                                     *elegant1_output[8:15],
+                                     elegant1_output[16],
+                                     kernel_inv))
+
+        result = np.array(results)
  
         result = (result +1)/2
         result = np.clip(result,0,1)

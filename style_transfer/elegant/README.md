@@ -40,12 +40,6 @@ If you pass `0` as an argument to VIDEO_PATH, you can use the webcam input inste
 $ python3 elegant.py --video VIDEO_PATH --reference STYLE_IMAGE_PATH
 ```
 
-If you want to run with onnxruntime instead of ailia, you can use `--onnx` option as below.
-
-```
-$ python3 elegant.py --onnx
-```
-
 By adding the `--use_dlib` option, you can use original version of face and landmark detection.
 
 ### Reference
@@ -63,4 +57,5 @@ ONNX opset = 16
 
 ### Netron
 
-- [elegant.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/EleGANt/elegant.onnx.prototxt)
+- [elegant1.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/EleGANt/elegant1.onnx.prototxt)
+- [elegant2.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/EleGANt/elegant2.onnx.prototxt)
