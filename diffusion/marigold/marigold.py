@@ -40,7 +40,7 @@ MODEL_VAE_ENCODER_PATH = 'vae_encoder.onnx.prototxt'
 WEIGHT_VAE_DECODER_PATH = 'vae_decoder.onnx'
 MODEL_VAE_DECODER_PATH = 'vae_decoder.onnx.prototxt'
 WEIGHT_UNET_PB_PATH = 'unet_weights.pb'
-WEIGHT_TEXT_ENCODER_PATH = 'text_encoder_weights.pb'
+WEIGHT_TEXT_ENCODER_PB_PATH = 'text_encoder_weights.pb'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/marigold/'
 
 IMAGE_PATH = 'demo.jpg'
@@ -450,7 +450,7 @@ def main():
     check_and_download_models(WEIGHT_VAE_ENCODER_PATH, MODEL_VAE_ENCODER_PATH, REMOTE_PATH)
     check_and_download_models(WEIGHT_VAE_DECODER_PATH, MODEL_VAE_DECODER_PATH, REMOTE_PATH)
     check_and_download_file(WEIGHT_UNET_PB_PATH, REMOTE_PATH)
-    check_and_download_file(WEIGHT_TEXT_ENCODER_PATH, REMOTE_PATH)
+    check_and_download_file(WEIGHT_TEXT_ENCODER_PB_PATH, REMOTE_PATH)
 
     env_id = args.env_id
     seed = args.seed
