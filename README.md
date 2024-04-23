@@ -21,6 +21,7 @@ The collection of pre-trained, state-of-the-art AI models.
 - 2024.04.08 ailia SDK can now be installed via pip.
 - 2024.04.02 Add zoe_depth, facefusion
 - 2024.04.01 Add pytorch-fcn (ailia SDK 1.3.0)
+- 2024.03.31 Add bert-network-packet-flow-header-payload
 - 2024.03.29 Add falcon-adapter-network-packet, pyannote-audio
 - 2024.03.08 Add did_m3d, damo_yolo, deep-music-enhancer, tusimple-DUC
 - 2024.03.05 Add polylanenet, rnnoise
