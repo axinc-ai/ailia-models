@@ -26,4 +26,4 @@ ONNX Runtime
 
 ### Netron
 
-- [rinna_gpt2/japanese-gpt2-small.opt.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/rinna_gpt2/japanese-gpt2-small.opt.onnx.prototxt)
+- [phi3-mini-128k-instruct-cuda-fp16.onnx](https://netron.app/?url=https://storage.googleapis.com/ailia-models/phi3/phi3-mini-128k-instruct-cuda-fp16.onnx)
