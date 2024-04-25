@@ -117,7 +117,7 @@ def predict(models, sentences):
 
 
 def recognize_from_sentence(models):
-    with open(args.input[0]) as f:
+    with open(args.input[0], encoding='utf-8') as f:
         sentences = [s.strip() for s in f.read().split("\n")]
 
     logger.info(
