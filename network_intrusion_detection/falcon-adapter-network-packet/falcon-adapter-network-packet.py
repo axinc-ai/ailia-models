@@ -112,7 +112,7 @@ similar = _SimilarWords()
 
 def process_txt_dataset(path):
     document_list = []
-    with open(path) as file:
+    with open(path, encoding="utf8") as file:
         for line in tqdm(
             file.readlines(),
             unit=" paragraphs",
