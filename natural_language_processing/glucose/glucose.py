@@ -2,6 +2,7 @@ import sys
 import time
 from itertools import combinations
 from logging import getLogger
+import json
 
 import numpy as np
 from transformers import AutoTokenizer
@@ -36,6 +37,11 @@ parser.add_argument(
     '--onnx',
     action='store_true',
     help='execute onnxruntime version.'
+)
+parser.add_argument(
+    '-w', '--write_json',
+    action='store_true',
+    help='Flag to output results to json file.'
 )
 args = update_parser(parser)
 
@@ -111,7 +117,7 @@ def predict(models, sentences):
 
 
 def recognize_from_sentence(models):
-    with open(args.input[0]) as f:
+    with open(args.input[0], encoding='utf-8') as f:
         sentences = [s.strip() for s in f.read().split("\n")]
 
     logger.info(
@@ -149,6 +155,14 @@ def recognize_from_sentence(models):
         "The top similar are below.\n"
         + "\n".join(f'#{i + 1} & #{j + 1} : {score}' for (i, j), score in comb_score[:3])
     )
+
+    if args.write_json:
+        out_data = []
+        for (i, j), score in comb_score[:3]:
+            out_data.append({ "idx_a": i, "idx_b": j, "score": score})
+        out_data = { "sentences": sentences, "result": out_data }
+        with open("output.json", "w", encoding="utf-8") as f:
+            json.dump(out_data, f, ensure_ascii=False, indent=2)
 
     logger.info('Script finished successfully.')
 
