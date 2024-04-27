@@ -647,6 +647,11 @@ def main():
     tokenizer = sentencepiece.SentencePieceProcessor()
     tokenizer.load(TOKENIZER_PATH)
 
+    if args.profile:
+        encoder.set_profile_mode(True)
+        decoder.set_profile_mode(True)
+        joint.set_profile_mode(True)
+
     # vocabulary = {}
     # for i in range(vocab_size):
     #     piece = tokenizer.id_to_piece(i)
@@ -667,6 +672,11 @@ def main():
     }
 
     recognize_from_audio(models)
+
+    if args.profile:
+        print(encoder.get_summary())
+        print(decoder.get_summary())
+        print(joint.get_summary())
 
 
 if __name__ == '__main__':
