@@ -1,12 +1,9 @@
 import os
 import sys
-import io
 
 import numpy as np
 import cv2
 
-import torch
-import torchaudio
 import transformers
 
 import ailia
@@ -14,7 +11,7 @@ import ailia
 # import original modules
 sys.path.append("../../util")
 from arg_utils import get_base_parser, update_parser, get_savepath  # noqa
-from model_utils import check_and_download_models, urlretrieve, progress_print  # noqa
+from model_utils import check_and_download_models, check_and_download_file  # noqa
 
 # logger
 from logging import getLogger  # noqa
@@ -32,24 +29,27 @@ WEIGHT_UNET_PB_PATH = "unet_weights.pb"
 MODEL_UNET_PATH = "unet.onnx.prototxt"
 WEIGHT_TEXT_ENCODER_PATH = "text_encoder.onnx"
 MODEL_TEXT_ENCODER_PATH = "text_encoder.onnx.prototxt"
+WEIGHT_TEXT_ENCODER_2_PATH = "text_encoder_2.onnx"
+WEIGHT_TEXT_ENCODER_2_PB_PATH = "text_encoder_2_weights.pb"
+MODEL_TEXT_ENCODER_2_PATH = "text_encoder_2.onnx.prototxt"
 WEIGHT_VAE_DECODER_PATH = "vae_decoder.onnx"
 MODEL_VAE_DECODER_PATH = "vae_decoder.onnx.prototxt"
 
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/sdlx-turbo/"
 
-SAVE_WAV_PATH = "output.wav"
+SAVE_IMAGE_PATH = "output.png"
 
 # ======================
 # Arguemnt Parser Config
 # ======================
 
-parser = get_base_parser("Riffusion", None, SAVE_WAV_PATH)
+parser = get_base_parser("SDXL-Turbo", None, SAVE_IMAGE_PATH)
 parser.add_argument(
     "-i",
     "--input",
     metavar="TEXT",
     type=str,
-    default="jazzy rapping from paris",
+    default="little cute gremlin wearing a jacket, cinematic, vivid colors, intricate masterpiece, golden ratio, highly detailed",
     help="the prompt to render",
 )
 parser.add_argument(
@@ -58,19 +58,8 @@ parser.add_argument(
     default=42,
     help="random seed",
 )
-parser.add_argument(
-    "--width",
-    type=int,
-    default=512,
-    help="width",
-)
 parser.add_argument("--onnx", action="store_true", help="execute onnxruntime version.")
 args = update_parser(parser, check_input_type=False)
-
-
-# ======================
-# Secondaty Functions
-# ======================
 
 
 # ======================
@@ -91,9 +80,7 @@ def recognize_from_text(pipe):
     )
     image = (image[0] * 255).astype(np.uint8)
 
-    audio_savepath = get_savepath(args.savepath, "", ext=".wav")
-    p, _ = os.path.splitext(audio_savepath)
-    img_savepath = p + ".png"
+    img_savepath = get_savepath(args.savepath, "", ext=".png")
     logger.info(f"saved at : {img_savepath}")
     cv2.imwrite(img_savepath, image)
 
@@ -101,20 +88,18 @@ def recognize_from_text(pipe):
 
 
 def main():
-    # check_and_download_models(WEIGHT_UNET_PATH, MODEL_UNET_PATH, REMOTE_PATH)
-    # check_and_download_models(
-    #     WEIGHT_TEXT_ENCODER_PATH, MODEL_TEXT_ENCODER_PATH, REMOTE_PATH
-    # )
-    # check_and_download_models(
-    #     WEIGHT_VAE_DECODER_PATH, MODEL_VAE_DECODER_PATH, REMOTE_PATH
-    # )
-
-    # if not os.path.exists(WEIGHT_UNET_PB_PATH):
-    #     urlretrieve(
-    #         REMOTE_PATH + WEIGHT_UNET_PB_PATH,
-    #         WEIGHT_UNET_PB_PATH,
-    #         progress_print,
-    #     )
+    check_and_download_models(WEIGHT_UNET_PATH, MODEL_UNET_PATH, REMOTE_PATH)
+    check_and_download_models(
+        WEIGHT_TEXT_ENCODER_PATH, MODEL_TEXT_ENCODER_PATH, REMOTE_PATH
+    )
+    check_and_download_models(
+        WEIGHT_TEXT_ENCODER_2_PATH, MODEL_TEXT_ENCODER_2_PATH, REMOTE_PATH
+    )
+    check_and_download_models(
+        WEIGHT_VAE_DECODER_PATH, MODEL_VAE_DECODER_PATH, REMOTE_PATH
+    )
+    check_and_download_file(WEIGHT_UNET_PB_PATH, REMOTE_PATH)
+    check_and_download_file(WEIGHT_TEXT_ENCODER_2_PB_PATH, REMOTE_PATH)
 
     seed = args.seed
     if seed is not None:
@@ -139,6 +124,12 @@ def main():
             env_id=env_id,
             memory_mode=memory_mode,
         )
+        text_encoder_2 = ailia.Net(
+            MODEL_TEXT_ENCODER_2_PATH,
+            WEIGHT_TEXT_ENCODER_2_PATH,
+            env_id=env_id,
+            memory_mode=memory_mode,
+        )
         vae_decoder = ailia.Net(
             MODEL_VAE_DECODER_PATH,
             WEIGHT_VAE_DECODER_PATH,
@@ -155,15 +146,19 @@ def main():
             else ["CPUExecutionProvider"]
         )
 
-        # net = onnxruntime.InferenceSession(WEIGHT_UNET_PATH, providers=providers)
-        # text_encoder = onnxruntime.InferenceSession(
-        #     WEIGHT_TEXT_ENCODER_PATH, providers=providers
-        # )
-        # vae_decoder = onnxruntime.InferenceSession(
-        #     WEIGHT_VAE_DECODER_PATH, providers=providers
-        # )
+        net = onnxruntime.InferenceSession(WEIGHT_UNET_PATH, providers=providers)
+        text_encoder = onnxruntime.InferenceSession(
+            WEIGHT_TEXT_ENCODER_PATH, providers=providers
+        )
+        text_encoder_2 = onnxruntime.InferenceSession(
+            WEIGHT_TEXT_ENCODER_2_PATH, providers=providers
+        )
+        vae_decoder = onnxruntime.InferenceSession(
+            WEIGHT_VAE_DECODER_PATH, providers=providers
+        )
 
-    # tokenizer = transformers.CLIPTokenizer.from_pretrained("./tokenizer")
+    tokenizer = transformers.CLIPTokenizer.from_pretrained("./tokenizer")
+    tokenizer_2 = transformers.CLIPTokenizer.from_pretrained("./tokenizer_2")
     scheduler = df.schedulers.EulerAncestralDiscreteScheduler.from_config(
         {
             "num_train_timesteps": 1000,
@@ -179,8 +174,10 @@ def main():
 
     pipe = df.StableDiffusionXL(
         vae_decoder=vae_decoder,
-        # text_encoder=text_encoder,
-        # tokenizer=tokenizer,
+        text_encoder=text_encoder,
+        text_encoder_2=text_encoder_2,
+        tokenizer=tokenizer,
+        tokenizer_2=tokenizer_2,
         unet=net,
         scheduler=scheduler,
         use_onnx=args.onnx,

@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import inspect
-from typing import Callable, List, Optional, Union
+from typing import Callable, List, Optional, Tuple, Union
 from logging import getLogger
 
 import numpy as np
@@ -25,8 +25,10 @@ class StableDiffusionXL:
     def __init__(
         self,
         vae_decoder,
-        # text_encoder,
-        # tokenizer,
+        text_encoder,
+        text_encoder_2,
+        tokenizer,
+        tokenizer_2,
         unet,
         scheduler,
         use_onnx: bool = False,
@@ -34,79 +36,129 @@ class StableDiffusionXL:
         super().__init__()
 
         self.vae_decoder = vae_decoder
-        # self.text_encoder = text_encoder
-        # self.tokenizer = tokenizer
+        self.text_encoder = text_encoder
+        self.text_encoder_2 = text_encoder_2
+        self.tokenizer = tokenizer
+        self.tokenizer_2 = tokenizer_2
         self.unet = unet
         self.scheduler = scheduler
         self.use_onnx = use_onnx
 
+        self.vae_scale_factor = 8
+
     def _encode_prompt(
         self,
-        prompt,
-        num_images_per_prompt,
-        do_classifier_free_guidance,
-        negative_prompt=None,
+        prompt: Union[str, List[str]],
+        num_images_per_prompt: int,
+        do_classifier_free_guidance: bool,
+        negative_prompt: Optional[Union[str, list]],
+        prompt_embeds: Optional[np.ndarray] = None,
+        negative_prompt_embeds: Optional[np.ndarray] = None,
+        pooled_prompt_embeds: Optional[np.ndarray] = None,
+        negative_pooled_prompt_embeds: Optional[np.ndarray] = None,
     ):
         r"""
         Encodes the prompt into text encoder hidden states.
 
         Args:
-            prompt (`str` or `list(int)`):
+            prompt (`Union[str, List[str]]`):
                 prompt to be encoded
             num_images_per_prompt (`int`):
                 number of images that should be generated per prompt
             do_classifier_free_guidance (`bool`):
                 whether to use classifier free guidance or not
-            negative_prompt (`str` or `List[str]`):
+            negative_prompt (`Optional[Union[str, list]]`):
                 The prompt or prompts not to guide the image generation. Ignored when not using guidance (i.e., ignored
                 if `guidance_scale` is less than `1`).
+            prompt_embeds (`Optional[np.ndarray]`, defaults to `None`):
+                Pre-generated text embeddings. Can be used to easily tweak text inputs, *e.g.* prompt weighting. If not
+                provided, text embeddings will be generated from `prompt` input argument.
+            negative_prompt_embeds (`Optional[np.ndarray]`, defaults to `None`):
+                Pre-generated negative text embeddings. Can be used to easily tweak text inputs, *e.g.* prompt
+                weighting. If not provided, negative_prompt_embeds will be generated from `negative_prompt` input
+                argument.
+            pooled_prompt_embeds (`Optional[np.ndarray]`, defaults to `None`):
+                Pre-generated pooled text embeddings. Can be used to easily tweak text inputs, *e.g.* prompt weighting.
+                If not provided, pooled text embeddings will be generated from `prompt` input argument.
+            negative_pooled_prompt_embeds (`Optional[np.ndarray]`, defaults to `None`):
+                Pre-generated negative pooled text embeddings. Can be used to easily tweak text inputs, *e.g.* prompt
+                weighting. If not provided, pooled negative_prompt_embeds will be generated from `negative_prompt`
+                input argument.
         """
-        batch_size = len(prompt) if isinstance(prompt, list) else 1
 
-        # get prompt text embeddings
-        text_inputs = self.tokenizer(
-            prompt,
-            padding="max_length",
-            max_length=self.tokenizer.model_max_length,
-            truncation=True,
-            return_tensors="np",
-        )
-        text_input_ids = text_inputs.input_ids
-        untruncated_ids = self.tokenizer(
-            prompt, padding="max_length", return_tensors="np"
-        ).input_ids
-
-        if not np.array_equal(text_input_ids, untruncated_ids):
-            removed_text = self.tokenizer.batch_decode(
-                untruncated_ids[:, self.tokenizer.model_max_length - 1 : -1]
-            )
-            logger.warning(
-                "The following part of your input was truncated because CLIP can only handle sequences up to"
-                f" {self.tokenizer.model_max_length} tokens: {removed_text}"
-            )
-
-        if not self.use_onnx:
-            output = self.text_encoder.predict([text_input_ids])
+        if isinstance(prompt, str):
+            batch_size = 1
+        elif isinstance(prompt, list):
+            batch_size = len(prompt)
         else:
-            output = self.text_encoder.run(
-                None, {"input_ids": text_input_ids.astype(np.int32)}
-            )
-        prompt_embeds = output[0]
+            batch_size = prompt_embeds.shape[0]
 
-        prompt_embeds = np.repeat(prompt_embeds, num_images_per_prompt, axis=0)
+        # Define tokenizers and text encoders
+        tokenizers = [self.tokenizer, self.tokenizer_2]
+        text_encoders = [self.text_encoder, self.text_encoder_2]
+
+        if prompt_embeds is None:
+            prompt_embeds_list = []
+            for tokenizer, text_encoder, input_dtype in zip(
+                tokenizers, text_encoders, [np.int32, np.int64]
+            ):
+                # get prompt text embeddings
+                text_inputs = tokenizer(
+                    prompt,
+                    padding="max_length",
+                    max_length=tokenizer.model_max_length,
+                    truncation=True,
+                    return_tensors="np",
+                )
+                text_input_ids = text_inputs.input_ids
+                untruncated_ids = tokenizer(
+                    prompt, padding="longest", return_tensors="np"
+                ).input_ids
+
+                if untruncated_ids.shape[-1] >= text_input_ids.shape[
+                    -1
+                ] and not np.array_equal(text_input_ids, untruncated_ids):
+                    removed_text = tokenizer.batch_decode(
+                        untruncated_ids[:, tokenizer.model_max_length - 1 : -1]
+                    )
+                    logger.warning(
+                        "The following part of your input was truncated because CLIP can only handle sequences up to"
+                        f" {tokenizer.model_max_length} tokens: {removed_text}"
+                    )
+
+                text_input_ids = text_input_ids.astype(input_dtype)
+                if not self.use_onnx:
+                    prompt_embeds = text_encoder.predict([text_input_ids])
+                else:
+                    prompt_embeds = text_encoder.run(
+                        None, {"input_ids": text_input_ids}
+                    )
+
+                pooled_prompt_embeds = prompt_embeds[0]
+                prompt_embeds = prompt_embeds[-2]
+                prompt_embeds = np.repeat(prompt_embeds, num_images_per_prompt, axis=0)
+                prompt_embeds_list.append(prompt_embeds)
+
+            prompt_embeds = np.concatenate(prompt_embeds_list, axis=-1)
 
         # get unconditional embeddings for classifier free guidance
-        if do_classifier_free_guidance:
-            uncond_tokens: List[str]
-            if negative_prompt is None:
-                uncond_tokens = [""] * batch_size
-            elif type(prompt) is not type(negative_prompt):
+        zero_out_negative_prompt = negative_prompt is None
+        if (
+            do_classifier_free_guidance
+            and negative_prompt_embeds is None
+            and zero_out_negative_prompt
+        ):
+            negative_prompt_embeds = np.zeros_like(prompt_embeds)
+            negative_pooled_prompt_embeds = np.zeros_like(pooled_prompt_embeds)
+        elif do_classifier_free_guidance and negative_prompt_embeds is None:
+            negative_prompt = negative_prompt or ""
+            if prompt is not None and type(prompt) is not type(negative_prompt):
                 raise TypeError(
                     f"`negative_prompt` should be the same type to `prompt`, but got {type(negative_prompt)} !="
                     f" {type(prompt)}."
                 )
             elif isinstance(negative_prompt, str):
-                uncond_tokens = [negative_prompt] * batch_size
+                uncond_tokens = [negative_prompt]
             elif batch_size != len(negative_prompt):
                 raise ValueError(
                     f"`negative_prompt`: {negative_prompt} has batch size {len(negative_prompt)}, but `prompt`:"
@@ -116,81 +168,165 @@ class StableDiffusionXL:
             else:
                 uncond_tokens = negative_prompt
 
-            max_length = prompt_embeds.shape[1]
-            uncond_input = self.tokenizer(
-                uncond_tokens,
-                padding="max_length",
-                max_length=max_length,
-                truncation=True,
-                return_tensors="np",
-            )
-            if not self.use_onnx:
-                output = self.text_encoder.predict([uncond_input.input_ids])
-            else:
-                output = self.text_encoder.run(
-                    None, {"input_ids": uncond_input.input_ids.astype(np.int32)}
+            negative_prompt_embeds_list = []
+            for tokenizer, text_encoder in zip(tokenizers, text_encoders):
+                max_length = prompt_embeds.shape[1]
+                uncond_input = tokenizer(
+                    uncond_tokens,
+                    padding="max_length",
+                    max_length=max_length,
+                    truncation=True,
+                    return_tensors="np",
                 )
-            negative_prompt_embeds = output[0]
+                negative_prompt_embeds = text_encoder(
+                    input_ids=uncond_input.input_ids.astype(
+                        text_encoder.input_dtype.get("input_ids", np.int32)
+                    )
+                )
+                negative_pooled_prompt_embeds = negative_prompt_embeds[0]
+                negative_prompt_embeds = negative_prompt_embeds[-2]
 
-        if do_classifier_free_guidance:
-            negative_prompt_embeds = np.repeat(
-                negative_prompt_embeds, num_images_per_prompt, axis=0
+                # duplicate unconditional embeddings for each generation per prompt, using mps friendly method
+                negative_prompt_embeds = np.repeat(
+                    negative_prompt_embeds, num_images_per_prompt, axis=0
+                )
+                # For classifier free guidance, we need to do two forward passes.
+                # Here we concatenate the unconditional and text embeddings into a single batch
+                # to avoid doing two forward passes
+                negative_prompt_embeds_list.append(negative_prompt_embeds)
+            negative_prompt_embeds = np.concatenate(
+                negative_prompt_embeds_list, axis=-1
             )
 
-            # For classifier free guidance, we need to do two forward passes.
-            # Here we concatenate the unconditional and text embeddings into a single batch
-            # to avoid doing two forward passes
-            prompt_embeds = np.concatenate([negative_prompt_embeds, prompt_embeds])
+        pooled_prompt_embeds = np.repeat(
+            pooled_prompt_embeds, num_images_per_prompt, axis=0
+        )
+        negative_pooled_prompt_embeds = np.repeat(
+            negative_pooled_prompt_embeds, num_images_per_prompt, axis=0
+        )
 
-        return prompt_embeds
+        return (
+            prompt_embeds,
+            negative_prompt_embeds,
+            pooled_prompt_embeds,
+            negative_pooled_prompt_embeds,
+        )
+
+    def prepare_latents(
+        self,
+        batch_size,
+        num_channels_latents,
+        height,
+        width,
+        dtype,
+        latents=None,
+    ):
+        shape = (
+            batch_size,
+            num_channels_latents,
+            height // self.vae_scale_factor,
+            width // self.vae_scale_factor,
+        )
+
+        if latents is None:
+            latents = np.random.randn(*shape).astype(dtype)
+        elif latents.shape != shape:
+            raise ValueError(
+                f"Unexpected latents shape, got {latents.shape}, expected {shape}"
+            )
+
+        # scale the initial noise by the standard deviation required by the scheduler
+        latents = latents * np.float64(self.scheduler.init_noise_sigma)
+
+        return latents
 
     def forward(
         self,
         prompt: Union[str, List[str]],
+        height: Optional[int] = None,
+        width: Optional[int] = None,
         num_inference_steps: int = 50,
         guidance_scale: float = 5.0,
+        negative_prompt: Optional[Union[str, List[str]]] = None,
+        num_images_per_prompt: int = 1,
+        latents: Optional[np.ndarray] = None,
+        prompt_embeds: Optional[np.ndarray] = None,
+        negative_prompt_embeds: Optional[np.ndarray] = None,
+        pooled_prompt_embeds: Optional[np.ndarray] = None,
+        negative_pooled_prompt_embeds: Optional[np.ndarray] = None,
+        original_size: Optional[Tuple[int, int]] = None,
+        crops_coords_top_left: Tuple[int, int] = (0, 0),
+        target_size: Optional[Tuple[int, int]] = None,
     ):
-        # # define call parameters
-        # if isinstance(prompt, str):
-        #     batch_size = 1
-        # # elif isinstance(prompt, list):
-        # else:
-        #     batch_size = len(prompt)
+        # Default height and width to unet
+        sample_size = 64
+        height = height or sample_size * self.vae_scale_factor
+        width = width or sample_size * self.vae_scale_factor
+
+        original_size = original_size or (height, width)
+        target_size = target_size or (height, width)
+
+        # Define call parameters
+        if isinstance(prompt, str):
+            batch_size = 1
+        elif isinstance(prompt, list):
+            batch_size = len(prompt)
+        else:
+            batch_size = prompt_embeds.shape[0]
 
         # here `guidance_scale` is defined analog to the guidance weight `w` of equation (2)
         # of the Imagen paper: https://arxiv.org/pdf/2205.11487.pdf . `guidance_scale = 1`
         # corresponds to doing no classifier free guidance.
         do_classifier_free_guidance = guidance_scale > 1.0
 
-        # # Encode input prompt
-        # prompt_embeds = self._encode_prompt(
-        #     prompt,
-        #     num_images_per_prompt,
-        #     do_classifier_free_guidance,
-        #     negative_prompt,
-        # )
+        # Encode input prompt
+        (
+            prompt_embeds,
+            negative_prompt_embeds,
+            pooled_prompt_embeds,
+            negative_pooled_prompt_embeds,
+        ) = self._encode_prompt(
+            prompt,
+            num_images_per_prompt,
+            do_classifier_free_guidance,
+            negative_prompt,
+            prompt_embeds=prompt_embeds,
+            negative_prompt_embeds=negative_prompt_embeds,
+            pooled_prompt_embeds=pooled_prompt_embeds,
+            negative_pooled_prompt_embeds=negative_pooled_prompt_embeds,
+        )
 
-        # # get the initial random noise unless the user supplied it
-        # latents_dtype = prompt_embeds.dtype
-        # latents_shape = (batch_size * num_images_per_prompt, 4, height // 8, width // 8)
-        # latents = np.random.randn(*latents_shape).astype(latents_dtype)
-
-        # 4. Prepare timesteps
+        # Prepare timesteps
         self.scheduler.set_timesteps(num_inference_steps)
         timesteps = self.scheduler.timesteps
 
-        # latents = latents * np.float64(self.scheduler.init_noise_sigma)
+        # Prepare latent variables
+        in_channels = 4
+        latents = self.prepare_latents(
+            batch_size * num_images_per_prompt,
+            in_channels,
+            height,
+            width,
+            prompt_embeds.dtype,
+            latents,
+        )
 
-        # # prepare extra kwargs for the scheduler step, since not all schedulers have the same signature
-        # # eta (η) is only used with the DDIMScheduler, it will be ignored for other schedulers.
-        # # eta corresponds to η in DDIM paper: https://arxiv.org/abs/2010.02502
-        # # and should be between [0, 1]
-        # accepts_eta = "eta" in set(
-        #     inspect.signature(self.scheduler.step).parameters.keys()
-        # )
-        # extra_step_kwargs = {}
-        # if accepts_eta:
-        #     extra_step_kwargs["eta"] = eta
+        # Prepare added time ids & embeddings
+        add_text_embeds = pooled_prompt_embeds
+        add_time_ids = (original_size + crops_coords_top_left + target_size,)
+        add_time_ids = np.array(add_time_ids, dtype=prompt_embeds.dtype)
+
+        if do_classifier_free_guidance:
+            prompt_embeds = np.concatenate(
+                (negative_prompt_embeds, prompt_embeds), axis=0
+            )
+            add_text_embeds = np.concatenate(
+                (negative_pooled_prompt_embeds, add_text_embeds), axis=0
+            )
+            add_time_ids = np.concatenate((add_time_ids, add_time_ids), axis=0)
+        add_time_ids = np.repeat(
+            add_time_ids, batch_size * num_images_per_prompt, axis=0
+        )
 
         # Denoising loop
         for i, t in enumerate(self.progress_bar(timesteps)):

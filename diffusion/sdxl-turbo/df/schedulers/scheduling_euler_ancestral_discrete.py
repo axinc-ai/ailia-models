@@ -69,6 +69,14 @@ class EulerAncestralDiscreteScheduler(ConfigMixin):
         self._step_index = None
         self._begin_index = None
 
+    @property
+    def init_noise_sigma(self):
+        # standard deviation of the initial noise distribution
+        if self.config.timestep_spacing in ["linspace", "trailing"]:
+            return np.max(self.sigmas)
+
+        return (np.max(self.sigmas) ** 2 + 1) ** 0.5
+
     def scale_model_input(
         self, sample: np.ndarray, timestep: Union[float, np.ndarray]
     ) -> np.ndarray:
