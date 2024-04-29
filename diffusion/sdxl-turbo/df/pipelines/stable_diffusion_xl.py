@@ -24,20 +24,19 @@ logger = getLogger(__name__)
 class StableDiffusionXL:
     def __init__(
         self,
-        # vae_decoder,
+        vae_decoder,
         # text_encoder,
         # tokenizer,
-        # unet,
+        unet,
         scheduler,
         use_onnx: bool = False,
     ):
         super().__init__()
 
-        # self.vae_encoder = vae_encoder
-        # self.vae_decoder = vae_decoder
+        self.vae_decoder = vae_decoder
         # self.text_encoder = text_encoder
         # self.tokenizer = tokenizer
-        # self.unet = unet
+        self.unet = unet
         self.scheduler = scheduler
         self.use_onnx = use_onnx
 
@@ -145,13 +144,6 @@ class StableDiffusionXL:
 
         return prompt_embeds
 
-    # here `guidance_scale` is defined analog to the guidance weight `w` of equation (2)
-    # of the Imagen paper: https://arxiv.org/pdf/2205.11487.pdf . `guidance_scale = 1`
-    # corresponds to doing no classifier free guidance.
-    @property
-    def do_classifier_free_guidance(self):
-        return self._guidance_scale > 1
-
     def forward(
         self,
         prompt: Union[str, List[str]],
@@ -165,7 +157,10 @@ class StableDiffusionXL:
         # else:
         #     batch_size = len(prompt)
 
-        self._guidance_scale = guidance_scale
+        # here `guidance_scale` is defined analog to the guidance weight `w` of equation (2)
+        # of the Imagen paper: https://arxiv.org/pdf/2205.11487.pdf . `guidance_scale = 1`
+        # corresponds to doing no classifier free guidance.
+        do_classifier_free_guidance = guidance_scale > 1.0
 
         # # Encode input prompt
         # prompt_embeds = self._encode_prompt(
@@ -202,9 +197,58 @@ class StableDiffusionXL:
             # expand the latents if we are doing classifier free guidance
             latent_model_input = (
                 np.concatenate([latents] * 2)
-                if self.do_classifier_free_guidance
+                if do_classifier_free_guidance
                 else latents
             )
+
+            latent_model_input = self.scheduler.scale_model_input(latent_model_input, t)
+
+            # predict the noise residual
+            timestep = np.array([t], dtype=int)
+            if not self.use_onnx:
+                output = self.unet.predict(
+                    [latent_model_input, timestep, prompt_embeds, add_text_embeds]
+                )
+            else:
+                output = self.unet.run(
+                    None,
+                    {
+                        "sample": latent_model_input,
+                        "timestep": timestep,
+                        "encoder_hidden_states": prompt_embeds,
+                        "text_embeds": add_text_embeds,
+                        "time_ids": add_time_ids,
+                    },
+                )
+            noise_pred = output[0]
+
+            # perform guidance
+            if do_classifier_free_guidance:
+                noise_pred_uncond, noise_pred_text = np.split(noise_pred, 2)
+                noise_pred = noise_pred_uncond + guidance_scale * (
+                    noise_pred_text - noise_pred_uncond
+                )
+
+            # compute the previous noisy sample x_t -> x_t-1
+            latents = self.scheduler.step(noise_pred, t, latents)
+
+        latents /= 0.13025
+        # it seems likes there is a strange result for using half-precision vae decoder if batchsize>1
+        outputs = []
+        for i in range(latents.shape[0]):
+            latent_sample = latents[i : i + 1]
+            if not self.use_onnx:
+                output = self.vae_decoder.predict([latent_sample])
+            else:
+                output = self.vae_decoder.run(None, {"latent_sample": latent_sample})
+            outputs.append(output[0])
+        image = np.concatenate(outputs)
+
+        image = np.clip(image / 2 + 0.5, 0, 1)
+        image = image.transpose((0, 2, 3, 1))
+        image = image[:, :, :, ::-1]  # RGB->BGR
+
+        return image
 
     def progress_bar(self, iterable=None, total=None):
         from tqdm.auto import tqdm

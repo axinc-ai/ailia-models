@@ -69,6 +69,31 @@ class EulerAncestralDiscreteScheduler(ConfigMixin):
         self._step_index = None
         self._begin_index = None
 
+    def scale_model_input(
+        self, sample: np.ndarray, timestep: Union[float, np.ndarray]
+    ) -> np.ndarray:
+        """
+        Ensures interchangeability with schedulers that need to scale the denoising model input depending on the
+        current timestep. Scales the denoising model input by `(sigma**2 + 1) ** 0.5` to match the Euler algorithm.
+
+        Args:
+            sample:
+                The input sample.
+            timestep (`int`, *optional*):
+                The current timestep in the diffusion chain.
+
+        Returns:
+            np.ndarray: A scaled input sample.
+        """
+
+        if self._step_index is None:
+            self._init_step_index(timestep)
+
+        sigma = self.sigmas[self._step_index]
+        sample = sample / ((sigma**2 + 1) ** 0.5)
+        self.is_scale_input_called = True
+        return sample
+
     def set_timesteps(self, num_inference_steps: int):
         """
         Sets the discrete timesteps used for the diffusion chain (to be run before inference).
@@ -122,3 +147,87 @@ class EulerAncestralDiscreteScheduler(ConfigMixin):
         self.timesteps = timesteps
         self._step_index = None
         self._begin_index = None
+
+    # Copied from diffusers.schedulers.scheduling_euler_discrete.EulerDiscreteScheduler.index_for_timestep
+    def index_for_timestep(self, timestep, schedule_timesteps=None):
+        if schedule_timesteps is None:
+            schedule_timesteps = self.timesteps
+
+        indices = (schedule_timesteps == timestep).nonzero()
+
+        # The sigma index that is taken for the **very** first `step`
+        # is always the second index (or the last index if there is only 1)
+        # This way we can ensure we don't accidentally skip a sigma in
+        # case we start in the middle of the denoising schedule (e.g. for image-to-image)
+        pos = 1 if len(indices) > 1 else 0
+
+        return indices[pos].item()
+
+    # Copied from diffusers.schedulers.scheduling_euler_discrete.EulerDiscreteScheduler._init_step_index
+    def _init_step_index(self, timestep):
+        if self._begin_index is None:
+            self._step_index = self.index_for_timestep(timestep)
+        else:
+            self._step_index = self._begin_index
+
+    def step(
+        self,
+        model_output: np.ndarray,
+        timestep: Union[float, np.ndarray],
+        sample: np.ndarray,
+    ):
+        """
+        Predict the sample from the previous timestep by reversing the SDE. This function propagates the diffusion
+        process from the learned model outputs (most often the predicted noise).
+
+        Args:
+            model_output:
+                The direct output from learned diffusion model.
+            timestep:
+                The current discrete timestep in the diffusion chain.
+            sample:
+                A current instance of a sample created by the diffusion process.
+        """
+        if self._step_index is None:
+            self._init_step_index(timestep)
+
+        sigma = self.sigmas[self._step_index]
+
+        # 1. compute predicted original sample (x_0) from sigma-scaled predicted noise
+        if self.config.prediction_type == "epsilon":
+            pred_original_sample = sample - sigma * model_output
+        elif self.config.prediction_type == "v_prediction":
+            # * c_out + input * c_skip
+            pred_original_sample = model_output * (-sigma / (sigma**2 + 1) ** 0.5) + (
+                sample / (sigma**2 + 1)
+            )
+        elif self.config.prediction_type == "sample":
+            raise NotImplementedError("prediction_type not implemented yet: sample")
+        else:
+            raise ValueError(
+                f"prediction_type given as {self.config.prediction_type} must be one of `epsilon`, or `v_prediction`"
+            )
+
+        sigma_from = self.sigmas[self._step_index]
+        sigma_to = self.sigmas[self._step_index + 1]
+        sigma_up = (sigma_to**2 * (sigma_from**2 - sigma_to**2) / sigma_from**2) ** 0.5
+        sigma_down = (sigma_to**2 - sigma_up**2) ** 0.5
+
+        # 2. Convert to an ODE derivative
+        derivative = (sample - pred_original_sample) / sigma
+
+        dt = sigma_down - sigma
+
+        prev_sample = sample + derivative * dt
+
+        noise = np.random.randn(*model_output.shape)
+
+        prev_sample = prev_sample + noise * sigma_up
+
+        # Cast sample back to model compatible dtype
+        prev_sample = prev_sample.astype(model_output.dtype)
+
+        # upon completion increase step index by one
+        self._step_index += 1
+
+        return prev_sample

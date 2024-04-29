@@ -178,10 +178,10 @@ def main():
     )
 
     pipe = df.StableDiffusionXL(
-        # vae_decoder=vae_decoder,
+        vae_decoder=vae_decoder,
         # text_encoder=text_encoder,
         # tokenizer=tokenizer,
-        # unet=net,
+        unet=net,
         scheduler=scheduler,
         use_onnx=args.onnx,
     )
