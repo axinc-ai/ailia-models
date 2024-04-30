@@ -10,7 +10,7 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath  # noqa
+from arg_utils import get_base_parser, update_parser, get_savepath  # noqa
 from model_utils import check_and_download_models  # noqa
 from image_utils import normalize_image  # noqa
 from detector_utils import load_image  # noqa
@@ -216,10 +216,11 @@ def main():
 
     # initialize
     if not args.onnx:
-        net = ailia.Net(MODEL_ENC_PATH, WEIGHT_ENC_PATH, env_id=env_id)
-        decoder = ailia.Net(MODEL_DEC_PATH, WEIGHT_DEC_PATH, env_id=env_id)
-        lm_net = ailia.Net(MODEL_LM_PATH, WEIGHT_LM_PATH, env_id=env_id)
-        ctc = ailia.Net(MODEL_CTC_PATH, WEIGHT_CTC_PATH, env_id=env_id)
+        memory_mode = ailia.get_memory_mode(True, True, False, True)
+        net = ailia.Net(MODEL_ENC_PATH, WEIGHT_ENC_PATH, env_id=env_id, memory_mode=memory_mode)
+        decoder = ailia.Net(MODEL_DEC_PATH, WEIGHT_DEC_PATH, env_id=env_id, memory_mode=memory_mode)
+        lm_net = ailia.Net(MODEL_LM_PATH, WEIGHT_LM_PATH, env_id=env_id, memory_mode=memory_mode)
+        ctc = ailia.Net(MODEL_CTC_PATH, WEIGHT_CTC_PATH, env_id=env_id, memory_mode=memory_mode)
     else:
         import onnxruntime
         net = onnxruntime.InferenceSession(WEIGHT_ENC_PATH)
