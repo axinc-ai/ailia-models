@@ -53,6 +53,7 @@ cd ../../diffusion/stable-diffusion-txt2img; python3 stable-diffusion-txt2img.py
 cd ../../diffusion/control_net python3 control_net.py ${OPTION}
 cd ../../diffusion/daclip-sde; python3 daclipsde.py ${OPTION}
 cd ../../diffusion/riffusion; python3 riffusion.py ${OPTION}
+cd ../../diffusion/marigold; python3 marigold.py ${OPTION}
 cd ../../deep_fashion/clothing-detection; python3 clothing-detection.py ${OPTION}
 cd ../../deep_fashion/fashionai-key-points-detection; python3 fashionai-key-points-detection.py ${OPTION}
 cd ../../deep_fashion/mmfashion; python3 mmfashion.py ${OPTION}
@@ -213,6 +214,7 @@ cd ../../natural_language_processing/multilingual-e5; python3 multilingual-e5.py
 cd ../../natural_language_processing/t5_whisper_medical; python3 t5_whisper_medical.py ${OPTION}
 cd ../../natural_language_processing/t5_base_japanese_summarization; python3 t5_base_japanese_summarization.py ${OPTION}
 cd ../../natural_language_processing/glucose; python3 glucose.py ${OPTION}
+cd ../../natural_language_processing/cross_encoder_mmarco; python3 cross_encoder_mmarco.py ${OPTION}
 cd ../../network_intrusion_detection/bert-network-packet-flow-header-payload; python3 bert-network-packet-flow-header-payload.py ${OPTION}
 cd ../../network_intrusion_detection/falcon-adapter-network-packet; python3 falcon-adapter-network-packet.py ${OPTION}
 cd ../../neural_rendering/nerf; python3 nerf.py ${OPTION}
