@@ -16,7 +16,7 @@ from arg_utils import get_base_parser, update_parser, get_savepath  # noqa
 from model_utils import check_and_download_models  # noqa
 from image_utils import normalize_image  # noqa
 from detector_utils import load_image  # noqa
-from classifier_utils import plot_results, print_results  # noqa
+from classifier_utils import plot_results, print_results, write_predictions  # noqa
 from math_utils import softmax  # noqa
 import webcamera_utils  # noqa
 # logger
@@ -54,6 +54,11 @@ parser.add_argument(
     '--onnx',
     action='store_true',
     help='execute onnxruntime version.'
+)
+parser.add_argument(
+    '-w', '--write_json',
+    action='store_true',
+    help='Flag to output results to json file.'
 )
 args = update_parser(parser)
 
@@ -220,6 +225,10 @@ def recognize_from_image(models):
         # show results
         pred = np.expand_dims(pred, axis=0)
         print_results(pred, text_inputs)
+
+        if args.write_json:
+            json_path = '%s.json' % image_path.rsplit('.', 1)[0]
+            write_predictions(json_path, pred, text_inputs, 'json')
 
     logger.info('Script finished successfully.')
 
