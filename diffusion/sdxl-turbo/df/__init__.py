@@ -1,2 +1,2 @@
 from .schedulers import EulerAncestralDiscreteScheduler
-from .pipelines import StableDiffusionXL
+from .pipelines import StableDiffusionXL, StableDiffusionXLImg2Img

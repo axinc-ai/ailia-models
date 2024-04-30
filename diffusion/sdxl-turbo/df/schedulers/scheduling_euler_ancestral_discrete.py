@@ -20,6 +20,8 @@ from ..configuration_utils import ConfigMixin, register_to_config
 
 
 class EulerAncestralDiscreteScheduler(ConfigMixin):
+    order = 1
+
     @register_to_config
     def __init__(
         self,
@@ -239,3 +241,33 @@ class EulerAncestralDiscreteScheduler(ConfigMixin):
         self._step_index += 1
 
         return prev_sample
+
+    def add_noise(
+        self,
+        original_samples: np.ndarray,
+        noise: np.ndarray,
+        timesteps: np.ndarray,
+    ) -> np.ndarray:
+        # Make sure sigmas and timesteps have the same device and dtype as original_samples
+        sigmas = self.sigmas
+        schedule_timesteps = self.timesteps
+        timesteps = timesteps
+
+        # self.begin_index is None when scheduler is used for training, or pipeline does not implement set_begin_index
+        if self._begin_index is None:
+            step_indices = [
+                self.index_for_timestep(t, schedule_timesteps) for t in timesteps
+            ]
+        elif self._step_index is not None:
+            # add_noise is called after first denoising step (for inpainting)
+            step_indices = [self._step_index] * timesteps.shape[0]
+        else:
+            # add noise is called bevore first denoising step to create inital latent(img2img)
+            step_indices = [self._begin_index] * timesteps.shape[0]
+
+        sigma = sigmas[step_indices].flatten()
+        while len(sigma.shape) < len(original_samples.shape):
+            sigma = np.expand_dims(sigma, axis=-1)
+
+        noisy_samples = original_samples + noise * sigma
+        return noisy_samples
