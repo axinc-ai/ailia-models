@@ -635,9 +635,10 @@ def main():
 
     # initialize
     if not args.onnx:
-        encoder = ailia.Net(MODEL_ENC_PATH, WEIGHT_ENC_PATH, env_id=env_id)
-        decoder = ailia.Net(MODEL_DEC_PATH, WEIGHT_DEC_PATH, env_id=env_id)
-        joint = ailia.Net(MODEL_JNT_PATH, WEIGHT_JNT_PATH, env_id=env_id)
+        memory_mode = ailia.get_memory_mode(True, True, False, True)
+        encoder = ailia.Net(MODEL_ENC_PATH, WEIGHT_ENC_PATH, env_id=env_id, memory_mode=memory_mode)
+        decoder = ailia.Net(MODEL_DEC_PATH, WEIGHT_DEC_PATH, env_id=env_id, memory_mode=memory_mode)
+        joint = ailia.Net(MODEL_JNT_PATH, WEIGHT_JNT_PATH, env_id=env_id, memory_mode=memory_mode)
     else:
         import onnxruntime
         encoder = onnxruntime.InferenceSession(WEIGHT_ENC_PATH)
