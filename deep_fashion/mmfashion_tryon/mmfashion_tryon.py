@@ -10,7 +10,7 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
+from arg_utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from detector_utils import load_image  # noqa: E402
 import webcamera_utils  # noqa: E402
@@ -462,7 +462,10 @@ def recognize_from_video(GMM_net, TOM_net, det_net, pose_net, seg_net):
         writer = None
 
     # prepare cloth image
-    image_path = args_input
+    if type(args_input) == list:
+        image_path = args_input[0]
+    else:
+        image_path = args_input
     img = load_image(image_path)
     img = cv2.cvtColor(img, cv2.COLOR_BGRA2RGB)
     img = cv2.resize(

@@ -11,7 +11,7 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser
+from arg_utils import get_base_parser, update_parser
 from model_utils import check_and_download_models
 from image_utils import normalize_image
 from detector_utils import load_image
@@ -57,7 +57,7 @@ args = update_parser(parser)
 # ======================
 
 def get_char_list():
-    with open(CHAR_FILE_PATH) as f:
+    with open(CHAR_FILE_PATH, encoding='utf-8') as f:
         char_list = f.read()
     char_list = '〓' + char_list.replace("\n", "")
     char_list = ['[CTCblank]'] + list(char_list)

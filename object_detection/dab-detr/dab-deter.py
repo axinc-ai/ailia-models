@@ -3,6 +3,7 @@ import os
 import sys
 import cv2
 import onnxruntime
+import json
 
 from dab_detr_utils import Detect
 
@@ -10,7 +11,7 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath
+from arg_utils import get_base_parser, update_parser, get_savepath
 from model_utils import check_and_download_models
 from detector_utils import load_image, reverse_letterbox, plot_results, write_predictions
 import webcamera_utils
@@ -55,6 +56,11 @@ parser.add_argument(
     '-o', '--onnx', action='store_true',
     help="Option to use onnxrutime to run or not."
 )
+parser.add_argument(
+    '-w', '--write_json',
+    action='store_true',
+    help='Flag to output results to json file.'
+)
 args = update_parser(parser)
 
 WEIGHT_PATH = "dab_detr.onnx"
@@ -81,7 +87,10 @@ def recognize_from_image():
     if args.onnx:
         session = onnxruntime.InferenceSession(WEIGHT_PATH)
     else:
-        session = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id = args.env_id)
+        memory_mode = ailia.get_memory_mode(
+            reduce_constant=True, ignore_input_with_initializer=True,
+            reduce_interstage=False, reuse_interstage=True)
+        session = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id = args.env_id, memory_mode=memory_mode)
 
     # input image loop
     for image_path in args.input:
@@ -119,6 +128,18 @@ def recognize_from_image():
         logger.info(f'saved at : {savepath}')
         cv2.imwrite(savepath, res_img)
 
+        # write prediction
+        if args.write_json:
+            json_path = '%s.json' % savepath.rsplit('.', 1)[0]
+            out_list = []
+            for o in output:
+                out_list.append({
+                    "category": o.category, "category_name": COCO_CATEGORY[o.category],
+                    "prob": float(o.prob), "x": float(o.x), "y": float(o.y), "w": float(o.w), "h": float(o.h)
+                })
+            with open(json_path, "w", encoding="utf-8") as f:
+                json.dump(out_list, f, indent=2)
+
     logger.info('Script finished successfully.')
 
 
@@ -127,7 +148,10 @@ def recognize_from_video():
     if args.onnx:
         session = onnxruntime.InferenceSession(WEIGHT_PATH)
     else:
-        session = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id = args.env_id)
+        memory_mode = ailia.get_memory_mode(
+            reduce_constant=True, ignore_input_with_initializer=True,
+            reduce_interstage=False, reuse_interstage=True)
+        session = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id = args.env_id, memory_mode=memory_mode)
 
     capture = webcamera_utils.get_capture(args.video)
 

@@ -1,7 +1,7 @@
 # ailia MODELS tutorial
 
 In this tutorial we will explain how to use ailia from python language.
-If you want to use ailia from other languages(C++/C#(Unity)/JNI/Kotlin) see the link at the bottom of this tutorial.
+If you want to use ailia from other languages(C++/C#(Unity)/JNI/Kotlin/Rust/Flutter) see the link at the bottom of this tutorial.
 
 ## Requirements
 
@@ -9,23 +9,11 @@ If you want to use ailia from other languages(C++/C#(Unity)/JNI/Kotlin) see the 
 
 ## Install ailia SDK
 
-- [Download a free evaluation version of ailia SDK](https://axinc.jp/en/trial/)
-- Unzip ailia SDK
-- Run the following command
-
 ```
-cd ailia_sdk/python
-python3 bootstrap.py
-pip3 install .
+pip3 install ailia
 ```
 
-- In the evaluation version, place the license file in the same folder as libailia.dll ([python_path]/site_packages/ailia) on Windows and in ~/Library/SHALO/ on Mac.
-
-- You can find the location of Python site-packages directory using the following command.
-
-```
-pip3 show ailia
-```
+The ailia SDK is a commercial library. Under certain conditions, it can be used free of charge; however, it is principally paid software. For details, please refer to https://ailia.ai/license/en/ .
 
 ## Install required libraries for Python
 
@@ -43,6 +31,7 @@ sudo apt install python3-matplotlib
 sudo apt install python3-scipy
 pip3 install cython
 pip3 install numpy
+pip3 install pillow
 ```
 
 [OpenCV for python3 is pre-installed on Jetson.](https://forums.developer.nvidia.com/t/install-opencv-for-python3-in-jetson-nano/74042/3) You only need to run this command if you get a cv2 import error.
@@ -185,3 +174,9 @@ python3 launcher.py
 
 ### Kotlin
 -  [Android Studio Sample Project](https://github.com/axinc-ai/ailia-android-studio-kotlin)
+
+### Rust
+- [ailia models Rust](https://github.com/axinc-ai/ailia-models-rust)
+
+### Flutter
+- [ailia models Flutter](https://github.com/axinc-ai/ailia-flutter)

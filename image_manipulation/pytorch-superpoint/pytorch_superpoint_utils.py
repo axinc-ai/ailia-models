@@ -1,6 +1,7 @@
 import numpy as np
 import cv2
 import matplotlib.pyplot as plt
+import json
 
 # for pytorch-superpoint
 from functional import grid_sample  # noqa
@@ -268,13 +269,27 @@ def draw_matches_cv(data, matches, plot_points=True):
         keypoints1 = [cv2.KeyPoint(p[0], p[1], 1) for p in matches_pts]
         keypoints2 = [cv2.KeyPoint(p[2], p[3], 1) for p in matches_pts]
 
-    inliers = data['inliers'].astype(bool)
     img1 = to3dim(data['image1'])
     img2 = to3dim(data['image2'])
     img1 = np.concatenate([img1, img1, img1], axis=2)
     img2 = np.concatenate([img2, img2, img2], axis=2)
     return cv2.drawMatches(np.uint8(img1), keypoints1, np.uint8(img2), keypoints2, matches,
                             None, matchColor=(0,255,0), singlePointColor=(0, 0, 255))
+
+def save_result_json(json_path, data, matches):
+    results = []
+    keypoints1 = [cv2.KeyPoint(p[1], p[0], 1) for p in data['keypoints1']]
+    keypoints2 = [cv2.KeyPoint(p[1], p[0], 1) for p in data['keypoints2']]
+    for m in matches:
+        results.append({
+            'distance': m.distance,
+            'queryIdx': m.queryIdx,
+            'queryPt': keypoints1[m.queryIdx].pt,
+            'trainIdx': m.trainIdx,
+            'trainPt': keypoints2[m.trainIdx].pt
+        })
+    with open(json_path, 'w') as f:
+        json.dump(results, f, indent=2)
 
 def get_random_m(matches, ratio):
     ran_idx = np.random.choice(matches.shape[0], int(matches.shape[0]*ratio))               

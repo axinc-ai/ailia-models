@@ -25,7 +25,7 @@ def _resize_image(img_org, base_size):
         base_height = base_size
         wpercent = base_height / float(img_org.size[1])
         wsize = int((float(img_org.size[0]) * float(wpercent)))
-        img = img_org.resize((wsize, base_height), Image.ANTIALIAS)
+        img = img_org.resize((wsize, base_height), Image.LANCZOS)
         if sky_side == 0:  # Left side is sky side, so keep it and crop right side
             img = img.crop(
                 (0, 0, base_size, img.size[1])
@@ -38,7 +38,7 @@ def _resize_image(img_org, base_size):
         base_width = base_size
         wpercent = base_width / float(img_org.size[0])
         hsize = int((float(img_org.size[1]) * float(wpercent)))
-        img = img_org.resize((base_width, hsize), Image.ANTIALIAS)
+        img = img_org.resize((base_width, hsize), Image.LANCZOS)
         img = img.crop(
             (0, 0, img.size[0], base_size)
         )  # Keeps sky area in image, crops from lower part
