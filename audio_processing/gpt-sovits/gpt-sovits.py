@@ -60,17 +60,17 @@ parser.add_argument(
 )
 args = update_parser(parser, check_input_type=False)
 
-WEIGHT_PATH_SSL = 'nahida_cnhubert.onnx'
-WEIGHT_PATH_T2S_ENCODER = 'nahida_t2s_encoder.onnx'
-WEIGHT_PATH_T2S_FIRST_DECODER = 'nahida_t2s_fsdec.onnx'
-WEIGHT_PATH_T2S_STAGE_DECODER = 'nahida_t2s_sdec.onnx'
-WEIGHT_PATH_VITS = 'nahida_vits.onnx'
+WEIGHT_PATH_SSL = 'cnhubert.onnx'
+WEIGHT_PATH_T2S_ENCODER = 't2s_encoder.onnx'
+WEIGHT_PATH_T2S_FIRST_DECODER = 't2s_fsdec.onnx'
+WEIGHT_PATH_T2S_STAGE_DECODER = 't2s_sdec.onnx'
+WEIGHT_PATH_VITS = 'vits.onnx'
 
-MODEL_PATH_SSL = 'nahida_cnhubert.onnx.prototxt'
-MODEL_PATH_T2S_ENCODER = 'nahida_t2s_encoder.onnx.prototxt'
-MODEL_PATH_T2S_FIRST_DECODER = 'nahida_t2s_fsdec.onnx.prototxt'
-MODEL_PATH_T2S_STAGE_DECODER = 'nahida_t2s_sdec.onnx.prototxt'
-MODEL_PATH_VITS = 'nahida_vits.onnx.prototxt'
+MODEL_PATH_SSL = 'cnhubert.onnx.prototxt'
+MODEL_PATH_T2S_ENCODER = 't2s_encoder.onnx.prototxt'
+MODEL_PATH_T2S_FIRST_DECODER = 't2s_fsdec.onnx.prototxt'
+MODEL_PATH_T2S_STAGE_DECODER = 't2s_sdec.onnx.prototxt'
+MODEL_PATH_VITS = 'vits.onnx.prototxt'
 
 
 # ======================

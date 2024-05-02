@@ -38,8 +38,8 @@ ONNX opset = 17
 
 ### Netron
 
-- [nahida_cnhubert.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/gpt-sovits/nahida_cnhubert.onnx.prototxt)
-- [nahida_t2s_encoder.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/gpt-sovits/nahida_t2s_encoder.onnx.prototxt)
-- [nahida_t2s_fsdec.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/gpt-sovits/nahida_t2s_fsdec.onnx.prototxt)
-- [nahida_t2s_sdec.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/gpt-sovits/nahida_t2s_sdec.onnx.prototxt)
-- [nahida_vits.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/gpt-sovits/nahida_vits.onnx.prototxt)
+- [cnhubert.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/gpt-sovits/cnhubert.onnx.prototxt)
+- [t2s_encoder.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/gpt-sovits/t2s_encoder.onnx.prototxt)
+- [t2s_fsdec.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/gpt-sovits/t2s_fsdec.onnx.prototxt)
+- [t2s_sdec.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/gpt-sovits/t2s_sdec.onnx.prototxt)
+- [vits.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/gpt-sovits/vits.onnx.prototxt)
