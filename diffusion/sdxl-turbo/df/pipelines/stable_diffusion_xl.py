@@ -381,7 +381,6 @@ class StableDiffusionXL:
 
         image = np.clip(image / 2 + 0.5, 0, 1)
         image = image.transpose((0, 2, 3, 1))
-        image = image[:, :, :, ::-1]  # RGB->BGR
 
         return image
 

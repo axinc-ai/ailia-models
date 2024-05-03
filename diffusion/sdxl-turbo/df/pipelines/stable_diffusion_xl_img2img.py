@@ -16,6 +16,7 @@ from typing import List, Optional, Tuple, Union
 from logging import getLogger
 
 import numpy as np
+from PIL import Image
 
 from .stable_diffusion_xl import StableDiffusionXL
 
@@ -112,6 +113,26 @@ class StableDiffusionXLImg2Img(StableDiffusionXL):
         )
         return init_latents
 
+    def image_processor(self, image):
+        height, width = image.shape[:2]
+        width, height = (x - x % self.vae_scale_factor for x in (width, height))
+
+        # resize
+        image = np.array(
+            Image.fromarray(image).resize((width, height), Image.Resampling.BICUBIC)
+        )
+
+        image = image / 255
+        image = image.astype(np.float32)
+
+        # reshape
+        image = image.transpose(2, 0, 1)  # HWC -> CHW
+        image = np.expand_dims(image, axis=0)
+        # normalize
+        image = 2.0 * image - 1.0
+
+        return image
+
     def forward(
         self,
         prompt: Union[str, List[str]],
@@ -161,7 +182,7 @@ class StableDiffusionXLImg2Img(StableDiffusionXL):
         )
 
         # Preprocess image
-        image = np.load("image.npy")
+        image = self.image_processor(image)
 
         # Prepare timesteps
         self.scheduler.set_timesteps(num_inference_steps)
@@ -180,6 +201,7 @@ class StableDiffusionXLImg2Img(StableDiffusionXL):
             batch_size,
             num_images_per_prompt,
         )
+        latents = latents.astype(prompt_embeds.dtype)
 
         height, width = latents.shape[-2:]
         height = height * self.vae_scale_factor
@@ -268,6 +290,5 @@ class StableDiffusionXLImg2Img(StableDiffusionXL):
 
         image = np.clip(image / 2 + 0.5, 0, 1)
         image = image.transpose((0, 2, 3, 1))
-        image = image[:, :, :, ::-1]  # RGB->BGR
 
         return image
