@@ -3,8 +3,4 @@ unidecode
 pyopenjtalk-prebuilt
 SoundFile
 librosa
-pypinyin # for chinese
-inflect # for english
-cn2an # for chinese
-jieba # for chinese
-eng_to_ipa # for english
+g2p_en

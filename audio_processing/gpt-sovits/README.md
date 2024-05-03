@@ -16,7 +16,7 @@ pip3 install -r requirements.txt
 ### Usage
 Automatically downloads the onnx and prototxt files on the first run. It is necessary to be connected to the Internet while downloading.
 
-For the sample sentence,
+For the sample sentence and sample audio,
 ```
 python3 gpt-sovits.py 
 ```
@@ -24,7 +24,13 @@ python3 gpt-sovits.py
 Run with audio prompt.
 
 ```
-python3 gpt-sovits.py -i "音声合成のテストを行なっています。" --audio reference_audio_captured_by_ax.wav --transcript "水をマレーシアから買わなくてはならないのです" -e 1
+python3 gpt-sovits.py -i "音声合成のテストを行なっています。" --ref_audio reference_audio_captured_by_ax.wav --ref_text "水をマレーシアから買わなくてはならないのです"
+```
+
+Run for english.
+
+```
+python3 gpt-sovits.py -i "Hello world. We are testing speech synthesis." --text_language en  --ref_audio reference_audio_captured_by_ax.wav --ref_text "水をマレーシアから買わなくてはならないのです" --ref_language ja
 ```
 
 ### Reference

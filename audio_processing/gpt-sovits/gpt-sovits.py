@@ -1,7 +1,5 @@
 import time
 import sys
-import argparse
-import re
 
 import numpy as np
 import soundfile as sf
@@ -15,9 +13,9 @@ from scipy.io.wavfile import write
 from logging import getLogger   # noqa: E402
 logger = getLogger(__name__)
 
-import os
 from text import cleaned_text_to_sequence
-from text.japanese import g2p
+import text.japanese as japanese
+import text.english as english
 import soundfile
 import librosa
 
@@ -39,12 +37,22 @@ parser.add_argument(
     help='input text'
 )
 parser.add_argument(
-    '--audio', '-a', metavar='TEXT', default="reference_audio_captured_by_ax.wav",
+    '--text_language', '-tl',
+    default='ja',
+    help='[ja, en]'
+)
+parser.add_argument(
+    '--ref_audio', '-ra', metavar='TEXT', default="reference_audio_captured_by_ax.wav",
     help='ref audio'
 )
 parser.add_argument(
-    '--transcript', '-t', metavar='TEXT', default="水をマレーシアから買わなくてはならない。",
+    '--ref_text', '-rt', metavar='TEXT', default="水をマレーシアから買わなくてはならない。",
     help='ref text'
+)
+parser.add_argument(
+    '--ref_language', '-rl',
+    default='ja',
+    help='[ja, en]'
 )
 parser.add_argument(
     '--onnx', action='store_true',
@@ -194,12 +202,18 @@ def generate_voice(ssl, t2s_encoder, t2s_first_decoder, t2s_stage_decoder, vits)
     gpt_sovits = GptSoVits(gpt, vits)
     ssl = SSLModel(ssl)
 
-    input_audio = args.audio
+    input_audio = args.ref_audio
 
-    ref_phones = g2p(args.transcript)
+    if args.ref_language == "ja":
+        ref_phones = japanese.g2p(args.ref_text)
+    else:
+        ref_phones = english.g2p(args.ref_text)
     ref_seq = np.array([cleaned_text_to_sequence(ref_phones)], dtype=np.int64)
 
-    text_phones = g2p(args.input)
+    if args.text_language == "ja":
+        text_phones = japanese.g2p(args.input)
+    else:
+        text_phones = english.g2p(args.input)
     text_seq = np.array([cleaned_text_to_sequence(text_phones)], dtype=np.int64)
 
     # empty for ja or en
