@@ -21,6 +21,8 @@ Image:
 
 <img src="cat.png" height="512px"/>
 
+(Image from https://huggingface.co/datasets/huggingface/documentation-images/resolve/main/diffusers/cat.png)
+
 Prompt:
 ```
 cat wizard, gandalf, lord of the rings, detailed, fantasy, cute, adorable, Pixar, Disney, 8k
