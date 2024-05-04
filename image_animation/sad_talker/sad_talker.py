@@ -47,9 +47,8 @@ def main():
     preprocesor = ImageToCoeff(
         use_onnx=True,
     )
+    print('3DMM Extraction for source image')
 
-    import pdb;pdb.set_trace()
-    pass
 
 
 if __name__ == '__main__':

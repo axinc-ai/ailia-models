@@ -6,16 +6,17 @@ from skimage import io, img_as_float32, transform
 import scipy.io as scio
 
 class AnimeGeneratorInput(TypedDict):
-    source_image: str
+    source_image: np.ndarray
     source_semantics: np.ndarray
+    target_semantics: np.ndarray
     frame_num: int
-    target_semantics_list: np.ndarray
     video_name: str
     audio_path: str
 
 
 class AnimeGenerator:
     def __init__(self):
+        # self.generator = 
         pass
 
     def preprocess(
@@ -101,21 +102,32 @@ class AnimeGenerator:
 
         target_semantics_np = np.array(target_semantics_list)             #frame_num 70 semantic_radius*2+1
         target_semantics_np = target_semantics_np.reshape(batch_size, -1, target_semantics_np.shape[-2], target_semantics_np.shape[-1])
-        data['target_semantics_list'] = target_semantics_np
+        data['target_semantics'] = target_semantics_np
         data['video_name'] = video_name
         data['audio_path'] = audio_path
         return AnimeGeneratorInput(
             source_image=data["source_image"],
             source_semantics=data["source_semantics"],
+            target_semantics=data["target_semantics"],
             frame_num=data["frame_num"],
-            target_semantics_list=data["target_semantics_list"],
             video_name=data["video_name"],
             audio_path=data["audio_path"],
         )
 
     def generate(
-        self):
-        pass
+        self,
+        gen_input: AnimeGeneratorInput,
+    ):
+        source_image = gen_input['source_image']
+        source_semantics = gen_input['source_semantics']
+        target_semantics = gen_input['target_semantics']
+        frame_num = gen_input['frame_num']
+
+        predictions_video = self._make_animation(
+            source_image,
+            source_semantics,
+            target_semantics,
+        )
 
     def _transform_semantic_1(self, semantic: np.ndarray, semantic_radius: int):
         semantic_list =  [semantic for i in range(0, semantic_radius*2+1)]
@@ -128,3 +140,10 @@ class AnimeGenerator:
         index = [ min(max(item, 0), num_frames-1) for item in seq ] 
         coeff_3dmm_g = coeff_3dmm[index, :]
         return coeff_3dmm_g.transpose(1,0)
+
+    def _make_animation(
+        self,
+        source_image: np.ndarray,
+        source_semantics: np.ndarray,
+    ):
+        pass
