@@ -1,5 +1,7 @@
+import json
 import math
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from lcm_scheduler import LCMScheduler
 
 import cv2
 import numpy as np
@@ -10,7 +12,8 @@ from diffusers import LCMScheduler, StableDiffusionXLControlNetPipeline
 from diffusers.image_processor import PipelineImageInput
 from diffusers.models import ControlNetModel
 from diffusers.pipelines.controlnet.multicontrolnet import MultiControlNetModel
-from diffusers.pipelines.stable_diffusion_xl import StableDiffusionXLPipelineOutput
+from diffusers.pipelines.stable_diffusion_xl import \
+    StableDiffusionXLPipelineOutput
 from diffusers.utils import deprecate, logging, replace_example_docstring
 from diffusers.utils.import_utils import is_xformers_available
 from diffusers.utils.torch_utils import is_compiled_module, is_torch_version
@@ -478,28 +481,6 @@ def draw_kps(
 
 
 class StableDiffusionXLInstantIDPipeline(StableDiffusionXLControlNetPipeline):
-    def cuda(self, dtype=torch.float16, use_xformers=False):
-        self.to("cuda", dtype)
-
-        if hasattr(self, "image_proj_model"):
-            self.image_proj_model.to(self.unet.device).to(self.unet.dtype)
-
-        if use_xformers:
-            if is_xformers_available():
-                import xformers
-                from packaging import version
-
-                xformers_version = version.parse(xformers.__version__)
-                if xformers_version == version.parse("0.0.16"):
-                    logger.warn(
-                        "xFormers 0.0.16 cannot be used for training in some GPUs. If you observe problems during training, please update xFormers to at least 0.0.17. See https://huggingface.co/docs/diffusers/main/en/optimization/xformers for more details."
-                    )
-                self.enable_xformers_memory_efficient_attention()
-            else:
-                raise ValueError(
-                    "xformers is not available. Make sure it is installed correctly"
-                )
-
     def load_ip_adapter_instantid(
         self, model_ckpt, image_emb_dim=512, num_tokens=16, scale=0.5
     ):
@@ -562,12 +543,6 @@ class StableDiffusionXLInstantIDPipeline(StableDiffusionXLControlNetPipeline):
             state_dict = state_dict["ip_adapter"]
         ip_layers.load_state_dict(state_dict)
 
-    def set_ip_adapter_scale(self, scale):
-        unet = getattr(self, self.unet_name) if not hasattr(self, "unet") else self.unet
-        for attn_processor in unet.attn_processors.values():
-            if isinstance(attn_processor, IPAttnProcessor):
-                attn_processor.scale = scale
-
     def _encode_prompt_image_emb(
         self, prompt_image_emb, device, dtype, do_classifier_free_guidance
     ):
@@ -592,7 +567,6 @@ class StableDiffusionXLInstantIDPipeline(StableDiffusionXLControlNetPipeline):
         return prompt_image_emb
 
     @torch.no_grad()
-    @replace_example_docstring(EXAMPLE_DOC_STRING)
     def __call__(
         self,
         prompt: Union[str, List[str]] = None,
@@ -767,48 +741,22 @@ class StableDiffusionXLInstantIDPipeline(StableDiffusionXLControlNetPipeline):
         callback = kwargs.pop("callback", None)
         callback_steps = kwargs.pop("callback_steps", None)
 
-        if callback is not None:
-            deprecate(
-                "callback",
-                "1.0.0",
-                "Passing `callback` as an input argument to `__call__` is deprecated, consider using `callback_on_step_end`",
-            )
-        if callback_steps is not None:
-            deprecate(
-                "callback_steps",
-                "1.0.0",
-                "Passing `callback_steps` as an input argument to `__call__` is deprecated, consider using `callback_on_step_end`",
-            )
-
         controlnet = (
             self.controlnet._orig_mod
             if is_compiled_module(self.controlnet)
             else self.controlnet
         )
 
-        # align format for control guidance
-        if not isinstance(control_guidance_start, list) and isinstance(
-            control_guidance_end, list
-        ):
-            control_guidance_start = len(control_guidance_end) * [
-                control_guidance_start
-            ]
-        elif not isinstance(control_guidance_end, list) and isinstance(
-            control_guidance_start, list
-        ):
-            control_guidance_end = len(control_guidance_start) * [control_guidance_end]
-        elif not isinstance(control_guidance_start, list) and not isinstance(
-            control_guidance_end, list
-        ):
-            mult = (
-                len(controlnet.nets)
-                if isinstance(controlnet, MultiControlNetModel)
-                else 1
-            )
-            control_guidance_start, control_guidance_end = (
-                mult * [control_guidance_start],
-                mult * [control_guidance_end],
-            )
+        mult = (
+            len(controlnet.nets)
+            if isinstance(controlnet, MultiControlNetModel)
+            else 1
+        )
+        control_guidance_start, control_guidance_end = (
+            mult * [control_guidance_start],
+            mult * [control_guidance_end],
+        )
+        # control_guidance_start = 0.0, control_guidance_end = 1.0
 
         # 1. Check inputs. Raise error if not correct
         self.check_inputs(
@@ -833,21 +781,8 @@ class StableDiffusionXLInstantIDPipeline(StableDiffusionXLControlNetPipeline):
         self._cross_attention_kwargs = cross_attention_kwargs
 
         # 2. Define call parameters
-        if prompt is not None and isinstance(prompt, str):
-            batch_size = 1
-        elif prompt is not None and isinstance(prompt, list):
-            batch_size = len(prompt)
-        else:
-            batch_size = prompt_embeds.shape[0]
-
+        batch_size = 1
         device = self._execution_device
-
-        if isinstance(controlnet, MultiControlNetModel) and isinstance(
-            controlnet_conditioning_scale, float
-        ):
-            controlnet_conditioning_scale = [controlnet_conditioning_scale] * len(
-                controlnet.nets
-            )
 
         global_pool_conditions = (
             controlnet.config.global_pool_conditions
@@ -855,6 +790,7 @@ class StableDiffusionXLInstantIDPipeline(StableDiffusionXLControlNetPipeline):
             else controlnet.nets[0].config.global_pool_conditions
         )
         guess_mode = guess_mode or global_pool_conditions
+        # guess_mode = False
 
         # 3.1 Encode input prompt
         text_encoder_lora_scale = (
@@ -894,41 +830,18 @@ class StableDiffusionXLInstantIDPipeline(StableDiffusionXLControlNetPipeline):
         )
 
         # 4. Prepare image
-        if isinstance(controlnet, ControlNetModel):
-            image = self.prepare_image(
-                image=image,
-                width=width,
-                height=height,
-                batch_size=batch_size * num_images_per_prompt,
-                num_images_per_prompt=num_images_per_prompt,
-                device=device,
-                dtype=controlnet.dtype,
-                do_classifier_free_guidance=self.do_classifier_free_guidance,
-                guess_mode=guess_mode,
-            )
-            height, width = image.shape[-2:]
-        elif isinstance(controlnet, MultiControlNetModel):
-            images = []
-
-            for image_ in image:
-                image_ = self.prepare_image(
-                    image=image_,
-                    width=width,
-                    height=height,
-                    batch_size=batch_size * num_images_per_prompt,
-                    num_images_per_prompt=num_images_per_prompt,
-                    device=device,
-                    dtype=controlnet.dtype,
-                    do_classifier_free_guidance=self.do_classifier_free_guidance,
-                    guess_mode=guess_mode,
-                )
-
-                images.append(image_)
-
-            image = images
-            height, width = image[0].shape[-2:]
-        else:
-            assert False
+        image = self.prepare_image(
+            image=image,
+            width=width,
+            height=height,
+            batch_size=batch_size * num_images_per_prompt,
+            num_images_per_prompt=num_images_per_prompt,
+            device=device,
+            dtype=controlnet.dtype,
+            do_classifier_free_guidance=self.do_classifier_free_guidance,
+            guess_mode=guess_mode,
+        )
+        height, width = image.shape[-2:]
 
         # 5. Prepare timesteps
         self.scheduler.set_timesteps(num_inference_steps, device=device)
@@ -950,13 +863,6 @@ class StableDiffusionXLInstantIDPipeline(StableDiffusionXLControlNetPipeline):
 
         # 6.5 Optionally get Guidance Scale Embedding
         timestep_cond = None
-        if self.unet.config.time_cond_proj_dim is not None:
-            guidance_scale_tensor = torch.tensor(self.guidance_scale - 1).repeat(
-                batch_size * num_images_per_prompt
-            )
-            timestep_cond = self.get_guidance_scale_embedding(
-                guidance_scale_tensor, embedding_dim=self.unet.config.time_cond_proj_dim
-            ).to(device=device, dtype=latents.dtype)
 
         # 7. Prepare extra step kwargs. TODO: Logic should ideally just be moved out of the pipeline
         extra_step_kwargs = self.prepare_extra_step_kwargs(generator, eta)
@@ -973,17 +879,11 @@ class StableDiffusionXLInstantIDPipeline(StableDiffusionXLControlNetPipeline):
             )
 
         # 7.2 Prepare added time ids & embeddings
-        if isinstance(image, list):
-            original_size = original_size or image[0].shape[-2:]
-        else:
-            original_size = original_size or image.shape[-2:]
+        original_size = original_size or image.shape[-2:]
         target_size = target_size or (height, width)
 
         add_text_embeds = pooled_prompt_embeds
-        if self.text_encoder_2 is None:
-            text_encoder_projection_dim = int(pooled_prompt_embeds.shape[-1])
-        else:
-            text_encoder_projection_dim = self.text_encoder_2.config.projection_dim
+        text_encoder_projection_dim = self.text_encoder_2.config.projection_dim
 
         add_time_ids = self._get_add_time_ids(
             original_size,
@@ -993,23 +893,7 @@ class StableDiffusionXLInstantIDPipeline(StableDiffusionXLControlNetPipeline):
             text_encoder_projection_dim=text_encoder_projection_dim,
         )
 
-        if negative_original_size is not None and negative_target_size is not None:
-            negative_add_time_ids = self._get_add_time_ids(
-                negative_original_size,
-                negative_crops_coords_top_left,
-                negative_target_size,
-                dtype=prompt_embeds.dtype,
-                text_encoder_projection_dim=text_encoder_projection_dim,
-            )
-        else:
-            negative_add_time_ids = add_time_ids
-
-        if self.do_classifier_free_guidance:
-            prompt_embeds = torch.cat([negative_prompt_embeds, prompt_embeds], dim=0)
-            add_text_embeds = torch.cat(
-                [negative_pooled_prompt_embeds, add_text_embeds], dim=0
-            )
-            add_time_ids = torch.cat([negative_add_time_ids, add_time_ids], dim=0)
+        negative_add_time_ids = add_time_ids
 
         prompt_embeds = prompt_embeds.to(device)
         add_text_embeds = add_text_embeds.to(device)
@@ -1146,33 +1030,11 @@ class StableDiffusionXLInstantIDPipeline(StableDiffusionXLControlNetPipeline):
                         step_idx = i // getattr(self.scheduler, "order", 1)
                         callback(step_idx, t, latents)
 
-        if not output_type == "latent":
-            # make sure the VAE is in float32 mode, as it overflows in float16
-            needs_upcasting = (
-                self.vae.dtype == torch.float16 and self.vae.config.force_upcast
-            )
-            if needs_upcasting:
-                self.upcast_vae()
-                latents = latents.to(
-                    next(iter(self.vae.post_quant_conv.parameters())).dtype
-                )
+        image = self.vae.decode(
+            latents / self.vae.config.scaling_factor, return_dict=False
+        )[0]
 
-            image = self.vae.decode(
-                latents / self.vae.config.scaling_factor, return_dict=False
-            )[0]
-
-            # cast back to fp16 if needed
-            if needs_upcasting:
-                self.vae.to(dtype=torch.float16)
-        else:
-            image = latents
-
-        if not output_type == "latent":
-            # apply watermark if available
-            if self.watermark is not None:
-                image = self.watermark.apply_watermark(image)
-
-            image = self.image_processor.postprocess(image, output_type=output_type)
+        image = self.image_processor.postprocess(image, output_type=output_type)
 
         # Offload all models
         self.maybe_free_model_hooks()
@@ -1189,6 +1051,29 @@ def get_pipe():
         torch_dtype=torch.float32,
         resume_download=True,
     )
+    # export test
+    # torch.onnx.export(
+    #     controlnet,
+    #     (
+    #         torch.randn((1, 4, 128, 120)),
+    #         torch.tensor([999]),
+    #         torch.randn((1, 16, 2048)),
+    #         torch.randn((1, 3, 1024, 960)),
+    #         0.8,
+    #         None,
+    #         None,
+    #         None,
+    #         {
+    #             "text_embeds": torch.randn(1, 1280),
+    #             "time_ids": torch.randn(1, 6),
+    #         },
+    #         None,
+    #         False,
+    #         False
+    #     ),
+    #     "controlnet.onnx",
+    # )
+    # input(">>> export")
     pipe = StableDiffusionXLInstantIDPipeline.from_pretrained(
         "stabilityai/sdxl-turbo",
         controlnet=controlnet,
@@ -1201,15 +1086,9 @@ def get_pipe():
     pipe.controlnet = pipe.controlnet.to(memory_format=torch.channels_last)
 
     pipe.text_encoder = pipe.text_encoder.to(memory_format=torch.channels_last)
-    pipe.scheduler = LCMScheduler.from_config(
-        pipe.scheduler.config,
-        beta_start=0.001,
-        beta_end=0.012,
-    )
+    scheduler_config = json.load(open("lcm_scheduler_config.json"))
+    pipe.scheduler = LCMScheduler.from_config(scheduler_config)
 
-    # pipe.scheduler = DEISMultistepScheduler.from_config(
-    #     pipe.scheduler.config,
-    # )
     pipe.enable_freeu(
         s1=0.6,
         s2=0.4,
