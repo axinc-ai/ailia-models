@@ -15,9 +15,11 @@ The collection of pre-trained, state-of-the-art AI models.
 [ailia MODELS tutorial 日本語版](TUTORIAL_jp.md)
 
 # Supported models
-323 models as of April 8th, 2024
+326 models as of April 30th, 2024
 
 # Latest update
+- 2024.04.30 Add cross_encoder_mmarco
+- 2024.04.28 Add marigold
 - 2024.04.08 ailia SDK can now be installed via pip.
 - 2024.04.02 Add zoe_depth, facefusion
 - 2024.04.01 Add pytorch-fcn (ailia SDK 1.3.0)
