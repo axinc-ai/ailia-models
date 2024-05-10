@@ -210,18 +210,22 @@ def decode(
 
 
 def stopping_criteria(input_ids: np.array) -> bool:
-    max_length = 129
+    is_done = np.full((input_ids.shape[0],), False)
 
+    # MaxLengthCriteria
+    max_length = 448
     cur_len = input_ids.shape[-1]
-    is_done = cur_len >= max_length
+    is_done = is_done | cur_len >= max_length
+
+    # EosTokenCriteria
+    eos_token_id = 50257
+    is_done = is_done | np.isin(input_ids[:, -1], [eos_token_id])
+
     return is_done
 
 
-def greedy_search(net, encoder_hidden_states):
-    # decoder_start_token_id = 50258
-    # eos_token_id = np.array([50257])
-    # pad_token_id = 50257
-
+def greedy_search(net, input_ids, last_hidden_state):
+    pad_token_id = 50257
     suppress_tokens = [
         # fmt: off
         1,     2,     7,     8,     9,     10,    14,    25,    26,    27,
@@ -242,20 +246,15 @@ def greedy_search(net, encoder_hidden_states):
     eos_token_id = 50257
     max_initial_timestamp_index = 50
 
-    # shape = encoder_hidden_states.shape[:-1]
-    # batch_size = shape[0]
+    batch_size, cur_len = input_ids.shape
+    past_key_values = [np.zeros((batch_size, 20, 0, 64), dtype=np.float16)] * 8
 
-    # # input_ids = np.ones(shape, dtype=int) * -100
-    # input_ids = np.ones((batch_size, 1), dtype=int) * decoder_start_token_id
-    # past_key_values = [np.zeros((batch_size, 20, 0, 64), dtype=np.float16)] * 8
+    # keep track of which sequences are already finished
+    this_peer_finished = False
+    unfinished_sequences = np.ones(batch_size, dtype=int)
 
-    # # keep track of which sequences are already finished
-    # unfinished_sequences = np.ones(input_ids.shape[0], dtype=int)
-
-    this_peer_finished = False  # used by synced_gpus only
-    while True:
+    while not this_peer_finished:
         logits, past_key_values = decode(
-            # net, encoder_hidden_states, input_ids[:, -1:], past_key_values
             net,
             encoder_hidden_states,
             input_ids,
@@ -313,33 +312,21 @@ def greedy_search(net, encoder_hidden_states):
             if timestamp_logprob > max_text_token_logprob:
                 next_tokens_scores[k, :timestamp_begin] = -float("inf")
 
-        # # argmax
-        # next_tokens = np.argmax(next_tokens_scores, axis=-1)
+        # argmax
+        next_tokens = np.argmax(next_tokens_scores, axis=-1)
 
-        # # finished sentences should have their next token be a padding token
-        # next_tokens = next_tokens * unfinished_sequences + pad_token_id * (
-        #     1 - unfinished_sequences
-        # )
+        # finished sentences should have their next token be a padding token
+        next_tokens = next_tokens * unfinished_sequences + pad_token_id * (
+            1 - unfinished_sequences
+        )
 
-        # # update generated ids, model inputs, and length for next step
-        # input_ids = np.concatenate([input_ids, next_tokens[:, None]], axis=-1)
+        # update generated ids, model inputs, and length for next step
+        input_ids = np.concatenate([input_ids, next_tokens[:, None]], axis=-1)
 
-        # # if eos_token was found in one sentence, set sentence to finished
-        # unfinished_sequences = unfinished_sequences * np.prod(
-        #     np.tile(next_tokens, (eos_token_id.shape[0], 1)) != eos_token_id[:, None],
-        #     axis=0,
-        # )
-
-        # # stop when each sentence is finished
-        # if np.max(unfinished_sequences) == 0:
-        #     this_peer_finished = True
-
-        # # stop if we exceed the maximum length
-        # if stopping_criteria(input_ids):
-        #     this_peer_finished = True
-
-        # if this_peer_finished:
-        #     break
+        is_stopping = stopping_criteria(input_ids)
+        unfinished_sequences = unfinished_sequences & ~is_stopping
+        if np.max(unfinished_sequences) == 0:
+            this_peer_finished = True
 
     return input_ids
 
@@ -362,15 +349,17 @@ def predict(models, wav, chunk_length_s=0):
         #     output = net.run(None, {"input_features": input_features})
         # last_hidden_state = output[0]
         # last_hidden_state = last_hidden_state.astype(np.float16)
-        last_hidden_state = np.zeros((1, 1), dtype=np.float16)
 
         # if args.benchmark:
         #     end = int(round(time.time() * 1000))
         #     estimation_time = end - start
         #     logger.info(f"\tencoder processing time {estimation_time} ms")
 
+        input_ids = np.array([[50258, 50266, 50360]])
+        last_hidden_state = np.zeros((1, 1), dtype=np.float16)
+
         net = models["dec"]
-        tokens = greedy_search(net, last_hidden_state)
+        tokens = greedy_search(net, input_ids, last_hidden_state)
 
         # item["tokens"] = tokens
 
