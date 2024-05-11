@@ -6,7 +6,8 @@ from logging import getLogger
 import numpy as np
 from transformers import WhisperTokenizer
 from scipy.special import log_softmax, logsumexp
-import soundfile as sf
+import librosa
+
 
 # import original modules
 sys.path.append("../../util")
@@ -15,7 +16,8 @@ from model_utils import check_and_download_models, check_and_download_file  # no
 
 import ailia
 
-# from audio_utils import mel_filter_bank, window_function, spectrogram
+from audio_utils import SAMPLE_RATE, extract_fbank_features
+
 
 logger = getLogger(__name__)
 
@@ -33,7 +35,7 @@ REMOTE_PATH = "https://storage.googleapis.com/ailia-models/kotoba-whisper/"
 WAV_PATH = "demo.wav"
 SAVE_TEXT_PATH = "output.txt"
 
-SAMPLE_RATE = 16000
+flg_ffmpeg = True
 
 # ======================
 # Arguemnt Parser Config
@@ -55,6 +57,29 @@ args = update_parser(parser, check_input_type=False)
 # ======================
 
 
+def load_audio(file: str, sr: int = SAMPLE_RATE):
+    if flg_ffmpeg:
+        import ffmpeg
+
+        try:
+            out, _ = (
+                ffmpeg.input(file, threads=0)
+                .output("-", format="f32le", acodec="pcm_f32le", ac=1, ar=sr)
+                .run(cmd="ffmpeg", capture_stdout=True, capture_stderr=True)
+            )
+        except ffmpeg.Error as e:
+            raise RuntimeError("ffmpeg command failed: %s" % e.stderr.decode())
+        audio = np.frombuffer(out, np.float32)
+    else:
+        # prepare input data
+        audio, source_sr = librosa.load(file, sr=None)
+        # Resample the audio if needed
+        if source_sr is not None and source_sr != sr:
+            audio = librosa.resample(audio, orig_sr=source_sr, target_sr=sr)
+
+    return audio
+
+
 def feature_extractor(raw_speech):
     raw_speech = np.asarray([raw_speech]).T
 
@@ -72,38 +97,8 @@ def feature_extractor(raw_speech):
     raw_speech = np.expand_dims(raw_speech, axis=0)
     raw_speech = raw_speech.transpose(2, 0, 1)
 
-    n_fft = 400
-    hop_length = 160
-    feature_size = 80
-
-    if not hasattr(preprocess, "mel_filters"):
-        preprocess.mel_filters = mel_filter_bank(
-            num_frequency_bins=1 + n_fft // 2,
-            num_mel_filters=feature_size,
-            min_frequency=0.0,
-            max_frequency=8000.0,
-            sampling_rate=SAMPLE_RATE,
-            norm="slaney",
-            mel_scale="slaney",
-        )
-
-    features = []
-    for i, waveform in enumerate(raw_speech[0]):
-        log_spec = spectrogram(
-            waveform,
-            window_function(n_fft, "hann"),
-            frame_length=n_fft,
-            hop_length=hop_length,
-            power=2.0,
-            mel_filters=preprocess.mel_filters,
-        )
-        log_spec = log_spec[:, :-1]
-        log_spec = np.maximum(log_spec, log_spec.max() - 8.0)
-        log_spec = (log_spec + 4.0) / 4.0
-
-        features.append(log_spec)
-
-    features = np.array(features, dtype=np.float32)
+    features = extract_fbank_features(raw_speech[0])
+    features = features.astype(np.float32)
 
     return features
 
@@ -145,6 +140,9 @@ def preprocess(inputs, chunk_length_s=0):
 
         chunk_len = chunk_length_s * SAMPLE_RATE
         stride_left = stride_right = int(round(stride_length_s * SAMPLE_RATE))
+
+        if chunk_len < stride_left + stride_right:
+            raise ValueError("Chunk length must be superior to stride length")
 
         for item in chunk_iter(
             inputs,
@@ -336,24 +334,24 @@ def greedy_search(net, input_ids, encoder_hidden_states):
     return input_ids
 
 
-def predict(models, wav, chunk_length_s=0):
-    # processed = preprocess(wav, chunk_length_s)
-    processed = [1]
+def predict(models, audio, chunk_length_s=0):
+    processed = preprocess(audio, chunk_length_s)
 
     model_outputs = []
     for item in processed:
         # if args.benchmark:
         #     start = int(round(time.time() * 1000))
 
-        # input_features = item.pop("input_features")
+        input_features = item.pop("input_features")
 
-        # net = models["enc"]
-        # if not args.onnx:
-        #     output = net.run(input_features)
-        # else:
-        #     output = net.run(None, {"input_features": input_features})
-        # last_hidden_state = output[0]
-        # last_hidden_state = last_hidden_state.astype(np.float16)
+        # encoder
+        net = models["enc"]
+        if not args.onnx:
+            output = net.run(input_features)
+        else:
+            output = net.run(None, {"input_features": input_features})
+        last_hidden_state = output[0]
+        last_hidden_state = last_hidden_state.astype(np.float16)
 
         # if args.benchmark:
         #     end = int(round(time.time() * 1000))
@@ -366,17 +364,17 @@ def predict(models, wav, chunk_length_s=0):
         net = models["dec"]
         tokens = greedy_search(net, input_ids, last_hidden_state)
 
-        # item["tokens"] = tokens
+        item["tokens"] = tokens
 
-        # if "stride" in item:
-        #     chunk_len, stride_left, stride_right = item["stride"]
-        #     # Go back in seconds
-        #     chunk_len /= SAMPLE_RATE
-        #     stride_left /= SAMPLE_RATE
-        #     stride_right /= SAMPLE_RATE
-        #     item["stride"] = chunk_len, stride_left, stride_right
+        if "stride" in item:
+            chunk_len, stride_left, stride_right = item["stride"]
+            # Go back in seconds
+            chunk_len /= SAMPLE_RATE
+            stride_left /= SAMPLE_RATE
+            stride_right /= SAMPLE_RATE
+            item["stride"] = chunk_len, stride_left, stride_right
 
-        # model_outputs.append(item)
+        model_outputs.append(item)
 
     # tokenizer = models["tokenizer"]
     # time_precision = 0.02
@@ -399,7 +397,7 @@ def recognize_from_audio(models):
         logger.info(audio_path)
 
         # prepare input data
-        wav, _ = sf.read(audio_path)
+        audio = load_audio(audio_path)
 
         # inference
         logger.info("Start inference...")
@@ -407,7 +405,7 @@ def recognize_from_audio(models):
         if args.benchmark:
             start = int(round(time.time() * 1000))
 
-        text = predict(models, wav, chunk_length_s=chunk_length_s)
+        text = predict(models, audio, chunk_length_s=chunk_length_s)
 
         if args.benchmark:
             end = int(round(time.time() * 1000))
@@ -420,10 +418,10 @@ def recognize_from_audio(models):
 
 
 def main():
-    # # model files check and download
-    # check_and_download_models(WEIGHT_ENC_PATH, MODEL_ENC_PATH, REMOTE_PATH)
-    # check_and_download_models(WEIGHT_DEC_PATH, MODEL_DEC_PATH, REMOTE_PATH)
-    # check_and_download_file(WEIGHT_ENC_PB_PATH, REMOTE_PATH)
+    # model files check and download
+    check_and_download_models(WEIGHT_ENC_PATH, MODEL_ENC_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_DEC_PATH, MODEL_DEC_PATH, REMOTE_PATH)
+    check_and_download_file(WEIGHT_ENC_PB_PATH, REMOTE_PATH)
 
     env_id = args.env_id
 
@@ -453,16 +451,13 @@ def main():
             if cuda
             else ["CPUExecutionProvider"]
         )
-        # enc_net = onnxruntime.InferenceSession(WEIGHT_ENC_PATH, providers=providers)
-        # dec_net = onnxruntime.InferenceSession(WEIGHT_DEC_PATH, providers=providers)
-        dec_net = onnxruntime.InferenceSession(
-            "decoder_model.onnx", providers=providers
-        )
+        enc_net = onnxruntime.InferenceSession(WEIGHT_ENC_PATH, providers=providers)
+        dec_net = onnxruntime.InferenceSession(WEIGHT_DEC_PATH, providers=providers)
 
     # tokenizer = WhisperTokenizer.from_pretrained("tokenizer")
 
     models = {
-        # "enc": enc_net,
+        "enc": enc_net,
         "dec": dec_net,
         # "tokenizer": tokenizer,
     }
