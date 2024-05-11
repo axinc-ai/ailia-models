@@ -224,7 +224,7 @@ def stopping_criteria(input_ids: np.array) -> bool:
     return is_done
 
 
-def greedy_search(net, input_ids, last_hidden_state):
+def greedy_search(net, input_ids, encoder_hidden_states):
     pad_token_id = 50257
     suppress_tokens = [
         # fmt: off
@@ -254,10 +254,15 @@ def greedy_search(net, input_ids, last_hidden_state):
     unfinished_sequences = np.ones(batch_size, dtype=int)
 
     while not this_peer_finished:
+        # prepare model inputs
+        past_length = past_key_values[0].shape[2]
+        decoder_input_ids = input_ids[:, past_length:]
+
+        # forward pass to get next token
         logits, past_key_values = decode(
             net,
             encoder_hidden_states,
-            input_ids,
+            decoder_input_ids,
             past_key_values,
         )
         next_tokens_scores = logits[:, -1, :]
