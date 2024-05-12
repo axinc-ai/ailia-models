@@ -67,7 +67,7 @@ class LCMScheduler(ConfigMixin):
 
         # setable values
         self.num_inference_steps = None
-        self.timesteps = np.from_numpy(np.arange(0, num_train_timesteps)[::-1].copy().astype(np.int64))
+        self.timesteps = np.arange(0, num_train_timesteps)[::-1].copy().astype(np.int64)
         self.custom_timesteps = False
 
         self._step_index = None
@@ -142,9 +142,7 @@ class LCMScheduler(ConfigMixin):
             raise ValueError("Can only pass one of `num_inference_steps` or `custom_timesteps`.")
 
         # 1. Calculate the LCM original training/distillation timestep schedule.
-        original_steps = (
-            original_inference_steps if original_inference_steps is not None else self.config.original_inference_steps
-        )
+        original_steps = 50
 
         if original_steps > self.config.num_train_timesteps:
             raise ValueError(
