@@ -234,8 +234,11 @@ def decide_threshold_from_gt_image(net, params, train_outputs, gt_imgs):
         img = load_image(image_path)
         img = cv2.cvtColor(img, cv2.COLOR_BGRA2RGB)
         img = preprocess(img, IMAGE_RESIZE, keep_aspect=KEEP_ASPECT, crop_size = IMAGE_SIZE)
+        if args.enable_optimization:
+            dist_tmp = infer_optimized(net, params, train_outputs, img, IMAGE_SIZE, device)
+        else:
+            dist_tmp = infer(net, params, train_outputs, img, IMAGE_SIZE)
 
-        dist_tmp = infer(net, params, train_outputs, img, IMAGE_SIZE)
 
         score_map.append(dist_tmp)
 
