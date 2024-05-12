@@ -104,6 +104,20 @@ By adding the `--aug` option, you can process with augmentation.
 $ python3 padim.py --aug
 ```
 
+By adding the `--enable_optimization` option, you can use optimized code, which significantly speeds up distance matrix calculation.  You have to have cuda compatible GPU and pytorch installed
+(default is processing without optimization)
+```bash
+$ python3 padim.py --enable_optimization True
+```
+
+By adding the `--compare_optimization` option, you can compare output of the optimized code with the output of the original code.  You have to have cuda compatible GPU and pytorch installed
+(default is processing without comparison)
+```bash
+$ python3 padim.py --compare_optimization True
+```
+
+
+
 ## PaDiM GUI
 
 You can also use the GUI to train and test.

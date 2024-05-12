@@ -80,7 +80,29 @@ parser.add_argument(
     '-an', '--aug_num', type=int, default=5,
     help='specify the amplification number of augmentation.'
 )
+parser.add_argument(
+    '-eon', '--enable_optimization', type=bool, default=False,
+    help='Flag to enable optimized code'
+)
+parser.add_argument(
+    '--compare_optimization', type=bool, default=False,
+    help='Flag to compare output of optimization with original code'
+)
 args = update_parser(parser)
+
+if args.compare_optimization:
+    args.enable_optimization = True
+    train_output_list=[]
+
+if args.enable_optimization:
+    import torch
+    if torch.cuda.is_available() :
+        device = torch.device("cuda")
+        
+    else:
+        device = torch.device("cpu")
+    logger.info("Torch device : " + str(device))
+
 
 
 # ======================
@@ -152,6 +174,18 @@ def plot_fig(file_list, test_imgs, scores, anormal_scores, gt_imgs, threshold, s
         fig_img.savefig(savepath_tmp, dpi=100)
         plt.close()
 
+def infer_init_run(net, params, train_outputs, IMAGE_SIZE):
+    import numpy as np
+    dummy_image = np.random.rand(1, 3, 224, 224) * 255.0  # Scale between 0 and 255
+    # Convert the dtype to float32 for efficiency
+    dummy_image = dummy_image.astype(np.float32)
+    logger.info(f"PaDiM  initialization inference starts!")
+    if args.enable_optimization:
+        score = infer_optimized(net, params, train_outputs, dummy_image, IMAGE_SIZE, device)
+    else:
+        score = infer(net, params, train_outputs, dummy_image, IMAGE_SIZE)
+    logger.info(f"PaDiM initialization inference finish!")
+
 
 def train_from_image_or_video(net, params):
     # training
@@ -219,6 +253,7 @@ def infer_from_image(net, params, train_outputs, threshold, gt_imgs):
     test_imgs = []
 
     score_map = []
+    infer_init_run(net, params, train_outputs, IMAGE_SIZE)
     for i_img in range(0, len(args.input)):
         logger.info('from (%s) ' % (args.input[i_img]))
 
@@ -228,20 +263,40 @@ def infer_from_image(net, params, train_outputs, threshold, gt_imgs):
         img = preprocess(img, IMAGE_RESIZE, keep_aspect=KEEP_ASPECT, crop_size = IMAGE_SIZE)
 
         test_imgs.append(img[0])
-
+        
         if args.benchmark:
             logger.info('BENCHMARK mode')
             total_time = 0
-            for i in range(args.benchmark_count):
-                start = int(round(time.time() * 1000))
-                dist_tmp = infer(net, params, train_outputs, img, IMAGE_SIZE)
-                end = int(round(time.time() * 1000))
-                logger.info(f'\tailia processing time {end - start} ms')
-                if i != 0:
-                    total_time = total_time + (end - start)
-            logger.info(f'\taverage time {total_time / (args.benchmark_count - 1)} ms')
+            if args.enable_optimization:
+                for i in range(args.benchmark_count):
+                    start = int(round(time.time() * 1000))
+                    dist_tmp = infer_optimized(net, params, train_outputs, img, IMAGE_SIZE, device)
+                    end = int(round(time.time() * 1000))
+                    logger.info(f'\tailia processing time {end - start} ms')
+                    if i != 0:
+                        total_time = total_time + (end - start)
+                logger.info(f'\taverage time {total_time / (args.benchmark_count - 1)} ms')
+            else:
+                for i in range(args.benchmark_count):
+                    start = int(round(time.time() * 1000))
+                    dist_tmp = infer(net, params, train_outputs, img, IMAGE_SIZE)
+                    end = int(round(time.time() * 1000))
+                    logger.info(f'\tailia processing time {end - start} ms')
+                    if i != 0:
+                        total_time = total_time + (end - start)
+                logger.info(f'\taverage time {total_time / (args.benchmark_count - 1)} ms')
+            if args.compare_optimization:
+                    logger.info(f'\tResults of optimized and original code is the same: {np.allclose(infer(net, params, train_output_list[0], img, IMAGE_SIZE), infer_optimized(net, params, train_output_list[1], img, IMAGE_SIZE, device))}')
+                    
+
         else:
-            dist_tmp = infer(net, params, train_outputs, img, IMAGE_SIZE)
+            if args.enable_optimization:
+                dist_tmp = infer_optimized(net, params, train_outputs, img, IMAGE_SIZE, device)
+            else:
+                dist_tmp = infer(net, params, train_outputs, img, IMAGE_SIZE)
+            if args.compare_optimization:
+                    logger.info('Results of optimized and original code is the same: '+ str(np.allclose(infer(net, params, train_output_list[0], img, IMAGE_SIZE), infer_optimized(net, params, train_output_list[1], img, IMAGE_SIZE, device))))
+             
 
         score_map.append(dist_tmp)
 
@@ -264,29 +319,55 @@ def infer_from_video(net, params, train_outputs, threshold):
     score_map = []
 
     frame_shown = False
-    while(True):
-        ret, frame = capture.read()
-        if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
-            break
-        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
-            break
+    infer_init_run(net, params, train_outputs, IMAGE_SIZE)
+    if args.enable_optimization:
+        while(True):
+            ret, frame = capture.read()
+            if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+                break
+            if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
+                break
 
-        img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        img = preprocess(img, IMAGE_RESIZE, keep_aspect=KEEP_ASPECT)
+            img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            img = preprocess(img, IMAGE_RESIZE, keep_aspect=KEEP_ASPECT)
 
-        dist_tmp = infer(net, params, train_outputs, img)
+            dist_tmp = infer_optimized(net, params, train_outputs, img, device)
 
-        score_map.append(dist_tmp)
-        scores = normalize_scores(score_map)    # min max is calculated dynamically, please set fixed min max value from calibration data for production
+            score_map.append(dist_tmp)
+            scores = normalize_scores(score_map)    # min max is calculated dynamically, please set fixed min max value from calibration data for production
 
-        heat_map, mask, vis_img = visualize(denormalization(img[0]), scores[len(scores)-1], threshold)
-        frame = pack_visualize(heat_map, mask, vis_img, scores, IMAGE_SIZE)
+            heat_map, mask, vis_img = visualize(denormalization(img[0]), scores[len(scores)-1], threshold)
+            frame = pack_visualize(heat_map, mask, vis_img, scores, IMAGE_SIZE)
 
-        cv2.imshow('frame', frame)
-        frame_shown = True
+            cv2.imshow('frame', frame)
+            frame_shown = True
 
-        if writer is not None:
-            writer.write(frame)
+            if writer is not None:
+                writer.write(frame)
+    else:
+        while(True):
+            ret, frame = capture.read()
+            if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+                break
+            if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
+                break
+
+            img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            img = preprocess(img, IMAGE_RESIZE, keep_aspect=KEEP_ASPECT)
+
+            dist_tmp = infer(net, params, train_outputs, img)
+
+            score_map.append(dist_tmp)
+            scores = normalize_scores(score_map)    # min max is calculated dynamically, please set fixed min max value from calibration data for production
+
+            heat_map, mask, vis_img = visualize(denormalization(img[0]), scores[len(scores)-1], threshold)
+            frame = pack_visualize(heat_map, mask, vis_img, scores, IMAGE_SIZE)
+
+            cv2.imshow('frame', frame)
+            frame_shown = True
+
+            if writer is not None:
+                writer.write(frame)
 
     capture.release()
     cv2.destroyAllWindows()
@@ -299,9 +380,24 @@ def train_and_infer(net, params):
         logger.info('loading train set feature from: %s' % args.feat)
         with open(args.feat, 'rb') as f:
             train_outputs = pickle.load(f)
+            if args.compare_optimization:
+                train_output_list.append(train_outputs)
+            if args.enable_optimization:
+                train_outputs=[torch.from_numpy(train_outputs[0]).float().to(device), train_outputs[1], 
+                        torch.from_numpy(train_outputs[2]).float().to(device), train_outputs[3] ]
+                if args.compare_optimization:
+                    train_output_list.append(train_outputs)
+
         logger.info('loaded.')
     else:
         train_outputs = train_from_image_or_video(net, params)
+        if args.compare_optimization:
+                    train_output_list.append(train_outputs)
+        if args.enable_optimization:
+            train_outputs=[torch.from_numpy(train_outputs[0]).float().to(device), train_outputs[1], 
+                            torch.from_numpy(train_outputs[2]).float().to(device), train_outputs[3] ]
+            if args.compare_optimization:
+                    train_output_list.append(train_outputs)
 
     if args.threshold is None:
         if args.video:
