@@ -4,7 +4,7 @@ from typing import List
 from logging import getLogger
 
 import numpy as np
-from transformers import WhisperTokenizer
+from transformers import WhisperTokenizerFast
 from scipy.special import log_softmax, logsumexp
 import librosa
 
@@ -339,8 +339,8 @@ def predict(models, audio, chunk_length_s=0):
 
     model_outputs = []
     for item in processed:
-        # if args.benchmark:
-        #     start = int(round(time.time() * 1000))
+        if args.benchmark:
+            start = int(round(time.time() * 1000))
 
         input_features = item.pop("input_features")
 
@@ -353,16 +353,20 @@ def predict(models, audio, chunk_length_s=0):
         last_hidden_state = output[0]
         last_hidden_state = last_hidden_state.astype(np.float16)
 
-        # if args.benchmark:
-        #     end = int(round(time.time() * 1000))
-        #     estimation_time = end - start
-        #     logger.info(f"\tencoder processing time {estimation_time} ms")
+        if args.benchmark:
+            end = int(round(time.time() * 1000))
+            estimation_time = end - start
+            logger.info(f"\tencoder processing time {estimation_time} ms")
 
-        input_ids = np.array([[50258, 50266, 50360]])
-        last_hidden_state = np.zeros((1, 1), dtype=np.float16)
+        # language: japanese
+        # task: transcribe
+        init_tokens = np.array([[50258, 50266, 50360]])
+
+        batch_size = input_features.shape[0]
+        decoder_input_ids = np.repeat(init_tokens[:, ...], batch_size, axis=0)
 
         net = models["dec"]
-        tokens = greedy_search(net, input_ids, last_hidden_state)
+        tokens = greedy_search(net, decoder_input_ids, last_hidden_state)
 
         item["tokens"] = tokens
 
@@ -376,17 +380,17 @@ def predict(models, audio, chunk_length_s=0):
 
         model_outputs.append(item)
 
-    # tokenizer = models["tokenizer"]
-    # time_precision = 0.02
-    # text, optional = tokenizer._decode_asr(
-    #     model_outputs,
-    #     return_timestamps=None,
-    #     return_language=None,
-    #     time_precision=time_precision,
-    # )
-    # text = text.strip()
+    # postprocess
+    tokenizer = models["tokenizer"]
+    time_precision = 0.02
+    text, optional = tokenizer._decode_asr(
+        model_outputs,
+        return_timestamps=True,
+        return_language=None,
+        time_precision=time_precision,
+    )
 
-    # return text
+    return {"text": text, **optional}
 
 
 def recognize_from_audio(models):
@@ -405,14 +409,14 @@ def recognize_from_audio(models):
         if args.benchmark:
             start = int(round(time.time() * 1000))
 
-        text = predict(models, audio, chunk_length_s=chunk_length_s)
+        result = predict(models, audio, chunk_length_s=chunk_length_s)
 
         if args.benchmark:
             end = int(round(time.time() * 1000))
             estimation_time = end - start
             logger.info(f"\ttotal processing time {estimation_time} ms")
 
-    logger.info(text)
+    print(result["text"])
 
     logger.info("Script finished successfully.")
 
@@ -445,21 +449,16 @@ def main():
     else:
         import onnxruntime
 
-        cuda = 0 < ailia.get_gpu_environment_id()
-        providers = (
-            ["CUDAExecutionProvider", "CPUExecutionProvider"]
-            if cuda
-            else ["CPUExecutionProvider"]
-        )
+        providers = ["CUDAExecutionProvider", "CPUExecutionProvider"]
         enc_net = onnxruntime.InferenceSession(WEIGHT_ENC_PATH, providers=providers)
         dec_net = onnxruntime.InferenceSession(WEIGHT_DEC_PATH, providers=providers)
 
-    # tokenizer = WhisperTokenizer.from_pretrained("tokenizer")
+    tokenizer = WhisperTokenizerFast.from_pretrained("tokenizer")
 
     models = {
         "enc": enc_net,
         "dec": dec_net,
-        # "tokenizer": tokenizer,
+        "tokenizer": tokenizer,
     }
 
     recognize_from_audio(models)
