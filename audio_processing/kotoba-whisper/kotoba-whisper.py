@@ -47,6 +47,12 @@ parser = get_base_parser(
 parser.add_argument(
     "--chunk_length", type=int, default=None, help="the chunk size for chunking."
 )
+parser.add_argument(
+    "--batch_size",
+    type=int,
+    default=1,
+    help="the size of the batch to use, for inference.",
+)
 parser.add_argument("--memory_mode", default=-1, type=int, help="memory mode")
 parser.add_argument("--onnx", action="store_true", help="execute onnxruntime version.")
 args = update_parser(parser, check_input_type=False)
@@ -334,51 +340,75 @@ def greedy_search(net, input_ids, encoder_hidden_states):
     return input_ids
 
 
+def forward(models, input_features):
+    if args.benchmark:
+        start = int(round(time.time() * 1000))
+
+    # encoder
+    net = models["enc"]
+    if not args.onnx:
+        output = net.run(input_features)
+    else:
+        output = net.run(None, {"input_features": input_features})
+    last_hidden_state = output[0]
+    last_hidden_state = last_hidden_state.astype(np.float16)
+
+    if args.benchmark:
+        end = int(round(time.time() * 1000))
+        estimation_time = end - start
+        logger.info(f"\tencoder processing time {estimation_time} ms")
+
+    # language: japanese
+    # task: transcribe
+    init_tokens = np.array([[50258, 50266, 50360]])
+
+    batch_size = input_features.shape[0]
+    decoder_input_ids = np.repeat(init_tokens[:, ...], batch_size, axis=0)
+
+    net = models["dec"]
+    outputs = greedy_search(net, decoder_input_ids, last_hidden_state)
+
+    return outputs
+
+
 def predict(models, audio, chunk_length_s=0):
+    batch_size = args.batch_size
+
     processed = preprocess(audio, chunk_length_s)
 
     model_outputs = []
+
+    # pack_iter
+    accumulator = []
     for item in processed:
-        if args.benchmark:
-            start = int(round(time.time() * 1000))
+        accumulator.append(item)
+        if batch_size <= len(accumulator):
+            input_features = np.concatenate(
+                [item.pop("input_features") for item in accumulator], axis=0
+            )
+            tokens = forward(models, input_features)
+            for i, item in enumerate(accumulator):
+                item["tokens"] = tokens[i : i + 1]
+                model_outputs.append(item)
+            accumulator.clear()
 
-        input_features = item.pop("input_features")
+    if 0 < len(accumulator):
+        input_features = np.concatenate(
+            [item.pop("input_features") for item in accumulator], axis=0
+        )
+        tokens = forward(models, input_features)
+        for i, item in enumerate(accumulator):
+            item["tokens"] = tokens[i : i + 1]
+            model_outputs.append(item)
 
-        # encoder
-        net = models["enc"]
-        if not args.onnx:
-            output = net.run(input_features)
-        else:
-            output = net.run(None, {"input_features": input_features})
-        last_hidden_state = output[0]
-        last_hidden_state = last_hidden_state.astype(np.float16)
-
-        if args.benchmark:
-            end = int(round(time.time() * 1000))
-            estimation_time = end - start
-            logger.info(f"\tencoder processing time {estimation_time} ms")
-
-        # language: japanese
-        # task: transcribe
-        init_tokens = np.array([[50258, 50266, 50360]])
-
-        batch_size = input_features.shape[0]
-        decoder_input_ids = np.repeat(init_tokens[:, ...], batch_size, axis=0)
-
-        net = models["dec"]
-        tokens = greedy_search(net, decoder_input_ids, last_hidden_state)
-
-        item["tokens"] = tokens
-
-        if "stride" in item:
+    if chunk_length_s:
+        for item in model_outputs:
             chunk_len, stride_left, stride_right = item["stride"]
             # Go back in seconds
             chunk_len /= SAMPLE_RATE
             stride_left /= SAMPLE_RATE
             stride_right /= SAMPLE_RATE
             item["stride"] = chunk_len, stride_left, stride_right
-
-        model_outputs.append(item)
 
     # postprocess
     tokenizer = models["tokenizer"]
