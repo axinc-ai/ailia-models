@@ -86,11 +86,14 @@ def load_audio(file: str, sr: int = SAMPLE_RATE):
     return audio
 
 
-def feature_extractor(raw_speech):
+def feature_extractor(raw_speech, padding="max_length"):
     raw_speech = np.asarray([raw_speech]).T
 
     max_length = 480000
-    raw_speech = raw_speech[:max_length]
+    if padding == "longest":
+        max_length = len(raw_speech)
+    else:
+        raw_speech = raw_speech[:max_length]
 
     if len(raw_speech) < max_length:
         difference = max_length - len(raw_speech)
@@ -158,7 +161,14 @@ def preprocess(inputs, chunk_length_s=0):
         ):
             yield item
     else:
-        features = feature_extractor(inputs)
+        n_samples = 480000
+        if inputs.shape[0] > n_samples:
+            features = feature_extractor(
+                inputs,
+                padding="longest",
+            )
+        else:
+            features = feature_extractor(inputs)
         yield {"input_features": features}
 
 
@@ -340,6 +350,15 @@ def greedy_search(net, input_ids, encoder_hidden_states):
     return input_ids
 
 
+def generate_with_fallback(
+    models,
+    segment_input,
+):
+    temperature = 1.0
+
+    seek_outputs = forward(models, segment_input)
+
+
 def forward(models, input_features):
     if args.benchmark:
         start = int(round(time.time() * 1000))
@@ -371,6 +390,53 @@ def forward(models, input_features):
     return outputs
 
 
+def genarate(models, input_features):
+    num_segment_frames = 3000
+    total_input_frames = input_features.shape[-1]
+    is_shortform = total_input_frames <= num_segment_frames
+
+    if is_shortform:
+        outputs = forward(models, input_features)
+    else:
+        # global generate variables
+        time_precision = 0.02
+        input_stride = 2
+
+        # global longform generation variables
+        max_frames = np.ones((1,), dtype=int) * total_input_frames
+        seek = np.zeros((1,), dtype=int)
+
+        # Preppare running variables, list for generation
+        batch_size = 1
+
+        # Transcribe audio until we reach the end of all input audios
+        while (seek < max_frames).any():
+            time_offset = seek * time_precision / input_stride
+            seek_num_frames = np.clip(max_frames - seek, None, num_segment_frames)
+
+            # cut out next 30s segment from input features
+            segment_input = input_features[:, :, seek[0] : seek[0] + seek_num_frames[0]]
+            if segment_input.shape[-1] < num_segment_frames:
+                # pad to 3000 if necessary
+                segment_input = np.pad(
+                    segment_input,
+                    pad_width=(
+                        (0, 0),
+                        (0, 0),
+                        (0, num_segment_frames - segment_input.shape[-1]),
+                    ),
+                )
+
+            seek_sequences, seek_outputs, should_skip, do_condition_on_prev_tokens = (
+                generate_with_fallback(
+                    models,
+                    segment_input=segment_input,
+                )
+            )
+
+    return outputs
+
+
 def predict(models, audio, chunk_length_s=0):
     batch_size = args.batch_size
 
@@ -386,7 +452,7 @@ def predict(models, audio, chunk_length_s=0):
             input_features = np.concatenate(
                 [item.pop("input_features") for item in accumulator], axis=0
             )
-            tokens = forward(models, input_features)
+            tokens = genarate(models, input_features)
             for i, item in enumerate(accumulator):
                 item["tokens"] = tokens[i : i + 1]
                 model_outputs.append(item)
@@ -396,7 +462,7 @@ def predict(models, audio, chunk_length_s=0):
         input_features = np.concatenate(
             [item.pop("input_features") for item in accumulator], axis=0
         )
-        tokens = forward(models, input_features)
+        tokens = genarate(models, input_features)
         for i, item in enumerate(accumulator):
             item["tokens"] = tokens[i : i + 1]
             model_outputs.append(item)
