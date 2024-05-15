@@ -586,6 +586,7 @@ The collection of pre-trained, state-of-the-art AI models.
 
 # Other languages
 
-[unity version](https://github.com/axinc-ai/ailia-models-unity)
-
-[c++ version](https://github.com/axinc-ai/ailia-models-cpp)
+- [unity version](https://github.com/axinc-ai/ailia-models-unity)
+- [c++ version](https://github.com/axinc-ai/ailia-models-cpp)
+- [flutter version](https://github.com/axinc-ai/ailia-models-flutter)
+- [rust version](https://github.com/axinc-ai/ailia-models-rust)
