@@ -51,8 +51,16 @@ parser.add_argument(
     action='store_true',
     help='execute onnxruntime version.'
 )
+parser.add_argument(
+    '--opt',
+    action='store_true',
+    help='use opset17 version.'
+)
 args = update_parser(parser)
 
+if args.opt:
+    WEIGHT_BASE_PATH = 'multilingual-e5-base.opt.onnx'
+    MODEL_BASE_PATH = 'multilingual-e5-base.opt.onnx.prototxt'
 
 # ======================
 # Secondaty Functions
@@ -99,8 +107,8 @@ def closest_sentence(embs, q_emb):
 # Main functions
 # ======================
 
-def predict(models, sentences):
-    input_texts = ['query: {}'.format(t) for t in sentences]
+def predict(models, sentences, header):
+    input_texts = [header + ': {}'.format(t) for t in sentences]
 
     tokenizer = models['tokenizer']
     batch_dict = tokenizer(
@@ -138,18 +146,21 @@ def recognize_from_sentence(models):
     logger.info("Generating embeddings...")
     if args.benchmark:
         logger.info('BENCHMARK mode')
+        total = 0
         for i in range(5):
             start = int(round(time.time() * 1000))
-            embs = predict(models, sentences)
+            embs = predict(models, sentences, "passage")
             end = int(round(time.time() * 1000))
             logger.info(f'\tailia processing time {end - start} ms')
+            total = total + end - start
+        logger.info(f'average time {total / 5} ms\n')
         exit()
     else:
-        embs = predict(models, sentences)
+        embs = predict(models, sentences, "passage")
 
     # check prompt from command line argument
     if prompt is not None:
-        prompt_emb = predict(models, [prompt])
+        prompt_emb = predict(models, [prompt], "query")
 
         idx, sim = closest_sentence(embs, prompt_emb)
 
@@ -160,7 +171,7 @@ def recognize_from_sentence(models):
     # application
     prompt = input('User (press q to exit): ')
     while prompt not in ('q', 'ｑ'):
-        prompt_emb = predict(models, [prompt])
+        prompt_emb = predict(models, [prompt], "query")
 
         idx, sim = closest_sentence(embs, prompt_emb)
 
