@@ -350,15 +350,6 @@ def greedy_search(net, input_ids, encoder_hidden_states):
     return input_ids
 
 
-def generate_with_fallback(
-    models,
-    segment_input,
-):
-    temperature = 1.0
-
-    seek_outputs = forward(models, segment_input)
-
-
 def forward(models, input_features):
     if args.benchmark:
         start = int(round(time.time() * 1000))
@@ -390,7 +381,7 @@ def forward(models, input_features):
     return outputs
 
 
-def genarate(models, input_features):
+def generate(models, input_features):
     num_segment_frames = 3000
     total_input_frames = input_features.shape[-1]
     is_shortform = total_input_frames <= num_segment_frames
@@ -403,11 +394,91 @@ def genarate(models, input_features):
         input_stride = 2
 
         # global longform generation variables
+        timestamp_begin = 50365
         max_frames = np.ones((1,), dtype=int) * total_input_frames
         seek = np.zeros((1,), dtype=int)
 
         # Preppare running variables, list for generation
-        batch_size = 1
+        current_segments = [[]]
+
+        def retrieve_segment(
+            seek_sequence,
+            seek_outputs,
+            time_offset,
+            timestamp_begin,
+            seek_num_frames,
+            time_precision,
+            input_stride,
+            prev_idx,
+            idx,
+        ):
+            # find the predicted "end of segment" predictions of Whisper
+            # "end of segment" predictions occur whenever Whisper predicts a timestamp token
+            timestamp_tokens = np.greater_equal(seek_sequence, timestamp_begin)
+            single_timestamp_ending = timestamp_tokens[-2:].tolist() == [False, True]
+            timestamp_segment_indices = np.where(
+                timestamp_tokens[:-1] & timestamp_tokens[1:]
+            )[0]
+            np.add(timestamp_segment_indices, 1, out=timestamp_segment_indices)
+
+            # If whisper predicted a "end of segment" via a timestep token, let's go ever each
+            # "end of segment" prediction and slice the decoding into segments accordingly
+            if len(timestamp_segment_indices) > 0:
+                # if the output contains two consecutive timestamp tokens
+                slices = timestamp_segment_indices.tolist()
+                segments = []
+                if single_timestamp_ending:
+                    slices.append(len(seek_sequence))
+
+                last_slice = 0
+                # Add each segment to list of all segments
+                for current_slice in slices:
+                    sliced_tokens = seek_sequence[last_slice:current_slice]
+                    start_timestamp_pos = sliced_tokens[0].item() - timestamp_begin
+                    end_timestamp_pos = sliced_tokens[-1].item() - timestamp_begin
+                    segments.append(
+                        {
+                            "start": time_offset[prev_idx]
+                            + start_timestamp_pos * time_precision,
+                            "end": time_offset[prev_idx]
+                            + end_timestamp_pos * time_precision,
+                            "tokens": sliced_tokens,
+                            "result": seek_outputs[idx],
+                        }
+                    )
+                    last_slice = current_slice
+
+                if single_timestamp_ending:
+                    # single timestamp at the end means no speech after the last timestamp.
+                    segment_offset = seek_num_frames[prev_idx]
+                else:
+                    # otherwise, ignore the unfinished segment and seek to the last timestamp
+                    # here we throw away all predictions after the last predicted "end of segment"
+                    # since we are cutting right in the middle of an audio
+                    last_timestamp_pos = (
+                        seek_sequence[last_slice - 1].item() - timestamp_begin
+                    )
+                    segment_offset = last_timestamp_pos * input_stride
+            else:
+                # If whisper does not predict any "end of segment" token, then
+                # the whole decoding is considered a segment and we add it to the list of segments
+                timestamps = seek_sequence[timestamp_tokens.nonzero()[0]]
+                last_timestamp_pos = seek_num_frames[prev_idx]
+                if timestamps.size > 0 and timestamps[-1].item() != timestamp_begin:
+                    # no consecutive timestamps but it has a timestamp; use the last one.
+                    last_timestamp_pos = timestamps[-1].item() - timestamp_begin
+                segments = [
+                    {
+                        "start": time_offset[prev_idx],
+                        "end": time_offset[prev_idx]
+                        + last_timestamp_pos * time_precision,
+                        "tokens": seek_sequence,
+                        "result": seek_outputs[idx],
+                    }
+                ]
+                segment_offset = seek_num_frames[prev_idx]
+
+            return segments, segment_offset
 
         # Transcribe audio until we reach the end of all input audios
         while (seek < max_frames).any():
@@ -427,12 +498,49 @@ def genarate(models, input_features):
                     ),
                 )
 
-            seek_sequences, seek_outputs, should_skip, do_condition_on_prev_tokens = (
-                generate_with_fallback(
-                    models,
-                    segment_input=segment_input,
+            seek_outputs = forward(models, segment_input)
+            seek_sequences = seek_outputs = seek_outputs[:, 3:]
+
+            seek_sequence_list = []
+            seek_outputs_list = []
+            eos_token_id = 50257
+            pad_token_id = 50257
+            for i, seek_sequence in enumerate(seek_sequences):
+                # make sure we cut a predicted EOS token if we are not finished with the generation yet
+                is_not_final = (seek[0] + num_segment_frames) < max_frames[0]
+                # remove eos token id
+                if is_not_final and seek_sequence[-1] == eos_token_id:
+                    seek_sequence = seek_sequence[:-1]
+
+                # remove all padding tokens
+                if seek_sequence[-1] == pad_token_id:
+                    num_paddings = np.sum(seek_sequence == pad_token_id)
+                    seek_sequence = seek_sequence[:-num_paddings]
+
+                seek_sequence_list.append(seek_sequence)
+                seek_outputs_list.append(seek_outputs[i])
+
+            seek_sequences = seek_sequence_list
+            seek_outputs = seek_outputs_list
+
+            # 6.9 In every generated sequence, split by timestamp tokens and extract segments
+            for i, seek_sequence in enumerate(seek_sequences):
+                prev_i = 0
+
+                segments, segment_offset = retrieve_segment(
+                    seek_sequence=seek_sequence,
+                    seek_outputs=seek_outputs,
+                    time_offset=time_offset,
+                    timestamp_begin=timestamp_begin,
+                    seek_num_frames=seek_num_frames,
+                    time_precision=time_precision,
+                    input_stride=input_stride,
+                    prev_idx=prev_i,
+                    idx=i,
                 )
-            )
+
+                current_segments[i] += segments
+                seek[i] += segment_offset
 
     return outputs
 
@@ -452,7 +560,7 @@ def predict(models, audio, chunk_length_s=0):
             input_features = np.concatenate(
                 [item.pop("input_features") for item in accumulator], axis=0
             )
-            tokens = genarate(models, input_features)
+            tokens = generate(models, input_features)
             for i, item in enumerate(accumulator):
                 item["tokens"] = tokens[i : i + 1]
                 model_outputs.append(item)
@@ -462,7 +570,7 @@ def predict(models, audio, chunk_length_s=0):
         input_features = np.concatenate(
             [item.pop("input_features") for item in accumulator], axis=0
         )
-        tokens = genarate(models, input_features)
+        tokens = generate(models, input_features)
         for i, item in enumerate(accumulator):
             item["tokens"] = tokens[i : i + 1]
             model_outputs.append(item)
