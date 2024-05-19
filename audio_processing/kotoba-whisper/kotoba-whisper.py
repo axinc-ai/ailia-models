@@ -480,6 +480,9 @@ def generate(models, input_features):
 
             return segments, segment_offset
 
+        eos_token_id = 50257
+        pad_token_id = 50257
+
         # Transcribe audio until we reach the end of all input audios
         while (seek < max_frames).any():
             time_offset = seek * time_precision / input_stride
@@ -503,8 +506,7 @@ def generate(models, input_features):
 
             seek_sequence_list = []
             seek_outputs_list = []
-            eos_token_id = 50257
-            pad_token_id = 50257
+
             for i, seek_sequence in enumerate(seek_sequences):
                 # make sure we cut a predicted EOS token if we are not finished with the generation yet
                 is_not_final = (seek[0] + num_segment_frames) < max_frames[0]
@@ -541,6 +543,30 @@ def generate(models, input_features):
 
                 current_segments[i] += segments
                 seek[i] += segment_offset
+
+        max_total_length = 0
+        sequences = []
+        for current_segment_list in current_segments:
+            if (
+                current_segment_list is not None
+                and len([d["tokens"] for d in current_segment_list]) > 0
+            ):
+                sequence = np.concatenate(
+                    [d["tokens"] for d in current_segment_list], axis=-1
+                )
+                sequences.append(sequence)
+                max_total_length = max(max_total_length, len(sequences[-1]))
+            else:
+                sequences.append(np.array([]))
+        for i in range(len(current_segments)):
+            pad_length = max_total_length - len(sequences[i])
+            pad = (0, pad_length)
+
+            sequences[i] = np.pad(
+                sequences[i], pad_width=pad, constant_values=pad_token_id
+            )
+        tokens = np.stack(sequences, axis=0)
+        outputs = tokens
 
     return outputs
 
