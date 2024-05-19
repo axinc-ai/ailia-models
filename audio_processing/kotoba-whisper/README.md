@@ -4,6 +4,8 @@
 
 Audio file
 
+https://github.com/axinc-ai/ailia-models/assets/29946532/b0b83413-cb15-4414-afab-46c4bf71340d
+
 ## Output
 
 Recognized speech text
