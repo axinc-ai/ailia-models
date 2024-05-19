@@ -35,7 +35,7 @@ REMOTE_PATH = "https://storage.googleapis.com/ailia-models/kotoba-whisper/"
 WAV_PATH = "demo.wav"
 SAVE_TEXT_PATH = "output.txt"
 
-flg_ffmpeg = True
+flg_ffmpeg = False
 
 # ======================
 # Arguemnt Parser Config
