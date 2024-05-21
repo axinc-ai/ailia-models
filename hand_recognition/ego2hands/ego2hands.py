@@ -69,7 +69,6 @@ def preprocess(image, h=None, w=None):
     if h is not None and w is not None:
         image = cv2.resize(image, (w, h))
 
-    print(image.shape)
     image = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
     
     img_edge = cv2.Canny(image, 25, 100).astype(np.float32)
@@ -232,8 +231,6 @@ def main():
     
     # net initialize
     model = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id = args.env_id)
-
-    print(args.overlay)
 
     if args.video is not None:
         # video mode
