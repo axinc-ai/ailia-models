@@ -16,9 +16,7 @@ from sklearn.metrics import precision_recall_curve
 
 from skimage import morphology
 from skimage.segmentation import mark_boundaries
-from padim import args
-if args.enable_optimization:
-    import torch
+import torch
 
 WEIGHT_RESNET18_PATH = 'resnet18.onnx'
 MODEL_RESNET18_PATH = 'resnet18.onnx.prototxt'

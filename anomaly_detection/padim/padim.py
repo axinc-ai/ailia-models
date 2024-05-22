@@ -379,6 +379,7 @@ def infer_from_video(net, params, train_outputs, threshold):
 
 
 def train_and_infer(net, params):
+    timestart=time.time()
     if args.feat:
         logger.info('loading train set feature from: %s' % args.feat)
         with open(args.feat, 'rb') as f:
@@ -387,7 +388,7 @@ def train_and_infer(net, params):
                 train_output_list.append(train_outputs)
             if args.enable_optimization:
                 train_outputs=[torch.from_numpy(train_outputs[0]).float().to(device), train_outputs[1], 
-                        torch.from_numpy(train_outputs[2]).float().to(device), train_outputs[3] ]
+                        torch.from_numpy(train_outputs[2]).float().to(device), train_outputs[3] ]  
                 if args.compare_optimization:
                     train_output_list.append(train_outputs)
 
@@ -426,7 +427,7 @@ def train_and_infer(net, params):
 
 def main():
     # model files check and download
-    weight_path, model_path, params = get_params(args.arch)
+    weight_path, model_path, params = get_params(args.arch) 
     check_and_download_models(weight_path, model_path, REMOTE_PATH)
 
     # create net instance
