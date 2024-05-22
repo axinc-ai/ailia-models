@@ -232,6 +232,7 @@ The collection of pre-trained, state-of-the-art AI models.
 | [<img src="hand_recognition/hand3d/output.png" width=128px>](hand_recognition/hand3d/) |[hand3d](/hand_recognition/hand3d/) | [ColorHandPose3D network](https://github.com/lmb-freiburg/hand3d) | TensorFlow | 1.2.5 and later |
 | [<img src="hand_recognition/minimal-hand/output.png" width=128px>](hand_recognition/minimal-hand/) |[minimal-hand](/hand_recognition/minimal-hand/) | [Minimal Hand](https://github.com/CalciferZh/minimal-hand) | TensorFlow | 1.2.8 and later |
 | [<img src="hand_recognition/v2v-posenet/output.png" width=128px>](hand_recognition/v2v-posenet/) |[v2v-posenet](/hand_recognition/v2v-posenet/) | [V2V-PoseNet](https://github.com/mks0601/V2V-PoseNet_RELEASE) | Pytorch | 1.2.6 and later |
+| [<img src="hand_recognition/ego2hands/output.png" width=128px>](hand_recognition/ego2hands/) |[ego2hands](/hand_recognition/ego2hands/) | [Ego2Hands](https://github.com/AlextheEngineer/Ego2Hands) | Pytorch | 1.2.16 and later |
 
 ## Image captioning
 
