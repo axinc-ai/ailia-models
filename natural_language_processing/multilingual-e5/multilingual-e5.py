@@ -154,7 +154,7 @@ def recognize_from_sentence(models):
             logger.info(f'\tailia processing time {end - start} ms')
             total = total + end - start
         logger.info(f'average time {total / 5} ms\n')
-        exit()
+        return
     else:
         embs = predict(models, sentences, "passage")
 
@@ -210,7 +210,13 @@ def main():
         "tokenizer": tokenizer,
     }
 
+    if args.profile:
+        net.set_profile_mode(True)
+
     recognize_from_sentence(models)
+
+    if args.profile:
+        print(net.get_summary())
 
 
 if __name__ == '__main__':
