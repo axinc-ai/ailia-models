@@ -3,3 +3,4 @@ SoundFile
 librosa
 torch
 pyaudio
+madmom

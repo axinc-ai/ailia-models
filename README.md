@@ -15,9 +15,10 @@ The collection of pre-trained, state-of-the-art AI models.
 [ailia MODELS tutorial 日本語版](TUTORIAL_jp.md)
 
 # Supported models
-326 models as of April 30th, 2024
+327 models as of May 22th, 2024
 
 # Latest update
+- 2024.05.22 Add beatnet
 - 2024.04.30 Add cross_encoder_mmarco
 - 2024.04.28 Add marigold
 - 2024.04.08 ailia SDK can now be installed via pip.
@@ -77,6 +78,7 @@ The collection of pre-trained, state-of-the-art AI models.
 | [audioset_tagging_cnn](/audio_processing/audioset_tagging_cnn/) | [PANNs: Large-Scale Pretrained Audio Neural Networks for Audio Pattern Recognition](https://github.com/qiuqiangkong/audioset_tagging_cnn) | Pytorch | 1.2.9 and later | |
 | [deep music enhancer](/audio_processing/deep-music-enhancer/) | [On Filter Generalization for Music Bandwidth Extension Using Deep Neural Networks](https://github.com/serkansulun/deep-music-enhancer) | Pytorch | 1.2.6 and later | |
 | [pyannote-audio](/audio_processing/pyannote-audio/) | [Pyannote-audio](https://github.com/pyannote/pyannote-audio) | Pytorch | 1.2.15 and later | [JP](https://medium.com/axinc/pyannoteaudio-%E8%A9%B1%E8%80%85%E5%88%86%E9%9B%A2%E3%82%92%E8%A1%8C%E3%81%86%E3%81%9F%E3%82%81%E3%81%AE%E6%A9%9F%E6%A2%B0%E5%AD%A6%E7%BF%92%E3%83%A2%E3%83%87%E3%83%AB-fca61f4ef5d0) |
+| [beatnet](/audio_processing/beatnet/) | [BeatNet: CRNN and Particle Filtering for Online Joint Beat Downbeat and Meter Tracking](https://github.com/mjhydri/BeatNet) | Pytorch | 1.2.16 and later | |
 
 ## Background removal
 
