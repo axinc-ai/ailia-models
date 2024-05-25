@@ -390,7 +390,7 @@ class StableDiffusionimg2Img:
                     None, {"latent_sample": latent_sample.astype(np.float32)}
                 )[0]
             else:
-                output = self.vae_decoder.predict([latent_sample])
+                output = self.vae_decoder.predict([latent_sample])[0]
             outputs.append(output)
         image = np.concatenate(outputs)
         # post process

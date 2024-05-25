@@ -1,3 +1,4 @@
+
 import sys
 
 import numpy as np
@@ -9,7 +10,7 @@ import ailia
 from logging import getLogger
 
 sys.path.append("../../util")
-from arg_utils import get_base_parser, update_parser  # noqa
+from arg_utils import get_base_parser, update_parser, get_savepath  # noqa
 from model_utils import check_and_download_models
 from detector_utils import load_image
 from df.pipelines.stable_diffusion import StableDiffusion
@@ -182,7 +183,12 @@ def main():
         )
     image = (image[0] * 255).astype(np.uint8)
     image = image[:, :, ::-1]  # RGB->BGR
-    cv2.imwrite("output.png", image)
+
+    img_savepath = get_savepath(args.savepath, "", ext=".png")
+    logger.info(f"saved at : {img_savepath}")
+    cv2.imwrite(img_savepath, image)
+
+    logger.info("Script finished successfully.")
 
 
 if __name__ == "__main__":
