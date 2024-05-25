@@ -21,9 +21,10 @@ from df.schedulers.euler_discrete_scheduler import EulerDiscreteScheduler
 logger = getLogger(__name__)
 
 
-class StableDiffusion:
+class StableDiffusionimg2Img:
     def __init__(
         self,
+        vae_encoder,
         vae_decoder,
         text_encoder,
         tokenizer,
@@ -31,6 +32,7 @@ class StableDiffusion:
         scheduler: EulerDiscreteScheduler,
         use_onnx: bool = False,
     ):
+        self.vae_encoder = vae_encoder
         self.vae_decoder = vae_decoder
         self.text_encoder = text_encoder
         self.tokenizer = tokenizer
@@ -175,28 +177,87 @@ class StableDiffusion:
         elif total is not None:
             return tqdm(total=total)
 
+    def _preprocess_base_image(
+        self,
+        base_image: np.ndarray,
+        width: Optional[int],
+        height: Optional[int],
+    ) -> np.ndarray:
+
+        def resize(images: np.ndarray, height, width) -> np.ndarray:
+            import torch
+            images = torch.from_numpy(images)
+            images = torch.nn.functional.interpolate(images, size=(height, width))
+            return images.cpu().float().numpy()
+
+        def reshape(image: np.ndarray) -> np.ndarray:
+            """
+            Reshape inputs to expected shape.
+            """
+            if image.ndim == 3:
+                image = image[..., None]
+            return image.transpose(3, 2, 0, 1)
+
+        def normalize(image: np.ndarray) -> np.ndarray:
+            return 2.0 * image - 1.0
+
+        if height is None:
+            height = base_image.shape[1]
+        if width is None:
+            width = base_image.shape[2]
+        width, height = (x - x % self.vae_scale_factor for x in (width, height))
+        base_image = base_image / 255.0
+
+        base_image = reshape(base_image)
+        base_image = resize(base_image, height, width)
+
+        # do_normalize
+        do_normalize = True
+        if base_image.min() < 0:
+            logger.warn(
+                "Passing `image` as torch tensor with value range in [-1,1] is deprecated. The expected value range for image tensor is [0,1] "
+                f"when passing as pytorch tensor or numpy Array. You passed `image` with value range [{image.min()},{image.max()}]",
+                FutureWarning,
+            )
+            do_normalize = False
+
+        if do_normalize:
+            base_image = normalize(base_image)
+        
+        return base_image
+
     def forward(
         self,
         prompt: Union[str, List[str]],
+        base_image: Optional[np.ndarray],
         height: Optional[int] = None,
         width: Optional[int] = None,
         num_inference_steps: int=50,
         guidance_scale: float = 0.0,
+        strength: float = 0.8,
         negative_prompt: Optional[Union[str, list]]=None,
         num_images_per_prompt: int = 1,
         latents: Optional[np.ndarray] = None,
     ) -> np.ndarray:
         
-        sample_size = 64
-        height = height or sample_size * self.vae_scale_factor
-        width = width or sample_size * self.vae_scale_factor
-
         if isinstance(prompt, str):
             batch_size = 1
         elif isinstance(prompt, list):
             batch_size = len(prompt)
         else:
             raise Exception("Prompt must be either a string or a list of strings.")
+        
+        sample_size = 64
+        height = height or sample_size * self.vae_scale_factor
+        width = width or sample_size * self.vae_scale_factor
+
+        # set timesteps
+        self.scheduler.set_timesteps(num_inference_steps)
+
+        # preprocess image
+        base_image = self._preprocess_base_image(
+            base_image=base_image, width=width, height=height,
+        )
 
         do_classifier_free_guidance = guidance_scale > 1.0
 
@@ -207,19 +268,59 @@ class StableDiffusion:
             num_images_per_prompt=num_images_per_prompt,
         )
 
-        # set timesteps
-        self.scheduler.set_timesteps(num_inference_steps)
-        timesteps = self.scheduler.timesteps
+        # encode the init image into latents and scale the latents
+        if self.use_onnx:
+            init_latents = self.vae_encoder.run(
+                None,
+                {"sample": base_image},
+            )[0]
+        else:
+            init_latents = self.vae_encoder.predict(
+                [base_image],
+            )[0]
+        scaling_factor = 0.18215
+        init_latents = scaling_factor * init_latents
 
-        in_channels = 4
-        latents = self._prepare_latents(
-            batch_size=batch_size * num_images_per_prompt,
-            num_channels_latents=in_channels,
-            height=height,
-            width=width,
-            dtype=prompt_embeds.dtype,
-            latents=latents,
+        if isinstance(prompt, str):
+            prompt = [prompt]
+        init_latents = np.concatenate([init_latents] * num_images_per_prompt, axis=0, dtype=np.float32)
+        if (
+            batch_size > init_latents.shape[0]
+            and batch_size % init_latents.shape[0] == 0
+        ):
+            # expand init_latents for batch_size
+            additional_image_per_prompt = batch_size // init_latents.shape[0]
+            init_latents = np.concatenate(
+                [init_latents] * additional_image_per_prompt, axis=0
+            )
+        elif (
+            batch_size > init_latents.shape[0]
+            and batch_size % init_latents.shape[0] != 0
+        ):
+            raise ValueError(
+                f"Cannot duplicate `image` of batch size {init_latents.shape[0]} to {batch_size} text prompts."
+            )
+        else:
+            init_latents = np.concatenate([init_latents], axis=0)
+
+        # get the original timestep using init_timestep
+        offset = 1
+        init_timestep = min(int(num_inference_steps * strength), num_inference_steps) + offset
+        timesteps = self.scheduler.timesteps[-init_timestep]
+        timesteps = np.array([timesteps] * batch_size * num_images_per_prompt)
+
+        # add noise to latents using the timesteps
+        noise = np.random.randn(*init_latents.shape)
+        init_latents = self.scheduler.add_noise(
+            init_latents,
+            noise,
+            timesteps,
         )
+
+        latents = init_latents
+        t_start = max(num_inference_steps - init_timestep + offset, 0)
+        timesteps = self.scheduler.timesteps[t_start:]
+
         for i, t in enumerate(self._progress_bar(timesteps)):
             # expand the latents if we are doing classifier free guidance
             latent_model_input = np.concatenate([latents] * 2) if do_classifier_free_guidance else latents
@@ -230,14 +331,14 @@ class StableDiffusion:
                 noise_pred = self.unet.run(
                     None,
                     {
-                        "sample": latent_model_input,
+                        "sample": latent_model_input.astype(np.float32),
                         "timestep": timestep,
                         "encoder_hidden_states": prompt_embeds,
                     },
                 )[0]
             else:
                 noise_pred = self.unet.predict(
-                    [latent_model_input, timestep, prompt_embeds],
+                    [latent_model_input, timestep, prompt_embeds ],
                 )[0]
 
             # perform guidance
@@ -255,7 +356,7 @@ class StableDiffusion:
         for i in range(latents.shape[0]):
             latent_sample = latents[i : i + 1]
             if self.use_onnx:
-                output = self.vae_decoder.run(None, {"latent_sample": latent_sample})[0]
+                output = self.vae_decoder.run(None, {"latent_sample": latent_sample.astype(np.float32)})[0]
             else:
                 output = self.vae_decoder.predict([latent_sample])
             outputs.append(output)
