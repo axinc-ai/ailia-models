@@ -33,23 +33,37 @@ class EulerDiscreteScheduler(ConfigMixin):
         if trained_betas is not None:
             self.betas = np.array(trained_betas, dtype=np.float32)
         elif beta_schedule == "linear":
-            self.betas = np.linspace(beta_start, beta_end, num_train_timesteps, dtype=np.float32)
+            self.betas = np.linspace(
+                beta_start, beta_end, num_train_timesteps, dtype=np.float32
+            )
         elif beta_schedule == "scaled_linear":
             # this schedule is very specific to the latent diffusion model.
-            self.betas = np.linspace(beta_start**0.5, beta_end**0.5, num_train_timesteps, dtype=np.float32) ** 2
+            self.betas = (
+                np.linspace(
+                    beta_start**0.5,
+                    beta_end**0.5,
+                    num_train_timesteps,
+                    dtype=np.float32,
+                )
+                ** 2
+            )
         else:
-            raise NotImplementedError(f"{beta_schedule} does is not implemented for {self.__class__}")
+            raise NotImplementedError(
+                f"{beta_schedule} does is not implemented for {self.__class__}"
+            )
 
         self.alphas = 1.0 - self.betas
         self.alphas_cumprod = np.cumprod(self.alphas, axis=0)
 
         sigmas = np.array(((1 - self.alphas_cumprod) / self.alphas_cumprod) ** 0.5)
         sigmas = np.flip(sigmas, axis=0)
-        timesteps = np.linspace(0, num_train_timesteps - 1, num_train_timesteps, dtype=float)[::-1].copy()
+        timesteps = np.linspace(
+            0, num_train_timesteps - 1, num_train_timesteps, dtype=float
+        )[::-1].copy()
 
         self.sigmas = np.concatenate((sigmas, np.zeros(1)), axis=0)
         self.timesteps = timesteps
-        self.num_inference_steps = None        
+        self.num_inference_steps = None
         self.is_scale_input_called = False
         self._step_index = None
         self.begin_index = None
@@ -79,7 +93,7 @@ class EulerDiscreteScheduler(ConfigMixin):
     def index_for_timestep(
         self,
         timestep: Union[float, np.ndarray],
-        schedule_timesteps: Union[None, float, np.ndarray]=None,
+        schedule_timesteps: Union[None, float, np.ndarray] = None,
     ):
         if schedule_timesteps is None:
             schedule_timesteps = self.timesteps
@@ -146,7 +160,6 @@ class EulerDiscreteScheduler(ConfigMixin):
         self.sigmas = np.concatenate((sigmas, np.zeros(1)), axis=0)
         self._step_index = None
         self.begin_index = None
-        
 
     def scale_model_input(
         self,
@@ -205,7 +218,11 @@ class EulerDiscreteScheduler(ConfigMixin):
 
         sigma = self.sigmas[self.step_index]
 
-        gamma = min(s_churn / (len(self.sigmas) - 1), 2**0.5 - 1) if s_tmin <= sigma <= s_tmax else 0.0
+        gamma = (
+            min(s_churn / (len(self.sigmas) - 1), 2**0.5 - 1)
+            if s_tmin <= sigma <= s_tmax
+            else 0.0
+        )
 
         noise = np.random.randn(*model_output.shape)
 
@@ -218,13 +235,18 @@ class EulerDiscreteScheduler(ConfigMixin):
         # 1. compute predicted original sample (x_0) from sigma-scaled predicted noise
         # NOTE: "original_sample" should not be an expected prediction_type but is left in for
         # backwards compatibility
-        if self.config.prediction_type == "original_sample" or self.config.prediction_type == "sample":
+        if (
+            self.config.prediction_type == "original_sample"
+            or self.config.prediction_type == "sample"
+        ):
             pred_original_sample = model_output
         elif self.config.prediction_type == "epsilon":
             pred_original_sample = sample - sigma_hat * model_output
         elif self.config.prediction_type == "v_prediction":
             # denoised = model_output * c_out + input * c_skip
-            pred_original_sample = model_output * (-sigma / (sigma**2 + 1) ** 0.5) + (sample / (sigma**2 + 1))
+            pred_original_sample = model_output * (-sigma / (sigma**2 + 1) ** 0.5) + (
+                sample / (sigma**2 + 1)
+            )
         else:
             raise ValueError(
                 f"prediction_type given as {self.config.prediction_type} must be one of `epsilon`, or `v_prediction`"
@@ -253,7 +275,9 @@ class EulerDiscreteScheduler(ConfigMixin):
 
         # self.begin_index is None when scheduler is used for training, or pipeline does not implement setbegin_index
         if self.begin_index is None:
-            step_indices = [self.index_for_timestep(t, schedule_timesteps) for t in timesteps]
+            step_indices = [
+                self.index_for_timestep(t, schedule_timesteps) for t in timesteps
+            ]
         elif self.step_index is not None:
             # add_noise is called after first denoising step (for inpainting)
             step_indices = [self.step_index] * timesteps.shape[0]

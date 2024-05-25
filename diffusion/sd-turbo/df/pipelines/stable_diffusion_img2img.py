@@ -82,7 +82,9 @@ class StableDiffusionimg2Img:
                 return_tensors="np",
             )
             text_input_ids = text_inputs.input_ids
-            untruncated_ids = self.tokenizer(prompt, padding="max_length", return_tensors="np").input_ids
+            untruncated_ids = self.tokenizer(
+                prompt, padding="max_length", return_tensors="np"
+            ).input_ids
 
             if not np.array_equal(text_input_ids, untruncated_ids):
                 removed_text = self.tokenizer.batch_decode(
@@ -137,11 +139,15 @@ class StableDiffusionimg2Img:
                     None, {"input_ids": negative_input_ids}
                 )[0]
             else:
-                negative_prompt_embeds = self.text_encoder.predict([negative_input_ids])[0]
+                negative_prompt_embeds = self.text_encoder.predict(
+                    [negative_input_ids]
+                )[0]
 
         # generate prompt_embeds from input
         if do_classifier_free_guidance:
-            negative_prompt_embeds = np.repeat(negative_prompt_embeds, num_images_per_prompt, axis=0)
+            negative_prompt_embeds = np.repeat(
+                negative_prompt_embeds, num_images_per_prompt, axis=0
+            )
 
             # For classifier free guidance, we need to do two forward passes.
             # Here we concatenate the unconditional and text embeddings into a single batch
@@ -158,18 +164,27 @@ class StableDiffusionimg2Img:
         dtype: np.dtype,
         latents: Optional[np.ndarray] = None,
     ) -> np.ndarray:
-        shape = (batch_size, num_channels_latents, height // self.vae_scale_factor, width // self.vae_scale_factor)
+        shape = (
+            batch_size,
+            num_channels_latents,
+            height // self.vae_scale_factor,
+            width // self.vae_scale_factor,
+        )
         generator = np.random
 
         if latents is None:
             latents = generator.randn(*shape).astype(dtype)
         elif latents.shape != shape:
-            raise ValueError(f"Unexpected latents shape, got {latents.shape}, expected {shape}")
+            raise ValueError(
+                f"Unexpected latents shape, got {latents.shape}, expected {shape}"
+            )
         # scale the initial noise by the standard deviation required by the scheduler
         latents = latents * np.float64(self.scheduler.init_noise_sigma)
         return latents
 
-    def _progress_bar(self, iterable: Optional[iter]=None, total: Optional[float]=None):
+    def _progress_bar(
+        self, iterable: Optional[iter] = None, total: Optional[float] = None
+    ):
         from tqdm.auto import tqdm
 
         if iterable is not None:
@@ -186,6 +201,7 @@ class StableDiffusionimg2Img:
 
         def resize(images: np.ndarray, height, width) -> np.ndarray:
             import torch
+
             images = torch.from_numpy(images)
             images = torch.nn.functional.interpolate(images, size=(height, width))
             return images.cpu().float().numpy()
@@ -223,7 +239,7 @@ class StableDiffusionimg2Img:
 
         if do_normalize:
             base_image = normalize(base_image)
-        
+
         return base_image
 
     def forward(
@@ -232,21 +248,21 @@ class StableDiffusionimg2Img:
         base_image: Optional[np.ndarray],
         height: Optional[int] = None,
         width: Optional[int] = None,
-        num_inference_steps: int=50,
+        num_inference_steps: int = 50,
         guidance_scale: float = 0.0,
         strength: float = 0.8,
-        negative_prompt: Optional[Union[str, list]]=None,
+        negative_prompt: Optional[Union[str, list]] = None,
         num_images_per_prompt: int = 1,
         latents: Optional[np.ndarray] = None,
     ) -> np.ndarray:
-        
+
         if isinstance(prompt, str):
             batch_size = 1
         elif isinstance(prompt, list):
             batch_size = len(prompt)
         else:
             raise Exception("Prompt must be either a string or a list of strings.")
-        
+
         sample_size = 64
         height = height or sample_size * self.vae_scale_factor
         width = width or sample_size * self.vae_scale_factor
@@ -256,7 +272,9 @@ class StableDiffusionimg2Img:
 
         # preprocess image
         base_image = self._preprocess_base_image(
-            base_image=base_image, width=width, height=height,
+            base_image=base_image,
+            width=width,
+            height=height,
         )
 
         do_classifier_free_guidance = guidance_scale > 1.0
@@ -283,7 +301,9 @@ class StableDiffusionimg2Img:
 
         if isinstance(prompt, str):
             prompt = [prompt]
-        init_latents = np.concatenate([init_latents] * num_images_per_prompt, axis=0, dtype=np.float32)
+        init_latents = np.concatenate(
+            [init_latents] * num_images_per_prompt, axis=0, dtype=np.float32
+        )
         if (
             batch_size > init_latents.shape[0]
             and batch_size % init_latents.shape[0] == 0
@@ -305,7 +325,9 @@ class StableDiffusionimg2Img:
 
         # get the original timestep using init_timestep
         offset = 1
-        init_timestep = min(int(num_inference_steps * strength), num_inference_steps) + offset
+        init_timestep = (
+            min(int(num_inference_steps * strength), num_inference_steps) + offset
+        )
         timesteps = self.scheduler.timesteps[-init_timestep]
         timesteps = np.array([timesteps] * batch_size * num_images_per_prompt)
 
@@ -323,7 +345,11 @@ class StableDiffusionimg2Img:
 
         for i, t in enumerate(self._progress_bar(timesteps)):
             # expand the latents if we are doing classifier free guidance
-            latent_model_input = np.concatenate([latents] * 2) if do_classifier_free_guidance else latents
+            latent_model_input = (
+                np.concatenate([latents] * 2)
+                if do_classifier_free_guidance
+                else latents
+            )
             latent_model_input = self.scheduler.scale_model_input(latent_model_input, t)
 
             timestep = np.array([t], dtype=int)
@@ -338,17 +364,21 @@ class StableDiffusionimg2Img:
                 )[0]
             else:
                 noise_pred = self.unet.predict(
-                    [latent_model_input, timestep, prompt_embeds ],
+                    [latent_model_input, timestep, prompt_embeds],
                 )[0]
 
             # perform guidance
             if do_classifier_free_guidance:
                 noise_pred_uncond, noise_pred_text = np.split(noise_pred, 2)
-                noise_pred = noise_pred_uncond + guidance_scale * (noise_pred_text - noise_pred_uncond)
+                noise_pred = noise_pred_uncond + guidance_scale * (
+                    noise_pred_text - noise_pred_uncond
+                )
 
             # compute the previous noisy sample x_t -> x_t-1
             latents = self.scheduler.step(
-                noise_pred, t, latents,
+                noise_pred,
+                t,
+                latents,
             )
 
         latents /= 0.18215
@@ -356,7 +386,9 @@ class StableDiffusionimg2Img:
         for i in range(latents.shape[0]):
             latent_sample = latents[i : i + 1]
             if self.use_onnx:
-                output = self.vae_decoder.run(None, {"latent_sample": latent_sample.astype(np.float32)})[0]
+                output = self.vae_decoder.run(
+                    None, {"latent_sample": latent_sample.astype(np.float32)}
+                )[0]
             else:
                 output = self.vae_decoder.predict([latent_sample])
             outputs.append(output)
@@ -365,4 +397,3 @@ class StableDiffusionimg2Img:
         image = np.clip(image / 2 + 0.5, 0, 1)
         image = image.transpose((0, 2, 3, 1))
         return image
-

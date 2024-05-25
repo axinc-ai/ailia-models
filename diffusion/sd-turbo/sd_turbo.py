@@ -6,7 +6,7 @@ import cv2
 import transformers
 
 import ailia
-from logging import getLogger 
+from logging import getLogger
 
 sys.path.append("../../util")
 from arg_utils import get_base_parser, update_parser  # noqa
@@ -24,7 +24,7 @@ logger = getLogger(__name__)
 # ======================
 
 WEIGHT_UNET_PATH = "unet.onnx"
-MODEL_UNET_PATH  = "unet.onnx.prototxt"
+MODEL_UNET_PATH = "unet.onnx.prototxt"
 WEIGHT_TEXT_ENCODER_PATH = "text_encoder.onnx"
 MODEL_TEXT_ENCODER_PATH = "text_encoder.onnx.prototxt"
 WEIGHT_VAE_ENCODER_PATH = "vae_encoder.onnx"
@@ -59,20 +59,55 @@ parser.add_argument(
 parser.add_argument("--onnx", action="store_true", help="execute onnxruntime version.")
 args = update_parser(parser, check_input_type=False)
 
+
 def main():
+    env_id = args.env_id
     image_path = args.init_image
     check_and_download_models(WEIGHT_UNET_PATH, MODEL_UNET_PATH, REMOTE_PATH)
-    check_and_download_models(WEIGHT_TEXT_ENCODER_PATH, MODEL_TEXT_ENCODER_PATH, REMOTE_PATH)
-    check_and_download_models(WEIGHT_VAE_ENCODER_PATH, MODEL_VAE_ENCODER_PATH, REMOTE_PATH)
-    check_and_download_models(WEIGHT_VAE_DECODER_PATH, MODEL_VAE_DECODER_PATH, REMOTE_PATH)
+    check_and_download_models(
+        WEIGHT_TEXT_ENCODER_PATH, MODEL_TEXT_ENCODER_PATH, REMOTE_PATH
+    )
+    check_and_download_models(
+        WEIGHT_VAE_ENCODER_PATH, MODEL_VAE_ENCODER_PATH, REMOTE_PATH
+    )
+    check_and_download_models(
+        WEIGHT_VAE_DECODER_PATH, MODEL_VAE_DECODER_PATH, REMOTE_PATH
+    )
     """
     Parse input
     """
     prompt = args.input
     if not args.onnx:
-        raise Exception("Not supported yet")
+        memory_mode = ailia.get_memory_mode(
+            reduce_constant=True,
+            ignore_input_with_initializer=True,
+            reduce_interstage=False,
+            reuse_interstage=True,
+        )
+        unet = ailia.Net(
+            MODEL_UNET_PATH, WEIGHT_UNET_PATH, env_id=env_id, memory_mode=memory_mode
+        )
+        text_encoder = ailia.Net(
+            MODEL_TEXT_ENCODER_PATH,
+            WEIGHT_TEXT_ENCODER_PATH,
+            env_id=env_id,
+            memory_mode=memory_mode,
+        )
+        vae_encoder = ailia.Net(
+            MODEL_VAE_ENCODER_PATH,
+            WEIGHT_VAE_ENCODER_PATH,
+            env_id=env_id,
+            memory_mode=memory_mode,
+        )
+        vae_decoder = ailia.Net(
+            MODEL_VAE_DECODER_PATH,
+            WEIGHT_VAE_DECODER_PATH,
+            env_id=env_id,
+            memory_mode=memory_mode,
+        )
     else:
         import onnxruntime
+
         cuda = 0 < ailia.get_gpu_environment_id()
         providers = (
             ["CUDAExecutionProvider", "CPUExecutionProvider"]
@@ -141,11 +176,14 @@ def main():
         image = pipeline.forward(
             prompt=prompt,
             base_image=init_image,
-            num_inference_steps=2, strength=0.5, guidance_scale=0.0,
+            num_inference_steps=2,
+            strength=0.5,
+            guidance_scale=0.0,
         )
     image = (image[0] * 255).astype(np.uint8)
     image = image[:, :, ::-1]  # RGB->BGR
     cv2.imwrite("output.png", image)
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()

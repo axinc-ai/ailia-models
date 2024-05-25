@@ -89,7 +89,9 @@ class ConfigMixin:
         unused_kwargs = {**config_dict, **kwargs}
 
         # 7. Define "hidden" config parameters that were saved for compatible classes
-        hidden_config_dict = {k: v for k, v in original_dict.items() if k not in init_dict}
+        hidden_config_dict = {
+            k: v for k, v in original_dict.items() if k not in init_dict
+        }
 
         return init_dict, unused_kwargs, hidden_config_dict
 
@@ -123,7 +125,9 @@ def register_to_config(init):
         new_kwargs = {}
         signature = inspect.signature(init)
         parameters = {
-            name: p.default for i, (name, p) in enumerate(signature.parameters.items()) if i > 0
+            name: p.default
+            for i, (name, p) in enumerate(signature.parameters.items())
+            if i > 0
         }
         for arg, name in zip(args, parameters.keys()):
             new_kwargs[name] = arg
