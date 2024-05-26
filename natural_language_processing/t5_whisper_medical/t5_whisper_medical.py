@@ -213,17 +213,23 @@ def main(args):
         for input_path in args.input:
             # load input file
             with open(input_path, "r", encoding="utf-8") as fi:
-                body = fi.read()
+                body = fi.readlines()
 
             # pre process
-            body_preprocessed = preprocess_body(body)
+            result = ""
+            for line in body:
+                if line[-1] != "。" and line[-1] != "、" and line[-1] != "？" and line[-1] != "！":
+                    line = line + "。"
+                body_preprocessed = preprocess_body(line)
 
-            # execute prediction
-            most_plausible_title, _ = model.estimate(body_preprocessed, 384, temperature=0.0, top_k=50, top_p=0)
-            logger.info("%s", most_plausible_title)
+                # execute prediction
+                most_plausible_title, _ = model.estimate(body_preprocessed, 384, temperature=0.0, top_k=50, top_p=0)
+                logger.info("%s", most_plausible_title)
+                result = result + most_plausible_title + "\n"
+
             save_path = get_savepath(args.savepath, input_path)
             with open(save_path, "w", encoding="utf-8") as fo:
-                fo.write(most_plausible_title + "\n")
+                fo.write(result)
 
 
 if __name__ == '__main__':
