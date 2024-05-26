@@ -218,12 +218,17 @@ def main(args):
             # pre process
             result = ""
             for line in body:
+                add_punctuation = False
                 if line[-1] != "。" and line[-1] != "、" and line[-1] != "？" and line[-1] != "！":
                     line = line + "。"
+                    add_punctuation = True
                 body_preprocessed = preprocess_body(line)
 
                 # execute prediction
                 most_plausible_title, _ = model.estimate(body_preprocessed, 384, temperature=0.0, top_k=50, top_p=0)
+                if add_punctuation:
+                    if most_plausible_title[-1] == "。":
+                        most_plausible_title = most_plausible_title[:-1]
                 logger.info("%s", most_plausible_title)
                 result = result + most_plausible_title + "\n"
 
