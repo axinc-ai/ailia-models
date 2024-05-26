@@ -446,6 +446,7 @@ def generate(models, input_features):
                             "result": seek_outputs[idx],
                         }
                     )
+                    logger.info(models["tokenizer"].decode(sliced_tokens))
                     last_slice = current_slice
 
                 if single_timestamp_ending:
@@ -476,6 +477,7 @@ def generate(models, input_features):
                         "result": seek_outputs[idx],
                     }
                 ]
+                logger.info(models["tokenizer"].decode(seek_sequence))
                 segment_offset = seek_num_frames[prev_idx]
 
             return segments, segment_offset
@@ -646,7 +648,8 @@ def recognize_from_audio(models):
             estimation_time = end - start
             logger.info(f"\ttotal processing time {estimation_time} ms")
 
-    print(result["text"])
+    logger.info("Final output.")
+    logger.info(result["text"])
 
     logger.info("Script finished successfully.")
 
