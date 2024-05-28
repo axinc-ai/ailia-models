@@ -51,7 +51,7 @@ Pytorch
 
 ## Model Format
 
-ONNX opset=14
+ONNX opset=17
 
 ## Netron
 
