@@ -1,18 +1,28 @@
+import json
 import sys
 from typing import Any, List
 
 import ailia
 import cv2
 import numpy as np
+
+import transformers
 from detection_utils import get_detection
 from download_model import download_model
 from face import Face
-from instant_id_utils import (draw_kps, get_model_file_names, load_image,
-                              preprocess)
-from landmark_utils import (P2sRt, estimate_affine_matrix_3d23d, load_mean_lmk,
-                            matrix2angle, trans_points, transform_landmark)
+from instant_id_utils import draw_kps, get_model_file_names, load_image, preprocess
+from landmark_utils import (
+    P2sRt,
+    estimate_affine_matrix_3d23d,
+    load_mean_lmk,
+    matrix2angle,
+    trans_points,
+    transform_landmark,
+)
 from pipe import get_pipe
+from pipeline import StableDiffusionXLControlNetPipeline
 from recognition_utils import norm_crop
+from scheduler import LCMScheduler
 
 sys.path.append("../../util")
 import onnxruntime
@@ -225,17 +235,24 @@ def infer_from_image(nets: dict[str, Any]):
     face_emb = face_info["embedding"]
     face_kps = draw_kps(input_image_pil, face_info["kps"])
 
-    pipe = get_pipe()
-    pipe.set_ip_adapter_scale(ADAPTER_STRENGTH_RATIO)
-    images = pipe(
-        args.prompt,
-        image_embeds=face_emb,
-        image=face_kps,
-        controlnet_conditioning_scale=IDENTITYNET_STRENGTH_RATIO,
-        num_inference_steps=1,
-        guidance_scale=0.0,
-    ).images[0]
-    images.save(args.savepath)
+    tokenizer = transformers.CLIPTokenizer.from_pretrained("./tokenizer")
+    tokenizer_2 = transformers.CLIPTokenizer.from_pretrained("./tokenizer_2")
+    scheduler_config = json.load(open("scheduler/lcm_scheduler_config.json"))
+    scheduler = LCMScheduler.from_config(scheduler_config)
+    pipe = StableDiffusionXLControlNetPipeline(
+        nets["vae_decoder"],
+        text_encoder=nets["text_encoder"],
+        text_encoder_2=nets["text_encoder_2"],
+        tokenizer=tokenizer,
+        tokenizer_2=tokenizer_2,
+        unet=nets["unet"],
+        controlnet=nets["controlnet"],
+        image_proj_model=nets["image_proj_model"],
+        scheduler=scheduler,
+        use_onnx=args.onnx,
+    )
+    image = pipe.forward(args.prompt, image=face_kps, image_embeds=face_emb)
+    cv2.imwrite(args.savepath[0], (image * 255).transpose(1, 2, 0).astype(np.uint8))
 
 
 if __name__ == "__main__":
@@ -252,9 +269,13 @@ if __name__ == "__main__":
         )
 
         if args.onnx:
-            net = onnxruntime.InferenceSession(model_files["weight"])
+            net = onnxruntime.InferenceSession(model_files["weight"], options)
         else:
-            net = ailia.Net(model_files["model"], model_files["weight"], env_id=args.env_id)
+            print(f"{model_name=}")
+            net = ailia.Net(
+                model_files["model"], model_files["weight"], env_id=args.env_id,
+                memory_mode=11
+            )
 
         nets[model_name] = net
 
