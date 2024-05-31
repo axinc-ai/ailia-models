@@ -53,6 +53,31 @@ def get_model_file_names() -> dict[str, tuple[str]]:
             "weight": "genderage.onnx",
             "model": "genderage.onnx.prototxt",
         },
+        "vae_decoder": {
+            "weight": "decoder.onnx",
+            "model": "decoder.onnx.prototxt",
+        },
+        # UNetエクスポートできたらコメントアウト
+        # "unet": {
+        #     "weight": "unet.onnx",
+        #     "model": "unet.onnx.prototxt",
+        # },
+        "text_encoder": {
+            "weight": "text_encoder.onnx",
+            "model": "text_encoder.onnx.prototxt",
+        },
+        "text_encoder_2": {
+            "weight": "text_encoder2.onnx",
+            "model": "text_encoder2.onnx.prototxt",
+        },
+        "controlnet": {
+            "weight": "controlnet.onnx",
+            "model": "controlnet.onnx.prototxt",
+        },
+        "image_proj_model": {
+            "weight": "image_proj_model.onnx",
+            "model": "image_proj_model.onnx.prototxt",
+        },
     }
 
 
