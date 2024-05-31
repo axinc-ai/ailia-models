@@ -40,6 +40,7 @@ result_index = 0
 model_index = 0
 slider_index = 50
 
+
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/padim/'
 
 train_folder = None
@@ -47,6 +48,9 @@ test_folder = None
 test_type = "folder"
 test_roi = None
 score_cache = {}
+EnableOptimization = True
+save_format="pkl"
+BENCHMARK = False
 
 # ======================
 # List box cursor changed
@@ -90,6 +94,39 @@ def model_changed(event):
 def slider_changed(event):
     global scale, slider_index
     slider_index = scale.get()
+
+def enable_optimization(event):
+    global EnableOptimization
+    selection = event.widget.curselection()
+    if selection:
+        selected_index = selection[0]
+        selected_value = event.widget.get(selected_index)
+        EnableOptimization = (selected_value == "True")
+    else:
+        EnableOptimization = False
+    logger.info(f"EnableOptimization set to: {EnableOptimization}")
+
+def save_type_select(event):
+    global save_format
+    selection = event.widget.curselection()
+    if selection:
+        selected_index = selection[0]
+        selected_value = event.widget.get(selected_index)
+        save_format = selected_value
+    else:
+        save_format = "pkl"
+    logger.info(f"Selected format set to: {save_format}")
+
+def enable_benchmark(event):
+    global BENCHMARK
+    selection = event.widget.curselection()
+    if selection:
+        selected_index = selection[0]
+        selected_value = event.widget.get(selected_index)
+        BENCHMARK = (selected_value == "True")
+    else:
+        BENCHMARK = False
+    logger.info(f"BENCHMARK set to: {BENCHMARK}")
 
 # ======================
 # List box double click
@@ -147,7 +184,7 @@ def create_photo_image(path,w=CANVAS_W,h=CANVAS_H):
     #image_bgr = cv2.resize(image_bgr,(w,h))
     image_rgb = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB) # imreadはBGRなのでRGBに変換
     image_pil = Image.fromarray(image_rgb) # RGBからPILフォーマットへ変換
-    image_pil.thumbnail((w,h), Image.ANTIALIAS)
+    image_pil.thumbnail((w,h), Image.LANCZOS)
     image_tk  = ImageTk.PhotoImage(image_pil) # ImageTkフォーマットへ変換
     return image_tk
 
@@ -226,16 +263,51 @@ def train_button_clicked():
     aug = False
     aug_num = 0
     seed = 1024
-    train_outputs = training(net, params, get_image_resize(), get_image_crop_size(), get_keep_aspect(), batch_size, train_dir, aug, aug_num, seed, logger)
+    train_outputs=training_optimized(net, params, get_image_resize(), get_image_crop_size(), get_keep_aspect(), batch_size, train_dir, aug, aug_num, seed, logger)
+    if  not EnableOptimization:
+        if save_format == "pkl" :
+            train_feat_file = "train.pkl"
+            logger.info('Saving train set feature to: %s ...' % train_feat_file)
+            with open(train_feat_file, 'wb') as f:
+                pickle.dump(train_outputs, f)
+            logger.info('Saved.')
+        elif save_format == "npy" :
+            
+            for i, output in enumerate(train_outputs):
+                    train_feat_file = "train_output_"+str(i)+".npy"
+                    logger.info('Saving train set feature to: %s ...' % train_feat_file)
+                    np.save(f"train_output_{i}.npy", output) 
+            logger.info('Saved.')  
+        elif save_format == "pt":
+            train_feat_file = "train.pt"
+            logger.info('Saving train set feature to: %s ...' % train_feat_file)
+            torch.save(train_outputs, train_feat_file)
+            logger.info('Saved.')
 
-    # save learned distribution
-    train_feat_file = "train.pkl"
-    #train_dir = args.train_dir
-    #train_feat_file = "%s.pkl" % os.path.basename(train_dir)
-    logger.info('saving train set feature to: %s ...' % train_feat_file)
-    with open(train_feat_file, 'wb') as f:
-        pickle.dump(train_outputs, f)
-    logger.info('saved.')
+    else:
+        if save_format=="npy":
+            for i, output in enumerate(train_outputs):
+                    train_feat_file = "train_output_"+str(i)+".npy"
+                    logger.info('Saving train set feature to: %s ...' % train_feat_file)
+                    np.save(f"train_output_{i}.npy", output) 
+            logger.info('Saved.')   
+    
+        train_outputs=[torch.from_numpy(train_outputs[0]).float().to(device), train_outputs[1], 
+                        torch.from_numpy(train_outputs[2]).float().to(device), train_outputs[3] ] 
+        if save_format == "pkl" :
+            train_feat_file = "trainOptimized.pkl"
+            logger.info('saving train set feature to: %s ...' % train_feat_file)
+            with open(train_feat_file, 'wb') as f:
+                pickle.dump(train_outputs, f)
+                logger.info('Saved.')
+        elif save_format == "pt":
+            train_feat_file = "trainOptimized.pt"
+            logger.info('Saving train set feature to: %s ...' % train_feat_file)
+            torch.save(train_outputs, train_feat_file)
+            logger.info('Saved.')
+        
+    
+       
 
     global score_cache
     score_cache = {}
@@ -259,17 +331,75 @@ def test_button_clicked():
     # create net instance
     env_id = ailia.get_gpu_environment_id()
     net = ailia.Net(model_path, weight_path, env_id=env_id)
+    if _check_file_exists(save_format):
+        if EnableOptimization:
+            train_feat_file = "trainOptimized."+save_format
+            
+            if save_format== "pkl":
+                logger.info(f"Loading {train_feat_file}")
+                with open(train_feat_file, 'rb') as f:
+                    train_outputs = pickle.load(f)
+            elif save_format == "npy":
+                train_outputs = []
+                i = 0
+                while True:
+                    try:
+                        logger.info(f"Loading train_output_{i}.npy")
+                        train_outputs.append(np.load(f"train_output_{i}.npy", allow_pickle=True))
+                        i += 1
+                    except FileNotFoundError:
+                        break  # Stop when there are no more files to load  
+                train_outputs=[torch.from_numpy(train_outputs[0]).float().to(device), train_outputs[1], 
+                                torch.from_numpy(train_outputs[2]).float().to(device), train_outputs[3] ] 
+            elif save_format == "pt":
+                logger.info(f"Loading {train_feat_file}")
+                train_outputs = torch.load(train_feat_file)
+        else:
+            train_feat_file = "train."+save_format
+            if save_format == "pkl":
+                logger.info(f"Loading {train_feat_file}")
+                with open(train_feat_file, 'rb') as f:
+                    train_outputs = pickle.load(f)
+            elif save_format == "npy":
+                train_outputs = []
+                i = 0
+                while True:
+                    try:
+                        logger.info(f"Loading train_output_{i}.npy")
+                        train_outputs.append(np.load(f"train_output_{i}.npy", allow_pickle=True))
+                        i += 1
+                    except FileNotFoundError:
+                        break  # Stop when there are no more files to load
+                
+            elif save_format == "pt":
+                logger.info(f"Loading {train_feat_file}")
+                train_outputs = torch.load(train_feat_file)
+                train_outputs_numpy = []
+                if train_outputs[0] is torch.Tensor:
+                    for item in train_outputs:
+                        if isinstance(item, torch.Tensor):
+                            train_outputs_numpy.append(item.cpu().numpy())  # Move to CPU and convert to NumPy
+                        else:
+                            train_outputs_numpy.append(item)
 
-    # load trained model
-    with open("train.pkl", 'rb') as f:
-        train_outputs = pickle.load(f)
-    
     threshold = slider_index / 100.0
 
     if test_type == "folder":
         test_from_folder(net, params, train_outputs, threshold)
     else:
         test_from_video(net, params, train_outputs, threshold)
+
+def _check_file_exists(save_format):
+    if save_format=="npy":
+        filename="train_output_0.npy" 
+    elif EnableOptimization:
+        filename="trainOptimized."+save_format
+    else:
+        filename="train."+save_format
+    if not os.path.isfile(filename):
+        logger.info(f"File {filename} does not exist. Unable to load the model")
+
+    return os.path.isfile(filename)
 
 def test_from_folder(net, params, train_outputs, threshold):
     # file loop
@@ -282,7 +412,7 @@ def test_from_folder(net, params, train_outputs, threshold):
         roi_img = preprocess(roi_img, get_image_resize(), keep_aspect=get_keep_aspect(), crop_size=get_image_crop_size(), mask=True)
     else:
         roi_img = None
-
+    
     score_map = []
     for i_img in range(0, len(test_list)):
         logger.info('from (%s) ' % (test_list[i_img]))
@@ -296,7 +426,34 @@ def test_from_folder(net, params, train_outputs, threshold):
         if image_path in score_cache:
             dist_tmp = score_cache[image_path].copy()
         else:
-            dist_tmp = infer(net, params, train_outputs, img, get_image_crop_size())
+            if BENCHMARK:
+                import time
+                logger.info('BENCHMARK mode')
+                total_time = 0
+                if EnableOptimization:
+                    for i in range(6):
+                        start = int(round(time.time() * 1000))
+                        dist_tmp = infer_optimized(net, params, train_outputs, img, get_image_crop_size(), device)
+                        end = int(round(time.time() * 1000))
+                        logger.info(f'\tailia processing time {end - start} ms')
+                        if i != 0:
+                            total_time = total_time + (end - start)
+                    logger.info(f'\taverage time {total_time / 5} ms')
+                else:
+                    for i in range(6):
+                        start = int(round(time.time() * 1000))
+                        dist_tmp = infer(net, params, train_outputs, img, get_image_crop_size())
+                        end = int(round(time.time() * 1000))
+                        logger.info(f'\tailia processing time {end - start} ms')
+                        if i != 0:
+                            total_time = total_time + (end - start)
+                    logger.info(f'\taverage time {total_time / 5} ms')
+
+            else:
+                if EnableOptimization:
+                    dist_tmp = infer_optimized(net, params, train_outputs, img, get_image_crop_size(), device)
+                else:
+                    dist_tmp = infer(net, params, train_outputs, img, get_image_crop_size())
             score_cache[image_path] = dist_tmp.copy()
         score_map.append(dist_tmp)
 
@@ -345,8 +502,10 @@ def test_from_video(net, params, train_outputs, threshold):
 
         img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         img = preprocess(img, get_image_resize(), keep_aspect=get_keep_aspect(), crop_size=get_image_crop_size())
-
-        dist_tmp = infer(net, params, train_outputs, img, get_image_crop_size())
+        if EnableOptimization:
+            dist_tmp = infer_optimized(net, params, train_outputs, img, get_image_crop_size(), device)
+        else:
+            dist_tmp = infer(net, params, train_outputs, img, get_image_crop_size())
 
         score_map.append(dist_tmp)
         roi_img = None
@@ -537,6 +696,8 @@ def get_model_id_list():
 def get_model_resolution_list():
     return [224, 448, 224]
 
+def get_optimization_list():
+    return [True, False]
 # ======================
 # GUI
 # ======================
@@ -552,6 +713,15 @@ def main():
     global outputFile, listsOutput, output_list, ListboxOutput
     global listsModel, ListboxModel
     global valueKeepAspect, valueCenterCrop
+    if EnableOptimization:
+        import torch
+        global device
+        if torch.cuda.is_available() :
+            device = torch.device("cuda")
+            
+        else:
+            device = torch.device("cpu")
+        logger.info("Torch device : " + str(device))
 
     # rootメインウィンドウの設定
     root = tk.Tk()
@@ -567,18 +737,24 @@ def main():
     test_list = get_test_file_list()
     result_list = get_result_file_list()
     model_list = get_model_list()
+    
 
     listsInput = tk.StringVar(value=train_list)
     listsOutput = tk.StringVar(value=test_list)
     listsResult = tk.StringVar(value=result_list)
     listsModel = tk.StringVar(value=model_list)
+    
+    
 
     # 各種ウィジェットの作成
     ListboxInput = tk.Listbox(frame, listvariable=listsInput, width=20, height=12, selectmode=tk.BROWSE, exportselection=False)
     ListboxOutput = tk.Listbox(frame, listvariable=listsOutput, width=20, height=12, selectmode=tk.BROWSE, exportselection=False)
     ListboxResult = tk.Listbox(frame, listvariable=listsResult, width=20, height=12, selectmode=tk.BROWSE, exportselection=False)
     ListboxModel = tk.Listbox(frame, listvariable=listsModel, width=20, height=6, selectmode=tk.BROWSE, exportselection=False)
+    
 
+    # Bind the listbox selection event to the toggle_optimization function
+    
     ListboxInput.bind("<<ListboxSelect>>", input_changed)
     ListboxOutput.bind("<<ListboxSelect>>", output_changed)
     ListboxResult.bind("<<ListboxSelect>>", result_changed)
@@ -587,11 +763,13 @@ def main():
     ListboxInput.bind("<Double-Button-1>", input_double_click)
     ListboxOutput.bind("<Double-Button-1>", output_double_click)
     ListboxResult.bind("<Double-Button-1>", result_double_click)
+    
 
     ListboxInput.select_set(input_index)
     ListboxOutput.select_set(output_index)
     ListboxResult.select_set(result_index)
     ListboxModel.select_set(model_index)
+    
 
     textRun = tk.StringVar(frame)
     textRun.set("Train")
@@ -650,6 +828,15 @@ def main():
     textSave = tk.StringVar(frame)
     textSave.set("Save images")
 
+    textOptimization = tk.StringVar(frame)
+    textOptimization.set("Set optimization")
+
+    textSaveFile = tk.StringVar(frame)
+    textSaveFile.set("Trained file format")
+
+    textBenchmark = tk.StringVar(frame)
+    textBenchmark.set("Benchmark mode")
+
     valueKeepAspect = tkinter.BooleanVar()
     valueKeepAspect.set(True)
     valueCenterCrop = tkinter.BooleanVar()
@@ -667,6 +854,10 @@ def main():
     labelModel = tk.Label(frame, textvariable=textModel)
     labelTestSettings = tk.Label(frame, textvariable=textTestSettings)
     labelSlider = tk.Label(frame, textvariable=textSlider)
+    labelOPt = tk.Label(frame, textvariable=textOptimization)
+    labelSaveFile = tk.Label(frame, textvariable=textSaveFile)
+    labelBenchmark = tk.Label(frame, textvariable=textBenchmark)
+
 
     buttonTrain = tk.Button(frame, textvariable=textRun, command=train_button_clicked, width=14)
     buttonTest = tk.Button(frame, textvariable=textStop, command=test_button_clicked, width=14)
@@ -738,11 +929,54 @@ def main():
     labelSlider.grid(row=9, column=4, sticky=tk.NW, columnspan=3)
     scale.grid(row=10, column=4, sticky=tk.NW, columnspan=3)
 
+    options = ["False", "True"]
+    listsOPt = tk.StringVar(value=options)
+    labelOPt.grid(row=11, column=0, sticky=tk.NW, columnspan=3)
+    ListboxOptimization = tk.Listbox(frame, listvariable=listsOPt, width=20, height=len(options), selectmode=tk.BROWSE, exportselection=False)
+    ListboxOptimization.grid(row=11, column=0, padx=0, pady=20)
+
+    # Set the initial selection in the Listbox
+    initial_selection = options.index("True")  # Default to "True"
+    ListboxOptimization.select_set(initial_selection)
+    ListboxOptimization.event_generate('<<ListboxSelect>>')  # Trigger the event to set the initial state
+
+    # Bind the listbox selection event to the toggle_optimization function
+    ListboxOptimization.bind('<<ListboxSelect>>', enable_optimization)
+
+    fileOptions = ["pkl", "pt", "npy"]
+    listsFileOPt = tk.StringVar(value=fileOptions)
+    labelSaveFile.grid(row=12, column=0, sticky=tk.NW, columnspan=3)
+    ListboxFileSelect = tk.Listbox(frame, listvariable=listsFileOPt, width=20, height=len(fileOptions), selectmode=tk.BROWSE, exportselection=False)
+    ListboxFileSelect.grid(row=12, column=0, padx=0, pady=20)
+
+    # Set the initial selection in the Listbox
+    initial_selectionFile = fileOptions.index("pkl")  # Default to "pkl"
+    ListboxFileSelect.select_set(initial_selectionFile)
+    ListboxFileSelect.event_generate('<<ListboxSelect>>')  # Trigger the event to set the initial state
+
+    # Bind the listbox selection event to the save_type_select function
+    ListboxFileSelect.bind('<<ListboxSelect>>', save_type_select)
+
+    fileBenchmark = ["True", "False"]
+    listsFileBenchmark = tk.StringVar(value=fileBenchmark)
+    labelBenchmark.grid(row=12, column=4, sticky=tk.NW)
+    ListboxFileBenchmark = tk.Listbox(frame, listvariable=listsFileBenchmark, width=20, height=len(fileOptions), selectmode=tk.BROWSE, exportselection=False)
+    ListboxFileBenchmark.grid(row=12, column=4, padx=0, pady=20)
+
+    # Set the initial selection in the Listbox
+    initial_selection_benchmark = fileBenchmark.index("False")  # Default to "False"
+    ListboxFileBenchmark.select_set(initial_selection_benchmark)
+    ListboxFileBenchmark.event_generate('<<ListboxSelect>>')  # Trigger the event to set the initial state
+
+    # Bind the listbox selection event to the save_type_select function
+    ListboxFileBenchmark.bind('<<ListboxSelect>>', enable_benchmark)
     # メインフレームの作成と設置
     frame = ttk.Frame(root)
     frame.pack(padx=20, pady=10)
 
     root.mainloop()
+
+    
 
 if __name__ == '__main__':
     main()

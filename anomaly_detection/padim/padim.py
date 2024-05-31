@@ -49,8 +49,8 @@ parser.add_argument(
     help='arch model.'
 )
 parser.add_argument(
-    '-f', '--feat', metavar="PICKLE_FILE", default=None,
-    help='train set feature pkl files.'
+    '-f', '--feat', metavar="FILE", default=None,
+    help='train set feature  files.'
 )
 parser.add_argument(
     '-bs', '--batch_size', default=32,
@@ -88,6 +88,15 @@ parser.add_argument(
     '--compare_optimization', type=bool, default=False,
     help='Flag to compare output of optimization with original code'
 )
+parser.add_argument(
+    '--compare_optimization', type=bool, default=False,
+    help='Flag to compare output of optimization with original code'
+)
+
+parser.add_argument(
+    '--save_format', metavar="FILE", default="pkl",
+    help='chose training file format pt, npy or pkl.'
+)
 args = update_parser(parser)
 
 if args.compare_optimization:
@@ -98,7 +107,9 @@ if args.enable_optimization:
     import torch
     if torch.cuda.is_available() :
         device = torch.device("cuda")
-        
+
+    elif torch.backends.mps.is_available():
+        device = torch.device("mps")  
     else:
         device = torch.device("cpu")
     logger.info("Torch device : " + str(device))
@@ -189,18 +200,18 @@ def infer_init_run(net, params, train_outputs, IMAGE_SIZE):
 
 def train_from_image_or_video(net, params):
     # training
-    train_outputs = training(net, params, IMAGE_RESIZE, IMAGE_SIZE, KEEP_ASPECT, int(args.batch_size), args.train_dir, args.aug, args.aug_num, args.seed, logger)
-
+    if args.enable_optimization:
+        train_outputs = training_optimized(net, params, IMAGE_RESIZE, IMAGE_SIZE, KEEP_ASPECT, int(args.batch_size), args.train_dir, args.aug, args.aug_num, args.seed, logger)
+    else:
+        train_outputs = training(net, params, IMAGE_RESIZE, IMAGE_SIZE, KEEP_ASPECT, int(args.batch_size), args.train_dir, args.aug, args.aug_num, args.seed, logger)
     # save learned distribution
     if args.feat:
         train_feat_file = args.feat
     else:
         train_dir = args.train_dir
-        train_feat_file = "%s.pkl" % os.path.basename(train_dir)
-    logger.info('saving train set feature to: %s ...' % train_feat_file)
-    with open(train_feat_file, 'wb') as f:
-        pickle.dump(train_outputs, f)
-    logger.info('saved.')
+        train_feat_file = str(os.path.basename(train_dir))+"."+str(args.save_format)
+
+    train_outputs=_save_training_flie(train_feat_file, args.save_format, train_outputs)
 
     return train_outputs
 
@@ -381,29 +392,12 @@ def infer_from_video(net, params, train_outputs, threshold):
 def train_and_infer(net, params):
     timestart=time.time()
     if args.feat:
-        logger.info('loading train set feature from: %s' % args.feat)
-        with open(args.feat, 'rb') as f:
-            train_outputs = pickle.load(f)
-            if args.compare_optimization:
-                train_output_list.append(train_outputs)
-            if args.enable_optimization:
-                train_outputs=[torch.from_numpy(train_outputs[0]).float().to(device), train_outputs[1], 
-                        torch.from_numpy(train_outputs[2]).float().to(device), train_outputs[3] ]  
-                if args.compare_optimization:
-                    train_output_list.append(train_outputs)
-
+        train_outputs=_load_training_file(args.feat, args.save_format)
         logger.info('loaded.')
     else:
         train_outputs = train_from_image_or_video(net, params)
-        if args.compare_optimization:
-                    train_output_list.append(train_outputs)
-        if args.enable_optimization:
-            train_outputs=[torch.from_numpy(train_outputs[0]).float().to(device), train_outputs[1], 
-                            torch.from_numpy(train_outputs[2]).float().to(device), train_outputs[3] ]
-            if args.compare_optimization:
-                    train_output_list.append(train_outputs)
 
-    if args.threshold is None:
+    if args.threshold is None: 
         if args.video:
             threshold = 0.5
             gt_imgs = None
@@ -424,9 +418,154 @@ def train_and_infer(net, params):
         infer_from_image(net, params, train_outputs, threshold, gt_imgs)
     logger.info('Script finished successfully.')
 
+def _save_training_flie(train_feat_file, save_format, train_outputs):
+    if args.compare_optimization:
+            train_output_list.append(train_outputs)
+
+    if not args.enable_optimization:
+        if save_format == "pkl" :
+            if train_feat_file==None:
+                print("PKL FOREVA")
+                train_feat_file = "train.pkl"
+            logger.info('Saving train set feature to: %s ...' % train_feat_file)
+            with open(train_feat_file, 'wb') as f:
+                pickle.dump(train_outputs, f)
+            logger.info('Saved.')
+        elif save_format == "npy" :
+            
+            for i, output in enumerate(train_outputs):
+                    if train_feat_file==None:
+                        train_feat_file = "train_output_"+str(i)+".npy"
+                    else:
+                        train_feat_file = train_feat_file.split(".")[0].strip()+str(i)+".npy"
+
+                    logger.info('Saving train set feature to: %s ...' % train_feat_file)
+                    np.save(f"train_output_{i}.npy", output) 
+            logger.info('Saved.')  
+        elif save_format == "pt":
+            if train_feat_file==None:
+                train_feat_file = "train.pt"
+            logger.info('Saving train set feature to: %s ...' % train_feat_file)
+            torch.save(train_outputs, train_feat_file)
+            logger.info('Saved.')
+        
+
+    else:
+        if save_format=="npy":
+            for i, output in enumerate(train_outputs):
+                    if train_feat_file==None:
+                        train_feat_file = "train_output_"+str(i)+".npy"
+                    else:
+                        train_feat_file = train_feat_file.split(".")[0].strip()+str(i)+".npy"
+                    logger.info('Saving train set feature to: %s ...' % train_feat_file)
+                    np.save(f"train_output_{i}.npy", output) 
+            logger.info('Saved.')   
+    
+        train_outputs=[torch.from_numpy(train_outputs[0]).float().to(device), train_outputs[1], 
+                        torch.from_numpy(train_outputs[2]).float().to(device), train_outputs[3] ] 
+        if save_format == "pkl" :
+            if train_feat_file==None:
+                train_feat_file = "trainOptimized.pkl"
+            logger.info('saving train set feature to: %s ...' % train_feat_file)
+            with open(train_feat_file, 'wb') as f:
+                pickle.dump(train_outputs, f)
+                logger.info('Saved.')
+        elif save_format == "pt":
+            if train_feat_file==None:
+                train_feat_file = "trainOptimized.pt"
+            logger.info('Saving train set feature to: %s ...' % train_feat_file)
+            torch.save(train_outputs, train_feat_file)
+            logger.info('Saved.')
+        
+        
+        if args.compare_optimization:
+                train_output_list.append(train_outputs)
+        
+    return train_outputs
+
+def _load_training_file(train_feat_file, save_format):
+    if _check_file_exists(train_feat_file, save_format):
+        if not train_feat_file:
+                train_feat_file = "trainOptimized."+save_format
+        else:
+            save_format=train_feat_file.split(".")[1].strip()
+            logger.info("Save format ", save_format)
+        
+        if args.enable_optimization:
+            
+            
+            if save_format== "pkl":
+                logger.info(f"Loading {train_feat_file}")
+                with open(train_feat_file, 'rb') as f:
+                    train_outputs = pickle.load(f)
+            elif save_format == "npy":
+                train_outputs = []
+                i = 0
+                if train_feat_file:
+                    train_feat_file=train_feat_file.split(".")[0].strip()
+                else:
+                    train_feat_file="train_output_"
+                while True:
+                    try:
+                        logger.info(f"{train_feat_file}_{i}.npy")
+                        train_outputs.append(np.load(f"{train_feat_file}{i}.npy", allow_pickle=True))
+                        i += 1
+                    except FileNotFoundError:
+                        break  # Stop when there are no more files to load  
+                train_outputs=[torch.from_numpy(train_outputs[0]).float().to(device), train_outputs[1], 
+                                torch.from_numpy(train_outputs[2]).float().to(device), train_outputs[3] ] 
+            elif save_format == "pt":
+                logger.info(f"Loading {train_feat_file}")
+                train_outputs = torch.load(train_feat_file)
+        else:
+            train_feat_file = "train."+save_format
+            if save_format == "pkl":
+                logger.info(f"Loading {train_feat_file}")
+                with open(train_feat_file, 'rb') as f:
+                    train_outputs = pickle.load(f)
+            elif save_format == "npy":
+                train_outputs = []
+                i = 0
+                while True:
+                    try:
+                        logger.info(f"Loading train_output_{i}.npy")
+                        train_outputs.append(np.load(f"train_output_{i}.npy", allow_pickle=True))
+                        i += 1
+                    except FileNotFoundError:
+                        break  # Stop when there are no more files to load
+                
+            elif save_format == "pt":
+                logger.info(f"Loading {train_feat_file}")
+                train_outputs = torch.load(train_feat_file)
+                train_outputs_numpy = []
+                if train_outputs[0] is torch.Tensor:
+                    for item in train_outputs:
+                        if isinstance(item, torch.Tensor):
+                            train_outputs_numpy.append(item.cpu().numpy())  # Move to CPU and convert to NumPy
+                        else:
+                            train_outputs_numpy.append(item)
+                        return train_outputs_numpy
+            return train_outputs
+
+def _check_file_exists(train_feat_file, save_format):
+    if train_feat_file == None:
+        if save_format=="npy":
+            filename="train_output_0.npy" 
+        elif args.enable_optimization:
+            filename="trainOptimized."+save_format
+        else:
+            filename="train."+save_format
+        if not os.path.isfile(filename):
+            logger.info(f"File {filename} does not exist. Unable to load the model")
+    else:
+        return os.path.isfile(train_feat_file)
+
+    return os.path.isfile(filename)
+
 
 def main():
     # model files check and download
+    starttime=time.time()
     weight_path, model_path, params = get_params(args.arch) 
     check_and_download_models(weight_path, model_path, REMOTE_PATH)
 
@@ -435,6 +574,7 @@ def main():
 
     # check input
     train_and_infer(net, params)
+    logger.info('Script finished execution time: '+str(int((time.time()-starttime)*1000)))
 
 
 if __name__ == '__main__':
