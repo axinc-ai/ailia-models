@@ -71,7 +71,7 @@ You can specify the directory of normal product files with the `--train_dir` opt
 $ python3 padim.py --train_dir train
 ```
 
-The feature vectors created from files in the train directory can be saved to the pickle, numpy or pickle file.  For that you have to specify desired format as `npy`, `pt` or `pkl`. Depending on --enable_optimization flag, files saved might be originally pytorch tensors (True) or numpy arrays (False). 
+The feature vectors created from files in the train directory can be saved to the pickle, numpy or pytorch file.  For that you have to specify desired format as `npy`, `pt` or `pkl`. Depending on --enable_optimization flag, files saved might be originally pytorch tensors (True) or numpy arrays (False). 
 ```bash
 $ python3 padim.py --save_format pt
 ```
