@@ -1,7 +1,6 @@
 import json
 import math
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
-from lcm_scheduler import LCMScheduler
 
 import cv2
 import numpy as np
@@ -12,11 +11,12 @@ from diffusers import LCMScheduler, StableDiffusionXLControlNetPipeline
 from diffusers.image_processor import PipelineImageInput
 from diffusers.models import ControlNetModel
 from diffusers.pipelines.controlnet.multicontrolnet import MultiControlNetModel
-from diffusers.pipelines.stable_diffusion_xl import \
-    StableDiffusionXLPipelineOutput
-from diffusers.utils import deprecate, logging, replace_example_docstring
-from diffusers.utils.import_utils import is_xformers_available
+from diffusers.pipelines.stable_diffusion_xl import StableDiffusionXLPipelineOutput
+from diffusers.utils import logging
 from diffusers.utils.torch_utils import is_compiled_module, is_torch_version
+
+from pipeline import StableDiffusionXLControlNetPipeline
+from scheduler import LCMScheduler
 
 # Copyright 2024 The InstantX Team. All rights reserved.
 #
@@ -507,6 +507,8 @@ class StableDiffusionXLInstantIDPipeline(StableDiffusionXLControlNetPipeline):
             state_dict = state_dict["image_proj"]
         self.image_proj_model.load_state_dict(state_dict)
 
+        print(f"{image_emb_dim=}")
+        input(">>>")
         self.image_proj_model_in_features = image_emb_dim
 
     def set_ip_adapter(self, model_ckpt, num_tokens, scale):
@@ -748,9 +750,7 @@ class StableDiffusionXLInstantIDPipeline(StableDiffusionXLControlNetPipeline):
         )
 
         mult = (
-            len(controlnet.nets)
-            if isinstance(controlnet, MultiControlNetModel)
-            else 1
+            len(controlnet.nets) if isinstance(controlnet, MultiControlNetModel) else 1
         )
         control_guidance_start, control_guidance_end = (
             mult * [control_guidance_start],
@@ -759,22 +759,22 @@ class StableDiffusionXLInstantIDPipeline(StableDiffusionXLControlNetPipeline):
         # control_guidance_start = 0.0, control_guidance_end = 1.0
 
         # 1. Check inputs. Raise error if not correct
-        self.check_inputs(
-            prompt,
-            prompt_2,
-            image,
-            callback_steps,
-            negative_prompt,
-            negative_prompt_2,
-            prompt_embeds,
-            negative_prompt_embeds,
-            pooled_prompt_embeds,
-            negative_pooled_prompt_embeds,
-            controlnet_conditioning_scale,
-            control_guidance_start,
-            control_guidance_end,
-            callback_on_step_end_tensor_inputs,
-        )
+        # self.check_inputs(
+        #     prompt,
+        #     prompt_2,
+        #     image,
+        #     callback_steps,
+        #     negative_prompt,
+        #     negative_prompt_2,
+        #     prompt_embeds,
+        #     negative_prompt_embeds,
+        #     pooled_prompt_embeds,
+        #     negative_pooled_prompt_embeds,
+        #     controlnet_conditioning_scale,
+        #     control_guidance_start,
+        #     control_guidance_end,
+        #     callback_on_step_end_tensor_inputs,
+        # )
 
         self._guidance_scale = guidance_scale
         self._clip_skip = clip_skip
@@ -901,12 +901,11 @@ class StableDiffusionXLInstantIDPipeline(StableDiffusionXLControlNetPipeline):
             batch_size * num_images_per_prompt, 1
         )
         encoder_hidden_states = torch.cat([prompt_embeds, prompt_image_emb], dim=1)
-
         # 8. Denoising loop
         num_warmup_steps = len(timesteps) - num_inference_steps * self.scheduler.order
-        is_unet_compiled = is_compiled_module(self.unet)
-        is_controlnet_compiled = is_compiled_module(self.controlnet)
-        is_torch_higher_equal_2_1 = is_torch_version(">=", "2.1")
+        is_unet_compiled = is_compiled_module(self.unet)  # False
+        is_controlnet_compiled = is_compiled_module(self.controlnet)  # False
+        is_torch_higher_equal_2_1 = is_torch_version(">=", "2.1")  # True
 
         with self.progress_bar(total=num_inference_steps) as progress_bar:
             for i, t in enumerate(timesteps):
@@ -934,6 +933,7 @@ class StableDiffusionXLInstantIDPipeline(StableDiffusionXLControlNetPipeline):
                 # controlnet(s) inference
                 if guess_mode and self.do_classifier_free_guidance:
                     # Infer ControlNet only for the conditional batch.
+                    print("A")
                     control_model_input = latents
                     control_model_input = self.scheduler.scale_model_input(
                         control_model_input, t
@@ -958,6 +958,7 @@ class StableDiffusionXLInstantIDPipeline(StableDiffusionXLControlNetPipeline):
                 else:
                     controlnet_cond_scale = controlnet_conditioning_scale
                     if isinstance(controlnet_cond_scale, list):
+                        print("list")
                         controlnet_cond_scale = controlnet_cond_scale[0]
                     cond_scale = controlnet_cond_scale * controlnet_keep[i]
 
@@ -976,6 +977,7 @@ class StableDiffusionXLInstantIDPipeline(StableDiffusionXLControlNetPipeline):
                     # Infered ControlNet only for the conditional batch.
                     # To apply the output of ControlNet to both the unconditional and conditional batches,
                     # add 0 to the unconditional batch to keep it unchanged.
+                    print("concat")
                     down_block_res_samples = [
                         torch.cat([torch.zeros_like(d), d])
                         for d in down_block_res_samples
@@ -983,8 +985,44 @@ class StableDiffusionXLInstantIDPipeline(StableDiffusionXLControlNetPipeline):
                     mid_block_res_sample = torch.cat(
                         [torch.zeros_like(mid_block_res_sample), mid_block_res_sample]
                     )
-
                 # predict the noise residual
+                inputs = {
+                    "encoder_hidden_states": encoder_hidden_states,
+                    "timestep_cond": timestep_cond,
+                    "cross_attention_kwargs": self.cross_attention_kwargs,
+                    "down_block_additional_residuals": down_block_res_samples,
+                    "mid_block_additional_residual": mid_block_res_sample,
+                    "added_cond_kwargs": added_cond_kwargs
+                }
+                import pickle
+                pickle.dump(latent_model_input, open("unet_dynamo/latent_model_input.pkl", "wb"))
+                pickle.dump(encoder_hidden_states, open("unet_dynamo/encoder_hidden_states.pkl", "wb"))
+                pickle.dump(t, open("unet_dynamo/t.pkl", "wb"))
+                pickle.dump(timestep_cond, open("unet_dynamo/timestep_cond.pkl", "wb"))
+                pickle.dump(self.cross_attention_kwargs, open("unet_dynamo/cross_attention_kwargs.pkl", "wb"))
+                pickle.dump(added_cond_kwargs, open("unet_dynamo/added_cond_kwargs.pkl", "wb"))
+                pickle.dump(down_block_res_samples, open("unet_dynamo/down_block_res_samples.pkl", "wb"))
+                pickle.dump(mid_block_res_sample, open("unet_dynamo/mid_block_res_sample.pkl", "wb"))
+                with torch.no_grad():
+                    torch.save(self.unet.state_dict(), "unet_dynamo/unet.pth")
+                    unet = torch.onnx.dynamo_export(
+                        self.unet,
+                        latent_model_input,
+                        t,
+                        encoder_hidden_states,
+                        None,
+                        timestep_cond,
+                        None,
+                        self.cross_attention_kwargs,
+                        added_cond_kwargs,
+                        down_block_res_samples,
+                        mid_block_res_sample,
+                        None,
+                        None,
+                        False,
+                    )
+                    unet.save("unet_dynamo/unet.onnx")
+                    input(">>> export unet")
                 noise_pred = self.unet(
                     latent_model_input,
                     t,
@@ -999,6 +1037,7 @@ class StableDiffusionXLInstantIDPipeline(StableDiffusionXLControlNetPipeline):
 
                 # perform guidance
                 if self.do_classifier_free_guidance:
+                    print("do classifier")
                     noise_pred_uncond, noise_pred_text = noise_pred.chunk(2)
                     noise_pred = noise_pred_uncond + guidance_scale * (
                         noise_pred_text - noise_pred_uncond
@@ -1010,6 +1049,7 @@ class StableDiffusionXLInstantIDPipeline(StableDiffusionXLControlNetPipeline):
                 )[0]
 
                 if callback_on_step_end is not None:
+                    print("callback_on_step_end")
                     callback_kwargs = {}
                     for k in callback_on_step_end_tensor_inputs:
                         callback_kwargs[k] = locals()[k]
@@ -1025,8 +1065,10 @@ class StableDiffusionXLInstantIDPipeline(StableDiffusionXLControlNetPipeline):
                 if i == len(timesteps) - 1 or (
                     (i + 1) > num_warmup_steps and (i + 1) % self.scheduler.order == 0
                 ):
+                    print(f"progress")
                     progress_bar.update()
                     if callback is not None and i % callback_steps == 0:
+                        print(f"callbacak called")
                         step_idx = i // getattr(self.scheduler, "order", 1)
                         callback(step_idx, t, latents)
 
@@ -1043,56 +1085,3 @@ class StableDiffusionXLInstantIDPipeline(StableDiffusionXLControlNetPipeline):
             return (image,)
 
         return StableDiffusionXLPipelineOutput(images=image)
-
-
-def get_pipe():
-    controlnet = ControlNetModel.from_pretrained(
-        "ControlNetModel",
-        torch_dtype=torch.float32,
-        resume_download=True,
-    )
-    # export test
-    # torch.onnx.export(
-    #     controlnet,
-    #     (
-    #         torch.randn((1, 4, 128, 120)),
-    #         torch.tensor([999]),
-    #         torch.randn((1, 16, 2048)),
-    #         torch.randn((1, 3, 1024, 960)),
-    #         0.8,
-    #         None,
-    #         None,
-    #         None,
-    #         {
-    #             "text_embeds": torch.randn(1, 1280),
-    #             "time_ids": torch.randn(1, 6),
-    #         },
-    #         None,
-    #         False,
-    #         False
-    #     ),
-    #     "controlnet.onnx",
-    # )
-    # input(">>> export")
-    pipe = StableDiffusionXLInstantIDPipeline.from_pretrained(
-        "stabilityai/sdxl-turbo",
-        controlnet=controlnet,
-        torch_dtype=torch.float32,
-        resume_download=True,
-    )
-    pipe.load_ip_adapter_instantid("ip-adapter.bin")
-    pipe.to("cpu")
-    pipe.unet = pipe.unet.to(memory_format=torch.channels_last)
-    pipe.controlnet = pipe.controlnet.to(memory_format=torch.channels_last)
-
-    pipe.text_encoder = pipe.text_encoder.to(memory_format=torch.channels_last)
-    scheduler_config = json.load(open("lcm_scheduler_config.json"))
-    pipe.scheduler = LCMScheduler.from_config(scheduler_config)
-
-    pipe.enable_freeu(
-        s1=0.6,
-        s2=0.4,
-        b1=1.1,
-        b2=1.2,
-    )
-    return pipe
