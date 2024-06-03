@@ -425,22 +425,22 @@ def _save_training_flie(train_feat_file, save_format, train_outputs):
     if not args.enable_optimization:
         if save_format == "pkl" :
             if train_feat_file==None:
-                print("PKL FOREVA")
                 train_feat_file = "train.pkl"
             logger.info('Saving train set feature to: %s ...' % train_feat_file)
             with open(train_feat_file, 'wb') as f:
                 pickle.dump(train_outputs, f)
             logger.info('Saved.')
         elif save_format == "npy" :
-            
+            filename=train_feat_file.split(".")[0].strip()
             for i, output in enumerate(train_outputs):
+                    
                     if train_feat_file==None:
                         train_feat_file = "train_output_"+str(i)+".npy"
                     else:
-                        train_feat_file = train_feat_file.split(".")[0].strip()+str(i)+".npy"
+                        train_feat_file = filename+str("_")+str(i)+".npy"
 
                     logger.info('Saving train set feature to: %s ...' % train_feat_file)
-                    np.save(f"train_output_{i}.npy", output) 
+                    np.save(f"{filename}_{i}.npy", output)
             logger.info('Saved.')  
         elif save_format == "pt":
             if train_feat_file==None:
@@ -452,13 +452,14 @@ def _save_training_flie(train_feat_file, save_format, train_outputs):
 
     else:
         if save_format=="npy":
+            filename=train_feat_file.split(".")[0].strip()
             for i, output in enumerate(train_outputs):
                     if train_feat_file==None:
                         train_feat_file = "train_output_"+str(i)+".npy"
                     else:
-                        train_feat_file = train_feat_file.split(".")[0].strip()+str(i)+".npy"
+                        train_feat_file = filename+"_"+str(i)+".npy"
                     logger.info('Saving train set feature to: %s ...' % train_feat_file)
-                    np.save(f"train_output_{i}.npy", output) 
+                    np.save(f"{filename}_{i}.npy", output) 
             logger.info('Saved.')   
     
         train_outputs=[torch.from_numpy(train_outputs[0]).float().to(device), train_outputs[1], 
@@ -489,7 +490,7 @@ def _load_training_file(train_feat_file, save_format):
                 train_feat_file = "trainOptimized."+save_format
         else:
             save_format=train_feat_file.split(".")[1].strip()
-            logger.info("Save format ", save_format)
+            logger.info(f"Save format {save_format}")
         
         if args.enable_optimization:
             
@@ -502,13 +503,15 @@ def _load_training_file(train_feat_file, save_format):
                 train_outputs = []
                 i = 0
                 if train_feat_file:
-                    train_feat_file=train_feat_file.split(".")[0].strip()
+                    train_feat_file=train_feat_file.split("_")[0].strip()
                 else:
-                    train_feat_file="train_output_"
+                    train_feat_file="train_"
+                
                 while True:
                     try:
+                        
                         logger.info(f"{train_feat_file}_{i}.npy")
-                        train_outputs.append(np.load(f"{train_feat_file}{i}.npy", allow_pickle=True))
+                        train_outputs.append(np.load(f"{train_feat_file}_{i}.npy", allow_pickle=True))
                         i += 1
                     except FileNotFoundError:
                         break  # Stop when there are no more files to load  
@@ -518,23 +521,30 @@ def _load_training_file(train_feat_file, save_format):
                 logger.info(f"Loading {train_feat_file}")
                 train_outputs = torch.load(train_feat_file)
         else:
-            train_feat_file = "train."+save_format
+            
             if save_format == "pkl":
+                train_feat_file = "train."+save_format
                 logger.info(f"Loading {train_feat_file}")
                 with open(train_feat_file, 'rb') as f:
                     train_outputs = pickle.load(f)
             elif save_format == "npy":
                 train_outputs = []
                 i = 0
+                if train_feat_file:
+                    train_feat_file=train_feat_file.split("_")[0].strip()
+                else:
+                    train_feat_file="train_"
                 while True:
                     try:
-                        logger.info(f"Loading train_output_{i}.npy")
-                        train_outputs.append(np.load(f"train_output_{i}.npy", allow_pickle=True))
+                        
+                        logger.info(f"{train_feat_file}_{i}.npy")
+                        train_outputs.append(np.load(f"{train_feat_file}_{i}.npy", allow_pickle=True))
                         i += 1
                     except FileNotFoundError:
-                        break  # Stop when there are no more files to load
+                        break  # Stop when there are no more files to load  
                 
             elif save_format == "pt":
+                train_feat_file = "train."+save_format
                 logger.info(f"Loading {train_feat_file}")
                 train_outputs = torch.load(train_feat_file)
                 train_outputs_numpy = []
@@ -545,7 +555,10 @@ def _load_training_file(train_feat_file, save_format):
                         else:
                             train_outputs_numpy.append(item)
                         return train_outputs_numpy
-            return train_outputs
+        return train_outputs
+    else:
+        logger.info(f"filename {train_feat_file} have not been found")
+        
 
 def _check_file_exists(train_feat_file, save_format):
     if train_feat_file == None:
