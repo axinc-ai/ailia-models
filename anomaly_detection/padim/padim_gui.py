@@ -433,7 +433,7 @@ def test_from_folder(net, params, train_outputs, threshold):
                 if EnableOptimization:
                     for i in range(6):
                         start = int(round(time.time() * 1000))
-                        dist_tmp = infer_optimized(net, params, train_outputs, img, get_image_crop_size(), device)
+                        dist_tmp = infer_optimized(net, params, train_outputs, img, get_image_crop_size(), device, logger)
                         end = int(round(time.time() * 1000))
                         logger.info(f'\tailia processing time {end - start} ms')
                         if i != 0:
@@ -451,7 +451,7 @@ def test_from_folder(net, params, train_outputs, threshold):
 
             else:
                 if EnableOptimization:
-                    dist_tmp = infer_optimized(net, params, train_outputs, img, get_image_crop_size(), device)
+                    dist_tmp = infer_optimized(net, params, train_outputs, img, get_image_crop_size(), device, logger)
                 else:
                     dist_tmp = infer(net, params, train_outputs, img, get_image_crop_size())
             score_cache[image_path] = dist_tmp.copy()
@@ -503,7 +503,7 @@ def test_from_video(net, params, train_outputs, threshold):
         img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         img = preprocess(img, get_image_resize(), keep_aspect=get_keep_aspect(), crop_size=get_image_crop_size())
         if EnableOptimization:
-            dist_tmp = infer_optimized(net, params, train_outputs, img, get_image_crop_size(), device)
+            dist_tmp = infer_optimized(net, params, train_outputs, img, get_image_crop_size(), device, logger)
         else:
             dist_tmp = infer(net, params, train_outputs, img, get_image_crop_size())
 
