@@ -111,10 +111,10 @@ if args.compare_optimization:
 
 if args.enable_optimization:
     import torch
-    if torch.cuda.is_available() and  args.optimization_device=="cuda" :
+    if  args.optimization_device=="cuda" and torch.cuda.is_available():
         device = torch.device("cuda")
 
-    elif torch.backends.mps.is_available() and args.optimization_device=="mps" :
+    elif args.optimization_device=="mps" and torch.backends.mps.is_available():
         device = torch.device("mps")  
     else:
         device = torch.device("cpu")
