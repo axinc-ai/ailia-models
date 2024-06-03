@@ -97,6 +97,12 @@ parser.add_argument(
     '--save_format', metavar="FILE", default="pkl",
     help='chose training file format pt, npy or pkl.'
 )
+
+parser.add_argument(
+    '--optimization_device', metavar="device",  default='cpu', choices=('cpu', 'cuda', 'mps'),
+    help='chose optimization device'
+)
+
 args = update_parser(parser)
 
 if args.compare_optimization:
@@ -105,10 +111,10 @@ if args.compare_optimization:
 
 if args.enable_optimization:
     import torch
-    if torch.cuda.is_available() :
+    if torch.cuda.is_available() and  args.optimization_device=="cuda" :
         device = torch.device("cuda")
 
-    elif torch.backends.mps.is_available():
+    elif torch.backends.mps.is_available() and args.optimization_device=="mps" :
         device = torch.device("mps")  
     else:
         device = torch.device("cpu")
@@ -192,7 +198,7 @@ def infer_init_run(net, params, train_outputs, IMAGE_SIZE):
     dummy_image = dummy_image.astype(np.float32)
     logger.info(f"PaDiM  initialization inference starts!")
     if args.enable_optimization:
-        score = infer_optimized(net, params, train_outputs, dummy_image, IMAGE_SIZE, device)
+        score = infer_optimized(net, params, train_outputs, dummy_image, IMAGE_SIZE, device, logger)
     else:
         score = infer(net, params, train_outputs, dummy_image, IMAGE_SIZE)
     logger.info(f"PaDiM initialization inference finish!")
@@ -246,7 +252,7 @@ def decide_threshold_from_gt_image(net, params, train_outputs, gt_imgs):
         img = cv2.cvtColor(img, cv2.COLOR_BGRA2RGB)
         img = preprocess(img, IMAGE_RESIZE, keep_aspect=KEEP_ASPECT, crop_size = IMAGE_SIZE)
         if args.enable_optimization:
-            dist_tmp = infer_optimized(net, params, train_outputs, img, IMAGE_SIZE, device)
+            dist_tmp = infer_optimized(net, params, train_outputs, img, IMAGE_SIZE, device,logger)
         else:
             dist_tmp = infer(net, params, train_outputs, img, IMAGE_SIZE)
 
@@ -284,7 +290,7 @@ def infer_from_image(net, params, train_outputs, threshold, gt_imgs):
             if args.enable_optimization:
                 for i in range(args.benchmark_count):
                     start = int(round(time.time() * 1000))
-                    dist_tmp = infer_optimized(net, params, train_outputs, img, IMAGE_SIZE, device)
+                    dist_tmp = infer_optimized(net, params, train_outputs, img, IMAGE_SIZE, device,logger)
                     end = int(round(time.time() * 1000))
                     logger.info(f'\tailia processing time {end - start} ms')
                     if i != 0:
@@ -300,16 +306,16 @@ def infer_from_image(net, params, train_outputs, threshold, gt_imgs):
                         total_time = total_time + (end - start)
                 logger.info(f'\taverage time {total_time / (args.benchmark_count - 1)} ms')
             if args.compare_optimization:
-                    logger.info(f'\tResults of optimized and original code is the same: {np.allclose(infer(net, params, train_output_list[0], img, IMAGE_SIZE), infer_optimized(net, params, train_output_list[1], img, IMAGE_SIZE, device))}')
+                    logger.info(f'\tResults of optimized and original code is the same: {np.allclose(infer(net, params, train_output_list[0], img, IMAGE_SIZE), infer_optimized(net, params, train_output_list[1], img, IMAGE_SIZE, device,logger))}')
                     
 
         else:
             if args.enable_optimization:
-                dist_tmp = infer_optimized(net, params, train_outputs, img, IMAGE_SIZE, device)
+                dist_tmp = infer_optimized(net, params, train_outputs, img, IMAGE_SIZE, device,logger)
             else:
                 dist_tmp = infer(net, params, train_outputs, img, IMAGE_SIZE)
             if args.compare_optimization:
-                    logger.info('Results of optimized and original code is the same: '+ str(np.allclose(infer(net, params, train_output_list[0], img, IMAGE_SIZE), infer_optimized(net, params, train_output_list[1], img, IMAGE_SIZE, device))))
+                    logger.info('Results of optimized and original code is the same: '+ str(np.allclose(infer(net, params, train_output_list[0], img, IMAGE_SIZE), infer_optimized(net, params, train_output_list[1], img, IMAGE_SIZE, device,logger))))
              
 
         score_map.append(dist_tmp)
@@ -345,7 +351,7 @@ def infer_from_video(net, params, train_outputs, threshold):
             img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             img = preprocess(img, IMAGE_RESIZE, keep_aspect=KEEP_ASPECT)
 
-            dist_tmp = infer_optimized(net, params, train_outputs, img, device)
+            dist_tmp = infer_optimized(net, params, train_outputs, img, device,logger)
 
             score_map.append(dist_tmp)
             scores = normalize_scores(score_map)    # min max is calculated dynamically, please set fixed min max value from calibration data for production
@@ -461,9 +467,9 @@ def _save_training_flie(train_feat_file, save_format, train_outputs):
                     logger.info('Saving train set feature to: %s ...' % train_feat_file)
                     np.save(f"{filename}_{i}.npy", output) 
             logger.info('Saved.')   
-    
+        
         train_outputs=[torch.from_numpy(train_outputs[0]).float().to(device), train_outputs[1], 
-                        torch.from_numpy(train_outputs[2]).float().to(device), train_outputs[3] ] 
+                        torch.from_numpy(train_outputs[2]).float().to(device), train_outputs[3] ]
         if save_format == "pkl" :
             if train_feat_file==None:
                 train_feat_file = "trainOptimized.pkl"

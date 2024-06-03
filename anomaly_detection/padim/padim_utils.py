@@ -18,6 +18,7 @@ from skimage import morphology
 from skimage.segmentation import mark_boundaries
 import torch
 
+
 WEIGHT_RESNET18_PATH = 'resnet18.onnx'
 MODEL_RESNET18_PATH = 'resnet18.onnx.prototxt'
 WEIGHT_WIDE_RESNET50_2_PATH = 'wide_resnet50_2.onnx'
@@ -487,7 +488,7 @@ def infer(net, params, train_outputs, img, crop_size):
     return dist_tmp
 
 
-def infer_optimized(net, params, train_outputs, img, crop_size, device):
+def infer_optimized(net, params, train_outputs, img, crop_size, device, logger):
     # prepare input data
     imgs = []
     imgs.append(img)
@@ -519,6 +520,11 @@ def infer_optimized(net, params, train_outputs, img, crop_size, device):
     mean_vectors = train_outputs[0]
     inv_cov_matrices = train_outputs[2]
     samples = embedding_vectors[0] 
+    if mean_vectors.device!=device:
+        logger.info(f"Changing device from {mean_vectors.device} to {device}")
+        mean_vectors=mean_vectors.to(device)
+        samples=samples.to(device)
+        inv_cov_matrices=inv_cov_matrices.to(device)
     # Step 1: Compute the difference between each sample and its corresponding mean
     differences = samples - mean_vectors
     # Step 2: Apply the inverse covariance matrix
