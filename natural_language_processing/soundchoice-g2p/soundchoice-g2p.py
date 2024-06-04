@@ -4,6 +4,9 @@ import re
 from functools import partial
 from logging import getLogger
 
+import numpy as np
+from transformers import AutoTokenizer
+
 import ailia
 
 # import original modules
@@ -16,14 +19,15 @@ from webcamera_utils import get_capture, get_writer  # noqa
 
 logger = getLogger(__name__)
 
-# from sample_utils import decode_batch, mask_to_bboxes, draw_bbox
 
 # ======================
 # Parameters
 # ======================
 
-WEIGHT_PATH = "soundchoice-g2p.onnx"
-MODEL_PATH = "soundchoice-g2p.onnx.prototxt"
+WEIGHT_PATH = "soundchoice-g2p_atn.onnx"
+MODEL_PATH = "soundchoice-g2p_atn.onnx.prototxt"
+WEIGHT_EMB_PATH = "soundchoice-g2p_emb.onnx"
+MODEL_EMB_PATH = "soundchoice-g2p_emb.onnx.prototxt"
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/soundchoice-g2p/"
 
 
@@ -46,6 +50,40 @@ args = update_parser(parser, check_input_type=False)
 # ======================
 # Secondary Functions
 # ======================
+
+
+def expand_to_chars(emb, seq, seq_len, word_separator):
+    """Expands word embeddings to a sequence of character
+    embeddings, assigning each character the word embedding
+    of the word to which it belongs
+
+    Arguments
+    ---------
+    emb: torch.Tensor
+        a tensor of word embeddings
+    seq: torch.Tensor
+        a tensor of character embeddings
+    seq_len: torch.Tensor
+        a tensor of character embedding lengths
+    word_separator: torch.Tensor
+        the word separator being used
+
+    Returns
+    -------
+    char_word_emb: torch.Tensor
+        a combined character + word embedding tensor
+    """
+    word_boundaries = seq == word_separator
+    words = np.cumsum(word_boundaries, axis=-1)
+
+    char_word_emb = np.zeros((emb.shape[0], seq.shape[-1], emb.shape[-1]))
+    seq_len_idx = (seq_len * seq.shape[-1]).astype(int)
+    for idx, (item, item_length) in enumerate(zip(words, seq_len_idx)):
+        char_word_emb[idx] = emb[idx, item]
+        char_word_emb[idx, item_length:, :] = 0
+        char_word_emb[idx, word_boundaries[idx], :] = 0
+
+    return char_word_emb
 
 
 def clean_pipeline(txt, graphemes):
@@ -73,6 +111,13 @@ def clean_pipeline(txt, graphemes):
     return result
 
 
+lab2ind = {
+    # fmt: off
+    '<bos>': 0, '<eos>': 1, '<unk>': 2, 'A': 3, 'B': 4, 'C': 5, 'D': 6, 'E': 7, 'F': 8, 'G': 9, 'H': 10, 'I': 11, 'J': 12, 'K': 13, 'L': 14, 'M': 15, 'N': 16, 'O': 17, 'P': 18, 'Q': 19, 'R': 20, 'S': 21, 'T': 22, 'U': 23, 'V': 24, 'W': 25, 'X': 26, 'Y': 27, 'Z': 28, "'": 29, ' ': 30
+    # fmt: on
+}
+
+
 def grapheme_pipeline(char, uppercase=True):
     """Encodes a grapheme sequence
 
@@ -92,11 +137,7 @@ def grapheme_pipeline(char, uppercase=True):
         a list of graphemes encoded as integers
     grapheme_encoded: torch.Tensor
     """
-    lab2ind = {
-        # fmt: off
-        '<bos>': 0, '<eos>': 1, '<unk>': 2, 'A': 3, 'B': 4, 'C': 5, 'D': 6, 'E': 7, 'F': 8, 'G': 9, 'H': 10, 'I': 11, 'J': 12, 'K': 13, 'L': 14, 'M': 15, 'N': 16, 'O': 17, 'P': 18, 'Q': 19, 'R': 20, 'S': 21, 'T': 22, 'U': 23, 'V': 24, 'W': 25, 'X': 26, 'Y': 27, 'Z': 28, "'": 29, ' ': 30
-        # fmt: on
-    }
+
     if uppercase:
         char = char.upper()
     grapheme_list = [
@@ -126,13 +167,72 @@ def grapheme_pipeline(char, uppercase=True):
 
     grapheme_encoded_list = [encode_label(label) for label in grapheme_list]
 
+    bos_label = "<bos>"
+    grapheme_encoded = np.array([lab2ind[bos_label]] + list(grapheme_encoded_list))
+    grapheme_len = np.array(len(grapheme_encoded))
+
+    return grapheme_encoded_list, grapheme_encoded, grapheme_len
+
+
+def word_emb_pipeline(
+    models,
+    txt,
+    grapheme_encoded,
+    grapheme_encoded_len,
+):
+    raw_word_emb = embeddings(models, txt)
+    word_separator_idx = lab2ind[" "]
+
+    char_word_emb = expand_to_chars(
+        emb=raw_word_emb[None, ...],
+        seq=grapheme_encoded[None, ...],
+        seq_len=grapheme_encoded_len[None, ...],
+        word_separator=word_separator_idx,
+    )
+    char_word_emb = np.squeeze(char_word_emb)
+
 
 # ======================
 # Main functions
 # ======================
 
 
-def encode_input(data):
+def embeddings(models, sentence):
+    tokenizer = models["tokenizer"]
+    encoded = tokenizer.encode_plus(sentence, return_tensors="np")
+    input_ids = encoded["input_ids"]
+    attention_mask = encoded["attention_mask"]
+    token_type_ids = encoded["token_type_ids"]
+
+    # feedforward
+    net = models["emb"]
+    if not args.onnx:
+        output = net.predict([input_ids, attention_mask, token_type_ids])
+    else:
+        output = net.run(
+            None,
+            {
+                "input_ids": input_ids,
+                "attention_mask": attention_mask,
+                "token_type_ids": token_type_ids,
+            },
+        )
+    hidden_states = output[0]
+
+    token_ids_word = np.array(
+        [idx for idx, word_id in enumerate(encoded.word_ids()) if word_id is not None],
+    )
+
+    # get_hidden_states
+    layers = [-4, -3, -2, -1]
+    output = np.sum(hidden_states[layers], axis=0)
+    output = np.squeeze(output)
+    output = output[token_ids_word]
+
+    return output
+
+
+def encode_input(models, input_text):
     intermediate = {}
 
     graphemes = [
@@ -141,15 +241,22 @@ def encode_input(data):
         # fmt: on
     ]
     partial_clean_pipeline = partial(clean_pipeline, graphemes=graphemes)
-    value = partial_clean_pipeline(data["txt"])
-    intermediate["txt_cleaned"] = value
+    txt_cleaned = partial_clean_pipeline(input_text)
+    intermediate["txt_cleaned"] = txt_cleaned
 
-    value = grapheme_pipeline(value)
-    intermediate["grapheme_encoded_list"] = value
+    grapheme_encoded_list, grapheme_encoded, grapheme_len = grapheme_pipeline(
+        txt_cleaned
+    )
+    intermediate["grapheme_encoded_list"] = grapheme_encoded_list
+    intermediate["grapheme_encoded"] = grapheme_encoded
+    intermediate["grapheme_len"] = grapheme_len
+
+    word_emb = word_emb_pipeline(models, input_text, grapheme_encoded, grapheme_len)
+    intermediate["word_emb"] = word_emb
 
 
-def predict(net, input_text):
-    model_input = encode_input({"txt": input_text})
+def predict(models, input_text):
+    model_input = encode_input(models, input_text)
 
     # feedforward
     if not args.onnx:
@@ -160,7 +267,7 @@ def predict(net, input_text):
     return
 
 
-def recognize_from_text(net):
+def recognize_from_text(models):
     input_text = args.input
 
     logger.info("Input text: " + input_text)
@@ -172,7 +279,7 @@ def recognize_from_text(net):
         total_time_estimation = 0
         for i in range(args.benchmark_count):
             start = int(round(time.time() * 1000))
-            out = predict(net, input_text)
+            out = predict(models, input_text)
             end = int(round(time.time() * 1000))
             estimation_time = end - start
 
@@ -185,7 +292,7 @@ def recognize_from_text(net):
             f"\taverage time estimation {total_time_estimation / (args.benchmark_count - 1)} ms"
         )
     else:
-        out = predict(net, input_text)
+        out = predict(models, input_text)
 
     logger.info("Script finished successfully.")
 
@@ -193,19 +300,30 @@ def recognize_from_text(net):
 def main():
     # model files check and download
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_EMB_PATH, MODEL_EMB_PATH, REMOTE_PATH)
 
     env_id = args.env_id
 
     # initialize
     if not args.onnx:
         net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+        emb = ailia.Net(MODEL_EMB_PATH, WEIGHT_EMB_PATH, env_id=env_id)
     else:
         import onnxruntime
 
         providers = ["CUDAExecutionProvider", "CPUExecutionProvider"]
         net = onnxruntime.InferenceSession(WEIGHT_PATH, providers=providers)
+        emb = onnxruntime.InferenceSession(WEIGHT_EMB_PATH, providers=providers)
 
-    recognize_from_text(net)
+    tokenizer = AutoTokenizer.from_pretrained("tokenizer")
+
+    models = {
+        "tokenizer": tokenizer,
+        "net": net,
+        "emb": emb,
+    }
+
+    recognize_from_text(models)
 
 
 if __name__ == "__main__":
