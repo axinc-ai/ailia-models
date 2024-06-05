@@ -33,6 +33,7 @@ cd ../../audio_processing/audioset_tagging_cnn/; python3 audioset_tagging_cnn.py
 cd ../../audio_processing/deep-music-enhancer/; python3 deep_music_enhancer.py ${OPTION}
 cd ../../audio_processing/pyannote-audio/; python3 pyannote-audio.py ${OPTION}
 cd ../../audio_processing/reazon_speech/; python3 reazon_speech.py ${OPTION}
+cd ../../audio_processing/kotoba-whisper/; python3 kotoba-whisper.py ${OPTION}
 cd ../../background_ramoval/deep-image-matting; python3 deep-image-matting.py ${OPTION}
 cd ../../background_ramoval/u2net; python3 u2net.py ${OPTION}
 cd ../../background_ramoval/u2net; python3 u2net.py -a small ${OPTION}
