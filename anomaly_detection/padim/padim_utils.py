@@ -520,7 +520,7 @@ def infer_optimized(net, params, train_outputs, img, crop_size, device, logger):
     mean_vectors = train_outputs[0]
     inv_cov_matrices = train_outputs[2]
     samples = embedding_vectors[0] 
-    if mean_vectors.device!=device:
+    if str(device) not in str(mean_vectors.device):
         logger.info(f"Changing device from {mean_vectors.device} to {device}")
         mean_vectors=mean_vectors.to(device)
         samples=samples.to(device)

@@ -51,6 +51,12 @@ score_cache = {}
 EnableOptimization = True
 save_format="pkl"
 BENCHMARK = False
+selected_device = "cpu"
+if EnableOptimization:
+    import torch
+    
+    device = torch.device("cpu")
+    logger.info("Torch device : " + str(device))
 
 # ======================
 # List box cursor changed
@@ -127,6 +133,17 @@ def enable_benchmark(event):
     else:
         BENCHMARK = False
     logger.info(f"BENCHMARK set to: {BENCHMARK}")
+
+def select_device(event):
+    global device
+    selection = event.widget.curselection()
+    if selection:
+        selected_index = selection[0]
+        selected_value = event.widget.get(selected_index)
+        device = torch.device(selected_value)
+    else:
+        device = torch.device("cpu")
+    logger.info(f"Device set to: {device}")
 
 # ======================
 # List box double click
@@ -713,15 +730,7 @@ def main():
     global outputFile, listsOutput, output_list, ListboxOutput
     global listsModel, ListboxModel
     global valueKeepAspect, valueCenterCrop
-    if EnableOptimization:
-        import torch
-        global device
-        if torch.cuda.is_available() :
-            device = torch.device("cuda")
-            
-        else:
-            device = torch.device("cpu")
-        logger.info("Torch device : " + str(device))
+
 
     # rootメインウィンドウの設定
     root = tk.Tk()
@@ -837,6 +846,9 @@ def main():
     textBenchmark = tk.StringVar(frame)
     textBenchmark.set("Benchmark mode")
 
+    textDevice = tk.StringVar(frame)
+    textDevice.set("Optimization device")
+
     valueKeepAspect = tkinter.BooleanVar()
     valueKeepAspect.set(True)
     valueCenterCrop = tkinter.BooleanVar()
@@ -857,6 +869,7 @@ def main():
     labelOPt = tk.Label(frame, textvariable=textOptimization)
     labelSaveFile = tk.Label(frame, textvariable=textSaveFile)
     labelBenchmark = tk.Label(frame, textvariable=textBenchmark)
+    labelDevice = tk.Label(frame, textvariable=textDevice)
 
 
     buttonTrain = tk.Button(frame, textvariable=textRun, command=train_button_clicked, width=14)
@@ -957,11 +970,28 @@ def main():
     # Bind the listbox selection event to the save_type_select function
     ListboxFileSelect.bind('<<ListboxSelect>>', save_type_select)
 
+
+    fileDevice = ["cpu", "cuda", "mps"]
+    listsFileDevice = tk.StringVar(value=fileDevice)
+    labelDevice.grid(row=11, column=4, sticky=tk.NW)
+    ListboxDeviceSelect = tk.Listbox(frame, listvariable=listsFileDevice, width=20, height=len(fileDevice), selectmode=tk.BROWSE, exportselection=False)
+    ListboxDeviceSelect.grid(row=11, column=4, padx=0, pady=20)
+
+    # Set the initial selection in the Listbox
+    initial_selection_Device = fileDevice.index("cpu")  # Default to "False"
+    ListboxDeviceSelect.select_set(initial_selection_Device)
+    ListboxDeviceSelect.event_generate('<<ListboxSelect>>')  # Trigger the event to set the initial state
+
+    # Bind the listbox selection event to the save_type_select function
+    ListboxDeviceSelect.bind('<<ListboxSelect>>', select_device)
+    # メインフレームの作成と設置
+    
+
     fileBenchmark = ["True", "False"]
     listsFileBenchmark = tk.StringVar(value=fileBenchmark)
-    labelBenchmark.grid(row=12, column=4, sticky=tk.NW)
+    labelBenchmark.grid(row=11, column=5, sticky=tk.NW)
     ListboxFileBenchmark = tk.Listbox(frame, listvariable=listsFileBenchmark, width=20, height=len(fileOptions), selectmode=tk.BROWSE, exportselection=False)
-    ListboxFileBenchmark.grid(row=12, column=4, padx=0, pady=20)
+    ListboxFileBenchmark.grid(row=11, column=5, padx=0, pady=20)
 
     # Set the initial selection in the Listbox
     initial_selection_benchmark = fileBenchmark.index("False")  # Default to "False"
