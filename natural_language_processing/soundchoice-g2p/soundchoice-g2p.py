@@ -171,7 +171,7 @@ def grapheme_pipeline(char, uppercase=True):
     grapheme_encoded = np.array([lab2ind[bos_label]] + list(grapheme_encoded_list))
     grapheme_len = np.array(len(grapheme_encoded))
 
-    return grapheme_encoded_list, grapheme_encoded, grapheme_len
+    return grapheme_list, grapheme_encoded_list, grapheme_encoded, grapheme_len
 
 
 def word_emb_pipeline(
@@ -190,6 +190,8 @@ def word_emb_pipeline(
         word_separator=word_separator_idx,
     )
     char_word_emb = np.squeeze(char_word_emb)
+
+    return char_word_emb
 
 
 # ======================
@@ -242,27 +244,43 @@ def encode_input(models, input_text):
     ]
     partial_clean_pipeline = partial(clean_pipeline, graphemes=graphemes)
     txt_cleaned = partial_clean_pipeline(input_text)
-    intermediate["txt_cleaned"] = txt_cleaned
 
-    grapheme_encoded_list, grapheme_encoded, grapheme_len = grapheme_pipeline(
-        txt_cleaned
+    grapheme_list, grapheme_encoded_list, grapheme_encoded, grapheme_len = (
+        grapheme_pipeline(txt_cleaned)
     )
+    intermediate["grapheme_list"] = grapheme_list
     intermediate["grapheme_encoded_list"] = grapheme_encoded_list
     intermediate["grapheme_encoded"] = grapheme_encoded
-    intermediate["grapheme_len"] = grapheme_len
 
     word_emb = word_emb_pipeline(models, input_text, grapheme_encoded, grapheme_len)
     intermediate["word_emb"] = word_emb
 
+    return intermediate
+
+
+def compute_outputs(models, p_seq, encoder_outputs):
+    print(p_seq)
+    print(p_seq.shape)
+    print(encoder_outputs)
+    print(encoder_outputs.shape)
+
 
 def predict(models, input_text):
     model_input = encode_input(models, input_text)
+    grapheme_encoded = model_input["grapheme_encoded"][None, ...]
+    word_emb = model_input["word_emb"][None, ...].astype(np.float32)
 
     # feedforward
+    net = models["net"]
     if not args.onnx:
-        output = net.predict([img])
+        output = net.predict([grapheme_encoded, word_emb])
     else:
-        output = net.run(None, {"src": img})
+        output = net.run(
+            None, {"grapheme_encoded": grapheme_encoded, "word_emb": word_emb}
+        )
+    p_seq, encoder_outputs, _ = output
+
+    compute_outputs(models, p_seq, encoder_outputs)
 
     return
 
