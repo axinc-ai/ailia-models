@@ -36,7 +36,7 @@ MODEL_PATH_B = "depth_anything_vitb14.onnx.prototxt"
 WEIGHT_PATH_L = "onnx_repo_safe/depth_anything_vitl14.onnx"
 MODEL_PATH_L = "depth_anything_vitl14.onnx.prototxt"
 
-REMOTE_PATH = None
+REMOTE_PATH = "https://storage.googleapis.com/ailia-models/depth_anything/"
 
 DEFAULT_INPUT_PATH = 'demo1.png'
 DEFAULT_SAVE_PATH = 'output.png'

@@ -1,9 +1,3 @@
-import random
-from PIL import Image, ImageOps, ImageFilter
-import torch
-from torchvision import transforms
-import torch.nn.functional as F
-
 import numpy as np
 import cv2
 import math
@@ -189,12 +183,6 @@ class Resize(object):
                 sample["depth"] = cv2.resize(
                     sample["depth"], (width, height), interpolation=cv2.INTER_NEAREST
                 )
-
-            if "semseg_mask" in sample:
-                # sample["semseg_mask"] = cv2.resize(
-                #     sample["semseg_mask"], (width, height), interpolation=cv2.INTER_NEAREST
-                # )
-                sample["semseg_mask"] = F.interpolate(torch.from_numpy(sample["semseg_mask"]).float()[None, None, ...], (height, width), mode='nearest').numpy()[0, 0]
                 
             if "mask" in sample:
                 sample["mask"] = cv2.resize(
