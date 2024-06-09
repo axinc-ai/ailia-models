@@ -13,9 +13,8 @@ import ailia
 sys.path.append("../../util")
 from arg_utils import get_base_parser, update_parser, get_savepath  # noqa
 from model_utils import check_and_download_models  # noqa
-from image_utils import normalize_image  # noqa
-from detector_utils import load_image  # noqa
-from webcamera_utils import get_capture, get_writer  # noqa
+
+from beam_searcher import S2SBeamSearcher
 
 logger = getLogger(__name__)
 
@@ -258,11 +257,12 @@ def encode_input(models, input_text):
     return intermediate
 
 
-def compute_outputs(models, p_seq, encoder_outputs):
+def compute_outputs(p_seq, encoder_outputs):
     print(p_seq)
     print(p_seq.shape)
     print(encoder_outputs)
     print(encoder_outputs.shape)
+    S2SBeamSearcher().forward(encoder_outputs)
 
 
 def predict(models, input_text):
@@ -280,7 +280,7 @@ def predict(models, input_text):
         )
     p_seq, encoder_outputs, _ = output
 
-    compute_outputs(models, p_seq, encoder_outputs)
+    compute_outputs(p_seq, encoder_outputs)
 
     return
 
