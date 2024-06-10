@@ -144,7 +144,9 @@ def image_processor(img):
 def forward(net, input_ids, inputs_embeds, position_ids, past_key_values):
     # feedforward
     if not args.onnx:
-        output = net.predict([input_ids, inputs_embeds, position_ids, past_key_values])
+        input_list = [input_ids, inputs_embeds, position_ids]
+        input_list.extend(past_key_values)
+        output = net.predict(input_list)
     else:
         output = net.run(
             None,
@@ -510,9 +512,10 @@ def main():
 
     # initialize
     if not args.onnx:
-        net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
-        encode_images = ailia.Net(MODEL_ENC_PATH, WEIGHT_ENC_PATH, env_id=env_id)
-        embed_tokens = ailia.Net(MODEL_EMB_PATH, WEIGHT_EMB_PATH, env_id=env_id)
+        memory_mode = ailia.get_memory_mode(True, True, False, True)
+        net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id, memory_mode=memory_mode)
+        encode_images = ailia.Net(MODEL_ENC_PATH, WEIGHT_ENC_PATH, env_id=env_id, memory_mode=memory_mode)
+        embed_tokens = ailia.Net(MODEL_EMB_PATH, WEIGHT_EMB_PATH, env_id=env_id, memory_mode=memory_mode)
     else:
         import onnxruntime
 
