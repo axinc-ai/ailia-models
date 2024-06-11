@@ -74,6 +74,9 @@ The collection of pre-trained, state-of-the-art AI models.
 | [deep music enhancer](/audio_processing/deep-music-enhancer/) | [On Filter Generalization for Music Bandwidth Extension Using Deep Neural Networks](https://github.com/serkansulun/deep-music-enhancer) | Pytorch | 1.2.6 and later | |
 | [pyannote-audio](/audio_processing/pyannote-audio/) | [Pyannote-audio](https://github.com/pyannote/pyannote-audio) | Pytorch | 1.2.15 and later | [JP](https://medium.com/axinc/pyannoteaudio-%E8%A9%B1%E8%80%85%E5%88%86%E9%9B%A2%E3%82%92%E8%A1%8C%E3%81%86%E3%81%9F%E3%82%81%E3%81%AE%E6%A9%9F%E6%A2%B0%E5%AD%A6%E7%BF%92%E3%83%A2%E3%83%87%E3%83%AB-fca61f4ef5d0) |
 | [kotoba-whisper](/audio_processing/kotoba-whisper/) | [kotoba-whisper](https://huggingface.co/kotoba-tech/kotoba-whisper-v1.0) | Pytorch | 1.2.16 and later | |
+| [reazon_speech](/audio_processing/reazon_speech/) | [ReazonSpeech](https://research.reazon.jp/projects/ReazonSpeech/) | Pytorch | 1.4.0 and later | |
+| [reazon_speech2](/audio_processing/reazon_speech2/) | [ReazonSpeech2](https://research.reazon.jp/projects/ReazonSpeech/) | Pytorch | 1.4.0 and later | |
+| [gpt-sovits](/audio_processing/gpt-sovits/) | [GPT-SoVITS](https://github.com/RVC-Boss/GPT-SoVITS) | Pytorch | 1.4.0 and later | [JP](https://medium.com/axinc/gpt-sovits-%E3%83%95%E3%82%A1%E3%82%A4%E3%83%B3%E3%83%81%E3%83%A5%E3%83%BC%E3%83%8B%E3%83%B3%E3%82%B0%E3%81%A7%E3%81%8D%E3%82%8B0%E3%82%B7%E3%83%A7%E3%83%83%E3%83%88%E3%81%AE%E9%9F%B3%E5%A3%B0%E5%90%88%E6%88%90%E3%83%A2%E3%83%87%E3%83%AB-2212eeb5ad20) |
 
 ## Background removal
 
