@@ -59,8 +59,8 @@ parser.add_argument(
     help='use onnx runtime'
 )
 parser.add_argument(
-    '--onnx_vits', action='store_true',
-    help='use onnx runtime for vits'
+    '--normal', action='store_true',
+    help='use normal model'
 )
 parser.add_argument(
     '--profile', action='store_true',
@@ -71,14 +71,17 @@ args = update_parser(parser, check_input_type=False)
 WEIGHT_PATH_SSL = 'cnhubert.onnx'
 WEIGHT_PATH_T2S_ENCODER = 't2s_encoder.onnx'
 WEIGHT_PATH_T2S_FIRST_DECODER = 't2s_fsdec.onnx'
-WEIGHT_PATH_T2S_STAGE_DECODER = 't2s_sdec.onnx'
+if args.normal:
+    WEIGHT_PATH_T2S_STAGE_DECODER = 't2s_sdec.onnx'
+else:
+    WEIGHT_PATH_T2S_STAGE_DECODER = 't2s_sdec.opt.onnx'
 WEIGHT_PATH_VITS = 'vits.onnx'
 
-MODEL_PATH_SSL = 'cnhubert.onnx.prototxt'
-MODEL_PATH_T2S_ENCODER = 't2s_encoder.onnx.prototxt'
-MODEL_PATH_T2S_FIRST_DECODER = 't2s_fsdec.onnx.prototxt'
-MODEL_PATH_T2S_STAGE_DECODER = 't2s_sdec.onnx.prototxt'
-MODEL_PATH_VITS = 'vits.onnx.prototxt'
+MODEL_PATH_SSL = WEIGHT_PATH_SSL + '.prototxt'
+MODEL_PATH_T2S_ENCODER = WEIGHT_PATH_T2S_ENCODER + '.prototxt'
+MODEL_PATH_T2S_FIRST_DECODER = WEIGHT_PATH_T2S_FIRST_DECODER + '.prototxt'
+MODEL_PATH_T2S_STAGE_DECODER = WEIGHT_PATH_T2S_STAGE_DECODER + '.prototxt'
+MODEL_PATH_VITS = WEIGHT_PATH_VITS + '.prototxt'
 
 
 # ======================
@@ -189,7 +192,7 @@ class GptSoVits():
         pred_semantic = self.t2s.forward(ref_seq, text_seq, ref_bert, text_bert, ssl_content)
         if args.benchmark:
             start = int(round(time.time() * 1000))
-        if args.onnx or args.onnx_vits:
+        if args.onnx:
             audio1 = self.sess.run(None, {
                 "text_seq" : text_seq,
                 "pred_semantic" : pred_semantic, 
@@ -301,18 +304,13 @@ def main():
         t2s_encoder = ailia.Net(weight = WEIGHT_PATH_T2S_ENCODER, stream = MODEL_PATH_T2S_ENCODER, memory_mode = memory_mode, env_id = args.env_id)
         t2s_first_decoder = ailia.Net(weight = WEIGHT_PATH_T2S_FIRST_DECODER, stream = MODEL_PATH_T2S_FIRST_DECODER, memory_mode = memory_mode, env_id = args.env_id)
         t2s_stage_decoder = ailia.Net(weight = WEIGHT_PATH_T2S_STAGE_DECODER, stream = MODEL_PATH_T2S_STAGE_DECODER, memory_mode = memory_mode, env_id = args.env_id)
-        if args.onnx_vits:
-            import onnxruntime
-            vits = onnxruntime.InferenceSession(WEIGHT_PATH_VITS) # stftの対応までの暫定
-        else:
-            vits = ailia.Net(weight = WEIGHT_PATH_VITS, stream = MODEL_PATH_VITS, memory_mode = memory_mode, env_id = args.env_id)
+        vits = ailia.Net(weight = WEIGHT_PATH_VITS, stream = MODEL_PATH_VITS, memory_mode = memory_mode, env_id = args.env_id)
         if args.profile:
             ssl.set_profile_mode(True)
             t2s_encoder.set_profile_mode(True)
             t2s_first_decoder.set_profile_mode(True)
             t2s_stage_decoder.set_profile_mode(True)
-            if not args.onnx_vits:
-                vits.set_profile_mode(True)
+            vits.set_profile_mode(True)
 
     if args.benchmark:
         start = int(round(time.time() * 1000))
@@ -332,9 +330,8 @@ def main():
         print(t2s_first_decoder.get_summary())
         print("t2s_stage_decoder : ")
         print(t2s_stage_decoder.get_summary())
-        if not args.onnx_vits:
-            print("vits : ")
-            print(vits.get_summary())
+        print("vits : ")
+        print(vits.get_summary())
 
 
 if __name__ == '__main__':
