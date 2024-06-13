@@ -15,9 +15,10 @@ The collection of pre-trained, state-of-the-art AI models.
 [ailia MODELS tutorial 日本語版](TUTORIAL_jp.md)
 
 # Supported models
-327 models as of May 28th, 2024
+330 models as of June 11th, 2024
 
 # Latest update
+- 2024.06.11 Add gpt-sovits, reazon speech, reazon speech2 (ailia SDK 1.4.0)
 - 2024.05.28 Add kotoba-whisper
 - 2024.05.26 Add multilingual-e5 (LayerNorm version)
 - 2024.04.30 Add cross_encoder_mmarco
