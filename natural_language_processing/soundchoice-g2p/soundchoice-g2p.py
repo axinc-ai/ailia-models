@@ -14,6 +14,7 @@ sys.path.append("../../util")
 from arg_utils import get_base_parser, update_parser, get_savepath  # noqa
 from model_utils import check_and_download_models  # noqa
 
+import beam_searcher
 from beam_searcher import S2SBeamSearcher
 
 logger = getLogger(__name__)
@@ -257,12 +258,13 @@ def encode_input(models, input_text):
     return intermediate
 
 
-def compute_outputs(p_seq, encoder_outputs):
+def compute_outputs(net, p_seq, encoder_outputs):
     print(p_seq)
     print(p_seq.shape)
     print(encoder_outputs)
     print(encoder_outputs.shape)
-    S2SBeamSearcher().forward(encoder_outputs)
+
+    S2SBeamSearcher(net, args.onnx).forward(encoder_outputs)
 
 
 def predict(models, input_text):
@@ -280,7 +282,8 @@ def predict(models, input_text):
         )
     p_seq, encoder_outputs, _ = output
 
-    compute_outputs(p_seq, encoder_outputs)
+    net = models["rnn"]
+    compute_outputs(net, p_seq, encoder_outputs)
 
     return
 
@@ -332,6 +335,9 @@ def main():
         providers = ["CUDAExecutionProvider", "CPUExecutionProvider"]
         net = onnxruntime.InferenceSession(WEIGHT_PATH, providers=providers)
         emb = onnxruntime.InferenceSession(WEIGHT_EMB_PATH, providers=providers)
+        rnn = onnxruntime.InferenceSession(
+            "rnn_beam_searcher.onnx", providers=providers
+        )
 
     tokenizer = AutoTokenizer.from_pretrained("tokenizer")
 
@@ -339,6 +345,7 @@ def main():
         "tokenizer": tokenizer,
         "net": net,
         "emb": emb,
+        "rnn": rnn,
     }
 
     recognize_from_text(models)
