@@ -1,4 +1,13 @@
 import numpy as np
+from scipy.special import log_softmax, logsumexp
+
+batch_size = 1
+blank_index = 2
+bos_index = 0
+eos_index = 1
+vocab_size = 43
+max_enc_len = 40
+minus_inf = -1e20
 
 
 class AlivedHypotheses:
@@ -35,7 +44,7 @@ weights = {
 }
 
 
-def coverage_score(inp_tokens, coverage, candidates, attn):
+def coverage_score(inp_tokens, coverage, attn):
     """This method scores the new beams based on the
     Coverage scorer.
 
@@ -45,10 +54,6 @@ def coverage_score(inp_tokens, coverage, candidates, attn):
         The input tensor of the current timestep.
     coverage : No limit
         The scorer states for this timestep.
-    candidates : np.ndarray
-        (batch_size x beam_size, scorer_beam_size).
-        The top-k candidates to be scored after the full scorers.
-        If None, scorers will score on full vocabulary set.
     attn : np.ndarray
         The attention weight to be used in CoverageScorer or CTCScorer.
     """
@@ -59,7 +64,6 @@ def coverage_score(inp_tokens, coverage, candidates, attn):
         coverage = np.zeros_like(attn)
 
     coverage = coverage + attn
-    vocab_size = 43
 
     # Compute coverage penalty and add it to scores
     threshold = 0.5
@@ -78,7 +82,7 @@ def coverage_score(inp_tokens, coverage, candidates, attn):
 coverage_score.time_step = 0
 
 
-def ctc_score(inp_tokens, states, candidates=None, attn=None):
+def ctc_score(inp_tokens, states, attn=None):
     """This method if one step of forwarding operation
     for the prefix ctc scorer.
 
@@ -88,171 +92,131 @@ def ctc_score(inp_tokens, states, candidates=None, attn=None):
         The last chars of prefix label sequences g, where h = g + c.
     states : tuple
         Previous ctc states.
-    candidates : np.ndarray
-        (batch_size * beam_size, ctc_beam_size), The topk candidates for rescoring.
-        If given, performing partial ctc scoring.
     attn : np.ndarray
         (batch_size * beam_size, max_enc_len), The attention weights.
     """
 
-    batch_size = 1
     n_bh = inp_tokens.shape[0]
     beam_size = n_bh // batch_size
     last_char = inp_tokens
     ctc_score.prefix_length += 1
-    vocab_size = 43
-    num_candidates = vocab_size if candidates is None else candidates.shape[-1]
+    num_candidates = vocab_size
     if states is None:
         # r_prev: (L, 2, batch_size * beam_size)
-        max_enc_len = 40
-        r_prev = np.ones((max_enc_len, 2, batch_size, beam_size)) * -1e20
+        r_prev = np.ones((max_enc_len, 2, batch_size, beam_size)) * minus_inf
 
         # Accumulate blank posteriors at each step
-        blank_index = 2
         r_prev[:, 1] = np.expand_dims(
-            np.cumsum(self.x[0, :, :, blank_index], 0), axis=2
+            np.cumsum(ctc_score.x[0, :, :, blank_index], 0), axis=2
         )
-        print(r_prev)
-        print(r_prev.shape)
-        1 / 0
-        r_prev = r_prev.view(-1, 2, n_bh)
-        psi_prev = torch.full(
-            (n_bh, self.vocab_size),
-            0.0,
-            device=self.device,
-        )
+        r_prev = r_prev.reshape(-1, 2, n_bh)
+        psi_prev = np.zeros((n_bh, vocab_size))
     else:
         r_prev, psi_prev = states
 
-    # for partial search
-    if candidates is not None:
-        # The first index of each candidate.
-        cand_offset = self.batch_index * self.vocab_size
-        scoring_table = torch.full(
-            (n_bh, self.vocab_size),
-            -1,
-            dtype=torch.long,
-            device=self.device,
-        )
-        # Assign indices of candidates to their positions in the table
-        col_index = torch.arange(n_bh, device=self.device).unsqueeze(1)
-        scoring_table[col_index, candidates] = torch.arange(
-            num_candidates, device=self.device
-        )
-        # Select candidates indices for scoring
-        scoring_index = (
-            candidates + cand_offset.unsqueeze(1).repeat(1, beam_size).view(-1, 1)
-        ).view(-1)
-        x_inflate = torch.index_select(
-            self.x.view(2, -1, self.batch_size * self.vocab_size),
-            2,
-            scoring_index,
-        ).view(2, -1, n_bh, num_candidates)
     # for full search
-    else:
-        scoring_table = None
-        # Inflate x to (2, -1, batch_size * beam_size, num_candidates)
-        # It is used to compute forward probs in a batched way
-        x_inflate = (
-            self.x.unsqueeze(3)
-            .repeat(1, 1, 1, beam_size, 1)
-            .view(2, -1, n_bh, num_candidates)
-        )
+    scoring_table = None
+    # Inflate x to (2, -1, batch_size * beam_size, num_candidates)
+    # It is used to compute forward probs in a batched way
+    x_inflate = np.repeat(
+        np.expand_dims(ctc_score.x, axis=3), beam_size, axis=3
+    ).reshape(2, -1, n_bh, num_candidates)
 
     # Prepare forward probs
-    r = torch.full(
-        (
-            self.max_enc_len,
-            2,
-            n_bh,
-            num_candidates,
-        ),
-        self.minus_inf,
-        device=self.device,
-    )
-    r.fill_(self.minus_inf)
+    r = np.ones((max_enc_len, 2, n_bh, num_candidates)) * minus_inf
 
     # (Alg.2-6)
-    if self.prefix_length == 0:
+    if ctc_score.prefix_length == 0:
         r[0, 0] = x_inflate[0, 0]
     # (Alg.2-10): phi = prev_nonblank + prev_blank = r_t-1^nb(g) + r_t-1^b(g)
-    r_sum = torch.logsumexp(r_prev, 1)
-    phi = r_sum.unsqueeze(2).repeat(1, 1, num_candidates)
+    r_sum = logsumexp(r_prev, 1)
+    phi = np.repeat(np.expand_dims(r_sum, axis=2), num_candidates, axis=2)
 
     # (Alg.2-10): if last token of prefix g in candidates, phi = prev_b + 0
-    if candidates is not None:
-        for i in range(n_bh):
-            pos = scoring_table[i, last_char[i]]
-            if pos != -1:
-                phi[:, i, pos] = r_prev[:, 1, i]
-    else:
-        for i in range(n_bh):
-            phi[:, i, last_char[i]] = r_prev[:, 1, i]
+    for i in range(n_bh):
+        phi[:, i, last_char[i]] = r_prev[:, 1, i]
 
     # Start, end frames for scoring (|g| < |h|).
     # Scoring based on attn peak if ctc_window_size > 0
-    if self.ctc_window_size == 0 or attn is None:
-        start = max(1, self.prefix_length)
-        end = self.max_enc_len
-    else:
-        _, attn_peak = torch.max(attn, dim=1)
-        max_frame = torch.max(attn_peak).item() + self.ctc_window_size
-        min_frame = torch.min(attn_peak).item() - self.ctc_window_size
-        start = max(max(1, self.prefix_length), int(min_frame))
-        end = min(self.max_enc_len, int(max_frame))
+    start = max(1, ctc_score.prefix_length)
+    end = max_enc_len
 
     # Compute forward prob log(r_t^nb(h)) and log(r_t^b(h)):
     for t in range(start, end):
-        # (Alg.2-11): dim=0, p(h|cur step is nonblank) = [p(prev step=y) + phi] * p(c)
+        # (Alg.2-11): axis=0, p(h|cur step is nonblank) = [p(prev step=y) + phi] * p(c)
         rnb_prev = r[t - 1, 0]
-        # (Alg.2-12): dim=1, p(h|cur step is blank) = [p(prev step is blank) + p(prev step is nonblank)] * p(blank)
+        # (Alg.2-12): axis=1, p(h|cur step is blank) = [p(prev step is blank) + p(prev step is nonblank)] * p(blank)
         rb_prev = r[t - 1, 1]
-        r_ = torch.stack([rnb_prev, phi[t - 1], rnb_prev, rb_prev]).view(
+        r_ = np.stack([rnb_prev, phi[t - 1], rnb_prev, rb_prev]).reshape(
             2, 2, n_bh, num_candidates
         )
-        r[t] = torch.logsumexp(r_, 1) + x_inflate[:, t]
+        r[t] = logsumexp(r_, 1) + x_inflate[:, t]
 
     # Compute the predix prob, psi
-    psi_init = r[start - 1, 0].unsqueeze(0)
+    psi_init = np.expand_dims(r[start - 1, 0], axis=0)
     # phi is prob at t-1 step, shift one frame and add it to the current prob p(c)
-    phix = torch.cat((phi[0].unsqueeze(0), phi[:-1]), dim=0) + x_inflate[0]
+    phix = (
+        np.concatenate((np.expand_dims(phi[0], axis=0), phi[:-1]), axis=0)
+        + x_inflate[0]
+    )
     # (Alg.2-13): psi = psi + phi * p(c)
-    if candidates is not None:
-        psi = torch.full(
-            (n_bh, self.vocab_size),
-            self.minus_inf,
-            device=self.device,
-        )
-        psi_ = torch.logsumexp(torch.cat((phix[start:end], psi_init), dim=0), dim=0)
-        # only assign prob to candidates
-        for i in range(n_bh):
-            psi[i, candidates[i]] = psi_[i]
-    else:
-        psi = torch.logsumexp(torch.cat((phix[start:end], psi_init), dim=0), dim=0)
+    psi = logsumexp(np.concatenate((phix[start:end], psi_init), axis=0), axis=0)
 
     # (Alg.2-3): if c = <eos>, psi = log(r_T^n(g) + r_T^b(g)), where T is the length of max frames
     for i in range(n_bh):
-        psi[i, self.eos_index] = r_sum[self.last_frame_index[i // beam_size], i]
+        psi[i, eos_index] = r_sum[ctc_score.last_frame_index[i // beam_size], i]
 
-    if self.eos_index != self.blank_index:
+    if eos_index != blank_index:
         # Exclude blank probs for joint scoring
-        psi[:, self.blank_index] = self.minus_inf
+        psi[:, blank_index] = minus_inf
 
     return psi - psi_prev, (r, psi, scoring_table)
 
 
+ctc_score.last_frame_index = None
 ctc_score.prefix_length = -1
+ctc_score.x = None
 
 
-def reset_scorer_mem():
-    pass
+def reset_scorer_mem(x, enc_lens):
+    ctc_weight = np.load("ctc_fc_weight.npy")
+    ctc_bias = np.load("ctc_fc_bias.npy")
+
+    ctc_score.last_frame_index = np.array([enc_lens]) - 1
+
+    logits = x @ ctc_weight.T + ctc_bias
+
+    shape = logits.shape
+    x = logits.reshape(shape[0] * shape[1], shape[2])
+    x_act = log_softmax(x, axis=-1)
+    x_act = x_act.reshape(shape[0], shape[1], shape[2])
+    x = x_act
+
+    # length_to_mask
+    mask = np.expand_dims(np.arange(enc_lens), axis=0) < enc_lens
+    mask = mask.astype(np.int32)
+    mask = 1 - mask
+    mask = (
+        np.broadcast_to(
+            np.expand_dims(mask, axis=-1),
+            (1, enc_lens, x.shape[-1]),
+        )
+        == 1
+    )
+    x = np.where(mask, minus_inf, x)
+    x[:, :, 0] = np.where(mask[:, :, 0], 0, x[:, :, 0])
+
+    # axis=0: xnb, nonblank posteriors, axis=1: xb, blank posteriors
+    xnb = x.transpose(1, 0, 2)
+    xb = np.repeat(np.expand_dims(xnb[:, :, blank_index], axis=2), vocab_size, axis=2)
+
+    # (2, L, batch_size * beam_size, vocab_size)
+    ctc_score.x = np.stack([xnb, xb])
 
 
 class S2SBeamSearcher:
 
     def __init__(self, net, onnx=False):
-        self.bos_index = 0
-        self.eos_index = 1
         self.min_decode_ratio = 0
         self.max_decode_ratio = 1.0
 
@@ -260,7 +224,6 @@ class S2SBeamSearcher:
         self.eos_threshold = 10.0
         self.ctc_weight = 0.5
         self.attn_weight = 1.0 - self.ctc_weight
-        self.minus_inf = -1e20
 
         self.net = net
         self.onnx = onnx
@@ -297,7 +260,7 @@ class S2SBeamSearcher:
             Each element represents whether the eos log-probabilities will be kept.
         """
         max_probs = np.max(log_probs, axis=-1)
-        eos_probs = log_probs[:, self.eos_index]
+        eos_probs = log_probs[:, eos_index]
         cond = eos_probs > (self.eos_threshold * max_probs)
         return cond
 
@@ -368,51 +331,20 @@ class S2SBeamSearcher:
         scorer_memory : No limit
             The memory variables generated in this step.
         """
-        # if self.scorer is not None:
-        #     log_probs, scorer_memory = self.scorer.score(
-        #         inp_tokens,
-        #         scorer_memory,
-        #         attn,
-        #         log_probs,
-        #         self.beam_size,
-        #     )
         new_memory = dict()
         score, new_memory["coverage"] = coverage_score(
-            inp_tokens, memory["coverage"], None, attn
+            inp_tokens, memory["coverage"], attn
         )
         weights = 5.0
         log_probs += score * weights
 
         # block blank token if CTC is used
-        blank_index = 2
-        minus_inf = -1e20
         log_probs[:, blank_index] = minus_inf
-        score, new_memory["coverage"] = ctc_score(
-            inp_tokens, memory["coverage"], None, attn
-        )
-
-        # score full candidates
-        for k, impl in self.full_scorers.items():
-            if k == "ctc":
-                # block blank token if CTC is used
-                log_probs[:, impl.blank_index] = impl.ctc_score.minus_inf
-
-            score, new_memory[k] = impl.score(inp_tokens, memory[k], None, attn)
-            log_probs += score * self.weights[k]
-
-        # select candidates from the results of full scorers for partial scorers
-        _, candidates = log_probs.topk(
-            int(self.beam_size * self.scorer_beam_scale), dim=-1
-        )
-
-        # score pruned tokens candidates
-        for k, impl in self.partial_scorers.items():
-            score, new_memory[k] = impl.score(inp_tokens, memory[k], candidates, attn)
-            log_probs += score * self.weights[k]
+        score, new_memory["ctc"] = ctc_score(inp_tokens, memory["coverage"], attn)
+        weights = 0.5
+        log_probs += score * weights
 
         return log_probs, new_memory
-
-        return log_probs, scorer_memory
 
     def _update_reset_memory(self, enc_states, enc_lens):
         """Call reset memory for each module.
@@ -489,13 +421,13 @@ class S2SBeamSearcher:
         enc_lens = np.tile(enc_lens, [self.beam_size])
 
         # Using bos as the first input
-        inp_tokens = np.ones((self.n_bh,), dtype=int) * self.bos_index
+        inp_tokens = np.ones((self.n_bh,), dtype=int) * bos_index
 
         # The first index of each sentence.
         self.beam_offset = np.arange(self.batch_size) * self.beam_size
 
         # initialize sequence scores variables.
-        sequence_scores = np.ones((self.n_bh,)) * self.minus_inf
+        sequence_scores = np.ones((self.n_bh,)) * minus_inf
 
         # keep only the first to make sure no redundancy.
         sequence_scores[self.beam_offset, ...] = 0.0
@@ -610,10 +542,10 @@ class S2SBeamSearcher:
 
         # _eos_threshold_step
         cond = self._check_eos_threshold(log_probs)
-        log_probs[:, self.eos_index] = np.where(
+        log_probs[:, eos_index] = np.where(
             cond,
-            log_probs[:, self.eos_index],
-            self.minus_inf,
+            log_probs[:, eos_index],
+            minus_inf,
         )
 
         (
