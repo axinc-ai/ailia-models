@@ -34,16 +34,6 @@ class AlivedHypotheses:
         self.sequence_scores = sequence_scores
 
 
-weights = {
-    "ctc": 0.5,
-    "rnnlm": 0.0,
-    "transformerlm": 0.0,
-    "kenlm": 0.0,
-    "coverage": 5.0,
-    "length": 0.0,
-}
-
-
 def coverage_score(inp_tokens, coverage, attn):
     """This method scores the new beams based on the
     Coverage scorer.
@@ -176,6 +166,7 @@ def ctc_score(inp_tokens, states, attn=None):
 ctc_score.last_frame_index = None
 ctc_score.prefix_length = -1
 ctc_score.x = None
+ctc_score.batch_index = None
 
 
 def reset_scorer_mem(x, enc_lens):
@@ -212,6 +203,49 @@ def reset_scorer_mem(x, enc_lens):
 
     # (2, L, batch_size * beam_size, vocab_size)
     ctc_score.x = np.stack([xnb, xb])
+
+    # indices of batch.
+    ctc_score.batch_index = np.arange(batch_size)
+
+
+def ctc_permute_mem(memory, index):
+    """This method permutes the CTC model memory
+    to synchronize the memory index with the current output.
+
+    Arguments
+    ---------
+    memory : No limit
+        The memory variable to be permuted.
+    index : np.ndarray
+        The index of the previous path.
+
+    Return
+    ------
+    The variable of the memory being permuted.
+
+    """
+
+    r, psi, _ = memory
+
+    beam_size = index.shape[1]
+    n_bh = batch_size * beam_size
+
+    # The first index of each batch.
+    beam_offset = ctc_score.batch_index * beam_size
+    # The index of top-K vocab came from in (t-1) timesteps at batch * beam * vocab dimension.
+    cand_index = (
+        index
+        + np.repeat(np.expand_dims(beam_offset, axis=1), index.shape[1], axis=1)
+        * vocab_size
+    ).reshape(n_bh)
+    # synchronize forward prob
+    psi = psi.reshape(-1)[cand_index]
+    psi = np.repeat(psi.reshape(-1, 1), vocab_size, axis=1).reshape(n_bh, vocab_size)
+
+    r = r.reshape(-1, 2, n_bh * vocab_size)[:, :, cand_index]
+    r = r.reshape(-1, 2, n_bh)
+
+    return r, psi
 
 
 class S2SBeamSearcher:
@@ -340,7 +374,7 @@ class S2SBeamSearcher:
 
         # block blank token if CTC is used
         log_probs[:, blank_index] = minus_inf
-        score, new_memory["ctc"] = ctc_score(inp_tokens, memory["coverage"], attn)
+        score, new_memory["ctc"] = ctc_score(inp_tokens, memory["ctc"], attn)
         weights = 0.5
         log_probs += score * weights
 
@@ -373,6 +407,164 @@ class S2SBeamSearcher:
 
         scorer_memory = {"coverage": None, "ctc": None}
         return memory, scorer_memory
+
+    def _update_permute_memory(
+        self, memory, scorer_memory, predecessors, candidates, prev_attn_peak
+    ):
+        """Call permute memory for each module. It allows us to synchronize the memory with the output.
+
+        Arguments
+        ---------
+        memory : No limit
+            The memory variables input for this step.
+            (ex. RNN hidden states).
+        scorer_memory : No limit
+            The memory variables input for this step.
+            (ex. RNN hidden states).
+        predecessors : np.ndarray
+            The index of which beam the current top-K output came from in (t-1) steps.
+        candidates : np.ndarray
+            The index of the current top-K output.
+        prev_attn_peak : np.ndarray
+            The previous attention peak place.
+
+        Returns
+        -------
+        memory : No limit
+            The memory variables generated in this step.
+        scorer_memory : No limit
+            The memory variables generated in this step.
+        prev_attn_peak : np.ndarray
+            The previous attention peak place.
+        """
+        # _attn_weight_permute_memory_step
+        hs, c = memory
+        hs = hs[:, predecessors, :]
+        c = c[predecessors, :]
+        memory = (hs, c)
+
+        # _scorer_permute_memory_step
+        scorer_memory["coverage"] = scorer_memory["coverage"][predecessors, :]
+        scorer_memory["ctc"] = ctc_permute_mem(scorer_memory["ctc"], candidates)
+
+        return memory, scorer_memory, prev_attn_peak
+
+    def _update_sequences_and_log_probs(
+        self,
+        log_probs,
+        inp_tokens,
+        predecessors,
+        candidates,
+        alived_hyps,
+    ):
+        """This method update sequences and log probabilities by adding the new inp_tokens.
+
+        Arguments
+        ---------
+        log_probs : np.ndarray
+            The log-probabilities of the current step output.
+        inp_tokens : np.ndarray
+            The input tensor of the current step.
+        predecessors : np.ndarray
+            The index of which beam the current top-K output came from in (t-1) steps.
+        candidates : np.ndarray
+            The index of the current top-K output.
+        alived_hyps : AlivedHypotheses
+            The alived hypotheses.
+
+        Returns
+        -------
+        alived_hyps : AlivedHypotheses
+            The alived hypotheses.
+        """
+        # Update alived_seq
+        alived_hyps.alived_seq = np.concatenate(
+            [
+                alived_hyps.alived_seq[predecessors, :],
+                np.expand_dims(inp_tokens, axis=1),
+            ],
+            axis=-1,
+        )
+
+        # Takes the log-probabilities
+        beam_log_probs = log_probs[
+            np.expand_dims(np.arange(self.batch_size), axis=1), candidates
+        ].reshape(self.n_bh)
+
+        # Update alived_log_probs
+        alived_hyps.alived_log_probs = np.concatenate(
+            [
+                alived_hyps.alived_log_probs[predecessors, :],
+                np.expand_dims(beam_log_probs, axis=1),
+            ],
+            axis=-1,
+        )
+
+        return alived_hyps
+
+    def _compute_scores_and_next_inp_tokens(self, alived_hyps, log_probs, step):
+        """Compute scores and next input tokens.
+
+        Arguments
+        ---------
+        alived_hyps : AlivedHypotheses
+            The alived hypotheses.
+        log_probs : np.ndarray
+            The log-probabilities of the current step output.
+        step : int
+            The current decoding step.
+
+        Returns
+        -------
+        scores : np.ndarray
+            The scores of the current step output.
+        candidates : np.ndarray
+            The index of the current top-K output.
+        predecessors : np.ndarray
+            The index of which beam the current top-K output came from in (t-1) steps.
+        inp_tokens : np.ndarray
+            The input tensor of the current step.
+        alived_hyps : AlivedHypotheses
+            The alived hypotheses.
+        """
+        scores = np.repeat(
+            np.expand_dims(alived_hyps.sequence_scores, axis=1), self.n_out, axis=1
+        )
+        scores = scores + log_probs
+
+        # length normalization
+        scores = scores / (step + 1)
+
+        # keep topk beams
+        # scores, candidates = scores.view(self.batch_size, -1).topk(self.beam_size, dim=-1)
+        a = scores.reshape(self.batch_size, -1)
+        candidates = np.argsort(-a, axis=-1)[:, : self.beam_size]
+        scores = np.take_along_axis(a, candidates, axis=-1)
+
+        # The input for the next step, also the output of current step.
+        inp_tokens = (candidates % self.n_out).reshape(self.n_bh)
+
+        scores = scores.reshape(self.n_bh)
+        alived_hyps.sequence_scores = scores
+
+        # recover the length normalization
+        alived_hyps.sequence_scores = alived_hyps.sequence_scores * (step + 1)
+
+        # The index of which beam the current top-K output came from in (t-1) steps.
+        predecessors = (
+            np.floor_divide(candidates, self.n_out)
+            + np.repeat(
+                np.expand_dims(self.beam_offset, axis=1), candidates.shape[1], axis=1
+            )
+        ).reshape(self.n_bh)
+
+        return (
+            scores,
+            candidates,
+            predecessors,
+            inp_tokens,
+            alived_hyps,
+        )
 
     def init_beam_search_data(self, enc_states):
         """Initialize the beam search data.
@@ -459,6 +651,52 @@ class S2SBeamSearcher:
             enc_states,
             enc_lens,
         )
+
+    def _update_hyps_and_scores_if_eos_token(
+        self,
+        inp_tokens,
+        alived_hyps,
+        eos_hyps_and_log_probs_scores,
+        scores,
+    ):
+        """This method will update hyps and scores if inp_tokens are eos.
+
+        Arguments
+        ---------
+        inp_tokens : np.ndarray
+            The current output.
+        alived_hyps : AlivedHypotheses
+            alived_seq : np.ndarray
+            alived_log_probs : np.ndarray
+        eos_hyps_and_log_probs_scores : list
+            Generated hypotheses (the one that haved reached eos) and log probs scores.
+        scores : np.ndarray
+            Scores at the current step.
+
+        Returns
+        -------
+        is_eos : torch.BoolTensor
+            Each element represents whether the token is eos.
+        """
+        is_eos = inp_tokens == eos_index
+        # (eos_indices,) = np.nonzero(is_eos, as_tuple=True)
+        (eos_indices,) = np.nonzero(is_eos)
+
+        # Store the hypothesis and their scores when reaching eos.
+        if eos_indices.shape[0] > 0:
+            for index in eos_indices:
+                # convert to int
+                batch_id = index // self.beam_size
+                if len(eos_hyps_and_log_probs_scores[batch_id]) == self.beam_size:
+                    continue
+                hyp = alived_hyps.alived_seq[index, :]
+                log_probs = alived_hyps.alived_log_probs[index, :]
+                final_scores = np.copy(scores[index])
+                eos_hyps_and_log_probs_scores[batch_id].append(
+                    (hyp, log_probs, final_scores)
+                )
+
+        return is_eos
 
     def search_step(
         self,
@@ -590,7 +828,9 @@ class S2SBeamSearcher:
         )
 
         # Block the paths that have reached eos.
-        alived_hyps.sequence_scores.masked_fill_(is_eos, float("-inf"))
+        alived_hyps.sequence_scores = np.where(
+            is_eos, float("-inf"), alived_hyps.sequence_scores
+        )
 
         return (
             alived_hyps,
