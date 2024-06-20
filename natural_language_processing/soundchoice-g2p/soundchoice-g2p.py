@@ -14,7 +14,6 @@ sys.path.append("../../util")
 from arg_utils import get_base_parser, update_parser, get_savepath  # noqa
 from model_utils import check_and_download_models  # noqa
 
-import beam_searcher
 from beam_searcher import S2SBeamSearcher
 
 logger = getLogger(__name__)
@@ -28,6 +27,8 @@ WEIGHT_PATH = "soundchoice-g2p_atn.onnx"
 MODEL_PATH = "soundchoice-g2p_atn.onnx.prototxt"
 WEIGHT_EMB_PATH = "soundchoice-g2p_emb.onnx"
 MODEL_EMB_PATH = "soundchoice-g2p_emb.onnx.prototxt"
+WEIGHT_BEAM_PATH = "rnn_beam_searcher.onnx"
+MODEL_BEAM_PATH = "rnn_beam_searcher.onnx.prototxt"
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/soundchoice-g2p/"
 
 
@@ -114,6 +115,16 @@ def clean_pipeline(txt, graphemes):
 lab2ind = {
     # fmt: off
     '<bos>': 0, '<eos>': 1, '<unk>': 2, 'A': 3, 'B': 4, 'C': 5, 'D': 6, 'E': 7, 'F': 8, 'G': 9, 'H': 10, 'I': 11, 'J': 12, 'K': 13, 'L': 14, 'M': 15, 'N': 16, 'O': 17, 'P': 18, 'Q': 19, 'R': 20, 'S': 21, 'T': 22, 'U': 23, 'V': 24, 'W': 25, 'X': 26, 'Y': 27, 'Z': 28, "'": 29, ' ': 30
+    # fmt: on
+}
+
+ind2lab = {
+    # fmt: off
+    0: '<bos>', 1: '<eos>', 2: '<unk>', 3: 'AA', 4: 'AE', 5: 'AH', 6: 'AO', 7: 'AW', 8: 'AY', 9: 'B', 
+    10: 'CH', 11: 'D', 12: 'DH', 13: 'EH', 14: 'ER', 15: 'EY', 16: 'F', 17: 'G', 18: 'HH', 19: 'IH', 
+    20: 'IY', 21: 'JH', 22: 'K', 23: 'L', 24: 'M', 25: 'N', 26: 'NG', 27: 'OW', 28: 'OY', 29: 'P', 
+    30: 'R', 31: 'S', 32: 'SH', 33: 'T', 34: 'TH', 35: 'UH', 36: 'UW', 37: 'V', 38: 'W', 39: 'Y', 
+    40: 'Z', 41: 'ZH', 42: ' '
     # fmt: on
 }
 
@@ -259,12 +270,19 @@ def encode_input(models, input_text):
 
 
 def compute_outputs(net, p_seq, encoder_outputs):
-    print(p_seq)
-    print(p_seq.shape)
-    print(encoder_outputs)
-    print(encoder_outputs.shape)
+    hyps, scores, *_ = S2SBeamSearcher(net, args.onnx).forward(encoder_outputs)
 
-    S2SBeamSearcher(net, args.onnx).forward(encoder_outputs)
+    def decode_ndim(x):
+        try:
+            decoded = []
+            for subtensor in x:
+                decoded.append(decode_ndim(subtensor))
+            return decoded
+        except TypeError:  # Not an iterable, bottom level!
+            return ind2lab[int(x)]
+
+    phonemes = decode_ndim(hyps)
+    return phonemes
 
 
 def predict(models, input_text):
@@ -282,10 +300,10 @@ def predict(models, input_text):
         )
     p_seq, encoder_outputs, _ = output
 
-    net = models["rnn"]
-    compute_outputs(net, p_seq, encoder_outputs)
+    net = models["beam"]
+    phonemes = compute_outputs(net, p_seq, encoder_outputs)
 
-    return
+    return phonemes[0]
 
 
 def recognize_from_text(models):
@@ -300,7 +318,7 @@ def recognize_from_text(models):
         total_time_estimation = 0
         for i in range(args.benchmark_count):
             start = int(round(time.time() * 1000))
-            out = predict(models, input_text)
+            phonemes = predict(models, input_text)
             end = int(round(time.time() * 1000))
             estimation_time = end - start
 
@@ -313,7 +331,7 @@ def recognize_from_text(models):
             f"\taverage time estimation {total_time_estimation / (args.benchmark_count - 1)} ms"
         )
     else:
-        out = predict(models, input_text)
+        phonemes = predict(models, input_text)
 
     logger.info("Script finished successfully.")
 
@@ -329,15 +347,14 @@ def main():
     if not args.onnx:
         net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
         emb = ailia.Net(MODEL_EMB_PATH, WEIGHT_EMB_PATH, env_id=env_id)
+        beam = ailia.Net(MODEL_BEAM_PATH, WEIGHT_BEAM_PATH, env_id=env_id)
     else:
         import onnxruntime
 
         providers = ["CUDAExecutionProvider", "CPUExecutionProvider"]
         net = onnxruntime.InferenceSession(WEIGHT_PATH, providers=providers)
         emb = onnxruntime.InferenceSession(WEIGHT_EMB_PATH, providers=providers)
-        rnn = onnxruntime.InferenceSession(
-            "rnn_beam_searcher.onnx", providers=providers
-        )
+        beam = onnxruntime.InferenceSession(WEIGHT_BEAM_PATH, providers=providers)
 
     tokenizer = AutoTokenizer.from_pretrained("tokenizer")
 
@@ -345,7 +362,7 @@ def main():
         "tokenizer": tokenizer,
         "net": net,
         "emb": emb,
-        "rnn": rnn,
+        "beam": beam,
     }
 
     recognize_from_text(models)

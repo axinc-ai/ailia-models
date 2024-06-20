@@ -692,6 +692,83 @@ class S2SBeamSearcher:
 
         return is_eos
 
+    def _get_topk_prediction(self, eos_hyps_and_log_probs_scores):
+        """This method sorts the scores and return corresponding hypothesis and log probs.
+
+        Arguments
+        ---------
+        eos_hyps_and_log_probs_scores : list
+            Generated hypotheses (the one that haved reached eos) and log probs scores.
+
+        Returns
+        -------
+        topk_hyps : np.ndarray (batch, topk, max length of token_id sequences)
+            This tensor stores the topk predicted hypothesis.
+        topk_lengths : np.ndarray (batch, topk)
+            This tensor contains the final scores of topk hypotheses.
+        topk_scores : np.ndarray (batch, topk)
+            The length of each topk sequence in the batch.
+        topk_log_probs : np.ndarray (batch, topk, max length of token_id sequences)
+            The log probabilities of each hypotheses.
+        """
+        top_hyps, top_log_probs, top_scores, top_lengths = [], [], [], []
+        batch_size = len(eos_hyps_and_log_probs_scores)
+
+        # Collect hypotheses
+        for i in range(len(eos_hyps_and_log_probs_scores)):
+            hyps, log_probs, scores = zip(*eos_hyps_and_log_probs_scores[i])
+            top_hyps += hyps
+            top_scores += scores
+            top_log_probs += log_probs
+            top_lengths += [len(hyp) for hyp in hyps]
+
+        # Convert lists to tensors
+        max_length = max(top_lengths)
+        top_hyps = np.stack(
+            [
+                np.pad(
+                    top_hyps[i],
+                    (0, max_length - len(top_hyps[i])),
+                    mode="constant",
+                    constant_values=0,
+                )
+                for i in range(len(top_lengths))
+            ]
+        )
+        top_log_probs = np.stack(
+            [
+                np.pad(
+                    top_log_probs[i],
+                    (0, max_length - len(top_log_probs[i])),
+                    mode="constant",
+                    constant_values=0,
+                )
+                for i in range(len(top_lengths))
+            ]
+        )
+        top_lengths = np.array(top_lengths)
+        top_scores = np.array(top_scores).reshape(batch_size, -1)
+
+        # Use SpeechBrain style lengths
+        top_lengths = np.abs(top_lengths - 1) / top_hyps.shape[1]
+
+        # Get topk indices
+        top_k = 1
+        indices = np.argsort(-top_scores, axis=-1)[:, :top_k]
+        topk_scores = np.take(top_scores, indices)
+        indices = (indices + np.expand_dims(self.beam_offset, axis=1)).reshape(
+            batch_size * top_k
+        )
+        # Select topk hypotheses
+        topk_hyps = top_hyps[indices, ...]
+        topk_hyps = topk_hyps.reshape(batch_size, top_k, -1)
+        topk_lengths = top_lengths[indices, ...]
+        topk_lengths = topk_lengths.reshape(batch_size, top_k)
+        topk_log_probs = top_log_probs[indices, ...]
+        topk_log_probs = topk_log_probs.reshape(batch_size, top_k, -1)
+
+        return topk_hyps, topk_lengths, topk_scores, topk_log_probs
+
     def search_step(
         self,
         alived_hyps,
@@ -838,6 +915,46 @@ class S2SBeamSearcher:
             scores,
         )
 
+    def _fill_alived_hyps_with_eos_token(
+        self,
+        alived_hyps,
+        eos_hyps_and_log_probs_scores,
+        scores,
+    ):
+        """Fill the alived_hyps that have not reached eos with eos.
+
+        Arguments
+        ---------
+        alived_hyps : AlivedHypotheses
+            The alived hypotheses.
+        eos_hyps_and_log_probs_scores : list
+            Generated hypotheses (the one that haved reached eos) and log probs scores.
+        scores : np.ndarray
+            The scores of the current step output.
+
+        Returns
+        -------
+        eos_hyps_and_log_probs_scores : list
+            Generated hypotheses (the one that haved reached eos) and log probs scores.
+        """
+
+        # _check_full_beams
+        hyps_len = [len(lst) for lst in eos_hyps_and_log_probs_scores]
+        beams_size = [self.beam_size for _ in range(len(hyps_len))]
+        flg_full_beams = hyps_len == beams_size
+
+        if not flg_full_beams:
+            # Using all eos to fill-up the hyps.
+            inp_tokens = np.ones(self.n_bh, dtype=np.int32) * eos_index
+            self._update_hyps_and_scores_if_eos_token(
+                inp_tokens,
+                alived_hyps,
+                eos_hyps_and_log_probs_scores,
+                scores,
+            )
+
+        return eos_hyps_and_log_probs_scores
+
     def forward(self, enc_states):
         (
             alived_hyps,
@@ -881,3 +998,34 @@ class S2SBeamSearcher:
                 enc_lens,
                 step,
             )
+
+        finals_hyps_and_log_probs_scores = self._fill_alived_hyps_with_eos_token(
+            alived_hyps,
+            eos_hyps_and_log_probs_scores,
+            scores,
+        )
+
+        (
+            topk_hyps,
+            topk_lengths,
+            topk_scores,
+            topk_log_probs,
+        ) = self._get_topk_prediction(finals_hyps_and_log_probs_scores)
+
+        # select the best hyps
+        best_hyps = topk_hyps[:, 0, :]
+        best_lens = topk_lengths[:, 0]
+        best_scores = topk_scores[:, 0]
+        best_log_probs = topk_log_probs[:, 0, :]
+
+        # Convert best hypothesis to list
+        batch = best_hyps
+        lengths = best_lens
+        batch_max_len = batch.shape[1]
+        hyps = []
+        for seq, seq_length in zip(batch, lengths):
+            actual_size = int(np.round(seq_length * batch_max_len))
+            seq_true = seq[:actual_size, ...]
+            hyps.append(seq_true.tolist())
+
+        return hyps, best_lens, best_scores, best_log_probs
