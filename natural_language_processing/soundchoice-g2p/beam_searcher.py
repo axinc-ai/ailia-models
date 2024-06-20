@@ -319,11 +319,6 @@ class S2SBeamSearcher:
     ):
         """This method computes a forward_step."""
         hs, c = memory
-        hs = np.zeros((4, 16, 512))
-        hs = hs.astype(np.float32)
-        c = c.astype(np.float32)
-        # inp_tokens = inp_tokens.astype(np.int32)
-        enc_lens = enc_lens.astype(np.int32)
         if not self.onnx:
             output = self.net.predict([inp_tokens, hs, c, enc_states, enc_lens])
         else:
@@ -397,10 +392,9 @@ class S2SBeamSearcher:
             scorer_memory : No limit
                 The memory variables generated in this step.
         """
-        hs = None
-        # self.dec.attn.reset()
         attn_dim = 256
-        c = np.zeros((self.n_bh, attn_dim))
+        hs = np.zeros((4, 16, 512), dtype=np.float32)
+        c = np.zeros((self.n_bh, attn_dim), dtype=np.float32)
         memory = hs, c
 
         reset_scorer_mem(enc_states, enc_lens)
@@ -604,13 +598,13 @@ class S2SBeamSearcher:
         self.batch_size = enc_states.shape[0]
         self.n_bh = self.batch_size * self.beam_size
 
-        self.n_out = out_features = 43
+        self.n_out = 43
 
         memory, scorer_memory = self._update_reset_memory(enc_states, enc_lens)
 
         # Inflate the enc_states and enc_len by beam_size times
         enc_states = np.tile(enc_states, [self.beam_size, 1, 1])
-        enc_lens = np.tile(enc_lens, [self.beam_size])
+        enc_lens = np.tile(enc_lens, [self.beam_size]).astype(np.int32)
 
         # Using bos as the first input
         inp_tokens = np.ones((self.n_bh,), dtype=int) * bos_index
