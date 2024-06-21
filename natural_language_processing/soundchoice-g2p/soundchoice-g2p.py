@@ -11,7 +11,7 @@ import ailia
 
 # import original modules
 sys.path.append("../../util")
-from arg_utils import get_base_parser, update_parser, get_savepath  # noqa
+from arg_utils import get_base_parser, update_parser  # noqa
 from model_utils import check_and_download_models  # noqa
 
 from beam_searcher import S2SBeamSearcher
@@ -31,12 +31,28 @@ WEIGHT_BEAM_PATH = "rnn_beam_searcher.onnx"
 MODEL_BEAM_PATH = "rnn_beam_searcher.onnx.prototxt"
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/soundchoice-g2p/"
 
+lab2ind = {
+    # fmt: off
+    '<bos>': 0, '<eos>': 1, '<unk>': 2, 'A': 3, 'B': 4, 'C': 5, 'D': 6, 'E': 7, 'F': 8, 'G': 9, 'H': 10, 'I': 11, 'J': 12, 'K': 13, 'L': 14, 'M': 15, 'N': 16, 'O': 17, 'P': 18, 'Q': 19, 'R': 20, 'S': 21, 'T': 22, 'U': 23, 'V': 24, 'W': 25, 'X': 26, 'Y': 27, 'Z': 28, "'": 29, ' ': 30
+    # fmt: on
+}
+
+ind2lab = {
+    # fmt: off
+    0: '<bos>', 1: '<eos>', 2: '<unk>', 3: 'AA', 4: 'AE', 5: 'AH', 6: 'AO', 7: 'AW', 8: 'AY', 9: 'B', 
+    10: 'CH', 11: 'D', 12: 'DH', 13: 'EH', 14: 'ER', 15: 'EY', 16: 'F', 17: 'G', 18: 'HH', 19: 'IH', 
+    20: 'IY', 21: 'JH', 22: 'K', 23: 'L', 24: 'M', 25: 'N', 26: 'NG', 27: 'OW', 28: 'OY', 29: 'P', 
+    30: 'R', 31: 'S', 32: 'SH', 33: 'T', 34: 'TH', 35: 'UH', 36: 'UW', 37: 'V', 38: 'W', 39: 'Y', 
+    40: 'Z', 41: 'ZH', 42: ' '
+    # fmt: on
+}
+
 
 # ======================
 # Arguemnt Parser Config
 # ======================
 
-parser = get_base_parser("SoundChoice", None, None)
+parser = get_base_parser("SoundChoice: Grapheme-to-Phoneme", None, None)
 parser.add_argument(
     "-i",
     "--input",
@@ -101,7 +117,7 @@ def clean_pipeline(txt, graphemes):
 
     Returns
     -------
-    item: DynamicItem
+    str:
         A wrapped transformation function
     """
     RE_MULTI_SPACE = re.compile(r"\s{2,}")
@@ -110,23 +126,6 @@ def clean_pipeline(txt, graphemes):
     result = "".join(char for char in result if char in graphemes)
     result = RE_MULTI_SPACE.sub(" ", result)
     return result
-
-
-lab2ind = {
-    # fmt: off
-    '<bos>': 0, '<eos>': 1, '<unk>': 2, 'A': 3, 'B': 4, 'C': 5, 'D': 6, 'E': 7, 'F': 8, 'G': 9, 'H': 10, 'I': 11, 'J': 12, 'K': 13, 'L': 14, 'M': 15, 'N': 16, 'O': 17, 'P': 18, 'Q': 19, 'R': 20, 'S': 21, 'T': 22, 'U': 23, 'V': 24, 'W': 25, 'X': 26, 'Y': 27, 'Z': 28, "'": 29, ' ': 30
-    # fmt: on
-}
-
-ind2lab = {
-    # fmt: off
-    0: '<bos>', 1: '<eos>', 2: '<unk>', 3: 'AA', 4: 'AE', 5: 'AH', 6: 'AO', 7: 'AW', 8: 'AY', 9: 'B', 
-    10: 'CH', 11: 'D', 12: 'DH', 13: 'EH', 14: 'ER', 15: 'EY', 16: 'F', 17: 'G', 18: 'HH', 19: 'IH', 
-    20: 'IY', 21: 'JH', 22: 'K', 23: 'L', 24: 'M', 25: 'N', 26: 'NG', 27: 'OW', 28: 'OY', 29: 'P', 
-    30: 'R', 31: 'S', 32: 'SH', 33: 'T', 34: 'TH', 35: 'UH', 36: 'UW', 37: 'V', 38: 'W', 39: 'Y', 
-    40: 'Z', 41: 'ZH', 42: ' '
-    # fmt: on
-}
 
 
 def grapheme_pipeline(char, uppercase=True):
@@ -333,6 +332,8 @@ def recognize_from_text(models):
     else:
         phonemes = predict(models, input_text)
 
+    print("-".join(phonemes))
+
     logger.info("Script finished successfully.")
 
 
@@ -340,6 +341,7 @@ def main():
     # model files check and download
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
     check_and_download_models(WEIGHT_EMB_PATH, MODEL_EMB_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_BEAM_PATH, MODEL_BEAM_PATH, REMOTE_PATH)
 
     env_id = args.env_id
 

@@ -6,7 +6,6 @@ blank_index = 2
 bos_index = 0
 eos_index = 1
 vocab_size = 43
-max_enc_len = 40
 minus_inf = -1e20
 
 
@@ -93,7 +92,7 @@ def ctc_score(inp_tokens, states, attn=None):
     num_candidates = vocab_size
     if states is None:
         # r_prev: (L, 2, batch_size * beam_size)
-        r_prev = np.ones((max_enc_len, 2, batch_size, beam_size)) * minus_inf
+        r_prev = np.ones((ctc_score.max_enc_len, 2, batch_size, beam_size)) * minus_inf
 
         # Accumulate blank posteriors at each step
         r_prev[:, 1] = np.expand_dims(
@@ -113,7 +112,7 @@ def ctc_score(inp_tokens, states, attn=None):
     ).reshape(2, -1, n_bh, num_candidates)
 
     # Prepare forward probs
-    r = np.ones((max_enc_len, 2, n_bh, num_candidates)) * minus_inf
+    r = np.ones((ctc_score.max_enc_len, 2, n_bh, num_candidates)) * minus_inf
 
     # (Alg.2-6)
     if ctc_score.prefix_length == 0:
@@ -129,7 +128,7 @@ def ctc_score(inp_tokens, states, attn=None):
     # Start, end frames for scoring (|g| < |h|).
     # Scoring based on attn peak if ctc_window_size > 0
     start = max(1, ctc_score.prefix_length)
-    end = max_enc_len
+    end = ctc_score.max_enc_len
 
     # Compute forward prob log(r_t^nb(h)) and log(r_t^b(h)):
     for t in range(start, end):
@@ -163,6 +162,7 @@ def ctc_score(inp_tokens, states, attn=None):
     return psi - psi_prev, (r, psi, scoring_table)
 
 
+ctc_score.max_enc_len = None
 ctc_score.last_frame_index = None
 ctc_score.prefix_length = -1
 ctc_score.x = None
@@ -173,8 +173,7 @@ def reset_scorer_mem(x, enc_lens):
     ctc_weight = np.load("ctc_fc_weight.npy")
     ctc_bias = np.load("ctc_fc_bias.npy")
 
-    ctc_score.last_frame_index = np.array([enc_lens]) - 1
-
+    # ctc_fc
     logits = x @ ctc_weight.T + ctc_bias
 
     shape = logits.shape
@@ -182,6 +181,13 @@ def reset_scorer_mem(x, enc_lens):
     x_act = log_softmax(x, axis=-1)
     x_act = x_act.reshape(shape[0], shape[1], shape[2])
     x = x_act
+
+    """
+    CTCPrefixScore
+    """
+
+    ctc_score.max_enc_len = x.shape[1]
+    ctc_score.last_frame_index = np.array([enc_lens]) - 1
 
     # length_to_mask
     mask = np.expand_dims(np.arange(enc_lens), axis=0) < enc_lens
