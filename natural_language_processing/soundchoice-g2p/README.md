@@ -51,6 +51,6 @@ ONNX opset=17
 
 ## Netron
 
-[soundchoice-g2p_atn.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/soundchoice-g2p/soundchoice-g2p_atn.onnx.prototxt)
-[soundchoice-g2p_emb.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/soundchoice-g2p/soundchoice-g2p_emb.onnx.prototxt)
+[soundchoice-g2p_atn.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/soundchoice-g2p/soundchoice-g2p_atn.onnx.prototxt)  
+[soundchoice-g2p_emb.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/soundchoice-g2p/soundchoice-g2p_emb.onnx.prototxt)  
 [rnn_beam_searcher.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/soundchoice-g2p/rnn_beam_searcher.onnx.prototxt)
