@@ -164,7 +164,7 @@ def ctc_score(inp_tokens, states, attn=None):
 
 ctc_score.max_enc_len = None
 ctc_score.last_frame_index = None
-ctc_score.prefix_length = -1
+ctc_score.prefix_length = None
 ctc_score.x = None
 ctc_score.batch_index = None
 
@@ -188,6 +188,7 @@ def reset_scorer_mem(x, enc_lens):
 
     ctc_score.max_enc_len = x.shape[1]
     ctc_score.last_frame_index = np.array([enc_lens]) - 1
+    ctc_score.prefix_length = -1
 
     # length_to_mask
     mask = np.expand_dims(np.arange(enc_lens), axis=0) < enc_lens
