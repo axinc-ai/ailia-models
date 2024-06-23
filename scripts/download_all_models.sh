@@ -219,6 +219,7 @@ cd ../../natural_language_processing/t5_whisper_medical; python3 t5_whisper_medi
 cd ../../natural_language_processing/t5_base_japanese_summarization; python3 t5_base_japanese_summarization.py ${OPTION}
 cd ../../natural_language_processing/glucose; python3 glucose.py ${OPTION}
 cd ../../natural_language_processing/cross_encoder_mmarco; python3 cross_encoder_mmarco.py ${OPTION}
+cd ../../natural_language_processing/soundchoise-g2p; python3 soundchoise-g2p.py ${OPTION}
 cd ../../network_intrusion_detection/bert-network-packet-flow-header-payload; python3 bert-network-packet-flow-header-payload.py ${OPTION}
 cd ../../network_intrusion_detection/falcon-adapter-network-packet; python3 falcon-adapter-network-packet.py ${OPTION}
 cd ../../neural_rendering/nerf; python3 nerf.py ${OPTION}
