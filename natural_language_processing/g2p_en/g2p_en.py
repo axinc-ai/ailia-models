@@ -45,7 +45,7 @@ REMOTE_PATH = "https://storage.googleapis.com/ailia-models/g2p_en/"
 # Arguemnt Parser Config
 # ======================
 
-parser = get_base_parser("SoundChoice: Grapheme-to-Phoneme", None, None)
+parser = get_base_parser("g2p_en: Grapheme-to-Phoneme", None, None)
 parser.add_argument(
     "-i",
     "--input",
