@@ -32,7 +32,18 @@ def construct_homograph_dictionary():
         homograph2features[headword.lower()] = (pron1.split(), pron2.split(), pos1)
     return homograph2features
 
-
+def construct_cmu_dictionary():
+    f = os.path.join(dirname,'cmudict')
+    cmudict = dict()
+    for line in codecs.open(f, 'r', 'utf8').read().splitlines():
+        if line.startswith("#"): continue # comment
+        lists = line.strip().split(" ")
+        headword = lists[0]
+        pron = lists[2:]
+        key = headword.lower()
+        if not (key in cmudict):
+            cmudict[key] = pron
+    return cmudict
 
 class G2p(object):
     def __init__(self):
@@ -56,6 +67,7 @@ class G2p(object):
 
         self.cmu = cmudict.dict()
         self.homograph2features = construct_homograph_dictionary()
+        self.cmudict = construct_cmu_dictionary()
 
     def tokenize(self, word):
         chars = list(word) + ["</s>"]
@@ -98,6 +110,16 @@ class G2p(object):
         words = word_tokenize(text)
         tokens = pos_tag(words)  # tuples of (word, tag)
 
+        #print(words)
+        #print(tokens)
+
+        text2 = text
+        text2 = text2.replace(".", " . ") # 句読点を単独トークンにする
+        text2 = text2.replace(",", " , ")
+        words2 = text2.split()
+        #print(words2)
+
+
         # steps
         prons = []
         for word, pos in tokens:
@@ -111,7 +133,13 @@ class G2p(object):
                 else:
                     pron = pron2
             elif word in self.cmu:  # lookup CMU dict
-                pron = self.cmu[word][0]
+                if (self.cmu[word][0] != self.cmudict[word]):
+                    print(word)
+                    print(self.cmu[word][0])
+                    print(self.cmudict[word])
+                    exit()
+                pron = self.cmu[word][0] # original
+                #pron = self.cmudict[word] # ax impl
             else: # predict for oov
                 pron = self.predict(word)
 
@@ -134,5 +162,7 @@ if __name__ == '__main__':
         out = g2p(text)
         if out != reference:
             print("Error")
+            print(out)
+            print(reference)
             exit()
     print("Success")
