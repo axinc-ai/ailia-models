@@ -54,6 +54,7 @@ parser.add_argument(
     help="Input text.",
 )
 parser.add_argument("--verify", action="store_true", help="verify mode.")
+parser.add_argument("--onnx", action="store_true", help="use onnx runtime.")
 args = update_parser(parser, check_input_type=False)
 
 
@@ -113,13 +114,30 @@ class G2p(object):
     def predict(self, word, encoder, decoder):
         x = self.tokenize(word)
 
-        h = encoder.run([x])[0]
+        if args.onnx:
+            h = encoder.run(
+                None,
+                {
+                    'x': x
+                },
+            )[0]
+        else:
+            h = encoder.run([x])[0]
 
         preds = []
         pred = 2    # initial symbol
         for i in range(20):
             pred = np.array([pred])
-            logits, h = decoder.run([pred, h])
+            if args.onnx:
+                logits, h = decoder.run(
+                    None,
+                    {
+                        'pred': pred,
+                        'h_in': h,
+                    },
+                )
+            else:
+                logits, h = decoder.run([pred, h])
             pred = np.argmax(logits)
             if pred == 3: break  # 3: </s>
             preds.append(pred)
@@ -153,6 +171,9 @@ class G2p(object):
         # steps
         prons = []
         for word, pos in tokens:
+            if args.verify:
+                pron = self.predict(word, encoder, decoder)
+            
             if re.search("[a-z]", word) is None:
                 pron = [word]
 
@@ -230,8 +251,14 @@ def main():
     env_id = args.env_id
 
     # initialize
-    encoder = ailia.Net(ENCODER_MODEL_PATH, ENCODER_WEIGHT_PATH, env_id=env_id)
-    decoder = ailia.Net(DECODER_MODEL_PATH, DECODER_WEIGHT_PATH, env_id=env_id)
+    if args.onnx:
+        import onnxruntime
+        providers = ['CPUExecutionProvider']
+        encoder = onnxruntime.InferenceSession(ENCODER_WEIGHT_PATH, providers=providers)
+        decoder = onnxruntime.InferenceSession(DECODER_WEIGHT_PATH, providers=providers)
+    else:
+        encoder = ailia.Net(ENCODER_MODEL_PATH, ENCODER_WEIGHT_PATH, env_id=env_id)
+        decoder = ailia.Net(DECODER_MODEL_PATH, DECODER_WEIGHT_PATH, env_id=env_id)
 
     if args.verify:
         verify(encoder, decoder)
