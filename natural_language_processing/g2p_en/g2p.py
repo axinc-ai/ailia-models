@@ -1,8 +1,8 @@
-from nltk import pos_tag
-from nltk.corpus import cmudict
-import nltk
-from nltk.tokenize import TweetTokenizer
-word_tokenize = TweetTokenizer().tokenize
+#from nltk import pos_tag
+#from nltk.corpus import cmudict
+#import nltk
+#from nltk.tokenize import TweetTokenizer
+#word_tokenize = TweetTokenizer().tokenize
 import codecs
 import re
 import os
@@ -11,15 +11,16 @@ from builtins import str as unicode
 from expand import normalize_numbers
 import numpy as np
 import ailia
+from averaged_perceptron import tag
 
-try:
-    nltk.data.find('taggers/averaged_perceptron_tagger.zip')
-except LookupError:
-    nltk.download('averaged_perceptron_tagger')
-try:
-    nltk.data.find('corpora/cmudict.zip')
-except LookupError:
-    nltk.download('cmudict')
+#try:
+#    nltk.data.find('taggers/averaged_perceptron_tagger.zip')
+#except LookupError:
+#    nltk.download('averaged_perceptron_tagger')
+#try:
+#    nltk.data.find('corpora/cmudict.zip')
+#except LookupError:
+#    nltk.download('cmudict')
 
 dirname = os.path.dirname(__file__)
 
@@ -65,7 +66,7 @@ class G2p(object):
         self.p2idx = {p: idx for idx, p in enumerate(self.phonemes)}
         self.idx2p = {idx: p for idx, p in enumerate(self.phonemes)}
 
-        self.cmu = cmudict.dict()
+        #self.cmu = cmudict.dict()
         self.homograph2features = construct_homograph_dictionary()
         self.cmudict = construct_cmu_dictionary()
 
@@ -107,8 +108,8 @@ class G2p(object):
         text = text.replace("e.g.", "for example")
 
         # tokenization
-        words = word_tokenize(text)
-        tokens = pos_tag(words)  # tuples of (word, tag)
+        #words = word_tokenize(text)
+        #print(words)
 
         #print(words)
         #print(tokens)
@@ -116,9 +117,11 @@ class G2p(object):
         text2 = text
         text2 = text2.replace(".", " . ") # 句読点を単独トークンにする
         text2 = text2.replace(",", " , ")
-        words2 = text2.split()
+        words = text2.split()
         #print(words2)
 
+        #tokens = pos_tag(words)  # tuples of (word, tag)
+        tokens = tag(words)
 
         # steps
         prons = []
@@ -132,14 +135,14 @@ class G2p(object):
                     pron = pron1
                 else:
                     pron = pron2
-            elif word in self.cmu:  # lookup CMU dict
-                if (self.cmu[word][0] != self.cmudict[word]):
-                    print(word)
-                    print(self.cmu[word][0])
-                    print(self.cmudict[word])
-                    exit()
-                pron = self.cmu[word][0] # original
-                #pron = self.cmudict[word] # ax impl
+            elif word in self.cmudict:  # lookup CMU dict
+                #if (self.cmu[word][0] != self.cmudict[word]):
+                #    print(word)
+                #    print(self.cmu[word][0])
+                #    print(self.cmudict[word])
+                #    exit()
+                #pron = self.cmu[word][0] # original
+                pron = self.cmudict[word] # ax impl
             else: # predict for oov
                 pron = self.predict(word)
 
