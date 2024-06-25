@@ -1,8 +1,10 @@
-#from nltk import pos_tag
-#from nltk.corpus import cmudict
-#import nltk
-#from nltk.tokenize import TweetTokenizer
-#word_tokenize = TweetTokenizer().tokenize
+import sys
+import time
+import re
+from logging import getLogger
+
+import numpy as np
+
 import codecs
 import re
 import os
@@ -13,14 +15,51 @@ import numpy as np
 import ailia
 from averaged_perceptron import tag
 
-#try:
-#    nltk.data.find('taggers/averaged_perceptron_tagger.zip')
-#except LookupError:
-#    nltk.download('averaged_perceptron_tagger')
-#try:
-#    nltk.data.find('corpora/cmudict.zip')
-#except LookupError:
-#    nltk.download('cmudict')
+import ailia
+
+# import original modules
+sys.path.append("../../util")
+from arg_utils import get_base_parser, update_parser  # noqa
+from model_utils import check_and_download_models, check_and_download_file  # noqa
+
+logger = getLogger(__name__)
+
+
+# ======================
+# Parameters
+# ======================
+
+ENCODER_WEIGHT_PATH = "g2p_encoder.onnx"
+ENCODER_MODEL_PATH = "g2p_encoder.onnx.prototxt"
+DECODER_WEIGHT_PATH = "g2p_decoder.onnx"
+DECODER_MODEL_PATH = "g2p_decoder.onnx.prototxt"
+
+CMUDICT_PATH = "cmudict"
+HOMOGRAPHS_PATH = "homographs.en"
+TAGGER_PATH = "averaged_perceptron_tagger.pickle"
+
+REMOTE_PATH = "https://storage.googleapis.com/ailia-models/g2p_en/"
+
+
+# ======================
+# Arguemnt Parser Config
+# ======================
+
+parser = get_base_parser("SoundChoice: Grapheme-to-Phoneme", None, None)
+parser.add_argument(
+    "-i",
+    "--input",
+    type=str,
+    default="I'm an activationist.",
+    help="Input text.",
+)
+parser.add_argument("--verify", action="store_true", help="verify mode.")
+args = update_parser(parser, check_input_type=False)
+
+
+# ======================
+# Dictionary
+# ======================
 
 dirname = os.path.dirname(__file__)
 
@@ -61,12 +100,8 @@ class G2p(object):
                                                              'UH0', 'UH1', 'UH2', 'UW',
                                                              'UW0', 'UW1', 'UW2', 'V', 'W', 'Y', 'Z', 'ZH']
         self.g2idx = {g: idx for idx, g in enumerate(self.graphemes)}
-        self.idx2g = {idx: g for idx, g in enumerate(self.graphemes)}
-
-        self.p2idx = {p: idx for idx, p in enumerate(self.phonemes)}
         self.idx2p = {idx: p for idx, p in enumerate(self.phonemes)}
 
-        #self.cmu = cmudict.dict()
         self.homograph2features = construct_homograph_dictionary()
         self.cmudict = construct_cmu_dictionary()
 
@@ -75,10 +110,7 @@ class G2p(object):
         x = [self.g2idx.get(char, self.g2idx["<unk>"]) for char in chars]
         return np.array(x)
 
-    def predict(self, word):
-        encoder = ailia.Net(weight="g2p_encoder.onnx")
-        decoder = ailia.Net(weight="g2p_decoder.onnx")
-
+    def predict(self, word, encoder, decoder):
         x = self.tokenize(word)
 
         h = encoder.run([x])[0]
@@ -95,8 +127,7 @@ class G2p(object):
         preds = [self.idx2p.get(idx, "<unk>") for idx in preds]
         return preds
 
-    def __call__(self, text):
-
+    def __call__(self, text, encoder, decoder):
         # preprocessing
         text = unicode(text)
         text = normalize_numbers(text)
@@ -107,20 +138,16 @@ class G2p(object):
         text = text.replace("i.e.", "that is")
         text = text.replace("e.g.", "for example")
 
-        # tokenization
-        #words = word_tokenize(text)
-        #print(words)
-
-        #print(words)
-        #print(tokens)
-
+        # word tokenize
+        print(text)
         text2 = text
         text2 = text2.replace(".", " . ") # 句読点を単独トークンにする
         text2 = text2.replace(",", " , ")
+        text2 = text2.replace("!", " ! ")
+        text2 = text2.replace("?", " ? ")
         words = text2.split()
-        #print(words2)
 
-        #tokens = pos_tag(words)  # tuples of (word, tag)
+        # classify 
         tokens = tag(words)
 
         # steps
@@ -136,22 +163,43 @@ class G2p(object):
                 else:
                     pron = pron2
             elif word in self.cmudict:  # lookup CMU dict
-                #if (self.cmu[word][0] != self.cmudict[word]):
-                #    print(word)
-                #    print(self.cmu[word][0])
-                #    print(self.cmudict[word])
-                #    exit()
-                #pron = self.cmu[word][0] # original
-                pron = self.cmudict[word] # ax impl
+                pron = self.cmudict[word]
             else: # predict for oov
-                pron = self.predict(word)
+                if args.benchmark:
+                    logger.info("BENCHMARK mode")
+                    total_time_estimation = 0
+                    for i in range(args.benchmark_count):
+                        start = int(round(time.time() * 1000))
+                        pron = self.predict(word, encoder, decoder)
+                        end = int(round(time.time() * 1000))
+                        estimation_time = end - start
+
+                        # Logging
+                        logger.info(f"\tailia processing estimation time {estimation_time} ms")
+                        if i != 0:
+                            total_time_estimation = total_time_estimation + estimation_time
+
+                    logger.info(
+                        f"\taverage time estimation {total_time_estimation / (args.benchmark_count - 1)} ms"
+                    )
+                else:
+                    pron = self.predict(word, encoder, decoder)
 
             prons.extend(pron)
             prons.extend([" "])
 
         return prons[:-1]
 
-if __name__ == '__main__':
+def recognize_from_text(encoder, decoder):
+    g2p = G2p()
+    out = g2p(args.input, encoder, decoder)
+
+    logger.info("Input : " + str(args.input))
+    logger.info("Output : " + str(out))
+    logger.info("Script finished successfully.")
+
+
+def verify(encoder, decoder):
     texts = ["I have $250 in my pocket.", # number -> spell-out
              "popular pets, e.g. cats and dogs", # e.g. -> for example
              "I refuse to collect the refuse around here.", # homograph
@@ -162,10 +210,34 @@ if __name__ == '__main__':
 ['AY1', 'M', ' ', 'AE1', 'N', ' ', 'AE2', 'K', 'T', 'IH0', 'V', 'EY1', 'SH', 'AH0', 'N', 'IH0', 'S', 'T', ' ', '.']]
     g2p = G2p()
     for text,reference in zip(texts, references):
-        out = g2p(text)
+        out = g2p(text, encoder, decoder)
         if out != reference:
-            print("Error")
+            print("Verify Error")
             print(out)
             print(reference)
             exit()
-    print("Success")
+    print("Verify Success")
+
+
+def main():
+    # model files check and download
+    check_and_download_models(ENCODER_WEIGHT_PATH, ENCODER_MODEL_PATH, REMOTE_PATH)
+    check_and_download_models(DECODER_WEIGHT_PATH, DECODER_MODEL_PATH, REMOTE_PATH)
+    check_and_download_file(CMUDICT_PATH, REMOTE_PATH)
+    check_and_download_file(HOMOGRAPHS_PATH, REMOTE_PATH)
+    check_and_download_file(TAGGER_PATH, REMOTE_PATH)
+
+    env_id = args.env_id
+
+    # initialize
+    encoder = ailia.Net(ENCODER_MODEL_PATH, ENCODER_WEIGHT_PATH, env_id=env_id)
+    decoder = ailia.Net(DECODER_MODEL_PATH, DECODER_WEIGHT_PATH, env_id=env_id)
+
+    if args.verify:
+        verify(encoder, decoder)
+    else:
+        recognize_from_text(encoder, decoder)
+
+
+if __name__ == "__main__":
+    main()
