@@ -57,7 +57,7 @@ parser.add_argument(
     "-i",
     "--input",
     type=str,
-    default="To be or not to be, that is the question",
+    default="To be or not to be, that is the questionary",
     help="Input text.",
 )
 parser.add_argument("--onnx", action="store_true", help="execute onnxruntime version.")
@@ -90,16 +90,34 @@ def expand_to_chars(emb, seq, seq_len, word_separator):
     char_word_emb: torch.Tensor
         a combined character + word embedding tensor
     """
+    print("seq", seq)
+    print("emb.shape", emb.shape)
+
     word_boundaries = seq == word_separator
     words = np.cumsum(word_boundaries, axis=-1)
 
+    print("word_boundaries", word_boundaries)
+    print("words.shape", words.shape)
+    print("words", words)
+
     char_word_emb = np.zeros((emb.shape[0], seq.shape[-1], emb.shape[-1]))
+
+    print("char_word_emb.shape", char_word_emb.shape)
+
     seq_len_idx = (seq_len * seq.shape[-1]).astype(int)
+    print("seq_len", seq_len)
+    print("seq.shape[-1]", seq.shape[-1])
+    print("seq_len_idx", seq_len_idx)
     for idx, (item, item_length) in enumerate(zip(words, seq_len_idx)):
+        print("idx", idx)
+        print("item", item)
+        print("item_length", item_length)
+        print("word_boundaries[idx]", word_boundaries[idx])
         char_word_emb[idx] = emb[idx, item]
         char_word_emb[idx, item_length:, :] = 0
         char_word_emb[idx, word_boundaries[idx], :] = 0
 
+    print("char_word_emb", char_word_emb)
     return char_word_emb
 
 
@@ -193,6 +211,8 @@ def word_emb_pipeline(
     raw_word_emb = embeddings(models, txt)
     word_separator_idx = lab2ind[" "]
 
+    print("raw_word_emb", raw_word_emb)
+
     char_word_emb = expand_to_chars(
         emb=raw_word_emb[None, ...],
         seq=grapheme_encoded[None, ...],
@@ -200,6 +220,8 @@ def word_emb_pipeline(
         word_separator=word_separator_idx,
     )
     char_word_emb = np.squeeze(char_word_emb)
+
+    print("char_word_emb", char_word_emb)
 
     return char_word_emb
 
@@ -216,6 +238,10 @@ def embeddings(models, sentence):
     attention_mask = encoded["attention_mask"]
     token_type_ids = encoded["token_type_ids"]
 
+    print("input_ids", input_ids)
+    print("attention_mask", attention_mask)
+    print("token_type_ids", token_type_ids)
+
     # feedforward
     net = models["emb"]
     if not args.onnx:
@@ -230,10 +256,25 @@ def embeddings(models, sentence):
             },
         )
     hidden_states = output[0]
+    print("hidden_states", hidden_states)
+    print("hidden_states", hidden_states.shape)
 
     token_ids_word = np.array(
         [idx for idx, word_id in enumerate(encoded.word_ids()) if word_id is not None],
     )
+
+    max_word_id = 0
+    for idx in range(0, len(encoded.word_ids())):
+        if encoded.word_ids()[idx] == None:
+            continue
+        max_word_id = encoded.word_ids()[idx]
+    token_ids_word = []
+    for idx in range(0, max_word_id + 1):
+        token_ids_word.append(np.where(np.array(encoded.word_ids()) == idx)[0][0])
+    token_ids_word = np.array(token_ids_word)
+
+    print("word_ids", encoded.word_ids())
+    print("token_ids_word", token_ids_word)
 
     # get_hidden_states
     layers = [-4, -3, -2, -1]
@@ -241,11 +282,15 @@ def embeddings(models, sentence):
     output = np.squeeze(output)
     output = output[token_ids_word]
 
+    print("output.shape", output.shape)
+
     return output
 
 
 def encode_input(models, input_text):
     intermediate = {}
+
+    print("input_text", input_text)
 
     graphemes = [
         # fmt: off
@@ -255,12 +300,16 @@ def encode_input(models, input_text):
     partial_clean_pipeline = partial(clean_pipeline, graphemes=graphemes)
     txt_cleaned = partial_clean_pipeline(input_text)
 
+    print("txt_cleaned", txt_cleaned)
+
     grapheme_list, grapheme_encoded_list, grapheme_encoded, grapheme_len = (
         grapheme_pipeline(txt_cleaned)
     )
     intermediate["grapheme_list"] = grapheme_list
     intermediate["grapheme_encoded_list"] = grapheme_encoded_list
     intermediate["grapheme_encoded"] = grapheme_encoded
+
+    print("grapheme_encoded", grapheme_encoded)
 
     word_emb = word_emb_pipeline(models, input_text, grapheme_encoded, grapheme_len)
     intermediate["word_emb"] = word_emb
@@ -298,6 +347,11 @@ def predict(models, input_text):
             None, {"grapheme_encoded": grapheme_encoded, "word_emb": word_emb}
         )
     p_seq, encoder_outputs, _ = output
+
+    print("p_seq.shape", p_seq.shape)
+    print("p_seq", p_seq)
+    print("encoder_outputs.shape", encoder_outputs.shape)
+    print("encoder_outputs", encoder_outputs)
 
     net = models["beam"]
     phonemes = compute_outputs(net, p_seq, encoder_outputs)
