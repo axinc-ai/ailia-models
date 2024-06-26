@@ -57,7 +57,7 @@ def import_from_text():
         label = lines[i+1]
         weight = lines[i+2]
         i = i + 3
-        if not (feat in weight):
+        if not (feat in weights):
             weights[feat] = {}
         weights[feat][label] = float(weight)
     f.close()
