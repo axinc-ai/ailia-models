@@ -1,6 +1,10 @@
 from nltk.data import load
 from collections import defaultdict
 
+EXPORT_TO_TEXT = False
+IMPORT_FROM_TEXT = False
+UNIT_TEST = False
+
 class AveragedPerceptron:
     def __init__(self, weights=None):
         # Each feature gets its own weight vector, so weights is a dict-of-dicts
@@ -31,8 +35,62 @@ class AveragedPerceptron:
 
 model = AveragedPerceptron()
 
-model.weights, tagdict, classes = load("averaged_perceptron_tagger.pickle")
-model.classes = classes
+def export_to_text():
+    weights, tagdict, classes = load("averaged_perceptron_tagger.pickle")
+    f = open("averaged_perceptron_tagger_weights.txt", "w")
+    for feat in weights.keys():
+        feat_weights = weights[feat]
+        for label, weight in feat_weights.items():
+            f.write(feat + "\n" + label + "\n" + str(weight) + "\n")
+    f.close()
+
+    f = open("averaged_perceptron_tagger_tagdict.txt", "w")
+    for tag in tagdict.keys():
+        f.write(tag + "\n" + tagdict[tag] + "\n")
+    f.close()
+
+    f = open("averaged_perceptron_tagger_classes.txt", "w")
+    for cls in classes:
+        f.write(cls + "\n")
+    f.close()
+
+def import_from_text():
+    f = open("averaged_perceptron_tagger_weights.txt", "r")
+    weights = {}
+    lines = f.read().split('\n')[:-1]
+    i = 0
+    while i < len(lines):
+        feat = lines[i+0]
+        label = lines[i+1]
+        weight = lines[i+2]
+        i = i + 3
+        if not (feat in weight):
+            weights[feat] = {}
+        weights[feat][label] = float(weight)
+    f.close()
+
+    f = open("averaged_perceptron_tagger_tagdict.txt", "r")
+    tagdict = {}
+    lines = f.read().split('\n')[:-1]
+    i = 0
+    while i < len(lines):
+        tag = lines[i+0]
+        v = lines[i+1]
+        i = i + 2
+        tagdict[tag] = v
+    f.close()
+        
+    f = open("averaged_perceptron_tagger_classes.txt", "r")
+    classes = f.read().split('\n')[:-1]
+    f.close()
+    return weights, tagdict, classes
+
+if EXPORT_TO_TEXT:
+    export_to_text()
+if IMPORT_FROM_TEXT:
+    model.weights, tagdict, model.classes = import_from_text()
+else:
+    model.weights, tagdict, model.classes = load("averaged_perceptron_tagger.pickle")
 
 START = ["-START-", "-START2-"]
 END = ["-END-", "-END2-"]
@@ -108,8 +166,9 @@ def tag(tokens, return_conf=False, use_tagdict=True):
 
     return output
 
-#words = ["i'm", 'an', 'activationist', '.']
+if UNIT_TEST:
+    words = ["i'm", 'an', 'activationist', '.']
+    output = tag(words)
+    print(output)
+    #[("i'm", 'VB'), ('an', 'DT'), ('activationist', 'NN'), ('.', '.')]
 
-#output = tag(words)
-
-#print(output)
