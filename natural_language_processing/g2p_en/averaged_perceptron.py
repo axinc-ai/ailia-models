@@ -11,12 +11,7 @@ class AveragedPerceptron:
         self.weights = weights if weights else {}
         self.classes = set()
 
-    def _softmax(self, scores):
-        s = np.fromiter(scores.values(), dtype=float)
-        exps = np.exp(s)
-        return exps / np.sum(exps)
-
-    def predict(self, features, return_conf=False):
+    def predict(self, features):
         """Dot-product the features and current weights and return the best label."""
         scores = defaultdict(float)
         for feat, value in features.items():
@@ -28,10 +23,8 @@ class AveragedPerceptron:
 
         # Do a secondary alphabetic sort, for stability
         best_label = max(self.classes, key=lambda label: (scores[label], label))
-        # compute the confidence
-        conf = max(self._softmax(scores)) if return_conf == True else None
 
-        return best_label, conf
+        return best_label
 
 model = AveragedPerceptron()
 
@@ -140,7 +133,7 @@ def normalize(word):
         return "!DIGITS"
     return word.lower()
 
-def tag(tokens, return_conf=False, use_tagdict=True):
+def tag(tokens):
     """
     Tag tokenized sentences.
     :params tokens: list of word
@@ -151,15 +144,11 @@ def tag(tokens, return_conf=False, use_tagdict=True):
 
     context = START + [normalize(w) for w in tokens] + END
     for i, word in enumerate(tokens):
-        tag, conf = (
-            (tagdict.get(word), 1.0) if use_tagdict == True else (None, None)
-        )
-        #print(tag, word)
+        tag = tagdict.get(word)
         if not tag:
             features = _get_features(i, word, context, prev, prev2)
-            #print(features)
-            tag, conf = model.predict(features, return_conf)
-        output.append((word, tag, conf) if return_conf == True else (word, tag))
+            tag = model.predict(features)
+        output.append((word, tag))
 
         prev2 = prev
         prev = tag
