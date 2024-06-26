@@ -114,15 +114,20 @@ class G2p(object):
     def predict(self, word, encoder, decoder):
         x = self.tokenize(word)
 
+        h = np.zeros((1, 256), dtype=np.float32)
+
         if args.onnx:
-            h = encoder.run(
-                None,
-                {
-                    'x': x
-                },
-            )[0]
+            for i in range(x.shape[0]):
+                h = encoder.run(
+                    None,
+                    {
+                        'x': np.array([x[i]]),
+                        'h_in': h
+                    },
+                )[0]
         else:
-            h = encoder.run([x])[0]
+            for i in range(x.shape[0]):
+                h = encoder.run([np.array([x[i]]), h])[0]
 
         preds = []
         pred = 2    # initial symbol
