@@ -15,17 +15,14 @@ The collection of pre-trained, state-of-the-art AI models.
 [ailia MODELS tutorial 日本語版](TUTORIAL_jp.md)
 
 # Supported models
-330 models as of June 11th, 2024
+332 models as of June 24th, 2024
 
 # Latest update
+- 2024.06.26 Add g2p_en
+- 2024.06.24 Add soundchoice-g2p
 - 2024.06.11 Add gpt-sovits, reazon speech, reazon speech2 (ailia SDK 1.4.0)
 - 2024.05.28 Add kotoba-whisper
 - 2024.05.26 Add multilingual-e5 (LayerNorm version)
-- 2024.04.30 Add cross_encoder_mmarco
-- 2024.04.28 Add marigold
-- 2024.04.08 ailia SDK can now be installed via pip.
-- 2024.04.02 Add zoe_depth, facefusion
-- 2024.04.01 Add pytorch-fcn (ailia SDK 1.3.0)
 - More information in our [Wiki](https://github.com/axinc-ai/ailia-models/wiki)
 
 ## Action recognition
