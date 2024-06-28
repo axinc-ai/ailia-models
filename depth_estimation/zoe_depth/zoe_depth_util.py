@@ -40,7 +40,10 @@ def postprocess(
 
     pred = (pred - vmin) / (vmax - vmin)
     pred[invalid_mask] = np.nan
-    cmapper = matplotlib.cm.get_cmap(cmap)
+    if hasattr(matplotlib, "colormaps"):
+        cmapper = matplotlib.colormaps[cmap]
+    else:
+        cmapper = matplotlib.cm.get_cmap(cmap)
     pred = cmapper(pred, bytes=True)
     img = pred[...]
     img[invalid_mask] = (128, 128, 128, 256)
