@@ -139,6 +139,33 @@ def py_cpu_nms(dets, thresh):
 
     return keep
 
+def plot_enhanced_faces(img_raw, dets, cropped_faces, enhanced_faces, resize_factor=0.5, save_image_path=None):
+    for i, (bbox, cropped_face, enhanced_face) in enumerate(zip(dets, cropped_faces, enhanced_faces)):
+        # Create a resize version of the original/enhanced faces
+        cropped_face = cv2.resize(cropped_face, None, fx=resize_factor, fy=resize_factor)
+        enhanced_face = cv2.resize(enhanced_face, None, fx=resize_factor, fy=resize_factor)
+
+        # Determine the position to draw the faces in the top left corner
+        top_left_x, top_left_y = 10, 10
+        zoomed_height, zoomed_width = cropped_face.shape[:2]
+
+        # Draw the faces in the top left corner of the image
+        img_raw[top_left_y+i*zoomed_height:top_left_y+(i+1)*zoomed_height, top_left_x:top_left_x+zoomed_width] = cropped_face
+        img_raw[top_left_y+i*zoomed_height:top_left_y+(i+1)*zoomed_height, top_left_x+zoomed_width:top_left_x+2*zoomed_width] = enhanced_face
+
+        # Draw the bounding box on the original image for reference
+        x1, y1, x2, y2, score = bbox
+        text = "{:.4f}".format(score)
+        cv2.rectangle(img_raw, (x1, y1), (x2, y2), (255, 0, 0), 2)
+        cx = x1
+        cy = y1 + 12
+        cv2.putText(img_raw, text, (cx, cy),
+                    cv2.FONT_HERSHEY_DUPLEX, 0.5, (255, 255, 255))
+
+    if save_image_path is not None:
+        # save image
+        cv2.imwrite(save_image_path, img_raw)
+
 def plot_detections(img_raw, dets, vis_thres , save_image_path=None):
     for b in dets:
         if b[4] < vis_thres:

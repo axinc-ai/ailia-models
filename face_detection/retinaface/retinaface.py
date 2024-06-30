@@ -14,9 +14,13 @@ sys.path.append('../../util')
 from logging import getLogger  # noqa: E402
 
 import webcamera_utils  # noqa: E402
-from image_utils import imread, load_image  # noqa: E402
+from image_utils import imread  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from arg_utils import get_base_parser, get_savepath, update_parser  # noqa: E402
+
+sys.path.append('../../generative_adversarial_networks/gfpgan')
+from gfpgan import WEIGHT_PATH as GFPGAN_WEIGHT_PATH, MODEL_PATH as GFPGAN_MODEL_PATH, REMOTE_PATH as GFPGAN_REMOTE_PATH
+from gfpgan import preprocess, post_processing, align_warp_face
 
 logger = getLogger(__name__)
 
@@ -34,6 +38,8 @@ NMS_THRES = 0.4
 KEEP_TOP_K = 750
 VIS_THRES = 0.6
 
+EYE_DIST_THRESH = 5
+
 # ======================
 # Arguemnt Parser Config
 # ======================
@@ -44,7 +50,7 @@ parser = get_base_parser(
 )
 parser.add_argument(
     '-a', '--arch', metavar='ARCH',
-    default='resnet50', choices=MODEL_LISTS,
+    default='mobile0.25', choices=MODEL_LISTS,
     help='model lists: ' + ' | '.join(MODEL_LISTS)
 )
 parser.add_argument(
@@ -67,7 +73,7 @@ if args.arch == 'resnet50':
     MODEL_PATH = 'retinaface_resnet50.onnx.prototxt'
 elif args.arch == 'mobile0.25':
     WEIGHT_PATH = 'retinaface_mobile0.25.onnx'
-    MODEL_PATH = 'retinaface_mobile0.25.onnx.prototxt'    
+    MODEL_PATH = 'retinaface_mobile0.25.onnx.prototxt'
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/retinaface/"
 
 def postprocessing(preds_ailia, input_data, cfg, dim):
@@ -108,7 +114,7 @@ def postprocessing(preds_ailia, input_data, cfg, dim):
     landms = landms[:KEEP_TOP_K, :]
 
     detections = np.concatenate((dets, landms), axis=1)
-    
+
     return detections
 
 
@@ -140,7 +146,7 @@ def recognize_from_image():
         dim = (IMAGE_WIDTH, IMAGE_HEIGHT)
         org_img = cv2.resize(org_img, dim, interpolation = cv2.INTER_AREA)
 
-        
+
         img = org_img - (104, 117, 123)
         input_data = img.transpose(2, 0, 1)
         input_data.shape = (1,) + input_data.shape
@@ -152,7 +158,7 @@ def recognize_from_image():
             total_time = 0
             for i in range(args.benchmark_count):
                 start = int(round(time.time() * 1000))
-                preds_ailia = net.predict([input_data])  
+                preds_ailia = net.predict([input_data])
                 end = int(round(time.time() * 1000))
                 logger.info(f'\tailia processing time {end - start} ms')
                 if i != 0:
@@ -184,6 +190,11 @@ def recognize_from_video():
         cfg = rut.cfg_re50
     mem_mode = ailia.get_memory_mode(reduce_constant=True, reuse_interstage=True)
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id, memory_mode=mem_mode)
+    # disable FP16 for gfpgan
+    if "FP16" in ailia.get_environment(args.env_id).props or sys.platform == 'Darwin':
+        logger.warning('GFPGAN model do not work on FP16. So use CPU mode.')
+        args.env_id = 0
+    gfpgan = ailia.Net(GFPGAN_MODEL_PATH, GFPGAN_WEIGHT_PATH, env_id=args.env_id, memory_mode=mem_mode)
     resize = args.rescale
 
     capture = webcamera_utils.get_capture(args.video)
@@ -219,8 +230,50 @@ def recognize_from_video():
 
         # post-processing
         detections = postprocessing(preds_ailia, input_data, cfg, dim)
+        cropped_faces = []
+        bboxes = []
+        all_landmarks_5 = []
+        for det in detections:
+            score = det[4]
+            if score < VIS_THRES:
+                continue
+            det = list(map(int, det))
 
-        rut.plot_detections(input_image, detections, vis_thres=VIS_THRES)
+            # remove faces with too small eye distance: side faces or too small faces
+            eye_dist = np.linalg.norm([det[6] - det[8], det[7] - det[9]])
+            if eye_dist < EYE_DIST_THRESH:
+                continue
+
+            x1, y1, x2, y2 = det[:4]
+            cropped_face = input_image[y1:y2, x1:x2]
+            if cropped_face.size == 0:
+                continue
+
+            landmark = np.array([[det[i], det[i + 1]] for i in range(5, 15, 2)])
+
+            # cropped_face = cv2.resize(cropped_face, (512, 512))
+            # cropped_faces.append(cropped_face)
+            cropped_face, _ = align_warp_face(input_image, [landmark])
+            cropped_faces.append(cropped_face[0])
+
+            bboxes.append((x1, y1, x2, y2, score))
+
+
+        # run gfpgan
+        restored_faces = []
+        for cropped_face in cropped_faces:
+            x = preprocess(cropped_face)
+
+            # feedforward
+            output = gfpgan.predict([x])
+            pred = output[0]
+
+            restored_face = post_processing(pred)
+            restored_faces.append(restored_face)
+
+        # display results
+        # rut.plot_detections(input_image, detections, vis_thres=VIS_THRES)
+        rut.plot_enhanced_faces(input_image, bboxes, cropped_faces, restored_faces)
         cv2.imshow('frame', input_image)
         frame_shown = True
 
@@ -238,6 +291,7 @@ def recognize_from_video():
 def main():
     # model files check and download
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
+    check_and_download_models(GFPGAN_WEIGHT_PATH, GFPGAN_MODEL_PATH, GFPGAN_REMOTE_PATH)
 
     if args.video is not None:
         # video mode
