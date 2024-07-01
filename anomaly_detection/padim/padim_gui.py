@@ -141,8 +141,12 @@ def select_device(event):
         selected_index = selection[0]
         selected_value = event.widget.get(selected_index)
         device = torch.device(selected_value)
+        if selected_value=="cuda:0":
+            torch.cuda.set_per_process_memory_fraction(fraction=0.5, device="cuda:0")
     else:
         device = torch.device("cpu")
+
+    
     logger.info(f"Device set to: {device}")
 
 # ======================
@@ -971,7 +975,7 @@ def main():
     ListboxFileSelect.bind('<<ListboxSelect>>', save_type_select)
 
 
-    fileDevice = ["cpu", "cuda", "mps"]
+    fileDevice = ["cpu", "cuda:0", "mps"]
     listsFileDevice = tk.StringVar(value=fileDevice)
     labelDevice.grid(row=11, column=4, sticky=tk.NW)
     ListboxDeviceSelect = tk.Listbox(frame, listvariable=listsFileDevice, width=20, height=len(fileDevice), selectmode=tk.BROWSE, exportselection=False)
