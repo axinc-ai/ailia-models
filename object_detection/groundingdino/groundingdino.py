@@ -1,6 +1,5 @@
 import sys
 import time
-import datetime
 
 import numpy as np
 import cv2
@@ -14,9 +13,9 @@ import ailia
 sys.path.append("../../util")
 from arg_utils import get_base_parser, update_parser, get_savepath  # noqa
 from model_utils import check_and_download_models  # noqa
+from image_utils import normalize_image  # noqa
 from math_utils import sigmoid
-from detector_utils import load_image  # noqa
-from webcamera_utils import get_capture, get_writer  # noqa
+from detector_utils import load_image, plot_results, hsv_to_rgb  # noqa
 
 # logger
 from logging import getLogger  # noqa
@@ -42,17 +41,10 @@ SAVE_IMAGE_PATH = "output.png"
 
 parser = get_base_parser("Grounded-SAM", IMAGE_PATH, SAVE_IMAGE_PATH)
 parser.add_argument(
-    "--seed",
-    type=int,
-    default=int(datetime.datetime.now().strftime("%Y%m%d")),
-    help="random seed for selection the color of the box",
-)
-parser.add_argument(
-    "-m",
-    "--model_type",
-    default="SwinB_896_4x",
-    choices=("SwinB_896_4x", "R50_640_4x"),
-    help="model type",
+    "--caption",
+    type=str,
+    default="Horse. Clouds. Grasses. Sky. Hill.",
+    help="Text prompt.",
 )
 parser.add_argument("--onnx", action="store_true", help="execute onnxruntime version.")
 args = update_parser(parser)
@@ -110,22 +102,89 @@ def draw_predictions(
     logits: np.ndarray,
     phrases: list,
 ) -> np.ndarray:
-    print(boxes)
-    print(logits)
-    print(phrases)
-    # h, w, _ = image.shape
-    # boxes = boxes * torch.Tensor([w, h, w, h])
-    # xyxy = box_convert(boxes=boxes, in_fmt="cxcywh", out_fmt="xyxy").numpy()
-    # detections = sv.Detections(xyxy=xyxy)
+    height, width, _ = image.shape
+    boxes = boxes * np.array([width, height, width, height])
 
-    # labels = [f"{phrase} {logit:.2f}" for phrase, logit in zip(phrases, logits)]
+    cx, cy, w, h = np.split(boxes, 4, axis=-1)
+    x1 = cx - 0.5 * w
+    y1 = cy - 0.5 * h
+    x2 = cx + 0.5 * w
+    y2 = cy + 0.5 * h
+    xyxy = np.concatenate((x1, y1, x2, y2), axis=-1)
 
-    # box_annotator = sv.BoxAnnotator()
-    # annotated_frame = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
-    # annotated_frame = box_annotator.annotate(
-    #     scene=annotated_frame, detections=detections, labels=labels
-    # )
-    # return annotated_frame
+    mode_ailia = True
+    if mode_ailia:
+        detect_objects = []
+        for i in range(len(xyxy)):
+            x1, y1, x2, y2 = xyxy[i].astype(int)
+            r = ailia.DetectorObject(
+                category=phrases[i],
+                prob=logits[i],
+                x=x1 / width,
+                y=y1 / height,
+                w=(x2 - x1) / width,
+                h=(y2 - y1) / height,
+            )
+            detect_objects.append(r)
+
+        res_img = plot_results(detect_objects, image)
+        return res_img
+
+    labels = [f"{phrase} {logit:.2f}" for phrase, logit in zip(phrases, logits)]
+
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    thickness = 2
+    text_scale = 0.5
+    text_thickness = 1
+    text_padding = 10
+    for i in range(len(xyxy)):
+        x1, y1, x2, y2 = xyxy[i].astype(int)
+        color = hsv_to_rgb(256 * i / (len(xyxy) + 1), 255, 255)
+        cv2.rectangle(
+            img=image,
+            pt1=(x1, y1),
+            pt2=(x2, y2),
+            color=color,
+            thickness=thickness,
+        )
+
+        text = labels[i]
+
+        text_width, text_height = cv2.getTextSize(
+            text=text,
+            fontFace=font,
+            fontScale=text_scale,
+            thickness=text_thickness,
+        )[0]
+
+        text_x = x1 + text_padding
+        text_y = y1 - text_padding
+
+        text_background_x1 = x1
+        text_background_y1 = y1 - 2 * text_padding - text_height
+
+        text_background_x2 = x1 + 2 * text_padding + text_width
+        text_background_y2 = y1
+
+        cv2.rectangle(
+            img=image,
+            pt1=(text_background_x1, text_background_y1),
+            pt2=(text_background_x2, text_background_y2),
+            color=color,
+            thickness=cv2.FILLED,
+        )
+        cv2.putText(
+            img=image,
+            text=text,
+            org=(text_x, text_y),
+            fontFace=font,
+            fontScale=text_scale,
+            color=(0, 0, 0),
+            thickness=text_thickness,
+            lineType=cv2.LINE_AA,
+        )
+
+    return image
 
 
 # ======================
@@ -134,6 +193,34 @@ def draw_predictions(
 
 
 def preprocess(img):
+    im_h, im_w, _ = img.shape
+
+    # Resize
+    size = 800
+    max_size = 1333
+    min_original_size = min(im_w, im_h)
+    max_original_size = max(im_w, im_h)
+    if max_original_size / min_original_size * size > max_size:
+        size = int(round(max_size * min_original_size / max_original_size))
+
+    if (im_w <= im_h and im_w == size) or (im_h <= im_w and im_h == size):
+        oh, ow = im_h, im_w
+    elif im_w < im_h:
+        ow = size
+        oh = int(size * im_h / im_w)
+    else:
+        oh = size
+        ow = int(size * im_w / im_h)
+
+    img = np.asarray(Image.fromarray(img).resize((ow, oh), Image.BILINEAR))
+
+    # Normalize
+    img = normalize_image(img, normalize_type="ImageNet")
+
+    img = img.transpose((2, 0, 1))  # HWC -> CHW
+    img = np.expand_dims(img, axis=0)
+    img = img.astype(np.float16)
+
     return img
 
 
@@ -159,6 +246,9 @@ def post_processing(tokenizer, caption, pred_logits, pred_boxes):
 
 
 def predict(models, img, caption):
+    img = img[:, :, ::-1]  # BGR -> RGB
+    img = preprocess(img)
+
     tokenizer = models["tokenizer"]
 
     captions = [caption]
@@ -196,7 +286,7 @@ def predict(models, img, caption):
     if not args.onnx:
         output = net.predict(
             [
-                samples,
+                img,
                 input_ids,
                 token_type_ids,
                 attention_mask,
@@ -208,7 +298,7 @@ def predict(models, img, caption):
         output = net.run(
             None,
             {
-                "samples": samples,
+                "samples": img,
                 "input_ids": input_ids,
                 "token_type_ids": token_type_ids,
                 "attention_mask": attention_mask,
@@ -226,7 +316,9 @@ def predict(models, img, caption):
 
 
 def recognize_from_image(models):
-    caption = "horse. clouds. grasses. sky. hill."
+    caption = args.caption
+
+    logger.info("Caption: " + caption)
 
     # input image loop
     for image_path in args.input:
@@ -265,10 +357,10 @@ def recognize_from_image(models):
         # draw prediction
         res_img = draw_predictions(img, boxes, logits, phrases)
 
-        # # plot result
-        # savepath = get_savepath(args.savepath, image_path, ext=".png")
-        # logger.info(f"saved at : {savepath}")
-        # cv2.imwrite(savepath, res_img)
+        # plot result
+        savepath = get_savepath(args.savepath, image_path, ext=".png")
+        logger.info(f"saved at : {savepath}")
+        cv2.imwrite(savepath, res_img)
 
     logger.info("Script finished successfully.")
 
