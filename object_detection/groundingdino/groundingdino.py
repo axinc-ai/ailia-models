@@ -32,7 +32,7 @@ WEIGHT_PATH = "groundingdino_swint_ogc.onnx"
 MODEL_PATH = "groundingdino_swint_ogc.onnx.prototxt"
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/grounded-sam/"
 
-IMAGE_PATH = "demo7.jpg"
+IMAGE_PATH = "demo.jpg"
 SAVE_IMAGE_PATH = "output.png"
 
 # ======================
@@ -317,6 +317,8 @@ def predict(models, img, caption):
 
 def recognize_from_image(models):
     caption = args.caption
+    if not caption.endswith("."):
+        caption = caption + "."
 
     logger.info("Caption: " + caption)
 
