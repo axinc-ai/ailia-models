@@ -39,7 +39,7 @@ SAVE_IMAGE_PATH = "output.png"
 # Arguemnt Parser Config
 # ======================
 
-parser = get_base_parser("Grounded-SAM", IMAGE_PATH, SAVE_IMAGE_PATH)
+parser = get_base_parser("Grounding DINO", IMAGE_PATH, SAVE_IMAGE_PATH)
 parser.add_argument(
     "--caption",
     type=str,
