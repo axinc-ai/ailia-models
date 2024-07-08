@@ -113,11 +113,14 @@ if args.enable_optimization:
     import torch
     if  args.optimization_device=="cuda" and torch.cuda.is_available():
         device = torch.device("cuda")
+        
 
     elif args.optimization_device=="mps" and torch.backends.mps.is_available():
         device = torch.device("mps")  
     else:
         device = torch.device("cpu")
+
+    weights_torch=gaussian_kernel1d_torch(4, 0, int(4.0*float(4)+0.5), device).unsqueeze(0).unsqueeze(0).expand(1, 1, 33)
     logger.info("Torch device : " + str(device))
 
 
@@ -140,7 +143,11 @@ def plot_fig(file_list, test_imgs, scores, anormal_scores, gt_imgs, threshold, s
             gt = gt.transpose(1, 2, 0).squeeze()
         else:
             gt = np.zeros((1,1,1))
-        heat_map, mask, vis_img = visualize(img, scores[i], threshold)
+        if args.enable_optimization:
+            heat_map, mask, vis_img = visualize(img, scores[i].squeeze(0).cpu().numpy(), threshold)
+        else:
+            heat_map, mask, vis_img = visualize(img, scores[i], threshold)
+
 
         fig_img, ax_img = plt.subplots(1, 5, figsize=(12, 3))
         fig_img.subplots_adjust(right=0.9)
@@ -197,8 +204,9 @@ def infer_init_run(net, params, train_outputs, IMAGE_SIZE):
     # Convert the dtype to float32 for efficiency
     dummy_image = dummy_image.astype(np.float32)
     logger.info(f"PaDiM  initialization inference starts!")
+    
     if args.enable_optimization:
-        score = infer_optimized(net, params, train_outputs, dummy_image, IMAGE_SIZE, device, logger)
+        score = infer_optimized(net, params, train_outputs, dummy_image, IMAGE_SIZE, device, logger, weights_torch)
     else:
         score = infer(net, params, train_outputs, dummy_image, IMAGE_SIZE)
     logger.info(f"PaDiM initialization inference finish!")
@@ -252,16 +260,19 @@ def decide_threshold_from_gt_image(net, params, train_outputs, gt_imgs):
         img = cv2.cvtColor(img, cv2.COLOR_BGRA2RGB)
         img = preprocess(img, IMAGE_RESIZE, keep_aspect=KEEP_ASPECT, crop_size = IMAGE_SIZE)
         if args.enable_optimization:
-            dist_tmp = infer_optimized(net, params, train_outputs, img, IMAGE_SIZE, device,logger)
+            dist_tmp = infer_optimized(net, params, train_outputs, img, IMAGE_SIZE, device,logger, weights_torch)
         else:
             dist_tmp = infer(net, params, train_outputs, img, IMAGE_SIZE)
 
 
         score_map.append(dist_tmp)
+    if args.enable_optimization:
+        scores = normalize_scores_torch(score_map, IMAGE_SIZE)
+        threshold = decide_threshold(scores.cpu().numpy(), gt_imgs)
 
-    scores = normalize_scores(score_map, IMAGE_SIZE)
-
-    threshold = decide_threshold(scores, gt_imgs)
+    else:
+        scores = normalize_scores_torch(score_map, IMAGE_SIZE)
+        threshold = decide_threshold(scores, gt_imgs)
 
     return threshold
 
@@ -290,7 +301,7 @@ def infer_from_image(net, params, train_outputs, threshold, gt_imgs):
             if args.enable_optimization:
                 for i in range(args.benchmark_count):
                     start = int(round(time.time() * 1000))
-                    dist_tmp = infer_optimized(net, params, train_outputs, img, IMAGE_SIZE, device,logger)
+                    dist_tmp = infer_optimized(net, params, train_outputs, img, IMAGE_SIZE, device,logger, weights_torch)
                     end = int(round(time.time() * 1000))
                     logger.info(f'\tailia processing time {end - start} ms')
                     if i != 0:
@@ -306,22 +317,27 @@ def infer_from_image(net, params, train_outputs, threshold, gt_imgs):
                         total_time = total_time + (end - start)
                 logger.info(f'\taverage time {total_time / (args.benchmark_count - 1)} ms')
             if args.compare_optimization:
-                    logger.info(f'\tResults of optimized and original code is the same: {np.allclose(infer(net, params, train_output_list[0], img, IMAGE_SIZE), infer_optimized(net, params, train_output_list[1], img, IMAGE_SIZE, device,logger))}')
+                    logger.info(f'\tResults of optimized and original code is the same: {np.allclose(infer(net, params, train_output_list[0], img, IMAGE_SIZE), infer_optimized(net, params, train_output_list[1], img, IMAGE_SIZE, device,logger, weights_torch))}')
                     
 
         else:
             if args.enable_optimization:
-                dist_tmp = infer_optimized(net, params, train_outputs, img, IMAGE_SIZE, device,logger)
+                dist_tmp = infer_optimized(net, params, train_outputs, img, IMAGE_SIZE, device,logger, weights_torch)
             else:
                 dist_tmp = infer(net, params, train_outputs, img, IMAGE_SIZE)
             if args.compare_optimization:
-                    logger.info('Results of optimized and original code is the same: '+ str(np.allclose(infer(net, params, train_output_list[0], img, IMAGE_SIZE), infer_optimized(net, params, train_output_list[1], img, IMAGE_SIZE, device,logger))))
+                    logger.info('Results of optimized and original code is the same: '+ str(np.allclose(infer(net, params, train_output_list[0], img, IMAGE_SIZE), infer_optimized(net, params, train_output_list[1], img, IMAGE_SIZE, device,logger, weights_torch))))
              
 
         score_map.append(dist_tmp)
+    if args.enable_optimization:
+        scores = normalize_scores_torch(score_map, IMAGE_SIZE)
+        anormal_scores = calculate_anormal_scores_torch(score_map, IMAGE_SIZE)
 
-    scores = normalize_scores(score_map, IMAGE_SIZE)
-    anormal_scores = calculate_anormal_scores(score_map, IMAGE_SIZE)
+    else:
+        scores = normalize_scores(score_map, IMAGE_SIZE)
+        anormal_scores = calculate_anormal_scores(score_map, IMAGE_SIZE)
+
 
     # Plot gt image
     plot_fig(args.input, test_imgs, scores, anormal_scores, gt_imgs, threshold, args.savepath)
@@ -340,6 +356,7 @@ def infer_from_video(net, params, train_outputs, threshold):
 
     frame_shown = False
     infer_init_run(net, params, train_outputs, IMAGE_SIZE)
+    
     if args.enable_optimization:
         while(True):
             ret, frame = capture.read()
@@ -351,7 +368,7 @@ def infer_from_video(net, params, train_outputs, threshold):
             img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             img = preprocess(img, IMAGE_RESIZE, keep_aspect=KEEP_ASPECT)
 
-            dist_tmp = infer_optimized(net, params, train_outputs, img, device,logger)
+            dist_tmp = infer_optimized(net, params, train_outputs, img, device,logger, weights_torch)
 
             score_map.append(dist_tmp)
             scores = normalize_scores(score_map)    # min max is calculated dynamically, please set fixed min max value from calibration data for production
@@ -505,6 +522,8 @@ def _load_training_file(train_feat_file, save_format):
                 logger.info(f"Loading {train_feat_file}")
                 with open(train_feat_file, 'rb') as f:
                     train_outputs = pickle.load(f)
+                train_outputs=[train_outputs[0].to(device), train_outputs[1], 
+                                train_outputs[2].to(device), train_outputs[3] ] 
             elif save_format == "npy":
                 train_outputs = []
                 i = 0
