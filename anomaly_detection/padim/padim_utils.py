@@ -519,9 +519,29 @@ def infer_optimized(net, params, train_outputs, img, crop_size, device, logger, 
     embedding_vectors = embedding_vectors.view(B, C, H * W)
 
     # calculate distance matrix
-    mean_vectors = train_outputs[0]
-    inv_cov_matrices = train_outputs[2]
-    samples = embedding_vectors[0] 
+    #mean_vectors = train_outputs[0]
+    #inv_cov_matrices = train_outputs[2]
+    #samples = embedding_vectors[0]
+    #  
+    if str(device) not in str(train_outputs[0].device):
+        logger.info(f"Changing device from {train_outputs[0].device} to {device}")
+        train_outputs[0]=train_outputs[0].to(device)
+        embedding_vectors[0]=embedding_vectors[0].to(device)
+        train_outputs[2]=train_outputs[2].to(device)
+    # Step 1: Compute the difference between each sample and its corresponding mean
+    dist_tmp = embedding_vectors[0] - train_outputs[0]
+    # Step 2: Apply the inverse covariance matrix
+    transformed_differences = torch.einsum('ijk,jk->ik', train_outputs[2], dist_tmp)
+
+    # Step 3: Compute the Mahalanobis distance
+    dist_tmp = torch.sqrt(torch.sum(dist_tmp * transformed_differences, dim=0))
+    transformed_differences=0
+    # upsample
+    dist_tmp=F.interpolate(dist_tmp.view(1, -1).view( H, W).unsqueeze(0).unsqueeze(0), 
+                           size=(crop_size, crop_size), mode='bilinear', align_corners=False).squeeze(0)
+    dist_tmp=gausian_filter_torch(dist_tmp, weights_torch, mode='reflect')
+
+    """
     if str(device) not in str(mean_vectors.device):
         logger.info(f"Changing device from {mean_vectors.device} to {device}")
         mean_vectors=mean_vectors.to(device)
@@ -534,8 +554,9 @@ def infer_optimized(net, params, train_outputs, img, crop_size, device, logger, 
     # Step 3: Compute the Mahalanobis distance
     dist_tmp = torch.sqrt(torch.sum(differences * transformed_differences, dim=0))
     # upsample
+    """
     
-    dist_tmp = dist_tmp.view(1, -1).view( H, W)
+    #dist_tmp = dist_tmp.view(1, -1).view( H, W)
     """
     dist_tmp = dist_tmp.view(1, -1).view( H, W).cpu().numpy()
     print("crop_size ", crop_size)
@@ -549,9 +570,9 @@ def infer_optimized(net, params, train_outputs, img, crop_size, device, logger, 
     print("Shape after gausian filter: ", dist_tmp.shape)
     """
 
-    dist_tmp=F.interpolate(dist_tmp.unsqueeze(0).unsqueeze(0), 
-                           size=(crop_size, crop_size), mode='bilinear', align_corners=False).squeeze(0)
-    dist_tmp=gausian_filter_torch(dist_tmp, weights_torch, mode='reflect')
+    #dist_tmp=F.interpolate(dist_tmp.unsqueeze(0).unsqueeze(0), 
+                           #size=(crop_size, crop_size), mode='bilinear', align_corners=False).squeeze(0)
+    #dist_tmp=gausian_filter_torch(dist_tmp, weights_torch, mode='reflect')
     
 
     return dist_tmp
