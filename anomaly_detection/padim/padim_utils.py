@@ -562,9 +562,9 @@ def gaussian_kernel1d_torch(sigma, order, radius, device):
     """
     if order < 0:
         raise ValueError('order must be non-negative')
-    exponent_range = torch.arange(order + 1, device=device)
+    #exponent_range = torch.arange(order + 1, device=device)
     sigma2 = sigma * sigma
-    x = torch.arange(-radius, radius + 1, dtype=torch.float64, device=device)
+    x = torch.arange(-radius, radius + 1, dtype=torch.float32, device=device)
     phi_x = torch.exp(-0.5 / sigma2 * x ** 2)
     phi_x = phi_x / phi_x.sum()
 
@@ -573,14 +573,14 @@ def gaussian_kernel1d_torch(sigma, order, radius, device):
     
 def gausian_filter_torch(input, weights,  output=None, mode='constant', cval=0.0, origin=0):
  
-  input=input.permute(2, 0,1 ).to(dtype=torch.float64)
-  input_padded=F.pad(input, pad=(16, 16), mode='reflect')
-  output1=torch.nn.functional.conv1d(input_padded, weights.to(dtype=torch.float64)  ) #torch.Size([448, 1, 448])
+  input=input.permute(2, 0,1 )
+  input=F.pad(input, pad=(16, 16), mode='reflect')
+  input=F.conv1d(input, weights  ) 
   
-  input2=output1.permute(2, 1,0 )
-  input_padded2=F.pad(input2, pad=(16, 16), mode='reflect', )
-  output2=torch.nn.functional.conv1d(input_padded2, weights.to(dtype=torch.float64) ).permute(1, 0,2 ) 
-  return output2
+  input=input.permute(2, 1,0 )
+  input=F.pad(input, pad=(16, 16), mode='reflect', )
+  input=F.conv1d(input, weights).permute(1, 0,2 ) 
+  return input
 
 
 def normalize_scores(score_map, crop_size, roi_img = None):

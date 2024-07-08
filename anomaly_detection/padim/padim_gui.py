@@ -365,6 +365,8 @@ def test_button_clicked():
                 logger.info(f"Loading {train_feat_file}")
                 with open(train_feat_file, 'rb') as f:
                     train_outputs = pickle.load(f)
+                train_outputs=[train_outputs[0].to(device), train_outputs[1], 
+                                train_outputs[2].to(device), train_outputs[3] ] 
             elif save_format == "npy":
                 train_outputs = []
                 i = 0
