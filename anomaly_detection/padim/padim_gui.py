@@ -56,6 +56,9 @@ if EnableOptimization:
     import torch
     
     device = torch.device("cpu")
+    weights_torch=gaussian_kernel1d_torch(4, 0, int(4.0*float(4)+0.5), device).unsqueeze(0).unsqueeze(0).expand(1, 1, 33)
+    
+
     logger.info("Torch device : " + str(device))
 
 # ======================
@@ -135,12 +138,14 @@ def enable_benchmark(event):
     logger.info(f"BENCHMARK set to: {BENCHMARK}")
 
 def select_device(event):
-    global device
+    global device, weights_torch
     selection = event.widget.curselection()
     if selection:
         selected_index = selection[0]
         selected_value = event.widget.get(selected_index)
         device = torch.device(selected_value)
+        weights_torch = gaussian_kernel1d_torch(4, 0, int(4.0*float(4)+0.5), device).unsqueeze(0).unsqueeze(0).expand(1, 1, 33)
+    
         if selected_value=="cuda:0":
             torch.cuda.set_per_process_memory_fraction(fraction=0.5, device="cuda:0")
     else:
@@ -454,7 +459,7 @@ def test_from_folder(net, params, train_outputs, threshold):
                 if EnableOptimization:
                     for i in range(6):
                         start = int(round(time.time() * 1000))
-                        dist_tmp = infer_optimized(net, params, train_outputs, img, get_image_crop_size(), device, logger)
+                        dist_tmp = infer_optimized(net, params, train_outputs, img, get_image_crop_size(), device, logger, weights_torch)
                         end = int(round(time.time() * 1000))
                         logger.info(f'\tailia processing time {end - start} ms')
                         if i != 0:
@@ -472,22 +477,34 @@ def test_from_folder(net, params, train_outputs, threshold):
 
             else:
                 if EnableOptimization:
-                    dist_tmp = infer_optimized(net, params, train_outputs, img, get_image_crop_size(), device, logger)
+                    dist_tmp = infer_optimized(net, params, train_outputs, img, get_image_crop_size(), device, logger, weights_torch)
+                    score_cache[image_path] = dist_tmp
                 else:
                     dist_tmp = infer(net, params, train_outputs, img, get_image_crop_size())
-            score_cache[image_path] = dist_tmp.copy()
+                    score_cache[image_path] = dist_tmp.copy()
         score_map.append(dist_tmp)
-
-    scores = normalize_scores(score_map, get_image_crop_size(), roi_img)
-    anormal_scores = calculate_anormal_scores(score_map, get_image_crop_size())
+    if EnableOptimization:
+        scores = normalize_scores_torch(score_map, get_image_crop_size()).squeeze(0).cpu().numpy()
+        anormal_scores = calculate_anormal_scores_torch(score_map, get_image_crop_size())
+    else:
+        scores = normalize_scores(score_map, get_image_crop_size(), roi_img)
+        anormal_scores = calculate_anormal_scores(score_map, get_image_crop_size())
 
     # Plot gt image
     os.makedirs("result", exist_ok=True)
     global result_list, listsResult, ListboxResult
     result_list = []
-    for i in range(0, scores.shape[0]):
+    scores_numpy=np.zeros(scores.shape)
+    for i in range(0, len(test_imgs)):
         img = denormalization(test_imgs[i])
         heat_map, mask, vis_img = visualize(img, scores[i], threshold)
+        """
+        if EnableOptimization:
+            scores_numpy[i] = scores[i].squeeze(0).cpu().numpy()
+            heat_map, mask, vis_img = visualize(img, scores[i].squeeze(0).cpu().numpy(), threshold)
+        else:
+            heat_map, mask, vis_img = visualize(img, scores[i], threshold)
+        """
         frame = pack_visualize(heat_map, mask, vis_img, scores, get_image_crop_size())
         dirname, path = os.path.split(test_list[i])
         output_path = "result/"+path
@@ -524,18 +541,23 @@ def test_from_video(net, params, train_outputs, threshold):
         img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         img = preprocess(img, get_image_resize(), keep_aspect=get_keep_aspect(), crop_size=get_image_crop_size())
         if EnableOptimization:
-            dist_tmp = infer_optimized(net, params, train_outputs, img, get_image_crop_size(), device, logger)
+            dist_tmp = infer_optimized(net, params, train_outputs, img, get_image_crop_size(), device, logger, weights_torch), 
+            score_map.append(dist_tmp)
+            roi_img = None
+            scores = normalize_scores_torch(score_map, get_image_crop_size(), roi_img)
+            
+
         else:
             dist_tmp = infer(net, params, train_outputs, img, get_image_crop_size())
 
-        score_map.append(dist_tmp)
-        roi_img = None
-        scores = normalize_scores(score_map, get_image_crop_size(), roi_img)    # min max is calculated dynamically, please set fixed min max value from calibration data for production
+            score_map.append(dist_tmp)
+            roi_img = None
+            scores = normalize_scores(score_map, get_image_crop_size(), roi_img)    # min max is calculated dynamically, please set fixed min max value from calibration data for production
 
-        heat_map, mask, vis_img = visualize(denormalization(img[0]), scores[len(scores)-1], threshold)
-        frame = pack_visualize(heat_map, mask, vis_img, scores, get_image_crop_size())
+            heat_map, mask, vis_img = visualize(denormalization(img[0]), scores[len(scores)-1], threshold)
+            frame = pack_visualize(heat_map, mask, vis_img, scores, get_image_crop_size())
 
-        cv2.imshow('frame', frame)
+            cv2.imshow('frame', frame)
         frame_shown = True
 
         if writer is not None:

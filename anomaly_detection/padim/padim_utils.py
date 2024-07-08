@@ -9,6 +9,7 @@ from PIL import Image
 from image_utils import normalize_image  # noqa: E402
 from detector_utils import load_image  # noqa: E402
 
+
 from scipy.spatial.distance import mahalanobis
 from scipy.ndimage import gaussian_filter
 
@@ -17,6 +18,7 @@ from sklearn.metrics import precision_recall_curve
 from skimage import morphology
 from skimage.segmentation import mark_boundaries
 import torch
+import torch.nn.functional as F
 
 
 WEIGHT_RESNET18_PATH = 'resnet18.onnx'
@@ -488,7 +490,7 @@ def infer(net, params, train_outputs, img, crop_size):
     return dist_tmp
 
 
-def infer_optimized(net, params, train_outputs, img, crop_size, device, logger):
+def infer_optimized(net, params, train_outputs, img, crop_size, device, logger, weights_torch=None):
     # prepare input data
     imgs = []
     imgs.append(img)
@@ -531,17 +533,54 @@ def infer_optimized(net, params, train_outputs, img, crop_size, device, logger):
     transformed_differences = torch.einsum('ijk,jk->ik', inv_cov_matrices, differences)
     # Step 3: Compute the Mahalanobis distance
     dist_tmp = torch.sqrt(torch.sum(differences * transformed_differences, dim=0))
-
     # upsample
+    
+    dist_tmp = dist_tmp.view(1, -1).view( H, W)
+    """
     dist_tmp = dist_tmp.view(1, -1).view( H, W).cpu().numpy()
+    print("crop_size ", crop_size)
     dist_tmp = np.array(Image.fromarray(dist_tmp).resize(
             (crop_size, crop_size), resample=Image.BILINEAR)
         )
-
+    print("Shape before gausian filter: ", dist_tmp.shape)
     # apply gaussian smoothing on the score map
     dist_tmp = gaussian_filter(dist_tmp, sigma=4)
 
+    print("Shape after gausian filter: ", dist_tmp.shape)
+    """
+
+    dist_tmp=F.interpolate(dist_tmp.unsqueeze(0).unsqueeze(0), 
+                           size=(crop_size, crop_size), mode='bilinear', align_corners=False).squeeze(0)
+    dist_tmp=gausian_filter_torch(dist_tmp, weights_torch, mode='reflect')
+    
+
     return dist_tmp
+
+def gaussian_kernel1d_torch(sigma, order, radius, device):
+    """
+    Computes a 1-D Gaussian convolution kernel.
+    """
+    if order < 0:
+        raise ValueError('order must be non-negative')
+    exponent_range = torch.arange(order + 1, device=device)
+    sigma2 = sigma * sigma
+    x = torch.arange(-radius, radius + 1, dtype=torch.float64, device=device)
+    phi_x = torch.exp(-0.5 / sigma2 * x ** 2)
+    phi_x = phi_x / phi_x.sum()
+
+    if order == 0:
+        return phi_x
+    
+def gausian_filter_torch(input, weights,  output=None, mode='constant', cval=0.0, origin=0):
+ 
+  input=input.permute(2, 0,1 ).to(dtype=torch.float64)
+  input_padded=F.pad(input, pad=(16, 16), mode='reflect')
+  output1=torch.nn.functional.conv1d(input_padded, weights.to(dtype=torch.float64)  ) #torch.Size([448, 1, 448])
+  
+  input2=output1.permute(2, 1,0 )
+  input_padded2=F.pad(input2, pad=(16, 16), mode='reflect', )
+  output2=torch.nn.functional.conv1d(input_padded2, weights.to(dtype=torch.float64) ).permute(1, 0,2 ) 
+  return output2
 
 
 def normalize_scores(score_map, crop_size, roi_img = None):
@@ -562,6 +601,27 @@ def normalize_scores(score_map, crop_size, roi_img = None):
 
     return scores
 
+def normalize_scores_torch(score_map, crop_size, roi_img=None):
+    """
+    score_map is list of torch tensors
+    crop size int
+    """
+    # Convert list of tensors to a single tensor
+    score_map = torch.stack(score_map)
+
+    # Handle ROI (Region of Interest)
+    if roi_img is not None:
+        roi_img = (roi_img > 0.5).float()  # Threshold to binary mask
+        for i in range(score_map.shape[0]):
+            score_map[i] *= roi_img[0, 0]  # Element-wise multiplication
+
+    # Normalization using min-max scaling (avoiding division by zero)
+    max_score = score_map.max()
+    min_score = score_map.min()
+    scores = (score_map - min_score) / torch.clamp(max_score - min_score, min=1e-8)
+
+    return scores
+
 def calculate_anormal_scores(score_map, crop_size):
     N = len(score_map)
     score_map = np.vstack(score_map)
@@ -571,7 +631,22 @@ def calculate_anormal_scores(score_map, crop_size):
     anormal_scores = np.zeros((score_map.shape[0]))
     for i in range(score_map.shape[0]):
         anormal_scores[i] = score_map[i].max()
+    return anormal_scores
+
+def calculate_anormal_scores_torch(score_map, crop_size):
+    N = len(score_map)
+
+
+    # Stack the score maps into a single tensor
+    score_map = torch.vstack(score_map)
+    score_map = score_map.unsqueeze(0).view(N, crop_size, crop_size)
+
+    # Calculate anormal scores
+    anormal_scores = np.zeros((N))
+    for i in range(score_map.shape[0]):
+        anormal_scores[i] = score_map[i].max().cpu().numpy()
     
+
     return anormal_scores
 
 
