@@ -30,7 +30,7 @@ logger = getLogger(__name__)
 
 WEIGHT_PATH = "groundingdino_swint_ogc.onnx"
 MODEL_PATH = "groundingdino_swint_ogc.onnx.prototxt"
-REMOTE_PATH = "https://storage.googleapis.com/ailia-models/grounded-sam/"
+REMOTE_PATH = "https://storage.googleapis.com/ailia-models/groundingdino/"
 
 IMAGE_PATH = "demo.jpg"
 SAVE_IMAGE_PATH = "output.png"
