@@ -39,6 +39,8 @@ output_index = 0
 result_index = 0
 model_index = 0
 slider_index = 50
+BENCHMARK = False
+USE_FP_16 = True
 
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/padim/'
 
@@ -147,7 +149,7 @@ def create_photo_image(path,w=CANVAS_W,h=CANVAS_H):
     #image_bgr = cv2.resize(image_bgr,(w,h))
     image_rgb = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB) # imreadはBGRなのでRGBに変換
     image_pil = Image.fromarray(image_rgb) # RGBからPILフォーマットへ変換
-    image_pil.thumbnail((w,h), Image.ANTIALIAS)
+    image_pil.thumbnail((w,h), Image.LANCZOS)
     image_tk  = ImageTk.PhotoImage(image_pil) # ImageTkフォーマットへ変換
     return image_tk
 
@@ -255,10 +257,15 @@ def test_button_clicked():
     # model files check and download
     weight_path, model_path, params = get_params(get_model_id())
     check_and_download_models(weight_path, model_path, REMOTE_PATH)
+    
+    weight_path_post, model_path_post= get_params(get_model_id(), True, get_image_crop_size(), USE_FP_16)
+    check_and_download_models(weight_path, model_path, REMOTE_PATH)
+
 
     # create net instance
     env_id = ailia.get_gpu_environment_id()
     net = ailia.Net(model_path, weight_path, env_id=env_id)
+    net2 = ailia.Net( model_path_post,weight_path_post, env_id=env_id)
 
     # load trained model
     with open("train.pkl", 'rb') as f:
@@ -267,11 +274,11 @@ def test_button_clicked():
     threshold = slider_index / 100.0
 
     if test_type == "folder":
-        test_from_folder(net, params, train_outputs, threshold)
+        test_from_folder(net,net2, params, train_outputs, threshold)
     else:
-        test_from_video(net, params, train_outputs, threshold)
+        test_from_video(net,net2, params, train_outputs, threshold)
 
-def test_from_folder(net, params, train_outputs, threshold):
+def test_from_folder(net, net2, params, train_outputs, threshold):
     # file loop
     test_imgs = []
 
@@ -296,8 +303,22 @@ def test_from_folder(net, params, train_outputs, threshold):
         if image_path in score_cache:
             dist_tmp = score_cache[image_path].copy()
         else:
-            dist_tmp = infer(net, params, train_outputs, img, get_image_crop_size())
-            score_cache[image_path] = dist_tmp.copy()
+            if BENCHMARK:
+                import time
+                logger.info('BENCHMARK mode')
+                total_time = 0
+                
+                for i in range(6):
+                    start = int(round(time.time() * 1000))
+                    dist_tmp = infer_optimized_ailia(net, net2, params, train_outputs, img, get_image_crop_size())
+                    end = int(round(time.time() * 1000))
+                    logger.info(f'\tailia processing time {end - start} ms')
+                    if i != 0:
+                        total_time = total_time + (end - start)
+                logger.info(f'\taverage time {total_time / 5} ms')
+            else:
+                dist_tmp = infer_optimized_ailia(net,net2, params, train_outputs, img, get_image_crop_size())
+                score_cache[image_path] = dist_tmp.copy()
         score_map.append(dist_tmp)
 
     scores = normalize_scores(score_map, get_image_crop_size(), roi_img)
@@ -320,7 +341,33 @@ def test_from_folder(net, params, train_outputs, threshold):
     load_detail(result_list[0], False)
     ListboxResult.select_set(0)
 
-def test_from_video(net, params, train_outputs, threshold):
+def enable_benchmark(event):
+    global BENCHMARK
+    selection = event.widget.curselection()
+    if selection:
+        selected_index = selection[0]
+        selected_value = event.widget.get(selected_index)
+        BENCHMARK = (selected_value == "True")
+    else:
+        BENCHMARK = False
+    logger.info(f"BENCHMARK set to: {BENCHMARK}")
+
+def save_type_select(event):
+    global USE_FP_16
+    selection = event.widget.curselection()
+    if selection:
+        selected_index = selection[0]
+        selected_value = event.widget.get(selected_index)
+        if selected_value == 'fp32':
+
+            USE_FP_16 = False
+        else:
+            USE_FP_16 = True
+    else:
+        USE_FP_16 = False
+    logger.info(f"Precision format set to FP16: {USE_FP_16}")
+
+def test_from_video(net,net2, params, train_outputs, threshold):
     result_path = "result.mp4"
 
     video_path = test_folder
@@ -346,7 +393,7 @@ def test_from_video(net, params, train_outputs, threshold):
         img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         img = preprocess(img, get_image_resize(), keep_aspect=get_keep_aspect(), crop_size=get_image_crop_size())
 
-        dist_tmp = infer(net, params, train_outputs, img, get_image_crop_size())
+        dist_tmp = infer_optimized_ailia(net,net2, params, train_outputs, img, get_image_crop_size())
 
         score_map.append(dist_tmp)
         roi_img = None
@@ -650,6 +697,12 @@ def main():
     textSave = tk.StringVar(frame)
     textSave.set("Save images")
 
+    textBenchmark = tk.StringVar(frame)
+    textBenchmark.set("Benchmark mode")
+
+    textSaveFile = tk.StringVar(frame)
+    textSaveFile.set("Precision")
+
     valueKeepAspect = tkinter.BooleanVar()
     valueKeepAspect.set(True)
     valueCenterCrop = tkinter.BooleanVar()
@@ -667,6 +720,8 @@ def main():
     labelModel = tk.Label(frame, textvariable=textModel)
     labelTestSettings = tk.Label(frame, textvariable=textTestSettings)
     labelSlider = tk.Label(frame, textvariable=textSlider)
+    labelBenchmark = tk.Label(frame, textvariable=textBenchmark)
+    labelSaveFile = tk.Label(frame, textvariable=textSaveFile)
 
     buttonTrain = tk.Button(frame, textvariable=textRun, command=train_button_clicked, width=14)
     buttonTest = tk.Button(frame, textvariable=textStop, command=test_button_clicked, width=14)
@@ -737,6 +792,35 @@ def main():
     labelTestSettings.grid(row=8, column=4, sticky=tk.NW, columnspan=3)
     labelSlider.grid(row=9, column=4, sticky=tk.NW, columnspan=3)
     scale.grid(row=10, column=4, sticky=tk.NW, columnspan=3)
+
+    fileBenchmark = ["True", "False"]
+    listsFileBenchmark = tk.StringVar(value=fileBenchmark)
+    labelBenchmark.grid(row=11, column=5, sticky=tk.NW)
+    ListboxFileBenchmark = tk.Listbox(frame, listvariable=listsFileBenchmark, width=20, height=len(fileBenchmark), selectmode=tk.BROWSE, exportselection=False)
+    ListboxFileBenchmark.grid(row=11, column=5, padx=0, pady=20)
+
+    # Set the initial selection in the Listbox
+    initial_selection_benchmark = fileBenchmark.index("False")  # Default to "False"
+    ListboxFileBenchmark.select_set(initial_selection_benchmark)
+    ListboxFileBenchmark.event_generate('<<ListboxSelect>>')  # Trigger the event to set the initial state
+
+    # Bind the listbox selection event to the save_type_select function
+    ListboxFileBenchmark.bind('<<ListboxSelect>>', enable_benchmark)
+
+
+    fileOptions = ["fp32", "fp16"]
+    listsFileOPt = tk.StringVar(value=fileOptions)
+    labelSaveFile.grid(row=12, column=0, sticky=tk.NW, columnspan=3)
+    ListboxFileSelect = tk.Listbox(frame, listvariable=listsFileOPt, width=20, height=len(fileOptions), selectmode=tk.BROWSE, exportselection=False)
+    ListboxFileSelect.grid(row=12, column=0, padx=0, pady=20)
+
+    # Set the initial selection in the Listbox
+    initial_selectionFile = fileOptions.index("fp32")  # Default to "pkl"
+    ListboxFileSelect.select_set(initial_selectionFile)
+    ListboxFileSelect.event_generate('<<ListboxSelect>>')  # Trigger the event to set the initial state
+
+    # Bind the listbox selection event to the save_type_select function
+    ListboxFileSelect.bind('<<ListboxSelect>>', save_type_select)
 
     # メインフレームの作成と設置
     frame = ttk.Frame(root)

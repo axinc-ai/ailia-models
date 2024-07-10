@@ -80,6 +80,11 @@ parser.add_argument(
     '-an', '--aug_num', type=int, default=5,
     help='specify the amplification number of augmentation.'
 )
+
+parser.add_argument(
+    '--FP16P',  type=bool, default=False,
+    help='Set use of precision16.'
+)
 args = update_parser(parser)
 
 
@@ -153,9 +158,9 @@ def plot_fig(file_list, test_imgs, scores, anormal_scores, gt_imgs, threshold, s
         plt.close()
 
 
-def train_from_image_or_video(net, params):
+def train_from_image_or_video(net,net2, params):
     # training
-    train_outputs = training(net, params, IMAGE_RESIZE, IMAGE_SIZE, KEEP_ASPECT, int(args.batch_size), args.train_dir, args.aug, args.aug_num, args.seed, logger)
+    train_outputs = training_optimized(net, params, IMAGE_RESIZE, IMAGE_SIZE, KEEP_ASPECT, int(args.batch_size), args.train_dir, args.aug, args.aug_num, args.seed, logger)
 
     # save learned distribution
     if args.feat:
@@ -191,7 +196,7 @@ def load_gt_imgs(gt_type_dir):
     return gt_imgs
 
 
-def decide_threshold_from_gt_image(net, params, train_outputs, gt_imgs):
+def decide_threshold_from_gt_image(net,net2, params, train_outputs, gt_imgs):
     score_map = []
     for i_img in range(0, len(args.input)):
         logger.info('from (%s) ' % (args.input[i_img]))
@@ -201,7 +206,7 @@ def decide_threshold_from_gt_image(net, params, train_outputs, gt_imgs):
         img = cv2.cvtColor(img, cv2.COLOR_BGRA2RGB)
         img = preprocess(img, IMAGE_RESIZE, keep_aspect=KEEP_ASPECT, crop_size = IMAGE_SIZE)
 
-        dist_tmp = infer(net, params, train_outputs, img, IMAGE_SIZE)
+        dist_tmp = infer_optimized_ailia(net,net2, params, train_outputs, img, IMAGE_SIZE)
 
         score_map.append(dist_tmp)
 
@@ -211,7 +216,7 @@ def decide_threshold_from_gt_image(net, params, train_outputs, gt_imgs):
 
     return threshold
 
-def infer_from_image(net, params, train_outputs, threshold, gt_imgs):
+def infer_from_image(net, net2, params, train_outputs, threshold, gt_imgs):
     if len(args.input) == 0:
         logger.error("Input file not found")
         return
@@ -234,14 +239,14 @@ def infer_from_image(net, params, train_outputs, threshold, gt_imgs):
             total_time = 0
             for i in range(args.benchmark_count):
                 start = int(round(time.time() * 1000))
-                dist_tmp = infer(net, params, train_outputs, img, IMAGE_SIZE)
+                dist_tmp = infer_optimized_ailia(net,net2, params, train_outputs, img, IMAGE_SIZE)
                 end = int(round(time.time() * 1000))
                 logger.info(f'\tailia processing time {end - start} ms')
                 if i != 0:
                     total_time = total_time + (end - start)
             logger.info(f'\taverage time {total_time / (args.benchmark_count - 1)} ms')
         else:
-            dist_tmp = infer(net, params, train_outputs, img, IMAGE_SIZE)
+            dist_tmp = infer_optimized_ailia(net, net2, params, train_outputs, img, IMAGE_SIZE)
 
         score_map.append(dist_tmp)
 
@@ -252,7 +257,7 @@ def infer_from_image(net, params, train_outputs, threshold, gt_imgs):
     plot_fig(args.input, test_imgs, scores, anormal_scores, gt_imgs, threshold, args.savepath)
 
 
-def infer_from_video(net, params, train_outputs, threshold):
+def infer_from_video(net,net2, params, train_outputs, threshold):
     capture = webcamera_utils.get_capture(args.video)
     if args.savepath != SAVE_IMAGE_PATH:
         f_h = int(IMAGE_SIZE)
@@ -274,7 +279,7 @@ def infer_from_video(net, params, train_outputs, threshold):
         img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         img = preprocess(img, IMAGE_RESIZE, keep_aspect=KEEP_ASPECT)
 
-        dist_tmp = infer(net, params, train_outputs, img)
+        dist_tmp = infer_optimized_ailia(net,net2, params, train_outputs, img)
 
         score_map.append(dist_tmp)
         scores = normalize_scores(score_map)    # min max is calculated dynamically, please set fixed min max value from calibration data for production
@@ -294,14 +299,14 @@ def infer_from_video(net, params, train_outputs, threshold):
         writer.release()
 
 
-def train_and_infer(net, params):
+def train_and_infer(net, net2, params):
     if args.feat:
         logger.info('loading train set feature from: %s' % args.feat)
         with open(args.feat, 'rb') as f:
             train_outputs = pickle.load(f)
         logger.info('loaded.')
     else:
-        train_outputs = train_from_image_or_video(net, params)
+        train_outputs = train_from_image_or_video(net,net2, params)
 
     if args.threshold is None:
         if args.video:
@@ -312,16 +317,16 @@ def train_and_infer(net, params):
             gt_type_dir = args.gt_dir if args.gt_dir else None
             gt_imgs = load_gt_imgs(gt_type_dir)
 
-            threshold = decide_threshold_from_gt_image(net, params, train_outputs, gt_imgs)
+            threshold = decide_threshold_from_gt_image(net,net2, params, train_outputs, gt_imgs)
             logger.info('Optimal threshold: %f' % threshold)
     else:
         threshold = args.threshold
         gt_imgs = None
 
     if args.video:
-        infer_from_video(net, params, train_outputs, threshold)
+        infer_from_video(net,net2, params, train_outputs, threshold)
     else:
-        infer_from_image(net, params, train_outputs, threshold, gt_imgs)
+        infer_from_image(net,net2, params, train_outputs, threshold, gt_imgs)
     logger.info('Script finished successfully.')
 
 
@@ -329,12 +334,14 @@ def main():
     # model files check and download
     weight_path, model_path, params = get_params(args.arch)
     check_and_download_models(weight_path, model_path, REMOTE_PATH)
+    weight_path_post, model_path_post = get_params( args.arch, True, IMAGE_SIZE, args.FP16P) 
+    check_and_download_models(weight_path_post, model_path_post, REMOTE_PATH)
 
     # create net instance
     net = ailia.Net(model_path, weight_path, env_id=args.env_id)
-
+    net_post = ailia.Net(model_path_post, weight_path_post, env_id=args.env_id)
     # check input
-    train_and_infer(net, params)
+    train_and_infer(net,net_post, params)
 
 
 if __name__ == '__main__':
