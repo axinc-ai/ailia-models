@@ -547,17 +547,17 @@ def infer_optimized(net, net2, params, train_outputs, img, crop_size, device, lo
     dist_tmp = embedding_vectors[0] - train_outputs[0]
 
     # Step 2: Apply the inverse covariance matrix
-    print(" train_outputs[2], dist_tmp ",  train_outputs[2].shape, embedding_vectors[0].shape, train_outputs[0].shape)
+    #print(" train_outputs[2], dist_tmp ",  train_outputs[2].shape, embedding_vectors[0].shape, train_outputs[0].shape)
     transformed_differences = torch.einsum('ijk,jk->ik', train_outputs[2], dist_tmp)
 
     # Step 3: Compute the Mahalanobis distance
     dist_tmp = torch.sqrt(torch.sum(dist_tmp * transformed_differences, dim=0))
     transformed_differences=0
     # upsample
-    print(H, W, crop_size)
+    #print(H, W, crop_size)
     dist_tmp=F.interpolate(dist_tmp.view(1, -1).view( H, W).unsqueeze(0).unsqueeze(0), 
                            size=(crop_size, crop_size), mode='bilinear', align_corners=False).squeeze(0)
-    print(dist_tmp.shape)
+    #print(dist_tmp.shape)
     dist_tmp=gausian_filter_torch(dist_tmp, weights_torch, mode='reflect')
 
     """
@@ -628,10 +628,10 @@ def infer_optimized_ailia(net, net2, params, train_outputs, img, crop_size ):
     # reshape 2d pixels to 1d features
     B, C, H, W = embedding_vectors.shape
     embedding_vectors = embedding_vectors.reshape(B, C, H * W)
-    print("train_outputs[2],  embedding_vectors[0], train_outputs[0] ", train_outputs[2].shape,  embedding_vectors[0].shape, train_outputs[0].shape)
+    #print("train_outputs[2],  embedding_vectors[0], train_outputs[0] ", train_outputs[2].shape,  embedding_vectors[0].shape, train_outputs[0].shape)
 
     output2=net2.run([train_outputs[2],  embedding_vectors[0], train_outputs[0]])[0]
-    print(type(output2))
+    #print(type(output2))
 
     return output2.astype(np.float32)
 
