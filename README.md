@@ -124,7 +124,6 @@ The collection of pre-trained, state-of-the-art AI models.
 | [<img src="diffusion/control_net/examples/output_pose1.png" width=128px>](diffusion/control_net/) | [control_net](/diffusion/control_net/) | [ControlNet](https://github.com/lllyasviel/ControlNet) | Pytorch | 1.2.15 and later |
 | [<img src="diffusion/daclip-sde/output.png" width=128px>](diffusion/daclip-sde/) | [DA-CLIP](/diffusion/daclip-sde/) | [DA-CLIP](https://github.com/Algolzw/daclip-uir) | Pytorch | 1.2.16 and later |
 | [<img src="diffusion/riffusion/output.png" width=128px>](diffusion/riffusion/) | [riffusion](/diffusion/riffusion/) | [Riffusion](https://github.com/riffusion/riffusion) | Pytorch | 1.2.16 and later |
-| [<img src="diffusion/depth_anyting_controlnet/output.png" width=128px>](diffusion/depth_anything_controlnet/) | [depth_anything_controlnet](/deffusion/depth_anything_controlnet/) | [Depth Anything](https://github.com/LiheYoung/Depth-Anything/blob/main/LICENSE) | Pytorch | 1.4.0 and later |
 
 ## Face detection
 
