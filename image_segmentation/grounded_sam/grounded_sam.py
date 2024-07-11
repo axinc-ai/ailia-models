@@ -1,4 +1,5 @@
 import sys
+import os
 import time
 
 import numpy as np
@@ -19,6 +20,15 @@ from detector_utils import load_image, plot_results, hsv_to_rgb  # noqa
 
 # logger
 from logging import getLogger  # noqa
+
+
+top_path = os.path.dirname(
+    os.path.dirname(
+        os.path.dirname(
+            os.path.abspath(__file__),
+        )
+    )
+)
 
 
 logger = getLogger(__name__)
@@ -55,6 +65,23 @@ args = update_parser(parser)
 # ======================
 # Secondaty Functions
 # ======================
+
+
+def setup_groudingdino(tokenizer, grounding_dino):
+    sys.path.append(os.path.join(top_path, "object_detection/groundingdino"))
+    from groundingdino_mod import mod, set_args
+
+    set_args(args)
+
+    def predict(img, caption):
+        models = {
+            "tokenizer": tokenizer,
+            "net": grounding_dino,
+        }
+        boxes, logits, phrases = mod.predict(models, img, caption)
+        return boxes, logits, phrases
+
+    return predict
 
 
 def generate_masks_with_special_tokens(input_ids, special_tokens_list):
@@ -98,6 +125,108 @@ def generate_masks_with_special_tokens(input_ids, special_tokens_list):
     return attention_mask, position_ids
 
 
+def draw_predictions(image, boxes, logits, phrases, masks):
+    height, width, _ = image.shape
+
+    # draw masks
+    colored_mask = np.array(image, copy=True, dtype=np.uint8)
+    area = np.array([np.sum(mask) for mask in masks])
+    for detection_idx in np.flip(np.argsort(area)):
+        mask = masks[detection_idx]
+        colored_mask[mask] = (255, 255, 255)
+
+    opacity = 0.5
+    image = cv2.addWeighted(colored_mask, opacity, image, 1 - opacity, 0)
+    image = image.astype(np.uint8)
+
+    boxes = boxes * np.array([width, height, width, height])
+    cx, cy, w, h = np.split(boxes, 4, axis=-1)
+    x1 = cx - 0.5 * w
+    y1 = cy - 0.5 * h
+    x2 = cx + 0.5 * w
+    y2 = cy + 0.5 * h
+    xyxy = np.concatenate((x1, y1, x2, y2), axis=-1)
+
+    mode_ailia = True
+    if mode_ailia:
+        detect_objects = []
+        for i in range(len(xyxy)):
+            x1, y1, x2, y2 = xyxy[i].astype(int)
+            r = ailia.DetectorObject(
+                category=phrases[i],
+                prob=logits[i],
+                x=x1 / width,
+                y=y1 / height,
+                w=(x2 - x1) / width,
+                h=(y2 - y1) / height,
+            )
+            detect_objects.append(r)
+
+        res_img = plot_results(detect_objects, image)
+        return res_img
+
+    labels = [f"{phrase} {logit:.2f}" for phrase, logit in zip(phrases, logits)]
+
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    thickness = 2
+    text_scale = 0.5
+    text_thickness = 1
+    text_padding = 10
+    for i in range(len(xyxy)):
+        x1, y1, x2, y2 = xyxy[i].astype(int)
+        color = hsv_to_rgb(256 * i / (len(xyxy) + 1), 255, 255)
+        cv2.rectangle(
+            img=image,
+            pt1=(x1, y1),
+            pt2=(x2, y2),
+            color=color,
+            thickness=thickness,
+        )
+
+        text = labels[i]
+
+        text_width, text_height = cv2.getTextSize(
+            text=text,
+            fontFace=font,
+            fontScale=text_scale,
+            thickness=text_thickness,
+        )[0]
+
+        text_x = x1 + text_padding
+        text_y = y1 - text_padding
+
+        text_background_x1 = x1
+        text_background_y1 = y1 - 2 * text_padding - text_height
+
+        text_background_x2 = x1 + 2 * text_padding + text_width
+        text_background_y2 = y1
+
+        cv2.rectangle(
+            img=image,
+            pt1=(text_background_x1, text_background_y1),
+            pt2=(text_background_x2, text_background_y2),
+            color=color,
+            thickness=cv2.FILLED,
+        )
+        cv2.putText(
+            img=image,
+            text=text,
+            org=(text_x, text_y),
+            fontFace=font,
+            fontScale=text_scale,
+            color=(0, 0, 0),
+            thickness=text_thickness,
+            lineType=cv2.LINE_AA,
+        )
+
+    return image
+
+
+# ======================
+# Main functions
+# ======================
+
+
 def preprocess_shape(h, w, long_side_length):
     scale = long_side_length * 1.0 / max(h, w)
     new_h, new_w = h * scale, w * scale
@@ -107,153 +236,7 @@ def preprocess_shape(h, w, long_side_length):
     return new_h, new_w
 
 
-def mask_annotate(img, masks):
-    colored_mask = np.array(img, copy=True, dtype=np.uint8)
-    area = np.array([np.sum(mask) for mask in masks])
-    for detection_idx in np.flip(np.argsort(area)):
-        mask = masks[detection_idx]
-        colored_mask[mask] = (255, 255, 255)
-
-    opacity = 0.5
-    img = cv2.addWeighted(colored_mask, opacity, img, 1 - opacity, 0)
-
-    return img.astype(np.uint8)
-
-
-# ======================
-# Main functions
-# ======================
-
-
-def preprocess(img):
-    im_h, im_w, _ = img.shape
-
-    # Resize
-    size = 800
-    max_size = 1333
-    min_original_size = min(im_w, im_h)
-    max_original_size = max(im_w, im_h)
-    if max_original_size / min_original_size * size > max_size:
-        size = int(round(max_size * min_original_size / max_original_size))
-
-    if (im_w <= im_h and im_w == size) or (im_h <= im_w and im_h == size):
-        oh, ow = im_h, im_w
-    elif im_w < im_h:
-        ow = size
-        oh = int(size * im_h / im_w)
-    else:
-        oh = size
-        ow = int(size * im_w / im_h)
-
-    img = np.asarray(Image.fromarray(img).resize((ow, oh), Image.BILINEAR))
-
-    # Normalize
-    img = normalize_image(img, normalize_type="ImageNet")
-
-    img = img.transpose((2, 0, 1))  # HWC -> CHW
-    img = np.expand_dims(img, axis=0)
-    img = img.astype(np.float16)
-
-    return img
-
-
-def post_processing(tokenizer, caption, pred_logits, pred_boxes):
-    prediction_logits = sigmoid(pred_logits.astype(np.float32))[0]
-    prediction_boxes = pred_boxes[0]
-
-    box_threshold = 0.35
-    mask = np.max(prediction_logits, axis=1) > box_threshold
-    logits = prediction_logits[mask]  # logits.shape = (n, 256)
-    boxes = prediction_boxes[mask]  # boxes.shape = (n, 4)
-
-    text_threshold = 0.25
-    # get_phrases_from_posmap
-    tokenized = tokenizer(caption)
-    non_zero_idx = [np.nonzero(logit > text_threshold)[0].tolist() for logit in logits]
-    token_ids_list = [[tokenized["input_ids"][i] for i in li] for li in non_zero_idx]
-    phrases = [tokenizer.decode(token_ids) for token_ids in token_ids_list]
-
-    logits = np.max(logits, axis=1)
-
-    return boxes, logits, phrases
-
-
-def predict_grounding_dino(models, img, caption):
-    img = img[:, :, ::-1]  # BGR -> RGB
-    img = preprocess(img)
-
-    tokenizer = models["tokenizer"]
-
-    captions = [caption]
-    tokenized = tokenizer(captions, padding="longest", return_tensors="np")
-
-    (text_self_attention_masks, position_ids) = generate_masks_with_special_tokens(
-        tokenized["input_ids"], tokenizer.specical_tokens
-    )
-
-    max_text_len = 256
-    if text_self_attention_masks.shape[1] > max_text_len:
-        text_self_attention_masks = text_self_attention_masks[
-            :, :max_text_len, :max_text_len
-        ]
-        position_ids = position_ids[:, :max_text_len]
-        tokenized["input_ids"] = tokenized["input_ids"][:, :max_text_len]
-        tokenized["attention_mask"] = tokenized["attention_mask"][:, :max_text_len]
-        tokenized["token_type_ids"] = tokenized["token_type_ids"][:, :max_text_len]
-
-    # extract text embeddings
-    tokenized_for_encoder = {
-        k: v for k, v in tokenized.items() if k != "attention_mask"
-    }
-    tokenized_for_encoder["attention_mask"] = text_self_attention_masks
-    tokenized_for_encoder["position_ids"] = position_ids
-
-    input_ids = tokenized_for_encoder["input_ids"]
-    token_type_ids = tokenized_for_encoder["token_type_ids"]
-    attention_mask = tokenized_for_encoder["attention_mask"]
-    position_ids = tokenized_for_encoder["position_ids"]
-    text_token_mask = tokenized.attention_mask.astype(bool)
-
-    # feedforward
-    net = models["grounding_dino"]
-    if not args.onnx:
-        output = net.predict(
-            [
-                img,
-                input_ids,
-                token_type_ids,
-                attention_mask,
-                position_ids,
-                text_token_mask,
-            ]
-        )
-    else:
-        output = net.run(
-            None,
-            {
-                "samples": img,
-                "input_ids": input_ids,
-                "token_type_ids": token_type_ids,
-                "attention_mask": attention_mask,
-                "position_ids": position_ids,
-                "text_token_mask": text_token_mask,
-            },
-        )
-    pred_logits, pred_boxes = output
-
-    boxes, logits, phrases = post_processing(
-        tokenizer, caption, pred_logits, pred_boxes
-    )
-
-    return boxes, logits, phrases
-
-
-def segment(net, img, xyxy):
-    img = img[:, :, ::-1]  # BGR -> RGB
-    original_size = img.shape[:2]
-
-    target_length = 1024
-    target_size = preprocess_shape(original_size[0], original_size[1], target_length)
+def preprocess(img, target_size):
     img = np.array(
         Image.fromarray(img).resize(target_size[::-1], Image.Resampling.BILINEAR)
     )
@@ -269,22 +252,38 @@ def segment(net, img, xyxy):
     img = np.expand_dims(img, axis=0)
     img = img.astype(np.float32)
 
+    return img
+
+
+def segment(net, img, boxes):
+    height, width, _ = img.shape
+    img = img[:, :, ::-1]  # BGR -> RGB
+
+    target_length = 1024
+    target_size = preprocess_shape(height, width, target_length)
+    img = preprocess(img, target_size)
+
+    boxes = boxes * np.array([width, height, width, height], dtype=np.float32)
+
+    cx, cy, w, h = np.split(boxes, 4, axis=-1)
+    x1 = cx - 0.5 * w
+    y1 = cy - 0.5 * h
+    x2 = cx + 0.5 * w
+    y2 = cy + 0.5 * h
+    xyxy = np.concatenate((x1, y1, x2, y2), axis=-1)
+
     result_masks = []
     for box in xyxy:
         # Transform
-        new_h, new_w = preprocess_shape(
-            original_size[0], original_size[1], target_length
-        )
-
         coords = box.reshape(-1, 2, 2)
-        coords[..., 0] = coords[..., 0] * (new_w / original_size[1])
-        coords[..., 1] = coords[..., 1] * (new_h / original_size[0])
+        coords[..., 0] = coords[..., 0] * (target_size[1] / width)
+        coords[..., 1] = coords[..., 1] * (target_size[0] / height)
         box = box.reshape(-1, 4)
         box = box[None, :]
 
         # feedforward
         input_size = np.array(target_size, dtype=int)
-        original_size = np.array(original_size, dtype=int)
+        original_size = np.array((height, width), dtype=int)
         if not args.onnx:
             output = net.predict([img, box, input_size, original_size])
         else:
@@ -309,22 +308,13 @@ def segment(net, img, xyxy):
 
 
 def predict(models, img, caption):
-    height, width, _ = img.shape
-    boxes, logits, phrases = predict_grounding_dino(models, img, caption)
-
-    boxes = boxes * np.array([width, height, width, height], dtype=np.float32)
-
-    cx, cy, w, h = np.split(boxes, 4, axis=-1)
-    x1 = cx - 0.5 * w
-    y1 = cy - 0.5 * h
-    x2 = cx + 0.5 * w
-    y2 = cy + 0.5 * h
-    xyxy = np.concatenate((x1, y1, x2, y2), axis=-1)
+    predict_grounding_dino = models["grounding_dino"]
+    boxes, logits, phrases = predict_grounding_dino(img, caption)
 
     net = models["sam"]
-    mask = segment(net, img, xyxy)
+    masks = segment(net, img, boxes)
 
-    return mask
+    return boxes, logits, phrases, masks
 
 
 def recognize_from_image(models):
@@ -364,8 +354,12 @@ def recognize_from_image(models):
         else:
             output = predict(models, img, caption)
 
-        mask = output
-        res_img = mask_annotate(img, mask)
+        boxes, logits, phrases, masks = output
+
+        logger.info("detected %d instances" % len(boxes))
+
+        # draw prediction
+        res_img = draw_predictions(img, boxes, logits, phrases, masks)
 
         # plot result
         savepath = get_savepath(args.savepath, image_path, ext=".png")
@@ -397,9 +391,11 @@ def main():
         ["[CLS]", "[SEP]", ".", "?"]
     )
 
+    predict_grounding_dino = setup_groudingdino(tokenizer, grounding_dino)
+
     models = {
         "tokenizer": tokenizer,
-        "grounding_dino": grounding_dino,
+        "grounding_dino": predict_grounding_dino,
         "sam": net,
     }
 
