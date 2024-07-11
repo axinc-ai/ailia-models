@@ -98,6 +98,28 @@ def generate_masks_with_special_tokens(input_ids, special_tokens_list):
     return attention_mask, position_ids
 
 
+def preprocess_shape(h, w, long_side_length):
+    scale = long_side_length * 1.0 / max(h, w)
+    new_h, new_w = h * scale, w * scale
+    new_w = int(new_w + 0.5)
+    new_h = int(new_h + 0.5)
+
+    return new_h, new_w
+
+
+def mask_annotate(img, masks):
+    colored_mask = np.array(img, copy=True, dtype=np.uint8)
+    area = np.array([np.sum(mask) for mask in masks])
+    for detection_idx in np.flip(np.argsort(area)):
+        mask = masks[detection_idx]
+        colored_mask[mask] = (255, 255, 255)
+
+    opacity = 0.5
+    img = cv2.addWeighted(colored_mask, opacity, img, 1 - opacity, 0)
+
+    return img.astype(np.uint8)
+
+
 # ======================
 # Main functions
 # ======================
@@ -227,16 +249,32 @@ def predict_grounding_dino(models, img, caption):
 
 
 def segment(net, img, xyxy):
+    img = img[:, :, ::-1]  # BGR -> RGB
     original_size = img.shape[:2]
+
+    target_length = 1024
+    target_size = preprocess_shape(original_size[0], original_size[1], target_length)
+    img = np.array(
+        Image.fromarray(img).resize(target_size[::-1], Image.Resampling.BILINEAR)
+    )
+
+    img = normalize_image(img, normalize_type="ImageNet")
+
+    img_size = 1024
+    pad_h = img_size - target_size[0]
+    pad_w = img_size - target_size[1]
+    img = np.pad(img, ((0, pad_h), (0, pad_w), (0, 0)))
+
+    img = img.transpose(2, 0, 1)  # HWC -> CHW
+    img = np.expand_dims(img, axis=0)
+    img = img.astype(np.float32)
 
     result_masks = []
     for box in xyxy:
         # Transform
-        long_side_length = 1024
-        scale = long_side_length * 1.0 / max(original_size)
-        new_h, new_w = original_size[0] * scale, original_size[1] * scale
-        new_w = int(new_w + 0.5)
-        new_h = int(new_h + 0.5)
+        new_h, new_w = preprocess_shape(
+            original_size[0], original_size[1], target_length
+        )
 
         coords = box.reshape(-1, 2, 2)
         coords[..., 0] = coords[..., 0] * (new_w / original_size[1])
@@ -245,29 +283,36 @@ def segment(net, img, xyxy):
         box = box[None, :]
 
         # feedforward
+        input_size = np.array(target_size, dtype=int)
+        original_size = np.array(original_size, dtype=int)
         if not args.onnx:
-            output = net.predict([img, box])
+            output = net.predict([img, box, input_size, original_size])
         else:
             output = net.run(
                 None,
-                {"image": img, "box": box},
+                {
+                    "image": img,
+                    "box": box,
+                    "input_size": input_size,
+                    "original_size": original_size,
+                },
             )
         masks, iou_predictions, low_res_masks = output
 
         masks = masks[0]
-        iou_predictions = iou_predictions[0]
-        low_res_masks = low_res_masks[0]
-        # index = np.argmax(scores)
-        # result_masks.append(masks[index])
+        scores = iou_predictions[0]
+        logits = low_res_masks[0]
+        index = np.argmax(scores)
+        result_masks.append(masks[index])
 
-    return result_masks
+    return np.array(result_masks)
 
 
 def predict(models, img, caption):
     height, width, _ = img.shape
     boxes, logits, phrases = predict_grounding_dino(models, img, caption)
 
-    boxes = boxes * np.array([width, height, width, height])
+    boxes = boxes * np.array([width, height, width, height], dtype=np.float32)
 
     cx, cy, w, h = np.split(boxes, 4, axis=-1)
     x1 = cx - 0.5 * w
@@ -278,6 +323,8 @@ def predict(models, img, caption):
 
     net = models["sam"]
     mask = segment(net, img, xyxy)
+
+    return mask
 
 
 def recognize_from_image(models):
@@ -317,10 +364,13 @@ def recognize_from_image(models):
         else:
             output = predict(models, img, caption)
 
-        # # plot result
-        # savepath = get_savepath(args.savepath, image_path, ext=".png")
-        # logger.info(f"saved at : {savepath}")
-        # cv2.imwrite(savepath, res_img)
+        mask = output
+        res_img = mask_annotate(img, mask)
+
+        # plot result
+        savepath = get_savepath(args.savepath, image_path, ext=".png")
+        logger.info(f"saved at : {savepath}")
+        cv2.imwrite(savepath, res_img)
 
     logger.info("Script finished successfully.")
 
