@@ -15,9 +15,10 @@ The collection of pre-trained, state-of-the-art AI models.
 [ailia MODELS tutorial 日本語版](TUTORIAL_jp.md)
 
 # Supported models
-332 models as of June 24th, 2024
+333 models as of July 9th, 2024
 
 # Latest update
+- 2024.07.09 Add GroundingDINO
 - 2024.06.26 Add g2p_en
 - 2024.06.24 Add soundchoice-g2p
 - 2024.06.11 Add gpt-sovits, reazon speech, reazon speech2 (ailia SDK 1.4.0)
