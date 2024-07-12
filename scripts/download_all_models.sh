@@ -33,6 +33,9 @@ cd ../../audio_processing/audioset_tagging_cnn/; python3 audioset_tagging_cnn.py
 cd ../../audio_processing/deep-music-enhancer/; python3 deep_music_enhancer.py ${OPTION}
 cd ../../audio_processing/pyannote-audio/; python3 pyannote-audio.py ${OPTION}
 cd ../../audio_processing/kotoba-whisper/; python3 kotoba-whisper.py ${OPTION}
+cd ../../audio_processing/reazon_speech/; python3 reazon_speech.py ${OPTION}
+cd ../../audio_processing/reazon_speech2/; python3 reazon_speech2.py ${OPTION}
+cd ../../audio_processing/gpt-sovits/; python3 gpt-sovits.py ${OPTION}
 cd ../../background_ramoval/deep-image-matting; python3 deep-image-matting.py ${OPTION}
 cd ../../background_ramoval/u2net; python3 u2net.py ${OPTION}
 cd ../../background_ramoval/u2net; python3 u2net.py -a small ${OPTION}
@@ -217,6 +220,8 @@ cd ../../natural_language_processing/t5_whisper_medical; python3 t5_whisper_medi
 cd ../../natural_language_processing/t5_base_japanese_summarization; python3 t5_base_japanese_summarization.py ${OPTION}
 cd ../../natural_language_processing/glucose; python3 glucose.py ${OPTION}
 cd ../../natural_language_processing/cross_encoder_mmarco; python3 cross_encoder_mmarco.py ${OPTION}
+cd ../../natural_language_processing/soundchoice-g2p; python3 soundchoice-g2p.py ${OPTION}
+cd ../../natural_language_processing/g2p_en; python3 g2p_en.py ${OPTION}
 cd ../../network_intrusion_detection/bert-network-packet-flow-header-payload; python3 bert-network-packet-flow-header-payload.py ${OPTION}
 cd ../../network_intrusion_detection/falcon-adapter-network-packet; python3 falcon-adapter-network-packet.py ${OPTION}
 cd ../../neural_rendering/nerf; python3 nerf.py ${OPTION}
@@ -259,6 +264,7 @@ cd ../../object_detection/footandball; python3 footandball.py ${OPTION}
 cd ../../object_detection/qrcode_wechatqrode; python3 qrcode_wechatqrode.py ${OPTION}
 cd ../../object_detection/layout_parsing; python3 layout_parsing.py ${OPTION}
 cd ../../object_detection/damo_yolo; python3 damo_yolo.py ${OPTION}
+cd ../../object_detection/groundingdino; python3 groundingdino.py ${OPTION}
 cd ../../object_detection_3d/3d_bbox; python3 3d_bbox.py ${OPTION}
 cd ../../object_detection_3d/3d-object-detection.pytorch; python3 3d-object-detection.pytorch.py ${OPTION}
 cd ../../object_detection_3d/mediapipe_objectron; python3 mediapipe_objectron.py ${OPTION}
