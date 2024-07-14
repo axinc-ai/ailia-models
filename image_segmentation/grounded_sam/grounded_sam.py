@@ -15,8 +15,8 @@ sys.path.append("../../util")
 from arg_utils import get_base_parser, update_parser, get_savepath  # noqa
 from model_utils import check_and_download_models  # noqa
 from image_utils import normalize_image  # noqa
-from math_utils import sigmoid
 from detector_utils import load_image, plot_results, hsv_to_rgb  # noqa
+from nms_utils import nms_boxes  # noqa
 
 # logger
 from logging import getLogger  # noqa
@@ -38,11 +38,12 @@ logger = getLogger(__name__)
 # Parameters
 # ======================
 
+WEIGHT_PATH = "sam_vit_h_4b8939.onnx"
+MODEL_PATH = "sam_vit_h_4b8939.onnx.prototxt"
 WEIGHT_GDINO_PATH = "groundingdino_swint_ogc.onnx"
 MODEL_GDINO_PATH = "groundingdino_swint_ogc.onnx.prototxt"
-WEIGHT_SAM_PATH = "sam_vit_h_4b8939.onnx"
-MODEL_SAM_PATH = "sam_vit_h_4b8939.onnx.prototxt"
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/grounded-sam/"
+REMOTE_GDINO_PATH = "https://storage.googleapis.com/ailia-models/groundingdino/"
 
 IMAGE_PATH = "demo.jpg"
 SAVE_IMAGE_PATH = "output.png"
@@ -128,12 +129,16 @@ def generate_masks_with_special_tokens(input_ids, special_tokens_list):
 def draw_predictions(image, boxes, logits, phrases, masks):
     height, width, _ = image.shape
 
+    colors = [
+        hsv_to_rgb(256 * i / (len(boxes) + 1), 255, 255) for i in range(len(boxes))
+    ]
+
     # draw masks
     colored_mask = np.array(image, copy=True, dtype=np.uint8)
     area = np.array([np.sum(mask) for mask in masks])
     for detection_idx in np.flip(np.argsort(area)):
         mask = masks[detection_idx]
-        colored_mask[mask] = (255, 255, 255)
+        colored_mask[mask] = colors[detection_idx][:3]
 
     opacity = 0.5
     image = cv2.addWeighted(colored_mask, opacity, image, 1 - opacity, 0)
@@ -174,7 +179,7 @@ def draw_predictions(image, boxes, logits, phrases, masks):
     text_padding = 10
     for i in range(len(xyxy)):
         x1, y1, x2, y2 = xyxy[i].astype(int)
-        color = hsv_to_rgb(256 * i / (len(xyxy) + 1), 255, 255)
+        color = colors[i]
         cv2.rectangle(
             img=image,
             pt1=(x1, y1),
@@ -255,22 +260,13 @@ def preprocess(img, target_size):
     return img
 
 
-def segment(net, img, boxes):
+def segment(net, img, xyxy):
     height, width, _ = img.shape
     img = img[:, :, ::-1]  # BGR -> RGB
 
     target_length = 1024
     target_size = preprocess_shape(height, width, target_length)
     img = preprocess(img, target_size)
-
-    boxes = boxes * np.array([width, height, width, height], dtype=np.float32)
-
-    cx, cy, w, h = np.split(boxes, 4, axis=-1)
-    x1 = cx - 0.5 * w
-    y1 = cy - 0.5 * h
-    x2 = cx + 0.5 * w
-    y2 = cy + 0.5 * h
-    xyxy = np.concatenate((x1, y1, x2, y2), axis=-1)
 
     result_masks = []
     for box in xyxy:
@@ -308,11 +304,30 @@ def segment(net, img, boxes):
 
 
 def predict(models, img, caption):
+    height, width, _ = img.shape
+
     predict_grounding_dino = models["grounding_dino"]
     boxes, logits, phrases = predict_grounding_dino(img, caption)
 
+    _boxes = boxes * np.array([width, height, width, height], dtype=np.float32)
+    cx, cy, w, h = np.split(_boxes, 4, axis=-1)
+    x1 = cx - 0.5 * w
+    y1 = cy - 0.5 * h
+    x2 = cx + 0.5 * w
+    y2 = cy + 0.5 * h
+    xyxy = np.concatenate((x1, y1, x2, y2), axis=-1)
+
+    # NMS
+    NMS_THRESHOLD = 0.8
+    nms_idx = nms_boxes(xyxy, logits, NMS_THRESHOLD)
+
+    boxes = boxes[nms_idx]
+    xyxy = xyxy[nms_idx]
+    logits = logits[nms_idx]
+    phrases = [p for i, p in enumerate(phrases) if i in nms_idx]
+
     net = models["sam"]
-    masks = segment(net, img, boxes)
+    masks = segment(net, img, xyxy)
 
     return boxes, logits, phrases, masks
 
@@ -371,8 +386,8 @@ def recognize_from_image(models):
 
 def main():
     # model files check and download
-    check_and_download_models(WEIGHT_GDINO_PATH, MODEL_GDINO_PATH, REMOTE_PATH)
-    check_and_download_models(WEIGHT_SAM_PATH, MODEL_SAM_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_GDINO_PATH, MODEL_GDINO_PATH, REMOTE_GDINO_PATH)
 
     env_id = args.env_id
 
@@ -384,7 +399,7 @@ def main():
         import onnxruntime
 
         grounding_dino = onnxruntime.InferenceSession(WEIGHT_GDINO_PATH)
-        net = onnxruntime.InferenceSession(WEIGHT_SAM_PATH)
+        net = onnxruntime.InferenceSession(WEIGHT_PATH)
 
     tokenizer = AutoTokenizer.from_pretrained("tokenizer")
     tokenizer.specical_tokens = tokenizer.convert_tokens_to_ids(
