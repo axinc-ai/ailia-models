@@ -395,8 +395,11 @@ def main():
 
     # initialize
     if not args.onnx:
-        grounding_dino = ailia.Net(MODEL_GDINO_PATH, WEIGHT_GDINO_PATH, env_id=env_id)
-        net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+        memory_mode = ailia.get_memory_mode(
+            reduce_constant=True, ignore_input_with_initializer=True,
+            reduce_interstage=False, reuse_interstage=True)
+        grounding_dino = ailia.Net(MODEL_GDINO_PATH, WEIGHT_GDINO_PATH, env_id=env_id, memory_mode=memory_mode)
+        net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id, memory_mode=memory_mode)
     else:
         import onnxruntime
 
