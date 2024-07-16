@@ -15,14 +15,14 @@ The collection of pre-trained, state-of-the-art AI models.
 [ailia MODELS tutorial 日本語版](TUTORIAL_jp.md)
 
 # Supported models
-332 models as of June 24th, 2024
+334 models as of July 12th, 2024
 
 # Latest update
+- 2024.07.12 Add llava
+- 2024.07.09 Add GroundingDINO
 - 2024.06.26 Add g2p_en
 - 2024.06.24 Add soundchoice-g2p
 - 2024.06.11 Add gpt-sovits, reazon speech, reazon speech2 (ailia SDK 1.4.0)
-- 2024.05.28 Add kotoba-whisper
-- 2024.05.26 Add multilingual-e5 (LayerNorm version)
 - More information in our [Wiki](https://github.com/axinc-ai/ailia-models/wiki)
 
 ## Action recognition
@@ -327,6 +327,13 @@ The collection of pre-trained, state-of-the-art AI models.
 | [<img src="image_segmentation/tusimple-DUC/output.png" width=128px>](image_segmentation/tusimple-DUC/) | [tusimple-DUC](/image_segmentation/tusimple-DUC/) | [TuSimple-DUC](https://github.com/TuSimple/TuSimple-DUC) | Pytorch | 1.2.10 and later |  |
 | [<img src="image_segmentation/pytorch-fcn/result.jpg" width=128px>](image_segmentation/pytorch-fcn/) | [pytorch-fcn](/image_segmentation/pytorch-fcn/) | [pytorch-fcn](https://github.com/wkentaro/pytorch-fcn) | Pytorch | 1.3.0 and later |
 | [<img src="image_segmentation/grounded_sam/output.png" width=128px>](image_segmentation/grounded_sam/) | [grounded_sam](/image_segmentation/grounded_sam/) | [Grounded-SAM](https://github.com/IDEA-Research/Grounded-Segment-Anything/tree/main) | Pytorch | 1.3.0 and later |
+
+## Large Language Model
+
+| Model | Reference | Exported From | Supported Ailia Version | Blog |
+|------------:|:------------:|:------------:|:------------:|:------------:|
+|[llava](/large_language_model/llava) | [LLaVA](https://github.com/haotian-liu/LLaVA) | Pytorch | 1.2.16 and later | |
+
 
 ## Landmark classification
 
