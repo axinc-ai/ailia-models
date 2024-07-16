@@ -326,6 +326,7 @@ The collection of pre-trained, state-of-the-art AI models.
 | [<img src="image_segmentation/segment-anything/example/output1.png" width=128px>](image_segmentation/segment-anything/) | [segment-anything](/image_segmentation/segment-anything/) | [Segment Anything](https://github.com/facebookresearch/segment-anything) | Pytorch | 1.2.16 and later |
 | [<img src="image_segmentation/tusimple-DUC/output.png" width=128px>](image_segmentation/tusimple-DUC/) | [tusimple-DUC](/image_segmentation/tusimple-DUC/) | [TuSimple-DUC](https://github.com/TuSimple/TuSimple-DUC) | Pytorch | 1.2.10 and later |  |
 | [<img src="image_segmentation/pytorch-fcn/result.jpg" width=128px>](image_segmentation/pytorch-fcn/) | [pytorch-fcn](/image_segmentation/pytorch-fcn/) | [pytorch-fcn](https://github.com/wkentaro/pytorch-fcn) | Pytorch | 1.3.0 and later |
+| [<img src="image_segmentation/grounded_sam/output.png" width=128px>](image_segmentation/grounded_sam/) | [grounded_sam](/image_segmentation/grounded_sam/) | [Grounded-SAM](https://github.com/IDEA-Research/Grounded-Segment-Anything/tree/main) | Pytorch | 1.2.16 and later |
 
 ## Large Language Model
 
