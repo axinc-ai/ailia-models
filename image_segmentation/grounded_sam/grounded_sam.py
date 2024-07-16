@@ -13,7 +13,7 @@ import ailia
 # import original modules
 sys.path.append("../../util")
 from arg_utils import get_base_parser, update_parser, get_savepath  # noqa
-from model_utils import check_and_download_models  # noqa
+from model_utils import check_and_download_models, check_and_download_file  # noqa
 from image_utils import normalize_image  # noqa
 from detector_utils import load_image, plot_results, hsv_to_rgb  # noqa
 from nms_utils import nms_boxes  # noqa
@@ -40,6 +40,7 @@ logger = getLogger(__name__)
 
 WEIGHT_PATH = "sam_vit_h_4b8939.onnx"
 MODEL_PATH = "sam_vit_h_4b8939.onnx.prototxt"
+DATA_PATH = "sam_vit_h_4b8939_weights.pb"
 WEIGHT_GDINO_PATH = "groundingdino_swint_ogc.onnx"
 MODEL_GDINO_PATH = "groundingdino_swint_ogc.onnx.prototxt"
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/grounded-sam/"
@@ -387,6 +388,7 @@ def recognize_from_image(models):
 def main():
     # model files check and download
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
+    check_and_download_file(DATA_PATH, REMOTE_PATH)
     check_and_download_models(WEIGHT_GDINO_PATH, MODEL_GDINO_PATH, REMOTE_GDINO_PATH)
 
     env_id = args.env_id
