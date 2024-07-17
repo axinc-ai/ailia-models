@@ -5,7 +5,6 @@ import time
 import numpy as np
 import cv2
 from PIL import Image
-from transformers import AutoTokenizer
 
 import ailia
 
@@ -59,6 +58,11 @@ parser.add_argument(
     type=str,
     default="The running dog.",
     help="Text prompt.",
+)
+parser.add_argument(
+    '--disable_ailia_tokenizer',
+    action='store_true',
+    help='disable ailia tokenizer.'
 )
 parser.add_argument("--onnx", action="store_true", help="execute onnxruntime version.")
 args = update_parser(parser)
@@ -406,7 +410,13 @@ def main():
         grounding_dino = onnxruntime.InferenceSession(WEIGHT_GDINO_PATH)
         net = onnxruntime.InferenceSession(WEIGHT_PATH)
 
-    tokenizer = AutoTokenizer.from_pretrained("tokenizer")
+    if args.disable_ailia_tokenizer:
+        from transformers import AutoTokenizer
+        tokenizer = AutoTokenizer.from_pretrained("tokenizer")
+    else:
+        from ailia_tokenizer import BertUncasedTokenizer
+        tokenizer = BertUncasedTokenizer.from_pretrained("./tokenizer/vocab.txt")
+
     tokenizer.specical_tokens = tokenizer.convert_tokens_to_ids(
         ["[CLS]", "[SEP]", ".", "?"]
     )

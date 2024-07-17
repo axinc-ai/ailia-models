@@ -20,7 +20,7 @@
 This model requires additional module.
 
 ```
-pip3 install transformers
+pip3 install ailia_tokenizer
 ```
 
 ## Usage
