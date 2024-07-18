@@ -15,9 +15,10 @@ The collection of pre-trained, state-of-the-art AI models.
 [ailia MODELS tutorial 日本語版](TUTORIAL_jp.md)
 
 # Supported models
-334 models as of July 12th, 2024
+335 models as of July 16th, 2024
 
 # Latest update
+- 2024.07.16 Add grounded_sam
 - 2024.07.12 Add llava
 - 2024.07.09 Add GroundingDINO
 - 2024.06.26 Add g2p_en
