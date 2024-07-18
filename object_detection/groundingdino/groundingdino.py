@@ -4,7 +4,6 @@ import time
 import numpy as np
 import cv2
 from PIL import Image
-from transformers import AutoTokenizer
 
 import ailia
 
@@ -45,6 +44,11 @@ parser.add_argument(
     type=str,
     default="Horse. Clouds. Grasses. Sky. Hill.",
     help="Text prompt.",
+)
+parser.add_argument(
+    '--disable_ailia_tokenizer',
+    action='store_true',
+    help='disable ailia tokenizer.'
 )
 parser.add_argument("--onnx", action="store_true", help="execute onnxruntime version.")
 args = update_parser(parser)
@@ -238,7 +242,7 @@ def post_processing(tokenizer, caption, pred_logits, pred_boxes):
     tokenized = tokenizer(caption)
     non_zero_idx = [np.nonzero(logit > text_threshold)[0].tolist() for logit in logits]
     token_ids_list = [[tokenized["input_ids"][i] for i in li] for li in non_zero_idx]
-    phrases = [tokenizer.decode(token_ids) for token_ids in token_ids_list]
+    phrases = [tokenizer.decode(token_ids, skip_special_tokens = True) for token_ids in token_ids_list]
 
     logits = np.max(logits, axis=1)
 
@@ -384,7 +388,13 @@ def main():
 
         net = onnxruntime.InferenceSession(WEIGHT_PATH)
 
-    tokenizer = AutoTokenizer.from_pretrained("tokenizer")
+    if args.disable_ailia_tokenizer:
+        from transformers import AutoTokenizer
+        tokenizer = AutoTokenizer.from_pretrained("tokenizer")
+    else:
+        from ailia_tokenizer import BertUncasedTokenizer
+        tokenizer = BertUncasedTokenizer.from_pretrained("./tokenizer/vocab.txt")
+
     tokenizer.specical_tokens = tokenizer.convert_tokens_to_ids(
         ["[CLS]", "[SEP]", ".", "?"]
     )
