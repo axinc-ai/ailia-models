@@ -15,6 +15,8 @@ from detector_utils import load_image  # noqa
 from nms_utils import nms_boxes
 from webcamera_utils import get_capture, get_writer  # noqa
 
+from utils_crop import crop_image
+
 # logger
 from logging import getLogger  # noqa
 
@@ -162,7 +164,6 @@ def get_face_analysis(det_face, landmark):
 
     def face_analysis(img):
         input_size = 512
-        img = img[:, :, ::-1]  # BGR -> RGB
 
         im_ratio = float(img.shape[0]) / img.shape[1]
         if im_ratio > 1:
@@ -279,6 +280,8 @@ def get_face_analysis(det_face, landmark):
         src_face = src_face[0]
         lmk = src_face["landmark_2d_106"]  # this is the 106 landmarks from insightface
 
+        return lmk
+
     return face_analysis
 
 
@@ -289,7 +292,6 @@ def get_face_analysis(det_face, landmark):
 
 def preprocess(img):
     h, w = img.shape[:2]
-    # img = img[:, :, ::-1]  # BGR -> RGB
 
     # ajust the size of the image according to the maximum dimension
     max_dim = 1280
@@ -335,20 +337,63 @@ def post_processing(pred):
     return img
 
 
-def warp_decode(models):
-    pass
-
-
-def predict(models, img):
+def crop_src_image(models, img):
+    img = img[:, :, ::-1]  # BGR -> RGB
     img = preprocess(img)
 
     face_analysis = models["face_analysis"]
-    face_analysis(img)
+    lmk = face_analysis(img)
 
-    return
+    # crop the face
+    crop_info = crop_image(img, lmk, dsize=512, scale=2.3, vy_ratio=-0.125)
+
+    crop_dct = crop_image(img, lmk, dsize=224, scale=1.5, vy_ratio=-0.1)
+    img_crop = crop_dct["img_crop"]
+
+    img_crop = img_crop / 255
+    img_crop = img_crop.transpose(2, 0, 1)  # HWC -> CHW
+    img_crop = np.expand_dims(img_crop, axis=0)
+    img_crop = img_crop.astype(np.float32)
+
+    # feedforward
+    net = models["landmark_runner"]
+    if not args.onnx:
+        output = net.predict([img_crop])
+    else:
+        output = net.run(None, {"input": img_crop})
+    out_pts = output[2]
+
+    # 2d landmarks 203 points
+    lmk = out_pts[0].reshape(-1, 2) * 224  # scale to 0-224
+    # _transform_pts
+    M = crop_dct["M_c2o"]
+    lmk = lmk @ M[:2, :2].T + M[:2, 2]
+
+    crop_info["lmk_crop"] = lmk
+    crop_info["img_crop_256x256"] = cv2.resize(
+        crop_info["img_crop"], (256, 256), interpolation=cv2.INTER_AREA
+    )
+    crop_info["lmk_crop_256x256"] = crop_info["lmk_crop"] * 256 / 512
+
+    return crop_info
+
+
+def predict(models, crop_info, img):
+    source_lmk = crop_info["lmk_crop"]
+    img_crop, img_crop_256x256 = crop_info["img_crop"], crop_info["img_crop_256x256"]
+
+    return models
 
 
 def recognize_from_image(models):
+    # prepare input data
+    img = load_image(IMAGE_PATH)
+    img = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
+    crop_info = crop_src_image(models, img)
+
+    if crop_info is None:
+        raise Exception("No face detected in the source image!")
+
     # input image loop
     for image_path in args.input:
         logger.info(image_path)
@@ -454,6 +499,8 @@ def main():
         # init S
         stitching = onnxruntime.InferenceSession("stitching.onnx")
 
+        landmark_runner = onnxruntime.InferenceSession("landmark.onnx")
+
         landmark = onnxruntime.InferenceSession("2d106det.onnx")
         det_face = onnxruntime.InferenceSession("det_10g.onnx")
 
@@ -465,6 +512,7 @@ def main():
         "warping_module": warping_module,
         "spade_generator": spade_generator,
         "stitching": stitching,
+        "landmark_runner": landmark_runner,
         "face_analysis": face_analysis,
     }
 
