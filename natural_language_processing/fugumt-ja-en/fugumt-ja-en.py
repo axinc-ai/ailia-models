@@ -4,7 +4,6 @@ from typing import Tuple
 from logging import getLogger
 
 import numpy as np
-from transformers import MarianTokenizer
 
 # import original modules
 sys.path.append('../../util')
@@ -37,12 +36,25 @@ parser.add_argument(
     help="Input text."
 )
 parser.add_argument(
+    '--disable_ailia_tokenizer',
+    action='store_true',
+    help='disable ailia tokenizer.'
+)
+parser.add_argument(
     '--onnx',
     action='store_true',
     help='execute onnxruntime version.'
 )
 args = update_parser(parser, check_input_type=False)
 
+# ======================
+# Import tokenizer
+# ======================
+
+if args.disable_ailia_tokenizer:
+    from transformers import MarianTokenizer
+else:
+    from ailia_tokenizer import MarianTokenizer
 
 # ======================
 # Model wrapper
@@ -169,7 +181,7 @@ class MarianMT:
         translation_text = self.tokenizer.decode(
             output_ids[0],
             skip_special_tokens=True,
-            clean_up_tokenization_spaces=False,
+            #clean_up_tokenization_spaces=False,
         )
         return translation_text
 
@@ -240,7 +252,10 @@ def main():
     check_and_download_models(ENCODER_ONNX_PATH, ENCODER_PROTOTXT_PATH, REMOTE_PATH)
     check_and_download_models(DECODER_ONNX_PATH, DECODER_PROTOTXT_PATH, REMOTE_PATH)
 
-    tokenizer = MarianTokenizer.from_pretrained("tokenizer")
+    if args.disable_ailia_tokenizer:
+        tokenizer = MarianTokenizer.from_pretrained("tokenizer")
+    else:
+        tokenizer = MarianTokenizer.from_pretrained("./tokenizer/source.spm")
 
     if not args.onnx:
         encoder = ailia.Net(stream=ENCODER_PROTOTXT_PATH, weight=ENCODER_ONNX_PATH)
