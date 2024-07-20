@@ -10,10 +10,15 @@ The sentence closest to the input prompt.
 
 ## Requirements
 
-This model requires additional module if you want to load pdf file.
+This model requires additional modules.
 
 ```
-pip3 install transformers
+pip3 install ailia_tokenizer
+```
+
+If you want to load pdf file, you need to install pdfminer.six.
+
+```
 pip3 install pdfminer.six
 ```
 
