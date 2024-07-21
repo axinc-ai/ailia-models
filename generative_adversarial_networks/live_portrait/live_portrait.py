@@ -269,18 +269,7 @@ def get_face_analysis(det_face, landmark):
             reverse=True,
         )
 
-        if len(src_face) == 0:
-            logger.info("No face detected in the source image.")
-            return None
-        elif len(src_face) > 1:
-            logger.info(
-                f"More than one face detected in the image, only pick one face by rule {crop_cfg.direction}."
-            )
-
-        src_face = src_face[0]
-        lmk = src_face["landmark_2d_106"]  # this is the 106 landmarks from insightface
-
-        return lmk
+        return src_face
 
     return face_analysis
 
@@ -342,11 +331,32 @@ def crop_src_image(models, img):
     img = preprocess(img)
 
     face_analysis = models["face_analysis"]
-    lmk = face_analysis(img)
+    src_face = face_analysis(img)
+
+    if len(src_face) == 0:
+        logger.info("No face detected in the source image.")
+        return None
+    elif len(src_face) > 1:
+        logger.info(f"More than one face detected in the image, only pick one face.")
+
+    src_face = src_face[0]
+    lmk = src_face["landmark_2d_106"]  # this is the 106 landmarks from insightface
 
     # crop the face
     crop_info = crop_image(img, lmk, dsize=512, scale=2.3, vy_ratio=-0.125)
 
+    lmk = landmark_runner(models, img, lmk)
+
+    crop_info["lmk_crop"] = lmk
+    crop_info["img_crop_256x256"] = cv2.resize(
+        crop_info["img_crop"], (256, 256), interpolation=cv2.INTER_AREA
+    )
+    crop_info["lmk_crop_256x256"] = crop_info["lmk_crop"] * 256 / 512
+
+    return crop_info
+
+
+def landmark_runner(models, img, lmk):
     crop_dct = crop_image(img, lmk, dsize=224, scale=1.5, vy_ratio=-0.1)
     img_crop = crop_dct["img_crop"]
 
@@ -369,13 +379,7 @@ def crop_src_image(models, img):
     M = crop_dct["M_c2o"]
     lmk = lmk @ M[:2, :2].T + M[:2, 2]
 
-    crop_info["lmk_crop"] = lmk
-    crop_info["img_crop_256x256"] = cv2.resize(
-        crop_info["img_crop"], (256, 256), interpolation=cv2.INTER_AREA
-    )
-    crop_info["lmk_crop_256x256"] = crop_info["lmk_crop"] * 256 / 512
-
-    return crop_info
+    return lmk
 
 
 def predict(models, crop_info, img):
@@ -385,7 +389,7 @@ def predict(models, crop_info, img):
     return models
 
 
-def recognize_from_image(models):
+def recognize_from_video(models):
     # prepare input data
     img = load_image(IMAGE_PATH)
     img = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
@@ -394,58 +398,25 @@ def recognize_from_image(models):
     if crop_info is None:
         raise Exception("No face detected in the source image!")
 
-    # input image loop
-    for image_path in args.input:
-        logger.info(image_path)
-
-        # prepare input data
-        img = load_image(image_path)
-        img = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
-
-        # inference
-        logger.info("Start inference...")
-        if args.benchmark:
-            logger.info("BENCHMARK mode")
-            total_time_estimation = 0
-            for i in range(args.benchmark_count):
-                start = int(round(time.time() * 1000))
-                restored_img = predict(models, crop_info, img)
-                end = int(round(time.time() * 1000))
-                estimation_time = end - start
-
-                # Logging
-                logger.info(f"\tailia processing estimation time {estimation_time} ms")
-                if i != 0:
-                    total_time_estimation = total_time_estimation + estimation_time
-
-            logger.info(
-                f"\taverage time estimation {total_time_estimation / (args.benchmark_count - 1)} ms"
-            )
-        else:
-            restored_img = predict(models, crop_info, img)
-
-        # plot result
-        savepath = get_savepath(args.savepath, image_path, ext=".png")
-        logger.info(f"saved at : {savepath}")
-        cv2.imwrite(savepath, restored_img)
-
-    logger.info("Script finished successfully.")
-
-
-def recognize_from_video(models):
-    video_file = args.video if args.video else args.input[0]
+    # video_file = args.video if args.video else args.input[0]
+    video_file = "d0.mp4"
     capture = get_capture(video_file)
     assert capture.isOpened(), "Cannot capture source"
+    # capture = imageio.get_reader(file_path, "ffmpeg")
 
-    # create video writer if savepath is specified as video format
-    if args.savepath != SAVE_IMAGE_PATH:
-        f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT)) * args.upscale
-        f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH)) * args.upscale
-        writer = get_writer(args.savepath, f_h, f_w)
-    else:
-        writer = None
+    # # create video writer if savepath is specified as video format
+    # if args.savepath != SAVE_IMAGE_PATH:
+    #     f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT)) * args.upscale
+    #     f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH)) * args.upscale
+    #     writer = get_writer(args.savepath, f_h, f_w)
+    # else:
+    #     writer = None
+
+    face_analysis = models["face_analysis"]
+    trajectory_lmk = []
 
     frame_shown = False
+    frame_no = 0
     while True:
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord("q")) or not ret:
@@ -453,23 +424,45 @@ def recognize_from_video(models):
         if frame_shown and cv2.getWindowProperty("frame", cv2.WND_PROP_VISIBLE) == 0:
             break
 
-        # inference
-        img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        restored_img = predict(models, img)
-        restored_img = cv2.cvtColor(restored_img, cv2.COLOR_RGB2BGR)
+        img_rgb = frame[:, :, ::-1]  # BGR -> RGB
 
-        # show
-        cv2.imshow("frame", restored_img)
-        frame_shown = True
+        if frame_no == 0:
+            src_face = face_analysis(img_rgb)
+            if len(src_face) == 0:
+                logger.info(f"No face detected in the frame #{frame_no}")
+                raise Exception(f"No face detected in the frame #{frame_no}")
+            elif len(src_face) > 1:
+                logger.info(
+                    f"More than one face detected in the driving frame_{frame_no}, only pick one face."
+                )
+            src_face = src_face[0]
+            lmk = src_face["landmark_2d_106"]
+            lmk = landmark_runner(models, img_rgb, lmk)
+        else:
+            lmk = landmark_runner(models, img_rgb, trajectory_lmk[-1])
+        trajectory_lmk.append(lmk)
 
-        # save results
-        if writer is not None:
-            writer.write(restored_img)
+        print(frame.shape)
 
-    capture.release()
-    cv2.destroyAllWindows()
-    if writer is not None:
-        writer.release()
+        # # inference
+        # img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        # restored_img = predict(models, img)
+        # restored_img = cv2.cvtColor(restored_img, cv2.COLOR_RGB2BGR)
+
+        # # show
+        # cv2.imshow("frame", restored_img)
+        # frame_shown = True
+
+        # # save results
+        # if writer is not None:
+        #     writer.write(restored_img)
+
+        frame_no += 1
+
+    # capture.release()
+    # cv2.destroyAllWindows()
+    # if writer is not None:
+    #     writer.release()
 
     logger.info("Script finished successfully.")
 
@@ -516,10 +509,7 @@ def main():
         "face_analysis": face_analysis,
     }
 
-    if args.video is not None:
-        recognize_from_video(models)
-    else:
-        recognize_from_image(models)
+    recognize_from_video(models)
 
 
 if __name__ == "__main__":
