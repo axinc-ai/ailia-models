@@ -13,6 +13,7 @@ from arg_utils import get_base_parser, update_parser, get_savepath  # noqa
 from model_utils import check_and_download_models  # noqa
 from detector_utils import load_image  # noqa
 from nms_utils import nms_boxes
+from math_utils import softmax
 from webcamera_utils import get_capture, get_writer  # noqa
 
 from utils_crop import crop_image
@@ -24,6 +25,8 @@ from logging import getLogger  # noqa
 # from face_restoration import get_face_landmarks_5
 # from face_restoration import align_warp_face, get_inverse_affine
 # from face_restoration import paste_faces_to_image
+
+PI = np.pi
 
 logger = getLogger(__name__)
 
@@ -127,6 +130,51 @@ def trans_points2d(pts, M):
         new_pts[i] = new_pt[0:2]
 
     return new_pts
+
+
+def calculate_distance_ratio(
+    lmk: np.ndarray, idx1: int, idx2: int, idx3: int, idx4: int, eps: float = 1e-6
+) -> np.ndarray:
+    return np.linalg.norm(lmk[:, idx1] - lmk[:, idx2], axis=1, keepdims=True) / (
+        np.linalg.norm(lmk[:, idx3] - lmk[:, idx4], axis=1, keepdims=True) + eps
+    )
+
+
+def get_rotation_matrix(pitch_, yaw_, roll_):
+    """the input is in degree"""
+    # transform to radian
+    pitch = pitch_ / 180 * PI
+    yaw = yaw_ / 180 * PI
+    roll = roll_ / 180 * PI
+
+    # calculate the euler matrix
+    bs = pitch.shape[0]
+    ones = np.ones([bs, 1])
+    zeros = np.zeros([bs, 1])
+    x, y, z = pitch, yaw, roll
+
+    rot_x = np.concatenate(
+        [ones, zeros, zeros, zeros, np.cos(x), -np.sin(x), zeros, np.sin(x), np.cos(x)],
+        axis=1,
+    ).reshape([bs, 3, 3])
+
+    rot_y = np.concatenate(
+        [np.cos(y), zeros, np.sin(y), zeros, ones, zeros, -np.sin(y), zeros, np.cos(y)],
+        axis=1,
+    ).reshape([bs, 3, 3])
+
+    rot_z = np.concatenate(
+        [np.cos(z), -np.sin(z), zeros, np.sin(z), np.cos(z), zeros, zeros, zeros, ones],
+        axis=1,
+    ).reshape([bs, 3, 3])
+
+    rot = rot_z @ rot_y @ rot_x
+    return rot.transpose(0, 2, 1)  # transpose
+
+
+# ======================
+# Main functions
+# ======================
 
 
 def get_face_analysis(det_face, landmark):
@@ -274,12 +322,17 @@ def get_face_analysis(det_face, landmark):
     return face_analysis
 
 
-# ======================
-# Main functions
-# ======================
-
-
 def preprocess(img):
+    img = img / 255.0
+    img = np.clip(img, 0, 1)  # clip to 0~1
+    img = img.transpose(2, 0, 1)  # HxWx3x1 -> 1x3xHxW
+    img = np.expand_dims(img, axis=0)
+    img = img.astype(np.float32)
+
+    return img
+
+
+def det_preprocess(img):
     h, w = img.shape[:2]
 
     # ajust the size of the image according to the maximum dimension
@@ -305,30 +358,12 @@ def preprocess(img):
     if new_h != img.shape[0] or new_w != img.shape[1]:
         img = img[:new_h, :new_w]
 
-    # img = normalize_image(img, normalize_type="127.5")
-
-    # img = img.transpose(2, 0, 1)  # HWC -> CHW
-    # img = np.expand_dims(img, axis=0)
-    # img = img.astype(np.float32)
-
-    return img
-
-
-def post_processing(pred):
-    img = pred[0]
-    img = img.transpose(1, 2, 0)  # CHW -> HWC
-    img = img[:, :, ::-1]  # RGB -> BGR
-
-    img = np.clip(img, -1, 1)
-    img = (img + 1) * 127.5
-    img = img.astype(np.uint8)
-
     return img
 
 
 def crop_src_image(models, img):
     img = img[:, :, ::-1]  # BGR -> RGB
-    img = preprocess(img)
+    img = det_preprocess(img)
 
     face_analysis = models["face_analysis"]
     src_face = face_analysis(img)
@@ -382,6 +417,35 @@ def landmark_runner(models, img, lmk):
     return lmk
 
 
+def get_kp_info(models, x):
+    net = models["motion_extractor"]
+
+    # feedforward
+    if not args.onnx:
+        output = net.predict([x])
+    else:
+        output = net.run(None, {"x": x})
+    pitch, yaw, roll, t, exp, scale, kp = output
+
+    kp_info = dict(pitch=pitch, yaw=yaw, roll=roll, t=t, exp=exp, scale=scale, kp=kp)
+
+    pred = softmax(kp_info["pitch"], axis=1)
+    degree = np.sum(pred * np.arange(66), axis=1) * 3 - 97.5
+    kp_info["pitch"] = degree[:, None]  # Bx1
+    pred = softmax(kp_info["yaw"], axis=1)
+    degree = np.sum(pred * np.arange(66), axis=1) * 3 - 97.5
+    kp_info["yaw"] = degree[:, None]  # Bx1
+    pred = softmax(kp_info["roll"], axis=1)
+    degree = np.sum(pred * np.arange(66), axis=1) * 3 - 97.5
+    kp_info["roll"] = degree[:, None]  # Bx1
+
+    bs = kp_info["kp"].shape[0]
+    kp_info["kp"] = kp_info["kp"].reshape(bs, -1, 3)  # BxNx3
+    kp_info["exp"] = kp_info["exp"].reshape(bs, -1, 3)  # BxNx3
+
+    return kp_info
+
+
 def predict(models, crop_info, img):
     source_lmk = crop_info["lmk_crop"]
     img_crop, img_crop_256x256 = crop_info["img_crop"], crop_info["img_crop_256x256"]
@@ -397,6 +461,13 @@ def recognize_from_video(models):
 
     if crop_info is None:
         raise Exception("No face detected in the source image!")
+
+    # prepare_source
+    I_s = preprocess(crop_info["img_crop_256x256"])
+
+    x_s_info = get_kp_info(models, I_s)
+    x_c_s = x_s_info["kp"]
+    R_s = get_rotation_matrix(x_s_info["pitch"], x_s_info["yaw"], x_s_info["roll"])
 
     # video_file = args.video if args.video else args.input[0]
     video_file = "d0.mp4"
@@ -426,6 +497,7 @@ def recognize_from_video(models):
 
         img_rgb = frame[:, :, ::-1]  # BGR -> RGB
 
+        # calc_lmks_from_cropped_video
         if frame_no == 0:
             src_face = face_analysis(img_rgb)
             if len(src_face) == 0:
@@ -441,8 +513,43 @@ def recognize_from_video(models):
         else:
             lmk = landmark_runner(models, img_rgb, trajectory_lmk[-1])
         trajectory_lmk.append(lmk)
+        driving_rgb_crop_256x256 = cv2.resize(img_rgb, (256, 256))
 
-        print(frame.shape)
+        # calc_driving_ratio
+        lmk = lmk[None]
+        c_d_eyes = np.concatenate(
+            [
+                calculate_distance_ratio(lmk, 6, 18, 0, 12),
+                calculate_distance_ratio(lmk, 30, 42, 24, 36),
+            ],
+            axis=1,
+        )
+        c_d_lip = calculate_distance_ratio(lmk, 90, 102, 48, 66)
+
+        # prepare_driving_videos
+        I_d_i = preprocess(driving_rgb_crop_256x256)
+
+        # collect s_d, R_d, δ_d and t_d for inference
+        x_d_i_info = get_kp_info(models, I_d_i)
+        R_d_i = get_rotation_matrix(
+            x_d_i_info["pitch"], x_d_i_info["yaw"], x_d_i_info["roll"]
+        )
+
+        output_fps = 25
+        x_d_i_info = motion = {
+            "scale": x_d_i_info["scale"].astype(np.float32),
+            "R_d": R_d_i.astype(np.float32),
+            "exp": x_d_i_info["exp"].astype(np.float32),
+            "t": x_d_i_info["t"].astype(np.float32),
+        }
+        c_d_eyes = c_d_eyes.astype(np.float32)
+        c_d_lip = c_d_lip.astype(np.float32)
+
+        if frame_no == 0:
+            R_d_0 = R_d_i
+            x_d_0_info = x_d_i_info
+
+        R_new = (R_d_i @ R_d_0.transpose(0, 2, 1)) @ R_s
 
         # # inference
         # img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
