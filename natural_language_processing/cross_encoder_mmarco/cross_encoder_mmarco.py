@@ -58,7 +58,7 @@ def main():
 
     ailia_model = ailia.Net(MODEL_PATH, WEIGHT_PATH)
 
-    if True:#args.disable_ailia_tokenizer:
+    if args.disable_ailia_tokenizer:
         from transformers import AutoTokenizer
         tokenizer = AutoTokenizer.from_pretrained("jeffwan/mmarco-mMiniLMv2-L12-H384-v1")
     else:
