@@ -3,13 +3,15 @@ import time
 
 import torch
 import numpy
-from transformers import BertTokenizer, BertJapaneseTokenizer
+
+import os
+import shutil
 
 import ailia
 
 sys.path.append('../../util')
 from arg_utils import get_base_parser, update_parser  # noqa: E402
-from model_utils import check_and_download_models  # noqa: E402
+from model_utils import check_and_download_models, check_and_download_file  # noqa: E402
 
 # logger
 from logging import getLogger   # noqa: E402
@@ -46,6 +48,11 @@ parser.add_argument(
     default='bert-base-japanese-whole-word-masking', choices=MODEL_LISTS,
     help='model lists: ' + ' | '.join(MODEL_LISTS)
 )
+parser.add_argument(
+    '--disable_ailia_tokenizer',
+    action='store_true',
+    help='disable ailia tokenizer.'
+)
 args = update_parser(parser, check_input_type=False)
 
 
@@ -59,32 +66,94 @@ REMOTE_PATH = "https://storage.googleapis.com/ailia-models/bert_maskedlm/"
 
 
 # ======================
+# Get tokenizer
+# ======================
+
+def get_tokenizer():
+    if args.arch == 'bert-base-cased':
+        if args.disable_ailia_tokenizer:
+            from transformers import BertTokenizer
+            tokenizer = BertTokenizer.from_pretrained('bert-base-cased')
+        else:
+            from ailia_tokenizer import BertCasedTokenizer
+            check_and_download_file("bert-base-cased-vocab.txt", REMOTE_PATH)
+            tokenizer = BertCasedTokenizer.from_pretrained("bert-base-cased-vocab.txt")
+    elif args.arch == 'bert-base-uncased':
+        if args.disable_ailia_tokenizer:
+            from transformers import BertTokenizer
+            tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+        else:
+            from ailia_tokenizer import BertUncasedTokenizer
+            check_and_download_file("bert-base-uncased-vocab.txt", REMOTE_PATH)
+            tokenizer = BertUncasedTokenizer.from_pretrained('bert-base-uncased-vocab.txt')
+    elif args.arch == 'bert-base-japanese-whole-word-masking':
+        if args.disable_ailia_tokenizer:
+            from transformers import BertJapaneseTokenizer
+            tokenizer = BertJapaneseTokenizer.from_pretrained(
+                'cl-tohoku/bert-base-japanese-whole-word-masking'
+            )
+        else:
+            from ailia_tokenizer import BertJapaneseWordPieceTokenizer
+            check_and_download_file("bert-base-japanese-whole-word-masking-vocab.txt", REMOTE_PATH)
+            check_and_download_file("ipadic.zip", REMOTE_PATH)
+            if not os.path.exists("ipadic"):
+                shutil.unpack_archive('ipadic.zip', '')
+            tokenizer = BertJapaneseWordPieceTokenizer.from_pretrained('ipadic', 'bert-base-japanese-whole-word-masking-vocab.txt')
+    elif args.arch == 'bert-base-japanese-char-whole-word-masking':
+        if args.disable_ailia_tokenizer:
+            from transformers import BertJapaneseTokenizer
+            tokenizer = BertJapaneseTokenizer.from_pretrained(
+                'cl-tohoku/bert-base-japanese-char-whole-word-masking'
+            )
+        else:
+            from ailia_tokenizer import BertJapaneseCharacterTokenizer
+            check_and_download_file("bert-base-japanese-char-whole-word-masking-vocab.txt", REMOTE_PATH)
+            check_and_download_file("ipadic.zip", REMOTE_PATH)
+            if not os.path.exists("ipadic"):
+                shutil.unpack_archive('ipadic.zip', '')
+            tokenizer = BertJapaneseCharacterTokenizer.from_pretrained('ipadic', 'bert-base-japanese-char-whole-word-masking-vocab.txt')
+    elif args.arch == 'bert-base-japanese-v3':
+        if args.disable_ailia_tokenizer:
+            from transformers import BertJapaneseTokenizer
+            tokenizer = BertJapaneseTokenizer.from_pretrained(
+                'cl-tohoku/bert-base-japanese-v3'
+            )
+        else:
+            from ailia_tokenizer import BertJapaneseWordPieceTokenizer
+            check_and_download_file("bert-base-japanese-v3-vocab.txt", REMOTE_PATH)
+            check_and_download_file("unidic-lite.zip", REMOTE_PATH)
+            if not os.path.exists("unidic-lite"):
+                shutil.unpack_archive('unidic-lite.zip', '')
+            tokenizer = BertJapaneseWordPieceTokenizer.from_pretrained('unidic-lite', 'bert-base-japanese-v3-vocab.txt')
+    elif args.arch == 'bert-base-japanese-char-v3':
+        if args.disable_ailia_tokenizer:
+            from transformers import BertJapaneseTokenizer
+            tokenizer = BertJapaneseTokenizer.from_pretrained(
+                'cl-tohoku/bert-base-japanese-char-v3'
+            )
+        else:
+            from ailia_tokenizer import BertJapaneseCharacterTokenizer
+            check_and_download_file("bert-base-japanese-char-v3-vocab.txt", REMOTE_PATH)
+            check_and_download_file("unidic-lite.zip", REMOTE_PATH)
+            if not os.path.exists("unidic-lite"):
+                shutil.unpack_archive('unidic-lite.zip', '')
+            tokenizer = BertJapaneseCharacterTokenizer.from_pretrained('unidic-lite', 'bert-base-japanese-char-v3-vocab.txt')
+    else:
+        logger.error("unknown arch")
+        return None
+    return tokenizer
+
+
+# ======================
 # Main function
 # ======================
 def main():
     # model files check and download
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
 
-    if args.arch == 'bert-base-cased' or args.arch == 'bert-base-uncased':
-        tokenizer = BertTokenizer.from_pretrained(args.arch)
-    elif args.arch == 'bert-base-japanese-whole-word-masking':
-        tokenizer = BertJapaneseTokenizer.from_pretrained(
-            'cl-tohoku/bert-base-japanese-whole-word-masking'
-        )
-    elif args.arch == 'bert-base-japanese-char-whole-word-masking':
-        tokenizer = BertJapaneseTokenizer.from_pretrained(
-            'cl-tohoku/bert-base-japanese-char-whole-word-masking'
-        )
-    elif args.arch == 'bert-base-japanese-v3':
-        tokenizer = BertJapaneseTokenizer.from_pretrained(
-            'cl-tohoku/bert-base-japanese-v3'
-        )
-    elif args.arch == 'bert-base-japanese-char-v3':
-        tokenizer = BertJapaneseTokenizer.from_pretrained(
-            'cl-tohoku/bert-base-japanese-char-v3'
-        )
-    else:
-        logger.error("unknown arch")
+    # get tokenizer
+    tokenizer = get_tokenizer()
+    if tokenizer == None:
         return
 
     text = args.input

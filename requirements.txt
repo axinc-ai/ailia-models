@@ -1,6 +1,6 @@
 -i https://pypi.org/simple
 ailia
-ailia_tokenizer
+ailia_tokenizer>=1.3.0
 numpy<2.0
 matplotlib>=3.2.1
 opencv-python>=4.4.0.42
