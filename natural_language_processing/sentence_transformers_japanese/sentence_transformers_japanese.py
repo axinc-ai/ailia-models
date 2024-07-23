@@ -6,12 +6,11 @@ from logging import getLogger
 
 import ailia
 import numpy as np
-from transformers import AutoTokenizer
 
 # import local modules
 sys.path.append('../../util')
 from arg_utils import get_base_parser, update_parser # noqa: E402
-from model_utils import check_and_download_models # noqa: E402
+from model_utils import check_and_download_models, check_and_download_file # noqa: E402
 
 
 logger = getLogger(__name__)
@@ -21,6 +20,7 @@ logger = getLogger(__name__)
 # Parameters
 # ======================
 WEIGHT_NAME = 'paraphrase-multilingual-mpnet-base-v2'
+SPM_NAME = 'sentencepiece.bpe.model'
 
 WEIGHT_PATH = WEIGHT_NAME + '.onnx'
 MODEL_PATH = WEIGHT_PATH + '.prototxt'
@@ -39,6 +39,11 @@ parser = get_base_parser(
 parser.add_argument(
     '-p', '--prompt', metavar='PROMPT', default=None,
     help='Specify input prompt. If not specified, script runs interactively.'
+)
+parser.add_argument(
+    '--disable_ailia_tokenizer',
+    action='store_true',
+    help='disable ailia tokenizer.'
 )
 args = update_parser(parser)
 
@@ -99,7 +104,14 @@ def main():
         logger.warning('This model do not work on FP16. So use CPU mode.')
         args.env_id = 0
     model = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
-    tokenizer = AutoTokenizer.from_pretrained('sentence-transformers/' + WEIGHT_NAME)
+
+    if args.disable_ailia_tokenizer:
+        from transformers import AutoTokenizer
+        tokenizer = AutoTokenizer.from_pretrained('sentence-transformers/' + WEIGHT_NAME)
+    else:
+        check_and_download_file(SPM_NAME, REMOTE_PATH)
+        from transformers import XLMRobertaTokenizer
+        tokenizer = XLMRobertaTokenizer.from_pretrained(SPM_NAME)
 
     # extract pdf sentences to list
     sentences = preprocess(args.input[0])
