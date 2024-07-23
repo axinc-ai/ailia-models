@@ -110,7 +110,7 @@ def main():
         tokenizer = AutoTokenizer.from_pretrained('sentence-transformers/' + WEIGHT_NAME)
     else:
         check_and_download_file(SPM_NAME, REMOTE_PATH)
-        from transformers import XLMRobertaTokenizer
+        from ailia_tokenizer import XLMRobertaTokenizer
         tokenizer = XLMRobertaTokenizer.from_pretrained(SPM_NAME)
 
     # extract pdf sentences to list
