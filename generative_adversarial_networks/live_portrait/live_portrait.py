@@ -149,8 +149,8 @@ def get_rotation_matrix(pitch_, yaw_, roll_):
 
     # calculate the euler matrix
     bs = pitch.shape[0]
-    ones = np.ones([bs, 1])
-    zeros = np.zeros([bs, 1])
+    ones = np.ones([bs, 1], dtype=np.float32)
+    zeros = np.zeros([bs, 1], dtype=np.float32)
     x, y, z = pitch, yaw, roll
 
     rot_x = np.concatenate(
@@ -170,6 +170,30 @@ def get_rotation_matrix(pitch_, yaw_, roll_):
 
     rot = rot_z @ rot_y @ rot_x
     return rot.transpose(0, 2, 1)  # transpose
+
+
+def transform_keypoint(kp_info: dict):
+    """
+    transform the implicit keypoints with the pose, shift, and expression deformation
+    kp: BxNx3
+    """
+    kp = kp_info["kp"]  # (bs, k, 3)
+    pitch, yaw, roll = kp_info["pitch"], kp_info["yaw"], kp_info["roll"]
+
+    t, exp = kp_info["t"], kp_info["exp"]
+    scale = kp_info["scale"]
+
+    bs = kp.shape[0]
+    num_kp = kp.shape[1]  # Bxnum_kpx3
+
+    rot_mat = get_rotation_matrix(pitch, yaw, roll)  # (bs, 3, 3)
+
+    # Eqn.2: s * (R * x_c,s + exp) + t
+    kp_transformed = kp.reshape(bs, num_kp, 3) @ rot_mat + exp.reshape(bs, num_kp, 3)
+    kp_transformed *= scale[..., None]  # (bs, k, 3) * (bs, 1, 1) = (bs, k, 3)
+    kp_transformed[:, :, 0:2] += t[:, None, 0:2]  # remove z, only apply tx ty
+
+    return kp_transformed
 
 
 # ======================
@@ -332,12 +356,12 @@ def preprocess(img):
     return img
 
 
-def det_preprocess(img):
+def src_preprocess(img):
     h, w = img.shape[:2]
 
     # ajust the size of the image according to the maximum dimension
     max_dim = 1280
-    if max_dim > 0 and max(h, w) > max_dim:
+    if max(h, w) > max_dim:
         if h > w:
             new_h = max_dim
             new_w = int(w * (max_dim / h))
@@ -363,7 +387,6 @@ def det_preprocess(img):
 
 def crop_src_image(models, img):
     img = img[:, :, ::-1]  # BGR -> RGB
-    img = det_preprocess(img)
 
     face_analysis = models["face_analysis"]
     src_face = face_analysis(img)
@@ -417,6 +440,20 @@ def landmark_runner(models, img, lmk):
     return lmk
 
 
+def extract_feature_3d(models, x):
+    net = models["appearance_feature_extractor"]
+
+    # feedforward
+    if not args.onnx:
+        output = net.predict([x])
+    else:
+        output = net.run(None, {"x": x})
+    f_s = output[0]
+    f_s = f_s.astype(np.float32)
+
+    return f_s
+
+
 def get_kp_info(models, x):
     net = models["motion_extractor"]
 
@@ -439,11 +476,91 @@ def get_kp_info(models, x):
     degree = np.sum(pred * np.arange(66), axis=1) * 3 - 97.5
     kp_info["roll"] = degree[:, None]  # Bx1
 
+    kp_info = {k: v.astype(np.float32) for k, v in kp_info.items()}
+
     bs = kp_info["kp"].shape[0]
     kp_info["kp"] = kp_info["kp"].reshape(bs, -1, 3)  # BxNx3
     kp_info["exp"] = kp_info["exp"].reshape(bs, -1, 3)  # BxNx3
 
     return kp_info
+
+
+def stitching(models, kp_source, kp_driving):
+    """conduct the stitching
+    kp_source: Bxnum_kpx3
+    kp_driving: Bxnum_kpx3
+    """
+
+    bs, num_kp = kp_source.shape[:2]
+
+    kp_driving_new = kp_driving
+
+    bs_src = kp_source.shape[0]
+    bs_dri = kp_driving.shape[0]
+    feat = np.concatenate(
+        [kp_source.reshape(bs_src, -1), kp_driving.reshape(bs_dri, -1)], axis=1
+    )
+
+    # feedforward
+    net = models["stitching"]
+    if not args.onnx:
+        output = net.predict([feat])
+    else:
+        output = net.run(None, {"x": feat})
+    delta = output[0]
+
+    delta_exp = delta[..., : 3 * num_kp].reshape(bs, num_kp, 3)  # 1x20x3
+    delta_tx_ty = delta[..., 3 * num_kp : 3 * num_kp + 2].reshape(bs, 1, 2)  # 1x1x2
+
+    kp_driving_new += delta_exp
+    kp_driving_new[..., :2] += delta_tx_ty
+
+    return kp_driving_new
+
+
+def warp_decode(models, feature_3d, kp_source, kp_driving):
+    """get the image after the warping of the implicit keypoints
+    feature_3d: Bx32x16x64x64, feature volume
+    kp_source: BxNx3
+    kp_driving: BxNx3
+    """
+
+    # feedforward
+    net = models["warping_module"]
+    if not args.onnx:
+        output = net.predict([feature_3d, kp_source, kp_driving])
+    else:
+        output = net.run(
+            None,
+            {
+                "feature_3d": feature_3d,
+                "kp_source": kp_source,
+                "kp_driving": kp_driving,
+            },
+        )
+    out, occlusion_map, deformation = output
+    out = out.astype(np.float32)
+
+    # decode
+    net = models["spade_generator"]
+    if not args.onnx:
+        output = net.predict([out])
+    else:
+        output = net.run(
+            None,
+            {
+                "feature": out,
+            },
+        )
+    out = output[0]
+
+    ret_dct = {
+        "out": out.astype(np.float32),
+        "occlusion_map": occlusion_map.astype(np.float32),
+        "deformation": deformation.astype(np.float32),
+    }
+
+    return ret_dct
 
 
 def predict(models, crop_info, img):
@@ -457,7 +574,9 @@ def recognize_from_video(models):
     # prepare input data
     img = load_image(IMAGE_PATH)
     img = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
-    crop_info = crop_src_image(models, img)
+
+    src_img = src_preprocess(img)
+    crop_info = crop_src_image(models, src_img)
 
     if crop_info is None:
         raise Exception("No face detected in the source image!")
@@ -468,6 +587,8 @@ def recognize_from_video(models):
     x_s_info = get_kp_info(models, I_s)
     x_c_s = x_s_info["kp"]
     R_s = get_rotation_matrix(x_s_info["pitch"], x_s_info["yaw"], x_s_info["roll"])
+    f_s = extract_feature_3d(models, I_s)
+    x_s = transform_keypoint(x_s_info)
 
     # video_file = args.video if args.video else args.input[0]
     video_file = "d0.mp4"
@@ -550,6 +671,22 @@ def recognize_from_video(models):
             x_d_0_info = x_d_i_info
 
         R_new = (R_d_i @ R_d_0.transpose(0, 2, 1)) @ R_s
+        delta_new = x_s_info["exp"] + (x_d_i_info["exp"] - x_d_0_info["exp"])
+        scale_new = x_s_info["scale"] * (x_d_i_info["scale"] / x_d_0_info["scale"])
+        t_new = x_s_info["t"] + (x_d_i_info["t"] - x_d_0_info["t"])
+
+        t_new[..., 2] = 0  # zero tz
+        x_d_i_new = scale_new * (x_c_s @ R_new + delta_new) + t_new
+
+        x_d_i_new = stitching(models, x_s, x_d_i_new)
+
+        out = warp_decode(models, f_s, x_s, x_d_i_new)
+
+        out = out["out"]
+        out = out.transpose(0, 2, 3, 1)  # 1x3xHxW -> 1xHxWx3
+        out = np.clip(out, 0, 1)  # clip to 0~1
+        out = np.clip(out * 255, 0, 255).astype(np.uint8)  # 0~1 -> 0~255
+        I_p_i = out[0]
 
         # # inference
         # img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
