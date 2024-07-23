@@ -563,11 +563,83 @@ def warp_decode(models, feature_3d, kp_source, kp_driving):
     return ret_dct
 
 
-def predict(models, crop_info, img):
-    source_lmk = crop_info["lmk_crop"]
-    img_crop, img_crop_256x256 = crop_info["img_crop"], crop_info["img_crop_256x256"]
+def predict(models, x_s_info, R_s, f_s, x_s, img):
+    # calc_lmks_from_cropped_video
+    frame_0 = predict.lmk is None
+    if frame_0:
+        face_analysis = models["face_analysis"]
+        src_face = face_analysis(img)
+        if len(src_face) == 0:
+            logger.info(f"No face detected in the frame")
+            raise Exception(f"No face detected in the frame")
+        elif len(src_face) > 1:
+            logger.info(
+                f"More than one face detected in the driving frame, only pick one face."
+            )
+        src_face = src_face[0]
+        lmk = src_face["landmark_2d_106"]
+        lmk = landmark_runner(models, img, lmk)
+    else:
+        lmk = landmark_runner(models, img, predict.lmk)
+    predict.lmk = lmk
 
-    return models
+    # calc_driving_ratio
+    lmk = lmk[None]
+    c_d_eyes = np.concatenate(
+        [
+            calculate_distance_ratio(lmk, 6, 18, 0, 12),
+            calculate_distance_ratio(lmk, 30, 42, 24, 36),
+        ],
+        axis=1,
+    )
+    c_d_lip = calculate_distance_ratio(lmk, 90, 102, 48, 66)
+    c_d_eyes = c_d_eyes.astype(np.float32)
+    c_d_lip = c_d_lip.astype(np.float32)
+
+    # prepare_driving_videos
+    img = cv2.resize(img, (256, 256))
+    I_d = preprocess(img)
+
+    # collect s_d, R_d, δ_d and t_d for inference
+    x_d_info = get_kp_info(models, I_d)
+    R_d = get_rotation_matrix(x_d_info["pitch"], x_d_info["yaw"], x_d_info["roll"])
+    x_d_info = {
+        "scale": x_d_info["scale"].astype(np.float32),
+        "R_d": R_d.astype(np.float32),
+        "exp": x_d_info["exp"].astype(np.float32),
+        "t": x_d_info["t"].astype(np.float32),
+    }
+
+    if frame_0:
+        predict.x_d_0_info = x_d_info
+
+    x_d_0_info = predict.x_d_0_info
+    R_d_0 = x_d_0_info["R_d"]
+
+    R_new = (R_d @ R_d_0.transpose(0, 2, 1)) @ R_s
+    delta_new = x_s_info["exp"] + (x_d_info["exp"] - x_d_0_info["exp"])
+    scale_new = x_s_info["scale"] * (x_d_info["scale"] / x_d_0_info["scale"])
+    t_new = x_s_info["t"] + (x_d_info["t"] - x_d_0_info["t"])
+
+    t_new[..., 2] = 0  # zero tz
+    x_c_s = x_s_info["kp"]
+    x_d_new = scale_new * (x_c_s @ R_new + delta_new) + t_new
+
+    # with stitching and without retargeting
+    x_d_new = stitching(models, x_s, x_d_new)
+
+    out = warp_decode(models, f_s, x_s, x_d_new)
+    out = out["out"]
+    out = out.transpose(0, 2, 3, 1)  # 1x3xHxW -> 1xHxWx3
+    out = np.clip(out, 0, 1)  # clip to 0~1
+    out = np.clip(out * 255, 0, 255).astype(np.uint8)  # 0~1 -> 0~255
+    I_p = out[0]
+
+    return I_p
+
+
+predict.lmk = None
+predict.x_d_0_info = None
 
 
 def recognize_from_video(models):
@@ -585,7 +657,6 @@ def recognize_from_video(models):
     I_s = preprocess(crop_info["img_crop_256x256"])
 
     x_s_info = get_kp_info(models, I_s)
-    x_c_s = x_s_info["kp"]
     R_s = get_rotation_matrix(x_s_info["pitch"], x_s_info["yaw"], x_s_info["roll"])
     f_s = extract_feature_3d(models, I_s)
     x_s = transform_keypoint(x_s_info)
@@ -604,9 +675,6 @@ def recognize_from_video(models):
     # else:
     #     writer = None
 
-    face_analysis = models["face_analysis"]
-    trajectory_lmk = []
-
     frame_shown = False
     frame_no = 0
     while True:
@@ -616,82 +684,9 @@ def recognize_from_video(models):
         if frame_shown and cv2.getWindowProperty("frame", cv2.WND_PROP_VISIBLE) == 0:
             break
 
+        # inference
         img_rgb = frame[:, :, ::-1]  # BGR -> RGB
-
-        # calc_lmks_from_cropped_video
-        if frame_no == 0:
-            src_face = face_analysis(img_rgb)
-            if len(src_face) == 0:
-                logger.info(f"No face detected in the frame #{frame_no}")
-                raise Exception(f"No face detected in the frame #{frame_no}")
-            elif len(src_face) > 1:
-                logger.info(
-                    f"More than one face detected in the driving frame_{frame_no}, only pick one face."
-                )
-            src_face = src_face[0]
-            lmk = src_face["landmark_2d_106"]
-            lmk = landmark_runner(models, img_rgb, lmk)
-        else:
-            lmk = landmark_runner(models, img_rgb, trajectory_lmk[-1])
-        trajectory_lmk.append(lmk)
-        driving_rgb_crop_256x256 = cv2.resize(img_rgb, (256, 256))
-
-        # calc_driving_ratio
-        lmk = lmk[None]
-        c_d_eyes = np.concatenate(
-            [
-                calculate_distance_ratio(lmk, 6, 18, 0, 12),
-                calculate_distance_ratio(lmk, 30, 42, 24, 36),
-            ],
-            axis=1,
-        )
-        c_d_lip = calculate_distance_ratio(lmk, 90, 102, 48, 66)
-
-        # prepare_driving_videos
-        I_d_i = preprocess(driving_rgb_crop_256x256)
-
-        # collect s_d, R_d, δ_d and t_d for inference
-        x_d_i_info = get_kp_info(models, I_d_i)
-        R_d_i = get_rotation_matrix(
-            x_d_i_info["pitch"], x_d_i_info["yaw"], x_d_i_info["roll"]
-        )
-
-        output_fps = 25
-        x_d_i_info = motion = {
-            "scale": x_d_i_info["scale"].astype(np.float32),
-            "R_d": R_d_i.astype(np.float32),
-            "exp": x_d_i_info["exp"].astype(np.float32),
-            "t": x_d_i_info["t"].astype(np.float32),
-        }
-        c_d_eyes = c_d_eyes.astype(np.float32)
-        c_d_lip = c_d_lip.astype(np.float32)
-
-        if frame_no == 0:
-            R_d_0 = R_d_i
-            x_d_0_info = x_d_i_info
-
-        R_new = (R_d_i @ R_d_0.transpose(0, 2, 1)) @ R_s
-        delta_new = x_s_info["exp"] + (x_d_i_info["exp"] - x_d_0_info["exp"])
-        scale_new = x_s_info["scale"] * (x_d_i_info["scale"] / x_d_0_info["scale"])
-        t_new = x_s_info["t"] + (x_d_i_info["t"] - x_d_0_info["t"])
-
-        t_new[..., 2] = 0  # zero tz
-        x_d_i_new = scale_new * (x_c_s @ R_new + delta_new) + t_new
-
-        x_d_i_new = stitching(models, x_s, x_d_i_new)
-
-        out = warp_decode(models, f_s, x_s, x_d_i_new)
-
-        out = out["out"]
-        out = out.transpose(0, 2, 3, 1)  # 1x3xHxW -> 1xHxWx3
-        out = np.clip(out, 0, 1)  # clip to 0~1
-        out = np.clip(out * 255, 0, 255).astype(np.uint8)  # 0~1 -> 0~255
-        I_p_i = out[0]
-
-        # # inference
-        # img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        # restored_img = predict(models, img)
-        # restored_img = cv2.cvtColor(restored_img, cv2.COLOR_RGB2BGR)
+        img = predict(models, x_s_info, R_s, f_s, x_s, img_rgb)
 
         # # show
         # cv2.imshow("frame", restored_img)
