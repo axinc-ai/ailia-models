@@ -83,20 +83,12 @@ def infer_text(net_text_branch, net_text_projection, text_data):
         tokenize = RobertaTokenizer.from_pretrained(CLAP_TOKENIZER_VOCAB_PATH, CLAP_TOKENIZER_MERGES_PATH)
         result = tokenize(
             text_data,
-            padding=True, # max_length not supported yet
+            padding="max_length",
             truncation=True,
             max_length=77,
             return_tensors="np",
         )
-
         data = {k: v for k, v in result.items()}
-
-        # simulate max length
-        padding_array = np.ones(77 - data["input_ids"].shape[1], dtype=data["input_ids"].dtype)
-        data["input_ids"] = np.array([np.concatenate((row, padding_array)) for row in data["input_ids"]])
-
-        padding_array = np.zeros(77 - data["attention_mask"].shape[1], dtype=data["attention_mask"].dtype)
-        data["attention_mask"] = np.array([np.concatenate((row, padding_array)) for row in data["attention_mask"]])
 
     #print("input_ids", data["input_ids"])
     #print("attention_mask", data["attention_mask"])
