@@ -22,10 +22,6 @@ from utils_crop import crop_image
 from logging import getLogger  # noqa
 
 
-# from face_restoration import get_face_landmarks_5
-# from face_restoration import align_warp_face, get_inverse_affine
-# from face_restoration import paste_faces_to_image
-
 PI = np.pi
 
 logger = getLogger(__name__)
@@ -34,32 +30,24 @@ logger = getLogger(__name__)
 # Parameters
 # ======================
 
-WEIGHT_DET_PATH = "retinaface_resnet50.onnx"
-MODEL_DET_PATH = "retinaface_resnet50.onnx.prototxt"
-REMOTE_PATH = "https://storage.googleapis.com/ailia-models/gfpgan/"
-
-REALESRGAN_MODEL = "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.1/RealESRGAN_x2plus.pth"
+WEIGHT_DET_PATH = ".onnx"
+MODEL_DET_PATH = ".onnx.prototxt"
+REMOTE_PATH = "https://storage.googleapis.com/ailia-models/live_portrait/"
 
 IMAGE_PATH = "s6.jpg"
-SAVE_IMAGE_PATH = "output.png"
+DRIVING_VIDEO_PATH = "d0.mp4"
 
-IMAGE_SIZE = 512
 
 # ======================
 # Arguemnt Parser Config
 # ======================
 
-parser = get_base_parser("LivePortrait", IMAGE_PATH, SAVE_IMAGE_PATH)
+parser = get_base_parser("LivePortrait", IMAGE_PATH, None)
+parser.add_argument(
+    "--driving", metavar="VIDEO", default=DRIVING_VIDEO_PATH, help="Driving video."
+)
 parser.add_argument("--onnx", action="store_true", help="execute onnxruntime version.")
 args = update_parser(parser)
-
-
-# ======================
-# Model selection
-# ======================
-
-WEIGHT_PATH = ".onnx"
-MODEL_PATH = ".onnx.prototxt"
 
 
 # ======================
@@ -194,6 +182,35 @@ def transform_keypoint(kp_info: dict):
     kp_transformed[:, :, 0:2] += t[:, None, 0:2]  # remove z, only apply tx ty
 
     return kp_transformed
+
+
+def prepare_paste_back(mask_crop, crop_M_c2o, dsize):
+    """prepare mask for later image paste back"""
+    mask_ori = cv2.warpAffine(
+        mask_crop, crop_M_c2o[:2, :], dsize=dsize, flags=cv2.INTER_LINEAR
+    )
+    mask_ori = mask_ori.astype(np.float32) / 255.0
+    return mask_ori
+
+
+def paste_back(img_crop, M_c2o, img_ori, mask_ori):
+    """paste back the image"""
+    dsize = (img_ori.shape[1], img_ori.shape[0])
+    result = cv2.warpAffine(img_crop, M_c2o[:2, :], dsize=dsize, flags=cv2.INTER_LINEAR)
+    result = np.clip(mask_ori * result + (1 - mask_ori) * img_ori, 0, 255).astype(
+        np.uint8
+    )
+    return result
+
+
+def concat_frame(driving_img, src_img, I_p):
+    h, w, _ = I_p.shape
+
+    src_img = cv2.resize(src_img, (w, h))
+    driving_img = cv2.resize(driving_img, (w, h))
+    out = np.hstack((driving_img, src_img, I_p))
+
+    return out
 
 
 # ======================
@@ -386,8 +403,6 @@ def src_preprocess(img):
 
 
 def crop_src_image(models, img):
-    img = img[:, :, ::-1]  # BGR -> RGB
-
     face_analysis = models["face_analysis"]
     src_face = face_analysis(img)
 
@@ -632,7 +647,7 @@ def predict(models, x_s_info, R_s, f_s, x_s, img):
     out = out["out"]
     out = out.transpose(0, 2, 3, 1)  # 1x3xHxW -> 1xHxWx3
     out = np.clip(out, 0, 1)  # clip to 0~1
-    out = np.clip(out * 255, 0, 255).astype(np.uint8)  # 0~1 -> 0~255
+    out = (out * 255).astype(np.uint8)  # 0~1 -> 0~255
     I_p = out[0]
 
     return I_p
@@ -643,10 +658,21 @@ predict.x_d_0_info = None
 
 
 def recognize_from_video(models):
+    source_image = args.input[0]
+    driving_video = args.driving
+    flg_composite = True
+
+    logger.info("Source image: " + source_image)
+    logger.info("Driving video: " + str(driving_video))
+
     # prepare input data
-    img = load_image(IMAGE_PATH)
+    img = load_image(source_image)
     img = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
 
+    mask_crop = load_image("mask_template.png")
+    mask_crop = cv2.cvtColor(mask_crop, cv2.COLOR_BGRA2BGR)
+
+    img = img[:, :, ::-1]  # BGR -> RGB
     src_img = src_preprocess(img)
     crop_info = crop_src_image(models, src_img)
 
@@ -654,29 +680,31 @@ def recognize_from_video(models):
         raise Exception("No face detected in the source image!")
 
     # prepare_source
-    I_s = preprocess(crop_info["img_crop_256x256"])
+    img_crop_256x256 = crop_info["img_crop_256x256"]
+    I_s = preprocess(img_crop_256x256)
 
     x_s_info = get_kp_info(models, I_s)
     R_s = get_rotation_matrix(x_s_info["pitch"], x_s_info["yaw"], x_s_info["roll"])
     f_s = extract_feature_3d(models, I_s)
     x_s = transform_keypoint(x_s_info)
 
-    # video_file = args.video if args.video else args.input[0]
-    video_file = "d0.mp4"
-    capture = get_capture(video_file)
+    capture = get_capture(driving_video)
     assert capture.isOpened(), "Cannot capture source"
     # capture = imageio.get_reader(file_path, "ffmpeg")
 
-    # # create video writer if savepath is specified as video format
-    # if args.savepath != SAVE_IMAGE_PATH:
-    #     f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT)) * args.upscale
-    #     f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH)) * args.upscale
-    #     writer = get_writer(args.savepath, f_h, f_w)
-    # else:
-    #     writer = None
+    # create video writer if savepath is specified as video format
+    if args.savepath:
+        f_h, f_w = (512, 1536) if flg_composite else src_img.shape[:2]
+        writer = get_writer(args.savepath, f_h, f_w)
+    else:
+        writer = None
+
+    # prepare for pasteback
+    mask_ori = prepare_paste_back(
+        mask_crop, crop_info["M_c2o"], dsize=(src_img.shape[1], src_img.shape[0])
+    )
 
     frame_shown = False
-    frame_no = 0
     while True:
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord("q")) or not ret:
@@ -686,22 +714,26 @@ def recognize_from_video(models):
 
         # inference
         img_rgb = frame[:, :, ::-1]  # BGR -> RGB
-        img = predict(models, x_s_info, R_s, f_s, x_s, img_rgb)
+        I_p = predict(models, x_s_info, R_s, f_s, x_s, img_rgb)
 
-        # # show
-        # cv2.imshow("frame", restored_img)
-        # frame_shown = True
+        if flg_composite:
+            driving_img = concat_frame(img_rgb, img_crop_256x256, I_p)
+        else:
+            driving_img = paste_back(I_p, crop_info["M_c2o"], src_img, mask_ori)
+        driving_img = driving_img[:, :, ::-1]  # RGB -> BGR
 
-        # # save results
-        # if writer is not None:
-        #     writer.write(restored_img)
+        # show
+        cv2.imshow("frame", driving_img)
+        frame_shown = True
 
-        frame_no += 1
+        # save results
+        if writer is not None:
+            writer.write(driving_img)
 
-    # capture.release()
-    # cv2.destroyAllWindows()
-    # if writer is not None:
-    #     writer.release()
+    capture.release()
+    cv2.destroyAllWindows()
+    if writer is not None:
+        writer.release()
 
     logger.info("Script finished successfully.")
 
@@ -718,23 +750,32 @@ def main():
     else:
         import onnxruntime
 
+        providers = ["CUDAExecutionProvider", "CPUExecutionProvider"]
         # init F
         appearance_feature_extractor = onnxruntime.InferenceSession(
-            "appearance_feature_extractor.onnx"
+            "appearance_feature_extractor.onnx", providers=providers
         )
         # init M
-        motion_extractor = onnxruntime.InferenceSession("motion_extractor.onnx")
+        motion_extractor = onnxruntime.InferenceSession(
+            "motion_extractor.onnx", providers=providers
+        )
         # init W
-        warping_module = onnxruntime.InferenceSession("warping_module.onnx")
+        warping_module = onnxruntime.InferenceSession(
+            "warping_module.onnx", providers=providers
+        )
         # init G
-        spade_generator = onnxruntime.InferenceSession("spade_generator.onnx")
+        spade_generator = onnxruntime.InferenceSession(
+            "spade_generator.onnx", providers=providers
+        )
         # init S
-        stitching = onnxruntime.InferenceSession("stitching.onnx")
+        stitching = onnxruntime.InferenceSession("stitching.onnx", providers=providers)
 
-        landmark_runner = onnxruntime.InferenceSession("landmark.onnx")
+        landmark_runner = onnxruntime.InferenceSession(
+            "landmark.onnx", providers=providers
+        )
 
-        landmark = onnxruntime.InferenceSession("2d106det.onnx")
-        det_face = onnxruntime.InferenceSession("det_10g.onnx")
+        landmark = onnxruntime.InferenceSession("2d106det.onnx", providers=providers)
+        det_face = onnxruntime.InferenceSession("det_10g.onnx", providers=providers)
 
     face_analysis = get_face_analysis(det_face, landmark)
 
