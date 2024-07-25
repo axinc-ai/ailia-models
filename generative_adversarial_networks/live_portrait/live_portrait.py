@@ -686,6 +686,62 @@ predict.lmk = None
 predict.x_d_0_info = None
 
 
+def warmup(models):
+    img = np.zeros((512, 512, 3), dtype=np.uint8)
+    x_s = np.random.randn(1, 21, 3).astype(np.float32)
+    x_d = np.random.randn(1, 21, 3).astype(np.float32)
+    f_s = np.random.randn(1, 32, 16, 64, 64).astype(np.float32)
+    lmk = np.random.randn(106, 2).astype(np.float32)
+    I_d = I_s = np.random.randn(1, 3, 256, 256).astype(np.float32)
+
+    start_time = time.time()
+
+    get_kp_info(models, I_s)
+    extract_feature_3d(models, I_s)
+    landmark_runner(models, img, lmk)
+    get_kp_info(models, I_d)
+    stitching(models, x_s, x_d)
+    warp_decode(models, f_s, x_s, x_d)
+
+    face_analysis = models["face_analysis"]
+    face_analysis(img)
+
+    elapse = time.time() - start_time
+    logger.info(f"warmup time: {elapse:.3f}s")
+
+
+def benchmark(models):
+    logger.info("BENCHMARK mode")
+
+    img = np.zeros((512, 512, 3), dtype=np.uint8)
+    x_s = np.random.randn(1, 21, 3).astype(np.float32)
+    x_d = np.random.randn(1, 21, 3).astype(np.float32)
+    f_s = np.random.randn(1, 32, 16, 64, 64).astype(np.float32)
+    lmk = np.random.randn(106, 2).astype(np.float32)
+    I_d = np.random.randn(1, 3, 256, 256).astype(np.float32)
+
+    total_time_estimation = 0
+    for i in range(args.benchmark_count):
+        start = int(round(time.time() * 1000))
+        try:
+            landmark_runner(models, img, lmk)
+            get_kp_info(models, I_d)
+            stitching(models, x_s, x_d)
+            warp_decode(models, f_s, x_s, x_d)
+        finally:
+            end = int(round(time.time() * 1000))
+            estimation_time = end - start
+
+        # Loggin
+        logger.info(f"\tailia processing estimation time {estimation_time} ms")
+        if i != 0:
+            total_time_estimation = total_time_estimation + estimation_time
+
+    logger.info(
+        f"\taverage time estimation {total_time_estimation / (args.benchmark_count - 1)} ms"
+    )
+
+
 def recognize_from_video(models):
     source_image = args.input[0]
     driving_video = args.driving
@@ -819,7 +875,12 @@ def main():
         "face_analysis": face_analysis,
     }
 
-    recognize_from_video(models)
+    warmup(models)
+
+    if args.benchmark:
+        benchmark(models)
+    else:
+        recognize_from_video(models)
 
 
 if __name__ == "__main__":
