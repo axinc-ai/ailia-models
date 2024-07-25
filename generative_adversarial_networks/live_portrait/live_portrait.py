@@ -9,7 +9,7 @@ import ailia
 
 # import original modules
 sys.path.append("../../util")
-from arg_utils import get_base_parser, update_parser, get_savepath  # noqa
+from arg_utils import get_base_parser, update_parser  # noqa
 from model_utils import check_and_download_models  # noqa
 from detector_utils import load_image  # noqa
 from nms_utils import nms_boxes
@@ -30,12 +30,28 @@ logger = getLogger(__name__)
 # Parameters
 # ======================
 
-WEIGHT_DET_PATH = ".onnx"
-MODEL_DET_PATH = ".onnx.prototxt"
+WEIGHT_F_PATH = "appearance_feature_extractor.onnx"
+MODEL_F_PATH = "appearance_feature_extractor.onnx.prototxt"
+WEIGHT_M_PATH = "motion_extractor.onnx"
+MODEL_M_PATH = "motion_extractor.onnx.prototxt"
+WEIGHT_W_PATH = "warping_module.onnx"
+MODEL_W_PATH = "warping_module.onnx.prototxt"
+WEIGHT_G_PATH = "spade_generator.onnx"
+MODEL_G_PATH = "spade_generator.onnx.prototxt"
+WEIGHT_S_PATH = "stitching.onnx"
+MODEL_S_PATH = "stitching.onnx.prototxt"
+WEIGHT_L_PATH = "landmark.onnx"
+MODEL_L_PATH = "landmark.onnx.prototxt"
+
+WEIGHT_IF_DET_PATH = "det_10g.onnx"
+MODEL_IF_DET_PATH = "det_10g.onnx.prototxt"
+WEIGHT_IF_LMK_PATH = "2d106det.onnx"
+MODEL_IF_LMK_PATH = "2d106det.onnx.prototxt"
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/live_portrait/"
 
 IMAGE_PATH = "s6.jpg"
 DRIVING_VIDEO_PATH = "d0.mp4"
+MASK_PATH = "mask_template.png"
 
 
 # ======================
@@ -45,6 +61,11 @@ DRIVING_VIDEO_PATH = "d0.mp4"
 parser = get_base_parser("LivePortrait", IMAGE_PATH, None)
 parser.add_argument(
     "--driving", metavar="VIDEO", default=DRIVING_VIDEO_PATH, help="Driving video."
+)
+parser.add_argument(
+    "--composite",
+    action="store_true",
+    help='Combine "driving frame | source image | generation frame".',
 )
 parser.add_argument("--onnx", action="store_true", help="execute onnxruntime version.")
 args = update_parser(parser)
@@ -201,6 +222,14 @@ def paste_back(img_crop, M_c2o, img_ori, mask_ori):
         np.uint8
     )
     return result
+
+
+def get_fps(video, default_fps=25):
+    fps = cv2.VideoCapture(video).get(cv2.CAP_PROP_FPS)
+    if fps in (0, None):
+        fps = default_fps
+
+    return fps
 
 
 def concat_frame(driving_img, src_img, I_p):
@@ -660,7 +689,7 @@ predict.x_d_0_info = None
 def recognize_from_video(models):
     source_image = args.input[0]
     driving_video = args.driving
-    flg_composite = True
+    flg_composite = args.composite
 
     logger.info("Source image: " + source_image)
     logger.info("Driving video: " + str(driving_video))
@@ -669,7 +698,7 @@ def recognize_from_video(models):
     img = load_image(source_image)
     img = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
 
-    mask_crop = load_image("mask_template.png")
+    mask_crop = load_image(MASK_PATH)
     mask_crop = cv2.cvtColor(mask_crop, cv2.COLOR_BGRA2BGR)
 
     img = img[:, :, ::-1]  # BGR -> RGB
@@ -694,8 +723,9 @@ def recognize_from_video(models):
 
     # create video writer if savepath is specified as video format
     if args.savepath:
-        f_h, f_w = (512, 1536) if flg_composite else src_img.shape[:2]
-        writer = get_writer(args.savepath, f_h, f_w)
+        f_h, f_w = (512, 512 * 3) if flg_composite else src_img.shape[:2]
+        output_fps = int(get_fps(driving_video))
+        writer = get_writer(args.savepath, f_h, f_w, fps=output_fps)
     else:
         writer = None
 
@@ -739,53 +769,53 @@ def recognize_from_video(models):
 
 
 def main():
-    # # model files check and download
-    # check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
+    # model files check and download
+    check_and_download_models(WEIGHT_F_PATH, MODEL_F_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_M_PATH, MODEL_M_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_W_PATH, MODEL_W_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_G_PATH, MODEL_G_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_S_PATH, MODEL_S_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_L_PATH, MODEL_L_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_IF_DET_PATH, MODEL_IF_DET_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_IF_LMK_PATH, MODEL_IF_LMK_PATH, REMOTE_PATH)
 
     env_id = args.env_id
 
     # initialize
     if not args.onnx:
-        net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+        net_f = ailia.Net(MODEL_F_PATH, WEIGHT_F_PATH, env_id=env_id)
+        net_m = ailia.Net(MODEL_M_PATH, WEIGHT_M_PATH, env_id=env_id)
+        net_w = ailia.Net(MODEL_W_PATH, WEIGHT_W_PATH, env_id=env_id)
+        net_g = ailia.Net(MODEL_G_PATH, WEIGHT_G_PATH, env_id=env_id)
+        net_s = ailia.Net(MODEL_S_PATH, WEIGHT_S_PATH, env_id=env_id)
+        net_l = ailia.Net(MODEL_L_PATH, WEIGHT_L_PATH, env_id=env_id)
+        det_face = ailia.Net(MODEL_IF_DET_PATH, WEIGHT_IF_DET_PATH, env_id=env_id)
+        landmark = ailia.Net(MODEL_IF_LMK_PATH, WEIGHT_IF_LMK_PATH, env_id=env_id)
     else:
         import onnxruntime
 
+        onnxruntime.set_default_logger_severity(3)
+
         providers = ["CUDAExecutionProvider", "CPUExecutionProvider"]
-        # init F
-        appearance_feature_extractor = onnxruntime.InferenceSession(
-            "appearance_feature_extractor.onnx", providers=providers
-        )
-        # init M
-        motion_extractor = onnxruntime.InferenceSession(
-            "motion_extractor.onnx", providers=providers
-        )
-        # init W
-        warping_module = onnxruntime.InferenceSession(
-            "warping_module.onnx", providers=providers
-        )
-        # init G
-        spade_generator = onnxruntime.InferenceSession(
-            "spade_generator.onnx", providers=providers
-        )
-        # init S
-        stitching = onnxruntime.InferenceSession("stitching.onnx", providers=providers)
+        net_f = onnxruntime.InferenceSession(WEIGHT_F_PATH, providers=providers)
+        net_m = onnxruntime.InferenceSession(WEIGHT_M_PATH, providers=providers)
+        net_w = onnxruntime.InferenceSession(WEIGHT_W_PATH, providers=providers)
+        net_g = onnxruntime.InferenceSession(WEIGHT_G_PATH, providers=providers)
+        net_s = onnxruntime.InferenceSession(WEIGHT_S_PATH, providers=providers)
+        net_l = onnxruntime.InferenceSession(WEIGHT_L_PATH, providers=providers)
 
-        landmark_runner = onnxruntime.InferenceSession(
-            "landmark.onnx", providers=providers
-        )
-
-        landmark = onnxruntime.InferenceSession("2d106det.onnx", providers=providers)
-        det_face = onnxruntime.InferenceSession("det_10g.onnx", providers=providers)
+        det_face = onnxruntime.InferenceSession(WEIGHT_IF_DET_PATH, providers=providers)
+        landmark = onnxruntime.InferenceSession(WEIGHT_IF_LMK_PATH, providers=providers)
 
     face_analysis = get_face_analysis(det_face, landmark)
 
     models = {
-        "appearance_feature_extractor": appearance_feature_extractor,
-        "motion_extractor": motion_extractor,
-        "warping_module": warping_module,
-        "spade_generator": spade_generator,
-        "stitching": stitching,
-        "landmark_runner": landmark_runner,
+        "appearance_feature_extractor": net_f,
+        "motion_extractor": net_m,
+        "warping_module": net_w,
+        "spade_generator": net_g,
+        "stitching": net_s,
+        "landmark_runner": net_l,
         "face_analysis": face_analysis,
     }
 
