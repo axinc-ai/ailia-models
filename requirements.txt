@@ -13,3 +13,4 @@ ftfy
 webcolors
 pymatting
 lapx
+transformers>=4.27.0,<=4.43.2
