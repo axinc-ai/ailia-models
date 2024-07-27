@@ -96,7 +96,6 @@ def main():
 
     # preprocess
     sentences, sentences_ids = preprocess(tokenizer, body)
-    logger.info(f'Tokens : {sentences_ids}')
 
     # inference
     if args.benchmark:

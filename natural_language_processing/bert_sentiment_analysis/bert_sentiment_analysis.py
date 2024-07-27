@@ -73,7 +73,6 @@ def main():
         del inputs_onnx["token_type_ids"]
 
     logger.info("Input : "+str(args.input))
-    logger.info("Tokens : "+str(inputs_onnx["input_ids"]))
 
     # inference
     if args.benchmark:
