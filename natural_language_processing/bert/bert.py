@@ -7,13 +7,11 @@ import numpy as np
 import warnings
 warnings.filterwarnings('ignore', category=FutureWarning)
 
-from transformers import BertTokenizer  # noqa: E402
-
 import ailia  # noqa: E402
 # import original modules
 sys.path.append('../../util')
 from arg_utils import get_base_parser, update_parser  # noqa: E402
-from model_utils import check_and_download_models  # noqa: E402
+from model_utils import check_and_download_models, check_and_download_file  # noqa: E402
 
 # logger
 from logging import getLogger   # noqa: E402
@@ -40,6 +38,11 @@ parser.add_argument(
     '--lang', '-l', metavar='LANG',
     default='en', choices=LANGS,
     help='choose language: ' + ' | '.join(LANGS) + ' (default: en)'
+)
+parser.add_argument(
+    '--disable_ailia_tokenizer',
+    action='store_true',
+    help='disable ailia tokenizer.'
 )
 # TODO
 # input masked sentence ? how treats Japanese?
@@ -140,13 +143,28 @@ def main():
 
     # bert tokenizer
     if LANG == 'en':
-        tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+        if args.disable_ailia_tokenizer:
+            from transformers import BertTokenizer  # noqa: E402
+            tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+        else:
+            from ailia_tokenizer import BertUncasedTokenizer
+            VOCAB_REMOTE_PATH = "https://storage.googleapis.com/ailia-models/bert_maskedlm/"
+            check_and_download_file("bert-base-uncased-vocab.txt", VOCAB_REMOTE_PATH)
+            tokenizer = BertUncasedTokenizer.from_pretrained('bert-base-uncased-vocab.txt')
     elif LANG == 'jp':
-        tokenizer = BertTokenizer(
-            'vocab.txt',
-            do_lower_case=False,
-            do_basic_tokenize=False,
-        )
+        if True:#args.disable_ailia_tokenizer:
+            from transformers import BertTokenizer  # noqa: E402
+            tokenizer = BertTokenizer(
+                'vocab.txt',
+                do_lower_case=False,
+                do_basic_tokenize=False,
+            )
+        #else:
+        #    # This tokenizer type not supported
+        #    from ailia_tokenizer import BertCasedTokenizer
+        #    VOCAB_REMOTE_PATH = "https://storage.googleapis.com/ailia-models/bert_maskedlm/"
+        #    check_and_download_file("bert-base-uncased-vocab.txt", VOCAB_REMOTE_PATH)
+        #    tokenizer = BertCcasedTokenizer.from_pretrained('vocab.txt')
 
     # prepare data
     sentence_id = np.ones((1, MAX_SEQ_LEN), dtype=np.int64)
