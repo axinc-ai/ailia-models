@@ -4,7 +4,6 @@ from typing import List
 from logging import getLogger
 
 import numpy as np
-from transformers import WhisperTokenizer
 import soundfile as sf
 
 # import original modules
@@ -16,6 +15,7 @@ from detector_utils import load_image  # noqa
 import ailia
 
 from audio_utils import mel_filter_bank, window_function, spectrogram
+from tokenizer_utils import decode_asr
 
 logger = getLogger(__name__)
 
@@ -54,6 +54,11 @@ parser.add_argument(
     '--onnx',
     action='store_true',
     help='execute onnxruntime version.'
+)
+parser.add_argument(
+    '--disable_ailia_tokenizer',
+    action='store_true',
+    help='disable ailia tokenizer.'
 )
 args = update_parser(parser, check_input_type=False)
 
@@ -327,11 +332,20 @@ def predict(models, wav, chunk_length_s=0):
 
     tokenizer = models['tokenizer']
     time_precision = 0.02
-    text, optional = tokenizer._decode_asr(
-        model_outputs,
-        return_timestamps=None,
-        return_language=None,
-        time_precision=time_precision)
+
+    if args.disable_ailia_tokenizer:
+        text, optional = tokenizer._decode_asr(
+            model_outputs,
+            return_timestamps=None,
+            return_language=None,
+            time_precision=time_precision)
+    else:
+        text, optional = decode_asr(
+            tokenizer,
+            model_outputs,
+            return_timestamps=None,
+            return_language=None,
+            time_precision=time_precision)
     text = text.strip()
 
     return text
@@ -390,7 +404,12 @@ def main():
         enc_net = onnxruntime.InferenceSession(WEIGHT_ENC_PATH, providers=providers)
         dec_net = onnxruntime.InferenceSession(WEIGHT_DEC_PATH, providers=providers)
 
-    tokenizer = WhisperTokenizer.from_pretrained("tokenizer")
+    if args.disable_ailia_tokenizer:
+        from transformers import WhisperTokenizer
+        tokenizer = WhisperTokenizer.from_pretrained("tokenizer")
+    else:
+        from ailia_tokenizer import WhisperTokenizer
+        tokenizer = WhisperTokenizer.from_pretrained()
 
     models = {
         'enc': enc_net,
