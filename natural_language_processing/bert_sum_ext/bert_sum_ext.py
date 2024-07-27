@@ -2,7 +2,6 @@ import time
 import sys
 
 import numpy as np
-from transformers import AutoTokenizer
 from bert_sum_ext_utils import tokenize, select_sentences
 from cluster_features import ClusterFeatures
 
@@ -40,6 +39,11 @@ parser.add_argument(
     '-f', '--file', type=str, default=SAMPLE_TEXT_PATH,
     help='input text file path'
 )
+parser.add_argument(
+    '--disable_ailia_tokenizer',
+    action='store_true',
+    help='disable ailia tokenizer.'
+)
 args = update_parser(parser)
 
 
@@ -76,7 +80,14 @@ def main():
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
 
     model = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
-    tokenizer = AutoTokenizer.from_pretrained('./bert/')
+
+    if True:#args.disable_ailia_tokenizer:
+        from transformers import AutoTokenizer
+        tokenizer = AutoTokenizer.from_pretrained('./bert/')
+    #else:
+    #    # tokenize_chinese_chars falseの対応が必要
+    #    from ailia_tokenizer import BertCasedTokenizer
+    #    tokenizer = BertCasedTokenizer.from_pretrained('./bert/vocab.txt')
 
     with open(args.file, encoding="utf-8") as f:
         body = f.read()
@@ -85,6 +96,7 @@ def main():
 
     # preprocess
     sentences, sentences_ids = preprocess(tokenizer, body)
+    logger.info(f'Tokens : {sentences_ids}')
 
     # inference
     if args.benchmark:

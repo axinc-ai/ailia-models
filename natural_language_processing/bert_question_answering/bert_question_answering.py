@@ -2,7 +2,6 @@ import time
 import sys
 
 import numpy as np
-from transformers import AutoTokenizer
 from transformers.data import SquadExample, SquadFeatures, squad_convert_examples_to_features
 from typing import Dict, List, Tuple, Union
 from transformers.tokenization_utils_base import PaddingStrategy
@@ -46,6 +45,11 @@ parser.add_argument(
     '--torch',
     action='store_true',
     help='execute torch version.'
+)
+parser.add_argument(
+    '--disable_ailia_tokenizer',
+    action='store_true',
+    help='disable ailia tokenizer.'
 )
 args = update_parser(parser, check_input_type=False)
 
@@ -388,7 +392,14 @@ def main():
     topk = 1
     max_answer_len = 15
 
-    tokenizer = AutoTokenizer.from_pretrained('deepset/roberta-base-squad2')
+    if True:#args.disable_ailia_tokenizer:
+        from transformers import AutoTokenizer
+        tokenizer = AutoTokenizer.from_pretrained('deepset/roberta-base-squad2')
+    #else:
+    #    # not supported yet
+    #    from ailia_tokenizer import RobertaTokenizer
+    #    tokenizer = RobertaTokenizer.from_pretrained('tokenizer/vocab.json', 'tokenizer/merges.txt')
+    #    tokenizer.padding_side = "right"
 
     # Convert inputs to features
     examples = []
