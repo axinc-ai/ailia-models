@@ -61,6 +61,12 @@ parser.add_argument(
     help='random seed'
 )
 
+parser.add_argument(
+    '--disable_ailia_tokenizer',
+    action='store_true',
+    help='disable ailia tokenizer.'
+)
+
 args = update_parser(parser, check_input_type=False)
 
 if args.seed:
@@ -295,8 +301,12 @@ def main():
     check_and_download_models(ENCODER_WEIGHT_PATH, ENCODER_MODEL_PATH, REMOTE_PATH)
     check_and_download_models(DECODER_WEIGHT_PATH, DECODER_MODEL_PATH, REMOTE_PATH)
 
-    model_name = "sonoisa/t5-base-japanese"
-    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    if args.disable_ailia_tokenizer:
+        from transformers import AutoTokenizer
+        tokenizer = AutoTokenizer.from_pretrained("sonoisa/t5-base-japanese", is_fast=True)
+    else:
+        from ailia_tokenizer import T5Tokenizer
+        tokenizer = T5Tokenizer.from_pretrained("./tokenizer/spiece.model")
 
     env_id = args.env_id
 
