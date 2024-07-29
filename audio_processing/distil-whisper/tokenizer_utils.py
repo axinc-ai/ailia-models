@@ -131,6 +131,24 @@ TO_LANGUAGE_CODE = {
 
 TASK_IDS = ["translate", "transcribe"]
 
+def _strip_prompt(tokenizer, token_ids: List[int], prompt_token_id: int, decoder_start_token_id: int):
+    if not isinstance(token_ids, list):
+        token_ids = tokenizer._convert_to_list(token_ids)
+
+    # handle case of empty token_ids for decoding with timestamps.
+    # at this point token_ids is a list, so it is safe to use if not check.
+    if not token_ids:
+        return token_ids
+
+    has_prompt = token_ids[0] == prompt_token_id
+    if has_prompt:
+        if decoder_start_token_id in token_ids:
+            return token_ids[token_ids.index(decoder_start_token_id) :]
+        else:
+            return []
+
+    return token_ids
+
 def _find_longest_common_sequence(sequences, token_timestamp_sequences=None):
     # It would be much harder to do O(n) because of fault tolerance.
     # We actually have a really good property which is that the total sequence
@@ -412,7 +430,7 @@ def decode_asr(tokenizer, model_outputs, *, return_timestamps, return_language, 
         # our lives easier
         token_ids = output["tokens"][0].tolist()
         # (possibly) remove the prompt from the token ids
-        token_ids = tokenizer._strip_prompt(token_ids, prompt_token_id, decoder_start_token_id)
+        token_ids = _strip_prompt(tokenizer, token_ids, prompt_token_id, decoder_start_token_id)
         if return_timestamps == "word":
             token_timestamps = output["token_timestamps"][0].tolist()
 
