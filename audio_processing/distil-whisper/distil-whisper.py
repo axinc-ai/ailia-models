@@ -409,7 +409,7 @@ def main():
         tokenizer = WhisperTokenizer.from_pretrained("tokenizer")
     else:
         from ailia_tokenizer import WhisperTokenizer
-        tokenizer = WhisperTokenizer.from_pretrained()
+        tokenizer = WhisperTokenizer.from_pretrained("./tokenizer/vocab.json", "./tokenizer/merges.txt", "./tokenizer/added_tokens.json")
 
     models = {
         'enc': enc_net,
