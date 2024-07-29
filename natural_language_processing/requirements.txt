@@ -1,4 +1,5 @@
 -i https://pypi.org/simple
+transformers>=4.27.0,<=4.43.2
 tokenizers>=0.7.0
 sentencepiece>=0.1.90
 sacremoses>=0.0.43
