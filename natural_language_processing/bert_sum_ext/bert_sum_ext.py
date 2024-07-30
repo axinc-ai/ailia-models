@@ -81,13 +81,12 @@ def main():
 
     model = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
 
-    if True:#args.disable_ailia_tokenizer:
+    if args.disable_ailia_tokenizer:
         from transformers import AutoTokenizer
         tokenizer = AutoTokenizer.from_pretrained('./bert/')
-    #else:
-    #    # tokenize_chinese_chars falseの対応が必要
-    #    from ailia_tokenizer import BertCasedTokenizer
-    #    tokenizer = BertCasedTokenizer.from_pretrained('./bert/vocab.txt')
+    else:
+        from ailia_tokenizer import BertTokenizer
+        tokenizer = BertTokenizer.from_pretrained('./bert/vocab.txt', './bert/tokenizer_config.json')
 
     with open(args.file, encoding="utf-8") as f:
         body = f.read()

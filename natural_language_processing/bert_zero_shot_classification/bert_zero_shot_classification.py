@@ -76,17 +76,18 @@ def main():
 
     ailia_model = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
 
-    if True:#args.disable_ailia_tokenizer:
+    if args.disable_ailia_tokenizer:
         from transformers import AutoTokenizer
         tokenizer = AutoTokenizer.from_pretrained('roberta-large-mnli')
-    #else:
-    #    # 未対応
-    #    from ailia_tokenizer import RobertaTokenizer
-    #    tokenizer = RobertaTokenizer.from_pretrained('tokenizer/vocab.json', 'tokenizer/merges.txt')
+    else:
+        from ailia_tokenizer import RobertaTokenizer
+        tokenizer = RobertaTokenizer.from_pretrained('tokenizer/vocab.json', 'tokenizer/merges.txt')
 
     model_inputs = preprocess(
         args.sentence, candidate_labels, args.hypothesis_template
     )
+
+    print(model_inputs)
 
     model_inputs = tokenizer(
         model_inputs,
@@ -95,6 +96,8 @@ def main():
         padding=True,
         truncation="only_first",
     )
+
+    print(model_inputs)
 
     inputs_onnx = {
         k: v for k, v in model_inputs.items()
