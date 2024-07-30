@@ -75,17 +75,19 @@ def get_tokenizer():
             from transformers import BertTokenizer
             tokenizer = BertTokenizer.from_pretrained('bert-base-cased')
         else:
-            from ailia_tokenizer import BertCasedTokenizer
+            from ailia_tokenizer import BertTokenizer
             check_and_download_file("bert-base-cased-vocab.txt", REMOTE_PATH)
-            tokenizer = BertCasedTokenizer.from_pretrained("bert-base-cased-vocab.txt")
+            check_and_download_file("bert-base-cased-tokenizer_config.json", REMOTE_PATH)
+            tokenizer = BertTokenizer.from_pretrained("bert-base-cased-vocab.txt", "bert-base-cased-tokenizer_config.json")
     elif args.arch == 'bert-base-uncased':
         if args.disable_ailia_tokenizer:
             from transformers import BertTokenizer
             tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
         else:
-            from ailia_tokenizer import BertUncasedTokenizer
+            from ailia_tokenizer import BertTokenizer
             check_and_download_file("bert-base-uncased-vocab.txt", REMOTE_PATH)
-            tokenizer = BertUncasedTokenizer.from_pretrained('bert-base-uncased-vocab.txt')
+            check_and_download_file("bert-base-uncased-tokenizer_config.json", REMOTE_PATH)
+            tokenizer = BertTokenizer.from_pretrained('bert-base-uncased-vocab.txt', 'bert-base-uncased-tokenizer_config.json')
     elif args.arch == 'bert-base-japanese-whole-word-masking':
         if args.disable_ailia_tokenizer:
             from transformers import BertJapaneseTokenizer
