@@ -87,17 +87,14 @@ def main():
         args.sentence, candidate_labels, args.hypothesis_template
     )
 
-    print(model_inputs)
-
     model_inputs = tokenizer(
         model_inputs,
         add_special_tokens=True,
         return_tensors="np",
         padding=True,
         truncation="only_first",
+        max_length=512 # Added from tokenizer_config
     )
-
-    print(model_inputs)
 
     inputs_onnx = {
         k: v for k, v in model_inputs.items()
