@@ -208,34 +208,19 @@ def extract_feature_transformer4(example, tokenizer):
     doc_stride =128
     question_first = tokenizer.padding_side == "right"
 
-    if args.disable_ailia_tokenizer:
-        encoded_inputs = tokenizer(
-            text=example.question_text if question_first else example.context_text,
-            text_pair=example.context_text if question_first else example.question_text,
-            padding=padding,
-            truncation="only_second" if question_first else "only_first",
-            max_length=max_seq_len,
-            stride=doc_stride,
-            return_tensors="np",
-            return_token_type_ids=True,
-            return_overflowing_tokens=True,
-            return_offsets_mapping=True,
-            return_special_tokens_mask=True,
-        )
-    else:
-        encoded_inputs = tokenizer(
-            text=example.question_text if question_first else example.context_text,
-            text_pair=example.context_text if question_first else example.question_text,
-            padding=padding,
-            truncation="only_second" if question_first else "only_first",
-            max_length=max_seq_len,
-            #stride=doc_stride, # overflow_to_sample_mappingを使用しないので不要
-            return_tensors="np",
-            return_token_type_ids=True,
-            #return_overflowing_tokens=True, # overflow_to_sample_mappingを使用しないので不要
-            #return_offsets_mapping=True,　# overflow_to_sample_mappingを使用しないので不要
-            #return_special_tokens_mask=True, # special_tokens_maskは使用していない
-        )
+    encoded_inputs = tokenizer(
+        text=example.question_text if question_first else example.context_text,
+        text_pair=example.context_text if question_first else example.question_text,
+        padding=padding,
+        truncation="only_second" if question_first else "only_first",
+        max_length=max_seq_len,
+        stride=doc_stride,
+        return_tensors="np",
+        return_token_type_ids=True,
+        return_overflowing_tokens=True,
+        return_offsets_mapping=True,
+        return_special_tokens_mask=True,
+    )
 
     # When the input is too long, it's converted in a batch of inputs with overflowing tokens
     # and a stride of overlap between the inputs. If a batch of inputs is given, a special output
@@ -405,16 +390,17 @@ def main():
     topk = 1
     max_answer_len = 15
 
-    if args.disable_ailia_tokenizer:
+    if True:#args.disable_ailia_tokenizer:
         from transformers import AutoTokenizer
         tokenizer = AutoTokenizer.from_pretrained('deepset/roberta-base-squad2')
         import transformers
         TRANSFORMER_VERSION=int(transformers.__version__.split(".")[0])
-    else:
-        from ailia_tokenizer import RobertaTokenizer
-        tokenizer = RobertaTokenizer.from_pretrained('tokenizer/vocab.json', 'tokenizer/merges.txt')
-        tokenizer.padding_side = "right"
-        TRANSFORMER_VERSION=4
+    #else:
+    #    # not supported yet
+    #    from ailia_tokenizer import RobertaTokenizer
+    #    tokenizer = RobertaTokenizer.from_pretrained('tokenizer/vocab.json', 'tokenizer/merges.txt')
+    #    tokenizer.padding_side = "right"
+    #    TRANSFORMER_VERSION=4
 
     # Convert inputs to features
     examples = []
