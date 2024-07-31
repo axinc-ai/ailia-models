@@ -7,7 +7,6 @@ import random
 
 import librosa
 import numpy as np
-from transformers import AutoTokenizer
 
 import ailia
 
@@ -67,7 +66,11 @@ parser.add_argument(
     action='store_true',
     help='Flag to output results to json file.'
 )
-
+parser.add_argument(
+    '--disable_ailia_tokenizer',
+    action='store_true',
+    help='disable ailia tokenizer.'
+)
 args = update_parser(parser, check_input_type=False)
 
 # ======================
@@ -236,12 +239,24 @@ def main():
     if args.version == '2023':
         caption_model = ailia.Net(CAPTION_MODEL_PATH_2023, CAPTION_WEIGHT_PATH_2023, env_id=env_id)
         audio_model = ailia.Net(AUDIO_MODEL_PATH_2023, AUDIO_WEIGHT_PATH_2023, env_id=env_id)
-        tokenizer = AutoTokenizer.from_pretrained('gpt2')
-        tokenizer.add_special_tokens({'pad_token': '!'})
+        if args.disable_ailia_tokenizer:
+            from transformers import AutoTokenizer
+            tokenizer = AutoTokenizer.from_pretrained('gpt2')
+            tokenizer.add_special_tokens({'pad_token': '!'})
+        else:
+            from ailia_tokenizer import GPT2Tokenizer
+            tokenizer = GPT2Tokenizer.from_pretrained('./tokenizer_gpt2/vocab.json', './tokenizer_gpt2/merges.txt')
+            tokenizer.add_special_tokens({'pad_token': '!'})
+            #tokenizer._pad_token_id = 0
     elif args.version == '2022':
         caption_model = ailia.Net(CAPTION_MODEL_PATH_2022, CAPTION_WEIGHT_PATH_2022, env_id=env_id)
         audio_model = ailia.Net(AUDIO_MODEL_PATH_2022, AUDIO_WEIGHT_PATH_2022, env_id=env_id)
-        tokenizer = AutoTokenizer.from_pretrained('bert-base-uncased')
+        if args.disable_ailia_tokenizer:
+            from transformers import AutoTokenizer
+            tokenizer = AutoTokenizer.from_pretrained('bert-base-uncased')
+        else:
+            from ailia_tokenizer import BertTokenizer
+            tokenizer = BertTokenizer.from_pretrained('./tokenizer_bert/vocab.txt', './tokenizer_bert/tokenizer_config.json')
 
     model = {
         'caption_model':caption_model,
