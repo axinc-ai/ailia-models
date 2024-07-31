@@ -44,8 +44,6 @@ parser.add_argument(
     action='store_true',
     help='disable ailia tokenizer.'
 )
-# TODO
-# input masked sentence ? how treats Japanese?
 args = update_parser(parser)
 
 
