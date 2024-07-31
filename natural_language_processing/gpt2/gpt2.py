@@ -1,6 +1,5 @@
 import time
 import sys
-from transformers import AutoTokenizer
 
 from utils_gpt2 import *
 import ailia
@@ -33,6 +32,11 @@ parser.add_argument(
     action='store_true',
     help='By default, the ailia SDK is used, but with this option, you can switch to using ONNX Runtime'
 )
+parser.add_argument(
+    '--disable_ailia_tokenizer',
+    action='store_true',
+    help='disable ailia tokenizer.'
+)
 args = update_parser(parser, check_input_type=False)
 
 
@@ -56,7 +60,12 @@ def main():
     else:
         logger.info("This model requires multiple input shape, so running on CPU")
         ailia_model = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=0)#args.env_id)
-    tokenizer = AutoTokenizer.from_pretrained("gpt2-medium")
+    if args.disable_ailia_tokenizer:
+        from transformers import AutoTokenizer
+        tokenizer = AutoTokenizer.from_pretrained("gpt2-medium")
+    else:
+        from ailia_tokenizer import GPT2Tokenizer
+        tokenizer = GPT2Tokenizer.from_pretrained("./tokenizer/vocab.json", "./tokenizer/merges.txt")
     logger.info("Input : "+args.input)
 
     # inference
