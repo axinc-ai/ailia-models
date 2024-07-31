@@ -9,8 +9,6 @@ from PIL import Image
 
 import ailia
 
-from transformers import AutoTokenizer
-
 # import original modules
 sys.path.append("../../util")
 from arg_utils import get_base_parser, update_parser  # noqa
@@ -51,6 +49,11 @@ parser.add_argument(
     "--prompt",
     default="What are the things I should be cautious about when I visit here?",
     help="prompt.",
+)
+parser.add_argument(
+    '--disable_ailia_tokenizer',
+    action='store_true',
+    help='disable ailia tokenizer.'
 )
 parser.add_argument("--onnx", action="store_true", help="execute onnxruntime version.")
 args = update_parser(parser)
@@ -528,7 +531,13 @@ def main():
             WEIGHT_EMB_PATH, providers=providers
         )
 
-    tokenizer = AutoTokenizer.from_pretrained("tokenizer")
+    if args.disable_ailia_tokenizer:
+        from transformers import AutoTokenizer
+        tokenizer = AutoTokenizer.from_pretrained("tokenizer")
+    else:
+        from ailia_tokenizer import LlamaTokenizer
+        tokenizer = LlamaTokenizer.from_pretrained("./tokenizer/tokenizer.model")
+        tokenizer.bos_token_id = 1
 
     models = {
         "net": net,
