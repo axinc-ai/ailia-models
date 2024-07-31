@@ -1,10 +1,7 @@
 import logging
-import re
 import sys
-import unicodedata
 import time
 
-from transformers import T5Tokenizer
 import numpy as np
 from tqdm import trange
 sys.path.append('../../util')
@@ -40,6 +37,11 @@ parser = get_base_parser(
 parser.add_argument(
     '-o', '--onnx', action='store_true',
     help="Option to use onnxrutime to run or not."
+)
+parser.add_argument(
+    '--disable_ailia_tokenizer',
+    action='store_true',
+    help='disable ailia tokenizer.'
 )
 args = update_parser(parser)
 
@@ -187,7 +189,13 @@ def main(args):
     check_and_download_models(DECODER_ONNX_PATH, DECODER_PROTOTXT_PATH, REMOTE_PATH)
 
     # load model
-    tokenizer = T5Tokenizer.from_pretrained("./tokenizer/", is_fast=False)
+    if args.disable_ailia_tokenizer:
+        from transformers import T5Tokenizer
+        tokenizer = T5Tokenizer.from_pretrained("./tokenizer/", is_fast=False)
+    else:
+        from ailia_tokenizer import T5Tokenizer
+        tokenizer = T5Tokenizer.from_pretrained("./tokenizer/spiece.model")
+
     if args.onnx:
         from onnxruntime import InferenceSession
         encoder_sess = InferenceSession(ENCODER_ONNX_PATH)

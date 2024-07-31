@@ -2,8 +2,6 @@ import sys
 import time
 from logging import getLogger
 
-from scipy.special import softmax
-from transformers import AutoTokenizer
 import numpy as np
 
 import ailia
