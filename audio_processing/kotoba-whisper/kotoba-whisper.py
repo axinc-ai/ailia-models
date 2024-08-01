@@ -4,7 +4,6 @@ from typing import List
 from logging import getLogger
 
 import numpy as np
-from transformers import WhisperTokenizerFast
 from scipy.special import log_softmax, logsumexp
 import librosa
 
@@ -17,6 +16,7 @@ from model_utils import check_and_download_models, check_and_download_file  # no
 import ailia
 
 from audio_utils import SAMPLE_RATE, extract_fbank_features
+from tokenizer_utils import decode_asr
 
 
 logger = getLogger(__name__)
@@ -52,6 +52,11 @@ parser.add_argument(
     type=int,
     default=1,
     help="the size of the batch to use, for inference.",
+)
+parser.add_argument(
+    '--disable_ailia_tokenizer',
+    action='store_true',
+    help='disable ailia tokenizer.'
 )
 parser.add_argument("--memory_mode", default=-1, type=int, help="memory mode")
 parser.add_argument("--onnx", action="store_true", help="execute onnxruntime version.")
@@ -615,12 +620,19 @@ def predict(models, audio, chunk_length_s=0):
     # postprocess
     tokenizer = models["tokenizer"]
     time_precision = 0.02
-    text, optional = tokenizer._decode_asr(
-        model_outputs,
-        return_timestamps=True,
-        return_language=None,
-        time_precision=time_precision,
-    )
+    if args.disable_ailia_tokenizer:
+        text, optional = tokenizer._decode_asr(
+            model_outputs,
+            return_timestamps=True,
+            return_language=None,
+            time_precision=time_precision)
+    else:
+        text, optional = decode_asr(
+            tokenizer,
+            model_outputs,
+            return_timestamps=True,
+            return_language=None,
+            time_precision=time_precision)
 
     return {"text": text, **optional}
 
@@ -686,7 +698,12 @@ def main():
         enc_net = onnxruntime.InferenceSession(WEIGHT_ENC_PATH, providers=providers)
         dec_net = onnxruntime.InferenceSession(WEIGHT_DEC_PATH, providers=providers)
 
-    tokenizer = WhisperTokenizerFast.from_pretrained("tokenizer")
+    if args.disable_ailia_tokenizer:
+        from transformers import WhisperTokenizerFast
+        tokenizer = WhisperTokenizerFast.from_pretrained("tokenizer")
+    else:
+        from ailia_tokenizer import WhisperTokenizer
+        tokenizer = WhisperTokenizer.from_pretrained("./tokenizer/vocab.json", "./tokenizer/merges.txt", "./tokenizer/added_tokens.json")
 
     models = {
         "enc": enc_net,
