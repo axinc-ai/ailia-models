@@ -293,6 +293,8 @@ def main():
     else:
         from ailia_tokenizer import T5Tokenizer
         tokenizer = T5Tokenizer.from_pretrained("./tokenizer/spiece.model")
+        tokenizer.add_special_tokens({"pad_token" : "[PAD]"})
+        tokenizer.cls_token_id = 4
         tokenizer.bos_token_id = 1
 
     models = {
