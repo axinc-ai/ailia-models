@@ -189,7 +189,7 @@ def tokenize_and_embeddings(models, document_list):
         document_list, unit=" documents", desc="Processing", postfix="Word Embeddings"
     ):
         # for document in document_list:
-        tokens = tokenizer(document, truncation=True, return_tensors="np")
+        tokens = tokenizer(document, truncation=True, max_length=512, return_tensors="np")
         words = tokenizer.convert_ids_to_tokens(tokens["input_ids"][0].tolist())
         word_ids = tokens.word_ids()
 
@@ -449,7 +449,7 @@ def predict(models, packet_hex):
 
     tokenizer = models["tokenizer"]
     net = models["similar"]
-    tokens = tokenizer(final_format, truncation=True, return_tensors="np")
+    tokens = tokenizer(final_format, truncation=True, max_length=512, return_tensors="np")
     input_ids = tokens["input_ids"]
     attention_mask = tokens["attention_mask"]
 
