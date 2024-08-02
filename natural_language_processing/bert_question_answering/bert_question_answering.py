@@ -350,7 +350,7 @@ def main():
     else:
         # not supported yet
         from ailia_tokenizer import RobertaTokenizer
-        tokenizer = RobertaTokenizer.from_pretrained('tokenizer/vocab.json', 'tokenizer/merges.txt')
+        tokenizer = RobertaTokenizer.from_pretrained('tokenizer/')
         tokenizer.padding_side = "right"
         tokenizer.cls_token_id = 0
         tokenizer.model_input_names = ["input_ids", "attention_mask"]

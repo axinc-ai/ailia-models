@@ -64,7 +64,7 @@ def main():
         tokenizer = T5Tokenizer.from_pretrained("rinna/japanese-gpt2-small")
     else:
         from transformers import T5Tokenizer
-        tokenizer = T5Tokenizer.from_pretrained("./tokenizer/spiece.model")
+        tokenizer = T5Tokenizer.from_pretrained("./tokenizer/")
     logger.info("Input : "+args.input)
 
     # inference

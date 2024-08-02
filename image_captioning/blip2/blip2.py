@@ -383,7 +383,7 @@ def main():
         tokenizer = AutoTokenizer.from_pretrained("tokenizer")
     else:
         from ailia_tokenizer import GPT2Tokenizer
-        tokenizer = GPT2Tokenizer.from_pretrained("./tokenizer/vocab.json", "./tokenizer/merges.txt")
+        tokenizer = GPT2Tokenizer.from_pretrained("./tokenizer/")
 
     models = {
         'net': net,

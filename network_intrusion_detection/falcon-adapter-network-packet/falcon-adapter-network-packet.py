@@ -562,7 +562,7 @@ def main():
         tokenizer = AutoTokenizer.from_pretrained("tokenizer")
     else:
         from ailia_tokenizer import BertTokenizer
-        tokenizer = BertTokenizer.from_pretrained("./tokenizer/vocab.txt", "./tokenizer/tokenizer_config.json")
+        tokenizer = BertTokenizer.from_pretrained("./tokenizer/")
     scaler = joblib.load(SCALER_PKL)
     cluster_centers = np.load(CLUSTER_CENTERS)
     tag_names = np.load(TAGS_NAMES)

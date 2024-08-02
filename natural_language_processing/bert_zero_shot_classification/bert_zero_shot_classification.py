@@ -81,7 +81,7 @@ def main():
         tokenizer = AutoTokenizer.from_pretrained('roberta-large-mnli')
     else:
         from ailia_tokenizer import RobertaTokenizer
-        tokenizer = RobertaTokenizer.from_pretrained('tokenizer/vocab.json', 'tokenizer/merges.txt')
+        tokenizer = RobertaTokenizer.from_pretrained('tokenizer/')
 
     model_inputs = preprocess(
         args.sentence, candidate_labels, args.hypothesis_template

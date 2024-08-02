@@ -245,7 +245,7 @@ def main():
             tokenizer.add_special_tokens({'pad_token': '!'})
         else:
             from ailia_tokenizer import GPT2Tokenizer
-            tokenizer = GPT2Tokenizer.from_pretrained('./tokenizer_gpt2/vocab.json', './tokenizer_gpt2/merges.txt')
+            tokenizer = GPT2Tokenizer.from_pretrained('./tokenizer_gpt2/')
             tokenizer.add_special_tokens({'pad_token': '!'})
             #tokenizer._pad_token_id = 0
     elif args.version == '2022':
@@ -256,7 +256,7 @@ def main():
             tokenizer = AutoTokenizer.from_pretrained('bert-base-uncased')
         else:
             from ailia_tokenizer import BertTokenizer
-            tokenizer = BertTokenizer.from_pretrained('./tokenizer_bert/vocab.txt', './tokenizer_bert/tokenizer_config.json')
+            tokenizer = BertTokenizer.from_pretrained('./tokenizer_bert/')
 
     model = {
         'caption_model':caption_model,

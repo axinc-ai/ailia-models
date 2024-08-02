@@ -262,7 +262,7 @@ def main(args):
         tokenizer = T5Tokenizer.from_pretrained(HUGGING_FACE_MODEL_PATH, is_fast=True)
     else:
         from ailia_tokenizer import T5Tokenizer
-        tokenizer = T5Tokenizer.from_pretrained("./tokenizer/spiece.model")
+        tokenizer = T5Tokenizer.from_pretrained("./tokenizer/")
     if args.onnx:
         from onnxruntime import InferenceSession
         encoder_sess = InferenceSession(ENCODER_ONNX_PATH)

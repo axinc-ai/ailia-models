@@ -155,7 +155,7 @@ class BERTEmbedder:
             self.tokenizer = BertTokenizerFast.from_pretrained("bert-base-uncased")
         else:
             from ailia_tokenizer import BertTokenizer
-            self.tokenizer = BertTokenizer.from_pretrained("./tokenizer/vocab.txt", "./tokenizer/tokenizer_config.json")
+            self.tokenizer = BertTokenizer.from_pretrained("./tokenizer/")
 
         self.max_length = max_length
 

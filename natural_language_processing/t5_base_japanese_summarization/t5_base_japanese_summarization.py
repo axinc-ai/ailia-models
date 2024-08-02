@@ -304,7 +304,7 @@ def main():
         tokenizer = AutoTokenizer.from_pretrained("sonoisa/t5-base-japanese", is_fast=True)
     else:
         from ailia_tokenizer import T5Tokenizer
-        tokenizer = T5Tokenizer.from_pretrained("./tokenizer/spiece.model")
+        tokenizer = T5Tokenizer.from_pretrained("./tokenizer/")
 
     env_id = args.env_id
 

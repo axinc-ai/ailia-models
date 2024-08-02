@@ -286,7 +286,7 @@ def main():
     if args.disable_ailia_tokenizer:
         tokenizer = MarianTokenizer.from_pretrained("tokenizer")
     else:
-        tokenizer = MarianTokenizer.from_pretrained("./tokenizer/source.spm")
+        tokenizer = MarianTokenizer.from_pretrained("./tokenizer/")
 
     env_id = args.env_id
 

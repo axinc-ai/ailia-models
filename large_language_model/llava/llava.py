@@ -536,7 +536,7 @@ def main():
         tokenizer = AutoTokenizer.from_pretrained("tokenizer")
     else:
         from ailia_tokenizer import LlamaTokenizer
-        tokenizer = LlamaTokenizer.from_pretrained("./tokenizer/tokenizer.model")
+        tokenizer = LlamaTokenizer.from_pretrained("./tokenizer")
         tokenizer.bos_token_id = 1
 
     models = {

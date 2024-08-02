@@ -398,7 +398,7 @@ def main():
 
         #ailia Tokenizer 1.4
         from ailia_tokenizer import BertTokenizer
-        tokenizer = BertTokenizer.from_pretrained("./tokenizer/vocab.txt", "./tokenizer/tokenizer_config.json")
+        tokenizer = BertTokenizer.from_pretrained("./tokenizer/")
 
     tokenizer.specical_tokens = tokenizer.convert_tokens_to_ids(
         ["[CLS]", "[SEP]", ".", "?"]

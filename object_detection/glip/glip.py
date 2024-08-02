@@ -554,7 +554,7 @@ def main():
         tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
     else:
         from ailia_tokenizer import BertTokenizer
-        tokenizer = BertTokenizer.from_pretrained("./tokenizer/vocab.txt", "./tokenizer/tokenizer_config.json")
+        tokenizer = BertTokenizer.from_pretrained("./tokenizer/")
 
     models = dict(
         tokenizer=tokenizer,

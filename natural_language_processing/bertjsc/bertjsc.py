@@ -139,7 +139,7 @@ def main():
         check_and_download_file("ipadic.zip", VOCAB_REMOTE_PATH)
         if not os.path.exists("ipadic"):
             shutil.unpack_archive('ipadic.zip', '')
-        tokenizer = BertJapaneseWordPieceTokenizer.from_pretrained('ipadic', './tokenizer/vocab.txt')
+        tokenizer = BertJapaneseWordPieceTokenizer.from_pretrained(dict_path='ipadic', pretrained_model_name_or_path='./tokenizer/')
 
     env_id = args.env_id
 

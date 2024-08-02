@@ -131,14 +131,14 @@ def main():
             tokenizer = BertTokenizer.from_pretrained('bert-base-cased')
         else:
             from ailia_tokenizer import BertTokenizer
-            tokenizer = BertTokenizer.from_pretrained("bert-base-cased-vocab.txt", "./tokenizer/bert-base-cased/tokenizer_config.json")
+            tokenizer = BertTokenizer.from_pretrained("./tokenizer/bert-base-cased/")
     elif args.arch == 'bert-base-uncased':
         if args.disable_ailia_tokenizer:
             from transformers import BertTokenizer
             tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
         else:
             from ailia_tokenizer import BertTokenizer
-            tokenizer = BertTokenizer.from_pretrained('bert-base-uncased-vocab.txt', './tokenizer/bert-base-uncased/tokenizer_config.json')
+            tokenizer = BertTokenizer.from_pretrained('./tokenizer/bert-base-uncased/')
     elif args.arch == 'bert-base-japanese-whole-word-masking':
         if args.disable_ailia_tokenizer:
             from transformers import BertJapaneseTokenizer
@@ -150,7 +150,7 @@ def main():
             check_and_download_file("ipadic.zip", REMOTE_PATH)
             if not os.path.exists("ipadic"):
                 shutil.unpack_archive('ipadic.zip', '')
-            tokenizer = BertJapaneseWordPieceTokenizer.from_pretrained('ipadic', './tokenizer/bert-base-japanese-whole-word-masking/vocab.txt')
+            tokenizer = BertJapaneseWordPieceTokenizer.from_pretrained(dict_path='ipadic', pretrained_model_name_or_path='./tokenizer/bert-base-japanese-whole-word-masking/')
 
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
     net.set_input_blob_shape(

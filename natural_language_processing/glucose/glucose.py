@@ -191,7 +191,7 @@ def main():
         tokenizer = AutoTokenizer.from_pretrained("tokenizer")
     else:
         from ailia_tokenizer import XLMRobertaTokenizer
-        tokenizer = XLMRobertaTokenizer.from_pretrained("./tokenizer/sentencepiece.bpe.model")
+        tokenizer = XLMRobertaTokenizer.from_pretrained("./tokenizer/")
 
     models = {
         "net": net,

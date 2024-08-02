@@ -86,7 +86,7 @@ def main():
         tokenizer = AutoTokenizer.from_pretrained('./bert/')
     else:
         from ailia_tokenizer import BertTokenizer
-        tokenizer = BertTokenizer.from_pretrained('./bert/vocab.txt', './bert/tokenizer_config.json')
+        tokenizer = BertTokenizer.from_pretrained('./bert/')
 
     with open(args.file, encoding="utf-8") as f:
         body = f.read()

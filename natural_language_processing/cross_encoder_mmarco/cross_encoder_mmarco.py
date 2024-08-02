@@ -45,7 +45,6 @@ args = update_parser(parser, check_input_type=False)
 
 WEIGHT_PATH = "mmarco-mMiniLMv2-L12-H384-v1.onnx"
 MODEL_PATH = "mmarco-mMiniLMv2-L12-H384-v1.onnx.prototxt"
-SPM_NAME = 'sentencepiece.bpe.model'
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/cross_encoder_mmarco/"
 
 
@@ -62,9 +61,8 @@ def main():
         from transformers import AutoTokenizer
         tokenizer = AutoTokenizer.from_pretrained("jeffwan/mmarco-mMiniLMv2-L12-H384-v1")
     else:
-        check_and_download_file(SPM_NAME, REMOTE_PATH)
         from ailia_tokenizer import XLMRobertaTokenizer
-        tokenizer = XLMRobertaTokenizer.from_pretrained(SPM_NAME)
+        tokenizer = XLMRobertaTokenizer.from_pretrained("./tokenizer/")
 
     model_inputs = tokenizer([args.query], [args.paragraph],  padding=True, truncation=True, return_tensors="np")
     inputs_onnx = {

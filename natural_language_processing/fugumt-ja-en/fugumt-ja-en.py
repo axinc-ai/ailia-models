@@ -255,7 +255,7 @@ def main():
     if args.disable_ailia_tokenizer:
         tokenizer = MarianTokenizer.from_pretrained("tokenizer")
     else:
-        tokenizer = MarianTokenizer.from_pretrained("./tokenizer/source.spm")
+        tokenizer = MarianTokenizer.from_pretrained("./tokenizer/")
 
     if not args.onnx:
         encoder = ailia.Net(stream=ENCODER_PROTOTXT_PATH, weight=ENCODER_ONNX_PATH)

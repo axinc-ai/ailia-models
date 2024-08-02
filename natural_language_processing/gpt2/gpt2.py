@@ -65,7 +65,7 @@ def main():
         tokenizer = AutoTokenizer.from_pretrained("gpt2-medium")
     else:
         from ailia_tokenizer import GPT2Tokenizer
-        tokenizer = GPT2Tokenizer.from_pretrained("./tokenizer/vocab.json", "./tokenizer/merges.txt")
+        tokenizer = GPT2Tokenizer.from_pretrained("./tokenizer/")
     logger.info("Input : "+args.input)
 
     # inference

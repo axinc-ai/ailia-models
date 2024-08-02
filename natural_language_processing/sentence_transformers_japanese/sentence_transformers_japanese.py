@@ -20,7 +20,6 @@ logger = getLogger(__name__)
 # Parameters
 # ======================
 WEIGHT_NAME = 'paraphrase-multilingual-mpnet-base-v2'
-SPM_NAME = 'sentencepiece.bpe.model'
 
 WEIGHT_PATH = WEIGHT_NAME + '.onnx'
 MODEL_PATH = WEIGHT_PATH + '.prototxt'
@@ -109,9 +108,8 @@ def main():
         from transformers import AutoTokenizer
         tokenizer = AutoTokenizer.from_pretrained('sentence-transformers/' + WEIGHT_NAME)
     else:
-        check_and_download_file(SPM_NAME, REMOTE_PATH)
         from ailia_tokenizer import XLMRobertaTokenizer
-        tokenizer = XLMRobertaTokenizer.from_pretrained(SPM_NAME)
+        tokenizer = XLMRobertaTokenizer.from_pretrained("./tokenizer/")
 
     # extract pdf sentences to list
     sentences = preprocess(args.input[0])

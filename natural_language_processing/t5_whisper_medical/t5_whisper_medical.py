@@ -194,7 +194,7 @@ def main(args):
         tokenizer = T5Tokenizer.from_pretrained("./tokenizer/", is_fast=False)
     else:
         from ailia_tokenizer import T5Tokenizer
-        tokenizer = T5Tokenizer.from_pretrained("./tokenizer/spiece.model")
+        tokenizer = T5Tokenizer.from_pretrained("./tokenizer/")
 
     if args.onnx:
         from onnxruntime import InferenceSession

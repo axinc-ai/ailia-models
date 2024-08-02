@@ -157,11 +157,10 @@ def main():
     else:
         from ailia_tokenizer import BertJapaneseWordPieceTokenizer
         VOCAB_REMOTE_PATH = "https://storage.googleapis.com/ailia-models/bert_maskedlm/"
-        check_and_download_file("bert-base-japanese-v3-vocab.txt", VOCAB_REMOTE_PATH)
         check_and_download_file("unidic-lite.zip", VOCAB_REMOTE_PATH)
         if not os.path.exists("unidic-lite"):
             shutil.unpack_archive('unidic-lite.zip', '')
-        tokenizer = BertJapaneseWordPieceTokenizer.from_pretrained('unidic-lite', 'bert-base-japanese-v3-vocab.txt')
+        tokenizer = BertJapaneseWordPieceTokenizer.from_pretrained(dict_path = 'unidic-lite', pretrained_model_name_or_path='./tokenizer/vocab.txt')
 
     env_id = args.env_id
 

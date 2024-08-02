@@ -148,7 +148,7 @@ def main():
             from ailia_tokenizer import BertUncasedTokenizer
             VOCAB_REMOTE_PATH = "https://storage.googleapis.com/ailia-models/bert_maskedlm/"
             check_and_download_file("bert-base-uncased-vocab.txt", VOCAB_REMOTE_PATH)
-            tokenizer = BertUncasedTokenizer.from_pretrained('bert-base-uncased-vocab.txt')
+            tokenizer = BertUncasedTokenizer.from_pretrained('./tokenizer/en/vocab.txt')
     elif LANG == 'jp':
         if True:#args.disable_ailia_tokenizer:
             from transformers import BertTokenizer  # noqa: E402
@@ -162,7 +162,7 @@ def main():
         #    from ailia_tokenizer import BertCasedTokenizer
         #    VOCAB_REMOTE_PATH = "https://storage.googleapis.com/ailia-models/bert_maskedlm/"
         #    check_and_download_file("bert-base-uncased-vocab.txt", VOCAB_REMOTE_PATH)
-        #    tokenizer = BertCcasedTokenizer.from_pretrained('vocab.txt')
+        #    tokenizer = BertCcasedTokenizer.from_pretrained('./tokenizer/jp/vocab.txt')
 
     # prepare data
     sentence_id = np.ones((1, MAX_SEQ_LEN), dtype=np.int64)

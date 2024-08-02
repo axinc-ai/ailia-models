@@ -48,8 +48,6 @@ CLAP_TEXT_ROBERTAMODEL_WEIGHT_PATH = "CLAP_text_text_branch_RobertaModel_roberta
 CLAP_TEXT_ROBERTAMODEL_MODEL_PATH  = "CLAP_text_text_branch_RobertaModel_roberta-base.onnx.prototxt"
 CLAP_TEXT_PROJECTION_WEIGHT_PATH   = "CLAP_text_projection_LAION-Audio-630K_with_fusion.onnx"
 CLAP_TEXT_PROJECTION_MODEL_PATH    = "CLAP_text_projection_LAION-Audio-630K_with_fusion.onnx.prototxt"
-CLAP_TOKENIZER_VOCAB_PATH = "vocab.json"
-CLAP_TOKENIZER_MERGES_PATH = "merges.txt"
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/clap/"
 
 
@@ -80,7 +78,7 @@ def infer_text(net_text_branch, net_text_projection, text_data):
         data["attention_mask"] = data["attention_mask"].to('cpu').detach().numpy().copy()
     else:
         from ailia_tokenizer import RobertaTokenizer
-        tokenize = RobertaTokenizer.from_pretrained(CLAP_TOKENIZER_VOCAB_PATH, CLAP_TOKENIZER_MERGES_PATH)
+        tokenize = RobertaTokenizer.from_pretrained("./tokenizer/")
         result = tokenize(
             text_data,
             padding="max_length",
@@ -157,8 +155,6 @@ def main():
     check_and_download_models(CLAP_AUDIO_WEIGHT_PATH, CLAP_AUDIO_MODEL_PATH, REMOTE_PATH)
     check_and_download_models(CLAP_TEXT_PROJECTION_WEIGHT_PATH, CLAP_TEXT_PROJECTION_MODEL_PATH, REMOTE_PATH)
     check_and_download_models(CLAP_TEXT_ROBERTAMODEL_WEIGHT_PATH, CLAP_TEXT_ROBERTAMODEL_MODEL_PATH, REMOTE_PATH)
-    check_and_download_file(CLAP_TOKENIZER_VOCAB_PATH, REMOTE_PATH)
-    check_and_download_file(CLAP_TOKENIZER_MERGES_PATH, REMOTE_PATH)
 
     # net initialize
     if not args.onnx:
