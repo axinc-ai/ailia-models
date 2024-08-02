@@ -190,7 +190,7 @@ def tokenize_and_embeddings(models, document_list):
     ):
         # for document in document_list:
         tokens = tokenizer(document, truncation=True, return_tensors="np")
-        words = tokenizer.convert_ids_to_tokens(tokens["input_ids"][0])
+        words = tokenizer.convert_ids_to_tokens(tokens["input_ids"][0].tolist())
         word_ids = tokens.word_ids()
 
         input_ids = tokens["input_ids"]

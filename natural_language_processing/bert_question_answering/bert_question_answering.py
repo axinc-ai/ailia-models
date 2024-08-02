@@ -2,9 +2,20 @@ import time
 import sys
 
 import numpy as np
-from transformers.data import SquadExample, SquadFeatures, squad_convert_examples_to_features
 from typing import Dict, List, Tuple, Union
-from transformers.tokenization_utils_base import PaddingStrategy
+
+class SquadExample:
+    def __init__(self, question, context):
+        self.question_text = question
+        self.context_text = context
+
+class SquadFeatures:
+    def __init__(self, input_ids, attention_mask, token_type_ids, p_mask, encoding):
+        self.input_ids = input_ids
+        self.attention_mask = attention_mask
+        self.token_type_ids = token_type_ids
+        self.p_mask = p_mask
+        self.encoding = encoding
 
 import ailia
 
@@ -37,11 +48,6 @@ parser.add_argument(
 parser.add_argument(
     '--context', '-c', metavar='TEXT', default=DEFAULT_CONTEXT,
     help='input context'
-)
-parser.add_argument(
-    '--torch',
-    action='store_true',
-    help='execute torch version.'
 )
 parser.add_argument(
     '--disable_ailia_tokenizer',
@@ -87,9 +93,9 @@ def create_sample(
         :class:`~transformers.SquadExample` grouping question and context.
     """
     if isinstance(question, list):
-        return [SquadExample(None, q, c, None, None, None) for q, c in zip(question, context)]
+        return [SquadExample(q, c) for q, c in zip(question, context)]
     else:
-        return SquadExample(None, question, context, None, None, None)
+        return SquadExample(question, context)
 
 
 def decode(start: np.ndarray, end: np.ndarray, topk: int, max_answer_len: int) -> Tuple:
@@ -185,20 +191,6 @@ def span_to_answer(tokenizer, text: str, start: int, end: int) -> Dict[str, Unio
 #Reference
 #https://github.com/huggingface/transformers/blob/master/src/transformers/pipelines/question_answering.py
 
-def extract_feature_transformer3(example, tokenizer):
-    # for transformer3, we can use squad_convert_examples_to_features for is_fast model
-    features = squad_convert_examples_to_features(
-            examples=[example],
-            tokenizer=tokenizer,
-            max_seq_length=384,
-            doc_stride=128,
-            max_query_length=64,
-            padding_strategy=PaddingStrategy.DO_NOT_PAD.value,
-            is_training=False,
-            tqdm_enabled=False,
-        )
-    return features
-
 def extract_feature_transformer4(example, tokenizer):
     # for transformer3, we can not use squad_convert_examples_to_features for is_fast model
 
@@ -208,19 +200,34 @@ def extract_feature_transformer4(example, tokenizer):
     doc_stride =128
     question_first = tokenizer.padding_side == "right"
 
-    encoded_inputs = tokenizer(
-        text=example.question_text if question_first else example.context_text,
-        text_pair=example.context_text if question_first else example.question_text,
-        padding=padding,
-        truncation="only_second" if question_first else "only_first",
-        max_length=max_seq_len,
-        stride=doc_stride,
-        return_tensors="np",
-        return_token_type_ids=True,
-        return_overflowing_tokens=True,
-        return_offsets_mapping=True,
-        return_special_tokens_mask=True,
-    )
+    if args.disable_ailia_tokenizer:
+        encoded_inputs = tokenizer(
+            text=example.question_text if question_first else example.context_text,
+            text_pair=example.context_text if question_first else example.question_text,
+            padding=padding,
+            truncation="only_second" if question_first else "only_first",
+            max_length=max_seq_len,
+            stride=doc_stride,
+            return_tensors="np",
+            return_token_type_ids=True,
+            return_overflowing_tokens=True,
+            return_offsets_mapping=True,
+            return_special_tokens_mask=True,
+        )
+    else:
+        encoded_inputs = tokenizer(
+            text=example.question_text if question_first else example.context_text,
+            text_pair=example.context_text if question_first else example.question_text,
+            padding=padding,
+            truncation="only_second" if question_first else "only_first",
+            max_length=max_seq_len,
+            #stride=doc_stride,
+            return_tensors="np",
+            return_token_type_ids=True,
+            #return_overflowing_tokens=True,
+            #return_offsets_mapping=True,
+            #return_special_tokens_mask=True,
+        )
 
     # When the input is too long, it's converted in a batch of inputs with overflowing tokens
     # and a stride of overlap between the inputs. If a batch of inputs is given, a special output
@@ -262,39 +269,10 @@ def extract_feature_transformer4(example, tokenizer):
                 token_type_ids=token_type_ids_span_idx,
                 p_mask=submask,
                 encoding=encoded_inputs[span_idx],
-                # We don't use the rest of the values - and actually
-                # for Fast tokenizer we could totally avoid using SquadFeatures and SquadExample
-                cls_index=None,
-                token_to_orig_map={},
-                example_index=0,
-                unique_id=0,
-                paragraph_len=0,
-                token_is_max_context=0,
-                tokens=[],
-                start_position=0,
-                end_position=0,
-                is_impossible=False,
-                qas_id=None,
             )
         )
     return features
 
-def convert_the_answer_back_to_the_original_text_transformer3(answers, example, feature, starts, ends, scores):
-    char_to_word = np.array(example.char_to_word_offset)
-
-    # Convert the answer (tokens) back to the original text
-    t2org = feature.token_to_orig_map
-    answers += [
-        {
-            "score": score.item(),
-            "start": np.where(char_to_word == t2org[s])[0][0].item(),
-            "end": np.where(char_to_word == t2org[e])[0][-1].item(),
-            "answer": " ".join(
-                example.doc_tokens[t2org[s]:t2org[e] + 1]
-            ),
-        }
-        for s, e, score in zip(starts, ends, scores)
-    ]
 
 def convert_the_answer_back_to_the_original_text_transformer4(answers, example, feature, tokenizer, starts, ends, scores):
     # Convert the answer (tokens) back to the original text
@@ -340,40 +318,11 @@ def convert_the_answer_back_to_the_original_text_transformer4(answers, example, 
             }
         )
 
-# ======================
-# Pytorch version
-# ======================
-
-def run_torch():
-    from transformers import AutoModelForQuestionAnswering, AutoTokenizer, pipeline
-
-    model_name = "deepset/roberta-base-squad2"
-
-    # a) Get predictions
-    nlp = pipeline('question-answering', model=model_name, tokenizer=model_name)
-    QA_input = {
-        'question': args.question,
-        'context': args.context
-    }
-    logger.info("Pytorch version")
-    logger.info("Question : " + str(QA_input["question"]))
-    logger.info("Context : " + str(QA_input["context"]))
-    res = nlp(QA_input)
-    logger.info("Answer : " + str(res))
-
-    # b) Load model & tokenizer
-    model = AutoModelForQuestionAnswering.from_pretrained(model_name)
-    tokenizer = AutoTokenizer.from_pretrained(model_name)
 
 # ======================
 # Main function
 # ======================
 def main():
-    # torch version
-    if args.torch:
-        run_torch()
-        return
-
     # model files check and download
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
 
@@ -390,18 +339,22 @@ def main():
     topk = 1
     max_answer_len = 15
 
-    if True:#args.disable_ailia_tokenizer:
+    if args.disable_ailia_tokenizer:
         from transformers import AutoTokenizer
         tokenizer = AutoTokenizer.from_pretrained('deepset/roberta-base-squad2')
         import transformers
         TRANSFORMER_VERSION=int(transformers.__version__.split(".")[0])
-    #else:
-    #    # not supported yet
-    #    from ailia_tokenizer import RobertaTokenizer
-    #    tokenizer = RobertaTokenizer.from_pretrained('tokenizer/vocab.json', 'tokenizer/merges.txt')
-    #    tokenizer.padding_side = "right"
-    #    TRANSFORMER_VERSION=4
-
+        if TRANSFORMER_VERSION <= 3:
+            logger.error("Transformer must be greater than 4.")
+            return
+    else:
+        # not supported yet
+        from ailia_tokenizer import RobertaTokenizer
+        tokenizer = RobertaTokenizer.from_pretrained('tokenizer/vocab.json', 'tokenizer/merges.txt')
+        tokenizer.padding_side = "right"
+        tokenizer.cls_token_id = 0
+    
+   
     # Convert inputs to features
     examples = []
 
@@ -416,14 +369,9 @@ def main():
             example = create_sample(**item)
             examples.append(example)
 
-    if TRANSFORMER_VERSION>=4:
-        features_list = [
-            extract_feature_transformer4(example,tokenizer) for example in examples
-        ]
-    else:
-        features_list = [
-            extract_feature_transformer3(example,tokenizer) for example in examples
-        ]
+    features_list = [
+        extract_feature_transformer4(example,tokenizer) for example in examples
+    ]
 
     all_answers = []
     for features, example in zip(features_list, examples):
@@ -485,10 +433,7 @@ def main():
             start_[0] = end_[0] = 0.0
 
             starts, ends, scores = decode(start_, end_, topk, max_answer_len)
-            if TRANSFORMER_VERSION>=4:
-                convert_the_answer_back_to_the_original_text_transformer4(answers, example, feature, tokenizer, starts, ends, scores)
-            else:
-                convert_the_answer_back_to_the_original_text_transformer3(answers, example, feature, starts, ends, scores)
+            convert_the_answer_back_to_the_original_text_transformer4(answers, example, feature, tokenizer, starts, ends, scores)
 
         if handle_impossible_answer:
             answers.append(
