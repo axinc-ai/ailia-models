@@ -254,10 +254,10 @@ def extract_feature_transformer4(example, tokenizer):
     for span_idx in range(num_spans):
         input_ids_span_idx = encoded_inputs["input_ids"][span_idx]
         attention_mask_span_idx = (
-            encoded_inputs["attention_mask"][span_idx] if "attention_mask" in encoded_inputs else None
+            encoded_inputs["attention_mask"][span_idx] if "attention_mask" in encoded_inputs.keys() else None
         )
         token_type_ids_span_idx = (
-            encoded_inputs["token_type_ids"][span_idx] if "token_type_ids" in encoded_inputs else None
+            encoded_inputs["token_type_ids"][span_idx] if "token_type_ids" in encoded_inputs.keys() else None
         )
         submask = p_mask[span_idx]
         if isinstance(submask, np.ndarray):
@@ -268,7 +268,7 @@ def extract_feature_transformer4(example, tokenizer):
                 attention_mask=attention_mask_span_idx,
                 token_type_ids=token_type_ids_span_idx,
                 p_mask=submask,
-                encoding=encoded_inputs[span_idx],
+                encoding=encoded_inputs[span_idx] if args.disable_ailia_tokenizer else encoded_inputs,
             )
         )
     return features
@@ -353,6 +353,7 @@ def main():
         tokenizer = RobertaTokenizer.from_pretrained('tokenizer/vocab.json', 'tokenizer/merges.txt')
         tokenizer.padding_side = "right"
         tokenizer.cls_token_id = 0
+        tokenizer.model_input_names = ["input_ids", "attention_mask"]
     
    
     # Convert inputs to features
