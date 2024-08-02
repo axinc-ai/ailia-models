@@ -16,6 +16,7 @@ from model_utils import check_and_download_models, check_and_download_file  # no
 from image_utils import normalize_image  # noqa
 from detector_utils import load_image, plot_results, hsv_to_rgb  # noqa
 from nms_utils import nms_boxes  # noqa
+from load_model import load_groudingdino
 
 # logger
 from logging import getLogger  # noqa
@@ -74,10 +75,7 @@ args = update_parser(parser)
 
 
 def setup_groudingdino(tokenizer, grounding_dino):
-    sys.path.append(os.path.join(top_path, "object_detection/groundingdino"))
-    from groundingdino_mod import mod, set_args
-
-    set_args(args)
+    mod = load_groudingdino(args)
 
     def predict(img, caption):
         models = {
