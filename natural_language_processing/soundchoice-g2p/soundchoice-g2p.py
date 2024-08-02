@@ -5,7 +5,6 @@ from functools import partial
 from logging import getLogger
 
 import numpy as np
-from transformers import AutoTokenizer
 
 import ailia
 
@@ -59,6 +58,11 @@ parser.add_argument(
     type=str,
     default="To be or not to be, that is the question",
     help="Input text.",
+)
+parser.add_argument(
+    '--disable_ailia_tokenizer',
+    action='store_true',
+    help='disable ailia tokenizer.'
 )
 parser.add_argument("--onnx", action="store_true", help="execute onnxruntime version.")
 args = update_parser(parser, check_input_type=False)
@@ -358,7 +362,12 @@ def main():
         emb = onnxruntime.InferenceSession(WEIGHT_EMB_PATH, providers=providers)
         beam = onnxruntime.InferenceSession(WEIGHT_BEAM_PATH, providers=providers)
 
-    tokenizer = AutoTokenizer.from_pretrained("tokenizer")
+    if args.disable_ailia_tokenizer:
+        from transformers import AutoTokenizer
+        tokenizer = AutoTokenizer.from_pretrained("tokenizer")
+    else:
+        from ailia_tokenizer import BertTokenizer
+        tokenizer = BertTokenizer.from_pretrained("./tokenizer/vocab.txt", "./tokenizer/tokenizer_config.json")
 
     models = {
         "tokenizer": tokenizer,
