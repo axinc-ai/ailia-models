@@ -2,7 +2,8 @@ export OPTION="-e 1"
 cd ../
 cd audio_processing/clap/; python3 clap.py ${OPTION}
 cd ../../audio_processing/distil-whisper/; python3 distil-whisper.py ${OPTION}
-cd ../../audio_processing/msclap/; python3 msclap.py ${OPTION}
+cd ../../audio_processing/msclap/; python3 msclap.py -v 2022 ${OPTION}
+cd ../../audio_processing/msclap/; python3 msclap.py -v 2023 ${OPTION}
 cd ../../audio_processing/kotoba-whisper/; python3 kotoba-whisper.py ${OPTION}
 cd ../../diffusion/latent-diffusion-txt2img; python3 latent-diffusion-txt2img.py ${OPTION}
 cd ../../diffusion/stable-diffusion-txt2img; python3 stable-diffusion-txt2img.py ${OPTION}
@@ -12,7 +13,12 @@ cd ../../diffusion/marigold; python3 marigold.py ${OPTION}
 cd ../../image_captioning/blip2; python3 blip2.py ${OPTION}
 cd ../../image_classification/japanese-clip; python3 japanese-clip.py ${OPTION}
 cd ../../large_language_model/llava; python3 llava.py ${OPTION}
-cd ../../natural_language_processing/bert; python3 bert.py ${OPTION}
+cd ../../natural_language_processing/bert; python3 bert.py -a bert-base-cased ${OPTION}
+cd ../../natural_language_processing/bert; python3 bert.py -a bert-base-uncased ${OPTION}
+cd ../../natural_language_processing/bert; python3 bert.py -a bert-base-japanese-whole-word-masking ${OPTION}
+cd ../../natural_language_processing/bert; python3 bert.py -a bert-base-japanese-char-whole-word-masking ${OPTION}
+cd ../../natural_language_processing/bert; python3 bert.py -a bert-base-japanese-v3 ${OPTION}
+cd ../../natural_language_processing/bert; python3 bert.py -a bert-base-japanese-char-v3 ${OPTION}
 cd ../../natural_language_processing/bert_insert_punctuation; python3 bert_insert_punctuation.py ${OPTION}
 cd ../../natural_language_processing/bert_maskedlm; python3 bert_maskedlm.py ${OPTION}
 cd ../../natural_language_processing/bert_ner; python3 bert_ner.py ${OPTION}
