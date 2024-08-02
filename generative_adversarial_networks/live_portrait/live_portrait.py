@@ -1,3 +1,4 @@
+import os
 import sys
 import time
 
@@ -14,6 +15,7 @@ from model_utils import check_and_download_models  # noqa
 from detector_utils import load_image  # noqa
 from nms_utils import nms_boxes
 from math_utils import softmax
+from load_model import load_facemesh_v2
 from webcamera_utils import get_capture, get_writer  # noqa
 
 from utils_crop import crop_image
@@ -24,7 +26,16 @@ from logging import getLogger  # noqa
 
 PI = np.pi
 
+top_path = os.path.dirname(
+    os.path.dirname(
+        os.path.dirname(
+            os.path.abspath(__file__),
+        )
+    )
+)
+
 logger = getLogger(__name__)
+
 
 # ======================
 # Parameters
@@ -42,12 +53,19 @@ WEIGHT_S_PATH = "stitching.onnx"
 MODEL_S_PATH = "stitching.onnx.prototxt"
 WEIGHT_L_PATH = "landmark.onnx"
 MODEL_L_PATH = "landmark.onnx.prototxt"
-
+# insightface model
 WEIGHT_IF_DET_PATH = "det_10g.onnx"
 MODEL_IF_DET_PATH = "det_10g.onnx.prototxt"
 WEIGHT_IF_LMK_PATH = "2d106det.onnx"
 MODEL_IF_LMK_PATH = "2d106det.onnx.prototxt"
+# facemesh v2 model
+WEIGHT_FM_DET_PATH = "face_detector.onnx"
+MODEL_FM_DET_PATH = "face_detector.onnx.prototxt"
+WEIGHT_FM_LMK_PATH = "face_landmarks_detector.onnx"
+MODEL_FM_LMK_PATH = "face_landmarks_detector.onnx.prototxt"
+
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/live_portrait/"
+REMOTE_FM_V2_PATH = "https://storage.googleapis.com/ailia-models/facemesh_v2/"
 
 IMAGE_PATH = "s6.jpg"
 DRIVING_VIDEO_PATH = "d0.mp4"
@@ -61,6 +79,12 @@ MASK_PATH = "mask_template.png"
 parser = get_base_parser("LivePortrait", IMAGE_PATH, None)
 parser.add_argument(
     "--driving", metavar="VIDEO", default=DRIVING_VIDEO_PATH, help="Driving video."
+)
+parser.add_argument(
+    "--det",
+    default="insightface",
+    choices=["insightface", "facemesh"],
+    help="Face analysis module.",
 )
 parser.add_argument(
     "--composite",
@@ -388,6 +412,154 @@ def get_face_analysis(det_face, landmark):
         )
 
         return src_face
+
+    return face_analysis
+
+
+def setup_facemesh(det_face, landmark):
+    mod = load_facemesh_v2(args)
+
+    def face_analysis(img):
+        h, w = img.shape[:2]
+        models = {
+            "det_net": det_face,
+            "net": landmark,
+        }
+        landmarks = mod.predict(models, img[:, :, ::-1])  # RGB -> BGR
+
+        if len(landmarks) == 0:
+            return []
+        fm_lmk = landmarks[0]
+        fm_lmk[:, 0] = fm_lmk[:, 0] * w
+        fm_lmk[:, 1] = fm_lmk[:, 1] * h
+
+        keypoint_map = {
+            # lips
+            52: (61,),
+            64: (39, 40),
+            63: (37,),
+            71: (0,),
+            67: (267,),
+            68: (269, 270),
+            61: (291,),
+            65: (78,),
+            66: (81,),
+            62: (13,),
+            70: (311,),
+            69: (308,),
+            54: (178,),
+            60: (14,),
+            57: (402,),
+            55: (91,),
+            56: (84, 181),
+            53: (17,),
+            59: (314, 405),
+            58: (321,),
+            # left eye
+            89: (362,),
+            95: (384, 385),
+            94: (386,),
+            96: (387, 388),
+            93: (263,),
+            88: (473,),
+            92: (473,),
+            90: (380, 381),
+            87: (374,),
+            91: (373, 390),
+            81: (465,),
+            # left eyebrow
+            102: (336,),
+            103: (296,),
+            104: (334,),
+            105: (293,),
+            97: (285,),
+            98: (295,),
+            99: (282,),
+            100: (283,),
+            101: (276,),
+            # right eye
+            35: (33,),
+            41: (160, 161),
+            40: (159,),
+            42: (157, 158),
+            39: (133,),
+            34: (468,),
+            38: (468,),
+            36: (163, 144),
+            33: (145,),
+            37: (153, 154),
+            75: (245,),
+            # right eyebrow
+            48: (63,),
+            49: (105,),
+            51: (66,),
+            50: (107,),
+            43: (46,),
+            44: (53,),
+            45: (52,),
+            47: (65,),
+            46: (55,),
+            # face oval
+            1: (162,),
+            9: (162, 127, 127),  # 1:2
+            10: (127, 127, 234),  # 2:1
+            11: (234,),
+            12: (234, 93, 93),  # 1:2
+            13: (93, 93, 132),  # 2:1
+            14: (132,),
+            15: (132, 58, 58),  # 1:2
+            16: (58, 58, 172),  # 2:1
+            2: (172,),
+            3: (172, 136, 136),  # 1:2
+            4: (136, 136, 150),  # 2:1
+            5: (150,),
+            6: (149,),
+            7: (176,),
+            8: (148,),
+            0: (152,),
+            24: (377,),
+            23: (400,),
+            22: (378,),
+            21: (379,),
+            20: (379, 365, 365),  # 1:2
+            19: (365, 365, 397),  # 2:1
+            18: (397,),
+            32: (397, 288, 288),  # 1:2
+            31: (288, 288, 361),  # 2:1
+            30: (361,),
+            29: (323, 323, 361),  # 2:1
+            28: (323, 323, 454),  # 2:1
+            27: (454,),
+            26: (454, 356, 356),  # 1:2
+            25: (356, 356, 389),  # 2:1
+            17: (389,),
+            # nose
+            72: (168,),
+            73: (6, 197, 197),  # 1:2
+            74: (195, 195, 5),  # 2:1
+            86: (4,),
+            76: (209,),
+            77: (64,),
+            78: (64, 60, 60),  # 1:2
+            79: (60, 60, 2),  # 2:1
+            80: (2,),
+            85: (2, 290, 290),  # 1:2
+            84: (290, 290, 294),  # 2:1
+            83: (294,),
+            82: (429,),
+        }
+        lmk = np.zeros((106, 2))
+        for i, kps in keypoint_map.items():
+            x = y = 0
+            for idx in kps:
+                x += fm_lmk[idx][0]
+                y += fm_lmk[idx][1]
+            lmk[i] = x / len(kps), y / len(kps)
+
+        face = dict(det_score=0)
+        face["landmark_2d_106"] = lmk
+
+        return [face]
 
     return face_analysis
 
@@ -832,8 +1004,16 @@ def main():
     check_and_download_models(WEIGHT_G_PATH, MODEL_G_PATH, REMOTE_PATH)
     check_and_download_models(WEIGHT_S_PATH, MODEL_S_PATH, REMOTE_PATH)
     check_and_download_models(WEIGHT_L_PATH, MODEL_L_PATH, REMOTE_PATH)
-    check_and_download_models(WEIGHT_IF_DET_PATH, MODEL_IF_DET_PATH, REMOTE_PATH)
-    check_and_download_models(WEIGHT_IF_LMK_PATH, MODEL_IF_LMK_PATH, REMOTE_PATH)
+    if args.det == "isightface":
+        check_and_download_models(WEIGHT_IF_DET_PATH, MODEL_IF_DET_PATH, REMOTE_PATH)
+        check_and_download_models(WEIGHT_IF_LMK_PATH, MODEL_IF_LMK_PATH, REMOTE_PATH)
+    else:  # facemesh
+        check_and_download_models(
+            WEIGHT_FM_DET_PATH, MODEL_FM_DET_PATH, REMOTE_FM_V2_PATH
+        )
+        check_and_download_models(
+            WEIGHT_FM_LMK_PATH, MODEL_FM_LMK_PATH, REMOTE_FM_V2_PATH
+        )
 
     env_id = args.env_id
 
@@ -845,8 +1025,13 @@ def main():
         net_g = ailia.Net(MODEL_G_PATH, WEIGHT_G_PATH, env_id=env_id)
         net_s = ailia.Net(MODEL_S_PATH, WEIGHT_S_PATH, env_id=env_id)
         net_l = ailia.Net(MODEL_L_PATH, WEIGHT_L_PATH, env_id=env_id)
-        det_face = ailia.Net(MODEL_IF_DET_PATH, WEIGHT_IF_DET_PATH, env_id=env_id)
-        landmark = ailia.Net(MODEL_IF_LMK_PATH, WEIGHT_IF_LMK_PATH, env_id=env_id)
+
+        if args.det == "insightface":
+            det_face = ailia.Net(MODEL_IF_DET_PATH, WEIGHT_IF_DET_PATH, env_id=env_id)
+            landmark = ailia.Net(MODEL_IF_LMK_PATH, WEIGHT_IF_LMK_PATH, env_id=env_id)
+        else:
+            det_face = ailia.Net(MODEL_FM_DET_PATH, WEIGHT_FM_DET_PATH, env_id=env_id)
+            landmark = ailia.Net(MODEL_FM_LMK_PATH, WEIGHT_FM_LMK_PATH, env_id=env_id)
     else:
         import onnxruntime
 
@@ -860,10 +1045,25 @@ def main():
         net_s = onnxruntime.InferenceSession(WEIGHT_S_PATH, providers=providers)
         net_l = onnxruntime.InferenceSession(WEIGHT_L_PATH, providers=providers)
 
-        det_face = onnxruntime.InferenceSession(WEIGHT_IF_DET_PATH, providers=providers)
-        landmark = onnxruntime.InferenceSession(WEIGHT_IF_LMK_PATH, providers=providers)
+        if args.det == "insightface":
+            det_face = onnxruntime.InferenceSession(
+                WEIGHT_IF_DET_PATH, providers=providers
+            )
+            landmark = onnxruntime.InferenceSession(
+                WEIGHT_IF_LMK_PATH, providers=providers
+            )
+        else:
+            det_face = onnxruntime.InferenceSession(
+                WEIGHT_FM_DET_PATH, providers=providers
+            )
+            landmark = onnxruntime.InferenceSession(
+                WEIGHT_FM_LMK_PATH, providers=providers
+            )
 
-    face_analysis = get_face_analysis(det_face, landmark)
+    if args.det == "facemesh":
+        face_analysis = setup_facemesh(det_face, landmark)
+    else:
+        face_analysis = get_face_analysis(det_face, landmark)
 
     models = {
         "appearance_feature_extractor": net_f,
