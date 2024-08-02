@@ -60,9 +60,9 @@ def main():
             'distilbert-base-uncased-finetuned-sst-2-english'
         )
     else:
-        from ailia_tokenizer import BertUncasedTokenizer
-        tokenizer = BertUncasedTokenizer.from_pretrained(
-            './tokenizer/vocab.txt'
+        from ailia_tokenizer import BertTokenizer
+        tokenizer = BertTokenizer.from_pretrained(
+            './tokenizer/'
         )
 
     model_inputs = tokenizer.encode_plus(args.input, return_tensors="np")

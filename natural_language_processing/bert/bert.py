@@ -145,24 +145,20 @@ def main():
             from transformers import BertTokenizer  # noqa: E402
             tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
         else:
-            from ailia_tokenizer import BertUncasedTokenizer
-            VOCAB_REMOTE_PATH = "https://storage.googleapis.com/ailia-models/bert_maskedlm/"
-            check_and_download_file("bert-base-uncased-vocab.txt", VOCAB_REMOTE_PATH)
-            tokenizer = BertUncasedTokenizer.from_pretrained('./tokenizer/en/vocab.txt')
+            from ailia_tokenizer import BertTokenizer
+            tokenizer = BertTokenizer.from_pretrained('./tokenizer/en/')
     elif LANG == 'jp':
-        if True:#args.disable_ailia_tokenizer:
+        if args.disable_ailia_tokenizer:
             from transformers import BertTokenizer  # noqa: E402
             tokenizer = BertTokenizer(
-                'vocab.txt',
+                './tokenizer/jp/vocab.txt',
                 do_lower_case=False,
                 do_basic_tokenize=False,
             )
-        #else:
-        #    # This tokenizer type not supported
-        #    from ailia_tokenizer import BertCasedTokenizer
-        #    VOCAB_REMOTE_PATH = "https://storage.googleapis.com/ailia-models/bert_maskedlm/"
-        #    check_and_download_file("bert-base-uncased-vocab.txt", VOCAB_REMOTE_PATH)
-        #    tokenizer = BertCcasedTokenizer.from_pretrained('./tokenizer/jp/vocab.txt')
+        else:
+            # This tokenizer type not supported
+            from ailia_tokenizer import BertTokenizer
+            tokenizer = BertTokenizer.from_pretrained('./tokenizer/jp/')
 
     # prepare data
     sentence_id = np.ones((1, MAX_SEQ_LEN), dtype=np.int64)
@@ -191,7 +187,7 @@ def main():
         preds_ailia[0][0][masked_index]
     )[-NUM_PREDICT:][::-1]
 
-    predicted_tokens = tokenizer.convert_ids_to_tokens(predicted_indices)
+    predicted_tokens = tokenizer.convert_ids_to_tokens(predicted_indices.tolist())
 
     logger.info('Input sentence: ' + SENTENCE)
     logger.info(f'predicted top {NUM_PREDICT} words: {predicted_tokens}')

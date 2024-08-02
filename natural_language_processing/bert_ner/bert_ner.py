@@ -58,9 +58,9 @@ def main():
             'dbmdz/bert-large-cased-finetuned-conll03-english'
         )
     else:
-        from ailia_tokenizer import BertCasedTokenizer
-        tokenizer = BertCasedTokenizer.from_pretrained(
-            './tokenizer/vocab.txt'
+        from ailia_tokenizer import BertTokenizer
+        tokenizer = BertTokenizer.from_pretrained(
+            './tokenizer/'
         )
     model_inputs = tokenizer.encode_plus(args.input, return_tensors="np")
     inputs_onnx = {
