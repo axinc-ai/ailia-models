@@ -4,7 +4,6 @@ from logging import getLogger
 
 import numpy as np
 from scipy.special import log_softmax
-from transformers import MarianTokenizer
 
 import ailia
 
