@@ -67,11 +67,10 @@ def main():
     else:
         from ailia_tokenizer import BertJapaneseWordPieceTokenizer
         VOCAB_REMOTE_PATH = "https://storage.googleapis.com/ailia-models/bert_maskedlm/"
-        check_and_download_file("bert-base-japanese-whole-word-masking-vocab.txt", VOCAB_REMOTE_PATH)
         check_and_download_file("ipadic.zip", VOCAB_REMOTE_PATH)
         if not os.path.exists("ipadic"):
             shutil.unpack_archive('ipadic.zip', '')
-        tokenizer = BertJapaneseWordPieceTokenizer.from_pretrained('ipadic', 'bert-base-japanese-whole-word-masking-vocab.txt')
+        tokenizer = BertJapaneseWordPieceTokenizer.from_pretrained('ipadic', './tokenizer/vocab.txt')
 
     model_inputs = tokenizer.encode_plus(args.input, return_tensors="np")
     inputs_onnx = {
