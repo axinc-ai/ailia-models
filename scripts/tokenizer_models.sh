@@ -36,9 +36,9 @@ cd ../../natural_language_processing/rinna_gpt2; python3 rinna_gpt2.py ${OPTION}
 cd ../../natural_language_processing/fugumt-en-ja; python3 fugumt-en-ja.py ${OPTION}
 cd ../../natural_language_processing/fugumt-ja-en; python3 fugumt-en-ja.py ${OPTION}
 cd ../../natural_language_processing/bert_sum_ext; python3 bert_sum_ext.py ${OPTION}
-cd ../../natural_language_processing/sentence_transformers_japanese; python3 sentence_transformers_japanese.py ${OPTION}
+cd ../../natural_language_processing/sentence_transformers_japanese; python3 sentence_transformers_japanese.py -p "what is ailia SDK?" ${OPTION}
 cd ../../natural_language_processing/t5_base_japanese_title_generation; python3 t5_base_japanese_title_generation.py ${OPTION}
-cd ../../natural_language_processing/multilingual-e5; python3 multilingual-e5.py ${OPTION}
+cd ../../natural_language_processing/multilingual-e5; python3 multilingual-e5.py -p "what is ailia SDK?" ${OPTION}
 cd ../../natural_language_processing/t5_whisper_medical; python3 t5_whisper_medical.py ${OPTION}
 cd ../../natural_language_processing/t5_base_japanese_summarization; python3 t5_base_japanese_summarization.py ${OPTION}
 cd ../../natural_language_processing/glucose; python3 glucose.py ${OPTION}

@@ -64,7 +64,7 @@ def main():
         from ailia_tokenizer import XLMRobertaTokenizer
         tokenizer = XLMRobertaTokenizer.from_pretrained("./tokenizer/")
 
-    model_inputs = tokenizer([args.query], [args.paragraph],  padding=True, truncation=True, return_tensors="np")
+    model_inputs = tokenizer([args.query], [args.paragraph],  padding=True, truncation=True, max_length = 512, return_tensors="np")
     inputs_onnx = {
         k: v for k, v in model_inputs.items()
     }

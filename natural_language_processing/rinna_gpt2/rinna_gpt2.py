@@ -63,7 +63,7 @@ def main():
         from transformers import T5Tokenizer
         tokenizer = T5Tokenizer.from_pretrained("rinna/japanese-gpt2-small")
     else:
-        from transformers import T5Tokenizer
+        from ailia_tokenizer import T5Tokenizer
         tokenizer = T5Tokenizer.from_pretrained("./tokenizer/")
     logger.info("Input : "+args.input)
 

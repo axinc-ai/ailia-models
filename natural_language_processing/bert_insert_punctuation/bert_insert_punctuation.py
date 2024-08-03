@@ -160,7 +160,7 @@ def main():
         check_and_download_file("unidic-lite.zip", VOCAB_REMOTE_PATH)
         if not os.path.exists("unidic-lite"):
             shutil.unpack_archive('unidic-lite.zip', '')
-        tokenizer = BertJapaneseWordPieceTokenizer.from_pretrained(dict_path = 'unidic-lite', pretrained_model_name_or_path='./tokenizer/vocab.txt')
+        tokenizer = BertJapaneseWordPieceTokenizer.from_pretrained(dict_path = 'unidic-lite', pretrained_model_name_or_path='./tokenizer/')
 
     env_id = args.env_id
 
