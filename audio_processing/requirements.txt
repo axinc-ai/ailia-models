@@ -3,4 +3,3 @@ SoundFile
 librosa
 torch
 pyaudio
-transformers>=4.27.0,<=4.43.2
