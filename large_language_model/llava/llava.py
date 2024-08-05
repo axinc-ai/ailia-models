@@ -12,7 +12,7 @@ import ailia
 # import original modules
 sys.path.append("../../util")
 from arg_utils import get_base_parser, update_parser  # noqa
-from model_utils import check_and_download_models  # noqa
+from model_utils import check_and_download_models, check_and_download_file  # noqa
 from detector_utils import load_image  # noqa
 
 logger = getLogger(__name__)
@@ -28,6 +28,7 @@ WEIGHT_ENC_PATH = "encode_images.onnx"
 MODEL_ENC_PATH = "encode_images.onnx.prototxt"
 WEIGHT_EMB_PATH = "embed_tokens.onnx"
 MODEL_EMB_PATH = "embed_tokens.onnx.prototxt"
+PB_PATH = "llava-v1.5-7b_weights.pb"
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/llava/"
 
 IMAGE_PATH = "view.jpg"
@@ -511,6 +512,7 @@ def main():
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
     check_and_download_models(WEIGHT_ENC_PATH, MODEL_ENC_PATH, REMOTE_PATH)
     check_and_download_models(WEIGHT_EMB_PATH, MODEL_EMB_PATH, REMOTE_PATH)
+    check_and_download_file(PB_PATH, REMOTE_PATH)
     env_id = args.env_id
 
     # initialize
