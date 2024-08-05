@@ -9,12 +9,10 @@ from PIL import Image
 
 import ailia
 
-from transformers import AutoTokenizer
-
 # import original modules
 sys.path.append("../../util")
 from arg_utils import get_base_parser, update_parser  # noqa
-from model_utils import check_and_download_models  # noqa
+from model_utils import check_and_download_models, check_and_download_file  # noqa
 from detector_utils import load_image  # noqa
 
 logger = getLogger(__name__)
@@ -30,6 +28,7 @@ WEIGHT_ENC_PATH = "encode_images.onnx"
 MODEL_ENC_PATH = "encode_images.onnx.prototxt"
 WEIGHT_EMB_PATH = "embed_tokens.onnx"
 MODEL_EMB_PATH = "embed_tokens.onnx.prototxt"
+PB_PATH = "llava-v1.5-7b_weights.pb"
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/llava/"
 
 IMAGE_PATH = "view.jpg"
@@ -51,6 +50,11 @@ parser.add_argument(
     "--prompt",
     default="What are the things I should be cautious about when I visit here?",
     help="prompt.",
+)
+parser.add_argument(
+    '--disable_ailia_tokenizer',
+    action='store_true',
+    help='disable ailia tokenizer.'
 )
 parser.add_argument("--onnx", action="store_true", help="execute onnxruntime version.")
 args = update_parser(parser)
@@ -508,6 +512,7 @@ def main():
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
     check_and_download_models(WEIGHT_ENC_PATH, MODEL_ENC_PATH, REMOTE_PATH)
     check_and_download_models(WEIGHT_EMB_PATH, MODEL_EMB_PATH, REMOTE_PATH)
+    check_and_download_file(PB_PATH, REMOTE_PATH)
     env_id = args.env_id
 
     # initialize
@@ -528,7 +533,13 @@ def main():
             WEIGHT_EMB_PATH, providers=providers
         )
 
-    tokenizer = AutoTokenizer.from_pretrained("tokenizer")
+    if args.disable_ailia_tokenizer:
+        from transformers import AutoTokenizer
+        tokenizer = AutoTokenizer.from_pretrained("tokenizer")
+    else:
+        from ailia_tokenizer import LlamaTokenizer
+        tokenizer = LlamaTokenizer.from_pretrained("./tokenizer")
+        tokenizer.bos_token_id = 1
 
     models = {
         "net": net,

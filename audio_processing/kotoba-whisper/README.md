@@ -17,7 +17,6 @@ Recognized speech text
 
 This model requires additional module.
 ```
-pip3 install transformers
 pip3 install librosa
 ```
 
