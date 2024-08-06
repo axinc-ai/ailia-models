@@ -37,7 +37,7 @@ MODEL_VAE_DECODER_PATH = "vae_decoder.onnx.prototxt"
 WEIGHT_VAE_ENCODER_PATH = "vae_encoder.onnx"
 MODEL_VAE_ENCODER_PATH = "vae_encoder.onnx.prototxt"
 
-REMOTE_PATH = "https://storage.googleapis.com/ailia-models/sdlx-turbo/"
+REMOTE_PATH = "https://storage.googleapis.com/ailia-models/sdxl-turbo/"
 
 IMAGE_SIZE = 512
 SAVE_IMAGE_PATH = "output.png"
