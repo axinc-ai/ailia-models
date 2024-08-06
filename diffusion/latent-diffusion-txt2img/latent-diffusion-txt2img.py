@@ -5,8 +5,6 @@ import time
 import numpy as np
 import cv2
 
-from transformers import BertTokenizerFast
-
 import ailia
 
 # import original modules
@@ -89,6 +87,11 @@ parser.add_argument(
     action='store_true',
     help='execute onnxruntime version.'
 )
+parser.add_argument(
+    '--disable_ailia_tokenizer',
+    action='store_true',
+    help='disable ailia tokenizer.'
+)
 args = update_parser(parser, check_input_type=False)
 
 
@@ -147,7 +150,13 @@ class BERTEmbedder:
     """ Uses a pretrained BERT tokenizer by huggingface. Vocab size: 30522 (?)"""
 
     def __init__(self, transformer_emb, transformer_attn, max_length=77):
-        self.tokenizer = BertTokenizerFast.from_pretrained("bert-base-uncased")
+        if args.disable_ailia_tokenizer:
+            from transformers import BertTokenizerFast
+            self.tokenizer = BertTokenizerFast.from_pretrained("bert-base-uncased")
+        else:
+            from ailia_tokenizer import BertTokenizer
+            self.tokenizer = BertTokenizer.from_pretrained("./tokenizer/")
+
         self.max_length = max_length
 
         self.transformer_emb = transformer_emb
@@ -155,10 +164,10 @@ class BERTEmbedder:
 
     def encode(self, text):
         batch_encoding = self.tokenizer(
-            text, truncation=True, max_length=self.max_length, return_length=True,
-            return_overflowing_tokens=False, padding="max_length", return_tensors="pt")
+            text, truncation=True, max_length=self.max_length, #return_length=True,
+            #return_overflowing_tokens=False,
+            padding="max_length", return_tensors="np")
         tokens = batch_encoding["input_ids"]
-        tokens = tokens.numpy()
 
         if not args.onnx:
             output = self.transformer_emb.predict([tokens])
