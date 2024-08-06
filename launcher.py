@@ -160,7 +160,7 @@ def create_photo_image(path,w=320,h=240):
     #image_bgr = cv2.resize(image_bgr,(w,h))
     image_rgb = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB) # imreadはBGRなのでRGBに変換
     image_pil = Image.fromarray(image_rgb) # RGBからPILフォーマットへ変換
-    image_pil.thumbnail((w,h), Image.ANTIALIAS)
+    image_pil.thumbnail((w,h), Image.LANCZOS)
     image_tk  = ImageTk.PhotoImage(image_pil) # ImageTkフォーマットへ変換
     return image_tk
 

@@ -1,0 +1,6 @@
+langid
+unidecode
+pyopenjtalk-prebuilt
+SoundFile
+librosa
+g2p_en
