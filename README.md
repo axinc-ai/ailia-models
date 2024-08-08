@@ -137,6 +137,7 @@ The collection of pre-trained, state-of-the-art AI models.
 | [<img src="diffusion/daclip-sde/output.png" width=128px>](diffusion/daclip-sde/) | [DA-CLIP](/diffusion/daclip-sde/) | [DA-CLIP](https://github.com/Algolzw/daclip-uir) | Pytorch | 1.2.16 and later |
 | [<img src="diffusion/riffusion/output.png" width=128px>](diffusion/riffusion/) | [riffusion](/diffusion/riffusion/) | [Riffusion](https://github.com/riffusion/riffusion) | Pytorch | 1.2.16 and later |
 | [<img src="diffusion/marigold/output_colorize.png" width=128px>](diffusion/marigold/) | [marigold](/diffusion/marigold/) | [Marigold: Repurposing Diffusion-Based Image Generators for Monocular Depth Estimation](https://github.com/prs-eth/Marigold) | Pytorch | 1.2.16 and later |
+| [<img src="diffusion/sdxl-turbo/output.png" width=128px>](diffusion/sdxl-turbo/) | [sdxl-turbo](/diffusion/sdxl-turbo/) | [Hugging Face - SDXL-Turbo](https://huggingface.co/stabilityai/sdxl-turbo) | Pytorch | 1.2.16 and later |
 
 ## Face detection
 
