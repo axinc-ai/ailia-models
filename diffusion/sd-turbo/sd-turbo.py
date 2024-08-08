@@ -9,7 +9,7 @@ from logging import getLogger
 
 sys.path.append("../../util")
 from arg_utils import get_base_parser, update_parser, get_savepath  # noqa
-from model_utils import check_and_download_models
+from model_utils import check_and_download_models, check_and_download_file
 from detector_utils import load_image
 from df.pipelines.stable_diffusion import StableDiffusion
 from df.pipelines.stable_diffusion_img2img import StableDiffusionimg2Img
@@ -24,6 +24,7 @@ logger = getLogger(__name__)
 
 WEIGHT_UNET_PATH = "unet.onnx"
 MODEL_UNET_PATH = "unet.onnx.prototxt"
+PB_UNET_PATH = "unet.pb"
 WEIGHT_TEXT_ENCODER_PATH = "text_encoder.onnx"
 MODEL_TEXT_ENCODER_PATH = "text_encoder.onnx.prototxt"
 WEIGHT_VAE_ENCODER_PATH = "vae_encoder.onnx"
@@ -68,6 +69,7 @@ def main():
     env_id = args.env_id
     image_path = args.init_image
     check_and_download_models(WEIGHT_UNET_PATH, MODEL_UNET_PATH, REMOTE_PATH)
+    check_and_download_file(PB_UNET_PATH, REMOTE_PATH)
     check_and_download_models(
         WEIGHT_TEXT_ENCODER_PATH, MODEL_TEXT_ENCODER_PATH, REMOTE_PATH
     )
