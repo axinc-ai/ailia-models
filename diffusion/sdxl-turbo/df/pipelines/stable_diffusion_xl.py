@@ -341,8 +341,8 @@ class StableDiffusionXL:
             # predict the noise residual
             timestep = np.array([t], dtype=int)
             if not self.use_onnx:
-                output = self.unet.predict(
-                    [latent_model_input, timestep, prompt_embeds, add_text_embeds]
+                output = self.unet.run(
+                    [latent_model_input, timestep, prompt_embeds, add_text_embeds, add_time_ids]
                 )
             else:
                 output = self.unet.run(
@@ -373,7 +373,7 @@ class StableDiffusionXL:
         for i in range(latents.shape[0]):
             latent_sample = latents[i : i + 1]
             if not self.use_onnx:
-                output = self.vae_decoder.predict([latent_sample])
+                output = self.vae_decoder.run([latent_sample])
             else:
                 output = self.vae_decoder.run(None, {"latent_sample": latent_sample})
             outputs.append(output[0])

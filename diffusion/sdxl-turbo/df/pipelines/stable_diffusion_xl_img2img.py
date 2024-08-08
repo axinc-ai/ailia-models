@@ -75,7 +75,7 @@ class StableDiffusionXLImg2Img(StableDiffusionXL):
         batch_size = batch_size * num_images_per_prompt
 
         if not self.use_onnx:
-            output = self.vae_encoder.predict([image])
+            output = self.vae_encoder.run([image])
         else:
             output = self.vae_encoder.run(
                 None,
@@ -250,7 +250,7 @@ class StableDiffusionXLImg2Img(StableDiffusionXL):
             timestep = np.array([t], dtype=int)
             if not self.use_onnx:
                 output = self.unet.predict(
-                    [latent_model_input, timestep, prompt_embeds, add_text_embeds]
+                    [latent_model_input, timestep, prompt_embeds, add_text_embeds, add_time_ids]
                 )
             else:
                 output = self.unet.run(

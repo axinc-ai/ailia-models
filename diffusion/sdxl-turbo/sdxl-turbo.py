@@ -3,8 +3,6 @@ import sys
 import numpy as np
 import cv2
 
-import transformers
-
 import ailia
 
 # import original modules
@@ -67,6 +65,11 @@ parser.add_argument(
     type=int,
     default=42,
     help="random seed",
+)
+parser.add_argument(
+    '--disable_ailia_tokenizer',
+    action='store_true',
+    help='disable ailia tokenizer.'
 )
 parser.add_argument("--onnx", action="store_true", help="execute onnxruntime version.")
 args = update_parser(parser, check_input_type=False)
@@ -143,6 +146,11 @@ def main():
 
     env_id = args.env_id
 
+    # disable FP16
+    if "FP16" in ailia.get_environment(args.env_id).props or sys.platform == 'Darwin':
+        logger.warning('This model do not work on FP16. So use CPU mode.')
+        env_id = 0
+
     # initialize
     if not args.onnx:
         memory_mode = ailia.get_memory_mode(
@@ -172,6 +180,13 @@ def main():
             env_id=env_id,
             memory_mode=memory_mode,
         )
+        if init_image:
+            vae_encoder = ailia.Net(
+                MODEL_VAE_ENCODER_PATH,
+                WEIGHT_VAE_ENCODER_PATH,
+                env_id=env_id,
+                memory_mode=memory_mode,
+            )
     else:
         import onnxruntime
 
@@ -197,8 +212,18 @@ def main():
                 "vae_encoder.onnx", providers=providers
             )
 
-    tokenizer = transformers.CLIPTokenizer.from_pretrained("./tokenizer")
-    tokenizer_2 = transformers.CLIPTokenizer.from_pretrained("./tokenizer_2")
+    if args.disable_ailia_tokenizer:
+        import transformers
+        tokenizer = transformers.CLIPTokenizer.from_pretrained("./tokenizer")
+        tokenizer_2 = transformers.CLIPTokenizer.from_pretrained("./tokenizer_2")
+    else:
+        from ailia_tokenizer import CLIPTokenizer
+        tokenizer = CLIPTokenizer.from_pretrained()
+        tokenizer.model_max_length = 77
+        tokenizer_2 = CLIPTokenizer.from_pretrained()
+        tokenizer_2.add_special_tokens({'pad_token': '!'})
+        tokenizer_2.model_max_length = 77
+
     scheduler = df.schedulers.EulerAncestralDiscreteScheduler.from_config(
         {
             "num_train_timesteps": 1000,
