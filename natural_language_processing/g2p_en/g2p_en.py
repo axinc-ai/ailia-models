@@ -13,7 +13,6 @@ from builtins import str as unicode
 from expand import normalize_numbers
 import numpy as np
 import ailia
-from averaged_perceptron import tag
 
 import ailia
 
@@ -171,6 +170,7 @@ class G2p(object):
         words = text2.split()
 
         # classify 
+        from averaged_perceptron import tag
         tokens = tag(words)
 
         # steps
