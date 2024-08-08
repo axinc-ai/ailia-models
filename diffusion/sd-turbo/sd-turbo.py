@@ -4,8 +4,6 @@ import sys
 import numpy as np
 import cv2
 
-import transformers
-
 import ailia
 from logging import getLogger
 
@@ -56,6 +54,11 @@ parser.add_argument(
     type=str,
     default=None,
     help="input image file path.",
+)
+parser.add_argument(
+    '--disable_ailia_tokenizer',
+    action='store_true',
+    help='disable ailia tokenizer.'
 )
 parser.add_argument("--onnx", action="store_true", help="execute onnxruntime version.")
 args = update_parser(parser, check_input_type=False)
@@ -134,7 +137,15 @@ def main():
             init_image, (IMAGE_SIZE, IMAGE_SIZE), interpolation=cv2.INTER_LINEAR
         )
 
-    tokenizer = transformers.CLIPTokenizer.from_pretrained("./tokenizer")
+    if args.disable_ailia_tokenizer:
+        import transformers
+        tokenizer = transformers.CLIPTokenizer.from_pretrained("./tokenizer")
+    else:
+        from ailia_tokenizer import CLIPTokenizer
+        tokenizer = CLIPTokenizer.from_pretrained()
+        tokenizer.model_max_length = 77
+        tokenizer.add_special_tokens({'pad_token': '!'})
+    
     scheduler = None
     scheduler = EulerDiscreteScheduler.from_config(
         {
