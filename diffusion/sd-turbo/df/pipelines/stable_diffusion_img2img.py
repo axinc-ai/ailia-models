@@ -83,7 +83,7 @@ class StableDiffusionimg2Img:
             )
             text_input_ids = text_inputs.input_ids
             untruncated_ids = self.tokenizer(
-                prompt, padding="max_length", return_tensors="np"
+                prompt, padding="max_length", return_tensors="np", max_length=self.tokenizer.model_max_length
             ).input_ids
 
             if not np.array_equal(text_input_ids, untruncated_ids):
