@@ -14,5 +14,4 @@ filterpy
 ftfy
 webcolors
 pymatting
-dlib==19.21.1
 lapx
