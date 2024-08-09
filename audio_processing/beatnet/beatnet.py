@@ -47,7 +47,7 @@ DEFAULT_INPUT_PATH = 'input.mp3'
 # Arguemnt Parser Config
 # ======================
 parser = get_base_parser(
-    'Ego2Hands: Egocentric Two-hand Segmentation and Detection',
+    'BeatNet: CRNN and Particle Filtering for Online Joint Beat Downbeat and Meter Tracking',
     DEFAULT_INPUT_PATH, None
 )
 
@@ -64,7 +64,7 @@ args = update_parser(parser)
 # ======================
 
 # From https://github.com/mjhydri/BeatNet/blob/main/src/BeatNet/log_spect.py
-# imports were modified to not require BeatNet(pip module)
+# Imports were modified to not require BeatNet(pip module)
 
 # Author: Mojtaba Heydari <mheydari@ur.rochester.edu>
 
@@ -78,7 +78,7 @@ from madmom.audio.spectrogram import (
 from madmom.processors import ParallelProcessor, SequentialProcessor
 
 
-# feature extractor that extracts magnitude spectrogoram and its differences  
+# feature extractor that extracts magnitude spectrogram and its differences  
 
 class LOG_SPECT(FeatureModule):
     def __init__(self, num_channels=1, sample_rate=22050, win_length=2048, hop_size=512, n_bands=[12], mode='online'):
@@ -102,7 +102,7 @@ class LOG_SPECT(FeatureModule):
                 diff_ratio=0.5, positive_diffs=True, stack_diffs=np.hstack)
             # process each frame size with spec and diff sequentially
             multi.append(SequentialProcessor((frames, stft, filt, spec, diff)))
-        # stack the features and processes everything sequentially
+        # stack the features and process everything sequentially
         self.pipe = SequentialProcessor((sig, multi, np.hstack))
 
     def process_audio(self, audio):
@@ -131,10 +131,10 @@ class BeatNet:
         Parameters
         ----------
         Inputs: 
-            model: An scalar in the range [1,3] to select which pre-trained CRNN models to utilize. 
-            mode: An string to determine the working mode. i.e. 'stream', 'realtime', 'online' and ''offline.
-                'stream' mode: Uses the system microphone to capture sound and does the process in real-time. Due to training the model on standard mastered songs, it is highly recommended to make sure the microphone sound is as loud as possible. Less reverbrations leads to the better results.  
-                'Realtime' mode: Reads an audio file chunk by chunk, and processes each chunck at the time.
+            model: A scalar in the range [1,3] to select which pre-trained CRNN models to utilize. 
+            mode: A string to determine the working mode. i.e. 'stream', 'realtime', 'online', and ''offline.
+                'stream' mode: Uses the system microphone to capture sound and does the process in real time. Due to training the model on standard mastered songs, it is highly recommended to make sure the microphone sound is as loud as possible. Less reverbrations leads to the better results.  
+                'Realtime' mode: Reads an audio file chunk by chunk, and processes each chunk at the time.
                 'Online' mode: Reads the whole audio and feeds it into the BeatNet CRNN at the same time and then infers the parameters on interest using particle filtering.
                 'offline' mode: Reads the whole audio and feeds it into the BeatNet CRNN at the same time and then inferes the parameters on interest using madmom dynamic Bayesian network. This method is quicker that madmom beat/downbeat tracking.
             inference model: A string to choose the inference approach. i.e. 'PF' standing for Particle Filtering for causal inferences and 'DBN' standing for Dynamic Bayesian Network for non-causal usages.
@@ -143,7 +143,7 @@ class BeatNet:
                 'beat_particles': Plots beat/tempo tracking state space and current particle states at each time frame.
                 'downbeat_particles': Plots the downbeat/meter tracking state space and current particle states at each time frame.
                 Note that to speedup plotting the figures, rather than new plots per frame, the previous plots get updated. However, to secure realtime results, it is recommended to not plot or have as less number of plots as possible at the time.   
-            threading: To decide whether accomplish the inference at the main thread or another thread. 
+            threading: To decide whether to accomplish the inference at the main thread or another thread. 
             device: type of dvice. cpu or cuda:i
 
         Outputs:
