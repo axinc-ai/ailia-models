@@ -15,6 +15,12 @@ This video is rendered from an obj file
 ![Output](render.gif)
 
 
+## Install
+
+```
+pip3 install -r requirements.txt
+```
+
 ## Usage
 Automatically downloads the onnx and prototxt files on the first run.
 It is necessary to be connected to the Internet while downloading.
