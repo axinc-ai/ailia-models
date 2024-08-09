@@ -5,37 +5,7 @@ def softmax_np(x: np.ndarray):
     e_x = np.exp(x - np.max(x))  # subtract max to stabilize
     return e_x / e_x.sum(axis=0)
 
-def search(query : list, key : list):
-    """search key in query using boyer-moore algorithm and return its index"""
-    # create skip table
-    skip = {}
-    for i, k in enumerate(key):
-        skip[k] = len(key) - i - 1
 
-    # search
-    i = len(key) - 1
-    while i < len(query):
-        j = len(key) - 1
-        while query[i] == key[j]:
-            if j == 0:
-                return i
-            i -= 1
-            j -= 1
-        i += skip.get(query[i], len(key))
-    return -1
-
-def check_repeat_ngram(tokens, new_token, detect_size):
-    """
-    Description:
-        Detect repeating ngrams longer than detect_size.
-        This function should be called upon every new token generation.
-    Args:
-        tokens (list): List of tokens generated so far.
-        new_token (int): Newly generated token.
-        detect_size (int): Size of ngram to detect.
-    """
-    rep_idx = search(tokens, tokens[-detect_size+1:]+new_token)
-    return rep_idx
 
 """
 top k top p filtering algorithm
