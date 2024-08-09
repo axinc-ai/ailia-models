@@ -17,8 +17,6 @@ from image_utils import imread  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from arg_utils import get_base_parser, get_savepath, update_parser  # noqa: E402
 
-import matplotlib.pyplot as plt
-
 from scipy.special import softmax
 
 logger = getLogger(__name__)
@@ -65,25 +63,6 @@ args = update_parser(parser)
 # Helper functions
 # ======================
 
-def plot_image(image, mask, savepath=None):
-
-    plt.imshow(mask)    
-    plt.show()
-    if savepath is not None:
-        logger.info(f'saving result to {savepath}')
-        
-        mask = cv2.cvtColor(mask, cv2.COLOR_RGB2BGR)
-        cv2.imwrite(savepath, mask)
-
-def update_frame(image, mask, frame):
-    if frame is None:
-        frame = plt.imshow(mask)
-        plt.pause(.01)
-    else:
-        frame.set_data(mask)
-        plt.pause(0.1)
-    return frame
-
 def preprocess(image, h=None, w=None, mean = np.array([0.485, 0.456, 0.406]), std = np.array([0.229, 0.224, 0.225])):
     
     if h is not None and w is not None:
@@ -129,7 +108,10 @@ def recognize_from_image(model):
     mask = postprocess(org_img, logits, org_img.shape[0], org_img.shape[1], args.overlay)
 
     # visualize
-    plot_image(image, mask, args.savepath)
+    logger.info(f'saving result to {args.savepath}')
+        
+    mask = cv2.cvtColor(mask, cv2.COLOR_RGB2BGR)
+    cv2.imwrite(args.savepath, mask)
 
     logger.info('Script finished successfully.')
 
@@ -138,10 +120,12 @@ def recognize_from_video(model):
 
     capture = webcamera_utils.get_capture(args.video)
 
-    frame_shown = None
+    frame_shown = False
     while(True):
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord("q")) or not ret:
+            break
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
             break
         frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB) / 255.
 
@@ -151,9 +135,8 @@ def recognize_from_video(model):
         mask = postprocess(frame, logits, frame.shape[0], frame.shape[1], args.overlay)
 
         # visualize
-        frame_shown = update_frame(frame, mask, frame_shown)
-        if not plt.get_fignums():
-            break
+        cv2.imshow("frame", mask)
+        frame_shown = True
 
     capture.release()
     logger.info('Script finished successfully.')
