@@ -4,7 +4,6 @@ from logging import getLogger
 
 import numpy as np
 from scipy.special import log_softmax
-from transformers import MarianTokenizer
 
 import ailia
 
@@ -38,11 +37,26 @@ parser.add_argument(
     help="Input text."
 )
 parser.add_argument(
+    '--disable_ailia_tokenizer',
+    action='store_true',
+    help='disable ailia tokenizer.'
+)
+parser.add_argument(
     '--onnx',
     action='store_true',
     help='execute onnxruntime version.'
 )
 args = update_parser(parser, check_input_type=False)
+
+
+# ======================
+# Import tokenizer
+# ======================
+
+if args.disable_ailia_tokenizer:
+    from transformers import MarianTokenizer
+else:
+    from ailia_tokenizer import MarianTokenizer
 
 
 # ======================
@@ -229,7 +243,7 @@ def predict(mod, input_text):
     translation_text = tokenizer.decode(
         output_ids,
         skip_special_tokens=True,
-        clean_up_tokenization_spaces=False,
+        #clean_up_tokenization_spaces=False,
     )
 
     return translation_text
@@ -269,7 +283,10 @@ def main():
     # model files check and download
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
 
-    tokenizer = MarianTokenizer.from_pretrained("tokenizer")
+    if args.disable_ailia_tokenizer:
+        tokenizer = MarianTokenizer.from_pretrained("tokenizer")
+    else:
+        tokenizer = MarianTokenizer.from_pretrained("./tokenizer/")
 
     env_id = args.env_id
 
