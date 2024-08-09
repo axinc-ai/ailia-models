@@ -51,4 +51,4 @@ ONNX opset = 10
 
 ### Netron
 
-[crnn.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/crnn/crnn.onnx.prototxt)
+[crnn_audio_classification.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/crnn_audio_classification/crnn_audio_classification.onnx.prototxt)
