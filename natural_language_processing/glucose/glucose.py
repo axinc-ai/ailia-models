@@ -5,7 +5,6 @@ from logging import getLogger
 import json
 
 import numpy as np
-from transformers import AutoTokenizer
 
 import ailia
 
@@ -42,6 +41,11 @@ parser.add_argument(
     '-w', '--write_json',
     action='store_true',
     help='Flag to output results to json file.'
+)
+parser.add_argument(
+    '--disable_ailia_tokenizer',
+    action='store_true',
+    help='disable ailia tokenizer.'
 )
 args = update_parser(parser)
 
@@ -117,7 +121,7 @@ def predict(models, sentences):
 
 
 def recognize_from_sentence(models):
-    with open(args.input[0]) as f:
+    with open(args.input[0], encoding='utf-8') as f:
         sentences = [s.strip() for s in f.read().split("\n")]
 
     logger.info(
@@ -182,7 +186,12 @@ def main():
         providers = ['CUDAExecutionProvider', 'CPUExecutionProvider'] if cuda else ['CPUExecutionProvider']
         net = onnxruntime.InferenceSession(WEIGHT_PATH, providers=providers)
 
-    tokenizer = AutoTokenizer.from_pretrained("tokenizer")
+    if args.disable_ailia_tokenizer:
+        from transformers import AutoTokenizer
+        tokenizer = AutoTokenizer.from_pretrained("tokenizer")
+    else:
+        from ailia_tokenizer import XLMRobertaTokenizer
+        tokenizer = XLMRobertaTokenizer.from_pretrained("./tokenizer/")
 
     models = {
         "net": net,
