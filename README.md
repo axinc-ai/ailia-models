@@ -15,15 +15,15 @@ The collection of pre-trained, state-of-the-art AI models.
 [ailia MODELS tutorial 日本語版](TUTORIAL_jp.md)
 
 # Supported models
-335 models as of July 16th, 2024
+340 models as of August 9th, 2024
 
 # Latest update
+- 2024.08.09 Add mahalanobis-ad, t5_base_japanese_ner
+- 2024.08.08 Add sdxl-turbo, sd-turbo
+- 2024.08.05 Migrate to ailia Tokenizer 1.3 from Transformers
 - 2024.07.16 Add grounded_sam
 - 2024.07.12 Add llava
 - 2024.07.09 Add GroundingDINO
-- 2024.06.26 Add g2p_en
-- 2024.06.24 Add soundchoice-g2p
-- 2024.06.11 Add gpt-sovits, reazon speech, reazon speech2 (ailia SDK 1.4.0)
 - More information in our [Wiki](https://github.com/axinc-ai/ailia-models/wiki)
 
 ## Action recognition
