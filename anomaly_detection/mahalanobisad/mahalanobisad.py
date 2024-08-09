@@ -81,7 +81,7 @@ args = update_parser(parser)
 # ==========================
 MODEL_PATH = "efficientnet-" + args.model + ".onnx.prototxt"
 WEIGHT_PATH = "efficientnet-" + args.model + ".onnx"
-REMOTE_PATH = "https://storage.googleapis.com/ailia-models/efficientnet/"
+REMOTE_PATH = "https://storage.googleapis.com/ailia-models/mahalanobisad/"
 
 
 # ======================
