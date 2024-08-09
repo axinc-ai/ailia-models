@@ -23,7 +23,7 @@ WEIGHT_PATH = 'TripoSR.onnx'
 MODEL_PATH  = 'TripoSR.onnx.prototxt'
 WEIGHT_DECODER_PATH = 'TripoSR_decoder.onnx'
 MODEL_DECODER_PATH  = 'TripoSR_decoder.onnx.prototxt'
-REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/TripoSR/'
+REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/tripo_sr/'
 
 IMAGE_PATH = "input.png"
 SAVE_PATH  = "output.obj"
