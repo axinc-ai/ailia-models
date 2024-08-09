@@ -6,7 +6,6 @@ from logging import getLogger
 import numpy as np
 import cv2
 from PIL import Image
-from transformers import AutoTokenizer
 
 # import original modules
 sys.path.append('../../util')
@@ -44,6 +43,11 @@ parser.add_argument(
     '--onnx',
     action='store_true',
     help='execute onnxruntime version.'
+)
+parser.add_argument(
+    '--disable_ailia_tokenizer',
+    action='store_true',
+    help='disable ailia tokenizer.'
 )
 args = update_parser(parser, check_input_type=False)
 
@@ -374,7 +378,12 @@ def main():
         net = onnxruntime.InferenceSession(WEIGHT_PATH, providers=providers)
         vis_net = onnxruntime.InferenceSession(WEIGHT_VIS_PATH, providers=providers)
 
-    tokenizer = AutoTokenizer.from_pretrained("tokenizer")
+    if args.disable_ailia_tokenizer:
+        from transformers import AutoTokenizer
+        tokenizer = AutoTokenizer.from_pretrained("tokenizer")
+    else:
+        from ailia_tokenizer import GPT2Tokenizer
+        tokenizer = GPT2Tokenizer.from_pretrained("./tokenizer/")
 
     models = {
         'net': net,

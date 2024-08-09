@@ -15,17 +15,15 @@ The collection of pre-trained, state-of-the-art AI models.
 [ailia MODELS tutorial 日本語版](TUTORIAL_jp.md)
 
 # Supported models
-330 models as of June 11th, 2024
+340 models as of August 9th, 2024
 
 # Latest update
-- 2024.06.11 Add gpt-sovits, reazon speech, reazon speech2 (ailia SDK 1.4.0)
-- 2024.05.28 Add kotoba-whisper
-- 2024.05.26 Add multilingual-e5 (LayerNorm version)
-- 2024.04.30 Add cross_encoder_mmarco
-- 2024.04.28 Add marigold
-- 2024.04.08 ailia SDK can now be installed via pip.
-- 2024.04.02 Add zoe_depth, facefusion
-- 2024.04.01 Add pytorch-fcn (ailia SDK 1.3.0)
+- 2024.08.09 Add mahalanobis-ad, t5_base_japanese_ner
+- 2024.08.08 Add sdxl-turbo, sd-turbo
+- 2024.08.05 Migrate to ailia Tokenizer 1.3 from Transformers
+- 2024.07.16 Add grounded_sam
+- 2024.07.12 Add llava
+- 2024.07.09 Add GroundingDINO
 - More information in our [Wiki](https://github.com/axinc-ai/ailia-models/wiki)
 
 ## Action recognition
@@ -46,6 +44,7 @@ The collection of pre-trained, state-of-the-art AI models.
 | [<img src="anomaly_detection/padim/output.png" width=128px>](anomaly_detection/padim/) | [padim](/anomaly_detection/padim/) | [PaDiM-Anomaly-Detection-Localization-master](https://github.com/xiahaifeng1995/PaDiM-Anomaly-Detection-Localization-master) | Pytorch | 1.2.6 and later | [EN](https://medium.com/axinc-ai/padim-a-machine-learning-model-for-detecting-defective-products-without-retraining-5daa6f203377) [JP](https://medium.com/axinc/padim-%E5%86%8D%E5%AD%A6%E7%BF%92%E4%B8%8D%E8%A6%81%E3%81%A7%E4%B8%8D%E8%89%AF%E5%93%81%E6%A4%9C%E7%9F%A5%E3%82%92%E8%A1%8C%E3%81%86%E6%A9%9F%E6%A2%B0%E5%AD%A6%E7%BF%92%E3%83%A2%E3%83%87%E3%83%AB-69add653fbd3) |
 | [<img src="anomaly_detection/spade-pytorch/output.png" width=128px>](anomaly_detection/spade-pytorch/) | [spade-pytorch](/anomaly_detection/spade-pytorch/) | [Sub-Image Anomaly Detection with Deep Pyramid Correspondences](https://github.com/byungjae89/SPADE-pytorch) | Pytorch | 1.2.6 and later | |
 | [<img src="anomaly_detection/patchcore/output.png" width=128px>](anomaly_detection/patchcore/) | [patchcore](/anomaly_detection/patchcore/) | [PatchCore_anomaly_detection](https://github.com/hcw-00/PatchCore_anomaly_detection) | Pytorch | 1.2.6 and later | |
+| [<img src="anomaly_detection/mahalanobisad/bottle_test_good_000.png" width=128px>](anomaly_detection/mahalanobisad/) | [mahalanobisad](/anomaly_detection/mahalanobisad/) | [MahalanobisAD-pytorch](https://github.com/byungjae89/MahalanobisAD-pytorch/tree/master) | Pytorch | 1.2.9 and later | |
 
 ## Audio processing
 
@@ -139,6 +138,8 @@ _se
 | [<img src="diffusion/daclip-sde/output.png" width=128px>](diffusion/daclip-sde/) | [DA-CLIP](/diffusion/daclip-sde/) | [DA-CLIP](https://github.com/Algolzw/daclip-uir) | Pytorch | 1.2.16 and later |
 | [<img src="diffusion/riffusion/output.png" width=128px>](diffusion/riffusion/) | [riffusion](/diffusion/riffusion/) | [Riffusion](https://github.com/riffusion/riffusion) | Pytorch | 1.2.16 and later |
 | [<img src="diffusion/marigold/output_colorize.png" width=128px>](diffusion/marigold/) | [marigold](/diffusion/marigold/) | [Marigold: Repurposing Diffusion-Based Image Generators for Monocular Depth Estimation](https://github.com/prs-eth/Marigold) | Pytorch | 1.2.16 and later |
+| [<img src="diffusion/sdxl-turbo/output.png" width=128px>](diffusion/sdxl-turbo/) | [sdxl-turbo](/diffusion/sdxl-turbo/) | [Hugging Face - SDXL-Turbo](https://huggingface.co/stabilityai/sdxl-turbo) | Pytorch | 1.2.16 and later |
+| [<img src="diffusion/sd-turbo/output.png" width=128px>](diffusion/sd-turbo/) | [sd-turbo](/diffusion/sd-turbo/) | [Hugging Face - SD-Turbo](https://huggingface.co/stabilityai/sd-turbo) | Pytorch | 1.2.16 and later |
 
 ## Face detection
 
@@ -233,6 +234,7 @@ _se
 | [<img src="hand_recognition/hand3d/output.png" width=128px>](hand_recognition/hand3d/) |[hand3d](/hand_recognition/hand3d/) | [ColorHandPose3D network](https://github.com/lmb-freiburg/hand3d) | TensorFlow | 1.2.5 and later |
 | [<img src="hand_recognition/minimal-hand/output.png" width=128px>](hand_recognition/minimal-hand/) |[minimal-hand](/hand_recognition/minimal-hand/) | [Minimal Hand](https://github.com/CalciferZh/minimal-hand) | TensorFlow | 1.2.8 and later |
 | [<img src="hand_recognition/v2v-posenet/output.png" width=128px>](hand_recognition/v2v-posenet/) |[v2v-posenet](/hand_recognition/v2v-posenet/) | [V2V-PoseNet](https://github.com/mks0601/V2V-PoseNet_RELEASE) | Pytorch | 1.2.6 and later |
+| [<img src="hand_recognition/hands_segmentation_pytorch/output.png" width=128px>](hands_recognition/hands_segmentation_pytorch/) |[hands_segmentation_pytorch](/hand_recognition/hands_segmentation_pytorch/) | [hands-segmentation-pytorch](https://github.com/guglielmocamporese/hands-segmentation-pytorch) | Pytorch | 1.2.10 and later |
 
 ## Image captioning
 
@@ -329,6 +331,14 @@ _se
 | [<img src="image_segmentation/segment-anything/example/output1.png" width=128px>](image_segmentation/segment-anything/) | [segment-anything](/image_segmentation/segment-anything/) | [Segment Anything](https://github.com/facebookresearch/segment-anything) | Pytorch | 1.2.16 and later |
 | [<img src="image_segmentation/tusimple-DUC/output.png" width=128px>](image_segmentation/tusimple-DUC/) | [tusimple-DUC](/image_segmentation/tusimple-DUC/) | [TuSimple-DUC](https://github.com/TuSimple/TuSimple-DUC) | Pytorch | 1.2.10 and later |  |
 | [<img src="image_segmentation/pytorch-fcn/result.jpg" width=128px>](image_segmentation/pytorch-fcn/) | [pytorch-fcn](/image_segmentation/pytorch-fcn/) | [pytorch-fcn](https://github.com/wkentaro/pytorch-fcn) | Pytorch | 1.3.0 and later |
+| [<img src="image_segmentation/grounded_sam/output.png" width=128px>](image_segmentation/grounded_sam/) | [grounded_sam](/image_segmentation/grounded_sam/) | [Grounded-SAM](https://github.com/IDEA-Research/Grounded-Segment-Anything/tree/main) | Pytorch | 1.2.16 and later |
+
+## Large Language Model
+
+| Model | Reference | Exported From | Supported Ailia Version | Blog |
+|------------:|:------------:|:------------:|:------------:|:------------:|
+|[llava](/large_language_model/llava) | [LLaVA](https://github.com/haotian-liu/LLaVA) | Pytorch | 1.2.16 and later | |
+
 
 ## Landmark classification
 
@@ -376,6 +386,9 @@ _se
 |[t5_base_summarization](/natural_language_processing/t5_base_japanese_summarization) | [t5-japanese](https://github.com/sonoisa/t5-japanese) | Pytorch | 1.2.13 and later |
 |[glucose](/natural_language_processing/glucose) | [GLuCoSE (General Luke-based Contrastive Sentence Embedding)-base-Japanese](https://huggingface.co/pkshatech/GLuCoSE-base-ja) | Pytorch | 1.2.15 and later |
 |[cross_encoder_mmarco](/natural_language_processing/cross_encoder_mmarco) | [jeffwan/mmarco-mMiniLMv2-L12-H384-v](https://huggingface.co/jeffwan/mmarco-mMiniLMv2-L12-H384-v1) | Pytorch | 1.2.10 and later | [JP](https://medium.com/axinc/crossencodermmarco-%E8%B3%AA%E5%95%8F%E6%96%87%E3%81%A8%E5%9B%9E%E7%AD%94%E6%96%87%E3%81%AE%E9%A1%9E%E4%BC%BC%E5%BA%A6%E3%82%92%E8%A8%88%E7%AE%97%E3%81%99%E3%82%8B%E6%A9%9F%E6%A2%B0%E5%AD%A6%E7%BF%92%E3%83%A2%E3%83%87%E3%83%AB-c90b35e9fc09)|
+|[soundchoice-g2p](/natural_language_processing/soundchoice-g2p) | [Hugging Face - speechbrain/soundchoice-g2p](https://huggingface.co/speechbrain/soundchoice-g2p) | Pytorch | 1.2.16 and later | |
+|[g2p_en](/natural_language_processing/g2p_en) | [g2p_en](https://github.com/Kyubyong/g2p) | Pytorch | 1.2.14 and later | |
+|[t5_base_japanese_ner](/natural_language_processing/t5_base_japanese_ner) |  [t5-japanese](https://github.com/sonoisa/t5-japanese) | Pytorch | 1.2.13 and later |
 
 ## Network intrusion detection
 
@@ -439,6 +452,7 @@ _se
 | [<img src="object_detection/qrcode_wechatqrcode/output.jpg" width=128px>](object_detection/qrcode_wechatqrcode/) | [qrcode_wechatqrcode](/object_detection/qrcode_wechatqrcode/) | [qrcode_wechatqrcode](https://github.com/opencv/opencv_zoo/tree/4fb591053ba1201c07c68929cc324787d5afaa6c/models/qrcode_wechatqrcode) | Caffe | 1.2.15 and later | |
 | [<img src="object_detection/layout_parsing/output.jpg" width=128px>](object_detection/layout_parsing/) |[layout_parsing](object_detection/layout_parsing/)  | [unstructured-inference](https://github.com/Unstructured-IO/unstructured-inference/tree/main) | Pytorch | 1.2.9 and later | |
 | [<img src="object_detection/damo_yolo/output.jpg" width=128px>](object_detection/damo_yolo/) | [damo_yolo](/object_detection/damo_yolo/) | [DAMO-YOLO](https://github.com/tinyvision/DAMO-YOLO) | Pytorch | 1.2.9 and later | |
+| [<img src="object_detection/groundingdino/output.png" width=128px>](object_detection/groundingdino/) | [groundingdino](/object_detection/groundingdino/) | [Grounding DINO](https://github.com/IDEA-Research/GroundingDINO/tree/main) | Pytorch | 1.2.16 and later | |
 
 ## Object detection 3d
 

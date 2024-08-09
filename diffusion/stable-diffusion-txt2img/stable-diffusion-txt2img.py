@@ -6,8 +6,6 @@ from functools import partial
 import numpy as np
 import cv2
 
-from transformers import CLIPTokenizer, CLIPTextModel
-
 import ailia
 
 # import original modules
@@ -139,14 +137,19 @@ parser.add_argument(
     help='execute onnxruntime version.'
 )
 parser.add_argument(
-    '--onnx_clip',
+    '--transformers_clip',
     action='store_true',
-    help='use onnx version of clip.'
+    help='use transformer version of clip.'
 )
 parser.add_argument(
     '--legacy',
     action='store_true',
     help='execute legacy multi model version.'
+)
+parser.add_argument(
+    '--disable_ailia_tokenizer',
+    action='store_true',
+    help='disable ailia tokenizer.'
 )
 args = update_parser(parser, check_input_type=False)
 
@@ -212,21 +215,31 @@ class FrozenCLIPEmbedder:
     """Uses the CLIP transformer encoder for text (from Hugging Face)"""
 
     def __init__(self, version="openai/clip-vit-large-patch14", max_length=77, onnx=None):
-        self.tokenizer = CLIPTokenizer.from_pretrained(version)
-        self.transformer = CLIPTextModel.from_pretrained(version)
-        self.onnx = onnx
+        if args.disable_ailia_tokenizer:
+            from transformers import CLIPTokenizer
+            self.tokenizer = CLIPTokenizer.from_pretrained(version)
+        else:
+            from ailia_tokenizer import CLIPTokenizer
+            self.tokenizer = CLIPTokenizer.from_pretrained()
+        if onnx is None:
+            from transformers import CLIPTextModel
+            self.onnx = None
+            self.transformer = CLIPTextModel.from_pretrained(version)
+        else:
+            self.onnx = onnx
+            self.transformer = None
         self.max_length = max_length
 
     def encode(self, text):
         batch_encoding = self.tokenizer(
-            text, truncation=True, max_length=self.max_length, return_length=True,
-            return_overflowing_tokens=False, padding="max_length", return_tensors="pt")
+            text, truncation=True, max_length=self.max_length, padding="max_length", return_tensors="np")
         tokens = batch_encoding["input_ids"]
         if self.onnx != None:
-            z = self.onnx.predict(tokens.numpy())
+            z = self.onnx.predict(tokens)
             z = self.onnx.get_blob_data(self.onnx.find_blob_index_by_name("/ln_final/Add_1_output_0")) # get hidden state
         else:
-            outputs = self.transformer(input_ids=tokens)
+            import torch
+            outputs = self.transformer(input_ids=torch.from_numpy(tokens))
             z = outputs.last_hidden_state
             z = z.detach().numpy()
         return z
@@ -447,7 +460,10 @@ def apply_model(models, x, t, cc, update_context=True):
     diffusion_mid = models["diffusion_mid"]
     diffusion_out = models["diffusion_out"]
 
-    x = x.astype(np.float32)
+    if not args.legacy and args.onnx:
+        x = x.astype(np.float16)
+    else:
+        x = x.astype(np.float32)
 
     if not args.legacy:
         if not args.onnx:
@@ -670,9 +686,7 @@ def main():
         check_and_download_models(WEIGHT_SD_MID_PATH, MODEL_SD_MID_PATH, REMOTE_PATH)
         check_and_download_models(WEIGHT_SD_OUT_PATH, MODEL_SD_OUT_PATH, REMOTE_PATH)
     check_and_download_models(WEIGHT_VAE_PATH, MODEL_VAE_PATH, REMOTE_PATH)
-
-    if args.onnx_clip:
-        check_and_download_models(WEIGHT_VITL14_TEXT_PATH, MODEL_VITL14_TEXT_PATH, CLIP_REMOTE_PATH)
+    check_and_download_models(WEIGHT_VITL14_TEXT_PATH, MODEL_VITL14_TEXT_PATH, CLIP_REMOTE_PATH)
 
     env_id = args.env_id
 
@@ -696,7 +710,7 @@ def main():
                 MODEL_SD_OUT_PATH, WEIGHT_SD_OUT_PATH, env_id=env_id, memory_mode=memory_mode)
         autoencoder = ailia.Net(
             MODEL_VAE_PATH, WEIGHT_VAE_PATH, env_id=env_id, memory_mode=memory_mode)
-        if args.onnx_clip:
+        if not args.transformers_clip:
             env_id_cpu = -1 # clip without low memory mode only work on cpu
             clip = ailia.Net(
                 MODEL_VITL14_TEXT_PATH, WEIGHT_VITL14_TEXT_PATH, env_id=env_id_cpu) # require hidden state, so use normal memory mode
