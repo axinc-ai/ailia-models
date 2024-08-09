@@ -100,7 +100,7 @@ The collection of pre-trained, state-of-the-art AI models.
 |:-----------|------------:|:------------:|:------------:|:------------:|:------------:|
 | [<img src="crowd_counting/crowdcount-cascaded-mtl/result.png" width=256px>](crowd_counting/crowdcount-cascaded-mtl/) | [crowdcount-cascaded-mtl](/crowd_counting/crowdcount-cascaded-mtl) | [CNN-based Cascaded Multi-task Learning of <br/>High-level Prior and Density Estimation for Crowd Counting <br/>(Single Image Crowd Counting)](https://github.com/svishwa/crowdcount-cascaded-mtl) | Pytorch | 1.2.1 and later | [EN](https://medium.com/axinc-ai/crowdcounting-a-machine-learning-model-for-counting-people-a7b274a7c2af) [JP](https://medium.com/axinc/crowdcounting-%E7%94%BB%E5%83%8F%E3%81%8B%E3%82%89%E4%BA%BA%E6%95%B0%E3%82%92%E8%A8%88%E6%B8%AC%E3%81%99%E3%82%8B%E6%A9%9F%E6%A2%B0%E5%AD%A6%E7%BF%92%E3%83%A2%E3%83%87%E3%83%AB-459e8b3fc184) |
 | [<img src="crowd_counting/c-3-framework/output.png" width=256px>](crowd_counting/c-3-framework/) | [c-3-framework](/crowd_counting/c-3-framework) | [Crowd Counting Code Framework(C^3-Framework)](https://github.com/gjy3035/C-3-Framework) | Pytorch | 1.2.5 and later | |
-_se
+
 ## Deep fashion
 
 | | Model | Reference | Exported From | Supported Ailia Version | Blog |

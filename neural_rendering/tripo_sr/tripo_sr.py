@@ -39,7 +39,7 @@ CHUNK_SIZE = 8192
 # Arguemnt Parser Config
 # ======================
 
-parser = get_base_parser('PointNet.pytorch model', IMAGE_PATH,SAVE_PATH)
+parser = get_base_parser('TripoSR model', IMAGE_PATH,SAVE_PATH)
 
 parser.add_argument(
     "--mc-resolution",
