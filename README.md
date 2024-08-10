@@ -389,7 +389,7 @@ The collection of pre-trained, state-of-the-art AI models.
 |[soundchoice-g2p](/natural_language_processing/soundchoice-g2p) | [Hugging Face - speechbrain/soundchoice-g2p](https://huggingface.co/speechbrain/soundchoice-g2p) | Pytorch | 1.2.16 and later | |
 |[g2p_en](/natural_language_processing/g2p_en) | [g2p_en](https://github.com/Kyubyong/g2p) | Pytorch | 1.2.14 and later | |
 |[t5_base_japanese_ner](/natural_language_processing/t5_base_japanese_ner) |  [t5-japanese](https://github.com/sonoisa/t5-japanese) | Pytorch | 1.2.13 and later |
-|[japanese-reranker-cross-encoder](/natural_language_processing/japanese-reranker-cross-encoder) | [hotchpotch/japanese-reranker-cross-encoder-large-v1](https://huggingface.co/hotchpotch/japanese-reranker-cross-encoder-large-v1) | Pytorch | 1.2.x and later |
+|[japanese-reranker-cross-encoder](/natural_language_processing/japanese-reranker-cross-encoder) | [hotchpotch/japanese-reranker-cross-encoder-large-v1](https://huggingface.co/hotchpotch/japanese-reranker-cross-encoder-large-v1) | Pytorch | 1.2.16 and later |
 
 ## Network intrusion detection
 
