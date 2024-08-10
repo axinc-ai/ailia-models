@@ -392,8 +392,13 @@ def main():
         from transformers import AutoTokenizer
         tokenizer = AutoTokenizer.from_pretrained("tokenizer")
     else:
-        from ailia_tokenizer import BertUncasedTokenizer
-        tokenizer = BertUncasedTokenizer.from_pretrained("./tokenizer/vocab.txt")
+        #ailia Tokenizer 1.3
+        #from ailia_tokenizer import BertUncasedTokenizer
+        #tokenizer = BertUncasedTokenizer.from_pretrained("./tokenizer/vocab.txt")
+
+        #ailia Tokenizer 1.4
+        from ailia_tokenizer import BertTokenizer
+        tokenizer = BertTokenizer.from_pretrained("./tokenizer/")
 
     tokenizer.specical_tokens = tokenizer.convert_tokens_to_ids(
         ["[CLS]", "[SEP]", ".", "?"]
