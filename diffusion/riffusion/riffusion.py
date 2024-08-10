@@ -7,7 +7,6 @@ import cv2
 
 import torch
 import torchaudio
-import transformers
 import soundfile as sf
 
 import ailia
@@ -63,6 +62,11 @@ parser.add_argument(
     '--onnx',
     action='store_true',
     help='execute onnxruntime version.'
+)
+parser.add_argument(
+    '--disable_ailia_tokenizer',
+    action='store_true',
+    help='disable ailia tokenizer.'
 )
 args = update_parser(parser, check_input_type=False)
 
@@ -380,9 +384,16 @@ def main():
         text_encoder = onnxruntime.InferenceSession(WEIGHT_TEXT_ENCODER_PATH, providers=providers)
         vae_decoder = onnxruntime.InferenceSession(WEIGHT_VAE_DECODER_PATH, providers=providers)
 
-    tokenizer = transformers.CLIPTokenizer.from_pretrained(
-        "./tokenizer"
-    )
+    if args.disable_ailia_tokenizer:
+        import transformers
+        tokenizer = transformers.CLIPTokenizer.from_pretrained(
+            "./tokenizer"
+        )
+    else:
+        import ailia_tokenizer
+        tokenizer = ailia_tokenizer.CLIPTokenizer.from_pretrained()
+        tokenizer.model_max_length = 77
+
     scheduler = df.schedulers.DPMSolverMultistepScheduler.from_config({
         "num_train_timesteps": 1000,
         "beta_start": 0.00085,

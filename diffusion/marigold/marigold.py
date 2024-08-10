@@ -10,7 +10,6 @@ import cv2
 from PIL import Image
 import matplotlib
 from tqdm import tqdm
-from transformers import CLIPTokenizer
 from scipy.optimize import minimize
 
 import ailia
@@ -73,6 +72,11 @@ parser.add_argument(
     '--onnx',
     action='store_true',
     help='execute onnxruntime version.'
+)
+parser.add_argument(
+    '--disable_ailia_tokenizer',
+    action='store_true',
+    help='disable ailia tokenizer.'
 )
 args = update_parser(parser)
 
@@ -166,7 +170,7 @@ def single_infer(
         text_inputs = tokenizer(
             prompt,
             padding="do_not_pad",
-            max_length=tokenizer.model_max_length,
+            max_length=77, #tokenizer.model_max_length,
             truncation=True,
             return_tensors="np",
         )
@@ -481,7 +485,12 @@ def main():
         vae_encoder = onnxruntime.InferenceSession(WEIGHT_VAE_ENCODER_PATH, providers=providers)
         vae_decoder = onnxruntime.InferenceSession(WEIGHT_VAE_DECODER_PATH, providers=providers)
 
-    tokenizer = CLIPTokenizer.from_pretrained("tokenizer")
+    if args.disable_ailia_tokenizer:
+        from transformers import CLIPTokenizer
+        tokenizer = CLIPTokenizer.from_pretrained("tokenizer")
+    else:
+        from ailia_tokenizer import CLIPTokenizer
+        tokenizer = CLIPTokenizer.from_pretrained()
 
     scheduler = df.schedulers.DDIMScheduler.from_config({
         "prediction_type": "v_prediction",

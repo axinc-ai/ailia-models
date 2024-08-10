@@ -14,7 +14,7 @@ import ailia
 sys.path.append('../../util')
 from arg_utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
-from image_utils import normalize_image  # noqa
+from load_model import load_bytetrack
 from webcamera_utils import get_capture, get_writer  # noqa: E402
 
 from ecc import ECC
@@ -103,11 +103,9 @@ args = update_parser(parser)
 # Secondaty Functions
 # ======================
 
-def setup_detector(net):
-    sys.path.append(os.path.join(top_path, 'object_tracking/bytetrack'))
-    from bytetrack_mod import mod, set_args  # noqa
 
-    set_args(args)
+def setup_detector(net):
+    mod = load_bytetrack(args)
 
     def _detector(img):
         dets = mod.predict(net, img)
