@@ -4,7 +4,6 @@ import time
 from logging import getLogger
 
 import numpy as np
-from transformers import AutoTokenizer
 from scapy.all import Ether, CookedLinux
 
 import ailia
@@ -68,6 +67,11 @@ parser = get_base_parser(
 parser.add_argument("--hex", type=str, default=None, help="Input-HEX data.")
 parser.add_argument("--ip", action="store_true", help="Use IP layer as payload.")
 parser.add_argument("--onnx", action="store_true", help="execute onnxruntime version.")
+parser.add_argument(
+    '--disable_ailia_tokenizer',
+    action='store_true',
+    help='disable ailia tokenizer.'
+)
 args = update_parser(parser)
 
 
@@ -214,7 +218,12 @@ def main():
 
         net = onnxruntime.InferenceSession(WEIGHT_PATH)
 
-    tokenizer = AutoTokenizer.from_pretrained("tokenizer")
+    if args.disable_ailia_tokenizer:
+        from transformers import AutoTokenizer
+        tokenizer = AutoTokenizer.from_pretrained("tokenizer")
+    else:
+        from ailia_tokenizer import BertTokenizer
+        tokenizer = BertTokenizer.from_pretrained("./tokenizer/")
 
     models = {
         "tokenizer": tokenizer,
