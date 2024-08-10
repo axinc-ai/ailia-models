@@ -6,7 +6,7 @@ import numpy as np
 import ailia  # noqa: E402
 sys.path.append('../../util')
 from arg_utils import get_base_parser, update_parser  # noqa: E402
-from model_utils import check_and_download_models  # noqa: E402
+from model_utils import check_and_download_models, check_and_download_file  # noqa: E402
 
 # logger
 from logging import getLogger   # noqa: E402
@@ -14,7 +14,6 @@ logger = getLogger(__name__)
 
 # for clap
 import librosa
-from transformers import RobertaTokenizer, RobertaModel
 from clap_utils import *
 
 
@@ -29,9 +28,14 @@ parser.add_argument(
     help='By default, the ailia SDK is used, but with this option, you can switch to using ONNX Runtime'
 )
 parser.add_argument(
-    '--ailia_audio',
+    '--disable_ailia_tokenizer',
     action='store_true',
-    help='use ailia_audio instead librosa to get spectrogram feature'
+    help='disable ailia tokenizer.'
+)
+parser.add_argument(
+    '--disable_ailia_audio',
+    action='store_true',
+    help='disable ailia audio and use librosa to get spectrogram feature'
 )
 args = update_parser(parser)
 
@@ -59,22 +63,38 @@ def cos_sim(v1, v2):
 # ======================
 def infer_text(net_text_branch, net_text_projection, text_data):
     # tokenizer
-    tokenize = RobertaTokenizer.from_pretrained('roberta-base')
-    result = tokenize(
-        text_data,
-        padding="max_length",
-        truncation=True,
-        max_length=77,
-        return_tensors="pt",
-    )
-    data = {k: v.squeeze(0) for k, v in result.items()}
-    data["input_ids"] = data["input_ids"].to('cpu').detach().numpy().copy()
-    data["attention_mask"] = data["attention_mask"].to('cpu').detach().numpy().copy()
+    if args.disable_ailia_tokenizer:
+        from transformers import RobertaTokenizer
+        tokenize = RobertaTokenizer.from_pretrained('roberta-base')
+        result = tokenize(
+            text_data,
+            padding="max_length",
+            truncation=True,
+            max_length=77,
+            return_tensors="pt",
+        )
+        data = {k: v.squeeze(0) for k, v in result.items()}
+        data["input_ids"] = data["input_ids"].to('cpu').detach().numpy().copy()
+        data["attention_mask"] = data["attention_mask"].to('cpu').detach().numpy().copy()
+    else:
+        from ailia_tokenizer import RobertaTokenizer
+        tokenize = RobertaTokenizer.from_pretrained("./tokenizer/")
+        result = tokenize(
+            text_data,
+            padding="max_length",
+            truncation=True,
+            max_length=77,
+            return_tensors="np",
+        )
+        data = {k: v for k, v in result.items()}
+
+    #print("input_ids", data["input_ids"])
+    #print("attention_mask", data["attention_mask"])
 
     # predict
     input_data = {
         'input_ids': data["input_ids"],
-        'attention_mask': data["attention_mask"]          
+        'attention_mask': data["attention_mask"]
     }
     if not args.onnx:
         output = net_text_branch.predict(input_data) # text_branch
@@ -113,7 +133,7 @@ def infer_audio(net_audio, audio_src):
             'model_type': 'HTSAT', 
             'model_name': 'tiny'
         },
-        b_use_ailia=args.ailia_audio
+        b_use_ailia=not args.disable_ailia_audio
     )
     input_dict = {
         'longer': [[True]], # Error occers when longer value is "False".
