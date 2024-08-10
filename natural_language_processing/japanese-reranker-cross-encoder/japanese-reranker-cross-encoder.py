@@ -2,14 +2,15 @@ import sys
 import time
 from logging import getLogger
 
-from transformers import AutoTokenizer
+import os
+import shutil
 
 import ailia
 
 # import original modules
 sys.path.append("../../util")
 from arg_utils import get_base_parser, update_parser, get_savepath  # noqa
-from model_utils import check_and_download_models  # noqa
+from model_utils import check_and_download_models, check_and_download_file  # noqa
 
 logger = getLogger(__name__)
 
@@ -34,6 +35,11 @@ parser = get_base_parser("japanese-reranker-cross-encoder", TEXT_PATH, None)
 parser.add_argument(
     "--query", type=str, default="感動的な映画について", help="Input query."
 )
+parser.add_argument(
+    '--disable_ailia_tokenizer',
+    action='store_true',
+    help='disable ailia tokenizer.'
+)
 parser.add_argument("--onnx", action="store_true", help="execute onnxruntime version.")
 args = update_parser(parser)
 
@@ -48,7 +54,7 @@ def predict(models, query, sentences):
     net = models["net"]
 
     features = tokenizer(
-        [(query, passage) for passage in sentences],
+        [[query, passage] for passage in sentences],
         padding=True,
         truncation=True,
         max_length=512,
@@ -133,7 +139,17 @@ def main():
         providers = ["CUDAExecutionProvider", "CPUExecutionProvider"]
         net = onnxruntime.InferenceSession(WEIGHT_PATH, providers=providers)
 
-    tokenizer = AutoTokenizer.from_pretrained("tokenizer")
+    if args.disable_ailia_tokenizer:
+        from transformers import AutoTokenizer
+        tokenizer = AutoTokenizer.from_pretrained("tokenizer")
+    else:
+        from ailia_tokenizer import BertJapaneseWordPieceTokenizer
+        VOCAB_REMOTE_PATH = "https://storage.googleapis.com/ailia-models/bert_maskedlm/"
+        check_and_download_file("unidic-lite.zip", VOCAB_REMOTE_PATH)
+        if not os.path.exists("unidic-lite"):
+            shutil.unpack_archive('unidic-lite.zip', '')
+        tokenizer = BertJapaneseWordPieceTokenizer.from_pretrained(dict_path = 'unidic-lite', pretrained_model_name_or_path = './tokenizer/')
+
 
     models = {
         "net": net,
