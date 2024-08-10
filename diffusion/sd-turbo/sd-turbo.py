@@ -57,6 +57,12 @@ parser.add_argument(
     help="input image file path.",
 )
 parser.add_argument(
+    "--seed",
+    type=int,
+    default=None,
+    help="random seed",
+)
+parser.add_argument(
     '--disable_ailia_tokenizer',
     action='store_true',
     help='disable ailia tokenizer.'
@@ -79,6 +85,11 @@ def main():
     check_and_download_models(
         WEIGHT_VAE_DECODER_PATH, MODEL_VAE_DECODER_PATH, REMOTE_PATH
     )
+
+    seed = args.seed
+    if seed is not None:
+        np.random.seed(seed)
+
     """
     Parse input
     """
