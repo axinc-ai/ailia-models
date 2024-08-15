@@ -5,14 +5,16 @@ import pprint
 
 import numpy as np
 from scipy.special import softmax
-from transformers import BertJapaneseTokenizer
+
+import os
+import shutil
 
 import ailia
 
 # import original modules
 sys.path.append('../../util')
 from arg_utils import get_base_parser, update_parser, get_savepath  # noqa
-from model_utils import check_and_download_models  # noqa
+from model_utils import check_and_download_models, check_and_download_file  # noqa
 
 logger = getLogger(__name__)
 
@@ -35,6 +37,11 @@ parser.add_argument(
     "-i", "--input", metavar="TEXT", type=str,
     default="日本語を校正しま.",
     help="Input text."
+)
+parser.add_argument(
+    '--disable_ailia_tokenizer',
+    action='store_true',
+    help='disable ailia tokenizer.'
 )
 args = update_parser(parser, check_input_type=False)
 
@@ -62,6 +69,8 @@ def predict(model, input_text):
         max_length=512,
         truncation=True,
     )
+
+    logger.info("Tokens: %s" % enc["input_ids"])
 
     model_inputs = (np.array(enc['input_ids'])[None],#prepare input
                     np.array(enc['attention_mask'])[None],
@@ -121,7 +130,16 @@ def main():
     # model files check and download
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
 
-    tokenizer = BertJapaneseTokenizer.from_pretrained("cl-tohoku/bert-base-japanese-whole-word-masking")
+    if args.disable_ailia_tokenizer:
+        from transformers import BertJapaneseTokenizer
+        tokenizer = BertJapaneseTokenizer.from_pretrained("cl-tohoku/bert-base-japanese-whole-word-masking")
+    else:
+        from ailia_tokenizer import BertJapaneseWordPieceTokenizer
+        VOCAB_REMOTE_PATH = "https://storage.googleapis.com/ailia-models/bert_maskedlm/"
+        check_and_download_file("ipadic.zip", VOCAB_REMOTE_PATH)
+        if not os.path.exists("ipadic"):
+            shutil.unpack_archive('ipadic.zip', '')
+        tokenizer = BertJapaneseWordPieceTokenizer.from_pretrained(dict_path='ipadic', pretrained_model_name_or_path='./tokenizer/')
 
     env_id = args.env_id
 

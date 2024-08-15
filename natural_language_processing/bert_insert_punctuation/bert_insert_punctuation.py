@@ -2,9 +2,10 @@ import sys
 import time
 from logging import getLogger
 import pprint
+import os
+import shutil
 
 import numpy as np
-from transformers import AutoTokenizer
 from scipy.special import softmax
 
 import ailia
@@ -12,7 +13,7 @@ import ailia
 # import original modules
 sys.path.append('../../util')
 from arg_utils import get_base_parser, update_parser, get_savepath  # noqa
-from model_utils import check_and_download_models  # noqa
+from model_utils import check_and_download_models, check_and_download_file  # noqa
 
 logger = getLogger(__name__)
 
@@ -46,6 +47,12 @@ parser.add_argument(
 
 parser.add_argument(
     "-sc", "--score", action = 'store_true'
+)
+
+parser.add_argument(
+    '--disable_ailia_tokenizer',
+    action='store_true',
+    help='disable ailia tokenizer.'
 )
 
 args = update_parser(parser, check_input_type=False)
@@ -143,8 +150,17 @@ def main():
     # model files check and download
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
 
-    model_name = "cl-tohoku/bert-base-japanese-v3"
-    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    if args.disable_ailia_tokenizer:
+        from transformers import AutoTokenizer
+        model_name = "cl-tohoku/bert-base-japanese-v3"
+        tokenizer = AutoTokenizer.from_pretrained(model_name)
+    else:
+        from ailia_tokenizer import BertJapaneseWordPieceTokenizer
+        VOCAB_REMOTE_PATH = "https://storage.googleapis.com/ailia-models/bert_maskedlm/"
+        check_and_download_file("unidic-lite.zip", VOCAB_REMOTE_PATH)
+        if not os.path.exists("unidic-lite"):
+            shutil.unpack_archive('unidic-lite.zip', '')
+        tokenizer = BertJapaneseWordPieceTokenizer.from_pretrained(dict_path = 'unidic-lite', pretrained_model_name_or_path='./tokenizer/')
 
     env_id = args.env_id
 

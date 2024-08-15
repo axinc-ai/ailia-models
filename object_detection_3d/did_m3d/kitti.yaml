@@ -1,0 +1,51 @@
+dataset:
+  type: 'kitti'
+  data_dir: 'data/KITTI3D'
+  root_dir: '.'
+  dense_depth_dir: 'data/KITTI3D/training/depth_dense'
+  label_dir: 'data/KITTI3D/training/label_2'
+  eval_cls: ['Car']
+#  eval_cls: ['Car','Pedestrian','Cyclist']
+  batch_size: 16
+  num_workers: 16
+  class_merging: False
+  use_dontcare: False
+  use_3d_center: True
+  writelist: ['Car','Pedestrian','Cyclist']
+  random_flip: 0.5
+  random_crop: 0.5
+  scale: 0.4
+  shift: 0.1
+  drop_last_val: True
+
+model:
+  type: 'DID'
+  backbone: 'dla34'
+  neck: 'DLAUp'
+
+optimizer:
+  type: 'adam'
+  lr: 0.001
+  weight_decay: 0.00001
+
+lr_scheduler:
+  warmup: True  # 5 epoches, cosine warmup, init_lir=0.00001 in default
+  decay_rate: 0.1
+  decay_list: [90, 120]
+
+trainer:
+  max_epoch: 150
+  eval_start: 90
+  eval_frequency: 10 # evaluation interval (in epoch)
+  save_frequency: 10 # checkpoint save interval (in epoch)
+  disp_frequency: 200 # display interval (in batch)
+  log_dir: 'kitti_models/logs/DID-M3D'
+  out_dir: 'kitti_models/output/DID-M3D'
+
+tester:
+  threshold: 0.3  # confidence filter
+  out_dir: './tmp_test/test'
+  resume_model: '' # pre-trained model path
+
+
+
