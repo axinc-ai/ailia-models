@@ -9,6 +9,7 @@ cd ../../action_recognition/driver-action-recognition-adas; python3 driver-actio
 cd ../../anomaly_detection/padim; python3 padim.py ${OPTION}
 cd ../../anomaly_detection/spade-pytorch; python3 spade-pytorch.py ${OPTION}
 cd ../../anomaly_detection/patchcore; python3 patchcore.py ${OPTION}
+cd ../../anomaly_detection/mahalanobisad; python3 mahalanobisad.py ${OPTION}
 cd ../../audio_processing/crnn_audio_classification; python3 crnn_audio_classification.py ${OPTION}
 cd ../../audio_processing/deepspeech2; python3 deepspeech2.py ${OPTION}
 cd ../../audio_processing/pytorch-dc-tts/; python3 pytorch-dc-tts.py ${OPTION}
@@ -31,6 +32,11 @@ cd ../../audio_processing/narabas/; python3 narabas.py ${OPTION}
 cd ../../audio_processing/rnnoise/; python3 rnnoise.py ${OPTION}
 cd ../../audio_processing/audioset_tagging_cnn/; python3 audioset_tagging_cnn.py ${OPTION}
 cd ../../audio_processing/deep-music-enhancer/; python3 deep_music_enhancer.py ${OPTION}
+cd ../../audio_processing/pyannote-audio/; python3 pyannote-audio.py ${OPTION}
+cd ../../audio_processing/kotoba-whisper/; python3 kotoba-whisper.py ${OPTION}
+cd ../../audio_processing/reazon_speech/; python3 reazon_speech.py ${OPTION}
+cd ../../audio_processing/reazon_speech2/; python3 reazon_speech2.py ${OPTION}
+cd ../../audio_processing/gpt-sovits/; python3 gpt-sovits.py ${OPTION}
 cd ../../background_ramoval/deep-image-matting; python3 deep-image-matting.py ${OPTION}
 cd ../../background_ramoval/u2net; python3 u2net.py ${OPTION}
 cd ../../background_ramoval/u2net; python3 u2net.py -a small ${OPTION}
@@ -52,6 +58,9 @@ cd ../../diffusion/stable-diffusion-txt2img; python3 stable-diffusion-txt2img.py
 cd ../../diffusion/control_net python3 control_net.py ${OPTION}
 cd ../../diffusion/daclip-sde; python3 daclipsde.py ${OPTION}
 cd ../../diffusion/riffusion; python3 riffusion.py ${OPTION}
+cd ../../diffusion/marigold; python3 marigold.py ${OPTION}
+cd ../../diffusion/sdxl-turbo; python3 sdxl-turbo.py ${OPTION}
+cd ../../diffusion/sd-turbo; python3 sd-turbo.py ${OPTION}
 cd ../../deep_fashion/clothing-detection; python3 clothing-detection.py ${OPTION}
 cd ../../deep_fashion/fashionai-key-points-detection; python3 fashionai-key-points-detection.py ${OPTION}
 cd ../../deep_fashion/mmfashion; python3 mmfashion.py ${OPTION}
@@ -66,7 +75,9 @@ cd ../../depth_estimation/lap-depth; python3 lap-depth.py ${OPTION}
 cd ../../depth_estimation/hitnet; python3 hitnet.py ${OPTION}
 cd ../../depth_estimation/crestereo; python3 crestereo.py ${OPTION}
 cd ../../depth_estimation/mobilestereonet; python3 mobilestereonet.py ${OPTION}
+cd ../../depth_estimation/depth_anything; python3 depth_anything.py ${OPTION}
 cd ../../face_detection/blazeface; python3 blazeface.py ${OPTION}
+cd ../../face_detection/zoe_depth; python3 zoe_depth ${OPTION}
 cd ../../face_detection/dbface; python3 dbface.py ${OPTION}
 cd ../../face_detection/face-mask-detection; python3 face-mask-detection.py ${OPTION}
 cd ../../face_detection/yolov1-face; python3 yolov1-face.py ${OPTION}
@@ -100,6 +111,7 @@ cd ../../face_recognition/3ddfa; python3 3ddfa$.py ${OPTION}
 cd ../../face_recognition/mivolo; python3 mivolo.py ${OPTION}
 cd ../../face_recognition/l2cs_net; python3 l2cs_net.py ${OPTION}
 cd ../../face_restoration/codeformer; python3 codeformer.py ${OPTION}
+cd ../../face_swapping/facefusion; python3 facefusion.py ${OPTION}
 cd ../../frame_interpolation/flavr; python3 flavr.py ${OPTION}
 cd ../../frame_interpolation/cain; python3 cain.py ${OPTION}
 cd ../../frame_interpolation/film; python3 film.py ${OPTION}
@@ -120,6 +132,7 @@ cd ../../hand_recognition/blazehand; python3 blazehand.py ${OPTION}
 cd ../../hand_recognition/hand3d; python3 hand3d.py ${OPTION}
 cd ../../hand_recognition/minimal-hand; python3 minimal-hand.py ${OPTION}
 cd ../../hand_recognition/v2v-posenet; python3 v2v-posenet.py ${OPTION}
+cd ../../hand_recognition/hands_segmentation_pytorch; python3 hands_segmentation_pytorch.py ${OPTION}
 cd ../../image_captioning/illustration2vec; python3 illustration2vec.py ${OPTION}
 cd ../../image_captioning/image_captioning_pytorch; python3 image_captioning_pytorch.py ${OPTION}
 cd ../../image_captioning/blip2; python3 blip2.py ${OPTION}
@@ -140,11 +153,13 @@ cd ../../image_classification/mlp_mixer; python3 mlp_mixer.py ${OPTION}
 cd ../../image_classification/alexnet; python3 alexnet.py ${OPTION}
 cd ../../image_classification/clip; python3 clip.py ${OPTION}
 cd ../../image_classification/japanese-clip; python3 japanese-clip.py ${OPTION}
+cd ../../image_classification/japanese-stable-clip-vit-l-16; python3 japanese-stable-clip-vit-l-16.py ${OPTION}
 cd ../../image_classification/weather-prediction-from-image; python3 weather-prediction-from-image.py ${OPTION}
 cd ../../image_classification/convnext; python3 convnext.py ${OPTION}
 cd ../../image_classification/swin-transformer; python3 swin_transformer.py ${OPTION}
 cd ../../image_classification/mobileone; python3 mobileone.py ${OPTION}
 cd ../../image_classification/imagenet21k; python3 imagenet21k.py ${OPTION}
+cd ../../image_classification/volo; python3 volo.py ${OPTION}
 cd ../../image_inpainting/3d-photo-inpainting; python3 3d-photo-inpainting.py ${OPTION}
 cd ../../image_inpainting/inpainting_gmcnn; python3 inpainting_gmcnn.py ${OPTION}
 cd ../../image_inpainting/pytorch-inpainting-with-partial-conv; python3 pytorch-inpainting-with-partial-conv.py ${OPTION}
@@ -184,11 +199,15 @@ cd ../../image_segmentation/group_vit; python3 group_vit.py ${OPTION}
 cd ../../image_segmentation/anime-segmentation; python3 anime-segmentation.py ${OPTION}
 cd ../../image_segmentation/segment-anything; python3 segment-anything.py ${OPTION}
 cd ../../image_segmentation/tusimple-DUC; python3 tusimple_DUC.py ${OPTION}
+cd ../../image_segmentation/pytorch-fcn; python3 pytorch-fcn.py ${OPTION}
+cd ../../image_segmentation/grounded_sam; python3 grounded_sam.py ${OPTION}
+cd ../../large_language_model/llava; python3 llava.py ${OPTION}
 cd ../../landmark_classification/landmarks_classifier_asia; python3 landmarks_classifier_asia.py ${OPTION}
 cd ../../landmark_classification/places365; python3 places365.py ${OPTION}
 cd ../../line_segment_detection/mlsd; python3 mlsd.py ${OPTION}
 cd ../../line_segment_detection/dexined; python3 dexined.py ${OPTION}
 cd ../../low_light_image_enhancement/agllnet; python3 agllnet.py ${OPTION}
+cd ../../low_light_image_enhancement/drbn_skf; python3 drbn_skf.py ${OPTION}
 cd ../../natural_language_processing/bert; python3 bert.py ${OPTION}
 cd ../../natural_language_processing/bert_insert_punctuation; python3 bert_insert_punctuation.py ${OPTION}
 cd ../../natural_language_processing/bert_maskedlm; python3 bert_maskedlm.py ${OPTION}
@@ -210,7 +229,15 @@ cd ../../natural_language_processing/multilingual-e5; python3 multilingual-e5.py
 cd ../../natural_language_processing/t5_whisper_medical; python3 t5_whisper_medical.py ${OPTION}
 cd ../../natural_language_processing/t5_base_japanese_summarization; python3 t5_base_japanese_summarization.py ${OPTION}
 cd ../../natural_language_processing/glucose; python3 glucose.py ${OPTION}
+cd ../../natural_language_processing/cross_encoder_mmarco; python3 cross_encoder_mmarco.py ${OPTION}
+cd ../../natural_language_processing/soundchoice-g2p; python3 soundchoice-g2p.py ${OPTION}
+cd ../../natural_language_processing/g2p_en; python3 g2p_en.py ${OPTION}
+cd ../../natural_language_processing/t5_base_japanese_ner; pyhton3 t5_base_japanese_ner.py ${OPTION}
+cd ../../natural_language_processing/japanese-reranker-cross-encoder; python3 japanese-reranker-cross-encoder.py ${OPTION}
+cd ../../network_intrusion_detection/bert-network-packet-flow-header-payload; python3 bert-network-packet-flow-header-payload.py ${OPTION}
+cd ../../network_intrusion_detection/falcon-adapter-network-packet; python3 falcon-adapter-network-packet.py ${OPTION}
 cd ../../neural_rendering/nerf; python3 nerf.py ${OPTION}
+cd ../../neural_rendering/tripo_sr; python3 tripo_sr.py ${OPTION}
 cd ../../object_detection/centernet; python3 centernet.py ${OPTION}
 cd ../../object_detection/m2det; python3 m2det.py ${OPTION}
 cd ../../object_detection/maskrcnn; python3 maskrcnn.py ${OPTION}
@@ -250,6 +277,7 @@ cd ../../object_detection/footandball; python3 footandball.py ${OPTION}
 cd ../../object_detection/qrcode_wechatqrode; python3 qrcode_wechatqrode.py ${OPTION}
 cd ../../object_detection/layout_parsing; python3 layout_parsing.py ${OPTION}
 cd ../../object_detection/damo_yolo; python3 damo_yolo.py ${OPTION}
+cd ../../object_detection/groundingdino; python3 groundingdino.py ${OPTION}
 cd ../../object_detection_3d/3d_bbox; python3 3d_bbox.py ${OPTION}
 cd ../../object_detection_3d/3d-object-detection.pytorch; python3 3d-object-detection.pytorch.py ${OPTION}
 cd ../../object_detection_3d/mediapipe_objectron; python3 mediapipe_objectron.py ${OPTION}
@@ -266,7 +294,7 @@ cd ../../object_tracking/qd-3dt; python3 qd-3dt.py ${OPTION}
 cd ../../object_tracking/strong_sort; python3 strong_sort.py ${OPTION}
 cd ../../object_tracking/deepsort_vehicle; python3 deepsort_vehicle.py ${OPTION}
 cd ../../optical_flow_estimation/raft; python3 raft.py ${OPTION}
-cd ../../point_segmentation/pointnet_pytorch python3 pointnet_pytorch.py ${OPTION}
+cd ../../point_segmentation/pointnet_pytorch; python3 pointnet_pytorch.py ${OPTION}
 cd ../../pose_estimation/lightweight-human-pose-estimation; python3 lightweight-human-pose-estimation.py ${OPTION}
 cd ../../pose_estimation/openpose; python3 openpose.py ${OPTION}
 cd ../../pose_estimation/pose_resnet; python3 pose_resnet.py ${OPTION}
@@ -300,6 +328,7 @@ cd ../../style_transfer/adain; python3 adain.py ${OPTION}
 cd ../../style_transfer/beauty_gan; python3 beauty_gan.py ${OPTION}
 cd ../../style_transfer/animeganv2; python3 animeganv2.py ${OPTION}
 cd ../../style_transfer/pix2pixHD; python3 pix2pixhd.py ${OPTION}
+cd ../../style_transfer/elegant; python3 elegant.py ${OPTION}
 cd ../../super_resolution/srresnet; python3 srresnet.py ${OPTION}
 cd ../../super_resolution/han; python3 han.py ${OPTION}
 cd ../../super_resolution/edsr; python3 edsr.py ${OPTION}

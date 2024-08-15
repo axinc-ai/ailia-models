@@ -17,7 +17,6 @@ He hoped there would be stew for dinner, turnips and carrots and bruised potatoe
 
 This model requires additional module.
 ```
-pip3 install transformers
 pip3 install soundfile
 ```
 
