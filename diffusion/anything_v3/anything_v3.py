@@ -55,6 +55,12 @@ parser.add_argument(
     help="the prompt to render"
 )
 parser.add_argument(
+    "--seed",
+    type=int,
+    default=None,
+    help="random seed",
+)
+parser.add_argument(
     '--onnx',
     action='store_true',
     help='execute onnxruntime version.'
@@ -86,6 +92,10 @@ def recognize_from_text(pipe):
 
 
 def main():
+    seed = args.seed
+    if seed is not None:
+        np.random.seed(seed)
+
     check_and_download_models(WEIGHT_UNET_PATH, MODEL_UNET_PATH, REMOTE_PATH)
     check_and_download_models(WEIGHT_SAFETY_CHECKER_PATH, MODEL_SAFETY_CHECKER_PATH, REMOTE_PATH)
     check_and_download_models(WEIGHT_TEXT_ENCODER_PATH, MODEL_TEXT_ENCODER_PATH, REMOTE_PATH)
