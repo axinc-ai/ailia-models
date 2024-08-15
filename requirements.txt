@@ -1,5 +1,7 @@
 -i https://pypi.org/simple
-numpy>=1.18.4
+ailia>=1.4.0
+ailia_tokenizer>=1.3.0
+numpy<2.0
 matplotlib>=3.2.1
 opencv-python>=4.4.0.42
 pillow>=7.1.2
@@ -12,5 +14,4 @@ filterpy
 ftfy
 webcolors
 pymatting
-dlib==19.21.1
-lap
+lapx

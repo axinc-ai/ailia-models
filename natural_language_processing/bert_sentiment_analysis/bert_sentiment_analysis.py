@@ -1,7 +1,6 @@
 import time
 import sys
 
-from transformers import DistilBertTokenizer
 import numpy
 
 import ailia
@@ -29,6 +28,11 @@ parser.add_argument(
     '--input', '-i', metavar='TEXT', default=DEFAULT_TEXT,
     help='input text'
 )
+parser.add_argument(
+    '--disable_ailia_tokenizer',
+    action='store_true',
+    help='disable ailia tokenizer.'
+)
 args = update_parser(parser, check_input_type=False)
 
 
@@ -50,13 +54,23 @@ def main():
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
 
     ailia_model = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
-    tokenizer = DistilBertTokenizer.from_pretrained(
-        'distilbert-base-uncased-finetuned-sst-2-english'
-    )
-    model_inputs = tokenizer.encode_plus(args.input, return_tensors="pt")
+    if args.disable_ailia_tokenizer:
+        from transformers import DistilBertTokenizer
+        tokenizer = DistilBertTokenizer.from_pretrained(
+            'distilbert-base-uncased-finetuned-sst-2-english'
+        )
+    else:
+        from ailia_tokenizer import BertTokenizer
+        tokenizer = BertTokenizer.from_pretrained(
+            './tokenizer/'
+        )
+
+    model_inputs = tokenizer.encode_plus(args.input, return_tensors="np")
     inputs_onnx = {
-        k: v.cpu().detach().numpy() for k, v in model_inputs.items()
+        k: v for k, v in model_inputs.items()
     }
+    if not args.disable_ailia_tokenizer:
+        del inputs_onnx["token_type_ids"]
 
     logger.info("Input : "+str(args.input))
 
