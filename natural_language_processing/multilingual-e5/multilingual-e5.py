@@ -3,7 +3,6 @@ import time
 from logging import getLogger
 
 import numpy as np
-from transformers import AutoTokenizer
 
 import ailia
 
@@ -47,12 +46,25 @@ parser.add_argument(
     help='model type'
 )
 parser.add_argument(
+    '--disable_ailia_tokenizer',
+    action='store_true',
+    help='disable ailia tokenizer.'
+)
+parser.add_argument(
     '--onnx',
     action='store_true',
     help='execute onnxruntime version.'
 )
+parser.add_argument(
+    '--opt',
+    action='store_true',
+    help='use opset17 version.'
+)
 args = update_parser(parser)
 
+if args.opt:
+    WEIGHT_BASE_PATH = 'multilingual-e5-base.opt.onnx'
+    MODEL_BASE_PATH = 'multilingual-e5-base.opt.onnx.prototxt'
 
 # ======================
 # Secondaty Functions
@@ -63,7 +75,7 @@ def read_sentences(file_path):
         from pdfminer.high_level import extract_text
         text = extract_text(file_path)
     else:
-        with open(file_path, "r") as f:
+        with open(file_path, "r", encoding="utf-8") as f:
             text = f.read()
 
     sents = text.replace('\n', '').split('。')
@@ -99,8 +111,8 @@ def closest_sentence(embs, q_emb):
 # Main functions
 # ======================
 
-def predict(models, sentences):
-    input_texts = ['query: {}'.format(t) for t in sentences]
+def predict(models, sentences, header):
+    input_texts = [header + ': {}'.format(t) for t in sentences]
 
     tokenizer = models['tokenizer']
     batch_dict = tokenizer(
@@ -138,18 +150,21 @@ def recognize_from_sentence(models):
     logger.info("Generating embeddings...")
     if args.benchmark:
         logger.info('BENCHMARK mode')
+        total = 0
         for i in range(5):
             start = int(round(time.time() * 1000))
-            embs = predict(models, sentences)
+            embs = predict(models, sentences, "passage")
             end = int(round(time.time() * 1000))
             logger.info(f'\tailia processing time {end - start} ms')
-        exit()
+            total = total + end - start
+        logger.info(f'average time {total / 5} ms\n')
+        return
     else:
-        embs = predict(models, sentences)
+        embs = predict(models, sentences, "passage")
 
     # check prompt from command line argument
     if prompt is not None:
-        prompt_emb = predict(models, [prompt])
+        prompt_emb = predict(models, [prompt], "query")
 
         idx, sim = closest_sentence(embs, prompt_emb)
 
@@ -160,7 +175,7 @@ def recognize_from_sentence(models):
     # application
     prompt = input('User (press q to exit): ')
     while prompt not in ('q', 'ｑ'):
-        prompt_emb = predict(models, [prompt])
+        prompt_emb = predict(models, [prompt], "query")
 
         idx, sim = closest_sentence(embs, prompt_emb)
 
@@ -192,14 +207,25 @@ def main():
         providers = ['CUDAExecutionProvider', 'CPUExecutionProvider'] if cuda else ['CPUExecutionProvider']
         net = onnxruntime.InferenceSession(WEIGHT_PATH, providers=providers)
 
-    tokenizer = AutoTokenizer.from_pretrained('tokenizer')
+    if args.disable_ailia_tokenizer:
+        from transformers import AutoTokenizer
+        tokenizer = AutoTokenizer.from_pretrained('tokenizer')
+    else:
+        from ailia_tokenizer import XLMRobertaTokenizer
+        tokenizer = XLMRobertaTokenizer.from_pretrained('./tokenizer/')
 
     models = {
         "net": net,
         "tokenizer": tokenizer,
     }
 
+    if args.profile:
+        net.set_profile_mode(True)
+
     recognize_from_sentence(models)
+
+    if args.profile:
+        print(net.get_summary())
 
 
 if __name__ == '__main__':

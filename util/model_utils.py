@@ -1,6 +1,7 @@
 import os
 import urllib.request
 import ssl
+import shutil
 
 # logger
 from logging import getLogger
@@ -34,11 +35,12 @@ def progress_print(block_count, block_size, total_size):
 
 
 def urlretrieve(remote_path, weight_path, progress_print):
+    temp_path = weight_path + ".tmp"
     try:
         #raise ssl.SSLError # test
         urllib.request.urlretrieve(
             remote_path,
-            weight_path,
+            temp_path,
             progress_print,
         )
     except ssl.SSLError as e:
@@ -46,9 +48,10 @@ def urlretrieve(remote_path, weight_path, progress_print):
         remote_path = remote_path.replace("https","http")
         urllib.request.urlretrieve(
             remote_path,
-            weight_path,
+            temp_path,
             progress_print,
         )
+    shutil.move(temp_path, weight_path)
 
 
 def check_and_download_models(weight_path, model_path, remote_path):

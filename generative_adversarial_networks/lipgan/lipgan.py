@@ -26,7 +26,7 @@ logger = getLogger(__name__)
 # ======================
 WEIGHT_PATH = "lipgan.onnx"
 MODEL_PATH = "lipgan.onnx.prototxt"
-REMOTE_PATH = "https://storage.googleapis.com/ailia-models/psgan/"
+REMOTE_PATH = "https://storage.googleapis.com/ailia-models/lipgan/"
 
 FACE_DETECTOR_WEIGHT_PATH = "../../face_detection/blazeface/blazeface.onnx"
 FACE_DETECTOR_MODEL_PATH = "../../face_detection/blazeface/blazeface.onnx.prototxt"

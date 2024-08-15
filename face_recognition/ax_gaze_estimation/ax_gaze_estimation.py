@@ -427,9 +427,8 @@ def recognize_from_video():
         else:
             frame_draw = frame.copy()
 
-        if preds[0] is not None and args.video == '0': # Flip horizontally if camera
-            visual_img = estimator.draw(frame, *preds, draw_iris=args.draw_iris, draw_head_pose=args.draw_head_pose,
-                                        horizontal_flip=True)
+        if args.video == '0': # Flip horizontally if camera
+            visual_img = cv2.flip(frame_draw, 1)
         else:
             visual_img = frame_draw
 
