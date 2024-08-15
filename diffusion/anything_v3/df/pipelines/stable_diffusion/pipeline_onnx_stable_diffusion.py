@@ -16,7 +16,6 @@ import inspect
 from typing import Callable, List, Optional, Union
 
 import numpy as np
-import torch
 
 #from transformers import CLIPFeatureExtractor, CLIPTokenizer
 
@@ -272,9 +271,9 @@ class OnnxStableDiffusionPipeline(DiffusionPipeline):
         for i, t in enumerate(self.progress_bar(self.scheduler.timesteps)):
             # expand the latents if we are doing classifier free guidance
             latent_model_input = np.concatenate([latents] * 2) if do_classifier_free_guidance else latents
-            latent_model_input = self.scheduler.scale_model_input(torch.from_numpy(latent_model_input), t)
-            latent_model_input = latent_model_input.cpu().numpy()
-
+            latent_model_input = self.scheduler.scale_model_input(latent_model_input, t)
+            latent_model_input = latent_model_input
+            
             # predict the noise residual
             timestep = np.array([t], dtype=timestep_dtype)
             noise_pred = self.unet(sample=latent_model_input, timestep=timestep, encoder_hidden_states=text_embeddings)
@@ -287,9 +286,9 @@ class OnnxStableDiffusionPipeline(DiffusionPipeline):
 
             # compute the previous noisy sample x_t -> x_t-1
             scheduler_output = self.scheduler.step(
-                torch.from_numpy(noise_pred), t, torch.from_numpy(latents), **extra_step_kwargs
+                noise_pred, t, latents, **extra_step_kwargs
             )
-            latents = scheduler_output.prev_sample.numpy()
+            latents = scheduler_output.prev_sample
 
             # call the callback, if provided
             if callback is not None and i % callback_steps == 0:

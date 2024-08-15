@@ -15,8 +15,7 @@ import importlib
 import os
 from dataclasses import dataclass
 from typing import Any, Dict, Optional, Union
-
-import torch
+import numpy as np
 
 from ..utils import BaseOutput
 
@@ -35,7 +34,7 @@ class SchedulerOutput(BaseOutput):
             denoising loop.
     """
 
-    prev_sample: torch.FloatTensor
+    prev_sample: np.ndarray
 
 
 class SchedulerMixin:
