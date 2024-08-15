@@ -199,9 +199,10 @@ def recognize_from_video(net):
             break
 
         IMAGE_HEIGHT, IMAGE_WIDTH = frame.shape[0], frame.shape[1]
+        SQUARE_SIZE = max(IMAGE_WIDTH, IMAGE_HEIGHT)
 
         # resize with keep aspect
-        frame,resized_img = webcamera_utils.adjust_frame_size(frame, IMAGE_HEIGHT, IMAGE_WIDTH)
+        frame,resized_img = webcamera_utils.adjust_frame_size(frame, SQUARE_SIZE, SQUARE_SIZE)
 
         out_img = compute(net,face_helper,frame)
         cv2.imshow('output', out_img)
