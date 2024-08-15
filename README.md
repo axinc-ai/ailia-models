@@ -141,7 +141,7 @@ The collection of pre-trained, state-of-the-art AI models.
 | [<img src="diffusion/marigold/output_colorize.png" width=128px>](diffusion/marigold/) | [marigold](/diffusion/marigold/) | [Marigold: Repurposing Diffusion-Based Image Generators for Monocular Depth Estimation](https://github.com/prs-eth/Marigold) | Pytorch | 1.2.16 and later |
 | [<img src="diffusion/sdxl-turbo/output.png" width=128px>](diffusion/sdxl-turbo/) | [sdxl-turbo](/diffusion/sdxl-turbo/) | [Hugging Face - SDXL-Turbo](https://huggingface.co/stabilityai/sdxl-turbo) | Pytorch | 1.2.16 and later |
 | [<img src="diffusion/sd-turbo/output.png" width=128px>](diffusion/sd-turbo/) | [sd-turbo](/diffusion/sd-turbo/) | [Hugging Face - SD-Turbo](https://huggingface.co/stabilityai/sd-turbo) | Pytorch | 1.2.16 and later |
-| [<img src="diffusion/anything_v3/output.png" width=128px>](diffusion/anything_v3/) | [anything_v3](/diffusion/anything_v3/) | [Linaqruf/anything-v3.0](https://huggingface.co/Linaqruf/anything-v3.0) | Pytorch | 1.2.16 and later |
+| [<img src="diffusion/anything_v3/output.png" width=128px>](diffusion/anything_v3/) | [anything_v3](/diffusion/anything_v3/) | [Linaqruf/anything-v3.0](https://huggingface.co/Linaqruf/anything-v3.0) | Pytorch | 1.5.0 and later |
 
 ## Face detection
 

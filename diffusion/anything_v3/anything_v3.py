@@ -6,7 +6,6 @@ import numpy as np
 import cv2
 
 import ailia
-import transformers
 
 import random
 
@@ -59,6 +58,11 @@ parser.add_argument(
     '--onnx',
     action='store_true',
     help='execute onnxruntime version.'
+)
+parser.add_argument(
+    '--disable_ailia_tokenizer',
+    action='store_true',
+    help='disable ailia tokenizer.'
 )
 args = update_parser(parser, check_input_type=False)
 
@@ -120,12 +124,18 @@ def main():
     pndm_scheduler = df.schedulers.scheduling_pndm.PNDMScheduler.from_pretrained(
         "./scheduler"
     )
-    feature_extractor = transformers.CLIPImageProcessor.from_pretrained(
-        "./feature_extractor"
-    )
-    tokenizer = transformers.CLIPTokenizer.from_pretrained(
-        "./tokenizer"
-    )
+    if True:#args.disable_ailia_tokenizer:
+        import transformers
+        feature_extractor = transformers.CLIPImageProcessor.from_pretrained(
+            "./feature_extractor"
+        )
+        tokenizer = transformers.CLIPTokenizer.from_pretrained(
+            "./tokenizer"
+        )
+    #else:
+    #    from ailia_tokenizer import CLIPTokenizer
+    #    tokenizer = CLIPTokenizer.from_pretrained()
+    #    tokenizer.model_max_length = 77
 
     # set pipeline
     use_transformers = True
