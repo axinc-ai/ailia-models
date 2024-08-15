@@ -13,14 +13,14 @@ from logging import getLogger  # noqa: E402
 import webcamera_utils  # noqa: E402
 from image_utils import imread  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
-from utils import get_base_parser, update_parser  # noqa: E402
+from arg_utils import get_base_parser, update_parser  # noqa: E402
 
 logger = getLogger(__name__)
 
 WEIGHT_PATH = "drbn_skf_lol.onnx"
 MODEL_PATH = "drbn_skf_lol.onnx.prototxt"
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/drbn_skf/'
-IMAGE_PATH = '1.png'
+IMAGE_PATH = 'input.png'
 SAVE_IMAGE_PATH = 'output.png'
 HEIGHT_SIZE = 400
 WIDTH_SIZE = 600
