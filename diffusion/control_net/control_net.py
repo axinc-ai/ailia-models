@@ -4,8 +4,6 @@ import time
 import numpy as np
 import cv2
 
-from transformers import CLIPTokenizer, CLIPTextModel
-
 import ailia
 
 # import original modules
@@ -51,6 +49,10 @@ MODEL_DFSN_OUT_PATH = 'diffusion_out.onnx.prototxt'
 WEIGHT_AUTO_ENC_PATH = 'autoencoder.onnx'
 MODEL_AUTO_ENC_PATH = 'autoencoder.onnx.prototxt'
 REMOTE_PATH_SD = 'https://storage.googleapis.com/ailia-models/stable-diffusion-txt2img/'
+
+WEIGHT_VITL14_TEXT_PATH = 'ViT-L14-encode_text.onnx'
+MODEL_VITL14_TEXT_PATH = 'ViT-L14-encode_text.onnx.prototxt'
+CLIP_REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/clip/'
 
 IMAGE_PATH = 'examples/bird.png'
 SAVE_IMAGE_PATH = 'output.png'
@@ -114,6 +116,16 @@ parser.add_argument(
     '--onnx',
     action='store_true',
     help='execute onnxruntime version.'
+)
+parser.add_argument(
+    '--transformers_clip',
+    action='store_true',
+    help='use transformer version of clip.'
+)
+parser.add_argument(
+    '--disable_ailia_tokenizer',
+    action='store_true',
+    help='disable ailia tokenizer.'
 )
 args = update_parser(parser)
 
@@ -198,24 +210,34 @@ ddim_sqrt_one_minus_alphas = np.sqrt(1. - ddim_alphas)
 class FrozenCLIPEmbedder:
     """Uses the CLIP transformer encoder for text (from Hugging Face)"""
 
-    def __init__(self, version="openai/clip-vit-large-patch14", max_length=77):
-        from transformers import logging
-
-        self.tokenizer = CLIPTokenizer.from_pretrained(version)
-        self.transformer = CLIPTextModel.from_pretrained(version)
+    def __init__(self, version="openai/clip-vit-large-patch14", max_length=77, onnx=None):
+        if args.disable_ailia_tokenizer:
+            from transformers import CLIPTokenizer
+            self.tokenizer = CLIPTokenizer.from_pretrained(version)
+        else:
+            from ailia_tokenizer import CLIPTokenizer
+            self.tokenizer = CLIPTokenizer.from_pretrained()
+        if onnx is None:
+            from transformers import CLIPTextModel
+            self.onnx = None
+            self.transformer = CLIPTextModel.from_pretrained(version)
+        else:
+            self.onnx = onnx
+            self.transformer = None
         self.max_length = max_length
-
-        logging.set_verbosity_error()
 
     def encode(self, text):
         batch_encoding = self.tokenizer(
-            text, truncation=True, max_length=self.max_length, return_length=True,
-            return_overflowing_tokens=False, padding="max_length", return_tensors="pt")
+            text, truncation=True, max_length=self.max_length, padding="max_length", return_tensors="np")
         tokens = batch_encoding["input_ids"]
-        outputs = self.transformer(input_ids=tokens)
-
-        z = outputs.last_hidden_state
-        z = z.detach().numpy()
+        if self.onnx != None:
+            z = self.onnx.predict(tokens)
+            z = self.onnx.get_blob_data(self.onnx.find_blob_index_by_name("/ln_final/Add_1_output_0")) # get hidden state
+        else:
+            import torch
+            outputs = self.transformer(input_ids=torch.from_numpy(tokens))
+            z = outputs.last_hidden_state
+            z = z.detach().numpy()
         return z
 
 
@@ -439,7 +461,7 @@ def predict(
     ], axis=0).astype(np.float32) / 255
     control = control.transpose((0, 3, 1, 2))  # HWC -> CHW
 
-    cond_stage_model = FrozenCLIPEmbedder()
+    cond_stage_model = FrozenCLIPEmbedder(onnx = models["clip"])
     cond = {
         "c_concat": [control],
         "c_crossattn": [cond_stage_model.encode([prompt + ', ' + a_prompt] * num_samples)]
@@ -521,6 +543,7 @@ def main():
     check_and_download_models(WEIGHT_DFSN_MID_PATH, MODEL_DFSN_MID_PATH, REMOTE_PATH_SD)
     check_and_download_models(WEIGHT_DFSN_OUT_PATH, MODEL_DFSN_OUT_PATH, REMOTE_PATH_SD)
     check_and_download_models(WEIGHT_AUTO_ENC_PATH, MODEL_AUTO_ENC_PATH, REMOTE_PATH_SD)
+    check_and_download_models(WEIGHT_VITL14_TEXT_PATH, MODEL_VITL14_TEXT_PATH, CLIP_REMOTE_PATH)
 
     det_model = args.model_type
 
@@ -549,6 +572,12 @@ def main():
             MODEL_DFSN_OUT_PATH, WEIGHT_DFSN_OUT_PATH, env_id=env_id, memory_mode=memory_mode)
         autoencoder = ailia.Net(
             MODEL_AUTO_ENC_PATH, WEIGHT_AUTO_ENC_PATH, env_id=env_id, memory_mode=memory_mode)
+        if not args.transformers_clip:
+            env_id_cpu = -1 # clip without low memory mode only work on cpu
+            clip = ailia.Net(
+                MODEL_VITL14_TEXT_PATH, WEIGHT_VITL14_TEXT_PATH, env_id=env_id_cpu) # require hidden state, so use normal memory mode
+        else:
+            clip = None
     else:
         import onnxruntime
         control_net = onnxruntime.InferenceSession(WEIGHT_PATH)
@@ -557,6 +586,7 @@ def main():
         diffusion_out = onnxruntime.InferenceSession(WEIGHT_DFSN_OUT_PATH)
         autoencoder = onnxruntime.InferenceSession(WEIGHT_AUTO_ENC_PATH)
         annotator.common.onnx = True
+        clip = None
 
     det_net = None
     ext_net = None
@@ -591,6 +621,7 @@ def main():
         diffusion_mid=diffusion_mid,
         diffusion_out=diffusion_out,
         autoencoder=autoencoder,
+        clip=clip
     )
     recognize_from_image_text(models)
 

@@ -4,6 +4,7 @@ import sys
 import ailia
 import cv2
 from numpy import fix
+import json
 
 sys.path.append("../../util")
 from logging import getLogger  # noqa: E402
@@ -53,6 +54,11 @@ parser.add_argument(
     action="store_true",
     help="set this option when target file is pdf",
 )
+parser.add_argument(
+    '-w', '--write_json',
+    action='store_true',
+    help='Flag to output results to json file.'
+)
 args = update_parser(parser)
 
 
@@ -64,11 +70,8 @@ def infer_from_pdf(detector: ailia.Detector):
         img_processed, ratio = preprocess(img_orig, INPUT_SHAPE)
 
         def compute():
-            if args.detector:
-                detector.compute(img_orig, args.threshold, args.iou)
-                return None
-            else:
-                return detector.run(img_processed)
+            detector.compute(img_orig, args.threshold, args.iou)
+            return None
 
         # inference
         logger.info('Start inference...')
@@ -118,13 +121,23 @@ def infer_from_image(detector: ailia.Detector):
         output = compute()
     
     res_img = plot_results(detector, img_orig, YOLOX_LABEL_MAP)
-    detector_object = detector
 
     extension = os.path.splitext(image_filename)[1]
     output_filename = image_filename.replace(extension, "_parsed.jpg")
     cv2.imwrite(output_filename, res_img)
 
-    
+    if args.write_json:
+        json_filename = image_filename.replace(extension, "_parsed.json")
+        out_list = []
+        for idx in range(detector.get_object_count()):
+            d = detector.get_object(idx)
+            out_list.append({
+                "category": d.category, "category_name": YOLOX_LABEL_MAP[d.category],
+                "prob": float(d.prob),
+                "x": float(d.x), "y": float(d.y), "w": float(d.w), "h": float(d.h)
+            })
+        with open(json_filename, "w", encoding="utf-8") as f:
+            json.dump(out_list, f, indent=2)
 
 if __name__ == "__main__":
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)

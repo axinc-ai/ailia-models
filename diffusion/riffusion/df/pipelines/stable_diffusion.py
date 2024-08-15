@@ -74,7 +74,7 @@ class StableDiffusion:
             return_tensors="np",
         )
         text_input_ids = text_inputs.input_ids
-        untruncated_ids = self.tokenizer(prompt, padding="max_length", return_tensors="np").input_ids
+        untruncated_ids = self.tokenizer(prompt, padding="max_length", max_length=self.tokenizer.model_max_length, return_tensors="np").input_ids
 
         if not np.array_equal(text_input_ids, untruncated_ids):
             removed_text = self.tokenizer.batch_decode(
