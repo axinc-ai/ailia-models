@@ -283,12 +283,14 @@ The collection of pre-trained, state-of-the-art AI models.
 
 | | Model | Reference | Exported From | Supported Ailia Version | Blog |
 |:-----------|------------:|:------------:|:------------:|:------------:|:------------:|
+| [<img src="generative_adversarial_networks/gfpgan/out_03.png" width=128px>](generative_adversarial_networks/gfpgan/) | [gfpgan](/generative_adversarial_networks/gfpgan)| [GFP-GAN: Towards Real-World Blind Face Restoration with Generative Facial Prior](https://github.com/TencentARC/GFPGAN)| Pytorch | 1.2.10 and later | [JP](https://medium.com/axinc/gfpgan-%E9%A1%94%E7%94%BB%E5%83%8F%E3%82%92%E9%AB%98%E7%94%BB%E8%B3%AA%E5%8C%96%E3%81%99%E3%82%8B%E6%A9%9F%E6%A2%B0%E5%AD%A6%E7%BF%92%E3%83%A2%E3%83%87%E3%83%AB-547acd717086) |
 | [<img src="face_restoration/codeformer/output.png" width=128px>](face_restoration/codeformer/) | [codeformer](/face_restoration/codeformer/) | [CodeFormer: Towards Robust Blind Face Restoration with Codebook Lookup Transformer](https://github.com/sczhou/CodeFormer) | Pytorch | 1.2.9 and later |
 
 ## Face swapping
 
 | | Model | Reference | Exported From | Supported Ailia Version | Blog |
 |:-----------|------------:|:------------:|:------------:|:------------:|:------------:|
+| [<img src="generative_adversarial_networks/sber-swap/output.png" width=128px>](generative_adversarial_networks/sber-swap/) | [sber-swap](/generative_adversarial_networks/sber-swap/) | [SberSwap](https://github.com/ai-forever/sber-swap) | Pytorch | 1.2.12 and later | |
 | [<img src="face_swapping/facefusion/output.png" width=128px>](face_swapping/facefusion/) | [facefusion](/face_swapping/facefusion/) | [FaceFusion](https://github.com/facefusion/facefusion) | ONNXRuntime | 1.2.10 and later |
 
 ## Frame Interpolation
@@ -308,8 +310,6 @@ The collection of pre-trained, state-of-the-art AI models.
 | [<img src="generative_adversarial_networks/council-gan/output_glasses.png" width=128px>](generative_adversarial_networks/council-gan/) | [council-gan](/generative_adversarial_networks/council-gan)| [Council-GAN](https://github.com/Onr/Council-GAN)| Pytorch | 1.2.4 and later |
 | [<img src="generative_adversarial_networks/restyle-encoder/img/face_img.jpg" width=128px>](generative_adversarial_networks/restyle-encoder/) | [restyle-encoder](/generative_adversarial_networks/restyle-encoder)| [ReStyle](https://github.com/yuval-alaluf/restyle-encoder)| Pytorch | 1.2.9 and later |
 | [<img src="generative_adversarial_networks/sam/img/input.jpg" width=128px>](generative_adversarial_networks/sam/) | [sam](/generative_adversarial_networks/sam)| [Age Transformation Using a Style-Based Regression Model](https://github.com/yuval-alaluf/SAM)| Pytorch | 1.2.9 and later |
-| [<img src="generative_adversarial_networks/gfpgan/out_03.png" width=128px>](generative_adversarial_networks/gfpgan/) | [gfpgan](/generative_adversarial_networks/gfpgan)| [GFP-GAN: Towards Real-World Blind Face Restoration with Generative Facial Prior](https://github.com/TencentARC/GFPGAN)| Pytorch | 1.2.10 and later | [JP](https://medium.com/axinc/gfpgan-%E9%A1%94%E7%94%BB%E5%83%8F%E3%82%92%E9%AB%98%E7%94%BB%E8%B3%AA%E5%8C%96%E3%81%99%E3%82%8B%E6%A9%9F%E6%A2%B0%E5%AD%A6%E7%BF%92%E3%83%A2%E3%83%87%E3%83%AB-547acd717086) |
-| [<img src="generative_adversarial_networks/sber-swap/output.png" width=128px>](generative_adversarial_networks/sber-swap/) | [sber-swap](/generative_adversarial_networks/sber-swap/) | [SberSwap](https://github.com/ai-forever/sber-swap) | Pytorch | 1.2.12 and later | |
 | [<img src="generative_adversarial_networks/encoder4editing/output.png" width=128px>](generative_adversarial_networks/encoder4editing/) | [encoder4editing](/generative_adversarial_networks/encoder4editing/) | [Designing an Encoder for StyleGAN Image Manipulation](https://github.com/omertov/encoder4editing) | Pytorch | 1.2.10 and later | |
 | [<img src="generative_adversarial_networks/lipgan/input.jpg" width=128px>](generative_adversarial_networks/lipgan/) | [lipgan](/generative_adversarial_networks/lipgan/) | [LipGAN](https://github.com/Rudrabha/LipGAN) | Keras | 1.2.15 and later | [JP](https://medium.com/axinc/lipgan-%E3%83%AA%E3%83%83%E3%83%97%E3%82%B7%E3%83%B3%E3%82%AF%E5%8B%95%E7%94%BB%E3%82%92%E7%94%9F%E6%88%90%E3%81%99%E3%82%8B%E6%A9%9F%E6%A2%B0%E5%AD%A6%E7%BF%92%E3%83%A2%E3%83%87%E3%83%AB-57511508eaff) |
 
@@ -467,7 +467,7 @@ The collection of pre-trained, state-of-the-art AI models.
 | | Model | Reference | Exported From | Supported Ailia Version | Blog |
 |:-----------|------------:|:------------:|:------------:|:------------:|:------------:|
 | [<img src="low_light_image_enhancement/agllnet/output.png" width=128px>](low_light_image_enhancement/agllnet/) | [agllnet](/low_light_image_enhancement/agllnet/) | [AGLLNet: Attention Guided Low-light Image Enhancement (IJCV 2021)](https://github.com/yu-li/AGLLNet) | Pytorch | 1.2.9 and later |[EN](https://medium.com/axinc-ai/agllnet-a-machine-learning-model-for-brightening-dark-images-133a0887b5c) [JP](https://medium.com/axinc/agllnet-%E6%9A%97%E3%81%84%E7%94%BB%E5%83%8F%E3%82%92%E6%98%8E%E3%82%8B%E3%81%8F%E3%81%99%E3%82%8B%E6%A9%9F%E6%A2%B0%E5%AD%A6%E7%BF%92%E3%83%A2%E3%83%87%E3%83%AB-d59181ad89a9) |
-| [<img src="low_light_image_enhancement/drbn_skf/output.png" width=128px>](low_light_image_enhancement/drbn_skf/) | [drbn_skf](/low_light_image_enhancement/drbn_skf/) | [DRBN SKF](https://github.com/langmanbusi/Semantic-Aware-Low-Light-Image-Enhancement/tree/main/DRBN_SKF) | Pytorch | 1.2.14 and later | |
+| [<img src="low_light_image_enhancement/drbn_skf/output1.png" width=128px>](low_light_image_enhancement/drbn_skf/) | [drbn_skf](/low_light_image_enhancement/drbn_skf/) | [DRBN SKF](https://github.com/langmanbusi/Semantic-Aware-Low-Light-Image-Enhancement/tree/main/DRBN_SKF) | Pytorch | 1.2.14 and later | |
 
 ## Natural language processing
 
