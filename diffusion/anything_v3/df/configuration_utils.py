@@ -26,16 +26,10 @@ from typing import Any, Dict, Tuple, Union
 
 import numpy as np
 
-from huggingface_hub import hf_hub_download
-from huggingface_hub.utils import EntryNotFoundError, RepositoryNotFoundError, RevisionNotFoundError
-from requests import HTTPError
-
-from .utils import DIFFUSERS_CACHE, HUGGINGFACE_CO_RESOLVE_ENDPOINT, DummyObject
+from .utils import DIFFUSERS_CACHE, DummyObject
 
 
 #logger = logging.get_logger(__name__)
-
-_re_configuration_file = re.compile(r"config\.(.*)\.json")
 
 
 class FrozenDict(OrderedDict):
@@ -115,26 +109,6 @@ class ConfigMixin:
             #logger.debug(f"Updating config from {previous_dict} to {internal_dict}")
 
         self._internal_dict = FrozenDict(internal_dict)
-
-    def save_config(self, save_directory: Union[str, os.PathLike], push_to_hub: bool = False, **kwargs):
-        """
-        Save a configuration object to the directory `save_directory`, so that it can be re-loaded using the
-        [`~ConfigMixin.from_config`] class method.
-
-        Args:
-            save_directory (`str` or `os.PathLike`):
-                Directory where the configuration JSON file will be saved (will be created if it does not exist).
-        """
-        if os.path.isfile(save_directory):
-            raise AssertionError(f"Provided path ({save_directory}) should be a directory, not a file")
-
-        os.makedirs(save_directory, exist_ok=True)
-
-        # If we save using the predefined names, we can load using `from_config`
-        output_config_file = os.path.join(save_directory, self.config_name)
-
-        self.to_json_file(output_config_file)
-        #logger.info(f"Configuration saved in {output_config_file}")
 
     @classmethod
     def from_config(cls, config: Union[FrozenDict, Dict[str, Any]] = None, return_unused_kwargs=False, **kwargs):
@@ -320,59 +294,7 @@ class ConfigMixin:
                     f"Error no file named {cls.config_name} found in directory {pretrained_model_name_or_path}."
                 )
         else:
-            try:
-                # Load from URL or cache if already cached
-                config_file = hf_hub_download(
-                    pretrained_model_name_or_path,
-                    filename=cls.config_name,
-                    cache_dir=cache_dir,
-                    force_download=force_download,
-                    proxies=proxies,
-                    resume_download=resume_download,
-                    local_files_only=local_files_only,
-                    use_auth_token=use_auth_token,
-                    user_agent=user_agent,
-                    subfolder=subfolder,
-                    revision=revision,
-                )
-
-            except RepositoryNotFoundError:
-                raise EnvironmentError(
-                    f"{pretrained_model_name_or_path} is not a local folder and is not a valid model identifier"
-                    " listed on 'https://huggingface.co/models'\nIf this is a private repository, make sure to pass a"
-                    " token having permission to this repo with `use_auth_token` or log in with `huggingface-cli"
-                    " login`."
-                )
-            except RevisionNotFoundError:
-                raise EnvironmentError(
-                    f"{revision} is not a valid git identifier (branch name, tag name or commit id) that exists for"
-                    " this model name. Check the model page at"
-                    f" 'https://huggingface.co/{pretrained_model_name_or_path}' for available revisions."
-                )
-            except EntryNotFoundError:
-                raise EnvironmentError(
-                    f"{pretrained_model_name_or_path} does not appear to have a file named {cls.config_name}."
-                )
-            except HTTPError as err:
-                raise EnvironmentError(
-                    "There was a specific connection error when trying to load"
-                    f" {pretrained_model_name_or_path}:\n{err}"
-                )
-            except ValueError:
-                raise EnvironmentError(
-                    f"We couldn't connect to '{HUGGINGFACE_CO_RESOLVE_ENDPOINT}' to load this model, couldn't find it"
-                    f" in the cached files and it looks like {pretrained_model_name_or_path} is not the path to a"
-                    f" directory containing a {cls.config_name} file.\nCheckout your internet connection or see how to"
-                    " run the library in offline mode at"
-                    " 'https://huggingface.co/docs/diffusers/installation#offline-mode'."
-                )
-            except EnvironmentError:
-                raise EnvironmentError(
-                    f"Can't load config for '{pretrained_model_name_or_path}'. If you were trying to load it from "
-                    "'https://huggingface.co/models', make sure you don't have a local directory with the same name. "
-                    f"Otherwise, make sure '{pretrained_model_name_or_path}' is the correct path to a directory "
-                    f"containing a {cls.config_name} file"
-                )
+            raise EnvironmentError("config file not found.")
 
         try:
             # Load config dict
@@ -557,46 +479,3 @@ def register_to_config(init):
 
     return inner_init
 
-
-def flax_register_to_config(cls):
-    original_init = cls.__init__
-
-    @functools.wraps(original_init)
-    def init(self, *args, **kwargs):
-        if not isinstance(self, ConfigMixin):
-            raise RuntimeError(
-                f"`@register_for_config` was applied to {self.__class__.__name__} init method, but this class does "
-                "not inherit from `ConfigMixin`."
-            )
-
-        # Ignore private kwargs in the init. Retrieve all passed attributes
-        init_kwargs = {k: v for k, v in kwargs.items()}
-
-        # Retrieve default values
-        fields = dataclasses.fields(self)
-        default_kwargs = {}
-        for field in fields:
-            # ignore flax specific attributes
-            if field.name in self._flax_internal_args:
-                continue
-            if type(field.default) == dataclasses._MISSING_TYPE:
-                default_kwargs[field.name] = None
-            else:
-                default_kwargs[field.name] = getattr(self, field.name)
-
-        # Make sure init_kwargs override default kwargs
-        new_kwargs = {**default_kwargs, **init_kwargs}
-        # dtype should be part of `init_kwargs`, but not `new_kwargs`
-        if "dtype" in new_kwargs:
-            new_kwargs.pop("dtype")
-
-        # Get positional arguments aligned with kwargs
-        for i, arg in enumerate(args):
-            name = fields[i].name
-            new_kwargs[name] = arg
-
-        getattr(self, "register_to_config")(**new_kwargs)
-        original_init(self, *args, **kwargs)
-
-    cls.__init__ = init
-    return cls
