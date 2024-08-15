@@ -1,13 +1,12 @@
 import time
 import sys
 
-from transformers import AutoTokenizer
 import numpy
 
 import ailia
 
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser  # noqa: E402
+from arg_utils import get_base_parser, update_parser  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 
 # logger
@@ -27,6 +26,11 @@ parser = get_base_parser('bert ner.', None, None)
 parser.add_argument(
     '--input', '-i', metavar='TEXT', default=SENTENCE,
     help='input text'
+)
+parser.add_argument(
+    '--disable_ailia_tokenizer',
+    action='store_true',
+    help='disable ailia tokenizer.'
 )
 args = update_parser(parser, check_input_type=False)
 
@@ -48,12 +52,19 @@ def main():
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
 
     ailia_model = ailia.Net(MODEL_PATH, WEIGHT_PATH)
-    tokenizer = AutoTokenizer.from_pretrained(
-        'dbmdz/bert-large-cased-finetuned-conll03-english'
-    )
-    model_inputs = tokenizer.encode_plus(args.input, return_tensors="pt")
+    if args.disable_ailia_tokenizer:
+        from transformers import AutoTokenizer
+        tokenizer = AutoTokenizer.from_pretrained(
+            'dbmdz/bert-large-cased-finetuned-conll03-english'
+        )
+    else:
+        from ailia_tokenizer import BertTokenizer
+        tokenizer = BertTokenizer.from_pretrained(
+            './tokenizer/'
+        )
+    model_inputs = tokenizer.encode_plus(args.input, return_tensors="np")
     inputs_onnx = {
-        k: v.cpu().detach().numpy() for k, v in model_inputs.items()
+        k: v for k, v in model_inputs.items()
     }
 
     logger.info("Input : " + str(args.input))

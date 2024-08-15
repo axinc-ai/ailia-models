@@ -6,13 +6,11 @@ import numpy as np
 import cv2
 from PIL import Image
 
-from transformers import AutoTokenizer
-
 import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath  # noqa
+from arg_utils import get_base_parser, update_parser, get_savepath  # noqa
 from model_utils import check_and_download_models  # noqa
 from image_utils import normalize_image  # noqa
 from detector_utils import load_image, plot_results  # noqa
@@ -69,6 +67,11 @@ parser.add_argument(
     '--onnx',
     action='store_true',
     help='execute onnxruntime version.'
+)
+parser.add_argument(
+    '--disable_ailia_tokenizer',
+    action='store_true',
+    help='disable ailia tokenizer.'
 )
 args = update_parser(parser)
 
@@ -341,8 +344,8 @@ def predict(models, img, caption):
         [caption],
         max_length=max_length,
         padding='max_length',
-        return_special_tokens_mask=True,
-        return_tensors='pt',
+        #return_special_tokens_mask=True,
+        return_tensors='np',
         truncation=True)
 
     tokens_positive, entity_names = run_ner(caption)
@@ -353,9 +356,9 @@ def predict(models, img, caption):
     net = models['bert_encoder']
     language_dict_features = bert_encoder(
         net,
-        tokenized.input_ids.numpy(),
-        tokenized.attention_mask.numpy(),
-        tokenized.token_type_ids.numpy())
+        tokenized.input_ids,
+        tokenized.attention_mask,
+        tokenized.token_type_ids)
 
     net = models['backbone']
     if not args.onnx:
@@ -546,7 +549,12 @@ def main():
         rpn = onnxruntime.InferenceSession(WEIGHT_RPN_PATH)
         bert_model.onnx = True
 
-    tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
+    if args.disable_ailia_tokenizer:
+        from transformers import AutoTokenizer
+        tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
+    else:
+        from ailia_tokenizer import BertTokenizer
+        tokenizer = BertTokenizer.from_pretrained("./tokenizer/")
 
     models = dict(
         tokenizer=tokenizer,

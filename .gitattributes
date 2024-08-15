@@ -1,1 +1,21 @@
+# commit LF, checkout CRLF(win) or LF(unix)
+* text=auto
 
+# commit LF, checkout LF
+*.sh text=lf
+*.ps1 text=lf
+
+# commit LF, checkout CRLF
+*.cmd text eol=crlf
+*.bat text eol=crlf
+
+# binary
+*.gif binary
+*.jpeg binary
+*.jpg binary
+*.png binary
+*.gz binary
+*.jar binary
+
+# others
+*.pdf -text

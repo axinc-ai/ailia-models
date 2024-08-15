@@ -1,13 +1,12 @@
 import time
 import sys
 
-from transformers import AutoTokenizer
 import numpy
 
 import ailia
 
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser  # noqa: E402
+from arg_utils import get_base_parser, update_parser  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 
 # logger
@@ -36,6 +35,11 @@ parser.add_argument(
 parser.add_argument(
     '--hypothesis_template', '-t', metavar='TEXT', default=HYPOTHESIS_TEMPLATE,
     help='input hypothesis template'
+)
+parser.add_argument(
+    '--disable_ailia_tokenizer',
+    action='store_true',
+    help='disable ailia tokenizer.'
 )
 args = update_parser(parser, check_input_type=False)
 
@@ -71,7 +75,13 @@ def main():
     candidate_labels = CANDIDATE_LABELS.split(", ")
 
     ailia_model = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
-    tokenizer = AutoTokenizer.from_pretrained('roberta-large-mnli')
+
+    if args.disable_ailia_tokenizer:
+        from transformers import AutoTokenizer
+        tokenizer = AutoTokenizer.from_pretrained('roberta-large-mnli')
+    else:
+        from ailia_tokenizer import RobertaTokenizer
+        tokenizer = RobertaTokenizer.from_pretrained('tokenizer/')
 
     model_inputs = preprocess(
         args.sentence, candidate_labels, args.hypothesis_template
@@ -80,13 +90,14 @@ def main():
     model_inputs = tokenizer(
         model_inputs,
         add_special_tokens=True,
-        return_tensors="pt",
+        return_tensors="np",
         padding=True,
         truncation="only_first",
+        max_length=512 # Added from tokenizer_config
     )
 
     inputs_onnx = {
-        k: v.cpu().detach().numpy() for k, v in model_inputs.items()
+        k: v for k, v in model_inputs.items()
     }
 
     logger.info("Sentence : "+str(args.sentence))

@@ -11,7 +11,8 @@ sys.path.append('../../util')
 import webcamera_utils  # noqa
 from image_utils import imread, load_image  # noqa
 from model_utils import check_and_download_models  # noqa
-from utils import get_base_parser, get_savepath, update_parser  # noqa
+from arg_utils import get_base_parser, get_savepath, update_parser  # noqa
+from load_model import load_face_detection_adas
 
 _this = os.path.dirname(os.path.abspath(__file__))
 top_path = os.path.dirname(os.path.dirname(_this))
@@ -96,8 +97,7 @@ def setup_detector(net):
 
         detector = _detector
     else:
-        sys.path.append(os.path.join(top_path, 'face_detection/face-detection-adas'))
-        from face_detection_adas_mod import mod  # noqa
+        mod = load_face_detection_adas(args)
 
         prior_box = np.squeeze(np.load(os.path.join(
             top_path, 'face_detection/face-detection-adas', mod.PRIORBOX_PATH)))

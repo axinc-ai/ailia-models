@@ -7,10 +7,10 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
+from arg_utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 import webcamera_utils  # noqa: E402
-from detector_utils import plot_results, load_image  # noqa: E402
+from detector_utils import plot_results, load_image, write_predictions  # noqa: E402
 
 # logger.info
 from logging import getLogger   # noqa: E402
@@ -41,6 +41,11 @@ IOU = 0.45
 # ======================
 parser = get_base_parser(
     'Face Detection using Yolov1', IMAGE_PATH, SAVE_IMAGE_PATH
+)
+parser.add_argument(
+    '-w', '--write_json',
+    action='store_true',
+    help='Flag to output results to json file.'
 )
 args = update_parser(parser)
 
@@ -85,6 +90,12 @@ def recognize_from_image():
         savepath = get_savepath(args.savepath, image_path)
         logger.info(f'saved at : {savepath}')
         cv2.imwrite(savepath, res_img)
+
+        # write prediction
+        if args.write_json:
+            json_file = '%s.json' % savepath.rsplit('.', 1)[0]
+            write_predictions(json_file, detector, img, category=FACE_CATEGORY, file_type='json')
+
     logger.info('Script finished successfully.')
 
 
@@ -123,7 +134,7 @@ def recognize_from_video():
 
         img = cv2.cvtColor(frame, cv2.COLOR_RGB2BGRA)
         detector.compute(img, THRESHOLD, IOU)
-        res_img = plot_results(detector, frame, FACE_CATEGORY, False)
+        res_img = plot_results(detector, frame, FACE_CATEGORY, logging=False)
         cv2.imshow('frame', res_img)
         frame_shown = True
 

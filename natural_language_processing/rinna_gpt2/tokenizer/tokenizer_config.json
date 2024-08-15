@@ -1,0 +1,1 @@
+{"eos_token": "</s>", "unk_token": "<unk>", "pad_token": "[PAD]", "extra_ids": 0, "additional_special_tokens": [], "sp_model_kwargs": {}, "bos_token": "<s>", "cls_token": "[CLS]", "sep_token": "[SEP]", "mask_token": "[MASK]", "do_lower_case": true, "tokenizer_class": "T5Tokenizer"}

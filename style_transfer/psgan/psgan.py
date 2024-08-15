@@ -10,11 +10,10 @@ from PIL import Image
 import ailia
 from psgan.postprocess import PostProcess
 from psgan.preprocess import PreProcess
-from setup import setup_config
 
 # Import original modules
 sys.path.append("../../util")
-from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
+from arg_utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # NOQA: E402
 from webcamera_utils import adjust_frame_size, get_capture, cut_max_square  # NOQA: E402
 
@@ -60,12 +59,6 @@ parser = get_base_parser(
     SAVE_IMAGE_PATH,
 )
 parser.add_argument(
-    "--config_file",
-    default="./configs/base.yaml",
-    metavar="FILE",
-    help="Path to config file",
-)
-parser.add_argument(
     "opts",
     help="Modify config options using the command-line.",
     default=None,
@@ -86,7 +79,6 @@ parser.add_argument(
 )
 
 args = update_parser(parser)
-config = setup_config(args)
 
 # ======================
 # Main functions
@@ -157,7 +149,7 @@ def _postprocessing(out, source, crop_face, postprocess):
 def transfer_to_image():
     # Prepare input data
     preprocess = PreProcess(
-        config, args, face_parser_path, face_alignment_path, face_detector_path
+        args, face_parser_path, face_alignment_path, face_detector_path
     )
     source, real_A, mask_A, diff_A, crop_face = _prepare_data(
         args, preprocess, "source"
@@ -180,7 +172,7 @@ def transfer_to_image():
         out = _transfer(real_A, real_B, mask_A, mask_B, diff_A, diff_B, net)
 
     # Postprocessing
-    postprocess = PostProcess(config)
+    postprocess = PostProcess()
     image = _postprocessing(out[0], source, crop_face, postprocess)
     savepath = get_savepath(args.savepath, args.input[0])
     image.save(savepath)
@@ -193,10 +185,10 @@ def transfer_to_video():
     net = _initialize_net(args)
 
     preprocess = PreProcess(
-        config, args, face_parser_path, face_alignment_path, face_detector_path
+        args, face_parser_path, face_alignment_path, face_detector_path
     )
     _, real_B, mask_B, diff_B, _ = _prepare_data(args, preprocess, "reference")
-    postprocess = PostProcess(config)
+    postprocess = PostProcess()
 
     capture = get_capture(args.video)
     

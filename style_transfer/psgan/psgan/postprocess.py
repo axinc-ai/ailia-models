@@ -4,9 +4,12 @@ from PIL import Image
 
 
 class PostProcess:
-    def __init__(self, config):
-        self.denoise = config.POSTPROCESS.WILL_DENOISE
-        self.img_size = config.DATA.IMG_SIZE
+    def __init__(self):
+        POSTPROCESS_WILL_DENOISE = False
+        DATA_IMG_SIZE = 256
+
+        self.denoise = POSTPROCESS_WILL_DENOISE
+        self.img_size = DATA_IMG_SIZE
 
     def __call__(self, source: Image, result: Image):
         # TODO: Refract -> name, resize

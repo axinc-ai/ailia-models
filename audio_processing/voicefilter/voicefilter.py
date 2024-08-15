@@ -11,7 +11,7 @@ from audio_utils import Audio
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
+from arg_utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 # logger
 from logging import getLogger  # noqa: E402
@@ -58,7 +58,7 @@ def read_wave(path):
     wav, source_sr = librosa.load(path, sr=None)
     # Resample the wav if needed
     if source_sr is not None and source_sr != SAMPLING_RATE:
-        wav = librosa.resample(wav, source_sr, SAMPLING_RATE)
+        wav = librosa.resample(wav, orig_sr=source_sr, target_sr=SAMPLING_RATE)
 
     return wav
 

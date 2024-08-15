@@ -1,14 +1,13 @@
 import time
 import sys
 import os
-from transformers import T5Tokenizer
 import numpy
 
 from utils_rinna_gpt2 import *
 import ailia
 
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser  # noqa: E402
+from arg_utils import get_base_parser, update_parser  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 
 # logger
@@ -34,6 +33,11 @@ parser.add_argument(
     action='store_true',
     help='By default, the ailia SDK is used, but with this option, you can switch to using ONNX Runtime'
 )
+parser.add_argument(
+    '--disable_ailia_tokenizer',
+    action='store_true',
+    help='disable ailia tokenizer.'
+)
 args = update_parser(parser, check_input_type=False)
 
 
@@ -55,7 +59,12 @@ def main():
     else:
         logger.info("This model requires multiple input shape, so running on CPU")
         ailia_model = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=0)#args.env_id)
-    tokenizer = T5Tokenizer.from_pretrained("rinna/japanese-gpt2-small")
+    if args.disable_ailia_tokenizer:
+        from transformers import T5Tokenizer
+        tokenizer = T5Tokenizer.from_pretrained("rinna/japanese-gpt2-small")
+    else:
+        from ailia_tokenizer import T5Tokenizer
+        tokenizer = T5Tokenizer.from_pretrained("./tokenizer/")
     logger.info("Input : "+args.input)
 
     # inference

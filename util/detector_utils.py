@@ -5,6 +5,7 @@ from logging import getLogger
 import ailia
 import cv2
 import numpy as np
+import json
 
 logger = getLogger(__name__)
 
@@ -137,9 +138,9 @@ def plot_results(detector, img, category=None, segm_masks=None, logging=True):
         colors.append(color)
 
     # draw segmentation area
-    if segm_masks:
+    if segm_masks is not None and 0 < len(segm_masks):
         for idx in range(count):
-            mask = np.repeat(np.expand_dims(segm_masks[idx], 2), 3, 2).astype(bool)
+            mask = np.repeat(np.expand_dims(segm_masks[idx], 2), 3, axis=2).astype(bool)
             color = colors[idx][:3]
             fill = np.repeat(np.repeat([[color]], img.shape[0], 0), img.shape[1], 1)
             img[:, :, :3][mask] = img[:, :, :3][mask] * 0.7 + fill[mask] * 0.3
@@ -207,18 +208,40 @@ def plot_results(detector, img, category=None, segm_masks=None, logging=True):
     return img
 
 
-def write_predictions(file_name, detector, img=None, category=None):
+def write_predictions(file_name, detector, img=None, category=None, file_type='txt'):
     h, w = (img.shape[0], img.shape[1]) if img is not None else (1, 1)
 
     count = detector.get_object_count() if hasattr(detector, 'get_object_count') else len(detector)
 
-    with open(file_name, 'w') as f:
+    if file_type == 'json':
+        results = []
         for idx in range(count):
             obj = detector.get_object(idx) if hasattr(detector, 'get_object') else detector[idx]
-            label = category[obj.category] if category else obj.category
-            f.write('%s %f %d %d %d %d\n' % (
-                label.replace(' ', '_'),
-                obj.prob,
-                int(w * obj.x), int(h * obj.y),
-                int(w * obj.w), int(h * obj.h),
-            ))
+            label = category[int(obj.category)] \
+                if not isinstance(obj.category, str) and category is not None \
+                else obj.category
+            prob = float(obj.prob)
+            bbox_x = float(w * obj.x)
+            bbox_y = float(h * obj.y)
+            bbox_w = float(w * obj.w)
+            bbox_h = float(h * obj.h)
+            results.append({
+                'category': label, 'prob': prob,
+                'x': bbox_x, 'y': bbox_y, 'w': bbox_w, 'h': bbox_h
+            })
+        with open(file_name, 'w') as f:
+            json.dump(results, f, indent=2)
+    else:
+        with open(file_name, 'w') as f:
+            for idx in range(count):
+                obj = detector.get_object(idx) if hasattr(detector, 'get_object') else detector[idx]
+                label = category[int(obj.category)] \
+                    if not isinstance(obj.category, str) and category is not None \
+                    else obj.category
+
+                f.write('%s %f %d %d %d %d\n' % (
+                    label.replace(' ', '_'),
+                    obj.prob,
+                    int(w * obj.x), int(h * obj.y),
+                    int(w * obj.w), int(h * obj.h),
+                ))

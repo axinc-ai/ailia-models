@@ -8,7 +8,7 @@ import ailia
 import blazepose_utils as but
 
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
+from arg_utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from detector_utils import load_image  # noqa: E402C
 import webcamera_utils  # noqa: E402
@@ -366,8 +366,13 @@ def main():
     weight_path, model_path = info[args.model]
     check_and_download_models(weight_path, model_path, REMOTE_PATH)
 
-    env_id = args.env_id
+    # disable FP16
+    if "FP16" in ailia.get_environment(args.env_id).props or sys.platform == 'Darwin':
+        logger.warning('This model do not work on FP16. So use CPU mode.')
+        args.env_id = 0
 
+    env_id = args.env_id
+    
     # initialize
     det_net = ailia.Net(MODEL_DETECTOR_PATH, WEIGHT_DETECTOR_PATH, env_id=env_id)
     net = ailia.Net(model_path, weight_path, env_id=env_id)
