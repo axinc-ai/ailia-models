@@ -206,6 +206,7 @@ cd ../../landmark_classification/places365; python3 places365.py ${OPTION}
 cd ../../line_segment_detection/mlsd; python3 mlsd.py ${OPTION}
 cd ../../line_segment_detection/dexined; python3 dexined.py ${OPTION}
 cd ../../low_light_image_enhancement/agllnet; python3 agllnet.py ${OPTION}
+cd ../../low_light_image_enhancement/drbn_skf; python3 drbn_skf.py ${OPTION}
 cd ../../natural_language_processing/bert; python3 bert.py ${OPTION}
 cd ../../natural_language_processing/bert_insert_punctuation; python3 bert_insert_punctuation.py ${OPTION}
 cd ../../natural_language_processing/bert_maskedlm; python3 bert_maskedlm.py ${OPTION}
