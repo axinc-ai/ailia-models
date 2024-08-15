@@ -20,8 +20,7 @@ translation_text: これは猫です。
 This model requires additional module.
 
 ```
-pip3 install transformers
-pip3 install sentencepiece
+pip3 install ailia_tokenizer
 ```
 
 ## Usage
