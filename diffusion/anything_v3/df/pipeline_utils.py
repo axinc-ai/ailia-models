@@ -37,17 +37,7 @@ from .configuration_utils import ConfigMixin
 from .modeling_utils import _LOW_CPU_MEM_USAGE_DEFAULT
 from .schedulers.scheduling_utils import SCHEDULER_CONFIG_NAME
 from .utils import (
-    CONFIG_NAME,
-    DIFFUSERS_CACHE,
-    ONNX_WEIGHTS_NAME,
-    WEIGHTS_NAME,
     BaseOutput,
-    #deprecate,
-    is_accelerate_available,
-    is_safetensors_available,
-    is_torch_version,
-    is_transformers_available,
-    #logging,
 )
 
 

@@ -21,36 +21,11 @@ from typing import Callable, List, Optional, Tuple, Union
 import torch
 from torch import Tensor, device
 
-from huggingface_hub import hf_hub_download
-from huggingface_hub.utils import EntryNotFoundError, RepositoryNotFoundError, RevisionNotFoundError
-from requests import HTTPError
-
 from . import __version__
-from .utils import (
-    CONFIG_NAME,
-    DIFFUSERS_CACHE,
-    HUGGINGFACE_CO_RESOLVE_ENDPOINT,
-    SAFETENSORS_WEIGHTS_NAME,
-    WEIGHTS_NAME,
-    is_accelerate_available,
-    is_safetensors_available,
-    is_torch_version
-)
 
 
-if is_torch_version(">=", "1.9.0"):
-    _LOW_CPU_MEM_USAGE_DEFAULT = True
-else:
-    _LOW_CPU_MEM_USAGE_DEFAULT = False
+_LOW_CPU_MEM_USAGE_DEFAULT = True
 
-
-if is_accelerate_available():
-    import accelerate
-    from accelerate.utils import set_module_tensor_to_device
-    from accelerate.utils.versions import is_torch_version
-
-if is_safetensors_available():
-    import safetensors
 
 
 def get_parameter_device(parameter: torch.nn.Module):
@@ -145,7 +120,7 @@ class ModelMixin(torch.nn.Module):
         - **config_name** ([`str`]) -- A filename under which the model should be stored when calling
           [`~modeling_utils.ModelMixin.save_pretrained`].
     """
-    config_name = CONFIG_NAME
+    config_name = "config.json"
     _automatically_saved_args = ["_diffusers_version", "_class_name", "_name_or_path"]
     _supports_gradient_checkpointing = False
 
@@ -591,60 +566,9 @@ class ModelMixin(torch.nn.Module):
                 )
             return model_file
         else:
-            try:
-                # Load from URL or cache if already cached
-                model_file = hf_hub_download(
-                    pretrained_model_name_or_path,
-                    filename=weights_name,
-                    cache_dir=cache_dir,
-                    force_download=force_download,
-                    proxies=proxies,
-                    resume_download=resume_download,
-                    local_files_only=local_files_only,
-                    use_auth_token=use_auth_token,
-                    user_agent=user_agent,
-                    subfolder=subfolder,
-                    revision=revision,
-                )
-                return model_file
-
-            except RepositoryNotFoundError:
-                raise EnvironmentError(
-                    f"{pretrained_model_name_or_path} is not a local folder and is not a valid model identifier "
-                    "listed on 'https://huggingface.co/models'\nIf this is a private repository, make sure to pass a "
-                    "token having permission to this repo with `use_auth_token` or log in with `huggingface-cli "
-                    "login`."
-                )
-            except RevisionNotFoundError:
-                raise EnvironmentError(
-                    f"{revision} is not a valid git identifier (branch name, tag name or commit id) that exists for "
-                    "this model name. Check the model page at "
-                    f"'https://huggingface.co/{pretrained_model_name_or_path}' for available revisions."
-                )
-            except EntryNotFoundError:
-                raise EnvironmentError(
-                    f"{pretrained_model_name_or_path} does not appear to have a file named {weights_name}."
-                )
-            except HTTPError as err:
-                raise EnvironmentError(
-                    "There was a specific connection error when trying to load"
-                    f" {pretrained_model_name_or_path}:\n{err}"
-                )
-            except ValueError:
-                raise EnvironmentError(
-                    f"We couldn't connect to '{HUGGINGFACE_CO_RESOLVE_ENDPOINT}' to load this model, couldn't find it"
-                    f" in the cached files and it looks like {pretrained_model_name_or_path} is not the path to a"
-                    f" directory containing a file named {weights_name} or"
-                    " \nCheckout your internet connection or see how to run the library in"
-                    " offline mode at 'https://huggingface.co/docs/diffusers/installation#offline-mode'."
-                )
-            except EnvironmentError:
-                raise EnvironmentError(
-                    f"Can't load the model for '{pretrained_model_name_or_path}'. If you were trying to load it from "
-                    "'https://huggingface.co/models', make sure you don't have a local directory with the same name. "
-                    f"Otherwise, make sure '{pretrained_model_name_or_path}' is the correct path to a directory "
-                    f"containing a file named {weights_name}"
-                )
+            raise EnvironmentError(
+                f"Model not found."
+            )
 
     @classmethod
     def _load_pretrained_model(

@@ -26,8 +26,6 @@ from typing import Any, Dict, Tuple, Union
 
 import numpy as np
 
-from .utils import DIFFUSERS_CACHE, DummyObject
-
 
 #logger = logging.get_logger(__name__)
 
@@ -259,7 +257,6 @@ class ConfigMixin:
 
         </Tip>
         """
-        cache_dir = kwargs.pop("cache_dir", DIFFUSERS_CACHE)
         force_download = kwargs.pop("force_download", False)
         resume_download = kwargs.pop("resume_download", False)
         proxies = kwargs.pop("proxies", None)
@@ -335,10 +332,10 @@ class ConfigMixin:
         # load diffusers library to import compatible and original scheduler
         diffusers_library = importlib.import_module(__name__.split(".")[0])
 
-        if cls.has_compatibles:
-            compatible_classes = [c for c in cls._get_compatibles() if not isinstance(c, DummyObject)]
-        else:
-            compatible_classes = []
+        #if cls.has_compatibles:
+        #    compatible_classes = [c for c in cls._get_compatibles() if not isinstance(c, DummyObject)]
+        #else:
+        compatible_classes = []
 
         expected_keys_comp_cls = set()
         for c in compatible_classes:

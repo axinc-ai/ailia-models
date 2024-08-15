@@ -7,14 +7,7 @@ import PIL
 from PIL import Image
 
 from ...utils import (
-    BaseOutput,
-    OptionalDependencyNotAvailable,
-    is_flax_available,
-    is_k_diffusion_available,
-    is_onnx_available,
-    is_torch_available,
-    is_transformers_available,
-    is_transformers_version,
+    BaseOutput
 )
 
 

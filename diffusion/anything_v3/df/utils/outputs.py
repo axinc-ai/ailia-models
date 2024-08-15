@@ -21,21 +21,6 @@ from typing import Any, Tuple
 
 import numpy as np
 
-from .import_utils import is_torch_available
-
-
-def is_tensor(x):
-    """
-    Tests if `x` is a `torch.Tensor` or `np.ndarray`.
-    """
-    if is_torch_available():
-        import torch
-
-        if isinstance(x, torch.Tensor):
-            return True
-
-    return isinstance(x, np.ndarray)
-
 
 class BaseOutput(OrderedDict):
     """

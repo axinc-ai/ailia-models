@@ -21,7 +21,6 @@ import numpy as np
 import torch
 
 from ..configuration_utils import ConfigMixin, register_to_config
-from ..utils import _COMPATIBLE_STABLE_DIFFUSION_SCHEDULERS
 from .scheduling_utils import SchedulerMixin, SchedulerOutput
 
 
@@ -93,7 +92,6 @@ class PNDMScheduler(SchedulerMixin, ConfigMixin):
 
     """
 
-    _compatibles = _COMPATIBLE_STABLE_DIFFUSION_SCHEDULERS.copy()
     order = 1
 
     @register_to_config
