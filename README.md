@@ -125,6 +125,7 @@ The collection of pre-trained, state-of-the-art AI models.
 | [<img src="depth_estimation/crestereo/output.png" width=256px>](depth_estimation/crestereo/) |[crestereo](depth_estimation/crestereo)| [ONNX-CREStereo-Depth-Estimation](https://github.com/ibaiGorordo/ONNX-CREStereo-Depth-Estimation) | Pytorch | 1.2.13 and later |
 | [<img src="depth_estimation/mobilestereonet/output.png" width=256px>](depth_estimation/mobilestereonet/) |[mobilestereonet](depth_estimation/mobilestereonet)| [MobileStereoNet](https://github.com/cogsys-tuebingen/mobilestereonet) | Pytorch | 1.2.13 and later |
 | [<img src="depth_estimation/zoe_depth/output_k.png" width=256px>](depth_estimation/zoe_depth/) |[zoe_depth](depth_estimation/zoe_depth)| [ZoeDepth](https://github.com/isl-org/ZoeDepth) | Pytorch | 1.3.0 and later |
+| [<img src="depth_estimation/depth_anything/output.png" width=256px>](depth_estimation/depth_anything/) |[DepthAnything](depth_estimation/depth_anything)| [DepthAnything](https://github.com/LiheYoung/Depth-Anything) | Pytorch | 1.2.9 and later |
 
 ## Diffusion
 
@@ -271,6 +272,7 @@ The collection of pre-trained, state-of-the-art AI models.
 | [<img src="image_classification/mobileone/clock.jpg" width=128px>](image_classification/mobileone/) | [mobileone](/image_classification/mobileone/)|[A PyTorch implementation of MobileOne](https://github.com/apple/ml-mobileone) | Pytorch | 1.2.1 and later | |
 | [<img src="image_classification/imagenet21k/input.jpg" width=128px>](image_classification/imagenet21k/) | [imagenet21k](/image_classification/imagenet21k/) | [ImageNet21K](https://github.com/Alibaba-MIIL/ImageNet21K) | Pytorch | 1.2.11 and later | |
 | [<img src="image_classification/japanese-stable-clip-vit-l-16/dog.jpeg" width=128px>](image_classification/japanese-stable-clip-vit-l-16/) | [japanese-stable-clip-vit-l-16](/image_classification/japanese-stable-clip-vit-l-16/) | [japanese-stable-clip-vit-l-16](https://huggingface.co/stabilityai/japanese-stable-clip-vit-l-16/) | Pytorch | 1.2.11 and later | |
+| [<img src="image_classification/volo/input.jpg" width=128px>](image_classification/volo/) | [volo](/image_classification/volo/) | [VOLO: Vision Outlooker for Visual Recognition](https://github.com/sail-sg/volo) | Pytorch | 1.2.9 and later | |
 
 ## Image inpainting
 
@@ -359,6 +361,7 @@ The collection of pre-trained, state-of-the-art AI models.
 | | Model | Reference | Exported From | Supported Ailia Version | Blog |
 |:-----------|------------:|:------------:|:------------:|:------------:|:------------:|
 | [<img src="low_light_image_enhancement/agllnet/output.png" width=128px>](low_light_image_enhancement/agllnet/) | [agllnet](/low_light_image_enhancement/agllnet/) | [AGLLNet: Attention Guided Low-light Image Enhancement (IJCV 2021)](https://github.com/yu-li/AGLLNet) | Pytorch | 1.2.9 and later |[EN](https://medium.com/axinc-ai/agllnet-a-machine-learning-model-for-brightening-dark-images-133a0887b5c) [JP](https://medium.com/axinc/agllnet-%E6%9A%97%E3%81%84%E7%94%BB%E5%83%8F%E3%82%92%E6%98%8E%E3%82%8B%E3%81%8F%E3%81%99%E3%82%8B%E6%A9%9F%E6%A2%B0%E5%AD%A6%E7%BF%92%E3%83%A2%E3%83%87%E3%83%AB-d59181ad89a9) |
+| [<img src="low_light_image_enhancement/drbn_skf/output.png" width=128px>](low_light_image_enhancement/drbn_skf/) | [drbn_skf](/low_light_image_enhancement/drbn_skf/) | [DRBN SKF](https://github.com/langmanbusi/Semantic-Aware-Low-Light-Image-Enhancement/tree/main/DRBN_SKF) | Pytorch | 1.2.14 and later | |
 
 ## Natural language processing
 
@@ -550,6 +553,7 @@ The collection of pre-trained, state-of-the-art AI models.
 | [<img src="style_transfer/beauty_gan/output.png" width=128px>](style_transfer/beauty_gan/) | [beauty_gan](/style_transfer/beauty_gan/) | [BeautyGAN](https://github.com/wtjiang98/BeautyGAN_pytorch) | Pytorch | 1.2.7 and later | |
 | [<img src="style_transfer/animeganv2/output.png" width=128px>](style_transfer/animeganv2/) | [animeganv2](/style_transfer/animeganv2/) | [PyTorch Implementation of AnimeGANv2](https://github.com/bryandlee/animegan2-pytorch) | Pytorch | 1.2.5 and later | |
 | [<img src="style_transfer/pix2pixHD/output.png" width=128px>](style_transfer/pix2pixHD/) | [pix2pixHD](/style_transfer/pix2pixHD/) | [pix2pixHD: High-Resolution Image Synthesis and Semantic Manipulation with Conditional GANs](https://github.com/NVIDIA/pix2pixHD) | Pytorch | 1.2.6 and later | |
+| [<img src="style_transfer/elegant/output.png" width=128px>](style_transfer/elegant/) | [EleGANt](/style_transfer/elegant/) | [EleGANt: Exquisite and Locally Editable GAN for Makeup Transfer](https://github.com/Chenyu-Yang-2000/EleGANt) | Pytorch | 1.2.15 and later | |
 
 ## Super resolution
 

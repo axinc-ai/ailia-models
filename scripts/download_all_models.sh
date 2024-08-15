@@ -75,6 +75,7 @@ cd ../../depth_estimation/lap-depth; python3 lap-depth.py ${OPTION}
 cd ../../depth_estimation/hitnet; python3 hitnet.py ${OPTION}
 cd ../../depth_estimation/crestereo; python3 crestereo.py ${OPTION}
 cd ../../depth_estimation/mobilestereonet; python3 mobilestereonet.py ${OPTION}
+cd ../../depth_estimation/depth_anything; python3 depth_anything.py ${OPTION}
 cd ../../face_detection/blazeface; python3 blazeface.py ${OPTION}
 cd ../../face_detection/zoe_depth; python3 zoe_depth ${OPTION}
 cd ../../face_detection/dbface; python3 dbface.py ${OPTION}
@@ -157,6 +158,7 @@ cd ../../image_classification/convnext; python3 convnext.py ${OPTION}
 cd ../../image_classification/swin-transformer; python3 swin_transformer.py ${OPTION}
 cd ../../image_classification/mobileone; python3 mobileone.py ${OPTION}
 cd ../../image_classification/imagenet21k; python3 imagenet21k.py ${OPTION}
+cd ../../image_classification/volo; python3 volo.py ${OPTION}
 cd ../../image_inpainting/3d-photo-inpainting; python3 3d-photo-inpainting.py ${OPTION}
 cd ../../image_inpainting/inpainting_gmcnn; python3 inpainting_gmcnn.py ${OPTION}
 cd ../../image_inpainting/pytorch-inpainting-with-partial-conv; python3 pytorch-inpainting-with-partial-conv.py ${OPTION}
@@ -204,6 +206,7 @@ cd ../../landmark_classification/places365; python3 places365.py ${OPTION}
 cd ../../line_segment_detection/mlsd; python3 mlsd.py ${OPTION}
 cd ../../line_segment_detection/dexined; python3 dexined.py ${OPTION}
 cd ../../low_light_image_enhancement/agllnet; python3 agllnet.py ${OPTION}
+cd ../../low_light_image_enhancement/drbn_skf; python3 drbn_skf.py ${OPTION}
 cd ../../natural_language_processing/bert; python3 bert.py ${OPTION}
 cd ../../natural_language_processing/bert_insert_punctuation; python3 bert_insert_punctuation.py ${OPTION}
 cd ../../natural_language_processing/bert_maskedlm; python3 bert_maskedlm.py ${OPTION}
@@ -324,6 +327,7 @@ cd ../../style_transfer/adain; python3 adain.py ${OPTION}
 cd ../../style_transfer/beauty_gan; python3 beauty_gan.py ${OPTION}
 cd ../../style_transfer/animeganv2; python3 animeganv2.py ${OPTION}
 cd ../../style_transfer/pix2pixHD; python3 pix2pixhd.py ${OPTION}
+cd ../../style_transfer/elegant; python3 elegant.py ${OPTION}
 cd ../../super_resolution/srresnet; python3 srresnet.py ${OPTION}
 cd ../../super_resolution/han; python3 han.py ${OPTION}
 cd ../../super_resolution/edsr; python3 edsr.py ${OPTION}
