@@ -124,7 +124,7 @@ def main():
     pndm_scheduler = df.schedulers.scheduling_pndm.PNDMScheduler.from_pretrained(
         "./scheduler"
     )
-    if True:#args.disable_ailia_tokenizer:
+    if args.disable_ailia_tokenizer:
         import transformers
         feature_extractor = transformers.CLIPImageProcessor.from_pretrained(
             "./feature_extractor"
@@ -132,23 +132,15 @@ def main():
         tokenizer = transformers.CLIPTokenizer.from_pretrained(
             "./tokenizer"
         )
-    #else:
-    #    from ailia_tokenizer import CLIPTokenizer
-    #    tokenizer = CLIPTokenizer.from_pretrained()
-    #    tokenizer.model_max_length = 77
+    else:
+        from ailia_tokenizer import CLIPTokenizer
+        feature_extractor = None
+        safety_checker = None
+        tokenizer = CLIPTokenizer.from_pretrained()
+        tokenizer.model_max_length = 77
 
     # set pipeline
-    use_transformers = True
-    use_diffusers = False
-
-    if use_diffusers and use_transformers:
-        import diffusers
-        pipeline_cls = diffusers.OnnxStableDiffusionPipeline
-    elif not use_diffusers and use_transformers:
-        pipeline_cls = df.OnnxStableDiffusionPipeline
-    else:
-        print('not implemented.')
-        exit()
+    pipeline_cls = df.OnnxStableDiffusionPipeline
     
     pipe = pipeline_cls(
         vae_encoder = vae_encoder,
@@ -159,7 +151,7 @@ def main():
         scheduler = pndm_scheduler,
         safety_checker = safety_checker,
         feature_extractor = feature_extractor,
-        requires_safety_checker = True       
+        requires_safety_checker = False       
     )
 
     # generate

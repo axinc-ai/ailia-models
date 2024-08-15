@@ -51,9 +51,9 @@ from .utils import (
 )
 
 
-if is_transformers_available():
-    import transformers
-    from transformers import PreTrainedModel
+#if is_transformers_available():
+#    import transformers
+#    from transformers import PreTrainedModel
 
 
 INDEX_FILE = "diffusion_pytorch_model.bin"
@@ -166,7 +166,6 @@ class DiffusionPipeline(ConfigMixin):
             if module is None:
                 register_dict = {name: (None, None)}
             else:
-                print('use pipelines module')
                 library = module.__module__.split(".")[0]
 
                 # check if the module is a pipeline module

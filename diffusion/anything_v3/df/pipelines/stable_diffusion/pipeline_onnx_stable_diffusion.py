@@ -18,7 +18,7 @@ from typing import Callable, List, Optional, Union
 import numpy as np
 import torch
 
-from transformers import CLIPFeatureExtractor, CLIPTokenizer
+#from transformers import CLIPFeatureExtractor, CLIPTokenizer
 
 from ...configuration_utils import FrozenDict
 from ...onnx_utils import ORT_TO_NP_TYPE, OnnxRuntimeModel
@@ -36,12 +36,12 @@ class OnnxStableDiffusionPipeline(DiffusionPipeline):
     vae_encoder: OnnxRuntimeModel
     vae_decoder: OnnxRuntimeModel
     text_encoder: OnnxRuntimeModel
-    tokenizer: CLIPTokenizer
+    tokenizer: object
     unet: OnnxRuntimeModel
     #scheduler: Union[DDIMScheduler, PNDMScheduler, LMSDiscreteScheduler]
     scheduler: Union[PNDMScheduler]
     safety_checker: OnnxRuntimeModel
-    feature_extractor: CLIPFeatureExtractor
+    feature_extractor: object
 
     _optional_components = ["safety_checker", "feature_extractor"]
 
@@ -50,12 +50,12 @@ class OnnxStableDiffusionPipeline(DiffusionPipeline):
         vae_encoder: OnnxRuntimeModel,
         vae_decoder: OnnxRuntimeModel,
         text_encoder: OnnxRuntimeModel,
-        tokenizer: CLIPTokenizer,
+        tokenizer: object,
         unet: OnnxRuntimeModel,
         #scheduler: Union[DDIMScheduler, PNDMScheduler, LMSDiscreteScheduler],
         scheduler: Union[PNDMScheduler],
         safety_checker: OnnxRuntimeModel,
-        feature_extractor: CLIPFeatureExtractor,
+        feature_extractor: object,
         requires_safety_checker: bool = True,
     ):
         super().__init__()
@@ -141,7 +141,7 @@ class OnnxStableDiffusionPipeline(DiffusionPipeline):
             return_tensors="np",
         )
         text_input_ids = text_inputs.input_ids
-        untruncated_ids = self.tokenizer(prompt, padding="max_length", return_tensors="np").input_ids
+        untruncated_ids = self.tokenizer(prompt, max_length=self.tokenizer.model_max_length, padding="max_length", return_tensors="np").input_ids
 
         if not np.array_equal(text_input_ids, untruncated_ids):
             removed_text = self.tokenizer.batch_decode(untruncated_ids[:, self.tokenizer.model_max_length - 1 : -1])
@@ -339,12 +339,12 @@ class StableDiffusionOnnxPipeline(OnnxStableDiffusionPipeline):
         vae_encoder: OnnxRuntimeModel,
         vae_decoder: OnnxRuntimeModel,
         text_encoder: OnnxRuntimeModel,
-        tokenizer: CLIPTokenizer,
+        tokenizer: object,
         unet: OnnxRuntimeModel,
         #scheduler: Union[DDIMScheduler, PNDMScheduler, LMSDiscreteScheduler],
         scheduler: Union[PNDMScheduler],
         safety_checker: OnnxRuntimeModel,
-        feature_extractor: CLIPFeatureExtractor,
+        feature_extractor: object,
     ):
         deprecation_message = "Please use `OnnxStableDiffusionPipeline` instead of `StableDiffusionOnnxPipeline`."
         deprecate("StableDiffusionOnnxPipeline", "1.0.0", deprecation_message)
