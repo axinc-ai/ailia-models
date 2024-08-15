@@ -77,7 +77,7 @@ The collection of pre-trained, state-of-the-art AI models.
 | [reazon_speech](/audio_processing/reazon_speech/) | [ReazonSpeech](https://research.reazon.jp/projects/ReazonSpeech/) | Pytorch | 1.4.0 and later | |
 | [reazon_speech2](/audio_processing/reazon_speech2/) | [ReazonSpeech2](https://research.reazon.jp/projects/ReazonSpeech/) | Pytorch | 1.4.0 and later | |
 | [gpt-sovits](/audio_processing/gpt-sovits/) | [GPT-SoVITS](https://github.com/RVC-Boss/GPT-SoVITS) | Pytorch | 1.4.0 and later | [JP](https://medium.com/axinc/gpt-sovits-%E3%83%95%E3%82%A1%E3%82%A4%E3%83%B3%E3%83%81%E3%83%A5%E3%83%BC%E3%83%8B%E3%83%B3%E3%82%B0%E3%81%A7%E3%81%8D%E3%82%8B0%E3%82%B7%E3%83%A7%E3%83%83%E3%83%88%E3%81%AE%E9%9F%B3%E5%A3%B0%E5%90%88%E6%88%90%E3%83%A2%E3%83%87%E3%83%AB-2212eeb5ad20) |
-| [dtln](/audio_processing/dtln/) | [Dual-signal Transformation LSTM Network](https://github.com/breizhn/DTLN) | Tensorflow | 1.4.0 and later |  |
+| [dtln](/audio_processing/dtln/) | [Dual-signal Transformation LSTM Network](https://github.com/breizhn/DTLN) | Tensorflow | 1.3.0 and later |  |
 
 ## Background removal
 
