@@ -20,7 +20,7 @@ import torch
 
 #from transformers import CLIPFeatureExtractor, CLIPTokenizer
 
-from ...configuration_utils import FrozenDict
+#from ...configuration_utils import FrozenDict
 from ...onnx_utils import ORT_TO_NP_TYPE, OnnxRuntimeModel
 from ...pipeline_utils import DiffusionPipeline
 #from ...schedulers import DDIMScheduler, LMSDiscreteScheduler, PNDMScheduler
@@ -72,7 +72,7 @@ class OnnxStableDiffusionPipeline(DiffusionPipeline):
             deprecate("steps_offset!=1", "1.0.0", deprecation_message, standard_warn=False)
             new_config = dict(scheduler.config)
             new_config["steps_offset"] = 1
-            scheduler._internal_dict = FrozenDict(new_config)
+            #scheduler._internal_dict = FrozenDict(new_config)
 
         if hasattr(scheduler.config, "clip_sample") and scheduler.config.clip_sample is True:
             deprecation_message = (
@@ -85,7 +85,7 @@ class OnnxStableDiffusionPipeline(DiffusionPipeline):
             deprecate("clip_sample not set", "1.0.0", deprecation_message, standard_warn=False)
             new_config = dict(scheduler.config)
             new_config["clip_sample"] = False
-            scheduler._internal_dict = FrozenDict(new_config)
+            #scheduler._internal_dict = FrozenDict(new_config)
 
         if safety_checker is None and requires_safety_checker:
             print(
