@@ -26,7 +26,6 @@ import torch
 
 #import diffusers
 import PIL
-from huggingface_hub import model_info, snapshot_download
 from packaging import version
 from PIL import Image
 from tqdm.auto import tqdm
@@ -34,44 +33,17 @@ from tqdm.auto import tqdm
 from .configuration_utils import ConfigMixin
 #from .dynamic_modules_utils import get_class_from_dynamic_module
 #from .hub_utils import http_user_agent
-from .modeling_utils import _LOW_CPU_MEM_USAGE_DEFAULT
-from .schedulers.scheduling_utils import SCHEDULER_CONFIG_NAME
 from .utils import (
     BaseOutput,
 )
 
 
-#if is_transformers_available():
-#    import transformers
-#    from transformers import PreTrainedModel
-
-
-INDEX_FILE = "diffusion_pytorch_model.bin"
-CUSTOM_PIPELINE_FILE_NAME = "pipeline.py"
-DUMMY_MODULES_FOLDER = "diffusers.utils"
-TRANSFORMERS_DUMMY_MODULES_FOLDER = "transformers.utils"
-
-
-#logger = logging.get_logger(__name__)
-
 
 LOADABLE_CLASSES = {
     "diffusers": {
-        "ModelMixin": ["save_pretrained", "from_pretrained"],
-        "SchedulerMixin": ["save_pretrained", "from_pretrained"],
-        "DiffusionPipeline": ["save_pretrained", "from_pretrained"],
-        "OnnxRuntimeModel": ["save_pretrained", "from_pretrained"],
-    },
-    "transformers": {
-        "PreTrainedTokenizer": ["save_pretrained", "from_pretrained"],
-        "PreTrainedTokenizerFast": ["save_pretrained", "from_pretrained"],
-        "PreTrainedModel": ["save_pretrained", "from_pretrained"],
-        "FeatureExtractionMixin": ["save_pretrained", "from_pretrained"],
-        "ProcessorMixin": ["save_pretrained", "from_pretrained"],
-        "ImageProcessingMixin": ["save_pretrained", "from_pretrained"],
-    },
-    "onnxruntime.training": {
-        "ORTModule": ["save_pretrained", "from_pretrained"],
+        "SchedulerMixin": ["from_pretrained"],
+        "DiffusionPipeline": ["from_pretrained"],
+        "OnnxRuntimeModel": ["from_pretrained"],
     },
 }
 
