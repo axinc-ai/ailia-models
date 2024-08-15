@@ -18,8 +18,6 @@ from image_utils import imread  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from arg_utils import get_base_parser, get_savepath, update_parser  # noqa: E402
 
-import matplotlib.pyplot as plt
-
 logger = getLogger(__name__)
 
 
@@ -88,25 +86,9 @@ class get_depth_anything_ts():
         return image
 
 def plot_image(image, depth, savepath=None):
-
-    if args.grey:
-        plt.imshow(depth, cmap='inferno')
-    else:
-        plt.imshow(depth[:,:,::-1])
-        
-    plt.show()
     if savepath is not None:
         logger.info(f'saving result to {savepath}')
         cv2.imwrite(savepath, depth)
-
-def update_frame(image, depth, frame):
-    if frame is None:
-        frame = plt.imshow(depth)
-        plt.pause(.01)
-    else:
-        frame.set_data(depth)
-        plt.pause(0.1)
-    return frame
 
 def post_process(depth, h, w):
     depth = cv2.resize(depth[0,0], dsize=(w, h), interpolation=cv2.INTER_LINEAR)
@@ -157,10 +139,12 @@ def recognize_from_video(model):
 
     capture = webcamera_utils.get_capture(args.video)
 
-    frame_shown = None
+    frame_shown = False
     while(True):
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord("q")) or not ret:
+            break
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
             break
         frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB) / 255.
 
@@ -170,9 +154,8 @@ def recognize_from_video(model):
         depth = post_process(depth, frame.shape[0], frame.shape[1])
 
         # visualize
-        frame_shown = update_frame(frame, depth, frame_shown)
-        if not plt.get_fignums():
-            break
+        cv2.imshow("frame", depth)
+        frame_shown =  True
 
     capture.release()
     logger.info('Script finished successfully.')
