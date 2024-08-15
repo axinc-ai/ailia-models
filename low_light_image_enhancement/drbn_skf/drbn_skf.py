@@ -109,23 +109,20 @@ def recognize_from_video(weight_path, model_path):
     net = get_model(model_path, weight_path, env_id, mem_mode)
     capture = webcamera_utils.get_capture(args.video)
 
-    f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
-    
     if args.savepath != SAVE_IMAGE_PATH:
         logger.warning(
             "currently, video results cannot be output correctry..."
         )
-        writer = webcamera_utils.get_writer(args.savepath, f_h, f_w, rgb=True)
+        writer = webcamera_utils.get_writer(args.savepath, HEIGHT_SIZE, WIDTH_SIZE, rgb=True)
     else:
         writer = None
     
-
+    frame_shown = False
     while True:
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xff == ord("q")) or not ret:
             break
-        if cv2.getWindowProperty("frame", cv2.WND_PROP_VISIBLE) == 0:
+        if frame_shown and cv2.getWindowProperty("frame", cv2.WND_PROP_VISIBLE) == 0:
             break
 
         img = frame / 255.
@@ -143,12 +140,13 @@ def recognize_from_video(weight_path, model_path):
         pred = rearrange(pred, "1 c h w -> h w c")
         pred = pred[..., ::-1]
         pred_postprocess = postprocess(pred * 255.0)
+        pred_postprocess = pred_postprocess.astype(np.uint8)
 
-        concat = np.hstack((frame, pred))
-        cv2.imshow("left: original, right: result", concat)
+        cv2.imshow("frame", pred_postprocess)
+        frame_shown = True
 
         if writer is not None:
-            writer.write(output)
+            writer.write(pred_postprocess)
     
     capture.release()
     if not writer is None:
