@@ -1,0 +1,8 @@
+# control line setting for vehicle crossing crosswalk behavior detection
+
+# control_line in pixels for different videos
+# two horizontal lines parallel to the y-axis in pixels coordinates. [top, button]
+control_line: [400, 680]
+
+# red line
+red_line: 0.5  # proportion of diff. between red_line and top_line to diff. between button_line and top_line

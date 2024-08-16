@@ -66,3 +66,5 @@ ONNX opset=11
 [yolov5l.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/yolov5/yolov5l.onnx.prototxt)
 
 [yolov5x.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/yolov5/yolov5x.onnx.prototxt)
+
+[yolov5s6.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/yolov5/yolov5s6.onnx.prototxt)

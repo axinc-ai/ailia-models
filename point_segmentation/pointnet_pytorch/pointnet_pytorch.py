@@ -2,13 +2,15 @@ import sys
 import time
 
 import numpy as np
+import matplotlib
 import matplotlib.pyplot as plt
+import json
 
 import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
+from arg_utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 
 # logger
@@ -88,6 +90,21 @@ parser.add_argument(
     ),
     help='choice class'
 )
+parser.add_argument(
+    '--gui',
+    action='store_true',
+    help='Operate the detection result with GUI'
+)
+parser.add_argument(
+    '-w', '--write_json',
+    action='store_true',
+    help='Flag to output results to json file'
+)
+parser.add_argument(
+    '--seed',
+    type=int,
+    help='Speciry seed value to randomize order of input points'
+)
 args = update_parser(parser)
 
 
@@ -97,6 +114,8 @@ args = update_parser(parser)
 
 def load_data(point_file, npoints=2500):
     point_set = np.loadtxt(point_file).astype(np.float32)
+    if args.seed is not None:
+        np.random.seed(args.seed)
     choice = np.random.choice(len(point_set), npoints, replace=True)
     point_set = point_set[choice, :]
 
@@ -157,7 +176,10 @@ def recognize_from_points(filename, net_seg, net_cls):
         pred_seg = predict_seg(point, net_seg)
         pred_cls = predict_cls(point, net_cls)
 
-    cmap = plt.cm.get_cmap("hsv", 10)
+    if hasattr(matplotlib, "colormaps"):
+        cmap = matplotlib.colormaps["hsv"].resampled(10)
+    else:
+        cmap = plt.cm.get_cmap("hsv", 10)
     cmap = np.array([cmap(i) for i in range(10)])[:, :3]
     pred_color = cmap[pred_seg, :]
 
@@ -172,7 +194,7 @@ def recognize_from_points(filename, net_seg, net_cls):
     X = point[:, 0]
     Y = point[:, 1]
     Z = point[:, 2]
-    ax.scatter(X, Y, Z, color=pred_color)
+    ax.scatter(X, Y, Z, c=pred_color)
 
     # adjust plot scale
     max_range = np.array([X.max() - X.min(), Y.max() - Y.min(), Z.max() - Z.min()]).max() * 0.5
@@ -189,7 +211,17 @@ def recognize_from_points(filename, net_seg, net_cls):
     logger.info(f'saved at : {savepath}')
 
     plt.savefig(savepath, dpi=120)
-    plt.show()
+    if args.gui:
+        plt.show()
+        
+    if args.write_json:
+        results = {'class': str(pred_cls), 'points': []}
+        for i in range(point.shape[0]):
+            results['points'].append({'pos': point[i].tolist(), 'seg': int(pred_seg[i])})
+        json_file = '%s.json' % savepath.rsplit('.', 1)[0]
+        with open(json_file, 'w') as f:
+            json.dump(results, f, indent=2)
+
     logger.info('Script finished successfully.')
 
 

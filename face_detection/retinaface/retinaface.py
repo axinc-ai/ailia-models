@@ -1,22 +1,23 @@
 import sys
 import time
 
+import ailia
 import cv2
 import numpy as np
 
-import ailia
 import retinaface_utils as rut
 from retinaface_utils import PriorBox
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
-from model_utils import check_and_download_models  # noqa: E402
-from image_utils import load_image  # noqa: E402
-import webcamera_utils  # noqa: E402
-
 # logger
-from logging import getLogger   # noqa: E402
+from logging import getLogger  # noqa: E402
+
+import webcamera_utils  # noqa: E402
+from image_utils import imread, load_image  # noqa: E402
+from model_utils import check_and_download_models  # noqa: E402
+from arg_utils import get_base_parser, get_savepath, update_parser  # noqa: E402
+
 logger = getLogger(__name__)
 
 
@@ -50,6 +51,11 @@ parser.add_argument(
     '-r', '--rescale', metavar='RESCALE', type=float,
     default=1,
     help='scale down the original image size to prevent memory overflow, otherwise original size is used'
+)
+parser.add_argument(
+    '-w', '--write_json',
+    action='store_true',
+    help='Flag to output results to json file.'
 )
 args = update_parser(parser)
 
@@ -117,7 +123,8 @@ def recognize_from_image():
         cfg = rut.cfg_mnet
     elif args.arch == "resnet50":
         cfg = rut.cfg_re50
-    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
+    mem_mode = ailia.get_memory_mode(reduce_constant=True, reuse_interstage=True)
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id, memory_mode=mem_mode)
     resize = args.rescale
 
     # input image loop
@@ -125,7 +132,7 @@ def recognize_from_image():
         # prepare input data
         logger.info(image_path)
         # org_img = load_image(image_path, (IMAGE_HEIGHT, IMAGE_WIDTH))
-        org_img = cv2.imread(image_path, cv2.IMREAD_COLOR)
+        org_img = imread(image_path, cv2.IMREAD_COLOR)
 
         # resize image
         IMAGE_WIDTH = int(org_img.shape[1] / resize)
@@ -162,6 +169,10 @@ def recognize_from_image():
         logger.info(f'saved at : {savepath}')
         rut.plot_detections(org_img, detections, vis_thres=VIS_THRES, save_image_path=savepath)
 
+        if args.write_json:
+            json_file = '%s.json' % savepath.rsplit('.', 1)[0]
+            rut.save_json(json_file, detections, VIS_THRES)
+
     logger.info('Script finished successfully.')
 
 
@@ -171,7 +182,8 @@ def recognize_from_video():
         cfg = rut.cfg_mnet
     elif args.arch == "resnet50":
         cfg = rut.cfg_re50
-    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
+    mem_mode = ailia.get_memory_mode(reduce_constant=True, reuse_interstage=True)
+    net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id, memory_mode=mem_mode)
     resize = args.rescale
 
     capture = webcamera_utils.get_capture(args.video)
@@ -184,9 +196,12 @@ def recognize_from_video():
     else:
         writer = None
 
+    frame_shown = False
     while(True):
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
             break
 
         # resize image
@@ -207,6 +222,7 @@ def recognize_from_video():
 
         rut.plot_detections(input_image, detections, vis_thres=VIS_THRES)
         cv2.imshow('frame', input_image)
+        frame_shown = True
 
         # save results
         if writer is not None:

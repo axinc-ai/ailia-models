@@ -1,4 +1,4 @@
-# BlazePose
+# BlazePose Upper Body
 
 ## Input
 

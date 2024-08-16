@@ -2,19 +2,13 @@ import cv2
 import numpy as np
 from scipy.special import expit
 
-
 num_coords = 18
-x_scale = 256.0
-y_scale = 256.0
-h_scale = 256.0
-w_scale = 256.0
 min_score_thresh = 0.75
 min_suppression_threshold = 0.3
 num_keypoints = 7
-resolution = 256
 
 
-def resize_pad(img):
+def resize_pad(img, resolution):
     """ resize and pad images to be input to the detectors
 
     The face and palm detector networks take 256x256 and 128x128 images
@@ -30,15 +24,15 @@ def resize_pad(img):
 
     size0 = img.shape
     if size0[0] >= size0[1]:
-        h1 = 256
-        w1 = 256 * size0[1] // size0[0]
+        h1 = resolution
+        w1 = resolution * size0[1] // size0[0]
         padh = 0
-        padw = 256 - w1
+        padw = resolution - w1
         scale = size0[1] / w1
     else:
-        h1 = 256 * size0[0] // size0[1]
-        w1 = 256
-        padh = 256 - h1
+        h1 = resolution * size0[0] // size0[1]
+        w1 = resolution
+        padh = resolution - h1
         padw = 0
         scale = size0[0] / h1
     padh1 = padh//2
@@ -48,14 +42,19 @@ def resize_pad(img):
     img1 = cv2.resize(img, (w1, h1))
     img1 = np.pad(img1, ((padh1, padh2), (padw1, padw2), (0, 0)), mode='constant')
     pad = (int(padh1 * scale), int(padw1 * scale))
-    img2 = cv2.resize(img1, (128, 128))
+    img2 = cv2.resize(img1, (resolution, resolution))
     return img1, img2, scale, pad
 
 
-def decode_boxes(raw_boxes, anchors):
+def decode_boxes(raw_boxes, anchors, resolution):
     """Converts the predictions into actual coordinates using
     the anchor boxes. Processes the entire batch at once.
     """
+    x_scale = resolution
+    y_scale = resolution
+    h_scale = resolution
+    w_scale = resolution
+
     boxes = np.zeros_like(raw_boxes)
 
     x_center = raw_boxes[..., 0] / x_scale * anchors[:, 2] + anchors[:, 0]
@@ -79,7 +78,7 @@ def decode_boxes(raw_boxes, anchors):
     return boxes
 
 
-def raw_output_to_detections(raw_box, raw_score, anchors):
+def raw_output_to_detections(raw_box, raw_score, anchors, resolution):
     """The output of the neural network is an array of shape (b, 896, 18)
     containing the bounding box regressor predictions, as well as an array
     of shape (b, 896, 1) with the classification confidences.
@@ -92,7 +91,7 @@ def raw_output_to_detections(raw_box, raw_score, anchors):
     mediapipe/calculators/tflite/tflite_tensors_to_detections_calculator.cc
     mediapipe/calculators/tflite/tflite_tensors_to_detections_calculator.proto
     """
-    detection_boxes = decode_boxes(raw_box, anchors)
+    detection_boxes = decode_boxes(raw_box, anchors, resolution)
 
     thresh = 100.0
     raw_score = raw_score.clip(-thresh, thresh)
@@ -239,7 +238,7 @@ def weighted_non_max_suppression(detections):
     return output_detections
 
 
-def denormalize_detections(detections, scale, pad):
+def denormalize_detections(detections, scale, pad, resolution):
     """ maps detection coordinates from [0,1] to image coordinates
 
     The face and palm detector networks take 256x256 and 128x128 images
@@ -256,17 +255,19 @@ def denormalize_detections(detections, scale, pad):
         pad: padding in the x and y dimensions
 
     """
-    detections[:, 0] = detections[:, 0] * scale * 256 - pad[0]
-    detections[:, 1] = detections[:, 1] * scale * 256 - pad[1]
-    detections[:, 2] = detections[:, 2] * scale * 256 - pad[0]
-    detections[:, 3] = detections[:, 3] * scale * 256 - pad[1]
+    image_size = resolution
 
-    detections[:, 4::2] = detections[:, 4::2] * scale * 256 - pad[1]
-    detections[:, 5::2] = detections[:, 5::2] * scale * 256 - pad[0]
+    detections[:, 0] = detections[:, 0] * scale * image_size - pad[0]
+    detections[:, 1] = detections[:, 1] * scale * image_size - pad[1]
+    detections[:, 2] = detections[:, 2] * scale * image_size - pad[0]
+    detections[:, 3] = detections[:, 3] * scale * image_size - pad[1]
+
+    detections[:, 4::2] = detections[:, 4::2] * scale * image_size - pad[1]
+    detections[:, 5::2] = detections[:, 5::2] * scale * image_size - pad[0]
     return detections
 
 
-def postprocess(preds_ailia, anchor_path='anchors.npy'):
+def postprocess(preds_ailia, anchor_path='anchors.npy', resolution=256):
     """
     Process detection predictions from ailia and return filtered detections
     """
@@ -276,7 +277,7 @@ def postprocess(preds_ailia, anchor_path='anchors.npy'):
     anchors = np.load(anchor_path).astype("float32")
 
     # Postprocess the raw predictions:
-    detections = raw_output_to_detections(raw_box, raw_score, anchors)
+    detections = raw_output_to_detections(raw_box, raw_score, anchors, resolution)
 
     # Non-maximum suppression to remove overlapping detections:
     filtered_detections = []

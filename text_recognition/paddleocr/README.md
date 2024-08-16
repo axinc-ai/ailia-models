@@ -34,12 +34,16 @@ $ python3 paddleocr.py --input IMAGE_PATH --savepath SAVE_IMAGE_PATH
 $ python3 paddleocr.py -i IMAGE_PATH -s SAVE_IMAGE_PATH
 ```
 
+<br/>
+
 By adding the `--video` option, you can input the video.
 ```bash
 $ python3 paddleocr.py --video VIDEO_PATH --savepath SAVE_VIDEO_PATH
 $ python3 paddleocr.py -v VIDEO_PATH -s SAVE_VIDEO_PATH
 (ex) $ python3 paddleocr.py --video input.mp4 --savepath output.mp4
 ```
+
+<br/>
 
 By adding the `--language` option, you can choose the language.
 ```bash
@@ -64,11 +68,28 @@ $ python3 paddleocr.py --case CASE
 $ python3 paddleocr.py -c CASE
 (ex) $ python3 paddleocr.py --case server
 ```
+
 The prepared language specifications are as follows.
   - mobile (default)
   - server (only Japanese and Chinese have server size models)
 
-<br>
+<br/>
+
+By adding the `--det_limit_type` and `--det_limit_side_len` option, You can limit the size of the input image for text detection.
+`--det_limit_type` is max or min and `--det_limit_side_len` is a positive integer, generally set to a multiple of 32, such as 960.
+The default setting of the parameters is `--det_limit_type`='max', `--det_limit_side_len`=1920. Indicates that the longest side of the network input image cannot exceed 1920, If this value is exceeded, the image will be resized with the same width ratio to ensure that the longest side is det_limit_side_len.
+Set as `--det_limit_type`='min', `--det_limit_side_len`=960 it means that the shortest side of the image is limited to 960.
+```bash
+$ python3 paddleocr.py -lt DET_LIMIT_TYPE -ll DET_LIMIT_SIDE_LEN
+$ python3 paddleocr.py  --det_limit_type DET_LIMIT_TYPE --det_limit_side_len DET_LIMIT_SIDE_LEN
+(ex) $ python3 paddleocr.py -lt max -ll 1920
+(ex) $ python3 paddleocr.py  --det_limit_type min --det_limit_side_len 960
+```
+The prepared language specifications are as follows.
+  - mobile (default)
+  - server (only Japanese and Chinese have server size models)
+
+<br/>
 
 ## About font file
 

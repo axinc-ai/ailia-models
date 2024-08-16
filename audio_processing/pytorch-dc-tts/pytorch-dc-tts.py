@@ -5,11 +5,10 @@ import argparse
 import numpy as np
 
 import ailia  # noqa: E402
-from pytorch_dc_tts_utils import get_test_data, save_to_wav
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
+from arg_utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 
 # logger
@@ -44,7 +43,16 @@ parser.add_argument(
     '--input', '-i', metavar='TEXT', default=SENTENCE,
     help='input text'
 )
+parser.add_argument(
+    '--ailia_audio', action='store_true',
+    help='use ailia audio library'
+)
 args = update_parser(parser, check_input_type=False)
+
+if args.ailia_audio:
+    from pytorch_dc_tts_utils_ailia import get_test_data, save_to_wav
+else:
+    from pytorch_dc_tts_utils import get_test_data, save_to_wav
 
 # ======================
 # Main function
@@ -113,6 +121,11 @@ def main():
     # model files check and download
     check_and_download_models(WEIGHT_PATH_T2M, MODEL_PATH_T2M, REMOTE_PATH_T2M)
     check_and_download_models(WEIGHT_PATH_SSRM, MODEL_PATH_SSRM, REMOTE_PATH_SSRM)
+
+    # disable FP16
+    if "FP16" in ailia.get_environment(args.env_id).props or sys.platform == 'Darwin':
+        logger.warning('This model do not work on FP16. So use CPU mode.')
+        args.env_id = 0
 
     generate_sentence(args.input)
 
