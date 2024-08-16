@@ -4,7 +4,6 @@ import time
 from functools import partial
 import numpy as np
 import cv2
-from transformers import CLIPTokenizer, CLIPImageProcessor
 import ailia
 
 # import original modules
@@ -89,11 +88,14 @@ parser.add_argument(
     "--lcm_origin_steps", type=int, default=50,
     help="execute onnxruntime version."
 )
-
-
 parser.add_argument(
     "--img2img", action="store_true",
     help="execute img2img pipeline version."
+)
+parser.add_argument(
+    '--disable_ailia_tokenizer',
+    action='store_true',
+    help='disable ailia tokenizer.'
 )
 
 args = update_parser(parser, check_input_type=False)
@@ -292,7 +294,14 @@ def main():
     #if args.img2img is True:
     #    check_and_download_models(WEIGHT_VAE_ENCODER_PATH, MODEL_VAE_ENCODER_PATH, REMOTE_PATH)
     
-    tokenizer = CLIPTokenizer.from_pretrained(local_clip_tokenizer_path)
+    if args.disable_ailia_tokenizer:
+        from transformers import CLIPTokenizer, CLIPImageProcessor
+        tokenizer = CLIPTokenizer.from_pretrained(local_clip_tokenizer_path)
+    else:
+        from ailia_tokenizer import CLIPTokenizer
+        tokenizer = CLIPTokenizer.from_pretrained()
+        tokenizer.model_max_length = 77
+
     # initialize
     if not args.onnx:
         
