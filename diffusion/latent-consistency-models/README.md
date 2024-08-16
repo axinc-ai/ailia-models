@@ -13,12 +13,6 @@ Text to render
 
 ![Output](output.png)
 
-## Requirements
-This model requires additional module.
-
-```
-pip3 install transformers
-```
 
 ## Usage
 Automatically downloads the onnx and prototxt files on the first run.
