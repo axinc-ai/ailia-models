@@ -1,6 +1,7 @@
 import sys
 import time
 from typing import Union
+import json
 
 import ailia  # noqa: E402
 import numpy as np
@@ -42,6 +43,11 @@ parser.add_argument(
     type=int,
     help="sample rate",
     default=16000,
+)
+parser.add_argument(
+    '-w', '--write_json',
+    action='store_true',
+    help='Flag to output results to json file.'
 )
 args = update_parser(parser)
 
@@ -124,6 +130,13 @@ def infer(net: Union[ailia.Net, onnxruntime.InferenceSession]):
 
     for (start, end, phoneme) in segments:
         logger.info(f"{start:.3f} {end:.3f} {phoneme}")
+
+    if args.write_json:
+        result = []
+        for (start, end, phoneme) in segments:
+            result.append({"start": float(start), "end": float(end), "phoneme": phoneme})
+        with open("output.json", "w", encoding="utf-8") as f:
+            json.dump(result, f, indent=2)
 
 
 if __name__ == "__main__":

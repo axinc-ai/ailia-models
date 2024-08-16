@@ -49,8 +49,11 @@ parser.add_argument(
 )
 parser.add_argument(
     '-w', '--write_prediction',
-    action='store_true',
-    help='Flag to output the prediction file.'
+    nargs='?',
+    const='txt',
+    choices=['txt', 'json'],
+    type=str,
+    help='Output results to txt or json file.'
 )
 parser.add_argument(
     '-th', '--threshold',
@@ -195,7 +198,7 @@ def recognize_from_image(detector):
         bboxes = xyxy2xywh(bboxes)
         for box, score , ind in zip(bboxes,scores,cls_inds):
             r = ailia.DetectorObject(
-                category=ind-1,
+                category=int(ind-1),
                 prob=score,
                 x=box[0]/w,
                 y=box[1]/h,
@@ -214,8 +217,9 @@ def recognize_from_image(detector):
 
         # write prediction
         if args.write_prediction:
-            pred_file = '%s.txt' % savepath.rsplit('.', 1)[0]
-            write_predictions(pred_file, detections, raw_img, COCO_CATEGORY)
+            ext = args.write_prediction
+            pred_file = "%s.%s" % (savepath.rsplit('.', 1)[0], ext)
+            write_predictions(pred_file, detections, raw_img, category=COCO_CATEGORY, file_type=ext)
 
     logger.info('Script finished successfully.')
 

@@ -6,7 +6,7 @@ import argparse
 import utilities
 import numpy as np
 import matplotlib.pyplot as plt
-
+import json
 
 import ailia
 
@@ -41,13 +41,14 @@ SAVE_PATH = "output.png"
 parser = get_base_parser(
     'audioset_tagging_cnn', WAVE_PATH, None, input_ftype='audio'
 )
-parser.add_argument('--mode', type=str, default="audio_tagging")
+parser.add_argument('--mode', type=str, default="audio_tagging", choices=["audio_tagging", "sound_event_detection"])
 parser.add_argument('--sample_rate', type=int, default=32000)
 parser.add_argument('--window_size', type=int, default=1024)
 parser.add_argument('--hop_size', type=int, default=320)
 parser.add_argument('--mel_bins', type=int, default=64)
 parser.add_argument('--fmin', type=int, default=50)
 parser.add_argument('--fmax', type=int, default=14000) 
+parser.add_argument('-w', '--write_json', action='store_true', help='Flag to output results to json file.')
 
 args = parser.parse_args()
 
@@ -81,6 +82,15 @@ def audio_tagging(args,model):
     for k in range(10):
         print('{}: {:.3f}'.format(np.array(labels)[sorted_indexes[k]], 
             clipwise_output[sorted_indexes[k]]))
+    if args.write_json:
+        result = []
+        for k in range(10):
+            result.append({
+                'label': np.array(labels)[sorted_indexes[k]],
+                'prob': float(clipwise_output[sorted_indexes[k]])
+            })
+        with open('output_tagging.json', 'w') as f:
+            json.dump(result, f, indent=2)
 
     return clipwise_output, labels
 

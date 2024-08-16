@@ -18,7 +18,6 @@ from nltk.stem import WordNetLemmatizer
 from sklearn.metrics.pairwise import euclidean_distances
 from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.feature_extraction.text import CountVectorizer
-from transformers import AutoTokenizer
 from scapy.all import Ether, CookedLinux
 
 import ailia
@@ -81,6 +80,11 @@ parser.add_argument(
     "--save_vector", action="store_true", help="Save the generated vector."
 )
 parser.add_argument("--onnx", action="store_true", help="execute onnxruntime version.")
+parser.add_argument(
+    '--disable_ailia_tokenizer',
+    action='store_true',
+    help='disable ailia tokenizer.'
+)
 args = update_parser(parser)
 
 
@@ -112,7 +116,7 @@ similar = _SimilarWords()
 
 def process_txt_dataset(path):
     document_list = []
-    with open(path) as file:
+    with open(path, encoding="utf8") as file:
         for line in tqdm(
             file.readlines(),
             unit=" paragraphs",
@@ -185,8 +189,8 @@ def tokenize_and_embeddings(models, document_list):
         document_list, unit=" documents", desc="Processing", postfix="Word Embeddings"
     ):
         # for document in document_list:
-        tokens = tokenizer(document, truncation=True, return_tensors="np")
-        words = tokenizer.convert_ids_to_tokens(tokens["input_ids"][0])
+        tokens = tokenizer(document, truncation=True, max_length=512, return_tensors="np")
+        words = tokenizer.convert_ids_to_tokens(tokens["input_ids"][0].tolist())
         word_ids = tokens.word_ids()
 
         input_ids = tokens["input_ids"]
@@ -445,7 +449,7 @@ def predict(models, packet_hex):
 
     tokenizer = models["tokenizer"]
     net = models["similar"]
-    tokens = tokenizer(final_format, truncation=True, return_tensors="np")
+    tokens = tokenizer(final_format, truncation=True, max_length=512, return_tensors="np")
     input_ids = tokens["input_ids"]
     attention_mask = tokens["attention_mask"]
 
@@ -553,7 +557,12 @@ def main():
         import onnxruntime
         net_similar = onnxruntime.InferenceSession(WEIGHT_SIMILAR_PATH)
 
-    tokenizer = AutoTokenizer.from_pretrained("tokenizer")
+    if args.disable_ailia_tokenizer:
+        from transformers import AutoTokenizer
+        tokenizer = AutoTokenizer.from_pretrained("tokenizer")
+    else:
+        from ailia_tokenizer import BertTokenizer
+        tokenizer = BertTokenizer.from_pretrained("./tokenizer/")
     scaler = joblib.load(SCALER_PKL)
     cluster_centers = np.load(CLUSTER_CENTERS)
     tag_names = np.load(TAGS_NAMES)

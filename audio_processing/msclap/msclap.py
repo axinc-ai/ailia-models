@@ -1,12 +1,12 @@
 import sys
 import time
 from logging import getLogger
+import json
 
 import random
 
 import librosa
 import numpy as np
-from transformers import AutoTokenizer
 
 import ailia
 
@@ -61,6 +61,16 @@ parser.add_argument(
     help="Version of the CLAP model (2022 or 2023)."
 )
 
+parser.add_argument(
+    '-w', '--write_json',
+    action='store_true',
+    help='Flag to output results to json file.'
+)
+parser.add_argument(
+    '--disable_ailia_tokenizer',
+    action='store_true',
+    help='disable ailia tokenizer.'
+)
 args = update_parser(parser, check_input_type=False)
 
 # ======================
@@ -132,6 +142,15 @@ def print_sorted_dict(d):
     for k, v in sorted(d.items(), key=lambda x: x[1], reverse=True):
         pad = ' ' * (m_len - len(k) + 4)
         print(f'{pad + k}: {v}')
+
+def save_sorted_dict_as_json(d):
+    m_len = max([len(k) for k in d.keys()])
+    result = []
+    for k, v in sorted(d.items(), key=lambda x: x[1], reverse=True):
+        result.append({"caption": k, "similarity": float(v)})
+    with open('output.json', 'w', encoding='utf-8') as f:
+        json.dump(result, f, indent=2)
+
 # ======================
 # Main functions
 # ======================
@@ -178,6 +197,9 @@ def estimate_best_caption(model):
     print(f"Similarity: ")
     print_sorted_dict(dict(zip(input_text, output)))
 
+    if args.write_json:
+        save_sorted_dict_as_json(dict(zip(input_text, output)))
+
     logger.info('Script finished successfully.')
 
 
@@ -217,12 +239,24 @@ def main():
     if args.version == '2023':
         caption_model = ailia.Net(CAPTION_MODEL_PATH_2023, CAPTION_WEIGHT_PATH_2023, env_id=env_id)
         audio_model = ailia.Net(AUDIO_MODEL_PATH_2023, AUDIO_WEIGHT_PATH_2023, env_id=env_id)
-        tokenizer = AutoTokenizer.from_pretrained('gpt2')
-        tokenizer.add_special_tokens({'pad_token': '!'})
+        if args.disable_ailia_tokenizer:
+            from transformers import AutoTokenizer
+            tokenizer = AutoTokenizer.from_pretrained('gpt2')
+            tokenizer.add_special_tokens({'pad_token': '!'})
+        else:
+            from ailia_tokenizer import GPT2Tokenizer
+            tokenizer = GPT2Tokenizer.from_pretrained('./tokenizer_gpt2/')
+            tokenizer.add_special_tokens({'pad_token': '!'})
+            #tokenizer._pad_token_id = 0
     elif args.version == '2022':
         caption_model = ailia.Net(CAPTION_MODEL_PATH_2022, CAPTION_WEIGHT_PATH_2022, env_id=env_id)
         audio_model = ailia.Net(AUDIO_MODEL_PATH_2022, AUDIO_WEIGHT_PATH_2022, env_id=env_id)
-        tokenizer = AutoTokenizer.from_pretrained('bert-base-uncased')
+        if args.disable_ailia_tokenizer:
+            from transformers import AutoTokenizer
+            tokenizer = AutoTokenizer.from_pretrained('bert-base-uncased')
+        else:
+            from ailia_tokenizer import BertTokenizer
+            tokenizer = BertTokenizer.from_pretrained('./tokenizer_bert/')
 
     model = {
         'caption_model':caption_model,

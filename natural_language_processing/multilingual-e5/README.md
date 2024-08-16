@@ -10,10 +10,15 @@ The sentence closest to the input prompt.
 
 ## Requirements
 
-This model requires additional module if you want to load pdf file.
+This model requires additional modules.
 
 ```
-pip3 install transformers
+pip3 install ailia_tokenizer
+```
+
+If you want to load pdf file, you need to install pdfminer.six.
+
+```
 pip3 install pdfminer.six
 ```
 
@@ -55,4 +60,5 @@ ONNX opset=11
 ## Netron
 
 [multilingual-e5-base.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/multilingual-e5/multilingual-e5-base.onnx.prototxt)  
+[multilingual-e5-base.opt.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/multilingual-e5/multilingual-e5-base.opt.onnx.prototxt)  
 [multilingual-e5-large.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/multilingual-e5/multilingual-e5-large.onnx.prototxt)  
