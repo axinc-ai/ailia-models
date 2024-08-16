@@ -2,6 +2,7 @@ import os
 import sys
 import numpy as np
 import cv2
+import json
 
 MAX_CLASS_COUNT = 3
 
@@ -9,7 +10,7 @@ RECT_WIDTH = 640
 RECT_HEIGHT = 20
 RECT_MARGIN = 2
 
-def get_top_scores(classifier):
+def get_top_scores(classifier, top_k=MAX_CLASS_COUNT):
     if hasattr(classifier, 'get_class_count'):
         # ailia classifier API
         count = classifier.get_class_count()
@@ -22,17 +23,18 @@ def get_top_scores(classifier):
     else:
         # ailia predict API
         classifier = classifier[0]
-        top_scores = classifier.argsort()[-1 * MAX_CLASS_COUNT:][::-1]
+        top_scores = classifier.argsort()[-1 * top_k:][::-1]
         scores = classifier
     return top_scores, scores
 
 
-def print_results(classifier, labels):
-    top_scores, scores = get_top_scores(classifier)
+def print_results(classifier, labels, top_k=MAX_CLASS_COUNT):
+    top_scores, scores = get_top_scores(classifier, top_k)
+    top_k = min(len(top_scores),top_k)
 
     print('==============================================================')
-    print(f'class_count={MAX_CLASS_COUNT}')
-    for idx in range(MAX_CLASS_COUNT):
+    print(f'class_count={top_k}')
+    for idx in range(top_k):
         print(f'+ idx={idx}')
         print(f'  category={top_scores[idx]}['
               f'{labels[top_scores[idx]]} ]')
@@ -45,18 +47,19 @@ def hsv_to_rgb(h, s, v):
     return (int(bgr[0]), int(bgr[1]), int(bgr[2]), 255)
 
 
-def plot_results(input_image, classifier, labels, logging=True):
+def plot_results(input_image, classifier, labels, top_k=MAX_CLASS_COUNT, logging=True):
     x = RECT_MARGIN
     y = RECT_MARGIN
     w = RECT_WIDTH
     h = RECT_HEIGHT
 
-    top_scores, scores = get_top_scores(classifier)
+    top_scores, scores = get_top_scores(classifier, top_k)
+    top_k = min(len(top_scores),top_k)
 
     if logging:
         print('==============================================================')
-        print(f'class_count={MAX_CLASS_COUNT}')
-    for idx in range(MAX_CLASS_COUNT):
+        print(f'class_count={top_k}')
+    for idx in range(top_k):
         if logging:
             print(f'+ idx={idx}')
             print(f'  category={top_scores[idx]}['
@@ -84,3 +87,31 @@ def plot_results(input_image, classifier, labels, logging=True):
         )
 
         y=y + h + RECT_MARGIN
+
+
+def write_predictions(file_name, classifier, labels, file_type='txt'):
+    if file_type == 'json':
+        top_k = MAX_CLASS_COUNT
+        top_scores, scores = get_top_scores(classifier, top_k)
+        top_k = min(len(top_scores),top_k)
+        out_data = []
+        for idx in range(top_k):
+            out_data.append({
+                'idx': idx,
+                'category': int(top_scores[idx]),
+                'label': labels[top_scores[idx]],
+                'prob': float(scores[top_scores[idx]])
+            })
+        with open(file_name, 'w', encoding='utf-8') as f:
+            json.dump(out_data, f, indent=2, ensure_ascii=False)
+    else:
+        top_k = 5
+        top_scores, scores = get_top_scores(classifier, top_k)
+        top_k = min(len(top_scores),top_k)
+        with open(file_name, 'w', encoding='utf-8') as f:
+            for idx in range(top_k):
+                f.write('%s %d %f\n' % (
+                    labels[top_scores[idx]].replace(' ', '_'),
+                    top_scores[idx],
+                    scores[top_scores[idx]]
+                ))

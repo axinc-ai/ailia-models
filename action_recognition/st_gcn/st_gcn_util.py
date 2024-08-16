@@ -1,5 +1,10 @@
-import numpy as np
+import sys
+
 import cv2
+import numpy as np
+
+sys.path.append('../../util')
+from image_utils import imread  # noqa: E402
 
 graph_edge = [
     (0, 0), (1, 1), (2, 2), (3, 3), (4, 4), (5, 5), (6, 6), (7, 7), (8, 8), (9, 9), (10, 10), (11, 11), (12, 12),
@@ -239,13 +244,13 @@ def stgcn_visualize(
 
         put_text(skeleton, 'inputs of st-gcn', (0.15, 0.5))
 
-        text_1 = cv2.imread(
+        text_1 = imread(
             './resource/demo_asset/original_video.png', cv2.IMREAD_UNCHANGED)
-        text_2 = cv2.imread(
+        text_2 = imread(
             './resource/demo_asset/pose_estimation.png', cv2.IMREAD_UNCHANGED)
-        text_3 = cv2.imread(
+        text_3 = imread(
             './resource/demo_asset/attention+prediction.png', cv2.IMREAD_UNCHANGED)
-        text_4 = cv2.imread(
+        text_4 = imread(
             './resource/demo_asset/attention+rgb.png', cv2.IMREAD_UNCHANGED)
 
         try:

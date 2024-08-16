@@ -73,3 +73,4 @@ Pytorch
 ## Netron
 
 [mobilenetv3_small.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/mobilenetv3/mobilenetv3_small.onnx.prototxt)
+[mobilenetv3_large.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/mobilenetv3/mobilenetv3_large.onnx.prototxt)

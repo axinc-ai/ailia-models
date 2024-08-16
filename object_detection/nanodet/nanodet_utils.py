@@ -1,7 +1,10 @@
 import cv2
 import numpy as np
-from scipy.special import softmax
 from abc import ABCMeta, abstractmethod
+
+import sys
+sys.path.append('../../util')
+from math_utils import softmax
 
 import ailia
 

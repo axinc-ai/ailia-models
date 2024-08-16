@@ -1,21 +1,22 @@
 import sys
 import time
 
-import numpy as np
-import cv2
-
 import ailia
+import cv2
+import numpy as np
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
-from model_utils import check_and_download_models  # noqa: E402
-from image_utils import load_image  # noqa: E402
+# logger
+from logging import getLogger  # noqa: E402
+
 import webcamera_utils  # noqa: E402
+from image_utils import imread, load_image  # noqa: E402
+from model_utils import check_and_download_models  # noqa: E402
+from arg_utils import get_base_parser, get_savepath, update_parser  # noqa: E402
+
 import adain_utils  # noqa: E402
 
-# logger
-from logging import getLogger   # noqa: E402
 logger = getLogger(__name__)
 
 
@@ -46,6 +47,11 @@ parser.add_argument(
     default=STYLE_PATH,
     help='The style image path.'
 )
+parser.add_argument(
+    '-a', '--alpha',
+    default=1.0, type=float,
+    help='Adjust the degree of stylization. It should be a value between 0.0 and 1.0(default).'
+)
 args = update_parser(parser)
 
 
@@ -53,7 +59,7 @@ args = update_parser(parser)
 # Utils
 # ======================
 # TODO multiple style image and weight feature
-def style_transfer(vgg, decoder, content, style, alpha=1.0):
+def style_transfer(vgg, decoder, content, style, alpha=args.alpha):
     assert (0.0 <= alpha <= 1.0)
     content_f = vgg.predict(content.astype(np.float32))
     style_f = vgg.predict(style)
@@ -81,7 +87,7 @@ def image_style_transfer():
             gen_input_ailia=True,
         )
 
-        src_h, src_w, _ = cv2.imread(image_path).shape
+        src_h, src_w, _ = imread(image_path).shape
         style_img = load_image(
             args.style,
             (IMAGE_HEIGHT, IMAGE_WIDTH),
@@ -137,9 +143,12 @@ def video_style_transfer():
         gen_input_ailia=True
     )
 
+    frame_shown = False
     while(True):
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
             break
 
         # Resize by padding the perimeter.
@@ -161,6 +170,7 @@ def video_style_transfer():
         )
 
         cv2.imshow('frame', res_img)
+        frame_shown = True
 
         # save results
         if writer is not None:

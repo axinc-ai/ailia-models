@@ -6,23 +6,52 @@
 
 (Image from https://github.com/PeikeLi/Self-Correction-Human-Parsing/blob/master/demo/demo.jpg)
 
+#### LIP
 Shape : (1, 3, 473, 473)  
+#### ATR
+Shape : (1, 3, 512, 512)  
+#### PASCAL
+Shape : (1, 3, 512, 512)
 
 ## Output
 
+#### LIP
 ![Output](output.png)
 
 - parsing shape : (1, 20, 119, 119)
 - fusion shape : (1, 20, 119, 119)
 - edge shape : (1, 2, 119, 119)
 
-## Category
+#### ATR
+- parsing shape : (1, 18, 128, 128)
+- fusion shape : (1, 18, 128, 128)
+- edge shape : (1, 2, 128, 128)
+#### PASCAL
+- parsing shape : (1, 7, 128, 128)
+- fusion shape : (1, 7, 128, 128)
+- edge shape : (1, 2, 128, 128)
 
+### Category
+
+#### LIP
 ```
 CATEGORY = (
     'Background', 'Hat', 'Hair', 'Glove', 'Sunglasses', 'Upper-clothes', 'Dress', 'Coat',
     'Socks', 'Pants', 'Jumpsuits', 'Scarf', 'Skirt', 'Face', 'Left-arm', 'Right-arm',
     'Left-leg', 'Right-leg', 'Left-shoe', 'Right-shoe'
+)
+```
+#### ATR
+```
+CATEGORY = (
+    'Background', 'Hat', 'Hair', 'Sunglasses', 'Upper-clothes', 'Skirt', 'Pants', 'Dress', 'Belt',
+    'Left-shoe', 'Right-shoe', 'Face', 'Left-leg', 'Right-leg', 'Left-arm', 'Right-arm', 'Bag', 'Scarf'
+)
+```
+#### PASCAL
+```
+CATEGORY = (
+    'Background', 'Head', 'Torso', 'Upper Arms', 'Lower Arms', 'Upper Legs', 'Lower Legs'
 )
 ```
 
@@ -47,6 +76,12 @@ If you pass `0` as an argument to VIDEO_PATH, you can use the webcam input inste
 $ python3 human_part_segmentation.py --video VIDEO_PATH
 ```
 
+By adding the `--arch` option, you can specify architecture type which is selected from "lip", "atr", "pascal".  
+(default is lip)
+```bash
+$ python3 human_part_segmentation --arch lip
+```
+
 ## Reference
 
 - [Self Correction for Human Parsing](https://github.com/PeikeLi/Self-Correction-Human-Parsing)
@@ -62,4 +97,6 @@ ONNX opset=11
 
 ## Netron
 
-[resnet-lip.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/human_part_segmentation/resnet-lip.onnx.prototxt)
+[resnet-lip.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/human_part_segmentation/resnet-lip.onnx.prototxt)  
+[resnet-atr.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/human_part_segmentation/resnet-atr.onnx.prototxt)  
+[resnet-pascal.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/human_part_segmentation/resnet-pascal.onnx.prototxt)

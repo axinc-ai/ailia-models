@@ -1,20 +1,22 @@
 import sys
 import time
 
+import ailia
 import cv2
 import numpy as np
 
-import ailia
-from rotnet_utils import generate_rotated_image, create_figure, visualize
+from rotnet_utils import create_figure, generate_rotated_image, visualize
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
-from model_utils import check_and_download_models  # noqa: E402
-import webcamera_utils  # noqa: E402
-
 # logger
-from logging import getLogger   # noqa: E402
+from logging import getLogger  # noqa: E402
+
+import webcamera_utils  # noqa: E402
+from image_utils import imread  # noqa: E402
+from model_utils import check_and_download_models  # noqa: E402
+from arg_utils import get_base_parser, get_savepath, update_parser  # noqa: E402
+
 logger = getLogger(__name__)
 
 
@@ -70,7 +72,7 @@ def recognize_from_image():
     for image_path in args.input:
         # prepare input data
         logger.info(image_path)
-        org_img = cv2.cvtColor(cv2.imread(image_path), cv2.COLOR_BGR2RGB)
+        org_img = cv2.cvtColor(imread(image_path), cv2.COLOR_BGR2RGB)
 
         if args.apply_rotate:
             rotation_angle = np.random.randint(360)

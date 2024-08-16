@@ -4,7 +4,10 @@
 
 <img src="input.png" width="320px">
 
-(Image from https://github.com/hollance/BlazeFace-PyTorch/blob/master/3faces.png)
+(Image from https://search.creativecommons.org/photos/df3a19c2-47ca-4f58-8aed-0dc62e89e9e9)
+
+Image credit: "Day 21 Occupy Wall Street October 6 2011 Shankbone 6" by david_shankbone is marked under CC PDM 1.0. To view the terms, visit https://creativecommons.org/publicdomain/mark/1.0/
+
 
 Ailia input shape: (1, 3, 128, 128)  
 Range: [-1, 1]
@@ -19,6 +22,13 @@ It is necessary to be connected to the Internet while downloading.
 For the sample image,
 ``` bash
 $ python3 blazeface.py 
+```
+
+If you want to use the blazefaceback model, add the `--back` or `-b` option.   
+You can find details in the reference.   
+To summarize, blazefaceback is the model that is trained to match the back-facing camera.
+```bash
+$ python3 blazeface.py --back
 ```
 
 If you want to specify the input image, put the image path after the `--input` option.  

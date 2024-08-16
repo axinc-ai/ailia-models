@@ -24,7 +24,8 @@ from webcamera_utils import adjust_frame_size  # noqa: E402
 from image_utils import load_image  # noqa: E402
 from image_utils import normalize_image  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
-from utils import check_file_existance  # noqa: E402
+from arg_utils import check_file_existance  # noqa: E402
+from arg_utils import get_base_parser, update_parser  # noqa: E402
 
 from ax_action_recognition_util import pose_postprocess,TIME_RANGE,get_detector_result_lw_human_pose,draw_boxes,softmax
 sys.path.append('../../pose_estimation/pose_resnet')
@@ -35,7 +36,6 @@ from pose_resnet_util import compute,keep_aspect
 # ======================
 # Parameters 1
 # ======================
-SAVE_IMAGE_PATH = ""
 
 ALGORITHM = ailia.POSE_ALGORITHM_LW_HUMAN_POSE
 
@@ -64,15 +64,7 @@ FRAME_SKIP = True
 # ======================
 # Arguemnt Parser Config
 # ======================
-parser = argparse.ArgumentParser(
-    description='Fast and accurate human pose 2D-estimation.'
-)
-parser.add_argument(
-    '-v', '--video', metavar='VIDEO',
-    default=None,
-    help='The input video path. ' +
-         'If the VIDEO argument is set to 0, the webcam input will be used.'
-)
+parser = get_base_parser('Action recognition', None, None)
 parser.add_argument(
     '-n', '--normal',
     action='store_true',
@@ -85,22 +77,11 @@ parser.add_argument(
     help='model lists: ' + ' | '.join(MODEL_LISTS)
 )
 parser.add_argument(
-    '-s', '--savepath', metavar='SAVE_IMAGE_PATH',
-    default=SAVE_IMAGE_PATH,
-    help='Save path for the output image or video.'
-)
-parser.add_argument(
-    '-b', '--benchmark',
-    action='store_true',
-    help='Running the inference on the same input 5 times ' +
-         'to measure execution performance. (Cannot be used in video mode)'
-)
-parser.add_argument(
     '-f', '--fps',
     default=10,
     help='Input fps for the detection model'
 )
-args = parser.parse_args()
+args = update_parser(parser)
 
 POSE_KEY = [
     ailia.POSE_KEYPOINT_NOSE,
@@ -127,7 +108,7 @@ def ailia_to_openpose(person):
     pose_keypoints = np.zeros((18, 3))
     for i, key in enumerate(POSE_KEY):
         p = person.points[key]
-        pose_keypoints[i, :] = [p.x, p.y, p.score]
+        pose_keypoints[i, :] = [p.x, p.y, float(p.score)]
     return pose_keypoints
 
 # ======================
@@ -316,7 +297,6 @@ def resize(img, size=(EX_INPUT_WIDTH, EX_INPUT_HEIGHT)):
 def recognize_from_video():
     try:
         print('[INFO] Webcam mode is activated')
-        RECORD_TIME = 80
         capture = cv2.VideoCapture(int(args.video))
         if not capture.isOpened():
             print("[ERROR] webcamera not found")
@@ -340,7 +320,7 @@ def recognize_from_video():
         writer = None
 
     # pose estimation
-    env_id = ailia.get_gpu_environment_id()
+    env_id = args.env_id
     print(f'env_id: {env_id}')
     if args.arch=="lw_human_pose":
         pose = ailia.PoseEstimator(
@@ -375,7 +355,7 @@ def recognize_from_video():
     )
 
     # action recognition
-    env_id = ailia.get_gpu_environment_id()
+    env_id = args.env_id
     print(f'env_id: {env_id}')
     model = ailia.Net(ACTION_MODEL_PATH, ACTION_WEIGHT_PATH, env_id=env_id)
 
@@ -384,15 +364,15 @@ def recognize_from_video():
     frame_nb = int(capture.get(cv2.CAP_PROP_FRAME_COUNT))
     idx_frame = 0
 
-    time_start = time.time()
+    frame_shown = False
     while(True):
-        time_curr = time.time()
-        if args.video == '0' and time_curr-time_start > RECORD_TIME:
-            break
         ret, frame = capture.read()
 
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
+            break
+        
         if (not ret) or (frame_nb>=1 and idx_frame>=frame_nb):
             break
 
@@ -477,7 +457,7 @@ def recognize_from_video():
             box = track.to_tlwh()
             x1, y1, x2, y2 = tlwh_to_xyxy(box, h, w)
             track_id = track.track_id
-            outputs.append(np.array([x1, y1, x2, y2, track_id], dtype=np.int))
+            outputs.append(np.array([x1, y1, x2, y2, track_id], dtype=int))
         if len(outputs) > 0:
             outputs = np.stack(outputs, axis=0)
 
@@ -524,6 +504,7 @@ def recognize_from_video():
                 print()
 
         cv2.imshow('frame', input_image)
+        frame_shown = True
 
         idx_frame = idx_frame + 1
 

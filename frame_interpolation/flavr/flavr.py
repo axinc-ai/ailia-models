@@ -11,7 +11,7 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
+from arg_utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from detector_utils import load_image  # noqa: E402
 import webcamera_utils  # noqa: E402
@@ -150,6 +150,8 @@ def recognize_from_video(net, n_output):
     if 0 < video_length:
         it = iter(tqdm(range(video_length)))
         next(it)
+        
+    frame_shown = False
     while True:
         if 0 < video_length:
             try:
@@ -158,6 +160,8 @@ def recognize_from_video(net, n_output):
                 break
         ret, frame = cap.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
             break
 
         images.append(cv2.resize(frame, (f_w, f_h)))
@@ -185,6 +189,7 @@ def recognize_from_video(net, n_output):
         
         #preview
         cv2.imshow('frame', output_buffer)
+        frame_shown = True
 
     cap.release()
     cv2.destroyAllWindows()

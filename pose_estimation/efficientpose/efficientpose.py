@@ -1,23 +1,24 @@
+import argparse
 import sys
 import time
-import argparse
 from os.path import join, normpath
 
-import cv2
-from PIL import Image, ImageDraw
-import numpy as np
-
 import ailia
+import cv2
+import numpy as np
+from PIL import Image, ImageDraw
+
 import efficientpose_utils as e_utils
 
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
-from webcamera_utils import adjust_frame_size, get_capture  # noqa: E402
-from image_utils import load_image  # noqa: E402
-from model_utils import check_and_download_models  # noqa: E402
-
 # logger
-from logging import getLogger   # noqa: E402
+from logging import getLogger  # noqa: E402
+
+from image_utils import imread, load_image  # noqa: E402
+from model_utils import check_and_download_models  # noqa: E402
+from arg_utils import get_base_parser, get_savepath, update_parser  # noqa: E402
+from webcamera_utils import adjust_frame_size, get_capture  # noqa: E402
+
 logger = getLogger(__name__)
 
 #TODO:More refactoring on threshold
@@ -154,7 +155,7 @@ def recognize_from_image():
         logger.info(image_path)
 
         # prepare input data
-        src_img = cv2.imread(image_path)
+        src_img = imread(image_path)
         image_height, image_width = src_img.shape[:2]
         batch = np.expand_dims(src_img[...,::-1], axis=0)
 
@@ -212,9 +213,12 @@ def recognize_from_video():
 
     capture = get_capture(args.video)
 
+    frame_shown = False
     while(True):
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
             break
 
         # prepare input data
@@ -239,9 +243,12 @@ def recognize_from_video():
 
         display_result(frame, coordinates)
         cv2.imshow('frame', frame)
+        frame_shown = True
         # e_utils.display_camera(cv2, frame, coordinates, image_height, image_width)
         
         if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
+        if cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
             break
 
     capture.release()

@@ -1,18 +1,20 @@
+import codecs
 import sys
 import time
-import codecs
-
-import cv2
 
 import ailia
+import cv2
+
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser  # noqa: E402
-from model_utils import check_and_download_models  # noqa: E402
-import webcamera_utils  # noqa: E402
-
 # logger
-from logging import getLogger   # noqa: E402
+from logging import getLogger  # noqa: E402
+
+import webcamera_utils  # noqa: E402
+from image_utils import imread  # noqa: E402
+from model_utils import check_and_download_models  # noqa: E402
+from arg_utils import get_base_parser, update_parser  # noqa: E402
+
 logger = getLogger(__name__)
 
 
@@ -70,7 +72,10 @@ def recognize_from_image():
         # prepare input data
         logger.info(image_path)
         etl_word = codecs.open(ETL_PATH, 'r', 'utf-8').readlines()
-        img = cv2.imread(image_path, cv2.IMREAD_UNCHANGED)
+        img = imread(image_path, cv2.IMREAD_UNCHANGED)
+        if img is None:
+            logger.error("can not open "+image_path)
+            continue
         img = preprocess_image(img)
 
         # inference
@@ -93,7 +98,7 @@ def recognize_from_image():
             logger.info(f"+ idx={idx}")
             info = classifier.get_class(idx)
             logger.info(
-                f"  category={info.category} [ {etl_word[info.category]} ]"
+                f"  category={info.category} [ {etl_word[info.category].rstrip()} ]"
             )
             logger.info(f"  prob={info.prob}")
 
@@ -122,12 +127,15 @@ def recognize_from_video():
         writer = webcamera_utils.get_writer(args.savepath, save_h, save_w)
     else:
         writer = None
-
+    
+    frame_shown = False
     while(True):
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
-
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
+            break
+        
         in_frame, frame = webcamera_utils.adjust_frame_size(
             frame, IMAGE_HEIGHT, IMAGE_WIDTH
         )
@@ -146,10 +154,11 @@ def recognize_from_video():
             logger.info(f"+ idx={idx}")
             info = classifier.get_class(idx)
             logger.info(
-                f"  category={info.category} [ {etl_word[info.category]} ]"
+                f"  category={info.category} [ {etl_word[info.category].rstrip()} ]"
             )
             logger.info(f"  prob={info.prob}")
         cv2.imshow('frame', in_frame)
+        frame_shown = True
         # save results
         if writer is not None:
             writer.write(in_frame)
