@@ -57,6 +57,7 @@ cd ../../diffusion/latent-diffusion-superresolution; python3 latent-diffusion-su
 cd ../../diffusion/latent-diffusion-inpainting; python3 latent-diffusion-inpainting.py ${OPTION}
 cd ../../diffusion/stable-diffusion-txt2img; python3 stable-diffusion-txt2img.py ${OPTION}
 cd ../../diffusion/control_net python3 control_net.py ${OPTION}
+cd ../../diffusion/latent-consistency-models python3 latent-consistency-models.py ${OPTION}
 cd ../../diffusion/daclip-sde; python3 daclipsde.py ${OPTION}
 cd ../../diffusion/riffusion; python3 riffusion.py ${OPTION}
 cd ../../diffusion/marigold; python3 marigold.py ${OPTION}

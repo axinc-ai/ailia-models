@@ -187,7 +187,7 @@ The collection of pre-trained, state-of-the-art AI models.
 | [<img src="diffusion/control_net/examples/output_pose1.png" width=128px>](diffusion/control_net/) | [control_net](/diffusion/control_net/) | [ControlNet](https://github.com/lllyasviel/ControlNet) | Pytorch | 1.2.15 and later |
 | [<img src="diffusion/sd-turbo/output.png" width=128px>](diffusion/sd-turbo/) | [sd-turbo](/diffusion/sd-turbo/) | [Hugging Face - SD-Turbo](https://huggingface.co/stabilityai/sd-turbo) | Pytorch | 1.2.16 and later |
 | [<img src="diffusion/sdxl-turbo/output.png" width=128px>](diffusion/sdxl-turbo/) | [sdxl-turbo](/diffusion/sdxl-turbo/) | [Hugging Face - SDXL-Turbo](https://huggingface.co/stabilityai/sdxl-turbo) | Pytorch | 1.2.16 and later |
-
+| [<img src="diffusion/latent-consistency-models/Output/0000.png" width=128px>](diffusion/latent-consistency-models/) | [latent-consistency-models](/diffusion/latent-consistency-models/) | [latent-consistency-models](https://github.com/luosiallen/latent-consistency-model) | Pytorch | 1.2.16 and later |
 
 ### Text to audio
 
