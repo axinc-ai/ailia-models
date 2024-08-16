@@ -1,19 +1,19 @@
 import sys
 import time
 
-import numpy as np
-import cv2
-
 import ailia
+import cv2
+import numpy as np
 
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
-from image_utils import load_image  # noqa: E402
-from model_utils import check_and_download_models  # noqa: E402
-import webcamera_utils  # noqa: E402
-
 # logger
-from logging import getLogger   # noqa: E402
+from logging import getLogger  # noqa: E402
+
+import webcamera_utils  # noqa: E402
+from image_utils import imread, load_image  # noqa: E402
+from model_utils import check_and_download_models  # noqa: E402
+from arg_utils import get_base_parser, get_savepath, update_parser  # noqa: E402
+
 logger = getLogger(__name__)
 
 
@@ -149,7 +149,7 @@ def recognize_from_image():
     for image_path in args.input:
         # prepare input data
         logger.info(image_path)
-        src_img = cv2.imread(image_path)
+        src_img = imread(image_path)
         input_image = load_image(
             image_path,
             (IMAGE_HEIGHT, IMAGE_WIDTH),
@@ -198,10 +198,13 @@ def recognize_from_video():
         writer = webcamera_utils.get_writer(args.savepath, save_h, save_w)
     else:
         writer = None
-
+    
+    frame_shown = False
     while(True):
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
             break
 
         input_image, input_data = webcamera_utils.adjust_frame_size(
@@ -215,6 +218,7 @@ def recognize_from_video():
         # postprocessing
         display_result(input_image, pose)
         cv2.imshow('frame', input_image)
+        frame_shown = True
 
         # save results
         if writer is not None:

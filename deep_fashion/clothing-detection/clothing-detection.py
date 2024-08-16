@@ -10,9 +10,9 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
+from arg_utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
-from detector_utils import plot_results, load_image  # noqa: E402
+from detector_utils import plot_results, load_image, write_predictions  # noqa: E402
 from webcamera_utils import get_capture, get_writer,\
     calc_adjust_fsize  # noqa: E402
 
@@ -71,6 +71,11 @@ parser.add_argument(
     default=DETECTION_WIDTH,
     help='The detection width and height for yolo. (default: 416)'
 )
+parser.add_argument(
+    '-w', '--write_json',
+    action='store_true',
+    help='Flag to output results to json file.'
+)
 args = update_parser(parser)
 
 weight_path, model_path = DATASETS_MODEL_PATH[args.dataset]
@@ -106,7 +111,7 @@ def preprocess(img, resize):
 
 
 def post_processing(img_shape, all_boxes, all_scores, indices):
-    indices = indices.astype(np.int)
+    indices = indices.astype(int)
 
     bboxes = []
     for idx_ in indices[0]:
@@ -175,10 +180,14 @@ def recognize_from_image(filename, detector):
 
     # plot result
     res_img = plot_results(detect_object, img, category)
-    # cv2.imwrite(args.savepath, res_img)
     savepath = get_savepath(args.savepath, filename)
     logger.info(f'saved at : {savepath}')
     cv2.imwrite(savepath, res_img)
+
+    # write prediction
+    if args.write_json:
+        json_file = '%s.json' % savepath.rsplit('.', 1)[0]
+        write_predictions(json_file, detect_object, img, category=category, file_type='json')
 
 
 def recognize_from_video(video, detector):
@@ -186,28 +195,25 @@ def recognize_from_video(video, detector):
 
     # create video writer if savepath is specified as video format
     if args.savepath != SAVE_IMAGE_PATH:
-        ailia_input_w = detector.get_input_shape()[3]
-        ailia_input_h = detector.get_input_shape()[2]
-
         f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
         f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
-        save_h, save_w = calc_adjust_fsize(
-            f_h, f_w, ailia_input_h, ailia_input_w
-        )
-        # save_w * 2: we stack source frame and estimated heatmap
-        writer = get_writer(args.savepath, save_h, save_w * 2)
+        writer = get_writer(args.savepath, f_h, f_w)
     else:
         writer = None
 
+    frame_shown = False
     while True:
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
             break
 
         x = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         detect_object = detect_objects(x, detector)
         res_img = plot_results(detect_object, frame, category)
         cv2.imshow('frame', res_img)
+        frame_shown = True
 
         # save results
         if writer is not None:

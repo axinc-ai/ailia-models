@@ -3,7 +3,7 @@ try:
 except ImportError:
     accimage = None
 
-import collections
+from collections.abc import Iterable
 import numbers
 import numpy as np
 from PIL import Image
@@ -51,7 +51,7 @@ class Resize(object):
         assert (
             isinstance(size, int)
             or isinstance(size, float)
-            or (isinstance(size, collections.Iterable) and len(size) == 2)
+            or (isinstance(size, Iterable) and len(size) == 2)
         )
         self.size = size
         self.interpolation = interpolation

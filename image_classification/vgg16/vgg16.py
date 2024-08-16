@@ -8,7 +8,7 @@ import vgg16_labels
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser  # noqa: E402
+from arg_utils import get_base_parser, update_parser  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from image_utils import load_image  # noqa: E402
 from classifier_utils import plot_results, print_results  # noqa: E402
@@ -94,9 +94,12 @@ def recognize_from_video():
     else:
         writer = None
 
+    frame_shown = False
     while(True):
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
             break
 
         _, input_data = webcamera_utils.preprocess_frame(
@@ -109,6 +112,7 @@ def recognize_from_video():
         # postprocessing
         plot_results(frame, preds_ailia, vgg16_labels.imagenet_category)
         cv2.imshow('frame', frame)
+        frame_shown = True
         time.sleep(SLEEP_TIME)
 
         # save results

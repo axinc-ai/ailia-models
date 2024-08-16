@@ -9,10 +9,12 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
+from arg_utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from detector_utils import load_image  # noqa: E402C
+from classifier_utils import plot_results, print_results  # noqa: E402
 from math_utils import softmax  # noqa: E402C
+import webcamera_utils  # noqa: E402
 # logger
 from logging import getLogger  # noqa: E402
 
@@ -30,6 +32,10 @@ WEIGHT_VITB32_IMAGE_PATH = 'ViT-B32-encode_image.onnx'
 MODEL_VITB32_IMAGE_PATH = 'ViT-B32-encode_image.onnx.prototxt'
 WEIGHT_VITB32_TEXT_PATH = 'ViT-B32-encode_text.onnx'
 MODEL_VITB32_TEXT_PATH = 'ViT-B32-encode_text.onnx.prototxt'
+WEIGHT_VITL14_IMAGE_PATH = 'ViT-L14-encode_image.onnx'
+MODEL_VITL14_IMAGE_PATH = 'ViT-L14-encode_image.onnx.prototxt'
+WEIGHT_VITL14_TEXT_PATH = 'ViT-L14-encode_text.onnx'
+MODEL_VITL14_TEXT_PATH = 'ViT-L14-encode_text.onnx.prototxt'
 WEIGHT_RN50_IMAGE_PATH = 'RN50-encode_image.onnx'
 MODEL_RN50_IMAGE_PATH = 'RN50-encode_image.onnx.prototxt'
 WEIGHT_RN50_TEXT_PATH = 'RN50-encode_text.onnx'
@@ -58,7 +64,7 @@ parser.add_argument(
     help='description file'
 )
 parser.add_argument(
-    '-m', '--model_type', default='ViTB32', choices=('ViTB32', 'RN50'),
+    '-m', '--model_type', default='ViTB32', choices=('ViTB32', 'ViTL14', 'RN50'),
     help='model type'
 )
 parser.add_argument(
@@ -103,7 +109,7 @@ def preprocess(img):
 
     # resize
     scale = h / min(im_h, im_w)
-    ow, oh = int(im_w * scale), int(im_h * scale)
+    ow, oh = round(im_w * scale), round(im_h * scale)
     if ow != im_w or oh != im_h:
         img = np.array(Image.fromarray(img).resize((ow, oh), Image.BICUBIC))
 
@@ -151,15 +157,22 @@ def predict(net, img, text_feature):
 
 
 def predict_text_feature(net, text):
-    text = tokenize(text)
+    text_tokens = tokenize(text)
 
     # feedforward
-    if not args.onnx:
-        output = net.predict([text])
-    else:
-        output = net.run(None, {'text': text})
+    text_feature = []
+    batch_size_limit = 16
 
-    text_feature = output[0]
+    for i in range(0, text_tokens.shape[0], batch_size_limit):
+        batch_size = min(batch_size_limit, text_tokens.shape[0] - i)
+        logger.info("Embedding " + str(i) + " to " + str(i+batch_size))
+        if not args.onnx:
+            output = net.predict([text_tokens[i:i+batch_size,:]])
+        else:
+            output = net.run(None, {'text': text_tokens[i:i+batch_size,:]})
+        text_feature.append(output[0])
+
+    text_feature = np.concatenate(text_feature)
 
     text_feature = text_feature / np.linalg.norm(text_feature, ord=2, axis=-1, keepdims=True)
 
@@ -167,8 +180,6 @@ def predict_text_feature(net, text):
 
 
 def recognize_from_image(net_image, net_text):
-    top_k = 5
-
     text_inputs = args.text_inputs
     desc_file = args.desc_file
     if desc_file:
@@ -207,10 +218,58 @@ def recognize_from_image(net_image, net_text):
         else:
             pred = predict(net_image, img, text_feature)
 
-    inds = np.argsort(-pred)[:top_k]
-    logger.info("Top predictions:")
-    for i in inds:
-        logger.info(f"{text_inputs[i]:>16s}: {100 * pred[i]:.2f}%")
+        # show results
+        pred = np.expand_dims(pred, axis=0)
+        print_results(pred, text_inputs)
+
+    logger.info('Script finished successfully.')
+
+
+def recognize_from_video(net_image, net_text):
+    text_inputs = args.text_inputs
+    desc_file = args.desc_file
+    if desc_file:
+        with open(desc_file) as f:
+            text_inputs = [x.strip() for x in f.readlines() if x.strip()]
+    elif text_inputs is None:
+        text_inputs = [f"a {c}" for c in ("human", "dog", "cat")]
+
+    text_feature = predict_text_feature(net_text, text_inputs)
+
+    capture = webcamera_utils.get_capture(args.video)
+    # create video writer if savepath is specified as video format
+    if args.savepath is not None:
+        f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        f_w = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
+        writer = webcamera_utils.get_writer(args.savepath, f_h, f_w)
+    else:
+        writer = None
+
+    frame_shown = False
+    while (True):
+        ret, frame = capture.read()
+        if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
+            break
+
+        img = frame
+
+        pred = predict(net_image, img, text_feature)
+
+        plot_results(frame, np.expand_dims(pred, axis=0), text_inputs)
+
+        cv2.imshow('frame', frame)
+        frame_shown = True
+
+        # save results
+        if writer is not None:
+            writer.write(frame)
+
+    capture.release()
+    cv2.destroyAllWindows()
+    if writer is not None:
+        writer.release()
 
     logger.info('Script finished successfully.')
 
@@ -220,6 +279,9 @@ def main():
         'ViTB32': (
             (WEIGHT_VITB32_IMAGE_PATH, MODEL_VITB32_IMAGE_PATH),
             (WEIGHT_VITB32_TEXT_PATH, MODEL_VITB32_TEXT_PATH)),
+        'ViTL14': (
+            (WEIGHT_VITL14_IMAGE_PATH, MODEL_VITL14_IMAGE_PATH),
+            (WEIGHT_VITL14_TEXT_PATH, MODEL_VITL14_TEXT_PATH)),
         'RN50': (
             (WEIGHT_RN50_IMAGE_PATH, MODEL_RN50_IMAGE_PATH),
             (WEIGHT_RN50_TEXT_PATH, MODEL_RN50_TEXT_PATH)),
@@ -234,9 +296,13 @@ def main():
 
     env_id = args.env_id
 
+    # disable FP16
+    if "FP16" in ailia.get_environment(args.env_id).props or sys.platform == 'Darwin':
+        logger.warning('This model do not work on FP16. So use CPU mode.')
+        args.env_id = 0
+
     # initialize
     if not args.onnx:
-        logger.info("This model requires 10GB or more memory.")
         memory_mode = ailia.get_memory_mode(
             reduce_constant=True, ignore_input_with_initializer=True,
             reduce_interstage=False, reuse_interstage=False)
@@ -247,7 +313,12 @@ def main():
         net_image = onnxruntime.InferenceSession(WEIGHT_IMAGE_PATH)
         net_text = onnxruntime.InferenceSession(WEIGHT_TEXT_PATH)
 
-    recognize_from_image(net_image, net_text)
+    if args.video is not None:
+        # video mode
+        recognize_from_video(net_image, net_text)
+    else:
+        # image mode
+        recognize_from_image(net_image, net_text)
 
 
 if __name__ == '__main__':

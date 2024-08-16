@@ -1,19 +1,21 @@
 import sys
 import time
 
+import ailia
 import cv2
 import numpy as np
 
-import ailia
 import hopenet_utils as hut
 
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
-from webcamera_utils import get_capture, get_writer  # noqa: E402
-from model_utils import check_and_download_models  # noqa: E402
-
 # logger
-from logging import getLogger   # noqa: E402
+from logging import getLogger  # noqa: E402
+
+from image_utils import imread  # noqa: E402
+from model_utils import check_and_download_models  # noqa: E402
+from arg_utils import get_base_parser, get_savepath, update_parser  # noqa: E402
+from webcamera_utils import get_capture, get_writer  # noqa: E402
+
 logger = getLogger(__name__)
 
 
@@ -227,7 +229,7 @@ def recognize_from_image():
     # input image loop
     for image_path in args.input:
         logger.info(image_path)
-        src_img = cv2.imread(image_path)
+        src_img = imread(image_path)
 
         # inference
         logger.info('Start inference...')
@@ -260,9 +262,12 @@ def recognize_from_video():
     else:
         writer = None
 
+    frame_shown = False
     while(True):
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
             break
 
         preds = hp_estimator.predict(frame)
@@ -274,6 +279,7 @@ def recognize_from_video():
             visual_img = frame_draw
 
         cv2.imshow('frame', visual_img)
+        frame_shown = True
 
         # save results
         if writer is not None:

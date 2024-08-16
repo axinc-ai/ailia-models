@@ -14,8 +14,8 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
-from utils import check_file_existance  # noqa: E402
+from arg_utils import get_base_parser, update_parser, get_savepath  # noqa: E402
+from arg_utils import check_file_existance  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 import webcamera_utils  # noqa: E402
 
@@ -53,6 +53,10 @@ parser.add_argument(
     '--rotate3d', action='store_true', default=False,
     help='allowing 3D canvas rotation while on pause',
 )
+parser.add_argument(
+    '--put_fps', action='store_true', default=False,
+    help='put FPS on result image',
+)
 args = update_parser(parser)
 
 
@@ -78,12 +82,6 @@ def main():
     check_file_existance(FILE_PATH)
 
     # prepare input data
-    canvas_3d = np.zeros((720, 1280, 3), dtype=np.uint8)
-    plotter = Plotter3d(canvas_3d.shape[:2])
-    canvas_3d_window_name = 'Canvas3D'
-    cv2.namedWindow(canvas_3d_window_name)
-    cv2.setMouseCallback(canvas_3d_window_name, Plotter3d.mouse_callback)
-
     with open(FILE_PATH, 'r') as f:
         extrinsics = json.load(f)
 
@@ -96,6 +94,13 @@ def main():
     else:
         frame_provider = VideoReader(args.video)
         is_video = True
+
+    canvas_3d = np.zeros((720, 1280, 3), dtype=np.uint8)
+    canvas_3d_window_name = 'Canvas3D'
+    plotter = Plotter3d(canvas_3d.shape[:2])
+    if is_video or args.rotate3d:
+        cv2.namedWindow(canvas_3d_window_name)
+        cv2.setMouseCallback(canvas_3d_window_name, Plotter3d.mouse_callback)
 
     fx = -1
     delay = 1
@@ -211,8 +216,9 @@ def main():
             mean_time = current_time
         else:
             mean_time = mean_time * 0.95 + current_time * 0.05
-        cv2.putText(frame, 'FPS: {}'.format(int(1 / mean_time * 10) / 10),
-                    (40, 80), cv2.FONT_HERSHEY_COMPLEX, 1, (0, 0, 255))
+        if args.put_fps:
+            cv2.putText(frame, 'FPS: {}'.format(int(1 / mean_time * 10) / 10),
+                        (40, 80), cv2.FONT_HERSHEY_COMPLEX, 1, (0, 0, 255))
 
         if is_video:
             cv2.imshow('ICV 3D Human Pose Estimation', frame)
@@ -221,28 +227,37 @@ def main():
             logger.info(f'saved at : {savepath}')
             cv2.imwrite(savepath, frame)
 
-        key = cv2.waitKey(delay)
-        if key == esc_code or key == q_code:
-            break
-        if key == p_code:
-            if delay == 1:
-                delay = 0
-            else:
-                delay = 1
-
-        if delay == 0 and args.rotate3d:
-            key = 0
-            while (key != p_code
-                   and key != esc_code
-                   and key != q_code
-                   and key != space_code):
-                plotter.plot(canvas_3d, poses_3d, edges)
-                cv2.imshow(canvas_3d_window_name, canvas_3d)
-                key = cv2.waitKey(33)
+        if is_video or args.rotate3d:
+            key = cv2.waitKey(delay)
             if key == esc_code or key == q_code:
                 break
-            else:
-                delay = 1
+            if cv2.getWindowProperty('ICV 3D Human Pose Estimation', cv2.WND_PROP_VISIBLE) == 0:
+                break
+            if cv2.getWindowProperty(canvas_3d_window_name, cv2.WND_PROP_VISIBLE) == 0:
+                break
+            if key == p_code:
+                if delay == 1:
+                    delay = 0
+                else:
+                    delay = 1
+
+            if delay == 0 and args.rotate3d:
+                key = 0
+                while (key != p_code
+                       and key != esc_code
+                       and key != q_code
+                       and key != space_code):
+                    plotter.plot(canvas_3d, poses_3d, edges)
+                    cv2.imshow(canvas_3d_window_name, canvas_3d)
+                    key = cv2.waitKey(33)
+                    if cv2.getWindowProperty(canvas_3d_window_name, cv2.WND_PROP_VISIBLE) == 0:
+                        break
+                if key == esc_code or key == q_code:
+                    break
+                elif cv2.getWindowProperty(canvas_3d_window_name, cv2.WND_PROP_VISIBLE) == 0:
+                    break
+                else:
+                    delay = 1
 
     if writer is not None:
         writer.release()

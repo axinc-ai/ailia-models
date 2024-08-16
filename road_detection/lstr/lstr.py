@@ -1,17 +1,23 @@
-import os, sys
 import glob
+import os
+import sys
 import time
-import numpy as np
-import cv2
+import json
+
 import ailia
+import cv2
+import numpy as np
+
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
-from model_utils import check_and_download_models  # noqa: E402
-import webcamera_utils
-
 # logger
-from logging import getLogger   # noqa: E402
+from logging import getLogger  # noqa: E402
+
+import webcamera_utils
+from image_utils import imread  # noqa: E402
+from model_utils import check_and_download_models  # noqa: E402
+from arg_utils import get_base_parser, get_savepath, update_parser  # noqa: E402
+
 logger = getLogger(__name__)
 
 
@@ -39,6 +45,11 @@ DB_STD = [0.2886383, 0.27408165, 0.27809834]
 # ======================
 parser = get_base_parser(
     'LSTR', IMAGE_PATH, SAVE_IMAGE_PATH,
+)
+parser.add_argument(
+    '-w', '--write_json',
+    action='store_true',
+    help='Flag to output results to json file.'
 )
 args = update_parser(parser)
 
@@ -133,11 +144,26 @@ def draw_annotation(pred, img):
     return img
 
 
+def save_result_json(json_path, img, pred):
+    img_h, img_w, _ = img.shape
+    results = []
+    pred = pred[pred[:, 0].astype(int) == 1]
+    for lane in pred:
+        conf, lower, upper = lane[0], lane[1], lane[2]
+        lane = lane[3:]  # remove conf, upper, lower
+        results.append({
+            "k''": lane[0], "f''": lane[1], "m''": lane[2], "n'": lane[3], "b''": lane[4], "b'''": lane[5],
+            "alpha": lower * img_h, "beta": upper * img_w, "conf": conf
+        })
+    with open(json_path, 'w') as f:
+        json.dump(results, f, indent=2)
+
+
 def recognize_from_image(net, orig_target_sizes):
     # input image loop
     for image_path in args.input:
         # prepare input data
-        image = cv2.imread(image_path)
+        image = imread(image_path)
 
         out_pred_logits, out_pred_curves, _, _, weights = predict(net, image)
         results = postprocess(out_pred_logits, out_pred_curves, orig_target_sizes)
@@ -146,6 +172,10 @@ def recognize_from_image(net, orig_target_sizes):
         savepath = get_savepath(args.savepath, image_path)
         logger.info(f'saved at : {savepath}')
         cv2.imwrite(savepath, preds)
+
+        if args.write_json:
+            json_file = '%s.json' % savepath.rsplit('.', 1)[0]
+            save_result_json(json_file, image, results[0])
 
     logger.info('Script finished successfully.')
 
@@ -158,10 +188,13 @@ def recognize_from_video(net, orig_target_sizes):
         writer = webcamera_utils.get_writer(args.savepath, HEIGHT, WIDTH)
     else:
         writer = None
-
+    
+    frame_shown = False
     while True:
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
             break
 
         frame = cv2.resize(frame, dsize=(VIDEO_HEIGHT, VIDEO_WIDTH))
@@ -169,6 +202,7 @@ def recognize_from_video(net, orig_target_sizes):
         results = postprocess(out_pred_logits, out_pred_curves, orig_target_sizes)
         preds = draw_annotation(results[0], frame)
         cv2.imshow('frame', preds)
+        frame_shown = True
 
         # save results
         if writer is not None:
