@@ -480,6 +480,7 @@ The collection of pre-trained, state-of-the-art AI models.
 |[bert_maskedlm](/natural_language_processing/bert_maskedlm) | [huggingface/transformers](https://github.com/huggingface/transformers) | Pytorch | 1.2.5 and later |
 |[bert_question_answering](/natural_language_processing/bert_question_answering) | [huggingface/transformers](https://github.com/huggingface/transformers) | Pytorch | 1.2.5 and later |
 |[bert_zero_shot_classification](/natural_language_processing/bert_zero_shot_classification) | [huggingface/transformers](https://github.com/huggingface/transformers) | Pytorch | 1.2.5 and later |
+|[bert_ner_japanese](/natural_language_processing/bert_ner_japanese) | [jurabi/bert-ner-japanese](https://huggingface.co/jurabi/bert-ner-japanese) | Pytorch | 1.X.X and later |
 
 ### Embedding
 
