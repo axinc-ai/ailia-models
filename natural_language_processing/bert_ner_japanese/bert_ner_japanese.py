@@ -38,9 +38,9 @@ parser.add_argument(
     default="株式会社Jurabiは、東京都台東区に本社を置くIT企業である。",
     help="Input sentense.",
 )
-parser.add_argument(
-    "--disable_ailia_tokenizer", action="store_true", help="disable ailia tokenizer."
-)
+# parser.add_argument(
+#     "--disable_ailia_tokenizer", action="store_true", help="disable ailia tokenizer."
+# )
 parser.add_argument(
     "--disable_aggregation", action="store_true", help="disable aggregation."
 )
@@ -171,7 +171,7 @@ def recognize_from_text(models):
     else:
         entities = predict(models, sentence)
 
-    print("tokenized:\n%s" % json.dumps(entities, indent=2, ensure_ascii=False))
+    print("NER:\n%s" % json.dumps(entities, indent=2, ensure_ascii=False))
 
     logger.info("Script finished successfully.")
 
