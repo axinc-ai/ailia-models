@@ -1,6 +1,8 @@
 import sys
 import time
 import json
+import os
+import shutil
 
 from logging import getLogger
 
@@ -11,7 +13,7 @@ import ailia
 # import original modules
 sys.path.append("../../util")
 from arg_utils import get_base_parser, update_parser  # noqa
-from model_utils import check_and_download_models  # noqa
+from model_utils import check_and_download_models, check_and_download_file  # noqa
 
 from token_classification import TokenClassification
 
@@ -38,9 +40,9 @@ parser.add_argument(
     default="株式会社Jurabiは、東京都台東区に本社を置くIT企業である。",
     help="Input sentense.",
 )
-# parser.add_argument(
-#     "--disable_ailia_tokenizer", action="store_true", help="disable ailia tokenizer."
-# )
+parser.add_argument(
+    "--disable_ailia_tokenizer", action="store_true", help="disable ailia tokenizer."
+)
 parser.add_argument(
     "--disable_aggregation", action="store_true", help="disable aggregation."
 )
@@ -197,7 +199,11 @@ def main():
 
         tokenizer = AutoTokenizer.from_pretrained("tokenizer")
     else:
-        raise NotImplementedError("ailia tokenizer is not supported yet.")
+        from ailia_tokenizer import BertJapaneseWordPieceTokenizer
+        check_and_download_file("unidic-lite.zip", REMOTE_PATH)
+        if not os.path.exists("unidic-lite"):
+            shutil.unpack_archive('unidic-lite.zip', '')
+        tokenizer = BertJapaneseWordPieceTokenizer.from_pretrained(dict_path = 'unidic-lite', pretrained_model_name_or_path = './tokenizer/')
 
     models = {
         "net": net,
