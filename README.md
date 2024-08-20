@@ -513,6 +513,7 @@ The collection of pre-trained, state-of-the-art AI models.
 |------------:|:------------:|:------------:|:------------:|:------------:|
 |[bert_ner](/natural_language_processing/bert_ner) | [huggingface/transformers](https://github.com/huggingface/transformers) | Pytorch | 1.2.5 and later |
 |[t5_base_japanese_ner](/natural_language_processing/t5_base_japanese_ner) |  [t5-japanese](https://github.com/sonoisa/t5-japanese) | Pytorch | 1.2.13 and later |
+|[bert_ner_japanese](/natural_language_processing/bert_ner_japanese) | [jurabi/bert-ner-japanese](https://huggingface.co/jurabi/bert-ner-japanese) | Pytorch | 1.2.10 and later |
 
 ### Reranker
 
