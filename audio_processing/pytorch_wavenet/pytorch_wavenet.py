@@ -3,7 +3,9 @@ import sys
 import numpy as np
 import torch
 import torch.nn.functional as F
-from torch.autograd import Variable, Function
+from torch.autograd import Variable
+
+import soundfile as sf
 
 import ailia
 
@@ -21,8 +23,8 @@ logger = getLogger(__name__)
 # ======================
 # PARAMETERS
 # ======================
-WEIGHT_PATH = "wavenet_pytorch_op_11.onnx"
-MODEL_PATH = "wavenet_pytorch_op_11.onnx.prototxt"
+WEIGHT_PATH = "wavenet_pytorch_op_17.onnx"
+MODEL_PATH = "wavenet_pytorch_op_17.onnx.prototxt"
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/pytorch-wavenet/"
 
 
@@ -54,39 +56,61 @@ def get_model():
 
 
 def generate_first_sample():
-    first_samples = torch.randint(0, 256, (1028,))
-    # first_samples = torch.full((1028,),fill_value=126).long() # silence wave sample
+    first_samples = torch.randint(0, 256, (3085,))
     return first_samples
 
 
 def output_wav(filename, rate, data):
-    from scipy.io.wavfile import write
-
-    write(filename, rate, data)
+    sf.write(filename, rate, data)
 
 
 def generate_wave(net, num_samples, first_samples=None, temperature=1.0):
     tic = time.time()
 
-    receptive_field = 1021
+    progress_interval = 1000
+
+    # receptive_field = 1021
     classes = 256
 
-    generated = Variable(first_samples, volatile=True)
-    num_pad = receptive_field - generated.size(0)
+    if first_samples is None:
+        first_samples = generate_first_sample()
 
-    # if num_pad > 0:
-    #    generated = _constant_pad_1d(generated, self.scope, pad_start=True)
-    #    print("pad zero")
+    num_given_samples = first_samples.shape[0]
+    total_samples = num_given_samples + num_samples
 
+    input = np.zeros((1, classes, 1), dtype=np.float32)
+    input[:, first_samples[0], :] = 1
+
+    # prepare queues
+    shapes = [
+        # fmt: off
+        (32, 2), (32, 3), (32, 5), (32, 9), (32, 17),
+        (32, 33), (32, 65), (32, 129), (32, 257), (32, 513),
+        (32, 2), (32, 3), (32, 5), (32, 9), (32, 17),
+        (32, 33), (32, 65), (32, 129), (32, 257), (32, 513),
+        (32, 2), (32, 3), (32, 5), (32, 9), (32, 17),
+        (32, 33), (32, 65), (32, 129), (32, 257), (32, 513),
+        # fmt: on
+    ]
+    dilated_queues = [np.zeros(shape, dtype=np.float32) for shape in shapes]
+
+    # fill queues with given samples
+    for i in range(num_given_samples - 1):
+        _, dilated_queues = _inference(net, input, dilated_queues)
+
+        input.fill(0)
+        input[:, first_samples[i + 1], :] = 1
+
+        if i % progress_interval == 0:
+            print(str(100 * i // total_samples) + "% generated")
+
+    # generated = Variable(first_samples, volatile=True)
+    # num_pad = receptive_field - generated.size(0)
+
+    # generate new samples
     for i in range(num_samples):
-        input = Variable(torch.FloatTensor(1, classes, receptive_field).zero_())
-        input = input.scatter_(
-            1, generated[-receptive_field:].view(1, -1, receptive_field), 1.0
-        )
-
-        output = _inference(net, input)
-
-        x = output[:, :, -1].squeeze()
+        x, dilated_queues = _inference(net, input, dilated_queues)
+        x = x.squeeze()
 
         if temperature > 0:
             x /= temperature
@@ -101,8 +125,8 @@ def generate_wave(net, num_samples, first_samples=None, temperature=1.0):
         generated = torch.cat((generated, x), 0)
 
         # progress feedback
-        if i % 1600 == 0:
-            print(str(100 * i // num_samples) + "% generated")
+        if i % progress_interval == 0:
+            print(str(100 * (i + num_given_samples) // total_samples) + "% generated")
 
     generated = (generated.float() / classes) * 2.0 - 1
 
@@ -115,42 +139,29 @@ def generate_wave(net, num_samples, first_samples=None, temperature=1.0):
     return mu_gen
 
 
-def _inference(net, input):
-    input = input.to("cpu").detach().numpy().copy()
+def _inference(net, input, dilated_queues):
     if not args.onnx:
-        output = net.run(input)
+        output = net.run([input, *dilated_queues])
     else:
-        output = net.run([net.get_outputs()[0].name], {net.get_inputs()[0].name: input})
+        output = net.run(
+            None,
+            {
+                "input": input,
+                **{
+                    "dilated_queues_%d" % (i + 1): q
+                    for i, q in enumerate(dilated_queues)
+                },
+            },
+        )
+    x = output[0]
+    dilated_queues = output[1:]
 
-    return torch.from_numpy(output[0].astype(np.float32)).clone()
+    return x, dilated_queues
 
 
 def _mu_law_expansion(data, mu):
     s = np.sign(data) * (np.exp(np.abs(data) * np.log(mu + 1)) - 1) / mu
     return s
-
-
-def _constant_pad_1d(input, target_size, dimension=0, value=0, pad_start=False):
-    num_pad = target_size - input.size(dimension)
-    assert num_pad >= 0, "target size has to be greater than input size"
-
-    input_size = input.size()
-
-    size = list(input.size())
-    size[dimension] = target_size
-    output = input.new(*tuple(size)).fill_(value)
-    c_output = output
-
-    # crop output
-    if pad_start:
-        c_output = c_output.narrow(
-            dimension, num_pad, c_output.size(dimension) - num_pad
-        )
-    else:
-        c_output = c_output.narrow(dimension, 0, c_output.size(dimension) - num_pad)
-
-    c_output.copy_(input)
-    return output
 
 
 def main():
@@ -164,12 +175,10 @@ def main():
     sample = generate_first_sample()
 
     # generate wave
-    generated = generate_wave(net, 16000, first_samples=sample, temperature=1.0)
+    generated = generate_wave(net, 160000, first_samples=sample, temperature=1.0)
 
     # output wav
-    output_wav("output.wav", 1600, generated)
-
-    print(generated)
+    output_wav("output.wav", 16000, generated)
 
     logger.info("Script finished successfully.")
 
