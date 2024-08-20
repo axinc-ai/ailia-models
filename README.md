@@ -15,9 +15,12 @@ The collection of pre-trained, state-of-the-art AI models.
 [ailia MODELS tutorial 日本語版](TUTORIAL_jp.md)
 
 # Supported models
-340 models as of August 9th, 2024
+351 models as of August 16th, 2024
 
 # Latest update
+- 2024.08.16 Add latent-consistency-model-txt2img, fbcnn
+- 2024.08.15 Add volo, elegant, depth_anything, drbn_skf, codeformer, dtln
+- 2024.08.10 Add TripoSR, japanese-reranker-cross-encoder
 - 2024.08.09 Add mahalanobis-ad, t5_base_japanese_ner
 - 2024.08.08 Add sdxl-turbo, sd-turbo
 - 2024.08.05 Migrate to ailia Tokenizer 1.3 from Transformers
