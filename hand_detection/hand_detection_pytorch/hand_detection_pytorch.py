@@ -1,19 +1,22 @@
 import sys
 import time
 
-import cv2
-
 import ailia
+import cv2
+import json
+
 import hand_detection_pytorch_utils
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
-from model_utils import check_and_download_models  # noqa: E402
-import webcamera_utils  # noqa: E402
-
 # logger
-from logging import getLogger   # noqa: E402
+from logging import getLogger  # noqa: E402
+
+import webcamera_utils  # noqa: E402
+from image_utils import imread  # noqa: E402
+from model_utils import check_and_download_models  # noqa: E402
+from arg_utils import get_base_parser, get_savepath, update_parser  # noqa: E402
+
 logger = getLogger(__name__)
 
 
@@ -39,7 +42,23 @@ parser = get_base_parser(
     IMAGE_PATH,
     SAVE_IMAGE_PATH,
 )
+parser.add_argument(
+    '-w', '--write_json',
+    action='store_true',
+    help='Flag to output results to json file.'
+)
 args = update_parser(parser)
+
+
+def save_result_json(json_path, dets):
+    results = []
+    for i in range(dets.shape[0]):
+        xyxy = dets[i][0:4].tolist()
+        results.append({
+            'x1': xyxy[0], 'y1': xyxy[1], 'x2': xyxy[2], 'y2': xyxy[3]
+        })
+    with open(json_path, 'w') as f:
+        json.dump(results, f, indent=2)
 
 
 # ======================
@@ -53,7 +72,7 @@ def recognize_from_image():
         # prepare input data
         logger.info(image_path)
 
-        to_show = cv2.imread(image_path, cv2.IMREAD_COLOR)
+        to_show = imread(image_path, cv2.IMREAD_COLOR)
         logger.info(f'input image shape: {to_show.shape}')
         img, scale = hand_detection_pytorch_utils.pre_process(to_show)
         detector.set_input_shape((1, 3, img.shape[2], img.shape[3]))
@@ -84,6 +103,11 @@ def recognize_from_image():
         savepath = get_savepath(args.savepath, image_path)
         logger.info(f'saved at : {savepath}')
         cv2.imwrite(savepath, to_show)
+
+        if args.write_json:
+            json_file = '%s.json' % savepath.rsplit('.', 1)[0]
+            save_result_json(json_file, dets)
+
     logger.info('Script finished successfully.')
 
 
@@ -101,10 +125,13 @@ def recognize_from_video():
     else:
         writer = None
 
+    frame_shown = False
     while(True):
         ret, to_show = capture.read()
         # press q to end video capture
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
             break
 
         img, scale = hand_detection_pytorch_utils.pre_process(to_show)
@@ -122,6 +149,7 @@ def recognize_from_video():
                 3
             )
         cv2.imshow('frame', to_show)
+        frame_shown = True
         # save results
         if writer is not None:
             writer.write(to_show)

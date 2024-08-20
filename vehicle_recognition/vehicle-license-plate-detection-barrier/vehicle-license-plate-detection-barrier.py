@@ -5,12 +5,13 @@ from collections import namedtuple
 import colorsys
 
 import cv2
+import json
 import numpy as np
 
 import ailia
 
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
+from arg_utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from detector_utils import load_image  # noqa: E402C
 import webcamera_utils  # noqa: E402
@@ -48,6 +49,11 @@ parser.add_argument(
     '-th', '--threshold',
     default=THRESHOLD, type=float,
     help='The detection threshold for detection.'
+)
+parser.add_argument(
+    '-w', '--write_json',
+    action='store_true',
+    help='Flag to output results to json file.'
 )
 args = update_parser(parser)
 
@@ -105,6 +111,23 @@ def draw_detections(frame, detections, palette, threshold):
                 (xmin, ymin - 7), cv2.FONT_HERSHEY_COMPLEX, 0.6, color, 1)
 
     return frame
+
+
+def save_result_json(file_name, frame, detections, threshold):
+    h, w = frame.shape[:2]
+    results = []
+    for detection in detections:
+        if detection.score > threshold:
+            results.append({
+                'class_id': detection.id,
+                'score': float(detection.score),
+                'xmin': float(detection.xmin),
+                'ymin': float(detection.ymin),
+                'xmax': float(detection.xmax),
+                'ymax': float(detection.ymax)
+            })
+    with open(file_name, 'w') as f:
+        json.dump(results, f, indent=2)
 
 
 # ======================
@@ -174,6 +197,11 @@ def recognize_from_image(net):
         logger.info(f'saved at : {savepath}')
         cv2.imwrite(savepath, res_img)
 
+        # write results
+        if args.write_json:
+            json_file = '%s.json' % savepath.rsplit('.', 1)[0]
+            save_result_json(json_file, img, detections, threshold)
+
     logger.info('Script finished successfully.')
 
 
@@ -191,9 +219,13 @@ def recognize_from_video(net):
         writer = None
 
     palette = get_palette(100)
+    
+    frame_shown = False
     while (True):
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
             break
 
         frame, resized_img = webcamera_utils.adjust_frame_size(frame, IMAGE_SIZE, IMAGE_SIZE)
@@ -203,6 +235,7 @@ def recognize_from_video(net):
 
         frame = draw_detections(frame, detections, palette, threshold)
         cv2.imshow('frame', frame)
+        frame_shown = True
 
         # save results
         if writer is not None:

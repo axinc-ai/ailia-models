@@ -2,22 +2,23 @@ import os
 import sys
 import time
 
-import numpy as np
-import cv2
-
 import ailia
+import cv2
+import numpy as np
+
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
-from model_utils import check_and_download_models  # noqa: E402
-import webcamera_utils  # noqa: E402
-
 # logger
-from logging import getLogger   # noqa: E402
+from logging import getLogger  # noqa: E402
+
+import webcamera_utils  # noqa: E402
+from image_utils import imread  # noqa: E402
+from model_utils import check_and_download_models  # noqa: E402
+from arg_utils import get_base_parser, get_savepath, update_parser  # noqa: E402
+
 logger = getLogger(__name__)
 
 from deep_image_matting_util import generate_trimap
-
 
 # ======================
 # Parameters
@@ -303,7 +304,7 @@ def recognize_from_image(net):
     for image_path in args.input:
         # prepare input data
         logger.info(image_path)
-        src_img = cv2.imread(image_path)    
+        src_img = imread(image_path)    
 
         # set input shape
         IMAGE_WIDTH, IMAGE_HEIGHT, PADDING, RGB_MODE = set_input_shape(net, src_img)
@@ -318,7 +319,7 @@ def recognize_from_image(net):
             input_data = src_img
             trimap_data, seg_data = generate_trimap(seg_net, input_data, args)
         else:
-            trimap_data = cv2.imread(args.trimap)
+            trimap_data = imread(args.trimap)
 
         # output image buffer
         output_img = np.zeros((src_img.shape[0],src_img.shape[1],4))
@@ -349,10 +350,16 @@ def recognize_from_video(net):
     capture = webcamera_utils.get_capture(args.video)
     writer = None
 
+    frame_shown = False
     while(True):
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
+        if frame_shown and cv2.getWindowProperty('trimap', cv2.WND_PROP_VISIBLE) == 0:
+            break
+        if frame_shown and cv2.getWindowProperty('segmentation', cv2.WND_PROP_VISIBLE) == 0:
+            break
+
 
         # grab src image
         src_img = frame
@@ -383,6 +390,7 @@ def recognize_from_video(net):
         trimap_data, seg_data = generate_trimap(seg_net, src_img, args)
         cv2.imshow('trimap', trimap_data / 255.0)
         cv2.imshow('segmentation', seg_data / 255.0)
+        frame_shown = True
 
         # tile loop
         process_one_frame(output_img,src_img,trimap_data,IMAGE_WIDTH,IMAGE_HEIGHT,PADDING,net)

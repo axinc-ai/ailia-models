@@ -10,7 +10,7 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser  # noqa: E402
+from arg_utils import get_base_parser, update_parser  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 import webcamera_utils  # noqa: E402
 
@@ -265,8 +265,8 @@ def grid_sample(image, grid, padding_mode='border', align_corners=False):
 
     c = np.zeros_like(y) + np.arange(C)[np.newaxis, :, np.newaxis, np.newaxis]
     n = np.zeros_like(y) + np.arange(N)[:, np.newaxis, np.newaxis, np.newaxis]
-    c = c.astype(np.int)
-    n = n.astype(np.int)
+    c = c.astype(int)
+    n = n.astype(int)
 
     # Unnormalize with align_corners condition
     ix = grid_sampler_compute_source_index(x, W, align_corners)
@@ -287,10 +287,10 @@ def grid_sample(image, grid, padding_mode='border', align_corners=False):
     # Get values of the image by provided x0,y0,x1,y1 by channel
 
     # image, n, c, x, y, H, W
-    x0 = x0.astype(np.int)
-    y0 = y0.astype(np.int)
-    x1 = x1.astype(np.int)
-    y1 = y1.astype(np.int)
+    x0 = x0.astype(int)
+    y0 = y0.astype(int)
+    x1 = x1.astype(int)
+    y1 = y1.astype(int)
     Ia = safe_get(image, n, c, x0, y0, H, W, padding_mode)
     Ib = safe_get(image, n, c, x0, y1, H, W, padding_mode)
     Ic = safe_get(image, n, c, x1, y0, H, W, padding_mode)
@@ -631,12 +631,11 @@ def recognize_from_image():
             logger.info('BENCHMARK mode')
             for i in range(args.benchmark_count):
                 start = int(round(time.time() * 1000))
-                cmap = cnet.run(image1)[0]
+                net, up_mask, delta_flow = update_block.run([net, inp, corr, flow])
                 end = int(round(time.time() * 1000))
                 logger.info(f'\tailia processing time {end - start} ms')
         else:
-            cmap = cnet.run(image1)[0]
-        net, up_mask, delta_flow = update_block.run([net, inp, corr, flow])
+            net, up_mask, delta_flow = update_block.run([net, inp, corr, flow])
 
         # F(t+1) = F(t) + \Delta(t)
         coords1 = coords1 + delta_flow
@@ -676,10 +675,10 @@ def recognize_from_video():
             W = int((W / d - (RESIZE_ALIGNMENT-1))//RESIZE_ALIGNMENT * RESIZE_ALIGNMENT)
             H = int((H / d - (RESIZE_ALIGNMENT-1))//RESIZE_ALIGNMENT * RESIZE_ALIGNMENT)
 
-    fps = capture.get(cv2.CAP_PROP_FPS)
     # create video writer if savepath is specified as video format
     if (args.savepath is not None) & (args.savepath.split('.')[-1] == 'mp4'):
-        writer = webcamera_utils.get_writer(args.savepath, H*3, W, fps=fps*0.8)
+        fps = capture.get(cv2.CAP_PROP_FPS)
+        writer = webcamera_utils.get_writer(args.savepath, H*3, W, fps=fps)
     else:
         writer = None
 
@@ -688,13 +687,17 @@ def recognize_from_video():
     if RESIZE_ENABLE:
         frame_before = cv2.resize(frame_before, (W,H))
     frame_before = frame_before[..., ::-1]  # BGR2RGB
-    while(True):
+    
+    frame_shown = False
+    while True:
         # read frame
         ret, frame_after = capture.read()
-        if RESIZE_ENABLE:
-            frame_after = cv2.resize(frame_after, (W,H))
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
+            break
+        if RESIZE_ENABLE:
+            frame_after = cv2.resize(frame_after, (W,H))
 
         # preprocessing
         frame_after = frame_after[..., ::-1]  # BGR2RGB
@@ -759,12 +762,11 @@ def recognize_from_video():
                 logger.info('BENCHMARK mode')
                 for i in range(args.benchmark_count):
                     start = int(round(time.time() * 1000))
-                    cmap = cnet.run(image1)[0]
+                    net, up_mask, delta_flow = update_block.run([net, inp, corr, flow])
                     end = int(round(time.time() * 1000))
                     logger.info(f'\tailia processing time {end - start} ms')
             else:
-                cmap = cnet.run(image1)[0]
-            net, up_mask, delta_flow = update_block.run([net, inp, corr, flow])
+                net, up_mask, delta_flow = update_block.run([net, inp, corr, flow])
 
             # F(t+1) = F(t) + \Delta(t)
             coords1 = coords1 + delta_flow
@@ -779,11 +781,10 @@ def recognize_from_video():
 
         # visualize
         img_BGR = viz(image1_org, image2_org, flow_up)
-        # save visualization
-        logger.info(f'saved at : {args.savepath}')
 
         # view result figure
         cv2.imshow('frame', img_BGR)
+        frame_shown = True
         time.sleep(SLEEP_TIME)
         # save result
         if writer is not None:

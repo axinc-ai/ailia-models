@@ -1,22 +1,23 @@
 import sys
 import time
-import cv2
 
 import ailia
+import cv2
 
-from mlp_mixer_utils import *
 from mlp_mixer_labels import imagenet_category
+from mlp_mixer_utils import *
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser  # noqa: E402
-from model_utils import check_and_download_models  # noqa: E402
-from classifier_utils import plot_results, print_results  # noqa: E402
-from image_utils import load_image  # noqa: E402
-import webcamera_utils  # noqa: E402
-
 # logger
-from logging import getLogger   # noqa: E402
+from logging import getLogger  # noqa: E402
+
+import webcamera_utils  # noqa: E402
+from classifier_utils import plot_results, print_results  # noqa: E402
+from image_utils import imread, load_image  # noqa: E402
+from model_utils import check_and_download_models  # noqa: E402
+from arg_utils import get_base_parser, update_parser  # noqa: E402
+
 logger = getLogger(__name__)
 
 
@@ -61,7 +62,7 @@ def recognize_from_image():
     for image_path in args.input:
         # prepare input data
         logger.info(image_path)
-        input_img = cv2.imread(image_path)
+        input_img = imread(image_path)
         input_data = preprocess_input(input_img, IMAGE_HEIGHT, IMAGE_WIDTH)
 
         # inference
@@ -97,9 +98,12 @@ def recognize_from_video():
     else:
         writer = None
 
+    frame_shown = False
     while(True):
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
             break
 
         # prepare input data
@@ -113,9 +117,10 @@ def recognize_from_video():
         preds = softmax(preds)
 
         # get result
-        print_results(preds, imagenet_category)
+        plot_results(frame, preds, imagenet_category)
 
         cv2.imshow('frame', frame)
+        frame_shown = True
         time.sleep(SLEEP_TIME)
 
         # save results

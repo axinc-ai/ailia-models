@@ -11,10 +11,10 @@ from st_gcn_util import naive_pose_tracker, render_video, render_image
 from st_gcn_labels import KINETICS_LABEL
 
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser  # noqa: E402
-from utils import check_file_existance  # noqa: E402
+from arg_utils import get_base_parser, update_parser  # noqa: E402
+from arg_utils import check_file_existance  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
-from webcamera_utils import get_capture  # noqa: E402
+from webcamera_utils import get_capture, get_writer  # noqa: E402
 
 
 # ======================
@@ -142,6 +142,7 @@ def postprocess(output, feature, num_person):
 # Main functions
 # ======================
 def recognize_offline(input, pose, net):
+    input = input[0]
     capture = cv2.VideoCapture(input)
     video_length = int(capture.get(cv2.CAP_PROP_FRAME_COUNT))
     pose_tracker = naive_pose_tracker(data_frame=video_length)
@@ -152,6 +153,8 @@ def recognize_offline(input, pose, net):
     while True:
         ret, frame = capture.read()
         if frame is None:
+            break
+        if video_length <= frame_index:
             break
 
         source_H, source_W, _ = frame.shape
@@ -176,8 +179,6 @@ def recognize_offline(input, pose, net):
             img = cv2.cvtColor(img, cv2.COLOR_BGR2BGRA)
             pose.compute(img)
             count = pose.get_object_count()
-            if count == 0:
-                continue
 
             pose_keypoints = np.zeros((count, 18, 3))
             # pose_keypoints.shape : (num_person, num_joint, 3)
@@ -231,15 +232,29 @@ def recognize_from_file(input, pose, net):
         data, voting_label_name,
         video_label_name, intensity, frames)
 
-    # visualize
+    # visualize or save
+    writer = None
     for i, image in enumerate(images):
         image = image.astype(np.uint8)
-        if args.img_save:
+
+        # init writer
+        if (writer is None) and (args.savepath is not None):
+            shape = image.shape
+            writer = get_writer(args.savepath, image.shape[0], image.shape[1])
+
+        if writer is not None:
+            writer.write(image)
+        elif args.img_save:
             cv2.imwrite("output/ST-GCN-%08d.png" % i, image)
         else:
             cv2.imshow("ST-GCN", image)
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
+            if cv2.getWindowProperty('ST-GCN', cv2.WND_PROP_VISIBLE) == 0:
+                break
+
+    if writer is not None:
+        writer.release()
 
 
 def recognize_realtime(video, pose, net):
@@ -250,11 +265,14 @@ def recognize_realtime(video, pose, net):
     # start recognition
     start_time = time.time()
     frame_index = 0
+    frame_shown = False
     while True:
         tic = time.time()
 
         ret, frame = capture.read()
         if cv2.waitKey(1) & 0xFF == ord('q') or not ret:
+            break
+        if frame_shown and cv2.getWindowProperty('ST-GCN', cv2.WND_PROP_VISIBLE) == 0:
             break
 
         source_H, source_W, _ = frame.shape
@@ -324,6 +342,7 @@ def recognize_realtime(video, pose, net):
             cv2.imwrite("output/ST-GCN-%08d.png" % frame_index, image)
         else:
             cv2.imshow('ST-GCN', image)
+            frame_shown = True
 
     capture.release()
     cv2.destroyAllWindows()

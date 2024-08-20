@@ -4,7 +4,7 @@
 
 ![Input](input.jpg)
 
-(Image from https://github.com/RangiLyu/nanodet/blob/main/demo_mnn/imgs/000252.jpg)
+(Image from https://pixabay.com/ja/photos/%E3%83%AD%E3%83%B3%E3%83%89%E3%83%B3%E5%B8%82-%E9%8A%80%E8%A1%8C-%E3%83%AD%E3%83%B3%E3%83%89%E3%83%B3-4481399/)
 
 Ailia input shape: (1, 3, 416, 416), (1, 3, 640, 640)
 

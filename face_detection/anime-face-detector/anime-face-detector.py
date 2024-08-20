@@ -9,7 +9,7 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
+from arg_utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from detector_utils import load_image  # noqa: E402C
 from image_utils import normalize_image  # noqa: E402C
@@ -19,7 +19,7 @@ from logging import getLogger  # noqa: E402
 
 from post_transforms_utils import flip_back, get_affine_transform
 from top_down_utils import keypoints_from_heatmaps
-from visual_utils import visualize
+from output_utils import visualize, save_json
 
 logger = getLogger(__name__)
 
@@ -58,6 +58,11 @@ parser = get_base_parser(
 parser.add_argument(
     '-d', '--detector', default='yolov3', choices=('yolov3', 'faster-rcnn'),
     help='face detector model.'
+)
+parser.add_argument(
+    '-w', '--write_json',
+    action='store_true',
+    help='Flag to output results to json file.'
 )
 args = update_parser(parser)
 
@@ -233,7 +238,7 @@ def predict(landmark_detector, face_detector, img):
 
     pose_results = []
     if len(bboxes) == 0:
-        return pose_results
+        return pose_results, bboxes
 
     bboxes_xywh = xyxy2xywh(bboxes)
 
@@ -324,6 +329,10 @@ def recognize_from_image(landmark_detector, face_detector):
         logger.info(f'saved at : {savepath}')
         cv2.imwrite(savepath, res_img)
 
+        if args.write_json:
+            json_file = '%s.json' % savepath.rsplit('.', 1)[0]
+            save_json(json_file, keypoints, bboxes)
+
     logger.info('Script finished successfully.')
 
 
@@ -342,10 +351,13 @@ def recognize_from_video(landmark_detector, face_detector):
         writer = get_writer(args.savepath, f_h, f_w)
     else:
         writer = None
-
+    
+    frame_shown = False
     while True:
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
             break
 
         # inference
@@ -360,6 +372,7 @@ def recognize_from_video(landmark_detector, face_detector):
 
         # show
         cv2.imshow('frame', res_img)
+        frame_shown = True
 
         # save results
         if writer is not None:

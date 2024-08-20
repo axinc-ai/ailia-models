@@ -1,23 +1,23 @@
+import platform
 import sys
 import time
-import platform
-
-import numpy as np
-import cv2
 
 import ailia
+import cv2
+import numpy as np
 
 # import original modules
 sys.path.append('../../util')
 sys.path.append('../../face_detection/blazeface')
-from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
-from model_utils import check_and_download_models  # noqa: E402
-from image_utils import load_image  # noqa: E402
+# logger
+from logging import getLogger  # noqa: E402
+
 import webcamera_utils  # noqa: E402
 from blazeface_utils import compute_blazeface_with_keypoint  # noqa: E402
+from image_utils import imread, load_image  # noqa: E402
+from model_utils import check_and_download_models  # noqa: E402
+from arg_utils import get_base_parser, get_savepath, update_parser  # noqa: E402
 
-# logger
-from logging import getLogger   # noqa: E402
 logger = getLogger(__name__)
 
 
@@ -93,7 +93,7 @@ def recognize_from_image():
     for image_path in args.input:
         # prepare input data
         logger.info(image_path)
-        org_img = cv2.imread(image_path)
+        org_img = imread(image_path)
         img = load_image(
             image_path,
             (IMAGE_HEIGHT, IMAGE_WIDTH),
@@ -149,9 +149,12 @@ def recognize_from_video():
     else:
         writer = None
 
+    frame_shown = False
     while(True):
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
             break
 
         # detect eyes
@@ -217,6 +220,7 @@ def recognize_from_video():
             )
 
         cv2.imshow('frame', frame)
+        frame_shown = True
         # save results
         if writer is not None:
             writer.write(frame)

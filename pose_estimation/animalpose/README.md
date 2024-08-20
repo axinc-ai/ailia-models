@@ -33,6 +33,11 @@ If you pass `0` as an argument to VIDEO_PATH, you can use the webcam input inste
 $ python3 animalpose.py --video VIDEO_PATH
 ```
 
+By default, yolov3 and hrnet32 are used. Yolox_m and hrnet48 can also be used for accuracy.
+```bash
+$ python3 animalpose.py -d yolox_m -m hrnet48
+```
+
 ## Reference
 
 - [MMPose](https://github.com/open-mmlab/mmpose) 

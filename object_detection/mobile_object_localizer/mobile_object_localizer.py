@@ -3,12 +3,13 @@ import time
 
 import numpy as np
 import cv2
+import json
 
 import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
+from arg_utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from detector_utils import load_image  # noqa: E402C
 from webcamera_utils import get_capture, get_writer  # noqa: E402
@@ -46,6 +47,11 @@ parser.add_argument(
     default=THRESHOLD, type=float,
     help='The detection threshold for yolo. (default: ' + str(THRESHOLD) + ')'
 )
+parser.add_argument(
+    '-w', '--write_json',
+    action='store_true',
+    help='Flag to output results to json file.'
+)
 args = update_parser(parser)
 
 
@@ -76,6 +82,21 @@ def draw_detections(img, bboxes):
             cv2.FONT_HERSHEY_SIMPLEX, size, color, text_thickness, cv2.LINE_AA)
 
     return img
+
+
+def save_result_json(json_path, img, bboxes):
+    h, w = img.shape[:2]
+    res = []
+    for bbox in bboxes:
+        box = bbox[:4]
+        det_score = 100.0 * bbox[4]
+        res.append({
+            'det': det_score,
+            'x1': box[0], 'y1': box[1],
+            'x2': box[2], 'y2': box[3]
+        })
+    with open(json_path, 'w') as f:
+        json.dump(res, f, indent=2)
 
 
 # ======================
@@ -170,6 +191,11 @@ def recognize_from_image(net):
         logger.info(f'saved at : {savepath}')
         cv2.imwrite(savepath, res_img)
 
+        # write prediction
+        if args.write_json:
+            pred_file = '%s.json' % savepath.rsplit('.', 1)[0]
+            save_result_json(pred_file, img, bboxes)
+
     logger.info('Script finished successfully.')
 
 
@@ -189,9 +215,12 @@ def recognize_from_video(net):
     else:
         writer = None
 
+    frame_shown = False 
     while True:
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
             break
 
         # inference
@@ -202,6 +231,7 @@ def recognize_from_video(net):
 
         # show
         cv2.imshow('frame', res_img)
+        frame_shown = True
 
         # save results
         if writer is not None:
