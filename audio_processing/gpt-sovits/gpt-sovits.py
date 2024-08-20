@@ -74,7 +74,7 @@ WEIGHT_PATH_T2S_FIRST_DECODER = 't2s_fsdec.onnx'
 if args.normal:
     WEIGHT_PATH_T2S_STAGE_DECODER = 't2s_sdec.onnx'
 else:
-    WEIGHT_PATH_T2S_STAGE_DECODER = 't2s_sdec.opt.onnx'
+    WEIGHT_PATH_T2S_STAGE_DECODER = 't2s_sdec.opt2.onnx'
 WEIGHT_PATH_VITS = 'vits.onnx'
 
 MODEL_PATH_SSL = WEIGHT_PATH_SSL + '.prototxt'
