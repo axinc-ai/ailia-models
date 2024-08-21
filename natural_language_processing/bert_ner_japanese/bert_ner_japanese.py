@@ -193,7 +193,6 @@ def main():
         providers = ["CUDAExecutionProvider", "CPUExecutionProvider"]
         net = onnxruntime.InferenceSession(WEIGHT_PATH, providers=providers)
 
-    args.disable_ailia_tokenizer = True
     if args.disable_ailia_tokenizer:
         from transformers import AutoTokenizer
 
