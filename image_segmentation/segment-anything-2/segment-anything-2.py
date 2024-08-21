@@ -9,16 +9,21 @@ from typing import Tuple
 np.random.seed(3)
 
 import torch
+from torch import nn
 
-class PositionEmbeddingRandom():
+class PositionEmbeddingRandom(nn.Module):
     """
     Positional encoding using random spatial frequencies.
     """
 
     def __init__(self, num_pos_feats: int = 64, scale: Optional[float] = None) -> None:
+        super().__init__()
         if scale is None or scale <= 0.0:
             scale = 1.0
-        self.positional_encoding_gaussian_matrix = scale * torch.randn((2, num_pos_feats)),
+        self.register_buffer(
+            "positional_encoding_gaussian_matrix",
+            scale * torch.randn((2, num_pos_feats)),
+        )
 
     def _pe_encoding(self, coords: torch.Tensor) -> torch.Tensor:
         """Positionally encode points that are normalized to [0,1]."""
@@ -177,15 +182,15 @@ def _predict(
             concat_points = (box_coords, box_labels)
 
 
-    model = ailia.Net(weight="prompt_encoder_hiera_l.onnx", stream=None, memory_mode=11, env_id=1)
+    model = ailia.Net(weight="prompt_encoder_sparse_hiera_l.onnx", stream=None, memory_mode=11, env_id=1)
     #import onnxruntime
-    #model = onnxruntime.InferenceSession("prompt_encoder_hiera_l.onnx")
+    #model = onnxruntime.InferenceSession("prompt_encoder_sparse_hiera_l.onnx")
     #if mask_input is None:
     #    mask_input = np.zeros((1, 1))
 
     #mask_input is not supported yet
-    #print(concat_points[0].shape)
-    #print(concat_points[1].shape)
+    print(concat_points[0].shape)
+    print(concat_points[1].shape)
     sparse_embeddings, dense_embeddings = model.run([concat_points[0].numpy(), concat_points[1].numpy()])#, mask_input)
     #sparse_embeddings, dense_embeddings = model.run(None, {"coords":concat_points[0].numpy(), "labels":concat_points[1].numpy()})#, mask_input)
 
@@ -194,17 +199,30 @@ def _predict(
         concat_points is not None and concat_points[0].shape[0] > 1
     )  # multi object prediction
     high_res_features = [
-        feat_level.unsqueeze(0)
+        feat_level
         for feat_level in features["high_res_feats"]
     ]
-    model = ailia.Net(weight="mask_decoder_hiera_l.onnx", stream=None, memory_mode=11, env_id=1)
-    pe = PositionEmbeddingRandom()
-    image_embedding_size = [64, 64]
-    image_feature = features["image_embed"].unsqueeze(0).numpy()
+    #model = ailia.Net(weight="mask_decoder_hiera_l.onnx", stream=None, memory_mode=11, env_id=1)
+    import onnxruntime
+    model = onnxruntime.InferenceSession("mask_decoder_hiera_l.onnx")
+    pe = PositionEmbeddingRandom(num_pos_feats=256//2)
+    image_embedding_size = (64, 64)
+    image_feature = features["image_embed"]#np.expand_dims(features["image_embed"], axis=0)
     image_pe = pe(image_embedding_size).unsqueeze(0).numpy()
-    low_res_masks, iou_predictions, _, _ = model.run([image_feature, image_pe,  sparse_embeddings, dense_embeddings, multimask_output, batched_mode, high_res_features])
+    #low_res_masks, iou_predictions, _, _ = model.run([image_feature, image_pe,  sparse_embeddings, dense_embeddings, high_res_features[0], high_res_features[1]])
+    low_res_masks, iou_predictions, _, _  = model.run(None, {
+        "image_embeddings":image_feature,
+        "image_pe": image_pe,
+        "sparse_prompt_embeddings": sparse_embeddings,
+        "dense_prompt_embeddings": dense_embeddings,
+        "high_res_features1":high_res_features[0],
+        "high_res_features2":high_res_features[1]})
 
     # Upscale the masks to the original image resolution
+    low_res_masks = torch.Tensor(low_res_masks)
+    iou_predictions = torch.Tensor(iou_predictions)
+    print(low_res_masks.shape)
+
     masks = postprocess_masks(
         low_res_masks, orig_hw
     )
@@ -236,10 +254,12 @@ def transform_boxes(
     boxes = transform_coords(boxes.reshape(-1, 2, 2), normalize, orig_hw)
     return boxes
 
-def postprocess_masks(self, masks: torch.Tensor, orig_hw) -> torch.Tensor:
+def postprocess_masks(masks: torch.Tensor, orig_hw) -> torch.Tensor:
     # max_hole_areaは0.0を仮定している
     # そうでない場合はオリジナルは穴埋め処理が入る
     import torch.nn.functional as F
+    print("postprocess_masks", masks.shape, orig_hw)
+    masks = masks.float()
     masks = F.interpolate(masks, orig_hw, mode="bilinear", align_corners=False)
     return masks
 
@@ -251,8 +271,10 @@ model = ailia.Net(weight="image_encoder_hiera_l.onnx", stream=None, memory_mode=
 
 import cv2
 import numpy
-img = cv2.imread("truck.jpg")
-img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+image = cv2.imread("truck.jpg")
+orig_hw = [image.shape[0], image.shape[1]]
+print(orig_hw)
+img = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 img = img.astype(numpy.float32)
 img = img / 255.0
 img = img - [0.485, 0.456, 0.406]
@@ -260,8 +282,6 @@ img = img / [0.229, 0.224, 0.225]
 img = cv2.resize(img, (1024, 1024))
 img = numpy.expand_dims(img, 0)
 img = numpy.transpose(img, (0, 3, 1, 2))
-print(img.shape)
-orig_hw = [img.shape[2], img.shape[3]]
 feats = model.run(img)
 
 features = {"image_embed": feats[-1], "high_res_feats": feats[:-1]}
@@ -282,6 +302,6 @@ scores = scores[sorted_ind]
 logits = logits[sorted_ind]
 
 if show:
-    show_masks(img, masks, scores, point_coords=input_point, input_labels=input_label, borders=True)
+    show_masks(image, masks, scores, point_coords=input_point, input_labels=input_label, borders=True)
 
 print("Success!")
