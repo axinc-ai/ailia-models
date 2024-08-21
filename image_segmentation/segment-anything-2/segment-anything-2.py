@@ -182,17 +182,17 @@ def _predict(
             concat_points = (box_coords, box_labels)
 
 
-    model = ailia.Net(weight="prompt_encoder_sparse_hiera_l.onnx", stream=None, memory_mode=11, env_id=1)
-    #import onnxruntime
-    #model = onnxruntime.InferenceSession("prompt_encoder_sparse_hiera_l.onnx")
+    #model = ailia.Net(weight="prompt_encoder_sparse_hiera_l.onnx", stream=None, memory_mode=11, env_id=1)
+    import onnxruntime
+    model = onnxruntime.InferenceSession("prompt_encoder_sparse_hiera_l.onnx")
     #if mask_input is None:
     #    mask_input = np.zeros((1, 1))
 
     #mask_input is not supported yet
     print(concat_points[0].shape)
     print(concat_points[1].shape)
-    sparse_embeddings, dense_embeddings = model.run([concat_points[0].numpy(), concat_points[1].numpy()])#, mask_input)
-    #sparse_embeddings, dense_embeddings = model.run(None, {"coords":concat_points[0].numpy(), "labels":concat_points[1].numpy()})#, mask_input)
+    #sparse_embeddings, dense_embeddings = model.run([concat_points[0].numpy(), concat_points[1].numpy()])#, mask_input)
+    sparse_embeddings, dense_embeddings = model.run(None, {"coords":concat_points[0].numpy(), "labels":concat_points[1].numpy()})#, mask_input)
 
     # Predict masks
     batched_mode = (
@@ -267,8 +267,11 @@ def postprocess_masks(masks: torch.Tensor, orig_hw) -> torch.Tensor:
 show = True
 
 
-model = ailia.Net(weight="image_encoder_hiera_l.onnx", stream=None, memory_mode=11, env_id=1)
+#model = ailia.Net(weight="image_encoder_hiera_l.onnx", stream=None, memory_mode=11, env_id=1)
 
+import onnxruntime
+model = onnxruntime.InferenceSession("image_encoder_hiera_l.onnx")
+    
 import cv2
 import numpy
 image = cv2.imread("truck.jpg")
@@ -282,7 +285,10 @@ img = img / [0.229, 0.224, 0.225]
 img = cv2.resize(img, (1024, 1024))
 img = numpy.expand_dims(img, 0)
 img = numpy.transpose(img, (0, 3, 1, 2))
-feats = model.run(img)
+img = img.astype(numpy.float32)
+
+#feats = model.run([img])
+feats = model.run(None, {"input_image":img})
 
 features = {"image_embed": feats[-1], "high_res_feats": feats[:-1]}
 
