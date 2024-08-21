@@ -177,11 +177,17 @@ def _predict(
             concat_points = (box_coords, box_labels)
 
 
-    model = ailia.Net(weight="prompt_encoder.onnx", stream=None, memory_mode=11, env_id=1)
-    print(concat_points)
-    if mask_input is None:
-        mask_input = np.zeros((1, 1))
-    sparse_embeddings, dense_embeddings = model.run(concat_points, mask_input)
+    model = ailia.Net(weight="prompt_encoder_hiera_l.onnx", stream=None, memory_mode=11, env_id=1)
+    #import onnxruntime
+    #model = onnxruntime.InferenceSession("prompt_encoder_hiera_l.onnx")
+    #if mask_input is None:
+    #    mask_input = np.zeros((1, 1))
+
+    #mask_input is not supported yet
+    #print(concat_points[0].shape)
+    #print(concat_points[1].shape)
+    sparse_embeddings, dense_embeddings = model.run([concat_points[0].numpy(), concat_points[1].numpy()])#, mask_input)
+    #sparse_embeddings, dense_embeddings = model.run(None, {"coords":concat_points[0].numpy(), "labels":concat_points[1].numpy()})#, mask_input)
 
     # Predict masks
     batched_mode = (
@@ -191,7 +197,7 @@ def _predict(
         feat_level.unsqueeze(0)
         for feat_level in features["high_res_feats"]
     ]
-    model = ailia.Net(weight="mask_decoder.onnx", stream=None, memory_mode=11, env_id=1)
+    model = ailia.Net(weight="mask_decoder_hiera_l.onnx", stream=None, memory_mode=11, env_id=1)
     pe = PositionEmbeddingRandom()
     image_embedding_size = [64, 64]
     image_feature = features["image_embed"].unsqueeze(0).numpy()
@@ -241,7 +247,7 @@ def postprocess_masks(self, masks: torch.Tensor, orig_hw) -> torch.Tensor:
 show = True
 
 
-model = ailia.Net(weight="image_encoder.onnx", stream=None, memory_mode=11, env_id=1)
+model = ailia.Net(weight="image_encoder_hiera_l.onnx", stream=None, memory_mode=11, env_id=1)
 
 import cv2
 import numpy
