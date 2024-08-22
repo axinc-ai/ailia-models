@@ -294,7 +294,7 @@ The collection of pre-trained, state-of-the-art AI models.
 
 | | Model | Reference | Exported From | Supported Ailia Version | Blog |
 |:-----------|------------:|:------------:|:------------:|:------------:|:------------:|
-| [<img src="face_swapping/sber-swap/output.png" width=128px>](face_swapping/sber-swap/) | [sber-swap](/face_swapping/sber-swap/) | [SberSwap](https://github.com/ai-forever/sber-swap) | Pytorch | 1.2.12 and later | |
+| [<img src="face_swapping/sber-swap/output.png" width=128px>](face_swapping/sber-swap/) | [sber-swap](/face_swapping/sber-swap/) | [SberSwap](https://github.com/ai-forever/sber-swap) | Pytorch | 1.2.12 and later | [JP](https://medium.com/axinc/sberswap-ai%E3%81%AB%E3%82%88%E3%82%8B%E9%AB%98%E7%B2%BE%E5%BA%A6%E3%81%AAfaceswap-bddae3b8ff84) |
 | [<img src="face_swapping/facefusion/output.png" width=128px>](face_swapping/facefusion/) | [facefusion](/face_swapping/facefusion/) | [FaceFusion](https://github.com/facefusion/facefusion) | ONNXRuntime | 1.2.10 and later |
 
 ## Frame Interpolation
