@@ -1,16 +1,19 @@
 ﻿import sys
 import os
 import time
-from copy import deepcopy
-from collections import OrderedDict
 from logging import getLogger
 
 import numpy as np
 import cv2
-from PIL import Image
 
 import ailia
-import copy
+
+import os
+import numpy as np
+import matplotlib.pyplot as plt
+import ailia
+from typing import Optional
+from typing import Tuple
 
 # import original modules
 sys.path.append('../../util')
@@ -71,17 +74,10 @@ parser.add_argument(
 )
 args = update_parser(parser)
 
+# ======================
+# Utility
+# ======================
 
-
-
-import os
-import numpy as np
-import matplotlib.pyplot as plt
-import ailia
-from typing import Optional
-from typing import Tuple
-
-# %%
 np.random.seed(3)
 
 import torch
@@ -129,6 +125,10 @@ def show_masks(image, masks, scores, point_coords=None, box_coords=None, input_l
         plt.axis('off')
         plt.show()
 
+# ======================
+# Logic
+# ======================
+
 def predict(
     features,
     orig_hw,
@@ -139,6 +139,8 @@ def predict(
     multimask_output: bool = True,
     return_logits: bool = False,
     normalize_coords=True,
+    prompt_encoder = None,
+    mask_decoder = None
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     # Transform input prompts
     mask_input, unnorm_coords, labels, unnorm_box = _prep_prompts(
@@ -153,7 +155,9 @@ def predict(
         unnorm_box,
         mask_input,
         multimask_output,
-        return_logits=return_logits
+        return_logits=return_logits,
+        prompt_encoder=prompt_encoder,
+        mask_decoder=mask_decoder
     )
 
     masks_np = masks.squeeze(0).float().detach().cpu().numpy()
@@ -201,6 +205,8 @@ def _predict(
     mask_input: Optional[torch.Tensor] = None,
     multimask_output: bool = True,
     return_logits: bool = False,
+    prompt_encoder = None,
+    mask_decoder = None
 ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     if point_coords is not None:
         concat_points = (point_coords, point_labels)
@@ -222,65 +228,42 @@ def _predict(
             concat_points = (box_coords, box_labels)
 
 
-    if args.onnx:
-        import onnxruntime
-        model = onnxruntime.InferenceSession("prompt_encoder_sparse_hiera_l.onnx")
-    else:
-        model = ailia.Net(weight="prompt_encoder_sparse_hiera_l.onnx", stream=None, memory_mode=11, env_id=1)
-    #if mask_input is None:
-    #    mask_input = np.zeros((1, 1))
 
-    #mask_input is not supported yet
-    #print("concat_points", concat_points)
-    #print(concat_points[0].shape)
-    #print(concat_points[1].shape)
-    #sparse_embeddings, dense_embeddings = model.run([concat_points[0].numpy(), concat_points[1].numpy()])#, mask_input)
     if args.onnx:
-        sparse_embeddings, dense_embeddings, dense_pe = model.run(None, {"coords":concat_points[0].numpy(), "labels":concat_points[1].numpy()})
+        sparse_embeddings, dense_embeddings, dense_pe = prompt_encoder.run(None, {"coords":concat_points[0].numpy(), "labels":concat_points[1].numpy()})
     else:
-        sparse_embeddings, dense_embeddings, dense_pe = model.run({"coords":concat_points[0].numpy(), "labels":concat_points[1].numpy()})
-    sparse_embeddings = torch.Tensor(sparse_embeddings)
-    dense_embeddings = torch.Tensor(dense_embeddings)
-    dense_pe = torch.Tensor(dense_pe)
-    #print("sparse_embeddings", sparse_embeddings)
-    #print("dense_embeddings", dense_embeddings)
+        sparse_embeddings, dense_embeddings, dense_pe = prompt_encoder.run({"coords":concat_points[0].numpy(), "labels":concat_points[1].numpy()})
 
     # Predict masks
     batched_mode = (
         concat_points is not None and concat_points[0].shape[0] > 1
     )  # multi object prediction
     high_res_features = [
-        feat_level[0].unsqueeze(0)
+        feat_level
         for feat_level in features["high_res_feats"]
     ]
+
+    image_feature = features["image_embed"]
     if args.onnx:
-        import onnxruntime
-        model = onnxruntime.InferenceSession("mask_decoder_hiera_l.onnx")
+        low_res_masks, iou_predictions, _, _  = mask_decoder.run(None, {
+            "image_embeddings":image_feature,
+            "image_pe": dense_pe,
+            "sparse_prompt_embeddings": sparse_embeddings,
+            "dense_prompt_embeddings": dense_embeddings,
+            "high_res_features1":high_res_features[0],
+            "high_res_features2":high_res_features[1]})
     else:
-        model = ailia.Net(weight="mask_decoder_hiera_l.onnx", stream=None, memory_mode=11, env_id=1)
-    image_feature = features["image_embed"]#np.expand_dims(features["image_embed"], axis=0)
-    #low_res_masks, iou_predictions, _, _ = model.run([image_feature, image_pe,  sparse_embeddings, dense_embeddings, high_res_features[0], high_res_features[1]])
-    if args.onnx:
-        low_res_masks, iou_predictions, _, _  = model.run(None, {
-            "image_embeddings":image_feature[0].unsqueeze(0).numpy(),
-            "image_pe": dense_pe.numpy(),
-            "sparse_prompt_embeddings": sparse_embeddings.numpy(),
-            "dense_prompt_embeddings": dense_embeddings.numpy(),
-            "high_res_features1":high_res_features[0].numpy(),
-            "high_res_features2":high_res_features[1].numpy()})
-    else:
-        low_res_masks, iou_predictions, _, _  = model.run({
-            "image_embeddings":image_feature[0].unsqueeze(0).numpy(),
-            "image_pe": dense_pe.numpy(),
-            "sparse_prompt_embeddings": sparse_embeddings.numpy(),
-            "dense_prompt_embeddings": dense_embeddings.numpy(),
-            "high_res_features1":high_res_features[0].numpy(),
-            "high_res_features2":high_res_features[1].numpy()})
+        low_res_masks, iou_predictions, _, _  = mask_decoder.run({
+            "image_embeddings":image_feature,
+            "image_pe": dense_pe,
+            "sparse_prompt_embeddings": sparse_embeddings,
+            "dense_prompt_embeddings": dense_embeddings,
+            "high_res_features1":high_res_features[0],
+            "high_res_features2":high_res_features[1]})
 
     # Upscale the masks to the original image resolution
     low_res_masks = torch.Tensor(low_res_masks)
     iou_predictions = torch.Tensor(iou_predictions)
-    print(low_res_masks.shape)
 
     masks = postprocess_masks(
         low_res_masks, orig_hw
@@ -322,35 +305,39 @@ def postprocess_masks(masks: torch.Tensor, orig_hw) -> torch.Tensor:
     masks = F.interpolate(masks, orig_hw, mode="bilinear", align_corners=False)
     return masks
 
+# ======================
+# Main
+# ======================
 
 show = True
 
 if args.onnx:
     import onnxruntime
-    model = onnxruntime.InferenceSession("image_encoder_hiera_l.onnx")
+    image_encoder = onnxruntime.InferenceSession("image_encoder_hiera_l.onnx")
+    prompt_encoder = onnxruntime.InferenceSession("prompt_encoder_sparse_hiera_l.onnx")
+    mask_decoder = onnxruntime.InferenceSession("mask_decoder_hiera_l.onnx")
 else:
-    model = ailia.Net(weight="image_encoder_hiera_l.onnx", stream=None, memory_mode=11, env_id=1)
-    
-import cv2
-import numpy
+    image_encoder = ailia.Net(weight="image_encoder_hiera_l.onnx", stream=None, memory_mode=11, env_id=1)
+    prompt_encoder = ailia.Net(weight="prompt_encoder_sparse_hiera_l.onnx", stream=None, memory_mode=11, env_id=1)
+    mask_decoder = ailia.Net(weight="mask_decoder_hiera_l.onnx", stream=None, memory_mode=11, env_id=1)
+
 image = cv2.imread("truck.jpg")
 orig_hw = [image.shape[0], image.shape[1]]
-#print(orig_hw)
 img = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-img = img.astype(numpy.float32)
+img = img.astype(np.float32)
 img = img / 255.0
 img = img - [0.485, 0.456, 0.406]
 img = img / [0.229, 0.224, 0.225]
 img = cv2.resize(img, (1024, 1024))
-img = numpy.expand_dims(img, 0)
-img = numpy.transpose(img, (0, 3, 1, 2))
-img = img.astype(numpy.float32)
+img = np.expand_dims(img, 0)
+img = np.transpose(img, (0, 3, 1, 2))
+img = img.astype(np.float32)
 
 if args.onnx:
-    vision_feat1, vision_feat2, vision_feat3 = model.run(None, {"input_image":img})
+    vision_feat1, vision_feat2, vision_feat3 = image_encoder.run(None, {"input_image":img})
 else:
-    vision_feat1, vision_feat2, vision_feat3 = model.run({"input_image":img})
-feats = [torch.Tensor(vision_feat1), torch.Tensor(vision_feat2), torch.Tensor(vision_feat3)]
+    vision_feat1, vision_feat2, vision_feat3 = image_encoder.run({"input_image":img})
+feats = [vision_feat1, vision_feat2, vision_feat3]
 features = {"image_embed": feats[-1], "high_res_feats": feats[:-1]}
 
 input_point = np.array([[500, 375]])
@@ -361,7 +348,9 @@ masks, scores, logits = predict(
     features=features,
     point_coords=input_point,
     point_labels=input_label,
-    multimask_output=True
+    multimask_output=True,
+    prompt_encoder=prompt_encoder,
+    mask_decoder=mask_decoder
 )
 sorted_ind = np.argsort(scores)[::-1]
 masks = masks[sorted_ind]
