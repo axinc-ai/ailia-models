@@ -113,7 +113,9 @@ cd ../../face_recognition/3ddfa; python3 3ddfa$.py ${OPTION}
 cd ../../face_recognition/mivolo; python3 mivolo.py ${OPTION}
 cd ../../face_recognition/l2cs_net; python3 l2cs_net.py ${OPTION}
 cd ../../face_restoration/codeformer; python3 codeformer.py ${OPTION}
+cd ../../face_restoration/gfpgan; python3 gfpgan.py ${OPTION}
 cd ../../face_swapping/facefusion; python3 facefusion.py ${OPTION}
+cd ../../face-swapping/sber-swap; python3 sber-swap.py ${OPTION}
 cd ../../frame_interpolation/flavr; python3 flavr.py ${OPTION}
 cd ../../frame_interpolation/cain; python3 cain.py ${OPTION}
 cd ../../frame_interpolation/film; python3 film.py ${OPTION}
@@ -123,8 +125,6 @@ cd ../../generative_adversarial_networks/pytorch-gan; python3 pytorch-gan.py ${O
 cd ../../generative_adversarial_networks/restyle-encoder; python3 restyle-encoder.py ${OPTION}
 cd ../../generative_adversarial_networks/sam; python3 sam.py ${OPTION}
 cd ../../generative_adversarial_networks/psgan; python3 psgan.py ${OPTION}
-cd ../../generative_adversarial_networks/gfpgan; python3 gfpgan.py ${OPTION}
-cd ../../generative_adversarial_networks/sber-swap; python3 sber-swap.py ${OPTION}
 cd ../../generative_adversarial_networks/encoder4editing; python3 encoder4editing.py ${OPTION}
 cd ../../generative_adversarial_networks/lipgan; python3 lipgan.py ${OPTION}
 cd ../../hand_detection/yolov3-hand; python3 yolov3-hand.py ${OPTION}
