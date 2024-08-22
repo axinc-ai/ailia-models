@@ -9,42 +9,6 @@ from typing import Tuple
 np.random.seed(3)
 
 import torch
-from torch import nn
-
-class PositionEmbeddingRandom(nn.Module):
-    """
-    Positional encoding using random spatial frequencies.
-    """
-
-    def __init__(self, num_pos_feats: int = 64, scale: Optional[float] = None) -> None:
-        super().__init__()
-        if scale is None or scale <= 0.0:
-            scale = 1.0
-        self.register_buffer(
-            "positional_encoding_gaussian_matrix",
-            scale * torch.randn((2, num_pos_feats)),
-        )
-
-    def _pe_encoding(self, coords: torch.Tensor) -> torch.Tensor:
-        """Positionally encode points that are normalized to [0,1]."""
-        # assuming coords are in [0, 1]^2 square and have d_1 x ... x d_n x 2 shape
-        coords = 2 * coords - 1
-        coords = coords @ self.positional_encoding_gaussian_matrix
-        coords = 2 * np.pi * coords
-        # outputs d_1 x ... x d_n x C shape
-        return torch.cat([torch.sin(coords), torch.cos(coords)], dim=-1)
-
-    def __call__(self, size: Tuple[int, int]) -> torch.Tensor:
-        """Generate positional encoding for a grid of the specified size."""
-        h, w = size
-        grid = torch.ones((h, w), dtype=torch.float32)
-        y_embed = grid.cumsum(dim=0) - 0.5
-        x_embed = grid.cumsum(dim=1) - 0.5
-        y_embed = y_embed / h
-        x_embed = x_embed / w
-
-        pe = self._pe_encoding(torch.stack([x_embed, y_embed], dim=-1))
-        return pe.permute(2, 0, 1)  # C x H x W
 
 def show_mask(mask, ax, random_color=False, borders = True):
     if random_color:
@@ -189,34 +153,37 @@ def _predict(
     #    mask_input = np.zeros((1, 1))
 
     #mask_input is not supported yet
-    print(concat_points[0].shape)
-    print(concat_points[1].shape)
+    #print("concat_points", concat_points)
+    #print(concat_points[0].shape)
+    #print(concat_points[1].shape)
     #sparse_embeddings, dense_embeddings = model.run([concat_points[0].numpy(), concat_points[1].numpy()])#, mask_input)
-    sparse_embeddings, dense_embeddings = model.run(None, {"coords":concat_points[0].numpy(), "labels":concat_points[1].numpy()})#, mask_input)
+    sparse_embeddings, dense_embeddings, dense_pe = model.run(None, {"coords":concat_points[0].numpy(), "labels":concat_points[1].numpy()})#, mask_input)
+    sparse_embeddings = torch.Tensor(sparse_embeddings)
+    dense_embeddings = torch.Tensor(dense_embeddings)
+    dense_pe = torch.Tensor(dense_pe)
+    #print("sparse_embeddings", sparse_embeddings)
+    #print("dense_embeddings", dense_embeddings)
 
     # Predict masks
     batched_mode = (
         concat_points is not None and concat_points[0].shape[0] > 1
     )  # multi object prediction
     high_res_features = [
-        feat_level
+        feat_level[0].unsqueeze(0)
         for feat_level in features["high_res_feats"]
     ]
     #model = ailia.Net(weight="mask_decoder_hiera_l.onnx", stream=None, memory_mode=11, env_id=1)
     import onnxruntime
     model = onnxruntime.InferenceSession("mask_decoder_hiera_l.onnx")
-    pe = PositionEmbeddingRandom(num_pos_feats=256//2)
-    image_embedding_size = (64, 64)
     image_feature = features["image_embed"]#np.expand_dims(features["image_embed"], axis=0)
-    image_pe = pe(image_embedding_size).unsqueeze(0).numpy()
     #low_res_masks, iou_predictions, _, _ = model.run([image_feature, image_pe,  sparse_embeddings, dense_embeddings, high_res_features[0], high_res_features[1]])
     low_res_masks, iou_predictions, _, _  = model.run(None, {
-        "image_embeddings":image_feature,
-        "image_pe": image_pe,
-        "sparse_prompt_embeddings": sparse_embeddings,
-        "dense_prompt_embeddings": dense_embeddings,
-        "high_res_features1":high_res_features[0],
-        "high_res_features2":high_res_features[1]})
+        "image_embeddings":image_feature[0].unsqueeze(0).numpy(),
+        "image_pe": dense_pe.numpy(),
+        "sparse_prompt_embeddings": sparse_embeddings.numpy(),
+        "dense_prompt_embeddings": dense_embeddings.numpy(),
+        "high_res_features1":high_res_features[0].numpy(),
+        "high_res_features2":high_res_features[1].numpy()})
 
     # Upscale the masks to the original image resolution
     low_res_masks = torch.Tensor(low_res_masks)
@@ -276,7 +243,7 @@ import cv2
 import numpy
 image = cv2.imread("truck.jpg")
 orig_hw = [image.shape[0], image.shape[1]]
-print(orig_hw)
+#print(orig_hw)
 img = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 img = img.astype(numpy.float32)
 img = img / 255.0
@@ -288,8 +255,8 @@ img = numpy.transpose(img, (0, 3, 1, 2))
 img = img.astype(numpy.float32)
 
 #feats = model.run([img])
-feats = model.run(None, {"input_image":img})
-
+vision_feat1, vision_feat2, vision_feat3 = model.run(None, {"input_image":img})
+feats = [torch.Tensor(vision_feat1), torch.Tensor(vision_feat2), torch.Tensor(vision_feat3)]
 features = {"image_embed": feats[-1], "high_res_feats": feats[:-1]}
 
 input_point = np.array([[500, 375]])
