@@ -1,4 +1,80 @@
-﻿import os
+﻿import sys
+import os
+import time
+from copy import deepcopy
+from collections import OrderedDict
+from logging import getLogger
+
+import numpy as np
+import cv2
+from PIL import Image
+
+import ailia
+import copy
+
+# import original modules
+sys.path.append('../../util')
+from arg_utils import get_base_parser, update_parser, get_savepath  # noqa
+from model_utils import urlretrieve, progress_print, check_and_download_models  # noqa
+from image_utils import normalize_image  # noqa
+from detector_utils import load_image  # noqa
+from webcamera_utils import get_capture, get_writer  # noqa
+
+logger = getLogger(__name__)
+
+# ======================
+# Parameters
+# ======================
+
+WEIGHT_IMAGE_ENCODER_L_PATH = 'sam_l_0b3195.onnx'
+MODEL_IMAGE_ENCODER_L_PATH = 'sam_l_0b3195.onnx.prototxt'
+REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/segment-anything-2/'
+
+IMAGE_PATH = 'truck.jpg'
+SAVE_IMAGE_PATH = 'output.png'
+
+POINT1 = (500, 375)
+POINT2 = (1125, 625)
+
+TARGET_LENGTH = 1024
+
+# ======================
+# Arguemnt Parser Config
+# ======================
+
+parser = get_base_parser(
+    'Segment Anything 2', IMAGE_PATH, SAVE_IMAGE_PATH
+)
+parser.add_argument(
+    '-p', '--pos', action='append', type=int, metavar="X", nargs=2,
+    help='Positive coordinate specified by x,y.'
+)
+parser.add_argument(
+    '--neg', action='append', type=int, metavar="X", nargs=2,
+    help='Negative coordinate specified by x,y.'
+)
+parser.add_argument(
+    '--box', type=int, metavar="X", nargs=4,
+    help='Box coordinate specified by x1,y1,x2,y2.'
+)
+parser.add_argument(
+    '--idx', type=int, choices=(0, 1, 2, 3),
+    help='Select mask index.'
+)
+parser.add_argument(
+    '-m', '--model_type', default='hiera_l', choices=('hiera_l'),
+    help='Select model.'
+)
+parser.add_argument(
+    '--onnx', action='store_true',
+    help='execute onnxruntime version.'
+)
+args = update_parser(parser)
+
+
+
+
+import os
 import numpy as np
 import matplotlib.pyplot as plt
 import ailia
@@ -146,9 +222,11 @@ def _predict(
             concat_points = (box_coords, box_labels)
 
 
-    #model = ailia.Net(weight="prompt_encoder_sparse_hiera_l.onnx", stream=None, memory_mode=11, env_id=1)
-    import onnxruntime
-    model = onnxruntime.InferenceSession("prompt_encoder_sparse_hiera_l.onnx")
+    if args.onnx:
+        import onnxruntime
+        model = onnxruntime.InferenceSession("prompt_encoder_sparse_hiera_l.onnx")
+    else:
+        model = ailia.Net(weight="prompt_encoder_sparse_hiera_l.onnx", stream=None, memory_mode=11, env_id=1)
     #if mask_input is None:
     #    mask_input = np.zeros((1, 1))
 
@@ -157,7 +235,10 @@ def _predict(
     #print(concat_points[0].shape)
     #print(concat_points[1].shape)
     #sparse_embeddings, dense_embeddings = model.run([concat_points[0].numpy(), concat_points[1].numpy()])#, mask_input)
-    sparse_embeddings, dense_embeddings, dense_pe = model.run(None, {"coords":concat_points[0].numpy(), "labels":concat_points[1].numpy()})#, mask_input)
+    if args.onnx:
+        sparse_embeddings, dense_embeddings, dense_pe = model.run(None, {"coords":concat_points[0].numpy(), "labels":concat_points[1].numpy()})
+    else:
+        sparse_embeddings, dense_embeddings, dense_pe = model.run({"coords":concat_points[0].numpy(), "labels":concat_points[1].numpy()})
     sparse_embeddings = torch.Tensor(sparse_embeddings)
     dense_embeddings = torch.Tensor(dense_embeddings)
     dense_pe = torch.Tensor(dense_pe)
@@ -172,18 +253,29 @@ def _predict(
         feat_level[0].unsqueeze(0)
         for feat_level in features["high_res_feats"]
     ]
-    #model = ailia.Net(weight="mask_decoder_hiera_l.onnx", stream=None, memory_mode=11, env_id=1)
-    import onnxruntime
-    model = onnxruntime.InferenceSession("mask_decoder_hiera_l.onnx")
+    if args.onnx:
+        import onnxruntime
+        model = onnxruntime.InferenceSession("mask_decoder_hiera_l.onnx")
+    else:
+        model = ailia.Net(weight="mask_decoder_hiera_l.onnx", stream=None, memory_mode=11, env_id=1)
     image_feature = features["image_embed"]#np.expand_dims(features["image_embed"], axis=0)
     #low_res_masks, iou_predictions, _, _ = model.run([image_feature, image_pe,  sparse_embeddings, dense_embeddings, high_res_features[0], high_res_features[1]])
-    low_res_masks, iou_predictions, _, _  = model.run(None, {
-        "image_embeddings":image_feature[0].unsqueeze(0).numpy(),
-        "image_pe": dense_pe.numpy(),
-        "sparse_prompt_embeddings": sparse_embeddings.numpy(),
-        "dense_prompt_embeddings": dense_embeddings.numpy(),
-        "high_res_features1":high_res_features[0].numpy(),
-        "high_res_features2":high_res_features[1].numpy()})
+    if args.onnx:
+        low_res_masks, iou_predictions, _, _  = model.run(None, {
+            "image_embeddings":image_feature[0].unsqueeze(0).numpy(),
+            "image_pe": dense_pe.numpy(),
+            "sparse_prompt_embeddings": sparse_embeddings.numpy(),
+            "dense_prompt_embeddings": dense_embeddings.numpy(),
+            "high_res_features1":high_res_features[0].numpy(),
+            "high_res_features2":high_res_features[1].numpy()})
+    else:
+        low_res_masks, iou_predictions, _, _  = model.run({
+            "image_embeddings":image_feature[0].unsqueeze(0).numpy(),
+            "image_pe": dense_pe.numpy(),
+            "sparse_prompt_embeddings": sparse_embeddings.numpy(),
+            "dense_prompt_embeddings": dense_embeddings.numpy(),
+            "high_res_features1":high_res_features[0].numpy(),
+            "high_res_features2":high_res_features[1].numpy()})
 
     # Upscale the masks to the original image resolution
     low_res_masks = torch.Tensor(low_res_masks)
@@ -233,11 +325,11 @@ def postprocess_masks(masks: torch.Tensor, orig_hw) -> torch.Tensor:
 
 show = True
 
-
-#model = ailia.Net(weight="image_encoder_hiera_l.onnx", stream=None, memory_mode=11, env_id=1)
-
-import onnxruntime
-model = onnxruntime.InferenceSession("image_encoder_hiera_l.onnx")
+if args.onnx:
+    import onnxruntime
+    model = onnxruntime.InferenceSession("image_encoder_hiera_l.onnx")
+else:
+    model = ailia.Net(weight="image_encoder_hiera_l.onnx", stream=None, memory_mode=11, env_id=1)
     
 import cv2
 import numpy
@@ -254,8 +346,10 @@ img = numpy.expand_dims(img, 0)
 img = numpy.transpose(img, (0, 3, 1, 2))
 img = img.astype(numpy.float32)
 
-#feats = model.run([img])
-vision_feat1, vision_feat2, vision_feat3 = model.run(None, {"input_image":img})
+if args.onnx:
+    vision_feat1, vision_feat2, vision_feat3 = model.run(None, {"input_image":img})
+else:
+    vision_feat1, vision_feat2, vision_feat3 = model.run({"input_image":img})
 feats = [torch.Tensor(vision_feat1), torch.Tensor(vision_feat2), torch.Tensor(vision_feat3)]
 features = {"image_embed": feats[-1], "high_res_feats": feats[:-1]}
 
