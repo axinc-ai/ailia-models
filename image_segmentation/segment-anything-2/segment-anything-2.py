@@ -80,8 +80,6 @@ args = update_parser(parser)
 
 np.random.seed(3)
 
-import torch
-
 def show_mask(mask, ax, random_color=False, borders = True):
     if random_color:
         color = np.concatenate([np.random.random(3), np.array([0.6])], axis=0)
@@ -160,10 +158,7 @@ def predict(
         mask_decoder=mask_decoder
     )
 
-    masks_np = masks.squeeze(0).float().detach().cpu().numpy()
-    iou_predictions_np = iou_predictions.squeeze(0).float().detach().cpu().numpy()
-    low_res_masks_np = low_res_masks.squeeze(0).float().detach().cpu().numpy()
-    return masks_np, iou_predictions_np, low_res_masks_np
+    return masks[0], iou_predictions[0], low_res_masks[0]
 
 def _prep_prompts(
     point_coords, point_labels, box, mask_logits, normalize_coords, orig_hw
@@ -256,13 +251,10 @@ def _predict(
             "high_res_features2":high_res_features[1]})
 
     # Upscale the masks to the original image resolution
-    low_res_masks = torch.Tensor(low_res_masks)
-    iou_predictions = torch.Tensor(iou_predictions)
-
     masks = postprocess_masks(
         low_res_masks, orig_hw
     )
-    low_res_masks = torch.clamp(low_res_masks, -32.0, 32.0)
+    low_res_masks = np.clip(low_res_masks, -32.0, 32.0)
     mask_threshold = 0.0
     if not return_logits:
         masks = masks > mask_threshold
@@ -290,68 +282,78 @@ def transform_boxes(
     boxes = transform_coords(boxes.reshape(-1, 2, 2), normalize, orig_hw)
     return boxes
 
-def postprocess_masks(masks: torch.Tensor, orig_hw) -> torch.Tensor:
-    # max_hole_areaは0.0を仮定している
-    # そうでない場合はオリジナルは穴埋め処理が入る
-    import torch.nn.functional as F
-    print("postprocess_masks", masks.shape, orig_hw)
-    masks = masks.float()
-    masks = F.interpolate(masks, orig_hw, mode="bilinear", align_corners=False)
-    return masks
+def postprocess_masks(masks: np.ndarray, orig_hw) -> np.ndarray:
+    interpolated_masks = []
+    for mask in masks:
+        mask = np.transpose(mask, (1, 2, 0))
+        resized_mask = cv2.resize(mask, (orig_hw[1], orig_hw[0]), interpolation=cv2.INTER_LINEAR)
+        resized_mask = np.transpose(resized_mask, (2, 0, 1))
+        interpolated_masks.append(resized_mask)
+    interpolated_masks = np.array(interpolated_masks)
+
+    return interpolated_masks
 
 # ======================
 # Main
 # ======================
 
-show = True
+def predict_from_image(image_encoder, prompt_encoder, mask_decoder):
+    for input in args.input:
+        image = cv2.imread(input)
+        orig_hw = [image.shape[0], image.shape[1]]
+        img = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        img = img.astype(np.float32)
+        img = img / 255.0
+        img = img - [0.485, 0.456, 0.406]
+        img = img / [0.229, 0.224, 0.225]
+        img = cv2.resize(img, (1024, 1024))
+        img = np.expand_dims(img, 0)
+        img = np.transpose(img, (0, 3, 1, 2))
+        img = img.astype(np.float32)
 
-if args.onnx:
-    import onnxruntime
-    image_encoder = onnxruntime.InferenceSession("image_encoder_hiera_l.onnx")
-    prompt_encoder = onnxruntime.InferenceSession("prompt_encoder_sparse_hiera_l.onnx")
-    mask_decoder = onnxruntime.InferenceSession("mask_decoder_hiera_l.onnx")
-else:
-    image_encoder = ailia.Net(weight="image_encoder_hiera_l.onnx", stream=None, memory_mode=11, env_id=1)
-    prompt_encoder = ailia.Net(weight="prompt_encoder_sparse_hiera_l.onnx", stream=None, memory_mode=11, env_id=1)
-    mask_decoder = ailia.Net(weight="mask_decoder_hiera_l.onnx", stream=None, memory_mode=11, env_id=1)
+        if args.onnx:
+            vision_feat1, vision_feat2, vision_feat3 = image_encoder.run(None, {"input_image":img})
+        else:
+            vision_feat1, vision_feat2, vision_feat3 = image_encoder.run({"input_image":img})
+        feats = [vision_feat1, vision_feat2, vision_feat3]
+        features = {"image_embed": feats[-1], "high_res_feats": feats[:-1]}
 
-image = cv2.imread("truck.jpg")
-orig_hw = [image.shape[0], image.shape[1]]
-img = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-img = img.astype(np.float32)
-img = img / 255.0
-img = img - [0.485, 0.456, 0.406]
-img = img / [0.229, 0.224, 0.225]
-img = cv2.resize(img, (1024, 1024))
-img = np.expand_dims(img, 0)
-img = np.transpose(img, (0, 3, 1, 2))
-img = img.astype(np.float32)
+        input_point = np.array([[500, 375]])
+        input_label = np.array([1])
 
-if args.onnx:
-    vision_feat1, vision_feat2, vision_feat3 = image_encoder.run(None, {"input_image":img})
-else:
-    vision_feat1, vision_feat2, vision_feat3 = image_encoder.run({"input_image":img})
-feats = [vision_feat1, vision_feat2, vision_feat3]
-features = {"image_embed": feats[-1], "high_res_feats": feats[:-1]}
+        masks, scores, logits = predict(
+            orig_hw=orig_hw,
+            features=features,
+            point_coords=input_point,
+            point_labels=input_label,
+            multimask_output=True,
+            prompt_encoder=prompt_encoder,
+            mask_decoder=mask_decoder
+        )
+        sorted_ind = np.argsort(scores)[::-1]
+        masks = masks[sorted_ind]
+        scores = scores[sorted_ind]
+        logits = logits[sorted_ind]
 
-input_point = np.array([[500, 375]])
-input_label = np.array([1])
+        show_masks(image, masks, scores, point_coords=input_point, input_labels=input_label, borders=True)
 
-masks, scores, logits = predict(
-    orig_hw=orig_hw,
-    features=features,
-    point_coords=input_point,
-    point_labels=input_label,
-    multimask_output=True,
-    prompt_encoder=prompt_encoder,
-    mask_decoder=mask_decoder
-)
-sorted_ind = np.argsort(scores)[::-1]
-masks = masks[sorted_ind]
-scores = scores[sorted_ind]
-logits = logits[sorted_ind]
+        #savepath = get_savepath(args.savepath, image_path, ext='.png')
+        #logger.info(f'saved at : {savepath}')
+        #cv2.imwrite(savepath, res_img)
 
-if show:
-    show_masks(image, masks, scores, point_coords=input_point, input_labels=input_label, borders=True)
+def main():
+    if args.onnx:
+        import onnxruntime
+        image_encoder = onnxruntime.InferenceSession("image_encoder_hiera_l.onnx")
+        prompt_encoder = onnxruntime.InferenceSession("prompt_encoder_sparse_hiera_l.onnx")
+        mask_decoder = onnxruntime.InferenceSession("mask_decoder_hiera_l.onnx")
+    else:
+        image_encoder = ailia.Net(weight="image_encoder_hiera_l.onnx", stream=None, memory_mode=11, env_id=1)
+        prompt_encoder = ailia.Net(weight="prompt_encoder_sparse_hiera_l.onnx", stream=None, memory_mode=11, env_id=1)
+        mask_decoder = ailia.Net(weight="mask_decoder_hiera_l.onnx", stream=None, memory_mode=11, env_id=1)
 
-print("Success!")
+    predict_from_image(image_encoder, prompt_encoder, mask_decoder)
+    print("Success!")
+
+if __name__ == '__main__':
+    main()
