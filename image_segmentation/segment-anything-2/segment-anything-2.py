@@ -171,27 +171,20 @@ def _prep_prompts(
 
     unnorm_coords, labels, unnorm_box, mask_input = None, None, None, None
     if point_coords is not None:
-        assert (
-            point_labels is not None
-        ), "point_labels must be supplied if point_coords is supplied."
-        point_coords = torch.as_tensor(
-            point_coords, dtype=torch.float
-        )
+        point_coords = point_coords.astype(np.float32)
         unnorm_coords = transform_coords(
             point_coords, normalize=normalize_coords, orig_hw=orig_hw
         )
-        labels = torch.as_tensor(point_labels, dtype=torch.int)
+        labels = point_labels.astype(np.int64)
         if len(unnorm_coords.shape) == 2:
             unnorm_coords, labels = unnorm_coords[None, ...], labels[None, ...]
     if box is not None:
-        box = torch.as_tensor(box, dtype=torch.float,)
+        box = box.astype(np.float32)
         unnorm_box = transform_boxes(
             box, normalize=normalize_coords, orig_hw=orig_hw
         )  # Bx2x2
     if mask_logits is not None:
-        mask_input = torch.as_tensor(
-            mask_logits, dtype=torch.float
-        )
+        mask_input = mask_input.astype(np.float32)
         if len(mask_input.shape) == 3:
             mask_input = mask_input[None, :, :, :]
     return mask_input, unnorm_coords, labels, unnorm_box
@@ -199,15 +192,15 @@ def _prep_prompts(
 def _predict(
     features,
     orig_hw,
-    point_coords: Optional[torch.Tensor],
-    point_labels: Optional[torch.Tensor],
-    boxes: Optional[torch.Tensor] = None,
-    mask_input: Optional[torch.Tensor] = None,
+    point_coords: Optional[np.ndarray],
+    point_labels: Optional[np.ndarray],
+    boxes: Optional[np.ndarray] = None,
+    mask_input: Optional[np.ndarray] = None,
     multimask_output: bool = True,
     return_logits: bool = False,
     prompt_encoder = None,
     mask_decoder = None
-) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     if point_coords is not None:
         concat_points = (point_coords, point_labels)
     else:
@@ -216,23 +209,24 @@ def _predict(
     # Embed prompts
     if boxes is not None:
         box_coords = boxes.reshape(-1, 2, 2)
-        box_labels = torch.tensor([[2, 3]], dtype=torch.int, device=boxes.device)
+        box_labels = np.ndarray([[2, 3]], dtype=np.int64)
         box_labels = box_labels.repeat(boxes.size(0), 1)
         # we merge "boxes" and "points" into a single "concat_points" input (where
         # boxes are added at the beginning) to sam_prompt_encoder
         if concat_points is not None:
-            concat_coords = torch.cat([box_coords, concat_points[0]], dim=1)
-            concat_labels = torch.cat([box_labels, concat_points[1]], dim=1)
+            concat_coords = np.concatenate([box_coords, concat_points[0]], axis=1)
+            concat_labels = np.concatenate([box_labels, concat_points[1]], axis=1)
             concat_points = (concat_coords, concat_labels)
         else:
             concat_points = (box_coords, box_labels)
 
+    print(concat_points)
 
 
     if args.onnx:
-        sparse_embeddings, dense_embeddings, dense_pe = prompt_encoder.run(None, {"coords":concat_points[0].numpy(), "labels":concat_points[1].numpy()})
+        sparse_embeddings, dense_embeddings, dense_pe = prompt_encoder.run(None, {"coords":concat_points[0], "labels":concat_points[1]})
     else:
-        sparse_embeddings, dense_embeddings, dense_pe = prompt_encoder.run({"coords":concat_points[0].numpy(), "labels":concat_points[1].numpy()})
+        sparse_embeddings, dense_embeddings, dense_pe = prompt_encoder.run({"coords":concat_points[0], "labels":concat_points[1]})
 
     # Predict masks
     batched_mode = (
@@ -277,12 +271,12 @@ def _predict(
 
 
 def transform_coords(
-    coords: torch.Tensor, normalize=False, orig_hw=None
-) -> torch.Tensor:
+    coords, normalize=False, orig_hw=None
+):
     if normalize:
         assert orig_hw is not None
         h, w = orig_hw
-        coords = coords.clone()
+        coords = coords.copy()
         coords[..., 0] = coords[..., 0] / w
         coords[..., 1] = coords[..., 1] / h
 
@@ -291,8 +285,8 @@ def transform_coords(
     return coords
 
 def transform_boxes(
-    boxes: torch.Tensor, normalize=False, orig_hw=None
-) -> torch.Tensor:
+    boxes, normalize=False, orig_hw=None
+):
     boxes = transform_coords(boxes.reshape(-1, 2, 2), normalize, orig_hw)
     return boxes
 
