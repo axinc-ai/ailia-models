@@ -133,7 +133,7 @@ def show_masks(image, masks, scores, point_coords=None, box_coords=None, input_l
 # ======================
 
 from sam2_image_predictor import SAM2ImagePredictor
-
+#from sam2_video_predictor import SAM2VideoPredictor
 
 # ======================
 # Main
@@ -195,6 +195,10 @@ def recognize_from_image(image_encoder, prompt_encoder, mask_decoder):
         logger.info(f'saved at : {savepath}')
         show_masks(image, masks, scores, point_coords=input_point, input_labels=input_label, borders=True, savepath=savepath)
 
+def recognize_from_video(image_encoder, prompt_encoder, mask_decoder):
+    #video_predictor = SAM2VideoPredictor()
+    a = 1
+
 def main():
     # model files check and download
     check_and_download_models(WEIGHT_IMAGE_ENCODER_L_PATH, None, REMOTE_PATH)
@@ -211,7 +215,10 @@ def main():
         prompt_encoder = ailia.Net(weight=WEIGHT_PROMPT_ENCODER_L_PATH, stream=None, memory_mode=11, env_id=1)
         mask_decoder = ailia.Net(weight=WEIGHT_MASK_DECODER_L_PATH, stream=None, memory_mode=11, env_id=1)
 
-    recognize_from_image(image_encoder, prompt_encoder, mask_decoder)
+    if args.video is not None:
+        recognize_from_video(image_encoder, prompt_encoder, mask_decoder)
+    else:
+        recognize_from_image(image_encoder, prompt_encoder, mask_decoder)
 
 if __name__ == '__main__':
     main()
