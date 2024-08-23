@@ -29,8 +29,12 @@ logger = getLogger(__name__)
 # Parameters
 # ======================
 
-WEIGHT_IMAGE_ENCODER_L_PATH = 'sam_l_0b3195.onnx'
-MODEL_IMAGE_ENCODER_L_PATH = 'sam_l_0b3195.onnx.prototxt'
+WEIGHT_IMAGE_ENCODER_L_PATH = 'image_encoder_hiera_l.onnx'
+MODEL_IMAGE_ENCODER_L_PATH = 'image_encoder_hiera_l.onnx.prototxt'
+WEIGHT_PROMPT_ENCODER_L_PATH = 'prompt_encoder_hiera_l.onnx'
+MODEL_PROMPT_ENCODER_L_PATH = 'prompt_encoder_hiera_l.onnx.prototxt'
+WEIGHT_MASK_DECODER_L_PATH = 'mask_decoder_hiera_l.onnx'
+MODEL_MASK_DECODER_L_PATH = 'mask_decoder_hiera_l.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/segment-anything-2/'
 
 IMAGE_PATH = 'truck.jpg'
@@ -78,7 +82,7 @@ args = update_parser(parser)
 # Utility
 # ======================
 
-np.random.seed(3)
+#np.random.seed(3)
 
 def show_mask(mask, ax, random_color=False, borders = True):
     if random_color:
@@ -107,7 +111,7 @@ def show_box(box, ax):
     w, h = box[2] - box[0], box[3] - box[1]
     ax.add_patch(plt.Rectangle((x0, y0), w, h, edgecolor='green', facecolor=(0, 0, 0, 0), lw=2))    
 
-def show_masks(image, masks, scores, point_coords=None, box_coords=None, input_labels=None, borders=True):
+def show_masks(image, masks, scores, point_coords=None, box_coords=None, input_labels=None, borders=True, savepath = None):
     for i, (mask, score) in enumerate(zip(masks, scores)):
         plt.figure(figsize=(10, 10))
         plt.imshow(image)
@@ -121,7 +125,8 @@ def show_masks(image, masks, scores, point_coords=None, box_coords=None, input_l
         if len(scores) > 1:
             plt.title(f"Mask {i+1}, Score: {score:.3f}", fontsize=18)
         plt.axis('off')
-        plt.show()
+        if i == 0:
+            plt.savefig(savepath)
 
 # ======================
 # Logic
@@ -297,9 +302,35 @@ def postprocess_masks(masks: np.ndarray, orig_hw) -> np.ndarray:
 # Main
 # ======================
 
-def predict_from_image(image_encoder, prompt_encoder, mask_decoder):
-    for input in args.input:
-        image = cv2.imread(input)
+def recognize_from_image(image_encoder, prompt_encoder, mask_decoder):
+    pos_points = args.pos
+    neg_points = args.neg
+    box = args.box
+
+    if pos_points is None:
+        if neg_points is None and box is None:
+            pos_points = [POINT1]
+        else:
+            pos_points = []
+    if neg_points is None:
+        neg_points = []
+    if box is not None:
+        box = np.array(box).reshape(2, 2)
+
+    input_point = pos_points
+    input_label = np.array([1])
+
+    input_point = []
+    input_label = []
+    if pos_points:
+        input_point.append(np.array(pos_points))
+        input_label.append(np.ones(len(pos_points)))
+    if neg_points:
+        input_point.append(np.array(neg_points))
+        input_label.append(np.zeros(len(neg_points)))
+
+    for image_path in args.input:
+        image = cv2.imread(image_path)
         orig_hw = [image.shape[0], image.shape[1]]
         img = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         img = img.astype(np.float32)
@@ -318,9 +349,6 @@ def predict_from_image(image_encoder, prompt_encoder, mask_decoder):
         feats = [vision_feat1, vision_feat2, vision_feat3]
         features = {"image_embed": feats[-1], "high_res_feats": feats[:-1]}
 
-        input_point = np.array([[500, 375]])
-        input_label = np.array([1])
-
         masks, scores, logits = predict(
             orig_hw=orig_hw,
             features=features,
@@ -335,25 +363,27 @@ def predict_from_image(image_encoder, prompt_encoder, mask_decoder):
         scores = scores[sorted_ind]
         logits = logits[sorted_ind]
 
-        show_masks(image, masks, scores, point_coords=input_point, input_labels=input_label, borders=True)
-
-        #savepath = get_savepath(args.savepath, image_path, ext='.png')
-        #logger.info(f'saved at : {savepath}')
-        #cv2.imwrite(savepath, res_img)
+        savepath = get_savepath(args.savepath, image_path, ext='.png')
+        logger.info(f'saved at : {savepath}')
+        show_masks(image, masks, scores, point_coords=input_point, input_labels=input_label, borders=True, savepath=savepath)
 
 def main():
+    # model files check and download
+    check_and_download_models(WEIGHT_IMAGE_ENCODER_L_PATH, None, REMOTE_PATH)
+    check_and_download_models(WEIGHT_PROMPT_ENCODER_L_PATH, None, REMOTE_PATH)
+    check_and_download_models(WEIGHT_MASK_DECODER_L_PATH, None, REMOTE_PATH)
+
     if args.onnx:
         import onnxruntime
-        image_encoder = onnxruntime.InferenceSession("image_encoder_hiera_l.onnx")
-        prompt_encoder = onnxruntime.InferenceSession("prompt_encoder_sparse_hiera_l.onnx")
-        mask_decoder = onnxruntime.InferenceSession("mask_decoder_hiera_l.onnx")
+        image_encoder = onnxruntime.InferenceSession(WEIGHT_IMAGE_ENCODER_L_PATH)
+        prompt_encoder = onnxruntime.InferenceSession(WEIGHT_PROMPT_ENCODER_L_PATH)
+        mask_decoder = onnxruntime.InferenceSession(WEIGHT_MASK_DECODER_L_PATH)
     else:
-        image_encoder = ailia.Net(weight="image_encoder_hiera_l.onnx", stream=None, memory_mode=11, env_id=1)
-        prompt_encoder = ailia.Net(weight="prompt_encoder_sparse_hiera_l.onnx", stream=None, memory_mode=11, env_id=1)
-        mask_decoder = ailia.Net(weight="mask_decoder_hiera_l.onnx", stream=None, memory_mode=11, env_id=1)
+        image_encoder = ailia.Net(weight=WEIGHT_IMAGE_ENCODER_L_PATH, stream=None, memory_mode=11, env_id=1)
+        prompt_encoder = ailia.Net(weight=WEIGHT_PROMPT_ENCODER_L_PATH, stream=None, memory_mode=11, env_id=1)
+        mask_decoder = ailia.Net(weight=WEIGHT_MASK_DECODER_L_PATH, stream=None, memory_mode=11, env_id=1)
 
-    predict_from_image(image_encoder, prompt_encoder, mask_decoder)
-    print("Success!")
+    recognize_from_image(image_encoder, prompt_encoder, mask_decoder)
 
 if __name__ == '__main__':
     main()
