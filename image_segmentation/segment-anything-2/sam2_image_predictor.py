@@ -26,6 +26,11 @@ from webcamera_utils import get_capture, get_writer  # noqa
 logger = getLogger(__name__)
 
 class SAM2ImagePredictor:
+    def trunc_normal(self, size, std=0.02, a=-2, b=2):
+        values = np.random.normal(loc=0., scale=std, size=size)
+        values = np.clip(values, a*std, b*std)       
+        return values
+
     def set_image(self, image, image_encoder, onnx):
         img = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         img = img.astype(np.float32)
@@ -38,12 +43,51 @@ class SAM2ImagePredictor:
         img = img.astype(np.float32)
 
         if onnx:
-            vision_feat1, vision_feat2, vision_feat3 = image_encoder.run(None, {"input_image":img})
+            vision_features, vision_pos_enc_0, vision_pos_enc_1, vision_pos_enc_2, backbone_fpn_0, backbone_fpn_1, backbone_fpn_2 = image_encoder.run(None, {"input_image":img})
         else:
-            vision_feat1, vision_feat2, vision_feat3 = image_encoder.run({"input_image":img})
-        feats = [vision_feat1, vision_feat2, vision_feat3]
+            vision_features, vision_pos_enc_0, vision_pos_enc_1, vision_pos_enc_2, backbone_fpn_0, backbone_fpn_1, backbone_fpn_2 = image_encoder.run({"input_image":img})
+
+        backbone_out = {"vision_features":vision_features,
+                        "vision_pos_enc":[vision_pos_enc_0, vision_pos_enc_1, vision_pos_enc_2],
+                        "backbone_fpn":[backbone_fpn_0,backbone_fpn_1, backbone_fpn_2]}
+
+        _, vision_feats, _, _ = self._prepare_backbone_features(backbone_out)
+        # Add no_mem_embed, which is added to the lowest rest feat. map during training on videos
+        directly_add_no_mem_embed = True
+        if directly_add_no_mem_embed:
+            print(vision_feats[-1].shape)
+            hidden_dim = 256
+            no_mem_embed = self.trunc_normal((1, 1, hidden_dim), std=0.02).astype(np.float32)
+            vision_feats[-1] = vision_feats[-1] + no_mem_embed
+
+        bb_feat_sizes = [
+            (256, 256),
+            (128, 128),
+            (64, 64),
+        ]
+
+        feats = [
+            np.transpose(feat, (1, 2, 0)).reshape(1, -1, *feat_size)
+            for feat, feat_size in zip(vision_feats[::-1], bb_feat_sizes[::-1])
+        ][::-1]
+
         features = {"image_embed": feats[-1], "high_res_feats": feats[:-1]}
         return features
+
+    def _prepare_backbone_features(self, backbone_out):
+        """Prepare and flatten visual features."""
+        backbone_out = backbone_out.copy()
+        num_feature_levels = 3
+
+        feature_maps = backbone_out["backbone_fpn"][-num_feature_levels :]
+        vision_pos_embeds = backbone_out["vision_pos_enc"][-num_feature_levels :]
+
+        feat_sizes = [(x.shape[-2], x.shape[-1]) for x in vision_pos_embeds]
+        # flatten NxCxHxW to HWxNxC
+        vision_feats = [np.transpose(x.reshape(x.shape[0], x.shape[1], -1), (2, 0, 1)) for x in feature_maps]
+        vision_pos_embeds = [np.transpose(x.reshape(x.shape[0], x.shape[1], -1), (2, 0, 1)) for x in vision_pos_embeds]
+
+        return backbone_out, vision_feats, vision_pos_embeds, feat_sizes
 
     def predict(
         self,
@@ -120,26 +164,25 @@ class SAM2ImagePredictor:
         onnx = False
     ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         if point_coords is not None:
-            concat_points = (point_coords, point_labels)
+            concat_points = (point_coords, point_labels.astype(np.int32))
         else:
             concat_points = None
 
         # Embed prompts
         if boxes is not None:
             box_coords = boxes.reshape(-1, 2, 2)
-            box_labels = np.ndarray([[2, 3]], dtype=np.int64)
+            box_labels = np.ndarray([[2, 3]])
             box_labels = box_labels.repeat(boxes.size(0), 1)
             # we merge "boxes" and "points" into a single "concat_points" input (where
             # boxes are added at the beginning) to sam_prompt_encoder
             if concat_points is not None:
                 concat_coords = np.concatenate([box_coords, concat_points[0]], axis=1)
                 concat_labels = np.concatenate([box_labels, concat_points[1]], axis=1)
-                concat_points = (concat_coords, concat_labels)
+                concat_points = (concat_coords, concat_labels.astype(np.int32))
             else:
-                concat_points = (box_coords, box_labels)
+                concat_points = (box_coords, box_labels.astype(np.int32))
 
         print(concat_points)
-
 
         if onnx:
             sparse_embeddings, dense_embeddings, dense_pe = prompt_encoder.run(None, {"coords":concat_points[0], "labels":concat_points[1]})
@@ -157,7 +200,7 @@ class SAM2ImagePredictor:
 
         image_feature = features["image_embed"]
         if onnx:
-            low_res_masks, iou_predictions, _, _  = mask_decoder.run(None, {
+            masks, iou_pred, sam_tokens_out, object_score_logits   = mask_decoder.run(None, {
                 "image_embeddings":image_feature,
                 "image_pe": dense_pe,
                 "sparse_prompt_embeddings": sparse_embeddings,
@@ -165,13 +208,15 @@ class SAM2ImagePredictor:
                 "high_res_features1":high_res_features[0],
                 "high_res_features2":high_res_features[1]})
         else:
-            low_res_masks, iou_predictions, _, _  = mask_decoder.run({
+            masks, iou_pred, sam_tokens_out, object_score_logits  = mask_decoder.run({
                 "image_embeddings":image_feature,
                 "image_pe": dense_pe,
                 "sparse_prompt_embeddings": sparse_embeddings,
                 "dense_prompt_embeddings": dense_embeddings,
                 "high_res_features1":high_res_features[0],
                 "high_res_features2":high_res_features[1]})
+
+        low_res_masks, iou_predictions, _, _  = self.forward_postprocess(masks, iou_pred, sam_tokens_out, object_score_logits, multimask_output)
 
         # Upscale the masks to the original image resolution
         masks = self.postprocess_masks(
@@ -184,6 +229,37 @@ class SAM2ImagePredictor:
 
         return masks, iou_predictions, low_res_masks
 
+    def forward_postprocess(
+        self,
+        masks,
+        iou_pred,
+        mask_tokens_out,
+        object_score_logits,
+        multimask_output: bool,
+    ):
+        # Select the correct mask or masks for output
+        if multimask_output:
+            masks = masks[:, 1:, :, :]
+            iou_pred = iou_pred[:, 1:]
+        #elif self.dynamic_multimask_via_stability and not self.training:
+        #    masks, iou_pred = self._dynamic_multimask_via_stability(masks, iou_pred)
+        else:
+            masks = masks[:, 0:1, :, :]
+            iou_pred = iou_pred[:, 0:1]
+
+        use_multimask_token_for_obj_ptr = True
+        if multimask_output and use_multimask_token_for_obj_ptr:
+            sam_tokens_out = mask_tokens_out[:, 1:]  # [b, 3, c] shape
+        else:
+            # Take the mask output token. Here we *always* use the token for single mask output.
+            # At test time, even if we track after 1-click (and using multimask_output=True),
+            # we still take the single mask token here. The rationale is that we always track
+            # after multiple clicks during training, so the past tokens seen during training
+            # are always the single mask token (and we'll let it be the object-memory token).
+            sam_tokens_out = mask_tokens_out[:, 0:1]  # [b, 1, c] shape
+
+        # Prepare output
+        return masks, iou_pred, sam_tokens_out, object_score_logits
 
     def transform_coords(
         self, coords, normalize=False, orig_hw=None
