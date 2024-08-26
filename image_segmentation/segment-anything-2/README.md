@@ -9,19 +9,7 @@
 ## Output
 
 - 1 positive point
-![Output](example/output1.png)
-
-- 2 positive points
-![Output](example/output2.png)
-
-- 1 positive point, 1 negative point
-![Output](example/output3.png)
-
-- box
-![Output](example/output4.png)
-
-- box, 1 negative point
-![Output](example/output5.png)
+![Output](output.png)
 
 ## Usage
 Automatically downloads the onnx and prototxt files on the first run.
@@ -62,9 +50,9 @@ $ python3 segment-anything.py --pos 500 375 --pos 1125 625
 $ python3 segment-anything.py --box 425 600 700 875 --neg 575 750
 ```
 
-By adding the `--model_type` option, you can specify model type which is selected from "sam_h", "sam_l", "sam_b". (default is sam_h)
+By adding the `--model_type` option, you can specify model type which is selected from "hiera_l". (default is hiera_l)
 ```bash
-$ python3 segment-anything.py --model_type sam_l
+$ python3 segment-anything.py --model_type hiera_l
 ```
 
 ## Reference
@@ -83,4 +71,4 @@ ONNX opset=17
 
 [image_encoder_hiera_l.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/segment-anything-2/image_encoder_hiera_l.onnx.prototxt)  
 [mask_decoder_hiera_l.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/segment-anything-2/mask_decoder_hiera_l.onnx.prototxt)  
-[iprompt_encoder_sparse_hiera_l.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/segment-anything-2/prompt_encoder_sparse_hiera_l.onnx.prototxt)  
+[iprompt_encoder_hiera_l.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/segment-anything-2/prompt_encoder_hiera_l.onnx.prototxt)  
