@@ -1,29 +1,14 @@
 ﻿import sys
 import os
 import time
-from logging import getLogger
 
 import numpy as np
 import cv2
 
-import ailia
-
 import os
 import numpy as np
-import matplotlib.pyplot as plt
-import ailia
 from typing import Optional
 from typing import Tuple
-
-# import original modules
-sys.path.append('../../util')
-from arg_utils import get_base_parser, update_parser, get_savepath  # noqa
-from model_utils import urlretrieve, progress_print, check_and_download_models  # noqa
-from image_utils import normalize_image  # noqa
-from detector_utils import load_image  # noqa
-from webcamera_utils import get_capture, get_writer  # noqa
-
-logger = getLogger(__name__)
 
 class SAM2ImagePredictor:
     def trunc_normal(self, size, std=0.02, a=-2, b=2):
@@ -182,12 +167,20 @@ class SAM2ImagePredictor:
             else:
                 concat_points = (box_coords, box_labels.astype(np.int32))
 
-        print(concat_points)
+        if mask_input is None:
+            mask_input_dummy = np.zeros((1, 256, 256), dtype=np.float32)
+            masks_enable = np.array([0], dtype=np.int32)
+        else:
+            mask_input_dummy = mask_input
+            masks_enable = np.array([1], dtype=np.int32)
+
+        if concat_points is None:
+            raise("concat_points must be exists")
 
         if onnx:
-            sparse_embeddings, dense_embeddings, dense_pe = prompt_encoder.run(None, {"coords":concat_points[0], "labels":concat_points[1]})
+            sparse_embeddings, dense_embeddings, dense_pe = prompt_encoder.run(None, {"coords":concat_points[0], "labels":concat_points[1], "masks":mask_input_dummy, "masks_enable":masks_enable})
         else:
-            sparse_embeddings, dense_embeddings, dense_pe = prompt_encoder.run({"coords":concat_points[0], "labels":concat_points[1]})
+            sparse_embeddings, dense_embeddings, dense_pe = prompt_encoder.run({"coords":concat_points[0], "labels":concat_points[1], "masks":mask_input_dummy, "masks_enable":masks_enable})
 
         # Predict masks
         batched_mode = (

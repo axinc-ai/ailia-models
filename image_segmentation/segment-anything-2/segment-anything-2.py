@@ -12,15 +12,11 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 import ailia
-from typing import Optional
-from typing import Tuple
 
 # import original modules
 sys.path.append('../../util')
 from arg_utils import get_base_parser, update_parser, get_savepath  # noqa
-from model_utils import urlretrieve, progress_print, check_and_download_models  # noqa
-from image_utils import normalize_image  # noqa
-from detector_utils import load_image  # noqa
+from model_utils import check_and_download_models  # noqa
 from webcamera_utils import get_capture, get_writer  # noqa
 
 logger = getLogger(__name__)
@@ -31,8 +27,8 @@ logger = getLogger(__name__)
 
 WEIGHT_IMAGE_ENCODER_L_PATH = 'image_encoder_hiera_l.onnx'
 MODEL_IMAGE_ENCODER_L_PATH = 'image_encoder_hiera_l.onnx.prototxt'
-WEIGHT_PROMPT_ENCODER_L_PATH = 'prompt_encoder_sparse_hiera_l.onnx'
-MODEL_PROMPT_ENCODER_L_PATH = 'prompt_encoder_sparse_hiera_l.onnx.prototxt'
+WEIGHT_PROMPT_ENCODER_L_PATH = 'prompt_encoder_hiera_l.onnx'
+MODEL_PROMPT_ENCODER_L_PATH = 'prompt_encoder_hiera_l.onnx.prototxt'
 WEIGHT_MASK_DECODER_L_PATH = 'mask_decoder_hiera_l.onnx'
 MODEL_MASK_DECODER_L_PATH = 'mask_decoder_hiera_l.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/segment-anything-2/'
@@ -195,9 +191,10 @@ def recognize_from_image(image_encoder, prompt_encoder, mask_decoder):
         logger.info(f'saved at : {savepath}')
         show_masks(image, masks, scores, point_coords=input_point, input_labels=input_label, borders=True, savepath=savepath)
 
+
 def recognize_from_video(image_encoder, prompt_encoder, mask_decoder):
     #video_predictor = SAM2VideoPredictor()
-    a = 1
+    raise("not implemented yet")
 
 def main():
     # model files check and download
@@ -219,6 +216,8 @@ def main():
         recognize_from_video(image_encoder, prompt_encoder, mask_decoder)
     else:
         recognize_from_image(image_encoder, prompt_encoder, mask_decoder)
+
+    logger.info('Script finished successfully.')
 
 if __name__ == '__main__':
     main()
