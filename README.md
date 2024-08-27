@@ -15,9 +15,10 @@ The collection of pre-trained, state-of-the-art AI models.
 [ailia MODELS tutorial 日本語版](TUTORIAL_jp.md)
 
 # Supported models
-352 models as of August 20th, 2024
+353 models as of August 27th, 2024
 
 # Latest update
+- 2024.08.27 Add segment-anything-2 (image mode)
 - 2024.08.20 Add bert_ner_japanese
 - 2024.08.16 Add latent-consistency-model-txt2img, fbcnn
 - 2024.08.15 Add volo, elegant, depth_anything, drbn_skf, codeformer, dtln
