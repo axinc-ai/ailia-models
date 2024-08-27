@@ -40,7 +40,6 @@ class SAM2ImagePredictor:
         # Add no_mem_embed, which is added to the lowest rest feat. map during training on videos
         directly_add_no_mem_embed = True
         if directly_add_no_mem_embed:
-            print(vision_feats[-1].shape)
             hidden_dim = 256
             no_mem_embed = self.trunc_normal((1, 1, hidden_dim), std=0.02).astype(np.float32)
             vision_feats[-1] = vision_feats[-1] + no_mem_embed
