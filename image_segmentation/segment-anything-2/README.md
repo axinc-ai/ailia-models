@@ -17,42 +17,42 @@ It is necessary to be connected to the Internet while downloading.
 
 For the sample image,
 ```bash
-$ python3 segment-anything.py
+$ python3 segment-anything-2.py
 ```
 
 If you want to specify the input image, put the image path after the `--input` option.  
 You can use `--savepath` option to change the name of the output file to save.
 ```bash
-$ python3 segment-anything.py --input IMAGE_PATH --savepath SAVE_IMAGE_PATH
+$ python3 segment-anything-2.py --input IMAGE_PATH --savepath SAVE_IMAGE_PATH
 ```
 
 If you want to specify the positive point, put the coordinates(x,y) after the `--pos` option.
 ```bash
-$ python3 segment-anything.py --pos 500 375
+$ python3 segment-anything-2.py --pos 500 375
 ```
 
 And if you want to specify the negative point, put the coordinates after the `--neg` option.
 ```bash
-$ python3 segment-anything.py --pos 500 375 --neg 360 405
+$ python3 segment-anything-2.py --pos 500 375 --neg 360 405
 ```
 
 If you want to specify the box, put the coordinates(x1,y1,x2,y2) after the `--box` option.
 ```bash
-$ python3 segment-anything.py --box 425 600 700 875
+$ python3 segment-anything-2.py --box 425 600 700 875
 ```
 
 These options can be combined.
 ```bash
-$ python3 segment-anything.py --pos 500 375 --pos 1125 625
+$ python3 segment-anything-2.py --pos 500 375 --pos 1125 625
 ```
 
 ```bash
-$ python3 segment-anything.py --box 425 600 700 875 --neg 575 750
+$ python3 segment-anything-2.py --box 425 600 700 875 --neg 575 750
 ```
 
 By adding the `--model_type` option, you can specify model type which is selected from "hiera_l". (default is hiera_l)
 ```bash
-$ python3 segment-anything.py --model_type hiera_l
+$ python3 segment-anything-2.py --model_type hiera_l
 ```
 
 ## Reference

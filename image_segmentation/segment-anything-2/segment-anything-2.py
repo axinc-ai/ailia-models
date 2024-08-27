@@ -158,9 +158,10 @@ def recognize_from_image(image_encoder, prompt_encoder, mask_decoder):
         input_label.append(np.zeros(len(neg_points)))
     input_point = np.array(input_point)
     input_label = np.array(input_label)
+    if box:
+        box = np.array(box)
 
     image_predictor = SAM2ImagePredictor()
-
 
     for image_path in args.input:
         image = cv2.imread(image_path)
@@ -186,7 +187,7 @@ def recognize_from_image(image_encoder, prompt_encoder, mask_decoder):
 
         savepath = get_savepath(args.savepath, image_path, ext='.png')
         logger.info(f'saved at : {savepath}')
-        show_masks(image, masks, scores, point_coords=input_point, input_labels=input_label, borders=True, savepath=savepath)
+        show_masks(image, masks, scores, point_coords=input_point, input_labels=input_label, box_coords=box, borders=True, savepath=savepath)
 
 
 def recognize_from_video(image_encoder, prompt_encoder, mask_decoder):

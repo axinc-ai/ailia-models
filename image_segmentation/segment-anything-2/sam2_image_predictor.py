@@ -155,8 +155,8 @@ class SAM2ImagePredictor:
         # Embed prompts
         if boxes is not None:
             box_coords = boxes.reshape(-1, 2, 2)
-            box_labels = np.ndarray([[2, 3]])
-            box_labels = box_labels.repeat(boxes.size(0), 1)
+            box_labels = np.array([[2, 3]])
+            box_labels = box_labels.repeat(boxes.shape[0], 1)
             # we merge "boxes" and "points" into a single "concat_points" input (where
             # boxes are added at the beginning) to sam_prompt_encoder
             if concat_points is not None:
