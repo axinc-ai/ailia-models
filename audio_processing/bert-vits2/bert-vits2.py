@@ -2,6 +2,7 @@ import time
 import sys
 
 import numpy as np
+import librosa
 
 import ailia  # noqa: E402
 sys.path.append('../../util')
@@ -9,20 +10,21 @@ from arg_utils import get_base_parser, update_parser  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 
 from vits2utils import text_normalize, g2p, intersperse, text2sep_kata, cleaned_text_to_sequence
+from clap_feature_extraction import feature_extractor
 
 # logger
 from logging import getLogger   # noqa: E402
 logger = getLogger(__name__)
 
 from scipy.io.wavfile import write
-from transformers import AutoTokenizer, ClapProcessor
+from transformers import AutoTokenizer
 
 
 # ======================
 # Arguemnt Parser Config
 # ======================
 DEFAULT_INPUT = '吾輩は猫である'
-DEFAULT_EMO = "私はいまとても嬉しいです"#'落ち着いている様子'
+DEFAULT_EMO = "私はいまとても嬉しいです"
 DEFAULT_OUTPUT = 'result.wav'
 parser = get_base_parser('Bert-VITS2', None, DEFAULT_OUTPUT)
 
@@ -39,6 +41,14 @@ parser.add_argument(
     default=DEFAULT_EMO,
     help='Emotion text to be used for styling the audio'
 )
+
+parser.add_argument(
+    '--emo-audio',
+    type=str,
+    default=None,
+    help='Path to the audio file that is used to modify the emotion'
+)
+
 
 parser.add_argument(
     '--style-text',
@@ -69,7 +79,8 @@ PATHS = {
     'flow': 'BertVits2.2PT_flow.onnx',
     'dec': 'BertVits2.2PT_dec.onnx',
     'clap': 'emo_clap.onnx',
-    'bert': 'debertav2lc.onnx'
+    'bert': 'debertav2lc.onnx',
+    'clap_audio': 'emo_clap_audio.onnx'
 }
 
 MODEL_PATHS = {
@@ -80,10 +91,11 @@ MODEL_PATHS = {
     'flow': 'BertVits2.2PT_flow.onnx.prototxt',
     'dec': 'BertVits2.2PT_dec.onnx.prototxt',
     'clap': 'emo_clap.onnx.prototxt',
-    'bert': 'debertav2lc.onnx.prototxt'
+    'bert': 'debertav2lc.onnx.prototxt',
+    'clap_audio': 'emo_clap_audio.onnx.prototxt'
 }
 
-MODEL_NAMES = ['enc', 'emb_g', 'dp', 'sdp', 'flow', 'dec', 'clap', 'bert']
+MODEL_NAMES = ['enc', 'emb_g', 'dp', 'sdp', 'flow', 'dec', 'clap', 'bert', 'clap_audio']
 
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/bert-vits2/"
 
@@ -121,7 +133,7 @@ def get_bert_features(bert, tokenizer, text, word2ph, style_text=None, style_wei
 
     return phone_level_feature[None]
 
-def prepare_inputs(text, style_text, sid, emo, bert, tokenizer, clap, clap_tokenizer):
+def prepare_inputs(text, style_text, sid, emo, emo_audio_path, bert, tokenizer, clap_text, clap_tokenizer, clap_audio):
     text = text_normalize(text)
     phones, tones, word2ph = g2p(text, tokenizer)
     x, tones, lang_ids = cleaned_text_to_sequence(phones, tones,'JP')
@@ -141,11 +153,22 @@ def prepare_inputs(text, style_text, sid, emo, bert, tokenizer, clap, clap_token
     lang_ids = np.array(lang_ids)[None]
     sid = np.array([sid])
 
-    emo_input = clap_tokenizer(emo, return_tensors="np")
-    emo_embed = clap.predict({
-        'input_ids': emo_input['input_ids'],
-        'attention_mask': emo_input['attention_mask']
-    })[0]
+    if emo_audio_path is not None:
+        emo_audio, _ = librosa.load(emo_audio_path, sr=48000, mono=True)
+        input_feature, longer = feature_extractor(emo_audio)
+        input_feature = input_feature[None]
+        longer = np.asarray(longer)[None]
+        emo_embed = clap_audio.predict(
+            (input_feature, longer)
+        )[0]
+    elif emo is not None:
+        emo_input = clap_tokenizer(emo, return_tensors="np")
+        emo_embed = clap_text.predict({
+            'input_ids': emo_input['input_ids'],
+            'attention_mask': emo_input['attention_mask']
+        })[0]
+    else:
+        ValueError('At least one of emo or emo_audio must be present')
 
     return x, tones, lang_ids, bert, sid, emo_embed
 
@@ -236,6 +259,7 @@ def predict(inputs, models, noise_scale=0.667, length_scale=1.0, noise_scale_w=0
 def infer(models):
     text = args.text
     emo = args.emo
+    emo_audio_path = args.emo_audio
     style_text = args.style_text
     sid = args.sid
 
@@ -244,10 +268,12 @@ def infer(models):
         style_text,
         sid,
         emo,
+        emo_audio_path,
         models['bert'],
         models['bert_tokenizer'],
         models['clap'],
-        models['clap_tokenizer']
+        models['clap_tokenizer'],
+        models['clap_audio']
     )
     inputs = {
         "x": phones,

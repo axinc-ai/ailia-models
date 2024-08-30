@@ -4,15 +4,20 @@
 
 **text (```--text```)**
 
-text that will be converted to speech. (Default: )
+text that will be converted to speech. (Default: 吾輩は猫である)
 
 **emo text (```--emo```)**
 
-text that represents the emotion when being converted to speech.
+text that represents the emotion when being converted to speech. (Default: 私はいまとてもうれしいです)
+
+**emo audio path(optional) (```--emo-audio```)**
+
+path to audio file that represents the emotion when being converted to speech.
+If both `--emo` and `--emo-audio` is present, `--emo-audio` will be used as the reference of emotion.
 
 **speaker id (```--sid```)**
 
-specifies the type of voice that will be used. JP characters' id is in the 196 to 427 range.
+specifies the type of voice that will be used. JP characters' id is in the 196 to 427 range. (Default: 340)
 
 **style text(optional)  (```--style-text```)**
 
@@ -81,3 +86,5 @@ ONNX opset=12
 [clap](https://netron.app/?url=https://storage.googleapis.com/ailia-models/bert-vits2/emo_clap.onnx.prototxt')
 
 [bert](https://netron.app/?url=https://storage.googleapis.com/ailia-models/bert-vits2/debertav2lc.onnx.prototxt')
+
+[clap_audio](https://netron.app/?url=https://storage.googleapis.com/ailia-models/bert-vits2/emo_clap_audio.onnx.prototxt')
