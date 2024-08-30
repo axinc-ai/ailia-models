@@ -25,8 +25,6 @@ logger = getLogger(__name__)
 # Parameters
 # ======================
 
-WEIGHT_IMAGE_ENCODER_L_PATH = 'image_encoder_hiera_l.onnx'
-MODEL_IMAGE_ENCODER_L_PATH = 'image_encoder_hiera_l.onnx.prototxt'
 WEIGHT_PROMPT_ENCODER_L_PATH = 'prompt_encoder_hiera_l.onnx'
 MODEL_PROMPT_ENCODER_L_PATH = 'prompt_encoder_hiera_l.onnx.prototxt'
 WEIGHT_MASK_DECODER_L_PATH = 'mask_decoder_hiera_l.onnx'
@@ -65,7 +63,7 @@ parser.add_argument(
     help='Select mask index.'
 )
 parser.add_argument(
-    '-m', '--model_type', default='hiera_l', choices=('hiera_l'),
+    '-m', '--model_type', default='hiera_l', choices=('hiera_l', 'hiera_b+', 'hiera_s', 'hiera_t'),
     help='Select model.'
 )
 parser.add_argument(
@@ -195,6 +193,10 @@ def recognize_from_video(image_encoder, prompt_encoder, mask_decoder):
     raise("not implemented yet")
 
 def main():
+    # fetch image encoder model
+    WEIGHT_IMAGE_ENCODER_L_PATH = 'image_encoder_'+args.model_type+'.onnx'
+    MODEL_IMAGE_ENCODER_L_PATH = 'image_encoder_'+args.model_type+'.onnx.prototxt'
+
     # model files check and download
     check_and_download_models(WEIGHT_IMAGE_ENCODER_L_PATH, MODEL_IMAGE_ENCODER_L_PATH, REMOTE_PATH)
     check_and_download_models(WEIGHT_PROMPT_ENCODER_L_PATH, MODEL_PROMPT_ENCODER_L_PATH, REMOTE_PATH)
