@@ -25,10 +25,6 @@ logger = getLogger(__name__)
 # Parameters
 # ======================
 
-WEIGHT_PROMPT_ENCODER_L_PATH = 'prompt_encoder_hiera_l.onnx'
-MODEL_PROMPT_ENCODER_L_PATH = 'prompt_encoder_hiera_l.onnx.prototxt'
-WEIGHT_MASK_DECODER_L_PATH = 'mask_decoder_hiera_l.onnx'
-MODEL_MASK_DECODER_L_PATH = 'mask_decoder_hiera_l.onnx.prototxt'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/segment-anything-2/'
 
 IMAGE_PATH = 'truck.jpg'
@@ -196,6 +192,10 @@ def main():
     # fetch image encoder model
     WEIGHT_IMAGE_ENCODER_L_PATH = 'image_encoder_'+args.model_type+'.onnx'
     MODEL_IMAGE_ENCODER_L_PATH = 'image_encoder_'+args.model_type+'.onnx.prototxt'
+    WEIGHT_PROMPT_ENCODER_L_PATH = 'prompt_encoder_'+args.model_type+'.onnx'
+    MODEL_PROMPT_ENCODER_L_PATH = 'prompt_encoder_'+args.model_type+'.onnx.prototxt'
+    WEIGHT_MASK_DECODER_L_PATH = 'mask_decoder_'+args.model_type+'.onnx'
+    MODEL_MASK_DECODER_L_PATH = 'mask_decoder_'+args.model_type+'.onnx.prototxt'
 
     # model files check and download
     check_and_download_models(WEIGHT_IMAGE_ENCODER_L_PATH, MODEL_IMAGE_ENCODER_L_PATH, REMOTE_PATH)
