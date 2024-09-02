@@ -136,18 +136,21 @@ class SAM2VideoPredictor():
         self.multimask_output_for_tracking = True
         self.use_multimask_token_for_obj_ptr = True
 
-        # a single token to indicate no memory embedding from previous frames
+        # Temporal encoding of the memories
         from torch.nn.init import trunc_normal_
-        self.no_mem_embed = torch.nn.Parameter(torch.zeros(1, 1, self.hidden_dim))
-        self.no_mem_pos_enc = torch.nn.Parameter(torch.zeros(1, 1, self.hidden_dim))
-        trunc_normal_(self.no_mem_embed, std=0.02)
-        trunc_normal_(self.no_mem_pos_enc, std=0.02)
-        self.no_obj_ptr = torch.nn.Parameter(torch.zeros(1, self.hidden_dim))
-        trunc_normal_(self.no_obj_ptr, std=0.02)
         self.maskmem_tpos_enc = torch.nn.Parameter(
             torch.zeros(self.num_maskmem, 1, 1, self.mem_dim)
         )
         trunc_normal_(self.maskmem_tpos_enc, std=0.02)
+        # a single token to indicate no memory embedding from previous frames
+        self.no_mem_embed = torch.nn.Parameter(torch.zeros(1, 1, self.hidden_dim))
+        self.no_mem_pos_enc = torch.nn.Parameter(torch.zeros(1, 1, self.hidden_dim))
+        trunc_normal_(self.no_mem_embed, std=0.02)
+        trunc_normal_(self.no_mem_pos_enc, std=0.02)
+        # Part 4: SAM-style prompt encoder (for both mask and point inputs)
+        # and SAM-style mask decoder for the final mask output
+        self.no_obj_ptr = torch.nn.Parameter(torch.zeros(1, self.hidden_dim))
+        trunc_normal_(self.no_obj_ptr, std=0.02)
 
         """Initialize an inference state."""
         compute_device = "cpu"  # device of the model
