@@ -185,7 +185,7 @@ def recognize_from_image(image_encoder, prompt_encoder, mask_decoder):
         show_masks(image, masks, scores, point_coords=input_point, input_labels=input_label, box_coords=box, borders=True, savepath=savepath)
 
 
-def recognize_from_video(image_encoder, prompt_encoder, mask_decoder, memory_attention, memory_decoder):
+def recognize_from_video(image_encoder, prompt_encoder, mask_decoder, memory_attention, memory_encoder):
     video_dir = "./bedroom_short"
 
     #video_predictor = SAM2VideoPredictor()
@@ -223,7 +223,7 @@ def recognize_from_video(image_encoder, prompt_encoder, mask_decoder, memory_att
     ]
     frame_names.sort(key=lambda p: int(os.path.splitext(p)[0]))
 
-    inference_state = predictor.init_state(video_path=video_dir)
+    inference_state = predictor.init_state(video_path=video_dir, image_encoder=image_encoder)
     predictor.reset_state(inference_state)
 
     ann_frame_idx = 0  # the frame index we interact with
@@ -243,6 +243,8 @@ def recognize_from_video(image_encoder, prompt_encoder, mask_decoder, memory_att
         image_encoder=image_encoder,
         prompt_encoder=prompt_encoder,
         mask_decoder=mask_decoder,
+        memory_attention=memory_attention,
+        memory_encoder=memory_encoder
     )
 
     # show the results on the current (interacted) frame
@@ -256,7 +258,7 @@ def recognize_from_video(image_encoder, prompt_encoder, mask_decoder, memory_att
 
     # run propagation throughout the video and collect the results in a dict
     video_segments = {}  # video_segments contains the per-frame segmentation results
-    for out_frame_idx, out_obj_ids, out_mask_logits in predictor.propagate_in_video(inference_state, image_encoder, prompt_encoder, mask_decoder):
+    for out_frame_idx, out_obj_ids, out_mask_logits in predictor.propagate_in_video(inference_state, image_encoder, prompt_encoder, mask_decoder, memory_attention, memory_encoder):
         video_segments[out_frame_idx] = {
             out_obj_id: (out_mask_logits[i] > 0.0).cpu().numpy()
             for i, out_obj_id in enumerate(out_obj_ids)
