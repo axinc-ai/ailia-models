@@ -123,9 +123,18 @@ class SAM2VideoPredictor():
         self.soft_no_obj_ptr = False
         self.fixed_no_obj_ptr = True
         self.non_overlap_masks_for_mem_enc = False
-        self.binarize_mask_from_pts_for_mem_enc = False
+        self.binarize_mask_from_pts_for_mem_enc = True
         self.sigmoid_scale_for_mem_enc = 20
         self.sigmoid_bias_for_mem_enc = -10.0
+        #self.sam_mask_decoder.dynamic_multimask_via_stability = True # must implement it for video and image mode
+        #self.sam_mask_decoder.dynamic_multimask_stability_delta = 0.05
+        #self.sam_mask_decoder.dynamic_multimask_stability_thresh = 0.98
+        self.max_cond_frames_in_attn = -1
+        self.memory_temporal_stride_for_eval = 1
+        self.max_obj_ptrs_in_encoder = 16
+        self.only_obj_ptrs_in_the_past_for_eval = True
+        self.multimask_output_for_tracking = True
+        self.use_multimask_token_for_obj_ptr = True
 
         # a single token to indicate no memory embedding from previous frames
         from torch.nn.init import trunc_normal_
@@ -135,6 +144,10 @@ class SAM2VideoPredictor():
         trunc_normal_(self.no_mem_pos_enc, std=0.02)
         self.no_obj_ptr = torch.nn.Parameter(torch.zeros(1, self.hidden_dim))
         trunc_normal_(self.no_obj_ptr, std=0.02)
+        self.maskmem_tpos_enc = torch.nn.Parameter(
+            torch.zeros(self.num_maskmem, 1, 1, self.mem_dim)
+        )
+        trunc_normal_(self.maskmem_tpos_enc, std=0.02)
 
         """Initialize an inference state."""
         compute_device = "cpu"  # device of the model
@@ -689,6 +702,7 @@ class SAM2VideoPredictor():
 
     @torch.inference_mode()
     def propagate_in_video_preflight(self, inference_state, image_encoder, prompt_encoder, mask_decoder, memory_attention, memory_encoder, mlp):
+        assert(memory_encoder!=None)
         """Prepare inference_state and consolidate temporary outputs before tracking."""
         # Tracking has started and we don't allow adding new objects until session is reset.
         inference_state["tracking_has_started"] = True
@@ -715,7 +729,9 @@ class SAM2VideoPredictor():
             # consolidate the temporary output across all objects on this frame
             for frame_idx in temp_frame_inds:
                 consolidated_out = self._consolidate_temp_output_across_obj(
-                    inference_state, frame_idx, is_cond=is_cond, run_mem_encoder=True, image_encoder=image_encoder, prompt_encoder=prompt_encoder, mask_decoder=mask_decoder, memory_attention=memory_attention, memory_encoder=memory_encoder, mlp=mlp
+                    inference_state, frame_idx, is_cond=is_cond, run_mem_encoder=True,
+                    image_encoder=image_encoder, prompt_encoder=prompt_encoder, mask_decoder=mask_decoder, memory_attention=memory_attention,
+                    memory_encoder=memory_encoder, mlp=mlp
                 )
                 # merge them into "output_dict" and also create per-object slices
                 output_dict[storage_key][frame_idx] = consolidated_out
@@ -772,6 +788,7 @@ class SAM2VideoPredictor():
         mlp=None
     ):
         """Propagate the input points across frames to track in the entire video."""
+        assert(memory_encoder!=None)
         self.propagate_in_video_preflight(inference_state, image_encoder, prompt_encoder, mask_decoder, memory_attention, memory_encoder, mlp)
 
         output_dict = inference_state["output_dict"]
@@ -1648,7 +1665,7 @@ class SAM2VideoPredictor():
         feat_sizes,
         pred_masks_high_res,
         is_mask_from_pts,
-        memory_encoder=None
+        memory_encoder
     ):
         """Encode the current image and its prediction into a memory feature."""
         B = current_vision_feats[-1].size(1)  # batch size on this frame

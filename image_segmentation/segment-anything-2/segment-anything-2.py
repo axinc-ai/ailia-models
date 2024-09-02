@@ -259,7 +259,13 @@ def recognize_from_video(image_encoder, prompt_encoder, mask_decoder, memory_att
 
     # run propagation throughout the video and collect the results in a dict
     video_segments = {}  # video_segments contains the per-frame segmentation results
-    for out_frame_idx, out_obj_ids, out_mask_logits in predictor.propagate_in_video(inference_state, image_encoder, prompt_encoder, mask_decoder, memory_attention, memory_encoder, mlp):
+    for out_frame_idx, out_obj_ids, out_mask_logits in predictor.propagate_in_video(inference_state,
+                                                                                    image_encoder = image_encoder,
+                                                                                    prompt_encoder = prompt_encoder,
+                                                                                    mask_decoder = mask_decoder,
+                                                                                    memory_attention = memory_attention,
+                                                                                    memory_encoder = memory_encoder,
+                                                                                    mlp = mlp):
         video_segments[out_frame_idx] = {
             out_obj_id: (out_mask_logits[i] > 0.0).cpu().numpy()
             for i, out_obj_id in enumerate(out_obj_ids)
