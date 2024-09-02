@@ -1,8 +1,10 @@
 import warnings
 from collections import OrderedDict
+from typing import List, Optional, Tuple, Type
 
 import torch
 import numpy as np
+import torch.nn.functional as F
 
 from tqdm import tqdm
 
@@ -97,17 +99,42 @@ class SAM2VideoPredictor():
         async_loading_frames=False,
         image_encoder=None
     ):
-        """default state"""
+        """default state from yaml"""
         self.image_size = 1024
         self.num_feature_levels = 3
         self.hidden_dim = 256
         self.num_maskmem = 7  # default 1 input frame + 6 previous frames
-        self.directly_add_no_mem_embed = False
+        self.directly_add_no_mem_embed = True
         self.training = False
         self.mem_dim = self.hidden_dim
-        self.add_tpos_enc_to_obj_ptrs = True
-        self.use_obj_ptrs_in_encoder = False
-        self.add_all_frames_to_correct_as_cond = False
+        self.add_tpos_enc_to_obj_ptrs = False
+        self.use_obj_ptrs_in_encoder = True
+        self.add_all_frames_to_correct_as_cond = True
+        self.multimask_output_in_sam = True
+        self.multimask_min_pt_num = 0
+        self.multimask_max_pt_num = 1
+        self.sam_prompt_embed_dim = self.hidden_dim
+        self.backbone_stride = 16
+        self.sam_image_embedding_size = self.image_size // self.backbone_stride
+        self.pred_obj_scores = True
+        self.use_obj_ptrs_in_encoder = True
+        self.use_mlp_for_obj_ptr_proj = True
+        self.proj_tpos_enc_in_obj_ptrs = False
+        if self.use_obj_ptrs_in_encoder:
+            # a linear projection on SAM output tokens to turn them into object pointers
+            self.obj_ptr_proj = torch.nn.Linear(self.hidden_dim, self.hidden_dim)
+            if self.use_mlp_for_obj_ptr_proj:
+                self.obj_ptr_proj = MLP(
+                    self.hidden_dim, self.hidden_dim, self.hidden_dim, 3
+                )
+        else:
+            self.obj_ptr_proj = torch.nn.Identity()
+        if self.proj_tpos_enc_in_obj_ptrs:
+            # a linear projection on temporal positional encoding in object pointers to
+            # avoid potential interference with spatial positional encoding
+            self.obj_ptr_tpos_proj = torch.nn.Linear(self.hidden_dim, self.mem_dim)
+        else:
+            self.obj_ptr_tpos_proj = torch.nn.Identity()
 
         # a single token to indicate no memory embedding from previous frames
         from torch.nn.init import trunc_normal_
@@ -1291,7 +1318,7 @@ class SAM2VideoPredictor():
         iou_pred = torch.Tensor(iou_pred)
         sam_tokens_out = torch.Tensor(sam_tokens_out)
         object_score_logits = torch.Tensor(object_score_logits)
-        low_res_multimasks, ious, sam_output_tokens, object_score_logits  = self.sam_mask_decoder.forward_postprocess(masks, iou_pred, sam_tokens_out, object_score_logits, multimask_output)
+        low_res_multimasks, ious, sam_output_tokens, object_score_logits  = self.forward_postprocess(masks, iou_pred, sam_tokens_out, object_score_logits, multimask_output)
         print(low_res_multimasks.shape)
         print(ious.shape)
         print(sam_output_tokens.shape)
@@ -1355,6 +1382,37 @@ class SAM2VideoPredictor():
             obj_ptr,
             object_score_logits,
         )
+
+    def forward_postprocess(
+        self,
+        masks: torch.Tensor,
+        iou_pred: torch.Tensor,
+        mask_tokens_out: torch.Tensor,
+        object_score_logits: torch.Tensor,
+        multimask_output: bool,
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        # Select the correct mask or masks for output
+        if multimask_output:
+            masks = masks[:, 1:, :, :]
+            iou_pred = iou_pred[:, 1:]
+        #elif self.dynamic_multimask_via_stability and not self.training:
+        #    masks, iou_pred = self._dynamic_multimask_via_stability(masks, iou_pred)
+        else:
+            masks = masks[:, 0:1, :, :]
+            iou_pred = iou_pred[:, 0:1]
+
+        if multimask_output and self.use_multimask_token_for_obj_ptr:
+            sam_tokens_out = mask_tokens_out[:, 1:]  # [b, 3, c] shape
+        else:
+            # Take the mask output token. Here we *always* use the token for single mask output.
+            # At test time, even if we track after 1-click (and using multimask_output=True),
+            # we still take the single mask token here. The rationale is that we always track
+            # after multiple clicks during training, so the past tokens seen during training
+            # are always the single mask token (and we'll let it be the object-memory token).
+            sam_tokens_out = mask_tokens_out[:, 0:1]  # [b, 1, c] shape
+
+        # Prepare output
+        return masks, iou_pred, sam_tokens_out, object_score_logits
 
     def _use_mask_as_output(self, backbone_features, high_res_features, mask_inputs, import_from_onnx, import_from_tflite, model_id):
         """
@@ -1438,6 +1496,8 @@ class SAM2VideoPredictor():
         num_obj_ptr_tokens = 0
         # Step 1: condition the visual features of the current frame on previous memories
         if not is_init_cond_frame:
+            print("memory 1")
+
             # Retrieve the memories encoded with the maskmem backbone
             to_cat_memory, to_cat_memory_pos_embed = [], []
             # Add conditioning frames's output first (all cond frames have t_pos=0 for
@@ -1559,7 +1619,9 @@ class SAM2VideoPredictor():
                     num_obj_ptr_tokens = 0
         else:
             # for initial conditioning frames, encode them without using any previous memory
+            print("memory 2")
             if self.directly_add_no_mem_embed:
+                print("directly_add_no_mem_embed")
                 # directly add no-mem embedding (instead of using the transformer encoder)
                 pix_feat_with_mem = current_vision_feats[-1] + self.no_mem_embed
                 pix_feat_with_mem = pix_feat_with_mem.permute(1, 2, 0).view(B, C, H, W)
