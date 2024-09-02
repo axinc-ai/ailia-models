@@ -106,10 +106,10 @@ class SAM2VideoPredictor():
         self.num_maskmem = 7  # default 1 input frame + 6 previous frames
         self.directly_add_no_mem_embed = True
         self.training = False
-        self.mem_dim = self.hidden_dim
+        self.mem_dim = 64
         self.add_tpos_enc_to_obj_ptrs = False
         self.use_obj_ptrs_in_encoder = True
-        self.add_all_frames_to_correct_as_cond = True
+        self.add_all_frames_to_correct_as_cond = False
         self.multimask_output_in_sam = True
         self.multimask_min_pt_num = 0
         self.multimask_max_pt_num = 1
@@ -120,21 +120,12 @@ class SAM2VideoPredictor():
         self.use_obj_ptrs_in_encoder = True
         self.use_mlp_for_obj_ptr_proj = True
         self.proj_tpos_enc_in_obj_ptrs = False
-        if self.use_obj_ptrs_in_encoder:
-            # a linear projection on SAM output tokens to turn them into object pointers
-            self.obj_ptr_proj = torch.nn.Linear(self.hidden_dim, self.hidden_dim)
-            if self.use_mlp_for_obj_ptr_proj:
-                self.obj_ptr_proj = MLP(
-                    self.hidden_dim, self.hidden_dim, self.hidden_dim, 3
-                )
-        else:
-            self.obj_ptr_proj = torch.nn.Identity()
-        if self.proj_tpos_enc_in_obj_ptrs:
-            # a linear projection on temporal positional encoding in object pointers to
-            # avoid potential interference with spatial positional encoding
-            self.obj_ptr_tpos_proj = torch.nn.Linear(self.hidden_dim, self.mem_dim)
-        else:
-            self.obj_ptr_tpos_proj = torch.nn.Identity()
+        self.soft_no_obj_ptr = False
+        self.fixed_no_obj_ptr = True
+        self.non_overlap_masks_for_mem_enc = False
+        self.binarize_mask_from_pts_for_mem_enc = False
+        self.sigmoid_scale_for_mem_enc = 20
+        self.sigmoid_bias_for_mem_enc = -10.0
 
         # a single token to indicate no memory embedding from previous frames
         from torch.nn.init import trunc_normal_
@@ -142,6 +133,8 @@ class SAM2VideoPredictor():
         self.no_mem_pos_enc = torch.nn.Parameter(torch.zeros(1, 1, self.hidden_dim))
         trunc_normal_(self.no_mem_embed, std=0.02)
         trunc_normal_(self.no_mem_pos_enc, std=0.02)
+        self.no_obj_ptr = torch.nn.Parameter(torch.zeros(1, self.hidden_dim))
+        trunc_normal_(self.no_obj_ptr, std=0.02)
 
         """Initialize an inference state."""
         compute_device = "cpu"  # device of the model
@@ -262,7 +255,8 @@ class SAM2VideoPredictor():
         prompt_encoder=None,
         mask_decoder=None,
         memory_attention=None,
-        memory_encoder=None
+        memory_encoder=None,
+        mlp=None
     ):
         """Add new points to a frame."""
         obj_idx = self._obj_id_to_idx(inference_state, obj_id)
@@ -382,7 +376,8 @@ class SAM2VideoPredictor():
             prompt_encoder=prompt_encoder,
             mask_decoder=mask_decoder,
             memory_attention=memory_attention,
-            memory_encoder=memory_encoder
+            memory_encoder=memory_encoder,
+            mlp=mlp
         )
         # Add the output to the output dict (to be used as future memory)
         obj_temp_output_dict[storage_key][frame_idx] = current_out
@@ -395,7 +390,7 @@ class SAM2VideoPredictor():
             is_cond=is_cond,
             run_mem_encoder=False,
             consolidate_at_video_res=True,
-            image_encoder=image_encoder, prompt_encoder=prompt_encoder, mask_decoder=mask_decoder, memory_encoder=memory_encoder
+            image_encoder=image_encoder, prompt_encoder=prompt_encoder, mask_decoder=mask_decoder, memory_encoder=memory_encoder, mlp=mlp
         )
         _, video_res_masks = self._get_orig_video_res_output(
             inference_state, consolidated_out["pred_masks_video_res"]
@@ -417,7 +412,8 @@ class SAM2VideoPredictor():
         prompt_encoder,
         mask_decoder,
         memory_attention,
-        memory_encoder
+        memory_encoder,
+        mlp
     ):
         """Add new mask to a frame."""
         obj_idx = self._obj_id_to_idx(inference_state, obj_id)
@@ -481,7 +477,8 @@ class SAM2VideoPredictor():
             prompt_encoder=prompt_encoder,
             mask_decoder=mask_decoder,
             memory_attention=memory_attention,
-            memory_encoder=memory_encoder
+            memory_encoder=memory_encoder,
+            mlp=mlp
         )
         # Add the output to the output dict (to be used as future memory)
         obj_temp_output_dict[storage_key][frame_idx] = current_out
@@ -494,7 +491,7 @@ class SAM2VideoPredictor():
             is_cond=is_cond,
             run_mem_encoder=False,
             consolidate_at_video_res=True,
-            image_encoder=image_encoder, prompt_encoder=prompt_encoder, mask_decoder=mask_decoder,
+            image_encoder=image_encoder, prompt_encoder=prompt_encoder, mask_decoder=mask_decoder, memory_encoder=memory_encoder, mlp=mlp
         )
         _, video_res_masks = self._get_orig_video_res_output(
             inference_state, consolidated_out["pred_masks_video_res"]
@@ -534,7 +531,8 @@ class SAM2VideoPredictor():
         prompt_encoder=None,
         mask_decoder=None,
         memory_attention=None,
-        memory_encoder=None
+        memory_encoder=None,
+        mlp=None
     ):
         """
         Consolidate the per-object temporary outputs in `temp_output_dict_per_obj` on
@@ -601,7 +599,7 @@ class SAM2VideoPredictor():
                 if run_mem_encoder:
                     if empty_mask_ptr is None:
                         empty_mask_ptr = self._get_empty_mask_ptr(
-                            inference_state, frame_idx, image_encoder, prompt_encoder, mask_decoder, memory_attention, memory_encoder
+                            inference_state, frame_idx, image_encoder, prompt_encoder, mask_decoder, memory_attention, memory_encoder, mlp
                         )
                     # fill object pointer with a dummy pointer (based on an empty mask)
                     consolidated_out["obj_ptr"][obj_idx : obj_idx + 1] = empty_mask_ptr
@@ -640,6 +638,7 @@ class SAM2VideoPredictor():
                 batch_size=batch_size,
                 high_res_masks=high_res_masks,
                 is_mask_from_pts=True,  # these frames are what the user interacted with
+                image_encoder=image_encoder,
                 memory_encoder=memory_encoder
             )
             consolidated_out["maskmem_features"] = maskmem_features
@@ -647,7 +646,7 @@ class SAM2VideoPredictor():
 
         return consolidated_out
 
-    def _get_empty_mask_ptr(self, inference_state, frame_idx, image_encoder, prompt_encoder, mask_decoder, memory_attention, memory_encoder):
+    def _get_empty_mask_ptr(self, inference_state, frame_idx, image_encoder, prompt_encoder, mask_decoder, memory_attention, memory_encoder, mlp):
         """Get a dummy object pointer based on an empty mask on the current frame."""
         # A dummy (empty) mask with a single object
         batch_size = 1
@@ -683,12 +682,13 @@ class SAM2VideoPredictor():
             prompt_encoder=prompt_encoder,
             mask_decoder=mask_decoder,
             memory_attention=memory_attention,
-            memory_encoder=memory_encoder
+            memory_encoder=memory_encoder,
+            mlp=mlp
         )
         return current_out["obj_ptr"]
 
     @torch.inference_mode()
-    def propagate_in_video_preflight(self, inference_state, image_encoder, prompt_encoder, mask_decoder, memory_attention, memory_encoder):
+    def propagate_in_video_preflight(self, inference_state, image_encoder, prompt_encoder, mask_decoder, memory_attention, memory_encoder, mlp):
         """Prepare inference_state and consolidate temporary outputs before tracking."""
         # Tracking has started and we don't allow adding new objects until session is reset.
         inference_state["tracking_has_started"] = True
@@ -715,7 +715,7 @@ class SAM2VideoPredictor():
             # consolidate the temporary output across all objects on this frame
             for frame_idx in temp_frame_inds:
                 consolidated_out = self._consolidate_temp_output_across_obj(
-                    inference_state, frame_idx, is_cond=is_cond, run_mem_encoder=True, image_encoder=image_encoder, prompt_encoder=prompt_encoder, mask_decoder=mask_decoder, memory_attention=memory_attention, memory_encoder=memory_encoder
+                    inference_state, frame_idx, is_cond=is_cond, run_mem_encoder=True, image_encoder=image_encoder, prompt_encoder=prompt_encoder, mask_decoder=mask_decoder, memory_attention=memory_attention, memory_encoder=memory_encoder, mlp=mlp
                 )
                 # merge them into "output_dict" and also create per-object slices
                 output_dict[storage_key][frame_idx] = consolidated_out
@@ -768,10 +768,11 @@ class SAM2VideoPredictor():
         prompt_encoder=None,
         mask_decoder=None,
         memory_attention=None,
-        memory_encoder=None
+        memory_encoder=None,
+        mlp=None
     ):
         """Propagate the input points across frames to track in the entire video."""
-        self.propagate_in_video_preflight(inference_state, image_encoder, prompt_encoder, mask_decoder, memory_attention, memory_encoder)
+        self.propagate_in_video_preflight(inference_state, image_encoder, prompt_encoder, mask_decoder, memory_attention, memory_encoder, mlp)
 
         output_dict = inference_state["output_dict"]
         consolidated_frame_inds = inference_state["consolidated_frame_inds"]
@@ -835,7 +836,8 @@ class SAM2VideoPredictor():
                     prompt_encoder=prompt_encoder,
                     mask_decoder=mask_decoder,
                     memory_attention=memory_attention,
-                    memory_encoder=memory_encoder
+                    memory_encoder=memory_encoder,
+                    mlp=mlp
                 )
                 output_dict[storage_key][frame_idx] = current_out
             # Create slices of per-object outputs for subsequent interaction with each
@@ -970,7 +972,8 @@ class SAM2VideoPredictor():
         prompt_encoder=None,
         mask_decoder=None,
         memory_attention=None,
-        memory_encoder=None
+        memory_encoder=None,
+        mlp=None
     ):
         """Run tracking on a single frame based on current inputs and previous memory."""
         # Retrieve correct image features
@@ -1000,7 +1003,8 @@ class SAM2VideoPredictor():
             prompt_encoder=prompt_encoder,
             mask_decoder=mask_decoder,
             memory_attention=memory_attention,
-            memory_encoder=memory_encoder
+            memory_encoder=memory_encoder,
+            mlp=mlp
         )
 
         # optionally offload the output to CPU memory to save GPU space
@@ -1123,7 +1127,8 @@ class SAM2VideoPredictor():
         prompt_encoder=None,
         mask_decoder=None,
         memory_attention=None,
-        memory_encoder=None
+        memory_encoder=None,
+        mlp=None
     ):
         current_out = {"point_inputs": point_inputs, "mask_inputs": mask_inputs}
         # High-resolution feature maps for the SAM head, reshape (HW)BC => BCHW
@@ -1140,7 +1145,7 @@ class SAM2VideoPredictor():
             pix_feat = current_vision_feats[-1].permute(1, 2, 0)
             pix_feat = pix_feat.view(-1, self.hidden_dim, *feat_sizes[-1])
             sam_outputs = self._use_mask_as_output(
-                pix_feat, high_res_features, mask_inputs
+                pix_feat, high_res_features, mask_inputs, prompt_encoder, mask_decoder, mlp
             )
         else:
             # fused the visual feature with previous memory features in the memory bank
@@ -1170,7 +1175,8 @@ class SAM2VideoPredictor():
                 high_res_features=high_res_features,
                 multimask_output=multimask_output,
                 prompt_encoder=prompt_encoder,
-                mask_decoder=mask_decoder
+                mask_decoder=mask_decoder,
+                mlp=mlp
             )
         (
             _,
@@ -1213,8 +1219,8 @@ class SAM2VideoPredictor():
         high_res_features=None,
         multimask_output=False,
         prompt_encoder=None,
-        mask_decoder=None
-
+        mask_decoder=None,
+        mlp=None
     ):
         """
         Forward SAM prompt encoders and mask heads.
@@ -1319,11 +1325,6 @@ class SAM2VideoPredictor():
         sam_tokens_out = torch.Tensor(sam_tokens_out)
         object_score_logits = torch.Tensor(object_score_logits)
         low_res_multimasks, ious, sam_output_tokens, object_score_logits  = self.forward_postprocess(masks, iou_pred, sam_tokens_out, object_score_logits, multimask_output)
-        print(low_res_multimasks.shape)
-        print(ious.shape)
-        print(sam_output_tokens.shape)
-        print(object_score_logits.shape)
-
 
         if self.pred_obj_scores:
             is_obj_appearing = object_score_logits > 0
@@ -1359,7 +1360,9 @@ class SAM2VideoPredictor():
             low_res_masks, high_res_masks = low_res_multimasks, high_res_multimasks
 
         # Extract object pointer from the SAM output token (with occlusion handling)
-        obj_ptr = self.obj_ptr_proj(sam_output_token)
+        obj_ptr = mlp.run(None, {"x":sam_output_token.numpy()})[0]
+        obj_ptr = torch.Tensor(obj_ptr)
+        
         if self.pred_obj_scores:
             # Allow *soft* no obj ptr, unlike for masks
             if self.soft_no_obj_ptr:
@@ -1414,7 +1417,7 @@ class SAM2VideoPredictor():
         # Prepare output
         return masks, iou_pred, sam_tokens_out, object_score_logits
 
-    def _use_mask_as_output(self, backbone_features, high_res_features, mask_inputs, import_from_onnx, import_from_tflite, model_id):
+    def _use_mask_as_output(self, backbone_features, high_res_features, mask_inputs, prompt_encoder, mask_decoder, mlp):
         """
         Directly turn binary `mask_inputs` into a output mask logits without using SAM.
         (same input and output shapes as in _forward_sam_heads above).
@@ -1443,9 +1446,9 @@ class SAM2VideoPredictor():
                 backbone_features=backbone_features,
                 mask_inputs=self.mask_downsample(mask_inputs_float),
                 high_res_features=high_res_features,
-                import_from_onnx=import_from_onnx,
-                import_from_tflite=import_from_tflite,
-                model_id=model_id
+                prompt_encoder=prompt_encoder,
+                mask_decoder=mask_decoder,
+                mlp=mlp
             )
         # In this method, we are treating mask_input as output, e.g. using it directly to create spatial mem;
         # Below, we follow the same design axiom to use mask_input to decide if obj appears or not instead of relying
@@ -1496,8 +1499,6 @@ class SAM2VideoPredictor():
         num_obj_ptr_tokens = 0
         # Step 1: condition the visual features of the current frame on previous memories
         if not is_init_cond_frame:
-            print("memory 1")
-
             # Retrieve the memories encoded with the maskmem backbone
             to_cat_memory, to_cat_memory_pos_embed = [], []
             # Add conditioning frames's output first (all cond frames have t_pos=0 for
@@ -1601,7 +1602,7 @@ class SAM2VideoPredictor():
                         tpos_dim = C if self.proj_tpos_enc_in_obj_ptrs else self.mem_dim
                         obj_pos = torch.tensor(pos_list, device=device)
                         obj_pos = get_1d_sine_pe(obj_pos / t_diff_max, dim=tpos_dim)
-                        obj_pos = self.obj_ptr_tpos_proj(obj_pos)
+                        #obj_pos = self.obj_ptr_tpos_proj(obj_pos) # identity
                         obj_pos = obj_pos.unsqueeze(1).expand(-1, B, self.mem_dim)
                     else:
                         obj_pos = obj_ptrs.new_zeros(len(pos_list), B, self.mem_dim)
@@ -1619,9 +1620,7 @@ class SAM2VideoPredictor():
                     num_obj_ptr_tokens = 0
         else:
             # for initial conditioning frames, encode them without using any previous memory
-            print("memory 2")
             if self.directly_add_no_mem_embed:
-                print("directly_add_no_mem_embed")
                 # directly add no-mem embedding (instead of using the transformer encoder)
                 pix_feat_with_mem = current_vision_feats[-1] + self.no_mem_embed
                 pix_feat_with_mem = pix_feat_with_mem.permute(1, 2, 0).view(B, C, H, W)
@@ -1636,7 +1635,6 @@ class SAM2VideoPredictor():
         memory_pos_embed = torch.cat(to_cat_memory_pos_embed, dim=0)
 
         num_obj_ptr_tokens_numpy = np.array((num_obj_ptr_tokens)).astype(np.int64)
-        print(memory.shape)
         pix_feat_with_mem = memory_attention.run(None, {"curr":current_vision_feats[0].numpy(), "memory":memory.numpy(), "curr_pos":current_vision_pos_embeds[0].numpy(), "memory_pos":memory_pos_embed.numpy(), "num_obj_ptr_tokens":num_obj_ptr_tokens_numpy})
         pix_feat_with_mem = torch.Tensor(pix_feat_with_mem[0])
         

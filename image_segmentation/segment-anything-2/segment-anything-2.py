@@ -185,7 +185,7 @@ def recognize_from_image(image_encoder, prompt_encoder, mask_decoder):
         show_masks(image, masks, scores, point_coords=input_point, input_labels=input_label, box_coords=box, borders=True, savepath=savepath)
 
 
-def recognize_from_video(image_encoder, prompt_encoder, mask_decoder, memory_attention, memory_encoder):
+def recognize_from_video(image_encoder, prompt_encoder, mask_decoder, memory_attention, memory_encoder, mlp):
     video_dir = "./bedroom_short"
 
     #video_predictor = SAM2VideoPredictor()
@@ -244,7 +244,8 @@ def recognize_from_video(image_encoder, prompt_encoder, mask_decoder, memory_att
         prompt_encoder=prompt_encoder,
         mask_decoder=mask_decoder,
         memory_attention=memory_attention,
-        memory_encoder=memory_encoder
+        memory_encoder=memory_encoder,
+        mlp=mlp
     )
 
     # show the results on the current (interacted) frame
@@ -258,7 +259,7 @@ def recognize_from_video(image_encoder, prompt_encoder, mask_decoder, memory_att
 
     # run propagation throughout the video and collect the results in a dict
     video_segments = {}  # video_segments contains the per-frame segmentation results
-    for out_frame_idx, out_obj_ids, out_mask_logits in predictor.propagate_in_video(inference_state, image_encoder, prompt_encoder, mask_decoder, memory_attention, memory_encoder):
+    for out_frame_idx, out_obj_ids, out_mask_logits in predictor.propagate_in_video(inference_state, image_encoder, prompt_encoder, mask_decoder, memory_attention, memory_encoder, mlp):
         video_segments[out_frame_idx] = {
             out_obj_id: (out_mask_logits[i] > 0.0).cpu().numpy()
             for i, out_obj_id in enumerate(out_obj_ids)
@@ -288,6 +289,8 @@ def main():
     MODEL_MEMORY_ATTENTION_L_PATH = 'memory_attention_'+args.model_type+'.onnx.prototxt'
     WEIGHT_MEMORY_ENCODER_L_PATH = 'memory_encoder_'+args.model_type+'.onnx'
     MODEL_MEMORY_ENCODER_L_PATH = 'memory_encoder_'+args.model_type+'.onnx.prototxt'
+    WEIGHT_MLP_L_PATH = 'mlp_'+args.model_type+'.onnx'
+    MODEL_MLP_L_PATH = 'mlp_'+args.model_type+'.onnx.prototxt'
 
     # model files check and download
     check_and_download_models(WEIGHT_IMAGE_ENCODER_L_PATH, MODEL_IMAGE_ENCODER_L_PATH, REMOTE_PATH)
@@ -295,6 +298,7 @@ def main():
     check_and_download_models(WEIGHT_MASK_DECODER_L_PATH, MODEL_MASK_DECODER_L_PATH, REMOTE_PATH)
     check_and_download_models(WEIGHT_MEMORY_ATTENTION_L_PATH, MODEL_MEMORY_ATTENTION_L_PATH, REMOTE_PATH)
     check_and_download_models(WEIGHT_MEMORY_ENCODER_L_PATH, MODEL_MEMORY_ENCODER_L_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_MLP_L_PATH, MODEL_MLP_L_PATH, REMOTE_PATH)
 
     if args.onnx:
         import onnxruntime
@@ -303,6 +307,7 @@ def main():
         mask_decoder = onnxruntime.InferenceSession(WEIGHT_MASK_DECODER_L_PATH)
         memory_attention = onnxruntime.InferenceSession(WEIGHT_MEMORY_ATTENTION_L_PATH)
         memory_encoder = onnxruntime.InferenceSession(WEIGHT_MEMORY_ENCODER_L_PATH)
+        mlp = onnxruntime.InferenceSession(WEIGHT_MLP_L_PATH)
     else:
         memory_mode = ailia.get_memory_mode(reduce_constant=True, ignore_input_with_initializer=True, reduce_interstage=False, reuse_interstage=True)
         image_encoder = ailia.Net(weight=WEIGHT_IMAGE_ENCODER_L_PATH, stream=MODEL_IMAGE_ENCODER_L_PATH, memory_mode=memory_mode, env_id=args.env_id)
@@ -310,9 +315,10 @@ def main():
         mask_decoder = ailia.Net(weight=WEIGHT_MASK_DECODER_L_PATH, stream=MODEL_MASK_DECODER_L_PATH, memory_mode=memory_mode, env_id=args.env_id)
         memory_attention = ailia.Net(weight=WEIGHT_MEMORY_ATTENTION_L_PATH, stream=MODEL_MEMORY_ATTENTION_L_PATH, memory_mode=memory_mode, env_id=args.env_id)
         memory_encoder = ailia.Net(weight=WEIGHT_MEMORY_ENCODER_L_PATH, stream=MODEL_MEMORY_ENCODER_L_PATH, memory_mode=memory_mode, env_id=args.env_id)
+        mlp = ailia.Net(weight=WEIGHT_MLP_L_PATH, stream=MODEL_MLP_L_PATH, memory_mode=memory_mode, env_id=args.env_id)
 
     if args.video is not None:
-        recognize_from_video(image_encoder, prompt_encoder, mask_decoder, memory_attention, memory_encoder)
+        recognize_from_video(image_encoder, prompt_encoder, mask_decoder, memory_attention, memory_encoder, mlp)
     else:
         recognize_from_image(image_encoder, prompt_encoder, mask_decoder)
 
