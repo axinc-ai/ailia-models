@@ -126,9 +126,9 @@ class SAM2VideoPredictor():
         self.binarize_mask_from_pts_for_mem_enc = True
         self.sigmoid_scale_for_mem_enc = 20
         self.sigmoid_bias_for_mem_enc = -10.0
-        #self.sam_mask_decoder.dynamic_multimask_via_stability = True # must implement it for video and image mode
-        #self.sam_mask_decoder.dynamic_multimask_stability_delta = 0.05
-        #self.sam_mask_decoder.dynamic_multimask_stability_thresh = 0.98
+        self.dynamic_multimask_via_stability = True # must implement it for video and image mode
+        self.dynamic_multimask_stability_delta = 0.05
+        self.dynamic_multimask_stability_thresh = 0.98
         self.max_cond_frames_in_attn = -1
         self.memory_temporal_stride_for_eval = 1
         self.max_obj_ptrs_in_encoder = 16
@@ -1415,8 +1415,8 @@ class SAM2VideoPredictor():
         if multimask_output:
             masks = masks[:, 1:, :, :]
             iou_pred = iou_pred[:, 1:]
-        #elif self.dynamic_multimask_via_stability and not self.training:
-        #    masks, iou_pred = self._dynamic_multimask_via_stability(masks, iou_pred)
+        elif self.dynamic_multimask_via_stability and not self.training:
+            masks, iou_pred = self._dynamic_multimask_via_stability(masks, iou_pred)
         else:
             masks = masks[:, 0:1, :, :]
             iou_pred = iou_pred[:, 0:1]
@@ -1718,8 +1718,7 @@ class SAM2VideoPredictor():
 
         return backbone_out, vision_feats, vision_pos_embeds, feat_sizes
 
-
-
+    # others
     def _use_multimask(self, is_init_cond_frame, point_inputs):
         """Whether to use multimask output in the SAM head."""
         num_pts = 0 if point_inputs is None else point_inputs["point_labels"].size(1)
@@ -1749,3 +1748,54 @@ class SAM2VideoPredictor():
         # don't overlap (here sigmoid(-10.0)=4.5398e-05)
         pred_masks = torch.where(keep, pred_masks, torch.clamp(pred_masks, max=-10.0))
         return pred_masks
+
+    # mask_decoder
+    def _get_stability_scores(self, mask_logits):
+        """
+        Compute stability scores of the mask logits based on the IoU between upper and
+        lower thresholds, similar to https://github.com/fairinternal/onevision/pull/568.
+        """
+        mask_logits = mask_logits.flatten(-2)
+        stability_delta = self.dynamic_multimask_stability_delta
+        area_i = torch.sum(mask_logits > stability_delta, dim=-1).float()
+        area_u = torch.sum(mask_logits > -stability_delta, dim=-1).float()
+        stability_scores = torch.where(area_u > 0, area_i / area_u, 1.0)
+        return stability_scores
+
+    def _dynamic_multimask_via_stability(self, all_mask_logits, all_iou_scores):
+        """
+        When outputting a single mask, if the stability score from the current single-mask
+        output (based on output token 0) falls below a threshold, we instead select from
+        multi-mask outputs (based on output token 1~3) the mask with the highest predicted
+        IoU score. This is intended to ensure a valid mask for both clicking and tracking.
+        """
+        # The best mask from multimask output tokens (1~3)
+        multimask_logits = all_mask_logits[:, 1:, :, :]
+        multimask_iou_scores = all_iou_scores[:, 1:]
+        best_scores_inds = torch.argmax(multimask_iou_scores, dim=-1)
+        batch_inds = torch.arange(
+            multimask_iou_scores.size(0), device=all_iou_scores.device
+        )
+        best_multimask_logits = multimask_logits[batch_inds, best_scores_inds]
+        best_multimask_logits = best_multimask_logits.unsqueeze(1)
+        best_multimask_iou_scores = multimask_iou_scores[batch_inds, best_scores_inds]
+        best_multimask_iou_scores = best_multimask_iou_scores.unsqueeze(1)
+
+        # The mask from singlemask output token 0 and its stability score
+        singlemask_logits = all_mask_logits[:, 0:1, :, :]
+        singlemask_iou_scores = all_iou_scores[:, 0:1]
+        stability_scores = self._get_stability_scores(singlemask_logits)
+        is_stable = stability_scores >= self.dynamic_multimask_stability_thresh
+
+        # Dynamically fall back to best multimask output upon low stability scores.
+        mask_logits_out = torch.where(
+            is_stable[..., None, None].expand_as(singlemask_logits),
+            singlemask_logits,
+            best_multimask_logits,
+        )
+        iou_scores_out = torch.where(
+            is_stable.expand_as(singlemask_iou_scores),
+            singlemask_iou_scores,
+            best_multimask_iou_scores,
+        )
+        return mask_logits_out, iou_scores_out
