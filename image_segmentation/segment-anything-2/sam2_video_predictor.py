@@ -106,6 +106,8 @@ class SAM2VideoPredictor():
         self.training = False
         self.mem_dim = self.hidden_dim
         self.add_tpos_enc_to_obj_ptrs = True
+        self.use_obj_ptrs_in_encoder = False
+        self.add_all_frames_to_correct_as_cond = False
 
         # a single token to indicate no memory embedding from previous frames
         from torch.nn.init import trunc_normal_
@@ -1572,6 +1574,7 @@ class SAM2VideoPredictor():
         memory_pos_embed = torch.cat(to_cat_memory_pos_embed, dim=0)
 
         num_obj_ptr_tokens_numpy = np.array((num_obj_ptr_tokens)).astype(np.int64)
+        print(memory.shape)
         pix_feat_with_mem = memory_attention.run(None, {"curr":current_vision_feats[0].numpy(), "memory":memory.numpy(), "curr_pos":current_vision_pos_embeds[0].numpy(), "memory_pos":memory_pos_embed.numpy(), "num_obj_ptr_tokens":num_obj_ptr_tokens_numpy})
         pix_feat_with_mem = torch.Tensor(pix_feat_with_mem[0])
         
