@@ -13,6 +13,7 @@ from sam2_misc import concat_points, load_video_frames
 # a large negative value as a placeholder score for missing objects
 NO_OBJ_SCORE = -1024.0
 
+# sam2_utils.py
 def select_closest_cond_frames(frame_idx, cond_frame_outputs, max_cond_frame_num):
     """
     Select up to `max_cond_frame_num` conditioning frames from `cond_frame_outputs`
@@ -69,6 +70,7 @@ def get_1d_sine_pe(pos_inds, dim, temperature=10000):
     pos_embed = torch.cat([pos_embed.sin(), pos_embed.cos()], dim=-1)
     return pos_embed
 
+# sam2_video_predictor.py
 class SAM2VideoPredictor():
     """The predictor class to handle user interactions and manage inference states."""
 
@@ -1123,6 +1125,7 @@ class SAM2VideoPredictor():
             for obj_output_dict in inference_state["output_dict_per_obj"].values():
                 obj_output_dict["non_cond_frame_outputs"].pop(t, None)
 
+    # sam2_base.py
     def track_step(
         self,
         frame_idx,
@@ -1231,6 +1234,7 @@ class SAM2VideoPredictor():
 
         return current_out
 
+    # sam_base.py
     def _forward_sam_heads(
         self,
         backbone_features,
@@ -1406,6 +1410,7 @@ class SAM2VideoPredictor():
             object_score_logits,
         )
 
+    # mask_decoder.py
     def forward_postprocess(
         self,
         masks: torch.Tensor,
@@ -1437,6 +1442,7 @@ class SAM2VideoPredictor():
         # Prepare output
         return masks, iou_pred, sam_tokens_out, object_score_logits
 
+    # sam2_base.py
     def _use_mask_as_output(self, backbone_features, high_res_features, mask_inputs, prompt_encoder, mask_decoder, mlp):
         """
         Directly turn binary `mask_inputs` into a output mask logits without using SAM.
@@ -1704,7 +1710,7 @@ class SAM2VideoPredictor():
 
         return maskmem_features, maskmem_pos_enc
 
-
+    # sam2_base.py
     def _prepare_backbone_features(self, backbone_out):
         """Prepare and flatten visual features."""
         backbone_out = backbone_out.copy()
@@ -1721,7 +1727,7 @@ class SAM2VideoPredictor():
 
         return backbone_out, vision_feats, vision_pos_embeds, feat_sizes
 
-    # others
+    # sam2_base.py
     def _use_multimask(self, is_init_cond_frame, point_inputs):
         """Whether to use multimask output in the SAM head."""
         num_pts = 0 if point_inputs is None else point_inputs["point_labels"].size(1)
@@ -1752,7 +1758,7 @@ class SAM2VideoPredictor():
         pred_masks = torch.where(keep, pred_masks, torch.clamp(pred_masks, max=-10.0))
         return pred_masks
 
-    # mask_decoder
+    # mask_decoder.py
     def _get_stability_scores(self, mask_logits):
         """
         Compute stability scores of the mask logits based on the IoU between upper and
