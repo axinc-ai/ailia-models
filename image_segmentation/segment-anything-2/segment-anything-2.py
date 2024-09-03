@@ -188,9 +188,8 @@ def recognize_from_image(image_encoder, prompt_encoder, mask_decoder):
 def recognize_from_video(image_encoder, prompt_encoder, mask_decoder, memory_attention, memory_encoder, mlp):
     video_dir = "./bedroom_short"
 
-    #video_predictor = SAM2VideoPredictor()
     from PIL import Image
-    predictor = SAM2VideoPredictor()
+    predictor = SAM2VideoPredictor(args.onnx)
 
     def show_mask(mask, ax, obj_id=None, random_color=False):
         if random_color:

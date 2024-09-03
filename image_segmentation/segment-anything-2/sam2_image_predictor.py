@@ -233,7 +233,7 @@ class SAM2ImagePredictor:
         if multimask_output:
             masks = masks[:, 1:, :, :]
             iou_pred = iou_pred[:, 1:]
-        #elif self.dynamic_multimask_via_stability and not self.training:
+        #elif self.dynamic_multimask_via_stability and not self.training: # multimask_outputが常にTrueなので発生しない
         #    masks, iou_pred = self._dynamic_multimask_via_stability(masks, iou_pred)
         else:
             masks = masks[:, 0:1, :, :]

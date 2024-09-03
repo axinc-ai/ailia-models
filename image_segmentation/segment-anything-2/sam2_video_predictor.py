@@ -76,6 +76,7 @@ class SAM2VideoPredictor():
 
     def __init__(
         self,
+        onnx,
         fill_hole_area=0,
         # whether to apply non-overlapping constraints on the output object masks
         non_overlap_masks=False,
@@ -83,10 +84,9 @@ class SAM2VideoPredictor():
         # note that this would only apply to *single-object tracking* unless `clear_non_cond_mem_for_multi_obj` is also set to True)
         clear_non_cond_mem_around_input=False,
         # whether to also clear non-conditioning memory of the surrounding frames (only effective when `clear_non_cond_mem_around_input` is True).
-        clear_non_cond_mem_for_multi_obj=False,
-        **kwargs,
+        clear_non_cond_mem_for_multi_obj=False
     ):
-        super().__init__(**kwargs)
+        self.onnx = onnx
         self.fill_hole_area = fill_hole_area
         self.non_overlap_masks = non_overlap_masks
         self.clear_non_cond_mem_around_input = clear_non_cond_mem_around_input
@@ -128,7 +128,7 @@ class SAM2VideoPredictor():
         self.binarize_mask_from_pts_for_mem_enc = True
         self.sigmoid_scale_for_mem_enc = 20
         self.sigmoid_bias_for_mem_enc = -10.0
-        self.dynamic_multimask_via_stability = True # must implement it for video and image mode
+        self.dynamic_multimask_via_stability = True
         self.dynamic_multimask_stability_delta = 0.05
         self.dynamic_multimask_stability_thresh = 0.98
         self.max_cond_frames_in_attn = -1
@@ -949,7 +949,10 @@ class SAM2VideoPredictor():
 
             print("begin image encoder onnx")
             print(image.shape)
-            vision_features, vision_pos_enc_0, vision_pos_enc_1, vision_pos_enc_2, backbone_fpn_0, backbone_fpn_1, backbone_fpn_2 = image_encoder.run(None, {"input_image":image.numpy()})
+            if self.onnx:
+                vision_features, vision_pos_enc_0, vision_pos_enc_1, vision_pos_enc_2, backbone_fpn_0, backbone_fpn_1, backbone_fpn_2 = image_encoder.run(None, {"input_image":image.numpy()})
+            else:
+                vision_features, vision_pos_enc_0, vision_pos_enc_1, vision_pos_enc_2, backbone_fpn_0, backbone_fpn_1, backbone_fpn_2 = image_encoder.run({"input_image":image.numpy()})
             
             backbone_out = {"vision_features":torch.Tensor(vision_features),
                             "vision_pos_enc":[torch.Tensor(vision_pos_enc_0), torch.Tensor(vision_pos_enc_1), torch.Tensor(vision_pos_enc_2)],
@@ -1330,7 +1333,10 @@ class SAM2VideoPredictor():
             masks_enable = torch.tensor([1], dtype=torch.int)
 
         print("begin prompt encoder onnx")
-        sparse_embeddings, dense_embeddings, dense_pe = prompt_encoder.run(None, {"coords":sam_point_coords.numpy(), "labels":sam_point_labels.numpy(), "masks":mask_input_dummy.numpy(), "masks_enable":masks_enable.numpy()})
+        if self.onnx:
+            sparse_embeddings, dense_embeddings, dense_pe = prompt_encoder.run(None, {"coords":sam_point_coords.numpy(), "labels":sam_point_labels.numpy(), "masks":mask_input_dummy.numpy(), "masks_enable":masks_enable.numpy()})
+        else:
+            sparse_embeddings, dense_embeddings, dense_pe = prompt_encoder.run({"coords":sam_point_coords.numpy(), "labels":sam_point_labels.numpy(), "masks":mask_input_dummy.numpy(), "masks_enable":masks_enable.numpy()})
         sparse_embeddings = torch.Tensor(sparse_embeddings)
         dense_embeddings = torch.Tensor(dense_embeddings)
         dense_pe = torch.Tensor(dense_pe)
@@ -1341,14 +1347,24 @@ class SAM2VideoPredictor():
         print("dense_embeddings", np.sum(dense_embeddings.numpy()))
         print("high_res_features", np.sum(high_res_features[0].numpy()))
         print("high_res_features", np.sum(high_res_features[1].numpy()))
-        masks, iou_pred, sam_tokens_out, object_score_logits  = mask_decoder.run(None, {
-            "image_embeddings":backbone_features.numpy(),
-            "image_pe": dense_pe.numpy(),
-            "sparse_prompt_embeddings": sparse_embeddings.numpy(),
-            "dense_prompt_embeddings": dense_embeddings.numpy(),
-            #repeat_image=False,  # the image is already batched
-            "high_res_features1":high_res_features[0].numpy(),
-            "high_res_features2":high_res_features[1].numpy()})
+        if self.onnx:
+            masks, iou_pred, sam_tokens_out, object_score_logits  = mask_decoder.run(None, {
+                "image_embeddings":backbone_features.numpy(),
+                "image_pe": dense_pe.numpy(),
+                "sparse_prompt_embeddings": sparse_embeddings.numpy(),
+                "dense_prompt_embeddings": dense_embeddings.numpy(),
+                #repeat_image=False,  # the image is already batched
+                "high_res_features1":high_res_features[0].numpy(),
+                "high_res_features2":high_res_features[1].numpy()})
+        else:
+            masks, iou_pred, sam_tokens_out, object_score_logits  = mask_decoder.run({
+                "image_embeddings":backbone_features.numpy(),
+                "image_pe": dense_pe.numpy(),
+                "sparse_prompt_embeddings": sparse_embeddings.numpy(),
+                "dense_prompt_embeddings": dense_embeddings.numpy(),
+                #repeat_image=False,  # the image is already batched
+                "high_res_features1":high_res_features[0].numpy(),
+                "high_res_features2":high_res_features[1].numpy()})
         masks = torch.Tensor(masks)
         iou_pred = torch.Tensor(iou_pred)
         sam_tokens_out = torch.Tensor(sam_tokens_out)
@@ -1389,7 +1405,10 @@ class SAM2VideoPredictor():
             low_res_masks, high_res_masks = low_res_multimasks, high_res_multimasks
 
         # Extract object pointer from the SAM output token (with occlusion handling)
-        obj_ptr = mlp.run(None, {"x":sam_output_token.numpy()})[0]
+        if self.onnx:
+            obj_ptr = mlp.run(None, {"x":sam_output_token.numpy()})[0]
+        else:
+            obj_ptr = mlp.run({"x":sam_output_token.numpy()})[0]
         obj_ptr = torch.Tensor(obj_ptr)
         
         if self.pred_obj_scores:
@@ -1671,7 +1690,10 @@ class SAM2VideoPredictor():
         print("curr_pos", np.sum(current_vision_pos_embeds[0].numpy()))
         print("memory_pos", np.sum(memory_pos_embed.numpy()))
         print("num_obj_ptr_tokens", np.sum(num_obj_ptr_tokens_numpy))
-        pix_feat_with_mem = memory_attention.run(None, {"curr":current_vision_feats[0].numpy(), "memory":memory.numpy(), "curr_pos":current_vision_pos_embeds[0].numpy(), "memory_pos":memory_pos_embed.numpy(), "num_obj_ptr_tokens":num_obj_ptr_tokens_numpy})
+        if self.onnx:
+            pix_feat_with_mem = memory_attention.run(None, {"curr":current_vision_feats[0].numpy(), "memory":memory.numpy(), "curr_pos":current_vision_pos_embeds[0].numpy(), "memory_pos":memory_pos_embed.numpy(), "num_obj_ptr_tokens":num_obj_ptr_tokens_numpy})
+        else:
+            pix_feat_with_mem = memory_attention.run({"curr":current_vision_feats[0].numpy(), "memory":memory.numpy(), "curr_pos":current_vision_pos_embeds[0].numpy(), "memory_pos":memory_pos_embed.numpy(), "num_obj_ptr_tokens":num_obj_ptr_tokens_numpy})
         pix_feat_with_mem = torch.Tensor(pix_feat_with_mem[0])
         
         # reshape the output (HW)BC => BCHW
@@ -1712,7 +1734,10 @@ class SAM2VideoPredictor():
         if self.sigmoid_bias_for_mem_enc != 0.0:
             mask_for_mem = mask_for_mem + self.sigmoid_bias_for_mem_enc
 
-        vision_features, vision_pos_enc = memory_encoder.run(None, {"pix_feat":pix_feat.numpy(), "masks":mask_for_mem.numpy()})
+        if self.onnx:
+            vision_features, vision_pos_enc = memory_encoder.run(None, {"pix_feat":pix_feat.numpy(), "masks":mask_for_mem.numpy()})
+        else:
+            vision_features, vision_pos_enc = memory_encoder.run({"pix_feat":pix_feat.numpy(), "masks":mask_for_mem.numpy()})
         maskmem_out = {"vision_features": torch.Tensor(vision_features), "vision_pos_enc": [torch.Tensor(vision_pos_enc)]}
 
         maskmem_features = maskmem_out["vision_features"]
