@@ -76,7 +76,7 @@ args = update_parser(parser)
 # Utility
 # ======================
 
-#np.random.seed(3)
+np.random.seed(3)
 
 def show_mask(mask, ax, random_color=False, borders = True):
     if random_color:

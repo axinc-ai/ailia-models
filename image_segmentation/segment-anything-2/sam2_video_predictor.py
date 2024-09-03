@@ -1027,6 +1027,10 @@ class SAM2VideoPredictor():
             maskmem_features = maskmem_features.to(torch.bfloat16)
             maskmem_features = maskmem_features.to(storage_device, non_blocking=True)
         pred_masks_gpu = current_out["pred_masks"]
+        #if self.fill_hole_area > 0:
+        #    pred_masks_gpu = fill_holes_in_mask_scores(
+        #        pred_masks_gpu, self.fill_hole_area
+        #    )
         # potentially fill holes in the predicted masks
         pred_masks = pred_masks_gpu.to(storage_device, non_blocking=True)
         # "maskmem_pos_enc" is the same across frames, so we only need to store one copy of it
