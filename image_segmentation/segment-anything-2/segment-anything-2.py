@@ -13,6 +13,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 import ailia
 
+import torch
+from PIL import Image
+from tqdm import tqdm
+
 # import original modules
 sys.path.append('../../util')
 from arg_utils import get_base_parser, update_parser, get_savepath  # noqa
@@ -185,8 +189,74 @@ def recognize_from_image(image_encoder, prompt_encoder, mask_decoder):
         show_masks(image, masks, scores, point_coords=input_point, input_labels=input_label, box_coords=box, borders=True, savepath=savepath)
 
 
+def _load_img_as_tensor(img_path, image_size):
+    img_pil = Image.open(img_path)
+    img_np = np.array(img_pil.convert("RGB").resize((image_size, image_size)))
+    if img_np.dtype == np.uint8:  # np.uint8 is expected for JPEG images
+        img_np = img_np / 255.0
+    else:
+        raise RuntimeError(f"Unknown image dtype: {img_np.dtype} on {img_path}")
+    img = torch.from_numpy(img_np).permute(2, 0, 1)
+    video_width, video_height = img_pil.size  # the original video size
+    return img, video_height, video_width
+
+
+def load_video_frames(
+    video_path,
+    image_size,
+    img_mean=(0.485, 0.456, 0.406),
+    img_std=(0.229, 0.224, 0.225),
+):
+    """
+    Load the video frames from a directory of JPEG files ("<frame_index>.jpg" format).
+
+    The frames are resized to image_size x image_size and are loaded to GPU if
+    `offload_video_to_cpu` is `False` and to CPU if `offload_video_to_cpu` is `True`.
+
+    You can load a frame asynchronously by setting `async_loading_frames` to `True`.
+    """
+    if isinstance(video_path, str) and os.path.isdir(video_path):
+        jpg_folder = video_path
+    else:
+        raise NotImplementedError(
+            "Only JPEG frames are supported at this moment. For video files, you may use "
+            "ffmpeg (https://ffmpeg.org/) to extract frames into a folder of JPEG files, such as \n"
+            "```\n"
+            "ffmpeg -i <your_video>.mp4 -q:v 2 -start_number 0 <output_dir>/'%05d.jpg'\n"
+            "```\n"
+            "where `-q:v` generates high-quality JPEG frames and `-start_number 0` asks "
+            "ffmpeg to start the JPEG file from 00000.jpg."
+        )
+
+    frame_names = [
+        p
+        for p in os.listdir(jpg_folder)
+        if os.path.splitext(p)[-1] in [".jpg", ".jpeg", ".JPG", ".JPEG"]
+    ]
+    frame_names.sort(key=lambda p: int(os.path.splitext(p)[0]))
+    num_frames = len(frame_names)
+    if num_frames == 0:
+        raise RuntimeError(f"no images found in {jpg_folder}")
+    img_paths = [os.path.join(jpg_folder, frame_name) for frame_name in frame_names]
+    img_mean = torch.tensor(img_mean, dtype=torch.float32)[:, None, None]
+    img_std = torch.tensor(img_std, dtype=torch.float32)[:, None, None]
+
+    images = torch.zeros(num_frames, 3, image_size, image_size, dtype=torch.float32)
+    for n, img_path in enumerate(tqdm(img_paths, desc="frame loading (JPEG)")):
+        images[n], video_height, video_width = _load_img_as_tensor(img_path, image_size)
+    # normalize by mean and std
+    images -= img_mean
+    images /= img_std
+    return images, video_height, video_width
+
 def recognize_from_video(image_encoder, prompt_encoder, mask_decoder, memory_attention, memory_encoder, mlp):
-    video_dir = "./bedroom_short"
+    video_path = "./bedroom_short"
+    image_size = 1024
+
+    images, video_height, video_width = load_video_frames(
+        video_path=video_path,
+        image_size=image_size
+    )
 
     from PIL import Image
     predictor = SAM2VideoPredictor(args.onnx)
@@ -217,12 +287,12 @@ def recognize_from_video(image_encoder, prompt_encoder, mask_decoder, memory_att
 
     # scan all the JPEG frame names in this directory
     frame_names = [
-        p for p in os.listdir(video_dir)
+        p for p in os.listdir(video_path)
         if os.path.splitext(p)[-1] in [".jpg", ".jpeg", ".JPG", ".JPEG"]
     ]
     frame_names.sort(key=lambda p: int(os.path.splitext(p)[0]))
 
-    inference_state = predictor.init_state(video_path=video_dir, image_encoder=image_encoder)
+    inference_state = predictor.init_state(images = images, video_height = video_height, video_width = video_width, image_encoder=image_encoder)
     predictor.reset_state(inference_state)
 
     ann_frame_idx = 0  # the frame index we interact with
@@ -250,7 +320,7 @@ def recognize_from_video(image_encoder, prompt_encoder, mask_decoder, memory_att
     # show the results on the current (interacted) frame
     plt.figure(figsize=(9, 6))
     plt.title(f"frame {ann_frame_idx}")
-    plt.imshow(Image.open(os.path.join(video_dir, frame_names[ann_frame_idx])))
+    plt.imshow(Image.open(os.path.join(video_path, frame_names[ann_frame_idx])))
     show_points(points, labels, plt.gca())
     show_mask((out_mask_logits[0] > 0.0).cpu().numpy(), plt.gca(), obj_id=out_obj_ids[0])
     #plt.show()
@@ -276,7 +346,7 @@ def recognize_from_video(image_encoder, prompt_encoder, mask_decoder, memory_att
     for out_frame_idx in range(0, len(frame_names), vis_frame_stride):
         plt.figure(figsize=(6, 4))
         plt.title(f"frame {out_frame_idx}")
-        plt.imshow(Image.open(os.path.join(video_dir, frame_names[out_frame_idx])))
+        plt.imshow(Image.open(os.path.join(video_path, frame_names[out_frame_idx])))
         for out_obj_id, out_mask in video_segments[out_frame_idx].items():
             show_mask(out_mask, plt.gca(), obj_id=out_obj_id)
         #plt.show()

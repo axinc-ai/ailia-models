@@ -8,8 +8,6 @@ import torch.nn.functional as F
 
 from tqdm import tqdm
 
-from sam2_misc import concat_points, load_video_frames
-
 # a large negative value as a placeholder score for missing objects
 NO_OBJ_SCORE = -1024.0
 
@@ -70,6 +68,16 @@ def get_1d_sine_pe(pos_inds, dim, temperature=10000):
     pos_embed = torch.cat([pos_embed.sin(), pos_embed.cos()], dim=-1)
     return pos_embed
 
+def concat_points(old_point_inputs, new_points, new_labels):
+    """Add new points and labels to previous point inputs (add at the end)."""
+    if old_point_inputs is None:
+        points, labels = new_points, new_labels
+    else:
+        points = torch.cat([old_point_inputs["point_coords"], new_points], dim=1)
+        labels = torch.cat([old_point_inputs["point_labels"], new_labels], dim=1)
+
+    return {"point_coords": points, "point_labels": labels}
+
 # sam2_video_predictor.py
 class SAM2VideoPredictor():
     """The predictor class to handle user interactions and manage inference states."""
@@ -95,10 +103,9 @@ class SAM2VideoPredictor():
     @torch.inference_mode()
     def init_state(
         self,
-        video_path,
-        offload_video_to_cpu=False,
-        offload_state_to_cpu=False,
-        async_loading_frames=False,
+        images,
+        video_height,
+        video_width,
         image_encoder=None
     ):
         """default state from yaml"""
@@ -155,33 +162,14 @@ class SAM2VideoPredictor():
         trunc_normal_(self.no_obj_ptr, std=0.02)
 
         """Initialize an inference state."""
-        compute_device = "cpu"  # device of the model
-        images, video_height, video_width = load_video_frames(
-            video_path=video_path,
-            image_size=self.image_size,
-            offload_video_to_cpu=offload_video_to_cpu,
-            async_loading_frames=async_loading_frames,
-            compute_device=compute_device,
-        )
         inference_state = {}
         inference_state["images"] = images
         inference_state["num_frames"] = len(images)
-        # whether to offload the video frames to CPU memory
-        # turning on this option saves the GPU memory with only a very small overhead
-        inference_state["offload_video_to_cpu"] = offload_video_to_cpu
-        # whether to offload the inference state to CPU memory
-        # turning on this option saves the GPU memory at the cost of a lower tracking fps
-        # (e.g. in a test case of 768x768 model, fps dropped from 27 to 24 when tracking one object
-        # and from 24 to 21 when tracking two objects)
-        inference_state["offload_state_to_cpu"] = offload_state_to_cpu
         # the original video height and width, used for resizing final output scores
         inference_state["video_height"] = video_height
         inference_state["video_width"] = video_width
-        inference_state["device"] = compute_device
-        if offload_state_to_cpu:
-            inference_state["storage_device"] = torch.device("cpu")
-        else:
-            inference_state["storage_device"] = compute_device
+        inference_state["device"] = torch.device("cpu")
+        inference_state["storage_device"] = torch.device("cpu")
         # inputs on each frame
         inference_state["point_inputs_per_obj"] = {}
         inference_state["mask_inputs_per_obj"] = {}
@@ -1843,3 +1831,5 @@ class SAM2VideoPredictor():
             best_multimask_iou_scores,
         )
         return mask_logits_out, iou_scores_out
+
+
