@@ -1329,13 +1329,18 @@ class SAM2VideoPredictor():
             mask_input_dummy = sam_mask_prompt
             masks_enable = torch.tensor([1], dtype=torch.int)
 
-        print("begin mask decoder onnx")
+        print("begin prompt encoder onnx")
         sparse_embeddings, dense_embeddings, dense_pe = prompt_encoder.run(None, {"coords":sam_point_coords.numpy(), "labels":sam_point_labels.numpy(), "masks":mask_input_dummy.numpy(), "masks_enable":masks_enable.numpy()})
         sparse_embeddings = torch.Tensor(sparse_embeddings)
         dense_embeddings = torch.Tensor(dense_embeddings)
         dense_pe = torch.Tensor(dense_pe)
-
-        print("backbone_features", backbone_features.shape)
+        print("begin mask decoder onnx")
+        print("backbone_features", np.sum(backbone_features.numpy()))
+        print("image_pe", np.sum(dense_pe.numpy()))
+        print("sparse_embeddings", np.sum(sparse_embeddings.numpy()))
+        print("dense_embeddings", np.sum(dense_embeddings.numpy()))
+        print("high_res_features", np.sum(high_res_features[0].numpy()))
+        print("high_res_features", np.sum(high_res_features[1].numpy()))
         masks, iou_pred, sam_tokens_out, object_score_logits  = mask_decoder.run(None, {
             "image_embeddings":backbone_features.numpy(),
             "image_pe": dense_pe.numpy(),
@@ -1661,6 +1666,11 @@ class SAM2VideoPredictor():
         memory_pos_embed = torch.cat(to_cat_memory_pos_embed, dim=0)
 
         num_obj_ptr_tokens_numpy = np.array((num_obj_ptr_tokens)).astype(np.int64)
+        print("curr", np.sum(current_vision_feats[0].numpy()))
+        print("memory", np.sum(memory.numpy()))
+        print("curr_pos", np.sum(current_vision_pos_embeds[0].numpy()))
+        print("memory_pos", np.sum(memory_pos_embed.numpy()))
+        print("num_obj_ptr_tokens", np.sum(num_obj_ptr_tokens_numpy))
         pix_feat_with_mem = memory_attention.run(None, {"curr":current_vision_feats[0].numpy(), "memory":memory.numpy(), "curr_pos":current_vision_pos_embeds[0].numpy(), "memory_pos":memory_pos_embed.numpy(), "num_obj_ptr_tokens":num_obj_ptr_tokens_numpy})
         pix_feat_with_mem = torch.Tensor(pix_feat_with_mem[0])
         
