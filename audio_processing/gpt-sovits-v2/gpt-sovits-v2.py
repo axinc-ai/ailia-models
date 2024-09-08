@@ -31,7 +31,7 @@ REMOTE_PATH = "https://storage.googleapis.com/ailia-models/gpt-sovits-v2/"
 WEIGHT_PATH_SSL = "cnhubert.onnx"
 WEIGHT_PATH_T2S_ENCODER = "t2s_encoder.onnx"
 WEIGHT_PATH_T2S_FIRST_DECODER = "t2s_fsdec.onnx"
-WEIGHT_PATH_T2S_STAGE_DECODER = "t2s_sdec.opt2.onnx"
+WEIGHT_PATH_T2S_STAGE_DECODER = "t2s_sdec.onnx"
 WEIGHT_PATH_VITS = "vits.onnx"
 MODEL_PATH_SSL = WEIGHT_PATH_SSL + ".prototxt"
 MODEL_PATH_T2S_ENCODER = WEIGHT_PATH_T2S_ENCODER + ".prototxt"
@@ -53,6 +53,7 @@ parser.add_argument(
     default="ax株式会社ではAIの実用化のための技術を開発しています。",
     help="input text",
 )
+parser.add_argument("--text_language", "-tl", default="ja", help="[ja, en]")
 parser.add_argument(
     "--ref_audio",
     "-ra",
@@ -67,7 +68,9 @@ parser.add_argument(
     default=REF_TEXT,
     help="ref text",
 )
+parser.add_argument("--ref_language", "-rl", default="ja", help="[ja, en]")
 parser.add_argument("--onnx", action="store_true", help="use onnx runtime")
+parser.add_argument("--profile", action="store_true", help="use profile model")
 args = update_parser(parser, check_input_type=False)
 
 
@@ -93,13 +96,24 @@ class T2SModel:
         self.sess_fsdec = sess_fsdec
         self.sess_sdec = sess_sdec
 
-    def forward(self, ref_seq, text_seq, ref_bert, text_bert, ssl_content):
+    def forward(
+        self,
+        ref_seq,
+        text_seq,
+        ref_bert,
+        text_bert,
+        ssl_content,
+        top_k=20,
+        top_p=0.6,
+        temperature=0.6,
+        repetition_penalty=1.35,
+    ):
         early_stop_num = self.early_stop_num
 
-        top_k = np.array([5], dtype=np.int64)
-        top_p = np.array([1.0], dtype=np.float32)
-        temperature = np.array([1.0], dtype=np.float32)
-        repetition_penalty = np.array([1.35], dtype=np.float32)
+        top_k = np.array([top_k], dtype=np.int64)
+        top_p = np.array([top_p], dtype=np.float32)
+        temperature = np.array([temperature], dtype=np.float32)
+        repetition_penalty = np.array([repetition_penalty], dtype=np.float32)
 
         EOS = 1024
 
@@ -249,13 +263,33 @@ class T2SModel:
 
 
 class GptSoVits:
-    def __init__(self, t2s, sess):
+    def __init__(self, t2s: T2SModel, sess):
         self.t2s = t2s
         self.sess = sess
 
-    def forward(self, ref_seq, text_seq, ref_bert, text_bert, ref_audio, ssl_content):
+    def forward(
+        self,
+        ref_seq,
+        text_seq,
+        ref_bert,
+        text_bert,
+        ref_audio,
+        ssl_content,
+        top_k=20,
+        top_p=0.6,
+        temperature=0.6,
+        repetition_penalty=1.35,
+    ):
         pred_semantic = self.t2s.forward(
-            ref_seq, text_seq, ref_bert, text_bert, ssl_content
+            ref_seq,
+            text_seq,
+            ref_bert,
+            text_bert,
+            ssl_content,
+            top_k=top_k,
+            top_p=top_p,
+            temperature=temperature,
+            repetition_penalty=repetition_penalty,
         )
         if args.benchmark:
             start = int(round(time.time() * 1000))
@@ -338,6 +372,10 @@ def generate_voice(ssl, t2s_encoder, t2s_first_decoder, t2s_stage_decoder, vits)
     text = args.input
     text_language = args.text_language
 
+    top_k = 15
+    top_p = 1
+    temperature = 1
+
     ref_free = ref_text is None or len(ref_text) == 0
 
     if not ref_free:
@@ -379,15 +417,58 @@ def generate_voice(ssl, t2s_encoder, t2s_first_decoder, t2s_stage_decoder, vits)
         ref_seq, ref_bert, _ = get_phones_and_bert(ref_text, ref_language)
         ref_seq = np.array(ref_seq)[np.newaxis, :]
 
+    audio_opt = []
+    for i_text, text in enumerate(texts):
+        # 解决输入目标文本的空行导致报错的问题
+        if len(text.strip()) == 0:
+            continue
+        if text[-1] not in splits:
+            text += "。" if text_language != "en" else "."
+
+        logger.info("Actual Input Target Text (per sentence): %s" % text)
+        text_seq, text_bert, norm_text = get_phones_and_bert(text, text_language)
+        text_seq = np.array(text_seq)[np.newaxis, :]
+        logger.info("Processed text from the frontend (per sentence): %s" % norm_text)
+
+        audio = gpt_sovits.forward(
+            ref_seq,
+            text_seq,
+            ref_bert.T,
+            text_bert.T,
+            ref_audio,
+            ssl_content,
+            top_k=top_k,
+            top_p=top_p,
+            temperature=temperature,
+        )
+
+        max_audio = np.abs(audio).max()
+        if max_audio > 1:
+            audio /= max_audio
+        audio_opt.append(audio)
+        audio_opt.append(zero_wav)
+
+    audio = (np.concatenate(audio_opt, 0) * 32768).astype(np.int16)
+
+    savepath = args.savepath
+    logger.info(f"saved at : {savepath}")
+    soundfile.write(savepath, audio, vits_hps_data_sampling_rate)
+
     logger.info("Script finished successfully.")
 
 
 def main():
     # model files check and download
     check_and_download_models(WEIGHT_PATH_SSL, MODEL_PATH_SSL, REMOTE_PATH)
-    check_and_download_models(WEIGHT_PATH_T2S_ENCODER, MODEL_PATH_T2S_ENCODER, REMOTE_PATH)
-    check_and_download_models(WEIGHT_PATH_T2S_FIRST_DECODER, MODEL_PATH_T2S_FIRST_DECODER, REMOTE_PATH)
-    check_and_download_models(WEIGHT_PATH_T2S_STAGE_DECODER, MODEL_PATH_T2S_STAGE_DECODER, REMOTE_PATH)
+    check_and_download_models(
+        WEIGHT_PATH_T2S_ENCODER, MODEL_PATH_T2S_ENCODER, REMOTE_PATH
+    )
+    check_and_download_models(
+        WEIGHT_PATH_T2S_FIRST_DECODER, MODEL_PATH_T2S_FIRST_DECODER, REMOTE_PATH
+    )
+    check_and_download_models(
+        WEIGHT_PATH_T2S_STAGE_DECODER, MODEL_PATH_T2S_STAGE_DECODER, REMOTE_PATH
+    )
     check_and_download_models(WEIGHT_PATH_VITS, MODEL_PATH_VITS, REMOTE_PATH)
 
     env_id = args.env_id
