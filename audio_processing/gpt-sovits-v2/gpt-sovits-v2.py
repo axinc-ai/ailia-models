@@ -7,6 +7,7 @@ from logging import getLogger  # noqa: E402
 import numpy as np
 import soundfile
 import librosa
+from tqdm import tqdm
 
 # import original modules
 sys.path.append("../../util")
@@ -82,7 +83,78 @@ splits = {
 
 
 # ======================
-# Logic
+# Secondary Functions
+# ======================
+
+
+def split(todo_text):
+    todo_text = todo_text.replace("……", "。").replace("——", "，")
+    if todo_text[-1] not in splits:
+        todo_text += "。"
+    i_split_head = i_split_tail = 0
+    len_text = len(todo_text)
+    todo_texts = []
+    while 1:
+        if i_split_head >= len_text:
+            break  # 结尾一定有标点，所以直接跳出即可，最后一段在上次已加入
+        if todo_text[i_split_head] in splits:
+            i_split_head += 1
+            todo_texts.append(todo_text[i_split_tail:i_split_head])
+            i_split_tail = i_split_head
+        else:
+            i_split_head += 1
+    return todo_texts
+
+
+def cut(inp):
+    punctuation = set(["!", "?", "…", ",", ".", "-", " "])
+
+    inp = inp.strip("\n")
+    inps = split(inp)
+    split_idx = list(range(0, len(inps), 4))
+    split_idx[-1] = None
+    if len(split_idx) > 1:
+        opts = []
+        for idx in range(len(split_idx) - 1):
+            opts.append("".join(inps[split_idx[idx] : split_idx[idx + 1]]))
+    else:
+        opts = [inp]
+    opts = [item for item in opts if not set(item).issubset(punctuation)]
+    return "\n".join(opts)
+
+
+def process_text(texts):
+    _text = []
+    if all(text in [None, " ", "\n", ""] for text in texts):
+        raise ValueError("Please enter valid text.")
+    for text in texts:
+        if text in [None, " ", ""]:
+            pass
+        else:
+            _text.append(text)
+    return _text
+
+
+def merge_short_text_in_array(texts, threshold):
+    if (len(texts)) < 2:
+        return texts
+    result = []
+    text = ""
+    for ele in texts:
+        text += ele
+        if len(text) >= threshold:
+            result.append(text)
+            text = ""
+    if len(text) > 0:
+        if len(result) == 0:
+            result.append(text)
+        else:
+            result[len(result) - 1] += text
+    return result
+
+
+# ======================
+# Main Logic
 # ======================
 
 
@@ -176,7 +248,7 @@ class T2SModel:
             logger.info("\tfsdec processing time {} ms".format(end - start))
 
         stop = False
-        for idx in range(1, 1500):
+        for idx in tqdm(range(1, 1500)):
             if args.benchmark:
                 start = int(round(time.time() * 1000))
             if args.onnx:
@@ -279,6 +351,7 @@ class GptSoVits:
         top_p=0.6,
         temperature=0.6,
         repetition_penalty=1.35,
+        speed=1.0,
     ):
         pred_semantic = self.t2s.forward(
             ref_seq,
@@ -291,6 +364,7 @@ class GptSoVits:
             temperature=temperature,
             repetition_penalty=repetition_penalty,
         )
+        speed = np.array(speed, dtype=np.float32)
         if args.benchmark:
             start = int(round(time.time() * 1000))
         if args.onnx:
@@ -300,6 +374,7 @@ class GptSoVits:
                     "text_seq": text_seq,
                     "pred_semantic": pred_semantic,
                     "ref_audio": ref_audio,
+                    "speed": speed,
                 },
             )
         else:
@@ -308,6 +383,7 @@ class GptSoVits:
                     "text_seq": text_seq,
                     "pred_semantic": pred_semantic,
                     "ref_audio": ref_audio,
+                    "speed": speed,
                 }
             )
         if args.benchmark:
@@ -371,18 +447,15 @@ def generate_voice(ssl, t2s_encoder, t2s_first_decoder, t2s_stage_decoder, vits)
     ref_language = args.ref_language
     text = args.input
     text_language = args.text_language
-
     top_k = 15
     top_p = 1
     temperature = 1
+    speed = 1.0
 
-    ref_free = ref_text is None or len(ref_text) == 0
-
-    if not ref_free:
-        ref_text = ref_text.strip("\n")
-        if ref_text[-1] not in splits:
-            ref_text += "。" if ref_language != "en" else "."
-        logger.info("Actual Input Reference Text: %s" % ref_text)
+    ref_text = ref_text.strip("\n")
+    if ref_text[-1] not in splits:
+        ref_text += "。" if ref_language != "en" else "."
+    logger.info("Actual Input Reference Text: %s" % ref_text)
 
     text = text.strip("\n")
     logger.info("Actual Input Target Text: %s" % text)
@@ -392,30 +465,30 @@ def generate_voice(ssl, t2s_encoder, t2s_first_decoder, t2s_stage_decoder, vits)
 
     ref_audio, sr = librosa.load(input_audio, sr=vits_hps_data_sampling_rate)
 
-    if not ref_free:
-        ref_audio_16k = librosa.resample(ref_audio, orig_sr=sr, target_sr=16000)
-        if ref_audio_16k.shape[0] > 160000 or ref_audio_16k.shape[0] < 48000:
-            logger.error(
-                "Reference audio is outside the 3-10 second range, please choose another one!"
-            )
-            exit(1)
+    ref_audio_16k = librosa.resample(ref_audio, orig_sr=sr, target_sr=16000)
+    if ref_audio_16k.shape[0] > 160000 or ref_audio_16k.shape[0] < 48000:
+        logger.error(
+            "Reference audio is outside the 3-10 second range, please choose another one!"
+        )
+        exit(1)
 
-        # hubertの入力のみpaddingする
-        ref_audio_16k = np.concatenate([ref_audio_16k, zero_wav], axis=0)
-        ref_audio_16k = ref_audio_16k[np.newaxis, :]
-        ssl_content = ssl.forward(ref_audio_16k)
+    # hubertの入力のみpaddingする
+    ref_audio_16k = np.concatenate([ref_audio_16k, zero_wav], axis=0)
+    ref_audio_16k = ref_audio_16k[np.newaxis, :]
+    ssl_content = ssl.forward(ref_audio_16k)
 
-    ref_seq, ref_bert, _ = get_phones_and_bert(ref_text, ref_language)
-    ref_audio = ref_audio[np.newaxis, :]
-
+    text = cut(text)  # Slice once every 4 sentences
     while "\n\n" in text:
         text = text.replace("\n\n", "\n")
     logger.info("Actual Input Target Text (after sentence segmentation): %s" % text)
     texts = text.split("\n")
+    texts = process_text(texts)
+    texts = merge_short_text_in_array(texts, 5)
 
-    if not ref_free:
-        ref_seq, ref_bert, _ = get_phones_and_bert(ref_text, ref_language)
-        ref_seq = np.array(ref_seq)[np.newaxis, :]
+    ref_seq, ref_bert, _ = get_phones_and_bert(ref_text, ref_language)
+    ref_seq = np.array(ref_seq)[np.newaxis, :]
+
+    ref_audio = ref_audio[np.newaxis, :]
 
     audio_opt = []
     for i_text, text in enumerate(texts):
@@ -440,6 +513,7 @@ def generate_voice(ssl, t2s_encoder, t2s_first_decoder, t2s_stage_decoder, vits)
             top_k=top_k,
             top_p=top_p,
             temperature=temperature,
+            speed=speed,
         )
 
         max_audio = np.abs(audio).max()
