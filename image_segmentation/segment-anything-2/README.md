@@ -30,6 +30,11 @@ For the webcam,
 $ python3 segment-anything-2.py -v 0
 ```
 
+Improve performance,
+```bash
+$ python3 segment-anything-2.py -v 0 --num_mask_mem 2 --max_obj_ptrs_in_encoder 2
+```
+
 If you want to specify the input image, put the image path after the `--input` option.  
 You can use `--savepath` option to change the name of the output file to save.
 ```bash

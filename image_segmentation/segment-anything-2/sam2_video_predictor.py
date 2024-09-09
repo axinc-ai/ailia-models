@@ -105,12 +105,14 @@ class SAM2VideoPredictor():
     @torch.inference_mode()
     def init_state(
         self,
+        num_maskmem = 7,  # default 1 input frame + 6 previous frames
+        max_obj_ptrs_in_encoder = 16,
     ):
         """default state from yaml"""
         self.image_size = 1024
         self.num_feature_levels = 3
         self.hidden_dim = 256
-        self.num_maskmem = 7  # default 1 input frame + 6 previous frames
+        self.num_maskmem = num_maskmem
         self.directly_add_no_mem_embed = True
         self.training = False
         self.mem_dim = 64
@@ -138,7 +140,7 @@ class SAM2VideoPredictor():
         self.dynamic_multimask_stability_thresh = 0.98
         self.max_cond_frames_in_attn = -1
         self.memory_temporal_stride_for_eval = 1
-        self.max_obj_ptrs_in_encoder = 16
+        self.max_obj_ptrs_in_encoder = max_obj_ptrs_in_encoder
         self.only_obj_ptrs_in_the_past_for_eval = True
         self.multimask_output_for_tracking = True
         self.use_multimask_token_for_obj_ptr = True
