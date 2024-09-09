@@ -20,6 +20,16 @@ For the sample image,
 $ python3 segment-anything-2.py
 ```
 
+For the sample video,
+```bash
+$ python3 segment-anything-2.py -v demo
+```
+
+For the webcam,
+```bash
+$ python3 segment-anything-2.py -v 0
+```
+
 If you want to specify the input image, put the image path after the `--input` option.  
 You can use `--savepath` option to change the name of the output file to save.
 ```bash

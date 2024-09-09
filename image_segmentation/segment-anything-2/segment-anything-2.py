@@ -195,83 +195,34 @@ def recognize_from_image(image_encoder, prompt_encoder, mask_decoder):
         cv2.imwrite(savepath, image)
 
 
-def _load_img_as_tensor(img_path, image_size):
+def preprocess_frame(img, image_size):
     img_mean=(0.485, 0.456, 0.406)
     img_std=(0.229, 0.224, 0.225)
-    img = cv2.imread(img_path)
-    video_height = img.shape[0]  # the original video size
-    video_width = img.shape[1]
     img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
     img = cv2.resize(img, (image_size, image_size))
     img = img / 255.0
     img = img - img_mean
     img = img / img_std
     img = np.transpose(img, (2, 0, 1))
-    return img, video_height, video_width
+    return img
 
-
-def load_video_frames(
-    video_path,
-    image_size,
-):
-    """
-    Load the video frames from a directory of JPEG files ("<frame_index>.jpg" format).
-
-    The frames are resized to image_size x image_size and are loaded to GPU if
-    `offload_video_to_cpu` is `False` and to CPU if `offload_video_to_cpu` is `True`.
-
-    You can load a frame asynchronously by setting `async_loading_frames` to `True`.
-    """
-    if isinstance(video_path, str) and os.path.isdir(video_path):
-        jpg_folder = video_path
-    else:
-        raise NotImplementedError(
-            "Only JPEG frames are supported at this moment. For video files, you may use "
-            "ffmpeg (https://ffmpeg.org/) to extract frames into a folder of JPEG files, such as \n"
-            "```\n"
-            "ffmpeg -i <your_video>.mp4 -q:v 2 -start_number 0 <output_dir>/'%05d.jpg'\n"
-            "```\n"
-            "where `-q:v` generates high-quality JPEG frames and `-start_number 0` asks "
-            "ffmpeg to start the JPEG file from 00000.jpg."
-        )
-
-    frame_names = [
-        p
-        for p in os.listdir(jpg_folder)
-        if os.path.splitext(p)[-1] in [".jpg", ".jpeg", ".JPG", ".JPEG"]
-    ]
-    frame_names.sort(key=lambda p: int(os.path.splitext(p)[0]))
-    num_frames = len(frame_names)
-    if num_frames == 0:
-        raise RuntimeError(f"no images found in {jpg_folder}")
-    img_paths = [os.path.join(jpg_folder, frame_name) for frame_name in frame_names]    
-    images = np.zeros((num_frames, 3, image_size, image_size), dtype=np.float32)
-    for n, img_path in enumerate(tqdm(img_paths, desc="frame loading (JPEG)")):
-        images[n], video_height, video_width = _load_img_as_tensor(img_path, image_size)
-    return images, video_height, video_width
 
 def recognize_from_video(image_encoder, prompt_encoder, mask_decoder, memory_attention, memory_encoder, mlp):
-    video_path = "./bedroom_short"
     image_size = 1024
 
-    if video_path == None:
+    if args.video == "demo":
+        frame_names = [
+            p for p in os.listdir(args.video)
+            if os.path.splitext(p)[-1] in [".jpg", ".jpeg", ".JPG", ".JPEG"]
+        ]
+        frame_names.sort(key=lambda p: int(os.path.splitext(p)[0]))
+    else:
+        frame_names = None
         capture = webcamera_utils.get_capture(args.video)
         video_height = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
         video_width = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
-    else:
-        images, video_height, video_width = load_video_frames(
-            video_path=video_path,
-            image_size=image_size
-        )
 
     predictor = SAM2VideoPredictor(args.onnx, args.normal)
-
-    # scan all the JPEG frame names in this directory
-    frame_names = [
-        p for p in os.listdir(video_path)
-        if os.path.splitext(p)[-1] in [".jpg", ".jpeg", ".JPG", ".JPEG"]
-    ]
-    frame_names.sort(key=lambda p: int(os.path.splitext(p)[0]))
 
     inference_state = predictor.init_state()
     predictor.reset_state(inference_state)
@@ -279,8 +230,9 @@ def recognize_from_video(image_encoder, prompt_encoder, mask_decoder, memory_att
     # run propagation throughout the video and collect the results in a dict
     video_segments = {}  # video_segments contains the per-frame segmentation results
 
-    if video_path == None:
-        frame_shown = False
+    frame_shown = False
+
+    if frame_names is None:
         frame_idx = 0
         while (True):
             ret, frame = capture.read()
@@ -288,26 +240,40 @@ def recognize_from_video(image_encoder, prompt_encoder, mask_decoder, memory_att
                 break
             if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
                 break
+
+            image = preprocess_frame(frame, image_size)
+
             predictor.append_image(
                 inference_state,
-                frame,
+                image,
                 video_height,
                 video_width,
                 image_encoder)
             frame = process_frame(frame, frame_idx, predictor, inference_state, video_segments, image_encoder, prompt_encoder, mask_decoder, memory_attention, memory_encoder, mlp)
+            frame = frame.astype(np.uint8)
             cv2.imshow('frame', frame)
             frame_shown = True
         frame_idx = frame_idx + 1
     else:
-        for frame_idx in range(len(images)):
+        for frame_idx in range(len(frame_names)):
+            frame = cv2.imread(os.path.join(args.video, frame_names[frame_idx]))
+            if (cv2.waitKey(1) & 0xFF == ord('q')):
+                break
+            if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
+                break
+
+            video_height = frame.shape[0]  # the original video size
+            video_width = frame.shape[1]
+            image = preprocess_frame(frame, image_size)
             predictor.append_image(
                 inference_state,
-                images[frame_idx],
+                image,
                 video_height,
                 video_width,
                 image_encoder)
-            frame = cv2.imread(os.path.join(video_path, frame_names[frame_idx]))
             frame = process_frame(frame, frame_idx, predictor, inference_state, video_segments, image_encoder, prompt_encoder, mask_decoder, memory_attention, memory_encoder, mlp)
+            frame = frame.astype(np.uint8)
+            cv2.imshow('frame', frame)
             cv2.imwrite(f'video_{frame_idx}.png', frame)
 
 
@@ -336,15 +302,6 @@ def process_frame(image, frame_idx, predictor, inference_state, video_segments, 
             mlp=mlp
         )
 
-        # show the results on the current (interacted) frame
-        #plt.figure(figsize=(9, 6))
-        #plt.title(f"frame {ann_frame_idx}")
-        #plt.imshow(Image.open(os.path.join(video_path, frame_names[ann_frame_idx])))
-        #show_points(points, labels, plt.gca())
-        #show_mask((out_mask_logits[0] > 0.0).cpu().numpy(), plt.gca(), obj_id=out_obj_ids[0])
-        #plt.show()
-        #plt.savefig(f'video.png')
-
         predictor.propagate_in_video_preflight(inference_state,
                                                                                 image_encoder = image_encoder,
                                                                                 prompt_encoder = prompt_encoder,
@@ -372,8 +329,6 @@ def process_frame(image, frame_idx, predictor, inference_state, video_segments, 
         image = show_points(points.astype(np.int64), labels.astype(np.int64), image)
         image = show_box(None, image)
 
-    #image = show_points(input_point, input_label, image)
-    #image = show_box(box, image)
     return image
 
 
