@@ -13,6 +13,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 import ailia
 
+# import original modules
+sys.path.append('../../util')
+import webcamera_utils
+
 from tqdm import tqdm
 
 # import original modules
@@ -250,12 +254,16 @@ def recognize_from_video(image_encoder, prompt_encoder, mask_decoder, memory_att
     video_path = "./bedroom_short"
     image_size = 1024
 
-    images, video_height, video_width = load_video_frames(
-        video_path=video_path,
-        image_size=image_size
-    )
+    if video_path == None:
+        capture = webcamera_utils.get_capture(args.video)
+        video_height = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        video_width = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
+    else:
+        images, video_height, video_width = load_video_frames(
+            video_path=video_path,
+            image_size=image_size
+        )
 
-    from PIL import Image
     predictor = SAM2VideoPredictor(args.onnx, args.normal)
 
     def show_mask(mask, ax, obj_id=None, random_color=False):
@@ -290,61 +298,44 @@ def recognize_from_video(image_encoder, prompt_encoder, mask_decoder, memory_att
     frame_names.sort(key=lambda p: int(os.path.splitext(p)[0]))
 
     inference_state = predictor.init_state()
-    for i in range(len(images)):
-        predictor.append_image(
-            inference_state,
-            images[i],
-            video_height,
-            video_width,
-            image_encoder)
     predictor.reset_state(inference_state)
-
-    ann_frame_idx = 0  # the frame index we interact with
-    ann_obj_id = 1  # give a unique id to each object we interact with (it can be any integers)
-
-    # Let's add a 2nd positive click at (x, y) = (250, 220) to refine the mask
-    # sending all clicks (and their labels) to `add_new_points_or_box`
-    points = np.array([[210, 350], [250, 220]], dtype=np.float32)
-    # for labels, `1` means positive click and `0` means negative click
-    labels = np.array([1, 1], np.int32)
-    _, out_obj_ids, out_mask_logits = predictor.add_new_points_or_box(
-        inference_state=inference_state,
-        frame_idx=ann_frame_idx,
-        obj_id=ann_obj_id,
-        points=points,
-        labels=labels,
-        image_encoder=image_encoder,
-        prompt_encoder=prompt_encoder,
-        mask_decoder=mask_decoder,
-        memory_attention=memory_attention,
-        memory_encoder=memory_encoder,
-        mlp=mlp
-    )
-
-    # show the results on the current (interacted) frame
-    plt.figure(figsize=(9, 6))
-    plt.title(f"frame {ann_frame_idx}")
-    plt.imshow(Image.open(os.path.join(video_path, frame_names[ann_frame_idx])))
-    show_points(points, labels, plt.gca())
-    show_mask((out_mask_logits[0] > 0.0).cpu().numpy(), plt.gca(), obj_id=out_obj_ids[0])
-    #plt.show()
-    plt.savefig(f'video.png')
 
     # run propagation throughout the video and collect the results in a dict
     video_segments = {}  # video_segments contains the per-frame segmentation results
-    for out_frame_idx, out_obj_ids, out_mask_logits in predictor.propagate_in_video(inference_state,
-                                                                                    image_encoder = image_encoder,
-                                                                                    prompt_encoder = prompt_encoder,
-                                                                                    mask_decoder = mask_decoder,
-                                                                                    memory_attention = memory_attention,
-                                                                                    memory_encoder = memory_encoder,
-                                                                                    mlp = mlp):
-        video_segments[out_frame_idx] = {
-            out_obj_id: (out_mask_logits[i] > 0.0).cpu().numpy()
-            for i, out_obj_id in enumerate(out_obj_ids)
-        }
+
+    if video_path == None:
+        frame_shown = False
+        frame_idx = 0
+        while (True):
+            ret, frame = capture.read()
+            if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+                break
+            if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
+                break
+            predictor.append_image(
+                inference_state,
+                images[frame_idx],
+                video_height,
+                video_width,
+                image_encoder)
+            #res_img = 
+            process_frame(frame_idx, predictor, inference_state, video_segments, image_encoder, prompt_encoder, mask_decoder, memory_attention, memory_encoder, mlp)
+            #cv2.imshow('frame', res_img)
+            frame_shown = True
+        frame_idx = frame_idx + 1
+    else:
+        for frame_idx in range(len(images)):
+            predictor.append_image(
+                inference_state,
+                images[frame_idx],
+                video_height,
+                video_width,
+                image_encoder)
+            #res_img = 
+            process_frame(frame_idx, predictor, inference_state, video_segments, image_encoder, prompt_encoder, mask_decoder, memory_attention, memory_encoder, mlp)
 
     # render the segmentation results every few frames
+    from PIL import Image
     vis_frame_stride = 1
     plt.close("all")
     for out_frame_idx in range(0, len(frame_names), vis_frame_stride):
@@ -354,7 +345,70 @@ def recognize_from_video(image_encoder, prompt_encoder, mask_decoder, memory_att
         for out_obj_id, out_mask in video_segments[out_frame_idx].items():
             show_mask(out_mask, plt.gca(), obj_id=out_obj_id)
         #plt.show()
-        plt.savefig(f'video{out_frame_idx+1}_.png')
+        plt.savefig(f'video_{out_frame_idx+1}.png')
+        if out_frame_idx == 0:
+            points = np.array([[210, 350], [250, 220]], dtype=np.float32)
+            # for labels, `1` means positive click and `0` means negative click
+            labels = np.array([1, 1], np.int32)
+            show_points(points, labels, plt.gca())
+            plt.savefig(f'video.png')
+
+def process_frame(frame_idx, predictor, inference_state, video_segments, image_encoder, prompt_encoder, mask_decoder, memory_attention, memory_encoder, mlp):
+    ann_frame_idx = 0  # the frame index we interact with
+    ann_obj_id = 1  # give a unique id to each object we interact with (it can be any integers)
+
+    if frame_idx == 0:
+        # Let's add a 2nd positive click at (x, y) = (250, 220) to refine the mask
+        # sending all clicks (and their labels) to `add_new_points_or_box`
+        points = np.array([[210, 350], [250, 220]], dtype=np.float32)
+        # for labels, `1` means positive click and `0` means negative click
+        labels = np.array([1, 1], np.int32)
+        _, out_obj_ids, out_mask_logits = predictor.add_new_points_or_box(
+            inference_state=inference_state,
+            frame_idx=ann_frame_idx,
+            obj_id=ann_obj_id,
+            points=points,
+            labels=labels,
+            image_encoder=image_encoder,
+            prompt_encoder=prompt_encoder,
+            mask_decoder=mask_decoder,
+            memory_attention=memory_attention,
+            memory_encoder=memory_encoder,
+            mlp=mlp
+        )
+
+        # show the results on the current (interacted) frame
+        #plt.figure(figsize=(9, 6))
+        #plt.title(f"frame {ann_frame_idx}")
+        #plt.imshow(Image.open(os.path.join(video_path, frame_names[ann_frame_idx])))
+        #show_points(points, labels, plt.gca())
+        #show_mask((out_mask_logits[0] > 0.0).cpu().numpy(), plt.gca(), obj_id=out_obj_ids[0])
+        #plt.show()
+        #plt.savefig(f'video.png')
+
+        predictor.propagate_in_video_preflight(inference_state,
+                                                                                image_encoder = image_encoder,
+                                                                                prompt_encoder = prompt_encoder,
+                                                                                mask_decoder = mask_decoder,
+                                                                                memory_attention = memory_attention,
+                                                                                memory_encoder = memory_encoder,
+                                                                                mlp = mlp)
+
+    out_frame_idx, out_obj_ids, out_mask_logits = predictor.propagate_in_video(inference_state,
+                                                                                image_encoder = image_encoder,
+                                                                                prompt_encoder = prompt_encoder,
+                                                                                mask_decoder = mask_decoder,
+                                                                                memory_attention = memory_attention,
+                                                                                memory_encoder = memory_encoder,
+                                                                                mlp = mlp,
+                                                                                frame_idx = frame_idx)
+
+    video_segments[out_frame_idx] = {
+        out_obj_id: (out_mask_logits[i] > 0.0).cpu().numpy()
+        for i, out_obj_id in enumerate(out_obj_ids)
+    }
+
+
 
 def main():
     # fetch image encoder model

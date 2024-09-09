@@ -780,19 +780,16 @@ class SAM2VideoPredictor():
     def propagate_in_video(
         self,
         inference_state,
-        start_frame_idx=None,
-        max_frame_num_to_track=None,
-        reverse=False,
         image_encoder=None,
         prompt_encoder=None,
         mask_decoder=None,
         memory_attention=None,
         memory_encoder=None,
-        mlp=None
+        mlp=None,
+        frame_idx = 0
     ):
         """Propagate the input points across frames to track in the entire video."""
         assert(memory_encoder!=None)
-        self.propagate_in_video_preflight(inference_state, image_encoder, prompt_encoder, mask_decoder, memory_attention, memory_encoder, mlp)
 
         output_dict = inference_state["output_dict"]
         consolidated_frame_inds = inference_state["consolidated_frame_inds"]
@@ -806,25 +803,21 @@ class SAM2VideoPredictor():
         )
 
         # set start index, end index, and processing order
-        if start_frame_idx is None:
-            # default: start from the earliest frame with input points
-            start_frame_idx = min(output_dict["cond_frame_outputs"])
-        if max_frame_num_to_track is None:
-            # default: track all the frames in the video
-            max_frame_num_to_track = num_frames
-        if reverse:
-            end_frame_idx = max(start_frame_idx - max_frame_num_to_track, 0)
-            if start_frame_idx > 0:
-                processing_order = range(start_frame_idx, end_frame_idx - 1, -1)
-            else:
-                processing_order = []  # skip reverse tracking if starting from frame 0
-        else:
-            end_frame_idx = min(
-                start_frame_idx + max_frame_num_to_track, num_frames - 1
-            )
-            processing_order = range(start_frame_idx, end_frame_idx + 1)
 
-        for frame_idx in tqdm(processing_order, desc="propagate in video"):
+        # default: start from the earliest frame with input points
+        start_frame_idx = min(output_dict["cond_frame_outputs"])
+
+        # default: track all the frames in the video
+        max_frame_num_to_track = num_frames
+
+        reverse = False
+
+        end_frame_idx = min(
+            start_frame_idx + max_frame_num_to_track, num_frames - 1
+        )
+        processing_order = range(start_frame_idx, end_frame_idx + 1)
+
+        if True:#for frame_idx in tqdm(processing_order, desc="propagate in video"):
             # We skip those frames already in consolidated outputs (these are frames
             # that received input clicks or mask). Note that we cannot directly run
             # batched forward on them via `_run_single_frame_inference` because the
@@ -872,7 +865,7 @@ class SAM2VideoPredictor():
             _, video_res_masks = self._get_orig_video_res_output(
                 inference_state, pred_masks
             )
-            yield frame_idx, obj_ids, video_res_masks
+            return frame_idx, obj_ids, video_res_masks
 
     def _add_output_per_object(
         self, inference_state, frame_idx, current_out, storage_key
