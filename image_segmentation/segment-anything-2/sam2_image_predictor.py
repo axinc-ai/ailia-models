@@ -38,11 +38,9 @@ class SAM2ImagePredictor:
 
         _, vision_feats, _, _ = self._prepare_backbone_features(backbone_out)
         # Add no_mem_embed, which is added to the lowest rest feat. map during training on videos
-        directly_add_no_mem_embed = True
-        if directly_add_no_mem_embed:
-            hidden_dim = 256
-            no_mem_embed = self.trunc_normal((1, 1, hidden_dim), std=0.02).astype(np.float32)
-            vision_feats[-1] = vision_feats[-1] + no_mem_embed
+        hidden_dim = 256
+        no_mem_embed = self.trunc_normal((1, 1, hidden_dim), std=0.02).astype(np.float32)
+        vision_feats[-1] = vision_feats[-1] + no_mem_embed
 
         bb_feat_sizes = [
             (256, 256),
@@ -81,16 +79,13 @@ class SAM2ImagePredictor:
         point_labels: Optional[np.ndarray] = None,
         box: Optional[np.ndarray] = None,
         mask_input: Optional[np.ndarray] = None,
-        multimask_output: bool = True,
-        return_logits: bool = False,
-        normalize_coords=True,
         prompt_encoder = None,
         mask_decoder = None,
         onnx = False
     ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         # Transform input prompts
         mask_input, unnorm_coords, labels, unnorm_box = self._prep_prompts(
-        point_coords, point_labels, box, mask_input, normalize_coords, orig_hw
+        point_coords, point_labels, box, mask_input, orig_hw
         )
 
         masks, iou_predictions, low_res_masks = self._predict(
@@ -100,8 +95,6 @@ class SAM2ImagePredictor:
             labels,
             unnorm_box,
             mask_input,
-            multimask_output,
-            return_logits=return_logits,
             prompt_encoder=prompt_encoder,
             mask_decoder=mask_decoder,
             onnx=onnx
@@ -110,14 +103,14 @@ class SAM2ImagePredictor:
         return masks[0], iou_predictions[0], low_res_masks[0]
 
     def _prep_prompts(
-        self, point_coords, point_labels, box, mask_logits, normalize_coords, orig_hw
+        self, point_coords, point_labels, box, mask_logits, orig_hw
     ):
 
         unnorm_coords, labels, unnorm_box, mask_input = None, None, None, None
         if point_coords is not None:
             point_coords = point_coords.astype(np.float32)
             unnorm_coords = self.transform_coords(
-                point_coords, normalize=normalize_coords, orig_hw=orig_hw
+                point_coords, orig_hw=orig_hw
             )
             labels = point_labels.astype(np.int64)
             if len(unnorm_coords.shape) == 2:
@@ -125,7 +118,7 @@ class SAM2ImagePredictor:
         if box is not None:
             box = box.astype(np.float32)
             unnorm_box = self.transform_boxes(
-                box, normalize=normalize_coords, orig_hw=orig_hw
+                box, orig_hw=orig_hw
             )  # Bx2x2
         if mask_logits is not None:
             mask_input = mask_input.astype(np.float32)
@@ -141,8 +134,6 @@ class SAM2ImagePredictor:
         point_labels: Optional[np.ndarray],
         boxes: Optional[np.ndarray] = None,
         mask_input: Optional[np.ndarray] = None,
-        multimask_output: bool = True,
-        return_logits: bool = False,
         prompt_encoder = None,
         mask_decoder = None,
         onnx = False
@@ -208,7 +199,7 @@ class SAM2ImagePredictor:
                 "high_res_features1":high_res_features[0],
                 "high_res_features2":high_res_features[1]})
 
-        low_res_masks, iou_predictions, _, _  = self.forward_postprocess(masks, iou_pred, sam_tokens_out, object_score_logits, multimask_output)
+        low_res_masks, iou_predictions, _, _  = self.forward_postprocess(masks, iou_pred, sam_tokens_out, object_score_logits)
 
         # Upscale the masks to the original image resolution
         masks = self.postprocess_masks(
@@ -216,8 +207,7 @@ class SAM2ImagePredictor:
         )
         low_res_masks = np.clip(low_res_masks, -32.0, 32.0)
         mask_threshold = 0.0
-        if not return_logits:
-            masks = masks > mask_threshold
+        masks = masks > mask_threshold
 
         return masks, iou_predictions, low_res_masks
 
@@ -227,41 +217,19 @@ class SAM2ImagePredictor:
         iou_pred,
         mask_tokens_out,
         object_score_logits,
-        multimask_output: bool,
     ):
-        # Select the correct mask or masks for output
-        if multimask_output:
-            masks = masks[:, 1:, :, :]
-            iou_pred = iou_pred[:, 1:]
-        #elif self.dynamic_multimask_via_stability and not self.training: # multimask_outputが常にTrueなので発生しない
-        #    masks, iou_pred = self._dynamic_multimask_via_stability(masks, iou_pred)
-        else:
-            masks = masks[:, 0:1, :, :]
-            iou_pred = iou_pred[:, 0:1]
-
-        use_multimask_token_for_obj_ptr = True
-        if multimask_output and use_multimask_token_for_obj_ptr:
-            sam_tokens_out = mask_tokens_out[:, 1:]  # [b, 3, c] shape
-        else:
-            # Take the mask output token. Here we *always* use the token for single mask output.
-            # At test time, even if we track after 1-click (and using multimask_output=True),
-            # we still take the single mask token here. The rationale is that we always track
-            # after multiple clicks during training, so the past tokens seen during training
-            # are always the single mask token (and we'll let it be the object-memory token).
-            sam_tokens_out = mask_tokens_out[:, 0:1]  # [b, 1, c] shape
-
-        # Prepare output
+        masks = masks[:, 1:, :, :]
+        iou_pred = iou_pred[:, 1:]
+        sam_tokens_out = mask_tokens_out[:, 1:]  # [b, 3, c] shape # use_multimask_token_for_obj_ptr
         return masks, iou_pred, sam_tokens_out, object_score_logits
 
     def transform_coords(
-        self, coords, normalize=False, orig_hw=None
+        self, coords, orig_hw
     ):
-        if normalize:
-            assert orig_hw is not None
-            h, w = orig_hw
-            coords = coords.copy()
-            coords[..., 0] = coords[..., 0] / w
-            coords[..., 1] = coords[..., 1] / h
+        h, w = orig_hw
+        coords = coords.copy()
+        coords[..., 0] = coords[..., 0] / w
+        coords[..., 1] = coords[..., 1] / h
 
         resolution = 1024
         coords = coords * resolution  # unnormalize coords

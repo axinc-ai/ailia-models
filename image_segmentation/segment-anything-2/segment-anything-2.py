@@ -174,7 +174,6 @@ def recognize_from_image(image_encoder, prompt_encoder, mask_decoder):
             point_coords=input_point,
             point_labels=input_label,
             box=box,
-            multimask_output=True,
             prompt_encoder=prompt_encoder,
             mask_decoder=mask_decoder,
             onnx=args.onnx
