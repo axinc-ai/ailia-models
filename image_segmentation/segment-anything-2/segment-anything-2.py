@@ -70,6 +70,11 @@ parser.add_argument(
     '--onnx', action='store_true',
     help='execute onnxruntime version.'
 )
+parser.add_argument(
+    '--normal', action='store_true',
+    help='Use normal version of onnx model. Normal version requires 6 dim matmul.'
+)
+
 args = update_parser(parser)
 
 # ======================
@@ -258,7 +263,7 @@ def recognize_from_video(image_encoder, prompt_encoder, mask_decoder, memory_att
     )
 
     from PIL import Image
-    predictor = SAM2VideoPredictor(args.onnx)
+    predictor = SAM2VideoPredictor(args.onnx, args.normal)
 
     def show_mask(mask, ax, obj_id=None, random_color=False):
         if random_color:
@@ -359,8 +364,14 @@ def main():
     MODEL_PROMPT_ENCODER_L_PATH = 'prompt_encoder_'+args.model_type+'.onnx.prototxt'
     WEIGHT_MASK_DECODER_L_PATH = 'mask_decoder_'+args.model_type+'.onnx'
     MODEL_MASK_DECODER_L_PATH = 'mask_decoder_'+args.model_type+'.onnx.prototxt'
-    WEIGHT_MEMORY_ATTENTION_L_PATH = 'memory_attention_'+args.model_type+'.onnx'
-    MODEL_MEMORY_ATTENTION_L_PATH = 'memory_attention_'+args.model_type+'.onnx.prototxt'
+    if args.normal:
+        # 6dim matmul
+        WEIGHT_MEMORY_ATTENTION_L_PATH = 'memory_attention_'+args.model_type+'.onnx'
+        MODEL_MEMORY_ATTENTION_L_PATH = 'memory_attention_'+args.model_type+'.onnx.prototxt'
+    else:
+        # 4dim matmul with batch 1
+        WEIGHT_MEMORY_ATTENTION_L_PATH = 'memory_attention_'+args.model_type+'.opt.onnx'
+        MODEL_MEMORY_ATTENTION_L_PATH = 'memory_attention_'+args.model_type+'.opt.onnx.prototxt'
     WEIGHT_MEMORY_ENCODER_L_PATH = 'memory_encoder_'+args.model_type+'.onnx'
     MODEL_MEMORY_ENCODER_L_PATH = 'memory_encoder_'+args.model_type+'.onnx.prototxt'
     WEIGHT_MLP_L_PATH = 'mlp_'+args.model_type+'.onnx'

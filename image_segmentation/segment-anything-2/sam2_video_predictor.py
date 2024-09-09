@@ -85,6 +85,7 @@ class SAM2VideoPredictor():
     def __init__(
         self,
         onnx,
+        normal,
         fill_hole_area=0,
         # whether to apply non-overlapping constraints on the output object masks
         non_overlap_masks=False,
@@ -95,6 +96,7 @@ class SAM2VideoPredictor():
         clear_non_cond_mem_for_multi_obj=False
     ):
         self.onnx = onnx
+        self.normal = normal
         self.fill_hole_area = fill_hole_area
         self.non_overlap_masks = non_overlap_masks
         self.clear_non_cond_mem_around_input = clear_non_cond_mem_around_input
@@ -1682,10 +1684,20 @@ class SAM2VideoPredictor():
         print("curr_pos", np.sum(current_vision_pos_embeds[0].numpy()))
         print("memory_pos", np.sum(memory_pos_embed.numpy()))
         print("num_obj_ptr_tokens", np.sum(num_obj_ptr_tokens_numpy))
-        if self.onnx:
-            pix_feat_with_mem = memory_attention.run(None, {"curr":current_vision_feats[0].numpy(), "memory":memory.numpy(), "curr_pos":current_vision_pos_embeds[0].numpy(), "memory_pos":memory_pos_embed.numpy(), "num_obj_ptr_tokens":num_obj_ptr_tokens_numpy})
+        if self.normal:
+            if self.onnx:
+                pix_feat_with_mem = memory_attention.run(None, {"curr":current_vision_feats[0].numpy(), "memory":memory.numpy(), "curr_pos":current_vision_pos_embeds[0].numpy(), "memory_pos":memory_pos_embed.numpy(), "num_obj_ptr_tokens":num_obj_ptr_tokens_numpy})
+            else:
+                pix_feat_with_mem = memory_attention.run({"curr":current_vision_feats[0].numpy(), "memory":memory.numpy(), "curr_pos":current_vision_pos_embeds[0].numpy(), "memory_pos":memory_pos_embed.numpy(), "num_obj_ptr_tokens":num_obj_ptr_tokens_numpy})
         else:
-            pix_feat_with_mem = memory_attention.run({"curr":current_vision_feats[0].numpy(), "memory":memory.numpy(), "curr_pos":current_vision_pos_embeds[0].numpy(), "memory_pos":memory_pos_embed.numpy(), "num_obj_ptr_tokens":num_obj_ptr_tokens_numpy})
+            memory_1 = memory[:-num_obj_ptr_tokens,:,:]
+            memory_2 = memory[-num_obj_ptr_tokens:,:,:]
+            memory_pos_embed_1 = memory_pos_embed[:-num_obj_ptr_tokens,:,:]
+            memory_pos_embed_2 = memory_pos_embed[-num_obj_ptr_tokens:,:,:]
+            if self.onnx:
+                pix_feat_with_mem = memory_attention.run(None, {"curr":current_vision_feats[0].numpy(), "memory_1":memory_1.numpy(), "memory_2":memory_2.numpy(), "curr_pos":current_vision_pos_embeds[0].numpy(), "memory_pos_1":memory_pos_embed_1.numpy(), "memory_pos_2":memory_pos_embed_2.numpy()})
+            else:
+                pix_feat_with_mem = memory_attention.run({"curr":current_vision_feats[0].numpy(), "memory_1":memory_1.numpy(), "memory_2":memory_2.numpy(), "curr_pos":current_vision_pos_embeds[0].numpy(), "memory_pos_1":memory_pos_embed_1.numpy(), "memory_pos_2":memory_pos_embed_2.numpy()})
         pix_feat_with_mem = torch.Tensor(pix_feat_with_mem[0])
         
         # reshape the output (HW)BC => BCHW
