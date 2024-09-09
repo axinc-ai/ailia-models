@@ -314,7 +314,7 @@ def recognize_from_video(image_encoder, prompt_encoder, mask_decoder, memory_att
                 break
             predictor.append_image(
                 inference_state,
-                images[frame_idx],
+                frame,
                 video_height,
                 video_width,
                 image_encoder)
