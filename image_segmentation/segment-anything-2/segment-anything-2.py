@@ -10,7 +10,6 @@ import ailia
 
 import os
 import numpy as np
-import matplotlib.pyplot as plt
 import ailia
 
 # import original modules
@@ -85,50 +84,48 @@ args = update_parser(parser)
 
 np.random.seed(3)
 
-def show_mask(mask, ax, random_color=False, borders = True):
-    if random_color:
-        color = np.concatenate([np.random.random(3), np.array([0.6])], axis=0)
-    else:
-        color = np.array([30/255, 144/255, 255/255, 0.6])
+
+def show_mask(mask, img, color = np.array([255, 144, 30])):
+    global area_img
+    color = color.reshape(1, 1, -1)
+
+    print(mask.shape)
+
     h, w = mask.shape[-2:]
-    mask = mask.astype(np.uint8)
-    mask_image =  mask.reshape(h, w, 1) * color.reshape(1, 1, -1)
-    if borders:
-        import cv2
-        contours, _ = cv2.findContours(mask,cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE) 
-        # Try to smooth contours
-        contours = [cv2.approxPolyDP(contour, epsilon=0.01, closed=True) for contour in contours]
-        mask_image = cv2.drawContours(mask_image, contours, -1, (1, 1, 1, 0.5), thickness=2) 
-    ax.imshow(mask_image)
+    mask = mask.reshape(h, w, 1)
 
-def show_points(coords, labels, ax, marker_size=375):
-    pos_points = coords[labels==1]
-    neg_points = coords[labels==0]
-    ax.scatter(pos_points[:, 0], pos_points[:, 1], color='green', marker='*', s=marker_size, edgecolor='white', linewidth=1.25)
-    ax.scatter(neg_points[:, 0], neg_points[:, 1], color='red', marker='*', s=marker_size, edgecolor='white', linewidth=1.25)   
+    mask_image = mask * color
+    img = (img * ~mask) + (img * mask) * 0.6 + mask_image * 0.4
 
-def show_box(box, ax):
-    x0, y0 = box[0], box[1]
-    w, h = box[2] - box[0], box[3] - box[1]
-    ax.add_patch(plt.Rectangle((x0, y0), w, h, edgecolor='green', facecolor=(0, 0, 0, 0), lw=2))    
+    return img
 
-def show_masks(image, masks, scores, point_coords=None, box_coords=None, input_labels=None, borders=True, savepath = None):
-    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-    for i, (mask, score) in enumerate(zip(masks, scores)):
-        plt.figure(figsize=(10, 10))
-        plt.imshow(image)
-        show_mask(mask, plt.gca(), borders=borders)
-        if point_coords is not None:
-            assert input_labels is not None
-            show_points(point_coords, input_labels, plt.gca())
-        if box_coords is not None:
-            # boxes
-            show_box(box_coords, plt.gca())
-        if len(scores) > 1:
-            plt.title(f"Mask {i+1}, Score: {score:.3f}", fontsize=18)
-        plt.axis('off')
-        if i == 0:
-            plt.savefig(savepath)
+
+def show_points(coords, labels, img):
+    pos_points = coords[labels == 1]
+    neg_points = coords[labels == 0]
+
+    for p in pos_points:
+        cv2.drawMarker(
+            img, p, (0, 255, 0), markerType=cv2.MARKER_TILTED_CROSS, line_type=cv2.LINE_AA,
+            markerSize=30, thickness=5)
+    for p in neg_points:
+        cv2.drawMarker(
+            img, p, (0, 0, 255), markerType=cv2.MARKER_TILTED_CROSS, line_type=cv2.LINE_AA,
+            markerSize=30, thickness=5)
+
+    return img
+
+
+def show_box(box, img):
+    if box is None:
+        return img
+    cv2.rectangle(
+        img, box[0], box[1], color=(2, 118, 2),
+        thickness=3,
+        lineType=cv2.LINE_4,
+        shift=0)
+
+    return img
 
 # ======================
 # Logic
@@ -192,7 +189,10 @@ def recognize_from_image(image_encoder, prompt_encoder, mask_decoder):
 
         savepath = get_savepath(args.savepath, image_path, ext='.png')
         logger.info(f'saved at : {savepath}')
-        show_masks(image, masks, scores, point_coords=input_point, input_labels=input_label, box_coords=box, borders=True, savepath=savepath)
+        image = show_mask(masks[0], image)
+        image = show_points(input_point, input_label, image)
+        image = show_box(box, image)
+        cv2.imwrite(savepath, image)
 
 
 def _load_img_as_tensor(img_path, image_size):
@@ -266,30 +266,6 @@ def recognize_from_video(image_encoder, prompt_encoder, mask_decoder, memory_att
 
     predictor = SAM2VideoPredictor(args.onnx, args.normal)
 
-    def show_mask(mask, ax, obj_id=None, random_color=False):
-        if random_color:
-            color = np.concatenate([np.random.random(3), np.array([0.6])], axis=0)
-        else:
-            cmap = plt.get_cmap("tab10")
-            cmap_idx = 0 if obj_id is None else obj_id
-            color = np.array([*cmap(cmap_idx)[:3], 0.6])
-        h, w = mask.shape[-2:]
-        mask_image = mask.reshape(h, w, 1) * color.reshape(1, 1, -1)
-        ax.imshow(mask_image)
-
-
-    def show_points(coords, labels, ax, marker_size=200):
-        pos_points = coords[labels==1]
-        neg_points = coords[labels==0]
-        ax.scatter(pos_points[:, 0], pos_points[:, 1], color='green', marker='*', s=marker_size, edgecolor='white', linewidth=1.25)
-        ax.scatter(neg_points[:, 0], neg_points[:, 1], color='red', marker='*', s=marker_size, edgecolor='white', linewidth=1.25)
-
-
-    def show_box(box, ax):
-        x0, y0 = box[0], box[1]
-        w, h = box[2] - box[0], box[3] - box[1]
-        ax.add_patch(plt.Rectangle((x0, y0), w, h, edgecolor='green', facecolor=(0, 0, 0, 0), lw=2))
-
     # scan all the JPEG frame names in this directory
     frame_names = [
         p for p in os.listdir(video_path)
@@ -318,9 +294,8 @@ def recognize_from_video(image_encoder, prompt_encoder, mask_decoder, memory_att
                 video_height,
                 video_width,
                 image_encoder)
-            #res_img = 
-            process_frame(frame_idx, predictor, inference_state, video_segments, image_encoder, prompt_encoder, mask_decoder, memory_attention, memory_encoder, mlp)
-            #cv2.imshow('frame', res_img)
+            frame = process_frame(frame, frame_idx, predictor, inference_state, video_segments, image_encoder, prompt_encoder, mask_decoder, memory_attention, memory_encoder, mlp)
+            cv2.imshow('frame', frame)
             frame_shown = True
         frame_idx = frame_idx + 1
     else:
@@ -331,38 +306,22 @@ def recognize_from_video(image_encoder, prompt_encoder, mask_decoder, memory_att
                 video_height,
                 video_width,
                 image_encoder)
-            #res_img = 
-            process_frame(frame_idx, predictor, inference_state, video_segments, image_encoder, prompt_encoder, mask_decoder, memory_attention, memory_encoder, mlp)
+            frame = cv2.imread(os.path.join(video_path, frame_names[frame_idx]))
+            frame = process_frame(frame, frame_idx, predictor, inference_state, video_segments, image_encoder, prompt_encoder, mask_decoder, memory_attention, memory_encoder, mlp)
+            cv2.imwrite(f'video_{frame_idx}.png', frame)
 
-    # render the segmentation results every few frames
-    from PIL import Image
-    vis_frame_stride = 1
-    plt.close("all")
-    for out_frame_idx in range(0, len(frame_names), vis_frame_stride):
-        plt.figure(figsize=(6, 4))
-        plt.title(f"frame {out_frame_idx}")
-        plt.imshow(Image.open(os.path.join(video_path, frame_names[out_frame_idx])))
-        for out_obj_id, out_mask in video_segments[out_frame_idx].items():
-            show_mask(out_mask, plt.gca(), obj_id=out_obj_id)
-        #plt.show()
-        plt.savefig(f'video_{out_frame_idx+1}.png')
-        if out_frame_idx == 0:
-            points = np.array([[210, 350], [250, 220]], dtype=np.float32)
-            # for labels, `1` means positive click and `0` means negative click
-            labels = np.array([1, 1], np.int32)
-            show_points(points, labels, plt.gca())
-            plt.savefig(f'video.png')
 
-def process_frame(frame_idx, predictor, inference_state, video_segments, image_encoder, prompt_encoder, mask_decoder, memory_attention, memory_encoder, mlp):
+def process_frame(image, frame_idx, predictor, inference_state, video_segments, image_encoder, prompt_encoder, mask_decoder, memory_attention, memory_encoder, mlp):
     ann_frame_idx = 0  # the frame index we interact with
     ann_obj_id = 1  # give a unique id to each object we interact with (it can be any integers)
 
+    # sending all clicks (and their labels) to `add_new_points_or_box`
+    points = np.array([[210, 350], [250, 220]], dtype=np.float32)
+    # for labels, `1` means positive click and `0` means negative click
+    labels = np.array([1, 1], np.int32)
+
     if frame_idx == 0:
         # Let's add a 2nd positive click at (x, y) = (250, 220) to refine the mask
-        # sending all clicks (and their labels) to `add_new_points_or_box`
-        points = np.array([[210, 350], [250, 220]], dtype=np.float32)
-        # for labels, `1` means positive click and `0` means negative click
-        labels = np.array([1, 1], np.int32)
         _, out_obj_ids, out_mask_logits = predictor.add_new_points_or_box(
             inference_state=inference_state,
             frame_idx=ann_frame_idx,
@@ -408,6 +367,14 @@ def process_frame(frame_idx, predictor, inference_state, video_segments, image_e
         for i, out_obj_id in enumerate(out_obj_ids)
     }
 
+    image = show_mask((out_mask_logits[0] > 0.0).cpu().numpy(), image, color = np.array([30, 144, 255]))
+    if frame_idx == 0:
+        image = show_points(points.astype(np.int64), labels.astype(np.int64), image)
+        image = show_box(None, image)
+
+    #image = show_points(input_point, input_label, image)
+    #image = show_box(box, image)
+    return image
 
 
 def main():
