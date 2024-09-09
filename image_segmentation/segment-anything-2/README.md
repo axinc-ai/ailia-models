@@ -27,7 +27,7 @@ $ python3 segment-anything-2.py -v demo
 
 For the webcam,
 ```bash
-$ python3 segment-anything-2.py -v 0
+$ python3 segment-anything-2.py -v 0 --pos 960 540
 ```
 
 Improve performance,
