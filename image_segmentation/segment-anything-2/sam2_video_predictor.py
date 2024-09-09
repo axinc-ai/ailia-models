@@ -105,10 +105,6 @@ class SAM2VideoPredictor():
     @torch.inference_mode()
     def init_state(
         self,
-        images,
-        video_height,
-        video_width,
-        image_encoder=None
     ):
         """default state from yaml"""
         self.image_size = 1024
@@ -165,11 +161,7 @@ class SAM2VideoPredictor():
 
         """Initialize an inference state."""
         inference_state = {}
-        inference_state["images"] = images
-        inference_state["num_frames"] = len(images)
         # the original video height and width, used for resizing final output scores
-        inference_state["video_height"] = video_height
-        inference_state["video_width"] = video_width
         inference_state["device"] = torch.device("cpu")
         inference_state["storage_device"] = torch.device("cpu")
         # inputs on each frame
@@ -203,8 +195,24 @@ class SAM2VideoPredictor():
         inference_state["tracking_has_started"] = False
         inference_state["frames_already_tracked"] = {}
         # Warm up the visual backbone and cache the image feature on frame 0
-        self._get_image_feature(inference_state, frame_idx=0, batch_size=1, image_encoder=image_encoder)
+        inference_state["images"] = None
+        inference_state["num_frames"] = 0
         return inference_state
+
+    def append_image(self,
+        inference_state,
+        image,
+        video_height,
+        video_width,
+        image_encoder):
+        inference_state["video_height"] = video_height
+        inference_state["video_width"] = video_width
+        if inference_state["images"] is None:
+            inference_state["images"] = [image]
+        else:
+            inference_state["images"].append(image)
+        inference_state["num_frames"] = len(inference_state["images"])
+        self._get_image_feature(inference_state, frame_idx=0, batch_size=1, image_encoder=image_encoder)
 
     def _obj_id_to_idx(self, inference_state, obj_id):
         """Map client-side object id to model-side object index."""
@@ -934,15 +942,14 @@ class SAM2VideoPredictor():
         )
         if backbone_out is None:
             # Cache miss -- we will run inference on a single image
-            device = inference_state["device"]
-            image = inference_state["images"][frame_idx].to(device).float().unsqueeze(0)
+            image = np.expand_dims(inference_state["images"][frame_idx], axis=0)
 
             print("begin image encoder onnx")
             print(image.shape)
             if self.onnx:
-                vision_features, vision_pos_enc_0, vision_pos_enc_1, vision_pos_enc_2, backbone_fpn_0, backbone_fpn_1, backbone_fpn_2 = image_encoder.run(None, {"input_image":image.numpy()})
+                vision_features, vision_pos_enc_0, vision_pos_enc_1, vision_pos_enc_2, backbone_fpn_0, backbone_fpn_1, backbone_fpn_2 = image_encoder.run(None, {"input_image":image})
             else:
-                vision_features, vision_pos_enc_0, vision_pos_enc_1, vision_pos_enc_2, backbone_fpn_0, backbone_fpn_1, backbone_fpn_2 = image_encoder.run({"input_image":image.numpy()})
+                vision_features, vision_pos_enc_0, vision_pos_enc_1, vision_pos_enc_2, backbone_fpn_0, backbone_fpn_1, backbone_fpn_2 = image_encoder.run({"input_image":image})
             
             backbone_out = {"vision_features":torch.Tensor(vision_features),
                             "vision_pos_enc":[torch.Tensor(vision_pos_enc_0), torch.Tensor(vision_pos_enc_1), torch.Tensor(vision_pos_enc_2)],
@@ -954,7 +961,7 @@ class SAM2VideoPredictor():
 
         # expand the features to have the same dimension as the number of objects
         print("batch_size", batch_size)
-        expanded_image = image.expand(batch_size, -1, -1, -1)
+        expanded_image = np.repeat(image[np.newaxis, ...], batch_size, axis=0)
         expanded_backbone_out = {
             "backbone_fpn": backbone_out["backbone_fpn"].copy(),
             "vision_pos_enc": backbone_out["vision_pos_enc"].copy(),

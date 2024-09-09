@@ -13,8 +13,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 import ailia
 
-import torch
-from PIL import Image
 from tqdm import tqdm
 
 # import original modules
@@ -194,22 +192,23 @@ def recognize_from_image(image_encoder, prompt_encoder, mask_decoder):
 
 
 def _load_img_as_tensor(img_path, image_size):
-    img_pil = Image.open(img_path)
-    img_np = np.array(img_pil.convert("RGB").resize((image_size, image_size)))
-    if img_np.dtype == np.uint8:  # np.uint8 is expected for JPEG images
-        img_np = img_np / 255.0
-    else:
-        raise RuntimeError(f"Unknown image dtype: {img_np.dtype} on {img_path}")
-    img = torch.from_numpy(img_np).permute(2, 0, 1)
-    video_width, video_height = img_pil.size  # the original video size
+    img_mean=(0.485, 0.456, 0.406)
+    img_std=(0.229, 0.224, 0.225)
+    img = cv2.imread(img_path)
+    video_height = img.shape[0]  # the original video size
+    video_width = img.shape[1]
+    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    img = cv2.resize(img, (image_size, image_size))
+    img = img / 255.0
+    img = img - img_mean
+    img = img / img_std
+    img = np.transpose(img, (2, 0, 1))
     return img, video_height, video_width
 
 
 def load_video_frames(
     video_path,
     image_size,
-    img_mean=(0.485, 0.456, 0.406),
-    img_std=(0.229, 0.224, 0.225),
 ):
     """
     Load the video frames from a directory of JPEG files ("<frame_index>.jpg" format).
@@ -241,16 +240,10 @@ def load_video_frames(
     num_frames = len(frame_names)
     if num_frames == 0:
         raise RuntimeError(f"no images found in {jpg_folder}")
-    img_paths = [os.path.join(jpg_folder, frame_name) for frame_name in frame_names]
-    img_mean = torch.tensor(img_mean, dtype=torch.float32)[:, None, None]
-    img_std = torch.tensor(img_std, dtype=torch.float32)[:, None, None]
-
-    images = torch.zeros(num_frames, 3, image_size, image_size, dtype=torch.float32)
+    img_paths = [os.path.join(jpg_folder, frame_name) for frame_name in frame_names]    
+    images = np.zeros((num_frames, 3, image_size, image_size), dtype=np.float32)
     for n, img_path in enumerate(tqdm(img_paths, desc="frame loading (JPEG)")):
         images[n], video_height, video_width = _load_img_as_tensor(img_path, image_size)
-    # normalize by mean and std
-    images -= img_mean
-    images /= img_std
     return images, video_height, video_width
 
 def recognize_from_video(image_encoder, prompt_encoder, mask_decoder, memory_attention, memory_encoder, mlp):
@@ -296,7 +289,14 @@ def recognize_from_video(image_encoder, prompt_encoder, mask_decoder, memory_att
     ]
     frame_names.sort(key=lambda p: int(os.path.splitext(p)[0]))
 
-    inference_state = predictor.init_state(images = images, video_height = video_height, video_width = video_width, image_encoder=image_encoder)
+    inference_state = predictor.init_state()
+    for i in range(len(images)):
+        predictor.append_image(
+            inference_state,
+            images[i],
+            video_height,
+            video_width,
+            image_encoder)
     predictor.reset_state(inference_state)
 
     ann_frame_idx = 0  # the frame index we interact with
