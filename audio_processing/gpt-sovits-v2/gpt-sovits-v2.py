@@ -11,7 +11,7 @@ from tqdm import tqdm
 
 # import original modules
 sys.path.append("../../util")
-from arg_utils import get_base_parser, update_parser, get_savepath  # noqa: E402
+from arg_utils import get_base_parser, update_parser  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 
 import ailia
@@ -54,7 +54,9 @@ parser.add_argument(
     default="ax株式会社ではAIの実用化のための技術を開発しています。",
     help="input text",
 )
-parser.add_argument("--text_language", "-tl", default="ja", help="[ja, en]")
+parser.add_argument(
+    "--text_language", "-tl", default="ja", choices=("ja", "en"), help="[ja, en]"
+)
 parser.add_argument(
     "--ref_audio",
     "-ra",
@@ -69,7 +71,13 @@ parser.add_argument(
     default=REF_TEXT,
     help="ref text",
 )
-parser.add_argument("--ref_language", "-rl", default="ja", help="[ja, en]")
+parser.add_argument(
+    "--ref_language", "-rl", default="ja", choices=("ja", "en"), help="[ja, en]"
+)
+parser.add_argument("--top_k", type=int, default=15, help="top_k")
+parser.add_argument("--top_p", type=float, default=1.0, help="top_p")
+parser.add_argument("--temperature", type=float, default=1.0, help="temperature")
+parser.add_argument("--speed", type=float, default=1.0, help="Speech rate")
 parser.add_argument("--onnx", action="store_true", help="use onnx runtime")
 parser.add_argument("--profile", action="store_true", help="use profile model")
 args = update_parser(parser, check_input_type=False)
@@ -447,10 +455,10 @@ def generate_voice(ssl, t2s_encoder, t2s_first_decoder, t2s_stage_decoder, vits)
     ref_language = args.ref_language
     text = args.input
     text_language = args.text_language
-    top_k = 15
-    top_p = 1
-    temperature = 1
-    speed = 1.0
+    top_k = args.top_k
+    top_p = args.top_p
+    temperature = args.temperature
+    speed = args.speed
 
     ref_text = ref_text.strip("\n")
     if ref_text[-1] not in splits:
