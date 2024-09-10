@@ -251,12 +251,19 @@ def recognize_from_video(image_encoder, prompt_encoder, mask_decoder, memory_att
         input_point = np.array([[210, 350], [250, 220]], dtype=np.float32)
         input_label = np.array([1, 1], np.int32)
         input_box = None
+        video_width = 960
+        video_height = 540
     else:
         frame_names = None
         capture = webcamera_utils.get_capture(args.video)
         video_height = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
         video_width = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
         input_point, input_label, input_box = get_input_point()
+
+    if args.savepath != SAVE_IMAGE_PATH:
+        writer = webcamera_utils.get_writer(args.savepath, video_height, video_width)
+    else:
+        writer = None
 
     predictor = SAM2VideoPredictor(args.onnx, args.normal, args.benchmark)
 
@@ -304,9 +311,15 @@ def recognize_from_video(image_encoder, prompt_encoder, mask_decoder, memory_att
         cv2.imshow('frame', frame)
         if frame_names is not None:
             cv2.imwrite(f'video_{frame_idx}.png', frame)
+
+        if writer is not None:
+            writer.write(frame)
+
         frame_shown = True
         frame_idx = frame_idx + 1
 
+    if writer is not None:
+        writer.release()
 
 def annotate_frame(points, labels, box, predictor, inference_state, image_encoder, prompt_encoder, mask_decoder, memory_attention, memory_encoder, mlp):
     ann_frame_idx = 0  # the frame index we interact with
