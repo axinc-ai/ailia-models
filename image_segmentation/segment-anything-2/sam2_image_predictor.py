@@ -13,24 +13,16 @@ from typing import Tuple
 class SAM2ImagePredictor:
     def trunc_normal(self, size, std=0.02, a=-2, b=2):
         values = np.random.normal(loc=0., scale=std, size=size)
-        values = np.clip(values, a*std, b*std)       
+        values = np.clip(values, a*std, b*std)
         return values
 
     def set_image(self, image, image_encoder, onnx):
-        img = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        img = img.astype(np.float32)
-        img = img / 255.0
-        img = img - [0.485, 0.456, 0.406]
-        img = img / [0.229, 0.224, 0.225]
-        img = cv2.resize(img, (1024, 1024))
-        img = np.expand_dims(img, 0)
-        img = np.transpose(img, (0, 3, 1, 2))
-        img = img.astype(np.float32)
+        image = np.expand_dims(image, axis=0)
 
         if onnx:
-            vision_features, vision_pos_enc_0, vision_pos_enc_1, vision_pos_enc_2, backbone_fpn_0, backbone_fpn_1, backbone_fpn_2 = image_encoder.run(None, {"input_image":img})
+            vision_features, vision_pos_enc_0, vision_pos_enc_1, vision_pos_enc_2, backbone_fpn_0, backbone_fpn_1, backbone_fpn_2 = image_encoder.run(None, {"input_image":image})
         else:
-            vision_features, vision_pos_enc_0, vision_pos_enc_1, vision_pos_enc_2, backbone_fpn_0, backbone_fpn_1, backbone_fpn_2 = image_encoder.run({"input_image":img})
+            vision_features, vision_pos_enc_0, vision_pos_enc_1, vision_pos_enc_2, backbone_fpn_0, backbone_fpn_1, backbone_fpn_2 = image_encoder.run({"input_image":image})
 
         backbone_out = {"vision_features":vision_features,
                         "vision_pos_enc":[vision_pos_enc_0, vision_pos_enc_1, vision_pos_enc_2],

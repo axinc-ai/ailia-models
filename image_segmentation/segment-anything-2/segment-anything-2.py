@@ -177,8 +177,10 @@ def recognize_from_image(image_encoder, prompt_encoder, mask_decoder):
     for image_path in args.input:
         image = cv2.imread(image_path)
         orig_hw = [image.shape[0], image.shape[1]]
+        image_size = 1024
+        image_np = preprocess_frame(image, image_size=image_size)
 
-        features = image_predictor.set_image(image, image_encoder, args.onnx)
+        features = image_predictor.set_image(image_np, image_encoder, args.onnx)
 
         masks, scores, logits = image_predictor.predict(
             orig_hw=orig_hw,
