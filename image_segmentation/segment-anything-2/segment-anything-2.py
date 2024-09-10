@@ -120,8 +120,9 @@ def show_points(coords, labels, img):
 def show_box(box, img):
     if box is None:
         return img
+
     cv2.rectangle(
-        img, box[0], box[1], color=(2, 118, 2),
+        img, (box[0], box[1]), (box[2], box[3]), color=(2, 118, 2),
         thickness=3,
         lineType=cv2.LINE_4,
         shift=0)

@@ -1,15 +1,28 @@
 # Segment Anything 2
 
-## Input
+## Image mode
+
+### Input
 
 ![Input](truck.jpg)
 
 (Image from https://github.com/facebookresearch/segment-anything/blob/main/notebooks/images/truck.jpg)
 
-## Output
+### Output
 
-- 1 positive point
 ![Output](output.png)
+
+## Video mode
+
+### Input
+
+![Input](demo/00000.jpg)
+
+(Image from https://github.com/facebookresearch/segment-anything-2/tree/main/notebooks/videos/bedroom)
+
+### Output
+
+![Output](video_4.png)
 
 ## Usage
 Automatically downloads the onnx and prototxt files on the first run.
