@@ -92,8 +92,6 @@ np.random.seed(3)
 def show_mask(mask, img, color = np.array([255, 144, 30]), obj_id=None):
     color = color.reshape(1, 1, -1)
 
-    print(mask.shape)
-
     h, w = mask.shape[-2:]
     mask = mask.reshape(h, w, 1)
 

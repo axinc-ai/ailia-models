@@ -199,6 +199,8 @@ class SAM2VideoPredictor():
         # Warm up the visual backbone and cache the image feature on frame 0
         inference_state["images"] = None
         inference_state["num_frames"] = 0
+        # Debug
+        self.debug = False
         return inference_state
 
     def append_image(self,
@@ -214,7 +216,8 @@ class SAM2VideoPredictor():
         else:
             inference_state["images"].append(image)
         inference_state["num_frames"] = len(inference_state["images"])
-        self._get_image_feature(inference_state, frame_idx=0, batch_size=1, image_encoder=image_encoder)
+        if len(inference_state["images"]) == 1:
+            self._get_image_feature(inference_state, frame_idx=0, batch_size=1, image_encoder=image_encoder)
 
     def _obj_id_to_idx(self, inference_state, obj_id):
         """Map client-side object id to model-side object index."""
@@ -939,8 +942,10 @@ class SAM2VideoPredictor():
             # Cache miss -- we will run inference on a single image
             image = np.expand_dims(inference_state["images"][frame_idx], axis=0)
 
-            print("begin image encoder onnx")
-            print(image.shape)
+            if self.debug:
+                print("begin image encoder onnx")
+                print(frame_idx)
+                print(image.shape)
             if self.onnx:
                 vision_features, vision_pos_enc_0, vision_pos_enc_1, vision_pos_enc_2, backbone_fpn_0, backbone_fpn_1, backbone_fpn_2 = image_encoder.run(None, {"input_image":image})
             else:
@@ -955,7 +960,6 @@ class SAM2VideoPredictor():
             inference_state["cached_features"] = {frame_idx: (image, backbone_out)}
 
         # expand the features to have the same dimension as the number of objects
-        print("batch_size", batch_size)
         expanded_image = np.repeat(image[np.newaxis, ...], batch_size, axis=0)
         expanded_backbone_out = {
             "backbone_fpn": backbone_out["backbone_fpn"].copy(),
@@ -1328,7 +1332,8 @@ class SAM2VideoPredictor():
             mask_input_dummy = sam_mask_prompt
             masks_enable = torch.tensor([1], dtype=torch.int)
 
-        print("begin prompt encoder onnx")
+        if self.debug:
+            print("begin prompt encoder onnx")
         if self.onnx:
             sparse_embeddings, dense_embeddings, dense_pe = prompt_encoder.run(None, {"coords":sam_point_coords.numpy(), "labels":sam_point_labels.numpy(), "masks":mask_input_dummy.numpy(), "masks_enable":masks_enable.numpy()})
         else:
@@ -1336,13 +1341,14 @@ class SAM2VideoPredictor():
         sparse_embeddings = torch.Tensor(sparse_embeddings)
         dense_embeddings = torch.Tensor(dense_embeddings)
         dense_pe = torch.Tensor(dense_pe)
-        print("begin mask decoder onnx")
-        print("backbone_features", np.sum(backbone_features.numpy()))
-        print("image_pe", np.sum(dense_pe.numpy()))
-        print("sparse_embeddings", np.sum(sparse_embeddings.numpy()))
-        print("dense_embeddings", np.sum(dense_embeddings.numpy()))
-        print("high_res_features", np.sum(high_res_features[0].numpy()))
-        print("high_res_features", np.sum(high_res_features[1].numpy()))
+        if self.debug:
+            print("begin mask decoder onnx")
+            print("backbone_features", np.sum(backbone_features.numpy()))
+            print("image_pe", np.sum(dense_pe.numpy()))
+            print("sparse_embeddings", np.sum(sparse_embeddings.numpy()))
+            print("dense_embeddings", np.sum(dense_embeddings.numpy()))
+            print("high_res_features", np.sum(high_res_features[0].numpy()))
+            print("high_res_features", np.sum(high_res_features[1].numpy()))
         if self.onnx:
             masks, iou_pred, sam_tokens_out, object_score_logits  = mask_decoder.run(None, {
                 "image_embeddings":backbone_features.numpy(),
@@ -1681,11 +1687,12 @@ class SAM2VideoPredictor():
         memory_pos_embed = torch.cat(to_cat_memory_pos_embed, dim=0)
 
         num_obj_ptr_tokens_numpy = np.array((num_obj_ptr_tokens)).astype(np.int64)
-        print("curr", np.sum(current_vision_feats[0].numpy()))
-        print("memory", np.sum(memory.numpy()))
-        print("curr_pos", np.sum(current_vision_pos_embeds[0].numpy()))
-        print("memory_pos", np.sum(memory_pos_embed.numpy()))
-        print("num_obj_ptr_tokens", np.sum(num_obj_ptr_tokens_numpy))
+        if self.debug:
+            print("curr", np.sum(current_vision_feats[0].numpy()))
+            print("memory", np.sum(memory.numpy()))
+            print("curr_pos", np.sum(current_vision_pos_embeds[0].numpy()))
+            print("memory_pos", np.sum(memory_pos_embed.numpy()))
+            print("num_obj_ptr_tokens", np.sum(num_obj_ptr_tokens_numpy))
         if self.normal:
             if self.onnx:
                 pix_feat_with_mem = memory_attention.run(None, {"curr":current_vision_feats[0].numpy(), "memory":memory.numpy(), "curr_pos":current_vision_pos_embeds[0].numpy(), "memory_pos":memory_pos_embed.numpy(), "num_obj_ptr_tokens":num_obj_ptr_tokens_numpy})
