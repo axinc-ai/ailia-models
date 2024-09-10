@@ -1,11 +1,13 @@
 import warnings
 from collections import OrderedDict
-from typing import List, Optional, Tuple, Type
 
 import numpy as np
 import cv2
 
-from tqdm import tqdm
+import time
+from logging import getLogger
+
+logger = getLogger(__name__)
 
 # a large negative value as a placeholder score for missing objects
 NO_OBJ_SCORE = -1024.0
@@ -106,6 +108,7 @@ class SAM2VideoPredictor():
         self,
         onnx,
         normal,
+        benchmark,
         fill_hole_area=0,
         # whether to apply non-overlapping constraints on the output object masks
         non_overlap_masks=False,
@@ -117,6 +120,7 @@ class SAM2VideoPredictor():
     ):
         self.onnx = onnx
         self.normal = normal
+        self.benchmark = benchmark
         self.fill_hole_area = fill_hole_area
         self.non_overlap_masks = non_overlap_masks
         self.clear_non_cond_mem_around_input = clear_non_cond_mem_around_input
@@ -938,11 +942,17 @@ class SAM2VideoPredictor():
                 print("begin image encoder onnx")
                 print(frame_idx)
                 print(image.shape)
+            if self.benchmark:
+                start = int(round(time.time() * 1000))
             if self.onnx:
                 vision_features, vision_pos_enc_0, vision_pos_enc_1, vision_pos_enc_2, backbone_fpn_0, backbone_fpn_1, backbone_fpn_2 = image_encoder.run(None, {"input_image":image})
             else:
                 vision_features, vision_pos_enc_0, vision_pos_enc_1, vision_pos_enc_2, backbone_fpn_0, backbone_fpn_1, backbone_fpn_2 = image_encoder.run({"input_image":image})
-            
+            if self.benchmark:
+                end = int(round(time.time() * 1000))
+                estimation_time = (end - start)
+                logger.info(f'\timage_encoder processing {estimation_time} ms')
+
             backbone_out = {"vision_features":vision_features,
                             "vision_pos_enc":[vision_pos_enc_0, vision_pos_enc_1, vision_pos_enc_2],
                             "backbone_fpn":[backbone_fpn_0, backbone_fpn_1, backbone_fpn_2]}
@@ -1334,10 +1344,20 @@ class SAM2VideoPredictor():
 
         if self.debug:
             print("begin prompt encoder onnx")
+
+        if self.benchmark:
+            start = int(round(time.time() * 1000))
+
         if self.onnx:
             sparse_embeddings, dense_embeddings, dense_pe = prompt_encoder.run(None, {"coords":sam_point_coords, "labels":sam_point_labels, "masks":mask_input_dummy, "masks_enable":masks_enable})
         else:
             sparse_embeddings, dense_embeddings, dense_pe = prompt_encoder.run({"coords":sam_point_coords, "labels":sam_point_labels, "masks":mask_input_dummy, "masks_enable":masks_enable})
+
+        if self.benchmark:
+            end = int(round(time.time() * 1000))
+            estimation_time = (end - start)
+            logger.info(f'\tprompt_encoder processing {estimation_time} ms')
+
         if self.debug:
             print("begin mask decoder onnx")
             print("backbone_features", np.sum(backbone_features))
@@ -1346,6 +1366,10 @@ class SAM2VideoPredictor():
             print("dense_embeddings", np.sum(dense_embeddings))
             print("high_res_features", np.sum(high_res_features[0]))
             print("high_res_features", np.sum(high_res_features[1]))
+
+        if self.benchmark:
+            start = int(round(time.time() * 1000))
+
         if self.onnx:
             masks, iou_pred, sam_tokens_out, object_score_logits  = mask_decoder.run(None, {
                 "image_embeddings":backbone_features,
@@ -1364,6 +1388,12 @@ class SAM2VideoPredictor():
                 #repeat_image=False,  # the image is already batched
                 "high_res_features1":high_res_features[0],
                 "high_res_features2":high_res_features[1]})
+
+        if self.benchmark:
+            end = int(round(time.time() * 1000))
+            estimation_time = (end - start)
+            logger.info(f'\tmask_decoder processing {estimation_time} ms')
+
         low_res_multimasks, ious, sam_output_tokens, object_score_logits  = self.forward_postprocess(masks, iou_pred, sam_tokens_out, object_score_logits, multimask_output)
 
         if self.pred_obj_scores:
@@ -1401,10 +1431,16 @@ class SAM2VideoPredictor():
             low_res_masks, high_res_masks = low_res_multimasks, high_res_multimasks
 
         # Extract object pointer from the SAM output token (with occlusion handling)
+        if self.benchmark:
+            start = int(round(time.time() * 1000))
         if self.onnx:
             obj_ptr = mlp.run(None, {"x":sam_output_token})[0]
         else:
             obj_ptr = mlp.run({"x":sam_output_token})[0]
+        if self.benchmark:
+            end = int(round(time.time() * 1000))
+            estimation_time = (end - start)
+            logger.info(f'\tmlp processing {estimation_time} ms')
         
         if self.pred_obj_scores:
             # Allow *soft* no obj ptr, unlike for masks
@@ -1689,6 +1725,9 @@ class SAM2VideoPredictor():
             print("curr_pos", np.sum(current_vision_pos_embeds[0]))
             print("memory_pos", np.sum(memory_pos_embed))
             print("num_obj_ptr_tokens", np.sum(num_obj_ptr_tokens_numpy))
+        if self.benchmark:
+            start = int(round(time.time() * 1000))
+
         if self.normal:
             if self.onnx:
                 pix_feat_with_mem = memory_attention.run(None, {"curr":current_vision_feats[0], "memory":memory, "curr_pos":current_vision_pos_embeds[0], "memory_pos":memory_pos_embed, "num_obj_ptr_tokens":num_obj_ptr_tokens_numpy})
@@ -1703,6 +1742,12 @@ class SAM2VideoPredictor():
                 pix_feat_with_mem = memory_attention.run(None, {"curr":current_vision_feats[0], "memory_1":memory_1, "memory_2":memory_2, "curr_pos":current_vision_pos_embeds[0], "memory_pos_1":memory_pos_embed_1, "memory_pos_2":memory_pos_embed_2})
             else:
                 pix_feat_with_mem = memory_attention.run({"curr":current_vision_feats[0], "memory_1":memory_1, "memory_2":memory_2, "curr_pos":current_vision_pos_embeds[0], "memory_pos_1":memory_pos_embed_1, "memory_pos_2":memory_pos_embed_2})
+
+        if self.benchmark:
+            end = int(round(time.time() * 1000))
+            estimation_time = (end - start)
+            logger.info(f'\tmemory_attention processing {estimation_time} ms')
+
         pix_feat_with_mem = pix_feat_with_mem[0]
         
         # reshape the output (HW)BC => BCHW
@@ -1743,10 +1788,19 @@ class SAM2VideoPredictor():
         if self.sigmoid_bias_for_mem_enc != 0.0:
             mask_for_mem = mask_for_mem + self.sigmoid_bias_for_mem_enc
 
+        if self.benchmark:
+            start = int(round(time.time() * 1000))
+
         if self.onnx:
             vision_features, vision_pos_enc = memory_encoder.run(None, {"pix_feat":pix_feat, "masks":mask_for_mem})
         else:
             vision_features, vision_pos_enc = memory_encoder.run({"pix_feat":pix_feat, "masks":mask_for_mem})
+
+        if self.benchmark:
+            end = int(round(time.time() * 1000))
+            estimation_time = (end - start)
+            logger.info(f'\tmemory_encoder processing {estimation_time} ms')
+
         maskmem_out = {"vision_features": vision_features, "vision_pos_enc": [vision_pos_enc]}
 
         maskmem_features = maskmem_out["vision_features"]

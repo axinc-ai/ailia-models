@@ -15,11 +15,6 @@ import ailia
 # import original modules
 sys.path.append('../../util')
 import webcamera_utils
-
-from tqdm import tqdm
-
-# import original modules
-sys.path.append('../../util')
 from arg_utils import get_base_parser, update_parser, get_savepath  # noqa
 from model_utils import check_and_download_models  # noqa
 from webcamera_utils import get_capture, get_writer  # noqa
@@ -181,18 +176,44 @@ def recognize_from_image(image_encoder, prompt_encoder, mask_decoder):
         image_size = 1024
         image_np = preprocess_frame(image, image_size=image_size)
 
-        features = image_predictor.set_image(image_np, image_encoder, args.onnx)
+        if args.benchmark:
+            logger.info('BENCHMARK mode')
+            total_time_estimation = 0
+            for i in range(args.benchmark_count):
+                start = int(round(time.time() * 1000))
+                features = image_predictor.set_image(image_np, image_encoder, args.onnx)
+                masks, scores, logits = image_predictor.predict(
+                    orig_hw=orig_hw,
+                    features=features,
+                    point_coords=input_point,
+                    point_labels=input_label,
+                    box=input_box,
+                    prompt_encoder=prompt_encoder,
+                    mask_decoder=mask_decoder,
+                    onnx=args.onnx
+                )
+                end = int(round(time.time() * 1000))
+                estimation_time = (end - start)
 
-        masks, scores, logits = image_predictor.predict(
-            orig_hw=orig_hw,
-            features=features,
-            point_coords=input_point,
-            point_labels=input_label,
-            box=input_box,
-            prompt_encoder=prompt_encoder,
-            mask_decoder=mask_decoder,
-            onnx=args.onnx
-        )
+                # Logging
+                logger.info(f'\tailia processing estimation time {estimation_time} ms')
+                if i != 0:
+                    total_time_estimation = total_time_estimation + estimation_time
+
+            logger.info(f'\taverage time estimation {total_time_estimation / (args.benchmark_count - 1)} ms')
+        else:
+            features = image_predictor.set_image(image_np, image_encoder, args.onnx)
+            masks, scores, logits = image_predictor.predict(
+                orig_hw=orig_hw,
+                features=features,
+                point_coords=input_point,
+                point_labels=input_label,
+                box=input_box,
+                prompt_encoder=prompt_encoder,
+                mask_decoder=mask_decoder,
+                onnx=args.onnx
+            )
+
         sorted_ind = np.argsort(scores)[::-1]
         masks = masks[sorted_ind]
         scores = scores[sorted_ind]
@@ -237,7 +258,7 @@ def recognize_from_video(image_encoder, prompt_encoder, mask_decoder, memory_att
         video_width = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
         input_point, input_label, input_box = get_input_point()
 
-    predictor = SAM2VideoPredictor(args.onnx, args.normal)
+    predictor = SAM2VideoPredictor(args.onnx, args.normal, args.benchmark)
 
     inference_state = predictor.init_state(args.num_mask_mem, args.max_obj_ptrs_in_encoder)
     predictor.reset_state(inference_state)
