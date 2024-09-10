@@ -99,7 +99,7 @@ class SAM2ImagePredictor:
     ):
 
         unnorm_coords, labels, unnorm_box, mask_input = None, None, None, None
-        if point_coords is not None:
+        if point_coords is not None and len(point_coords) != 0:
             point_coords = point_coords.astype(np.float32)
             unnorm_coords = self.transform_coords(
                 point_coords, orig_hw=orig_hw
@@ -228,9 +228,9 @@ class SAM2ImagePredictor:
         return coords
 
     def transform_boxes(
-        self, boxes, normalize=False, orig_hw=None
+        self, boxes, orig_hw=None
     ):
-        boxes = self.transform_coords(boxes.reshape(-1, 2, 2), normalize, orig_hw)
+        boxes = self.transform_coords(boxes.reshape(-1, 2, 2), orig_hw)
         return boxes
 
     def postprocess_masks(self, masks: np.ndarray, orig_hw) -> np.ndarray:

@@ -298,9 +298,9 @@ class SAM2VideoPredictor():
         if points is None and box is None:
             raise ValueError("at least one of points or box must be provided as input")
 
-        if points is None:
+        if points is None or len(points) == 0:
             points = np.zeros((0, 2), dtype=np.float32)
-        if labels is None:
+        if labels is None or len(labels) == 0:
             labels = np.zeros((0), dtype=np.int32)
         if points.ndim == 2:
             points = np.expand_dims(points, axis = 0)  # add batch dimension
