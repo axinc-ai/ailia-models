@@ -2,9 +2,8 @@ import warnings
 from collections import OrderedDict
 from typing import List, Optional, Tuple, Type
 
-import torch
 import numpy as np
-import torch.nn.functional as F
+import cv2
 
 from tqdm import tqdm
 
@@ -61,11 +60,11 @@ def get_1d_sine_pe(pos_inds, dim, temperature=10000):
     Get 1D sine positional embedding as in the original Transformer paper.
     """
     pe_dim = dim // 2
-    dim_t = torch.arange(pe_dim, dtype=torch.float32, device=pos_inds.device)
+    dim_t = np.arange(pe_dim, dtype=np.float32)
     dim_t = temperature ** (2 * (dim_t // 2) / pe_dim)
 
     pos_embed = pos_inds.unsqueeze(-1) / dim_t
-    pos_embed = torch.cat([pos_embed.sin(), pos_embed.cos()], dim=-1)
+    pos_embed = np.concatenate([pos_embed.sin(), pos_embed.cos()], axis=-1)
     return pos_embed
 
 def concat_points(old_point_inputs, new_points, new_labels):
@@ -73,10 +72,31 @@ def concat_points(old_point_inputs, new_points, new_labels):
     if old_point_inputs is None:
         points, labels = new_points, new_labels
     else:
-        points = torch.cat([old_point_inputs["point_coords"], new_points], dim=1)
-        labels = torch.cat([old_point_inputs["point_labels"], new_labels], dim=1)
+        points = np.concatenate([old_point_inputs["point_coords"], new_points], axis=1)
+        labels = np.concatenate([old_point_inputs["point_labels"], new_labels], axis=1)
 
     return {"point_coords": points, "point_labels": labels}
+
+def trunc_normal(size, std=0.02, a=-2, b=2):
+    values = np.random.normal(loc=0., scale=std, size=size)
+    values = np.clip(values, a*std, b*std)
+    return values
+
+def sigmoid(x):
+    return 1 / (1 + np.exp(-x))
+
+def interpolate(low_res_multimasks, image_size):
+    high_res_multimasks = np.zeros((low_res_multimasks.shape[0], low_res_multimasks.shape[1], image_size[0], image_size[1]))
+    for b in range(low_res_multimasks.shape[0]):
+        for c in range(low_res_multimasks.shape[1]):
+            high_res_multimasks[b][c] = cv2.resize(low_res_multimasks[b][c], (image_size[1], image_size[0]), high_res_multimasks, interpolation=cv2.INTER_LINEAR)
+        #high_res_multimasks = F.interpolate(
+        #    low_res_multimasks,
+        #    size=(self.image_size, self.image_size),
+        #    mode="bilinear",
+        #    align_corners=False,
+        #)
+    return high_res_multimasks
 
 # sam2_video_predictor.py
 class SAM2VideoPredictor():
@@ -102,7 +122,6 @@ class SAM2VideoPredictor():
         self.clear_non_cond_mem_around_input = clear_non_cond_mem_around_input
         self.clear_non_cond_mem_for_multi_obj = clear_non_cond_mem_for_multi_obj
 
-    @torch.inference_mode()
     def init_state(
         self,
         num_maskmem = 7,  # default 1 input frame + 6 previous frames
@@ -146,26 +165,17 @@ class SAM2VideoPredictor():
         self.use_multimask_token_for_obj_ptr = True
 
         # Temporal encoding of the memories
-        from torch.nn.init import trunc_normal_
-        self.maskmem_tpos_enc = torch.nn.Parameter(
-            torch.zeros(self.num_maskmem, 1, 1, self.mem_dim)
-        )
-        trunc_normal_(self.maskmem_tpos_enc, std=0.02)
+        self.maskmem_tpos_enc = trunc_normal((self.num_maskmem, 1, 1, self.mem_dim), std=0.02)
         # a single token to indicate no memory embedding from previous frames
-        self.no_mem_embed = torch.nn.Parameter(torch.zeros(1, 1, self.hidden_dim))
-        self.no_mem_pos_enc = torch.nn.Parameter(torch.zeros(1, 1, self.hidden_dim))
-        trunc_normal_(self.no_mem_embed, std=0.02)
-        trunc_normal_(self.no_mem_pos_enc, std=0.02)
+        self.no_mem_embed = trunc_normal((1, 1, self.hidden_dim), std=0.02)
+        self.no_mem_pos_enc = trunc_normal((1, 1, self.hidden_dim), std=0.02)
         # Part 4: SAM-style prompt encoder (for both mask and point inputs)
         # and SAM-style mask decoder for the final mask output
-        self.no_obj_ptr = torch.nn.Parameter(torch.zeros(1, self.hidden_dim))
-        trunc_normal_(self.no_obj_ptr, std=0.02)
+        self.no_obj_ptr = trunc_normal((1, self.hidden_dim), std=0.02)
 
         """Initialize an inference state."""
         inference_state = {}
         # the original video height and width, used for resizing final output scores
-        inference_state["device"] = torch.device("cpu")
-        inference_state["storage_device"] = torch.device("cpu")
         # inputs on each frame
         inference_state["point_inputs_per_obj"] = {}
         inference_state["mask_inputs_per_obj"] = {}
@@ -261,7 +271,6 @@ class SAM2VideoPredictor():
         """Get the total number of unique object ids received so far in this session."""
         return len(inference_state["obj_idx_to_id"])
 
-    @torch.inference_mode()
     def add_new_points_or_box(
         self,
         inference_state,
@@ -290,17 +299,13 @@ class SAM2VideoPredictor():
             raise ValueError("at least one of points or box must be provided as input")
 
         if points is None:
-            points = torch.zeros(0, 2, dtype=torch.float32)
-        elif not isinstance(points, torch.Tensor):
-            points = torch.tensor(points, dtype=torch.float32)
+            points = np.zeros((0, 2), dtype=np.float32)
         if labels is None:
-            labels = torch.zeros(0, dtype=torch.int32)
-        elif not isinstance(labels, torch.Tensor):
-            labels = torch.tensor(labels, dtype=torch.int32)
-        if points.dim() == 2:
-            points = points.unsqueeze(0)  # add batch dimension
-        if labels.dim() == 1:
-            labels = labels.unsqueeze(0)  # add batch dimension
+            labels = np.zeros((0), dtype=np.int32)
+        if points.ndim == 2:
+            points = np.expand_dims(points, axis = 0)  # add batch dimension
+        if labels.ndim == 1:
+            labels = np.expand_dims(labels, axis = 0)  # add batch dimension
 
         # If `box` is provided, we add it as the first two points with labels 2 and 3
         # along with the user-provided points (consistent with how SAM 2 is trained).
@@ -320,22 +325,18 @@ class SAM2VideoPredictor():
                     category=UserWarning,
                     stacklevel=2,
                 )
-            if not isinstance(box, torch.Tensor):
-                box = torch.tensor(box, dtype=torch.float32, device=points.device)
             box_coords = box.reshape(1, 2, 2)
-            box_labels = torch.tensor([2, 3], dtype=torch.int32, device=labels.device)
+            box_labels = np.array([2, 3], dtype=np.int32)
             box_labels = box_labels.reshape(1, 2)
-            points = torch.cat([box_coords, points], dim=1)
-            labels = torch.cat([box_labels, labels], dim=1)
+            points = np.concatenate([box_coords, points], axis=1)
+            labels = np.concatenate([box_labels, labels], axis=1)
 
         if normalize_coords:
             video_H = inference_state["video_height"]
             video_W = inference_state["video_width"]
-            points = points / torch.tensor([video_W, video_H]).to(points.device)
+            points = points / np.array([video_W, video_H])
         # scale the (normalized) coordinates by the model's internal image size
         points = points * self.image_size
-        points = points.to(inference_state["device"])
-        labels = labels.to(inference_state["device"])
 
         if not clear_old_points:
             point_inputs = point_inputs_per_frame.get(frame_idx, None)
@@ -374,10 +375,9 @@ class SAM2VideoPredictor():
                 prev_out = obj_output_dict["non_cond_frame_outputs"].get(frame_idx)
 
         if prev_out is not None and prev_out["pred_masks"] is not None:
-            device = inference_state["device"]
-            prev_sam_mask_logits = prev_out["pred_masks"].to(device, non_blocking=True)
+            prev_sam_mask_logits = prev_out["pred_masks"]
             # Clamp the scale of prev_sam_mask_logits to avoid rare numerical issues.
-            prev_sam_mask_logits = torch.clamp(prev_sam_mask_logits, -32.0, 32.0)
+            prev_sam_mask_logits = np.clip(prev_sam_mask_logits, -32.0, 32.0)
         current_out, _ = self._run_single_frame_inference(
             inference_state=inference_state,
             output_dict=obj_output_dict,  # run on the slice of a single object
@@ -422,7 +422,6 @@ class SAM2VideoPredictor():
         """Deprecated method. Please use `add_new_points_or_box` instead."""
         return self.add_new_points_or_box(*args, **kwargs)
 
-    @torch.inference_mode()
     def add_new_mask(
         self,
         inference_state,
@@ -441,23 +440,22 @@ class SAM2VideoPredictor():
         point_inputs_per_frame = inference_state["point_inputs_per_obj"][obj_idx]
         mask_inputs_per_frame = inference_state["mask_inputs_per_obj"][obj_idx]
 
-        if not isinstance(mask, torch.Tensor):
-            mask = torch.tensor(mask, dtype=torch.bool)
         assert mask.dim() == 2
         mask_H, mask_W = mask.shape
         mask_inputs_orig = mask[None, None]  # add batch and channel dimension
-        mask_inputs_orig = mask_inputs_orig.float().to(inference_state["device"])
-
+        mask_inputs_orig = mask_inputs_orig.astype(np.float32)
+        
         # resize the mask if it doesn't match the model's image size
         if mask_H != self.image_size or mask_W != self.image_size:
-            mask_inputs = torch.nn.functional.interpolate(
-                mask_inputs_orig,
-                size=(self.image_size, self.image_size),
-                align_corners=False,
-                mode="bilinear",
-                antialias=True,  # use antialias for downsampling
-            )
-            mask_inputs = (mask_inputs >= 0.5).float()
+            mask_inputs = interpolate(mask_inputs_orig, (self.image_size, self.image_size))
+            #mask_inputs = torch.nn.functional.interpolate(
+            #    mask_inputs_orig,
+            #    size=(self.image_size, self.image_size),
+            #    align_corners=False,
+            #    mode="bilinear",
+            #    antialias=True,  # use antialias for downsampling
+            #)
+            mask_inputs = (mask_inputs >= 0.5).astype(np.float32)
         else:
             mask_inputs = mask_inputs_orig
 
@@ -524,19 +522,18 @@ class SAM2VideoPredictor():
         Resize the object scores to the original video resolution (video_res_masks)
         and apply non-overlapping constraints for final output.
         """
-        device = inference_state["device"]
         video_H = inference_state["video_height"]
         video_W = inference_state["video_width"]
-        any_res_masks = any_res_masks.to(device, non_blocking=True)
         if any_res_masks.shape[-2:] == (video_H, video_W):
             video_res_masks = any_res_masks
         else:
-            video_res_masks = torch.nn.functional.interpolate(
-                any_res_masks,
-                size=(video_H, video_W),
-                mode="bilinear",
-                align_corners=False,
-            )
+            video_res_masks = interpolate(any_res_masks, (video_H, video_W))
+            #video_res_masks = torch.nn.functional.interpolate(
+            #    any_res_masks,
+            #    size=(video_H, video_W),
+            #    mode="bilinear",
+            #    align_corners=False,
+            #)
         if self.non_overlap_masks:
             video_res_masks = self._apply_non_overlapping_constraints(video_res_masks)
         return any_res_masks, video_res_masks
@@ -584,17 +581,15 @@ class SAM2VideoPredictor():
         consolidated_out = {
             "maskmem_features": None,
             "maskmem_pos_enc": None,
-            consolidated_mask_key: torch.full(
-                size=(batch_size, 1, consolidated_H, consolidated_W),
+            consolidated_mask_key: np.full(
+                shape=(batch_size, 1, consolidated_H, consolidated_W),
                 fill_value=NO_OBJ_SCORE,
-                dtype=torch.float32,
-                device=inference_state["storage_device"],
+                dtype=np.float32
             ),
-            "obj_ptr": torch.full(
-                size=(batch_size, self.hidden_dim),
+            "obj_ptr": np.full(
+                shape=(batch_size, self.hidden_dim),
                 fill_value=NO_OBJ_SCORE,
-                dtype=torch.float32,
-                device=inference_state["device"],
+                dtype=np.float32
             ),
         }
         empty_mask_ptr = None
@@ -632,25 +627,26 @@ class SAM2VideoPredictor():
                 consolidated_pred_masks[obj_idx : obj_idx + 1] = obj_mask
             else:
                 # Resize first if temporary object mask has a different resolution
-                resized_obj_mask = torch.nn.functional.interpolate(
-                    obj_mask,
-                    size=consolidated_pred_masks.shape[-2:],
-                    mode="bilinear",
-                    align_corners=False,
-                )
+                resized_obj_mask = interpolate(obj_mask,consolidated_pred_masks.shape[-2:])
+                #resized_obj_mask = torch.nn.functional.interpolate(
+                #    obj_mask,
+                #    size=consolidated_pred_masks.shape[-2:],
+                #    mode="bilinear",
+                #    align_corners=False,
+                #)
                 consolidated_pred_masks[obj_idx : obj_idx + 1] = resized_obj_mask
             consolidated_out["obj_ptr"][obj_idx : obj_idx + 1] = out["obj_ptr"]
 
         # Optionally, apply non-overlapping constraints on the consolidated scores
         # and rerun the memory encoder
         if run_mem_encoder:
-            device = inference_state["device"]
-            high_res_masks = torch.nn.functional.interpolate(
-                consolidated_out["pred_masks"].to(device, non_blocking=True),
-                size=(self.image_size, self.image_size),
-                mode="bilinear",
-                align_corners=False,
-            )
+            high_res_masks = interpolate(consolidated_out["pred_masks"],(self.image_size, self.image_size))
+            #high_res_masks = torch.nn.functional.interpolate(
+            #    consolidated_out["pred_masks"],
+            #    size=(self.image_size, self.image_size),
+            #    mode="bilinear",
+            #    align_corners=False,
+            #)
             if self.non_overlap_masks_for_mem_enc:
                 high_res_masks = self._apply_non_overlapping_constraints(high_res_masks)
             maskmem_features, maskmem_pos_enc = self._run_memory_encoder(
@@ -671,10 +667,9 @@ class SAM2VideoPredictor():
         """Get a dummy object pointer based on an empty mask on the current frame."""
         # A dummy (empty) mask with a single object
         batch_size = 1
-        mask_inputs = torch.zeros(
+        mask_inputs = np.zeros(
             (batch_size, 1, self.image_size, self.image_size),
-            dtype=torch.float32,
-            device=inference_state["device"],
+            dtype=np.float32
         )
 
         # Retrieve correct image features
@@ -708,7 +703,6 @@ class SAM2VideoPredictor():
         )
         return current_out["obj_ptr"]
 
-    @torch.inference_mode()
     def propagate_in_video_preflight(self, inference_state, image_encoder, prompt_encoder, mask_decoder, memory_attention, memory_encoder, mlp):
         assert(memory_encoder!=None)
         """Prepare inference_state and consolidate temporary outputs before tracking."""
@@ -781,7 +775,6 @@ class SAM2VideoPredictor():
             input_frames_inds.update(mask_inputs_per_frame.keys())
         assert all_consolidated_frame_inds == input_frames_inds
 
-    @torch.inference_mode()
     def propagate_in_video(
         self,
         inference_state,
@@ -880,10 +873,10 @@ class SAM2VideoPredictor():
         `output_dict_per_obj`. The resulting slices share the same tensor storage.
         """
         maskmem_features = current_out["maskmem_features"]
-        assert maskmem_features is None or isinstance(maskmem_features, torch.Tensor)
+        #assert maskmem_features is None or isinstance(maskmem_features, np.array)
 
         maskmem_pos_enc = current_out["maskmem_pos_enc"]
-        assert maskmem_pos_enc is None or isinstance(maskmem_pos_enc, list)
+        #assert maskmem_pos_enc is None or isinstance(maskmem_pos_enc, list)
 
         output_dict_per_obj = inference_state["output_dict_per_obj"]
         for obj_idx, obj_output_dict in output_dict_per_obj.items():
@@ -900,7 +893,6 @@ class SAM2VideoPredictor():
                 obj_out["maskmem_pos_enc"] = [x[obj_slice] for x in maskmem_pos_enc]
             obj_output_dict[storage_key][frame_idx] = obj_out
 
-    @torch.inference_mode()
     def reset_state(self, inference_state):
         """Remove all input points or mask in all frames throughout the video."""
         self._reset_tracking_results(inference_state)
@@ -951,9 +943,9 @@ class SAM2VideoPredictor():
             else:
                 vision_features, vision_pos_enc_0, vision_pos_enc_1, vision_pos_enc_2, backbone_fpn_0, backbone_fpn_1, backbone_fpn_2 = image_encoder.run({"input_image":image})
             
-            backbone_out = {"vision_features":torch.Tensor(vision_features),
-                            "vision_pos_enc":[torch.Tensor(vision_pos_enc_0), torch.Tensor(vision_pos_enc_1), torch.Tensor(vision_pos_enc_2)],
-                            "backbone_fpn":[torch.Tensor(backbone_fpn_0), torch.Tensor(backbone_fpn_1), torch.Tensor(backbone_fpn_2)]}
+            backbone_out = {"vision_features":vision_features,
+                            "vision_pos_enc":[vision_pos_enc_0, vision_pos_enc_1, vision_pos_enc_2],
+                            "backbone_fpn":[backbone_fpn_0, backbone_fpn_1, backbone_fpn_2]}
 
             # Cache the most recent frame's feature (for repeated interactions with
             # a frame; we can use an LRU cache for more frames in the future).
@@ -966,11 +958,15 @@ class SAM2VideoPredictor():
             "vision_pos_enc": backbone_out["vision_pos_enc"].copy(),
         }
         for i, feat in enumerate(expanded_backbone_out["backbone_fpn"]):
-            expanded_backbone_out["backbone_fpn"][i] = feat.expand(
-                batch_size, -1, -1, -1
-            )
+            new_shape = (batch_size, feat.shape[1], feat.shape[2], feat.shape[3])
+            expanded_backbone_out["backbone_fpn"][i] = np.broadcast_to(feat, new_shape)
+            #expanded_backbone_out["backbone_fpn"][i] = feat.expand(
+            #    batch_size, -1, -1, -1
+            #)
         for i, pos in enumerate(expanded_backbone_out["vision_pos_enc"]):
-            pos = pos.expand(batch_size, -1, -1, -1)
+            new_shape = (batch_size, pos.shape[1], pos.shape[2], pos.shape[3])
+            pos = np.broadcast_to(pos, new_shape)
+            #pos = pos.expand(batch_size, -1, -1, -1)
             expanded_backbone_out["vision_pos_enc"][i] = pos
 
         features = self._prepare_backbone_features(expanded_backbone_out)
@@ -1029,18 +1025,14 @@ class SAM2VideoPredictor():
         )
 
         # optionally offload the output to CPU memory to save GPU space
-        storage_device = inference_state["storage_device"]
         maskmem_features = current_out["maskmem_features"]
-        if maskmem_features is not None:
-            maskmem_features = maskmem_features.to(torch.bfloat16)
-            maskmem_features = maskmem_features.to(storage_device, non_blocking=True)
         pred_masks_gpu = current_out["pred_masks"]
         #if self.fill_hole_area > 0:
         #    pred_masks_gpu = fill_holes_in_mask_scores(
         #        pred_masks_gpu, self.fill_hole_area
         #    )
         # potentially fill holes in the predicted masks
-        pred_masks = pred_masks_gpu.to(storage_device, non_blocking=True)
+        pred_masks = pred_masks_gpu
         # "maskmem_pos_enc" is the same across frames, so we only need to store one copy of it
         maskmem_pos_enc = self._get_maskmem_pos_enc(inference_state, current_out)
         # object pointer is a small tensor, so we always keep it on GPU memory for fast access
@@ -1075,9 +1067,6 @@ class SAM2VideoPredictor():
         )
 
         # optionally offload the output to CPU memory to save GPU space
-        storage_device = inference_state["storage_device"]
-        maskmem_features = maskmem_features.to(torch.bfloat16)
-        maskmem_features = maskmem_features.to(storage_device, non_blocking=True)
         # "maskmem_pos_enc" is the same across frames, so we only need to store one copy of it
         maskmem_pos_enc = self._get_maskmem_pos_enc(
             inference_state, {"maskmem_pos_enc": maskmem_pos_enc}
@@ -1096,15 +1085,20 @@ class SAM2VideoPredictor():
             if "maskmem_pos_enc" not in model_constants:
                 assert isinstance(out_maskmem_pos_enc, list)
                 # only take the slice for one object, since it's same across objects
-                maskmem_pos_enc = [x[0:1].clone() for x in out_maskmem_pos_enc]
+                maskmem_pos_enc = [x[0:1].copy() for x in out_maskmem_pos_enc]
                 model_constants["maskmem_pos_enc"] = maskmem_pos_enc
             else:
                 maskmem_pos_enc = model_constants["maskmem_pos_enc"]
             # expand the cached maskmem_pos_enc to the actual batch size
-            batch_size = out_maskmem_pos_enc[0].size(0)
+            batch_size = out_maskmem_pos_enc[0].shape[0]
+
             expanded_maskmem_pos_enc = [
-                x.expand(batch_size, -1, -1, -1) for x in maskmem_pos_enc
+                np.broadcast_to(x, (batch_size, x.shape[1], x.shape[2], x.shape[3])) for x in maskmem_pos_enc
             ]
+
+            #expanded_maskmem_pos_enc = [
+            #    x.expand(batch_size, -1, -1, -1) for x in maskmem_pos_enc
+            #]
         else:
             expanded_maskmem_pos_enc = None
         return expanded_maskmem_pos_enc
@@ -1159,8 +1153,12 @@ class SAM2VideoPredictor():
         current_out = {"point_inputs": point_inputs, "mask_inputs": mask_inputs}
         # High-resolution feature maps for the SAM head, reshape (HW)BC => BCHW
         if len(current_vision_feats) > 1:
+            #high_res_features = [
+            #    x.permute(1, 2, 0).view(x.size(1), x.size(2), *s)
+            #    for x, s in zip(current_vision_feats[:-1], feat_sizes[:-1])
+            #]]
             high_res_features = [
-                x.permute(1, 2, 0).view(x.size(1), x.size(2), *s)
+                np.reshape(np.transpose(x, (1, 2, 0)), (x.shape[1], x.shape[2], *s))
                 for x, s in zip(current_vision_feats[:-1], feat_sizes[:-1])
             ]
         else:
@@ -1168,8 +1166,11 @@ class SAM2VideoPredictor():
         if mask_inputs is not None and self.use_mask_input_as_output_without_sam:
             # When use_mask_input_as_output_without_sam=True, we directly output the mask input
             # (see it as a GT mask) without using a SAM prompt encoder + mask decoder.
-            pix_feat = current_vision_feats[-1].permute(1, 2, 0)
-            pix_feat = pix_feat.view(-1, self.hidden_dim, *feat_sizes[-1])
+            #pix_feat = current_vision_feats[-1].permute(1, 2, 0)
+            #pix_feat = pix_feat.view(-1, self.hidden_dim, *feat_sizes[-1])
+            pix_feat = np.transpose(current_vision_feats[-1], (1, 2, 0))
+            pix_feat = np.reshape(pix_feat, (-1, self.hidden_dim, *feat_sizes[-1]))
+
             sam_outputs = self._use_mask_as_output(
                 pix_feat, high_res_features, mask_inputs, prompt_encoder, mask_decoder, mlp
             )
@@ -1288,35 +1289,35 @@ class SAM2VideoPredictor():
         - obj_ptr: [B, C] shape, the object pointer vector for the output mask, extracted
           based on the output token from the SAM mask decoder.
         """
-        B = backbone_features.size(0)
-        device = backbone_features.device
-        assert backbone_features.size(1) == self.sam_prompt_embed_dim
-        assert backbone_features.size(2) == self.sam_image_embedding_size
-        assert backbone_features.size(3) == self.sam_image_embedding_size
+        B = backbone_features.shape[0]
+        assert backbone_features.shape[1] == self.sam_prompt_embed_dim
+        assert backbone_features.shape[2] == self.sam_image_embedding_size
+        assert backbone_features.shape[3] == self.sam_image_embedding_size
 
         # a) Handle point prompts
         if point_inputs is not None:
             sam_point_coords = point_inputs["point_coords"]
             sam_point_labels = point_inputs["point_labels"]
-            assert sam_point_coords.size(0) == B and sam_point_labels.size(0) == B
+            assert sam_point_coords.shape[0] == B and sam_point_labels.shape[0] == B
         else:
             # If no points are provide, pad with an empty point (with label -1)
-            sam_point_coords = torch.zeros(B, 1, 2, device=device)
-            sam_point_labels = -torch.ones(B, 1, dtype=torch.int32, device=device)
-
+            sam_point_coords = np.zeros((B, 1, 2))
+            sam_point_labels = -np.ones((B, 1), dtype=np.int32)
+            
         # b) Handle mask prompts
         if mask_inputs is not None:
             # If mask_inputs is provided, downsize it into low-res mask input if needed
             # and feed it as a dense mask prompt into the SAM mask encoder
             assert len(mask_inputs.shape) == 4 and mask_inputs.shape[:2] == (B, 1)
             if mask_inputs.shape[-2:] != self.sam_prompt_encoder.mask_input_size:
-                sam_mask_prompt = F.interpolate(
-                    mask_inputs.float(),
-                    size=self.sam_prompt_encoder.mask_input_size,
-                    align_corners=False,
-                    mode="bilinear",
-                    antialias=True,  # use antialias for downsampling
-                )
+                sam_mask_prompt = interpolate(mask_inputs.astype(np.float32), self.sam_prompt_encoder.mask_input_size)
+                #sam_mask_prompt = F.interpolate(
+                #    mask_inputs.float(),
+                #    size=self.sam_prompt_encoder.mask_input_size,
+                #    align_corners=False,
+                #    mode="bilinear",
+                #    antialias=True,  # use antialias for downsampling
+                #)
             else:
                 sam_mask_prompt = mask_inputs
         else:
@@ -1325,52 +1326,44 @@ class SAM2VideoPredictor():
             sam_mask_prompt = None
 
         if sam_mask_prompt is None:
-            import numpy as np
-            mask_input_dummy = torch.Tensor(np.zeros((1, 256, 256)))
-            masks_enable = torch.tensor([0], dtype=torch.int)
+            mask_input_dummy = np.zeros((1, 256, 256))
+            masks_enable = np.array([0], dtype=np.int64)
         else:
             mask_input_dummy = sam_mask_prompt
-            masks_enable = torch.tensor([1], dtype=torch.int)
+            masks_enable = np.array([1], dtype=np.int64)
 
         if self.debug:
             print("begin prompt encoder onnx")
         if self.onnx:
-            sparse_embeddings, dense_embeddings, dense_pe = prompt_encoder.run(None, {"coords":sam_point_coords.numpy(), "labels":sam_point_labels.numpy(), "masks":mask_input_dummy.numpy(), "masks_enable":masks_enable.numpy()})
+            sparse_embeddings, dense_embeddings, dense_pe = prompt_encoder.run(None, {"coords":sam_point_coords, "labels":sam_point_labels, "masks":mask_input_dummy, "masks_enable":masks_enable})
         else:
-            sparse_embeddings, dense_embeddings, dense_pe = prompt_encoder.run({"coords":sam_point_coords.numpy(), "labels":sam_point_labels.numpy(), "masks":mask_input_dummy.numpy(), "masks_enable":masks_enable.numpy()})
-        sparse_embeddings = torch.Tensor(sparse_embeddings)
-        dense_embeddings = torch.Tensor(dense_embeddings)
-        dense_pe = torch.Tensor(dense_pe)
+            sparse_embeddings, dense_embeddings, dense_pe = prompt_encoder.run({"coords":sam_point_coords, "labels":sam_point_labels, "masks":mask_input_dummy, "masks_enable":masks_enable})
         if self.debug:
             print("begin mask decoder onnx")
-            print("backbone_features", np.sum(backbone_features.numpy()))
-            print("image_pe", np.sum(dense_pe.numpy()))
-            print("sparse_embeddings", np.sum(sparse_embeddings.numpy()))
-            print("dense_embeddings", np.sum(dense_embeddings.numpy()))
-            print("high_res_features", np.sum(high_res_features[0].numpy()))
-            print("high_res_features", np.sum(high_res_features[1].numpy()))
+            print("backbone_features", np.sum(backbone_features))
+            print("image_pe", np.sum(dense_pe))
+            print("sparse_embeddings", np.sum(sparse_embeddings))
+            print("dense_embeddings", np.sum(dense_embeddings))
+            print("high_res_features", np.sum(high_res_features[0]))
+            print("high_res_features", np.sum(high_res_features[1]))
         if self.onnx:
             masks, iou_pred, sam_tokens_out, object_score_logits  = mask_decoder.run(None, {
-                "image_embeddings":backbone_features.numpy(),
-                "image_pe": dense_pe.numpy(),
-                "sparse_prompt_embeddings": sparse_embeddings.numpy(),
-                "dense_prompt_embeddings": dense_embeddings.numpy(),
+                "image_embeddings":backbone_features,
+                "image_pe": dense_pe,
+                "sparse_prompt_embeddings": sparse_embeddings,
+                "dense_prompt_embeddings": dense_embeddings,
                 #repeat_image=False,  # the image is already batched
-                "high_res_features1":high_res_features[0].numpy(),
-                "high_res_features2":high_res_features[1].numpy()})
+                "high_res_features1":high_res_features[0],
+                "high_res_features2":high_res_features[1]})
         else:
             masks, iou_pred, sam_tokens_out, object_score_logits  = mask_decoder.run({
-                "image_embeddings":backbone_features.numpy(),
-                "image_pe": dense_pe.numpy(),
-                "sparse_prompt_embeddings": sparse_embeddings.numpy(),
-                "dense_prompt_embeddings": dense_embeddings.numpy(),
+                "image_embeddings":backbone_features,
+                "image_pe": dense_pe,
+                "sparse_prompt_embeddings": sparse_embeddings,
+                "dense_prompt_embeddings": dense_embeddings,
                 #repeat_image=False,  # the image is already batched
-                "high_res_features1":high_res_features[0].numpy(),
-                "high_res_features2":high_res_features[1].numpy()})
-        masks = torch.Tensor(masks)
-        iou_pred = torch.Tensor(iou_pred)
-        sam_tokens_out = torch.Tensor(sam_tokens_out)
-        object_score_logits = torch.Tensor(object_score_logits)
+                "high_res_features1":high_res_features[0],
+                "high_res_features2":high_res_features[1]})
         low_res_multimasks, ious, sam_output_tokens, object_score_logits  = self.forward_postprocess(masks, iou_pred, sam_tokens_out, object_score_logits, multimask_output)
 
         if self.pred_obj_scores:
@@ -1378,7 +1371,7 @@ class SAM2VideoPredictor():
 
             # Mask used for spatial memories is always a *hard* choice between obj and no obj,
             # consistent with the actual mask prediction
-            low_res_multimasks = torch.where(
+            low_res_multimasks = np.where(
                 is_obj_appearing[:, None, None],
                 low_res_multimasks,
                 NO_OBJ_SCORE,
@@ -1386,32 +1379,32 @@ class SAM2VideoPredictor():
 
         # convert masks from possibly bfloat16 (or float16) to float32
         # (older PyTorch versions before 2.1 don't support `interpolate` on bf16)
-        low_res_multimasks = low_res_multimasks.float()
-        high_res_multimasks = F.interpolate(
-            low_res_multimasks,
-            size=(self.image_size, self.image_size),
-            mode="bilinear",
-            align_corners=False,
-        )
+        low_res_multimasks = low_res_multimasks.astype(np.float32)
+        high_res_multimasks = interpolate(low_res_multimasks, (self.image_size, self.image_size))
+        #high_res_multimasks = F.interpolate(
+        #    low_res_multimasks,
+        #    size=(self.image_size, self.image_size),
+        #    mode="bilinear",
+        #    align_corners=False,
+        #)
 
         sam_output_token = sam_output_tokens[:, 0]
         if multimask_output:
             # take the best mask prediction (with the highest IoU estimation)
-            best_iou_inds = torch.argmax(ious, dim=-1)
-            batch_inds = torch.arange(B, device=device)
-            low_res_masks = low_res_multimasks[batch_inds, best_iou_inds].unsqueeze(1)
-            high_res_masks = high_res_multimasks[batch_inds, best_iou_inds].unsqueeze(1)
-            if sam_output_tokens.size(1) > 1:
+            best_iou_inds = np.argmax(ious, axis=-1)
+            batch_inds = np.arange(B)
+            low_res_masks = np.expand_dims(low_res_multimasks[batch_inds, best_iou_inds], axis = 1)
+            high_res_masks = np.expand_dims(high_res_multimasks[batch_inds, best_iou_inds], axis = 1)
+            if sam_output_tokens.shape[1] > 1:
                 sam_output_token = sam_output_tokens[batch_inds, best_iou_inds]
         else:
             low_res_masks, high_res_masks = low_res_multimasks, high_res_multimasks
 
         # Extract object pointer from the SAM output token (with occlusion handling)
         if self.onnx:
-            obj_ptr = mlp.run(None, {"x":sam_output_token.numpy()})[0]
+            obj_ptr = mlp.run(None, {"x":sam_output_token})[0]
         else:
-            obj_ptr = mlp.run({"x":sam_output_token.numpy()})[0]
-        obj_ptr = torch.Tensor(obj_ptr)
+            obj_ptr = mlp.run({"x":sam_output_token})[0]
         
         if self.pred_obj_scores:
             # Allow *soft* no obj ptr, unlike for masks
@@ -1420,7 +1413,7 @@ class SAM2VideoPredictor():
                 assert not self.teacher_force_obj_scores_for_mem
                 lambda_is_obj_appearing = object_score_logits.sigmoid()
             else:
-                lambda_is_obj_appearing = is_obj_appearing.float()
+                lambda_is_obj_appearing = is_obj_appearing.astype(np.float32)
 
             if self.fixed_no_obj_ptr:
                 obj_ptr = lambda_is_obj_appearing * obj_ptr
@@ -1439,12 +1432,12 @@ class SAM2VideoPredictor():
     # mask_decoder.py
     def forward_postprocess(
         self,
-        masks: torch.Tensor,
-        iou_pred: torch.Tensor,
-        mask_tokens_out: torch.Tensor,
-        object_score_logits: torch.Tensor,
+        masks,
+        iou_pred,
+        mask_tokens_out,
+        object_score_logits,
         multimask_output: bool,
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
+    ):
         # Select the correct mask or masks for output
         if multimask_output:
             masks = masks[:, 1:, :, :]
@@ -1476,21 +1469,22 @@ class SAM2VideoPredictor():
         """
         # Use -10/+10 as logits for neg/pos pixels (very close to 0/1 in prob after sigmoid).
         out_scale, out_bias = 20.0, -10.0  # sigmoid(-10.0)=4.5398e-05
-        mask_inputs_float = mask_inputs.float()
+        mask_inputs_float = mask_inputs.astype(np.float32)
         high_res_masks = mask_inputs_float * out_scale + out_bias
-        low_res_masks = F.interpolate(
-            high_res_masks,
-            size=(high_res_masks.size(-2) // 4, high_res_masks.size(-1) // 4),
-            align_corners=False,
-            mode="bilinear",
-            antialias=True,  # use antialias for downsampling
-        )
+        low_res_masks = interpolate(high_res_masks, (high_res_masks.size(-2) // 4, high_res_masks.size(-1) // 4))
+        #low_res_masks = F.interpolate(
+        #    high_res_masks,
+        #    size=(high_res_masks.size(-2) // 4, high_res_masks.size(-1) // 4),
+        #    align_corners=False,
+        #    mode="bilinear",
+        #    antialias=True,  # use antialias for downsampling
+        #)
         # a dummy IoU prediction of all 1's under mask input
-        ious = mask_inputs.new_ones(mask_inputs.size(0), 1).float()
+        ious = mask_inputs.new_ones(mask_inputs.size(0), 1).astype(np.float32)
         if not self.use_obj_ptrs_in_encoder:
             # all zeros as a dummy object pointer (of shape [B, C])
-            obj_ptr = torch.zeros(
-                mask_inputs.size(0), self.hidden_dim, device=mask_inputs.device
+            obj_ptr = np.zeros(
+                (mask_inputs.size(0), self.hidden_dim)
             )
         else:
             # produce an object pointer using the SAM decoder from the mask input
@@ -1505,9 +1499,9 @@ class SAM2VideoPredictor():
         # In this method, we are treating mask_input as output, e.g. using it directly to create spatial mem;
         # Below, we follow the same design axiom to use mask_input to decide if obj appears or not instead of relying
         # on the object_scores from the SAM decoder.
-        is_obj_appearing = torch.any(mask_inputs.flatten(1).float() > 0.0, dim=1)
+        is_obj_appearing = np.any(mask_inputs.flatten(1).astype(np.float32) > 0.0, dim=1)
         is_obj_appearing = is_obj_appearing[..., None]
-        lambda_is_obj_appearing = is_obj_appearing.float()
+        lambda_is_obj_appearing = is_obj_appearing.astype(np.float32)
         object_score_logits = out_scale * lambda_is_obj_appearing + out_bias
         if self.pred_obj_scores:
             if self.fixed_no_obj_ptr:
@@ -1538,14 +1532,13 @@ class SAM2VideoPredictor():
         memory_attention=None
     ):
         """Fuse the current frame's visual feature map with previous memory."""
-        B = current_vision_feats[-1].size(1)  # batch size on this frame
+        B = current_vision_feats[-1].shape[1]  # batch size on this frame
         C = self.hidden_dim
         H, W = feat_sizes[-1]  # top-level (lowest-resolution) feature size
-        device = current_vision_feats[-1].device
         # The case of `self.num_maskmem == 0` below is primarily used for reproducing SAM on images.
         # In this case, we skip the fusion with any memory.
         if self.num_maskmem == 0:  # Disable memory and skip fusion
-            pix_feat = current_vision_feats[-1].permute(1, 2, 0).view(B, C, H, W)
+            pix_feat = np.transpose(current_vision_feats[-1], (1, 2, 0)).reshape((B, C, H, W))
             return pix_feat
 
         num_obj_ptr_tokens = 0
@@ -1603,11 +1596,13 @@ class SAM2VideoPredictor():
                     continue  # skip padding frames
                 # "maskmem_features" might have been offloaded to CPU in demo use cases,
                 # so we load it back to GPU (it's a no-op if it's already on GPU).
-                feats = prev["maskmem_features"].to(device, non_blocking=True)
-                to_cat_memory.append(feats.flatten(2).permute(2, 0, 1))
+                feats = prev["maskmem_features"]
+                #to_cat_memory.append(feats.flatten(2).permute(2, 0, 1))
+                to_cat_memory.append(np.transpose(np.reshape(feats, (feats.shape[0], feats.shape[1], feats.shape[2]*feats.shape[3])), (2, 0, 1)))
                 # Spatial positional encoding (it might have been offloaded to CPU in eval)
-                maskmem_enc = prev["maskmem_pos_enc"][-1].to(device)
-                maskmem_enc = maskmem_enc.flatten(2).permute(2, 0, 1)
+                maskmem_enc = prev["maskmem_pos_enc"][-1]
+                #maskmem_enc = maskmem_enc.flatten(2).permute(2, 0, 1)
+                maskmem_enc = np.transpose(np.reshape(maskmem_enc, (maskmem_enc.shape[0], maskmem_enc.shape[1], maskmem_enc.shape[2]*maskmem_enc.shape[3])), (2, 0, 1))
                 # Temporal positional encoding
                 maskmem_enc = (
                     maskmem_enc + self.maskmem_tpos_enc[self.num_maskmem - t_pos - 1]
@@ -1646,25 +1641,26 @@ class SAM2VideoPredictor():
                 if len(pos_and_ptrs) > 0:
                     pos_list, ptrs_list = zip(*pos_and_ptrs)
                     # stack object pointers along dim=0 into [ptr_seq_len, B, C] shape
-                    obj_ptrs = torch.stack(ptrs_list, dim=0)
+                    obj_ptrs = np.stack(ptrs_list, axis=0)
                     # a temporal positional embedding based on how far each object pointer is from
                     # the current frame (sine embedding normalized by the max pointer num).
                     if self.add_tpos_enc_to_obj_ptrs:
                         t_diff_max = max_obj_ptrs_in_encoder - 1
                         tpos_dim = C if self.proj_tpos_enc_in_obj_ptrs else self.mem_dim
-                        obj_pos = torch.tensor(pos_list, device=device)
+                        obj_pos = pos_list
                         obj_pos = get_1d_sine_pe(obj_pos / t_diff_max, dim=tpos_dim)
                         #obj_pos = self.obj_ptr_tpos_proj(obj_pos) # identity
                         obj_pos = obj_pos.unsqueeze(1).expand(-1, B, self.mem_dim)
                     else:
-                        obj_pos = obj_ptrs.new_zeros(len(pos_list), B, self.mem_dim)
+                        obj_pos = np.zeros((len(pos_list), B, self.mem_dim))
                     if self.mem_dim < C:
                         # split a pointer into (C // self.mem_dim) tokens for self.mem_dim < C
                         obj_ptrs = obj_ptrs.reshape(
                             -1, B, C // self.mem_dim, self.mem_dim
                         )
-                        obj_ptrs = obj_ptrs.permute(0, 2, 1, 3).flatten(0, 1)
-                        obj_pos = obj_pos.repeat_interleave(C // self.mem_dim, dim=0)
+                        obj_ptrs = np.transpose(obj_ptrs, (0, 2, 1, 3))
+                        obj_ptrs = np.reshape(obj_ptrs, (obj_ptrs.shape[0] * obj_ptrs.shape[1],) + obj_ptrs.shape[2:])
+                        obj_pos = np.repeat(obj_pos, C // self.mem_dim, axis=0)
                     to_cat_memory.append(obj_ptrs)
                     to_cat_memory_pos_embed.append(obj_pos)
                     num_obj_ptr_tokens = obj_ptrs.shape[0]
@@ -1675,7 +1671,7 @@ class SAM2VideoPredictor():
             if self.directly_add_no_mem_embed:
                 # directly add no-mem embedding (instead of using the transformer encoder)
                 pix_feat_with_mem = current_vision_feats[-1] + self.no_mem_embed
-                pix_feat_with_mem = pix_feat_with_mem.permute(1, 2, 0).view(B, C, H, W)
+                pix_feat_with_mem = np.transpose(pix_feat_with_mem, (1, 2, 0)).reshape(B, C, H, W)
                 return pix_feat_with_mem
 
             # Use a dummy token on the first frame (to avoid empty memory input to tranformer encoder)
@@ -1683,34 +1679,34 @@ class SAM2VideoPredictor():
             to_cat_memory_pos_embed = [self.no_mem_pos_enc.expand(1, B, self.mem_dim)]
 
         # Step 2: Concatenate the memories and forward through the transformer encoder
-        memory = torch.cat(to_cat_memory, dim=0)
-        memory_pos_embed = torch.cat(to_cat_memory_pos_embed, dim=0)
+        memory = np.concatenate(to_cat_memory, axis=0)
+        memory_pos_embed = np.concatenate(to_cat_memory_pos_embed, axis=0)
 
         num_obj_ptr_tokens_numpy = np.array((num_obj_ptr_tokens)).astype(np.int64)
         if self.debug:
-            print("curr", np.sum(current_vision_feats[0].numpy()))
-            print("memory", np.sum(memory.numpy()))
-            print("curr_pos", np.sum(current_vision_pos_embeds[0].numpy()))
-            print("memory_pos", np.sum(memory_pos_embed.numpy()))
+            print("curr", np.sum(current_vision_feats[0]))
+            print("memory", np.sum(memory))
+            print("curr_pos", np.sum(current_vision_pos_embeds[0]))
+            print("memory_pos", np.sum(memory_pos_embed))
             print("num_obj_ptr_tokens", np.sum(num_obj_ptr_tokens_numpy))
         if self.normal:
             if self.onnx:
-                pix_feat_with_mem = memory_attention.run(None, {"curr":current_vision_feats[0].numpy(), "memory":memory.numpy(), "curr_pos":current_vision_pos_embeds[0].numpy(), "memory_pos":memory_pos_embed.numpy(), "num_obj_ptr_tokens":num_obj_ptr_tokens_numpy})
+                pix_feat_with_mem = memory_attention.run(None, {"curr":current_vision_feats[0], "memory":memory, "curr_pos":current_vision_pos_embeds[0], "memory_pos":memory_pos_embed, "num_obj_ptr_tokens":num_obj_ptr_tokens_numpy})
             else:
-                pix_feat_with_mem = memory_attention.run({"curr":current_vision_feats[0].numpy(), "memory":memory.numpy(), "curr_pos":current_vision_pos_embeds[0].numpy(), "memory_pos":memory_pos_embed.numpy(), "num_obj_ptr_tokens":num_obj_ptr_tokens_numpy})
+                pix_feat_with_mem = memory_attention.run({"curr":current_vision_feats[0], "memory":memory, "curr_pos":current_vision_pos_embeds[0], "memory_pos":memory_pos_embed, "num_obj_ptr_tokens":num_obj_ptr_tokens_numpy})
         else:
             memory_1 = memory[:-num_obj_ptr_tokens,:,:]
             memory_2 = memory[-num_obj_ptr_tokens:,:,:]
             memory_pos_embed_1 = memory_pos_embed[:-num_obj_ptr_tokens,:,:]
             memory_pos_embed_2 = memory_pos_embed[-num_obj_ptr_tokens:,:,:]
             if self.onnx:
-                pix_feat_with_mem = memory_attention.run(None, {"curr":current_vision_feats[0].numpy(), "memory_1":memory_1.numpy(), "memory_2":memory_2.numpy(), "curr_pos":current_vision_pos_embeds[0].numpy(), "memory_pos_1":memory_pos_embed_1.numpy(), "memory_pos_2":memory_pos_embed_2.numpy()})
+                pix_feat_with_mem = memory_attention.run(None, {"curr":current_vision_feats[0], "memory_1":memory_1, "memory_2":memory_2, "curr_pos":current_vision_pos_embeds[0], "memory_pos_1":memory_pos_embed_1, "memory_pos_2":memory_pos_embed_2})
             else:
-                pix_feat_with_mem = memory_attention.run({"curr":current_vision_feats[0].numpy(), "memory_1":memory_1.numpy(), "memory_2":memory_2.numpy(), "curr_pos":current_vision_pos_embeds[0].numpy(), "memory_pos_1":memory_pos_embed_1.numpy(), "memory_pos_2":memory_pos_embed_2.numpy()})
-        pix_feat_with_mem = torch.Tensor(pix_feat_with_mem[0])
+                pix_feat_with_mem = memory_attention.run({"curr":current_vision_feats[0], "memory_1":memory_1, "memory_2":memory_2, "curr_pos":current_vision_pos_embeds[0], "memory_pos_1":memory_pos_embed_1, "memory_pos_2":memory_pos_embed_2})
+        pix_feat_with_mem = pix_feat_with_mem[0]
         
         # reshape the output (HW)BC => BCHW
-        pix_feat_with_mem = pix_feat_with_mem.permute(1, 2, 0).view(B, C, H, W)
+        pix_feat_with_mem = np.transpose(pix_feat_with_mem, (1, 2, 0)).reshape(B, C, H, W)
         return pix_feat_with_mem
 
     def _encode_new_memory(
@@ -1722,11 +1718,11 @@ class SAM2VideoPredictor():
         memory_encoder
     ):
         """Encode the current image and its prediction into a memory feature."""
-        B = current_vision_feats[-1].size(1)  # batch size on this frame
+        B = current_vision_feats[-1].shape[1]  # batch size on this frame
         C = self.hidden_dim
         H, W = feat_sizes[-1]  # top-level (lowest-resolution) feature size
         # top-level feature, (HW)BC => BCHW
-        pix_feat = current_vision_feats[-1].permute(1, 2, 0).view(B, C, H, W)
+        pix_feat = np.transpose(current_vision_feats[-1], (1, 2, 0)).reshape(B, C, H, W)
         if self.non_overlap_masks_for_mem_enc and not self.training:
             # optionally, apply non-overlapping constraints to the masks (it's applied
             # in the batch dimension and should only be used during eval, where all
@@ -1737,10 +1733,10 @@ class SAM2VideoPredictor():
         # scale the raw mask logits with a temperature before applying sigmoid
         binarize = self.binarize_mask_from_pts_for_mem_enc and is_mask_from_pts
         if binarize and not self.training:
-            mask_for_mem = (pred_masks_high_res > 0).float()
+            mask_for_mem = (pred_masks_high_res > 0).astype(np.float32)
         else:
             # apply sigmoid on the raw mask logits to turn them into range (0, 1)
-            mask_for_mem = torch.sigmoid(pred_masks_high_res)
+            mask_for_mem = sigmoid(pred_masks_high_res)
         # apply scale and bias terms to the sigmoid probabilities
         if self.sigmoid_scale_for_mem_enc != 1.0:
             mask_for_mem = mask_for_mem * self.sigmoid_scale_for_mem_enc
@@ -1748,10 +1744,10 @@ class SAM2VideoPredictor():
             mask_for_mem = mask_for_mem + self.sigmoid_bias_for_mem_enc
 
         if self.onnx:
-            vision_features, vision_pos_enc = memory_encoder.run(None, {"pix_feat":pix_feat.numpy(), "masks":mask_for_mem.numpy()})
+            vision_features, vision_pos_enc = memory_encoder.run(None, {"pix_feat":pix_feat, "masks":mask_for_mem})
         else:
-            vision_features, vision_pos_enc = memory_encoder.run({"pix_feat":pix_feat.numpy(), "masks":mask_for_mem.numpy()})
-        maskmem_out = {"vision_features": torch.Tensor(vision_features), "vision_pos_enc": [torch.Tensor(vision_pos_enc)]}
+            vision_features, vision_pos_enc = memory_encoder.run({"pix_feat":pix_feat, "masks":mask_for_mem})
+        maskmem_out = {"vision_features": vision_features, "vision_pos_enc": [vision_pos_enc]}
 
         maskmem_features = maskmem_out["vision_features"]
         maskmem_pos_enc = maskmem_out["vision_pos_enc"]
@@ -1770,15 +1766,18 @@ class SAM2VideoPredictor():
 
         feat_sizes = [(x.shape[-2], x.shape[-1]) for x in vision_pos_embeds]
         # flatten NxCxHxW to HWxNxC
-        vision_feats = [x.flatten(2).permute(2, 0, 1) for x in feature_maps]
-        vision_pos_embeds = [x.flatten(2).permute(2, 0, 1) for x in vision_pos_embeds]
+        #vision_feats = [x.flatten(2).permute(2, 0, 1) for x in feature_maps]
+        #vision_pos_embeds = [x.flatten(2).permute(2, 0, 1) for x in vision_pos_embeds]
+
+        vision_feats = [np.transpose(np.reshape(x, (x.shape[0], x.shape[1], x.shape[2] * x.shape[3])), (2, 0, 1)) for x in feature_maps]
+        vision_pos_embeds = [np.transpose(np.reshape(x, (x.shape[0], x.shape[1], x.shape[2] * x.shape[3])), (2, 0, 1)) for x in vision_pos_embeds]
 
         return backbone_out, vision_feats, vision_pos_embeds, feat_sizes
 
     # sam2_base.py
     def _use_multimask(self, is_init_cond_frame, point_inputs):
         """Whether to use multimask output in the SAM head."""
-        num_pts = 0 if point_inputs is None else point_inputs["point_labels"].size(1)
+        num_pts = 0 if point_inputs is None else point_inputs["point_labels"].shape[1]
         multimask_output = (
             self.multimask_output_in_sam
             and (is_init_cond_frame or self.multimask_output_for_tracking)
@@ -1795,15 +1794,14 @@ class SAM2VideoPredictor():
         if batch_size == 1:
             return pred_masks
 
-        device = pred_masks.device
         # "max_obj_inds": object index of the object with the highest score at each location
-        max_obj_inds = torch.argmax(pred_masks, dim=0, keepdim=True)
+        max_obj_inds = np.argmax(pred_masks, axis=0, keepdim=True)
         # "batch_obj_inds": object index of each object slice (along dim 0) in `pred_masks`
-        batch_obj_inds = torch.arange(batch_size, device=device)[:, None, None, None]
+        batch_obj_inds = np.arange(batch_size)[:, None, None, None]
         keep = max_obj_inds == batch_obj_inds
         # suppress overlapping regions' scores below -10.0 so that the foreground regions
         # don't overlap (here sigmoid(-10.0)=4.5398e-05)
-        pred_masks = torch.where(keep, pred_masks, torch.clamp(pred_masks, max=-10.0))
+        pred_masks = np.where(keep, pred_masks, np.clip(pred_masks, max=-10.0))
         return pred_masks
 
     # mask_decoder.py
@@ -1812,11 +1810,11 @@ class SAM2VideoPredictor():
         Compute stability scores of the mask logits based on the IoU between upper and
         lower thresholds, similar to https://github.com/fairinternal/onevision/pull/568.
         """
-        mask_logits = mask_logits.flatten(-2)
+        mask_logits = np.reshape(mask_logits, mask_logits.shape[:-2] + (mask_logits.shape[-2] * mask_logits.shape[-1],))
         stability_delta = self.dynamic_multimask_stability_delta
-        area_i = torch.sum(mask_logits > stability_delta, dim=-1).float()
-        area_u = torch.sum(mask_logits > -stability_delta, dim=-1).float()
-        stability_scores = torch.where(area_u > 0, area_i / area_u, 1.0)
+        area_i = np.sum(mask_logits > stability_delta, axis=-1).astype(np.float32)
+        area_u = np.sum(mask_logits > -stability_delta, axis=-1).astype(np.float32)
+        stability_scores = np.where(area_u > 0, area_i / area_u, 1.0)
         return stability_scores
 
     def _dynamic_multimask_via_stability(self, all_mask_logits, all_iou_scores):
@@ -1829,14 +1827,14 @@ class SAM2VideoPredictor():
         # The best mask from multimask output tokens (1~3)
         multimask_logits = all_mask_logits[:, 1:, :, :]
         multimask_iou_scores = all_iou_scores[:, 1:]
-        best_scores_inds = torch.argmax(multimask_iou_scores, dim=-1)
-        batch_inds = torch.arange(
-            multimask_iou_scores.size(0), device=all_iou_scores.device
+        best_scores_inds = np.argmax(multimask_iou_scores, axis=-1)
+        batch_inds = np.arange(
+            multimask_iou_scores.shape[0]
         )
         best_multimask_logits = multimask_logits[batch_inds, best_scores_inds]
-        best_multimask_logits = best_multimask_logits.unsqueeze(1)
+        best_multimask_logits = np.expand_dims(best_multimask_logits, axis=1)
         best_multimask_iou_scores = multimask_iou_scores[batch_inds, best_scores_inds]
-        best_multimask_iou_scores = best_multimask_iou_scores.unsqueeze(1)
+        best_multimask_iou_scores = np.expand_dims(best_multimask_iou_scores, axis=1)
 
         # The mask from singlemask output token 0 and its stability score
         singlemask_logits = all_mask_logits[:, 0:1, :, :]
@@ -1845,13 +1843,30 @@ class SAM2VideoPredictor():
         is_stable = stability_scores >= self.dynamic_multimask_stability_thresh
 
         # Dynamically fall back to best multimask output upon low stability scores.
-        mask_logits_out = torch.where(
-            is_stable[..., None, None].expand_as(singlemask_logits),
+
+        #broadcasted_is_stable = is_stable[..., None, None].expand_as(singlemask_logits)
+
+        #broadcasted_is_stable = torch.tensor(is_stable)[..., None, None]
+        #broadcasted_is_stable = broadcasted_is_stable.expand_as(torch.tensor(singlemask_logits)).numpy()
+
+        expanded_is_stable = np.expand_dims(is_stable, axis=(-1, -2))
+        broadcasted_is_stable = np.broadcast_to(expanded_is_stable, singlemask_logits.shape)
+
+        mask_logits_out = np.where(
+            broadcasted_is_stable,
             singlemask_logits,
             best_multimask_logits,
         )
-        iou_scores_out = torch.where(
-            is_stable.expand_as(singlemask_iou_scores),
+
+        #broadcasted_is_stable = is_stable.expand_as(singlemask_iou_scores)
+
+        #broadcasted_is_stable = torch.tensor(is_stable)
+        #broadcasted_is_stable = broadcasted_is_stable.expand_as(torch.tensor(singlemask_iou_scores)).numpy()
+
+        broadcasted_is_stable = np.broadcast_to(is_stable, singlemask_iou_scores.shape)
+
+        iou_scores_out = np.where(
+            broadcasted_is_stable,
             singlemask_iou_scores,
             best_multimask_iou_scores,
         )

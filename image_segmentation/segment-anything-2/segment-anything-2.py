@@ -323,7 +323,7 @@ def process_frame(image, frame_idx, predictor, inference_state, image_encoder, p
                                                                                 mlp = mlp,
                                                                                 frame_idx = frame_idx)
 
-    image = show_mask((out_mask_logits[0] > 0.0).cpu().numpy(), image, color = np.array([30, 144, 255]), obj_id = out_obj_ids[0])
+    image = show_mask((out_mask_logits[0] > 0.0), image, color = np.array([30, 144, 255]), obj_id = out_obj_ids[0])
 
     return image
 
