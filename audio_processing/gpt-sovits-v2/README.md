@@ -24,13 +24,13 @@ python3 gpt-sovits-v2.py
 Run with audio prompt.
 
 ```
-python3 gpt-sovits-v2.py -i "ax株式会社ではAIの実用化のための技術を開発しています。" --ref_audio zundamon.wav --ref_text "ボクの名前はずんだもん。音声合成のテストを行なっています。"
+python3 gpt-sovits-v2.py -i "ax株式会社ではAIの実用化のための技術を開発しています。" --ref_audio reference_audio_captured_by_ax.wav --ref_text "水をマレーシアから買わなくてはならない。"
 ```
 
 Run for english.
 
 ```
-python3 gpt-sovits-v2.py -i "Hello world. We are testing speech synthesis." --text_language en --ref_audio zundamon.wav --ref_text "ボクの名前はずんだもん。音声合成のテストを行なっています。" --ref_language ja
+python3 gpt-sovits-v2.py -i "Hello world. We are testing speech synthesis." --text_language en --ref_audio reference_audio_captured_by_ax.wav --ref_text "水をマレーシアから買わなくてはならない。" --ref_language ja
 ```
 
 ### Reference

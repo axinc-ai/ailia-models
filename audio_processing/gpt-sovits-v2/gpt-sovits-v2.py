@@ -25,8 +25,8 @@ logger = getLogger(__name__)
 # PARAMETERS
 # ======================
 
-REF_WAV_PATH = "zundamon.wav"
-REF_TEXT = "ボクの名前はずんだもん。音声合成のテストを行なっています。"
+REF_WAV_PATH = "reference_audio_captured_by_ax.wav"
+REF_TEXT = "水をマレーシアから買わなくてはならない。"
 SAVE_WAV_PATH = "output.wav"
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/gpt-sovits-v2/"
 WEIGHT_PATH_SSL = "cnhubert.onnx"
@@ -475,10 +475,9 @@ def generate_voice(ssl, t2s_encoder, t2s_first_decoder, t2s_stage_decoder, vits)
 
     ref_audio_16k = librosa.resample(ref_audio, orig_sr=sr, target_sr=16000)
     if ref_audio_16k.shape[0] > 160000 or ref_audio_16k.shape[0] < 48000:
-        logger.error(
+        logger.warning(
             "Reference audio is outside the 3-10 second range, please choose another one!"
         )
-        exit(1)
 
     # hubertの入力のみpaddingする
     ref_audio_16k = np.concatenate([ref_audio_16k, zero_wav], axis=0)
