@@ -82,9 +82,9 @@ parser.add_argument(
 	help="Use realesrgan.",
 )
 parser.add_argument(
-    "--gui",
+    "--cui",
     action="store_true",
-    help="Display preview in GUI."
+    help="Don't display realtime preview in GUI."
 )
 args = update_parser(parser)
 
@@ -313,7 +313,7 @@ def recognize(static, ailia_net, blazeface, realesrgan):
 	else:
 		video_stream = get_capture(args.video)
 
-	show_gui = args.gui or not static
+	show_gui = not args.cui or not static
 	frame_shown = False
 	for i in range(len(mel_chunks)):
 		if static:
