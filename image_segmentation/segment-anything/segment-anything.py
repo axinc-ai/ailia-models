@@ -81,8 +81,8 @@ parser.add_argument(
     help='execute onnxruntime version.'
 )
 parser.add_argument(
-    '--gui', action='store_true',
-    help='Open mouse click GUI.'
+    '--cui', action='store_true',
+    help="Don't open mouse click GUI."
 )
 args = update_parser(parser)
 
@@ -435,7 +435,7 @@ def main():
         img_enc=img_enc,
     )
     recognize_from_image(models, args.pos, args.neg)
-    if args.gui:
+    if not args.cui:
         for image_path in args.input:
             img_path = copy.deepcopy(image_path)
             show_GUI(img_path)
