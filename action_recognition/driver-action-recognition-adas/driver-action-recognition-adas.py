@@ -38,9 +38,9 @@ IMAGE_SIZE = 224
 
 parser = get_base_parser('driver-action-recognition-adas', VIDEO_PATH, None)
 parser.add_argument(
-    '--gui',
+    '--cui',
     action='store_true',
-    help='Display preview in GUI.'
+    help="Don't display preview in GUI."
 )
 args = update_parser(parser)
 
@@ -152,7 +152,7 @@ def recognize_from_video(enc, dec):
 
         frame = render_frame(frame, display_text)
 
-        if args.gui or args.video:
+        if not args.cui or args.video:
             cv2.imshow('frame', frame)
             frame_shown = True
         else:
