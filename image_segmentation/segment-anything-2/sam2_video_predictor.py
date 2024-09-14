@@ -82,7 +82,7 @@ def concat_points(old_point_inputs, new_points, new_labels):
 def trunc_normal(size, std=0.02, a=-2, b=2):
     values = np.random.normal(loc=0., scale=std, size=size)
     values = np.clip(values, a*std, b*std)
-    return values
+    return values.astype(np.float32)
 
 def sigmoid(x):
     return 1 / (1 + np.exp(-x))
@@ -936,7 +936,7 @@ class SAM2VideoPredictor():
         )
         if backbone_out is None:
             # Cache miss -- we will run inference on a single image
-            image = np.expand_dims(inference_state["images"][frame_idx], axis=0)
+            image = np.expand_dims(inference_state["images"][frame_idx], axis=0).astype(np.float32)
 
             if self.debug:
                 print("begin image encoder onnx")
@@ -1306,12 +1306,12 @@ class SAM2VideoPredictor():
 
         # a) Handle point prompts
         if point_inputs is not None:
-            sam_point_coords = point_inputs["point_coords"]
-            sam_point_labels = point_inputs["point_labels"]
+            sam_point_coords = point_inputs["point_coords"].astype(np.float32)
+            sam_point_labels = point_inputs["point_labels"].astype(np.int32)
             assert sam_point_coords.shape[0] == B and sam_point_labels.shape[0] == B
         else:
             # If no points are provide, pad with an empty point (with label -1)
-            sam_point_coords = np.zeros((B, 1, 2))
+            sam_point_coords = np.zeros((B, 1, 2), dtype=np.float32)
             sam_point_labels = -np.ones((B, 1), dtype=np.int32)
             
         # b) Handle mask prompts
@@ -1336,11 +1336,11 @@ class SAM2VideoPredictor():
             sam_mask_prompt = None
 
         if sam_mask_prompt is None:
-            mask_input_dummy = np.zeros((1, 256, 256))
-            masks_enable = np.array([0], dtype=np.int64)
+            mask_input_dummy = np.zeros((1, 256, 256)).astype(np.float32)
+            masks_enable = np.array([0], dtype=np.int32)
         else:
-            mask_input_dummy = sam_mask_prompt
-            masks_enable = np.array([1], dtype=np.int64)
+            mask_input_dummy = sam_mask_prompt.astype(np.float32)
+            masks_enable = np.array([1], dtype=np.int32)
 
         if self.debug:
             print("begin prompt encoder onnx")
