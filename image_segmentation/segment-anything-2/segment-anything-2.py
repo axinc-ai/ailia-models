@@ -6,11 +6,8 @@ from logging import getLogger
 import numpy as np
 import cv2
 
-import ailia
-
 import os
 import numpy as np
-import ailia
 
 # import original modules
 sys.path.append('../../util')
@@ -272,6 +269,9 @@ def recognize_from_video(image_encoder, prompt_encoder, mask_decoder, memory_att
 
     frame_shown = False
 
+    if args.benchmark:
+        start = int(round(time.time() * 1000))
+
     frame_idx = 0
     while (True):
         if frame_names is None:
@@ -317,6 +317,11 @@ def recognize_from_video(image_encoder, prompt_encoder, mask_decoder, memory_att
 
         frame_shown = True
         frame_idx = frame_idx + 1
+
+    if args.benchmark:
+        end = int(round(time.time() * 1000))
+        estimation_time = (end - start)
+        logger.info(f'\ttotal processing time {estimation_time} ms')
 
     if writer is not None:
         writer.release()
@@ -401,6 +406,7 @@ def main():
         memory_encoder = onnxruntime.InferenceSession(WEIGHT_MEMORY_ENCODER_L_PATH)
         mlp = onnxruntime.InferenceSession(WEIGHT_MLP_L_PATH)
     else:
+        import ailia
         memory_mode = ailia.get_memory_mode(reduce_constant=True, ignore_input_with_initializer=True, reduce_interstage=False, reuse_interstage=True)
         image_encoder = ailia.Net(weight=WEIGHT_IMAGE_ENCODER_L_PATH, stream=MODEL_IMAGE_ENCODER_L_PATH, memory_mode=memory_mode, env_id=args.env_id)
         prompt_encoder = ailia.Net(weight=WEIGHT_PROMPT_ENCODER_L_PATH, stream=MODEL_PROMPT_ENCODER_L_PATH, memory_mode=memory_mode, env_id=args.env_id)

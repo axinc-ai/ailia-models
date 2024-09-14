@@ -17,7 +17,7 @@ class SAM2ImagePredictor:
         return values
 
     def set_image(self, image, image_encoder, onnx):
-        image = np.expand_dims(image, axis=0)
+        image = np.expand_dims(image, axis=0).astype(np.float32)
 
         if onnx:
             vision_features, vision_pos_enc_0, vision_pos_enc_1, vision_pos_enc_2, backbone_fpn_0, backbone_fpn_1, backbone_fpn_2 = image_encoder.run(None, {"input_image":image})
