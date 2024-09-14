@@ -88,7 +88,7 @@ def sigmoid(x):
     return 1 / (1 + np.exp(-x))
 
 def interpolate(low_res_multimasks, image_size):
-    high_res_multimasks = np.zeros((low_res_multimasks.shape[0], low_res_multimasks.shape[1], image_size[0], image_size[1]))
+    high_res_multimasks = np.zeros((low_res_multimasks.shape[0], low_res_multimasks.shape[1], image_size[0], image_size[1]), dtype=np.float32)
     for b in range(low_res_multimasks.shape[0]):
         for c in range(low_res_multimasks.shape[1]):
             high_res_multimasks[b][c] = cv2.resize(low_res_multimasks[b][c], (image_size[1], image_size[0]), high_res_multimasks, interpolation=cv2.INTER_LINEAR)
@@ -1688,7 +1688,7 @@ class SAM2VideoPredictor():
                         #obj_pos = self.obj_ptr_tpos_proj(obj_pos) # identity
                         obj_pos = obj_pos.unsqueeze(1).expand(-1, B, self.mem_dim)
                     else:
-                        obj_pos = np.zeros((len(pos_list), B, self.mem_dim))
+                        obj_pos = np.zeros((len(pos_list), B, self.mem_dim), dtype=np.float32)
                     if self.mem_dim < C:
                         # split a pointer into (C // self.mem_dim) tokens for self.mem_dim < C
                         obj_ptrs = obj_ptrs.reshape(
