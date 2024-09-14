@@ -1336,7 +1336,7 @@ class SAM2VideoPredictor():
             sam_mask_prompt = None
 
         if sam_mask_prompt is None:
-            mask_input_dummy = np.zeros((1, 256, 256)).astype(np.float32)
+            mask_input_dummy = np.zeros((1, 256, 256), dtype=np.float32)
             masks_enable = np.array([0], dtype=np.int32)
         else:
             mask_input_dummy = sam_mask_prompt.astype(np.float32)
@@ -1520,7 +1520,7 @@ class SAM2VideoPredictor():
         if not self.use_obj_ptrs_in_encoder:
             # all zeros as a dummy object pointer (of shape [B, C])
             obj_ptr = np.zeros(
-                (mask_inputs.size(0), self.hidden_dim)
+                (mask_inputs.size(0), self.hidden_dim), dtype=np.float32
             )
         else:
             # produce an object pointer using the SAM decoder from the mask input
