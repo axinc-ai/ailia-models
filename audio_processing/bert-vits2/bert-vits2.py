@@ -1,5 +1,7 @@
 import time
 import sys
+import os
+import shutil
 
 import numpy as np
 import librosa
@@ -7,7 +9,7 @@ import librosa
 import ailia  # noqa: E402
 sys.path.append('../../util')
 from arg_utils import get_base_parser, update_parser  # noqa: E402
-from model_utils import check_and_download_models  # noqa: E402
+from model_utils import check_and_download_models, check_and_download_file  # noqa: E402
 
 from vits2utils import text_normalize, g2p, intersperse, text2sep_kata, cleaned_text_to_sequence
 from clap_feature_extraction import feature_extractor
@@ -17,7 +19,6 @@ from logging import getLogger   # noqa: E402
 logger = getLogger(__name__)
 
 from scipy.io.wavfile import write
-from transformers import AutoTokenizer
 
 
 # ======================
@@ -62,6 +63,12 @@ parser.add_argument(
     type=int,
     default=340,
     help='Speaker ID'
+)
+
+parser.add_argument(
+    '--disable_ailia_tokenizer',
+    action='store_true',
+    help='disable ailia tokenizer.'
 )
 
 args = update_parser(parser)
@@ -290,20 +297,31 @@ def infer(models):
 
 def main():
     # load models
-    bert_tokenizer = AutoTokenizer.from_pretrained("ku-nlp/deberta-v2-large-japanese-char-wwm")
-    clap_tokenizer = AutoTokenizer.from_pretrained('laion/clap-htsat-fused')
+    if args.disable_ailia_tokenizer:
+        from transformers import AutoTokenizer
+        bert_tokenizer = AutoTokenizer.from_pretrained("ku-nlp/deberta-v2-large-japanese-char-wwm")
+        clap_tokenizer = AutoTokenizer.from_pretrained('laion/clap-htsat-fused')
+    else:
+        # Originally it is Juman++, but because it is a char tokenizer, any previous Japanese word segmentation should work.
+        import ailia_tokenizer
+        DICT_REMOTE_PATH = "https://storage.googleapis.com/ailia-models/bert_maskedlm/"
+        check_and_download_file("unidic-lite.zip", DICT_REMOTE_PATH)
+        if not os.path.exists("unidic-lite"):
+            shutil.unpack_archive('unidic-lite.zip', '')
+        bert_tokenizer = ailia_tokenizer.BertJapaneseCharacterTokenizer.from_pretrained(dict_path = 'unidic-lite', pretrained_model_name_or_path = "./tokenizer/deberta-v2-large-japanese-char-wwm")
+        clap_tokenizer = ailia_tokenizer.RobertaTokenizer.from_pretrained('./tokenizer/clap-htsat-fused')
     models = {'bert_tokenizer': bert_tokenizer,'clap_tokenizer': clap_tokenizer}
+
+    #disable FP16
+    if "FP16" in ailia.get_environment(args.env_id).props or sys.platform == 'Darwin':
+        logger.error('This model do not work on FP16, use CPU instead.')
+        args.env_id = 0
 
     for m in MODEL_NAMES:
         check_and_download_models(
             PATHS[m], MODEL_PATHS[m], REMOTE_PATH
         )
         models[m] = ailia.Net(MODEL_PATHS[m], PATHS[m], args.env_id)
-    
-    #disable FP16
-    if "FP16" in ailia.get_environment(args.env_id).props or sys.platform == 'Darwin':
-        logger.error('This model do not work on FP16, use CPU instead.')
-        exit()
     
     infer(models)
 
