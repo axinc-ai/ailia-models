@@ -71,6 +71,12 @@ The collection of pre-trained, state-of-the-art AI models.
 | [hifigan](/audio_processing/hifigan/) | [HiFi-GAN](https://github.com/jik876/hifi-gan) | Pytorch | 1.2.9 and later |  |
 | [deep music enhancer](/audio_processing/deep-music-enhancer/) | [On Filter Generalization for Music Bandwidth Extension Using Deep Neural Networks](https://github.com/serkansulun/deep-music-enhancer) | Pytorch | 1.2.6 and later | |
 
+### Music generation
+
+| Model | Reference | Exported From | Supported Ailia Version | Blog |
+|------------:|:------------:|:------------:|:------------:|:------------:|
+| [pytorch_wavenet](/audio_processing/pytorch_wavenet/) | [pytorch_wavenet](https://github.com/vincentherrmann/pytorch-wavenet) | Pytorch | 1.2.14 and later |  |
+
 ### Noise reduction
 
 | Model | Reference | Exported From | Supported Ailia Version | Blog |
