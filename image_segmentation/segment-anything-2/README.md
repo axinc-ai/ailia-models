@@ -43,9 +43,10 @@ For the webcam,
 $ python3 segment-anything-2.py -v 0 --pos 960 540
 ```
 
-Improve performance,
+By default, the ailia SDK is used. If you want to use ONNX Runtime, use the --onnx option.
+
 ```bash
-$ python3 segment-anything-2.py -v 0 --num_mask_mem 2 --max_obj_ptrs_in_encoder 2
+$ python3 segment-anything-2.py --onnx
 ```
 
 If you want to specify the input image, put the image path after the `--input` option.  
@@ -81,6 +82,11 @@ $ python3 segment-anything-2.py --box 425 600 700 875 --neg 575 750
 By adding the `--model_type` option, you can specify model type which is selected from "hiera_l",  "hiera_b+",  "hiera_s", and "hiera_t". (default is hiera_l)
 ```bash
 $ python3 segment-anything-2.py --model_type hiera_l
+```
+
+To improve the performance of MemoryAttention, you can also reduce the number of reference images in past frames, which is num_mask_mem.
+```bash
+$ python3 segment-anything-2.py -v 0 --num_mask_mem 2 --max_obj_ptrs_in_encoder 2
 ```
 
 ## Reference
