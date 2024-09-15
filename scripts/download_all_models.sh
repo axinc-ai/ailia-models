@@ -37,6 +37,8 @@ cd ../../audio_processing/kotoba-whisper/; python3 kotoba-whisper.py ${OPTION}
 cd ../../audio_processing/reazon_speech/; python3 reazon_speech.py ${OPTION}
 cd ../../audio_processing/reazon_speech2/; python3 reazon_speech2.py ${OPTION}
 cd ../../audio_processing/gpt-sovits/; python3 gpt-sovits.py ${OPTION}
+cd ../../audio_processing/gpt-sovits-v2/; python3 gpt-sovits-v2.py ${OPTION}
+cd ../../audio_processing/bert-vits2/; python3 bert-vits2.py ${OPTION}
 cd ../../audio_processing/dtln/; python3 dtln.py ${OPTION}
 cd ../../background_ramoval/deep-image-matting; python3 deep-image-matting.py ${OPTION}
 cd ../../background_ramoval/u2net; python3 u2net.py ${OPTION}
@@ -113,7 +115,9 @@ cd ../../face_recognition/3ddfa; python3 3ddfa$.py ${OPTION}
 cd ../../face_recognition/mivolo; python3 mivolo.py ${OPTION}
 cd ../../face_recognition/l2cs_net; python3 l2cs_net.py ${OPTION}
 cd ../../face_restoration/codeformer; python3 codeformer.py ${OPTION}
+cd ../../face_restoration/gfpgan; python3 gfpgan.py ${OPTION}
 cd ../../face_swapping/facefusion; python3 facefusion.py ${OPTION}
+cd ../../face-swapping/sber-swap; python3 sber-swap.py ${OPTION}
 cd ../../frame_interpolation/flavr; python3 flavr.py ${OPTION}
 cd ../../frame_interpolation/cain; python3 cain.py ${OPTION}
 cd ../../frame_interpolation/film; python3 film.py ${OPTION}
@@ -123,8 +127,6 @@ cd ../../generative_adversarial_networks/pytorch-gan; python3 pytorch-gan.py ${O
 cd ../../generative_adversarial_networks/restyle-encoder; python3 restyle-encoder.py ${OPTION}
 cd ../../generative_adversarial_networks/sam; python3 sam.py ${OPTION}
 cd ../../generative_adversarial_networks/psgan; python3 psgan.py ${OPTION}
-cd ../../generative_adversarial_networks/gfpgan; python3 gfpgan.py ${OPTION}
-cd ../../generative_adversarial_networks/sber-swap; python3 sber-swap.py ${OPTION}
 cd ../../generative_adversarial_networks/encoder4editing; python3 encoder4editing.py ${OPTION}
 cd ../../generative_adversarial_networks/lipgan; python3 lipgan.py ${OPTION}
 cd ../../hand_detection/yolov3-hand; python3 yolov3-hand.py ${OPTION}
@@ -204,6 +206,7 @@ cd ../../image_segmentation/segment-anything; python3 segment-anything.py ${OPTI
 cd ../../image_segmentation/tusimple-DUC; python3 tusimple_DUC.py ${OPTION}
 cd ../../image_segmentation/pytorch-fcn; python3 pytorch-fcn.py ${OPTION}
 cd ../../image_segmentation/grounded_sam; python3 grounded_sam.py ${OPTION}
+cd ../../image_segmentation/segment-anything-2; python3 segment-anything-2.py ${OPTION}
 cd ../../large_language_model/llava; python3 llava.py ${OPTION}
 cd ../../landmark_classification/landmarks_classifier_asia; python3 landmarks_classifier_asia.py ${OPTION}
 cd ../../landmark_classification/places365; python3 places365.py ${OPTION}

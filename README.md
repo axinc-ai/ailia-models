@@ -15,9 +15,12 @@ The collection of pre-trained, state-of-the-art AI models.
 [ailia MODELS tutorial 日本語版](TUTORIAL_jp.md)
 
 # Supported models
-351 models as of August 16th, 2024
+353 models as of September 10th, 2024
 
 # Latest update
+- 2024.09.10 Add segment-anything-2 (video mode)
+- 2024.08.27 Add segment-anything-2 (image mode)
+- 2024.08.20 Add bert_ner_japanese
 - 2024.08.16 Add latent-consistency-model-txt2img, fbcnn
 - 2024.08.15 Add volo, elegant, depth_anything, drbn_skf, codeformer, dtln
 - 2024.08.10 Add TripoSR, japanese-reranker-cross-encoder
@@ -116,7 +119,9 @@ The collection of pre-trained, state-of-the-art AI models.
 | [pytorch-dc-tts](/audio_processing/pytorch-dc-tts/) | [Efficiently Trainable Text-to-Speech System Based on Deep Convolutional Networks with Guided Attention](https://github.com/tugstugi/pytorch-dc-tts) | Pytorch | 1.2.6 and later | Oct 2017 |  [EN](https://medium.com/axinc-ai/pytorchdctts-a-machine-learning-model-for-text-to-speech-synthesis-2273e269b480) [JP](https://medium.com/axinc/pytorchdctts-%E3%83%86%E3%82%AD%E3%82%B9%E3%83%88%E3%81%8B%E3%82%89%E9%9F%B3%E5%A3%B0%E5%90%88%E6%88%90%E3%82%92%E8%A1%8C%E3%81%86%E6%A9%9F%E6%A2%B0%E5%AD%A6%E7%BF%92%E3%83%A2%E3%83%87%E3%83%AB-dcb5eb07c883) |
 | [tacotron2](/audio_processing/tacotron2/) | [Tacotron2](https://github.com/NVIDIA/tacotron2) | Pytorch | 1.2.15 and later | Feb 2018 | [JP](https://medium.com/axinc/tacotron2-%E6%B3%A2%E5%BD%A2%E5%A4%89%E6%8F%9B%E3%82%92ai%E3%81%A7%E8%A1%8C%E3%81%86%E9%AB%98%E5%93%81%E8%B3%AA%E3%81%AA%E9%9F%B3%E5%A3%B0%E5%90%88%E6%88%90%E3%83%A2%E3%83%87%E3%83%AB-bc592217a399) |
 | [vall-e-x](/audio_processing/vall-e-x/) | [VALL-E-X](https://github.com/Plachtaa/VALL-E-X) | Pytorch | 1.2.15 and later | Mar 2023 | [JP](https://medium.com/axinc/vall-e-x-%E5%86%8D%E5%AD%A6%E7%BF%92%E4%B8%8D%E8%A6%81%E3%81%A7%E5%A3%B0%E8%B3%AA%E3%82%92%E5%A4%89%E6%9B%B4%E3%81%A7%E3%81%8D%E3%82%8B%E9%9F%B3%E5%A3%B0%E5%90%88%E6%88%90%E3%83%A2%E3%83%87%E3%83%AB-977efc19ac84) |
+| [Bert-VITS2](/audio_processing/bert-vits2/) | [Bert-VITS2](https://github.com/fishaudio/Bert-VITS2) | Pytorch | 1.2.16 and later | Aug 2023|
 | [gpt-sovits](/audio_processing/gpt-sovits/) | [GPT-SoVITS](https://github.com/RVC-Boss/GPT-SoVITS) | Pytorch | 1.4.0 and later | Feb 2024 | [JP](https://medium.com/axinc/gpt-sovits-%E3%83%95%E3%82%A1%E3%82%A4%E3%83%B3%E3%83%81%E3%83%A5%E3%83%BC%E3%83%8B%E3%83%B3%E3%82%B0%E3%81%A7%E3%81%8D%E3%82%8B0%E3%82%B7%E3%83%A7%E3%83%83%E3%83%88%E3%81%AE%E9%9F%B3%E5%A3%B0%E5%90%88%E6%88%90%E3%83%A2%E3%83%87%E3%83%AB-2212eeb5ad20) |
+| [gpt-sovits-v2](/audio_processing/gpt-sovits-v2/) | [GPT-SoVITS](https://github.com/RVC-Boss/GPT-SoVITS) | Pytorch | 1.4.0 and later | Aug 2024 |  |
 
 ### Voice activity detection
 
@@ -286,14 +291,14 @@ The collection of pre-trained, state-of-the-art AI models.
 
 | | Model | Reference | Exported From | Supported Ailia Version | Blog |
 |:-----------|------------:|:------------:|:------------:|:------------:|:------------:|
-| [<img src="generative_adversarial_networks/gfpgan/out_03.png" width=128px>](generative_adversarial_networks/gfpgan/) | [gfpgan](/generative_adversarial_networks/gfpgan)| [GFP-GAN: Towards Real-World Blind Face Restoration with Generative Facial Prior](https://github.com/TencentARC/GFPGAN)| Pytorch | 1.2.10 and later | [JP](https://medium.com/axinc/gfpgan-%E9%A1%94%E7%94%BB%E5%83%8F%E3%82%92%E9%AB%98%E7%94%BB%E8%B3%AA%E5%8C%96%E3%81%99%E3%82%8B%E6%A9%9F%E6%A2%B0%E5%AD%A6%E7%BF%92%E3%83%A2%E3%83%87%E3%83%AB-547acd717086) |
+| [<img src="face_restoration/gfpgan/out_03.png" width=128px>](face_restoration/gfpgan/) | [gfpgan](/face_restoration/gfpgan)| [GFP-GAN: Towards Real-World Blind Face Restoration with Generative Facial Prior](https://github.com/TencentARC/GFPGAN)| Pytorch | 1.2.10 and later | [JP](https://medium.com/axinc/gfpgan-%E9%A1%94%E7%94%BB%E5%83%8F%E3%82%92%E9%AB%98%E7%94%BB%E8%B3%AA%E5%8C%96%E3%81%99%E3%82%8B%E6%A9%9F%E6%A2%B0%E5%AD%A6%E7%BF%92%E3%83%A2%E3%83%87%E3%83%AB-547acd717086) |
 | [<img src="face_restoration/codeformer/output.png" width=128px>](face_restoration/codeformer/) | [codeformer](/face_restoration/codeformer/) | [CodeFormer: Towards Robust Blind Face Restoration with Codebook Lookup Transformer](https://github.com/sczhou/CodeFormer) | Pytorch | 1.2.9 and later |
 
 ## Face swapping
 
 | | Model | Reference | Exported From | Supported Ailia Version | Blog |
 |:-----------|------------:|:------------:|:------------:|:------------:|:------------:|
-| [<img src="generative_adversarial_networks/sber-swap/output.png" width=128px>](generative_adversarial_networks/sber-swap/) | [sber-swap](/generative_adversarial_networks/sber-swap/) | [SberSwap](https://github.com/ai-forever/sber-swap) | Pytorch | 1.2.12 and later | |
+| [<img src="face_swapping/sber-swap/output.png" width=128px>](face_swapping/sber-swap/) | [sber-swap](/face_swapping/sber-swap/) | [SberSwap](https://github.com/ai-forever/sber-swap) | Pytorch | 1.2.12 and later | [JP](https://medium.com/axinc/sberswap-ai%E3%81%AB%E3%82%88%E3%82%8B%E9%AB%98%E7%B2%BE%E5%BA%A6%E3%81%AAfaceswap-bddae3b8ff84) |
 | [<img src="face_swapping/facefusion/output.png" width=128px>](face_swapping/facefusion/) | [facefusion](/face_swapping/facefusion/) | [FaceFusion](https://github.com/facefusion/facefusion) | ONNXRuntime | 1.2.10 and later |
 
 ## Frame Interpolation
@@ -444,6 +449,7 @@ The collection of pre-trained, state-of-the-art AI models.
 | [<img src="image_segmentation/tusimple-DUC/output.png" width=128px>](image_segmentation/tusimple-DUC/) | [tusimple-DUC](/image_segmentation/tusimple-DUC/) | [TuSimple-DUC](https://github.com/TuSimple/TuSimple-DUC) | Pytorch | 1.2.10 and later |  |
 | [<img src="image_segmentation/pytorch-fcn/result.jpg" width=128px>](image_segmentation/pytorch-fcn/) | [pytorch-fcn](/image_segmentation/pytorch-fcn/) | [pytorch-fcn](https://github.com/wkentaro/pytorch-fcn) | Pytorch | 1.3.0 and later |
 | [<img src="image_segmentation/grounded_sam/output.png" width=128px>](image_segmentation/grounded_sam/) | [grounded_sam](/image_segmentation/grounded_sam/) | [Grounded-SAM](https://github.com/IDEA-Research/Grounded-Segment-Anything/tree/main) | Pytorch | 1.2.16 and later |
+| [<img src="image_segmentation/segment-anything-2/output.png" width=128px>](image_segmentation/segment-anything-2/) | [segment-anything-2](/image_segmentation/segment-anything-2/) | [Segment Anything 2](https://github.com/facebookresearch/segment-anything-2) | Pytorch | 1.2.16 and later |
 
 ## Large Language Model
 
