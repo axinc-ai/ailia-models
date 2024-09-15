@@ -34,7 +34,7 @@ SAVE_WAVE_PATH = "output.wav"
 parser = get_base_parser(
     "pytorch_wavenet", SAMPLE_WAVE_PATH, SAVE_WAVE_PATH, input_ftype="audio"
 )
-parser.add_argument("--num_samples", type=float, default=160000, help="num_samples")
+parser.add_argument("--num_samples", type=float, default=16000, help="num_samples")
 parser.add_argument("--temperature", type=float, default=1.0, help="temperature")
 parser.add_argument(
     "--no_input", action="store_true", default=False, help="not sample input"
