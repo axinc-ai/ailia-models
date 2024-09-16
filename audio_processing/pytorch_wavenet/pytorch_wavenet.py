@@ -107,7 +107,7 @@ def generate_wave(net, num_samples, first_samples=None, temperature=1.0):
 
     # generate new samples
     generated = np.array([])
-    for i in range(num_samples):
+    for i in range(int(num_samples)):
         x, dilated_queues = _inference(net, input, dilated_queues)
         x = x.squeeze()
 
