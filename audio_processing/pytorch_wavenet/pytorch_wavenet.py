@@ -42,6 +42,10 @@ parser.add_argument(
 parser.add_argument(
     "--onnx", action="store_true", default=False, help="Use onnxruntime"
 )
+parser.add_argument(
+    '--seed', default=1000, type=int,
+    help='random seed'
+)
 args = update_parser(parser)
 
 
@@ -193,4 +197,5 @@ def main():
 
 
 if __name__ == "__main__":
+    np.random.seed(args.seed)
     main()
