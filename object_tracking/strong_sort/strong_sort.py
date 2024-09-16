@@ -90,9 +90,9 @@ parser.add_argument(
     help='model type'
 )
 parser.add_argument(
-    '--gui',
+    '--cui',
     action='store_true',
-    help='Display preview in GUI.'
+    help="Don't display preview in GUI."
 )
 # tracking args
 parser.add_argument('--min-box-area', type=float, default=10, help='filter out tiny boxes')
@@ -328,7 +328,7 @@ def recognize_from_video(mod):
         res_img = frame_vis_generator(frame, online_tlwhs, online_ids)
 
         # show
-        if args.gui or args.video:
+        if not args.cui or args.video:
             cv2.imshow('frame', res_img)
             frame_shown = True
         else:

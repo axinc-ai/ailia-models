@@ -81,6 +81,11 @@ parser.add_argument(
 	action="store_true",
 	help="Use realesrgan.",
 )
+parser.add_argument(
+    "--cui",
+    action="store_true",
+    help="Don't display realtime preview in GUI."
+)
 args = update_parser(parser)
 
 # ======================
@@ -308,6 +313,7 @@ def recognize(static, ailia_net, blazeface, realesrgan):
 	else:
 		video_stream = get_capture(args.video)
 
+	show_gui = not args.cui or not static
 	frame_shown = False
 	for i in range(len(mel_chunks)):
 		if static:
@@ -320,7 +326,7 @@ def recognize(static, ailia_net, blazeface, realesrgan):
 			frames = [frame]
 			full_frames = frames
 
-		if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+		if (show_gui and (cv2.waitKey(1) & 0xFF == ord('q'))) or not ret:
 			break
 		if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
 			break
@@ -330,18 +336,25 @@ def recognize(static, ailia_net, blazeface, realesrgan):
 			out = cv2.VideoWriter(args.savepath, 
 									cv2.VideoWriter_fourcc(*'mp4v'), fps, (frame_w, frame_h))
 
-
 		f = infer(frame, mel_chunks[i], ailia_net, blazeface, realesrgan)
 		out.write(f)
 
-		cv2.imshow("frame", f)
-		frame_shown = True
+		if show_gui:
+			cv2.imshow("frame", f)
+			frame_shown = True
+		else:
+			end_char = "\n" if (i == len(mel_chunks) - 1) else ""
+			print(f"\rProcessed frame: {i}", end=end_char)
 
 	out.release()
 
+	if show_gui:
+		cv2.destroyAllWindows()
 	if args.merge_audio:
 		command = 'ffmpeg -i {} -i {} -strict -2 -q:v 1 {}'.format(args.audio, args.savepath, args.savepath + '_audio.mp4')
 		subprocess.call(command, shell=True)
+
+	logger.info('Script finished successfully.')
 
 def main():
 	# Check model files and download

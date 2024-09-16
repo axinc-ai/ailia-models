@@ -91,9 +91,9 @@ parser.add_argument(
     help='choice class'
 )
 parser.add_argument(
-    '--gui',
+    '--skip_plot',
     action='store_true',
-    help='Operate the detection result with GUI'
+    help='Skip showing 3D plot of result (for CUI)'
 )
 parser.add_argument(
     '-w', '--write_json',
@@ -211,7 +211,7 @@ def recognize_from_points(filename, net_seg, net_cls):
     logger.info(f'saved at : {savepath}')
 
     plt.savefig(savepath, dpi=120)
-    if args.gui:
+    if not args.skip_plot:
         plt.show()
         
     if args.write_json:
