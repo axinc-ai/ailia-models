@@ -77,12 +77,67 @@ def preprocess(img):
     return img
 
 
+def construct_prompts(text):
+    task_prompts_without_inputs = {
+        "<OCR>": "What is the text in the image?",
+        "<OCR_WITH_REGION>": "What is the text in the image, with regions?",
+        "<CAPTION>": "What does the image describe?",
+        "<DETAILED_CAPTION>": "Describe in detail what is shown in the image.",
+        "<MORE_DETAILED_CAPTION>": "Describe with a paragraph what is shown in the image.",
+        "<OD>": "Locate the objects with category name in the image.",
+        "<DENSE_REGION_CAPTION>": "Locate the objects in the image, with their descriptions.",
+        "<REGION_PROPOSAL>": "Locate the region proposals in the image.",
+    }
+    task_prompts_with_input = {
+        "<CAPTION_TO_PHRASE_GROUNDING>": "Locate the phrases in the caption: {input}",
+        "<REFERRING_EXPRESSION_SEGMENTATION>": "Locate {input} in the image with mask",
+        "<REGION_TO_SEGMENTATION>": "What is the polygon mask of region {input}",
+        "<OPEN_VOCABULARY_DETECTION>": "Locate {input} in the image.",
+        "<REGION_TO_CATEGORY>": "What is the region {input}?",
+        "<REGION_TO_DESCRIPTION>": "What does the region {input} describe?",
+        "<REGION_TO_OCR>": "What text is in the region {input}?",
+    }
+
+    # replace the task tokens with the task prompts if task token is in the text
+    prompts = []
+    for _text in text:
+        # 1. fixed task prompts without additional inputs
+        for task_token, task_prompt in task_prompts_without_inputs.items():
+            if task_token in _text:
+                assert (
+                    _text == task_token
+                ), f"Task token {task_token} should be the only token in the text."
+                _text = task_prompt
+                break
+        # 2. task prompts with additional inputs
+        for task_token, task_prompt in task_prompts_with_input.items():
+            if task_token in _text:
+                _text = task_prompt.format(input=_text.replace(task_token, ""))
+                break
+        prompts.append(_text)
+
+    return prompts
+
+
 def predict(models, img, task_prompt, text_input=None):
     img = img[:, :, ::-1]  # BGR -> RGB
-    preprocess(img)
+    pixel_values = preprocess(img)
 
-    input_ids = np.load("input_ids.npy")
-    pixel_values = np.load("pixel_values.npy")
+    if text_input is None:
+        prompt = task_prompt
+    else:
+        prompt = task_prompt + text_input
+    text = construct_prompts([prompt])
+
+    tokenizer = models["tokenizer"]
+    inputs = tokenizer(
+        text,
+        return_tensors="np",
+        padding=False,
+        return_token_type_ids=False,
+    )
+    input_ids = inputs["input_ids"]
+    attention_mask = inputs["attention_mask"]
 
     # Extra the input embeddings
     net = models["embedding"]
@@ -99,12 +154,18 @@ def predict(models, img, task_prompt, text_input=None):
     else:
         output = net.run(None, {"pixel_values": pixel_values})
     image_features = output[0]
+    inputs_embeds = np.concatenate([image_features, inputs_embeds], axis=1)
+
+    attention_mask = np.ones(inputs_embeds.shape[:2], dtype=int)
+
     net = models["encoder"]
     if not args.onnx:
-        output = net.predict([pixel_values])
+        output = net.predict([inputs_embeds, attention_mask])
     else:
-        output = net.run(None, {"pixel_values": pixel_values})
-    embeds = output[0]
+        output = net.run(
+            None, {"inputs_embeds": inputs_embeds, "attention_mask": attention_mask}
+        )
+    last_hidden_state = output[0]
 
 
 def recognize_from_image(models):
@@ -193,22 +254,20 @@ def main():
             WEIGHT_DEC_BASE_PATH, providers=providers
         )
 
-    # if args.disable_ailia_tokenizer:
-    #     import transformers
+    args.disable_ailia_tokenizer = True
+    if args.disable_ailia_tokenizer:
+        import transformers
 
-    #     tokenizer = transformers.CLIPTokenizer.from_pretrained("./tokenizer")
-    #     tokenizer_2 = transformers.CLIPTokenizer.from_pretrained("./tokenizer_2")
-    # else:
-    #     from ailia_tokenizer import CLIPTokenizer
-
-    #     tokenizer = CLIPTokenizer.from_pretrained()
+        tokenizer = transformers.BartTokenizerFast.from_pretrained("./tokenizer")
+    else:
+        raise NotImplementedError("ailia tokenizer is not supported yet.")
 
     models = {
+        "tokenizer": tokenizer,
         "embedding": embedding,
         "encode_image": encode_image,
         "encoder": encoder,
         "decoder": decoder,
-        # "tokenizer": tokenizer,
     }
 
     # generate
