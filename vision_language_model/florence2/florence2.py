@@ -8,6 +8,7 @@ from logging import getLogger  # noqa
 import numpy as np
 import cv2
 from PIL import Image
+from scipy.special import log_softmax
 
 import ailia
 
@@ -17,6 +18,8 @@ from arg_utils import get_base_parser, update_parser, get_savepath  # noqa
 from model_utils import check_and_download_models, check_and_download_file  # noqa
 from image_utils import normalize_image  # noqa
 from detector_utils import load_image  # noqa
+
+from logit_process import logits_processor
 
 
 logger = getLogger(__name__)
@@ -119,6 +122,86 @@ def construct_prompts(text):
     return prompts
 
 
+def decode(
+    net,
+    input_ids: np.ndarray,
+    encoder_hidden_states: np.ndarray,
+    past_key_values: List[np.ndarray],
+):
+    if not args.onnx:
+        decoder_output = net.predict(
+            [input_ids, encoder_hidden_states, *past_key_values]
+        )
+    else:
+        decoder_output = net.run(
+            None,
+            {
+                "input_ids": input_ids,
+                "encoder_hidden_states": encoder_hidden_states,
+                "past_key_values.0.decoder.key": past_key_values[0],
+                "past_key_values.0.decoder.value": past_key_values[1],
+                "past_key_values.0.encoder.key": past_key_values[2],
+                "past_key_values.0.encoder.value": past_key_values[3],
+                "past_key_values.1.decoder.key": past_key_values[4],
+                "past_key_values.1.decoder.value": past_key_values[5],
+                "past_key_values.1.encoder.key": past_key_values[6],
+                "past_key_values.1.encoder.value": past_key_values[7],
+                "past_key_values.2.decoder.key": past_key_values[8],
+                "past_key_values.2.decoder.value": past_key_values[9],
+                "past_key_values.2.encoder.key": past_key_values[10],
+                "past_key_values.2.encoder.value": past_key_values[11],
+                "past_key_values.3.decoder.key": past_key_values[12],
+                "past_key_values.3.decoder.value": past_key_values[13],
+                "past_key_values.3.encoder.key": past_key_values[14],
+                "past_key_values.3.encoder.value": past_key_values[15],
+                "past_key_values.4.decoder.key": past_key_values[16],
+                "past_key_values.4.decoder.value": past_key_values[17],
+                "past_key_values.4.encoder.key": past_key_values[18],
+                "past_key_values.4.encoder.value": past_key_values[19],
+                "past_key_values.5.decoder.key": past_key_values[20],
+                "past_key_values.5.decoder.value": past_key_values[21],
+                "past_key_values.5.encoder.key": past_key_values[22],
+                "past_key_values.5.encoder.value": past_key_values[23],
+            },
+        )
+
+    logits, new_past_key_values = decoder_output[0], decoder_output[1:]
+
+    return logits, new_past_key_values
+
+
+def greedy_search(net, encoder_hidden_states):
+    bos_token_id = 2
+    # eos_token_id = np.array([50118])
+
+    num_beams = 3
+
+    input_ids = np.ones((num_beams, 1), dtype=int) * bos_token_id
+    encoder_hidden_states = np.repeat(encoder_hidden_states, repeats=num_beams, axis=0)
+    past_key_values = [np.zeros((num_beams, 12, 0, 64), dtype=np.float16)] * 24
+
+    # keep track of which sequences are already finished
+    unfinished_sequences = np.ones(input_ids.shape[0], dtype=int)
+
+    this_peer_finished = False  # used by synced_gpus only
+    while True:
+        logits, past_key_values = decode(
+            net,
+            input_ids,
+            encoder_hidden_states,
+            past_key_values,
+        )
+
+        next_token_logits = logits[:, -1, :]
+        next_token_scores = log_softmax(next_token_logits, axis=-1)
+
+        next_token_scores_processed = logits_processor(input_ids, next_token_scores)
+        if this_peer_finished:
+            break
+
+    return input_ids
+
+
 def predict(models, img, task_prompt, text_input=None):
     img = img[:, :, ::-1]  # BGR -> RGB
     pixel_values = preprocess(img)
@@ -166,6 +249,9 @@ def predict(models, img, task_prompt, text_input=None):
             None, {"inputs_embeds": inputs_embeds, "attention_mask": attention_mask}
         )
     last_hidden_state = output[0]
+
+    net = models["decoder"]
+    generated_ids = greedy_search(net, last_hidden_state)
 
 
 def recognize_from_image(models):
