@@ -456,7 +456,7 @@ The collection of pre-trained, state-of-the-art AI models.
 | [<img src="image_segmentation/pytorch-fcn/result.jpg" width=128px>](image_segmentation/pytorch-fcn/) | [pytorch-fcn](/image_segmentation/pytorch-fcn/) | [pytorch-fcn](https://github.com/wkentaro/pytorch-fcn) | Pytorch | 1.3.0 and later |
 | [<img src="image_segmentation/grounded_sam/output.png" width=128px>](image_segmentation/grounded_sam/) | [grounded_sam](/image_segmentation/grounded_sam/) | [Grounded-SAM](https://github.com/IDEA-Research/Grounded-Segment-Anything/tree/main) | Pytorch | 1.2.16 and later |
 | [<img src="image_segmentation/segment-anything-2/output.png" width=128px>](image_segmentation/segment-anything-2/) | [segment-anything-2](/image_segmentation/segment-anything-2/) | [Segment Anything 2](https://github.com/facebookresearch/segment-anything-2) | Pytorch | 1.2.16 and later |
-
+| [<img src="image_segmentation/MobileSAM/example/output1.png" width=128px>](image_segmentation/MobileSAM) | [MobileSAM](/image_segmentation/MobileSAM/) | [MobileSAM](https://github.com/ChaoningZhang/MobileSAM) | Pytorch | 1.2.16 and later |
 ## Large Language Model
 
 | Model | Reference | Exported From | Supported Ailia Version | Blog |
