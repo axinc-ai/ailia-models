@@ -15,9 +15,11 @@ The collection of pre-trained, state-of-the-art AI models.
 [ailia MODELS tutorial 日本語版](TUTORIAL_jp.md)
 
 # Supported models
-353 models as of September 10th, 2024
+356 models as of September 15th, 2024
 
 # Latest update
+- 2024.09.15 Add bert-vits2, pytorch_wavenet
+- 2024.09.12 Add gpt-sovits-v2
 - 2024.09.10 Add segment-anything-2 (video mode)
 - 2024.08.27 Add segment-anything-2 (image mode)
 - 2024.08.20 Add bert_ner_japanese
