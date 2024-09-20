@@ -19,6 +19,7 @@ from model_utils import check_and_download_models, check_and_download_file  # no
 from image_utils import normalize_image  # noqa
 from detector_utils import load_image  # noqa
 
+from beam_search import BeamSearchScorer
 from logit_process import logits_processor
 
 
@@ -171,19 +172,35 @@ def decode(
 
 
 def greedy_search(net, encoder_hidden_states):
+    pad_token_id = 1
     bos_token_id = 2
-    # eos_token_id = np.array([50118])
+    eos_token_id = 2
 
+    batch_size = 1
     num_beams = 3
+
+    # prepare beam search scorer
+    beam_scorer = BeamSearchScorer(
+        batch_size=batch_size,
+        num_beams=num_beams,
+        length_penalty=1.0,
+        do_early_stopping=True,
+        num_beam_hyps_to_keep=1,
+        max_length=1025,
+    )
 
     input_ids = np.ones((num_beams, 1), dtype=int) * bos_token_id
     encoder_hidden_states = np.repeat(encoder_hidden_states, repeats=num_beams, axis=0)
     past_key_values = [np.zeros((num_beams, 12, 0, 64), dtype=np.float16)] * 24
 
-    # keep track of which sequences are already finished
-    unfinished_sequences = np.ones(input_ids.shape[0], dtype=int)
+    # initialise score of first beam with 0 and the rest with -1e9.
+    beam_scores = np.zeros((batch_size, num_beams))
+    beam_scores[:, 1:] = -1e9
+    beam_scores = beam_scores.flatten()
 
     this_peer_finished = False  # used by synced_gpus only
+    decoder_prompt_len = input_ids.shape[-1]  # record the prompt length of decoder
+
     while True:
         logits, past_key_values = decode(
             net,
@@ -196,6 +213,39 @@ def greedy_search(net, encoder_hidden_states):
         next_token_scores = log_softmax(next_token_logits, axis=-1)
 
         next_token_scores_processed = logits_processor(input_ids, next_token_scores)
+        next_token_scores = next_token_scores_processed + np.broadcast_to(
+            beam_scores[:, None], next_token_scores_processed.shape
+        )
+
+        # reshape for beam search
+        vocab_size = next_token_scores.shape[-1]
+        next_token_scores = next_token_scores.reshape(1, num_beams * vocab_size)
+
+        # Beam token selection
+        n_eos_tokens = 1
+        n_tokens_to_keep = (1 + n_eos_tokens) * num_beams
+
+        next_tokens = np.argsort(-next_token_scores, axis=1, kind="stable")[
+            :, :n_tokens_to_keep
+        ]
+        next_token_scores = np.take_along_axis(next_token_scores, next_tokens, axis=1)
+
+        next_indices = next_tokens // vocab_size
+        next_tokens = next_tokens % vocab_size
+
+        beam_outputs = beam_scorer.process(
+            input_ids,
+            next_token_scores,
+            next_tokens,
+            next_indices,
+            pad_token_id=pad_token_id,
+            eos_token_id=eos_token_id,
+            decoder_prompt_len=decoder_prompt_len,
+        )
+        beam_scores = beam_outputs["next_beam_scores"]
+        beam_next_tokens = beam_outputs["next_beam_tokens"]
+        beam_idx = beam_outputs["next_beam_indices"]
+
         if this_peer_finished:
             break
 
