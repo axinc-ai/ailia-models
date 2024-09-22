@@ -171,6 +171,19 @@ def decode(
     return logits, new_past_key_values
 
 
+def stopping_criteria(input_ids: np.array) -> bool:
+    max_length = 1025
+
+    cur_len = input_ids.shape[-1]
+    is_done = cur_len >= max_length
+    is_done = np.full(input_ids.shape[0], is_done)
+
+    eos_token_id = 2
+    is_done = is_done | np.isin(input_ids[:, -1], eos_token_id)
+
+    return is_done
+
+
 def greedy_search(net, encoder_hidden_states):
     pad_token_id = 1
     bos_token_id = 2
@@ -202,9 +215,13 @@ def greedy_search(net, encoder_hidden_states):
     decoder_prompt_len = input_ids.shape[-1]  # record the prompt length of decoder
 
     while True:
+        decoder_input_ids = input_ids
+        past_length = past_key_values[0].shape[2]
+        decoder_input_ids = decoder_input_ids[:, past_length:]
+
         logits, past_key_values = decode(
             net,
-            input_ids,
+            decoder_input_ids,
             encoder_hidden_states,
             past_key_values,
         )
@@ -243,8 +260,23 @@ def greedy_search(net, encoder_hidden_states):
             decoder_prompt_len=decoder_prompt_len,
         )
         beam_scores = beam_outputs["next_beam_scores"]
-        beam_next_tokens = beam_outputs["next_beam_tokens"]
-        beam_idx = beam_outputs["next_beam_indices"]
+        beam_next_tokens = beam_outputs["next_beam_tokens"].astype(int)
+        beam_idx = beam_outputs["next_beam_indices"].astype(int)
+
+        input_ids = np.concatenate(
+            [input_ids[beam_idx, :], np.expand_dims(beam_next_tokens, axis=-1)], axis=-1
+        )
+
+        # temporary_reorder_cache
+        reordered_past = []
+        for i in range(0, 24, 4):
+            layer_past = past_key_values[i : i + 4]
+            reordered_past += [
+                np.take(past_state, beam_idx, axis=0) for past_state in layer_past[:2]
+            ] + layer_past[2:]
+
+        if beam_scorer.is_done or all(stopping_criteria(input_ids)):
+            this_peer_finished = True
 
         if this_peer_finished:
             break
