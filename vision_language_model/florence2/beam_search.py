@@ -96,7 +96,7 @@ class BeamSearchScorer:
                     beam_index = None
 
                     self._beam_hyps[batch_group_idx].add(
-                        input_ids[batch_beam_idx].clone(),
+                        np.copy(input_ids[batch_beam_idx]),
                         next_score.item(),
                         beam_indices=beam_index,
                         generated_len=cur_len - decoder_prompt_len,
@@ -271,6 +271,33 @@ class BeamHypotheses:
         """
         return len(self.beams)
 
+    def add(
+        self,
+        hyp: np.ndarray,
+        sum_logprobs: float,
+        beam_indices: Optional[np.ndarray] = None,
+        generated_len: Optional[int] = None,
+    ):
+        """
+        Add a new hypothesis to the list.
+        """
+        if generated_len is not None:
+            score = sum_logprobs / (generated_len**self.length_penalty)
+        # This 'else' case exists for retrocompatibility
+        else:
+            score = sum_logprobs / (hyp.shape[-1] ** self.length_penalty)
+
+        if len(self) < self.num_beams or score > self.worst_score:
+            self.beams.append((score, hyp, beam_indices))
+            if len(self) > self.num_beams:
+                sorted_next_scores = sorted(
+                    [(s, idx) for idx, (s, _, _) in enumerate(self.beams)]
+                )
+                del self.beams[sorted_next_scores[0][1]]
+                self.worst_score = sorted_next_scores[1][0]
+            else:
+                self.worst_score = min(score, self.worst_score)
+
     def is_done(
         self,
         best_sum_logprobs: float,
@@ -286,37 +313,6 @@ class BeamHypotheses:
             return False
 
         # `True`: stop as soon as at least `num_beams` hypotheses are finished
-        if self.early_stopping is True:
+        # if self.early_stopping is True:
+        if True:
             return True
-        # `False`: heuristic -- compute best possible score from `cur_len`, even though it is not entirely accurate
-        #  when `length_penalty` is positive. See the discussion below for more details.
-        # https://github.com/huggingface/transformers/pull/20901#issuecomment-1369845565
-        elif self.early_stopping is False:
-            highest_attainable_score = (
-                best_sum_logprobs
-                / (cur_len - decoder_prompt_len) ** self.length_penalty
-            )
-            ret = self.worst_score >= highest_attainable_score
-            return ret
-        # `"never"`: compute the best possible score, depending on the signal of `length_penalty`
-        else:
-            # `length_penalty` > 0.0 -> max denominator is obtaned from `max_length`, not from `cur_len` -> min
-            # abs(`highest_attainable_score`) is obtained -> `highest_attainable_score` is negative, hence we obtain
-            # its max this way
-            if self.length_penalty > 0.0:
-                if self.max_length <= decoder_prompt_len:
-                    raise ValueError(
-                        "max_length is not larger than decoder prompt length"
-                    )
-                highest_attainable_score = (
-                    best_sum_logprobs
-                    / (self.max_length - decoder_prompt_len) ** self.length_penalty
-                )
-            # the opposite logic applies here (max `highest_attainable_score` from `cur_len`)
-            else:
-                highest_attainable_score = (
-                    best_sum_logprobs
-                    / (cur_len - decoder_prompt_len) ** self.length_penalty
-                )
-            ret = self.worst_score >= highest_attainable_score
-            return ret

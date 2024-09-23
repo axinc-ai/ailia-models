@@ -274,6 +274,7 @@ def greedy_search(net, encoder_hidden_states):
             reordered_past += [
                 np.take(past_state, beam_idx, axis=0) for past_state in layer_past[:2]
             ] + layer_past[2:]
+        past_key_values = reordered_past
 
         if beam_scorer.is_done or all(stopping_criteria(input_ids)):
             this_peer_finished = True
