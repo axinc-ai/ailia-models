@@ -21,7 +21,7 @@ class BeamSearchScorer:
 
         self._is_init = False
 
-        # self._beam_hyps[i*self.num_beam_groups+j] is the beam_hyps of the j-th group in the i-th mini-batch.
+        # self._beam_hyps[i*1+j] is the beam_hyps of the j-th group in the i-th mini-batch.
         self._beam_hyps = [
             BeamHypotheses(
                 num_beams=self.group_size,
@@ -31,7 +31,7 @@ class BeamSearchScorer:
             )
             for _ in range(batch_size)
         ]
-        # self._done[i*self.num_beam_groups+j] indicates whether the generation of the beam_hyps of the j-th group
+        # self._done[i*1+j] indicates whether the generation of the beam_hyps of the j-th group
         # in the i-th mini-batch is complete.
         self._done = np.array([False for _ in range(batch_size)], dtype=bool)
 
@@ -132,17 +132,14 @@ class BeamSearchScorer:
         final_beam_tokens: np.ndarray,
         final_beam_indices: np.ndarray,
         max_length: int,
-        # pad_token_id: Optional[Union[int, np.array]] = None,
-        # eos_token_id: Optional[Union[int, List[int], np.array]] = None,
-        # beam_indices: Optional[np.ndarray] = None,
-        # decoder_prompt_len: Optional[int] = 0,
+        pad_token_id: Optional[int] = None,
+        eos_token_id: Optional[int] = None,
+        decoder_prompt_len=0,
     ) -> List[np.ndarray]:
-        batch_size = len(self._beam_hyps) // self.num_beam_groups
+        batch_size = len(self._beam_hyps)
 
-        if eos_token_id is not None and not isinstance(eos_token_id, np.array):
-            if isinstance(eos_token_id, int):
-                eos_token_id = [eos_token_id]
-            eos_token_id = np.array(eos_token_id)
+        eos_token_id = [eos_token_id]
+        eos_token_id = np.array(eos_token_id)
 
         # finalize all open beam hypotheses and add to generated hypotheses
         for batch_group_idx, beam_hyp in enumerate(self._beam_hyps):
@@ -155,32 +152,23 @@ class BeamSearchScorer:
                 batch_beam_idx = batch_group_idx * self.group_size + index_per_group
                 final_score = final_beam_scores[batch_beam_idx].item()
                 final_tokens = input_ids[batch_beam_idx]
-                beam_index = (
-                    beam_indices[batch_beam_idx] if beam_indices is not None else None
-                )
                 generated_len = final_tokens.shape[-1] - decoder_prompt_len
                 beam_hyp.add(
                     final_tokens,
                     final_score,
-                    beam_indices=beam_index,
+                    beam_indices=None,
                     generated_len=generated_len,
                 )
 
         # select the best hypotheses
-        sent_lengths = input_ids.new(batch_size * self.num_beam_hyps_to_keep)
+        sent_lengths = np.zeros(batch_size * self.num_beam_hyps_to_keep, dtype=int)
         best = []
         best_indices = []
-        best_scores = np.zeros(
-            batch_size * self.num_beam_hyps_to_keep,
-            device=self.device,
-            dtype=torch.float32,
-        )
+        best_scores = np.zeros(batch_size * self.num_beam_hyps_to_keep)
 
         # retrieve best hypotheses
         for i in range(batch_size):
-            beam_hyps_in_batch = self._beam_hyps[
-                i * self.num_beam_groups : (i + 1) * self.num_beam_groups
-            ]
+            beam_hyps_in_batch = self._beam_hyps[i * 1 : (i + 1) * 1]
             candidate_beams = [
                 beam for beam_hyp in beam_hyps_in_batch for beam in beam_hyp.beams
             ]
@@ -202,49 +190,39 @@ class BeamSearchScorer:
 
         # prepare for adding eos
         sent_lengths_max = sent_lengths.max().item() + 1
-        sent_max_len = (
-            min(sent_lengths_max, max_length)
-            if max_length is not None
-            else sent_lengths_max
-        )
-        decoded: np.ndarray = input_ids.new(
-            batch_size * self.num_beam_hyps_to_keep, sent_max_len
+        sent_max_len = min(sent_lengths_max, max_length)
+        decoded = np.zeros(
+            (batch_size * self.num_beam_hyps_to_keep, sent_max_len), dtype=int
         )
 
         if len(best_indices) > 0 and best_indices[0] is not None:
-            indices: np.ndarray = input_ids.new(
-                batch_size * self.num_beam_hyps_to_keep, sent_max_len
-            )
+            indices = np.zeros((batch_size * self.num_beam_hyps_to_keep, sent_max_len))
         else:
             indices = None
 
         # shorter batches are padded if needed
         if sent_lengths.min().item() != sent_lengths.max().item():
-            if pad_token_id is None:
-                raise ValueError("`pad_token_id` has to be defined")
-            decoded.fill_(pad_token_id)
+            decoded.fill(pad_token_id)
 
         if indices is not None:
-            indices.fill_(-1)
+            indices.fill(-1)
 
         # fill with hypotheses and eos_token_id if the latter fits in
         for i, (hypo, best_idx) in enumerate(zip(best, best_indices)):
             decoded[i, : sent_lengths[i]] = hypo
 
             if indices is not None:
-                indices[i, : len(best_idx)] = np.array(best_idx)
+                indices[i, : len(best_idx)] = best_idx
 
             if sent_lengths[i] < sent_max_len:
                 # inserting only the first eos_token_id
                 decoded[i, sent_lengths[i]] = eos_token_id[0]
 
-        return UserDict(
-            {
-                "sequences": decoded,
-                "sequence_scores": best_scores,
-                "beam_indices": indices,
-            }
-        )
+        return {
+            "sequences": decoded,
+            "sequence_scores": best_scores,
+            "beam_indices": indices,
+        }
 
 
 class BeamHypotheses:

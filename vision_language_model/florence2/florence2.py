@@ -172,7 +172,7 @@ def decode(
 
 
 def stopping_criteria(input_ids: np.array) -> bool:
-    max_length = 1025
+    stopping_criteria.max_length = max_length = 1025
 
     cur_len = input_ids.shape[-1]
     is_done = cur_len >= max_length
@@ -282,7 +282,18 @@ def greedy_search(net, encoder_hidden_states):
         if this_peer_finished:
             break
 
-    return input_ids
+    sequence_outputs = beam_scorer.finalize(
+        input_ids,
+        beam_scores,
+        next_tokens,
+        next_indices,
+        pad_token_id=pad_token_id,
+        eos_token_id=eos_token_id,
+        max_length=stopping_criteria.max_length,
+        decoder_prompt_len=decoder_prompt_len,
+    )
+
+    return sequence_outputs["sequences"]
 
 
 def predict(models, img, task_prompt, text_input=None):
@@ -336,6 +347,8 @@ def predict(models, img, task_prompt, text_input=None):
     net = models["decoder"]
     generated_ids = greedy_search(net, last_hidden_state)
 
+    tokenizer = models["tokenizer"]
+    generated_text = tokenizer.batch_decode(generated_ids, skip_special_tokens=False)[0]
 
 def recognize_from_image(models):
     prompt = "<OD>"
@@ -430,6 +443,21 @@ def main():
         tokenizer = transformers.BartTokenizerFast.from_pretrained("./tokenizer")
     else:
         raise NotImplementedError("ailia tokenizer is not supported yet.")
+
+    tokens_to_add = {
+        "additional_special_tokens": tokenizer.additional_special_tokens
+        + ["<od>", "</od>", "<ocr>", "</ocr>"]
+        + [f"<loc_{x}>" for x in range(1000)]
+        + [
+            # fmt: off
+            '<cap>', '</cap>', '<ncap>', '</ncap>','<dcap>', '</dcap>', '<grounding>', 
+            '</grounding>', '<seg>', '</seg>', '<sep>', '<region_cap>', '</region_cap>', 
+            '<region_to_desciption>', '</region_to_desciption>', '<proposal>', '</proposal>', 
+            '<poly>', '</poly>', '<and>'
+            # fmt: on
+        ]
+    }
+    tokenizer.add_special_tokens(tokens_to_add)
 
     models = {
         "tokenizer": tokenizer,
