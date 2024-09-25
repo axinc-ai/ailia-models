@@ -149,11 +149,13 @@ def get_input_point():
     input_point = []
     input_label = []
     if pos_points:
-        input_point.append(np.array(pos_points))
-        input_label.append(np.ones(len(pos_points)))
+        for i in range(len(pos_points)):
+            input_point.append(pos_points[i])
+            input_label.append(1)
     if neg_points:
-        input_point.append(np.array(neg_points))
-        input_label.append(np.zeros(len(neg_points)))
+        for i in range(len(neg_points)):
+            input_point.append(neg_points[i])
+            input_label.append(0)
     input_point = np.array(input_point)
     input_label = np.array(input_label)
     input_box = None
