@@ -21,6 +21,7 @@ from detector_utils import load_image  # noqa
 
 from beam_search import BeamSearchScorer
 from logit_process import logits_processor
+from processing_florence2 import post_process_generation
 
 
 logger = getLogger(__name__)
@@ -297,6 +298,7 @@ def greedy_search(net, encoder_hidden_states):
 
 
 def predict(models, img, task_prompt, text_input=None):
+    h, w, _ = img.shape
     img = img[:, :, ::-1]  # BGR -> RGB
     pixel_values = preprocess(img)
 
@@ -350,6 +352,12 @@ def predict(models, img, task_prompt, text_input=None):
     tokenizer = models["tokenizer"]
     generated_text = tokenizer.batch_decode(generated_ids, skip_special_tokens=False)[0]
 
+    answer = post_process_generation(
+        generated_text, task=task_prompt, image_size=(w, h)
+    )
+    return answer
+
+
 def recognize_from_image(models):
     prompt = "<OD>"
 
@@ -368,7 +376,7 @@ def recognize_from_image(models):
             total_time_estimation = 0
             for i in range(args.benchmark_count):
                 start = int(round(time.time() * 1000))
-                output = predict(models, img, prompt)
+                answer = predict(models, img, prompt)
                 end = int(round(time.time() * 1000))
                 estimation_time = end - start
 
@@ -381,7 +389,9 @@ def recognize_from_image(models):
                 f"\taverage time estimation {total_time_estimation / (args.benchmark_count - 1)} ms"
             )
         else:
-            output = predict(models, img, prompt)
+            answer = predict(models, img, prompt)
+
+    print(answer)
 
     logger.info("Script finished successfully.")
 
