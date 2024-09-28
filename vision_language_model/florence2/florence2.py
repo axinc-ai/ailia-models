@@ -51,10 +51,27 @@ IMG_SIZE = 768
 
 parser = get_base_parser("Florence-2", IMAGE_PATH, SAVE_IMAGE_PATH)
 parser.add_argument(
-    "--seed",
-    type=int,
+    "-p",
+    "--prompt",
+    choices=[
+        "CAPTION",
+        "DETAILED_CAPTION",
+        "MORE_DETAILED_CAPTION",
+        "CAPTION_TO_PHRASE_GROUNDING",
+        "OD",
+        "DENSE_REGION_CAPTION",
+        "REGION_PROPOSAL",
+        "OCR",
+        "OCR_WITH_REGION",
+    ],
+    default="CAPTION",
+    help="prompt",
+)
+parser.add_argument(
+    "--text_input",
+    type=str,
     default=None,
-    help="random seed",
+    help="TEXT_INPUT (use by CAPTION_TO_PHRASE_GROUNDING)",
 )
 parser.add_argument(
     "--disable_ailia_tokenizer", action="store_true", help="disable ailia tokenizer."
@@ -359,7 +376,16 @@ def predict(models, img, task_prompt, text_input=None):
 
 
 def recognize_from_image(models):
-    prompt = "<OD>"
+    prompt = "<%s>" % args.prompt
+    logger.info("Prompt: %s" % prompt)
+
+    text_input = None
+    if prompt == "<CAPTION_TO_PHRASE_GROUNDING>":
+        text_input = args.text_input
+        if text_input is None:
+            raise ValueError("TEXT_INPUT is required for CAPTION_TO_PHRASE_GROUNDING")
+
+        logger.info("TEXT_INPUT: %s" % text_input)
 
     # input image loop
     for image_path in args.input:
@@ -376,7 +402,7 @@ def recognize_from_image(models):
             total_time_estimation = 0
             for i in range(args.benchmark_count):
                 start = int(round(time.time() * 1000))
-                answer = predict(models, img, prompt)
+                answer = predict(models, img, prompt, text_input=text_input)
                 end = int(round(time.time() * 1000))
                 estimation_time = end - start
 
@@ -389,9 +415,9 @@ def recognize_from_image(models):
                 f"\taverage time estimation {total_time_estimation / (args.benchmark_count - 1)} ms"
             )
         else:
-            answer = predict(models, img, prompt)
+            answer = predict(models, img, prompt, text_input=text_input)
 
-    print(answer)
+        print(answer)
 
     logger.info("Script finished successfully.")
 
