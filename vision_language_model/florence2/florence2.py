@@ -1,14 +1,18 @@
 import sys
 import time
 from typing import List
+import random
 
 # logger
 from logging import getLogger  # noqa
 
 import numpy as np
 import cv2
-from PIL import Image
+from PIL import Image, ImageDraw
+
 from scipy.special import log_softmax
+import matplotlib.pyplot as plt
+import matplotlib.patches as patches
 
 import ailia
 
@@ -78,6 +82,92 @@ parser.add_argument(
 )
 parser.add_argument("--onnx", action="store_true", help="execute onnxruntime version.")
 args = update_parser(parser, check_input_type=False)
+
+
+# ======================
+# Secondary Functions
+# ======================
+
+colormap = [
+    "blue",
+    "orange",
+    "green",
+    "purple",
+    "brown",
+    "pink",
+    "gray",
+    "olive",
+    "cyan",
+    "red",
+    "lime",
+    "indigo",
+    "violet",
+    "aqua",
+    "magenta",
+    "coral",
+    "gold",
+    "tan",
+    "skyblue",
+]
+
+
+def plot_bbox(image, data, savepath):
+    # Create a figure and axes
+    fig, ax = plt.subplots(
+        figsize=(image.shape[1] / 100, image.shape[0] / 100), dpi=100
+    )
+
+    # Display the image
+    ax.imshow(image)
+
+    # Plot each bounding box
+    for bbox, label in zip(data["bboxes"], data["labels"]):
+        # Unpack the bounding box coordinates
+        x1, y1, x2, y2 = bbox
+        # Create a Rectangle patch
+        rect = patches.Rectangle(
+            (x1, y1), x2 - x1, y2 - y1, linewidth=1, edgecolor="r", facecolor="none"
+        )
+        # Add the rectangle to the Axes
+        ax.add_patch(rect)
+        # Annotate the label
+        plt.text(
+            x1,
+            y1,
+            label,
+            color="white",
+            fontsize=8,
+            bbox=dict(facecolor="red", alpha=0.5),
+        )
+
+    # Remove the axis ticks and labels
+    ax.axis("off")
+
+    # Set tight layout to fit the image exactly
+    plt.subplots_adjust(left=0, right=1, top=1, bottom=0)
+
+    # Save the figure without changing the original size or adding padding
+    plt.savefig(savepath, pad_inches=0, dpi=100)
+
+
+def draw_ocr_bboxes(image, prediction, savepath, scale=1):
+    image = Image.fromarray(image)
+    draw = ImageDraw.Draw(image)
+
+    bboxes, labels = prediction["quad_boxes"], prediction["labels"]
+    for box, label in zip(bboxes, labels):
+        color = random.choice(colormap)
+        new_box = (np.array(box) * scale).tolist()
+        draw.polygon(new_box, width=3, outline=color)
+        draw.text(
+            (new_box[0] + 8, new_box[1] + 2),
+            "{}".format(label),
+            align="right",
+            fill=color,
+        )
+
+    # Save or display the image
+    image.save(savepath)
 
 
 # ======================
@@ -315,7 +405,7 @@ def greedy_search(net, encoder_hidden_states):
 
 
 def predict(models, img, task_prompt, text_input=None):
-    h, w, _ = img.shape
+    im_h, im_w, _ = img.shape
     img = img[:, :, ::-1]  # BGR -> RGB
     pixel_values = preprocess(img)
 
@@ -370,7 +460,7 @@ def predict(models, img, task_prompt, text_input=None):
     generated_text = tokenizer.batch_decode(generated_ids, skip_special_tokens=False)[0]
 
     answer = post_process_generation(
-        generated_text, task=task_prompt, image_size=(w, h)
+        generated_text, task=task_prompt, image_size=(im_w, im_h)
     )
     return answer
 
@@ -394,6 +484,7 @@ def recognize_from_image(models):
         # prepare input data
         img = load_image(image_path)
         img = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
+        img_rgb = img[:, :, ::-1]
 
         # inference
         logger.info("Start inference...")
@@ -418,6 +509,16 @@ def recognize_from_image(models):
             answer = predict(models, img, prompt, text_input=text_input)
 
         print(answer)
+
+        info = next(iter(answer.values()))
+        if "bboxes" in info or "quad_boxes" in info:
+            # plot result
+            savepath = get_savepath(args.savepath, image_path, ext=".png")
+            logger.info(f"saved at : {savepath}")
+            if "bboxes" in info:
+                plot_bbox(img_rgb, info, savepath)
+            if "quad_boxes" in info:
+                draw_ocr_bboxes(img_rgb, info, savepath)
 
     logger.info("Script finished successfully.")
 
