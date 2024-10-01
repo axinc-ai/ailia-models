@@ -9,7 +9,6 @@ from logging import getLogger  # noqa
 import numpy as np
 import cv2
 from PIL import Image, ImageDraw
-
 from scipy.special import log_softmax
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
@@ -19,7 +18,7 @@ import ailia
 # import original modules
 sys.path.append("../../util")
 from arg_utils import get_base_parser, update_parser, get_savepath  # noqa
-from model_utils import check_and_download_models, check_and_download_file  # noqa
+from model_utils import check_and_download_models  # noqa
 from image_utils import normalize_image  # noqa
 from detector_utils import load_image  # noqa
 
@@ -34,14 +33,22 @@ logger = getLogger(__name__)
 # Parameters
 # ======================
 
-WEIGHT_EMB_PATH = "embeddings.onnx"
-WEIGHT_ENC_IMG_PATH = "encode_image.onnx"
+WEIGHT_EMB_BASE_PATH = "embeddings_base.onnx"
+WEIGHT_IMG_BASE_PATH = "feature_base.onnx"
 WEIGHT_ENC_BASE_PATH = "encoder_base.onnx"
 WEIGHT_DEC_BASE_PATH = "decoder_base.onnx"
-MODEL_EMB_PATH = "embeddings.onnx.prototxt"
-MODEL_ENC_IMG_PATH = "encode_image.onnx.prototxt"
+WEIGHT_EMB_LARGE_PATH = "embeddings_large.onnx"
+WEIGHT_IMG_LARGE_PATH = "feature_large.onnx"
+WEIGHT_ENC_LARGE_PATH = "encoder_large.onnx"
+WEIGHT_DEC_LARGE_PATH = "decoder_large.onnx"
+MODEL_EMB_BASE_PATH = "embeddings_base.onnx.prototxt"
+MODEL_IMG_BASE_PATH = "feature_base.onnx.prototxt"
 MODEL_ENC_BASE_PATH = "encoder_base.onnx.prototxt"
 MODEL_DEC_BASE_PATH = "decoder_base.onnx.prototxt"
+MODEL_EMB_LARGE_PATH = "embeddings_large.onnx.prototxt"
+MODEL_IMG_LARGE_PATH = "feature_large.onnx.prototxt"
+MODEL_ENC_LARGE_PATH = "encoder_large.onnx.prototxt"
+MODEL_DEC_LARGE_PATH = "decoder_large.onnx.prototxt"
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/florence2/"
 
 IMAGE_PATH = "car.jpg"
@@ -76,6 +83,9 @@ parser.add_argument(
     type=str,
     default=None,
     help="TEXT_INPUT (use by CAPTION_TO_PHRASE_GROUNDING)",
+)
+parser.add_argument(
+    "--model_type", choices=["base", "large"], default="base", help="model type"
 )
 parser.add_argument(
     "--disable_ailia_tokenizer", action="store_true", help="disable ailia tokenizer."
@@ -293,10 +303,11 @@ def stopping_criteria(input_ids: np.array) -> bool:
 
 
 def greedy_search(net, encoder_hidden_states):
+    model_type = args.model_type
+
     pad_token_id = 1
     bos_token_id = 2
     eos_token_id = 2
-
     batch_size = 1
     num_beams = 3
 
@@ -312,7 +323,11 @@ def greedy_search(net, encoder_hidden_states):
 
     input_ids = np.ones((num_beams, 1), dtype=int) * bos_token_id
     encoder_hidden_states = np.repeat(encoder_hidden_states, repeats=num_beams, axis=0)
-    past_key_values = [np.zeros((num_beams, 12, 0, 64), dtype=np.float16)] * 24
+    past_key_values = [
+        np.zeros(
+            (num_beams, 12 if model_type == "base" else 16, 0, 64), dtype=np.float16
+        )
+    ] * (24 if model_type == "base" else 48)
 
     # initialise score of first beam with 0 and the rest with -1e9.
     beam_scores = np.zeros((batch_size, num_beams))
@@ -377,7 +392,8 @@ def greedy_search(net, encoder_hidden_states):
 
         # temporary_reorder_cache
         reordered_past = []
-        for i in range(0, 24, 4):
+        n = 24 if model_type == "base" else 48
+        for i in range(0, n, 4):
             layer_past = past_key_values[i : i + 4]
             reordered_past += [
                 np.take(past_state, beam_idx, axis=0) for past_state in layer_past[:2]
@@ -524,39 +540,37 @@ def recognize_from_image(models):
 
 
 def main():
+    if args.model_type == "base":
+        WEIGHT_EMB_PATH = WEIGHT_EMB_BASE_PATH
+        WEIGHT_IMG_PATH = WEIGHT_IMG_BASE_PATH
+        WEIGHT_ENC_PATH = WEIGHT_ENC_BASE_PATH
+        WEIGHT_DEC_PATH = WEIGHT_DEC_BASE_PATH
+        MODEL_EMB_PATH = MODEL_EMB_BASE_PATH
+        MODEL_IMG_PATH = MODEL_IMG_BASE_PATH
+        MODEL_ENC_PATH = MODEL_ENC_BASE_PATH
+        MODEL_DEC_PATH = MODEL_DEC_BASE_PATH
+    else:
+        WEIGHT_EMB_PATH = WEIGHT_EMB_LARGE_PATH
+        WEIGHT_IMG_PATH = WEIGHT_IMG_LARGE_PATH
+        WEIGHT_ENC_PATH = WEIGHT_ENC_LARGE_PATH
+        WEIGHT_DEC_PATH = WEIGHT_DEC_LARGE_PATH
+        MODEL_EMB_PATH = MODEL_EMB_LARGE_PATH
+        MODEL_IMG_PATH = MODEL_IMG_LARGE_PATH
+        MODEL_ENC_PATH = MODEL_ENC_LARGE_PATH
+        MODEL_DEC_PATH = MODEL_DEC_LARGE_PATH
     check_and_download_models(WEIGHT_EMB_PATH, MODEL_EMB_PATH, REMOTE_PATH)
-    check_and_download_models(WEIGHT_ENC_IMG_PATH, MODEL_ENC_IMG_PATH, REMOTE_PATH)
-    check_and_download_models(WEIGHT_ENC_BASE_PATH, MODEL_ENC_BASE_PATH, REMOTE_PATH)
-    check_and_download_models(WEIGHT_DEC_BASE_PATH, MODEL_DEC_BASE_PATH, REMOTE_PATH)
-
-    # seed = args.seed
-    # if seed is not None:
-    #     np.random.seed(seed)
+    check_and_download_models(WEIGHT_IMG_PATH, MODEL_IMG_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_ENC_PATH, MODEL_ENC_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_DEC_PATH, MODEL_DEC_PATH, REMOTE_PATH)
 
     env_id = args.env_id
 
     # initialize
     if not args.onnx:
-        embedding = ailia.Net(
-            MODEL_EMB_PATH,
-            WEIGHT_EMB_PATH,
-            env_id=env_id,
-        )
-        encode_image = ailia.Net(
-            MODEL_ENC_IMG_PATH,
-            WEIGHT_ENC_IMG_PATH,
-            env_id=env_id,
-        )
-        encoder = ailia.Net(
-            MODEL_ENC_BASE_PATH,
-            WEIGHT_ENC_BASE_PATH,
-            env_id=env_id,
-        )
-        decoder = ailia.Net(
-            MODEL_DEC_BASE_PATH,
-            WEIGHT_DEC_BASE_PATH,
-            env_id=env_id,
-        )
+        embedding = ailia.Net(MODEL_EMB_PATH, WEIGHT_EMB_PATH, env_id=env_id)
+        encode_image = ailia.Net(MODEL_IMG_PATH, WEIGHT_IMG_PATH, env_id=env_id)
+        encoder = ailia.Net(MODEL_ENC_PATH, WEIGHT_ENC_PATH, env_id=env_id)
+        decoder = ailia.Net(MODEL_DEC_PATH, WEIGHT_DEC_PATH, env_id=env_id)
     else:
         import onnxruntime
 
@@ -564,14 +578,10 @@ def main():
 
         embedding = onnxruntime.InferenceSession(WEIGHT_EMB_PATH, providers=providers)
         encode_image = onnxruntime.InferenceSession(
-            WEIGHT_ENC_IMG_PATH, providers=providers
+            WEIGHT_IMG_PATH, providers=providers
         )
-        encoder = onnxruntime.InferenceSession(
-            WEIGHT_ENC_BASE_PATH, providers=providers
-        )
-        decoder = onnxruntime.InferenceSession(
-            WEIGHT_DEC_BASE_PATH, providers=providers
-        )
+        encoder = onnxruntime.InferenceSession(WEIGHT_ENC_PATH, providers=providers)
+        decoder = onnxruntime.InferenceSession(WEIGHT_DEC_PATH, providers=providers)
 
     args.disable_ailia_tokenizer = True
     if args.disable_ailia_tokenizer:
