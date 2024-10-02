@@ -356,3 +356,4 @@ cd ../../text_recognition/ndlocr_text_recognition; python3 ndlocr_text_recogniti
 cd ../../time_series_forecasting/informer2020; python3 informer2020.py ${OPTION}
 cd ../../vehicle_recognition/vehicle-attributes-recognition-barrier; python3 vehicle-attributes-recognition-barrier.py ${OPTION}
 cd ../../vehicle_recognition/vehicle-license-plate-detection-barrier; python3 vehicle-license-plate-detection-barrier.py ${OPTION}
+cd ../../vision_language_model/florence2; python3 florence2.py ${OPTION}
