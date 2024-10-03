@@ -15,9 +15,10 @@ The collection of pre-trained, state-of-the-art AI models.
 [ailia MODELS tutorial 日本語版](TUTORIAL_jp.md)
 
 # Supported models
-356 models as of September 15th, 2024
+357 models as of October 2nd, 2024
 
 # Latest update
+- 2024.10.02 Add florence2
 - 2024.09.15 Add bert-vits2, pytorch_wavenet
 - 2024.09.12 Add gpt-sovits-v2
 - 2024.09.10 Add segment-anything-2 (video mode)
@@ -29,9 +30,6 @@ The collection of pre-trained, state-of-the-art AI models.
 - 2024.08.09 Add mahalanobis-ad, t5_base_japanese_ner
 - 2024.08.08 Add sdxl-turbo, sd-turbo
 - 2024.08.05 Migrate to ailia Tokenizer 1.3 from Transformers
-- 2024.07.16 Add grounded_sam
-- 2024.07.12 Add llava
-- 2024.07.09 Add GroundingDINO
 - More information in our [Wiki](https://github.com/axinc-ai/ailia-models/wiki)
 
 ## Action recognition
