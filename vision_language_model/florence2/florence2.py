@@ -583,17 +583,36 @@ def main():
         encoder = onnxruntime.InferenceSession(WEIGHT_ENC_PATH, providers=providers)
         decoder = onnxruntime.InferenceSession(WEIGHT_DEC_PATH, providers=providers)
 
-    if args.prompt != "CAPTION":
-        args.disable_ailia_tokenizer = True
-
     if args.disable_ailia_tokenizer:
         import transformers
 
         tokenizer = transformers.BartTokenizerFast.from_pretrained("./tokenizer")
 
+        #tokenizer.additional_special_tokensにすでにSpecialTokensが含まれている
+        if len(tokenizer.additional_special_tokens) != 1024:
+            raise("special token error")
+
+        #tokens_to_add = {
+        #    "additional_special_tokens": tokenizer.additional_special_tokens
+        #    + ["<od>", "</od>", "<ocr>", "</ocr>"]
+        #    + [f"<loc_{x}>" for x in range(1000)]
+        #    + [
+        #        # fmt: off
+        #        '<cap>', '</cap>', '<ncap>', '</ncap>','<dcap>', '</dcap>', '<grounding>', 
+        #        '</grounding>', '<seg>', '</seg>', '<sep>', '<region_cap>', '</region_cap>', 
+        #        '<region_to_desciption>', '</region_to_desciption>', '<proposal>', '</proposal>', 
+        #        '<poly>', '</poly>', '<and>'
+        #        # fmt: on
+        #    ]
+        #}
+        #tokenizer.add_special_tokens(tokens_to_add)
+    else:
+        import ailia_tokenizer
+        tokenizer = ailia_tokenizer.RobertaTokenizer.from_pretrained("./tokenizer")
+
         tokens_to_add = {
-            "additional_special_tokens": tokenizer.additional_special_tokens
-            + ["<od>", "</od>", "<ocr>", "</ocr>"]
+            "additional_special_tokens":
+              ["<od>", "</od>", "<ocr>", "</ocr>"]
             + [f"<loc_{x}>" for x in range(1000)]
             + [
                 # fmt: off
@@ -605,9 +624,6 @@ def main():
             ]
         }
         tokenizer.add_special_tokens(tokens_to_add)
-    else:
-        import ailia_tokenizer
-        tokenizer = ailia_tokenizer.RobertaTokenizer.from_pretrained("./tokenizer")
 
     models = {
         "tokenizer": tokenizer,
