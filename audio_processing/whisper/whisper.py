@@ -204,6 +204,7 @@ dims_dict = {
     "medium": ModelDimensions(80, 1500, 1024, 16, 24, 51865, 448, 1024, 16, 24),
     "large": ModelDimensions(80, 1500, 1280, 20, 32, 51865, 448, 1280, 20, 32),
     "large-v3": ModelDimensions(128, 1500, 1280, 20, 32, 51866, 448, 1280, 20, 32),
+    "turbo": ModelDimensions(128, 1500, 1280, 20, 32, 51866, 448, 1280, 20, 4),
 }
 dims = dims_dict[args.model_type]
 
@@ -280,6 +281,8 @@ if not args.dynamic_kv_cache:
     MODEL_DEC_LARGE_PATH = "decoder_large_fix_kv_cache.onnx.prototxt"
     WEIGHT_DEC_LARGE_V3_PATH = "decoder_large_v3_fix_kv_cache.onnx"
     MODEL_DEC_LARGE_V3_PATH = "decoder_large_v3_fix_kv_cache.onnx.prototxt"
+    WEIGHT_DEC_TURBO_PATH = "decoder_turbo_fix_kv_cache.onnx"
+    MODEL_DEC_TURBO_PATH = "decoder_turbo_fix_kv_cache.onnx.prototxt"
 else:
     # KV_CACHEが推論ごとに変化するバージョン
     WEIGHT_DEC_TINY_PATH = "decoder_tiny.onnx"
@@ -294,6 +297,8 @@ else:
     MODEL_DEC_LARGE_PATH = "decoder_large.onnx.prototxt"
     WEIGHT_DEC_LARGE_V3_PATH = "decoder_large_v3.onnx"
     MODEL_DEC_LARGE_V3_PATH = "decoder_large_v3.onnx.prototxt"
+    WEIGHT_DEC_TURBO_PATH = "decoder_turbo.onnx"
+    MODEL_DEC_TURBO_PATH = "decoder_turbo.onnx.prototxt"
 
 WEIGHT_ENC_TINY_PATH = "encoder_tiny" + OPT + ".onnx"
 MODEL_ENC_TINY_PATH = "encoder_tiny" + OPT + ".onnx.prototxt"
@@ -307,6 +312,8 @@ WEIGHT_ENC_LARGE_PATH = "encoder_large.onnx"
 MODEL_ENC_LARGE_PATH = "encoder_large.onnx.prototxt"
 WEIGHT_ENC_LARGE_V3_PATH = "encoder_large_v3.onnx"
 MODEL_ENC_LARGE_V3_PATH = "encoder_large_v3.onnx.prototxt"
+WEIGHT_ENC_TURBO_PATH = "encoder_turbo.onnx"
+MODEL_ENC_TURBO_PATH = "encoder_turbo.onnx.prototxt"
 
 WEIGTH_ENC_LARGE_PB_PATH = "encoder_large_weights.pb"
 WEIGHT_DEC_LARGE_PB_PATH = "decoder_large_weights.pb"
@@ -314,6 +321,7 @@ WEIGHT_DEC_LARGE_FIX_KV_CACHE_PB_PATH = "decoder_large_fix_kv_cache_weights.pb"
 WEIGTH_ENC_LARGE_V3_PB_PATH = "encoder_large_v3_weights.pb"
 WEIGHT_DEC_LARGE_V3_PB_PATH = "decoder_large_v3_weights.pb"
 WEIGHT_DEC_LARGE_V3_FIX_KV_CACHE_PB_PATH = "decoder_large_v3_fix_kv_cache_weights.pb"
+WEIGHT_ENC_TURBO_PB_PATH = "encoder_turbo_weights.pb"
 
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/whisper/"
 
@@ -425,6 +433,8 @@ def new_kv_cache(n_group, length=451):
         size = [48, n_group, length, 1024]
     elif model_type in ("large", "large-v3"):
         size = [64, n_group, length, 1280]
+    elif model_type == "turbo":
+        size = [8, n_group, length, 1280]
     else:
         raise ValueError(f"Unsupported model type: {model_type}")
 
@@ -1184,6 +1194,8 @@ def main():
             check_and_download_file(
                 WEIGHT_DEC_LARGE_V3_FIX_KV_CACHE_PB_PATH, REMOTE_PATH
             )
+    elif args.model_type == "turbo":
+        check_and_download_file(WEIGHT_ENC_TURBO_PB_PATH, REMOTE_PATH)
 
     mic_info = None
     if args.V:
