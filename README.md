@@ -15,9 +15,10 @@ The collection of pre-trained, state-of-the-art AI models.
 [ailia MODELS tutorial 日本語版](TUTORIAL_jp.md)
 
 # Supported models
-357 models as of October 2nd, 2024
+358 models as of October 9th, 2024
 
 # Latest update
+- 2024.10.09 Add whisper-v3-turbo
 - 2024.10.02 Add florence2
 - 2024.09.15 Add bert-vits2, pytorch_wavenet
 - 2024.09.12 Add gpt-sovits-v2
