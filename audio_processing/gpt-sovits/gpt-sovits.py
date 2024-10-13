@@ -14,8 +14,6 @@ from logging import getLogger   # noqa: E402
 logger = getLogger(__name__)
 
 from text import cleaned_text_to_sequence
-import text.japanese as japanese
-import text.english as english
 import soundfile
 import librosa
 
@@ -65,6 +63,10 @@ parser.add_argument(
 parser.add_argument(
     '--profile', action='store_true',
     help='use profile model'
+)
+parser.add_argument(
+    '--ailia_voice', action='store_true',
+    help='use ailia voice for G2P'
 )
 args = update_parser(parser, check_input_type=False)
 
@@ -238,16 +240,36 @@ def generate_voice(ssl, t2s_encoder, t2s_first_decoder, t2s_stage_decoder, vits)
 
     input_audio = args.ref_audio
 
-    if args.ref_language == "ja":
-        ref_phones = japanese.g2p(args.ref_text)
+    if args.ailia_voice:
+        import ailia_voice
+        voice = ailia_voice.GPTSoVITS()
+        voice.initialize_model(model_path = "./models/")
     else:
-        ref_phones = english.g2p(args.ref_text)
+        import text.japanese as japanese
+        import text.english as english
+
+    if args.ref_language == "ja":
+        if args.ailia_voice:
+            ref_phones = voice.g2p(args.ref_text, ailia_voice.AILIA_VOICE_G2P_TYPE_GPT_SOVITS_JA).split(" ")[:-1]
+        else:
+            ref_phones = japanese.g2p(args.ref_text)
+    else:
+        if args.ailia_voice:
+            ref_phones = voice.g2p(args.ref_text, ailia_voice.AILIA_VOICE_G2P_TYPE_GPT_SOVITS_EN).split(" ")[:-1]
+        else:
+            ref_phones = english.g2p(args.ref_text)
     ref_seq = np.array([cleaned_text_to_sequence(ref_phones)], dtype=np.int64)
 
     if args.text_language == "ja":
-        text_phones = japanese.g2p(args.input)
+        if args.ailia_voice:
+            text_phones = voice.g2p(args.input, ailia_voice.AILIA_VOICE_G2P_TYPE_GPT_SOVITS_JA).split(" ")[:-1]
+        else:
+            text_phones = japanese.g2p(args.input)
     else:
-        text_phones = english.g2p(args.input)
+        if args.ailia_voice:
+            text_phones = voice.g2p(args.input, ailia_voice.AILIA_VOICE_G2P_TYPE_GPT_SOVITS_EN).split(" ")[:-1]
+        else:
+            text_phones = english.g2p(args.input)
     text_seq = np.array([cleaned_text_to_sequence(text_phones)], dtype=np.int64)
 
     # empty for ja or en
