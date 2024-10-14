@@ -8,7 +8,9 @@ The collection of pre-trained, state-of-the-art AI models.
 
 # How to use
 
-# NEW - ailia SDK can now be installed with "pip3 install ailia" ! 
+Try now on [Colab](https://colab.research.google.com/github/axinc-ai/ailia-models/blob/master/hello_ailia.ipynb)
+
+If you would like to try on your computer:
 
 [ailia MODELS tutorial](TUTORIAL.md)
 
