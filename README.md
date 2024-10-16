@@ -8,7 +8,7 @@ The collection of pre-trained, state-of-the-art AI models.
 
 # How to use
 
-Try now on [Colab](https://colab.research.google.com/github/axinc-ai/ailia-models/blob/master/hello_ailia.ipynb)
+Try now on [Google Colaboratory](https://www.ailia.ai/redirect_google_colab)
 
 If you would like to try on your computer:
 
