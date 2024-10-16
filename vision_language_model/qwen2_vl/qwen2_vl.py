@@ -162,22 +162,46 @@ def forward(
     return logits, new_past_key_values
 
 
-def sample(net):
+def sample(models):
+    image_token_id = 151655
+    image_token_id = np.array([image_token_id])
+
+    net = models["visual"]
+    if not args.onnx:
+        output = net.predict(
+            [input_ids, pixel_values, image_grid_thw, attention_mask, image_token_id]
+        )
+    else:
+        output = net.run(
+            None,
+            {
+                "input_ids": input_ids,
+                "pixel_values": pixel_values,
+                "image_grid_thw": image_grid_thw,
+                "image_token_id": image_token_id,
+            },
+        )
+    inputs_embeds = output[0]
     past_key_values = [
-        np.zeros((1, 2, 0, 128), dtype=np.float16) for _ in range(28 * 2)
+        np.zeros((1, 2, 0, 128), dtype=np.float32) for _ in range(28 * 2)
     ]
+    net = models["net"]
     while True:
         logits, past_key_values = forward(
             net,
-            decoder_input_ids,
-            encoder_hidden_states,
+            input_ids,
+            inputs_embeds,
+            position_ids,
+            attention_mask,
             past_key_values,
         )
+        inputs_embeds = inputs_embeds[:0, :1, :]
 
 
 def predict(models, img, prompt):
     im_h, im_w, _ = img.shape
     img = img[:, :, ::-1]  # BGR -> RGB
+    result = sample(models)
 
 
 def recognize_from_image(models):
