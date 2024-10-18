@@ -17,7 +17,9 @@ from arg_utils import get_base_parser, update_parser, get_savepath  # noqa
 from model_utils import check_and_download_models  # noqa
 from image_utils import normalize_image  # noqa
 from detector_utils import load_image  # noqa
+from math_utils import softmax
 
+from logit_process import logits_processor
 
 logger = getLogger(__name__)
 
@@ -163,6 +165,7 @@ def forward(
 
 
 def sample(models):
+    pad_token_id = 151643
     image_token_id = 151655
     image_token_id = np.array([image_token_id])
 
@@ -185,6 +188,12 @@ def sample(models):
     past_key_values = [
         np.zeros((1, 2, 0, 128), dtype=np.float32) for _ in range(28 * 2)
     ]
+
+    # keep track of which sequences are already finished
+    batch_size, cur_len = input_ids.shape
+    this_peer_finished = False
+    unfinished_sequences = np.ones(batch_size, dtype=int)
+
     net = models["net"]
     while True:
         logits, past_key_values = forward(
@@ -197,11 +206,81 @@ def sample(models):
         )
         inputs_embeds = inputs_embeds[:0, :1, :]
 
+        next_token_logits = logits[:, -1, :]
+
+        # pre-process distribution
+        next_token_scores = logits_processor(input_ids, next_token_logits)
+
+        # token selection
+        probs = softmax(next_token_scores, axis=-1)
+        next_tokens = np.random.choice(len(probs[0]), size=1, p=probs[0])
+
+        # finished sentences should have their next token be a padding token
+        next_tokens = next_tokens * unfinished_sequences + pad_token_id * (
+            1 - unfinished_sequences
+        )
+
+        # update generated ids, model inputs, and length for next step
+        input_ids = np.concatenate([input_ids, next_tokens[:, None]], axis=-1)
+
+        attention_mask = np.concatenate(
+            [attention_mask, np.ones((attention_mask.shape[0], 1))],
+            axis=-1,
+        )
+        # cache_position = cache_position[-1:] + 1
+
+        unfinished_sequences = unfinished_sequences & ~stopping_criteria(input_ids)
+        this_peer_finished = np.max(unfinished_sequences) == 0
+        cur_len += 1
+
+        if this_peer_finished:
+            break
+
 
 def predict(models, img, prompt):
     im_h, im_w, _ = img.shape
     img = img[:, :, ::-1]  # BGR -> RGB
+    # pixel_values = preprocess(img)
+
+    # tokenizer = models["tokenizer"]
+    # inputs = tokenizer(
+    #     text,
+    #     return_tensors="np",
+    #     padding=False,
+    #     return_token_type_ids=False,
+    # )
+    # input_ids = inputs["input_ids"]
+    # attention_mask = inputs["attention_mask"]
+    input_ids = np.load("input_ids.npy")
+
+    # # Extra the input embeddings
+    # net = models["embedding"]
+    # if not args.onnx:
+    #     output = net.predict([input_ids])
+    # else:
+    #     output = net.run(None, {"input_ids": input_ids})
+    # inputs_embeds = output[0]
+
+    # # Merge text and images
+    # net = models["encode_image"]
+    # if not args.onnx:
+    #     output = net.predict([pixel_values])
+    # else:
+    #     output = net.run(None, {"pixel_values": pixel_values})
+    # image_features = output[0]
+    # inputs_embeds = np.concatenate([image_features, inputs_embeds], axis=1)
+
+    # attention_mask = np.ones(inputs_embeds.shape[:2], dtype=int)
+
     result = sample(models)
+
+    # tokenizer = models["tokenizer"]
+    # generated_text = tokenizer.batch_decode(generated_ids, skip_special_tokens=False)[0]
+
+    # answer = post_process_generation(
+    #     generated_text, task=prompt, image_size=(im_w, im_h)
+    # )
+    # return answer
 
 
 def recognize_from_image(models):
