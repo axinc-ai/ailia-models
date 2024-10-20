@@ -164,10 +164,128 @@ def forward(
     return logits, new_past_key_values
 
 
+def get_rope_index(input_ids, image_grid_thw, video_grid_thw, attention_mask):
+    spatial_merge_size = 2
+    image_token_id = 151655
+    video_token_id = 151656
+    vision_start_token_id = 151652
+    mrope_position_deltas = []
+    if image_grid_thw is not None or video_grid_thw is not None:
+        total_input_ids = input_ids
+        position_ids = np.ones(
+            (3, input_ids.shape[0], input_ids.shape[1]),
+            dtype=input_ids.dtype,
+        )
+        image_index, video_index = 0, 0
+        for i, input_ids in enumerate(total_input_ids):
+            input_ids = input_ids[attention_mask[i] == 1]
+            image_nums, video_nums = 0, 0
+            vision_start_indices = np.argwhere(
+                input_ids == vision_start_token_id
+            ).squeeze(1)
+            vision_tokens = input_ids[vision_start_indices + 1]
+            image_nums = np.sum(vision_tokens == image_token_id)
+            video_nums = np.sum(vision_tokens == video_token_id)
+            input_tokens = input_ids.tolist()
+            llm_pos_ids_list: list = []
+            st = 0
+            remain_images, remain_videos = image_nums, video_nums
+            for _ in range(image_nums + video_nums):
+                if image_token_id in input_tokens and remain_images > 0:
+                    ed_image = input_tokens.index(image_token_id, st)
+                else:
+                    ed_image = len(input_tokens) + 1
+                if video_token_id in input_tokens and remain_videos > 0:
+                    ed_video = input_tokens.index(video_token_id, st)
+                else:
+                    ed_video = len(input_tokens) + 1
+                if ed_image < ed_video:
+                    t, h, w = (
+                        image_grid_thw[image_index][0],
+                        image_grid_thw[image_index][1],
+                        image_grid_thw[image_index][2],
+                    )
+                    image_index += 1
+                    remain_images -= 1
+                    ed = ed_image
+                else:
+                    t, h, w = (
+                        video_grid_thw[video_index][0],
+                        video_grid_thw[video_index][1],
+                        video_grid_thw[video_index][2],
+                    )
+                    video_index += 1
+                    remain_videos -= 1
+                    ed = ed_video
+                llm_grid_t, llm_grid_h, llm_grid_w = (
+                    t.item(),
+                    h.item() // spatial_merge_size,
+                    w.item() // spatial_merge_size,
+                )
+                text_len = ed - st
+
+                st_idx = (
+                    llm_pos_ids_list[-1].max() + 1 if len(llm_pos_ids_list) > 0 else 0
+                )
+                llm_pos_ids_list.append(
+                    np.tile(np.arange(text_len).reshape(1, -1), (3, 1)) + st_idx
+                )
+
+                t_index = np.tile(
+                    np.arange(llm_grid_t).reshape(-1, 1), (1, llm_grid_h * llm_grid_w)
+                ).flatten()
+                h_index = np.tile(
+                    np.arange(llm_grid_h).reshape(1, -1, 1),
+                    (llm_grid_t, 1, llm_grid_w),
+                ).flatten()
+                w_index = np.tile(
+                    np.arange(llm_grid_w).reshape(1, 1, -1),
+                    (llm_grid_t, llm_grid_h, 1),
+                ).flatten()
+                llm_pos_ids_list.append(
+                    np.stack([t_index, h_index, w_index]) + text_len + st_idx
+                )
+                st = ed + llm_grid_t * llm_grid_h * llm_grid_w
+
+            if st < len(input_tokens):
+                st_idx = (
+                    llm_pos_ids_list[-1].max() + 1 if len(llm_pos_ids_list) > 0 else 0
+                )
+                text_len = len(input_tokens) - st
+                llm_pos_ids_list.append(
+                    np.tile(np.arange(text_len).reshape(1, -1), (3, 1)) + st_idx
+                )
+
+            llm_positions = np.concatenate(llm_pos_ids_list, axis=1).reshape(3, -1)
+            position_ids[..., i, attention_mask[i] == 1] = llm_positions
+            mrope_position_deltas.append(
+                llm_positions.max() + 1 - len(total_input_ids[i])
+            )
+
+        mrope_position_deltas = np.expand_dims(np.array(mrope_position_deltas), axis=1)
+        return position_ids, mrope_position_deltas
+    else:
+        raise NotImplementedError
+
+
+def stopping_criteria(input_ids: np.array) -> np.array:
+    max_length = 438
+
+    cur_len = input_ids.shape[-1]
+    is_done = cur_len >= max_length
+    is_done = np.full(input_ids.shape[0], is_done)
+
+    eos_token_id = np.array([151645, 151643])
+    is_done = is_done | np.isin(input_ids[:, -1], eos_token_id)
+
+    return is_done
+
+
 def sample(models):
     pad_token_id = 151643
     image_token_id = 151655
     image_token_id = np.array([image_token_id])
+    video_grid_thw = None
 
     net = models["visual"]
     if not args.onnx:
@@ -196,15 +314,33 @@ def sample(models):
 
     net = models["net"]
     while True:
+        # prepare model inputs
+        model_input_ids = input_ids
+        if model_input_ids.shape[1] != cache_position.shape[0]:
+            model_input_ids = model_input_ids[:, cache_position]
+        batch_size, seq_length = model_input_ids.shape
+        if cache_position[0] == 0:
+            position_ids, rope_deltas = get_rope_index(
+                model_input_ids, image_grid_thw, video_grid_thw, attention_mask
+            )
+        else:
+            delta = cache_position[0] + rope_deltas if rope_deltas is not None else 0
+            position_ids = np.arange(seq_length)
+            position_ids = np.tile(position_ids.reshape(1, -1), (batch_size, 1))
+            position_ids = position_ids + delta
+            position_ids = np.tile(np.expand_dims(position_ids, axis=0), (3, 1, 1))
+        if cache_position[0] != 0:
+            # Disable inputs_embeds parameter if cache is used
+            inputs_embeds = inputs_embeds[:0, :1, :]
+
         logits, past_key_values = forward(
             net,
-            input_ids,
+            model_input_ids,
             inputs_embeds,
             position_ids,
             attention_mask,
             past_key_values,
         )
-        inputs_embeds = inputs_embeds[:0, :1, :]
 
         next_token_logits = logits[:, -1, :]
 
@@ -224,10 +360,10 @@ def sample(models):
         input_ids = np.concatenate([input_ids, next_tokens[:, None]], axis=-1)
 
         attention_mask = np.concatenate(
-            [attention_mask, np.ones((attention_mask.shape[0], 1))],
+            [attention_mask, np.ones((attention_mask.shape[0], 1), dtype=int)],
             axis=-1,
         )
-        # cache_position = cache_position[-1:] + 1
+        cache_position = cache_position[-1:] + 1
 
         unfinished_sequences = unfinished_sequences & ~stopping_criteria(input_ids)
         this_peer_finished = np.max(unfinished_sequences) == 0
