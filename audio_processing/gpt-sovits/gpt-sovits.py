@@ -139,7 +139,7 @@ class T2SModel():
             if args.onnx:
                 y, k, v, y_emb, logits, samples = self.sess_sdec.run(None, {"iy":y, "ik":k, "iv":v, "iy_emb":y_emb, "ix_example":x_example, "top_k":top_k, "top_p":top_p, "temperature":temperature, "repetition_penalty":repetition_penalty})
             else:
-                COPY_INPUT_BLOB_DATA = False
+                COPY_INPUT_BLOB_DATA = True
                 if idx == 1:
                     y, k, v, y_emb, logits, samples = self.sess_sdec.run({"iy":y, "ik":k, "iv":v, "iy_emb":y_emb, "ix_example":x_example, "top_k":top_k, "top_p":top_p, "temperature":temperature, "repetition_penalty":repetition_penalty})
                     kv_base_shape = k.shape
