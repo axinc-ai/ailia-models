@@ -8,14 +8,14 @@ from logging import getLogger  # noqa
 
 import numpy as np
 import cv2
+from PIL import Image
 
 import ailia
 
 # import original modules
 sys.path.append("../../util")
-from arg_utils import get_base_parser, update_parser, get_savepath  # noqa
+from arg_utils import get_base_parser, update_parser  # noqa
 from model_utils import check_and_download_models  # noqa
-from image_utils import normalize_image  # noqa
 from detector_utils import load_image  # noqa
 from math_utils import softmax
 
@@ -61,23 +61,117 @@ args = update_parser(parser)
 # ======================
 
 
+def smart_resize(
+    height: int,
+    width: int,
+    factor: int = 28,
+    min_pixels: int = 4 * 28 * 28,
+    max_pixels: int = 16384 * 28 * 28,
+) -> tuple[int, int]:
+    def round_by_factor(number: int, factor: int) -> int:
+        return round(number / factor) * factor
+
+    def ceil_by_factor(number: int, factor: int) -> int:
+        return np.ceil(number / factor) * factor
+
+    def floor_by_factor(number: int, factor: int) -> int:
+        return np.floor(number / factor) * factor
+
+    h_bar = max(factor, round_by_factor(height, factor))
+    w_bar = max(factor, round_by_factor(width, factor))
+    if h_bar * w_bar > max_pixels:
+        beta = np.sqrt((height * width) / max_pixels)
+        h_bar = floor_by_factor(height / beta, factor)
+        w_bar = floor_by_factor(width / beta, factor)
+    elif h_bar * w_bar < min_pixels:
+        beta = np.sqrt(min_pixels / (height * width))
+        h_bar = ceil_by_factor(height * beta, factor)
+        w_bar = ceil_by_factor(width * beta, factor)
+
+    return h_bar, w_bar
+
+
+def fetch_image(image_path: str) -> np.ndarray:
+    img = load_image(image_path)
+    img = cv2.cvtColor(img, cv2.COLOR_BGRA2RGB)
+
+    height, width, _ = img.shape
+    resized_height, resized_width = smart_resize(
+        height,
+        width,
+    )
+
+    img = np.array(Image.fromarray(img).resize((resized_width, resized_height)))
+
+    return img
+
+
 # ======================
 # Main functions
 # ======================
 
 
 def preprocess(img):
-    h = w = IMG_SIZE
+    height, width, _ = img.shape
 
-    img = np.array(Image.fromarray(img).resize((w, h), Image.Resampling.BICUBIC))
+    max_pixels = 12845056
+    min_pixels = 56 * 56
+    patch_size = 14
+    merge_size = 2
+    # factor = 28
+    factor = patch_size * merge_size
 
-    img = normalize_image(img, normalize_type="ImageNet")
+    h_bar = round(height / factor) * factor
+    w_bar = round(width / factor) * factor
+    if h_bar * w_bar > max_pixels:
+        beta = np.sqrt((height * width) / max_pixels)
+        h_bar = np.floor(height / beta / factor) * factor
+        w_bar = np.floor(width / beta / factor) * factor
+    elif h_bar * w_bar < min_pixels:
+        beta = np.sqrt(min_pixels / (height * width))
+        h_bar = np.ceil(height * beta / factor) * factor
+        w_bar = np.ceil(width * beta / factor) * factor
+    resized_height, resized_width = h_bar, w_bar
+
+    img = np.array(
+        Image.fromarray(img).resize(
+            (resized_width, resized_height), Image.Resampling.BICUBIC
+        )
+    )
+
+    mean = np.array([0.48145467, 0.4578275, 0.40821072], dtype=np.float32)
+    std = np.array([0.26862955, 0.2613026, 0.2757771], dtype=np.float32)
+    img = img / 255
+    img = (img - mean) / std
 
     img = img.transpose(2, 0, 1)  # HWC -> CHW
     img = np.expand_dims(img, axis=0)
-    img = img.astype(np.float16)
+    img = img.astype(np.float32)
 
-    return img
+    temporal_patch_size = 2
+    patches = np.tile(img, (temporal_patch_size, 1, 1, 1))
+
+    channel = patches.shape[1]
+    grid_t = patches.shape[0] // temporal_patch_size
+    grid_h, grid_w = resized_height // patch_size, resized_width // patch_size
+    patches = patches.reshape(
+        grid_t,
+        temporal_patch_size,
+        channel,
+        grid_h // merge_size,
+        merge_size,
+        patch_size,
+        grid_w // merge_size,
+        merge_size,
+        patch_size,
+    )
+    patches = patches.transpose(0, 3, 6, 4, 7, 2, 1, 5, 8)
+    flatten_patches = patches.reshape(
+        grid_t * grid_h * grid_w,
+        channel * temporal_patch_size * patch_size * patch_size,
+    )
+
+    return flatten_patches, (grid_t, grid_h, grid_w)
 
 
 def forward(
@@ -281,11 +375,12 @@ def stopping_criteria(input_ids: np.array) -> np.array:
     return is_done
 
 
-def sample(models):
+def sample(models, input_ids, pixel_values, attention_mask, image_grid_thw):
     pad_token_id = 151643
     image_token_id = 151655
     image_token_id = np.array([image_token_id])
     video_grid_thw = None
+    rope_deltas = None
 
     net = models["visual"]
     if not args.onnx:
@@ -311,6 +406,9 @@ def sample(models):
     batch_size, cur_len = input_ids.shape
     this_peer_finished = False
     unfinished_sequences = np.ones(batch_size, dtype=int)
+    cache_position = (
+        np.cumsum(np.ones_like(input_ids[0, :], dtype=np.int64), axis=0) - 1
+    )
 
     net = models["net"]
     while True:
@@ -372,88 +470,83 @@ def sample(models):
         if this_peer_finished:
             break
 
+    return input_ids
 
-def predict(models, img, prompt):
-    im_h, im_w, _ = img.shape
-    img = img[:, :, ::-1]  # BGR -> RGB
-    # pixel_values = preprocess(img)
 
-    # tokenizer = models["tokenizer"]
-    # inputs = tokenizer(
-    #     text,
-    #     return_tensors="np",
-    #     padding=False,
-    #     return_token_type_ids=False,
-    # )
-    # input_ids = inputs["input_ids"]
-    # attention_mask = inputs["attention_mask"]
-    input_ids = np.load("input_ids.npy")
+def predict(models, img, text):
+    text = "<|im_start|>system\nYou are a helpful assistant.<|im_end|>\n<|im_start|>user\n<|vision_start|><|image_pad|><|vision_end|>Describe this image.<|im_end|>\n<|im_start|>assistant\n"
 
-    # # Extra the input embeddings
-    # net = models["embedding"]
-    # if not args.onnx:
-    #     output = net.predict([input_ids])
-    # else:
-    #     output = net.run(None, {"input_ids": input_ids})
-    # inputs_embeds = output[0]
+    pixel_values, image_grid_thw = preprocess(img)
+    image_grid_thw = np.array([image_grid_thw])
 
-    # # Merge text and images
-    # net = models["encode_image"]
-    # if not args.onnx:
-    #     output = net.predict([pixel_values])
-    # else:
-    #     output = net.run(None, {"pixel_values": pixel_values})
-    # image_features = output[0]
-    # inputs_embeds = np.concatenate([image_features, inputs_embeds], axis=1)
+    merge_length = 4
+    index = 0
+    while "<|image_pad|>" in text:
+        text = text.replace(
+            "<|image_pad|>",
+            "<|placeholder|>" * (image_grid_thw[index].prod() // merge_length),
+            1,
+        )
+        index += 1
+    text = text.replace("<|placeholder|>", "<|image_pad|>")
 
-    # attention_mask = np.ones(inputs_embeds.shape[:2], dtype=int)
+    text = [text]
 
-    result = sample(models)
+    tokenizer = models["tokenizer"]
+    text_inputs = tokenizer(
+        text,
+        return_tensors="np",
+        padding=True,
+        padding_side="left",
+    )
+    input_ids = text_inputs["input_ids"]
+    attention_mask = text_inputs["attention_mask"]
 
-    # tokenizer = models["tokenizer"]
-    # generated_text = tokenizer.batch_decode(generated_ids, skip_special_tokens=False)[0]
+    generated_ids = sample(
+        models, input_ids, pixel_values, attention_mask, image_grid_thw
+    )
 
-    # answer = post_process_generation(
-    #     generated_text, task=prompt, image_size=(im_w, im_h)
-    # )
-    # return answer
+    generated_ids_trimmed = [
+        out_ids[len(in_ids) :] for in_ids, out_ids in zip(input_ids, generated_ids)
+    ]
+    output_text = tokenizer.batch_decode(
+        generated_ids_trimmed,
+        skip_special_tokens=True,
+        clean_up_tokenization_spaces=False,
+    )
+
+    return output_text[0]
 
 
 def recognize_from_image(models):
     prompt = args.prompt
     logger.info("Prompt: %s" % prompt)
 
-    # input image loop
-    for image_path in args.input:
-        logger.info(image_path)
+    img = fetch_image(args.input[0])
 
-        # prepare input data
-        img = load_image(image_path)
-        img = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
-
-        # inference
-        logger.info("Start inference...")
-        if args.benchmark:
-            logger.info("BENCHMARK mode")
-            total_time_estimation = 0
-            for i in range(args.benchmark_count):
-                start = int(round(time.time() * 1000))
-                output_text = predict(models, img, prompt)
-                end = int(round(time.time() * 1000))
-                estimation_time = end - start
-
-                # Logging
-                logger.info(f"\tailia processing estimation time {estimation_time} ms")
-                if i != 0:
-                    total_time_estimation = total_time_estimation + estimation_time
-
-            logger.info(
-                f"\taverage time estimation {total_time_estimation / (args.benchmark_count - 1)} ms"
-            )
-        else:
+    # inference
+    logger.info("Start inference...")
+    if args.benchmark:
+        logger.info("BENCHMARK mode")
+        total_time_estimation = 0
+        for i in range(args.benchmark_count):
+            start = int(round(time.time() * 1000))
             output_text = predict(models, img, prompt)
+            end = int(round(time.time() * 1000))
+            estimation_time = end - start
 
-        print(output_text)
+            # Logging
+            logger.info(f"\tailia processing estimation time {estimation_time} ms")
+            if i != 0:
+                total_time_estimation = total_time_estimation + estimation_time
+
+        logger.info(
+            f"\taverage time estimation {total_time_estimation / (args.benchmark_count - 1)} ms"
+        )
+    else:
+        output_text = predict(models, img, prompt)
+
+    print(output_text)
 
     logger.info("Script finished successfully.")
 
@@ -477,7 +570,16 @@ def main():
         visual = onnxruntime.InferenceSession(WEIGHT_VIS_PATH, providers=providers)
         net = onnxruntime.InferenceSession(WEIGHT_PATH, providers=providers)
 
+    args.disable_ailia_tokenizer = True
+    if args.disable_ailia_tokenizer:
+        import transformers
+
+        tokenizer = transformers.Qwen2TokenizerFast.from_pretrained("./tokenizer")
+    else:
+        raise NotImplementedError
+
     models = {
+        "tokenizer": tokenizer,
         "visual": visual,
         "net": net,
     }
