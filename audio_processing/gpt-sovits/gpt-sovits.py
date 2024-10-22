@@ -1,5 +1,6 @@
 import time
 import sys
+import platform
 
 import numpy as np
 import soundfile as sf
@@ -85,6 +86,25 @@ MODEL_PATH_T2S_FIRST_DECODER = WEIGHT_PATH_T2S_FIRST_DECODER + '.prototxt'
 MODEL_PATH_T2S_STAGE_DECODER = WEIGHT_PATH_T2S_STAGE_DECODER + '.prototxt'
 MODEL_PATH_VITS = WEIGHT_PATH_VITS + '.prototxt'
 
+# ======================
+# Mode
+# ======================
+
+if not args.onnx:
+    import ailia
+    version = ailia.get_version().split(".")
+    AILIA_VERSION_MAJOR = int(version[0])
+    AILIA_VERSION_MINOR = int(version[1])
+    AILIA_VERSION_REVISION = int(version[2])
+    COPY_BLOB_DATA = not (
+        AILIA_VERSION_MAJOR <= 1
+        and AILIA_VERSION_MINOR <= 2
+        and AILIA_VERSION_REVISION < 15
+    )
+    MOVE_BLOB_DATA = not (
+        AILIA_VERSION_MAJOR <= 1
+        and AILIA_VERSION_MINOR < 5
+    )
 
 # ======================
 # Logic
@@ -139,7 +159,6 @@ class T2SModel():
             if args.onnx:
                 y, k, v, y_emb, logits, samples = self.sess_sdec.run(None, {"iy":y, "ik":k, "iv":v, "iy_emb":y_emb, "ix_example":x_example, "top_k":top_k, "top_p":top_p, "temperature":temperature, "repetition_penalty":repetition_penalty})
             else:
-                COPY_INPUT_BLOB_DATA = True
                 if idx == 1:
                     y, k, v, y_emb, logits, samples = self.sess_sdec.run({"iy":y, "ik":k, "iv":v, "iy_emb":y_emb, "ix_example":x_example, "top_k":top_k, "top_p":top_p, "temperature":temperature, "repetition_penalty":repetition_penalty})
                     kv_base_shape = k.shape
@@ -147,7 +166,10 @@ class T2SModel():
                     input_blob_idx = self.sess_sdec.get_input_blob_list()
                     output_blob_idx = self.sess_sdec.get_output_blob_list()
                     self.sess_sdec.set_input_blob_data(y, 0)
-                    if COPY_INPUT_BLOB_DATA:
+                    if MOVE_BLOB_DATA:
+                        self.sess_sdec.move_blob_data(input_blob_idx[1], output_blob_idx[1], self.sess_sdec)
+                        self.sess_sdec.move_blob_data(input_blob_idx[2], output_blob_idx[2], self.sess_sdec)
+                    elif COPY_BLOB_DATA:
                         kv_shape = (kv_base_shape[0], kv_base_shape[1] + idx - 2, kv_base_shape[2], kv_base_shape[3])
                         self.sess_sdec.set_input_blob_shape(kv_shape, 1)
                         self.sess_sdec.set_input_blob_shape(kv_shape, 2)
@@ -164,7 +186,7 @@ class T2SModel():
                     self.sess_sdec.set_input_blob_data(repetition_penalty, 8)
                     self.sess_sdec.update()
                     y = self.sess_sdec.get_blob_data(output_blob_idx[0])
-                    if not COPY_INPUT_BLOB_DATA:
+                    if not COPY_BLOB_DATA and not MOVE_BLOB_DATA:
                         k = self.sess_sdec.get_blob_data(output_blob_idx[1])
                         v = self.sess_sdec.get_blob_data(output_blob_idx[2])
                     y_emb = self.sess_sdec.get_blob_data(output_blob_idx[3])
@@ -333,6 +355,12 @@ def main():
             t2s_first_decoder.set_profile_mode(True)
             t2s_stage_decoder.set_profile_mode(True)
             vits.set_profile_mode(True)
+        pf = platform.system()
+        if pf == "Darwin":
+            if args.env_id == 2:
+                logger.info(
+                    "This model not optimized for macOS GPU currently. Please try -e 1 option to improve inference speed."
+                )
 
     if args.benchmark:
         start = int(round(time.time() * 1000))
