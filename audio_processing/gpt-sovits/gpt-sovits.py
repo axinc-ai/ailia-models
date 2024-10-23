@@ -336,11 +336,13 @@ def main():
 
     if args.onnx:
         import onnxruntime
-        ssl = onnxruntime.InferenceSession(WEIGHT_PATH_SSL)
-        t2s_encoder = onnxruntime.InferenceSession(WEIGHT_PATH_T2S_ENCODER)
-        t2s_first_decoder = onnxruntime.InferenceSession(WEIGHT_PATH_T2S_FIRST_DECODER)
-        t2s_stage_decoder = onnxruntime.InferenceSession(WEIGHT_PATH_T2S_STAGE_DECODER)
-        vits = onnxruntime.InferenceSession(WEIGHT_PATH_VITS)
+        providers = ["CPUExecutionProvider"]
+        #providers = ["CUDAExecutionProvider"]
+        ssl = onnxruntime.InferenceSession(WEIGHT_PATH_SSL, providers=providers)
+        t2s_encoder = onnxruntime.InferenceSession(WEIGHT_PATH_T2S_ENCODER, providers=providers)
+        t2s_first_decoder = onnxruntime.InferenceSession(WEIGHT_PATH_T2S_FIRST_DECODER, providers=providers)
+        t2s_stage_decoder = onnxruntime.InferenceSession(WEIGHT_PATH_T2S_STAGE_DECODER, providers=providers)
+        vits = onnxruntime.InferenceSession(WEIGHT_PATH_VITS, providers=providers)
     else:
         import ailia
         memory_mode = ailia.get_memory_mode(reduce_constant=True, ignore_input_with_initializer=True, reduce_interstage=False, reuse_interstage=True)

@@ -230,6 +230,11 @@ if not args.onnx:
         and AILIA_VERSION_MINOR <= 2
         and AILIA_VERSION_REVISION < 15
     )
+    MOVE_BLOB_DATA_ENABLE = not (
+        AILIA_VERSION_MAJOR <= 1
+        and AILIA_VERSION_MINOR <= 5
+        and AILIA_VERSION_REVISION < 0
+    )
     LAYER_NORM_ENABLE = not (
         AILIA_VERSION_MAJOR <= 1
         and AILIA_VERSION_MINOR <= 2
@@ -547,7 +552,7 @@ def inference_logits(
 
             dec_net.predict([tokens, audio_features, kv_cache, offset], output=output)
         else:
-            if is_init_kv_cache or not COPY_BLOB_DATA_ENABLE or args.dynamic_kv_cache:
+            if is_init_kv_cache or (not COPY_BLOB_DATA_ENABLE and not MOVE_BLOB_DATA_ENABLE) or args.dynamic_kv_cache:
                 if constant_audio_feature:
                     dec_net.predict(
                         {"tokens": tokens, "kv_cache": kv_cache, "offset": offset},
@@ -558,7 +563,10 @@ def inference_logits(
                         [tokens, audio_features, kv_cache, offset], output=output
                     )
             else:
-                dec_net.copy_blob_data("kv_cache", "output_kv_cache", None)
+                if MOVE_BLOB_DATA_ENABLE:
+                    dec_net.move_blob_data("kv_cache", "output_kv_cache", None)
+                else:
+                    dec_net.copy_blob_data("kv_cache", "output_kv_cache", None)
                 output = [logits]
                 if constant_audio_feature:
                     dec_net.predict({"tokens": tokens, "offset": offset}, output=output)
@@ -1235,7 +1243,7 @@ def main():
         import onnxruntime
 
         providers = ["CPUExecutionProvider"]
-        # providers = ["CUDAExecutionProvider"]
+        #providers = ["CUDAExecutionProvider"]
         enc_net = onnxruntime.InferenceSession(WEIGHT_ENC_PATH, providers=providers)
         if args.profile:
             options = onnxruntime.SessionOptions()
