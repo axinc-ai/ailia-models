@@ -36,6 +36,8 @@ REMOTE_PATH = "https://storage.googleapis.com/ailia-models/qwen2_vl/"
 IMAGE_PATH = "demo.jpg"
 SAVE_IMAGE_PATH = "output.png"
 
+CHAT_TEMPLATE = "{% set image_count = namespace(value=0) %}{% set video_count = namespace(value=0) %}{% for message in messages %}{% if loop.first and message['role'] != 'system' %}<|im_start|>system\nYou are a helpful assistant.<|im_end|>\n{% endif %}<|im_start|>{{ message['role'] }}\n{% if message['content'] is string %}{{ message['content'] }}<|im_end|>\n{% else %}{% for content in message['content'] %}{% if content['type'] == 'image' or 'image' in content or 'image_url' in content %}{% set image_count.value = image_count.value + 1 %}{% if add_vision_id %}Picture {{ image_count.value }}: {% endif %}<|vision_start|><|image_pad|><|vision_end|>{% elif content['type'] == 'video' or 'video' in content %}{% set video_count.value = video_count.value + 1 %}{% if add_vision_id %}Video {{ video_count.value }}: {% endif %}<|vision_start|><|video_pad|><|vision_end|>{% elif 'text' in content %}{{ content['text'] }}{% endif %}{% endfor %}<|im_end|>\n{% endif %}{% endfor %}{% if add_generation_prompt %}<|im_start|>assistant\n{% endif %}"
+
 
 # ======================
 # Arguemnt Parser Config
@@ -118,7 +120,6 @@ def preprocess(img):
     min_pixels = 56 * 56
     patch_size = 14
     merge_size = 2
-    # factor = 28
     factor = patch_size * merge_size
 
     h_bar = round(height / factor) * factor
@@ -473,11 +474,33 @@ def sample(models, input_ids, pixel_values, attention_mask, image_grid_thw):
     return input_ids
 
 
-def predict(models, img, text):
-    text = "<|im_start|>system\nYou are a helpful assistant.<|im_end|>\n<|im_start|>user\n<|vision_start|><|image_pad|><|vision_end|>Describe this image.<|im_end|>\n<|im_start|>assistant\n"
+def predict(models, messages):
+    tokenizer = models["tokenizer"]
+    text = tokenizer.apply_chat_template(
+        messages,
+        chat_template=CHAT_TEMPLATE,
+        tokenize=False,
+        add_generation_prompt=True,
+    )
 
-    pixel_values, image_grid_thw = preprocess(img)
-    image_grid_thw = np.array([image_grid_thw])
+    image_inputs = []
+    for message in messages:
+        for ele in message["content"]:
+            if "image" in ele:
+                img = fetch_image(ele["image"])
+                image_inputs.append(img)
+            if "video" in ele:
+                img = fetch_image(args.input[0])
+
+    pixel_values = []
+    vision_grid_thws = []
+    for img in image_inputs:
+        patches, vision_grid_thw = preprocess(img)
+        pixel_values.extend(patches)
+        vision_grid_thws.append(vision_grid_thw)
+
+    pixel_values = np.array(pixel_values)
+    image_grid_thw = np.array(vision_grid_thws)
 
     merge_length = 4
     index = 0
@@ -492,7 +515,6 @@ def predict(models, img, text):
 
     text = [text]
 
-    tokenizer = models["tokenizer"]
     text_inputs = tokenizer(
         text,
         return_tensors="np",
@@ -522,7 +544,15 @@ def recognize_from_image(models):
     prompt = args.prompt
     logger.info("Prompt: %s" % prompt)
 
-    img = fetch_image(args.input[0])
+    messages = [
+        {
+            "role": "user",
+            "content": [
+                {"type": "image", "image": "demo.jpg"},
+                {"type": "text", "text": prompt},
+            ],
+        }
+    ]
 
     # inference
     logger.info("Start inference...")
@@ -531,7 +561,7 @@ def recognize_from_image(models):
         total_time_estimation = 0
         for i in range(args.benchmark_count):
             start = int(round(time.time() * 1000))
-            output_text = predict(models, img, prompt)
+            output_text = predict(models, messages)
             end = int(round(time.time() * 1000))
             estimation_time = end - start
 
@@ -544,7 +574,7 @@ def recognize_from_image(models):
             f"\taverage time estimation {total_time_estimation / (args.benchmark_count - 1)} ms"
         )
     else:
-        output_text = predict(models, img, prompt)
+        output_text = predict(models, messages)
 
     print(output_text)
 
