@@ -101,10 +101,6 @@ if not args.onnx:
         and AILIA_VERSION_MINOR <= 2
         and AILIA_VERSION_REVISION < 15
     )
-    MOVE_BLOB_DATA = not (
-        AILIA_VERSION_MAJOR <= 1
-        and AILIA_VERSION_MINOR < 5
-    )
 
 # ======================
 # Logic
@@ -166,10 +162,7 @@ class T2SModel():
                     input_blob_idx = self.sess_sdec.get_input_blob_list()
                     output_blob_idx = self.sess_sdec.get_output_blob_list()
                     self.sess_sdec.set_input_blob_data(y, 0)
-                    if MOVE_BLOB_DATA:
-                        self.sess_sdec.move_blob_data(input_blob_idx[1], output_blob_idx[1], self.sess_sdec)
-                        self.sess_sdec.move_blob_data(input_blob_idx[2], output_blob_idx[2], self.sess_sdec)
-                    elif COPY_BLOB_DATA:
+                    if COPY_BLOB_DATA:
                         kv_shape = (kv_base_shape[0], kv_base_shape[1] + idx - 2, kv_base_shape[2], kv_base_shape[3])
                         self.sess_sdec.set_input_blob_shape(kv_shape, 1)
                         self.sess_sdec.set_input_blob_shape(kv_shape, 2)
@@ -186,7 +179,7 @@ class T2SModel():
                     self.sess_sdec.set_input_blob_data(repetition_penalty, 8)
                     self.sess_sdec.update()
                     y = self.sess_sdec.get_blob_data(output_blob_idx[0])
-                    if not COPY_BLOB_DATA and not MOVE_BLOB_DATA:
+                    if not COPY_BLOB_DATA:
                         k = self.sess_sdec.get_blob_data(output_blob_idx[1])
                         v = self.sess_sdec.get_blob_data(output_blob_idx[2])
                     y_emb = self.sess_sdec.get_blob_data(output_blob_idx[3])
@@ -264,7 +257,7 @@ def generate_voice(ssl, t2s_encoder, t2s_first_decoder, t2s_stage_decoder, vits)
 
     if args.ailia_voice:
         import ailia_voice
-        voice = ailia_voice.GPTSoVITS()
+        voice = ailia_voice.G2P()
         voice.initialize_model(model_path = "./models/")
     else:
         import text.japanese as japanese
