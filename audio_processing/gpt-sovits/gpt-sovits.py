@@ -1,5 +1,6 @@
 import time
 import sys
+import platform
 
 import numpy as np
 import soundfile as sf
@@ -14,8 +15,6 @@ from logging import getLogger   # noqa: E402
 logger = getLogger(__name__)
 
 from text import cleaned_text_to_sequence
-import text.japanese as japanese
-import text.english as english
 import soundfile
 import librosa
 
@@ -66,6 +65,10 @@ parser.add_argument(
     '--profile', action='store_true',
     help='use profile model'
 )
+parser.add_argument(
+    '--ailia_voice', action='store_true',
+    help='use ailia voice for G2P'
+)
 args = update_parser(parser, check_input_type=False)
 
 WEIGHT_PATH_SSL = 'cnhubert.onnx'
@@ -74,7 +77,7 @@ WEIGHT_PATH_T2S_FIRST_DECODER = 't2s_fsdec.onnx'
 if args.normal:
     WEIGHT_PATH_T2S_STAGE_DECODER = 't2s_sdec.onnx'
 else:
-    WEIGHT_PATH_T2S_STAGE_DECODER = 't2s_sdec.opt2.onnx'
+    WEIGHT_PATH_T2S_STAGE_DECODER = 't2s_sdec.opt3.onnx'
 WEIGHT_PATH_VITS = 'vits.onnx'
 
 MODEL_PATH_SSL = WEIGHT_PATH_SSL + '.prototxt'
@@ -83,6 +86,21 @@ MODEL_PATH_T2S_FIRST_DECODER = WEIGHT_PATH_T2S_FIRST_DECODER + '.prototxt'
 MODEL_PATH_T2S_STAGE_DECODER = WEIGHT_PATH_T2S_STAGE_DECODER + '.prototxt'
 MODEL_PATH_VITS = WEIGHT_PATH_VITS + '.prototxt'
 
+# ======================
+# Mode
+# ======================
+
+if not args.onnx:
+    import ailia
+    version = ailia.get_version().split(".")
+    AILIA_VERSION_MAJOR = int(version[0])
+    AILIA_VERSION_MINOR = int(version[1])
+    AILIA_VERSION_REVISION = int(version[2])
+    COPY_BLOB_DATA = not (
+        AILIA_VERSION_MAJOR <= 1
+        and AILIA_VERSION_MINOR <= 2
+        and AILIA_VERSION_REVISION < 15
+    )
 
 # ======================
 # Logic
@@ -137,7 +155,6 @@ class T2SModel():
             if args.onnx:
                 y, k, v, y_emb, logits, samples = self.sess_sdec.run(None, {"iy":y, "ik":k, "iv":v, "iy_emb":y_emb, "ix_example":x_example, "top_k":top_k, "top_p":top_p, "temperature":temperature, "repetition_penalty":repetition_penalty})
             else:
-                COPY_INPUT_BLOB_DATA = False
                 if idx == 1:
                     y, k, v, y_emb, logits, samples = self.sess_sdec.run({"iy":y, "ik":k, "iv":v, "iy_emb":y_emb, "ix_example":x_example, "top_k":top_k, "top_p":top_p, "temperature":temperature, "repetition_penalty":repetition_penalty})
                     kv_base_shape = k.shape
@@ -145,7 +162,7 @@ class T2SModel():
                     input_blob_idx = self.sess_sdec.get_input_blob_list()
                     output_blob_idx = self.sess_sdec.get_output_blob_list()
                     self.sess_sdec.set_input_blob_data(y, 0)
-                    if COPY_INPUT_BLOB_DATA:
+                    if COPY_BLOB_DATA:
                         kv_shape = (kv_base_shape[0], kv_base_shape[1] + idx - 2, kv_base_shape[2], kv_base_shape[3])
                         self.sess_sdec.set_input_blob_shape(kv_shape, 1)
                         self.sess_sdec.set_input_blob_shape(kv_shape, 2)
@@ -162,7 +179,7 @@ class T2SModel():
                     self.sess_sdec.set_input_blob_data(repetition_penalty, 8)
                     self.sess_sdec.update()
                     y = self.sess_sdec.get_blob_data(output_blob_idx[0])
-                    if not COPY_INPUT_BLOB_DATA:
+                    if not COPY_BLOB_DATA:
                         k = self.sess_sdec.get_blob_data(output_blob_idx[1])
                         v = self.sess_sdec.get_blob_data(output_blob_idx[2])
                     y_emb = self.sess_sdec.get_blob_data(output_blob_idx[3])
@@ -238,16 +255,36 @@ def generate_voice(ssl, t2s_encoder, t2s_first_decoder, t2s_stage_decoder, vits)
 
     input_audio = args.ref_audio
 
-    if args.ref_language == "ja":
-        ref_phones = japanese.g2p(args.ref_text)
+    if args.ailia_voice:
+        import ailia_voice
+        voice = ailia_voice.G2P()
+        voice.initialize_model(model_path = "./models/")
     else:
-        ref_phones = english.g2p(args.ref_text)
+        import text.japanese as japanese
+        import text.english as english
+
+    if args.ref_language == "ja":
+        if args.ailia_voice:
+            ref_phones = voice.g2p(args.ref_text, ailia_voice.AILIA_VOICE_G2P_TYPE_GPT_SOVITS_JA).split(" ")[:-1]
+        else:
+            ref_phones = japanese.g2p(args.ref_text)
+    else:
+        if args.ailia_voice:
+            ref_phones = voice.g2p(args.ref_text, ailia_voice.AILIA_VOICE_G2P_TYPE_GPT_SOVITS_EN).split(" ")[:-1]
+        else:
+            ref_phones = english.g2p(args.ref_text)
     ref_seq = np.array([cleaned_text_to_sequence(ref_phones)], dtype=np.int64)
 
     if args.text_language == "ja":
-        text_phones = japanese.g2p(args.input)
+        if args.ailia_voice:
+            text_phones = voice.g2p(args.input, ailia_voice.AILIA_VOICE_G2P_TYPE_GPT_SOVITS_JA).split(" ")[:-1]
+        else:
+            text_phones = japanese.g2p(args.input)
     else:
-        text_phones = english.g2p(args.input)
+        if args.ailia_voice:
+            text_phones = voice.g2p(args.input, ailia_voice.AILIA_VOICE_G2P_TYPE_GPT_SOVITS_EN).split(" ")[:-1]
+        else:
+            text_phones = english.g2p(args.input)
     text_seq = np.array([cleaned_text_to_sequence(text_phones)], dtype=np.int64)
 
     # empty for ja or en
@@ -292,11 +329,13 @@ def main():
 
     if args.onnx:
         import onnxruntime
-        ssl = onnxruntime.InferenceSession(WEIGHT_PATH_SSL)
-        t2s_encoder = onnxruntime.InferenceSession(WEIGHT_PATH_T2S_ENCODER)
-        t2s_first_decoder = onnxruntime.InferenceSession(WEIGHT_PATH_T2S_FIRST_DECODER)
-        t2s_stage_decoder = onnxruntime.InferenceSession(WEIGHT_PATH_T2S_STAGE_DECODER)
-        vits = onnxruntime.InferenceSession(WEIGHT_PATH_VITS)
+        providers = ["CPUExecutionProvider"]
+        #providers = ["CUDAExecutionProvider"]
+        ssl = onnxruntime.InferenceSession(WEIGHT_PATH_SSL, providers=providers)
+        t2s_encoder = onnxruntime.InferenceSession(WEIGHT_PATH_T2S_ENCODER, providers=providers)
+        t2s_first_decoder = onnxruntime.InferenceSession(WEIGHT_PATH_T2S_FIRST_DECODER, providers=providers)
+        t2s_stage_decoder = onnxruntime.InferenceSession(WEIGHT_PATH_T2S_STAGE_DECODER, providers=providers)
+        vits = onnxruntime.InferenceSession(WEIGHT_PATH_VITS, providers=providers)
     else:
         import ailia
         memory_mode = ailia.get_memory_mode(reduce_constant=True, ignore_input_with_initializer=True, reduce_interstage=False, reuse_interstage=True)
@@ -311,6 +350,12 @@ def main():
             t2s_first_decoder.set_profile_mode(True)
             t2s_stage_decoder.set_profile_mode(True)
             vits.set_profile_mode(True)
+        pf = platform.system()
+        if pf == "Darwin":
+            if args.env_id == 2:
+                logger.info(
+                    "This model not optimized for macOS GPU currently. Please try -e 1 option to improve inference speed."
+                )
 
     if args.benchmark:
         start = int(round(time.time() * 1000))
