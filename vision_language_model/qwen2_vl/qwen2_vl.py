@@ -90,7 +90,7 @@ def smart_resize(
         h_bar = ceil_by_factor(height * beta, factor)
         w_bar = ceil_by_factor(width * beta, factor)
 
-    return h_bar, w_bar
+    return int(h_bar), int(w_bar)
 
 
 def fetch_image(image_path: str) -> np.ndarray:
@@ -108,13 +108,59 @@ def fetch_image(image_path: str) -> np.ndarray:
     return img
 
 
+def fetch_video(video_path: str) -> np.ndarray:
+    cap = cv2.VideoCapture(video_path)
+    frames = []
+    while True:
+        ret, frame = cap.read()
+        if not ret:
+            break
+        frame = cv2.cvtColor(frame, cv2.COLOR_BGRA2RGB)
+        frames.append(frame)
+
+    total_frames = len(frames)
+    nframes = 4
+    no = np.linspace(0, total_frames - 1, nframes)
+    frames = [x[1] for x in filter(lambda x: x[0] in no, enumerate(frames))]
+
+    height, width, _ = frames[0].shape
+
+    VIDEO_MIN_PIXELS = 128 * 28 * 28
+    VIDEO_MAX_PIXELS = 768 * 28 * 28
+    VIDEO_TOTAL_PIXELS = 24576 * 28 * 28
+    FRAME_FACTOR = 2
+    min_pixels = VIDEO_MIN_PIXELS
+    max_pixels = max(
+        min(VIDEO_MAX_PIXELS, VIDEO_TOTAL_PIXELS / nframes * FRAME_FACTOR),
+        int(min_pixels * 1.05),
+    )
+    resized_height, resized_width = smart_resize(
+        height,
+        width,
+        min_pixels=min_pixels,
+        max_pixels=max_pixels,
+    )
+
+    frames = [
+        np.array(
+            Image.fromarray(frame).resize(
+                (resized_width, resized_height),
+                Image.Resampling.BICUBIC,
+            )
+        )
+        for frame in frames
+    ]
+
+    return frames
+
+
 # ======================
 # Main functions
 # ======================
 
 
-def preprocess(img):
-    height, width, _ = img.shape
+def preprocess(images):
+    height, width, _ = images[0].shape
 
     max_pixels = 12845056
     min_pixels = 56 * 56
@@ -134,23 +180,30 @@ def preprocess(img):
         w_bar = np.ceil(width * beta / factor) * factor
     resized_height, resized_width = h_bar, w_bar
 
-    img = np.array(
-        Image.fromarray(img).resize(
-            (resized_width, resized_height), Image.Resampling.BICUBIC
+    patches = []
+    for img in images:
+        img = np.array(
+            Image.fromarray(img).resize(
+                (resized_width, resized_height), Image.Resampling.BICUBIC
+            )
         )
-    )
 
-    mean = np.array([0.48145467, 0.4578275, 0.40821072], dtype=np.float32)
-    std = np.array([0.26862955, 0.2613026, 0.2757771], dtype=np.float32)
-    img = img / 255
-    img = (img - mean) / std
+        mean = np.array([0.48145467, 0.4578275, 0.40821072], dtype=np.float32)
+        std = np.array([0.26862955, 0.2613026, 0.2757771], dtype=np.float32)
+        img = img / 255
+        img = (img - mean) / std
 
-    img = img.transpose(2, 0, 1)  # HWC -> CHW
-    img = np.expand_dims(img, axis=0)
-    img = img.astype(np.float32)
+        img = img.transpose(2, 0, 1)  # HWC -> CHW
+        # img = np.expand_dims(img, axis=0)
+        img = img.astype(np.float32)
+
+        patches.append(img)
+
+    patches = np.array(patches)
 
     temporal_patch_size = 2
-    patches = np.tile(img, (temporal_patch_size, 1, 1, 1))
+    if patches.shape[0] == 1:
+        patches = np.tile(patches, (temporal_patch_size, 1, 1, 1))
 
     channel = patches.shape[1]
     grid_t = patches.shape[0] // temporal_patch_size
@@ -363,9 +416,8 @@ def get_rope_index(input_ids, image_grid_thw, video_grid_thw, attention_mask):
         raise NotImplementedError
 
 
-def stopping_criteria(input_ids: np.array) -> np.array:
-    max_length = 438
 
+def stopping_criteria(input_ids: np.array, max_length) -> np.array:
     cur_len = input_ids.shape[-1]
     is_done = cur_len >= max_length
     is_done = np.full(input_ids.shape[0], is_done)
@@ -379,15 +431,14 @@ def stopping_criteria(input_ids: np.array) -> np.array:
 def sample(models, input_ids, pixel_values, attention_mask, image_grid_thw):
     pad_token_id = 151643
     image_token_id = 151655
+
     image_token_id = np.array([image_token_id])
     video_grid_thw = None
     rope_deltas = None
 
     net = models["visual"]
     if not args.onnx:
-        output = net.predict(
-            [input_ids, pixel_values, image_grid_thw, attention_mask, image_token_id]
-        )
+        output = net.predict([input_ids, pixel_values, image_grid_thw, image_token_id])
     else:
         output = net.run(
             None,
@@ -410,6 +461,7 @@ def sample(models, input_ids, pixel_values, attention_mask, image_grid_thw):
     cache_position = (
         np.cumsum(np.ones_like(input_ids[0, :], dtype=np.int64), axis=0) - 1
     )
+    max_length = 128 + input_ids.shape[1]
 
     net = models["net"]
     while True:
@@ -464,7 +516,9 @@ def sample(models, input_ids, pixel_values, attention_mask, image_grid_thw):
         )
         cache_position = cache_position[-1:] + 1
 
-        unfinished_sequences = unfinished_sequences & ~stopping_criteria(input_ids)
+        unfinished_sequences = unfinished_sequences & ~stopping_criteria(
+            input_ids, max_length
+        )
         this_peer_finished = np.max(unfinished_sequences) == 0
         cur_len += 1
 
@@ -484,20 +538,28 @@ def predict(models, messages):
     )
 
     image_inputs = []
+    video_inputs = []
     for message in messages:
         for ele in message["content"]:
             if "image" in ele:
                 img = fetch_image(ele["image"])
                 image_inputs.append(img)
             if "video" in ele:
-                img = fetch_image(args.input[0])
+                video = fetch_video(ele["video"])
+                video_inputs.append(video)
 
     pixel_values = []
     vision_grid_thws = []
-    for img in image_inputs:
-        patches, vision_grid_thw = preprocess(img)
-        pixel_values.extend(patches)
-        vision_grid_thws.append(vision_grid_thw)
+    if video_inputs:
+        for images in video_inputs:
+            patches, vision_grid_thw = preprocess(images)
+            pixel_values.extend(patches)
+            vision_grid_thws.append(vision_grid_thw)
+    else:
+        for img in image_inputs:
+            patches, vision_grid_thw = preprocess([img])
+            pixel_values.extend(patches)
+            vision_grid_thws.append(vision_grid_thw)
 
     pixel_values = np.array(pixel_values)
     image_grid_thw = np.array(vision_grid_thws)
