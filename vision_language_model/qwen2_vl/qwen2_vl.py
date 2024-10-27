@@ -318,103 +318,94 @@ def get_rope_index(input_ids, image_grid_thw, video_grid_thw, attention_mask):
     video_token_id = 151656
     vision_start_token_id = 151652
     mrope_position_deltas = []
-    if image_grid_thw is not None or video_grid_thw is not None:
-        total_input_ids = input_ids
-        position_ids = np.ones(
-            (3, input_ids.shape[0], input_ids.shape[1]),
-            dtype=input_ids.dtype,
+
+    total_input_ids = input_ids
+    position_ids = np.ones(
+        (3, input_ids.shape[0], input_ids.shape[1]),
+        dtype=input_ids.dtype,
+    )
+    image_index, video_index = 0, 0
+    for i, input_ids in enumerate(total_input_ids):
+        input_ids = input_ids[attention_mask[i] == 1]
+        image_nums, video_nums = 0, 0
+        vision_start_indices = np.argwhere(input_ids == vision_start_token_id).squeeze(
+            1
         )
-        image_index, video_index = 0, 0
-        for i, input_ids in enumerate(total_input_ids):
-            input_ids = input_ids[attention_mask[i] == 1]
-            image_nums, video_nums = 0, 0
-            vision_start_indices = np.argwhere(
-                input_ids == vision_start_token_id
-            ).squeeze(1)
-            vision_tokens = input_ids[vision_start_indices + 1]
-            image_nums = np.sum(vision_tokens == image_token_id)
-            video_nums = np.sum(vision_tokens == video_token_id)
-            input_tokens = input_ids.tolist()
-            llm_pos_ids_list: list = []
-            st = 0
-            remain_images, remain_videos = image_nums, video_nums
-            for _ in range(image_nums + video_nums):
-                if image_token_id in input_tokens and remain_images > 0:
-                    ed_image = input_tokens.index(image_token_id, st)
-                else:
-                    ed_image = len(input_tokens) + 1
-                if video_token_id in input_tokens and remain_videos > 0:
-                    ed_video = input_tokens.index(video_token_id, st)
-                else:
-                    ed_video = len(input_tokens) + 1
-                if ed_image < ed_video:
-                    t, h, w = (
-                        image_grid_thw[image_index][0],
-                        image_grid_thw[image_index][1],
-                        image_grid_thw[image_index][2],
-                    )
-                    image_index += 1
-                    remain_images -= 1
-                    ed = ed_image
-                else:
-                    t, h, w = (
-                        video_grid_thw[video_index][0],
-                        video_grid_thw[video_index][1],
-                        video_grid_thw[video_index][2],
-                    )
-                    video_index += 1
-                    remain_videos -= 1
-                    ed = ed_video
-                llm_grid_t, llm_grid_h, llm_grid_w = (
-                    t.item(),
-                    h.item() // spatial_merge_size,
-                    w.item() // spatial_merge_size,
+        vision_tokens = input_ids[vision_start_indices + 1]
+        image_nums = np.sum(vision_tokens == image_token_id)
+        video_nums = np.sum(vision_tokens == video_token_id)
+        input_tokens = input_ids.tolist()
+        llm_pos_ids_list: list = []
+        st = 0
+        remain_images, remain_videos = image_nums, video_nums
+        for _ in range(image_nums + video_nums):
+            if image_token_id in input_tokens and remain_images > 0:
+                ed_image = input_tokens.index(image_token_id, st)
+            else:
+                ed_image = len(input_tokens) + 1
+            if video_token_id in input_tokens and remain_videos > 0:
+                ed_video = input_tokens.index(video_token_id, st)
+            else:
+                ed_video = len(input_tokens) + 1
+            if ed_image < ed_video:
+                t, h, w = (
+                    image_grid_thw[image_index][0],
+                    image_grid_thw[image_index][1],
+                    image_grid_thw[image_index][2],
                 )
-                text_len = ed - st
+                image_index += 1
+                remain_images -= 1
+                ed = ed_image
+            else:
+                t, h, w = (
+                    video_grid_thw[video_index][0],
+                    video_grid_thw[video_index][1],
+                    video_grid_thw[video_index][2],
+                )
+                video_index += 1
+                remain_videos -= 1
+                ed = ed_video
+            llm_grid_t, llm_grid_h, llm_grid_w = (
+                t.item(),
+                h.item() // spatial_merge_size,
+                w.item() // spatial_merge_size,
+            )
+            text_len = ed - st
 
-                st_idx = (
-                    llm_pos_ids_list[-1].max() + 1 if len(llm_pos_ids_list) > 0 else 0
-                )
-                llm_pos_ids_list.append(
-                    np.tile(np.arange(text_len).reshape(1, -1), (3, 1)) + st_idx
-                )
-
-                t_index = np.tile(
-                    np.arange(llm_grid_t).reshape(-1, 1), (1, llm_grid_h * llm_grid_w)
-                ).flatten()
-                h_index = np.tile(
-                    np.arange(llm_grid_h).reshape(1, -1, 1),
-                    (llm_grid_t, 1, llm_grid_w),
-                ).flatten()
-                w_index = np.tile(
-                    np.arange(llm_grid_w).reshape(1, 1, -1),
-                    (llm_grid_t, llm_grid_h, 1),
-                ).flatten()
-                llm_pos_ids_list.append(
-                    np.stack([t_index, h_index, w_index]) + text_len + st_idx
-                )
-                st = ed + llm_grid_t * llm_grid_h * llm_grid_w
-
-            if st < len(input_tokens):
-                st_idx = (
-                    llm_pos_ids_list[-1].max() + 1 if len(llm_pos_ids_list) > 0 else 0
-                )
-                text_len = len(input_tokens) - st
-                llm_pos_ids_list.append(
-                    np.tile(np.arange(text_len).reshape(1, -1), (3, 1)) + st_idx
-                )
-
-            llm_positions = np.concatenate(llm_pos_ids_list, axis=1).reshape(3, -1)
-            position_ids[..., i, attention_mask[i] == 1] = llm_positions
-            mrope_position_deltas.append(
-                llm_positions.max() + 1 - len(total_input_ids[i])
+            st_idx = llm_pos_ids_list[-1].max() + 1 if len(llm_pos_ids_list) > 0 else 0
+            llm_pos_ids_list.append(
+                np.tile(np.arange(text_len).reshape(1, -1), (3, 1)) + st_idx
             )
 
-        mrope_position_deltas = np.expand_dims(np.array(mrope_position_deltas), axis=1)
-        return position_ids, mrope_position_deltas
-    else:
-        raise NotImplementedError
+            t_index = np.tile(
+                np.arange(llm_grid_t).reshape(-1, 1), (1, llm_grid_h * llm_grid_w)
+            ).flatten()
+            h_index = np.tile(
+                np.arange(llm_grid_h).reshape(1, -1, 1),
+                (llm_grid_t, 1, llm_grid_w),
+            ).flatten()
+            w_index = np.tile(
+                np.arange(llm_grid_w).reshape(1, 1, -1),
+                (llm_grid_t, llm_grid_h, 1),
+            ).flatten()
+            llm_pos_ids_list.append(
+                np.stack([t_index, h_index, w_index]) + text_len + st_idx
+            )
+            st = ed + llm_grid_t * llm_grid_h * llm_grid_w
 
+        if st < len(input_tokens):
+            st_idx = llm_pos_ids_list[-1].max() + 1 if len(llm_pos_ids_list) > 0 else 0
+            text_len = len(input_tokens) - st
+            llm_pos_ids_list.append(
+                np.tile(np.arange(text_len).reshape(1, -1), (3, 1)) + st_idx
+            )
+
+        llm_positions = np.concatenate(llm_pos_ids_list, axis=1).reshape(3, -1)
+        position_ids[..., i, attention_mask[i] == 1] = llm_positions
+        mrope_position_deltas.append(llm_positions.max() + 1 - len(total_input_ids[i]))
+
+    mrope_position_deltas = np.expand_dims(np.array(mrope_position_deltas), axis=1)
+    return position_ids, mrope_position_deltas
 
 
 def stopping_criteria(input_ids: np.array, max_length) -> np.array:
@@ -428,13 +419,44 @@ def stopping_criteria(input_ids: np.array, max_length) -> np.array:
     return is_done
 
 
-def sample(models, input_ids, pixel_values, attention_mask, image_grid_thw):
+def sample(
+    models,
+    input_ids,
+    pixel_values,
+    attention_mask,
+    image_grid_thw,
+    video_grid_thw,
+):
     pad_token_id = 151643
     image_token_id = 151655
+    video_token_id = 151656
 
-    image_token_id = np.array([image_token_id])
-    video_grid_thw = None
-    rope_deltas = None
+    pixel_values = (
+        pixel_values
+        if pixel_values is not None
+        # dummy for no image
+        else np.zeros((16, 1176), dtype=np.float32)
+    )
+    image_token_id = (
+        np.array([image_token_id])
+        if image_grid_thw is not None
+        else (
+            np.array([video_token_id])
+            if video_grid_thw is not None
+            # dummy for no image
+            else np.array([-1], dtype=int)
+        )
+    )
+    image_grid_thw = (
+        image_grid_thw
+        if image_grid_thw is not None
+        else (
+            video_grid_thw
+            if video_grid_thw is not None
+            # dummy for no image
+            else np.array([[1, 4, 4]], dtype=int)
+        )
+    )
 
     net = models["visual"]
     if not args.onnx:
@@ -461,6 +483,7 @@ def sample(models, input_ids, pixel_values, attention_mask, image_grid_thw):
     cache_position = (
         np.cumsum(np.ones_like(input_ids[0, :], dtype=np.int64), axis=0) - 1
     )
+    rope_deltas = None
     max_length = 128 + input_ids.shape[1]
 
     net = models["net"]
@@ -548,32 +571,49 @@ def predict(models, messages):
                 video = fetch_video(ele["video"])
                 video_inputs.append(video)
 
-    pixel_values = []
-    vision_grid_thws = []
-    if video_inputs:
-        for images in video_inputs:
-            patches, vision_grid_thw = preprocess(images)
-            pixel_values.extend(patches)
-            vision_grid_thws.append(vision_grid_thw)
-    else:
+    pixel_values = None
+    image_grid_thw = None
+    video_grid_thw = None
+    if image_inputs:
+        pixel_values = []
+        vision_grid_thws = []
         for img in image_inputs:
             patches, vision_grid_thw = preprocess([img])
             pixel_values.extend(patches)
             vision_grid_thws.append(vision_grid_thw)
-
-    pixel_values = np.array(pixel_values)
-    image_grid_thw = np.array(vision_grid_thws)
+        pixel_values = np.array(pixel_values)
+        image_grid_thw = np.array(vision_grid_thws)
+    if video_inputs:
+        pixel_values = []
+        vision_grid_thws = []
+        for images in video_inputs:
+            patches, vision_grid_thw = preprocess(images)
+            pixel_values.extend(patches)
+            vision_grid_thws.append(vision_grid_thw)
+        pixel_values = np.array(pixel_values)
+        video_grid_thw = np.array(vision_grid_thws)
 
     merge_length = 4
-    index = 0
-    while "<|image_pad|>" in text:
-        text = text.replace(
-            "<|image_pad|>",
-            "<|placeholder|>" * (image_grid_thw[index].prod() // merge_length),
-            1,
-        )
-        index += 1
-    text = text.replace("<|placeholder|>", "<|image_pad|>")
+    if image_inputs:
+        index = 0
+        while "<|image_pad|>" in text:
+            text = text.replace(
+                "<|image_pad|>",
+                "<|placeholder|>" * (image_grid_thw[index].prod() // merge_length),
+                1,
+            )
+            index += 1
+        text = text.replace("<|placeholder|>", "<|image_pad|>")
+    if video_inputs:
+        index = 0
+        while "<|video_pad|>" in text:
+            text = text.replace(
+                "<|video_pad|>",
+                "<|placeholder|>" * (video_grid_thw[index].prod() // merge_length),
+                1,
+            )
+            index += 1
+        text = text.replace("<|placeholder|>", "<|video_pad|>")
 
     text = [text]
 
@@ -587,7 +627,12 @@ def predict(models, messages):
     attention_mask = text_inputs["attention_mask"]
 
     generated_ids = sample(
-        models, input_ids, pixel_values, attention_mask, image_grid_thw
+        models,
+        input_ids,
+        pixel_values,
+        attention_mask,
+        image_grid_thw,
+        video_grid_thw,
     )
 
     generated_ids_trimmed = [
