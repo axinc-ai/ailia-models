@@ -1,7 +1,6 @@
 import sys
 import time
 from typing import List
-import random
 
 # logger
 from logging import getLogger  # noqa
@@ -52,11 +51,28 @@ parser.add_argument(
     help="prompt",
 )
 parser.add_argument(
-    "-p",
-    "--prompt",
-    type=str,
-    default="Describe this image.",
-    help="prompt",
+    "--min_pixels",
+    type=int,
+    default=None,
+    help="min_pixels",
+)
+parser.add_argument(
+    "--max_pixels",
+    type=int,
+    default=None,
+    help="max_pixels",
+)
+parser.add_argument(
+    "--total_pixels",
+    type=int,
+    default=None,
+    help="total_pixels",
+)
+parser.add_argument(
+    "--fps",
+    type=int,
+    default=None,
+    help="fps",
 )
 parser.add_argument(
     "--disable_ailia_tokenizer", action="store_true", help="disable ailia tokenizer."
@@ -105,9 +121,13 @@ def fetch_image(image_path: str) -> np.ndarray:
     img = cv2.cvtColor(img, cv2.COLOR_BGRA2RGB)
 
     height, width, _ = img.shape
+
+    MIN_PIXELS = 4 * 28 * 28
+    MAX_PIXELS = 16384 * 28 * 28
+    min_pixels = args.min_pixels or MIN_PIXELS
+    max_pixels = args.max_pixels or MAX_PIXELS
     resized_height, resized_width = smart_resize(
-        height,
-        width,
+        height, width, min_pixels=min_pixels, max_pixels=max_pixels
     )
 
     img = np.array(Image.fromarray(img).resize((resized_width, resized_height)))
@@ -117,6 +137,7 @@ def fetch_image(image_path: str) -> np.ndarray:
 
 def fetch_video(video_path: str) -> np.ndarray:
     cap = cv2.VideoCapture(video_path)
+    video_fps = cap.get(cv2.CAP_PROP_FPS)
     frames = []
     while True:
         ret, frame = cap.read()
@@ -126,7 +147,12 @@ def fetch_video(video_path: str) -> np.ndarray:
         frames.append(frame)
 
     total_frames = len(frames)
-    nframes = 4
+    fps = args.fps or 2
+    min_frames = 4
+    max_frames = 30
+    nframes = total_frames / video_fps * fps
+    nframes = min(max(nframes, min_frames), max_frames)
+    nframes = round(nframes / 2) * 2
     no = np.linspace(0, total_frames - 1, nframes)
     frames = [x[1] for x in filter(lambda x: x[0] in no, enumerate(frames))]
 
@@ -136,9 +162,10 @@ def fetch_video(video_path: str) -> np.ndarray:
     VIDEO_MAX_PIXELS = 768 * 28 * 28
     VIDEO_TOTAL_PIXELS = 24576 * 28 * 28
     FRAME_FACTOR = 2
-    min_pixels = VIDEO_MIN_PIXELS
-    max_pixels = max(
-        min(VIDEO_MAX_PIXELS, VIDEO_TOTAL_PIXELS / nframes * FRAME_FACTOR),
+    min_pixels = args.min_pixels or VIDEO_MIN_PIXELS
+    total_pixels = args.total_pixels or VIDEO_TOTAL_PIXELS
+    max_pixels = args.max_pixels or max(
+        min(VIDEO_MAX_PIXELS, total_pixels / nframes * FRAME_FACTOR),
         int(min_pixels * 1.05),
     )
     resized_height, resized_width = smart_resize(
