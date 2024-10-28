@@ -151,6 +151,9 @@ parser.add_argument("--prompt", default=None, help="prompt for word vocabulary")
 parser.add_argument(
     "--intermediate", action="store_true", help="display intermediate state."
 )
+parser.add_argument(
+    "--fp16", action="store_true", help="use fp16 model (default : fp32 model)."
+)
 args = update_parser(parser)
 
 if args.ailia_audio:
@@ -281,8 +284,12 @@ if not args.dynamic_kv_cache:
     MODEL_DEC_LARGE_PATH = "decoder_large_fix_kv_cache.onnx.prototxt"
     WEIGHT_DEC_LARGE_V3_PATH = "decoder_large_v3_fix_kv_cache.onnx"
     MODEL_DEC_LARGE_V3_PATH = "decoder_large_v3_fix_kv_cache.onnx.prototxt"
-    WEIGHT_DEC_TURBO_PATH = "decoder_turbo_fix_kv_cache.onnx"
-    MODEL_DEC_TURBO_PATH = "decoder_turbo_fix_kv_cache.onnx.prototxt"
+    if args.fp16:
+        WEIGHT_DEC_TURBO_PATH = "decoder_turbo_fix_kv_cache_fp16.onnx"
+        MODEL_DEC_TURBO_PATH = "decoder_turbo_fix_kv_cache_fp16.onnx.prototxt"
+    else:
+        WEIGHT_DEC_TURBO_PATH = "decoder_turbo_fix_kv_cache.onnx"
+        MODEL_DEC_TURBO_PATH = "decoder_turbo_fix_kv_cache.onnx.prototxt"
 else:
     # KV_CACHEが推論ごとに変化するバージョン
     WEIGHT_DEC_TINY_PATH = "decoder_tiny.onnx"
@@ -312,8 +319,12 @@ WEIGHT_ENC_LARGE_PATH = "encoder_large.onnx"
 MODEL_ENC_LARGE_PATH = "encoder_large.onnx.prototxt"
 WEIGHT_ENC_LARGE_V3_PATH = "encoder_large_v3.onnx"
 MODEL_ENC_LARGE_V3_PATH = "encoder_large_v3.onnx.prototxt"
-WEIGHT_ENC_TURBO_PATH = "encoder_turbo.onnx"
-MODEL_ENC_TURBO_PATH = "encoder_turbo.onnx.prototxt"
+if args.fp16:
+    WEIGHT_ENC_TURBO_PATH = "encoder_turbo_fp16.onnx"
+    MODEL_ENC_TURBO_PATH = "encoder_turbo_fp16.onnx.prototxt"
+else:
+    WEIGHT_ENC_TURBO_PATH = "encoder_turbo.onnx"
+    MODEL_ENC_TURBO_PATH = "encoder_turbo.onnx.prototxt"
 
 WEIGTH_ENC_LARGE_PB_PATH = "encoder_large_weights.pb"
 WEIGHT_DEC_LARGE_PB_PATH = "decoder_large_weights.pb"
