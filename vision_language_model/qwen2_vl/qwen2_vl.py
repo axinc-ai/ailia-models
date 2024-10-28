@@ -33,7 +33,7 @@ MODEL_PATH = "Qwen2-VL-2B.onnx.prototxt"
 MODEL_VIS_PATH = "Qwen2-VL-2B_vis.onnx.prototxt"
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/qwen2_vl/"
 
-IMAGE_PATH = "demo.jpg"
+IMAGE_PATH = "demo.jpeg"
 SAVE_IMAGE_PATH = "output.png"
 
 CHAT_TEMPLATE = "{% set image_count = namespace(value=0) %}{% set video_count = namespace(value=0) %}{% for message in messages %}{% if loop.first and message['role'] != 'system' %}<|im_start|>system\nYou are a helpful assistant.<|im_end|>\n{% endif %}<|im_start|>{{ message['role'] }}\n{% if message['content'] is string %}{{ message['content'] }}<|im_end|>\n{% else %}{% for content in message['content'] %}{% if content['type'] == 'image' or 'image' in content or 'image_url' in content %}{% set image_count.value = image_count.value + 1 %}{% if add_vision_id %}Picture {{ image_count.value }}: {% endif %}<|vision_start|><|image_pad|><|vision_end|>{% elif content['type'] == 'video' or 'video' in content %}{% set video_count.value = video_count.value + 1 %}{% if add_vision_id %}Video {{ video_count.value }}: {% endif %}<|vision_start|><|video_pad|><|vision_end|>{% elif 'text' in content %}{{ content['text'] }}{% endif %}{% endfor %}<|im_end|>\n{% endif %}{% endfor %}{% if add_generation_prompt %}<|im_start|>assistant\n{% endif %}"
@@ -44,6 +44,13 @@ CHAT_TEMPLATE = "{% set image_count = namespace(value=0) %}{% set video_count = 
 # ======================
 
 parser = get_base_parser("Qwen2-VL", IMAGE_PATH, SAVE_IMAGE_PATH)
+parser.add_argument(
+    "-p",
+    "--prompt",
+    type=str,
+    default="Describe this image.",
+    help="prompt",
+)
 parser.add_argument(
     "-p",
     "--prompt",
@@ -647,19 +654,19 @@ def predict(models, messages):
     return output_text[0]
 
 
-def recognize_from_image(models):
+def recognize(models):
     prompt = args.prompt
     logger.info("Prompt: %s" % prompt)
 
-    messages = [
-        {
-            "role": "user",
-            "content": [
-                {"type": "image", "image": "demo.jpg"},
-                {"type": "text", "text": prompt},
-            ],
-        }
-    ]
+    content = []
+    if args.video is not None:
+        content.append({"type": "video", "video": args.video})
+    else:
+        for input_path in args.input:
+            content.append({"type": "image", "image": input_path})
+    content.append({"type": "text", "text": prompt})
+
+    messages = [{"role": "user", "content": content}]
 
     # inference
     logger.info("Start inference...")
@@ -696,9 +703,8 @@ def main():
 
     # initialize
     if not args.onnx:
-        visual = ailia.Net(
-            "Qwen2-VL-2B_vis.onnx.prototxt", "Qwen2-VL-2B_vis.onnx", env_id=env_id
-        )
+        visual = ailia.Net(MODEL_VIS_PATH, WEIGHT_VIS_PATH, env_id=env_id)
+        net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
     else:
         import onnxruntime
 
@@ -722,7 +728,7 @@ def main():
     }
 
     # generate
-    recognize_from_image(models)
+    recognize(models)
 
 
 if __name__ == "__main__":
