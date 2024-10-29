@@ -263,12 +263,19 @@ else:
 
 OPT = ".opt"
 OPT2 = ".opt2"
+OPT3 = ".opt"
 if LAYER_NORM_ENABLE:
     OPT = ".opt3"
     OPT2 = ".opt3"
+    OPT3 = ".opt"
 if args.normal:
     OPT = ""
     OPT2 = ""
+    OPT3 = ""
+
+FP16 = ""
+if args.fp16:
+    FP16 = "_fp16"
 
 if not args.dynamic_kv_cache:
     # 高速化のためKV_CACHEのサイズを最大サイズで固定化したバージョン
@@ -284,12 +291,8 @@ if not args.dynamic_kv_cache:
     MODEL_DEC_LARGE_PATH = "decoder_large_fix_kv_cache.onnx.prototxt"
     WEIGHT_DEC_LARGE_V3_PATH = "decoder_large_v3_fix_kv_cache.onnx"
     MODEL_DEC_LARGE_V3_PATH = "decoder_large_v3_fix_kv_cache.onnx.prototxt"
-    if args.fp16:
-        WEIGHT_DEC_TURBO_PATH = "decoder_turbo_fix_kv_cache_fp16.onnx"
-        MODEL_DEC_TURBO_PATH = "decoder_turbo_fix_kv_cache_fp16.onnx.prototxt"
-    else:
-        WEIGHT_DEC_TURBO_PATH = "decoder_turbo_fix_kv_cache.onnx"
-        MODEL_DEC_TURBO_PATH = "decoder_turbo_fix_kv_cache.onnx.prototxt"
+    WEIGHT_DEC_TURBO_PATH = "decoder_turbo_fix_kv_cache" + FP16 + OPT3 + ".onnx"
+    MODEL_DEC_TURBO_PATH = "decoder_turbo_fix_kv_cache" + FP16 + OPT3 + ".onnx.prototxt"
 else:
     # KV_CACHEが推論ごとに変化するバージョン
     WEIGHT_DEC_TINY_PATH = "decoder_tiny.onnx"
@@ -319,12 +322,8 @@ WEIGHT_ENC_LARGE_PATH = "encoder_large.onnx"
 MODEL_ENC_LARGE_PATH = "encoder_large.onnx.prototxt"
 WEIGHT_ENC_LARGE_V3_PATH = "encoder_large_v3.onnx"
 MODEL_ENC_LARGE_V3_PATH = "encoder_large_v3.onnx.prototxt"
-if args.fp16:
-    WEIGHT_ENC_TURBO_PATH = "encoder_turbo_fp16.onnx"
-    MODEL_ENC_TURBO_PATH = "encoder_turbo_fp16.onnx.prototxt"
-else:
-    WEIGHT_ENC_TURBO_PATH = "encoder_turbo.onnx"
-    MODEL_ENC_TURBO_PATH = "encoder_turbo.onnx.prototxt"
+WEIGHT_ENC_TURBO_PATH = "encoder_turbo" + FP16 + OPT3 + ".onnx"
+MODEL_ENC_TURBO_PATH = "encoder_turbo"  + FP16 + OPT3 + ".onnx.prototxt"
 
 WEIGTH_ENC_LARGE_PB_PATH = "encoder_large_weights.pb"
 WEIGHT_DEC_LARGE_PB_PATH = "decoder_large_weights.pb"
