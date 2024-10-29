@@ -1,6 +1,7 @@
 import sys
 import time
-from typing import List
+from typing import List, Tuple
+from io import StringIO
 
 # logger
 from logging import getLogger  # noqa
@@ -34,8 +35,6 @@ REMOTE_PATH = "https://storage.googleapis.com/ailia-models/qwen2_vl/"
 
 IMAGE_PATH = "demo.jpeg"
 SAVE_IMAGE_PATH = "output.png"
-
-CHAT_TEMPLATE = "{% set image_count = namespace(value=0) %}{% set video_count = namespace(value=0) %}{% for message in messages %}{% if loop.first and message['role'] != 'system' %}<|im_start|>system\nYou are a helpful assistant.<|im_end|>\n{% endif %}<|im_start|>{{ message['role'] }}\n{% if message['content'] is string %}{{ message['content'] }}<|im_end|>\n{% else %}{% for content in message['content'] %}{% if content['type'] == 'image' or 'image' in content or 'image_url' in content %}{% set image_count.value = image_count.value + 1 %}{% if add_vision_id %}Picture {{ image_count.value }}: {% endif %}<|vision_start|><|image_pad|><|vision_end|>{% elif content['type'] == 'video' or 'video' in content %}{% set video_count.value = video_count.value + 1 %}{% if add_vision_id %}Video {{ video_count.value }}: {% endif %}<|vision_start|><|video_pad|><|vision_end|>{% elif 'text' in content %}{{ content['text'] }}{% endif %}{% endfor %}<|im_end|>\n{% endif %}{% endfor %}{% if add_generation_prompt %}<|im_start|>assistant\n{% endif %}"
 
 
 # ======================
@@ -92,7 +91,7 @@ def smart_resize(
     factor: int = 28,
     min_pixels: int = 4 * 28 * 28,
     max_pixels: int = 16384 * 28 * 28,
-) -> tuple[int, int]:
+) -> Tuple[int, int]:
     def round_by_factor(number: int, factor: int) -> int:
         return round(number / factor) * factor
 
@@ -586,13 +585,26 @@ def sample(
 
 
 def predict(models, messages):
-    tokenizer = models["tokenizer"]
-    text = tokenizer.apply_chat_template(
-        messages,
-        chat_template=CHAT_TEMPLATE,
-        tokenize=False,
-        add_generation_prompt=True,
-    )
+    buf = StringIO()
+    for i, message in enumerate(messages):
+        if i == 0 and message["role"] != "system":
+            buf.write("<|im_start|>system\nYou are a helpful assistant.<|im_end|>\n")
+        buf.write("<|im_start|>")
+        buf.write(f'{message["role"]}\n')
+        if isinstance(message["content"], str):
+            buf.write(f'{message["content"]}')
+            buf.write("<|im_end|>\n")
+        else:
+            for content in message["content"]:
+                if content["type"] == "image" and "image" in content:
+                    buf.write("<|vision_start|><|image_pad|><|vision_end|>")
+                elif content["type"] == "video" and "video" in content:
+                    buf.write("<|vision_start|><|video_pad|><|vision_end|>")
+                elif "text" in content:
+                    buf.write(f'{content["text"]}')
+            buf.write("<|im_end|>\n")
+    buf.write("<|im_start|>assistant\n")
+    text = buf.getvalue()
 
     image_inputs = []
     video_inputs = []
@@ -651,6 +663,7 @@ def predict(models, messages):
 
     text = [text]
 
+    tokenizer = models["tokenizer"]
     text_inputs = tokenizer(
         text,
         return_tensors="np",
@@ -731,10 +744,15 @@ def main():
     # initialize
     if not args.onnx:
         memory_mode = ailia.get_memory_mode(
-            reduce_constant=True, ignore_input_with_initializer=True,
-            reduce_interstage=False, reuse_interstage=True)
-        visual = ailia.Net(MODEL_VIS_PATH, WEIGHT_VIS_PATH, env_id=env_id, memory_mode = memory_mode)
-        net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id, memory_mode = memory_mode)
+            reduce_constant=True,
+            ignore_input_with_initializer=True,
+            reduce_interstage=False,
+            reuse_interstage=True,
+        )
+        visual = ailia.Net(
+            MODEL_VIS_PATH, WEIGHT_VIS_PATH, env_id=env_id, memory_mode=memory_mode
+        )
+        net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id, memory_mode=memory_mode)
     else:
         import onnxruntime
 
@@ -750,8 +768,9 @@ def main():
         tokenizer = transformers.Qwen2TokenizerFast.from_pretrained("./tokenizer")
     else:
         from ailia_tokenizer import GPT2Tokenizer
-        tokenizer = GPT2Tokenizer.from_pretrained('./tokenizer')
-        #tokenizer.add_special_tokens({'pad_token': '!'})
+
+        tokenizer = GPT2Tokenizer.from_pretrained("./tokenizer")
+        # tokenizer.add_special_tokens({'pad_token': '!'})
 
     models = {
         "tokenizer": tokenizer,
