@@ -730,8 +730,11 @@ def main():
 
     # initialize
     if not args.onnx:
-        visual = ailia.Net(MODEL_VIS_PATH, WEIGHT_VIS_PATH, env_id=env_id)
-        net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+        memory_mode = ailia.get_memory_mode(
+            reduce_constant=True, ignore_input_with_initializer=True,
+            reduce_interstage=False, reuse_interstage=True)
+        visual = ailia.Net(MODEL_VIS_PATH, WEIGHT_VIS_PATH, env_id=env_id, memory_mode = memory_mode)
+        net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id, memory_mode = memory_mode)
     else:
         import onnxruntime
 
@@ -746,7 +749,9 @@ def main():
 
         tokenizer = transformers.Qwen2TokenizerFast.from_pretrained("./tokenizer")
     else:
-        raise NotImplementedError
+        from ailia_tokenizer import GPT2Tokenizer
+        tokenizer = GPT2Tokenizer.from_pretrained('./tokenizer')
+        #tokenizer.add_special_tokens({'pad_token': '!'})
 
     models = {
         "tokenizer": tokenizer,
