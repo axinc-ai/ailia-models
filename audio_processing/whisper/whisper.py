@@ -330,8 +330,8 @@ WEIGHT_DEC_LARGE_PB_PATH = "decoder_large_weights.pb"
 WEIGHT_DEC_LARGE_FIX_KV_CACHE_PB_PATH = "decoder_large_fix_kv_cache_weights.pb"
 WEIGTH_ENC_LARGE_V3_PB_PATH = "encoder_large_v3_weights.pb"
 WEIGHT_DEC_LARGE_V3_PB_PATH = "decoder_large_v3_weights.pb"
-WEIGHT_DEC_LARGE_V3_FIX_KV_CACHE_PB_PATH = "decoder_large_v3_fix_kv_cache_weights.pb"
-WEIGHT_ENC_TURBO_PB_PATH = "encoder_turbo_weights.pb"
+WEIGHT_DEC_LARGE_V3_FIX_KV_CACHE_PB_PATH = "decoder_large_v3_fix_kv_cache_weights" + OPT3 + ".pb"
+WEIGHT_ENC_TURBO_PB_PATH = "encoder_turbo_weights" + OPT3 + ".pb"
 
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/whisper/"
 
@@ -1205,7 +1205,8 @@ def main():
                 WEIGHT_DEC_LARGE_V3_FIX_KV_CACHE_PB_PATH, REMOTE_PATH
             )
     elif args.model_type == "turbo":
-        check_and_download_file(WEIGHT_ENC_TURBO_PB_PATH, REMOTE_PATH)
+        if args.fp16 == False:
+            check_and_download_file(WEIGHT_ENC_TURBO_PB_PATH, REMOTE_PATH)
 
     mic_info = None
     if args.V:
