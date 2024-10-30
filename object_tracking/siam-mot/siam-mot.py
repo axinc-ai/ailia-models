@@ -4,7 +4,7 @@ import time
 import numpy as np
 import cv2
 from PIL import Image
-from matplotlib import cm
+import matplotlib
 
 import ailia
 
@@ -70,9 +70,9 @@ parser.add_argument(
     help='execute onnxruntime version.'
 )
 parser.add_argument(
-    '--gui',
+    '--cui',
     action='store_true',
-    help='Display preview in GUI.'
+    help="Don't display preview in GUI."
 )
 args = update_parser(parser)
 
@@ -89,7 +89,11 @@ def get_colors(n, colormap="gist_ncar"):
     # https://matplotlib.org/examples/color/colormaps_reference.html
     # and https://matplotlib.org/users/colormaps.html
 
-    colors = cm.get_cmap(colormap)(np.linspace(0, 1, n))
+    if hasattr(matplotlib, "colormaps"):
+        cm = matplotlib.colormaps[colormap]
+    else:
+        cm = matplotlib.cm.get_cmap(colormap)
+    colors = cm(np.linspace(0, 1, n))
     # Randomly shuffle the colors
     np.random.shuffle(colors)
     # Opencv expects bgr while cm returns rgb, so we swap to match the colormap (though it also works fine without)
@@ -359,7 +363,7 @@ def recognize_from_video(rpn, box, tracker, feat_ext):
         res_img = frame_vis_generator(frame, boxes)
 
         # show
-        if args.gui or args.video:
+        if not args.cui or args.video:
             cv2.imshow('frame', res_img)
             frame_shown = True
         else:

@@ -97,9 +97,9 @@ parser.add_argument(
     help='Number of outputs for category.',
 )
 parser.add_argument(
-    '--gui',
+    '--cui',
     action='store_true',
-    help='Display preview in GUI.'
+    help="Don't display preview in GUI."
 )
 args = update_parser(parser)
 
@@ -160,7 +160,7 @@ def recognize_from_image():
             preview_img = imread(sorted_inputs_path[
                     next_input_index - args.duration
             ])
-            if args.gui:
+            if not args.cui:
                 cv2.imshow('preview', preview_img)
                 frame_shown = True
             

@@ -55,3 +55,4 @@ ONNX opset = 17
 #### Optimized model
 
 - [t2s_sdec.opt.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/gpt-sovits/t2s_sdec.opt.onnx.prototxt)
+- [t2s_sdec.opt2.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/gpt-sovits/t2s_sdec.opt2.onnx.prototxt)

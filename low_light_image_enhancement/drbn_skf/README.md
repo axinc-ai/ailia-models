@@ -16,7 +16,7 @@ Ailia input shape: (1, 3, 400, 600)
 ![Output2](output2.png)
 
 
-## Usege
+## Usage
 Automaticaly downloads the onnx and prototxt files on the first run. 
 
 It is necessary to be connected to the Internet while downloading.

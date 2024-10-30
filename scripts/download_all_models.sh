@@ -37,7 +37,10 @@ cd ../../audio_processing/kotoba-whisper/; python3 kotoba-whisper.py ${OPTION}
 cd ../../audio_processing/reazon_speech/; python3 reazon_speech.py ${OPTION}
 cd ../../audio_processing/reazon_speech2/; python3 reazon_speech2.py ${OPTION}
 cd ../../audio_processing/gpt-sovits/; python3 gpt-sovits.py ${OPTION}
+cd ../../audio_processing/gpt-sovits-v2/; python3 gpt-sovits-v2.py ${OPTION}
+cd ../../audio_processing/bert-vits2/; python3 bert-vits2.py ${OPTION}
 cd ../../audio_processing/dtln/; python3 dtln.py ${OPTION}
+cd ../../audio_processing/pytorch_wavenet/; python3 pytorch_wavenet.py ${OPTION}
 cd ../../background_ramoval/deep-image-matting; python3 deep-image-matting.py ${OPTION}
 cd ../../background_ramoval/u2net; python3 u2net.py ${OPTION}
 cd ../../background_ramoval/u2net; python3 u2net.py -a small ${OPTION}
@@ -57,6 +60,7 @@ cd ../../diffusion/latent-diffusion-superresolution; python3 latent-diffusion-su
 cd ../../diffusion/latent-diffusion-inpainting; python3 latent-diffusion-inpainting.py ${OPTION}
 cd ../../diffusion/stable-diffusion-txt2img; python3 stable-diffusion-txt2img.py ${OPTION}
 cd ../../diffusion/control_net python3 control_net.py ${OPTION}
+cd ../../diffusion/latent-consistency-models python3 latent-consistency-models.py ${OPTION}
 cd ../../diffusion/daclip-sde; python3 daclipsde.py ${OPTION}
 cd ../../diffusion/riffusion; python3 riffusion.py ${OPTION}
 cd ../../diffusion/marigold; python3 marigold.py ${OPTION}
@@ -112,7 +116,9 @@ cd ../../face_recognition/3ddfa; python3 3ddfa$.py ${OPTION}
 cd ../../face_recognition/mivolo; python3 mivolo.py ${OPTION}
 cd ../../face_recognition/l2cs_net; python3 l2cs_net.py ${OPTION}
 cd ../../face_restoration/codeformer; python3 codeformer.py ${OPTION}
+cd ../../face_restoration/gfpgan; python3 gfpgan.py ${OPTION}
 cd ../../face_swapping/facefusion; python3 facefusion.py ${OPTION}
+cd ../../face-swapping/sber-swap; python3 sber-swap.py ${OPTION}
 cd ../../frame_interpolation/flavr; python3 flavr.py ${OPTION}
 cd ../../frame_interpolation/cain; python3 cain.py ${OPTION}
 cd ../../frame_interpolation/film; python3 film.py ${OPTION}
@@ -122,8 +128,6 @@ cd ../../generative_adversarial_networks/pytorch-gan; python3 pytorch-gan.py ${O
 cd ../../generative_adversarial_networks/restyle-encoder; python3 restyle-encoder.py ${OPTION}
 cd ../../generative_adversarial_networks/sam; python3 sam.py ${OPTION}
 cd ../../generative_adversarial_networks/psgan; python3 psgan.py ${OPTION}
-cd ../../generative_adversarial_networks/gfpgan; python3 gfpgan.py ${OPTION}
-cd ../../generative_adversarial_networks/sber-swap; python3 sber-swap.py ${OPTION}
 cd ../../generative_adversarial_networks/encoder4editing; python3 encoder4editing.py ${OPTION}
 cd ../../generative_adversarial_networks/lipgan; python3 lipgan.py ${OPTION}
 cd ../../hand_detection/yolov3-hand; python3 yolov3-hand.py ${OPTION}
@@ -181,6 +185,7 @@ cd ../../image_manipulation/pytorch-superpoint; python3 pytorch_superpoint.py ${
 cd ../../image_manipulation/cnngeometric_pytorch; python3 cnngeometric_pytorch.py ${OPTION}
 cd ../../image_manipulation/lightglue; python3 lightglue.py ${OPTION}
 cd ../../image_manipulation/docshadow; python3 docshadow.py ${OPTION}
+cd ../../image_manipulation/fbcnn; python3 fbcnn.py ${OPTION}
 cd ../../image_restoration/nafnet; python3 nafnet.py ${OPTION}
 cd ../../image_segmentation/deeplabv3; python3 deeplabv3.py ${OPTION}
 cd ../../image_segmentation/hair_segmentation; python3 hair_segmentation.py ${OPTION}
@@ -202,6 +207,7 @@ cd ../../image_segmentation/segment-anything; python3 segment-anything.py ${OPTI
 cd ../../image_segmentation/tusimple-DUC; python3 tusimple_DUC.py ${OPTION}
 cd ../../image_segmentation/pytorch-fcn; python3 pytorch-fcn.py ${OPTION}
 cd ../../image_segmentation/grounded_sam; python3 grounded_sam.py ${OPTION}
+cd ../../image_segmentation/segment-anything-2; python3 segment-anything-2.py ${OPTION}
 cd ../../large_language_model/llava; python3 llava.py ${OPTION}
 cd ../../landmark_classification/landmarks_classifier_asia; python3 landmarks_classifier_asia.py ${OPTION}
 cd ../../landmark_classification/places365; python3 places365.py ${OPTION}
@@ -235,6 +241,7 @@ cd ../../natural_language_processing/soundchoice-g2p; python3 soundchoice-g2p.py
 cd ../../natural_language_processing/g2p_en; python3 g2p_en.py ${OPTION}
 cd ../../natural_language_processing/t5_base_japanese_ner; pyhton3 t5_base_japanese_ner.py ${OPTION}
 cd ../../natural_language_processing/japanese-reranker-cross-encoder; python3 japanese-reranker-cross-encoder.py ${OPTION}
+cd ../../natural_language_processing/bert_ner_japanese; python3 bert_ner_japanese.py ${OPTION}
 cd ../../network_intrusion_detection/bert-network-packet-flow-header-payload; python3 bert-network-packet-flow-header-payload.py ${OPTION}
 cd ../../network_intrusion_detection/falcon-adapter-network-packet; python3 falcon-adapter-network-packet.py ${OPTION}
 cd ../../neural_rendering/nerf; python3 nerf.py ${OPTION}
@@ -349,3 +356,4 @@ cd ../../text_recognition/ndlocr_text_recognition; python3 ndlocr_text_recogniti
 cd ../../time_series_forecasting/informer2020; python3 informer2020.py ${OPTION}
 cd ../../vehicle_recognition/vehicle-attributes-recognition-barrier; python3 vehicle-attributes-recognition-barrier.py ${OPTION}
 cd ../../vehicle_recognition/vehicle-license-plate-detection-barrier; python3 vehicle-license-plate-detection-barrier.py ${OPTION}
+cd ../../vision_language_model/florence2; python3 florence2.py ${OPTION}
