@@ -29,9 +29,10 @@ logger = getLogger(__name__)
 
 WEIGHT_PATH = "Qwen2-VL-2B.onnx"
 WEIGHT_VIS_PATH = "Qwen2-VL-2B_vis.onnx"
-PB_PATH = "Qwen2-VL-2B_vis_weights.pb"
 MODEL_PATH = "Qwen2-VL-2B.onnx.prototxt"
 MODEL_VIS_PATH = "Qwen2-VL-2B_vis.onnx.prototxt"
+PB_PATH = "Qwen2-VL-2B_weights.pb"
+PB_VIS_PATH = "Qwen2-VL-2B_vis_weights.pb"
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/qwen2_vl/"
 
 IMAGE_PATH = "demo.jpeg"
@@ -740,6 +741,7 @@ def main():
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
     check_and_download_models(WEIGHT_VIS_PATH, MODEL_VIS_PATH, REMOTE_PATH)
     check_and_download_file(PB_PATH, REMOTE_PATH)
+    check_and_download_file(PB_VIS_PATH, REMOTE_PATH)
     
     env_id = args.env_id
 
