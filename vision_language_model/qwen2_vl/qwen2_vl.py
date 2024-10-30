@@ -15,7 +15,7 @@ import ailia
 # import original modules
 sys.path.append("../../util")
 from arg_utils import get_base_parser, update_parser  # noqa
-from model_utils import check_and_download_models  # noqa
+from model_utils import check_and_download_models, check_and_download_file  # noqa
 from detector_utils import load_image  # noqa
 from math_utils import softmax
 
@@ -29,6 +29,7 @@ logger = getLogger(__name__)
 
 WEIGHT_PATH = "Qwen2-VL-2B.onnx"
 WEIGHT_VIS_PATH = "Qwen2-VL-2B_vis.onnx"
+PB_PATH = "Qwen2-VL-2B_vis_weights.pb"
 MODEL_PATH = "Qwen2-VL-2B.onnx.prototxt"
 MODEL_VIS_PATH = "Qwen2-VL-2B_vis.onnx.prototxt"
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/qwen2_vl/"
@@ -738,7 +739,8 @@ def recognize(models):
 def main():
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
     check_and_download_models(WEIGHT_VIS_PATH, MODEL_VIS_PATH, REMOTE_PATH)
-
+    check_and_download_file(PB_PATH, REMOTE_PATH)
+    
     env_id = args.env_id
 
     # initialize
