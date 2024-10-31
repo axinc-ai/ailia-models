@@ -151,6 +151,9 @@ parser.add_argument("--prompt", default=None, help="prompt for word vocabulary")
 parser.add_argument(
     "--intermediate", action="store_true", help="display intermediate state."
 )
+parser.add_argument(
+    "--fp16", action="store_true", help="use fp16 model (default : fp32 model)."
+)
 args = update_parser(parser)
 
 if args.ailia_audio:
@@ -260,12 +263,19 @@ else:
 
 OPT = ".opt"
 OPT2 = ".opt2"
+OPT3 = ".opt"
 if LAYER_NORM_ENABLE:
     OPT = ".opt3"
     OPT2 = ".opt3"
+    OPT3 = ".opt"
 if args.normal:
     OPT = ""
     OPT2 = ""
+    OPT3 = ""
+
+FP16 = ""
+if args.fp16:
+    FP16 = "_fp16"
 
 if not args.dynamic_kv_cache:
     # 高速化のためKV_CACHEのサイズを最大サイズで固定化したバージョン
@@ -281,8 +291,8 @@ if not args.dynamic_kv_cache:
     MODEL_DEC_LARGE_PATH = "decoder_large_fix_kv_cache.onnx.prototxt"
     WEIGHT_DEC_LARGE_V3_PATH = "decoder_large_v3_fix_kv_cache.onnx"
     MODEL_DEC_LARGE_V3_PATH = "decoder_large_v3_fix_kv_cache.onnx.prototxt"
-    WEIGHT_DEC_TURBO_PATH = "decoder_turbo_fix_kv_cache.onnx"
-    MODEL_DEC_TURBO_PATH = "decoder_turbo_fix_kv_cache.onnx.prototxt"
+    WEIGHT_DEC_TURBO_PATH = "decoder_turbo_fix_kv_cache" + FP16 + OPT3 + ".onnx"
+    MODEL_DEC_TURBO_PATH = "decoder_turbo_fix_kv_cache" + FP16 + OPT3 + ".onnx.prototxt"
 else:
     # KV_CACHEが推論ごとに変化するバージョン
     WEIGHT_DEC_TINY_PATH = "decoder_tiny.onnx"
@@ -312,16 +322,16 @@ WEIGHT_ENC_LARGE_PATH = "encoder_large.onnx"
 MODEL_ENC_LARGE_PATH = "encoder_large.onnx.prototxt"
 WEIGHT_ENC_LARGE_V3_PATH = "encoder_large_v3.onnx"
 MODEL_ENC_LARGE_V3_PATH = "encoder_large_v3.onnx.prototxt"
-WEIGHT_ENC_TURBO_PATH = "encoder_turbo.onnx"
-MODEL_ENC_TURBO_PATH = "encoder_turbo.onnx.prototxt"
+WEIGHT_ENC_TURBO_PATH = "encoder_turbo" + FP16 + OPT3 + ".onnx"
+MODEL_ENC_TURBO_PATH = "encoder_turbo"  + FP16 + OPT3 + ".onnx.prototxt"
 
 WEIGTH_ENC_LARGE_PB_PATH = "encoder_large_weights.pb"
 WEIGHT_DEC_LARGE_PB_PATH = "decoder_large_weights.pb"
 WEIGHT_DEC_LARGE_FIX_KV_CACHE_PB_PATH = "decoder_large_fix_kv_cache_weights.pb"
 WEIGTH_ENC_LARGE_V3_PB_PATH = "encoder_large_v3_weights.pb"
 WEIGHT_DEC_LARGE_V3_PB_PATH = "decoder_large_v3_weights.pb"
-WEIGHT_DEC_LARGE_V3_FIX_KV_CACHE_PB_PATH = "decoder_large_v3_fix_kv_cache_weights.pb"
-WEIGHT_ENC_TURBO_PB_PATH = "encoder_turbo_weights.pb"
+WEIGHT_DEC_LARGE_V3_FIX_KV_CACHE_PB_PATH = "decoder_large_v3_fix_kv_cache_weights" + OPT3 + ".pb"
+WEIGHT_ENC_TURBO_PB_PATH = "encoder_turbo_weights" + OPT3 + ".pb"
 
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/whisper/"
 
@@ -1195,7 +1205,8 @@ def main():
                 WEIGHT_DEC_LARGE_V3_FIX_KV_CACHE_PB_PATH, REMOTE_PATH
             )
     elif args.model_type == "turbo":
-        check_and_download_file(WEIGHT_ENC_TURBO_PB_PATH, REMOTE_PATH)
+        if args.fp16 == False:
+            check_and_download_file(WEIGHT_ENC_TURBO_PB_PATH, REMOTE_PATH)
 
     mic_info = None
     if args.V:

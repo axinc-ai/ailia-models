@@ -567,10 +567,13 @@ def main():
 
     # initialize
     if not args.onnx:
-        embedding = ailia.Net(MODEL_EMB_PATH, WEIGHT_EMB_PATH, env_id=env_id)
-        encode_image = ailia.Net(MODEL_IMG_PATH, WEIGHT_IMG_PATH, env_id=env_id)
-        encoder = ailia.Net(MODEL_ENC_PATH, WEIGHT_ENC_PATH, env_id=env_id)
-        decoder = ailia.Net(MODEL_DEC_PATH, WEIGHT_DEC_PATH, env_id=env_id)
+        memory_mode = ailia.get_memory_mode(
+            reduce_constant=True, ignore_input_with_initializer=True,
+            reduce_interstage=False, reuse_interstage=True)
+        embedding = ailia.Net(MODEL_EMB_PATH, WEIGHT_EMB_PATH, env_id=env_id, memory_mode=memory_mode)
+        encode_image = ailia.Net(MODEL_IMG_PATH, WEIGHT_IMG_PATH, env_id=env_id, memory_mode=memory_mode)
+        encoder = ailia.Net(MODEL_ENC_PATH, WEIGHT_ENC_PATH, env_id=env_id, memory_mode=memory_mode)
+        decoder = ailia.Net(MODEL_DEC_PATH, WEIGHT_DEC_PATH, env_id=env_id, memory_mode=memory_mode)
     else:
         import onnxruntime
 
