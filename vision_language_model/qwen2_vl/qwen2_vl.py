@@ -28,12 +28,6 @@ logger = getLogger(__name__)
 # Parameters
 # ======================
 
-WEIGHT_PATH = "Qwen2-VL-2B.onnx"
-WEIGHT_VIS_PATH = "Qwen2-VL-2B_vis.onnx"
-MODEL_PATH = "Qwen2-VL-2B.onnx.prototxt"
-MODEL_VIS_PATH = "Qwen2-VL-2B_vis.onnx.prototxt"
-PB_PATH = "Qwen2-VL-2B_weights.pb"
-PB_VIS_PATH = "Qwen2-VL-2B_vis_weights.pb"
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/qwen2_vl/"
 
 IMAGE_PATH = "demo.jpeg"
@@ -79,8 +73,31 @@ parser.add_argument(
 parser.add_argument(
     "--disable_ailia_tokenizer", action="store_true", help="disable ailia tokenizer."
 )
+parser.add_argument(
+    "--fp16", action="store_true", help="use fp16 model (default : fp32 model)."
+)
 parser.add_argument("--onnx", action="store_true", help="execute onnxruntime version.")
 args = update_parser(parser)
+
+
+# ======================
+# Model selection
+# ======================
+
+FP16 = ""
+if args.fp16:
+    FP16 = "_fp16"
+
+WEIGHT_PATH = "Qwen2-VL-2B" + FP16 + ".onnx"
+WEIGHT_VIS_PATH = "Qwen2-VL-2B_vis" + FP16 + ".onnx"
+MODEL_PATH = "Qwen2-VL-2B" + FP16 + ".onnx.prototxt"
+MODEL_VIS_PATH = "Qwen2-VL-2B_vis" + FP16 + ".onnx.prototxt"
+if args.fp16:
+    PB_PATH = None
+    PB_VIS_PATH = None
+else:
+    PB_PATH = "Qwen2-VL-2B_weights.pb"
+    PB_VIS_PATH = "Qwen2-VL-2B_vis_weights.pb"
 
 
 # ======================
@@ -741,8 +758,10 @@ def recognize(models):
 def main():
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
     check_and_download_models(WEIGHT_VIS_PATH, MODEL_VIS_PATH, REMOTE_PATH)
-    check_and_download_file(PB_PATH, REMOTE_PATH)
-    check_and_download_file(PB_VIS_PATH, REMOTE_PATH)
+    if PB_PATH is not None:
+        check_and_download_file(PB_PATH, REMOTE_PATH)
+    if PB_VIS_PATH is not None:
+        check_and_download_file(PB_VIS_PATH, REMOTE_PATH)
     
     env_id = args.env_id
 
