@@ -2,6 +2,7 @@ import sys
 import time
 from typing import List, Tuple
 from io import StringIO
+import platform
 
 # logger
 from logging import getLogger  # noqa
@@ -744,6 +745,11 @@ def main():
     check_and_download_file(PB_VIS_PATH, REMOTE_PATH)
     
     env_id = args.env_id
+
+    # disable FP16
+    if "FP16" in ailia.get_environment(args.env_id).props or platform.system() == 'Darwin':
+        logger.warning('This model do not work on FP16. So use CPU mode.')
+        env_id = 1
 
     # initialize
     if not args.onnx:
