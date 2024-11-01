@@ -93,7 +93,7 @@ WEIGHT_VIS_PATH = "Qwen2-VL-2B_vis" + FP16 + ".onnx"
 MODEL_PATH = "Qwen2-VL-2B" + FP16 + ".onnx.prototxt"
 MODEL_VIS_PATH = "Qwen2-VL-2B_vis" + FP16 + ".onnx.prototxt"
 if args.fp16:
-    PB_PATH = None
+    PB_PATH = "Qwen2-VL-2B_weights_fp16.pb"
     PB_VIS_PATH = None
 else:
     PB_PATH = "Qwen2-VL-2B_weights.pb"
