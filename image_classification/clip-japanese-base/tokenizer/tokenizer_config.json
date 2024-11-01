@@ -1,0 +1,15 @@
+{
+  "added_tokens_decoder": {},
+  "auto_map": {
+    "AutoTokenizer": [
+      "line-corporation/clip-japanese-base--tokenization_clyp.CLYPTokenizer",
+      null
+    ]
+  },
+  "clean_up_tokenization_spaces": true,
+  "max_length": 77,
+  "model_max_length": 1000000000000000019884624838656,
+  "padding": "longest",
+  "tokenizer_class": "CLYPTokenizer",
+  "truncation": true
+}
