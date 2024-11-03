@@ -30,7 +30,7 @@ IMAGE_WIDTH = 256
 # Argument Parser Config
 # ======================
 parser = get_base_parser(
-    'Single Image Super-Resolution with HAT', IMAGE_PATH, SAVE_IMAGE_PATH,
+    'Single Image Super-Resolution with HAT', IMAGE_PATH, SAVE_IMAGE_PATH, fp16_support=False
 )
 parser.add_argument(
     '--arch', default="HAT", type=str, choices=["HAT","HAT_S","HAT_GAN_REAL_sharper","HAT_GAN_REAL"],
@@ -202,12 +202,6 @@ def recognize_from_video(net):
 def main():
     # model files check and download
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
-
-    # disable FP16
-    env_id = args.env_id
-    if "FP16" in ailia.get_environment(args.env_id).props or sys.platform == 'Darwin':
-        logger.warning('This model do not work on FP16. So use CPU mode.')
-        env_id = 0
 
     # net initialize
     memory_mode = ailia.get_memory_mode(reduce_constant=True, reduce_interstage=True)

@@ -38,7 +38,7 @@ def check_file_existance(filename):
 
 
 def get_base_parser(
-        description, default_input, default_save, input_ftype='image',
+        description, default_input, default_save, input_ftype='image', fp16_support=True, large_model=False
 ):
     """
     Get ailia default argument parser
@@ -83,9 +83,16 @@ def get_base_parser(
         help=('Running the inference on the same input 5 times to measure '
               'execution performance. (Cannot be used in video mode)')
     )
+    default_env_id = ailia.get_gpu_environment_id() if AILIA_EXIST else 0
+    if AILIA_EXIST:
+        if not fp16_support:
+            if "FP16" in ailia.get_environment(default_env_id).props:
+                default_env_id = ailia.ENVIRONMENT_AUTO
+        if large_model:
+            default_env_id = ailia.ENVIRONMENT_AUTO
     parser.add_argument(
         '-e', '--env_id', type=int,
-        default=ailia.get_gpu_environment_id() if AILIA_EXIST else 0,
+        default=default_env_id,
         help=('A specific environment id can be specified. By default, '
               'the return value of ailia.get_gpu_environment_id will be used')
     )
@@ -114,7 +121,7 @@ def get_base_parser(
     return parser
 
 
-def update_parser(parser, check_input_type=True, large_model=False):
+def update_parser(parser, check_input_type=True):
     """Default check or update configurations should be placed here
 
     Parameters
@@ -142,23 +149,16 @@ def update_parser(parser, check_input_type=True, large_model=False):
             logger.info('env_id updated to 0')
             args.env_id = 0
 
-        if large_model:
-            if args.env_id == ailia.get_gpu_environment_id() and ailia.get_environment(args.env_id).props == "LOWPOWER":
-                args.env_id = 0 # cpu
-                logger.warning('This model requires huge gpu memory so fallback to cpu mode')
-
         if args.env_list:
             for idx in range(count) :
                 env = ailia.get_environment(idx)
                 logger.info("  env[" + str(idx) + "]=" + str(env))
 
         if args.env_id == ailia.ENVIRONMENT_AUTO:
-            args.env_id = ailia.get_gpu_environment_id()
-            if args.env_id == ailia.ENVIRONMENT_AUTO:
-                logger.info('env_id updated to 0')
-                args.env_id = 0
+            if count >= 2:
+                args.env_id = 1
             else:
-                logger.info('env_id updated to ' + str(args.env_id) + '(from get_gpu_environment_id())')
+                args.env_id = 0
 
         logger.info(f'env_id: {args.env_id}')
 

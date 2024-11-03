@@ -41,6 +41,7 @@ parser = get_base_parser(
     'MiVOLO: Multi-input Transformer for Age and Gender Estimation',
     IMAGE_OR_VIDEO_PATH,
     SAVE_IMAGE_OR_VIDEO_PATH,
+    fp16_support=False
 )
 parser.add_argument(
     '-ng', '--no_gender', action='store_true',
@@ -609,11 +610,6 @@ def main():
     # model files check and download
     check_and_download_models(WEIGHT_YOLOV8_PATH, MODEL_YOLOV8_PATH, REMOTE_PATH)
     check_and_download_models(WEIGHT_MIVOLO_PATH, MODEL_MIVOLO_PATH, REMOTE_PATH)
-
-    # disable FP16
-    if "FP16" in ailia.get_environment(args.env_id).props or sys.platform == 'Darwin':
-        logger.warning('This model do not work on FP16. So use CPU mode.')
-        args.env_id = 0
 
     # net initialize
     logger.info(f'env_id: {args.env_id}')

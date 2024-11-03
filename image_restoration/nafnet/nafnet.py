@@ -37,7 +37,7 @@ MODEL_LISTS= BLUR_LISTS + NOISE_LISTS
 # Arguemnt Parser Config
 # ======================
 
-parser = get_base_parser('NAFNet model', IMAGE_PATH, SAVE_IMAGE_PATH)
+parser = get_base_parser('NAFNet model', IMAGE_PATH, SAVE_IMAGE_PATH, fp16_support=False)
 
 parser.add_argument(
     '-a', '--arch', metavar='ARCH',
@@ -180,10 +180,6 @@ def main():
     
     # net initialize
     env_id = args.env_id
-    if args.arch in BLUR_LISTS:
-        if "FP16" in ailia.get_environment(env_id).props:
-            logger.warning('This model do not work on FP16. So use CPU mode.')
-            env_id = 0
 
     memory_mode=ailia.get_memory_mode(True,True,False,True)
     net = ailia.Net(None, WEIGHT_PATH,memory_mode=memory_mode,env_id=env_id)

@@ -49,7 +49,7 @@ parser.add_argument(
     action='store_true',
     help='disable ailia tokenizer.'
 )
-args = update_parser(parser, check_input_type=False)
+args = update_parser(parser, check_input_type=False, fp16_support=False)
 
 
 # ======================
@@ -355,11 +355,7 @@ def main():
     check_and_download_file(WEIGHT_PB_PATH, REMOTE_PATH)
     check_and_download_file(WEIGHT_VIS_PB_PATH, REMOTE_PATH)
 
-    # disable FP16
     env_id = args.env_id
-    if "FP16" in ailia.get_environment(env_id).props or sys.platform == 'Darwin':
-        logger.warning('This model do not work on FP16. So use CPU mode.')
-        env_id = 0
 
     # initialize
     if not args.onnx:
