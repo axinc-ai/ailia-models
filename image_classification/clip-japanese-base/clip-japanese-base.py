@@ -10,10 +10,12 @@ from PIL import Image
 
 import ailia
 
+
 # import original modules
 sys.path.append("../../util")
 from arg_utils import get_base_parser, update_parser  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
+from image_utils import normalize_image  # noqa: E402
 from detector_utils import load_image  # noqa: E402C
 from classifier_utils import plot_results, print_results  # noqa: E402
 from math_utils import softmax  # noqa: E402C
@@ -33,7 +35,7 @@ WEIGHT_TEXT_PATH = "encode_text.onnx"
 MODEL_TEXT_PATH = "encode_text.onnx.prototxt"
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/clip-japanese-base/"
 
-IMAGE_PATH = "chelsea.png"
+IMAGE_PATH = "demo.jpeg"
 SAVE_IMAGE_PATH = "output.png"
 
 IMAGE_SIZE = 224
@@ -42,7 +44,7 @@ IMAGE_SIZE = 224
 # Arguemnt Parser Config
 # ======================
 
-parser = get_base_parser("CLIP", IMAGE_PATH, SAVE_IMAGE_PATH)
+parser = get_base_parser("clip-japanese-base", IMAGE_PATH, SAVE_IMAGE_PATH)
 parser.add_argument(
     "-t",
     "--text",
@@ -67,29 +69,27 @@ args = update_parser(parser)
 
 
 def preprocess(img):
-    h, w = (IMAGE_SIZE, IMAGE_SIZE)
     im_h, im_w, _ = img.shape
 
     # resize
-    scale = h / min(im_h, im_w)
-    ow, oh = round(im_w * scale), round(im_h * scale)
-    if ow != im_w or oh != im_h:
-        img = np.array(Image.fromarray(img).resize((ow, oh), Image.BICUBIC))
+    scale = IMAGE_SIZE / max(im_h, im_w)
+    if scale != 1.0:
+        new_size = tuple(round(dim * scale) for dim in (im_w, im_h))
+        img = np.array(Image.fromarray(img).resize(new_size, Image.Resampling.BICUBIC))
+        pad_h = IMAGE_SIZE - new_size[1]
+        pad_w = IMAGE_SIZE - new_size[0]
+        img = np.pad(
+            img,
+            pad_width=(
+                (pad_h // 2, pad_h - pad_h // 2),
+                (pad_w // 2, pad_w - pad_w // 2),
+                (0, 0),
+            ),
+            mode="constant",
+            constant_values=0,
+        )
 
-    # center_crop
-    if ow > w:
-        x = (ow - w) // 2
-        img = img[:, x : x + w, :]
-    if oh > h:
-        y = (oh - h) // 2
-        img = img[y : y + h, :, :]
-
-    img = img[:, :, ::-1]  # BGR -> RBG
-    img = img / 255
-
-    mean = np.array((0.48145466, 0.4578275, 0.40821073))
-    std = np.array((0.26862954, 0.26130258, 0.27577711))
-    img = (img - mean) / std
+    img = normalize_image(img, normalize_type="ImageNet")
 
     img = img.transpose(2, 0, 1)  # HWC -> CHW
     img = np.expand_dims(img, axis=0)
@@ -99,6 +99,7 @@ def preprocess(img):
 
 
 def predict(net, img, text_features):
+    img = img[:, :, ::-1]  # BGR -> RGB
     img = preprocess(img)
 
     # feedforward
@@ -117,21 +118,36 @@ def predict(net, img, text_features):
 
 def get_text_features(models, text):
     tokenizer = models["tokenizer"]
-    text_inputs = tokenizer(text)
-    if not isinstance(text_inputs["input_ids"], np.ndarray):
-        text_inputs = {k: v.numpy() for k, v in text_inputs.items()}
+    out = tokenizer(
+        text,
+        max_length=76,
+        padding="longest",
+        truncation=True,
+        add_special_tokens=False,
+    )
+    cls_token_id = 4
+    input_ids = np.array([[cls_token_id] + ids for ids in out["input_ids"]])
+    attention_mask = np.array([[1] + am for am in out["attention_mask"]])
+    position_ids = np.array([list(range(0, len(input_ids[0])))] * len(input_ids))
 
     net = models["text"]
     if not args.onnx:
         output = net.predict(
             [
-                text_inputs["input_ids"],
-                text_inputs["attention_mask"],
-                text_inputs["position_ids"],
+                input_ids,
+                attention_mask,
+                position_ids,
             ]
         )
     else:
-        output = net.run(None, text_inputs)
+        output = net.run(
+            None,
+            {
+                "input_ids": input_ids,
+                "attention_mask": attention_mask,
+                "position_ids": position_ids,
+            },
+        )
     text_features = output[0]
 
     return text_features
@@ -257,11 +273,13 @@ def main():
 
     args.disable_ailia_tokenizer = True
     if args.disable_ailia_tokenizer:
-        from transformers import AutoTokenizer
+        from transformers import T5Tokenizer
 
-        tokenizer = AutoTokenizer.from_pretrained("./tokenizer", trust_remote_code=True)
+        tokenizer = T5Tokenizer.from_pretrained("./tokenizer")
     else:
-        raise NotImplementedError("ailia tokenizer is not supported.")
+        from ailia_tokenizer import T5Tokenizer
+
+        tokenizer = T5Tokenizer.from_pretrained("./tokenizer")
 
     models = {
         "tokenizer": tokenizer,
