@@ -33,7 +33,7 @@ MIN_LENGTH = 5
 # Arguemnt Parser Config
 # ======================
 parser = get_base_parser(
-    'sentence transformers japanese', SAMPLE_PDF_PATH, None 
+    'sentence transformers japanese', SAMPLE_PDF_PATH, None , fp16_support=False
 )
 parser.add_argument(
     '-p', '--prompt', metavar='PROMPT', default=None,
@@ -99,9 +99,6 @@ def main():
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
 
     # initialize
-    if "FP16" in ailia.get_environment(args.env_id).props or platform.system() == 'Darwin':
-        logger.warning('This model do not work on FP16. So use CPU mode.')
-        args.env_id = 0
     model = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
 
     if args.disable_ailia_tokenizer:

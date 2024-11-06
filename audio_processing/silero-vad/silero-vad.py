@@ -44,7 +44,7 @@ SAMPLING_RATE = 16000
 # ======================
 
 parser = get_base_parser(
-    'Silero VAD', WAVE_PATH, SAVE_PATH, input_ftype='audio'
+    'Silero VAD', WAVE_PATH, SAVE_PATH, input_ftype='audio', fp16_support=False
 )
 parser.add_argument(
     '--onnx',
@@ -111,11 +111,6 @@ def main():
     # model files check and download
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
     
-    # disable FP16
-    if "FP16" in ailia.get_environment(args.env_id).props or sys.platform == 'Darwin':
-        logger.warning('This model do not work on FP16. So use CPU mode.')
-        args.env_id = 0
-        
     if not args.onnx:
         env_id = args.env_id
         session = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)

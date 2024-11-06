@@ -47,7 +47,7 @@ IMAGE_HEIGHT = 240
 # Arguemnt Parser Config
 # ======================
 parser = get_base_parser(
-    'CNNGeometric PyTorch', SOURCE_IMAGE_PATH, SAVE_IMAGE_PATH
+    'CNNGeometric PyTorch', SOURCE_IMAGE_PATH, SAVE_IMAGE_PATH, fp16_support=False
 )
 parser.add_argument(
     '-m', '--model_1', default='streetview_affine', choices=('streetview_affine', 'streetview_hom', 'streetview_tps'),
@@ -229,11 +229,6 @@ def main():
     check_and_download_models(WEIGHT_STREETVIEW_AFFINE_PATH, MODEL_STREETVIEW_AFFINE_PATH, REMOTE_PATH)
     check_and_download_models(WEIGHT_STREETVIEW_HOM_PATH, MODEL_STREETVIEW_HOM_PATH, REMOTE_PATH)
     check_and_download_models(WEIGHT_STREETVIEW_TPS_PATH, MODEL_STREETVIEW_TPS_PATH, REMOTE_PATH)
-
-    # disable FP16
-    if "FP16" in ailia.get_environment(args.env_id).props or sys.platform == 'Darwin':
-        logger.warning('This model do not work on FP16. So use CPU mode.')
-        args.env_id = 0
 
     # net initialize
     if args.model_1 == 'streetview_affine':

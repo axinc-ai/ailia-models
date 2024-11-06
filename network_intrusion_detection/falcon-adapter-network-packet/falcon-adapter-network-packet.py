@@ -74,6 +74,7 @@ parser = get_base_parser(
     "falcon-adapter-network-packet",
     PACEKT_HEX_PATH,
     None,
+    fp16_support=False
 )
 parser.add_argument("--hex", type=str, default=None, help="Input-HEX data.")
 parser.add_argument(
@@ -544,11 +545,6 @@ def main():
     check_and_download_file(CORPUS_PATH, REMOTE_PATH)
 
     env_id = args.env_id
-
-    # disable FP16
-    if "FP16" in ailia.get_environment(args.env_id).props or sys.platform == 'Darwin':
-        logger.warning('This model do not work on FP16. So use CPU mode.')
-        env_id = 0
 
     # initialize
     if not args.onnx:

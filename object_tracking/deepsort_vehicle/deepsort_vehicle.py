@@ -70,7 +70,7 @@ NN_BUDGET = 100
 # Arguemnt Parser Config
 # ======================
 
-parser = get_base_parser('Deep SORT Vehicle', None, None)
+parser = get_base_parser('Deep SORT Vehicle', None, None, fp16_support=False)
 parser.add_argument(
     '-p', '--pairimage', metavar='IMAGE',
     nargs=2,
@@ -322,11 +322,6 @@ def compare_images(detector, extractor):
 
 
 def main():
-    # disable FP16
-    if "FP16" in ailia.get_environment(args.env_id).props or sys.platform == 'Darwin':
-        logger.warning('This model do not work on FP16. So use CPU mode.')
-        args.env_id = 0
-
     # model files check and download
     if not args.no_detector:
         logger.info('Check Detector...')

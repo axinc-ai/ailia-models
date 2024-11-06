@@ -57,7 +57,7 @@ REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/swinir/'
 # ======================
 
 parser = get_base_parser(
-    'SwinIR: Image Restoration Using Swin Transformer', IMAGE_CLASSICAL_PATH, SAVE_IMAGE_PATH
+    'SwinIR: Image Restoration Using Swin Transformer', IMAGE_CLASSICAL_PATH, SAVE_IMAGE_PATH, large_model=True
 )
 parser.add_argument(
     '--onnx',
@@ -69,7 +69,7 @@ parser.add_argument(
     default='classical',
     choices=['classical', 'lightweight', 'real', 'gray', 'color', 'jpeg']
 )
-args = update_parser(parser, large_model=True)
+args = update_parser(parser)
 
 
 # ======================
