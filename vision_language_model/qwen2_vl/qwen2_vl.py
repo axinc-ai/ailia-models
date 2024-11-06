@@ -38,7 +38,7 @@ SAVE_IMAGE_PATH = "output.png"
 # Arguemnt Parser Config
 # ======================
 
-parser = get_base_parser("Qwen2-VL", IMAGE_PATH, SAVE_IMAGE_PATH)
+parser = get_base_parser("Qwen2-VL", IMAGE_PATH, SAVE_IMAGE_PATH, large_model = True)
 parser.add_argument(
     "-p",
     "--prompt",
@@ -684,12 +684,21 @@ def predict(models, messages):
     text = [text]
 
     tokenizer = models["tokenizer"]
-    text_inputs = tokenizer(
-        text,
-        return_tensors="np",
-        padding=True,
-        padding_side="left",
-    )
+    if args.disable_ailia_tokenizer:
+        text_inputs = tokenizer(
+            text,
+            return_tensors="np",
+            padding=True,
+            padding_side="left",
+        )
+    else:
+        text_inputs = tokenizer(
+            text,
+            return_tensors="np",
+            padding=True,
+            #padding_side="left",
+        )
+
     input_ids = text_inputs["input_ids"]
     attention_mask = text_inputs["attention_mask"]
 
@@ -765,11 +774,6 @@ def main():
     
     env_id = args.env_id
 
-    # disable FP16
-    if "FP16" in ailia.get_environment(args.env_id).props or platform.system() == 'Darwin':
-        logger.warning('This model do not work on FP16. So use CPU mode.')
-        env_id = 1
-
     # initialize
     if not args.onnx:
         memory_mode = ailia.get_memory_mode(
@@ -799,7 +803,7 @@ def main():
         from ailia_tokenizer import GPT2Tokenizer
 
         tokenizer = GPT2Tokenizer.from_pretrained("./tokenizer")
-        # tokenizer.add_special_tokens({'pad_token': '!'})
+        tokenizer.add_special_tokens({"additional_special_tokens":['<|end_of_text|>', '<|im_start|>', '<|im_end|>', '<|object_ref_start|>', '<|object_ref_end|>', '<|box_start|>', '<|box_end|>', '<|quad_start|>', '<|quad_end|>', '<|vision_start|>', '<|vision_end|>', '<|vision_pad|>', '<|image_pad|>', '<|video_pad|>']})
 
     models = {
         "tokenizer": tokenizer,
