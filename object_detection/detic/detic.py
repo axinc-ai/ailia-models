@@ -54,7 +54,7 @@ SAVE_IMAGE_PATH = 'output.png'
 # ======================
 
 parser = get_base_parser(
-    'Detic', IMAGE_PATH, SAVE_IMAGE_PATH
+    'Detic', IMAGE_PATH, SAVE_IMAGE_PATH, fp16_support=False
 )
 parser.add_argument(
     '--seed', type=int, default=int(datetime.datetime.now().strftime('%Y%m%d')),
@@ -481,11 +481,6 @@ def main():
 
     # model files check and download
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
-
-    # disable FP16
-    if "FP16" in ailia.get_environment(args.env_id).props or platform.system() == 'Darwin':
-        logger.warning('This model do not work on FP16. So use CPU mode.')
-        args.env_id = 0
 
     # initialize
     if not args.onnx:

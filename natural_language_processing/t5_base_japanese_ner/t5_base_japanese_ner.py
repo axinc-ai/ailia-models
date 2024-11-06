@@ -33,7 +33,7 @@ REMOTE_PATH = "https://storage.googleapis.com/ailia-models/t5_base_japanese_ner/
 # ======================
 
 parser = get_base_parser(
-    't5_base_japanese_summarization', None, None
+    't5_base_japanese_summarization', None, None, fp16_support=False
 )
 
 parser.add_argument(
@@ -145,11 +145,6 @@ def main():
         tokenizer = T5Tokenizer.from_pretrained("./tokenizer/")
 
     env_id = args.env_id
-
-    # disable FP16
-    if "FP16" in ailia.get_environment(env_id).props or sys.platform == 'Darwin':
-        logger.warning('This model do not work on FP16. Use CPU mode instead.')
-        env_id = 0
 
     # initialize
     encoder = ailia.Net(ENCODER_MODEL_PATH, ENCODER_WEIGHT_PATH, env_id = env_id)
