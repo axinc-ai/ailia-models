@@ -33,6 +33,8 @@ REMOTE_PATH = "https://storage.googleapis.com/ailia-models/qwen2_vl/"
 IMAGE_PATH = "demo.jpeg"
 SAVE_IMAGE_PATH = "output.png"
 
+COPY_BLOB_DATA = True
+
 
 # ======================
 # Arguemnt Parser Config
@@ -296,7 +298,7 @@ def forward(
         )
         logits, new_past_key_values = output[0], output[1:]
     else:
-        if first_run:
+        if first_run or COPY_BLOB_DATA == False:
             output = net.run(
                 None,
                 {
@@ -834,7 +836,7 @@ def main():
         visual = onnxruntime.InferenceSession(WEIGHT_VIS_PATH, providers=providers)
         net = onnxruntime.InferenceSession(WEIGHT_PATH, providers=providers)
 
-    args.disable_ailia_tokenizer = True
+    #args.disable_ailia_tokenizer = True
     if args.disable_ailia_tokenizer:
         import transformers
 
