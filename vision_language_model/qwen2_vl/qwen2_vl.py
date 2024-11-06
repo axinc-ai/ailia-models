@@ -288,79 +288,93 @@ def forward(
     position_ids: np.ndarray,
     attention_mask: np.ndarray,
     past_key_values: List[np.ndarray],
+    first_run,
 ):
     if not args.onnx:
         output = net.predict(
             [input_ids, inputs_embeds, position_ids, attention_mask, *past_key_values]
         )
+        logits, new_past_key_values = output[0], output[1:]
     else:
-        output = net.run(
-            None,
-            {
-                "input_ids": input_ids,
-                "inputs_embeds": inputs_embeds,
-                "position_ids": position_ids,
-                "attention_mask": attention_mask,
-                "key_cache0": past_key_values[0],
-                "value_cache0": past_key_values[1],
-                "key_cache1": past_key_values[2],
-                "value_cache1": past_key_values[3],
-                "key_cache2": past_key_values[4],
-                "value_cache2": past_key_values[5],
-                "key_cache3": past_key_values[6],
-                "value_cache3": past_key_values[7],
-                "key_cache4": past_key_values[8],
-                "value_cache4": past_key_values[9],
-                "key_cache5": past_key_values[10],
-                "value_cache5": past_key_values[11],
-                "key_cache6": past_key_values[12],
-                "value_cache6": past_key_values[13],
-                "key_cache7": past_key_values[14],
-                "value_cache7": past_key_values[15],
-                "key_cache8": past_key_values[16],
-                "value_cache8": past_key_values[17],
-                "key_cache9": past_key_values[18],
-                "value_cache9": past_key_values[19],
-                "key_cache10": past_key_values[20],
-                "value_cache10": past_key_values[21],
-                "key_cache11": past_key_values[22],
-                "value_cache11": past_key_values[23],
-                "key_cache12": past_key_values[24],
-                "value_cache12": past_key_values[25],
-                "key_cache13": past_key_values[26],
-                "value_cache13": past_key_values[27],
-                "key_cache14": past_key_values[28],
-                "value_cache14": past_key_values[29],
-                "key_cache15": past_key_values[30],
-                "value_cache15": past_key_values[31],
-                "key_cache16": past_key_values[32],
-                "value_cache16": past_key_values[33],
-                "key_cache17": past_key_values[34],
-                "value_cache17": past_key_values[35],
-                "key_cache18": past_key_values[36],
-                "value_cache18": past_key_values[37],
-                "key_cache19": past_key_values[38],
-                "value_cache19": past_key_values[39],
-                "key_cache20": past_key_values[40],
-                "value_cache20": past_key_values[41],
-                "key_cache21": past_key_values[42],
-                "value_cache21": past_key_values[43],
-                "key_cache22": past_key_values[44],
-                "value_cache22": past_key_values[45],
-                "key_cache23": past_key_values[46],
-                "value_cache23": past_key_values[47],
-                "key_cache24": past_key_values[48],
-                "value_cache24": past_key_values[49],
-                "key_cache25": past_key_values[50],
-                "value_cache25": past_key_values[51],
-                "key_cache26": past_key_values[52],
-                "value_cache26": past_key_values[53],
-                "key_cache27": past_key_values[54],
-                "value_cache27": past_key_values[55],
-            },
-        )
-
-    logits, new_past_key_values = output[0], output[1:]
+        if first_run:
+            output = net.run(
+                None,
+                {
+                    "input_ids": input_ids,
+                    "inputs_embeds": inputs_embeds,
+                    "position_ids": position_ids,
+                    "attention_mask": attention_mask,
+                    "key_cache0": past_key_values[0],
+                    "value_cache0": past_key_values[1],
+                    "key_cache1": past_key_values[2],
+                    "value_cache1": past_key_values[3],
+                    "key_cache2": past_key_values[4],
+                    "value_cache2": past_key_values[5],
+                    "key_cache3": past_key_values[6],
+                    "value_cache3": past_key_values[7],
+                    "key_cache4": past_key_values[8],
+                    "value_cache4": past_key_values[9],
+                    "key_cache5": past_key_values[10],
+                    "value_cache5": past_key_values[11],
+                    "key_cache6": past_key_values[12],
+                    "value_cache6": past_key_values[13],
+                    "key_cache7": past_key_values[14],
+                    "value_cache7": past_key_values[15],
+                    "key_cache8": past_key_values[16],
+                    "value_cache8": past_key_values[17],
+                    "key_cache9": past_key_values[18],
+                    "value_cache9": past_key_values[19],
+                    "key_cache10": past_key_values[20],
+                    "value_cache10": past_key_values[21],
+                    "key_cache11": past_key_values[22],
+                    "value_cache11": past_key_values[23],
+                    "key_cache12": past_key_values[24],
+                    "value_cache12": past_key_values[25],
+                    "key_cache13": past_key_values[26],
+                    "value_cache13": past_key_values[27],
+                    "key_cache14": past_key_values[28],
+                    "value_cache14": past_key_values[29],
+                    "key_cache15": past_key_values[30],
+                    "value_cache15": past_key_values[31],
+                    "key_cache16": past_key_values[32],
+                    "value_cache16": past_key_values[33],
+                    "key_cache17": past_key_values[34],
+                    "value_cache17": past_key_values[35],
+                    "key_cache18": past_key_values[36],
+                    "value_cache18": past_key_values[37],
+                    "key_cache19": past_key_values[38],
+                    "value_cache19": past_key_values[39],
+                    "key_cache20": past_key_values[40],
+                    "value_cache20": past_key_values[41],
+                    "key_cache21": past_key_values[42],
+                    "value_cache21": past_key_values[43],
+                    "key_cache22": past_key_values[44],
+                    "value_cache22": past_key_values[45],
+                    "key_cache23": past_key_values[46],
+                    "value_cache23": past_key_values[47],
+                    "key_cache24": past_key_values[48],
+                    "value_cache24": past_key_values[49],
+                    "key_cache25": past_key_values[50],
+                    "value_cache25": past_key_values[51],
+                    "key_cache26": past_key_values[52],
+                    "value_cache26": past_key_values[53],
+                    "key_cache27": past_key_values[54],
+                    "value_cache27": past_key_values[55],
+                },
+            )
+            logits, new_past_key_values = output[0], output[1:]
+        else:
+            net.set_blob_data( "input_ids", input_ids)
+            net.set_blob_data( "inputs_embeds", inputs_embeds)
+            net.set_blob_data( "position_ids", position_ids)
+            for i in range(28):
+                net.set_input_blob_shape( "key_cache"+str(i), net.get_blob_shape("key_cache"+str(i)))
+                net.set_input_blob_shape( "value_cache"+str(i),net.get_blob_shape("value_cache"+str(i)))
+                net.copy_blob_data( net, "key_cache"+str(i), net, "key_cache_out"+str(i))
+                net.copy_blob_data( net, "value_cache"+str(i),net,  "value_cache_out"+str(i))
+            net.update()
+            logits = net.get_blob_data ("logits")
+            new_past_key_values = None
 
     return logits, new_past_key_values
 
@@ -511,6 +525,9 @@ def sample(
         )
     )
 
+    if args.benchmark:
+        start = int(round(time.time() * 1000))
+
     net = models["visual"]
     if not args.onnx:
         output = net.predict([input_ids, pixel_values, image_grid_thw, image_token_id])
@@ -529,6 +546,11 @@ def sample(
         np.zeros((1, 2, 0, 128), dtype=np.float32) for _ in range(28 * 2)
     ]
 
+    if args.benchmark:
+        end = int(round(time.time() * 1000))
+        estimation_time = end - start
+        logger.info(f"\tencode time {estimation_time} ms")
+
     # keep track of which sequences are already finished
     batch_size, cur_len = input_ids.shape
     this_peer_finished = False
@@ -540,6 +562,7 @@ def sample(
     max_length = 128 + input_ids.shape[1]
 
     net = models["net"]
+    first_run = True
     while True:
         # prepare model inputs
         model_input_ids = input_ids
@@ -560,6 +583,9 @@ def sample(
             # Disable inputs_embeds parameter if cache is used
             inputs_embeds = inputs_embeds[:0, :1, :]
 
+        if args.benchmark:
+            start = int(round(time.time() * 1000))
+
         logits, past_key_values = forward(
             net,
             model_input_ids,
@@ -567,7 +593,14 @@ def sample(
             position_ids,
             attention_mask,
             past_key_values,
+            first_run
         )
+        first_run = False
+
+        if args.benchmark:
+            end = int(round(time.time() * 1000))
+            estimation_time = end - start
+            logger.info(f"\tdecode time {estimation_time} ms")
 
         next_token_logits = logits[:, -1, :]
 
