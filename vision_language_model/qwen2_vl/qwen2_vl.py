@@ -33,7 +33,7 @@ REMOTE_PATH = "https://storage.googleapis.com/ailia-models/qwen2_vl/"
 IMAGE_PATH = "demo.jpeg"
 SAVE_IMAGE_PATH = "output.png"
 
-COPY_BLOB_DATA = True
+COPY_BLOB_DATA = False
 
 
 # ======================
@@ -299,16 +299,16 @@ def forward(
             )
             logits, new_past_key_values = output[0], output[1:]
         else:
-            net.set_blob_data( "input_ids", input_ids)
-            net.set_blob_data( "inputs_embeds", inputs_embeds)
-            net.set_blob_data( "position_ids", position_ids)
+            net.set_input_blob_data( input_ids, net.find_blob_index_by_name("input_ids"))
+            net.set_input_blob_data( inputs_embeds, net.find_blob_index_by_name("inputs_embeds"))
+            net.set_input_blob_data( position_ids, net.find_blob_index_by_name("position_ids"))
             for i in range(28):
-                net.set_input_blob_shape( "key_cache"+str(i), net.get_blob_shape("key_cache"+str(i)))
-                net.set_input_blob_shape( "value_cache"+str(i),net.get_blob_shape("value_cache"+str(i)))
-                net.copy_blob_data( net, "key_cache"+str(i), net, "key_cache_out"+str(i))
-                net.copy_blob_data( net, "value_cache"+str(i),net,  "value_cache_out"+str(i))
+                net.set_input_blob_shape( net.get_blob_shape(net.find_blob_index_by_name("key_cache_out"+str(i))), net.find_blob_index_by_name("key_cache"+str(i)))
+                net.set_input_blob_shape( net.get_blob_shape(net.find_blob_index_by_name("value_cache_out"+str(i))), net.find_blob_index_by_name("value_cache"+str(i)))
+                net.copy_blob_data( "key_cache"+str(i), "key_cache_out"+str(i))
+                net.copy_blob_data( "value_cache"+str(i), "value_cache_out"+str(i))
             net.update()
-            logits = net.get_blob_data ("logits")
+            logits = net.get_blob_data( net.find_blob_index_by_name("logits") )
             new_past_key_values = None
     else:
         output = net.run(
