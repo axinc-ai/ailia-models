@@ -314,10 +314,10 @@ def forward(
         output = net.run(
             None,
             {
-                "input_ids": input_ids,
+                "input_ids": input_ids.astype(np.int64),
                 "inputs_embeds": inputs_embeds,
-                "position_ids": position_ids,
-                "attention_mask": attention_mask,
+                "position_ids": position_ids.astype(np.int64),
+                "attention_mask": attention_mask.astype(np.int64),
                 "key_cache0": past_key_values[0],
                 "value_cache0": past_key_values[1],
                 "key_cache1": past_key_values[2],
