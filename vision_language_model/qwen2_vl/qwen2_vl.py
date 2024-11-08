@@ -537,10 +537,10 @@ def sample(
         output = net.run(
             None,
             {
-                "input_ids": input_ids,
+                "input_ids": input_ids.astype(np.int64),
                 "pixel_values": pixel_values,
-                "image_grid_thw": image_grid_thw,
-                "image_token_id": image_token_id,
+                "image_grid_thw": image_grid_thw.astype(np.int64),
+                "image_token_id": image_token_id.astype(np.int64),
             },
         )
     inputs_embeds = output[0]
