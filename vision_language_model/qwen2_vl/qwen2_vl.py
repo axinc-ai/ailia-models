@@ -302,9 +302,15 @@ def forward(
             net.set_input_blob_data( input_ids, net.find_blob_index_by_name("input_ids"))
             net.set_input_blob_data( inputs_embeds, net.find_blob_index_by_name("inputs_embeds"))
             net.set_input_blob_data( position_ids, net.find_blob_index_by_name("position_ids"))
+            key_shapes = []
+            value_shapes = []
             for i in range(28):
-                net.set_input_blob_shape( net.get_blob_shape(net.find_blob_index_by_name("key_cache_out"+str(i))), net.find_blob_index_by_name("key_cache"+str(i)))
-                net.set_input_blob_shape( net.get_blob_shape(net.find_blob_index_by_name("value_cache_out"+str(i))), net.find_blob_index_by_name("value_cache"+str(i)))
+                key_shapes.append(net.get_blob_shape(net.find_blob_index_by_name("key_cache_out"+str(i))))
+                value_shapes.append(net.get_blob_shape(net.find_blob_index_by_name("value_cache_out"+str(i))))
+            for i in range(28):
+                net.set_input_blob_shape(key_shapes[i], net.find_blob_index_by_name("key_cache"+str(i)))
+                net.set_input_blob_shape(value_shapes[i], net.find_blob_index_by_name("value_cache"+str(i)))
+            for i in range(28):
                 net.copy_blob_data( "key_cache"+str(i), "key_cache_out"+str(i))
                 net.copy_blob_data( "value_cache"+str(i), "value_cache_out"+str(i))
             net.update()
