@@ -5,10 +5,15 @@ from transformers import Qwen2VLForConditionalGeneration, AutoTokenizer, AutoPro
 from qwen_vl_utils import process_vision_info
 import time
 
+import platform
+pf = platform.system()
+
 start = int(round(time.time() * 1000))
 
-device_map = "audo"
-device_map = "cpu"
+if pf == 'Darwin':
+    device_map = "cpu"
+else:
+    device_map = "cuda:0"
 
 # default: Load the model on the available device(s)
 model = Qwen2VLForConditionalGeneration.from_pretrained(
@@ -56,7 +61,7 @@ inputs = processor(
     padding=True,
     return_tensors="pt",
 )
-if device_map == "auto":
+if device_map != "cpu":
   inputs = inputs.to("cuda")
 
 end = int(round(time.time() * 1000))
