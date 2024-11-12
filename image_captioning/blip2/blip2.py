@@ -37,7 +37,7 @@ IMG_SIZE = 224
 # ======================
 
 parser = get_base_parser(
-    'BLIP-2', IMAGE_PATH, None
+    'BLIP-2', IMAGE_PATH, None, fp16_support=False
 )
 parser.add_argument(
     '--onnx',
@@ -49,7 +49,7 @@ parser.add_argument(
     action='store_true',
     help='disable ailia tokenizer.'
 )
-args = update_parser(parser, check_input_type=False, fp16_support=False)
+args = update_parser(parser, check_input_type=False)
 
 
 # ======================

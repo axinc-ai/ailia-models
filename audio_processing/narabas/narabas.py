@@ -26,7 +26,7 @@ REMOTE_PATH = "https://storage.googleapis.com/ailia-models/narabas/"
 AUDIO_PATH = "input.wav"
 HOP_LENGTH_SEC = 0.02
 
-parser = get_base_parser('narabas', AUDIO_PATH, None fp16_support=False)
+parser = get_base_parser('narabas', AUDIO_PATH, None, fp16_support=False)
 parser.add_argument(
     '--onnx',
     action='store_true',
