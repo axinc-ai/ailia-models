@@ -1,20 +1,21 @@
 import os
 import sys
-import ailia
-import numpy as np
+from typing import Literal, Sequence
 import json
+from logging import getLogger
 
-# logger
-from logging import getLogger  # noqa: E402
+import ailia
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
 
 # import original modules
 sys.path.append("../../util")
 from arg_utils import get_base_parser, update_parser  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 
-import pandas as pd
-import matplotlib.pyplot as plt
-
+# logger
 logger = getLogger(__name__)
 
 
@@ -37,6 +38,30 @@ SAVE_DATA_PATH = "output.npy"
 parser = get_base_parser("TimesFM", DATA_PATH, SAVE_DATA_PATH)
 parser.add_argument("-i", "--input", type=str, default=DATA_PATH)
 parser.add_argument(
+    "--context_len",
+    type=int,
+    default=512,
+    help="context length, max context length of 512.",
+)
+parser.add_argument(
+    "--horizon_len",
+    type=int,
+    default=128,
+    help="time series length to forecast, it must not exceed context len.",
+)
+parser.add_argument(
+    "--forecast_horizon",
+    type=int,
+    default=None,
+    help="How many ends of the time series of data to forecast.",
+)
+parser.add_argument(
+    "--forecast_mode",
+    default="median",
+    choices=["mean", "median"],
+    help="forecast_mode: mean or median",
+)
+parser.add_argument(
     "--onnx",
     action="store_true",
     help="By default, the ailia SDK is used, but with this option, you can switch to using ONNX Runtime",
@@ -55,6 +80,17 @@ args = update_parser(parser)
 # ======================
 
 
+def get_data(
+    data_path,
+):
+    df = pd.read_csv(data_path)
+    df = df[["HUFL", "HULL", "MUFL", "MULL", "LUFL", "LULL", "OT"]]
+
+    target_index = 6
+
+    return df, target_index
+
+
 def draw_result(history, trues, preds, save_path):
     plt.figure(figsize=(12, 4))
 
@@ -67,14 +103,15 @@ def draw_result(history, trues, preds, save_path):
     )
 
     offset = len(history)
-    plt.plot(
-        range(offset, offset + len(trues)),
-        trues,
-        label=f"Ground Truth ({len(trues)} timesteps)",
-        color="darkblue",
-        linestyle="--",
-        alpha=0.5,
-    )
+    if 0 < len(trues):
+        plt.plot(
+            range(offset, offset + len(trues)),
+            trues,
+            label=f"Ground Truth ({len(trues)} timesteps)",
+            color="darkblue",
+            linestyle="--",
+            alpha=0.5,
+        )
     plt.plot(
         range(offset, offset + len(preds)),
         preds,
@@ -94,31 +131,201 @@ def draw_result(history, trues, preds, save_path):
 # Main functions
 # ======================
 
+batch_size = 32
 
-def get_data(
-    data_path,
+
+def preprocess(
+    inputs: Sequence[np.ndarray], freq: Sequence[int], context_len, horizon_len
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, int]:
+
+    input_ts, input_padding, inp_freq = [], [], []
+
+    pmap_pad = ((len(inputs) - 1) // batch_size + 1) * batch_size - len(inputs)
+
+    for i, ts in enumerate(inputs):
+        input_len = ts.shape[0]
+        padding = np.zeros(shape=(input_len + horizon_len,), dtype=float)
+        if input_len < context_len:
+            num_front_pad = context_len - input_len
+            ts = np.concatenate(
+                [np.zeros(shape=(num_front_pad,), dtype=float), ts], axis=0
+            )
+            padding = np.concatenate(
+                [np.ones(shape=(num_front_pad,), dtype=float), padding], axis=0
+            )
+        elif input_len > context_len:
+            ts = ts[-context_len:]
+            padding = padding[-(context_len + horizon_len) :]
+
+        input_ts.append(ts)
+        input_padding.append(padding)
+        inp_freq.append(freq[i])
+
+    # Padding the remainder batch.
+    for _ in range(pmap_pad):
+        input_ts.append(input_ts[-1])
+        input_padding.append(input_padding[-1])
+        inp_freq.append(inp_freq[-1])
+
+    return (
+        np.stack(input_ts, axis=0),
+        np.stack(input_padding, axis=0),
+        np.array(inp_freq).astype(np.int32).reshape(-1, 1),
+        pmap_pad,
+    )
+
+
+def decode(
+    net,
+    input_ts: np.ndarray,
+    paddings: np.ndarray,
+    freq: np.ndarray,
+    horizon_len: int,
+    max_len: int = 512,
+) -> tuple[np.ndarray, np.ndarray]:
+    final_out = input_ts
+    full_outputs = []
+
+    output_patch_len = 128
+    num_decode_patches = (horizon_len + output_patch_len - 1) // output_patch_len
+    for _ in range(num_decode_patches):
+        current_padding = paddings[:, 0 : final_out.shape[1]]
+        input_ts = final_out[:, -max_len:]
+        input_padding = current_padding[:, -max_len:]
+
+        # feedforward
+        if not args.onnx:
+            output = net.predict([input_ts, input_padding, freq])
+        else:
+            output = net.run(
+                None,
+                {"input_ts": input_ts, "input_padding": input_padding, "freq": freq},
+            )
+        fprop_outputs = output[0]
+
+        # (full batch, last patch, output_patch_len, index of mean forecast = 0)
+        new_ts = fprop_outputs[:, -1, :output_patch_len, 0]
+        new_full_ts = fprop_outputs[:, -1, :output_patch_len, :]
+        # (full batch, last patch, output_patch_len, all output indices)
+        full_outputs.append(new_full_ts)
+        final_out = np.concatenate([final_out, new_ts], axis=-1)
+
+    # `full_outputs` indexing starts at the forecast horizon.
+    full_outputs = np.concatenate(full_outputs, axis=1)[:, 0:horizon_len, :]
+
+    return (full_outputs[:, :, 0], full_outputs)
+
+
+def forecast(
+    net,
+    inputs,
+    freq=None,
+    context_len=512,
+    horizon_len=128,
+    forecast_mode: Literal["mean", "median"] = "median",
 ):
-    df = pd.read_csv(data_path)
-    df = df[["HUFL", "HULL", "MUFL", "MULL", "LUFL", "LULL", "OT"]]
-    return df
+    """
+    Returns:
+        A tuple for np.array:
+        - the mean forecast of size (# inputs, # forecast horizon),
+        - the full forecast (mean + quantiles) of size
+    """
+    inputs = [np.array(ts)[-context_len:] for ts in inputs]
+    if freq is None:
+        freq = [0] * len(inputs)
+
+    input_ts, input_padding, inp_freq, pmap_pad = preprocess(
+        inputs, freq, context_len, horizon_len
+    )
+
+    mean_outputs = []
+    full_outputs = []
+    for i in range(input_ts.shape[0] // batch_size):
+        input_ts_in = np.array(
+            input_ts[i * batch_size : (i + 1) * batch_size],
+            dtype=np.float32,
+        )
+        input_padding_in = np.array(
+            input_padding[i * batch_size : (i + 1) * batch_size],
+            dtype=np.float32,
+        )
+        inp_freq_in = np.array(
+            inp_freq[
+                i * batch_size : (i + 1) * batch_size,
+                :,
+            ],
+            dtype=int,
+        )
+
+        mean_output, full_output = decode(
+            net,
+            input_ts=input_ts_in,
+            paddings=input_padding_in,
+            freq=inp_freq_in,
+            horizon_len=horizon_len,
+        )
+        mean_outputs.append(mean_output)
+        full_outputs.append(full_output)
+
+    mean_outputs = np.concatenate(mean_outputs, axis=0)
+    full_outputs = np.concatenate(full_outputs, axis=0)
+
+    if pmap_pad > 0:
+        mean_outputs = mean_outputs[:-pmap_pad, ...]
+        full_outputs = full_outputs[:-pmap_pad, ...]
+
+    if forecast_mode == "mean":
+        point_forecast, experimental_quantile_forecast = mean_outputs, full_outputs
+    elif forecast_mode == "median":
+        median_index = 4
+        point_forecast, experimental_quantile_forecast = (
+            full_outputs[:, :, 1 + median_index],
+            full_outputs,
+        )
+    else:
+        raise ValueError(
+            "Unsupported point forecast mode:"
+            f" {forecast_mode}. Use 'mean' or 'median'."
+        )
+
+    return point_forecast, experimental_quantile_forecast
 
 
 def time_series_forecasting(net):
-    ### prepare dataset ###
     data_path = args.input[0]
-    context_length = 512
-    forecast_horizon = 96
+    context_length = args.context_len
+    horizon_len = args.horizon_len
+    forecast_horizon = args.forecast_horizon
+    forecast_mode = args.forecast_mode
 
-    df_data = get_data(data_path)
-    df_input = df_data.iloc[-(context_length + forecast_horizon) : -forecast_horizon]
-    df_true = df_data.iloc[-forecast_horizon:]
-    target_index = 6
+    df_data, target_index = get_data(data_path)
+    df_train = (
+        df_data.iloc[-(context_length + forecast_horizon) : -forecast_horizon]
+        if forecast_horizon
+        else df_data.iloc[-context_length:]
+    )
+    df_true = df_data.iloc[-forecast_horizon:] if forecast_horizon else df_data.iloc[:0]
 
-    forecast_input = df_input.values.T
-    point_true = df_true.values.T
+    forecast_train = df_train.values.T
+    forecast_true = df_true.values.T
+
+    point_forecast, _ = forecast(
+        net,
+        forecast_train,
+        context_len=context_length,
+        horizon_len=horizon_len,
+        forecast_mode=forecast_mode,
+    )
+
+    history = forecast_train[target_index, :]
+    true = forecast_true[target_index, :]
+    pred = point_forecast[target_index, :]
+
+    # ### save result ###
+    # np.save(args.savepath, preds)
 
     ### visualize ###
-    draw_result(history, trues, preds, "output.png")
+    draw_result(history, true, pred, "output.png")
 
     logger.info("Script finished successfully.")
 
