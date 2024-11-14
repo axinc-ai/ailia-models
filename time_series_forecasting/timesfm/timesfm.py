@@ -1,7 +1,6 @@
-import os
 import sys
 from typing import Literal, Sequence
-import json
+import warnings
 from logging import getLogger
 
 import ailia
@@ -12,7 +11,7 @@ import matplotlib.pyplot as plt
 
 # import original modules
 sys.path.append("../../util")
-from arg_utils import get_base_parser, update_parser  # noqa: E402
+from arg_utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 
 # logger
@@ -28,15 +27,18 @@ MODEL_PATH = "timesfm-1.0-200m.onnx.prototxt"
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/timesfm/"
 
 DATA_PATH = "ETTh1.csv"
-SAVE_DATA_PATH = "output.npy"
+SAVE_IMAGE_PATH = "output.png"
+
+BATCH_SIZE = 32
 
 
 # ======================
 # Arguemnt Parser Config
 # ======================
 
-parser = get_base_parser("TimesFM", DATA_PATH, SAVE_DATA_PATH)
+parser = get_base_parser("TimesFM", DATA_PATH, SAVE_IMAGE_PATH)
 parser.add_argument("-i", "--input", type=str, default=DATA_PATH)
+parser.add_argument("--target", type=str, default=None)
 parser.add_argument(
     "--context_len",
     type=int,
@@ -80,17 +82,6 @@ args = update_parser(parser)
 # ======================
 
 
-def get_data(
-    data_path,
-):
-    df = pd.read_csv(data_path)
-    df = df[["HUFL", "HULL", "MUFL", "MULL", "LUFL", "LULL", "OT"]]
-
-    target_index = 6
-
-    return df, target_index
-
-
 def draw_result(history, trues, preds, save_path):
     plt.figure(figsize=(12, 4))
 
@@ -131,8 +122,6 @@ def draw_result(history, trues, preds, save_path):
 # Main functions
 # ======================
 
-batch_size = 32
-
 
 def preprocess(
     inputs: Sequence[np.ndarray], freq: Sequence[int], context_len, horizon_len
@@ -140,7 +129,7 @@ def preprocess(
 
     input_ts, input_padding, inp_freq = [], [], []
 
-    pmap_pad = ((len(inputs) - 1) // batch_size + 1) * batch_size - len(inputs)
+    pmap_pad = ((len(inputs) - 1) // BATCH_SIZE + 1) * BATCH_SIZE - len(inputs)
 
     for i, ts in enumerate(inputs):
         input_len = ts.shape[0]
@@ -240,18 +229,18 @@ def forecast(
 
     mean_outputs = []
     full_outputs = []
-    for i in range(input_ts.shape[0] // batch_size):
+    for i in range(input_ts.shape[0] // BATCH_SIZE):
         input_ts_in = np.array(
-            input_ts[i * batch_size : (i + 1) * batch_size],
+            input_ts[i * BATCH_SIZE : (i + 1) * BATCH_SIZE],
             dtype=np.float32,
         )
         input_padding_in = np.array(
-            input_padding[i * batch_size : (i + 1) * batch_size],
+            input_padding[i * BATCH_SIZE : (i + 1) * BATCH_SIZE],
             dtype=np.float32,
         )
         inp_freq_in = np.array(
             inp_freq[
-                i * batch_size : (i + 1) * batch_size,
+                i * BATCH_SIZE : (i + 1) * BATCH_SIZE,
                 :,
             ],
             dtype=int,
@@ -297,35 +286,50 @@ def time_series_forecasting(net):
     horizon_len = args.horizon_len
     forecast_horizon = args.forecast_horizon
     forecast_mode = args.forecast_mode
+    target = args.target
 
-    df_data, target_index = get_data(data_path)
+    df = pd.read_csv(data_path)
+
+    if target is None:
+        target = df.columns[-1]
+
+    target = int(target) if target.isdigit() else target
+    if isinstance(target, str):
+        logger.info("target column: %s" % target)
+        df = df[[target]]
+    else:
+        logger.info("target column index: %s" % target)
+        df = df.iloc[:, [target]]
+
     df_train = (
-        df_data.iloc[-(context_length + forecast_horizon) : -forecast_horizon]
+        df[-(context_length + forecast_horizon) : -forecast_horizon]
         if forecast_horizon
-        else df_data.iloc[-context_length:]
+        else df[-context_length:]
     )
-    df_true = df_data.iloc[-forecast_horizon:] if forecast_horizon else df_data.iloc[:0]
+    df_true = df[-forecast_horizon:] if forecast_horizon else df[:0]
 
-    forecast_train = df_train.values.T
-    forecast_true = df_true.values.T
+    history = df_train.values.T
+    trues = df_true.values.T
 
-    point_forecast, _ = forecast(
+    preds, _ = forecast(
         net,
-        forecast_train,
+        history,
         context_len=context_length,
         horizon_len=horizon_len,
         forecast_mode=forecast_mode,
     )
 
-    history = forecast_train[target_index, :]
-    true = forecast_true[target_index, :]
-    pred = point_forecast[target_index, :]
+    history = history.reshape(-1)
+    trues = trues.reshape(-1)
+    preds = preds.reshape(-1)
 
-    # ### save result ###
-    # np.save(args.savepath, preds)
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore")
 
-    ### visualize ###
-    draw_result(history, true, pred, "output.png")
+        # plot result
+        savepath = get_savepath(args.savepath, data_path, ext=".png")
+        logger.info(f"saved at : {savepath}")
+        draw_result(history, trues, preds, savepath)
 
     logger.info("Script finished successfully.")
 
