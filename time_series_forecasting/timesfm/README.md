@@ -42,6 +42,7 @@ $ python3 timesfm.py --forecast_horizon 128
 
 ## Reference
 
+- [TimesFM](https://github.com/google-research/timesfm)
 - [Hugging Face - google/timesfm-1.0-200m](https://huggingface.co/google/timesfm-1.0-200m)
 
 ## Framework
