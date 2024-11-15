@@ -357,3 +357,4 @@ cd ../../time_series_forecasting/informer2020; python3 informer2020.py ${OPTION}
 cd ../../vehicle_recognition/vehicle-attributes-recognition-barrier; python3 vehicle-attributes-recognition-barrier.py ${OPTION}
 cd ../../vehicle_recognition/vehicle-license-plate-detection-barrier; python3 vehicle-license-plate-detection-barrier.py ${OPTION}
 cd ../../vision_language_model/florence2; python3 florence2.py ${OPTION}
+cd ../../vision_language_model/qwen2_vl; python3 qwen2_vl.py ${OPTION}
