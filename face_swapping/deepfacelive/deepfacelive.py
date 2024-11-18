@@ -2,15 +2,15 @@ import sys
 import time
 from dataclasses import dataclass
 from enum import IntEnum
-
-# logger
-from logging import getLogger  # noqa
+from typing import List  # noqa
+from logging import getLogger
 
 import numpy as np
 import cv2
 from PIL import Image
 
 import ailia
+
 
 # import original modules
 sys.path.append("../../util")
@@ -21,6 +21,7 @@ from nms_utils import nms_boxes  # noqa
 from webcamera_utils import get_capture, get_writer  # noqa
 
 from util_math import *
+from util_affine import *
 
 logger = getLogger(__name__)
 
@@ -87,14 +88,15 @@ class FaceSwapInfo:
     face_ulmrks: FLandmarks2D = None
 
     face_resolution: int = None
-    face_align_image_name: str = None
-    face_align_mask_name: str = None
-    face_align_lmrks_mask_name: str = None
-    face_anim_image_name: str = None
-    face_swap_image_name: str = None
-    face_swap_mask_name: str = None
 
-    image_to_align_uni_mat = None
+    face_align_image: np.ndarray = None
+    face_align_lmrks_mask: np.ndarray = None
+    # face_align_mask_name: str = None
+    # face_anim_image_name: str = None
+    face_swap_image: np.ndarray = None
+    # face_swap_mask_name: str = None
+
+    image_to_align_uni_mat: np.ndarray = None
     face_align_ulmrks: FLandmarks2D = None
 
 
@@ -297,12 +299,12 @@ def setup_yolov5face(net):
         _, H, W, _ = img.shape
         img = img.astype(np.float32) / 255.0
 
-        in_img = img.transpose(0, 3, 1, 2)
-        preds = predict(in_img)
+        feed_img = img.transpose(0, 3, 1, 2)
+        preds = predict(feed_img)
 
         if augment:
-            in_img = img[:, :, ::-1, :].transpose(0, 3, 1, 2)
-            rl_preds = predict(in_img)
+            feed_img = img[:, :, ::-1, :].transpose(0, 3, 1, 2)
+            rl_preds = predict(feed_img)
             rl_preds[:, :, 0] = W - rl_preds[:, :, 0]
             preds = np.concatenate([preds, rl_preds], 1)
 
@@ -338,6 +340,60 @@ def setup_yolov5face(net):
     return extract
 
 
+def setup_google_facemesh(net):
+    input_height = 192
+    input_width = 192
+
+    def extract(img):
+        """
+        arguments
+
+         img    np.ndarray      HW,HWC,NHWC uint8/float32
+
+        returns (N,468,3)
+        """
+        H, W, _ = img.shape
+
+        h_scale = H / input_height
+        w_scale = W / input_width
+
+        img = resize(img, (input_width, input_height))
+
+        img = img / 255
+        img = np.expand_dims(img, axis=0)
+        img = img.astype(np.float32)
+
+        # feedforward
+        if not args.onnx:
+            output = net.predict([img])
+        else:
+            output = net.run(None, {"input_1": img})
+        lmrks = output[0]
+
+        lmrks = lmrks.reshape((-1, 468, 3))
+        lmrks *= (w_scale, h_scale, 1)
+
+        return lmrks
+
+    return extract
+
+
+def resize(
+    img,
+    size: Tuple,
+):
+    """
+    resize to (W,H)
+    """
+    H, W, _ = img.shape
+
+    TW, TH = size
+    if W != TW or H != TH:
+        img = cv2.resize(img, (TW, TH), interpolation=cv2.INTER_LINEAR)
+
+    return img
+
+
 def as_4pts(pts, w_h=None) -> np.ndarray:
     """
     get rect as 4 pts
@@ -353,6 +409,83 @@ def as_4pts(pts, w_h=None) -> np.ndarray:
     if w_h is not None:
         return pts * w_h
     return pts.copy()
+
+
+def sort_by_area_size(rects: List[np.ndarray]):
+    """
+    sort list of FRect by largest area descend
+    """
+    rects = [(rect, polygon_area(as_4pts(rect))) for rect in rects]
+    rects = sorted(rects, key=lambda x: x[1], reverse=True)
+    rects = [x[0] for x in rects]
+    return rects
+
+
+def face_urect_cut(
+    fsi,
+    img: np.ndarray,
+    coverage: float,
+    output_size: int,
+    x_offset: float = 0,
+    y_offset: float = 0,
+):
+    """
+    Cut the face to square of output_size from img with given coverage using this rect
+
+    returns image,
+            uni_mat     uniform matrix to transform uniform img space to uniform cutted space
+    """
+
+    uni_rect = np.array(
+        [
+            [0.0, 0.0],
+            [0.0, 1.0],
+            [1.0, 1.0],
+            [1.0, 0.0],
+        ],
+        dtype=np.float32,
+    )
+
+    # Face rect is not a square, also rect can be rotated
+
+    h, w = img.shape[0:2]
+
+    # Get scaled rect pts to target img
+    pts = as_4pts(fsi.face_urect, w_h=(w, h))
+
+    # Estimate transform from global space to local aligned space with bounds [0..1]
+    mat = umeyama(pts, uni_rect, True)
+
+    # get corner points in global space
+    g_p = transform_points(invert(mat), [(0, 0), (1, 0), (1, 1), (0, 1), (0.5, 0.5)])
+    g_c = g_p[4]
+
+    h_vec = (g_p[1] - g_p[0]).astype(np.float32)
+    v_vec = (g_p[3] - g_p[0]).astype(np.float32)
+
+    # calc diagonal vectors between corners in global space
+    tb_diag_vec = segment_to_vector(g_p[0], g_p[2]).astype(np.float32)
+    bt_diag_vec = segment_to_vector(g_p[3], g_p[1]).astype(np.float32)
+
+    mod = segment_length(g_p[0], g_p[4]) * coverage
+
+    g_c += h_vec * x_offset + v_vec * y_offset
+
+    l_t = np.array(
+        [g_c - tb_diag_vec * mod, g_c + bt_diag_vec * mod, g_c + tb_diag_vec * mod],
+        np.float32,
+    )
+    src_pts, dst_pts = l_t, np.float32(
+        ((0, 0), (output_size, 0), (output_size, output_size))
+    )
+    mat = cv2.getAffineTransform(np.float32(src_pts), np.float32(dst_pts))
+    src_pts, dst_pts = (l_t / (w, h)).astype(np.float32), np.float32(
+        ((0, 0), (1, 0), (1, 1))
+    )
+    uni_mat = cv2.getAffineTransform(np.float32(src_pts), np.float32(dst_pts))
+
+    face_image = cv2.warpAffine(img, mat, (output_size, output_size), cv2.INTER_CUBIC)
+    return face_image, uni_mat
 
 
 def face_ulmrks_transform(face_ulmrks, mat, invert=False) -> "FLandmarks2D":
@@ -371,6 +504,30 @@ def face_ulmrks_transform(face_ulmrks, mat, invert=False) -> "FLandmarks2D":
     return FLandmarks2D(type=face_ulmrks.type, ulmrks=ulmrks)
 
 
+def get_convexhull_mask(
+    face_align_ulmrks, h_w, color=(1,), dtype=np.float32
+) -> np.ndarray:
+    """ """
+    h, w = h_w
+    ch = len(color)
+    lmrks = (face_align_ulmrks.ulmrks * h_w).astype(np.int32)
+    mask = np.zeros((h, w, ch), dtype=dtype)
+    cv2.fillConvexPoly(mask, cv2.convexHull(lmrks), color)
+    return mask
+
+
+def from_3D_468_landmarks(lmrks):
+    """ """
+    mat = np.empty((3, 3))
+    mat[0, :] = (lmrks[454] - lmrks[234]) / np.linalg.norm(lmrks[454] - lmrks[234])
+    mat[1, :] = (lmrks[152] - lmrks[6]) / np.linalg.norm(lmrks[152] - lmrks[6])
+    mat[2, :] = np.cross(mat[0, :], mat[1, :])
+    pitch, yaw, roll = rotation_matrix_to_euler(mat)
+
+    face_rect = np.array([pitch, yaw * 2, roll], np.float32)
+    return face_rect
+
+
 # ======================
 # Main functions
 # ======================
@@ -381,6 +538,8 @@ def face_detector(models, tar_img):
 
     detector_threshold = 0.5
     fixed_window_size = 480
+    max_faces = 1
+    temporal_smoothing = 1
 
     face_detector = models["face_detector"]
     rects = face_detector(
@@ -396,132 +555,32 @@ def face_detector(models, tar_img):
         for l, t, r, b in [[l / W, t / H, r / W, b / H] for l, t, r, b in rects]
     ]
 
-    # rects = sort_by_area_size(rects)
+    rects = sort_by_area_size(rects)
 
-    info = []
-
-    max_faces = 1
-    temporal_smoothing = 1
+    fsi_list = []
     if len(rects) != 0:
         max_faces = max_faces
         if max_faces != 0 and len(rects) > max_faces:
             rects = rects[:max_faces]
 
-        # if temporal_smoothing != 1:
-        #     if len(self.temporal_rects) != len(rects):
-        #         self.temporal_rects = [[] for _ in range(len(rects))]
+        if temporal_smoothing != 1:
+            if len(getattr(face_detector, "temporal_rects", [])) != len(rects):
+                face_detector.temporal_rects = [[] for _ in range(len(rects))]
 
         for face_id, face_urect in enumerate(rects):
-            # if temporal_smoothing != 1:
-            #     if not is_frame_reemitted or len(self.temporal_rects[face_id]) == 0:
-            #         self.temporal_rects[face_id].append(face_urect.as_4pts())
+            if temporal_smoothing != 1:
+                if len(face_detector.temporal_rects[face_id]) == 0:
+                    face_detector.temporal_rects[face_id].append(as_4pts(face_urect))
 
-            #     self.temporal_rects[face_id] = self.temporal_rects[face_id][
-            #         -temporal_smoothing:
-            #     ]
-
-            #     face_urect = FRect.from_4pts(np.mean(self.temporal_rects[face_id], 0))
+                face_detector.temporal_rects[face_id] = face_detector.temporal_rects[
+                    face_id
+                ][-temporal_smoothing:]
+                face_urect = np.mean(face_detector.temporal_rects[face_id], 0)
 
             if polygon_area(face_urect) != 0:
-                info.append(FaceSwapInfo(face_urect=face_urect))
+                fsi_list.append(FaceSwapInfo(face_urect=face_urect))
 
-        return info
-
-
-def face_urect_cut(fsi, frame_image, coverage, resolution):
-    pass
-
-
-def face_urect_cut(
-    fsi,
-    img: np.ndarray,
-    coverage: float,
-    output_size: int,
-    x_offset: float = 0,
-    y_offset: float = 0,
-):
-    """
-    Cut the face to square of output_size from img with given coverage using this rect
-
-    returns image,
-            uni_mat     uniform matrix to transform uniform img space to uniform cutted space
-    """
-
-    # Face rect is not a square, also rect can be rotated
-
-    h, w = img.shape[0:2]
-
-    # Get scaled rect pts to target img
-    pts = fsi.as_4pts(w_h=(w, h))
-
-    # Estimate transform from global space to local aligned space with bounds [0..1]
-    mat = Affine2DMat.umeyama(pts, uni_rect, True)
-
-    # get corner points in global space
-    g_p = mat.invert().transform_points([(0, 0), (1, 0), (1, 1), (0, 1), (0.5, 0.5)])
-    g_c = g_p[4]
-
-    h_vec = (g_p[1] - g_p[0]).astype(np.float32)
-    v_vec = (g_p[3] - g_p[0]).astype(np.float32)
-
-    # calc diagonal vectors between corners in global space
-    tb_diag_vec = segment_to_vector(g_p[0], g_p[2]).astype(np.float32)
-    bt_diag_vec = segment_to_vector(g_p[3], g_p[1]).astype(np.float32)
-
-    mod = segment_length(g_p[0], g_p[4]) * coverage
-
-    g_c += h_vec * x_offset + v_vec * y_offset
-
-    l_t = np.array(
-        [g_c - tb_diag_vec * mod, g_c + bt_diag_vec * mod, g_c + tb_diag_vec * mod],
-        np.float32,
-    )
-
-    mat = Affine2DMat.from_3_pairs(
-        l_t, np.float32(((0, 0), (output_size, 0), (output_size, output_size)))
-    )
-    uni_mat = Affine2DUniMat.from_3_pairs(
-        (l_t / (w, h)).astype(np.float32), np.float32(((0, 0), (1, 0), (1, 1)))
-    )
-
-    face_image = cv2.warpAffine(img, mat, (output_size, output_size), cv2.INTER_CUBIC)
-    return face_image, uni_mat
-
-
-def get_convexhull_mask(
-    face_align_ulmrks, h_w, color=(1,), dtype=np.float32
-) -> np.ndarray:
-    """ """
-    h, w = h_w
-    ch = len(color)
-    lmrks = (face_align_ulmrks.ulmrks * h_w).astype(np.int32)
-    mask = np.zeros((h, w, ch), dtype=dtype)
-    cv2.fillConvexPoly(mask, cv2.convexHull(lmrks), color)
-    return mask
-
-
-def opencv_lbf(face_image):
-    pass
-
-
-def google_facemesh(face_image):
-    pass
-
-
-def insightface_2d106(face_image):
-    pass
-
-
-def from_3D_468_landmarks(lmrks):
-    """ """
-    mat = np.empty((3, 3))
-    mat[0, :] = (lmrks[454] - lmrks[234]) / np.linalg.norm(lmrks[454] - lmrks[234])
-    mat[1, :] = (lmrks[152] - lmrks[6]) / np.linalg.norm(lmrks[152] - lmrks[6])
-    mat[2, :] = np.cross(mat[0, :], mat[1, :])
-    pitch, yaw, roll = rotation_matrix_to_euler(mat)
-
-    face_rect = np.array([pitch, yaw * 2, roll], np.float32)
-    return face_rect
+        return fsi_list
 
 
 def face_marker(models, frame_image, fsi_list, marker_coverage=1.4):
@@ -530,68 +589,67 @@ def face_marker(models, frame_image, fsi_list, marker_coverage=1.4):
     is_insightface_2d106 = False
     temporal_smoothing = 1
 
-    # if temporal_smoothing != 1 and \
-    #     len(self.temporal_lmrks) != len(fsi_list):
-    #     self.temporal_lmrks = [ [] for _ in range(len(fsi_list)) ]
+    if temporal_smoothing != 1 and len(face_marker.temporal_lmrks) != len(fsi_list):
+        face_marker.temporal_lmrks = [[] for _ in range(len(fsi_list))]
 
     for face_id, fsi in enumerate(fsi_list):
-        if fsi.face_urect is not None:
-            # Cut the face to feed to the face marker
-            face_image, face_uni_mat = face_urect_cut(
-                fsi,
-                frame_image,
-                marker_coverage,
-                (
-                    256
-                    if is_opencv_lbf
-                    else (
-                        192
-                        if is_google_facemesh
-                        else 192 if is_insightface_2d106 else 0
-                    )
-                ),
-            )
-            # _,H,W,_ = ImageProcessor(face_image).get_dims()
-            H = W = 192
-            if is_opencv_lbf:
-                lmrks = opencv_lbf(face_image)[0]
-            elif is_google_facemesh:
-                lmrks = google_facemesh(face_image)[0]
-            elif is_insightface_2d106:
-                lmrks = insightface_2d106(face_image)[0]
+        if fsi.face_urect is None:
+            continue
 
-            if temporal_smoothing != 1:
-                if not is_frame_reemitted or len(self.temporal_lmrks[face_id]) == 0:
-                    self.temporal_lmrks[face_id].append(lmrks)
-                self.temporal_lmrks[face_id] = self.temporal_lmrks[face_id][
-                    -temporal_smoothing:
-                ]
-                lmrks = np.mean(self.temporal_lmrks[face_id], 0)
+        # Cut the face to feed to the face marker
+        face_image, face_uni_mat = face_urect_cut(
+            fsi,
+            frame_image,
+            marker_coverage,
+            (
+                256
+                if is_opencv_lbf
+                else (192 if is_google_facemesh else 192 if is_insightface_2d106 else 0)
+            ),
+        )
+        H, W, _ = face_image.shape
 
-            if is_google_facemesh:
-                fsi.face_pose = from_3D_468_landmarks(lmrks)
+        # if is_opencv_lbf:
+        #     lmrks = opencv_lbf(face_image)[0]
+        # elif is_google_facemesh:
+        #     lmrks = google_facemesh(face_image)[0]
+        # elif is_insightface_2d106:
+        #     lmrks = insightface_2d106(face_image)[0]
+        face_marker = models["face_marker"]
+        lmrks = face_marker(face_image)[0]
 
-            if is_opencv_lbf:
-                lmrks /= (W, H)
-            elif is_google_facemesh:
-                lmrks = lmrks[..., 0:2] / (W, H)
-            elif is_insightface_2d106:
-                lmrks = lmrks[..., 0:2] / (W, H)
+        if temporal_smoothing != 1:
+            if len(face_marker.temporal_lmrks[face_id]) == 0:
+                face_marker.temporal_lmrks[face_id].append(lmrks)
+            face_marker.temporal_lmrks[face_id] = face_marker.temporal_lmrks[face_id][
+                -temporal_smoothing:
+            ]
+            lmrks = np.mean(face_marker.temporal_lmrks[face_id], 0)
 
-            face_ulmrks = FLandmarks2D(
-                type=(
-                    ELandmarks2D.L68
-                    if is_opencv_lbf
-                    else (
-                        ELandmarks2D.L468
-                        if is_google_facemesh
-                        else ELandmarks2D.L106 if is_insightface_2d106 else None
-                    )
-                ),
-                ulmrks=lmrks,
-            )
-            face_ulmrks = face_ulmrks_transform(face_ulmrks, face_uni_mat, invert=True)
-            fsi.face_ulmrks = face_ulmrks
+        if is_google_facemesh:
+            fsi.face_pose = from_3D_468_landmarks(lmrks)
+
+        if is_opencv_lbf:
+            lmrks /= (W, H)
+        elif is_google_facemesh:
+            lmrks = lmrks[..., 0:2] / (W, H)
+        elif is_insightface_2d106:
+            lmrks = lmrks[..., 0:2] / (W, H)
+
+        face_ulmrks = FLandmarks2D(
+            type=(
+                ELandmarks2D.L68
+                if is_opencv_lbf
+                else (
+                    ELandmarks2D.L468
+                    if is_google_facemesh
+                    else ELandmarks2D.L106 if is_insightface_2d106 else None
+                )
+            ),
+            ulmrks=lmrks,
+        )
+        face_ulmrks = face_ulmrks_transform(face_ulmrks, face_uni_mat, invert=True)
+        fsi.face_ulmrks = face_ulmrks
 
     return fsi_list
 
@@ -603,69 +661,62 @@ def face_aligner(models, frame_image, fsi_list, face_coverage=2.2, resolution=25
     x_offset = y_offset = 0.0
 
     for face_id, fsi in enumerate(fsi_list):
-        head_yaw = None
-        if head_mode or freeze_z_rotation:
-            if fsi.face_pose is not None:
-                head_yaw = fsi.face_pose.as_radians()[1]
+        if fsi.face_ulmrks is None:
+            continue
 
         face_ulmrks = fsi.face_ulmrks
-        if face_ulmrks is not None:
-            fsi.face_resolution = resolution
+        fsi.face_resolution = resolution
 
-            H, W = frame_image.shape[:2]
-            if align_mode == AlignMode.FROM_RECT:
-                face_align_img, uni_mat = face_urect_cut(
-                    fsi,
-                    frame_image,
-                    coverage=face_coverage,
-                    output_size=resolution,
-                    x_offset=x_offset,
-                    y_offset=y_offset,
-                )
-            # elif align_mode == AlignMode.FROM_POINTS:
-            #     face_align_img, uni_mat = face_ulmrks.cut(
-            #         frame_image,
-            #         state.face_coverage + (1.0 if head_mode else 0.0),
-            #         state.resolution,
-            #         exclude_moving_parts=state.exclude_moving_parts,
-            #         head_yaw=head_yaw,
-            #         x_offset=state.x_offset,
-            #         y_offset=state.y_offset - 0.08 + (-0.50 if head_mode else 0.0),
-            #         freeze_z_rotation=freeze_z_rotation,
-            #     )
-            # elif align_mode == AlignMode.FROM_STATIC_RECT:
-            #     rect = FRect.from_ltrb(
-            #         [
-            #             0.5 - (fsi.face_resolution / W) / 2,
-            #             0.5 - (fsi.face_resolution / H) / 2,
-            #             0.5 + (fsi.face_resolution / W) / 2,
-            #             0.5 + (fsi.face_resolution / H) / 2,
-            #         ]
-            #     )
-            #     face_align_img, uni_mat = rect.cut(
-            #         frame_image,
-            #         coverage=state.face_coverage,
-            #         output_size=state.resolution,
-            #         x_offset=state.x_offset,
-            #         y_offset=state.y_offset,
-            #     )
-
-            # fsi.face_align_image_name = f"{frame_image_name}_{face_id}_aligned"
-            fsi.image_to_align_uni_mat = uni_mat
-            fsi.face_align_ulmrks = face_ulmrks_transform(uni_mat)
-            fsi.face_align_image_name = face_align_img
-
-            # Due to FaceAligner is not well loaded, we can make lmrks mask here
-            face_align_lmrks_mask_img = get_convexhull_mask(
-                fsi.face_align_ulmrks,
-                face_align_img.shape[:2],
-                color=(255,),
-                dtype=np.uint8,
+        H, W = frame_image.shape[:2]
+        if align_mode == AlignMode.FROM_RECT:
+            face_align_img, uni_mat = face_urect_cut(
+                fsi,
+                frame_image,
+                coverage=face_coverage,
+                output_size=resolution,
+                x_offset=x_offset,
+                y_offset=y_offset,
             )
-            # fsi.face_align_lmrks_mask_name = (
-            #     f"{frame_image_name}_{face_id}_aligned_lmrks_mask"
-            # )
-            fsi.face_align_lmrks_mask_name = face_align_lmrks_mask_img
+        # elif align_mode == AlignMode.FROM_POINTS:
+        #     face_align_img, uni_mat = face_ulmrks.cut(
+        #         frame_image,
+        #         state.face_coverage + (1.0 if head_mode else 0.0),
+        #         state.resolution,
+        #         exclude_moving_parts=state.exclude_moving_parts,
+        #         head_yaw=head_yaw,
+        #         x_offset=state.x_offset,
+        #         y_offset=state.y_offset - 0.08 + (-0.50 if head_mode else 0.0),
+        #         freeze_z_rotation=freeze_z_rotation,
+        #     )
+        # elif align_mode == AlignMode.FROM_STATIC_RECT:
+        #     rect = FRect.from_ltrb(
+        #         [
+        #             0.5 - (fsi.face_resolution / W) / 2,
+        #             0.5 - (fsi.face_resolution / H) / 2,
+        #             0.5 + (fsi.face_resolution / W) / 2,
+        #             0.5 + (fsi.face_resolution / H) / 2,
+        #         ]
+        #     )
+        #     face_align_img, uni_mat = rect.cut(
+        #         frame_image,
+        #         coverage=state.face_coverage,
+        #         output_size=state.resolution,
+        #         x_offset=state.x_offset,
+        #         y_offset=state.y_offset,
+        #     )
+
+        fsi.image_to_align_uni_mat = uni_mat
+        fsi.face_align_ulmrks = face_ulmrks_transform(face_ulmrks, uni_mat)
+        fsi.face_align_image = face_align_img
+
+        # Due to FaceAligner is not well loaded, we can make lmrks mask here
+        face_align_lmrks_mask_img = get_convexhull_mask(
+            fsi.face_align_ulmrks,
+            face_align_img.shape[:2],
+            color=(255,),
+            dtype=np.uint8,
+        )
+        fsi.face_align_lmrks_mask = face_align_lmrks_mask_img
 
     return fsi_list
 
@@ -676,23 +727,27 @@ def face_animator(models, frame_image, fsi_list):
 
     for i, fsi in enumerate(fsi_list):
         if animator_face_id == i:
-            face_align_image = fsi.face_align_image_name
-            if face_align_image is not None:
-                # _, H, W, _ = ImageProcessor(face_align_image).get_dims()
+            if fsi.face_align_image is None:
+                continue
 
-                # if self.driving_ref_motion is None:
-                #     self.driving_ref_motion = lia_model.extract_motion(face_align_image)
+            face_align_image = fsi.face_align_image
+            H, W, _ = face_align_image.shape
 
-                anim_image = generate(
-                    animatable_img,
-                    face_align_image,
-                    driving_ref_motion,
-                    power=state.relative_power,
+            if getattr(face_animator, "driving_ref_motion") is None:
+                face_animator.driving_ref_motion = lia_model.extract_motion(
+                    face_align_image
                 )
-                anim_image = ImageProcessor(anim_image).resize((W, H)).get_image("HWC")
 
-                # fsi.face_swap_image_name = f"{fsi.face_align_image_name}_swapped"
-                fsi.face_swap_image_name = anim_image
+            anim_image = generate(
+                animatable_img,
+                face_align_image,
+                face_animator.driving_ref_motion,
+                power=relative_power,
+            )
+            anim_image = ImageProcessor(anim_image).resize((W, H)).get_image("HWC")
+
+            # fsi.face_swap_image_name = f"{fsi.face_align_image_name}_swapped"
+            fsi.face_swap_image_name = anim_image
             break
 
 
@@ -759,11 +814,11 @@ def deepfacelive(models, tar_img):
     aligned_face_id = 0
     for i, fsi in enumerate(fsi_list):
         if aligned_face_id == i:
-            aligned_face = fsi.face_align_image_name
+            aligned_face = fsi.face_align_image
             break
 
     for fsi in fsi_list:
-        swapped_face = fsi.face_swap_image_name
+        swapped_face = fsi.face_swap_image
         if swapped_face is not None:
             break
 
@@ -882,10 +937,15 @@ def main():
         import onnxruntime
 
         net_face = onnxruntime.InferenceSession("YoloV5Face.onnx")
+        net_marker = onnxruntime.InferenceSession("FaceMesh.onnx")
 
-    extract = setup_yolov5face(net_face)
+    face_detector = setup_yolov5face(net_face)
+    face_marker = setup_google_facemesh(net_marker)
 
-    models = {"face_detector": extract}
+    models = {
+        "face_detector": face_detector,
+        "face_marker": face_marker,
+    }
 
     if args.video is not None:
         recognize_from_video(models)
