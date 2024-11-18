@@ -1004,7 +1004,7 @@ def main():
     check_and_download_models(WEIGHT_G_PATH, MODEL_G_PATH, REMOTE_PATH)
     check_and_download_models(WEIGHT_S_PATH, MODEL_S_PATH, REMOTE_PATH)
     check_and_download_models(WEIGHT_L_PATH, MODEL_L_PATH, REMOTE_PATH)
-    if args.det == "isightface":
+    if args.det == "insightface":
         check_and_download_models(WEIGHT_IF_DET_PATH, MODEL_IF_DET_PATH, REMOTE_PATH)
         check_and_download_models(WEIGHT_IF_LMK_PATH, MODEL_IF_LMK_PATH, REMOTE_PATH)
     else:  # facemesh
