@@ -2,7 +2,7 @@ import sys
 import time
 from dataclasses import dataclass
 from enum import IntEnum
-from typing import List  # noqa
+from typing import List, Tuple
 from logging import getLogger
 
 import numpy as np
@@ -17,6 +17,7 @@ sys.path.append("../../util")
 from arg_utils import get_base_parser, update_parser, get_savepath  # noqa
 from model_utils import check_and_download_models  # noqa
 from detector_utils import load_image  # noqa
+from image_utils import normalize_image
 from nms_utils import nms_boxes  # noqa
 from webcamera_utils import get_capture, get_writer  # noqa
 
@@ -35,8 +36,10 @@ MODEL_G_PATH = ".onnx.prototxt"
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/deepfacelive/"
 
 IMAGE_PATH = "Obama.jpg"
-SOURCE_PATH = "Kim Chen Yin.jpg"
+SOURCE_PATH = "Kim Chen Yin.png"
 SAVE_IMAGE_PATH = "output.png"
+
+IMG_SIZE = 256
 
 
 # ======================
@@ -45,9 +48,6 @@ SAVE_IMAGE_PATH = "output.png"
 
 parser = get_base_parser("DeepFaceLive", IMAGE_PATH, SAVE_IMAGE_PATH)
 parser.add_argument("-src", "--source", default=SOURCE_PATH, help="source image")
-parser.add_argument(
-    "--use_sr", action="store_true", help="True for super resolution on swap image"
-)
 parser.add_argument("--onnx", action="store_true", help="execute onnxruntime version.")
 args = update_parser(parser)
 
@@ -82,7 +82,6 @@ class AlignMode(IntEnum):
 
 @dataclass
 class FaceSwapInfo:
-    image_name: str = None
     face_urect: np.ndarray = None
     face_pose: np.ndarray = None
     face_ulmrks: FLandmarks2D = None
@@ -378,6 +377,32 @@ def setup_google_facemesh(net):
     return extract
 
 
+def fit_in(img):
+    TW = TH = IMG_SIZE
+    H, W, _ = img.shape
+
+    SW = W / TW
+    SH = H / TH
+    scale = 1.0
+    if SW > 1.0 or SH > 1.0 or (SW < 1.0 and SH < 1.0):
+        scale /= max(SW, SH)
+
+    if scale != 1.0:
+        img = cv2.resize(
+            img,
+            (int(W * scale), int(H * scale)),
+            interpolation=cv2.INTER_LINEAR,
+        )
+        H, W = img.shape[0:2]
+
+    w_pad = (TW - W) if TW is not None else 0
+    h_pad = (TH - H) if TH is not None else 0
+    if w_pad != 0 or h_pad != 0:
+        img = np.pad(img, ((0, 0), (0, h_pad), (0, w_pad), (0, 0)))
+
+    return img
+
+
 def resize(
     img,
     size: Tuple,
@@ -580,7 +605,7 @@ def face_detector(models, tar_img):
             if polygon_area(face_urect) != 0:
                 fsi_list.append(FaceSwapInfo(face_urect=face_urect))
 
-        return fsi_list
+    return fsi_list
 
 
 def face_marker(models, frame_image, fsi_list, marker_coverage=1.4):
@@ -721,7 +746,7 @@ def face_aligner(models, frame_image, fsi_list, face_coverage=2.2, resolution=25
     return fsi_list
 
 
-def face_animator(models, frame_image, fsi_list):
+def face_animator(models, src_img, fsi_list):
     animator_face_id = 0
     relative_power = 0.72
 
@@ -733,83 +758,118 @@ def face_animator(models, frame_image, fsi_list):
             face_align_image = fsi.face_align_image
             H, W, _ = face_align_image.shape
 
-            if getattr(face_animator, "driving_ref_motion") is None:
-                face_animator.driving_ref_motion = lia_model.extract_motion(
-                    face_align_image
-                )
+            net = models["net"]
+            if getattr(face_animator, "driving_ref_motion", None) is None:
+                face_animator.driving_ref_motion = extract_motion(net, face_align_image)
 
             anim_image = generate(
-                animatable_img,
+                net,
+                src_img,
                 face_align_image,
                 face_animator.driving_ref_motion,
                 power=relative_power,
             )
-            anim_image = ImageProcessor(anim_image).resize((W, H)).get_image("HWC")
+            anim_image = resize(anim_image, (W, H))
 
-            # fsi.face_swap_image_name = f"{fsi.face_align_image_name}_swapped"
-            fsi.face_swap_image_name = anim_image
+            fsi.face_swap_image = anim_image
             break
+
+    return fsi_list
+
+
+def extract_motion(net, img: np.ndarray):
+    in_src = np.zeros((1, 3, IMG_SIZE, IMG_SIZE), np.float32)
+
+    feed_img = normalize_image(
+        resize(img, (IMG_SIZE, IMG_SIZE))[..., ::-1], normalize_type="127.5"
+    )
+    feed_img = feed_img.transpose(2, 0, 1)  # HWC -> CHW
+    feed_img = np.expand_dims(feed_img, axis=0)
+    feed_img = feed_img.astype(np.float32)
+
+    in_drv_start_motion = np.zeros((1, 20), np.float32)
+    in_power = np.zeros((1,), np.float32)
+
+    # feedforward
+    if not args.onnx:
+        output = net.predict([in_src, feed_img, in_drv_start_motion, in_power])
+    else:
+        output = net.run(
+            None,
+            {
+                "in_src": in_src,
+                "in_drv": feed_img,
+                "in_drv_start_motion": in_drv_start_motion,
+                "in_power": in_power,
+            },
+        )
+    out_drv_motion = output[1]
+
+    return out_drv_motion
 
 
 def generate(
+    net,
     img_source: np.ndarray,
     img_driver: np.ndarray,
     driver_start_motion: np.ndarray,
     power,
 ):
-    """
+    H, W, _ = img_source.shape
 
-    arguments
-
-        img_source             np.ndarray      HW HWC 1HWC   uint8/float32
-
-        img_driver             np.ndarray      HW HWC 1HWC   uint8/float32
-
-        driver_start_motion    reference motion for driver
-    """
-    ip = ImageProcessor(img_source)
-    dtype = ip.get_dtype()
-    _, H, W, _ = ip.get_dims()
-
-    out = self._generator.run(
-        ["out"],
-        {
-            "in_src": ip.resize(self.get_input_size())
-            .ch(3)
-            .swap_ch()
-            .to_ufloat32(as_tanh=True)
-            .get_image("NCHW"),
-            "in_drv": ImageProcessor(img_driver)
-            .resize(self.get_input_size())
-            .ch(3)
-            .swap_ch()
-            .to_ufloat32(as_tanh=True)
-            .get_image("NCHW"),
-            "in_drv_start_motion": driver_start_motion,
-            "in_power": np.array([power], np.float32),
-        },
-    )[0].transpose(0, 2, 3, 1)[0]
-
-    out = (
-        ImageProcessor(out)
-        .to_dtype(dtype, from_tanh=True)
-        .resize((W, H))
-        .swap_ch()
-        .get_image("HWC")
+    in_src = normalize_image(
+        resize(img_source, (IMG_SIZE, IMG_SIZE))[..., :3][..., ::-1],
+        normalize_type="127.5",
     )
-    return out
+    in_src = in_src.transpose(2, 0, 1)  # HWC -> CHW
+    in_src = np.expand_dims(in_src, axis=0)
+    in_src = in_src.astype(np.float32)
+
+    in_drv = normalize_image(
+        resize(img_driver, (IMG_SIZE, IMG_SIZE))[..., ::-1], normalize_type="127.5"
+    )
+    in_drv = in_drv.transpose(2, 0, 1)  # HWC -> CHW
+    in_drv = np.expand_dims(in_drv, axis=0)
+    in_drv = in_drv.astype(np.float32)
+
+    in_power = np.array([power], np.float32)
+
+    # feedforward
+    if not args.onnx:
+        output = net.predict([in_src, in_drv, driver_start_motion, in_power])
+    else:
+        output = net.run(
+            None,
+            {
+                "in_src": in_src,
+                "in_drv": in_drv,
+                "in_drv_start_motion": driver_start_motion,
+                "in_power": in_power,
+            },
+        )
+    out = output[0]
+
+    out = out.transpose(0, 2, 3, 1)[0]
+
+    out += 1.0
+    out /= 2.0
+    out *= 255.0
+    np.clip(out, 0, 255, out=out)
+
+    out_img = out.astype(np.uint8, copy=False)
+    out_img = resize(out_img, (W, H))[..., ::-1]
+
+    return out_img
 
 
-def deepfacelive(models, tar_img):
-    tar_img = cv2.imread("Obama.jpg")
-
-    fsi_list = face_detector(models, tar_img)
+def deepfacelive(models, drv_img, src_img):
+    fsi_list = face_detector(models, drv_img)
     if len(fsi_list) == 0:
         return None
 
-    fsi_list = face_marker(models, tar_img, fsi_list)
-    fsi_list = face_aligner(models, tar_img, fsi_list)
-    fsi_list = face_animator(models, tar_img, fsi_list)
+    fsi_list = face_marker(models, drv_img, fsi_list)
+    fsi_list = face_aligner(models, drv_img, fsi_list, resolution=224)
+    fsi_list = face_animator(models, src_img, fsi_list)
 
     aligned_face_id = 0
     for i, fsi in enumerate(fsi_list):
@@ -829,13 +889,17 @@ def recognize_from_image(models):
     source_path = args.source
     logger.info("Source: {}".format(source_path))
 
-    # input image loop
+    src_img = load_image(source_path)
+    src_img = cv2.cvtColor(src_img, cv2.COLOR_BGRA2BGR)
+    src_img = fit_in(src_img)
+
+    # driver image loop
     for image_path in args.input:
-        logger.info("Target: {}".format(image_path))
+        logger.info("Driving: {}".format(image_path))
 
         # prepare input data
-        tar_img = load_image(image_path)
-        tar_img = cv2.cvtColor(tar_img, cv2.COLOR_BGRA2BGR)
+        drv_img = load_image(image_path)
+        drv_img = cv2.cvtColor(drv_img, cv2.COLOR_BGRA2BGR)
 
         # inference
         logger.info("Start inference...")
@@ -844,7 +908,7 @@ def recognize_from_image(models):
             total_time_estimation = 0
             for i in range(args.benchmark_count):
                 start = int(round(time.time() * 1000))
-                output = deepfacelive(models, tar_img)
+                output = deepfacelive(models, drv_img, src_img)
                 end = int(round(time.time() * 1000))
                 estimation_time = end - start
 
@@ -857,7 +921,7 @@ def recognize_from_image(models):
                 f"\taverage time estimation {total_time_estimation / (args.benchmark_count - 1)} ms"
             )
         else:
-            output = deepfacelive(models, tar_img)
+            output = deepfacelive(models, drv_img, src_img)
 
         aligned_face, swapped_face = output
         if aligned_face is not None and swapped_face is not None:
@@ -936,6 +1000,7 @@ def main():
     else:
         import onnxruntime
 
+        net = onnxruntime.InferenceSession("generator.onnx")
         net_face = onnxruntime.InferenceSession("YoloV5Face.onnx")
         net_marker = onnxruntime.InferenceSession("FaceMesh.onnx")
 
@@ -943,6 +1008,7 @@ def main():
     face_marker = setup_google_facemesh(net_marker)
 
     models = {
+        "net": net,
         "face_detector": face_detector,
         "face_marker": face_marker,
     }
