@@ -34,6 +34,7 @@ IMAGE_PATH = "demo.jpeg"
 SAVE_IMAGE_PATH = "output.png"
 
 COPY_BLOB_DATA = True
+INTERMEDIATE = True
 
 
 # ======================
@@ -495,6 +496,30 @@ def stopping_criteria(input_ids: np.array, max_length) -> np.array:
     return is_done
 
 
+def tokenizer_decode(input_ids, generated_ids, tokenizer, intermediate):
+    generated_ids_trimmed = [
+        out_ids[len(in_ids) :] for in_ids, out_ids in zip(input_ids, generated_ids)
+    ]
+    try:
+        if args.disable_ailia_tokenizer:
+            output_text = tokenizer.batch_decode(
+                generated_ids_trimmed,
+                skip_special_tokens=True,
+                clean_up_tokenization_spaces=False,
+            )
+        else:
+            output_text = tokenizer.batch_decode(
+                generated_ids_trimmed,
+                skip_special_tokens=True,
+                #clean_up_tokenization_spaces=False,
+            )
+    except UnicodeDecodeError:
+        if intermediate:
+            return [""]
+        raise
+    return output_text
+
+
 def sample(
     models,
     input_ids,
@@ -502,10 +527,13 @@ def sample(
     attention_mask,
     image_grid_thw,
     video_grid_thw,
+    tokenizer,
 ):
     pad_token_id = 151643
     image_token_id = 151655
     video_token_id = 151656
+    if INTERMEDIATE:
+        initial_ids = input_ids.copy()
 
     pixel_values = (
         pixel_values
@@ -536,6 +564,10 @@ def sample(
 
     if args.benchmark:
         start = int(round(time.time() * 1000))
+
+    if INTERMEDIATE:
+        print("Encoding..." + "\n\u001B[2A")
+        before_text = ""
 
     net = models["visual"]
     if not args.onnx:
@@ -642,6 +674,16 @@ def sample(
 
         if this_peer_finished:
             break
+
+        if INTERMEDIATE:
+            output_text = tokenizer_decode(initial_ids, input_ids, tokenizer, True)[0]
+            if output_text.startswith(before_text):
+                deltaText = output_text[len(before_text):]
+            else:
+                deltaText = output_text
+            print(deltaText, end="")
+            sys.stdout.flush()
+            before_text = output_text
 
     return input_ids
 
@@ -751,23 +793,10 @@ def predict(models, messages):
         attention_mask,
         image_grid_thw,
         video_grid_thw,
+        tokenizer,
     )
 
-    generated_ids_trimmed = [
-        out_ids[len(in_ids) :] for in_ids, out_ids in zip(input_ids, generated_ids)
-    ]
-    if args.disable_ailia_tokenizer:
-        output_text = tokenizer.batch_decode(
-            generated_ids_trimmed,
-            skip_special_tokens=True,
-            clean_up_tokenization_spaces=False,
-        )
-    else:
-        output_text = tokenizer.batch_decode(
-            generated_ids_trimmed,
-            skip_special_tokens=True,
-            #clean_up_tokenization_spaces=False,
-        )
+    output_text = tokenizer_decode(input_ids, generated_ids, tokenizer, False)
 
     return output_text[0]
 
@@ -808,7 +837,10 @@ def recognize(models):
     else:
         output_text = predict(models, messages)
 
-    print(output_text)
+    if INTERMEDIATE:
+        print("")
+    else:
+        print(output_text)
 
     logger.info("Script finished successfully.")
 
