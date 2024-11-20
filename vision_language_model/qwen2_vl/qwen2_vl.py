@@ -562,6 +562,7 @@ def sample(
 
     if INTERMEDIATE:
         print("Encoding..." + "\n\u001B[2A")
+        before_text = ""
 
     net = models["visual"]
     if not args.onnx:
@@ -670,8 +671,13 @@ def sample(
             break
 
         if INTERMEDIATE:
-            output_text = tokenizer_decode(initial_ids, input_ids, tokenizer)
-            print(output_text[0][-32:] + "\n\u001B[2A")
+            output_text = tokenizer_decode(initial_ids, input_ids, tokenizer)[0]
+            if output_text.startswith(before_text):
+                deltaText = output_text[len(before_text):]
+            else:
+                deltaText = output_text
+            print(deltaText)
+            before_text = output_text[0]
 
     return input_ids
 
@@ -825,7 +831,8 @@ def recognize(models):
     else:
         output_text = predict(models, messages)
 
-    print(output_text)
+    if not INTERMEDIATE:
+        print(output_text)
 
     logger.info("Script finished successfully.")
 
