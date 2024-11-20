@@ -677,7 +677,7 @@ def sample(
             else:
                 deltaText = output_text
             print(deltaText)
-            before_text = output_text[0]
+            before_text = output_text
 
     return input_ids
 
