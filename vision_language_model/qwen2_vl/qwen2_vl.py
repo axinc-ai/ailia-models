@@ -496,22 +496,27 @@ def stopping_criteria(input_ids: np.array, max_length) -> np.array:
     return is_done
 
 
-def tokenizer_decode(input_ids, generated_ids, tokenizer):
+def tokenizer_decode(input_ids, generated_ids, tokenizer, intermediate):
     generated_ids_trimmed = [
         out_ids[len(in_ids) :] for in_ids, out_ids in zip(input_ids, generated_ids)
     ]
-    if args.disable_ailia_tokenizer:
-        output_text = tokenizer.batch_decode(
-            generated_ids_trimmed,
-            skip_special_tokens=True,
-            clean_up_tokenization_spaces=False,
-        )
-    else:
-        output_text = tokenizer.batch_decode(
-            generated_ids_trimmed,
-            skip_special_tokens=True,
-            #clean_up_tokenization_spaces=False,
-        )
+    try:
+        if args.disable_ailia_tokenizer:
+            output_text = tokenizer.batch_decode(
+                generated_ids_trimmed,
+                skip_special_tokens=True,
+                clean_up_tokenization_spaces=False,
+            )
+        else:
+            output_text = tokenizer.batch_decode(
+                generated_ids_trimmed,
+                skip_special_tokens=True,
+                #clean_up_tokenization_spaces=False,
+            )
+    except UnicodeDecodeError:
+        if intermediate:
+            return [""]
+        raise
     return output_text
 
 
@@ -671,12 +676,13 @@ def sample(
             break
 
         if INTERMEDIATE:
-            output_text = tokenizer_decode(initial_ids, input_ids, tokenizer)[0]
+            output_text = tokenizer_decode(initial_ids, input_ids, tokenizer, True)[0]
             if output_text.startswith(before_text):
                 deltaText = output_text[len(before_text):]
             else:
                 deltaText = output_text
             print(deltaText, end="")
+            sys.stdout.flush()
             before_text = output_text
 
     return input_ids
@@ -790,7 +796,7 @@ def predict(models, messages):
         tokenizer,
     )
 
-    output_text = tokenizer_decode(input_ids, generated_ids, tokenizer)
+    output_text = tokenizer_decode(input_ids, generated_ids, tokenizer, False)
 
     return output_text[0]
 
