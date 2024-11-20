@@ -496,7 +496,7 @@ def stopping_criteria(input_ids: np.array, max_length) -> np.array:
     return is_done
 
 
-def tokenizer_decode(tokenizer, input_ids, generated_ids):
+def tokenizer_decode(input_ids, generated_ids, tokenizer):
     generated_ids_trimmed = [
         out_ids[len(in_ids) :] for in_ids, out_ids in zip(input_ids, generated_ids)
     ]
