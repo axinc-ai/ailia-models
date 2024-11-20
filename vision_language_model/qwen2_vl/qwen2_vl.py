@@ -676,7 +676,7 @@ def sample(
                 deltaText = output_text[len(before_text):]
             else:
                 deltaText = output_text
-            print(deltaText)
+            print(deltaText, end="")
             before_text = output_text
 
     return input_ids
@@ -831,7 +831,9 @@ def recognize(models):
     else:
         output_text = predict(models, messages)
 
-    if not INTERMEDIATE:
+    if INTERMEDIATE:
+        print("")
+    else:
         print(output_text)
 
     logger.info("Script finished successfully.")
