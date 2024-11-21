@@ -31,8 +31,12 @@ logger = getLogger(__name__)
 # Parameters
 # ======================
 
-WEIGHT_G_PATH = ".onnx"
-MODEL_G_PATH = ".onnx.prototxt"
+WEIGHT_PATH = "generator.onnx"
+MODEL_PATH = "generator.onnx.prototxt"
+WEIGHT_YOLOV5FACE_PATH = "YoloV5Face.onnx"
+MODEL_YOLOV5FACE_PATH = "YoloV5Face.onnx.prototxt"
+WEIGHT_FACEMESH_PATH = "FaceMesh.onnx"
+MODEL_FACEMESH_PATH = "FaceMesh.onnx.prototxt"
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/deepfacelive/"
 
 IMAGE_PATH = "Obama.jpg"
@@ -48,6 +52,27 @@ IMG_SIZE = 256
 
 parser = get_base_parser("DeepFaceLive", IMAGE_PATH, SAVE_IMAGE_PATH)
 parser.add_argument("-src", "--source", default=SOURCE_PATH, help="source image")
+parser.add_argument(
+    "--window_size",
+    type=int,
+    default=448,
+    help="Image size when detecting. Multiple of 32. 0 is auto.",
+)
+parser.add_argument(
+    "--threshold", type=float, default=0.5, help="face detection threshold. 0.0-1.0"
+)
+parser.add_argument("--max_faces", type=int, default=1, help="max faces")
+parser.add_argument(
+    "--temporal_smoothing", type=int, default=1, help="temporal smoothing"
+)
+parser.add_argument(
+    "--marker_coverage", type=float, default=1.4, help="marker coverage"
+)
+parser.add_argument(
+    "--marker_temporal_smoothing", type=int, default=1, help="marker temporal smoothing"
+)
+parser.add_argument("--face_coverage", type=float, default=2.2, help="face coverage")
+parser.add_argument("--resolution", type=int, default=224, help="output resolution")
 parser.add_argument("--onnx", action="store_true", help="execute onnxruntime version.")
 args = update_parser(parser)
 
@@ -126,7 +151,6 @@ def setup_yolov5face(net):
 
         returns scale float value
         """
-        img = img[None, ...]
         N, H, W, C = img.shape
 
         if TW is not None and TH is None:
@@ -163,7 +187,7 @@ def setup_yolov5face(net):
 
         return img, scale
 
-    def pad_to_next_divisor(img, dw=None, dh=None) -> "ImageProcessor":
+    def pad_to_next_divisor(img, dw=None, dh=None):
         """
         pad image to next divisor of width/height
 
@@ -286,6 +310,7 @@ def setup_yolov5face(net):
         if H > 2048 or W > 2048:
             fixed_window = 2048
 
+        img = img[None, ...]
         if fixed_window != 0:
             fixed_window = max(32, max(1, fixed_window // 32) * 32)
             img, img_scale = fit_in(
@@ -398,7 +423,7 @@ def fit_in(img):
     w_pad = (TW - W) if TW is not None else 0
     h_pad = (TH - H) if TH is not None else 0
     if w_pad != 0 or h_pad != 0:
-        img = np.pad(img, ((0, 0), (0, h_pad), (0, w_pad), (0, 0)))
+        img = np.pad(img, ((0, h_pad), (0, w_pad), (0, 0)))
 
     return img
 
@@ -558,18 +583,20 @@ def from_3D_468_landmarks(lmrks):
 # ======================
 
 
-def face_detector(models, tar_img):
+def face_detector(
+    models,
+    tar_img,
+    threshold=0.5,
+    fixed_window_size=448,
+    max_faces=1,
+    temporal_smoothing=1,
+):
     H, W, _ = tar_img.shape
 
-    detector_threshold = 0.5
-    fixed_window_size = 480
-    max_faces = 1
-    temporal_smoothing = 1
-
-    face_detector = models["face_detector"]
-    rects = face_detector(
+    extract = models["face_detector"]
+    rects = extract(
         tar_img,
-        threshold=detector_threshold,
+        threshold=threshold,
         fixed_window=fixed_window_size,
     )
     rects = rects[0]
@@ -608,13 +635,14 @@ def face_detector(models, tar_img):
     return fsi_list
 
 
-def face_marker(models, frame_image, fsi_list, marker_coverage=1.4):
+def face_marker(models, frame_image, fsi_list, coverage=1.4, temporal_smoothing=1):
     is_opencv_lbf = False
     is_google_facemesh = True
     is_insightface_2d106 = False
-    temporal_smoothing = 1
 
-    if temporal_smoothing != 1 and len(face_marker.temporal_lmrks) != len(fsi_list):
+    if temporal_smoothing != 1 and (
+        len(getattr(face_marker, "temporal_lmrks", [])) != len(fsi_list)
+    ):
         face_marker.temporal_lmrks = [[] for _ in range(len(fsi_list))]
 
     for face_id, fsi in enumerate(fsi_list):
@@ -625,7 +653,7 @@ def face_marker(models, frame_image, fsi_list, marker_coverage=1.4):
         face_image, face_uni_mat = face_urect_cut(
             fsi,
             frame_image,
-            marker_coverage,
+            coverage,
             (
                 256
                 if is_opencv_lbf
@@ -640,8 +668,8 @@ def face_marker(models, frame_image, fsi_list, marker_coverage=1.4):
         #     lmrks = google_facemesh(face_image)[0]
         # elif is_insightface_2d106:
         #     lmrks = insightface_2d106(face_image)[0]
-        face_marker = models["face_marker"]
-        lmrks = face_marker(face_image)[0]
+        extract = models["face_marker"]
+        lmrks = extract(face_image)[0]
 
         if temporal_smoothing != 1:
             if len(face_marker.temporal_lmrks[face_id]) == 0:
@@ -679,7 +707,7 @@ def face_marker(models, frame_image, fsi_list, marker_coverage=1.4):
     return fsi_list
 
 
-def face_aligner(models, frame_image, fsi_list, face_coverage=2.2, resolution=256):
+def face_aligner(models, frame_image, fsi_list, coverage=2.2, resolution=256):
     head_mode = False
     freeze_z_rotation = False
     align_mode = AlignMode.FROM_RECT
@@ -697,7 +725,7 @@ def face_aligner(models, frame_image, fsi_list, face_coverage=2.2, resolution=25
             face_align_img, uni_mat = face_urect_cut(
                 fsi,
                 frame_image,
-                coverage=face_coverage,
+                coverage=coverage,
                 output_size=resolution,
                 x_offset=x_offset,
                 y_offset=y_offset,
@@ -863,12 +891,31 @@ def generate(
 
 
 def deepfacelive(models, drv_img, src_img):
-    fsi_list = face_detector(models, drv_img)
+    fsi_list = face_detector(
+        models,
+        drv_img,
+        threshold=args.threshold,
+        fixed_window_size=args.window_size,
+        max_faces=args.max_faces,
+        temporal_smoothing=args.temporal_smoothing,
+    )
     if len(fsi_list) == 0:
         return None
 
-    fsi_list = face_marker(models, drv_img, fsi_list)
-    fsi_list = face_aligner(models, drv_img, fsi_list, resolution=224)
+    fsi_list = face_marker(
+        models,
+        drv_img,
+        fsi_list,
+        coverage=args.marker_coverage,
+        temporal_smoothing=args.marker_temporal_smoothing,
+    )
+    fsi_list = face_aligner(
+        models,
+        drv_img,
+        fsi_list,
+        coverage=args.face_coverage,
+        resolution=args.resolution,
+    )
     fsi_list = face_animator(models, src_img, fsi_list)
 
     aligned_face_id = 0
@@ -943,6 +990,10 @@ def recognize_from_video(models):
     source_path = args.source
     logger.info("Source: {}".format(source_path))
 
+    src_img = load_image(source_path)
+    src_img = cv2.cvtColor(src_img, cv2.COLOR_BGRA2BGR)
+    src_img = fit_in(src_img)
+
     # create video writer if savepath is specified as video format
     if args.savepath != SAVE_IMAGE_PATH:
         f_h = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
@@ -960,20 +1011,15 @@ def recognize_from_video(models):
             break
 
         # inference
-        output = predict(models, frame)
+        output = deepfacelive(models, frame, src_img)
 
-        if args.use_sr:
-            output = face_enhancement(net_pix2pix, output)
+        aligned_face, swapped_face = output
+        if aligned_face is not None and swapped_face is not None:
+            res_img = np.concatenate((aligned_face, swapped_face), 1)
 
-        if output:
-            # plot result
-            res_img = get_final_img(output, frame, net_lmk)
-        else:
-            res_img = frame
-
-        # show
-        cv2.imshow("frame", res_img)
-        frame_shown = True
+            # show
+            cv2.imshow("frame", res_img)
+            frame_shown = True
 
         # save results
         if writer is not None:
@@ -988,21 +1034,33 @@ def recognize_from_video(models):
 
 
 def main():
-    # # model files check and download
-    # check_and_download_models(WEIGHT_G_PATH, MODEL_G_PATH, REMOTE_PATH)
+    # model files check and download
+    check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
+    check_and_download_models(
+        WEIGHT_YOLOV5FACE_PATH, MODEL_YOLOV5FACE_PATH, REMOTE_PATH
+    )
+    check_and_download_models(WEIGHT_FACEMESH_PATH, MODEL_FACEMESH_PATH, REMOTE_PATH)
 
     env_id = args.env_id
 
     # initialize
     if not args.onnx:
-        # net_iface = ailia.Net(MODEL_ARCFACE_PATH, WEIGHT_ARCFACE_PATH, env_id=env_id)
-        pass
+        net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+        net_face = ailia.Net(
+            MODEL_YOLOV5FACE_PATH, WEIGHT_YOLOV5FACE_PATH, env_id=env_id
+        )
+        net_marker = ailia.Net(MODEL_FACEMESH_PATH, WEIGHT_FACEMESH_PATH, env_id=env_id)
     else:
         import onnxruntime
 
-        net = onnxruntime.InferenceSession("generator.onnx")
-        net_face = onnxruntime.InferenceSession("YoloV5Face.onnx")
-        net_marker = onnxruntime.InferenceSession("FaceMesh.onnx")
+        providers = ["CUDAExecutionProvider", "CPUExecutionProvider"]
+        net = onnxruntime.InferenceSession(WEIGHT_PATH, providers=providers)
+        net_face = onnxruntime.InferenceSession(
+            WEIGHT_YOLOV5FACE_PATH, providers=providers
+        )
+        net_marker = onnxruntime.InferenceSession(
+            WEIGHT_FACEMESH_PATH, providers=providers
+        )
 
     face_detector = setup_yolov5face(net_face)
     face_marker = setup_google_facemesh(net_marker)
