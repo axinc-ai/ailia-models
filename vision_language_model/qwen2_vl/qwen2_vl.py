@@ -683,7 +683,8 @@ def sample(
                 deltaText = output_text
             print(deltaText, end="")
             sys.stdout.flush()
-            before_text = output_text
+            if output_text != "":
+                before_text = output_text
 
     return input_ids
 
