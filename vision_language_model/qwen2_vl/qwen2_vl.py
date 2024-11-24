@@ -79,6 +79,24 @@ parser.add_argument(
 parser.add_argument(
     "--fp16", action="store_true", help="use fp16 model (default : fp32 model)."
 )
+parser.add_argument(
+    "--temperature",
+    type=float,
+    default=1.0,
+    help="temperature",
+)
+parser.add_argument(
+    "--top_p",
+    type=float,
+    default=1.0,
+    help="top_p",
+)
+parser.add_argument(
+    "--top_k",
+    type=int,
+    default=50,
+    help="top_k",
+)
 parser.add_argument("--onnx", action="store_true", help="execute onnxruntime version.")
 args = update_parser(parser)
 
@@ -646,7 +664,7 @@ def sample(
         next_token_logits = logits[:, -1, :]
 
         # pre-process distribution
-        next_token_scores = logits_processor(input_ids, next_token_logits)
+        next_token_scores = logits_processor(input_ids, next_token_logits, args.temperature, args.top_p, args.top_k)
 
         # token selection
         probs = softmax(next_token_scores, axis=-1)
