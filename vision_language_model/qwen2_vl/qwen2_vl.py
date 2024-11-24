@@ -82,19 +82,19 @@ parser.add_argument(
 parser.add_argument(
     "--temperature",
     type=float,
-    default=1.0,
+    default=0.01,
     help="temperature",
 )
 parser.add_argument(
     "--top_p",
     type=float,
-    default=1.0,
+    default=0.001,
     help="top_p",
 )
 parser.add_argument(
     "--top_k",
     type=int,
-    default=50,
+    default=1,
     help="top_k",
 )
 parser.add_argument("--onnx", action="store_true", help="execute onnxruntime version.")

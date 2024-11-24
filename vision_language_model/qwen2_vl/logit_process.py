@@ -40,7 +40,7 @@ def TopKLogitsWarper(scores, top_k):
 
 def logits_processor(input_ids, scores, temperature, top_p, top_k):
     scores = TemperatureLogitsWarper(scores, temperature)
-    scores = TopKLogitsWarper(scores, top_p)
-    scores = TopPLogitsWarper(scores, top_k)
+    scores = TopKLogitsWarper(scores, top_k)
+    scores = TopPLogitsWarper(scores, top_p)
 
     return scores
