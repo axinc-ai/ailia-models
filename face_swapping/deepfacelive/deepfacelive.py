@@ -7,7 +7,6 @@ from logging import getLogger
 
 import numpy as np
 import cv2
-from PIL import Image
 
 import ailia
 
@@ -23,6 +22,7 @@ from webcamera_utils import get_capture, get_writer  # noqa
 
 from util_math import *
 from util_affine import *
+from FLandmarks2D import ELandmarks2D, FLandmarks2D, face_ulmrks_cut
 
 logger = getLogger(__name__)
 
@@ -71,6 +71,12 @@ parser.add_argument(
 parser.add_argument(
     "--marker_temporal_smoothing", type=int, default=1, help="marker temporal smoothing"
 )
+parser.add_argument(
+    "--align_mode",
+    default="from_rect",
+    choices=("from_rect", "from_points"),
+    help="align mode",
+)
 parser.add_argument("--face_coverage", type=float, default=2.2, help="face coverage")
 parser.add_argument("--resolution", type=int, default=224, help="output resolution")
 parser.add_argument("--onnx", action="store_true", help="execute onnxruntime version.")
@@ -80,29 +86,6 @@ args = update_parser(parser)
 # ======================
 # Class Definitions
 # ======================
-
-
-class ELandmarks2D(IntEnum):
-    L5 = 0
-    L68 = 1
-    L106 = 2
-    L468 = 3
-
-
-@dataclass
-class FLandmarks2D:
-    """
-    Describes 2D face landmarks in uniform float coordinates
-    """
-
-    type: ELandmarks2D = None
-    ulmrks: np.ndarray = None
-
-
-class AlignMode(IntEnum):
-    FROM_RECT = 0
-    FROM_POINTS = 1
-    FROM_STATIC_RECT = 2
 
 
 @dataclass
@@ -707,21 +690,23 @@ def face_marker(models, frame_image, fsi_list, coverage=1.4, temporal_smoothing=
     return fsi_list
 
 
-def face_aligner(models, frame_image, fsi_list, coverage=2.2, resolution=256):
+def face_aligner(
+    frame_image, fsi_list, align_mode="from_rect", coverage=2.2, resolution=256
+):
+    exclude_moving_parts = True
     head_mode = False
     freeze_z_rotation = False
-    align_mode = AlignMode.FROM_RECT
     x_offset = y_offset = 0.0
 
     for face_id, fsi in enumerate(fsi_list):
         if fsi.face_ulmrks is None:
             continue
 
+        head_yaw = None
         face_ulmrks = fsi.face_ulmrks
-        fsi.face_resolution = resolution
 
-        H, W = frame_image.shape[:2]
-        if align_mode == AlignMode.FROM_RECT:
+        fsi.face_resolution = resolution
+        if align_mode == "from_rect":
             face_align_img, uni_mat = face_urect_cut(
                 fsi,
                 frame_image,
@@ -730,17 +715,18 @@ def face_aligner(models, frame_image, fsi_list, coverage=2.2, resolution=256):
                 x_offset=x_offset,
                 y_offset=y_offset,
             )
-        # elif align_mode == AlignMode.FROM_POINTS:
-        #     face_align_img, uni_mat = face_ulmrks.cut(
-        #         frame_image,
-        #         state.face_coverage + (1.0 if head_mode else 0.0),
-        #         state.resolution,
-        #         exclude_moving_parts=state.exclude_moving_parts,
-        #         head_yaw=head_yaw,
-        #         x_offset=state.x_offset,
-        #         y_offset=state.y_offset - 0.08 + (-0.50 if head_mode else 0.0),
-        #         freeze_z_rotation=freeze_z_rotation,
-        #     )
+        elif align_mode == "from_points":
+            face_align_img, uni_mat = face_ulmrks_cut(
+                fsi.face_ulmrks,
+                frame_image,
+                coverage + (1.0 if head_mode else 0.0),
+                resolution,
+                exclude_moving_parts=exclude_moving_parts,
+                head_yaw=head_yaw,
+                x_offset=x_offset,
+                y_offset=y_offset - 0.08 + (-0.50 if head_mode else 0.0),
+                freeze_z_rotation=freeze_z_rotation,
+            )
         # elif align_mode == AlignMode.FROM_STATIC_RECT:
         #     rect = FRect.from_ltrb(
         #         [
@@ -910,9 +896,9 @@ def deepfacelive(models, drv_img, src_img):
         temporal_smoothing=args.marker_temporal_smoothing,
     )
     fsi_list = face_aligner(
-        models,
         drv_img,
         fsi_list,
+        align_mode=args.align_mode,
         coverage=args.face_coverage,
         resolution=args.resolution,
     )
