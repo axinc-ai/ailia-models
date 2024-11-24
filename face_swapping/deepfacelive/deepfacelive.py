@@ -35,6 +35,8 @@ WEIGHT_PATH = "generator.onnx"
 MODEL_PATH = "generator.onnx.prototxt"
 WEIGHT_YOLOV5FACE_PATH = "YoloV5Face.onnx"
 MODEL_YOLOV5FACE_PATH = "YoloV5Face.onnx.prototxt"
+WEIGHT_CENTERFACE_PATH = "CenterFace.onnx"
+MODEL_CENTERFACE_PATH = "CenterFace.onnx.prototxt"
 WEIGHT_FACEMESH_PATH = "FaceMesh.onnx"
 MODEL_FACEMESH_PATH = "FaceMesh.onnx.prototxt"
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/deepfacelive/"
@@ -52,6 +54,12 @@ IMG_SIZE = 256
 
 parser = get_base_parser("DeepFaceLive", IMAGE_PATH, SAVE_IMAGE_PATH)
 parser.add_argument("-src", "--source", default=SOURCE_PATH, help="source image")
+parser.add_argument(
+    "--detector",
+    default="yolov5",
+    choices=("yolov5", "centerface", "s3fd"),
+    help="detector",
+)
 parser.add_argument(
     "--window_size",
     type=int,
@@ -114,31 +122,6 @@ class FaceSwapInfo:
 
 
 def setup_yolov5face(net):
-    def pad_to_next_divisor(img, dw=None, dh=None):
-        """
-        pad image to next divisor of width/height
-
-         dw,dh  int
-        """
-        _, H, W, _ = img.shape
-
-        w_pad = 0
-        if dw is not None:
-            w_pad = W % dw
-            if w_pad != 0:
-                w_pad = dw - w_pad
-
-        h_pad = 0
-        if dh is not None:
-            h_pad = H % dh
-            if h_pad != 0:
-                h_pad = dh - h_pad
-
-        if w_pad != 0 or h_pad != 0:
-            img = np.pad(img, ((0, 0), (0, h_pad), (0, w_pad), (0, 0)))
-
-        return img
-
     def np_sigmoid(x: np.ndarray):
         """
         sigmoid with safe check of overflow
@@ -291,6 +274,98 @@ def setup_yolov5face(net):
     return extract
 
 
+def setup_centerface(net):
+    def predict(img):
+        # feedforward
+        if not args.onnx:
+            output = net.predict([img])
+        else:
+            output = net.run(None, {"in": img})
+        heatmaps, scales, offsets = output
+
+        return heatmaps, offsets, scales
+
+    def refine(heatmap, offset, scale, h, w, threshold):
+        heatmap = heatmap[0]
+        scale0, scale1 = scale[0, :, :], scale[1, :, :]
+        offset0, offset1 = offset[0, :, :], offset[1, :, :]
+        c0, c1 = np.where(heatmap > threshold)
+        bboxlist = []
+        if len(c0) > 0:
+            for i in range(len(c0)):
+                s0, s1 = (
+                    np.exp(scale0[c0[i], c1[i]]) * 4,
+                    np.exp(scale1[c0[i], c1[i]]) * 4,
+                )
+                o0, o1 = offset0[c0[i], c1[i]], offset1[c0[i], c1[i]]
+                s = heatmap[c0[i], c1[i]]
+                x1, y1 = max(0, (c1[i] + o1 + 0.5) * 4 - s1 / 2), max(
+                    0, (c0[i] + o0 + 0.5) * 4 - s0 / 2
+                )
+                x1, y1 = min(x1, w), min(y1, h)
+                bboxlist.append([x1, y1, min(x1 + s1, w), min(y1 + s0, h), s])
+
+            bboxlist = np.array(bboxlist, dtype=np.float32)
+
+            keep = nms_boxes(bboxlist[:, :4], bboxlist[:, 4], 0.3)
+            bboxlist = bboxlist[keep, :]
+            bboxlist = [x for x in bboxlist if x[-1] >= 0.5]
+
+        return bboxlist
+
+    def extract(
+        img,
+        threshold: float = 0.5,
+        fixed_window=0,
+        min_face_size=40,
+    ):
+        H, W, _ = img.shape
+
+        img = img[None, ...]
+        if fixed_window != 0:
+            fixed_window = max(64, max(1, fixed_window // 32) * 32)
+            img, img_scale = fit_in(
+                img, fixed_window, fixed_window, pad_to_target=True, allow_upscale=False
+            )
+        else:
+            img = pad_to_next_divisor(img, 64, 64)
+            img_scale = 1.0
+
+        _, H, W, _ = img.shape
+        img = img[..., ::-1]
+        feed_img = img.transpose(0, 3, 1, 2)
+        feed_img = feed_img.astype(np.float32)
+
+        heatmaps, offsets, scales = predict(feed_img)
+
+        faces_per_batch = []
+        for heatmap, offset, scale in zip(heatmaps, offsets, scales):
+            faces = []
+            for face in refine(heatmap, offset, scale, H, W, threshold):
+                l, t, r, b, c = face
+
+                if img_scale != 1.0:
+                    l, t, r, b = (
+                        l / img_scale,
+                        t / img_scale,
+                        r / img_scale,
+                        b / img_scale,
+                    )
+
+                bt = b - t
+                if min(r - l, bt) < min_face_size:
+                    continue
+                b += bt * 0.1
+
+                faces.append((l, t, r, b))
+
+            faces_per_batch.append(faces)
+
+        return faces_per_batch
+
+    return extract
+
+
 def setup_google_facemesh(net):
     input_height = 192
     input_width = 192
@@ -398,6 +473,32 @@ def resize(
         if 3 < ndim:
             H, W = img.shape[0:2]
             img = img.reshape((H, W, N, C)).transpose((2, 0, 1, 3))
+
+    return img
+
+
+def pad_to_next_divisor(img, dw=None, dh=None):
+    """
+    pad image to next divisor of width/height
+
+        dw,dh  int
+    """
+    _, H, W, _ = img.shape
+
+    w_pad = 0
+    if dw is not None:
+        w_pad = W % dw
+        if w_pad != 0:
+            w_pad = dw - w_pad
+
+    h_pad = 0
+    if dh is not None:
+        h_pad = H % dh
+        if h_pad != 0:
+            h_pad = dh - h_pad
+
+    if w_pad != 0 or h_pad != 0:
+        img = np.pad(img, ((0, 0), (0, h_pad), (0, w_pad), (0, 0)))
 
     return img
 
@@ -984,11 +1085,20 @@ def recognize_from_video(models):
 
 
 def main():
+    if args.detector == "yolov5":
+        WEIGHT_FACE_PATH, MODEL_FACE_PATH = (
+            WEIGHT_YOLOV5FACE_PATH,
+            MODEL_YOLOV5FACE_PATH,
+        )
+    elif args.detector == "centerface":
+        WEIGHT_FACE_PATH, MODEL_FACE_PATH = (
+            WEIGHT_CENTERFACE_PATH,
+            MODEL_CENTERFACE_PATH,
+        )
+
     # model files check and download
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
-    check_and_download_models(
-        WEIGHT_YOLOV5FACE_PATH, MODEL_YOLOV5FACE_PATH, REMOTE_PATH
-    )
+    check_and_download_models(WEIGHT_FACE_PATH, MODEL_FACE_PATH, REMOTE_PATH)
     check_and_download_models(WEIGHT_FACEMESH_PATH, MODEL_FACEMESH_PATH, REMOTE_PATH)
 
     env_id = args.env_id
@@ -996,23 +1106,24 @@ def main():
     # initialize
     if not args.onnx:
         net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
-        net_face = ailia.Net(
-            MODEL_YOLOV5FACE_PATH, WEIGHT_YOLOV5FACE_PATH, env_id=env_id
-        )
+        net_face = ailia.Net(MODEL_FACE_PATH, WEIGHT_FACE_PATH, env_id=env_id)
         net_marker = ailia.Net(MODEL_FACEMESH_PATH, WEIGHT_FACEMESH_PATH, env_id=env_id)
     else:
         import onnxruntime
 
         providers = ["CUDAExecutionProvider", "CPUExecutionProvider"]
         net = onnxruntime.InferenceSession(WEIGHT_PATH, providers=providers)
-        net_face = onnxruntime.InferenceSession(
-            WEIGHT_YOLOV5FACE_PATH, providers=providers
-        )
+        net_face = onnxruntime.InferenceSession(WEIGHT_FACE_PATH, providers=providers)
         net_marker = onnxruntime.InferenceSession(
             WEIGHT_FACEMESH_PATH, providers=providers
         )
 
-    face_detector = setup_yolov5face(net_face)
+    if args.detector == "yolov5":
+        face_detector = setup_yolov5face(net_face)
+    elif args.detector == "centerface":
+        face_detector = setup_centerface(net_face)
+    else:
+        raise ValueError("Invalid detector type")
     face_marker = setup_google_facemesh(net_marker)
 
     models = {
