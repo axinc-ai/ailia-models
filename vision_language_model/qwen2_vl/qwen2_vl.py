@@ -862,7 +862,7 @@ def recognize(models):
     else:
         output_text = predict(models, messages)
 
-    if False:#INTERMEDIATE:
+    if INTERMEDIATE:
         print("")
     else:
         print(output_text)
