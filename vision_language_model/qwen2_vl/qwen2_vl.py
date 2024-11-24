@@ -79,6 +79,30 @@ parser.add_argument(
 parser.add_argument(
     "--fp16", action="store_true", help="use fp16 model (default : fp32 model)."
 )
+parser.add_argument(
+    "--temperature",
+    type=float,
+    default=0.01,
+    help="temperature from generation_config.json",
+)
+parser.add_argument(
+    "--top_p",
+    type=float,
+    default=0.001,
+    help="top_p from generation_config.json",
+)
+parser.add_argument(
+    "--top_k",
+    type=int,
+    default=1,
+    help="top_k from generation_config.json",
+)
+parser.add_argument(
+    "--max_length",
+    type=int,
+    default=256,
+    help="max_length for generation",
+)
 parser.add_argument("--onnx", action="store_true", help="execute onnxruntime version.")
 args = update_parser(parser)
 
@@ -600,7 +624,7 @@ def sample(
         np.cumsum(np.ones_like(input_ids[0, :], dtype=np.int64), axis=0) - 1
     )
     rope_deltas = None
-    max_length = 128 + input_ids.shape[1]
+    max_length = args.max_length + input_ids.shape[1]
 
     net = models["net"]
     first_run = True
@@ -646,7 +670,7 @@ def sample(
         next_token_logits = logits[:, -1, :]
 
         # pre-process distribution
-        next_token_scores = logits_processor(input_ids, next_token_logits)
+        next_token_scores = logits_processor(input_ids, next_token_logits, args.temperature, args.top_p, args.top_k)
 
         # token selection
         probs = softmax(next_token_scores, axis=-1)
