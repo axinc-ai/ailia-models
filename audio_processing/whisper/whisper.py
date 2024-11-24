@@ -154,6 +154,9 @@ parser.add_argument(
 parser.add_argument(
     "--fp16", action="store_true", help="use fp16 model (default : fp32 model)."
 )
+parser.add_argument(
+    "--no_kanji", action="store_true", help="no kanji mode."
+)
 args = update_parser(parser)
 
 if args.ailia_audio:
@@ -737,6 +740,16 @@ def decode(enc_net, dec_net, mel, options):
     initial_token_length = len(initial_tokens)
     kv_cache = None
 
+    # token table
+    if args.no_kanji:
+        hiragana_list = [chr(i) for i in range(ord('あ'), ord('ん') + 1)]
+        hiragana_list.extend([chr(i) for i in range(ord('ア'), ord('ン') + 1)])
+        hiragana_list.extend([chr(i) for i in range(ord('A'), ord('z') + 1)])
+        hiragana_list.extend(["、", "。", "・", " ", "ー"])
+        token_list = []
+        for i in range(len(hiragana_list)):
+            token_list.extend(tokenizer.encode(hiragana_list[i]))
+
     # sampling loop
     for i in range(sample_len):
         if args.debug:
@@ -765,9 +778,15 @@ def decode(enc_net, dec_net, mel, options):
         # apply the logit filters, e.g. for suppressing or applying penalty to
         for logit_filter in logit_filters:
             logit_filter.apply(logits, tokens)
-
+        
         def rearrange_kv_cache(source_indices):
             kv_cache[...] = kv_cache[:, source_indices]
+
+        # restrict to hiragana
+        if args.no_kanji:
+            for i in range(logits.shape[1]):
+                if i < 50256 and not(i in token_list):
+                    logits[0][i] = -np.inf
 
         # expand the tokens tensor with the selected next tokens
         tokens, completed = decoder.update(
@@ -839,6 +858,8 @@ def decode_with_fallback(enc_net, dec_net, segment, decode_options):
     temperatures = (
         [temperature] if isinstance(temperature, (int, float)) else temperature
     )
+    if args.no_kanji:
+        temperatures = [0]
     decode_result = None
 
     for t in temperatures:
