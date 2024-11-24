@@ -55,7 +55,7 @@ parser.add_argument("-src", "--source", default=SOURCE_PATH, help="source image"
 parser.add_argument(
     "--window_size",
     type=int,
-    default=448,
+    default=480,
     help="Image size when detecting. Multiple of 32. 0 is auto.",
 )
 parser.add_argument(
@@ -79,6 +79,7 @@ parser.add_argument(
 )
 parser.add_argument("--face_coverage", type=float, default=2.2, help="face coverage")
 parser.add_argument("--resolution", type=int, default=224, help="output resolution")
+parser.add_argument("--relative_power", type=float, default=1.0, help="relative power")
 parser.add_argument("--onnx", action="store_true", help="execute onnxruntime version.")
 args = update_parser(parser)
 
@@ -113,63 +114,6 @@ class FaceSwapInfo:
 
 
 def setup_yolov5face(net):
-    def fit_in(
-        img,
-        TW=None,
-        TH=None,
-        pad_to_target: bool = False,
-        allow_upscale: bool = False,
-        interpolation: "ImageProcessor.Interpolation" = None,
-    ) -> float:
-        """
-        fit image in w,h keeping aspect ratio
-
-            TW,TH           int/None     target width,height
-
-            pad_to_target   bool    pad remain area with zeros
-
-            allow_upscale   bool    if image smaller than TW,TH it will be upscaled
-
-            interpolation   ImageProcessor.Interpolation. value
-
-        returns scale float value
-        """
-        N, H, W, C = img.shape
-
-        if TW is not None and TH is None:
-            scale = TW / W
-        elif TW is None and TH is not None:
-            scale = TH / H
-        elif TW is not None and TH is not None:
-            SW = W / TW
-            SH = H / TH
-            scale = 1.0
-            if SW > 1.0 or SH > 1.0 or (SW < 1.0 and SH < 1.0):
-                scale /= max(SW, SH)
-        else:
-            raise ValueError("TW or TH should be specified")
-
-        if not allow_upscale and scale > 1.0:
-            scale = 1.0
-
-        if scale != 1.0:
-            img = img.transpose((1, 2, 0, 3)).reshape((H, W, N * C))
-            img = cv2.resize(
-                img,
-                (int(W * scale), int(H * scale)),
-                interpolation=cv2.INTER_LINEAR,
-            )
-            H, W = img.shape[0:2]
-            img = img.reshape((H, W, N, C)).transpose((2, 0, 1, 3))
-
-        if pad_to_target:
-            w_pad = (TW - W) if TW is not None else 0
-            h_pad = (TH - H) if TH is not None else 0
-            if w_pad != 0 or h_pad != 0:
-                img = np.pad(img, ((0, 0), (0, h_pad), (0, w_pad), (0, 0)))
-
-        return img, scale
-
     def pad_to_next_divisor(img, dw=None, dh=None):
         """
         pad image to next divisor of width/height
@@ -385,30 +329,55 @@ def setup_google_facemesh(net):
     return extract
 
 
-def fit_in(img):
-    TW = TH = IMG_SIZE
-    H, W, _ = img.shape
+def fit_in(
+    img, TW=None, TH=None, pad_to_target: bool = False, allow_upscale: bool = False
+) -> float:
+    """
+    fit image in w,h keeping aspect ratio
 
-    SW = W / TW
-    SH = H / TH
-    scale = 1.0
-    if SW > 1.0 or SH > 1.0 or (SW < 1.0 and SH < 1.0):
-        scale /= max(SW, SH)
+        TW,TH           int/None     target width,height
+
+        pad_to_target   bool    pad remain area with zeros
+
+        allow_upscale   bool    if image smaller than TW,TH it will be upscaled
+
+        interpolation   ImageProcessor.Interpolation. value
+
+    returns scale float value
+    """
+    ndim = img.ndim
+    N, H, W, C = (1,) + img.shape if ndim == 3 else img.shape
+
+    if TW is not None and TH is None:
+        scale = TW / W
+    elif TW is None and TH is not None:
+        scale = TH / H
+    elif TW is not None and TH is not None:
+        SW = W / TW
+        SH = H / TH
+        scale = 1.0
+        if SW > 1.0 or SH > 1.0 or (SW < 1.0 and SH < 1.0):
+            scale /= max(SW, SH)
+    else:
+        raise ValueError("TW or TH should be specified")
+
+    if not allow_upscale and scale > 1.0:
+        scale = 1.0
 
     if scale != 1.0:
-        img = cv2.resize(
-            img,
-            (int(W * scale), int(H * scale)),
-            interpolation=cv2.INTER_LINEAR,
-        )
-        H, W = img.shape[0:2]
+        img = resize(img, (int(W * scale), int(H * scale)))
 
-    w_pad = (TW - W) if TW is not None else 0
-    h_pad = (TH - H) if TH is not None else 0
-    if w_pad != 0 or h_pad != 0:
-        img = np.pad(img, ((0, h_pad), (0, w_pad), (0, 0)))
+    if pad_to_target:
+        _, H, W, _ = (1,) + img.shape if ndim == 3 else img.shape
+        w_pad = (TW - W) if TW is not None else 0
+        h_pad = (TH - H) if TH is not None else 0
+        if w_pad != 0 or h_pad != 0:
+            if 3 < ndim:
+                img = np.pad(img, ((0, 0), (0, h_pad), (0, w_pad), (0, 0)))
+            else:
+                img = np.pad(img, ((0, h_pad), (0, w_pad), (0, 0)))
 
-    return img
+    return img, scale
 
 
 def resize(
@@ -418,11 +387,17 @@ def resize(
     """
     resize to (W,H)
     """
-    H, W, _ = img.shape
+    ndim = img.ndim
+    N, H, W, C = (1,) + img.shape if ndim == 3 else img.shape
 
     TW, TH = size
     if W != TW or H != TH:
+        if 3 < ndim:
+            img = img.transpose((1, 2, 0, 3)).reshape((H, W, N * C))
         img = cv2.resize(img, (TW, TH), interpolation=cv2.INTER_LINEAR)
+        if 3 < ndim:
+            H, W = img.shape[0:2]
+            img = img.reshape((H, W, N, C)).transpose((2, 0, 1, 3))
 
     return img
 
@@ -698,7 +673,7 @@ def face_aligner(
     freeze_z_rotation = False
     x_offset = y_offset = 0.0
 
-    for face_id, fsi in enumerate(fsi_list):
+    for _, fsi in enumerate(fsi_list):
         if fsi.face_ulmrks is None:
             continue
 
@@ -727,22 +702,6 @@ def face_aligner(
                 y_offset=y_offset - 0.08 + (-0.50 if head_mode else 0.0),
                 freeze_z_rotation=freeze_z_rotation,
             )
-        # elif align_mode == AlignMode.FROM_STATIC_RECT:
-        #     rect = FRect.from_ltrb(
-        #         [
-        #             0.5 - (fsi.face_resolution / W) / 2,
-        #             0.5 - (fsi.face_resolution / H) / 2,
-        #             0.5 + (fsi.face_resolution / W) / 2,
-        #             0.5 + (fsi.face_resolution / H) / 2,
-        #         ]
-        #     )
-        #     face_align_img, uni_mat = rect.cut(
-        #         frame_image,
-        #         coverage=state.face_coverage,
-        #         output_size=state.resolution,
-        #         x_offset=state.x_offset,
-        #         y_offset=state.y_offset,
-        #     )
 
         fsi.image_to_align_uni_mat = uni_mat
         fsi.face_align_ulmrks = face_ulmrks_transform(face_ulmrks, uni_mat)
@@ -760,9 +719,8 @@ def face_aligner(
     return fsi_list
 
 
-def face_animator(models, src_img, fsi_list):
+def face_animator(models, src_img, fsi_list, relative_power=1.0):
     animator_face_id = 0
-    relative_power = 0.72
 
     for i, fsi in enumerate(fsi_list):
         if animator_face_id == i:
@@ -902,7 +860,9 @@ def deepfacelive(models, drv_img, src_img):
         coverage=args.face_coverage,
         resolution=args.resolution,
     )
-    fsi_list = face_animator(models, src_img, fsi_list)
+    fsi_list = face_animator(
+        models, src_img, fsi_list, relative_power=args.relative_power
+    )
 
     aligned_face_id = 0
     for i, fsi in enumerate(fsi_list):
@@ -924,7 +884,9 @@ def recognize_from_image(models):
 
     src_img = load_image(source_path)
     src_img = cv2.cvtColor(src_img, cv2.COLOR_BGRA2BGR)
-    src_img = fit_in(src_img)
+    src_img, _ = fit_in(
+        src_img, TW=IMG_SIZE, TH=IMG_SIZE, pad_to_target=True, allow_upscale=True
+    )
 
     # driver image loop
     for image_path in args.input:
@@ -978,7 +940,9 @@ def recognize_from_video(models):
 
     src_img = load_image(source_path)
     src_img = cv2.cvtColor(src_img, cv2.COLOR_BGRA2BGR)
-    src_img = fit_in(src_img)
+    src_img, _ = fit_in(
+        src_img, TW=IMG_SIZE, TH=IMG_SIZE, pad_to_target=True, allow_upscale=True
+    )
 
     # create video writer if savepath is specified as video format
     if args.savepath != SAVE_IMAGE_PATH:
