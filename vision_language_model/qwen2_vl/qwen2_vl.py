@@ -83,19 +83,25 @@ parser.add_argument(
     "--temperature",
     type=float,
     default=0.01,
-    help="temperature",
+    help="temperature from generation_config.json",
 )
 parser.add_argument(
     "--top_p",
     type=float,
     default=0.001,
-    help="top_p",
+    help="top_p from generation_config.json",
 )
 parser.add_argument(
     "--top_k",
     type=int,
     default=1,
-    help="top_k",
+    help="top_k from generation_config.json",
+)
+parser.add_argument(
+    "--max_length",
+    type=int,
+    default=256,
+    help="max_length for generation",
 )
 parser.add_argument("--onnx", action="store_true", help="execute onnxruntime version.")
 args = update_parser(parser)
@@ -618,7 +624,7 @@ def sample(
         np.cumsum(np.ones_like(input_ids[0, :], dtype=np.int64), axis=0) - 1
     )
     rope_deltas = None
-    max_length = 128 + input_ids.shape[1]
+    max_length = args.max_length + input_ids.shape[1]
 
     net = models["net"]
     first_run = True
@@ -856,7 +862,7 @@ def recognize(models):
     else:
         output_text = predict(models, messages)
 
-    if INTERMEDIATE:
+    if False:#INTERMEDIATE:
         print("")
     else:
         print(output_text)
