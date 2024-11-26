@@ -295,7 +295,7 @@ def main():
                 device=device)
             models["face_restor"] = face_restor
         else:
-            # assert not args.onnx, "face_det is currently not supporting onnx option"
+            assert not args.onnx, "onnx option not supported for face_det"
 
             face_det = ailia.Net(MODEL_DET_PATH, WEIGHT_DET_PATH, env_id=env_id)
             models["face_det"] = face_det
