@@ -186,14 +186,19 @@ class FastSAMPrompt:
         fig = plt.gcf()
         plt.draw()
 
-        try:
-            buf = fig.canvas.tostring_rgb()
-        except AttributeError:
-            fig.canvas.draw()
-            buf = fig.canvas.tostring_rgb()
-        cols, rows = fig.canvas.get_width_height()
-        img_array = np.frombuffer(buf, dtype=np.uint8).reshape(rows, cols, 3)
-        result = cv2.cvtColor(img_array, cv2.COLOR_RGB2BGR)
+        #try:
+        #    buf = fig.canvas.tostring_rgb()
+        #except AttributeError:
+        #    fig.canvas.draw()
+        #    buf = fig.canvas.tostring_rgb()
+        
+        fig.canvas.draw()
+        result = np.array(fig.canvas.renderer.buffer_rgba())
+
+        #cols, rows = fig.canvas.get_width_height()
+        #img_array = np.frombuffer(buf, dtype=np.uint8).reshape(rows, cols, 3)
+        #result = cv2.cvtColor(img_array, cv2.COLOR_RGB2BGR)
+        
         plt.close()
         return result
             
@@ -242,6 +247,7 @@ class FastSAMPrompt:
         annotation = annotation[sorted_indices]
 
         index = (annotation != 0).argmax(axis=0)
+        np.random.seed(314)
         if random_color:
             color = np.random.random((msak_sum, 1, 1, 3))
         else:

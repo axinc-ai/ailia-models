@@ -1,16 +1,15 @@
 import cv2
 import numpy as np
 
-import ailia
 from scipy.ndimage import zoom
 
 from util import *
 
 class BasePredictor:
-    def __init__(self,modelname,env_id):
+    def __init__(self, model):
         self.imgsz = None
-        self.model = ailia.Net(None,modelname[0],env_id=env_id)
-
+        self.model = model
+        
     def pre_transform(self, im):
         same_shapes = all(x.shape == im[0].shape for x in im)
         auto = False
@@ -47,8 +46,8 @@ class BasePredictor:
 
 class FastSAMPredictor(BasePredictor):
 
-    def __init__(self,modelname,env_id):
-        super().__init__(modelname,env_id)
+    def __init__(self, model):
+        super().__init__(model)
 
     def __call__(self, source=None, conf=0.4,iou=0.9,**kwargs):
         return list(self.stream_inference(source))  # merge list of Result into one

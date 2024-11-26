@@ -2,15 +2,12 @@ import os
 import ast
 import sys
 import time
-from collections import OrderedDict
 from logging import getLogger
 
 import numpy as np
 import cv2
 
 import ailia
-
-import argparse
 
 from predict import FastSAMPredictor
 from prompt import FastSAMPrompt 
@@ -137,45 +134,30 @@ def FastSAM(SAM_model, vit_model,input):
 # Main functions
 # ======================
 
-def recognize_from_image(pos_points,env_id):
-    if pos_points is None:
-        pos_points = []
-
-    lf = '\n'
-    logger.info(f"Positive coordinate: {pos_points}")
-
+def recognize_from_image(net_sam, net_image, net_text):
     # input image loop
     for image_path in args.input:
         logger.info(image_path)
 
-        # prepare input data
-        img = imread(image_path)
-
         # inference
         logger.info('Start inference...')
-        recognize(image_path, img, pos_points,env_id)
+        recognize(image_path, net_sam, net_image, net_text)
 
 
-def recognize(image_path, img, pos_points,env_id):
-    model = FastSAMPredictor((WEIGHT_FASTSAM_PATH,MODEL_FASTSAM_PATH),env_id)
-    net_image = ailia.Net(None,"ViT-B32-encode_image.onnx",env_id=env_id)
-    net_text  = ailia.Net(None,"ViT-B32-encode_text.onnx",env_id=env_id)
+def recognize(image_path, net_sam, net_image, net_text):
+    model = FastSAMPredictor(net_sam)
     args.point_prompt = ast.literal_eval(args.point_prompt)
     args.box_prompt = convert_box_xywh_to_xyxy(ast.literal_eval(args.box_prompt))
     args.point_label = ast.literal_eval(args.point_label)
 
     input = imread(image_path)
 
-    bboxes = None
-    points = None
-    point_label = None
-
     if args.benchmark:
             logger.info('BENCHMARK mode')
             total_time_estimation = 0
             for i in range(args.benchmark_count):
                 start = int(round(time.time() * 1000))
-                result = FastSAM(model,(net_image,net_text) ,input)
+                result = FastSAM(model,(net_image, net_text), input)
 
                 end = int(round(time.time() * 1000))
                 estimation_time = (end - start)
@@ -213,11 +195,21 @@ def main():
         reduce_constant=True, ignore_input_with_initializer=True,
         reduce_interstage=False, reuse_interstage=True)
 
-    if args.profile:
-        sam_net.set_profile_mode(True)
-        img_enc.set_profile_mode(True)
+    net_sam = ailia.Net(MODEL_FASTSAM_PATH, WEIGHT_FASTSAM_PATH, env_id = env_id, memory_mode = memory_mode)
+    net_image = ailia.Net(MODEL_VIT_IMAGE_PATH, WEIGHT_VIT_IMAGE_PATH, env_id = env_id, memory_mode = memory_mode)
+    net_text  = ailia.Net(MODEL_VIT_TEXT_PATH, WEIGHT_VIT_TEXT_PATH, env_id = env_id, memory_mode = memory_mode)
 
-    recognize_from_image(args.pos,env_id)
+    if args.profile:
+        net_sam.set_profile_mode(True)
+        net_image.set_profile_mode(True)
+        net_text.set_profile_mode(True)
+
+    recognize_from_image(net_sam, net_image, net_text)
+
+    if args.profile:
+        print(net_sam.get_summary())
+        print(net_image.get_summary())
+        print(net_text.get_summary())
 
 if __name__ == '__main__':
     main()
