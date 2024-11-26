@@ -158,7 +158,6 @@ def recognize(image_path, net_sam, net_image, net_text):
             for i in range(args.benchmark_count):
                 start = int(round(time.time() * 1000))
                 result = FastSAM(model,(net_image, net_text), input)
-
                 end = int(round(time.time() * 1000))
                 estimation_time = (end - start)
 
@@ -175,6 +174,51 @@ def recognize(image_path, net_sam, net_image, net_text):
     savepath = get_savepath(args.savepath, image_path, ext='.png')
     logger.info(f'saved at : {savepath}')
     cv2.imwrite(savepath, result)
+
+
+def recognize_from_video(net_sam, net_image, net_text):
+    model = FastSAMPredictor(net_sam)
+    args.point_prompt = ast.literal_eval(args.point_prompt)
+    args.box_prompt = convert_box_xywh_to_xyxy(ast.literal_eval(args.box_prompt))
+    args.point_label = ast.literal_eval(args.point_label)
+
+
+    frame_names = None
+    capture = get_capture(args.video)
+    video_height = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    video_width = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
+
+    if args.savepath != SAVE_IMAGE_PATH:
+        writer = get_writer(args.savepath, video_height, video_width)
+    else:
+        writer = None
+
+    frame_shown = False
+
+    frame_idx = 0
+    while (True):
+        ret, frame = capture.read()
+
+        if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
+            break
+        if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
+            break
+
+        frame = FastSAM(model,(net_image, net_text), frame)
+
+        cv2.imshow('frame', frame)
+        if frame_names is not None:
+            cv2.imwrite(f'video_{frame_idx}.png', frame)
+
+        if writer is not None:
+            writer.write(frame)
+
+        frame_shown = True
+        frame_idx = frame_idx + 1
+
+    if writer is not None:
+        writer.release()
+
 
 def main():
 
@@ -204,7 +248,10 @@ def main():
         net_image.set_profile_mode(True)
         net_text.set_profile_mode(True)
 
-    recognize_from_image(net_sam, net_image, net_text)
+    if args.video is not None:
+        recognize_from_video(net_sam, net_image, net_text)
+    else:
+        recognize_from_image(net_sam, net_image, net_text)
 
     if args.profile:
         print(net_sam.get_summary())
