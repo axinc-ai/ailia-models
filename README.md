@@ -17,22 +17,15 @@ If you would like to try on your computer:
 [ailia MODELS tutorial 日本語版](TUTORIAL_jp.md)
 
 # Supported models
-358 models as of October 9th, 2024
+360 models as of November 19th, 2024
 
 # Latest update
+- 2024.11.19 Add qwen2_vl, live_portrait (ailia SDK 1.5)
 - 2024.10.09 Add whisper-v3-turbo
 - 2024.10.02 Add florence2
 - 2024.09.15 Add bert-vits2, pytorch_wavenet
 - 2024.09.12 Add gpt-sovits-v2
 - 2024.09.10 Add segment-anything-2 (video mode)
-- 2024.08.27 Add segment-anything-2 (image mode)
-- 2024.08.20 Add bert_ner_japanese
-- 2024.08.16 Add latent-consistency-model-txt2img, fbcnn
-- 2024.08.15 Add volo, elegant, depth_anything, drbn_skf, codeformer, dtln
-- 2024.08.10 Add TripoSR, japanese-reranker-cross-encoder
-- 2024.08.09 Add mahalanobis-ad, t5_base_japanese_ner
-- 2024.08.08 Add sdxl-turbo, sd-turbo
-- 2024.08.05 Migrate to ailia Tokenizer 1.3 from Transformers
 - More information in our [Wiki](https://github.com/axinc-ai/ailia-models/wiki)
 
 ## Action recognition
@@ -329,6 +322,7 @@ If you would like to try on your computer:
 | [<img src="generative_adversarial_networks/sam/img/input.jpg" width=128px>](generative_adversarial_networks/sam/) | [sam](/generative_adversarial_networks/sam)| [Age Transformation Using a Style-Based Regression Model](https://github.com/yuval-alaluf/SAM)| Pytorch | 1.2.9 and later |
 | [<img src="generative_adversarial_networks/encoder4editing/output.png" width=128px>](generative_adversarial_networks/encoder4editing/) | [encoder4editing](/generative_adversarial_networks/encoder4editing/) | [Designing an Encoder for StyleGAN Image Manipulation](https://github.com/omertov/encoder4editing) | Pytorch | 1.2.10 and later | |
 | [<img src="generative_adversarial_networks/lipgan/input.jpg" width=128px>](generative_adversarial_networks/lipgan/) | [lipgan](/generative_adversarial_networks/lipgan/) | [LipGAN](https://github.com/Rudrabha/LipGAN) | Keras | 1.2.15 and later | [JP](https://medium.com/axinc/lipgan-%E3%83%AA%E3%83%83%E3%83%97%E3%82%B7%E3%83%B3%E3%82%AF%E5%8B%95%E7%94%BB%E3%82%92%E7%94%9F%E6%88%90%E3%81%99%E3%82%8B%E6%A9%9F%E6%A2%B0%E5%AD%A6%E7%BF%92%E3%83%A2%E3%83%87%E3%83%AB-57511508eaff) |
+| [<img src="generative_adversarial_networks/live_portrait/s6.jpg" width=128px>](generative_adversarial_networks/live_portrait/) | [live_portrait](/generative_adversarial_networks/live_portrait)| [LivePortrait](https://github.com/KwaiVGI/LivePortrait) | Pytorch | 1.5.0 and later | [JP](https://medium.com/axinc/live-portrait-1%E6%9E%9A%E3%81%AE%E7%94%BB%E5%83%8F%E3%82%92%E5%8B%95%E3%81%8B%E3%81%9B%E3%82%8Bai%E3%83%A2%E3%83%87%E3%83%AB-8eaa7d3eb683)|
 
 ## Hand detection
 
@@ -790,6 +784,7 @@ If you would like to try on your computer:
 | | Model | Reference | Exported From | Supported Ailia Version | Blog |
 |:-----------|------------:|:------------:|:------------:|:------------:|:------------:|
 | [<img src="vision_language_model/florence2/car.jpg" width=128px>](vision_language_model/florence2/) | [florence2](vision_language_model/florence2) | [Hugging Face - microsoft/Florence-2-base](https://huggingface.co/microsoft/Florence-2-base) | Pytorch | 1.2.16 and later | |
+| [<img src="vision_language_model/qwen2_vl/demo.jpeg" width=128px>](vision_language_model/qwen2_vl/) | [qwen2_vl](vision_language_model/qwen2_vl) | [Qwen2-VL](https://github.com/QwenLM/Qwen2-VL) | Pytorch | 1.5.0 and later | |
 
 ## Commercial model
 
