@@ -29,7 +29,7 @@ logger = getLogger(__name__)
 # Parameters
 # ======================
 
-REMOTE_FASTSAM_PATH = 'https://storage.googleapis.com/ailia-models/FastSAM/'
+REMOTE_FASTSAM_PATH = 'https://storage.googleapis.com/ailia-models/fast_sam/'
 
 WEIGHT_VIT_TEXT_PATH = 'ViT-B32-encode_text.onnx'
 MODEL_VIT_TEXT_PATH  = 'ViT-B32-encode_text.onnx.prototxt'
