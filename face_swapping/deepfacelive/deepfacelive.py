@@ -40,6 +40,8 @@ WEIGHT_S3FD_PATH = "S3FD.onnx"
 MODEL_S3FD_PATH = "S3FD.onnx.prototxt"
 WEIGHT_FACEMESH_PATH = "FaceMesh.onnx"
 MODEL_FACEMESH_PATH = "FaceMesh.onnx.prototxt"
+WEIGHT_INSIGHTFACE_PATH = "InsightFace2D106.onnx"
+MODEL_INSIGHTFACE_PATH = "InsightFace2D106.onnx.prototxt"
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/deepfacelive/"
 
 IMAGE_PATH = "Obama.jpg"
@@ -73,6 +75,12 @@ parser.add_argument(
 parser.add_argument("--max_faces", type=int, default=1, help="max faces")
 parser.add_argument(
     "--temporal_smoothing", type=int, default=1, help="temporal smoothing"
+)
+parser.add_argument(
+    "--marker",
+    default="facemesh",
+    choices=("facemesh", "insightface"),
+    help="Face Marker",
 )
 parser.add_argument(
     "--marker_coverage", type=float, default=1.4, help="marker coverage"
@@ -454,6 +462,17 @@ def setup_google_facemesh(net):
     input_height = 192
     input_width = 192
 
+    def from_3D_468_landmarks(lmrks):
+        """ """
+        mat = np.empty((3, 3))
+        mat[0, :] = (lmrks[454] - lmrks[234]) / np.linalg.norm(lmrks[454] - lmrks[234])
+        mat[1, :] = (lmrks[152] - lmrks[6]) / np.linalg.norm(lmrks[152] - lmrks[6])
+        mat[2, :] = np.cross(mat[0, :], mat[1, :])
+        pitch, yaw, roll = rotation_matrix_to_euler(mat)
+
+        face_rect = np.array([pitch, yaw * 2, roll], np.float32)
+        return face_rect
+
     def extract(img):
         """
         arguments
@@ -483,7 +502,44 @@ def setup_google_facemesh(net):
         lmrks = lmrks.reshape((-1, 468, 3))
         lmrks *= (w_scale, h_scale, 1)
 
-        return lmrks
+        face_pose = from_3D_468_landmarks(lmrks[0])
+
+        return lmrks[0], face_pose
+
+    return extract
+
+
+def setup_insightface_2d106(net):
+    input_height = 192
+    input_width = 192
+
+    def extract(img):
+        H, W, _ = img.shape
+
+        h_scale = H / input_height
+        w_scale = W / input_width
+
+        img = resize(img, (input_width, input_height))
+        img = img[..., ::-1]
+
+        img = img.transpose(2, 0, 1)  # HWC -> CHW
+        img = np.expand_dims(img, axis=0)
+        img = img.astype(np.float32)
+
+        # feedforward
+        if not args.onnx:
+            output = net.predict([img])
+        else:
+            output = net.run(None, {"data": img})
+        lmrks = output[0]
+
+        lmrks = lmrks.reshape((1, 106, 2))
+        lmrks /= 2.0
+        lmrks += (0.5, 0.5)
+        lmrks *= (w_scale, h_scale)
+        lmrks *= (W, H)
+
+        return lmrks[0], None
 
     return extract
 
@@ -709,18 +765,6 @@ def get_convexhull_mask(
     return mask
 
 
-def from_3D_468_landmarks(lmrks):
-    """ """
-    mat = np.empty((3, 3))
-    mat[0, :] = (lmrks[454] - lmrks[234]) / np.linalg.norm(lmrks[454] - lmrks[234])
-    mat[1, :] = (lmrks[152] - lmrks[6]) / np.linalg.norm(lmrks[152] - lmrks[6])
-    mat[2, :] = np.cross(mat[0, :], mat[1, :])
-    pitch, yaw, roll = rotation_matrix_to_euler(mat)
-
-    face_rect = np.array([pitch, yaw * 2, roll], np.float32)
-    return face_rect
-
-
 # ======================
 # Main functions
 # ======================
@@ -779,10 +823,6 @@ def face_detector(
 
 
 def face_marker(models, frame_image, fsi_list, coverage=1.4, temporal_smoothing=1):
-    is_opencv_lbf = False
-    is_google_facemesh = True
-    is_insightface_2d106 = False
-
     if temporal_smoothing != 1 and (
         len(getattr(face_marker, "temporal_lmrks", [])) != len(fsi_list)
     ):
@@ -793,26 +833,11 @@ def face_marker(models, frame_image, fsi_list, coverage=1.4, temporal_smoothing=
             continue
 
         # Cut the face to feed to the face marker
-        face_image, face_uni_mat = face_urect_cut(
-            fsi,
-            frame_image,
-            coverage,
-            (
-                256
-                if is_opencv_lbf
-                else (192 if is_google_facemesh else 192 if is_insightface_2d106 else 0)
-            ),
-        )
+        face_image, face_uni_mat = face_urect_cut(fsi, frame_image, coverage, 192)
         H, W, _ = face_image.shape
 
-        # if is_opencv_lbf:
-        #     lmrks = opencv_lbf(face_image)[0]
-        # elif is_google_facemesh:
-        #     lmrks = google_facemesh(face_image)[0]
-        # elif is_insightface_2d106:
-        #     lmrks = insightface_2d106(face_image)[0]
         extract = models["face_marker"]
-        lmrks = extract(face_image)[0]
+        lmrks, face_pose = extract(face_image)
 
         if temporal_smoothing != 1:
             if len(face_marker.temporal_lmrks[face_id]) == 0:
@@ -822,25 +847,14 @@ def face_marker(models, frame_image, fsi_list, coverage=1.4, temporal_smoothing=
             ]
             lmrks = np.mean(face_marker.temporal_lmrks[face_id], 0)
 
-        if is_google_facemesh:
-            fsi.face_pose = from_3D_468_landmarks(lmrks)
+        fsi.face_pose = face_pose
 
-        if is_opencv_lbf:
-            lmrks /= (W, H)
-        elif is_google_facemesh:
-            lmrks = lmrks[..., 0:2] / (W, H)
-        elif is_insightface_2d106:
-            lmrks = lmrks[..., 0:2] / (W, H)
-
+        lmrks = lmrks[..., 0:2] / (W, H)
         face_ulmrks = FLandmarks2D(
             type=(
-                ELandmarks2D.L68
-                if is_opencv_lbf
-                else (
-                    ELandmarks2D.L468
-                    if is_google_facemesh
-                    else ELandmarks2D.L106 if is_insightface_2d106 else None
-                )
+                ELandmarks2D.L468
+                if lmrks.shape[0] == 468
+                else ELandmarks2D.L106 if lmrks.shape[0] == 106 else None
             ),
             ulmrks=lmrks,
         )
@@ -1187,11 +1201,24 @@ def main():
         )
     else:
         raise ValueError("Invalid detector type")
+    # Face marker
+    if args.marker == "facemesh":
+        WEIGHT_MARKER_PATH, MODEL_MARKER_PATH = (
+            WEIGHT_FACEMESH_PATH,
+            MODEL_FACEMESH_PATH,
+        )
+    elif args.marker == "insightface":
+        WEIGHT_MARKER_PATH, MODEL_MARKER_PATH = (
+            WEIGHT_INSIGHTFACE_PATH,
+            MODEL_INSIGHTFACE_PATH,
+        )
+    else:
+        raise ValueError("Invalid marker type")
 
     # model files check and download
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
     check_and_download_models(WEIGHT_DET_PATH, MODEL_DET_PATH, REMOTE_PATH)
-    check_and_download_models(WEIGHT_FACEMESH_PATH, MODEL_FACEMESH_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_MARKER_PATH, MODEL_MARKER_PATH, REMOTE_PATH)
 
     env_id = args.env_id
 
@@ -1199,7 +1226,7 @@ def main():
     if not args.onnx:
         net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
         net_face = ailia.Net(MODEL_DET_PATH, WEIGHT_DET_PATH, env_id=env_id)
-        net_marker = ailia.Net(MODEL_FACEMESH_PATH, WEIGHT_FACEMESH_PATH, env_id=env_id)
+        net_marker = ailia.Net(MODEL_MARKER_PATH, WEIGHT_MARKER_PATH, env_id=env_id)
     else:
         import onnxruntime
 
@@ -1207,7 +1234,7 @@ def main():
         net = onnxruntime.InferenceSession(WEIGHT_PATH, providers=providers)
         net_face = onnxruntime.InferenceSession(WEIGHT_DET_PATH, providers=providers)
         net_marker = onnxruntime.InferenceSession(
-            WEIGHT_FACEMESH_PATH, providers=providers
+            WEIGHT_MARKER_PATH, providers=providers
         )
 
     if args.detector == "yolov5":
@@ -1216,7 +1243,11 @@ def main():
         face_detector = setup_centerface(net_face)
     elif args.detector == "s3fd":
         face_detector = setup_s3fd(net_face)
-    face_marker = setup_google_facemesh(net_marker)
+
+    if args.marker == "facemesh":
+        face_marker = setup_google_facemesh(net_marker)
+    elif args.marker == "insightface":
+        face_marker = setup_insightface_2d106(net_marker)
 
     models = {
         "net": net,
