@@ -1,7 +1,6 @@
 import sys
 import time
 from dataclasses import dataclass
-from enum import IntEnum
 from typing import List, Tuple
 from logging import getLogger
 
@@ -37,6 +36,8 @@ WEIGHT_YOLOV5FACE_PATH = "YoloV5Face.onnx"
 MODEL_YOLOV5FACE_PATH = "YoloV5Face.onnx.prototxt"
 WEIGHT_CENTERFACE_PATH = "CenterFace.onnx"
 MODEL_CENTERFACE_PATH = "CenterFace.onnx.prototxt"
+WEIGHT_S3FD_PATH = "S3FD.onnx"
+MODEL_S3FD_PATH = "S3FD.onnx.prototxt"
 WEIGHT_FACEMESH_PATH = "FaceMesh.onnx"
 MODEL_FACEMESH_PATH = "FaceMesh.onnx.prototxt"
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/deepfacelive/"
@@ -58,7 +59,7 @@ parser.add_argument(
     "--detector",
     default="yolov5",
     choices=("yolov5", "centerface", "s3fd"),
-    help="detector",
+    help="Face Detector",
 )
 parser.add_argument(
     "--window_size",
@@ -86,7 +87,9 @@ parser.add_argument(
     help="align mode",
 )
 parser.add_argument("--face_coverage", type=float, default=2.2, help="face coverage")
-parser.add_argument("--resolution", type=int, default=224, help="output resolution")
+parser.add_argument(
+    "--resolution", type=int, default=224, help="resolution of aligned face"
+)
 parser.add_argument("--relative_power", type=float, default=1.0, help="relative power")
 parser.add_argument("--onnx", action="store_true", help="execute onnxruntime version.")
 args = update_parser(parser)
@@ -231,9 +234,9 @@ def setup_yolov5face(net):
             img_scale = 1.0
 
         _, H, W, _ = img.shape
-        img = img.astype(np.float32) / 255.0
+        img = img / 255.0
 
-        feed_img = img.transpose(0, 3, 1, 2)
+        feed_img = img.transpose(0, 3, 1, 2).astype(np.float32)
         preds = predict(feed_img)
 
         if augment:
@@ -275,16 +278,6 @@ def setup_yolov5face(net):
 
 
 def setup_centerface(net):
-    def predict(img):
-        # feedforward
-        if not args.onnx:
-            output = net.predict([img])
-        else:
-            output = net.run(None, {"in": img})
-        heatmaps, scales, offsets = output
-
-        return heatmaps, offsets, scales
-
     def refine(heatmap, offset, scale, h, w, threshold):
         heatmap = heatmap[0]
         scale0, scale1 = scale[0, :, :], scale[1, :, :]
@@ -333,10 +326,14 @@ def setup_centerface(net):
 
         _, H, W, _ = img.shape
         img = img[..., ::-1]
-        feed_img = img.transpose(0, 3, 1, 2)
-        feed_img = feed_img.astype(np.float32)
+        feed_img = img.transpose(0, 3, 1, 2).astype(np.float32)
 
-        heatmaps, offsets, scales = predict(feed_img)
+        # feedforward
+        if not args.onnx:
+            output = net.predict([feed_img])
+        else:
+            output = net.run(None, {"in": feed_img})
+        heatmaps, scales, offsets = output
 
         faces_per_batch = []
         for heatmap, offset, scale in zip(heatmaps, offsets, scales):
@@ -344,6 +341,93 @@ def setup_centerface(net):
             for face in refine(heatmap, offset, scale, H, W, threshold):
                 l, t, r, b, c = face
 
+                if img_scale != 1.0:
+                    l, t, r, b = (
+                        l / img_scale,
+                        t / img_scale,
+                        r / img_scale,
+                        b / img_scale,
+                    )
+
+                bt = b - t
+                if min(r - l, bt) < min_face_size:
+                    continue
+                b += bt * 0.1
+
+                faces.append((l, t, r, b))
+
+            faces_per_batch.append(faces)
+
+        return faces_per_batch
+
+    return extract
+
+
+def setup_s3fd(net):
+    def refine(olist, threshold):
+        bboxlist = []
+        variances = [0.1, 0.2]
+        for i in range(len(olist) // 2):
+            ocls, oreg = olist[i * 2], olist[i * 2 + 1]
+
+            stride = 2 ** (i + 2)  # 4,8,16,32,64,128
+            for hindex, windex in [*zip(*np.where(ocls[1, :, :] > threshold))]:
+                axc, ayc = stride / 2 + windex * stride, stride / 2 + hindex * stride
+                score = ocls[1, hindex, windex]
+                loc = np.ascontiguousarray(oreg[:, hindex, windex]).reshape((1, 4))
+                priors = np.array([[axc, ayc, stride * 4, stride * 4]])
+                bbox = np.concatenate(
+                    (
+                        priors[:, :2] + loc[:, :2] * variances[0] * priors[:, 2:],
+                        priors[:, 2:] * np.exp(loc[:, 2:] * variances[1]),
+                    ),
+                    1,
+                )
+                bbox[:, :2] -= bbox[:, 2:] / 2
+                bbox[:, 2:] += bbox[:, :2]
+                x1, y1, x2, y2 = bbox[0]
+                bboxlist.append([x1, y1, x2, y2, score])
+
+        if len(bboxlist) != 0:
+            bboxlist = np.array(bboxlist)
+            keep = nms_boxes(bboxlist[:, :4], bboxlist[:, 4], 0.3)
+            bboxlist = bboxlist[keep, :]
+            bboxlist = [x for x in bboxlist if x[-1] >= 0.5]
+
+        return bboxlist
+
+    def extract(
+        img,
+        threshold: float = 0.3,
+        fixed_window=0,
+        min_face_size=8,
+    ):
+        img = img[None, ...]
+        if fixed_window != 0:
+            fixed_window = max(64, max(1, fixed_window // 32) * 32)
+            img, img_scale = fit_in(
+                img, fixed_window, fixed_window, pad_to_target=True, allow_upscale=False
+            )
+        else:
+            img = pad_to_next_divisor(img, 64, 64)
+            img_scale = 1.0
+
+        img = img - [104, 117, 123]
+        feed_img = img.transpose(0, 3, 1, 2).astype(np.float32)
+
+        # feedforward
+        if not args.onnx:
+            output = net.predict([feed_img])
+        else:
+            output = net.run(None, {"in": feed_img})
+        batches_bbox = output
+
+        faces_per_batch = []
+        for batch in range(img.shape[0]):
+            bbox = refine([x[batch] for x in batches_bbox], threshold)
+
+            faces = []
+            for l, t, r, b, c in bbox:
                 if img_scale != 1.0:
                     l, t, r, b = (
                         l / img_scale,
@@ -1085,20 +1169,28 @@ def recognize_from_video(models):
 
 
 def main():
+    # Face detector
     if args.detector == "yolov5":
-        WEIGHT_FACE_PATH, MODEL_FACE_PATH = (
+        WEIGHT_DET_PATH, MODEL_DET_PATH = (
             WEIGHT_YOLOV5FACE_PATH,
             MODEL_YOLOV5FACE_PATH,
         )
     elif args.detector == "centerface":
-        WEIGHT_FACE_PATH, MODEL_FACE_PATH = (
+        WEIGHT_DET_PATH, MODEL_DET_PATH = (
             WEIGHT_CENTERFACE_PATH,
             MODEL_CENTERFACE_PATH,
         )
+    elif args.detector == "s3fd":
+        WEIGHT_DET_PATH, MODEL_DET_PATH = (
+            WEIGHT_S3FD_PATH,
+            MODEL_S3FD_PATH,
+        )
+    else:
+        raise ValueError("Invalid detector type")
 
     # model files check and download
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
-    check_and_download_models(WEIGHT_FACE_PATH, MODEL_FACE_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_DET_PATH, MODEL_DET_PATH, REMOTE_PATH)
     check_and_download_models(WEIGHT_FACEMESH_PATH, MODEL_FACEMESH_PATH, REMOTE_PATH)
 
     env_id = args.env_id
@@ -1106,14 +1198,14 @@ def main():
     # initialize
     if not args.onnx:
         net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
-        net_face = ailia.Net(MODEL_FACE_PATH, WEIGHT_FACE_PATH, env_id=env_id)
+        net_face = ailia.Net(MODEL_DET_PATH, WEIGHT_DET_PATH, env_id=env_id)
         net_marker = ailia.Net(MODEL_FACEMESH_PATH, WEIGHT_FACEMESH_PATH, env_id=env_id)
     else:
         import onnxruntime
 
         providers = ["CUDAExecutionProvider", "CPUExecutionProvider"]
         net = onnxruntime.InferenceSession(WEIGHT_PATH, providers=providers)
-        net_face = onnxruntime.InferenceSession(WEIGHT_FACE_PATH, providers=providers)
+        net_face = onnxruntime.InferenceSession(WEIGHT_DET_PATH, providers=providers)
         net_marker = onnxruntime.InferenceSession(
             WEIGHT_FACEMESH_PATH, providers=providers
         )
@@ -1122,8 +1214,8 @@ def main():
         face_detector = setup_yolov5face(net_face)
     elif args.detector == "centerface":
         face_detector = setup_centerface(net_face)
-    else:
-        raise ValueError("Invalid detector type")
+    elif args.detector == "s3fd":
+        face_detector = setup_s3fd(net_face)
     face_marker = setup_google_facemesh(net_marker)
 
     models = {
