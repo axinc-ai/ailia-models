@@ -17,9 +17,10 @@ If you would like to try on your computer:
 [ailia MODELS tutorial 日本語版](TUTORIAL_jp.md)
 
 # Supported models
-360 models as of November 19th, 2024
+361 models as of November 26th, 2024
 
 # Latest update
+- 2024.11.26 Add fast_sam
 - 2024.11.19 Add qwen2_vl, live_portrait (ailia SDK 1.5)
 - 2024.10.09 Add whisper-v3-turbo
 - 2024.10.02 Add florence2
