@@ -44,8 +44,8 @@ WEIGHT_INSIGHTFACE_PATH = "InsightFace2D106.onnx"
 MODEL_INSIGHTFACE_PATH = "InsightFace2D106.onnx.prototxt"
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/deepfacelive/"
 
-IMAGE_PATH = "Obama.jpg"
-SOURCE_PATH = "Kim Chen Yin.png"
+IMAGE_DIR_PATH = "sample/"
+SOURCE_PATH = "Kim_Chen_Yin.png"
 SAVE_IMAGE_PATH = "output.png"
 
 IMG_SIZE = 256
@@ -55,7 +55,7 @@ IMG_SIZE = 256
 # Arguemnt Parser Config
 # ======================
 
-parser = get_base_parser("DeepFaceLive", IMAGE_PATH, SAVE_IMAGE_PATH)
+parser = get_base_parser("DeepFaceLive", IMAGE_DIR_PATH, SAVE_IMAGE_PATH)
 parser.add_argument("-src", "--source", default=SOURCE_PATH, help="source image")
 parser.add_argument(
     "--detector",
@@ -118,12 +118,8 @@ class FaceSwapInfo:
 
     face_align_image: np.ndarray = None
     face_align_lmrks_mask: np.ndarray = None
-    # face_align_mask_name: str = None
-    # face_anim_image_name: str = None
     face_swap_image: np.ndarray = None
-    # face_swap_mask_name: str = None
 
-    image_to_align_uni_mat: np.ndarray = None
     face_align_ulmrks: FLandmarks2D = None
 
 
@@ -902,7 +898,6 @@ def face_aligner(
                 freeze_z_rotation=freeze_z_rotation,
             )
 
-        fsi.image_to_align_uni_mat = uni_mat
         fsi.face_align_ulmrks = face_ulmrks_transform(face_ulmrks, uni_mat)
         fsi.face_align_image = face_align_img
 
@@ -1087,6 +1082,8 @@ def recognize_from_image(models):
         src_img, TW=IMG_SIZE, TH=IMG_SIZE, pad_to_target=True, allow_upscale=True
     )
 
+    logger.info("Start inference...")
+
     # driver image loop
     for image_path in args.input:
         logger.info("Driving: {}".format(image_path))
@@ -1096,7 +1093,6 @@ def recognize_from_image(models):
         drv_img = cv2.cvtColor(drv_img, cv2.COLOR_BGRA2BGR)
 
         # inference
-        logger.info("Start inference...")
         if args.benchmark:
             logger.info("BENCHMARK mode")
             total_time_estimation = 0
