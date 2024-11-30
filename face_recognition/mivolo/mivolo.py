@@ -4,6 +4,7 @@ import time
 
 import cv2
 import numpy as np
+np.set_printoptions(suppress=True, precision=2)
 from scipy.optimize import linear_sum_assignment
 
 import ailia
@@ -28,8 +29,8 @@ logger = getLogger(__name__)
 # ======================
 IMAGE_OR_VIDEO_PATH = 'input.jpg'  # input.mp4
 SAVE_IMAGE_OR_VIDEO_PATH = 'output.png'  # output.mp4
-IMAGE_HEIGHT_YOLOV8 = 640
-IMAGE_WIDTH_YOLOV8 = 640
+IMAGE_HEIGHT_YOLO = 640
+IMAGE_WIDTH_YOLO = 640
 IMAGE_HEIGHT_MIVOLO = 224
 IMAGE_WIDTH_MIVOLO = 224
 
@@ -41,11 +42,16 @@ parser = get_base_parser(
     'MiVOLO: Multi-input Transformer for Age and Gender Estimation',
     IMAGE_OR_VIDEO_PATH,
     SAVE_IMAGE_OR_VIDEO_PATH,
-    fp16_support=False
 )
 parser.add_argument(
     '-ng', '--no_gender', action='store_true',
     help="Options to prevent gender prediction."
+)
+parser.add_argument(
+    '-md', '--model_detection', metavar='MODEL',
+    default='yolov8x', choices=['yolov8x', 'yoloxs', 'yoloxx'],
+    help='The input detection model path.' +
+         'you can choose yolov8-x, yolox-s or yolox-x'
 )
 args = update_parser(parser)
 
@@ -53,15 +59,15 @@ args = update_parser(parser)
 # ==========================
 # MODEL AND OTHER PARAMETERS
 # ==========================
-MODEL_YOLOV8_PATH = 'yolov8x_person_face.onnx.prototxt'
-WEIGHT_YOLOV8_PATH = 'yolov8x_person_face.onnx'
+MODEL_YOLO_PATH = args.model_detection + '_person_face.onnx.prototxt'
+WEIGHT_YOLO_PATH = args.model_detection + '_person_face.onnx'
 MODEL_MIVOLO_PATH = 'mivolo.onnx.prototxt'
 WEIGHT_MIVOLO_PATH = 'mivolo.onnx'
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/mivolo/'
 
 SLEEP_TIME = 0  # for web cam mode
-# for yolov8 and non-maximum-supression
-THRESH_YOLOV8 = 0.4
+# for yolo and non-maximum-supression
+THRESH_YOLO = 0.4
 THRESH_IOU = 0.6
 # for gender and age estimation
 IMAGENET_DEFAULT_MEAN = (0.485, 0.456, 0.406)
@@ -101,7 +107,28 @@ def prep_input(image, width, height, mean=None, std=None):
     if (mean is not None) & (std is not None):
         input_data = (input_data - mean[None, None]) / std[None, None]
     input_data = np.transpose(input_data, (2, 0, 1))[None]
-    return input_data.astype(np.float32)
+    return input_data
+
+
+def prep_input_yolox(image, width, height, mean=None, std=None):
+    padded_img = np.ones((height, width, 3), dtype=np.uint8) * 114
+    r = min(height / image.shape[0], width / image.shape[1])
+    resized_img = cv2.resize(image.copy()[..., ::-1],
+                             (int(image.shape[1] * r), int(image.shape[0] * r)),
+                             interpolation=cv2.INTER_LINEAR)
+    padded_img[:int(resized_img.shape[0]), :int(resized_img.shape[1])] = resized_img
+    input_data = padded_img.astype(np.float32)
+    if (mean is not None):
+        if (type(mean) is tuple) | (type(mean) is list):
+            mean = np.array(mean)
+    if (std is not None):
+        if (type(std) is tuple) | (type(std) is list):
+            std = np.array(std)
+    if (mean is not None) & (std is not None):
+        input_data = input_data / 255.0
+        input_data = (input_data - mean[None, None]) / std[None, None]
+    input_data = np.transpose(input_data, (2, 0, 1))[None]
+    return input_data
 
 
 def calc_iou_1xN(bbox_a, bbox_b, area_a, area_b):
@@ -153,7 +180,7 @@ def calc_iou_MxN(box1, box2, over_second=False):
     overlap = (np.minimum(box1[:, None, 2:4], box2[:, 2:4]) - np.maximum(box1[:, None, :2], box2[:, :2]))
     overlap[overlap < 0] = 0
     overlap = np.prod(overlap, axis=-1)
-    
+
     iou = overlap / (area1[:, None] + area2 - overlap)  # iou = overlap / (area1 + area2 - overlap)
     if over_second:
         return ((overlap / area2) + iou) / 2  # mean(overlap / area2, iou)
@@ -310,8 +337,8 @@ def track(bbox, tracker):
         online_tlwhs = np.vstack(online_tlwhs)
         online_tlwhs[:, :4] = xywh2xyxy(online_tlwhs[:, :4], tl=True)
         return np.hstack([online_tlwhs,
-                        np.array(online_scores)[:, None],
-                        np.array(online_ids)[:, None]])
+                          np.array(online_scores)[:, None],
+                          np.array(online_ids)[:, None]])
     else:
         return np.zeros([0, 6])
 
@@ -334,29 +361,47 @@ def bbox_label(image, bbox, label='', color=(128, 128, 128), txt_color=(255, 255
 # ======================
 # Main functions
 # ======================
-def recognize_from_image(net_yolov8, net_mivolo):
+def recognize_from_image(net_YOLO, net_mivolo):
     # input image loop
     for image_path in args.input:
-        # prepare input data for yolov8
+        # prepare input data for yolo
         logger.info(image_path)
         image = imread(image_path)[:, :, ::-1].copy()
-        input_data = prep_input(image, width=IMAGE_WIDTH_YOLOV8, height=IMAGE_HEIGHT_YOLOV8)
+        if WEIGHT_YOLO_PATH[:5] == 'yolox':
+            input_data = prep_input_yolox(image, width=IMAGE_WIDTH_YOLO, height=IMAGE_HEIGHT_YOLO)
+        else:
+            input_data = prep_input(image, width=IMAGE_WIDTH_YOLO, height=IMAGE_HEIGHT_YOLO)
+        print('np.max(input_data) =', np.max(input_data))
 
         # inference
         if args.benchmark:
             logger.info('BENCHMARK mode')
             for i in range(args.benchmark_count):
                 start = int(round(time.time() * 1000))
-                output_yolov8 = net_yolov8.run(input_data)
+                output_YOLO = net_YOLO.run(input_data)
                 end = int(round(time.time() * 1000))
                 logger.info(f'\tailia processing time {end - start} ms')
         else:
-            output_yolov8 = net_yolov8.run(input_data)
-        output_yolov8 = output_yolov8[0][0].T
+            output_YOLO = net_YOLO.run(input_data)
+        output_YOLO = output_YOLO[0][0]
+        if WEIGHT_YOLO_PATH[:5] == 'yolox':
+            class_conf = np.max(output_YOLO[:, 5:], axis=1)
+            conf_mask = (output_YOLO[:, 4] * class_conf)
+            class_pred = np.argmax(output_YOLO[:, 5:], axis=1)
+            output_YOLO = output_YOLO[:, :6]
+            output_YOLO[:, 4:] = 0
+            output_YOLO[(class_pred == 0), 5] = conf_mask[(class_pred == 0)]
+            output_YOLO[(class_pred == 1), 4] = conf_mask[(class_pred == 1)]
+        else:
+            output_YOLO = output_YOLO.T
+        print('output_YOLO.shape =\n', output_YOLO.shape)
+        print('output_YOLO =\n', output_YOLO[np.argsort(-output_YOLO[:, 4])])
 
         # apply threshold
-        bbox_face = output_yolov8[output_yolov8[:, 5] > THRESH_YOLOV8][:, [0, 1, 2, 3, 5]]
-        bbox_person = output_yolov8[output_yolov8[:, 4] > THRESH_YOLOV8][:, :5]
+        bbox_face = output_YOLO[output_YOLO[:, 5] > THRESH_YOLO][:, [0, 1, 2, 3, 5]]
+        bbox_person = output_YOLO[output_YOLO[:, 4] > THRESH_YOLO][:, :5]
+        print('bbox_face.shape =\n', bbox_face.shape)
+        print('bbox_person.shape =\n', bbox_person.shape)
 
         # xywh -> xyxy
         bbox_face[:, :4] = xywh2xyxy(bbox_face[:, :4])
@@ -367,10 +412,15 @@ def recognize_from_image(net_yolov8, net_mivolo):
         bbox_person = nms(bbox=bbox_person, thresh_iou=THRESH_IOU)
 
         # rescale
-        bbox_face[:, [0, 2]] = bbox_face[:, [0, 2]] * (image.shape[1] / IMAGE_WIDTH_YOLOV8)
-        bbox_face[:, [1, 3]] = bbox_face[:, [1, 3]] * (image.shape[0] / IMAGE_HEIGHT_YOLOV8)
-        bbox_person[:, [0, 2]] = bbox_person[:, [0, 2]] * (image.shape[1] / IMAGE_WIDTH_YOLOV8)
-        bbox_person[:, [1, 3]] = bbox_person[:, [1, 3]] * (image.shape[0] / IMAGE_HEIGHT_YOLOV8)
+        if WEIGHT_YOLO_PATH[:5] == 'yolox':
+            r = min(IMAGE_HEIGHT_YOLO / image.shape[0], IMAGE_WIDTH_YOLO / image.shape[1])
+            bbox_face[:, :4] = bbox_face[:, :4] / r
+            bbox_person[:, :4] = bbox_person[:, :4] / r
+        else:
+            bbox_face[:, [0, 2]] = bbox_face[:, [0, 2]] * (image.shape[1] / IMAGE_WIDTH_YOLO)
+            bbox_face[:, [1, 3]] = bbox_face[:, [1, 3]] * (image.shape[0] / IMAGE_HEIGHT_YOLO)
+            bbox_person[:, [0, 2]] = bbox_person[:, [0, 2]] * (image.shape[1] / IMAGE_WIDTH_YOLO)
+            bbox_person[:, [1, 3]] = bbox_person[:, [1, 3]] * (image.shape[0] / IMAGE_HEIGHT_YOLO)
 
         # cast float to int
         bbox_face = bbox_face[:, :4]
@@ -451,7 +501,7 @@ def recognize_from_image(net_yolov8, net_mivolo):
     logger.info('Script finished successfully.')
 
 
-def recognize_from_video(net_yolov8, net_mivolo, tracker_face, tracker_person):
+def recognize_from_video(net_YOLO, net_mivolo, tracker_face, tracker_person):
     # capture video
     capture = webcamera_utils.get_capture(args.video)
     height = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
@@ -474,23 +524,36 @@ def recognize_from_video(net_yolov8, net_mivolo, tracker_face, tracker_person):
         frame = frame[..., ::-1].copy()
 
         # preprocessing
-        input_data = prep_input(frame, width=IMAGE_WIDTH_YOLOV8, height=IMAGE_HEIGHT_YOLOV8)
+        if WEIGHT_YOLO_PATH[:5] == 'yolox':
+            input_data = prep_input_yolox(frame, width=IMAGE_WIDTH_YOLO, height=IMAGE_HEIGHT_YOLO)
+        else:
+            input_data = prep_input(frame, width=IMAGE_WIDTH_YOLO, height=IMAGE_HEIGHT_YOLO)
 
         # inference
         if args.benchmark:
             logger.info('BENCHMARK mode')
             for i in range(args.benchmark_count):
                 start = int(round(time.time() * 1000))
-                output_yolov8 = net_yolov8.run(input_data)
+                output_YOLO = net_YOLO.run(input_data)
                 end = int(round(time.time() * 1000))
                 logger.info(f'\tailia processing time {end - start} ms')
         else:
-            output_yolov8 = net_yolov8.run(input_data)
-        output_yolov8 = output_yolov8[0][0].T
+            output_YOLO = net_YOLO.run(input_data)
+        output_YOLO = output_YOLO[0][0]
+        if WEIGHT_YOLO_PATH[:5] == 'yolox':
+            class_conf = np.max(output_YOLO[:, 5:], axis=1)
+            conf_mask = (output_YOLO[:, 4] * class_conf)
+            class_pred = np.argmax(output_YOLO[:, 5:], axis=1)
+            output_YOLO = output_YOLO[:, :6]
+            output_YOLO[:, 4:] = 0
+            output_YOLO[(class_pred == 0), 5] = conf_mask[(class_pred == 0)]
+            output_YOLO[(class_pred == 1), 4] = conf_mask[(class_pred == 1)]
+        else:
+            output_YOLO = output_YOLO.T
 
         # apply threshold
-        bbox_face = output_yolov8[output_yolov8[:, 5] > THRESH_YOLOV8][:, [0, 1, 2, 3, 5]]
-        bbox_person = output_yolov8[output_yolov8[:, 4] > THRESH_YOLOV8][:, :5]
+        bbox_face = output_YOLO[output_YOLO[:, 5] > THRESH_YOLO][:, [0, 1, 2, 3, 5]]
+        bbox_person = output_YOLO[output_YOLO[:, 4] > THRESH_YOLO][:, :5]
 
         # xywh -> xyxy
         bbox_face[:, :4] = xywh2xyxy(bbox_face[:, :4])
@@ -505,10 +568,15 @@ def recognize_from_video(net_yolov8, net_mivolo, tracker_face, tracker_person):
         bbox_person = track(bbox_person, tracker_person)
 
         # rescale
-        bbox_face[:, [0, 2]] = bbox_face[:, [0, 2]] * (frame.shape[1] / IMAGE_WIDTH_YOLOV8)
-        bbox_face[:, [1, 3]] = bbox_face[:, [1, 3]] * (frame.shape[0] / IMAGE_HEIGHT_YOLOV8)
-        bbox_person[:, [0, 2]] = bbox_person[:, [0, 2]] * (frame.shape[1] / IMAGE_WIDTH_YOLOV8)
-        bbox_person[:, [1, 3]] = bbox_person[:, [1, 3]] * (frame.shape[0] / IMAGE_HEIGHT_YOLOV8)
+        if WEIGHT_YOLO_PATH[:5] == 'yolox':
+            r = min(IMAGE_HEIGHT_YOLO / frame.shape[0], IMAGE_WIDTH_YOLO / frame.shape[1])
+            bbox_face[:, :4] = bbox_face[:, :4] / r
+            bbox_person[:, :4] = bbox_person[:, :4] / r
+        else:
+            bbox_face[:, [0, 2]] = bbox_face[:, [0, 2]] * (frame.shape[1] / IMAGE_WIDTH_YOLO)
+            bbox_face[:, [1, 3]] = bbox_face[:, [1, 3]] * (frame.shape[0] / IMAGE_HEIGHT_YOLO)
+            bbox_person[:, [0, 2]] = bbox_person[:, [0, 2]] * (frame.shape[1] / IMAGE_WIDTH_YOLO)
+            bbox_person[:, [1, 3]] = bbox_person[:, [1, 3]] * (frame.shape[0] / IMAGE_HEIGHT_YOLO)
 
         # cast float to int
         bbox_face = bbox_face[:, [0, 1, 2, 3, 5]]
@@ -608,12 +676,17 @@ def recognize_from_video(net_yolov8, net_mivolo, tracker_face, tracker_person):
 
 def main():
     # model files check and download
-    check_and_download_models(WEIGHT_YOLOV8_PATH, MODEL_YOLOV8_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_YOLO_PATH, MODEL_YOLO_PATH, REMOTE_PATH)
     check_and_download_models(WEIGHT_MIVOLO_PATH, MODEL_MIVOLO_PATH, REMOTE_PATH)
+
+    # disable FP16
+    if "FP16" in ailia.get_environment(args.env_id).props or sys.platform == 'Darwin':
+        logger.warning('This model do not work on FP16. So use CPU mode.')
+        args.env_id = 0
 
     # net initialize
     logger.info(f'env_id: {args.env_id}')
-    net_yolov8 = ailia.Net(MODEL_YOLOV8_PATH, WEIGHT_YOLOV8_PATH, env_id=args.env_id)
+    net_YOLO = ailia.Net(MODEL_YOLO_PATH, WEIGHT_YOLO_PATH, env_id=args.env_id)
     net_mivolo = ailia.Net(MODEL_MIVOLO_PATH, WEIGHT_MIVOLO_PATH, env_id=args.env_id)
 
     tracker_face = BYTETracker(track_thresh=TRACK_THRESH, track_buffer=TRACK_BUFFER,
@@ -623,10 +696,10 @@ def main():
 
     if args.video is None:
         # image mode
-        recognize_from_image(net_yolov8, net_mivolo)
+        recognize_from_image(net_YOLO, net_mivolo)
     else:
         # video mode
-        recognize_from_video(net_yolov8, net_mivolo, tracker_face, tracker_person)
+        recognize_from_video(net_YOLO, net_mivolo, tracker_face, tracker_person)
 
 
 if __name__ == '__main__':
