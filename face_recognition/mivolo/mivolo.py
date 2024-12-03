@@ -67,7 +67,10 @@ REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/mivolo/'
 
 SLEEP_TIME = 0  # for web cam mode
 # for yolo and non-maximum-supression
-THRESH_YOLO = 0.4
+if WEIGHT_YOLO_PATH[:5] == 'yolox':
+    THRESH_YOLO = 0.7
+else:
+    THRESH_YOLO = 0.4
 THRESH_IOU = 0.6
 # for gender and age estimation
 IMAGENET_DEFAULT_MEAN = (0.485, 0.456, 0.406)
