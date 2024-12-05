@@ -71,7 +71,7 @@ MODEL_PATH = "llava-jp-1.3b-v1.1.onnx.prototxt"
 
 
 def prepare_inputs_for_multimodal(
-    input_ids, position_ids, attention_mask, past_key_values, images
+    net_vis, input_ids, position_ids, attention_mask, past_key_values, images
 ):
     if input_ids.shape[1] == 1:
         target_shape = past_key_values[-1][-1].shape[-2] + 1
@@ -96,23 +96,75 @@ def prepare_inputs_for_multimodal(
             None,
         )
 
-    # image_features = encode_images(images)
-
-    new_input_embeds = np.load("new_input_embeds.npy")
-    max_len = new_input_embeds[0].shape[0]
-
-    position_ids = np.zeros(
-        (1, max_len),
-        dtype=position_ids.dtype,
-    )
-    cur_len = 781
-    if cur_len > 0:
-        attention_mask[0, :cur_len] = True
-        position_ids[0, :cur_len] = np.arange(
-            0,
-            cur_len,
-            dtype=position_ids.dtype,
+    if not args.onnx:
+        output = net_vis.predict(
+            [
+                input_ids,
+                attention_mask,
+                images,
+            ]
         )
+    else:
+        output = net_vis.run(
+            None,
+            {
+                "input_ids": input_ids,
+                "attention_mask": attention_mask,
+                "images": images,
+            },
+        )
+    input_embeds, image_features = output
+
+    IMAGE_TOKEN_INDEX = -200
+    cur_input_ids = input_ids[0]
+
+    num_images = np.sum(cur_input_ids == IMAGE_TOKEN_INDEX)
+    if num_images == 0:
+        cur_image_features = image_features[cur_image_idx]
+        cur_input_embeds_1 = input_embeds
+        cur_input_embeds = np.concatenate(
+            [cur_input_embeds_1, cur_image_features[:0]], axis=0
+        )
+        new_input_embeds = cur_input_embeds
+    else:
+        # ex. input_ids -> input_ids_noim
+        # [1 2 3 -200 4 5 6] -> [1 2 3], [4 5 6]
+        image_token_indices = (
+            [-1]
+            + np.where(cur_input_ids == IMAGE_TOKEN_INDEX)[0].tolist()
+            + [cur_input_ids.shape[0]]
+        )
+        split_sizes = [
+            image_token_indices[i + 1] - (image_token_indices[i] + 1)
+            for i in range(len(image_token_indices) - 1)
+        ]
+
+        # 分割位置の計算
+        split_indices = np.cumsum(split_sizes[:-1])
+        input_embeds_no_im = np.split(input_embeds, split_indices, axis=0)
+
+        # IMAGE_TOKEN_INDEXの部分を画像特徴量に置き換える
+        new_input_embeds = []
+        cur_image_idx = 0
+        for i in range(num_images + 1):
+            new_input_embeds.append(input_embeds_no_im[i])
+            if i < num_images:
+                cur_image_features = image_features[cur_image_idx]
+                cur_image_idx += 1
+                new_input_embeds.append(cur_image_features)
+
+        new_input_embeds = np.concatenate(new_input_embeds)
+
+    tokenizer_model_max_length = 1532
+    new_input_embeds = new_input_embeds[:tokenizer_model_max_length]
+
+    max_len = new_input_embeds.shape[0]
+
+    new_input_embeds = np.expand_dims(new_input_embeds, axis=0)
+    attention_mask = np.zeros((1, max_len), dtype=attention_mask.dtype)
+    position_ids = np.zeros((1, max_len), dtype=position_ids.dtype)
+    attention_mask[..., :max_len] = True
+    position_ids[..., :max_len] = np.arange(0, max_len, dtype=position_ids.dtype)
 
     return (
         None,
@@ -123,7 +175,7 @@ def prepare_inputs_for_multimodal(
 
 
 def forward(
-    net,
+    models,
     input_ids: np.ndarray,
     position_ids: np.ndarray,
     attention_mask: np.ndarray,
@@ -131,13 +183,14 @@ def forward(
     past_key_values: List[np.ndarray],
     first_run,
 ):
+    visual = models["visual"]
     (
         input_ids,
         position_ids,
         past_key_values,
         inputs_embeds,
     ) = prepare_inputs_for_multimodal(
-        input_ids, position_ids, attention_mask, past_key_values, images
+        visual, input_ids, position_ids, attention_mask, past_key_values, images
     )
 
     if input_ids is None:
@@ -145,6 +198,7 @@ def forward(
     if inputs_embeds is None:
         inputs_embeds = np.zeros((1, 0, 2048), dtype=np.float32)
 
+    net = models["net"]
     if not args.onnx:
         # if first_run or COPY_BLOB_DATA == False:
         if 1:
