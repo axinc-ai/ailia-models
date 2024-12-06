@@ -210,6 +210,7 @@ cd ../../image_segmentation/pytorch-fcn; python3 pytorch-fcn.py ${OPTION}
 cd ../../image_segmentation/grounded_sam; python3 grounded_sam.py ${OPTION}
 cd ../../image_segmentation/segment-anything-2; python3 segment-anything-2.py ${OPTION}
 cd ../../image_segmentation/fast_sam; python3 fast_sam.py ${OPTION}
+cd ../../image_segmentation/detectree; python3 detectree.py ${OPTION}
 cd ../../large_language_model/llava; python3 llava.py ${OPTION}
 cd ../../landmark_classification/landmarks_classifier_asia; python3 landmarks_classifier_asia.py ${OPTION}
 cd ../../landmark_classification/places365; python3 places365.py ${OPTION}
