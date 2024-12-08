@@ -29,14 +29,13 @@ logger = getLogger(__name__)
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/llava-jp/"
 
 IMAGE_PATH = "sample.jpg"
-SAVE_IMAGE_PATH = "output.png"
 
 
 # ======================
 # Arguemnt Parser Config
 # ======================
 
-parser = get_base_parser("LLaVA-JP", IMAGE_PATH, SAVE_IMAGE_PATH, large_model=True)
+parser = get_base_parser("LLaVA-JP", IMAGE_PATH, None, large_model=True)
 parser.add_argument(
     "-p",
     "--prompt",
@@ -46,6 +45,12 @@ parser.add_argument(
 )
 parser.add_argument(
     "--disable_ailia_tokenizer", action="store_true", help="disable ailia tokenizer."
+)
+parser.add_argument(
+    "-im",
+    "--intermediate",
+    action="store_true",
+    help="print intermediate results.",
 )
 parser.add_argument("--onnx", action="store_true", help="execute onnxruntime version.")
 args = update_parser(parser)
@@ -57,7 +62,15 @@ args = update_parser(parser)
 
 
 WEIGHT_PATH = "llava-jp-1.3b-v1.1.onnx"
+WEIGHT_ENC_PATH = "encode_images.onnx"
 MODEL_PATH = "llava-jp-1.3b-v1.1.onnx.prototxt"
+MODEL_ENC_PATH = "encode_images.onnx.prototxt"
+
+IMG_SIZE = 768
+
+SYSTEM_PROMPT = "これは好奇心旺盛なユーザーと人工知能システムのチャットです。システムはユーザーの質問に親切、詳細、丁寧に答える。"
+IMAGE_TOKEN_INDEX = -200
+STOP_STR = "<EOD|LLM-jp>"
 
 
 # ======================
@@ -65,9 +78,64 @@ MODEL_PATH = "llava-jp-1.3b-v1.1.onnx.prototxt"
 # ======================
 
 
+class TextStreamer:
+    def __init__(self, tokenizer):
+        self.tokenizer = tokenizer
+        self.token_cache = []
+        self.print_len = 0
+        self.stop_str = STOP_STR
+
+    def put(self, value):
+        self.token_cache.extend(value.tolist())
+        output_text = self.tokenizer.decode(self.token_cache)
+
+        if output_text.endswith(self.stop_str) or output_text.endswith("\n"):
+            printable_text = output_text[self.print_len :].replace(self.stop_str, "")
+            self.token_cache = []
+            self.print_len = 0
+        elif output_text != "":
+            printable_text = output_text[self.print_len :]
+            self.print_len += len(printable_text)
+
+        print(printable_text, flush=True, end="")
+
+    def end(self):
+        # Flush the cache, if it exists
+        if len(self.token_cache) > 0:
+            text = self.tokenizer.decode(self.token_cache)
+            printable_text = text[self.print_len :]
+            self.token_cache = []
+            self.print_len = 0
+        else:
+            printable_text = ""
+
+        print(printable_text, flush=True, end=None)
+
+
 # ======================
 # Main functions
 # ======================
+
+
+def preprocess(images):
+    images = [im[:, :, ::-1] for im in images]  # BGR -> RGB
+
+    height = width = IMG_SIZE
+    images = [
+        np.array(Image.fromarray(img).resize((width, height), Image.Resampling.BICUBIC))
+        for img in images
+    ]
+    scale = 0.00392156862745098
+    images = [(img.astype(np.float64) * scale).astype(np.float32) for img in images]
+
+    mean = np.array([0.5, 0.5, 0.5], dtype=np.float32)
+    std = np.array([0.5, 0.5, 0.5], dtype=np.float32)
+    images = [(img - mean) / std for img in images]
+
+    images = [img.transpose(2, 0, 1) for img in images]
+    images = np.array(images, dtype=np.float32)
+
+    return images
 
 
 def prepare_inputs_for_multimodal(
@@ -115,7 +183,6 @@ def prepare_inputs_for_multimodal(
         )
     input_embeds, image_features = output
 
-    IMAGE_TOKEN_INDEX = -200
     cur_input_ids = input_ids[0]
 
     num_images = np.sum(cur_input_ids == IMAGE_TOKEN_INDEX)
@@ -310,76 +377,31 @@ def forward(
     return logits, new_past_key_values
 
 
-def stopping_criteria(input_ids: np.array, max_length) -> np.array:
+def stopping_criteria(input_ids: np.array) -> np.array:
+    max_length = 310
     cur_len = input_ids.shape[-1]
     is_done = cur_len >= max_length
     is_done = np.full(input_ids.shape[0], is_done)
 
-    eos_token_id = np.array([151645, 151643])
+    eos_token_id = np.array([7])
     is_done = is_done | np.isin(input_ids[:, -1], eos_token_id)
 
     return is_done
 
 
-def tokenizer_decode(input_ids, generated_ids, tokenizer, intermediate):
-    generated_ids_trimmed = [
-        out_ids[len(in_ids) :] for in_ids, out_ids in zip(input_ids, generated_ids)
-    ]
-    try:
-        if args.disable_ailia_tokenizer:
-            output_text = tokenizer.batch_decode(
-                generated_ids_trimmed,
-                skip_special_tokens=True,
-                clean_up_tokenization_spaces=False,
-            )
-        else:
-            output_text = tokenizer.batch_decode(
-                generated_ids_trimmed,
-                skip_special_tokens=True,
-                # clean_up_tokenization_spaces=False,
-            )
-    except UnicodeDecodeError:
-        if intermediate:
-            return [""]
-        raise
-    return output_text
-
-
-def sample(
-    models,
-    input_ids,
-    pixel_values,
-    attention_mask,
-    image_grid_thw,
-    video_grid_thw,
-    tokenizer,
-):
+def sample(models, input_ids, attention_mask, images, intermediate=False):
     pad_token_id = 7
 
     if args.benchmark:
         start = int(round(time.time() * 1000))
 
-    if INTERMEDIATE:
+    if intermediate:
         print("Encoding..." + "\n\u001B[2A")
-        before_text = ""
-
-    net = models["visual"]
-    if not args.onnx:
-        output = net.predict([input_ids, pixel_values, image_grid_thw, image_token_id])
+        streamer = TextStreamer(models["tokenizer"])
     else:
-        output = net.run(
-            None,
-            {
-                "input_ids": input_ids.astype(np.int64),
-                "pixel_values": pixel_values,
-                "image_grid_thw": image_grid_thw.astype(np.int64),
-                "image_token_id": image_token_id.astype(np.int64),
-            },
-        )
-    inputs_embeds = output[0]
-    past_key_values = [
-        np.zeros((1, 2, 0, 128), dtype=np.float32) for _ in range(28 * 2)
-    ]
+        streamer = None
+
+    past_key_values = [np.zeros((1, 16, 0, 128), dtype=np.float32)] * 48
 
     if args.benchmark:
         end = int(round(time.time() * 1000))
@@ -393,9 +415,7 @@ def sample(
     cache_position = (
         np.cumsum(np.ones_like(input_ids[0, :], dtype=np.int64), axis=0) - 1
     )
-    # max_length = args.max_length + input_ids.shape[1]
 
-    net = models["net"]
     first_run = True
     while True:
         # prepare model inputs
@@ -411,7 +431,7 @@ def sample(
             start = int(round(time.time() * 1000))
 
         logits, past_key_values = forward(
-            net,
+            models,
             model_input_ids,
             position_ids,
             attention_mask,
@@ -426,16 +446,16 @@ def sample(
             estimation_time = end - start
             logger.info(f"\tdecode time {estimation_time} ms")
 
-        next_token_logits = logits[:, -1, :]
-
-        # pre-process distribution
-        next_token_scores = logits_processor(
-            input_ids, next_token_logits, args.temperature, args.top_p, args.top_k
         attention_mask = np.concatenate(
             [attention_mask, np.ones((attention_mask.shape[0], 1), dtype=int)],
             axis=-1,
         )
         cache_position = cache_position[-1:] + 1
+
+        next_token_logits = logits[:, -1, :]
+
+        # pre-process distribution
+        next_token_scores = logits_processor(input_ids, next_token_logits)
 
         # token selection
         probs = softmax(next_token_scores, axis=-1)
@@ -449,58 +469,83 @@ def sample(
         # update generated ids, model inputs, and length for next step
         input_ids = np.concatenate([input_ids, next_tokens[:, None]], axis=-1)
 
-        unfinished_sequences = unfinished_sequences & ~stopping_criteria(
-            input_ids, max_length
-        )
+        if streamer:
+            streamer.put(next_tokens)
+
+        unfinished_sequences = unfinished_sequences & ~stopping_criteria(input_ids)
         this_peer_finished = np.max(unfinished_sequences) == 0
         cur_len += 1
 
         if this_peer_finished:
             break
 
-        if INTERMEDIATE:
-            output_text = tokenizer_decode(initial_ids, input_ids, tokenizer, True)[0]
-            if output_text.startswith(before_text):
-                deltaText = output_text[len(before_text) :]
-            else:
-                deltaText = output_text
-            print(deltaText, end="")
-            sys.stdout.flush()
-            if output_text != "":
-                before_text = output_text
+    if streamer is not None:
+        streamer.end()
 
     return input_ids
 
 
-def predict(models, messages):
-    generated_ids = sample(
-        models,
-        input_ids,
-        pixel_values,
-        attention_mask,
-        image_grid_thw,
-        video_grid_thw,
-        tokenizer,
+def predict(models, images, message, intermediate=False):
+    images = preprocess(images)
+
+    prompt = "".join(["<image>\n"] * len(images)) + message
+    messages = [["ユーザー", prompt], ["システム", None]]
+
+    seps = [" ", STOP_STR]
+    ret = SYSTEM_PROMPT + seps[0]
+    for i, (role, message) in enumerate(messages):
+        if message:
+            ret += role + ": " + message + seps[i % 2]
+        else:
+            ret += role + ": "
+    prompt = ret
+
+    tokenizer = models["tokenizer"]
+    prompt_chunks = [tokenizer(chunk).input_ids for chunk in prompt.split("<image>")]
+
+    input_ids = []
+    offset = 0
+    if (
+        len(prompt_chunks) > 0
+        and len(prompt_chunks[0]) > 0
+        and prompt_chunks[0][0] == tokenizer.bos_token_id
+    ):
+        offset = 1
+        input_ids.append(prompt_chunks[0][0])
+
+    sep = [IMAGE_TOKEN_INDEX] * (offset + 1)
+    for x in [
+        ele
+        for sublist in zip(prompt_chunks, [sep] * len(prompt_chunks))
+        for ele in sublist
+    ][:-1]:
+        input_ids.extend(x[offset:])
+    input_ids = np.array([input_ids], dtype=np.long)
+    input_ids = input_ids[:, :-1]  # </sep>がinputの最後に入るので削除する
+    attention_mask = np.ones(input_ids.shape[:2], dtype=np.long)
+
+    output = sample(
+        models, input_ids, attention_mask, images, intermediate=intermediate
     )
+    output_text = tokenizer.decode(output[0][len(input_ids[0]) :])
+    output_text = output_text.replace(STOP_STR, "")
 
-    output_text = tokenizer_decode(input_ids, generated_ids, tokenizer, False)
-
-    return output_text[0]
+    return output_text
 
 
 def recognize(models):
     prompt = args.prompt
+    intermediate = args.intermediate
+
     logger.info("Prompt: %s" % prompt)
 
-    content = []
-    if args.video is not None:
-        content.append({"type": "video", "video": args.video})
-    else:
-        for input_path in args.input:
-            content.append({"type": "image", "image": input_path})
-    content.append({"type": "text", "text": prompt})
-
-    messages = [{"role": "user", "content": content}]
+    # input image loop
+    images = []
+    for image_path in args.input:
+        # prepare input data
+        img = load_image(image_path)
+        img = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
+        images.append(img)
 
     # inference
     logger.info("Start inference...")
@@ -509,7 +554,7 @@ def recognize(models):
         total_time_estimation = 0
         for i in range(args.benchmark_count):
             start = int(round(time.time() * 1000))
-            output_text = predict(models, messages)
+            output_text = predict(models, images, prompt, intermediate=intermediate)
             end = int(round(time.time() * 1000))
             estimation_time = end - start
 
@@ -522,11 +567,9 @@ def recognize(models):
             f"\taverage time estimation {total_time_estimation / (args.benchmark_count - 1)} ms"
         )
     else:
-        output_text = predict(models, messages)
+        output_text = predict(models, images, prompt, intermediate=intermediate)
 
-    if INTERMEDIATE:
-        print("")
-    else:
+    if not intermediate:
         print(output_text)
 
     logger.info("Script finished successfully.")
@@ -550,51 +593,29 @@ def main():
             reduce_interstage=False,
             reuse_interstage=True,
         )
-        # visual = ailia.Net(
-        #     MODEL_VIS_PATH, WEIGHT_VIS_PATH, env_id=env_id, memory_mode=memory_mode
-        # )
+        visual = ailia.Net(
+            MODEL_ENC_PATH, WEIGHT_ENC_PATH, env_id=env_id, memory_mode=memory_mode
+        )
         net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id, memory_mode=memory_mode)
     else:
         import onnxruntime
 
         providers = ["CUDAExecutionProvider", "CPUExecutionProvider"]
 
-        # visual = onnxruntime.InferenceSession(WEIGHT_VIS_PATH, providers=providers)
+        visual = onnxruntime.InferenceSession(WEIGHT_ENC_PATH, providers=providers)
         net = onnxruntime.InferenceSession(WEIGHT_PATH, providers=providers)
 
-    # # args.disable_ailia_tokenizer = True
-    # if args.disable_ailia_tokenizer:
-    #     import transformers
+    args.disable_ailia_tokenizer = True
+    if args.disable_ailia_tokenizer:
+        import transformers
 
-    #     tokenizer = transformers.Qwen2TokenizerFast.from_pretrained("./tokenizer")
-    # else:
-    #     from ailia_tokenizer import GPT2Tokenizer
-
-    #     tokenizer = GPT2Tokenizer.from_pretrained("./tokenizer")
-    #     tokenizer.add_special_tokens(
-    #         {
-    #             "additional_special_tokens": [
-    #                 "<|end_of_text|>",
-    #                 "<|im_start|>",
-    #                 "<|im_end|>",
-    #                 "<|object_ref_start|>",
-    #                 "<|object_ref_end|>",
-    #                 "<|box_start|>",
-    #                 "<|box_end|>",
-    #                 "<|quad_start|>",
-    #                 "<|quad_end|>",
-    #                 "<|vision_start|>",
-    #                 "<|vision_end|>",
-    #                 "<|vision_pad|>",
-    #                 "<|image_pad|>",
-    #                 "<|video_pad|>",
-    #             ]
-    #         }
-    #     )
+        tokenizer = transformers.AutoTokenizer.from_pretrained("./tokenizer")
+    else:
+        raise NotImplementedError
 
     models = {
-        # "tokenizer": tokenizer,
-        # "visual": visual,
+        "tokenizer": tokenizer,
+        "visual": visual,
         "net": net,
     }
 
