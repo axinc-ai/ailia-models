@@ -62,11 +62,14 @@ args = update_parser(parser)
 
 
 WEIGHT_PATH = "llava-jp-1.3b-v1.1.onnx"
+WEIGHT_PB_PATH = "llava-jp-1.3b-v1.1_weights.pb"
 WEIGHT_ENC_PATH = "encode_images.onnx"
 MODEL_PATH = "llava-jp-1.3b-v1.1.onnx.prototxt"
 MODEL_ENC_PATH = "encode_images.onnx.prototxt"
 
 IMG_SIZE = 768
+
+COPY_BLOB_DATA = True
 
 SYSTEM_PROMPT = "これは好奇心旺盛なユーザーと人工知能システムのチャットです。システムはユーザーの質問に親切、詳細、丁寧に答える。"
 IMAGE_TOKEN_INDEX = -200
@@ -164,6 +167,9 @@ def prepare_inputs_for_multimodal(
             None,
         )
 
+    if args.benchmark:
+        start = int(round(time.time() * 1000))
+
     if not args.onnx:
         output = net_vis.predict(
             [
@@ -182,6 +188,11 @@ def prepare_inputs_for_multimodal(
             },
         )
     input_embeds, image_features = output
+
+    if args.benchmark:
+        end = int(round(time.time() * 1000))
+        estimation_time = end - start
+        logger.info(f"\tencode time {estimation_time} ms")
 
     cur_input_ids = input_ids[0]
 
@@ -248,7 +259,7 @@ def forward(
     attention_mask: np.ndarray,
     images: np.ndarray,
     past_key_values: List[np.ndarray],
-    first_run,
+    blob_copy,
 ):
     visual = models["visual"]
     (
@@ -267,8 +278,7 @@ def forward(
 
     net = models["net"]
     if not args.onnx:
-        # if first_run or COPY_BLOB_DATA == False:
-        if 1:
+        if not blob_copy:
             output = net.predict(
                 [
                     input_ids,
@@ -279,29 +289,25 @@ def forward(
             )
             logits, new_past_key_values = output[0], output[1:]
         else:
-            NUM_KV = 28
-            key_shapes = []
-            value_shapes = []
-            for i in range(NUM_KV):
-                key_shapes.append(
-                    net.get_blob_shape(
-                        net.find_blob_index_by_name("key_cache_out" + str(i))
-                    )
+            NUM_KV = 24
+            key_shapes = [
+                net.get_blob_shape(
+                    net.find_blob_index_by_name("key_cache_out" + str(i))
                 )
-                value_shapes.append(
-                    net.get_blob_shape(
-                        net.find_blob_index_by_name("value_cache_out" + str(i))
-                    )
+                for i in range(NUM_KV)
+            ]
+            value_shapes = [
+                net.get_blob_shape(
+                    net.find_blob_index_by_name("value_cache_out" + str(i))
                 )
+                for i in range(NUM_KV)
+            ]
             net.set_input_blob_data(input_ids, net.find_blob_index_by_name("input_ids"))
             net.set_input_blob_data(
                 inputs_embeds, net.find_blob_index_by_name("inputs_embeds")
             )
             net.set_input_blob_data(
                 position_ids, net.find_blob_index_by_name("position_ids")
-            )
-            net.set_input_blob_data(
-                attention_mask, net.find_blob_index_by_name("attention_mask")
             )
             for i in range(NUM_KV):
                 net.set_input_blob_shape(
@@ -314,7 +320,9 @@ def forward(
                 net.copy_blob_data("value_cache" + str(i), "value_cache_out" + str(i))
             net.update()
             logits = net.get_blob_data(net.find_blob_index_by_name("logits"))
-            new_past_key_values = None
+            new_past_key_values = [
+                net.get_blob_data(net.find_blob_index_by_name("key_cache_out0"))
+            ]
     else:
         output = net.run(
             None,
@@ -392,21 +400,12 @@ def stopping_criteria(input_ids: np.array) -> np.array:
 def sample(models, input_ids, attention_mask, images, intermediate=False):
     pad_token_id = 7
 
-    if args.benchmark:
-        start = int(round(time.time() * 1000))
-
     if intermediate:
-        print("Encoding..." + "\n\u001B[2A")
         streamer = TextStreamer(models["tokenizer"])
     else:
         streamer = None
 
     past_key_values = [np.zeros((1, 16, 0, 128), dtype=np.float32)] * 48
-
-    if args.benchmark:
-        end = int(round(time.time() * 1000))
-        estimation_time = end - start
-        logger.info(f"\tencode time {estimation_time} ms")
 
     # keep track of which sequences are already finished
     batch_size, cur_len = input_ids.shape
@@ -416,7 +415,7 @@ def sample(models, input_ids, attention_mask, images, intermediate=False):
         np.cumsum(np.ones_like(input_ids[0, :], dtype=np.int64), axis=0) - 1
     )
 
-    first_run = True
+    blob_copy = False
     while True:
         # prepare model inputs
         if 0 < past_key_values[0].shape[-2]:
@@ -437,9 +436,9 @@ def sample(models, input_ids, attention_mask, images, intermediate=False):
             attention_mask,
             images,
             past_key_values,
-            first_run,
+            blob_copy,
         )
-        first_run = False
+        blob_copy = True if COPY_BLOB_DATA else False
 
         if args.benchmark:
             end = int(round(time.time() * 1000))
@@ -577,11 +576,8 @@ def recognize(models):
 
 def main():
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
-    # check_and_download_models(WEIGHT_VIS_PATH, MODEL_VIS_PATH, REMOTE_PATH)
-    # if PB_PATH is not None:
-    #     check_and_download_file(PB_PATH, REMOTE_PATH)
-    # if PB_VIS_PATH is not None:
-    #     check_and_download_file(PB_VIS_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_ENC_PATH, MODEL_ENC_PATH, REMOTE_PATH)
+    check_and_download_file(WEIGHT_PB_PATH, REMOTE_PATH)
 
     env_id = args.env_id
 
