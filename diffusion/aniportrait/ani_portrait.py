@@ -158,6 +158,10 @@ def generate_from_image(nets: dict[str, Any]):
         ref_image = crop_face(ref_image, lmk_extractor)
         fps = 30
         cfg = 3.5
+        length = 60
+        fi_step = 3
+        width = 512
+        height = 512
 
         lmks3d, lmks = lmk_extractor(ref_image)
         # ref_pose = draw_landmarks((ref_image.shape[1], ref_image.shape[0]), lmks, normed=True)
@@ -167,17 +171,18 @@ def generate_from_image(nets: dict[str, Any]):
         sample["audio_feature"] = np.expand_dims(sample["audio_feature"], axis=0)
 
         # inference
-        # if args.onnx:
-        #     pred = nets["a2m_model"].run(
-        #         ["output"],
-        #         {"input_value": sample["audio_feature"], "seq_len": [sample["seq_len"]]}
-        #     )
-        # else:
-        #     pred = nets["a2m_model"].predict(sample["audio_feature"])
+        if args.onnx:
+            pred = nets["a2m_model"].run(
+                ["output"],
+                {"input_value": sample["audio_feature"], "seq_len": [sample["seq_len"]]}
+            )
+            print(f"{pred=}")
+        else:
+            pred = nets["a2m_model"].predict(sample["audio_feature"])
         
-        # pred = pred.squeeze()
-        # pred = pred.reshape(pred.shape[0], -1, 3)
-        # pred = pred + lmks3d
+        pred = pred.squeeze()
+        pred = pred.reshape(pred.shape[0], -1, 3)
+        pred = pred + lmks3d
 
         if args.head_pose_reference_video is not None:
             pose_seq = get_head_pose(lmk_extractor, args.head_pose_reference_video)
@@ -231,6 +236,16 @@ def generate_from_image(nets: dict[str, Any]):
         for i, verts in enumerate(projected_vertices):
             lmk_img = draw_landmarks(verts)
             pose_images.append(lmk_img)
+
+        pose_list = []
+        args_L = len(pose_images) if length == 0 or length > len(pose_images) else length
+        for pose_image_np in pose_images[: args_L : fi_step]:
+            pose_image_np = cv2.resize(pose_image_np, (width, height))
+            pose_list.append(pose_image_np)
+
+        for i, img in enumerate(pose_list, 1):
+            cv2.imwrite(f"pose_{i}.png", img)
+
     else:
         pass
 
