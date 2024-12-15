@@ -43,6 +43,12 @@ def get_model_file_names() -> dict[str, dict[str, str]]:
                 "model": "face_detector.onnx.prototxt",
             },
         },
+        "audio": {
+            "wav2vec2feature_extractor": {
+                "weight": "wav2vec2feature_extractor.onnx",
+                "model": "wav2vec2feature_extractor.onnx.prototxt"
+            }
+        },
     }
 
 

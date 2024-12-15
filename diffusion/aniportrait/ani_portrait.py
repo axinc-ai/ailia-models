@@ -1,3 +1,5 @@
+from math import ceil
+import random
 import numpy as np
 import cv2
 import sys
@@ -7,7 +9,7 @@ from tqdm import tqdm
 import onnxruntime
 from ani_portrait_utils import get_model_file_names
 from lmk_extractor import LMKExtractor
-from facemesh_v2_utils import matrix_to_euler_and_translation, smooth_pose_seq, crop_face
+from facemesh_v2_utils import matrix_to_euler_and_translation, smooth_pose_seq, crop_face, euler_and_translation_to_matrix
 from scipy.interpolate import interp1d
 
 sys.path.append("../../util")
@@ -16,6 +18,7 @@ from arg_utils import get_base_parser, update_parser  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from scheduling_ddim import DDIMScheduler
 import ailia
+from audio_processor import prepare_audio_feature
 
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/AniPortrait/"
 FACEMESH_REMOTE_PATH = "https://storage.googleapis.com/ailia-models/facemesh_v2"
@@ -45,9 +48,9 @@ parser.add_argument("-m", "--mode", choices=MODES)
 args = update_parser(parser, check_input_type=False)
 
 
-def get_head_pose(lmk_extractor):
+def get_head_pose(lmk_extractor: LMKExtractor, video_path):
     trans_mat = []
-    cap = cv2.VideoCapture(args.head_pose_reference_video)
+    cap = cv2.VideoCapture(video_path)
     total_frames = cap.get(cv2.CAP_PROP_FRAME_COUNT)
     fps = cap.get(cv2.CAP_PROP_FPS)
     while True:
@@ -73,16 +76,75 @@ def get_head_pose(lmk_extractor):
         pose_arr[i, 3:6] = translation_vector
 
     new_fps = 30
-    old_time = np.linspace(0, total_frames / fps, total_frames)
+    old_time = np.linspace(0, total_frames / fps, int(total_frames))
     new_time = np.linspace(0, total_frames / fps, int(total_frames * new_fps / fps))
 
-    pose_arr_interp = np.zseros((len(new_time), 6))
+    pose_arr_interp = np.zeros((len(new_time), 6))
     for i in range(6):
         interp_func = interp1d(old_time, pose_arr[:, i])
         pose_arr_interp[:, i] = interp_func(new_time)
 
-    pose_arr_smooth = smooth_pose_seq(pose_arr_interp)
+    pose_arr_smooth = smooth_pose_seq(pose_arr_interp, window_size=5)
     return pose_arr_smooth
+
+
+def draw_landmarks(image_size, keypoints, normed=False):
+    ini_size = [512, 512]
+    image = np.zeros([ini_size[1], ini_size[0], 3], dtype=np.uint8)
+    for i in range(keypoints.shape[0]):
+        x = int(keypoints[i, 0])
+        y = int(keypoints[i, 1])
+        cv2.circle(image, (x, y), 1, (0, 255, 0), -1)
+    return image
+
+
+def smooth_pose_seq(pose_seq, window_size):
+    smoothed_pose_seq = np.zeros_like(pose_seq)
+    
+    for i in range(len(pose_seq)):
+        start = max(0, i - window_size // 2)
+        end = min(len(pose_seq), i + window_size // 2 + 1)
+        smoothed_pose_seq[i] = np.mean(pose_seq[start:end], axis=0)
+
+    return smoothed_pose_seq
+
+
+def create_perspective_matrix(aspect_ratio):
+    k_degrees_to_radians = np.pi / 180.0
+    near = 1
+    far = 10_000
+    perspective_matrix = np.zeros(16, dtype=np.float32)
+
+    f = 1.0 / np.tan(k_degrees_to_radians * 63 / 2.0)
+
+    denom = 1.0 / (near - far)
+    perspective_matrix[0] = f / aspect_ratio
+    perspective_matrix[5] = f
+    perspective_matrix[10] = (near + far) * denom
+    perspective_matrix[11] = -1.0
+    perspective_matrix[14] = 1.0 * far * near * denom
+
+    perspective_matrix[5] *= -1.0
+    return perspective_matrix
+
+
+def project_points(points_3d, trans_mat, pose_vectors, image_shape):
+    P = create_perspective_matrix(image_shape[1] / image_shape[0]).reshape(4, 4).T
+    L, N, _ = points_3d.shape
+    projected_points = np.zeros((L, N, 2))
+
+    for i in range(L):
+        points_3d_frame = points_3d[i]
+        ones = np.ones((points_3d_frame.shape[0], 1))
+        points_3d_homogeneous = np.hstack((points_3d_frame, ones))
+        transformed_points = points_3d_homogeneous @ (trans_mat @ euler_and_traslation_to_matrix(pose_vectors[i][:3])).T @ P
+        projected_points_frame = transformed_points[:, :2] / transformed_points[:, 3, np.newaxis]
+        projected_points_frame[:, 0] = (projected_points_frame[:, 0] + 1) * 0.5 * image_shape[1]
+        projected_points_frame[:, 1] = (projected_points_frame[:, 1] + 1) * 0.5 * image_shape[0]
+        projected_points[i] = projected_points_frame
+
+    return projected_points
+
 
 
 def generate_from_image(nets: dict[str, Any]):
@@ -97,7 +159,78 @@ def generate_from_image(nets: dict[str, Any]):
         fps = 30
         cfg = 3.5
 
-        _, lmks = lmk_extractor(ref_image)
+        lmks3d, lmks = lmk_extractor(ref_image)
+        # ref_pose = draw_landmarks((ref_image.shape[1], ref_image.shape[0]), lmks, normed=True)
+
+        sample = prepare_audio_feature(args.audio, wav2vec_model_path="./pretrained_model/wav2vec2-base-960h")
+        sample["audio_feature"] = sample["audio_feature"].astype(np.float32)
+        sample["audio_feature"] = np.expand_dims(sample["audio_feature"], axis=0)
+
+        # inference
+        # if args.onnx:
+        #     pred = nets["a2m_model"].run(
+        #         ["output"],
+        #         {"input_value": sample["audio_feature"], "seq_len": [sample["seq_len"]]}
+        #     )
+        # else:
+        #     pred = nets["a2m_model"].predict(sample["audio_feature"])
+        
+        # pred = pred.squeeze()
+        # pred = pred.reshape(pred.shape[0], -1, 3)
+        # pred = pred + lmks3d
+
+        if args.head_pose_reference_video is not None:
+            pose_seq = get_head_pose(lmk_extractor, args.head_pose_reference_video)
+            mirrored_pose_seq = np.concatenate((pose_seq, pose_seq[-2:0:-1]), axis=0)
+            pose_seq = np.tile(mirrored_pose_seq, (sample["seq_len"] // len(mirrored_pose_seq) + 1, 1))[:sample["seq_len"]]
+        else:
+            chunk_duration = 5
+            sr = 16_000
+            fps = 30
+            chunk_size = sr * chunk_duration
+
+            audio_chunks = []
+
+            for i in range(ceil(sample["audio_feature"].shape[1] / chunk_size)):
+                audio_chunks.append(
+                    sample["audio_feature"][0, i * chunk_size:(i + 1) * chunk_size].reshape(1, -1)
+                )
+
+            seq_len_list = [chunk_duration * fps] * (len(audio_chunks) - 1) + [sample["seq_len"] % (chunk_duration * fps)]
+
+            audio_chunks[-2] = np.concatenate((audio_chunks[-2], audio_chunks[-1]), axis=1)
+            seq_len_list[-2] = seq_len_list[-2] + seq_len_list[-1]
+            del audio_chunks[-1]
+            del seq_len_list[-1]
+
+            pose_seq = []
+
+            for audio, seq_len in zip(audio_chunks, seq_len_list):
+                print(f"{audio.shape=}")
+                input(">>>")
+                if args.onnx:
+                    pose_seq_chunk = nets["a2p_model"].run(
+                        ["output"],
+                        {"input_value": audio, "seq_len": [seq_len], "id_seed": [random.randint(0, 99)]}
+                    )
+                    print(f"{pose_seq_chunk=}")
+                else:
+                    pose_seq_chunk = nets["a2p_model"].predict(audio)
+
+                pose_seq_chunk = pose_seq_chunk.squeeze()
+                pose_seq_chunk[:, :3] *= 0.5
+                pose_seq.append(pose_seq_chunk)
+
+            pose_seq = np.concatenate(pose_seq, 0)
+            pose_seq = smooth_pose_seq(pose_seq, 7)
+
+        projected_vertices = project_points(pred, trans_mat, pose_seq, (height, width))
+
+        pose_images = []
+
+        for i, verts in enumerate(projected_vertices):
+            lmk_img = draw_landmarks(verts)
+            pose_images.append(lmk_img)
     else:
         pass
 

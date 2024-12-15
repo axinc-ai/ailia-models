@@ -228,3 +228,12 @@ def crop_face(img, lmk_extractor, expand=1.5):
         cropped_img = img[y_min + top:y_max + top, x_min + left:x_max + left]
 
     return cropped_img
+
+def euler_and_translation_to_matrix(euler_angles, translation_vector):
+    rotation = R.from_euler("xyz", euler_angles, degrees=True)
+    rotation_matrix = rotation.as_matrix()
+
+    matrix = np.eye(4)
+    matrix[:3, :3] = rotation_matrix
+    matrix[:3, 3] = translation_vector
+    return matrix
