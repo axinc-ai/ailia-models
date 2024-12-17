@@ -42,6 +42,7 @@ parser = get_base_parser(
     'MiVOLO: Multi-input Transformer for Age and Gender Estimation',
     IMAGE_OR_VIDEO_PATH,
     SAVE_IMAGE_OR_VIDEO_PATH,
+    fp16_support=False
 )
 parser.add_argument(
     '-ng', '--no_gender', action='store_true',
