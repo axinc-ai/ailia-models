@@ -17,7 +17,7 @@ If you would like to try on your computer:
 [ailia MODELS tutorial 日本語版](TUTORIAL_jp.md)
 
 # Supported models
-363 models as of November 26th, 2024
+363 models as of December 17th, 2024
 
 # Latest update
 - 2024.12.17 Add yolov10, yolov11
