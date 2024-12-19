@@ -17,16 +17,14 @@ If you would like to try on your computer:
 [ailia MODELS tutorial 日本語版](TUTORIAL_jp.md)
 
 # Supported models
-361 models as of November 26th, 2024
+363 models as of November 26th, 2024
 
 # Latest update
+- 2024.12.17 Add yolov10, yolov11
 - 2024.11.26 Add fast_sam
 - 2024.11.19 Add qwen2_vl, live_portrait (ailia SDK 1.5)
 - 2024.10.09 Add whisper-v3-turbo
 - 2024.10.02 Add florence2
-- 2024.09.15 Add bert-vits2, pytorch_wavenet
-- 2024.09.12 Add gpt-sovits-v2
-- 2024.09.10 Add segment-anything-2 (video mode)
 - More information in our [Wiki](https://github.com/axinc-ai/ailia-models/wiki)
 
 ## Action recognition
