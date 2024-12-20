@@ -109,6 +109,7 @@ def audio_encode(models, input_audios, input_audio_lengths, audio_span_tokens):
     # feedforward
     net = models["enc"]
     if not args.onnx:
+        # if False:
         output = net.predict([input_audios, padding_mask, input_audio_lengths])
     else:
         output = net.run(
@@ -139,30 +140,42 @@ def audio_encode(models, input_audios, input_audio_lengths, audio_span_tokens):
 def forward(
     models,
     input_ids: np.ndarray,
-    position_ids: np.ndarray,
     attention_mask: np.ndarray,
     audio_info: dict,
     past_key_values: List[np.ndarray],
     blob_copy: bool,
 ):
-    if past_key_values[0].shape[1] == 0:
+    audios = audio_info["input_audios"]
+    audio_span_tokens = audio_info["audio_span_tokens"]
+    input_audio_lengths = audio_info["input_audio_lengths"]
+    if 0 < past_key_values[0].shape[1]:
+        audios = (
+            np.ones(
+                (len(audio_span_tokens), input_ids.shape[1], 4096), dtype=np.float16
+            )
+            * -np.inf
+        )
+    else:
         audio_start_id = 155163
         bos_pos = np.where(input_ids == audio_start_id)
         eos_pos = np.where(input_ids == audio_start_id + 1)
 
         audio_pos = np.stack((bos_pos[0], bos_pos[1], eos_pos[1]), axis=1)
-        audios = audio_info["input_audios"]
-        audio_span_tokens = audio_info["audio_span_tokens"]
-        input_audio_lengths = audio_info["input_audio_lengths"]
 
-        audio_encode(models, audios, input_audio_lengths, audio_span_tokens)
-    else:
-        pass
-
-    if input_ids is None:
-        input_ids = np.zeros((1, 0), dtype=np.int64)
-    if inputs_embeds is None:
-        inputs_embeds = np.zeros((1, 0, 2048), dtype=np.float32)
+        audios = audio_encode(models, audios, input_audio_lengths, audio_span_tokens)
+        lst = []
+        for idx, (i, a, b) in enumerate(audio_pos):
+            lst.append(
+                np.concatenate(
+                    [
+                        np.ones((a, 4096), dtype=np.float16) * -np.inf,
+                        audios[idx],
+                        np.ones((input_ids.shape[1] - b - 1, 4096), dtype=np.float16)
+                        * -np.inf,
+                    ]
+                )
+            )
+        audios = np.stack(lst, axis=0)
 
     net = models["net"]
     if not args.onnx:
@@ -170,14 +183,14 @@ def forward(
             output = net.predict(
                 [
                     input_ids,
-                    position_ids,
-                    inputs_embeds,
+                    attention_mask,
+                    audios,
                     *past_key_values,
                 ]
             )
             logits, new_past_key_values = output[0], output[1:]
         else:
-            NUM_KV = 24
+            NUM_KV = 32
             key_shapes = [
                 net.get_blob_shape(
                     net.find_blob_index_by_name("key_cache_out" + str(i))
@@ -192,11 +205,9 @@ def forward(
             ]
             net.set_input_blob_data(input_ids, net.find_blob_index_by_name("input_ids"))
             net.set_input_blob_data(
-                inputs_embeds, net.find_blob_index_by_name("inputs_embeds")
+                attention_mask, net.find_blob_index_by_name("attention_mask")
             )
-            net.set_input_blob_data(
-                position_ids, net.find_blob_index_by_name("position_ids")
-            )
+            net.set_input_blob_data(audios, net.find_blob_index_by_name("audios"))
             for i in range(NUM_KV):
                 net.set_input_blob_shape(
                     key_shapes[i], net.find_blob_index_by_name("key_cache" + str(i))
@@ -216,8 +227,8 @@ def forward(
             None,
             {
                 "input_ids": input_ids,
-                "position_ids": position_ids,
-                "inputs_embeds": inputs_embeds,
+                "attention_mask": attention_mask,
+                "audios": audios,
                 "key_cache0": past_key_values[0],
                 "value_cache0": past_key_values[1],
                 "key_cache1": past_key_values[2],
@@ -266,6 +277,22 @@ def forward(
                 "value_cache22": past_key_values[45],
                 "key_cache23": past_key_values[46],
                 "value_cache23": past_key_values[47],
+                "key_cache24": past_key_values[48],
+                "value_cache24": past_key_values[49],
+                "key_cache25": past_key_values[50],
+                "value_cache25": past_key_values[51],
+                "key_cache26": past_key_values[52],
+                "value_cache26": past_key_values[53],
+                "key_cache27": past_key_values[54],
+                "value_cache27": past_key_values[55],
+                "key_cache28": past_key_values[56],
+                "value_cache28": past_key_values[57],
+                "key_cache29": past_key_values[58],
+                "value_cache29": past_key_values[59],
+                "key_cache30": past_key_values[60],
+                "value_cache30": past_key_values[61],
+                "key_cache31": past_key_values[62],
+                "value_cache31": past_key_values[63],
             },
         )
         logits, new_past_key_values = output[0], output[1:]
@@ -274,21 +301,21 @@ def forward(
 
 
 def stopping_criteria(input_ids: np.array) -> np.array:
-    max_length = 310
+    max_length = 690
     cur_len = input_ids.shape[-1]
     is_done = cur_len >= max_length
     is_done = np.full(input_ids.shape[0], is_done)
 
-    eos_token_id = np.array([7])
+    eos_token_id = np.array([151643])
     is_done = is_done | np.isin(input_ids[:, -1], eos_token_id)
 
     return is_done
 
 
 def sample(models, input_ids, attention_mask, audio_info):
-    # pad_token_id = 7
+    pad_token_id = 151643
 
-    past_key_values = [np.zeros((1, 0, 32, 128), dtype=np.float32)] * 64
+    past_key_values = [np.zeros((1, 0, 32, 128), dtype=np.float16)] * 64
 
     # keep track of which sequences are already finished
     batch_size, cur_len = input_ids.shape
@@ -302,15 +329,13 @@ def sample(models, input_ids, attention_mask, audio_info):
     while True:
         # prepare model inputs
         if 0 < past_key_values[0].shape[1]:
-            # model_input_ids = input_ids[:, cache_position]
-            pass
+            model_input_ids = input_ids[:, cache_position]
         else:
             model_input_ids = input_ids
         position_ids = attention_mask.astype(np.int32).cumsum(axis=-1) - 1
         position_ids = np.where(attention_mask == 0, 1, position_ids)
         if 0 < past_key_values[0].shape[1]:
-            # position_ids = position_ids[:, -model_input_ids.shape[1] :]
-            pass
+            position_ids = position_ids[:, -1:]
 
         if args.benchmark:
             start = int(round(time.time() * 1000))
@@ -318,7 +343,6 @@ def sample(models, input_ids, attention_mask, audio_info):
         logits, past_key_values = forward(
             models,
             model_input_ids,
-            position_ids,
             attention_mask,
             audio_info,
             past_key_values,
@@ -354,18 +378,12 @@ def sample(models, input_ids, attention_mask, audio_info):
         # update generated ids, model inputs, and length for next step
         input_ids = np.concatenate([input_ids, next_tokens[:, None]], axis=-1)
 
-        if streamer:
-            streamer.put(next_tokens)
-
         unfinished_sequences = unfinished_sequences & ~stopping_criteria(input_ids)
         this_peer_finished = np.max(unfinished_sequences) == 0
         cur_len += 1
 
         if this_peer_finished:
             break
-
-    if streamer is not None:
-        streamer.end()
 
     return input_ids
 
@@ -400,9 +418,6 @@ def recognize(models):
         )
     else:
         output_text = predict(models, None, prompt)
-
-    if not intermediate:
-        print(output_text)
 
     logger.info("Script finished successfully.")
 
