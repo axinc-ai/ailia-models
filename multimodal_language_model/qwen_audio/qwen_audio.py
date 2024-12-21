@@ -1,15 +1,12 @@
+import re
 import sys
 import time
-from typing import List, Tuple
-from io import StringIO
-import platform
+from typing import Dict, List, Optional, Tuple
 
 # logger
 from logging import getLogger  # noqa
 
 import numpy as np
-import cv2
-from PIL import Image
 
 import ailia
 
@@ -17,10 +14,10 @@ import ailia
 sys.path.append("../../util")
 from arg_utils import get_base_parser, update_parser  # noqa
 from model_utils import check_and_download_models, check_and_download_file  # noqa
-from detector_utils import load_image  # noqa
 from math_utils import softmax
 
 from logit_process import logits_processor
+from audio_utils import process_audio
 
 logger = getLogger(__name__)
 
@@ -50,36 +47,12 @@ parser.add_argument(
 parser.add_argument(
     "--disable_ailia_tokenizer", action="store_true", help="disable ailia tokenizer."
 )
-parser.add_argument(
-    "--temperature",
-    type=float,
-    default=0.01,
-    help="temperature from generation_config.json",
-)
-parser.add_argument(
-    "--top_p",
-    type=float,
-    default=0.001,
-    help="top_p from generation_config.json",
-)
-parser.add_argument(
-    "--top_k",
-    type=int,
-    default=1,
-    help="top_k from generation_config.json",
-)
-parser.add_argument(
-    "--max_length",
-    type=int,
-    default=256,
-    help="max_length for generation",
-)
 parser.add_argument("--onnx", action="store_true", help="execute onnxruntime version.")
 args = update_parser(parser)
 
 
 # ======================
-# Model selection
+# Parameters
 # ======================
 
 WEIGHT_PATH = "Qwen-Audio-Chat.onnx"
@@ -88,10 +61,130 @@ MODEL_PATH = "Qwen-Audio-Chat.onnx.prototxt"
 MODEL_ENC_PATH = "Qwen-Audio-Chat_encode.onnx.prototxt"
 PB_PATH = "Qwen-Audio-Chat_weights.pb"
 
+SYSTEM_PROMPT = "You are a helpful assistant."
+
 
 # ======================
 # Secondary Functions
 # ======================
+
+
+def make_context(
+    tokenizer,
+    query: str,
+    history: List[Tuple[str, str]] = None,
+    system: str = "",
+    max_window_size: int = 6144,
+):
+    if history is None:
+        history = []
+
+    im_start, im_end = "<|im_start|>", "<|im_end|>"
+    im_start_tokens = [tokenizer.im_start_id]
+    im_end_tokens = [tokenizer.im_end_id]
+    nl_tokens = tokenizer.encode("\n")
+
+    def _tokenize_str(role, content):
+        audio_info = process_audio(content)
+        return (
+            f"{role}\n{content}",
+            tokenizer.encode(
+                role, allowed_special=set(tokenizer.AUDIO_ST), audio_info=audio_info
+            )
+            + nl_tokens
+            + tokenizer.encode(
+                content,
+                allowed_special=set(tokenizer.AUDIO_ST),
+                audio_info=audio_info,
+            ),
+        )
+
+    system_text, system_tokens_part = _tokenize_str("system", system)
+    system_tokens = im_start_tokens + system_tokens_part + im_end_tokens
+
+    raw_text = ""
+    context_tokens = []
+
+    for turn_query, turn_response in reversed(history):
+        query_text, query_tokens_part, _ = _tokenize_str("user", turn_query)
+        query_tokens = im_start_tokens + query_tokens_part + im_end_tokens
+        if turn_response is not None:
+            response_text, response_tokens_part, _ = _tokenize_str(
+                "assistant", turn_response
+            )
+            response_tokens = im_start_tokens + response_tokens_part + im_end_tokens
+
+            next_context_tokens = nl_tokens + query_tokens + nl_tokens + response_tokens
+            prev_chat = (
+                f"\n{im_start}{query_text}{im_end}\n{im_start}{response_text}{im_end}"
+            )
+        else:
+            next_context_tokens = nl_tokens + query_tokens + nl_tokens
+            prev_chat = f"\n{im_start}{query_text}{im_end}\n"
+
+        current_context_size = (
+            len(system_tokens) + len(next_context_tokens) + len(context_tokens)
+        )
+        if current_context_size < max_window_size:
+            context_tokens = next_context_tokens + context_tokens
+            raw_text = prev_chat + raw_text
+        else:
+            break
+
+    context_tokens = system_tokens + context_tokens
+    raw_text = f"{im_start}{system_text}{im_end}" + raw_text
+    context_tokens += (
+        nl_tokens
+        + im_start_tokens
+        + _tokenize_str("user", query)[1]
+        + im_end_tokens
+        + nl_tokens
+        + im_start_tokens
+        + tokenizer.encode("assistant")
+        + nl_tokens
+    )
+    raw_text += f"\n{im_start}user\n{query}{im_end}\n{im_start}assistant\n"
+
+    return raw_text, context_tokens
+
+
+def decode_tokens(
+    tokens,
+    tokenizer,
+    raw_text_len: int,
+    context_length: int,
+    verbose: bool = False,
+    errors: str = "replace",
+    audio_info: Dict = None,
+) -> str:
+    eod_token_ids = [tokenizer.im_start_id, tokenizer.im_end_id]
+    kwargs = {"audio_info": audio_info}
+
+    end_reason = f"Gen length {len(tokens)}"
+    eod_token_idx = context_length
+    for eod_token_idx in range(context_length, len(tokens)):
+        if tokens[eod_token_idx] in eod_token_ids:
+            end_reason = f"Gen {tokenizer.decode([tokens[eod_token_idx]],**kwargs)!r}"
+            break
+
+    trim_decode_tokens = tokenizer.decode(
+        tokens[:eod_token_idx], errors=errors, **kwargs
+    )[raw_text_len:]
+
+    if verbose:
+        print(
+            "\nRaw Generate w/o EOD:",
+            tokenizer.decode(tokens, errors=errors, **kwargs)[raw_text_len:],
+        )
+        print("\nRaw Generate:", trim_decode_tokens)
+        print("\nEnd Reason:", end_reason)
+
+    trim_decode_tokens = trim_decode_tokens.strip()
+
+    if verbose:
+        print("\nGenerate:", trim_decode_tokens)
+
+    return trim_decode_tokens
 
 
 # ======================
@@ -176,6 +269,7 @@ def forward(
                 )
             )
         audios = np.stack(lst, axis=0)
+        # audios = np.load("audios.npy")
 
     net = models["net"]
     if not args.onnx:
@@ -388,14 +482,50 @@ def sample(models, input_ids, attention_mask, audio_info):
     return input_ids
 
 
-def predict(models, images, message):
-    output = sample(models, input_ids, attention_mask, audio_info)
+def predict(models, query, history: Optional[List[Tuple[str, str]]] = None):
+    if history is None:
+        history = []
+    else:
+        # copy history to avoid modification
+        history = [x for x in history]
+
+    tokenizer = models["tokenizer"]
+    raw_text, context_tokens = make_context(
+        tokenizer,
+        query,
+        history=history,
+        system=SYSTEM_PROMPT,
+    )
+    audio_info = process_audio(raw_text)
+
+    input_ids = np.array([context_tokens])
+    attention_mask = np.ones(input_ids.shape[:2], dtype=np.long)
+    outputs = sample(models, input_ids, attention_mask, audio_info)
+
+    response = decode_tokens(
+        outputs[0],
+        tokenizer,
+        raw_text_len=len(raw_text),
+        context_length=len(context_tokens),
+        audio_info=audio_info,
+    )
+
+    query = "Audio 1:<audio>assets/audio/1272-128104-0000.flac</audio>\nwhat does the person say?"
+    history.append((query, response))
+
+    return response, history
 
 
 def recognize(models):
     prompt = args.prompt
+    audio_urls = args.input
 
     logger.info("Prompt: %s" % prompt)
+
+    tokenizer = models["tokenizer"]
+    query = tokenizer.from_list_format(
+        [{"audio": input} for input in audio_urls] + [{"text": prompt}],
+    )
 
     # inference
     logger.info("Start inference...")
@@ -404,7 +534,7 @@ def recognize(models):
         total_time_estimation = 0
         for i in range(args.benchmark_count):
             start = int(round(time.time() * 1000))
-            output_text = predict(models, None, prompt)
+            response, history = predict(models, query)
             end = int(round(time.time() * 1000))
             estimation_time = end - start
 
@@ -417,7 +547,9 @@ def recognize(models):
             f"\taverage time estimation {total_time_estimation / (args.benchmark_count - 1)} ms"
         )
     else:
-        output_text = predict(models, None, prompt)
+        response, history = predict(models, query)
+
+    print(response)
 
     logger.info("Script finished successfully.")
 
@@ -446,41 +578,24 @@ def main():
 
         providers = ["CUDAExecutionProvider", "CPUExecutionProvider"]
 
-        enc = onnxruntime.InferenceSession(WEIGHT_ENC_PATH, providers=providers)
+        enc = onnxruntime.InferenceSession(
+            WEIGHT_ENC_PATH, providers=["CPUExecutionProvider"]
+        )
+        # enc = None
         net = onnxruntime.InferenceSession(WEIGHT_PATH, providers=providers)
 
-    # # args.disable_ailia_tokenizer = True
-    # if args.disable_ailia_tokenizer:
-    #     import transformers
+    args.disable_ailia_tokenizer = True
+    if args.disable_ailia_tokenizer:
+        import transformers
 
-    #     tokenizer = transformers.Qwen2TokenizerFast.from_pretrained("./tokenizer")
-    # else:
-    #     from ailia_tokenizer import GPT2Tokenizer
-
-    #     tokenizer = GPT2Tokenizer.from_pretrained("./tokenizer")
-    #     tokenizer.add_special_tokens(
-    #         {
-    #             "additional_special_tokens": [
-    #                 "<|end_of_text|>",
-    #                 "<|im_start|>",
-    #                 "<|im_end|>",
-    #                 "<|object_ref_start|>",
-    #                 "<|object_ref_end|>",
-    #                 "<|box_start|>",
-    #                 "<|box_end|>",
-    #                 "<|quad_start|>",
-    #                 "<|quad_end|>",
-    #                 "<|vision_start|>",
-    #                 "<|vision_end|>",
-    #                 "<|vision_pad|>",
-    #                 "<|image_pad|>",
-    #                 "<|video_pad|>",
-    #             ]
-    #         }
-    #     )
+        tokenizer = transformers.AutoTokenizer.from_pretrained(
+            "./tokenizer", trust_remote_code=True
+        )
+    else:
+        raise NotImplementedError
 
     models = {
-        # "tokenizer": tokenizer,
+        "tokenizer": tokenizer,
         "enc": enc,
         "net": net,
     }
