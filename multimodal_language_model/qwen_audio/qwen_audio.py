@@ -1,4 +1,4 @@
-import re
+import os
 import sys
 import time
 from typing import Dict, List, Optional, Tuple
@@ -106,10 +106,10 @@ def make_context(
     context_tokens = []
 
     for turn_query, turn_response in reversed(history):
-        query_text, query_tokens_part, _ = _tokenize_str("user", turn_query)
+        query_text, query_tokens_part = _tokenize_str("user", turn_query)
         query_tokens = im_start_tokens + query_tokens_part + im_end_tokens
         if turn_response is not None:
-            response_text, response_tokens_part, _ = _tokenize_str(
+            response_text, response_tokens_part = _tokenize_str(
                 "assistant", turn_response
             )
             response_tokens = im_start_tokens + response_tokens_part + im_end_tokens
@@ -215,15 +215,14 @@ def audio_encode(models, input_audios, input_audio_lengths, audio_span_tokens):
         )
     x = output[0]
 
-    bos = np.load("bos.npy")
-    eos = np.load("eos.npy")
+    bos = np.load(os.path.join(os.path.dirname(__file__), "bos.npy"))
+    eos = np.load(os.path.join(os.path.dirname(__file__), "eos.npy"))
 
     output_audios = []
     for i in range(len(audio_span_tokens)):
         audio_span = audio_span_tokens[i]
         audio = x[i][: audio_span - 2]
-        if bos is not None:
-            audio = np.concatenate([bos, audio, eos])
+        audio = np.concatenate([bos, audio, eos])
         assert len(audio) == audio_span
         output_audios.append(audio)
 
@@ -269,7 +268,6 @@ def forward(
                 )
             )
         audios = np.stack(lst, axis=0)
-        # audios = np.load("audios.npy")
 
     net = models["net"]
     if not args.onnx:
@@ -510,7 +508,6 @@ def predict(models, query, history: Optional[List[Tuple[str, str]]] = None):
         audio_info=audio_info,
     )
 
-    query = "Audio 1:<audio>assets/audio/1272-128104-0000.flac</audio>\nwhat does the person say?"
     history.append((query, response))
 
     return response, history
@@ -548,6 +545,11 @@ def recognize(models):
         )
     else:
         response, history = predict(models, query)
+
+        # # 2nd dialogue turn
+        # print(response)
+        # query = 'Find the start time and end time of the word "middle classes"'
+        # response, history = predict(models, query, history=history)
 
     print(response)
 
