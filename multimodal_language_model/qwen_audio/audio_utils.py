@@ -1,12 +1,11 @@
-import os
 import re
 from functools import lru_cache
 from subprocess import CalledProcessError, run
-from typing import Optional, Union
 
 import numpy as np
-import torch
-import torch.nn.functional as F
+import librosa
+
+flg_ffmpeg = False
 
 
 # hard-coded audio hyperparameters
@@ -31,83 +30,70 @@ def load_audio(file: str, sr: int = SAMPLE_RATE):
     Open an audio file and read as mono waveform, resampling as necessary
     """
 
-    # This launches a subprocess to decode audio while down-mixing
-    # and resampling as necessary.  Requires the ffmpeg CLI in PATH.
-    # fmt: off
-    cmd = [
-        "ffmpeg",
-        "-nostdin",
-        "-threads", "0",
-        "-i", file,
-        "-f", "s16le",
-        "-ac", "1",
-        "-acodec", "pcm_s16le",
-        "-ar", str(sr),
-        "-"
-    ]
-    # fmt: on
-    try:
-        out = run(cmd, capture_output=True, check=True).stdout
-    except CalledProcessError as e:
-        raise RuntimeError(f"Failed to load audio: {e.stderr.decode()}") from e
+    if flg_ffmpeg:
+        # This launches a subprocess to decode audio while down-mixing
+        # and resampling as necessary.  Requires the ffmpeg CLI in PATH.
+        # fmt: off
+        cmd = [
+            "ffmpeg",
+            "-nostdin",
+            "-threads", "0",
+            "-i", file,
+            "-f", "s16le",
+            "-ac", "1",
+            "-acodec", "pcm_s16le",
+            "-ar", str(sr),
+            "-"
+        ]
+        # fmt: on
+        try:
+            out = run(cmd, capture_output=True, check=True).stdout
+        except CalledProcessError as e:
+            raise RuntimeError(f"Failed to load audio: {e.stderr.decode()}") from e
 
-    return np.frombuffer(out, np.int16).flatten().astype(np.float32) / 32768.0
+        return np.frombuffer(out, np.int16).flatten().astype(np.float32) / 32768.0
+    else:
+        # prepare input data
+        audio, _ = librosa.load(file, sr=sr, mono=True, dtype=np.float32)
+        return audio
 
 
 def pad_or_trim(array, length: int = N_SAMPLES, *, axis: int = -1):
     """
     Pad or trim the audio array to N_SAMPLES, as expected by the encoder.
     """
-    if torch.is_tensor(array):
-        if array.shape[axis] > length:
-            array = array.index_select(
-                dim=axis, index=torch.arange(length, device=array.device)
-            )
+    if array.shape[axis] > length:
+        array = array.take(indices=range(length), axis=axis)
 
-        if array.shape[axis] < length:
-            pad_widths = [(0, 0)] * array.ndim
-            pad_widths[axis] = (0, length - array.shape[axis])
-            array = F.pad(array, [pad for sizes in pad_widths[::-1] for pad in sizes])
-    else:
-        if array.shape[axis] > length:
-            array = array.take(indices=range(length), axis=axis)
-
-        if array.shape[axis] < length:
-            pad_widths = [(0, 0)] * array.ndim
-            pad_widths[axis] = (0, length - array.shape[axis])
-            array = np.pad(array, pad_widths)
+    if array.shape[axis] < length:
+        pad_widths = [(0, 0)] * array.ndim
+        pad_widths[axis] = (0, length - array.shape[axis])
+        array = np.pad(array, pad_widths)
 
     return array
 
 
 @lru_cache(maxsize=None)
-def mel_filters(device, n_mels: int = N_MELS) -> torch.Tensor:
+def mel_filters(n_mels: int = N_MELS):
     """
-    load the mel filterbank matrix for projecting STFT into a Mel spectrogram.
-    Allows decoupling librosa dependency; saved using:
+    the mel filterbank matrix for projecting STFT into a Mel spectrogram.
+    """
+    filters = librosa.filters.mel(sr=SAMPLE_RATE, n_fft=N_FFT, n_mels=n_mels)
 
-        np.savez_compressed(
-            "mel_filters.npz",
-            mel_80=librosa.filters.mel(sr=16000, n_fft=400, n_mels=80),
-        )
-    """
-    assert n_mels == 80, f"Unsupported n_mels: {n_mels}"
-    with np.load(os.path.join(os.path.dirname(__file__), "mel_filters.npz")) as f:
-        return torch.from_numpy(f[f"mel_{n_mels}"]).to(device)
+    return filters
 
 
 def log_mel_spectrogram(
-    audio: Union[str, np.ndarray, torch.Tensor],
+    audio: np.ndarray,
     n_mels: int = N_MELS,
     padding: int = 0,
-    device: Optional[Union[str, torch.device]] = None,
 ):
     """
     Compute the log-Mel spectrogram of
 
     Parameters
     ----------
-    audio: Union[str, np.ndarray, torch.Tensor], shape = (*)
+    audio: np.ndarray, shape = (*)
         The path to audio or either a NumPy array or Tensor containing the audio waveform in 16 kHz
 
     n_mels: int
@@ -121,28 +107,27 @@ def log_mel_spectrogram(
 
     Returns
     -------
-    torch.Tensor, shape = (80, n_frames)
+    np.ndarray, shape = (80, n_frames)
         A Tensor that contains the Mel spectrogram
     """
-    if not torch.is_tensor(audio):
-        if isinstance(audio, str):
-            audio = load_audio(audio)
-        audio = torch.from_numpy(audio)
-
-    if device is not None:
-        audio = audio.to(device)
     if padding > 0:
-        audio = F.pad(audio, (0, padding))
-    window = torch.hann_window(N_FFT).to(audio.device)
-    stft = torch.stft(audio, N_FFT, HOP_LENGTH, window=window, return_complex=True)
-    magnitudes = stft[..., :-1].abs() ** 2
+        audio = np.pad(audio, (0, padding))
+    stft = librosa.stft(
+        y=audio,
+        n_fft=N_FFT,
+        hop_length=HOP_LENGTH,
+        window="hann",
+        pad_mode="reflect",
+    )
+    magnitudes = np.abs(stft[:, :-1]) ** 2
 
-    filters = mel_filters(audio.device, n_mels)
+    filters = mel_filters(n_mels)
     mel_spec = filters @ magnitudes
 
-    log_spec = torch.clamp(mel_spec, min=1e-10).log10()
-    log_spec = torch.maximum(log_spec, log_spec.max() - 8.0)
+    log_spec = np.log10(np.clip(mel_spec, 1e-10, None))
+    log_spec = np.maximum(log_spec, np.max(log_spec) - 8.0)
     log_spec = (log_spec + 4.0) / 4.0
+
     return log_spec
 
 

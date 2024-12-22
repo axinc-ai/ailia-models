@@ -4,7 +4,7 @@ import time
 from typing import Dict, List, Optional, Tuple
 
 # logger
-from logging import getLogger  # noqa
+from logging import getLogger
 
 import numpy as np
 
@@ -583,7 +583,6 @@ def main():
         enc = onnxruntime.InferenceSession(
             WEIGHT_ENC_PATH, providers=["CPUExecutionProvider"]
         )
-        # enc = None
         net = onnxruntime.InferenceSession(WEIGHT_PATH, providers=providers)
 
     args.disable_ailia_tokenizer = True
