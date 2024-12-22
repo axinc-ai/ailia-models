@@ -580,9 +580,7 @@ def main():
 
         providers = ["CUDAExecutionProvider", "CPUExecutionProvider"]
 
-        enc = onnxruntime.InferenceSession(
-            WEIGHT_ENC_PATH, providers=["CPUExecutionProvider"]
-        )
+        enc = onnxruntime.InferenceSession(WEIGHT_ENC_PATH, providers=providers)
         net = onnxruntime.InferenceSession(WEIGHT_PATH, providers=providers)
 
     args.disable_ailia_tokenizer = True
