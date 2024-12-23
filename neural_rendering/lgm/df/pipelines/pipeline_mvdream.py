@@ -31,24 +31,24 @@ def get_camera(
 class MVDreamPipeline():
     def __init__(
         self,
-        image_encoder,
-        text_encoder,
+        unet,
         vae_encoder,
         vae_decoder,
-        unet,
+        text_encoder,
+        image_encoder,
         tokenizer,
         feature_extractor,
         scheduler: DDIMScheduler,
         use_onnx: bool = False,
     ):
-        self.image_encoder = image_encoder
-        self.text_encoder = text_encoder
+        self.unet = unet
         self.vae_encoder = vae_encoder
         self.vae_decoder = vae_decoder
-        self.unet = unet
+        self.text_encoder = text_encoder
+        self.image_encoder = image_encoder
         self.tokenizer = tokenizer
-        self.scheduler = scheduler
         self.feature_extractor = feature_extractor
+        self.scheduler = scheduler
         self.use_onnx = use_onnx
         self.vae_scale_factor = 8
 
@@ -117,8 +117,8 @@ class MVDreamPipeline():
             prompt_embeds = self.text_encoder.run(None, {"input": text_input_ids})[0]
         else:
             prompt_embeds = self.text_encoder.predict({"input": text_input_ids})[0]
-        prompt_embeds = prompt_embeds.astype(np.float16)
 
+        prompt_embeds = prompt_embeds.astype(np.float16)
         bs_embed, seq_len, _ = prompt_embeds.shape
         prompt_embeds = np.repeat(prompt_embeds, num_images_per_prompt, axis=0)
         prompt_embeds = prompt_embeds.reshape(bs_embed * num_images_per_prompt, seq_len, -1)
@@ -157,8 +157,8 @@ class MVDreamPipeline():
                 negative_prompt_embeds = self.text_encoder.run(None, {"input": uncond_input.input_ids})[0]
             else:
                 negative_prompt_embeds = self.text_encoder.predict({"input": uncond_input.input_ids})[0]
-            negative_prompt_embeds = negative_prompt_embeds.astype(np.float16)
 
+            negative_prompt_embeds = negative_prompt_embeds.astype(np.float16)
             seq_len = negative_prompt_embeds.shape[1]
             negative_prompt_embeds = np.repeat(negative_prompt_embeds, num_images_per_prompt, axis=0)
             negative_prompt_embeds = negative_prompt_embeds.reshape(
@@ -168,6 +168,15 @@ class MVDreamPipeline():
             prompt_embeds = np.concatenate([negative_prompt_embeds, prompt_embeds], axis=0)
 
         return prompt_embeds
+    
+    def decode_latents(self, latents):
+        if self.use_onnx:
+            image = self.vae_decoder.run(None, {"input": latents})[0]
+        else:
+            image = self.vae_decoder.predict({"input": latents})[0]
+        image = np.clip((image / 2 + 0.5), 0, 1)
+        image = image.transpose(0, 2, 3, 1).astype(np.float32)
+        return image
 
     def prepare_latents(
         self,
@@ -204,6 +213,7 @@ class MVDreamPipeline():
 
     def encode_image_latents(self, image, num_images_per_prompt):
         image = np.transpose(np.expand_dims(image, axis=0), (0, 3, 1, 2)).astype(np.float16)
+        image = 2 * image - 1
         if self.use_onnx:
             latents = self.vae_encoder.run(None, {"input": image,})[0]
         else:
@@ -222,8 +232,8 @@ class MVDreamPipeline():
 
     def __call__(
         self,
-        prompt: Union[str, List[str]] = "",
         image: Optional[np.ndarray] = None,
+        prompt: Union[str, List[str]] = "",
         height: int = 256,
         width: int = 256,
         elevation: float = 0,
@@ -231,7 +241,7 @@ class MVDreamPipeline():
         guidance_scale: float = 7.0,
         negative_prompt: str = "",
         num_images_per_prompt: int = 1,
-        output_type: Optional[str] = "numpy", # pil, numpy, latents
+        output_type: Optional[str] = "numpy", # numpy, latents
         callback: Optional[Callable[[int, int, np.ndarray], None]] = None,
         callback_steps: int = 1,
         num_frames: int = 4,
@@ -317,16 +327,8 @@ class MVDreamPipeline():
         # Post-processing
         if output_type == "latent":
             image = latents
-        else:
-            if self.use_onnx:
-                decoded_image = self.vae_decoder.run(None, {"input": latents})[0]
-            else:
-                decoded_image = self.vae_decoder.predict({"input": latents})[0]
-            
-            if output_type == "pil":
-                image = self.numpy_to_pil(decoded_image)
-            else:  # numpy
-                image = decoded_image
+        else: # numpy
+            image = self.decode_latents(latents)
 
         # Offload last model to CPU
         if hasattr(self, "final_offload_hook") and self.final_offload_hook is not None:

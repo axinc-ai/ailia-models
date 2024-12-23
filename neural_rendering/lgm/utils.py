@@ -63,14 +63,13 @@ def prepare_default_rays(fovy, cam_radius, input_size, elevation=0):
     
     return rays_embeddings
 
-def preprocess_mvdream_pipeline(image):
+def process_mv_image(image, bg_remover):
     # bg removal
-    bg_remover = rembg.new_session()
-    carved_image = rembg.remove(image, session=bg_remover) # [H, W, 4]
-    mask = carved_image[..., -1] > 0
+    removed_image = rembg.remove(image, session=bg_remover) # [H, W, 4]
+    mask = removed_image[..., -1] > 0
 
     # recenter
-    image = recenter(carved_image, mask, border_ratio=0.2)
+    image = recenter(removed_image, mask, border_ratio=0.2)
     image = image.astype(np.float32) / 255.0
 
     # rgba to rgb white bg
@@ -89,8 +88,7 @@ def resize_images(input_image, target_size):
 def normalize_images(input_image, mean, std):
     mean = np.array(mean, dtype=np.float32)[:, None, None]
     std = np.array(std, dtype=np.float32)[:, None, None]
-    for i in range(input_image.shape[0]):
-        input_image[i] = (input_image[i] - mean) / std
+    input_image = (input_image - mean[None, :, :, :]) / std[None, :, :, :]
     return input_image
 
 def preprocess_lgm_model(mv_image, opt):
@@ -100,7 +98,6 @@ def preprocess_lgm_model(mv_image, opt):
     image = resize_images(image, opt.input_size)
     image = normalize_images(image, IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD)
 
-    image = np.concatenate([image, rays_embeddings], axis=1)[np.newaxis] # [1, 4, 9, H, W]
-    image = image.astype(np.float16)
+    image = np.concatenate([image, rays_embeddings], axis=1).astype(np.float16) # [1, 4, 9, H, W]
 
     return image

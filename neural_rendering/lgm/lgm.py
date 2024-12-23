@@ -5,6 +5,7 @@ import kiui
 from kiui.cam import orbit_camera
 import tqdm
 import transformers
+import rembg
 
 import ailia
 
@@ -19,36 +20,30 @@ logger = getLogger(__name__)
 
 from df.pipelines.pipeline_mvdream import MVDreamPipeline
 from df.schedulers.scheduling_ddim import DDIMScheduler
-from utils import preprocess_mvdream_pipeline, preprocess_lgm_model
+from utils import process_mv_image, preprocess_lgm_model
 from gs import GaussianRenderer
 
 # ======================
 # Parameters
 # ======================
-WEIGHT_UNET_PATH = "unet.onnx"
-# MODEL_UNET_PATH = "unet.onnx.prototxt"
-WEIGHT_TEXT_ENCODER_PATH = "text_encoder.onnx"
-# MODEL_TEXT_ENCODER_PATH = "text_encoder.onnx.prototxt"
-WEIGHT_VAE_DECODER_PATH = "vae_decoder.onnx"
-# MODEL_VAE_DECODER_PATH = "vae_decoder.onnx.prototxt"
+WEIGHT_UNET_IMAGE_PATH = "unet_image.onnx"
+MODEL_UNET_IMAGE_PATH = "unet_image.onnx.prototxt"
+WEIGHT_UNET_TEXT_PATH = "unet_text.onnx"
+MODEL_UNET_TEXT_PATH = "unet_text.onnx.prototxt"
 WEIGHT_VAE_ENCODER_PATH = "vae_encoder.onnx"
-# MODEL_VAE_ENCODER_PATH = "vae_encoder.onnx.prototxt"
+MODEL_VAE_ENCODER_PATH = "vae_encoder.onnx.prototxt"
+WEIGHT_VAE_DECODER_PATH = "vae_decoder.onnx"
+MODEL_VAE_DECODER_PATH = "vae_decoder.onnx.prototxt"
+WEIGHT_TEXT_ENCODER_PATH = "text_encoder.onnx"
+MODEL_TEXT_ENCODER_PATH = "text_encoder.onnx.prototxt"
 WEIGHT_IMAGE_ENCODER_PATH = "image_encoder.onnx"
-# MODEL_IMAGE_ENCODER_PATH = "image_encoder.onnx.prototxt"
+MODEL_IMAGE_ENCODER_PATH = "image_encoder.onnx.prototxt"
 WEIGHT_LGM_PATH = "lgm.onnx"
-# MODEL_LGM_PATH = "lgm.onnx.prototxt"
-
-MODEL_UNET_PATH = None
-MODEL_TEXT_ENCODER_PATH = None
-MODEL_VAE_DECODER_PATH = None
-MODEL_VAE_ENCODER_PATH = None
-MODEL_IMAGE_ENCODER_PATH = None
-MODEL_LGM_PATH = None
+MODEL_LGM_PATH = "lgm.onnx.prototxt"
 
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/lgm/"
 
 INPUT_SIZE = 256
-OUTPUT_SIZE = 256
 FOVY = 49.1
 CAM_RADIUS = 1.5
 ZFAR = 2.5
@@ -63,15 +58,22 @@ parser = get_base_parser(
     'lgm', IMAGE_PATH, SAVE_VIDEO_PATH
 )
 parser.add_argument(
+    "--prompt",
+    metavar="TEXT",
+    type=str,
+    default=None,
+    help="the prompt to render",
+)
+parser.add_argument(
     "--seed",
     type=int,
-    default=None,
+    default=2,
     help="random seed",
 )
 parser.add_argument(
     "--output_size",
     type=int,
-    default=None,
+    default=256,
     help="output size",
 )
 parser.add_argument(
@@ -80,7 +82,9 @@ parser.add_argument(
     help='disable ailia tokenizer.'
 )
 parser.add_argument(
-    '-o', '--onnx', action='store_true',
+    '-o',
+    '--onnx',
+    action='store_true',
     help="Option to use onnxrutime to run or not."
 )
 args = update_parser(parser)
@@ -90,7 +94,7 @@ args = update_parser(parser)
 # ======================
 class Options:
     input_size: int = INPUT_SIZE
-    output_size: int = args.output_size if args.output_size is not None else OUTPUT_SIZE
+    output_size: int = args.output_size
     fovy: float = FOVY
     cam_radius: float = CAM_RADIUS
     zfar: float = ZFAR
@@ -111,37 +115,42 @@ def load_model(weight_path, model_path, env_id=None, memory_mode=None, use_onnx=
     else:
         return ailia.Net(model_path, weight_path, env_id=env_id, memory_mode=memory_mode)
 
-def generate_multi_view_images(image):
+def generate_multi_view_images(
+    input_image, 
+    prompt, 
+    prompt_neg='', 
+    input_elevation=0, 
+    input_num_steps=30
+):
     env_id = args.env_id
     user_onnx = args.onnx
+    bg_remover = rembg.new_session()
 
     model_paths = [
-        (WEIGHT_UNET_PATH, MODEL_UNET_PATH),
-        (WEIGHT_TEXT_ENCODER_PATH, MODEL_TEXT_ENCODER_PATH),
         (WEIGHT_VAE_ENCODER_PATH, MODEL_VAE_ENCODER_PATH),
         (WEIGHT_VAE_DECODER_PATH, MODEL_VAE_DECODER_PATH),
+        (WEIGHT_TEXT_ENCODER_PATH, MODEL_TEXT_ENCODER_PATH),
         (WEIGHT_IMAGE_ENCODER_PATH, MODEL_IMAGE_ENCODER_PATH),
     ]
     for weight, model in model_paths:
         check_and_download_models(weight, model, REMOTE_PATH)
 
     memory_mode = None
-    if not user_onnx:
-        memory_mode = ailia.get_memory_mode(
-            reduce_constant=True,
-            ignore_input_with_initializer=True,
-            reduce_interstage=False,
-            reuse_interstage=True,
-        )
-    unet = load_model(WEIGHT_UNET_PATH, MODEL_UNET_PATH, env_id, memory_mode, user_onnx)
-    text_encoder = load_model(
-        WEIGHT_TEXT_ENCODER_PATH, MODEL_TEXT_ENCODER_PATH, env_id, memory_mode, user_onnx
-    )
+    # if not user_onnx:
+    #     memory_mode = ailia.get_memory_mode(
+    #         reduce_constant=True,
+    #         ignore_input_with_initializer=True,
+    #         reduce_interstage=False,
+    #         reuse_interstage=True,
+    #     )
     vae_encoder = load_model(
         WEIGHT_VAE_ENCODER_PATH, MODEL_VAE_ENCODER_PATH, env_id, memory_mode, user_onnx
     )
     vae_decoder = load_model(
         WEIGHT_VAE_DECODER_PATH, MODEL_VAE_DECODER_PATH, env_id, memory_mode, user_onnx
+    )
+    text_encoder = load_model(
+        WEIGHT_TEXT_ENCODER_PATH, MODEL_TEXT_ENCODER_PATH, env_id, memory_mode, user_onnx
     )
     image_encoder = load_model(
         WEIGHT_IMAGE_ENCODER_PATH, MODEL_IMAGE_ENCODER_PATH, env_id, memory_mode, user_onnx
@@ -173,20 +182,68 @@ def generate_multi_view_images(image):
         "timestep_spacing": "leading",
     })
 
-    mvdream_pipe = MVDreamPipeline(
-        image_encoder=image_encoder,
-        text_encoder=text_encoder,
-        vae_encoder=vae_encoder,
-        vae_decoder=vae_decoder,
-        unet=unet,
-        tokenizer=tokenizer,
-        feature_extractor=feature_extractor,
-        scheduler=scheduler,
-        use_onnx=args.onnx,
-    )
+    # text-conditioned
+    if input_image is None:
+        check_and_download_models(WEIGHT_UNET_TEXT_PATH, MODEL_UNET_TEXT_PATH, REMOTE_PATH)
+        unet_text = load_model(
+            WEIGHT_UNET_TEXT_PATH, MODEL_UNET_TEXT_PATH, env_id, memory_mode, user_onnx
+        )
+        pipe_text = MVDreamPipeline(
+            unet=unet_text,
+            vae_encoder=None,
+            vae_decoder=vae_decoder,
+            text_encoder=text_encoder,
+            image_encoder=None,
+            tokenizer=tokenizer,
+            feature_extractor=None,
+            scheduler=scheduler,
+            use_onnx=args.onnx,
+        )
 
-    logger.info("Generating multi-view images...")
-    mv_image = mvdream_pipe('', image, guidance_scale=5.0, num_inference_steps=30, elevation=0)
+        logger.info("Generating multi-view images...")
+        mv_image_uint8 = pipe_text(
+            image=None,
+            prompt=prompt,
+            negative_prompt=prompt_neg,
+            elevation=input_elevation,
+            num_inference_steps=input_num_steps,
+            guidance_scale=7.5
+        )
+        mv_image_uint8 = (mv_image_uint8 * 255).astype(np.uint8)
+        mv_image = []
+        for i in range(4):
+            image = process_mv_image(mv_image_uint8[i], bg_remover)
+            mv_image.append(image)
+
+    # image-conditioned (may also input text, but no text usually works too)
+    else:
+        check_and_download_models(WEIGHT_UNET_IMAGE_PATH, MODEL_UNET_IMAGE_PATH, REMOTE_PATH)
+        unet_image = load_model(
+            WEIGHT_UNET_IMAGE_PATH, MODEL_UNET_IMAGE_PATH, env_id, memory_mode, user_onnx
+        )
+        pipe_image = MVDreamPipeline(
+            unet=unet_image,
+            vae_encoder=vae_encoder,
+            vae_decoder=vae_decoder,
+            text_encoder=text_encoder,
+            image_encoder=image_encoder,
+            tokenizer=tokenizer,
+            feature_extractor=feature_extractor,
+            scheduler=scheduler,
+            use_onnx=args.onnx,
+        )
+
+        logger.info("Generating multi-view images...")
+        image = process_mv_image(input_image, bg_remover)
+        mv_image = pipe_image(
+            image=image,
+            prompt=prompt,
+            negative_prompt=prompt_neg,
+            elevation=input_elevation,
+            num_inference_steps=input_num_steps,
+            guidance_scale=5.0,
+        )
+        
     mv_image = np.stack([mv_image[1], mv_image[2], mv_image[3], mv_image[0]], axis=0) # [4, 256, 256, 3]
     return mv_image
 
@@ -242,16 +299,24 @@ def render_video(gaussians, opt):
 # Main functions
 # ======================
 def main():
-    seed = args.seed
-    if seed is not None:
-        np.random.seed(seed)
+    kiui.seed_everything(args.seed)
 
-    # load image
-    input_image = kiui.read_image(args.input[0], mode='uint8')
+    # load input
+    if args.prompt is not None:
+        prompt = args.prompt
+        input_image = None
+    else:
+        prompt = ""
+        input_image = kiui.read_image(args.input[0], mode='uint8')
 
     # generate multi-view images
-    processed_image = preprocess_mvdream_pipeline(input_image)
-    multi_view_image = generate_multi_view_images(processed_image)
+    multi_view_image = generate_multi_view_images(
+        input_image=input_image,
+        prompt=prompt,
+        prompt_neg="",
+        input_elevation=0,
+        input_num_steps=30
+    )
 
     # generate gaussians
     processed_mv_image = preprocess_lgm_model(multi_view_image, opt)
