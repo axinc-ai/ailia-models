@@ -126,34 +126,22 @@ def generate_multi_view_images(
     user_onnx = args.onnx
     bg_remover = rembg.new_session()
 
-    model_paths = [
-        (WEIGHT_VAE_ENCODER_PATH, MODEL_VAE_ENCODER_PATH),
-        (WEIGHT_VAE_DECODER_PATH, MODEL_VAE_DECODER_PATH),
-        (WEIGHT_TEXT_ENCODER_PATH, MODEL_TEXT_ENCODER_PATH),
-        (WEIGHT_IMAGE_ENCODER_PATH, MODEL_IMAGE_ENCODER_PATH),
-    ]
-    for weight, model in model_paths:
-        check_and_download_models(weight, model, REMOTE_PATH)
-
     memory_mode = None
-    # if not user_onnx:
-    #     memory_mode = ailia.get_memory_mode(
-    #         reduce_constant=True,
-    #         ignore_input_with_initializer=True,
-    #         reduce_interstage=False,
-    #         reuse_interstage=True,
-    #     )
-    vae_encoder = load_model(
-        WEIGHT_VAE_ENCODER_PATH, MODEL_VAE_ENCODER_PATH, env_id, memory_mode, user_onnx
-    )
+    if not user_onnx:
+        memory_mode = ailia.get_memory_mode(
+            reduce_constant=True,
+            ignore_input_with_initializer=True,
+            reduce_interstage=False,
+            reuse_interstage=True,
+        )
+
+    check_and_download_models(WEIGHT_VAE_DECODER_PATH, MODEL_VAE_DECODER_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_TEXT_ENCODER_PATH, MODEL_TEXT_ENCODER_PATH, REMOTE_PATH)
     vae_decoder = load_model(
         WEIGHT_VAE_DECODER_PATH, MODEL_VAE_DECODER_PATH, env_id, memory_mode, user_onnx
     )
     text_encoder = load_model(
         WEIGHT_TEXT_ENCODER_PATH, MODEL_TEXT_ENCODER_PATH, env_id, memory_mode, user_onnx
-    )
-    image_encoder = load_model(
-        WEIGHT_IMAGE_ENCODER_PATH, MODEL_IMAGE_ENCODER_PATH, env_id, memory_mode, user_onnx
     )
 
     if args.disable_ailia_tokenizer:
@@ -218,8 +206,16 @@ def generate_multi_view_images(
     # image-conditioned (may also input text, but no text usually works too)
     else:
         check_and_download_models(WEIGHT_UNET_IMAGE_PATH, MODEL_UNET_IMAGE_PATH, REMOTE_PATH)
+        check_and_download_models(WEIGHT_VAE_ENCODER_PATH, MODEL_VAE_ENCODER_PATH, REMOTE_PATH)
+        check_and_download_models(WEIGHT_IMAGE_ENCODER_PATH, MODEL_IMAGE_ENCODER_PATH, REMOTE_PATH)
         unet_image = load_model(
             WEIGHT_UNET_IMAGE_PATH, MODEL_UNET_IMAGE_PATH, env_id, memory_mode, user_onnx
+        )
+        vae_encoder = load_model(
+            WEIGHT_VAE_ENCODER_PATH, MODEL_VAE_ENCODER_PATH, env_id, memory_mode, user_onnx
+        )
+        image_encoder = load_model(
+            WEIGHT_IMAGE_ENCODER_PATH, MODEL_IMAGE_ENCODER_PATH, env_id, memory_mode, user_onnx
         )
         pipe_image = MVDreamPipeline(
             unet=unet_image,
