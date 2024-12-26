@@ -20,6 +20,7 @@ If you would like to try on your computer:
 363 models as of December 17th, 2024
 
 # Latest update
+- 2024.12.18 Update ONNX file of prompt encoder for SAM
 - 2024.12.17 Add yolov10, yolov11
 - 2024.11.26 Add fast_sam
 - 2024.11.19 Add qwen2_vl, live_portrait (ailia SDK 1.5)
