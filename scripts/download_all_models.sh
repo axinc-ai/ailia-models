@@ -10,6 +10,7 @@ cd ../../anomaly_detection/padim; python3 padim.py ${OPTION}
 cd ../../anomaly_detection/spade-pytorch; python3 spade-pytorch.py ${OPTION}
 cd ../../anomaly_detection/patchcore; python3 patchcore.py ${OPTION}
 cd ../../anomaly_detection/mahalanobisad; python3 mahalanobisad.py ${OPTION}
+cd ../../audio_language_model/qwen_audio; python3 qwen_audio.py ${OPTION}
 cd ../../audio_processing/crnn_audio_classification; python3 crnn_audio_classification.py ${OPTION}
 cd ../../audio_processing/deepspeech2; python3 deepspeech2.py ${OPTION}
 cd ../../audio_processing/pytorch-dc-tts/; python3 pytorch-dc-tts.py ${OPTION}
@@ -210,7 +211,6 @@ cd ../../image_segmentation/pytorch-fcn; python3 pytorch-fcn.py ${OPTION}
 cd ../../image_segmentation/grounded_sam; python3 grounded_sam.py ${OPTION}
 cd ../../image_segmentation/segment-anything-2; python3 segment-anything-2.py ${OPTION}
 cd ../../image_segmentation/fast_sam; python3 fast_sam.py ${OPTION}
-cd ../../large_audio_language_model/qwen_audio; python3 qwen_audio.py ${OPTION}
 cd ../../large_language_model/llava; python3 llava.py ${OPTION}
 cd ../../landmark_classification/landmarks_classifier_asia; python3 landmarks_classifier_asia.py ${OPTION}
 cd ../../landmark_classification/places365; python3 places365.py ${OPTION}
