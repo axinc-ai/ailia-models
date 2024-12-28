@@ -455,6 +455,12 @@ If you would like to try on your computer:
 | [<img src="image_segmentation/segment-anything-2/output.png" width=128px>](image_segmentation/segment-anything-2/) | [segment-anything-2](/image_segmentation/segment-anything-2/) | [Segment Anything 2](https://github.com/facebookresearch/segment-anything-2) | Pytorch | 1.2.16 and later |
 | [<img src="image_segmentation/fast_sam/output.png" width=128px>](image_segmentation/fast_sam/) | [fast_sam](/image_segmentation/fast_sam/) | [FastSAM](https://github.com/CASIA-IVA-Lab/FastSAM) | Pytorch | 1.2.14 and later |
 
+## Large Audio Language Model
+
+| Model | Reference | Exported From | Supported Ailia Version | Blog |
+|------------:|:------------:|:------------:|:------------:|:------------:|
+|[qwen_audio](/large_audio_language_model/qwen_audio) | [Qwen-Audio](https://github.com/QwenLM/Qwen-Audio) | Pytorch | 1.5.0 and later | |
+
 ## Large Language Model
 
 | Model | Reference | Exported From | Supported Ailia Version | Blog |
