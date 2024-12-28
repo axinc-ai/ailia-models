@@ -497,7 +497,7 @@ def predict(models, query, history: Optional[List[Tuple[str, str]]] = None):
     audio_info = process_audio(raw_text)
 
     input_ids = np.array([context_tokens])
-    attention_mask = np.ones(input_ids.shape[:2], dtype=np.long)
+    attention_mask = np.ones(input_ids.shape[:2], dtype=np.int64)
     outputs = sample(models, input_ids, attention_mask, audio_info)
 
     response = decode_tokens(
