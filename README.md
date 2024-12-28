@@ -8,7 +8,7 @@ The collection of pre-trained, state-of-the-art AI models.
 
 # How to use
 
-Try now on [Google Colaboratory](https://www.ailia.ai/redirect_google_colab)
+Try now on [Google Colaboratory](https://www.ailia.ai/launch_to_colab)
 
 If you would like to try on your computer:
 
