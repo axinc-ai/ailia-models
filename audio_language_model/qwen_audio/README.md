@@ -32,19 +32,9 @@ For the sample wav,
 $ python3 qwen_audio.py
 ```
 
-If you want to specify the input image, put the image path after the `--input` option.  
-```bash
-$ python3 qwen_audio.py --input IMAGE_PATH --prompt "Describe this image."
-```
-
 If you want to specify the audio, put the file path after the `--input` option.
 ```bash
 $ python3 qwen_audio.py --input AUDIO_FILE
-```
-
-By adding the `--video` option, you can input the video.   
-```bash
-$ python3 qwen_audio.py --video VIDEO_PATH --prompt "Describe this video."
 ```
 
 If you want to specify the prompt, put the prompt after the `--prompt` option.  
