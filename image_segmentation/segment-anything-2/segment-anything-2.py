@@ -58,7 +58,7 @@ parser.add_argument(
     help='Number of obj ptr in encoder.'
 )
 parser.add_argument(
-    '-m', '--model_type', default='hiera_t', choices=('hiera_l', 'hiera_b+', 'hiera_s', 'hiera_t'),
+    '-m', '--model_type', default='hiera_l', choices=('hiera_l', 'hiera_b+', 'hiera_s', 'hiera_t'),
     help='Select model.'
 )
 parser.add_argument(
