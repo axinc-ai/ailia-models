@@ -8,7 +8,7 @@ The collection of pre-trained, state-of-the-art AI models.
 
 # How to use
 
-Try now on [Google Colaboratory](https://www.ailia.ai/redirect_google_colab)
+Try now on [Google Colaboratory](https://www.ailia.ai/launch_to_colab)
 
 If you would like to try on your computer:
 
@@ -754,6 +754,7 @@ If you would like to try on your computer:
 | [<img src="super_resolution/rcan-it/output.png" width=128px>](super_resolution/rcan-it/) | [rcan-it](/super_resolution/rcan-it/) | [Revisiting RCAN: Improved Training for Image Super-Resolution](https://github.com/zudi-lin/rcan-it) | Pytorch | 1.2.10 and later |
 | [<img src="super_resolution/swinir/output_classical.png" width=128px>](super_resolution/swinir/) | [swinir](/super_resolution/swinir/) | [SwinIR: Image Restoration Using Swin Transformer](https://github.com/JingyunLiang/SwinIR) | Pytorch | 1.2.12 and later |
 | [<img src="super_resolution/hat/output.png" width=128px>](super_resolution/hat/) | [Hat](/super_resolution/hat/) | [Hat](https://github.com/XPixelGroup/HAT) | Pytorch | 1.2.6 and later |
+| [<img src="super_resolution/span/output.png" width=128px>](super_resolution/span/) | [SPAN](/super_resolution/span/) | [SPAN](https://github.com/hongyuanyu/SPAN) | Pytorch | 1.2.14 and later |
 
 ## Text detection
 
