@@ -42,6 +42,7 @@ parser = get_base_parser(
     'Vision Transformer',
     IMAGE_OR_VIDEO_PATH,
     SAVE_IMAGE_OR_VIDEO_PATH,
+    fp16_support=False
 )
 parser.add_argument(
     '-m', '--model', metavar='MODEL',
@@ -268,10 +269,6 @@ def recognize_from_video():
 def main():
     # model files check and download
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
-
-    if "FP16" in ailia.get_environment(args.env_id).props or platform.system() == 'Darwin':
-        logger.warning('This model do not work on FP16. So use CPU mode.')
-        args.env_id = 0
 
     if args.video is not None:
         # video mode
