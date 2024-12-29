@@ -33,7 +33,7 @@ $ python3 span.py --input IMAGE_PATH --savepath SAVE_IMAGE_PATH
 
 By adding the `--arch` option, you can specify model type which is selected from "span_ch48","span_ch52".  (default is span_ch48)
 ```bash
-$ python3 span.py --arch span
+$ python3 span.py --arch ARCH
 ```
 
 If you want to specify the scale for the resolution, put the scale after the `--scale` option.  
