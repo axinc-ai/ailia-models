@@ -17,9 +17,10 @@ If you would like to try on your computer:
 [ailia MODELS tutorial 日本語版](TUTORIAL_jp.md)
 
 # Supported models
-363 models as of December 17th, 2024
+363 models as of December 29th, 2024
 
 # Latest update
+- 2024.12.29 Add SAM2.1, span
 - 2024.12.18 Update ONNX file of prompt encoder for SAM
 - 2024.12.17 Add yolov10, yolov11
 - 2024.11.26 Add fast_sam
