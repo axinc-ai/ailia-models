@@ -65,8 +65,10 @@ def get_1d_sine_pe(pos_inds, dim, temperature=10000):
     dim_t = np.arange(pe_dim, dtype=np.float32)
     dim_t = temperature ** (2 * (dim_t // 2) / pe_dim)
 
-    pos_embed = pos_inds.unsqueeze(-1) / dim_t
-    pos_embed = np.concatenate([pos_embed.sin(), pos_embed.cos()], axis=-1)
+    #pos_embed = pos_inds.unsqueeze(-1) / dim_t
+    pos_embed = np.expand_dims(pos_inds, axis=-1) / dim_t
+    #pos_embed = np.concatenate([np.sin(pos_embed), np.cos(pos_embed)], axis=-1)
+    pos_embed = np.concatenate([np.sin(pos_embed), np.cos(pos_embed)], axis=-1)
     return pos_embed
 
 def concat_points(old_point_inputs, new_points, new_labels):
@@ -296,7 +298,8 @@ class SAM2VideoPredictor():
         mask_decoder=None,
         memory_attention=None,
         memory_encoder=None,
-        mlp=None
+        mlp=None,
+        obj_ptr_tpos_proj=None
     ):
         """Add new points to a frame."""
         obj_idx = self._obj_id_to_idx(inference_state, obj_id)
@@ -408,7 +411,8 @@ class SAM2VideoPredictor():
             mask_decoder=mask_decoder,
             memory_attention=memory_attention,
             memory_encoder=memory_encoder,
-            mlp=mlp
+            mlp=mlp,
+            obj_ptr_tpos_proj=obj_ptr_tpos_proj
         )
         # Add the output to the output dict (to be used as future memory)
         obj_temp_output_dict[storage_key][frame_idx] = current_out
@@ -421,7 +425,7 @@ class SAM2VideoPredictor():
             is_cond=is_cond,
             run_mem_encoder=False,
             consolidate_at_video_res=True,
-            image_encoder=image_encoder, prompt_encoder=prompt_encoder, mask_decoder=mask_decoder, memory_encoder=memory_encoder, mlp=mlp
+            image_encoder=image_encoder, prompt_encoder=prompt_encoder, mask_decoder=mask_decoder, memory_encoder=memory_encoder, mlp=mlp, obj_ptr_tpos_proj=obj_ptr_tpos_proj
         )
         _, video_res_masks = self._get_orig_video_res_output(
             inference_state, consolidated_out["pred_masks_video_res"]
@@ -560,7 +564,8 @@ class SAM2VideoPredictor():
         mask_decoder=None,
         memory_attention=None,
         memory_encoder=None,
-        mlp=None
+        mlp=None,
+        obj_ptr_tpos_proj=None
     ):
         """
         Consolidate the per-object temporary outputs in `temp_output_dict_per_obj` on
@@ -625,7 +630,7 @@ class SAM2VideoPredictor():
                 if run_mem_encoder:
                     if empty_mask_ptr is None:
                         empty_mask_ptr = self._get_empty_mask_ptr(
-                            inference_state, frame_idx, image_encoder, prompt_encoder, mask_decoder, memory_attention, memory_encoder, mlp
+                            inference_state, frame_idx, image_encoder, prompt_encoder, mask_decoder, memory_attention, memory_encoder, mlp, obj_ptr_tpos_proj
                         )
                     # fill object pointer with a dummy pointer (based on an empty mask)
                     consolidated_out["obj_ptr"][obj_idx : obj_idx + 1] = empty_mask_ptr
@@ -744,7 +749,7 @@ class SAM2VideoPredictor():
                 consolidated_out = self._consolidate_temp_output_across_obj(
                     inference_state, frame_idx, is_cond=is_cond, run_mem_encoder=True,
                     image_encoder=image_encoder, prompt_encoder=prompt_encoder, mask_decoder=mask_decoder, memory_attention=memory_attention,
-                    memory_encoder=memory_encoder, mlp=mlp
+                    memory_encoder=memory_encoder, mlp=mlp, obj_ptr_tpos_proj=obj_ptr_tpos_proj
                 )
                 # merge them into "output_dict" and also create per-object slices
                 output_dict[storage_key][frame_idx] = consolidated_out
@@ -860,7 +865,8 @@ class SAM2VideoPredictor():
                     mask_decoder=mask_decoder,
                     memory_attention=memory_attention,
                     memory_encoder=memory_encoder,
-                    mlp=mlp
+                    mlp=mlp,
+                    obj_ptr_tpos_proj=obj_ptr_tpos_proj
                 )
                 output_dict[storage_key][frame_idx] = current_out
             # Create slices of per-object outputs for subsequent interaction with each
@@ -1696,18 +1702,20 @@ class SAM2VideoPredictor():
                     if self.add_tpos_enc_to_obj_ptrs:
                         t_diff_max = max_obj_ptrs_in_encoder - 1
                         tpos_dim = C if self.proj_tpos_enc_in_obj_ptrs else self.mem_dim
-                        obj_pos = pos_list
+                        obj_pos = np.array(pos_list)
                         obj_pos = get_1d_sine_pe(obj_pos / t_diff_max, dim=tpos_dim)
 
-                        tpos = np.zeros((obj_pos.shape[0], 64))
+                        tpos = np.zeros((obj_pos.shape[0], 64), np.float32)
                         for i in range(obj_pos.shape[0]):
                             if self.onnx:
-                                tpos[i:i+1,:] = obj_ptr_tpos_proj.run(None, {"obj_pos": obj_pos[i:i+1,:].astype(np.float32)})[0]
+                                tpos[i:i+1,:] = obj_ptr_tpos_proj.run(None, {"x": obj_pos[i:i+1,:].astype(np.float32)})[0]
                             else:
-                                tpos[i:i+1,:] = obj_ptr_tpos_proj.run({"obj_pos": obj_pos[i:i+1,:].astype(np.float32)})[0]
+                                tpos[i:i+1,:] = obj_ptr_tpos_proj.run({"x": obj_pos[i:i+1,:].astype(np.float32)})[0]
                         obj_pos = tpos
 
-                        obj_pos = obj_pos.unsqueeze(1).expand(-1, B, self.mem_dim)
+                        #obj_pos = obj_pos.unsqueeze(1).expand(-1, B, self.mem_dim)
+                        obj_pos_expanded = np.expand_dims(obj_pos, axis=1) # numpy
+                        obj_pos = np.tile(obj_pos_expanded, (1, B, 1))
                     else:
                         obj_pos = np.zeros((len(pos_list), B, self.mem_dim), dtype=np.float32)
                     if self.mem_dim < C:
