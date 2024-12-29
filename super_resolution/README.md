@@ -6,6 +6,7 @@ Increases the resolution of the input image.
 
 |Name|PSNR (BSD100)|Dataset|Publish Date|
 |-----|-----|-----|-----|
+|[span](./span/)|32.22|Photo|2023
 |[real-esrgan](./real-esrgan/)|N/A|Photo, Anime|2021|
 |[han](./han/)|27.85|Photo|2020|
 |[edsr](./edsr/)|27.71|Photo|2017|
