@@ -150,10 +150,6 @@ ONNX opset=17
 - [memory_encoder_hiera_t.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/segment-anything-2/memory_encoder_hiera_t.onnx.prototxt)  
 - [mlp_hiera_t.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/segment-anything-2/mlp_hiera_t.onnx.prototxt)  
 
-#### Model information
-
-memory_attention.onnx uses a 6-dimensional Matmul. memory_attention.opt.onnx can be implemented using a 4-dimensional Matmul instead of fixing the batch size to 1.
-
 ### SAM2.1
 
 #### hiera_l
@@ -161,7 +157,7 @@ memory_attention.onnx uses a 6-dimensional Matmul. memory_attention.opt.onnx can
 - [image_encoder_hiera_l_2.1.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/segment-anything-2.1/image_encoder_hiera_l_2.1.onnx.prototxt)  
 - [mask_decoder_hiera_l_2.1.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/segment-anything-2.1/mask_decoder_hiera_l_2.1.onnx.prototxt)  
 - [prompt_encoder_hiera_l_2.1.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/segment-anything-2.1/prompt_encoder_hiera_l_2.1.onnx.prototxt)  
-- [memory_attention_hiera_l_2.1.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/segment-anything-2.1/memory_attention_hiera_l_2.1.onnx.prototxt)  
+- [memory_attention_hiera_l_2.1.opt.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/segment-anything-2.1/memory_attention_hiera_l_2.1.opt.onnx.prototxt)  
 - [memory_encoder_hiera_l_2.1.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/segment-anything-2.1/memory_encoder_hiera_l_2.1.onnx.prototxt)  
 - [mlp_hiera_l_2.1.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/segment-anything-2.1/mlp_hiera_l_2.1.onnx.prototxt)  
 - [obj_ptr_tpos_proj_hiera_l_2.1.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/segment-anything-2.1/obj_ptr_tpos_proj_hiera_l_2.1.onnx.prototxt)  
@@ -171,7 +167,7 @@ memory_attention.onnx uses a 6-dimensional Matmul. memory_attention.opt.onnx can
 - [image_encoder_hiera_b+_2.1.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/segment-anything-2.1/image_encoder_hiera_b+_2.1.onnx.prototxt)  
 - [mask_decoder_hiera_b+_2.1.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/segment-anything-2.1/mask_decoder_hiera_b+_2.1.onnx.prototxt)  
 - [prompt_encoder_hiera_b+_2.1.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/segment-anything-2.1/prompt_encoder_hiera_b+_2.1.onnx.prototxt)  
-- [memory_attention_hiera_b+_2.1.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/segment-anything-2.1/memory_attention_hiera_b+_2.1.onnx.prototxt)  
+- [memory_attention_hiera_b+_2.1.opt.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/segment-anything-2.1/memory_attention_hiera_b+_2.1.opt.onnx.prototxt)  
 - [memory_encoder_hiera_b+_2.1.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/segment-anything-2.1/memory_encoder_hiera_b+_2.1.onnx.prototxt)  
 - [mlp_hiera_b+_2.1.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/segment-anything-2.1/mlp_hiera_b+_2.1.onnx.prototxt)  
 - [obj_ptr_tpos_proj_hiera_b+_2.1.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/segment-anything-2.1/obj_ptr_tpos_proj_hiera_b+_2.1.onnx.prototxt)  
@@ -181,7 +177,7 @@ memory_attention.onnx uses a 6-dimensional Matmul. memory_attention.opt.onnx can
 - [image_encoder_hiera_s_2.1.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/segment-anything-2.1/image_encoder_hiera_s_2.1.onnx.prototxt)  
 - [mask_decoder_hiera_s_2.1.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/segment-anything-2.1/mask_decoder_hiera_s_2.1.onnx.prototxt)  
 - [prompt_encoder_hiera_s_2.1.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/segment-anything-2.1/prompt_encoder_hiera_s_2.1.onnx.prototxt)  
-- [memory_attention_hiera_s_2.1.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/segment-anything-2.1/memory_attention_hiera_s_2.1.onnx.prototxt)  
+- [memory_attention_hiera_s_2.1.opt.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/segment-anything-2.1/memory_attention_hiera_s_2.1.opt.onnx.prototxt)  
 - [memory_encoder_hiera_s_2.1.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/segment-anything-2.1/memory_encoder_hiera_s_2.1.onnx.prototxt)  
 - [mlp_hiera_s_2.1.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/segment-anything-2.1/mlp_hiera_s_2.1.onnx.prototxt)  
 - [obj_ptr_tpos_proj_hiera_s_2.1.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/segment-anything-2.1/obj_ptr_tpos_proj_hiera_s_2.1.onnx.prototxt)  
@@ -191,11 +187,11 @@ memory_attention.onnx uses a 6-dimensional Matmul. memory_attention.opt.onnx can
 - [image_encoder_hiera_t_2.1.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/segment-anything-2.1/image_encoder_hiera_t_2.1.onnx.prototxt)  
 - [mask_decoder_hiera_t_2.1.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/segment-anything-2.1/mask_decoder_hiera_t_2.1.onnx.prototxt)  
 - [prompt_encoder_hiera_t_2.1.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/segment-anything-2.1/prompt_encoder_hiera_t_2.1.onnx.prototxt)  
-- [memory_attention_hiera_t_2.1.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/segment-anything-2.1/memory_attention_hiera_t_2.1.onnx.prototxt)  
+- [memory_attention_hiera_t_2.1.opt.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/segment-anything-2.1/memory_attention_hiera_t_2.1.opt.onnx.prototxt)  
 - [memory_encoder_hiera_t_2.1.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/segment-anything-2.1/memory_encoder_hiera_t_2.1.onnx.prototxt)  
 - [mlp_hiera_t_2.1.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/segment-anything-2.1/mlp_hiera_t_2.1.onnx.prototxt)  
 - [obj_ptr_tpos_proj_hiera_t_2.1.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/segment-anything-2.1/obj_ptr_tpos_proj_hiera_t_2.1.onnx.prototxt)  
 
-#### Model information
+## Model information
 
-memory_attention.onnx can be implemented using a 4-dimensional Matmul instead of fixing the batch size to 1.
+memory_attention.onnx uses a 6-dimensional Matmul. memory_attention.opt.onnx can be implemented using a 4-dimensional Matmul instead of fixing the batch size to 1.

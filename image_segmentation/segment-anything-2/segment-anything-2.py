@@ -404,11 +404,8 @@ def main():
         MODEL_MEMORY_ATTENTION_L_PATH = 'memory_attention_'+model_type+'.onnx.prototxt'
     else:
         # 4dim matmul with batch 1
-        opt_id = ".opt"
-        if args.version == "2.1":
-            opt_id = ""
-        WEIGHT_MEMORY_ATTENTION_L_PATH = 'memory_attention_'+model_type+opt_id+'.onnx'
-        MODEL_MEMORY_ATTENTION_L_PATH = 'memory_attention_'+model_type+opt_id+'.onnx.prototxt'
+        WEIGHT_MEMORY_ATTENTION_L_PATH = 'memory_attention_'+model_type+'.opt.onnx'
+        MODEL_MEMORY_ATTENTION_L_PATH = 'memory_attention_'+model_type+'.opt.onnx.prototxt'
     WEIGHT_MEMORY_ENCODER_L_PATH = 'memory_encoder_'+model_type+'.onnx'
     MODEL_MEMORY_ENCODER_L_PATH = 'memory_encoder_'+model_type+'.onnx.prototxt'
     WEIGHT_MLP_L_PATH = 'mlp_'+model_type+'.onnx'
