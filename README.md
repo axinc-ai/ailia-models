@@ -8,7 +8,7 @@ The collection of pre-trained, state-of-the-art AI models.
 
 # How to use
 
-Try now on [Google Colaboratory](https://www.ailia.ai/redirect_google_colab)
+Try now on [Google Colaboratory](https://www.ailia.ai/launch_to_colab)
 
 If you would like to try on your computer:
 
@@ -17,15 +17,15 @@ If you would like to try on your computer:
 [ailia MODELS tutorial 日本語版](TUTORIAL_jp.md)
 
 # Supported models
-360 models as of November 19th, 2024
+363 models as of December 17th, 2024
 
 # Latest update
+- 2024.12.18 Update ONNX file of prompt encoder for SAM
+- 2024.12.17 Add yolov10, yolov11
+- 2024.11.26 Add fast_sam
 - 2024.11.19 Add qwen2_vl, live_portrait (ailia SDK 1.5)
 - 2024.10.09 Add whisper-v3-turbo
 - 2024.10.02 Add florence2
-- 2024.09.15 Add bert-vits2, pytorch_wavenet
-- 2024.09.12 Add gpt-sovits-v2
-- 2024.09.10 Add segment-anything-2 (video mode)
 - More information in our [Wiki](https://github.com/axinc-ai/ailia-models/wiki)
 
 ## Action recognition
@@ -322,7 +322,7 @@ If you would like to try on your computer:
 | [<img src="generative_adversarial_networks/sam/img/input.jpg" width=128px>](generative_adversarial_networks/sam/) | [sam](/generative_adversarial_networks/sam)| [Age Transformation Using a Style-Based Regression Model](https://github.com/yuval-alaluf/SAM)| Pytorch | 1.2.9 and later |
 | [<img src="generative_adversarial_networks/encoder4editing/output.png" width=128px>](generative_adversarial_networks/encoder4editing/) | [encoder4editing](/generative_adversarial_networks/encoder4editing/) | [Designing an Encoder for StyleGAN Image Manipulation](https://github.com/omertov/encoder4editing) | Pytorch | 1.2.10 and later | |
 | [<img src="generative_adversarial_networks/lipgan/input.jpg" width=128px>](generative_adversarial_networks/lipgan/) | [lipgan](/generative_adversarial_networks/lipgan/) | [LipGAN](https://github.com/Rudrabha/LipGAN) | Keras | 1.2.15 and later | [JP](https://medium.com/axinc/lipgan-%E3%83%AA%E3%83%83%E3%83%97%E3%82%B7%E3%83%B3%E3%82%AF%E5%8B%95%E7%94%BB%E3%82%92%E7%94%9F%E6%88%90%E3%81%99%E3%82%8B%E6%A9%9F%E6%A2%B0%E5%AD%A6%E7%BF%92%E3%83%A2%E3%83%87%E3%83%AB-57511508eaff) |
-| [<img src="generative_adversarial_networks/live_portrait/s6.jpg" width=128px>](generative_adversarial_networks/live_portrait/) | [live_portrait](/generative_adversarial_networks/live_portrait)| [LivePortrait](https://github.com/KwaiVGI/LivePortrait) | Pytorch | 1.5.0 and later |
+| [<img src="generative_adversarial_networks/live_portrait/s6.jpg" width=128px>](generative_adversarial_networks/live_portrait/) | [live_portrait](/generative_adversarial_networks/live_portrait)| [LivePortrait](https://github.com/KwaiVGI/LivePortrait) | Pytorch | 1.5.0 and later | [JP](https://medium.com/axinc/live-portrait-1%E6%9E%9A%E3%81%AE%E7%94%BB%E5%83%8F%E3%82%92%E5%8B%95%E3%81%8B%E3%81%9B%E3%82%8Bai%E3%83%A2%E3%83%87%E3%83%AB-8eaa7d3eb683)|
 
 ## Hand detection
 
@@ -453,6 +453,7 @@ If you would like to try on your computer:
 | [<img src="image_segmentation/pytorch-fcn/result.jpg" width=128px>](image_segmentation/pytorch-fcn/) | [pytorch-fcn](/image_segmentation/pytorch-fcn/) | [pytorch-fcn](https://github.com/wkentaro/pytorch-fcn) | Pytorch | 1.3.0 and later |
 | [<img src="image_segmentation/grounded_sam/output.png" width=128px>](image_segmentation/grounded_sam/) | [grounded_sam](/image_segmentation/grounded_sam/) | [Grounded-SAM](https://github.com/IDEA-Research/Grounded-Segment-Anything/tree/main) | Pytorch | 1.2.16 and later |
 | [<img src="image_segmentation/segment-anything-2/output.png" width=128px>](image_segmentation/segment-anything-2/) | [segment-anything-2](/image_segmentation/segment-anything-2/) | [Segment Anything 2](https://github.com/facebookresearch/segment-anything-2) | Pytorch | 1.2.16 and later |
+| [<img src="image_segmentation/fast_sam/output.png" width=128px>](image_segmentation/fast_sam/) | [fast_sam](/image_segmentation/fast_sam/) | [FastSAM](https://github.com/CASIA-IVA-Lab/FastSAM) | Pytorch | 1.2.14 and later |
 
 ## Large Language Model
 
@@ -600,6 +601,8 @@ If you would like to try on your computer:
 | [<img src="object_detection/yolov8/output.png" width=128px>](object_detection/yolov8/) | [yolov8](/object_detection/yolov8/) | [YOLOv8](https://github.com/ultralytics/ultralytics) | Pytorch | 1.2.14.1 and later | |
 | [<img src="object_detection/yolov8-seg/output.png" width=128px>](object_detection/yolov8-seg/) | [yolov8-seg](/object_detection/yolov8-seg/) | [YOLOv8](https://github.com/ultralytics/ultralytics) | Pytorch | 1.2.14.1 and later |  |
 | [<img src="object_detection/yolov9/output.png" width=128px>](object_detection/yolov9/) | [yolov9](/object_detection/yolov9/) | [YOLOv9](https://github.com/WongKinYiu/yolov9) | Pytorch | 1.2.10 and later |  |
+| [<img src="object_detection/yolov10/output.png" width=128px>](object_detection/yolov10/) | [yolov10](/object_detection/yolov10/) | [YOLOv10](https://github.com/THU-MIG/yolov10) | Pytorch | 1.2.11 and later |  |
+| [<img src="object_detection/yolov11/output.png" width=128px>](object_detection/yolov11/) | [yolov11](/object_detection/yolov11/) | [YOLOv11](https://github.com/ultralytics/ultralytics) | Pytorch | 1.2.14 and later |  |
 | [<img src="object_detection/yolor/output.jpg" width=128px>](object_detection/yolor/) | [yolor](/object_detection/yolor/) | [yolor](https://github.com/WongKinYiu/yolor/tree/paper) | Pytorch | 1.2.5 and later |
 | [<img src="object_detection/yolox/output.jpg" width=128px>](object_detection/yolox/) | [yolox](/object_detection/yolox/) | [YOLOX](https://github.com/Megvii-BaseDetection/YOLOX) | Pytorch | 1.2.6 and later | [EN](https://medium.com/axinc-ai/yolox-object-detection-model-exceeding-yolov5-d6cea6d3c4bc) [JP](https://medium.com/axinc/yolox-yolov5%E3%82%92%E8%B6%85%E3%81%88%E3%82%8B%E7%89%A9%E4%BD%93%E6%A4%9C%E5%87%BA%E3%83%A2%E3%83%87%E3%83%AB-e9706e15fef2) |
 | [<img src="object_detection/yolox-ti-lite/output.jpg" width=128px>](object_detection/yolox-ti-lite/) | [yolox-ti-lite](/object_detection/yolox-ti-lite/) | [edgeai-yolox](https://github.com/TexasInstruments/edgeai-yolox) | Pytorch | 1.2.9 and later | |

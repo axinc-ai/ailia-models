@@ -59,5 +59,12 @@ ONNX opset = 11
 
 ## Netron
 
+### Original model
+
 [mivolo.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/mivolo/mivolo.onnx.prototxt)  
 [yolov8x_person_face.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/mivolo/yolov8x_person_face.onnx.prototxt)
+
+### ax retrained model
+
+[yoloxs_person_face.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/mivolo/yoloxs_person_face.onnx.prototxt)  
+[yoloxx_person_face.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/mivolo/yoloxx_person_face.onnx.prototxt)

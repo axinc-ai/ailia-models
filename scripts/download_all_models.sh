@@ -209,6 +209,7 @@ cd ../../image_segmentation/tusimple-DUC; python3 tusimple_DUC.py ${OPTION}
 cd ../../image_segmentation/pytorch-fcn; python3 pytorch-fcn.py ${OPTION}
 cd ../../image_segmentation/grounded_sam; python3 grounded_sam.py ${OPTION}
 cd ../../image_segmentation/segment-anything-2; python3 segment-anything-2.py ${OPTION}
+cd ../../image_segmentation/fast_sam; python3 fast_sam.py ${OPTION}
 cd ../../large_language_model/llava; python3 llava.py ${OPTION}
 cd ../../landmark_classification/landmarks_classifier_asia; python3 landmarks_classifier_asia.py ${OPTION}
 cd ../../landmark_classification/places365; python3 places365.py ${OPTION}
@@ -264,6 +265,8 @@ cd ../../object_detection/yolov7; python3 yolov7.py ${OPTION}
 cd ../../object_detection/yolov8; python3 yolov8.py ${OPTION}
 cd ../../object_detection/yolov8-seg; python3 yolov8-seg.py ${OPTION}
 cd ../../object_detection/yolov9; python3 yolov9.py ${OPTION}
+cd ../../object_detection/yolov10; python3 yolov10.py ${OPTION}
+cd ../../object_detection/yolov11; python3 yolov11.py ${OPTION}
 cd ../../object_detection/yolox; python3 yolox.py ${OPTION}
 cd ../../object_detection/yolox-ti-lite; python3 yolox-ti-lite.py ${OPTION}
 cd ../../object_detection/yolov; python3 yolov.py ${OPTION}
