@@ -32,7 +32,7 @@ parser = get_base_parser(
     'Swift Parameter-free Attention Network for Efficient Super-Resolution', IMAGE_PATH, SAVE_IMAGE_PATH
 )
 parser.add_argument(
-    '--arch', default="HAT", type=str, choices=["span_ch48","span_ch52"],
+    '--arch', default="span_ch48", type=str, choices=["span_ch48","span_ch52"],
 )
 parser.add_argument(
     '--scale', default=2, type=int, choices=[2,4],
