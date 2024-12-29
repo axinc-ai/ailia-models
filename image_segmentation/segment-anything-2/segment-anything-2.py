@@ -70,7 +70,7 @@ parser.add_argument(
     help='Use normal version of onnx model. Normal version requires 6 dim matmul.'
 )
 parser.add_argument(
-    '--version', default='2.1', choices=('2', '2.1'),
+    '--version', default='2', choices=('2', '2.1'),
     help='Select model.'
 )
 
@@ -396,27 +396,28 @@ def main():
     MODEL_PROMPT_ENCODER_L_PATH = 'prompt_encoder_'+model_type+'.onnx.prototxt'
     WEIGHT_MASK_DECODER_L_PATH = 'mask_decoder_'+model_type+'.onnx'
     MODEL_MASK_DECODER_L_PATH = 'mask_decoder_'+model_type+'.onnx.prototxt'
-    if args.normal or args.version == "2.1":
+    if args.normal:
         # 6dim matmul
+        if args.version == "2.1":
+            raise Exception("SAM2.1 not exported normal model.")
         WEIGHT_MEMORY_ATTENTION_L_PATH = 'memory_attention_'+model_type+'.onnx'
         MODEL_MEMORY_ATTENTION_L_PATH = 'memory_attention_'+model_type+'.onnx.prototxt'
     else:
         # 4dim matmul with batch 1
-        WEIGHT_MEMORY_ATTENTION_L_PATH = 'memory_attention_'+model_type+'.opt.onnx'
-        MODEL_MEMORY_ATTENTION_L_PATH = 'memory_attention_'+model_type+'.opt.onnx.prototxt'
+        opt_id = ".opt"
+        if args.version == "2.1":
+            opt_id = ""
+        WEIGHT_MEMORY_ATTENTION_L_PATH = 'memory_attention_'+model_type+opt_id+'.onnx'
+        MODEL_MEMORY_ATTENTION_L_PATH = 'memory_attention_'+model_type+opt_id+'.onnx.prototxt'
     WEIGHT_MEMORY_ENCODER_L_PATH = 'memory_encoder_'+model_type+'.onnx'
     MODEL_MEMORY_ENCODER_L_PATH = 'memory_encoder_'+model_type+'.onnx.prototxt'
     WEIGHT_MLP_L_PATH = 'mlp_'+model_type+'.onnx'
     MODEL_MLP_L_PATH = 'mlp_'+model_type+'.onnx.prototxt'
-    WEIGHT_TPOS_L_PATH = 'obj_ptr_tpos_proj_'+model_type+'.onnx'
-    MODEL_TPOS_L_PATH = 'obj_ptr_tpos_proj_'+model_type+'.onnx.prototxt'
     if args.version == "2.1":
-        MODEL_IMAGE_ENCODER_L_PATH = None
-        MODEL_PROMPT_ENCODER_L_PATH = None
-        MODEL_MASK_DECODER_L_PATH = None
-        MODEL_MEMORY_ATTENTION_L_PATH = None
-        MODEL_MEMORY_ENCODER_L_PATH = None
-        MODEL_MLP_L_PATH = None
+        WEIGHT_TPOS_L_PATH = 'obj_ptr_tpos_proj_'+model_type+'.onnx'
+        MODEL_TPOS_L_PATH = 'obj_ptr_tpos_proj_'+model_type+'.onnx.prototxt'
+    else:
+        WEIGHT_TPOS_L_PATH = None
         MODEL_TPOS_L_PATH = None
 
     # model files check and download
