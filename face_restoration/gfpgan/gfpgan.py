@@ -65,6 +65,11 @@ parser.add_argument(
     default='v1.3',
     help=['v1.3', 'v1.4']
 )
+parser.add_argument(
+    '--onnx',
+    action='store_true',
+    help='execute onnxruntime version.'
+)
 args = update_parser(parser)
 
 
@@ -135,7 +140,10 @@ def predict(models, img):
         x = preprocess(cropped_face)
 
         # feedforward
-        output = gfpgan.predict([x])
+        if not args.onnx:
+            output = gfpgan.predict([x])
+        else:
+            output = gfpgan.run(None, {'x': x})
         pred = output[0]
 
         restored_face = post_processing(pred)
@@ -254,7 +262,18 @@ def main():
     env_id = args.env_id
 
     # initialize
-    gfpgan = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+    if not args.onnx:
+        gfpgan = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+    else:
+        import onnxruntime
+        available_providers = onnxruntime.get_available_providers()
+        if 'CUDAExecutionProvider' in available_providers:
+            providers = ['CUDAExecutionProvider', 'CPUExecutionProvider']
+        elif 'DmlExecutionProvider' in available_providers:
+            providers = ['DmlExecutionProvider', 'CPUExecutionProvider']
+        else:
+            providers = ['CPUExecutionProvider']
+        gfpgan = onnxruntime.InferenceSession(WEIGHT_PATH, providers=providers)
 
     models = {
         "gfpgan": gfpgan,
@@ -276,6 +295,8 @@ def main():
                 device=device)
             models["face_restor"] = face_restor
         else:
+            assert not args.onnx, "onnx option not supported for face_det"
+
             face_det = ailia.Net(MODEL_DET_PATH, WEIGHT_DET_PATH, env_id=env_id)
             models["face_det"] = face_det
 
