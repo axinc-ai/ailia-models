@@ -271,7 +271,6 @@ def main():
         net_image = onnxruntime.InferenceSession(WEIGHT_IMAGE_PATH)
         net_text = onnxruntime.InferenceSession(WEIGHT_TEXT_PATH)
 
-    args.disable_ailia_tokenizer = True
     if args.disable_ailia_tokenizer:
         from transformers import T5Tokenizer
 
