@@ -2,8 +2,6 @@ import sys
 import time
 from logging import getLogger
 
-from scipy.special import softmax
-from transformers import AutoTokenizer
 import numpy as np
 
 import ailia
@@ -32,7 +30,7 @@ REMOTE_PATH = "https://storage.googleapis.com/ailia-models/t5_base_japanese_summ
 # ======================
 
 parser = get_base_parser(
-    't5_base_japanese_summarization', None, None
+    't5_base_japanese_summarization', None, None, fp16_support=False
 )
 
 parser.add_argument(
@@ -59,6 +57,12 @@ parser.add_argument(
 parser.add_argument(
     '--seed', type=int,
     help='random seed'
+)
+
+parser.add_argument(
+    '--disable_ailia_tokenizer',
+    action='store_true',
+    help='disable ailia tokenizer.'
 )
 
 args = update_parser(parser, check_input_type=False)
@@ -295,15 +299,14 @@ def main():
     check_and_download_models(ENCODER_WEIGHT_PATH, ENCODER_MODEL_PATH, REMOTE_PATH)
     check_and_download_models(DECODER_WEIGHT_PATH, DECODER_MODEL_PATH, REMOTE_PATH)
 
-    model_name = "sonoisa/t5-base-japanese"
-    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    if args.disable_ailia_tokenizer:
+        from transformers import AutoTokenizer
+        tokenizer = AutoTokenizer.from_pretrained("sonoisa/t5-base-japanese", is_fast=True)
+    else:
+        from ailia_tokenizer import T5Tokenizer
+        tokenizer = T5Tokenizer.from_pretrained("./tokenizer/")
 
     env_id = args.env_id
-
-    # disable FP16
-    if "FP16" in ailia.get_environment(env_id).props or sys.platform == 'Darwin':
-        logger.warning('This model do not work on FP16. So use CPU mode.')
-        env_id = 0
 
     # initialize
     encoder = ailia.Net(ENCODER_MODEL_PATH, ENCODER_WEIGHT_PATH, env_id = env_id)

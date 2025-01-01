@@ -7,7 +7,6 @@ import cv2
 
 import torch
 import torchaudio
-import transformers
 import soundfile as sf
 
 import ailia
@@ -44,7 +43,7 @@ SAVE_WAV_PATH = 'output.wav'
 # ======================
 
 parser = get_base_parser(
-    'Riffusion', None, SAVE_WAV_PATH
+    'Riffusion', None, SAVE_WAV_PATH, fp16_support=False
 )
 parser.add_argument(
     "-i", "--input", metavar="TEXT", type=str,
@@ -63,6 +62,11 @@ parser.add_argument(
     '--onnx',
     action='store_true',
     help='execute onnxruntime version.'
+)
+parser.add_argument(
+    '--disable_ailia_tokenizer',
+    action='store_true',
+    help='disable ailia tokenizer.'
 )
 args = update_parser(parser, check_input_type=False)
 
@@ -359,10 +363,6 @@ def main():
 
     env_id = args.env_id
 
-    # warning FP16
-    if "FP16" in ailia.get_environment(args.env_id).props:
-        logger.warning('FP32 is recommended for this model.')
-    
     # initialize
     if not args.onnx:
         memory_mode = ailia.get_memory_mode(
@@ -380,9 +380,16 @@ def main():
         text_encoder = onnxruntime.InferenceSession(WEIGHT_TEXT_ENCODER_PATH, providers=providers)
         vae_decoder = onnxruntime.InferenceSession(WEIGHT_VAE_DECODER_PATH, providers=providers)
 
-    tokenizer = transformers.CLIPTokenizer.from_pretrained(
-        "./tokenizer"
-    )
+    if args.disable_ailia_tokenizer:
+        import transformers
+        tokenizer = transformers.CLIPTokenizer.from_pretrained(
+            "./tokenizer"
+        )
+    else:
+        import ailia_tokenizer
+        tokenizer = ailia_tokenizer.CLIPTokenizer.from_pretrained()
+        tokenizer.model_max_length = 77
+
     scheduler = df.schedulers.DPMSolverMultistepScheduler.from_config({
         "num_train_timesteps": 1000,
         "beta_start": 0.00085,

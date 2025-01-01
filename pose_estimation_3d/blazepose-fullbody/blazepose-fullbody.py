@@ -46,6 +46,7 @@ parser = get_base_parser(
     'BlazePose, an on-device real-time body pose tracking.',
     IMAGE_PATH,
     SAVE_IMAGE_PATH,
+    fp16_support=False
 )
 parser.add_argument(
     '-m', '--model', metavar='ARCH',
@@ -367,7 +368,7 @@ def main():
     check_and_download_models(weight_path, model_path, REMOTE_PATH)
 
     env_id = args.env_id
-
+    
     # initialize
     det_net = ailia.Net(MODEL_DETECTOR_PATH, WEIGHT_DETECTOR_PATH, env_id=env_id)
     net = ailia.Net(model_path, weight_path, env_id=env_id)

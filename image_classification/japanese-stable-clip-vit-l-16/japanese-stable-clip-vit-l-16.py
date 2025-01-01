@@ -6,8 +6,6 @@ import numpy as np
 import cv2
 from PIL import Image
 
-from transformers import AutoTokenizer
-
 import ailia
 
 # import original modules
@@ -16,7 +14,7 @@ from arg_utils import get_base_parser, update_parser, get_savepath  # noqa
 from model_utils import check_and_download_models  # noqa
 from image_utils import normalize_image  # noqa
 from detector_utils import load_image  # noqa
-from classifier_utils import plot_results, print_results  # noqa
+from classifier_utils import plot_results, print_results, write_predictions  # noqa
 from math_utils import softmax  # noqa
 import webcamera_utils  # noqa
 # logger
@@ -54,6 +52,16 @@ parser.add_argument(
     '--onnx',
     action='store_true',
     help='execute onnxruntime version.'
+)
+parser.add_argument(
+    '-w', '--write_json',
+    action='store_true',
+    help='Flag to output results to json file.'
+)
+parser.add_argument(
+    '--disable_ailia_tokenizer',
+    action='store_true',
+    help='disable ailia tokenizer.'
 )
 args = update_parser(parser)
 
@@ -221,6 +229,10 @@ def recognize_from_image(models):
         pred = np.expand_dims(pred, axis=0)
         print_results(pred, text_inputs)
 
+        if args.write_json:
+            json_path = '%s.json' % image_path.rsplit('.', 1)[0]
+            write_predictions(json_path, pred, text_inputs, 'json')
+
     logger.info('Script finished successfully.')
 
 
@@ -290,7 +302,15 @@ def main():
         net_image = onnxruntime.InferenceSession(WEIGHT_IMAGE_PATH)
         net_text = onnxruntime.InferenceSession(WEIGHT_TEXT_PATH)
 
-    tokenizer = AutoTokenizer.from_pretrained("tokenizer")
+    if args.disable_ailia_tokenizer:
+        from transformers import T5Tokenizer
+        tokenizer = T5Tokenizer.from_pretrained("tokenizer")
+    else:
+        from ailia_tokenizer import T5Tokenizer
+        tokenizer = T5Tokenizer.from_pretrained("./tokenizer/")
+        tokenizer.add_special_tokens({"pad_token" : "[PAD]"})
+        tokenizer.cls_token_id = 4
+        tokenizer.bos_token_id = 1
 
     models = {
         "tokenizer": tokenizer,

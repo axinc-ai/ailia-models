@@ -46,9 +46,9 @@ parser.add_argument(
     'you can switch to the normal (not optimized) model'
 )
 parser.add_argument(
-    '--gui',
+    '--skip_plot',
     action='store_true',
-    help='Operate the detection result with GUI'
+    help='Skip showing 3D plot of result (for CUI)'
 )
 args = update_parser(parser)
 
@@ -476,7 +476,7 @@ def recognize_from_image():
         savepath_3d = savepath_3d.stem+"_3dpose"+savepath_3d.suffix
         logger.info(f'saved at : {savepath_3d}')
         plt.savefig(savepath_3d, dpi=120)
-        if args.gui:
+        if not args.skip_plot:
             plt.show()
 
     logger.info('Script finished successfully.')

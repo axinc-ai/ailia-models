@@ -81,12 +81,6 @@ parser.add_argument(
     help="Use dlib models for face alignment",
 )
 parser.add_argument(
-    "--config_file",
-    default="../../style_transfer/psgan/configs/base.yaml",
-    metavar="FILE",
-    help="Path to config file for psgan",
-)
-parser.add_argument(
     "opts",
     help="Modify config options using the command-line (for psgan)",
     default=None,

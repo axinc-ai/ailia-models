@@ -40,6 +40,7 @@ parser = get_base_parser(
     'Real-time NN for object instance segmentation by Mask R-CNN',
     IMAGE_PATH,
     SAVE_IMAGE_PATH,
+    large_model=True
 )
 parser.add_argument(
     '-n', '--normal',
@@ -47,7 +48,7 @@ parser.add_argument(
     help='By default, the optimized model is used, but with this option, ' +
     'you can switch to the normal (not optimized) model'
 )
-args = update_parser(parser, large_model=True)
+args = update_parser(parser)
 
 if args.normal:
     WEIGHT_PATH = 'mask_rcnn_R_50_FPN_1x.onnx'

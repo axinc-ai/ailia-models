@@ -32,7 +32,7 @@ IMAGE_WIDTH = 128
 # Argument Parser Config
 # ======================
 parser = get_base_parser(
-    'Yet-Another-Anime-Segmenter, anime character segmentation.', IMAGE_PATH, SAVE_IMAGE_PATH,
+    'Yet-Another-Anime-Segmenter, anime character segmentation.', IMAGE_PATH, SAVE_IMAGE_PATH, large_model=True
 )
 parser.add_argument(
     '--onnx',
@@ -40,7 +40,7 @@ parser.add_argument(
     help='By default, the ailia SDK is used, but with this option, ' +
     'you can switch to using ONNX Runtime'
 )
-args = update_parser(parser, large_model=True)
+args = update_parser(parser)
 
 
 # ======================
