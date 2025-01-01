@@ -80,7 +80,7 @@ def detect_faces(
         image,
         conf_threshold=0.8,
         nms_threshold=0.4):
-    image = image - np.array([104., 117., 123.])
+    image = image - np.array([104., 117., 123.], dtype=np.float32)
     image = image.transpose(2, 0, 1)
     image = np.expand_dims(image, axis=0)
     height, width = image.shape[2:]

@@ -91,6 +91,11 @@ parser.add_argument(
     action="store_true",
     help='Combine "driving frame | source image | generation frame".',
 )
+parser.add_argument(
+    "--cui",
+    action="store_true",
+    help="Don't display perview in GUI.",
+)
 parser.add_argument("--onnx", action="store_true", help="execute onnxruntime version.")
 args = update_parser(parser)
 
@@ -921,6 +926,7 @@ def recognize_from_video(models):
 
     logger.info("Source image: " + source_image)
     logger.info("Driving video: " + str(driving_video))
+    logger.info("Start processing...")
 
     # prepare input data
     img = load_image(source_image)
@@ -981,8 +987,9 @@ def recognize_from_video(models):
         driving_img = driving_img[:, :, ::-1]  # RGB -> BGR
 
         # show
-        cv2.imshow("frame", driving_img)
-        frame_shown = True
+        if not args.cui or args.video:
+            cv2.imshow("frame", driving_img)
+            frame_shown = True
 
         # save results
         if writer is not None:
@@ -992,6 +999,7 @@ def recognize_from_video(models):
     cv2.destroyAllWindows()
     if writer is not None:
         writer.release()
+        logger.info(f"Result was saved as {args.savepath}")
 
     logger.info("Script finished successfully.")
 
