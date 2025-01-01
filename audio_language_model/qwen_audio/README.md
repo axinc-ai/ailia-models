@@ -19,6 +19,7 @@ The person says: "mister quilter is the apostle of the middle classes and we are
 This model requires additional module.
 ```
 pip3 install transformers
+pip3 install tiktoken
 pip3 install librosa
 ```
 
