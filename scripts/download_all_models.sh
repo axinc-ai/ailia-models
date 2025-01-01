@@ -216,7 +216,6 @@ cd ../../image_segmentation/pytorch-fcn; python3 pytorch-fcn.py ${OPTION}
 cd ../../image_segmentation/grounded_sam; python3 grounded_sam.py ${OPTION}
 cd ../../image_segmentation/segment-anything-2; python3 segment-anything-2.py ${OPTION}
 cd ../../image_segmentation/fast_sam; python3 fast_sam.py ${OPTION}
-cd ../../large_language_model/llava; python3 llava.py ${OPTION}
 cd ../../large_language_model/llama; python3 llama.py ${OPTION}
 cd ../../landmark_classification/landmarks_classifier_asia; python3 landmarks_classifier_asia.py ${OPTION}
 cd ../../landmark_classification/places365; python3 places365.py ${OPTION}
@@ -370,5 +369,6 @@ cd ../../time_series_forecasting/informer2020; python3 informer2020.py ${OPTION}
 cd ../../time_series_forecasting/timesfm; python3 timesfm.py ${OPTION}
 cd ../../vehicle_recognition/vehicle-attributes-recognition-barrier; python3 vehicle-attributes-recognition-barrier.py ${OPTION}
 cd ../../vehicle_recognition/vehicle-license-plate-detection-barrier; python3 vehicle-license-plate-detection-barrier.py ${OPTION}
+cd ../../vision_language_model/llava; python3 llava.py ${OPTION}
 cd ../../vision_language_model/florence2; python3 florence2.py ${OPTION}
 cd ../../vision_language_model/qwen2_vl; python3 qwen2_vl.py ${OPTION}
