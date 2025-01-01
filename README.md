@@ -622,7 +622,6 @@ If you would like to try on your computer:
 | [<img src="object_detection/poly_yolo/output.jpg" width=128px>](object_detection/poly_yolo/) | [poly_yolo](/object_detection/poly_yolo/) | [Poly YOLO](https://gitlab.com/irafm-ai/poly-yolo/) | Keras | 1.2.6 and later | |
 | [<img src="object_detection/crowd_det/output.png" width=128px>](object_detection/crowd_det/) | [crowd_det](/object_detection/crowd_det/) | [Detection in Crowded Scenes](https://github.com/Purkialo/CrowdDet) | Pytorch | 1.2.13 and later | |
 | [<img src="object_detection/damo_yolo/output.jpg" width=128px>](object_detection/damo_yolo/) | [damo_yolo](/object_detection/damo_yolo/) | [DAMO-YOLO](https://github.com/tinyvision/DAMO-YOLO) | Pytorch | 1.2.9 and later | |
-| [<img src="object_detection/rtdetrv2/output.jpg" width=128px>](object_detection/rtdetrv2/) | [rtdetrv2](/object_detection/rtdetrv2/) | [RT-DETR](https://github.com/lyuwenyu/RT-DETR) | Pytorch | 1.2.13 and later | |
 
 ### Transformer
 
@@ -632,6 +631,7 @@ If you would like to try on your computer:
 | [<img src="object_detection/dab-detr/output.jpg" width=128px>](object_detection/dab-detr/) | [dab-detr](/object_detection/dab-detr/) | [DAB-DETR](https://github.com/IDEA-opensource/DAB-DETR) | Pytorch | 1.2.12 and later | Jan 2022 | |
 | [<img src="object_detection/detic/output.png" width=128px>](object_detection/detic/) | [detic](/object_detection/detic/) | [Detecting Twenty-thousand Classes using Image-level Supervision](https://github.com/facebookresearch/Detic) | Pytorch | 1.2.10 and later | Jan 2022 | [EN](https://medium.com/p/49cba412b7d4) [JP](https://medium.com/axinc/detic-21k%E3%82%AF%E3%83%A9%E3%82%B9%E3%82%92%E9%AB%98%E7%B2%BE%E5%BA%A6%E3%81%AB%E3%82%BB%E3%82%B0%E3%83%A1%E3%83%B3%E3%83%86%E3%83%BC%E3%82%B7%E3%83%A7%E3%83%B3%E3%81%A7%E3%81%8D%E3%82%8B%E7%89%A9%E4%BD%93%E6%A4%9C%E5%87%BA%E3%83%A2%E3%83%87%E3%83%AB-1b8f777ee89a) |
 | [<img src="object_detection/groundingdino/output.png" width=128px>](object_detection/groundingdino/) | [groundingdino](/object_detection/groundingdino/) | [Grounding DINO](https://github.com/IDEA-Research/GroundingDINO/tree/main) | Pytorch | 1.2.16 and later | Mar 2023 | [JP](https://medium.com/axinc/grounding-dino-%E4%BB%BB%E6%84%8F%E3%81%AE%E7%89%A9%E4%BD%93%E3%82%92%E6%A4%9C%E5%87%BA%E3%81%A7%E3%81%8D%E3%82%8B%E7%89%A9%E4%BD%93%E6%A4%9C%E5%87%BA%E3%83%A2%E3%83%87%E3%83%AB-3cc87db64f0c) |
+| [<img src="object_detection/rtdetrv2/output.png" width=128px>](object_detection/rtdetrv2/) | [rtdetrv2](/object_detection/rtdetrv2/) | [RT-DETR](https://github.com/lyuwenyu/RT-DETR) | Pytorch | 1.2.13 and later | |
 
 ### Specific target
 
