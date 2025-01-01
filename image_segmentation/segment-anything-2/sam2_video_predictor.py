@@ -65,8 +65,10 @@ def get_1d_sine_pe(pos_inds, dim, temperature=10000):
     dim_t = np.arange(pe_dim, dtype=np.float32)
     dim_t = temperature ** (2 * (dim_t // 2) / pe_dim)
 
-    pos_embed = pos_inds.unsqueeze(-1) / dim_t
-    pos_embed = np.concatenate([pos_embed.sin(), pos_embed.cos()], axis=-1)
+    #pos_embed = pos_inds.unsqueeze(-1) / dim_t
+    pos_embed = np.expand_dims(pos_inds, axis=-1) / dim_t
+    #pos_embed = np.concatenate([np.sin(pos_embed), np.cos(pos_embed)], axis=-1)
+    pos_embed = np.concatenate([np.sin(pos_embed), np.cos(pos_embed)], axis=-1)
     return pos_embed
 
 def concat_points(old_point_inputs, new_points, new_labels):
@@ -130,6 +132,7 @@ class SAM2VideoPredictor():
         self,
         num_maskmem = 7,  # default 1 input frame + 6 previous frames
         max_obj_ptrs_in_encoder = 16,
+        version = "2.1"
     ):
         """default state from yaml"""
         self.image_size = 1024
@@ -140,6 +143,9 @@ class SAM2VideoPredictor():
         self.training = False
         self.mem_dim = 64
         self.add_tpos_enc_to_obj_ptrs = False
+        self.version = version
+        if version == "2.1":
+            self.add_tpos_enc_to_obj_ptrs = True
         self.use_obj_ptrs_in_encoder = True
         self.add_all_frames_to_correct_as_cond = False
         self.multimask_output_in_sam = True
@@ -152,6 +158,8 @@ class SAM2VideoPredictor():
         self.use_obj_ptrs_in_encoder = True
         self.use_mlp_for_obj_ptr_proj = True
         self.proj_tpos_enc_in_obj_ptrs = False
+        if version == "2.1":
+            self.proj_tpos_enc_in_obj_ptrs = True
         self.soft_no_obj_ptr = False
         self.fixed_no_obj_ptr = True
         self.non_overlap_masks_for_mem_enc = False
@@ -290,7 +298,8 @@ class SAM2VideoPredictor():
         mask_decoder=None,
         memory_attention=None,
         memory_encoder=None,
-        mlp=None
+        mlp=None,
+        obj_ptr_tpos_proj=None
     ):
         """Add new points to a frame."""
         obj_idx = self._obj_id_to_idx(inference_state, obj_id)
@@ -402,7 +411,8 @@ class SAM2VideoPredictor():
             mask_decoder=mask_decoder,
             memory_attention=memory_attention,
             memory_encoder=memory_encoder,
-            mlp=mlp
+            mlp=mlp,
+            obj_ptr_tpos_proj=obj_ptr_tpos_proj
         )
         # Add the output to the output dict (to be used as future memory)
         obj_temp_output_dict[storage_key][frame_idx] = current_out
@@ -415,7 +425,7 @@ class SAM2VideoPredictor():
             is_cond=is_cond,
             run_mem_encoder=False,
             consolidate_at_video_res=True,
-            image_encoder=image_encoder, prompt_encoder=prompt_encoder, mask_decoder=mask_decoder, memory_encoder=memory_encoder, mlp=mlp
+            image_encoder=image_encoder, prompt_encoder=prompt_encoder, mask_decoder=mask_decoder, memory_encoder=memory_encoder, mlp=mlp, obj_ptr_tpos_proj=obj_ptr_tpos_proj
         )
         _, video_res_masks = self._get_orig_video_res_output(
             inference_state, consolidated_out["pred_masks_video_res"]
@@ -554,7 +564,8 @@ class SAM2VideoPredictor():
         mask_decoder=None,
         memory_attention=None,
         memory_encoder=None,
-        mlp=None
+        mlp=None,
+        obj_ptr_tpos_proj=None
     ):
         """
         Consolidate the per-object temporary outputs in `temp_output_dict_per_obj` on
@@ -619,7 +630,7 @@ class SAM2VideoPredictor():
                 if run_mem_encoder:
                     if empty_mask_ptr is None:
                         empty_mask_ptr = self._get_empty_mask_ptr(
-                            inference_state, frame_idx, image_encoder, prompt_encoder, mask_decoder, memory_attention, memory_encoder, mlp
+                            inference_state, frame_idx, image_encoder, prompt_encoder, mask_decoder, memory_attention, memory_encoder, mlp, obj_ptr_tpos_proj
                         )
                     # fill object pointer with a dummy pointer (based on an empty mask)
                     consolidated_out["obj_ptr"][obj_idx : obj_idx + 1] = empty_mask_ptr
@@ -667,7 +678,7 @@ class SAM2VideoPredictor():
 
         return consolidated_out
 
-    def _get_empty_mask_ptr(self, inference_state, frame_idx, image_encoder, prompt_encoder, mask_decoder, memory_attention, memory_encoder, mlp):
+    def _get_empty_mask_ptr(self, inference_state, frame_idx, image_encoder, prompt_encoder, mask_decoder, memory_attention, memory_encoder, mlp, obj_ptr_tpos_proj):
         """Get a dummy object pointer based on an empty mask on the current frame."""
         # A dummy (empty) mask with a single object
         batch_size = 1
@@ -703,11 +714,12 @@ class SAM2VideoPredictor():
             mask_decoder=mask_decoder,
             memory_attention=memory_attention,
             memory_encoder=memory_encoder,
-            mlp=mlp
+            mlp=mlp,
+            obj_ptr_tpos_proj=obj_ptr_tpos_proj
         )
         return current_out["obj_ptr"]
 
-    def propagate_in_video_preflight(self, inference_state, image_encoder, prompt_encoder, mask_decoder, memory_attention, memory_encoder, mlp):
+    def propagate_in_video_preflight(self, inference_state, image_encoder, prompt_encoder, mask_decoder, memory_attention, memory_encoder, mlp, obj_ptr_tpos_proj):
         assert(memory_encoder!=None)
         """Prepare inference_state and consolidate temporary outputs before tracking."""
         # Tracking has started and we don't allow adding new objects until session is reset.
@@ -737,7 +749,7 @@ class SAM2VideoPredictor():
                 consolidated_out = self._consolidate_temp_output_across_obj(
                     inference_state, frame_idx, is_cond=is_cond, run_mem_encoder=True,
                     image_encoder=image_encoder, prompt_encoder=prompt_encoder, mask_decoder=mask_decoder, memory_attention=memory_attention,
-                    memory_encoder=memory_encoder, mlp=mlp
+                    memory_encoder=memory_encoder, mlp=mlp, obj_ptr_tpos_proj=obj_ptr_tpos_proj
                 )
                 # merge them into "output_dict" and also create per-object slices
                 output_dict[storage_key][frame_idx] = consolidated_out
@@ -788,6 +800,7 @@ class SAM2VideoPredictor():
         memory_attention=None,
         memory_encoder=None,
         mlp=None,
+        obj_ptr_tpos_proj=None,
         frame_idx = 0
     ):
         """Propagate the input points across frames to track in the entire video."""
@@ -852,7 +865,8 @@ class SAM2VideoPredictor():
                     mask_decoder=mask_decoder,
                     memory_attention=memory_attention,
                     memory_encoder=memory_encoder,
-                    mlp=mlp
+                    mlp=mlp,
+                    obj_ptr_tpos_proj=obj_ptr_tpos_proj
                 )
                 output_dict[storage_key][frame_idx] = current_out
             # Create slices of per-object outputs for subsequent interaction with each
@@ -1000,7 +1014,8 @@ class SAM2VideoPredictor():
         mask_decoder=None,
         memory_attention=None,
         memory_encoder=None,
-        mlp=None
+        mlp=None,
+        obj_ptr_tpos_proj=None
     ):
         """Run tracking on a single frame based on current inputs and previous memory."""
         # Retrieve correct image features
@@ -1031,7 +1046,8 @@ class SAM2VideoPredictor():
             mask_decoder=mask_decoder,
             memory_attention=memory_attention,
             memory_encoder=memory_encoder,
-            mlp=mlp
+            mlp=mlp,
+            obj_ptr_tpos_proj=obj_ptr_tpos_proj
         )
 
         # optionally offload the output to CPU memory to save GPU space
@@ -1158,7 +1174,8 @@ class SAM2VideoPredictor():
         mask_decoder=None,
         memory_attention=None,
         memory_encoder=None,
-        mlp=None
+        mlp=None,
+        obj_ptr_tpos_proj=None
     ):
         current_out = {"point_inputs": point_inputs, "mask_inputs": mask_inputs}
         # High-resolution feature maps for the SAM head, reshape (HW)BC => BCHW
@@ -1196,6 +1213,7 @@ class SAM2VideoPredictor():
                 num_frames=num_frames,
                 track_in_reverse=track_in_reverse,
                 memory_attention=memory_attention,
+                obj_ptr_tpos_proj=obj_ptr_tpos_proj,
             )
             # apply SAM-style segmentation head
             # here we might feed previously predicted low-res SAM mask logits into the SAM mask decoder,
@@ -1565,7 +1583,8 @@ class SAM2VideoPredictor():
         output_dict,
         num_frames,
         track_in_reverse=False,  # tracking in reverse time order (for demo usage)
-        memory_attention=None
+        memory_attention=None,
+        obj_ptr_tpos_proj=None
     ):
         """Fuse the current frame's visual feature map with previous memory."""
         B = current_vision_feats[-1].shape[1]  # batch size on this frame
@@ -1683,10 +1702,20 @@ class SAM2VideoPredictor():
                     if self.add_tpos_enc_to_obj_ptrs:
                         t_diff_max = max_obj_ptrs_in_encoder - 1
                         tpos_dim = C if self.proj_tpos_enc_in_obj_ptrs else self.mem_dim
-                        obj_pos = pos_list
+                        obj_pos = np.array(pos_list)
                         obj_pos = get_1d_sine_pe(obj_pos / t_diff_max, dim=tpos_dim)
-                        #obj_pos = self.obj_ptr_tpos_proj(obj_pos) # identity
-                        obj_pos = obj_pos.unsqueeze(1).expand(-1, B, self.mem_dim)
+
+                        tpos = np.zeros((obj_pos.shape[0], 64), np.float32)
+                        for i in range(obj_pos.shape[0]):
+                            if self.onnx:
+                                tpos[i:i+1,:] = obj_ptr_tpos_proj.run(None, {"x": obj_pos[i:i+1,:].astype(np.float32)})[0]
+                            else:
+                                tpos[i:i+1,:] = obj_ptr_tpos_proj.run({"x": obj_pos[i:i+1,:].astype(np.float32)})[0]
+                        obj_pos = tpos
+
+                        #obj_pos = obj_pos.unsqueeze(1).expand(-1, B, self.mem_dim)
+                        obj_pos_expanded = np.expand_dims(obj_pos, axis=1) # numpy
+                        obj_pos = np.tile(obj_pos_expanded, (1, B, 1))
                     else:
                         obj_pos = np.zeros((len(pos_list), B, self.mem_dim), dtype=np.float32)
                     if self.mem_dim < C:
@@ -1728,20 +1757,34 @@ class SAM2VideoPredictor():
         if self.benchmark:
             start = int(round(time.time() * 1000))
 
-        if self.normal:
-            if self.onnx:
-                pix_feat_with_mem = memory_attention.run(None, {"curr":current_vision_feats[0], "memory":memory, "curr_pos":current_vision_pos_embeds[0], "memory_pos":memory_pos_embed, "num_obj_ptr_tokens":num_obj_ptr_tokens_numpy})
-            else:
-                pix_feat_with_mem = memory_attention.run({"curr":current_vision_feats[0], "memory":memory, "curr_pos":current_vision_pos_embeds[0], "memory_pos":memory_pos_embed, "num_obj_ptr_tokens":num_obj_ptr_tokens_numpy})
-        else:
+        if self.version == "2.1":
             memory_1 = memory[:-num_obj_ptr_tokens,:,:]
             memory_2 = memory[-num_obj_ptr_tokens:,:,:]
             memory_pos_embed_1 = memory_pos_embed[:-num_obj_ptr_tokens,:,:]
             memory_pos_embed_2 = memory_pos_embed[-num_obj_ptr_tokens:,:,:]
+            attention_mask_1 = np.zeros((memory_1.shape[0], memory_1.shape[1]), dtype=np.bool_)
+            attention_mask_2 = np.zeros((memory_2.shape[0], memory_2.shape[1]), dtype=np.bool_)
+            attention_mask_1[:memory_1.shape[0],:] = True
+            attention_mask_2[:memory_2.shape[0],:] = True
             if self.onnx:
-                pix_feat_with_mem = memory_attention.run(None, {"curr":current_vision_feats[0], "memory_1":memory_1, "memory_2":memory_2, "curr_pos":current_vision_pos_embeds[0], "memory_pos_1":memory_pos_embed_1, "memory_pos_2":memory_pos_embed_2})
+                pix_feat_with_mem = memory_attention.run(None, {"curr":current_vision_feats[0], "memory_1":memory_1, "memory_2":memory_2, "curr_pos":current_vision_pos_embeds[0], "memory_pos_1":memory_pos_embed_1, "memory_pos_2":memory_pos_embed_2, "attention_mask_1":attention_mask_1, "attention_mask_2":attention_mask_2})
             else:
-                pix_feat_with_mem = memory_attention.run({"curr":current_vision_feats[0], "memory_1":memory_1, "memory_2":memory_2, "curr_pos":current_vision_pos_embeds[0], "memory_pos_1":memory_pos_embed_1, "memory_pos_2":memory_pos_embed_2})
+                pix_feat_with_mem = memory_attention.run({"curr":current_vision_feats[0], "memory_1":memory_1, "memory_2":memory_2, "curr_pos":current_vision_pos_embeds[0], "memory_pos_1":memory_pos_embed_1, "memory_pos_2":memory_pos_embed_2, "attention_mask_1":attention_mask_1, "attention_mask_2":attention_mask_2})
+        else:
+            if self.normal:
+                if self.onnx:
+                    pix_feat_with_mem = memory_attention.run(None, {"curr":current_vision_feats[0], "memory":memory, "curr_pos":current_vision_pos_embeds[0], "memory_pos":memory_pos_embed, "num_obj_ptr_tokens":num_obj_ptr_tokens_numpy})
+                else:
+                    pix_feat_with_mem = memory_attention.run({"curr":current_vision_feats[0], "memory":memory, "curr_pos":current_vision_pos_embeds[0], "memory_pos":memory_pos_embed, "num_obj_ptr_tokens":num_obj_ptr_tokens_numpy})
+            else:
+                memory_1 = memory[:-num_obj_ptr_tokens,:,:]
+                memory_2 = memory[-num_obj_ptr_tokens:,:,:]
+                memory_pos_embed_1 = memory_pos_embed[:-num_obj_ptr_tokens,:,:]
+                memory_pos_embed_2 = memory_pos_embed[-num_obj_ptr_tokens:,:,:]
+                if self.onnx:
+                    pix_feat_with_mem = memory_attention.run(None, {"curr":current_vision_feats[0], "memory_1":memory_1, "memory_2":memory_2, "curr_pos":current_vision_pos_embeds[0], "memory_pos_1":memory_pos_embed_1, "memory_pos_2":memory_pos_embed_2})
+                else:
+                    pix_feat_with_mem = memory_attention.run({"curr":current_vision_feats[0], "memory_1":memory_1, "memory_2":memory_2, "curr_pos":current_vision_pos_embeds[0], "memory_pos_1":memory_pos_embed_1, "memory_pos_2":memory_pos_embed_2})
 
         if self.benchmark:
             end = int(round(time.time() * 1000))

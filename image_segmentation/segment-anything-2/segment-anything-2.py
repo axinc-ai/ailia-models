@@ -22,8 +22,6 @@ logger = getLogger(__name__)
 # Parameters
 # ======================
 
-REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/segment-anything-2/'
-
 IMAGE_PATH = 'truck.jpg'
 SAVE_IMAGE_PATH = 'output.png'
 
@@ -71,8 +69,23 @@ parser.add_argument(
     '--normal', action='store_true',
     help='Use normal version of onnx model. Normal version requires 6 dim matmul.'
 )
+parser.add_argument(
+    '--version', default='2', choices=('2', '2.1'),
+    help='Select model.'
+)
 
 args = update_parser(parser)
+
+
+# ======================
+# Model path
+# ======================
+
+if args.version == "2.1":
+    REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/segment-anything-2.1/'
+else:
+    REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/segment-anything-2/'
+
 
 # ======================
 # Utility
@@ -149,11 +162,13 @@ def get_input_point():
     input_point = []
     input_label = []
     if pos_points:
-        input_point.append(np.array(pos_points))
-        input_label.append(np.ones(len(pos_points)))
+        for i in range(len(pos_points)):
+            input_point.append(pos_points[i])
+            input_label.append(1)
     if neg_points:
-        input_point.append(np.array(neg_points))
-        input_label.append(np.zeros(len(neg_points)))
+        for i in range(len(neg_points)):
+            input_point.append(neg_points[i])
+            input_label.append(0)
     input_point = np.array(input_point)
     input_label = np.array(input_label)
     input_box = None
@@ -236,7 +251,7 @@ def preprocess_frame(img, image_size):
     return img
 
 
-def recognize_from_video(image_encoder, prompt_encoder, mask_decoder, memory_attention, memory_encoder, mlp):
+def recognize_from_video(image_encoder, prompt_encoder, mask_decoder, memory_attention, memory_encoder, mlp, obj_ptr_tpos_proj):
     image_size = 1024
 
     if args.video == "demo":
@@ -264,7 +279,7 @@ def recognize_from_video(image_encoder, prompt_encoder, mask_decoder, memory_att
 
     predictor = SAM2VideoPredictor(args.onnx, args.normal, args.benchmark)
 
-    inference_state = predictor.init_state(args.num_mask_mem, args.max_obj_ptrs_in_encoder)
+    inference_state = predictor.init_state(args.num_mask_mem, args.max_obj_ptrs_in_encoder, args.version)
     predictor.reset_state(inference_state)
 
     frame_shown = False
@@ -299,9 +314,9 @@ def recognize_from_video(image_encoder, prompt_encoder, mask_decoder, memory_att
             image_encoder)
 
         if frame_idx == 0:
-            annotate_frame(input_point, input_label, input_box, predictor, inference_state, image_encoder, prompt_encoder, mask_decoder, memory_attention, memory_encoder, mlp)
+            annotate_frame(input_point, input_label, input_box, predictor, inference_state, image_encoder, prompt_encoder, mask_decoder, memory_attention, memory_encoder, mlp, obj_ptr_tpos_proj)
 
-        frame = process_frame(frame, frame_idx, predictor, inference_state, image_encoder, prompt_encoder, mask_decoder, memory_attention, memory_encoder, mlp)
+        frame = process_frame(frame, frame_idx, predictor, inference_state, image_encoder, prompt_encoder, mask_decoder, memory_attention, memory_encoder, mlp, obj_ptr_tpos_proj)
         frame = frame.astype(np.uint8)
 
         if frame_idx == 0:
@@ -326,7 +341,7 @@ def recognize_from_video(image_encoder, prompt_encoder, mask_decoder, memory_att
     if writer is not None:
         writer.release()
 
-def annotate_frame(points, labels, box, predictor, inference_state, image_encoder, prompt_encoder, mask_decoder, memory_attention, memory_encoder, mlp):
+def annotate_frame(points, labels, box, predictor, inference_state, image_encoder, prompt_encoder, mask_decoder, memory_attention, memory_encoder, mlp, obj_ptr_tpos_proj):
     ann_frame_idx = 0  # the frame index we interact with
     ann_obj_id = 1  # give a unique id to each object we interact with (it can be any integers)
 
@@ -351,9 +366,10 @@ def annotate_frame(points, labels, box, predictor, inference_state, image_encode
                                                                             mask_decoder = mask_decoder,
                                                                             memory_attention = memory_attention,
                                                                             memory_encoder = memory_encoder,
-                                                                            mlp = mlp)
+                                                                            mlp = mlp,
+                                                                            obj_ptr_tpos_proj = obj_ptr_tpos_proj)
 
-def process_frame(image, frame_idx, predictor, inference_state, image_encoder, prompt_encoder, mask_decoder, memory_attention, memory_encoder, mlp):
+def process_frame(image, frame_idx, predictor, inference_state, image_encoder, prompt_encoder, mask_decoder, memory_attention, memory_encoder, mlp, obj_ptr_tpos_proj):
     out_frame_idx, out_obj_ids, out_mask_logits = predictor.propagate_in_video(inference_state,
                                                                                 image_encoder = image_encoder,
                                                                                 prompt_encoder = prompt_encoder,
@@ -361,6 +377,7 @@ def process_frame(image, frame_idx, predictor, inference_state, image_encoder, p
                                                                                 memory_attention = memory_attention,
                                                                                 memory_encoder = memory_encoder,
                                                                                 mlp = mlp,
+                                                                                obj_ptr_tpos_proj = obj_ptr_tpos_proj,
                                                                                 frame_idx = frame_idx)
 
     image = show_mask((out_mask_logits[0] > 0.0), image, color = np.array([30, 144, 255]), obj_id = out_obj_ids[0])
@@ -370,24 +387,35 @@ def process_frame(image, frame_idx, predictor, inference_state, image_encoder, p
 
 def main():
     # fetch image encoder model
-    WEIGHT_IMAGE_ENCODER_L_PATH = 'image_encoder_'+args.model_type+'.onnx'
-    MODEL_IMAGE_ENCODER_L_PATH = 'image_encoder_'+args.model_type+'.onnx.prototxt'
-    WEIGHT_PROMPT_ENCODER_L_PATH = 'prompt_encoder_'+args.model_type+'.onnx'
-    MODEL_PROMPT_ENCODER_L_PATH = 'prompt_encoder_'+args.model_type+'.onnx.prototxt'
-    WEIGHT_MASK_DECODER_L_PATH = 'mask_decoder_'+args.model_type+'.onnx'
-    MODEL_MASK_DECODER_L_PATH = 'mask_decoder_'+args.model_type+'.onnx.prototxt'
+    model_type = args.model_type
+    if args.version == "2.1":
+        model_type = model_type + "_2.1"
+    WEIGHT_IMAGE_ENCODER_L_PATH = 'image_encoder_'+model_type+'.onnx'
+    MODEL_IMAGE_ENCODER_L_PATH = 'image_encoder_'+model_type+'.onnx.prototxt'
+    WEIGHT_PROMPT_ENCODER_L_PATH = 'prompt_encoder_'+model_type+'.onnx'
+    MODEL_PROMPT_ENCODER_L_PATH = 'prompt_encoder_'+model_type+'.onnx.prototxt'
+    WEIGHT_MASK_DECODER_L_PATH = 'mask_decoder_'+model_type+'.onnx'
+    MODEL_MASK_DECODER_L_PATH = 'mask_decoder_'+model_type+'.onnx.prototxt'
     if args.normal:
         # 6dim matmul
-        WEIGHT_MEMORY_ATTENTION_L_PATH = 'memory_attention_'+args.model_type+'.onnx'
-        MODEL_MEMORY_ATTENTION_L_PATH = 'memory_attention_'+args.model_type+'.onnx.prototxt'
+        if args.version == "2.1":
+            raise Exception("SAM2.1 not exported normal model.")
+        WEIGHT_MEMORY_ATTENTION_L_PATH = 'memory_attention_'+model_type+'.onnx'
+        MODEL_MEMORY_ATTENTION_L_PATH = 'memory_attention_'+model_type+'.onnx.prototxt'
     else:
         # 4dim matmul with batch 1
-        WEIGHT_MEMORY_ATTENTION_L_PATH = 'memory_attention_'+args.model_type+'.opt.onnx'
-        MODEL_MEMORY_ATTENTION_L_PATH = 'memory_attention_'+args.model_type+'.opt.onnx.prototxt'
-    WEIGHT_MEMORY_ENCODER_L_PATH = 'memory_encoder_'+args.model_type+'.onnx'
-    MODEL_MEMORY_ENCODER_L_PATH = 'memory_encoder_'+args.model_type+'.onnx.prototxt'
-    WEIGHT_MLP_L_PATH = 'mlp_'+args.model_type+'.onnx'
-    MODEL_MLP_L_PATH = 'mlp_'+args.model_type+'.onnx.prototxt'
+        WEIGHT_MEMORY_ATTENTION_L_PATH = 'memory_attention_'+model_type+'.opt.onnx'
+        MODEL_MEMORY_ATTENTION_L_PATH = 'memory_attention_'+model_type+'.opt.onnx.prototxt'
+    WEIGHT_MEMORY_ENCODER_L_PATH = 'memory_encoder_'+model_type+'.onnx'
+    MODEL_MEMORY_ENCODER_L_PATH = 'memory_encoder_'+model_type+'.onnx.prototxt'
+    WEIGHT_MLP_L_PATH = 'mlp_'+model_type+'.onnx'
+    MODEL_MLP_L_PATH = 'mlp_'+model_type+'.onnx.prototxt'
+    if args.version == "2.1":
+        WEIGHT_TPOS_L_PATH = 'obj_ptr_tpos_proj_'+model_type+'.onnx'
+        MODEL_TPOS_L_PATH = 'obj_ptr_tpos_proj_'+model_type+'.onnx.prototxt'
+    else:
+        WEIGHT_TPOS_L_PATH = None
+        MODEL_TPOS_L_PATH = None
 
     # model files check and download
     check_and_download_models(WEIGHT_IMAGE_ENCODER_L_PATH, MODEL_IMAGE_ENCODER_L_PATH, REMOTE_PATH)
@@ -396,6 +424,8 @@ def main():
     check_and_download_models(WEIGHT_MEMORY_ATTENTION_L_PATH, MODEL_MEMORY_ATTENTION_L_PATH, REMOTE_PATH)
     check_and_download_models(WEIGHT_MEMORY_ENCODER_L_PATH, MODEL_MEMORY_ENCODER_L_PATH, REMOTE_PATH)
     check_and_download_models(WEIGHT_MLP_L_PATH, MODEL_MLP_L_PATH, REMOTE_PATH)
+    if args.version == "2.1":
+        check_and_download_models(WEIGHT_TPOS_L_PATH, MODEL_TPOS_L_PATH, REMOTE_PATH)
 
     if args.onnx:
         import onnxruntime
@@ -405,6 +435,10 @@ def main():
         memory_attention = onnxruntime.InferenceSession(WEIGHT_MEMORY_ATTENTION_L_PATH)
         memory_encoder = onnxruntime.InferenceSession(WEIGHT_MEMORY_ENCODER_L_PATH)
         mlp = onnxruntime.InferenceSession(WEIGHT_MLP_L_PATH)
+        if args.version == "2.1":
+            obj_ptr_tpos_proj = onnxruntime.InferenceSession(WEIGHT_TPOS_L_PATH)
+        else:
+            obj_ptr_tpos_proj = None
     else:
         import ailia
         memory_mode = ailia.get_memory_mode(reduce_constant=True, ignore_input_with_initializer=True, reduce_interstage=False, reuse_interstage=True)
@@ -414,9 +448,13 @@ def main():
         memory_attention = ailia.Net(weight=WEIGHT_MEMORY_ATTENTION_L_PATH, stream=MODEL_MEMORY_ATTENTION_L_PATH, memory_mode=memory_mode, env_id=args.env_id)
         memory_encoder = ailia.Net(weight=WEIGHT_MEMORY_ENCODER_L_PATH, stream=MODEL_MEMORY_ENCODER_L_PATH, memory_mode=memory_mode, env_id=args.env_id)
         mlp = ailia.Net(weight=WEIGHT_MLP_L_PATH, stream=MODEL_MLP_L_PATH, memory_mode=memory_mode, env_id=args.env_id)
+        if args.version == "2.1":
+            obj_ptr_tpos_proj = ailia.Net(weight=WEIGHT_TPOS_L_PATH, stream=MODEL_TPOS_L_PATH, memory_mode=memory_mode, env_id=args.env_id)
+        else:
+            obj_ptr_tpos_proj = None
 
     if args.video is not None:
-        recognize_from_video(image_encoder, prompt_encoder, mask_decoder, memory_attention, memory_encoder, mlp)
+        recognize_from_video(image_encoder, prompt_encoder, mask_decoder, memory_attention, memory_encoder, mlp, obj_ptr_tpos_proj)
     else:
         recognize_from_image(image_encoder, prompt_encoder, mask_decoder)
 

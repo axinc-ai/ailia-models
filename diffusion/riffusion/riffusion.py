@@ -43,7 +43,7 @@ SAVE_WAV_PATH = 'output.wav'
 # ======================
 
 parser = get_base_parser(
-    'Riffusion', None, SAVE_WAV_PATH
+    'Riffusion', None, SAVE_WAV_PATH, fp16_support=False
 )
 parser.add_argument(
     "-i", "--input", metavar="TEXT", type=str,
@@ -363,10 +363,6 @@ def main():
 
     env_id = args.env_id
 
-    # warning FP16
-    if "FP16" in ailia.get_environment(args.env_id).props:
-        logger.warning('FP32 is recommended for this model.')
-    
     # initialize
     if not args.onnx:
         memory_mode = ailia.get_memory_mode(

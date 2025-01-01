@@ -39,7 +39,7 @@ MODEL_LISTS = ['resnet50','mixer','vit','mobilenet']
 # Arguemnt Parser Config
 # ======================
 parser = get_base_parser(
-    'imagenet21k', IMAGE_PATH, None
+    'imagenet21k', IMAGE_PATH, None, fp16_support=False
 )
 
 parser.add_argument(
@@ -262,10 +262,6 @@ def main():
 
     # model files check and download
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
-
-    if "FP16" in ailia.get_environment(args.env_id).props or platform.system() == 'Darwin':
-        logger.warning('This model do not work on FP16. So use CPU mode.')
-        args.env_id = 0
 
     # net initialize
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)

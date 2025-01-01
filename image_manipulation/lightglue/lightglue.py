@@ -40,7 +40,7 @@ SAVE_IMAGE_PATH = 'output.png'
 # ======================
 
 parser = get_base_parser(
-    'LightGlue', IMAGE_A_PATH, SAVE_IMAGE_PATH
+    'LightGlue', IMAGE_A_PATH, SAVE_IMAGE_PATH, fp16_support=False
 )
 parser.add_argument(
     '-i2', '--input2', metavar='IMAGE2', default=IMAGE_B_PATH,
@@ -153,11 +153,7 @@ def main():
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
     check_and_download_models(LIGHTGLUE_WEIGHT_PATH, LIGHTGLUE_MODEL_PATH, REMOTE_PATH)
 
-    # disable FP16
     env_id = args.env_id
-    if "FP16" in ailia.get_environment(args.env_id).props or sys.platform == 'Darwin':
-        logger.warning('This model do not work on FP16. So use CPU mode.')
-        env_id = 0
 
     # Load ONNX models
 

@@ -84,6 +84,11 @@ By adding the `--model_type` option, you can specify model type which is selecte
 $ python3 segment-anything-2.py --model_type hiera_l
 ```
 
+By adding the `--version` option, you can specify model type which is selected from "2" and "2.1". (default is 2)
+```bash
+$ python3 segment-anything-2.py --version "2.1"
+```
+
 To improve the performance of MemoryAttention, you can also reduce the number of reference images in past frames, which is num_mask_mem.
 ```bash
 $ python3 segment-anything-2.py -v 0 --num_mask_mem 2 --max_obj_ptrs_in_encoder 2
@@ -103,7 +108,9 @@ ONNX opset=17
 
 ## Netron
 
-### hiera_l
+### SAM2
+
+#### hiera_l
 
 - [image_encoder_hiera_l.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/segment-anything-2/image_encoder_hiera_l.onnx.prototxt)  
 - [mask_decoder_hiera_l.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/segment-anything-2/mask_decoder_hiera_l.onnx.prototxt)  
@@ -113,7 +120,7 @@ ONNX opset=17
 - [memory_encoder_hiera_l.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/segment-anything-2/memory_encoder_hiera_l.onnx.prototxt)  
 - [mlp_hiera_l.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/segment-anything-2/mlp_hiera_l.onnx.prototxt)  
 
-### hiera_b+
+#### hiera_b+
 
 - [image_encoder_hiera_b+.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/segment-anything-2/image_encoder_hiera_b+.onnx.prototxt)  
 - [mask_decoder_hiera_b+.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/segment-anything-2/mask_decoder_hiera_b+.onnx.prototxt)  
@@ -123,7 +130,7 @@ ONNX opset=17
 - [memory_encoder_hiera_b+.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/segment-anything-2/memory_encoder_hiera_b+.onnx.prototxt)  
 - [mlp_hiera_b+.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/segment-anything-2/mlp_hiera_b+.onnx.prototxt)  
 
-### hiera_s
+#### hiera_s
 
 - [image_encoder_hiera_s.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/segment-anything-2/image_encoder_hiera_s.onnx.prototxt)  
 - [mask_decoder_hiera_s.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/segment-anything-2/mask_decoder_hiera_s.onnx.prototxt)  
@@ -133,7 +140,7 @@ ONNX opset=17
 - [memory_encoder_hiera_s.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/segment-anything-2/memory_encoder_hiera_s.onnx.prototxt)  
 - [mlp_hiera_s.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/segment-anything-2/mlp_hiera_s.onnx.prototxt)  
 
-### hiera_t
+#### hiera_t
 
 - [image_encoder_hiera_t.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/segment-anything-2/image_encoder_hiera_t.onnx.prototxt)  
 - [mask_decoder_hiera_t.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/segment-anything-2/mask_decoder_hiera_t.onnx.prototxt)  
@@ -143,6 +150,48 @@ ONNX opset=17
 - [memory_encoder_hiera_t.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/segment-anything-2/memory_encoder_hiera_t.onnx.prototxt)  
 - [mlp_hiera_t.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/segment-anything-2/mlp_hiera_t.onnx.prototxt)  
 
-### Optimized model
+### SAM2.1
+
+#### hiera_l
+
+- [image_encoder_hiera_l_2.1.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/segment-anything-2.1/image_encoder_hiera_l_2.1.onnx.prototxt)  
+- [mask_decoder_hiera_l_2.1.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/segment-anything-2.1/mask_decoder_hiera_l_2.1.onnx.prototxt)  
+- [prompt_encoder_hiera_l_2.1.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/segment-anything-2.1/prompt_encoder_hiera_l_2.1.onnx.prototxt)  
+- [memory_attention_hiera_l_2.1.opt.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/segment-anything-2.1/memory_attention_hiera_l_2.1.opt.onnx.prototxt)  
+- [memory_encoder_hiera_l_2.1.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/segment-anything-2.1/memory_encoder_hiera_l_2.1.onnx.prototxt)  
+- [mlp_hiera_l_2.1.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/segment-anything-2.1/mlp_hiera_l_2.1.onnx.prototxt)  
+- [obj_ptr_tpos_proj_hiera_l_2.1.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/segment-anything-2.1/obj_ptr_tpos_proj_hiera_l_2.1.onnx.prototxt)  
+
+#### hiera_b+
+
+- [image_encoder_hiera_b+_2.1.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/segment-anything-2.1/image_encoder_hiera_b+_2.1.onnx.prototxt)  
+- [mask_decoder_hiera_b+_2.1.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/segment-anything-2.1/mask_decoder_hiera_b+_2.1.onnx.prototxt)  
+- [prompt_encoder_hiera_b+_2.1.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/segment-anything-2.1/prompt_encoder_hiera_b+_2.1.onnx.prototxt)  
+- [memory_attention_hiera_b+_2.1.opt.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/segment-anything-2.1/memory_attention_hiera_b+_2.1.opt.onnx.prototxt)  
+- [memory_encoder_hiera_b+_2.1.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/segment-anything-2.1/memory_encoder_hiera_b+_2.1.onnx.prototxt)  
+- [mlp_hiera_b+_2.1.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/segment-anything-2.1/mlp_hiera_b+_2.1.onnx.prototxt)  
+- [obj_ptr_tpos_proj_hiera_b+_2.1.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/segment-anything-2.1/obj_ptr_tpos_proj_hiera_b+_2.1.onnx.prototxt)  
+
+#### hiera_s
+
+- [image_encoder_hiera_s_2.1.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/segment-anything-2.1/image_encoder_hiera_s_2.1.onnx.prototxt)  
+- [mask_decoder_hiera_s_2.1.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/segment-anything-2.1/mask_decoder_hiera_s_2.1.onnx.prototxt)  
+- [prompt_encoder_hiera_s_2.1.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/segment-anything-2.1/prompt_encoder_hiera_s_2.1.onnx.prototxt)  
+- [memory_attention_hiera_s_2.1.opt.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/segment-anything-2.1/memory_attention_hiera_s_2.1.opt.onnx.prototxt)  
+- [memory_encoder_hiera_s_2.1.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/segment-anything-2.1/memory_encoder_hiera_s_2.1.onnx.prototxt)  
+- [mlp_hiera_s_2.1.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/segment-anything-2.1/mlp_hiera_s_2.1.onnx.prototxt)  
+- [obj_ptr_tpos_proj_hiera_s_2.1.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/segment-anything-2.1/obj_ptr_tpos_proj_hiera_s_2.1.onnx.prototxt)  
+
+#### hiera_t
+
+- [image_encoder_hiera_t_2.1.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/segment-anything-2.1/image_encoder_hiera_t_2.1.onnx.prototxt)  
+- [mask_decoder_hiera_t_2.1.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/segment-anything-2.1/mask_decoder_hiera_t_2.1.onnx.prototxt)  
+- [prompt_encoder_hiera_t_2.1.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/segment-anything-2.1/prompt_encoder_hiera_t_2.1.onnx.prototxt)  
+- [memory_attention_hiera_t_2.1.opt.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/segment-anything-2.1/memory_attention_hiera_t_2.1.opt.onnx.prototxt)  
+- [memory_encoder_hiera_t_2.1.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/segment-anything-2.1/memory_encoder_hiera_t_2.1.onnx.prototxt)  
+- [mlp_hiera_t_2.1.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/segment-anything-2.1/mlp_hiera_t_2.1.onnx.prototxt)  
+- [obj_ptr_tpos_proj_hiera_t_2.1.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/segment-anything-2.1/obj_ptr_tpos_proj_hiera_t_2.1.onnx.prototxt)  
+
+## Model information
 
 memory_attention.onnx uses a 6-dimensional Matmul. memory_attention.opt.onnx can be implemented using a 4-dimensional Matmul instead of fixing the batch size to 1.

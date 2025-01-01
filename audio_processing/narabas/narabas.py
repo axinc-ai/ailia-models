@@ -26,7 +26,7 @@ REMOTE_PATH = "https://storage.googleapis.com/ailia-models/narabas/"
 AUDIO_PATH = "input.wav"
 HOP_LENGTH_SEC = 0.02
 
-parser = get_base_parser('narabas', AUDIO_PATH, None)
+parser = get_base_parser('narabas', AUDIO_PATH, None, fp16_support=False)
 parser.add_argument(
     '--onnx',
     action='store_true',
@@ -140,11 +140,6 @@ def infer(net: Union[ailia.Net, onnxruntime.InferenceSession]):
 
 
 if __name__ == "__main__":
-    # disable FP16
-    if "FP16" in ailia.get_environment(args.env_id).props or sys.platform == 'Darwin':
-        logger.warning('This model do not work on FP16. So use CPU mode.')
-        args.env_id = 0
-
     check_and_download_models(NARABAS_WEIGHT_PASS, NARABAS_MODEL_PATH, REMOTE_PATH)
     net = create_instance(NARABAS_WEIGHT_PASS, NARABAS_MODEL_PATH)
     infer(net)

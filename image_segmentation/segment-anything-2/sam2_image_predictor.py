@@ -165,9 +165,6 @@ class SAM2ImagePredictor:
             sparse_embeddings, dense_embeddings, dense_pe = prompt_encoder.run({"coords":concat_points[0], "labels":concat_points[1], "masks":mask_input_dummy, "masks_enable":masks_enable})
 
         # Predict masks
-        batched_mode = (
-            concat_points is not None and concat_points[0].shape[0] > 1
-        )  # multi object prediction
         high_res_features = [
             feat_level
             for feat_level in features["high_res_feats"]
