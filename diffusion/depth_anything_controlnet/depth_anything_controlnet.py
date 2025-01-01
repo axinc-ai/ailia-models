@@ -7,7 +7,7 @@ import sys
 sys.path.append('../../util')
 from image_utils import imread  # noqa: E402
 from arg_utils import get_base_parser, update_parser, get_savepath  # noqa
-from model_utils import check_and_download_models # noqa
+from model_utils import check_and_download_models, check_and_download_file # noqa
 # logger
 from logging import getLogger  # noqa: E402
 
@@ -51,6 +51,8 @@ VAE_DECODER_MODEL_PATH = "vae_decoder.onnx.prototxt"
 TEXT_ENCODER_WEIGHT_PATH = "text_encoder.onnx"
 UNET_WEIGHT_PATH = "unet.onnx"
 VAE_DECODER_WEIGHT_PATH = "vae_decoder.onnx"
+
+WEIGHT_PB_PATH = "weights.pb"
 
 # ======================
 # Main functions
@@ -193,7 +195,8 @@ def main():
     check_and_download_models(TEXT_ENCODER_MODEL_PATH, TEXT_ENCODER_WEIGHT_PATH, REMOTE_PATH)
     check_and_download_models(UNET_MODEL_PATH, UNET_WEIGHT_PATH, REMOTE_PATH)
     check_and_download_models(VAE_DECODER_MODEL_PATH, VAE_DECODER_WEIGHT_PATH, REMOTE_PATH)
-    
+    check_and_download_file(WEIGHT_PB_PATH, REMOTE_PATH)
+ 
     if args.disable_ailia_tokenizer:
         from transformers import AutoTokenizer
         tokenizer = AutoTokenizer.from_pretrained(TOKENIZER_PATH)
