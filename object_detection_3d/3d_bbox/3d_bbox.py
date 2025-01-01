@@ -91,9 +91,9 @@ def plot_regressed_3d_bbox(img, cam_to_img, box_2d, dimensions, alpha, theta_ray
 parser = get_base_parser('3d_bbox model', IMAGE_PATH, SAVE_IMAGE_PATH)
 
 parser.add_argument(
-    '--gui',
+    '--cui',
     action='store_true',
-    help='Display preview in GUI.'
+    help="Don't display preview in GUI."
 )
 parser.add_argument(
     '-w', '--write_json',
@@ -187,7 +187,7 @@ def recognize_from_image():
             alpha -= np.pi
 
             plot_regressed_3d_bbox(img, proj_matrix, box_2d, dim, alpha, theta_ray)
-            if args.gui:
+            if not args.cui:
                 cv2.imshow('3D detections', img)
 
         savepath = get_savepath(args.savepath, image_path)
@@ -199,7 +199,7 @@ def recognize_from_image():
             with open(json_file, 'w') as f:
                 json.dump(saved_results, f, indent=2)
 
-    if args.gui and cv2.waitKey(0) != 32:  # space bar
+    if not args.cui and cv2.waitKey(0) != 32:  # space bar
         exit()
 
 def recognize_from_video():
@@ -284,7 +284,7 @@ def recognize_from_video():
 
             location = plot_regressed_3d_bbox(img, proj_matrix, box_2d, dim, alpha, theta_ray)
 
-            if args.gui:
+            if not args.cui:
                 cv2.imshow('3D detections', img)
             frame_shown = True
 
