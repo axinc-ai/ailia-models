@@ -371,3 +371,4 @@ cd ../../vehicle_recognition/vehicle-license-plate-detection-barrier; python3 ve
 cd ../../vision_language_model/llava; python3 llava.py ${OPTION}
 cd ../../vision_language_model/florence2; python3 florence2.py ${OPTION}
 cd ../../vision_language_model/qwen2_vl; python3 qwen2_vl.py ${OPTION}
+cd ../../vision_language_model/llava-jp; python3 llava-jp.py ${OPTION}
