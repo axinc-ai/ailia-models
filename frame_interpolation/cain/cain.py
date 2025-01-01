@@ -35,7 +35,7 @@ SAVE_IMAGE_PATH = 'output.png'
 # Arguemnt Parser Config
 # ======================
 
-parser = get_base_parser('CAIN', IMAGE_PATH, SAVE_IMAGE_PATH)
+parser = get_base_parser('CAIN', IMAGE_PATH, SAVE_IMAGE_PATH, large_model=True)
 parser.add_argument(
     '-i2', '--input2', metavar='IMAGE2', default=None,
     help='The second input image path.'
@@ -45,7 +45,7 @@ parser.add_argument(
     default="256,448",
     help='Specify the size to resize on video mode.'
 )
-args = update_parser(parser, large_model=True)
+args = update_parser(parser)
 
 
 # ======================

@@ -44,7 +44,7 @@ IMAGE_MAX_SIZE = 960
 # ======================
 
 parser = get_base_parser(
-    'Dehamer', IMAGE_PATH, SAVE_IMAGE_PATH
+    'Dehamer', IMAGE_PATH, SAVE_IMAGE_PATH, fp16_support=False
 )
 parser.add_argument(
     '-m', '--model_type', default='NH', choices=('NH', 'dense', 'indoor', 'outdoor'),
@@ -217,10 +217,6 @@ def main():
 
     # model files check and download
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
-
-    if "FP16" in ailia.get_environment(args.env_id).props or platform.system() == 'Darwin':
-        logger.warning('This model do not work on FP16. So use CPU mode.')
-        args.env_id = 0
 
     # initialize
     if not args.onnx:
