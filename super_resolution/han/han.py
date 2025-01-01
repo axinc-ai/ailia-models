@@ -29,7 +29,7 @@ SAVE_IMAGE_PATH = 'output.png'
 # Argument Parser Config
 # ======================
 parser = get_base_parser(
-    'Single Image Super-Resolution with HAN', IMAGE_PATH, SAVE_IMAGE_PATH,
+    'Single Image Super-Resolution with HAN', IMAGE_PATH, SAVE_IMAGE_PATH, fp16_support=False
 )
 parser.add_argument(
     '-n', '--normal', action='store_true',
@@ -205,9 +205,6 @@ def main():
 
     # net initialize
     env_id = args.env_id
-    if "FP16" in ailia.get_environment(args.env_id).props or sys.platform == "darwin" :
-        env_id = 0
-        logger.info('This model not working on FP16. So running on CPU.')
     memory_mode = ailia.get_memory_mode(reduce_constant=True, reduce_interstage=True)
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id, memory_mode=memory_mode)
     logger.info('Model: ' + WEIGHT_PATH[:-5])

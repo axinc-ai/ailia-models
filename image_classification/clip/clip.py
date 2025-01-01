@@ -52,7 +52,7 @@ IMAGE_SIZE = 224
 # ======================
 
 parser = get_base_parser(
-    'CLIP', IMAGE_PATH, SAVE_IMAGE_PATH
+    'CLIP', IMAGE_PATH, SAVE_IMAGE_PATH, fp16_support=False
 )
 parser.add_argument(
     '-t', '--text', dest='text_inputs', type=str,
@@ -295,11 +295,6 @@ def main():
     check_and_download_models(WEIGHT_TEXT_PATH, MODEL_TEXT_PATH, REMOTE_PATH)
 
     env_id = args.env_id
-
-    # disable FP16
-    if "FP16" in ailia.get_environment(args.env_id).props or sys.platform == 'Darwin':
-        logger.warning('This model do not work on FP16. So use CPU mode.')
-        args.env_id = 0
 
     # initialize
     if not args.onnx:
