@@ -402,7 +402,7 @@ If you would like to try on your computer:
 | [<img src="image_inpainting/inpainting_gmcnn/result_paris-streetview_rect.png" width=128px>](image_inpainting/inpainting_gmcnn/) | [inpainting_gmcnn](/image_inpainting/inpainting_gmcnn/) | [Image Inpainting via Generative Multi-column Convolutional Neural Networks](https://github.com/shepnerd/inpainting_gmcnn) | TensorFlow | 1.2.6 and later |
 | [<img src="image_inpainting/3d-photo-inpainting/example_moon_circle.jpg" width=128px>](image_inpainting/3d-photo-inpainting/) | [3d-photo-inpainting](/image_inpainting/3d-photo-inpainting/) | [3D Photography using Context-aware Layered Depth Inpainting](https://github.com/vt-vl-lab/3d-photo-inpainting) | Pytorch | 1.2.7 and later |
 | [<img src="image_inpainting/deepfillv2/result_paris-streetview_rect.png" width=128px>](image_inpainting/deepfillv2/) | [deepfillv2](/image_inpainting/deepfillv2/) | [Free-Form Image Inpainting with Gated Convolution](https://github.com/open-mmlab/mmediting/tree/master/configs/inpainting/deepfillv2) | Pytorch | 1.2.9 and later |
-[<img src="image_inpainting/lama/output.png" width=128px>](image_inpainting/lama/) | [lama](/image_inpainting/lama/) | [LaMa: Resolution-robust Large Mask Inpainting with Fourier Convolutions](https://github.com/advimman/lama) | Pytorch | 1.2.13 and later |
+| [<img src="image_inpainting/lama/output.png" width=128px>](image_inpainting/lama/) | [lama](/image_inpainting/lama/) | [LaMa: Resolution-robust Large Mask Inpainting with Fourier Convolutions](https://github.com/advimman/lama) | Pytorch | 1.2.13 and later |
 
 ## Image manipulation
 
