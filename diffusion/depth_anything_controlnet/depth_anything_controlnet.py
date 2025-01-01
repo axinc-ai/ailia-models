@@ -7,6 +7,7 @@ import sys
 sys.path.append('../../util')
 from image_utils import imread  # noqa: E402
 from arg_utils import get_base_parser, update_parser, get_savepath  # noqa
+from model_utils import check_and_download_models # noqa
 # logger
 from logging import getLogger  # noqa: E402
 
@@ -40,6 +41,8 @@ parser.add_argument(
 args = update_parser(parser)
 
 TOKENIZER_PATH = "./tokenizer"
+
+REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/depth_anything_controlnet/'
 
 TEXT_ENCODER_MODEL_PATH = "text_encoder.onnx.prototxt"
 UNET_MODEL_PATH = "unet.onnx.prototxt"
@@ -187,6 +190,9 @@ def main():
     if seed is not None:
         np.random.seed(seed)
 
+    check_and_download_models(TEXT_ENCODER_MODEL_PATH, TEXT_ENCODER_WEIGHT_PATH, REMOTE_PATH)
+    check_and_download_models(UNET_MODEL_PATH, UNET_WEIGHT_PATH, REMOTE_PATH)
+    check_and_download_models(VAE_DECODER_MODEL_PATH, VAE_DECODER_WEIGHT_PATH, REMOTE_PATH)
     
     if args.disable_ailia_tokenizer:
         from transformers import AutoTokenizer
