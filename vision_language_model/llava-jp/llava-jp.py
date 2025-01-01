@@ -519,9 +519,9 @@ def predict(models, images, message, intermediate=False):
         for ele in sublist
     ][:-1]:
         input_ids.extend(x[offset:])
-    input_ids = np.array([input_ids], dtype=np.long)
+    input_ids = np.array([input_ids], dtype=np.int64)
     input_ids = input_ids[:, :-1]  # </sep>がinputの最後に入るので削除する
-    attention_mask = np.ones(input_ids.shape[:2], dtype=np.long)
+    attention_mask = np.ones(input_ids.shape[:2], dtype=np.int64)
 
     output = sample(
         models, input_ids, attention_mask, images, intermediate=intermediate
