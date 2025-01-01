@@ -622,7 +622,8 @@ If you would like to try on your computer:
 | [<img src="object_detection/poly_yolo/output.jpg" width=128px>](object_detection/poly_yolo/) | [poly_yolo](/object_detection/poly_yolo/) | [Poly YOLO](https://gitlab.com/irafm-ai/poly-yolo/) | Keras | 1.2.6 and later | |
 | [<img src="object_detection/crowd_det/output.png" width=128px>](object_detection/crowd_det/) | [crowd_det](/object_detection/crowd_det/) | [Detection in Crowded Scenes](https://github.com/Purkialo/CrowdDet) | Pytorch | 1.2.13 and later | |
 | [<img src="object_detection/damo_yolo/output.jpg" width=128px>](object_detection/damo_yolo/) | [damo_yolo](/object_detection/damo_yolo/) | [DAMO-YOLO](https://github.com/tinyvision/DAMO-YOLO) | Pytorch | 1.2.9 and later | |
-| [<img src="object_detection/rtdetrv2/output.jpg" width=128px>](object_detection/rtdetrv2/) | [rtdetrv2](/object_detection/rtdetrv2/) | [RT-DETR](https://github.com/lyuwenyu/RT-DETR) | Pytorch | 1.2.9 and later | |
+| [<img src="object_detection/rtdetrv2/output.jpg" width=128px>](object_detection/rtdetrv2/) | [rtdetrv2](/object_detection/rtdetrv2/) | [RT-DETR](https://github.com/lyuwenyu/RT-DETR) | Pytorch | 1.2.13 and later | |
+
 ### Transformer
 
 | | Model | Reference | Exported From | Supported Ailia Version | Date | Blog |
