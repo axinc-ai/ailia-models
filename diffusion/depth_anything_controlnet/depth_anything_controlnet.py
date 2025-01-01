@@ -14,7 +14,7 @@ from logging import getLogger  # noqa: E402
 logger = getLogger(__name__)
 
 parser = get_base_parser(
-    'DepthAnything ControlNet', 'depth_flower.png', 'output.png'
+    'DepthAnything ControlNet', 'depth_flower.png', 'output.png', large_model = True
 )
 
 parser.add_argument('--input', '-i', type=str, default='depth_flower.png', help='Input image path')
@@ -150,6 +150,8 @@ def generate(
     sample = initial_latent
     # t in this loop corresponds to the index of tau, the rescaled version of the timestep
     for t in reversed(range(1, n_inference_timesteps+1)):
+        logger.info("iteration: %s" % (n_inference_timesteps - t + 1))
+        
         pred_noise = models['unet'].predict([
             np.tile(sample, (2, 1, 1, 1)),
             np.array([ns.to_train_timestep(t)]),
