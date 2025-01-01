@@ -121,7 +121,7 @@ def main():
         args.env_id = 0
 
     # model files check and download
-    check_and_download_models(MODEL_PATH, MODEL_PATH, REMOTE_PATH)
+    check_and_download_models(MODEL_PATH, WEIGHT_PATH, REMOTE_PATH)
 
     memory_mode = ailia.get_memory_mode(reduce_constant=True, reduce_interstage=True)
     # net initialize
