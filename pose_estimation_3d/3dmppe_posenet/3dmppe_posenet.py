@@ -60,8 +60,9 @@ parser = get_base_parser(
     'Real-time NN for 3D Multi-person Pose Estimation by PoseNet',
     IMAGE_OR_VIDEO_PATH,
     SAVE_IMAGE_OR_VIDEO_PATH,
+    large_model=True
 )
-args = update_parser(parser, large_model=True)
+args = update_parser(parser)
 
 
 # ======================

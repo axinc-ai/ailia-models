@@ -27,7 +27,7 @@ from scipy.io.wavfile import write
 DEFAULT_INPUT = '吾輩は猫である'
 DEFAULT_EMO = "私はいまとても嬉しいです"
 DEFAULT_OUTPUT = 'result.wav'
-parser = get_base_parser('Bert-VITS2', None, DEFAULT_OUTPUT)
+parser = get_base_parser('Bert-VITS2', None, DEFAULT_OUTPUT, fp16_support=False)
 
 parser.add_argument(
     '--text',
@@ -316,11 +316,6 @@ def main():
         bert_tokenizer = ailia_tokenizer.BertJapaneseCharacterTokenizer.from_pretrained(dict_path = 'unidic-lite', pretrained_model_name_or_path = "./tokenizer/deberta-v2-large-japanese-char-wwm")
         clap_tokenizer = ailia_tokenizer.RobertaTokenizer.from_pretrained('./tokenizer/clap-htsat-fused')
     models = {'bert_tokenizer': bert_tokenizer,'clap_tokenizer': clap_tokenizer}
-
-    #disable FP16
-    if "FP16" in ailia.get_environment(args.env_id).props or sys.platform == 'Darwin':
-        logger.error('This model do not work on FP16, use CPU instead.')
-        args.env_id = 0
 
     for m in MODEL_NAMES:
         check_and_download_models(

@@ -54,7 +54,7 @@ TARGET_LENGTH = 1024
 # ======================
 
 parser = get_base_parser(
-    'Segment Anything', IMAGE_PATH, SAVE_IMAGE_PATH
+    'Segment Anything', IMAGE_PATH, SAVE_IMAGE_PATH, fp16_support=False
 )
 parser.add_argument(
     '-p', '--pos', action='append', type=int, metavar="X", nargs=2,
@@ -405,11 +405,6 @@ def main():
 
     env_id = args.env_id
 
-    # disable FP16
-    if "FP16" in ailia.get_environment(env_id).props or sys.platform == 'Darwin':
-        logger.warning('This model do not work on FP16. So use CPU mode.')
-        env_id = 0
-    
     # initialize
     if not args.onnx:
         memory_mode = ailia.get_memory_mode(

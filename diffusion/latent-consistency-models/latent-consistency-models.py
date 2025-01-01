@@ -122,12 +122,23 @@ def image_post_processing(image):
     return x_samples
 
 def save_image(images, save_path):
-    base_count = len(os.listdir(save_path))
-    for img in images:
-        sample_file = os.path.join(save_path, f"{base_count:04}.png")
-        cv2.imwrite(sample_file, img)
-        base_count += 1
-    print("Images saved at ", save_path)
+    if os.path.isdir(save_path):
+        base_count = len(os.listdir(save_path))
+        for img in images:
+            sample_file = os.path.join(save_path, f"{base_count:04}.png")
+            cv2.imwrite(sample_file, img)
+            base_count += 1
+        print("Images saved at ", save_path)
+    else:
+        if 1 < len(images):
+            splited = os.path.splitext(save_path)
+            for i in range(len(images)):
+                p = splited[0] + f"{i}" + splited[1]
+                cv2.imwrite(p, images[i])
+            print("Images saved from ", splited[0] + "0" + splited[1], " to ", splited[0] + f"len(images) - 1" + splited[1])
+        else:
+            cv2.imwrite(save_path, images[0])
+            print("Image saved at ", save_path)
     
     
 # ======================
@@ -276,7 +287,7 @@ def generate_image(
         has_nsfw_concept = None
     
     #save_image
-    save_image(image, SAVE_IMAGE_PATH)
+    save_image(image, args.savepath)
     logger.info("Script finished successfully.")
 
 def main():

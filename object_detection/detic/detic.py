@@ -54,7 +54,7 @@ SAVE_IMAGE_PATH = 'output.png'
 # ======================
 
 parser = get_base_parser(
-    'Detic', IMAGE_PATH, SAVE_IMAGE_PATH
+    'Detic', IMAGE_PATH, SAVE_IMAGE_PATH, fp16_support=False
 )
 parser.add_argument(
     '--seed', type=int, default=int(datetime.datetime.now().strftime('%Y%m%d')),
@@ -69,9 +69,9 @@ parser.add_argument(
     help='vocabulary'
 )
 parser.add_argument(
-    '--opset16',
+    '--legacy',
     action='store_true',
-    help='Use the opset16 model. In that case, grid_sampler runs inside the model.'
+    help='Use the legacy model. In that case, grid_sampler runs outside the model.'
 )
 parser.add_argument(
     '--onnx',
@@ -346,7 +346,7 @@ def predict(net, img):
     #img[:] = 0 # test for grid sampler
 
     # feedforward
-    if args.opset16:
+    if not args.legacy:
         if not args.onnx:
             output = net.predict([img, im_hw])
         else:
@@ -359,7 +359,7 @@ def predict(net, img):
 
     pred_boxes, scores, pred_classes, pred_masks = output
 
-    if not args.opset16:
+    if args.legacy:
         pred = post_processing(
             pred_boxes, scores, pred_classes, pred_masks,
             (im_h, im_w), pred_hw
@@ -462,7 +462,7 @@ def recognize_from_video(net):
 
 
 def main():
-    if args.opset16:
+    if not args.legacy:
         dic_model = {
             ('SwinB_896_4x', 'lvis'): (WEIGHT_SWINB_LVIS_OP16_PATH, MODEL_SWINB_LVIS_OP16_PATH),
             ('SwinB_896_4x', 'in21k'): (WEIGHT_SWINB_IN21K_OP16_PATH, MODEL_SWINB_IN21K_OP16_PATH),
@@ -481,11 +481,6 @@ def main():
 
     # model files check and download
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
-
-    # disable FP16
-    if "FP16" in ailia.get_environment(args.env_id).props or platform.system() == 'Darwin':
-        logger.warning('This model do not work on FP16. So use CPU mode.')
-        args.env_id = 0
 
     # initialize
     if not args.onnx:
