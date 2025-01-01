@@ -69,7 +69,7 @@ args = update_parser(parser)
 
 WEIGHT_PATH = args.arch + '_coco.onnx'
 MODEL_PATH  = args.arch + '_coco.onnx.prototxt'
-REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/rtdetrv2/'
+REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/rt-detr-v2/'
 
 # ======================
 # Main functions
