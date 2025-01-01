@@ -161,6 +161,7 @@ cd ../../image_classification/alexnet; python3 alexnet.py ${OPTION}
 cd ../../image_classification/clip; python3 clip.py ${OPTION}
 cd ../../image_classification/japanese-clip; python3 japanese-clip.py ${OPTION}
 cd ../../image_classification/japanese-stable-clip-vit-l-16; python3 japanese-stable-clip-vit-l-16.py ${OPTION}
+cd ../../image_classification/clip-japanese-base; python3 clip-japanese-base.py ${OPTION}
 cd ../../image_classification/weather-prediction-from-image; python3 weather-prediction-from-image.py ${OPTION}
 cd ../../image_classification/convnext; python3 convnext.py ${OPTION}
 cd ../../image_classification/swin-transformer; python3 swin_transformer.py ${OPTION}
@@ -297,6 +298,7 @@ cd ../../object_detection_3d/mediapipe_objectron; python3 mediapipe_objectron.py
 cd ../../object_detection_3d/egonet; python3 egonet.py ${OPTION}
 cd ../../object_detection_3d/d4lcn; python3 d4lcn.py ${OPTION}
 cd ../../object_detection_3d/did_m3d; python3 did_m3d.py ${OPTION}
+cd ../../object_detection_3d/rt-detr-v2; python3 rt-detr-v2.py ${OPTION}
 cd ../../object_tracking/centroids-reid; python3 centroids-reid.py ${OPTION}
 cd ../../object_tracking/deepsort; python3 deepsort.py ${OPTION}
 cd ../../object_tracking/person_reid_baseline_pytorch; python3 person_reid_baseline_pytorch.py ${OPTION}
@@ -349,6 +351,7 @@ cd ../../super_resolution/real-esrgan; python3 real-esrgan.py ${OPTION}
 cd ../../super_resolution/rcan-it; python3 rcan-it.py ${OPTION}
 cd ../../super_resolution/swinir; python3 swinir.py ${OPTION}
 cd ../../super_resolution/hat; python3 hat.py ${OPTION}
+cd ../../super_resolution/span; python3 span.py ${OPTION}
 cd ../../text_detection/craft_pytorch; python3 craft_pytorch.py ${OPTION}
 cd ../../text_detection/pixel_link; python3 pixel_link.py ${OPTION}
 cd ../../text_detection/east; python3 east.py ${OPTION}
@@ -359,6 +362,7 @@ cd ../../text_recognition/paddleocr; python3 paddleocr.py ${OPTION}
 cd ../../text_recognition/easyocr; python3 easyocr.py ${OPTION}
 cd ../../text_recognition/ndlocr_text_recognition; python3 ndlocr_text_recognition.py ${OPTION}
 cd ../../time_series_forecasting/informer2020; python3 informer2020.py ${OPTION}
+cd ../../time_series_forecasting/timesfm; python3 timesfm.py ${OPTION}
 cd ../../vehicle_recognition/vehicle-attributes-recognition-barrier; python3 vehicle-attributes-recognition-barrier.py ${OPTION}
 cd ../../vehicle_recognition/vehicle-license-plate-detection-barrier; python3 vehicle-license-plate-detection-barrier.py ${OPTION}
 cd ../../vision_language_model/florence2; python3 florence2.py ${OPTION}
