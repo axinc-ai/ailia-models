@@ -17,16 +17,16 @@ If you would like to try on your computer:
 [ailia MODELS tutorial 日本語版](TUTORIAL_jp.md)
 
 # Supported models
-363 models as of December 29th, 2024
+372 models as of January 1st, 2025
 
 # Latest update
+- 2025.01.01 Add RT-DETRv2, gazelle, lama, anything_v3, depth_anything_controlnet, deepfacelive, llava-jp
+- 2024.12.31 Add clip-japanese-base, timesfm
 - 2024.12.29 Add SAM2.1, span
 - 2024.12.18 Update ONNX file of prompt encoder for SAM
 - 2024.12.17 Add yolov10, yolov11
 - 2024.11.26 Add fast_sam
 - 2024.11.19 Add qwen2_vl, live_portrait (ailia SDK 1.5)
-- 2024.10.09 Add whisper-v3-turbo
-- 2024.10.02 Add florence2
 - More information in our [Wiki](https://github.com/axinc-ai/ailia-models/wiki)
 
 ## Action recognition
