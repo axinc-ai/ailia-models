@@ -200,6 +200,7 @@ If you would like to try on your computer:
 | [<img src="diffusion/sdxl-turbo/output.png" width=128px>](diffusion/sdxl-turbo/) | [sdxl-turbo](/diffusion/sdxl-turbo/) | [Hugging Face - SDXL-Turbo](https://huggingface.co/stabilityai/sdxl-turbo) | Pytorch | 1.2.16 and later |
 | [<img src="diffusion/latent-consistency-models/Output/0000.png" width=128px>](diffusion/latent-consistency-models/) | [latent-consistency-models](/diffusion/latent-consistency-models/) | [latent-consistency-models](https://github.com/luosiallen/latent-consistency-model) | Pytorch | 1.2.16 and later |
 | [<img src="diffusion/anything_v3/output.png" width=128px>](diffusion/anything_v3/) | [anything_v3](/diffusion/anything_v3/) | [Linaqruf/anything-v3.0](https://huggingface.co/Linaqruf/anything-v3.0) | Pytorch | 1.5.0 and later |
+| [<img src="diffusion/depth_anything_controlnet/visualization.png" width=128px>](diffusion/depth_anything_controlnet/) | [depth_anything_controlnet](/diffusion/depth_anything_controlnet/) | [DepthAnything](https://github.com/LiheYoung/Depth-Anything) | Pytorch | 1.2.16 and later |
 
 ### Text to audio
 
