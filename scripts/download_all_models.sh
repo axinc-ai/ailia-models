@@ -115,6 +115,7 @@ cd ../../face_recognition/facemesh_v2; python3 facemesh_v2.py ${OPTION}
 cd ../../face_recognition/3ddfa; python3 3ddfa$.py ${OPTION}
 cd ../../face_recognition/mivolo; python3 mivolo.py ${OPTION}
 cd ../../face_recognition/l2cs_net; python3 l2cs_net.py ${OPTION}
+cd ../../face_recognition/gazelle; python3 gazelle.py ${OPTION}
 cd ../../face_restoration/codeformer; python3 codeformer.py ${OPTION}
 cd ../../face_restoration/gfpgan; python3 gfpgan.py ${OPTION}
 cd ../../face_swapping/facefusion; python3 facefusion.py ${OPTION}
