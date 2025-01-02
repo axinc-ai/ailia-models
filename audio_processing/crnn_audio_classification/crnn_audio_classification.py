@@ -176,7 +176,7 @@ def create_spectrogram(wav):
 # ======================
 # Main function
 # ======================
-def crnn(data, session):
+def crnn(data, session, fixed_shape = False):
     # normal inference
     spec = MelspectrogramStretch()
     xt, lengths = spec.forward(data)
@@ -185,10 +185,13 @@ def crnn(data, session):
     lengths_np = np.zeros((1))
     lengths_np[0] = lengths[0]
 
-    new_xt = np.zeros((1, 1, 128, 176))
-    new_xt[:, :, :xt.shape[2], :xt.shape[3]] = xt
-    xt = new_xt
-    lengths_np = np.array([176.])
+    # fixed shape
+    if fixed_shape:
+        new_xt = np.zeros((1, 1, 128, 176))
+        new_xt[:, :, :xt.shape[2], :xt.shape[3]] = xt
+        xt = new_xt
+        lengths_np = np.array([176.])
+
     results = session.predict({"data": xt, "lengths": lengths_np})
 
     label, conf = postprocess(results[0])
@@ -199,6 +202,7 @@ def crnn(data, session):
 def microphone_input_recognition():
     try:
         print('processing...')
+        session = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
         frame_shown = False
         while True:
             if (cv2.waitKey(1) & 0xFF == ord('q')):
@@ -209,11 +213,9 @@ def microphone_input_recognition():
             wav = record_microphone_input()
 
             # create instance
-            session = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
 
-            data = (wav, SAMPLING_RATE) # TODO: change 48000
-
-            label, conf = crnn(data, session)
+            data = (wav, SAMPLING_RATE)
+            label, conf = crnn(data, session, fixed_shape = True)
 
             plt.specgram(wav,Fs=1)
             plt.title('Predicted class is = {}, confidence = {}'.format(label, conf))
