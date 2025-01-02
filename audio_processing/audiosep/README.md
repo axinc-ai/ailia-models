@@ -52,19 +52,14 @@ https://github.com/axinc-ai/ailia-models/assets/53651931/7710b6c9-49dc-4d2a-8489
 
 Pytorch
 
-
-
-
-
-
 ## Model Format
 
 ONNX opset=11
 
 ## Netron
 
-[text_encoder.onnx.prototxt]()
-[resunet.onnx.prototxt]()
+* [audiosep_text.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/audiosep/audiosep_text.onnx.prototxt)
+* [audiosep_resunet.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/audiosep/audiosep_resunet.onnx.prototxt)
 
 
 
