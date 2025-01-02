@@ -14,7 +14,7 @@ from logging import getLogger  # noqa: E402
 
 from image_utils import imread, load_image  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
-from utils import get_base_parser, get_savepath, update_parser  # noqa: E402
+from arg_utils import get_base_parser, get_savepath, update_parser  # noqa: E402
 from webcamera_utils import adjust_frame_size, get_capture  # noqa: E402
 
 logger = getLogger(__name__)
@@ -32,7 +32,7 @@ IMAGE_WIDTH = 128
 # Argument Parser Config
 # ======================
 parser = get_base_parser(
-    'Yet-Another-Anime-Segmenter, anime character segmentation.', IMAGE_PATH, SAVE_IMAGE_PATH,
+    'Yet-Another-Anime-Segmenter, anime character segmentation.', IMAGE_PATH, SAVE_IMAGE_PATH, large_model=True
 )
 parser.add_argument(
     '--onnx',
@@ -40,7 +40,7 @@ parser.add_argument(
     help='By default, the ailia SDK is used, but with this option, ' +
     'you can switch to using ONNX Runtime'
 )
-args = update_parser(parser, large_model=True)
+args = update_parser(parser)
 
 
 # ======================

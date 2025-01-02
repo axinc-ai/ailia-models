@@ -20,7 +20,7 @@ from logging import getLogger  # noqa: E402
 
 from image_utils import imread, normalize_image  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
-from utils import get_base_parser, get_savepath, update_parser  # noqa: E402
+from arg_utils import get_base_parser, get_savepath, update_parser  # noqa: E402
 from webcamera_utils import (calc_adjust_fsize, get_capture,  # noqa: E402
                              get_writer, preprocess_frame)
 
@@ -48,9 +48,9 @@ std = np.array([0.229, 0.224, 0.225], np.float32).reshape(1, 1, 3)
 # ======================
 parser = get_base_parser('pose_hg_3d model', IMAGE_PATH, SAVE_IMAGE_PATH)
 parser.add_argument(
-    '-g', '--gui',
+    '--skip_plot',
     action='store_true',
-    help='Operate the detection result with GUI'
+    help='Skip showing 3D plot of result (for CUI)'
 )
 args = update_parser(parser)
 
@@ -103,8 +103,8 @@ def recognize_from_image():
         debugger.add_img(img)
         debugger.add_point_2d(pred, (255, 0, 0))
         debugger.add_point_3d(pred_3d, 'b')
-        debugger.show_all_imgs(pause=False)
-        if args.gui:
+        if not args.skip_plot:
+            debugger.show_all_imgs(pause=False)
             debugger.show_3d()
 
         savepath_3d = pathlib.PurePath(savepath)

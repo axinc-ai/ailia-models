@@ -8,7 +8,7 @@ import ailia
 import blazepose_utils as but
 
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
+from arg_utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from detector_utils import load_image  # noqa: E402C
 import webcamera_utils  # noqa: E402
@@ -46,6 +46,7 @@ parser = get_base_parser(
     'BlazePose, an on-device real-time body pose tracking.',
     IMAGE_PATH,
     SAVE_IMAGE_PATH,
+    fp16_support=False
 )
 parser.add_argument(
     '-m', '--model', metavar='ARCH',
@@ -367,7 +368,7 @@ def main():
     check_and_download_models(weight_path, model_path, REMOTE_PATH)
 
     env_id = args.env_id
-
+    
     # initialize
     det_net = ailia.Net(MODEL_DETECTOR_PATH, WEIGHT_DETECTOR_PATH, env_id=env_id)
     net = ailia.Net(model_path, weight_path, env_id=env_id)

@@ -10,7 +10,7 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
+from arg_utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from detector_utils import load_image  # noqa: E402
 
@@ -46,7 +46,7 @@ SAVE_IMAGE_PATH = 'result.png'
 # ======================
 # Arguemnt Parser Config
 # ======================
-parser = get_base_parser('deepfillv2 model', IMAGE_PATH, SAVE_IMAGE_PATH)
+parser = get_base_parser('deepfillv2 model', IMAGE_PATH, SAVE_IMAGE_PATH, fp16_support=False)
 parser.add_argument(
     '-m', '--model', default="places", choices=("places", "celeba"),
     help='mask type'
@@ -184,10 +184,6 @@ def main():
                     "\t(MODEL = celeba, IMG_RESOLUTION = 256)\n"
                     "\t(MODEL = places, IMG_RESOLUTION = 256 or 512 or 1024)")
         sys.exit(-1)
-
-    if "FP16" in ailia.get_environment(args.env_id).props or platform.system() == 'Darwin':
-        logger.warning('This model do not work on FP16. So use CPU mode.')
-        args.env_id = 0
 
     # model files check and download
     weight_path, model_path, img_shape = info[key]

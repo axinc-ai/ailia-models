@@ -13,7 +13,7 @@ sys.path.append('../../util')
 from classifier_utils import plot_results  # noqa: E402
 from image_utils import imread, load_image  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
-from utils import get_base_parser, update_parser  # noqa: E402
+from arg_utils import get_base_parser, update_parser  # noqa: E402
 from webcamera_utils import get_capture  # noqa: E402
 
 # ======================
@@ -97,9 +97,9 @@ parser.add_argument(
     help='Number of outputs for category.',
 )
 parser.add_argument(
-    '--gui',
+    '--cui',
     action='store_true',
-    help='Display preview in GUI.'
+    help="Don't display preview in GUI."
 )
 args = update_parser(parser)
 
@@ -160,7 +160,7 @@ def recognize_from_image():
             preview_img = imread(sorted_inputs_path[
                     next_input_index - args.duration
             ])
-            if args.gui:
+            if not args.cui:
                 cv2.imshow('preview', preview_img)
                 frame_shown = True
             

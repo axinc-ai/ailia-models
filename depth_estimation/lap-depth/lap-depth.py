@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 import ailia
 
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
+from arg_utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from detector_utils import load_image  # noqa: E402C
 import webcamera_utils  # noqa: E402

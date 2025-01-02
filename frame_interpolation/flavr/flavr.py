@@ -11,7 +11,7 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
+from arg_utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from detector_utils import load_image  # noqa: E402
 import webcamera_utils  # noqa: E402
@@ -38,7 +38,7 @@ SAVE_IMAGE_PATH = 'output.png'
 # ======================
 # Arguemnt Parser Config
 # ======================
-parser = get_base_parser('FLAVR model', IMAGE_PATH, SAVE_IMAGE_PATH)
+parser = get_base_parser('FLAVR model', IMAGE_PATH, SAVE_IMAGE_PATH, large_model=True)
 parser.add_argument(
     '-ip', '--interpolation', type=int, choices=(2, 4, 8), default=2,
     help='2x/4x/8x Interpolation'
@@ -53,7 +53,7 @@ parser.add_argument(
     default="256,448",
     help='Specify the size to resize.'
 )
-args = update_parser(parser, large_model=True)
+args = update_parser(parser)
 
 
 # ======================

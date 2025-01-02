@@ -17,7 +17,7 @@ from logging import getLogger  # noqa: E402
 import webcamera_utils  # noqa: E402
 from image_utils import imread, load_image  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
-from utils import get_base_parser, get_savepath, update_parser  # noqa: E402
+from arg_utils import get_base_parser, get_savepath, update_parser  # noqa: E402
 
 logger = getLogger(__name__)
 
@@ -46,9 +46,9 @@ parser.add_argument(
     'you can switch to the normal (not optimized) model'
 )
 parser.add_argument(
-    '--gui',
+    '--skip_plot',
     action='store_true',
-    help='Operate the detection result with GUI'
+    help='Skip showing 3D plot of result (for CUI)'
 )
 args = update_parser(parser)
 
@@ -476,7 +476,7 @@ def recognize_from_image():
         savepath_3d = savepath_3d.stem+"_3dpose"+savepath_3d.suffix
         logger.info(f'saved at : {savepath_3d}')
         plt.savefig(savepath_3d, dpi=120)
-        if args.gui:
+        if not args.skip_plot:
             plt.show()
 
     logger.info('Script finished successfully.')

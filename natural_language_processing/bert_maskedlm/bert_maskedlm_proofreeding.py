@@ -1,15 +1,15 @@
 import sys
 import codecs
 
-import torch
 import numpy
-from transformers import BertTokenizer, BertJapaneseTokenizer
+import os
+import shutil
 
 import ailia
 
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser  # noqa: E402
-from model_utils import check_and_download_models  # noqa: E402
+from arg_utils import get_base_parser, update_parser  # noqa: E402
+from model_utils import check_and_download_models, check_and_download_file  # noqa: E402
 
 
 # ======================
@@ -39,6 +39,11 @@ parser.add_argument(
     '-a', '--arch', metavar='ARCH',
     default='bert-base-japanese-whole-word-masking', choices=MODEL_LISTS,
     help='model lists: ' + ' | '.join(MODEL_LISTS)
+)
+parser.add_argument(
+    '--disable_ailia_tokenizer',
+    action='store_true',
+    help='disable ailia tokenizer.'
 )
 args = update_parser(parser)
 
@@ -120,12 +125,32 @@ def main():
     # model files check and download
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
 
-    if args.arch == 'bert-base-cased' or args.arch == 'bert-base-uncased':
-        tokenizer = BertTokenizer.from_pretrained(args.arch)
-    else:
-        tokenizer = BertJapaneseTokenizer.from_pretrained(
-            "cl-tohoku/"+args.arch
-        )
+    if args.arch == 'bert-base-cased':
+        if args.disable_ailia_tokenizer:
+            from transformers import BertTokenizer
+            tokenizer = BertTokenizer.from_pretrained('bert-base-cased')
+        else:
+            from ailia_tokenizer import BertTokenizer
+            tokenizer = BertTokenizer.from_pretrained("./tokenizer/bert-base-cased/")
+    elif args.arch == 'bert-base-uncased':
+        if args.disable_ailia_tokenizer:
+            from transformers import BertTokenizer
+            tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+        else:
+            from ailia_tokenizer import BertTokenizer
+            tokenizer = BertTokenizer.from_pretrained('./tokenizer/bert-base-uncased/')
+    elif args.arch == 'bert-base-japanese-whole-word-masking':
+        if args.disable_ailia_tokenizer:
+            from transformers import BertJapaneseTokenizer
+            tokenizer = BertJapaneseTokenizer.from_pretrained(
+                'cl-tohoku/bert-base-japanese-whole-word-masking'
+            )
+        else:
+            from ailia_tokenizer import BertJapaneseWordPieceTokenizer
+            check_and_download_file("ipadic.zip", REMOTE_PATH)
+            if not os.path.exists("ipadic"):
+                shutil.unpack_archive('ipadic.zip', '')
+            tokenizer = BertJapaneseWordPieceTokenizer.from_pretrained(dict_path='ipadic', pretrained_model_name_or_path='./tokenizer/bert-base-japanese-whole-word-masking/')
 
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
     net.set_input_blob_shape(
@@ -171,8 +196,7 @@ def main():
             index = target_ids[0]
             score[masked_index] = outputs[0][0, masked_index][index]
 
-            predictions = torch.from_numpy(outputs[0][0, masked_index]).topk(1)
-            index = predictions.indices[0]
+            index = numpy.argmax(outputs[0][0, masked_index])
             top_token = tokenizer.convert_ids_to_tokens([index])[0]
             suggest[masked_index] = top_token
 

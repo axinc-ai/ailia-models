@@ -10,7 +10,7 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser  # noqa: E402
+from arg_utils import get_base_parser, update_parser  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 import webcamera_utils  # noqa: E402
 
@@ -631,12 +631,11 @@ def recognize_from_image():
             logger.info('BENCHMARK mode')
             for i in range(args.benchmark_count):
                 start = int(round(time.time() * 1000))
-                cmap = cnet.run(image1)[0]
+                net, up_mask, delta_flow = update_block.run([net, inp, corr, flow])
                 end = int(round(time.time() * 1000))
                 logger.info(f'\tailia processing time {end - start} ms')
         else:
-            cmap = cnet.run(image1)[0]
-        net, up_mask, delta_flow = update_block.run([net, inp, corr, flow])
+            net, up_mask, delta_flow = update_block.run([net, inp, corr, flow])
 
         # F(t+1) = F(t) + \Delta(t)
         coords1 = coords1 + delta_flow
@@ -690,15 +689,15 @@ def recognize_from_video():
     frame_before = frame_before[..., ::-1]  # BGR2RGB
     
     frame_shown = False
-    while(True):
+    while True:
         # read frame
         ret, frame_after = capture.read()
-        if RESIZE_ENABLE:
-            frame_after = cv2.resize(frame_after, (W,H))
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:
             break
         if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
             break
+        if RESIZE_ENABLE:
+            frame_after = cv2.resize(frame_after, (W,H))
 
         # preprocessing
         frame_after = frame_after[..., ::-1]  # BGR2RGB
@@ -763,12 +762,11 @@ def recognize_from_video():
                 logger.info('BENCHMARK mode')
                 for i in range(args.benchmark_count):
                     start = int(round(time.time() * 1000))
-                    cmap = cnet.run(image1)[0]
+                    net, up_mask, delta_flow = update_block.run([net, inp, corr, flow])
                     end = int(round(time.time() * 1000))
                     logger.info(f'\tailia processing time {end - start} ms')
             else:
-                cmap = cnet.run(image1)[0]
-            net, up_mask, delta_flow = update_block.run([net, inp, corr, flow])
+                net, up_mask, delta_flow = update_block.run([net, inp, corr, flow])
 
             # F(t+1) = F(t) + \Delta(t)
             coords1 = coords1 + delta_flow

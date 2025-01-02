@@ -21,7 +21,7 @@ import webcamera_utils  # noqa: E402
 from classifier_utils import plot_results, print_results  # noqa: E402
 from image_utils import imread, load_image  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
-from utils import get_base_parser, update_parser  # noqa: E402
+from arg_utils import get_base_parser, update_parser  # noqa: E402
 
 logger = getLogger(__name__)
 
@@ -42,6 +42,7 @@ parser = get_base_parser(
     'Vision Transformer',
     IMAGE_OR_VIDEO_PATH,
     SAVE_IMAGE_OR_VIDEO_PATH,
+    fp16_support=False
 )
 parser.add_argument(
     '-m', '--model', metavar='MODEL',
@@ -268,10 +269,6 @@ def recognize_from_video():
 def main():
     # model files check and download
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
-
-    if "FP16" in ailia.get_environment(args.env_id).props or platform.system() == 'Darwin':
-        logger.warning('This model do not work on FP16. So use CPU mode.')
-        args.env_id = 0
 
     if args.video is not None:
         # video mode

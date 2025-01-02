@@ -14,7 +14,7 @@ from logging import getLogger  # noqa: E402
 import webcamera_utils  # noqa: E402
 from image_utils import imread  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
-from utils import get_base_parser, get_savepath, update_parser  # noqa: E402
+from arg_utils import get_base_parser, get_savepath, update_parser  # noqa: E402
 
 logger = getLogger(__name__)
 
@@ -38,7 +38,7 @@ FRAMEWORK_LISTS = ['keras', 'torch']
 # ======================
 # Arguemnt Parser Config
 # ======================
-parser = get_base_parser('Deep Image Matting', IMAGE_PATH, SAVE_IMAGE_PATH)
+parser = get_base_parser('Deep Image Matting', IMAGE_PATH, SAVE_IMAGE_PATH, fp16_support=False)
 parser.add_argument(
     '-t', '--trimap', metavar='IMAGE',
     default=TRIMAP_PATH,
@@ -424,12 +424,11 @@ def main():
     )
 
     # net initialize
-    env_id = 0  # use cpu because overflow fp16 range
     if args.onnx:
         import onnxruntime
         net = onnxruntime.InferenceSession(WEIGHT_PATH)
     else:
-        net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id)
+        net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id)
 
     if args.video is not None:
         # video mode

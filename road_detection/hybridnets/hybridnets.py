@@ -14,7 +14,7 @@ sys.path.append('../../util')
 import webcamera_utils  # noqa: E402
 from image_utils import imread  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
-from utils import get_base_parser, get_savepath, update_parser
+from arg_utils import get_base_parser, get_savepath, update_parser
 
 WEIGHT_PATH = 'hybridnets.onnx'
 MODEL_PATH  = 'hybridnets.onnx.prototxt'
@@ -125,7 +125,9 @@ def recognize_from_image():
 
     t0 = time.time()
 
-    model = ailia.Net(None,args.model_name)
+    model = ailia.Net(None,args.model_name, env_id=args.env_id)
+    if args.profile:
+        model.set_profile_mode(True)
     
     color_list = standard_to_bgr(STANDARD_COLORS)
     
@@ -168,6 +170,9 @@ def recognize_from_image():
             cap.release()
             out_stream.release()
 
+    if args.profile:
+        print(model.get_summary())
+
     logger.info('Script finished successfully.')
 
 def recognize_from_video():
@@ -178,7 +183,7 @@ def recognize_from_video():
         writer = webcamera_utils.get_writer(args.savepath, HEIGHT, WIDTH)
     else:
         writer = None
-    model = ailia.Net(None,args.model_name)
+    model = ailia.Net(None,args.model_name, env_id=args.env_id)
     while (True):
         ret, frame = capture.read()
         if (cv2.waitKey(1) & 0xFF == ord('q')) or not ret:

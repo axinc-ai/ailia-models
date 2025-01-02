@@ -7,7 +7,7 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser  # noqa: E402
+from arg_utils import get_base_parser, update_parser  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from math_utils import softmax  # noqa: E402
 import webcamera_utils  # noqa: E402
@@ -38,9 +38,9 @@ IMAGE_SIZE = 224
 
 parser = get_base_parser('driver-action-recognition-adas', VIDEO_PATH, None)
 parser.add_argument(
-    '--gui',
+    '--cui',
     action='store_true',
-    help='Display preview in GUI.'
+    help="Don't display preview in GUI."
 )
 args = update_parser(parser)
 
@@ -152,7 +152,7 @@ def recognize_from_video(enc, dec):
 
         frame = render_frame(frame, display_text)
 
-        if args.gui or args.video:
+        if not args.cui or args.video:
             cv2.imshow('frame', frame)
             frame_shown = True
         else:
