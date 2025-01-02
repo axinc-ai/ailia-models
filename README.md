@@ -17,9 +17,10 @@ If you would like to try on your computer:
 [ailia MODELS tutorial 日本語版](TUTORIAL_jp.md)
 
 # Supported models
-372 models as of January 1st, 2025
+374 models as of January 2nd, 2025
 
 # Latest update
+- 2025.01.02 Add qwen_audio, audiosep
 - 2025.01.01 Add RT-DETRv2, gazelle, lama, anything_v3, depth_anything_controlnet, deepfacelive, llava-jp
 - 2024.12.31 Add clip-japanese-base, timesfm
 - 2024.12.29 Add SAM2.1, span
