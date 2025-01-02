@@ -33,7 +33,7 @@ IMAGE_WIDTH = 32
 # ======================
 # Argument Parser Config
 # ======================
-parser = get_base_parser("ConvNeXt is ", IMAGE_PATH, None,)
+parser = get_base_parser("ConvNeXt is ", IMAGE_PATH, None, fp16_support=False)
 parser.add_argument('-m', '--model', metavar='MODEL',
                     default="base_1k", choices=['base_1k', 'small_1k', 'tiny_1k', 'cifar10'])
 args = update_parser(parser)
@@ -137,10 +137,6 @@ def recognize_from_video(net, classes):
     logger.info('Script finished successfully.')
 
 def main():
-    if "FP16" in ailia.get_environment(args.env_id).props or platform.system() == 'Darwin':
-        logger.warning('This model do not work on FP16. So use CPU mode.')
-        args.env_id = 0
-
     if args.model == 'base_1k':
         # model files check and download
         check_and_download_models(BASE_1k_WEIGHT_PATH, BASE_1k_MODEL_PATH, REMOTE_PATH)

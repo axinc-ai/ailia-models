@@ -1,0 +1,2 @@
+pyopenjtalk
+num2words

@@ -5,8 +5,6 @@ import numpy as np
 import cv2
 from PIL import Image
 
-from transformers import T5Tokenizer
-
 import ailia
 
 # import original modules
@@ -61,6 +59,11 @@ parser.add_argument(
     '--onnx',
     action='store_true',
     help='execute onnxruntime version.'
+)
+parser.add_argument(
+    '--disable_ailia_tokenizer',
+    action='store_true',
+    help='disable ailia tokenizer.'
 )
 args = update_parser(parser)
 
@@ -284,7 +287,15 @@ def main():
         net_image = onnxruntime.InferenceSession(WEIGHT_IMAGE_PATH)
         net_text = onnxruntime.InferenceSession(WEIGHT_TEXT_PATH)
 
-    tokenizer = T5Tokenizer.from_pretrained("tokenizer")
+    if args.disable_ailia_tokenizer:
+        from transformers import T5Tokenizer
+        tokenizer = T5Tokenizer.from_pretrained("tokenizer")
+    else:
+        from ailia_tokenizer import T5Tokenizer
+        tokenizer = T5Tokenizer.from_pretrained("./tokenizer/")
+        tokenizer.add_special_tokens({"pad_token" : "[PAD]"})
+        tokenizer.cls_token_id = 4
+        tokenizer.bos_token_id = 1
 
     models = {
         "tokenizer": tokenizer,

@@ -373,38 +373,28 @@ def mean(signals, win_length=9):
     """
 
     assert signals.ndim == 2, "Input tensor must have 2 dimensions (batch_size, width)"
-    signals = np.expand_dims(signals, axis=1)
+    
+    def apply_convolution(array, kernel):
+        pad_width = win_length // 2
+        padded_array = np.pad(array, ((0, 0), (pad_width, pad_width)), mode='constant', constant_values=0)
+        convolved = np.array([
+            np.convolve(padded_array[i, :], kernel, mode='valid')
+            for i in range(padded_array.shape[0])
+        ])
+        return convolved
 
     # Apply the mask by setting masked elements to zero, or make NaNs zero
     mask = ~np.isnan(signals)
     masked_x = np.where(mask, signals, np.zeros(signals.shape))
 
     # Create a ones kernel with the same number of channels as the input tensor
-    ones_kernel = np.ones((signals.shape[1], 1, win_length))
-
-    import torch
-    from torch.nn import functional as F
-
-    masked_x = torch.from_numpy(masked_x).float()
-    mask = torch.from_numpy(mask).float()
-    ones_kernel = torch.from_numpy(ones_kernel).float()
+    ones_kernel = np.ones(win_length)
 
     # Perform sum pooling
-    sum_pooled = F.conv1d(
-        masked_x,
-        ones_kernel,
-        stride=1,
-        padding=win_length // 2,
-    )
+    sum_pooled = apply_convolution(masked_x, ones_kernel)
+
     # Count the non-masked (valid) elements in each pooling window
-    valid_count = F.conv1d(
-        mask,
-        ones_kernel,
-        stride=1,
-        padding=win_length // 2,
-    )
-    sum_pooled = np.asarray(sum_pooled)
-    valid_count = np.asarray(valid_count)
+    valid_count = apply_convolution(mask.astype(float), ones_kernel)
 
     valid_count = np.clip(valid_count, 1, None)  # Avoid division by zero
 
@@ -414,7 +404,7 @@ def mean(signals, win_length=9):
     # Fill zero values with NaNs
     avg_pooled[avg_pooled == 0] = float("nan")
 
-    return np.squeeze(avg_pooled, axis=1)
+    return avg_pooled
 
 
 def median(signals, win_length):

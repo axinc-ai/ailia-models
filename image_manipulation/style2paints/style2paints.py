@@ -48,9 +48,9 @@ SAVE_IMAGE_PATH = 'output.png'
 # ======================
 
 parser = get_base_parser(
-    'Style2Paints model', IMAGE_PATH, SAVE_IMAGE_PATH
+    'Style2Paints model', IMAGE_PATH, SAVE_IMAGE_PATH, large_model=True
 )
-args = update_parser(parser, large_model=True)
+args = update_parser(parser)
 
 
 

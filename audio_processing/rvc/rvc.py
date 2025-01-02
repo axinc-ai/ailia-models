@@ -97,6 +97,10 @@ parser.add_argument(
     help='specify .onnx file'
 )
 parser.add_argument(
+    '--version', default=1, choices=[1, 2], type=int,
+    help='specify rvc version'
+)
+parser.add_argument(
     '--onnx',
     action='store_true',
     help='execute onnxruntime version.'
@@ -281,7 +285,11 @@ def vc(
         output = hubert.predict([feats, padding_mask])
     else:
         output = hubert.run(None, {'source': feats, 'padding_mask': padding_mask})
-    feats = output[0]
+
+    if args.version == 1:
+        feats = output[0] # v1 : 256
+    elif args.version == 2:
+        feats = hubert.get_blob_data(hubert.find_blob_index_by_name("/encoder/Slice_5_output_0")) # v2 : 768
 
     if protect < 0.5 and pitch is not None and pitchf is not None:
         feats0 = np.copy(feats)

@@ -35,7 +35,7 @@ def melspectrogram(wav, ailia_audio):
     else:
         D = librosa.stft(y=wav, n_fft=n_fft, hop_length=hop_size, win_length=win_size) # default args : window="hann", center=True, pad_mode="reflect"
         D = np.abs(D)
-        _mel_basis = librosa.filters.mel(sample_rate, n_fft, n_mels=num_mels, fmin=fmin, fmax=fmax) # default atgs : htk=False, norm="slaney"
+        _mel_basis = librosa.filters.mel(sr=sample_rate, n_fft=n_fft, n_mels=num_mels, fmin=fmin, fmax=fmax) # default args : htk=False, norm="slaney"
         D = np.dot(_mel_basis, D)
     S = _amp_to_db(D) - ref_level_db
     return _normalize(S)

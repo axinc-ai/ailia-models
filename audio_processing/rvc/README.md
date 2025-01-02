@@ -55,6 +55,11 @@ By adding the `--file_index` option, you can specify faiss feature file.
 python3 rvc.py -i booth.wav -m Rinne.onnx --f0_method crepe --f0 1 --f0_up_key 11 --tgt_sr 48000 --file_index Rinne.index --index_rate 0.75
 ```
 
+By adding the `--version` option, you can specify rvc model file version.
+```bash
+$ python3 rvc.py --model_file rvc_v2.onnx --version 2
+```
+
 ## Reference
 
 - [Retrieval-based-Voice-Conversion-WebUI](https://github.com/RVC-Project/Retrieval-based-Voice-Conversion-WebUI)
