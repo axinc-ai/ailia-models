@@ -13,7 +13,7 @@ Default input: bus_chatter.wav
 
 feature (numpy file)
 ```
-feature.wav
+feature.npy
 ```
 
 
@@ -28,7 +28,8 @@ $ python3 vggish.py
 
 If you want to specify the input file, put the path after the `--input` option.
 ```bash
-$ python3 vggish.py --input IMAGE_PATH
+$ python3 vggish.py --input AUDIO_PATH
+```
 ```
 
 
