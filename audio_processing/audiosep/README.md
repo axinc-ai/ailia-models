@@ -10,6 +10,8 @@ https://github.com/axinc-ai/ailia-models/assets/53651931/4b761212-a1c7-46dc-b598
 
 This audio file was adapted from the [official audiosep implementation](https://github.com/Audio-AGI/AudioSep)
 
+https://audio-agi.github.io/Separate-Anything-You-Describe/demos/exp31_water/drops_mixture.wav
+
 * **Text condition**
 
 Text description of the sound source you want to separate.
