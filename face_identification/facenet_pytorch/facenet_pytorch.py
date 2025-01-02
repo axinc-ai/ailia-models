@@ -2,6 +2,7 @@ import os
 import sys
 import time
 from logging import getLogger
+import json
 
 import ailia
 import cv2
@@ -31,6 +32,11 @@ parser.add_argument(
     '-w', '--weight', default='vggface2',
     choices=['vggface2', 'casia-webface'],
     help='You can choose the model weights.'
+)
+parser.add_argument(
+    '--write_json',
+    action='store_true',
+    help='Flag to output results to json file.'
 )
 args = update_parser(parser)
 
@@ -130,6 +136,14 @@ def main():
     # results
     np.set_printoptions(linewidth=1000)
     logger.info('Similarity: \n' + np.array2string(attach_label(sim_matrix, filenames)))
+
+    if args.write_json:
+        result = attach_label(sim_matrix, filenames)
+        out_data = []
+        for r in result:
+            out_data.append(tuple(r))
+        with open('output.json', 'w', encoding='utf-8') as f:
+            json.dump(out_data, f, indent=2)
 
 if __name__ == '__main__':
     main()

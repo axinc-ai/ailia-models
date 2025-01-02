@@ -58,11 +58,9 @@ def get_landmark(filepath, args, face_alignment_path, face_detector_path):
             # lm is a shape=(68,2) np.array
     else: 
         from psgan.preprocess import PreProcess
-        from setup import setup_config
 
-        config = setup_config(args)
         preprocess = PreProcess(
-                config, args, None, face_alignment_path, face_detector_path, need_parser=False, return_landmarks=True
+                args, None, face_alignment_path, face_detector_path, need_parser=False, return_landmarks=True
             )
 
         image = PIL.Image.open(filepath).convert("RGB")

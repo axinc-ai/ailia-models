@@ -74,9 +74,9 @@ parser.add_argument(
           'if the person in two images is the same person or not.')
 )
 parser.add_argument(
-    '--gui',
+    '--cui',
     action='store_true',
-    help='Display preview in GUI.'
+    help="Don't display preview in GUI."
 )
 args = update_parser(parser)
 
@@ -228,7 +228,7 @@ def recognize_from_video():
 
             results.append((idx_frame - 1, bbox_tlwh, identities))
 
-        if args.gui or args.video:
+        if not args.cui or args.video:
             cv2.imshow('frame', frame)
             frame_shown = True
         else:

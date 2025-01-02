@@ -52,7 +52,7 @@ IMAGE_SIZE = 224
 # ======================
 
 parser = get_base_parser(
-    'CLIP', IMAGE_PATH, SAVE_IMAGE_PATH
+    'CLIP', IMAGE_PATH, SAVE_IMAGE_PATH, fp16_support=False
 )
 parser.add_argument(
     '-t', '--text', dest='text_inputs', type=str,

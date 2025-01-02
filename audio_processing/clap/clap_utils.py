@@ -1,5 +1,7 @@
 import numpy as np
 import librosa
+import ailia.audio
+from skimage.transform import resize
 
 
 def int16_to_float32(x):
@@ -56,8 +58,36 @@ def get_mel(audio_data, audio_cfg):
 
     return mel_librosa
 
+def get_mel_ailia(audio_data, audio_cfg):
+    mel = ailia.audio.mel_spectrogram(
+        audio_data,
+        sample_rate=audio_cfg['sample_rate'],
+        fft_n=audio_cfg['window_size'],
+        hop_n=audio_cfg['hop_size'],
+        win_n=audio_cfg['window_size'],
+        win_type=1, # hann
+        center_mode=1,
+        power=2.0,
+        fft_norm_type=None,
+        f_min=audio_cfg['fmin'],
+        f_max=audio_cfg['fmax'],
+        mel_n=64,
+        mel_norm=False,
+        htk=True
+    )
 
-def get_audio_features(sample, audio_data, max_len, data_truncating, data_filling, audio_cfg):
+    def power_to_db(S, ref=1.0, amin=1e-10, top_db=80.0):
+        S[(S >= 0) & (S < amin)] = amin
+        S[(S < 0) & (S > -amin)] = -amin
+        return 10 * np.log10(S / ref)
+    
+    mel_db = power_to_db(np.square(mel), top_db=None)
+    mel_db = mel_db.transpose(1, 0)
+    
+    return mel_db
+
+
+def get_audio_features(sample, audio_data, max_len, data_truncating, data_filling, audio_cfg, b_use_ailia=False):
     """
     Calculate and add audio features to sample.
     Sample: a dict containing all the data of current sample.
@@ -67,10 +97,11 @@ def get_audio_features(sample, audio_data, max_len, data_truncating, data_fillin
     data_filling: the method of filling data.
     audio_cfg: a dict containing audio configuration. Comes from model_cfg['audio_cfg'].
     """
+    mel_func = get_mel_ailia if b_use_ailia else get_mel
     if len(audio_data) > max_len:
         if data_truncating == "fusion":
             # fusion
-            mel = get_mel(audio_data, audio_cfg)
+            mel = mel_func(audio_data, audio_cfg)
             # split to three parts
             chunk_frames = max_len // audio_cfg['hop_size']+1  # the +1 related to how the spectrogram is computed
             total_frames = mel.shape[0]
@@ -102,11 +133,11 @@ def get_audio_features(sample, audio_data, max_len, data_truncating, data_fillin
                 mel_chunk_back = mel[idx_back:idx_back+chunk_frames, :]
 
                 # shrink the mel
-                # Output may differ between torchvision.transforms.Resize and numpy.resize.
+                # Output may differ between torchvision.transforms.Resize and skimage.transform.resize.
                 #mel_shrink_torch = torch.from_numpy(mel[None])
                 #mel_shrink_torch = torchvision.transforms.Resize(size=[chunk_frames, 64])(mel_shrink_torch)[0]
                 #mel_shrink_torch = mel_shrink_torch.to('cpu').detach().numpy().copy()
-                mel_shrink_numpy = np.resize(mel[None], (chunk_frames, 64))
+                mel_shrink_numpy = resize(mel, (chunk_frames, 64), preserve_range=True, anti_aliasing=True, mode='edge')
                 # logging.info(f"mel_shrink.shape: {mel_shrink.shape}")
 
                 # stack
@@ -132,7 +163,7 @@ def get_audio_features(sample, audio_data, max_len, data_truncating, data_fillin
                 audio_data = np.tile(audio_data, n_repeat+1)[:max_len]
                 
         if data_truncating == 'fusion':
-            mel = get_mel(audio_data, audio_cfg)
+            mel = mel_func(audio_data, audio_cfg)
             mel_fusion = np.stack([mel, mel, mel, mel], axis=0)
         longer = [[False]]
 
