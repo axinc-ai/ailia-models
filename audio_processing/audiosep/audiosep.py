@@ -6,7 +6,6 @@ from logging import getLogger
 import scipy
 import librosa
 import numpy as np
-from transformers import RobertaTokenizer
 
 import ailia
 
@@ -47,6 +46,12 @@ parser.add_argument(
     "-i", "--input", metavar="TEXT", type=str,
     default="water drops",
     help="Text query."
+)
+
+parser.add_argument(
+    '--disable_ailia_tokenizer',
+    action='store_true',
+    help='disable ailia tokenizer.'
 )
 
 args = update_parser(parser, check_input_type=False)
@@ -196,6 +201,8 @@ def inference(model, input_text, input_wav):
     text_prompt_tkn = dict(tokenizer(input_text, return_tensors = 'np', padding = True))
     text_prompt_tkn = (text_prompt_tkn['input_ids'], text_prompt_tkn['attention_mask'])
 
+    print(text_prompt_tkn)
+
     # prepare audio input
     mag, cosin, sinin = wav_to_spectrogram(input_wav)
     orig_len = mag.shape[-1]
@@ -266,10 +273,16 @@ def main():
     # initialize
     querynet = ailia.Net(None, QUERY_WEIGHT_PATH, env_id=env_id)
     sepnet = ailia.Net(None, SEPNET_WEIGHT_PATH)
+    if args.disable_ailia_tokenizer:
+        from transformers import RobertaTokenizer
+        tokenizer = RobertaTokenizer.from_pretrained('roberta-base')
+    else:
+        import ailia_tokenizer
+        tokenizer = ailia_tokenizer.RobertaTokenizer.from_pretrained('./tokenizer/')
     model = {
         'querynet': querynet,
         'sepnet':sepnet,
-        'tokenizer':RobertaTokenizer.from_pretrained('roberta-base')
+        'tokenizer':tokenizer
     }
 
     split_audio(model)
