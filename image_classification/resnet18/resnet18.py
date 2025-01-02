@@ -1,20 +1,23 @@
-import time
 import sys
-
-import cv2
+import time
 
 import ailia
+import cv2
+
 import resnet18_labels
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser  # noqa: E402
-from model_utils import check_and_download_models  # noqa: E402
-from classifier_utils import plot_results, print_results  # noqa: E402
-import webcamera_utils  # noqa: E402
-
 # logger
-from logging import getLogger   # noqa: E402
+from logging import getLogger  # noqa: E402
+
+import webcamera_utils  # noqa: E402
+from classifier_utils import (plot_results, print_results,  # noqa: E402
+                              write_predictions)
+from image_utils import imread  # noqa: E402
+from model_utils import check_and_download_models  # noqa: E402
+from arg_utils import get_base_parser, get_savepath, update_parser  # noqa: E402
+
 logger = getLogger(__name__)
 
 
@@ -35,8 +38,15 @@ SLEEP_TIME = 0
 parser = get_base_parser(
     'Resnet18 ImageNet classification model', IMAGE_PATH, None
 )
-
+parser.add_argument(
+    '-w', '--write_prediction',
+    action='store_true',
+    help='Flag to output the prediction file.'
+)
 args = update_parser(parser)
+
+if args.write_prediction:
+    MAX_CLASS_COUNT = 5
 
 IMAGE_RANGE = ailia.NETWORK_IMAGE_RANGE_IMAGENET
 
@@ -80,7 +90,7 @@ def recognize_from_image():
     for image_path in args.input:
         # prepare input data
         logger.info(image_path)
-        img = cv2.imread(image_path, cv2.IMREAD_UNCHANGED)
+        img = imread(image_path, cv2.IMREAD_UNCHANGED)
         img = preprocess_image(img)
 
         # inference
@@ -94,8 +104,17 @@ def recognize_from_image():
                 logger.info(f'\tailia processing time {end - start} ms')
         else:
             classifier.compute(img, MAX_CLASS_COUNT)
+
         # show results
         print_results(classifier, resnet18_labels.imagenet_category)
+
+        # write prediction
+        if args.write_prediction:
+            savepath = get_savepath(args.savepath, image_path)
+            pred_file = '%s.txt' % savepath.rsplit('.', 1)[0]
+            write_predictions(pred_file, classifier, resnet18_labels.imagenet_category)
+
+    logger.info('Script finished successfully.')
 
 
 def recognize_from_video():

@@ -1,22 +1,24 @@
 #ailia detector api sample
-import numpy as np
-import time
 import os
 import sys
-import cv2
-from yolor_utils import COCO_CATEGORY,non_max_suppression_numpy,scale_coords
+import time
 
 import ailia
+import cv2
+import numpy as np
+
+from yolor_utils import COCO_CATEGORY, non_max_suppression_numpy, scale_coords
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath
-from model_utils import check_and_download_models
-from detector_utils import reverse_letterbox, plot_results
-import webcamera_utils
-
 # logger
 from logging import getLogger
+
+import webcamera_utils
+from detector_utils import plot_results, reverse_letterbox, write_predictions
+from image_utils import imread  # noqa: E402
+from model_utils import check_and_download_models
+from arg_utils import get_base_parser, get_savepath, update_parser
 
 logger = getLogger(__name__)
 
@@ -33,7 +35,14 @@ parser.add_argument(
     default='yolor_w6',
     help='yolor_p6, yolor_w6]'
 )
-
+parser.add_argument(
+    '-w', '--write_prediction',
+    nargs='?',
+    const='txt',
+    choices=['txt', 'json'],
+    type=str,
+    help='Output results to txt or json file.'
+)
 args = update_parser(parser)
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/yolor/'
 MODEL_NAME = args.model_name
@@ -56,7 +65,7 @@ def recognize_from_image():
     for image_path in args.input:
         # prepare input data
         logger.debug(f'input image: {image_path}')
-        raw_img = cv2.imread(image_path)
+        raw_img = imread(image_path)
         img = cv2.resize(raw_img, dsize=(1280, 896))
         img = np.transpose(img, (2, 0, 1))
         img = np.expand_dims(img, 0)
@@ -101,6 +110,12 @@ def recognize_from_image():
         savepath = get_savepath(args.savepath, image_path)
         logger.info(f'saved at : {savepath}')
         cv2.imwrite(savepath, res_img)
+
+        # write prediction
+        if args.write_prediction is not None:
+            ext = args.write_prediction
+            pred_file = "%s.%s" % (savepath.rsplit('.', 1)[0], ext)
+            write_predictions(pred_file, detect_object, raw_img, category=COCO_CATEGORY, file_type=ext)
 
     logger.info('Script finished successfully.')
 

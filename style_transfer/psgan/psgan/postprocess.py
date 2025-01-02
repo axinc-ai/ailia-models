@@ -4,9 +4,12 @@ from PIL import Image
 
 
 class PostProcess:
-    def __init__(self, config):
-        self.denoise = config.POSTPROCESS.WILL_DENOISE
-        self.img_size = config.DATA.IMG_SIZE
+    def __init__(self):
+        POSTPROCESS_WILL_DENOISE = False
+        DATA_IMG_SIZE = 256
+
+        self.denoise = POSTPROCESS_WILL_DENOISE
+        self.img_size = DATA_IMG_SIZE
 
     def __call__(self, source: Image, result: Image):
         # TODO: Refract -> name, resize
@@ -15,9 +18,9 @@ class PostProcess:
 
         height, width = source.shape[:2]
         small_source = cv2.resize(source, (self.img_size, self.img_size))
-        laplacian_diff = source.astype(np.float) - cv2.resize(
+        laplacian_diff = source.astype(float) - cv2.resize(
             small_source, (width, height)
-        ).astype(np.float)
+        ).astype(float)
         result = (
             (cv2.resize(result, (width, height)) + laplacian_diff)
             .round()

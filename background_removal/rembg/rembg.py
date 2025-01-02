@@ -1,15 +1,20 @@
 import sys
+import time
 
 import numpy as np
 import cv2
 from pymatting.alpha.estimate_alpha_cf import estimate_alpha_cf
+from pymatting.alpha.estimate_alpha_knn import estimate_alpha_knn
+from pymatting.alpha.estimate_alpha_lbdm import estimate_alpha_lbdm
+from pymatting.alpha.estimate_alpha_lkm import estimate_alpha_lkm
+from pymatting.alpha.estimate_alpha_rw import estimate_alpha_rw
 from scipy.ndimage import binary_erosion
 
 import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath  # noqa
+from arg_utils import get_base_parser, update_parser, get_savepath  # noqa
 from model_utils import check_and_download_models  # noqa
 from detector_utils import load_image  # noqa
 from image_utils import normalize_image  # noqa
@@ -42,6 +47,27 @@ parser.add_argument(
     action='store_true',
     help='Composite input image and predicted alpha value'
 )
+parser.add_argument(
+    '-a', '--algorithm',
+    default='cf', type=str,
+    help='Algorithm to estimate alpha value.'
+        'cf: confidence-based'
+        'knn: k-nearest neighbor'
+        'lbdm: local binary descriptor matching'
+        'lkm: local k-means'
+        'rw: random walk'
+)
+parser.add_argument(
+    '-w', '--width',
+    default=IMAGE_SIZE, type=int,
+    help='The segmentation width for u2net. (default: 320)'
+)
+parser.add_argument(
+    '-h', '--height',
+    default=IMAGE_SIZE, type=int,
+    help='The segmentation height for u2net. (default: 320)'
+)
+args = update_parser(parser)
 args = update_parser(parser)
 
 
@@ -111,11 +137,16 @@ def estimate_alpha(
     trimap[is_foreground] = 255
     trimap[is_background] = 0
 
+    # fix trimap did not contain foreground values
+    if not(255 in trimap):
+        return np.zeros(mask.shape)
+
     # build the cutout image
     img_normalized = img / 255.0
     trimap_normalized = trimap / 255.0
 
-    alpha = estimate_alpha_cf(img_normalized, trimap_normalized)
+    estimate_alpha_func = 'estimate_alpha_' + args.algorithm
+    alpha = globals()[estimate_alpha_func](img_normalized, trimap_normalized)
     alpha = np.clip(alpha * 255, 0, 255).astype(np.uint8)
 
     return alpha
@@ -150,12 +181,24 @@ def recognize_from_image(net):
         img = load_image(image_path)
         img = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
 
-        # inference
-        mask = predict(net, img)
+        if args.benchmark:
+            logger.info('BENCHMARK mode')
+            total_time = 0
+            for i in range(args.benchmark_count):
+                start = int(round(time.time() * 1000))
+                mask = predict(net, img)
+                res_img = estimate_alpha(img, mask)
+                end = int(round(time.time() * 1000))
+                if i != 0:
+                    total_time = total_time + (end - start)
+                logger.info(f'\tailia processing time {end - start} ms')
+            logger.info(f'\taverage time {total_time / (args.benchmark_count-1)} ms')
+        else:            
+            # inference
+            mask = predict(net, img)
 
-        # refine alpha
-        # res_img = mask
-        res_img = estimate_alpha(img, mask)
+            # refine alpha
+            res_img = estimate_alpha(img, mask)
 
         if args.composite:
             img = cv2.cvtColor(img, cv2.COLOR_BGR2BGRA)
@@ -226,6 +269,8 @@ def main():
 
     # net initialize
     net = ailia.Net(MASK_MODEL_PATH, MASK_WEIGHT_PATH, env_id=env_id)
+    if args.width!=IMAGE_SIZE or args.height!=IMAGE_SIZE:
+        net.set_input_shape((1,3,args.height,args.width))
 
     if args.video is not None:
         recognize_from_video(net)

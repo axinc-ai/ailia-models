@@ -1,15 +1,21 @@
-import cv2
-import numpy as np
 import os
 import random
+import sys
 
+import cv2
+import numpy as np
 import torch
-from torchvision import transforms
 from torch.utils import data
+from torchvision import transforms
 
 from lib_3d_bbox.File import *
 
 from .ClassAverages import ClassAverages
+
+sys.path.append(os.path.join(os.path.dirname(__file__), "../../../util"))
+
+from image_utils import imread  # noqa: E402
+
 
 # TODO: clean up where this is
 def generate_bins(bins):
@@ -82,7 +88,7 @@ class Dataset(data.Dataset):
 
         if id != self.curr_id:
             self.curr_id = id
-            self.curr_img = cv2.imread(self.top_img_path + '%s.png'%id)
+            self.curr_img = imread(self.top_img_path + '%s.png'%id)
 
         label = self.labels[id][str(line_num)]
         # P doesn't matter here
@@ -220,7 +226,7 @@ class Dataset(data.Dataset):
         for id in self.ids:
             data[id] = {}
             img_path = self.top_img_path + '%s.png'%id
-            img = cv2.imread(img_path)
+            img = imread(img_path)
             data[id]['Image'] = img
 
             # using p per frame
@@ -281,7 +287,7 @@ class DetectedObject:
     def format_img(self, img, box_2d):
 
         # Should this happen? or does normalize take care of it. YOLO doesnt like
-        # img=img.astype(np.float) / 255
+        # img=img.astype(float) / 255
 
         # torch transforms
         normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],

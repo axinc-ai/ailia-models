@@ -1,18 +1,19 @@
 import sys
 import time
-import numpy as np
-import cv2
 
 import ailia
+import cv2
+import numpy as np
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
-from model_utils import check_and_download_models  # noqa: E402
-import webcamera_utils  # noqa: E402 noqa: E402
-
 # logger
 from logging import getLogger  # noqa: E402
+
+import webcamera_utils  # noqa: E402 noqa: E402
+from image_utils import imread  # noqa: E402
+from model_utils import check_and_download_models  # noqa: E402
+from arg_utils import get_base_parser, get_savepath, update_parser  # noqa: E402
 
 logger = getLogger(__name__)
 
@@ -87,7 +88,7 @@ def recognize_from_image():
     for image_path in args.input:
         # prepare input data
         logger.debug(f'input image: {image_path}')
-        img = cv2.imread(image_path)
+        img = imread(image_path)
         img = cv2.resize(img, (WIDTH, HEIGHT))
         img_data = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         img_data = img_data / 255.
@@ -119,9 +120,7 @@ def recognize_from_image():
         savepath = get_savepath(args.savepath, image_path)
         logger.info(f'saved at : {savepath}')
         cv2.imwrite(savepath,output)
-
-        if cv2.waitKey(0) != 32:  # space bar
-            exit()
+    logger.info('Script finished successfully.')
 
 
 def recognize_from_video():

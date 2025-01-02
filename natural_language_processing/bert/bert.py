@@ -7,13 +7,11 @@ import numpy as np
 import warnings
 warnings.filterwarnings('ignore', category=FutureWarning)
 
-from transformers import BertTokenizer  # noqa: E402
-
 import ailia  # noqa: E402
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser  # noqa: E402
-from model_utils import check_and_download_models  # noqa: E402
+from arg_utils import get_base_parser, update_parser  # noqa: E402
+from model_utils import check_and_download_models, check_and_download_file  # noqa: E402
 
 # logger
 from logging import getLogger   # noqa: E402
@@ -41,8 +39,11 @@ parser.add_argument(
     default='en', choices=LANGS,
     help='choose language: ' + ' | '.join(LANGS) + ' (default: en)'
 )
-# TODO
-# input masked sentence ? how treats Japanese?
+parser.add_argument(
+    '--disable_ailia_tokenizer',
+    action='store_true',
+    help='disable ailia tokenizer.'
+)
 args = update_parser(parser)
 
 
@@ -140,13 +141,24 @@ def main():
 
     # bert tokenizer
     if LANG == 'en':
-        tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+        if args.disable_ailia_tokenizer:
+            from transformers import BertTokenizer  # noqa: E402
+            tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+        else:
+            from ailia_tokenizer import BertTokenizer
+            tokenizer = BertTokenizer.from_pretrained('./tokenizer/en/')
     elif LANG == 'jp':
-        tokenizer = BertTokenizer(
-            'vocab.txt',
-            do_lower_case=False,
-            do_basic_tokenize=False,
-        )
+        if args.disable_ailia_tokenizer:
+            from transformers import BertTokenizer  # noqa: E402
+            tokenizer = BertTokenizer(
+                './tokenizer/jp/vocab.txt',
+                do_lower_case=False,
+                do_basic_tokenize=False,
+            )
+        else:
+            # This tokenizer type not supported
+            from ailia_tokenizer import BertTokenizer
+            tokenizer = BertTokenizer.from_pretrained('./tokenizer/jp/')
 
     # prepare data
     sentence_id = np.ones((1, MAX_SEQ_LEN), dtype=np.int64)
@@ -175,7 +187,7 @@ def main():
         preds_ailia[0][0][masked_index]
     )[-NUM_PREDICT:][::-1]
 
-    predicted_tokens = tokenizer.convert_ids_to_tokens(predicted_indices)
+    predicted_tokens = tokenizer.convert_ids_to_tokens(predicted_indices.tolist())
 
     logger.info('Input sentence: ' + SENTENCE)
     logger.info(f'predicted top {NUM_PREDICT} words: {predicted_tokens}')

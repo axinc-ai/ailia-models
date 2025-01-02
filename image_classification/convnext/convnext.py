@@ -1,27 +1,26 @@
-import time
-import sys
-
-import cv2
-import numpy as np
 import platform
+import sys
+import time
 
 import ailia
+import cv2
+import numpy as np
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser  # noqa: E402
-from model_utils import check_and_download_models  # noqa: E402
-from image_utils import load_image  # noqa: E402
-from classifier_utils import plot_results, print_results  # noqa: E402
-import webcamera_utils  # noqa: E402
-
 # logger
-from logging import getLogger   # noqa: E402
+from logging import getLogger  # noqa: E402
+
+import webcamera_utils  # noqa: E402
+from classifier_utils import plot_results, print_results  # noqa: E402
+from image_utils import imread, load_image  # noqa: E402
+from model_utils import check_and_download_models  # noqa: E402
+from arg_utils import get_base_parser, update_parser  # noqa: E402
+
 logger = getLogger(__name__)
 
 # for ConvNeXt
 import os
-
 
 # ======================
 # PARAMETERS 1
@@ -34,7 +33,7 @@ IMAGE_WIDTH = 32
 # ======================
 # Argument Parser Config
 # ======================
-parser = get_base_parser("ConvNeXt is ", IMAGE_PATH, None,)
+parser = get_base_parser("ConvNeXt is ", IMAGE_PATH, None, fp16_support=False)
 parser.add_argument('-m', '--model', metavar='MODEL',
                     default="base_1k", choices=['base_1k', 'small_1k', 'tiny_1k', 'cifar10'])
 args = update_parser(parser)
@@ -85,7 +84,7 @@ def recognize_from_image(net, classes):
     for image_path in args.input:
         # prepare input data
         if os.path.isfile(image_path):
-            image = cv2.imread(image_path, cv2.IMREAD_COLOR)
+            image = imread(image_path, cv2.IMREAD_COLOR)
         else:
             logger.error(f'{image_path} not found.')
             exit()
@@ -138,10 +137,6 @@ def recognize_from_video(net, classes):
     logger.info('Script finished successfully.')
 
 def main():
-    if "FP16" in ailia.get_environment(args.env_id).props or platform.system() == 'Darwin':
-        logger.warning('This model do not work on FP16. So use CPU mode.')
-        args.env_id = 0
-
     if args.model == 'base_1k':
         # model files check and download
         check_and_download_models(BASE_1k_WEIGHT_PATH, BASE_1k_MODEL_PATH, REMOTE_PATH)

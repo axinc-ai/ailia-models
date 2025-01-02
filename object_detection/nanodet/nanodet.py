@@ -1,22 +1,23 @@
-import numpy as np
-import time
 import os
 import sys
+import time
+
+import ailia
 import cv2
+import numpy as np
 
 from nanodet_utils import NanoDetABC
 
-import ailia
-
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath
-from model_utils import check_and_download_models
-from detector_utils import reverse_letterbox, plot_results
-import webcamera_utils
-
 # logger
 from logging import getLogger
+
+import webcamera_utils
+from detector_utils import plot_results, reverse_letterbox, write_predictions
+from image_utils import imread  # noqa: E402
+from model_utils import check_and_download_models
+from arg_utils import get_base_parser, get_savepath, update_parser
 
 logger = getLogger(__name__)
 
@@ -65,7 +66,14 @@ parser.add_argument(
     help='[nanodet-EfficientNet-Lite0_320, nanodet-EfficientNet-Lite1_416, nanodet-EfficientNet-Lite2_512'
          'nanodet_m, nanodet_m_416, nanodet_t, nanodet-RepVGG-A0_416]'
 )
-
+parser.add_argument(
+    '-w', '--write_prediction',
+    nargs='?',
+    const='txt',
+    choices=['txt', 'json'],
+    type=str,
+    help='Output results to txt or json file.'
+)
 args = update_parser(parser)
 
 MODEL_NAME = args.model_name
@@ -109,7 +117,7 @@ def recognize_from_image():
     for image_path in args.input:
         # prepare input data
         logger.debug(f'input image: {image_path}')
-        raw_img = cv2.imread(image_path)
+        raw_img = imread(image_path)
         logger.debug(f'input image shape: {raw_img.shape}')
 
         # inference
@@ -130,6 +138,12 @@ def recognize_from_image():
         savepath = get_savepath(args.savepath, image_path)
         logger.info(f'saved at : {savepath}')
         cv2.imwrite(savepath, res_img)
+
+        # write prediction
+        if args.write_prediction is not None:
+            ext = args.write_prediction
+            pred_file = "%s.%s" % (savepath.rsplit('.', 1)[0], ext)
+            write_predictions(pred_file, detect_object, raw_img, category=COCO_CATEGORY, file_type=ext)
 
     logger.info('Script finished successfully.')
 

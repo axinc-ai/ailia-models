@@ -9,7 +9,7 @@ import ailia
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
+from arg_utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 from image_utils import load_image  # noqa: E402
 import webcamera_utils  # noqa: E402
@@ -24,14 +24,12 @@ logger = getLogger(__name__)
 # ======================
 IMAGE_PATH = 'input.png'
 SAVE_IMAGE_PATH = 'output.png'
-#IMAGE_HEIGHT = 194    # net.get_input_shape()[3]
-#IMAGE_WIDTH = 194     # net.get_input_shape()[2]
 
 # ======================
 # Argument Parser Config
 # ======================
 parser = get_base_parser(
-    'Single Image Super-Resolution with HAN', IMAGE_PATH, SAVE_IMAGE_PATH,
+    'Single Image Super-Resolution with HAN', IMAGE_PATH, SAVE_IMAGE_PATH, fp16_support=False
 )
 parser.add_argument(
     '-n', '--normal', action='store_true',
@@ -121,6 +119,8 @@ def recognize_from_image(net):
         c = img.shape[2]
         if c == 1:
             img = np.concatenate([img] * 3, 2)
+        elif c == 4:
+            img = img[:,:,0:3]
 
         img = np.ascontiguousarray(img.transpose((2, 0, 1)))
         img = img.astype(np.float32)
@@ -205,9 +205,6 @@ def main():
 
     # net initialize
     env_id = args.env_id
-    if sys.platform == "darwin" :
-        env_id = 0
-        logger.info('This model not working on FP16. So running on CPU.')
     memory_mode = ailia.get_memory_mode(reduce_constant=True, reduce_interstage=True)
     net = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=env_id, memory_mode=memory_mode)
     logger.info('Model: ' + WEIGHT_PATH[:-5])

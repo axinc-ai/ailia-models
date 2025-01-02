@@ -1,20 +1,22 @@
 import sys
 import time
 
-import numpy as np
-import cv2
-
 import ailia
+import cv2
+import numpy as np
 
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
+# logger
+from logging import getLogger  # noqa: E402
+
+from image_utils import imread  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
-from webcamera_utils import get_writer, get_capture  # noqa: E402
+from arg_utils import get_base_parser, get_savepath, update_parser  # noqa: E402
+from webcamera_utils import get_capture, get_writer  # noqa: E402
 
 from real_esrgan_utils import RealESRGAN
+from real_esrgan_utils_v3 import RealESRGANv3
 
-# logger
-from logging import getLogger   # noqa: E402
 logger = getLogger(__name__)
 
 
@@ -23,9 +25,6 @@ logger = getLogger(__name__)
 # ======================
 INPUT_IMAGE_PATH = 'input.jpg'
 SAVE_IMAGE_PATH = 'output.jpg'
-
-W = 256
-H = 256
 
 REMOTE_PATH = 'https://storage.googleapis.com/ailia-models/real-esrgan/'
 
@@ -40,7 +39,7 @@ parser = get_base_parser(
 parser.add_argument(
     '-m', '--model', metavar='MODEL_NAME',
     default='RealESRGAN',
-    help='[RealESRGAN, RealESRGAN_anime]'
+    help='[RealESRGAN, RealESRGAN_anime, RealESRGAN_anime_v3]'
 )
 
 
@@ -49,16 +48,21 @@ args = update_parser(parser)
 MODEL_PATH = args.model + '.opt.onnx.prototxt'
 WEIGHT_PATH = args.model + '.opt.onnx'
 
+if args.model == "RealESRGAN_anime_v3":
+    RealESRGAN = RealESRGANv3
+else:
+    RealESRGAN = RealESRGAN
+
 
 def enhance_image():
     for image_path in args.input:
         # prepare input data
-        img = cv2.imread(image_path, cv2.IMREAD_UNCHANGED)
-        img = cv2.resize(img, dsize=(H, W))
+        img = imread(image_path, cv2.IMREAD_UNCHANGED)
 
         # net initialize
         mem_mode = ailia.get_memory_mode(reduce_constant=True, ignore_input_with_initializer=True, reduce_interstage=False, reuse_interstage=True)
         model = ailia.Net(MODEL_PATH, WEIGHT_PATH, env_id=args.env_id, memory_mode=mem_mode)
+        model.set_input_shape((3,img.shape[1],img.shape[0]))
         upsampler = RealESRGAN(model)
 
         # inference
@@ -106,7 +110,8 @@ def enhance_video():
         if frame_shown and cv2.getWindowProperty('frame', cv2.WND_PROP_VISIBLE) == 0:
             break
 
-        img = cv2.resize(frame, dsize=(H, W))
+        h, w = frame.shape[0], frame.shape[1]
+        img = frame[h//2:h//2+h//4, w//2:w//2+w//4, :]
 
         # inference
         output = upsampler.enhance(img)

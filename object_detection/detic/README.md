@@ -31,9 +31,19 @@ If you pass `0` as an argument to VIDEO_PATH, you can use the webcam input inste
 $ python3 detic.py --video VIDEO_PATH
 ```
 
+By adding the `--model_type` option, you can specify model type which is selected from "SwinB_896_4x", "R50_640_4x". (default is SwinB_896_4x)
+```bash
+$ python3 detic.py --model_type SwinB_896_4x
+```
+
 By adding the `--vocabulary` option, you can specify the model's vocabulary which is selected from "lvis", "in21k". (default is lvis)
 ```bash
 $ python3 detic.py --vocabulary lvis
+```
+
+By adding the `--detection_width` option, you can specify the model's input width to increase inference speed
+```bash
+$ python3 detic.py --detection_width 320
 ```
 
 ## Reference
@@ -50,5 +60,7 @@ ONNX opset=11
 
 ## Netron
 
-[Detic_C2_SwinB_896_4x_IN-21K+COCO_lvis.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/detic/Detic_C2_SwinB_896_4x_IN-21K+COCO_lvis.onnx.prototxt)  
-[Detic_C2_SwinB_896_4x_IN-21K+COCO_in21k.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/detic/Detic_C2_SwinB_896_4x_IN-21K+COCO_in21k.onnx.prototxt)
+- [Detic_C2_SwinB_896_4x_IN-21K+COCO_lvis.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/detic/Detic_C2_SwinB_896_4x_IN-21K%2bCOCO_lvis.onnx.prototxt)  
+- [Detic_C2_SwinB_896_4x_IN-21K+COCO_in21k.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/detic/Detic_C2_SwinB_896_4x_IN-21K%2bCOCO_in21k.onnx.prototxt)
+- [Detic_C2_R50_640_4x_lvis.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/detic/Detic_C2_R50_640_4x_lvis.onnx.prototxt)
+- [Detic_C2_R50_640_4x_in21k.onnx.prototxt](https://netron.app/?url=https://storage.googleapis.com/ailia-models/detic/Detic_C2_R50_640_4x_in21k.onnx.prototxt)

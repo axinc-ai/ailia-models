@@ -1,27 +1,28 @@
-import time
-import sys
 import platform
+import sys
+import time
 
-import numpy as np
 import cv2
-
 import matplotlib
+import numpy as np
+
 matplotlib.use('Agg')
+import ailia
 import matplotlib.pyplot as plt
 
-import ailia
 import vit_labels
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser  # noqa: E402
-from model_utils import check_and_download_models  # noqa: E402
-from image_utils import load_image  # noqa: E402
-from classifier_utils import plot_results, print_results  # noqa: E402
-import webcamera_utils  # noqa: E402
-
 # logger
-from logging import getLogger   # noqa: E402
+from logging import getLogger  # noqa: E402
+
+import webcamera_utils  # noqa: E402
+from classifier_utils import plot_results, print_results  # noqa: E402
+from image_utils import imread, load_image  # noqa: E402
+from model_utils import check_and_download_models  # noqa: E402
+from arg_utils import get_base_parser, update_parser  # noqa: E402
+
 logger = getLogger(__name__)
 
 
@@ -41,6 +42,7 @@ parser = get_base_parser(
     'Vision Transformer',
     IMAGE_OR_VIDEO_PATH,
     SAVE_IMAGE_OR_VIDEO_PATH,
+    fp16_support=False
 )
 parser.add_argument(
     '-m', '--model', metavar='MODEL',
@@ -101,7 +103,8 @@ def calc_attention_map(att_mat, height_org=224, width_org=224):
     return mask
 
 
-import warnings                                      # provisional...
+import warnings  # provisional...
+
 warnings.simplefilter('ignore', DeprecationWarning)  # provisional...
 def visualize_result(image, mask, probs, labels):
     # adjust for output
@@ -161,7 +164,7 @@ def recognize_from_image():
     for image_path in args.input:
         # prepare input data
         logger.info(image_path)
-        image = cv2.imread(image_path)[:, :, ::-1]
+        image = imread(image_path)[:, :, ::-1]
         input_data = prep_input(image)
 
         # inference
@@ -266,10 +269,6 @@ def recognize_from_video():
 def main():
     # model files check and download
     check_and_download_models(WEIGHT_PATH, MODEL_PATH, REMOTE_PATH)
-
-    if "FP16" in ailia.get_environment(args.env_id).props or platform.system() == 'Darwin':
-        logger.warning('This model do not work on FP16. So use CPU mode.')
-        args.env_id = 0
 
     if args.video is not None:
         # video mode

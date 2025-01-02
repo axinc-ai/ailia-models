@@ -1,22 +1,23 @@
 import sys
 import time
 
+import ailia
 import cv2
 import numpy as np
 
-import ailia
 import retinaface_utils as rut
 from retinaface_utils import PriorBox
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
-from model_utils import check_and_download_models  # noqa: E402
-from image_utils import load_image  # noqa: E402
-import webcamera_utils  # noqa: E402
-
 # logger
-from logging import getLogger   # noqa: E402
+from logging import getLogger  # noqa: E402
+
+import webcamera_utils  # noqa: E402
+from image_utils import imread, load_image  # noqa: E402
+from model_utils import check_and_download_models  # noqa: E402
+from arg_utils import get_base_parser, get_savepath, update_parser  # noqa: E402
+
 logger = getLogger(__name__)
 
 
@@ -50,6 +51,11 @@ parser.add_argument(
     '-r', '--rescale', metavar='RESCALE', type=float,
     default=1,
     help='scale down the original image size to prevent memory overflow, otherwise original size is used'
+)
+parser.add_argument(
+    '-w', '--write_json',
+    action='store_true',
+    help='Flag to output results to json file.'
 )
 args = update_parser(parser)
 
@@ -126,7 +132,7 @@ def recognize_from_image():
         # prepare input data
         logger.info(image_path)
         # org_img = load_image(image_path, (IMAGE_HEIGHT, IMAGE_WIDTH))
-        org_img = cv2.imread(image_path, cv2.IMREAD_COLOR)
+        org_img = imread(image_path, cv2.IMREAD_COLOR)
 
         # resize image
         IMAGE_WIDTH = int(org_img.shape[1] / resize)
@@ -162,6 +168,10 @@ def recognize_from_image():
         savepath = get_savepath(args.savepath, image_path)
         logger.info(f'saved at : {savepath}')
         rut.plot_detections(org_img, detections, vis_thres=VIS_THRES, save_image_path=savepath)
+
+        if args.write_json:
+            json_file = '%s.json' % savepath.rsplit('.', 1)[0]
+            rut.save_json(json_file, detections, VIS_THRES)
 
     logger.info('Script finished successfully.')
 

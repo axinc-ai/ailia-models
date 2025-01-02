@@ -2,6 +2,7 @@ import os
 import sys
 import numpy as np
 import cv2
+import json
 
 MAX_CLASS_COUNT = 3
 
@@ -86,3 +87,31 @@ def plot_results(input_image, classifier, labels, top_k=MAX_CLASS_COUNT, logging
         )
 
         y=y + h + RECT_MARGIN
+
+
+def write_predictions(file_name, classifier, labels, file_type='txt'):
+    if file_type == 'json':
+        top_k = MAX_CLASS_COUNT
+        top_scores, scores = get_top_scores(classifier, top_k)
+        top_k = min(len(top_scores),top_k)
+        out_data = []
+        for idx in range(top_k):
+            out_data.append({
+                'idx': idx,
+                'category': int(top_scores[idx]),
+                'label': labels[top_scores[idx]],
+                'prob': float(scores[top_scores[idx]])
+            })
+        with open(file_name, 'w', encoding='utf-8') as f:
+            json.dump(out_data, f, indent=2, ensure_ascii=False)
+    else:
+        top_k = 5
+        top_scores, scores = get_top_scores(classifier, top_k)
+        top_k = min(len(top_scores),top_k)
+        with open(file_name, 'w', encoding='utf-8') as f:
+            for idx in range(top_k):
+                f.write('%s %d %f\n' % (
+                    labels[top_scores[idx]].replace(' ', '_'),
+                    top_scores[idx],
+                    scores[top_scores[idx]]
+                ))

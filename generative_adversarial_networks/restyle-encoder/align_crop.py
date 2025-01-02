@@ -58,11 +58,9 @@ def get_landmark(filepath, args, face_alignment_path, face_detector_path):
             # lm is a shape=(68,2) np.array
     else: 
         from psgan.preprocess import PreProcess
-        from setup import setup_config
 
-        config = setup_config(args)
         preprocess = PreProcess(
-                config, args, None, face_alignment_path, face_detector_path, need_parser=False, return_landmarks=True
+                args, None, face_alignment_path, face_detector_path, need_parser=False, return_landmarks=True
             )
 
         image = PIL.Image.open(filepath).convert("RGB")
@@ -126,7 +124,7 @@ def align_face(filepath, args, face_alignment_path, face_detector_path):
         shrink = int(np.floor(qsize / output_size * 0.5))
         if shrink > 1:
             rsize = (int(np.rint(float(img.size[0]) / shrink)), int(np.rint(float(img.size[1]) / shrink)))
-            img = img.resize(rsize, PIL.Image.ANTIALIAS)
+            img = img.resize(rsize, PIL.Image.LANCZOS)
             quad /= shrink
             qsize /= shrink
 
@@ -156,7 +154,7 @@ def align_face(filepath, args, face_alignment_path, face_detector_path):
         # Transform.
         img = img.transform((transform_size, transform_size), PIL.Image.QUAD, (quad + 0.5).flatten(), PIL.Image.BILINEAR)
         if output_size < transform_size:
-            img = img.resize((output_size, output_size), PIL.Image.ANTIALIAS)
+            img = img.resize((output_size, output_size), PIL.Image.LANCZOS)
 
         # Save aligned image.
         return img

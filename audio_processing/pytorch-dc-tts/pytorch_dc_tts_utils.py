@@ -63,7 +63,7 @@ def griffin_lim(spectrogram):
     X_best = copy.deepcopy(spectrogram)
     for i in range(hp.n_iter):
         X_t = invert_spectrogram(X_best)
-        est = librosa.stft(X_t, hp.n_fft, hp.hop_length, win_length=hp.win_length)
+        est = librosa.stft(X_t, n_fft=hp.n_fft, hop_length=hp.hop_length, win_length=hp.win_length)
         phase = est / np.maximum(1e-8, np.abs(est))
         X_best = spectrogram * phase
     X_t = invert_spectrogram(X_best)
@@ -77,14 +77,14 @@ def invert_spectrogram(spectrogram):
     Args:
       spectrogram: [1+n_fft//2, t]
     '''
-    return librosa.istft(spectrogram, hp.hop_length, win_length=hp.win_length, window="hann")
+    return librosa.istft(spectrogram, hop_length=hp.hop_length, win_length=hp.win_length, window="hann")
 
 
 
 """Get test data"""
 def get_test_data(sentence, max_n):
     normalized_sentences = [text_normalize(line).strip() + "E" for line in sentence]  # text normalization, E: EOS
-    texts = np.zeros((len(normalized_sentences), max_n + 1), np.long)
+    texts = np.zeros((len(normalized_sentences), max_n + 1), int)
     vocab = "PE abcdefghijklmnopqrstuvwxyz'.?"  # P: Padding, E: EOS.
     char2idx = {char: idx for idx, char in enumerate(vocab)}
     for i, sent in enumerate(normalized_sentences):

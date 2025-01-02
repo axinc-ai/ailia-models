@@ -1,8 +1,17 @@
 -i https://pypi.org/simple
-numpy>=1.18.4
+ailia>=1.5.0
+ailia_tokenizer>=1.4.1
+numpy<2.0
 matplotlib>=3.2.1
 opencv-python>=4.4.0.42
 pillow>=7.1.2
 scipy>=1.4.1
 urllib3>=1.25.9
 scikit-image>=0.17.2
+tqdm
+h5py
+filterpy
+ftfy
+webcolors
+pymatting
+lapx

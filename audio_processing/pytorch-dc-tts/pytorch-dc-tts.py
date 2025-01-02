@@ -8,7 +8,7 @@ import ailia  # noqa: E402
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser, get_savepath  # noqa: E402
+from arg_utils import get_base_parser, update_parser, get_savepath  # noqa: E402
 from model_utils import check_and_download_models  # noqa: E402
 
 # logger
@@ -37,7 +37,7 @@ MAX_T = 210
 # ======================
 
 parser = get_base_parser( 'Efficiently Trainable Text-to-Speech System Based on' +
-    'Deep Convolutional Networks with Guided Attention', SENTENCE, SAVE_WAV_PATH)
+    'Deep Convolutional Networks with Guided Attention', SENTENCE, SAVE_WAV_PATH, fp16_support=False)
 # overwrite
 parser.add_argument(
     '--input', '-i', metavar='TEXT', default=SENTENCE,

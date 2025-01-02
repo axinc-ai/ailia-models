@@ -126,7 +126,7 @@ def dump_segmentation_threshold(trimap_data, src_data, w, h, args):
     savedir = os.path.dirname(args.savepath)
     segmentation_data = trimap_data.copy()
     segmentation_data = cv2.cvtColor(segmentation_data, cv2.COLOR_GRAY2BGR)
-    segmentation_data = segmentation_data.astype(np.float)
+    segmentation_data = segmentation_data.astype(float)
     segmentation_data = (src_data + segmentation_data)/2
     cv2.imwrite(
         os.path.join(savedir, "debug_segmentation_threshold.png"),
@@ -144,7 +144,7 @@ def dump_trimap(trimap_data, src_data, w, h, args):
 
     segmentation_data = trimap_data.copy().astype(np.uint8)
     segmentation_data = cv2.cvtColor(segmentation_data, cv2.COLOR_GRAY2BGR)
-    segmentation_data = segmentation_data.astype(np.float)
+    segmentation_data = segmentation_data.astype(float)
     segmentation_data = (src_data + segmentation_data)/2
 
     cv2.imwrite(

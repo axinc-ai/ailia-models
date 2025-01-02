@@ -1,22 +1,20 @@
 import os
+import re
 import sys
 import time
-import re
 from collections import deque
 
-import numpy as np
-import cv2
-
 import ailia
+import cv2
+import numpy as np
 
 # import original modules
 sys.path.append('../../util')
-from utils import get_base_parser, update_parser  # noqa: E402
-from model_utils import check_and_download_models  # noqa: E402
-from webcamera_utils import get_capture  # noqa: E402
-from image_utils import load_image  # noqa: E402
 from classifier_utils import plot_results  # noqa: E402
-
+from image_utils import imread, load_image  # noqa: E402
+from model_utils import check_and_download_models  # noqa: E402
+from arg_utils import get_base_parser, update_parser  # noqa: E402
+from webcamera_utils import get_capture  # noqa: E402
 
 # ======================
 # Parameters
@@ -98,6 +96,11 @@ parser.add_argument(
     '-t', '--top', metavar='TOP', default=3, type=int,
     help='Number of outputs for category.',
 )
+parser.add_argument(
+    '--cui',
+    action='store_true',
+    help="Don't display preview in GUI."
+)
 args = update_parser(parser)
 
 
@@ -154,11 +157,12 @@ def recognize_from_image():
 
             print_mars_result(result)
 
-            preview_img = cv2.imread(sorted_inputs_path[
+            preview_img = imread(sorted_inputs_path[
                     next_input_index - args.duration
             ])
-            cv2.imshow('preview', preview_img)
-            frame_shown = True
+            if not args.cui:
+                cv2.imshow('preview', preview_img)
+                frame_shown = True
             
             for i in range(args.duration - 1):
                 input_blob[0, :, i, :, :] = input_blob[0, :, i + 1, :, :]
