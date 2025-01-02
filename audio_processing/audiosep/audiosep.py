@@ -201,8 +201,6 @@ def inference(model, input_text, input_wav):
     text_prompt_tkn = dict(tokenizer(input_text, return_tensors = 'np', padding = True))
     text_prompt_tkn = (text_prompt_tkn['input_ids'], text_prompt_tkn['attention_mask'])
 
-    print(text_prompt_tkn)
-
     # prepare audio input
     mag, cosin, sinin = wav_to_spectrogram(input_wav)
     orig_len = mag.shape[-1]
