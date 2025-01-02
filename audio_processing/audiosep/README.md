@@ -46,6 +46,7 @@ https://github.com/axinc-ai/ailia-models/assets/53651931/7710b6c9-49dc-4d2a-8489
 ## Reference
 
 * [AudioSep](https://github.com/Audio-AGI/AudioSep)
+* [Separate Anything You Describe](https://audio-agi.github.io/Separate-Anything-You-Describe/)
 
 ## Framework
 
