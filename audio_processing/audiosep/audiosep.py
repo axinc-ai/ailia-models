@@ -33,17 +33,11 @@ REMOTE_PATH = "https://storage.googleapis.com/ailia-models/audiosep/"
 # ======================
 
 parser = get_base_parser(
-    'audiosep', None, None
+    'audiosep', "input.wav", None
 )
 
 parser.add_argument(
-    "-f", "--file", metavar="PATH", type=str,
-    default="input.wav",
-    help="Input file path."
-)
-
-parser.add_argument(
-    "-i", "--input", metavar="TEXT", type=str,
+    "-p", "--prompt", metavar="TEXT", type=str,
     default="water drops",
     help="Text query."
 )
@@ -224,8 +218,8 @@ def inference(model, input_text, input_wav):
     return output_wav
 
 def split_audio(model):
-    input_text = args.input
-    input_wav = librosa.load(args.file, sr=32000, mono=True)[0][None,None,:]
+    input_text = args.prompt
+    input_wav = librosa.load(args.input[0], sr=32000, mono=True)[0][None,None,:]
 
     logger.info("input_text: %s" % input_text)
 

@@ -31,13 +31,13 @@ Running this script will separate sound sources from the original input audio fi
 
 #### Example1: Extract sound of thunder
 ```bash
-$ python3 audiosep.py -i "thunder" -p input.wav -s output_thunder.wav
+$ python3 audiosep.py -p "thunder" -i input.wav -s output_thunder.wav
 ```
 https://github.com/axinc-ai/ailia-models/assets/53651931/d0d016dd-a808-4eb6-a4b5-9791f8f1bd2f
 
 #### Example2: Extract sound of waterdrops
 ```bash
-$ python3 audiosep.py -i "water drops" -p input.wav -s output_waterdrops.wav
+$ python3 audiosep.py -p "water drops" -i input.wav -s output_waterdrops.wav
 ```
 https://github.com/axinc-ai/ailia-models/assets/53651931/7710b6c9-49dc-4d2a-8489-ccbf7fb45591
 
