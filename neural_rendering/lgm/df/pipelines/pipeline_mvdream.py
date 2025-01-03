@@ -1,6 +1,6 @@
 import numpy as np
 from typing import Callable, List, Optional, Union
-from kiui.cam import orbit_camera
+from kiui_utils import orbit_camera
 
 from df.schedulers.scheduling_ddim import DDIMScheduler
 

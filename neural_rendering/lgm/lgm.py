@@ -1,8 +1,7 @@
 import sys
 import numpy as np
+import cv2
 import imageio.v2 as imageio
-import kiui
-from kiui.cam import orbit_camera
 import tqdm
 import transformers
 import rembg
@@ -11,6 +10,7 @@ import ailia
 
 # import original modules
 sys.path.append("../../util")
+from image_utils import imread  # noqa
 from arg_utils import get_base_parser, update_parser, get_savepath  # noqa
 from model_utils import check_and_download_models, check_and_download_file  # noqa
 
@@ -22,6 +22,7 @@ from df.pipelines.pipeline_mvdream import MVDreamPipeline
 from df.schedulers.scheduling_ddim import DDIMScheduler
 from utils import process_mv_image, preprocess_lgm_model
 from gs import GaussianRenderer
+from kiui_utils import orbit_camera
 
 # ======================
 # Parameters
@@ -101,6 +102,13 @@ class Options:
     znear: float = ZNEAR
 
 opt = Options()
+
+def load_image(image_path):
+    image = imread(image_path, flags=cv2.IMREAD_UNCHANGED)
+    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+    if image.dtype != np.uint8:
+        image = (image * 255).astype(np.uint8)
+    return image
 
 def load_model(weight_path, model_path, env_id=None, memory_mode=None, use_onnx=False):
     if use_onnx:
@@ -295,7 +303,7 @@ def render_video(gaussians, opt):
 # Main functions
 # ======================
 def main():
-    kiui.seed_everything(args.seed)
+    np.random.seed(args.seed)
 
     # load input
     if args.prompt is not None:
@@ -303,7 +311,7 @@ def main():
         input_image = None
     else:
         prompt = ""
-        input_image = kiui.read_image(args.input[0], mode='uint8')
+        input_image = load_image(args.input[0])
 
     # generate multi-view images
     multi_view_image = generate_multi_view_images(

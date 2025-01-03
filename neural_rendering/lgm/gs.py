@@ -1,6 +1,5 @@
 import numpy as np
 import torch
-from kiui.op import inverse_sigmoid
 from plyfile import PlyData, PlyElement
 from c_diff_gaussian_rasterization import GaussianRasterizationSettings, GaussianRasterizer
 
@@ -88,7 +87,7 @@ class GaussianRenderer:
 
         # invert activation to make it compatible with the original ply format
         if compatible:
-            opacity = inverse_sigmoid(opacity)
+            opacity = self.inverse_sigmoid(opacity)
             scales = torch.log(scales + 1e-8)
             shs = (shs - 0.5) / 0.28209479177387814
 
@@ -116,3 +115,7 @@ class GaussianRenderer:
         el = PlyElement.describe(elements, 'vertex')
 
         PlyData([el]).write(path)
+
+    def inverse_sigmoid(self, x, eps=1e-6):
+        x = x.clamp(eps, 1 - eps)
+        return torch.log(x / (1 - x))

@@ -1,6 +1,5 @@
 torch
 transformers
-kiui >= 0.2.3
 plyfile
 rembg
 rich
