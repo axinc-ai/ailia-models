@@ -1,7 +1,7 @@
 import numpy as np
 import cv2
 import rembg
-from kiui_utils import orbit_camera, safe_normalize, recenter
+from lgm_utils.kiui import orbit_camera, safe_normalize, recenter
 
 IMAGENET_DEFAULT_MEAN = (0.485, 0.456, 0.406)
 IMAGENET_DEFAULT_STD = (0.229, 0.224, 0.225)

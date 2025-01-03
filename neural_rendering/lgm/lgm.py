@@ -20,9 +20,9 @@ logger = getLogger(__name__)
 
 from df.pipelines.pipeline_mvdream import MVDreamPipeline
 from df.schedulers.scheduling_ddim import DDIMScheduler
-from utils import process_mv_image, preprocess_lgm_model
-from gs import GaussianRenderer
-from kiui_utils import orbit_camera
+from lgm_utils.data_process import process_mv_image, preprocess_lgm_model
+from lgm_utils.gs import GaussianRenderer
+from lgm_utils.kiui import orbit_camera
 
 # ======================
 # Parameters
