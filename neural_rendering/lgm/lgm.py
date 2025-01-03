@@ -21,7 +21,7 @@ logger = getLogger(__name__)
 from df.pipelines.pipeline_mvdream import MVDreamPipeline
 from df.schedulers.scheduling_ddim import DDIMScheduler
 from lgm_utils.data_process import process_mv_image, preprocess_lgm_model
-from lgm_utils.gs import GaussianRenderer
+from lgm_utils.gs import GaussianRenderer, save_ply
 from lgm_utils.kiui import orbit_camera
 
 # ======================
@@ -76,6 +76,11 @@ parser.add_argument(
     type=int,
     default=256,
     help="output size",
+)
+parser.add_argument(
+    "--save_ply",
+    action="store_true",
+    help="save gaussians as ply file",
 )
 parser.add_argument(
     '--disable_ailia_tokenizer',
@@ -325,6 +330,11 @@ def main():
     # generate gaussians
     processed_mv_image = preprocess_lgm_model(multi_view_image, opt)
     gaussians = generate_gaussians(processed_mv_image)
+
+    # save gaussians as ply file
+    if args.save_ply:
+        save_ply_path = get_savepath(args.savepath, "", ext=".ply")
+        save_ply(gaussians, save_ply_path)
 
     # render video
     images = render_video(gaussians, opt)

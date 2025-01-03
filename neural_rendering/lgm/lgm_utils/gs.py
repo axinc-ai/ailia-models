@@ -64,58 +64,58 @@ class GaussianRenderer:
         images = torch.stack(images, dim=0).view(B, V, 3, self.opt.output_size, self.opt.output_size)
         return images
 
-    def save_ply(self, gaussians, path, compatible=True):
-        # gaussians: [B, N, 14]
-        # compatible: save pre-activated gaussians as in the original paper
-        assert gaussians.shape[0] == 1, 'only support batch size 1'
+def save_ply(gaussians, path, compatible=True):
+    # gaussians: [B, N, 14]
+    # compatible: save pre-activated gaussians as in the original paper
+    assert gaussians.shape[0] == 1, 'only support batch size 1'
 
-        gaussians = torch.from_numpy(gaussians).to(dtype=torch.float32)
+    gaussians = torch.from_numpy(gaussians).to(dtype=torch.float32)
 
-        means3D = gaussians[0, :, 0:3].contiguous().float()
-        opacity = gaussians[0, :, 3:4].contiguous().float()
-        scales = gaussians[0, :, 4:7].contiguous().float()
-        rotations = gaussians[0, :, 7:11].contiguous().float()
-        shs = gaussians[0, :, 11:].unsqueeze(1).contiguous().float() # [N, 1, 3]
+    means3D = gaussians[0, :, 0:3].contiguous().float()
+    opacity = gaussians[0, :, 3:4].contiguous().float()
+    scales = gaussians[0, :, 4:7].contiguous().float()
+    rotations = gaussians[0, :, 7:11].contiguous().float()
+    shs = gaussians[0, :, 11:].unsqueeze(1).contiguous().float() # [N, 1, 3]
 
-        # prune by opacity
-        mask = opacity.squeeze(-1) >= 0.005
-        means3D = means3D[mask]
-        opacity = opacity[mask]
-        scales = scales[mask]
-        rotations = rotations[mask]
-        shs = shs[mask]
+    # prune by opacity
+    mask = opacity.squeeze(-1) >= 0.005
+    means3D = means3D[mask]
+    opacity = opacity[mask]
+    scales = scales[mask]
+    rotations = rotations[mask]
+    shs = shs[mask]
 
-        # invert activation to make it compatible with the original ply format
-        if compatible:
-            opacity = self.inverse_sigmoid(opacity)
-            scales = torch.log(scales + 1e-8)
-            shs = (shs - 0.5) / 0.28209479177387814
+    # invert activation to make it compatible with the original ply format
+    if compatible:
+        opacity = inverse_sigmoid(opacity)
+        scales = torch.log(scales + 1e-8)
+        shs = (shs - 0.5) / 0.28209479177387814
 
-        xyzs = means3D.detach().cpu().numpy()
-        f_dc = shs.detach().transpose(1, 2).flatten(start_dim=1).contiguous().cpu().numpy()
-        opacities = opacity.detach().cpu().numpy()
-        scales = scales.detach().cpu().numpy()
-        rotations = rotations.detach().cpu().numpy()
+    xyzs = means3D.detach().cpu().numpy()
+    f_dc = shs.detach().transpose(1, 2).flatten(start_dim=1).contiguous().cpu().numpy()
+    opacities = opacity.detach().cpu().numpy()
+    scales = scales.detach().cpu().numpy()
+    rotations = rotations.detach().cpu().numpy()
 
-        l = ['x', 'y', 'z']
-        # All channels except the 3 DC
-        for i in range(f_dc.shape[1]):
-            l.append('f_dc_{}'.format(i))
-        l.append('opacity')
-        for i in range(scales.shape[1]):
-            l.append('scale_{}'.format(i))
-        for i in range(rotations.shape[1]):
-            l.append('rot_{}'.format(i))
+    l = ['x', 'y', 'z']
+    # All channels except the 3 DC
+    for i in range(f_dc.shape[1]):
+        l.append('f_dc_{}'.format(i))
+    l.append('opacity')
+    for i in range(scales.shape[1]):
+        l.append('scale_{}'.format(i))
+    for i in range(rotations.shape[1]):
+        l.append('rot_{}'.format(i))
 
-        dtype_full = [(attribute, 'f4') for attribute in l]
+    dtype_full = [(attribute, 'f4') for attribute in l]
 
-        elements = np.empty(xyzs.shape[0], dtype=dtype_full)
-        attributes = np.concatenate((xyzs, f_dc, opacities, scales, rotations), axis=1)
-        elements[:] = list(map(tuple, attributes))
-        el = PlyElement.describe(elements, 'vertex')
+    elements = np.empty(xyzs.shape[0], dtype=dtype_full)
+    attributes = np.concatenate((xyzs, f_dc, opacities, scales, rotations), axis=1)
+    elements[:] = list(map(tuple, attributes))
+    el = PlyElement.describe(elements, 'vertex')
 
-        PlyData([el]).write(path)
+    PlyData([el]).write(path)
 
-    def inverse_sigmoid(self, x, eps=1e-6):
-        x = x.clamp(eps, 1 - eps)
-        return torch.log(x / (1 - x))
+def inverse_sigmoid(x, eps=1e-6):
+    x = x.clamp(eps, 1 - eps)
+    return torch.log(x / (1 - x))
