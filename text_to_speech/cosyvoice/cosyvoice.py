@@ -1,21 +1,21 @@
 import sys
 import time
+from logging import getLogger
 
-# logger
-from logging import getLogger  # noqa
-
-import librosa
 import numpy as np
+from scipy.special import log_softmax
+import librosa
 import whisper
+import torchaudio.compliance.kaldi as kaldi
 
 import ailia
 
 # import original modules
 sys.path.append("../../util")
-from arg_utils import get_base_parser, update_parser, get_savepath  # noqa
-from model_utils import check_and_download_models, check_and_download_file  # noqa
+from arg_utils import get_base_parser, update_parser, get_savepath
+from model_utils import check_and_download_models, check_and_download_file
+from math_utils import softmax
 
-import torchaudio.compliance.kaldi as kaldi
 from audio_utils import mel_spectrogram
 from cosyvoice_utils import text_normalize
 
@@ -49,6 +49,34 @@ args = update_parser(parser, check_input_type=False)
 # ======================
 # Secondary Functions
 # ======================
+
+
+def nucleus_sampling(weighted_scores, top_p=0.8, top_k=25):
+    prob, indices = [], []
+    cum_prob = 0.0
+
+    score = softmax(weighted_scores, axis=0)
+
+    # Sort scores and indices
+    sorted_idx = np.argsort(score)[::-1]
+    sorted_value = score[sorted_idx]
+
+    for i in range(len(sorted_idx)):
+        # Sampling both top-p and numbers.
+        if cum_prob < top_p and len(prob) < top_k:
+            cum_prob += sorted_value[i]
+            prob.append(sorted_value[i])
+            indices.append(sorted_idx[i])
+        else:
+            break
+
+    prob = np.array(prob)
+    indices = np.array(indices, dtype=np.int64)
+
+    # Multinomial sampling
+    top_ids = np.random.choice(indices, size=1, p=prob / prob.sum())
+
+    return top_ids
 
 
 # ======================
@@ -126,6 +154,110 @@ def extract_speech_feat(speech):
     return speech_feat, speech_feat_len
 
 
+def llm_forward(llm, xs, cache):
+    masks = np.expand_dims(np.tril(np.ones((xs.shape[1], xs.shape[1]))), axis=0)
+    if not args.onnx:
+        output = llm.predict([xs, masks, *cache])
+    else:
+        key_cache = {"key_cache%d" % i: cache[i * 2] for i in range(24)}
+        value_cache = {"value_cache%d" % i: cache[i * 2 + 1] for i in range(24)}
+        output = llm.run(None, {"xs": xs, "masks": masks, **key_cache, **value_cache})
+    y_pred, *cache = output
+    return y_pred, cache
+
+
+def llm_inference(
+    models,
+    text: np.ndarray,
+    text_len: np.ndarray,
+    prompt_text: np.ndarray,
+    prompt_text_len: np.ndarray,
+    prompt_speech_token: np.ndarray,
+    prompt_speech_token_len: np.ndarray,
+    embedding: np.ndarray,
+    max_token_text_ratio: float = 20,
+    min_token_text_ratio: float = 2,
+):
+    speech_token_size = 6561
+
+    text = np.concatenate([prompt_text, text], axis=1)
+    text_len += prompt_text_len
+
+    net = models["embed_tokens"]
+    if not args.onnx:
+        output = net.predict([text])
+    else:
+        output = net.run(None, {"input": text})
+    text = output[0]
+
+    # 2. encode embedding
+    llm_input_size = 896
+    embedding = np.zeros((1, 0, llm_input_size), dtype=text.dtype)
+
+    # 3. concat llm_input
+    sos_eos = 0
+    task_id = 1
+    speech_embedding = models["speech_embedding"]
+    llm_embedding = models["llm_embedding"]
+    sos_eos_emb = llm_embedding[sos_eos].reshape(1, 1, -1)
+    task_id_emb = llm_embedding[task_id].reshape(1, 1, -1)
+    if prompt_speech_token_len != 0:
+        prompt_speech_token_emb = speech_embedding[prompt_speech_token]
+    else:
+        prompt_speech_token_emb = np.zeros((1, 0, llm_input_size), dtype=text.dtype)
+    lm_input = np.concatenate(
+        [sos_eos_emb, embedding, text, task_id_emb, prompt_speech_token_emb], axis=1
+    )
+
+    # 4. cal min/max_length
+    min_len = int((text_len - prompt_text_len) * min_token_text_ratio)
+    max_len = int((text_len - prompt_text_len) * max_token_text_ratio)
+
+    cache = [np.zeros((1, 2, 0, 64), dtype=np.float32)] * (2 * 24)
+
+    # 5. step by step decode
+    decoded_tokens = []
+    for i in range(max_len):
+        net = models["llm"]
+        y_pred, cache = llm_forward(net, lm_input, cache)
+
+        weight = models["llm_decoder_weight"]
+        bias = models["llm_decoder_bias"]
+        x = (y_pred[:, -1] @ weight.T) + bias
+        logp = log_softmax(x, axis=-1)
+
+        # sampling_ids
+        weighted_scores = np.squeeze(logp, axis=0)
+        num_trials, max_trials = 0, 100
+        ignore_eos = True if i < min_len else False
+        top_p, top_k, win_size, tau_r = 0.8, 25, 10, 0.1
+        while True:
+            top_ids = nucleus_sampling(weighted_scores, top_p=top_p, top_k=top_k)
+            rep_num = np.sum(np.array(decoded_tokens[-win_size:]) == top_ids)
+            if rep_num >= win_size * tau_r:
+                score = softmax(weighted_scores, axis=0)
+                top_ids = np.random.choice(len(score), size=1, p=score)
+            if (not ignore_eos) or (speech_token_size not in top_ids):
+                break
+            num_trials += 1
+            if num_trials > max_trials:
+                raise RuntimeError(
+                    "sampling reaches max_trials {} and still get eos when ignore_eos is True, check your input!".format(
+                        max_trials
+                    )
+                )
+
+        if top_ids == speech_token_size:
+            break
+        if top_ids > speech_token_size:
+            continue
+        decoded_tokens.append(top_ids)
+        lm_input = speech_embedding[top_ids].reshape(1, 1, -1)
+
+    tts_speech_token = np.array(decoded_tokens)
+    return tts_speech_token
+
+
 def inference(models, tts_text, prompt_text, prompt_speech_16k, speed=1.0):
     sample_rate = 24000
 
@@ -135,15 +267,12 @@ def inference(models, tts_text, prompt_text, prompt_speech_16k, speed=1.0):
     tokenizer = models["tokenizer"]
     tokens = tokenizer([tts_text], return_tensors="np")
     tts_text_token = tokens["input_ids"]
-    tts_text_token_len = np.array([tts_text_token.shape[1]], dtype=int)
 
     tokens = tokenizer([prompt_text], return_tensors="np")
     prompt_text_token = tokens["input_ids"]
-    prompt_text_token_len = np.array([prompt_text_token.shape[1]], dtype=int)
 
-    resample_rate = 24000
     prompt_speech_resample = librosa.resample(
-        prompt_speech_16k, orig_sr=16000, target_sr=resample_rate
+        prompt_speech_16k, orig_sr=16000, target_sr=sample_rate
     )
 
     speech_feat, speech_feat_len = extract_speech_feat(prompt_speech_resample)
@@ -161,30 +290,43 @@ def inference(models, tts_text, prompt_text, prompt_speech_16k, speed=1.0):
     campplus = models["campplus"]
     embedding = extract_spk_embedding(campplus, prompt_speech_16k)
 
-    model_input = {
-        "text": tts_text_token,
-        "text_len": tts_text_token_len,
-        "prompt_text": prompt_text_token,
-        "prompt_text_len": prompt_text_token_len,
-        "llm_prompt_speech_token": speech_token,
-        "llm_prompt_speech_token_len": speech_token_len,
-        "flow_prompt_speech_token": speech_token,
-        "flow_prompt_speech_token_len": speech_token_len,
-        "prompt_speech_feat": speech_feat,
-        "prompt_speech_feat_len": speech_feat_len,
-        "llm_embedding": embedding,
-        "flow_embedding": embedding,
-    }
+    text = tts_text_token
+    prompt_text = prompt_text_token
+    llm_prompt_speech_token = speech_token
+    flow_prompt_speech_token = speech_token
+    prompt_speech_feat = speech_feat
+    llm_embedding = embedding
+    flow_embedding = embedding
 
-    # for model_output in self.model.tts(**model_input, stream=stream, speed=speed):
-    #     speech_len = model_output["tts_speech"].shape[1] / self.sample_rate
-    #     logger.info(
-    #         "yield speech len {}, rtf {}".format(
-    #             speech_len, (time.time() - start_time) / speech_len
-    #         )
-    #     )
-    #     yield model_output
-    #     start_time = time.time()
+    tts_speech_token = llm_inference(
+        models,
+        text=text,
+        text_len=np.array([text.shape[1]], dtype=int),
+        prompt_text=prompt_text,
+        prompt_text_len=np.array([prompt_text.shape[1]], dtype=int),
+        prompt_speech_token=llm_prompt_speech_token,
+        prompt_speech_token_len=np.array([llm_prompt_speech_token.shape[1]], dtype=int),
+        embedding=llm_embedding,
+    )
+    tts_speech_token = np.expand_dims(tts_speech_token, axis=0)
+
+    tts_speech = token2wav(
+        token=tts_speech_token,
+        prompt_token=flow_prompt_speech_token,
+        prompt_feat=prompt_speech_feat,
+        embedding=flow_embedding,
+        token_offset=0,
+        speed=speed,
+    )
+
+    speech_len = tts_speech.shape[1] / sample_rate
+    logger.info(
+        "yield speech len {}, rtf {}".format(
+            speech_len, (time.time() - start_time) / speech_len
+        )
+    )
+
+    return tts_speech
 
 
 def inference_zero_shot(models):
@@ -229,6 +371,7 @@ def main():
             "speech_tokenizer_v2.onnx.prototxt",
             "speech_tokenizer_v2.onnx",
             env_id=env_id,
+            # memory_mode=memory_mode,
         )
         campplus = ailia.Net(
             "campplus.onnx.prototxt",
@@ -290,12 +433,21 @@ def main():
     else:
         raise NotImplementedError
 
+    speech_embedding = np.load("speech_embedding.npy")
+    llm_embedding = np.load("llm_embedding.npy")
+    llm_decoder_weight = np.load("llm_decoder_weight.npy")
+    llm_decoder_bias = np.load("llm_decoder_bias.npy")
+
     models = dict(
         tokenizer=tokenizer,
         speech_tokenizer=speech_tokenizer,
         campplus=campplus,
         embed_tokens=embed_tokens,
+        speech_embedding=speech_embedding,
+        llm_embedding=llm_embedding,
         llm=llm,
+        llm_decoder_weight=llm_decoder_weight,
+        llm_decoder_bias=llm_decoder_bias,
         flow_enc=flow_enc,
         flow_dec=flow_dec,
         hift=hift,
