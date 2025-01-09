@@ -250,7 +250,7 @@ def split_audio(model):
         sp = args.savepath
     scipy.io.wavfile.write(sp, 32000, np.round(output * 32767).astype(np.int16))
 
-    logger.info(f"Separated audio has been saved to ")
+    logger.info(f"Separated audio has been saved to {sp}")
 
     logger.info('Script finished successfully.')
 
