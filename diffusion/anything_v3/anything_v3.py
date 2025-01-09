@@ -55,6 +55,12 @@ parser.add_argument(
     help="the prompt to render"
 )
 parser.add_argument(
+    "--steps",
+    type=int,
+    default=50,
+    help="number of inference steps",
+)
+parser.add_argument(
     "--seed",
     type=int,
     default=None,
@@ -82,7 +88,7 @@ def recognize_from_text(pipe):
 
     logger.info('Start inference...')
 
-    image = pipe(prompt).images[0]
+    image = pipe(prompt=prompt, num_inference_steps=args.steps).images[0]
 
     savepath = get_savepath(args.savepath, "", ext='.png')
     image.save(savepath)
