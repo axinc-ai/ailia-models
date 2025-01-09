@@ -104,7 +104,7 @@ def main():
 
     if not os.path.exists(WEIGHT_PB_UNET_PATH):
         logger.info('Downloading weights.pb...')
-        urlretrieve(REMOTE_PATH, WEIGHT_PB_UNET_PATH, progress_print)
+        urlretrieve(REMOTE_PATH + WEIGHT_PB_UNET_PATH, WEIGHT_PB_UNET_PATH, progress_print)
     logger.info('weights.pb is prepared!')
 
     env_id = args.env_id
