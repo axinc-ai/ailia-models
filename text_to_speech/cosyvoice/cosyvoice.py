@@ -79,6 +79,42 @@ def nucleus_sampling(weighted_scores, top_p=0.8, top_k=25):
     return top_ids
 
 
+def subsequent_chunk_mask(
+    size: int,
+    chunk_size: int,
+    num_left_chunks: int = -1,
+):
+    """Create mask for subsequent steps (size, size) with chunk size,
+       this is for streaming encoder
+
+    Args:
+        size (int): size of mask
+        chunk_size (int): size of chunk
+        num_left_chunks (int): number of left chunks
+            <0: use full chunk
+            >=0: use num_left_chunks
+
+    Returns:
+        torch.Tensor: mask
+
+    Examples:
+        >>> subsequent_chunk_mask(4, 2)
+        [[1, 1, 0, 0],
+         [1, 1, 0, 0],
+         [1, 1, 1, 1],
+         [1, 1, 1, 1]]
+    """
+    ret = np.zeros((size, size), dtype=np.bool)
+    for i in range(size):
+        if num_left_chunks < 0:
+            start = 0
+        else:
+            start = max((i // chunk_size - num_left_chunks) * chunk_size, 0)
+        ending = min((i // chunk_size + 1) * chunk_size, size)
+        ret[i, start:ending] = True
+    return ret
+
+
 # ======================
 # Main functions
 # ======================
@@ -233,7 +269,9 @@ def llm_inference(
         top_p, top_k, win_size, tau_r = 0.8, 25, 10, 0.1
         while True:
             top_ids = nucleus_sampling(weighted_scores, top_p=top_p, top_k=top_k)
-            rep_num = np.sum(np.array(decoded_tokens[-win_size:]) == top_ids)
+            rep_num = np.sum(
+                np.array(decoded_tokens[-win_size:]).reshape(-1) == top_ids
+            )
             if rep_num >= win_size * tau_r:
                 score = softmax(weighted_scores, axis=0)
                 top_ids = np.random.choice(len(score), size=1, p=score)
@@ -254,11 +292,163 @@ def llm_inference(
         decoded_tokens.append(top_ids)
         lm_input = speech_embedding[top_ids].reshape(1, 1, -1)
 
-    tts_speech_token = np.array(decoded_tokens)
+    tts_speech_token = np.concatenate(decoded_tokens)
     return tts_speech_token
 
 
-def inference(models, tts_text, prompt_text, prompt_speech_16k, speed=1.0):
+def solve_euler(models, x, t_span, mu, mask, spks, cond):
+    """
+    Fixed euler solver for ODEs.
+    Args:
+        x (torch.Tensor): random noise
+        t_span (torch.Tensor): n_timesteps interpolated
+            shape: (n_timesteps + 1,)
+        mu (torch.Tensor): output of encoder
+            shape: (batch_size, n_feats, mel_timesteps)
+        mask (torch.Tensor): output_mask
+            shape: (batch_size, 1, mel_timesteps)
+        spks (torch.Tensor, optional): speaker ids. Defaults to None.
+            shape: (batch_size, spk_emb_dim)
+        cond: Not used but kept for future purposes
+    """
+    t, _, dt = t_span[0], t_span[-1], t_span[1] - t_span[0]
+    t = t[None, ...]
+
+    # I am storing this because I can later plot it by putting a debugger here and saving it to a file
+    # Or in future might add like a return_all_steps flag
+    sol = []
+
+    # Do not use concat, it may cause memory format changed and trt infer with wrong results!
+    x_in = np.zeros([2, 80, x.shape[2]], dtype=x.dtype)
+    mask_in = np.zeros([2, 1, x.shape[2]], dtype=x.dtype)
+    mu_in = np.zeros([2, 80, x.shape[2]], dtype=x.dtype)
+    t_in = np.zeros([2], dtype=x.dtype)
+    spks_in = np.zeros([2, 80], dtype=x.dtype)
+    cond_in = np.zeros([2, 80, x.shape[2]], dtype=x.dtype)
+
+    for step in range(1, len(t_span)):
+        # Classifier-Free Guidance inference introduced in VoiceBox
+        x_in[:] = x
+        mask_in[:] = mask
+        mu_in[0] = mu
+        t_in[:] = t[None, ...]
+        spks_in[0] = spks
+        cond_in[0] = cond
+
+        net = models["flow_dec"]
+        if not args.onnx:
+            output = net.predict([x_in, mask_in, mu_in, t_in, spks_in, cond_in])
+        else:
+            output = net.run(
+                None,
+                {
+                    "x": x_in,
+                    "mask": mask_in,
+                    "mu": mu_in,
+                    "t": t_in,
+                    "spks": spks_in,
+                    "cond": cond_in,
+                },
+            )
+        dphi_dt = output[0]
+
+        inference_cfg_rate = 0.7
+        cumsum_indices = np.cumsum([x.shape[0], x.shape[0]])[:-1]
+        dphi_dt, cfg_dphi_dt = np.split(dphi_dt, cumsum_indices, axis=0)
+        dphi_dt = (
+            1.0 + inference_cfg_rate
+        ) * dphi_dt - inference_cfg_rate * cfg_dphi_dt
+
+        x = x + dt * dphi_dt
+        t = t + dt
+        sol.append(x)
+        if step < len(t_span) - 1:
+            dt = t_span[step + 1] - t
+
+    return sol[-1].float()
+
+
+def token2wav(models, token, prompt_token, prompt_feat, embedding, token_offset):
+    token_len = np.array([token.shape[1]], dtype=int)
+    prompt_token_len = np.array([prompt_token.shape[1]], dtype=int)
+
+    # make_pad_mask
+    xs = np.concatenate([prompt_token, token], axis=1)
+    batch_size = 1
+    max_len = xs.shape[1]
+    seq_range = np.arange(0, max_len, dtype=int)
+    seq_range_expand = np.broadcast_to(seq_range.reshape(1, -1), (batch_size, max_len))
+    seq_length_expand = np.expand_dims(token_len, axis=-1)
+    mask = seq_range_expand >= seq_length_expand
+    masks = ~np.expand_dims(mask, axis=1)
+
+    # add_optional_chunk_mask
+    static_chunk_size = 50
+    num_left_chunks = -1
+    chunk_masks = subsequent_chunk_mask(
+        xs.shape[1], static_chunk_size, num_left_chunks
+    )  # (L, L)
+    chunk_masks = np.expand_dims(chunk_masks, axis=0)  # (1, L, L)
+    chunk_masks = masks & chunk_masks  # (B, L, L)
+
+    net = models["flow_enc"]
+    if not args.onnx:
+        output = net.predict(
+            [
+                token,
+                token_len,
+                prompt_token,
+                prompt_token_len,
+                prompt_feat,
+                embedding,
+                chunk_masks,
+            ]
+        )
+    else:
+        output = net.run(
+            None,
+            {
+                "token": token,
+                "token_len": token_len,
+                "prompt_token": prompt_token,
+                "prompt_token_len": prompt_token_len,
+                "prompt_feat": prompt_feat,
+                "embedding": embedding,
+                "chunk_masks": chunk_masks,
+            },
+        )
+    mu, mask, spks, cond = output
+
+    # decoder
+    if not hasattr(token2wav, "rand_noise"):
+        token2wav.rand_noise = np.random.randn(1, 80, 50 * 300)
+
+    temperature = 1.0
+    n_timesteps = 10
+    z = token2wav.rand_noise[:, :, : mu.shape[2]] * temperature
+    # fix prompt and overlap part mu and z
+    t_span = np.linspace(0, 1, n_timesteps + 1, dtype=mu.dtype)
+    t_span = 1 - np.cos(t_span * 0.5 * np.pi)
+
+    feat = solve_euler(models, z, t_span=t_span, mu=mu, mask=mask, spks=spks, cond=cond)
+
+    mel_len1 = prompt_feat.shape[1]
+    tts_mel = feat[:, :, mel_len1:]
+
+    token_mel_ratio = 2
+    tts_mel = tts_mel[:, :, token_offset * token_mel_ratio :]
+
+    net = models["hift"]
+    if not args.onnx:
+        output = net.predict([tts_mel])
+    else:
+        output = net.run(None, {"speech_feat": tts_mel})
+    tts_speech, _ = output
+
+    return tts_speech
+
+
+def inference(models, tts_text, prompt_text, prompt_speech_16k):
     sample_rate = 24000
 
     logger.info("synthesis text {}".format(tts_text))
@@ -311,17 +501,17 @@ def inference(models, tts_text, prompt_text, prompt_speech_16k, speed=1.0):
     tts_speech_token = np.expand_dims(tts_speech_token, axis=0)
 
     tts_speech = token2wav(
+        models,
         token=tts_speech_token,
         prompt_token=flow_prompt_speech_token,
         prompt_feat=prompt_speech_feat,
         embedding=flow_embedding,
         token_offset=0,
-        speed=speed,
     )
 
     speech_len = tts_speech.shape[1] / sample_rate
     logger.info(
-        "yield speech len {}, rtf {}".format(
+        "speech len {}, rtf {}".format(
             speech_len, (time.time() - start_time) / speech_len
         )
     )
