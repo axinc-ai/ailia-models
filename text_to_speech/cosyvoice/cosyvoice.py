@@ -79,40 +79,32 @@ def nucleus_sampling(weighted_scores, top_p=0.8, top_k=25):
     return top_ids
 
 
-def subsequent_chunk_mask(
-    size: int,
-    chunk_size: int,
-    num_left_chunks: int = -1,
-):
-    """Create mask for subsequent steps (size, size) with chunk size,
-       this is for streaming encoder
+def istft(magnitude, phase):
+    magnitude = np.clip(magnitude, a_min=None, a_max=1e2)
+    real = magnitude * np.cos(phase)
+    img = magnitude * np.sin(phase)
 
-    Args:
-        size (int): size of mask
-        chunk_size (int): size of chunk
-        num_left_chunks (int): number of left chunks
-            <0: use full chunk
-            >=0: use num_left_chunks
+    import torch
 
-    Returns:
-        torch.Tensor: mask
+    # fmt: off
+    real = torch.from_numpy(real)
+    img = torch.from_numpy(img)
+    stft_window = torch.tensor([0.0000, 0.0381, 0.1464, 0.3087, 0.5000, 0.6913, 0.8536, 0.9619, 1.0000,
+        0.9619, 0.8536, 0.6913, 0.5000, 0.3087, 0.1464, 0.0381])
+    # fmt: on
 
-    Examples:
-        >>> subsequent_chunk_mask(4, 2)
-        [[1, 1, 0, 0],
-         [1, 1, 0, 0],
-         [1, 1, 1, 1],
-         [1, 1, 1, 1]]
-    """
-    ret = np.zeros((size, size), dtype=np.bool)
-    for i in range(size):
-        if num_left_chunks < 0:
-            start = 0
-        else:
-            start = max((i // chunk_size - num_left_chunks) * chunk_size, 0)
-        ending = min((i // chunk_size + 1) * chunk_size, size)
-        ret[i, start:ending] = True
-    return ret
+    print("phase>>", phase)
+    print("real>>", real)
+    print("img>>", img)
+    inverse_transform = torch.istft(
+        torch.complex(real, img),
+        n_fft=16,
+        hop_length=4,
+        win_length=16,
+        window=stft_window,
+    )
+    inverse_transform = inverse_transform.numpy()
+    return inverse_transform
 
 
 # ======================
@@ -130,13 +122,15 @@ def extract_speech_token(speech_tokenizer, speech):
     feat = feat.numpy()
 
     if not args.onnx:
-        output = speech_tokenizer.predict([feat, np.array([feat.shape[2]], dtype=int)])
+        output = speech_tokenizer.predict(
+            [feat, np.array([feat.shape[2]], dtype=np.int32)]
+        )
     else:
         output = speech_tokenizer.run(
             None,
             {
                 "feats": feat,
-                "feats_length": np.array([feat.shape[2]], dtype=int),
+                "feats_length": np.array([feat.shape[2]], dtype=np.int32),
             },
         )
     speech_token = output[0]
@@ -365,31 +359,12 @@ def solve_euler(models, x, t_span, mu, mask, spks, cond):
         if step < len(t_span) - 1:
             dt = t_span[step + 1] - t
 
-    return sol[-1].float()
+    return sol[-1]
 
 
 def token2wav(models, token, prompt_token, prompt_feat, embedding, token_offset):
-    token_len = np.array([token.shape[1]], dtype=int)
-    prompt_token_len = np.array([prompt_token.shape[1]], dtype=int)
-
-    # make_pad_mask
-    xs = np.concatenate([prompt_token, token], axis=1)
-    batch_size = 1
-    max_len = xs.shape[1]
-    seq_range = np.arange(0, max_len, dtype=int)
-    seq_range_expand = np.broadcast_to(seq_range.reshape(1, -1), (batch_size, max_len))
-    seq_length_expand = np.expand_dims(token_len, axis=-1)
-    mask = seq_range_expand >= seq_length_expand
-    masks = ~np.expand_dims(mask, axis=1)
-
-    # add_optional_chunk_mask
-    static_chunk_size = 50
-    num_left_chunks = -1
-    chunk_masks = subsequent_chunk_mask(
-        xs.shape[1], static_chunk_size, num_left_chunks
-    )  # (L, L)
-    chunk_masks = np.expand_dims(chunk_masks, axis=0)  # (1, L, L)
-    chunk_masks = masks & chunk_masks  # (B, L, L)
+    token_len = np.array([token.shape[1]], dtype=np.int32)
+    prompt_token_len = np.array([prompt_token.shape[1]], dtype=np.int32)
 
     net = models["flow_enc"]
     if not args.onnx:
@@ -401,7 +376,6 @@ def token2wav(models, token, prompt_token, prompt_feat, embedding, token_offset)
                 prompt_token_len,
                 prompt_feat,
                 embedding,
-                chunk_masks,
             ]
         )
     else:
@@ -414,14 +388,9 @@ def token2wav(models, token, prompt_token, prompt_feat, embedding, token_offset)
                 "prompt_token_len": prompt_token_len,
                 "prompt_feat": prompt_feat,
                 "embedding": embedding,
-                "chunk_masks": chunk_masks,
             },
         )
     mu, mask, spks, cond = output
-
-    # decoder
-    if not hasattr(token2wav, "rand_noise"):
-        token2wav.rand_noise = np.random.randn(1, 80, 50 * 300)
 
     temperature = 1.0
     n_timesteps = 10
@@ -443,7 +412,12 @@ def token2wav(models, token, prompt_token, prompt_feat, embedding, token_offset)
         output = net.predict([tts_mel])
     else:
         output = net.run(None, {"speech_feat": tts_mel})
-    tts_speech, _ = output
+    magnitude, phase = output
+
+    x = istft(magnitude, phase)
+
+    audio_limit = 0.99
+    tts_speech = np.clip(x, -audio_limit, audio_limit)
 
     return tts_speech
 
@@ -597,6 +571,25 @@ def main():
         import onnxruntime
 
         providers = ["CUDAExecutionProvider", "CPUExecutionProvider"]
+        speech_tokenizer = onnxruntime.InferenceSession(
+            "speech_tokenizer_v2.onnx", providers=providers
+        )
+        campplus = onnxruntime.InferenceSession("campplus.onnx", providers=providers)
+        embed_tokens = onnxruntime.InferenceSession(
+            "CosyVoice2-0.5B_embed_tokens.onnx", providers=providers
+        )
+        llm = onnxruntime.InferenceSession(
+            "CosyVoice2-0.5B_llm.onnx", providers=providers
+        )
+        flow_enc = onnxruntime.InferenceSession(
+            "CosyVoice2-0.5B_flow_encoder.onnx", providers=providers
+        )
+        flow_dec = onnxruntime.InferenceSession(
+            "CosyVoice2-0.5B_flow.decoder.estimator.fp32.onnx", providers=providers
+        )
+        hift = onnxruntime.InferenceSession(
+            "CosyVoice2-0.5B_hift.onnx", providers=providers
+        )
 
     args.disable_ailia_tokenizer = True
     if args.disable_ailia_tokenizer:
