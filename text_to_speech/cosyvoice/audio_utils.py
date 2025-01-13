@@ -1,14 +1,20 @@
 import torch
 
+import numpy as np
+import librosa
 from librosa.filters import mel as librosa_mel_fn
-from scipy.io.wavfile import read
 
 MAX_WAV_VALUE = 32768.0
 
 
-def load_wav(full_path):
-    sampling_rate, data = read(full_path)
-    return data, sampling_rate
+def load_wav(file, target_sr):
+    # prepare input data
+    audio, source_sr = librosa.load(file, sr=None)
+    # Resample the wav if needed
+    if source_sr is not None and source_sr != target_sr:
+        audio = librosa.resample(audio, orig_sr=source_sr, target_sr=target_sr)
+
+    return audio.astype(np.float32)
 
 
 def dynamic_range_compression_torch(x, C=1, clip_val=1e-5):

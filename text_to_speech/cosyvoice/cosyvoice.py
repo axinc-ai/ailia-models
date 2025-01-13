@@ -5,6 +5,7 @@ from logging import getLogger
 import numpy as np
 from scipy.special import log_softmax
 import librosa
+import soundfile as sf
 import whisper
 import torchaudio.compliance.kaldi as kaldi
 
@@ -16,7 +17,7 @@ from arg_utils import get_base_parser, update_parser, get_savepath
 from model_utils import check_and_download_models, check_and_download_file
 from math_utils import softmax
 
-from audio_utils import mel_spectrogram
+from audio_utils import load_wav, mel_spectrogram
 from cosyvoice_utils import text_normalize
 
 
@@ -26,13 +27,32 @@ logger = getLogger(__name__)
 # Parameters
 # ======================
 
+WEIGHT_SPEECH_PATH = "speech_tokenizer_v2.onnx"
+WEIGHT_CAMP_PATH = "campplus.onnx"
+WEIGHT_EMB_TKN_PATH = "CosyVoice2-0.5B_embed_tokens.onnx"
+WEIGHT_LLM_PATH = "CosyVoice2-0.5B_llm.onnx"
+WEIGHT_FLOW_ENC_PATH = "CosyVoice2-0.5B_flow_encoder.onnx"
+WEIGHT_FLOW_DEC_PATH = "CosyVoice2-0.5B_flow.decoder.estimator.fp32.onnx"
+WEIGHT_HIFT_PATH = "CosyVoice2-0.5B_hift.onnx"
+MODEL_SPEECH_PATH = "speech_tokenizer_v2.onnx.prototxt"
+MODEL_CAMP_PATH = "campplus.onnx.prototxt"
+MODEL_EMB_TKN_PATH = "CosyVoice2-0.5B_embed_tokens.onnx.prototxt"
+MODEL_LLM_PATH = "CosyVoice2-0.5B_llm.onnx.prototxt"
+MODEL_FLOW_ENC_PATH = "CosyVoice2-0.5B_flow_encoder.onnx.prototxt"
+MODEL_FLOW_DEC_PATH = "CosyVoice2-0.5B_flow.decoder.estimator.fp32.onnx.prototxt"
+MODEL_HIFT_PATH = "CosyVoice2-0.5B_hift.onnx.prototxt"
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/cosyvoice/"
+
+SAMPLE_RATE = 24000
+
+WAV_PATH = "common_voice_ja_37088095.wav"
+SAVE_WAV_PATH = "output.wav"
 
 # ======================
 # Arguemnt Parser Config
 # ======================
 
-parser = get_base_parser("CosyVoice", None, None)
+parser = get_base_parser("CosyVoice", WAV_PATH, SAVE_WAV_PATH)
 parser.add_argument(
     "--seed",
     type=int,
@@ -84,26 +104,13 @@ def istft(magnitude, phase):
     real = magnitude * np.cos(phase)
     img = magnitude * np.sin(phase)
 
-    import torch
-
-    # fmt: off
-    real = torch.from_numpy(real)
-    img = torch.from_numpy(img)
-    stft_window = torch.tensor([0.0000, 0.0381, 0.1464, 0.3087, 0.5000, 0.6913, 0.8536, 0.9619, 1.0000,
-        0.9619, 0.8536, 0.6913, 0.5000, 0.3087, 0.1464, 0.0381])
-    # fmt: on
-
-    print("phase>>", phase)
-    print("real>>", real)
-    print("img>>", img)
-    inverse_transform = torch.istft(
-        torch.complex(real, img),
-        n_fft=16,
+    complex_stft = real + 1j * img
+    inverse_transform = librosa.istft(
+        complex_stft,
         hop_length=4,
         win_length=16,
-        window=stft_window,
+        window="hann",
     )
-    inverse_transform = inverse_transform.numpy()
     return inverse_transform
 
 
@@ -168,7 +175,7 @@ def extract_speech_feat(speech):
         speech,
         n_fft=1920,
         num_mels=80,
-        sampling_rate=24000,
+        sampling_rate=SAMPLE_RATE,
         hop_size=480,
         win_size=1920,
         fmin=0,
@@ -186,6 +193,7 @@ def extract_speech_feat(speech):
 
 def llm_forward(llm, xs, cache):
     masks = np.expand_dims(np.tril(np.ones((xs.shape[1], xs.shape[1]))), axis=0)
+    masks = masks.astype(np.bool)
     if not args.onnx:
         output = llm.predict([xs, masks, *cache])
     else:
@@ -210,7 +218,7 @@ def llm_inference(
 ):
     speech_token_size = 6561
 
-    text = np.concatenate([prompt_text, text], axis=1)
+    text = np.concatenate([prompt_text, text], axis=1).astype(np.int32)
     text_len += prompt_text_len
 
     net = models["embed_tokens"]
@@ -240,8 +248,8 @@ def llm_inference(
     )
 
     # 4. cal min/max_length
-    min_len = int((text_len - prompt_text_len) * min_token_text_ratio)
-    max_len = int((text_len - prompt_text_len) * max_token_text_ratio)
+    min_len = int((text_len - prompt_text_len).item() * min_token_text_ratio)
+    max_len = int((text_len - prompt_text_len).item() * max_token_text_ratio)
 
     cache = [np.zeros((1, 2, 0, 64), dtype=np.float32)] * (2 * 24)
 
@@ -394,7 +402,8 @@ def token2wav(models, token, prompt_token, prompt_feat, embedding, token_offset)
 
     temperature = 1.0
     n_timesteps = 10
-    z = token2wav.rand_noise[:, :, : mu.shape[2]] * temperature
+    rand_noise = np.random.randn(1, 80, 50 * 300).astype(np.float32)
+    z = rand_noise[:, :, : mu.shape[2]] * temperature
     # fix prompt and overlap part mu and z
     t_span = np.linspace(0, 1, n_timesteps + 1, dtype=mu.dtype)
     t_span = 1 - np.cos(t_span * 0.5 * np.pi)
@@ -423,8 +432,6 @@ def token2wav(models, token, prompt_token, prompt_feat, embedding, token_offset)
 
 
 def inference(models, tts_text, prompt_text, prompt_speech_16k):
-    sample_rate = 24000
-
     logger.info("synthesis text {}".format(tts_text))
     start_time = time.time()
 
@@ -436,7 +443,7 @@ def inference(models, tts_text, prompt_text, prompt_speech_16k):
     prompt_text_token = tokens["input_ids"]
 
     prompt_speech_resample = librosa.resample(
-        prompt_speech_16k, orig_sr=16000, target_sr=sample_rate
+        prompt_speech_16k, orig_sr=16000, target_sr=SAMPLE_RATE
     )
 
     speech_feat, speech_feat_len = extract_speech_feat(prompt_speech_resample)
@@ -483,7 +490,7 @@ def inference(models, tts_text, prompt_text, prompt_speech_16k):
         token_offset=0,
     )
 
-    speech_len = tts_speech.shape[1] / sample_rate
+    speech_len = tts_speech.shape[1] / SAMPLE_RATE
     logger.info(
         "speech len {}, rtf {}".format(
             speech_len, (time.time() - start_time) / speech_len
@@ -494,11 +501,25 @@ def inference(models, tts_text, prompt_text, prompt_speech_16k):
 
 
 def inference_zero_shot(models):
-    # prompt = args.input if isinstance(args.input, str) else args.input[0]
-    audio_path = "common_voice_ja_37088095.wav"
+    audio_path = args.input[0]
     tts_text = "それから食事のときには、彼等のうちから数人招きます。もっともそのときには、普通の人間も、二三人ずつ立派な人を招くことにします。"
     prompt_text = "建築的な統一にもたらされることによって科学的となるのである。"
-    prompt_speech_16k = np.load("prompt_speech_16k.npy")
+
+    speech = load_wav(audio_path, 16000)
+    speech = speech[None, :]
+
+    top_db = 60
+    hop_length = 220
+    win_length = 440
+    max_val = 0.8
+    speech, _ = librosa.effects.trim(
+        speech, top_db=top_db, frame_length=win_length, hop_length=hop_length
+    )
+    if np.max(np.abs(speech)) > max_val:
+        speech = speech / np.max(np.abs(speech)) * max_val
+    speech = np.concatenate(
+        [speech, np.zeros([1, int(SAMPLE_RATE * 0.2)], dtype=np.float32)], axis=1
+    )
 
     logger.info("tts_text: %s" % tts_text)
     logger.info("prompt_text: %s" % prompt_text)
@@ -507,6 +528,7 @@ def inference_zero_shot(models):
 
     tokenizer = models["tokenizer"]
     prompt_text = text_normalize(tokenizer, prompt_text, split=False)
+    a = []
     for s in text_normalize(tokenizer, tts_text, split=True):
         if len(s) < 0.5 * len(prompt_text):
             logger.warning(
@@ -515,12 +537,33 @@ def inference_zero_shot(models):
                 )
             )
 
-        tts_speech = inference(models, s, prompt_text, prompt_speech_16k)
+        tts_speech = inference(models, s, prompt_text, speech)
+        a.append(tts_speech)
+
+    tts_speech = np.concatenate(a, axis=1)
+    tts_speech = tts_speech.squeeze()
+
+    # save result
+    savepath = get_savepath(args.savepath, audio_path, ext=".wav")
+    logger.info(f"saved at : {savepath}")
+    sf.write(savepath, tts_speech, SAMPLE_RATE)
 
     logger.info("Script finished successfully.")
 
 
 def main():
+    check_and_download_models(WEIGHT_SPEECH_PATH, MODEL_SPEECH_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_CAMP_PATH, MODEL_CAMP_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_EMB_TKN_PATH, MODEL_EMB_TKN_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_LLM_PATH, MODEL_LLM_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_FLOW_ENC_PATH, MODEL_FLOW_ENC_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_FLOW_DEC_PATH, MODEL_FLOW_DEC_PATH, REMOTE_PATH)
+    check_and_download_models(WEIGHT_HIFT_PATH, MODEL_HIFT_PATH, REMOTE_PATH)
+
+    seed = args.seed
+    if seed is not None:
+        np.random.seed(seed)
+
     env_id = args.env_id
 
     # initialize
@@ -532,64 +575,57 @@ def main():
             reuse_interstage=True,
         )
         speech_tokenizer = ailia.Net(
-            "speech_tokenizer_v2.onnx.prototxt",
-            "speech_tokenizer_v2.onnx",
+            MODEL_SPEECH_PATH,
+            WEIGHT_SPEECH_PATH,
             env_id=env_id,
-            # memory_mode=memory_mode,
+            memory_mode=memory_mode,
         )
         campplus = ailia.Net(
-            "campplus.onnx.prototxt",
-            "campplus.onnx",
-            env_id=env_id,
+            MODEL_CAMP_PATH, WEIGHT_CAMP_PATH, env_id=env_id, memory_mode=memory_mode
         )
         embed_tokens = ailia.Net(
-            "CosyVoice2-0.5B_embed_tokens.onnx.prototxt",
-            "CosyVoice2-0.5B_embed_tokens.onnx",
+            MODEL_EMB_TKN_PATH,
+            WEIGHT_EMB_TKN_PATH,
             env_id=env_id,
+            memory_mode=memory_mode,
         )
         llm = ailia.Net(
-            "CosyVoice2-0.5B_llm.onnx.prototxt",
-            "CosyVoice2-0.5B_llm.onnx",
-            env_id=env_id,
+            MODEL_LLM_PATH, WEIGHT_LLM_PATH, env_id=env_id, memory_mode=memory_mode
         )
         flow_enc = ailia.Net(
-            "CosyVoice2-0.5B_flow_encoder.onnx.prototxt",
-            "CosyVoice2-0.5B_flow_encoder.onnx",
+            MODEL_FLOW_ENC_PATH,
+            WEIGHT_FLOW_ENC_PATH,
             env_id=env_id,
+            memory_mode=memory_mode,
         )
         flow_dec = ailia.Net(
-            "CosyVoice2-0.5B_flow.decoder.estimator.fp32.onnx.prototxt",
-            "CosyVoice2-0.5B_flow.decoder.estimator.fp32.onnx",
+            MODEL_FLOW_DEC_PATH,
+            WEIGHT_FLOW_DEC_PATH,
             env_id=env_id,
+            memory_mode=memory_mode,
         )
         hift = ailia.Net(
-            "CosyVoice2-0.5B_hift.onnx.prototxt",
-            "CosyVoice2-0.5B_hift.onnx",
-            env_id=env_id,
+            MODEL_HIFT_PATH, WEIGHT_HIFT_PATH, env_id=env_id, memory_mode=memory_mode
         )
     else:
         import onnxruntime
 
         providers = ["CUDAExecutionProvider", "CPUExecutionProvider"]
         speech_tokenizer = onnxruntime.InferenceSession(
-            "speech_tokenizer_v2.onnx", providers=providers
+            WEIGHT_SPEECH_PATH, providers=providers
         )
-        campplus = onnxruntime.InferenceSession("campplus.onnx", providers=providers)
+        campplus = onnxruntime.InferenceSession(WEIGHT_CAMP_PATH, providers=providers)
         embed_tokens = onnxruntime.InferenceSession(
-            "CosyVoice2-0.5B_embed_tokens.onnx", providers=providers
+            WEIGHT_EMB_TKN_PATH, providers=providers
         )
-        llm = onnxruntime.InferenceSession(
-            "CosyVoice2-0.5B_llm.onnx", providers=providers
-        )
+        llm = onnxruntime.InferenceSession(WEIGHT_LLM_PATH, providers=providers)
         flow_enc = onnxruntime.InferenceSession(
-            "CosyVoice2-0.5B_flow_encoder.onnx", providers=providers
+            WEIGHT_FLOW_ENC_PATH, providers=providers
         )
         flow_dec = onnxruntime.InferenceSession(
-            "CosyVoice2-0.5B_flow.decoder.estimator.fp32.onnx", providers=providers
+            WEIGHT_FLOW_DEC_PATH, providers=providers
         )
-        hift = onnxruntime.InferenceSession(
-            "CosyVoice2-0.5B_hift.onnx", providers=providers
-        )
+        hift = onnxruntime.InferenceSession(WEIGHT_HIFT_PATH, providers=providers)
 
     args.disable_ailia_tokenizer = True
     if args.disable_ailia_tokenizer:
