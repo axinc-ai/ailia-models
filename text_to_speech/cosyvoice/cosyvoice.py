@@ -6,8 +6,12 @@ import numpy as np
 from scipy.special import log_softmax
 import librosa
 import soundfile as sf
-import whisper
-import torchaudio.compliance.kaldi as kaldi
+
+use_torch = True
+try:
+    import torchaudio.compliance.kaldi as kaldi
+except ImportError:
+    use_torch = False
 
 import ailia
 
@@ -17,7 +21,7 @@ from arg_utils import get_base_parser, update_parser, get_savepath
 from model_utils import check_and_download_models, check_and_download_file
 from math_utils import softmax
 
-from audio_utils import load_wav, mel_spectrogram
+from audio_utils import load_wav, mel_spectrogram, log_mel_spectrogram, compute_fbank
 from cosyvoice_utils import text_normalize
 
 
@@ -41,11 +45,15 @@ MODEL_LLM_PATH = "CosyVoice2-0.5B_llm.onnx.prototxt"
 MODEL_FLOW_ENC_PATH = "CosyVoice2-0.5B_flow_encoder.onnx.prototxt"
 MODEL_FLOW_DEC_PATH = "CosyVoice2-0.5B_flow.decoder.estimator.fp32.onnx.prototxt"
 MODEL_HIFT_PATH = "CosyVoice2-0.5B_hift.onnx.prototxt"
+NPY_SPEECH_EMB_PATH = "speech_embedding.npy"
+NPY_LLM_EMB_PATH = "llm_embedding.npy"
+NPY_LLM_DEC_WEIGHT_PATH = "llm_decoder_weight.npy"
+NPY_LLM_DEC_BIAS_PATH = "llm_decoder_bias.npy"
 REMOTE_PATH = "https://storage.googleapis.com/ailia-models/cosyvoice/"
 
 SAMPLE_RATE = 24000
 
-WAV_PATH = "common_voice_ja_37088095.wav"
+WAV_PATH = "zero_shot_prompt.wav"
 SAVE_WAV_PATH = "output.wav"
 
 # ======================
@@ -53,6 +61,20 @@ SAVE_WAV_PATH = "output.wav"
 # ======================
 
 parser = get_base_parser("CosyVoice", WAV_PATH, SAVE_WAV_PATH)
+parser.add_argument(
+    "-t",
+    "--tts_text",
+    type=str,
+    default="收到好友从远方寄来的生日礼物，那份意外的惊喜与深深的祝福让我心中充满了甜蜜的快乐，笑容如花儿般绽放。",
+    help="tts_text",
+)
+parser.add_argument(
+    "-p",
+    "--prompt_text",
+    type=str,
+    default="希望你以后能够做的比我还好呦。",
+    help="prompt_text",
+)
 parser.add_argument(
     "--seed",
     type=int,
@@ -120,13 +142,14 @@ def istft(magnitude, phase):
 
 
 def extract_speech_token(speech_tokenizer, speech):
-    import torch
-
     assert (
         speech.shape[1] / 16000 <= 30
     ), "do not support extract speech token for audio longer than 30s"
-    feat = whisper.log_mel_spectrogram(torch.from_numpy(speech), n_mels=128)
-    feat = feat.numpy()
+
+    feat = log_mel_spectrogram(
+        speech,
+        n_mels=128,
+    )
 
     if not args.onnx:
         output = speech_tokenizer.predict(
@@ -147,12 +170,15 @@ def extract_speech_token(speech_tokenizer, speech):
 
 
 def extract_spk_embedding(campplus, speech):
-    import torch
+    if use_torch:
+        import torch
 
-    speech = torch.from_numpy(speech)
-    feat = kaldi.fbank(speech, num_mel_bins=80, dither=0, sample_frequency=16000)
-    feat = feat - feat.mean(dim=0, keepdim=True)
-    feat = feat.numpy()
+        x = torch.from_numpy(speech)
+        feat = kaldi.fbank(x, num_mel_bins=80, dither=0, sample_frequency=16000)
+        feat = feat - feat.mean(dim=0, keepdim=True)
+        feat = feat.numpy()
+    else:
+        feat = compute_fbank(speech[0], sr=16000)
 
     feat = np.expand_dims(feat, axis=0)
     if not args.onnx:
@@ -168,9 +194,6 @@ def extract_spk_embedding(campplus, speech):
 
 
 def extract_speech_feat(speech):
-    import torch
-
-    speech = torch.from_numpy(speech)
     speech_feat = mel_spectrogram(
         speech,
         n_fft=1920,
@@ -182,8 +205,6 @@ def extract_speech_feat(speech):
         fmax=8000,
         center=False,
     )
-    speech_feat = speech_feat.numpy()
-
     speech_feat = np.squeeze(speech_feat, axis=0).transpose(1, 0)
     speech_feat = np.expand_dims(speech_feat, axis=0)
     speech_feat_len = np.array([speech_feat.shape[1]], dtype=int)
@@ -302,14 +323,14 @@ def solve_euler(models, x, t_span, mu, mask, spks, cond):
     """
     Fixed euler solver for ODEs.
     Args:
-        x (torch.Tensor): random noise
-        t_span (torch.Tensor): n_timesteps interpolated
+        x (np.ndarray): random noise
+        t_span (np.ndarray): n_timesteps interpolated
             shape: (n_timesteps + 1,)
-        mu (torch.Tensor): output of encoder
+        mu (np.ndarray): output of encoder
             shape: (batch_size, n_feats, mel_timesteps)
-        mask (torch.Tensor): output_mask
+        mask (np.ndarray): output_mask
             shape: (batch_size, 1, mel_timesteps)
-        spks (torch.Tensor, optional): speaker ids. Defaults to None.
+        spks (np.ndarray, optional): speaker ids. Defaults to None.
             shape: (batch_size, spk_emb_dim)
         cond: Not used but kept for future purposes
     """
@@ -432,7 +453,6 @@ def token2wav(models, token, prompt_token, prompt_feat, embedding, token_offset)
 
 
 def inference(models, tts_text, prompt_text, prompt_speech_16k):
-    logger.info("synthesis text {}".format(tts_text))
     start_time = time.time()
 
     tokenizer = models["tokenizer"]
@@ -502,8 +522,8 @@ def inference(models, tts_text, prompt_text, prompt_speech_16k):
 
 def inference_zero_shot(models):
     audio_path = args.input[0]
-    tts_text = "それから食事のときには、彼等のうちから数人招きます。もっともそのときには、普通の人間も、二三人ずつ立派な人を招くことにします。"
-    prompt_text = "建築的な統一にもたらされることによって科学的となるのである。"
+    tts_text = args.tts_text
+    prompt_text = args.prompt_text
 
     speech = load_wav(audio_path, 16000)
     speech = speech[None, :]
@@ -559,6 +579,10 @@ def main():
     check_and_download_models(WEIGHT_FLOW_ENC_PATH, MODEL_FLOW_ENC_PATH, REMOTE_PATH)
     check_and_download_models(WEIGHT_FLOW_DEC_PATH, MODEL_FLOW_DEC_PATH, REMOTE_PATH)
     check_and_download_models(WEIGHT_HIFT_PATH, MODEL_HIFT_PATH, REMOTE_PATH)
+    check_and_download_file(NPY_SPEECH_EMB_PATH, REMOTE_PATH)
+    check_and_download_file(NPY_LLM_EMB_PATH, REMOTE_PATH)
+    check_and_download_file(NPY_LLM_DEC_WEIGHT_PATH, REMOTE_PATH)
+    check_and_download_file(NPY_LLM_DEC_BIAS_PATH, REMOTE_PATH)
 
     seed = args.seed
     if seed is not None:
@@ -652,10 +676,10 @@ def main():
     else:
         raise NotImplementedError
 
-    speech_embedding = np.load("speech_embedding.npy")
-    llm_embedding = np.load("llm_embedding.npy")
-    llm_decoder_weight = np.load("llm_decoder_weight.npy")
-    llm_decoder_bias = np.load("llm_decoder_bias.npy")
+    speech_embedding = np.load(NPY_SPEECH_EMB_PATH)
+    llm_embedding = np.load(NPY_LLM_EMB_PATH)
+    llm_decoder_weight = np.load(NPY_LLM_DEC_WEIGHT_PATH)
+    llm_decoder_bias = np.load(NPY_LLM_DEC_BIAS_PATH)
 
     models = dict(
         tokenizer=tokenizer,
