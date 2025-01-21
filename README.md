@@ -1,4 +1,4 @@
-<img src="ailia-models.png">
+[<img src="ailia-models_B_241211.png">](ABOUT_AINYAN.md)
 
 The collection of pre-trained, state-of-the-art AI models.
 
@@ -17,16 +17,17 @@ If you would like to try on your computer:
 [ailia MODELS tutorial 日本語版](TUTORIAL_jp.md)
 
 # Supported models
-363 models as of December 29th, 2024
+374 models as of January 2nd, 2025
 
 # Latest update
+- 2025.01.02 Add qwen_audio, audiosep
+- 2025.01.01 Add RT-DETRv2, gazelle, lama, anything_v3, depth_anything_controlnet, deepfacelive, llava-jp
+- 2024.12.31 Add clip-japanese-base, timesfm
 - 2024.12.29 Add SAM2.1, span
 - 2024.12.18 Update ONNX file of prompt encoder for SAM
 - 2024.12.17 Add yolov10, yolov11
 - 2024.11.26 Add fast_sam
 - 2024.11.19 Add qwen2_vl, live_portrait (ailia SDK 1.5)
-- 2024.10.09 Add whisper-v3-turbo
-- 2024.10.02 Add florence2
 - More information in our [Wiki](https://github.com/axinc-ai/ailia-models/wiki)
 
 ## Action recognition
@@ -48,6 +49,12 @@ If you would like to try on your computer:
 | [<img src="anomaly_detection/spade-pytorch/output.png" width=128px>](anomaly_detection/spade-pytorch/) | [spade-pytorch](/anomaly_detection/spade-pytorch/) | [Sub-Image Anomaly Detection with Deep Pyramid Correspondences](https://github.com/byungjae89/SPADE-pytorch) | Pytorch | 1.2.6 and later | May 2020 | |
 | [<img src="anomaly_detection/padim/output.png" width=128px>](anomaly_detection/padim/) | [padim](/anomaly_detection/padim/) | [PaDiM-Anomaly-Detection-Localization-master](https://github.com/xiahaifeng1995/PaDiM-Anomaly-Detection-Localization-master) | Pytorch | 1.2.6 and later | Nov 2020 | [EN](https://medium.com/axinc-ai/padim-a-machine-learning-model-for-detecting-defective-products-without-retraining-5daa6f203377) [JP](https://medium.com/axinc/padim-%E5%86%8D%E5%AD%A6%E7%BF%92%E4%B8%8D%E8%A6%81%E3%81%A7%E4%B8%8D%E8%89%AF%E5%93%81%E6%A4%9C%E7%9F%A5%E3%82%92%E8%A1%8C%E3%81%86%E6%A9%9F%E6%A2%B0%E5%AD%A6%E7%BF%92%E3%83%A2%E3%83%87%E3%83%AB-69add653fbd3) |
 | [<img src="anomaly_detection/patchcore/output.png" width=128px>](anomaly_detection/patchcore/) | [patchcore](/anomaly_detection/patchcore/) | [PatchCore_anomaly_detection](https://github.com/hcw-00/PatchCore_anomaly_detection) | Pytorch | 1.2.6 and later | Jun 2021 | |
+
+## Audio Language Model
+
+| Model | Reference | Exported From | Supported Ailia Version | Blog |
+|------------:|:------------:|:------------:|:------------:|:------------:|
+|[qwen_audio](/audio_language_model/qwen_audio) | [Qwen-Audio](https://github.com/QwenLM/Qwen-Audio) | Pytorch | 1.5.0 and later | |
 
 ## Audio processing
 
@@ -82,6 +89,7 @@ If you would like to try on your computer:
 | [voicefilter](/audio_processing/voicefilter/) | [VoiceFilter](https://github.com/mindslab-ai/voicefilter)  | Pytorch | 1.2.7 and later | [EN](https://medium.com/axinc-ai/voicefilter-targeted-voice-separation-model-6fe6f85309ea) [JP](https://medium.com/axinc/voicefilter-%E4%BB%BB%E6%84%8F%E3%81%AE%E4%BA%BA%E7%89%A9%E3%81%AE%E5%A3%B0%E3%82%92%E6%8A%BD%E5%87%BA%E3%81%A7%E3%81%8D%E3%82%8B%E9%9F%B3%E5%A3%B0%E5%88%86%E9%9B%A2%E3%83%A2%E3%83%87%E3%83%AB-d5b88a8549d9) |
 | [rnnoise](/audio_processing/rnnoise/) | [rnnoise](https://github.com/xiph/rnnoise) | Keras | 1.2.15 and later | |
 | [dtln](/audio_processing/dtln/) | [Dual-signal Transformation LSTM Network](https://github.com/breizhn/DTLN) | Tensorflow | 1.3.0 and later |  |
+| [audiosep](/audio_processing/audiosep/) | [AudioSep](https://github.com/Audio-AGI/AudioSep) | Pytorch | 1.3.0 and later | |
 
 ### Phoneme alignment
 
@@ -199,6 +207,8 @@ If you would like to try on your computer:
 | [<img src="diffusion/sd-turbo/output.png" width=128px>](diffusion/sd-turbo/) | [sd-turbo](/diffusion/sd-turbo/) | [Hugging Face - SD-Turbo](https://huggingface.co/stabilityai/sd-turbo) | Pytorch | 1.2.16 and later |
 | [<img src="diffusion/sdxl-turbo/output.png" width=128px>](diffusion/sdxl-turbo/) | [sdxl-turbo](/diffusion/sdxl-turbo/) | [Hugging Face - SDXL-Turbo](https://huggingface.co/stabilityai/sdxl-turbo) | Pytorch | 1.2.16 and later |
 | [<img src="diffusion/latent-consistency-models/Output/0000.png" width=128px>](diffusion/latent-consistency-models/) | [latent-consistency-models](/diffusion/latent-consistency-models/) | [latent-consistency-models](https://github.com/luosiallen/latent-consistency-model) | Pytorch | 1.2.16 and later |
+| [<img src="diffusion/anything_v3/output.png" width=128px>](diffusion/anything_v3/) | [anything_v3](/diffusion/anything_v3/) | [Linaqruf/anything-v3.0](https://huggingface.co/Linaqruf/anything-v3.0) | Pytorch | 1.5.0 and later |
+| [<img src="diffusion/depth_anything_controlnet/visualization.png" width=128px>](diffusion/depth_anything_controlnet/) | [depth_anything_controlnet](/diffusion/depth_anything_controlnet/) | [DepthAnything](https://github.com/LiheYoung/Depth-Anything) | Pytorch | 1.2.16 and later |
 
 ### Text to audio
 
@@ -263,6 +273,7 @@ If you would like to try on your computer:
 | [<img src="face_recognition/gazeml/output.png" width=128px>](face_recognition/gazeml/) | [gazeml](/face_recognition/gazeml/) | [A deep learning framework based on Tensorflow <br/>for the training of high performance gaze estimation](https://github.com/swook/GazeML) | TensorFlow | 1.2.0 and later |
 | [<img src="face_recognition/mediapipe_iris/output.png" width=128px>](face_recognition/mediapipe_iris/) | [mediapipe_iris](/face_recognition/mediapipe_iris/) | [irislandmarks.pytorch](https://github.com/cedriclmenard/irislandmarks.pytorch) | Pytorch | 1.2.2 and later | [EN](https://medium.com/axinc-ai/mediapipe-iris-detecting-key-points-in-the-eye-637f5c1e728e) [JP](https://medium.com/axinc/mediapipe-iris-%E7%9B%AE%E3%81%AE%E3%82%AD%E3%83%BC%E3%83%9D%E3%82%A4%E3%83%B3%E3%83%88%E3%82%92%E6%A4%9C%E5%87%BA%E3%81%99%E3%82%8B%E6%A9%9F%E6%A2%B0%E5%AD%A6%E7%BF%92%E3%83%A2%E3%83%87%E3%83%AB-a4742f143551) |
 | [<img src="face_recognition/ax_gaze_estimation/output.png" width=128px>](face_recognition/ax_gaze_estimation/) | [ax_gaze_estimation](/face_recognition/ax_gaze_estimation/) | ax Gaze Estimation | Pytorch | 1.2.2 and later | [EN](https://medium.com/axinc-ai/axgazeestimation-a-machine-learning-model-for-estimating-gaze-c9648042d637) [JP](https://medium.com/axinc/axgazeestimation-%E8%A6%96%E7%B7%9A%E3%82%92%E6%8E%A8%E5%AE%9A%E3%81%99%E3%82%8B%E6%A9%9F%E6%A2%B0%E5%AD%A6%E7%BF%92%E3%83%A2%E3%83%87%E3%83%AB-8446a791968) |
+| [<img src="face_recognition/gazelle/output.png" width=128px>](face_recognition/gazelle/) | [gazelle](/face_recognition/gazelle/) | [gazelle](https://github.com/fkryan/gazelle) | Pytorch | 1.2.16 and later |
 
 ### Head pose estimation
 
@@ -302,7 +313,8 @@ If you would like to try on your computer:
 | | Model | Reference | Exported From | Supported Ailia Version | Blog |
 |:-----------|------------:|:------------:|:------------:|:------------:|:------------:|
 | [<img src="face_swapping/sber-swap/output.png" width=128px>](face_swapping/sber-swap/) | [sber-swap](/face_swapping/sber-swap/) | [SberSwap](https://github.com/ai-forever/sber-swap) | Pytorch | 1.2.12 and later | [JP](https://medium.com/axinc/sberswap-ai%E3%81%AB%E3%82%88%E3%82%8B%E9%AB%98%E7%B2%BE%E5%BA%A6%E3%81%AAfaceswap-bddae3b8ff84) |
-| [<img src="face_swapping/facefusion/output.png" width=128px>](face_swapping/facefusion/) | [facefusion](/face_swapping/facefusion/) | [FaceFusion](https://github.com/facefusion/facefusion) | ONNXRuntime | 1.2.10 and later |
+| [<img src="face_swapping/facefusion/output.png" width=128px>](face_swapping/facefusion/) | [facefusion](/face_swapping/facefusion/) | [FaceFusion](https://github.com/facefusion/facefusion) | ONNX Runtime | 1.2.10 and later |
+| [<img src="face_swapping/deepfacelive/sample_results/frame_000001_res.png" width=128px>](face_swapping/deepfacelive/) | [deepfacelive](/face_swapping/deepfacelive/) | [DeepFaceLive](https://github.com/iperov/DeepFaceLive) | ONNX Runtime | 1.2.10 and later |
 
 ## Frame Interpolation
 
@@ -401,6 +413,7 @@ If you would like to try on your computer:
 | [<img src="image_inpainting/inpainting_gmcnn/result_paris-streetview_rect.png" width=128px>](image_inpainting/inpainting_gmcnn/) | [inpainting_gmcnn](/image_inpainting/inpainting_gmcnn/) | [Image Inpainting via Generative Multi-column Convolutional Neural Networks](https://github.com/shepnerd/inpainting_gmcnn) | TensorFlow | 1.2.6 and later |
 | [<img src="image_inpainting/3d-photo-inpainting/example_moon_circle.jpg" width=128px>](image_inpainting/3d-photo-inpainting/) | [3d-photo-inpainting](/image_inpainting/3d-photo-inpainting/) | [3D Photography using Context-aware Layered Depth Inpainting](https://github.com/vt-vl-lab/3d-photo-inpainting) | Pytorch | 1.2.7 and later |
 | [<img src="image_inpainting/deepfillv2/result_paris-streetview_rect.png" width=128px>](image_inpainting/deepfillv2/) | [deepfillv2](/image_inpainting/deepfillv2/) | [Free-Form Image Inpainting with Gated Convolution](https://github.com/open-mmlab/mmediting/tree/master/configs/inpainting/deepfillv2) | Pytorch | 1.2.9 and later |
+| [<img src="image_inpainting/lama/output.png" width=128px>](image_inpainting/lama/) | [lama](/image_inpainting/lama/) | [LaMa: Resolution-robust Large Mask Inpainting with Fourier Convolutions](https://github.com/advimman/lama) | Pytorch | 1.2.13 and later |
 
 ## Image manipulation
 
@@ -457,13 +470,6 @@ If you would like to try on your computer:
 | [<img src="image_segmentation/segment-anything-2/output.png" width=128px>](image_segmentation/segment-anything-2/) | [segment-anything-2](/image_segmentation/segment-anything-2/) | [Segment Anything 2](https://github.com/facebookresearch/segment-anything-2) | Pytorch | 1.2.16 and later |
 | [<img src="image_segmentation/fast_sam/output.png" width=128px>](image_segmentation/fast_sam/) | [fast_sam](/image_segmentation/fast_sam/) | [FastSAM](https://github.com/CASIA-IVA-Lab/FastSAM) | Pytorch | 1.2.14 and later |
 | [<img src="image_segmentation/mobile_sam/example/output1.png" width=128px>](image_segmentation/mobile_sam/) | [mobile_sam](/image_segmentation/mobile_sam/) | [MobileSAM](https://github.com/ChaoningZhang/MobileSAM) | Pytorch | 1.6.0 and later |
-
-## Large Language Model
-
-| Model | Reference | Exported From | Supported Ailia Version | Blog |
-|------------:|:------------:|:------------:|:------------:|:------------:|
-|[llava](/large_language_model/llava) | [LLaVA](https://github.com/haotian-liu/LLaVA) | Pytorch | 1.2.16 and later | |
-
 
 ## Landmark classification
 
@@ -791,8 +797,10 @@ If you would like to try on your computer:
 
 | | Model | Reference | Exported From | Supported Ailia Version | Blog |
 |:-----------|------------:|:------------:|:------------:|:------------:|:------------:|
+| [<img src="vision_language_model/llava/view.jpg" width=128px>](vision_language_model/llava/) | [llava](/vision_language_model/llava) | [LLaVA](https://github.com/haotian-liu/LLaVA) | Pytorch | 1.2.16 and later | |
 | [<img src="vision_language_model/florence2/car.jpg" width=128px>](vision_language_model/florence2/) | [florence2](vision_language_model/florence2) | [Hugging Face - microsoft/Florence-2-base](https://huggingface.co/microsoft/Florence-2-base) | Pytorch | 1.2.16 and later | |
 | [<img src="vision_language_model/qwen2_vl/demo.jpeg" width=128px>](vision_language_model/qwen2_vl/) | [qwen2_vl](vision_language_model/qwen2_vl) | [Qwen2-VL](https://github.com/QwenLM/Qwen2-VL) | Pytorch | 1.5.0 and later | |
+| [<img src="vision_language_model/llava-jp/sample.jpg" width=128px>](vision_language_model/llava-jp/) | [llava-jp](vision_language_model/llava-jp) | [LLaVA-JP](https://github.com/tosiyuki/LLaVA-JP/tree/main) | Pytorch | 1.5.0 and later | |
 
 ## Commercial model
 
