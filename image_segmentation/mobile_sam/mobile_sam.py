@@ -164,8 +164,8 @@ def recognize(image_path,  pos_points, neg_points=None,env_id=0):
                 masks,low_res_logits = compute(sam_net,predictor,image_embedding,input_point,input_label,mask_input,has_mask_input,image)
 
 
-                end = int(round(time.time() * 1000))
-                estimation_time = (end - start)
+            end = int(round(time.time() * 1000))
+            estimation_time = (end - start)
 
             # Logging
             logger.info(f'\tailia processing estimation time {estimation_time} ms')
