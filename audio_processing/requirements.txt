@@ -1,5 +1,4 @@
 -i https://pypi.org/simple
-SoundFile
+soundfile
 librosa
-torch
 pyaudio
